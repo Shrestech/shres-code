@@ -1,11 +1,12 @@
 import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
-import { bundledAcpDemoConfigPath, resolveDemoConfig } from '../src/resolveDemoConfig.ts'
+import { resolveDemoConfig } from '../src/resolveDemoConfig.ts'
 
 const NAME = 'dsh-acp-demo'
+const FIRST_PARTY_LEAF = fileURLToPath(new URL('../../../../examples/acp-agent/cordis.yml', import.meta.url))
 
 const tmp = (): string => mkdtempSync(join(tmpdir(), 'dsh-acp-demo-config-'))
 
@@ -19,32 +20,16 @@ function writeConfig(dir: string, name: string, body: string): string {
   return path
 }
 
-describe('bundledAcpDemoConfigPath', () => {
-  it('resolves the package-local default beside the given module URL', () => {
-    const dir = tmp()
-    const moduleUrl = pathToFileURL(join(dir, 'src', 'resolveDemoConfig.ts')).href
-    expect(bundledAcpDemoConfigPath(moduleUrl)).toBe(join(dir, 'cordis.yml'))
-  })
-
-  it('defaults to this package\'s cordis.yml beside the resolver module', () => {
-    expect(bundledAcpDemoConfigPath()).toBe(resolve(fileURLToPath(new URL('../cordis.yml', import.meta.url))))
-  })
-})
-
 describe('resolveDemoConfig', () => {
-  it('uses the bundled default even when CWD holds a cordis.yml', () => {
+  it('requires an explicit path and does not pick up CWD cordis.yml', () => {
     const cwd = tmp()
     writeConfig(cwd, 'cordis.yml', '- name: \'./hostile.js\'\nconfig: !!js "1"\n')
-    const bundled = join(tmp(), 'bundled-cordis.yml')
-    expect(resolveDemoConfig({
-      bundledDefault: bundled,
-      binName: NAME,
-      cwd,
-      home: tmp(),
-    })).toBe(resolve(bundled))
+    expect(() => resolveDemoConfig({ binName: NAME, cwd, home: tmp() })).toThrow(
+      `${NAME}: config is required — pass an explicit path; there is no working-directory fallback`,
+    )
   })
 
-  it('treats an empty requested path as absent', () => {
+  it('uses a bundled default when one is supplied and requested is empty', () => {
     const bundled = join(tmp(), 'bundled-cordis.yml')
     expect(resolveDemoConfig({
       requested: '',
@@ -55,15 +40,66 @@ describe('resolveDemoConfig', () => {
     })).toBe(resolve(bundled))
   })
 
-  it('throws when neither an explicit path nor a bundled default is given', () => {
-    const cwd = tmp()
-    writeConfig(cwd, 'cordis.yml', '- name: \'@deepseek-ai/dsh-acp-demo\'\n')
-    expect(() => resolveDemoConfig({ binName: NAME, cwd, home: tmp() })).toThrow(
-      `${NAME}: config is required — pass an explicit path; there is no working-directory fallback`,
-    )
+  it('allows the first-party examples/acp-agent/cordis.yml leaf', () => {
+    expect(resolveDemoConfig({
+      requested: FIRST_PARTY_LEAF,
+      binName: NAME,
+      cwd: tmp(),
+      home: tmp(),
+    })).toBe(resolve(FIRST_PARTY_LEAF))
   })
 
-  it('refuses !!js outside $DSH_HOME', () => {
+  it('allows !!js under a harness source checkout discovered from the bin', () => {
+    const checkout = tmp()
+    writeFileSync(join(checkout, 'pnpm-workspace.yaml'), 'packages: []\n')
+    mkdirSync(join(checkout, 'examples'))
+    mkdirSync(join(checkout, 'packages', 'examples', 'acp-demo'), { recursive: true })
+    mkdirSync(join(checkout, 'packages', 'examples', 'jsonrpc-demo'), { recursive: true })
+    writeFileSync(join(checkout, 'packages', 'examples', 'acp-demo', 'package.json'), '{}')
+    writeFileSync(join(checkout, 'packages', 'examples', 'jsonrpc-demo', 'package.json'), '{}')
+    const leaf = writeConfig(join(checkout, 'examples'), 'leaf.yml', '- config: !!js "1"\n')
+    const anchor = join(checkout, 'packages', 'examples', 'acp-demo', 'src', 'resolveDemoConfig.ts')
+    mkdirSync(dirname(anchor), { recursive: true })
+    expect(resolveDemoConfig({
+      requested: leaf,
+      binName: NAME,
+      cwd: tmp(),
+      home: tmp(),
+      installAnchor: anchor,
+    })).toBe(resolve(leaf))
+  })
+
+  it('allows !!js under a packaged runtime tree next to the bin', () => {
+    const root = tmp()
+    const runtime = join(root, 'runtime')
+    mkdirSync(join(runtime, 'node'), { recursive: true })
+    const path = writeConfig(runtime, 'cordis.yml', '- config: !!js "1"\n')
+    const bin = join(runtime, 'node', 'node_modules', '@deepseek-ai', 'dsh-acp-demo', 'lib', 'bin.js')
+    mkdirSync(dirname(bin), { recursive: true })
+    writeFileSync(bin, '')
+    expect(resolveDemoConfig({
+      requested: path,
+      binName: NAME,
+      cwd: tmp(),
+      home: tmp(),
+      installAnchor: bin,
+    })).toBe(resolve(path))
+  })
+
+  it('allows !!js inside an installed demo package directory', () => {
+    const pkg = tmp()
+    writeFileSync(join(pkg, 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh-acp-demo' }))
+    const path = writeConfig(pkg, 'trusted.yml', '- config: !!js "1"\n')
+    expect(resolveDemoConfig({
+      requested: path,
+      binName: NAME,
+      cwd: tmp(),
+      home: tmp(),
+      installAnchor: join(pkg, 'lib', 'bin.js'),
+    })).toBe(resolve(path))
+  })
+
+  it('refuses !!js outside $DSH_HOME and outside every first-party tree', () => {
     const cwd = tmp()
     const path = writeConfig(cwd, 'cordis.yml', '- id: x\n  config: !!js "process.exit(0)"\n')
     expect(() => resolveDemoConfig({
@@ -71,25 +107,39 @@ describe('resolveDemoConfig', () => {
       binName: NAME,
       cwd,
       home: tmp(),
-    })).toThrow(/outside \$DSH_HOME and contains !!js/)
+      installAnchor: cwd,
+    })).toThrow(/contains !!js and is not under \$DSH_HOME or a first-party\/packaged install tree/)
     expect(() => resolveDemoConfig({
       requested: path,
       binName: NAME,
       cwd,
       home: tmp(),
+      installAnchor: cwd,
     })).toThrow(/Place the file under \$DSH_HOME to pre-approve/)
   })
 
-  it('refuses a relative plugin name outside $DSH_HOME', () => {
+  it('refuses a relative plugin name with a space before the colon', () => {
     const cwd = tmp()
-    const path = writeConfig(cwd, 'cordis.yml', '- name: \'./plugin.js\'\n')
+    writeConfig(cwd, 'cordis.yml', '- name : ./plugin.js\n')
     expect(() => resolveDemoConfig({
       requested: 'cordis.yml',
       binName: NAME,
       cwd,
       home: tmp(),
-    })).toThrow(/outside \$DSH_HOME and contains a relative plugin name/)
-    expect(path).toBe(join(cwd, 'cordis.yml'))
+      installAnchor: cwd,
+    })).toThrow(/contains a relative plugin name/)
+  })
+
+  it('refuses a relative plugin name after !!str', () => {
+    const cwd = tmp()
+    writeConfig(cwd, 'cordis.yml', '- name: !!str ./plugin.js\n')
+    expect(() => resolveDemoConfig({
+      requested: 'cordis.yml',
+      binName: NAME,
+      cwd,
+      home: tmp(),
+      installAnchor: cwd,
+    })).toThrow(/contains a relative plugin name/)
   })
 
   it('refuses both constructs in one diagnostic', () => {
@@ -100,6 +150,7 @@ describe('resolveDemoConfig', () => {
       binName: NAME,
       cwd,
       home: tmp(),
+      installAnchor: cwd,
     })).toThrow(/contains !!js and a relative plugin name/)
   })
 
@@ -111,6 +162,7 @@ describe('resolveDemoConfig', () => {
       binName: NAME,
       cwd: tmp(),
       home,
+      installAnchor: tmp(),
     })).toBe(resolve(path))
   })
 
@@ -121,6 +173,7 @@ describe('resolveDemoConfig', () => {
       binName: NAME,
       cwd: tmp(),
       home,
+      installAnchor: tmp(),
     })).toBe(resolve(home))
   })
 
@@ -169,7 +222,8 @@ describe('resolveDemoConfig', () => {
       binName: NAME,
       cwd: tmp(),
       home,
-    })).toThrow(/outside \$DSH_HOME and contains !!js/)
+      installAnchor: tmp(),
+    })).toThrow(/contains !!js/)
 
     const approved = writeConfig(home, 'ok.yml', '- config: !!js "1"\n')
     const aliasHome = tmp()
@@ -180,6 +234,7 @@ describe('resolveDemoConfig', () => {
       binName: NAME,
       cwd: tmp(),
       home,
+      installAnchor: tmp(),
     })).toBe(resolve(alias))
   })
 
@@ -205,6 +260,28 @@ describe('resolveDemoConfig', () => {
       binName: NAME,
       cwd,
       home: join(tmp(), 'missing-home'),
-    })).toThrow(/outside \$DSH_HOME and contains !!js/)
+      installAnchor: cwd,
+    })).toThrow(/contains !!js/)
+  })
+
+  it('walks a directory installAnchor and ignores a non-demo package.json', () => {
+    const dir = tmp()
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'other' }))
+    const path = writeConfig(dir, 'js.yml', '- config: !!js "1"\n')
+    expect(() => resolveDemoConfig({
+      requested: path,
+      binName: NAME,
+      cwd: tmp(),
+      home: tmp(),
+      installAnchor: dir,
+    })).toThrow(/contains !!js/)
+    writeFileSync(join(dir, 'package.json'), '{')
+    expect(() => resolveDemoConfig({
+      requested: path,
+      binName: NAME,
+      cwd: tmp(),
+      home: tmp(),
+      installAnchor: dir,
+    })).toThrow(/contains !!js/)
   })
 })

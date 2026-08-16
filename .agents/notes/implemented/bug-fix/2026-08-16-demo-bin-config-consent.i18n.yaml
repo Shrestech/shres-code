@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-16-demo-bin-config-consent.md
-2026-08-16-demo-bin-config-consent.md: 44b6cba2c71423818efa2ba1407bb418863b5608
-2026-08-16-demo-bin-config-consent.zh.md: 4a0f690a8c154f8706995632c695c7976fe3d0e5
+2026-08-16-demo-bin-config-consent.md: f53b308f7f118b896c0d153915b42099b70c29c8
+2026-08-16-demo-bin-config-consent.zh.md: fc3a52ceaaf8e20fe812d7fc4964210bce0f4138

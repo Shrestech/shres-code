@@ -12,9 +12,11 @@ Status: implemented
 
 ## 决策
 
-未指定 `--config` 时，`dsh-acp-demo` 使用本包捆绑的组合路径（由 resolver 模块 URL 推导），绝不会使用相对 CWD 的 `cordis.yml`。`dsh-jsonrpc-agent` 仍然要求 `$DSH_CORDIS_CONFIG` 或位置参数 `argv[2]`，仍然没有内置回退。
+两个 bin 都要求显式配置路径，绝不会默认加载 CWD 下的 `cordis.yml`。`dsh-acp-demo` 接受 `--config`／`-c`。`dsh-jsonrpc-agent` 接受 `$DSH_CORDIS_CONFIG` 或位置参数 `argv[2]`。缺少路径时打印用法并退出；点名的路径不存在则按找不到失败。
 
-显式路径（`--config`、`$DSH_CORDIS_CONFIG` 或 argv）会按原始 YAML 文本扫描 `!!js`，以及以 `./` 或 `../` 开头的 `name:` 值。缺失的显式文件按找不到失败。位于 `$DSH_HOME` 之外且包含任一构造的文件会失败，诊断会说明将文件放到 `$DSH_HOME` 下即可预批准这些构造。位于 `$DSH_HOME` 下的文件（home 本身或其子孙，经过 `realpath`）可以包含这些构造。两种构造都没有的文件可以放在任何位置。
+显式路径会按原始 YAML 文本扫描 `!!js`，以及以 `./` 或 `../` 开头的 `name:` 值（冒号前允许空格，路径前允许 `!!tag`，例如 `!!str`）。包含任一构造的文件，在其规范路径为 `$DSH_HOME` 或其子孙，或位于从 bin 向上发现的第一方树内时允许：本 harness 源码检出（`pnpm-workspace.yaml` 加上两个 demo 包）、附带 `runtime/cordis.yml` 或与 `node/` 同级的 `cordis.yml` 的已打包运行时、或已安装的 demo 包目录。其他位置会失败，诊断会说明将文件放到 `$DSH_HOME` 下即可预批准这些构造。两种构造都没有的文件可以放在任何位置。
+
+该扫描是尽力而为的原始文本过滤，不解析 include，也不覆盖每一种 YAML 编码。硬保证是：这些 bin 绝不会在没有显式路径的情况下加载 CWD 下的 `cordis.yml`。
 
 两个 bin 都通过 `loadLayeredEnv` 加载环境文件；该函数在应用项目或 home 的 `.env` 之前拒绝 bootstrap-only 名称。`dsh-acp-demo` 在 `DSH_SNAPSHOT=replay` 时仍会跳过这次加载，并在选定已同意路径之后运行 `resolveConfigPath`，以便回放把 `cordis.yml` 换成同级 `cordis.snapshot.yml`。
 
@@ -24,16 +26,20 @@ resolver 分别放在两个 demo 包中（`resolveDemoConfig.ts`）。这两个�
 
 **保留 CWD 默认值并打印警告。** 警告无法阻止进程对恶意 `cordis.yml` 中的 `!!js` 求值。默认值本身就是漏洞。
 
-**把每一次显式 `--config` 都当成完整同意，包括 `$DSH_HOME` 之外的 `!!js`。** 点名文件是同意将其作为配置加载。`!!js` 和相对 `name:` 会执行代码，需要单独预批准：文件必须位于 `$DSH_HOME` 下。
+**把每一次显式 `--config` 都当成完整同意，包括不受信任检出中的 `!!js`。** 点名文件是同意将其作为配置加载。`!!js` 和相对 `name:` 会执行代码。第一方叶子和已打包的 `runtime/cordis.yml` 按位置批准；随机检出不批准。
 
-**即使在 `$DSH_HOME` 下也禁止 `!!js` 和相对插件名。** 这会去掉为使用这些构造的受信任组合提供的已记录预批准方式。放在 home 下就是批准。
+**拒绝 `$DSH_HOME` 之外的每一个 `!!js` 文件。** 这会破坏 `pnpm demo:acp`、快照套件，以及 Python SDK 附带的 `runtime/cordis.yml`。那些文件是第一方或随发行版交付的，不是恶意 CWD 默认值。
 
-**把该辅助函数放进 `dsh-app-boot`。** 产品 CLI 已有自己的启动路径。为一个仅用于 demo 的同意规则扩大 app-boot 的职责，不如让两个 bin 各自拥有约 80 行的辅助函数。
+**把一份包内 ACP `cordis.yml` 作为无标志默认值交付。** 安全属性是「绝不使用 CWD 默认值」，不是「总要启动点什么」。要求 `--config` 与 JSON-RPC bin 一致，也不会再发明第二套组合。
+
+**把 `$DSH_HOME` 指到 `examples/`，好让第一方叶子通过 home 检查。** 这会把 skill（技能）、settings 和 home `.env` 一并搬走。按 bin 安装树做位置允许列表，才能让 home 继续作为用户数据根。
+
+**把该辅助函数放进 `dsh-app-boot`。** 产品 CLI 已有自己的启动路径。为一个仅用于 demo 的同意规则扩大 app-boot 的职责，不如让两个 bin 各自拥有该辅助函数。
 
 ## 后果
 
-在不受信任的检出中 `cd` 后不带标志运行 `dsh-acp-demo`，不再挂载该检出的 `cordis.yml`。想使用 `!!js` 或相对插件 `name:` 的操作者需先把文件复制或写到 `$DSH_HOME` 下。仍通过 `--config` 指向 `$DSH_HOME` 之外且含 `!!js` 的文件的第一方示例配置，会在同样检查下失败，直到它们也这样做。恶意 `.env` 不能再通过这些 bin 重定向 `DEEPSEEK_BASE_URL` 或改写 `HOME`。
+在不受信任的检出中 `cd` 后不带标志运行 `dsh-acp-demo`，不再挂载该检出的 `cordis.yml`；bin 要求 `--config`。同一检出里带 `!!js` 或相对插件 `name:` 的显式 `./cordis.yml` 仍会被拒绝，除非把文件复制到 `$DSH_HOME` 下。`demo:acp`、`examples/` 下的快照叶子，以及已打包 Python 运行时的 `runtime/cordis.yml` 会继续工作，因为它们位于第一方或已打包树中。恶意 `.env` 不能再通过这些 bin 重定向 `DEEPSEEK_BASE_URL` 或改写 `HOME`。
 
 ## 测试
 
-每个 demo 包的 `resolve-demo-config.spec.ts` 固定了无标志默认值、必需路径、`$DSH_HOME` 之外的 `!!js` 与相对 `name:`、`$DSH_HOME` 下的批准、home 外且两种构造都没有的文件、缺失的显式文件，以及符号链接规范化。
+每个 demo 包的 `resolve-demo-config.spec.ts` 固定了针对 CWD `cordis.yml` 的必需路径、第一方 `examples/*/cordis.yml` 叶子、harness 检出 fixture（测试前置数据）、已打包运行时 fixture、在所有批准位置之外的 `!!js` 与相对 `name:`（包括 `name :` 和 `!!str`）、`$DSH_HOME` 下的批准、home 外且两种构造都没有的文件、缺失的显式文件，以及符号链接规范化。

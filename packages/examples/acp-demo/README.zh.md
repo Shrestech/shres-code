@@ -42,7 +42,7 @@ ACP（Agent Client Protocol）自动化服务器应用：默认 agent（智能�
 
 ## Bin
 
-`dsh-acp-demo [--config path-to-cordis.yml]`（短形式 `-c`）会加载分层 `.env`（先调用目录，再 `$DSH_HOME`），回放模式除外，并拒绝任一文件中的 bootstrap-only 名称。未指定 `--config` 时，bin 使用本包捆绑的组合路径，绝不会使用 CWD 下的 `cordis.yml`。显式 `--config` 若位于 `$DSH_HOME` 之外且包含 `!!js` 或相对插件 `name:`，则会失败；将文件放到 `$DSH_HOME` 下即可预批准这些构造。`DSH_SNAPSHOT=replay` 选择同级 `cordis.snapshot.yml`；stdin EOF 会在退出前 dispose（资源释放）上下文并刷新会话。Loader 已安装的可选对等依赖（peer dependency）`node-addon-require-builtin` 使纯 Node 下构建后的 bin 可以解析裸插件说明符。诊断使用 stderr，因为 stdout 是 ACP wire。
+`dsh-acp-demo --config path-to-cordis.yml`（短形式 `-c`）会加载分层 `.env`（先调用目录，再 `$DSH_HOME`），回放模式除外，并拒绝任一文件中的 bootstrap-only 名称。配置路径是必需的；没有 CWD 回退或内置回退。显式 `--config` 若包含 `!!js` 或相对插件 `name:`，仅当文件位于 `$DSH_HOME` 下、本 harness 检出内、或紧邻 bin 的已打包运行时／安装树内时才允许；否则会失败，诊断会说明将文件放到 `$DSH_HOME` 下即可预批准。`DSH_SNAPSHOT=replay` 选择同级 `cordis.snapshot.yml`；stdin EOF 会在退出前 dispose（资源释放）上下文并刷新会话。Loader 已安装的可选对等依赖（peer dependency）`node-addon-require-builtin` 使纯 Node 下构建后的 bin 可以解析裸插件说明符。诊断使用 stderr，因为 stdout 是 ACP wire。
 
 ## 模型体验
 
