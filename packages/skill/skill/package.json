@@ -35,6 +35,7 @@
     "@roos-code/roos-code-invariants": "workspace:^",
     "@roos-code/roos-code-llm": "workspace:^",
     "@roos-code/roos-code-scope": "workspace:^",
+    "@roos-code/roos-code-untrusted-frame": "workspace:^",
     "@roos-code/cordis": "workspace:^"
   },
   "dependencies": {
@@ -44,6 +45,7 @@
     "@roos-code/roos-code-invariants": "workspace:^",
     "@roos-code/roos-code-llm": "workspace:^",
     "@roos-code/roos-code-scope": "workspace:^",
+    "@roos-code/roos-code-untrusted-frame": "workspace:^",
     "@roos-code/cordis": "workspace:^"
   }
 }

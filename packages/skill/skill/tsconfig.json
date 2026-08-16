@@ -23,6 +23,9 @@
     },
     {
       "path": "../../runtime-diagnostics/invariants"
+    },
+    {
+      "path": "../../util/untrusted-frame"
     }
   ]
 }

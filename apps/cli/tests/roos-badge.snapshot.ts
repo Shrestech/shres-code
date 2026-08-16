@@ -154,6 +154,7 @@ describe('roos badge assembled snapshot', () => {
               "kind": "directory",
               "path": "{{badgeAssetsPath}}",
             },
+            "source": "bundled",
           },
         },
         "summary": {

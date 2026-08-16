@@ -6821,6 +6821,9 @@ importers:
       '@roos-code/roos-code-scope':
         specifier: workspace:^
         version: link:../../core/scope
+      '@roos-code/roos-code-untrusted-frame':
+        specifier: workspace:^
+        version: link:../../util/untrusted-frame
 
   packages/skill/skill-badge:
     devDependencies:
@@ -6895,6 +6898,9 @@ importers:
       '@roos-code/roos-code-tools':
         specifier: workspace:^
         version: link:../../core/tools
+      '@roos-code/roos-code-untrusted-frame':
+        specifier: workspace:^
+        version: link:../../util/untrusted-frame
 
   packages/spill/spill:
     devDependencies:

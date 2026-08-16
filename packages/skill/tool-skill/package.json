@@ -51,6 +51,7 @@
     "@roos-code/roos-code-skill": "workspace:^",
     "@roos-code/roos-code-skill-filesystem": "workspace:^",
     "@roos-code/roos-code-tools": "workspace:^",
+    "@roos-code/roos-code-untrusted-frame": "workspace:^",
     "@roos-code/cordis": "workspace:^"
   }
 }

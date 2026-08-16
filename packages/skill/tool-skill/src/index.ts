@@ -91,6 +91,7 @@ export function apply(ctx: Context, config: Config = {}): void {
         properties: {
           name: { type: 'string', required: true },
           provider: { type: 'string', required: true },
+          source: { type: 'string', required: true },
           resourceBase: {
             oneOf: [
               {
@@ -148,6 +149,7 @@ export function apply(ctx: Context, config: Config = {}): void {
       return {
         name: skill.name,
         provider: skill.provider,
+        source: skill.source,
         ...skill.resourceBase !== undefined ? {
           resourceBase: { ...skill.resourceBase },
         } : {},

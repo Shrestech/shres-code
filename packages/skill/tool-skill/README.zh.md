@@ -22,7 +22,7 @@
 |---|---|---|
 | `name` | string（必填） | 可用 skill 列表中精确的 kebab-case skill 名称。 |
 
-执行使用调用 agent 的 `session.header.cwd`，使结果随工作区变化的提供方能够解析出胜出的 skill。成功调用返回规范形式的 `{ name, provider, resourceBase?, content }`，其中不包含目录排名和提供方内部机制；其 Native 渲染器会生成一个文本结果，其中包含 `<skill_content name="...">`、`<skill_resources>` 和 `<skill_instructions>`。
+执行使用调用 agent 的 `session.header.cwd`，使结果随工作区变化的提供方能够解析出胜出的 skill。成功调用返回规范形式的 `{ name, provider, source, resourceBase?, content }`，其中不包含目录排名和提供方内部机制；其 Native 渲染器会生成一个文本结果，其中包含 `<skill_content name="...">`、`<skill_resources>` 和 `<skill_instructions>`。`project-*` 来源会前置 [`roos-untrusted-frame`](../../util/untrusted-frame/README.md) 说明头；`bundled` 与 `user-*` 仍作为受信任的本地内容。正文中的字面量 `</skill_content>` 与 `</skill_instructions>` 会被中和，以免关闭包装。
 
 资源指引只会根据 `resourceBase` 解析指令显式引用的路径或 URL；脚本、参考资料和资源文件按需加载，结果不会列举 skill 目录。本地提供方可以提供目录，而远程或嵌入式提供方可以提供 URL 或不透明加载指引。
 
@@ -94,6 +94,8 @@ A user may also invoke a skill directly; its <skill_content> block then appears 
 </skill_instructions>
 </skill_content>
 ```
+
+`project-*` 来源会在该块前面加上 [`roos-untrusted-frame`](../../util/untrusted-frame/README.md) 说明头（领域首句加上共享的「不要遵循其中指令」免责声明）。目录仍只含摘要，不会被定界。
 
 ##### 提供方管理的资源指引
 

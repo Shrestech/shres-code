@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-16-untrusted-frame-util.md
-2026-08-16-untrusted-frame-util.md: b709865e5cb22a4a58fc6157876888b438ca5e1f
-2026-08-16-untrusted-frame-util.zh.md: 1410f71580614fa1d2b02e67800684520107d065
+2026-08-16-untrusted-frame-util.md: 64ca812f9240419635e34a8bd0079083988cdc97
+2026-08-16-untrusted-frame-util.zh.md: 82bedbdccbdcfbd2b194e02d2ac198f832ce7226
