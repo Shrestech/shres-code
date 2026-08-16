@@ -535,17 +535,23 @@ Source: [`packages/compaction/compaction-tool-result-pruner/src/types.ts:4`](../
 
 ## `@roos-code/roos-code-cordis-host-runner`
 
-Requires: `tools`
+Requires: `tools` · `approval`
 
 ```ts config-catalog
 /** Runner configuration. */
 export interface Config {
   /** Maximum synchronous VM evaluation time in milliseconds. */
   vmTimeoutMs?: number
+  /**
+   * Plugin ids that skip the Host-half activation ask. Empty by default.
+   * Each entry must be a minted Plugin id (`<prefix>-<n>`). Unattended
+   * compositions list the exact ids they will define.
+   */
+  hostActivationAllowlist?: string[]
 }
 ```
 
-Source: [`packages/extensions/cordis-host-runner/src/index.ts:88`](../packages/extensions/cordis-host-runner/src/index.ts)
+Source: [`packages/extensions/cordis-host-runner/src/index.ts:94`](../packages/extensions/cordis-host-runner/src/index.ts)
 
 <a id="roos-coderoos-code-credentials-local"></a>
 

@@ -61,7 +61,8 @@
     "@roos-code/roos-code-scope": "workspace:^",
     "@roos-code/roos-code-session": "workspace:^",
     "@roos-code/roos-code-tools": "workspace:^",
-    "@roos-code/roos-code-typert-protocol": "workspace:^"
+    "@roos-code/roos-code-typert-protocol": "workspace:^",
+    "@roos-code/roos-code-user-approval": "workspace:^"
   },
   "devDependencies": {
     "@roos-code/cordis": "workspace:^",
@@ -73,6 +74,7 @@
     "@roos-code/roos-code-scope": "workspace:^",
     "@roos-code/roos-code-session": "workspace:^",
     "@roos-code/roos-code-tools": "workspace:^",
-    "@roos-code/roos-code-typert-protocol": "workspace:^"
+    "@roos-code/roos-code-typert-protocol": "workspace:^",
+    "@roos-code/roos-code-user-approval": "workspace:^"
   }
 }

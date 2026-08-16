@@ -294,6 +294,7 @@ export type DynamicCordisRunResponse =
       | 'client-half-failed'
       | 'rejected'
       | 'cancelled'
+      | 'unavailable'
       | 'not-running'
     message: string
     /** Original failure stack when available. */
@@ -316,7 +317,11 @@ export type DynamicCordisHostHalfResult =
     /** False when a panel merely attaches this page to an already active run. */
     startedHere: boolean
   }
-  | ({ ok: false } & CordisErrorDetails)
+  | ({
+    ok: false
+    /** Closed Host-activation denial when the ask did not grant. */
+    reason?: 'rejected' | 'cancelled' | 'unavailable'
+  } & CordisErrorDetails)
 
 /** Client-half source for one exact activation. */
 export interface DynamicCordisClientSource {

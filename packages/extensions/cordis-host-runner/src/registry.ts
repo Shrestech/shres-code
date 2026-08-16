@@ -59,6 +59,8 @@ export interface DynamicCordisPlugin {
   approvedClientPackages: Set<CordisDynamicPackageId>
   /** Whether one user decision authorized future Package versions of this Plugin. */
   clientVersionUpdatesApproved: boolean
+  /** Whether this Session already granted Host-half activation for this Plugin. */
+  hostActivationApproved: boolean
   /** Last successfully activated version. */
   currentPackageId?: CordisDynamicPackageId
   /** Failed or in-progress target version. */

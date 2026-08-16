@@ -138,7 +138,7 @@ pnpm run build
 pnpm roos --profile headless "summarize this workspace"
 ```
 
-自指的 cordis 演示可以检查并修改其实时插件运行时，并需要相同的凭证（默认 `web`，也可用 `acp`）：
+自指的 cordis 演示可以检查并修改其实时插件运行时，并需要相同的凭证（默认 `web`，也可用 `acp`）。激活 Host 半会在任何 Host 代码运行之前，对该 Session 中的每个 Plugin 向已组成的审批应答者询问一次：
 
 ```sh
 pnpm run demo:cordis

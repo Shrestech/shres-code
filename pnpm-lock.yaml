@@ -4016,6 +4016,9 @@ importers:
       '@roos-code/roos-code-typert-protocol':
         specifier: workspace:^
         version: link:../../typert/protocol
+      '@roos-code/roos-code-user-approval':
+        specifier: workspace:^
+        version: link:../../interaction/user-approval
 
   packages/extensions/tool-cordis:
     devDependencies:
@@ -4025,6 +4028,9 @@ importers:
       '@roos-code/cordis-plugin-loader':
         specifier: workspace:^
         version: link:../../../vendor/loader
+      '@roos-code/cordis-plugin-timer':
+        specifier: workspace:^
+        version: link:../../../vendor/timer
       '@roos-code/roos-code-agent':
         specifier: workspace:^
         version: link:../../core/agent
@@ -4049,6 +4055,9 @@ importers:
       '@roos-code/roos-code-tools':
         specifier: workspace:^
         version: link:../../core/tools
+      '@roos-code/roos-code-user-approval':
+        specifier: workspace:^
+        version: link:../../interaction/user-approval
 
   packages/extensions/ui-cordis:
     devDependencies:

@@ -52,6 +52,8 @@
     "@roos-code/roos-code-session": "workspace:^",
     "@roos-code/roos-code-system-prompt": "workspace:^",
     "@roos-code/roos-code-tools": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@roos-code/roos-code-user-approval": "workspace:^",
+    "@roos-code/cordis": "workspace:^",
+    "@roos-code/cordis-plugin-timer": "workspace:^"
   }
 }

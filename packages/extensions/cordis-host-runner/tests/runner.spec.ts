@@ -147,7 +147,7 @@ describe('dynamic runner definitions', () => {
 })
 
 describe('dynamic runner dispatch', () => {
-  it('starts a host-only package immediately, with no request and no approval', async () => {
+  it('starts a host-only package immediately after the one-shot Host-activation grant, with no Client request', async () => {
     const { ctx, runner, gateway } = await setup()
     const { pluginId, packageId } = define(runner, {
       sessionId: AGENT_A.id, name: 'doubler', purpose: 'p', host: HOST_CODE,

@@ -45,6 +45,7 @@ import * as ToolPwsh from '@roos-code/roos-code-tool-pwsh'
 import * as ToolBashPersistent from '@roos-code/roos-code-tool-bash-persistent'
 import CordisHostRunner from '@roos-code/roos-code-cordis-host-runner'
 import * as ToolCordis from '@roos-code/roos-code-tool-cordis'
+import ApprovalService from '@roos-code/roos-code-user-approval'
 import * as ToolFs from '@roos-code/roos-code-tool-fs'
 import * as ToolFsSearch from '@roos-code/roos-code-tool-fs-search'
 import * as ToolStrReplaceEditor from '@roos-code/roos-code-tool-str-replace-editor'
@@ -258,9 +259,10 @@ const TOOL_PACKAGES: ToolPackage[] = [
     pkg: '@roos-code/roos-code-tool-cordis',
     dir: 'tool-cordis',
     source: 'packages/extensions/tool-cordis/src/index.ts',
-    requires: ['ctx.tools', 'ctx.dynamicCordisRunner'],
+    requires: ['ctx.tools', 'ctx.dynamicCordisRunner', 'ctx.approval'],
     writes: ['tool/call', 'tool/result', 'process-local dynamic package lifecycle'],
     async mount(ctx) {
+      await ctx.plugin(ApprovalService)
       await ctx.plugin(CordisHostRunner)
       await ctx.plugin(ToolCordis)
     },

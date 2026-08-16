@@ -49,7 +49,7 @@ describe('dynamic Plugin versions', () => {
     })
     const controller = new AbortController()
     const pending = runner.run(AGENT_A, defined.pluginId, defined.packageId, 'run', controller.signal)
-    await Promise.resolve()
+    await expect(pending).resolves.toMatchObject({ ok: true, status: 'awaiting-approval' })
     const request = gateway.events.find(([event]) => event === 'cordis/request-run')?.[1]
     expect(request).toBeDefined()
     const approval = request as {
@@ -66,7 +66,6 @@ describe('dynamic Plugin versions', () => {
 
     controller.abort()
 
-    await expect(pending).resolves.toMatchObject({ ok: true, status: 'awaiting-approval' })
     expect(runner.inventory()[0]?.activeRun).toBeDefined()
     await runner.stop(AGENT_A, defined.pluginId)
     expect(runner.inventory()[0]?.activeRun).toBeUndefined()

@@ -138,7 +138,7 @@ The one-shot Headless coding agent needs `DEEPSEEK_API_KEY` in the environment o
 pnpm roos --profile headless "summarize this workspace"
 ```
 
-The self-referential cordis demo can inspect and modify its live plugin runtime and needs the same credentials (`web` by default, or `acp`):
+The self-referential cordis demo can inspect and modify its live plugin runtime and needs the same credentials (`web` by default, or `acp`). Activating a Host half asks the composed approval answerer once per Plugin in the Session before any Host code runs:
 
 ```sh
 pnpm run demo:cordis

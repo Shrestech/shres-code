@@ -25,6 +25,8 @@ import LocalJobRegistry from '@roos-code/roos-code-jobs-local'
 import * as ToolTasks from '@roos-code/roos-code-tool-jobs'
 import CordisHostRunner from '@roos-code/roos-code-cordis-host-runner'
 import * as ToolCordis from '@roos-code/roos-code-tool-cordis'
+import ApprovalService from '@roos-code/roos-code-user-approval'
+import type { ApprovalOutcome } from '@roos-code/roos-code-user-approval'
 
 /**
  * With-key Code Mode proof: a real model receives only `run_code`, composes two
@@ -263,11 +265,19 @@ describe('Code Mode typed values: keyless real-worker contracts', () => {
 
   it('uses versioned Cordis DTO ids directly for running and pending Plugins, then confirms removal', async () => {
     ctx = await typedCodeModeHarness()
+    await ctx.plugin(ApprovalService)
+    ctx.on('approval/request', () => Promise.resolve<ApprovalOutcome>('allowed-once'))
     await ctx.plugin(CordisHostRunner)
     await ctx.plugin(ToolCordis)
+    const events: SessionEvent[] = [{ type: 'turn/start', data: { turn: 1 } } as SessionEvent]
     const agent = {
       id: SessionId('code-mode-cordis'),
-      session: { append: vi.fn() },
+      session: {
+        events,
+        append(type: string, data: Record<string, unknown>) {
+          events.push({ type, data } as SessionEvent)
+        },
+      },
     } as unknown as Agent
 
     const value = completion(await runCode(ctx, `

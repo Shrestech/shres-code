@@ -73,7 +73,7 @@ Namespace 插件：命名导出 `name`／`inject`／`apply`，无默认导出（
 
 #### 模型看到的内容
 
-检查会精确地用 `## <section>` 加换行及取决于数据的正文来拼接选中区段，各区段之间留一个空行；`what: "temporary"` 使用 `## Dynamic Packages` 标题。每一行都会报告标识、标签、用途、存在哪些半、运行状态与版本号、提供和等待的服务、已注册的 host 方法，以及最后一次浏览器半装载上报；空状态说明定义只存在于本进程内存中。宽泛的 API／事件报告省略 JSDoc；`name` 配合 `what: "api"`、`what: "events"` 或 `what: "client"` 返回一个精确目标及其完整约定。`client` 区段每个座位一行，给出其基数、作用域、摘要，以及注册进去是否会替换出厂 UI，随后是跨座位通用的 registrant 纪律；每个座位的 register 选项、owner 与框架 props、可直接运行的示例，只在精确 `name` 时才吐出。define 回答该包已定义、尚未运行，并给出用于运行的标识；run 报告版本号、host 半提供或等待什么，以及是否有页面确认了浏览器半；stop 与 undefine 各以一行确认。每一次拒绝都是携带 runner 教学文案的工具错误。提交的程序保留在 assistant 工具调用历史中。
+检查会精确地用 `## <section>` 加换行及取决于数据的正文来拼接选中区段，各区段之间留一个空行；`what: "temporary"` 使用 `## Dynamic Packages` 标题。每一行都会报告标识、标签、用途、存在哪些半、运行状态与版本号、提供和等待的服务、已注册的 host 方法，以及最后一次浏览器半装载上报；空状态说明定义只存在于本进程内存中。宽泛的 API／事件报告省略 JSDoc；`name` 配合 `what: "api"`、`what: "events"` 或 `what: "client"` 返回一个精确目标及其完整约定。`client` 区段每个座位一行，给出其基数、作用域、摘要，以及注册进去是否会替换出厂 UI，随后是跨座位通用的 registrant 纪律；每个座位的 register 选项、owner 与框架 props、可直接运行的示例，只在精确 `name` 时才吐出。define 回答该包已定义、尚未运行，并给出用于运行的标识；run 报告版本号、host 半提供或等待什么，以及是否有页面确认了浏览器半；Host 半审批拒绝是一条结构化的非错误结果（`rejected`／`cancelled`／`unavailable`），并告诉模型不要重试；stop 与 undefine 各以一行确认。其他拒绝是携带 runner 教学文案的工具错误。提交的程序保留在 assistant 工具调用历史中。
 
 #### Token 影响
 

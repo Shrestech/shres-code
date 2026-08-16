@@ -242,9 +242,11 @@ export function apply(ctx: Context): void {
     description:
       'Activate one exact Package of a dynamic Plugin. Use mode:"run" for the first activation, restarting '
       + 'currentPackageId, or rollback. When current exists, use mode:"update" to switch to a different Package, '
-      + 'even if the Plugin is currently stopped. An unauthorized Client Package creates an approval request and '
+      + 'even if the Plugin is currently stopped. A Host half asks the session approval channel once per Plugin in '
+      + 'this Session before any Host code runs; rejected, cancelled, or unavailable is a final structured result — '
+      + 'do not retry that same activation. An unauthorized Client Package creates an approval request and '
       + 'returns awaiting-approval; an authorized Package returns starting and continues asynchronously in the '
-      + 'browser. Neither result waits for the final outcome inside the Tool. currentPackageId changes only after '
+      + 'browser. Neither Client result waits for the final outcome inside the Tool. currentPackageId changes only after '
       + 'complete success; on failure, the old current and target next remain. Asynchronous success, rejection, or '
       + 'technical failure is reported through state and steering. After a technical failure, read diagnostics with '
       + 'cordis_inspect_self, correct the same Plugin, and retry autonomously. Do not request approval again after '
@@ -265,6 +267,12 @@ export function apply(ctx: Context): void {
         const result = requireJsonObject(value)
         const pluginId = requireJsonString(result, 'pluginId')
         const packageId = requireJsonString(result, 'packageId')
+        if (isHostActivationDenial(result.status)) {
+          const message = typeof result.message === 'string'
+            ? result.message
+            : `Host activation of ${pluginId}/${packageId} was ${result.status}.`
+          return [{ type: 'text', text: message }]
+        }
         const pluginRunId = requireJsonString(result, 'pluginRunId')
         return [{
           type: 'text',
@@ -280,7 +288,7 @@ export function apply(ctx: Context): void {
         return {
           pluginId: requireJsonString(result, 'pluginId'),
           packageId: requireJsonString(result, 'packageId'),
-          pluginRunId: requireJsonString(result, 'pluginRunId'),
+          ...typeof result.pluginRunId === 'string' ? { pluginRunId: result.pluginRunId } : {},
         }
       },
     },
@@ -288,8 +296,20 @@ export function apply(ctx: Context): void {
       const agent = requireAgent(exec)
       const pluginId = CordisDynamicPluginId(args.pluginId)
       const packageId = CordisDynamicPackageId(args.packageId)
-      const receipt = await ctx.dynamicCordisRunner.run(agent, pluginId, packageId, args.mode, exec.signal)
-      if (!receipt.ok) throw new Error(receipt.message)
+      const receipt = await ctx.dynamicCordisRunner.run(
+        agent, pluginId, packageId, args.mode, exec.signal, exec.callId,
+      )
+      if (!receipt.ok) {
+        if (isHostActivationDenial(receipt.reason)) {
+          return {
+            status: receipt.reason,
+            pluginId: args.pluginId,
+            packageId: args.packageId,
+            message: receipt.message,
+          }
+        }
+        throw new Error(receipt.message)
+      }
       if (receipt.status !== 'running') {
         return {
           status: receipt.status,
@@ -396,6 +416,10 @@ export function apply(ctx: Context): void {
     })
     return { kind: 'enter', messages: [...decision.messages, ...contexts] }
   })
+}
+
+function isHostActivationDenial(value: unknown): value is 'rejected' | 'cancelled' | 'unavailable' {
+  return value === 'rejected' || value === 'cancelled' || value === 'unavailable'
 }
 
 function requireJsonObject(value: JsonValue): Record<string, JsonValue> {

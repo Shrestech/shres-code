@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { Context, FiberState } from '@roos-code/cordis'
+import Timer from '@roos-code/cordis-plugin-timer'
+import SystemPrompt from '@roos-code/roos-code-system-prompt'
+import ToolRegistry from '@roos-code/roos-code-tools'
+import ApprovalService from '@roos-code/roos-code-user-approval'
 import type { CordisDynamicPackageId, CordisDynamicPluginId } from '../src/types.ts'
+import DynamicCordisRunnerService from '../src/index.ts'
 import { missingServices } from '../src/lifecycle.ts'
 import {
   AGENT_A, call, CONSUMER_CODE, CONTENT_OUTPUT_CODE, dummyTool, LISTENER_CODE, mount,
@@ -25,6 +31,29 @@ function latestPackage(harness: Awaited<ReturnType<typeof setup>>, pluginId: Cor
   if (packageId === undefined) throw new Error(`missing package for ${pluginId}`)
   return packageId
 }
+
+describe('approval composition', () => {
+  it('stays pending until ctx.approval is composed, then Host-half provide/inject still works', async () => {
+    const ctx = new Context()
+    await ctx.plugin(Timer)
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRegistry)
+    const fiber = ctx.plugin(DynamicCordisRunnerService)
+    await Promise.resolve()
+    expect(fiber.state).toBe(FiberState.PENDING)
+
+    await ctx.plugin(ApprovalService)
+    await fiber
+    expect(fiber.state).toBe(FiberState.ACTIVE)
+    expect(ctx.dynamicCordisRunner).toBeDefined()
+  })
+
+  it('does not start a providing Host half when the Session grant is denied', async () => {
+    const harness = await setup(undefined, 'rejected')
+    await expect(mount(harness, PROVIDER_CODE)).rejects.toThrow('rejected host activation')
+    expect(harness.ctx.get('greeter')).toBeUndefined()
+  })
+})
 
 describe('cross-package provide/inject', () => {
   it('provider first: the consumer activates immediately and its tool reaches the provided service', async () => {
