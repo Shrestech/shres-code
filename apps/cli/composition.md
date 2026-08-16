@@ -158,6 +158,8 @@ flowchart LR
   cfg --> plugin_roos_base_repeat_tool_reminder
   plugin_roos_base_web["web<br/>@roos-code/roos-code-web"]
   cfg --> plugin_roos_base_web
+  plugin_roos_base_web_search_attached_cli["web-search-attached-cli<br/>@roos-code/roos-code-web-search-attached-cli"]
+  cfg --> plugin_roos_base_web_search_attached_cli
   plugin_roos_base_web_search_deepseek["web-search-deepseek<br/>@roos-code/roos-code-web-search-deepseek"]
   cfg --> plugin_roos_base_web_search_deepseek
   plugin_roos_base_tool_web["tool-web<br/>@roos-code/roos-code-tool-web"]
@@ -251,6 +253,7 @@ flowchart LR
 | `tool-str-replace-editor` | `@roos-code/roos-code-tool-str-replace-editor` |
 | `repeat-tool-reminder` | `@roos-code/roos-code-repeat-tool-reminder` |
 | `web` | `@roos-code/roos-code-web` |
+| `web-search-attached-cli` | `@roos-code/roos-code-web-search-attached-cli` |
 | `web-search-deepseek` | `@roos-code/roos-code-web-search-deepseek` |
 | `tool-web` | `@roos-code/roos-code-tool-web` |
 | `tools` | `@roos-code/roos-code-tools` |

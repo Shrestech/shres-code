@@ -40,8 +40,10 @@ declare module '@roos-code/cordis' {
 
 /** Selection inputs for execution-time provider resolution. */
 interface Selection<P> {
-  /** The configured provider id for this capability, if any. */
+  /** Exclusive pin; when set, fallback ids are ignored. */
   readonly configuredId?: string
+  /** Ordered first-usable-wins ids. Ignored when {@link configuredId} is set. */
+  readonly fallbackIds?: readonly string[]
   /** Providers registered for this capability kind. */
   readonly providers: ReadonlyMap<string, P>
 }
@@ -49,27 +51,36 @@ interface Selection<P> {
 /**
  * Config for the web seam. `searchProvider` / `fetchProvider` pin which provider
  * wins for each capability; both are optional (a single registered usable
- * provider auto-selects). Operational overrides such as environment variables
- * must feed these same fields rather than introduce a hidden priority chain.
+ * provider auto-selects). `searchProviders` / `fetchProviders` are ordered
+ * fallbacks used only when the singular pin is omitted. Operational overrides
+ * such as environment variables must feed these same fields rather than
+ * introduce a hidden priority chain.
  */
 export interface WebRuntimeConfig {
-  /** Explicit search provider id. Omitted = auto-select when exactly one usable. */
+  /** Exclusive search provider id. Wins over {@link searchProviders}. */
   readonly searchProvider?: string
-  /** Explicit fetch provider id. Omitted = auto-select when exactly one usable. */
+  /** Ordered search ids; the first registered and `available()` provider runs. */
+  readonly searchProviders?: string[]
+  /** Exclusive fetch provider id. Wins over {@link fetchProviders}. */
   readonly fetchProvider?: string
+  /** Ordered fetch ids; the first registered and `available()` provider runs. */
+  readonly fetchProviders?: string[]
 }
 
 /**
  * The web access service. Registered as `ctx.web` (one instance per context).
  *
  * Selection semantics (resolved at execution time, never order-dependent):
- * - A configured id that is registered and `available()` → that provider.
- * - A configured id not registered → `WEB_PROVIDER_CONFIGURED_MISSING`.
- * - A configured id registered but unavailable →
+ * - A singular configured id that is registered and `available()` → that provider.
+ * - A singular configured id not registered → `WEB_PROVIDER_CONFIGURED_MISSING`.
+ * - A singular configured id registered but unavailable →
  *   `WEB_PROVIDER_CONFIGURED_UNAVAILABLE`.
- * - No id configured, exactly one registered usable provider → that provider.
- * - No id configured, multiple usable providers → `WEB_PROVIDER_AMBIGUOUS`.
- * - No id configured, no usable provider → `WEB_PROVIDER_UNAVAILABLE`.
+ * - An ordered fallback list → first listed id that is registered and usable.
+ * - A fallback list whose members are all missing or unusable →
+ *   `WEB_PROVIDER_UNAVAILABLE`.
+ * - No pin, exactly one registered usable provider → that provider.
+ * - No pin, multiple usable providers → `WEB_PROVIDER_AMBIGUOUS`.
+ * - No pin, no usable provider → `WEB_PROVIDER_UNAVAILABLE`.
  */
 export class WebRuntime extends Service {
   /**
@@ -79,18 +90,28 @@ export class WebRuntime extends Service {
    */
   static Config: z<WebRuntimeConfig> = z.object({
     searchProvider: z.string(),
+    searchProviders: z.array(z.string()),
     fetchProvider: z.string(),
+    fetchProviders: z.array(z.string()),
   })
 
   private searchProviders = new Map<string, WebSearchProvider>()
   private fetchProviders = new Map<string, WebFetchProvider>()
   private readonly searchProviderId: string | undefined
+  private readonly searchProviderFallbackIds: readonly string[] | undefined
   private readonly fetchProviderId: string | undefined
+  private readonly fetchProviderFallbackIds: readonly string[] | undefined
 
   constructor(ctx: Context, config: WebRuntimeConfig = {}) {
     super(ctx, 'web')
     this.searchProviderId = config.searchProvider ?? process.env.ROOS_WEB_SEARCH_PROVIDER
+    this.searchProviderFallbackIds = splitProviderList(
+      config.searchProviders ?? splitEnvList(process.env.ROOS_WEB_SEARCH_PROVIDERS),
+    )
     this.fetchProviderId = config.fetchProvider ?? process.env.ROOS_WEB_FETCH_PROVIDER
+    this.fetchProviderFallbackIds = splitProviderList(
+      config.fetchProviders ?? splitEnvList(process.env.ROOS_WEB_FETCH_PROVIDERS),
+    )
   }
 
   /**
@@ -141,6 +162,9 @@ export class WebRuntime extends Service {
     const provider = resolveProvider({
       providers: this.searchProviders,
       ...this.searchProviderId !== undefined ? { configuredId: this.searchProviderId } : {},
+      ...this.searchProviderFallbackIds !== undefined
+        ? { fallbackIds: this.searchProviderFallbackIds }
+        : {},
     })
     const result = await provider.search(request, signal)
     return capSources(result, request.maxResults)
@@ -158,6 +182,9 @@ export class WebRuntime extends Service {
     const provider = resolveProvider({
       providers: this.fetchProviders,
       ...this.fetchProviderId !== undefined ? { configuredId: this.fetchProviderId } : {},
+      ...this.fetchProviderFallbackIds !== undefined
+        ? { fallbackIds: this.fetchProviderFallbackIds }
+        : {},
     })
     return provider.fetch(request, signal)
   }
@@ -170,7 +197,7 @@ interface ResolvableProvider {
 
 /** Resolve the selected provider or throw the matching {@link WebError}. */
 function resolveProvider<P extends ResolvableProvider>(selection: Selection<P>): P {
-  const { configuredId, providers } = selection
+  const { configuredId, fallbackIds, providers } = selection
   if (configuredId !== undefined) {
     const provider = providers.get(configuredId)
     if (!provider) {
@@ -180,6 +207,16 @@ function resolveProvider<P extends ResolvableProvider>(selection: Selection<P>):
       throw new WebError(`configured web provider "${configuredId}" is registered but unavailable`, 'WEB_PROVIDER_CONFIGURED_UNAVAILABLE')
     }
     return provider
+  }
+  if (fallbackIds !== undefined) {
+    for (const id of fallbackIds) {
+      const provider = providers.get(id)
+      if (provider !== undefined && provider.available()) return provider
+    }
+    throw new WebError(
+      `no usable web provider from [${fallbackIds.join(', ')}]`,
+      'WEB_PROVIDER_UNAVAILABLE',
+    )
   }
   const usable = [...providers.values()].filter(provider => provider.available())
   const [single] = usable
@@ -191,6 +228,27 @@ function resolveProvider<P extends ResolvableProvider>(selection: Selection<P>):
     throw new WebError(`multiple usable web providers are registered (${ids}); configure one explicitly`, 'WEB_PROVIDER_AMBIGUOUS')
   }
   return single
+}
+
+/**
+ * Drop blank ids from a configured fallback list.
+ * @param ids - raw configured or env-split ids.
+ * @returns a non-empty list, or `undefined` when nothing remains.
+ */
+function splitProviderList(ids: readonly string[] | undefined): string[] | undefined {
+  if (ids === undefined) return undefined
+  const cleaned = ids.map(id => id.trim()).filter(id => id.length > 0)
+  return cleaned.length > 0 ? cleaned : undefined
+}
+
+/**
+ * Split `$ROOS_WEB_*_PROVIDERS` (comma-separated) into ids.
+ * @param value - raw environment value.
+ * @returns ids, or `undefined` when the variable is unset or blank.
+ */
+function splitEnvList(value: string | undefined): readonly string[] | undefined {
+  if (value === undefined || value.trim().length === 0) return undefined
+  return value.split(',')
 }
 
 /** Enforce `maxResults` on a search result: truncate `sources[]` and flag it. */

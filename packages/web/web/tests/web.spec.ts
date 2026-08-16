@@ -106,6 +106,30 @@ describe('WebRuntime execution resolution', () => {
     await expect(web.search({ query: 'q' })).rejects.toThrow(expect.objectContaining({ code: 'WEB_PROVIDER_AMBIGUOUS' }))
   })
 
+  it('picks the first usable id from searchProviders and skips missing or unusable ones', async () => {
+    const { web } = await mountWeb({ searchProviders: ['missing', 'exa', 'perplexity'] })
+    web.registerSearchProvider(makeSearchProvider('exa', unavailable, () => Promise.resolve(searchResult('exa'))))
+    web.registerSearchProvider(makeSearchProvider('perplexity', available, () => Promise.resolve(searchResult('perplexity'))))
+    await expect(web.search({ query: 'q' })).resolves.toMatchObject({ content: 'perplexity' })
+  })
+
+  it('lets a singular searchProvider pin win over searchProviders', async () => {
+    const { web } = await mountWeb({
+      searchProvider: 'exa',
+      searchProviders: ['perplexity', 'exa'],
+    })
+    web.registerSearchProvider(makeSearchProvider('exa', available, () => Promise.resolve(searchResult('exa'))))
+    web.registerSearchProvider(makeSearchProvider('perplexity', available, () => Promise.resolve(searchResult('perplexity'))))
+    await expect(web.search({ query: 'q' })).resolves.toMatchObject({ content: 'exa' })
+  })
+
+  it('throws WEB_PROVIDER_UNAVAILABLE when every searchProviders id is unusable', async () => {
+    const { web } = await mountWeb({ searchProviders: ['exa', 'missing'] })
+    web.registerSearchProvider(makeSearchProvider('exa', unavailable, () => Promise.resolve(searchResult('exa'))))
+    web.registerSearchProvider(makeSearchProvider('perplexity', available, () => Promise.resolve(searchResult('perplexity'))))
+    await expect(web.search({ query: 'q' })).rejects.toThrow(expect.objectContaining({ code: 'WEB_PROVIDER_UNAVAILABLE' }))
+  })
+
   it('runs the configured provider even when another usable provider is registered', async () => {
     const { web } = await mountWeb({ searchProvider: 'perplexity' })
     web.registerSearchProvider(makeSearchProvider('exa', available, () => Promise.resolve(searchResult('exa'))))
@@ -185,6 +209,96 @@ describe('WebRuntime maxResults enforcement', () => {
     const result = await web.search({ query: 'q' })
     expect(result.sources).toHaveLength(2)
     expect(result.truncated).toBe(false)
+  })
+})
+
+describe('WebRuntime environment and blank fallback lists', () => {
+  it('reads ordered search ids from $ROOS_WEB_SEARCH_PROVIDERS', async () => {
+    const previous = process.env.ROOS_WEB_SEARCH_PROVIDERS
+    process.env.ROOS_WEB_SEARCH_PROVIDERS = ' missing , perplexity '
+    try {
+      const ctx = new Context()
+      const web = new WebRuntime(ctx)
+      web.registerSearchProvider(makeSearchProvider('perplexity', available, () => Promise.resolve(searchResult('perplexity'))))
+      await expect(web.search({ query: 'q' })).resolves.toMatchObject({ content: 'perplexity' })
+    } finally {
+      if (previous === undefined) delete process.env.ROOS_WEB_SEARCH_PROVIDERS
+      else process.env.ROOS_WEB_SEARCH_PROVIDERS = previous
+    }
+  })
+
+  it('ignores a blank $ROOS_WEB_SEARCH_PROVIDERS value', async () => {
+    const previous = process.env.ROOS_WEB_SEARCH_PROVIDERS
+    process.env.ROOS_WEB_SEARCH_PROVIDERS = '   '
+    try {
+      const ctx = new Context()
+      const web = new WebRuntime(ctx)
+      web.registerSearchProvider(makeSearchProvider('exa', available, () => Promise.resolve(searchResult('exa'))))
+      await expect(web.search({ query: 'q' })).resolves.toMatchObject({ content: 'exa' })
+    } finally {
+      if (previous === undefined) delete process.env.ROOS_WEB_SEARCH_PROVIDERS
+      else process.env.ROOS_WEB_SEARCH_PROVIDERS = previous
+    }
+  })
+
+  it('treats a blank searchProviders list as omitted', async () => {
+    const { web } = await mountWeb({ searchProviders: ['  ', ''] })
+    web.registerSearchProvider(makeSearchProvider('exa', available, () => Promise.resolve(searchResult('exa'))))
+    await expect(web.search({ query: 'q' })).resolves.toMatchObject({ content: 'exa' })
+  })
+
+  it('lets a singular fetchProvider pin win over fetchProviders', async () => {
+    const { web } = await mountWeb({
+      fetchProvider: 'http',
+      fetchProviders: ['other', 'http'],
+    })
+    web.registerFetchProvider(makeFetchProvider('http', available, fetchResult('pinned')))
+    web.registerFetchProvider(makeFetchProvider('other', available, fetchResult('other')))
+    await expect(web.fetch({ url: 'https://example.com' })).resolves.toMatchObject({
+      body: { content: 'pinned' },
+    })
+  })
+
+  it('picks the first usable id from fetchProviders', async () => {
+    const { web } = await mountWeb({ fetchProviders: ['missing', 'http'] })
+    web.registerFetchProvider(makeFetchProvider('http', available, fetchResult('http')))
+    await expect(web.fetch({ url: 'https://example.com' })).resolves.toMatchObject({
+      body: { content: 'http' },
+    })
+  })
+
+  it('reads ordered fetch ids from $ROOS_WEB_FETCH_PROVIDERS', async () => {
+    const previous = process.env.ROOS_WEB_FETCH_PROVIDERS
+    process.env.ROOS_WEB_FETCH_PROVIDERS = 'http'
+    try {
+      const ctx = new Context()
+      const web = new WebRuntime(ctx)
+      web.registerFetchProvider(makeFetchProvider('http', available, fetchResult('env-http')))
+      await expect(web.fetch({ url: 'https://example.com' })).resolves.toMatchObject({
+        body: { content: 'env-http' },
+      })
+    } finally {
+      if (previous === undefined) delete process.env.ROOS_WEB_FETCH_PROVIDERS
+      else process.env.ROOS_WEB_FETCH_PROVIDERS = previous
+    }
+  })
+
+  it('omits fallback lists when the env vars are unset', async () => {
+    const searchPrev = process.env.ROOS_WEB_SEARCH_PROVIDERS
+    const fetchPrev = process.env.ROOS_WEB_FETCH_PROVIDERS
+    delete process.env.ROOS_WEB_SEARCH_PROVIDERS
+    delete process.env.ROOS_WEB_FETCH_PROVIDERS
+    try {
+      const ctx = new Context()
+      const web = new WebRuntime(ctx)
+      web.registerSearchProvider(makeSearchProvider('exa', available, () => Promise.resolve(searchResult('exa'))))
+      await expect(web.search({ query: 'q' })).resolves.toMatchObject({ content: 'exa' })
+    } finally {
+      if (searchPrev === undefined) delete process.env.ROOS_WEB_SEARCH_PROVIDERS
+      else process.env.ROOS_WEB_SEARCH_PROVIDERS = searchPrev
+      if (fetchPrev === undefined) delete process.env.ROOS_WEB_FETCH_PROVIDERS
+      else process.env.ROOS_WEB_FETCH_PROVIDERS = fetchPrev
+    }
   })
 })
 

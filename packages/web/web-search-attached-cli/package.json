@@ -1,0 +1,55 @@
+{
+  "name": "@roos-code/roos-code-web-search-attached-cli",
+  "description": "Search provider that reuses an attached CLI vendor (Grok, Claude, Codex, Kimi) hosted web-search API for ctx.web",
+  "version": "0.1.0-rc.5",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/roos-code/roos-code.git",
+    "directory": "packages/web/web-search-attached-cli"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./invariant": {
+      "types": "./lib/types/invariant.d.ts",
+      "default": "./lib/invariant.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/invariant.js",
+    "lib/types/**/*.d.ts"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "@roos-code/roos-code-agent-default-model": "workspace:^",
+    "@roos-code/roos-code-credentials": "workspace:^",
+    "@roos-code/roos-code-launch-environment": "workspace:^",
+    "@roos-code/roos-code-invariants": "workspace:^",
+    "@roos-code/roos-code-web": "workspace:^",
+    "@roos-code/cordis": "workspace:^",
+    "@roos-code/roos-code-settings": "workspace:^"
+  },
+  "dependencies": {
+    "@roos-code/schemastery": "workspace:^"
+  },
+  "devDependencies": {
+    "@roos-code/roos-code-agent-default-model": "workspace:^",
+    "@roos-code/roos-code-credentials": "workspace:^",
+    "@roos-code/roos-code-launch-environment": "workspace:^",
+    "@roos-code/roos-code-invariants": "workspace:^",
+    "@roos-code/roos-code-web": "workspace:^",
+    "@roos-code/cordis": "workspace:^",
+    "@roos-code/roos-code-settings": "workspace:^"
+  }
+}

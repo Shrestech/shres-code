@@ -1244,6 +1244,9 @@ importers:
       '@roos-code/roos-code-web':
         specifier: workspace:^
         version: link:../../web/web
+      '@roos-code/roos-code-web-search-attached-cli':
+        specifier: workspace:^
+        version: link:../../web/web-search-attached-cli
       '@roos-code/roos-code-web-search-deepseek':
         specifier: workspace:^
         version: link:../../web/web-search-deepseek
@@ -8315,6 +8318,34 @@ importers:
         specifier: workspace:^
         version: link:../web
 
+  packages/web/web-search-attached-cli:
+    dependencies:
+      '@roos-code/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@roos-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@roos-code/roos-code-agent-default-model':
+        specifier: workspace:^
+        version: link:../../core/agent-default-model
+      '@roos-code/roos-code-credentials':
+        specifier: workspace:^
+        version: link:../../credentials/credentials
+      '@roos-code/roos-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@roos-code/roos-code-launch-environment':
+        specifier: workspace:^
+        version: link:../../util/launch-environment
+      '@roos-code/roos-code-settings':
+        specifier: workspace:^
+        version: link:../../settings/settings
+      '@roos-code/roos-code-web':
+        specifier: workspace:^
+        version: link:../web
+
   packages/web/web-search-deepseek:
     dependencies:
       '@roos-code/schemastery':
@@ -8882,6 +8913,9 @@ importers:
       '@roos-code/roos-code-web-fetch-http':
         specifier: workspace:^
         version: link:../../packages/web/web-fetch-http
+      '@roos-code/roos-code-web-search-attached-cli':
+        specifier: workspace:^
+        version: link:../../packages/web/web-search-attached-cli
       '@roos-code/roos-code-web-search-deepseek':
         specifier: workspace:^
         version: link:../../packages/web/web-search-deepseek

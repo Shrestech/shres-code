@@ -9,6 +9,8 @@ This package owns the Service Definition role of the web capability. Unlike shel
 | `@roos-code/roos-code-web` (this) | Service Definition: the service, provider registries, selection policy, request/result vocabulary, the `WebError` taxonomy |
 | `@roos-code/roos-code-web-search-exa` | Search provider: Exa |
 | `@roos-code/roos-code-web-search-perplexity` | Search provider: Perplexity |
+| `@roos-code/roos-code-web-search-deepseek` | Search provider: DeepSeek official |
+| `@roos-code/roos-code-web-search-attached-cli` | Search provider: attached CLI vendor (Grok, Claude, Codex, Kimi) |
 | `@roos-code/roos-code-web-fetch-http` | Fetch provider: anonymous public HTTP(S) |
 | `@roos-code/roos-code-tool-web` | Consumer: the model-facing `web_search` / `web_fetch` tool schemas over `ctx.web` |
 
@@ -26,16 +28,18 @@ Providers register **capabilities**, not tools. `roos-tool-web` is the only owne
 
 ## Selection
 
-Selection never depends on registration, config, or HMR order. A capability has an explicit provider id (config `searchProvider`/`fetchProvider`, or env `$ROOS_WEB_SEARCH_PROVIDER`/`$ROOS_WEB_FETCH_PROVIDER` feeding the same fields), or auto-selects when exactly one usable provider is registered. `search()`/`fetch()` resolve the provider at execution time:
+Selection never depends on registration, config, or HMR order. A singular pin (`searchProvider`/`fetchProvider`, or env `$ROOS_WEB_SEARCH_PROVIDER`/`$ROOS_WEB_FETCH_PROVIDER`) is exclusive. An ordered list (`searchProviders`/`fetchProviders`, or `$ROOS_WEB_*_PROVIDERS`) is first-usable-wins and is ignored when a singular pin is set. With neither, the seam auto-selects when exactly one usable provider is registered. `search()`/`fetch()` resolve the provider at execution time:
 
 | Situation | Execution |
 |---|---|
-| configured id registered and `available()` | runs that provider |
-| configured id not registered | `WEB_PROVIDER_CONFIGURED_MISSING` |
-| configured id registered but unavailable | `WEB_PROVIDER_CONFIGURED_UNAVAILABLE` |
-| no id, exactly one registered usable provider | runs it |
-| no id, no usable provider | `WEB_PROVIDER_UNAVAILABLE` |
-| no id, multiple usable providers | `WEB_PROVIDER_AMBIGUOUS` |
+| singular pin registered and `available()` | runs that provider |
+| singular pin not registered | `WEB_PROVIDER_CONFIGURED_MISSING` |
+| singular pin registered but unavailable | `WEB_PROVIDER_CONFIGURED_UNAVAILABLE` |
+| ordered list | first listed id that is registered and usable |
+| ordered list with no usable member | `WEB_PROVIDER_UNAVAILABLE` |
+| no pin, exactly one registered usable provider | runs it |
+| no pin, no usable provider | `WEB_PROVIDER_UNAVAILABLE` |
+| no pin, multiple usable providers | `WEB_PROVIDER_AMBIGUOUS` |
 
 The failure branches throw `WebError`, whose structured code (plus message detail — the missing id, the ambiguous candidate set) is the direct callers route on. A provider's own `available()` is a cheap local check (credential presence, parseable config) that feeds this execution-time selection and **must not make network calls**; `roos-tool-web` never calls it — the tool executes through `ctx.web.search()`/`fetch()` and routes on the thrown codes, so provider selection has one owner.
 

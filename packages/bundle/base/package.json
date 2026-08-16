@@ -115,6 +115,7 @@
     "@roos-code/roos-code-user-approval": "workspace:^",
     "@roos-code/roos-code-user-questions": "workspace:^",
     "@roos-code/roos-code-web": "workspace:^",
+    "@roos-code/roos-code-web-search-attached-cli": "workspace:^",
     "@roos-code/roos-code-web-search-deepseek": "workspace:^",
     "@roos-code/roos-code-workflow-worker-thread": "workspace:^",
     "@roos-code/roos-code-agent-instructions": "workspace:^"

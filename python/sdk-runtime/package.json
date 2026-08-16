@@ -105,6 +105,7 @@
     "@roos-code/roos-code-user-questions": "workspace:^",
     "@roos-code/roos-code-web": "workspace:^",
     "@roos-code/roos-code-web-fetch-http": "workspace:^",
+    "@roos-code/roos-code-web-search-attached-cli": "workspace:^",
     "@roos-code/roos-code-web-search-deepseek": "workspace:^",
     "@roos-code/roos-code-web-search-exa": "workspace:^",
     "@roos-code/roos-code-web-search-perplexity": "workspace:^",

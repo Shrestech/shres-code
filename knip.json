@@ -583,6 +583,15 @@
         "tests/**/*.ts"
       ]
     },
+    "packages/web/web-search-attached-cli": {
+      "entry": [
+        "tests/**/*.spec.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
     "packages/examples/acp-demo": {
       "entry": [
         "tests/**/*.spec.ts",
