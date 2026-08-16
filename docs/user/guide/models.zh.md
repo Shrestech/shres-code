@@ -24,7 +24,7 @@ roos models set deepseek-official deepseek-v4-pro --effort max
 roos models set --purpose compaction ollama-local llama3.2
 ```
 
-`set` 写入 `agent-default-model` 分节。`--effort` 在适配器元数据（`LlmReasoningEffortInfo`）接受该模型的该级别后存储 `reasoningEffort`；未知强度会在写入前失败。`--purpose compaction` 或 `--purpose session-title` 写入按用途覆盖，并保留会话默认值。
+`set` 写入 `agent-default-model` 分节。`--effort` 在适配器元数据（`LlmReasoningEffortInfo`）接受该模型的该级别后存储 `reasoningEffort`；省略 `--effort` 时只写入 `{ provider, model }`，不会持久化适配器默认强度。未知强度会在写入前失败。`--purpose compaction` 或 `--purpose session-title` 写入按用途覆盖，并保留会话默认值。
 
 压缩与会话标题请求通过 `ctx.llm.stream()` 并设置 `purpose`，不进入会话的 `agent/request` waterfall，因此在这些调用方读取之前，已存储的按用途覆盖不会被应用。
 
@@ -50,8 +50,8 @@ roos providers remove acme-gateway
 
 API 密钥绝不会作为 argv 值。命令在隐藏的 TTY 行上提示，或读取一行 stdin，然后通过 `ctx.credentials.set` 以 `0600` 存储。设置中只保留 `credential-ref` 名称（`apiKeyEnv`）。
 
-`remove` 会取消设置用户拥有的 `llm-pi-ai` 路由。像 `deepseek-official` 这样由组合拥有的路由不能在此移除。
+`remove` 会取消设置用户拥有的 `llm-pi-ai` 路由。移除 `openai` 这类随附模板只会清除用户覆盖，随附路由仍然保留。像 `deepseek-official` 这样由组合拥有的路由不能在此移除。
 
 ## 在会话中途切换
 
-在组合了命令注册表的会话中，`/model` 会打印当前选择以及已公布的推理强度。`/model <provider> <model> [--effort <level>]` 会写入会话的 `ModelSelection`，供下一轮组装的请求使用。该手势由用户发出：`command/run` 记录 `source: { kind: 'user' }`，模型不能把它当作工具调用。
+在组合了命令注册表的会话中，`/model` 会打印当前选择以及已公布的推理强度。`/model <provider> <model> [--effort <level>]` 会写入会话的 `ModelSelection`，供下一轮组装的请求使用，并同时通过 `saveSelection()` 把该配对写成进程级默认值，供后续会话和 Settings → Models 使用。该手势由用户发出：`command/run` 记录 `source: { kind: 'user' }`，模型不能把它当作工具调用。子代理会话上的 `/model` 会被拒绝，以免子会话切换改写根默认值。

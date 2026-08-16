@@ -84,8 +84,14 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
   {
     key: 'agentDefaultModel',
     summary: 'Owns the default model selection independently of any Host or transport.',
-    description: 'Owns the default model selection independently of any Host or transport. The composition entry remains usable without a settings provider; when one is mounted, its user layer is read live.',
+    description: 'Owns the default model selection independently of any Host or transport. The composition entry remains usable without a settings provider; when one is mounted, its user layer is read live. `/model` is an optional child that activates only when a command registry is composed.',
     methods: [
+      {
+        signature: 'llm(): Context[\'llm\'] | undefined',
+        description: 'The mounted LLM service, when one is composed.',
+        parameters: [],
+        returns: 'the live llm service, or undefined.',
+      },
       {
         signature: 'currentSelection(): ModelSelection',
         description: 'Read the current default model selection.',
@@ -93,9 +99,27 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'a detached provider, model, and optional reasoning selection.',
       },
       {
-        signature: 'async saveSelection(next: ModelSelection): Promise<void>',
-        description: 'Save the complete default model selection. A deployment without a settings provider keeps its composition entry.',
-        parameters: [{ name: 'next', description: 'resolved selection accepted by an entry point.' }],
+        signature: 'purposeSelections(): Partial<Record<ModelPurpose, ModelSelection>>',
+        description: 'Read stored purpose overrides.',
+        parameters: [],
+        returns: 'a detached map of purpose to selection; absent keys have no override.',
+      },
+      {
+        signature: 'selectionForPurpose(purpose: ModelPurpose): ModelSelection | undefined',
+        description: 'Read the stored override for one GenerateOptions.purpose, when present.',
+        parameters: [{ name: 'purpose', description: 'compaction or session-title.' }],
+        returns: 'the override, or `undefined` when the conversation default applies.',
+      },
+      {
+        signature: 'selectionFor(agent: Agent): LiveModelSelectionRef',
+        description: 'Install or return the session-local model selection that prompt assembly snapshots.\n\nPrecedence, resolved on every read: a selection made in this process, else the session\'s latest logged request/header, else the live default.',
+        parameters: [{ name: 'agent', description: 'the Agent whose request waterfall should observe this selection.' }],
+        returns: 'the shared mutable selection for this Agent.',
+      },
+      {
+        signature: 'async saveSelection(next: ModelSelection, options: SaveSelectionOptions = {}): Promise<void>',
+        description: 'Save a default or purpose-specific model selection. A deployment without a settings provider keeps its composition entry.',
+        parameters: [{ name: 'next', description: 'resolved selection accepted by an entry point.' }, { name: 'options', description: 'optional purpose key; omit to write the conversation default.' }],
         returns: 'fulfillment after the optional settings write settles.',
       },
     ],
@@ -3526,6 +3550,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ModelModalityMap {\n    text: \'text\';\n    image: \'image\';\n}',
   },
   {
+    name: 'ModelPurpose',
+    declaration: 'export type ModelPurpose = \'compaction\' | \'session-title\';',
+  },
+  {
     name: 'ObjectJsonSchema',
     declaration: 'export type ObjectJsonSchema = JsonSchemaNode & {\n    type: \'object\';\n};',
   },
@@ -3752,6 +3780,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'SaveImageAttachment',
     declaration: 'export interface SaveImageAttachment {\n    data: Uint8Array;\n    mediaType: ImageMediaType;\n    name?: string;\n}',
+  },
+  {
+    name: 'SaveSelectionOptions',
+    declaration: 'export interface SaveSelectionOptions {\n    purpose?: ModelPurpose;\n}',
   },
   {
     name: 'SaveTextSpill',

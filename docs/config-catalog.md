@@ -100,7 +100,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/core/agent-default-model/src/index.ts:41`](../packages/core/agent-default-model/src/index.ts)
+Source: [`packages/core/agent-default-model/src/index.ts:75`](../packages/core/agent-default-model/src/index.ts)
 
 <a id="roos-coderoos-code-agent-instructions"></a>
 
@@ -693,7 +693,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/bundle/headless/src/index.ts:32`](../packages/bundle/headless/src/index.ts)
+Source: [`packages/bundle/headless/src/index.ts:30`](../packages/bundle/headless/src/index.ts)
 
 <a id="roos-coderoos-code-hooks-claude-code"></a>
 

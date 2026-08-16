@@ -320,9 +320,15 @@ Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnp
 
 ### `ctx.agentDefaultModel` — `AgentDefaultModelConfig`
 
-Owns the default model selection independently of any Host or transport. The composition entry remains usable without a settings provider; when one is mounted, its user layer is read live.
+Owns the default model selection independently of any Host or transport. The composition entry remains usable without a settings provider; when one is mounted, its user layer is read live. `/model` is an optional child that activates only when a command registry is composed.
 
 ```ts cordis-catalog
+/**
+ * The mounted LLM service, when one is composed.
+ * @returns the live llm service, or undefined.
+ */
+llm(): Context['llm'] | undefined
+
 /**
  * Read the current default model selection.
  * @returns a detached provider, model, and optional reasoning selection.
@@ -330,15 +336,40 @@ Owns the default model selection independently of any Host or transport. The com
 currentSelection(): ModelSelection
 
 /**
- * Save the complete default model selection. A deployment without a settings
- * provider keeps its composition entry.
+ * Read stored purpose overrides.
+ * @returns a detached map of purpose to selection; absent keys have no override.
+ */
+purposeSelections(): Partial<Record<ModelPurpose, ModelSelection>>
+
+/**
+ * Read the stored override for one GenerateOptions.purpose, when present.
+ * @param purpose - compaction or session-title.
+ * @returns the override, or `undefined` when the conversation default applies.
+ */
+selectionForPurpose(purpose: ModelPurpose): ModelSelection | undefined
+
+/**
+ * Install or return the session-local model selection that prompt assembly snapshots.
+ *
+ * Precedence, resolved on every read: a selection made in this process, else
+ * the session's latest logged request/header, else the live default.
+ *
+ * @param agent - the Agent whose request waterfall should observe this selection.
+ * @returns the shared mutable selection for this Agent.
+ */
+selectionFor(agent: Agent): LiveModelSelectionRef
+
+/**
+ * Save a default or purpose-specific model selection. A deployment without a
+ * settings provider keeps its composition entry.
  * @param next - resolved selection accepted by an entry point.
+ * @param options - optional purpose key; omit to write the conversation default.
  * @returns fulfillment after the optional settings write settles.
  */
-async saveSelection(next: ModelSelection): Promise<void>
+async saveSelection(next: ModelSelection, options: SaveSelectionOptions = {}): Promise<void>
 ```
 
-Source: [`packages/core/agent-default-model/src/index.ts:64`](../../packages/core/agent-default-model/src/index.ts)
+Source: [`packages/core/agent-default-model/src/index.ts:118`](../../packages/core/agent-default-model/src/index.ts)
 
 <a id="ctxagentloop--agentloop"></a>
 

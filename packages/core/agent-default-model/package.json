@@ -42,6 +42,11 @@
     "@roos-code/roos-code-settings": "workspace:^",
     "@roos-code/cordis": "workspace:^"
   },
+  "peerDependenciesMeta": {
+    "@roos-code/roos-code-commands": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@roos-code/roos-code-agent": "workspace:^",
     "@roos-code/roos-code-commands": "workspace:^",

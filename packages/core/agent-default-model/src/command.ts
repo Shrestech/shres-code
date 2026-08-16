@@ -71,6 +71,9 @@ export async function handleModelCommand(
   agent: Agent,
   rawInput: string,
 ): Promise<CommandResult> {
+  if (isSubagentSession(agent)) {
+    return { kind: 'error', text: 'model: /model is not available on a subagent session' }
+  }
   const parsed = parseModelCommand(rawInput)
   if ('error' in parsed) return { kind: 'error', text: parsed.error }
   if (parsed.kind === 'show') {
@@ -85,7 +88,8 @@ export async function handleModelCommand(
 }
 
 /**
- * Validate and assign a session-local selection; also persist it as the default.
+ * Validate and assign a session-local selection, then save it as the
+ * process-wide default used by future sessions.
  * @param service - default-model service.
  * @param agent - receiving agent.
  * @param parsed - set action.
@@ -110,9 +114,12 @@ export async function applyModelSwitch(
 
 /**
  * Reject an unknown provider or an effort the adapter does not advertise.
+ * `resolveCallConfig` is a validator, not a defaulting step: an omitted
+ * effort is not persisted even when the adapter materializes `defaultEffort`.
+ * A requested effort must survive `resolveCallConfig` unchanged.
  * @param service - default-model service (reads `ctx.llm` when mounted).
  * @param requested - candidate selection.
- * @returns the adapter-resolved selection.
+ * @returns the provider/model pair, plus the requested effort when one was supplied.
  */
 export async function validateSelection(
   service: AgentDefaultModelConfig,
@@ -125,7 +132,7 @@ export async function validateSelection(
         `model: cannot validate effort "${requested.reasoningEffort}" because no llm service is mounted`,
       )
     }
-    return requested
+    return { provider: requested.provider, model: requested.model }
   }
   try {
     const resolved = await llm.resolveCallConfig({
@@ -135,17 +142,31 @@ export async function validateSelection(
         ? {}
         : { reasoningEffort: requested.reasoningEffort },
     })
+    if (requested.reasoningEffort === undefined) {
+      return { provider: resolved.provider, model: resolved.model }
+    }
+    if (resolved.reasoningEffort !== requested.reasoningEffort) {
+      throw new Error(
+        `model: effort "${requested.reasoningEffort}" did not survive validation for ${resolved.provider} ${resolved.model}`,
+      )
+    }
     return {
       provider: resolved.provider,
       model: resolved.model,
-      ...resolved.reasoningEffort === undefined
-        ? {}
-        : { reasoningEffort: resolved.reasoningEffort },
+      reasoningEffort: requested.reasoningEffort,
     }
   } catch (error: unknown) {
     if (error instanceof LlmError) throw new Error(`model: ${error.message}`)
     throw error
   }
+}
+
+/** Whether this agent is a subagent child whose switch must not write the process default. */
+function isSubagentSession(agent: Agent): boolean {
+  const header = agent.session.header
+  return header.origin === 'subagent'
+    || header.parentSession !== undefined
+    || (header.delegationDepth ?? 0) > 0
 }
 
 /**
@@ -213,7 +234,9 @@ async function resolveInfo(
   if (llm === undefined) return undefined
   try {
     return await llm.resolveModelInfo(provider, model)
-  } catch {
+  } catch (error: unknown) {
+    // Advisory listing: one model's metadata failure must not abort the catalog.
+    void error
     return undefined
   }
 }

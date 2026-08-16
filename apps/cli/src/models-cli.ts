@@ -92,6 +92,9 @@ const SHIPPED_PI_AI_PROVIDERS: Record<string, {
   groq: { apiKeyEnv: 'GROQ_API_KEY' },
 }
 
+/** Shipped `llm-pi-ai` route ids, used to refuse a silent remove of a composition route. */
+export const SHIPPED_PI_AI_PROVIDER_IDS: readonly string[] = Object.keys(SHIPPED_PI_AI_PROVIDERS)
+
 interface TemplateDefaults {
   displayName: string
   apiKeyEnv?: string
@@ -345,35 +348,82 @@ async function discoverModels(
 ): Promise<string> {
   const entry = ctx.llm.listConfigurableProviders().find(candidate => candidate.provider === command.provider)
   const settingsNs = entry?.settingsNs ?? 'llm-pi-ai'
+  let existing: Record<string, unknown>[] | undefined
+  if (command.add) {
+    if (entry === undefined) {
+      throw new Error(`roos models discover: cannot --add models for unknown provider "${command.provider}"`)
+    }
+    existing = storedModelRows(ctx, entry.settingsNs, entry.settingsPath, command.provider)
+  }
   const models = await ctx.llm.discoverModels(settingsNs, {
     provider: command.provider,
     ...command.baseURL === undefined ? {} : { baseURL: command.baseURL },
   })
-  if (command.add && models.length > 0) {
-    if (entry === undefined) {
-      throw new Error(`roos models discover: cannot --add models for unknown provider "${command.provider}"`)
-    }
-    const existing = await listedModelIds(ctx, command.provider)
-    const merged = [...existing]
+  if (existing !== undefined && models.length > 0 && entry !== undefined) {
+    const seen = new Set(existing.map(row => row.id))
+    const merged: Record<string, unknown>[] = [...existing]
     for (const model of models) {
-      if (!merged.includes(model.id)) merged.push(model.id)
+      if (seen.has(model.id)) continue
+      merged.push({
+        id: model.id,
+        ...model.name === undefined ? {} : { name: model.name },
+        ...model.contextWindow === undefined ? {} : { contextWindow: model.contextWindow },
+        ...model.maxTokens === undefined ? {} : { maxTokens: model.maxTokens },
+      })
     }
     await ctx.settings.mutate(settingsNamespace(entry.settingsNs), [{
       op: 'set',
       path: [...entry.settingsPath, 'models'],
-      value: merged.map(id => ({ id })),
+      value: merged,
     }])
   }
   if (models.length === 0) return `${command.provider}: (no models advertised)`
   return [`${command.provider}:`, ...models.map(model => `  ${model.id}`)].join('\n')
 }
 
-async function listedModelIds(ctx: Context, provider: string): Promise<string[]> {
-  try {
-    return (await ctx.llm.listModels(provider)).map(model => model.id)
-  } catch {
-    return []
+/**
+ * Read the resolved stored model objects for one route.
+ * @param ctx - booted models composition.
+ * @param settingsNs - namespace that owns the route.
+ * @param settingsPath - path from the section root to the profile.
+ * @param provider - route id, for error text.
+ * @returns the existing model objects, unmodified.
+ */
+function storedModelRows(
+  ctx: Context,
+  settingsNs: string,
+  settingsPath: readonly string[],
+  provider: string,
+): Record<string, unknown>[] {
+  const descriptor = ctx.settings.describe().find(entry => entry.ns === settingsNs)
+  if (descriptor === undefined) {
+    throw new Error(`roos models discover: cannot --add models; settings namespace "${settingsNs}" is not registered`)
   }
+  const userModels = declaredModelList(descriptor.user, settingsPath)
+  const baseModels = declaredModelList(descriptor.base, settingsPath)
+  const models = userModels ?? (baseModels !== undefined && baseModels.length > 0 ? baseModels : undefined)
+  if (models === undefined) {
+    throw new Error(`roos models discover: cannot --add models; "${provider}" has no stored model list`)
+  }
+  return models.map((row, index) => {
+    if (typeof row !== 'object' || row === null || typeof (row as { id?: unknown }).id !== 'string') {
+      throw new Error(`roos models discover: cannot --add models; "${provider}" model list entry ${String(index)} is not a model object`)
+    }
+    return { ...(row as Record<string, unknown>) }
+  })
+}
+
+/** Read a declared `models` array from a settings layer, or undefined when absent. */
+function declaredModelList(root: unknown, settingsPath: readonly string[]): unknown[] | undefined {
+  if (typeof root !== 'object' || root === null) return undefined
+  let cursor: unknown = root
+  for (const segment of settingsPath) {
+    if (typeof cursor !== 'object' || cursor === null) return undefined
+    cursor = (cursor as Record<string, unknown>)[segment]
+  }
+  if (typeof cursor !== 'object' || cursor === null) return undefined
+  const models = (cursor as { models?: unknown }).models
+  return Array.isArray(models) ? models : undefined
 }
 
 async function addProvider(
@@ -430,8 +480,27 @@ async function removeProvider(ctx: Context, provider: string): Promise<string> {
   if (entry.settingsNs !== 'llm-pi-ai') {
     throw new Error(`roos providers remove: "${provider}" is not a user-owned pi-ai route`)
   }
+  const shipped = SHIPPED_PI_AI_PROVIDER_IDS.includes(provider)
+  if (shipped && !userLayerHasProvider(ctx, provider)) {
+    throw new Error(
+      `roos providers remove: "${provider}" is a shipped route; there is no user override to clear`,
+    )
+  }
   await ctx.settings.mutate(PI_AI, [{ op: 'unset', path: ['providers', provider] }])
+  if (shipped) {
+    return `Cleared the user override for ${provider}; the shipped route remains.`
+  }
   return `Provider ${provider} removed.`
+}
+
+/** Whether the user layer of `llm-pi-ai` names this route. */
+function userLayerHasProvider(ctx: Context, provider: string): boolean {
+  const descriptor = ctx.settings.describe().find(entry => entry.ns === PI_AI)
+  const user = descriptor?.user
+  if (typeof user !== 'object' || user === null) return false
+  const providers = (user as { providers?: unknown }).providers
+  if (typeof providers !== 'object' || providers === null) return false
+  return Object.hasOwn(providers, provider)
 }
 
 async function maybeStoreKey(ctx: Context, io: ModelsCliIo, ref: string, provider: string): Promise<void> {

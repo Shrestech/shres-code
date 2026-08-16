@@ -11,7 +11,7 @@
 - `ctx.agentDefaultModel.selectionFor(agent)` 在该 Agent 的 `agent/request` waterfall 上安装会话级 `ModelSelection`。`/model` 写入同一引用，因此会话中途切换在下一轮组装的请求上生效。
 - `ctx.agentDefaultModel.selectionForPurpose(purpose)` 读取已存储的按用途覆盖（若存在）。
 
-当组合了命令注册表时，该服务注册 `/model [<provider> <model>] [--effort <level>]`。不带参数的调用打印当前选择以及已公布模型和对应推理强度。带参数的调用对照适配器元数据（`LlmReasoningEffortInfo`）校验推理强度，并写入会话选择。`commands.execute` 将 `command/run` 记录为 `source: { kind: 'user' }`；命令平面不是模型工具。
+当组合了命令注册表时，该服务注册 `/model [<provider> <model>] [--effort <level>]`。不带参数的调用打印当前选择以及已公布模型和对应推理强度。带参数的调用对照适配器元数据（`LlmReasoningEffortInfo`）校验推理强度，写入会话选择，并 `saveSelection()` 把该配对写成进程级默认值。即使适配器物化了 `defaultEffort`，省略的强度也不会被持久化。子代理会话上的 `/model` 会被拒绝。`commands.execute` 将 `command/run` 记录为 `source: { kind: 'user' }`；命令平面不是模型工具。
 
 该服务不校验目录成员关系。提供方路由可以服务未在目录中公布的模型；实际发起模型请求的消费方负责可用性诊断。
 

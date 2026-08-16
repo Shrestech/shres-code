@@ -102,7 +102,7 @@ export interface Config {
 }
 ```
 
-来源：[`packages/core/agent-default-model/src/index.ts:41`](../packages/core/agent-default-model/src/index.ts)
+来源：[`packages/core/agent-default-model/src/index.ts:75`](../packages/core/agent-default-model/src/index.ts)
 
 <a id="roos-coderoos-code-agent-instructions"></a>
 
@@ -695,7 +695,7 @@ export interface Config {
 }
 ```
 
-来源：[`packages/bundle/headless/src/index.ts:31`](../packages/bundle/headless/src/index.ts)
+来源：[`packages/bundle/headless/src/index.ts:30`](../packages/bundle/headless/src/index.ts)
 
 <a id="roos-coderoos-code-hooks-claude-code"></a>
 

@@ -36,6 +36,8 @@ function mockLlm(options: {
   models?: Record<string, { id: string; name: string; provider: string }[]>
   efforts?: Record<string, { id: string; name: string }[]>
   defaultEffort?: string
+  materializeDefault?: string
+  remapEffort?: string
   resolveError?: Error
   infoError?: Error
 } = {}) {
@@ -74,6 +76,12 @@ function mockLlm(options: {
           `provider "${config.provider}" model "${config.model}" does not support reasoning effort "${config.reasoningEffort}"`,
           'UNSUPPORTED_REASONING_EFFORT',
         ))
+      }
+      if (config.reasoningEffort === undefined && options.materializeDefault !== undefined) {
+        return Promise.resolve({ ...config, reasoningEffort: options.materializeDefault })
+      }
+      if (config.reasoningEffort !== undefined && options.remapEffort !== undefined) {
+        return Promise.resolve({ ...config, reasoningEffort: options.remapEffort })
       }
       return Promise.resolve(config)
     },
@@ -203,6 +211,64 @@ describe('/model command', () => {
     })
     const cleared = await ctx.commands.execute(agent, '/model openai gpt-4.1', new AbortController().signal)
     expect(cleared?.result.text).toBe('model: openai gpt-4.1')
+    expect(ctx.agentDefaultModel.currentSelection()).toEqual({ provider: 'openai', model: 'gpt-4.1' })
+    await ctx.fiber.dispose()
+  })
+
+  it('does not persist an adapter-materialized defaultEffort when --effort is omitted', async () => {
+    const { ctx, agent } = await boot({
+      llm: mockLlm({
+        providers: [{ id: 'openai' }],
+        models: { openai: [{ id: 'gpt-4.1', name: 'GPT', provider: 'openai' }] },
+        materializeDefault: 'high',
+      }),
+    })
+    const execution = await ctx.commands.execute(agent, '/model openai gpt-4.1', new AbortController().signal)
+    expect(execution?.result).toEqual({ kind: 'success', text: 'model: openai gpt-4.1' })
+    expect(ctx.agentDefaultModel.currentSelection()).toEqual({ provider: 'openai', model: 'gpt-4.1' })
+    await ctx.fiber.dispose()
+  })
+
+  it('rejects an effort that resolveCallConfig remaps', async () => {
+    const { ctx, agent } = await boot({
+      llm: mockLlm({
+        efforts: { 'deepseek-official/deepseek-v4-flash': [{ id: 'high', name: 'High' }] },
+        remapEffort: 'max',
+      }),
+    })
+    const execution = await ctx.commands.execute(agent, '/model --effort high', new AbortController().signal)
+    expect(execution?.result.kind).toBe('error')
+    expect(execution?.result.text).toMatch(/did not survive validation/)
+    await ctx.fiber.dispose()
+  })
+
+  it('refuses /model on a subagent session', async () => {
+    const ctx = new Context()
+    await ctx.plugin(MemorySettings)
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(CommandRuntime)
+    ctx.provide('llm', mockLlm())
+    await ctx.plugin(AgentDefaultModelConfig, {
+      provider: 'deepseek-official',
+      model: 'deepseek-v4-flash',
+    })
+    const metas = [
+      { origin: 'subagent' as const },
+      { parentSession: SessionId('parent') },
+      { delegationDepth: 1 },
+    ]
+    for (const [index, meta] of metas.entries()) {
+      const session = ctx.sessions.create(SessionId(`child-${String(index)}`), { meta })
+      const agent = { id: session.id, session, ctx } as unknown as Agent
+      await ctx.plugin(Object.assign((inner: Context) => { createScope(inner, agent) }, { inject: ['commands'] }))
+      const listed = await ctx.commands.execute(agent, '/model', new AbortController().signal)
+      expect(listed?.result).toEqual({
+        kind: 'error', text: 'model: /model is not available on a subagent session',
+      })
+    }
+    expect(ctx.agentDefaultModel.currentSelection()).toEqual({
+      provider: 'deepseek-official', model: 'deepseek-v4-flash',
+    })
     await ctx.fiber.dispose()
   })
 

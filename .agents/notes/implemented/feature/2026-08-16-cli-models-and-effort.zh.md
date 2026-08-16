@@ -18,7 +18,7 @@ Web 的 Settings → Models 页面已经写入 `agent-default-model`、`llm-pi-a
 
 API 密钥绝不是 argv 值。命令在隐藏的 TTY 行上提示或读取 stdin，然后通过 `ctx.credentials.set`（`0600`）存储秘密。设置中只携带 `credential-ref` 名称。
 
-当组合了命令注册表时，`agent-default-model` 在 `ctx.commands` 上注册 `/model`，模式与 `/permission` 的可选子功能相同。带参数时通过 `selectionFor(agent)`（`agent/request` waterfall）写入会话 `ModelSelection`。不带参数时打印当前选择和已公布的推理强度。`command/run` 始终记录 `source: { kind: 'user' }`；命令平面不是模型工具。
+当组合了命令注册表时，`agent-default-model` 在 `ctx.commands` 上注册 `/model`，模式与 `/permission` 的可选子功能相同。带参数时通过 `selectionFor(agent)`（`agent/request` waterfall）写入会话 `ModelSelection`，并同时 `saveSelection()` 把该配对写成后续会话的进程级默认值。不带参数时打印当前选择和已公布的推理强度。`command/run` 始终记录 `source: { kind: 'user' }`；命令平面不是模型工具。子代理会话上的 `/model` 会被拒绝。即使适配器物化了 `defaultEffort`，省略的 `--effort` 也不会被持久化。
 
 Web 的 `/model` popup 是该宿主命令的 `commandUi.decorate`，因此名称不会冲突。
 
@@ -36,10 +36,10 @@ Web 的 `/model` popup 是该宿主命令的 `commandUi.decorate`，因此名称
 
 ## 后果
 
-CLI 与 Web 共享一个默认值、一个提供方目录和一个凭据存储。会话中途的 `/model` 由用户发出，并在下一轮组装的请求上生效。按用途覆盖存在于磁盘上，但尚未重定向辅助的 `llm.stream()` 调用。
+CLI 与 Web 共享一个默认值、一个提供方目录和一个凭据存储。会话中途的 `/model` 由用户发出，在下一轮组装的请求上生效，并同时更新进程级默认值。按用途覆盖存在于磁盘上，但尚未重定向辅助的 `llm.stream()` 调用。
 
 快照工具没有 CLI 子命令或会话中途 `/model` 的 fixture；包测试钉住 list/set/add 文本记录以及 `/model` 会话日志，包括 `command/run` 的 source `user`。
 
 ## 测试
 
-`apps/cli` 规格在临时 `$ROOS_HOME` 上覆盖 `models list|set|discover` 与 `providers add|list|remove`，包括 `--effort`、`--purpose`、提示输入的密钥以及未知强度失败。`agent-default-model` 规格覆盖 `/model` 解析／列出／切换、用户发出的 `command/run`、`selectionFor` 优先级以及按用途持久化。`ui-model-selection` 规格覆盖 `/model` decoration。
+`apps/cli` 规格在临时 `$ROOS_HOME` 上覆盖 `models list|set|discover` 与 `providers add|list|remove`，包括 `--effort`、`--purpose`、提示输入的密钥、未知强度失败、省略 `--effort` 时的持久化、ollama-cloud `--add` 保留 pinned 容量、随附路由 remove，以及 CLI 目录 id 与基础组合一致。`agent-default-model` 规格覆盖 `/model` 解析／列出／切换、用户发出的 `command/run`、`selectionFor` 优先级、按用途持久化、剥离物化默认强度，以及拒绝子代理。`ui-model-selection` 规格覆盖 `/model` decoration。

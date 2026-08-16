@@ -24,7 +24,7 @@ roos models set deepseek-official deepseek-v4-pro --effort max
 roos models set --purpose compaction ollama-local llama3.2
 ```
 
-`set` writes the `agent-default-model` section. `--effort` stores `reasoningEffort` after the adapter metadata (`LlmReasoningEffortInfo`) accepts that level for the chosen model; an unknown effort fails before anything is written. `--purpose compaction` or `--purpose session-title` writes a purpose override and leaves the conversation default in place.
+`set` writes the `agent-default-model` section. `--effort` stores `reasoningEffort` after the adapter metadata (`LlmReasoningEffortInfo`) accepts that level for the chosen model; omitting `--effort` writes only `{ provider, model }` and does not persist an adapter default. An unknown effort fails before anything is written. `--purpose compaction` or `--purpose session-title` writes a purpose override and leaves the conversation default in place.
 
 Compaction and session-title requests call `ctx.llm.stream()` with `purpose` set and do not enter the conversation `agent/request` waterfall, so a stored purpose override is not applied until those callers read it.
 
@@ -50,8 +50,8 @@ roos providers remove acme-gateway
 
 An API key is never an argv value. The command prompts on a hidden TTY line or reads one stdin line, then stores it through `ctx.credentials.set` at `0600`. Settings keep only the `credential-ref` name (`apiKeyEnv`).
 
-`remove` unsets a user-owned `llm-pi-ai` route. Composition-owned routes such as `deepseek-official` cannot be removed here.
+`remove` unsets a user-owned `llm-pi-ai` route. Removing a shipped template such as `openai` only clears a user override; the shipped route remains. Composition-owned routes such as `deepseek-official` cannot be removed here.
 
 ## Switch mid-session
 
-In a session that composes the command registry, `/model` prints the current selection and advertised efforts. `/model <provider> <model> [--effort <level>]` writes the session `ModelSelection` for the next assembled turn. The gesture is user-authored: `command/run` records `source: { kind: 'user' }`, and the model cannot invoke it as a tool.
+In a session that composes the command registry, `/model` prints the current selection and advertised efforts. `/model <provider> <model> [--effort <level>]` writes the session `ModelSelection` for the next assembled turn and also `saveSelection()`s that pair as the process-wide default used by future sessions and Settings → Models. The gesture is user-authored: `command/run` records `source: { kind: 'user' }`, and the model cannot invoke it as a tool. `/model` is refused on a subagent session so a child switch cannot change the root default.

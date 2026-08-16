@@ -2,15 +2,19 @@
 
 import { createServer } from 'node:http'
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
+import { readFileSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { PassThrough } from 'node:stream'
 import { afterEach, describe, expect, it } from 'vitest'
 import { credentialRef } from '@roos-code/roos-code-credentials'
+import { settingsNamespace } from '@roos-code/roos-code-settings'
 import {
   bootModelsCli,
   runModelsCli,
+  SHIPPED_PI_AI_PROVIDER_IDS,
   type ModelsCliCommand,
   type ModelsCliIo,
 } from '../src/models-cli.ts'
@@ -99,6 +103,20 @@ describe('roos models / providers', () => {
     expect(listed.stdout).toContain('deepseek-v4-pro  (default)')
   })
 
+  it('does not write reasoningEffort when --effort is omitted', async () => {
+    const home = await tempHome()
+    const set = await run(home, {
+      kind: 'models-set', provider: 'deepseek-official', model: 'deepseek-v4-flash',
+    })
+    expect(set.exit).toBe(0)
+    expect(set.stdout).toBe('Default: deepseek-official deepseek-v4-flash\n')
+    const ctx = await bootModelsCli(home)
+    expect(ctx.agentDefaultModel.currentSelection()).toEqual({
+      provider: 'deepseek-official', model: 'deepseek-v4-flash',
+    })
+    await ctx.fiber.dispose()
+  })
+
   it('writes a purpose override without replacing the conversation default', async () => {
     const home = await tempHome()
     await run(home, {
@@ -155,6 +173,39 @@ describe('roos models / providers', () => {
     expect(unknown.stderr).toMatch(/cannot --add models for unknown provider/)
   })
 
+  it('appends discovered ids without dropping shipped ollama-cloud capacities', async () => {
+    const home = await tempHome()
+    const baseURL = await listingServer({
+      data: [{ id: 'qwen3:cloud' }, { id: 'deepseek-v4-flash:cloud' }],
+    })
+    const keyed = await bootModelsCli(home)
+    await keyed.credentials.set(credentialRef('OLLAMA_API_KEY'), 'test-discover')
+    await keyed.fiber.dispose()
+    const added = await run(home, {
+      kind: 'models-discover', provider: 'ollama-cloud', baseURL, add: true,
+    })
+    expect(added.exit).toBe(0)
+    const ctx = await bootModelsCli(home)
+    const descriptor = ctx.settings.describe().find(entry => entry.ns === settingsNamespace('llm-pi-ai'))
+    const providers = (descriptor?.value as { providers?: Record<string, { models?: unknown[] }> })?.providers
+    const models = providers?.['ollama-cloud']?.models ?? []
+    expect(models).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'deepseek-v4-flash:cloud', contextWindow: 1048576, maxTokens: 32768,
+      }),
+      expect.objectContaining({
+        id: 'deepseek-v4-pro:cloud', contextWindow: 1048576, maxTokens: 32768,
+      }),
+      expect.objectContaining({ id: 'qwen3:cloud' }),
+    ]))
+    await ctx.fiber.dispose()
+    const catalog = await run(home, {
+      kind: 'models-discover', provider: 'openai', add: true,
+    })
+    expect(catalog.exit).toBe(1)
+    expect(catalog.stderr).toMatch(/has no stored model list/)
+  })
+
   it('adds a shipped template and a custom route without taking a key from argv', async () => {
     const home = await tempHome()
     const template = await run(home, { kind: 'providers-add', template: 'ollama-local' })
@@ -198,6 +249,18 @@ describe('roos models / providers', () => {
     expect(refuse.stderr).toMatch(/not a user-owned pi-ai route/)
     const missing = await run(home, { kind: 'providers-remove', provider: 'ghost' })
     expect(missing.stderr).toMatch(/unknown provider "ghost"/)
+    const noOverride = await run(home, { kind: 'providers-remove', provider: 'openai' })
+    expect(noOverride.exit).toBe(1)
+    expect(noOverride.stderr).toMatch(/shipped route; there is no user override/)
+    await run(home, { kind: 'providers-add', template: 'openai' }, [''])
+    const cleared = await run(home, { kind: 'providers-remove', provider: 'openai' })
+    expect(cleared.stdout).toContain('Cleared the user override for openai; the shipped route remains.')
+    const stillListed = await run(home, { kind: 'providers-list' })
+    expect(stillListed.stdout).toContain('openai')
+  })
+
+  it('boots the same pi-ai provider ids as the base bundle', () => {
+    expect([...SHIPPED_PI_AI_PROVIDER_IDS].sort()).toEqual(baseBundlePiAiProviderIds().sort())
   })
 
   it('prompts for an omitted template and rejects an unknown one', async () => {
@@ -224,3 +287,13 @@ describe('roos models / providers', () => {
     expect(model.stderr).toMatch(/needs a model id/)
   })
 })
+
+function baseBundlePiAiProviderIds(): string[] {
+  const path = join(dirname(fileURLToPath(import.meta.url)), '../../../packages/bundle/base/cordis.patch.yml')
+  const text = readFileSync(path, 'utf8')
+  const start = text.indexOf('- id: llm-pi-ai')
+  const rest = text.slice(start)
+  const next = rest.indexOf('\n    - id:', 1)
+  const block = next === -1 ? rest : rest.slice(0, next)
+  return [...block.matchAll(/^          ([a-z][a-z0-9-]*):$/gmu)].map(match => match[1]!)
+}

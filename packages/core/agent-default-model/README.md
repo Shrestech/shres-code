@@ -11,7 +11,7 @@ The plugin config requires `{ provider, model }`. That composition entry is the 
 - `ctx.agentDefaultModel.selectionFor(agent)` installs the session-local `ModelSelection` on that Agent's `agent/request` waterfall. `/model` writes this same ref, so a mid-session switch takes effect on the next assembled turn.
 - `ctx.agentDefaultModel.selectionForPurpose(purpose)` reads a stored purpose override when one exists.
 
-When a command registry is composed, the service registers `/model [<provider> <model>] [--effort <level>]`. A bare invocation prints the current selection plus advertised models and their efforts. An argued invocation validates the effort against adapter metadata (`LlmReasoningEffortInfo`) and writes the session selection. `commands.execute` records `command/run` with `source: { kind: 'user' }`; the command plane is not a model tool.
+When a command registry is composed, the service registers `/model [<provider> <model>] [--effort <level>]`. A bare invocation prints the current selection plus advertised models and their efforts. An argued invocation validates the effort against adapter metadata (`LlmReasoningEffortInfo`), writes the session selection, and `saveSelection()`s that pair as the process-wide default. An omitted effort is not persisted even when the adapter materializes `defaultEffort`. `/model` is refused on a subagent session. `commands.execute` records `command/run` with `source: { kind: 'user' }`; the command plane is not a model tool.
 
 The service does not validate catalog membership. A provider route may serve an unadvertised model, and the consumer that actually opens a model request owns availability diagnostics.
 

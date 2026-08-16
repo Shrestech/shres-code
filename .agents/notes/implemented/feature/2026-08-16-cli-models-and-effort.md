@@ -18,7 +18,7 @@ A second config file or an argv API key would split the store and leak secrets i
 
 API keys are never argv values. The command prompts on a hidden TTY line or reads stdin, then stores the secret through `ctx.credentials.set` (`0600`). Settings carry only the `credential-ref` name.
 
-`/model` is registered on `ctx.commands` by `agent-default-model` when that registry is composed, the same optional-child pattern as `/permission`. With arguments it writes the session `ModelSelection` through `selectionFor(agent)` (the `agent/request` waterfall). Without arguments it prints the current selection and advertised efforts. `command/run` always records `source: { kind: 'user' }`; the command plane is not a model tool.
+`/model` is registered on `ctx.commands` by `agent-default-model` when that registry is composed, the same optional-child pattern as `/permission`. With arguments it writes the session `ModelSelection` through `selectionFor(agent)` (the `agent/request` waterfall) and also `saveSelection()`s that pair as the process-wide default for future sessions. Without arguments it prints the current selection and advertised efforts. `command/run` always records `source: { kind: 'user' }`; the command plane is not a model tool. `/model` is refused on a subagent session. An omitted `--effort` is not persisted even when the adapter materializes `defaultEffort`.
 
 The Web `/model` popup is a `commandUi.decorate` of that host command so the names do not collide.
 
@@ -36,10 +36,10 @@ Compaction and session-title call `ctx.llm.stream()` with `purpose` and never en
 
 ## Consequences
 
-CLI and Web share one default, one provider directory, and one credential store. Mid-session `/model` is user-authored and takes effect on the next assembled turn. Purpose overrides exist on disk but do not yet redirect auxiliary `llm.stream()` calls.
+CLI and Web share one default, one provider directory, and one credential store. Mid-session `/model` is user-authored, takes effect on the next assembled turn, and also updates the process-wide default. Purpose overrides exist on disk but do not yet redirect auxiliary `llm.stream()` calls.
 
 The snapshot harness has no CLI-subcommand or mid-session `/model` fixture; package tests pin the list/set/add transcripts and the `/model` session log, including `command/run` source `user`.
 
 ## Testing
 
-`apps/cli` specs cover `models list|set|discover` and `providers add|list|remove` against a temp `$ROOS_HOME`, including `--effort`, `--purpose`, prompted keys, and unknown-effort failure. `agent-default-model` specs cover `/model` parse/list/switch, user-authored `command/run`, `selectionFor` precedence, and purpose persistence. `ui-model-selection` specs cover the `/model` decoration.
+`apps/cli` specs cover `models list|set|discover` and `providers add|list|remove` against a temp `$ROOS_HOME`, including `--effort`, `--purpose`, prompted keys, unknown-effort failure, omitted-effort persistence, ollama-cloud `--add` pin survival, shipped-route remove, and CLI catalog ids matching the base bundle. `agent-default-model` specs cover `/model` parse/list/switch, user-authored `command/run`, `selectionFor` precedence, purpose persistence, materialized-default stripping, and subagent refusal. `ui-model-selection` specs cover the `/model` decoration.
