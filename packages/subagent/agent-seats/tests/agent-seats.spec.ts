@@ -92,6 +92,22 @@ describe('agent-seats remount', () => {
     await ctx.fiber.dispose()
   })
 
+  it('withdraws seat tools when the seats plugin fiber disposes', async () => {
+    const ctx = new Context()
+    await ctx.plugin(MemorySettings)
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRuntime)
+    await ctx.plugin(SubagentRuntime)
+    registerSpawn(ctx)
+    const fiber = await ctx.plugin(seats, {
+      seats: { boomer: { provider: 'ollama-cloud', model: 'kimi-k3' } },
+    })
+    expect(toolNames(ctx)).toContain('boomer')
+    await fiber.dispose()
+    expect(toolNames(ctx)).not.toContain('boomer')
+    await ctx.fiber.dispose()
+  })
+
   it('keeps roster labels aligned with the three product seats', () => {
     expect(SEAT_ROSTER.map(entry => [entry.id, entry.label, entry.role])).toEqual([
       ['boomer', 'Boomer', 'Architect'],

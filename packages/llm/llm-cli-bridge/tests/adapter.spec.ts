@@ -479,6 +479,24 @@ describe('parse, serialize, and resolveRoutes', () => {
 })
 
 describe('plugin registration', () => {
+  it('registers no adapter when every shipped route is disabled', async () => {
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    await ctx.plugin(plugin, {
+      routes: {
+        'claude-cli': { enabled: false },
+        'codex-cli': { enabled: false },
+        'grok-cli': { enabled: false },
+        'kimi-cli': { enabled: false },
+      },
+    })
+    expect(ctx.llm.listProviders()).toEqual([])
+    expect(ctx.llm.listConfigurableProviders().map(entry => entry.provider)).toEqual(
+      expect.arrayContaining(['claude-cli', 'codex-cli', 'grok-cli', 'kimi-cli']),
+    )
+    await ctx.fiber.dispose()
+  })
+
   it('withdraws a disabled route from the live registry', async () => {
     const ctx = new Context()
     await ctx.plugin(LlmRuntime)

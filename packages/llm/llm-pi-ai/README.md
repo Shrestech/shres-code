@@ -6,7 +6,7 @@ The package root exposes the Cordis plugin contract, `PiAiAdapter`, `supportedPr
 
 ## Config
 
-Configure credentials, the model catalog, and deployment-specific transport settings per provider, keyed by the provider route itself. `apiKeyEnv` is a credential *reference* resolved per request, so no secret enters this file. Omitting it leaves the route unauthenticated, which for an installed catalog route means pi-ai's provider-native ambient discovery; a configured reference that resolves to nothing fails the request with `MISSING_CREDENTIAL` instead, because falling through would authenticate with whatever unrelated key the environment happens to hold. One credential serves every model on its route.
+Configure credentials, the model catalog, and deployment-specific transport settings per provider, keyed by the provider route itself. `enabled: false` keeps the directory entry and withdraws that route from the live adapter registry; omitted means on. `apiKeyEnv` is a credential *reference* resolved per request, so no secret enters this file. Omitting it leaves the route unauthenticated, which for an installed catalog route means pi-ai's provider-native ambient discovery; a configured reference that resolves to nothing fails the request with `MISSING_CREDENTIAL` instead, because falling through would authenticate with whatever unrelated key the environment happens to hold. One credential serves every model on its route.
 
 ```yaml
 - id: llm
@@ -17,6 +17,7 @@ Configure credentials, the model catalog, and deployment-specific transport sett
       openai:
         apiKeyEnv: OPENAI_API_KEY
         baseURL: https://proxy.example.com:8443
+        enabled: true            # optional; false withdraws this route from the live adapter registry
         reasoning: high
         retryPolicy:
           mode: normal

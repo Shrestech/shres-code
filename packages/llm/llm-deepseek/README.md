@@ -25,6 +25,7 @@ The package root exposes the Cordis plugin contract and `DeepSeekAdapter`; wire 
         maxDelayMs: 10000
         jitterRatio: 0.1
     defaultContextWindow: 1000000 # optional positive-integer fallback; this is the default
+    enabled: true            # optional; false withdraws the route from the live adapter registry
     models:                  # optional; defaults to V4 Flash and V4 Pro
       - id: deepseek-v4-flash
         name: DeepSeek-V4-Flash
@@ -32,6 +33,8 @@ The package root exposes the Cordis plugin contract and `DeepSeekAdapter`; wire 
         description: Company-hosted reasoning model
         contextWindow: 512000
 ```
+
+`enabled: false` keeps the directory entry so Models can still edit the route, and withdraws `deepseek-official` from the live adapter registry so the picker no longer offers it. Omitted means on.
 
 The plugin registers the single provider route `deepseek-official` together with its resolved `retryPolicy`. A request selects it with `provider: deepseek-official`; its `model` is passed through as the wire `model` string, so changing DeepSeek models does not require lifecycle-time registration. Omitting `models` advertises `deepseek-v4-flash` as `DeepSeek-V4-Flash` and `deepseek-v4-pro` as `DeepSeek-V4-Pro`, each with a 1,000,000-token context window; an explicit list replaces those defaults, while `models: []` advertises none. Catalog entries are exposed through `ctx.llm.listModels('deepseek-official')` for clients such as ACP editors and the Web selector, but remain advisory: unlisted model ids still pass through unchanged. An omitted entry name defaults to its id.
 

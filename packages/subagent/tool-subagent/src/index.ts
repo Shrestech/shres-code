@@ -152,13 +152,6 @@ function stopReasonError(result: SubagentResult): string | undefined {
 }
 
 /**
- * Append the child's preserved partial answer to a stop-reason error so a
- * truncated or cancelled child's real text still reaches the parent model.
- * @param error - the stop-reason headline.
- * @param output - the child's selected output (`SubagentResult.output`).
- * @returns the headline, extended with the partial text when any exists.
- */
-/**
  * Persist the model's short description, optionally prefixed for a named seat.
  * @param description - the model's 3-5 word `description` argument.
  * @param prefix - optional display prefix (`Boomer`, `Joey`, `Flyer`).
@@ -168,6 +161,13 @@ function childLabel(description: string, prefix: string | undefined): string {
   return prefix === undefined || prefix.length === 0 ? description : `${prefix}: ${description}`
 }
 
+/**
+ * Append the child's preserved partial answer to a stop-reason error so a
+ * truncated or cancelled child's real text still reaches the parent model.
+ * @param error - the stop-reason headline.
+ * @param output - the child's selected output (`SubagentResult.output`).
+ * @returns the headline, extended with the partial text when any exists.
+ */
 function withPartialText(error: string, output: ContentBlock[]): string {
   const text = output
     .filter((block): block is Extract<ContentBlock, { type: 'text' }> => block.type === 'text')

@@ -175,41 +175,7 @@ export function resolveRgPath(): Promise<string> {
   return rgPathPromise
 }
 
-/**
- * Run the packaged ripgrep binary with a plain argv vector and return its
- * complete raw stdout. The working directory is the calling agent's session
- * cwd (`exec.agent.session.header.cwd`) when available, else
- * `process.cwd()`. `exec.signal` is forwarded so the cooperative tool timeout
- * (`@roos-code/roos-code-tool-call-timeout-policy`) and caller cancellation terminate the
- * process tree.
- *
- * The spawn is unconfined (a plain `ctx.subprocess` call), so `--no-config`
- * is prepended: a host `RIPGREP_CONFIG_PATH` (or `rg.conf` next to the
- * binary) can otherwise inject `--pre` and make ripgrep execute an arbitrary
- * preprocessor for every matched file. The collect dispositions are the
- * seam's diagnostic-tail shape (no spill files): the tools never read a raw
- * spill path, and truncated stdout fails as `SEARCH_RAW_OUTPUT_OVERFLOW`.
- *
- * Exit semantics are tool-owned: exit 0 is success with results, exit 1 is
- * success with zero results (`noMatches`), anything else throws a
- * {@link SearchError} (abort/timeout → `SEARCH_ABORTED`, invalid pattern →
- * `SEARCH_INVALID_PATTERN`, the rest → `SEARCH_FAILED` /
- * `SEARCH_RAW_OUTPUT_OVERFLOW`). Both launch-time failure domains are
- * classified: a synchronous throw at spawn CREATION (a NUL in argv, an abort
- * racing the pre-check, a rejected `@vscode/ripgrep` resolution) and a
- * rejection of `handle.done` (the seam's infrastructure failures) both become
- * `SEARCH_FAILED` with the original as `cause` — an abort already observed by
- * creation time becomes `SEARCH_ABORTED` instead.
- *
- * @param ctx - the plugin context; execution uses its `subprocess` service.
- * @param exec - the tool-execution context; supplies the session cwd and the abort signal.
- * @param toolName - `glob` or `grep`, used in error messages.
- * @param argv - the ripgrep arguments (every model value an unquoted argv element; no shell layer exists).
- * @param rawOutputMaxBytes - cap on the complete raw stdout the tool will parse.
- * @param graceMs - the seam's terminate-escalation grace period.
- * @param stderrMaxBytes - cap on the retained stderr diagnostic tail.
- * @returns the complete stdout, the zero-result flag, and the resolved workdir.
- */
+/** Basename suffix of a credentials document that search must not open. */
 const CREDENTIALS_BASENAME_SUFFIX = '.credentials.yaml'
 
 function isPathInside(target: string, root: string): boolean {
@@ -253,6 +219,41 @@ export function fenceSearchPath(
   }
 }
 
+/**
+ * Run the packaged ripgrep binary with a plain argv vector and return its
+ * complete raw stdout. The working directory is the calling agent's session
+ * cwd (`exec.agent.session.header.cwd`) when available, else
+ * `process.cwd()`. `exec.signal` is forwarded so the cooperative tool timeout
+ * (`@roos-code/roos-code-tool-call-timeout-policy`) and caller cancellation terminate the
+ * process tree.
+ *
+ * The spawn is unconfined (a plain `ctx.subprocess` call), so `--no-config`
+ * is prepended: a host `RIPGREP_CONFIG_PATH` (or `rg.conf` next to the
+ * binary) can otherwise inject `--pre` and make ripgrep execute an arbitrary
+ * preprocessor for every matched file. The collect dispositions are the
+ * seam's diagnostic-tail shape (no spill files): the tools never read a raw
+ * spill path, and truncated stdout fails as `SEARCH_RAW_OUTPUT_OVERFLOW`.
+ *
+ * Exit semantics are tool-owned: exit 0 is success with results, exit 1 is
+ * success with zero results (`noMatches`), anything else throws a
+ * {@link SearchError} (abort/timeout → `SEARCH_ABORTED`, invalid pattern →
+ * `SEARCH_INVALID_PATTERN`, the rest → `SEARCH_FAILED` /
+ * `SEARCH_RAW_OUTPUT_OVERFLOW`). Both launch-time failure domains are
+ * classified: a synchronous throw at spawn CREATION (a NUL in argv, an abort
+ * racing the pre-check, a rejected `@vscode/ripgrep` resolution) and a
+ * rejection of `handle.done` (the seam's infrastructure failures) both become
+ * `SEARCH_FAILED` with the original as `cause` — an abort already observed by
+ * creation time becomes `SEARCH_ABORTED` instead.
+ *
+ * @param ctx - the plugin context; execution uses its `subprocess` service.
+ * @param exec - the tool-execution context; supplies the session cwd and the abort signal.
+ * @param toolName - `glob` or `grep`, used in error messages.
+ * @param argv - the ripgrep arguments (every model value an unquoted argv element; no shell layer exists).
+ * @param rawOutputMaxBytes - cap on the complete raw stdout the tool will parse.
+ * @param graceMs - the seam's terminate-escalation grace period.
+ * @param stderrMaxBytes - cap on the retained stderr diagnostic tail.
+ * @returns the complete stdout, the zero-result flag, and the resolved workdir.
+ */
 export async function runRipgrep(
   ctx: Context,
   exec: ToolExecution,

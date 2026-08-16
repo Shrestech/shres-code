@@ -92,4 +92,5 @@ export function apply(ctx: Context, config: Config): void {
     onChange: remount,
   })
   remount()
+  ctx.effect(() => () => { disposeTools?.() }, 'agent-seats: withdraw tools')
 }

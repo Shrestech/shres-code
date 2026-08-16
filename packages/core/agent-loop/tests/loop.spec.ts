@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@roos-code/cordis'
 import LlmRuntime, { createUserMessage, CallId, LlmError, StreamChunk  } from '@roos-code/roos-code-llm'
 import SessionStore, { SessionId, TurnEndReason } from '@roos-code/roos-code-session'
@@ -77,6 +77,25 @@ describe('agent loop', () => {
     expect(adapter.requests[0]?.maxTokens).toBe(256)
   })
 
+  it('refuses a second maintenance job while one is live', async () => {
+    const adapter = new MockAdapter([])
+    const ctx = await harness(adapter)
+    const agent = ctx.agentLoop.create(SessionId('maintenance-busy'), {
+      provider: 'mock',
+      model: 'mock',
+    })
+    const started = Promise.withResolvers<undefined>()
+    const finish = Promise.withResolvers<undefined>()
+    const maintenance = agent.runMaintenance(async () => {
+      started.resolve(undefined)
+      await finish.promise
+    })
+    await started.promise
+    expect(() => { void agent.runMaintenance(async () => undefined) }).toThrow(/already has active work/)
+    finish.resolve(undefined)
+    await maintenance
+  })
+
   it('cancels queued wakeup work together with an active maintenance task', async () => {
     const adapter = new MockAdapter([textResponse('park reply')])
     const ctx = await harness(adapter)
@@ -130,6 +149,63 @@ describe('agent loop', () => {
 
     expect(userTexts(agent)).toEqual(['wake behind maintenance'])
     expect(adapter.requests).toHaveLength(1)
+  })
+
+  it('settles whenIdle when a latched maintenance wake cannot open an initiator', async () => {
+    const adapter = new MockAdapter([textResponse('unused')])
+    const ctx = await harness(adapter)
+    const agent = ctx.agentLoop.create(SessionId('maintenance-wake-initiator-disposed'), {
+      provider: 'mock',
+      model: 'mock',
+    })
+    const started = Promise.withResolvers<undefined>()
+    const finish = Promise.withResolvers<undefined>()
+    const maintenance = agent.runMaintenance(async () => {
+      started.resolve(undefined)
+      await finish.promise
+    })
+    await started.promise
+
+    send(agent, 'wake behind a closing initiator')
+    vi.spyOn(ctx.agents, 'withInitiator').mockImplementation(() => {
+      throw new Error('agent initiator scope is disposed')
+    })
+    finish.resolve(undefined)
+    await maintenance
+    await Promise.race([
+      agent.whenIdle(),
+      new Promise((_resolve, reject) => {
+        setTimeout(() => { reject(new Error('whenIdle hung after initiator-disposed wake')) }, 1000)
+      }),
+    ])
+
+    expect(agent.status).toBe('idle')
+    expect(adapter.requests).toEqual([])
+    expect(agent.session.events.filter(event => event.type === 'turn/start')).toHaveLength(0)
+  })
+
+  it('settles whenIdle when an idle wake cannot open an initiator', async () => {
+    const adapter = new MockAdapter([textResponse('unused')])
+    const ctx = await harness(adapter)
+    const agent = ctx.agentLoop.create(SessionId('idle-wake-initiator-disposed'), {
+      provider: 'mock',
+      model: 'mock',
+    })
+    vi.spyOn(ctx.agents, 'withInitiator').mockImplementation(() => {
+      throw new Error('agent initiator scope is disposed')
+    })
+
+    send(agent, 'cannot start')
+    await Promise.race([
+      agent.whenIdle(),
+      new Promise((_resolve, reject) => {
+        setTimeout(() => { reject(new Error('whenIdle hung after idle initiator-disposed wake')) }, 1000)
+      }),
+    ])
+
+    expect(agent.status).toBe('idle')
+    expect(adapter.requests).toEqual([])
+    expect(agent.session.events.filter(event => event.type === 'turn/start')).toHaveLength(0)
   })
 
   it('suppresses the replay when a latched maintenance wake is removed', async () => {

@@ -175,12 +175,18 @@ export class FirstRunSetup extends Service {
   }
 }
 
-/** Process streams for a production CLI run. Prompts use stderr. */
+/**
+ * Process streams for a production CLI run. Prompts use stderr.
+ * @returns the current {@link internals.io} factory result.
+ */
 export function defaultIo(): CliIo {
   return internals.io()
 }
 
-/** Production stdin/stderr pair; tests replace {@link internals.io}. */
+/**
+ * Production stdin/stderr pair; tests replace {@link internals.io}.
+ * @returns process streams with TTY detection.
+ */
 export function processIo(): CliIo {
   return {
     stdin: process.stdin,

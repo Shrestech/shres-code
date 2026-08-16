@@ -216,18 +216,6 @@ function userDefaultModelOf(namespaces: ReadonlyMap<string, SettingsNamespaceVie
 }
 
 /**
- * Whether a joined row can serve model requests as it stands: the route is
- * registered with the adapter registry, and whatever credential its resolved
- * profile names is stored. A profile naming no reference authenticates through
- * the provider's own path (the Bedrock chain, Vertex ADC, a gateway that needs
- * nothing), as does a live route with no settings address at all, so neither
- * owes this page a key. Delegated CLI routes are keyless in this join — their
- * keys live in `route.env` after the subprocess scrub — so they never count
- * as ready here.
- * @param row - one joined provider row.
- * @returns whether the user already has this provider to talk to.
- */
-/**
  * Whether the joined profile currently leaves this route in the live registry.
  * An omitted `enabled` field is on.
  * @param row - one joined provider row.
@@ -243,6 +231,18 @@ export function providerEnabled(
   return getPath(namespace.value, [...row.entry.settingsPath, 'enabled']) !== false
 }
 
+/**
+ * Whether a joined row can serve model requests as it stands: the route is
+ * registered with the adapter registry, and whatever credential its resolved
+ * profile names is stored. A profile naming no reference authenticates through
+ * the provider's own path (the Bedrock chain, Vertex ADC, a gateway that needs
+ * nothing), as does a live route with no settings address at all, so neither
+ * owes this page a key. Delegated CLI routes are keyless in this join — their
+ * keys live in `route.env` after the subprocess scrub — so they never count
+ * as ready here.
+ * @param row - one joined provider row.
+ * @returns whether the user already has this provider to talk to.
+ */
 export function providerUsable(row: ProviderRow): boolean {
   if (!row.entry.active) return false
   if (row.entry.kind === 'delegated') return false

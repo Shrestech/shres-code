@@ -241,6 +241,62 @@ describe('Agent.cancel()', () => {
     expect(userTexts(agent)).toEqual(['active'])
   })
 
+  it('send after a disposed cancel does not queue work or start a turn', async () => {
+    const adapter = new MockAdapter([textResponse('unused')])
+    const ctx = await harness(adapter)
+    const agent = ctx.agentLoop.create(SessionId('send-after-disposed'), {
+      provider: 'mock',
+      model: 'mock',
+    })
+
+    agent.cancel({ kind: 'disposed' })
+    send(agent, 'stale')
+    await Promise.race([
+      agent.whenIdle(),
+      new Promise((_resolve, reject) => {
+        setTimeout(() => { reject(new Error('whenIdle hung after disposed send')) }, 1000)
+      }),
+    ])
+
+    expect(agent.status).toBe('idle')
+    expect(userTexts(agent)).toEqual([])
+    expect(agent.inbox.nextTurn).toHaveLength(0)
+    expect(adapter.requests).toEqual([])
+  })
+
+  it('does not replay a keepInbox wake after a disposed cancel', async () => {
+    const adapter = new MockAdapter([textResponse('unused')])
+    const ctx = await harness(adapter)
+    const agent = ctx.agentLoop.create(SessionId('disposed-keepinbox-wake'), {
+      provider: 'mock',
+      model: 'mock',
+    })
+    const started = Promise.withResolvers<undefined>()
+    const maintenance = agent.runMaintenance(async (signal) => {
+      started.resolve(undefined)
+      await new Promise<void>((_resolve, reject) => {
+        signal.addEventListener('abort', () => {
+          reject(new Error('maintenance aborted', { cause: signal.reason }))
+        }, { once: true })
+      })
+    })
+    await started.promise
+
+    send(agent, 'late after dispose')
+    agent.cancel({ kind: 'disposed' }, { keepInbox: true })
+    await expect(maintenance).rejects.toThrow('maintenance aborted')
+    await Promise.race([
+      agent.whenIdle(),
+      new Promise((_resolve, reject) => {
+        setTimeout(() => { reject(new Error('whenIdle hung after disposed keepInbox wake')) }, 1000)
+      }),
+    ])
+
+    expect(agent.status).toBe('idle')
+    expect(adapter.requests).toEqual([])
+    expect(agent.session.events.filter(event => event.type === 'turn/start')).toHaveLength(0)
+  })
+
   it('cancel after waking send closes its synchronously opened turn without a step', async () => {
     const adapter = new MockAdapter([textResponse('should not run')])
     const ctx = await harness(adapter)

@@ -41,7 +41,11 @@ export async function runCliPicker(io: CliIo, options: readonly PickerOption[]):
   }
 }
 
-/** Format the numbered menu. */
+/**
+ * Format the numbered menu.
+ * @param entries - numbered picker rows.
+ * @returns the menu text, including the quit line.
+ */
 export function formatMenu(entries: readonly MenuEntry[]): string {
   const lines = [
     'No default model is configured, and no provider can serve requests yet.',
@@ -54,7 +58,11 @@ export function formatMenu(entries: readonly MenuEntry[]): string {
   return `${lines.join('\n')}\n`
 }
 
-/** Assign 1-based indexes and printable labels. */
+/**
+ * Assign 1-based indexes and printable labels.
+ * @param options - first-run picker options in print order.
+ * @returns menu rows ready for {@link formatMenu}.
+ */
 export function numberOptions(options: readonly PickerOption[]): MenuEntry[] {
   return options.map((option, offset) => ({
     index: offset + 1,

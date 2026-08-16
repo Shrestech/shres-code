@@ -214,7 +214,6 @@ export function apply(ctx: Context, config: Config): void {
       .filter(([, route]) => route.enabled !== false)
       .map(([id]) => id)
     if (registration === undefined) {
-      /* v8 ignore next 4 -- shipped routes always register at least one adapter */
       if (ids.length === 0) {
         registeredFacts = facts
         return

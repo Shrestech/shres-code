@@ -65,6 +65,8 @@ export class ReactLoopAgent implements Agent {
   readonly inbox: Inbox
   private phase: Phase
   private activityDone: Promise<void> = Promise.resolve()
+  /** Set by `cancel({ kind: 'disposed' })`. Later `send` / `wakeDriver` are no-ops. */
+  private disposed = false
 
   /** The agent-scoped registration boundary; the lifecycle owner unwinds it after the driver exits. */
   readonly scope: Scope
@@ -111,6 +113,7 @@ export class ReactLoopAgent implements Agent {
   }
 
   send(message: UserMessage, target: InboxTarget, wakeup: boolean): void {
+    if (this.disposed) return
     // Waking input cannot join an aborted activity, so it starts the next turn.
     // Captured before the insertion so a reentrant cancel from a splice observer cannot reclassify it.
     const wakingAfterAbort = wakeup && this.phase.kind !== 'idle' && this.phase.abort.signal.aborted
@@ -132,6 +135,7 @@ export class ReactLoopAgent implements Agent {
   }
 
   cancel(cause: AgentCancelCause, options: CancelOptions = {}): void {
+    if (cause.kind === 'disposed') this.disposed = true
     if (!options.keepInbox) {
       this.inbox.clear()
       if (this.phase.kind !== 'idle') this.phase.wakeRequested = false
@@ -170,6 +174,7 @@ export class ReactLoopAgent implements Agent {
    *   the inbox insertion so a reentrant cancel cannot reclassify it.
    */
   private wakeDriver(wakeAfterAbort = false): void {
+    if (this.disposed) return
     if (this.phase.kind !== 'idle') {
       // Maintenance and aborted drivers cannot deliver the wake: latch it for
       // replay at convergence. Live drivers claim queued work themselves;
@@ -182,14 +187,23 @@ export class ReactLoopAgent implements Agent {
     }
     const driver = Promise.withResolvers<void>()
     this.activityDone = driver.promise
+    const turn = this.phase.lastTurn
     this.setPhase({
       kind: 'running',
       abort: new AbortController(),
-      turn: this.phase.lastTurn,
+      turn,
       step: 0,
       wakeRequested: false,
     })
-    this.loopCtx.agents.withInitiator(this, () => this.kick()).then(driver.resolve, driver.reject)
+    try {
+      // withInitiator throws synchronously once the Agent service is closing.
+      // Attach settlement only after that call returns so a throw cannot leave
+      // activityDone pending and whenIdle() waiting forever.
+      this.loopCtx.agents.withInitiator(this, () => this.kick()).then(driver.resolve, driver.reject)
+    } catch {
+      this.setPhase({ kind: 'idle', lastTurn: turn })
+      driver.resolve()
+    }
   }
 
   async whenIdle(): Promise<void> {
