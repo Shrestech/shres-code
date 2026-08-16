@@ -161,12 +161,13 @@ export async function validateSelection(
   }
 }
 
-/** Whether this agent is a subagent child whose switch must not write the process default. */
+/**
+ * Whether this agent is a subagent child whose switch must not write the process default.
+ * `parentSession` is fork/seed lineage and is not a subagent mark.
+ */
 function isSubagentSession(agent: Agent): boolean {
   const header = agent.session.header
-  return header.origin === 'subagent'
-    || header.parentSession !== undefined
-    || (header.delegationDepth ?? 0) > 0
+  return header.origin === 'subagent' || (header.delegationDepth ?? 0) > 0
 }
 
 /**

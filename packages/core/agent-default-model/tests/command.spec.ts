@@ -254,7 +254,6 @@ describe('/model command', () => {
     })
     const metas = [
       { origin: 'subagent' as const },
-      { parentSession: SessionId('parent') },
       { delegationDepth: 1 },
     ]
     for (const [index, meta] of metas.entries()) {
@@ -269,6 +268,28 @@ describe('/model command', () => {
     expect(ctx.agentDefaultModel.currentSelection()).toEqual({
       provider: 'deepseek-official', model: 'deepseek-v4-flash',
     })
+    await ctx.fiber.dispose()
+  })
+
+  it('accepts /model on a forked user session that only has parentSession', async () => {
+    const ctx = new Context()
+    await ctx.plugin(MemorySettings)
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(CommandRuntime)
+    ctx.provide('llm', mockLlm({
+      providers: [{ id: 'openai' }],
+      models: { openai: [{ id: 'gpt-4.1', name: 'GPT', provider: 'openai' }] },
+    }))
+    await ctx.plugin(AgentDefaultModelConfig, {
+      provider: 'deepseek-official',
+      model: 'deepseek-v4-flash',
+    })
+    const session = ctx.sessions.create(SessionId('fork'), { meta: { parentSession: SessionId('parent') } })
+    const agent = { id: session.id, session, ctx } as unknown as Agent
+    await ctx.plugin(Object.assign((inner: Context) => { createScope(inner, agent) }, { inject: ['commands'] }))
+    const execution = await ctx.commands.execute(agent, '/model openai gpt-4.1', new AbortController().signal)
+    expect(execution?.result).toEqual({ kind: 'success', text: 'model: openai gpt-4.1' })
+    expect(ctx.agentDefaultModel.currentSelection()).toEqual({ provider: 'openai', model: 'gpt-4.1' })
     await ctx.fiber.dispose()
   })
 
