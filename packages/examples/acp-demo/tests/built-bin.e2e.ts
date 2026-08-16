@@ -77,7 +77,9 @@ async function makeConsumer(): Promise<string> {
     const resolved = fileURLToPath(import.meta.resolve(`${dep}/package.json`, fromAcp))
     await link(dirname(resolved), dep, nm)
   }
-  await writeFile(join(dir, 'mock-llm.mjs'), [
+  const dshHome = join(dir, '.dsh')
+  await mkdir(dshHome, { recursive: true })
+  await writeFile(join(dshHome, 'mock-llm.mjs'), [
     "import { LlmAdapter } from '@deepseek-ai/dsh-llm'",
     'class Mock extends LlmAdapter {',
     '  async * stream() {',
@@ -92,7 +94,7 @@ async function makeConsumer(): Promise<string> {
     "export function apply(ctx) { ctx.llm.registerAdapter(['built-acp-mock'], new Mock()) }",
     '',
   ].join('\n'))
-  await writeFile(join(dir, 'cordis.yml'), [
+  await writeFile(join(dshHome, 'cordis.yml'), [
     '- id: mock-llm',
     '  name: \'./mock-llm.mjs\'',
     '- id: subprocess',
@@ -134,7 +136,7 @@ afterEach(async () => {
 describe.skipIf(!existsSync(acpBin))('dsh-acp-demo BUILT bin (node lib/bin.js, no tsx)', () => {
   it('boots the published bin, completes a turn, and writes default Zstandard persistence', async () => {
     consumer = await makeConsumer()
-    child = spawn(process.execPath, [acpBin, '--config', './cordis.yml'], {
+    child = spawn(process.execPath, [acpBin, '--config', join(consumer, '.dsh', 'cordis.yml')], {
       cwd: consumer,
       env: {
         ...process.env,

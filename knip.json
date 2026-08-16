@@ -603,8 +603,12 @@
       ]
     },
     "packages/examples/jsonrpc-demo": {
+      "entry": [
+        "tests/**/*.spec.ts"
+      ],
       "project": [
-        "src/**/*.ts"
+        "src/**/*.ts",
+        "tests/**/*.ts"
       ]
     },
     "packages/subagent/subagent-spawn-in-process": {

@@ -6,7 +6,7 @@ Bin-only app that boots an external `cordis.yml`; its [`jsonrpc`](../../sdk/serv
 
 ## Config discovery
 
-The first non-empty channel wins: `$DSH_CORDIS_CONFIG`, then positional `argv[2]`. If neither names an existing file, the bin prints one-line usage to stderr and exits 1; there is no working-directory or built-in fallback. [`dsh-app-boot`](../../boot/app-boot/README.md) makes plugin load failures fatal. This protocol does not use `DSH_SNAPSHOT`.
+The first non-empty channel wins: `$DSH_CORDIS_CONFIG`, then positional `argv[2]`. If neither names a path, the bin prints one-line usage to stderr and exits 1; there is no working-directory or built-in fallback. An explicit path that does not exist fails as not found. An explicit path outside `$DSH_HOME` that contains `!!js` or a relative plugin `name:` fails; place that file under `$DSH_HOME` to pre-approve those constructs. The bin loads `.env` through `loadLayeredEnv`, which rejects bootstrap-only names. [`dsh-app-boot`](../../boot/app-boot/README.md) makes plugin load failures fatal. This protocol does not use `DSH_SNAPSHOT`.
 
 A config without `dsh-sdk-jsonrpc-server` is valid and serves nothing; the bin does not designate a server plugin.
 

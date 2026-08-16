@@ -42,7 +42,7 @@ The shipped [`examples/acp-agent/cordis.yml`](../../../examples/acp-agent/cordis
 
 ## Bin
 
-`dsh-acp-demo [--config path-to-cordis.yml]` (short form `-c`; default `./cordis.yml`) loads the gitignored `.env`, except in replay mode; `DSH_SNAPSHOT=replay` selects the sibling `cordis.snapshot.yml`; stdin EOF disposes the context and flushes sessions before exit. Loader's installed optional `node-addon-require-builtin` peer resolves bare plugin specifiers for the built bin under plain Node. Diagnostics use stderr because stdout is the ACP wire.
+`dsh-acp-demo [--config path-to-cordis.yml]` (short form `-c`) loads the layered `.env` (invoking directory, then `$DSH_HOME`) except in replay mode, and rejects bootstrap-only names from either file. With no `--config`, the bin uses this package's bundled composition path and never a CWD `cordis.yml`. An explicit `--config` outside `$DSH_HOME` that contains `!!js` or a relative plugin `name:` fails; place that file under `$DSH_HOME` to pre-approve those constructs. `DSH_SNAPSHOT=replay` selects the sibling `cordis.snapshot.yml`; stdin EOF disposes the context and flushes sessions before exit. Loader's installed optional `node-addon-require-builtin` peer resolves bare plugin specifiers for the built bin under plain Node. Diagnostics use stderr because stdout is the ACP wire.
 
 ## Model Experience
 

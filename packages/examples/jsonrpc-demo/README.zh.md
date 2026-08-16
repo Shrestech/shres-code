@@ -6,7 +6,7 @@
 
 ## 配置发现
 
-第一个非空通道生效：先 `$DSH_CORDIS_CONFIG`，再位置参数 `argv[2]`。如果二者都没有指向现有文件，bin 会向 stderr 打印单行用法并以 1 退出；没有工作目录回退或内置回退。[`dsh-app-boot`](../../boot/app-boot/README.md) 会使插件加载失败成为致命错误。此协议不使用 `DSH_SNAPSHOT`。
+第一个非空通道生效：先 `$DSH_CORDIS_CONFIG`，再位置参数 `argv[2]`。如果二者都没有给出路径，bin 会向 stderr 打印单行用法并以 1 退出；没有工作目录回退或内置回退。显式路径不存在时按找不到文件失败。显式路径若位于 `$DSH_HOME` 之外且包含 `!!js` 或相对插件 `name:`，则会失败；将文件放到 `$DSH_HOME` 下即可预批准这些构造。bin 通过 `loadLayeredEnv` 加载 `.env`，并拒绝 bootstrap-only 名称。[`dsh-app-boot`](../../boot/app-boot/README.md) 会使插件加载失败成为致命错误。此协议不使用 `DSH_SNAPSHOT`。
 
 不含 `dsh-sdk-jsonrpc-server` 的配置仍然有效，只是不提供任何服务；bin 不会指定服务器插件。
 

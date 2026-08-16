@@ -4,8 +4,8 @@
  * @module @deepseek-ai/dsh-sdk-jsonrpc-demo/runner
  */
 
-import { existsSync } from 'node:fs'
-import { boot, installFailLoud, loadEnv, resolveConfigPath } from '@deepseek-ai/dsh-app-boot'
+import { boot, installFailLoud, loadLayeredEnv } from '@deepseek-ai/dsh-app-boot'
+import { resolveDemoConfig, selectExplicitConfigPath } from './resolveDemoConfig.ts'
 
 /* v8 ignore start -- composition over tested app-boot/jsonrpc and executable acceptance paths */
 const NAME = 'dsh-jsonrpc-agent'
@@ -19,21 +19,17 @@ const NAME = 'dsh-jsonrpc-agent'
  */
 export async function runJsonrpcAgent(bareModuleBaseUrl?: string): Promise<void> {
   installFailLoud(NAME)
-  loadEnv(NAME)
+  loadLayeredEnv(NAME)
 
   // Env wins over argv; empty values are absent. External config defines the deployment.
-  const fromEnv = process.env['DSH_CORDIS_CONFIG']
-  const fromArgv = process.argv[2]
-  const requested = fromEnv !== undefined && fromEnv !== ''
-    ? fromEnv
-    : fromArgv !== undefined && fromArgv !== '' ? fromArgv : undefined
-  const configPath = requested === undefined ? undefined : resolveConfigPath(requested, undefined)
-  if (configPath === undefined || !existsSync(configPath)) {
+  const requested = selectExplicitConfigPath()
+  if (requested === undefined) {
     process.stderr.write(
       `usage: ${NAME} <path/to/cordis.yml> (or set DSH_CORDIS_CONFIG=<path>, which wins); the config is required — there is no built-in fallback\n`,
     )
     process.exit(1)
   }
+  const configPath = resolveDemoConfig({ requested, binName: NAME })
 
   const ctx = await boot(NAME, configPath, undefined, undefined, bareModuleBaseUrl)
   let exiting = false
