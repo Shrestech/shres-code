@@ -22,7 +22,7 @@
 |---|---|---|
 | `name` | string（必填） | 可用 skill 列表中精确的 kebab-case skill 名称。 |
 
-执行使用调用 agent 的 `session.header.cwd`，使结果随工作区变化的提供方能够解析出胜出的 skill。成功调用返回规范形式的 `{ name, provider, source, resourceBase?, content }`，其中不包含目录排名和提供方内部机制；其 Native 渲染器会生成一个文本结果，其中包含 `<skill_content name="...">`、`<skill_resources>` 和 `<skill_instructions>`。`project-*` 来源会前置 [`roos-untrusted-frame`](../../util/untrusted-frame/README.md) 说明头；`bundled` 与 `user-*` 仍作为受信任的本地内容。正文中的字面量 `</skill_content>` 与 `</skill_instructions>` 会被中和，以免关闭包装。
+执行使用调用 agent 的 `session.header.cwd`，使结果随工作区变化的提供方能够解析出胜出的 skill。成功调用返回规范形式的 `{ name, provider, source, resourceBase?, content }`，其中不包含目录排名和提供方内部机制；其 Native 渲染器会生成一个文本结果，其中包含 `<skill_content name="...">`、`<skill_resources>` 和 `<skill_instructions>`。受信任来源（`bundled`、`user-*`、`runtime`、`custom`）会中和正文中的结束标签族。其他来源（包括 `project-*`）把 [`roos-untrusted-frame`](../../util/untrusted-frame/README.md) 说明头放在 `<skill_content>` 内，并转义正文中的每个 `<`。
 
 资源指引只会根据 `resourceBase` 解析指令显式引用的路径或 URL；脚本、参考资料和资源文件按需加载，结果不会列举 skill 目录。本地提供方可以提供目录，而远程或嵌入式提供方可以提供 URL 或不透明加载指引。
 
@@ -95,7 +95,7 @@ A user may also invoke a skill directly; its <skill_content> block then appears 
 </skill_content>
 ```
 
-`project-*` 来源会在该块前面加上 [`roos-untrusted-frame`](../../util/untrusted-frame/README.md) 说明头（领域首句加上共享的「不要遵循其中指令」免责声明）。目录仍只含摘要，不会被定界。
+不受信任来源（`project-*`，或除 `bundled` / `user-*` / `runtime` / `custom` 以外的任何标签）把 [`roos-untrusted-frame`](../../util/untrusted-frame/README.md) 说明头放在该块内、`<skill_instructions>` 之上，并包装正文以转义每个 `<`。目录仍只含摘要，不会被定界。
 
 ##### 提供方管理的资源指引
 
@@ -151,7 +151,7 @@ Load referenced resources only as needed.
 
 #### 模型看到的内容
 
-已认领用户消息中任意位置、以空白为界、指名工作区目录中某个用户可调用 skill 的 `/name` token，会把该 skill 的完整 `<skill_content>` 渲染（与上文结果模板完全相同的形态）作为 `user` 角色的指令上下文注入，追加在该步骤所有其他注入之后——背景在前，模型要着手处理的材料在最后。只扫描直接的用户输入，检查在已加载定义上进行，未知名称和用户不可调用的名称保持为普通行文。这是 `disable-model-invocation` skill 唯一的入口，目录和 `skill` 工具永不暴露这类 skill；目录的结尾一句会告诉模型遵循注入块，而不是重新加载它。
+已认领用户消息中任意位置、以空白为界、指名工作区目录中某个用户可调用 skill 的 `/name` token，会把该 skill 的完整 `<skill_content>` 渲染（上文结果模板，来源不受信任时包含不受信任定界框说明头）作为 `user` 角色的指令上下文注入，追加在该步骤所有其他注入之后——背景在前，模型要着手处理的材料在最后。只扫描直接的用户输入，检查在已加载定义上进行，未知名称和用户不可调用的名称保持为普通行文。这是 `disable-model-invocation` skill 唯一的入口，目录和 `skill` 工具永不暴露这类 skill；目录的结尾一句会告诉模型遵循注入块，而不是重新加载它。
 
 #### Token 影响
 

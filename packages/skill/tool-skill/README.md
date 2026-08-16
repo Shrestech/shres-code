@@ -22,7 +22,7 @@ The catalog is omitted when no model-invocable skills are initially available, a
 |---|---|---|
 | `name` | string (required) | Exact kebab-case skill name from the available skills listing. |
 
-Execution uses the calling agent's `session.header.cwd` so workspace-sensitive providers resolve the winning skill. A successful call returns canonical `{ name, provider, source, resourceBase?, content }`, excluding catalog ranking and provider-internal machinery; its Native renderer produces one text result containing `<skill_content name="...">`, `<skill_resources>`, and `<skill_instructions>`. A `project-*` source prepends the [`roos-untrusted-frame`](../../util/untrusted-frame/README.md) header; `bundled` and `user-*` stay trusted local content. Literal `</skill_content>` and `</skill_instructions>` in the body are neutralized so they cannot close the wrapper.
+Execution uses the calling agent's `session.header.cwd` so workspace-sensitive providers resolve the winning skill. A successful call returns canonical `{ name, provider, source, resourceBase?, content }`, excluding catalog ranking and provider-internal machinery; its Native renderer produces one text result containing `<skill_content name="...">`, `<skill_resources>`, and `<skill_instructions>`. Trusted sources (`bundled`, `user-*`, `runtime`, `custom`) neutralize a close-tag family in the body. Every other source, including `project-*`, places the [`roos-untrusted-frame`](../../util/untrusted-frame/README.md) header inside `<skill_content>` and escapes every `<` in the body.
 
 Resource guidance resolves only paths or URLs explicitly referenced by the instructions against `resourceBase`; scripts, references, and assets load on demand, and the result does not enumerate a skill directory. Local providers may supply a directory, while remote or embedded providers may supply a URL or opaque loading guidance.
 
@@ -95,7 +95,7 @@ A successful call uses the result template and the provider-managed, directory, 
 </skill_content>
 ```
 
-A `project-*` source prefixes that block with the [`roos-untrusted-frame`](../../util/untrusted-frame/README.md) header (domain first sentence plus the shared do-not-follow disclaimer). The catalog stays summary-only and is not framed.
+An untrusted source (`project-*` or any label outside `bundled` / `user-*` / `runtime` / `custom`) places the [`roos-untrusted-frame`](../../util/untrusted-frame/README.md) header inside this block, above `<skill_instructions>`, and wraps the body so every `<` is escaped. The catalog stays summary-only and is not framed.
 
 ##### Provider-managed resource guidance
 
@@ -151,7 +151,7 @@ Append-only; newly visible content follows the reusable request prefix and does 
 
 #### What the model sees
 
-A whitespace-bounded `/name` token anywhere in a claimed user message, naming a user-invocable skill in the workspace catalog, injects that skill's full `<skill_content>` rendering (the exact result-template shape above) as a `user`-role instructions context appended after every other injection of that step — background first, the material to act on last. Only direct user input is scanned, the check runs on the loaded definition, and unknown or user-disabled names stay ordinary prose. This is the sole entry point for `disable-model-invocation` skills, which the catalog and the `skill` tool never expose; the catalog's closing sentence tells the model to follow the injected block instead of re-loading it.
+A whitespace-bounded `/name` token anywhere in a claimed user message, naming a user-invocable skill in the workspace catalog, injects that skill's full `<skill_content>` rendering (the result template above, including the untrusted-frame header when the source is untrusted) as a `user`-role instructions context appended after every other injection of that step — background first, the material to act on last. Only direct user input is scanned, the check runs on the loaded definition, and unknown or user-disabled names stay ordinary prose. This is the sole entry point for `disable-model-invocation` skills, which the catalog and the `skill` tool never expose; the catalog's closing sentence tells the model to follow the injected block instead of re-loading it.
 
 #### Token effect
 

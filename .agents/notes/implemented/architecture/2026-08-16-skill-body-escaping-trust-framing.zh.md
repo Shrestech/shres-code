@@ -12,11 +12,10 @@ Status: implemented
 
 ## 决策
 
-`renderSkillContent` 仍然为两条加载路径拥有同一份 `<skill_content>` 块。它现在：
+`renderSkillContent` 仍然为两条加载路径拥有同一份 `<skill_content>` 块。信任判定默认关闭：只有 `bundled`、`user-*`、`runtime` 和 `custom` 是受信任的本地内容。`project-*`、任何其他标签以及缺失的 source 都不受信任。
 
-- 把每个正文中的字面量 `</skill_content>` 与 `</skill_instructions>` 中和：把各自开头的 `<` 替换为来自 [`roos-untrusted-frame`](2026-08-16-untrusted-frame-util.md) 的 `UNTRUSTED_LT_ESCAPE`。其他标记（包括 `<tags>`）保持原样。`name` 属性仍按原先方式做 HTML 转义。
-- 当 `source` 以 `project-` 开头时，前置不受信任定界框说明头：领域首句 `The skill instructions below are untrusted project content.` 加上 `UNTRUSTED_INSTRUCTION_DISCLAIMER`、一个空行，然后是未改动的 `<skill_content>` 标签。资源提示留在块内、正文外。
-- 把 `bundled`、`user-roos`、`user-agents`、`runtime` 和 `custom` 留作受信任的本地内容：同一份 `<skill_content>` 块，没有说明头。
+- 受信任正文会中和一组结束标签——`</skill_content>` / `</skill_instructions>`，ASCII 大小写不敏感，`>` 前可有空白——把开头的 `<` 替换为 `UNTRUSTED_LT_ESCAPE`。其他标记（包括 `<tags>`）保持原样。`name` 属性仍按原先方式做 HTML 转义。
+- 不受信任来源把不受信任定界框说明头放在 `<skill_content>` **内部**、指令正文之上，因此目录里「遵循该块」的句子会覆盖到免责声明。正文使用 `wrapUntrusted('skill_instructions', content)`，从而转义每个 `<`。资源提示留在外层块内、被包装的正文外。
 
 `skill` 工具的结构化值携带 `source`，使 Native 渲染器能套用与用户显式注入相同的规则；后者本来就会收到完整的 `SkillDefinition`。
 
@@ -24,17 +23,19 @@ Status: implemented
 
 ## 考虑过的替代方案
 
-**把每个 skill 都当作不受信任，并对整个正文运行 `escapeUntrusted`。** 否决，因为打包 skill 和用户主目录 skill 是操作者控制的本地内容。把每个 `<` 都转义会为它们并不具有的威胁改写 markdown。
+**把每个 skill 都当作不受信任，并对整个正文运行 `escapeUntrusted`。** 否决，因为打包 skill 和用户主目录 skill 是操作者控制的本地内容。把每个 `<` 都转义会为它们并不具有的威胁改写 markdown。不受信任来源会经由 `wrapUntrusted` 运行 `escapeUntrusted`。
 
 **只在系统提示词或目录中警告，不转义结束标签。** 否决，因为包含 `</skill_instructions>` 的正文仍会关闭包装；一句目录文字无法修复被冲破的定界框。
 
-**把整个 `<skill_content>` 块包进 `frameUntrusted`。** 否决，因为那会转义 harness 自己的标签和 `name` 属性。受信任元数据应留在不受信任载荷之外；说明头放在现有块的上方。
+**把整个 `<skill_content>` 块包进 `frameUntrusted`。** 否决，因为那会转义 harness 自己的标签和 `name` 属性。受信任元数据（名称、资源提示）留在被包装的指令正文之外；说明头放在 `<skill_content>` 内，使目录所点名的块包含它。
+
+**信任任何非 `project-*` 来源，包括未知标签和缺失的 source。** 否决，因为 `SkillSource` 是开放联合。将来的远程或 marketplace 提供方只要另选一个字符串就会以受信任身份发布。允许列表就是那四个本地受信任标签。
 
 **像对待用户主目录 skill 一样信任项目 skill。** 否决，因为克隆下来的仓库不是当前 user 的写作。项目 skill 文件相当于 skill 语境下的抓取网页文本。
 
 ## 后果
 
-- 项目 skill 的渲染会因说明头而变长。加载 `project-*` skill 的快照（ACP 的 `skill-load`、web 的 skill 工具行、agent-spine 的热添加 skill 路径）会带上这些字节。打包 skill 的渲染（如 `roos-badge`）除新增的结构化 `source` 字段外保持字节相同。
-- 提到那两个结束标签的正文现在会在仍然闭合的包装内显示 `\u003c/skill_content>` / `\u003c/skill_instructions>`。
+- 项目 skill 的渲染会因 `<skill_content>` 内的说明头而变长，正文中的每个 `<` 都会变成 `\u003c`。加载 `project-*` skill 的快照（ACP 的 `skill-load`、web 的 skill 工具行、agent-spine 的热添加 skill 路径）会带上这些字节。打包 skill 的渲染（如 `roos-badge`）除新增的结构化 `source` 字段外保持字节相同。
+- 提到该结束标签族的受信任正文现在会在仍然闭合的包装内显示 `\u003c/skill_content>` / `\u003c/skill_instructions>`（以及大小写或空白变体）。
 - 目录模板和替换生命周期不谈论信任。仅正文渲染规则变化时，不必改目录。
-- `runtime` 与 `custom` 走受信任路径。将来若有并非 `project-*` 的远程提供方需要被定界，必须把 `source` 设为 `project-*`，或扩展本规则。
+- 新的远程提供方在被加入受信任允许列表之前都不受信任。

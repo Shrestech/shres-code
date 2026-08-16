@@ -85,7 +85,12 @@ Chokidar watches existing roots for direct bundle/flat-entry additions and remov
 Skill names are kebab-case (`^[a-z0-9]+(?:-[a-z0-9]+)*$`). The local provider accepts directory bundles (`<name>/SKILL.md`) and flat Markdown files (`<name>.md`). Nested recursive `**/SKILL.md` discovery is not supported.
 
 ```ts type-equiv
-/** Origin bucket for a skill contribution. The value is prompt-visible metadata, not precedence by itself. */
+/**
+ * Origin bucket for a skill contribution. The value is prompt-visible
+ * metadata, not precedence by itself. `renderSkillContent` treats only
+ * `bundled`, `user-*`, `runtime`, and `custom` as trusted local content;
+ * `project-*` and every other label, including a missing source, are untrusted.
+ */
 type SkillSource = 'project-roos' | 'project-agents' | 'runtime' | 'user-roos' | 'user-agents' | 'custom' | 'bundled' | (string & {})
 ```
 
@@ -232,7 +237,7 @@ interface Config {
 
 Before each later model step, the consumer applies exact tool visibility and digests the exact rendered entries between the `<available_skills>` tags from a complete snapshot. It derives the comparison baseline from the same entries in the newest recognizable visible catalog message sourced by the plugin. A changed digest appends a durable full replacement through `agent.inject()`; deleting every skill appends an explicit empty replacement. Incomplete snapshots preserve the last-good model view. If compaction hides every historical catalog message, the next complete snapshot re-establishes the current catalog; an empty view with no prior catalog emits nothing. These catalog messages are session history, not World State.
 
-The model-facing `skill({ name })` tool validates the kebab-case name, finds the summary in the invocation-neutral catalog, rejects it before loading unless `isModelInvocable` permits access, then rereads the complete definition for the calling agent cwd and rechecks the policy before returning content. It reports an unresolved skill as unknown or no longer available and returns a tool result containing `<skill_content name="...">`, `<skill_resources>`, and `<skill_instructions>`. Literal `</skill_content>` and `</skill_instructions>` sequences in the body are neutralized so they cannot close the wrapper; a `project-*` source prepends the untrusted-frame header, while `bundled` and `user-*` stay trusted local content. The catalog remains summary-only. `resourceBase` resolves explicitly referenced scripts, references, and assets only as needed; the loaded result does not enumerate a skill directory. Body-only edits therefore change later tool calls without producing catalog messages or rewriting earlier tool results.
+The model-facing `skill({ name })` tool validates the kebab-case name, finds the summary in the invocation-neutral catalog, rejects it before loading unless `isModelInvocable` permits access, then rereads the complete definition for the calling agent cwd and rechecks the policy before returning content. It reports an unresolved skill as unknown or no longer available and returns a tool result containing `<skill_content name="...">`, `<skill_resources>`, and `<skill_instructions>`. Trusted sources (`bundled`, `user-*`, `runtime`, `custom`) neutralize a close-tag family in the body; every other source, including `project-*`, places the untrusted-frame header inside `<skill_content>` and escapes every `<` in the body. The catalog remains summary-only. `resourceBase` resolves explicitly referenced scripts, references, and assets only as needed; the loaded result does not enumerate a skill directory. Body-only edits therefore change later tool calls without producing catalog messages or rewriting earlier tool results.
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 

@@ -41,7 +41,7 @@
 
 ### 共享的面向模型渲染
 
-`renderSkillContent(skill)` 把一个已加载 skill 渲染为规范的 `<skill_content>` 块（转义后的 `name` 属性、资源提示、正文中字面量 `</skill_content>` 与 `</skill_instructions>` 被中和以免关闭包装）。`project-*` 来源会前置 [`roos-untrusted-frame`](../../util/untrusted-frame/README.md) 说明头；`bundled`、`user-*`、`runtime` 和 `custom` 仍作为受信任的本地内容。它是两条加载路径的唯一真源：`roos-tool-skill` 将其作为 `skill` 工具结果返回，并在用户显式的手势边界将其注入，因此无论加载由谁发起，模型看到的都是同一种形态。`escapeText` 随之一并导出，供要在同一标记框架中嵌入文案的消费方使用。该包还声明 `skill-invocation` 这个 `MessageSource` kind（{ name, form: 'instructions' }），用户显式注入会把它打在自己的消息上——transcript（文本记录）消费方依据这份元数据呈现该次调用，而不是重新解析正文。
+`renderSkillContent(skill)` 把一个已加载 skill 渲染为规范的 `<skill_content>` 块（转义后的 `name` 属性、资源提示）。受信任来源（`bundled`、`user-*`、`runtime`、`custom`）会中和正文中的结束标签族，以免关闭包装。其他来源（包括 `project-*`）把 [`roos-untrusted-frame`](../../util/untrusted-frame/README.md) 说明头放在 `<skill_content>` 内，并用 `wrapUntrusted` 包装正文，从而转义每个 `<`。它是两条加载路径的唯一真源：`roos-tool-skill` 将其作为 `skill` 工具结果返回，并在用户显式的手势边界将其注入，因此无论加载由谁发起，模型看到的都是同一种形态。`escapeText` 随之一并导出，供要在同一标记框架中嵌入文案的消费方使用。该包还声明 `skill-invocation` 这个 `MessageSource` kind（{ name, form: 'instructions' }），用户显式注入会把它打在自己的消息上——transcript（文本记录）消费方依据这份元数据呈现该次调用，而不是重新解析正文。
 
 `isModelInvocable(skill)` 和 `isUserInvocable(skill)` 分别直接读取对应的正向字段。`ctx.skills.get()` 仍是受信且与策略无关的加载原语，因此每个面向用户或模型的消费方都必须先执行与自身接口匹配的判定，再暴露或加载 skill。
 

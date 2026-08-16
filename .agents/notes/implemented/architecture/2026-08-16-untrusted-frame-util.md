@@ -21,7 +21,7 @@ Current callers:
 - `roos-session-reference` frames the JSON snapshot as `<referenced-sessions>`. The model-visible bytes are unchanged from the previous inlined prefix and suffix.
 - `roos-tool-web` `web_fetch` frames the decoded page as `<untrusted-web-page>`. The `Fetched <url> (HTTP <status>)` header and the truncation footer stay outside.
 - `roos-tool-web` `web_search` emits the shared disclaimer once when an answer or any source is present, wraps the answer in `<untrusted-web-answer>`, and wraps each snippet in `<untrusted-web-snippet>`. Source titles, URLs, dates, the refine-the-query note, and the cite instruction stay outside.
-- `roos-skill` `renderSkillContent` prepends the shared disclaimer for `project-*` sources and reuses `UNTRUSTED_LT_ESCAPE` to neutralize `</skill_content>` / `</skill_instructions>` in every body. The `<skill_content>` tags and resource hints stay outside that escape. See the [skill framing Agent Note](2026-08-16-skill-body-escaping-trust-framing.md).
+- `roos-skill` `renderSkillContent` places the shared disclaimer inside `<skill_content>` for untrusted sources and wraps the instruction body with `wrapUntrusted`. Trusted sources reuse `UNTRUSTED_LT_ESCAPE` to neutralize a close-tag family. See the [skill framing Agent Note](2026-08-16-skill-body-escaping-trust-framing.md).
 
 `stringifyTagSafeJson` remains the JSON form of the same escape so session-reference byte budgets still measure the framed payload.
 
@@ -40,4 +40,4 @@ Current callers:
 - Fetched pages and search answers/snippets grow by the disclaimer and tags; every payload `<` becomes the six-character `\u003c` escape. Markdown conversion still runs before the fetch frame, so ordinary converted pages rarely contain `<`.
 - A `fetchMaxOutputChars` cap that can hold the status header, an empty frame, and the truncation footer always closes `</untrusted-web-page>` before the footer. A tinier cap still slices the finished string, including tags.
 - Session-reference snapshots keep their previous bytes; only the import path changed.
-- Project-sourced skills reuse the disclaimer and the `\u003c` escape; they keep their own `<skill_content>` tags rather than calling `frameUntrusted` on the whole block.
+- Project-sourced skills reuse the disclaimer and `wrapUntrusted` on the instruction body; they keep their own `<skill_content>` tags rather than calling `frameUntrusted` on the whole block.

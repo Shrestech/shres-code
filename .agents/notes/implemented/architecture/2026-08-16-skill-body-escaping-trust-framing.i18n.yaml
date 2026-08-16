@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-16-skill-body-escaping-trust-framing.md
-2026-08-16-skill-body-escaping-trust-framing.md: 278cf8c203c31f7d097cffa91897693a433364eb
-2026-08-16-skill-body-escaping-trust-framing.zh.md: 4b256577f3443f05eacc993d67658f134713b7fe
+2026-08-16-skill-body-escaping-trust-framing.md: 29d415ffea475d2f572c799b070da64d3e79e562
+2026-08-16-skill-body-escaping-trust-framing.zh.md: 59fcf46d0a50b4bd47665f37dc7b71c16c1cabfa
