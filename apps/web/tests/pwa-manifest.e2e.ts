@@ -18,7 +18,7 @@ it('ships install metadata with the built web application', async () => {
     scope: '/',
     display: 'fullscreen',
     icons: [{
-      src: '/favicon.svg',
+      src: '/favicon.svg?v=roo2',
       sizes: 'any',
       type: 'image/svg+xml',
       purpose: 'any',

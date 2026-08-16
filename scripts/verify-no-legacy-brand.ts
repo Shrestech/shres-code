@@ -19,6 +19,7 @@ const FORBIDDEN = [
   { id: 'home-dir', pattern: /~\/\.dsh\b/ },
   { id: 'python-sdk', pattern: /deepseek-harness-sdk/ },
   { id: 'product-prose', pattern: /DeepSeek Harness/ },
+  { id: 'product-vendor', pattern: /DeepSeek AI/ },
   { id: 'slash-stripped-slug', pattern: /deepseek-aidsh/ },
   { id: 'mermaid-dsh-node', pattern: /pkg_[A-Za-z0-9_]*_dsh_[A-Za-z0-9_]+/ },
 ] as const

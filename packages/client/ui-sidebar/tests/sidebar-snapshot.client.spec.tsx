@@ -80,7 +80,6 @@ describe('sidebar shell snapshots', () => {
     // Same fiber, same registration: setLocale alone re-renders the outlet.
     act(() => { locale.setLocale('en') })
     expect(slot.view.getAllByRole('button', { name: 'New session' })).toHaveLength(2)
-    expect(slot.view.queryByRole('button', { name: 'New session' })).toBeNull()
     await runtime.dispose()
   })
 })
