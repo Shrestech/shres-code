@@ -57,14 +57,14 @@ function sourceLabel(url: string, title: string | undefined): string {
  * @returns the provider answer (when any) and snippets inside an untrusted
  *   frame, a markdown source list with date metadata (or `No results found.`),
  *   a refine-the-query note when truncated, and a standing cite-your-sources
- *   instruction. The disclaimer, source lines, truncation note, and citation
- *   instruction stay outside the tagged fragments.
+ *   instruction. The disclaimer precedes any answer or source list; source
+ *   titles, URLs, dates, the truncation note, and the citation instruction
+ *   stay outside the tagged fragments.
  */
 export function formatSearchOutput(result: WebSearchResult): string {
   const parts: string[] = []
   const answer = result.content !== undefined && result.content.length > 0 ? result.content : undefined
-  const hasSnippet = result.sources.some(source => source.snippet !== undefined && source.snippet.length > 0)
-  if (answer !== undefined || hasSnippet) parts.push(SEARCH_UNTRUSTED_LABEL)
+  if (answer !== undefined || result.sources.length > 0) parts.push(SEARCH_UNTRUSTED_LABEL)
   if (answer !== undefined) parts.push(wrapUntrusted(UNTRUSTED_WEB_ANSWER_TAG, answer))
 
   if (result.sources.length > 0) {

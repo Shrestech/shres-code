@@ -20,7 +20,7 @@ Status: implemented
 
 - `roos-session-reference` 把 JSON 快照框在 `<referenced-sessions>` 中。模型可见字节与原先内联的前缀和后缀相同。
 - `roos-tool-web` 的 `web_fetch` 把已解码页面框在 `<untrusted-web-page>` 中。`Fetched <url> (HTTP <status>)` 状态头和截断页脚留在框外。
-- `roos-tool-web` 的 `web_search` 在存在答案或任何摘要时发出一次共享免责声明，把答案包进 `<untrusted-web-answer>`，并把每条摘要包进 `<untrusted-web-snippet>`。来源标题、URL、日期、缩小查询的说明和引用指令留在框外。
+- `roos-tool-web` 的 `web_search` 在存在答案或任何来源时发出一次共享免责声明，把答案包进 `<untrusted-web-answer>`，并把每条摘要包进 `<untrusted-web-snippet>`。来源标题、URL、日期、缩小查询的说明和引用指令留在框外。
 
 `stringifyTagSafeJson` 仍是同一转义的 JSON 形式，因此 session-reference 的字节预算仍按定界后的载荷计量。
 
@@ -37,6 +37,6 @@ Status: implemented
 ## 后果
 
 - 抓取页面和搜索答案／摘要会因免责声明与标签而变长；载荷中的每个 `<` 都会变成六个字符的 `\u003c` 转义。markdown 转换仍在 fetch 定界之前运行，因此普通转换后的页面很少包含 `<`。
-- 过小的 `fetchMaxOutputChars` 上限仍可能切开最终字符串（包括标签），方式与原先切开状态头相同。
+- 能容纳状态头、空定界框和截断页脚的 `fetchMaxOutputChars` 上限总会在页脚之前关闭 `</untrusted-web-page>`。更小的上限仍会切开最终字符串（包括标签）。
 - session-reference 快照保持原先字节；只有导入路径变了。
 - 项目来源的 skill 可以复用同一包装，而不必再发明第三套转义。

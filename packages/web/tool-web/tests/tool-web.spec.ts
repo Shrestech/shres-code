@@ -104,6 +104,17 @@ describe('search formatting', () => {
     expect(out).toContain('Showing the first 1 sources')
   })
 
+  it('warns on title-only sources without wrapping titles in answer or snippet tags', () => {
+    const out = formatSearchOutput({
+      truncated: false,
+      sources: [{ url: 'https://a.test/x', title: 'A' }],
+    })
+    expect(out).toContain(UNTRUSTED_INSTRUCTION_DISCLAIMER)
+    expect(out).toContain('[A](https://a.test/x)')
+    expect(out).not.toContain('<untrusted-web-answer>')
+    expect(out).not.toContain('<untrusted-web-snippet>')
+  })
+
   it('validates the query', () => {
     expect(() => parseSearchArgs({ query: '   ' })).toThrow('non-empty')
     expect(parseSearchArgs({ query: 'hi' })).toEqual({ query: 'hi' })
@@ -277,6 +288,8 @@ ${UNTRUSTED_INSTRUCTION_DISCLAIMER}`
     expect(out).toContain('Fetched https://a.test (HTTP 200)')
     expect(out).toContain('\\_\\_')
     expect(out).toContain('Content truncated')
+    expect(out.match(/<\/untrusted-web-page>/gu)).toHaveLength(1)
+    expect(out.indexOf('</untrusted-web-page>')).toBeLessThan(out.indexOf('Content truncated'))
     // Exact and tiny caps: the complete result is bounded, header and footer included.
     const exactText = `${HEADER}${framePage('abc')}`
     const exact = formatFetchOutput({
@@ -349,8 +362,9 @@ ${UNTRUSTED_INSTRUCTION_DISCLAIMER}`
   it('the preflight accepts ordinary closed, void, self-closing, quoted, and raw-text markup', () => {
     const paragraphs = '<p title=\'>\'>x<br   ><img src="x"><input/></p>'.repeat(600)
     const script = `<script>const invalid = '</scriptx>'; const template = '${'<div>'.repeat(600)}'</script >`
-    expect(renderHtml(`<!doctype html><?pi><1bad>${paragraphs}${script}`))
-      .not.toContain('<p')
+    const converted = renderHtml(`<!doctype html><?pi><1bad>${paragraphs}${script}`)
+    expect(converted).not.toContain('<p')
+    expect(converted).not.toContain(`${UNTRUSTED_LT_ESCAPE}p`)
     expect(renderHtml('plain text')).toBe('plain text')
     expect(renderHtml('<p>x</p><!-- unfinished')).toBe('x')
     expect(renderHtml('<script>unclosed')).toBe('')

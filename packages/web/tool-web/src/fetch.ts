@@ -12,7 +12,7 @@ import { defineTool } from '@roos-code/roos-code-tools'
 import type { GenericCallView, JsonValue, ToolResult, WebFetchResultView } from '@roos-code/roos-code-tools'
 import type { WebFetchBody, WebFetchResult } from '@roos-code/roos-code-web'
 import { assertNever } from '@roos-code/roos-code-llm'
-import { frameUntrusted, UNTRUSTED_INSTRUCTION_DISCLAIMER } from '@roos-code/roos-code-untrusted-frame'
+import { escapeUntrusted, frameUntrusted, UNTRUSTED_INSTRUCTION_DISCLAIMER } from '@roos-code/roos-code-untrusted-frame'
 import type {} from '@roos-code/roos-code-system-prompt'
 
 /** Tag wrapping the fetched page body. Status and truncation stay outside. */
@@ -310,6 +310,12 @@ const renderCache = new WeakMap<WebFetchResult, Map<number, RenderedFetch>>()
  * The uncached conversion behind {@link renderFetchOutput}. Separated so the
  * memo wraps exactly one call site and the conversion logic stays pure.
  *
+ * When the complete output would exceed `maxOutputChars`, the function
+ * reserves the status header, an empty untrusted frame, and the truncation
+ * footer, then cuts the escaped body so `</untrusted-web-page>` still closes
+ * before the trusted footer. A cap too small for that reservation still
+ * slices the finished string, which can leave only a header remainder.
+ *
  * @param result - the seam's fetch outcome.
  * @param maxOutputChars - cap on the complete returned string.
  * @returns the bounded text and effective truncation.
@@ -324,10 +330,28 @@ function computeFetchOutput(result: WebFetchResult, maxOutputChars: number): Ren
   })
   const prefix = `${header}${framed}`
   const truncated = result.truncated || rendered.sourceTruncated || prefix.length > maxOutputChars
-  const full = `${prefix}${truncated ? TRUNCATION_FOOTER : ''}`
-  if (full.length <= maxOutputChars) return { text: full, truncated }
-  if (maxOutputChars < TRUNCATION_FOOTER.length) return { text: full.slice(0, maxOutputChars), truncated }
-  return { text: `${prefix.slice(0, maxOutputChars - TRUNCATION_FOOTER.length)}${TRUNCATION_FOOTER}`, truncated }
+  if (!truncated) return { text: prefix, truncated: false }
+  const withFooter = `${prefix}${TRUNCATION_FOOTER}`
+  if (withFooter.length <= maxOutputChars) return { text: withFooter, truncated: true }
+
+  const emptyFrame = frameUntrusted({
+    tag: UNTRUSTED_WEB_PAGE_TAG,
+    label: FETCH_UNTRUSTED_LABEL,
+    body: '',
+  })
+  const reserved = header.length + emptyFrame.length + TRUNCATION_FOOTER.length
+  if (maxOutputChars < reserved) {
+    if (maxOutputChars < TRUNCATION_FOOTER.length) return { text: withFooter.slice(0, maxOutputChars), truncated: true }
+    return { text: `${prefix.slice(0, maxOutputChars - TRUNCATION_FOOTER.length)}${TRUNCATION_FOOTER}`, truncated: true }
+  }
+
+  const cutBody = escapeUntrusted(rendered.text).slice(0, maxOutputChars - reserved)
+  const cutFramed = frameUntrusted({
+    tag: UNTRUSTED_WEB_PAGE_TAG,
+    label: FETCH_UNTRUSTED_LABEL,
+    body: cutBody,
+  })
+  return { text: `${header}${cutFramed}${TRUNCATION_FOOTER}`, truncated: true }
 }
 
 /**

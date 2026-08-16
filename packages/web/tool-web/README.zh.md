@@ -93,7 +93,7 @@ Use the web_fetch tool to retrieve the content of a specific HTTP(S) URL (for ex
 
 #### 模型看到的内容
 
-当提供方返回了答案或任何摘要时，共享的 [`roos-untrusted-frame`](../../util/untrusted-frame/README.md) 免责声明会出现在这些片段之前。可选的提供方答案包在 `<untrusted-web-answer>` 中；每条摘要包在 `<untrusted-web-snippet>` 中。然后是 `Sources:`，再跟随内容取决于数据且格式严格为 `- [<title-or-url>](<url>)` 的行，并可添加后缀 ` — <framed-snippet> (<publishedAt>)`。既无答案也无来源时，结果显示 `No results found.`。列表被截断至上限时会添加 `(Showing the first <count> sources. Refine the query for more.)`；每个结果都以 `Cite the relevant URLs above as markdown links in your answer.` 结尾。免责声明、来源标题／URL、日期、截断说明和引用指令留在带标签的片段之外。
+当提供方返回了答案或任何来源时，共享的 [`roos-untrusted-frame`](../../util/untrusted-frame/README.md) 免责声明会出现在这些片段之前。可选的提供方答案包在 `<untrusted-web-answer>` 中；每条摘要包在 `<untrusted-web-snippet>` 中。然后是 `Sources:`，再跟随内容取决于数据且格式严格为 `- [<title-or-url>](<url>)` 的行，并可添加后缀 ` — <framed-snippet> (<publishedAt>)`。既无答案也无来源时，结果显示 `No results found.`。列表被截断至上限时会添加 `(Showing the first <count> sources. Refine the query for more.)`；每个结果都以 `Cite the relevant URLs above as markdown links in your answer.` 结尾。免责声明、来源标题／URL、日期、截断说明和引用指令留在带标签的片段之外。
 
 #### Token 影响
 

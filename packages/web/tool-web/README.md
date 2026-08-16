@@ -93,7 +93,7 @@ Prefix-stable while definitions and visibility are unchanged. Config enablement,
 
 #### What the model sees
 
-When the provider returned an answer or any snippet, the shared [`roos-untrusted-frame`](../../util/untrusted-frame/README.md) disclaimer precedes those fragments. The optional provider-owned answer is wrapped in `<untrusted-web-answer>`; each snippet is wrapped in `<untrusted-web-snippet>`. Then `Sources:` and data-dependent lines shaped exactly `- [<title-or-url>](<url>)`, optionally suffixed ` — <framed-snippet> (<publishedAt>)`. With neither answer nor sources the result says `No results found.` A capped list adds `(Showing the first <count> sources. Refine the query for more.)`; every result ends `Cite the relevant URLs above as markdown links in your answer.` The disclaimer, source titles/URLs, dates, truncation note, and citation instruction stay outside the tagged fragments.
+When the provider returned an answer or any source, the shared [`roos-untrusted-frame`](../../util/untrusted-frame/README.md) disclaimer precedes those fragments. The optional provider-owned answer is wrapped in `<untrusted-web-answer>`; each snippet is wrapped in `<untrusted-web-snippet>`. Then `Sources:` and data-dependent lines shaped exactly `- [<title-or-url>](<url>)`, optionally suffixed ` — <framed-snippet> (<publishedAt>)`. With neither answer nor sources the result says `No results found.` A capped list adds `(Showing the first <count> sources. Refine the query for more.)`; every result ends `Cite the relevant URLs above as markdown links in your answer.` The disclaimer, source titles/URLs, dates, truncation note, and citation instruction stay outside the tagged fragments.
 
 #### Token effect
 

@@ -20,7 +20,7 @@ Current callers:
 
 - `roos-session-reference` frames the JSON snapshot as `<referenced-sessions>`. The model-visible bytes are unchanged from the previous inlined prefix and suffix.
 - `roos-tool-web` `web_fetch` frames the decoded page as `<untrusted-web-page>`. The `Fetched <url> (HTTP <status>)` header and the truncation footer stay outside.
-- `roos-tool-web` `web_search` emits the shared disclaimer once when an answer or any snippet is present, wraps the answer in `<untrusted-web-answer>`, and wraps each snippet in `<untrusted-web-snippet>`. Source titles, URLs, dates, the refine-the-query note, and the cite instruction stay outside.
+- `roos-tool-web` `web_search` emits the shared disclaimer once when an answer or any source is present, wraps the answer in `<untrusted-web-answer>`, and wraps each snippet in `<untrusted-web-snippet>`. Source titles, URLs, dates, the refine-the-query note, and the cite instruction stay outside.
 
 `stringifyTagSafeJson` remains the JSON form of the same escape so session-reference byte budgets still measure the framed payload.
 
@@ -37,6 +37,6 @@ Current callers:
 ## Consequences
 
 - Fetched pages and search answers/snippets grow by the disclaimer and tags; every payload `<` becomes the six-character `\u003c` escape. Markdown conversion still runs before the fetch frame, so ordinary converted pages rarely contain `<`.
-- A tiny `fetchMaxOutputChars` cap can still slice the finished string, including tags, the same way it already sliced the status header.
+- A `fetchMaxOutputChars` cap that can hold the status header, an empty frame, and the truncation footer always closes `</untrusted-web-page>` before the footer. A tinier cap still slices the finished string, including tags.
 - Session-reference snapshots keep their previous bytes; only the import path changed.
 - Project-sourced skills can reuse the same wrapper without inventing a third escape.
