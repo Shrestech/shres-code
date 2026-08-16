@@ -36,6 +36,7 @@
     "@roos-code/roos-code-llm": "workspace:^",
     "@roos-code/roos-code-system-prompt": "workspace:^",
     "@roos-code/roos-code-tools": "workspace:^",
+    "@roos-code/roos-code-untrusted-frame": "workspace:^",
     "@roos-code/roos-code-web": "workspace:^",
     "@roos-code/cordis": "workspace:^"
   },
@@ -55,6 +56,7 @@
     "@roos-code/roos-code-system-prompt": "workspace:^",
     "@roos-code/roos-code-tool-call-timeout-policy": "workspace:^",
     "@roos-code/roos-code-tools": "workspace:^",
+    "@roos-code/roos-code-untrusted-frame": "workspace:^",
     "@roos-code/roos-code-web": "workspace:^",
     "@roos-code/roos-code-web-fetch-http": "workspace:^",
     "@roos-code/roos-code-web-search-exa": "workspace:^",

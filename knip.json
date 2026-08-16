@@ -383,6 +383,15 @@
         "tests/**/*.ts"
       ]
     },
+    "packages/util/untrusted-frame": {
+      "entry": [
+        "tests/**/*.spec.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
     "packages/test-support/acp-snapshot": {
       "entry": [
         "tests/**/*.spec.ts",

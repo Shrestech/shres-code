@@ -1,0 +1,42 @@
+{
+  "name": "@roos-code/roos-code-untrusted-frame",
+  "description": "Zero-dependency untrusted-content frame: label, XML-like tags, and lossless < \u2192 \\u003c escaping for model-visible remote text",
+  "version": "0.1.0-rc.5",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/roos-code/roos-code.git",
+    "directory": "packages/util/untrusted-frame"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./invariant": {
+      "types": "./lib/types/invariant.d.ts",
+      "default": "./lib/invariant.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/invariant.js",
+    "lib/types/**/*.d.ts"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "@roos-code/roos-code-invariants": "workspace:^",
+    "@roos-code/cordis": "workspace:^"
+  },
+  "devDependencies": {
+    "@roos-code/roos-code-invariants": "workspace:^",
+    "@roos-code/cordis": "workspace:^"
+  }
+}

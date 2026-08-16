@@ -10,5 +10,6 @@ These zero-dependency packages provide small primitives shared by multiple capab
 | [`paths/`](home-paths/README.md) | Resolves the Harness data root and shared paths |
 | [`timeout/`](timeout/README.md) | Provides deadline and timeout classification primitives |
 | [`retention/`](output-retention/README.md) | Bounds retained text and item collections |
+| [`untrusted-frame/`](untrusted-frame/README.md) | Frames untrusted model-visible text |
 | [`atomic-write/`](atomic-write/README.md) | Replaces files atomically |
 | [`native-command/`](native-command/README.md) | Runs host-native commands without a shell |

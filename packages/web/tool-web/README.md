@@ -26,9 +26,9 @@ The normalized service results are also the canonical tool values: `WebSearchRes
 | `searchMaxResults` | `8` | Upper bound on sources returned by one `web_search` call (the seam truncates a longer provider list and flags it). |
 | `fetchTimeoutMs` | `30000` | Cooperative tool-call timeout budget (ms) for `web_fetch`. |
 | `searchTimeoutMs` | `30000` | Cooperative tool-call timeout budget (ms) for `web_search`. |
-| `fetchMaxOutputChars` | `200000` | Cap on source characters converted synchronously and on one complete `web_fetch` output (header, rendered body, and footer); a cut body gets the truncation notice when it fits. |
+| `fetchMaxOutputChars` | `200000` | Cap on source characters converted synchronously and on one complete `web_fetch` output (header, untrusted frame, and footer); a cut body gets the truncation notice when it fits. |
 
-`fetchTimeoutMs`/`searchTimeoutMs` declare each tool's cooperative timeout budget (attached as `ToolDefinition.timeoutMs`), enforced by [`@roos-code/roos-code-tool-call-timeout-policy`](../../guard/timeout-policy/README.md); the model-facing schema exposes no timeout argument. `fetchMaxOutputChars` bounds both synchronous conversion work and the complete rendered result: only that many source characters are converted, and the header, converted prefix, and truncation notice are then capped together. The default leaves headroom above the local provider's 100,000-character body cap, but rendered expansion can still make the final bound truncate the result.
+`fetchTimeoutMs`/`searchTimeoutMs` declare each tool's cooperative timeout budget (attached as `ToolDefinition.timeoutMs`), enforced by [`@roos-code/roos-code-tool-call-timeout-policy`](../../guard/timeout-policy/README.md); the model-facing schema exposes no timeout argument. `fetchMaxOutputChars` bounds both synchronous conversion work and the complete rendered result: only that many source characters are converted, and the header, untrusted frame, and truncation notice are then capped together. The default leaves headroom above the local provider's 100,000-character body cap, but rendered expansion can still make the final bound truncate the result.
 
 ```yaml
 - id: tool-web
@@ -93,7 +93,7 @@ Prefix-stable while definitions and visibility are unchanged. Config enablement,
 
 #### What the model sees
 
-The optional provider-owned answer is followed by `Sources:` and data-dependent lines shaped exactly `- [<title-or-url>](<url>)`, optionally suffixed ` — <snippet> (<publishedAt>)`. With neither answer nor sources the result says `No results found.` A capped list adds `(Showing the first <count> sources. Refine the query for more.)`; every result ends `Cite the relevant URLs above as markdown links in your answer.`
+When the provider returned an answer or any snippet, the shared [`roos-untrusted-frame`](../../util/untrusted-frame/README.md) disclaimer precedes those fragments. The optional provider-owned answer is wrapped in `<untrusted-web-answer>`; each snippet is wrapped in `<untrusted-web-snippet>`. Then `Sources:` and data-dependent lines shaped exactly `- [<title-or-url>](<url>)`, optionally suffixed ` — <framed-snippet> (<publishedAt>)`. With neither answer nor sources the result says `No results found.` A capped list adds `(Showing the first <count> sources. Refine the query for more.)`; every result ends `Cite the relevant URLs above as markdown links in your answer.` The disclaimer, source titles/URLs, dates, truncation note, and citation instruction stay outside the tagged fragments.
 
 #### Token effect
 
@@ -107,7 +107,7 @@ Append-only; newly visible content follows the reusable request prefix and does 
 
 #### What the model sees
 
-A successful fetch is exactly `Fetched <finalUrl> (HTTP <statusCode>)`, a blank line, and the provider-owned decoded body. Truncation adds a blank line and `(Content truncated. Fetch a more specific URL or section for the full text.)`; failures become `Error: <message>`. Queries and URLs remain in call history.
+A successful fetch is `Fetched <finalUrl> (HTTP <statusCode>)`, a blank line, then an [`roos-untrusted-frame`](../../util/untrusted-frame/README.md) labeled for remote page content whose `<untrusted-web-page>` body is the provider-owned decoded page. Truncation adds a blank line and `(Content truncated. Fetch a more specific URL or section for the full text.)` after the closing tag; failures become `Error: <message>`. Queries and URLs remain in call history. The status header and truncation footer stay outside the frame.
 
 #### Token effect
 

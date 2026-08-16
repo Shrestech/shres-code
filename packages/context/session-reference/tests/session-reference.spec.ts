@@ -13,7 +13,7 @@ import SessionReferenceResolver, {
   type Config,
   type SessionReferenceErrorCode,
 } from '@roos-code/roos-code-session-reference'
-import { stringifyTagSafeJson } from '../src/serialization.ts'
+import { stringifyTagSafeJson } from '@roos-code/roos-code-untrusted-frame'
 
 class TestSessionQueryEngine extends SessionQueryEngine {
   override searchSessions(

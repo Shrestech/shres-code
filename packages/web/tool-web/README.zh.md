@@ -26,9 +26,9 @@
 | `searchMaxResults` | `8` | 一次 `web_search` 调用返回的来源数量上限（seam 截断更长的提供方列表并标记）。 |
 | `fetchTimeoutMs` | `30000` | `web_fetch` 的协作式工具调用超时预算（ms）。 |
 | `searchTimeoutMs` | `30000` | `web_search` 的协作式工具调用超时预算（ms）。 |
-| `fetchMaxOutputChars` | `200000` | 同步转换的源字符数与单次完整 `web_fetch` 输出的上限（状态头、渲染后的主体与页脚合并计算）；主体被截断时，在能容纳的情况下附带截断提示。 |
+| `fetchMaxOutputChars` | `200000` | 同步转换的源字符数与单次完整 `web_fetch` 输出的上限（状态头、不受信任定界框与页脚合并计算）；主体被截断时，在能容纳的情况下附带截断提示。 |
 
-`fetchTimeoutMs`／`searchTimeoutMs` 声明每个工具的协作式超时预算（附加为 `ToolDefinition.timeoutMs`），由 [`@roos-code/roos-code-tool-call-timeout-policy`](../../guard/timeout-policy/README.md) 强制执行；面向模型的 schema 不公开超时参数。`fetchMaxOutputChars` 同时限制同步转换工作量和完整渲染结果：只转换至多该数量的源字符，随后对状态头、转换后的前缀和截断提示合并设限。默认值为本地提供方的 100,000 字符主体上限留出余量，但渲染膨胀仍可能使最终上限截断结果。
+`fetchTimeoutMs`／`searchTimeoutMs` 声明每个工具的协作式超时预算（附加为 `ToolDefinition.timeoutMs`），由 [`@roos-code/roos-code-tool-call-timeout-policy`](../../guard/timeout-policy/README.md) 强制执行；面向模型的 schema 不公开超时参数。`fetchMaxOutputChars` 同时限制同步转换工作量和完整渲染结果：只转换至多该数量的源字符，随后对状态头、不受信任定界框和截断提示合并设限。默认值为本地提供方的 100,000 字符主体上限留出余量，但渲染膨胀仍可能使最终上限截断结果。
 
 ```yaml
 - id: tool-web
@@ -93,7 +93,7 @@ Use the web_fetch tool to retrieve the content of a specific HTTP(S) URL (for ex
 
 #### 模型看到的内容
 
-可选的提供方答案之后是 `Sources:`，再跟随内容取决于数据且格式严格为 `- [<title-or-url>](<url>)` 的行，并可添加后缀 ` — <snippet> (<publishedAt>)`。既无答案也无来源时，结果显示 `No results found.`。列表被截断至上限时会添加 `(Showing the first <count> sources. Refine the query for more.)`；每个结果都以 `Cite the relevant URLs above as markdown links in your answer.` 结尾。
+当提供方返回了答案或任何摘要时，共享的 [`roos-untrusted-frame`](../../util/untrusted-frame/README.md) 免责声明会出现在这些片段之前。可选的提供方答案包在 `<untrusted-web-answer>` 中；每条摘要包在 `<untrusted-web-snippet>` 中。然后是 `Sources:`，再跟随内容取决于数据且格式严格为 `- [<title-or-url>](<url>)` 的行，并可添加后缀 ` — <framed-snippet> (<publishedAt>)`。既无答案也无来源时，结果显示 `No results found.`。列表被截断至上限时会添加 `(Showing the first <count> sources. Refine the query for more.)`；每个结果都以 `Cite the relevant URLs above as markdown links in your answer.` 结尾。免责声明、来源标题／URL、日期、截断说明和引用指令留在带标签的片段之外。
 
 #### Token 影响
 
@@ -107,7 +107,7 @@ Use the web_fetch tool to retrieve the content of a specific HTTP(S) URL (for ex
 
 #### 模型看到的内容
 
-成功抓取的精确形状是 `Fetched <finalUrl> (HTTP <statusCode>)`、一个空行，以及由提供方返回的已解码正文。发生截断时会再添加一个空行和 `(Content truncated. Fetch a more specific URL or section for the full text.)`；失败变为 `Error: <message>`。查询与 URL 保留在调用历史中。
+成功抓取的形状是 `Fetched <finalUrl> (HTTP <statusCode>)`、一个空行，然后是一个为远程页面内容标注的 [`roos-untrusted-frame`](../../util/untrusted-frame/README.md)，其 `<untrusted-web-page>` 正文是提供方返回的已解码页面。发生截断时会在结束标签之后再添加一个空行和 `(Content truncated. Fetch a more specific URL or section for the full text.)`；失败变为 `Error: <message>`。查询与 URL 保留在调用历史中。状态头和截断页脚留在定界框外。
 
 #### Token 影响
 

@@ -122,6 +122,7 @@
     { "path": "./packages/util/home-paths" },
     { "path": "./packages/util/timeout" },
     { "path": "./packages/util/output-retention" },
+    { "path": "./packages/util/untrusted-frame" },
     { "path": "./packages/util/atomic-write" },
     { "path": "./packages/attachment/attachment" },
     { "path": "./packages/attachment/attachment-local" },

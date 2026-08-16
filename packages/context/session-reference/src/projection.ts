@@ -4,7 +4,7 @@ import { isCompactCheckpointSource } from '@roos-code/roos-code-compaction'
 import type { SessionSurfaceSnapshot } from '@roos-code/roos-code-session-query'
 import { assertNever } from '@roos-code/roos-code-llm'
 import { TextRetainer } from '@roos-code/roos-code-output-retention'
-import { stringifyTagSafeJson } from './serialization.ts'
+import { stringifyTagSafeJson } from '@roos-code/roos-code-untrusted-frame'
 import type { ReferencedConversationItem } from './types.ts'
 
 interface ProjectedItem extends ReferencedConversationItem {

@@ -40,6 +40,7 @@
     "@roos-code/roos-code-invariants": "workspace:^",
     "@roos-code/roos-code-llm": "workspace:^",
     "@roos-code/roos-code-output-retention": "workspace:^",
+    "@roos-code/roos-code-untrusted-frame": "workspace:^",
     "@roos-code/roos-code-session": "workspace:^",
     "@roos-code/roos-code-session-query": "workspace:^",
     "@roos-code/cordis": "workspace:^"
@@ -50,6 +51,7 @@
     "@roos-code/roos-code-invariants": "workspace:^",
     "@roos-code/roos-code-llm": "workspace:^",
     "@roos-code/roos-code-output-retention": "workspace:^",
+    "@roos-code/roos-code-untrusted-frame": "workspace:^",
     "@roos-code/roos-code-session": "workspace:^",
     "@roos-code/roos-code-session-query": "workspace:^",
     "@roos-code/cordis": "workspace:^"
