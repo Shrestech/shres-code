@@ -8,7 +8,12 @@ export type PluginsSettingsLocaleKey =
   | 'bashTitle' | 'bashDescription' | 'bashTimeoutMs' | 'bashTimeoutMsHint'
   | 'bashMaxOutputBytes' | 'bashMaxOutputBytesHint'
   | 'agentLoopTitle' | 'agentLoopDescription' | 'agentLoopMaxParallel' | 'agentLoopMaxParallelHint'
-  | 'webSearchTitle' | 'webSearchDescription'
+  | 'webSearchTitle' | 'webSearchDescription' | 'webSearchMethods'
+  | 'webSearchGrok' | 'webSearchGrokHint'
+  | 'webSearchClaude' | 'webSearchClaudeHint'
+  | 'webSearchCodex' | 'webSearchCodexHint'
+  | 'webSearchKimi' | 'webSearchKimiHint'
+  | 'webSearchDeepSeek' | 'webSearchDeepSeekHint'
   | 'webSearchApiKey' | 'webSearchApiKeyHint' | 'webSearchApiKeySet' | 'webSearchApiKeyUnset'
   | 'webSearchBaseUrl' | 'webSearchBaseUrlHint' | 'webSearchMaxUses' | 'webSearchMaxUsesHint'
 
@@ -42,7 +47,18 @@ export const en: Record<PluginsSettingsLocaleKey, string> = {
   agentLoopMaxParallel: 'Parallel tool calls',
   agentLoopMaxParallelHint: 'Upper bound on parallel-safe calls running at once within one step.',
   webSearchTitle: 'Web search',
-  webSearchDescription: 'The DeepSeek search provider.',
+  webSearchDescription: 'Turn on the search methods the agent may use.',
+  webSearchMethods: 'Methods',
+  webSearchGrok: 'Grok',
+  webSearchGrokHint: 'xAI web search, using the same key as the Grok CLI.',
+  webSearchClaude: 'Claude',
+  webSearchClaudeHint: 'Anthropic web search, using the same key as the Claude CLI.',
+  webSearchCodex: 'Codex',
+  webSearchCodexHint: 'OpenAI web search, using the same key as the Codex CLI.',
+  webSearchKimi: 'Kimi',
+  webSearchKimiHint: 'Moonshot web search, using the same key as the Kimi CLI.',
+  webSearchDeepSeek: 'DeepSeek',
+  webSearchDeepSeekHint: 'DeepSeek web search. Turn this off if you do not have a DeepSeek key.',
   webSearchApiKey: 'API key',
   webSearchApiKeyHint: 'Stored outside the settings file. Leave blank to keep the current key.',
   webSearchApiKeySet: 'A key is configured.',

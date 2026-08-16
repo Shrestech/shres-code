@@ -12,16 +12,16 @@ A selected backend whose key is still missing after refresh fails the search as 
 
 ## Selection
 
-1. If the current default model provider is a shipped CLI route, use that vendor.
-2. Else the first usable id in `preference` (default `grok-cli`, `claude-cli`, `codex-cli`, `kimi-cli`).
+1. If the current default model provider is an enabled shipped CLI route, use that vendor.
+2. Else the first enabled usable id among Grok, Claude, Codex, Kimi.
 
-The shipped web seam lists `attached-cli` before `deepseek-official`, so an attached CLI owns `web_search` and DeepSeek runs only when no CLI is attached.
+The Plugins **Web search** card turns each method on or off. The shipped web seam lists `attached-cli` before `deepseek-official`, so an enabled CLI method with a key runs before DeepSeek.
 
 ## Config
 
 | Key | Default | Meaning |
 |---|---|---|
-| `preference` | the four shipped CLI ids | Fallback order after the current conversation model |
+| `grok` / `claude` / `codex` / `kimi` | `true` | When false, that vendor is omitted from the search pool |
 
 ```yaml
 - id: web-search-attached-cli

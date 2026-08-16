@@ -1,18 +1,17 @@
 /**
- * The web-search card's staged form over the `web-search-deepseek` settings
- * namespace.
+ * The web-search card's staged form: method switches plus the DeepSeek
+ * endpoint, budget, and key.
  *
- * The key is the one control that does not live in the section: its literal
- * never rides a response, so the card learns only whether one is configured
- * and writes it through the credentials domain, addressed by the reference the
- * section names. It is still staged with the rest of the form, so one save
- * covers everything the card shows.
+ * CLI method flags live on `web-search-attached-cli`. DeepSeek's enable flag,
+ * endpoint, and budget live on `web-search-deepseek`. The key is written
+ * through the credentials domain, never into a settings section.
  */
 
 import type { IApiClient } from '@roos-code/roos-code-client-connection/client'
 import type { SettingsScope, SettingsScopeSnapshot, SnapshotStore } from '@roos-code/roos-code-client-runtime/client'
+import { createSnapshotStore } from '@roos-code/roos-code-client-runtime/client'
 import {
-  CardForm, numberField, textField,
+  CardForm, booleanField, numberField, textField,
   type CardActions, type CardFieldState, type CardShell,
 } from './card-form.ts'
 
@@ -22,13 +21,19 @@ import {
  */
 export const WEB_SEARCH_NS = 'web-search-deepseek'
 
+/** Namespace of the attached-CLI method switches. */
+export const WEB_SEARCH_METHODS_NS = 'web-search-attached-cli'
+
 /** Credential reference the provider resolves when the section names none. */
 const DEFAULT_API_KEY_REF = 'DEEPSEEK_API_KEY'
 
 /** Form field the credential control stages under. */
 const API_KEY_FIELD = 'apiKey'
 
-/** The search-provider fields this card edits. */
+/** Fields written to the attached-CLI section. */
+const METHOD_FIELDS = new Set(['grok', 'claude', 'codex', 'kimi'])
+
+/** The DeepSeek section fields this card edits. */
 export interface WebSearchSettings {
   /** Credential reference naming the environment key. */
   apiKeyEnv?: string
@@ -36,6 +41,20 @@ export interface WebSearchSettings {
   baseURL?: string
   /** Maximum searches served within one request. */
   maxUses?: number
+  /** When false, DeepSeek is omitted from the search pool. */
+  enabled?: boolean
+}
+
+/** Attached-CLI method flags this card edits. */
+export interface WebSearchMethods {
+  /** When false, Grok is omitted from the search pool. */
+  grok?: boolean
+  /** When false, Claude is omitted from the search pool. */
+  claude?: boolean
+  /** When false, Codex is omitted from the search pool. */
+  codex?: boolean
+  /** When false, Kimi is omitted from the search pool. */
+  kimi?: boolean
 }
 
 /** What the credentials domain last reported, and for which reference. */
@@ -50,6 +69,16 @@ interface CredentialState {
 
 /** What the web-search card renders. */
 export interface WebSearchCardState extends CardShell {
+  /** Grok method switch. */
+  grok: CardFieldState
+  /** Claude method switch. */
+  claude: CardFieldState
+  /** Codex method switch. */
+  codex: CardFieldState
+  /** Kimi method switch. */
+  kimi: CardFieldState
+  /** DeepSeek method switch. */
+  deepseek: CardFieldState
   /** Provider endpoint. */
   baseURL: CardFieldState
   /** Searches allowed per request. */
@@ -70,33 +99,63 @@ export interface WebSearchCardFace extends CardActions {
   }
 }
 
-/** Bridges the `web-search-deepseek` scope and the credentials domain onto the card. */
+const ON: CardFieldState = { text: 'true', overridden: false, invalid: false }
+
+/** Bridges both search namespaces and the credentials domain onto the card. */
 export class WebSearchCardController {
   private readonly form: CardForm<WebSearchSettings>
+  private readonly methods: CardForm<WebSearchMethods>
   private readonly store: SnapshotStore<WebSearchCardState>
   private credential: CredentialState = { ref: '', configured: false, writable: true }
 
   /**
-   * @param scope - the bound settings scope for the `web-search-deepseek` namespace.
+   * @param scope - the bound settings scope for the DeepSeek namespace.
    * @param api - wire face used for the credential the section references.
+   * @param methodsScope - the bound settings scope for CLI method switches.
    */
   constructor(
     private readonly scope: SettingsScope<WebSearchSettings>,
     private readonly api: Pick<IApiClient, 'credentials'>,
+    methodsScope: SettingsScope<WebSearchMethods>,
   ) {
     this.form = new CardForm(
       scope,
-      [textField('baseURL'), numberField('maxUses')],
+      [textField('baseURL'), numberField('maxUses'), booleanField('enabled')],
       [{ field: API_KEY_FIELD, write: text => this.writeKey(text) }],
     )
-    this.store = this.form.bind(() => this.projection())
+    this.methods = new CardForm(methodsScope, [
+      booleanField('grok'),
+      booleanField('claude'),
+      booleanField('codex'),
+      booleanField('kimi'),
+    ])
+    this.store = createSnapshotStore(this.projection())
+    const push = (): WebSearchCardState => {
+      const next = this.projection()
+      this.store.set(next)
+      return next
+    }
+    this.form.bind(push)
+    this.methods.bind(push)
     scope.subscribe(() => { void this.readCredential() })
     void this.readCredential()
   }
 
   private projection(): WebSearchCardState {
+    const deepseek = this.form.shell()
+    const methods = this.methods.shell()
     return {
-      ...this.form.shell(),
+      available: deepseek.available || methods.available,
+      writable: deepseek.writable && (methods.available ? methods.writable : true),
+      dirty: deepseek.dirty || methods.dirty,
+      invalid: deepseek.invalid || methods.invalid,
+      saving: deepseek.saving || methods.saving,
+      failed: deepseek.failed || methods.failed,
+      grok: methods.available ? this.methods.field('grok') : ON,
+      claude: methods.available ? this.methods.field('claude') : ON,
+      codex: methods.available ? this.methods.field('codex') : ON,
+      kimi: methods.available ? this.methods.field('kimi') : ON,
+      deepseek: deepseek.available ? this.form.field('enabled') : ON,
       baseURL: this.form.field('baseURL'),
       maxUses: this.form.field('maxUses'),
       apiKey: this.form.field(API_KEY_FIELD),
@@ -161,7 +220,27 @@ export class WebSearchCardController {
    * @returns the card's snapshot and its form actions.
    */
   inject(): WebSearchCardFace {
-    return { hooks: { webSearchCard: this.store }, ...this.form.actions() }
+    const deepseek = this.form.actions()
+    const methods = this.methods.actions()
+    return {
+      hooks: { webSearchCard: this.store },
+      edit: (field, text) => {
+        if (METHOD_FIELDS.has(field)) methods.edit(field, text)
+        else deepseek.edit(field, text)
+      },
+      resetField: (field) => {
+        if (METHOD_FIELDS.has(field)) methods.resetField(field)
+        else deepseek.resetField(field)
+      },
+      save: () => {
+        deepseek.save()
+        methods.save()
+      },
+      discard: () => {
+        deepseek.discard()
+        methods.discard()
+      },
+    }
   }
 
   /**

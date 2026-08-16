@@ -14,6 +14,8 @@ Shipped `web_search` pinned `searchProvider: deepseek-official`. A user who atta
 
 Backend pick: the current conversation CLI when that route is a shipped CLI id; otherwise the first usable id in `preference` (default Grok, Claude, Codex, Kimi). The shipped base composition lists `attached-cli` then `deepseek-official`.
 
+The Plugins **Web search** card exposes one on/off switch per method (Grok, Claude, Codex, Kimi, DeepSeek). A switch off removes that method from the pool. DeepSeek off stops the DeepSeek-missing-key failure when the user is not using DeepSeek.
+
 Grok calls `POST https://api.x.ai/v1/responses` with `{ type: "web_search" }`. Claude, Codex, and Kimi use their vendor equivalents.
 
 ## Alternatives considered

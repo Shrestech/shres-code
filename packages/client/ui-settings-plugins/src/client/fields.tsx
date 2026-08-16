@@ -121,3 +121,31 @@ export function SecretField(props: Pick<FieldProps, 'id' | 'label' | 'hint' | 't
     </div>
   )
 }
+
+/**
+ * An on/off switch. Draft text is `true` or `false`; the control never writes.
+ * @param props - the field's copy, its staged state, and the edit action.
+ * @returns the labelled switch.
+ */
+export function SwitchField(props: Pick<FieldProps, 'id' | 'label' | 'hint' | 'text' | 'disabled' | 'onEdit'>) {
+  const on = props.text !== 'false'
+  return (
+    <div className={css.field}>
+      <div className={css.switchRow}>
+        <label className={css.label} htmlFor={props.id}>{props.label}</label>
+        <button
+          id={props.id}
+          type="button"
+          className={on ? css.switchOn : css.switchOff}
+          role="switch"
+          aria-checked={on}
+          disabled={props.disabled}
+          onClick={() => { props.onEdit(on ? 'false' : 'true') }}
+        >
+          <span className={css.switchThumb} />
+        </button>
+      </div>
+      <p className={css.hint}>{props.hint}</p>
+    </div>
+  )
+}

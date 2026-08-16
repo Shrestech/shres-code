@@ -155,6 +155,10 @@ describe('DeepSeekSearchProvider availability', () => {
     expect(searchProvider(options).available()).toBe(true)
   })
 
+  it('is unavailable when the user turns this method off', () => {
+    expect(searchProvider({ ...options, enabled: false }).available()).toBe(false)
+  })
+
   it('is misconfigured when the base URL is unparseable', () => {
     expect(searchProvider({ ...options, baseURL: 'not a url' }).available()).toBe(false)
   })

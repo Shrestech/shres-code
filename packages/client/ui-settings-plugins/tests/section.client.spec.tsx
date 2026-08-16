@@ -335,6 +335,11 @@ describe('WebSearchCard', () => {
   function renderWebSearch(state: Partial<WebSearchCardState> = {}) {
     const store = createSnapshotStore<WebSearchCardState>({
       ...settled,
+      grok: field('true'),
+      claude: field('true'),
+      codex: field('true'),
+      kimi: field('true'),
+      deepseek: field('true'),
       baseURL: field(''),
       maxUses: field('5'),
       apiKey: field(''),
@@ -377,6 +382,27 @@ describe('WebSearchCard', () => {
 
     expect(screen.getByLabelText(en.webSearchApiKey)).toHaveProperty('disabled', true)
     expect(screen.getByLabelText(en.webSearchBaseUrl)).toHaveProperty('disabled', false)
+  })
+
+  it('stages method switches independently', () => {
+    const actions = renderWebSearch()
+    fireEvent.click(screen.getByText(en.webSearchTitle))
+
+    fireEvent.click(screen.getByRole('switch', { name: en.webSearchGrok }))
+    fireEvent.click(screen.getByRole('switch', { name: en.webSearchDeepSeek }))
+
+    expect(actions.edit.mock.calls).toEqual([
+      ['grok', 'false'],
+      ['enabled', 'false'],
+    ])
+  })
+
+  it('hides DeepSeek key fields while that method is off', () => {
+    renderWebSearch({ deepseek: field('false') })
+    fireEvent.click(screen.getByText(en.webSearchTitle))
+
+    expect(screen.queryByLabelText(en.webSearchApiKey)).toBeNull()
+    expect(screen.getByRole('switch', { name: en.webSearchDeepSeek }).getAttribute('aria-checked')).toBe('false')
   })
 
   it('stages the endpoint, the search budget, and their resets', () => {

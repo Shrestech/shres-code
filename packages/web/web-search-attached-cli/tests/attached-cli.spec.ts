@@ -6,6 +6,7 @@ import { SettingsProvider } from '@roos-code/roos-code-settings'
 import type { SettingsNamespace } from '@roos-code/roos-code-settings'
 import WebRuntime from '@roos-code/roos-code-web'
 import * as attachedCliPlugin from '@roos-code/roos-code-web-search-attached-cli'
+import { enabledBackends } from '@roos-code/roos-code-web-search-attached-cli'
 import {
   ATTACHED_CLI_PROVIDER_ID,
   AttachedCliSearchProvider,
@@ -205,6 +206,14 @@ describe('buildRequest', () => {
   it('rejects an unknown backend id', () => {
     expect(() => buildRequest('nope' as AttachedCliBackendId, 'https://example.com', 'k', 'q'))
       .toThrow(expect.objectContaining({ code: 'WEB_PROVIDER_ERROR' }))
+  })
+})
+
+describe('enabledBackends', () => {
+  it('defaults every vendor on and drops a vendor the user turns off', () => {
+    expect(enabledBackends({})).toEqual(['grok-cli', 'claude-cli', 'codex-cli', 'kimi-cli'])
+    expect(enabledBackends({ grok: false, claude: true, codex: false, kimi: false })).toEqual(['claude-cli'])
+    expect(enabledBackends({ grok: false, claude: false, codex: false, kimi: false })).toEqual([])
   })
 })
 
@@ -418,7 +427,7 @@ describe('web-search-attached-cli plugin registration', () => {
           super(inner, { ANTHROPIC_API_KEY: 'ant-stored' })
         }
       })
-      await ctx.plugin(attachedCliPlugin, { preference: [] })
+      await ctx.plugin(attachedCliPlugin, {})
       await expect(ctx.web.search({ query: 'q' })).resolves.toMatchObject({
         sources: [{ url: 'https://docs.anthropic.com' }],
       })
@@ -438,7 +447,9 @@ describe('web-search-attached-cli plugin registration', () => {
         super(inner, { OPENAI_API_KEY: '' })
       }
     })
-    await ctx.plugin(attachedCliPlugin, { preference: ['codex-cli'] })
+    await ctx.plugin(attachedCliPlugin, {
+      grok: false, claude: false, codex: true, kimi: false,
+    })
     await expect(ctx.web.search({ query: 'q' }))
       .rejects.toThrow(expect.objectContaining({ code: 'WEB_PROVIDER_UNAVAILABLE' }))
     if (previous === undefined) delete process.env.OPENAI_API_KEY
@@ -482,7 +493,7 @@ describe('web-search-attached-cli plugin registration', () => {
       await ctx.plugin(MemorySettings)
       await ctx.plugin(attachedCliPlugin, {})
       await ctx.settings.update(attachedCliPlugin.WEB_SEARCH_ATTACHED_CLI_SETTINGS_NAMESPACE, {
-        preference: ['kimi-cli'],
+        grok: false, claude: false, codex: false, kimi: true,
       })
       await ctx.web.search({ query: 'q' })
       expect(seen.at(-1)).toBe('https://api.moonshot.ai/v1/chat/completions')

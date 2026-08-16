@@ -17,8 +17,6 @@ import {
   AttachedCliSearchProvider,
   BACKEND_API_KEY_ENV,
   BACKEND_DEFAULT_BASE_URL,
-  DEFAULT_PREFERENCE,
-  isBackendId,
   type AttachedCliBackend,
   type AttachedCliBackendId,
   type AttachedCliSearchOptions,
@@ -48,13 +46,37 @@ export const inject = ['web']
 
 /** Plugin config. */
 export interface Config {
-  /** Preference after the current conversation model. */
-  preference?: AttachedCliBackendId[]
+  /** When false, Grok is omitted from the search pool. Defaults to on. */
+  grok?: boolean
+  /** When false, Claude is omitted from the search pool. Defaults to on. */
+  claude?: boolean
+  /** When false, Codex is omitted from the search pool. Defaults to on. */
+  codex?: boolean
+  /** When false, Kimi is omitted from the search pool. Defaults to on. */
+  kimi?: boolean
 }
 
 export const Config: z<Config> = z.object({
-  preference: z.array(z.union(['grok-cli', 'claude-cli', 'codex-cli', 'kimi-cli'] as const)),
+  grok: z.boolean().default(true),
+  claude: z.boolean().default(true),
+  codex: z.boolean().default(true),
+  kimi: z.boolean().default(true),
 })
+
+/**
+ * Enabled CLI backends in shipped order. An omitted flag is on.
+ * @param config - current section.
+ * @returns backends the multiplexer may use.
+ */
+export function enabledBackends(config: Config): AttachedCliBackendId[] {
+  const flags: readonly [AttachedCliBackendId, boolean | undefined][] = [
+    ['grok-cli', config.grok],
+    ['claude-cli', config.claude],
+    ['codex-cli', config.codex],
+    ['kimi-cli', config.kimi],
+  ]
+  return flags.filter(([, on]) => on !== false).map(([id]) => id)
+}
 
 /** Settings namespace for preference order. */
 export const WEB_SEARCH_ATTACHED_CLI_SETTINGS_NAMESPACE = settingsNamespace('web-search-attached-cli')
@@ -71,26 +93,30 @@ function resolveOptions(
   config: Config,
   resolvedKeys: Map<AttachedCliBackendId, string>,
 ): AttachedCliSearchOptions {
-  const preference = (config.preference ?? DEFAULT_PREFERENCE).filter(isBackendId)
+  const preference = enabledBackends(config)
+  const enabled = new Set(preference)
   const currentProvider = ctx.get('agentDefaultModel')?.currentSelection().provider
   const backends = {} as Record<AttachedCliBackendId, AttachedCliBackend>
   for (const id of ATTACHED_CLI_BACKENDS) {
+    const on = enabled.has(id)
     const envName = BACKEND_API_KEY_ENV[id]
     const ambient = launchEnvironmentOf(ctx).get(envName)?.value
     const cached = resolvedKeys.get(id)
-    const apiKey = (ambient !== undefined && ambient.length > 0 ? ambient : undefined)
-      ?? (cached !== undefined && cached.length > 0 ? cached : undefined)
+    const apiKey = on
+      ? (ambient !== undefined && ambient.length > 0 ? ambient : undefined)
+        ?? (cached !== undefined && cached.length > 0 ? cached : undefined)
+      : undefined
     backends[id] = {
       id,
       ...apiKey !== undefined ? { apiKey } : {},
       // The current conversation CLI is attached even before the credential
       // cache fills: search stays on that vendor instead of falling through.
-      hasResolver: currentProvider === id,
+      hasResolver: on && currentProvider === id,
       baseURL: BACKEND_DEFAULT_BASE_URL[id],
     }
   }
   return {
-    preference: preference.length > 0 ? preference : DEFAULT_PREFERENCE,
+    preference,
     ...currentProvider !== undefined ? { currentProvider } : {},
     backends,
     refreshKeys: async () => {

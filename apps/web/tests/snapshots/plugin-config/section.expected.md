@@ -4,9 +4,9 @@
     - button "General":
       - img
       - text: General
-    - button "Model":
+    - button "Models":
       - img
-      - text: Model
+      - text: Models
     - button "Plugins":
       - img
       - text: Plugins
@@ -25,14 +25,14 @@
   - tabpanel "Plugin configuration":
     - list:
       - listitem:
-        - 'button "ExpandSettings: Shell"':
-          - text: Shell limit agent Run each itemsCommands。
+        - 'button "Show settings: Shell"':
+          - text: Shell Limits every command the agent runs.
           - img
       - listitem:
-        - 'button "ExpandSettings: Agent loop"':
-          - text: Agent loop Agent Toolscall。
+        - 'button "Show settings: Agent loop"':
+          - text: Agent loop How the agent dispatches tool calls.
           - img
       - listitem:
-        - 'button "ExpandSettings: Web search"':
-          - text: Web search The DeepSeek search provider.
+        - 'button "Show settings: Web search"':
+          - text: Web search Turn on the search methods the agent may use.
           - img
