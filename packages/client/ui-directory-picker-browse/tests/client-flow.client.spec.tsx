@@ -150,11 +150,11 @@ describe('directory-picker-browse client half', () => {
     try {
       const fiber = b.ctx.plugin({ inject: [...inject], apply })
       await expect(fiber.await()).rejects.toThrow(/already has locale/)
-      // The zh registration rolled back with the failure: once the rival
-      // leaves, a fresh registrant owns the whole namespace again.
+      // The failed registration rolled back: once the rival leaves, a
+      // fresh registrant owns the whole namespace again.
       disposeRival()
-      const disposeZh = locale.register('directory-browser', 'zh', { 'browser.title': 'Idle' })
-      disposeZh()
+      const disposeIdle = locale.register('directory-browser', 'xx', { 'browser.title': 'Idle' })
+      disposeIdle()
     } finally {
       await new Promise(resolve => setTimeout(resolve, 0))
       process.off('unhandledRejection', onUnhandled)

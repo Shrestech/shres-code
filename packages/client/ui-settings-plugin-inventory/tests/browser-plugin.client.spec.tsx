@@ -87,7 +87,7 @@ describe('ui-settings-plugin-inventory browser plugin', () => {
 
     await fiber.dispose()
     expect(b.slots.entries('settings.plugins.tab')).toHaveLength(0)
-    expect(() => b.locale.register(NS, 'zh', {})).not.toThrow()
+    expect(() => b.locale.register(NS, 'xx', {})).not.toThrow()
     await b.ctx.fiber.dispose()
   })
 })

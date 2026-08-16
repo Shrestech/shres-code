@@ -61,26 +61,26 @@ function mount(version?: string, mutateImpl: () => Promise<unknown> = () => Prom
 }
 
 describe('WelcomeNotice', () => {
-  it('uses the exact owner copy in both GUI locales', () => {
-    expect(WELCOME_NOTICE_COPY.en).toEqual({
+  it('uses the exact owner copy', () => {
+    expect(WELCOME_NOTICE_COPY).toEqual({
       title: 'Internal Testing Notice',
       body: "Roos Code 0.1 remains in testing for Harness developers. Many areas need further improvement, and we welcome feedback from the developer community. Roos Code's core plugins and foundational APIs will continue to evolve rapidly over the coming months.\n\nWe look forward to exploring the limits of intelligence with developers around the world, building on open-source, open, reusable, and composable infrastructure. We welcome Harness developers everywhere to join the Roos plugin ecosystem.",
       continueLabel: 'Continue',
     })
-    expect(en.welcomeBody).toBe(WELCOME_NOTICE_COPY.en.body)
-    expect(en.welcomeBody).toBe(WELCOME_NOTICE_COPY.en.body)
+    expect(en.welcomeBody).toBe(WELCOME_NOTICE_COPY.body)
+    expect(en.welcomeBody).toBe(WELCOME_NOTICE_COPY.body)
   })
 
   it('renders one blocking modal action and focuses the title', async () => {
     const h = mount()
-    const dialog = await screen.findByRole('dialog', { name: WELCOME_NOTICE_COPY.en.title })
-    for (const paragraph of WELCOME_NOTICE_COPY.en.body.split('\n\n')) {
+    const dialog = await screen.findByRole('dialog', { name: WELCOME_NOTICE_COPY.title })
+    for (const paragraph of WELCOME_NOTICE_COPY.body.split('\n\n')) {
       expect(screen.getByText(paragraph, { exact: true })).toBeTruthy()
     }
     expect(dialog.querySelectorAll('p')).toHaveLength(2)
     expect(dialog.querySelectorAll('button')).toHaveLength(1)
-    expect(screen.getByRole('button', { name: WELCOME_NOTICE_COPY.en.continueLabel })).toBeTruthy()
-    expect(document.activeElement).toBe(screen.getByRole('heading', { name: WELCOME_NOTICE_COPY.en.title }))
+    expect(screen.getByRole('button', { name: WELCOME_NOTICE_COPY.continueLabel })).toBeTruthy()
+    expect(document.activeElement).toBe(screen.getByRole('heading', { name: WELCOME_NOTICE_COPY.title }))
     expect(h.appRoot.inert).toBe(true)
 
     fireEvent.keyDown(document, { key: 'Escape' })
@@ -92,7 +92,7 @@ describe('WelcomeNotice', () => {
   it('completes only after the acknowledgement write commits', async () => {
     const h = mount()
     await screen.findByRole('dialog')
-    fireEvent.click(screen.getByRole('button', { name: WELCOME_NOTICE_COPY.en.continueLabel }))
+    fireEvent.click(screen.getByRole('button', { name: WELCOME_NOTICE_COPY.continueLabel }))
     await act(async () => { await Promise.resolve() })
     expect(h.mutate).toHaveBeenCalledOnce()
     expect(h.complete).toHaveBeenCalledOnce()
@@ -110,7 +110,7 @@ describe('WelcomeNotice', () => {
     const write = new Promise<unknown>((resolve) => { resolveWrite = resolve })
     const h = mount(undefined, () => write)
     await screen.findByRole('dialog')
-    const action = screen.getByRole<HTMLButtonElement>('button', { name: WELCOME_NOTICE_COPY.en.continueLabel })
+    const action = screen.getByRole<HTMLButtonElement>('button', { name: WELCOME_NOTICE_COPY.continueLabel })
     fireEvent.click(action)
     expect(action.disabled).toBe(true)
     resolveWrite({
