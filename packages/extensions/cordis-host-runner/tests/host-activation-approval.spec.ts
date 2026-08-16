@@ -165,7 +165,7 @@ describe('host-half activation approval', () => {
     await ctx.plugin(ApprovalService)
     await expect(ctx.plugin(DynamicCordisRunnerService, {
       hostActivationAllowlist: ['not a plugin id'],
-    })).rejects.toThrow(/invalid hostActivationAllowlist entry/)
+    })).rejects.toThrow(/match regexp/)
   })
 
   it('fails closed when the Host-activation ask happens outside an open turn', async () => {
@@ -178,5 +178,98 @@ describe('host-half activation approval', () => {
       ok: false,
       reason: 'unavailable',
     })
+  })
+
+  it('does not re-ask after a later Package of the same Plugin', async () => {
+    const asked: string[] = []
+    const { ctx, runner } = await setup(undefined, 'none')
+    ctx.on('approval/request', () => {
+      asked.push('asked')
+      return Promise.resolve<ApprovalOutcome>('allowed-once')
+    })
+    const first = defineHost(runner)
+    await expect(runner.run(AGENT_A, first.pluginId, first.packageId, 'run'))
+      .resolves.toMatchObject({ ok: true })
+    const second = runner.define({
+      sessionId: AGENT_A.id,
+      plugin: { kind: 'existing', pluginId: first.pluginId },
+      name: 'doubler v2',
+      purpose: 'host activation fixture',
+      code: { host: HOST_CODE },
+    })
+
+    await expect(runner.run(AGENT_A, first.pluginId, second.packageId, 'update'))
+      .resolves.toMatchObject({ ok: true })
+    expect(asked).toHaveLength(1)
+  })
+
+  it('serializes concurrent Host-activation asks for one Plugin', async () => {
+    const asked: string[] = []
+    const gate = Promise.withResolvers<undefined>()
+    const { ctx, runner } = await setup(undefined, 'none')
+    ctx.on('approval/request', async () => {
+      asked.push('asked')
+      await gate.promise
+      return 'allowed-once' as ApprovalOutcome
+    })
+    const { pluginId, packageId } = defineHost(runner)
+    const first = runner.run(AGENT_A, pluginId, packageId, 'run')
+    const second = runner.run(AGENT_A, pluginId, packageId, 'run')
+    await Promise.resolve()
+    expect(asked).toHaveLength(1)
+    gate.resolve(undefined)
+    await expect(first).resolves.toMatchObject({ ok: true })
+    await expect(second).resolves.toMatchObject({ ok: true })
+    expect(asked).toHaveLength(1)
+  })
+
+  it('does not re-prompt after a closed Host-half denial', async () => {
+    const asked: string[] = []
+    const { ctx, runner } = await setup(undefined, 'none')
+    ctx.on('approval/request', () => {
+      asked.push('asked')
+      return Promise.resolve<ApprovalOutcome>('rejected')
+    })
+    const { pluginId, packageId } = defineHost(runner)
+
+    await expect(runner.run(AGENT_A, pluginId, packageId, 'run'))
+      .resolves.toMatchObject({ ok: false, reason: 'rejected' })
+    await expect(runner.run(AGENT_A, pluginId, packageId, 'run'))
+      .resolves.toMatchObject({ ok: false, reason: 'rejected' })
+    expect(asked).toHaveLength(1)
+  })
+
+  it('marks the Host half failed when runHostHalf is denied', async () => {
+    const { runner } = await setup(undefined, 'rejected')
+    const { pluginId, packageId } = defineHost(runner)
+
+    await expect(runner.runHostHalf(AGENT_A, pluginId, packageId, 'run', null, false))
+      .resolves.toMatchObject({ ok: false, reason: 'rejected' })
+    expect(runner.inventory()[0]?.latestRun).toMatchObject({
+      status: 'failed',
+      error: { phase: 'approval' },
+      host: { status: 'failed' },
+      client: { status: 'absent' },
+    })
+  })
+
+  it('does not record a Client grant when panel Host activation is denied', async () => {
+    const { runner, gateway } = await setup(undefined, 'rejected')
+    const defined = runner.define({
+      sessionId: AGENT_A.id,
+      plugin: { kind: 'new', idPrefix: 'both' },
+      name: 'both',
+      purpose: 'p',
+      code: { host: HOST_CODE, client: CLIENT_CODE },
+    })
+
+    await expect(runner.runHostHalf(AGENT_A, defined.pluginId, defined.packageId, 'run', null, false))
+      .resolves.toMatchObject({ ok: false, reason: 'rejected' })
+    expect(gateway.events.filter(([name]) => name === 'cordis/request-run')).toEqual([])
+    expect(runner.inventory()[0]?.latestRun).toMatchObject({
+      host: { status: 'failed' },
+    })
+    await expect(runner.run(AGENT_A, defined.pluginId, defined.packageId, 'run'))
+      .resolves.toMatchObject({ ok: false, reason: 'rejected' })
   })
 })

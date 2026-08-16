@@ -25,8 +25,5 @@
             name: '@roos-code/roos-code-code-runtime-worker-thread'
           - id: cordis-host-runner
             name: '@roos-code/roos-code-cordis-host-runner'
-            config:
-              hostActivationAllowlist:
-                - snap-1
           - id: tool-cordis
             name: '@roos-code/roos-code-tool-cordis'

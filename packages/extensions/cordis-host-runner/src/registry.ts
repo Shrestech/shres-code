@@ -61,6 +61,11 @@ export interface DynamicCordisPlugin {
   clientVersionUpdatesApproved: boolean
   /** Whether this Session already granted Host-half activation for this Plugin. */
   hostActivationApproved: boolean
+  /** Closed Host-half non-grant remembered so a later ask does not re-prompt. */
+  hostActivationDenial?: {
+    reason: 'rejected' | 'cancelled' | 'unavailable'
+    message: string
+  }
   /** Last successfully activated version. */
   currentPackageId?: CordisDynamicPackageId
   /** Failed or in-progress target version. */

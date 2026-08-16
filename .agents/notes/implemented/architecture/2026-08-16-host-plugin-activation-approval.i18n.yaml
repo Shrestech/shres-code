@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-16-host-plugin-activation-approval.md
-2026-08-16-host-plugin-activation-approval.md: 2445a015aafc695138ac8769c906024948bb8bdf
-2026-08-16-host-plugin-activation-approval.zh.md: f64d5fde50b6fb1dc566d422273afa3bea6a1bee
+2026-08-16-host-plugin-activation-approval.md: 22817ca61d89cd0bf758b531855229d7d89612bf
+2026-08-16-host-plugin-activation-approval.zh.md: 117c92cf002637c5440465ab37f4164945878a4f

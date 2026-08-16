@@ -78,6 +78,34 @@ import type { ApprovalOutcome } from './types.ts'
 export { ApprovalRequestId } from './types.ts'
 export type { ApprovalOutcome } from './types.ts'
 
+const OUTSIDE_TURN_MESSAGE =
+  'approval.request() outside an open turn: the approval/asked + approval/decided audit pair '
+  + 'must be turn-enclosed (a bare event between turns is crash-tail garbage on reload). '
+  + 'Ask from inside the turn that needs the decision.'
+
+/**
+ * Thrown when {@link ApprovalService.request} is called with no open turn.
+ * Callers that must fail closed without treating the throw as a tool crash
+ * distinguish it with {@link isApprovalOutsideTurnError}.
+ */
+export class ApprovalOutsideTurnError extends Error {
+  override readonly name = 'ApprovalOutsideTurnError'
+
+  constructor() {
+    super(OUTSIDE_TURN_MESSAGE)
+  }
+}
+
+/**
+ * Whether a thrown value is {@link ApprovalOutsideTurnError}.
+ * @param error - the caught value from {@link ApprovalService.request}.
+ * @returns true when the ask happened outside an open turn.
+ */
+export function isApprovalOutsideTurnError(error: unknown): error is ApprovalOutsideTurnError {
+  return error instanceof ApprovalOutsideTurnError
+    || (error instanceof Error && error.name === 'ApprovalOutsideTurnError')
+}
+
 /** Every {@link ApprovalOutcome}, for runtime normalization of answerer returns. */
 const OUTCOMES: readonly ApprovalOutcome[] = ['allowed-once', 'rejected', 'cancelled', 'unavailable']
 
@@ -257,11 +285,7 @@ export class ApprovalService extends Service {
   async request(req: ApprovalRequest): Promise<ApprovalOutcome> {
     const session = req.agent.session
     if (!hasOpenTurn(session.events)) {
-      throw new Error(
-        'approval.request() outside an open turn: the approval/asked + approval/decided audit pair '
-        + 'must be turn-enclosed (a bare event between turns is crash-tail garbage on reload). '
-        + 'Ask from inside the turn that needs the decision.',
-      )
+      throw new ApprovalOutsideTurnError()
     }
     const id = ApprovalRequestId(randomUUID())
     session.append('approval/asked', {

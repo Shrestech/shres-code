@@ -12,11 +12,11 @@ Unattended compositions (headless snapshots, CI) still need a way to start a kno
 
 ## Decision
 
-`DynamicCordisRunnerService.activate()` / `startFresh()` asks `ctx.approval` before any Host half is evaluated. The ask is one-shot per Plugin id per Session: `'allowed-once'` sets `plugin.hostActivationApproved` and later Packages or restarts of that Plugin do not ask again. `'allowed-once'` is the only grant; `rejected`, `cancelled`, and `unavailable` refuse before `startHost`. Client-only Packages never ask. Client-bearing Packages still emit `cordis/request-run` and keep the existing page card after the Host-half grant.
+`DynamicCordisRunnerService.activate()` / `startFresh()` asks `ctx.approval` before any Host half is evaluated. The ask is one-shot per Plugin id per Session and is serialized on that Plugin: `'allowed-once'` sets `plugin.hostActivationApproved` and later Packages or restarts of that Plugin do not ask again. `'allowed-once'` is the only grant; `rejected`, `cancelled`, and `unavailable` refuse before `startHost` and are remembered so a retry does not re-prompt. Client-only Packages never ask. Client-bearing Packages still emit `cordis/request-run` and keep the existing page card after the Host-half grant. A panel `runHostHalf` records the Client grant only after Host activation succeeds.
 
-The runner injects `approval` so a composition without the seam stays pending at load. Config `hostActivationAllowlist` (default `[]`) lists minted Plugin ids (`<prefix>-<n>`) that skip the ask; an invalid entry fails at plugin load. `cordis_run` returns a structured non-error result for those three denials so the model is told not to retry; the repeat-tool-reminder chain still observes the identical call.
+The runner injects `approval` so a composition without the seam stays pending at load. Config `hostActivationAllowlist` (default `[]`) lists minted Plugin ids (`<prefix>-<n>`) that skip the ask; the schema rejects an invalid entry at load. `cordis_run` returns a structured non-error result for those three denials so the model is told not to retry; the repeat-tool-reminder chain still observes the identical call. An ask outside an open turn is `ApprovalOutsideTurnError`, distinguished with `isApprovalOutsideTurnError`.
 
-`pnpm run demo:cordis` (Web by default, or `acp`) now prompts through the composed approval answerer before a Host half runs. Unattended replay compositions that must keep the lifecycle green list `snap-1` on the allowlist.
+`pnpm run demo:cordis` (Web by default, or `acp`) now prompts through the composed approval answerer before a Host half runs. Live advanced/e2e compositions do not silently allowlist `snap-1`; only unattended replay `*.snapshot.yml` files list that id.
 
 ## Alternatives considered
 
@@ -30,4 +30,4 @@ The runner injects `approval` so a composition without the seam stays pending at
 
 ## Consequences
 
-Host-only activation is no longer silent. Interactive Web and ACP demos ask the user; headless and snapshot compositions that need a Host half to start must either compose an answerer or list the minted Plugin id. Panel `runHostHalf` after the turn has closed fails closed (`unavailable`) rather than starting Host code without an auditable ask. The `cordis` preset skill and `cordis_run` description state that a Host-half denial is final.
+Host-only activation is no longer silent. Interactive Web and ACP demos ask the user; live advanced/e2e compositions must compose an answerer, while unattended replay `*.snapshot.yml` files list `snap-1`. Panel `runHostHalf` after the turn has closed fails closed (`unavailable`) rather than starting Host code without an auditable ask. The `cordis` preset skill and `cordis_run` description state that a Host-half denial is final.

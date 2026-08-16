@@ -12,11 +12,11 @@ Status: implemented
 
 ## 决定
 
-`DynamicCordisRunnerService.activate()`／`startFresh()` 在求值任何 Host 半之前询问 `ctx.approval`。这次询问对该 Session 中的每个 Plugin id 只进行一次：`'allowed-once'` 会设置 `plugin.hostActivationApproved`，该 Plugin 此后的 Package 或重启不再询问。唯一许可是 `'allowed-once'`；`rejected`、`cancelled` 和 `unavailable` 会在 `startHost` 之前拒绝。只有 Client 的 Package 从不询问。带 Client 的 Package 在取得 Host 半许可之后，仍会 emit `cordis/request-run` 并保留现有的页面卡片。
+`DynamicCordisRunnerService.activate()`／`startFresh()` 在求值任何 Host 半之前询问 `ctx.approval`。这次询问对该 Session 中的每个 Plugin id 只进行一次，并在该 Plugin 上串行化：`'allowed-once'` 会设置 `plugin.hostActivationApproved`，该 Plugin 此后的 Package 或重启不再询问。唯一许可是 `'allowed-once'`；`rejected`、`cancelled` 和 `unavailable` 会在 `startHost` 之前拒绝，并被记住，因此重试不会再次提问。只有 Client 的 Package 从不询问。带 Client 的 Package 在取得 Host 半许可之后，仍会 emit `cordis/request-run` 并保留现有的页面卡片。面板 `runHostHalf` 只在 Host 激活成功之后才记录 Client 许可。
 
-runner 注入 `approval`，因此缺少该 seam 的组合在加载时保持 pending。配置项 `hostActivationAllowlist`（默认 `[]`）列出跳过询问的已铸造 Plugin id（`<prefix>-<n>`）；非法条目在插件加载时失败。`cordis_run` 对这三种拒绝返回结构化的非错误结果，告诉模型不要重试；repeat-tool-reminder 链仍会观察完全相同的调用。
+runner 注入 `approval`，因此缺少该 seam 的组合在加载时保持 pending。配置项 `hostActivationAllowlist`（默认 `[]`）列出跳过询问的已铸造 Plugin id（`<prefix>-<n>`）；schema 在加载时拒绝非法条目。`cordis_run` 对这三种拒绝返回结构化的非错误结果，告诉模型不要重试；repeat-tool-reminder 链仍会观察完全相同的调用。不在开放轮次内的询问是 `ApprovalOutsideTurnError`，用 `isApprovalOutsideTurnError` 识别。
 
-`pnpm run demo:cordis`（默认 Web，或 `acp`）现在会在 Host 半运行之前，通过已组成的审批应答者提问。必须保持生命周期通过的无人值守回放组合，会把 `snap-1` 列在 allowlist 上。
+`pnpm run demo:cordis`（默认 Web，或 `acp`）现在会在 Host 半运行之前，通过已组成的审批应答者提问。实况 advanced／e2e 组合不会静默 allowlist `snap-1`；只有无人值守回放的 `*.snapshot.yml` 会列出该 id。
 
 ## 曾考虑的替代方案
 
@@ -30,4 +30,4 @@ runner 注入 `approval`，因此缺少该 seam 的组合在加载时保持 pend
 
 ## 影响
 
-只有 Host 半的激活不再是静默的。交互式 Web 与 ACP 演示会询问用户；需要启动 Host 半的 headless 与 snapshot 组合必须组成应答者，或列出已铸造的 Plugin id。轮次结束后的面板 `runHostHalf` 会故障关闭（`unavailable`），而不是在没有可审计询问的情况下启动 Host 代码。`cordis` 预设 skill 与 `cordis_run` 描述写明 Host 半拒绝是最终结果。
+只有 Host 半的激活不再是静默的。交互式 Web 与 ACP 演示会询问用户；实况 advanced／e2e 组合必须组成应答者，无人值守回放的 `*.snapshot.yml` 则列出 `snap-1`。轮次结束后的面板 `runHostHalf` 会故障关闭（`unavailable`），而不是在没有可审计询问的情况下启动 Host 代码。`cordis` 预设 skill 与 `cordis_run` 描述写明 Host 半拒绝是最终结果。

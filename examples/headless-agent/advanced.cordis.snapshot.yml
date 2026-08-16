@@ -41,6 +41,8 @@
       - insert:
           - id: code-runtime
             name: '@roos-code/roos-code-code-runtime-worker-thread'
+          - id: approval
+            name: '@roos-code/roos-code-user-approval'
           - id: cordis-host-runner
             name: '@roos-code/roos-code-cordis-host-runner'
             config:
