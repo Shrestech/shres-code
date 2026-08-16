@@ -35,15 +35,17 @@ function options(partial: Partial<AttachedCliSearchOptions> & {
   claude?: string | undefined
   codex?: string | undefined
   kimi?: string | undefined
+  ollama?: string | undefined
 }): AttachedCliSearchOptions {
   return {
-    preference: partial.preference ?? ['grok-cli', 'claude-cli', 'codex-cli', 'kimi-cli'],
+    preference: partial.preference ?? ['grok-cli', 'claude-cli', 'codex-cli', 'kimi-cli', 'ollama-cloud'],
     ...partial.currentProvider !== undefined ? { currentProvider: partial.currentProvider } : {},
     backends: {
       'grok-cli': backend('grok-cli', partial.grok),
       'claude-cli': backend('claude-cli', partial.claude),
       'codex-cli': backend('codex-cli', partial.codex),
       'kimi-cli': backend('kimi-cli', partial.kimi),
+      'ollama-cloud': backend('ollama-cloud', partial.ollama),
     },
     ...partial.fetch !== undefined ? { fetch: partial.fetch } : {},
     ...partial.refreshKeys !== undefined ? { refreshKeys: partial.refreshKeys } : {},
@@ -62,7 +64,7 @@ describe('selectBackend', () => {
   it('keeps the current conversation CLI when it is attached without a cached key', () => {
     const backends = options({ grok: 'g' }).backends
     expect(selectBackend({
-      preference: ['grok-cli', 'claude-cli', 'codex-cli', 'kimi-cli'],
+      preference: ['grok-cli', 'claude-cli', 'codex-cli', 'kimi-cli', 'ollama-cloud'],
       currentProvider: 'kimi-cli',
       backends: {
         ...backends,
@@ -77,6 +79,14 @@ describe('selectBackend', () => {
 
   it('returns undefined when no backend has a key', () => {
     expect(selectBackend(options({}))).toBeUndefined()
+  })
+
+  it('prefers the current Ollama Cloud model when that backend has a key', () => {
+    expect(selectBackend(options({
+      currentProvider: 'ollama-cloud',
+      grok: 'g',
+      ollama: 'ollama-key',
+    }))).toBe('ollama-cloud')
   })
 })
 
@@ -115,6 +125,15 @@ describe('mapVendorSearchPayload', () => {
       ],
     })
     expect(result.sources).toEqual([{ url: 'https://example.com', title: 'One' }])
+  })
+
+  it('maps Ollama Cloud title, url, and content onto a source snippet', () => {
+    expect(mapVendorSearchPayload({
+      results: [{ title: 'Ollama', url: 'https://ollama.com/', content: 'Cloud models' }],
+    })).toEqual({
+      sources: [{ title: 'Ollama', url: 'https://ollama.com/', snippet: 'Cloud models' }],
+      truncated: false,
+    })
   })
 
   it('keeps title and snippet from the first source object', () => {
@@ -198,6 +217,13 @@ describe('buildRequest', () => {
     })
   })
 
+  it('targets Ollama Cloud /api/web_search for ollama-cloud', () => {
+    const request = buildRequest('ollama-cloud', 'https://ollama.com', 'ollama-key', 'cloudflare tunnel')
+    expect(request.url).toBe('https://ollama.com/api/web_search')
+    expect(request.body).toEqual({ query: 'cloudflare tunnel' })
+    expect(request.headers.authorization).toBe('Bearer ollama-key')
+  })
+
   it('strips a trailing slash from the vendor base', () => {
     expect(buildRequest('grok-cli', 'https://api.x.ai/v1/', 'k', 'q').url)
       .toBe('https://api.x.ai/v1/responses')
@@ -211,9 +237,14 @@ describe('buildRequest', () => {
 
 describe('enabledBackends', () => {
   it('defaults every vendor on and drops a vendor the user turns off', () => {
-    expect(enabledBackends({})).toEqual(['grok-cli', 'claude-cli', 'codex-cli', 'kimi-cli'])
-    expect(enabledBackends({ grok: false, claude: true, codex: false, kimi: false })).toEqual(['claude-cli'])
-    expect(enabledBackends({ grok: false, claude: false, codex: false, kimi: false })).toEqual([])
+    expect(enabledBackends({})).toEqual([
+      'grok-cli', 'claude-cli', 'codex-cli', 'kimi-cli', 'ollama-cloud',
+    ])
+    expect(enabledBackends({ grok: false, claude: true, codex: false, kimi: false, ollama: false }))
+      .toEqual(['claude-cli'])
+    expect(enabledBackends({
+      grok: false, claude: false, codex: false, kimi: false, ollama: false,
+    })).toEqual([])
   })
 })
 
@@ -222,6 +253,7 @@ describe('backendUsable and isBackendId', () => {
     expect(backendUsable(backend('grok-cli', ''))).toBe(false)
     expect(backendUsable({ ...backend('grok-cli'), hasResolver: true })).toBe(true)
     expect(isBackendId('grok-cli')).toBe(true)
+    expect(isBackendId('ollama-cloud')).toBe(true)
     expect(isBackendId('deepseek-official')).toBe(false)
   })
 })
@@ -269,6 +301,29 @@ describe('AttachedCliSearchProvider', () => {
     const result = await ctx.web.search({ query: 'claude tools' })
     expect(provider.id).toBe(ATTACHED_CLI_PROVIDER_ID)
     expect(result.sources[0]?.url).toBe('https://docs.anthropic.com')
+  })
+
+  it('uses the key refreshKeys just stored, not the empty pre-refresh snapshot', async () => {
+    let ollama: string | undefined
+    const seen: string[] = []
+    const provider = new AttachedCliSearchProvider(() => options({
+      currentProvider: 'ollama-cloud',
+      ollama,
+      refreshKeys: async () => {
+        ollama = 'ollama-from-credentials'
+      },
+      fetch: async (input) => {
+        const href = input instanceof Request ? input.url : input instanceof URL ? input.href : input
+        seen.push(href)
+        return new Response(JSON.stringify({
+          results: [{ title: 'BTC', url: 'https://example.com/btc', content: 'price' }],
+        }), { status: 200 })
+      },
+    }))
+    await expect(provider.search({ query: 'bitcoin' })).resolves.toMatchObject({
+      sources: [{ title: 'BTC', url: 'https://example.com/btc', snippet: 'price' }],
+    })
+    expect(seen).toEqual(['https://ollama.com/api/web_search'])
   })
 
   it('throws WEB_PROVIDER_UNAVAILABLE after refresh leaves no backend', async () => {
@@ -448,7 +503,7 @@ describe('web-search-attached-cli plugin registration', () => {
       }
     })
     await ctx.plugin(attachedCliPlugin, {
-      grok: false, claude: false, codex: true, kimi: false,
+      grok: false, claude: false, codex: true, kimi: false, ollama: false,
     })
     await expect(ctx.web.search({ query: 'q' }))
       .rejects.toThrow(expect.objectContaining({ code: 'WEB_PROVIDER_UNAVAILABLE' }))
@@ -493,7 +548,7 @@ describe('web-search-attached-cli plugin registration', () => {
       await ctx.plugin(MemorySettings)
       await ctx.plugin(attachedCliPlugin, {})
       await ctx.settings.update(attachedCliPlugin.WEB_SEARCH_ATTACHED_CLI_SETTINGS_NAMESPACE, {
-        grok: false, claude: false, codex: false, kimi: true,
+        grok: false, claude: false, codex: false, kimi: true, ollama: false,
       })
       await ctx.web.search({ query: 'q' })
       expect(seen.at(-1)).toBe('https://api.moonshot.ai/v1/chat/completions')
@@ -501,6 +556,43 @@ describe('web-search-attached-cli plugin registration', () => {
       if (previous === undefined) delete process.env.XAI_API_KEY
       else process.env.XAI_API_KEY = previous
       delete process.env.MOONSHOT_API_KEY
+    }
+  })
+
+  it('searches Ollama Cloud with the stored OLLAMA_API_KEY', async () => {
+    const previous = process.env.OLLAMA_API_KEY
+    delete process.env.OLLAMA_API_KEY
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const href = input instanceof Request ? input.url : input instanceof URL ? input.href : input
+      expect(href).toBe('https://ollama.com/api/web_search')
+      return new Response(JSON.stringify({
+        results: [{ title: 'Ollama', url: 'https://ollama.com/', content: 'Cloud models' }],
+      }), { status: 200 })
+    }))
+    try {
+      const ctx = new Context()
+      await ctx.plugin(WebRuntime, { searchProviders: ['attached-cli', 'deepseek-official'] })
+      await ctx.plugin(class extends MemoryCredentials {
+        constructor(inner: Context) {
+          super(inner, { OLLAMA_API_KEY: 'ollama-stored' })
+        }
+      })
+      await ctx.plugin(class extends Service {
+        constructor(inner: Context) {
+          super(inner, 'agentDefaultModel')
+        }
+
+        currentSelection(): { provider: string; model: string } {
+          return { provider: 'ollama-cloud', model: 'deepseek-v4-flash:cloud' }
+        }
+      })
+      await ctx.plugin(attachedCliPlugin, {})
+      await expect(ctx.web.search({ query: 'Cloudflare Tunnel GitOps' })).resolves.toMatchObject({
+        sources: [{ title: 'Ollama', url: 'https://ollama.com/', snippet: 'Cloud models' }],
+      })
+    } finally {
+      if (previous === undefined) delete process.env.OLLAMA_API_KEY
+      else process.env.OLLAMA_API_KEY = previous
     }
   })
 

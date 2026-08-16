@@ -31,7 +31,7 @@ const DEFAULT_API_KEY_REF = 'DEEPSEEK_API_KEY'
 const API_KEY_FIELD = 'apiKey'
 
 /** Fields written to the attached-CLI section. */
-const METHOD_FIELDS = new Set(['grok', 'claude', 'codex', 'kimi'])
+const METHOD_FIELDS = new Set(['grok', 'claude', 'codex', 'kimi', 'ollama'])
 
 /** The DeepSeek section fields this card edits. */
 export interface WebSearchSettings {
@@ -55,6 +55,8 @@ export interface WebSearchMethods {
   codex?: boolean
   /** When false, Kimi is omitted from the search pool. */
   kimi?: boolean
+  /** When false, Ollama Cloud is omitted from the search pool. */
+  ollama?: boolean
 }
 
 /** What the credentials domain last reported, and for which reference. */
@@ -77,6 +79,8 @@ export interface WebSearchCardState extends CardShell {
   codex: CardFieldState
   /** Kimi method switch. */
   kimi: CardFieldState
+  /** Ollama Cloud method switch. */
+  ollama: CardFieldState
   /** DeepSeek method switch. */
   deepseek: CardFieldState
   /** Provider endpoint. */
@@ -128,6 +132,7 @@ export class WebSearchCardController {
       booleanField('claude'),
       booleanField('codex'),
       booleanField('kimi'),
+      booleanField('ollama'),
     ])
     this.store = createSnapshotStore(this.projection())
     const push = (): WebSearchCardState => {
@@ -155,6 +160,7 @@ export class WebSearchCardController {
       claude: methods.available ? this.methods.field('claude') : ON,
       codex: methods.available ? this.methods.field('codex') : ON,
       kimi: methods.available ? this.methods.field('kimi') : ON,
+      ollama: methods.available ? this.methods.field('ollama') : ON,
       deepseek: deepseek.available ? this.form.field('enabled') : ON,
       baseURL: this.form.field('baseURL'),
       maxUses: this.form.field('maxUses'),

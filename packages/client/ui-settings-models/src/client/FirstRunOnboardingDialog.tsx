@@ -58,6 +58,7 @@ const FALLBACK_MODELS: Readonly<Record<string, string>> = {
   'moonshotai': 'kimi-k2.5',
   'openrouter': 'openai/gpt-4o',
   'groq': 'llama-3.3-70b-versatile',
+  'zai': 'glm-5.2',
 }
 
 /**

@@ -66,6 +66,18 @@ describe('FishLogo', () => {
   })
 })
 
+describe('HoppingRoo', () => {
+  it('colors each seat and infers ids from prefixed labels', () => {
+    expect(primitives.seatIdOf('Boomer: design the API')).toBe('boomer')
+    expect(primitives.seatIdOf('joey')).toBe('joey')
+    expect(primitives.seatIdOf('worker')).toBeUndefined()
+    const { container } = render(<primitives.HoppingRoo seat="flyer" hopping />)
+    const svg = container.querySelector('[data-hopping-roo="flyer"]')!
+    expect(svg.getAttribute('data-state')).toBe('ongoing')
+    expect((svg as SVGElement).style.color.replace(/\s/g, '')).toMatch(/#3b7dd8|rgb\(59,125,216\)/)
+  })
+})
+
 describe('BrandWordmark', () => {
   it('renders live roos / CODE lettering and no leftover DeepSeek lockup', () => {
     const { container } = render(<primitives.BrandWordmark />)

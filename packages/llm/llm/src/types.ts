@@ -194,6 +194,13 @@ export interface LlmConfigurableProvider {
    * bypass harness approval. Selectors must show that fact.
    */
   kind?: 'delegated'
+  /**
+   * Command the host will spawn for a delegated CLI route. Configuration
+   * surfaces probe PATH with this name.
+   */
+  binary?: string
+  /** Whether {@link binary} is an executable file or a command on PATH. */
+  binaryFound?: boolean
 }
 
 /**

@@ -1,7 +1,7 @@
 /**
- * Multiplexed search provider that calls a vendor hosted web-search tool using
- * the same credential the CLI route already stores. It does not spawn `grok`,
- * `claude`, `codex`, or `kimi`.
+ * Multiplexed search provider that calls a vendor hosted web-search API using
+ * the same credential the conversation adapter already stores. It does not
+ * spawn `grok`, `claude`, `codex`, or `kimi`.
  * @module @roos-code/roos-code-web-search-attached-cli/provider
  */
 
@@ -16,8 +16,14 @@ import { mapVendorSearchPayload } from './parse.ts'
 /** Stable id this provider registers under. */
 export const ATTACHED_CLI_PROVIDER_ID = 'attached-cli'
 
-/** Shipped CLI routes this multiplexer can search through. */
-export const ATTACHED_CLI_BACKENDS = ['grok-cli', 'claude-cli', 'codex-cli', 'kimi-cli'] as const
+/** Shipped conversation vendors this multiplexer can search through. */
+export const ATTACHED_CLI_BACKENDS = [
+  'grok-cli',
+  'claude-cli',
+  'codex-cli',
+  'kimi-cli',
+  'ollama-cloud',
+] as const
 
 /** One shipped CLI backend id. */
 export type AttachedCliBackendId = (typeof ATTACHED_CLI_BACKENDS)[number]
@@ -25,12 +31,13 @@ export type AttachedCliBackendId = (typeof ATTACHED_CLI_BACKENDS)[number]
 /** Default preference when config omits one. */
 export const DEFAULT_PREFERENCE: readonly AttachedCliBackendId[] = ATTACHED_CLI_BACKENDS
 
-/** Credential env names already used by `llm-cli-bridge` routes. */
+/** Credential env names already used by the matching conversation adapter. */
 export const BACKEND_API_KEY_ENV: Record<AttachedCliBackendId, string> = {
   'grok-cli': 'XAI_API_KEY',
   'claude-cli': 'ANTHROPIC_API_KEY',
   'codex-cli': 'OPENAI_API_KEY',
   'kimi-cli': 'MOONSHOT_API_KEY',
+  'ollama-cloud': 'OLLAMA_API_KEY',
 }
 
 /** Default HTTP bases for each vendor search call. */
@@ -39,13 +46,15 @@ export const BACKEND_DEFAULT_BASE_URL: Record<AttachedCliBackendId, string> = {
   'claude-cli': 'https://api.anthropic.com/v1',
   'codex-cli': 'https://api.openai.com/v1',
   'kimi-cli': 'https://api.moonshot.ai/v1',
+  'ollama-cloud': 'https://ollama.com',
 }
 
 /**
  * Auxiliary search models. These are vendor Messages/Responses ids, not the
- * CLI aliases (`sonnet`, `k2`) the conversation adapter stores.
+ * CLI aliases (`sonnet`, `k2`) the conversation adapter stores. Ollama search
+ * is a dedicated retrieval endpoint and does not send a model.
  */
-export const BACKEND_DEFAULT_MODEL: Record<AttachedCliBackendId, string> = {
+export const BACKEND_DEFAULT_MODEL: Record<Exclude<AttachedCliBackendId, 'ollama-cloud'>, string> = {
   'grok-cli': 'grok-4.6',
   'claude-cli': 'claude-sonnet-4-5',
   'codex-cli': 'gpt-5.4',
@@ -132,9 +141,11 @@ export class AttachedCliSearchProvider implements WebSearchProvider {
   }
 
   async search(request: WebSearchRequest, signal?: AbortSignal): Promise<WebSearchResult> {
+    await this.resolveOptions().refreshKeys?.()
+    // Refresh mutates the credential cache. Re-read after it so the chosen
+    // backend's key is the one just resolved, not the empty pre-refresh copy.
     const options = this.resolveOptions()
-    await options.refreshKeys?.()
-    const id = selectBackend(this.resolveOptions())
+    const id = selectBackend(options)
     if (id === undefined) {
       throw new WebError('no attached CLI search backend has a credential', 'WEB_PROVIDER_UNAVAILABLE')
     }
@@ -231,6 +242,16 @@ export function buildRequest(
           messages: [{ role: 'user', content: query }],
           tools: [{ type: 'builtin_function', function: { name: '$web_search' } }],
         },
+      }
+    case 'ollama-cloud':
+      return {
+        url: `${base}/api/web_search`,
+        headers: {
+          authorization: `Bearer ${apiKey}`,
+          'content-type': 'application/json',
+          'user-agent': USER_AGENT,
+        },
+        body: { query },
       }
     default: {
       const never: never = id

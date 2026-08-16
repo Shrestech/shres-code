@@ -71,6 +71,14 @@ export function WebSearchCard(props: WebSearchCardProps) {
           onEdit={(text) => { props.edit('kimi', text) }}
         />
         <SwitchField
+          id="plugin-config-web-search-ollama"
+          label={t('webSearchOllama')}
+          hint={t('webSearchOllamaHint')}
+          text={state.ollama.text}
+          disabled={disabled}
+          onEdit={(text) => { props.edit('ollama', text) }}
+        />
+        <SwitchField
           id="plugin-config-web-search-deepseek"
           label={t('webSearchDeepSeek')}
           hint={t('webSearchDeepSeekHint')}

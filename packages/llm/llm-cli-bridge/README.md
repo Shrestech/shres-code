@@ -21,7 +21,7 @@ A non-empty `GenerateOptions.tools` without that route's `allowDelegatedTools: t
 
 ## Configuration
 
-The optional `llm-cli-bridge` settings section overlays the composition entry. Each route accepts `binary`, `modelArg`, `effortArg`, `effortStyle`, `apiKeyEnv`, `allowDelegatedTools`, and an advisory `models` list. An API key is stored write-only through the credentials seam under `apiKeyEnv`; the adapter injects the resolved secret into spawn env after the subprocess scrub. `env` values, if present, are `role('secret')` and are not written by the Models card.
+The optional `llm-cli-bridge` settings section overlays the composition entry. Each route accepts `binary`, `modelArg`, `effortArg`, `effortStyle`, `efforts`, `apiKeyEnv`, `allowDelegatedTools`, an advisory `models` list, and `enabled` (default true). `enabled: false` keeps the route in the Models directory but withdraws it from the live adapter registry, so the composer picker no longer offers it. Directory entries carry the resolved `binary` and whether that command is on PATH, which Models shows as found / not on PATH. The Models CLI card edits the executable, the effort ids, and the model list so the picker stays in sync with that route. An API key is optional (the CLI's own login is enough) and is stored write-only through the credentials seam under `apiKeyEnv` when typed; the adapter injects the resolved secret into spawn env after the subprocess scrub. `env` values, if present, are `role('secret')` and are not written by the Models card.
 
 ## Model Experience
 

@@ -101,6 +101,7 @@ function registrationFacts(profiles: ReadonlyMap<string, ResolvedPiAiProviderPro
       provider,
       displayName: profile.displayName,
       retryPolicy: profile.retryPolicy,
+      enabled: profile.enabled !== false,
     }))
     .sort((left, right) => left.provider.localeCompare(right.provider))
 }
@@ -260,7 +261,9 @@ export function apply(ctx: Context, config: Config): void {
     // conflicting route leaves the previous routes serving requests, and
     // `registeredFacts` only advances once the registry actually holds the
     // new set — so returning to a working configuration always re-applies.
-    const routes = [...profiles().keys()]
+    const routes = [...profiles().entries()]
+      .filter(([, profile]) => profile.enabled !== false)
+      .map(([id]) => id)
     if (registration === undefined) {
       // Dormant bare mount: nothing is registered until a section supplies
       // profiles, and an empty section keeps it that way.

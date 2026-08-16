@@ -138,6 +138,8 @@ export interface PiAiProviderProfile {
   streamIdleTimeoutMs?: number
   /** Provider-owned model-request retry policy; omission uses normal defaults. */
   retryPolicy?: RetryPolicyConfig
+  /** When false, this route is omitted from the live adapter registry. Defaults to on. */
+  enabled?: boolean
 }
 
 /** Validated profile with its route stamped and every adapter-owned default resolved. */
@@ -249,6 +251,7 @@ const profile = z.object({
   websocketConnectTimeoutMs: z.natural(),
   streamIdleTimeoutMs: z.number().min(Number.MIN_VALUE).max(MAX_TIMER_DELAY_MS).default(DEFAULT_STREAM_IDLE_TIMEOUT_MS),
   retryPolicy: RetryPolicySchema,
+  enabled: z.boolean().default(true),
 })
 
 /** Runtime schema for {@link Config}. */

@@ -13,6 +13,7 @@ export type PluginsSettingsLocaleKey =
   | 'webSearchClaude' | 'webSearchClaudeHint'
   | 'webSearchCodex' | 'webSearchCodexHint'
   | 'webSearchKimi' | 'webSearchKimiHint'
+  | 'webSearchOllama' | 'webSearchOllamaHint'
   | 'webSearchDeepSeek' | 'webSearchDeepSeekHint'
   | 'webSearchApiKey' | 'webSearchApiKeyHint' | 'webSearchApiKeySet' | 'webSearchApiKeyUnset'
   | 'webSearchBaseUrl' | 'webSearchBaseUrlHint' | 'webSearchMaxUses' | 'webSearchMaxUsesHint'
@@ -57,6 +58,8 @@ export const en: Record<PluginsSettingsLocaleKey, string> = {
   webSearchCodexHint: 'OpenAI web search, using the same key as the Codex CLI.',
   webSearchKimi: 'Kimi',
   webSearchKimiHint: 'Moonshot web search, using the same key as the Kimi CLI.',
+  webSearchOllama: 'Ollama',
+  webSearchOllamaHint: 'Ollama Cloud web search, using the same key as Ollama Cloud chat.',
   webSearchDeepSeek: 'DeepSeek',
   webSearchDeepSeekHint: 'DeepSeek web search. Turn this off if you do not have a DeepSeek key.',
   webSearchApiKey: 'API key',

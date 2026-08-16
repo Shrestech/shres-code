@@ -152,7 +152,11 @@ export class ModelsSettingsStore {
       const namespace = namespaces.get(entry.settingsNs)
       const configured = namespace !== undefined
         && (entry.settingsPath.length === 0 || getPath(namespace.value, entry.settingsPath) !== undefined)
-      const removable = namespace !== undefined
+      // Shipped CLI routes stay listed as `kind: 'delegated'` even after the
+      // user layer is cleared, so Delete would not take them off the page.
+      // An enable or edit writes that layer and must not make them look removable.
+      const removable = entry.kind !== 'delegated'
+        && namespace !== undefined
         && entry.settingsPath.length > 0
         && hasPath(namespace.user, entry.settingsPath)
         && !hasPath(namespace.base, entry.settingsPath)
@@ -223,6 +227,22 @@ function userDefaultModelOf(namespaces: ReadonlyMap<string, SettingsNamespaceVie
  * @param row - one joined provider row.
  * @returns whether the user already has this provider to talk to.
  */
+/**
+ * Whether the joined profile currently leaves this route in the live registry.
+ * An omitted `enabled` field is on.
+ * @param row - one joined provider row.
+ * @param namespaces - settings describe views by ns.
+ * @returns false only when the profile explicitly sets `enabled: false`.
+ */
+export function providerEnabled(
+  row: ProviderRow,
+  namespaces: ReadonlyMap<string, SettingsNamespaceView>,
+): boolean {
+  const namespace = namespaces.get(row.entry.settingsNs)
+  if (namespace === undefined) return true
+  return getPath(namespace.value, [...row.entry.settingsPath, 'enabled']) !== false
+}
+
 export function providerUsable(row: ProviderRow): boolean {
   if (!row.entry.active) return false
   if (row.entry.kind === 'delegated') return false

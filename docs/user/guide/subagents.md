@@ -23,8 +23,8 @@ An API key reaches the child only when `env` names it. The subprocess seam strip
 `claude-cli`, `codex-cli`, `grok-cli`, and `kimi-cli` are model-picker routes. Selecting one makes the conversation completion that CLI, not an HTTP adapter. The Models page and `roos models list` mark them `delegated`.
 
 ```sh
-roos models set grok-cli grok-4 --effort high
-roos models set kimi-cli k2 --effort high
+roos models set grok-cli grok-4.6 --effort high
+roos models set kimi-cli kimi-code/k3 --effort high
 ```
 
 `--effort` is validated against the efforts that CLI advertises (`grok-cli`: `low`/`medium`/`high`/`xhigh`; `kimi-cli`: `off`/`high`). The CLI's own tools do not go through Roos Code approval. That is the meaning of the Delegated tag.

@@ -43,6 +43,12 @@ type EditorLayout = 'deepseek' | 'pi-ai' | 'cli-bridge' | 'unknown'
 /** The public DeepSeek endpoint shown as the deepseek base-URL placeholder. */
 const DEEPSEEK_PUBLIC_BASE_URL = 'https://api.deepseek.com'
 
+/** Collect non-empty strings from a settings array. */
+function arrayOfStrings(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return value.filter((entry): entry is string => typeof entry === 'string' && entry.length > 0)
+}
+
 /** Props of {@link ProviderEditor}. */
 export interface ProviderEditorProps {
   /** Provider route id. */
@@ -145,6 +151,22 @@ function defaultCliEnvKey(provider: string): string {
   }
 }
 
+/** Shipped command name the adapter looks up on PATH when the profile omits `binary`. */
+function defaultCliBinary(provider: string): string {
+  switch (provider) {
+    case 'grok-cli':
+      return 'grok'
+    case 'kimi-cli':
+      return 'kimi'
+    case 'claude-cli':
+      return 'claude'
+    case 'codex-cli':
+      return 'codex'
+    default:
+      return provider
+  }
+}
+
 /** The credential reference this profile resolves keys through. */
 function refFor(namespace: SettingsNamespaceView, path: readonly string[], provider: string): string {
   const profile = getPath(namespace.value, path)
@@ -164,6 +186,7 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
   const { namespace, settingsPath, api, t } = props
   const [draft, setDraft] = useState<Record<string, unknown>>(() => draftAt(namespace, settingsPath))
   const [keyDraft, setKeyDraft] = useState('')
+  const [effortsText, setEffortsText] = useState<string | undefined>(undefined)
   const [keyState, setKeyState] = useState<CredentialView | undefined>(undefined)
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState<string | undefined>(undefined)
@@ -491,10 +514,26 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
       ? t('keyEnvLocked')
       : keyState?.configured === true && props.credentialRequired !== true
         ? t('keyStored')
-        : t('keyPlaceholder')
+        : t('keyPlaceholderCli')
+    const binaryPlaceholder = stringAt(fallback, 'binary') ?? defaultCliBinary(props.provider)
     return (
       <>
         <p className={styles['advancedHint']}>{t('delegatedHint')}</p>
+        {props.credentialOnly === true ? null : (
+          <div className={styles['field']}>
+            <span className={styles['fieldLabel']}>{t('cliBinary')}</span>
+            <input
+              className={styles['input']}
+              type="text"
+              value={stringAt(draft, 'binary') ?? ''}
+              placeholder={binaryPlaceholder}
+              aria-label={t('cliBinary')}
+              disabled={disabled}
+              onChange={(event) => { setField('binary', event.target.value) }}
+            />
+            <p className={styles['advancedHint']}>{t('cliBinaryHint')}</p>
+          </div>
+        )}
         <div className={styles['field']}>
           <span className={styles['fieldLabel']}>{t('keyInput')}</span>
           <input
@@ -513,18 +552,41 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
           {shownKeyFailure === undefined ? null : <p className={styles['error']}>{t(shownKeyFailure)}</p>}
         </div>
         {props.credentialOnly === true ? null : (
-          <div className={styles['field']}>
-            <span className={styles['fieldLabel']}>{t('cliBinary')}</span>
-            <input
-              className={styles['input']}
-              type="text"
-              value={stringAt(draft, 'binary') ?? ''}
-              placeholder={stringAt(fallback, 'binary') ?? props.provider}
-              aria-label={t('cliBinary')}
+          <>
+            <div className={styles['field']}>
+              <span className={styles['fieldLabel']}>{t('cliEfforts')}</span>
+              <input
+                className={styles['input']}
+                type="text"
+                value={effortsText ?? (hasPath(draft, ['efforts'])
+                  ? arrayOfStrings(getPath(draft, ['efforts']))
+                  : arrayOfStrings(getPath(fallback, ['efforts']))).join(', ')}
+                placeholder={arrayOfStrings(getPath(fallback, ['efforts'])).join(', ')}
+                aria-label={t('cliEfforts')}
+                disabled={disabled}
+                onChange={(event) => {
+                  const text = event.target.value
+                  setEffortsText(text)
+                  const next = text.split(',').map(part => part.trim()).filter(part => part.length > 0)
+                  setDraft(current => setPath(current, ['efforts'], next))
+                }}
+              />
+              <p className={styles['advancedHint']}>{t('cliEffortsHint')}</p>
+            </div>
+            <p className={styles['advancedHint']}>{t('cliModelsHint')}</p>
+            <DeepSeekModelsEditor
+              models={modelDrafts(hasPath(draft, ['models'])
+                ? getPath(draft, ['models'])
+                : inheritedModels())}
+              overridden={hasPath(draft, ['models'])}
+              defaultContextWindow={undefined}
+              defaultMaxTokens={undefined}
+              t={t}
               disabled={disabled}
-              onChange={(event) => { setField('binary', event.target.value) }}
+              onChange={(next) => { setDraft(current => setPath(current, ['models'], next)) }}
+              onReset={() => { setDraft(current => deletePath(current, ['models'])) }}
             />
-          </div>
+          </>
         )}
       </>
     )

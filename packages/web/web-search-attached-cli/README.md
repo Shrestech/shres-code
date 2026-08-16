@@ -1,27 +1,27 @@
 # @roos-code/roos-code-web-search-attached-cli
 
-A `WebSearchProvider` that reuses an **attached CLI vendor's hosted search API** — Grok (xAI), Claude (Anthropic), Codex (OpenAI), or Kimi (Moonshot) — with the same credential `llm-cli-bridge` already stores.
+A `WebSearchProvider` that reuses an **attached conversation vendor's hosted search API** — Grok (xAI), Claude (Anthropic), Codex (OpenAI), Kimi (Moonshot), or Ollama Cloud — with the same credential that adapter already stores.
 
-This is an **implementation** package: it registers provider id `attached-cli` into `ctx.web` and does not register a model-facing tool. It does **not** spawn `grok`, `claude`, `codex`, or `kimi`. Those binaries are full agents. This plugin POSTs to each vendor's web-search server tool and maps citations onto `{ sources[], content? }`.
+This is an **implementation** package: it registers provider id `attached-cli` into `ctx.web` and does not register a model-facing tool. It does **not** spawn `grok`, `claude`, `codex`, or `kimi`. Those binaries are full agents. CLI vendors POST to a web-search server tool. Ollama Cloud POSTs to `https://ollama.com/api/web_search`. Citations map onto `{ sources[], content? }`.
 
 ## When it is usable
 
-`available()` is true when the current default model is a shipped CLI route, or when at least one backend has a non-empty key in the launch environment or the credentials cache (`XAI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `MOONSHOT_API_KEY`).
+`available()` is true when the current default model is an enabled shipped vendor in this list, or when at least one backend has a non-empty key in the launch environment or the credentials cache (`XAI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `MOONSHOT_API_KEY`, `OLLAMA_API_KEY`).
 
-A selected backend whose key is still missing after refresh fails the search as `WEB_PROVIDER_CREDENTIAL_MISSING` instead of falling through to another vendor.
+`search()` refreshes the credential cache and then re-reads the snapshot before picking a backend, so a key that was only in the credentials store (not `$OLLAMA_API_KEY` in the process environment) is used on that same call. A selected backend whose key is still missing after refresh fails as `WEB_PROVIDER_CREDENTIAL_MISSING` instead of falling through to another vendor.
 
 ## Selection
 
-1. If the current default model provider is an enabled shipped CLI route, use that vendor.
-2. Else the first enabled usable id among Grok, Claude, Codex, Kimi.
+1. If the current default model provider is an enabled shipped vendor in this list, use that vendor.
+2. Else the first enabled usable id among Grok, Claude, Codex, Kimi, Ollama Cloud.
 
-The Plugins **Web search** card turns each method on or off. The shipped web seam lists `attached-cli` before `deepseek-official`, so an enabled CLI method with a key runs before DeepSeek.
+The Plugins **Web search** card turns each method on or off. The shipped web seam lists `attached-cli` before `deepseek-official`, so an enabled method with a key runs before DeepSeek.
 
 ## Config
 
 | Key | Default | Meaning |
 |---|---|---|
-| `grok` / `claude` / `codex` / `kimi` | `true` | When false, that vendor is omitted from the search pool |
+| `grok` / `claude` / `codex` / `kimi` / `ollama` | `true` | When false, that vendor is omitted from the search pool |
 
 ```yaml
 - id: web-search-attached-cli
@@ -30,7 +30,7 @@ The Plugins **Web search** card turns each method on or off. The shipped web sea
 
 ## Mapping
 
-Vendor JSON is walked for http(s) URLs (`url` / `uri` / `link`) and optional `title` / `snippet`. Grok and Codex `output_text` plus assistant `content` become `content` when present. Duplicate URLs keep the first title and snippet. The seam enforces `maxResults`.
+Vendor JSON is walked for http(s) URLs (`url` / `uri` / `link`) and optional `title` / `snippet` / `content`. Grok and Codex `output_text` plus assistant `content` become `content` when present. Duplicate URLs keep the first title and snippet. The seam enforces `maxResults`.
 
 HTTP redirects are rejected before the `Location` target is contacted and surface as `WEB_PROVIDER_ERROR`. Caller cancellation surfaces as `WEB_ABORTED`.
 
@@ -44,6 +44,6 @@ No direct invalidation; the named consumer owns any request-prefix changes. The 
 
 ## Known Limitations and Deferred Work
 
-- **One search is a full vendor model turn** — Grok, Claude, Codex, and Kimi expose search as a server tool on Messages/Responses, not a dedicated retrieval endpoint.
+- **One search is a full vendor model turn for CLI vendors** — Grok, Claude, Codex, and Kimi expose search as a server tool on Messages/Responses. Ollama Cloud is a dedicated retrieval endpoint.
 - **CLI aliases are not search model ids** — conversation ids such as `sonnet` and `k2` are not sent on the search request; each backend uses a fixed vendor model.
 - **Credential cache is asynchronous** — `available()` can see the current CLI route before the credentials store answers; a keyless attached CLI then fails the search rather than silently selecting DeepSeek.

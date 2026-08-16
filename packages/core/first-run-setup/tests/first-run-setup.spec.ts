@@ -233,6 +233,7 @@ describe('readiness', () => {
     expect(options.some(option => option.kind === 'template' && option.provider === 'xai')).toBe(true)
     expect(options.at(-1)).toEqual({ kind: 'custom' })
     expect(TEMPLATE_ROUTES.map(route => route.provider)).toContain('moonshotai')
+    expect(TEMPLATE_ROUTES.map(route => route.provider)).toContain('zai')
   })
 })
 

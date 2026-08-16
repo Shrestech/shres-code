@@ -55,7 +55,7 @@ function walk(value: unknown, sources: Map<string, CollectedSource>, texts: stri
   if (url !== undefined) {
     remember(sources, url, {
       title: readString(record, ['title', 'name']),
-      snippet: readString(record, ['snippet', 'cited_text', 'text', 'description']),
+      snippet: readString(record, ['snippet', 'cited_text', 'text', 'description', 'content']),
     })
   }
   if (record.type === 'output_text') {

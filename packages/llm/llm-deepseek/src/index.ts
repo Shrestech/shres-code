@@ -78,6 +78,8 @@ export interface Config {
   streamIdleTimeoutMs?: number
   /** Provider-owned model-request retry policy; omission uses normal defaults. */
   retryPolicy?: RetryPolicyConfig
+  /** When false, this route is omitted from the live adapter registry. Defaults to on. */
+  enabled?: boolean
 }
 
 const catalogModel: z<DeepSeekCatalogModel> = z.object({
@@ -98,6 +100,7 @@ export const Config: z<Config> = z.object({
   models: z.array(catalogModel).default(DEFAULT_MODELS),
   streamIdleTimeoutMs: z.number().min(Number.MIN_VALUE).max(MAX_TIMER_DELAY_MS).default(DEFAULT_STREAM_IDLE_TIMEOUT_MS),
   retryPolicy: RetryPolicySchema,
+  enabled: z.boolean().default(true),
 })
 
 /** Public API default; the internal endpoint comes from $DEEPSEEK_BASE_URL. */
@@ -253,18 +256,29 @@ export function apply(ctx: Context, config: Config): void {
   ])
   // Route effects bind to this apply fiber via the stable `ctx` reference,
   // even when a swap runs inside the scoped settings callback below.
-  const registration = ctx.llm.registerAdapter([PROVIDER], adapter)
-  let registeredPolicy = options().retryPolicy
+  const liveIds = (): string[] => current().enabled !== false ? [PROVIDER] : []
+  let registration: ReturnType<typeof ctx.llm.registerAdapter> | undefined
+  const ids = liveIds()
+  if (ids.length > 0) registration = ctx.llm.registerAdapter(ids, adapter)
+  let registeredFacts: unknown = { ids, policy: options().retryPolicy }
   const ensureRegistrationFacts = (): void => {
-    const policy = options().retryPolicy
-    if (deepEqualJson(policy, registeredPolicy)) return
+    const facts = { ids: liveIds(), policy: options().retryPolicy }
+    if (deepEqualJson(facts, registeredFacts)) return
     // The registry captures the retry policy at registration, so it is the one
     // fact per-request resolution cannot refresh. `replace` re-reads it in one
     // synchronous registry section: disposing and re-registering instead would
     // publish an empty route set between the two, and an observer that reacted
     // to it would see this provider disappear and come back.
-    registration.replace([PROVIDER])
-    registeredPolicy = policy
+    if (registration === undefined) {
+      if (facts.ids.length === 0) {
+        registeredFacts = facts
+        return
+      }
+      registration = ctx.llm.registerAdapter(facts.ids, adapter)
+    } else {
+      registration.replace(facts.ids)
+    }
+    registeredFacts = facts
   }
 
   installSettingsSection(ctx, NS, Config, config, {

@@ -37,6 +37,7 @@ export const PROVIDER_TEMPLATES = [
   'moonshotai',
   'openrouter',
   'groq',
+  'zai',
   'custom',
 ] as const
 
@@ -91,6 +92,7 @@ const SHIPPED_PI_AI_PROVIDERS: Record<string, {
   moonshotai: { apiKeyEnv: 'MOONSHOT_API_KEY' },
   openrouter: { apiKeyEnv: 'OPENROUTER_API_KEY' },
   groq: { apiKeyEnv: 'GROQ_API_KEY' },
+  zai: { apiKeyEnv: 'ZAI_API_KEY' },
 }
 
 /** Shipped `llm-pi-ai` route ids, used to refuse a silent remove of a composition route. */
@@ -126,6 +128,7 @@ const TEMPLATE_DEFAULTS: Record<Exclude<ProviderTemplate, 'custom'>, TemplateDef
   moonshotai: { displayName: 'Moonshot (Kimi)', apiKeyEnv: 'MOONSHOT_API_KEY' },
   openrouter: { displayName: 'OpenRouter', apiKeyEnv: 'OPENROUTER_API_KEY' },
   groq: { displayName: 'Groq', apiKeyEnv: 'GROQ_API_KEY' },
+  zai: { displayName: 'Z.AI (GLM)', apiKeyEnv: 'ZAI_API_KEY' },
 }
 
 /** Process streams; tests substitute captures. */

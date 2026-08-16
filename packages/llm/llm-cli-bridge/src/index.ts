@@ -27,6 +27,7 @@ import {
   resolveRoutes,
   type CliBridgeRoute,
 } from './config.ts'
+import { executableOnPath } from './probe.ts'
 
 export { CliLlmAdapter } from './adapter.ts'
 export type { CliLlmAdapterOptions } from './adapter.ts'
@@ -44,6 +45,7 @@ export {
 export type { CliBridgeModel, CliBridgeRoute, EffortStyle, ShippedRouteId } from './config.ts'
 export { answerFromObject, isCliErrorPayload, parseCliOutput } from './parse.ts'
 export { serializePrompt } from './serialize.ts'
+export { executableOnPath } from './probe.ts'
 
 export const name = 'llm-cli-bridge'
 export const inject = ['llm']
@@ -67,6 +69,7 @@ function registrationFacts(routes: ReadonlyMap<string, CliBridgeRoute>): unknown
       displayName: route.displayName,
       binary: route.binary,
       allowDelegatedTools: route.allowDelegatedTools,
+      enabled: route.enabled !== false,
     }))
     .sort((left, right) => left.provider.localeCompare(right.provider))
 }
@@ -86,6 +89,8 @@ function directoryEntries(
     settingsPath: ['routes', provider],
     declared: false,
     kind: 'delegated' as const,
+    binary: route.binary,
+    binaryFound: executableOnPath(route.binary),
   }))
 }
 
@@ -205,7 +210,9 @@ export function apply(ctx: Context, config: Config): void {
   const ensureRegistrationFacts = (): void => {
     const facts = registrationFacts(routes())
     if (deepEqualJson(facts, registeredFacts)) return
-    const ids = [...routes().keys()]
+    const ids = [...routes().entries()]
+      .filter(([, route]) => route.enabled !== false)
+      .map(([id]) => id)
     if (registration === undefined) {
       /* v8 ignore next 4 -- shipped routes always register at least one adapter */
       if (ids.length === 0) {

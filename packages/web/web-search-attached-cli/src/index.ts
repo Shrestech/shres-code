@@ -1,7 +1,8 @@
 /**
- * Register a multiplexer that searches through an attached CLI vendor's
- * hosted web-search API (Grok, Claude, Codex, Kimi) using the same credential
- * `llm-cli-bridge` already stores. It does not spawn those CLIs.
+ * Register a multiplexer that searches through an attached conversation
+ * vendor's hosted web-search API (Grok, Claude, Codex, Kimi, Ollama Cloud)
+ * using the same credential that adapter already stores. It does not spawn
+ * `grok`, `claude`, `codex`, or `kimi`.
  * @module @roos-code/roos-code-web-search-attached-cli
  */
 
@@ -54,6 +55,8 @@ export interface Config {
   codex?: boolean
   /** When false, Kimi is omitted from the search pool. Defaults to on. */
   kimi?: boolean
+  /** When false, Ollama Cloud is omitted from the search pool. Defaults to on. */
+  ollama?: boolean
 }
 
 export const Config: z<Config> = z.object({
@@ -61,6 +64,7 @@ export const Config: z<Config> = z.object({
   claude: z.boolean().default(true),
   codex: z.boolean().default(true),
   kimi: z.boolean().default(true),
+  ollama: z.boolean().default(true),
 })
 
 /**
@@ -74,6 +78,7 @@ export function enabledBackends(config: Config): AttachedCliBackendId[] {
     ['claude-cli', config.claude],
     ['codex-cli', config.codex],
     ['kimi-cli', config.kimi],
+    ['ollama-cloud', config.ollama],
   ]
   return flags.filter(([, on]) => on !== false).map(([id]) => id)
 }
@@ -109,7 +114,7 @@ function resolveOptions(
     backends[id] = {
       id,
       ...apiKey !== undefined ? { apiKey } : {},
-      // The current conversation CLI is attached even before the credential
+      // The current conversation vendor is attached even before the credential
       // cache fills: search stays on that vendor instead of falling through.
       hasResolver: on && currentProvider === id,
       baseURL: BACKEND_DEFAULT_BASE_URL[id],

@@ -10,13 +10,13 @@ Shipped `web_search` pinned `searchProvider: deepseek-official`. A user who atta
 
 `ctx.web` accepts an ordered `searchProviders` / `fetchProviders` list. A singular pin stays exclusive. The list is first-usable-wins and is ignored when a pin is set.
 
-`web-search-attached-cli` registers id `attached-cli`. It POSTs to the attached vendor's hosted search tool with the same credential `llm-cli-bridge` already stores (`XAI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `MOONSHOT_API_KEY`). It does not spawn `grok`, `claude`, `codex`, or `kimi`.
+`web-search-attached-cli` registers id `attached-cli`. It POSTs to the attached vendor's hosted search tool with the same credential that conversation adapter already stores (`XAI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `MOONSHOT_API_KEY`, `OLLAMA_API_KEY`). It does not spawn `grok`, `claude`, `codex`, or `kimi`.
 
-Backend pick: the current conversation CLI when that route is a shipped CLI id; otherwise the first usable id in `preference` (default Grok, Claude, Codex, Kimi). The shipped base composition lists `attached-cli` then `deepseek-official`.
+Backend pick: the current conversation vendor when that route is a shipped id in this list; otherwise the first usable id in preference (default Grok, Claude, Codex, Kimi, Ollama Cloud). The shipped base composition lists `attached-cli` then `deepseek-official`.
 
-The Plugins **Web search** card exposes one on/off switch per method (Grok, Claude, Codex, Kimi, DeepSeek). A switch off removes that method from the pool. DeepSeek off stops the DeepSeek-missing-key failure when the user is not using DeepSeek.
+The Plugins **Web search** card exposes one on/off switch per method (Grok, Claude, Codex, Kimi, Ollama, DeepSeek). A switch off removes that method from the pool. DeepSeek off stops the DeepSeek-missing-key failure when the user is not using DeepSeek.
 
-Grok calls `POST https://api.x.ai/v1/responses` with `{ type: "web_search" }`. Claude, Codex, and Kimi use their vendor equivalents.
+Grok calls `POST https://api.x.ai/v1/responses` with `{ type: "web_search" }`. Ollama Cloud calls `POST https://ollama.com/api/web_search`. Claude, Codex, and Kimi use their vendor equivalents.
 
 ## Alternatives considered
 
@@ -30,4 +30,4 @@ Grok calls `POST https://api.x.ai/v1/responses` with `{ type: "web_search" }`. C
 
 ## Consequences
 
-Attaching a CLI on the Models page also attaches web search to that vendor. DeepSeek search remains the fallback when no CLI is attached. `available()` is a sync snapshot of env, the credential cache, and the current CLI route; a keyless attached CLI fails the search instead of silently selecting DeepSeek. Search still costs a vendor model turn.
+Attaching a CLI or Ollama Cloud on the Models page also attaches web search to that vendor. DeepSeek search remains the fallback when no listed vendor has a key. `available()` is a sync snapshot of env, the credential cache, and the current conversation vendor; a keyless attached vendor fails the search instead of silently selecting DeepSeek. `search()` refreshes credentials then re-reads the snapshot so a key that lands during refresh is used on that same call. CLI search still costs a vendor model turn; Ollama Cloud is a retrieval endpoint.

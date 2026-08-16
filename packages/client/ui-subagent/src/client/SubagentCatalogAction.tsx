@@ -1,12 +1,13 @@
 import {
-  useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent,
+  useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactElement,
 } from 'react'
 import {
   indexSubagentDescendants, type SessionId, type SessionListState, type SessionProjectionMap,
   type SessionSummary, type SubagentAddress, type SubagentCatalogSnapshot,
 } from '@roos-code/roos-code-client-runtime/client'
 import {
-  IconChevronDownOutline14, IconChevronRightOutline14, IconRefreshOutline14, StateDot,
+  HoppingRoo, IconChevronDownOutline14, IconChevronRightOutline14, IconRefreshOutline14,
+  seatIdOf, StateDot, type SeatId,
 } from '@roos-code/roos-code-client-ui-primitives'
 import type { PropsLocale, PropsRuntime, TranslateNS } from '@roos-code/roos-code-client-ui-slots'
 import { NS } from './locales.ts'
@@ -173,6 +174,39 @@ function formatExactDuration(ms: number, t: TranslateNS<typeof NS>): string {
 
 const NO_DESCENDANTS = { count: 0, runningCount: 0 } as const
 
+/** Collect distinct running seats from catalog labels and summary titles. */
+function runningSeatsOf(
+  catalog: SubagentCatalogSnapshot | undefined,
+  summaries: Readonly<Record<SessionId, SessionSummary>>,
+): SeatId[] {
+  const found = new Set<SeatId>()
+  for (const entry of catalog?.entries ?? []) {
+    if (entry.kind !== 'child' || entry.activity !== 'running') continue
+    const fromLabel = seatIdOf(entry.label)
+    const fromTitle = seatIdOf(summaries[entry.id]?.title)
+    const fromDisplay = seatIdOf(summaries[entry.id]?.displayTitle)
+    const seat = fromLabel ?? fromTitle ?? fromDisplay
+    if (seat !== undefined) found.add(seat)
+  }
+  for (const summary of Object.values(summaries)) {
+    if (!summary.running || summary.origin !== 'subagent') continue
+    const seat = seatIdOf(summary.title) ?? seatIdOf(summary.displayTitle)
+    if (seat !== undefined) found.add(seat)
+  }
+  return (['boomer', 'joey', 'flyer'] as const).filter(id => found.has(id))
+}
+
+/** Leading mark: a colored hopper while the child is working. */
+function ActivityMark({
+  running, label,
+}: {
+  running: boolean
+  label?: string
+}): ReactElement {
+  if (!running) return <StateDot state="done" />
+  return <HoppingRoo size={12} seat={seatIdOf(label)} />
+}
+
 /** Render the known direct-child shape while its authoritative catalog hydrates. */
 function CatalogLoadingRows({
   parentSessionId,
@@ -199,7 +233,7 @@ function CatalogLoadingRows({
         className={`${css.row} ${css.disabled} ${css.loadingRow}`}
       >
         <span className={css.disclosureSpace} />
-        <StateDot state={summary.running ? 'ongoing' : 'done'} />
+        <ActivityMark running={summary.running} label={summary.title ?? summary.displayTitle} />
         <span className={css.content}>
           <span className={css.label}>{t('loading.label')}</span>
         </span>
@@ -345,7 +379,10 @@ function CatalogRows({
                   </button>
                 )}
               <div className={css.clickarea}>
-                <StateDot state={entry.activity === 'running' ? 'ongoing' : 'done'} />
+                <ActivityMark
+                  running={entry.activity === 'running'}
+                  label={entry.label ?? summary?.title ?? summary?.displayTitle}
+                />
                 <span className={css.content}>
                   <span className={css.label}>{label}</span>
                   <span className={css.summary}>{secondary}</span>
@@ -535,6 +572,8 @@ export function SubagentCatalogAction({
 
   if (!visible) return null
 
+  const runningSeats = runningSeatsOf(catalog, summaries)
+
   const focusAt = (index: number): void => {
     const items = treeItems(rootRef.current)
     if (items.length === 0) return
@@ -583,7 +622,13 @@ export function SubagentCatalogAction({
         }}
       >
         <span className={css.activitySlot}>
-          {descendants.runningCount > 0 && <StateDot state="ongoing" />}
+          {descendants.runningCount > 0 && (
+            runningSeats.length > 0
+              ? runningSeats.map(seat => (
+                <HoppingRoo key={seat} size={12} seat={seat} />
+              ))
+              : <HoppingRoo size={12} />
+          )}
         </span>
         <span className={css.count}>{t(totalCountKey, { count: descendantCount })}</span>
         <IconChevronDownOutline14 className={open ? css.triggerOpen : undefined} />

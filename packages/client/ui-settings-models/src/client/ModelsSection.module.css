@@ -55,6 +55,102 @@
   gap: 8px;
 }
 
+.seatsCard {
+  margin-top: 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.seatsTitle {
+  margin: 0;
+  font-size: 14px;
+  line-height: 22px;
+  font-weight: 500;
+  color: var(--dsw-alias-label-primary);
+}
+
+.seatsIntro {
+  margin: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.seatsList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.seatRow {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.seatIdentity {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.seatMark {
+  display: inline-flex;
+  flex: none;
+  margin-top: 2px;
+}
+
+.seatCopy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.seatHeadline {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.seatName {
+  font-size: 14px;
+  line-height: 22px;
+  font-weight: 500;
+  color: var(--dsw-alias-label-primary);
+}
+
+.seatRole {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.seatDescription {
+  margin: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.seatFields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.seatFields .field {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
 /* A configured provider: outlined on the panel fill, so the filled editor
    card it expands into reads as the nested object. */
 .rowCard {
@@ -100,6 +196,16 @@
   color: var(--dsw-alias-label-secondary);
 }
 
+.rowTagReady {
+  border-color: var(--dsw-alias-state-success-primary);
+  color: var(--dsw-alias-state-success-primary);
+}
+
+.rowTagMissing {
+  border-color: var(--dsw-alias-state-warn-label);
+  color: var(--dsw-alias-state-warn-label);
+}
+
 .credentialDot {
   box-sizing: border-box;
   display: inline-block;
@@ -120,8 +226,43 @@
 .rowActions {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
   margin-left: auto;
+}
+
+.rowSwitch {
+  flex: none;
+  width: 36px;
+  height: 20px;
+  padding: 2px;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.rowSwitchOn {
+  background: var(--dsw-alias-brand-primary);
+}
+
+.rowSwitchOff {
+  background: var(--dsw-alias-bg-module-platform);
+}
+
+.rowSwitch:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.rowSwitchThumb {
+  display: block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--dsw-alias-label-primary-inverted, #fff);
+}
+
+.rowSwitchOn .rowSwitchThumb {
+  margin-left: 16px;
 }
 
 /* `box-sizing` on every control here: the app has no global border-box reset,

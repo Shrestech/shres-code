@@ -2,7 +2,7 @@
 
 First-run model picker. `FirstRunSetup` provides `ctx.firstRunSetup`; it probes local Ollama, decides whether the current `agent-default-model` selection can already serve, and on a TTY prints a menu that writes that settings section plus any typed key through the credentials seam.
 
-The plugin does not silently select a vendor. A composition default such as `deepseek-official` is used only when that route is already usable (typically `DEEPSEEK_API_KEY` is set). Otherwise a TTY shows detected local Ollama models, the shipped template routes (Ollama Cloud, OpenAI, Anthropic, xAI, Moonshot, OpenRouter, Groq, DeepSeek), and a custom base URL; a non-TTY process fails with an error that names those same configuration paths.
+The plugin does not silently select a vendor. A composition default such as `deepseek-official` is used only when that route is already usable (typically `DEEPSEEK_API_KEY` is set). Otherwise a TTY shows detected local Ollama models, the shipped template routes (Ollama Cloud, OpenAI, Anthropic, xAI, Moonshot, OpenRouter, Groq, Z.AI, DeepSeek), and a custom base URL; a non-TTY process fails with an error that names those same configuration paths.
 
 - `ctx.firstRunSetup.needsSetup()` is true when the user layer of `agent-default-model` is empty and the current default cannot serve.
 - `ctx.firstRunSetup.detectLocalOllama()` calls `GET {ollamaBaseURL}/models` through pi-ai discovery, with `detectTimeoutMs`.

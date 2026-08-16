@@ -76,6 +76,16 @@ export interface Config {
    * budget belongs to the child runtime or its own deployment.
    */
   maxDepth?: number | 'provider-managed'
+  /**
+   * Override the provider-derived tool description. The background-policy
+   * appendix is still appended. Omission keeps the inherit/fresh wording.
+   */
+  description?: string
+  /**
+   * Prefix written onto the persisted child label (`"<prefix>: <description>"`).
+   * Omission stores the model's `description` argument unchanged.
+   */
+  labelPrefix?: string
 }
 
 export const Config: z<Config> = z.object({
@@ -96,6 +106,8 @@ export const Config: z<Config> = z.object({
     deny: z.array(z.string()).default(undefined as unknown as string[]),
   }).default(undefined as unknown as { allow: string[]; deny: string[] }),
   maxDepth: z.union([z.natural().max(Number.MAX_SAFE_INTEGER), z.const('provider-managed' as const)]).default(3),
+  description: z.string(),
+  labelPrefix: z.string(),
 })
 
 /** Render text blocks from the canonical JSON block array without trusting arbitrary values. */
@@ -146,6 +158,16 @@ function stopReasonError(result: SubagentResult): string | undefined {
  * @param output - the child's selected output (`SubagentResult.output`).
  * @returns the headline, extended with the partial text when any exists.
  */
+/**
+ * Persist the model's short description, optionally prefixed for a named seat.
+ * @param description - the model's 3-5 word `description` argument.
+ * @param prefix - optional display prefix (`Boomer`, `Joey`, `Flyer`).
+ * @returns the label stored on the child descriptor.
+ */
+function childLabel(description: string, prefix: string | undefined): string {
+  return prefix === undefined || prefix.length === 0 ? description : `${prefix}: ${description}`
+}
+
 function withPartialText(error: string, output: ContentBlock[]): string {
   const text = output
     .filter((block): block is Extract<ContentBlock, { type: 'text' }> => block.type === 'text')
@@ -289,6 +311,11 @@ export function apply(ctx: Context, config: Config): void {
       )
     }
     const wording = providerWording(provider.inheritsParentContext)
+    const description = (config.description ?? wording.description) + (backgroundEnabled
+      ? continuable
+        ? ' This tool runs in the background by default, immediately returns a durable subagent id, and keeps the child conversation available for later turns. When that run settles, the runtime sends the parent a notice containing its outcome and any final assistant message; `send_message` starts a later turn in the same child conversation. Set `run_in_background: false` only when your next action depends on receiving the result.'
+        : ' This call waits for the result by default. Set `run_in_background: true` to return a job id; collect with `job_output` and stop with `job_kill`.'
+      : ' This call waits for the subagent and returns its result.')
     if (continuable && provider.prepareContinuable === undefined) {
       throw new Error(
         `tool-subagent: provider "${provider.name}" does not support \`backgroundMode: continuable\``,
@@ -296,14 +323,7 @@ export function apply(ctx: Context, config: Config): void {
     }
     disposeTool = ctx.tools.register(defineTool({
       name: toolName,
-      description: wording.description + (backgroundEnabled
-        // The completion notice is the continuation service's own behavior, not
-        // a separately installed capability, so this promise holds whenever the
-        // continuable background path is reachable at all.
-        ? continuable
-          ? ' This tool runs in the background by default, immediately returns a durable subagent id, and keeps the child conversation available for later turns. When that run settles, the runtime sends the parent a notice containing its outcome and any final assistant message; `send_message` starts a later turn in the same child conversation. Set `run_in_background: false` only when your next action depends on receiving the result.'
-          : ' This call waits for the result by default. Set `run_in_background: true` to return a job id; collect with `job_output` and stop with `job_kill`.'
-        : ' This call waits for the subagent and returns its result.'),
+      description,
       parameters: {
         description: {
           type: 'string',
@@ -374,8 +394,9 @@ export function apply(ctx: Context, config: Config): void {
         }
 
         const maxDepth = typeof config.maxDepth === 'number' ? config.maxDepth : undefined
+        const label = childLabel(args.description, config.labelPrefix)
         const request = {
-          label: args.description,
+          label,
           prompt: [{ type: 'text', text: args.prompt }] as ContentBlock[],
           parent,
           ...config.agentOptions !== undefined ? { agentOptions: config.agentOptions } : {},
@@ -391,7 +412,7 @@ export function apply(ctx: Context, config: Config): void {
             // there, so this call neither waits for nor collects a result.
             const started = await ctx.subagents.startContinuable({
               provider: config.provider,
-              label: args.description,
+              label,
               request,
               signal: exec.signal,
             })
@@ -405,7 +426,7 @@ export function apply(ctx: Context, config: Config): void {
           // starter can spawn, and the task-owned signal covers startup.
           const id = jobs.start({
             kind: 'subagent',
-            label: args.description,
+            label,
             owner: parent,
             run: () => {
               const controller = new AbortController()

@@ -256,6 +256,38 @@ describe('roos-tool-subagent', () => {
     expect(seen?.agentOptions).toEqual({ model: 'child-model' })
   })
 
+  it('uses a configured description and prefixes the persisted child label', async () => {
+    let seen: { label?: string } | undefined
+    const ctx = new Context()
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRuntime)
+    await ctx.plugin(SubagentRuntime)
+    ctx.subagents.registerProvider({
+      name: 'capture',
+      capabilities: { outputSchema: false, depthLimit: false, toolFilter: false, persona: false },
+      inheritsParentContext: false,
+      start: async (request) => {
+        seen = request
+        return {
+          id: SessionId('capture-child'),
+          localAgent: undefined,
+          result: Promise.resolve({ output: [{ type: 'text', text: 'ok' }], stopReason: 'completed' as const }),
+          dispose: async () => {},
+        }
+      },
+    })
+    await ctx.plugin(tool, {
+      provider: 'capture',
+      description: 'Delegate design work to Boomer, the Architect seat.',
+      labelPrefix: 'Boomer',
+      maxDepth: 'provider-managed',
+    })
+    const schema = ctx.tools.schemas().find(entry => entry.name === 'subagent')
+    expect(schema?.description.startsWith('Delegate design work to Boomer, the Architect seat.')).toBe(true)
+    await callSubagent(ctx, { description: 'design the API', prompt: 'p' })
+    expect(seen?.label).toBe('Boomer: design the API')
+  })
+
   it('defaults toolName and omits agentOptions when apply() is called directly (schema bypass)', async () => {
     // `ctx.plugin` validates+defaults config first (toolName→'subagent', the
     // agentOptions object→{}), so the runtime `?? 'subagent'` fallback and the

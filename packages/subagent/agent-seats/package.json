@@ -1,0 +1,58 @@
+{
+  "name": "@roos-code/roos-code-agent-seats",
+  "description": "Named Boomer, Joey, and Flyer spawn seats bound to enabled provider/model pairs",
+  "version": "0.1.0-rc.5",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/roos-code/roos-code.git",
+    "directory": "packages/subagent/agent-seats"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./invariant": {
+      "types": "./lib/types/invariant.d.ts",
+      "default": "./lib/invariant.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/invariant.js",
+    "lib/types/**/*.d.ts"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@roos-code/schemastery": "workspace:^"
+  },
+  "peerDependencies": {
+    "@roos-code/roos-code-invariants": "workspace:^",
+    "@roos-code/roos-code-settings": "workspace:^",
+    "@roos-code/roos-code-subagent": "workspace:^",
+    "@roos-code/roos-code-system-prompt": "workspace:^",
+    "@roos-code/roos-code-tool-subagent": "workspace:^",
+    "@roos-code/roos-code-tools": "workspace:^",
+    "@roos-code/cordis": "workspace:^"
+  },
+  "devDependencies": {
+    "@roos-code/roos-code-agent": "workspace:^",
+    "@roos-code/roos-code-invariants": "workspace:^",
+    "@roos-code/roos-code-llm": "workspace:^",
+    "@roos-code/roos-code-session": "workspace:^",
+    "@roos-code/roos-code-settings": "workspace:^",
+    "@roos-code/roos-code-subagent": "workspace:^",
+    "@roos-code/roos-code-system-prompt": "workspace:^",
+    "@roos-code/roos-code-tool-subagent": "workspace:^",
+    "@roos-code/roos-code-tools": "workspace:^",
+    "@roos-code/cordis": "workspace:^"
+  }
+}

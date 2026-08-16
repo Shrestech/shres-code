@@ -43,6 +43,7 @@
     "@roos-code/cordis-plugin-timer": "workspace:^",
     "@roos-code/roos-code-agent": "workspace:^",
     "@roos-code/roos-code-agent-default-model": "workspace:^",
+    "@roos-code/roos-code-agent-seats": "workspace:^",
     "@roos-code/roos-code-agent-loop": "workspace:^",
     "@roos-code/roos-code-attachment-local": "workspace:^",
     "@roos-code/roos-code-shell-env": "workspace:^",

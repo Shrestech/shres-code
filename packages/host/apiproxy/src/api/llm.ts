@@ -34,6 +34,10 @@ export interface ConfigurableProviderView {
    * bypass harness approval.
    */
   kind?: 'delegated'
+  /** Command the host will spawn, when this is a delegated CLI route. */
+  binary?: string
+  /** Whether {@link binary} is an executable file or a command on PATH. */
+  binaryFound?: boolean
 }
 
 /** Llm-domain unary methods (the map keys llm.* of RpcMethodMap). */

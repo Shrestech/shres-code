@@ -1,0 +1,24 @@
+.roo {
+  display: block;
+  flex: none;
+  color: currentColor;
+  overflow: visible;
+}
+
+.hop {
+  transform-origin: 50% 90%;
+  animation: hop 560ms ease-in-out infinite;
+}
+
+@keyframes hop {
+  0%,
+  100% { transform: translateY(0) rotate(-8deg); }
+  35% { transform: translateY(-3px) rotate(10deg); }
+  70% { transform: translateY(-1px) rotate(-2deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hop {
+    animation: none;
+  }
+}

@@ -74,6 +74,8 @@ export interface CliBridgeRoute {
   defaultMaxTokens: number
   /** Advisory models shown by discovery consumers. */
   models: CliBridgeModel[]
+  /** When false, this route is omitted from the live adapter registry. Defaults to on. */
+  enabled?: boolean
 }
 
 /** Plugin / settings section: a dict of named routes. */
@@ -101,6 +103,7 @@ const routeSchema = z.object({
   contextWindow: z.number().step(1).min(1),
   defaultMaxTokens: z.number().step(1).min(1),
   models: z.array(z.object({ id: z.string().required(), name: z.string() })),
+  enabled: z.boolean().default(true),
 })
 
 export const Config = z.object({
@@ -188,7 +191,7 @@ export const SHIPPED_ROUTES: Record<ShippedRouteId, CliBridgeRoute> = {
     allowDelegatedTools: true,
     contextWindow: DEFAULT_CONTEXT_WINDOW,
     defaultMaxTokens: DEFAULT_MAX_TOKENS,
-    models: [{ id: 'grok-4', name: 'Grok 4' }, { id: 'grok-4.5', name: 'Grok 4.5' }],
+    models: [{ id: 'grok-4.6', name: 'Grok 4.6' }, { id: 'grok-4.5', name: 'Grok 4.5' }],
   },
   'kimi-cli': {
     displayName: 'Kimi Code CLI (delegated)',
@@ -205,7 +208,12 @@ export const SHIPPED_ROUTES: Record<ShippedRouteId, CliBridgeRoute> = {
     allowDelegatedTools: true,
     contextWindow: DEFAULT_CONTEXT_WINDOW,
     defaultMaxTokens: DEFAULT_MAX_TOKENS,
-    models: [{ id: 'k2', name: 'Kimi K2' }],
+    models: [
+      { id: 'kimi-code/k3-256k', name: 'K3-256k' },
+      { id: 'kimi-code/k3', name: 'K3' },
+      { id: 'kimi-code/kimi-for-coding', name: 'K2.7 Coding' },
+      { id: 'kimi-code/kimi-for-coding-highspeed', name: 'K2.7 Coding Highspeed' },
+    ],
   },
 }
 
@@ -245,6 +253,7 @@ function mergeRoute(base: CliBridgeRoute, overlay: Partial<CliBridgeRoute> | und
       extraArgs: [...base.extraArgs],
       efforts: [...base.efforts],
       models: [...base.models],
+      enabled: base.enabled ?? true,
     }
   }
   const extraArgs = overlay.extraArgs ?? base.extraArgs
@@ -280,6 +289,7 @@ function mergeRoute(base: CliBridgeRoute, overlay: Partial<CliBridgeRoute> | und
     contextWindow: overlay.contextWindow ?? base.contextWindow,
     defaultMaxTokens: overlay.defaultMaxTokens ?? base.defaultMaxTokens,
     models: models.map(model => ({ id: model.id, ...model.name === undefined ? {} : { name: model.name } })),
+    enabled: overlay.enabled ?? base.enabled ?? true,
   }
 }
 

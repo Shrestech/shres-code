@@ -408,9 +408,9 @@ describe('settings domain', () => {
     expect(webSearch.value).toEqual({ baseURL: 'https://search.test/v1' })
     const attachedCli = expectOk(await api.settings.mutate(request({
       ns: 'web-search-attached-cli',
-      ops: [{ op: 'set', path: ['preference'], value: ['kimi-cli', 'grok-cli'] }],
+      ops: [{ op: 'set', path: ['ollama'], value: true }],
     })))
-    expect(attachedCli.value).toEqual({ preference: ['kimi-cli', 'grok-cli'] })
+    expect(attachedCli.value).toEqual({ ollama: true })
 
     for (const response of [
       await api.settings.update(request({ ns: 'some-other-plugin', patch: { secretPath: '/etc/shadow' } })),
@@ -444,6 +444,22 @@ describe('settings domain', () => {
       })))
     })
     expect(frames).toEqual([forwardedSettings('ui-onboarding'), forwardedSettings('ui-theme')])
+  })
+
+  it('serves the agent-seats namespace so the Models card can bind Boomer, Joey, and Flyer', async () => {
+    const ctx = await harness()
+    ctx.settings.register(settingsNamespace('agent-seats'), z.object({
+      seats: z.object({
+        boomer: z.object({ provider: z.string(), model: z.string() }),
+      }),
+    }))
+    const api = createApiProxy(ctx, DEFAULTS)
+    expectOk(await api.settings.mutate(request({
+      ns: 'agent-seats',
+      ops: [{ op: 'set', path: ['seats', 'boomer'], value: { provider: 'ollama-cloud', model: 'kimi-k3' } }],
+    })))
+    expect(ctx.settings.describe().find(view => String(view.ns) === 'agent-seats')?.value)
+      .toEqual({ seats: { boomer: { provider: 'ollama-cloud', model: 'kimi-k3' } } })
   })
 
   it('serves the agent-preset namespace, so a browser preset picker can persist its choice', async () => {
@@ -665,12 +681,18 @@ describe('llm domain', () => {
       settingsNs: 'llm-cli-bridge',
       settingsPath: ['routes', 'grok-cli'],
       kind: 'delegated',
+      binary: 'grok',
+      binaryFound: true,
     }])
     ctx.llm.registerAdapter(['grok-cli'], new CatalogAdapter('Grok', ['grok-4'], 'delegated'))
     ctx.llm.registerAdapter(['orphan-cli'], new CatalogAdapter('Orphan', ['x'], 'delegated'))
     const api = createApiProxy(ctx, DEFAULTS)
     const providers = expectOk(await api.llm.providers(request({})))
-    expect(providers.providers.find(row => row.provider === 'grok-cli')).toMatchObject({ kind: 'delegated' })
+    expect(providers.providers.find(row => row.provider === 'grok-cli')).toMatchObject({
+      kind: 'delegated',
+      binary: 'grok',
+      binaryFound: true,
+    })
     expect(providers.providers.find(row => row.provider === 'orphan-cli')).toMatchObject({ kind: 'delegated' })
     const models = expectOk(await api.llm.models(request({})))
     expect(models.groups).toEqual(expect.arrayContaining([

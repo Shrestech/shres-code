@@ -88,6 +88,32 @@ function summary(id: SessionId, updatedAt: number): SessionSummary {
 }
 
 describe('SubagentCatalogAction', () => {
+  it('hops a colored kangaroo for a running named seat', () => {
+    const input = props({
+      ...catalog(),
+      entries: [
+        {
+          kind: 'child', id: CHILD, mode: 'continuable', label: 'Boomer: design the API',
+          activity: 'running', hasChildren: false,
+        },
+      ],
+    }, {}, {
+      [CHILD]: {
+        ...summary(CHILD, Date.now()),
+        parentId: PARENT,
+        origin: 'subagent',
+        running: true,
+        title: 'Boomer: design the API',
+        displayTitle: 'Boomer: design the API',
+      },
+    })
+    render(<SubagentCatalogAction {...input} />)
+    const trigger = screen.getByRole('button', { name: '1 subagent running' })
+    expect(trigger.querySelector('[data-hopping-roo="boomer"]')).not.toBeNull()
+    fireEvent.click(trigger)
+    expect(screen.getByRole('treeitem').querySelector('[data-hopping-roo="boomer"]')).not.toBeNull()
+  })
+
   it('aggregates live descendant activity onto the closed trigger', () => {
     const summaries: Record<SessionId, SessionSummary> = {
       [CHILD]: {

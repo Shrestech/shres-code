@@ -339,6 +339,7 @@ describe('WebSearchCard', () => {
       claude: field('true'),
       codex: field('true'),
       kimi: field('true'),
+      ollama: field('true'),
       deepseek: field('true'),
       baseURL: field(''),
       maxUses: field('5'),

@@ -1,7 +1,7 @@
 /** Page-store join: directory × namespaces × credentials, with last-good rows on failure. */
 import { describe, expect, it } from 'vitest'
 import type { RpcResponse } from '@roos-code/roos-code-api-remotes/client'
-import { messageOf, ModelsSettingsStore } from '../src/client/store.ts'
+import { messageOf, ModelsSettingsStore, providerEnabled } from '../src/client/store.ts'
 
 let nextRpc = 0
 function ok<T>(value: T): RpcResponse<T> {
@@ -97,6 +97,41 @@ describe('ModelsSettingsStore', () => {
     expect(byProvider.get('ghost')).toMatchObject({ configured: false, removable: false })
     expect(state.namespaces.get('llm-pi-ai')?.ns).toBe('llm-pi-ai')
     expect(state.hasUserDefaultModel).toBe(false)
+  })
+
+  it('does not mark a shipped delegated CLI removable after a user-layer write', async () => {
+    const { face } = api({
+      providers: () => Promise.resolve(ok({
+        providers: [{
+          provider: 'claude-cli',
+          displayName: 'Claude Code CLI (delegated)',
+          settingsNs: 'llm-cli-bridge',
+          settingsPath: ['routes', 'claude-cli'],
+          active: true,
+          kind: 'delegated',
+        }],
+      })),
+      describeSettings: () => Promise.resolve(ok({
+        writable: true,
+        hasDocument: false,
+        namespaces: [{
+          ns: 'llm-cli-bridge',
+          schema: {},
+          value: { routes: { 'claude-cli': { enabled: false } } },
+          user: { routes: { 'claude-cli': { enabled: false } } },
+          applies: 'live',
+          secrets: [],
+          revision: 1,
+        }],
+      })),
+    })
+    const store = new ModelsSettingsStore(face)
+    await store.load()
+    expect(store.store.getSnapshot().rows[0]).toMatchObject({
+      configured: true,
+      removable: false,
+      entry: { kind: 'delegated', provider: 'claude-cli' },
+    })
   })
 
   it('mirrors a saved user-layer default so first-run does not re-prompt', async () => {
@@ -286,6 +321,33 @@ describe('edge joins', () => {
     await first
     // The stale empty directory never overwrote the newer join.
     expect(store.store.getSnapshot().rows).toHaveLength(4)
+  })
+})
+
+describe('providerEnabled', () => {
+  it('treats an omitted enabled field as on and an explicit false as off', () => {
+    const namespaces = new Map(NAMESPACES.map(view => [view.ns, view]))
+    const openai = {
+      entry: DIRECTORY[1]!,
+      configured: true,
+      removable: true,
+      apiKeyEnv: 'OPENAI_API_KEY',
+      credential: undefined,
+    }
+    expect(providerEnabled(openai, namespaces)).toBe(true)
+    const off = new Map(namespaces)
+    off.set('llm-pi-ai', {
+      ...NAMESPACES[1]!,
+      value: { providers: { openai: { apiKeyEnv: 'OPENAI_API_KEY', enabled: false } } },
+    })
+    expect(providerEnabled(openai, off)).toBe(false)
+    expect(providerEnabled({
+      entry: { provider: 'ghost', displayName: 'Ghost', settingsNs: '', settingsPath: [], active: true },
+      configured: false,
+      removable: false,
+      apiKeyEnv: undefined,
+      credential: undefined,
+    }, namespaces)).toBe(true)
   })
 })
 

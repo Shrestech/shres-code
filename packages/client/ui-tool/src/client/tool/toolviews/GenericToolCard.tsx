@@ -6,7 +6,8 @@
 
 import type { ReactNode } from 'react'
 import {
-  IconApiOutline14, IconBrowseOutline16, IconCodeOutline16, IconEditOutline16, IconSearchOutline16, IconSparkle16,
+  HoppingRoo, IconApiOutline14, IconBrowseOutline16, IconCodeOutline16, IconEditOutline16,
+  IconSearchOutline16, IconSparkle16, seatIdOf,
 } from '@roos-code/roos-code-client-ui-primitives'
 import type { ToolCallOwnerProps, ToolTreeProps } from '../../contract/slots.ts'
 import { readCardModel } from '../models/read-card-model.ts'
@@ -46,12 +47,16 @@ export function GenericToolCard({ toolName, block, cwd, openFile, inspect, t }: 
     ? 'error'
     : model.state
   const singleFile = model.filePath !== undefined
+  const seat = seatIdOf(toolName)
+  const icon = seat !== undefined && state === 'running'
+    ? <HoppingRoo size={14} seat={seat} />
+    : VARIANT_ICONS[model.variant]
   return (
     <ToolRow
       t={t}
       variant={model.variant}
       toolName={toolName}
-      icon={VARIANT_ICONS[model.variant]}
+      icon={icon}
       title={model.title}
       // A terminal presenter's description is the contract's above-card text, so
       // it outranks the args-derived summary here exactly as it does in BashRow;

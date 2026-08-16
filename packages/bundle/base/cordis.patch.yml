@@ -131,6 +131,8 @@
             apiKeyEnv: OPENROUTER_API_KEY
           groq:
             apiKeyEnv: GROQ_API_KEY
+          zai:
+            apiKeyEnv: ZAI_API_KEY
 
     # First-run picker: probes local Ollama and, on headless, prints a TTY menu
     # when the composition default cannot serve. autoRunCli stays false here so
@@ -365,6 +367,11 @@
         toolName: subagent
         backgroundMode: continuable
 
+    # Named Boomer / Joey / Flyer seats remount extra spawn tools from the
+    # `agent-seats` settings section. Unbound seats register nothing.
+    - id: agent-seats
+      name: '@roos-code/roos-code-agent-seats'
+
     # Fork stays one-shot: a continuable child's `report` tool and prompt
     # section precede the inherited history a fork exists to reuse; one-shot
     # fork children install neither, keeping the parent's request prefix.
@@ -444,7 +451,7 @@
     # Every mode enables the stable model-facing web_search tool. An attached
     # CLI (Grok, Claude, Codex, Kimi) owns search through that vendor's hosted
     # web-search tool and the same credential the Models page already stores;
-    # DeepSeek official is the fallback when no CLI is attached. Fetch stays
+    # DeepSeek official is the fallback when no listed vendor has a key. Fetch stays
     # disabled and no fetch provider is mounted: that provider defers SSRF
     # protection and the model would choose the request target. Search is a full
     # auxiliary model request with server-side retrieval, so this shipped route

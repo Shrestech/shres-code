@@ -18,9 +18,10 @@ import type { IApiClient } from '@roos-code/roos-code-api-remotes/client'
 import { Button, IconPlusOutline16, Modal } from '@roos-code/roos-code-client-ui-primitives'
 import type { SnapshotSelectorHook } from '@roos-code/roos-code-client-web-react'
 import { CustomProviderCard } from './CustomProviderCard.tsx'
-import { deriveKeyRef, messageOf, protocolChoices, providerUsable } from './store.ts'
+import { deriveKeyRef, messageOf, protocolChoices, providerEnabled, providerUsable } from './store.ts'
 import type { ModelsSettingsState, ModelsSettingsStore, ProviderRow } from './store.ts'
 import { ProviderEditor, type ProviderEditorProps } from './ProviderEditor.tsx'
+import { SeatsCard } from './SeatsCard.tsx'
 import type { en } from './locales.ts'
 import styles from './ModelsSection.module.css'
 
@@ -218,6 +219,13 @@ function Loaded({ injected }: { injected: ModelsSectionInjected }): ReactNode {
     setDeleteFailure(undefined)
   }
 
+  const setProviderEnabled = (row: ProviderRow, enabled: boolean): void => {
+    void api.settings.mutate({
+      ns: row.entry.settingsNs,
+      ops: [{ op: 'set', path: [...row.entry.settingsPath, 'enabled'], value: enabled }],
+    }).then(() => { void controller.load() }, () => { void controller.load() })
+  }
+
   const confirmDelete = (): void => {
     /* v8 ignore next -- the action only renders with a target and is disabled while a deletion is pending */
     if (deleteTarget === undefined || deleting) return
@@ -284,6 +292,12 @@ function Loaded({ injected }: { injected: ModelsSectionInjected }): ReactNode {
             {providerCopy(t('savedProvider'), savedIdentity)}
           </p>
         )}
+      <SeatsCard
+        state={state}
+        api={api}
+        reload={() => { void controller.load() }}
+        t={t}
+      />
       <ul className={styles['rows']}>
         {listed.map((row) => {
           const target = targetOf(row)
@@ -311,6 +325,18 @@ function Loaded({ injected }: { injected: ModelsSectionInjected }): ReactNode {
           const credentialMissing = !credentialConfigured
             && row.apiKeyEnv !== undefined
             && row.credential?.configured === false
+          const cliBinary = row.entry.binary
+            ?? (row.entry.kind === 'delegated'
+              ? { 'claude-cli': 'claude', 'codex-cli': 'codex', 'grok-cli': 'grok', 'kimi-cli': 'kimi' }[row.entry.provider]
+              : undefined)
+          const cliStatus = cliBinary === undefined
+            ? undefined
+            : (row.entry.binaryFound === true
+              ? t('cliFound')
+              : row.entry.binaryFound === false
+                ? t('cliMissing')
+                : t('cliUses'))
+              .replace('{binary}', () => cliBinary)
           return (
             <li key={row.entry.provider} className={styles['rowCard']}>
               <div className={styles['rowHead']}>
@@ -329,7 +355,19 @@ function Loaded({ injected }: { injected: ModelsSectionInjected }): ReactNode {
                       </span>
                     )
                     : null}
-                  {credentialConfigured
+                  {row.entry.kind === 'delegated' && cliStatus !== undefined
+                    ? (
+                      <span
+                        className={`${styles['rowTag']} ${row.entry.binaryFound === true
+                          ? styles['rowTagReady']
+                          : styles['rowTagMissing']}`}
+                        title={cliStatus}
+                      >
+                        {cliStatus}
+                      </span>
+                    )
+                    : null}
+                  {row.entry.kind !== 'delegated' && credentialConfigured
                     ? (
                       <span
                         className={`${styles['credentialDot']} ${styles['credentialDotConfigured']}`}
@@ -338,7 +376,7 @@ function Loaded({ injected }: { injected: ModelsSectionInjected }): ReactNode {
                         title={t('credentialConfigured')}
                       />
                     )
-                    : credentialMissing
+                    : row.entry.kind !== 'delegated' && credentialMissing
                       ? (
                         <span
                           className={`${styles['credentialDot']} ${styles['credentialDotMissing']}`}
@@ -350,6 +388,25 @@ function Loaded({ injected }: { injected: ModelsSectionInjected }): ReactNode {
                       : null}
                 </span>
                 <span className={styles['rowActions']}>
+                  <button
+                    type="button"
+                    className={`${styles['rowSwitch']} ${providerEnabled(row, state.namespaces)
+                      ? styles['rowSwitchOn']
+                      : styles['rowSwitchOff']}`}
+                    role="switch"
+                    aria-checked={providerEnabled(row, state.namespaces)}
+                    aria-label={providerCopy(
+                      providerEnabled(row, state.namespaces) ? t('disableProvider') : t('enableProvider'),
+                      target,
+                    )}
+                    disabled={!state.writable}
+                    onClick={() => {
+                      setSavedTarget(undefined)
+                      setProviderEnabled(row, !providerEnabled(row, state.namespaces))
+                    }}
+                  >
+                    <span className={styles['rowSwitchThumb']} />
+                  </button>
                   <button
                     type="button"
                     className={styles['secondaryButton']}

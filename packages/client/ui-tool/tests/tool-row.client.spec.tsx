@@ -395,6 +395,13 @@ describe('GenericToolCard', () => {
     expect(view.container.querySelector('[data-state="running"]')).not.toBeNull()
   })
 
+  it('hops a colored kangaroo while a named seat tool is running', () => {
+    const view = render(
+      <GenericToolCard {...props('joey', running({ name: 'joey', argsRaw: '{"description":"implement the API"}' }))} />,
+    )
+    expect(view.container.querySelector('[data-hopping-roo="joey"]')).not.toBeNull()
+  })
+
   it('renders edit with its dedicated title, icon variant, and path summary', () => {
     const view = render(
       <GenericToolCard {...props('edit', running({

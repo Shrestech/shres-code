@@ -26,6 +26,7 @@
     "@roos-code/cordis-plugin-timer": "workspace:^",
     "@roos-code/roos-code-agent-tool-presentation": "workspace:^",
     "@roos-code/roos-code-agent-default-model": "workspace:^",
+    "@roos-code/roos-code-agent-seats": "workspace:^",
     "@roos-code/roos-code-app-boot": "workspace:^",
     "@roos-code/roos-code-base": "workspace:^",
     "@roos-code/roos-code-credentials": "workspace:^",

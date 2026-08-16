@@ -19,6 +19,7 @@ export const TEMPLATE_ROUTES: readonly TemplateRoute[] = [
   { provider: 'moonshotai', label: 'Moonshot (Kimi)', apiKeyEnv: 'MOONSHOT_API_KEY', defaultModel: 'kimi-k2.5' },
   { provider: 'openrouter', label: 'OpenRouter', apiKeyEnv: 'OPENROUTER_API_KEY', defaultModel: 'openai/gpt-4o' },
   { provider: 'groq', label: 'Groq', apiKeyEnv: 'GROQ_API_KEY', defaultModel: 'llama-3.3-70b-versatile' },
+  { provider: 'zai', label: 'Z.AI (GLM)', apiKeyEnv: 'ZAI_API_KEY', defaultModel: 'glm-5.2' },
   { provider: 'deepseek-official', label: 'DeepSeek', apiKeyEnv: 'DEEPSEEK_API_KEY', defaultModel: 'deepseek-v4-flash' },
 ]
 

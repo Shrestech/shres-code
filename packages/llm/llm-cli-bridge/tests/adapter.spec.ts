@@ -85,7 +85,7 @@ function options(overrides: Partial<GenerateOptions> = {}): GenerateOptions {
 describe('argv and serialize', () => {
   it('forwards selected model and effort onto grok argv', () => {
     expect(buildCliArgv(SHIPPED_ROUTES['grok-cli'], {
-      model: 'grok-4.5',
+      model: 'grok-4.6',
       effort: 'high',
       prompt: 'do it',
     })).toEqual([
@@ -93,7 +93,7 @@ describe('argv and serialize', () => {
       '--output-format', 'json',
       '--always-approve',
       '--no-auto-update',
-      '--model', 'grok-4.5',
+      '--model', 'grok-4.6',
       '--effort', 'high',
       '-p', 'do it',
     ])
@@ -101,19 +101,19 @@ describe('argv and serialize', () => {
 
   it('maps kimi thinking-bool and Codex config effort flags', () => {
     expect(buildCliArgv(SHIPPED_ROUTES['kimi-cli'], {
-      model: 'k2',
+      model: 'kimi-code/k3',
       effort: 'high',
       prompt: 'q',
     })).toEqual([
       'kimi',
       '--output-format', 'stream-json',
       '--yolo',
-      '--model', 'k2',
+      '--model', 'kimi-code/k3',
       '--thinking',
       '-p', 'q',
     ])
     expect(buildCliArgv(SHIPPED_ROUTES['kimi-cli'], {
-      model: 'k2',
+      model: 'kimi-code/k3',
       effort: 'off',
       prompt: 'q',
     })).toContain('--no-thinking')
@@ -131,12 +131,12 @@ describe('argv and serialize', () => {
 
   it('rejects an effort the route does not advertise', () => {
     expect(() => buildCliArgv(SHIPPED_ROUTES['kimi-cli'], {
-      model: 'k2',
+      model: 'kimi-code/k3',
       effort: 'xhigh',
       prompt: 'q',
     })).toThrow(LlmError)
     try {
-      buildCliArgv(SHIPPED_ROUTES['kimi-cli'], { model: 'k2', effort: 'xhigh', prompt: 'q' })
+      buildCliArgv(SHIPPED_ROUTES['kimi-cli'], { model: 'kimi-code/k3', effort: 'xhigh', prompt: 'q' })
     } catch (error) {
       expect(error).toMatchObject({ code: 'UNSUPPORTED_OPTION' })
     }
@@ -241,19 +241,24 @@ describe('CliLlmAdapter', () => {
       name: 'Grok Build CLI (delegated)',
       kind: 'delegated',
     })
-    const resolved = await adapter.resolveModel('grok-cli', 'grok-4')
+    const resolved = await adapter.resolveModel('grok-cli', 'grok-4.6')
     expect(resolved.context).toEqual({ contextWindow: 128_000 })
     expect(resolved.defaultMaxTokens).toBe(8_192)
     expect(resolved.reasoning?.efforts.map(effort => effort.id)).toEqual([
       'low', 'medium', 'high', 'xhigh',
     ])
-    const kimi = await adapter.resolveModel('kimi-cli', 'k2')
+    expect(await adapter.listModels('grok-cli')).toEqual([
+      { provider: 'grok-cli', id: 'grok-4.6', name: 'Grok 4.6' },
+      { provider: 'grok-cli', id: 'grok-4.5', name: 'Grok 4.5' },
+    ])
+    const kimi = await adapter.resolveModel('kimi-cli', 'kimi-code/k3')
     expect(kimi.reasoning?.efforts.map(effort => effort.id)).toEqual(['off', 'high'])
-    expect(await adapter.listModels('kimi-cli')).toEqual([{
-      provider: 'kimi-cli',
-      id: 'k2',
-      name: 'Kimi K2',
-    }])
+    expect(await adapter.listModels('kimi-cli')).toEqual([
+      { provider: 'kimi-cli', id: 'kimi-code/k3-256k', name: 'K3-256k' },
+      { provider: 'kimi-cli', id: 'kimi-code/k3', name: 'K3' },
+      { provider: 'kimi-cli', id: 'kimi-code/kimi-for-coding', name: 'K2.7 Coding' },
+      { provider: 'kimi-cli', id: 'kimi-code/kimi-for-coding-highspeed', name: 'K2.7 Coding Highspeed' },
+    ])
     const nameless = new CliLlmAdapter({
       routes: () => resolveRoutes({ 'grok-cli': { models: [{ id: 'bare' }] } }),
       spawn: () => fakeChild(),
@@ -324,7 +329,7 @@ describe('CliLlmAdapter', () => {
       cwd: () => '/tmp/ws',
       disposeGraceMs: () => 3000,
     })
-    const streamed = await collect(streamAdapter.stream(options({ provider: 'kimi-cli', model: 'k2' })))
+    const streamed = await collect(streamAdapter.stream(options({ provider: 'kimi-cli', model: 'kimi-code/k3' })))
     expect(streamed).toEqual(expect.arrayContaining([
       { type: 'text-delta', index: 0, text: 'two' },
       { type: 'usage', usage: { inputTokens: 1, outputTokens: 2, reasoningTokens: 3 } },
@@ -445,6 +450,8 @@ describe('parse, serialize, and resolveRoutes', () => {
       .toEqual([{ id: 'only-id' }])
     expect(resolveRoutes({ 'grok-cli': { displayName: 'Grok' } }).get('grok-cli')?.apiKeyEnv)
       .toBe('XAI_API_KEY')
+    expect(resolveRoutes({ 'grok-cli': { enabled: false } }).get('grok-cli')?.enabled).toBe(false)
+    expect(resolveRoutes({}).get('grok-cli')?.enabled).toBe(true)
     expect(resolveRoutes({ extra: { displayName: 'E', binary: 'e', apiKeyEnv: 'CUSTOM_KEY' } })
       .get('extra')?.apiKeyEnv).toBe('CUSTOM_KEY')
     expect(() => resolveRoutes({ extra: { displayName: 'X' } })).toThrow('displayName and binary')
@@ -472,6 +479,20 @@ describe('parse, serialize, and resolveRoutes', () => {
 })
 
 describe('plugin registration', () => {
+  it('withdraws a disabled route from the live registry', async () => {
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    await ctx.plugin(MemorySettings)
+    await ctx.plugin(plugin, {})
+    expect(ctx.llm.listProviders().some(provider => provider.id === 'grok-cli')).toBe(true)
+    await ctx.settings.update(settingsNamespace('llm-cli-bridge'), {
+      routes: { 'grok-cli': { enabled: false } },
+    })
+    expect(ctx.llm.listProviders().some(provider => provider.id === 'grok-cli')).toBe(false)
+    expect(ctx.llm.listConfigurableProviders().some(entry => entry.provider === 'grok-cli')).toBe(true)
+    await ctx.fiber.dispose()
+  })
+
   it('registers the four shipped delegated routes', async () => {
     const ctx = new Context()
     await ctx.plugin(LlmRuntime)
@@ -483,7 +504,9 @@ describe('plugin registration', () => {
     expect(directory.find(entry => entry.provider === 'grok-cli')).toMatchObject({
       kind: 'delegated',
       settingsNs: 'llm-cli-bridge',
+      binary: 'grok',
     })
+    expect(typeof directory.find(entry => entry.provider === 'grok-cli')?.binaryFound).toBe('boolean')
     const resolved = await ctx.llm.resolveCallConfig({
       provider: 'grok-cli',
       model: 'grok-4',

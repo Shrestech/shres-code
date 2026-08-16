@@ -6,11 +6,11 @@ First run with no usable default opens a picker instead of silently choosing a v
 
 ## Configure a shipped provider
 
-Open **Settings → Models**. The page lists the composed routes: DeepSeek, local Ollama, Ollama Cloud, OpenAI, Anthropic (Claude), xAI (Grok), Moonshot (Kimi), OpenRouter, and Groq.
+Open **Settings → Models**. The page lists the composed routes: DeepSeek, local Ollama, Ollama Cloud, OpenAI, Anthropic (Claude), xAI (Grok), Moonshot (Kimi), OpenRouter, Groq, and Z.AI (GLM).
 
 ![The Models page: the DeepSeek card, with Add provider and Add a custom provider below it](providers-models-page.png)
 
-Each keyed card exposes one API-key field; enter the key and save it. Named-but-unset keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `XAI_API_KEY`, `MOONSHOT_API_KEY`, `OLLAMA_API_KEY`, `OPENROUTER_API_KEY`, `GROQ_API_KEY`, `DEEPSEEK_API_KEY`) fail a request with `MISSING_CREDENTIAL` until stored.
+Each keyed card exposes one API-key field; enter the key and save it. Named-but-unset keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `XAI_API_KEY`, `MOONSHOT_API_KEY`, `OLLAMA_API_KEY`, `OPENROUTER_API_KEY`, `GROQ_API_KEY`, `ZAI_API_KEY`, `DEEPSEEK_API_KEY`) fail a request with `MISSING_CREDENTIAL` until stored.
 
 Keys are write-only. The page receives a redacted descriptor after saving, never the literal secret. The key is stored in `$ROOS_HOME/.credentials.yaml`, while settings retain only its credential reference.
 
@@ -24,7 +24,7 @@ The `ollama-cloud` route talks to `https://ollama.com/v1` with `OLLAMA_API_KEY`.
 
 ### Claude, Grok, and Kimi
 
-Anthropic, xAI, and Moonshot are catalog routes: pick the card, enter `ANTHROPIC_API_KEY`, `XAI_API_KEY`, or `MOONSHOT_API_KEY`, and save. The installed catalog supplies the endpoint, protocol, and model list. OpenAI, OpenRouter, and Groq work the same way.
+Anthropic, xAI, Moonshot, and Z.AI are catalog routes: pick the card, enter `ANTHROPIC_API_KEY`, `XAI_API_KEY`, `MOONSHOT_API_KEY`, or `ZAI_API_KEY`, and save. The installed catalog supplies the endpoint, protocol, and model list. OpenAI, OpenRouter, and Groq work the same way.
 
 Providers with native authentication need their native credentials instead. Bedrock, Vertex, Azure, and Codex use AWS credentials and a region, an ADC project, an `api-version`, and OAuth respectively; filling only the API-key field does not configure them.
 

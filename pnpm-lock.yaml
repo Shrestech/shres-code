@@ -147,6 +147,9 @@ importers:
       '@roos-code/roos-code-agent-instructions':
         specifier: workspace:^
         version: link:../../packages/context/agent-instructions
+      '@roos-code/roos-code-agent-seats':
+        specifier: workspace:^
+        version: link:../../packages/subagent/agent-seats
       '@roos-code/roos-code-agent-tool-presentation':
         specifier: workspace:^
         version: link:../../packages/core/agent-tool-presentation
@@ -1031,6 +1034,9 @@ importers:
       '@roos-code/roos-code-agent-loop':
         specifier: workspace:^
         version: link:../../core/agent-loop
+      '@roos-code/roos-code-agent-seats':
+        specifier: workspace:^
+        version: link:../../subagent/agent-seats
       '@roos-code/roos-code-api-gateway':
         specifier: workspace:^
         version: link:../../api/gateway
@@ -7132,6 +7138,43 @@ importers:
       '@roos-code/roos-code-storage':
         specifier: workspace:^
         version: link:../storage
+
+  packages/subagent/agent-seats:
+    dependencies:
+      '@roos-code/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@roos-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@roos-code/roos-code-agent':
+        specifier: workspace:^
+        version: link:../../core/agent
+      '@roos-code/roos-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@roos-code/roos-code-llm':
+        specifier: workspace:^
+        version: link:../../llm/llm
+      '@roos-code/roos-code-session':
+        specifier: workspace:^
+        version: link:../../core/session
+      '@roos-code/roos-code-settings':
+        specifier: workspace:^
+        version: link:../../settings/settings
+      '@roos-code/roos-code-subagent':
+        specifier: workspace:^
+        version: link:../subagent
+      '@roos-code/roos-code-system-prompt':
+        specifier: workspace:^
+        version: link:../../core/system-prompt
+      '@roos-code/roos-code-tool-subagent':
+        specifier: workspace:^
+        version: link:../tool-subagent
+      '@roos-code/roos-code-tools':
+        specifier: workspace:^
+        version: link:../../core/tools
 
   packages/subagent/subagent:
     dependencies:

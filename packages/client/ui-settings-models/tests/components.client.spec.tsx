@@ -261,6 +261,8 @@ describe('ModelsSection', () => {
           settingsPath: ['routes', 'grok-cli'],
           active: true,
           kind: 'delegated',
+          binary: 'grok',
+          binaryFound: true,
         },
       ],
     })))
@@ -271,13 +273,39 @@ describe('ModelsSection', () => {
     const { controller } = await mountFace(scripted)
     expect(screen.getByText('Grok Build CLI (delegated)')).toBeTruthy()
     expect(screen.getByText(en.delegatedTag)).toBeTruthy()
+    expect(screen.getByText(en.cliFound.replace('{binary}', 'grok'))).toBeTruthy()
+    expect(screen.queryByRole('button', {
+      name: providerCopy(en.removeProvider, {
+        provider: 'grok-cli',
+        displayName: 'Grok Build CLI (delegated)',
+      }),
+    })).toBeNull()
+    const toggle = screen.getByRole('switch', {
+      name: providerCopy(en.disableProvider, {
+        provider: 'grok-cli',
+        displayName: 'Grok Build CLI (delegated)',
+      }),
+    })
+    expect(toggle.getAttribute('aria-checked')).toBe('true')
+    fireEvent.click(toggle)
+    await waitFor(() => {
+      expect(scripted.mutate).toHaveBeenCalledWith(expect.objectContaining({
+        ns: 'llm-cli-bridge',
+        ops: [{ op: 'set', path: ['routes', 'grok-cli', 'enabled'], value: false }],
+      }))
+    })
+    scripted.mutate.mockClear()
     fireEvent.click(screen.getByRole('button', {
       name: providerCopy(en.editProvider, {
         provider: 'grok-cli',
         displayName: 'Grok Build CLI (delegated)',
       }),
     }))
-    expect(screen.getByLabelText(en.keyInput)).toBeTruthy()
+    expect(screen.getByLabelText<HTMLInputElement>(en.cliBinary).placeholder).toBe('grok')
+    expect(screen.getByText(en.cliBinaryHint)).toBeTruthy()
+    expect(screen.getByLabelText<HTMLInputElement>(en.keyInput).placeholder).toBe(en.keyPlaceholderCli)
+    expect(screen.getByLabelText(en.cliEfforts)).toBeTruthy()
+    expect(screen.getByText(en.cliModelsHint)).toBeTruthy()
     fireEvent.change(screen.getByLabelText(en.keyInput), { target: { value: 'xai-key' } })
     fireEvent.change(screen.getByLabelText(en.cliBinary), { target: { value: '/usr/bin/grok' } })
     fireEvent.click(screen.getByRole('button', { name: en.apply }))
