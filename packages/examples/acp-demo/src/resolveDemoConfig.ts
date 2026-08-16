@@ -48,6 +48,12 @@ export interface ResolveDemoConfigOptions {
    * their own install location.
    */
   installAnchor?: string
+  /**
+   * Running executable used as a second trust walk. Defaults to
+   * `process.execPath` so a pkg `--sea` exe whose module URL is
+   * `file:///snapshot/...` still sees on-disk `runtime/cordis.yml`.
+   */
+  execPath?: string
 }
 
 /**
@@ -68,6 +74,7 @@ export function resolveDemoConfig(options: ResolveDemoConfigOptions): string {
   const cwd = options.cwd ?? process.cwd()
   const home = options.home ?? resolveDshHome()
   const installAnchor = options.installAnchor ?? fileURLToPath(import.meta.url)
+  const execPath = options.execPath ?? process.execPath
   const requested = options.requested !== undefined && options.requested !== ''
     ? options.requested
     : undefined
@@ -80,7 +87,7 @@ export function resolveDemoConfig(options: ResolveDemoConfigOptions): string {
     return resolve(cwd, options.bundledDefault)
   }
   const absolute = resolve(cwd, requested)
-  assertTrustedExplicitConfig(absolute, options.binName, home, installAnchor)
+  assertTrustedExplicitConfig(absolute, options.binName, home, installAnchor, execPath)
   return absolute
 }
 
@@ -90,10 +97,11 @@ export function resolveDemoConfig(options: ResolveDemoConfigOptions): string {
  * @param absolute - resolved config path.
  * @param binName - diagnostic prefix.
  * @param home - Harness home used for the descendant check.
- * @param installAnchor - path used to discover first-party / packaged roots.
+ * @param installAnchor - module path used to discover first-party / packaged roots.
+ * @param execPath - running executable used as a second trust walk.
  */
 function assertTrustedExplicitConfig(
-  absolute: string, binName: string, home: string, installAnchor: string,
+  absolute: string, binName: string, home: string, installAnchor: string, execPath: string,
 ): void {
   let content: string
   try {
@@ -105,7 +113,7 @@ function assertTrustedExplicitConfig(
     throw new Error(`${binName}: failed to read config ${absolute}: ${String(error)}`)
   }
   const reasons = untrustedConstructs(content)
-  if (reasons.length === 0 || isPreapprovedLocation(absolute, home, installAnchor)) return
+  if (reasons.length === 0 || isPreapprovedLocation(absolute, home, installAnchor, execPath)) return
   throw new Error(
     `${binName}: refused to load ${absolute}: it contains ${reasons.join(' and ')}`
     + ' and is not under $DSH_HOME or a first-party/packaged install tree.'
@@ -129,33 +137,45 @@ function untrustedConstructs(content: string): string[] {
  * Whether the file is under `$DSH_HOME` or a first-party / packaged tree.
  * @param filePath - the config path that was read.
  * @param home - the Harness home.
- * @param installAnchor - path used to discover first-party / packaged roots.
+ * @param installAnchor - module path used to discover first-party / packaged roots.
+ * @param execPath - running executable used as a second trust walk.
  * @returns true when any approved root contains the file.
  */
-function isPreapprovedLocation(filePath: string, home: string, installAnchor: string): boolean {
+function isPreapprovedLocation(
+  filePath: string, home: string, installAnchor: string, execPath: string,
+): boolean {
   if (isPathInside(filePath, home)) return true
-  for (const root of discoverTrustedRoots(installAnchor)) {
+  for (const root of discoverTrustedRoots([installAnchor, execPath])) {
     if (isPathInside(filePath, root)) return true
   }
   return false
 }
 
 /**
- * Walk from `anchor` toward the filesystem root and collect first-party and
- * packaged directories that may contain `!!js` compositions.
- * @param anchor - a file or directory inside the bin's install tree.
+ * Walk each anchor toward the filesystem root and collect first-party and
+ * packaged directories that may contain `!!js` compositions. Anchors are the
+ * module URL and the real exe; never the invoking directory.
+ * @param anchors - files or directories inside the bin's install or exe tree.
  * @returns canonical trusted roots, nearest first.
  */
-function discoverTrustedRoots(anchor: string): string[] {
+function discoverTrustedRoots(anchors: readonly string[]): string[] {
   const roots: string[] = []
-  let current = startDir(anchor)
-  while (true) {
-    if (isHarnessSourceRoot(current) || isPackagedRuntimeRoot(current) || isDemoPackageDir(current)) {
-      roots.push(canonicalize(current))
+  const seen = new Set<string>()
+  for (const anchor of anchors) {
+    if (anchor === '') continue
+    let current = startDir(anchor)
+    while (true) {
+      if (isHarnessSourceRoot(current) || isPackagedRuntimeRoot(current) || isDemoPackageDir(current)) {
+        const canonical = canonicalize(current)
+        if (!seen.has(canonical)) {
+          seen.add(canonical)
+          roots.push(canonical)
+        }
+      }
+      const parent = dirname(current)
+      if (parent === current) break
+      current = parent
     }
-    const parent = dirname(current)
-    if (parent === current) break
-    current = parent
   }
   return roots
 }

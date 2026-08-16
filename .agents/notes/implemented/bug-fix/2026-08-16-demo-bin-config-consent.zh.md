@@ -14,7 +14,7 @@ Status: implemented
 
 两个 bin 都要求显式配置路径，绝不会默认加载 CWD 下的 `cordis.yml`。`dsh-acp-demo` 接受 `--config`／`-c`。`dsh-jsonrpc-agent` 接受 `$DSH_CORDIS_CONFIG` 或位置参数 `argv[2]`。缺少路径时打印用法并退出；点名的路径不存在则按找不到失败。
 
-显式路径会按原始 YAML 文本扫描 `!!js`，以及以 `./` 或 `../` 开头的 `name:` 值（冒号前允许空格，路径前允许 `!!tag`，例如 `!!str`）。包含任一构造的文件，在其规范路径为 `$DSH_HOME` 或其子孙，或位于从 bin 向上发现的第一方树内时允许：本 harness 源码检出（`pnpm-workspace.yaml` 加上两个 demo 包）、附带 `runtime/cordis.yml` 或与 `node/` 同级的 `cordis.yml` 的已打包运行时、或已安装的 demo 包目录。其他位置会失败，诊断会说明将文件放到 `$DSH_HOME` 下即可预批准这些构造。两种构造都没有的文件可以放在任何位置。
+显式路径会按原始 YAML 文本扫描 `!!js`，以及以 `./` 或 `../` 开头的 `name:` 值（冒号前允许空格，路径前允许 `!!tag`，例如 `!!str`）。包含任一构造的文件，在其规范路径为 `$DSH_HOME` 或其子孙，或位于从模块 URL 和 `process.execPath` 向上发现的第一方树内时允许（绝不从调用目录出发）：本 harness 源码检出（`pnpm-workspace.yaml` 加上两个 demo 包）、附带 `runtime/cordis.yml` 或与 `node/` 同级的 `cordis.yml` 的已打包运行时、或已安装的 demo 包目录。对 Python SDK 的 pkg `--sea` 载体必须走真实 exe：其 `import.meta.url` 是 `file:///snapshot/...`，而磁盘上的 `runtime/cordis.yml` 与 `runtime/dsh-jsonrpc-agent-pkg-*` 同级。其他位置会失败，诊断会说明将文件放到 `$DSH_HOME` 下即可预批准这些构造。两种构造都没有的文件可以放在任何位置。
 
 该扫描是尽力而为的原始文本过滤，不解析 include，也不覆盖每一种 YAML 编码。硬保证是：这些 bin 绝不会在没有显式路径的情况下加载 CWD 下的 `cordis.yml`。
 
@@ -42,4 +42,4 @@ resolver 分别放在两个 demo 包中（`resolveDemoConfig.ts`）。这两个�
 
 ## 测试
 
-每个 demo 包的 `resolve-demo-config.spec.ts` 固定了针对 CWD `cordis.yml` 的必需路径、第一方 `examples/*/cordis.yml` 叶子、harness 检出 fixture（测试前置数据）、已打包运行时 fixture、在所有批准位置之外的 `!!js` 与相对 `name:`（包括 `name :` 和 `!!str`）、`$DSH_HOME` 下的批准、home 外且两种构造都没有的文件、缺失的显式文件，以及符号链接规范化。
+每个 demo 包的 `resolve-demo-config.spec.ts` 固定了针对 CWD `cordis.yml` 的必需路径、第一方 `examples/*/cordis.yml` 叶子、harness 检出 fixture（测试前置数据）、已打包运行时 fixture、pkg snapshot 模块 URL 加上磁盘 exe 旁的 `runtime/cordis.yml`、必须继续拒绝的 CWD `runtime/cordis.yml`、在所有批准位置之外的 `!!js` 与相对 `name:`（包括 `name :` 和 `!!str`）、`$DSH_HOME` 下的批准、home 外且两种构造都没有的文件、缺失的显式文件，以及符号链接规范化。

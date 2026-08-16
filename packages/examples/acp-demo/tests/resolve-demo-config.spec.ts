@@ -86,6 +86,39 @@ describe('resolveDemoConfig', () => {
     })).toBe(resolve(path))
   })
 
+  it('allows on-disk runtime/cordis.yml when the module URL is a pkg snapshot VFS', () => {
+    const wheel = tmp()
+    const runtime = join(wheel, 'runtime')
+    mkdirSync(runtime)
+    const path = writeConfig(runtime, 'cordis.yml', '- config: !!js "1"\n')
+    const exe = join(runtime, 'dsh-jsonrpc-agent-pkg-macos-arm64')
+    writeFileSync(exe, '')
+    expect(resolveDemoConfig({
+      requested: path,
+      binName: NAME,
+      cwd: tmp(),
+      home: tmp(),
+      installAnchor: '/snapshot/node_modules/@deepseek-ai/dsh-acp-demo/lib/bin.js',
+      execPath: exe,
+    })).toBe(resolve(path))
+  })
+
+  it('does not trust a CWD runtime/cordis.yml from a snapshot module URL', () => {
+    const hostile = tmp()
+    mkdirSync(join(hostile, 'runtime'))
+    const path = writeConfig(join(hostile, 'runtime'), 'cordis.yml', '- config: !!js "1"\n')
+    const exe = join(tmp(), 'dsh-jsonrpc-agent-pkg-linux-x64')
+    writeFileSync(exe, '')
+    expect(() => resolveDemoConfig({
+      requested: path,
+      binName: NAME,
+      cwd: hostile,
+      home: tmp(),
+      installAnchor: '/snapshot/node_modules/@deepseek-ai/dsh-acp-demo/lib/bin.js',
+      execPath: exe,
+    })).toThrow(/contains !!js/)
+  })
+
   it('allows !!js inside an installed demo package directory', () => {
     const pkg = tmp()
     writeFileSync(join(pkg, 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh-acp-demo' }))
@@ -96,6 +129,7 @@ describe('resolveDemoConfig', () => {
       cwd: tmp(),
       home: tmp(),
       installAnchor: join(pkg, 'lib', 'bin.js'),
+      execPath: '',
     })).toBe(resolve(path))
   })
 
