@@ -201,7 +201,7 @@ function ActivityMark({
   running, label,
 }: {
   running: boolean
-  label?: string
+  label?: string | undefined
 }): ReactElement {
   if (!running) return <StateDot state="done" />
   return <HoppingRoo size={12} seat={seatIdOf(label)} />

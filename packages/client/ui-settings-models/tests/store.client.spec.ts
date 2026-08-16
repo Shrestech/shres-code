@@ -18,13 +18,24 @@ const DIRECTORY = [
   { provider: 'ghost', displayName: 'Ghost', settingsNs: '', settingsPath: [], active: true },
 ]
 
-const NAMESPACES = [
+type TestNamespace = {
+  ns: string
+  schema: object
+  value: Record<string, unknown>
+  base?: Record<string, unknown>
+  user?: Record<string, unknown>
+  applies: 'live'
+  secrets: never[]
+  revision: number
+}
+
+const NAMESPACES: TestNamespace[] = [
   {
     ns: 'llm-deepseek',
     schema: {},
     value: { apiKeyEnv: 'DEEPSEEK_API_KEY', baseURL: 'https://base' },
     base: { baseURL: 'https://base' },
-    applies: 'live' as const,
+    applies: 'live',
     secrets: [],
     revision: 0,
   },
@@ -33,7 +44,7 @@ const NAMESPACES = [
     schema: {},
     value: { providers: { openai: { apiKeyEnv: 'OPENAI_API_KEY' } } },
     user: { providers: { openai: { apiKeyEnv: 'OPENAI_API_KEY' } } },
-    applies: 'live' as const,
+    applies: 'live',
     secrets: [],
     revision: 0,
   },
@@ -41,7 +52,7 @@ const NAMESPACES = [
 
 function api(overrides: {
   providers?: () => Promise<RpcResponse<{ providers: typeof DIRECTORY }>>
-  describeSettings?: () => Promise<RpcResponse<{ writable: boolean; namespaces: typeof NAMESPACES }>>
+  describeSettings?: () => Promise<RpcResponse<{ writable: boolean; namespaces: readonly TestNamespace[] }>>
   describeCredentials?: (refs: string[]) => Promise<RpcResponse<{ credentials: Record<string, unknown> }>>
 } = {}) {
   const seenRefs: string[][] = []
