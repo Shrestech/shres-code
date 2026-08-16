@@ -1,4 +1,4 @@
-# @deepseek-ai/dsh-client-ui-message-feedback
+# @roos-code/roos-code-client-ui-message-feedback
 
 English | [中文](README.zh.md)
 

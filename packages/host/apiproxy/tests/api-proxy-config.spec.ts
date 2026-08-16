@@ -6,23 +6,23 @@
  */
 
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@deepseek-ai/cordis'
-import z from '@deepseek-ai/schemastery'
-import AgentRegistry from '@deepseek-ai/dsh-agent'
-import SessionStore from '@deepseek-ai/dsh-session'
-import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
-import ToolRuntime from '@deepseek-ai/dsh-tools'
-import UserQuestionService from '@deepseek-ai/dsh-user-questions'
-import LlmRuntime, { LlmAdapter } from '@deepseek-ai/dsh-llm'
-import type { GenerateOptions, LlmModelInfo, LlmProviderInfo, StreamChunk } from '@deepseek-ai/dsh-llm'
-import { SettingsProvider, settingsNamespace } from '@deepseek-ai/dsh-settings'
-import type { SettingsNamespace } from '@deepseek-ai/dsh-settings'
-import { CredentialProvider } from '@deepseek-ai/dsh-credentials'
-import type { CredentialInfo, CredentialRef, ResolvedCredential } from '@deepseek-ai/dsh-credentials'
+import { Context } from '@roos-code/cordis'
+import z from '@roos-code/schemastery'
+import AgentRegistry from '@roos-code/roos-code-agent'
+import SessionStore from '@roos-code/roos-code-session'
+import SystemPrompt from '@roos-code/roos-code-system-prompt'
+import ToolRuntime from '@roos-code/roos-code-tools'
+import UserQuestionService from '@roos-code/roos-code-user-questions'
+import LlmRuntime, { LlmAdapter } from '@roos-code/roos-code-llm'
+import type { GenerateOptions, LlmModelInfo, LlmProviderInfo, StreamChunk } from '@roos-code/roos-code-llm'
+import { SettingsProvider, settingsNamespace } from '@roos-code/roos-code-settings'
+import type { SettingsNamespace } from '@roos-code/roos-code-settings'
+import { CredentialProvider } from '@roos-code/roos-code-credentials'
+import type { CredentialInfo, CredentialRef, ResolvedCredential } from '@roos-code/roos-code-credentials'
 import type { HostFrame } from '../src/api/index.ts'
 import type { RpcRequest, RpcResponse } from '../src/api/rpc.ts'
 import { RpcId } from '../src/api/rpc.ts'
-import { AGENT_DEFAULT_MODEL_SETTINGS_NAMESPACE } from '@deepseek-ai/dsh-agent-default-model'
+import { AGENT_DEFAULT_MODEL_SETTINGS_NAMESPACE } from '@roos-code/roos-code-agent-default-model'
 import { createApiProxy } from '../src/api-proxy.ts'
 
 const DEFAULTS = { defaultModelSelection: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp' }
@@ -240,7 +240,7 @@ describe('settings domain', () => {
     const api = createApiProxy(ctx, DEFAULTS)
     const error = expectErr(await api.settings.describe(request({})))
     expect(error.code).toBe('internal')
-    expect(error.message).toContain('dsh-settings-file')
+    expect(error.message).toContain('roos-settings-file')
   })
 
   it('describes layered redacted namespaces with their secret slots', async () => {
@@ -584,7 +584,7 @@ describe('credentials domain', () => {
     const api = createApiProxy(ctx, DEFAULTS)
     const error = expectErr(await api.credentials.describe(request({ refs: ['A'] })))
     expect(error.code).toBe('internal')
-    expect(error.message).toContain('dsh-credentials-local')
+    expect(error.message).toContain('roos-credentials-local')
   })
 
   it('describes value-free views and flips state through set/unset with frames', async () => {

@@ -1,4 +1,4 @@
-# @deepseek-ai/dsh-tool-subagent
+# @roos-code/roos-code-tool-subagent
 
 [English](README.md) | 中文
 

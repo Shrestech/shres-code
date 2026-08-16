@@ -3,15 +3,15 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Context } from '@deepseek-ai/cordis'
-import Loader from '@deepseek-ai/cordis-plugin-loader'
-import Include from '@deepseek-ai/cordis-plugin-include'
-import AgentRegistry, { Inbox } from '@deepseek-ai/dsh-agent'
-import type { Agent, AgentStatus } from '@deepseek-ai/dsh-agent'
-import CommandRuntime from '@deepseek-ai/dsh-commands'
-import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
-import * as CommandFeedback from '@deepseek-ai/dsh-command-feedback'
-import { getOrCreateAnonymousUserId } from '@deepseek-ai/dsh-anonymous-user-id'
+import { Context } from '@roos-code/cordis'
+import Loader from '@roos-code/cordis-plugin-loader'
+import Include from '@roos-code/cordis-plugin-include'
+import AgentRegistry, { Inbox } from '@roos-code/roos-code-agent'
+import type { Agent, AgentStatus } from '@roos-code/roos-code-agent'
+import CommandRuntime from '@roos-code/roos-code-commands'
+import SessionStore, { SessionId } from '@roos-code/roos-code-session'
+import * as CommandFeedback from '@roos-code/roos-code-command-feedback'
+import { getOrCreateAnonymousUserId } from '@roos-code/roos-code-anonymous-user-id'
 
 let root: string | undefined
 let context: Context | undefined
@@ -52,14 +52,14 @@ function agent(ctx: Context): Agent {
 
 describe('/feedback real Loader composition through cordis.yml', () => {
   it('boots cordis.yml and records feedback without model-visible output', async () => {
-    root = await mkdtemp(join(tmpdir(), 'dsh-command-feedback-loader-'))
-    vi.stubEnv('DSH_HOME', root)
+    root = await mkdtemp(join(tmpdir(), 'roos-command-feedback-loader-'))
+    vi.stubEnv('ROOS_HOME', root)
     const configPath = join(root, 'cordis.yml')
     await writeFile(configPath, [
-      "- name: '@deepseek-ai/dsh-agent'",
-      "- name: '@deepseek-ai/dsh-session'",
-      "- name: '@deepseek-ai/dsh-commands'",
-      "- name: '@deepseek-ai/dsh-command-feedback'",
+      "- name: '@roos-code/roos-code-agent'",
+      "- name: '@roos-code/roos-code-session'",
+      "- name: '@roos-code/roos-code-commands'",
+      "- name: '@roos-code/roos-code-command-feedback'",
       '',
     ].join('\n'))
 
@@ -68,10 +68,10 @@ describe('/feedback real Loader composition through cordis.yml', () => {
     await context.plugin(Loader)
     context.loader.builtins.include = Include
     const modules = new Map<string, unknown>([
-      ['@deepseek-ai/dsh-agent', AgentRegistry],
-      ['@deepseek-ai/dsh-session', SessionStore],
-      ['@deepseek-ai/dsh-commands', CommandRuntime],
-      ['@deepseek-ai/dsh-command-feedback', CommandFeedback],
+      ['@roos-code/roos-code-agent', AgentRegistry],
+      ['@roos-code/roos-code-session', SessionStore],
+      ['@roos-code/roos-code-commands', CommandRuntime],
+      ['@roos-code/roos-code-command-feedback', CommandFeedback],
     ])
     context.loader.internal = {
       version: 'v2',
@@ -90,7 +90,7 @@ describe('/feedback real Loader composition through cordis.yml', () => {
     expect(context.commands.list(owner).map(command => command.name)).toContain('feedback')
 
     const accepted = await context.commands.execute(owner, '/feedback the diff view is unreadable', signal)
-    const userId = getOrCreateAnonymousUserId({ env: { DSH_HOME: root } })
+    const userId = getOrCreateAnonymousUserId({ env: { ROOS_HOME: root } })
     expect(accepted?.result).toEqual({
       kind: 'success',
       text: `Feedback recorded for session feedback-loader-agent\nAnonymous user: ${userId}. Session sharing is not configured.`,

@@ -1,5 +1,5 @@
 {
-  "name": "@deepseek-ai/dsh-app-boot",
+  "name": "@roos-code/roos-code-app-boot",
   "description": "Shared boot glue for the app bins: .env loading, fail-loud Loader guards, snapshot-aware config resolution, and the Loader boot sequence",
   "version": "0.1.0-rc.5",
   "publishConfig": {
@@ -7,7 +7,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
+    "url": "git+https://github.com/roos-code/roos-code.git",
     "directory": "packages/boot/app-boot"
   },
   "type": "module",
@@ -35,32 +35,32 @@
     "js-yaml": "^4.2.0"
   },
   "peerDependencies": {
-    "@deepseek-ai/cordis-plugin-group": "workspace:^",
-    "@deepseek-ai/cordis-plugin-hmr": "workspace:^",
-    "@deepseek-ai/cordis-plugin-include": "workspace:^",
-    "@deepseek-ai/cordis-plugin-loader": "workspace:^",
-    "@deepseek-ai/dsh-launch-environment": "workspace:^",
-    "@deepseek-ai/dsh-invariants": "workspace:^",
-    "@deepseek-ai/dsh-home-paths": "workspace:^",
-    "@deepseek-ai/dsh-system-prompt": "workspace:^",
-    "@deepseek-ai/cordis": "workspace:^"
+    "@roos-code/cordis-plugin-group": "workspace:^",
+    "@roos-code/cordis-plugin-hmr": "workspace:^",
+    "@roos-code/cordis-plugin-include": "workspace:^",
+    "@roos-code/cordis-plugin-loader": "workspace:^",
+    "@roos-code/roos-code-launch-environment": "workspace:^",
+    "@roos-code/roos-code-invariants": "workspace:^",
+    "@roos-code/roos-code-home-paths": "workspace:^",
+    "@roos-code/roos-code-system-prompt": "workspace:^",
+    "@roos-code/cordis": "workspace:^"
   },
   "peerDependenciesMeta": {
-    "@deepseek-ai/cordis-plugin-hmr": {
+    "@roos-code/cordis-plugin-hmr": {
       "optional": true
     }
   },
   "devDependencies": {
-    "@deepseek-ai/cordis-plugin-group": "workspace:^",
-    "@deepseek-ai/cordis-plugin-hmr": "workspace:^",
-    "@deepseek-ai/cordis-plugin-include": "workspace:^",
-    "@deepseek-ai/cordis-plugin-loader": "workspace:^",
-    "@deepseek-ai/cordis-plugin-timer": "workspace:^",
-    "@deepseek-ai/dsh-launch-environment": "workspace:^",
-    "@deepseek-ai/dsh-invariants": "workspace:^",
-    "@deepseek-ai/dsh-home-paths": "workspace:^",
-    "@deepseek-ai/dsh-system-prompt": "workspace:^",
+    "@roos-code/cordis-plugin-group": "workspace:^",
+    "@roos-code/cordis-plugin-hmr": "workspace:^",
+    "@roos-code/cordis-plugin-include": "workspace:^",
+    "@roos-code/cordis-plugin-loader": "workspace:^",
+    "@roos-code/cordis-plugin-timer": "workspace:^",
+    "@roos-code/roos-code-launch-environment": "workspace:^",
+    "@roos-code/roos-code-invariants": "workspace:^",
+    "@roos-code/roos-code-home-paths": "workspace:^",
+    "@roos-code/roos-code-system-prompt": "workspace:^",
     "@types/js-yaml": "^4.0.9",
-    "@deepseek-ai/cordis": "workspace:^"
+    "@roos-code/cordis": "workspace:^"
   }
 }

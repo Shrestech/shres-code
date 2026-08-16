@@ -1,10 +1,10 @@
 /** Package-owned invariant companion for the workflow-run UI plugin. */
 
 /* jscpd:ignore-start */
-import type { Context } from '@deepseek-ai/cordis'
-import type { InvariantInstaller } from '@deepseek-ai/dsh-invariants'
+import type { Context } from '@roos-code/cordis'
+import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
 
-const PACKAGE_NAME = '@deepseek-ai/dsh-client-ui-workflow-run'
+const PACKAGE_NAME = '@roos-code/roos-code-client-ui-workflow-run'
 
 /** Cordis companion plugin name. */
 export const name = 'client-ui-workflow-run-invariant'

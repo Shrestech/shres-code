@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@deepseek-ai/cordis'
-import SessionStore, { Session, SessionId } from '@deepseek-ai/dsh-session'
-import type { SandboxMode } from '@deepseek-ai/dsh-sandbox'
-import type { ApprovalPolicy } from '@deepseek-ai/dsh-user-approval'
+import { Context } from '@roos-code/cordis'
+import SessionStore, { Session, SessionId } from '@roos-code/roos-code-session'
+import type { SandboxMode } from '@roos-code/roos-code-sandbox'
+import type { ApprovalPolicy } from '@roos-code/roos-code-user-approval'
 import PermissionPresetService, {
   CUSTOM_PRESET, effectivePermissionPreset, PERMISSION_SETTINGS_NAMESPACE,
-} from '@deepseek-ai/dsh-permission-presets'
-import type { Config } from '@deepseek-ai/dsh-permission-presets'
-import { SettingsProvider } from '@deepseek-ai/dsh-settings'
-import type { SettingsNamespace } from '@deepseek-ai/dsh-settings'
+} from '@roos-code/roos-code-permission-presets'
+import type { Config } from '@roos-code/roos-code-permission-presets'
+import { SettingsProvider } from '@roos-code/roos-code-settings'
+import type { SettingsNamespace } from '@roos-code/roos-code-settings'
 
 /** Writable memory provider for the permission/settings lifecycle specs. */
 class MemorySettings extends SettingsProvider {

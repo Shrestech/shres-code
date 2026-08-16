@@ -1,12 +1,12 @@
 /**
- * Package-owned invariant companion for `@deepseek-ai/dsh-web-app`.
- * @module @deepseek-ai/dsh-web-app/invariant
+ * Package-owned invariant companion for `@roos-code/roos-code-web-app`.
+ * @module @roos-code/roos-code-web-app/invariant
  */
 
-import type { Context } from '@deepseek-ai/cordis'
-import type { InvariantInstaller } from '@deepseek-ai/dsh-invariants'
+import type { Context } from '@roos-code/cordis'
+import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
 
-const PACKAGE_NAME = '@deepseek-ai/dsh-web-app'
+const PACKAGE_NAME = '@roos-code/roos-code-web-app'
 
 /** Cordis companion plugin name. */
 export const name = 'web-app-invariant'

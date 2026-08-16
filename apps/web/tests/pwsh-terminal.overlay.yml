@@ -8,13 +8,13 @@
 # must boot the pwsh executor, so the lane skips on hosts without a usable
 # `pwsh`.
 - id: bash-sandbox
-  name: '@deepseek-ai/dsh-bash-sandbox'
+  name: '@roos-code/roos-code-bash-sandbox'
   disabled: true
 - id: permission
-  name: '@deepseek-ai/dsh-permission-presets'
+  name: '@roos-code/roos-code-permission-presets'
   disabled: true
 - insert:
     - id: pwsh-local
-      name: '@deepseek-ai/dsh-pwsh-local'
+      name: '@roos-code/roos-code-pwsh-local'
     - id: tool-pwsh
-      name: '@deepseek-ai/dsh-tool-pwsh'
+      name: '@roos-code/roos-code-tool-pwsh'

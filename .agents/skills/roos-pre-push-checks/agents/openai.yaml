@@ -1,0 +1,4 @@
+interface:
+  display_name: "Roos Pre-Push Checks"
+  short_description: "Run the relevant Roos Code checks before push"
+  default_prompt: "Use $roos-pre-push-checks before pushing this Roos Code branch."

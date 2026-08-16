@@ -1,4 +1,4 @@
-# @deepseek-ai/dsh-typert-loader
+# @roos-code/roos-code-typert-loader
 
 [English](README.md) | 中文
 

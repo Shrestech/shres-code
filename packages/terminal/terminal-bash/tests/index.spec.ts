@@ -1,24 +1,24 @@
 import { describe, expect, it, vi } from 'vitest'
 import { PassThrough } from 'node:stream'
-import { Context } from '@deepseek-ai/cordis'
-import Loader from '@deepseek-ai/cordis-plugin-loader'
-import SessionStore, { Session, SessionId } from '@deepseek-ai/dsh-session'
-import AgentRegistry, { Inbox, type Agent } from '@deepseek-ai/dsh-agent'
-import SandboxProvider from '@deepseek-ai/dsh-sandbox'
-import type { ConfinedArgv, SandboxPolicy } from '@deepseek-ai/dsh-sandbox'
-import SandboxPolicyService, { setSandboxMode } from '@deepseek-ai/dsh-sandbox-policy'
-import TerminalSessionService, { TerminalBackendCleanupError, TerminalSessionId } from '@deepseek-ai/dsh-terminal'
-import { BashTerminalBackend } from '@deepseek-ai/dsh-terminal-bash'
-import * as ptyLocal from '@deepseek-ai/dsh-terminal-bash'
-import type { ResolvedConfig } from '@deepseek-ai/dsh-terminal-bash/src/config.ts'
-import type { LocalPtySession } from '@deepseek-ai/dsh-terminal-bash/src/session.ts'
-import { SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
+import { Context } from '@roos-code/cordis'
+import Loader from '@roos-code/cordis-plugin-loader'
+import SessionStore, { Session, SessionId } from '@roos-code/roos-code-session'
+import AgentRegistry, { Inbox, type Agent } from '@roos-code/roos-code-agent'
+import SandboxProvider from '@roos-code/roos-code-sandbox'
+import type { ConfinedArgv, SandboxPolicy } from '@roos-code/roos-code-sandbox'
+import SandboxPolicyService, { setSandboxMode } from '@roos-code/roos-code-sandbox-policy'
+import TerminalSessionService, { TerminalBackendCleanupError, TerminalSessionId } from '@roos-code/roos-code-terminal'
+import { BashTerminalBackend } from '@roos-code/roos-code-terminal-bash'
+import * as ptyLocal from '@roos-code/roos-code-terminal-bash'
+import type { ResolvedConfig } from '@roos-code/roos-code-terminal-bash/src/config.ts'
+import type { LocalPtySession } from '@roos-code/roos-code-terminal-bash/src/session.ts'
+import { SubprocessRuntime } from '@roos-code/roos-code-subprocess'
 import type {
   SubprocessHandle,
   SubprocessSpawnSpec,
   SubprocessTerminalHandle,
   SubprocessTerminalSpawnSpec,
-} from '@deepseek-ai/dsh-subprocess'
+} from '@roos-code/roos-code-subprocess'
 
 class EmptySandbox extends SandboxProvider {
   confine(_argv: readonly string[], _policy: SandboxPolicy): ConfinedArgv {
@@ -207,8 +207,8 @@ describe('BashTerminalBackend startup rollback', () => {
       cwd: '/work',
       graceMs: 10,
       env: {
-        TERM: 'dumb', PAGER: 'cat', GIT_PAGER: 'cat', PS1: 'dsh> ', BASH_SILENCE_DEPRECATION_WARNING: '1',
-        DSH_SHELL: '1', DSH_SESSION_ID: 'agent', DSH_PTY_SESSION_ID: 'pty-1',
+        TERM: 'dumb', PAGER: 'cat', GIT_PAGER: 'cat', PS1: 'roos> ', BASH_SILENCE_DEPRECATION_WARNING: '1',
+        ROOS_SHELL: '1', ROOS_SESSION_ID: 'agent', ROOS_PTY_SESSION_ID: 'pty-1',
       },
     })
     expect(spawned?.env?.PTY_TEST_SECRET).toBeUndefined()
@@ -334,7 +334,7 @@ describe('BashTerminalBackend startup rollback', () => {
       async () => terminal,
     )
     const session = await backend.spawn(spec(agent(ctx)))
-    expect(session.motd).toBe('dsh> ')
+    expect(session.motd).toBe('roos> ')
     await session.close('test complete')
   })
 })

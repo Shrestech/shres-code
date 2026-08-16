@@ -1,13 +1,13 @@
 {
-  "name": "@deepseek-ai/dsh-system-prompt",
-  "description": "System prompt assembly registry for the DeepSeek Harness",
+  "name": "@roos-code/roos-code-system-prompt",
+  "description": "System prompt assembly registry for the Roos Code",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
+    "url": "git+https://github.com/roos-code/roos-code.git",
     "directory": "packages/core/system-prompt"
   },
   "type": "module",
@@ -32,18 +32,18 @@
   ],
   "license": "MIT",
   "peerDependencies": {
-    "@deepseek-ai/dsh-invariants": "workspace:^",
-    "@deepseek-ai/dsh-llm": "workspace:^",
-    "@deepseek-ai/dsh-scope": "workspace:^",
-    "@deepseek-ai/cordis": "workspace:^"
+    "@roos-code/roos-code-invariants": "workspace:^",
+    "@roos-code/roos-code-llm": "workspace:^",
+    "@roos-code/roos-code-scope": "workspace:^",
+    "@roos-code/cordis": "workspace:^"
   },
   "dependencies": {
-    "@deepseek-ai/schemastery": "workspace:^"
+    "@roos-code/schemastery": "workspace:^"
   },
   "devDependencies": {
-    "@deepseek-ai/dsh-invariants": "workspace:^",
-    "@deepseek-ai/dsh-llm": "workspace:^",
-    "@deepseek-ai/dsh-scope": "workspace:^",
-    "@deepseek-ai/cordis": "workspace:^"
+    "@roos-code/roos-code-invariants": "workspace:^",
+    "@roos-code/roos-code-llm": "workspace:^",
+    "@roos-code/roos-code-scope": "workspace:^",
+    "@roos-code/cordis": "workspace:^"
   }
 }

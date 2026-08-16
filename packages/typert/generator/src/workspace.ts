@@ -1,6 +1,6 @@
 /**
  * Workspace-level discovery and model-driven Typert generation.
- * @module @deepseek-ai/dsh-typert-generator/workspace
+ * @module @roos-code/roos-code-typert-generator/workspace
  */
 
 import { readFileSync } from 'node:fs'

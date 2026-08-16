@@ -1,13 +1,13 @@
 /**
- * Package-owned invariant companion for `@deepseek-ai/dsh-client-locale`.
- * @module @deepseek-ai/dsh-client-locale/invariant
+ * Package-owned invariant companion for `@roos-code/roos-code-client-locale`.
+ * @module @roos-code/roos-code-client-locale/invariant
  */
 
 /* jscpd:ignore-start */
-import type { Context } from '@deepseek-ai/cordis'
-import type { InvariantInstaller } from '@deepseek-ai/dsh-invariants'
+import type { Context } from '@roos-code/cordis'
+import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
 
-const PACKAGE_NAME = '@deepseek-ai/dsh-client-locale'
+const PACKAGE_NAME = '@roos-code/roos-code-client-locale'
 
 /** Cordis companion plugin name. */
 export const name = 'client-locale-invariant'

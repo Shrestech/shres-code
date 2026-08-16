@@ -1,0 +1,53 @@
+# Test-only composition: the SDK subagent backend on the real Loader/app path.
+# The scripted model delegates once; the child — a COMPLETE second harness
+# runtime speaking stdio JSON-RPC — echoes its process cwd, so parent-session
+# cwd inheritance is asserted keylessly end to end across the SDK wire.
+# `cwd` is deliberately omitted — the inheritance branch under test. The child
+# launch is machine-absolute, so the driving e2e supplies it via
+# ROOS_TEST_CHILD_COMMAND / ROOS_TEST_CHILD_ARGS / ROOS_TEST_CHILD_ENV (resolved
+# through the shared example-launch resolver, per testing policy).
+- id: mock-llm
+  name: './mock-delegating-llm.ts'
+
+- id: subagent
+  name: '@roos-code/roos-code-subagent'
+
+# providerName is omitted: the composition exercises the shipped default
+# (`roos-sdk`) through the real Loader.
+- id: subagent-roos-sdk
+  name: '@roos-code/roos-code-subagent-roos-sdk'
+  config:
+    command: !!js process.env.ROOS_TEST_CHILD_COMMAND
+    args: !!js JSON.parse(process.env.ROOS_TEST_CHILD_ARGS ?? '[]')
+    provider: mock
+    model: mock-echo
+    env: !!js JSON.parse(process.env.ROOS_TEST_CHILD_ENV ?? '{}')
+
+- id: tool-subagent
+  name: '@roos-code/roos-code-tool-subagent'
+  config:
+    provider: roos-sdk
+    toolName: subagent
+    # The SDK backend advertises no depthLimit: the child harness owns its own
+    # recursion budget, so the local numeric default cannot apply here.
+    maxDepth: 'provider-managed'
+
+- id: agent-spine
+  name: '@roos-code/roos-code-agent-spine-demo'
+  config:
+    agents:
+      - id: main
+        provider: mock
+        model: mock-delegate
+        cwd: !!js process.cwd()
+    persona: 'Test SDK subagent cwd inheritance.'
+    workspaceContext: false
+
+- id: persistence
+  name: '@roos-code/roos-code-session-persistence-jsonl'
+  config:
+    root: './.sessions'
+    compression: 'none'
+
+- id: checkpoint-policy
+  name: '@roos-code/roos-code-session-checkpoint-policy'

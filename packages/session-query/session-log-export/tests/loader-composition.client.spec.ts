@@ -3,13 +3,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
-import { Context } from '@deepseek-ai/cordis'
-import Loader from '@deepseek-ai/cordis-plugin-loader'
-import Include from '@deepseek-ai/cordis-plugin-include'
-import type { Agent } from '@deepseek-ai/dsh-agent'
-import CommandRuntime from '@deepseek-ai/dsh-commands'
-import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
-import * as SessionLogDownload from '@deepseek-ai/dsh-session-log-export'
+import { Context } from '@roos-code/cordis'
+import Loader from '@roos-code/cordis-plugin-loader'
+import Include from '@roos-code/cordis-plugin-include'
+import type { Agent } from '@roos-code/roos-code-agent'
+import CommandRuntime from '@roos-code/roos-code-commands'
+import SessionStore, { SessionId } from '@roos-code/roos-code-session'
+import * as SessionLogDownload from '@roos-code/roos-code-session-log-export'
 
 let root: string | undefined
 let context: Context | undefined
@@ -23,12 +23,12 @@ afterEach(async () => {
 
 describe('session-log-download real Loader composition', () => {
   it('discovers and executes /export through the assembled command plane', async () => {
-    root = await mkdtemp(join(tmpdir(), 'dsh-session-export-loader-'))
+    root = await mkdtemp(join(tmpdir(), 'roos-session-export-loader-'))
     const configPath = join(root, 'cordis.yml')
     await writeFile(configPath, [
-      "- name: '@deepseek-ai/dsh-session'",
-      "- name: '@deepseek-ai/dsh-commands'",
-      "- name: '@deepseek-ai/dsh-session-log-export'",
+      "- name: '@roos-code/roos-code-session'",
+      "- name: '@roos-code/roos-code-commands'",
+      "- name: '@roos-code/roos-code-session-log-export'",
       '',
     ].join('\n'))
 
@@ -37,9 +37,9 @@ describe('session-log-download real Loader composition', () => {
     await context.plugin(Loader)
     context.loader.builtins.include = Include
     const modules = new Map<string, unknown>([
-      ['@deepseek-ai/dsh-session', SessionStore],
-      ['@deepseek-ai/dsh-commands', CommandRuntime],
-      ['@deepseek-ai/dsh-session-log-export', SessionLogDownload],
+      ['@roos-code/roos-code-session', SessionStore],
+      ['@roos-code/roos-code-commands', CommandRuntime],
+      ['@roos-code/roos-code-session-log-export', SessionLogDownload],
     ])
     context.loader.internal = {
       version: 'v2',

@@ -1522,12 +1522,12 @@
     },
     {
       "doc": "docs/subsystems/subprocess.md",
-      "symbol": "DshEnvironmentKey",
+      "symbol": "RoosEnvironmentKey",
       "source": "packages/subprocess/subprocess/src/types.ts"
     },
     {
       "doc": "docs/subsystems/subprocess.md",
-      "symbol": "DshEnvironment",
+      "symbol": "RoosEnvironment",
       "source": "packages/subprocess/subprocess/src/types.ts"
     },
     {

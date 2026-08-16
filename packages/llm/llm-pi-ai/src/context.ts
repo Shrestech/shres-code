@@ -1,12 +1,12 @@
 /**
  * Harness request-history conversion into pi-ai's Context vocabulary.
  *
- * @module dsh-llm-pi-ai/context
+ * @module roos-llm-pi-ai/context
  */
 
-import { CallId, contentHasImage, LlmError } from '@deepseek-ai/dsh-llm'
-import type { ContentBlock, GenerateOptions, Message } from '@deepseek-ai/dsh-llm'
-import type { AttachmentStore } from '@deepseek-ai/dsh-attachment'
+import { CallId, contentHasImage, LlmError } from '@roos-code/roos-code-llm'
+import type { ContentBlock, GenerateOptions, Message } from '@roos-code/roos-code-llm'
+import type { AttachmentStore } from '@roos-code/roos-code-attachment'
 import type { Context as PiContext, ImageContent, Message as PiMessage, TextContent, Tool as PiTool } from '@earendil-works/pi-ai'
 import { toPiAssistant } from './replay.ts'
 

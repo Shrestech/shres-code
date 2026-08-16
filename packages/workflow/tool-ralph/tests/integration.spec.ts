@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@deepseek-ai/cordis'
-import type { Agent } from '@deepseek-ai/dsh-agent'
-import AgentLoop from '@deepseek-ai/dsh-agent-loop'
-import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
-import { createUserMessage, CallId  } from '@deepseek-ai/dsh-llm'
-import { SessionId } from '@deepseek-ai/dsh-session'
-import SubagentRuntime from '@deepseek-ai/dsh-subagent'
-import { STRUCTURED_OUTPUT_TOOL } from '@deepseek-ai/dsh-subagent-in-process-driver'
-import * as spawn from '@deepseek-ai/dsh-subagent-spawn-in-process'
-import WorkerThreadWorkflowEngine from '@deepseek-ai/dsh-workflow-worker-thread'
+import { Context } from '@roos-code/cordis'
+import type { Agent } from '@roos-code/roos-code-agent'
+import AgentLoop from '@roos-code/roos-code-agent-loop'
+import { mountAgentLoopTestDependencies } from '@roos-code/roos-code-agent-loop-testkit'
+import { createUserMessage, CallId  } from '@roos-code/roos-code-llm'
+import { SessionId } from '@roos-code/roos-code-session'
+import SubagentRuntime from '@roos-code/roos-code-subagent'
+import { STRUCTURED_OUTPUT_TOOL } from '@roos-code/roos-code-subagent-in-process-driver'
+import * as spawn from '@roos-code/roos-code-subagent-spawn-in-process'
+import WorkerThreadWorkflowEngine from '@roos-code/roos-code-workflow-worker-thread'
 import { MockAdapter, maxTokensResponse, textResponse, toolCallResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
 import * as toolRalph from '../src/index.ts'
 
@@ -34,7 +34,7 @@ async function mountRalph(script: MockScript, config: toolRalph.Config) {
   return { ctx, adapter, parentHandle, parent: parentHandle.agent }
 }
 
-describe('dsh-tool-ralph over the real spawn and worker-thread stack', () => {
+describe('roos-tool-ralph over the real spawn and worker-thread stack', () => {
   it('uses distinct empty-seed children, shared cwd, and only the prior bounded handoff', async () => {
     const firstReport = {
       status: 'continue',

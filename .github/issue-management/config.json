@@ -1,9 +1,9 @@
 {
-  "organization": "deepseek-harness",
-  "repository": "deepseek-harness",
+  "organization": "roos-code",
+  "repository": "roos-code",
   "projectNumber": 1,
-  "projectTitle": "DSH Issue Management",
-  "lifecycleActor": "dsh-issue-management",
+  "projectTitle": "Roos Issue Management",
+  "lifecycleActor": "roos-issue-management",
   "priorityField": "Priority",
   "allowUnassignedOwner": true,
   "statuses": [

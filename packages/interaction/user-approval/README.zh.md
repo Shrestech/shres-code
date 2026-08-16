@@ -1,4 +1,4 @@
-# @deepseek-ai/dsh-user-approval
+# @roos-code/roos-code-user-approval
 
 [English](README.md) | 中文
 

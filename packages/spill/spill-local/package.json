@@ -1,13 +1,13 @@
 {
-  "name": "@deepseek-ai/dsh-spill-local",
-  "description": "Local-filesystem implementation of the DeepSeek Harness spill storage seam (private session-scoped files)",
+  "name": "@roos-code/roos-code-spill-local",
+  "description": "Local-filesystem implementation of the Roos Code spill storage seam (private session-scoped files)",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
+    "url": "git+https://github.com/roos-code/roos-code.git",
     "directory": "packages/spill/spill-local"
   },
   "type": "module",
@@ -32,19 +32,19 @@
   ],
   "license": "MIT",
   "peerDependencies": {
-    "@deepseek-ai/dsh-invariants": "workspace:^",
-    "@deepseek-ai/dsh-spill": "workspace:^",
-    "@deepseek-ai/cordis": "workspace:^"
+    "@roos-code/roos-code-invariants": "workspace:^",
+    "@roos-code/roos-code-spill": "workspace:^",
+    "@roos-code/cordis": "workspace:^"
   },
   "dependencies": {
-    "@deepseek-ai/schemastery": "workspace:^"
+    "@roos-code/schemastery": "workspace:^"
   },
   "devDependencies": {
-    "@deepseek-ai/dsh-brand": "workspace:^",
-    "@deepseek-ai/dsh-invariants": "workspace:^",
-    "@deepseek-ai/dsh-llm": "workspace:^",
-    "@deepseek-ai/dsh-session": "workspace:^",
-    "@deepseek-ai/dsh-spill": "workspace:^",
-    "@deepseek-ai/cordis": "workspace:^"
+    "@roos-code/roos-code-brand": "workspace:^",
+    "@roos-code/roos-code-invariants": "workspace:^",
+    "@roos-code/roos-code-llm": "workspace:^",
+    "@roos-code/roos-code-session": "workspace:^",
+    "@roos-code/roos-code-spill": "workspace:^",
+    "@roos-code/cordis": "workspace:^"
   }
 }

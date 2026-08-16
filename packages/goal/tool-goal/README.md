@@ -1,4 +1,4 @@
-# @deepseek-ai/dsh-tool-goal
+# @roos-code/roos-code-tool-goal
 
 English | [中文](README.zh.md)
 
@@ -28,7 +28,7 @@ Complete and blocked also accept the exact current goal round: a goal-sourced `u
 
 ```yaml
 - id: tool-goal
-  name: '@deepseek-ai/dsh-tool-goal'
+  name: '@roos-code/roos-code-tool-goal'
   config:
     blockedAfterConsecutiveRounds: 3
 ```
@@ -75,6 +75,6 @@ Schemas are prefix-stable while their definitions and visibility are unchanged. 
 
 - **Semantic intent remains model judgment** — execution can prove that the current turn contains a direct human message, not whether the request is substantial enough to merit a goal.
 - **Same-condition blocking remains model judgment** — the runtime enforces distinct admitted-round count, not semantic equivalence of obstacles; an independent evaluator is deferred.
-- **No scheduling or direct human rendering** — these tools mutate state only; the same-session driver and [`dsh-command-goal`](../command-goal/README.md) are independent consumers of the same domain.
+- **No scheduling or direct human rendering** — these tools mutate state only; the same-session driver and [`roos-command-goal`](../command-goal/README.md) are independent consumers of the same domain.
 - **Goal-round authority requires a driver** — the autonomous `complete`/`blocked` path is dormant unless a continuation driver admits goal-sourced user turns; mounting this tool package alone does not create them.
 - **Prompt registration is independent of filtering** — a scope may hide the tools while retaining their guidance unless the deployment scopes both registrations together.

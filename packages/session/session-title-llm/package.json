@@ -1,13 +1,13 @@
 {
-  "name": "@deepseek-ai/dsh-session-title-llm",
-  "description": "Shared LLM generation policy for DeepSeek Harness session-title providers",
+  "name": "@roos-code/roos-code-session-title-llm",
+  "description": "Shared LLM generation policy for Roos Code session-title providers",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
+    "url": "git+https://github.com/roos-code/roos-code.git",
     "directory": "packages/session/session-title-llm"
   },
   "type": "module",
@@ -32,22 +32,22 @@
   ],
   "license": "MIT",
   "peerDependencies": {
-    "@deepseek-ai/dsh-invariants": "workspace:^",
-    "@deepseek-ai/dsh-llm": "workspace:^",
-    "@deepseek-ai/dsh-session": "workspace:^",
-    "@deepseek-ai/dsh-session-title": "workspace:^",
-    "@deepseek-ai/dsh-timeout": "workspace:^",
-    "@deepseek-ai/cordis": "workspace:^"
+    "@roos-code/roos-code-invariants": "workspace:^",
+    "@roos-code/roos-code-llm": "workspace:^",
+    "@roos-code/roos-code-session": "workspace:^",
+    "@roos-code/roos-code-session-title": "workspace:^",
+    "@roos-code/roos-code-timeout": "workspace:^",
+    "@roos-code/cordis": "workspace:^"
   },
   "dependencies": {
-    "@deepseek-ai/schemastery": "workspace:^"
+    "@roos-code/schemastery": "workspace:^"
   },
   "devDependencies": {
-    "@deepseek-ai/dsh-invariants": "workspace:^",
-    "@deepseek-ai/dsh-llm": "workspace:^",
-    "@deepseek-ai/dsh-session": "workspace:^",
-    "@deepseek-ai/dsh-session-title": "workspace:^",
-    "@deepseek-ai/dsh-timeout": "workspace:^",
-    "@deepseek-ai/cordis": "workspace:^"
+    "@roos-code/roos-code-invariants": "workspace:^",
+    "@roos-code/roos-code-llm": "workspace:^",
+    "@roos-code/roos-code-session": "workspace:^",
+    "@roos-code/roos-code-session-title": "workspace:^",
+    "@roos-code/roos-code-timeout": "workspace:^",
+    "@roos-code/cordis": "workspace:^"
   }
 }

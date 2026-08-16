@@ -1,17 +1,17 @@
 /**
  * Durable, lifecycle-bound feedback for finalized assistant messages.
- * @module @deepseek-ai/dsh-message-feedback
+ * @module @roos-code/roos-code-message-feedback
  */
 
 import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
-import { Context, Service } from '@deepseek-ai/cordis'
-import s from '@deepseek-ai/schemastery'
-import { deriveEventMessage, isAppendSurfaceEvent } from '@deepseek-ai/dsh-session/surface'
-import type { SessionHeader, SessionId } from '@deepseek-ai/dsh-session/types'
-import type { SessionInspection } from '@deepseek-ai/dsh-session-persistence'
-import type { KvTable } from '@deepseek-ai/dsh-storage-domain'
-import { TypertRemoteService, Remote } from '@deepseek-ai/dsh-typert-protocol'
+import { Context, Service } from '@roos-code/cordis'
+import s from '@roos-code/schemastery'
+import { deriveEventMessage, isAppendSurfaceEvent } from '@roos-code/roos-code-session/surface'
+import type { SessionHeader, SessionId } from '@roos-code/roos-code-session/types'
+import type { SessionInspection } from '@roos-code/roos-code-session-persistence'
+import type { KvTable } from '@roos-code/roos-code-storage-domain'
+import { TypertRemoteService, Remote } from '@roos-code/roos-code-typert-protocol'
 import { messageFeedbackDomainSpec } from './spec.ts'
 import type { MessageFeedbackRow, MessageFeedbackSessionIdentity } from './spec.ts'
 import type {
@@ -51,7 +51,7 @@ export interface Config {
   readonly maxNoteBytes: number
 }
 
-declare module '@deepseek-ai/cordis' {
+declare module '@roos-code/cordis' {
   interface Context {
     messageFeedback: MessageFeedbackService
   }

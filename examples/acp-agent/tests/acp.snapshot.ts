@@ -5,13 +5,13 @@ import { mkdir, utimes, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { homedir } from 'node:os'
 import { expect, it } from 'vitest'
-import { defineAcpSnapshotSuite, type Scenario, type SnapshotSuiteOptions } from '@deepseek-ai/dsh-acp-snapshot'
-import { resolvePwshPath } from '@deepseek-ai/dsh-pwsh-local'
-import { decodeStorageRecord } from '@deepseek-ai/dsh-session'
+import { defineAcpSnapshotSuite, type Scenario, type SnapshotSuiteOptions } from '@roos-code/roos-code-acp-snapshot'
+import { resolvePwshPath } from '@roos-code/roos-code-pwsh-local'
+import { decodeStorageRecord } from '@roos-code/roos-code-session'
 
 /**
  * The acp-agent example's snapshot suite: the scenario table for
- * `dsh-acp-snapshot`'s suite factory, which owns every compare/guard mechanic
+ * `roos-acp-snapshot`'s suite factory, which owns every compare/guard mechanic
  * (expected-output + re-persisted-log diffs, record/refresh write-back, the pinned-header
  * uniformity guard, the fixture guards). Fixtures live under `snapshots/<name>/`;
  * `pnpm run test:snapshot:record` re-records model transcripts against the real
@@ -20,7 +20,7 @@ import { decodeStorageRecord } from '@deepseek-ai/dsh-session'
  * .agents/notes/implemented/testing/2026-06-19-acp-snapshot-tests.md.
  */
 
-// The dsh-acp-demo bin (the demo:acp entry), this example's cordis.yml, and
+// The roos-acp-demo bin (the demo:acp entry), this example's cordis.yml, and
 // the repo-root tsconfig (four levels up from examples/acp-agent/tests) — all
 // ABSOLUTE: the subprocess cwd is a temp dir outside the repo.
 const AGENT = {
@@ -126,7 +126,7 @@ function snapshotModeFromEnv(value: string | undefined): SnapshotSuiteOptions['m
     case 'refresh':
       return 'refresh'
     default:
-      throw new Error(`unknown DSH_SNAPSHOT mode: ${value}`)
+      throw new Error(`unknown ROOS_SNAPSHOT mode: ${value}`)
   }
 }
 
@@ -254,7 +254,7 @@ const SCENARIOS: Scenario[] = [
     recorded: false,
     headerClass: 'sandbox',
     configPath: PARTIAL_LANDLOCK_CONFIG,
-    env: { DSH_PERMISSION_MODE: 'read-only' },
+    env: { ROOS_PERMISSION_MODE: 'read-only' },
     posixOnly: true,
   },
   // A valid cwd plus a missing provider executable exercises the assembled
@@ -266,8 +266,8 @@ const SCENARIOS: Scenario[] = [
     headerClass: 'sandbox',
     configPath: PARTIAL_LANDLOCK_CONFIG,
     env: {
-      DSH_PERMISSION_MODE: 'read-only',
-      DSH_SNAPSHOT_MISSING_SANDBOX_RUNNER: '1',
+      ROOS_PERMISSION_MODE: 'read-only',
+      ROOS_SNAPSHOT_MISSING_SANDBOX_RUNNER: '1',
     },
     posixOnly: true,
   },
@@ -390,7 +390,7 @@ const SCENARIOS: Scenario[] = [
   // and the parent log pins call/call/result/result instead of the serial
   // interleaving. The twin delegations must stay identical: replay binds child
   // scripts and harvest order nondeterministically across concurrent children
-  // (XXX(concurrent-subagents) in dsh-llm-replay).
+  // (XXX(concurrent-subagents) in roos-llm-replay).
   { name: 'subagent-parallel', hasModelTurn: true, recorded: false },
   { name: 'subagent-fork-in-process', hasModelTurn: true, recorded: true },
   { name: 'subagent-mixed', hasModelTurn: true, recorded: true },
@@ -434,7 +434,7 @@ const SCENARIOS: Scenario[] = [
   // published-handle disposal failure.
   {
     name: 'subagent-published-run-failure',
-    env: { DSH_SUBAGENT_PUBLISHED_FAILURE: '1' },
+    env: { ROOS_SUBAGENT_PUBLISHED_FAILURE: '1' },
     hasModelTurn: true,
     recorded: false,
     overridden: true,
@@ -575,21 +575,21 @@ const SCENARIOS: Scenario[] = [
     headerClass: 'sandbox',
     systemPromptSource: 'text-turn',
     toolSchemasSource: 'text-turn',
-    env: { DSH_PERMISSION_MODE: 'workspace-write' },
+    env: { ROOS_PERMISSION_MODE: 'workspace-write' },
   },
   {
     name: 'escalation-rejected',
     hasModelTurn: true,
     recorded: true,
     headerClass: 'sandbox',
-    env: { DSH_PERMISSION_MODE: 'workspace-write' },
+    env: { ROOS_PERMISSION_MODE: 'workspace-write' },
   },
   {
     name: 'fs-escalation-approved',
     hasModelTurn: true,
     recorded: true,
     headerClass: 'sandbox',
-    env: { DSH_PERMISSION_MODE: 'workspace-write' },
+    env: { ROOS_PERMISSION_MODE: 'workspace-write' },
   },
   // Unlike ordinary snapshots, this session cwd is outside the platform temp
   // roots that workspace-write always grants. The overlay points the
@@ -602,7 +602,7 @@ const SCENARIOS: Scenario[] = [
     overridden: true,
     headerClass: 'sandbox',
     configPath: SESSION_SANDBOX_ROOT_CONFIG,
-    env: { DSH_PERMISSION_MODE: 'workspace-write' },
+    env: { ROOS_PERMISSION_MODE: 'workspace-write' },
     workspaceParent: homedir(),
   },
 ]
@@ -616,7 +616,7 @@ defineAcpSnapshotSuite({
   agent: AGENT,
   snapshotsDir: SNAPSHOTS_DIR,
   scenarios: SCENARIOS,
-  mode: snapshotModeFromEnv(process.env.DSH_SNAPSHOT),
+  mode: snapshotModeFromEnv(process.env.ROOS_SNAPSHOT),
   hasPwsh,
 })
 

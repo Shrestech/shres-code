@@ -1,13 +1,13 @@
 {
-  "name": "@deepseek-ai/dsh-subprocess-e2b",
-  "description": "E2B subprocess implementation for DeepSeek Harness",
+  "name": "@roos-code/roos-code-subprocess-e2b",
+  "description": "E2B subprocess implementation for Roos Code",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
+    "url": "git+https://github.com/roos-code/roos-code.git",
     "directory": "packages/e2b/subprocess-e2b"
   },
   "type": "module",
@@ -32,20 +32,20 @@
   ],
   "license": "MIT",
   "peerDependencies": {
-    "@deepseek-ai/dsh-e2b": "workspace:^",
-    "@deepseek-ai/dsh-invariants": "workspace:^",
-    "@deepseek-ai/dsh-subprocess": "workspace:^",
-    "@deepseek-ai/dsh-timeout": "workspace:^",
-    "@deepseek-ai/cordis": "workspace:^"
+    "@roos-code/roos-code-e2b": "workspace:^",
+    "@roos-code/roos-code-invariants": "workspace:^",
+    "@roos-code/roos-code-subprocess": "workspace:^",
+    "@roos-code/roos-code-timeout": "workspace:^",
+    "@roos-code/cordis": "workspace:^"
   },
   "dependencies": {
-    "@deepseek-ai/schemastery": "workspace:^"
+    "@roos-code/schemastery": "workspace:^"
   },
   "devDependencies": {
-    "@deepseek-ai/dsh-e2b": "workspace:^",
-    "@deepseek-ai/dsh-invariants": "workspace:^",
-    "@deepseek-ai/dsh-subprocess": "workspace:^",
-    "@deepseek-ai/dsh-timeout": "workspace:^",
-    "@deepseek-ai/cordis": "workspace:^"
+    "@roos-code/roos-code-e2b": "workspace:^",
+    "@roos-code/roos-code-invariants": "workspace:^",
+    "@roos-code/roos-code-subprocess": "workspace:^",
+    "@roos-code/roos-code-timeout": "workspace:^",
+    "@roos-code/cordis": "workspace:^"
   }
 }

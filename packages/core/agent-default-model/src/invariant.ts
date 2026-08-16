@@ -5,13 +5,13 @@
  * already validates every mutable value before `currentSelection()` can observe it.
  * The empty installer keeps that absence explicit in composed invariant sets.
  *
- * @module @deepseek-ai/dsh-agent-default-model/invariant
+ * @module @roos-code/roos-code-agent-default-model/invariant
  */
 
-import type { Context } from '@deepseek-ai/cordis'
-import type { InvariantInstaller } from '@deepseek-ai/dsh-invariants'
+import type { Context } from '@roos-code/cordis'
+import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
 
-const PACKAGE_NAME = '@deepseek-ai/dsh-agent-default-model'
+const PACKAGE_NAME = '@roos-code/roos-code-agent-default-model'
 
 /** Cordis companion plugin name. */
 export const name = 'agent-default-model-invariant'

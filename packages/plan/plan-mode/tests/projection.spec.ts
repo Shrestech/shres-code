@@ -10,17 +10,17 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { Context } from '@deepseek-ai/cordis'
-import AgentRegistry from '@deepseek-ai/dsh-agent'
-import type { Agent } from '@deepseek-ai/dsh-agent'
-import SessionStore from '@deepseek-ai/dsh-session'
-import type { Session } from '@deepseek-ai/dsh-session'
-import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
-import ToolRuntime from '@deepseek-ai/dsh-tools'
-import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
-import UserQuestionService from '@deepseek-ai/dsh-user-questions'
-import { CommandId } from '@deepseek-ai/dsh-commands/brand'
-import PlanModeController from '@deepseek-ai/dsh-plan-mode'
+import { Context } from '@roos-code/cordis'
+import AgentRegistry from '@roos-code/roos-code-agent'
+import type { Agent } from '@roos-code/roos-code-agent'
+import SessionStore from '@roos-code/roos-code-session'
+import type { Session } from '@roos-code/roos-code-session'
+import SystemPrompt from '@roos-code/roos-code-system-prompt'
+import ToolRuntime from '@roos-code/roos-code-tools'
+import SessionProjectionRegistry from '@roos-code/roos-code-session-projection'
+import UserQuestionService from '@roos-code/roos-code-user-questions'
+import { CommandId } from '@roos-code/roos-code-commands/brand'
+import PlanModeController from '@roos-code/roos-code-plan-mode'
 
 interface Bench {
   ctx: Context

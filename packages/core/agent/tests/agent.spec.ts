@@ -1,12 +1,12 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import { Context, Service, symbols } from '@deepseek-ai/cordis'
-import { createUserMessage, freezeMessage } from '@deepseek-ai/dsh-llm'
-import { Session, SessionId, type UserMessage } from '@deepseek-ai/dsh-session'
+import { Context, Service, symbols } from '@roos-code/cordis'
+import { createUserMessage, freezeMessage } from '@roos-code/roos-code-llm'
+import { Session, SessionId, type UserMessage } from '@roos-code/roos-code-session'
 import AgentRegistry, {
   agentEvents,
   Inbox,
-} from '@deepseek-ai/dsh-agent'
-import TypertRegistry from '@deepseek-ai/dsh-typert-registry'
+} from '@roos-code/roos-code-agent'
+import TypertRegistry from '@roos-code/roos-code-typert-registry'
 
 import type {
   Agent,
@@ -15,7 +15,7 @@ import type {
   AgentStatus,
   CreateAgentOptions,
   ResumeAgentOptions,
-} from '@deepseek-ai/dsh-agent'
+} from '@roos-code/roos-code-agent'
 
 function stubAgent(rawId: string, overrides: Partial<Agent> = {}): Agent {
   const id = SessionId(rawId)
@@ -155,8 +155,8 @@ describe('AgentRegistry', () => {
     expect(lookup).toMatchObject({
       parameter: 'agent',
       wire: 'agentId',
-      hostTypeSymbol: '@deepseek-ai/dsh-agent#Agent',
-      wireTypeSymbol: '@deepseek-ai/dsh-session/types#SessionId',
+      hostTypeSymbol: '@roos-code/roos-code-agent#Agent',
+      wireTypeSymbol: '@roos-code/roos-code-session/types#SessionId',
     })
     expect(lookup?.resolve(agent.id)).toBe(agent)
     expect(ctx.typert.contexts.getHost('agent')?.resolve(agent.id)).toBe(agent.ctx)

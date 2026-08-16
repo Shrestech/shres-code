@@ -1,4 +1,4 @@
-# @deepseek-ai/dsh-session-title
+# @roos-code/roos-code-session-title
 
 English | [中文](README.zh.md)
 

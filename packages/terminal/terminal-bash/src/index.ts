@@ -1,17 +1,17 @@
 /**
  * Persistent shell PTY backend over the subprocess terminal primitive, shared
  * sandbox policy, bounded output, and provider-owned session cleanup.
- * @module @deepseek-ai/dsh-terminal-bash
+ * @module @roos-code/roos-code-terminal-bash
  */
 
-import { Context } from '@deepseek-ai/cordis'
-import type { Agent } from '@deepseek-ai/dsh-agent'
-import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
-import { TerminalBackendCleanupError } from '@deepseek-ai/dsh-terminal'
-import type { TerminalBackend, TerminalBackendSpawnSpec } from '@deepseek-ai/dsh-terminal'
-import type { SubprocessTerminalHandle, SubprocessTerminalSpawnSpec } from '@deepseek-ai/dsh-subprocess'
-import type { SandboxExecutionPolicy } from '@deepseek-ai/dsh-sandbox'
-import { effectiveSandboxMode } from '@deepseek-ai/dsh-sandbox-policy'
+import { Context } from '@roos-code/cordis'
+import type { Agent } from '@roos-code/roos-code-agent'
+import type { Session, SessionEvent } from '@roos-code/roos-code-session'
+import { TerminalBackendCleanupError } from '@roos-code/roos-code-terminal'
+import type { TerminalBackend, TerminalBackendSpawnSpec } from '@roos-code/roos-code-terminal'
+import type { SubprocessTerminalHandle, SubprocessTerminalSpawnSpec } from '@roos-code/roos-code-subprocess'
+import type { SandboxExecutionPolicy } from '@roos-code/roos-code-sandbox'
+import { effectiveSandboxMode } from '@roos-code/roos-code-sandbox-policy'
 import { type Config, type ResolvedConfig, validateConfig } from './config.ts'
 import { LocalPtySession } from './session.ts'
 import { CONTROLLED_PROMPT } from './sanitize.ts'
@@ -62,9 +62,9 @@ function childEnvironment(spec: TerminalBackendSpawnSpec): Record<string, string
     PS1: CONTROLLED_PROMPT,
     PROMPT_COMMAND: 'printf "\\033]133;D;%s\\007" "$?"',
     BASH_SILENCE_DEPRECATION_WARNING: '1',
-    DSH_SHELL: '1',
-    DSH_SESSION_ID: spec.owner.id,
-    DSH_PTY_SESSION_ID: spec.sessionId,
+    ROOS_SHELL: '1',
+    ROOS_SESSION_ID: spec.owner.id,
+    ROOS_PTY_SESSION_ID: spec.sessionId,
   }
 }
 

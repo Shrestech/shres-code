@@ -5,13 +5,13 @@ import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 import { resolveDemoConfig, selectExplicitConfigPath } from '../src/resolveDemoConfig.ts'
 
-const NAME = 'dsh-jsonrpc-agent'
+const NAME = 'roos-jsonrpc-agent'
 const FIRST_PARTY_LEAF = fileURLToPath(new URL('../../../../examples/jsonrpc-agent/cordis.yml', import.meta.url))
 
-const tmp = (): string => mkdtempSync(join(tmpdir(), 'dsh-jsonrpc-demo-config-'))
+const tmp = (): string => mkdtempSync(join(tmpdir(), 'roos-jsonrpc-demo-config-'))
 
 afterEach(() => {
-  Reflect.deleteProperty(process.env, 'DSH_HOME')
+  Reflect.deleteProperty(process.env, 'ROOS_HOME')
 })
 
 function writeConfig(dir: string, name: string, body: string): string {
@@ -24,29 +24,29 @@ describe('selectExplicitConfigPath', () => {
   it('returns undefined when neither channel is set, ignoring a CWD cordis.yml', () => {
     const cwd = tmp()
     writeConfig(cwd, 'cordis.yml', '- name: \'./hostile.js\'\n')
-    expect(selectExplicitConfigPath({}, ['node', 'dsh-jsonrpc-agent'])).toBeUndefined()
+    expect(selectExplicitConfigPath({}, ['node', 'roos-jsonrpc-agent'])).toBeUndefined()
   })
 
-  it('prefers DSH_CORDIS_CONFIG over argv and treats empty values as absent', () => {
+  it('prefers ROOS_CORDIS_CONFIG over argv and treats empty values as absent', () => {
     expect(selectExplicitConfigPath(
-      { DSH_CORDIS_CONFIG: '/from-env.yml' },
+      { ROOS_CORDIS_CONFIG: '/from-env.yml' },
       ['node', 'bin', '/from-argv.yml'],
     )).toBe('/from-env.yml')
     expect(selectExplicitConfigPath(
-      { DSH_CORDIS_CONFIG: '' },
+      { ROOS_CORDIS_CONFIG: '' },
       ['node', 'bin', '/from-argv.yml'],
     )).toBe('/from-argv.yml')
-    expect(selectExplicitConfigPath({ DSH_CORDIS_CONFIG: '' }, ['node', 'bin', ''])).toBeUndefined()
+    expect(selectExplicitConfigPath({ ROOS_CORDIS_CONFIG: '' }, ['node', 'bin', ''])).toBeUndefined()
   })
 
   it('reads process.env and process.argv when callers omit the sources', () => {
-    const previous = process.env['DSH_CORDIS_CONFIG']
-    process.env['DSH_CORDIS_CONFIG'] = '/default-env.yml'
+    const previous = process.env['ROOS_CORDIS_CONFIG']
+    process.env['ROOS_CORDIS_CONFIG'] = '/default-env.yml'
     try {
       expect(selectExplicitConfigPath()).toBe('/default-env.yml')
     } finally {
-      if (previous === undefined) Reflect.deleteProperty(process.env, 'DSH_CORDIS_CONFIG')
-      else process.env['DSH_CORDIS_CONFIG'] = previous
+      if (previous === undefined) Reflect.deleteProperty(process.env, 'ROOS_CORDIS_CONFIG')
+      else process.env['ROOS_CORDIS_CONFIG'] = previous
     }
   })
 })
@@ -54,7 +54,7 @@ describe('selectExplicitConfigPath', () => {
 describe('resolveDemoConfig', () => {
   it('requires an explicit path and does not pick up CWD cordis.yml', () => {
     const cwd = tmp()
-    writeConfig(cwd, 'cordis.yml', '- name: \'@deepseek-ai/dsh-sdk-jsonrpc-server\'\n')
+    writeConfig(cwd, 'cordis.yml', '- name: \'@roos-code/roos-code-sdk-jsonrpc-server\'\n')
     expect(() => resolveDemoConfig({ binName: NAME, cwd, home: tmp() })).toThrow(
       `${NAME}: config is required — pass an explicit path; there is no working-directory fallback`,
     )
@@ -105,7 +105,7 @@ describe('resolveDemoConfig', () => {
     const runtime = join(root, 'runtime')
     mkdirSync(join(runtime, 'node'), { recursive: true })
     const path = writeConfig(runtime, 'cordis.yml', '- config: !!js "1"\n')
-    const bin = join(runtime, 'node', 'node_modules', '@deepseek-ai', 'dsh-sdk-jsonrpc-demo', 'lib', 'packaged-bin.js')
+    const bin = join(runtime, 'node', 'node_modules', '@roos-code', 'roos-sdk-jsonrpc-demo', 'lib', 'packaged-bin.js')
     mkdirSync(dirname(bin), { recursive: true })
     writeFileSync(bin, '')
     expect(resolveDemoConfig({
@@ -122,14 +122,14 @@ describe('resolveDemoConfig', () => {
     const runtime = join(wheel, 'runtime')
     mkdirSync(runtime)
     const path = writeConfig(runtime, 'cordis.yml', '- config: !!js "1"\n')
-    const exe = join(runtime, 'dsh-jsonrpc-agent-pkg-macos-arm64')
+    const exe = join(runtime, 'roos-jsonrpc-agent-pkg-macos-arm64')
     writeFileSync(exe, '')
     expect(resolveDemoConfig({
       requested: path,
       binName: NAME,
       cwd: tmp(),
       home: tmp(),
-      installAnchor: '/snapshot/node_modules/@deepseek-ai/dsh-sdk-jsonrpc-demo/lib/packaged-bin.js',
+      installAnchor: '/snapshot/node_modules/@roos-code/roos-code-sdk-jsonrpc-demo/lib/packaged-bin.js',
       execPath: exe,
     })).toBe(resolve(path))
   })
@@ -138,21 +138,21 @@ describe('resolveDemoConfig', () => {
     const hostile = tmp()
     mkdirSync(join(hostile, 'runtime'))
     const path = writeConfig(join(hostile, 'runtime'), 'cordis.yml', '- config: !!js "1"\n')
-    const exe = join(tmp(), 'dsh-jsonrpc-agent-pkg-linux-x64')
+    const exe = join(tmp(), 'roos-jsonrpc-agent-pkg-linux-x64')
     writeFileSync(exe, '')
     expect(() => resolveDemoConfig({
       requested: path,
       binName: NAME,
       cwd: hostile,
       home: tmp(),
-      installAnchor: '/snapshot/node_modules/@deepseek-ai/dsh-sdk-jsonrpc-demo/lib/packaged-bin.js',
+      installAnchor: '/snapshot/node_modules/@roos-code/roos-code-sdk-jsonrpc-demo/lib/packaged-bin.js',
       execPath: exe,
     })).toThrow(/contains !!js/)
   })
 
   it('allows !!js inside an installed demo package directory', () => {
     const pkg = tmp()
-    writeFileSync(join(pkg, 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh-sdk-jsonrpc-demo' }))
+    writeFileSync(join(pkg, 'package.json'), JSON.stringify({ name: '@roos-code/roos-code-sdk-jsonrpc-demo' }))
     const path = writeConfig(pkg, 'trusted.yml', '- config: !!js "1"\n')
     expect(resolveDemoConfig({
       requested: path,
@@ -164,7 +164,7 @@ describe('resolveDemoConfig', () => {
     })).toBe(resolve(path))
   })
 
-  it('refuses !!js outside $DSH_HOME and outside every first-party tree', () => {
+  it('refuses !!js outside $ROOS_HOME and outside every first-party tree', () => {
     const cwd = tmp()
     const path = writeConfig(cwd, 'cordis.yml', '- config: !!js "process.exit(0)"\n')
     expect(() => resolveDemoConfig({
@@ -173,14 +173,14 @@ describe('resolveDemoConfig', () => {
       cwd,
       home: tmp(),
       installAnchor: cwd,
-    })).toThrow(/contains !!js and is not under \$DSH_HOME or a first-party\/packaged install tree/)
+    })).toThrow(/contains !!js and is not under \$ROOS_HOME or a first-party\/packaged install tree/)
     expect(() => resolveDemoConfig({
       requested: path,
       binName: NAME,
       cwd,
       home: tmp(),
       installAnchor: cwd,
-    })).toThrow(/Place the file under \$DSH_HOME to pre-approve/)
+    })).toThrow(/Place the file under \$ROOS_HOME to pre-approve/)
   })
 
   it('refuses a relative plugin name with a space before the colon', () => {
@@ -219,7 +219,7 @@ describe('resolveDemoConfig', () => {
     })).toThrow(/contains !!js and a relative plugin name/)
   })
 
-  it('allows !!js inside $DSH_HOME', () => {
+  it('allows !!js inside $ROOS_HOME', () => {
     const home = tmp()
     const path = writeConfig(home, 'approved.yml', '- config: !!js "1"\n')
     expect(resolveDemoConfig({
@@ -231,7 +231,7 @@ describe('resolveDemoConfig', () => {
     })).toBe(resolve(path))
   })
 
-  it('treats a config whose canonical path is $DSH_HOME as inside home', () => {
+  it('treats a config whose canonical path is $ROOS_HOME as inside home', () => {
     const home = writeConfig(tmp(), 'home.yml', '- config: !!js "1"\n')
     expect(resolveDemoConfig({
       requested: home,
@@ -242,9 +242,9 @@ describe('resolveDemoConfig', () => {
     })).toBe(resolve(home))
   })
 
-  it('allows a file with neither construct outside $DSH_HOME', () => {
+  it('allows a file with neither construct outside $ROOS_HOME', () => {
     const cwd = tmp()
-    const path = writeConfig(cwd, 'safe.yml', '- name: \'@deepseek-ai/dsh-sdk-jsonrpc-server\'\n')
+    const path = writeConfig(cwd, 'safe.yml', '- name: \'@roos-code/roos-code-sdk-jsonrpc-server\'\n')
     expect(resolveDemoConfig({
       requested: path,
       binName: NAME,
@@ -276,7 +276,7 @@ describe('resolveDemoConfig', () => {
     })).toThrow(new RegExp(`^${NAME}: failed to read config ${resolve(dir).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}: `))
   })
 
-  it('follows a symlink when deciding whether the file is under $DSH_HOME', () => {
+  it('follows a symlink when deciding whether the file is under $ROOS_HOME', () => {
     const home = tmp()
     const outside = tmp()
     const real = writeConfig(outside, 'evil.yml', '- config: !!js "1"\n')
@@ -303,12 +303,12 @@ describe('resolveDemoConfig', () => {
     })).toBe(resolve(alias))
   })
 
-  it('uses process.cwd and resolveDshHome when cwd and home are omitted', () => {
+  it('uses process.cwd and resolveRoosHome when cwd and home are omitted', () => {
     const cwd = tmp()
     const home = tmp()
-    writeConfig(cwd, 'safe.yml', '- name: \'@deepseek-ai/dsh-sdk-jsonrpc-server\'\n')
+    writeConfig(cwd, 'safe.yml', '- name: \'@roos-code/roos-code-sdk-jsonrpc-server\'\n')
     const previous = process.cwd()
-    process.env.DSH_HOME = home
+    process.env.ROOS_HOME = home
     process.chdir(cwd)
     try {
       expect(resolveDemoConfig({ requested: 'safe.yml', binName: NAME })).toBe(resolve(process.cwd(), 'safe.yml'))
@@ -317,7 +317,7 @@ describe('resolveDemoConfig', () => {
     }
   })
 
-  it('falls back to the spelled home path when $DSH_HOME does not exist', () => {
+  it('falls back to the spelled home path when $ROOS_HOME does not exist', () => {
     const cwd = tmp()
     const path = writeConfig(cwd, 'js.yml', '- config: !!js "1"\n')
     expect(() => resolveDemoConfig({

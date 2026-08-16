@@ -1,4 +1,4 @@
-# @deepseek-ai/dsh-client-ui-trajectory
+# @roos-code/roos-code-client-ui-trajectory
 
 [English](README.md) | 中文
 

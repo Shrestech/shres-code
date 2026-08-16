@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
-import { AttachmentId } from '@deepseek-ai/dsh-attachment'
-import type { AttachmentStore } from '@deepseek-ai/dsh-attachment'
-import { createUserMessage, CallId, CONTEXT_WINDOW_EXCEEDED_CODE, EMPTY_RESPONSE_CODE, LlmError, createMessage } from '@deepseek-ai/dsh-llm'
-import type { ContentBlock, StreamChunk } from '@deepseek-ai/dsh-llm'
+import { AttachmentId } from '@roos-code/roos-code-attachment'
+import type { AttachmentStore } from '@roos-code/roos-code-attachment'
+import { createUserMessage, CallId, CONTEXT_WINDOW_EXCEEDED_CODE, EMPTY_RESPONSE_CODE, LlmError, createMessage } from '@roos-code/roos-code-llm'
+import type { ContentBlock, StreamChunk } from '@roos-code/roos-code-llm'
 import type { AssistantMessage, AssistantMessageEvent, Usage } from '@earendil-works/pi-ai'
 import { toPiContext } from '../src/context.ts'
 import { toPiReplayState } from '../src/replay.ts'
@@ -210,7 +210,7 @@ describe('toPiContext', () => {
     })
     expect(context.messages[0]).toMatchObject({
       role: 'assistant',
-      api: 'dsh-foreign',
+      api: 'roos-foreign',
       provider: 'deepseek',
       model: 'old-model',
     })

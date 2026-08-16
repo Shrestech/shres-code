@@ -1,13 +1,13 @@
 {
-  "name": "@deepseek-ai/dsh-host-directory-picker-native",
-  "description": "Native-OS-chooser backend of the directory-picker seam for the DeepSeek Harness web GUI host",
+  "name": "@roos-code/roos-code-host-directory-picker-native",
+  "description": "Native-OS-chooser backend of the directory-picker seam for the Roos Code web GUI host",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
+    "url": "git+https://github.com/roos-code/roos-code.git",
     "directory": "packages/host/directory-picker-native"
   },
   "type": "module",
@@ -37,17 +37,17 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@deepseek-ai/dsh-host-directory-picker": "workspace:^",
-    "@deepseek-ai/dsh-native-command": "workspace:^",
+    "@roos-code/roos-code-host-directory-picker": "workspace:^",
+    "@roos-code/roos-code-native-command": "workspace:^",
     "koffi": "^3.1.0"
   },
   "peerDependencies": {
-    "@deepseek-ai/dsh-invariants": "workspace:^",
-    "@deepseek-ai/cordis": "workspace:^"
+    "@roos-code/roos-code-invariants": "workspace:^",
+    "@roos-code/cordis": "workspace:^"
   },
   "devDependencies": {
-    "@deepseek-ai/dsh-invariants": "workspace:^",
-    "@deepseek-ai/cordis": "workspace:^",
+    "@roos-code/roos-code-invariants": "workspace:^",
+    "@roos-code/cordis": "workspace:^",
     "tsx": "^4.19.2"
   }
 }

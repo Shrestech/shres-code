@@ -1,4 +1,4 @@
-# @deepseek-ai/dsh-session-telemetry
+# @roos-code/roos-code-session-telemetry
 
 [English](README.md) | 中文
 

@@ -8,17 +8,17 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { Context } from '@deepseek-ai/cordis'
-import SessionStore from '@deepseek-ai/dsh-session'
-import AgentRegistry from '@deepseek-ai/dsh-agent'
-import type { Agent, AgentHandle, CreateAgentOptions } from '@deepseek-ai/dsh-agent'
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import SessionTitleService from '@deepseek-ai/dsh-session-title'
-import UserQuestionService from '@deepseek-ai/dsh-user-questions'
-import type { Session, SessionId } from '@deepseek-ai/dsh-session'
-import type { RpcRequest } from '@deepseek-ai/dsh-host-apiproxy/api/rpc'
-import { RpcId } from '@deepseek-ai/dsh-host-apiproxy/api/rpc'
-import { createApiProxy } from '@deepseek-ai/dsh-host-apiproxy'
+import { Context } from '@roos-code/cordis'
+import SessionStore from '@roos-code/roos-code-session'
+import AgentRegistry from '@roos-code/roos-code-agent'
+import type { Agent, AgentHandle, CreateAgentOptions } from '@roos-code/roos-code-agent'
+import { createUserMessage } from '@roos-code/roos-code-llm'
+import SessionTitleService from '@roos-code/roos-code-session-title'
+import UserQuestionService from '@roos-code/roos-code-user-questions'
+import type { Session, SessionId } from '@roos-code/roos-code-session'
+import type { RpcRequest } from '@roos-code/roos-code-host-apiproxy/api/rpc'
+import { RpcId } from '@roos-code/roos-code-host-apiproxy/api/rpc'
+import { createApiProxy } from '@roos-code/roos-code-host-apiproxy'
 
 const sid = (id: string): SessionId => id as SessionId
 

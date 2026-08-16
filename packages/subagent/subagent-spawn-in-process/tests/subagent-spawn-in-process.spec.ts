@@ -1,20 +1,20 @@
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import { createUserMessage } from '@roos-code/roos-code-llm'
 import { describe, expect, it } from 'vitest'
-import { Context, symbols, type EffectMeta } from '@deepseek-ai/cordis'
-import Loader from '@deepseek-ai/cordis-plugin-loader'
-import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
-import { SessionId } from '@deepseek-ai/dsh-session'
-import AgentLoop from '@deepseek-ai/dsh-agent-loop'
-import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
-import InvariantRegistry from '@deepseek-ai/dsh-invariants'
-import * as SessionInvariant from '@deepseek-ai/dsh-session/invariant'
-import * as AgentInvariant from '@deepseek-ai/dsh-agent/invariant'
-import * as AgentLoopInvariant from '@deepseek-ai/dsh-agent-loop/invariant'
-import SubagentRuntime, { type SubagentStartRequest } from '@deepseek-ai/dsh-subagent'
+import { Context, symbols, type EffectMeta } from '@roos-code/cordis'
+import Loader from '@roos-code/cordis-plugin-loader'
+import AgentRegistry, { type Agent } from '@roos-code/roos-code-agent'
+import { SessionId } from '@roos-code/roos-code-session'
+import AgentLoop from '@roos-code/roos-code-agent-loop'
+import { mountAgentLoopTestDependencies } from '@roos-code/roos-code-agent-loop-testkit'
+import InvariantRegistry from '@roos-code/roos-code-invariants'
+import * as SessionInvariant from '@roos-code/roos-code-session/invariant'
+import * as AgentInvariant from '@roos-code/roos-code-agent/invariant'
+import * as AgentLoopInvariant from '@roos-code/roos-code-agent-loop/invariant'
+import SubagentRuntime, { type SubagentStartRequest } from '@roos-code/roos-code-subagent'
 import { MockAdapter, maxTokensResponse, textResponse, toolCallResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
 import * as spawn from '../src/index.ts'
-import { STRUCTURED_OUTPUT_TOOL } from '@deepseek-ai/dsh-subagent-in-process-driver'
-import { defineContentToolFixture } from '@deepseek-ai/dsh-tools'
+import { STRUCTURED_OUTPUT_TOOL } from '@roos-code/roos-code-subagent-in-process-driver'
+import { defineContentToolFixture } from '@roos-code/roos-code-tools'
 
 type Script = ConstructorParameters<typeof MockAdapter>[0]
 
@@ -64,7 +64,7 @@ function disposeChildLifecycle(parent: Agent): void {
   void lifecycle()
 }
 
-describe('dsh-subagent-spawn-in-process', () => {
+describe('roos-subagent-spawn-in-process', () => {
   it('runs a fresh child to completion and returns its final assistant output', async () => {
     // One model call for the child: a plain text answer.
     const { ctx, parent } = await setup([textResponse('child answer')])

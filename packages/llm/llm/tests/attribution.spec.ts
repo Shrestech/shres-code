@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module'
 import { describe, expect, it } from 'vitest'
-import { APP_IDENTITY, attributionHeaders, userAgent } from '@deepseek-ai/dsh-llm'
-import type { AppIdentity } from '@deepseek-ai/dsh-llm'
+import { APP_IDENTITY, attributionHeaders, userAgent } from '@roos-code/roos-code-llm'
+import type { AppIdentity } from '@roos-code/roos-code-llm'
 
 const manifest = createRequire(import.meta.url)('../package.json') as { version: string }
 
@@ -19,9 +19,9 @@ describe('APP_IDENTITY', () => {
 
   it('carries only static public product facts', () => {
     expect(APP_IDENTITY).toEqual({
-      product: 'deepseek-harness',
+      product: 'roos-code',
       version: manifest.version,
-      url: 'https://github.com/deepseek-ai/deepseek-harness',
+      url: 'https://github.com/roos-code/roos-code',
     })
   })
 })
@@ -29,7 +29,7 @@ describe('APP_IDENTITY', () => {
 describe('userAgent', () => {
   it('renders product/version with the +url comment', () => {
     expect(userAgent()).toBe(
-      `deepseek-harness/${manifest.version} (+https://github.com/deepseek-ai/deepseek-harness)`,
+      `roos-code/${manifest.version} (+https://github.com/roos-code/roos-code)`,
     )
   })
 

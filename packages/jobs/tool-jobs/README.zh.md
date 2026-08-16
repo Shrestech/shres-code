@@ -1,4 +1,4 @@
-# @deepseek-ai/dsh-tool-jobs
+# @roos-code/roos-code-tool-jobs
 
 [English](README.md) | 中文
 

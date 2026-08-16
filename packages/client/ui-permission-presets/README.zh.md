@@ -1,4 +1,4 @@
-# @deepseek-ai/dsh-client-ui-permission-presets
+# @roos-code/roos-code-client-ui-permission-presets
 
 [English](README.md) | 中文
 

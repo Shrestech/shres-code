@@ -1,13 +1,13 @@
 {
-  "name": "@deepseek-ai/dsh-web-frontend",
-  "description": "Web application entry: vite build over the @deepseek-ai/dsh-client-web shell library; dist/ served by apps/cli's dsh web",
+  "name": "@roos-code/roos-code-web-frontend",
+  "description": "Web application entry: vite build over the @roos-code/roos-code-client-web shell library; dist/ served by apps/cli's roos web",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
+    "url": "git+https://github.com/roos-code/roos-code.git",
     "directory": "apps/web"
   },
   "type": "module",
@@ -26,18 +26,18 @@
   },
   "license": "MIT",
   "dependencies": {
-    "@deepseek-ai/dsh-client-web": "workspace:^",
+    "@roos-code/roos-code-client-web": "workspace:^",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
-    "@deepseek-ai/cordis-plugin-group": "workspace:^",
-    "@deepseek-ai/dsh-client-modules": "workspace:^",
-    "@deepseek-ai/dsh-client-ui-primitives": "workspace:^",
-    "@deepseek-ai/dsh-client-ui-slots": "workspace:^",
-    "@deepseek-ai/dsh-client-web-react": "workspace:^",
-    "@deepseek-ai/dsh-cmdline": "workspace:^",
-    "@deepseek-ai/dsh-pwsh-local": "workspace:^",
+    "@roos-code/cordis-plugin-group": "workspace:^",
+    "@roos-code/roos-code-client-modules": "workspace:^",
+    "@roos-code/roos-code-client-ui-primitives": "workspace:^",
+    "@roos-code/roos-code-client-ui-slots": "workspace:^",
+    "@roos-code/roos-code-client-web-react": "workspace:^",
+    "@roos-code/roos-code-cmdline": "workspace:^",
+    "@roos-code/roos-code-pwsh-local": "workspace:^",
     "@types/node": "^22.0.0",
     "@types/react": "~18.3.1",
     "@types/react-dom": "~18.3.0",

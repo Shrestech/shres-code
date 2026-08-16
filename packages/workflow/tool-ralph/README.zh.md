@@ -1,4 +1,4 @@
-# @deepseek-ai/dsh-tool-ralph
+# @roos-code/roos-code-tool-ralph
 
 [English](README.md) | 中文
 

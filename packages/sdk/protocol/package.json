@@ -1,13 +1,13 @@
 {
-  "name": "@deepseek-ai/dsh-sdk-protocol",
-  "description": "Shared wire protocol for the DeepSeek Harness SDK runtime: the newline-delimited JSON-RPC stdio transport and the named request, result, and notification types spoken between the runtime server and SDK clients",
+  "name": "@roos-code/roos-code-sdk-protocol",
+  "description": "Shared wire protocol for the Roos Code SDK runtime: the newline-delimited JSON-RPC stdio transport and the named request, result, and notification types spoken between the runtime server and SDK clients",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
+    "url": "git+https://github.com/roos-code/roos-code.git",
     "directory": "packages/sdk/protocol"
   },
   "type": "module",
@@ -31,17 +31,17 @@
   ],
   "license": "MIT",
   "peerDependencies": {
-    "@deepseek-ai/dsh-invariants": "workspace:^",
-    "@deepseek-ai/dsh-llm": "workspace:^",
-    "@deepseek-ai/dsh-session": "workspace:^",
-    "@deepseek-ai/dsh-subagent": "workspace:^",
-    "@deepseek-ai/cordis": "workspace:^"
+    "@roos-code/roos-code-invariants": "workspace:^",
+    "@roos-code/roos-code-llm": "workspace:^",
+    "@roos-code/roos-code-session": "workspace:^",
+    "@roos-code/roos-code-subagent": "workspace:^",
+    "@roos-code/cordis": "workspace:^"
   },
   "devDependencies": {
-    "@deepseek-ai/dsh-invariants": "workspace:^",
-    "@deepseek-ai/dsh-llm": "workspace:^",
-    "@deepseek-ai/dsh-session": "workspace:^",
-    "@deepseek-ai/dsh-subagent": "workspace:^",
-    "@deepseek-ai/cordis": "workspace:^"
+    "@roos-code/roos-code-invariants": "workspace:^",
+    "@roos-code/roos-code-llm": "workspace:^",
+    "@roos-code/roos-code-session": "workspace:^",
+    "@roos-code/roos-code-subagent": "workspace:^",
+    "@roos-code/cordis": "workspace:^"
   }
 }

@@ -147,14 +147,14 @@ const sharedTheme: Pick<DefaultTheme.Config, 'search' | 'socialLinks' | 'editLin
     },
   },
   socialLinks: [
-    { icon: 'github', link: 'https://github.com/deepseek-ai/deepseek-harness' },
+    { icon: 'github', link: 'https://github.com/roos-code/roos-code' },
   ],
   editLink: {
     pattern: ({ frontmatter }: PageData) => {
       const data: unknown = frontmatter
       const editSource: unknown = typeof data === 'object' && data !== null ? Reflect.get(data, 'editSource') : undefined
       if (typeof editSource !== 'string') throw new Error('Projected documentation page has no editSource frontmatter.')
-      return `https://github.com/deepseek-ai/deepseek-harness/edit/master/${editSource}`
+      return `https://github.com/roos-code/roos-code/edit/master/${editSource}`
     },
     text: '在 GitHub 上编辑此页',
   },
@@ -169,7 +169,7 @@ const base = process.env.DOCS_BASE ?? '/'
  */
 const wordmark = readFileSync(resolve(import.meta.dirname, '../public/wordmark.svg'), 'utf8')
   .trim()
-  .replace('<svg ', '<svg class="dsh-wordmark" ')
+  .replace('<svg ', '<svg class="roos-wordmark" ')
 
 /**
  * Styles the default theme does not provide, carried inline because the site
@@ -183,9 +183,9 @@ const wordmark = readFileSync(resolve(import.meta.dirname, '../public/wordmark.s
  * stay behind a query only Firefox answers.
  */
 const siteStyle = `
-.dsh-lockup { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
-.dsh-wordmark { display: block; height: 22px; width: auto; color: var(--vp-c-text-1); }
-.dsh-tag {
+.roos-lockup { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.roos-wordmark { display: block; height: 22px; width: auto; color: var(--vp-c-text-1); }
+.roos-tag {
   display: inline-flex;
   align-items: center;
   border: 1px solid var(--vp-c-brand-soft);
@@ -243,11 +243,11 @@ const scrollbarScript = `
  * @returns Markup placed beside the navigation-bar home link.
  */
 function siteTitle(previewTag: string): string {
-  return `<span class="dsh-lockup">${wordmark}<span class="dsh-tag">${previewTag}</span></span>`
+  return `<span class="roos-lockup">${wordmark}<span class="roos-tag">${previewTag}</span></span>`
 }
 
 export default withMermaid({
-  title: 'DeepSeek Harness',
+  title: 'Roos Code',
   description: '用于构建 Agent Harness 的插件化 SDK',
   base,
   head: [
@@ -306,7 +306,7 @@ export default withMermaid({
             const data: unknown = frontmatter
             const editSource: unknown = typeof data === 'object' && data !== null ? Reflect.get(data, 'editSource') : undefined
             if (typeof editSource !== 'string') throw new Error('Projected documentation page has no editSource frontmatter.')
-            return `https://github.com/deepseek-ai/deepseek-harness/edit/master/${editSource}`
+            return `https://github.com/roos-code/roos-code/edit/master/${editSource}`
           },
           text: 'Edit this page on GitHub',
         },
@@ -321,7 +321,7 @@ export default withMermaid({
     publicDir: resolve(import.meta.dirname, '../public'),
     plugins: [
       {
-        name: 'deepseek-harness-doc-projector',
+        name: 'roos-code-doc-projector',
         configureServer: watchCanonicalDocs,
       },
     ],

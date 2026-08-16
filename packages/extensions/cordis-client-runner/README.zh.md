@@ -1,4 +1,4 @@
-# @deepseek-ai/dsh-cordis-client-runner
+# @roos-code/roos-code-cordis-client-runner
 
 [English](README.md) | 中文
 

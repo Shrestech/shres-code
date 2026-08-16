@@ -1,4 +1,4 @@
-# @deepseek-ai/dsh-storage-sqlite
+# @roos-code/roos-code-storage-sqlite
 
 [English](README.md) | 中文
 

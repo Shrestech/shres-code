@@ -1,4 +1,4 @@
-# @deepseek-ai/dsh-client-ui-settings-plugin-inventory
+# @roos-code/roos-code-client-ui-settings-plugin-inventory
 
 English | [中文](README.zh.md)
 

@@ -1,4 +1,4 @@
-# @deepseek-ai/dsh-tool-str-replace-editor
+# @roos-code/roos-code-tool-str-replace-editor
 
 English | [中文](README.zh.md)
 

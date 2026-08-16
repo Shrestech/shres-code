@@ -1,5 +1,5 @@
 {
-  "name": "@deepseek-ai/dsh-tool-bash",
+  "name": "@roos-code/roos-code-tool-bash",
   "description": "Model-facing bash tool with optional generic background-job and sandbox-escalation support",
   "version": "0.1.0-rc.5",
   "publishConfig": {
@@ -7,7 +7,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
+    "url": "git+https://github.com/roos-code/roos-code.git",
     "directory": "packages/shell/tool-bash"
   },
   "type": "module",
@@ -32,42 +32,42 @@
   ],
   "license": "MIT",
   "peerDependencies": {
-    "@deepseek-ai/dsh-agent": "workspace:^",
-    "@deepseek-ai/dsh-shell": "workspace:^",
-    "@deepseek-ai/dsh-shell-env": "workspace:^",
-    "@deepseek-ai/dsh-invariants": "workspace:^",
-    "@deepseek-ai/dsh-llm": "workspace:^",
-    "@deepseek-ai/dsh-sandbox": "workspace:^",
-    "@deepseek-ai/dsh-sandbox-policy": "workspace:^",
-    "@deepseek-ai/dsh-system-prompt": "workspace:^",
-    "@deepseek-ai/dsh-jobs": "workspace:^",
-    "@deepseek-ai/dsh-tools": "workspace:^",
-    "@deepseek-ai/dsh-user-approval": "workspace:^",
-    "@deepseek-ai/cordis": "workspace:^"
+    "@roos-code/roos-code-agent": "workspace:^",
+    "@roos-code/roos-code-shell": "workspace:^",
+    "@roos-code/roos-code-shell-env": "workspace:^",
+    "@roos-code/roos-code-invariants": "workspace:^",
+    "@roos-code/roos-code-llm": "workspace:^",
+    "@roos-code/roos-code-sandbox": "workspace:^",
+    "@roos-code/roos-code-sandbox-policy": "workspace:^",
+    "@roos-code/roos-code-system-prompt": "workspace:^",
+    "@roos-code/roos-code-jobs": "workspace:^",
+    "@roos-code/roos-code-tools": "workspace:^",
+    "@roos-code/roos-code-user-approval": "workspace:^",
+    "@roos-code/cordis": "workspace:^"
   },
   "dependencies": {
-    "@deepseek-ai/schemastery": "workspace:^"
+    "@roos-code/schemastery": "workspace:^"
   },
   "devDependencies": {
-    "@deepseek-ai/dsh-agent": "workspace:^",
-    "@deepseek-ai/dsh-agent-loop": "workspace:^",
-    "@deepseek-ai/dsh-agent-loop-testkit": "workspace:^",
-    "@deepseek-ai/dsh-shell": "workspace:^",
-    "@deepseek-ai/dsh-shell-env": "workspace:^",
-    "@deepseek-ai/dsh-bash-local": "workspace:^",
-    "@deepseek-ai/dsh-invariants": "workspace:^",
-    "@deepseek-ai/dsh-llm": "workspace:^",
-    "@deepseek-ai/dsh-subprocess-local": "workspace:^",
-    "@deepseek-ai/dsh-sandbox": "workspace:^",
-    "@deepseek-ai/dsh-sandbox-policy": "workspace:^",
-    "@deepseek-ai/dsh-session": "workspace:^",
-    "@deepseek-ai/dsh-session-persistence-jsonl": "workspace:^",
-    "@deepseek-ai/dsh-system-prompt": "workspace:^",
-    "@deepseek-ai/dsh-jobs": "workspace:^",
-    "@deepseek-ai/dsh-jobs-local": "workspace:^",
-    "@deepseek-ai/dsh-tool-jobs": "workspace:^",
-    "@deepseek-ai/dsh-tools": "workspace:^",
-    "@deepseek-ai/dsh-user-approval": "workspace:^",
-    "@deepseek-ai/cordis": "workspace:^"
+    "@roos-code/roos-code-agent": "workspace:^",
+    "@roos-code/roos-code-agent-loop": "workspace:^",
+    "@roos-code/roos-code-agent-loop-testkit": "workspace:^",
+    "@roos-code/roos-code-shell": "workspace:^",
+    "@roos-code/roos-code-shell-env": "workspace:^",
+    "@roos-code/roos-code-bash-local": "workspace:^",
+    "@roos-code/roos-code-invariants": "workspace:^",
+    "@roos-code/roos-code-llm": "workspace:^",
+    "@roos-code/roos-code-subprocess-local": "workspace:^",
+    "@roos-code/roos-code-sandbox": "workspace:^",
+    "@roos-code/roos-code-sandbox-policy": "workspace:^",
+    "@roos-code/roos-code-session": "workspace:^",
+    "@roos-code/roos-code-session-persistence-jsonl": "workspace:^",
+    "@roos-code/roos-code-system-prompt": "workspace:^",
+    "@roos-code/roos-code-jobs": "workspace:^",
+    "@roos-code/roos-code-jobs-local": "workspace:^",
+    "@roos-code/roos-code-tool-jobs": "workspace:^",
+    "@roos-code/roos-code-tools": "workspace:^",
+    "@roos-code/roos-code-user-approval": "workspace:^",
+    "@roos-code/cordis": "workspace:^"
   }
 }

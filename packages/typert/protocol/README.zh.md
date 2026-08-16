@@ -1,4 +1,4 @@
-# @deepseek-ai/dsh-typert-protocol
+# @roos-code/roos-code-typert-protocol
 
 [English](README.md) | 中文
 

@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@deepseek-ai/cordis'
-import SessionStore, { SessionId, type Session } from '@deepseek-ai/dsh-session'
-import { createUserMessage, ProviderRequestId } from '@deepseek-ai/dsh-llm'
-import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
-import InvariantRegistry from '@deepseek-ai/dsh-invariants'
-import * as RetryInvariant from '@deepseek-ai/dsh-llm-retry/invariant'
-import { RetryId } from '@deepseek-ai/dsh-llm-retry'
+import { Context } from '@roos-code/cordis'
+import SessionStore, { SessionId, type Session } from '@roos-code/roos-code-session'
+import { createUserMessage, ProviderRequestId } from '@roos-code/roos-code-llm'
+import { MAX_TIMER_DELAY_MS } from '@roos-code/roos-code-timeout'
+import InvariantRegistry from '@roos-code/roos-code-invariants'
+import * as RetryInvariant from '@roos-code/roos-code-llm-retry/invariant'
+import { RetryId } from '@roos-code/roos-code-llm-retry'
 import { providerForOpenStep } from '../src/history.ts'
 
 async function setup(): Promise<Context> {

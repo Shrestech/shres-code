@@ -1,13 +1,13 @@
 /**
- * Package-owned invariant companion for `@deepseek-ai/dsh-loader-smoke`.
- * @module @deepseek-ai/dsh-loader-smoke/invariant
+ * Package-owned invariant companion for `@roos-code/roos-code-loader-smoke`.
+ * @module @roos-code/roos-code-loader-smoke/invariant
  */
 
 /* jscpd:ignore-start */
-import type { Context } from '@deepseek-ai/cordis'
-import type { InvariantInstaller } from '@deepseek-ai/dsh-invariants'
+import type { Context } from '@roos-code/cordis'
+import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
 
-const PACKAGE_NAME = '@deepseek-ai/dsh-loader-smoke'
+const PACKAGE_NAME = '@roos-code/roos-code-loader-smoke'
 
 /** Cordis companion plugin name. */
 export const name = 'loader-smoke-invariant'

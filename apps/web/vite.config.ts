@@ -4,14 +4,14 @@ import type { Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 
 const src = (rel: string): string => fileURLToPath(new URL(rel, import.meta.url))
-const STANDALONE_ERROR = 'apps/web is not a standalone application: bare Vite cannot inject window.__DSH_BOOT__. '
-  + 'From a repository checkout, run `pnpm dsh web`; an installed package uses `dsh web`. '
-  + 'For client-plugin HMR, run `pnpm dsh web` together with `pnpm run dev:web`.'
+const STANDALONE_ERROR = 'apps/web is not a standalone application: bare Vite cannot inject window.__ROOS_BOOT__. '
+  + 'From a repository checkout, run `pnpm roos web`; an installed package uses `roos web`. '
+  + 'For client-plugin HMR, run `pnpm roos web` together with `pnpm run dev:web`.'
 
 /** Fail before a Vite dev or preview server can expose the boot-manifest-free shell. */
 function rejectStandaloneServe(): Plugin {
   return {
-    name: 'dsh-reject-standalone-web-serve',
+    name: 'roos-reject-standalone-web-serve',
     config(_config, env) {
       if (env.command === 'serve') throw new Error(STANDALONE_ERROR)
     },
@@ -139,13 +139,13 @@ export default defineConfig({
       // Browserization of the vendored cordis Loader: its only node-only
       // import; the two process probes are mapped by `define` below.
       { find: /^node:module$/, replacement: src('./src/node-module-stub.ts') },
-      { find: /^@deepseek-ai\/dsh-client-web$/, replacement: src('../../packages/client/web/src/boot.tsx') },
-      { find: /^@deepseek-ai\/dsh-client-web-react$/, replacement: src('../../packages/client/web-react/src/index.ts') },
-      { find: /^@deepseek-ai\/dsh-client-ui-slots$/, replacement: src('../../packages/client/ui-slots/src/index.ts') },
-      { find: /^@deepseek-ai\/dsh-client-ui-primitives$/, replacement: src('../../packages/client/ui-primitives/src/index.ts') },
-      { find: /^@deepseek-ai\/dsh-client-ui-attachment$/, replacement: src('../../packages/client/ui-attachment/src/index.ts') },
-      { find: /^@deepseek-ai\/dsh-client-schema-form$/, replacement: src('../../packages/client/schema-form/src/index.ts') },
-      { find: /^@deepseek-ai\/dsh-client-modules\/client$/, replacement: src('../../packages/client/modules/src/client/index.ts') },
+      { find: /^@roos-code\/roos-code-client-web$/, replacement: src('../../packages/client/web/src/boot.tsx') },
+      { find: /^@roos-code\/roos-code-client-web-react$/, replacement: src('../../packages/client/web-react/src/index.ts') },
+      { find: /^@roos-code\/roos-code-client-ui-slots$/, replacement: src('../../packages/client/ui-slots/src/index.ts') },
+      { find: /^@roos-code\/roos-code-client-ui-primitives$/, replacement: src('../../packages/client/ui-primitives/src/index.ts') },
+      { find: /^@roos-code\/roos-code-client-ui-attachment$/, replacement: src('../../packages/client/ui-attachment/src/index.ts') },
+      { find: /^@roos-code\/roos-code-client-schema-form$/, replacement: src('../../packages/client/schema-form/src/index.ts') },
+      { find: /^@roos-code\/roos-code-client-modules\/client$/, replacement: src('../../packages/client/modules/src/client/index.ts') },
     ],
   },
   define: {

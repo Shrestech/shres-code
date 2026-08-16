@@ -9,9 +9,9 @@ import { join } from 'node:path'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
-import { CallId, type StreamChunk } from '@deepseek-ai/dsh-llm'
-import type { ReplayEntry, ReplayOverrideDoc } from '@deepseek-ai/dsh-llm-replay'
-import type { SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
+import { CallId, type StreamChunk } from '@roos-code/roos-code-llm'
+import type { ReplayEntry, ReplayOverrideDoc } from '@roos-code/roos-code-llm-replay'
+import type { SessionEvent, SessionId } from '@roos-code/roos-code-session'
 import {
   launchWebScaffold,
   watchConsole,
@@ -179,7 +179,7 @@ describe('web e2e: continuous conversation grown through the composer', () => {
   const specs = Array.from({ length: TURN_COUNT }, (_, offset) => turnSpec(offset + 1))
 
   beforeAll(async () => {
-    replayDir = await mkdtemp(join(tmpdir(), 'dsh-continuous-chat-replay-'))
+    replayDir = await mkdtemp(join(tmpdir(), 'roos-continuous-chat-replay-'))
     const replayOverride = join(replayDir, 'replay.override.json')
     await writeFile(replayOverride, JSON.stringify(replayScript(specs)))
     scaffold = await launchWebScaffold({

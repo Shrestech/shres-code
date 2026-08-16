@@ -2,12 +2,12 @@
  * Model-facing read, read_image, write, and edit tools over `ctx.fs`. This package owns schemas, validation,
  * read windows, formatting, and observation events, never a concrete provider. An optional
  * event policy supplies mutation guards; without one the tools use unconditional provider calls.
- * @module @deepseek-ai/dsh-tool-fs
+ * @module @roos-code/roos-code-tool-fs
  */
 
-import type { Context } from '@deepseek-ai/cordis'
-import z from '@deepseek-ai/schemastery'
-import type {} from '@deepseek-ai/dsh-user-approval'
+import type { Context } from '@roos-code/cordis'
+import z from '@roos-code/schemastery'
+import type {} from '@roos-code/roos-code-user-approval'
 import { applyReadTool, READ_LIMIT, STREAM_MIN_SIZE } from './read.ts'
 import { applyWriteTool } from './write.ts'
 import { applyEditTool } from './edit.ts'

@@ -7,10 +7,10 @@
  */
 
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@deepseek-ai/cordis'
-import { CallId } from '@deepseek-ai/dsh-llm'
-import type { ToolExecution } from '@deepseek-ai/dsh-tools'
-import { resolveRgPath, runRipgrep } from '@deepseek-ai/dsh-tool-fs-search'
+import { Context } from '@roos-code/cordis'
+import { CallId } from '@roos-code/roos-code-llm'
+import type { ToolExecution } from '@roos-code/roos-code-tools'
+import { resolveRgPath, runRipgrep } from '@roos-code/roos-code-tool-fs-search'
 
 // Any access to the mocked module's surface throws — the shape a missing
 // platform package produces at module evaluation.

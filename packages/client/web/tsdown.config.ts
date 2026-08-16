@@ -18,7 +18,7 @@ export default clientOnly([{
   dts: false,
   clean: false,
   plugins: [{
-    name: 'dsh-css-stub',
+    name: 'roos-css-stub',
     resolveId(source: string) {
       if (!source.endsWith('.css')) return null
       return `\0dsh-css-stub:${source}.mjs`

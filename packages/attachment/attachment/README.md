@@ -1,4 +1,4 @@
-# @deepseek-ai/dsh-attachment
+# @roos-code/roos-code-attachment
 
 English | [中文](README.zh.md)
 

@@ -1,4 +1,4 @@
-# @deepseek-ai/dsh-client-hmr
+# @roos-code/roos-code-client-hmr
 
 [English](README.md) | 中文
 

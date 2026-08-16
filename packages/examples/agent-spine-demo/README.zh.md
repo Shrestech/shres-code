@@ -1,4 +1,4 @@
-# @deepseek-ai/dsh-agent-spine-demo
+# @roos-code/roos-code-agent-spine-demo
 
 [English](README.md) | 中文
 
@@ -11,32 +11,32 @@
 `apply(ctx, config)` 将以下每个插件挂载为组合包 fiber 的子节点：
 
 ```
-@deepseek-ai/cordis-plugin-timer  timer service (writes nothing to stdout)
-@deepseek-ai/dsh-llm              abstract LLM service + content-block vocabulary
-@deepseek-ai/dsh-session          event-sourced session log + store
-@deepseek-ai/dsh-session-title    log-backed title service + deterministic fallback
-@deepseek-ai/dsh-system-prompt    prompt-section + tool-schema assembly
-@deepseek-ai/dsh-tools            registry + guarded pre/around/post/final-result pipeline
-@deepseek-ai/dsh-skill            skill provider registry
-@deepseek-ai/dsh-skill-filesystem      local filesystem skill provider
-@deepseek-ai/dsh-agent            agent registry + initiator scope + agent/* events
-@deepseek-ai/dsh-goal             optional persisted same-session goal domain
-@deepseek-ai/dsh-tool-goal        optional model-facing goal controls
-@deepseek-ai/dsh-goal-round-driver     optional same-session goal-round driver
-@deepseek-ai/dsh-llm-retry        provider-routed request retry policy
-@deepseek-ai/dsh-jobs-local      generic background-job registry
-@deepseek-ai/dsh-invariants       configurable invariant registry service
-@deepseek-ai/dsh-session/invariant
-@deepseek-ai/dsh-agent/invariant
-@deepseek-ai/dsh-scope/invariant
-@deepseek-ai/dsh-agent-loop/invariant
+@roos-code/cordis-plugin-timer  timer service (writes nothing to stdout)
+@roos-code/roos-code-llm              abstract LLM service + content-block vocabulary
+@roos-code/roos-code-session          event-sourced session log + store
+@roos-code/roos-code-session-title    log-backed title service + deterministic fallback
+@roos-code/roos-code-system-prompt    prompt-section + tool-schema assembly
+@roos-code/roos-code-tools            registry + guarded pre/around/post/final-result pipeline
+@roos-code/roos-code-skill            skill provider registry
+@roos-code/roos-code-skill-filesystem      local filesystem skill provider
+@roos-code/roos-code-agent            agent registry + initiator scope + agent/* events
+@roos-code/roos-code-goal             optional persisted same-session goal domain
+@roos-code/roos-code-tool-goal        optional model-facing goal controls
+@roos-code/roos-code-goal-round-driver     optional same-session goal-round driver
+@roos-code/roos-code-llm-retry        provider-routed request retry policy
+@roos-code/roos-code-jobs-local      generic background-job registry
+@roos-code/roos-code-invariants       configurable invariant registry service
+@roos-code/roos-code-session/invariant
+@roos-code/roos-code-agent/invariant
+@roos-code/roos-code-scope/invariant
+@roos-code/roos-code-agent-loop/invariant
                                   package-owned relational checks
-@deepseek-ai/dsh-tool-bash        the model-facing bash schema (unless toolBash=false)
-@deepseek-ai/dsh-agent-instructions  AGENTS.md/CLAUDE.md workspace context loader
-@deepseek-ai/dsh-tool-skill       session-prefix skill catalog + model-facing loader schema
-@deepseek-ai/dsh-tool-jobs       job_output/job_list/job_kill schemas + completion notices
-@deepseek-ai/dsh-agent-loop       THE concrete loop (gets the forwarded `agents`)
-                                  (dsh-system-prompt gets the forwarded `persona`)
+@roos-code/roos-code-tool-bash        the model-facing bash schema (unless toolBash=false)
+@roos-code/roos-code-agent-instructions  AGENTS.md/CLAUDE.md workspace context loader
+@roos-code/roos-code-tool-skill       session-prefix skill catalog + model-facing loader schema
+@roos-code/roos-code-tool-jobs       job_output/job_list/job_kill schemas + completion notices
+@roos-code/roos-code-agent-loop       THE concrete loop (gets the forwarded `agents`)
+                                  (roos-system-prompt gets the forwarded `persona`)
 ```
 
 ## 有意留在组合包外的组件
@@ -54,14 +54,14 @@
 ## 配置
 
 ```ts
-import type { Config } from '@deepseek-ai/dsh-agent-spine-demo'
-// { agents?, maxParallelToolCalls?, includeHarnessIdentity?, includeRuntimeContext?, persona?, toolOrder?, tools?, dshHome?, sessionTitle?, skills?, workspaceContext, toolBash?, jobs?, toolJobs?, goals?, invariants? }
+import type { Config } from '@roos-code/roos-code-agent-spine-demo'
+// { agents?, maxParallelToolCalls?, includeHarnessIdentity?, includeRuntimeContext?, persona?, toolOrder?, tools?, roosHome?, sessionTitle?, skills?, workspaceContext, toolBash?, jobs?, toolJobs?, goals?, invariants? }
 // workspaceContext requires { maxBytes } or false; the other owner schemas supply defaults.
 ```
 
-组合包将每个字段转发给拥有它的子节点。应用包提供预创建的 agent：无头和 JSON-RPC 组合会创建 `main`，ACP 应用则在 `session/new` 按需创建 agent。`includeRuntimeContext: false` 会转发给 `dsh-system-prompt`，为新建会话抑制所有动态上下文快照，但不禁用其策略服务。提示词、工具、标题、skill、工作区上下文、不变式、目标和任务设置沿用其所属包记录的 schema 与默认值；`jobs.maxConcurrentJobsPerOwner` 配置本地 Service Provider，并与面向模型的 `toolJobs` 控制工具相互独立。`pickSpineConfig()` 只复制该组合包拥有的字段，`dshHome` 值冲突会在组合时失败。
+组合包将每个字段转发给拥有它的子节点。应用包提供预创建的 agent：无头和 JSON-RPC 组合会创建 `main`，ACP 应用则在 `session/new` 按需创建 agent。`includeRuntimeContext: false` 会转发给 `roos-system-prompt`，为新建会话抑制所有动态上下文快照，但不禁用其策略服务。提示词、工具、标题、skill、工作区上下文、不变式、目标和任务设置沿用其所属包记录的 schema 与默认值；`jobs.maxConcurrentJobsPerOwner` 配置本地 Service Provider，并与面向模型的 `toolJobs` 控制工具相互独立。`pickSpineConfig()` 只复制该组合包拥有的字段，`roosHome` 值冲突会在组合时失败。
 
-例如，`{ invariants: { enabled: true, package_allowlist: ['^@deepseek-ai/dsh-'], package_blocklist: ['agent-loop$'] } }` 会让包拥有的配套插件保持挂载，但抑制被阻止的拥有者。Blocklist 匹配优先于 allowlist 匹配；正则表达式与生命周期规则见 [`dsh-invariants`](../../runtime-diagnostics/invariants/README.md)。
+例如，`{ invariants: { enabled: true, package_allowlist: ['^@roos-code/roos-code-'], package_blocklist: ['agent-loop$'] } }` 会让包拥有的配套插件保持挂载，但抑制被阻止的拥有者。Blocklist 匹配优先于 allowlist 匹配；正则表达式与生命周期规则见 [`roos-invariants`](../../runtime-diagnostics/invariants/README.md)。
 
 ## 为何使用代码组合包，而非共享 YAML include
 
@@ -71,7 +71,7 @@ YAML include 可以去重配置，却无法拥有 bin 或提供入口默认值�
 
 ## 模型体验
 
-模型通过 `dsh-system-prompt`、`dsh-tool-skill`、`dsh-tool-bash`、`dsh-tools` 和 `dsh-llm-retry` 间接获得体验；还会通过 `dsh-tool-goal` 与 Goal Round 提示词获得体验，前提是启用 `goals`。组合包自身不添加面向模型的包装内容。
+模型通过 `roos-system-prompt`、`roos-tool-skill`、`roos-tool-bash`、`roos-tools` 和 `roos-llm-retry` 间接获得体验；还会通过 `roos-tool-goal` 与 Goal Round 提示词获得体验，前提是启用 `goals`。组合包自身不添加面向模型的包装内容。
 
 #### KV Cache 影响
 

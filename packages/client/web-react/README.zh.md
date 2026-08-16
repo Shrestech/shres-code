@@ -1,4 +1,4 @@
-# @deepseek-ai/dsh-client-web-react
+# @roos-code/roos-code-client-web-react
 
 [English](README.md) | 中文
 

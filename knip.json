@@ -61,9 +61,9 @@
         "acp-agent/tests/fixtures/subagent/subagent-claude-code/driver.ts",
         "acp-agent/tests/fixtures/subagent/subagent-codex/fixture.ts",
         "acp-agent/tests/fixtures/subagent/subagent-codex/driver.ts",
-        "jsonrpc-agent/tests/fixtures/subagent/subagent-dsh-sdk/driver.ts",
-        "jsonrpc-agent/tests/fixtures/subagent/subagent-dsh-sdk/child-mock-llm.ts",
-        "jsonrpc-agent/tests/fixtures/subagent/subagent-dsh-sdk/mock-delegating-llm.ts",
+        "jsonrpc-agent/tests/fixtures/subagent/subagent-roos-sdk/driver.ts",
+        "jsonrpc-agent/tests/fixtures/subagent/subagent-roos-sdk/child-mock-llm.ts",
+        "jsonrpc-agent/tests/fixtures/subagent/subagent-roos-sdk/mock-delegating-llm.ts",
         "*/tests/**/*.e2e.ts",
         "*/tests/**/*.snapshot.ts"
       ],
@@ -71,7 +71,7 @@
         "**/*.ts"
       ],
       "ignoreDependencies": [
-        "@deepseek-ai/.+"
+        "@roos-code/.+"
       ]
     },
     "packages/util/home": {
@@ -94,8 +94,8 @@
     },
     "packages/host/directory-picker-auto": {
       "ignoreDependencies": [
-        "@deepseek-ai/dsh-client-ui-directory-picker-browse",
-        "@deepseek-ai/dsh-client-ui-directory-picker-native"
+        "@roos-code/roos-code-client-ui-directory-picker-browse",
+        "@roos-code/roos-code-client-ui-directory-picker-native"
       ]
     },
     "packages/extensions/cordis-host-runner": {
@@ -147,7 +147,7 @@
         "tests/**/*.ts"
       ],
       "ignoreDependencies": [
-        "@deepseek-ai/dsh-api-gateway"
+        "@roos-code/roos-code-api-gateway"
       ]
     },
     "packages/client/ui-primitives": {
@@ -696,7 +696,7 @@
         "tests/**/*.tsx"
       ],
       "ignoreDependencies": [
-        "@deepseek-ai/dsh-client-ui-theme"
+        "@roos-code/roos-code-client-ui-theme"
       ]
     },
     "packages/client/ui-settings": {
@@ -721,9 +721,9 @@
         "tests/**/*.ts"
       ],
       "ignoreDependencies": [
-        "@deepseek-ai/dsh-client-ui-primitives",
-        "@deepseek-ai/dsh-client-ui-slots",
-        "@deepseek-ai/dsh-client-web-react",
+        "@roos-code/roos-code-client-ui-primitives",
+        "@roos-code/roos-code-client-ui-slots",
+        "@roos-code/roos-code-client-web-react",
         "@types/react",
         "@types/react-dom",
         "react",
@@ -741,7 +741,7 @@
         "tests/**/*.ts"
       ],
       "ignoreDependencies": [
-        "@deepseek-ai/.+"
+        "@roos-code/.+"
       ]
     },
     "packages/client/modules": {
@@ -762,7 +762,7 @@
         "tests/**/*.ts"
       ]
     },
-    "packages/subagent/subagent-dsh-sdk": {
+    "packages/subagent/subagent-roos-sdk": {
       "entry": [
         "tests/**/*.spec.ts",
         "tests/**/*.e2e.ts"
@@ -774,17 +774,17 @@
     },
     "packages/bundle/base": {
       "ignoreDependencies": [
-        "@deepseek-ai/.+"
+        "@roos-code/.+"
       ]
     },
     "packages/bundle/headless": {
       "ignoreDependencies": [
-        "@deepseek-ai/dsh-code-runtime-worker-thread"
+        "@roos-code/roos-code-code-runtime-worker-thread"
       ]
     },
     "packages/bundle/web-app": {
       "ignoreDependencies": [
-        "@deepseek-ai/.+"
+        "@roos-code/.+"
       ]
     }
   }

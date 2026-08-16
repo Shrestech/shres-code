@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@deepseek-ai/cordis'
+import { Context } from '@roos-code/cordis'
 import TurndownService from 'turndown'
-import { CallId } from '@deepseek-ai/dsh-llm'
-import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
-import ToolRuntime, { type ToolExecutionResult } from '@deepseek-ai/dsh-tools'
-import WebRuntime from '@deepseek-ai/dsh-web'
-import type { WebSearchProvider, WebSearchResult } from '@deepseek-ai/dsh-web'
-import * as ToolWeb from '@deepseek-ai/dsh-tool-web'
+import { CallId } from '@roos-code/roos-code-llm'
+import SystemPrompt from '@roos-code/roos-code-system-prompt'
+import ToolRuntime, { type ToolExecutionResult } from '@roos-code/roos-code-tools'
+import WebRuntime from '@roos-code/roos-code-web'
+import type { WebSearchProvider, WebSearchResult } from '@roos-code/roos-code-web'
+import * as ToolWeb from '@roos-code/roos-code-tool-web'
 import {
   formatSearchOutput,
   formatFetchOutput,
@@ -21,9 +21,9 @@ import {
   fetchMetaFromValue,
   fetchMetaFromResult,
   WEB_SEARCH_MAX_RESULTS,
-} from '@deepseek-ai/dsh-tool-web'
-import type { ContentBlock } from '@deepseek-ai/dsh-llm'
-import type { ToolResult } from '@deepseek-ai/dsh-tools'
+} from '@roos-code/roos-code-tool-web'
+import type { ContentBlock } from '@roos-code/roos-code-llm'
+import type { ToolResult } from '@roos-code/roos-code-tools'
 
 const testToolSignal = new AbortController().signal
 
@@ -38,7 +38,7 @@ async function mountTools(opts: {
   config?: ToolWeb.Config
   webConfig?: ConstructorParameters<typeof WebRuntime>[1]
   search?: WebSearchProvider
-  fetchProvider?: import('@deepseek-ai/dsh-web').WebFetchProvider
+  fetchProvider?: import('@roos-code/roos-code-web').WebFetchProvider
 } = {}): Promise<{ ctx: Context; fiber: Awaited<ReturnType<Context['plugin']>>; call: (name: string, args: unknown) => Promise<ToolExecutionResult> }> {
   const ctx = new Context()
   await ctx.plugin(SystemPrompt)
@@ -595,7 +595,7 @@ describe('tool-web execution through the real registry', () => {
       truncated: false,
     })
     // The model schema exposes no timeout: the tool forwards only the url; the
-    // tool-call budget is owned by dsh-tool-call-timeout-policy over exec.signal.
+    // tool-call budget is owned by roos-tool-call-timeout-policy over exec.signal.
     expect(seen.request).toEqual({ url: 'https://a.test' })
     expect(seen.signal).toBe(controller.signal)
     await fiber.dispose()

@@ -1,16 +1,16 @@
 // @vitest-environment jsdom
-import { Context, Service } from '@deepseek-ai/cordis'
+import { Context, Service } from '@roos-code/cordis'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   ConversationEventRegistry, ConversationNodeAssembler, SlotRegistry,
-} from '@deepseek-ai/dsh-client-runtime/client'
+} from '@roos-code/roos-code-client-runtime/client'
 import type {
   ChatConversationViewNode, ConversationEventInput, ConversationMatch, ConversationNodeDefinition,
   ConversationViewDefinition, SessionId, SessionListState,
-} from '@deepseek-ai/dsh-client-runtime/client'
-import { apply as applyLocale, inject as localeInject } from '@deepseek-ai/dsh-client-locale/client'
-import { makeTranslate, stubSettingsScope } from '@deepseek-ai/dsh-client-test-runtime'
+} from '@roos-code/roos-code-client-runtime/client'
+import { apply as applyLocale, inject as localeInject } from '@roos-code/roos-code-client-locale/client'
+import { makeTranslate, stubSettingsScope } from '@roos-code/roos-code-client-test-runtime'
 import {
   WorkflowRunPanel, type WorkflowRunInjected, type WorkflowRunPanelProps,
 } from '../src/client/WorkflowRunPanel.tsx'
@@ -584,6 +584,6 @@ describe('plugin lifecycle', () => {
       register: (pkg: string) => { registered.push(pkg); return () => {} },
     } as never)
     await applyInvariant(ctx)
-    expect(registered).toEqual(['@deepseek-ai/dsh-client-ui-workflow-run'])
+    expect(registered).toEqual(['@roos-code/roos-code-client-ui-workflow-run'])
   })
 })

@@ -9,17 +9,17 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-- text: Use web_search to search exactly "DeepSeek Harness snapshot search". Then reply exactly SEARCH_DONE and stop. {{clock}}
+- text: Use web_search to search exactly "Roos Code snapshot search". Then reply exactly SEARCH_DONE and stop. {{clock}}
 - button "Copy":
   - img
-- button "Context injection @deepseek-ai/dsh-system-prompt":
+- button "Context injection @roos-code/roos-code-system-prompt":
   - img
   - img
-  - text: Context injection @deepseek-ai/dsh-system-prompt
-- button "Search DeepSeek Harness snapshot search":
+  - text: Context injection @roos-code/roos-code-system-prompt
+- button "Search Roos Code snapshot search":
   - img
   - img
-  - text: Search DeepSeek Harness snapshot search
+  - text: Search Roos Code snapshot search
 - paragraph: SEARCH_DONE
 - button "Copy":
   - img

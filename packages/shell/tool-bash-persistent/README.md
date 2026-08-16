@@ -1,4 +1,4 @@
-# @deepseek-ai/dsh-tool-bash-persistent
+# @roos-code/roos-code-tool-bash-persistent
 
 English | [中文](README.zh.md)
 

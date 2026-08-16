@@ -1,11 +1,11 @@
 {
-  "name": "@deepseek-ai/dsh-session-log-export",
+  "name": "@roos-code/roos-code-session-log-export",
   "description": "Web Session-log export command and shared download dialog",
   "version": "0.1.0-rc.5",
   "publishConfig": { "access": "public" },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
+    "url": "git+https://github.com/roos-code/roos-code.git",
     "directory": "packages/session-query/session-log-export"
   },
   "type": "module",
@@ -22,40 +22,40 @@
   "scripts": { "bundle": "tsdown", "watch": "tsdown --watch" },
   "license": "MIT",
   "peerDependencies": {
-    "@deepseek-ai/cordis": "workspace:^",
-    "@deepseek-ai/dsh-client-locale": "workspace:^",
-    "@deepseek-ai/dsh-client-runtime": "workspace:^",
-    "@deepseek-ai/dsh-client-ui-commands": "workspace:^",
-    "@deepseek-ai/dsh-client-ui-conversation": "workspace:^",
-    "@deepseek-ai/dsh-client-ui-primitives": "workspace:^",
-    "@deepseek-ai/dsh-client-ui-slots": "workspace:^",
-    "@deepseek-ai/dsh-commands": "workspace:^",
-    "@deepseek-ai/dsh-invariants": "workspace:^",
+    "@roos-code/cordis": "workspace:^",
+    "@roos-code/roos-code-client-locale": "workspace:^",
+    "@roos-code/roos-code-client-runtime": "workspace:^",
+    "@roos-code/roos-code-client-ui-commands": "workspace:^",
+    "@roos-code/roos-code-client-ui-conversation": "workspace:^",
+    "@roos-code/roos-code-client-ui-primitives": "workspace:^",
+    "@roos-code/roos-code-client-ui-slots": "workspace:^",
+    "@roos-code/roos-code-commands": "workspace:^",
+    "@roos-code/roos-code-invariants": "workspace:^",
     "react": "^18.2.0"
   },
   "devDependencies": {
-    "@deepseek-ai/cordis": "workspace:^",
-    "@deepseek-ai/cordis-plugin-loader": "workspace:^",
-    "@deepseek-ai/dsh-agent": "workspace:^",
-    "@deepseek-ai/dsh-client-locale": "workspace:^",
-    "@deepseek-ai/dsh-client-runtime": "workspace:^",
-    "@deepseek-ai/dsh-client-ui-commands": "workspace:^",
-    "@deepseek-ai/dsh-client-ui-conversation": "workspace:^",
-    "@deepseek-ai/dsh-client-ui-primitives": "workspace:^",
-    "@deepseek-ai/dsh-client-ui-slots": "workspace:^",
-    "@deepseek-ai/dsh-commands": "workspace:^",
-    "@deepseek-ai/dsh-invariants": "workspace:^",
-    "@deepseek-ai/dsh-session": "workspace:^",
+    "@roos-code/cordis": "workspace:^",
+    "@roos-code/cordis-plugin-loader": "workspace:^",
+    "@roos-code/roos-code-agent": "workspace:^",
+    "@roos-code/roos-code-client-locale": "workspace:^",
+    "@roos-code/roos-code-client-runtime": "workspace:^",
+    "@roos-code/roos-code-client-ui-commands": "workspace:^",
+    "@roos-code/roos-code-client-ui-conversation": "workspace:^",
+    "@roos-code/roos-code-client-ui-primitives": "workspace:^",
+    "@roos-code/roos-code-client-ui-slots": "workspace:^",
+    "@roos-code/roos-code-commands": "workspace:^",
+    "@roos-code/roos-code-invariants": "workspace:^",
+    "@roos-code/roos-code-session": "workspace:^",
     "@types/react": "~18.3.1",
     "react": "^18.2.0"
   },
-  "dsh": {
+  "roos": {
     "client": {
       "inject": [
-        "@deepseek-ai/dsh-client-locale",
-        "@deepseek-ai/dsh-client-runtime",
-        "@deepseek-ai/dsh-client-ui-commands",
-        "@deepseek-ai/dsh-client-ui-conversation"
+        "@roos-code/roos-code-client-locale",
+        "@roos-code/roos-code-client-runtime",
+        "@roos-code/roos-code-client-ui-commands",
+        "@roos-code/roos-code-client-ui-conversation"
       ],
       "platform": "web"
     }

@@ -1,4 +1,4 @@
-# @deepseek-ai/dsh-storage-json
+# @roos-code/roos-code-storage-json
 
 [English](README.md) | 中文
 

@@ -1,4 +1,4 @@
-# dsh-client-ui-settings-plugins
+# roos-client-ui-settings-plugins
 
 English | [中文](README.zh.md)
 

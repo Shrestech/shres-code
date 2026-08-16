@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { SessionId } from '@deepseek-ai/dsh-session'
-import { SessionSearchCursor, type SessionQueryErrorCode } from '@deepseek-ai/dsh-session-query'
+import { SessionId } from '@roos-code/roos-code-session'
+import { SessionSearchCursor, type SessionQueryErrorCode } from '@roos-code/roos-code-session-query'
 import {
   buildEventWhere,
   buildSessionWhere,

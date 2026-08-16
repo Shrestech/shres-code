@@ -1,4 +1,4 @@
-# @deepseek-ai/dsh-client-schema-form
+# @roos-code/roos-code-client-schema-form
 
 [English](README.md) | 中文
 

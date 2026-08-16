@@ -1,4 +1,4 @@
-# @deepseek-ai/dsh-settings
+# @roos-code/roos-code-settings
 
 [English](README.md) | 中文
 

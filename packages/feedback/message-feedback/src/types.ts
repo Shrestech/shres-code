@@ -2,12 +2,12 @@
  * Public request, value, and failure vocabulary for per-message feedback.
  * This module contains types only so generated Remote clients can consume it
  * without importing Host runtime code.
- * @module @deepseek-ai/dsh-message-feedback/types
+ * @module @roos-code/roos-code-message-feedback/types
  */
 
-import type { Branded } from '@deepseek-ai/dsh-brand'
-import type { MessageId } from '@deepseek-ai/dsh-llm/brand'
-import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import type { Branded } from '@roos-code/roos-code-brand'
+import type { MessageId } from '@roos-code/roos-code-llm/brand'
+import type { SessionId } from '@roos-code/roos-code-session/types'
 
 /** Opaque compare-and-set token for one exact feedback item revision. */
 export type MessageFeedbackVersion = Branded<'MessageFeedbackVersion'>

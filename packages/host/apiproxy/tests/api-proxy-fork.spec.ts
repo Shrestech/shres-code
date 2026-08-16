@@ -1,19 +1,19 @@
 /** Session-fork boundaries, lineage, and inherited model routing. */
 
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@deepseek-ai/cordis'
-import AgentRegistry, { agentEvents } from '@deepseek-ai/dsh-agent'
-import type { Agent, AgentHandle, CreateAgentOptions } from '@deepseek-ai/dsh-agent'
-import { createUserMessage, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
-import type { LlmCallConfig } from '@deepseek-ai/dsh-llm'
-import SessionStore from '@deepseek-ai/dsh-session'
-import type { Session, SessionEvent, SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
-import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
-import UserQuestionService from '@deepseek-ai/dsh-user-questions'
-import type { Workspace } from '@deepseek-ai/dsh-workspace'
-import type { RpcRequest } from '@deepseek-ai/dsh-host-apiproxy/api/rpc'
-import { RpcId } from '@deepseek-ai/dsh-host-apiproxy/api/rpc'
-import { createApiProxy } from '@deepseek-ai/dsh-host-apiproxy'
+import { Context } from '@roos-code/cordis'
+import AgentRegistry, { agentEvents } from '@roos-code/roos-code-agent'
+import type { Agent, AgentHandle, CreateAgentOptions } from '@roos-code/roos-code-agent'
+import { createUserMessage, ReasoningEffortId } from '@roos-code/roos-code-llm'
+import type { LlmCallConfig } from '@roos-code/roos-code-llm'
+import SessionStore from '@roos-code/roos-code-session'
+import type { Session, SessionEvent, SessionHeader, SessionId } from '@roos-code/roos-code-session'
+import SystemPrompt from '@roos-code/roos-code-system-prompt'
+import UserQuestionService from '@roos-code/roos-code-user-questions'
+import type { Workspace } from '@roos-code/roos-code-workspace'
+import type { RpcRequest } from '@roos-code/roos-code-host-apiproxy/api/rpc'
+import { RpcId } from '@roos-code/roos-code-host-apiproxy/api/rpc'
+import { createApiProxy } from '@roos-code/roos-code-host-apiproxy'
 
 const sid = (id: string): SessionId => id as SessionId
 

@@ -2,17 +2,17 @@
  * Register a DeepSeek-backed provider in `ctx.web`. It calls the Anthropic-compatible Messages API
  * with native `web_search_20250305`. The provider reuses `DEEPSEEK_API_KEY` but not
  * `DEEPSEEK_BASE_URL`, because search and chat-completions use different bases.
- * @module @deepseek-ai/dsh-web-search-deepseek
+ * @module @roos-code/roos-code-web-search-deepseek
  */
 
-import type { Context } from '@deepseek-ai/cordis'
-import z from '@deepseek-ai/schemastery'
-import type {} from '@deepseek-ai/dsh-agent'
-import { credentialRef } from '@deepseek-ai/dsh-credentials'
-import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
-import { launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
-import type {} from '@deepseek-ai/dsh-session'
-import type {} from '@deepseek-ai/dsh-web'
+import type { Context } from '@roos-code/cordis'
+import z from '@roos-code/schemastery'
+import type {} from '@roos-code/roos-code-agent'
+import { credentialRef } from '@roos-code/roos-code-credentials'
+import { installSettingsSection, settingsNamespace } from '@roos-code/roos-code-settings'
+import { launchEnvironmentOf } from '@roos-code/roos-code-launch-environment'
+import type {} from '@roos-code/roos-code-session'
+import type {} from '@roos-code/roos-code-web'
 import {
   DeepSeekSearchProvider,
   DEEPSEEK_DEFAULT_API_VERSION,

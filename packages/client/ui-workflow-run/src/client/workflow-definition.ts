@@ -1,12 +1,12 @@
 import type {
   ChatConversationViewNode, ConversationLocation, ConversationNodeContext,
   ConversationNodeDefinition,
-} from '@deepseek-ai/dsh-client-runtime/client'
-import type { SessionId } from '@deepseek-ai/dsh-session/types'
+} from '@roos-code/roos-code-client-runtime/client'
+import type { SessionId } from '@roos-code/roos-code-session/types'
 import type {
   ToolWorkflowAgentEndData, ToolWorkflowAgentStartData,
-} from '@deepseek-ai/dsh-tool-workflow/types'
-import type { WorkflowAgentOutcome, WorkflowStopReason } from '@deepseek-ai/dsh-workflow/types'
+} from '@roos-code/roos-code-tool-workflow/types'
+import type { WorkflowAgentOutcome, WorkflowStopReason } from '@roos-code/roos-code-workflow/types'
 
 /** Status shown for a workflow, phase, or member. */
 export type WorkflowRunStatus = 'running' | 'completed' | 'failed' | 'cancelled' | 'interrupted'
@@ -34,7 +34,7 @@ export interface WorkflowRunChatData {
   readonly phases: readonly WorkflowRunPhaseData[]
 }
 
-declare module '@deepseek-ai/dsh-client-ui-conversation/client' {
+declare module '@roos-code/roos-code-client-ui-conversation/client' {
   interface ChatNodeDataMap {
     /** Durable top-level workflow run and all members that actually started. */
     'workflow-run': WorkflowRunChatData

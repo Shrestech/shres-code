@@ -1,18 +1,18 @@
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import { createUserMessage } from '@roos-code/roos-code-llm'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { Context } from '@deepseek-ai/cordis'
-import Loader from '@deepseek-ai/cordis-plugin-loader'
-import { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
-import { defineContentToolFixture } from '@deepseek-ai/dsh-tools'
-import type { Agent } from '@deepseek-ai/dsh-agent'
-import AgentLoop from '@deepseek-ai/dsh-agent-loop'
-import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
-import { LocalBashExecutor } from '@deepseek-ai/dsh-bash-local'
-import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
-import * as HooksCodex from '@deepseek-ai/dsh-hooks-codex'
+import { Context } from '@roos-code/cordis'
+import Loader from '@roos-code/cordis-plugin-loader'
+import { SessionId, type SessionEvent } from '@roos-code/roos-code-session'
+import { defineContentToolFixture } from '@roos-code/roos-code-tools'
+import type { Agent } from '@roos-code/roos-code-agent'
+import AgentLoop from '@roos-code/roos-code-agent-loop'
+import { mountAgentLoopTestDependencies } from '@roos-code/roos-code-agent-loop-testkit'
+import { LocalBashExecutor } from '@roos-code/roos-code-bash-local'
+import LocalSubprocessRuntime from '@roos-code/roos-code-subprocess-local'
+import * as HooksCodex from '@roos-code/roos-code-hooks-codex'
 import { MockAdapter, textResponse, toolCallResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
 
 /**
@@ -25,7 +25,7 @@ const dirs: string[] = []
 afterEach(() => { for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true }) })
 
 function configDir(): string {
-  const dir = mkdtempSync(join(tmpdir(), 'dsh-hooks-codex-'))
+  const dir = mkdtempSync(join(tmpdir(), 'roos-hooks-codex-'))
   dirs.push(dir)
   return dir
 }

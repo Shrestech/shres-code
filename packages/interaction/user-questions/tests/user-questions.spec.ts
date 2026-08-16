@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@deepseek-ai/cordis'
-import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
+import { Context } from '@roos-code/cordis'
+import AgentRegistry, { type Agent } from '@roos-code/roos-code-agent'
 import UserQuestionService, {
   UserQuestionError,
   type AskUserQuestionRequest,
   type UserQuestionProvider,
-} from '@deepseek-ai/dsh-user-questions'
+} from '@roos-code/roos-code-user-questions'
 
 function provider(answer = 'approved'): UserQuestionProvider & { seen: AskUserQuestionRequest[] } {
   const seen: AskUserQuestionRequest[] = []

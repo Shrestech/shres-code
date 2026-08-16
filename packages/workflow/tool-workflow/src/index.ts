@@ -2,29 +2,29 @@
  * The model-facing `workflow` tool: run a JavaScript orchestration script that fans out
  * subagents, and return the script's final value. It owns the model-facing schema and run lifecycle; script
  * parsing, execution, caps, and cancellation live behind `ctx.workflowEngine`
- * (`@deepseek-ai/dsh-workflow`), so a hardened engine swaps in without touching what the model
+ * (`@roos-code/roos-code-workflow`), so a hardened engine swaps in without touching what the model
  * sees. Execution awaits `run.result` and always disposes the run; non-completed reasons become tool
  * errors, and background collection remains deferred. Presentation is an args-only generic card
  * titled from `meta.name`. Explicit-ask usage guidance is registered as the tool's own prompt
  * section rather than deployment persona prose.
- * @module @deepseek-ai/dsh-tool-workflow
+ * @module @roos-code/roos-code-tool-workflow
  */
 
-import type { Context } from '@deepseek-ai/cordis'
-import z from '@deepseek-ai/schemastery'
-import { defineTool } from '@deepseek-ai/dsh-tools'
-import type { ToolCallView, ToolResultView } from '@deepseek-ai/dsh-tools'
-import type { ContentBlock } from '@deepseek-ai/dsh-llm'
-import type { JsonValue, Session, SessionEventMap } from '@deepseek-ai/dsh-session'
+import type { Context } from '@roos-code/cordis'
+import z from '@roos-code/schemastery'
+import { defineTool } from '@roos-code/roos-code-tools'
+import type { ToolCallView, ToolResultView } from '@roos-code/roos-code-tools'
+import type { ContentBlock } from '@roos-code/roos-code-llm'
+import type { JsonValue, Session, SessionEventMap } from '@roos-code/roos-code-session'
 import type {
   WorkflowResult, WorkflowRun, WorkflowRunId, WorkflowStopReason,
-} from '@deepseek-ai/dsh-workflow'
+} from '@roos-code/roos-code-workflow'
 import type {
   ToolWorkflowAgentEndData, ToolWorkflowAgentStartData,
   ToolWorkflowRunEndData, ToolWorkflowRunStartData,
 } from './types.ts'
 // Declaration merge only: makes ctx.systemPrompt visible for the section registration.
-import type {} from '@deepseek-ai/dsh-system-prompt'
+import type {} from '@roos-code/roos-code-system-prompt'
 
 export const name = 'tool-workflow'
 export const inject = ['tools', 'workflowEngine', 'systemPrompt']

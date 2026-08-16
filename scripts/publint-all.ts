@@ -12,7 +12,7 @@ import { parseArgs } from 'node:util'
 import { publint, type Message, type PackFile } from 'publint'
 import { formatMessage } from 'publint/utils'
 
-const CONCURRENCY_ENV = 'DSH_PUBLINT_CONCURRENCY'
+const CONCURRENCY_ENV = 'ROOS_PUBLINT_CONCURRENCY'
 const repositoryRoot = resolve(import.meta.dirname, '..')
 const { values: options } = parseArgs({
   args: process.argv.slice(2),

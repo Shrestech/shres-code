@@ -3,16 +3,16 @@
  * an escapable vm context on a fresh worker and bridges `agent()` calls to host
  * subagents. The thread prevents synchronous script work from blocking the host
  * and permits forced termination, but it is containment rather than a security boundary.
- * @module @deepseek-ai/dsh-workflow-worker-thread
+ * @module @roos-code/roos-code-workflow-worker-thread
  */
 
 import { randomUUID } from 'node:crypto'
 import { availableParallelism } from 'node:os'
 import * as vm from 'node:vm'
-import type { Context } from '@deepseek-ai/cordis'
-import z from '@deepseek-ai/schemastery'
-import WorkflowEngine, { WorkflowError, WorkflowRunId } from '@deepseek-ai/dsh-workflow'
-import type { WorkflowRun, WorkflowRunInfo, WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
+import type { Context } from '@roos-code/cordis'
+import z from '@roos-code/schemastery'
+import WorkflowEngine, { WorkflowError, WorkflowRunId } from '@roos-code/roos-code-workflow'
+import type { WorkflowRun, WorkflowRunInfo, WorkflowStartRequest } from '@roos-code/roos-code-workflow'
 import { WorkerRun } from './host.ts'
 import { validateMeta } from './meta.ts'
 import type { WorkerInit, WorkerLimits } from './types.ts'

@@ -1,4 +1,4 @@
-# @deepseek-ai/dsh-tool-ask-user
+# @roos-code/roos-code-tool-ask-user
 
 English | [中文](README.zh.md)
 

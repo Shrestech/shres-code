@@ -3,16 +3,16 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
-import { Context } from '@deepseek-ai/cordis'
-import Loader from '@deepseek-ai/cordis-plugin-loader'
-import Include from '@deepseek-ai/cordis-plugin-include'
-import AgentRegistry from '@deepseek-ai/dsh-agent'
-import AgentLoop from '@deepseek-ai/dsh-agent-loop'
-import LlmRuntime, { createUserMessage, LlmAdapter, LlmError, resolveRetryPolicy  } from '@deepseek-ai/dsh-llm'
-import type { GenerateOptions, ResolvedRetryPolicy, StreamChunk } from '@deepseek-ai/dsh-llm'
-import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
-import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
-import ToolRuntime from '@deepseek-ai/dsh-tools'
+import { Context } from '@roos-code/cordis'
+import Loader from '@roos-code/cordis-plugin-loader'
+import Include from '@roos-code/cordis-plugin-include'
+import AgentRegistry from '@roos-code/roos-code-agent'
+import AgentLoop from '@roos-code/roos-code-agent-loop'
+import LlmRuntime, { createUserMessage, LlmAdapter, LlmError, resolveRetryPolicy  } from '@roos-code/roos-code-llm'
+import type { GenerateOptions, ResolvedRetryPolicy, StreamChunk } from '@roos-code/roos-code-llm'
+import SessionStore, { SessionId } from '@roos-code/roos-code-session'
+import SystemPrompt from '@roos-code/roos-code-system-prompt'
+import ToolRuntime from '@roos-code/roos-code-tools'
 import * as retry from '../src/index.ts'
 
 let root: string | undefined
@@ -49,7 +49,7 @@ afterEach(async () => {
 })
 
 async function loadYaml(lines: readonly string[]): Promise<Context> {
-  root = await mkdtemp(join(tmpdir(), 'dsh-llm-retry-loader-'))
+  root = await mkdtemp(join(tmpdir(), 'roos-llm-retry-loader-'))
   const configPath = join(root, 'cordis.yml')
   await writeFile(configPath, [...lines, ''].join('\n'))
 
@@ -58,13 +58,13 @@ async function loadYaml(lines: readonly string[]): Promise<Context> {
   await context.plugin(Loader)
   context.loader.builtins.include = Include
   const modules = new Map<string, unknown>([
-    ['@deepseek-ai/dsh-llm', LlmRuntime],
-    ['@deepseek-ai/dsh-session', SessionStore],
-    ['@deepseek-ai/dsh-system-prompt', SystemPrompt],
-    ['@deepseek-ai/dsh-tools', ToolRuntime],
-    ['@deepseek-ai/dsh-agent', AgentRegistry],
-    ['@deepseek-ai/dsh-llm-retry', retry],
-    ['@deepseek-ai/dsh-agent-loop', AgentLoop],
+    ['@roos-code/roos-code-llm', LlmRuntime],
+    ['@roos-code/roos-code-session', SessionStore],
+    ['@roos-code/roos-code-system-prompt', SystemPrompt],
+    ['@roos-code/roos-code-tools', ToolRuntime],
+    ['@roos-code/roos-code-agent', AgentRegistry],
+    ['@roos-code/roos-code-llm-retry', retry],
+    ['@roos-code/roos-code-agent-loop', AgentLoop],
   ])
   context.loader.internal = {
     version: 'v2',
@@ -87,13 +87,13 @@ describe('real Loader composition', () => {
   // to trip the default 5s budget on cold caches.
   it('loads provider-supplied policy and records recovery through the shipping loop', { timeout: 60_000 }, async () => {
     const loaded = await loadYaml([
-      "- name: '@deepseek-ai/dsh-llm'",
-      "- name: '@deepseek-ai/dsh-session'",
-      "- name: '@deepseek-ai/dsh-system-prompt'",
-      "- name: '@deepseek-ai/dsh-tools'",
-      "- name: '@deepseek-ai/dsh-agent'",
-      "- name: '@deepseek-ai/dsh-llm-retry'",
-      "- name: '@deepseek-ai/dsh-agent-loop'",
+      "- name: '@roos-code/roos-code-llm'",
+      "- name: '@roos-code/roos-code-session'",
+      "- name: '@roos-code/roos-code-system-prompt'",
+      "- name: '@roos-code/roos-code-tools'",
+      "- name: '@roos-code/roos-code-agent'",
+      "- name: '@roos-code/roos-code-llm-retry'",
+      "- name: '@roos-code/roos-code-agent-loop'",
     ])
 
     const unloaded = [...loaded.loader.entries()]

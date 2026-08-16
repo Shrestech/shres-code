@@ -1,17 +1,17 @@
 import { PassThrough } from 'node:stream'
-import { Context } from '@deepseek-ai/cordis'
-import Loader from '@deepseek-ai/cordis-plugin-loader'
+import { Context } from '@roos-code/cordis'
+import Loader from '@roos-code/cordis-plugin-loader'
 import { describe, expect, it, vi } from 'vitest'
-import type { Agent } from '@deepseek-ai/dsh-agent'
-import type { InvariantInstaller } from '@deepseek-ai/dsh-invariants'
-import type { ContentBlock } from '@deepseek-ai/dsh-llm'
-import SubagentRuntime from '@deepseek-ai/dsh-subagent'
-import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
+import type { Agent } from '@roos-code/roos-code-agent'
+import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { ContentBlock } from '@roos-code/roos-code-llm'
+import SubagentRuntime from '@roos-code/roos-code-subagent'
+import { MAX_TIMER_DELAY_MS } from '@roos-code/roos-code-timeout'
 import type {
   SubprocessHandle,
   SubprocessOutcome,
-} from '@deepseek-ai/dsh-subprocess'
-import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
+} from '@roos-code/roos-code-subprocess'
+import LocalSubprocessRuntime from '@roos-code/roos-code-subprocess-local'
 import * as codex from '../src/index.ts'
 import * as invariant from '../src/invariant.ts'
 import {
@@ -350,7 +350,7 @@ describe('task admission and package contracts', () => {
     const ctx = { invariants: { register } } as unknown as Context
     await expect(invariant.apply(ctx)).resolves.toBe(dispose)
     expect(register).toHaveBeenCalledWith(
-      '@deepseek-ai/dsh-subagent-codex',
+      '@roos-code/roos-code-subagent-codex',
       expect.any(Function),
     )
     const install = register.mock.calls[0]![1]
@@ -371,8 +371,8 @@ describe('CodexAppServerWire', () => {
     const initialize = await child.peer.nextMethod('initialize')
     expect(initialize.params).toEqual({
       clientInfo: {
-        name: 'deepseek-harness',
-        title: 'DeepSeek Harness',
+        name: 'roos-code',
+        title: 'Roos Code',
         version: '0.0.1',
       },
       capabilities: {

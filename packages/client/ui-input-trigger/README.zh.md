@@ -1,4 +1,4 @@
-# @deepseek-ai/dsh-client-ui-input-trigger
+# @roos-code/roos-code-client-ui-input-trigger
 
 [English](README.md) | 中文
 

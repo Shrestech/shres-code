@@ -1,20 +1,20 @@
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@deepseek-ai/cordis'
-import Loader from '@deepseek-ai/cordis-plugin-loader'
-import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
-import ToolRuntime, { TOOL_ABORTED_BEFORE_DISPATCH } from '@deepseek-ai/dsh-tools'
-import type { ToolExecutionResult, ToolExecutionToken } from '@deepseek-ai/dsh-tools'
-import type { Agent } from '@deepseek-ai/dsh-agent'
-import { WorkflowRunId, WorkflowEngine } from '@deepseek-ai/dsh-workflow'
+import { Context } from '@roos-code/cordis'
+import Loader from '@roos-code/cordis-plugin-loader'
+import SystemPrompt from '@roos-code/roos-code-system-prompt'
+import ToolRuntime, { TOOL_ABORTED_BEFORE_DISPATCH } from '@roos-code/roos-code-tools'
+import type { ToolExecutionResult, ToolExecutionToken } from '@roos-code/roos-code-tools'
+import type { Agent } from '@roos-code/roos-code-agent'
+import { WorkflowRunId, WorkflowEngine } from '@roos-code/roos-code-workflow'
 import type {
   WorkflowAgentEndInfo, WorkflowAgentInfo, WorkflowResult, WorkflowRun,
   WorkflowRunId as WorkflowRunIdType, WorkflowStartRequest,
-} from '@deepseek-ai/dsh-workflow'
-import { CallId } from '@deepseek-ai/dsh-llm'
-import SubagentRuntime from '@deepseek-ai/dsh-subagent'
-import WorkerThreadWorkflowEngine from '@deepseek-ai/dsh-workflow-worker-thread'
+} from '@roos-code/roos-code-workflow'
+import { CallId } from '@roos-code/roos-code-llm'
+import SubagentRuntime from '@roos-code/roos-code-subagent'
+import WorkerThreadWorkflowEngine from '@roos-code/roos-code-workflow-worker-thread'
 import * as toolWorkflow from '../src/index.ts'
-import { Session, SessionId } from '@deepseek-ai/dsh-session'
+import { Session, SessionId } from '@roos-code/roos-code-session'
 
 const testToolSignal = new AbortController().signal
 
@@ -105,7 +105,7 @@ function execute(ctx: Context, args: unknown, extra?: {
   })
 }
 
-describe('dsh-tool-workflow', () => {
+describe('roos-tool-workflow', () => {
   it('starts a run with the script/args/parent/signal and renders the completed value', async () => {
     const { ctx, engine, parent } = await setup()
     const controller = new AbortController()
