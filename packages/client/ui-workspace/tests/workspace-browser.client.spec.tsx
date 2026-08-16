@@ -6,19 +6,19 @@ import type {
   SessionId, SessionListState, SessionSummary, WorkspaceId, WorkspaceListState, WorkspaceView,
 } from '@roos-code/roos-code-client-runtime/client'
 import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
-import { zh as commonZh } from '@roos-code/roos-code-client-locale/src/locales/zh.ts'
+import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
 import type { WorkspaceBrowserProps } from '../src/client/contract/slots.ts'
 import { createWorkspaceViewStore, FLAT_SESSION_ORDER_KEY } from '../src/client/stores.ts'
 import { UNGROUPED_KEY } from '../src/client/tree.ts'
 import { WorkspaceBrowser } from '../src/client/WorkspaceBrowser.tsx'
-import { zh } from '../src/client/locales.ts'
+import { en } from '../src/client/locales.ts'
 
 afterEach(cleanup)
 beforeEach(() => { localStorage.clear(); createWorkspaceViewStore().create().actions.setOrderBy('manual') })
 
 // The seat's key domain is workspace ∪ common; the stub mirrors the real
 // lookup chain (namespace, then common vocabulary, then the key).
-const t: WorkspaceBrowserProps['t'] = makeTranslate(zh, commonZh)
+const t: WorkspaceBrowserProps['t'] = makeTranslate(en, commonEn)
 
 const sid = (id: string) => id as SessionId
 const wid = (id: string) => id as WorkspaceId

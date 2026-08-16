@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { bindSnapshotSelector } from '@roos-code/roos-code-client-web-react'
 import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
-import { zh as commonZh } from '@roos-code/roos-code-client-locale/src/locales/zh.ts'
+import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
 import type {
   ChatConversationViewNode, ConversationNode,
 } from '@roos-code/roos-code-client-runtime/client'
@@ -23,7 +23,7 @@ import {
 } from '../src/client/chat/MessageItem.tsx'
 import { AssistantMarkdown } from '../src/client/chat/AssistantMarkdown.tsx'
 import { StatsLine, type StatsLineProps } from '../src/client/chat/StatsLine.tsx'
-import { zh } from '../src/client/locales.ts'
+import { en } from '../src/client/locales.ts'
 import { chatSnapshotFixture } from './chat-snapshot-fixture.client.ts'
 
 /** jsdom has no ResizeObserver; StatsLine watches its row for ellipsis truncation through one. */
@@ -41,7 +41,7 @@ afterEach(() => {
 })
 
 // Mirrors the real lookup chain (conversation namespace, then common).
-const t: ChatNodeViewProps['t'] = makeTranslate(zh, commonZh)
+const t: ChatNodeViewProps['t'] = makeTranslate(en, commonEn)
 const RETRY_ID = 'retry-fixture' as Extract<ConversationNode, { kind: 'model-retry' }>['retryId']
 
 interface MessageItemProps {

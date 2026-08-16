@@ -11,14 +11,14 @@ import {
   createSnapshotStore, EMPTY_CHAT_SNAPSHOT, EMPTY_CONVERSATION_VIEWS,
 } from '@roos-code/roos-code-client-runtime/client'
 import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
-import { zh as commonZh } from '@roos-code/roos-code-client-locale/src/locales/zh.ts'
+import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
 import type { ClientContext, ConversationSnapshot, SessionId } from '@roos-code/roos-code-client-runtime/client'
 import { SessionInputShell } from '../src/client/input/facade.ts'
 import type { ComposerAttachment } from '../src/client/contract/slots.ts'
 import type { DraftAttachmentId } from '../src/client/input/contract.ts'
 import { InputBar } from '../src/client/skeleton/InputBar.tsx'
 import type { InputBarProps } from '../src/client/skeleton/InputBar.tsx'
-import { zh } from '../src/client/locales.ts'
+import { en } from '../src/client/locales.ts'
 
 afterEach(cleanup)
 
@@ -178,7 +178,7 @@ function bench(over?: BenchOptions) {
     stop,
     command: over?.command ?? (() => Promise.resolve(true)),
     // Mirrors the real lookup chain (conversation namespace, then common).
-    t: over?.t ?? makeTranslate(zh, commonZh),
+    t: over?.t ?? makeTranslate(en, commonEn),
     renderSlot,
     variant: over?.variant ?? 'composer',
     ...(over?.inert === true ? { disabled: true } : {}),

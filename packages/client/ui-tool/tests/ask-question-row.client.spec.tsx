@@ -11,10 +11,10 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ToolResultNode } from '@roos-code/roos-code-client-runtime/client'
 import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
-import { zh as commonZh } from '@roos-code/roos-code-client-locale/src/locales/zh.ts'
+import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
 // Export discipline: packages/client/AGENTS.md.
 import { AskQuestionRow, askQuestionToolview } from '../src/client/tool/toolviews/ask-question-row.tsx'
-import { zh } from '@roos-code/roos-code-client-ui-conversation/src/client/locales.ts'
+import { en } from '@roos-code/roos-code-client-ui-conversation/src/client/locales.ts'
 
 afterEach(cleanup)
 
@@ -31,7 +31,7 @@ const runningCall = (argsRaw: string) =>
   ({ callId: 'c1', name: 'ask_user_question', argsRaw, turn: 1, step: 1, time: 1_000, callView: null, subCalls: [] })
 
 // Standard locale seat stub mirroring the real ns → common → key chain.
-const t = makeTranslate(zh, commonZh)
+const t = makeTranslate(en, commonEn)
 
 function rowProps(block: unknown): Parameters<typeof AskQuestionRow>[0] {
   return {

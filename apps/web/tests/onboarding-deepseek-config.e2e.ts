@@ -49,14 +49,14 @@ describe.skipIf(MODE === 'record')('web e2e: first-run DeepSeek credential setup
 
   it('stores a key write-only and observes configured state without restarting', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-onboarding-deepseek-config'))
-    const welcome = page.getByRole('dialog', { name: WELCOME_NOTICE_COPY.zh.title })
+    const welcome = page.getByRole('dialog', { name: WELCOME_NOTICE_COPY.en.title })
     await welcome.waitFor({ timeout: 15_000 })
     expect(await page.locator('#root').evaluate(root => (root as HTMLElement).inert)).toBe(true)
-    for (const paragraph of WELCOME_NOTICE_COPY.zh.body.split('\n\n')) {
+    for (const paragraph of WELCOME_NOTICE_COPY.en.body.split('\n\n')) {
       expect(await welcome.getByText(paragraph, { exact: true }).count()).toBe(1)
     }
     expect(await welcome.getByRole('button').allTextContents()).toEqual([
-      WELCOME_NOTICE_COPY.zh.continueLabel,
+      WELCOME_NOTICE_COPY.en.continueLabel,
     ])
     const welcomeAria = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(WELCOME_EXPECTED, welcomeAria, MODE)
@@ -68,7 +68,7 @@ describe.skipIf(MODE === 'record')('web e2e: first-run DeepSeek credential setup
     acknowledgeReloadConnectionLoss(tripwire, firstReloadWarnings)
     await welcome.waitFor({ timeout: 15_000 })
 
-    await welcome.getByRole('button', { name: WELCOME_NOTICE_COPY.zh.continueLabel }).click()
+    await welcome.getByRole('button', { name: WELCOME_NOTICE_COPY.en.continueLabel }).click()
     await welcome.waitFor({ state: 'detached', timeout: 15_000 })
 
     const credentialStep = page.getByRole('dialog', { name: '添加一个 API Key 开始使用' })
@@ -113,7 +113,7 @@ describe.skipIf(MODE === 'record')('web e2e: first-run DeepSeek credential setup
     await page.reload({ waitUntil: 'load' })
     acknowledgeReloadConnectionLoss(tripwire, secondReloadWarnings)
     await page.waitForSelector('[class*="frame"]', { timeout: 15_000 })
-    expect(await page.getByRole('dialog', { name: WELCOME_NOTICE_COPY.zh.title }).count()).toBe(0)
+    expect(await page.getByRole('dialog', { name: WELCOME_NOTICE_COPY.en.title }).count()).toBe(0)
     expect(await page.getByRole('dialog', { name: '添加一个 API Key 开始使用' }).count()).toBe(0)
 
     // An old acknowledgement means materially revised copy: welcome returns,
@@ -125,7 +125,7 @@ describe.skipIf(MODE === 'record')('web e2e: first-run DeepSeek credential setup
     await page.reload({ waitUntil: 'load' })
     acknowledgeReloadConnectionLoss(tripwire, thirdReloadWarnings)
     await welcome.waitFor({ timeout: 15_000 })
-    await welcome.getByRole('button', { name: WELCOME_NOTICE_COPY.zh.continueLabel }).click()
+    await welcome.getByRole('button', { name: WELCOME_NOTICE_COPY.en.continueLabel }).click()
     await welcome.waitFor({ state: 'detached', timeout: 15_000 })
     expect(await page.getByRole('dialog', { name: '添加一个 API Key 开始使用' }).count()).toBe(0)
 
@@ -186,7 +186,7 @@ describe.skipIf(MODE === 'record')('web e2e: first-run DeepSeek credential setup
     acknowledgeReloadConnectionLoss(tripwire, warningsBefore)
     expect(await page.evaluate(() =>
       (window as unknown as { __takeoverSightings: string[] }).__takeoverSightings)).toEqual([])
-    expect(await page.getByRole('dialog', { name: WELCOME_NOTICE_COPY.zh.title }).count()).toBe(0)
+    expect(await page.getByRole('dialog', { name: WELCOME_NOTICE_COPY.en.title }).count()).toBe(0)
     expect(await page.getByRole('dialog', { name: '添加一个 API Key 开始使用' }).count()).toBe(0)
     expect(tripwire.pageErrors).toEqual([])
   }, 60_000)

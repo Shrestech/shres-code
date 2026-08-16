@@ -1,7 +1,5 @@
 # @roos-code/roos-code-tool-bash
 
-English | [中文](README.zh.md)
-
 The model-facing `bash` tool registered over the `ctx.shell` executor seam. Foreground execution stays behind that seam; a background process handle is registered with the generic `ctx.jobs` runtime and controlled through `job_output`, `job_list`, and `job_kill` from `@roos-code/roos-code-tool-jobs`.
 
 Requires a loaded executor Service Provider (e.g. `@roos-code/roos-code-bash-local`) and the [`@roos-code/roos-code-shell-env`](../shell-env/README.md) registry; the plugin stays pending until every injected service exists (`inject: ['tools', 'bash', 'systemPrompt', 'bashEnv']`). The tool contract is bash-dialect — mount a bash-parsing executor.

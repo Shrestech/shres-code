@@ -6,14 +6,14 @@ import { createSnapshotStore } from '@roos-code/roos-code-client-runtime/client'
 import type { ComponentProps } from 'react'
 import type { ModelDirectoryState } from '../src/client/directory.ts'
 import { ModelSelect } from '../src/client/ModelSelect.tsx'
-import { zh } from '../src/client/locales.ts'
-import { zh as commonZh } from '@roos-code/roos-code-client-locale/src/locales/zh.ts'
+import { en } from '../src/client/locales.ts'
+import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
 
 // The seat's key domain is model ∪ common; the stub mirrors the real lookup
 // chain: package dictionary, then common vocabulary, then the key.
 const t: ComponentProps<typeof ModelSelect>['t'] = (key, params) => {
   const template = (zh as Record<string, string>)[key]
-    ?? (commonZh as Record<string, string>)[key]
+    ?? (commonEn as Record<string, string>)[key]
     ?? key
   return params === undefined
     ? template

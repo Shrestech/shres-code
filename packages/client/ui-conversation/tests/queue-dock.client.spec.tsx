@@ -14,10 +14,10 @@ import type {
 } from '@roos-code/roos-code-client-runtime/client'
 import type { SnapshotSelectorHook } from '@roos-code/roos-code-client-ui-slots'
 import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
-import { zh as commonZh } from '@roos-code/roos-code-client-locale/src/locales/zh.ts'
+import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
 import type { QueueItemId } from '../src/client/contract/queue.ts'
 import type { InputState } from '../src/client/input/contract.ts'
-import { zh } from '../src/client/locales.ts'
+import { en } from '../src/client/locales.ts'
 import { QueueDock, queueDockEntry, type QueueDockInjected, type QueueDockProps } from '../src/client/queue/QueueDock.tsx'
 
 afterEach(cleanup)
@@ -67,7 +67,7 @@ function liveSession(initial: ConversationSnapshot) {
 const INPUT_STATE: InputState = { draft: '', imageIds: [], draftRev: 0, phase: 'plain', occurrences: [], queue: [] }
 
 // Standard locale seat stub mirroring the real ns → common → key chain.
-const t: QueueDockProps['t'] = makeTranslate(zh, commonZh)
+const t: QueueDockProps['t'] = makeTranslate(en, commonEn)
 
 function kitFor(snapshot: ConversationSnapshot, injected: Partial<QueueDockInjected> = {}) {
   return {

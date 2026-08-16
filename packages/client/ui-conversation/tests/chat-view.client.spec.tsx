@@ -20,10 +20,10 @@ import type {
   ChatNode, ChatNodeOwnerProps, ChatNodeViewProps, ChatViewSlotProps, SelectionTarget, UseChatNodeTurnData,
 } from '@roos-code/roos-code-client-ui-conversation/client'
 import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
-import { zh as commonZh } from '@roos-code/roos-code-client-locale/src/locales/zh.ts'
+import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
 import { createChatStore } from '../src/client/stores.ts'
 import { ChatView } from '../src/client/chat/ChatView.tsx'
-import { zh } from '../src/client/locales.ts'
+import { en } from '../src/client/locales.ts'
 import { AssistantNodeView } from '../src/client/chat/AssistantNodeView.tsx'
 import { CommandNodeView, ManualCompactionNodeView } from '../src/client/chat/CommandNodeView.tsx'
 import {
@@ -165,7 +165,7 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
   // Selection rides the REAL chat store (same construction path as
   // production; the view reads it through the PropsStore useStore share).
   const chat = createChatStore().create()
-  const t = makeTranslate(zh, commonZh)
+  const t = makeTranslate(en, commonEn)
   const toolOwners: Array<{
     callId: string
     toolName: string
@@ -367,7 +367,7 @@ describe('Chat node rendering', () => {
   })
 
   it('formatRunDuration localizes units and floors partial seconds', () => {
-    const t = makeTranslate(zh, commonZh)
+    const t = makeTranslate(en, commonEn)
     expect(formatRunDuration(0, t)).toBe('0秒')
     expect(formatRunDuration(-500, t)).toBe('0秒')
     expect(formatRunDuration(15_999, t)).toBe('15秒')

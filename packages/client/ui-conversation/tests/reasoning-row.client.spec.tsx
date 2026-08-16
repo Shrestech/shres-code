@@ -2,9 +2,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
-import { zh as commonZh } from '@roos-code/roos-code-client-locale/src/locales/zh.ts'
+import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
 import { AssistantMarkdown } from '../src/client/chat/AssistantMarkdown.tsx'
-import { zh } from '../src/client/locales.ts'
+import { en } from '../src/client/locales.ts'
 
 let nextAnimationFrameId = 1
 let animationFrames = new Map<number, FrameRequestCallback>()
@@ -36,7 +36,7 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-const t = makeTranslate(zh, commonZh)
+const t = makeTranslate(en, commonEn)
 
 describe('ReasoningRow', () => {
   it('follows the latest streaming line, scrolls to its end, then restores the settled first line', () => {

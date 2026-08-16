@@ -7,7 +7,7 @@ import type {
 } from '@roos-code/roos-code-client-runtime/client'
 import { ConversationNodeAssembler } from '@roos-code/roos-code-client-runtime/client'
 import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
-import { zh as commonZh } from '@roos-code/roos-code-client-locale/src/locales/zh.ts'
+import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
 import type { SessionEvent } from '@roos-code/roos-code-session/types'
 import { commandDefinition } from '@roos-code/roos-code-client-ui-conversation/src/client/conversation-nodes/command.ts'
 import { chatViewDefinition } from '@roos-code/roos-code-client-ui-conversation/src/client/conversation-nodes/chat-snapshot-builder.ts'
@@ -15,7 +15,7 @@ import { GoalCommandInputView } from '../src/client/GoalCommandInputView.tsx'
 import {
   goalCommandInputDefinition, goalCommandText,
 } from '../src/client/goal-command-input.ts'
-import { zh } from '../src/client/locales.ts'
+import { en } from '../src/client/locales.ts'
 
 afterEach(cleanup)
 
@@ -117,7 +117,7 @@ describe('goal command input projection', () => {
   })
 
   it('renders the user-style command bubble without ordinary message actions', () => {
-    const t = makeTranslate(zh, commonZh)
+    const t = makeTranslate(en, commonEn)
     const props = {
       node: {
         key: 'goal-command-input:one',

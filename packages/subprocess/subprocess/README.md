@@ -1,7 +1,5 @@
 # @roos-code/roos-code-subprocess
 
-English | [中文](README.zh.md)
-
 The subprocess seam (`ctx.subprocess`) is the process half of one execution world. The abstract `SubprocessRuntime` exposes executable lookup, ordinary managed `spawn`, and one terminal-process primitive; its vocabulary covers raw/collected stdio, process and terminal handles, exit facts, tree/session cleanup, and the managed `ROOS_*` environment namespace. The local implementation lives in [`roos-subprocess-local`](../subprocess-local/README.md).
 
 ## Contract

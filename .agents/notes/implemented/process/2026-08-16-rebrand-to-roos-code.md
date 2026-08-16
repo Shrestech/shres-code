@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-08-16-rebrand-to-roos-code.zh.md)
-
 ## Problem
 
 The repository shipped as DeepSeek Harness under the `@deepseek-ai/dsh-*` npm names, the `dsh` CLI, `$DSH_*` environment variables, and `~/.dsh`. That identity is a DeepSeek product name. A fork that will publish under a different org cannot keep those names: the scoped packages would squat `@deepseek-ai`, hook scripts and env contracts would stay tied to `DSH_*`, and user data would keep landing in `~/.dsh`. There are no external consumers yet, so a compatibility shim would only preserve a name the project is leaving.

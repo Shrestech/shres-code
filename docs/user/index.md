@@ -7,5 +7,3 @@ head:
 ---
 
 # Roos Code
-
-English | [中文](index.zh.md)

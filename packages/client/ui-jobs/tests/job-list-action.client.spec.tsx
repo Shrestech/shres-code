@@ -4,7 +4,7 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
 import type { SessionId, SessionListState, JobView } from '@roos-code/roos-code-client-runtime/client'
 import { JobListAction, type JobListActionProps } from '../src/client/JobListAction.tsx'
-import { zh } from '../src/client/locales.ts'
+import { en } from '../src/client/locales.ts'
 
 // Live rows render `now - startedAt`, so every assertion needs a pinned clock.
 beforeEach(() => {
@@ -55,7 +55,7 @@ function props(jobs: readonly JobView[] | undefined): JobListActionProps {
  * time rather than split out of a flattened string.
  */
 function rowCells(): string[][] {
-  return within(screen.getByRole('list', { name: zh['list.aria'] }))
+  return within(screen.getByRole('list', { name: en['list.aria'] }))
     .getAllByRole('listitem')
     .map(row => [...row.children]
       .map(cell => cell.textContent ?? '')
@@ -79,7 +79,7 @@ describe('JobListAction visibility', () => {
   it('closes and unmounts when the last job disappears while the list is open', () => {
     const { container, rerender } = render(<JobListAction {...props([job()])} />)
     fireEvent.click(screen.getByRole('button'))
-    expect(screen.getByRole('list', { name: zh['list.aria'] })).toBeDefined()
+    expect(screen.getByRole('list', { name: en['list.aria'] })).toBeDefined()
 
     rerender(<JobListAction {...props([])} />)
     expect(container.innerHTML).toBe('')
@@ -205,7 +205,7 @@ describe('JobListAction dismissal', () => {
     const trigger = screen.getByRole('button')
     fireEvent.click(trigger)
 
-    fireEvent.pointerDown(screen.getByRole('list', { name: zh['list.aria'] }))
+    fireEvent.pointerDown(screen.getByRole('list', { name: en['list.aria'] }))
     expect(trigger.getAttribute('aria-expanded')).toBe('true')
 
     fireEvent.pointerDown(document.body)

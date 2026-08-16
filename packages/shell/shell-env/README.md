@@ -1,7 +1,5 @@
 # @roos-code/roos-code-shell-env
 
-English | [中文](README.zh.md)
-
 The tool-independent shell environment plugin: owns the `ctx.shellEnv` registry of trusted, per-execution `ROOS_*` variables that the model-facing shell tools (`roos-tool-bash`, `roos-tool-pwsh`) collect into every shell call's environment. Built-in shell facts (`ROOS_HOME`, `ROOS_SHELL=1`, `ROOS_SESSION_ID`) are owned by the registry itself; other plugins register additional enumerable facts with effect-scoped disposal, and duplicate ownership or undeclared runtime keys fail loudly.
 
 The package root exports the Cordis plugin contract (`name`, `inject`, `Config`, `apply`) plus the `ShellEnvRegistry` service class and its contributor types; consumers use `ctx.shellEnv` after loading this plugin.

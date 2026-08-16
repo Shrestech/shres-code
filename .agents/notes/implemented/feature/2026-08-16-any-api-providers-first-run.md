@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-08-16-any-api-providers-first-run.zh.md)
-
 ## Problem
 
 The pi-ai adapter could already serve OpenAI-compatible and catalog providers, but the shipped base bundle left `llm-pi-ai` dormant and first-run onboarding offered only official DeepSeek. A user without `DEEPSEEK_API_KEY` either hit `MISSING_CREDENTIAL` or watched the SDK silently mount DeepSeek. There was no local-Ollama probe, no shipped Ollama Cloud / Grok / Kimi / Claude routes, and no TTY picker that wrote `agent-default-model` plus credentials.

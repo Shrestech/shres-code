@@ -5,15 +5,15 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
-import { en as commonEn, zh as commonZh } from '@roos-code/roos-code-client-locale/src/locales/index.ts'
+import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/index.ts'
 import { ContextMeter, type ContextMeterProps } from '../src/client/skeleton/ContextMeter.tsx'
 import css from '../src/client/skeleton/ContextMeter.module.css'
-import { en, zh } from '../src/client/locales.ts'
+import { en } from '../src/client/locales.ts'
 
 afterEach(cleanup)
 
 // Mirrors the real lookup chain (conversation namespace, then common).
-const t = makeTranslate(zh, commonZh) as ContextMeterProps['t']
+const t = makeTranslate(en, commonEn) as ContextMeterProps['t']
 const tEn = makeTranslate(en, commonEn) as ContextMeterProps['t']
 
 const BREAKDOWN = { systemTokens: 120, toolsTokens: 21_500, messageTokens: 477_000 }

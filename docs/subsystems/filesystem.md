@@ -1,7 +1,5 @@
 # Filesystem
 
-English | [中文](filesystem.zh.md)
-
 The optional filesystem capability has four parts: [roos-fs](../../packages/fs/fs) owns `ctx.fs` and atomic text operations with optional guards, [roos-fs-local](../../packages/fs/fs-local) implements local disk, [roos-fs-observation-policy](../../packages/fs/fs-observation-policy) records observed presence or absence and adds freshness rules through events rather than a service, and [roos-tool-fs](../../packages/fs/tool-fs) directly executes model-facing read/write/edit calls and renders windows. It is outside the agent-loop spine; alternate backends do not change policy or tool schemas.
 
 `roos-fs-observation-policy` is optional. Without it, the `FileSystem` Service Definition, a provider, and the `roos-tool-fs` Consumer form the complete, unconstrained filesystem seam: `write` unconditionally creates or overwrites, and `edit` unconditionally replaces literal text. The policy plugin changes these operations by deciding the `fs/*` waterfalls. Removing it does not break the tool because the tool calls `ctx.fs` and dispatches events; it does not call policy methods. A deployment that loads `roos-tool-fs` is expected to also load `roos-fs-observation-policy` so the default behavior is read-before-write/edit.

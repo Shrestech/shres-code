@@ -1,7 +1,5 @@
 # Configure models
 
-English | [中文](providers.zh.md)
-
 This guide assumes you started the Web UI through the [root README](../../../README.md#run), or `roos --profile headless` on a TTY. Model changes take effect on the next request without restarting the server.
 
 First run with no usable default opens a picker instead of silently choosing a vendor. Headless prints detected local Ollama models, the shipped template routes, and a custom base URL; Web shows the same routes on the onboarding card. A non-TTY process with no usable default fails and names those configuration paths.

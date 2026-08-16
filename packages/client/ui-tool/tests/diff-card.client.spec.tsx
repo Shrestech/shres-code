@@ -16,14 +16,14 @@ import type {
 import type { ToolCallView, ToolResultView } from '@roos-code/roos-code-api-remotes/client'
 import type { SelectionTarget } from '@roos-code/roos-code-client-ui-conversation/client'
 import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
-import { zh as commonZh } from '@roos-code/roos-code-client-locale/src/locales/zh.ts'
+import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
 import { CHAT_DIFF_MAX_LINES, diffCardModel } from '../src/client/tool/models/diff-card-model.ts'
 import { createChatStore } from '@roos-code/roos-code-client-ui-conversation/src/client/stores.ts'
 import { GenericToolCard, type GenericToolCardProps } from '../src/client/tool/toolviews/GenericToolCard.tsx'
 import { DetailsPanel } from '@roos-code/roos-code-client-ui-conversation/src/client/skeleton/DetailsPanel.tsx'
 import { FileMutationRow, fileMutationToolview } from '../src/client/tool/toolviews/file-mutation-row.tsx'
 import { renderToolDetails, SessionProviderStub, toolChatSnapshot } from './tool-details-render.client.tsx'
-import { zh } from '@roos-code/roos-code-client-ui-conversation/src/client/locales.ts'
+import { en } from '@roos-code/roos-code-client-ui-conversation/src/client/locales.ts'
 
 afterEach(cleanup)
 
@@ -32,7 +32,7 @@ type FileMutationRowProps = Parameters<typeof FileMutationRow>[0]
 
 const SID = 's1' as SessionId
 
-const t = makeTranslate(zh, commonZh)
+const t = makeTranslate(en, commonEn)
 
 const ARGS = '{"file_path":"notes/demo.txt","old_string":"hello","new_string":"hello fixture"}'
 

@@ -1,7 +1,5 @@
 # @roos-code/roos-code-skill-badge
 
-English | [中文](README.zh.md)
-
 Optional bundled skill provider that contributes `roos-badge` to `ctx.skills`. The skill supplies the official “powered by roos” Markdown snippets and the packaged PNG for systems that cannot import a remote image reliably.
 
 Mount the plugin to enable the provider. It has no configuration. The shipped CLI composition includes the plugin as `disabled: true`; users must explicitly enable its `skill-badge` row before the skill enters a catalog.

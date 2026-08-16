@@ -1,7 +1,5 @@
 # @roos-code/roos-code-session-persistence-jsonl
 
-English | [中文](README.zh.md)
-
 The JSONL durable session-persistence backend — a concrete `SessionPersistence` (the `roos-session-persistence` seam). Each session has one append-only logical JSONL log, stored as `.jsonl.zstd` by default or raw `.jsonl` when compression is disabled.
 
 ## On-disk layout

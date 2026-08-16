@@ -10,9 +10,9 @@ import { RpcId } from '@roos-code/roos-code-client-connection/client'
 import type { SnapshotSelectorHook } from '@roos-code/roos-code-client-ui-slots'
 import { PendingQuestion, type QuestionComposerProps } from '../src/client/contract/slots.ts'
 import { QuestionComposer, parseRecommendedLabel } from '../src/client/QuestionComposer.tsx'
-import { en, zh } from '../src/client/locales.ts'
+import { en } from '../src/client/locales.ts'
 import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
-import { zh as commonZh } from '@roos-code/roos-code-client-locale/src/locales/zh.ts'
+import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
 
 afterEach(cleanup)
 
@@ -35,7 +35,7 @@ const kit = {
   useInput: (() => { throw new Error('unused') }) as never,
   inputActions: { setDraft: () => { throw new Error('unused') }, submit: () => { throw new Error('unused') } } as never,
   // The seat's key domain is question ∪ common.
-  t: seatOver(zh, commonZh),
+  t: seatOver(zh, commonEn),
 }
 
 const QUESTIONS = [

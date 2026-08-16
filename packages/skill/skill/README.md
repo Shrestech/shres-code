@@ -1,7 +1,5 @@
 # @roos-code/roos-code-skill
 
-English | [中文](README.zh.md)
-
 Pure agent skill provider registry.
 
 This package owns the `ctx.skills` interface. It does not know whether skills come from local files, embedded plugin data, HTTP, or another backend; providers register those sources with `ctx.skills.registerProvider(...)`. The shipped local implementation is [`@roos-code/roos-code-skill-filesystem`](../skill-filesystem).

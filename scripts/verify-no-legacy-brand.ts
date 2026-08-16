@@ -36,7 +36,7 @@ export interface LegacyBrandReference {
 function keepListed(file: string): boolean {
   if (file === 'LICENSE' || file === 'NOTICE') return true
   if (file.startsWith('.agents/notes/')) return true
-  if (file === 'docs/rescope.md' || file === 'docs/rescope.zh.md') return true
+  if (file === 'docs/rescope.md') return true
   if (/^vendor\/[^/]+\/(README\.md|LICENSE)$/.test(file)) return true
   if (file === 'scripts/rebrand.ts' || file === 'scripts/rebrand.spec.ts') return true
   if (file === 'scripts/rescope-vendor.ts' || file === 'scripts/rescope-vendor.spec.ts') return true

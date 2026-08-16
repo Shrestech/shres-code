@@ -14,7 +14,7 @@ import {
   createSnapshotStore, EMPTY_CONVERSATION_VIEWS,
 } from '@roos-code/roos-code-client-runtime/client'
 import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
-import { zh as commonZh } from '@roos-code/roos-code-client-locale/src/locales/zh.ts'
+import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
 import type {
   ConversationSnapshot, RunningToolCall, SessionId, SessionListState, ToolResultNode, WorkspaceListState,
 } from '@roos-code/roos-code-client-runtime/client'
@@ -23,7 +23,7 @@ import type { SelectionTarget } from '@roos-code/roos-code-client-ui-conversatio
 import { CHAT_READ_MAX_LINES, readCardModel } from '../src/client/tool/models/read-card-model.ts'
 import { createChatStore } from '@roos-code/roos-code-client-ui-conversation/src/client/stores.ts'
 import { GenericToolCard, type GenericToolCardProps } from '../src/client/tool/toolviews/GenericToolCard.tsx'
-import { zh } from '@roos-code/roos-code-client-ui-conversation/src/client/locales.ts'
+import { en } from '@roos-code/roos-code-client-ui-conversation/src/client/locales.ts'
 import { DetailsPanel } from '@roos-code/roos-code-client-ui-conversation/src/client/skeleton/DetailsPanel.tsx'
 import { ReadRow, readToolview } from '../src/client/tool/toolviews/read-row.tsx'
 import { renderToolDetails, SessionProviderStub, toolChatSnapshot } from './tool-details-render.client.tsx'
@@ -33,7 +33,7 @@ afterEach(cleanup)
 const SID = 's1' as SessionId
 
 /** The chat-view locale seat: this package's namespace over the common fallback. */
-const t: GenericToolCardProps['t'] = makeTranslate(zh, commonZh)
+const t: GenericToolCardProps['t'] = makeTranslate(en, commonEn)
 
 // The read tool's real schema key is `file_path`; the top-level read samples
 // use it so the row exercises a production-shaped call. `web_fetch` (below) has

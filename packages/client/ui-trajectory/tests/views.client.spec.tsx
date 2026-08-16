@@ -28,11 +28,11 @@ import {
   type ConversationSessionHeaderProps, type ConversationSessionProps,
 } from '@roos-code/roos-code-client-ui-conversation/src/client/skeleton/ConversationSession.tsx'
 import { createChatStore } from '@roos-code/roos-code-client-ui-conversation/src/client/stores.ts'
-import { zh as conversationZh } from '@roos-code/roos-code-client-ui-conversation/src/client/locales.ts'
+import { en as conversationEn } from '@roos-code/roos-code-client-ui-conversation/src/client/locales.ts'
 import { apply as localeApply, inject as localeInject } from '@roos-code/roos-code-client-locale/client'
 import { stubSettingsScope } from '@roos-code/roos-code-client-test-runtime'
 import type { LocaleKeysOf } from '@roos-code/roos-code-client-ui-slots'
-import { zh, type TrajectoryKey } from '../src/client/locales.ts'
+import { type TrajectoryKey } from '../src/client/locales.ts'
 import { apply, inject } from '@roos-code/roos-code-client-ui-trajectory/client'
 import { apply as nodeApply } from '@roos-code/roos-code-client-ui-trajectory'
 import type { TrajectoryTurnModel } from '../src/client/layout.ts'
@@ -47,7 +47,7 @@ import { deriveTrajectoryTimeline } from '../src/client/timeline.ts'
 const SID = 's1' as SessionId
 const sessionSnapshots = new WeakMap<SlotRegistry, SnapshotStore<ConversationSnapshot>>()
 const tConversation: ConversationSessionHeaderProps['t'] =
-  key => (conversationZh as Record<string, string>)[key] ?? key
+  key => (conversationEn as Record<string, string>)[key] ?? key
 
 afterEach(cleanup)
 // The chat store persists under its declared key; clear so one case's active
@@ -167,7 +167,7 @@ function standaloneProps(
     useWorkspaces: emptyWorkspaces(),
     useProjection: (() => undefined) as never,
     // The locale seat the outlet would inject for the declared namespace.
-    t: (key: LocaleKeysOf<'trajectory'>) => zh[key as TrajectoryKey] ?? key,
+    t: (key: LocaleKeysOf<'trajectory'>) => en[key as TrajectoryKey] ?? key,
   } as unknown as ConvViewProps & { t: (key: LocaleKeysOf<'trajectory'>) => string }
 }
 
@@ -248,7 +248,7 @@ function mount(slots: SlotRegistry, nodes: ConversationSnapshot['nodes'] = NODES
           loadOlder: trajectory.loadOlder,
           setActualDuration: trajectory.setActualDuration,
           useDuration: bindSnapshotSelector(trajectory.hooks.duration),
-          t: (key: TrajectoryKey) => zh[key],
+          t: (key: TrajectoryKey) => en[key],
         }
       })()
       : injected
@@ -384,11 +384,6 @@ describe('tab switching in ConversationRoot', () => {
   it('labels the trajectory tab in the active locale', async () => {
     const b = await bench()
     const labelOf = () => tabsOf(b.slots).find(tab => tab.id === 'trajectory')?.label
-    expect(labelOf()).toBe('Trajectory')
-    const locale = b.ctx.get('locale') as { setLocale(id: string): void }
-    locale.setLocale('zh')
-    expect(labelOf()).toBe('轨迹')
-    locale.setLocale('en')
     expect(labelOf()).toBe('Trajectory')
   })
 

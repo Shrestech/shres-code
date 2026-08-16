@@ -11,13 +11,13 @@ import { EMPTY_CONVERSATION_VIEWS } from '@roos-code/roos-code-client-runtime/cl
 import { bindSnapshotSelector } from '@roos-code/roos-code-client-web-react'
 import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
 import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
-import { zh as commonZh } from '@roos-code/roos-code-client-locale/src/locales/zh.ts'
+import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
 import { StatsLine, contextOccupancy, deriveStats, formatDuration, formatTokens, type StatsLineProps } from '../src/client/chat/StatsLine.tsx'
-import { en, zh } from '../src/client/locales.ts'
+import { en } from '../src/client/locales.ts'
 import { chatSnapshotFixture } from './chat-snapshot-fixture.client.ts'
 
 // Mirrors the real lookup chain (conversation namespace, then common).
-const t: StatsLineProps['t'] = makeTranslate(zh, commonZh)
+const t: StatsLineProps['t'] = makeTranslate(en, commonEn)
 const tEn: StatsLineProps['t'] = makeTranslate(en, commonEn)
 
 /** jsdom has no ResizeObserver; StatsLine watches its row for ellipsis truncation through one. */

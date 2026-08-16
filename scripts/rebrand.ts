@@ -406,7 +406,7 @@ function main(): void {
   } else if (mode === 'check') {
     console.log('rebrand: post-state verified — no residue, every exact edit landed, idempotent.')
   } else if (mode === 'apply') {
-    console.log('rebrand: applied. Run `pnpm install`, `pnpm run gen-third-party-notices`, and re-record the touched bilingual pairs.')
+    console.log('rebrand: applied. Run `pnpm install` and `pnpm run gen-third-party-notices`.')
   }
 }
 

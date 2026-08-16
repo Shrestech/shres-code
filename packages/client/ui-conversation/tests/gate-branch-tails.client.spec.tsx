@@ -11,16 +11,16 @@ import type { ConversationSnapshot, SessionId, SessionListState, WorkspaceListSt
 import type { SessionProviderComponent } from '@roos-code/roos-code-client-ui-slots'
 import type { DetailsSlotProps, DetailsToolOwnerProps, SelectionTarget } from '@roos-code/roos-code-client-ui-conversation/client'
 import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
-import { zh as commonZh } from '@roos-code/roos-code-client-locale/src/locales/zh.ts'
+import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
 import { createChatStore } from '../src/client/stores.ts'
 import { AssistantMarkdown, type AssistantMarkdownProps } from '../src/client/chat/AssistantMarkdown.tsx'
 import { StatsLine } from '../src/client/chat/StatsLine.tsx'
 import { DetailsPanel } from '../src/client/skeleton/DetailsPanel.tsx'
-import { zh } from '../src/client/locales.ts'
+import { en } from '../src/client/locales.ts'
 import { chatSnapshotFixture } from './chat-snapshot-fixture.client.ts'
 
 // Mirrors the real lookup chain (conversation namespace, then common).
-const t: AssistantMarkdownProps['t'] = makeTranslate(zh, commonZh)
+const t: AssistantMarkdownProps['t'] = makeTranslate(en, commonEn)
 
 /** jsdom has no ResizeObserver; StatsLine watches its row for ellipsis truncation through one. */
 class ResizeObserverStub {

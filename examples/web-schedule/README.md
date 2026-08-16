@@ -1,7 +1,5 @@
 # Session-local Schedule
 
-English | [中文](README.zh.md)
-
 This overlay opts one `roos web` process into Schedule reminders without changing the shipped default Web composition:
 
 ```sh

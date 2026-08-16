@@ -1,7 +1,5 @@
 # roos-home-paths
 
-English | [中文](README.zh.md)
-
 Shared filesystem path helpers for Roos Code user data.
 
 ## Roos home

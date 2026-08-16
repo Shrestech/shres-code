@@ -18,11 +18,11 @@ import { InputTriggerService } from '@roos-code/roos-code-client-ui-input-trigge
 import type { ClientSessionContext, CommandClaim, PickOutcome, SubmitOutcome } from '@roos-code/roos-code-client-ui-input-trigger/client'
 import { FakeApiClient, fakeRemote, ok } from '../../runtime/tests/fake-api.client.ts'
 import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
-import { zh as commonZh } from '@roos-code/roos-code-client-locale/src/locales/zh.ts'
+import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
 import { SessionInputShell } from '../src/client/input/facade.ts'
 import { InputBar } from '../src/client/skeleton/InputBar.tsx'
 import type { InputBarProps } from '../src/client/skeleton/InputBar.tsx'
-import { zh } from '../src/client/locales.ts'
+import { en } from '../src/client/locales.ts'
 import { bindSnapshotSelector } from '@roos-code/roos-code-client-web-react'
 import { createSnapshotStore } from '@roos-code/roos-code-client-runtime/client'
 import type { ConversationSnapshot } from '@roos-code/roos-code-client-runtime/client'
@@ -156,7 +156,7 @@ async function scopedBench(register?: (inputTriggers: InputTriggerService) => vo
     stop: vi.fn(),
     command: () => Promise.resolve(true),
     // Mirrors the real lookup chain (conversation namespace, then common).
-    t: makeTranslate(zh, commonZh),
+    t: makeTranslate(en, commonEn),
     variant: 'composer',
   }
   const view = render(<InputBar {...barProps} />)

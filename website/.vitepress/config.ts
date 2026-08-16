@@ -45,7 +45,7 @@ interface GuideModuleLink {
  */
 interface GuideModules {
   /** Guide sidebar collection for the locale. */
-  guide: 'zh-guide' | 'en-guide'
+  guide: 'guide' | 'en-guide'
   /** Development module link. */
   develop: GuideModuleLink
   /** Reference module link. */
@@ -58,14 +58,14 @@ interface GuideModules {
  */
 const guideModules = {
   root: {
-    guide: 'zh-guide',
-    develop: { label: '开发', collection: 'zh-develop' },
-    reference: { label: '参考', collection: 'zh-reference' },
+    guide: 'guide',
+    develop: { label: 'Development', collection: 'develop' },
+    reference: { label: 'Reference', collection: 'reference' },
   },
   en: {
-    guide: 'en-guide',
-    develop: { label: 'Development', collection: 'en-develop' },
-    reference: { label: 'Reference', collection: 'en-reference' },
+    guide: 'guide',
+    develop: { label: 'Development', collection: 'develop' },
+    reference: { label: 'Reference', collection: 'reference' },
   },
 } satisfies Record<DocsLocale, GuideModules>
 
@@ -118,33 +118,6 @@ function escapeVueInterpolation(html: string): string {
 const sharedTheme: Pick<DefaultTheme.Config, 'search' | 'socialLinks' | 'editLink'> = {
   search: {
     provider: 'local',
-    options: {
-      locales: {
-        root: {
-          translations: {
-            button: {
-              buttonText: '搜索文档',
-              buttonAriaLabel: '搜索文档',
-            },
-            modal: {
-              displayDetails: '显示详细列表',
-              resetButtonTitle: '清除搜索',
-              backButtonTitle: '关闭搜索',
-              noResultsText: '未找到相关结果',
-              footer: {
-                selectText: '选择',
-                selectKeyAriaLabel: '回车键',
-                navigateText: '切换',
-                navigateUpKeyAriaLabel: '上方向键',
-                navigateDownKeyAriaLabel: '下方向键',
-                closeText: '关闭',
-                closeKeyAriaLabel: 'Esc 键',
-              },
-            },
-          },
-        },
-      },
-    },
   },
   socialLinks: [
     { icon: 'github', link: 'https://github.com/roos-code/roos-code' },
@@ -156,7 +129,7 @@ const sharedTheme: Pick<DefaultTheme.Config, 'search' | 'socialLinks' | 'editLin
       if (typeof editSource !== 'string') throw new Error('Projected documentation page has no editSource frontmatter.')
       return `https://github.com/roos-code/roos-code/edit/master/${editSource}`
     },
-    text: '在 GitHub 上编辑此页',
+    text: 'Edit this page on GitHub',
   },
 }
 
@@ -248,7 +221,7 @@ function siteTitle(previewTag: string): string {
 
 export default withMermaid({
   title: 'Roos Code',
-  description: '用于构建 Agent Harness 的插件化 SDK',
+  description: 'A plugin-based SDK for building an agent harness',
   base,
   head: [
     // VitePress leaves head hrefs untouched, so the base belongs here explicitly.
@@ -262,56 +235,27 @@ export default withMermaid({
   outDir: '.dist',
   locales: {
     root: {
-      label: '简体中文',
-      lang: 'zh-CN',
+      label: 'English',
+      lang: 'en-US',
       themeConfig: {
-        siteTitle: siteTitle('技术预览'),
+        siteTitle: siteTitle('Preview'),
         nav: [
-          { text: '入门', link: landingLink('root', guideModules.root.guide), activeMatch: '^/guide/' },
+          { text: 'Guide', link: landingLink('root', guideModules.root.guide), activeMatch: '^/guide/' },
           ...moduleNav('root'),
         ],
         sidebar: {
           '/guide/': guideSidebar('root'),
-          '/develop/': sidebar('root', 'zh-develop'),
-          '/reference/': sidebar('root', 'zh-reference'),
-        },
-        outline: { label: '本页目录' },
-        docFooter: { prev: '上一篇', next: '下一篇' },
-        darkModeSwitchLabel: '外观',
-        lightModeSwitchTitle: '切换到浅色主题',
-        darkModeSwitchTitle: '切换到深色主题',
-        sidebarMenuLabel: '菜单',
-        returnToTopLabel: '返回顶部',
-        langMenuLabel: '切换语言',
-        skipToContentLabel: '跳至内容',
-      },
-    },
-    en: {
-      label: 'English',
-      lang: 'en-US',
-      link: '/en/',
-      themeConfig: {
-        siteTitle: siteTitle('Preview'),
-        nav: [
-          { text: 'Guide', link: landingLink('en', guideModules.en.guide), activeMatch: '^/en/guide/' },
-          ...moduleNav('en'),
-        ],
-        sidebar: {
-          '/en/guide/': guideSidebar('en'),
-          '/en/develop/': sidebar('en', 'en-develop'),
-          '/en/reference/': sidebar('en', 'en-reference'),
-        },
-        editLink: {
-          pattern: ({ frontmatter }: PageData) => {
-            const data: unknown = frontmatter
-            const editSource: unknown = typeof data === 'object' && data !== null ? Reflect.get(data, 'editSource') : undefined
-            if (typeof editSource !== 'string') throw new Error('Projected documentation page has no editSource frontmatter.')
-            return `https://github.com/roos-code/roos-code/edit/master/${editSource}`
-          },
-          text: 'Edit this page on GitHub',
+          '/develop/': sidebar('root', 'develop'),
+          '/reference/': sidebar('root', 'reference'),
         },
         outline: { label: 'On this page' },
         docFooter: { prev: 'Previous', next: 'Next' },
+        darkModeSwitchLabel: 'Appearance',
+        lightModeSwitchTitle: 'Switch to light theme',
+        darkModeSwitchTitle: 'Switch to dark theme',
+        sidebarMenuLabel: 'Menu',
+        returnToTopLabel: 'Return to top',
+        skipToContentLabel: 'Skip to content',
       },
     },
   },

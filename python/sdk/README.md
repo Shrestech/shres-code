@@ -1,7 +1,5 @@
 # Roos Code Python SDK
 
-English | [中文](https://github.com/roos-code/roos-code/blob/master/python/sdk/README.zh.md)
-
 Python subprocess SDK for driving Roos Code over JSON-RPC stdio. The
 runtime inherits normal Roos Code environment variables such as
 `DEEPSEEK_BASE_URL` and `DEEPSEEK_API_KEY`, so callers can use real model

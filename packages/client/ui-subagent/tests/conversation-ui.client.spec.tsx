@@ -9,7 +9,7 @@ import {
   SubagentCatalogAction, type SubagentCatalogActionProps,
 } from '../src/client/SubagentCatalogAction.tsx'
 import { SubagentReadOnlyComposer } from '../src/client/SubagentReadOnlyComposer.tsx'
-import { zh } from '../src/client/locales.ts'
+import { en } from '../src/client/locales.ts'
 
 afterEach(() => {
   cleanup()

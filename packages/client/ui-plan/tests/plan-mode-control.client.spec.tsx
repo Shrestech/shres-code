@@ -12,13 +12,13 @@ import { bindSnapshotSelector } from '@roos-code/roos-code-client-web-react'
 import type { PlanProjection } from '@roos-code/roos-code-plan-mode/client'
 import { PlanChip, type PlanChipProps } from '../src/client/PlanModeControl.tsx'
 import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
-import { zh as commonZh } from '@roos-code/roos-code-client-locale/src/locales/zh.ts'
-import { zh } from '../src/client/locales.ts'
+import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
+import { en } from '../src/client/locales.ts'
 
 afterEach(cleanup)
 
 // The framework-injected t seat, stubbed over the zh dictionaries (the default locale).
-const t: PlanChipProps['t'] = makeTranslate(zh, commonZh)
+const t: PlanChipProps['t'] = makeTranslate(en, commonEn)
 
 function setup(
   plan: PlanProjection | undefined,

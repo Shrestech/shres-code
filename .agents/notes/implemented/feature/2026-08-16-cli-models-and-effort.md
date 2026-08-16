@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-08-16-cli-models-and-effort.zh.md)
-
 ## Problem
 
 The Web Settings → Models page already writes `agent-default-model`, `llm-pi-ai` routes, and credential references. The product CLI could boot a profile or run the first-run picker, but it could not list, set, discover, or add those same routes, and a live session could not switch provider, model, or reasoning effort with a user-authored command.

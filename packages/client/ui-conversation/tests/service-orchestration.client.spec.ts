@@ -11,7 +11,7 @@ import type { QueuedMessage, SessionFace } from '@roos-code/roos-code-client-run
 import { ComposerBlockRegistry } from '../src/client/input/blocks.ts'
 import { InputHub } from '../src/client/input/hub.ts'
 import { ConversationController, UnsupportedImageMediaTypeError } from '../src/client/service.ts'
-import { zh } from '../src/client/locales.ts'
+import { en } from '../src/client/locales.ts'
 
 async function bench(readAttachment?: SessionFace['readAttachment']) {
   const runtime = await SlotTestRuntime.create()
@@ -25,7 +25,7 @@ async function bench(readAttachment?: SessionFace['readAttachment']) {
   })
   // config.input is required (the apply shares its hub with the inject
   // factories); the bench passes its own instance explicitly.
-  const hub = new InputHub(runtime.ctx, makeTranslate(zh, {}))
+  const hub = new InputHub(runtime.ctx, makeTranslate(en, {}))
   const fiber = runtime.ctx.plugin(ConversationController, {
     input: hub,
     blocks: new ComposerBlockRegistry(),
@@ -138,7 +138,7 @@ describe('ConversationController', () => {
     // No SessionRuntime at all: a bare context (the runtime always provides one).
     const bare = new Context()
     await bare.plugin(ConversationController, {
-      input: new InputHub(bare, makeTranslate(zh, {})),
+      input: new InputHub(bare, makeTranslate(en, {})),
       blocks: new ComposerBlockRegistry(),
     }).await()
     const orphan = bare.get('conversation') as ConversationController

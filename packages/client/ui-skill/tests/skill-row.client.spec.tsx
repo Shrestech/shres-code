@@ -6,13 +6,13 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { RunningToolCall, ToolResultNode } from '@roos-code/roos-code-client-runtime/client'
 import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
-import { zh as commonZh } from '@roos-code/roos-code-client-locale/src/locales/zh.ts'
+import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
 import { SkillRow } from '../src/client/SkillRow.tsx'
-import { zh } from '../src/client/locales.ts'
+import { en } from '../src/client/locales.ts'
 
 type SkillRowProps = Parameters<typeof SkillRow>[0]
 
-const t: SkillRowProps['t'] = makeTranslate(zh, commonZh)
+const t: SkillRowProps['t'] = makeTranslate(en, commonEn)
 
 afterEach(cleanup)
 

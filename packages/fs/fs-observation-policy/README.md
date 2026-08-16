@@ -1,7 +1,5 @@
 # @roos-code/roos-code-fs-observation-policy
 
-English | [中文](README.zh.md)
-
 The **fs-observation-policy plugin**: it records observed presence or absence and adds read-before-edit plus guarded write/edit on top of the `ctx.fs` provider contract ([`@roos-code/roos-code-fs`](../fs)) — through the `fs/*` event gate, **NOT** through a method service. This plugin registers **no** `ctx.fsPolicy` service and has no public `read`/`write`/`edit`/`resolve` methods. It is the policy third of the filesystem stack: not a swappable seam, but the policy that does not belong on the `FileSystem` provider base class.
 
 ```ts

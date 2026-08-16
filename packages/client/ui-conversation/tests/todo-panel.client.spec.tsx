@@ -10,13 +10,13 @@ import { bindSnapshotSelector } from '@roos-code/roos-code-client-web-react'
 import { createSnapshotStore } from '@roos-code/roos-code-client-runtime/client'
 import type { TodoItem } from '@roos-code/roos-code-client-runtime/client'
 import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
-import { zh as commonZh } from '@roos-code/roos-code-client-locale/src/locales/zh.ts'
+import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
 import type { TodoDockProps } from '../src/client/skeleton/TodoPanel.tsx'
 import { TodoDock, TodoPanel, todoDockEntry } from '../src/client/skeleton/TodoPanel.tsx'
-import { NS, zh } from '../src/client/locales.ts'
+import { NS } from '../src/client/locales.ts'
 
 // Mirrors the real lookup chain (conversation namespace, then common).
-const t: TodoDockProps['t'] = makeTranslate(zh, commonZh)
+const t: TodoDockProps['t'] = makeTranslate(en, commonEn)
 
 afterEach(cleanup)
 

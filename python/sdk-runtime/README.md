@@ -1,7 +1,5 @@
 # Roos Code Runtime Wheel
 
-English | [中文](https://github.com/roos-code/roos-code/blob/master/python/sdk-runtime/README.zh.md)
-
 Runtime carrier package for the Python SDK (dist `roos-code-runtime-bin`, module `roos_code_runtime`): it locates the bundled runtime binaries the `roos-code-sdk` client spawns, and ships the default configuration behind zero-config runs.
 
 ## Runtime carriers

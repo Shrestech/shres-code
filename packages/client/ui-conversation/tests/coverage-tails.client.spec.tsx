@@ -6,13 +6,13 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@roos-code/cordis'
 import { cleanup, render } from '@testing-library/react'
 import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
-import { zh as commonZh } from '@roos-code/roos-code-client-locale/src/locales/zh.ts'
+import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
 import { apply as nodeApply } from '../src/index.ts'
 import { AssistantMarkdown, type AssistantMarkdownProps } from '../src/client/chat/AssistantMarkdown.tsx'
-import { zh } from '../src/client/locales.ts'
+import { en } from '../src/client/locales.ts'
 
 // Mirrors the real lookup chain (conversation namespace, then common).
-const t: AssistantMarkdownProps['t'] = makeTranslate(zh, commonZh)
+const t: AssistantMarkdownProps['t'] = makeTranslate(en, commonEn)
 
 afterEach(cleanup)
 

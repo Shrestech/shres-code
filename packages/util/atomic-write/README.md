@@ -1,7 +1,5 @@
 # roos-atomic-write
 
-English | [中文](README.zh.md)
-
 Zero-dependency atomic file replacement shared by file-backed stores that must never leave partial, symlink-hijacked, or wider-than-intended content on disk — the user-settings document (`roos-settings-file`) and the credentials store (`roos-credentials-local`).
 
 ## Surface

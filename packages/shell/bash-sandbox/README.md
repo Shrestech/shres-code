@@ -1,7 +1,5 @@
 # @roos-code/roos-code-bash-sandbox
 
-English | [中文](README.zh.md)
-
 Sandbox-consuming Service Provider for the [`@roos-code/roos-code-shell`](../shell/) executor seam. Load it **instead of** `@roos-code/roos-code-bash-local`, together with a [`ctx.sandbox`](../../sandbox/sandbox/) provider (e.g. [`@roos-code/roos-code-sandbox-local`](../../sandbox/sandbox-local/)) and a [`ctx.sandboxPolicy`](../../sandbox/sandbox-policy/) (which owns the default mode + workspace root, shared with the sandboxed filesystem) — no alternate tool plugin is needed; `roos-tool-bash` detects the executor's `sandboxMode` capability and adds the escalation fields.
 
 The package root exports the default and named `SandboxBashExecutor` plugin plus its `Config`; result-classification helpers stay internal.

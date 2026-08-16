@@ -1,7 +1,5 @@
 # Manage models from the CLI
 
-English | [中文](models.zh.md)
-
 `roos models` and `roos providers` read and write the same `$ROOS_HOME/settings.yaml` and `$ROOS_HOME/.credentials.yaml` stores as **Settings → Models**. There is no second configuration path; a change on either surface is visible to the other after the next settings hot-reload.
 
 The [provider guide](./providers.md) owns first-run picking, custom route fields, and image-input claims. This page is the CLI command reference.

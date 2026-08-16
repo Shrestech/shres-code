@@ -1,7 +1,5 @@
 # @roos-code/roos-code-subprocess-e2b
 
-English | [中文](README.zh.md)
-
 E2B implementation of the [`@roos-code/roos-code-subprocess`](../../subprocess/subprocess/README.md) seam. Load [`@roos-code/roos-code-e2b`](../e2b/README.md) first, then this service in place of `roos-subprocess-local`. Existing Bash, PTY, and LSP consumers then execute in the shared remote sandbox without E2B-specific capability packages.
 
 ## Configuration

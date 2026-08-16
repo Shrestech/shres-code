@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-08-16-demo-bin-config-consent.zh.md)
-
 ## Problem
 
 `dsh-acp-demo` treated a missing `--config` as `./cordis.yml` in the invoking directory. A checkout that plants that file can therefore run `!!js` expressions and relative plugin `name:` values (`./x.js`) with the operator's privileges as soon as the bin starts. `dsh-jsonrpc-agent` already required an explicit path, but both bins loaded the invoking directory's `.env` through unhardened `loadEnv`, so the same checkout could set `DEEPSEEK_BASE_URL`, `SSL_CERT_FILE`, `HOME`, or other bootstrap names before any plugin mounted.

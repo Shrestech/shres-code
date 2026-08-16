@@ -1,7 +1,5 @@
 # @roos-code/roos-code-compaction-basic
 
-English | [中文](README.zh.md)
-
 The **basic compaction backend**: a `BasicCompactionEngine` implementing the `@roos-code/roos-code-compaction` Service Definition with reusable `ctx.tokenMeter` pressure, token-budget retention, and summarization as a direct one-shot `ctx.llm.stream()` call that replays the conversation prefix to reuse the provider's KV cache (interceptable at `llm/stream`).
 
 This package owns the Service Provider role of the compaction capability — see the [Service Definition package](../compaction/README.md) for its contract and the [capability-seam Agent Note](../../../.agents/notes/implemented/feature/2026-06-18-compaction-capability-seam.md) for the design.

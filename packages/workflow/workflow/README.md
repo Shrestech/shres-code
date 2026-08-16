@@ -1,7 +1,5 @@
 # @roos-code/roos-code-workflow
 
-English | [中文](README.zh.md)
-
 The workflow seam (`ctx.workflowEngine`) executes a model-written orchestration script that can fan out subagents. The seam defines the script, run, result, error, and event contracts; an engine decides how to isolate and execute the script.
 
 `@roos-code/roos-code-workflow-worker-thread` is the current engine and `@roos-code/roos-code-tool-workflow` is the model-facing consumer. A future process or sandbox engine can replace the implementation without changing the tool.

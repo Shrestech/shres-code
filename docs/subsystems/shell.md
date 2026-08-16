@@ -1,7 +1,5 @@
 # Bash Executor
 
-English | [中文](shell.zh.md)
-
 The bash execution seam is split across a Service Definition ([roos-shell](../../packages/shell/shell), `ctx.shell`), Service Providers ([roos-bash-local](../../packages/shell/bash-local) and [roos-bash-sandbox](../../packages/shell/bash-sandbox)), and Consumer ([roos-tool-bash](../../packages/shell/tool-bash), the `bash` schema). Generic background-job ids, ownership, and controls live in [jobs.md](jobs.md); this seam returns a task-free process handle. Raw process-group mechanics live behind the [subprocess seam](subprocess.md).
 
 Source: [`packages/shell/shell/src/types.ts`](../../packages/shell/shell/src/types.ts)

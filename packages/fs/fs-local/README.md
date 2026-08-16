@@ -1,7 +1,5 @@
 # @roos-code/roos-code-fs-local
 
-English | [中文](README.zh.md)
-
 The **local-filesystem implementation** of the `ctx.fs` provider contract ([`@roos-code/roos-code-fs`](../fs)). Backs the twelve `FileSystem` primitives with the host filesystem; loading it as a plugin populates `ctx.fs`.
 
 ```ts ignore-check

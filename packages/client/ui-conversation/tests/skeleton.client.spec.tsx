@@ -15,10 +15,10 @@ import type { ConversationRootProps } from '../src/client/skeleton/ConversationR
 import type { ClientContext } from '@roos-code/roos-code-client-runtime/client'
 import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
 import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
-import { zh as commonZh } from '@roos-code/roos-code-client-locale/src/locales/zh.ts'
+import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
 import { createChatStore } from '../src/client/stores.ts'
 import { SessionInputShell } from '../src/client/input/facade.ts'
-import { en, zh } from '../src/client/locales.ts'
+import { en } from '../src/client/locales.ts'
 import { ConversationRoot } from '../src/client/skeleton/ConversationRoot.tsx'
 import { ConversationSession, ConversationSessionHeader } from '../src/client/skeleton/ConversationSession.tsx'
 import { HeroShell } from '../src/client/skeleton/EmptyHero.tsx'
@@ -53,7 +53,7 @@ beforeEach(() => {
 })
 
 // Mirrors the real lookup chain (conversation namespace, then common).
-const t: ConversationRootProps['t'] = makeTranslate(zh, commonZh)
+const t: ConversationRootProps['t'] = makeTranslate(en, commonEn)
 
 const sid = (id: string) => id as SessionId
 const wid = (id: string) => id as WorkspaceId

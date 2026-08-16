@@ -13,7 +13,7 @@ import { apply as applyLocale, inject as localeInject } from '@roos-code/roos-co
 import { apply, inject } from '../src/client/index.ts'
 import { apply as applyNode } from '../src/index.ts'
 import * as JobInvariant from '../src/invariant.ts'
-import { en, NS, zh } from '../src/client/locales.ts'
+import { en, NS } from '../src/client/locales.ts'
 
 /** Slot ledger reader: entry ids currently registered in the header list. */
 function headerEntryIds(ctx: Context): (string | undefined)[] {
@@ -59,7 +59,7 @@ describe('ui-job browser half', () => {
   it('registers both dictionaries under its own namespace and releases them with the fiber', async () => {
     const { ctx, fiber } = await bench()
     const translate = ctx.locale.bind(NS)
-    expect(translate('list.aria')).toBe(zh['list.aria'])
+    expect(translate('list.aria')).toBe(en['list.aria'])
     ctx.locale.setLocale('en')
     expect(translate('list.aria')).toBe(en['list.aria'])
 

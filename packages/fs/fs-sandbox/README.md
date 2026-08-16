@@ -1,7 +1,5 @@
 # roos-fs-sandbox — the sandbox-enforcing filesystem backend
 
-English | [中文](README.zh.md)
-
 `SandboxedFileSystem` extends [`LocalFileSystem`](../fs-local/README.md) and registers as `ctx.fs`. It inherits every text-storage mechanic verbatim (resolve, stat, read/stream, list, the atomic write, the read-match-write edit critical section) and adds a per-call MODE fence on `writeText`/`editText` plus a credential fence on content reads and mutations.
 
 Its plugin config keeps the local backend knobs (`cwd` is the relative-path resolution default, `diffBasisMaxBytes` bounds the optional overwrite contextual-diff basis) and adds `denyReadPaths` for extra read-deny paths.

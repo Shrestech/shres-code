@@ -15,11 +15,11 @@ import type { PopupSpec, TokenSegment } from '../src/client/popup.ts'
 import { PopupSelectController } from '../src/client/popup.ts'
 import { PopupSelectView } from '../src/client/PopupSelectView.tsx'
 import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
-import { zh as commonZh } from '@roos-code/roos-code-client-locale/src/locales/zh.ts'
-import { zh } from '../src/client/locales.ts'
+import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
+import { en } from '../src/client/locales.ts'
 
 // The framework-injected t seat, stubbed over the zh dictionaries (the default locale).
-const t: Parameters<typeof PopupSelectView>[0]['t'] = makeTranslate(zh, commonZh)
+const t: Parameters<typeof PopupSelectView>[0]['t'] = makeTranslate(en, commonEn)
 
 // jsdom has no scrollIntoView; the view calls it on the highlighted row.
 const scrollIntoView = vi.fn()

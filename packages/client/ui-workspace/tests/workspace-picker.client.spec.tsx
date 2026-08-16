@@ -5,17 +5,17 @@ import type {
   SessionListState, WorkspaceId, WorkspaceListState, WorkspaceView,
 } from '@roos-code/roos-code-client-runtime/client'
 import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
-import { zh as commonZh } from '@roos-code/roos-code-client-locale/src/locales/zh.ts'
+import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
 import type { DirectoryFlowOwnerProps, WorkspacePickerProps } from '../src/client/contract/slots.ts'
 import { bindSnapshotSelector } from '@roos-code/roos-code-client-web-react'
 import { WorkspacePicker } from '../src/client/WorkspacePicker.tsx'
-import { zh } from '../src/client/locales.ts'
+import { en } from '../src/client/locales.ts'
 
 afterEach(cleanup)
 
 // The seat's key domain is workspace ∪ common; the stub mirrors the real
 // lookup chain (namespace, then common vocabulary, then the key).
-const t: WorkspacePickerProps['t'] = makeTranslate(zh, commonZh)
+const t: WorkspacePickerProps['t'] = makeTranslate(en, commonEn)
 
 const wid = (id: string) => id as WorkspaceId
 function workspace(id: string, title = id): WorkspaceView {

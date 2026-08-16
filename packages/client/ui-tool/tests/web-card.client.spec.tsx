@@ -28,15 +28,15 @@ import { DetailsPanel } from '@roos-code/roos-code-client-ui-conversation/src/cl
 import { WebRow, webToolview } from '../src/client/tool/toolviews/web-row.tsx'
 import { renderToolDetails, SessionProviderStub, toolChatSnapshot } from './tool-details-render.client.tsx'
 import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
-import { zh as commonZh } from '@roos-code/roos-code-client-locale/src/locales/zh.ts'
-import { zh } from '@roos-code/roos-code-client-ui-conversation/src/client/locales.ts'
+import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
+import { en } from '@roos-code/roos-code-client-ui-conversation/src/client/locales.ts'
 
 afterEach(cleanup)
 
 const SID = 's1' as SessionId
 
 /** Locale seat for the card render sites (GenericToolCard, DetailsPanel), as the sibling suites build it. */
-const t = makeTranslate(zh, commonZh)
+const t = makeTranslate(en, commonEn)
 
 const SEARCH_ARGS = '{"query":"deepseek harness"}'
 const FETCH_ARGS = '{"url":"https://example.com/page"}'
