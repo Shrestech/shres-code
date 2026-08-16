@@ -102,6 +102,8 @@
     "rescope-vendor:check": "tsx scripts/rescope-vendor.ts --check",
     "rebrand": "tsx scripts/rebrand.ts",
     "rebrand:check": "tsx scripts/rebrand.ts --check",
+    "purge-zh": "tsx scripts/purge-zh.ts",
+    "purge-zh:check": "tsx scripts/purge-zh.ts --check",
     "verify-no-legacy-brand": "tsx scripts/verify-no-legacy-brand.ts",
     "verify-client-domain-graph": "tsx scripts/verify-client-domain-graph.ts",
     "gen-cordis-catalog": "tsx scripts/gen-cordis-catalog.ts",
