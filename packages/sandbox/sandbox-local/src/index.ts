@@ -64,9 +64,14 @@ export interface Config {
   probeTimeoutMs?: number
 }
 
-/** Probe whether `bwrap` can create the profile; the provider caches the bounded result. */
+/**
+ * Probe whether `bwrap` can create the default-deny profile, including
+ * `--unshare-net`. A host that can bind-mount but cannot unshare a net
+ * namespace must probe unusable so the Linux chain can fall back to Landlock
+ * instead of failing every later confine.
+ */
 function defaultProbeBwrap(timeoutMs: number): boolean {
-  const probe = spawnSync('bwrap', ['--ro-bind', '/', '/', '--dev', '/dev', '--proc', '/proc', '--die-with-parent', '--', 'true'], {
+  const probe = spawnSync('bwrap', [...bwrapProfileArgs({ mode: 'read-only', workspaceRoot: '/' }), '--', 'true'], {
     timeout: timeoutMs,
     stdio: 'ignore',
   })

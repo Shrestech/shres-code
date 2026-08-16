@@ -614,17 +614,26 @@ export interface Config {
 
 ```ts config-catalog
 /**
- * Plugin config: the local backend's knobs verbatim (`cwd` resolution default
- * and `diffBasisMaxBytes` overwrite-presentation bound). The sandbox default
- * (mode + `workspace-write` fallback root) is NOT here — `ctx.sandboxPolicy`
- * resolves each calling session for every enforcing capability.
+ * Plugin config: the local backend's knobs (`cwd` resolution default and
+ * `diffBasisMaxBytes` overwrite-presentation bound) plus extra read-deny
+ * paths. The sandbox default (mode + `workspace-write` fallback root) is NOT
+ * here — `ctx.sandboxPolicy` resolves each calling session for every
+ * enforcing capability.
  */
-export type Config = LocalConfig
+export interface Config extends LocalConfig {
+  /**
+   * Extra paths whose content reads are denied except under
+   * `danger-full-access`. Each entry is a non-empty single-line path;
+   * relative entries resolve through the backend cwd. A directory denies
+   * every descendant. Default: none.
+   */
+  denyReadPaths?: string[]
+}
 ```
 
 依赖：[`LocalConfig`](#roos-coderoos-code-fs-local)
 
-来源：[`packages/fs/fs-sandbox/src/index.ts:49`](../packages/fs/fs-sandbox/src/index.ts)
+来源：[`packages/fs/fs-sandbox/src/index.ts:60`](../packages/fs/fs-sandbox/src/index.ts)
 
 <a id="roos-coderoos-code-goal"></a>
 
@@ -1515,10 +1524,16 @@ export interface Config {
    * `process.cwd()`). Normal agent calls use their session cwd instead.
    */
   workspaceRoot?: string
+  /**
+   * Outbound network for confined processes (default: `deny`). `deny` matches
+   * bwrap's net-namespace isolation; Seatbelt denies `network-outbound` and
+   * Landlock handles TCP bind/connect when the kernel ABI supports it.
+   */
+  network?: SandboxNetwork
 }
 ```
 
-依赖：[`SandboxMode`](subsystems/sandbox.md)
+依赖：[`SandboxMode`](subsystems/sandbox.md) · [`SandboxNetwork`](../packages/sandbox/sandbox/src/index.ts)
 
 来源：[`packages/sandbox/sandbox-policy/src/index.ts:67`](../packages/sandbox/sandbox-policy/src/index.ts)
 

@@ -24,12 +24,6 @@ describe('SandboxUnavailableError', () => {
     expect(error.message).not.toContain('Runner failure')
   })
 
-  it('treats an omitted network field as deny and honors an explicit allow', () => {
-    expect(sandboxNetwork({})).toBe('deny')
-    expect(sandboxNetwork({ network: 'deny' })).toBe('deny')
-    expect(sandboxNetwork({ network: 'allow' })).toBe('allow')
-  })
-
   it('carries the runner detail when the failure is discovered at execution time', () => {
     // The late twin of the confine-time throw: an unprobed sole candidate
     // that fails closed at exec surfaces the SAME error, with the runner's
@@ -37,5 +31,13 @@ describe('SandboxUnavailableError', () => {
     const error = new SandboxUnavailableError('read-only', 'landlock-run: landlock is not enforced by this kernel')
     expect(error.code).toBe(SANDBOX_UNAVAILABLE)
     expect(error.message).toContain('Runner failure: landlock-run: landlock is not enforced by this kernel')
+  })
+})
+
+describe('sandboxNetwork', () => {
+  it('treats an omitted network field as deny and honors an explicit allow', () => {
+    expect(sandboxNetwork({})).toBe('deny')
+    expect(sandboxNetwork({ network: 'deny' })).toBe('deny')
+    expect(sandboxNetwork({ network: 'allow' })).toBe('allow')
   })
 })

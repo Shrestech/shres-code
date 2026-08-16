@@ -16,7 +16,7 @@
 - `workspace-write`：只有目标规范化后位于可写根目录下，才允许变更。可写根包括工作区根目录和平台临时区域（`/tmp`、`os.tmpdir()`），与 Seatbelt profile 授权的集合相同；该集合由唯一的 [`writableRoots`](../../sandbox/README.md) 函数派生，使 fs 围栏与 bash runner 不会漂移。规范拼写使用词法快速路径；基于身份的祖先回退可以识别 Windows 长名称和 8.3 名称等别名等价根目录，而不会把无关前缀视为包含关系。委托前会立即重新规范化目标，因此工具解析后被替换的祖先符号链接也会被发现；
 - `danger-full-access`：不加围栏直接委托，包括凭据读取。
 
-除 `danger-full-access` 外的每种模式都会拒绝读取 `$ROOS_HOME/.credentials.yaml`、任何 `*.credentials.yaml` 基名，以及每条已配置的 `denyReadPaths` 条目，并抛出 `FS_SANDBOX_DENIED`。读取围栏会像写入一样通过 `checkedTarget()` 重新规范化，因此被拒绝文件的符号链接别名也会被拒绝。
+除 `danger-full-access` 外的每种模式都会拒绝读取和变更 `$ROOS_HOME/.credentials.yaml`、任何 `*.credentials.yaml` 基名（不区分大小写），以及每条已配置的 `denyReadPaths` 条目，并抛出 `FS_SANDBOX_DENIED`。围栏会通过 `checkedTarget()` 重新规范化，因此被拒绝文件的符号链接别名也会被拒绝。`read`／`read_image` 会盖上会话的常驻策略，因此会话的 `danger-full-access` fold 可以解除围栏。
 
 ## 威胁模型：策略围栏，而非内核边界
 

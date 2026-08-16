@@ -1,8 +1,8 @@
 /**
  * Tests for the sandbox-enforcing filesystem backend: the per-call policy fence
  * on write/edit (read-only denies, workspace-write contains, danger-full-access
- * passes through), reads always passing through, the capability fact, and the
- * containment matrix — `..` traversal, absolute paths outside, and symlink
+ * passes through), the credential read/write fence, the capability fact, and
+ * the containment matrix — `..` traversal, absolute paths outside, and symlink
  * escapes (a symlinked directory inside the workspace pointing out, and a new
  * file created under one). The fence is exercised on a real filesystem: a
  * denied write leaves no file on disk.
@@ -82,7 +82,7 @@ describe('read-only', () => {
     expect(await readFile(path, 'utf8')).toBe('original')
   })
 
-  it('allows reads (every mode permits reading)', async () => {
+  it('allows ordinary workspace reads', async () => {
     const path = join(workspace, 'readable.txt')
     await writeFile(path, 'hello')
     expect(await fs.readText(await target(path))).toBe('hello')
@@ -249,6 +249,13 @@ describe('the credential read fence', () => {
     await expect(fs.readText(await target(path))).rejects.toMatchObject({ code: 'FS_SANDBOX_DENIED' })
   })
 
+  it('denies a case-folded *.credentials.yaml basename', async () => {
+    await boot('workspace-write')
+    const path = join(workspace, 'provider.CREDENTIALS.YAML')
+    await writeFile(path, 'secret: folded\n')
+    await expect(fs.readText(await target(path))).rejects.toMatchObject({ code: 'FS_SANDBOX_DENIED' })
+  })
+
   it('denies streamText and readBytes of a workspace *.credentials.yaml file', async () => {
     await boot('workspace-write')
     const path = join(workspace, 'provider.credentials.yaml')
@@ -333,6 +340,18 @@ describe('the credential read fence', () => {
     await writeFile(nested, 'sk-nested\n')
     await boot('workspace-write')
     await expect(fs.readText(await target(nested))).rejects.toMatchObject({ code: 'FS_SANDBOX_DENIED' })
+  })
+
+  it('denies write and edit of a workspace credentials file so before cannot leak', async () => {
+    await boot('workspace-write')
+    const path = join(workspace, 'provider.credentials.yaml')
+    await writeFile(path, 'secret: original\n')
+    await expect(fs.writeText(await target(path), 'secret: overwritten\n'))
+      .rejects.toMatchObject({ code: 'FS_SANDBOX_DENIED' })
+    expect(await readFile(path, 'utf8')).toBe('secret: original\n')
+    await expect(fs.editText(await target(path), { oldString: 'original', newString: 'changed', replaceAll: false }))
+      .rejects.toMatchObject({ code: 'FS_SANDBOX_DENIED' })
+    expect(await readFile(path, 'utf8')).toBe('secret: original\n')
   })
 
   it('rejects empty or multiline denyReadPaths at load', async () => {

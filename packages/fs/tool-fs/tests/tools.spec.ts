@@ -766,6 +766,20 @@ describe('sandbox escalation API (write/edit)', () => {
     override get sandboxMode(): SandboxMode {
       return 'workspace-write'
     }
+    override async stat(target: FsTarget): Promise<FsInfo | undefined> {
+      const content = this.files.get(target.targetKey)
+      if (content === undefined) return undefined
+      return { version: FsVersion('v1'), type: 'file', size: content.length }
+    }
+    override async readText(
+      target: FsTarget,
+      _signal?: AbortSignal,
+      sandboxPolicy?: SandboxExecutionPolicy,
+    ): Promise<string> {
+      this.stamped.push(sandboxPolicy)
+      if (this.rejectWith) throw this.rejectWith
+      return super.readText(target)
+    }
     override async writeText(
       target: FsTarget,
       content: string,
@@ -845,16 +859,36 @@ describe('sandbox escalation API (write/edit)', () => {
     }
   })
 
+  it('a read stamps the standing session policy, including a danger-full-access fold', async () => {
+    const { ctx, fs } = await setupConfining()
+    fs.files.set('key:notes.txt', 'hello')
+    await call(ctx, 'read', { file_path: 'notes.txt' }, escalationAgent())
+    expect(fs.stamped).toEqual([{ mode: 'workspace-write', workspaceRoot: resolve('/session-project'), network: 'deny' }])
+    fs.stamped = []
+    await call(ctx, 'read', { file_path: 'notes.txt' }, escalationAgent([{ type: 'sandbox/mode', data: { mode: 'danger-full-access' } }]))
+    expect(fs.stamped).toEqual([{ mode: 'danger-full-access', workspaceRoot: resolve('/session-project'), network: 'deny' }])
+  })
+
+  it('a denied read maps to the sandbox marker without the write-tool escalation hint', async () => {
+    const { ctx, fs } = await setupConfining()
+    fs.files.set('key:notes.txt', 'hello')
+    fs.rejectWith = new FsError('denied', 'FS_SANDBOX_DENIED')
+    const result = await call(ctx, 'read', { file_path: 'notes.txt' }, escalationAgent())
+    expect(result.isError).toBe(true)
+    expect(text(result)).toContain('[sandbox: file access denied under workspace-write mode]')
+    expect(text(result)).not.toContain('retry this exact operation once with sandbox_permissions')
+  })
+
   it('a plain write stamps the default mode with the calling session root', async () => {
     const { ctx, fs } = await setupConfining()
     await call(ctx, 'write', { file_path: 'a.txt', content: 'x' }, escalationAgent())
-    expect(fs.stamped).toEqual([{ mode: 'workspace-write', workspaceRoot: resolve('/session-project') }])
+    expect(fs.stamped).toEqual([{ mode: 'workspace-write', workspaceRoot: resolve('/session-project'), network: 'deny' }])
   })
 
   it('a standing session override folds onto the stamp', async () => {
     const { ctx, fs } = await setupConfining()
     await call(ctx, 'write', { file_path: 'a.txt', content: 'x' }, escalationAgent([{ type: 'sandbox/mode', data: { mode: 'read-only' } }]))
-    expect(fs.stamped).toEqual([{ mode: 'read-only', workspaceRoot: resolve('/session-project') }])
+    expect(fs.stamped).toEqual([{ mode: 'read-only', workspaceRoot: resolve('/session-project'), network: 'deny' }])
   })
 
   it('a denied write maps to the shared marker plus the escalation hint (isError)', async () => {
@@ -887,7 +921,7 @@ describe('sandbox escalation API (write/edit)', () => {
       agent: escalationAgent() as never,
       signal: new AbortController().signal,
     })
-    expect(fs.stamped).toEqual([{ mode: 'danger-full-access', workspaceRoot: resolve('/session-project') }])
+    expect(fs.stamped).toEqual([{ mode: 'danger-full-access', workspaceRoot: resolve('/session-project'), network: 'deny' }])
   })
 
   it('a rejected escalation fails closed with its own text and never mutates', async () => {

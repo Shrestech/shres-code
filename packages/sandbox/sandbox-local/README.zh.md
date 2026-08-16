@@ -12,7 +12,7 @@
 
 Seatbelt profile 默认允许，但带 `(deny file-write*)` 和写入 allow-list，因此恰好约束相应模式承诺的文件操作：`read-only` 只授予 `/dev/null` 字面路径；`workspace-write` 另加工作区根目录、`/tmp` 和逐用户 darwin 临时目录（`os.tmpdir()`，即平台供 mkstemp 家族工具使用的真实临时区域）。每个根目录都经过规范化，因为 Seatbelt 匹配解析后的路径（`/tmp` 就是 `/private/tmp`）。默认 `network: deny` 会加上 `(deny network-outbound)`；`network: allow` 则省略该规则。Apple 将 `sandbox-exec` CLI（命令行界面）标为 deprecated，但所有 macOS 系统仍会提供它；若情况发生变化，功能探测会使执行被拒绝。
 
-bwrap 默认拒绝网络时会取消共享网络命名空间（`--unshare-net`）。Landlock 的文件系统授权保持不变；当内核 ABI 支持这些访问时，launcher 会拒绝 TCP bind/connect，而 `network: allow` 会通过 `--allow-net` 解除该拒绝。
+bwrap 默认拒绝网络时会取消共享网络命名空间（`--unshare-net`）；功能性 bwrap 探测使用同一份 profile，因此无法 unshare 网络命名空间的宿主会被判定为不可用，Linux 链路即可回退到 Landlock。Landlock 的文件系统授权保持不变；当内核 ABI 支持这些访问时，launcher 会拒绝 TCP bind/connect，而 `network: allow` 会通过 `--allow-net` 解除该拒绝。
 
 Windows 档为每个工作区保留一个确定性写入 SID 和常驻 ACE，但为每个活跃的会话/工作区对分配一个随机私有临时目录，以及不同的 SID 和可撤销 ACE。因此，共享工作区的会话会共享预期的写权限，却不会继承彼此的临时目录权限。新的提供方总会选择新的临时路径和 SID，因此崩溃残留既无法阻止恢复的会话，也无法向其授权；runner 会为无 agent（智能体）的调用提供同样的逐调用隔离。如果工作区等于或包含平台临时根目录，调用会在任何 ACL 改动发生前失败，因为否则其可继承的工作区 ACE 会延伸到每个私有临时子目录。
 

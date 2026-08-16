@@ -14,7 +14,9 @@ import { CallId } from '@roos-code/roos-code-llm'
 import SystemPrompt from '@roos-code/roos-code-system-prompt'
 import ToolRuntime, { TOOL_ABORTED_BEFORE_DISPATCH } from '@roos-code/roos-code-tools'
 import { LocalFileSystem } from '@roos-code/roos-code-fs-local'
+import { SandboxedFileSystem } from '@roos-code/roos-code-fs-sandbox'
 import * as FsPolicy from '@roos-code/roos-code-fs-observation-policy'
+import SandboxPolicyService from '@roos-code/roos-code-sandbox-policy'
 import * as ToolFs from '@roos-code/roos-code-tool-fs'
 
 const testToolSignal = new AbortController().signal
@@ -416,6 +418,36 @@ describe('per-session cwd', () => {
     const edited = await callIn(session, 'edit', { file_path: 'code.txt', old_string: 'alpha', new_string: 'beta' })
     expect(edited.isError).toBe(false)
     expect(await readFile(join(sessionDir, 'code.txt'), 'utf8')).toBe('beta')
+  })
+})
+
+describe('sandboxed credential-read transcript', () => {
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), 'roos-tool-fs-fence-'))
+    ctx = new Context()
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRuntime)
+    await ctx.plugin(SandboxPolicyService, { mode: 'workspace-write', workspaceRoot: dir })
+    await ctx.plugin(SandboxedFileSystem, { cwd: dir })
+    await ctx.plugin(FsPolicy)
+    fiber = await ctx.plugin(ToolFs)
+  })
+
+  it('the read tool returns the sandbox denial marker and does not leak the file', async () => {
+    const path = join(dir, 'provider.credentials.yaml')
+    await writeFile(path, 'DEEPSEEK_API_KEY: sk-secret\n', { mode: 0o600 })
+    const result = await ctx.tools.execute({
+      signal: testToolSignal,
+      callId: CallId(`call-${++callCounter}`),
+      name: 'read',
+      arguments: { file_path: path },
+      agent: { session: { header: { cwd: dir }, events: [] } } as never,
+    })
+    expect(result.isError).toBe(true)
+    expect(result.error).toMatchObject({ info: { code: 'FS_SANDBOX_DENIED' } })
+    expect(text(result)).toContain('[sandbox: file access denied under workspace-write mode]')
+    expect(text(result)).not.toContain('sk-secret')
+    expect(text(result)).not.toContain('retry this exact operation once with sandbox_permissions')
   })
 })
 

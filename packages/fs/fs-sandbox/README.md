@@ -16,7 +16,7 @@ The per-call policy carries the effective mode (session override or escalation g
 - `workspace-write` — allows a mutation only when the target canonicalizes under a writable root: the workspace root plus the platform temp areas (`/tmp`, `os.tmpdir()`), the SAME set the Seatbelt profile grants, derived from the one [`writableRoots`](../../sandbox/README.md) function so the fs fence and the bash runner cannot drift. Canonical spellings use a lexical fast path; an identity-based ancestor fallback recognizes alias-equivalent roots such as Windows long names and 8.3 names without treating unrelated prefixes as contained. The target is re-canonicalized immediately before delegating, so an ancestor symlink swapped since the tool resolved it is caught.
 - `danger-full-access` — delegates unfenced, including credential reads.
 
-Under every mode except `danger-full-access`, content reads of `$ROOS_HOME/.credentials.yaml`, any `*.credentials.yaml` basename, and each configured `denyReadPaths` entry are denied with `FS_SANDBOX_DENIED`. The read fence re-canonicalizes through `checkedTarget()` the same way writes do, so a symlink alias of a denied file is refused.
+Under every mode except `danger-full-access`, content reads and mutations of `$ROOS_HOME/.credentials.yaml`, any `*.credentials.yaml` basename (case-insensitive), and each configured `denyReadPaths` entry are denied with `FS_SANDBOX_DENIED`. The fence re-canonicalizes through `checkedTarget()`, so a symlink alias of a denied file is refused. `read` / `read_image` stamp the session's standing policy so a session `danger-full-access` fold lifts it.
 
 ## Threat model: a policy fence, not a kernel boundary
 

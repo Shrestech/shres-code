@@ -20,10 +20,11 @@
  * a mutation only when the target canonicalizes under the policy's workspace
  * root or a platform temp area (the SAME writable-root set Seatbelt grants,
  * derived from the one `writableRoots` function so bash and fs cannot drift);
- * `danger-full-access` delegates unfenced, including credential reads. Under
- * every other mode, content reads of `$ROOS_HOME/.credentials.yaml`, any
- * `*.credentials.yaml` basename, and configured {@link Config.denyReadPaths}
- * throw `FS_SANDBOX_DENIED`. A denial throws the structured
+ * `danger-full-access` delegates unfenced, including credential reads and
+ * writes. Under every other mode, content reads and mutations of
+ * `$ROOS_HOME/.credentials.yaml`, any `*.credentials.yaml` basename
+ * (case-insensitive), and configured {@link Config.denyReadPaths} throw
+ * `FS_SANDBOX_DENIED`. A denial throws the structured
  * `FS_SANDBOX_DENIED` — no text inference is needed (unlike bash's kernel
  * stderr), because an in-process fence knows exactly what it refused. The
  * escalation retry lives in the tool layer (`@roos-code/roos-code-tool-fs`),
@@ -194,11 +195,12 @@ export class SandboxedFileSystem extends LocalFileSystem {
    * operation must use, so the checked identity is the one delegated (no
    * check-here-read/write-there TOCTOU). `danger-full-access` returns the
    * caller's target unfenced. A `read` re-canonicalizes NOW and denies
-   * `$ROOS_HOME/.credentials.yaml`, any `*.credentials.yaml` basename, and
-   * configured {@link Config.denyReadPaths}. A `write` keeps the mutation
-   * fence: `read-only` denies; `workspace-write` re-canonicalizes, requires
-   * containment under a writable root, and returns THAT fresh target. Throws
-   * the structured `FS_SANDBOX_DENIED` on refusal — the tool layer maps it to
+   * `$ROOS_HOME/.credentials.yaml`, any `*.credentials.yaml` basename
+   * (case-insensitive), and configured {@link Config.denyReadPaths}. A
+   * `write` keeps the mutation fence (`read-only` denies; `workspace-write`
+   * re-canonicalizes and requires containment) and then applies the same
+   * credential deny so `before`/`after` cannot leak those files. Throws the
+   * structured `FS_SANDBOX_DENIED` on refusal — the tool layer maps it to
    * the model-facing `[sandbox: …]` marker and the escalation hint.
    */
   private async checkedTarget(
@@ -233,18 +235,22 @@ export class SandboxedFileSystem extends LocalFileSystem {
     if (!contained) {
       throw new FsError(`cannot write "${target.displayPath}": file access denied under workspace-write mode`, 'FS_SANDBOX_DENIED')
     }
+    if (await this.isDeniedRead(fresh, target)) {
+      throw new FsError(`cannot write "${target.displayPath}": file access denied under ${mode} mode`, 'FS_SANDBOX_DENIED')
+    }
     return fresh
   }
 
   /**
    * Whether a freshly re-canonicalized target is a credential document or an
-   * extra deny path. Basename matching covers `*.credentials.yaml` on the
-   * requested path and the resolved identity; the home document is also
-   * matched by filesystem identity so a symlink alias cannot bypass it.
+   * extra deny path. Basename matching covers `*.credentials.yaml` (case-
+   * insensitive) on the requested path and the resolved identity; the home
+   * document is also matched by filesystem identity so a symlink alias cannot
+   * bypass it.
    */
   private async isDeniedRead(fresh: FsTarget, requested: FsTarget): Promise<boolean> {
     const names = [basename(String(fresh.targetKey)), basename(fresh.displayPath), basename(requested.displayPath)]
-    if (names.some(name => name.endsWith(CREDENTIALS_BASENAME_SUFFIX))) return true
+    if (names.some(name => name.toLowerCase().endsWith(CREDENTIALS_BASENAME_SUFFIX))) return true
 
     const homeTarget = await this.resolve(join(resolveRoosHome(), CREDENTIALS_FILENAME))
     if (fresh.targetKey === homeTarget.targetKey) return true

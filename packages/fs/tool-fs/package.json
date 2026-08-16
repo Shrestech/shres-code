@@ -55,6 +55,7 @@
     "@roos-code/roos-code-attachment": "workspace:^",
     "@roos-code/roos-code-fs": "workspace:^",
     "@roos-code/roos-code-fs-local": "workspace:^",
+    "@roos-code/roos-code-fs-sandbox": "workspace:^",
     "@roos-code/roos-code-fs-observation-policy": "workspace:^",
     "@roos-code/roos-code-invariants": "workspace:^",
     "@roos-code/roos-code-llm": "workspace:^",

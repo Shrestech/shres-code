@@ -4290,6 +4290,9 @@ importers:
       '@roos-code/roos-code-fs-observation-policy':
         specifier: workspace:^
         version: link:../fs-observation-policy
+      '@roos-code/roos-code-fs-sandbox':
+        specifier: workspace:^
+        version: link:../fs-sandbox
       '@roos-code/roos-code-invariants':
         specifier: workspace:^
         version: link:../../runtime-diagnostics/invariants

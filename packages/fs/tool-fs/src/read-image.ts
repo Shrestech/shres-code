@@ -20,7 +20,9 @@ import type { ContentBlock } from '@roos-code/roos-code-llm'
 import { defineTool } from '@roos-code/roos-code-tools'
 import type { GenericCallView, ToolExecution } from '@roos-code/roos-code-tools'
 import type {} from '@roos-code/roos-code-fs'
+import { remediateFsError } from './error.ts'
 import { resolveRegularReadTarget } from './read-target.ts'
+import type { FsSandboxController } from './sandbox.ts'
 
 /** Extensions `read_image` accepts; magic-byte validation at the attachment service stays authoritative. */
 const IMAGE_EXTENSIONS: Readonly<Record<string, ImageMediaType>> = {
@@ -126,8 +128,9 @@ function imageReadContent(value: ImageReadValue): ContentBlock[] {
  * direct callers and gates on the calling route's declared image input.
  * @param ctx - the registration scope; execution uses its `fs` service plus
  *   the optional `attachments`/`llm` services.
+ * @param sandbox - standing-policy resolution and denial-marker mapping.
  */
-export function applyReadImageTool(ctx: Context): void {
+export function applyReadImageTool(ctx: Context, sandbox: FsSandboxController): void {
   ctx.tools.register(defineTool({
     name: 'read_image',
     description: 'Read a PNG/JPEG/WebP/GIF file and return the image itself. Requires the current model to accept image input.',
@@ -179,11 +182,17 @@ export function applyReadImageTool(ctx: Context): void {
       await assertImageCapableRoute(ctx, exec, args.file_path)
 
       const { target, info } = await resolveRegularReadTarget(ctx, exec, args.file_path)
+      const sandboxPolicy = sandbox.standingPolicy(exec)
 
       // The tool result is one message carrying one image, so the per-message
       // aggregate bound applies beside the per-image bound.
       const byteCap = Math.min(attachments.imageLimits.maxImageBytes, attachments.imageLimits.maxMessageImageBytes)
-      const data = await ctx.fs.readBytes(target, exec.signal, byteCap)
+      let data: Uint8Array
+      try {
+        data = await ctx.fs.readBytes(target, exec.signal, byteCap, sandboxPolicy)
+      } catch (error: unknown) {
+        throw remediateFsError(sandbox.mapError(error, sandboxPolicy, { hint: false }))
+      }
       // Persist before returning: the image block must reference a durably
       // committed object by the time the tool/result event is appended.
       let ref: ImageAttachmentRef

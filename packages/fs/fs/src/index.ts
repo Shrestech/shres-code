@@ -171,9 +171,13 @@ export abstract class FileSystem extends Service {
    * Read the whole regular text file as a single decoded string.
    * @param target - the resolved target to read.
    * @param signal - aborts the read.
+   * @param sandboxPolicy - the per-call mode and workspace root this read
+   *   runs under; a sandboxing backend fences credential and deny-path reads
+   *   by it, the bare backend ignores it. Omit to leave the backend its own
+   *   default.
    * @returns the full decoded UTF-8 content.
    */
-  abstract readText(target: FsTarget, signal?: AbortSignal): Promise<string>
+  abstract readText(target: FsTarget, signal?: AbortSignal, sandboxPolicy?: SandboxExecutionPolicy): Promise<string>
 
   /**
    * Stream the whole regular text file as decoded text chunks (same text
@@ -182,9 +186,13 @@ export abstract class FileSystem extends Service {
    * touches raw bytes.
    * @param target - the resolved target to read.
    * @param signal - aborts the stream, including between chunks.
+   * @param sandboxPolicy - the per-call mode and workspace root this read
+   *   runs under; a sandboxing backend fences credential and deny-path reads
+   *   by it, the bare backend ignores it. Omit to leave the backend its own
+   *   default.
    * @returns the chunk iterable, decoded and validated like {@link readText}.
    */
-  abstract streamText(target: FsTarget, signal?: AbortSignal): Promise<AsyncIterable<string>>
+  abstract streamText(target: FsTarget, signal?: AbortSignal, sandboxPolicy?: SandboxExecutionPolicy): Promise<AsyncIterable<string>>
 
   /**
    * Read the whole regular file as raw bytes with no decoding or binary
@@ -194,9 +202,18 @@ export abstract class FileSystem extends Service {
    * @param target - the resolved target to read.
    * @param signal - aborts the read.
    * @param maxBytes - inclusive byte cap on the complete content.
+   * @param sandboxPolicy - the per-call mode and workspace root this read
+   *   runs under; a sandboxing backend fences credential and deny-path reads
+   *   by it, the bare backend ignores it. Omit to leave the backend its own
+   *   default.
    * @returns the full raw content, at most `maxBytes` long.
    */
-  abstract readBytes(target: FsTarget, signal: AbortSignal | undefined, maxBytes: number): Promise<Uint8Array>
+  abstract readBytes(
+    target: FsTarget,
+    signal: AbortSignal | undefined,
+    maxBytes: number,
+    sandboxPolicy?: SandboxExecutionPolicy,
+  ): Promise<Uint8Array>
 
   /**
    * List direct children of a directory in stable name order. Returns resolved
