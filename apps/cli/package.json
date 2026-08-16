@@ -46,6 +46,7 @@
     "@roos-code/roos-code-headless": "workspace:^",
     "@roos-code/roos-code-llm": "workspace:^",
     "@roos-code/roos-code-llm-deepseek": "workspace:^",
+    "@roos-code/roos-code-llm-cli-bridge": "workspace:^",
     "@roos-code/roos-code-llm-pi-ai": "workspace:^",
     "@roos-code/roos-code-mcp-client": "workspace:^",
     "@roos-code/roos-code-home-paths": "workspace:^",

@@ -24,7 +24,9 @@ roos models set deepseek-official deepseek-v4-pro --effort max
 roos models set --purpose compaction ollama-local llama3.2
 ```
 
-`set` 写入 `agent-default-model` 分节。`--effort` 在适配器元数据（`LlmReasoningEffortInfo`）接受该模型的该级别后存储 `reasoningEffort`；省略 `--effort` 时只写入 `{ provider, model }`，不会持久化适配器默认强度。未知强度会在写入前失败。`--purpose compaction` 或 `--purpose session-title` 写入按用途覆盖，并保留会话默认值。
+`set` 写入 `agent-default-model` 分节。`--effort` 在适配器元数据（`LlmReasoningEffortInfo`）接受该模型的该级别后存储 `reasoningEffort`；省略 `--effort` 时只写入 `{ provider, model }`，不会持久化适配器默认强度。未知强度会在写入前失败。委派 CLI 路由（`grok-cli`、`kimi-cli`、`claude-cli`、`codex-cli`）公布该 CLI 实际接受的强度，因此 `roos models set grok-cli grok-4 --effort high` 走同一条写入路径。`--purpose compaction` 或 `--purpose session-title` 写入按用途覆盖，并保留会话默认值。
+
+[产品 CLI 指南](./subagents.md) 负责 subagent 与委派路由的划分，以及这些路由上的审批警告。
 
 压缩与会话标题请求通过 `ctx.llm.stream()` 并设置 `purpose`，不进入会话的 `agent/request` waterfall，因此在这些调用方读取之前，已存储的按用途覆盖不会被应用。
 

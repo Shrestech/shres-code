@@ -321,6 +321,13 @@ function Loaded({ injected }: { injected: ModelsSectionInjected }): ReactNode {
                   {row.entry.declared === true
                     ? <span className={styles['rowTag']}>{t('customTag')}</span>
                     : null}
+                  {row.entry.kind === 'delegated'
+                    ? (
+                      <span className={styles['rowTag']} title={t('delegatedHint')}>
+                        {t('delegatedTag')}
+                      </span>
+                    )
+                    : null}
                   {credentialConfigured
                     ? (
                       <span

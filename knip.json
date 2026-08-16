@@ -490,6 +490,16 @@
         "tests/**/*.ts"
       ]
     },
+    "packages/llm/llm-cli-bridge": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.e2e.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
     "packages/session/session-title-first-prompt-llm": {
       "entry": [
         "tests/**/*.spec.ts",
@@ -655,6 +665,26 @@
       ]
     },
     "packages/subagent/subagent-claude-code": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.e2e.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
+    "packages/subagent/subagent-grok-cli": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.e2e.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
+    "packages/subagent/subagent-kimi-cli": {
       "entry": [
         "tests/**/*.spec.ts",
         "tests/**/*.e2e.ts"

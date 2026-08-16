@@ -20,6 +20,7 @@ import type { CliIo } from '@roos-code/roos-code-first-run-setup'
 import LlmRuntime from '@roos-code/roos-code-llm'
 import { ReasoningEffortId } from '@roos-code/roos-code-llm'
 import * as LlmDeepseek from '@roos-code/roos-code-llm-deepseek'
+import * as LlmCliBridge from '@roos-code/roos-code-llm-cli-bridge'
 import * as LlmPiAi from '@roos-code/roos-code-llm-pi-ai'
 import { settingsNamespace } from '@roos-code/roos-code-settings'
 import SettingsFile from '@roos-code/roos-code-settings-file'
@@ -160,6 +161,7 @@ export async function bootModelsCli(roosHome?: string): Promise<Context> {
   })
   await ctx.plugin(LlmDeepseek)
   await ctx.plugin(LlmPiAi, { providers: SHIPPED_PI_AI_PROVIDERS })
+  await ctx.plugin(LlmCliBridge)
   return ctx
 }
 
@@ -215,6 +217,7 @@ interface ProviderRow {
   displayName: string
   active: boolean
   usable: boolean
+  delegated: boolean
   models: string[]
 }
 
@@ -230,6 +233,7 @@ function mergeProviderRows(ctx: Context): ProviderRow[] {
       displayName: entry.displayName,
       active: live.has(entry.provider),
       usable: true,
+      delegated: entry.kind === 'delegated',
       models: [],
     })
   }
@@ -240,6 +244,7 @@ function mergeProviderRows(ctx: Context): ProviderRow[] {
       displayName: provider.name,
       active: true,
       usable: true,
+      delegated: provider.kind === 'delegated',
       models: [],
     })
   }
@@ -275,6 +280,7 @@ export async function formatProviderList(ctx: Context): Promise<string> {
     const flags = [
       ...row.active ? ['active'] : ['dormant'],
       ...row.provider === selected.provider ? ['default'] : [],
+      ...row.delegated ? ['delegated'] : [],
       ...row.usable ? [] : ['unusable until keyed'],
     ]
     lines.push(`  ${row.provider}  ${row.displayName}  [${flags.join(', ')}]`)

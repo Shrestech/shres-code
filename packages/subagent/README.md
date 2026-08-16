@@ -13,6 +13,8 @@ This family lets an agent delegate work to child agents. Multiple named provider
 | [`subagent-acp/`](subagent-acp/README.md) | Starts an out-of-process child over ACP | registers on `ctx.subagents` |
 | [`subagent-codex/`](subagent-codex/README.md) | Starts a real Codex app-server child | registers on `ctx.subagents` |
 | [`subagent-claude-code/`](subagent-claude-code/README.md) | Starts a real Claude Code child through the official Claude Agent SDK | registers on `ctx.subagents` |
+| [`subagent-grok-cli/`](subagent-grok-cli/README.md) | Starts a real Grok Build `grok -p` child | registers on `ctx.subagents` |
+| [`subagent-kimi-cli/`](subagent-kimi-cli/README.md) | Starts a real Kimi Code CLI `kimi -p` child | registers on `ctx.subagents` |
 | [`subagent-roos-sdk/`](subagent-roos-sdk/README.md) | Starts an out-of-process Harness child through the TypeScript SDK | registers on `ctx.subagents` |
 | [`tool-subagent/`](tool-subagent/README.md) | Exposes delegation to the model | registers on `ctx.tools` |
 | [`tool-subagent-control/`](tool-subagent-control/README.md) | Exposes child messaging and listing to the model | registers on `ctx.tools` |

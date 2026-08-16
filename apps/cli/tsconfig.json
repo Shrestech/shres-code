@@ -66,6 +66,9 @@
       "path": "../../packages/settings/settings"
     },
     {
+      "path": "../../packages/llm/llm-cli-bridge"
+    },
+    {
       "path": "../../packages/llm/llm-pi-ai"
     },
     {

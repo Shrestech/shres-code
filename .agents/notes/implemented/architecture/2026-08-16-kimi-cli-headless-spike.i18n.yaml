@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-16-kimi-cli-headless-spike.md
+2026-08-16-kimi-cli-headless-spike.md: fab7034b22cd5c3b5699dbcfaf7a5a809724a119
+2026-08-16-kimi-cli-headless-spike.zh.md: 8d4b15e026db8028e171611e00222af184bb3cce

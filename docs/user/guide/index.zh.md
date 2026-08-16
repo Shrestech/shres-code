@@ -26,6 +26,7 @@ agent 可以读取和编辑工作区文件、运行命令、委派工作并维�
 
 - [配置模型](./providers.md)
 - [从 CLI 管理模型](./models.md)
+- [把任务委派给产品 CLI](./subagents.md)
 - [使用 Python SDK](./python-sdk.md)
 - [使用其他 CLI 模式](../../../apps/cli/README.md)
 - [开发插件](../develop/basic/)

@@ -146,6 +146,11 @@ export interface LlmProviderInfo {
   id: string
   /** Human-readable provider name for selectors and diagnostics. */
   name: string
+  /**
+   * When `delegated`, the route runs an external CLI whose own tools
+   * bypass harness approval. Absent means an ordinary HTTP adapter.
+   */
+  kind?: 'delegated'
 }
 
 /** Merge-extensible provider model modality vocabulary. */
@@ -184,6 +189,11 @@ export interface LlmConfigurableProvider {
    * from outside.
    */
   declared?: boolean
+  /**
+   * When `delegated`, the route runs an external CLI whose own tools
+   * bypass harness approval. Selectors must show that fact.
+   */
+  kind?: 'delegated'
 }
 
 /**

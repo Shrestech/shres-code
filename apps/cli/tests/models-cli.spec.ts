@@ -86,6 +86,22 @@ describe('roos models / providers', () => {
     expect(result.stdout).toMatch(/unusable until keyed/)
     expect(result.stdout).toContain('ollama-local')
     expect(result.stdout).toContain('llama3.2')
+    expect(result.stdout).toContain('grok-cli')
+    expect(result.stdout).toMatch(/delegated/)
+  })
+
+  it('sets a grok-cli model and advertised effort', async () => {
+    const home = await tempHome()
+    const set = await run(home, {
+      kind: 'models-set',
+      provider: 'grok-cli',
+      model: 'grok-4',
+      effort: 'high',
+    })
+    expect(set.exit).toBe(0)
+    expect(set.stdout).toContain('Default: grok-cli grok-4 effort=high')
+    const listed = await run(home, { kind: 'models-list' })
+    expect(listed.stdout).toContain('Default: grok-cli grok-4 effort=high')
   })
 
   it('sets the default including reasoning effort', async () => {

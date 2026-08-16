@@ -495,5 +495,12 @@
     # request from the `llm-deepseek:` settings section over this entry, with the
     # key coming from the credential store below. Thinking defaults are a deployment
     # choice.
+    # Delegated CLI completions. Each route runs an external coding-agent
+    # binary; its own tools bypass harness approval. The Models picker marks
+    # them delegated. `roos models set grok-cli <model> --effort <level>`
+    # writes through the same agent-default-model section as HTTP routes.
+    - id: llm-cli-bridge
+      name: '@roos-code/roos-code-llm-cli-bridge'
+
     - id: llm-deepseek
       name: '@roos-code/roos-code-llm-deepseek'

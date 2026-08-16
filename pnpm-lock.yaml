@@ -213,6 +213,9 @@ importers:
       '@roos-code/roos-code-llm':
         specifier: workspace:^
         version: link:../../packages/llm/llm
+      '@roos-code/roos-code-llm-cli-bridge':
+        specifier: workspace:^
+        version: link:../../packages/llm/llm-cli-bridge
       '@roos-code/roos-code-llm-deepseek':
         specifier: workspace:^
         version: link:../../packages/llm/llm-deepseek
@@ -539,6 +542,9 @@ importers:
       '@roos-code/roos-code-llm':
         specifier: workspace:*
         version: link:../packages/llm/llm
+      '@roos-code/roos-code-llm-cli-bridge':
+        specifier: workspace:*
+        version: link:../packages/llm/llm-cli-bridge
       '@roos-code/roos-code-llm-deepseek':
         specifier: workspace:*
         version: link:../packages/llm/llm-deepseek
@@ -650,6 +656,12 @@ importers:
       '@roos-code/roos-code-subagent-fork-in-process':
         specifier: workspace:*
         version: link:../packages/subagent/subagent-fork-in-process
+      '@roos-code/roos-code-subagent-grok-cli':
+        specifier: workspace:*
+        version: link:../packages/subagent/subagent-grok-cli
+      '@roos-code/roos-code-subagent-kimi-cli':
+        specifier: workspace:*
+        version: link:../packages/subagent/subagent-kimi-cli
       '@roos-code/roos-code-subagent-roos-sdk':
         specifier: workspace:*
         version: link:../packages/subagent/subagent-roos-sdk
@@ -1073,6 +1085,9 @@ importers:
       '@roos-code/roos-code-llm':
         specifier: workspace:^
         version: link:../../llm/llm
+      '@roos-code/roos-code-llm-cli-bridge':
+        specifier: workspace:^
+        version: link:../../llm/llm-cli-bridge
       '@roos-code/roos-code-llm-deepseek':
         specifier: workspace:^
         version: link:../../llm/llm-deepseek
@@ -5313,6 +5328,34 @@ importers:
         specifier: workspace:^
         version: link:../../util/timeout
 
+  packages/llm/llm-cli-bridge:
+    dependencies:
+      '@roos-code/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@roos-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@roos-code/roos-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@roos-code/roos-code-llm':
+        specifier: workspace:^
+        version: link:../llm
+      '@roos-code/roos-code-settings':
+        specifier: workspace:^
+        version: link:../../settings/settings
+      '@roos-code/roos-code-subprocess':
+        specifier: workspace:^
+        version: link:../../subprocess/subprocess
+      '@roos-code/roos-code-subprocess-local':
+        specifier: workspace:^
+        version: link:../../subprocess/subprocess-local
+      '@roos-code/roos-code-timeout':
+        specifier: workspace:^
+        version: link:../../util/timeout
+
   packages/llm/llm-deepseek:
     dependencies:
       '@roos-code/schemastery':
@@ -7302,6 +7345,43 @@ importers:
         specifier: workspace:^
         version: link:../subagent-spawn-in-process
 
+  packages/subagent/subagent-grok-cli:
+    dependencies:
+      '@roos-code/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@roos-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@roos-code/cordis-plugin-loader':
+        specifier: workspace:^
+        version: link:../../../vendor/loader
+      '@roos-code/roos-code-agent':
+        specifier: workspace:^
+        version: link:../../core/agent
+      '@roos-code/roos-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@roos-code/roos-code-llm':
+        specifier: workspace:^
+        version: link:../../llm/llm
+      '@roos-code/roos-code-session':
+        specifier: workspace:^
+        version: link:../../core/session
+      '@roos-code/roos-code-subagent':
+        specifier: workspace:^
+        version: link:../subagent
+      '@roos-code/roos-code-subprocess':
+        specifier: workspace:^
+        version: link:../../subprocess/subprocess
+      '@roos-code/roos-code-subprocess-local':
+        specifier: workspace:^
+        version: link:../../subprocess/subprocess-local
+      '@roos-code/roos-code-timeout':
+        specifier: workspace:^
+        version: link:../../util/timeout
+
   packages/subagent/subagent-in-process-driver:
     devDependencies:
       '@roos-code/cordis':
@@ -7355,6 +7435,43 @@ importers:
       '@roos-code/roos-code-user-approval':
         specifier: workspace:^
         version: link:../../interaction/user-approval
+
+  packages/subagent/subagent-kimi-cli:
+    dependencies:
+      '@roos-code/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@roos-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@roos-code/cordis-plugin-loader':
+        specifier: workspace:^
+        version: link:../../../vendor/loader
+      '@roos-code/roos-code-agent':
+        specifier: workspace:^
+        version: link:../../core/agent
+      '@roos-code/roos-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@roos-code/roos-code-llm':
+        specifier: workspace:^
+        version: link:../../llm/llm
+      '@roos-code/roos-code-session':
+        specifier: workspace:^
+        version: link:../../core/session
+      '@roos-code/roos-code-subagent':
+        specifier: workspace:^
+        version: link:../subagent
+      '@roos-code/roos-code-subprocess':
+        specifier: workspace:^
+        version: link:../../subprocess/subprocess
+      '@roos-code/roos-code-subprocess-local':
+        specifier: workspace:^
+        version: link:../../subprocess/subprocess-local
+      '@roos-code/roos-code-timeout':
+        specifier: workspace:^
+        version: link:../../util/timeout
 
   packages/subagent/subagent-roos-sdk:
     dependencies:

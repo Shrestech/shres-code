@@ -24,7 +24,9 @@ roos models set deepseek-official deepseek-v4-pro --effort max
 roos models set --purpose compaction ollama-local llama3.2
 ```
 
-`set` writes the `agent-default-model` section. `--effort` stores `reasoningEffort` after the adapter metadata (`LlmReasoningEffortInfo`) accepts that level for the chosen model; omitting `--effort` writes only `{ provider, model }` and does not persist an adapter default. An unknown effort fails before anything is written. `--purpose compaction` or `--purpose session-title` writes a purpose override and leaves the conversation default in place.
+`set` writes the `agent-default-model` section. `--effort` stores `reasoningEffort` after the adapter metadata (`LlmReasoningEffortInfo`) accepts that level for the chosen model; omitting `--effort` writes only `{ provider, model }` and does not persist an adapter default. An unknown effort fails before anything is written. Delegated CLI routes (`grok-cli`, `kimi-cli`, `claude-cli`, `codex-cli`) advertise the efforts that CLI actually accepts, so `roos models set grok-cli grok-4 --effort high` is the same write path. `--purpose compaction` or `--purpose session-title` writes a purpose override and leaves the conversation default in place.
+
+The [product CLI guide](./subagents.md) owns the subagent-versus-delegated-route split and the approval warning on those routes.
 
 Compaction and session-title requests call `ctx.llm.stream()` with `purpose` set and do not enter the conversation `agent/request` waterfall, so a stored purpose override is not applied until those callers read it.
 

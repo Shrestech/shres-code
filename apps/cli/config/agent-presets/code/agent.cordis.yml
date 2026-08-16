@@ -219,6 +219,24 @@
         enableRunInBackground: false
         maxDepth: provider-managed
 
+    - id: tool-subagent-grok-cli
+      name: '@roos-code/roos-code-tool-subagent'
+      disabled: true
+      config:
+        provider: grok-cli
+        toolName: subagent_grok_cli
+        enableRunInBackground: false
+        maxDepth: provider-managed
+
+    - id: tool-subagent-kimi-cli
+      name: '@roos-code/roos-code-tool-subagent'
+      disabled: true
+      config:
+        provider: kimi-cli
+        toolName: subagent_kimi_cli
+        enableRunInBackground: false
+        maxDepth: provider-managed
+
     - id: workflow-worker-thread
       name: '@roos-code/roos-code-workflow-worker-thread'
       config:
