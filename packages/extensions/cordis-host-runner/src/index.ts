@@ -1286,9 +1286,12 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
    * Grant Host-half evaluation at most once per Plugin id in this Session.
    * Concurrent asks for the same Plugin share one in-flight decision. An
    * allowlisted id or a prior `'allowed-once'` skips the ask. A remembered
-   * non-grant is returned without prompting again. Client-only Packages never
-   * ask. Absence of an answerer, a cancelled ask, or any outcome other than
-   * `'allowed-once'` refuses before Host code runs.
+   * closed `approval.request` outcome (`rejected` / `cancelled` / waterfall
+   * `'unavailable'`) is returned without prompting again. An idle-turn
+   * {@link isApprovalOutsideTurnError} is structured `'unavailable'` for that
+   * attempt only and is not stored. Client-only Packages never ask. Absence of
+   * an answerer, a cancelled ask, or any outcome other than `'allowed-once'`
+   * refuses before Host code runs.
    * @param agent - Agent whose Session owns the Plugin and receives the audit pair.
    * @param plugin - Plugin whose Host-half grant is being resolved.
    * @param definition - Package whose Host source would run.
@@ -1337,13 +1340,11 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
       })
     } catch (error) {
       if (isApprovalOutsideTurnError(error)) {
-        const denial: HostActivationDenial = {
+        return {
           ok: false,
           reason: 'unavailable',
           message: hostActivationDenied(plugin.pluginId, 'unavailable'),
         }
-        plugin.hostActivationDenial = denial
-        return denial
       }
       throw error
     }

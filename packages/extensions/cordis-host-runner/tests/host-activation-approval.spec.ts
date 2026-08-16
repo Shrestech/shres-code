@@ -180,6 +180,28 @@ describe('host-half activation approval', () => {
     })
   })
 
+  it('does not persist an outside-turn fail-closed as a Session denial', async () => {
+    const asked: ApprovalRequest[] = []
+    const { ctx, runner } = await setup(undefined, 'none')
+    ctx.on('approval/request', (req) => {
+      asked.push(req)
+      return Promise.resolve<ApprovalOutcome>('allowed-once')
+    })
+    const { pluginId, packageId } = defineHost(runner)
+    AGENT_A.session.events.length = 0
+    AGENT_A.session.append('turn/end', { turn: 1 })
+
+    await expect(runner.runHostHalf(AGENT_A, pluginId, packageId, 'run', null, false))
+      .resolves.toMatchObject({ ok: false, reason: 'unavailable' })
+    expect(asked).toEqual([])
+
+    AGENT_A.session.append('turn/start')
+
+    await expect(runner.run(AGENT_A, pluginId, packageId, 'run'))
+      .resolves.toMatchObject({ ok: true, status: 'running' })
+    expect(asked).toHaveLength(1)
+  })
+
   it('does not re-ask after a later Package of the same Plugin', async () => {
     const asked: string[] = []
     const { ctx, runner } = await setup(undefined, 'none')

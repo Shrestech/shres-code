@@ -61,7 +61,7 @@ export interface DynamicCordisPlugin {
   clientVersionUpdatesApproved: boolean
   /** Whether this Session already granted Host-half activation for this Plugin. */
   hostActivationApproved: boolean
-  /** Closed Host-half non-grant remembered so a later ask does not re-prompt. */
+  /** Closed `approval.request` non-grant remembered so a later ask does not re-prompt. Idle-turn throws are not stored. */
   hostActivationDenial?: {
     reason: 'rejected' | 'cancelled' | 'unavailable'
     message: string
