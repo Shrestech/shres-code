@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import type { CredentialView } from '@roos-code/roos-code-api-remotes/client'
 import type { ModelsSettingsState, ProviderRow } from '../src/client/store.ts'
-import { onboardingReadiness, providerUsable } from '../src/client/store.ts'
+import { onboardingCandidates, onboardingReadiness, providerUsable } from '../src/client/store.ts'
 
 const missingCredential: CredentialView = { configured: false, writable: true }
 
@@ -67,18 +67,17 @@ describe('providerUsable', () => {
 })
 
 describe('onboardingReadiness', () => {
-  it('waits for the first join and skips onboarding when the adapter directory entry is absent', () => {
+  it('waits for the first join and skips onboarding when no configurable route remains', () => {
     expect(onboardingReadiness(state({ status: 'idle', rows: [] }))).toEqual({ kind: 'loading' })
     expect(onboardingReadiness(state({ status: 'loading', rows: [] }))).toEqual({ kind: 'loading' })
     expect(onboardingReadiness(state({ rows: [] }))).toEqual({ kind: 'adapter-absent' })
     expect(onboardingReadiness(state({
       rows: [row({
-        entry: {
-          ...row().entry,
-          settingsNs: '',
-        },
+        apiKeyEnv: undefined,
+        credential: undefined,
+        entry: { ...row().entry, provider: 'native-only' },
       })],
-    }))).toEqual({ kind: 'adapter-absent' })
+    }))).toEqual({ kind: 'provider-ready' })
   })
 
   it('reports a missing writable effective credential', () => {
@@ -91,6 +90,23 @@ describe('onboardingReadiness', () => {
     expect(onboardingReadiness(state({
       rows: [row(), otherRow({ credential: missingCredential })],
     }))).toEqual({ kind: 'credential-missing' })
+  })
+
+  it('does not treat keyless local Ollama as already set up', () => {
+    const ollama = row({
+      apiKeyEnv: undefined,
+      credential: undefined,
+      entry: {
+        provider: 'ollama-local',
+        displayName: 'Ollama (local)',
+        settingsNs: 'llm-pi-ai',
+        settingsPath: ['providers', 'ollama-local'],
+        active: true,
+      },
+    })
+    expect(onboardingReadiness(state({ rows: [ollama] }))).toEqual({ kind: 'credential-missing' })
+    expect(onboardingCandidates(state({ rows: [ollama, row()] }).rows).map(item => item.entry.provider))
+      .toEqual(['ollama-local', 'deepseek-official'])
   })
 
   it('accepts file and process-environment credentials without prompting', () => {

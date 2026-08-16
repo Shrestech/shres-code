@@ -54,6 +54,7 @@
     "@roos-code/roos-code-compaction-basic": "workspace:^",
     "@roos-code/roos-code-compaction-tool-result-pruner": "workspace:^",
     "@roos-code/roos-code-credentials-local": "workspace:^",
+    "@roos-code/roos-code-first-run-setup": "workspace:^",
     "@roos-code/roos-code-fs-local": "workspace:^",
     "@roos-code/roos-code-fs-observation-policy": "workspace:^",
     "@roos-code/roos-code-fs-sandbox": "workspace:^",

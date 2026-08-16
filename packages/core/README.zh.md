@@ -12,6 +12,7 @@
 | [`tools/`](tools/README.md) | 作用域工具注册表和执行流水线 | `ctx.tools` |
 | [`agent/`](agent/README.md) | Agent 接口、注册表和事件词汇 | `ctx.agents` |
 | [`agent-default-model/`](agent-default-model/README.md) | 各 Agent 入口共享的默认模型选择 | `ctx.agentDefaultModel` |
+| [`first-run-setup/`](first-run-setup/README.md) | 首次运行模型选择器与本地 Ollama 探测 | `ctx.firstRunSetup` |
 | [`agent-loop/`](agent-loop/README.md) | 默认具体 agent 驱动器 | `ctx.agentLoop` |
 
 `scope` 提供共享作用域原语。`agent` 负责公开约定，`agent-loop` 是其默认实现；扩展插件依赖该 seam，从而保持驱动器可替换。`agent-default-model` 负责部署选择，Agent 入口仅在会话自身没有选择时使用它。

@@ -2,19 +2,31 @@
 
 [English](providers.md) | 中文
 
-本指南假定你已按照[根 README](../../../README.md#run)启动 Web UI。模型变更会在下一次请求时生效，不需要重启服务器。
+本指南假定你已按照[根 README](../../../README.md#run)启动 Web UI，或在 TTY 上运行 `roos --profile headless`。模型变更会在下一次请求时生效，不需要重启服务器。
 
-## 配置 DeepSeek
+首次运行且没有可用默认值时，会打开选择器，而不会静默选定某个厂商。headless 会打印探测到的本机 Ollama 模型、随附的模板路由和自定义基础 URL；Web 在引导卡片上提供同样的路由。非 TTY 进程在没有可用默认值时会失败，并点名这些配置路径。
 
-打开**设置 → 模型**。DeepSeek 卡片提供一个 API 密钥字段；输入密钥并保存。
+## 配置随附提供方
+
+打开**设置 → 模型**。页面列出组合中的路由：DeepSeek、本机 Ollama、Ollama Cloud、OpenAI、Anthropic（Claude）、xAI（Grok）、Moonshot（Kimi）、OpenRouter 和 Groq。
 
 ![模型页：DeepSeek 卡片，以及添加提供方与添加自定义提供方两个入口](providers-models-page.zh.png)
 
+每个需要密钥的卡片提供一个 API 密钥字段；输入密钥并保存。已命名但尚未设置的密钥（`OPENAI_API_KEY`、`ANTHROPIC_API_KEY`、`XAI_API_KEY`、`MOONSHOT_API_KEY`、`OLLAMA_API_KEY`、`OPENROUTER_API_KEY`、`GROQ_API_KEY`、`DEEPSEEK_API_KEY`）在存储之前会让请求以 `MISSING_CREDENTIAL` 失败。
+
 密钥是只写的。保存后，页面只会收到脱敏描述符，永远不会收到明文密钥。密钥存储在 `$ROOS_HOME/.credentials.yaml` 中，settings 只保留它的凭据引用。
 
-## 添加目录提供方
+### 本机 Ollama
 
-选择**添加提供方**，选取 Anthropic 或 OpenAI 等提供方，输入其 API 密钥并保存。已安装目录会提供端点、协议和模型列表。
+`ollama-local` 路由访问 `http://localhost:11434/v1`，不需要 API 密钥。首次运行会探测 `GET /v1/models`，并列出该接口返回的模型。传给 `ollama run` 的 CLI id 与 API 接受的 id 相同。
+
+### Ollama Cloud
+
+`ollama-cloud` 路由使用 `OLLAMA_API_KEY` 访问 `https://ollama.com/v1`。云端模型 id 带 `:cloud` 后缀；随附目录包含 `deepseek-v4-flash:cloud` 和 `deepseek-v4-pro:cloud`。这些拼写与 `ollama run deepseek-v4-flash:cloud` 一致。上下文窗口和最大输出 token 钉在路由上，因为 `GET /models` 不会披露它们。
+
+### Claude、Grok 和 Kimi
+
+Anthropic、xAI 和 Moonshot 是目录路由：打开对应卡片，分别填入 `ANTHROPIC_API_KEY`、`XAI_API_KEY` 或 `MOONSHOT_API_KEY` 并保存。已安装目录提供端点、协议和模型列表。OpenAI、OpenRouter 和 Groq 的用法相同。
 
 使用原生认证的提供方需要各自的原生凭据。Bedrock、Vertex、Azure 和 Codex 分别使用 AWS 凭据与区域、ADC 项目、`api-version` 和 OAuth；只填写 API 密钥字段无法完成配置。
 
@@ -88,6 +100,8 @@ llm-pi-ai:
 ## 排错
 
 - **`MISSING_CREDENTIAL`**：通过模型页存储提供方密钥，或提供被引用的环境变量。
+- **每次 headless 运行都出现首次运行选择器**：没有用户保存的 `agent-default-model`，且组合默认值无法提供服务。请选择一条路由、导出密钥，或在 `$ROOS_HOME/settings.yaml` 中写入该分节。
+- **选择器里没有本机 Ollama**：`GET http://localhost:11434/v1/models` 没有应答。请启动 Ollama 后重试；随附路由仍会出现在模型页上。
 - **`UNKNOWN_MODEL`**：选择已配置的模型，或向自定义提供方添加缺失的模型。
 - **获取可用模型返回 401**：检查密钥。模型发现会调用 OpenAI 兼容的 `GET /models` 端点；对于不提供该端点的服务，请手动输入模型。
 - **图片在发送前被拒绝**：该模型未声明图片模态。请给自定义提供方的模型加上 `input: [text, image]`；DeepSeek 自身的 chat-completions 路由是纯文本的，且无法通过配置改变。
@@ -95,4 +109,4 @@ llm-pi-ai:
 
 ## 进阶配置
 
-自动生成的[插件配置目录](../../config-catalog.md)列出所有受支持的字段与默认值。[`roos-llm-pi-ai`](../../../packages/llm/llm-pi-ai/README.md) 和 [`roos-llm-deepseek`](../../../packages/llm/llm-deepseek/README.md) 参考文档负责直接 `settings.yaml` 配置、目录解析、推理控制、凭据与适配器错误。
+自动生成的[插件配置目录](../../config-catalog.md)列出所有受支持的字段与默认值。[`roos-llm-pi-ai`](../../../packages/llm/llm-pi-ai/README.md) 和 [`roos-llm-deepseek`](../../../packages/llm/llm-deepseek/README.md) 参考文档负责直接 `settings.yaml` 配置、目录解析、推理控制、凭据与适配器错误。首次运行选择器约定见 [`roos-first-run-setup`](../../../packages/core/first-run-setup/README.md)。

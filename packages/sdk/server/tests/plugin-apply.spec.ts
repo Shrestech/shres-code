@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@roos-code/cordis'
 import * as agentCore from '@roos-code/roos-code-agent-spine-demo'
 import JsonlSessionPersistence from '@roos-code/roos-code-session-persistence-jsonl'
+import * as LlmDeepSeek from '@roos-code/roos-code-llm-deepseek'
 import * as jsonrpc from '../src/index.ts'
 
 /**
@@ -61,6 +62,7 @@ async function mountPlugin(
 ): Promise<ApplyHarness> {
   const ctx = new Context()
   await ctx.plugin(agentCore, { workspaceContext: false })
+  await ctx.plugin(LlmDeepSeek)
   await ctx.plugin(JsonlSessionPersistence, { root: storageDir })
   await new Promise(resolve => setTimeout(resolve, 50))
 

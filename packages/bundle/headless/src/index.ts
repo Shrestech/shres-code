@@ -13,6 +13,7 @@ import z from '@roos-code/schemastery'
 import { installModelSelection } from '@roos-code/roos-code-agent'
 import type { ModelSelectionRef } from '@roos-code/roos-code-agent'
 import type {} from '@roos-code/roos-code-agent-default-model'
+import type {} from '@roos-code/roos-code-first-run-setup'
 import { createUserMessage } from '@roos-code/roos-code-llm'
 import { SessionId } from '@roos-code/roos-code-session'
 import type { SessionEvent } from '@roos-code/roos-code-session'
@@ -103,6 +104,8 @@ async function run(ctx: Context, task: string, io: HeadlessIo): Promise<void> {
   // Early process shutdown can dispose the tree while settlement is pending.
   if (agents === undefined || defaultModel === undefined || sessions === undefined) return
 
+  const firstRun = ctx.get('firstRunSetup')
+  if (firstRun !== undefined) await firstRun.ensureReady()
   const selection = defaultModel.currentSelection()
   // This bundle composes no preset roster, so the model-facing rows sit in the
   // host plane and the agent reads them from the global layer. A deployment

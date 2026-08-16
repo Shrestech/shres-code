@@ -85,15 +85,63 @@
     - id: credentials
       name: '@roos-code/roos-code-credentials-local'
 
-    # The pi-ai multi-provider twin, mounted dormant: zero routes (and no extra
-    # models in the picker) until a `llm-pi-ai:` settings section supplies provider
-    # profiles — then those routes register live, keys resolving per request
-    # through their apiKeyEnv references, and drop again when the section empties.
-    # Supplying those profiles is exactly what the web Models page does. Which
-    # adapters exist is composition; which providers run is the user's settings
-    # document.
+    # Default any-API routes. Named `apiKeyEnv` values stay unset until the user
+    # stores a key (MISSING_CREDENTIAL on use). ollama-local is keyless: pi-ai's
+    # OpenAI-compatible client still wants an Authorization header, so the route
+    # sends a dummy Bearer token. ollama-cloud model ids use the public `:cloud`
+    # suffix; contextWindow/maxTokens are pinned because GET /models does not
+    # disclose them. first-run-setup offers these routes when no usable default
+    # exists; it never silently picks a vendor.
     - id: llm-pi-ai
       name: '@roos-code/roos-code-llm-pi-ai'
+      config:
+        providers:
+          ollama-local:
+            displayName: Ollama (local)
+            api: openai-completions
+            baseURL: http://localhost:11434/v1
+            headers:
+              Authorization: Bearer ollama
+            models:
+              - id: llama3.2
+                name: Llama 3.2
+          ollama-cloud:
+            displayName: Ollama Cloud
+            api: openai-completions
+            baseURL: https://ollama.com/v1
+            apiKeyEnv: OLLAMA_API_KEY
+            models:
+              - id: deepseek-v4-flash:cloud
+                name: DeepSeek V4 Flash (cloud)
+                contextWindow: 1048576
+                maxTokens: 32768
+              - id: deepseek-v4-pro:cloud
+                name: DeepSeek V4 Pro (cloud)
+                contextWindow: 1048576
+                maxTokens: 32768
+          openai:
+            apiKeyEnv: OPENAI_API_KEY
+          anthropic:
+            apiKeyEnv: ANTHROPIC_API_KEY
+          xai:
+            apiKeyEnv: XAI_API_KEY
+          moonshotai:
+            apiKeyEnv: MOONSHOT_API_KEY
+          openrouter:
+            apiKeyEnv: OPENROUTER_API_KEY
+          groq:
+            apiKeyEnv: GROQ_API_KEY
+
+    # First-run picker: probes local Ollama and, on headless, prints a TTY menu
+    # when the composition default cannot serve. autoRunCli stays false here so
+    # the Web process never blocks on stdin; headless calls ensureReady() after
+    # the loader settles.
+    - id: first-run-setup
+      name: '@roos-code/roos-code-first-run-setup'
+      config:
+        ollamaBaseURL: http://localhost:11434/v1
+        detectTimeoutMs: 1500
+        autoRunCli: false
 
     - id: session-persistence-jsonl
       name: '@roos-code/roos-code-session-persistence-jsonl'

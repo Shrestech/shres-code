@@ -84,6 +84,7 @@ function harness(options: {
   })
   const face = {
     llm: {
+      discoverModels: () => Promise.resolve(ok({ models: [{ id: 'deepseek-v4-flash' }] })),
       providers: () => {
         if (options.providersReject === true) return Promise.reject(new Error('provider transport unavailable'))
         return Promise.resolve(ok({
@@ -106,6 +107,7 @@ function harness(options: {
         namespaces: options.settingsNamespace === false ? [] : [deepSeekNamespace(apiKeyEnv)],
       })),
       mutate,
+      replace: () => Promise.resolve(ok(deepSeekNamespace(apiKeyEnv))),
     },
     credentials: {
       describe: () => options.describeFailure === undefined
@@ -244,7 +246,6 @@ describe('DeepSeekOnboardingDialog', () => {
   it('skips an absent adapter and an already-configured environment credential', async () => {
     for (const h of [
       harness({ provider: false }),
-      harness({ providerSettingsNs: '' }),
       harness({ configured: () => true, credential: { source: 'env', writable: false } }),
     ]) {
       const view = render(<DeepSeekOnboardingDialog {...h.props} />)

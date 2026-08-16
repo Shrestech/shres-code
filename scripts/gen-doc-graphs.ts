@@ -336,8 +336,16 @@ const SERVICE_ROLES: ServiceRole[] = [
     pkg: 'agent-default-model',
     title: 'Default Agent model selection',
     mode: 'core',
-    consumers: ['headless', 'host-apiproxy'],
+    consumers: ['headless', 'host-apiproxy', 'first-run-setup'],
     note: 'Layers the default ModelSelection through settings so direct and Host-backed Agent entry points share one state owner.',
+  },
+  {
+    key: 'firstRunSetup',
+    pkg: 'first-run-setup',
+    title: 'First-run model picker',
+    mode: 'core',
+    consumers: ['headless'],
+    note: 'Probes local Ollama and writes agent-default-model plus credentials when no usable default exists; never silently selects a vendor.',
   },
   {
     key: 'agentLoop',

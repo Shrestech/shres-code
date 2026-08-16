@@ -7,7 +7,7 @@ import { LocaleRuntime } from '@roos-code/roos-code-client-locale/client'
 import { TestRemote, usePinnedBrowserLanguages } from '@roos-code/roos-code-client-test-runtime'
 import { apply, inject, refreshIfLoaded } from '@roos-code/roos-code-client-ui-settings-models/client'
 import { ModelsSection } from '../src/client/ModelsSection.tsx'
-import { DeepSeekOnboardingDialog } from '../src/client/DeepSeekOnboardingDialog.tsx'
+import { FirstRunOnboardingDialog } from '../src/client/FirstRunOnboardingDialog.tsx'
 import { WelcomeNotice } from '../src/client/WelcomeNotice.tsx'
 
 // The service reads its initial locale from the browser; these specs assert
@@ -67,14 +67,14 @@ describe('ui-settings-models apply', () => {
       component: WelcomeNotice,
       options: { id: 'welcome-notice', order: -100 },
     })
-    const deepSeek = onboarding.find(entry => entry.options.id === 'deepseek-official')!
-    expect(deepSeek.component).toBe(DeepSeekOnboardingDialog)
-    expect(deepSeek.options).toMatchObject({ id: 'deepseek-official', order: 0 })
-    const deepSeekInjected = (
-      deepSeek.inject as unknown as () => import('../src/client/DeepSeekOnboardingDialog.tsx').DeepSeekOnboardingInjected
+    const firstRun = onboarding.find(entry => entry.options.id === 'first-run')!
+    expect(firstRun.component).toBe(FirstRunOnboardingDialog)
+    expect(firstRun.options).toMatchObject({ id: 'first-run', order: 0 })
+    const firstRunInjected = (
+      firstRun.inject as unknown as () => import('../src/client/FirstRunOnboardingDialog.tsx').FirstRunOnboardingInjected
     )()
-    expect(deepSeekInjected.hooks.models).toBe(injected.controller.store)
-    expect(deepSeekInjected.api).toBeDefined()
+    expect(firstRunInjected.hooks.models).toBe(injected.controller.store)
+    expect(firstRunInjected.api).toBeDefined()
 
     const after = await bench()
     await after.ctx.plugin({ inject: [...inject], apply }).await()
@@ -193,10 +193,10 @@ describe('pushed invalidations', () => {
     declare(b.slots)
     await b.ctx.plugin({ inject: [...inject], apply }).await()
     const entry = b.slots.entries('settings.onboarding')
-      .find(candidate => candidate.options.id === 'deepseek-official')!
+      .find(candidate => candidate.options.id === 'first-run')!
     const injected = (
       entry.inject as unknown as
-      () => import('../src/client/DeepSeekOnboardingDialog.tsx').DeepSeekOnboardingInjected
+      () => import('../src/client/FirstRunOnboardingDialog.tsx').FirstRunOnboardingInjected
     )()
     injected.controller.store.update((state) => { state.status = 'ready' })
     const load = vi.spyOn(injected.controller, 'load').mockResolvedValue()

@@ -68,6 +68,12 @@ async function makeHarness(storageDir: string) {
   return ctx
 }
 
+async function makeHarnessWithDeepSeek(storageDir: string) {
+  const ctx = await makeHarness(storageDir)
+  await ctx.plugin(LlmDeepSeek)
+  return ctx
+}
+
 /** Drive the owning service so test lifecycle events carry the real parent scope. */
 async function settleSubagent(
   ctx: Context,
@@ -114,7 +120,7 @@ describe('HarnessSdkJsonRpcServer', () => {
     const llmServer = await mockCompletionServer()
     vi.stubEnv('DEEPSEEK_API_KEY', 'test-key')
     vi.stubEnv('DEEPSEEK_BASE_URL', llmServer.url)
-    const ctx = await makeHarness(storageDir)
+    const ctx = await makeHarnessWithDeepSeek(storageDir)
     try {
       const transport = new FakeTransport()
       const server = new HarnessSdkJsonRpcServer(ctx, transport)
@@ -300,7 +306,7 @@ describe('HarnessSdkJsonRpcServer', () => {
     const llmServer = await mockCompletionServer()
     vi.stubEnv('DEEPSEEK_API_KEY', 'test-key')
     vi.stubEnv('DEEPSEEK_BASE_URL', llmServer.url)
-    const ctx = await makeHarness(storageDir)
+    const ctx = await makeHarnessWithDeepSeek(storageDir)
     try {
       const server = new HarnessSdkJsonRpcServer(ctx, new FakeTransport())
 
@@ -789,6 +795,20 @@ describe('HarnessSdkJsonRpcServer', () => {
       await server.initialize({ cwd: storageDir, provider: 'deepseek-official', model: 'preinstalled-model' })
 
       expect(ctx.get('llm')?.listProviders().filter(provider => provider.id === 'deepseek-official')).toEqual([{ id: 'deepseek-official', name: 'DeepSeek' }])
+      await server.shutdown()
+    } finally {
+      await ctx.fiber.dispose()
+      await rm(storageDir, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects a missing DeepSeek provider instead of mounting a fallback', async () => {
+    const storageDir = await mkdtemp(join(tmpdir(), 'roos-jsonrpc-no-fallback-'))
+    const ctx = await makeHarness(storageDir)
+    try {
+      const server = new HarnessSdkJsonRpcServer(ctx, new FakeTransport())
+      await expect(server.initialize({ cwd: storageDir, provider: 'deepseek-official', model: 'x' }))
+        .rejects.toThrow('no adapter registered for provider "deepseek-official"')
       await server.shutdown()
     } finally {
       await ctx.fiber.dispose()
