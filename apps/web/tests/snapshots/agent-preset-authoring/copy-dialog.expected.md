@@ -1,14 +1,14 @@
-- dialog "复制预设 · 复制自 极简模式":
-  - heading "复制预设 · 复制自 极简模式" [level=2]
-  - button "关闭":
+- dialog "Duplicate preset · Copied from Minimal mode":
+  - heading "Duplicate preset · Copied from Minimal mode" [level=2]
+  - button "Close":
     - img
-  - paragraph: 整个预设会在本机复制一份。标识符将成为目录名，事后无法更改；其余内容之后直接在预设自己的文件里编辑。
-  - text: 标识符
-  - textbox "标识符":
+  - paragraph: the wholepresetis copied on this machineCopy。Identifier willfordirectory name，cannot be changed later；remainingcontentafterdirectly in preset ownfile inEdit。
+  - text: Identifier
+  - textbox "Identifier":
     - /placeholder: my-agent
-  - text: 名称
-  - textbox "名称":
-    - /placeholder: 选择器中显示的名字，缺省用标识符
-  - alert: 请填写标识符。
-  - button "取消"
-  - button "创建" [disabled]
+  - text: Name
+  - textbox "Name":
+    - /placeholder: Shown in the picker; defaults to the identifier
+  - alert: Give the preset an identifier.
+  - button "Cancel"
+  - button "Create" [disabled]

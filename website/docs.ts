@@ -6,23 +6,17 @@
  */
 
 /** Locale key used by the VitePress site. */
-export type DocsLocale = 'root' | 'en'
+export type DocsLocale = 'root'
 
-/** Sidebar collection rendered for one locale and top-level module. */
-export type DocsSidebar =
-  | 'guide'
-  | 'develop'
-  | 'reference'
-  | 'en-guide'
-  | 'en-develop'
-  | 'en-reference'
+/** Sidebar collection rendered for one top-level module. */
+export type DocsSidebar = 'guide' | 'develop' | 'reference'
 
 /** A page projected into the VitePress source tree. */
 export interface DocsPage {
   /** VitePress locale whose route tree owns this projection. */
   locale: DocsLocale
   /** Language of the canonical source currently projected at this route. */
-  contentLocale: 'zh-CN' | 'en-US'
+  contentLocale: 'en-US'
   /** Repository-relative canonical Markdown source. */
   source: string
   /** VitePress route, including the `.md` suffix. */
@@ -41,107 +35,57 @@ export interface DocsPage {
   sourceAliases?: string[]
 }
 
-interface MirroredPage {
-  source: string | Record<DocsLocale, string>
+interface EnglishPage {
+  source: string
   route: string
-  contentLocale: DocsPage['contentLocale'] | Record<DocsLocale, DocsPage['contentLocale']>
-  label: Record<DocsLocale, string>
-  sidebar: Record<DocsLocale, DocsSidebar | null>
-  section: Record<DocsLocale, string>
+  label: string
+  sidebar: DocsSidebar | null
+  section: string
   order: number
   outline?: DocsPage['outline']
-  sourceAliases?: string[] | Partial<Record<DocsLocale, string[]>>
-}
-
-type PairedPage = Omit<MirroredPage, 'source' | 'contentLocale' | 'sourceAliases'> & {
-  /** English side of a sibling `foo.md` / `foo.zh.md` pair. */
-  source: string
-  /** Language-neutral repository aliases, such as the directory of an index page. */
   sourceAliases?: string[]
 }
 
-function localized<T>(value: T | Record<DocsLocale, T>, locale: DocsLocale): T {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? (value as Record<DocsLocale, T>)[locale]
-    : value
-}
-
-function mirroredPages(pages: MirroredPage[]): DocsPage[] {
-  return pages.flatMap(page => (['root', 'en'] as const).map((locale) => {
-    const aliases = page.sourceAliases === undefined
-      ? undefined
-      : Array.isArray(page.sourceAliases) ? page.sourceAliases : page.sourceAliases[locale]
-    return {
-      locale,
-      contentLocale: localized(page.contentLocale, locale),
-      source: localized(page.source, locale),
-      route: locale === 'root' ? page.route : `en/${page.route}`,
-      label: page.label[locale],
-      sidebar: page.sidebar[locale],
-      section: page.section[locale],
-      order: page.order,
-      ...(page.outline === undefined ? {} : { outline: page.outline }),
-      ...(aliases === undefined ? {} : { sourceAliases: aliases }),
-    }
+function englishPages(pages: EnglishPage[]): DocsPage[] {
+  return pages.map(page => ({
+    locale: 'root',
+    contentLocale: 'en-US',
+    ...page,
   }))
 }
 
-function pairedPages(pages: PairedPage[]): DocsPage[] {
-  return pages.map((page) => {
-    const sidebar = page.sidebar.en === 'en-guide'
-      ? 'guide' as const
-      : page.sidebar.en === 'en-develop'
-        ? 'develop' as const
-        : page.sidebar.en === 'en-reference'
-          ? 'reference' as const
-          : null
-    return {
-      locale: 'root' as const,
-      contentLocale: 'en-US' as const,
-      source: page.source,
-      route: page.route,
-      label: page.label.en,
-      sidebar,
-      section: page.section.en,
-      order: page.order,
-      ...(page.outline === undefined ? {} : { outline: page.outline }),
-      ...(page.sourceAliases === undefined ? {} : { sourceAliases: page.sourceAliases }),
-    }
-  })
-}
-
-const homeAndGuide = pairedPages([
+const homeAndGuide = englishPages([
   {
     source: 'docs/user/index.md',
     route: 'index.md',
-    label: { root: 'Roos Code', en: 'Roos Code' },
-    sidebar: { root: null, en: null },
-    section: { root: 'Home', en: 'Home' },
+    label: 'Roos Code',
+    sidebar: null,
+    section: 'Home',
     order: 0,
   },
   {
     source: 'docs/user/guide/index.md',
     route: 'guide/quickstart.md',
-    label: { root: 'Use the Web UI', en: 'Use the Web UI' },
-    sidebar: { root: 'zh-guide', en: 'en-guide' },
-    section: { root: 'Guide', en: 'Guide' },
+    label: 'Use the Web UI',
+    sidebar: 'guide',
+    section: 'Guide',
     order: 1,
     sourceAliases: ['docs/user/guide'],
   },
   {
     source: 'docs/user/guide/providers.md',
     route: 'guide/providers.md',
-    label: { root: 'Configure models', en: 'Configure models' },
-    sidebar: { root: 'zh-guide', en: 'en-guide' },
-    section: { root: 'Guide', en: 'Guide' },
+    label: 'Configure models',
+    sidebar: 'guide',
+    section: 'Guide',
     order: 2,
   },
   {
     source: 'docs/user/guide/models.md',
     route: 'guide/models.md',
-    label: { root: 'Manage models from the CLI', en: 'Manage models from the CLI' },
-    sidebar: { root: 'zh-guide', en: 'en-guide' },
-    section: { root: 'Guide', en: 'Guide' },
+    label: 'Manage models from the CLI',
+    sidebar: 'guide',
+    section: 'Guide',
     order: 3,
   },
   {
@@ -155,193 +99,192 @@ const homeAndGuide = pairedPages([
   {
     source: 'docs/user/guide/python-sdk.md',
     route: 'guide/python-sdk.md',
-    label: { root: 'Python', en: 'Python' },
-    sidebar: { root: 'zh-guide', en: 'en-guide' },
-    section: { root: 'SDK', en: 'SDK' },
+    label: 'Python',
+    sidebar: 'guide',
+    section: 'SDK',
     order: 1,
   },
 ])
 
-const develop = pairedPages([
+const develop = englishPages([
   {
     source: 'docs/user/develop/basic/index.md',
     route: 'develop/basic/index.md',
-    label: { root: 'Your first Harness plugin', en: 'Your first Harness plugin' },
-    sidebar: { root: 'zh-develop', en: 'en-develop' },
-    section: { root: 'Basics', en: 'Basics' },
+    label: 'Your first Harness plugin',
+    sidebar: 'develop',
+    section: 'Basics',
     order: 1,
     sourceAliases: ['docs/user/develop/basic'],
   },
   {
     source: 'docs/user/develop/basic/tool.md',
     route: 'develop/basic/tool.md',
-    label: { root: 'Build a tool', en: 'Build a tool' },
-    sidebar: { root: 'zh-develop', en: 'en-develop' },
-    section: { root: 'Basics', en: 'Basics' },
+    label: 'Build a tool',
+    sidebar: 'develop',
+    section: 'Basics',
     order: 2,
   },
   {
     source: 'docs/user/develop/basic/config.md',
     route: 'develop/basic/config.md',
-    label: { root: 'Plugin configuration', en: 'Plugin configuration' },
-    sidebar: { root: 'zh-develop', en: 'en-develop' },
-    section: { root: 'Basics', en: 'Basics' },
+    label: 'Plugin configuration',
+    sidebar: 'develop',
+    section: 'Basics',
     order: 3,
   },
   {
     source: 'docs/user/develop/basic/publish.md',
     route: 'develop/basic/publish.md',
-    label: { root: 'Package and install', en: 'Package and install' },
-    sidebar: { root: 'zh-develop', en: 'en-develop' },
-    section: { root: 'Basics', en: 'Basics' },
+    label: 'Package and install',
+    sidebar: 'develop',
+    section: 'Basics',
     order: 4,
   },
   {
     source: 'docs/user/develop/framework/index.md',
     route: 'develop/framework/index.md',
-    label: { root: 'Plugin lifecycle', en: 'Plugin lifecycle' },
-    sidebar: { root: 'zh-develop', en: 'en-develop' },
-    section: { root: 'Framework', en: 'Framework' },
+    label: 'Plugin lifecycle',
+    sidebar: 'develop',
+    section: 'Framework',
     order: 1,
     sourceAliases: ['docs/user/develop/framework'],
   },
   {
     source: 'docs/user/develop/framework/service.md',
     route: 'develop/framework/service.md',
-    label: { root: 'Services and dependencies', en: 'Services and dependencies' },
-    sidebar: { root: 'zh-develop', en: 'en-develop' },
-    section: { root: 'Framework', en: 'Framework' },
+    label: 'Services and dependencies',
+    sidebar: 'develop',
+    section: 'Framework',
     order: 2,
   },
   {
     source: 'docs/user/develop/framework/events.md',
     route: 'develop/framework/events.md',
-    label: { root: 'Event system', en: 'Event system' },
-    sidebar: { root: 'zh-develop', en: 'en-develop' },
-    section: { root: 'Framework', en: 'Framework' },
+    label: 'Event system',
+    sidebar: 'develop',
+    section: 'Framework',
     order: 3,
   },
   {
     source: 'docs/user/develop/practice/index.md',
     route: 'develop/practice/index.md',
-    label: { root: 'Capability layering', en: 'Capability layering' },
-    sidebar: { root: 'zh-develop', en: 'en-develop' },
-    section: { root: 'Practice', en: 'Practice' },
+    label: 'Capability layering',
+    sidebar: 'develop',
+    section: 'Practice',
     order: 1,
     sourceAliases: ['docs/user/develop/practice'],
   },
   {
     source: 'docs/user/develop/practice/llm-adapter.md',
     route: 'develop/practice/llm-adapter.md',
-    label: { root: 'LLM adapter', en: 'LLM adapter' },
-    sidebar: { root: 'zh-develop', en: 'en-develop' },
-    section: { root: 'Practice', en: 'Practice' },
+    label: 'LLM adapter',
+    sidebar: 'develop',
+    section: 'Practice',
     order: 2,
   },
 ])
 
-const cordisTutorial = pairedPages(([
-  ['index.md', 'Overview', 'Overview'],
-  ['01-first-plugin.md', '1. Your first plugin', '1. Your first plugin'],
-  ['02-lifecycle-and-effects.md', '2. Lifecycle and effects', '2. Lifecycle and effects'],
-  ['03-services.md', '3. Services', '3. Services'],
-  ['04-events.md', '4. Events', '4. Events'],
-  ['05-config.md', '5. Configuration', '5. Configuration'],
-  ['06-composition-and-hmr.md', '6. Composition and HMR', '6. Composition and HMR'],
-  ['07-into-the-harness.md', '7. Into the harness', '7. Into the harness'],
-] as const).map(([file, rootLabel, enLabel], order): PairedPage => ({
+const cordisTutorial = englishPages(([
+  ['index.md', 'Overview'],
+  ['01-first-plugin.md', '1. Your first plugin'],
+  ['02-lifecycle-and-effects.md', '2. Lifecycle and effects'],
+  ['03-services.md', '3. Services'],
+  ['04-events.md', '4. Events'],
+  ['05-config.md', '5. Configuration'],
+  ['06-composition-and-hmr.md', '6. Composition and HMR'],
+  ['07-into-the-harness.md', '7. Into the harness'],
+] as const).map(([file, label], order): EnglishPage => ({
   source: `docs/cordis-tutorial/${file}`,
   route: `develop/cordis-tutorial/${file}`,
-  label: { root: rootLabel, en: enLabel },
-  sidebar: { root: 'zh-develop', en: 'en-develop' },
-  section: { root: 'Cordis framework tutorial', en: 'Cordis framework tutorial' },
+  label,
+  sidebar: 'develop',
+  section: 'Cordis framework tutorial',
   order,
   ...(file === 'index.md' ? { sourceAliases: ['docs/cordis-tutorial'] } : {}),
 })))
 
-const cordisPrimerReference = pairedPages([
+const cordisPrimerReference = englishPages([
   {
     source: 'docs/cordis-primer.md',
     route: 'reference/cordis-primer.md',
-    label: { root: 'Cordis primer', en: 'Cordis primer' },
-    sidebar: { root: 'zh-reference', en: 'en-reference' },
-    section: { root: 'Concepts', en: 'Concepts' },
+    label: 'Cordis primer',
+    sidebar: 'reference',
+    section: 'Concepts',
     order: 1,
   },
 ])
 
 /**
- * Subsystem pages grouped by the concern they document, as `[Chinese section,
- * English section, pages]`. One flat list of every subsystem pushed the rest of
- * the reference sidebar below the fold.
+ * Subsystem pages grouped by the concern they document. One flat list of every
+ * subsystem pushed the rest of the reference sidebar below the fold.
  */
 const subsystemGroups = [
-  ['Overview', 'Overview', [
-    ['README.md', 'Subsystems', 'Subsystems'],
+  ['Overview', [
+    ['README.md', 'Subsystems'],
   ]],
-  ['Core and scopes', 'Core and scopes', [
-    ['core.md', 'Core', 'Core'],
-    ['scope.md', 'Scopes', 'Scopes'],
-    ['invariants.md', 'Runtime invariants', 'Runtime invariants'],
+  ['Core and scopes', [
+    ['core.md', 'Core'],
+    ['scope.md', 'Scopes'],
+    ['invariants.md', 'Runtime invariants'],
   ]],
-  ['Sessions and persistence', 'Sessions and persistence', [
-    ['session.md', 'Sessions', 'Sessions'],
-    ['session-query.md', 'Session query', 'Session query'],
-    ['session-reference.md', 'Session references', 'Session references'],
-    ['session-title.md', 'Session titles', 'Session titles'],
-    ['session-projection.md', 'Session projections', 'Session projections'],
-    ['persistence.md', 'Session persistence', 'Session persistence'],
-    ['spill.md', 'Spill storage', 'Spill storage'],
-    ['session-telemetry.md', 'SessionTelemetryBackend', 'SessionTelemetryBackend'],
+  ['Sessions and persistence', [
+    ['session.md', 'Sessions'],
+    ['session-query.md', 'Session query'],
+    ['session-reference.md', 'Session references'],
+    ['session-title.md', 'Session titles'],
+    ['session-projection.md', 'Session projections'],
+    ['persistence.md', 'Session persistence'],
+    ['spill.md', 'Spill storage'],
+    ['session-telemetry.md', 'SessionTelemetryBackend'],
   ]],
-  ['Model and context', 'Model and context', [
-    ['llm-streaming.md', 'LLM streaming', 'LLM streaming'],
-    ['token-meter.md', 'Token metering', 'Token metering'],
-    ['system-prompt.md', 'System prompts', 'System prompts'],
-    ['compaction.md', 'Compaction', 'Compaction'],
+  ['Model and context', [
+    ['llm-streaming.md', 'LLM streaming'],
+    ['token-meter.md', 'Token metering'],
+    ['system-prompt.md', 'System prompts'],
+    ['compaction.md', 'Compaction'],
   ]],
-  ['Execution and tools', 'Execution and tools', [
-    ['tools.md', 'Tools', 'Tools'],
-    ['shell.md', 'Bash execution', 'Bash execution'],
-    ['subprocess.md', 'Subprocesses', 'Subprocesses'],
-    ['terminal.md', 'PTY sessions', 'PTY sessions'],
-    ['jobs.md', 'Background jobs', 'Background jobs'],
-    ['filesystem.md', 'Filesystem', 'Filesystem'],
-    ['lsp.md', 'LSP navigation', 'LSP navigation'],
-    ['code-runtime.md', 'Code runtime', 'Code runtime'],
-    ['web.md', 'Web access', 'Web access'],
-    ['skills.md', 'Skills', 'Skills'],
-    ['workflow.md', 'Workflows', 'Workflows'],
-    ['subagent.md', 'Subagents', 'Subagents'],
+  ['Execution and tools', [
+    ['tools.md', 'Tools'],
+    ['shell.md', 'Bash execution'],
+    ['subprocess.md', 'Subprocesses'],
+    ['terminal.md', 'PTY sessions'],
+    ['jobs.md', 'Background jobs'],
+    ['filesystem.md', 'Filesystem'],
+    ['lsp.md', 'LSP navigation'],
+    ['code-runtime.md', 'Code runtime'],
+    ['web.md', 'Web access'],
+    ['skills.md', 'Skills'],
+    ['workflow.md', 'Workflows'],
+    ['subagent.md', 'Subagents'],
   ]],
-  ['Policy and interaction', 'Policy and interaction', [
-    ['approval.md', 'Approvals', 'Approvals'],
-    ['permission-presets.md', 'Permission presets', 'Permission presets'],
-    ['sandbox.md', 'Sandboxing', 'Sandboxing'],
-    ['plan.md', 'Plan mode', 'Plan mode'],
-    ['user-questions.md', 'User interaction', 'User interaction'],
-    ['commands.md', 'Human commands', 'Human commands'],
-    ['goal.md', 'Goals', 'Goals'],
-    ['schedule.md', 'Scheduled reminders', 'Scheduled reminders'],
+  ['Policy and interaction', [
+    ['approval.md', 'Approvals'],
+    ['permission-presets.md', 'Permission presets'],
+    ['sandbox.md', 'Sandboxing'],
+    ['plan.md', 'Plan mode'],
+    ['user-questions.md', 'User interaction'],
+    ['commands.md', 'Human commands'],
+    ['goal.md', 'Goals'],
+    ['schedule.md', 'Scheduled reminders'],
   ]],
-  ['Platform and access', 'Platform and access', [
-    ['web-server.md', 'HTTP server', 'HTTP server'],
-    ['typert.md', 'Typert', 'Typert'],
-    ['client-modules.md', 'Client modules', 'Client modules'],
-    ['storage.md', 'Storage', 'Storage'],
-    ['workspace.md', 'Workspaces', 'Workspaces'],
-    ['settings.md', 'User settings', 'User settings'],
-    ['credentials.md', 'User credentials', 'User credentials'],
+  ['Platform and access', [
+    ['web-server.md', 'HTTP server'],
+    ['typert.md', 'Typert'],
+    ['client-modules.md', 'Client modules'],
+    ['storage.md', 'Storage'],
+    ['workspace.md', 'Workspaces'],
+    ['settings.md', 'User settings'],
+    ['credentials.md', 'User credentials'],
   ]],
 ] as const
 
-const subsystemsReference = subsystemGroups.flatMap(([rootSection, enSection, files]) => pairedPages(
-  files.map(([file, rootLabel, enLabel], order): PairedPage => ({
+const subsystemsReference = subsystemGroups.flatMap(([section, files]) => englishPages(
+  files.map(([file, label], order): EnglishPage => ({
     source: `docs/subsystems/${file}`,
     route: file === 'README.md' ? 'reference/subsystems/index.md' : `reference/subsystems/${file}`,
-    label: { root: rootLabel, en: enLabel },
-    sidebar: { root: 'zh-reference', en: 'en-reference' },
-    section: { root: rootSection, en: enSection },
+    label,
+    sidebar: 'reference',
+    section,
     order,
     // Subsystem pages carry long third-level sections a two-level outline reaches.
     outline: [2, 3],
@@ -350,85 +293,84 @@ const subsystemsReference = subsystemGroups.flatMap(([rootSection, enSection, fi
 ))
 
 const reference = [
-  ...pairedPages(([
-    ['docs/architecture.md', 'reference/index.md', 'Architecture', 'Architecture', 0],
-  ] as const).map(([source, route, rootLabel, enLabel, order]): PairedPage => ({
+  ...englishPages(([
+    ['docs/architecture.md', 'reference/index.md', 'Architecture', 0],
+  ] as const).map(([source, route, label, order]): EnglishPage => ({
     source,
     route,
-    label: { root: rootLabel, en: enLabel },
-    sidebar: { root: 'zh-reference', en: 'en-reference' },
-    section: { root: 'Concepts', en: 'Concepts' },
+    label,
+    sidebar: 'reference',
+    section: 'Concepts',
     order,
   }))),
-  ...pairedPages(([
-    ['docs/capability-seams.md', 'reference/capability-seams.md', 'Capability services', 'Capability services', 2],
-    ['docs/agent-lifecycle.md', 'reference/agent-lifecycle.md', 'Agent lifecycle', 'Agent lifecycle', 3],
-    ['docs/tool-execution-pipeline.md', 'reference/tool-execution-pipeline.md', 'Tool execution', 'Tool execution', 4],
-  ] as const).map(([source, route, rootLabel, enLabel, order]): PairedPage => ({
+  ...englishPages(([
+    ['docs/capability-seams.md', 'reference/capability-seams.md', 'Capability services', 2],
+    ['docs/agent-lifecycle.md', 'reference/agent-lifecycle.md', 'Agent lifecycle', 3],
+    ['docs/tool-execution-pipeline.md', 'reference/tool-execution-pipeline.md', 'Tool execution', 4],
+  ] as const).map(([source, route, label, order]): EnglishPage => ({
     source,
     route,
-    label: { root: rootLabel, en: enLabel },
-    sidebar: { root: 'zh-reference', en: 'en-reference' },
-    section: { root: 'Concepts', en: 'Concepts' },
+    label,
+    sidebar: 'reference',
+    section: 'Concepts',
     order,
   }))),
-  ...pairedPages(([
-    ['docs/config-catalog.md', 'reference/config-catalog.md', 'Plugin configuration', 'Plugin configuration'],
-    ['docs/tool-catalog.md', 'reference/tool-catalog.md', 'Tool Schema', 'Tool schemas'],
-    ['docs/persistence-catalog.md', 'reference/persistence-catalog.md', 'Persistence events', 'Persistence events', 'deep'],
-  ] as const).map(([source, route, rootLabel, enLabel, outline], order): PairedPage => ({
+  ...englishPages(([
+    ['docs/config-catalog.md', 'reference/config-catalog.md', 'Plugin configuration'],
+    ['docs/tool-catalog.md', 'reference/tool-catalog.md', 'Tool schemas'],
+    ['docs/persistence-catalog.md', 'reference/persistence-catalog.md', 'Persistence events', 'deep'],
+  ] as const).map(([source, route, label, outline], order): EnglishPage => ({
     source,
     route,
-    label: { root: rootLabel, en: enLabel },
-    sidebar: { root: 'zh-reference', en: 'en-reference' },
-    section: { root: 'Generated reference', en: 'Generated reference' },
+    label,
+    sidebar: 'reference',
+    section: 'Generated reference',
     order,
     ...(outline === undefined ? {} : { outline }),
   }))),
-  ...pairedPages(([
-    ['context.md', 'Context', 'Context'],
-    ['events.md', 'Events', 'Events'],
-    ['fiber.md', 'Fiber', 'Fiber'],
-    ['registry.md', 'Plugin Registry', 'Plugin Registry'],
-    ['service.md', 'Service', 'Service'],
-  ] as const).map(([file, rootLabel, enLabel], order): PairedPage => ({
+  ...englishPages(([
+    ['context.md', 'Context'],
+    ['events.md', 'Events'],
+    ['fiber.md', 'Fiber'],
+    ['registry.md', 'Plugin Registry'],
+    ['service.md', 'Service'],
+  ] as const).map(([file, label], order): EnglishPage => ({
     source: `docs/cordis-api/${file}`,
     route: `reference/cordis-api/${file}`,
-    label: { root: rootLabel, en: enLabel },
-    sidebar: { root: 'zh-reference', en: 'en-reference' },
-    section: { root: 'Cordis API', en: 'Cordis Core API' },
+    label,
+    sidebar: 'reference',
+    section: 'Cordis Core API',
     order,
   }))),
-  ...mirroredPages(([
-    ['inherited.md', 'Inherited surface', 'Inherited surface'],
-  ] as const).map(([file, rootLabel, enLabel], order): MirroredPage => ({
+  ...englishPages(([
+    ['inherited.md', 'Inherited surface'],
+  ] as const).map(([file, label], order): EnglishPage => ({
     source: `docs/cordis-api/${file}`,
     route: `reference/cordis-api/${file}`,
-    contentLocale: 'en-US',
-    label: { root: rootLabel, en: enLabel },
-    sidebar: { root: 'zh-reference', en: 'en-reference' },
-    section: { root: 'Cordis API', en: 'Cordis Core API' },
+    label,
+    sidebar: 'reference',
+    section: 'Cordis Core API',
     order: order + 5,
   }))),
-  ...pairedPages(([
-    ['adding-a-package.md', 'Adding a package', 'Adding a package'],
-    ['adding-a-tool.md', 'Adding a tool', 'Adding a tool'],
-    ['adding-an-llm-adapter.md', 'Adding an LLM adapter', 'Adding an LLM adapter'],
-    ['extension-cookbook.md', 'Extension patterns', 'Extension patterns'],
-  ] as const).map(([file, rootLabel, enLabel], order): PairedPage => ({
+  ...englishPages(([
+    ['adding-a-package.md', 'Adding a package'],
+    ['adding-a-tool.md', 'Adding a tool'],
+    ['adding-an-llm-adapter.md', 'Adding an LLM adapter'],
+    ['extension-cookbook.md', 'Extension patterns'],
+  ] as const).map(([file, label], order): EnglishPage => ({
     source: `docs/cookbook/${file}`,
     route: `reference/cookbook/${file}`,
-    label: { root: rootLabel, en: enLabel },
-    sidebar: { root: 'zh-reference', en: 'en-reference' },
-    section: { root: 'Cookbook', en: 'Cookbook' },
+    label,
+    sidebar: 'reference',
+    section: 'Cookbook',
     order,
   }))),
-  ...pairedPages([{
+  ...englishPages([{
     source: 'docs/cookbook/adding-a-conversation-node.md',
     route: 'reference/cookbook/adding-a-conversation-node.md',
-    label: { root: 'Adding a Conversation Node', en: 'Adding a Conversation Node' },
-    sidebar: { root: 'zh-reference', en: 'en-reference' },
-    section: { root: 'Cookbook', en: 'Cookbook' },
+    label: 'Adding a Conversation Node',
+    sidebar: 'reference',
+    section: 'Cookbook',
     order: 4,
   }]),
 ]
@@ -462,7 +404,6 @@ const englishSections: readonly DocsSection[] = [
 
 const sections: Record<DocsLocale, readonly DocsSection[]> = {
   root: englishSections,
-  en: englishSections,
 }
 
 /**

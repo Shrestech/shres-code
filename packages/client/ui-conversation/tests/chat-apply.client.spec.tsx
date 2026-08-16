@@ -14,7 +14,7 @@ import { apply, inject } from '@roos-code/roos-code-client-ui-conversation/clien
 
 // The service reads its initial locale from the browser; these specs assert
 // the shipped Chinese copy, so they state the browser they assume.
-usePinnedBrowserLanguages('zh-CN')
+usePinnedBrowserLanguages('en-US')
 
 const ROOT = 'root-1' as SessionId
 const CHILD = 'child-1' as SessionId
@@ -62,7 +62,7 @@ describe('apply wiring', () => {
     const entries = b.slots.entries('conversation.view')
     expect(entries.map(e => e.options.id)).toEqual(['chat'])
     // Label is a locale thunk resolving through the zh dictionary.
-    expect(resolveSlotLabel(entries[0]?.options.label)).toBe('对话')
+    expect(resolveSlotLabel(entries[0]?.options.label)).toBe('Chat')
     expect(entries[0]?.options.order).toBe(0)
     // Declaring is claiming: the chat entry's registration put the hole on
     // the ledger with the contract's kind/scope.

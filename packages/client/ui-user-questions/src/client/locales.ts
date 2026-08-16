@@ -11,6 +11,8 @@ export const en = {
   'custom.placeholder': 'Type your answer',
   'action.skip': 'Skip this question',
   'action.next': 'Next',
+  submit: 'Submit',
+  submitting: 'Submitting…',
   'plan.header': 'Plan review',
   'plan.approve': 'Approve',
   'plan.decline': 'Refuse',

@@ -16,9 +16,14 @@ import {
 
 const args = process.argv.slice(2)
 const writeMode = args.length === 1 && args[0] === '--write'
-const rebaseMode = args.length === 1 && args[0] === '--rebase'
-if (args.length > 0 && !writeMode && !rebaseMode) {
+const rebaseRequested = args.length === 1 && args[0] === '--rebase'
+const rebaseMode = rebaseRequested && process.env.ROOS_ARCHIVE_REBASE === '1'
+if (args.length > 0 && !writeMode && !rebaseRequested) {
   console.error('verify-archived-agent-notes: usage: tsx scripts/verify-archived-agent-notes.ts [--write|--rebase]')
+  process.exit(1)
+}
+if (rebaseRequested && !rebaseMode) {
+  console.error('verify-archived-agent-notes: --rebase requires ROOS_ARCHIVE_REBASE=1; only a new owner-sanctioned rewrite may set it.')
   process.exit(1)
 }
 

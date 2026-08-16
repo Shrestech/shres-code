@@ -12,7 +12,7 @@
   - img
 - heading "CJK strong emphasis" [level=2]
 - paragraph:
-  - strong: 注意：
+  - strong: Note:
   - text: 内容
 - paragraph:
   - strong: "Notice:"
@@ -31,10 +31,10 @@
   - text: 后续
 - paragraph:
   - strong: 提醒！
-  - text: 继续
+  - text: Continue
 - paragraph:
   - strong: Warning!
-  - text: 继续
+  - text: Continue
 - paragraph: CJK_STRONG_DONE
 - button "Copy":
   - img

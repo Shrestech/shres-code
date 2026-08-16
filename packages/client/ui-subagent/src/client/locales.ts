@@ -3,10 +3,8 @@
 /** Dictionary namespace owned by this plugin. */
 export const NS = 'subagent'
 
-as const
-
-/** English dictionary, key-identical to the Chinese source of truth. */
-export const en: Record<SubagentKey, string> = {
+/** English dictionary, the key-set source of truth. */
+export const en = {
   'diagnostic.corrupt': 'corrupted session record',
   'diagnostic.unsupported': 'unsupported subagent record version',
   'diagnostic.unavailable': 'session record temporarily unavailable',
@@ -40,7 +38,7 @@ export const en: Record<SubagentKey, string> = {
   'readonly.title': 'This subagent is read-only for now',
   'readonly.oneShot.body': 'One-shot tasks do not accept follow-ups; review the full execution record here.',
   'readonly.body': 'The parent session is offline; reopen it to continue sending messages.',
-}
+} satisfies Record<string, string>
 
-/** Key domain of the `subagent` namespace (en is the source of truth). */
+/** Key domain of the `subagent` namespace. */
 export type SubagentKey = keyof typeof en

@@ -192,7 +192,6 @@ const PATH_RENAMES: readonly PathRename[] = [
   { id: 'skill-stacks', from: '.agents/skills/dsh-merging-stacked-prs', to: '.agents/skills/roos-merging-stacked-prs' },
   { id: 'skill-pre-push', from: '.agents/skills/dsh-pre-push-checks', to: '.agents/skills/roos-pre-push-checks' },
   { id: 'skill-prose', from: '.agents/skills/dsh-prose-standard', to: '.agents/skills/roos-prose-standard' },
-  { id: 'skill-translate', from: '.agents/skills/dsh-translate-docs', to: '.agents/skills/roos-translate-docs' },
   { id: 'skill-cot', from: '.agents/skills/dsh-trim-cot-leakage', to: '.agents/skills/roos-trim-cot-leakage' },
   { id: 'subagent-sdk', from: 'packages/subagent/subagent-dsh-sdk', to: 'packages/subagent/subagent-roos-sdk' },
   { id: 'subagent-sdk-fixture', from: 'examples/jsonrpc-agent/tests/fixtures/subagent/subagent-dsh-sdk', to: 'examples/jsonrpc-agent/tests/fixtures/subagent/subagent-roos-sdk' },
@@ -209,7 +208,6 @@ function excluded(file: string): boolean {
   if (file === 'scripts/verify-no-legacy-brand.ts') return true
   if (file === 'LICENSE' || file === 'NOTICE') return true
   if (file.startsWith('.agents/notes/')) return true
-  if (file.endsWith('.i18n.yaml')) return true
   if (file === 'pnpm-lock.yaml') return true
   if (/^vendor\/[^/]+\/(README\.md|LICENSE)$/.test(file)) return true
   return !EXTENSIONS.some(extension => file.endsWith(extension))

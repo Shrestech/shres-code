@@ -1,67 +1,67 @@
-- dialog "设置":
+- dialog "Settings":
   - navigation:
-    - text: 设置
-    - button "通用设置":
+    - text: Settings
+    - button "General":
       - img
-      - text: 通用设置
-    - button "模型":
+      - text: General
+    - button "Model":
       - img
-      - text: 模型
-    - button "插件":
+      - text: Model
+    - button "Plugins":
       - img
-      - text: 插件
-    - button "Agent 预设":
+      - text: Plugins
+    - button "Agent presets":
       - img
-      - text: Agent 预设
-  - button "打开配置文件"
-  - button "关闭":
+      - text: Agent presets
+  - button "Open configuration file"
+  - button "Close":
     - img
-    - text: 关闭
-  - heading "Agent 预设" [level=2]
-  - paragraph: 预设即一个会话的 Agent 所运行的插件组装 —— 它的工具、提示词与能力。复制一份既有预设改成自己的，或用「创造模式」让 Agent 帮你创建。
-  - heading "内置" [level=3]
+    - text: Close
+  - heading "Agent presets" [level=2]
+  - paragraph: preset is aSessions  Agent Run Pluginscomposition —— itsTools、prompt and capabilities。Copyan existingpresetand make it yours，or let the agent draft one for you in Creator mode。
+  - heading "Built-in" [level=3]
   - list:
     - listitem:
-      - 'button "当前使用: 标准模式" [disabled] [pressed]':
-        - text: 标准模式 内置 当前使用 功能完整的编码 Agent，支持文件编辑、Shell、文件与网页检索、Skills、计划、目标、子代理和工作流。
+      - 'button "In use: Standard mode" [disabled] [pressed]':
+        - text: Standard mode Built-in In use featurefull coding Agent，supportsfileEdit、Shell、fileand web search、Skills、plan、goal、subagentand workflows。
         - code: standard
-      - 'button "查看: 标准模式"':
+      - 'button "View: Standard mode"':
         - img
-        - text: 查看
-      - 'button "复制: 标准模式"':
+        - text: View
+      - 'button "Copy: Standard mode"':
         - img
-        - text: 复制
+        - text: Copy
     - listitem:
-      - 'button "设为默认: PTC 模式"':
-        - text: PTC 模式 内置 具备标准模式的全部能力，并通过 Code Mode SDK 呈现工具，让模型用一个 TypeScript 程序组合多步操作。
+      - 'button "Set as default: Code mode"':
+        - text: Code mode Built-in hasStandard mode all capabilities，and via Code Mode SDK presentsTools，letModelwith one TypeScript program combining multi-step operations。
         - code: code
-      - 'button "查看: PTC 模式"':
+      - 'button "View: Code mode"':
         - img
-        - text: 查看
-      - 'button "复制: PTC 模式"':
+        - text: View
+      - 'button "Copy: Code mode"':
         - img
-        - text: 复制
+        - text: Copy
     - listitem:
-      - 'button "设为默认: 极简模式"':
-        - text: 极简模式 内置 仅提供持久 bash 与 str_replace_editor 的双工具编码 Agent。
+      - 'button "Set as default: Minimal mode"':
+        - text: Minimal mode Built-in only provides persistent bash  and  str_replace_editor  dualToolscoding Agent。
         - code: minimal
-      - 'button "查看: 极简模式"':
+      - 'button "View: Minimal mode"':
         - img
-        - text: 查看
-      - 'button "复制: 极简模式"':
+        - text: View
+      - 'button "Copy: Minimal mode"':
         - img
-        - text: 复制
+        - text: Copy
     - listitem:
-      - 'button "设为默认: 创造模式"':
-        - text: 创造模式 内置 用于创建自定义 Agent preset：具备标准模式的全部能力，并提供运行时检查、插件实验和 preset 创作指导。
+      - 'button "Set as default: Creator mode"':
+        - text: Creator mode Built-in forCreateCustom Agent preset：hasStandard mode all capabilities，and providesRun runtime inspection、Plugins experiments and preset authorguidance。
         - code: cordis
-      - 'button "查看: 创造模式"':
+      - 'button "View: Creator mode"':
         - img
-        - text: 查看
-      - 'button "复制: 创造模式"':
+        - text: View
+      - 'button "Copy: Creator mode"':
         - img
-        - text: 复制
-  - heading "自定义" [level=3]
-  - button "用「创造模式」创作自定义预设":
+        - text: Copy
+  - heading "Custom" [level=3]
+  - button "Draft a custom preset with Creator mode":
     - img
-    - text: 用「创造模式」创作自定义预设
+    - text: Draft a custom preset with Creator mode

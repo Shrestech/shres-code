@@ -15,7 +15,7 @@ import type { MenuViewInjected } from '@roos-code/roos-code-client-ui-input-trig
 
 // The service reads its initial locale from the browser; these specs assert
 // the shipped Chinese copy, so they state the browser they assume.
-usePinnedBrowserLanguages('zh-CN')
+usePinnedBrowserLanguages('en-US')
 
 const sid = (k: string): SessionId => k as SessionId
 
@@ -50,7 +50,7 @@ describe('apply', () => {
     const { ctx, locale } = await bench()
     await ctx.plugin({ inject: [...inject], apply }).await()
     const t = locale.bind('slash.menu')
-    expect(t('command')).toBe('命令')
+    expect(t('command')).toBe('Commands')
     locale.setLocale('en')
     expect(t('skill')).toBe('Skills')
     expect(t('subagent')).toBe('Subagents')

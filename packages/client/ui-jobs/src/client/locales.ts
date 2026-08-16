@@ -3,10 +3,8 @@
 /** Dictionary namespace owned by this plugin. */
 export const NS = 'job'
 
-as const
-
-/** English dictionary, key-identical to the Chinese source of truth. */
-export const en: Record<JobKey, string> = {
+/** English dictionary, the key-set source of truth. */
+export const en = {
   'count.live.one': '{count} background job running',
   'count.live.other': '{count} background jobs running',
   'count.idle.one': '{count} background job',
@@ -22,7 +20,7 @@ export const en: Record<JobKey, string> = {
   'duration.hours': '{hours}h {minutes}m',
   'duration.title.live': 'Running for {duration}',
   'duration.title.done': 'Took {duration}',
-}
+} satisfies Record<string, string>
 
-/** Key domain of the `job` namespace (en is the source of truth). */
+/** Key domain of the `job` namespace. */
 export type JobKey = keyof typeof en

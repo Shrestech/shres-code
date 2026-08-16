@@ -9,7 +9,7 @@ import { defineStore, type EngineStoreHandle } from '@roos-code/roos-code-client
 export interface LanguageOptionRow {
   /** Locale id (the setLocale argument). */
   id: string
-  /** Display name in its own language (中文 / English). */
+  /** Display name in its own language (for example, English). */
   label: string
 }
 

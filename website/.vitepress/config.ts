@@ -45,7 +45,7 @@ interface GuideModuleLink {
  */
 interface GuideModules {
   /** Guide sidebar collection for the locale. */
-  guide: 'guide' | 'en-guide'
+  guide: 'guide'
   /** Development module link. */
   develop: GuideModuleLink
   /** Reference module link. */
@@ -53,21 +53,14 @@ interface GuideModules {
 }
 
 /**
- * Guide-module facts keyed by locale, giving every module label and collection
- * one home shared by the navigation bar and the guide sidebar.
+ * Guide-module facts, giving every module label and collection one home
+ * shared by the navigation bar and the guide sidebar.
  */
-const guideModules = {
-  root: {
-    guide: 'guide',
-    develop: { label: 'Development', collection: 'develop' },
-    reference: { label: 'Reference', collection: 'reference' },
-  },
-  en: {
-    guide: 'guide',
-    develop: { label: 'Development', collection: 'develop' },
-    reference: { label: 'Reference', collection: 'reference' },
-  },
-} satisfies Record<DocsLocale, GuideModules>
+const guideModules: GuideModules = {
+  guide: 'guide',
+  develop: { label: 'Development', collection: 'develop' },
+  reference: { label: 'Reference', collection: 'reference' },
+}
 
 /**
  * Guide sidebar with direct links into the first development and reference pages.
@@ -76,7 +69,7 @@ const guideModules = {
  * @returns Guide groups followed by top-level links to the other documentation modules.
  */
 function guideSidebar(locale: DocsLocale): DefaultTheme.SidebarItem[] {
-  const { guide, develop, reference } = guideModules[locale]
+  const { guide, develop, reference } = guideModules
   return [
     ...sidebar(locale, guide),
     ...[develop, reference].map(({ label, collection }) => ({
@@ -94,11 +87,10 @@ function guideSidebar(locale: DocsLocale): DefaultTheme.SidebarItem[] {
  * @returns The module items for the locale's navigation bar.
  */
 function moduleNav(locale: DocsLocale): DefaultTheme.NavItem[] {
-  const { develop, reference } = guideModules[locale]
-  const routePrefix = locale === 'root' ? '' : '/en'
+  const { develop, reference } = guideModules
   return [
-    { text: develop.label, link: landingLink(locale, develop.collection), activeMatch: `^${routePrefix}/develop/` },
-    { text: reference.label, link: landingLink(locale, reference.collection), activeMatch: `^${routePrefix}/reference/` },
+    { text: develop.label, link: landingLink(locale, develop.collection), activeMatch: '^/develop/' },
+    { text: reference.label, link: landingLink(locale, reference.collection), activeMatch: '^/reference/' },
   ]
 }
 
@@ -240,7 +232,7 @@ export default withMermaid({
       themeConfig: {
         siteTitle: siteTitle('Preview'),
         nav: [
-          { text: 'Guide', link: landingLink('root', guideModules.root.guide), activeMatch: '^/guide/' },
+          { text: 'Guide', link: landingLink('root', guideModules.guide), activeMatch: '^/guide/' },
           ...moduleNav('root'),
         ],
         sidebar: {

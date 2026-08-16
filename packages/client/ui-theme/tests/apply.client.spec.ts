@@ -15,7 +15,7 @@ import type { createAppearanceRowStore } from '../src/client/settings-store.ts'
 
 // The service reads its initial locale from the browser; these specs assert
 // the shipped Chinese copy, so they state the browser they assume.
-usePinnedBrowserLanguages('zh-CN')
+usePinnedBrowserLanguages('en-US')
 
 const SLOT = 'settings.general.item'
 
@@ -90,7 +90,7 @@ describe('ui-theme apply', () => {
     const before = await bench()
     declareItems(before.slots)
     await before.ctx.plugin({ inject: [...inject], apply }).await()
-    expect(before.locale.bind(SETTINGS_NS)('appearance.title')).toBe('外观')
+    expect(before.locale.bind(SETTINGS_NS)('appearance.title')).toBe('Appearance')
     before.locale.setLocale('en')
     expect(before.locale.bind(SETTINGS_NS)('appearance.title')).toBe('Appearance')
     const entry = before.slots.entries(SLOT).find(e => e.component === AppearanceRow)!

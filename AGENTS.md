@@ -51,7 +51,7 @@ examples/    Runnable cordis.yml leaves over packages/examples bundles (see exam
 .agents/     Agent workflows and Agent Notes (`notes/`)
 docs/        architecture, generated catalogs, postmortems, cookbook (see docs/AGENTS.md)
 scripts/     repo gates and generators
-website/     VitePress projection of selected bilingual docs/ sources
+website/     VitePress projection of selected English docs/ sources
 ```
 
 Package groups: [packages/README.md](packages/README.md).

@@ -5,16 +5,15 @@ export const NS = 'conversation'
 
 // The claimed /plan hint and the plan-mode textarea placeholder share one
 // string: both describe the same next action.
-const PLAN_NEXT_ACTION_ZH = '描述你的任务以生成计划'
-const PLAN_NEXT_ACTION_EN = 'describe your task to generate plan'
+const PLAN_NEXT_ACTION = 'describe your task to generate plan'
 
 /** English dictionary, the key-set source of truth. */
 export const en = {
   'view.chat': 'Chat',
-  'hint.plan': PLAN_NEXT_ACTION_EN,
+  'hint.plan': PLAN_NEXT_ACTION,
   'hint.goal': 'describe the objective for a long-running task',
   'hint.goal.active': 'goal active — edit / pause / resume / clear',
-  'placeholder.plan': PLAN_NEXT_ACTION_EN,
+  'placeholder.plan': PLAN_NEXT_ACTION,
   'placeholder.default': 'Message the agent',
   'placeholder.unavailable': 'Session unavailable',
   'placeholder.parentOffline': 'Parent session offline; sending is unavailable but you can still stop the run',
