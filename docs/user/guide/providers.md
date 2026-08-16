@@ -109,4 +109,4 @@ If a saved default names a provider that was deleted, the composer displays **Se
 
 ## Advanced configuration
 
-The generated [plugin configuration catalog](../../config-catalog.md) lists every supported field and default. The [`roos-llm-pi-ai`](../../../packages/llm/llm-pi-ai/README.md) and [`roos-llm-deepseek`](../../../packages/llm/llm-deepseek/README.md) references own direct `settings.yaml` configuration, catalog resolution, reasoning controls, credentials, and adapter errors. The first-run picker contract lives in [`roos-first-run-setup`](../../../packages/core/first-run-setup/README.md).
+The generated [plugin configuration catalog](../../config-catalog.md) lists every supported field and default. The [`roos-llm-pi-ai`](../../../packages/llm/llm-pi-ai/README.md) and [`roos-llm-deepseek`](../../../packages/llm/llm-deepseek/README.md) references own direct `settings.yaml` configuration, catalog resolution, reasoning controls, credentials, and adapter errors. The first-run picker contract lives in [`roos-first-run-setup`](../../../packages/core/first-run-setup/README.md). The [CLI models guide](./models.md) owns `roos models` and `roos providers`.

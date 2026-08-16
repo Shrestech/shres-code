@@ -141,6 +141,9 @@ importers:
       '@roos-code/cordis-plugin-timer':
         specifier: workspace:^
         version: link:../../vendor/timer
+      '@roos-code/roos-code-agent-default-model':
+        specifier: workspace:^
+        version: link:../../packages/core/agent-default-model
       '@roos-code/roos-code-agent-instructions':
         specifier: workspace:^
         version: link:../../packages/context/agent-instructions
@@ -177,6 +180,15 @@ importers:
       '@roos-code/roos-code-cordis-client-runner':
         specifier: workspace:^
         version: link:../../packages/extensions/cordis-client-runner
+      '@roos-code/roos-code-credentials':
+        specifier: workspace:^
+        version: link:../../packages/credentials/credentials
+      '@roos-code/roos-code-credentials-local':
+        specifier: workspace:^
+        version: link:../../packages/credentials/credentials-local
+      '@roos-code/roos-code-first-run-setup':
+        specifier: workspace:^
+        version: link:../../packages/core/first-run-setup
       '@roos-code/roos-code-fs-local':
         specifier: workspace:^
         version: link:../../packages/fs/fs-local
@@ -198,6 +210,15 @@ importers:
       '@roos-code/roos-code-launch-environment':
         specifier: workspace:^
         version: link:../../packages/util/launch-environment
+      '@roos-code/roos-code-llm':
+        specifier: workspace:^
+        version: link:../../packages/llm/llm
+      '@roos-code/roos-code-llm-deepseek':
+        specifier: workspace:^
+        version: link:../../packages/llm/llm-deepseek
+      '@roos-code/roos-code-llm-pi-ai':
+        specifier: workspace:^
+        version: link:../../packages/llm/llm-pi-ai
       '@roos-code/roos-code-mcp-client':
         specifier: workspace:^
         version: link:../../packages/mcp/mcp-client
@@ -222,6 +243,12 @@ importers:
       '@roos-code/roos-code-session-reference':
         specifier: workspace:^
         version: link:../../packages/context/session-reference
+      '@roos-code/roos-code-settings':
+        specifier: workspace:^
+        version: link:../../packages/settings/settings
+      '@roos-code/roos-code-settings-file':
+        specifier: workspace:^
+        version: link:../../packages/settings/settings-file
       '@roos-code/roos-code-skill':
         specifier: workspace:^
         version: link:../../packages/skill/skill
@@ -322,9 +349,6 @@ importers:
       '@roos-code/roos-code-host-webserver':
         specifier: workspace:^
         version: link:../../packages/host/webserver
-      '@roos-code/roos-code-llm':
-        specifier: workspace:^
-        version: link:../../packages/llm/llm
       '@roos-code/roos-code-llm-mock-server':
         specifier: workspace:^
         version: link:../../packages/test-support/llm-mock-server
@@ -334,9 +358,6 @@ importers:
       '@roos-code/roos-code-session':
         specifier: workspace:^
         version: link:../../packages/core/session
-      '@roos-code/roos-code-settings':
-        specifier: workspace:^
-        version: link:../../packages/settings/settings
       '@roos-code/roos-code-subagent':
         specifier: workspace:^
         version: link:../../packages/subagent/subagent
@@ -3495,12 +3516,21 @@ importers:
       '@roos-code/roos-code-agent':
         specifier: workspace:^
         version: link:../agent
+      '@roos-code/roos-code-commands':
+        specifier: workspace:^
+        version: link:../../interaction/commands
       '@roos-code/roos-code-invariants':
         specifier: workspace:^
         version: link:../../runtime-diagnostics/invariants
       '@roos-code/roos-code-llm':
         specifier: workspace:^
         version: link:../../llm/llm
+      '@roos-code/roos-code-scope':
+        specifier: workspace:^
+        version: link:../scope
+      '@roos-code/roos-code-session':
+        specifier: workspace:^
+        version: link:../session
       '@roos-code/roos-code-settings':
         specifier: workspace:^
         version: link:../../settings/settings

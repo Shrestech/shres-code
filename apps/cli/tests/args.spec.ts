@@ -57,6 +57,48 @@ describe('parseRoosArgs', () => {
       .toEqual({ mode: 'plugin', profile: 'tui', args: ['add', '--save-dev', 'x'] })
   })
 
+  it('routes models and providers subcommands', () => {
+    expect(parse(['models', 'list'])).toEqual({ mode: 'models', command: { kind: 'models-list' } })
+    expect(parse(['models', 'set', 'ollama-local', 'llama3.2', '--effort', 'high']))
+      .toEqual({
+        mode: 'models',
+        command: { kind: 'models-set', provider: 'ollama-local', model: 'llama3.2', effort: 'high' },
+      })
+    expect(parse(['models', 'set', 'ollama-local', 'qwen3', '--purpose', 'compaction']))
+      .toEqual({
+        mode: 'models',
+        command: {
+          kind: 'models-set', provider: 'ollama-local', model: 'qwen3', purpose: 'compaction',
+        },
+      })
+    expect(parse(['models', 'discover', 'ollama-local', '--base-url', 'http://127.0.0.1:11434/v1', '--add']))
+      .toEqual({
+        mode: 'models',
+        command: {
+          kind: 'models-discover',
+          provider: 'ollama-local',
+          baseURL: 'http://127.0.0.1:11434/v1',
+          add: true,
+        },
+      })
+    expect(parse(['providers', 'list'])).toEqual({ mode: 'models', command: { kind: 'providers-list' } })
+    expect(parse(['providers', 'add', '--template', 'ollama-local']))
+      .toEqual({ mode: 'models', command: { kind: 'providers-add', template: 'ollama-local' } })
+    expect(parse(['providers', 'add', '--template', 'custom', '--base-url', 'http://x/v1', '--provider', 'acme', '--model', 'm']))
+      .toEqual({
+        mode: 'models',
+        command: {
+          kind: 'providers-add',
+          template: 'custom',
+          baseURL: 'http://x/v1',
+          provider: 'acme',
+          model: 'm',
+        },
+      })
+    expect(parse(['providers', 'remove', 'acme']))
+      .toEqual({ mode: 'models', command: { kind: 'providers-remove', provider: 'acme' } })
+  })
+
   it('routes profile and web config dumps', () => {
     expect(parse(['--profile', 'web', '--dump-config']))
       .toEqual({ mode: 'dump-config', profile: 'web', defaultOnly: false, patches: [] })
@@ -96,6 +138,10 @@ describe('parseRoosArgs', () => {
     expect(exitCode(['plugin', '--profile', 'tui'])).toBe(1) // nothing to forward
     expect(exitCode(['plugin', '--profile', ''])).toBe(1)
     expect(exitCode(['--profile', 'x', 'plugin', 'add', 'y'])).toBe(1)
+    expect(exitCode(['models', 'set', 'p', 'm', '--purpose', 'nope'])).toBe(1)
+    expect(exitCode(['providers', 'add', '--template', 'nope'])).toBe(1)
+    expect(exitCode(['--profile', 'x', 'models', 'list'])).toBe(1)
+    expect(exitCode(['--profile', 'x', 'providers', 'list'])).toBe(1)
   })
 
   it('keeps its own help for an invocation with no app to hand it to', () => {

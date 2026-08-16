@@ -18,6 +18,15 @@
       "path": "../../core/agent"
     },
     {
+      "path": "../../interaction/commands"
+    },
+    {
+      "path": "../../core/scope"
+    },
+    {
+      "path": "../../core/session"
+    },
+    {
       "path": "../../llm/llm"
     },
     {

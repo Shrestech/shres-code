@@ -25,7 +25,7 @@ export type {
 } from './types.ts'
 export { detectLocalOllama } from './detect.ts'
 export { applyChoice, deriveKeyRef } from './apply-choice.ts'
-export { formatMenu, numberOptions, readSecret, runCliPicker } from './cli.ts'
+export { formatMenu, numberOptions, readLine, readSecret, runCliPicker } from './cli.ts'
 export { hasUserSelection, isDefaultUsable, listPickerOptions, noProviderError, TEMPLATE_ROUTES } from './options.ts'
 
 declare module '@roos-code/cordis' {

@@ -42,7 +42,34 @@
       "path": "../../packages/host/frontend-static"
     },
     {
+      "path": "../../packages/core/agent-default-model"
+    },
+    {
+      "path": "../../packages/core/first-run-setup"
+    },
+    {
       "path": "../../packages/core/session"
+    },
+    {
+      "path": "../../packages/credentials/credentials"
+    },
+    {
+      "path": "../../packages/credentials/credentials-local"
+    },
+    {
+      "path": "../../packages/llm/llm"
+    },
+    {
+      "path": "../../packages/llm/llm-deepseek"
+    },
+    {
+      "path": "../../packages/settings/settings"
+    },
+    {
+      "path": "../../packages/llm/llm-pi-ai"
+    },
+    {
+      "path": "../../packages/settings/settings-file"
     },
     {
       "path": "../../packages/core/system-prompt"

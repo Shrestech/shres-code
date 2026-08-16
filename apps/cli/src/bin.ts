@@ -47,6 +47,11 @@ switch (invocation.mode) {
     runDumpConfig(invocation.profile, invocation.defaultOnly, invocation.patches)
     break
   }
+  case 'models': {
+    const { runModelsCli } = await import('./models-cli.ts')
+    process.exit(await runModelsCli(invocation.command))
+    break
+  }
   default:
     invocation satisfies never
     throw new Error(`roos: unhandled invocation mode ${JSON.stringify(invocation)}`)

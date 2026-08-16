@@ -123,9 +123,8 @@ export function apply(ctx: ClientContext): void {
     const command = scope.get('commandUi') as CommandUiContract
     const models = scope.modelDirectories
     const sessions = scope.sessions
-    scope.effect(() => command.register({
+    scope.effect(() => command.decorate({
       name: 'model',
-      description: t('command.description'),
       available: session => sessions.subagentAddress(session.sessionId) === undefined,
       ui: {
         kind: 'popupSelect',

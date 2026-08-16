@@ -10,8 +10,6 @@
 import { randomUUID } from 'node:crypto'
 import type { Context } from '@roos-code/cordis'
 import z from '@roos-code/schemastery'
-import { installModelSelection } from '@roos-code/roos-code-agent'
-import type { ModelSelectionRef } from '@roos-code/roos-code-agent'
 import type {} from '@roos-code/roos-code-agent-default-model'
 import type {} from '@roos-code/roos-code-first-run-setup'
 import { createUserMessage } from '@roos-code/roos-code-llm'
@@ -116,8 +114,10 @@ async function run(ctx: Context, task: string, io: HeadlessIo): Promise<void> {
     meta: { cwd: process.cwd() },
     agentOptions: { provider: selection.provider, model: selection.model },
     setup: (agentCtx) => {
-      const selected: ModelSelectionRef = { current: selection, assembled: undefined }
-      installModelSelection(agentCtx, selected)
+      const agent = agentCtx.agent
+      /* v8 ignore next -- the factory assigns agentCtx.agent before setup runs */
+      if (agent === undefined) throw new Error('headless-runner: agent setup has no scoped agent')
+      defaultModel.selectionFor(agent)
     },
   })
   await agent.whenIdle()

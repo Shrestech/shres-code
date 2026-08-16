@@ -11,11 +11,14 @@
  * and `roos --profile web -h` prints the web app's help, not this one's.
  *
  * `web` is a hardcoded alias for `--profile web`; `plugin` manages a profile's
- * plugin dependencies by forwarding to pnpm.
+ * plugin dependencies by forwarding to pnpm; `models` and `providers` manage
+ * the same settings and credentials the Web Settings → Models page uses.
  * @module @roos-code/roos-code/args
  */
 
 import { Command, CommanderError } from 'commander'
+import type { ModelsCliCommand, ProviderTemplate } from './models-cli.ts'
+import { PROVIDER_TEMPLATES } from './models-cli.ts'
 
 /** Boot a named profile and hand it the invocation's inner arguments. */
 interface ProfileInvocation {
@@ -44,8 +47,14 @@ interface PluginInvocation {
   args: string[]
 }
 
+/** Manage models or providers against `$ROOS_HOME` settings and credentials. */
+interface ModelsInvocation {
+  mode: 'models'
+  command: ModelsCliCommand
+}
+
 /** The resolved `roos` invocation. Help, version, and errors exit inside {@link parseRoosArgs}. */
-export type RoosInvocation = ProfileInvocation | DumpConfigInvocation | PluginInvocation
+export type RoosInvocation = ProfileInvocation | DumpConfigInvocation | PluginInvocation | ModelsInvocation
 
 /** Launcher flags shared by the default command and the `web` alias. */
 interface BootOptions {
@@ -69,6 +78,9 @@ Examples:
   roos --profile tui --resume <session>       arguments after the launcher flags reach the app
   roos --profile web --help                   the web app's own flags and help
   roos plugin --profile tui add <package>     install a plugin into the tui profile
+  roos models list                            list providers and models from the same store as Settings → Models
+  roos models set ollama-local llama3.2 --effort high
+  roos providers add --template ollama-local
 `
 
 /**
@@ -180,6 +192,104 @@ export function parseRoosArgs(argv: readonly string[], version: string): RoosInv
       resolved = { mode: 'plugin', profile: options.profile, args }
     })
 
+  const models = program.command('models').description('list or set the default model using the same store as Settings → Models')
+  models
+    .command('list')
+    .description('list providers and models; the default is marked and missing-key routes are flagged')
+    .action(() => {
+      rejectParentOptions('models')
+      resolved = { mode: 'models', command: { kind: 'models-list' } }
+    })
+  models
+    .command('set')
+    .description('write agent-default-model, optionally including reasoning effort or a purpose override')
+    .argument('<provider>', 'provider route id')
+    .argument('<model>', 'provider-owned model id')
+    .option('--effort <level>', 'adapter-owned reasoning effort for this model')
+    .option('--purpose <purpose>', 'compaction or session-title override instead of the conversation default')
+    .action((provider: string, model: string, options: { effort?: string; purpose?: string }) => {
+      rejectParentOptions('models')
+      if (provider === '') program.error('error: models set needs a provider')
+      if (model === '') program.error('error: models set needs a model')
+      const purpose = parsePurpose(program, options.purpose)
+      resolved = {
+        mode: 'models',
+        command: {
+          kind: 'models-set',
+          provider,
+          model,
+          ...options.effort === undefined ? {} : { effort: options.effort },
+          ...purpose === undefined ? {} : { purpose },
+        },
+      }
+    })
+  models
+    .command('discover')
+    .description('GET /v1/models for a provider, optionally appending advertised ids to its catalog')
+    .argument('<provider>', 'provider route id')
+    .option('--base-url <url>', 'override the stored or composed base URL')
+    .option('--add', 'append advertised model ids to the route catalog')
+    .action((provider: string, options: { baseUrl?: string; add?: boolean }) => {
+      rejectParentOptions('models')
+      if (provider === '') program.error('error: models discover needs a provider')
+      resolved = {
+        mode: 'models',
+        command: {
+          kind: 'models-discover',
+          provider,
+          ...options.baseUrl === undefined ? {} : { baseURL: options.baseUrl },
+          add: options.add === true,
+        },
+      }
+    })
+
+  const providers = program.command('providers').description('add, list, or remove provider routes in the same store as Settings → Models')
+  providers
+    .command('list')
+    .description('list configured providers (same transcript as models list)')
+    .action(() => {
+      rejectParentOptions('providers')
+      resolved = { mode: 'models', command: { kind: 'providers-list' } }
+    })
+  providers
+    .command('add')
+    .description('add a shipped template or custom route; API keys are prompted, never taken from argv')
+    .option('--template <name>', `one of ${PROVIDER_TEMPLATES.join(', ')}`)
+    .option('--base-url <url>', 'OpenAI-compatible base URL')
+    .option('--api-key-env <name>', 'credential-ref name stored in settings (the secret itself is never an argv value)')
+    .option('--provider <id>', 'route id for --template custom')
+    .option('--model <id>', 'model id for --template custom')
+    .action((options: {
+      template?: string
+      baseUrl?: string
+      apiKeyEnv?: string
+      provider?: string
+      model?: string
+    }) => {
+      rejectParentOptions('providers')
+      const template = parseTemplate(program, options.template)
+      resolved = {
+        mode: 'models',
+        command: {
+          kind: 'providers-add',
+          ...template === undefined ? {} : { template },
+          ...options.baseUrl === undefined ? {} : { baseURL: options.baseUrl },
+          ...options.apiKeyEnv === undefined ? {} : { apiKeyEnv: options.apiKeyEnv },
+          ...options.provider === undefined ? {} : { provider: options.provider },
+          ...options.model === undefined ? {} : { model: options.model },
+        },
+      }
+    })
+  providers
+    .command('remove')
+    .description('remove a user-owned pi-ai provider route')
+    .argument('<provider>', 'provider route id')
+    .action((provider: string) => {
+      rejectParentOptions('providers')
+      if (provider === '') program.error('error: providers remove needs a provider')
+      resolved = { mode: 'models', command: { kind: 'providers-remove', provider } }
+    })
+
   try {
     program.parse(argv, { from: 'user' })
   } catch (error) {
@@ -188,4 +298,34 @@ export function parseRoosArgs(argv: readonly string[], version: string): RoosInv
   /* v8 ignore next -- an action resolves or Commander throws */
   if (resolved === undefined) throw new Error('roos: no invocation resolved')
   return resolved
+}
+
+const PURPOSES = new Set(['compaction', 'session-title'])
+
+/**
+ * Validate an optional `--purpose` flag.
+ * @param program - commander program used to fail loud.
+ * @param value - raw flag value.
+ * @returns the purpose, or undefined when the flag was omitted.
+ */
+function parsePurpose(program: Command, value: string | undefined): 'compaction' | 'session-title' | undefined {
+  if (value === undefined) return undefined
+  if (!PURPOSES.has(value)) {
+    program.error('error: --purpose must be compaction or session-title')
+  }
+  return value as 'compaction' | 'session-title'
+}
+
+/**
+ * Validate an optional `--template` flag.
+ * @param program - commander program used to fail loud.
+ * @param value - raw flag value.
+ * @returns the template, or undefined when the flag was omitted.
+ */
+function parseTemplate(program: Command, value: string | undefined): ProviderTemplate | undefined {
+  if (value === undefined) return undefined
+  if (!(PROVIDER_TEMPLATES as readonly string[]).includes(value)) {
+    program.error(`error: --template must be one of ${PROVIDER_TEMPLATES.join(', ')}`)
+  }
+  return value as ProviderTemplate
 }

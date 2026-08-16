@@ -43,6 +43,7 @@ async function boot(): Promise<{
 describe('AgentDefaultModelConfig', () => {
   it('resolves the user layer over the composition entry', async () => {
     const bench = await boot()
+    expect(bench.defaultModel.purposeSelections()).toEqual({})
     expect(bench.defaultModel.currentSelection()).toEqual({
       provider: 'deepseek-official', model: 'deepseek-v4-flash',
     })
@@ -93,6 +94,38 @@ describe('AgentDefaultModelConfig', () => {
     await ctx.plugin(AgentDefaultModelConfig, { provider: 'p', model: 'm' })
     await ctx.agentDefaultModel.saveSelection({ provider: 'other', model: 'other' })
     expect(ctx.agentDefaultModel.currentSelection()).toEqual({ provider: 'p', model: 'm' })
+    expect(ctx.agentDefaultModel.purposeSelections()).toEqual({})
     await ctx.fiber.dispose()
+  })
+
+  it('stores a purpose override without replacing the conversation default', async () => {
+    const bench = await boot()
+    await bench.defaultModel.saveSelection({
+      provider: 'acme-gateway', model: 'acme-large', reasoningEffort: ReasoningEffortId('high'),
+    })
+    await bench.defaultModel.saveSelection(
+      { provider: 'ollama-local', model: 'qwen3' },
+      { purpose: 'compaction' },
+    )
+    await bench.defaultModel.saveSelection(
+      { provider: 'openai', model: 'gpt-4.1', reasoningEffort: ReasoningEffortId('low') },
+      { purpose: 'session-title' },
+    )
+    expect(bench.defaultModel.currentSelection()).toEqual({
+      provider: 'acme-gateway', model: 'acme-large', reasoningEffort: 'high',
+    })
+    expect(bench.defaultModel.selectionForPurpose('compaction')).toEqual({
+      provider: 'ollama-local', model: 'qwen3',
+    })
+    expect(bench.defaultModel.purposeSelections()).toEqual({
+      compaction: { provider: 'ollama-local', model: 'qwen3' },
+      'session-title': { provider: 'openai', model: 'gpt-4.1', reasoningEffort: 'low' },
+    })
+    await bench.defaultModel.saveSelection({ provider: 'acme-gateway', model: 'acme-plain' })
+    expect(bench.defaultModel.currentSelection()).toEqual({ provider: 'acme-gateway', model: 'acme-plain' })
+    expect(bench.defaultModel.purposeSelections().compaction).toEqual({
+      provider: 'ollama-local', model: 'qwen3',
+    })
+    await bench.ctx.fiber.dispose()
   })
 })

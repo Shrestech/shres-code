@@ -1152,6 +1152,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
    * contribution), it must fold in between the selection and the log.
    */
   function selectionFor(agent: Agent): WebModelSelectionRef {
+    const owned = ctx.get('agentDefaultModel')
+    if (owned !== undefined) return owned.selectionFor(agent)
     const installed = selections.get(agent)
     if (installed !== undefined) return installed
     let picked: ModelSelection | undefined

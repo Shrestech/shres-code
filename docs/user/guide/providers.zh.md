@@ -109,4 +109,4 @@ llm-pi-ai:
 
 ## 进阶配置
 
-自动生成的[插件配置目录](../../config-catalog.md)列出所有受支持的字段与默认值。[`roos-llm-pi-ai`](../../../packages/llm/llm-pi-ai/README.md) 和 [`roos-llm-deepseek`](../../../packages/llm/llm-deepseek/README.md) 参考文档负责直接 `settings.yaml` 配置、目录解析、推理控制、凭据与适配器错误。首次运行选择器约定见 [`roos-first-run-setup`](../../../packages/core/first-run-setup/README.md)。
+自动生成的[插件配置目录](../../config-catalog.md)列出所有受支持的字段与默认值。[`roos-llm-pi-ai`](../../../packages/llm/llm-pi-ai/README.md) 和 [`roos-llm-deepseek`](../../../packages/llm/llm-deepseek/README.md) 参考文档负责直接 `settings.yaml` 配置、目录解析、推理控制、凭据与适配器错误。首次运行选择器约定见 [`roos-first-run-setup`](../../../packages/core/first-run-setup/README.md)。[CLI 模型指南](./models.md)负责 `roos models` 与 `roos providers`。

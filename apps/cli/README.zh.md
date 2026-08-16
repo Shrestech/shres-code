@@ -12,6 +12,7 @@
 | `roos --profile headless "job"` | 运行一个全新的持久化会话，打印最终答案并退出。 |
 | `roos web` | `--profile web` 的别名。 |
 | `roos plugin --profile <name> <pnpm args>` | 通过在 profile 目录中转发给 pnpm 来管理该 profile 的插件。 |
+| `roos models` / `roos providers` | 使用与 Settings → Models 相同的 `$ROOS_HOME` 设置和凭据来列出、设置、发现和添加模型。 |
 
 运行命令时所在的目录将作为默认 workspace 根目录。`web` 和 `headless` profile 在首次使用时会从随附模板自动初始化；其他任何 profile 都必须通过 `roos plugin` 创建。
 

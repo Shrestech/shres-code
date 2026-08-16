@@ -12,6 +12,7 @@ The `roos` command is the product launcher for profiles: ordered stacks of plugi
 | `roos --profile headless "job"` | Run one fresh persisted session, print the final answer, and exit. |
 | `roos web` | Alias of `--profile web`. |
 | `roos plugin --profile <name> <pnpm args>` | Manage a profile's plugins by forwarding to pnpm in the profile directory. |
+| `roos models` / `roos providers` | List, set, discover, and add models using the same `$ROOS_HOME` settings and credentials as Settings → Models. |
 
 The invoking directory is the default workspace root. The `web` and `headless` profiles auto-initialize on first use from shipped templates; any other profile must be created through `roos plugin`.
 
