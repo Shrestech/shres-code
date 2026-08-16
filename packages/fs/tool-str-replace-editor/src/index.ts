@@ -215,11 +215,13 @@ async function listDirectory(
 
 async function viewPath(
   ctx: Context,
+  policy: MutationPolicy,
   path: string,
   viewRange: number[] | undefined,
   maxOutputChars: number,
   exec: ToolRunContext,
 ): Promise<string> {
+  const sandboxPolicy = policy.resolve(exec)
   const target = await resolveTarget(ctx, path, exec.signal)
   const info = await statExisting(ctx, target, 'view', exec)
   if (info.type === 'directory') {
@@ -231,7 +233,12 @@ async function viewPath(
   if (info.type !== 'file') {
     throw new FsError(`cannot view "${target.displayPath}": not a regular file or directory`, 'FS_NOT_REGULAR_FILE')
   }
-  const content = await ctx.fs.readText(target, exec.signal)
+  let content: string
+  try {
+    content = await ctx.fs.readText(target, exec.signal, sandboxPolicy)
+  } catch (error: unknown) {
+    throw policy.mapError(error, sandboxPolicy)
+  }
   ctx.emit('fs/observed', target, { kind: 'present', version: info.version }, exec)
   return formatFileView(target.displayPath, content, maxOutputChars, viewRange)
 }
@@ -288,7 +295,12 @@ async function replaceInFile(
   if (info.type !== 'file') {
     throw new FsError(`cannot edit "${target.displayPath}": not a regular file`, 'FS_NOT_REGULAR_FILE')
   }
-  const before = await ctx.fs.readText(target, exec.signal)
+  let before: string
+  try {
+    before = await ctx.fs.readText(target, exec.signal, sandboxPolicy)
+  } catch (error: unknown) {
+    throw policy.mapError(error, sandboxPolicy)
+  }
   const offsets = matchOffsets(before, oldValue)
   const offset = offsets[0]
   if (offset === undefined) {
@@ -339,7 +351,12 @@ async function insertInFile(
   if (info.type !== 'file') {
     throw new FsError(`cannot insert into "${target.displayPath}": not a regular file`, 'FS_NOT_REGULAR_FILE')
   }
-  const before = await ctx.fs.readText(target, exec.signal)
+  let before: string
+  try {
+    before = await ctx.fs.readText(target, exec.signal, sandboxPolicy)
+  } catch (error: unknown) {
+    throw policy.mapError(error, sandboxPolicy)
+  }
   const lines = before.split('\n')
   if (!Number.isInteger(insertLine) || insertLine < 0 || insertLine > lines.length) {
     throw new Error(
@@ -463,7 +480,7 @@ function registerStrReplaceEditor(ctx: Context, config: ResolvedConfig): void {
     async execute(args, exec) {
       switch (args.command) {
         case 'view':
-          return viewPath(ctx, args.path, args.view_range, config.maxOutputChars, exec)
+          return viewPath(ctx, policy, args.path, args.view_range, config.maxOutputChars, exec)
         case 'create':
           return createFile(ctx, policy, args.path, args.file_text, exec)
         case 'str_replace':

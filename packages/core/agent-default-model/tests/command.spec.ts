@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { Context } from '@roos-code/cordis'
 import type { Agent, ModelSelection } from '@roos-code/roos-code-agent'
 import CommandRuntime from '@roos-code/roos-code-commands'
-import { LlmError, type LlmCallConfig } from '@roos-code/roos-code-llm'
+import { LlmError, ReasoningEffortId, type LlmCallConfig } from '@roos-code/roos-code-llm'
 import { SettingsProvider } from '@roos-code/roos-code-settings'
 import type { SettingsNamespace } from '@roos-code/roos-code-settings'
 import SessionStore, { SessionId } from '@roos-code/roos-code-session'
@@ -363,7 +363,7 @@ describe('selectionFor()', () => {
 
     header = { config: { provider: 'openai', model: 'gpt-4.1' } }
     expect(first.current).toEqual({ provider: 'openai', model: 'gpt-4.1' })
-    header = { config: { provider: 'openai', model: 'gpt-4.1', reasoningEffort: 'high' } }
+    header = { config: { provider: 'openai', model: 'gpt-4.1', reasoningEffort: ReasoningEffortId('high') } }
     expect(first.current).toEqual({ provider: 'openai', model: 'gpt-4.1', reasoningEffort: 'high' })
 
     const next: ModelSelection = { provider: 'ollama-local', model: 'llama3.2' }

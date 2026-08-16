@@ -4,9 +4,16 @@
  * @module @roos-code/roos-code-sandbox-local/profiles
  */
 
+import { join } from 'node:path'
 import { grantArgs as landlockGrantArgs } from '@roos-code/node-addon-landlock-run'
+import { resolveRoosHome } from '@roos-code/roos-code-home-paths'
 import { sandboxNetwork, writableRoots } from '@roos-code/roos-code-sandbox'
 import type { SandboxPolicy } from '@roos-code/roos-code-sandbox'
+
+/** Home credentials document the in-process fs fence also denies. */
+function credentialsReadDenyPath(): string {
+  return join(resolveRoosHome(), '.credentials.yaml')
+}
 
 /**
  * Build the bwrap profile arguments for one file-effect policy.
@@ -17,6 +24,7 @@ import type { SandboxPolicy } from '@roos-code/roos-code-sandbox'
  */
 export function bwrapProfileArgs(policy: SandboxPolicy): string[] {
   const args = ['--ro-bind', '/', '/', '--dev', '/dev', '--proc', '/proc', '--die-with-parent']
+  args.push('--bind', '/dev/null', credentialsReadDenyPath())
   if (sandboxNetwork(policy) === 'deny') args.push('--unshare-net')
   if (policy.mode === 'workspace-write') {
     args.push('--tmpfs', '/tmp')
@@ -27,8 +35,10 @@ export function bwrapProfileArgs(policy: SandboxPolicy): string[] {
 
 /**
  * Build the Landlock launcher grants for one file-effect policy. Filesystem
- * grants are unchanged; `network: allow` lifts the launcher's default TCP
- * deny via `--allow-net`.
+ * grants are unchanged — Landlock is allow-list only, so a `/` read grant
+ * cannot subtract `$ROOS_HOME/.credentials.yaml` (Seatbelt/bwrap + `ctx.fs`
+ * / search fences close that path). `network: allow` lifts the launcher's
+ * default TCP deny via `--allow-net`.
  * @param policy - file-effect policy to express as Landlock allow-list grants.
  * @returns launcher grant arguments before the trailing separator and command argv.
  */
@@ -60,6 +70,8 @@ function sbplString(path: string): string {
  */
 export function seatbeltProfileArgs(policy: SandboxPolicy): string[] {
   const forms = ['(version 1)', '(allow default)', '(deny file-write*)', `(allow file-write* (literal ${sbplString('/dev/null')}))`]
+  const credentials = credentialsReadDenyPath()
+  forms.push(`(deny file-read* (literal ${sbplString(credentials)}) (subpath ${sbplString(credentials)}))`)
   if (sandboxNetwork(policy) === 'deny') forms.push('(deny network-outbound)')
   const roots = writableRoots(policy)
   if (roots.length > 0) {

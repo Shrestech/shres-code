@@ -22,7 +22,7 @@ The archive boundary was rewritten once. `verify-archived-agent-notes --rebase` 
 
 ## Consequences
 
-Documentation, READMEs, Agent Notes, generated catalogs, and the Web UI are English. Cherry-picks that restore a Chinese sibling fail `purge-zh:check` and `verify-no-zh-artifacts`. A leftover `zh` locale setting continues to validate on the Host document and becomes English in the client without a settings migration. Archived English notes keep their historical language-switcher line; that line is not a live link.
+Documentation, READMEs, Agent Notes, generated catalogs, and the Web UI are English. Cherry-picks that restore a Chinese sibling fail `purge-zh:check` and `verify-no-zh-artifacts`. Re-run `pnpm run purge-zh --apply` after stacking later PRs that were cut before the purge. A leftover `zh` locale setting continues to validate on the Host document and becomes English in the client without a settings migration. Archived English notes keep their historical language-switcher line; that line is not a live link. `ci-static` now runs the brand/zh hygiene leaves so a restored sibling fails the PR static lane.
 
 ## Alternatives considered
 

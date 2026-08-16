@@ -121,7 +121,10 @@ const GENERIC_SKIPS: readonly GenericSkip[] = [
   { file: 'packages/extensions/cordis-host-runner/src/inspect-registry.ts', upstream: ['cordis'] },
   { file: 'packages/extensions/cordis-host-runner/src/types.ts', upstream: ['cordis'] },
   { file: 'packages/extensions/cordis-host-runner/tests/helpers.ts', upstream: ['cordis'] },
+  { file: 'packages/extensions/cordis-host-runner/tests/host-activation-approval.spec.ts', upstream: ['cordis'] },
   { file: 'packages/extensions/cordis-host-runner/tests/runner.spec.ts', upstream: ['cordis'] },
+  // Rewriter acceptance fixtures quote pre-rescope names on purpose.
+  { file: 'scripts/rebrand.spec.ts', upstream: RENAMES.map(rename => rename.upstream) },
   { file: 'packages/extensions/cordis-host-runner/tests/versioning.spec.ts', upstream: ['cordis'] },
   { file: 'packages/extensions/tool-cordis/src/api-catalog.ts', upstream: ['cordis'] },
   { file: 'packages/extensions/tool-cordis/src/providers.ts', upstream: ['cordis'] },

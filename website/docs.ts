@@ -47,11 +47,16 @@ interface EnglishPage {
 }
 
 function englishPages(pages: EnglishPage[]): DocsPage[] {
-  return pages.map(page => ({
-    locale: 'root',
-    contentLocale: 'en-US',
-    ...page,
-  }))
+  return pages.map((page) => {
+    const { outline, sourceAliases, ...rest } = page
+    return {
+      locale: 'root',
+      contentLocale: 'en-US',
+      ...rest,
+      ...outline === undefined ? {} : { outline },
+      ...sourceAliases === undefined ? {} : { sourceAliases },
+    }
+  })
 }
 
 const homeAndGuide = englishPages([
@@ -91,9 +96,9 @@ const homeAndGuide = englishPages([
   {
     source: 'docs/user/guide/subagents.md',
     route: 'guide/subagents.md',
-    label: { root: '委派给产品 CLI', en: 'Delegate to product CLIs' },
-    sidebar: { root: 'zh-guide', en: 'en-guide' },
-    section: { root: '入门', en: 'Guide' },
+    label: 'Delegate to product CLIs',
+    sidebar: 'guide',
+    section: 'Guide',
     order: 4,
   },
   {

@@ -3,8 +3,8 @@
 /** Dictionary namespace owned by this plugin. */
 export const NS = 'workflowRun'
 
-/** English dictionary (same key set). */
-export const en: Record<WorkflowRunKey, string> = {
+/** English dictionary (the key-set source of truth). */
+export const en = {
   'run.title': '{name}',
   'run.members.one': '{count} member',
   'run.members.other': '{count} members',
@@ -23,7 +23,7 @@ export const en: Record<WorkflowRunKey, string> = {
   'status.failed': 'Failed',
   'status.cancelled': 'Cancelled',
   'status.interrupted': 'Interrupted',
-}
+} satisfies Record<string, string>
 
 /** Union of this namespace's dictionary keys. */
 export type WorkflowRunKey = keyof typeof en

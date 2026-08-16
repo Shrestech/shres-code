@@ -15,7 +15,7 @@ import { defineTool } from '@roos-code/roos-code-tools'
 import type { GenericCallView, SearchResultView, ToolResult } from '@roos-code/roos-code-tools'
 import type { SpillRef } from '@roos-code/roos-code-spill'
 import type {} from '@roos-code/roos-code-system-prompt'
-import { runRipgrep, toWorkdirRelative, trySaveFormattedResult } from './search-core.ts'
+import { fenceSearchPath, runRipgrep, toWorkdirRelative, trySaveFormattedResult } from './search-core.ts'
 import { globSearchMeta, searchViewFromMeta } from './presentation.ts'
 import { acceptedDirectCallValue } from './direct-call.ts'
 
@@ -341,6 +341,7 @@ export function applyGlobTool(ctx: Context, caps: GlobToolCaps): void {
     },
     async execute(args, exec) {
       const input = parseGlobArgs(args)
+      fenceSearchPath(ctx, exec, 'glob', input.path)
       const run = await runRipgrep(ctx, exec, 'glob', buildGlobCommand(input), caps.rawOutputMaxBytes, caps.graceMs, caps.stderrMaxBytes)
       const root = input.path === undefined ? '.' : toWorkdirRelative(input.path, run.workdir)
       if (run.noMatches) return { root, paths: [] }

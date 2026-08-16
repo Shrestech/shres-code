@@ -13,6 +13,7 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@roos-code/cordis'
 import { join, sep } from 'node:path'
+import { resolveRoosHome } from '@roos-code/roos-code-home-paths'
 import { createUserMessage, CallId } from '@roos-code/roos-code-llm'
 import SystemPrompt, { renderPrompt } from '@roos-code/roos-code-system-prompt'
 import ToolRuntime, { TOOL_ABORTED_BEFORE_DISPATCH, type ToolExecution, type ToolExecutionToken } from '@roos-code/roos-code-tools'
@@ -26,6 +27,7 @@ import * as ToolFsSearch from '@roos-code/roos-code-tool-fs-search'
 import {
   buildGlobCommand,
   buildGrepCommand,
+  fenceSearchPath,
   formatGrepMatches,
   parseGrepMatches,
   presentGlobCall,
@@ -355,6 +357,16 @@ describe('command construction (plain argv)', () => {
 
   it('grep: fixed rg --json argv with the pattern in --regexp= form', () => {
     expect(buildGrepCommand({ pattern: 'foo.*bar' })).toEqual(['--json', '--regexp=foo.*bar'])
+  })
+
+  it('fenceSearchPath denies the home credentials document', () => {
+    const ctx = new Context()
+    const exec = {
+      agent: { session: { header: { cwd: process.cwd() } } },
+      signal: testToolSignal,
+    } as ToolExecution
+    expect(() => fenceSearchPath(ctx, exec, 'grep', join(resolveRoosHome(), '.credentials.yaml')))
+      .toThrow(/credentials/)
   })
 
   it('grep: include in --glob= form, path behind --, both plain elements', () => {

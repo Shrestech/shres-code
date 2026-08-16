@@ -4439,6 +4439,9 @@ importers:
       '@roos-code/roos-code-agent':
         specifier: workspace:^
         version: link:../../core/agent
+      '@roos-code/roos-code-home-paths':
+        specifier: workspace:^
+        version: link:../../util/home-paths
       '@roos-code/roos-code-invariants':
         specifier: workspace:^
         version: link:../../runtime-diagnostics/invariants
@@ -4448,6 +4451,9 @@ importers:
       '@roos-code/roos-code-output-retention':
         specifier: workspace:^
         version: link:../../util/output-retention
+      '@roos-code/roos-code-sandbox-policy':
+        specifier: workspace:^
+        version: link:../../sandbox/sandbox-policy
       '@roos-code/roos-code-session':
         specifier: workspace:^
         version: link:../../core/session
@@ -5820,6 +5826,9 @@ importers:
       '@roos-code/cordis':
         specifier: workspace:^
         version: link:../../../vendor/cordis
+      '@roos-code/roos-code-home-paths':
+        specifier: workspace:^
+        version: link:../../util/home-paths
       '@roos-code/roos-code-invariants':
         specifier: workspace:^
         version: link:../../runtime-diagnostics/invariants

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-08-16-cli-agent-bridges.zh.md)
-
 ## Problem
 
 Product CLIs (Grok Build, Kimi Code, Codex, Claude Code) already exist as full agents with their own tools, approvals, and models. Roos Code can either delegate a task to one of those agents, or treat the same binary as a model route. Collapsing those two uses into one plugin would either hide harness tools (silent drop) or pretend the external CLI's tools go through Roos Code approval (they do not).
@@ -32,4 +30,6 @@ Per-route settings: `binary`, `modelArg`, `effortArg` / `effortStyle`, `env`, `a
 
 ## Consequences
 
-Copy a preset and remove `disabled` from `tool-subagent-grok-cli` / `tool-subagent-kimi-cli` to expose those tools; mount the matching provider plugin on the host. Select `grok-cli` / `kimi-cli` / `claude-cli` / `codex-cli` from the Models page or `roos models set` to run the conversation through that CLI. Selectors show a Delegated tag. Keyless specs cover argv (including selected model + effort), the tools honesty gate, and signal teardown; real-binary e2e self-skips when the executable is absent.
+Copy a preset and remove `disabled` from `tool-subagent-grok-cli` / `tool-subagent-kimi-cli` to expose those tools; mount the matching provider plugin on the host. Select `grok-cli` / `kimi-cli` / `claude-cli` / `codex-cli` from the Models page or `roos models set` to run the conversation through that CLI. Selectors show a Delegated tag. Keyless specs cover argv (including selected model + effort), the tools honesty gate, and signal teardown; real-binary e2e mounts a `sessions` provider with a workspace cwd and self-skips when the executable is absent.
+
+The spawned CLIs remain unsandboxed and grok/kimi still pass `--always-approve` / `--yolo`. That is accepted for these opt-in delegated packages: containment is the subprocess env scrub, session cwd, and stdin-ignore. A `SubprocessSpawnSpec` sandbox field that routes through `ctx.sandbox.confine` is a later seam, not the shipped default.

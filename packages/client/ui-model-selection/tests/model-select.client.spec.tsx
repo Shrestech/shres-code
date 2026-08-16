@@ -12,7 +12,7 @@ import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/e
 // The seat's key domain is model ∪ common; the stub mirrors the real lookup
 // chain: package dictionary, then common vocabulary, then the key.
 const t: ComponentProps<typeof ModelSelect>['t'] = (key, params) => {
-  const template = (zh as Record<string, string>)[key]
+  const template = (en as Record<string, string>)[key]
     ?? (commonEn as Record<string, string>)[key]
     ?? key
   return params === undefined
@@ -64,7 +64,7 @@ describe('ModelSelect reasoning effort', () => {
     />)
 
     const trigger = screen.getByRole('button', {
-      name: 'Select model, current DeepSeek-V4-Flash，Effort High',
+      name: 'Select model, current DeepSeek-V4-Flash, reasoning effort High',
     })
     fireEvent.click(trigger)
     fireEvent.click(screen.getByRole('menuitem', { name: /Effort/ }))
@@ -78,7 +78,7 @@ describe('ModelSelect reasoning effort', () => {
         model: 'deepseek-v4-flash',
         reasoningEffort: 'max',
       })
-      expect(trigger.getAttribute('aria-label')).toBe('Select model, current DeepSeek-V4-Flash，Effort Max')
+      expect(trigger.getAttribute('aria-label')).toBe('Select model, current DeepSeek-V4-Flash, reasoning effort Max')
     })
   })
 
@@ -100,10 +100,10 @@ describe('ModelSelect reasoning effort', () => {
       select={vi.fn().mockResolvedValue(true)}
       t={t}
     />)
-    fireEvent.click(screen.getByRole('button', { name: '选择模型，当前 Grok 4' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: /模型/ }))
-    expect(screen.getByText('委派')).toBeTruthy()
-    expect(screen.getByTitle(zh['delegated.hint'])).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Select model, current Grok 4' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /Model/ }))
+    expect(screen.getByText('Delegated')).toBeTruthy()
+    expect(screen.getByTitle(en['delegated.hint'])).toBeTruthy()
   })
 
   it('offers provider default only when the adapter does not configure a model default', () => {
@@ -129,7 +129,7 @@ describe('ModelSelect reasoning effort', () => {
     />)
 
     fireEvent.click(screen.getByRole('button', {
-      name: 'Select model, current Model，Effort Default',
+      name: 'Select model, current Model, reasoning effort Default',
     }))
     fireEvent.click(screen.getByRole('menuitem', { name: /Effort/ }))
     expect(screen.getAllByRole('menuitemradio').map(item => item.textContent))
@@ -186,7 +186,7 @@ describe('ModelSelect reasoning effort', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: /Model/ }))
     fireEvent.click(screen.getByRole('menuitemradio', { name: /DeepSeek-V4-Pro/ }))
     const toast = await screen.findByRole('alert')
-    expect(toast.textContent).toContain('Model operation failed：model-unavailable: session already contains images')
+    expect(toast.textContent).toContain('Model operation failed: model-unavailable: session already contains images')
     // The selection failure does not render the in-menu load strip (no Retry).
     expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull()
   })

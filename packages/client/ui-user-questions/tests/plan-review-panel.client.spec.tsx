@@ -16,7 +16,6 @@ import { planReviewOf, type QuestionComposerProps, type QuestionWait } from '../
 import { QuestionComposer } from '../src/client/QuestionComposer.tsx'
 import { en } from '../src/client/locales.ts'
 import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
-import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
 
 afterEach(cleanup)
 
@@ -36,7 +35,7 @@ const kit = {
   useProjection: (() => undefined) as never,
   useInput: (() => { throw new Error('unused') }) as never,
   inputActions: { setDraft: () => { throw new Error('unused') }, submit: () => { throw new Error('unused') } } as never,
-  t: seatOver(zh, commonEn),
+  t: seatOver(en, commonEn),
 }
 
 const PLAN = '# Ship the picker\n\n- read the store\n- render the rows\n'

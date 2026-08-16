@@ -957,7 +957,7 @@ describe('ChatView', () => {
     h.props.renderSlot = ((key: string, owner: object, opts?: { entryKey?: string; fallback?: React.ReactNode }) => {
       calls.push({ key, owner, ...(opts?.entryKey !== undefined ? { entryKey: opts.entryKey } : {}) })
       return opts?.fallback ?? null
-    })
+    }) as typeof h.props.renderSlot
     render(<h.ChatView {...h.props} />)
     expect(calls).toHaveLength(1)
     expect(calls[0]).toMatchObject({

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-08-16-credential-read-fence-and-network-deny.zh.md)
-
 ## Problem
 
 The in-process filesystem fence confined writes but let every mode read any path the host process can open, so a model-controlled `read` of `$ROOS_HOME/.credentials.yaml` (or a `*.credentials.yaml` alias) exfiltrated provider keys. Separately, Seatbelt and Landlock confined file effects while leaving outbound TCP open; only bwrap was assumed to isolate the network, and even that profile omitted `--unshare-net`. A confined child could therefore fetch arbitrary hosts on macOS and on Linux Landlock, and also on Linux bwrap until this change.
@@ -25,4 +23,4 @@ The in-process filesystem fence confined writes but let every mode read any path
 
 ## Consequences
 
-Reading or mutating the managed credentials document through `ctx.fs` requires `danger-full-access`. Extra deny paths are a plugin config, not a session override. Outbound network is now denied by default on macOS Seatbelt, Linux bwrap (`--unshare-net` is new), and Linux Landlock when ABI ≥ 4; operators that need child network set `network: allow` on `sandbox-policy`. Windows ACL is unchanged. Landlock kernels below 6.7 still confine files and probe `partial`. The acp-agent snapshot `fs-credential-read-deny` pins the model-visible `[sandbox: file access denied under workspace-write mode]` marker when `read` targets a workspace `*.credentials.yaml` file.
+Reading or mutating the managed credentials document through `ctx.fs` requires `danger-full-access`. Extra deny paths are a plugin config, not a session override. `str_replace_editor` stamps the session policy on view/before-reads and maps denials through `policy.mapError`. `grep`/`glob` reject a model `path` that names a credentials document or, under a confined session, sits outside the workspace. Seatbelt denies `file-read*` of `$ROOS_HOME/.credentials.yaml`; bwrap binds `/dev/null` over that path. Landlock still grants `/` read-only and cannot subtract a single file; ripgrep and `ctx.fs` close that path on Linux. Outbound network is now denied by default on macOS Seatbelt, Linux bwrap (`--unshare-net` is new), and Linux Landlock when ABI ≥ 4; operators that need child network set `network: allow` on `sandbox-policy`. Windows ACL is unchanged. Landlock kernels below 6.7 still confine files and probe `partial`. The acp-agent snapshot `fs-credential-read-deny` pins the model-visible `[sandbox: file access denied under workspace-write mode]` marker when `read` targets a workspace `*.credentials.yaml` file.

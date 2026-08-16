@@ -20,7 +20,7 @@ afterEach(() => {
 
 const SESSION = 'session' as SessionId
 const START = 1_700_000_000_000
-const t: JobListActionProps['t'] = makeTranslate(zh)
+const t: JobListActionProps['t'] = makeTranslate(en)
 
 function job(over: Partial<JobView> = {}): JobView {
   return {
@@ -96,10 +96,10 @@ describe('JobListAction rows', () => {
     ])} />)
     fireEvent.click(screen.getByRole('button'))
     expect(rowCells()).toEqual([
-      ['bash', 'earlier live', 'Running', '0s'],
-      ['bash', 'later live', 'Running', '0s'],
-      ['bash', 'new done', 'already failed', '9s'],
-      ['bash', 'old done', 'Completed', '1s'],
+      ['bash', 'earlier live', 'running', '0s'],
+      ['bash', 'later live', 'running', '0s'],
+      ['bash', 'new done', 'failed', '9s'],
+      ['bash', 'old done', 'completed', '1s'],
     ])
   })
 
@@ -130,7 +130,7 @@ describe('JobListAction rows', () => {
     ])} />)
     fireEvent.click(screen.getByRole('button'))
     const words = rowCells().map(cells => cells[2])
-    expect(new Set(words)).toEqual(new Set(['Running', 'currently Stop', 'Completed', 'cancelled', 'already failed']))
+    expect(new Set(words)).toEqual(new Set(['running', 'stopping', 'completed', 'cancelled', 'failed']))
   })
 })
 

@@ -21,6 +21,9 @@
       "path": "../../../native/landlock-run/packages/entry"
     },
     {
+      "path": "../../util/home-paths"
+    },
+    {
       "path": "../../llm/llm"
     },
     {

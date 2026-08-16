@@ -141,7 +141,7 @@ function bench(over?: BenchOptions) {
     if (key === 'conversation.input.model') return over?.modelEntry ?? null
     return null
   }) as InputBarProps['renderSlot']
-  const props: InputBarProps = {
+  const props = {
     sessionId: SID,
     SessionProvider: ({ children }) => children(SID),
     useSession: bindSnapshotSelector(session),
@@ -189,7 +189,7 @@ function bench(over?: BenchOptions) {
     ...(over?.overlay !== undefined ? { overlay: over.overlay } : {}),
     ...(over?.leftItems !== undefined ? { leftItems: over.leftItems } : {}),
     ...(over?.rightItems !== undefined ? { rightItems: over.rightItems } : {}),
-  }
+  } as InputBarProps
   const view = render(<InputBar {...props} />)
   const textarea = view.container.querySelector('textarea')!
   const primaryStops = over?.running === true && over.subagent === undefined

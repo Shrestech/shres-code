@@ -354,6 +354,11 @@ function runningNodeMajor(): number {
 function ciStaticGates(options: { ownsBuild: boolean }): Gate[] {
   return [
     ...ciSharedStaticGates(),
+    pnpmScript('rescope-vendor-ci', 'rescope-vendor:check', { label: 'vendor rescope (ci-static)' }),
+    pnpmScript('rebrand-ci', 'rebrand:check', { label: 'Roos Code rebrand (ci-static)' }),
+    pnpmScript('legacy-brand-ci', 'verify-no-legacy-brand', { label: 'legacy brand residue (ci-static)' }),
+    pnpmScript('purge-zh-ci', 'purge-zh:check', { label: 'Chinese-language file purge (ci-static)' }),
+    pnpmScript('no-zh-ci', 'verify-no-zh-artifacts', { label: 'Chinese-language residue (ci-static)' }),
     ...options.ownsBuild ? [pnpmScript('build', 'build')] : [],
     ...docSyncLeafGates({
       includeDocTypecheck: options.ownsBuild,

@@ -7,7 +7,7 @@ import ToolRegistry from '@roos-code/roos-code-tools'
 import ApprovalService from '@roos-code/roos-code-user-approval'
 import type { ApprovalOutcome, ApprovalRequest } from '@roos-code/roos-code-user-approval'
 import DynamicCordisRunnerService from '../src/index.ts'
-import { AGENT_A, CLIENT_CODE, setup } from './helpers.ts'
+import { AGENT_A, CLIENT_CODE, closeStandInTurn, reopenStandInTurn, setup } from './helpers.ts'
 
 const HOST_CODE = `
   harness.handle('double', async (args) => args.value * 2)
@@ -171,8 +171,7 @@ describe('host-half activation approval', () => {
   it('fails closed when the Host-activation ask happens outside an open turn', async () => {
     const { runner } = await setup(undefined, 'allowed-once')
     const { pluginId, packageId } = defineHost(runner)
-    AGENT_A.session.events.length = 0
-    AGENT_A.session.append('turn/end', { turn: 1 })
+    closeStandInTurn(AGENT_A)
 
     await expect(runner.run(AGENT_A, pluginId, packageId, 'run')).resolves.toMatchObject({
       ok: false,
@@ -188,14 +187,13 @@ describe('host-half activation approval', () => {
       return Promise.resolve<ApprovalOutcome>('allowed-once')
     })
     const { pluginId, packageId } = defineHost(runner)
-    AGENT_A.session.events.length = 0
-    AGENT_A.session.append('turn/end', { turn: 1 })
+    closeStandInTurn(AGENT_A)
 
     await expect(runner.runHostHalf(AGENT_A, pluginId, packageId, 'run', null, false))
       .resolves.toMatchObject({ ok: false, reason: 'unavailable' })
     expect(asked).toEqual([])
 
-    AGENT_A.session.append('turn/start')
+    reopenStandInTurn(AGENT_A)
 
     await expect(runner.run(AGENT_A, pluginId, packageId, 'run'))
       .resolves.toMatchObject({ ok: true, status: 'running' })

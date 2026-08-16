@@ -16,6 +16,12 @@
       "path": "../../../vendor/schemastery"
     },
     {
+      "path": "../../util/home-paths"
+    },
+    {
+      "path": "../../sandbox/sandbox-policy"
+    },
+    {
       "path": "../../util/output-retention"
     },
     {

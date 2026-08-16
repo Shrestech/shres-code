@@ -2,7 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-08-16-skill-body-escaping-trust-framing.zh.md)
 
 ## Problem
 

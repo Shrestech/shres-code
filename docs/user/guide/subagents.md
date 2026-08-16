@@ -1,14 +1,12 @@
 # Delegate to product CLIs
 
-English | [中文](subagents.zh.md)
-
 Roos Code can hand a task to another coding agent, or it can run that same agent as the conversation model. Those are two different contracts.
 
 ## Subagent tools
 
 `subagent`, `subagent_fork`, and the optional product tools (`subagent_codex`, `subagent_claude_code`, `subagent_grok_cli`, `subagent_kimi_cli`) are capability-honest delegation. The parent model calls a tool. The child is a fresh process in the session workspace. The parent sees only the child's final text or a structured failure.
 
-The `code`, `standard`, and `cordis` presets ship the Grok and Kimi tool rows with `disabled: true`. Copy the preset, remove `disabled`, and mount the matching provider plugin on the host:
+The `code`, `standard`, and Cordis plugin-development presets ship the Grok and Kimi tool rows with `disabled: true`. Copy the preset, remove `disabled`, and mount the matching provider plugin on the host:
 
 ```yaml
 - id: subagent-grok-cli

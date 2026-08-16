@@ -129,7 +129,7 @@ export async function setup(
  * @param agent - session-less test Agent to mutate.
  */
 function attachOpenTurn(agent: Agent): void {
-  const events: Array<{ type: string; data?: unknown }> = [{ type: 'turn/start' }]
+  const events: Array<{ type: string; data?: unknown }> = [{ type: 'turn/start', data: { turn: 1 } }]
   Object.assign(agent, {
     session: {
       events,
@@ -138,6 +138,29 @@ function attachOpenTurn(agent: Agent): void {
       },
     },
   })
+}
+
+/**
+ * Close the stand-in Session's open turn so the next Host-activation ask
+ * is outside a turn. Used by fail-closed outside-turn tests.
+ * @param agent - Agent previously prepared by {@link attachOpenTurn}.
+ */
+export function closeStandInTurn(agent: Agent): void {
+  const session = agent.session as unknown as {
+    events: Array<{ type: string; data?: unknown }>
+    append(type: string, data?: unknown): void
+  }
+  session.events.splice(0, session.events.length)
+  session.append('turn/end', { turn: 1, reason: { kind: 'interrupted' } })
+}
+
+/**
+ * Open a new turn on the stand-in Session after {@link closeStandInTurn}.
+ * @param agent - Agent previously prepared by {@link attachOpenTurn}.
+ */
+export function reopenStandInTurn(agent: Agent): void {
+  const session = agent.session as { append(type: string, data?: unknown): void }
+  session.append('turn/start', { turn: 2 })
 }
 
 export function running(runner: DynamicCordisRunnerService, agent: Agent): { id: string; running: boolean }[] {

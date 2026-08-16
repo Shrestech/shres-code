@@ -143,7 +143,7 @@ describe('SessionProvider', () => {
   it('delivers the resolved cell to session slots under it (observable behavior, not context internals)', () => {
     const seen: Record<string, unknown>[] = []
     const h = makeHost({
-      root: renderSlot => <SessionProvider>{() => renderSlot('k.session', {})}</SessionProvider>,
+      root: renderSlot => <SessionProvider>{() => renderSlot('k.session', {}) as never}</SessionProvider>,
     })
     h.addSession('s1')
     h.addSession('s2')
@@ -168,7 +168,7 @@ describe('SessionProvider', () => {
   it('republishes a mounted session entry when its provide bundle changes under the same id', () => {
     const seen: unknown[] = []
     const h = makeHost({
-      root: renderSlot => <SessionProvider>{() => renderSlot('k.session', {})}</SessionProvider>,
+      root: renderSlot => <SessionProvider>{() => renderSlot('k.session', {}) as never}</SessionProvider>,
     })
     const original = h.addSession('s1')
     h.registerSession({

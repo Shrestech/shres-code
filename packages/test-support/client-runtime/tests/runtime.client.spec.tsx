@@ -417,7 +417,7 @@ describe('feature mount and disposal', () => {
           id: 'row-1',
           children: { 'trt.rows.hole': { kind: 'single', scope: 'root' } },
         } as never, ((props: { renderSlot: (key: string, owner: object) => unknown }) =>
-          <div data-testid="row">{props.renderSlot('trt.rows.hole', {}) as React.ReactNode}</div>) as never)
+          <div data-testid="row">{props.renderSlot('trt.rows.hole', {}) as never}</div>) as never)
       },
     })
     const view = runtime.renderRoot()

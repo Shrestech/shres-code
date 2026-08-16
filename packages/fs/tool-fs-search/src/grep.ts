@@ -18,7 +18,7 @@ import type { RetainedItems } from '@roos-code/roos-code-output-retention'
 import type { SpillRef } from '@roos-code/roos-code-spill'
 import type {} from '@roos-code/roos-code-system-prompt'
 import type { GrepMatch } from './search-core.ts'
-import { SearchError, previewLine, retainGrepMatches, runRipgrep, toWorkdirRelative, trySaveFormattedResult } from './search-core.ts'
+import { SearchError, fenceSearchPath, previewLine, retainGrepMatches, runRipgrep, toWorkdirRelative, trySaveFormattedResult } from './search-core.ts'
 import { grepSearchMeta, searchViewFromMeta } from './presentation.ts'
 import { acceptedDirectCallValue } from './direct-call.ts'
 
@@ -319,6 +319,7 @@ export function applyGrepTool(ctx: Context, caps: GrepToolCaps): void {
     },
     async execute(args, exec) {
       const input = parseGrepArgs(args)
+      fenceSearchPath(ctx, exec, 'grep', input.path)
       const run = await runRipgrep(ctx, exec, 'grep', buildGrepCommand(input), caps.rawOutputMaxBytes, caps.graceMs, caps.stderrMaxBytes)
       if (run.noMatches) return { matches: [] }
 

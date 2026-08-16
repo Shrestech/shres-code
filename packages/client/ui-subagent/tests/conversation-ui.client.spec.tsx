@@ -20,7 +20,7 @@ afterEach(() => {
 const PARENT = 'parent' as SessionId
 const CHILD = 'child' as SessionId
 const GRANDCHILD = 'grandchild' as SessionId
-const t: SubagentCatalogActionProps['t'] = makeTranslate(zh)
+const t: SubagentCatalogActionProps['t'] = makeTranslate(en)
 
 function catalog(over: Partial<SubagentCatalogSnapshot> = {}): SubagentCatalogSnapshot {
   return {
@@ -333,11 +333,11 @@ describe('SubagentCatalogAction', () => {
     const durationMetric = runningMetrics.getByText('1m 10s')
     expect(tokenMetric.parentElement).toBe(durationMetric.parentElement)
     expect(tokenMetric.nextElementSibling).toBe(durationMetric)
-    expect(screen.getByRole('treeitem', { name: /finished.*123 tok · 1h02m 03s/ })).toBeTruthy()
+    expect(screen.getByRole('treeitem', { name: /finished.*123 tok · 1h 02m 03s/ })).toBeTruthy()
     expect(screen.getByRole('treeitem', { name: /interrupted.*123M tok · 6s/ })).toBeTruthy()
-    expect(screen.getByRole('treeitem', { name: /days.*12d 05h06m 07s/ })).toBeTruthy()
+    expect(screen.getByRole('treeitem', { name: /days.*12d 05h 06m 07s/ })).toBeTruthy()
     expect(screen.getByText('12d 5h').getAttribute('title'))
-      .toBe('Total active duration: 12d 05h06m 07s')
+      .toBe('Total active duration: 12d 05h 06m 07s')
     expect(screen.getByText('1d')).toBeTruthy()
     expect(screen.getByText('~6mo 12d')).toBeTruthy()
     expect(screen.getByText('~1mo')).toBeTruthy()
@@ -346,7 +346,7 @@ describe('SubagentCatalogAction', () => {
 
     await vi.advanceTimersByTimeAsync(1_000)
     expect(screen.getByRole('treeitem', { name: /running.*4\.6K tok · 1m 11s/ })).toBeTruthy()
-    expect(screen.getByRole('treeitem', { name: /finished.*123 tok · 1h02m 03s/ })).toBeTruthy()
+    expect(screen.getByRole('treeitem', { name: /finished.*123 tok · 1h 02m 03s/ })).toBeTruthy()
     expect(screen.getByRole('treeitem', { name: /interrupted.*123M tok · 6s/ })).toBeTruthy()
   })
 

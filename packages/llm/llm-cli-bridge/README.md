@@ -1,7 +1,5 @@
 # @roos-code/roos-code-llm-cli-bridge
 
-English | [中文](README.zh.md)
-
 Delegated-completion adapter: `stream()` serializes `system` plus `messages` into a prompt, spawns a product CLI through [`roos-subprocess`](../../subprocess/subprocess/README.md), and emits `block-start` → `text-delta` → `block-end` → optional `usage` → `finish: stop`. There is no HTTP request, so `attributionHeaders()` does not apply.
 
 The four shipped routes are `claude-cli`, `codex-cli`, `grok-cli`, and `kimi-cli`. They are marked `kind: 'delegated'` on `providerInfo()` and in the configurable-provider directory. The CLI's own tools bypass harness approval; the Models picker shows a Delegated tag. See the [CLI agent bridges](../../../.agents/notes/implemented/architecture/2026-08-16-cli-agent-bridges.md) note.

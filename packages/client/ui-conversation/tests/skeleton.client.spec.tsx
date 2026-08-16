@@ -15,7 +15,6 @@ import type { ConversationRootProps } from '../src/client/skeleton/ConversationR
 import type { ClientContext } from '@roos-code/roos-code-client-runtime/client'
 import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
 import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
-import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
 import { createChatStore } from '../src/client/stores.ts'
 import { SessionInputShell } from '../src/client/input/facade.ts'
 import { en } from '../src/client/locales.ts'

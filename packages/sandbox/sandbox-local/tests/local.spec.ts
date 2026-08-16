@@ -13,6 +13,7 @@ import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@roos-code/cordis'
 import { LAUNCHER_FAILURE_EXIT } from '@roos-code/node-addon-landlock-run'
+import { resolveRoosHome } from '@roos-code/roos-code-home-paths'
 import { SANDBOX_UNAVAILABLE, SandboxUnavailableError } from '@roos-code/roos-code-sandbox'
 import type { SandboxPolicy } from '@roos-code/roos-code-sandbox'
 import {
@@ -20,6 +21,8 @@ import {
 } from '@roos-code/roos-code-sandbox-local'
 import type { Config } from '@roos-code/roos-code-sandbox-local'
 import { bwrapProfileArgs, landlockProfileArgs, seatbeltProfileArgs } from '../src/profiles.ts'
+
+const CREDENTIALS = join(resolveRoosHome(), '.credentials.yaml')
 
 const RO: SandboxPolicy = { mode: 'read-only', workspaceRoot: '/ws' }
 const WW: SandboxPolicy = { mode: 'workspace-write', workspaceRoot: '/ws' }
@@ -59,18 +62,20 @@ function fakeSeatbeltExec(status: number): string {
 }
 
 /** The seatbelt read-only profile — every seatbelt profile starts with these forms. */
-const SEATBELT_RO_PROFILE = '(version 1) (allow default) (deny file-write*) (allow file-write* (literal "/dev/null")) (deny network-outbound)'
+const SEATBELT_RO_PROFILE = `(version 1) (allow default) (deny file-write*) (allow file-write* (literal "/dev/null")) (deny file-read* (literal "${CREDENTIALS}") (subpath "${CREDENTIALS}")) (deny network-outbound)`
 
 describe('profile dialects', () => {
   it('bwrap read-only: whole tree read-only with fresh /dev and /proc, no writable mounts, net namespace unshared', () => {
     expect(bwrapProfileArgs(RO)).toEqual([
-      '--ro-bind', '/', '/', '--dev', '/dev', '--proc', '/proc', '--die-with-parent', '--unshare-net',
+      '--ro-bind', '/', '/', '--dev', '/dev', '--proc', '/proc', '--die-with-parent',
+      '--bind', '/dev/null', CREDENTIALS, '--unshare-net',
     ])
   })
 
   it('bwrap workspace-write: adds an ephemeral /tmp and rebinds the workspace root', () => {
     expect(bwrapProfileArgs(WW)).toEqual([
-      '--ro-bind', '/', '/', '--dev', '/dev', '--proc', '/proc', '--die-with-parent', '--unshare-net',
+      '--ro-bind', '/', '/', '--dev', '/dev', '--proc', '/proc', '--die-with-parent',
+      '--bind', '/dev/null', CREDENTIALS, '--unshare-net',
       '--tmpfs', '/tmp', '--bind', '/ws', '/ws',
     ])
   })
@@ -78,6 +83,7 @@ describe('profile dialects', () => {
   it('bwrap network allow: omits --unshare-net', () => {
     expect(bwrapProfileArgs({ ...RO, network: 'allow' })).toEqual([
       '--ro-bind', '/', '/', '--dev', '/dev', '--proc', '/proc', '--die-with-parent',
+      '--bind', '/dev/null', CREDENTIALS,
     ])
   })
 
@@ -102,7 +108,7 @@ describe('profile dialects', () => {
   it('seatbelt network allow: omits the outbound-network deny', () => {
     expect(seatbeltProfileArgs({ ...RO, network: 'allow' })).toEqual([
       '-p',
-      '(version 1) (allow default) (deny file-write*) (allow file-write* (literal "/dev/null"))',
+      `(version 1) (allow default) (deny file-write*) (allow file-write* (literal "/dev/null")) (deny file-read* (literal "${CREDENTIALS}") (subpath "${CREDENTIALS}"))`,
     ])
   })
 

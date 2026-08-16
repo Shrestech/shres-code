@@ -40,6 +40,9 @@ function fakeChild(options: {
   outcome?: SubprocessOutcome
   doneError?: Error
   hold?: boolean
+  pid?: number
+  collected?: SubprocessHandle['collected']
+  done?: Promise<SubprocessOutcome>
 } = {}): { handle: SubprocessHandle; terminate: ReturnType<typeof vi.fn> } {
   const stdout = options.stdout ?? JSON.stringify({ result: 'done' })
   let settled = false
@@ -60,16 +63,16 @@ function fakeChild(options: {
     settle(options.outcome ?? { exitCode: null, signal: 'SIGTERM' })
   })
   const handle: SubprocessHandle = {
-    pid: 1234,
+    pid: options.pid ?? 1234,
     stdin: undefined,
     stdout: undefined,
     stderr: undefined,
-    collected: {
+    collected: options.collected ?? {
       stdout: {
         readFrom: () => ({ text: stdout, nextOffset: stdout.length, lossy: false }),
       },
     },
-    done,
+    done: options.done ?? done,
     terminate,
     waitForExit: vi.fn(async () => true),
   }
@@ -121,25 +124,27 @@ describe('startKimiCliRun', () => {
       output: [{ type: 'text', text: 'ok answer' }],
       stopReason: 'completed',
     })
-    const spec = spawn.mock.calls[0]![0] as SubprocessSpawnSpec
-    expect(spec.argv).toEqual(kimiHeadlessArgv('kimi', 'do the task'))
-    expect(spec.env).toEqual({ MOONSHOT_API_KEY: 'k' })
-    expect(spec.cwd).toBe(process.cwd())
+    expect(spawn).toHaveBeenCalledWith(expect.objectContaining({
+      argv: kimiHeadlessArgv('kimi', 'do the task'),
+      env: { MOONSHOT_API_KEY: 'k' },
+      cwd: process.cwd(),
+    } satisfies Partial<SubprocessSpawnSpec>))
     await run.dispose()
     expect(child.terminate).toHaveBeenCalled()
   })
 
   it('disposes a pid-less child and treats missing stdout as empty', async () => {
-    const missing = fakeChild()
-    missing.handle.collected = { stdout: undefined }
+    const missing = fakeChild({ collected: {} })
     const missingRun = await startKimiCliRun(request(), runSpec(missing))
     await expect(missingRun.result).resolves.toMatchObject({ stopReason: 'error' })
     await missingRun.dispose()
 
-    const child = fakeChild({ stdout: '' })
-    child.handle.pid = 0
-    child.handle.collected = { stdout: undefined }
-    child.handle.done = Promise.reject(new Error('already gone'))
+    const child = fakeChild({
+      stdout: '',
+      pid: 0,
+      collected: {},
+      done: Promise.reject(new Error('already gone')),
+    })
     void child.handle.done.catch(() => undefined)
     const run = await startKimiCliRun(request(), runSpec(child))
     await expect(run.result).resolves.toMatchObject({ stopReason: 'error' })
@@ -253,15 +258,15 @@ describe('Kimi CLI provider registration', () => {
     await ctx.plugin(kimi, {})
     const child = fakeChild({
       stdout: '',
+      pid: 0,
       outcome: { exitCode: 2, signal: null },
+      collected: {},
     })
-    child.handle.collected = { stdout: undefined }
     spawn.mockImplementation(() => child.handle)
     const run = await ctx.subagents.start('kimi-cli', request())
     expect(resolveExecutable).toHaveBeenCalled()
     await expect(run.result).resolves.toMatchObject({ stopReason: 'error' })
     expect(warn).toHaveBeenCalled()
-    child.handle.pid = 0
     await run.dispose()
     await ctx.fiber.dispose()
   })

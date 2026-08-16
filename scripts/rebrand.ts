@@ -126,7 +126,7 @@ const EXACT_EDITS: readonly ExactEdit[] = [
     id: 'hygiene-legacy-brand',
     file: 'package.json',
     find: '&& pnpm run verify-vendored-links"',
-    replace: '&& pnpm run verify-vendored-links && pnpm run verify-no-legacy-brand"',
+    replace: '&& pnpm run verify-vendored-links && pnpm run verify-no-legacy-brand && pnpm run purge-zh:check && pnpm run verify-no-zh-artifacts"',
     expect: 1,
   },
   {
@@ -152,6 +152,8 @@ const EXACT_EDITS: readonly ExactEdit[] = [
       ...artifactOptions,
     }),
     pnpmScript('legacy-brand', 'verify-no-legacy-brand', { label: 'legacy brand residue' }),
+    pnpmScript('purge-zh', 'purge-zh:check', { label: 'Chinese-language file purge' }),
+    pnpmScript('no-zh-artifacts', 'verify-no-zh-artifacts', { label: 'Chinese-language residue' }),
   ]`,
     expect: 1,
   },
@@ -206,6 +208,8 @@ const PATH_RENAMES: readonly PathRename[] = [
 function excluded(file: string): boolean {
   if (file === 'scripts/rebrand.ts' || file === 'scripts/rebrand.spec.ts') return true
   if (file === 'scripts/verify-no-legacy-brand.ts') return true
+  if (file === 'scripts/purge-zh.ts' || file === 'scripts/purge-zh.spec.ts') return true
+  if (file === 'AGENTS.md' || file === 'CLAUDE.md') return true
   if (file === 'LICENSE' || file === 'NOTICE') return true
   if (file.startsWith('.agents/notes/')) return true
   if (file === 'pnpm-lock.yaml') return true

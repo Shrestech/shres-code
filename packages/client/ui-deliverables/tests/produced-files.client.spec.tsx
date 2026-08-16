@@ -279,7 +279,7 @@ describe('produced-file Turn data', () => {
 })
 
 describe('ProducedFiles row', () => {
-  const t = makeTranslate(zh)
+  const t = makeTranslate(en)
   const capability = (
     canOpenPath: boolean | undefined,
     isLoopback = true,

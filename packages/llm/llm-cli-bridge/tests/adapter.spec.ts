@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@roos-code/cordis'
 import LlmRuntime, {
+  createAssistantMessage,
   createUserMessage,
   LlmError,
   ReasoningEffortId,
@@ -43,15 +44,18 @@ class MemorySettings extends SettingsProvider {
 function fakeChild(options: {
   stdout?: string
   outcome?: SubprocessOutcome
+  pid?: number
+  done?: Promise<SubprocessOutcome>
+  collected?: SubprocessHandle['collected']
 } = {}): SubprocessHandle {
   const stdout = options.stdout ?? JSON.stringify({ result: 'hello', usage: { input_tokens: 3, output_tokens: 2 } })
-  const done = Promise.resolve(options.outcome ?? { exitCode: 0, signal: null })
+  const done = options.done ?? Promise.resolve(options.outcome ?? { exitCode: 0, signal: null })
   return {
-    pid: 99,
+    pid: options.pid ?? 99,
     stdin: undefined,
     stdout: undefined,
     stderr: undefined,
-    collected: {
+    collected: options.collected ?? {
       stdout: { readFrom: () => ({ text: stdout, nextOffset: stdout.length, lossy: false }) },
     },
     done,
@@ -209,8 +213,9 @@ describe('CliLlmAdapter', () => {
   it('honors abort by terminating the process tree', async () => {
     const controller = new AbortController()
     let resolveDone!: (outcome: SubprocessOutcome) => void
-    const child = fakeChild()
-    child.done = new Promise((resolve) => { resolveDone = resolve })
+    const child = fakeChild({
+      done: new Promise((resolve) => { resolveDone = resolve }),
+    })
     const adapter = new CliLlmAdapter({
       routes: () => resolveRoutes(undefined),
       spawn: () => child,
@@ -295,8 +300,7 @@ describe('CliLlmAdapter', () => {
   })
 
   it('omits usage, tears down a pid-less child, and parses stream-json', async () => {
-    const child = fakeChild({ stdout: JSON.stringify({ result: 'plain' }) })
-    child.pid = 0
+    const child = fakeChild({ stdout: JSON.stringify({ result: 'plain' }), pid: 0 })
     const adapter = new CliLlmAdapter({
       routes: () => resolveRoutes(undefined),
       spawn: () => child,
@@ -326,9 +330,11 @@ describe('CliLlmAdapter', () => {
       { type: 'usage', usage: { inputTokens: 1, outputTokens: 2, reasoningTokens: 3 } },
     ]))
 
-    const empty = fakeChild({ stdout: '' })
-    empty.collected = { stdout: undefined }
-    empty.done = Promise.reject(new Error('already gone'))
+    const empty = fakeChild({
+      stdout: '',
+      collected: {},
+      done: Promise.reject(new Error('already gone')),
+    })
     void empty.done.catch(() => undefined)
     empty.waitForExit = vi.fn(async () => {
       throw new Error('already gone')
@@ -341,8 +347,7 @@ describe('CliLlmAdapter', () => {
     })
     await expect(collect(emptyAdapter.stream(options()))).rejects.toThrow('already gone')
 
-    const noStdout = fakeChild()
-    noStdout.collected = { stdout: undefined }
+    const noStdout = fakeChild({ collected: {} })
     const noStdoutAdapter = new CliLlmAdapter({
       routes: () => resolveRoutes(undefined),
       spawn: () => noStdout,
@@ -396,8 +401,7 @@ describe('parse, serialize, and resolveRoutes', () => {
           content: [{ type: 'text', text: 'hi' }],
           source: { kind: 'plugin', plugin: 'test' },
         }),
-        {
-          role: 'assistant',
+        createAssistantMessage({
           content: [
             { type: 'text', text: 'a' },
             { type: 'reasoning', text: 'think' },
@@ -406,13 +410,14 @@ describe('parse, serialize, and resolveRoutes', () => {
             { type: 'tool-result', toolCallId: 'c1' as never, content: [{ type: 'text', text: 'out' }] },
             { type: 'unknown' } as unknown as ContentBlock,
           ],
-        },
+          source: { provider: 'test', model: 'test' },
+        }),
         {
           role: 'user',
           content: [{ type: 'text', text: 'tool out' }],
           source: { kind: 'tool', callId: 'c1' as never },
         } as never,
-        { role: 'system' as never, content: [{ type: 'text', text: 'fallback' }] },
+        { role: 'system' as never, content: [{ type: 'text', text: 'fallback' }] } as never,
       ],
     })).toContain('sys')
     expect(serializePrompt({
@@ -450,20 +455,15 @@ describe('parse, serialize, and resolveRoutes', () => {
   it('rejects empty model ids, missing promptArg, missing effortArg, and unknown effortStyle', () => {
     expect(() => buildCliArgv(SHIPPED_ROUTES['grok-cli'], { model: '', prompt: 'q' }))
       .toThrow(LlmError)
-    expect(() => buildCliArgv({
-      ...SHIPPED_ROUTES['grok-cli'],
-      promptStyle: 'flag',
-      promptArg: undefined,
-    }, { model: 'grok-4', prompt: 'q' })).toThrow('promptArg')
-    expect(() => effortFlags({
-      ...SHIPPED_ROUTES['grok-cli'],
-      effortStyle: 'flag',
-      effortArg: undefined,
-    }, 'high')).toThrow('effortArg')
-    expect(effortFlags({
-      ...SHIPPED_ROUTES['codex-cli'],
-      effortArg: undefined,
-    }, 'high')).toEqual(['-c', 'model_reasoning_effort=high'])
+    const grokFlag = { ...SHIPPED_ROUTES['grok-cli'], promptStyle: 'flag' as const }
+    delete grokFlag.promptArg
+    expect(() => buildCliArgv(grokFlag, { model: 'grok-4', prompt: 'q' })).toThrow('promptArg')
+    const grokEffort = { ...SHIPPED_ROUTES['grok-cli'], effortStyle: 'flag' as const }
+    delete grokEffort.effortArg
+    expect(() => effortFlags(grokEffort, 'high')).toThrow('effortArg')
+    const codexEffort = { ...SHIPPED_ROUTES['codex-cli'] }
+    delete codexEffort.effortArg
+    expect(effortFlags(codexEffort, 'high')).toEqual(['-c', 'model_reasoning_effort=high'])
     expect(() => effortFlags({
       ...SHIPPED_ROUTES['grok-cli'],
       effortStyle: 'nope' as never,
@@ -594,10 +594,9 @@ describe('plugin registration', () => {
 describe('resolveRouteEnv', () => {
   it('returns the route overlay when no credential is named', async () => {
     const ctx = new Context()
-    await expect(plugin.resolveRouteEnv(ctx, {
-      ...SHIPPED_ROUTES['grok-cli'],
-      apiKeyEnv: undefined,
-    })).resolves.toEqual({})
+    const unnamed = { ...SHIPPED_ROUTES['grok-cli'] }
+    delete unnamed.apiKeyEnv
+    await expect(plugin.resolveRouteEnv(ctx, unnamed)).resolves.toEqual({})
     await expect(plugin.resolveRouteEnv(ctx, {
       ...SHIPPED_ROUTES['grok-cli'],
       apiKeyEnv: '',

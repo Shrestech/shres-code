@@ -13,7 +13,7 @@ import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
 import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
 import type { TodoDockProps } from '../src/client/skeleton/TodoPanel.tsx'
 import { TodoDock, TodoPanel, todoDockEntry } from '../src/client/skeleton/TodoPanel.tsx'
-import { NS } from '../src/client/locales.ts'
+import { en, NS } from '../src/client/locales.ts'
 
 // Mirrors the real lookup chain (conversation namespace, then common).
 const t: TodoDockProps['t'] = makeTranslate(en, commonEn)

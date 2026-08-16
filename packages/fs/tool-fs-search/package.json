@@ -36,8 +36,10 @@
     "@roos-code/schemastery": "workspace:^"
   },
   "peerDependencies": {
+    "@roos-code/roos-code-home-paths": "workspace:^",
     "@roos-code/roos-code-invariants": "workspace:^",
     "@roos-code/roos-code-llm": "workspace:^",
+    "@roos-code/roos-code-sandbox-policy": "workspace:^",
     "@roos-code/roos-code-output-retention": "workspace:^",
     "@roos-code/roos-code-session": "workspace:^",
     "@roos-code/roos-code-spill": "workspace:^",
@@ -48,6 +50,8 @@
     "@roos-code/cordis": "workspace:^"
   },
   "devDependencies": {
+    "@roos-code/roos-code-home-paths": "workspace:^",
+    "@roos-code/roos-code-sandbox-policy": "workspace:^",
     "@roos-code/roos-code-agent": "workspace:^",
     "@roos-code/roos-code-subprocess": "workspace:^",
     "@roos-code/roos-code-subprocess-local": "workspace:^",

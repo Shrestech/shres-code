@@ -32,7 +32,7 @@ import { en as conversationEn } from '@roos-code/roos-code-client-ui-conversatio
 import { apply as localeApply, inject as localeInject } from '@roos-code/roos-code-client-locale/client'
 import { stubSettingsScope } from '@roos-code/roos-code-client-test-runtime'
 import type { LocaleKeysOf } from '@roos-code/roos-code-client-ui-slots'
-import { type TrajectoryKey } from '../src/client/locales.ts'
+import { en, type TrajectoryKey } from '../src/client/locales.ts'
 import { apply, inject } from '@roos-code/roos-code-client-ui-trajectory/client'
 import { apply as nodeApply } from '@roos-code/roos-code-client-ui-trajectory'
 import type { TrajectoryTurnModel } from '../src/client/layout.ts'

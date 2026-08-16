@@ -1,7 +1,5 @@
 # @roos-code/roos-code-subagent-grok-cli
 
-English | [中文](README.zh.md)
-
 This package registers the fixed `grok-cli` subagent provider. Each accepted run starts the official Grok Build `grok -p` command in the delegating Session's workspace, submits one self-contained text task, and returns only the final answer through the shared [`roos-subagent`](../subagent/README.md) result contract.
 
 Headless flags, JSON parse mode, auth, and effort mapping are recorded in the [Grok CLI spike](../../../.agents/notes/implemented/architecture/2026-08-16-grok-cli-headless-spike.md).

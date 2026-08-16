@@ -6,6 +6,7 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { Context } from '@roos-code/cordis'
 import LlmRuntime, { createUserMessage } from '@roos-code/roos-code-llm'
+import { SessionId } from '@roos-code/roos-code-session'
 import LocalSubprocessRuntime from '@roos-code/roos-code-subprocess-local'
 import * as plugin from '../src/index.ts'
 import { SHIPPED_ROUTES, type ShippedRouteId } from '../src/config.ts'
@@ -34,12 +35,17 @@ describe('llm-cli-bridge real CLI', () => {
     const ctx = new Context()
     await ctx.plugin(LlmRuntime)
     await ctx.plugin(LocalSubprocessRuntime)
+    const sessionId = SessionId('cli-bridge-e2e')
+    ctx.provide('sessions' as never, {
+      get: () => ({ header: { cwd: process.cwd() } }),
+    })
     await ctx.plugin(plugin, {})
     const model = SHIPPED_ROUTES[route].models[0]?.id ?? 'default'
     const chunks: string[] = []
     for await (const chunk of ctx.llm.stream({
       provider: route,
       model,
+      sessionId,
       messages: [createUserMessage({
         content: [{ type: 'text', text: 'Reply with the single word ok and nothing else.' }],
         source: { kind: 'plugin', plugin: 'test' },

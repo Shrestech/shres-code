@@ -2,7 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-08-16-host-plugin-activation-approval.zh.md)
 
 ## Problem
 

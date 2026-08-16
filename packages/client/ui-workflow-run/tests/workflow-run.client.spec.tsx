@@ -296,7 +296,7 @@ function panelProps(data: WorkflowRunChatData, sessions = listState(), openSessi
     loadImage: () => Promise.reject(new Error('unused')),
     fileMentions: () => undefined,
     openSession,
-    t: makeTranslate(zh),
+    t: makeTranslate(en),
   }
 }
 
@@ -475,7 +475,7 @@ describe('WorkflowRunPanel', () => {
       })],
     }
     const mixedView = render(<WorkflowRunPanel {...panelProps(mixed)} />)
-    expect(screen.getByText('Failed 1 · cancelled 1')).toBeTruthy()
+    expect(screen.getByText('Failed 1 · Cancelled 1')).toBeTruthy()
     expect([...mixedView.container.querySelectorAll('[data-member-status]')]
       .map(row => row.getAttribute('data-member-status'))).toEqual(['failed', 'cancelled'])
     expect(mixedView.container.querySelectorAll('[data-state="error"]')).toHaveLength(2)
@@ -491,7 +491,7 @@ describe('WorkflowRunPanel', () => {
         ],
       })],
     })} />)
-    expect(screen.getByText('Completed 1 · interrupted 1')).toBeTruthy()
+    expect(screen.getByText('Completed 1 · Interrupted 1')).toBeTruthy()
     expect(interruptedView.container.querySelector('[data-run-status="interrupted"]')).toBeTruthy()
     expect(interruptedView.container.querySelectorAll('[data-state="warning"]')).toHaveLength(2)
   })

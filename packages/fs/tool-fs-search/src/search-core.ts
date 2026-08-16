@@ -19,9 +19,11 @@
  * @module @roos-code/roos-code-tool-fs-search/search-core
  */
 
-import { isAbsolute, relative, sep } from 'node:path'
+import { basename, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type { Context } from '@roos-code/cordis'
+import { resolveRoosHome } from '@roos-code/roos-code-home-paths'
 import { HarnessError } from '@roos-code/roos-code-llm'
+import type { SandboxPolicyService } from '@roos-code/roos-code-sandbox-policy'
 import { ItemRetainer, TextRetainer } from '@roos-code/roos-code-output-retention'
 import type { RetainedItems } from '@roos-code/roos-code-output-retention'
 import type { SubprocessHandle, SubprocessOutcome, SubprocessOutputRead, SubprocessSpawnSpec } from '@roos-code/roos-code-subprocess'
@@ -208,6 +210,49 @@ export function resolveRgPath(): Promise<string> {
  * @param stderrMaxBytes - cap on the retained stderr diagnostic tail.
  * @returns the complete stdout, the zero-result flag, and the resolved workdir.
  */
+const CREDENTIALS_BASENAME_SUFFIX = '.credentials.yaml'
+
+function isPathInside(target: string, root: string): boolean {
+  const rel = relative(root, target)
+  return rel === '' || (!rel.startsWith(`..${sep}`) && rel !== '..' && !isAbsolute(rel))
+}
+
+/**
+ * Reject a model-supplied search root that would read a credential document
+ * or, under a confined session, walk outside the workspace. Omitted `path`
+ * searches the session cwd and is allowed.
+ * @param ctx - context that may carry `sandboxPolicy`.
+ * @param exec - tool execution; supplies the session cwd and workspace.
+ * @param toolName - `glob` or `grep`, used in error messages.
+ * @param searchPath - model `path` argument, or undefined to search the cwd.
+ */
+export function fenceSearchPath(
+  ctx: Context,
+  exec: ToolExecution,
+  toolName: string,
+  searchPath: string | undefined,
+): void {
+  const workdir = exec.agent?.session.header.cwd ?? process.cwd()
+  const target = resolve(workdir, searchPath ?? '.')
+  if (basename(target).toLowerCase().endsWith(CREDENTIALS_BASENAME_SUFFIX)) {
+    throw new SearchError(`${toolName} cannot search a credentials document`, 'SEARCH_FAILED')
+  }
+  const homeDoc = join(resolveRoosHome(), '.credentials.yaml')
+  if (target === homeDoc || isPathInside(target, homeDoc)) {
+    throw new SearchError(`${toolName} cannot search a credentials document`, 'SEARCH_FAILED')
+  }
+  const policy = (ctx.get('sandboxPolicy') as SandboxPolicyService | undefined)
+    ?.resolve({ ...exec.agent === undefined ? {} : { session: exec.agent.session } })
+  if (policy !== undefined && policy.mode !== 'danger-full-access') {
+    if (!isPathInside(target, policy.workspaceRoot) && !isPathInside(target, workdir)) {
+      throw new SearchError(
+        `${toolName} cannot search outside the workspace under ${policy.mode} mode`,
+        'SEARCH_FAILED',
+      )
+    }
+  }
+}
+
 export async function runRipgrep(
   ctx: Context,
   exec: ToolExecution,
