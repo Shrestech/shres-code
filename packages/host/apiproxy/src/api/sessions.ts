@@ -134,6 +134,11 @@ export interface ModelProviderGroup {
   id: string
   /** Provider display name. */
   name: string
+  /**
+   * When `delegated`, the route runs an external CLI whose own tools
+   * bypass harness approval. Selectors must show that fact.
+   */
+  kind?: 'delegated'
   /** Models in provider-preferred order. */
   models: ModelCatalogModel[]
 }

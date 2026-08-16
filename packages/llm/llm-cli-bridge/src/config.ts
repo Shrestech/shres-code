@@ -108,6 +108,27 @@ export const SHIPPED_ROUTE_IDS = ['claude-cli', 'codex-cli', 'grok-cli', 'kimi-c
 /** One shipped route id. */
 export type ShippedRouteId = (typeof SHIPPED_ROUTE_IDS)[number]
 
+/**
+ * Blank template for a hand-declared extra route. Overlays must opt into
+ * yolo flags and `allowDelegatedTools`.
+ */
+export const CUSTOM_ROUTE_TEMPLATE: CliBridgeRoute = {
+  displayName: '',
+  binary: '',
+  modelArg: '--model',
+  effortStyle: 'flag',
+  efforts: [],
+  extraArgs: [],
+  promptStyle: 'flag',
+  promptArg: '-p',
+  parseMode: 'json',
+  env: {},
+  allowDelegatedTools: false,
+  contextWindow: DEFAULT_CONTEXT_WINDOW,
+  defaultMaxTokens: DEFAULT_MAX_TOKENS,
+  models: [],
+}
+
 /** Built-in defaults for the four shipped CLI routes. */
 export const SHIPPED_ROUTES: Record<ShippedRouteId, CliBridgeRoute> = {
   'claude-cli': {
@@ -197,10 +218,9 @@ export function resolveRoutes(
         throw new Error(`llm-cli-bridge: route "${id}" needs displayName and binary`)
       }
       resolved.set(id, mergeRoute({
-        ...SHIPPED_ROUTES['grok-cli'],
+        ...CUSTOM_ROUTE_TEMPLATE,
         displayName: partial.displayName,
         binary: partial.binary,
-        models: [],
       }, partial))
     }
   }

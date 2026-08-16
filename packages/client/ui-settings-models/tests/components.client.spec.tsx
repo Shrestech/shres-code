@@ -232,6 +232,101 @@ describe('ModelsSection', () => {
     expect(document.body.textContent).toBe('')
   })
 
+  it('shows a stock delegated route with a Delegated tag and writes route env', async () => {
+    const scripted = scriptedFace()
+    const namespaces: SettingsNamespaceView[] = [
+      ...wireNamespaces(),
+      {
+        ns: 'llm-cli-bridge',
+        schema: JSON.parse(JSON.stringify(Schema.object({
+          routes: Schema.dict(Schema.object({
+            displayName: Schema.string(),
+            binary: Schema.string(),
+            env: Schema.dict(Schema.string()),
+          })),
+          disposeGraceMs: Schema.number(),
+        }).toJSON())) as unknown,
+        value: {},
+        applies: 'live',
+        secrets: [],
+        revision: 0,
+      },
+    ]
+    scripted.face.llm.providers.mockImplementation(() => Promise.resolve(ok({
+      providers: [
+        {
+          provider: 'grok-cli',
+          displayName: 'Grok Build CLI (delegated)',
+          settingsNs: 'llm-cli-bridge',
+          settingsPath: ['routes', 'grok-cli'],
+          active: true,
+          kind: 'delegated',
+        },
+      ],
+    })))
+    scripted.face.settings.describe.mockImplementation(() => Promise.resolve(ok({
+      writable: true, hasDocument: false, namespaces,
+    })))
+    scripted.mutate.mockImplementation(() => Promise.resolve(ok(namespaces[3])))
+    const { controller } = await mountFace(scripted)
+    expect(screen.getByText('Grok Build CLI (delegated)')).toBeTruthy()
+    expect(screen.getByText(en.delegatedTag)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', {
+      name: providerCopy(en.editProvider, {
+        provider: 'grok-cli',
+        displayName: 'Grok Build CLI (delegated)',
+      }),
+    }))
+    expect(screen.getByLabelText(en.cliEnv)).toBeTruthy()
+    fireEvent.change(screen.getByLabelText(en.cliEnvValue), { target: { value: 'xai-key' } })
+    fireEvent.change(screen.getByLabelText(en.cliEnvValue), { target: { value: '' } })
+    fireEvent.change(screen.getByLabelText(en.cliEnvValue), { target: { value: 'xai-key' } })
+    fireEvent.change(screen.getByLabelText(en.cliEnv), { target: { value: 'CUSTOM_KEY' } })
+    fireEvent.change(screen.getByLabelText(en.cliBinary), { target: { value: '/usr/bin/grok' } })
+    fireEvent.click(screen.getByRole('button', { name: en.apply }))
+    await waitFor(() => {
+      expect(scripted.mutate).toHaveBeenCalled()
+    })
+    const payload = scripted.mutate.mock.calls[0]![0] as { ops: { path: string[]; value?: unknown }[] }
+    expect(payload.ops).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        path: ['routes', 'grok-cli', 'env'],
+        value: { CUSTOM_KEY: 'xai-key' },
+      }),
+      expect.objectContaining({
+        path: ['routes', 'grok-cli', 'binary'],
+        value: '/usr/bin/grok',
+      }),
+    ]))
+
+    for (const entry of [
+      { provider: 'kimi-cli', displayName: 'Kimi', key: 'MOONSHOT_API_KEY' },
+      { provider: 'claude-cli', displayName: 'Claude', key: 'ANTHROPIC_API_KEY' },
+      { provider: 'codex-cli', displayName: 'Codex', key: 'OPENAI_API_KEY' },
+      { provider: 'extra-cli', displayName: 'Extra', key: 'API_KEY' },
+    ]) {
+      scripted.face.llm.providers.mockImplementation(() => Promise.resolve(ok({
+        providers: [{
+          provider: entry.provider,
+          displayName: entry.displayName,
+          settingsNs: 'llm-cli-bridge',
+          settingsPath: ['routes', entry.provider],
+          active: true,
+          kind: 'delegated',
+        }],
+      })))
+      await controller.load()
+      fireEvent.click(await screen.findByRole('button', {
+        name: providerCopy(en.editProvider, {
+          provider: entry.provider,
+          displayName: entry.displayName,
+        }),
+      }))
+      expect((screen.getByLabelText(en.cliEnv) as HTMLInputElement).placeholder).toBe(entry.key)
+      fireEvent.click(screen.getByRole('button', { name: en.cancel }))
+    }
+  })
+
   it('renders the unkeyed whole-section provider as an open setup card in the first-run posture', async () => {
     await mountFirstRun()
     // Nothing is reachable yet, and DeepSeek has no configured credential and

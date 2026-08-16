@@ -217,12 +217,15 @@ function userDefaultModelOf(namespaces: ReadonlyMap<string, SettingsNamespaceVie
  * profile names is stored. A profile naming no reference authenticates through
  * the provider's own path (the Bedrock chain, Vertex ADC, a gateway that needs
  * nothing), as does a live route with no settings address at all, so neither
- * owes this page a key.
+ * owes this page a key. Delegated CLI routes are keyless in this join — their
+ * keys live in `route.env` after the subprocess scrub — so they never count
+ * as ready here.
  * @param row - one joined provider row.
  * @returns whether the user already has this provider to talk to.
  */
 export function providerUsable(row: ProviderRow): boolean {
   if (!row.entry.active) return false
+  if (row.entry.kind === 'delegated') return false
   if (row.apiKeyEnv === undefined) return true
   return row.credential?.configured === true
 }
@@ -230,7 +233,8 @@ export function providerUsable(row: ProviderRow): boolean {
 /**
  * Whether a usable row ends first-run onboarding. Local Ollama is keyless and
  * always composed, so it does not count until the user picks it — otherwise
- * the card would never appear on a machine without a cloud key.
+ * the card would never appear on a machine without a cloud key. Delegated
+ * CLI routes are excluded by {@link providerUsable}.
  * @param row - one joined provider row.
  * @returns whether this row already satisfies first-run.
  */

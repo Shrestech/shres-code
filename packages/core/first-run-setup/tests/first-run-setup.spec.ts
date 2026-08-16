@@ -5,7 +5,8 @@ import type { IncomingMessage, Server, ServerResponse } from 'node:http'
 import { PassThrough } from 'node:stream'
 import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@roos-code/cordis'
-import LlmRuntime from '@roos-code/roos-code-llm'
+import LlmRuntime, { LlmAdapter } from '@roos-code/roos-code-llm'
+import type { GenerateOptions, StreamChunk } from '@roos-code/roos-code-llm'
 import * as LlmPiAi from '@roos-code/roos-code-llm-pi-ai'
 import AgentDefaultModelConfig from '@roos-code/roos-code-agent-default-model'
 import { credentialRef } from '@roos-code/roos-code-credentials'
@@ -183,6 +184,35 @@ describe('readiness', () => {
     await ctx.credentials.set(credentialRef('DEEPSEEK_API_KEY'), 'sk')
     expect(await isDefaultUsable(ctx, { reachable: false, models: [] })).toBe(true)
     await ctx.fiber.dispose()
+  })
+
+  it('does not treat a delegated CLI default as usable', async () => {
+    class DelegatedAdapter extends LlmAdapter {
+      override providerInfo(provider: string) {
+        return { id: provider, name: provider, kind: 'delegated' as const }
+      }
+
+      async * stream(_options: GenerateOptions): AsyncIterable<StreamChunk> {
+        throw new Error('unused')
+      }
+    }
+
+    const ctx = await boot({ defaultProvider: 'grok-cli', defaultModel: 'grok-4' })
+    ctx.llm.registerConfigurableProviders([{
+      provider: 'grok-cli',
+      displayName: 'Grok',
+      settingsNs: 'llm-cli-bridge',
+      settingsPath: ['routes', 'grok-cli'],
+      kind: 'delegated',
+    }])
+    ctx.llm.registerAdapter(['grok-cli'], new DelegatedAdapter())
+    expect(await isDefaultUsable(ctx, { reachable: false, models: [] })).toBe(false)
+    await ctx.fiber.dispose()
+
+    const liveOnly = await boot({ defaultProvider: 'orphan-cli', defaultModel: 'x' })
+    liveOnly.llm.registerAdapter(['orphan-cli'], new DelegatedAdapter())
+    expect(await isDefaultUsable(liveOnly, { reachable: false, models: [] })).toBe(false)
+    await liveOnly.fiber.dispose()
   })
 
   it('treats an ollama-local default as usable only while the probe succeeds', async () => {

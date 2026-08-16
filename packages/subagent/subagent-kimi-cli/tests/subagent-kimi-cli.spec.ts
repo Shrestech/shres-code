@@ -101,6 +101,7 @@ describe('textTask and parseKimiStreamJson', () => {
     expect(() => parseKimiStreamJson('')).toThrow('no output')
     expect(() => parseKimiStreamJson('not-json\nstill-not')).toThrow('no answer')
     expect(() => parseKimiStreamJson('{"type":"error","message":"auth"}')).toThrow('no answer')
+    expect(parseKimiStreamJson('{"foo":1}\n\n{"result":"ok"}')).toBe('ok')
   })
 
   it('builds the fixed headless argv', () => {
@@ -126,6 +127,23 @@ describe('startKimiCliRun', () => {
     expect(spec.cwd).toBe(process.cwd())
     await run.dispose()
     expect(child.terminate).toHaveBeenCalled()
+  })
+
+  it('disposes a pid-less child and treats missing stdout as empty', async () => {
+    const missing = fakeChild()
+    missing.handle.collected = { stdout: undefined }
+    const missingRun = await startKimiCliRun(request(), runSpec(missing))
+    await expect(missingRun.result).resolves.toMatchObject({ stopReason: 'error' })
+    await missingRun.dispose()
+
+    const child = fakeChild({ stdout: '' })
+    child.handle.pid = 0
+    child.handle.collected = { stdout: undefined }
+    child.handle.done = Promise.reject(new Error('already gone'))
+    void child.handle.done.catch(() => undefined)
+    const run = await startKimiCliRun(request(), runSpec(child))
+    await expect(run.result).resolves.toMatchObject({ stopReason: 'error' })
+    await run.dispose()
   })
 
   it('maps a non-zero exit to a structured error, not success', async () => {
@@ -220,6 +238,30 @@ describe('Kimi CLI provider registration', () => {
     spawn.mockImplementation(() => child.handle)
     const run = await ctx.subagents.start('kimi-cli', request())
     expect(spawn.mock.calls[0]![0].argv[0]).toBe('/opt/kimi')
+    await run.dispose()
+    await ctx.fiber.dispose()
+  })
+
+  it('resolves the executable from PATH and logs a child failure', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SubagentRuntime)
+    await ctx.plugin(LocalSubprocessRuntime)
+    const spawn = vi.spyOn(ctx.subprocess, 'spawn')
+    const resolveExecutable = vi.spyOn(ctx.subprocess, 'resolveExecutable')
+      .mockResolvedValue('/resolved/kimi')
+    const warn = vi.spyOn(ctx.logger, 'warn')
+    await ctx.plugin(kimi, {})
+    const child = fakeChild({
+      stdout: '',
+      outcome: { exitCode: 2, signal: null },
+    })
+    child.handle.collected = { stdout: undefined }
+    spawn.mockImplementation(() => child.handle)
+    const run = await ctx.subagents.start('kimi-cli', request())
+    expect(resolveExecutable).toHaveBeenCalled()
+    await expect(run.result).resolves.toMatchObject({ stopReason: 'error' })
+    expect(warn).toHaveBeenCalled()
+    child.handle.pid = 0
     await run.dispose()
     await ctx.fiber.dispose()
   })

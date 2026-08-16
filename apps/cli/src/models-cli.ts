@@ -302,8 +302,10 @@ function effortSuffix(effort: string | undefined): string {
 
 async function providerUsable(ctx: Context, provider: string): Promise<boolean> {
   const entry = ctx.llm.listConfigurableProviders().find(candidate => candidate.provider === provider)
+  const live = ctx.llm.listProviders().find(candidate => candidate.id === provider)
+  if (entry?.kind === 'delegated' || live?.kind === 'delegated') return false
   const apiKeyEnv = apiKeyEnvOf(ctx, entry?.settingsNs, entry?.settingsPath)
-  if (apiKeyEnv === undefined) return ctx.llm.listProviders().some(live => live.id === provider)
+  if (apiKeyEnv === undefined) return live !== undefined
   const info = await ctx.credentials.describe(credentialRef(apiKeyEnv))
   return info.configured
 }

@@ -38,7 +38,7 @@ import type { en } from './locales.ts'
 import styles from './ModelsSection.module.css'
 
 /** Per-adapter-family curated field sets (unknown namespaces get the hint alone). */
-type EditorLayout = 'deepseek' | 'pi-ai' | 'unknown'
+type EditorLayout = 'deepseek' | 'pi-ai' | 'cli-bridge' | 'unknown'
 
 /** The public DeepSeek endpoint shown as the deepseek base-URL placeholder. */
 const DEEPSEEK_PUBLIC_BASE_URL = 'https://api.deepseek.com'
@@ -125,7 +125,24 @@ export function pathOps(
 function layoutOf(ns: string): EditorLayout {
   if (ns === 'llm-deepseek') return 'deepseek'
   if (ns === 'llm-pi-ai') return 'pi-ai'
+  if (ns === 'llm-cli-bridge') return 'cli-bridge'
   return 'unknown'
+}
+
+/** Conventional env key a shipped CLI route forwards after the subprocess scrub. */
+function defaultCliEnvKey(provider: string): string {
+  switch (provider) {
+    case 'grok-cli':
+      return 'XAI_API_KEY'
+    case 'kimi-cli':
+      return 'MOONSHOT_API_KEY'
+    case 'claude-cli':
+      return 'ANTHROPIC_API_KEY'
+    case 'codex-cli':
+      return 'OPENAI_API_KEY'
+    default:
+      return 'API_KEY'
+  }
 }
 
 /** The credential reference this profile resolves keys through. */
@@ -467,6 +484,66 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
     )
   }
 
+  const cliBridgeFields = (): ReactNode => {
+    const envRecord = (): Record<string, string> => {
+      const value = getPath(draft, ['env']) ?? getPath(fallback, ['env'])
+      if (typeof value !== 'object' || value === null || Array.isArray(value)) return {}
+      return value as Record<string, string>
+    }
+    const env = envRecord()
+    const entries = Object.entries(env)
+    const [envName, envValue] = entries[0] ?? [defaultCliEnvKey(props.provider), '']
+    const setEnv = (name: string, value: string): void => {
+      const key = name.trim()
+      setDraft((current) => {
+        if (key.length === 0 || value.length === 0) return deletePath(current, ['env'])
+        return setPath(current, ['env'], { [key]: value })
+      })
+    }
+    return (
+      <>
+        <p className={styles['advancedHint']}>{t('delegatedHint')}</p>
+        <div className={styles['field']}>
+          <span className={styles['fieldLabel']}>{t('cliBinary')}</span>
+          <input
+            className={styles['input']}
+            type="text"
+            value={stringAt(draft, 'binary') ?? ''}
+            placeholder={stringAt(fallback, 'binary') ?? props.provider}
+            aria-label={t('cliBinary')}
+            disabled={disabled}
+            onChange={(event) => { setField('binary', event.target.value) }}
+          />
+        </div>
+        <div className={styles['field']}>
+          <span className={styles['fieldLabel']}>{t('cliEnv')}</span>
+          <input
+            className={styles['input']}
+            type="text"
+            value={envName}
+            placeholder={defaultCliEnvKey(props.provider)}
+            aria-label={t('cliEnv')}
+            disabled={disabled}
+            onChange={(event) => { setEnv(event.target.value, envValue) }}
+          />
+        </div>
+        <div className={styles['field']}>
+          <span className={styles['fieldLabel']}>{t('cliEnvValue')}</span>
+          <input
+            className={styles['input']}
+            type="password"
+            autoComplete="off"
+            value={hasPath(draft, ['env']) ? envValue : ''}
+            placeholder={t('cliEnvHint')}
+            aria-label={t('cliEnvValue')}
+            disabled={disabled}
+            onChange={(event) => { setEnv(envName, event.target.value) }}
+          />
+        </div>
+      </>
+    )
+  }
+
   return (
     <div className={props.credentialOnly === true ? styles['addBlock'] : styles['editor']}>
       {props.hideTitle === true
@@ -481,7 +558,9 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
         )}
       {layout === 'unknown'
         ? <p className={styles['advancedHint']}>{`${t('advancedHint')} (${namespace.ns})`}</p>
-        : curatedFields(layout)}
+        : layout === 'cli-bridge'
+          ? cliBridgeFields()
+          : curatedFields(layout)}
       {failure !== undefined ? <p className={styles['error']}>{failure}</p> : null}
       {props.credentialOnly === true || modelFailure === undefined
         ? null
@@ -494,8 +573,8 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
         t={t}
         busy={busy}
         submitDisabled={disabled || layout === 'unknown'
-          || (props.credentialOnly !== true && modelFailure !== undefined)
-          || shownKeyFailure !== undefined
+          || (props.credentialOnly !== true && layout !== 'cli-bridge' && modelFailure !== undefined)
+          || (layout !== 'cli-bridge' && shownKeyFailure !== undefined)
           || (props.credentialRequired === true && keyValue.length === 0)}
         submitLabel={props.submitLabel ?? 'apply'}
         submitBusyLabel={props.submitBusyLabel ?? 'applying'}

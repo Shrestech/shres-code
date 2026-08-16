@@ -101,6 +101,7 @@ describe('textTask and parseGrokJson', () => {
     expect(() => parseGrokJson('')).toThrow('no output')
     expect(() => parseGrokJson('not-json')).toThrow('was not JSON')
     expect(() => parseGrokJson('{"is_error":true,"result":"no"}')).toThrow('no answer')
+    expect(() => parseGrokJson('{"type":"error","message":"auth"}')).toThrow('no answer')
     expect(() => parseGrokJson('{}')).toThrow('no answer')
   })
 
@@ -127,6 +128,23 @@ describe('startGrokCliRun', () => {
     expect(spec.cwd).toBe(process.cwd())
     await run.dispose()
     expect(child.terminate).toHaveBeenCalled()
+  })
+
+  it('disposes a pid-less child and treats missing stdout as empty', async () => {
+    const missing = fakeChild()
+    missing.handle.collected = { stdout: undefined }
+    const missingRun = await startGrokCliRun(request(), runSpec(missing))
+    await expect(missingRun.result).resolves.toMatchObject({ stopReason: 'error' })
+    await missingRun.dispose()
+
+    const child = fakeChild({ stdout: '' })
+    child.handle.pid = 0
+    child.handle.collected = { stdout: undefined }
+    child.handle.done = Promise.reject(new Error('already gone'))
+    void child.handle.done.catch(() => undefined)
+    const run = await startGrokCliRun(request(), runSpec(child))
+    await expect(run.result).resolves.toMatchObject({ stopReason: 'error' })
+    await run.dispose()
   })
 
   it('maps a non-zero exit to a structured error, not success', async () => {
@@ -221,6 +239,30 @@ describe('Grok CLI provider registration', () => {
     spawn.mockImplementation(() => child.handle)
     const run = await ctx.subagents.start('grok-cli', request())
     expect(spawn.mock.calls[0]![0].argv[0]).toBe('/opt/grok')
+    await run.dispose()
+    await ctx.fiber.dispose()
+  })
+
+  it('resolves the executable from PATH and logs a child failure', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SubagentRuntime)
+    await ctx.plugin(LocalSubprocessRuntime)
+    const spawn = vi.spyOn(ctx.subprocess, 'spawn')
+    const resolveExecutable = vi.spyOn(ctx.subprocess, 'resolveExecutable')
+      .mockResolvedValue('/resolved/grok')
+    const warn = vi.spyOn(ctx.logger, 'warn')
+    await ctx.plugin(grok, {})
+    const child = fakeChild({
+      stdout: '',
+      outcome: { exitCode: 2, signal: null },
+    })
+    child.handle.collected = { stdout: undefined }
+    spawn.mockImplementation(() => child.handle)
+    const run = await ctx.subagents.start('grok-cli', request())
+    expect(resolveExecutable).toHaveBeenCalled()
+    await expect(run.result).resolves.toMatchObject({ stopReason: 'error' })
+    expect(warn).toHaveBeenCalled()
+    child.handle.pid = 0
     await run.dispose()
     await ctx.fiber.dispose()
   })

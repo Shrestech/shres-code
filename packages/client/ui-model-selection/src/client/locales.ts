@@ -27,6 +27,8 @@ export const zh = {
   'empty.models': '没有可用的模型。',
   'blocked.composer': '当前模型不可用，请先选择模型',
   'empty.efforts': '当前模型未提供推理等级。',
+  'delegated.tag': '委派',
+  'delegated.hint': '该路由运行外部 CLI。该 CLI 可调用自带工具，而不经过 Roos Code 审批。',
 } satisfies Record<string, string>
 
 /** The model namespace key union. */
@@ -51,4 +53,6 @@ export const en = {
   'empty.models': 'No models available.',
   'blocked.composer': 'This model is unavailable — select one to continue',
   'empty.efforts': 'This model provides no reasoning effort levels.',
+  'delegated.tag': 'Delegated',
+  'delegated.hint': 'This route runs an external CLI. That CLI may call its own tools without Roos Code approval.',
 } satisfies Record<ModelKey, string>

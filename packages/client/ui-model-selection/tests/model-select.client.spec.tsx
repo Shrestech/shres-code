@@ -82,6 +82,30 @@ describe('ModelSelect reasoning effort', () => {
     })
   })
 
+  it('marks a delegated provider group in the session picker', () => {
+    const directory = createSnapshotStore(state({
+      current: { provider: 'grok-cli', model: 'grok-4' },
+      groups: [{
+        id: 'grok-cli',
+        name: 'Grok Build CLI (delegated)',
+        kind: 'delegated',
+        models: [{ id: 'grok-4', name: 'Grok 4' }],
+      }],
+    }))
+    render(<ModelSelect
+      locked={false}
+      available
+      directory={directory}
+      load={vi.fn()}
+      select={vi.fn().mockResolvedValue(true)}
+      t={t}
+    />)
+    fireEvent.click(screen.getByRole('button', { name: '选择模型，当前 Grok 4' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /模型/ }))
+    expect(screen.getByText('委派')).toBeTruthy()
+    expect(screen.getByTitle(zh['delegated.hint'])).toBeTruthy()
+  })
+
   it('offers provider default only when the adapter does not configure a model default', () => {
     const directory = createSnapshotStore(state({
       groups: [{

@@ -262,8 +262,9 @@ function Loaded({ injected }: { injected: ModelsSectionInjected }): ReactNode {
   // One fact decides both first-run postures on this page and the onboarding
   // step: whether the user already has a provider to talk to.
   const anyUsable = state.rows.some(providerUsable)
-  const configured = state.rows.filter(row => row.configured)
-  const addable = state.rows.filter(row => !row.configured && row.entry.settingsNs !== '')
+  const listed = state.rows.filter(row => row.configured || row.entry.kind === 'delegated')
+  const addable = state.rows.filter(row =>
+    !row.configured && row.entry.settingsNs !== '' && row.entry.kind !== 'delegated')
   const addTarget = adding ? editing : undefined
   const addNamespace = addTarget === undefined ? undefined : state.namespaces.get(addTarget.settingsNs)
   // Hand-declared routes live in the pi-ai namespace, which is also the only
@@ -284,7 +285,7 @@ function Loaded({ injected }: { injected: ModelsSectionInjected }): ReactNode {
           </p>
         )}
       <ul className={styles['rows']}>
-        {configured.map((row) => {
+        {listed.map((row) => {
           const target = targetOf(row)
           const namespace = state.namespaces.get(target.settingsNs)
           /* v8 ignore next -- the join marks a row configured only when its namespace resolved */

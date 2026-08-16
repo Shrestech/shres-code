@@ -358,6 +358,7 @@ async function buildModelCatalog(ctx: Context): Promise<{
       const group: ModelProviderGroup = {
         id: provider.id,
         name: provider.name,
+        ...provider.kind === 'delegated' ? { kind: 'delegated' as const } : {},
         models: entries,
       }
       return { kind: 'group' as const, group }

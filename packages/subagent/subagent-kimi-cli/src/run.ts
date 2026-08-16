@@ -89,7 +89,9 @@ export function kimiHeadlessArgv(executable: string, prompt: string): string[] {
  */
 export async function disposeKimiChild(child: SubprocessHandle): Promise<void> {
   if (child.pid <= 0) {
-    await child.done.catch(() => {})
+    await child.done.catch(function alreadySettledOrKilled() {
+      // Teardown after the owner already settled or killed the child.
+    })
     return
   }
   child.terminate()

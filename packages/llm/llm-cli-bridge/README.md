@@ -45,3 +45,5 @@ Independent of harness HTTP request cache. There is no provider replay state.
 - **No HTTP attribution** — the child CLI owns its User-Agent.
 - **No live token streaming** — the adapter emits the final text as one delta after the process exits.
 - **Host-managed binaries** — a missing `grok` / `kimi` / `claude` / `codex` is a spawn error.
+- **Keyless delegated routes do not complete first-run** — `kind: 'delegated'` is not usable for onboarding, same as composed local Ollama.
+- **Spawn cwd is the session workspace** — `stream()` fails if the request has no session header cwd.

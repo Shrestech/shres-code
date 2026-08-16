@@ -65,6 +65,21 @@ describe('providerUsable', () => {
   it('treats a reference-free registered route as provider-native authentication', () => {
     expect(providerUsable(otherRow({ apiKeyEnv: undefined, credential: undefined }))).toBe(true)
   })
+
+  it('does not treat a keyless delegated CLI route as usable', () => {
+    expect(providerUsable(otherRow({
+      apiKeyEnv: undefined,
+      credential: undefined,
+      entry: {
+        provider: 'grok-cli',
+        displayName: 'Grok Build CLI (delegated)',
+        settingsNs: 'llm-cli-bridge',
+        settingsPath: ['routes', 'grok-cli'],
+        active: true,
+        kind: 'delegated',
+      },
+    }))).toBe(false)
+  })
 })
 
 describe('onboardingReadiness', () => {
@@ -91,6 +106,28 @@ describe('onboardingReadiness', () => {
     expect(onboardingReadiness(state({
       rows: [row(), otherRow({ credential: missingCredential })],
     }))).toEqual({ kind: 'credential-missing' })
+  })
+
+  it('does not treat a keyless delegated CLI route as already set up', () => {
+    const delegated = row({
+      apiKeyEnv: undefined,
+      credential: undefined,
+      entry: {
+        provider: 'grok-cli',
+        displayName: 'Grok Build CLI (delegated)',
+        settingsNs: 'llm-cli-bridge',
+        settingsPath: ['routes', 'grok-cli'],
+        active: true,
+        kind: 'delegated',
+      },
+    })
+    expect(onboardingReadiness(state({ rows: [delegated] }))).toEqual({
+      kind: 'unavailable',
+      reason: 'provider-inactive',
+    })
+    expect(onboardingReadiness(state({ rows: [delegated, row()] }))).toEqual({ kind: 'credential-missing' })
+    expect(onboardingCandidates(state({ rows: [delegated, row()] }).rows).map(item => item.entry.provider))
+      .toEqual(['deepseek-official'])
   })
 
   it('does not treat keyless local Ollama as already set up', () => {

@@ -3,7 +3,7 @@
  * @module @roos-code/roos-code-llm-cli-bridge/argv
  */
 
-import { LlmError } from '@roos-code/roos-code-llm'
+import { assertNever, LlmError } from '@roos-code/roos-code-llm'
 import type { CliBridgeRoute } from './config.ts'
 
 /** Inputs that become CLI flags for one delegated completion. */
@@ -71,8 +71,7 @@ export function effortFlags(route: CliBridgeRoute, effort: string): string[] {
       const key = route.effortArg ?? 'model_reasoning_effort'
       return ['-c', `${key}=${effort}`]
     }
-    /* v8 ignore next 2 -- closed union */
     default:
-      return []
+      return assertNever(route.effortStyle)
   }
 }

@@ -34,6 +34,7 @@
   "peerDependencies": {
     "@roos-code/roos-code-invariants": "workspace:^",
     "@roos-code/roos-code-llm": "workspace:^",
+    "@roos-code/roos-code-llm-cli-bridge": "workspace:^",
     "@roos-code/roos-code-session": "workspace:^",
     "@roos-code/roos-code-subagent": "workspace:^",
     "@roos-code/roos-code-subprocess": "workspace:^",
@@ -48,6 +49,8 @@
     "@roos-code/roos-code-agent": "workspace:^",
     "@roos-code/roos-code-invariants": "workspace:^",
     "@roos-code/roos-code-llm": "workspace:^",
+    "@roos-code/roos-code-llm-cli-bridge": "workspace:^",
+    "@roos-code/roos-code-loader-smoke": "workspace:^",
     "@roos-code/roos-code-session": "workspace:^",
     "@roos-code/roos-code-subagent": "workspace:^",
     "@roos-code/roos-code-subprocess": "workspace:^",

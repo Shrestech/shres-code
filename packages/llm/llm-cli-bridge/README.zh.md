@@ -45,3 +45,5 @@
 - **没有 HTTP attribution** — 子 CLI 拥有自己的 User-Agent。
 - **没有实时 token 流** — 适配器在进程退出后把最终文本作为一次 delta 发射。
 - **由主机管理二进制** — 缺少 `grok` / `kimi` / `claude` / `codex` 是 spawn 错误。
+- **无密钥委派路由不会结束首次运行** — `kind: 'delegated'` 与组合中的本机 Ollama 一样，不计入 onboarding 可用。
+- **spawn 工作目录是会话工作区** — 请求没有会话 header cwd 时 `stream()` 失败。

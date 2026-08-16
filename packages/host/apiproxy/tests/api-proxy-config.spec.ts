@@ -131,12 +131,20 @@ class MemoryCredentials extends CredentialProvider {
 
 /** Catalog-serving adapter stub for the llm.models path. */
 class CatalogAdapter extends LlmAdapter {
-  constructor(private readonly name: string, private readonly models: readonly string[]) {
+  constructor(
+    private readonly name: string,
+    private readonly models: readonly string[],
+    private readonly kind?: 'delegated',
+  ) {
     super()
   }
 
   override providerInfo(provider: string): LlmProviderInfo {
-    return { id: provider, name: this.name }
+    return {
+      id: provider,
+      name: this.name,
+      ...this.kind === 'delegated' ? { kind: 'delegated' as const } : {},
+    }
   }
 
   override listModels(provider: string): Promise<readonly LlmModelInfo[]> {
@@ -639,6 +647,28 @@ describe('llm domain', () => {
       // interrogated on its behalf either.
       { provider: 'undeclared', displayName: 'Undeclared', settingsNs: '', settingsPath: [], active: true },
     ])
+  })
+
+  it('forwards kind delegated on directory rows, undeclared live routes, and catalog groups', async () => {
+    const ctx = await harness({ configurableProviders: false })
+    ctx.llm.registerConfigurableProviders([{
+      provider: 'grok-cli',
+      displayName: 'Grok',
+      settingsNs: 'llm-cli-bridge',
+      settingsPath: ['routes', 'grok-cli'],
+      kind: 'delegated',
+    }])
+    ctx.llm.registerAdapter(['grok-cli'], new CatalogAdapter('Grok', ['grok-4'], 'delegated'))
+    ctx.llm.registerAdapter(['orphan-cli'], new CatalogAdapter('Orphan', ['x'], 'delegated'))
+    const api = createApiProxy(ctx, DEFAULTS)
+    const providers = expectOk(await api.llm.providers(request({})))
+    expect(providers.providers.find(row => row.provider === 'grok-cli')).toMatchObject({ kind: 'delegated' })
+    expect(providers.providers.find(row => row.provider === 'orphan-cli')).toMatchObject({ kind: 'delegated' })
+    const models = expectOk(await api.llm.models(request({})))
+    expect(models.groups).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'grok-cli', kind: 'delegated' }),
+      expect.objectContaining({ id: 'orphan-cli', kind: 'delegated' }),
+    ]))
   })
 
   it('serves the host-scoped catalog with per-provider failures contained', async () => {

@@ -34,12 +34,16 @@
   "peerDependencies": {
     "@roos-code/roos-code-invariants": "workspace:^",
     "@roos-code/roos-code-llm": "workspace:^",
+    "@roos-code/roos-code-session": "workspace:^",
     "@roos-code/roos-code-settings": "workspace:^",
     "@roos-code/roos-code-subprocess": "workspace:^",
     "@roos-code/roos-code-timeout": "workspace:^",
     "@roos-code/cordis": "workspace:^"
   },
   "peerDependenciesMeta": {
+    "@roos-code/roos-code-session": {
+      "optional": true
+    },
     "@roos-code/roos-code-settings": {
       "optional": true
     },
@@ -53,6 +57,7 @@
   "devDependencies": {
     "@roos-code/roos-code-invariants": "workspace:^",
     "@roos-code/roos-code-llm": "workspace:^",
+    "@roos-code/roos-code-session": "workspace:^",
     "@roos-code/roos-code-settings": "workspace:^",
     "@roos-code/roos-code-subprocess": "workspace:^",
     "@roos-code/roos-code-subprocess-local": "workspace:^",

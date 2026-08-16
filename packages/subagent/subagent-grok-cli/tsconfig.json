@@ -24,6 +24,9 @@
       "path": "../../llm/llm"
     },
     {
+      "path": "../../llm/llm-cli-bridge"
+    },
+    {
       "path": "../../core/session"
     },
     {

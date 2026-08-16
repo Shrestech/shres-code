@@ -4,7 +4,10 @@
  */
 
 import type { TokenUsage } from '@roos-code/roos-code-llm'
+import { answerFromObject } from './answer.ts'
 import type { CliBridgeRoute } from './config.ts'
+
+export { answerFromObject, isCliErrorPayload } from './answer.ts'
 
 /** Parsed CLI completion. */
 export interface ParsedCliOutput {
@@ -12,33 +15,6 @@ export interface ParsedCliOutput {
   text: string
   /** Token usage when the CLI reported counts. */
   usage?: TokenUsage
-}
-
-/**
- * Pull a non-empty string from a JSON value's common answer fields.
- * @param value - one parsed object.
- * @returns the first non-empty answer, or undefined.
- */
-export function answerFromObject(value: unknown): string | undefined {
-  if (typeof value !== 'object' || value === null) return undefined
-  const record = value as Record<string, unknown>
-  if (record.is_error === true || record.error === true) return undefined
-  if (record.type === 'error' || record.subtype === 'error') return undefined
-  for (const key of ['result', 'text', 'message', 'content', 'output'] as const) {
-    const field = record[key]
-    if (typeof field === 'string' && field.trim().length > 0) return field
-    if (Array.isArray(field)) {
-      const joined = field
-        .map(entry => typeof entry === 'string'
-          ? entry
-          : typeof entry === 'object' && entry !== null && typeof (entry as { text?: unknown }).text === 'string'
-            ? (entry as { text: string }).text
-            : '')
-        .join('')
-      if (joined.trim().length > 0) return joined
-    }
-  }
-  return undefined
 }
 
 /**

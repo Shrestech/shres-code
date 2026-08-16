@@ -90,7 +90,9 @@ export function grokHeadlessArgv(executable: string, prompt: string): string[] {
  */
 export async function disposeGrokChild(child: SubprocessHandle): Promise<void> {
   if (child.pid <= 0) {
-    await child.done.catch(() => {})
+    await child.done.catch(function alreadySettledOrKilled() {
+      // Teardown after the owner already settled or killed the child.
+    })
     return
   }
   child.terminate()

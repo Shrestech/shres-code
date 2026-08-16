@@ -30,8 +30,11 @@ export interface CliLlmAdapterOptions {
   routes: () => ReadonlyMap<string, CliBridgeRoute>
   /** Shared subprocess spawn, when the seam is mounted. */
   spawn: (spec: SubprocessSpawnSpec) => SubprocessHandle
-  /** Working directory for the child CLI. */
-  cwd: () => string
+  /**
+   * Working directory for the child CLI, resolved from the request session.
+   * Must fail loud when no session workspace exists.
+   */
+  cwd: (sessionId?: GenerateOptions['sessionId']) => string
   /** Process-tree termination grace. */
   disposeGraceMs: () => number
 }
@@ -109,7 +112,7 @@ export class CliLlmAdapter extends LlmAdapter {
     })
     const child = this.options.spawn({
       argv,
-      cwd: this.options.cwd(),
+      cwd: this.options.cwd(options.sessionId),
       stdio: {
         stdin: 'ignore',
         stdout: { maxBytes: STDOUT_COLLECT_MAX_BYTES },
@@ -142,9 +145,13 @@ export class CliLlmAdapter extends LlmAdapter {
       options.signal?.removeEventListener('abort', onAbort)
       if (child.pid > 0) {
         child.terminate()
-        await child.waitForExit().catch(() => {})
+        await child.waitForExit().catch(function alreadySettledOrKilled() {
+          // Teardown after the owner already settled or killed the child.
+        })
       }
-      await child.done.catch(() => {})
+      await child.done.catch(function alreadySettledOrKilled() {
+        // Teardown after the owner already settled or killed the child.
+      })
     }
   }
 

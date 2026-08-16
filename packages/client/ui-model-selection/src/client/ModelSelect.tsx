@@ -288,7 +288,16 @@ export function ModelSelect(
                   const headingId = `${id}-${group.id}`
                   return (
                     <section role="group" aria-labelledby={headingId} className={css.group} key={group.id}>
-                      <div className={css.groupTitle} id={headingId}>{group.name}</div>
+                      <div className={css.groupTitle} id={headingId}>
+                        <span>{group.name}</span>
+                        {group.kind === 'delegated'
+                          ? (
+                            <span className={css.delegated} title={t('delegated.hint')}>
+                              {t('delegated.tag')}
+                            </span>
+                          )
+                          : null}
+                      </div>
                       {group.models.map((model) => {
                         const selected = state.current?.provider === group.id && state.current.model === model.id
                         return (

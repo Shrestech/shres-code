@@ -1,5 +1,6 @@
 <!-- 英文源文件由 scripts/gen-doc-graphs.ts 生成；本中文文件是通过双语配对维护的经评审对侧。
-     更新时先运行 `pnpm run gen-doc-graphs` 更新英文，再更新本文件并运行 `pnpm run verify-translation-pairing --write docs/capability-seams.md` 重新记录配对。 -->
+     更新时先运行 `pnpm run gen-doc-graphs` 更新英文，再更新本文件并运行 `pnpm run verify-translation-pairing --write docs/capability-seams.md` 重新记录配对。
+     grok-cli / kimi-cli / llm-cli-bridge mermaid 节点为手工补齐：gen-doc-graphs 被 PR9 的类型链接（ModelPurpose / LiveModelSelectionRef / SaveSelectionOptions）挡住。 -->
 
 # 能力 Seams 与核心服务
 
@@ -17,6 +18,7 @@ flowchart LR
   pkg_llm["llm"]
   svc_llm["ctx.llm<br/>LLM adapter registry"]
   pkg_llm_deepseek["llm-deepseek"]
+  pkg_llm_cli_bridge["llm-cli-bridge"]
   pkg_llm_replay["llm-replay"]
   pkg_agent_loop["agent-loop"]
   pkg_compaction_basic["compaction-basic"]
@@ -127,6 +129,8 @@ flowchart LR
   pkg_subagent_acp["subagent-acp"]
   pkg_subagent_codex["subagent-codex"]
   pkg_subagent_claude_code["subagent-claude-code"]
+  pkg_subagent_grok_cli["subagent-grok-cli"]
+  pkg_subagent_kimi_cli["subagent-kimi-cli"]
   pkg_shell["shell"]
   svc_shell["ctx.shell<br/>Bash executor seam"]
   pkg_pwsh_local["pwsh-local"]
@@ -234,6 +238,7 @@ flowchart LR
   pkg_jobs_local --> svc_jobs
   pkg_llm --> svc_llm
   pkg_llm_deepseek --> svc_llm
+  pkg_llm_cli_bridge --> svc_llm
   pkg_llm_pi_ai --> svc_llm
   pkg_llm_replay --> svc_llm
   pkg_lsp --> svc_lsp
@@ -277,6 +282,8 @@ flowchart LR
   pkg_subagent_acp --> svc_subagents
   pkg_subagent_claude_code --> svc_subagents
   pkg_subagent_codex --> svc_subagents
+  pkg_subagent_grok_cli --> svc_subagents
+  pkg_subagent_kimi_cli --> svc_subagents
   pkg_subagent_fork_in_process --> svc_subagents
   pkg_subagent_roos_sdk --> svc_subagents
   pkg_subagent_spawn_in_process --> svc_subagents
@@ -384,6 +391,9 @@ flowchart LR
   svc_subprocess --> pkg_subagent_acp
   svc_subprocess --> pkg_subagent_claude_code
   svc_subprocess --> pkg_subagent_codex
+  svc_subprocess --> pkg_subagent_grok_cli
+  svc_subprocess --> pkg_subagent_kimi_cli
+  svc_subprocess --> pkg_llm_cli_bridge
   svc_subprocess --> pkg_terminal_bash
   svc_systemPrompt --> pkg_agent_loop
   svc_systemPrompt --> pkg_tool_fs

@@ -9,7 +9,13 @@
 
 import type { Context } from '@roos-code/cordis'
 import { MAX_TIMER_DELAY_MS } from '@roos-code/roos-code-timeout'
-import type { AdapterRegistrationHandle, DirectoryRegistrationHandle, LlmConfigurableProvider } from '@roos-code/roos-code-llm'
+import type {
+  AdapterRegistrationHandle,
+  DirectoryRegistrationHandle,
+  GenerateOptions,
+  LlmConfigurableProvider,
+} from '@roos-code/roos-code-llm'
+import type { SessionId } from '@roos-code/roos-code-session'
 import { deepEqualJson, installSettingsSection, settingsNamespace } from '@roos-code/roos-code-settings'
 import { CliLlmAdapter } from './adapter.ts'
 import {
@@ -27,12 +33,13 @@ export {
   DEFAULT_CONTEXT_WINDOW,
   DEFAULT_DISPOSE_GRACE_MS,
   DEFAULT_MAX_TOKENS,
+  CUSTOM_ROUTE_TEMPLATE,
   SHIPPED_ROUTE_IDS,
   SHIPPED_ROUTES,
   resolveRoutes,
 } from './config.ts'
 export type { CliBridgeModel, CliBridgeRoute, EffortStyle, ShippedRouteId } from './config.ts'
-export { parseCliOutput } from './parse.ts'
+export { answerFromObject, isCliErrorPayload, parseCliOutput } from './parse.ts'
 export { serializePrompt } from './serialize.ts'
 
 export const name = 'llm-cli-bridge'
@@ -80,18 +87,52 @@ function directoryEntries(
 }
 
 /**
+ * Validate the process-tree grace, including a live settings overlay.
+ * @param value - composition or current settings value.
+ * @returns the checked grace in milliseconds.
+ */
+function readDisposeGraceMs(value: number | undefined): number {
+  const disposeGraceMs = value ?? DEFAULT_DISPOSE_GRACE_MS
+  if (!Number.isFinite(disposeGraceMs) || disposeGraceMs <= 0 || disposeGraceMs > MAX_TIMER_DELAY_MS) {
+    throw new Error(
+      `llm-cli-bridge: disposeGraceMs must be a positive finite number no greater than ${MAX_TIMER_DELAY_MS}`,
+    )
+  }
+  return disposeGraceMs
+}
+
+/**
+ * Resolve the child cwd from the request session workspace. A tool-running
+ * CLI must not fall back to `process.cwd()`.
+ * @param ctx - context that may carry the session store.
+ * @param sessionId - stamped loop session, when present.
+ * @returns the session header cwd.
+ */
+function sessionWorkspaceCwd(ctx: Context, sessionId: GenerateOptions['sessionId']): string {
+  if (sessionId === undefined) {
+    throw new Error('llm-cli-bridge: stream() requires a session with a workspace')
+  }
+  const sessions = ctx.get('sessions')
+  if (sessions === undefined) {
+    throw new Error('llm-cli-bridge: stream() requires ctx.sessions')
+  }
+  const cwd = sessions.get(sessionId as SessionId)?.header.cwd
+  if (cwd === undefined || cwd.length === 0) {
+    throw new Error(
+      'llm-cli-bridge: no working directory for the child — start from a session that has one',
+    )
+  }
+  return cwd
+}
+
+/**
  * Register one CLI-bridge adapter for all configured routes.
  * @param ctx - context carrying the llm service and optional settings/subprocess.
  * @param config - composition entry; settings overlay the route dict.
  */
 export function apply(ctx: Context, config: Config): void {
   const resolved = config as ResolvedConfig
-  const disposeGraceMs = resolved.disposeGraceMs ?? DEFAULT_DISPOSE_GRACE_MS
-  if (!Number.isFinite(disposeGraceMs) || disposeGraceMs <= 0 || disposeGraceMs > MAX_TIMER_DELAY_MS) {
-    throw new Error(
-      `llm-cli-bridge: disposeGraceMs must be a positive finite number no greater than ${MAX_TIMER_DELAY_MS}`,
-    )
-  }
+  readDisposeGraceMs(resolved.disposeGraceMs)
 
   let current: () => Config = () => config
   let lastRaw: Config | undefined
@@ -115,8 +156,8 @@ export function apply(ctx: Context, config: Config): void {
       }
       return subprocess.spawn(spec)
     },
-    cwd: () => process.cwd(),
-    disposeGraceMs: () => disposeGraceMs,
+    cwd: sessionId => sessionWorkspaceCwd(ctx, sessionId),
+    disposeGraceMs: () => readDisposeGraceMs(current().disposeGraceMs),
   })
 
   let directory: DirectoryRegistrationHandle | undefined
@@ -140,6 +181,7 @@ export function apply(ctx: Context, config: Config): void {
     if (deepEqualJson(facts, registeredFacts)) return
     const ids = [...routes().keys()]
     if (registration === undefined) {
+      /* v8 ignore next 4 -- shipped routes always register at least one adapter */
       if (ids.length === 0) {
         registeredFacts = facts
         return
