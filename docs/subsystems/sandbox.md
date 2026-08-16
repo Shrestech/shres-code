@@ -8,16 +8,22 @@ Source: [`packages/sandbox/sandbox/src/index.ts`](../../packages/sandbox/sandbox
 
 ## Modes and enforcement
 
-`SandboxMode` governs filesystem effects only. `read-only` asks the backend to deny writes — the POSIX runners additionally grant the `/dev/null` sink their shells require, while the Windows ACL runner grants no explicit writable root and reports partial enforcement for its ambient ACL gaps; `workspace-write` permits writes under the workspace root and the backend's promised temp area; `danger-full-access` bypasses confinement. Network and process visibility are outside this vocabulary.
+`SandboxMode` governs filesystem effects only. `read-only` asks the backend to deny writes — the POSIX runners additionally grant the `/dev/null` sink their shells require, while the Windows ACL runner grants no explicit writable root and reports partial enforcement for its ambient ACL gaps; `workspace-write` permits writes under the workspace root and the backend's promised temp area; `danger-full-access` bypasses confinement. Process visibility is outside this vocabulary; outbound network is a separate `SandboxExecutionPolicy.network` field.
 
 ```ts type-equiv
 /**
  * File-effect policy for confined processes. `read-only` permits only required
  * sinks such as `/dev/null`; `workspace-write` also permits the workspace and a
- * backend-defined temp area; `danger-full-access` bypasses confinement. Network
- * and process visibility are outside this vocabulary.
+ * backend-defined temp area; `danger-full-access` bypasses confinement. Process
+ * visibility is outside this vocabulary; outbound network is a separate
+ * {@link SandboxExecutionPolicy.network} field.
  */
 type SandboxMode = 'read-only' | 'workspace-write' | 'danger-full-access'
+```
+
+```ts type-equiv
+/** Outbound network for a confined process. */
+type SandboxNetwork = 'allow' | 'deny'
 ```
 
 Only the first two modes can be sent to a provider. A `danger-full-access` consumer spawns its original argv and does not call `ctx.sandbox`.
@@ -61,6 +67,13 @@ interface SandboxExecutionPolicy {
    * for agentless calls, which fall back to per-call backend state.
    */
   sessionId?: SessionId
+  /**
+   * Outbound network for confined processes. `ctx.sandboxPolicy.resolve()`
+   * always sets this from the validated `network` config (default `deny`).
+   * Omitted on a hand-built policy is treated as `deny` by
+   * {@link sandboxNetwork}.
+   */
+  network?: SandboxNetwork
 }
 ```
 

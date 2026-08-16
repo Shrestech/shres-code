@@ -59,17 +59,25 @@ function fakeSeatbeltExec(status: number): string {
 }
 
 /** The seatbelt read-only profile — every seatbelt profile starts with these forms. */
-const SEATBELT_RO_PROFILE = '(version 1) (allow default) (deny file-write*) (allow file-write* (literal "/dev/null"))'
+const SEATBELT_RO_PROFILE = '(version 1) (allow default) (deny file-write*) (allow file-write* (literal "/dev/null")) (deny network-outbound)'
 
 describe('profile dialects', () => {
-  it('bwrap read-only: whole tree read-only with fresh /dev and /proc, no writable mounts', () => {
-    expect(bwrapProfileArgs(RO)).toEqual(['--ro-bind', '/', '/', '--dev', '/dev', '--proc', '/proc', '--die-with-parent'])
+  it('bwrap read-only: whole tree read-only with fresh /dev and /proc, no writable mounts, net namespace unshared', () => {
+    expect(bwrapProfileArgs(RO)).toEqual([
+      '--ro-bind', '/', '/', '--dev', '/dev', '--proc', '/proc', '--die-with-parent', '--unshare-net',
+    ])
   })
 
   it('bwrap workspace-write: adds an ephemeral /tmp and rebinds the workspace root', () => {
     expect(bwrapProfileArgs(WW)).toEqual([
-      '--ro-bind', '/', '/', '--dev', '/dev', '--proc', '/proc', '--die-with-parent',
+      '--ro-bind', '/', '/', '--dev', '/dev', '--proc', '/proc', '--die-with-parent', '--unshare-net',
       '--tmpfs', '/tmp', '--bind', '/ws', '/ws',
+    ])
+  })
+
+  it('bwrap network allow: omits --unshare-net', () => {
+    expect(bwrapProfileArgs({ ...RO, network: 'allow' })).toEqual([
+      '--ro-bind', '/', '/', '--dev', '/dev', '--proc', '/proc', '--die-with-parent',
     ])
   })
 
@@ -83,8 +91,19 @@ describe('profile dialects', () => {
     expect(landlockProfileArgs(WW)).toEqual(['--ro', '/', '--rw', '/dev/null', '--rw', '/tmp', '--rw', '/ws'])
   })
 
-  it('seatbelt read-only: allow-default with every file write denied except the /dev/null literal', () => {
+  it('landlock network allow: lifts the launcher TCP deny', () => {
+    expect(landlockProfileArgs({ ...RO, network: 'allow' })).toEqual(['--ro', '/', '--rw', '/dev/null', '--allow-net'])
+  })
+
+  it('seatbelt read-only: allow-default with every file write denied except the /dev/null literal, outbound network denied', () => {
     expect(seatbeltProfileArgs(RO)).toEqual(['-p', SEATBELT_RO_PROFILE])
+  })
+
+  it('seatbelt network allow: omits the outbound-network deny', () => {
+    expect(seatbeltProfileArgs({ ...RO, network: 'allow' })).toEqual([
+      '-p',
+      '(version 1) (allow default) (deny file-write*) (allow file-write* (literal "/dev/null"))',
+    ])
   })
 
   it('seatbelt workspace-write: one more allow for the canonicalized workspace root, /tmp, and the user temp dir', () => {

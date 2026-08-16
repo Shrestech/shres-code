@@ -8,16 +8,22 @@
 
 ## 模式与强制执行
 
-`SandboxMode` 仅管控文件系统效果。`read-only` 要求后端拒绝写入——POSIX runner 还会授予其 shell 所需的 `/dev/null` 接收器，而 Windows ACL runner 不授予任何显式可写根目录，并因环境 ACL 缺口报告部分强制执行；`workspace-write` 允许在工作区根目录及后端承诺的临时区域下写入；`danger-full-access` 绕过隔离。网络与进程可见性不在此处的定义范围内。
+`SandboxMode` 仅管控文件系统效果。`read-only` 要求后端拒绝写入——POSIX runner 还会授予其 shell 所需的 `/dev/null` 接收器，而 Windows ACL runner 不授予任何显式可写根目录，并因环境 ACL 缺口报告部分强制执行；`workspace-write` 允许在工作区根目录及后端承诺的临时区域下写入；`danger-full-access` 绕过隔离。进程可见性不在此处的定义范围内；出站网络是单独的 `SandboxExecutionPolicy.network` 字段。
 
 ```ts type-equiv
 /**
  * File-effect policy for confined processes. `read-only` permits only required
  * sinks such as `/dev/null`; `workspace-write` also permits the workspace and a
- * backend-defined temp area; `danger-full-access` bypasses confinement. Network
- * and process visibility are outside this vocabulary.
+ * backend-defined temp area; `danger-full-access` bypasses confinement. Process
+ * visibility is outside this vocabulary; outbound network is a separate
+ * {@link SandboxExecutionPolicy.network} field.
  */
 type SandboxMode = 'read-only' | 'workspace-write' | 'danger-full-access'
+```
+
+```ts type-equiv
+/** Outbound network for a confined process. */
+type SandboxNetwork = 'allow' | 'deny'
 ```
 
 只有前两种模式可以发送给提供方。`danger-full-access` 的消费方直接 spawn 原始 argv，不调用 `ctx.sandbox`。
@@ -61,6 +67,13 @@ interface SandboxExecutionPolicy {
    * for agentless calls, which fall back to per-call backend state.
    */
   sessionId?: SessionId
+  /**
+   * Outbound network for confined processes. `ctx.sandboxPolicy.resolve()`
+   * always sets this from the validated `network` config (default `deny`).
+   * Omitted on a hand-built policy is treated as `deny` by
+   * {@link sandboxNetwork}.
+   */
+  network?: SandboxNetwork
 }
 ```
 

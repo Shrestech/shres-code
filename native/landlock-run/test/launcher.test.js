@@ -92,6 +92,10 @@ const expectedNotice = enforcement === 'partial' ? `${PARTIAL_NOTICE}\n` : '';
   assert.equal(echo.stdout, 'confined-ok\n');
   assert.equal(echo.stderr, expectedNotice);
 
+  const allowNet = run([...grantArgs({ readOnly: ['/'], allowNetwork: true }), '--', '/bin/sh', '-c', 'echo allow-net-ok']);
+  assert.equal(allowNet.status, 0, allowNet.stderr);
+  assert.equal(allowNet.stdout, 'allow-net-ok\n');
+
   const exitCode = run([...grantArgs({ readOnly: ['/'] }), '--', '/bin/sh', '-c', 'exit 7']);
   assert.equal(exitCode.status, 7, 'the wrapped command exit code must pass through unchanged');
 

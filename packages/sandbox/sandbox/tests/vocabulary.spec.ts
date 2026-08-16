@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { SANDBOX_UNAVAILABLE, SandboxUnavailableError } from '@roos-code/roos-code-sandbox'
+import { SANDBOX_UNAVAILABLE, SandboxUnavailableError, sandboxNetwork } from '@roos-code/roos-code-sandbox'
 
 describe('SandboxUnavailableError', () => {
   it('carries the structured { name, code } identity consumers key on', () => {
@@ -22,6 +22,12 @@ describe('SandboxUnavailableError', () => {
     expect(error.message).toContain('"workspace-write"')
     expect(error.message).toContain('danger-full-access')
     expect(error.message).not.toContain('Runner failure')
+  })
+
+  it('treats an omitted network field as deny and honors an explicit allow', () => {
+    expect(sandboxNetwork({})).toBe('deny')
+    expect(sandboxNetwork({ network: 'deny' })).toBe('deny')
+    expect(sandboxNetwork({ network: 'allow' })).toBe('allow')
   })
 
   it('carries the runner detail when the failure is discovered at execution time', () => {

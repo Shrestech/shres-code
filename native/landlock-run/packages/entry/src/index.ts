@@ -49,6 +49,11 @@ export interface LauncherGrants {
   readonly readOnly?: readonly string[]
   /** Roots granted full filesystem access beneath (the launcher's `--rw`). */
   readonly readWrite?: readonly string[]
+  /**
+   * When true, do not restrict TCP bind/connect. The launcher denies those
+   * accesses by default when the running kernel's Landlock ABI supports them.
+   */
+  readonly allowNetwork?: boolean
 }
 
 /**
@@ -87,14 +92,16 @@ export function launcherPath(
  * before the `--` argv separator. A caller spawns
  * `[launcherPath(), ...grantArgs(grants), '--', ...command]`; the flag
  * spellings stay private to this package.
- * @param grants - the read-only and read-write roots to allow.
+ * @param grants - the read-only and read-write roots to allow, and optional
+ *   `allowNetwork` to lift the launcher's default TCP deny.
  * @returns the `--ro <path>` / `--rw <path>` argument list, read-only roots
- *   first, in the caller's order.
+ *   first, in the caller's order, plus `--allow-net` when requested.
  */
 export function grantArgs(grants: LauncherGrants): string[] {
   return [
     ...(grants.readOnly ?? []).flatMap(root => ['--ro', root]),
     ...(grants.readWrite ?? []).flatMap(root => ['--rw', root]),
+    ...grants.allowNetwork === true ? ['--allow-net'] : [],
   ]
 }
 
@@ -102,12 +109,14 @@ export function grantArgs(grants: LauncherGrants): string[] {
  * Functional probe: `landlock-run --probe` builds and enforces a maximal
  * ruleset in a short-lived child and exits 0 only when the running kernel
  * actually enforces it — `--version`-style checks would miss a kernel that
- * has the syscalls but refuses enforcement. The probe's one report line is
- * part of the CLI contract and distinguishes complete from per-ABI-subset
- * enforcement; a zero exit without the partial marker reads as `full`. A
- * failed or timed-out spawn (missing binary, wrong architecture, unenforcing
- * kernel) probes `unusable`. Synchronous by design: consumers run it once
- * and cache the verdict.
+ * has the syscalls but refuses enforcement. The maximal ruleset includes
+ * TCP bind/connect deny when ABI ≥ 4; an older ABI that cannot govern
+ * those accesses reports `partial` instead of failing. The probe's one
+ * report line is part of the CLI contract and distinguishes complete from
+ * per-ABI-subset enforcement; a zero exit without the partial marker
+ * reads as `full`. A failed or timed-out spawn (missing binary, wrong
+ * architecture, unenforcing kernel) probes `unusable`. Synchronous by
+ * design: consumers run it once and cache the verdict.
  * @param launcher - the launcher path to probe; defaults to
  *   {@link launcherPath}'s resolution for this host.
  * @param options - `timeoutMs` bounds the probe child (default 2000).

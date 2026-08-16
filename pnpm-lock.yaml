@@ -4230,6 +4230,10 @@ importers:
         version: link:../../llm/llm
 
   packages/fs/fs-sandbox:
+    dependencies:
+      '@roos-code/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
     devDependencies:
       '@roos-code/cordis':
         specifier: workspace:^
@@ -4240,6 +4244,9 @@ importers:
       '@roos-code/roos-code-fs-local':
         specifier: workspace:^
         version: link:../fs-local
+      '@roos-code/roos-code-home-paths':
+        specifier: workspace:^
+        version: link:../../util/home-paths
       '@roos-code/roos-code-invariants':
         specifier: workspace:^
         version: link:../../runtime-diagnostics/invariants

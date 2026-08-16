@@ -14,7 +14,7 @@ import { Session, SessionId } from '@roos-code/roos-code-session'
 import SandboxPolicyService, { SANDBOX_MODES, effectiveSandboxMode, setSandboxMode } from '@roos-code/roos-code-sandbox-policy'
 import SystemPrompt, { renderContextSnapshot, renderPrompt } from '@roos-code/roos-code-system-prompt'
 
-async function mounted(config: { mode?: 'read-only' | 'workspace-write' | 'danger-full-access'; workspaceRoot?: string } = {}) {
+async function mounted(config: { mode?: 'read-only' | 'workspace-write' | 'danger-full-access'; workspaceRoot?: string; network?: 'allow' | 'deny' } = {}) {
   const ctx = new Context()
   await ctx.plugin(SandboxPolicyService, config)
   return ctx
@@ -40,10 +40,11 @@ async function policyContext(ctx: Context, activeSession: Session): Promise<stri
 }
 
 describe('SandboxPolicyService', () => {
-  it('defaults to read-only under the process cwd', async () => {
+  it('defaults to read-only under the process cwd with outbound network denied', async () => {
     const ctx = await mounted()
     expect(ctx.sandboxPolicy.defaultMode).toBe('read-only')
     expect(ctx.sandboxPolicy.workspaceRoot).toBe(resolve(process.cwd()))
+    expect(ctx.sandboxPolicy.network).toBe('deny')
   })
 
   it('carries a configured mode and resolves the workspace root absolute', async () => {
@@ -57,6 +58,7 @@ describe('SandboxPolicyService', () => {
     expect(ctx.sandboxPolicy.resolve()).toEqual({
       mode: 'workspace-write',
       workspaceRoot: resolve('/fallback'),
+      network: 'deny',
     })
   })
 
@@ -69,11 +71,13 @@ describe('SandboxPolicyService', () => {
     expect(ctx.sandboxPolicy.resolve({ session: first })).toEqual({
       mode: 'workspace-write',
       workspaceRoot: resolve('/projects/first'),
+      network: 'deny',
       sessionId: 'sess-first',
     })
     expect(ctx.sandboxPolicy.resolve({ session: second })).toEqual({
       mode: 'read-only',
       workspaceRoot: resolve('/projects/second'),
+      network: 'deny',
       sessionId: 'sess-second',
     })
     expect(ctx.sandboxPolicy.overrideOf(first)).toBeUndefined()
@@ -81,6 +85,7 @@ describe('SandboxPolicyService', () => {
     expect(ctx.sandboxPolicy.resolve()).toEqual({
       mode: 'workspace-write',
       workspaceRoot: resolve('/fallback'),
+      network: 'deny',
     })
   })
 
@@ -100,6 +105,7 @@ describe('SandboxPolicyService', () => {
       expect(ctx.sandboxPolicy.resolve({ session: session('sess-symlink-parent', cwd) })).toEqual({
         mode: 'workspace-write',
         workspaceRoot: realpathSync.native(physical),
+        network: 'deny',
         sessionId: 'sess-symlink-parent',
       })
     } finally {
@@ -114,6 +120,7 @@ describe('SandboxPolicyService', () => {
     expect(ctx.sandboxPolicy.resolve({ session: active, mode: 'danger-full-access' })).toEqual({
       mode: 'danger-full-access',
       workspaceRoot: resolve('/projects/approved'),
+      network: 'deny',
       sessionId: 'sess-approved',
     })
   })
@@ -127,6 +134,21 @@ describe('SandboxPolicyService', () => {
     const ctx = new Context()
     // schemastery rejects the union violation when the plugin loads.
     await expect(ctx.plugin(SandboxPolicyService, { mode: 'yolo' as never })).rejects.toThrow()
+  })
+
+  it('carries a configured network allow through every resolved call', async () => {
+    const ctx = await mounted({ network: 'allow', workspaceRoot: '/fallback' })
+    expect(ctx.sandboxPolicy.network).toBe('allow')
+    expect(ctx.sandboxPolicy.resolve()).toEqual({
+      mode: 'read-only',
+      workspaceRoot: resolve('/fallback'),
+      network: 'allow',
+    })
+  })
+
+  it('rejects a network value outside the closed vocabulary at load', async () => {
+    const ctx = new Context()
+    await expect(ctx.plugin(SandboxPolicyService, { network: 'maybe' as never })).rejects.toThrow()
   })
 
   it('disposes the service and context contribution from a child fiber (HMR safety)', async () => {

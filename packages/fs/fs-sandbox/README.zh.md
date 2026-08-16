@@ -2,9 +2,9 @@
 
 [English](README.md) | 中文
 
-`SandboxedFileSystem` 扩展 [`LocalFileSystem`](../fs-local/README.md) 并注册为 `ctx.fs`。它逐字继承全部文本存储机制（解析、stat、读取／流式读取、列出、原子写入、按读取、匹配、写入顺序执行的编辑临界区），只为 `writeText`/`editText` 增加按调用的模式围栏。读取始终直接通过：所有模式都允许读取。
+`SandboxedFileSystem` 扩展 [`LocalFileSystem`](../fs-local/README.md) 并注册为 `ctx.fs`。它逐字继承全部文本存储机制（解析、stat、读取／流式读取、列出、原子写入、按读取、匹配、写入顺序执行的编辑临界区），并为 `writeText`/`editText` 增加按调用的模式围栏，同时对 `readText`/`streamText`/`readBytes` 施加凭据读取围栏。
 
-它原样复用本地后端配置：`cwd` 仍是相对路径的解析默认值，`diffBasisMaxBytes` 则限制可选的覆写上下文 diff 基础。
+插件配置保留本地后端旋钮（`cwd` 是相对路径的解析默认值，`diffBasisMaxBytes` 限制可选的覆写上下文 diff 基础），并增加 `denyReadPaths` 以指定额外禁止读取的路径。
 
 只需加载它来替代 `roos-fs-local`，并同时加载 [`ctx.sandboxPolicy`](../../sandbox/sandbox-policy/README.md)，即可完成替换；面向模型的工具（`roos-tool-fs`）无需改动。工具层把调用会话的模式和 cwd 解析为与 bash 相同的按调用策略，因此两个能力族绝不会约束到不同根目录。
 
@@ -14,7 +14,9 @@
 
 - `read-only`：以结构化 `FS_SANDBOX_DENIED` 拒绝所有变更；
 - `workspace-write`：只有目标规范化后位于可写根目录下，才允许变更。可写根包括工作区根目录和平台临时区域（`/tmp`、`os.tmpdir()`），与 Seatbelt profile 授权的集合相同；该集合由唯一的 [`writableRoots`](../../sandbox/README.md) 函数派生，使 fs 围栏与 bash runner 不会漂移。规范拼写使用词法快速路径；基于身份的祖先回退可以识别 Windows 长名称和 8.3 名称等别名等价根目录，而不会把无关前缀视为包含关系。委托前会立即重新规范化目标，因此工具解析后被替换的祖先符号链接也会被发现；
-- `danger-full-access`：不加围栏直接委托。
+- `danger-full-access`：不加围栏直接委托，包括凭据读取。
+
+除 `danger-full-access` 外的每种模式都会拒绝读取 `$ROOS_HOME/.credentials.yaml`、任何 `*.credentials.yaml` 基名，以及每条已配置的 `denyReadPaths` 条目，并抛出 `FS_SANDBOX_DENIED`。读取围栏会像写入一样通过 `checkedTarget()` 重新规范化，因此被拒绝文件的符号链接别名也会被拒绝。
 
 ## 威胁模型：策略围栏，而非内核边界
 

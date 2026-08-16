@@ -15,10 +15,16 @@
       "path": "../../../vendor/cordis"
     },
     {
+      "path": "../../../vendor/schemastery"
+    },
+    {
       "path": "../fs"
     },
     {
       "path": "../fs-local"
+    },
+    {
+      "path": "../../util/home-paths"
     },
     {
       "path": "../../sandbox/sandbox"

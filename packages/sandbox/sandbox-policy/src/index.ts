@@ -22,7 +22,7 @@ import { resolve as resolvePath } from 'node:path'
 import { Context, Service } from '@roos-code/cordis'
 import z from '@roos-code/schemastery'
 import type {} from '@roos-code/roos-code-agent'
-import { canonicalPath, type SandboxExecutionPolicy, type SandboxMode } from '@roos-code/roos-code-sandbox'
+import { canonicalPath, type SandboxExecutionPolicy, type SandboxMode, type SandboxNetwork } from '@roos-code/roos-code-sandbox'
 import type { Session } from '@roos-code/roos-code-session'
 import type {} from '@roos-code/roos-code-system-prompt'
 import { effectiveSandboxMode } from './session-mode.ts'
@@ -72,6 +72,12 @@ export interface Config {
    * `process.cwd()`). Normal agent calls use their session cwd instead.
    */
   workspaceRoot?: string
+  /**
+   * Outbound network for confined processes (default: `deny`). `deny` matches
+   * bwrap's net-namespace isolation; Seatbelt denies `network-outbound` and
+   * Landlock handles TCP bind/connect when the kernel ABI supports it.
+   */
+  network?: SandboxNetwork
 }
 
 /** Inputs that select the sandbox policy for one capability call. */
@@ -95,19 +101,24 @@ export class SandboxPolicyService extends Service {
     // No schema default: process.cwd() is resolved in the constructor so the
     // stored root is always absolute regardless of how it was supplied.
     workspaceRoot: z.string(),
+    network: z.union(['allow', 'deny'] as const).default('deny'),
   })
 
   /** The deployment default mode — the fallback beneath a session override. */
   readonly defaultMode: SandboxMode
   /** The absolute `workspace-write` fallback root for calls without a session cwd. */
   readonly workspaceRoot: string
+  /** The deployment outbound-network policy carried on every resolved call. */
+  readonly network: SandboxNetwork
   constructor(ctx: Context, config: Config) {
     super(ctx, 'sandboxPolicy')
-    // schemastery (static Config) already filled `mode`; the cast records that
-    // runtime fact. `workspaceRoot` has NO schema default, so its fallback to
-    // the process cwd is real branching, resolved absolute either way.
+    // schemastery (static Config) already filled `mode` and `network`; the
+    // casts record those runtime facts. `workspaceRoot` has NO schema default,
+    // so its fallback to the process cwd is real branching, resolved absolute
+    // either way.
     this.defaultMode = config.mode as SandboxMode
     this.workspaceRoot = resolveWorkspaceRoot(config.workspaceRoot ?? process.cwd())
+    this.network = config.network as SandboxNetwork
 
     ctx.inject(['systemPrompt'], (scope: Context) => {
       scope.systemPrompt.context({
@@ -130,13 +141,14 @@ export class SandboxPolicyService extends Service {
    * configured root is the fallback for agentless calls and sessions without a
    * cwd.
    * @param request - optional session and approved mode override.
-   * @returns the fully resolved per-call mode and absolute workspace root.
+   * @returns the fully resolved per-call mode, absolute workspace root, and outbound network.
    */
   resolve(request: SandboxPolicyRequest = {}): SandboxExecutionPolicy {
     const { session } = request
     return {
       mode: request.mode ?? (session === undefined ? undefined : this.overrideOf(session)) ?? this.defaultMode,
       workspaceRoot: resolveWorkspaceRoot(session?.header.cwd ?? this.workspaceRoot),
+      network: this.network,
       ...session === undefined ? {} : { sessionId: session.id },
     }
   }

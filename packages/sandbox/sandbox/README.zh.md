@@ -36,7 +36,7 @@ sandbox mode "<mode>" is requested but no sandbox backend is usable on this host
 
 ## 已知限制与暂缓事项
 
-- **文件操作是完整的策略词汇**：该 seam 不表达网络、进程、系统调用、设备或凭据限制。
+- **文件操作是模式词汇**：`SandboxMode` 不表达进程、系统调用、设备或凭据限制。出站网络是 `SandboxExecutionPolicy` 上的并列 `network` 字段（`allow`／`deny`，解析默认值为 `deny`）。
 - **只支持与宿主共享文件系统和内核的限制**：容器、microVM 与远程执行需要替换能力实现，而不是在此处增加提供方。
 - **拒绝报告是一种 stderr 方言**：该 seam 返回后端签名，而非类型化运行时拒绝通道，因此需要分类的消费方必须从子进程输出推断。
 - **Runner 诊断使用带内通道**：退出状态与 stderr 证据无法证明匹配行由哪个进程写入，因此受限子进程若故意模仿 runner，就可能造成可用性或诊断误归因。这无法绕过约束；带外 runner 状态通道暂缓实现。

@@ -23,10 +23,14 @@ export { canonicalPath, writableRoots } from './roots.ts'
 /**
  * File-effect policy for confined processes. `read-only` permits only required
  * sinks such as `/dev/null`; `workspace-write` also permits the workspace and a
- * backend-defined temp area; `danger-full-access` bypasses confinement. Network
- * and process visibility are outside this vocabulary.
+ * backend-defined temp area; `danger-full-access` bypasses confinement. Process
+ * visibility is outside this vocabulary; outbound network is a separate
+ * {@link SandboxExecutionPolicy.network} field.
  */
 export type SandboxMode = 'read-only' | 'workspace-write' | 'danger-full-access'
+
+/** Outbound network for a confined process. */
+export type SandboxNetwork = 'allow' | 'deny'
 
 /** A confining (non-`danger-full-access`) mode — the modes a {@link SandboxPolicy} can carry. */
 export type ConfinedSandboxMode = Exclude<SandboxMode, 'danger-full-access'>
@@ -49,6 +53,24 @@ export interface SandboxExecutionPolicy {
    * for agentless calls, which fall back to per-call backend state.
    */
   sessionId?: SessionId
+  /**
+   * Outbound network for confined processes. `ctx.sandboxPolicy.resolve()`
+   * always sets this from the validated `network` config (default `deny`).
+   * Omitted on a hand-built policy is treated as `deny` by
+   * {@link sandboxNetwork}.
+   */
+  network?: SandboxNetwork
+}
+
+/**
+ * Resolve outbound network for one policy. The policy home fills
+ * {@link SandboxExecutionPolicy.network} at `resolve()`; a hand-built policy
+ * that omits the field is `deny`.
+ * @param policy - per-call policy, which may omit `network`.
+ * @returns `allow` only when the policy explicitly allows outbound network.
+ */
+export function sandboxNetwork(policy: Pick<SandboxExecutionPolicy, 'network'>): SandboxNetwork {
+  return policy.network ?? 'deny'
 }
 
 /**

@@ -1,6 +1,6 @@
 {
   "name": "@roos-code/roos-code-fs-sandbox",
-  "description": "Sandbox-enforcing implementation of the Roos Code filesystem seam: fences write/edit by the per-call sandbox mode (read-only denies mutation, workspace-write contains it to the workspace + temp roots) while reads pass through",
+  "description": "Sandbox-enforcing implementation of the Roos Code filesystem seam: fences write/edit by the per-call sandbox mode and denies credential-document reads except under danger-full-access",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
@@ -34,14 +34,19 @@
   "peerDependencies": {
     "@roos-code/roos-code-fs": "workspace:^",
     "@roos-code/roos-code-fs-local": "workspace:^",
+    "@roos-code/roos-code-home-paths": "workspace:^",
     "@roos-code/roos-code-invariants": "workspace:^",
     "@roos-code/roos-code-sandbox": "workspace:^",
     "@roos-code/roos-code-sandbox-policy": "workspace:^",
     "@roos-code/cordis": "workspace:^"
   },
+  "dependencies": {
+    "@roos-code/schemastery": "workspace:^"
+  },
   "devDependencies": {
     "@roos-code/roos-code-fs": "workspace:^",
     "@roos-code/roos-code-fs-local": "workspace:^",
+    "@roos-code/roos-code-home-paths": "workspace:^",
     "@roos-code/roos-code-invariants": "workspace:^",
     "@roos-code/roos-code-sandbox": "workspace:^",
     "@roos-code/roos-code-sandbox-policy": "workspace:^",
