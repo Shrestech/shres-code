@@ -1,20 +1,30 @@
 # Configure models
 
-English | [中文](providers.zh.md)
+This guide assumes you started the Web UI through the [root README](../../../README.md#run), or `roos --profile headless` on a TTY. Model changes take effect on the next request without restarting the server.
 
-This guide assumes you started the Web UI through the [root README](../../../README.md#run). Model changes take effect on the next request without restarting the server.
+First run with no usable default opens a picker instead of silently choosing a vendor. Headless prints detected local Ollama models, the shipped template routes, and a custom base URL; Web shows the same routes on the onboarding card. A non-TTY process with no usable default fails and names those configuration paths.
 
-## Configure DeepSeek
+## Configure a shipped provider
 
-Open **Settings → Models**. The DeepSeek card exposes one API-key field; enter the key and save it.
+Open **Settings → Models**. The page lists the composed routes: DeepSeek, local Ollama, Ollama Cloud, OpenAI, Anthropic (Claude), xAI (Grok), Moonshot (Kimi), OpenRouter, and Groq.
 
 ![The Models page: the DeepSeek card, with Add provider and Add a custom provider below it](providers-models-page.png)
 
-Keys are write-only. The page receives a redacted descriptor after saving, never the literal secret. The key is stored in `$DSH_HOME/.credentials.yaml`, while settings retain only its credential reference.
+Each keyed card exposes one API-key field; enter the key and save it. Named-but-unset keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `XAI_API_KEY`, `MOONSHOT_API_KEY`, `OLLAMA_API_KEY`, `OPENROUTER_API_KEY`, `GROQ_API_KEY`, `DEEPSEEK_API_KEY`) fail a request with `MISSING_CREDENTIAL` until stored.
 
-## Add a catalog provider
+Keys are write-only. The page receives a redacted descriptor after saving, never the literal secret. The key is stored in `$ROOS_HOME/.credentials.yaml`, while settings retain only its credential reference.
 
-Choose **Add provider**, select a provider such as Anthropic or OpenAI, enter its API key, and save. The installed catalog supplies the endpoint, protocol, and model list.
+### Local Ollama
+
+The `ollama-local` route talks to `http://localhost:11434/v1` and needs no API key. First run probes `GET /v1/models` and offers whatever that listing returns. The CLI id you pass to `ollama run` is the same id the API accepts.
+
+### Ollama Cloud
+
+The `ollama-cloud` route talks to `https://ollama.com/v1` with `OLLAMA_API_KEY`. Cloud model ids carry a `:cloud` suffix; the shipped catalog includes `deepseek-v4-flash:cloud` and `deepseek-v4-pro:cloud`. Those spellings match `ollama run deepseek-v4-flash:cloud`. Context window and max tokens are pinned on the route because `GET /models` does not disclose them.
+
+### Claude, Grok, and Kimi
+
+Anthropic, xAI, and Moonshot are catalog routes: pick the card, enter `ANTHROPIC_API_KEY`, `XAI_API_KEY`, or `MOONSHOT_API_KEY`, and save. The installed catalog supplies the endpoint, protocol, and model list. OpenAI, OpenRouter, and Groq work the same way.
 
 Providers with native authentication need their native credentials instead. Bedrock, Vertex, Azure, and Codex use AWS credentials and a region, an ADC project, an `api-version`, and OAuth respectively; filling only the API-key field does not configure them.
 
@@ -32,7 +42,7 @@ Under **Model catalog**, choose **Fetch available models** to query the base URL
 
 A model you enter by hand is treated as text-only until it says otherwise, because nothing can ask an endpoint which modalities it accepts. Attaching an image to such a model is refused before it is sent, naming the model.
 
-A vision model on a custom provider therefore needs one line. The form has no field for it; add `input` to the model in `$DSH_HOME/settings.yaml`:
+A vision model on a custom provider therefore needs one line. The form has no field for it; add `input` to the model in `$ROOS_HOME/settings.yaml`:
 
 ```yaml
 llm-pi-ai:
@@ -88,6 +98,8 @@ If a saved default names a provider that was deleted, the composer displays **Se
 ## Troubleshooting
 
 - **`MISSING_CREDENTIAL`** — Store the provider key through the Models page or supply the referenced environment variable.
+- **First-run picker on every headless run** — No user-saved `agent-default-model` exists and the composition default cannot serve. Pick a route, export a key, or write the section in `$ROOS_HOME/settings.yaml`.
+- **Local Ollama is missing from the picker** — `GET http://localhost:11434/v1/models` did not answer. Start Ollama and retry; the shipped route still appears on the Models page.
 - **`UNKNOWN_MODEL`** — Select a configured model or add the missing model to the custom provider.
 - **Fetching available models returns 401** — Check the key. Model discovery calls the OpenAI-compatible `GET /models` endpoint; enter models manually for endpoints that do not provide it.
 - **An image is refused before sending** — The model declares no image modality. Give a custom provider's model `input: [text, image]`; DeepSeek's own chat-completions route is text-only and cannot be configured otherwise.
@@ -95,4 +107,4 @@ If a saved default names a provider that was deleted, the composer displays **Se
 
 ## Advanced configuration
 
-The generated [plugin configuration catalog](../../config-catalog.md) lists every supported field and default. The [`dsh-llm-pi-ai`](../../../packages/llm/llm-pi-ai/README.md) and [`dsh-llm-deepseek`](../../../packages/llm/llm-deepseek/README.md) references own direct `settings.yaml` configuration, catalog resolution, reasoning controls, credentials, and adapter errors.
+The generated [plugin configuration catalog](../../config-catalog.md) lists every supported field and default. The [`roos-llm-pi-ai`](../../../packages/llm/llm-pi-ai/README.md) and [`roos-llm-deepseek`](../../../packages/llm/llm-deepseek/README.md) references own direct `settings.yaml` configuration, catalog resolution, reasoning controls, credentials, and adapter errors. The first-run picker contract lives in [`roos-first-run-setup`](../../../packages/core/first-run-setup/README.md). The [CLI models guide](./models.md) owns `roos models` and `roos providers`.

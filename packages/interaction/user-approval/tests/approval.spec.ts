@@ -1,13 +1,16 @@
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@deepseek-ai/cordis'
-import type { Agent } from '@deepseek-ai/dsh-agent'
-import { CallId } from '@deepseek-ai/dsh-llm'
-import { carrierKeyOf, createScope } from '@deepseek-ai/dsh-scope'
-import type { Scope } from '@deepseek-ai/dsh-scope'
-import SessionStore, { Session, SessionId } from '@deepseek-ai/dsh-session'
-import type { SessionEvent } from '@deepseek-ai/dsh-session'
-import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
-import ApprovalService, { ApprovalOutcome, ApprovalRequest, effectiveApprovalPolicy, setApprovalPolicy } from '@deepseek-ai/dsh-user-approval'
+import { Context } from '@roos-code/cordis'
+import type { Agent } from '@roos-code/roos-code-agent'
+import { CallId } from '@roos-code/roos-code-llm'
+import { carrierKeyOf, createScope } from '@roos-code/roos-code-scope'
+import type { Scope } from '@roos-code/roos-code-scope'
+import SessionStore, { Session, SessionId } from '@roos-code/roos-code-session'
+import type { SessionEvent } from '@roos-code/roos-code-session'
+import SystemPrompt from '@roos-code/roos-code-system-prompt'
+import ApprovalService, {
+  ApprovalOutcome, ApprovalOutsideTurnError, ApprovalRequest, effectiveApprovalPolicy,
+  isApprovalOutsideTurnError, setApprovalPolicy,
+} from '@roos-code/roos-code-user-approval'
 
 /**
  * A minimal Agent stand-in — the service only reaches `agent.session.append`
@@ -44,7 +47,7 @@ describe('ApprovalService.request', () => {
     const ctx = await mounted()
     const { agent, appended } = fakeAgent([])
 
-    await expect(ctx.approval.request(requestOf(agent))).rejects.toThrow(/outside an open turn/)
+    await expect(ctx.approval.request(requestOf(agent))).rejects.toBeInstanceOf(ApprovalOutsideTurnError)
     expect(appended).toHaveLength(0)
   })
 
@@ -52,7 +55,16 @@ describe('ApprovalService.request', () => {
     const ctx = await mounted()
     const { agent, appended } = fakeAgent([{ type: 'turn/start' }, { type: 'turn/end' }])
 
-    await expect(ctx.approval.request(requestOf(agent))).rejects.toThrow(/outside an open turn/)
+    const thrown = await ctx.approval.request(requestOf(agent)).then(
+      () => undefined,
+      (error: unknown) => error,
+    )
+    expect(isApprovalOutsideTurnError(thrown)).toBe(true)
+    expect(isApprovalOutsideTurnError(new Error('outside an open turn'))).toBe(false)
+    expect(isApprovalOutsideTurnError('outside an open turn')).toBe(false)
+    const named = new Error('foreign throw')
+    named.name = 'ApprovalOutsideTurnError'
+    expect(isApprovalOutsideTurnError(named)).toBe(true)
     expect(appended).toHaveLength(0)
   })
 

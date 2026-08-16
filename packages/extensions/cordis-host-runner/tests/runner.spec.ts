@@ -147,7 +147,7 @@ describe('dynamic runner definitions', () => {
 })
 
 describe('dynamic runner dispatch', () => {
-  it('starts a host-only package immediately, with no request and no approval', async () => {
+  it('starts a host-only package immediately after the one-shot Host-activation grant, with no Client request', async () => {
     const { ctx, runner, gateway } = await setup()
     const { pluginId, packageId } = define(runner, {
       sessionId: AGENT_A.id, name: 'doubler', purpose: 'p', host: HOST_CODE,
@@ -491,7 +491,7 @@ describe('dynamic runner teardown', () => {
     const receipt = await runner.undefine(AGENT_A, 'dyn-404' as CordisDynamicPluginId)
 
     expect(receipt).toMatchObject({ ok: false, reason: 'plugin-missing' })
-    expect((receipt as { message: string }).message).toContain('lost on DSH restart')
+    expect((receipt as { message: string }).message).toContain('lost on Roos restart')
   })
 
   it('unwinds every host half when the runner itself is disposed', async () => {

@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import type {
   ConversationLocation, ConversationSnapshot, RequestView,
-} from '@deepseek-ai/dsh-client-runtime/client'
+} from '@roos-code/roos-code-client-runtime/client'
 import { TrajectoryGroupHeader } from '../src/client/TrajectoryGroupHeader.tsx'
 import { TrajectoryTurn } from '../src/client/TrajectoryTurn.tsx'
 import { TrajectoryTurnHeader } from '../src/client/TrajectoryTurnHeader.tsx'
@@ -480,12 +480,12 @@ describe('run_code sub-dispatch cells', () => {
     {
       kind: 'assistant', seq: 2, time: 6_000, turn: 1, step: 1,
       blocks: [
-        { kind: 'tool-call', callId: 'p1', name: 'run_code', argsRaw: '{"code":"…","description":"批量读取"}' },
+        { kind: 'tool-call', callId: 'p1', name: 'run_code', argsRaw: '{"code":"…","description":"batch read"}' },
       ],
     },
     {
       kind: 'tool-result', seq: 3, time: 9_000, callId: 'p1',
-      call: { name: 'run_code', argsRaw: '{"code":"…","description":"批量读取"}' }, callTime: 6_200,
+      call: { name: 'run_code', argsRaw: '{"code":"…","description":"batch read"}' }, callTime: 6_200,
       content: [{ type: 'text', text: 'done' }], isError: false, callView: null, resultView: null,
       subCalls: [],
     },

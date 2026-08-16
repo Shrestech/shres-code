@@ -17,7 +17,7 @@ First determine whether a capability belongs on Host or Client, then query the r
 6. Handle approval, waiting, Client loading, and render failures from the Run card, steering messages, or `cordis_inspect_self`.
 7. Use `cordis_stop` to disable the Plugin temporarily. Use `cordis_undefine` only when it is no longer needed.
 
-Do not wait in the same turn for user approval or asynchronous browser results. After `cordis_run` returns `awaiting-approval` or `starting`, end the current Tool flow and wait for the system to report the final outcome through state updates and steering.
+A Host-half Package asks the session approval channel inside `cordis_run` before any Host code runs; `rejected`, `cancelled`, or `unavailable` is a final structured result — do not retry that same activation. Do not wait in the same turn for Client-half approval or asynchronous browser results. After `cordis_run` returns `awaiting-approval` or `starting`, end the current Tool flow and wait for the system to report the final outcome through state updates and steering.
 
 ## Tool usage guidance
 
@@ -355,7 +355,7 @@ Tool arguments and return values must be JSON-compatible. `execute` owns the bus
 
 ## Handle internal live data
 
-Service instances, Event payloads, Slot props, Session and Conversation Snapshots, Tool state, and other DSH/Cordis objects are internal live data.
+Service instances, Event payloads, Slot props, Session and Conversation Snapshots, Tool state, and other Roos/Cordis objects are internal live data.
 
 Do not:
 
@@ -383,7 +383,7 @@ Choose the `cordis_run` mode as follows:
 | Update failed | `nextPackageId` | `update` to retry |
 | Update failed | `currentPackageId` | `run` to roll back |
 
-An unauthorized Client Package returns `awaiting-approval`. A single check mark authorizes only the current Package; double check marks authorize future versions of the same Plugin. A grant remains after a technical runtime failure. An authorized Package returns `starting` and completes asynchronously in the browser.
+A Host half asks `ctx.approval` once per Plugin in the Session; `'allowed-once'` is the only grant. An unauthorized Client Package returns `awaiting-approval`. A single check mark authorizes only the current Client Package; double check marks authorize future Client versions of the same Plugin. A grant remains after a technical runtime failure. An authorized Client Package returns `starting` and completes asynchronously in the browser.
 
 After a technical failure:
 

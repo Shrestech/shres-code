@@ -8,17 +8,17 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { Context } from '@deepseek-ai/cordis'
-import AgentRegistry, { Inbox } from '@deepseek-ai/dsh-agent'
-import type { Agent } from '@deepseek-ai/dsh-agent'
-import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
-import type { Session } from '@deepseek-ai/dsh-session'
-import UserQuestionService from '@deepseek-ai/dsh-user-questions'
-import LocalJobRegistry from '@deepseek-ai/dsh-jobs-local'
-import type { JobOutcome } from '@deepseek-ai/dsh-jobs'
-import type { MuxFrame, RpcRequest } from '@deepseek-ai/dsh-host-apiproxy/api'
-import { RpcId } from '@deepseek-ai/dsh-host-apiproxy/api/rpc'
-import { createApiProxy } from '@deepseek-ai/dsh-host-apiproxy'
+import { Context } from '@roos-code/cordis'
+import AgentRegistry, { Inbox } from '@roos-code/roos-code-agent'
+import type { Agent } from '@roos-code/roos-code-agent'
+import SessionStore, { SessionId } from '@roos-code/roos-code-session'
+import type { Session } from '@roos-code/roos-code-session'
+import UserQuestionService from '@roos-code/roos-code-user-questions'
+import LocalJobRegistry from '@roos-code/roos-code-jobs-local'
+import type { JobOutcome } from '@roos-code/roos-code-jobs'
+import type { MuxFrame, RpcRequest } from '@roos-code/roos-code-host-apiproxy/api'
+import { RpcId } from '@roos-code/roos-code-host-apiproxy/api/rpc'
+import { createApiProxy } from '@roos-code/roos-code-host-apiproxy'
 
 type JobFrame = Extract<MuxFrame, { type: 'session/jobs' }>
 

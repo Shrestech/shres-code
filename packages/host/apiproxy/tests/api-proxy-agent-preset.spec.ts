@@ -8,18 +8,18 @@
 import { mkdtempSync, realpathSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { Context } from '@deepseek-ai/cordis'
-import AgentRegistry, { type AgentFactory } from '@deepseek-ai/dsh-agent'
-import type { Agent } from '@deepseek-ai/dsh-agent'
-import SessionStore, { SessionId, type Session } from '@deepseek-ai/dsh-session'
-import UserQuestionService from '@deepseek-ai/dsh-user-questions'
+import { Context } from '@roos-code/cordis'
+import AgentRegistry, { type AgentFactory } from '@roos-code/roos-code-agent'
+import type { Agent } from '@roos-code/roos-code-agent'
+import SessionStore, { SessionId, type Session } from '@roos-code/roos-code-session'
+import UserQuestionService from '@roos-code/roos-code-user-questions'
 import { RpcId, type RpcRequest } from '../src/api/rpc.ts'
 import type { HostFrame } from '../src/api/events.ts'
 import {
   InvalidPresetIdError, PresetExistsError, resolveSessionPreset, UnknownPresetError,
-} from '@deepseek-ai/dsh-agent-presets'
-import type {} from '@deepseek-ai/dsh-agent-presets/types'
-import { GoalId } from '@deepseek-ai/dsh-goal'
+} from '@roos-code/roos-code-agent-presets'
+import type {} from '@roos-code/roos-code-agent-presets/types'
+import { GoalId } from '@roos-code/roos-code-goal'
 import { createApiProxy } from '../src/api-proxy.ts'
 import { describe, expect, it } from 'vitest'
 
@@ -106,7 +106,7 @@ async function harness(
   persistence?: unknown,
   options: { userIds?: readonly string[]; defaults?: Record<string, unknown> } = {},
 ) {
-  const cwd = realpathSync(mkdtempSync(join(tmpdir(), 'dsh-apiproxy-preset-')))
+  const cwd = realpathSync(mkdtempSync(join(tmpdir(), 'roos-apiproxy-preset-')))
   const ctx = new Context()
   await ctx.plugin(SessionStore)
   await ctx.plugin(AgentRegistry)
@@ -485,7 +485,7 @@ describe('authoring over the wire', () => {
     const { api } = await harness(['standard'])
 
     const response = await api.agentPresets.copy(
-      request({ from: 'standard', agentPreset: 'mine', name: '我的模式' }))
+      request({ from: 'standard', agentPreset: 'mine', name: 'My mode' }))
 
     expect(response.result.ok).toBe(true)
     if (!response.result.ok) throw new Error('unreachable')

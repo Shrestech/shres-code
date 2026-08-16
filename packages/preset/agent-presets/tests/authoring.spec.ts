@@ -11,13 +11,13 @@ import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { Context } from '@deepseek-ai/cordis'
-import Loader from '@deepseek-ai/cordis-plugin-loader'
-import Include from '@deepseek-ai/cordis-plugin-include'
+import { Context } from '@roos-code/cordis'
+import Loader from '@roos-code/cordis-plugin-loader'
+import Include from '@roos-code/cordis-plugin-include'
 import { beforeEach, describe, expect, it } from 'vitest'
 import AgentPresets, {
   COMPOSITION_FILE, copyComposition, METADATA_FILE,
-} from '@deepseek-ai/dsh-agent-presets'
+} from '@roos-code/roos-code-agent-presets'
 
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), 'fixtures')
 const VALID = '- id: tool-alpha\n  name: ../../plugins/contribute.js\n  config:\n    tool: alpha\n'
@@ -41,7 +41,7 @@ async function seedPreset(
 }
 
 beforeEach(async () => {
-  userRoot = await mkdtemp(join(tmpdir(), 'dsh-preset-authoring-'))
+  userRoot = await mkdtemp(join(tmpdir(), 'roos-preset-authoring-'))
   ctx = new Context()
   ctx.baseUrl = pathToFileURL(FIXTURES).href + '/'
   await ctx.plugin(Loader)
@@ -89,26 +89,26 @@ describe('copying a preset', () => {
   })
 
   it('keeps the source description but never its name or order', async () => {
-    await seedPreset(userRoot, 'source', { metadata: 'name: 源模式\ndescription: 只做检索。\norder: 1\n' })
+    await seedPreset(userRoot, 'source', { metadata: 'name: Source mode\ndescription: Retrieval only.\norder: 1\n' })
 
     await ctx.agentPresets.copy('source', 'mine')
 
     // Two rows presenting identically is how a roster stops being a chooser,
     // and the shipped set's declared order is not the copy's to claim.
     const metadata = await readFile(join(userRoot, 'mine', METADATA_FILE), 'utf8')
-    expect(metadata).toContain('description: 只做检索。')
+    expect(metadata).toContain('description: Retrieval only.')
     expect(metadata).not.toContain('name:')
     expect(metadata).not.toContain('order:')
     expect((await ctx.agentPresets.list()).find(preset => preset.id === 'mine'))
-      .toMatchObject({ description: '只做检索。' })
+      .toMatchObject({ description: 'Retrieval only.' })
   })
 
   it('stores the display name the author supplied', async () => {
-    await ctx.agentPresets.copy('standard', 'mine', '我的模式')
+    await ctx.agentPresets.copy('standard', 'mine', 'My mode')
 
-    expect(await readFile(join(userRoot, 'mine', METADATA_FILE), 'utf8')).toContain('name: 我的模式')
+    expect(await readFile(join(userRoot, 'mine', METADATA_FILE), 'utf8')).toContain('name: My mode')
     expect((await ctx.agentPresets.list()).find(preset => preset.id === 'mine'))
-      .toMatchObject({ name: '我的模式' })
+      .toMatchObject({ name: 'My mode' })
   })
 
   it('publishes no metadata file when there is nothing to publish', async () => {
@@ -191,7 +191,7 @@ describe('deleting a preset', () => {
 
 describe('a deployment with more than one user root', () => {
   it('refuses to delete a preset the writable root does not own', async () => {
-    const second = await mkdtemp(join(tmpdir(), 'dsh-preset-second-'))
+    const second = await mkdtemp(join(tmpdir(), 'roos-preset-second-'))
     await seedPreset(second, 'elsewhere')
     const layered = new Context()
     layered.baseUrl = pathToFileURL(FIXTURES).href + '/'
@@ -235,7 +235,7 @@ describe('a deployment with no writable root', () => {
 
 describe('a user root that does not exist yet', () => {
   it('is created by the first copy', async () => {
-    const absent = join(await mkdtemp(join(tmpdir(), 'dsh-preset-absent-')), 'nested', 'preset')
+    const absent = join(await mkdtemp(join(tmpdir(), 'roos-preset-absent-')), 'nested', 'preset')
     const fresh = new Context()
     fresh.baseUrl = pathToFileURL(FIXTURES).href + '/'
     await fresh.plugin(Loader)

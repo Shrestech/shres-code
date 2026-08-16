@@ -4,7 +4,7 @@
  * discipline), so `./client` projects the same single-source content
  * `./types` serves to host consumers — zero duplication.
  *
- * @module @deepseek-ai/dsh-plan-mode/client
+ * @module @roos-code/roos-code-plan-mode/client
  */
 
 export type * from './types.ts'

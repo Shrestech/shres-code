@@ -8,7 +8,7 @@
  * list rows' title projection).
  */
 import { describe, expect, it } from 'vitest'
-import type { SessionId } from '@deepseek-ai/dsh-api-remotes/client'
+import type { SessionId } from '@roos-code/roos-code-api-remotes/client'
 import { ProjectionValueStore } from '../src/client/sessions/projection-store.ts'
 import { Session } from '../src/client/sessions/session.ts'
 import { SessionManager } from '../src/client/sessions/manager.ts'
@@ -17,7 +17,7 @@ import { entries, plainTurn } from './event-script.client.ts'
 
 // Test-domain keys merged into the projection map (the Service Definition package's
 // pure-type outlet), the same way domain host plugins merge theirs.
-declare module '@deepseek-ai/dsh-session-projection/types' {
+declare module '@roos-code/roos-code-session-projection/types' {
   interface SessionProjectionMap {
     'test/marks': { marks: string[] }
   }
@@ -105,7 +105,7 @@ describe('Session tail-page seeding', () => {
     const api = new FakeApiClient()
     const session = new Session(SID, api, fakeRemote())
     api.onHistory = () => Promise.resolve(ok({
-      events: entries(plainTurn(0, 0, '问', '答')) as never[], hasMore: false,
+      events: entries(plainTurn(0, 0, 'Q', 'A')) as never[], hasMore: false,
       projections: { asOfSeq: 5, values: { 'test/marks': { marks: ['from-baseline'] } } },
     } as never))
     await session.open()

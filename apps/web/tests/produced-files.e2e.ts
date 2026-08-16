@@ -7,9 +7,9 @@ import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed, vi } from 'vitest'
-import { CallId, createAssistantMessage, createToolResultMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
-import { SESSION_FORMAT_VERSION, Session, SessionId } from '@deepseek-ai/dsh-session'
-import type {} from '@deepseek-ai/dsh-session-title'
+import { CallId, createAssistantMessage, createToolResultMessage, createUserMessage } from '@roos-code/roos-code-llm'
+import { SESSION_FORMAT_VERSION, Session, SessionId } from '@roos-code/roos-code-session'
+import type {} from '@roos-code/roos-code-session-title'
 import {
   launchWebScaffold, seedSession, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
@@ -22,7 +22,7 @@ const DONE = 'PRODUCED_FILES_DONE'
 
 /** Short leading names plus a long third name make the narrow lane deterministically show two. */
 const PRODUCED = [
-  '关于我.md',
+  'about-me.md',
   'index.html',
   'long-generated-experience-specification-for-produced-files-overflow.md',
   'styles.css',
@@ -142,7 +142,7 @@ describe('web e2e: a finished turn ends with the files it produced', () => {
     await row.waitFor({ timeout: 15_000 })
     const chips = row.getByRole('button')
     await expect.poll(() => chips.count()).toBe(2)
-    expect(await chips.nth(0).innerText()).toBe('关于我.md')
+    expect(await chips.nth(0).innerText()).toBe('about-me.md')
     expect(await chips.nth(1).innerText()).toBe('index.html')
     expect(await row.getByText('+ 8 files', { exact: true }).count()).toBe(1)
     const showFolder = page.getByRole('button', { name: 'Show in folder', exact: true })

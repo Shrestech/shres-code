@@ -1,12 +1,10 @@
-# @deepseek-ai/dsh-workflow
-
-English | [中文](README.zh.md)
+# @roos-code/roos-code-workflow
 
 The workflow seam (`ctx.workflowEngine`) executes a model-written orchestration script that can fan out subagents. The seam defines the script, run, result, error, and event contracts; an engine decides how to isolate and execute the script.
 
-`@deepseek-ai/dsh-workflow-worker-thread` is the current engine and `@deepseek-ai/dsh-tool-workflow` is the model-facing consumer. A future process or sandbox engine can replace the implementation without changing the tool.
+`@roos-code/roos-code-workflow-worker-thread` is the current engine and `@roos-code/roos-code-tool-workflow` is the model-facing consumer. A future process or sandbox engine can replace the implementation without changing the tool.
 
-The package root is the Host face. The browser-safe `@deepseek-ai/dsh-workflow/types` subpath contains run identities, metadata, results, and observe-only lifecycle payloads without importing `Agent`, Cordis services, or Host context declarations; Host-only `WorkflowStartRequest` and `WorkflowRun` live behind the package root.
+The package root is the Host face. The browser-safe `@roos-code/roos-code-workflow/types` subpath contains run identities, metadata, results, and observe-only lifecycle payloads without importing `Agent`, Cordis services, or Host context declarations; Host-only `WorkflowStartRequest` and `WorkflowRun` live behind the package root.
 
 ## Service and run contract
 
@@ -44,7 +42,7 @@ A child that resolves normally with a non-completed stop reason is not an infras
 
 ## Model Experience
 
-Indirectly, through `dsh-tool-workflow` and a workflow engine, which create child-agent requests and return a retained parent tool result.
+Indirectly, through `roos-tool-workflow` and a workflow engine, which create child-agent requests and return a retained parent tool result.
 
 #### KV Cache effect
 

@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import {
   resolveRetryPolicy,
   RetryPolicySchema,
-} from '@deepseek-ai/dsh-llm'
-import type { RetryPolicyConfig } from '@deepseek-ai/dsh-llm'
-import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
+} from '@roos-code/roos-code-llm'
+import type { RetryPolicyConfig } from '@roos-code/roos-code-llm'
+import { MAX_TIMER_DELAY_MS } from '@roos-code/roos-code-timeout'
 
 describe('provider retry policy', () => {
   it('resolves immutable normal defaults', () => {

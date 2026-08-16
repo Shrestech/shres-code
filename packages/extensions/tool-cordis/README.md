@@ -1,8 +1,6 @@
-# @deepseek-ai/dsh-tool-cordis
+# @roos-code/roos-code-tool-cordis
 
-English | [中文](README.zh.md)
-
-The self-referential Cordis toolset: five model-facing tools over the live runtime in the current DSH process. The registry, the vm sandbox, and the browser broadcast belong to [`@deepseek-ai/dsh-cordis-host-runner`](../cordis-host-runner/README.md) (`ctx.dynamic`), which this toolset injects — a composition with these tools but no runner never activates them. Design home — sandbox semantics, dynamic-package lifecycle and composition, standing decisions: [the toolset Agent Note](../../../.agents/notes/implemented/feature/2026-07-08-self-referential-cordis-toolset.md).
+The self-referential Cordis toolset: five model-facing tools over the live runtime in the current Roos process. The registry, the vm sandbox, and the browser broadcast belong to [`@roos-code/roos-code-cordis-host-runner`](../cordis-host-runner/README.md) (`ctx.dynamic`), which this toolset injects — a composition with these tools but no runner never activates them. Design home — sandbox semantics, dynamic-package lifecycle and composition, standing decisions: [the toolset Agent Note](../../../.agents/notes/implemented/feature/2026-07-08-self-referential-cordis-toolset.md).
 
 ## What it does
 
@@ -16,7 +14,7 @@ Two paired verbs, plus the read-only report.
 
 Exact model-facing schemas: [the generated tool catalog](../../../docs/tool-catalog.md).
 
-Dynamic packages live only in the shared DSH process memory. They remain active across later turns and may affect other sessions in that process, but disappear after `cordis_stop`/`cordis_undefine`, toolset unload, or DSH restart. They create no Plugin file, install no package, change no `cordis.yml` or personal/project configuration, do not survive restart, and cannot be promoted automatically. To keep an experiment, ask the Agent to implement a normal local, project, or repository Plugin through the regular development workflow. Every verb is session-scoped: a package is visible and controllable only in the session that defined it.
+Dynamic packages live only in the shared Roos process memory. They remain active across later turns and may affect other sessions in that process, but disappear after `cordis_stop`/`cordis_undefine`, toolset unload, or Roos restart. They create no Plugin file, install no package, change no `cordis.yml` or personal/project configuration, do not survive restart, and cannot be promoted automatically. To keep an experiment, ask the Agent to implement a normal local, project, or repository Plugin through the regular development workflow. Every verb is session-scoped: a package is visible and controllable only in the session that defined it.
 
 ## Trust stance
 
@@ -24,7 +22,7 @@ The sandbox isolates globals but is not a security boundary. Node globals are ab
 
 ## Config
 
-None. The vm evaluation bound (`vmTimeoutMs`) and the browser acknowledgement window (`ackTimeoutMs`) belong to the runner service that owns the sandbox and the broadcast — see [`@deepseek-ai/dsh-cordis-host-runner`](../cordis-host-runner/README.md#config).
+None. The vm evaluation bound (`vmTimeoutMs`) and the browser acknowledgement window (`ackTimeoutMs`) belong to the runner service that owns the sandbox and the broadcast — see [`@roos-code/roos-code-cordis-host-runner`](../cordis-host-runner/README.md#config).
 
 ## The generated client slot catalog
 
@@ -47,7 +45,7 @@ The generated `INHERITED_CTX_API` closes the `api` report with the framework-inh
 
 ## Rendering
 
-Every tool renders a `generic` card (`read` / `execute` / `delete`); `cordis_define` carries the submitted halves as `rawInput` and titles the card with the label and purpose. Presenters are pure functions of the args, and results keep the default text rendering. A Web client registers its own keyed `cordis_define` row (`@deepseek-ai/dsh-client-ui-cordis`) and reads the label, purpose, and minted id from the call arguments and the result metadata; the generic card is what a surface without that registration falls back to.
+Every tool renders a `generic` card (`read` / `execute` / `delete`); `cordis_define` carries the submitted halves as `rawInput` and titles the card with the label and purpose. Presenters are pure functions of the args, and results keep the default text rendering. A Web client registers its own keyed `cordis_define` row (`@roos-code/roos-code-client-ui-cordis`) and reads the label, purpose, and minted id from the call arguments and the result metadata; the generic card is what a surface without that registration falls back to.
 
 ## Export shape
 
@@ -59,7 +57,7 @@ Namespace plugin: named exports `name` / `inject` / `apply`, no default export (
 
 #### What the model sees
 
-The conversation model sees the generated [`cordis_inspect`, `cordis_define`, `cordis_run`, `cordis_stop`, and `cordis_undefine` schemas](../../../docs/tool-catalog.md#deepseek-aidsh-tool-cordis) whenever this plugin is visible.
+The conversation model sees the generated [`cordis_inspect`, `cordis_define`, `cordis_run`, `cordis_stop`, and `cordis_undefine` schemas](../../../docs/tool-catalog.md#roos-coderoos-code-tool-cordis) whenever this plugin is visible.
 
 #### Token effect
 
@@ -73,7 +71,7 @@ Prefix-stable while this tool view is unchanged. Scoping or plugin lifecycle cha
 
 #### What the model sees
 
-Inspect joins selected sections exactly as `## <section>` then a newline and the data-dependent body, with one blank line between sections; `what: "temporary"` uses the `## Dynamic Packages` heading. Each row reports the id, label, purpose, which halves exist, run state and revision, provided and awaited services, registered host methods, and the last browser-half load report. The empty state explains that definitions live only in this process's memory. Broad API/event reports omit JSDoc; `name` with `what: "api"`, `what: "events"`, or `what: "client"` returns one exact target with its full contract. The `client` section lists one seat per line with its cardinality, scope, summary, and whether registering there replaces shipped UI, then the cross-cutting registrant rules; the per-seat register options, owner and framework props, and runnable example arrive only under an exact `name`. Define answers that the package is defined and NOT running yet with the id to run; run reports the revision, what the host half provides or waits for, and whether a page acknowledged the browser half; stop and undefine acknowledge in one line. Every refusal is a tool error carrying the runner's teaching text. The submitted program remains in assistant tool-call history.
+Inspect joins selected sections exactly as `## <section>` then a newline and the data-dependent body, with one blank line between sections; `what: "temporary"` uses the `## Dynamic Packages` heading. Each row reports the id, label, purpose, which halves exist, run state and revision, provided and awaited services, registered host methods, and the last browser-half load report. The empty state explains that definitions live only in this process's memory. Broad API/event reports omit JSDoc; `name` with `what: "api"`, `what: "events"`, or `what: "client"` returns one exact target with its full contract. The `client` section lists one seat per line with its cardinality, scope, summary, and whether registering there replaces shipped UI, then the cross-cutting registrant rules; the per-seat register options, owner and framework props, and runnable example arrive only under an exact `name`. Define answers that the package is defined and NOT running yet with the id to run; run reports the revision, what the host half provides or waits for, and whether a page acknowledged the browser half; a Host-half approval denial is a structured non-error result (`rejected` / `cancelled` / `unavailable`) that tells the model not to retry; stop and undefine acknowledge in one line. Other refusals are a tool error carrying the runner's teaching text. The submitted program remains in assistant tool-call history.
 
 #### Token effect
 

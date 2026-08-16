@@ -3,11 +3,11 @@
  * event to rows, and delegates write-path orchestration to
  * {@link PersistenceCoordinator}. It has no independent per-session artifact,
  * so its locator returns `undefined`.
- * @module @deepseek-ai/dsh-session-persistence-sqlite
+ * @module @roos-code/roos-code-session-persistence-sqlite
  */
 
-import { Context } from '@deepseek-ai/cordis'
-import z from '@deepseek-ai/schemastery'
+import { Context } from '@roos-code/cordis'
+import z from '@roos-code/schemastery'
 import { randomUUID } from 'node:crypto'
 import { statSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
@@ -19,8 +19,8 @@ import {
   type PersistenceBackend, type SessionLocation, type SessionPersistenceSnapshot,
   type SessionInspection, type SessionPersistenceRevision as PersistenceRevision,
   type StoredPrefix, type StoredSuffix,
-} from '@deepseek-ai/dsh-session-persistence'
-import type { SessionEvent, SurfaceEventType, SessionId, SessionHeader, SessionPreparation } from '@deepseek-ai/dsh-session'
+} from '@roos-code/roos-code-session-persistence'
+import type { SessionEvent, SurfaceEventType, SessionId, SessionHeader, SessionPreparation } from '@roos-code/roos-code-session'
 import {
   type JournalMode, openDatabase, rowToMeta, scanRows, type EventRow, type SessionRow,
 } from './schema.ts'

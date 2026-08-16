@@ -21,6 +21,9 @@
       "path": "../../boot/app-boot"
     },
     {
+      "path": "../../util/home-paths"
+    },
+    {
       "path": "../../acp/acp"
     },
     {

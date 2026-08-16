@@ -1,5 +1,5 @@
 {
-  "name": "@deepseek-ai/dsh-client-ui-commands",
+  "name": "@roos-code/roos-code-client-ui-commands",
   "description": "Client command surface: global directory cache, '/' source, three command UI kinds, popupSelect registry",
   "version": "0.1.0-rc.5",
   "publishConfig": {
@@ -7,7 +7,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
+    "url": "git+https://github.com/roos-code/roos-code.git",
     "directory": "packages/client/ui-commands"
   },
   "type": "module",
@@ -29,14 +29,14 @@
     "./src/*": "./src/*",
     "./package.json": "./package.json"
   },
-  "dsh": {
+  "roos": {
     "client": {
       "inject": [
-        "@deepseek-ai/dsh-api-remotes",
-        "@deepseek-ai/dsh-client-runtime",
-        "@deepseek-ai/dsh-client-locale",
-        "@deepseek-ai/dsh-client-ui-input-trigger",
-        "@deepseek-ai/dsh-client-ui-conversation"
+        "@roos-code/roos-code-api-remotes",
+        "@roos-code/roos-code-client-runtime",
+        "@roos-code/roos-code-client-locale",
+        "@roos-code/roos-code-client-ui-input-trigger",
+        "@roos-code/roos-code-client-ui-conversation"
       ],
       "platform": "web"
     }
@@ -50,32 +50,32 @@
     "clsx": "^2.0.0"
   },
   "peerDependencies": {
-    "@deepseek-ai/dsh-api-remotes": "workspace:^",
-    "@deepseek-ai/dsh-client-locale": "workspace:^",
-    "@deepseek-ai/dsh-client-runtime": "workspace:^",
-    "@deepseek-ai/dsh-client-ui-conversation": "workspace:^",
-    "@deepseek-ai/dsh-client-ui-primitives": "workspace:^",
-    "@deepseek-ai/dsh-client-ui-input-trigger": "workspace:^",
-    "@deepseek-ai/dsh-client-ui-slots": "workspace:^",
-    "@deepseek-ai/dsh-commands": "workspace:^",
-    "@deepseek-ai/dsh-invariants": "workspace:^",
-    "@deepseek-ai/cordis": "workspace:^",
+    "@roos-code/roos-code-api-remotes": "workspace:^",
+    "@roos-code/roos-code-client-locale": "workspace:^",
+    "@roos-code/roos-code-client-runtime": "workspace:^",
+    "@roos-code/roos-code-client-ui-conversation": "workspace:^",
+    "@roos-code/roos-code-client-ui-primitives": "workspace:^",
+    "@roos-code/roos-code-client-ui-input-trigger": "workspace:^",
+    "@roos-code/roos-code-client-ui-slots": "workspace:^",
+    "@roos-code/roos-code-commands": "workspace:^",
+    "@roos-code/roos-code-invariants": "workspace:^",
+    "@roos-code/cordis": "workspace:^",
     "react": "^18.2.0"
   },
   "devDependencies": {
-    "@deepseek-ai/dsh-api-remotes": "workspace:^",
-    "@deepseek-ai/dsh-client-connection": "workspace:^",
-    "@deepseek-ai/dsh-client-locale": "workspace:^",
-    "@deepseek-ai/dsh-client-runtime": "workspace:^",
-    "@deepseek-ai/dsh-client-test-runtime": "workspace:^",
-    "@deepseek-ai/dsh-client-ui-conversation": "workspace:^",
-    "@deepseek-ai/dsh-client-ui-primitives": "workspace:^",
-    "@deepseek-ai/dsh-client-ui-input-trigger": "workspace:^",
-    "@deepseek-ai/dsh-client-ui-slots": "workspace:^",
-    "@deepseek-ai/dsh-commands": "workspace:^",
-    "@deepseek-ai/dsh-invariants": "workspace:^",
+    "@roos-code/roos-code-api-remotes": "workspace:^",
+    "@roos-code/roos-code-client-connection": "workspace:^",
+    "@roos-code/roos-code-client-locale": "workspace:^",
+    "@roos-code/roos-code-client-runtime": "workspace:^",
+    "@roos-code/roos-code-client-test-runtime": "workspace:^",
+    "@roos-code/roos-code-client-ui-conversation": "workspace:^",
+    "@roos-code/roos-code-client-ui-primitives": "workspace:^",
+    "@roos-code/roos-code-client-ui-input-trigger": "workspace:^",
+    "@roos-code/roos-code-client-ui-slots": "workspace:^",
+    "@roos-code/roos-code-commands": "workspace:^",
+    "@roos-code/roos-code-invariants": "workspace:^",
     "@types/react": "~18.3.1",
-    "@deepseek-ai/cordis": "workspace:^",
+    "@roos-code/cordis": "workspace:^",
     "react": "^18.2.0"
   },
   "files": [

@@ -1,21 +1,24 @@
 /**
- * Commander adapter for the `dsh` command line.
+ * Commander adapter for the `roos` command line.
  *
  * The launcher parses only what it owns — which profile to boot, which extra
  * patch overlays to apply, and the config dumps — and hands **everything after
  * its own flags** to the booted tree verbatim, where injected app plugins parse
  * their own flag families and print their own `--help` (see
- * `@deepseek-ai/dsh-cmdline`). Launcher flags therefore come first: the first
+ * `@roos-code/roos-code-cmdline`). Launcher flags therefore come first: the first
  * token this parser does not recognize starts the inner arguments, so
- * `dsh --profile tui --resume abc` boots the tui profile with `--resume abc`,
- * and `dsh --profile web -h` prints the web app's help, not this one's.
+ * `roos --profile tui --resume abc` boots the tui profile with `--resume abc`,
+ * and `roos --profile web -h` prints the web app's help, not this one's.
  *
  * `web` is a hardcoded alias for `--profile web`; `plugin` manages a profile's
- * plugin dependencies by forwarding to pnpm.
- * @module @deepseek-ai/dsh/args
+ * plugin dependencies by forwarding to pnpm; `models` and `providers` manage
+ * the same settings and credentials the Web Settings → Models page uses.
+ * @module @roos-code/roos-code/args
  */
 
 import { Command, CommanderError } from 'commander'
+import type { ModelsCliCommand, ProviderTemplate } from './models-cli.ts'
+import { PROVIDER_TEMPLATES } from './models-cli.ts'
 
 /** Boot a named profile and hand it the invocation's inner arguments. */
 interface ProfileInvocation {
@@ -44,8 +47,14 @@ interface PluginInvocation {
   args: string[]
 }
 
-/** The resolved `dsh` invocation. Help, version, and errors exit inside {@link parseDshArgs}. */
-export type DshInvocation = ProfileInvocation | DumpConfigInvocation | PluginInvocation
+/** Manage models or providers against `$ROOS_HOME` settings and credentials. */
+interface ModelsInvocation {
+  mode: 'models'
+  command: ModelsCliCommand
+}
+
+/** The resolved `roos` invocation. Help, version, and errors exit inside {@link parseRoosArgs}. */
+export type RoosInvocation = ProfileInvocation | DumpConfigInvocation | PluginInvocation | ModelsInvocation
 
 /** Launcher flags shared by the default command and the `web` alias. */
 interface BootOptions {
@@ -63,12 +72,15 @@ const collect = (value: string, previous: string[] = []): string[] => [...previo
 /** The launcher's own help text; each app prints its own. */
 const HELP_EXAMPLES = `
 Examples:
-  dsh --profile web                          boot the web profile (same as: dsh web)
-  dsh --profile headless "run the tests"     answer one task, print the result, and exit
-  dsh --profile tui --patch ./extra.yml      boot a custom profile with one extra overlay
-  dsh --profile tui --resume <session>       arguments after the launcher flags reach the app
-  dsh --profile web --help                   the web app's own flags and help
-  dsh plugin --profile tui add <package>     install a plugin into the tui profile
+  roos --profile web                          boot the web profile (same as: roos web)
+  roos --profile headless "run the tests"     answer one task, print the result, and exit
+  roos --profile tui --patch ./extra.yml      boot a custom profile with one extra overlay
+  roos --profile tui --resume <session>       arguments after the launcher flags reach the app
+  roos --profile web --help                   the web app's own flags and help
+  roos plugin --profile tui add <package>     install a plugin into the tui profile
+  roos models list                            list providers and models from the same store as Settings → Models
+  roos models set ollama-local llama3.2 --effort high
+  roos providers add --template ollama-local
 `
 
 /**
@@ -80,7 +92,7 @@ Examples:
  * @param args - the leftover arguments, in argv order.
  * @returns the resolved invocation.
  */
-function resolveBoot(program: Command, profile: string, options: BootOptions, args: string[]): DshInvocation {
+function resolveBoot(program: Command, profile: string, options: BootOptions, args: string[]): RoosInvocation {
   const patches = options.patch ?? []
   if (patches.includes('')) program.error('error: --patch needs a path')
   if (options.dumpConfig !== true && options.dumpDefaultConfig !== true) {
@@ -109,32 +121,32 @@ function resolveBoot(program: Command, profile: string, options: BootOptions, ar
  * @param version - version string printed by `--version`.
  * @returns the resolved invocation.
  */
-export function parseDshArgs(argv: readonly string[], version: string): DshInvocation {
-  let resolved: DshInvocation | undefined
+export function parseRoosArgs(argv: readonly string[], version: string): RoosInvocation {
+  let resolved: RoosInvocation | undefined
   // Annotated, not inferred: the actions below call back into `program`, and an
   // inferred type would be circular through its own chain.
   const program: Command = new Command()
   program
-    .name('dsh')
+    .name('roos')
     .version(version, '-V, --version', 'output the version number')
-    .description('dsh: boot a DeepSeek Harness profile — an ordered stack of plugin-bundle patch layers under your own overrides.')
+    .description('roos: boot a Roos Code profile — an ordered stack of plugin-bundle patch layers under your own overrides.')
     .addHelpText('after', HELP_EXAMPLES)
     .exitOverride()
     // The launcher's flags come first and end at the first token it does not
     // know; everything from there on belongs to the booted app, including
-    // its -h. `dsh -h` with no profile still prints this help, below.
+    // its -h. `roos -h` with no profile still prints this help, below.
     .helpOption(false)
     .allowUnknownOption()
     .passThroughOptions()
     .enablePositionalOptions()
-    .argument('[args...]', 'arguments for the booted profile\'s app (see: dsh --profile <name> --help)')
-    .option('--profile <name>', 'the profile under $DSH_HOME/profiles to boot')
+    .argument('[args...]', 'arguments for the booted profile\'s app (see: roos --profile <name> --help)')
+    .option('--profile <name>', 'the profile under $ROOS_HOME/profiles to boot')
     .option('--patch <path>', 'extra patch-list overlay applied after the profile layer (repeatable)', collect)
     .option('--dump-config', 'print the composed profile tree and exit')
     .option('--dump-default-config', 'print the profile tree without its user layer or --patch overlays and exit')
     .action((args: string[], options: BootOptions & { profile?: string }) => {
       // With the app owning -h, the launcher's own help is what a bare
-      // `dsh -h` (no profile to hand it to) must print.
+      // `roos -h` (no profile to hand it to) must print.
       if (options.profile === undefined) {
         if (args.some(argument => argument === '-h' || argument === '--help')) program.help()
         program.error('error: --profile <name> is required')
@@ -159,7 +171,7 @@ export function parseDshArgs(argv: readonly string[], version: string): DshInvoc
     .allowUnknownOption()
     .passThroughOptions()
     .enablePositionalOptions()
-    .argument('[args...]', 'arguments for the web app (see: dsh web --help)')
+    .argument('[args...]', 'arguments for the web app (see: roos web --help)')
     .option('--patch <path>', 'extra patch-list overlay applied after the profile layer (repeatable)', collect)
     .option('--dump-config', 'print the composed web-profile tree (with the user layer and any --patch) and exit')
     .option('--dump-default-config', 'print the web profile\'s bundle layers (no user layer) and exit')
@@ -180,12 +192,140 @@ export function parseDshArgs(argv: readonly string[], version: string): DshInvoc
       resolved = { mode: 'plugin', profile: options.profile, args }
     })
 
+  const models = program.command('models').description('list or set the default model using the same store as Settings → Models')
+  models
+    .command('list')
+    .description('list providers and models; the default is marked and missing-key routes are flagged')
+    .action(() => {
+      rejectParentOptions('models')
+      resolved = { mode: 'models', command: { kind: 'models-list' } }
+    })
+  models
+    .command('set')
+    .description('write agent-default-model, optionally including reasoning effort or a purpose override')
+    .argument('<provider>', 'provider route id')
+    .argument('<model>', 'provider-owned model id')
+    .option('--effort <level>', 'adapter-owned reasoning effort for this model')
+    .option('--purpose <purpose>', 'compaction or session-title override instead of the conversation default')
+    .action((provider: string, model: string, options: { effort?: string; purpose?: string }) => {
+      rejectParentOptions('models')
+      if (provider === '') program.error('error: models set needs a provider')
+      if (model === '') program.error('error: models set needs a model')
+      const purpose = parsePurpose(program, options.purpose)
+      resolved = {
+        mode: 'models',
+        command: {
+          kind: 'models-set',
+          provider,
+          model,
+          ...options.effort === undefined ? {} : { effort: options.effort },
+          ...purpose === undefined ? {} : { purpose },
+        },
+      }
+    })
+  models
+    .command('discover')
+    .description('GET /v1/models for a provider, optionally appending advertised ids to its catalog')
+    .argument('<provider>', 'provider route id')
+    .option('--base-url <url>', 'override the stored or composed base URL')
+    .option('--add', 'append advertised model ids to the route catalog')
+    .action((provider: string, options: { baseUrl?: string; add?: boolean }) => {
+      rejectParentOptions('models')
+      if (provider === '') program.error('error: models discover needs a provider')
+      resolved = {
+        mode: 'models',
+        command: {
+          kind: 'models-discover',
+          provider,
+          ...options.baseUrl === undefined ? {} : { baseURL: options.baseUrl },
+          add: options.add === true,
+        },
+      }
+    })
+
+  const providers = program.command('providers').description('add, list, or remove provider routes in the same store as Settings → Models')
+  providers
+    .command('list')
+    .description('list configured providers (same transcript as models list)')
+    .action(() => {
+      rejectParentOptions('providers')
+      resolved = { mode: 'models', command: { kind: 'providers-list' } }
+    })
+  providers
+    .command('add')
+    .description('add a shipped template or custom route; API keys are prompted, never taken from argv')
+    .option('--template <name>', `one of ${PROVIDER_TEMPLATES.join(', ')}`)
+    .option('--base-url <url>', 'OpenAI-compatible base URL')
+    .option('--api-key-env <name>', 'credential-ref name stored in settings (the secret itself is never an argv value)')
+    .option('--provider <id>', 'route id for --template custom')
+    .option('--model <id>', 'model id for --template custom')
+    .action((options: {
+      template?: string
+      baseUrl?: string
+      apiKeyEnv?: string
+      provider?: string
+      model?: string
+    }) => {
+      rejectParentOptions('providers')
+      const template = parseTemplate(program, options.template)
+      resolved = {
+        mode: 'models',
+        command: {
+          kind: 'providers-add',
+          ...template === undefined ? {} : { template },
+          ...options.baseUrl === undefined ? {} : { baseURL: options.baseUrl },
+          ...options.apiKeyEnv === undefined ? {} : { apiKeyEnv: options.apiKeyEnv },
+          ...options.provider === undefined ? {} : { provider: options.provider },
+          ...options.model === undefined ? {} : { model: options.model },
+        },
+      }
+    })
+  providers
+    .command('remove')
+    .description('remove a user-owned pi-ai provider route')
+    .argument('<provider>', 'provider route id')
+    .action((provider: string) => {
+      rejectParentOptions('providers')
+      if (provider === '') program.error('error: providers remove needs a provider')
+      resolved = { mode: 'models', command: { kind: 'providers-remove', provider } }
+    })
+
   try {
     program.parse(argv, { from: 'user' })
   } catch (error) {
     return process.exit(error instanceof CommanderError ? error.exitCode : 1)
   }
   /* v8 ignore next -- an action resolves or Commander throws */
-  if (resolved === undefined) throw new Error('dsh: no invocation resolved')
+  if (resolved === undefined) throw new Error('roos: no invocation resolved')
   return resolved
+}
+
+const PURPOSES = new Set(['compaction', 'session-title'])
+
+/**
+ * Validate an optional `--purpose` flag.
+ * @param program - commander program used to fail loud.
+ * @param value - raw flag value.
+ * @returns the purpose, or undefined when the flag was omitted.
+ */
+function parsePurpose(program: Command, value: string | undefined): 'compaction' | 'session-title' | undefined {
+  if (value === undefined) return undefined
+  if (!PURPOSES.has(value)) {
+    program.error('error: --purpose must be compaction or session-title')
+  }
+  return value as 'compaction' | 'session-title'
+}
+
+/**
+ * Validate an optional `--template` flag.
+ * @param program - commander program used to fail loud.
+ * @param value - raw flag value.
+ * @returns the template, or undefined when the flag was omitted.
+ */
+function parseTemplate(program: Command, value: string | undefined): ProviderTemplate | undefined {
+  if (value === undefined) return undefined
+  if (!(PROVIDER_TEMPLATES as readonly string[]).includes(value)) {
+    program.error(`error: --template must be one of ${PROVIDER_TEMPLATES.join(', ')}`)
+  }
+  return value as ProviderTemplate
 }

@@ -8,20 +8,20 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { Context } from '@deepseek-ai/cordis'
-import AgentRegistry from '@deepseek-ai/dsh-agent'
-import type { Agent } from '@deepseek-ai/dsh-agent'
-import SessionStore from '@deepseek-ai/dsh-session'
-import type { Session } from '@deepseek-ai/dsh-session'
-import UserQuestionService from '@deepseek-ai/dsh-user-questions'
-import { CommandId } from '@deepseek-ai/dsh-commands/brand'
+import { Context } from '@roos-code/cordis'
+import AgentRegistry from '@roos-code/roos-code-agent'
+import type { Agent } from '@roos-code/roos-code-agent'
+import SessionStore from '@roos-code/roos-code-session'
+import type { Session } from '@roos-code/roos-code-session'
+import UserQuestionService from '@roos-code/roos-code-user-questions'
+import { CommandId } from '@roos-code/roos-code-commands/brand'
 // Side-effect type imports: the knob-event SessionEventMap merges.
-import type {} from '@deepseek-ai/dsh-permission-presets'
-import type {} from '@deepseek-ai/dsh-sandbox-policy'
-import type {} from '@deepseek-ai/dsh-user-approval'
-import type { ApiProxy, RpcRequest } from '@deepseek-ai/dsh-host-apiproxy/api'
-import { RpcId } from '@deepseek-ai/dsh-host-apiproxy/api/rpc'
-import { createApiProxy } from '@deepseek-ai/dsh-host-apiproxy'
+import type {} from '@roos-code/roos-code-permission-presets'
+import type {} from '@roos-code/roos-code-sandbox-policy'
+import type {} from '@roos-code/roos-code-user-approval'
+import type { ApiProxy, RpcRequest } from '@roos-code/roos-code-host-apiproxy/api'
+import { RpcId } from '@roos-code/roos-code-host-apiproxy/api/rpc'
+import { createApiProxy } from '@roos-code/roos-code-host-apiproxy'
 
 let nextRpc = 1
 function request<P>(payload: P): RpcRequest<P> {

@@ -1,12 +1,14 @@
-import { Context } from '@deepseek-ai/cordis'
-import Timer from '@deepseek-ai/cordis-plugin-timer'
-import { CallId } from '@deepseek-ai/dsh-llm'
-import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
-import ToolRegistry from '@deepseek-ai/dsh-tools'
-import type { ToolDefinition, ToolExecutionResult } from '@deepseek-ai/dsh-tools'
+import { Context } from '@roos-code/cordis'
+import Timer from '@roos-code/cordis-plugin-timer'
+import { CallId } from '@roos-code/roos-code-llm'
+import SystemPrompt from '@roos-code/roos-code-system-prompt'
+import ToolRegistry from '@roos-code/roos-code-tools'
+import type { ToolDefinition, ToolExecutionResult } from '@roos-code/roos-code-tools'
 import type { CordisDynamicPluginId } from '../src/types.ts'
-import type { Agent } from '@deepseek-ai/dsh-agent'
-import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import type { Agent } from '@roos-code/roos-code-agent'
+import type { SessionId } from '@roos-code/roos-code-session/types'
+import ApprovalService from '@roos-code/roos-code-user-approval'
+import type { ApprovalOutcome } from '@roos-code/roos-code-user-approval'
 import DynamicCordisRunnerService from '../src/index.ts'
 import type { Config } from '../src/index.ts'
 
@@ -48,14 +50,25 @@ interface Harness {
 
 /**
  * Build a real tree with the runner mounted and a recording gateway provided.
- * @param config - runner config overrides (the vm bound).
+ * @param config - runner config overrides (the vm bound and Host-activation allowlist).
+ * @param hostApproval - Host-activation answerer; `'allowed-once'` keeps existing
+ *   Host-only fixtures green. `'none'` leaves the chain fail-closed to `'unavailable'`.
  * @returns the context, the runner service, and the gateway recorder.
  */
-export async function setup(config?: Config): Promise<Harness> {
+export async function setup(
+  config?: Config,
+  hostApproval: ApprovalOutcome | 'none' = 'allowed-once',
+): Promise<Harness> {
   const ctx = new Context()
   await ctx.plugin(Timer)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRegistry)
+  await ctx.plugin(ApprovalService)
+  attachOpenTurn(AGENT_A)
+  attachOpenTurn(AGENT_B)
+  if (hostApproval !== 'none') {
+    ctx.on('approval/request', () => Promise.resolve<ApprovalOutcome>(hostApproval))
+  }
   const gateway: Gateway = { events: [] }
   ctx.on('cordis/request-run', (request) => {
     gateway.events.push(['cordis/request-run', request])
@@ -111,6 +124,22 @@ export async function setup(config?: Config): Promise<Harness> {
  * @param agent - the session to project.
  * @returns id/running pairs in define order.
  */
+/**
+ * Give a stand-in Agent the open-turn Session the approval service requires.
+ * @param agent - session-less test Agent to mutate.
+ */
+function attachOpenTurn(agent: Agent): void {
+  const events: Array<{ type: string; data?: unknown }> = [{ type: 'turn/start' }]
+  Object.assign(agent, {
+    session: {
+      events,
+      append(type: string, data?: unknown) {
+        events.push({ type, data })
+      },
+    },
+  })
+}
+
 export function running(runner: DynamicCordisRunnerService, agent: Agent): { id: string; running: boolean }[] {
   return runner.inventory()
     .filter(row => row.agentId === agent.id)

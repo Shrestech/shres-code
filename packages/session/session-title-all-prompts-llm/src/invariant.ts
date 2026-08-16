@@ -1,13 +1,13 @@
 /**
- * Package-owned invariant companion for `@deepseek-ai/dsh-session-title-all-prompts-llm`.
- * @module @deepseek-ai/dsh-session-title-all-prompts-llm/invariant
+ * Package-owned invariant companion for `@roos-code/roos-code-session-title-all-prompts-llm`.
+ * @module @roos-code/roos-code-session-title-all-prompts-llm/invariant
  */
 
 /* jscpd:ignore-start */
-import type { Context } from '@deepseek-ai/cordis'
-import type { InvariantInstaller } from '@deepseek-ai/dsh-invariants'
+import type { Context } from '@roos-code/cordis'
+import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
 
-const PACKAGE_NAME = '@deepseek-ai/dsh-session-title-all-prompts-llm'
+const PACKAGE_NAME = '@roos-code/roos-code-session-title-all-prompts-llm'
 
 /** Cordis companion plugin name. */
 export const name = 'session-title-all-prompts-llm-invariant'

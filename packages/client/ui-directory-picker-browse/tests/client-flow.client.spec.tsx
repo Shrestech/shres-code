@@ -1,19 +1,19 @@
 // @vitest-environment jsdom
-import { Context } from '@deepseek-ai/cordis'
+import { Context } from '@roos-code/cordis'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
-import type { DirectoryListing } from '@deepseek-ai/dsh-client-runtime/client'
-import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
-import { usePinnedBrowserLanguages } from '@deepseek-ai/dsh-client-test-runtime'
-import type { DirectoryFlowOwnerProps } from '@deepseek-ai/dsh-client-ui-workspace/client'
+import { SlotRegistry } from '@roos-code/roos-code-client-runtime/client'
+import type { DirectoryListing } from '@roos-code/roos-code-client-runtime/client'
+import { LocaleRuntime } from '@roos-code/roos-code-client-locale/client'
+import { usePinnedBrowserLanguages } from '@roos-code/roos-code-client-test-runtime'
+import type { DirectoryFlowOwnerProps } from '@roos-code/roos-code-client-ui-workspace/client'
 import { apply, inject } from '../src/client/index.ts'
 import { BrowseDirectoryFlow } from '../src/client/flow.ts'
 import { apply as nodeApply } from '../src/index.ts'
 
 // The service reads its initial locale from the browser; these specs assert
 // the shipped Chinese copy, so they state the browser they assume.
-usePinnedBrowserLanguages('zh-CN')
+usePinnedBrowserLanguages('en-US')
 
 afterEach(cleanup)
 
@@ -150,11 +150,11 @@ describe('directory-picker-browse client half', () => {
     try {
       const fiber = b.ctx.plugin({ inject: [...inject], apply })
       await expect(fiber.await()).rejects.toThrow(/already has locale/)
-      // The zh registration rolled back with the failure: once the rival
-      // leaves, a fresh registrant owns the whole namespace again.
+      // The failed registration rolled back: once the rival leaves, a
+      // fresh registrant owns the whole namespace again.
       disposeRival()
-      const disposeZh = locale.register('directory-browser', 'zh', { 'browser.title': '空闲' })
-      disposeZh()
+      const disposeIdle = locale.register('directory-browser', 'xx', { 'browser.title': 'Idle' })
+      disposeIdle()
     } finally {
       await new Promise(resolve => setTimeout(resolve, 0))
       process.off('unhandledRejection', onUnhandled)
@@ -168,9 +168,9 @@ describe('directory-picker-browse client half', () => {
     const entry = b.slots.entries(HOLES[0])[0]!
     const injected = (entry.inject as () => { t: (key: string) => string })()
     // zh is the shipped default locale.
-    expect(injected.t('browser.title')).toBe('选择工作区目录')
-    expect(injected.t('browser.newFolder')).toBe('新建文件夹')
-    expect(injected.t('browser.showHidden')).toBe('显示隐藏文件')
+    expect(injected.t('browser.title')).toBe('Choose workspace')
+    expect(injected.t('browser.newFolder')).toBe('New folder')
+    expect(injected.t('browser.showHidden')).toBe('Show hidden files')
   })
 
   it('drives the injected browse calls through the hole entry', async () => {

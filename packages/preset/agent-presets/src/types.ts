@@ -1,7 +1,7 @@
 /** Client-safe event declarations owned by the agent-preset domain. */
-import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import type { SessionId } from '@roos-code/roos-code-session/types'
 
-declare module '@deepseek-ai/cordis' {
+declare module '@roos-code/cordis' {
   interface Events {
     /**
      * One session committed a different agent preset to its durable log.

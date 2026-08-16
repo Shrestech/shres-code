@@ -12,9 +12,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
-import { Context } from '@deepseek-ai/cordis'
-import Loader from '@deepseek-ai/cordis-plugin-loader'
-import Include from '@deepseek-ai/cordis-plugin-include'
+import { Context } from '@roos-code/cordis'
+import Loader from '@roos-code/cordis-plugin-loader'
+import Include from '@roos-code/cordis-plugin-include'
 import HttpServer from '../src/index.ts'
 
 let root: string | undefined
@@ -29,10 +29,10 @@ afterEach(async () => {
 
 /** Write a cordis.yml with one webserver row, then boot it through the real Loader. */
 async function loadComposition(port = 0): Promise<Context> {
-  root = await mkdtemp(join(tmpdir(), 'dsh-webserver-loader-'))
+  root = await mkdtemp(join(tmpdir(), 'roos-webserver-loader-'))
   const configPath = join(root, 'cordis.yml')
   await writeFile(configPath, [
-    "- name: '@deepseek-ai/dsh-host-webserver'",
+    "- name: '@roos-code/roos-code-host-webserver'",
     '  config:',
     "    host: '127.0.0.1'",
     `    port: ${String(port)}`,
@@ -44,7 +44,7 @@ async function loadComposition(port = 0): Promise<Context> {
   await context.plugin(Loader)
   context.loader.builtins.include = Include
   const modules = new Map<string, unknown>([
-    ['@deepseek-ai/dsh-host-webserver', HttpServer],
+    ['@roos-code/roos-code-host-webserver', HttpServer],
   ])
   context.loader.internal = {
     version: 'v2',
@@ -76,7 +76,7 @@ async function upgrade(port: number, path: string): Promise<ReturnType<typeof co
     `GET ${path} HTTP/1.1`,
     `Host: 127.0.0.1:${String(port)}`,
     'Connection: Upgrade',
-    'Upgrade: dsh-test',
+    'Upgrade: roos-test',
     '',
     '',
   ].join('\r\n'))
@@ -160,7 +160,7 @@ describe('real Loader composition', () => {
       path: '/events',
       handler: (_req, socket) => {
         socket.once('close', () => { upgradedServerClosed = true })
-        socket.write('HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: dsh-test\r\n\r\n')
+        socket.write('HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: roos-test\r\n\r\n')
       },
     })
     expect(() => server.registerUpgrade({ path: '/events', handler: () => {} }))
@@ -186,7 +186,7 @@ describe('real Loader composition', () => {
       'GET /upgrade-error HTTP/1.1',
       `Host: 127.0.0.1:${String(port)}`,
       'Connection: Upgrade',
-      'Upgrade: dsh-test',
+      'Upgrade: roos-test',
       '',
       '',
     ].join('\r\n'))

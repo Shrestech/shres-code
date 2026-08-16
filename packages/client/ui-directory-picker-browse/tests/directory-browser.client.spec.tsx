@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import type { DirectoryListing } from '@deepseek-ai/dsh-client-runtime/client'
-import { DirectoryBrowseError } from '@deepseek-ai/dsh-client-runtime/client'
+import type { DirectoryListing } from '@roos-code/roos-code-client-runtime/client'
+import { DirectoryBrowseError } from '@roos-code/roos-code-client-runtime/client'
 import { DirectoryBrowser } from '../src/client/DirectoryBrowser.tsx'
 
 afterEach(cleanup)
@@ -1332,13 +1332,13 @@ describe('DirectoryBrowser', () => {
     // Create dialog: same guard.
     fireEvent.click(screen.getByRole('button', { name: 'browser.newFolder' }))
     const nameInput = screen.getByLabelText('browser.folderName')
-    fireEvent.change(nameInput, { target: { value: '新建' } })
+    fireEvent.change(nameInput, { target: { value: 'new' } })
     fireEvent.compositionStart(nameInput)
     fireEvent.keyDown(nameInput, { key: 'Enter' })
     expect(b.createDirectory).not.toHaveBeenCalled()
     fireEvent.compositionEnd(nameInput)
     fireEvent.keyDown(nameInput, { key: 'Enter' })
-    await waitFor(() => { expect(b.createDirectory).toHaveBeenCalledWith(DOCS, '新建') })
+    await waitFor(() => { expect(b.createDirectory).toHaveBeenCalledWith(DOCS, 'new') })
   })
 
   it('surfaces a two-pane navigation failure as an alert below the columns', async () => {

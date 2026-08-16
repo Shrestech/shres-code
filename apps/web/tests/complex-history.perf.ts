@@ -9,22 +9,22 @@ import { performance } from 'node:perf_hooks'
 import type { Browser, CDPSession, Locator, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import type { StreamChunk } from '@deepseek-ai/dsh-llm'
+import type { StreamChunk } from '@roos-code/roos-code-llm'
 import {
   CallId,
   createAssistantMessage,
   createToolResultMessage,
   createUserMessage,
-} from '@deepseek-ai/dsh-llm'
-import type { ReplayEntry, ReplayOverrideDoc } from '@deepseek-ai/dsh-llm-replay'
-import type { SessionEvent } from '@deepseek-ai/dsh-session'
+} from '@roos-code/roos-code-llm'
+import type { ReplayEntry, ReplayOverrideDoc } from '@roos-code/roos-code-llm-replay'
+import type { SessionEvent } from '@roos-code/roos-code-session'
 import {
   SESSION_FORMAT_VERSION,
   Session,
   SessionId,
-} from '@deepseek-ai/dsh-session'
+} from '@roos-code/roos-code-session'
 // Carries the session/title event declaration into the fixture builder.
-import type {} from '@deepseek-ai/dsh-session-title'
+import type {} from '@roos-code/roos-code-session-title'
 import {
   launchWebScaffold,
   seedSession,
@@ -69,7 +69,7 @@ const LIVE_PROMPT = [
   ...Array.from(
     { length: 48 },
     (_, index) =>
-      `Context ${String(index + 1).padStart(2, '0')}: 用户正在检查长会话中的增量渲染性能。`
+      `Context ${String(index + 1).padStart(2, '0')}: usercurrently longSessions in thedelta。`
       + ` Preserve item ${String(index)} and compare ${'payload'.repeat(8)}.`,
   ),
   '```ts',
@@ -410,7 +410,7 @@ function textStream(deltas: readonly string[], inputTokens: number): StreamChunk
 function comparisonPrompt(index: number): string {
   if (index === COMPARISON_TURNS) return LIVE_PROMPT
   return (`${LONG_CONTINUATION_USER_PREFIX}_${String(index)} `
-    + `继续分析这个长会话的第 ${String(index)} 个增量问题，并保留当前滚动和输入响应。 `
+    + `Continuem longSessions # ${String(index)}  deltaQ，keepcurrent and Input。 `
     + 'context '.repeat(80)).trimEnd()
 }
 
@@ -452,7 +452,7 @@ function soakTurn(index: number): ConversationTurnSpec {
     : undefined
   return {
     prompt: (`${SOAK_USER_PREFIX}_${suffix} `
-      + `持续对话第 ${String(index)} 轮，检查增量渲染与保留状态。 `
+      + `Chat# ${String(index)}  turns，delta and keep。 `
       + 'context '.repeat(20)).trimEnd(),
     deltas: Array.from({ length: SOAK_DELTA_COUNT }, (_, chunkIndex) => {
       if (chunkIndex === 0) return `${SOAK_FIRST_PREFIX}_${suffix} `
@@ -600,18 +600,18 @@ async function startMutationProbe(page: Page): Promise<void> {
       childList: true,
       subtree: true,
     })
-    Reflect.set(globalThis, '__dshPerfMutationProbe', probe)
+    Reflect.set(globalThis, '__roosPerfMutationProbe', probe)
   })
 }
 
 async function stopMutationProbe(page: Page): Promise<MutationProbeResult> {
   return page.evaluate(() => {
-    const probe = Reflect.get(globalThis, '__dshPerfMutationProbe') as
+    const probe = Reflect.get(globalThis, '__roosPerfMutationProbe') as
       | { batches: number; records: number; observer: MutationObserver }
       | undefined
     if (probe === undefined) throw new Error('stream mutation probe was not started')
     probe.observer.disconnect()
-    Reflect.deleteProperty(globalThis, '__dshPerfMutationProbe')
+    Reflect.deleteProperty(globalThis, '__roosPerfMutationProbe')
     return { batches: probe.batches, records: probe.records }
   })
 }
@@ -682,11 +682,11 @@ async function startUserRenderProbe(
       childList: true,
       subtree: true,
     })
-    Reflect.set(globalThis, '__dshPerfUserRenderProbe', probe)
+    Reflect.set(globalThis, '__roosPerfUserRenderProbe', probe)
   }, marker)
   await send.evaluate((button) => {
     button.addEventListener('click', (event) => {
-      const probe = Reflect.get(globalThis, '__dshPerfUserRenderProbe') as
+      const probe = Reflect.get(globalThis, '__roosPerfUserRenderProbe') as
         | { sendAt?: number; trustedClick?: boolean; pollForMarker?: () => void }
         | undefined
       if (probe?.pollForMarker === undefined) throw new Error('user render probe was not started')
@@ -708,14 +708,14 @@ async function stopUserRenderProbe(
 ): Promise<UserRenderProbeResult> {
   try {
     await page.waitForFunction(() => {
-      const probe = Reflect.get(globalThis, '__dshPerfUserRenderProbe') as
+      const probe = Reflect.get(globalThis, '__roosPerfUserRenderProbe') as
         | { paintAt?: number }
         | undefined
       return probe?.paintAt !== undefined
     }, undefined, { timeout: 15_000 })
   } catch (error) {
     const diagnostic = await page.evaluate((expectedMarker) => {
-      const probe = Reflect.get(globalThis, '__dshPerfUserRenderProbe') as
+      const probe = Reflect.get(globalThis, '__roosPerfUserRenderProbe') as
         | {
           sendAt?: number
           domAt?: number
@@ -748,7 +748,7 @@ async function stopUserRenderProbe(
     throw new Error(`user render probe timed out: ${JSON.stringify(diagnostic)}`, { cause: error })
   }
   return page.evaluate(() => {
-    const probe = Reflect.get(globalThis, '__dshPerfUserRenderProbe') as
+    const probe = Reflect.get(globalThis, '__roosPerfUserRenderProbe') as
       | {
         sendAt?: number
         domAt?: number
@@ -758,7 +758,7 @@ async function stopUserRenderProbe(
         records: number
       }
       | undefined
-    Reflect.deleteProperty(globalThis, '__dshPerfUserRenderProbe')
+    Reflect.deleteProperty(globalThis, '__roosPerfUserRenderProbe')
     if (
       probe?.trustedClick !== true
       || probe.sendAt === undefined
@@ -827,7 +827,7 @@ async function launchPerformanceWorld(
     if (options.replay === undefined) {
       scaffold = await launchWebScaffold()
     } else {
-      replayDir = await mkdtemp(join(tmpdir(), 'dsh-web-perf-replay-'))
+      replayDir = await mkdtemp(join(tmpdir(), 'roos-web-perf-replay-'))
       const replayOverride = join(replayDir, 'replay.override.json')
       await writeFile(replayOverride, JSON.stringify(options.replay))
       scaffold = await launchWebScaffold({

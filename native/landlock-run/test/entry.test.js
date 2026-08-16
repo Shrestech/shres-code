@@ -15,7 +15,7 @@ import {
   grantArgs,
   launcherPath,
   probe,
-} from '@deepseek-ai/node-addon-landlock-run';
+} from '@roos-code/node-addon-landlock-run';
 
 // --- constants are part of the CLI contract ---
 assert.equal(LAUNCHER_BIN, 'landlock-run');
@@ -29,9 +29,14 @@ assert.deepEqual(
   ['--ro', '/', '--ro', '/opt', '--rw', '/tmp/work'],
 );
 assert.deepEqual(grantArgs({ readWrite: ['/a'], readOnly: ['/b'] }), ['--ro', '/b', '--rw', '/a']);
+assert.deepEqual(
+  grantArgs({ readOnly: ['/'], allowNetwork: true }),
+  ['--ro', '/', '--allow-net'],
+);
+assert.deepEqual(grantArgs({ readOnly: ['/'], allowNetwork: false }), ['--ro', '/']);
 
 // --- launcherPath: resolves the platform package next to its package.json ---
-const platformPackage = `@deepseek-ai/node-addon-landlock-run-${process.platform}-${process.arch}`;
+const platformPackage = `@roos-code/node-addon-landlock-run-${process.platform}-${process.arch}`;
 const resolvedViaSeam = launcherPath((specifier) => {
   assert.equal(specifier, `${platformPackage}/package.json`);
   return path.join('/fake-install', specifier);

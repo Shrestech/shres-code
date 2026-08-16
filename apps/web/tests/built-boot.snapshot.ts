@@ -31,7 +31,7 @@ it('boots the built plugin graph and renders a fixture session end to end', asyn
   // The resident fixture has both a question and an approval; composer routing
   // exposes the question first, and the assembled workspace plugin mirrors that
   // actionable wait instead of the underlying running state.
-  const waitingTitle = await within(tree).findByText('Fixture 历史会话')
+  const waitingTitle = await within(tree).findByText('Fixture historySessions')
   const waitingRow = waitingTitle.closest<HTMLElement>('[role="treeitem"]')
   if (waitingRow === null) throw new Error('fixture Session title must belong to a tree row')
   expect(waitingRow.querySelector('[data-state="warning"]')).not.toBeNull()
@@ -99,7 +99,7 @@ it('boots the built plugin graph and renders a fixture session end to end', asyn
   // Every bundle injected its plugin-owned style tag (the loader's CSS path).
   const styleOwners = [...document.head.querySelectorAll('style[data-plugin]')]
     .map(style => style.getAttribute('data-plugin'))
-  for (const plugin of ['@deepseek-ai/dsh-client-ui-layout', '@deepseek-ai/dsh-client-ui-sidebar', '@deepseek-ai/dsh-client-ui-conversation', '@deepseek-ai/dsh-client-ui-tool']) {
+  for (const plugin of ['@roos-code/roos-code-client-ui-layout', '@roos-code/roos-code-client-ui-sidebar', '@roos-code/roos-code-client-ui-conversation', '@roos-code/roos-code-client-ui-tool']) {
     expect(styleOwners).toContain(plugin)
   }
 })

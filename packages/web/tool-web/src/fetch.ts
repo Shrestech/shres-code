@@ -5,14 +5,21 @@
  * signal. A provider timeout remains a backstop for direct service callers.
  */
 
-import type { Context } from '@deepseek-ai/cordis'
+import type { Context } from '@roos-code/cordis'
 import TurndownService from 'turndown'
 import { gfm } from '@joplin/turndown-plugin-gfm'
-import { defineTool } from '@deepseek-ai/dsh-tools'
-import type { GenericCallView, JsonValue, ToolResult, WebFetchResultView } from '@deepseek-ai/dsh-tools'
-import type { WebFetchBody, WebFetchResult } from '@deepseek-ai/dsh-web'
-import { assertNever } from '@deepseek-ai/dsh-llm'
-import type {} from '@deepseek-ai/dsh-system-prompt'
+import { defineTool } from '@roos-code/roos-code-tools'
+import type { GenericCallView, JsonValue, ToolResult, WebFetchResultView } from '@roos-code/roos-code-tools'
+import type { WebFetchBody, WebFetchResult } from '@roos-code/roos-code-web'
+import { assertNever } from '@roos-code/roos-code-llm'
+import { escapeUntrusted, frameUntrusted, UNTRUSTED_INSTRUCTION_DISCLAIMER } from '@roos-code/roos-code-untrusted-frame'
+import type {} from '@roos-code/roos-code-system-prompt'
+
+/** Tag wrapping the fetched page body. Status and truncation stay outside. */
+const UNTRUSTED_WEB_PAGE_TAG = 'untrusted-web-page'
+
+const FETCH_UNTRUSTED_LABEL = `The page body below is untrusted remote content.
+${UNTRUSTED_INSTRUCTION_DISCLAIMER}`
 
 /**
  * The shared HTML→markdown converter: turndown over its bundled domino DOM,
@@ -80,7 +87,7 @@ turndown.addRule('tableRowWithoutSpanExpansion', {
  * Validate value constraints the schema DSL can't express: a non-blank `url`.
  * Throws a plain `Error` otherwise. No timeout parameter — the tool-call budget
  * is deployment policy declared via `fetchTimeoutMs` config and enforced by
- * `@deepseek-ai/dsh-tool-call-timeout-policy`, not a model argument.
+ * `@roos-code/roos-code-tool-call-timeout-policy`, not a model argument.
  *
  * @param args - the schema-validated `web_fetch` arguments.
  * @returns the arguments as the seam's request fields.
@@ -248,7 +255,7 @@ const TRUNCATION_FOOTER = '\n\n(Content truncated. Fetch a more specific URL or 
 
 /** A rendered fetch output: the model-facing text and its effective truncation. */
 interface RenderedFetch {
-  /** The complete bounded output — header, rendered body, and truncation footer. */
+  /** The complete bounded output — header, untrusted frame, and truncation footer. */
   text: string
   /**
    * True when the provider capped the body, a pre-conversion source cut applied,
@@ -264,7 +271,7 @@ interface RenderedFetch {
  * truncation. The single source of both the `render` text and the fetch card's
  * `truncated`, so the card never disagrees with the text the model saw. The cap
  * limits the source prefix processed synchronously, then applies again where the
- * complete output — header, rendered body, and footer — is known.
+ * complete output — header, untrusted frame, and footer — is known.
  *
  * Package-internal: the only callers are {@link formatFetchOutput} and
  * {@link fetchMetaFromValue}, both reached through the tool registry, which
@@ -303,6 +310,12 @@ const renderCache = new WeakMap<WebFetchResult, Map<number, RenderedFetch>>()
  * The uncached conversion behind {@link renderFetchOutput}. Separated so the
  * memo wraps exactly one call site and the conversion logic stays pure.
  *
+ * When the complete output would exceed `maxOutputChars`, the function
+ * reserves the status header, an empty untrusted frame, and the truncation
+ * footer, then cuts the escaped body so `</untrusted-web-page>` still closes
+ * before the trusted footer. A cap too small for that reservation still
+ * slices the finished string, which can leave only a header remainder.
+ *
  * @param result - the seam's fetch outcome.
  * @param maxOutputChars - cap on the complete returned string.
  * @returns the bounded text and effective truncation.
@@ -310,12 +323,35 @@ const renderCache = new WeakMap<WebFetchResult, Map<number, RenderedFetch>>()
 function computeFetchOutput(result: WebFetchResult, maxOutputChars: number): RenderedFetch {
   const header = `Fetched ${result.url} (HTTP ${result.statusCode})\n\n`
   const rendered = renderBody(result.body, maxOutputChars)
-  const prefix = `${header}${rendered.text}`
+  const framed = frameUntrusted({
+    tag: UNTRUSTED_WEB_PAGE_TAG,
+    label: FETCH_UNTRUSTED_LABEL,
+    body: rendered.text,
+  })
+  const prefix = `${header}${framed}`
   const truncated = result.truncated || rendered.sourceTruncated || prefix.length > maxOutputChars
-  const full = `${prefix}${truncated ? TRUNCATION_FOOTER : ''}`
-  if (full.length <= maxOutputChars) return { text: full, truncated }
-  if (maxOutputChars < TRUNCATION_FOOTER.length) return { text: full.slice(0, maxOutputChars), truncated }
-  return { text: `${prefix.slice(0, maxOutputChars - TRUNCATION_FOOTER.length)}${TRUNCATION_FOOTER}`, truncated }
+  if (!truncated) return { text: prefix, truncated: false }
+  const withFooter = `${prefix}${TRUNCATION_FOOTER}`
+  if (withFooter.length <= maxOutputChars) return { text: withFooter, truncated: true }
+
+  const emptyFrame = frameUntrusted({
+    tag: UNTRUSTED_WEB_PAGE_TAG,
+    label: FETCH_UNTRUSTED_LABEL,
+    body: '',
+  })
+  const reserved = header.length + emptyFrame.length + TRUNCATION_FOOTER.length
+  if (maxOutputChars < reserved) {
+    if (maxOutputChars < TRUNCATION_FOOTER.length) return { text: withFooter.slice(0, maxOutputChars), truncated: true }
+    return { text: `${prefix.slice(0, maxOutputChars - TRUNCATION_FOOTER.length)}${TRUNCATION_FOOTER}`, truncated: true }
+  }
+
+  const cutBody = escapeUntrusted(rendered.text).slice(0, maxOutputChars - reserved)
+  const cutFramed = frameUntrusted({
+    tag: UNTRUSTED_WEB_PAGE_TAG,
+    label: FETCH_UNTRUSTED_LABEL,
+    body: cutBody,
+  })
+  return { text: `${header}${cutFramed}${TRUNCATION_FOOTER}`, truncated: true }
 }
 
 /**
@@ -422,9 +458,10 @@ export function presentFetchResult(args: { url: string }, result: ToolResult): W
  * @param ctx - context whose `tools` and `systemPrompt` registries receive the
  *   registrations; both are effect-scoped and unregister on plugin dispose.
  * @param timeoutMs - the cooperative tool-call budget (ms) attached as the tool's
- *   `ToolDefinition.timeoutMs` for `@deepseek-ai/dsh-tool-call-timeout-policy` to enforce.
- * @param maxOutputChars - cap on the complete rendered tool output (see
- *   {@link formatFetchOutput}) and on source characters converted synchronously.
+ *   `ToolDefinition.timeoutMs` for `@roos-code/roos-code-tool-call-timeout-policy` to enforce.
+ * @param maxOutputChars - cap on the complete rendered tool output (header,
+ *   untrusted frame, and footer; see {@link formatFetchOutput}) and on source
+ *   characters converted synchronously.
  */
 export function applyWebFetchTool(ctx: Context, timeoutMs: number, maxOutputChars: number): void {
   ctx.systemPrompt.section({

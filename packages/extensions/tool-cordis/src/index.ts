@@ -1,20 +1,20 @@
 /**
  * Model-facing Cordis runtime/package inspection, define, run, stop, and remove tools.
- * @module @deepseek-ai/dsh-tool-cordis
+ * @module @roos-code/roos-code-tool-cordis
  */
 
-import type { Context } from '@deepseek-ai/cordis'
-import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
+import type { Context } from '@roos-code/cordis'
+import type { Agent, PreStepDecision } from '@roos-code/roos-code-agent'
 import {
   CordisDynamicPackageId, CordisDynamicPluginId,
-} from '@deepseek-ai/dsh-cordis-host-runner'
-import type { DynamicCordisReference } from '@deepseek-ai/dsh-cordis-host-runner'
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import type { JsonValue } from '@deepseek-ai/dsh-session'
-import type { UserMessage } from '@deepseek-ai/dsh-session'
-import { defineTool } from '@deepseek-ai/dsh-tools'
-import type { ToolExecution } from '@deepseek-ai/dsh-tools'
-import type {} from '@deepseek-ai/dsh-system-prompt'
+} from '@roos-code/roos-code-cordis-host-runner'
+import type { DynamicCordisReference } from '@roos-code/roos-code-cordis-host-runner'
+import { createUserMessage } from '@roos-code/roos-code-llm'
+import type { JsonValue } from '@roos-code/roos-code-session'
+import type { UserMessage } from '@roos-code/roos-code-session'
+import { defineTool } from '@roos-code/roos-code-tools'
+import type { ToolExecution } from '@roos-code/roos-code-tools'
+import type {} from '@roos-code/roos-code-system-prompt'
 import { missingServices, providedServices } from './inspect.ts'
 import {
   presentDefineCall, presentInspectListCall, presentInspectQueryCall, presentInspectSelfCall, presentRunCall,
@@ -242,9 +242,11 @@ export function apply(ctx: Context): void {
     description:
       'Activate one exact Package of a dynamic Plugin. Use mode:"run" for the first activation, restarting '
       + 'currentPackageId, or rollback. When current exists, use mode:"update" to switch to a different Package, '
-      + 'even if the Plugin is currently stopped. An unauthorized Client Package creates an approval request and '
+      + 'even if the Plugin is currently stopped. A Host half asks the session approval channel once per Plugin in '
+      + 'this Session before any Host code runs; rejected, cancelled, or unavailable is a final structured result — '
+      + 'do not retry that same activation. An unauthorized Client Package creates an approval request and '
       + 'returns awaiting-approval; an authorized Package returns starting and continues asynchronously in the '
-      + 'browser. Neither result waits for the final outcome inside the Tool. currentPackageId changes only after '
+      + 'browser. Neither Client result waits for the final outcome inside the Tool. currentPackageId changes only after '
       + 'complete success; on failure, the old current and target next remain. Asynchronous success, rejection, or '
       + 'technical failure is reported through state and steering. After a technical failure, read diagnostics with '
       + 'cordis_inspect_self, correct the same Plugin, and retry autonomously. Do not request approval again after '
@@ -265,6 +267,12 @@ export function apply(ctx: Context): void {
         const result = requireJsonObject(value)
         const pluginId = requireJsonString(result, 'pluginId')
         const packageId = requireJsonString(result, 'packageId')
+        if (isHostActivationDenial(result.status)) {
+          const message = typeof result.message === 'string'
+            ? result.message
+            : `Host activation of ${pluginId}/${packageId} was ${result.status}.`
+          return [{ type: 'text', text: message }]
+        }
         const pluginRunId = requireJsonString(result, 'pluginRunId')
         return [{
           type: 'text',
@@ -280,7 +288,7 @@ export function apply(ctx: Context): void {
         return {
           pluginId: requireJsonString(result, 'pluginId'),
           packageId: requireJsonString(result, 'packageId'),
-          pluginRunId: requireJsonString(result, 'pluginRunId'),
+          ...typeof result.pluginRunId === 'string' ? { pluginRunId: result.pluginRunId } : {},
         }
       },
     },
@@ -288,8 +296,20 @@ export function apply(ctx: Context): void {
       const agent = requireAgent(exec)
       const pluginId = CordisDynamicPluginId(args.pluginId)
       const packageId = CordisDynamicPackageId(args.packageId)
-      const receipt = await ctx.dynamicCordisRunner.run(agent, pluginId, packageId, args.mode, exec.signal)
-      if (!receipt.ok) throw new Error(receipt.message)
+      const receipt = await ctx.dynamicCordisRunner.run(
+        agent, pluginId, packageId, args.mode, exec.signal, exec.callId,
+      )
+      if (!receipt.ok) {
+        if (isHostActivationDenial(receipt.reason)) {
+          return {
+            status: receipt.reason,
+            pluginId: args.pluginId,
+            packageId: args.packageId,
+            message: receipt.message,
+          }
+        }
+        throw new Error(receipt.message)
+      }
       if (receipt.status !== 'running') {
         return {
           status: receipt.status,
@@ -396,6 +416,10 @@ export function apply(ctx: Context): void {
     })
     return { kind: 'enter', messages: [...decision.messages, ...contexts] }
   })
+}
+
+function isHostActivationDenial(value: unknown): value is 'rejected' | 'cancelled' | 'unavailable' {
+  return value === 'rejected' || value === 'cancelled' || value === 'unavailable'
 }
 
 function requireJsonObject(value: JsonValue): Record<string, JsonValue> {
@@ -523,7 +547,7 @@ function renderUnavailableReference(id: string): string {
   return [
     '<cordis_dynamic_plugin_context>',
     `The user explicitly referenced @${id}, but this Plugin is unavailable in the current Session.`,
-    'It may have been removed, belong to another Session, or have been lost when the DSH process restarted.',
+    'It may have been removed, belong to another Session, or have been lost when the Roos process restarted.',
     'Do not claim that it was updated or silently create a replacement Plugin. Tell the user that the reference is currently unavailable.',
     '</cordis_dynamic_plugin_context>',
   ].join('\n')

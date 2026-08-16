@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@deepseek-ai/cordis'
-import { WorkerThreadCodeRuntime } from '@deepseek-ai/dsh-code-runtime-worker-thread'
-import type { Config } from '@deepseek-ai/dsh-code-runtime-worker-thread'
-import type { CodeBindingFunction, CodeBindingNamespace, CodeRunResult } from '@deepseek-ai/dsh-code-runtime'
+import { Context } from '@roos-code/cordis'
+import { WorkerThreadCodeRuntime } from '@roos-code/roos-code-code-runtime-worker-thread'
+import type { Config } from '@roos-code/roos-code-code-runtime-worker-thread'
+import type { CodeBindingFunction, CodeBindingNamespace, CodeRunResult } from '@roos-code/roos-code-code-runtime'
 
 /**
  * Integration suite over REAL worker threads (no mocks — workers are cheap
@@ -838,7 +838,7 @@ describe('WorkerThreadCodeRuntime — seam misuse and lifecycle', () => {
     await expect(run([namespace('tools', 'CallError', '__dict__')])).rejects.toThrow(/member property.*not usable/)
     // The Python backend's owned globals are refused here too (shared
     // RESERVED_BINDING_GLOBALS), keeping namespace lists backend-portable.
-    await expect(runtime.run({ program: 'return 1', bindings: [{ global: '__dsh_main__', functions: {} }] }))
+    await expect(runtime.run({ program: 'return 1', bindings: [{ global: '__roos_main__', functions: {} }] }))
       .rejects.toThrow(/reserved binding global/)
   })
 

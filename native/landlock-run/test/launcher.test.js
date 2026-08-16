@@ -16,13 +16,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import {
   LAUNCHER_FAILURE_EXIT,
   grantArgs,
   launcherPath,
   probe,
-} from '@deepseek-ai/node-addon-landlock-run';
+} from '@roos-code/node-addon-landlock-run';
 
 const FATAL_PREFIX = 'landlock-run: ';
 const PARTIAL_NOTICE = 'landlock-run: partial enforcement (older Landlock ABI)';
@@ -91,6 +91,47 @@ const expectedNotice = enforcement === 'partial' ? `${PARTIAL_NOTICE}\n` : '';
   assert.equal(echo.status, 0, echo.stderr);
   assert.equal(echo.stdout, 'confined-ok\n');
   assert.equal(echo.stderr, expectedNotice);
+
+  const allowNet = run([...grantArgs({ readOnly: ['/'], allowNetwork: true }), '--', '/bin/sh', '-c', 'echo allow-net-ok']);
+  assert.equal(allowNet.status, 0, allowNet.stderr);
+  assert.equal(allowNet.stdout, 'allow-net-ok\n');
+
+  // TCP: default ruleset denies connect; --allow-net restores it. Self-skip
+  // when loopback is unusable even unconfined, or when ABI < 4 cannot govern net.
+  {
+    const portFile = path.join(os.tmpdir(), `nalr-tcp-port-${process.pid}`);
+    try { fs.unlinkSync(portFile); } catch { /* absent is the start state */ }
+    const listener = spawn(process.execPath, ['-e', `
+      const net = require('net');
+      const fs = require('fs');
+      const server = net.createServer((socket) => socket.end());
+      server.listen(0, '127.0.0.1', () => {
+        fs.writeFileSync(${JSON.stringify(portFile)}, String(server.address().port));
+      });
+      setTimeout(() => process.exit(0), 15_000);
+    `], { stdio: 'ignore' });
+    const deadline = Date.now() + 5_000;
+    while (!fs.existsSync(portFile) && Date.now() < deadline) {
+      spawnSync(process.execPath, ['-e', ''], { timeout: 50 });
+    }
+    if (!fs.existsSync(portFile)) {
+      listener.kill();
+      console.log('launcher.test: SKIP TCP proof — could not start a loopback listener');
+    } else {
+      const port = fs.readFileSync(portFile, 'utf8').trim();
+      const connect = `require('net').connect({host:'127.0.0.1',port:${port}},()=>process.exit(0)).on('error',()=>process.exit(1))`;
+      const deniedTcp = run([...grantArgs({ readOnly: ['/'], readWrite: ['/dev/null'] }), '--', process.execPath, '-e', connect]);
+      const allowedTcp = run([...grantArgs({ readOnly: ['/'], readWrite: ['/dev/null'], allowNetwork: true }), '--', process.execPath, '-e', connect]);
+      listener.kill();
+      if (allowedTcp.status !== 0) {
+        console.log('launcher.test: SKIP TCP proof — loopback connect unusable even with --allow-net');
+      } else if (deniedTcp.status === 0) {
+        assert.equal(enforcement, 'partial', 'ABI that cannot govern TCP must probe partial');
+      } else {
+        assert.notEqual(deniedTcp.status, 0, 'default ruleset must deny TCP connect');
+      }
+    }
+  }
 
   const exitCode = run([...grantArgs({ readOnly: ['/'] }), '--', '/bin/sh', '-c', 'exit 7']);
   assert.equal(exitCode.status, 7, 'the wrapped command exit code must pass through unchanged');

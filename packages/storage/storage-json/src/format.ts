@@ -2,11 +2,11 @@
  * On-disk JSON unit format: the file is always the current net state, kept
  * human-readable (pretty-printed, stable key order from insertion) — that
  * legibility is this backend's reason to exist.
- * @module @deepseek-ai/dsh-storage-json/src/format
+ * @module @roos-code/roos-code-storage-json/src/format
  */
 
-import { StorageError } from '@deepseek-ai/dsh-storage'
-import type { KvUnitDescriptor } from '@deepseek-ai/dsh-storage'
+import { StorageError } from '@roos-code/roos-code-storage'
+import type { KvUnitDescriptor } from '@roos-code/roos-code-storage'
 
 /** In-memory authoritative state of one unit; the file is its projection. `global` is `null` until first written. */
 export interface UnitState {

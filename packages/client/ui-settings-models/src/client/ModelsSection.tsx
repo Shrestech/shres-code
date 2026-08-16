@@ -14,9 +14,9 @@
 
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import type { IApiClient } from '@deepseek-ai/dsh-api-remotes/client'
-import { Button, IconPlusOutline16, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { SnapshotSelectorHook } from '@deepseek-ai/dsh-client-web-react'
+import type { IApiClient } from '@roos-code/roos-code-api-remotes/client'
+import { Button, IconPlusOutline16, Modal } from '@roos-code/roos-code-client-ui-primitives'
+import type { SnapshotSelectorHook } from '@roos-code/roos-code-client-web-react'
 import { CustomProviderCard } from './CustomProviderCard.tsx'
 import { deriveKeyRef, messageOf, protocolChoices, providerUsable } from './store.ts'
 import type { ModelsSettingsState, ModelsSettingsStore, ProviderRow } from './store.ts'
@@ -262,8 +262,9 @@ function Loaded({ injected }: { injected: ModelsSectionInjected }): ReactNode {
   // One fact decides both first-run postures on this page and the onboarding
   // step: whether the user already has a provider to talk to.
   const anyUsable = state.rows.some(providerUsable)
-  const configured = state.rows.filter(row => row.configured)
-  const addable = state.rows.filter(row => !row.configured && row.entry.settingsNs !== '')
+  const listed = state.rows.filter(row => row.configured || row.entry.kind === 'delegated')
+  const addable = state.rows.filter(row =>
+    !row.configured && row.entry.settingsNs !== '' && row.entry.kind !== 'delegated')
   const addTarget = adding ? editing : undefined
   const addNamespace = addTarget === undefined ? undefined : state.namespaces.get(addTarget.settingsNs)
   // Hand-declared routes live in the pi-ai namespace, which is also the only
@@ -284,7 +285,7 @@ function Loaded({ injected }: { injected: ModelsSectionInjected }): ReactNode {
           </p>
         )}
       <ul className={styles['rows']}>
-        {configured.map((row) => {
+        {listed.map((row) => {
           const target = targetOf(row)
           const namespace = state.namespaces.get(target.settingsNs)
           /* v8 ignore next -- the join marks a row configured only when its namespace resolved */
@@ -320,6 +321,13 @@ function Loaded({ injected }: { injected: ModelsSectionInjected }): ReactNode {
                       follows its answer and stays off when it gives none. */}
                   {row.entry.declared === true
                     ? <span className={styles['rowTag']}>{t('customTag')}</span>
+                    : null}
+                  {row.entry.kind === 'delegated'
+                    ? (
+                      <span className={styles['rowTag']} title={t('delegatedHint')}>
+                        {t('delegatedTag')}
+                      </span>
+                    )
                     : null}
                   {credentialConfigured
                     ? (

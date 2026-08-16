@@ -5,15 +5,15 @@
 // views. callId/approvalId stay plain string here (narrow to real brands when
 // convenient).
 
-import type { CommandId } from '@deepseek-ai/dsh-commands/brand'
-import type { MessageId } from '@deepseek-ai/dsh-llm/brand'
-import type { ContentBlock } from '@deepseek-ai/dsh-llm/types'
-import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
-import type { LlmRetryEventData } from '@deepseek-ai/dsh-llm-retry/types'
-import type { TodoItem } from '@deepseek-ai/dsh-session/types'
+import type { CommandId } from '@roos-code/roos-code-commands/brand'
+import type { MessageId } from '@roos-code/roos-code-llm/brand'
+import type { ContentBlock } from '@roos-code/roos-code-llm/types'
+import type { ImageAttachmentRef } from '@roos-code/roos-code-attachment'
+import type { LlmRetryEventData } from '@roos-code/roos-code-llm-retry/types'
+import type { TodoItem } from '@roos-code/roos-code-session/types'
 import type {
   RpcError, SessionId, SubagentAddress, ToolCallView, ToolResultView,
-} from '@deepseek-ai/dsh-api-remotes/client'
+} from '@roos-code/roos-code-api-remotes/client'
 import type { PendingInteraction } from './pending.ts'
 import type { ContextProvenanceView, KnownContextForm } from './context-provenance.ts'
 import type {
@@ -112,7 +112,7 @@ export interface AssistantMessageNode {
   requestConfig?: AssistantRequestConfig
   /** Timing derived from the recorded step/chunk/message event sequence. */
   timing?: AssistantTiming
-  /** Frozen partial of an aborted turn (no finalize ever arrives): rendered with a 已停止 marker.
+  /** Frozen partial of an aborted turn (no finalize ever arrives): rendered with a Stopped marker.
    *  Synthetic seq (fractional, derived from the turn/end seq) keeps it ordered inside the flow. */
   interrupted?: true
 }
@@ -354,7 +354,7 @@ export type OpenState = 'cold' | 'loading' | 'open' | 'error'
  */
 export type ComposerPhase = 'blank' | 'engaging' | 'active'
 
-/** Send/stop failure surfaced in the input error strip; op picks the user-facing copy (发送失败 vs 停止失败). */
+/** Send/stop failure surfaced in the input error strip; op picks the user-facing copy (Send failed vs Stop failed). */
 export interface PromptError {
   op: 'send' | 'stop'
   error: RpcError

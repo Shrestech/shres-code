@@ -1,12 +1,13 @@
 /** Host registration for the browser locale preference. */
 
-import type { Context } from '@deepseek-ai/cordis'
-import { settingsNamespace } from '@deepseek-ai/dsh-settings'
+import type { Context } from '@roos-code/cordis'
+import { settingsNamespace } from '@roos-code/roos-code-settings'
 import { LOCALE_SETTINGS_NAMESPACE, LocaleSettingsSchema } from './locale-settings.ts'
 
 export {
   LOCALE_IDS, LOCALE_PREFERENCE_FIELD, LOCALE_SETTINGS_NAMESPACE,
-  type LocaleId, type LocaleSettings,
+  normalizeLocalePreference,
+  type LocaleId, type LocaleSettings, type PersistedLocaleId,
 } from './locale-settings.ts'
 
 /**

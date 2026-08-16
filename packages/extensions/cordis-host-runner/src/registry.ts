@@ -1,10 +1,10 @@
 /**
  * Process-local dynamic Plugin registry and its opaque identity mints.
- * @module @deepseek-ai/dsh-cordis-host-runner/registry
+ * @module @roos-code/roos-code-cordis-host-runner/registry
  */
 
-import type { Fiber } from '@deepseek-ai/cordis'
-import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import type { Fiber } from '@roos-code/cordis'
+import type { SessionId } from '@roos-code/roos-code-session/types'
 import type {
   ApprovalRequestId, CordisDynamicPackageId, CordisDynamicPluginId, CordisDynamicPluginRunId,
   CordisDynamicRunMode, DynamicCordisRenderFailure, DynamicCordisRunAttempt,
@@ -59,6 +59,13 @@ export interface DynamicCordisPlugin {
   approvedClientPackages: Set<CordisDynamicPackageId>
   /** Whether one user decision authorized future Package versions of this Plugin. */
   clientVersionUpdatesApproved: boolean
+  /** Whether this Session already granted Host-half activation for this Plugin. */
+  hostActivationApproved: boolean
+  /** Closed `approval.request` non-grant remembered so a later ask does not re-prompt. Idle-turn throws are not stored. */
+  hostActivationDenial?: {
+    reason: 'rejected' | 'cancelled' | 'unavailable'
+    message: string
+  }
   /** Last successfully activated version. */
   currentPackageId?: CordisDynamicPackageId
   /** Failed or in-progress target version. */

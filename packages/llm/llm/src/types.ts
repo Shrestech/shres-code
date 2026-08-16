@@ -4,12 +4,12 @@
  * mapped interfaces make the content, source, and finish unions extensible.
  */
 
-import type { Branded } from '@deepseek-ai/dsh-brand'
-import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
+import type { Branded } from '@roos-code/roos-code-brand'
+import type { ImageAttachmentRef } from '@roos-code/roos-code-attachment'
 import type { CallId, ProviderRequestId, ReasoningEffortId } from './brand.ts'
 import type { Message } from './message.ts'
 
-declare module '@deepseek-ai/cordis' {
+declare module '@roos-code/cordis' {
   interface Events {
     /**
      * The provider topology changed: an adapter registered or unregistered
@@ -146,6 +146,11 @@ export interface LlmProviderInfo {
   id: string
   /** Human-readable provider name for selectors and diagnostics. */
   name: string
+  /**
+   * When `delegated`, the route runs an external CLI whose own tools
+   * bypass harness approval. Absent means an ordinary HTTP adapter.
+   */
+  kind?: 'delegated'
 }
 
 /** Merge-extensible provider model modality vocabulary. */
@@ -184,6 +189,11 @@ export interface LlmConfigurableProvider {
    * from outside.
    */
   declared?: boolean
+  /**
+   * When `delegated`, the route runs an external CLI whose own tools
+   * bypass harness approval. Selectors must show that fact.
+   */
+  kind?: 'delegated'
 }
 
 /**
@@ -305,8 +315,8 @@ export type StreamChunk =
 /**
  * JSON-schema description of a tool, as sent to the model.
  *
- * Declared here (not in dsh-tools) because it is part of {@link GenerateOptions};
- * dsh-tools' ToolDefinition and dsh-system-prompt's PromptAssembly both import
+ * Declared here (not in roos-tools) because it is part of {@link GenerateOptions};
+ * roos-tools' ToolDefinition and roos-system-prompt's PromptAssembly both import
  * it from this package.
  */
 export interface ToolSchema {
@@ -326,7 +336,7 @@ export interface GenerateOptions {
   /**
    * Ordered conversation messages, exactly as the provider sees them (after
    * the `system` slot). A loop-built request assembles them as
-   * the derived history (dsh-agent-loop); a hand-built one-shot passes any list.
+   * the derived history (roos-agent-loop); a hand-built one-shot passes any list.
    */
   messages: Message[]
   /** System prompt text (adapters map to the provider's system slot). */

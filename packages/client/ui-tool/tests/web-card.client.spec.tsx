@@ -12,31 +12,31 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import {
   createSnapshotStore, EMPTY_CONVERSATION_VIEWS,
-} from '@deepseek-ai/dsh-client-runtime/client'
+} from '@roos-code/roos-code-client-runtime/client'
 import type {
   ConversationSnapshot, RunningToolCall, SessionId, SessionListState, ToolResultNode, WorkspaceListState,
-} from '@deepseek-ai/dsh-client-runtime/client'
-import type { ToolResultView } from '@deepseek-ai/dsh-api-remotes/client'
-import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-web-react'
-import type { SelectionTarget } from '@deepseek-ai/dsh-client-ui-conversation/client'
-import type { ToolCallOwnerProps } from '@deepseek-ai/dsh-client-ui-tool/client'
-import { IconGlobeOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
+} from '@roos-code/roos-code-client-runtime/client'
+import type { ToolResultView } from '@roos-code/roos-code-api-remotes/client'
+import { bindSnapshotSelector } from '@roos-code/roos-code-client-web-react'
+import type { SelectionTarget } from '@roos-code/roos-code-client-ui-conversation/client'
+import type { ToolCallOwnerProps } from '@roos-code/roos-code-client-ui-tool/client'
+import { IconGlobeOutline14 } from '@roos-code/roos-code-client-ui-primitives'
 import { webCardModel } from '../src/client/tool/models/web-card-model.ts'
-import { createChatStore } from '@deepseek-ai/dsh-client-ui-conversation/src/client/stores.ts'
+import { createChatStore } from '@roos-code/roos-code-client-ui-conversation/src/client/stores.ts'
 import { GenericToolCard } from '../src/client/tool/toolviews/GenericToolCard.tsx'
-import { DetailsPanel } from '@deepseek-ai/dsh-client-ui-conversation/src/client/skeleton/DetailsPanel.tsx'
+import { DetailsPanel } from '@roos-code/roos-code-client-ui-conversation/src/client/skeleton/DetailsPanel.tsx'
 import { WebRow, webToolview } from '../src/client/tool/toolviews/web-row.tsx'
 import { renderToolDetails, SessionProviderStub, toolChatSnapshot } from './tool-details-render.client.tsx'
-import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
-import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
-import { zh } from '@deepseek-ai/dsh-client-ui-conversation/src/client/locales.ts'
+import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
+import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
+import { en } from '@roos-code/roos-code-client-ui-conversation/src/client/locales.ts'
 
 afterEach(cleanup)
 
 const SID = 's1' as SessionId
 
 /** Locale seat for the card render sites (GenericToolCard, DetailsPanel), as the sibling suites build it. */
-const t = makeTranslate(zh, commonZh)
+const t = makeTranslate(en, commonEn)
 
 const SEARCH_ARGS = '{"query":"deepseek harness"}'
 const FETCH_ARGS = '{"url":"https://example.com/page"}'
@@ -272,7 +272,7 @@ describe('DetailsPanel web Output section', () => {
     expect(view.getByText('HTTP 200')).toBeTruthy()
     // The card is a summary (URL + status only); the panel is the single-call
     // reading surface, so the fetched body still renders below the card.
-    const output = view.getByText('输出').closest('section')
+    const output = view.getByText('Output').closest('section')
     expect(output?.querySelector('pre')?.textContent).toContain('fetch body')
   })
 
@@ -281,7 +281,7 @@ describe('DetailsPanel web Output section', () => {
       nodes: [settledSearch({ callView: null, resultView: null })],
     }), { turnSeq: 10, callId: 'c1', toolName: 'web_search' })
     expect(view.container.querySelector('[data-web]')).toBeNull()
-    const output = view.getByText('输出').closest('section')
+    const output = view.getByText('Output').closest('section')
     expect(output?.querySelector('pre')?.textContent).toContain('search text')
   })
 })
@@ -300,7 +300,7 @@ describe('web toolview registration', () => {
           return () => {}
         },
       },
-    } as unknown as import('@deepseek-ai/cordis').Context
+    } as unknown as import('@roos-code/cordis').Context
     webToolview.apply(ctx)
     expect(registered.map(r => r.key)).toEqual(['web_search', 'web_fetch'])
     // Both keys claim the conversation locale seat ToolRow's body copy needs.

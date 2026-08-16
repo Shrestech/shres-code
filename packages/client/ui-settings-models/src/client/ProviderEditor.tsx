@@ -6,7 +6,7 @@
  * has none. The pi-ai profile records that derivation as `apiKeyEnv` only when
  * a key is entered; a blank key materializes a reference-free profile for
  * provider-native authentication);
- * the collapsed 自定义设置 area carries the per-family extras (`baseURL` for
+ * the collapsed CustomSettings area carries the per-family extras (`baseURL` for
  * both families, DeepSeek's id/name/context-window model catalog, and the
  * display name and wire protocol of a pi-ai route the adapter does not ship —
  * the two fields the create card asked that route for, editable here for the
@@ -23,10 +23,10 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { CredentialView, IApiClient, SettingsNamespaceView, SettingsPathOpView } from '@deepseek-ai/dsh-api-remotes/client'
+import type { CredentialView, IApiClient, SettingsNamespaceView, SettingsPathOpView } from '@roos-code/roos-code-api-remotes/client'
 import {
   deletePath, getPath, hasPath, nodeAtPath, rehydrateSchema, setPath, validateDraft,
-} from '@deepseek-ai/dsh-client-schema-form'
+} from '@roos-code/roos-code-client-schema-form'
 import {
   DeepSeekModelsEditor, modelDrafts, validateDeepSeekModels,
 } from './DeepSeekModelsEditor.tsx'
@@ -38,7 +38,7 @@ import type { en } from './locales.ts'
 import styles from './ModelsSection.module.css'
 
 /** Per-adapter-family curated field sets (unknown namespaces get the hint alone). */
-type EditorLayout = 'deepseek' | 'pi-ai' | 'unknown'
+type EditorLayout = 'deepseek' | 'pi-ai' | 'cli-bridge' | 'unknown'
 
 /** The public DeepSeek endpoint shown as the deepseek base-URL placeholder. */
 const DEEPSEEK_PUBLIC_BASE_URL = 'https://api.deepseek.com'
@@ -125,7 +125,24 @@ export function pathOps(
 function layoutOf(ns: string): EditorLayout {
   if (ns === 'llm-deepseek') return 'deepseek'
   if (ns === 'llm-pi-ai') return 'pi-ai'
+  if (ns === 'llm-cli-bridge') return 'cli-bridge'
   return 'unknown'
+}
+
+/** Conventional env key a shipped CLI route forwards after the subprocess scrub. */
+function defaultCliEnvKey(provider: string): string {
+  switch (provider) {
+    case 'grok-cli':
+      return 'XAI_API_KEY'
+    case 'kimi-cli':
+      return 'MOONSHOT_API_KEY'
+    case 'claude-cli':
+      return 'ANTHROPIC_API_KEY'
+    case 'codex-cli':
+      return 'OPENAI_API_KEY'
+    default:
+      return deriveKeyRef(provider)
+  }
 }
 
 /** The credential reference this profile resolves keys through. */
@@ -134,7 +151,8 @@ function refFor(namespace: SettingsNamespaceView, path: readonly string[], provi
   const named = typeof profile === 'object' && profile !== null
     ? (profile as { apiKeyEnv?: unknown }).apiKeyEnv
     : undefined
-  return typeof named === 'string' && named.length > 0 ? named : deriveKeyRef(provider)
+  if (typeof named === 'string' && named.length > 0) return named
+  return namespace.ns === 'llm-cli-bridge' ? defaultCliEnvKey(provider) : deriveKeyRef(provider)
 }
 
 /**
@@ -238,7 +256,8 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
     const ns = namespace.ns
     // A pi-ai profile names the conventional reference only when this page is
     // about to store a key. Otherwise the provider keeps its native auth path.
-    const next = layout === 'pi-ai' && stringAt(draft, 'apiKeyEnv') === undefined
+    const next = (layout === 'pi-ai' || layout === 'cli-bridge')
+      && stringAt(draft, 'apiKeyEnv') === undefined
       && stringAt(fallback, 'apiKeyEnv') === undefined && keyValue.length > 0
       ? setPath(draft, ['apiKeyEnv'], keyRef)
       : draft
@@ -467,6 +486,50 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
     )
   }
 
+  const cliBridgeFields = (): ReactNode => {
+    const keyPlaceholder = keyLocked
+      ? t('keyEnvLocked')
+      : keyState?.configured === true && props.credentialRequired !== true
+        ? t('keyStored')
+        : t('keyPlaceholder')
+    return (
+      <>
+        <p className={styles['advancedHint']}>{t('delegatedHint')}</p>
+        <div className={styles['field']}>
+          <span className={styles['fieldLabel']}>{t('keyInput')}</span>
+          <input
+            className={styles['input']}
+            type="password"
+            autoComplete="off"
+            value={keyDraft}
+            placeholder={keyPlaceholder}
+            aria-label={t('keyInput')}
+            aria-invalid={shownKeyFailure !== undefined}
+            required={props.credentialRequired === true}
+            autoFocus={props.autoFocusCredential === true}
+            disabled={disabled || keyLocked}
+            onChange={(event) => { setKeyDraft(event.target.value) }}
+          />
+          {shownKeyFailure === undefined ? null : <p className={styles['error']}>{t(shownKeyFailure)}</p>}
+        </div>
+        {props.credentialOnly === true ? null : (
+          <div className={styles['field']}>
+            <span className={styles['fieldLabel']}>{t('cliBinary')}</span>
+            <input
+              className={styles['input']}
+              type="text"
+              value={stringAt(draft, 'binary') ?? ''}
+              placeholder={stringAt(fallback, 'binary') ?? props.provider}
+              aria-label={t('cliBinary')}
+              disabled={disabled}
+              onChange={(event) => { setField('binary', event.target.value) }}
+            />
+          </div>
+        )}
+      </>
+    )
+  }
+
   return (
     <div className={props.credentialOnly === true ? styles['addBlock'] : styles['editor']}>
       {props.hideTitle === true
@@ -481,7 +544,9 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
         )}
       {layout === 'unknown'
         ? <p className={styles['advancedHint']}>{`${t('advancedHint')} (${namespace.ns})`}</p>
-        : curatedFields(layout)}
+        : layout === 'cli-bridge'
+          ? cliBridgeFields()
+          : curatedFields(layout)}
       {failure !== undefined ? <p className={styles['error']}>{failure}</p> : null}
       {props.credentialOnly === true || modelFailure === undefined
         ? null
@@ -494,7 +559,7 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
         t={t}
         busy={busy}
         submitDisabled={disabled || layout === 'unknown'
-          || (props.credentialOnly !== true && modelFailure !== undefined)
+          || (props.credentialOnly !== true && layout !== 'cli-bridge' && modelFailure !== undefined)
           || shownKeyFailure !== undefined
           || (props.credentialRequired === true && keyValue.length === 0)}
         submitLabel={props.submitLabel ?? 'apply'}

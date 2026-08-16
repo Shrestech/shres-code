@@ -1,20 +1,20 @@
 /**
  * Service Definition for the approval capability seam, covering requests, cancellation, audit, and per-session policy. Missing
  * answerers fail closed; grants apply only to the requested action.
- * @module @deepseek-ai/dsh-user-approval
+ * @module @roos-code/roos-code-user-approval
  */
 
 import { randomUUID } from 'node:crypto'
-import { Context, Service } from '@deepseek-ai/cordis'
-import z from '@deepseek-ai/schemastery'
-import type { Agent } from '@deepseek-ai/dsh-agent'
-import { createUserMessage, type CallId } from '@deepseek-ai/dsh-llm'
-import { scopeTarget } from '@deepseek-ai/dsh-scope'
-import type { Scoped } from '@deepseek-ai/dsh-scope'
-import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
-import type {} from '@deepseek-ai/dsh-system-prompt'
+import { Context, Service } from '@roos-code/cordis'
+import z from '@roos-code/schemastery'
+import type { Agent } from '@roos-code/roos-code-agent'
+import { createUserMessage, type CallId } from '@roos-code/roos-code-llm'
+import { scopeTarget } from '@roos-code/roos-code-scope'
+import type { Scoped } from '@roos-code/roos-code-scope'
+import type { Session, SessionEvent } from '@roos-code/roos-code-session'
+import type {} from '@roos-code/roos-code-system-prompt'
 
-declare module '@deepseek-ai/cordis' {
+declare module '@roos-code/cordis' {
   interface Context {
     approval: ApprovalService
   }
@@ -23,7 +23,7 @@ declare module '@deepseek-ai/cordis' {
     /**
      * Ask composed answerers for one decision. Return an outcome to claim the
      * request or call `next()`; failure yields the fail-closed default.
-     * Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.
+     * Scope-filtered dispatch (`@roos-code/roos-code-scope`): agent-scoped listeners receive only that agent.
      * @param req - the pending decision (agent, tool identity, reason, signal).
      * @mode waterfall
      */
@@ -31,7 +31,7 @@ declare module '@deepseek-ai/cordis' {
   }
 }
 
-declare module '@deepseek-ai/dsh-session/types' {
+declare module '@roos-code/roos-code-session/types' {
   interface SessionEventMap {
     /**
      * An approval question was put to the answerer chain — log-only audit
@@ -77,6 +77,34 @@ import type { ApprovalOutcome } from './types.ts'
 
 export { ApprovalRequestId } from './types.ts'
 export type { ApprovalOutcome } from './types.ts'
+
+const OUTSIDE_TURN_MESSAGE =
+  'approval.request() outside an open turn: the approval/asked + approval/decided audit pair '
+  + 'must be turn-enclosed (a bare event between turns is crash-tail garbage on reload). '
+  + 'Ask from inside the turn that needs the decision.'
+
+/**
+ * Thrown when {@link ApprovalService.request} is called with no open turn.
+ * Callers that must fail closed without treating the throw as a tool crash
+ * distinguish it with {@link isApprovalOutsideTurnError}.
+ */
+export class ApprovalOutsideTurnError extends Error {
+  override readonly name = 'ApprovalOutsideTurnError'
+
+  constructor() {
+    super(OUTSIDE_TURN_MESSAGE)
+  }
+}
+
+/**
+ * Whether a thrown value is {@link ApprovalOutsideTurnError}.
+ * @param error - the caught value from {@link ApprovalService.request}.
+ * @returns true when the ask happened outside an open turn.
+ */
+export function isApprovalOutsideTurnError(error: unknown): error is ApprovalOutsideTurnError {
+  return error instanceof ApprovalOutsideTurnError
+    || (error instanceof Error && error.name === 'ApprovalOutsideTurnError')
+}
 
 /** Every {@link ApprovalOutcome}, for runtime normalization of answerer returns. */
 const OUTCOMES: readonly ApprovalOutcome[] = ['allowed-once', 'rejected', 'cancelled', 'unavailable']
@@ -257,11 +285,7 @@ export class ApprovalService extends Service {
   async request(req: ApprovalRequest): Promise<ApprovalOutcome> {
     const session = req.agent.session
     if (!hasOpenTurn(session.events)) {
-      throw new Error(
-        'approval.request() outside an open turn: the approval/asked + approval/decided audit pair '
-        + 'must be turn-enclosed (a bare event between turns is crash-tail garbage on reload). '
-        + 'Ask from inside the turn that needs the decision.',
-      )
+      throw new ApprovalOutsideTurnError()
     }
     const id = ApprovalRequestId(randomUUID())
     session.append('approval/asked', {

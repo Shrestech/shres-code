@@ -12,13 +12,17 @@
  *
  * CLI contract (mirrors the `bwrap` runner argv shape the executor wraps):
  *
- *   landlock-run [--ro <path>]... [--rw <path>]... -- <argv>...
+ *   landlock-run [--ro <path>]... [--rw <path>]... [--allow-net] -- <argv>...
  *   landlock-run --probe
  *
  * `--ro` grants read+execute beneath the path; `--rw` grants full filesystem
  * access beneath the path. Everything else is denied (Landlock is an
- * allow-list). `--probe` builds a maximal ruleset and reports whether the
- * running kernel actually enforces it — the executor's functional probe.
+ * allow-list). TCP bind/connect is denied by default when the kernel ABI
+ * supports those accesses (ABI 4 / Linux 6.7+); `--allow-net` leaves them
+ * unrestricted. `--probe` builds a maximal ruleset (including the TCP deny
+ * when the ABI can govern it) and reports whether the running kernel
+ * actually enforces it — the executor's functional probe. A kernel that
+ * cannot govern TCP reports `partial` instead of failing.
  *
  * Fail-closed: if the ruleset cannot be created or is NOT enforced by the
  * kernel, the launcher exits non-zero WITHOUT exec'ing the command. A partial
@@ -38,6 +42,7 @@
 #define _GNU_SOURCE
 #include <errno.h>
 #include <fcntl.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -57,6 +62,7 @@
  */
 struct landlock_ruleset_attr {
   uint64_t handled_access_fs;
+  uint64_t handled_access_net;
 };
 
 struct landlock_path_beneath_attr {
@@ -82,10 +88,16 @@ struct landlock_path_beneath_attr {
 #define LL_FS_MAKE_BLOCK  (UINT64_C(1) << 11)
 #define LL_FS_MAKE_SYM    (UINT64_C(1) << 12)
 #define LL_FS_REFER       (UINT64_C(1) << 13) /* ABI 2 */
-#define LL_FS_TRUNCATE    (UINT64_C(1) << 14) /* ABI 3 (ABI 4 added TCP bits only) */
+#define LL_FS_TRUNCATE    (UINT64_C(1) << 14) /* ABI 3 */
 #define LL_FS_IOCTL_DEV   (UINT64_C(1) << 15) /* ABI 5 */
 
 #define LL_ABI1_MASK (LL_FS_REFER - 1) /* bits 0..12: every ABI-1 access, nothing newer */
+
+/* TCP network access bits introduced in ABI 4 (Linux 6.7). */
+#define LL_NET_BIND_TCP    (UINT64_C(1) << 0)
+#define LL_NET_CONNECT_TCP (UINT64_C(1) << 1)
+#define LL_NET_MASK (LL_NET_BIND_TCP | LL_NET_CONNECT_TCP)
+#define LANDLOCK_ABI_NET 4L
 
 /*
  * Newest ABI this build knows; the negotiation below scales the actual
@@ -132,6 +144,7 @@ static int fail_usage(const char *message, const char *detail) {
 /* Parsed CLI: either a probe, or grants plus the command argv after `--`. */
 struct cli {
   int probe;
+  int allow_net; /* 0 = deny TCP bind/connect when ABI supports it (default) */
   const char **ro;
   size_t ro_count;
   const char **rw;
@@ -157,6 +170,9 @@ static int parse(int argc, char **argv, struct cli *cli) {
         return fail_usage("--probe takes no other arguments", NULL);
       }
       cli->probe = 1;
+      index += 1;
+    } else if (strcmp(arg, "--allow-net") == 0) {
+      cli->allow_net = 1;
       index += 1;
     } else if (strcmp(arg, "--ro") == 0 || strcmp(arg, "--rw") == 0) {
       if (index + 1 >= argc) {
@@ -222,10 +238,14 @@ static int add_rule(int ruleset_fd, const char *path, uint64_t access) {
  * down from MAX_ABI. `--ro` paths get the read side of the vocabulary (read
  * file/dir + execute — the wrapped `bash` and everything it spawns must
  * remain executable); `--rw` paths get every filesystem access the
- * negotiated ABI can grant. Sets `no_new_privs` first (mandatory for an
- * unprivileged restrict, and it neutralizes setuid/setgid escalation inside
- * the sandbox). On success `*partial` reports whether the kernel governs
- * only a subset of MAX_ABI's accesses. Returns 0, else the exit code.
+ * negotiated ABI can grant. TCP bind/connect is handled (and therefore
+ * denied, because no net-port allow rules are added) when the kernel ABI
+ * supports it and `--allow-net` is absent; an older ABI that cannot govern
+ * those accesses reports partial instead of failing. Sets `no_new_privs`
+ * first (mandatory for an unprivileged restrict, and it neutralizes
+ * setuid/setgid escalation inside the sandbox). On success `*partial`
+ * reports whether the kernel governs only a subset of MAX_ABI's accesses.
+ * Returns 0, else the exit code.
  */
 static int restrict_self(const struct cli *cli, int *partial) {
   long abi = syscall(__NR_landlock_create_ruleset, NULL, 0, LANDLOCK_CREATE_RULESET_VERSION);
@@ -236,9 +256,25 @@ static int restrict_self(const struct cli *cli, int *partial) {
   }
   *partial = abi < MAX_ABI;
   uint64_t handled = fs_mask_for_abi(abi < MAX_ABI ? abi : MAX_ABI);
+  int want_net = !cli->allow_net;
+  int can_net = abi >= LANDLOCK_ABI_NET;
+  if (want_net && !can_net) *partial = 1;
 
   struct landlock_ruleset_attr attr = { .handled_access_fs = handled };
-  int ruleset_fd = (int)syscall(__NR_landlock_create_ruleset, &attr, sizeof attr, 0);
+  size_t attr_size = offsetof(struct landlock_ruleset_attr, handled_access_net);
+  if (want_net && can_net) {
+    attr.handled_access_net = LL_NET_MASK;
+    attr_size = sizeof attr;
+  }
+
+  int ruleset_fd = (int)syscall(__NR_landlock_create_ruleset, &attr, attr_size, 0);
+  if (ruleset_fd < 0 && want_net && can_net && (errno == E2BIG || errno == EINVAL)) {
+    /* Kernel rejected the net attribute: fall back to FS-only and report partial. */
+    attr.handled_access_net = 0;
+    attr_size = offsetof(struct landlock_ruleset_attr, handled_access_net);
+    *partial = 1;
+    ruleset_fd = (int)syscall(__NR_landlock_create_ruleset, &attr, attr_size, 0);
+  }
   if (ruleset_fd < 0) return fail("landlock ruleset error", strerror(errno));
 
   const uint64_t read_side = LL_FS_EXECUTE | LL_FS_READ_FILE | LL_FS_READ_DIR;

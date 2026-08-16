@@ -28,6 +28,9 @@
       "path": "../../guard/timeout-policy"
     },
     {
+      "path": "../../util/untrusted-frame"
+    },
+    {
       "path": "../web"
     },
     {

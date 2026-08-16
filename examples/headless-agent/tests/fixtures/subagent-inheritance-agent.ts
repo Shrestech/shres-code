@@ -3,8 +3,8 @@
  * @module subagent-inheritance-agent
  */
 
-import type { Context } from '@deepseek-ai/cordis'
-import type { SessionId } from '@deepseek-ai/dsh-session'
+import type { Context } from '@roos-code/cordis'
+import type { SessionId } from '@roos-code/roos-code-session'
 
 /** Fixture plugin name. */
 export const name = 'subagent-inheritance-agent'

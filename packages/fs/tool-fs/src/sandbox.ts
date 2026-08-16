@@ -1,21 +1,21 @@
 /**
- * The sandbox-escalation API shared by the `write` and `edit` tools: the
- * per-call policy resolution, the advertised escalation fields, and the denial-marker
- * mapping — all delegating the vocabulary and the fail-closed approval
- * sequence to `@deepseek-ai/dsh-sandbox` (the same pieces `@deepseek-ai/dsh-tool-bash`
- * uses), so bash and fs escalate identically. Built ONCE per plugin from
- * `ctx.fs.sandboxMode` (the capability fact — is a confining backend mounted?)
- * and shared by both mutating tools.
+ * The sandbox-escalation API shared by the filesystem tools: standing-policy
+ * resolution for reads, the advertised escalation fields and one-approved
+ * wider retry for writes/edits, and the denial-marker mapping — all
+ * delegating the vocabulary and the fail-closed approval sequence to
+ * `@roos-code/roos-code-sandbox` (the same pieces `@roos-code/roos-code-tool-bash`
+ * uses). Built ONCE per plugin from `ctx.fs.sandboxMode` (the capability
+ * fact — is a confining backend mounted?) and shared by every fenced tool.
  *
- * @module @deepseek-ai/dsh-tool-fs/sandbox
+ * @module @roos-code/roos-code-tool-fs/sandbox
  */
 
-import type { Context } from '@deepseek-ai/cordis'
-import type { ToolExecution } from '@deepseek-ai/dsh-tools'
-import type { SandboxExecutionPolicy, SandboxMode } from '@deepseek-ai/dsh-sandbox'
-import { ESCALATION_TARGETS, approveEscalation, escalationHintMarker, sandboxDenialMarker, validateEscalationArgs } from '@deepseek-ai/dsh-sandbox'
-import type { SandboxPolicyService } from '@deepseek-ai/dsh-sandbox-policy'
-import { FsError } from '@deepseek-ai/dsh-fs'
+import type { Context } from '@roos-code/cordis'
+import type { ToolExecution } from '@roos-code/roos-code-tools'
+import type { SandboxExecutionPolicy, SandboxMode } from '@roos-code/roos-code-sandbox'
+import { ESCALATION_TARGETS, approveEscalation, escalationHintMarker, sandboxDenialMarker, validateEscalationArgs } from '@roos-code/roos-code-sandbox'
+import type { SandboxPolicyService } from '@roos-code/roos-code-sandbox-policy'
+import { FsError } from '@roos-code/roos-code-fs'
 
 /** The two escalation arguments a mutating tool may carry (advertised only under a confining backend). */
 export interface FsEscalationArgs {
@@ -73,6 +73,16 @@ export class FsSandboxController {
   }
 
   /**
+   * The session's standing policy for a non-escalating call (reads). An
+   * approved write/edit stamp still goes through {@link resolvePolicy}.
+   * @param exec - the tool-execution context (agent supplies the session).
+   * @returns the resolved policy, or undefined for an unsandboxed backend.
+   */
+  standingPolicy(exec: ToolExecution): SandboxExecutionPolicy | undefined {
+    return this.policy?.resolve({ ...exec.agent ? { session: exec.agent.session } : {} })
+  }
+
+  /**
    * The policy to stamp onto this mutation: an approved escalation grant (a
    * strictly wider retry resolved through `ctx.approval` before anything
    * executes), else the session's standing mode. The calling session's cwd is
@@ -86,7 +96,7 @@ export class FsSandboxController {
    */
   async resolvePolicy(toolName: string, args: FsEscalationArgs, exec: ToolExecution): Promise<SandboxExecutionPolicy | undefined> {
     validateEscalationArgs(args.sandbox_permissions, args.justification)
-    const standingPolicy = this.policy?.resolve({ ...exec.agent ? { session: exec.agent.session } : {} })
+    const standingPolicy = this.standingPolicy(exec)
     if (args.sandbox_permissions === undefined || args.justification === undefined) {
       return standingPolicy
     }
@@ -109,23 +119,25 @@ export class FsSandboxController {
 
   /**
    * Map a thrown provider error for the model: a `FS_SANDBOX_DENIED` becomes a
-   * `FsError` whose text is the shared `[sandbox: …]` denial marker plus the
-   * same-turn escalation hint, so a policy denial reads identically to bash's
-   * WHILE keeping the structured `FS_SANDBOX_DENIED` code — `ToolRuntime`
-   * populates `result.error` only for `HarnessError` instances, so a plain
-   * `Error` would strip the code retry/observers key off. Any other error
-   * passes through unchanged. A `FS_SANDBOX_DENIED` only arises under a
-   * confining backend, which always advertises the escalation fields, so the
-   * hint always applies here.
-   * @param error - the error thrown by the mutation.
+   * `FsError` whose text is the shared `[sandbox: …]` denial marker, keeping
+   * the structured `FS_SANDBOX_DENIED` code — `ToolRuntime` populates
+   * `result.error` only for `HarnessError` instances, so a plain `Error`
+   * would strip the code retry/observers key off. Any other error passes
+   * through unchanged. Write and edit append the same-turn escalation hint
+   * because they advertise `sandbox_permissions`; reads pass `{ hint: false }`
+   * because they do not.
+   * @param error - the error thrown by the fenced operation.
    * @param policy - the policy stamped onto the call (names the mode in the marker).
+   * @param options - `hint: false` omits the write/edit escalation hint.
    * @returns the error to throw — the marker `FsError` for a sandbox denial, else the original.
    */
-  mapError(error: unknown, policy: SandboxExecutionPolicy | undefined): unknown {
+  mapError(error: unknown, policy: SandboxExecutionPolicy | undefined, options?: { hint?: boolean }): unknown {
     if (!(error instanceof FsError) || error.code !== 'FS_SANDBOX_DENIED') return error
     // A FS_SANDBOX_DENIED only arises under a confining backend, whose tool
-    // path always resolves a policy before mutation.
+    // path always resolves a policy before the fenced operation.
     const mode = (policy as SandboxExecutionPolicy).mode
-    return new FsError(`${sandboxDenialMarker(mode)}\n${escalationHintMarker('operation')}`, 'FS_SANDBOX_DENIED', { cause: error })
+    const marker = sandboxDenialMarker(mode)
+    const text = options?.hint === false ? marker : `${marker}\n${escalationHintMarker('operation')}`
+    return new FsError(text, 'FS_SANDBOX_DENIED', { cause: error })
   }
 }

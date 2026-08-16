@@ -4,18 +4,18 @@
  * else references RequestPayload<'session.*'> / ResponseValue<'session.*'>.
  */
 
-import type { MessageId } from '@deepseek-ai/dsh-llm/brand'
-import type { AttachmentIdType, ImageAttachmentLimits, ImageAttachmentRef, ImageMediaType } from '@deepseek-ai/dsh-attachment'
-import type { ContentBlock } from '@deepseek-ai/dsh-llm/types'
-import type { SessionEvent, SessionId } from '@deepseek-ai/dsh-session/types'
+import type { MessageId } from '@roos-code/roos-code-llm/brand'
+import type { AttachmentIdType, ImageAttachmentLimits, ImageAttachmentRef, ImageMediaType } from '@roos-code/roos-code-attachment'
+import type { ContentBlock } from '@roos-code/roos-code-llm/types'
+import type { SessionEvent, SessionId } from '@roos-code/roos-code-session/types'
 // The pure-type outlet: api/ is browser-importable, and the package root's
-// cordis Context merge (via dsh-agent) must not enter client aggregates.
-import type { SessionProjectionMap } from '@deepseek-ai/dsh-session-projection/types'
+// cordis Context merge (via roos-agent) must not enter client aggregates.
+import type { SessionProjectionMap } from '@roos-code/roos-code-session-projection/types'
 import type { RpcId, RpcRequest, RpcResponse } from './rpc.ts'
 import type { ToolEventView } from './events.ts'
 import type { WorkspaceId } from './workspace.ts'
 
-declare module '@deepseek-ai/dsh-session-projection/types' {
+declare module '@roos-code/roos-code-session-projection/types' {
   interface SessionProjectionMap {
     /**
      * Session-list hints persisted by the projection cache. `blank: false`
@@ -43,7 +43,7 @@ export interface SessionListMetadata {
   lastPromptAt: number | null
 }
 
-declare module '@deepseek-ai/dsh-llm' {
+declare module '@roos-code/roos-code-llm' {
   interface MessageSourceMap {
     /**
      * The prompt's rpcId is passed through MessageSource into the `user/message` event
@@ -134,6 +134,11 @@ export interface ModelProviderGroup {
   id: string
   /** Provider display name. */
   name: string
+  /**
+   * When `delegated`, the route runs an external CLI whose own tools
+   * bypass harness approval. Selectors must show that fact.
+   */
+  kind?: 'delegated'
   /** Models in provider-preferred order. */
   models: ModelCatalogModel[]
 }

@@ -1,20 +1,20 @@
 ---
 name: Task
-about: 明确的非 Feature、非 Bug 工作
+about: Concrete work that is not a Feature or Bug
 title: ''
 labels: ''
 assignees: ''
 type: Task
 ---
 
-<!-- 标题写中文行动或结果句；外露正文不超过 50 单位。 -->
-一句话说明要完成的工作。
+<!-- Title is an action or result sentence. Visible body stays within 50 units. -->
+One sentence describing the work to complete.
 
 <details>
-<summary>验收与细节</summary>
+<summary>Acceptance and details</summary>
 
-- 验收条件：
-- 交付物：
-- 测试证据：
+- Acceptance criteria:
+- Deliverable:
+- Test evidence:
 
 </details>

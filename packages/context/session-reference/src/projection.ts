@@ -1,10 +1,10 @@
 /** Current-surface projection and byte-bounded rendering. */
 
-import { isCompactCheckpointSource } from '@deepseek-ai/dsh-compaction'
-import type { SessionSurfaceSnapshot } from '@deepseek-ai/dsh-session-query'
-import { assertNever } from '@deepseek-ai/dsh-llm'
-import { TextRetainer } from '@deepseek-ai/dsh-output-retention'
-import { stringifyTagSafeJson } from './serialization.ts'
+import { isCompactCheckpointSource } from '@roos-code/roos-code-compaction'
+import type { SessionSurfaceSnapshot } from '@roos-code/roos-code-session-query'
+import { assertNever } from '@roos-code/roos-code-llm'
+import { TextRetainer } from '@roos-code/roos-code-output-retention'
+import { stringifyTagSafeJson } from '@roos-code/roos-code-untrusted-frame'
 import type { ReferencedConversationItem } from './types.ts'
 
 interface ProjectedItem extends ReferencedConversationItem {

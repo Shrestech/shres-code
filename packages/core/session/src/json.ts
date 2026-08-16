@@ -1,4 +1,4 @@
-/** Lossless-JSON validation and detached snapshots for durable session data. @module @deepseek-ai/dsh-session/json */
+/** Lossless-JSON validation and detached snapshots for durable session data. @module @roos-code/roos-code-session/json */
 
 /**
  * A value that round-trips losslessly through JSON: `null`, a boolean, a finite

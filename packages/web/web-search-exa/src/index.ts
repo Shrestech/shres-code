@@ -1,17 +1,17 @@
 /**
- * `@deepseek-ai/dsh-web-search-exa`: registers an Exa-backed `WebSearchProvider`
+ * `@roos-code/roos-code-web-search-exa`: registers an Exa-backed `WebSearchProvider`
  * with `ctx.web`. A function/namespace plugin (NOT a default-export service):
  * a search provider does not own the `ctx.web` key — it registers INTO the
- * seam's provider registry, exactly as `@deepseek-ai/dsh-llm-deepseek`
- * registers an adapter into `ctx.llm`. The key is owned by `@deepseek-ai/dsh-web`.
+ * seam's provider registry, exactly as `@roos-code/roos-code-llm-deepseek`
+ * registers an adapter into `ctx.llm`. The key is owned by `@roos-code/roos-code-web`.
  *
- * @module @deepseek-ai/dsh-web-search-exa
+ * @module @roos-code/roos-code-web-search-exa
  */
 
-import type { Context } from '@deepseek-ai/cordis'
-import { launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
-import z from '@deepseek-ai/schemastery'
-import type {} from '@deepseek-ai/dsh-web'
+import type { Context } from '@roos-code/cordis'
+import { launchEnvironmentOf } from '@roos-code/roos-code-launch-environment'
+import z from '@roos-code/schemastery'
+import type {} from '@roos-code/roos-code-web'
 import {
   ExaSearchProvider,
   EXA_DEFAULT_BASE_URL,

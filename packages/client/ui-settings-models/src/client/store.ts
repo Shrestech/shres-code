@@ -8,10 +8,10 @@
 
 import type {
   ConfigurableProviderView, CredentialView, IApiClient, SettingsNamespaceView,
-} from '@deepseek-ai/dsh-api-remotes/client'
-import type { SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
-import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
-import { getPath, hasPath, nodeAtPath, rehydrateSchema } from '@deepseek-ai/dsh-client-schema-form'
+} from '@roos-code/roos-code-api-remotes/client'
+import type { SnapshotStore } from '@roos-code/roos-code-client-runtime/client'
+import { createSnapshotStore } from '@roos-code/roos-code-client-runtime/client'
+import { getPath, hasPath, nodeAtPath, rehydrateSchema } from '@roos-code/roos-code-client-schema-form'
 
 /**
  * Any route key walks a dict schema to the same profile node, so the lookup
@@ -46,6 +46,12 @@ export interface ModelsSettingsState {
   rows: readonly ProviderRow[]
   /** Namespace views by ns, for the editor's schema/layers/secrets. */
   namespaces: ReadonlyMap<string, SettingsNamespaceView>
+  /**
+   * Whether the user layer of `agent-default-model` names a provider and
+   * model. Mirrors CLI `hasUserSelection` so an explicit first-run pick
+   * (including local Ollama) does not re-prompt.
+   */
+  hasUserDefaultModel: boolean
 }
 
 /**
@@ -99,7 +105,8 @@ function apiKeyEnvOf(namespace: SettingsNamespaceView | undefined, path: readonl
 export class ModelsSettingsStore {
   /** The snapshot the section renders from (uSES-safe store). */
   readonly store: SnapshotStore<ModelsSettingsState> = createSnapshotStore<ModelsSettingsState>({
-    status: 'idle', error: null, credentialError: null, writable: false, rows: [], namespaces: new Map(),
+    status: 'idle', error: null, credentialError: null, writable: false, rows: [],
+    namespaces: new Map(), hasUserDefaultModel: false,
   })
 
   /** Latest load wins; an older response never overwrites a newer one. */
@@ -185,8 +192,23 @@ export class ModelsSettingsStore {
           : {},
       }))
       s.namespaces = namespaces
+      s.hasUserDefaultModel = userDefaultModelOf(namespaces)
     })
   }
+}
+
+/**
+ * Whether the user layer of `agent-default-model` names both fields.
+ * @param namespaces - settings describe views by ns.
+ * @returns true only when the stored user section has provider and model.
+ */
+function userDefaultModelOf(namespaces: ReadonlyMap<string, SettingsNamespaceView>): boolean {
+  const user = namespaces.get('agent-default-model')?.user
+  if (typeof user !== 'object' || user === null) return false
+  const provider = (user as { provider?: unknown }).provider
+  const model = (user as { model?: unknown }).model
+  return typeof provider === 'string' && provider.length > 0
+    && typeof model === 'string' && model.length > 0
 }
 
 /**
@@ -195,14 +217,45 @@ export class ModelsSettingsStore {
  * profile names is stored. A profile naming no reference authenticates through
  * the provider's own path (the Bedrock chain, Vertex ADC, a gateway that needs
  * nothing), as does a live route with no settings address at all, so neither
- * owes this page a key.
+ * owes this page a key. Delegated CLI routes are keyless in this join — their
+ * keys live in `route.env` after the subprocess scrub — so they never count
+ * as ready here.
  * @param row - one joined provider row.
  * @returns whether the user already has this provider to talk to.
  */
 export function providerUsable(row: ProviderRow): boolean {
   if (!row.entry.active) return false
+  if (row.entry.kind === 'delegated') return false
   if (row.apiKeyEnv === undefined) return true
   return row.credential?.configured === true
+}
+
+/**
+ * Whether a usable row ends first-run onboarding. Local Ollama is keyless and
+ * always composed, so it does not count until the user picks it — otherwise
+ * the card would never appear on a machine without a cloud key. Delegated
+ * CLI routes are excluded by {@link providerUsable}.
+ * @param row - one joined provider row.
+ * @returns whether this row already satisfies first-run.
+ */
+export function onboardingProviderReady(row: ProviderRow): boolean {
+  if (!providerUsable(row)) return false
+  return row.entry.provider !== 'ollama-local'
+}
+
+/**
+ * Routes the first-run card can offer: keyed routes still missing a writable
+ * credential, plus the composed local-Ollama route.
+ * @param rows - joined provider rows.
+ * @returns candidate rows in directory order.
+ */
+export function onboardingCandidates(rows: readonly ProviderRow[]): ProviderRow[] {
+  return rows.filter((row) => {
+    if (!row.entry.active) return false
+    if (row.entry.provider === 'ollama-local') return true
+    if (row.apiKeyEnv === undefined) return false
+    return row.credential?.configured !== true
+  })
 }
 
 /** First-run onboarding readiness derived only from the shared Models join. */
@@ -223,11 +276,10 @@ export type OnboardingReadiness =
 
 /**
  * Project first-run readiness from the provider/settings/credential join used
- * by the Models page. The step exists to leave the user with a model to talk
- * to, so ANY usable provider ends it; only when none exists does the official
- * DeepSeek route — the one route the prompt can offer a key field for — decide
- * whether prompting can help. A missing official configurable-provider
- * declaration means the adapter is not repairable by navigating to Models.
+ * by the Models page. Any keyed usable provider ends the step. When none
+ * exists, every composed route that still needs a key — plus local Ollama —
+ * is offered. Local Ollama is keyless and always composed, so it does not
+ * itself end the step.
  * @param state - current shared Models join snapshot.
  * @returns the onboarding state without reading a parallel fact source.
  */
@@ -241,37 +293,27 @@ export function onboardingReadiness(state: ModelsSettingsState): OnboardingReadi
       reason: 'load-failed',
     }
   }
-  if (state.rows.some(providerUsable)) return { kind: 'provider-ready' }
-  const row = state.rows.find(candidate =>
-    candidate.entry.provider === 'deepseek-official'
-    && candidate.entry.settingsNs === 'llm-deepseek'
-    && candidate.entry.settingsPath.length === 0)
-  if (row === undefined) return { kind: 'adapter-absent' }
-  if (!row.entry.active) {
-    return {
-      kind: 'unavailable',
-      reason: 'provider-inactive',
-    }
+  if (state.hasUserDefaultModel) return { kind: 'provider-ready' }
+  if (state.rows.some(onboardingProviderReady)) return { kind: 'provider-ready' }
+  const candidates = onboardingCandidates(state.rows)
+  if (candidates.length === 0) {
+    return state.rows.length === 0
+      ? { kind: 'adapter-absent' }
+      : { kind: 'unavailable', reason: 'provider-inactive' }
   }
-  // Past the usable gate an active route names a reference it has no stored
-  // credential for, so the remaining questions are all about that credential.
-  if (state.credentialError !== null || row.credential === undefined) {
-    return {
-      kind: 'unavailable',
-      reason: 'credentials-unavailable',
+  const keyed = candidates.filter(row => row.apiKeyEnv !== undefined)
+  if (keyed.length > 0) {
+    if (state.credentialError !== null || keyed.every(row => row.credential === undefined)) {
+      return { kind: 'unavailable', reason: 'credentials-unavailable' }
     }
-  }
-  if (!state.writable) {
-    return {
-      kind: 'unavailable',
-      reason: 'settings-read-only',
+    if (!state.writable) {
+      return { kind: 'unavailable', reason: 'settings-read-only' }
     }
-  }
-  if (!row.credential.writable) {
-    return {
-      kind: 'unavailable',
-      reason: 'credential-read-only',
+    if (keyed.every(row => row.credential?.writable === false)) {
+      return { kind: 'unavailable', reason: 'credential-read-only' }
     }
+  } else if (!state.writable) {
+    return { kind: 'unavailable', reason: 'settings-read-only' }
   }
   return { kind: 'credential-missing' }
 }

@@ -1,13 +1,13 @@
 {
-  "name": "@deepseek-ai/dsh-subprocess-local",
-  "description": "Local-subprocess implementation of the DeepSeek Harness subprocess seam",
+  "name": "@roos-code/roos-code-subprocess-local",
+  "description": "Local-subprocess implementation of the Roos Code subprocess seam",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
+    "url": "git+https://github.com/roos-code/roos-code.git",
     "directory": "packages/subprocess/subprocess-local"
   },
   "type": "module",
@@ -36,19 +36,19 @@
   },
   "license": "MIT",
   "peerDependencies": {
-    "@deepseek-ai/dsh-invariants": "workspace:^",
-    "@deepseek-ai/dsh-subprocess": "workspace:^",
-    "@deepseek-ai/dsh-timeout": "workspace:^",
-    "@deepseek-ai/cordis": "workspace:^"
+    "@roos-code/roos-code-invariants": "workspace:^",
+    "@roos-code/roos-code-subprocess": "workspace:^",
+    "@roos-code/roos-code-timeout": "workspace:^",
+    "@roos-code/cordis": "workspace:^"
   },
   "dependencies": {
     "node-pty": "^1.1.0"
   },
   "devDependencies": {
-    "@deepseek-ai/dsh-invariants": "workspace:^",
-    "@deepseek-ai/dsh-loader-smoke": "workspace:^",
-    "@deepseek-ai/dsh-subprocess": "workspace:^",
-    "@deepseek-ai/dsh-timeout": "workspace:^",
-    "@deepseek-ai/cordis": "workspace:^"
+    "@roos-code/roos-code-invariants": "workspace:^",
+    "@roos-code/roos-code-loader-smoke": "workspace:^",
+    "@roos-code/roos-code-subprocess": "workspace:^",
+    "@roos-code/roos-code-timeout": "workspace:^",
+    "@roos-code/cordis": "workspace:^"
   }
 }

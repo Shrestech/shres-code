@@ -18,6 +18,9 @@
       "path": "../../boot/app-boot"
     },
     {
+      "path": "../../util/home-paths"
+    },
+    {
       "path": "../../runtime-diagnostics/invariants"
     }
   ]

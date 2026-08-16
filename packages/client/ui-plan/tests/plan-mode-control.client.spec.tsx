@@ -7,18 +7,18 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
-import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-web-react'
-import type { PlanProjection } from '@deepseek-ai/dsh-plan-mode/client'
+import { createSnapshotStore } from '@roos-code/roos-code-client-runtime/client'
+import { bindSnapshotSelector } from '@roos-code/roos-code-client-web-react'
+import type { PlanProjection } from '@roos-code/roos-code-plan-mode/client'
 import { PlanChip, type PlanChipProps } from '../src/client/PlanModeControl.tsx'
-import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
-import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
-import { zh } from '../src/client/locales.ts'
+import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
+import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
+import { en } from '../src/client/locales.ts'
 
 afterEach(cleanup)
 
 // The framework-injected t seat, stubbed over the zh dictionaries (the default locale).
-const t: PlanChipProps['t'] = makeTranslate(zh, commonZh)
+const t: PlanChipProps['t'] = makeTranslate(en, commonEn)
 
 function setup(
   plan: PlanProjection | undefined,
@@ -33,7 +33,7 @@ function setup(
   return { store, exitPlanMode, view }
 }
 
-const chip = () => screen.getByRole('button', { name: 'plan mode 已开启，按下关闭' })
+const chip = () => screen.getByRole('button', { name: 'Plan mode on, press to turn off' })
 
 describe('PlanChip', () => {
   it('renders nothing for an absent capability or a default-mode target', () => {
@@ -66,7 +66,7 @@ describe('PlanChip', () => {
     resolve(null)
     store.set({ value: { active: true, pending: true } })
     await waitFor(() => {
-      expect(screen.queryByRole('button', { name: 'plan mode 已开启，按下关闭' })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Plan mode on, press to turn off' })).toBeNull()
     })
   })
 

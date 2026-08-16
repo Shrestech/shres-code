@@ -30,6 +30,7 @@ export async function mockServer(script: {
   status?: number
   events?: string[]
   body?: string
+  json?: unknown
   delayMs?: number
   headers?: Record<string, string>
 }[]): Promise<MockServer> {
@@ -53,6 +54,11 @@ export async function mockServer(script: {
       if (behavior.status !== undefined && behavior.status !== 200) {
         response.writeHead(behavior.status, { 'content-type': 'application/json', ...behavior.headers })
         response.end(behavior.body ?? '{}')
+        return
+      }
+      if (behavior.json !== undefined) {
+        response.writeHead(200, { 'content-type': 'application/json', ...behavior.headers })
+        response.end(JSON.stringify(behavior.json))
         return
       }
       response.writeHead(200, { 'content-type': 'text/event-stream' })

@@ -1,13 +1,13 @@
 /**
- * Package-owned invariant companion for `@deepseek-ai/dsh-client-ui-input-trigger`.
- * @module @deepseek-ai/dsh-client-ui-input-trigger/invariant
+ * Package-owned invariant companion for `@roos-code/roos-code-client-ui-input-trigger`.
+ * @module @roos-code/roos-code-client-ui-input-trigger/invariant
  */
 
 /* jscpd:ignore-start */
-import type { Context } from '@deepseek-ai/cordis'
-import type { InvariantInstaller } from '@deepseek-ai/dsh-invariants'
+import type { Context } from '@roos-code/cordis'
+import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
 
-const PACKAGE_NAME = '@deepseek-ai/dsh-client-ui-input-trigger'
+const PACKAGE_NAME = '@roos-code/roos-code-client-ui-input-trigger'
 
 /** Cordis companion plugin name. */
 export const name = 'client-ui-input-trigger-invariant'

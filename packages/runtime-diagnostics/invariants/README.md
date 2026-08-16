@@ -1,6 +1,4 @@
-# dsh-invariants
-
-English | [中文](README.zh.md)
+# roos-invariants
 
 Configurable registry service for package-owned runtime invariant checks. The root plugin registers `ctx.invariants`; it contains no product checks or product-package imports. Every workspace package publishes a `./invariant` companion that registers its exact npm package name.
 
@@ -24,7 +22,7 @@ The service owns every registration fiber, while the returned disposer also belo
 
 `InvariantError` extends `Error`, carries stable `code: 'INVARIANT'`, and exposes the owning `packageName` without adding a product dependency to the service.
 
-Session itself owns immutable, surface-valid log storage in every composition: it takes one lossless JSON snapshot of each candidate, validates complete cited source-event coverage and positional replacement, restricts `tool/result` replacement to one current result's `content`, deep-freezes the accepted record, and exposes the log through immutable array snapshots. The `dsh-session` invariant companion checks the remaining cross-record rules that Session does not own.
+Session itself owns immutable, surface-valid log storage in every composition: it takes one lossless JSON snapshot of each candidate, validates complete cited source-event coverage and positional replacement, restricts `tool/result` replacement to one current result's `content`, deep-freezes the accepted record, and exposes the log through immutable array snapshots. The `roos-session` invariant companion checks the remaining cross-record rules that Session does not own.
 
 ## Package companions
 
@@ -36,14 +34,14 @@ The current executable companions protect these relationships:
 
 | Companion | Checks |
 |---|---|
-| `dsh-session`, `dsh-agent`, `dsh-scope`, `dsh-agent-loop` | Session enclosure and call/result trace, agent-status transitions, inbox FIFO conservation, scoped subjects, and model-request reconstruction. |
-| `dsh-llm`, `dsh-llm-retry`, `dsh-tools`, `dsh-system-prompt` | Stream grammar, durable retry position and bounds, tool-pipeline stages and frozen results, and authoritative prompt-assembly data. |
-| `dsh-compaction`, `dsh-hook-protocol`, `dsh-sandbox-policy` | Durable compaction and hook pairing, compaction metadata, and sandbox-mode vocabulary. |
-| `dsh-fs`, `dsh-subagent`, `dsh-workflow` | Filesystem event identity, provider/child pairing, and workflow/agent lifecycle identity. |
-| `dsh-goal`, `dsh-goal-round-driver` | Durable goal source/content agreement, revision and lifecycle transitions, timestamps, sequential admitted rounds, and reconstructed continuation prompts. |
-| `dsh-permission-presets`, `dsh-user-approval` | Active-preset references and approval asked/decided audit pairing. |
-| `dsh-jobs`, `dsh-tool-todo` | Task snapshot lifecycle/ownership fields and durable whole-list todo structure. |
-| `dsh-time-context` | Durable clock readings agree with the session's open turn and next pre-step position and elapsed baseline; rendered time parses and does not postdate its event. |
+| `roos-session`, `roos-agent`, `roos-scope`, `roos-agent-loop` | Session enclosure and call/result trace, agent-status transitions, inbox FIFO conservation, scoped subjects, and model-request reconstruction. |
+| `roos-llm`, `roos-llm-retry`, `roos-tools`, `roos-system-prompt` | Stream grammar, durable retry position and bounds, tool-pipeline stages and frozen results, and authoritative prompt-assembly data. |
+| `roos-compaction`, `roos-hook-protocol`, `roos-sandbox-policy` | Durable compaction and hook pairing, compaction metadata, and sandbox-mode vocabulary. |
+| `roos-fs`, `roos-subagent`, `roos-workflow` | Filesystem event identity, provider/child pairing, and workflow/agent lifecycle identity. |
+| `roos-goal`, `roos-goal-round-driver` | Durable goal source/content agreement, revision and lifecycle transitions, timestamps, sequential admitted rounds, and reconstructed continuation prompts. |
+| `roos-permission-presets`, `roos-user-approval` | Active-preset references and approval asked/decided audit pairing. |
+| `roos-jobs`, `roos-tool-todo` | Task snapshot lifecycle/ownership fields and durable whole-list todo structure. |
+| `roos-time-context` | Durable clock readings agree with the session's open turn and next pre-step position and elapsed baseline; rendered time parses and does not postdate its event. |
 
 The root entrypoint of each owner remains independent of diagnostics. Loading the service alone installs no product checks, and loading a companion without the service waits on its declared `invariants` injection.
 
@@ -52,16 +50,16 @@ The root entrypoint of each owner remains independent of diagnostics. Loading th
 ## Composition
 
 ```ts
-import type { Context } from '@deepseek-ai/cordis'
-import InvariantRegistry from '@deepseek-ai/dsh-invariants'
-import * as SessionInvariant from '@deepseek-ai/dsh-session/invariant'
+import type { Context } from '@roos-code/cordis'
+import InvariantRegistry from '@roos-code/roos-code-invariants'
+import * as SessionInvariant from '@roos-code/roos-code-session/invariant'
 
 declare const ctx: Context
 
 ctx.plugin(InvariantRegistry, {
   enabled: true,
-  package_allowlist: ['^@deepseek-ai/dsh-'],
-  package_blocklist: ['^@deepseek-ai/dsh-agent-loop$'],
+  package_allowlist: ['^@roos-code/roos-code-'],
+  package_blocklist: ['^@roos-code/roos-code-agent-loop$'],
 })
 ctx.plugin(SessionInvariant)
 ```

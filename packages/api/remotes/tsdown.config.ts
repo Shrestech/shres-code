@@ -1,7 +1,7 @@
 import { clientBundle } from '../../client/tsdown.client.ts'
 
 export default clientBundle(
-  '@deepseek-ai/dsh-api-remotes',
+  '@roos-code/roos-code-api-remotes',
   ['lib/types/index.js', 'lib/types/invariant.js'],
   { hostPhase: true },
 )

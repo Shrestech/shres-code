@@ -1,16 +1,16 @@
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@deepseek-ai/cordis'
-import { createUserMessage, CallId } from '@deepseek-ai/dsh-llm'
-import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
-import ToolRuntime, { RUN_CODE_NAME, defineContentToolFixture } from '@deepseek-ai/dsh-tools'
-import { Session, SessionId, type UserMessage } from '@deepseek-ai/dsh-session'
-import AgentRegistry, { agentEvents, type Agent } from '@deepseek-ai/dsh-agent'
-import { createScope } from '@deepseek-ai/dsh-scope'
+import { Context } from '@roos-code/cordis'
+import { createUserMessage, CallId } from '@roos-code/roos-code-llm'
+import SystemPrompt from '@roos-code/roos-code-system-prompt'
+import ToolRuntime, { RUN_CODE_NAME, defineContentToolFixture } from '@roos-code/roos-code-tools'
+import { Session, SessionId, type UserMessage } from '@roos-code/roos-code-session'
+import AgentRegistry, { agentEvents, type Agent } from '@roos-code/roos-code-agent'
+import { createScope } from '@roos-code/roos-code-scope'
 import UserQuestionService, {
   UserQuestionError, type AskUserQuestionRequest,
-} from '@deepseek-ai/dsh-user-questions'
-import CommandRuntime from '@deepseek-ai/dsh-commands'
-import { CodeRuntime, type CodeRunRequest, type CodeRunResult } from '@deepseek-ai/dsh-code-runtime'
+} from '@roos-code/roos-code-user-questions'
+import CommandRuntime from '@roos-code/roos-code-commands'
+import { CodeRuntime, type CodeRunRequest, type CodeRunResult } from '@roos-code/roos-code-code-runtime'
 import PlanModeController, { EXIT_PLAN_MODE, foldPlanMode, resolveConfig } from '../src/index.ts'
 import type { PlanModeConfig } from '../src/index.ts'
 
@@ -18,7 +18,7 @@ const TEST_PLAN_SECTION = 'Test plan mode instructions.'
 const PLAN_CONFIG = { section: TEST_PLAN_SECTION } satisfies PlanModeConfig
 
 /**
- * Drives the REAL plugin: mounts `dsh-plan-mode` beside real `SystemPrompt` and
+ * Drives the REAL plugin: mounts `roos-plan-mode` beside real `SystemPrompt` and
  * `ToolRuntime` services, with fake Agents carrying real `Session`s and a
  * real scoped `agent.ctx` minted through `createScope`.
  * Request boundaries are simulated by dispatching the real pre-step waterfall

@@ -29,6 +29,11 @@ export interface ConfigurableProviderView {
    * surface must treat absence as "unknown", not as "shipped".
    */
   declared?: boolean
+  /**
+   * When `delegated`, the route runs an external CLI whose own tools
+   * bypass harness approval.
+   */
+  kind?: 'delegated'
 }
 
 /** Llm-domain unary methods (the map keys llm.* of RpcMethodMap). */

@@ -9,13 +9,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { Context } from '@deepseek-ai/cordis'
-import { CallId } from '@deepseek-ai/dsh-llm'
-import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
-import ToolRuntime, { TOOL_ABORTED_BEFORE_DISPATCH } from '@deepseek-ai/dsh-tools'
-import { LocalFileSystem } from '@deepseek-ai/dsh-fs-local'
-import * as FsPolicy from '@deepseek-ai/dsh-fs-observation-policy'
-import * as ToolFs from '@deepseek-ai/dsh-tool-fs'
+import { Context } from '@roos-code/cordis'
+import { CallId } from '@roos-code/roos-code-llm'
+import SystemPrompt from '@roos-code/roos-code-system-prompt'
+import ToolRuntime, { TOOL_ABORTED_BEFORE_DISPATCH } from '@roos-code/roos-code-tools'
+import { LocalFileSystem } from '@roos-code/roos-code-fs-local'
+import { SandboxedFileSystem } from '@roos-code/roos-code-fs-sandbox'
+import * as FsPolicy from '@roos-code/roos-code-fs-observation-policy'
+import SandboxPolicyService from '@roos-code/roos-code-sandbox-policy'
+import * as ToolFs from '@roos-code/roos-code-tool-fs'
 
 const testToolSignal = new AbortController().signal
 
@@ -48,9 +50,9 @@ afterEach(async () => {
 // --------------------------------------------------------------------------
 // DEFAULT deployment: the policy gate plugin is loaded.
 // --------------------------------------------------------------------------
-describe('default deployment (with dsh-fs-observation-policy)', () => {
+describe('default deployment (with roos-fs-observation-policy)', () => {
   beforeEach(async () => {
-    dir = await mkdtemp(join(tmpdir(), 'dsh-tool-fs-'))
+    dir = await mkdtemp(join(tmpdir(), 'roos-tool-fs-'))
     ctx = new Context()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
@@ -310,9 +312,9 @@ describe('default deployment (with dsh-fs-observation-policy)', () => {
 // --------------------------------------------------------------------------
 // BARE deployment: the tool suite WITHOUT the policy gate.
 // --------------------------------------------------------------------------
-describe('bare provider (no dsh-fs-observation-policy)', () => {
+describe('bare provider (no roos-fs-observation-policy)', () => {
   beforeEach(async () => {
-    dir = await mkdtemp(join(tmpdir(), 'dsh-tool-fs-bare-'))
+    dir = await mkdtemp(join(tmpdir(), 'roos-tool-fs-bare-'))
     ctx = new Context()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
@@ -375,12 +377,12 @@ describe('bare provider (no dsh-fs-observation-policy)', () => {
 
 // Per-session cwd: a relative file_path resolves against the calling session's workspace
 // (`exec.agent.session.header.cwd`), not the backend's config.cwd, so the
-// caller-selected session workspace wins, matching dsh-tool-bash.
+// caller-selected session workspace wins, matching roos-tool-bash.
 describe('per-session cwd', () => {
   let sessionDir: string
   beforeEach(async () => {
-    dir = await mkdtemp(join(tmpdir(), 'dsh-tool-fs-cfg-'))
-    sessionDir = await mkdtemp(join(tmpdir(), 'dsh-tool-fs-session-'))
+    dir = await mkdtemp(join(tmpdir(), 'roos-tool-fs-cfg-'))
+    sessionDir = await mkdtemp(join(tmpdir(), 'roos-tool-fs-session-'))
     ctx = new Context()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
@@ -419,13 +421,43 @@ describe('per-session cwd', () => {
   })
 })
 
+describe('sandboxed credential-read transcript', () => {
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), 'roos-tool-fs-fence-'))
+    ctx = new Context()
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRuntime)
+    await ctx.plugin(SandboxPolicyService, { mode: 'workspace-write', workspaceRoot: dir })
+    await ctx.plugin(SandboxedFileSystem, { cwd: dir })
+    await ctx.plugin(FsPolicy)
+    fiber = await ctx.plugin(ToolFs)
+  })
+
+  it('the read tool returns the sandbox denial marker and does not leak the file', async () => {
+    const path = join(dir, 'provider.credentials.yaml')
+    await writeFile(path, 'DEEPSEEK_API_KEY: sk-secret\n', { mode: 0o600 })
+    const result = await ctx.tools.execute({
+      signal: testToolSignal,
+      callId: CallId(`call-${++callCounter}`),
+      name: 'read',
+      arguments: { file_path: path },
+      agent: { session: { header: { cwd: dir }, events: [] } } as never,
+    })
+    expect(result.isError).toBe(true)
+    expect(result.error).toMatchObject({ info: { code: 'FS_SANDBOX_DENIED' } })
+    expect(text(result)).toContain('[sandbox: file access denied under workspace-write mode]')
+    expect(text(result)).not.toContain('sk-secret')
+    expect(text(result)).not.toContain('retry this exact operation once with sandbox_permissions')
+  })
+})
+
 // --------------------------------------------------------------------------
 // Abort-through-the-tool, tool-tier concurrency, and the fs/observed contract —
 // all through ctx.tools.execute() against the REAL backend + policy.
 // --------------------------------------------------------------------------
 describe('signal, concurrency, and the fs/observed contract', () => {
   beforeEach(async () => {
-    dir = await mkdtemp(join(tmpdir(), 'dsh-tool-fs-'))
+    dir = await mkdtemp(join(tmpdir(), 'roos-tool-fs-'))
     ctx = new Context()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)

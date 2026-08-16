@@ -49,7 +49,7 @@ interface DiffRow {
   text: string
 }
 
-/** Local exhaustiveness helper — this package does not depend on `dsh-llm`. */
+/** Local exhaustiveness helper — this package does not depend on `roos-llm`. */
 /* v8 ignore next 3 -- closed-union backstop; only reached if a row kind is forged */
 function assertNever(value: never): never {
   throw new Error(`unreachable diff row kind: ${String(value)}`)
@@ -168,7 +168,7 @@ export function DiffBlock({ diffs, maxLines = DEFAULT_DIFF_MAX_LINES, className 
   return (
     <div className={clsx(css.block, className)} data-diff="">
       <button type="button" className={css.copyButton} onClick={onCopy}>
-        {copied ? '复制成功' : '复制'}
+        {copied ? 'Copied' : 'Copy'}
       </button>
       <div className={css.body}>
         {head.map((row, index) => (
@@ -179,10 +179,10 @@ export function DiffBlock({ diffs, maxLines = DEFAULT_DIFF_MAX_LINES, className 
             type="button"
             className={css.expand}
             aria-expanded={expanded}
-            aria-label={expanded ? '收起差异' : `展开其余 ${hidden} 行差异`}
+            aria-label={expanded ? 'Show less' : `Show remaining ${hidden} lines`}
             onClick={onToggle}
           >
-            {expanded ? '收起' : `… 其余 ${hidden} 行`}
+            {expanded ? 'Show less' : `… remaining ${hidden} lines`}
           </button>
         )}
         {tail.map((row, index) => (

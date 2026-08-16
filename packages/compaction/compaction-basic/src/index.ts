@@ -1,21 +1,21 @@
 /**
  * Basic replay-aware compaction backend.
  *
- * @module @deepseek-ai/dsh-compaction-basic
+ * @module @roos-code/roos-code-compaction-basic
  */
 
-import { Context } from '@deepseek-ai/cordis'
-import z from '@deepseek-ai/schemastery'
-import { CompactionEngine, ManualCompactionError } from '@deepseek-ai/dsh-compaction'
-import type { CompactionResult, CompactionTrigger } from '@deepseek-ai/dsh-compaction'
-import type { TokenMeter } from '@deepseek-ai/dsh-token-meter'
-import type { Session } from '@deepseek-ai/dsh-session'
-import { CONTEXT_WINDOW_EXCEEDED_CODE, assertNever } from '@deepseek-ai/dsh-llm'
-import type { LlmCallConfig } from '@deepseek-ai/dsh-llm'
-import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
-import type { CommandId } from '@deepseek-ai/dsh-commands/brand'
+import { Context } from '@roos-code/cordis'
+import z from '@roos-code/schemastery'
+import { CompactionEngine, ManualCompactionError } from '@roos-code/roos-code-compaction'
+import type { CompactionResult, CompactionTrigger } from '@roos-code/roos-code-compaction'
+import type { TokenMeter } from '@roos-code/roos-code-token-meter'
+import type { Session } from '@roos-code/roos-code-session'
+import { CONTEXT_WINDOW_EXCEEDED_CODE, assertNever } from '@roos-code/roos-code-llm'
+import type { LlmCallConfig } from '@roos-code/roos-code-llm'
+import type { Agent, PreStepDecision } from '@roos-code/roos-code-agent'
+import type { CommandId } from '@roos-code/roos-code-commands/brand'
 // Type-only: makes the optional sibling service available to `ctx.get()`.
-import type {} from '@deepseek-ai/dsh-compaction-tool-result-pruner'
+import type {} from '@roos-code/roos-code-compaction-tool-result-pruner'
 import {
   resolveCompactSpec,
   resolveConfig,

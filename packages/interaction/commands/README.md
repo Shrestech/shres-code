@@ -1,6 +1,4 @@
-# @deepseek-ai/dsh-commands
-
-English | [中文](README.zh.md)
+# @roos-code/roos-code-commands
 
 Plugin-owned human-command registry consumed by interactive UI adapters. The [plugin command registration Agent Note](../../../.agents/notes/implemented/feature/2026-07-19-plugin-command-registration.md) owns the boundary and dispatch contract.
 
@@ -16,7 +14,7 @@ Handlers return `success` or `error` plus optional UI text. A successful handler
 
 ## Composition
 
-The shipped `dsh` base mounts this service and the Web client dispatches through it. UI-less demo spines and ACP automation do not provide a command adapter. Custom interactive compositions and command producers mount `@deepseek-ai/dsh-commands` explicitly.
+The shipped `roos` base mounts this service and the Web client dispatches through it. UI-less demo spines and ACP automation do not provide a command adapter. Custom interactive compositions and command producers mount `@roos-code/roos-code-commands` explicitly.
 
 ## Model Experience
 
@@ -24,7 +22,7 @@ The shipped `dsh` base mounts this service and the Web client dispatches through
 
 #### What the model sees
 
-The registry itself submits nothing. Known slash commands execute in the UI command plane, and their `CommandResult` text is not submitted as a user message. Unknown slash-command input is rejected by shipped adapters instead of becoming a model prompt. A command producer may explicitly use the receiving `Agent`; for example, [`dsh-plan-mode`](../../plan/plan-mode/README.md#model-and-human-interactions) submits the optional message in `/plan [message]` after selecting plan mode.
+The registry itself submits nothing. Known slash commands execute in the UI command plane, and their `CommandResult` text is not submitted as a user message. Unknown slash-command input is rejected by shipped adapters instead of becoming a model prompt. A command producer may explicitly use the receiving `Agent`; for example, [`roos-plan-mode`](../../plan/plan-mode/README.md#model-and-human-interactions) submits the optional message in `/plan [message]` after selecting plan mode.
 
 #### Token effect
 

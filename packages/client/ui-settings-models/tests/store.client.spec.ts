@@ -1,6 +1,6 @@
 /** Page-store join: directory × namespaces × credentials, with last-good rows on failure. */
 import { describe, expect, it } from 'vitest'
-import type { RpcResponse } from '@deepseek-ai/dsh-api-remotes/client'
+import type { RpcResponse } from '@roos-code/roos-code-api-remotes/client'
 import { messageOf, ModelsSettingsStore } from '../src/client/store.ts'
 
 let nextRpc = 0
@@ -96,6 +96,41 @@ describe('ModelsSettingsStore', () => {
     expect(byProvider.get('anthropic')?.apiKeyEnv).toBeUndefined()
     expect(byProvider.get('ghost')).toMatchObject({ configured: false, removable: false })
     expect(state.namespaces.get('llm-pi-ai')?.ns).toBe('llm-pi-ai')
+    expect(state.hasUserDefaultModel).toBe(false)
+  })
+
+  it('mirrors a saved user-layer default so first-run does not re-prompt', async () => {
+    const cases: Array<{ user: unknown; expected: boolean }> = [
+      { user: { provider: 'ollama-local', model: 'qwen2.5' }, expected: true },
+      { user: { provider: '', model: 'qwen2.5' }, expected: false },
+      { user: { provider: 'ollama-local', model: '' }, expected: false },
+      { user: { provider: 1, model: 'qwen2.5' }, expected: false },
+      { user: null, expected: false },
+      { user: 'oops', expected: false },
+    ]
+    for (const { user, expected } of cases) {
+      const { face } = api({
+        describeSettings: () => Promise.resolve(ok({
+          writable: true,
+          hasDocument: false,
+          namespaces: [
+            ...NAMESPACES,
+            {
+              ns: 'agent-default-model',
+              schema: {},
+              value: user,
+              user,
+              applies: 'live' as const,
+              secrets: [],
+              revision: 1,
+            },
+          ] as never,
+        })),
+      })
+      const store = new ModelsSettingsStore(face)
+      await store.load()
+      expect(store.store.getSnapshot().hasUserDefaultModel).toBe(expected)
+    }
   })
 
   it('degrades the credential badge, not the page, when the credential domain fails', async () => {

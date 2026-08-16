@@ -1,17 +1,17 @@
 /**
  * Model-facing `get_goal`, `create_goal`, and `update_goal` tools over the
  * persisted same-session goal domain.
- * @module @deepseek-ai/dsh-tool-goal
+ * @module @roos-code/roos-code-tool-goal
  */
 
-import type { Context } from '@deepseek-ai/cordis'
-import z from '@deepseek-ai/schemastery'
-import { GoalId } from '@deepseek-ai/dsh-goal'
-import type { GoalRef, GoalView } from '@deepseek-ai/dsh-goal'
-import { boundContextSummary, createUserMessage, HarnessError } from '@deepseek-ai/dsh-llm'
-import { defineTool } from '@deepseek-ai/dsh-tools'
-import type { GenericCallView } from '@deepseek-ai/dsh-tools'
-import type {} from '@deepseek-ai/dsh-system-prompt'
+import type { Context } from '@roos-code/cordis'
+import z from '@roos-code/schemastery'
+import { GoalId } from '@roos-code/roos-code-goal'
+import type { GoalRef, GoalView } from '@roos-code/roos-code-goal'
+import { boundContextSummary, createUserMessage, HarnessError } from '@roos-code/roos-code-llm'
+import { defineTool } from '@roos-code/roos-code-tools'
+import type { GenericCallView } from '@roos-code/roos-code-tools'
+import type {} from '@roos-code/roos-code-system-prompt'
 import {
   completionAuthority,
   goalToolExecution,

@@ -8,7 +8,7 @@
  * Pure event sequences — no React, no DOM, no ambient clock.
  */
 import { describe, expect, it } from 'vitest'
-import type { CommandClaim, ReferenceInsert, TokenSpan } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
+import type { CommandClaim, ReferenceInsert, TokenSpan } from '@roos-code/roos-code-client-ui-input-trigger/client'
 import type { InputEffect, SubmitAttempt } from '../src/client/input/contract.ts'
 import { InputMachine, PLACEHOLDER, projectClipboard } from '../src/client/input/machine.ts'
 import { deriveDecorations, scanTextRefs } from '../src/client/input/decorations.ts'
@@ -103,9 +103,9 @@ describe('input-machine: plain × enter', () => {
 
   it('a non-whitespace prefix before "/" is not leading — default sink', () => {
     const m = new InputMachine()
-    m.dispatch({ type: 'draft-changed', draft: '第一行\n/goal x' })
+    m.dispatch({ type: 'draft-changed', draft: 'first line\n/goal x' })
     expect(m.dispatch({ type: 'enter', mode: 'queue' }))
-      .toEqual([{ type: 'default-sink', draft: '第一行\n/goal x', mode: 'queue' }])
+      .toEqual([{ type: 'default-sink', draft: 'first line\n/goal x', mode: 'queue' }])
   })
 })
 

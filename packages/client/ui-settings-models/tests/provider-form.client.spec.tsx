@@ -2,9 +2,9 @@
 /** Model-list editing, endpoint interrogation, and hand-declared provider creation. */
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import Schema from '@deepseek-ai/schemastery'
-import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-web-react'
-import type { RpcResponse, SettingsNamespaceView } from '@deepseek-ai/dsh-api-remotes/client'
+import Schema from '@roos-code/schemastery'
+import { bindSnapshotSelector } from '@roos-code/roos-code-client-web-react'
+import type { RpcResponse, SettingsNamespaceView } from '@roos-code/roos-code-api-remotes/client'
 import { ModelsSection, providerCopy } from '../src/client/ModelsSection.tsx'
 import type { ModelsSectionInjected } from '../src/client/ModelsSection.tsx'
 import { CustomProviderCard } from '../src/client/CustomProviderCard.tsx'
@@ -754,12 +754,12 @@ describe('hand-declared providers', () => {
     // The route id, not the stored name: it is what the route will be called
     // the moment the field is cleared.
     expect(name.placeholder).toBe('acme-gateway')
-    fireEvent.change(name, { target: { value: 'Acme 网关' } })
+    fireEvent.change(name, { target: { value: 'Acme Gateway' } })
     fireEvent.click(screen.getByText(en.apply))
 
     await waitFor(() => { expect(mutate).toHaveBeenCalledTimes(1) })
     expect(firstMutate(mutate).ops)
-      .toEqual([{ op: 'set', path: ['providers', 'acme-gateway', 'displayName'], value: 'Acme 网关' }])
+      .toEqual([{ op: 'set', path: ['providers', 'acme-gateway', 'displayName'], value: 'Acme Gateway' }])
   })
 
   it('offers the composition name as what a cleared field falls back to', async () => {
@@ -792,7 +792,7 @@ describe('hand-declared providers', () => {
     face.llm.providers = vi.fn(() => Promise.resolve(ok({
       providers: [{
         provider: 'acme-gateway',
-        displayName: 'Acme 网关',
+        displayName: 'Acme Gateway',
         settingsNs: 'llm-pi-ai',
         settingsPath: ['providers', 'acme-gateway'],
         active: true,
@@ -801,13 +801,13 @@ describe('hand-declared providers', () => {
     })))
     openEditor('acme-gateway')
 
-    fireEvent.change(screen.getByLabelText(en.customDisplayName), { target: { value: 'Acme 网关' } })
+    fireEvent.change(screen.getByLabelText(en.customDisplayName), { target: { value: 'Acme Gateway' } })
     fireEvent.click(screen.getByText(en.apply))
 
     const notice = await screen.findByRole('status')
     expect(notice.textContent).toBe(providerCopy(en.savedProvider, {
       provider: 'acme-gateway',
-      displayName: 'Acme 网关',
+      displayName: 'Acme Gateway',
     }))
   })
 

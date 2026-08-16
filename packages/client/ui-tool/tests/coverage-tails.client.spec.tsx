@@ -3,20 +3,20 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
-import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
-import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-web-react'
-import type { RunningToolCall, SessionId, SessionListState, ToolResultNode } from '@deepseek-ai/dsh-client-runtime/client'
-import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
-import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
+import { createSnapshotStore } from '@roos-code/roos-code-client-runtime/client'
+import { bindSnapshotSelector } from '@roos-code/roos-code-client-web-react'
+import type { RunningToolCall, SessionId, SessionListState, ToolResultNode } from '@roos-code/roos-code-client-runtime/client'
+import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
+import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
 import { GenericToolCard, type GenericToolCardProps } from '../src/client/tool/toolviews/GenericToolCard.tsx'
 import { ToolRow } from '../src/client/tool/components/ToolRow.tsx'
 import { BashRow } from '../src/client/tool/toolviews/bash-sample.tsx'
-import { zh } from '@deepseek-ai/dsh-client-ui-conversation/src/client/locales.ts'
+import { en } from '@roos-code/roos-code-client-ui-conversation/src/client/locales.ts'
 
 type BashRowProps = Parameters<typeof BashRow>[0]
 
 // Mirrors the real lookup chain (conversation namespace, then common).
-const t: GenericToolCardProps['t'] = makeTranslate(zh, commonZh)
+const t: GenericToolCardProps['t'] = makeTranslate(en, commonEn)
 
 afterEach(cleanup)
 
@@ -106,11 +106,11 @@ describe('Tool presentation tails', () => {
     const errorView = render(<BashRow {...bashProps(errorResult)} />)
     expect(errorView.container.querySelector('[data-sample="bash"]')).not.toBeNull()
     expect(errorView.container.querySelector('[data-state="error"]')).not.toBeNull()
-    expect(errorView.getByText('失败')).toBeTruthy()
+    expect(errorView.getByText('Failed')).toBeTruthy()
     errorView.unmount()
 
     const stoppedView = render(<BashRow {...bashProps(stoppedResult)} />)
     expect(stoppedView.container.querySelector('[data-state="stopped"]')).not.toBeNull()
-    expect(stoppedView.getByText('已停止')).toBeTruthy()
+    expect(stoppedView.getByText('Stopped')).toBeTruthy()
   })
 })

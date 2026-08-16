@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@deepseek-ai/cordis'
-import Loader from '@deepseek-ai/cordis-plugin-loader'
-import AgentRegistry, { agentEvents, Inbox } from '@deepseek-ai/dsh-agent'
-import type { Agent, AgentStatus } from '@deepseek-ai/dsh-agent'
-import GoalService, { GoalId } from '@deepseek-ai/dsh-goal'
-import type { GoalRef } from '@deepseek-ai/dsh-goal'
-import { createUserMessage, CallId } from '@deepseek-ai/dsh-llm'
-import type { MessageSource } from '@deepseek-ai/dsh-llm'
-import { SESSION_FORMAT_VERSION, Session, SessionId } from '@deepseek-ai/dsh-session'
-import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
-import ToolRuntime from '@deepseek-ai/dsh-tools'
-import type { ToolExecutionResult } from '@deepseek-ai/dsh-tools'
-import * as toolGoal from '@deepseek-ai/dsh-tool-goal'
+import { Context } from '@roos-code/cordis'
+import Loader from '@roos-code/cordis-plugin-loader'
+import AgentRegistry, { agentEvents, Inbox } from '@roos-code/roos-code-agent'
+import type { Agent, AgentStatus } from '@roos-code/roos-code-agent'
+import GoalService, { GoalId } from '@roos-code/roos-code-goal'
+import type { GoalRef } from '@roos-code/roos-code-goal'
+import { createUserMessage, CallId } from '@roos-code/roos-code-llm'
+import type { MessageSource } from '@roos-code/roos-code-llm'
+import { SESSION_FORMAT_VERSION, Session, SessionId } from '@roos-code/roos-code-session'
+import SystemPrompt from '@roos-code/roos-code-system-prompt'
+import ToolRuntime from '@roos-code/roos-code-tools'
+import type { ToolExecutionResult } from '@roos-code/roos-code-tools'
+import * as toolGoal from '@roos-code/roos-code-tool-goal'
 
 const testToolSignal = new AbortController().signal
 
@@ -198,7 +198,7 @@ describe('goal tool registration and presentation', () => {
 describe('goal tool execution authority', () => {
   it('lets a root model infer create intent from its accepted human turn', async () => {
     const { ctx, root } = await harness()
-    openTurn(root, { kind: 'user' }, '请持续工作直到这个功能完成')
+    openTurn(root, { kind: 'user' }, 'Keep working until this feature is complete')
     const result = await execute(ctx, 'create_goal', {
       objective: 'Finish the feature', max_goal_rounds: 9,
     }, root.agent)
@@ -269,7 +269,7 @@ describe('goal tool execution authority', () => {
     ctx.agents.register(fork.agent)
     expect(ctx.goals.get(fork.agent)).toMatchObject({ id: created.id, activation: 'disarmed' })
 
-    openTurn(fork, { kind: 'user' }, '继续这个目标')
+    openTurn(fork, { kind: 'user' }, 'Continue goal')
     const resumed = await execute(ctx, 'update_goal', {
       goal_id: created.id, revision: created.revision, action: 'resume',
     }, fork.agent)
@@ -406,7 +406,7 @@ describe('goal tool state transitions', () => {
     closeTurn(root, turn)
     agentEvents(ctx, root.agent).emit('agent/session-start', { source: 'resume' })
     expect(ctx.goals.get(root.agent)?.activation).toBe('disarmed')
-    turn = openTurn(root, { kind: 'user' }, '继续')
+    turn = openTurn(root, { kind: 'user' }, 'Continue')
     const resumed = await execute(ctx, 'update_goal', {
       goal_id: created.id, revision: created.revision, action: 'resume',
     }, root.agent)

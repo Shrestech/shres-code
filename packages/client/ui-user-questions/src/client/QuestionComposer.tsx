@@ -3,7 +3,7 @@ import clsx from 'clsx'
 import {
   Button, IconCheckOutline14, IconChevronLeftOutline14, IconChevronRightOutline14,
   IconCloseOutline16, IconEditOutline16, MarkdownText,
-} from '@deepseek-ai/dsh-client-ui-primitives'
+} from '@roos-code/roos-code-client-ui-primitives'
 import {
   PendingQuestion, planReviewOf,
   type QuestionAnswer, type QuestionComposerProps,
@@ -31,7 +31,7 @@ type Feedback = { key: 'error.incomplete' | 'error.unanswered' } | { text: strin
  * @returns Display label plus recommendation state.
  */
 export function parseRecommendedLabel(label: string): { label: string; recommended: boolean } {
-  const suffix = /\s*(?:\((?:recommended|推荐)\)|（(?:recommended|推荐)）)\s*$/i
+  const suffix = /\s*(?:\((?:recommended|Recommended)\)|（(?:recommended|Recommended)）)\s*$/i
   return suffix.test(label)
     ? { label: label.replace(suffix, ''), recommended: true }
     : { label, recommended: false }

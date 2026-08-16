@@ -2,12 +2,12 @@
  * Service Definition for the same-world process-confinement capability seam: wrap exact subprocess argv under a
  * host-path file policy. Containers, microVMs, and remote execution replace the
  * surrounding capability seam instead; this service shares the host kernel and filesystem.
- * @module @deepseek-ai/dsh-sandbox
+ * @module @roos-code/roos-code-sandbox
  */
 
-import { Context, Service } from '@deepseek-ai/cordis'
-import { HarnessError } from '@deepseek-ai/dsh-llm'
-import type { SessionId } from '@deepseek-ai/dsh-session'
+import { Context, Service } from '@roos-code/cordis'
+import { HarnessError } from '@roos-code/roos-code-llm'
+import type { SessionId } from '@roos-code/roos-code-session'
 
 export {
   ESCALATION_TARGETS,
@@ -23,10 +23,14 @@ export { canonicalPath, writableRoots } from './roots.ts'
 /**
  * File-effect policy for confined processes. `read-only` permits only required
  * sinks such as `/dev/null`; `workspace-write` also permits the workspace and a
- * backend-defined temp area; `danger-full-access` bypasses confinement. Network
- * and process visibility are outside this vocabulary.
+ * backend-defined temp area; `danger-full-access` bypasses confinement. Process
+ * visibility is outside this vocabulary; outbound network is a separate
+ * {@link SandboxExecutionPolicy.network} field.
  */
 export type SandboxMode = 'read-only' | 'workspace-write' | 'danger-full-access'
+
+/** Outbound network for a confined process. */
+export type SandboxNetwork = 'allow' | 'deny'
 
 /** A confining (non-`danger-full-access`) mode — the modes a {@link SandboxPolicy} can carry. */
 export type ConfinedSandboxMode = Exclude<SandboxMode, 'danger-full-access'>
@@ -42,13 +46,31 @@ export interface SandboxExecutionPolicy {
   /** Absolute root directory `workspace-write` may write under. */
   workspaceRoot: string
   /**
-   * Opaque identity of the calling session (the branded `dsh-session`
+   * Opaque identity of the calling session (the branded `roos-session`
    * SessionId). Backends key per-session state off it (e.g. windows-acl gives
    * each live session/workspace pair a random private temp directory and SID,
    * while the workspace SID and standing grant remain per-workspace); absent
    * for agentless calls, which fall back to per-call backend state.
    */
   sessionId?: SessionId
+  /**
+   * Outbound network for confined processes. `ctx.sandboxPolicy.resolve()`
+   * always sets this from the validated `network` config (default `deny`).
+   * Omitted on a hand-built policy is treated as `deny` by
+   * {@link sandboxNetwork}.
+   */
+  network?: SandboxNetwork
+}
+
+/**
+ * Resolve outbound network for one policy. The policy home fills
+ * {@link SandboxExecutionPolicy.network} at `resolve()`; a hand-built policy
+ * that omits the field is `deny`.
+ * @param policy - per-call policy, which may omit `network`.
+ * @returns `allow` only when the policy explicitly allows outbound network.
+ */
+export function sandboxNetwork(policy: Pick<SandboxExecutionPolicy, 'network'>): SandboxNetwork {
+  return policy.network ?? 'deny'
 }
 
 /**
@@ -143,7 +165,7 @@ export class SandboxUnavailableError extends HarnessError {
   }
 }
 
-declare module '@deepseek-ai/cordis' {
+declare module '@roos-code/cordis' {
   interface Context {
     sandbox: SandboxProvider
   }

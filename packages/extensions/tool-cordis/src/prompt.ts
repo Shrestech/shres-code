@@ -2,7 +2,7 @@
 
 export const CORDIS_SYSTEM_PROMPT = `# Dynamic Cordis Plugins
 
-Dynamic Cordis plugins temporarily extend the current DSH process. A Plugin uses apply(ctx) to consume Services, listen to Events, provide Services, register model Tools, or register browser UI in Slots.
+Dynamic Cordis plugins temporarily extend the current Roos process. A Plugin uses apply(ctx) to consume Services, listen to Events, provide Services, register model Tools, or register browser UI in Slots.
 
 - Plugin and Package definitions exist only in the current process. define itself does not modify repository source, configuration, or disk, and definitions do not survive a process restart.
 - The restricted execution environment prevents accidental misuse; it is not a security boundary for malicious code. Services obtained by dynamic code connect to the real runtime.
@@ -15,7 +15,7 @@ Dynamic Cordis plugins temporarily extend the current DSH process. A Plugin uses
 - Choose Host, Client, or both from the requested outcome. Do not propose a Client/browser UI when the task does not need visible page behavior, and do not avoid Client when the requested outcome is visual, interactive, or depends on page state. Host versus Client is an implementation choice; do not make the user choose it.
 - When a design direction or a potentially useful interface would materially affect the result, ask at most one concise outcome or creative-preference question and offer a few candidate directions. Otherwise proceed directly; do not conduct a multi-round interview or a complex questionnaire.
 - cordis_define only defines and presents code; it does not run it. After definition, explain the pluginId and packageId returned by the Host and whether the next step is a run or update.
-- cordis_run may require user approval. When it returns awaiting-approval, explain that the user must allow or reject it in the UI. Do not wait, retry, or claim that it is running.
+- cordis_run may require user approval. A Host half asks through the session approval channel once per Plugin in this Session before any Host code runs; rejected, cancelled, or unavailable is final — do not retry that same activation. When it returns awaiting-approval, explain that the user must allow or reject the Client half in the UI. Do not wait, retry, or claim that it is running.
 - When it returns starting, explain that the request has entered the asynchronous flow and the Client is still activating. starting does not mean success. Wait for the system to report the final result through steering context.
 - Do not request approval again after the user rejects it. After a technical failure, fix the same Plugin from its diagnostics; do not silently create a replacement Plugin.
 
@@ -81,7 +81,7 @@ return {
 
 ### Data: do not serialize live data
 
-- Services, Events, Slots, Sessions, and their derived Cordis/DSH objects are internal live data, not ordinary JSON that can be dumped.
+- Services, Events, Slots, Sessions, and their derived Cordis/Roos objects are internal live data, not ordinary JSON that can be dumped.
 - Do not apply JSON.stringify, structuredClone, recursive enumeration, full copying, or whole-object display to live data.
 - Read only the leaf fields required by the task, then construct the smallest owned data object without Host references.
 
@@ -93,7 +93,7 @@ return {
 
 ## Host and Client
 
-- Host runs in the DSH Node.js process and is appropriate for files, networking, commands, Agent/Session access, Host Events, Services, model Tools, and JSON methods callable by the Client.
+- Host runs in the Roos Node.js process and is appropriate for files, networking, commands, Agent/Session access, Host Events, Services, model Tools, and JSON methods callable by the Client.
 - Client runs in the browser page and is appropriate for themes, layout, current page state, Tool cards, and Slot UI.
 - Host and Client communicate through Package-private JSON methods: Host uses harness.handle(method, handler), and Client uses host.call(method, args). The direction is Client→Host, and only lossless JSON may cross it.
 - Client UI must be registered in a queried Slot; apply() cannot directly return a React Element. Query Slots.listSubTree without root to choose from the compact purpose/topology tree, then query the exact root for its full registration contract and props before writing code.

@@ -5,13 +5,13 @@
  * that are already showing, so a default set from one converges the other.
  */
 
-import { Context } from '@deepseek-ai/cordis'
+import { Context } from '@roos-code/cordis'
 import { describe, expect, it, vi } from 'vitest'
-import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
-import { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
-import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
-import { TestRemote, usePinnedBrowserLanguages } from '@deepseek-ai/dsh-client-test-runtime'
-import { apply, inject } from '@deepseek-ai/dsh-client-ui-agent-preset/client'
+import { resolveSlotLabel } from '@roos-code/roos-code-client-ui-slots'
+import { SlotRegistry } from '@roos-code/roos-code-client-runtime/client'
+import { LocaleRuntime } from '@roos-code/roos-code-client-locale/client'
+import { TestRemote, usePinnedBrowserLanguages } from '@roos-code/roos-code-client-test-runtime'
+import { apply, inject } from '@roos-code/roos-code-client-ui-agent-preset/client'
 import { AgentPresetLabel } from '../src/client/AgentPresetLabel.tsx'
 import type { AgentPresetLabelInjected } from '../src/client/AgentPresetLabel.tsx'
 import { AgentPresetRow } from '../src/client/AgentPresetRow.tsx'
@@ -23,7 +23,7 @@ import type { AgentPresetSeatInjected } from '../src/client/AgentPresetSeat.tsx'
 
 // The service reads its initial locale from the browser; these specs assert
 // the shipped Chinese copy, so they state the browser they assume.
-usePinnedBrowserLanguages('zh-CN')
+usePinnedBrowserLanguages('en-US')
 
 const ROSTER_ONE = {
   rpcId: 'r',
@@ -194,7 +194,7 @@ describe('ui-agent-preset apply', () => {
     expect(section.component).toBe(AgentPresetSection)
     expect(section.options).toMatchObject({ id: 'agent-presets', order: 20 })
     // The nav label is a locale-following thunk; owners resolve it at read time.
-    expect(resolveSlotLabel(section.options.label)).toBe('Agent 预设')
+    expect(resolveSlotLabel(section.options.label)).toBe('Agent presets')
   })
 
   it('registers into a declaration that arrives after apply', async () => {
@@ -236,7 +236,7 @@ describe('ui-agent-preset apply', () => {
     section.cancelCopy()
     section.beginCopy('standard')
     section.setCopyId('mine')
-    section.setCopyName('我的模式')
+    section.setCopyName('My mode')
     await section.confirmCopy()
     await section.view('standard')
     section.closeView()
@@ -389,7 +389,7 @@ describe('ui-agent-preset apply', () => {
     await section.load()
     section.beginCopy('standard')
     section.setCopyId('mine')
-    section.setCopyName('我的模式')
+    section.setCopyName('My mode')
     await section.confirmCopy()
 
     // Authoring copies a directory rather than writing a setting, so nothing

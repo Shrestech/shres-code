@@ -1,0 +1,40 @@
+# Test-only composition of the public opt-in provider and foreground tool.
+# The owning e2e boots this tree but never invokes the model or Kimi.
+- id: fixture
+  name: './fixture.ts'
+
+- id: subagent
+  name: '@roos-code/roos-code-subagent'
+
+- id: subprocess
+  name: '@roos-code/roos-code-subprocess-local'
+
+- id: subagent-kimi-cli
+  name: '@roos-code/roos-code-subagent-kimi-cli'
+
+- id: tool-subagent-kimi-cli
+  name: '@roos-code/roos-code-tool-subagent'
+  config:
+    provider: kimi-cli
+    toolName: subagent_kimi_cli
+    enableRunInBackground: false
+    maxDepth: 'provider-managed'
+
+- id: agent-spine
+  name: '@roos-code/roos-code-agent-spine-demo'
+  config:
+    agents:
+      - id: main
+        provider: mock
+        model: mock-delegate
+        cwd: !!js process.cwd()
+    persona: 'This composition test must not start a model turn.'
+    workspaceContext: false
+
+- id: persistence
+  name: '@roos-code/roos-code-session-persistence-jsonl'
+  config:
+    root: './.sessions'
+
+- id: checkpoint-policy
+  name: '@roos-code/roos-code-session-checkpoint-policy'

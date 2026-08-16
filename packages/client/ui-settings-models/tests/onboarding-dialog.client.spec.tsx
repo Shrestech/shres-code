@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
-/** First-run DeepSeek prompt behavior over the shared Models join. */
+/** First-run provider picker over the shared Models join. */
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import Schema from '@deepseek-ai/schemastery'
-import type { RpcResponse, SettingsNamespaceView } from '@deepseek-ai/dsh-api-remotes/client'
-import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-web-react'
-import { DeepSeekOnboardingDialog } from '../src/client/DeepSeekOnboardingDialog.tsx'
-import type { DeepSeekOnboardingDialogProps } from '../src/client/DeepSeekOnboardingDialog.tsx'
+import Schema from '@roos-code/schemastery'
+import type { RpcResponse, SettingsNamespaceView } from '@roos-code/roos-code-api-remotes/client'
+import { bindSnapshotSelector } from '@roos-code/roos-code-client-web-react'
+import { FirstRunOnboardingDialog } from '../src/client/FirstRunOnboardingDialog.tsx'
+import type { FirstRunOnboardingDialogProps } from '../src/client/FirstRunOnboardingDialog.tsx'
 import { ModelsSettingsStore } from '../src/client/store.ts'
 import { en } from '../src/client/locales.ts'
 
@@ -53,8 +53,25 @@ function deepSeekNamespace(apiKeyEnv: string | null): SettingsNamespaceView {
   }
 }
 
+function ollamaEntry() {
+  return {
+    provider: 'ollama-local',
+    displayName: 'Ollama (local)',
+    settingsNs: 'llm-pi-ai',
+    settingsPath: ['providers', 'ollama-local'],
+    active: true,
+  }
+}
+
 function harness(options: {
   provider?: boolean
+  extraProviders?: Array<{
+    provider: string
+    displayName: string
+    settingsNs: string
+    settingsPath: string[]
+    active: boolean
+  }>
   providerSettingsNs?: string
   providerActive?: boolean
   settingsNamespace?: boolean
@@ -66,6 +83,10 @@ function harness(options: {
   providersReject?: boolean
   setFailure?: string
   setReject?: string
+  discoverModels?: Array<{ id: string }>
+  replaceFailure?: string
+  mutateFailure?: string
+  defaultModelUser?: { provider: string; model: string }
 } = {}) {
   if (document.getElementById('root') === null) {
     const appRoot = document.createElement('div')
@@ -75,7 +96,18 @@ function harness(options: {
   let fileConfigured = false
   const configured = options.configured ?? (() => fileConfigured)
   const apiKeyEnv = options.apiKeyEnv === undefined ? 'DEEPSEEK_API_KEY' : options.apiKeyEnv
-  const mutate = vi.fn(() => Promise.resolve(ok(deepSeekNamespace(apiKeyEnv))))
+  const mutate = vi.fn(() => options.mutateFailure === undefined
+    ? Promise.resolve(ok(deepSeekNamespace(apiKeyEnv)))
+    : Promise.resolve(fail(options.mutateFailure)))
+  const replace = vi.fn((payload: { ns: string; section: object }) => {
+    if (options.replaceFailure !== undefined) return Promise.resolve(fail(options.replaceFailure))
+    return Promise.resolve(ok({
+      ...deepSeekNamespace(apiKeyEnv),
+      ns: payload.ns,
+      user: payload.section,
+      value: payload.section,
+    }))
+  })
   const set = vi.fn((_payload: { ref: string; value: string }) => {
     if (options.setReject !== undefined) return Promise.reject(new Error(options.setReject))
     if (options.setFailure !== undefined) return Promise.resolve(fail(options.setFailure))
@@ -84,18 +116,24 @@ function harness(options: {
   })
   const face = {
     llm: {
+      discoverModels: () => Promise.resolve(ok({
+        models: options.discoverModels ?? [{ id: 'deepseek-v4-flash' }],
+      })),
       providers: () => {
         if (options.providersReject === true) return Promise.reject(new Error('provider transport unavailable'))
         return Promise.resolve(ok({
-          providers: options.provider === false
-            ? []
-            : [{
-              provider: 'deepseek-official',
-              displayName: 'DeepSeek',
-              settingsNs: options.providerSettingsNs ?? 'llm-deepseek',
-              settingsPath: [],
-              active: options.providerActive ?? true,
-            }],
+          providers: [
+            ...options.provider === false
+              ? []
+              : [{
+                provider: 'deepseek-official',
+                displayName: 'DeepSeek',
+                settingsNs: options.providerSettingsNs ?? 'llm-deepseek',
+                settingsPath: [],
+                active: options.providerActive ?? true,
+              }],
+            ...options.extraProviders ?? [],
+          ],
         }))
       },
     },
@@ -103,9 +141,26 @@ function harness(options: {
       describe: () => Promise.resolve(ok({
         writable: options.settingsWritable ?? true,
         hasDocument: false,
-        namespaces: options.settingsNamespace === false ? [] : [deepSeekNamespace(apiKeyEnv)],
+        namespaces: options.settingsNamespace === false
+          ? []
+          : [
+            deepSeekNamespace(apiKeyEnv),
+            ...options.defaultModelUser === undefined
+              ? []
+              : [{
+                ns: 'agent-default-model',
+                schema: {},
+                value: options.defaultModelUser,
+                base: {},
+                user: options.defaultModelUser,
+                applies: 'live' as const,
+                secrets: [],
+                revision: 1,
+              }],
+          ],
       })),
       mutate,
+      replace,
     },
     credentials: {
       describe: () => options.describeFailure === undefined
@@ -128,8 +183,8 @@ function harness(options: {
   const openSection = vi.fn()
   const complete = vi.fn()
   const unusedHook = (() => { throw new Error('unused standard hook') }) as never
-  const props: DeepSeekOnboardingDialogProps = {
-    stepId: 'deepseek-official',
+  const props: FirstRunOnboardingDialogProps = {
+    stepId: 'first-run',
     complete,
     openSection,
     useSessions: unusedHook,
@@ -140,22 +195,22 @@ function harness(options: {
     t: key => en[key],
   }
   return {
-    controller, complete, openSection, props, mutate, set,
+    controller, complete, openSection, props, mutate, set, replace,
     configure: () => { fileConfigured = true },
   }
 }
 
-describe('DeepSeekOnboardingDialog', () => {
+describe('FirstRunOnboardingDialog', () => {
   it('renders when the shell root is absent', async () => {
     const h = harness()
     document.getElementById('root')!.remove()
-    render(<DeepSeekOnboardingDialog {...h.props} />)
+    render(<FirstRunOnboardingDialog {...h.props} />)
     expect(await screen.findByRole('dialog', { name: en.onboardingTitle })).toBeTruthy()
   })
 
   it('loads a credential-only modal, inerts the product, and focuses the key', async () => {
     const h = harness()
-    render(<DeepSeekOnboardingDialog {...h.props} />)
+    render(<FirstRunOnboardingDialog {...h.props} />)
     expect(await screen.findByRole('dialog', { name: en.onboardingTitle })).toBeTruthy()
     expect(document.getElementById('root')?.inert).toBe(true)
     expect(screen.getByText(en.onboardingDescription)).toBeTruthy()
@@ -168,7 +223,7 @@ describe('DeepSeekOnboardingDialog', () => {
     const h = harness()
     const appRoot = document.getElementById('root')!
     appRoot.inert = true
-    const view = render(<DeepSeekOnboardingDialog {...h.props} />)
+    const view = render(<FirstRunOnboardingDialog {...h.props} />)
     await screen.findByRole('dialog')
 
     fireEvent.keyDown(document, { key: 'Escape' })
@@ -182,7 +237,7 @@ describe('DeepSeekOnboardingDialog', () => {
 
   it('requires a non-blank key before Save and continue is available', async () => {
     const h = harness()
-    render(<DeepSeekOnboardingDialog {...h.props} />)
+    render(<FirstRunOnboardingDialog {...h.props} />)
     await screen.findByRole('dialog')
     const save = screen.getByRole<HTMLButtonElement>('button', { name: en.onboardingSave })
     expect(save.disabled).toBe(true)
@@ -198,7 +253,7 @@ describe('DeepSeekOnboardingDialog', () => {
       [{ setReject: 'connection lost' }, 'connection lost'],
     ] as const) {
       const h = harness(options)
-      const view = render(<DeepSeekOnboardingDialog {...h.props} />)
+      const view = render(<FirstRunOnboardingDialog {...h.props} />)
       await screen.findByRole('dialog')
       fireEvent.change(screen.getByLabelText(en.keyInput), { target: { value: 'sk-live' } })
       fireEvent.click(screen.getByRole('button', { name: en.onboardingSave }))
@@ -213,7 +268,7 @@ describe('DeepSeekOnboardingDialog', () => {
 
   it('allows configure-later dismissal without opening settings', async () => {
     const h = harness()
-    render(<DeepSeekOnboardingDialog {...h.props} />)
+    render(<FirstRunOnboardingDialog {...h.props} />)
     await screen.findByRole('dialog')
     fireEvent.click(screen.getByRole('button', { name: en.onboardingLater }))
     expect(h.complete).toHaveBeenCalledOnce()
@@ -232,7 +287,7 @@ describe('DeepSeekOnboardingDialog', () => {
       harness({ settingsNamespace: false }),
       harness({ apiKeyEnv: null }),
     ]) {
-      const view = render(<DeepSeekOnboardingDialog {...h.props} />)
+      const view = render(<FirstRunOnboardingDialog {...h.props} />)
       await act(async () => { await h.controller.load() })
       expect(screen.queryByRole('dialog')).toBeNull()
       await waitFor(() => { expect(h.complete).toHaveBeenCalledOnce() })
@@ -244,10 +299,9 @@ describe('DeepSeekOnboardingDialog', () => {
   it('skips an absent adapter and an already-configured environment credential', async () => {
     for (const h of [
       harness({ provider: false }),
-      harness({ providerSettingsNs: '' }),
       harness({ configured: () => true, credential: { source: 'env', writable: false } }),
     ]) {
-      const view = render(<DeepSeekOnboardingDialog {...h.props} />)
+      const view = render(<FirstRunOnboardingDialog {...h.props} />)
       await act(async () => { await h.controller.load() })
       expect(screen.queryByRole('dialog')).toBeNull()
       await waitFor(() => { expect(h.complete).toHaveBeenCalledOnce() })
@@ -257,11 +311,164 @@ describe('DeepSeekOnboardingDialog', () => {
 
   it('closes when an external credential invalidation refreshes the shared join', async () => {
     const h = harness()
-    render(<DeepSeekOnboardingDialog {...h.props} />)
+    render(<FirstRunOnboardingDialog {...h.props} />)
     await screen.findByRole('dialog')
     h.configure()
     await act(async () => { await h.controller.load() })
     await waitFor(() => { expect(screen.queryByRole('dialog')).toBeNull() })
     expect(h.complete).toHaveBeenCalledOnce()
+  })
+
+  it('shows a provider picker when more than one route needs setup', async () => {
+    const h = harness({ extraProviders: [ollamaEntry()] })
+    render(<FirstRunOnboardingDialog {...h.props} />)
+    expect(await screen.findByRole('combobox', { name: en.onboardingPickProvider })).toBeTruthy()
+    expect(screen.getByRole('option', { name: 'DeepSeek' })).toBeTruthy()
+    expect(screen.getByRole('option', { name: 'Ollama (local)' })).toBeTruthy()
+    fireEvent.change(screen.getByRole('combobox', { name: en.onboardingPickProvider }), {
+      target: { value: 'no-such-route' },
+    })
+    expect((screen.getByRole('combobox') as HTMLSelectElement).value).toBe('deepseek-official')
+  })
+
+  it('lets Configure later dismiss a local-Ollama-only card', async () => {
+    const h = harness({ provider: false, extraProviders: [ollamaEntry()] })
+    render(<FirstRunOnboardingDialog {...h.props} />)
+    await screen.findByRole('dialog')
+    fireEvent.click(screen.getByRole('button', { name: en.onboardingLater }))
+    expect(h.complete).toHaveBeenCalledOnce()
+    expect(h.replace).not.toHaveBeenCalled()
+  })
+
+  it('completes after a successful Use local Ollama write', async () => {
+    const h = harness({
+      extraProviders: [ollamaEntry()],
+      discoverModels: [{ id: 'qwen2.5' }],
+    })
+    render(<FirstRunOnboardingDialog {...h.props} />)
+    await screen.findByRole('dialog')
+    fireEvent.change(screen.getByRole('combobox', { name: en.onboardingPickProvider }), {
+      target: { value: 'ollama-local' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: en.onboardingUseOllama }))
+    await waitFor(() => { expect(h.complete).toHaveBeenCalledOnce() })
+    expect(h.props.api.settings.mutate).toHaveBeenCalledWith({
+      ns: 'llm-pi-ai',
+      ops: [{ op: 'set', path: ['providers', 'ollama-local', 'models'], value: [{ id: 'qwen2.5' }] }],
+    })
+    expect(h.replace).toHaveBeenCalledWith({
+      ns: 'agent-default-model',
+      section: { provider: 'ollama-local', model: 'qwen2.5' },
+    })
+  })
+
+  it('keeps the dialog open when the Ollama default write fails', async () => {
+    const h = harness({
+      extraProviders: [ollamaEntry()],
+      discoverModels: [{ id: 'qwen2.5' }],
+      replaceFailure: 'settings rejected',
+    })
+    render(<FirstRunOnboardingDialog {...h.props} />)
+    await screen.findByRole('dialog')
+    fireEvent.change(screen.getByRole('combobox', { name: en.onboardingPickProvider }), {
+      target: { value: 'ollama-local' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: en.onboardingUseOllama }))
+    expect(await screen.findByText('settings rejected')).toBeTruthy()
+    expect(h.complete).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog')).toBeTruthy()
+  })
+
+  it('writes agent-default-model after a keyed save', async () => {
+    const h = harness()
+    render(<FirstRunOnboardingDialog {...h.props} />)
+    await screen.findByRole('dialog')
+    fireEvent.change(screen.getByLabelText(en.keyInput), { target: { value: 'sk-live' } })
+    fireEvent.click(screen.getByRole('button', { name: en.onboardingSave }))
+    await waitFor(() => { expect(h.complete).toHaveBeenCalledOnce() })
+    expect(h.replace).toHaveBeenCalledWith({
+      ns: 'agent-default-model',
+      section: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+    })
+  })
+
+  it('does not re-prompt when the user layer already names a default', async () => {
+    const h = harness({
+      extraProviders: [ollamaEntry()],
+      defaultModelUser: { provider: 'ollama-local', model: 'qwen2.5' },
+    })
+    render(<FirstRunOnboardingDialog {...h.props} />)
+    await act(async () => { await h.controller.load() })
+    expect(screen.queryByRole('dialog')).toBeNull()
+    await waitFor(() => { expect(h.complete).toHaveBeenCalledOnce() })
+  })
+
+  it('keeps the dialog open when adopting the Ollama catalog fails', async () => {
+    const h = harness({
+      extraProviders: [ollamaEntry()],
+      discoverModels: [{ id: 'qwen2.5' }],
+      mutateFailure: 'catalog write rejected',
+    })
+    render(<FirstRunOnboardingDialog {...h.props} />)
+    await screen.findByRole('dialog')
+    fireEvent.change(screen.getByRole('combobox', { name: en.onboardingPickProvider }), {
+      target: { value: 'ollama-local' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: en.onboardingUseOllama }))
+    expect(await screen.findByText('catalog write rejected')).toBeTruthy()
+    expect(h.complete).not.toHaveBeenCalled()
+  })
+
+  it('falls back to a pinned model when discovery lists none', async () => {
+    const h = harness({ extraProviders: [ollamaEntry()], discoverModels: [] })
+    render(<FirstRunOnboardingDialog {...h.props} />)
+    await screen.findByRole('dialog')
+    fireEvent.change(screen.getByRole('combobox', { name: en.onboardingPickProvider }), {
+      target: { value: 'ollama-local' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: en.onboardingUseOllama }))
+    await waitFor(() => { expect(h.complete).toHaveBeenCalledOnce() })
+    expect(h.replace).toHaveBeenCalledWith({
+      ns: 'agent-default-model',
+      section: { provider: 'ollama-local', model: 'llama3.2' },
+    })
+  })
+
+  it('keeps the dialog open when discovery throws during an Ollama pick', async () => {
+    const h = harness({ extraProviders: [ollamaEntry()] })
+    h.props.api.llm.discoverModels = () => Promise.reject(new Error('discover down'))
+    render(<FirstRunOnboardingDialog {...h.props} />)
+    await screen.findByRole('dialog')
+    fireEvent.change(screen.getByRole('combobox', { name: en.onboardingPickProvider }), {
+      target: { value: 'ollama-local' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: en.onboardingUseOllama }))
+    expect(await screen.findByText('discover down')).toBeTruthy()
+    expect(h.complete).not.toHaveBeenCalled()
+  })
+
+  it('stringifies a non-Error discovery rejection on an Ollama pick', async () => {
+    const h = harness({ extraProviders: [ollamaEntry()] })
+    // oxlint-disable-next-line typescript/prefer-promise-reject-errors -- the non-Error rejection is the scenario
+    h.props.api.llm.discoverModels = () => Promise.reject('discover refused')
+    render(<FirstRunOnboardingDialog {...h.props} />)
+    await screen.findByRole('dialog')
+    fireEvent.change(screen.getByRole('combobox', { name: en.onboardingPickProvider }), {
+      target: { value: 'ollama-local' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: en.onboardingUseOllama }))
+    expect(await screen.findByText('discover refused')).toBeTruthy()
+    expect(h.complete).not.toHaveBeenCalled()
+  })
+
+  it('keeps the dialog open when the default write after a keyed save fails', async () => {
+    const h = harness({ replaceFailure: 'default write rejected' })
+    render(<FirstRunOnboardingDialog {...h.props} />)
+    await screen.findByRole('dialog')
+    fireEvent.change(screen.getByLabelText(en.keyInput), { target: { value: 'sk-live' } })
+    fireEvent.click(screen.getByRole('button', { name: en.onboardingSave }))
+    expect(await screen.findByText('default write rejected')).toBeTruthy()
+    expect(h.complete).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog')).toBeTruthy()
   })
 })

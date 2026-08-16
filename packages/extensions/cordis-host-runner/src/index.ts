@@ -1,16 +1,20 @@
 /**
  * Dynamic Cordis Plugin service: immutable package definitions, one active run
- * per Plugin, human-approved Client activation, and Host/Client invocation.
- * @module @deepseek-ai/dsh-cordis-host-runner
+ * per Plugin, one-shot Host-half approval, human-approved Client activation, and
+ * Host/Client invocation.
+ * @module @roos-code/roos-code-cordis-host-runner
  */
 
-import { Context } from '@deepseek-ai/cordis'
-import type { Fiber } from '@deepseek-ai/cordis'
-import z from '@deepseek-ai/schemastery'
-import type { Agent } from '@deepseek-ai/dsh-agent'
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import type { JsonValue } from '@deepseek-ai/dsh-session/types'
-import { TypertRemoteService, Remote } from '@deepseek-ai/dsh-typert-protocol'
+import { Context } from '@roos-code/cordis'
+import type { Fiber } from '@roos-code/cordis'
+import z from '@roos-code/schemastery'
+import type { Agent } from '@roos-code/roos-code-agent'
+import { assertNever, createUserMessage } from '@roos-code/roos-code-llm'
+import type { CallId } from '@roos-code/roos-code-llm'
+import type { JsonValue } from '@roos-code/roos-code-session/types'
+import { TypertRemoteService, Remote } from '@roos-code/roos-code-typert-protocol'
+import { isApprovalOutsideTurnError } from '@roos-code/roos-code-user-approval'
+import type { ApprovalOutcome } from '@roos-code/roos-code-user-approval'
 import { isPlugin, normalizeHandler } from './guard.ts'
 import { CordisInspectRegistryService } from './inspect-registry.ts'
 import { missingServices, startHostHalf } from './lifecycle.ts'
@@ -77,17 +81,26 @@ export function ApprovalRequestId(id: string): ApprovalRequestId {
   return id as ApprovalRequestId
 }
 
-declare module '@deepseek-ai/cordis' {
+declare module '@roos-code/cordis' {
   interface Context {
     /** Process-local dynamic Plugin registry and lifecycle service. */
     dynamicCordisRunner: DynamicCordisRunnerService
   }
 }
 
+/** Minted dynamic Plugin id: a 3–6 letter prefix, a hyphen, and a decimal suffix. */
+const HOST_ACTIVATION_PLUGIN_ID = /^[a-z]{3,6}-\d+$/
+
 /** Runner configuration. */
 export interface Config {
   /** Maximum synchronous VM evaluation time in milliseconds. */
   vmTimeoutMs?: number
+  /**
+   * Plugin ids that skip the Host-half activation ask. Empty by default.
+   * Each entry must be a minted Plugin id (`<prefix>-<n>`). Unattended
+   * compositions list the exact ids they will define.
+   */
+  hostActivationAllowlist?: string[]
 }
 
 type ResolvedConfig = Required<Config>
@@ -120,19 +133,32 @@ interface ActivationPlan {
   mode: CordisDynamicRunMode
 }
 
+/** Closed Host-half approval refusal returned by `run` and `activate`. */
+type HostActivationDenial = {
+  ok: false
+  reason: 'rejected' | 'cancelled' | 'unavailable'
+  message: string
+}
+
+/** One-shot Host-half grant, or the closed denial. */
+type HostActivationDecision = { ok: true } | HostActivationDenial
+
 /** Dynamic Plugin registry and Host-half lifecycle. */
 export class DynamicCordisRunnerService extends TypertRemoteService {
-  static inject = ['tools']
+  static inject = ['tools', 'approval']
 
   static Config: z<Config> = z.object({
     vmTimeoutMs: z.number().min(1).default(5000),
+    hostActivationAllowlist: z.array(z.string().pattern(HOST_ACTIVATION_PLUGIN_ID)).default([]),
   })
 
   private readonly rootCtx: Context
   private readonly registry = new DynamicCordisRegistry()
   private readonly inspectRegistry: CordisInspectRegistryService
   private readonly starting = new Map<CordisDynamicPluginId, Promise<DynamicCordisHostHalfResult>>()
+  private readonly authorizing = new Map<CordisDynamicPluginId, Promise<HostActivationDecision>>()
   private readonly resolved: ResolvedConfig
+  private readonly hostActivationAllowlist: ReadonlySet<string>
   private group: Fiber | undefined
 
   /** Create the service under the Host composition. */
@@ -140,6 +166,7 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
     super(ctx, 'dynamicCordisRunner')
     this.rootCtx = ctx
     this.resolved = config as ResolvedConfig
+    this.hostActivationAllowlist = resolveHostActivationAllowlist(config.hostActivationAllowlist)
     this.inspectRegistry = new CordisInspectRegistryService(ctx)
   }
 
@@ -172,6 +199,7 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
         packages: new Map(),
         approvedClientPackages: new Set(),
         clientVersionUpdatesApproved: false,
+        hostActivationApproved: false,
       }
       this.registry.add(plugin)
     } else {
@@ -238,11 +266,14 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
   /**
    * Start or update one Package for a model tool call. An unauthorized Client
    * Package waits for approval; Plugin-wide authorization covers later versions.
+   * A Host half asks `ctx.approval` once per Plugin id in this Session before
+   * any Host code runs; `'allowed-once'` is the only grant.
    * @param agent - Agent whose Session must own the Plugin.
    * @param pluginId - Stable Plugin identity to activate.
    * @param packageId - Immutable Package version to activate.
    * @param mode - Whether to run the current version or switch versions.
    * @param signal - Tool-call cancellation signal while the activation request is being created.
+   * @param callId - Tool-call identity attached to the Host-half approval ask, when the caller has one.
    * @returns The successful activation identity or an actionable refusal.
    */
   async run(
@@ -251,6 +282,7 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
     packageId: CordisDynamicPackageId,
     mode: CordisDynamicRunMode,
     signal?: AbortSignal,
+    callId?: CallId,
   ): Promise<DynamicCordisRunResponse> {
     const plan = this.resolvePlan(agent, pluginId, packageId, mode)
     if (!plan.ok) return plan.response
@@ -261,6 +293,8 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
         message: `the run request for dynamic plugin "${pluginId}" was cancelled before activation`,
       }
     }
+    const authorized = await this.authorizeHostActivation(agent, plan.plugin, plan.definition, signal, callId)
+    if (!authorized.ok) return authorized satisfies HostActivationDenial
     if (this.registry.pendingRequestFor(pluginId) !== undefined) {
       return { ok: false, reason: 'transition-in-flight', message: `dynamic plugin "${pluginId}" already has a pending run request` }
     }
@@ -268,7 +302,7 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
     plan.plugin.nextPackageId = packageId
     plan.plugin.latestRun = attempt
     if (plan.definition.clientCode === undefined) {
-      const started = await this.activate(plan, undefined, false, attempt)
+      const started = await this.activate(plan, undefined, false, attempt, agent, signal, callId)
       if (started.ok) return this.runResponse(plan.plugin, started)
       this.failAttempt(plan.plugin, attempt, 'host-load', started)
       return { ...started, reason: 'host-half-failed' }
@@ -333,6 +367,8 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
     const plan = this.resolvePlan(agent, pluginId, packageId, mode, requestId === null)
     if (!plan.ok) return { ok: false, message: plan.response.message }
     let attempt: DynamicCordisRunAttempt
+    let grantClientPackage = false
+    let grantFutureClientVersions = false
     if (requestId !== null) {
       const pending = this.registry.peekRequest(requestId)
       if (pending === undefined || pending.pluginId !== pluginId || pending.packageId !== packageId || pending.mode !== mode) {
@@ -346,8 +382,8 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
       }
       attempt = latest
       if (pending.requiresApproval) {
-        plan.plugin.approvedClientPackages.add(packageId)
-        if (approveFutureVersions) plan.plugin.clientVersionUpdatesApproved = true
+        grantClientPackage = true
+        grantFutureClientVersions = approveFutureVersions
       }
     } else {
       const pending = this.registry.pendingRequestFor(pluginId)
@@ -361,15 +397,20 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
         plan.plugin.nextPackageId = packageId
         plan.plugin.latestRun = attempt
       }
-      if (plan.definition.clientCode !== undefined) plan.plugin.approvedClientPackages.add(packageId)
+      if (plan.definition.clientCode !== undefined) grantClientPackage = true
     }
     const attaching = attempt.pluginRunId === plan.plugin.run?.pluginRunId
     if (!attaching) {
       attempt.status = 'starting-host'
       if (attempt.host.status !== 'absent') attempt.host = { status: 'pending', waitingFor: [] }
     }
-    const started = await this.activate(plan, requestId ?? undefined, attaching, attempt)
-    if (!started.ok) this.failAttempt(plan.plugin, attempt, 'host-load', started)
+    const started = await this.activate(plan, requestId ?? undefined, attaching, attempt, agent)
+    if (!started.ok) {
+      this.failAttempt(plan.plugin, attempt, started.reason === undefined ? 'host-load' : 'approval', started)
+      return started
+    }
+    if (grantClientPackage) plan.plugin.approvedClientPackages.add(packageId)
+    if (grantFutureClientVersions) plan.plugin.clientVersionUpdatesApproved = true
     return started
   }
 
@@ -812,10 +853,13 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
     requestId: ApprovalRequestId | undefined,
     allowActiveAttach: boolean,
     attempt: DynamicCordisRunAttempt,
+    agent: Agent,
+    signal?: AbortSignal,
+    callId?: CallId,
   ): Promise<DynamicCordisHostHalfResult> {
     const inFlight = this.starting.get(plan.plugin.pluginId)
     if (inFlight !== undefined) return inFlight
-    const starting = this.startFresh(plan, requestId, allowActiveAttach, attempt)
+    const starting = this.startFresh(plan, requestId, allowActiveAttach, attempt, agent, signal, callId)
     this.starting.set(plan.plugin.pluginId, starting)
     return starting.finally(() => { this.starting.delete(plan.plugin.pluginId) })
   }
@@ -825,6 +869,9 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
     requestId: ApprovalRequestId | undefined,
     allowActiveAttach: boolean,
     attempt: DynamicCordisRunAttempt,
+    agent: Agent,
+    signal?: AbortSignal,
+    callId?: CallId,
   ): Promise<DynamicCordisHostHalfResult> {
     const { plugin, definition, mode } = plan
     if (allowActiveAttach
@@ -839,6 +886,8 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
         startedHere: false,
       }
     }
+    const authorized = await this.authorizeHostActivation(agent, plugin, definition, signal, callId)
+    if (!authorized.ok) return { ok: false, reason: authorized.reason, message: authorized.message }
     if (plugin.run !== undefined) await this.retract(plugin)
     if (mode === 'update' || plugin.currentPackageId === undefined) plugin.nextPackageId = definition.packageId
     const run: DynamicCordisRun = {
@@ -1196,8 +1245,12 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
   ): void {
     attempt.status = 'failed'
     attempt.error = this.diagnostic(plugin, attempt, phase, failure)
-    if (phase.startsWith('host')) attempt.host = { status: 'failed', waitingFor: [], error: failure.message }
-    else attempt.client = { status: 'failed', waitingFor: [], error: failure.message }
+    // Host-activation denials use phase `approval` but failed the Host half.
+    if (phase.startsWith('host') || phase === 'approval') {
+      attempt.host = { status: 'failed', waitingFor: [], error: failure.message }
+    } else {
+      attempt.client = { status: 'failed', waitingFor: [], error: failure.message }
+    }
   }
 
   private diagnostic(
@@ -1229,6 +1282,93 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
     })
   }
 
+  /**
+   * Grant Host-half evaluation at most once per Plugin id in this Session.
+   * Concurrent asks for the same Plugin share one in-flight decision. An
+   * allowlisted id or a prior `'allowed-once'` skips the ask. A remembered
+   * closed `approval.request` outcome (`rejected` / `cancelled` / waterfall
+   * `'unavailable'`) is returned without prompting again. An idle-turn
+   * {@link isApprovalOutsideTurnError} is structured `'unavailable'` for that
+   * attempt only and is not stored. Client-only Packages never ask. Absence of
+   * an answerer, a cancelled ask, or any outcome other than `'allowed-once'`
+   * refuses before Host code runs.
+   * @param agent - Agent whose Session owns the Plugin and receives the audit pair.
+   * @param plugin - Plugin whose Host-half grant is being resolved.
+   * @param definition - Package whose Host source would run.
+   * @param signal - Tool-call cancellation signal the approval request rides, when present.
+   * @param callId - Tool-call identity attached to the approval prompt, when the caller has one.
+   * @returns a grant, or the closed denial to return to the caller.
+   */
+  private authorizeHostActivation(
+    agent: Agent,
+    plugin: DynamicCordisPlugin,
+    definition: DynamicCordisDefinition,
+    signal?: AbortSignal,
+    callId?: CallId,
+  ): Promise<HostActivationDecision> {
+    const inFlight = this.authorizing.get(plugin.pluginId)
+    if (inFlight !== undefined) return inFlight
+    const pending = this.decideHostActivation(agent, plugin, definition, signal, callId)
+    this.authorizing.set(plugin.pluginId, pending)
+    return pending.finally(() => { this.authorizing.delete(plugin.pluginId) })
+  }
+
+  private async decideHostActivation(
+    agent: Agent,
+    plugin: DynamicCordisPlugin,
+    definition: DynamicCordisDefinition,
+    signal?: AbortSignal,
+    callId?: CallId,
+  ): Promise<HostActivationDecision> {
+    if (definition.hostCode === undefined || plugin.hostActivationApproved) return { ok: true }
+    if (plugin.hostActivationDenial !== undefined) {
+      return { ok: false, ...plugin.hostActivationDenial }
+    }
+    if (this.hostActivationAllowlist.has(plugin.pluginId)) {
+      plugin.hostActivationApproved = true
+      delete plugin.hostActivationDenial
+      return { ok: true }
+    }
+    let outcome: ApprovalOutcome
+    try {
+      outcome = await this.ctx.approval.request({
+        agent,
+        toolName: 'cordis_run',
+        ...callId === undefined ? {} : { callId },
+        reason: `activate host half of dynamic plugin "${plugin.pluginId}" (${definition.name}: ${definition.purpose})`,
+        ...signal === undefined ? {} : { signal },
+      })
+    } catch (error) {
+      if (isApprovalOutsideTurnError(error)) {
+        return {
+          ok: false,
+          reason: 'unavailable',
+          message: hostActivationDenied(plugin.pluginId, 'unavailable'),
+        }
+      }
+      throw error
+    }
+    switch (outcome) {
+      case 'allowed-once':
+        plugin.hostActivationApproved = true
+        delete plugin.hostActivationDenial
+        return { ok: true }
+      case 'rejected':
+      case 'cancelled':
+      case 'unavailable': {
+        const denial: HostActivationDenial = {
+          ok: false,
+          reason: outcome,
+          message: hostActivationDenied(plugin.pluginId, outcome),
+        }
+        plugin.hostActivationDenial = denial
+        return denial
+      }
+      default:
+        return assertNever(outcome, 'ApprovalOutcome')
+    }
+  }
+
   private owned(agent: Agent, pluginId: CordisDynamicPluginId): DynamicCordisPlugin | undefined {
     const plugin = this.registry.get(pluginId)
     return plugin?.sessionId === agent.id ? plugin : undefined
@@ -1245,7 +1385,41 @@ function missingFor(ctx: Context, run: DynamicCordisRun): string[] {
 }
 
 function missingPluginMessage(id: CordisDynamicPluginId): string {
-  return `no dynamic plugin "${id}" in this process — it may have been removed or lost on DSH restart`
+  return `no dynamic plugin "${id}" in this process — it may have been removed or lost on Roos restart`
+}
+
+/**
+ * Validate the unattended Host-activation allowlist at load. An invalid
+ * entry fails the plugin rather than skipping the ask later.
+ * @param entries - configured Plugin ids, already defaulted to empty.
+ * @returns the de-duplicated allowlist.
+ */
+function resolveHostActivationAllowlist(entries: readonly string[] | undefined): ReadonlySet<string> {
+  return new Set(entries ?? [])
+}
+
+/**
+ * Model-facing Host-activation denial. Each outcome tells the model not to
+ * retry the same activation so the repeat-tool-reminder chain can fire on a
+ * repeated identical call instead of a retry storm.
+ * @param pluginId - Plugin whose Host half was not granted.
+ * @param outcome - closed approval outcome other than `'allowed-once'`.
+ * @returns the message returned on the tool result.
+ */
+function hostActivationDenied(
+  pluginId: CordisDynamicPluginId,
+  outcome: Exclude<ApprovalOutcome, 'allowed-once'>,
+): string {
+  switch (outcome) {
+    case 'rejected':
+      return `The user rejected host activation of plugin "${pluginId}". Do not request the same activation again unless the user asks.`
+    case 'cancelled':
+      return `Host activation approval for plugin "${pluginId}" was cancelled. Do not retry the same activation.`
+    case 'unavailable':
+      return `Host activation of plugin "${pluginId}" requires approval, but no approval channel is available. Do not retry the same activation.`
+    default:
+      return assertNever(outcome, 'HostActivationDenial')
+  }
 }
 
 function errorDetails(error: unknown): CordisErrorDetails {

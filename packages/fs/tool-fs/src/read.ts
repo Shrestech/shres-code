@@ -1,16 +1,18 @@
 /**
  * Model-facing UTF-8 read. It performs one provider stat for type, routing, and observed version,
  * streams large or size-unknown files, renders a bounded window, then emits the observation.
- * @module @deepseek-ai/dsh-tool-fs/src/read
+ * @module @roos-code/roos-code-tool-fs/src/read
  */
 
-import type { Context } from '@deepseek-ai/cordis'
-import { defineTool } from '@deepseek-ai/dsh-tools'
-import type { GenericCallView, ReadResultView, ToolResult } from '@deepseek-ai/dsh-tools'
-import type {} from '@deepseek-ai/dsh-fs'
-import type {} from '@deepseek-ai/dsh-system-prompt'
+import type { Context } from '@roos-code/cordis'
+import { defineTool } from '@roos-code/roos-code-tools'
+import type { GenericCallView, ReadResultView, ToolResult } from '@roos-code/roos-code-tools'
+import type {} from '@roos-code/roos-code-fs'
+import type {} from '@roos-code/roos-code-system-prompt'
+import { remediateFsError } from './error.ts'
 import { buildWindow, formatReadOutput, langFromPath, readMetaFromMeta } from './read-render.ts'
 import { resolveRegularReadTarget } from './read-target.ts'
+import type { FsSandboxController } from './sandbox.ts'
 
 /** Default and maximum number of lines returned by one `read` call (the `readLimit` config). */
 export const READ_LIMIT = 2000
@@ -65,8 +67,9 @@ export function parseReadArgs(args: { file_path: string; offset?: number; limit?
  * Register the `read` tool and its system-prompt guidance.
  * @param ctx - the plugin context; registrations are effects scoped to it, and execution uses its `fs` service.
  * @param caps - the deployment's resolved read caps (plugin config after defaulting).
+ * @param sandbox - standing-policy resolution and denial-marker mapping.
  */
-export function applyReadTool(ctx: Context, caps: ReadToolCaps): void {
+export function applyReadTool(ctx: Context, caps: ReadToolCaps, sandbox: FsSandboxController): void {
   ctx.systemPrompt.section({
     name: 'tool:read',
     order: 100,
@@ -138,12 +141,19 @@ export function applyReadTool(ctx: Context, caps: ReadToolCaps): void {
       // One stat: absence observation OR type check + size routing + present version.
       // A concurrent write can only make a later guarded mutation fail stale and require reread.
       const { target, info } = await resolveRegularReadTarget(ctx, exec, input.filePath)
+      const sandboxPolicy = sandbox.standingPolicy(exec)
 
       // Stream when the file is large OR size is unknown, so a size-less backend
-      // never buffers an arbitrarily large file.
-      const chunks = info.size === undefined || info.size >= caps.streamMinSize
-        ? await ctx.fs.streamText(target, exec.signal)
-        : [await ctx.fs.readText(target, exec.signal)]
+      // never buffers an arbitrarily large file. A session danger-full-access
+      // stamp must reach the fence so it can lift the credential deny.
+      let chunks: AsyncIterable<string> | string[]
+      try {
+        chunks = info.size === undefined || info.size >= caps.streamMinSize
+          ? await ctx.fs.streamText(target, exec.signal, sandboxPolicy)
+          : [await ctx.fs.readText(target, exec.signal, sandboxPolicy)]
+      } catch (error: unknown) {
+        throw remediateFsError(sandbox.mapError(error, sandboxPolicy, { hint: false }))
+      }
       const window = await buildWindow(
         chunks,
         { offset: input.offset, limit: input.limit, maxLineLength: caps.maxLineLength, maxBytes: caps.maxBytes },

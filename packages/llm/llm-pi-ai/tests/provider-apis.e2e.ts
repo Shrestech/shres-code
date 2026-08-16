@@ -1,16 +1,16 @@
 import { readFile } from 'node:fs/promises'
 import { afterEach, describe, expect, it } from 'vitest'
-import { Context } from '@deepseek-ai/cordis'
-import { AttachmentId, AttachmentStore } from '@deepseek-ai/dsh-attachment'
+import { Context } from '@roos-code/cordis'
+import { AttachmentId, AttachmentStore } from '@roos-code/roos-code-attachment'
 import type {
   ImageAttachmentLimits,
   ImageAttachmentRef,
   SaveImageAttachment,
   StoredImageAttachment,
-} from '@deepseek-ai/dsh-attachment'
-import LlmRuntime, { createUserMessage, CallId } from '@deepseek-ai/dsh-llm'
-import type { Message, ToolSchema } from '@deepseek-ai/dsh-llm'
-import * as LlmPiAi from '@deepseek-ai/dsh-llm-pi-ai'
+} from '@roos-code/roos-code-attachment'
+import LlmRuntime, { createUserMessage, CallId } from '@roos-code/roos-code-llm'
+import type { Message, ToolSchema } from '@roos-code/roos-code-llm'
+import * as LlmPiAi from '@roos-code/roos-code-llm-pi-ai'
 import type { PiAiReplayState } from '../src/replay.ts'
 import { assemble, type AssembledResult } from './assemble.ts'
 
@@ -23,18 +23,18 @@ interface ProviderCase {
   headers?: Record<string, string>
 }
 
-const openAIBaseURL = process.env.DSH_PI_AI_OPENAI_BASE_URL
+const openAIBaseURL = process.env.ROOS_PI_AI_OPENAI_BASE_URL
 const azureOpenAIKey = process.env.AZURE_OPENAI_API_KEY
 // Strictly ANTHROPIC_*: the DeepSeek endpoint does not serve the anthropic-messages
 // protocol, so falling back to DEEPSEEK_API_KEY turns the keyless skip into a 404.
 const anthropicApiKey = process.env.ANTHROPIC_API_KEY
-const anthropicBaseURL = process.env.DSH_PI_AI_ANTHROPIC_BASE_URL
+const anthropicBaseURL = process.env.ROOS_PI_AI_ANTHROPIC_BASE_URL
 
 const providerCases: ProviderCase[] = [
   {
     provider: 'openai',
     api: 'openai-responses',
-    model: process.env.DSH_PI_AI_OPENAI_MODEL ?? 'gpt-5.5',
+    model: process.env.ROOS_PI_AI_OPENAI_MODEL ?? 'gpt-5.5',
     ...azureOpenAIKey
       ? { apiKey: azureOpenAIKey, headers: { 'api-key': azureOpenAIKey, Authorization: '' } }
       : {},
@@ -43,7 +43,7 @@ const providerCases: ProviderCase[] = [
   {
     provider: 'anthropic',
     api: 'anthropic-messages',
-    model: process.env.DSH_PI_AI_ANTHROPIC_MODEL ?? 'claude-opus-4-8',
+    model: process.env.ROOS_PI_AI_ANTHROPIC_MODEL ?? 'claude-opus-4-8',
     ...anthropicApiKey === undefined ? {} : { apiKey: anthropicApiKey },
     ...anthropicBaseURL === undefined ? {} : { baseURL: anthropicBaseURL },
   },

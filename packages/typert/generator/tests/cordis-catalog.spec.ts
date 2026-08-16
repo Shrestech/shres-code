@@ -28,7 +28,7 @@ describe('Typert-backed Cordis catalog', () => {
         [...model.events].filter(e => EVENT_SCOPE_PAGE[e.scope] === page),
         CORDIS_CATALOG_POLICY,
       )
-      for (const side of [page, page.replace(/\.md$/, '.zh.md')]) {
+      for (const side of [page, page.replace(/\.md$/, '.en.md')]) {
         const committed = expected(`docs/subsystems/${side}`)
         const begin = committed.indexOf(REGION_BEGIN)
         const end = committed.indexOf(REGION_END)
@@ -57,7 +57,7 @@ describe('Typert-backed Cordis catalog', () => {
     // plugin provides them, so describing one as a service would answer "add the
     // plugin that provides it" for a key where no such plugin exists.
     expect(byKey.has('headlessIo')).toBe(false)
-    expect(byKey.has('dshHomePath')).toBe(false)
+    expect(byKey.has('roosHomePath')).toBe(false)
     expect(byKey.has('launcherEnvironment')).toBe(false)
   })
 })

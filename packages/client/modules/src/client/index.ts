@@ -7,16 +7,16 @@
  * providing it as `ctx.modules`. The kernel statically registers this module,
  * so the graph row for this package never triggers a real fetch — arrival is
  * a no-op against the already-registered entry.
- * @module @deepseek-ai/dsh-client-modules/client
+ * @module @roos-code/roos-code-client-modules/client
  */
-import type { Context } from '@deepseek-ai/cordis'
-import type { DshWindow } from './manifest.ts'
+import type { Context } from '@roos-code/cordis'
+import type { RoosWindow } from './manifest.ts'
 
 export { ClientModuleSystem } from './system.ts'
 export { parseBootManifest } from './manifest.ts'
 export type {
   BootManifest, BootModuleRow, BootPluginRow, ClientModuleLoader, ClientModuleRecord,
-  ClientModuleSystemOptions, ClientPluginHandoff, DshWindow, WebBootEntry, WebBootGraph,
+  ClientModuleSystemOptions, ClientPluginHandoff, RoosWindow, WebBootEntry, WebBootGraph,
 } from './manifest.ts'
 
 /**
@@ -24,11 +24,11 @@ export type {
  * @param ctx - client root context.
  */
 export function apply(ctx: Context): void {
-  const modules = (globalThis as DshWindow).__DSH_MODULES__
+  const modules = (globalThis as RoosWindow).__ROOS_MODULES__
   // The kernel writes the slot right after constructing the instance, before
   // any cordis entry exists — a missing slot means the kernel sequencing broke.
   if (modules === undefined) {
-    throw new Error('client-modules: window.__DSH_MODULES__ missing — the shell kernel must construct the module system before plugin boot')
+    throw new Error('client-modules: window.__ROOS_MODULES__ missing — the shell kernel must construct the module system before plugin boot')
   }
   ctx.reflect.provide('modules', modules)
 }

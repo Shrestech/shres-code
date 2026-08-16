@@ -1,10 +1,10 @@
-import { Context } from '@deepseek-ai/cordis'
+import { Context } from '@roos-code/cordis'
 import { describe, expect, it } from 'vitest'
-import type { WebServer } from '@deepseek-ai/dsh-host-webserver'
-import { SettingsProvider, settingsNamespace, type SettingsNamespace } from '@deepseek-ai/dsh-settings'
+import type { WebServer } from '@roos-code/roos-code-host-webserver'
+import { SettingsProvider, settingsNamespace, type SettingsNamespace } from '@roos-code/roos-code-settings'
 import {
   DEFAULT_PREFERENCE, THEME_SETTINGS_NAMESPACE, apply,
-} from '@deepseek-ai/dsh-client-ui-theme'
+} from '@roos-code/roos-code-client-ui-theme'
 
 class MemorySettings extends SettingsProvider {
   readonly writable = true

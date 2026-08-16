@@ -1,16 +1,16 @@
 /**
  * Durable session skill catalog and model-facing `skill` loader tool.
  *
- * @module @deepseek-ai/dsh-tool-skill
+ * @module @roos-code/roos-code-tool-skill
  */
 
 import { createHash } from 'node:crypto'
-import type { Context } from '@deepseek-ai/cordis'
-import z from '@deepseek-ai/schemastery'
-import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
-import { defineTool } from '@deepseek-ai/dsh-tools'
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import type { UserMessage } from '@deepseek-ai/dsh-session'
+import type { Context } from '@roos-code/cordis'
+import z from '@roos-code/schemastery'
+import type { Agent, PreStepDecision } from '@roos-code/roos-code-agent'
+import { defineTool } from '@roos-code/roos-code-tools'
+import { createUserMessage } from '@roos-code/roos-code-llm'
+import type { UserMessage } from '@roos-code/roos-code-session'
 import {
   escapeText,
   isModelInvocable,
@@ -19,7 +19,7 @@ import {
   renderSkillContent,
   type SkillInvocationSource,
   type SkillSummary,
-} from '@deepseek-ai/dsh-skill'
+} from '@roos-code/roos-code-skill'
 
 export const name = 'tool-skill'
 export const inject = ['agents', 'tools', 'skills']
@@ -40,7 +40,7 @@ export interface SkillCatalogSource {
   readonly entries: readonly { readonly name: string; readonly description: string }[]
 }
 
-declare module '@deepseek-ai/dsh-llm' {
+declare module '@roos-code/roos-code-llm' {
   interface MessageSourceMap {
     'skill-catalog': SkillCatalogSource
   }
@@ -91,6 +91,7 @@ export function apply(ctx: Context, config: Config = {}): void {
         properties: {
           name: { type: 'string', required: true },
           provider: { type: 'string', required: true },
+          source: { type: 'string', required: true },
           resourceBase: {
             oneOf: [
               {
@@ -148,6 +149,7 @@ export function apply(ctx: Context, config: Config = {}): void {
       return {
         name: skill.name,
         provider: skill.provider,
+        source: skill.source,
         ...skill.resourceBase !== undefined ? {
           resourceBase: { ...skill.resourceBase },
         } : {},

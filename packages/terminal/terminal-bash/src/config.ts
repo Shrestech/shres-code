@@ -1,6 +1,6 @@
 /** Validated configuration for the local PTY backend. */
 
-import z from '@deepseek-ai/schemastery'
+import z from '@roos-code/schemastery'
 
 /** Public plugin configuration. */
 export interface Config {

@@ -8,22 +8,22 @@
  */
 
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@deepseek-ai/cordis'
+import { Context } from '@roos-code/cordis'
 import { z } from 'zod'
-import AgentRegistry, { Inbox } from '@deepseek-ai/dsh-agent'
-import { AttachmentStore } from '@deepseek-ai/dsh-attachment'
-import type { Agent } from '@deepseek-ai/dsh-agent'
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
-import type { Session } from '@deepseek-ai/dsh-session'
-import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
-import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
-import UserQuestionService from '@deepseek-ai/dsh-user-questions'
-import type { MuxFrame, RpcRequest } from '@deepseek-ai/dsh-host-apiproxy/api'
-import { RpcId } from '@deepseek-ai/dsh-host-apiproxy/api/rpc'
-import { createApiProxy } from '@deepseek-ai/dsh-host-apiproxy'
+import AgentRegistry, { Inbox } from '@roos-code/roos-code-agent'
+import { AttachmentStore } from '@roos-code/roos-code-attachment'
+import type { Agent } from '@roos-code/roos-code-agent'
+import { createUserMessage } from '@roos-code/roos-code-llm'
+import SessionStore, { SessionId } from '@roos-code/roos-code-session'
+import type { Session } from '@roos-code/roos-code-session'
+import SessionProjectionRegistry from '@roos-code/roos-code-session-projection'
+import type { ProjectionDefinition } from '@roos-code/roos-code-session-projection'
+import UserQuestionService from '@roos-code/roos-code-user-questions'
+import type { MuxFrame, RpcRequest } from '@roos-code/roos-code-host-apiproxy/api'
+import { RpcId } from '@roos-code/roos-code-host-apiproxy/api/rpc'
+import { createApiProxy } from '@roos-code/roos-code-host-apiproxy'
 
-declare module '@deepseek-ai/dsh-session-projection/types' {
+declare module '@roos-code/roos-code-session-projection/types' {
   interface SessionProjectionMap {
     'test/last-user': { text: string } | null
   }

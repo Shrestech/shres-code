@@ -3,61 +3,61 @@ import { homedir, tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
-  DEFAULT_DSH_HOME_DISPLAY,
-  DSH_HOME_DIR_NAME,
+  DEFAULT_ROOS_HOME_DISPLAY,
+  ROOS_HOME_DIR_NAME,
   canonicalizeWatchPath,
-  defaultDshHome,
-  dshHomeDisplay,
-  dshHomePath,
+  defaultRoosHome,
+  roosHomeDisplay,
+  roosHomePath,
   expandHomePath,
-  resolveDshHome,
-} from '@deepseek-ai/dsh-home-paths'
+  resolveRoosHome,
+} from '@roos-code/roos-code-home-paths'
 
 afterEach(() => {
   vi.unstubAllEnvs()
 })
 
-describe('dsh path helpers', () => {
-  it('owns the shared default DSH home directory name', () => {
-    expect(DSH_HOME_DIR_NAME).toBe('.dsh')
-    expect(DEFAULT_DSH_HOME_DISPLAY).toBe('~/.dsh')
-    expect(defaultDshHome()).toBe(join(homedir(), '.dsh'))
+describe('roos path helpers', () => {
+  it('owns the shared default Roos home directory name', () => {
+    expect(ROOS_HOME_DIR_NAME).toBe('.roos')
+    expect(DEFAULT_ROOS_HOME_DISPLAY).toBe('~/.roos')
+    expect(defaultRoosHome()).toBe(join(homedir(), '.roos'))
   })
 
   it('expands tilde paths without changing non-tilde paths', () => {
     expect(expandHomePath('~')).toBe(homedir())
-    expect(expandHomePath('~/.dsh')).toBe(join(homedir(), '.dsh'))
-    expect(expandHomePath('~\\.dsh')).toBe(join(homedir(), '.dsh'))
-    expect(expandHomePath('/tmp/.dsh')).toBe('/tmp/.dsh')
-    expect(expandHomePath('~other/.dsh')).toBe('~other/.dsh')
+    expect(expandHomePath('~/.roos')).toBe(join(homedir(), '.roos'))
+    expect(expandHomePath('~\\.roos')).toBe(join(homedir(), '.roos'))
+    expect(expandHomePath('/tmp/.roos')).toBe('/tmp/.roos')
+    expect(expandHomePath('~other/.roos')).toBe('~other/.roos')
   })
 
-  it('resolves explicit path before DSH_HOME and the default', () => {
-    const envHome = join(homedir(), 'env-dsh')
+  it('resolves explicit path before ROOS_HOME and the default', () => {
+    const envHome = join(homedir(), 'env-roos')
 
-    expect(resolveDshHome('/tmp/explicit-dsh', { DSH_HOME: '~/env-dsh' })).toBe(resolve('/tmp/explicit-dsh'))
-    expect(resolveDshHome(undefined, { DSH_HOME: '~/env-dsh' })).toBe(envHome)
-    expect(resolveDshHome(undefined, {})).toBe(defaultDshHome())
+    expect(resolveRoosHome('/tmp/explicit-roos', { ROOS_HOME: '~/env-roos' })).toBe(resolve('/tmp/explicit-roos'))
+    expect(resolveRoosHome(undefined, { ROOS_HOME: '~/env-roos' })).toBe(envHome)
+    expect(resolveRoosHome(undefined, {})).toBe(defaultRoosHome())
   })
 
-  it('treats an empty or whitespace-only DSH_HOME as unset', () => {
-    expect(resolveDshHome(undefined, { DSH_HOME: '' })).toBe(defaultDshHome())
-    expect(resolveDshHome(undefined, { DSH_HOME: '   ' })).toBe(defaultDshHome())
+  it('treats an empty or whitespace-only ROOS_HOME as unset', () => {
+    expect(resolveRoosHome(undefined, { ROOS_HOME: '' })).toBe(defaultRoosHome())
+    expect(resolveRoosHome(undefined, { ROOS_HOME: '   ' })).toBe(defaultRoosHome())
   })
 
-  it('joins child segments onto the resolved DSH_HOME', () => {
-    vi.stubEnv('DSH_HOME', '~/env-dsh')
-    expect(dshHomePath()).toBe(join(homedir(), 'env-dsh'))
-    expect(dshHomePath('storages', 'cache')).toBe(join(homedir(), 'env-dsh', 'storages', 'cache'))
+  it('joins child segments onto the resolved ROOS_HOME', () => {
+    vi.stubEnv('ROOS_HOME', '~/env-roos')
+    expect(roosHomePath()).toBe(join(homedir(), 'env-roos'))
+    expect(roosHomePath('storages', 'cache')).toBe(join(homedir(), 'env-roos', 'storages', 'cache'))
   })
 
   it('labels a resolved home by whether it is the default root', () => {
-    expect(dshHomeDisplay(resolve(defaultDshHome()))).toBe('~/.dsh')
-    expect(dshHomeDisplay('/some/other/root')).toBe('$DSH_HOME')
+    expect(roosHomeDisplay(resolve(defaultRoosHome()))).toBe('~/.roos')
+    expect(roosHomeDisplay('/some/other/root')).toBe('$ROOS_HOME')
   })
 
   it('canonicalizes a watcher ancestor while preserving a missing suffix', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-watch-path-'))
+    const root = await mkdtemp(join(tmpdir(), 'roos-watch-path-'))
     const target = join(root, 'target')
     const alias = join(root, 'alias')
     try {

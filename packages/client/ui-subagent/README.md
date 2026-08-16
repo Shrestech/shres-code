@@ -1,6 +1,4 @@
-# @deepseek-ai/dsh-client-ui-subagent
-
-English | [中文](README.zh.md)
+# @roos-code/roos-code-client-ui-subagent
 
 Web subagent feature owner: contributes the lazily expandable catalog tree to `conversation.session.header.actions`, reason-specific read-only replacements to the conversation composer chain, and the existing `@` reference source to `ctx.inputTriggers`.
 

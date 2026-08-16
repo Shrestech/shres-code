@@ -1,20 +1,18 @@
-# dsh-home-paths
+# roos-home-paths
 
-English | [中文](README.zh.md)
+Shared filesystem path helpers for Roos Code user data.
 
-Shared filesystem path helpers for DeepSeek Harness user data.
+## Roos home
 
-## DSH home
+`resolveRoosHome()` resolves the single-root Roos Code home. Precedence, highest first: an explicit configured path, `$ROOS_HOME`, then `~/.roos`. The harness keeps all user data under one root.
 
-`resolveDshHome()` resolves the single-root DeepSeek Harness home. Precedence, highest first: an explicit configured path, `$DSH_HOME`, then `~/.dsh`. The harness keeps all user data under one root.
+`roosHomePath(...segments)` joins child segments onto that resolved home with Node's platform path rules. With no segments it returns the home itself.
 
-`dshHomePath(...segments)` joins child segments onto that resolved home with Node's platform path rules. With no segments it returns the home itself.
+`roosHomeDisplay()` names an active root symbolically for user-facing paths: `~/.roos` for the default home, `$ROOS_HOME` for any configured home. It never leaks an absolute machine path.
 
-`dshHomeDisplay()` names an active root symbolically for user-facing paths: `~/.dsh` for the default home, `$DSH_HOME` for any configured home. It never leaks an absolute machine path.
+`ROOS_HOME_DIR_NAME` owns the default user-data directory name: `.roos`.
 
-`DSH_HOME_DIR_NAME` owns the default user-data directory name: `.dsh`.
-
-`defaultDshHome()` returns the default DeepSeek Harness home by joining the operating-system home directory with `.dsh`, using Node's platform path rules.
+`defaultRoosHome()` returns the default Roos Code home by joining the operating-system home directory with `.roos`, using Node's platform path rules.
 
 `expandHomePath()` expands `~`, `~/...`, and Windows-style `~\...` prefixes against the operating-system home directory. It leaves non-tilde paths and `~user/...` untouched.
 

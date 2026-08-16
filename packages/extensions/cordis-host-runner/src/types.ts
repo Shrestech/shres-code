@@ -1,10 +1,10 @@
 /**
  * Client-safe wire vocabulary of the dynamic Cordis plugin runner.
- * @module @deepseek-ai/dsh-cordis-host-runner/types
+ * @module @roos-code/roos-code-cordis-host-runner/types
  */
 
-import type { Branded } from '@deepseek-ai/dsh-brand'
-import type { JsonValue, SessionId } from '@deepseek-ai/dsh-session/types'
+import type { Branded } from '@roos-code/roos-code-brand'
+import type { JsonValue, SessionId } from '@roos-code/roos-code-session/types'
 
 /** Stable identity of one dynamic plugin instance. */
 export type CordisDynamicPluginId = Branded<'CordisDynamicPluginId'>
@@ -294,6 +294,7 @@ export type DynamicCordisRunResponse =
       | 'client-half-failed'
       | 'rejected'
       | 'cancelled'
+      | 'unavailable'
       | 'not-running'
     message: string
     /** Original failure stack when available. */
@@ -316,7 +317,11 @@ export type DynamicCordisHostHalfResult =
     /** False when a panel merely attaches this page to an already active run. */
     startedHere: boolean
   }
-  | ({ ok: false } & CordisErrorDetails)
+  | ({
+    ok: false
+    /** Closed Host-activation denial when the ask did not grant. */
+    reason?: 'rejected' | 'cancelled' | 'unavailable'
+  } & CordisErrorDetails)
 
 /** Client-half source for one exact activation. */
 export interface DynamicCordisClientSource {
@@ -357,7 +362,7 @@ export type DynamicCordisInvokeResult =
   | { ok: true; value: JsonValue }
   | ({ ok: false; code: 'plugin-not-running' | 'stale-run' | 'method-not-found' | 'handler-error' } & CordisErrorDetails)
 
-declare module '@deepseek-ai/cordis' {
+declare module '@roos-code/cordis' {
   interface Events {
     /**
      * A Client-bearing activation needs a browser page, and may require a user decision.

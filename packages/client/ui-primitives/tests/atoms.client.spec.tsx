@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Button, ConnectionBanner, Input, Menu, Modal, Pill } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, ConnectionBanner, Input, Menu, Modal, Pill } from '@roos-code/roos-code-client-ui-primitives'
 import { POINTER_GRACE_MS } from '../src/pointer-grace.ts'
 
 afterEach(cleanup)
@@ -413,6 +413,6 @@ describe('ConnectionBanner', () => {
     const { container, rerender } = render(<ConnectionBanner reconnecting={false} />)
     expect(container.firstChild).toBeNull()
     rerender(<ConnectionBanner reconnecting />)
-    expect(container.textContent).toContain('重连')
+    expect(container.textContent).toContain('reconnect')
   })
 })

@@ -1,11 +1,11 @@
 /**
- * Shared wire protocol for the DeepSeek Harness SDK runtime: the
+ * Shared wire protocol for the Roos Code SDK runtime: the
  * newline-delimited JSON-RPC stdio transport plus the named request, result,
  * and notification types both wire ends speak. The runtime server plugin
- * (`@deepseek-ai/dsh-sdk-jsonrpc-server`) serves this protocol; SDK clients
- * (`@deepseek-ai/dsh-sdk-client`, the Python SDK) drive it.
+ * (`@roos-code/roos-code-sdk-jsonrpc-server`) serves this protocol; SDK clients
+ * (`@roos-code/roos-code-sdk-client`, the Python SDK) drive it.
  *
- * @module @deepseek-ai/dsh-sdk-protocol
+ * @module @roos-code/roos-code-sdk-protocol
  */
 
 export { JsonRpcLineTransport, JsonRpcResponseError } from './transport.ts'
