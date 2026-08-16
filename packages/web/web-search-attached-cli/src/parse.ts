@@ -82,7 +82,10 @@ function remember(
 ): void {
   const existing = sources.get(url)
   if (existing === undefined) {
-    sources.set(url, { url, ...extra })
+    const collected: CollectedSource = { url }
+    if (extra.title !== undefined) collected.title = extra.title
+    if (extra.snippet !== undefined) collected.snippet = extra.snippet
+    sources.set(url, collected)
     return
   }
   if (existing.title === undefined && extra.title !== undefined) existing.title = extra.title

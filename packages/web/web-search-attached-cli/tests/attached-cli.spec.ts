@@ -30,10 +30,10 @@ function backend(id: AttachedCliBackendId, apiKey?: string): AttachedCliBackend 
 }
 
 function options(partial: Partial<AttachedCliSearchOptions> & {
-  grok?: string
-  claude?: string
-  codex?: string
-  kimi?: string
+  grok?: string | undefined
+  claude?: string | undefined
+  codex?: string | undefined
+  kimi?: string | undefined
 }): AttachedCliSearchOptions {
   return {
     preference: partial.preference ?? ['grok-cli', 'claude-cli', 'codex-cli', 'kimi-cli'],
@@ -114,6 +114,21 @@ describe('mapVendorSearchPayload', () => {
       ],
     })
     expect(result.sources).toEqual([{ url: 'https://example.com', title: 'One' }])
+  })
+
+  it('keeps title and snippet from the first source object', () => {
+    expect(mapVendorSearchPayload({
+      url: 'https://only.example/doc',
+      title: 'Only title',
+      snippet: 'Only snippet',
+    })).toEqual({
+      sources: [{
+        url: 'https://only.example/doc',
+        title: 'Only title',
+        snippet: 'Only snippet',
+      }],
+      truncated: false,
+    })
   })
 
   it('keeps a first-seen title and later-only snippet', () => {
