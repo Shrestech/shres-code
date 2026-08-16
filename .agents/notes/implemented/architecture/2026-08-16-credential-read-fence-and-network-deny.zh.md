@@ -25,4 +25,4 @@ Status: implemented
 
 ## Consequences
 
-通过 `ctx.fs` 读取或变更受管凭据文档需要 `danger-full-access`。额外的禁止路径是插件配置，不是会话覆盖。现在默认拒绝出站网络的平台包括 macOS Seatbelt、Linux bwrap（新增 `--unshare-net`），以及 ABI ≥ 4 时的 Linux Landlock；需要子进程联网的操作方应在 `sandbox-policy` 上设置 `network: allow`。Windows ACL 不变。低于 6.7 的 Landlock 内核仍会约束文件并探测为 `partial`。组装后的应用快照 harness 尚未记录凭据读取拒绝场景；面向模型的标记改由 `roos-tool-fs` 的沙箱 transcript 测试钉住。
+通过 `ctx.fs` 读取或变更受管凭据文档需要 `danger-full-access`。额外的禁止路径是插件配置，不是会话覆盖。现在默认拒绝出站网络的平台包括 macOS Seatbelt、Linux bwrap（新增 `--unshare-net`），以及 ABI ≥ 4 时的 Linux Landlock；需要子进程联网的操作方应在 `sandbox-policy` 上设置 `network: allow`。Windows ACL 不变。低于 6.7 的 Landlock 内核仍会约束文件并探测为 `partial`。acp-agent 快照 `fs-credential-read-deny` 钉住模型可见的 `[sandbox: file access denied under workspace-write mode]` 标记：当 `read` 指向工作区中的 `*.credentials.yaml` 文件时返回该标记。

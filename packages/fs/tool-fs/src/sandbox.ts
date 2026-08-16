@@ -119,18 +119,16 @@ export class FsSandboxController {
 
   /**
    * Map a thrown provider error for the model: a `FS_SANDBOX_DENIED` becomes a
-   * `FsError` whose text is the shared `[sandbox: …]` denial marker plus the
-   * same-turn escalation hint, so a policy denial reads identically to bash's
-   * WHILE keeping the structured `FS_SANDBOX_DENIED` code — `ToolRuntime`
-   * populates `result.error` only for `HarnessError` instances, so a plain
-   * `Error` would strip the code retry/observers key off. Any other error
-   * passes through unchanged. A `FS_SANDBOX_DENIED` only arises under a
-   * confining backend, which always advertises the escalation fields, so the
-   * hint always applies here.
-   * @param error - the error thrown by the mutation.
+   * `FsError` whose text is the shared `[sandbox: …]` denial marker, keeping
+   * the structured `FS_SANDBOX_DENIED` code — `ToolRuntime` populates
+   * `result.error` only for `HarnessError` instances, so a plain `Error`
+   * would strip the code retry/observers key off. Any other error passes
+   * through unchanged. Write and edit append the same-turn escalation hint
+   * because they advertise `sandbox_permissions`; reads pass `{ hint: false }`
+   * because they do not.
+   * @param error - the error thrown by the fenced operation.
    * @param policy - the policy stamped onto the call (names the mode in the marker).
-   * @param options - `hint: false` omits the same-turn escalation hint (reads
-   *   do not advertise `sandbox_permissions`).
+   * @param options - `hint: false` omits the write/edit escalation hint.
    * @returns the error to throw — the marker `FsError` for a sandbox denial, else the original.
    */
   mapError(error: unknown, policy: SandboxExecutionPolicy | undefined, options?: { hint?: boolean }): unknown {

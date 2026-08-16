@@ -591,6 +591,17 @@ const SCENARIOS: Scenario[] = [
     headerClass: 'sandbox',
     env: { ROOS_PERMISSION_MODE: 'workspace-write' },
   },
+  // Authored keyless replay through the assembled app: under
+  // workspace-write, the real `read` tool refuses a workspace
+  // `*.credentials.yaml` file with the sandbox marker and never
+  // returns the fixture secret.
+  {
+    name: 'fs-credential-read-deny',
+    hasModelTurn: true,
+    recorded: false,
+    headerClass: 'sandbox',
+    env: { ROOS_PERMISSION_MODE: 'workspace-write' },
+  },
   // Unlike ordinary snapshots, this session cwd is outside the platform temp
   // roots that workspace-write always grants. The overlay points the
   // deployment fallback at /tmp, so a successful relative write proves the

@@ -2,11 +2,11 @@
 
 English | [中文](README.zh.md)
 
-`SandboxedFileSystem` extends [`LocalFileSystem`](../fs-local/README.md) and registers as `ctx.fs`. It inherits every text-storage mechanic verbatim (resolve, stat, read/stream, list, the atomic write, the read-match-write edit critical section) and adds a per-call MODE fence on `writeText`/`editText` plus a credential read fence on `readText`/`streamText`/`readBytes`.
+`SandboxedFileSystem` extends [`LocalFileSystem`](../fs-local/README.md) and registers as `ctx.fs`. It inherits every text-storage mechanic verbatim (resolve, stat, read/stream, list, the atomic write, the read-match-write edit critical section) and adds a per-call MODE fence on `writeText`/`editText` plus a credential fence on content reads and mutations.
 
 Its plugin config keeps the local backend knobs (`cwd` is the relative-path resolution default, `diffBasisMaxBytes` bounds the optional overwrite contextual-diff basis) and adds `denyReadPaths` for extra read-deny paths.
 
-Loading it INSTEAD OF `roos-fs-local`, together with a [`ctx.sandboxPolicy`](../../sandbox/sandbox-policy/README.md), is the whole swap; the model-facing tools (`roos-tool-fs`) are untouched. The tool layer resolves the calling session's mode and cwd into the SAME per-call policy bash receives, so the two families never confine to different roots.
+Loading it INSTEAD OF `roos-fs-local`, together with a [`ctx.sandboxPolicy`](../../sandbox/sandbox-policy/README.md), is the whole swap. The model-facing tools (`roos-tool-fs`) stamp that same per-call policy onto `read` / `read_image` / `write` / `edit`, so bash and filesystem never confine to different roots.
 
 ## The fence
 
@@ -14,7 +14,7 @@ The per-call policy carries the effective mode (session override or escalation g
 
 - `read-only` — denies every mutation with the structured `FS_SANDBOX_DENIED`.
 - `workspace-write` — allows a mutation only when the target canonicalizes under a writable root: the workspace root plus the platform temp areas (`/tmp`, `os.tmpdir()`), the SAME set the Seatbelt profile grants, derived from the one [`writableRoots`](../../sandbox/README.md) function so the fs fence and the bash runner cannot drift. Canonical spellings use a lexical fast path; an identity-based ancestor fallback recognizes alias-equivalent roots such as Windows long names and 8.3 names without treating unrelated prefixes as contained. The target is re-canonicalized immediately before delegating, so an ancestor symlink swapped since the tool resolved it is caught.
-- `danger-full-access` — delegates unfenced, including credential reads.
+- `danger-full-access` — delegates unfenced, including credential reads and writes.
 
 Under every mode except `danger-full-access`, content reads and mutations of `$ROOS_HOME/.credentials.yaml`, any `*.credentials.yaml` basename (case-insensitive), and each configured `denyReadPaths` entry are denied with `FS_SANDBOX_DENIED`. The fence re-canonicalizes through `checkedTarget()`, so a symlink alias of a denied file is refused. `read` / `read_image` stamp the session's standing policy so a session `danger-full-access` fold lifts it.
 
@@ -30,11 +30,11 @@ A denial is a structured `FsError` (`FS_SANDBOX_DENIED`, carrying the effective 
 
 #### What the model sees
 
-The policy owner contributes capability-neutral `sandbox:policy` context. Indirectly, `roos-tool-fs` renders this backend's `FS_SANDBOX_DENIED` refusals as the `[sandbox: file access denied under <mode> mode]` marker plus the same-turn escalation hint.
+The policy owner contributes capability-neutral `sandbox:policy` context. Indirectly, `roos-tool-fs` renders this backend's `FS_SANDBOX_DENIED` refusals as the `[sandbox: file access denied under <mode> mode]` marker; write and edit append the same-turn escalation hint, and reads do not.
 
 #### Token effect
 
-The current-policy clause adds a small runtime-context message while this backend is mounted; a denial adds the bounded marker and escalation hint to conversation history.
+The current-policy clause adds a small runtime-context message while this backend is mounted; a denial adds the bounded marker, and a write or edit denial also adds the escalation hint.
 
 #### KV Cache effect
 
