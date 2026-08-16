@@ -49,6 +49,7 @@ function state(overrides: Partial<ModelsSettingsState> = {}): ModelsSettingsStat
     writable: true,
     rows: [row()],
     namespaces: new Map(),
+    hasUserDefaultModel: false,
     ...overrides,
   }
 }
@@ -107,6 +108,10 @@ describe('onboardingReadiness', () => {
     expect(onboardingReadiness(state({ rows: [ollama] }))).toEqual({ kind: 'credential-missing' })
     expect(onboardingCandidates(state({ rows: [ollama, row()] }).rows).map(item => item.entry.provider))
       .toEqual(['ollama-local', 'deepseek-official'])
+    expect(onboardingReadiness(state({ rows: [ollama], hasUserDefaultModel: true })))
+      .toEqual({ kind: 'provider-ready' })
+    expect(onboardingReadiness(state({ rows: [ollama], writable: false })))
+      .toEqual({ kind: 'unavailable', reason: 'settings-read-only' })
   })
 
   it('accepts file and process-environment credentials without prompting', () => {

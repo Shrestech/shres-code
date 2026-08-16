@@ -3585,6 +3585,12 @@ importers:
       '@roos-code/cordis':
         specifier: workspace:^
         version: link:../../../vendor/cordis
+      '@roos-code/cordis-plugin-include':
+        specifier: workspace:^
+        version: link:../../../vendor/include
+      '@roos-code/cordis-plugin-loader':
+        specifier: workspace:^
+        version: link:../../../vendor/loader
       '@roos-code/roos-code-agent':
         specifier: workspace:^
         version: link:../agent

@@ -45,6 +45,8 @@
     "@roos-code/cordis": "workspace:^"
   },
   "devDependencies": {
+    "@roos-code/cordis-plugin-include": "workspace:^",
+    "@roos-code/cordis-plugin-loader": "workspace:^",
     "@roos-code/roos-code-agent": "workspace:^",
     "@roos-code/roos-code-agent-default-model": "workspace:^",
     "@roos-code/roos-code-credentials": "workspace:^",

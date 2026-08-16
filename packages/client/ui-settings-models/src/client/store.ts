@@ -46,6 +46,12 @@ export interface ModelsSettingsState {
   rows: readonly ProviderRow[]
   /** Namespace views by ns, for the editor's schema/layers/secrets. */
   namespaces: ReadonlyMap<string, SettingsNamespaceView>
+  /**
+   * Whether the user layer of `agent-default-model` names a provider and
+   * model. Mirrors CLI `hasUserSelection` so an explicit first-run pick
+   * (including local Ollama) does not re-prompt.
+   */
+  hasUserDefaultModel: boolean
 }
 
 /**
@@ -99,7 +105,8 @@ function apiKeyEnvOf(namespace: SettingsNamespaceView | undefined, path: readonl
 export class ModelsSettingsStore {
   /** The snapshot the section renders from (uSES-safe store). */
   readonly store: SnapshotStore<ModelsSettingsState> = createSnapshotStore<ModelsSettingsState>({
-    status: 'idle', error: null, credentialError: null, writable: false, rows: [], namespaces: new Map(),
+    status: 'idle', error: null, credentialError: null, writable: false, rows: [],
+    namespaces: new Map(), hasUserDefaultModel: false,
   })
 
   /** Latest load wins; an older response never overwrites a newer one. */
@@ -185,8 +192,23 @@ export class ModelsSettingsStore {
           : {},
       }))
       s.namespaces = namespaces
+      s.hasUserDefaultModel = userDefaultModelOf(namespaces)
     })
   }
+}
+
+/**
+ * Whether the user layer of `agent-default-model` names both fields.
+ * @param namespaces - settings describe views by ns.
+ * @returns true only when the stored user section has provider and model.
+ */
+function userDefaultModelOf(namespaces: ReadonlyMap<string, SettingsNamespaceView>): boolean {
+  const user = namespaces.get('agent-default-model')?.user
+  if (typeof user !== 'object' || user === null) return false
+  const provider = (user as { provider?: unknown }).provider
+  const model = (user as { model?: unknown }).model
+  return typeof provider === 'string' && provider.length > 0
+    && typeof model === 'string' && model.length > 0
 }
 
 /**
@@ -267,14 +289,13 @@ export function onboardingReadiness(state: ModelsSettingsState): OnboardingReadi
       reason: 'load-failed',
     }
   }
+  if (state.hasUserDefaultModel) return { kind: 'provider-ready' }
   if (state.rows.some(onboardingProviderReady)) return { kind: 'provider-ready' }
   const candidates = onboardingCandidates(state.rows)
   if (candidates.length === 0) {
-    if (state.rows.length === 0) return { kind: 'adapter-absent' }
-    if (state.rows.every(row => !row.entry.active)) {
-      return { kind: 'unavailable', reason: 'provider-inactive' }
-    }
-    return { kind: 'adapter-absent' }
+    return state.rows.length === 0
+      ? { kind: 'adapter-absent' }
+      : { kind: 'unavailable', reason: 'provider-inactive' }
   }
   const keyed = candidates.filter(row => row.apiKeyEnv !== undefined)
   if (keyed.length > 0) {

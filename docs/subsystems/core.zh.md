@@ -730,6 +730,59 @@ roots(): Agent[]
 
 Source: [`packages/core/agent/src/index.ts:256`](../../packages/core/agent/src/index.ts)
 
+<a id="ctxfirstrunsetup--firstrunsetup"></a>
+
+### `ctx.firstRunSetup` — `FirstRunSetup`
+
+Owns first-run detection and the CLI picker. Web onboarding reads the same readiness rules from the Models join; this service is the host-side writer.
+
+```ts cordis-catalog
+/**
+ * The resolved plugin config after schema defaults.
+ * @returns a detached copy of the validated config.
+ */
+resolvedConfig(): FirstRunResolvedConfig
+
+/**
+ * Probe local Ollama with this instance's configured URL and timeout.
+ * @returns advertised models, or `reachable: false` when the endpoint is down.
+ */
+detectLocalOllama(): Promise<LocalOllamaStatus>
+
+/**
+ * The shipped template routes the picker offers beside live Ollama models.
+ * @returns the template list.
+ */
+templateRoutes(): readonly TemplateRoute[]
+
+/**
+ * Whether setup must run: no user-saved default, and the composition
+ * default cannot serve.
+ * @returns true when the CLI picker or web card should appear.
+ */
+async needsSetup(): Promise<boolean>
+
+/**
+ * Menu entries for the current host: live Ollama models, templates, custom.
+ * @returns picker options in print order.
+ */
+async listOptions(): Promise<readonly PickerOption[]>
+
+/**
+ * Persist one picker outcome.
+ * @param choice - the selected route, key, and model.
+ */
+applyChoice(choice: FirstRunChoice): Promise<void>
+
+/**
+ * Run the CLI picker when setup is required. A non-TTY process fails loud.
+ * @param io - streams; omitted uses process stdin/stderr.
+ */
+async ensureReady(io: CliIo = defaultIo()): Promise<void>
+```
+
+Source: [`packages/core/first-run-setup/src/index.ts:85`](../../packages/core/first-run-setup/src/index.ts)
+
 <a id="agent-events"></a>
 
 ### `agent/*` events

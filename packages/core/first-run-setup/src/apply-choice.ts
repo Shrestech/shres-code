@@ -30,6 +30,7 @@ export function deriveKeyRef(provider: string): string {
 export async function applyChoice(ctx: Context, choice: FirstRunChoice): Promise<void> {
   switch (choice.kind) {
     case 'ollama-local':
+      await adoptOllamaLocalModel(ctx, choice.model)
       await saveDefault(ctx, 'ollama-local', choice.model)
       return
     case 'template': {
@@ -77,6 +78,26 @@ export async function applyChoice(ctx: Context, choice: FirstRunChoice): Promise
       throw new Error(`first-run-setup: unexpected choice ${JSON.stringify(_never)}`)
     }
   }
+}
+
+/**
+ * Replace the composed `ollama-local` catalog with the picked id so a
+ * non-`llama3.2` choice is not `UNKNOWN_MODEL` on the next request.
+ * @param ctx - context carrying settings.
+ * @param model - the advertised local model id the user picked.
+ */
+async function adoptOllamaLocalModel(ctx: Context, model: string): Promise<void> {
+  const settings = ctx.get('settings')
+  if (settings === undefined) {
+    throw new Error('first-run-setup: a settings provider is required to adopt an Ollama model')
+  }
+  await settings.update(PI_AI, {
+    providers: {
+      'ollama-local': {
+        models: [{ id: model }],
+      },
+    },
+  })
 }
 
 /** Persist the default Agent model selection. */

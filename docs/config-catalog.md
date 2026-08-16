@@ -591,6 +591,30 @@ export interface Config {
 
 Source: [`packages/e2b/e2b/src/index.ts:43`](../packages/e2b/e2b/src/index.ts)
 
+<a id="roos-coderoos-code-first-run-setup"></a>
+
+## `@roos-code/roos-code-first-run-setup`
+
+Requires: `agentDefaultModel` · `llm`
+
+```ts config-catalog
+/** Plugin configuration. Timeouts and URLs that vary by deployment live here. */
+export interface Config {
+  /** OpenAI-compatible base URL used to probe local Ollama. */
+  ollamaBaseURL: string
+  /** Abort the local-Ollama GET after this many milliseconds. */
+  detectTimeoutMs: number
+  /**
+   * When true, `apply` runs the CLI picker before the plugin is considered
+   * mounted. Headless instead calls {@link FirstRunSetup.ensureReady} after
+   * the loader settles so adapter routes exist first.
+   */
+  autoRunCli: boolean
+}
+```
+
+Source: [`packages/core/first-run-setup/src/index.ts:45`](../packages/core/first-run-setup/src/index.ts)
+
 <a id="roos-coderoos-code-fs-local"></a>
 
 ## `@roos-code/roos-code-fs-local`
@@ -669,7 +693,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/bundle/headless/src/index.ts:31`](../packages/bundle/headless/src/index.ts)
+Source: [`packages/bundle/headless/src/index.ts:32`](../packages/bundle/headless/src/index.ts)
 
 <a id="roos-coderoos-code-hooks-claude-code"></a>
 

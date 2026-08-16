@@ -15,7 +15,7 @@ import { SettingsProvider, settingsNamespace } from '@roos-code/roos-code-settin
 import type { SettingsNamespace } from '@roos-code/roos-code-settings'
 import * as FirstRunSetup from '../src/index.ts'
 import { apply as installInvariant } from '../src/invariant.ts'
-import { formatMenu, numberOptions, readLine, runCliPicker } from '../src/cli.ts'
+import { formatMenu, numberOptions, readLine, readSecret, runCliPicker } from '../src/cli.ts'
 import { detectLocalOllama } from '../src/detect.ts'
 import { applyChoice, deriveKeyRef } from '../src/apply-choice.ts'
 import {
@@ -293,13 +293,87 @@ describe('CLI picker', () => {
     stdin.end()
     await expect(pending).rejects.toThrow(/stdin closed/)
   })
+
+  it('pauses the shared line reader and restores a previous raw TTY', async () => {
+    const stdin = new PassThrough() as PassThrough & {
+      isTTY: boolean
+      isRaw: boolean
+      setRawMode: (value: boolean) => boolean
+    }
+    stdin.isTTY = true
+    stdin.isRaw = true
+    stdin.setRawMode = (value: boolean) => {
+      stdin.isRaw = value
+      return value
+    }
+    const stdout = new PassThrough()
+    let printed = ''
+    stdout.on('data', (chunk: Buffer) => { printed += chunk.toString('utf8') })
+    const io: CliIo = { stdin, stdout, stderr: stdout, isTTY: true }
+    const pendingLine = readLine(stdin)
+    queueMicrotask(() => { stdin.write('1\n') })
+    await expect(pendingLine).resolves.toBe('1')
+    const pending = readSecret(io)
+    queueMicrotask(() => { stdin.write('sk-live\r') })
+    await expect(pending).resolves.toBe('sk-live')
+    expect(printed).toBe('\n')
+    expect(stdin.isRaw).toBe(true)
+  })
+
+  it('hides TTY keystrokes while collecting an API key', async () => {
+    const stdin = new PassThrough() as PassThrough & {
+      isTTY: boolean
+      isRaw: boolean
+      setRawMode: (value: boolean) => boolean
+    }
+    stdin.isTTY = true
+    stdin.isRaw = false
+    stdin.setRawMode = (value: boolean) => {
+      stdin.isRaw = value
+      return value
+    }
+    const stdout = new PassThrough()
+    let printed = ''
+    stdout.on('data', (chunk: Buffer) => { printed += chunk.toString('utf8') })
+    const pending = readSecret({ stdin, stdout, stderr: stdout, isTTY: true })
+    queueMicrotask(() => { stdin.write('sk-live\r') })
+    await expect(pending).resolves.toBe('sk-live')
+    expect(printed).toBe('\n')
+    expect(stdin.isRaw).toBe(false)
+  })
+
+  it('supports backspace and treats Ctrl-C as interrupt on a hidden TTY', async () => {
+    const stdin = new PassThrough() as PassThrough & {
+      isTTY: boolean
+      isRaw: boolean
+      setRawMode: (value: boolean) => boolean
+    }
+    stdin.isTTY = true
+    stdin.isRaw = false
+    stdin.setRawMode = (value: boolean) => {
+      stdin.isRaw = value
+      return value
+    }
+    const stdout = new PassThrough()
+    const pending = readSecret({ stdin, stdout, stderr: stdout, isTTY: true })
+    queueMicrotask(() => { stdin.write('a\tb\u0001\u007fc\r') })
+    await expect(pending).resolves.toBe('a\tc')
+
+    const cancelled = readSecret({ stdin, stdout, stderr: stdout, isTTY: true })
+    queueMicrotask(() => { stdin.write('\u0003') })
+    await expect(cancelled).rejects.toThrow(/interrupted/)
+  })
 })
 
 describe('applyChoice', () => {
-  it('saves a local Ollama default', async () => {
+  it('saves a local Ollama default and adopts the picked model onto the route', async () => {
     const ctx = await boot()
     await applyChoice(ctx, { kind: 'ollama-local', model: 'qwen2.5' })
     expect(ctx.agentDefaultModel.currentSelection()).toEqual({ provider: 'ollama-local', model: 'qwen2.5' })
+    const info = await ctx.llm.resolveModelInfo('ollama-local', 'qwen2.5')
+    expect(info.id).toBe('qwen2.5')
+    await expect(ctx.llm.resolveModelInfo('ollama-local', 'llama3.2'))
+      .rejects.toThrow(/no configured model/)
     await ctx.fiber.dispose()
   })
 
@@ -338,9 +412,48 @@ describe('applyChoice', () => {
       .rejects.toThrow(/unknown template provider/)
     await ctx.fiber.dispose()
   })
+
+  it('rejects an ollama-local pick when agentDefaultModel is absent', async () => {
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    await ctx.plugin(MemorySettings)
+    await ctx.plugin(LlmPiAi, {
+      providers: {
+        'ollama-local': {
+          api: 'openai-completions',
+          baseURL: 'http://127.0.0.1:9/v1',
+          headers: { Authorization: 'Bearer ollama' },
+          models: [{ id: 'llama3.2' }],
+        },
+      },
+    })
+    await expect(applyChoice(ctx, { kind: 'ollama-local', model: 'qwen2.5' }))
+      .rejects.toThrow(/agentDefaultModel is required/)
+    await ctx.fiber.dispose()
+  })
 })
 
 describe('FirstRunSetup service', () => {
+  it('does not probe local Ollama when a keyed composition default is already usable', async () => {
+    const server = createServer(() => {
+      throw new Error('first-run-setup must not probe Ollama when the default key is present')
+    })
+    servers.push(server)
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+    const address = server.address()
+    if (address === null || typeof address === 'string') throw new Error('no port')
+    const ctx = await boot({ envKey: 'DEEPSEEK_API_KEY' })
+    await ctx.plugin(FirstRunSetup, {
+      ollamaBaseURL: `http://127.0.0.1:${address.port}/v1`,
+      detectTimeoutMs: 2000,
+      autoRunCli: false,
+    })
+    const started = Date.now()
+    expect(await ctx.firstRunSetup.needsSetup()).toBe(false)
+    expect(Date.now() - started).toBeLessThan(500)
+    await ctx.fiber.dispose()
+  })
+
   it('needs setup until a usable default exists, then apply is a no-op', async () => {
     const url = await listingServer({ data: [] }, 500)
     const ctx = await boot()
@@ -365,26 +478,39 @@ describe('FirstRunSetup service', () => {
     await ctx.fiber.dispose()
   })
 
-  it('auto-runs the CLI picker during apply when configured', async () => {
-    const url = await listingServer({ data: [{ id: 'llama3.2' }] })
+  it('exposes detectLocalOllama on the registered service', async () => {
+    const url = await listingServer({ data: [] }, 500)
     const ctx = await boot()
-    const captured = captureIo(['1'])
-    const previousStdin = process.stdin
-    // autoRunCli uses defaultIo only when ensureReady is called without args;
-    // the plugin path calls ensureReady() with defaults, so stub TTY off and
-    // instead drive through the service after mount for a deterministic script.
     await ctx.plugin(FirstRunSetup, {
       ollamaBaseURL: `${url}/v1`,
-      detectTimeoutMs: 1000,
+      detectTimeoutMs: 200,
       autoRunCli: false,
     })
-    await ctx.firstRunSetup.ensureReady(captured.io)
-    expect(ctx.agentDefaultModel.currentSelection()).toEqual({
-      provider: 'ollama-local', model: 'llama3.2',
-    })
-    expect(previousStdin).toBe(process.stdin)
-    const io = FirstRunSetup.defaultIo()
-    expect(io.stdout).toBe(process.stderr)
+    const status = await ctx.firstRunSetup.detectLocalOllama()
+    expect(status.reachable).toBe(false)
+    await ctx.fiber.dispose()
+  })
+
+  it('auto-runs the CLI picker during apply when autoRunCli is true', async () => {
+    const url = await listingServer({ data: [{ id: 'qwen2.5' }] })
+    const ctx = await boot()
+    const captured = captureIo(['1'])
+    const previous = FirstRunSetup.internals.io
+    FirstRunSetup.internals.io = () => captured.io
+    try {
+      await ctx.plugin(FirstRunSetup, {
+        ollamaBaseURL: `${url}/v1`,
+        detectTimeoutMs: 1000,
+        autoRunCli: true,
+      })
+      expect(ctx.agentDefaultModel.currentSelection()).toEqual({
+        provider: 'ollama-local', model: 'qwen2.5',
+      })
+      expect((await ctx.llm.resolveModelInfo('ollama-local', 'qwen2.5')).id).toBe('qwen2.5')
+    } finally {
+      FirstRunSetup.internals.io = previous
+    }
+    expect(FirstRunSetup.defaultIo().stdout).toBe(process.stderr)
     await ctx.fiber.dispose()
   })
 
@@ -571,7 +697,7 @@ describe('apply autoRunCli', () => {
       .then(async () => {
         const empty = new Context()
         await applyChoice(empty, { kind: 'ollama-local', model: 'x' })
-      })).rejects.toThrow(/agentDefaultModel is required/)
+      })).rejects.toThrow(/settings provider is required/)
     await ctx.fiber.dispose()
   })
 })

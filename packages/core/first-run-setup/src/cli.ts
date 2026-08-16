@@ -88,7 +88,7 @@ async function collectChoice(io: CliIo, option: PickerOption): Promise<FirstRunC
         return { kind: 'template', provider: option.provider, model: option.defaultModel }
       }
       write(io.stdout, `Enter API key for ${option.label} (${option.apiKeyEnv}):\n> `)
-      const apiKey = await readLine(io.stdin)
+      const apiKey = await readSecret(io)
       if (apiKey.length === 0) {
         throw new Error(`first-run-setup: ${option.apiKeyEnv} is required for ${option.provider}`)
       }
@@ -107,7 +107,7 @@ async function collectChoice(io: CliIo, option: PickerOption): Promise<FirstRunC
       const model = await readLine(io.stdin)
       if (model.length === 0) throw new Error('first-run-setup: a custom provider needs a model id')
       write(io.stdout, 'API key (leave blank if the endpoint needs none):\n> ')
-      const apiKey = await readLine(io.stdin)
+      const apiKey = await readSecret(io)
       return {
         kind: 'custom',
         provider,
@@ -132,6 +132,8 @@ function write(stream: NodeJS.WritableStream, text: string): void {
 interface LineSource {
   buffer: string
   ended: boolean
+  /** When true, the attach listener ignores data so a hidden reader can own it. */
+  paused?: boolean
   waiter?: { resolve: (line: string) => void; reject: (error: Error) => void }
 }
 
@@ -151,6 +153,7 @@ function attach(stdin: NodeJS.ReadableStream): LineSource {
   const source: LineSource = { buffer: '', ended: false }
   sources.set(stdin, source)
   stdin.on('data', (chunk: Buffer | string) => {
+    if (source.paused === true) return
     source.buffer += String(chunk)
     const waiter = source.waiter
     if (waiter === undefined) return
@@ -178,6 +181,63 @@ function attach(stdin: NodeJS.ReadableStream): LineSource {
     (stdin as NodeJS.ReadStream).resume()
   }
   return source
+}
+
+/**
+ * Read one secret line. A real TTY disables echo; scripted stdin (PassThrough,
+ * piped input) uses the ordinary line reader so tests stay deterministic.
+ * @param io - streams and TTY flag.
+ * @returns the trimmed secret.
+ */
+export async function readSecret(io: CliIo): Promise<string> {
+  const stdin = io.stdin as NodeJS.ReadStream
+  if (typeof stdin.setRawMode === 'function' && stdin.isTTY === true) {
+    return readHiddenLine(stdin, io.stdout)
+  }
+  return readLine(io.stdin)
+}
+
+/**
+ * Collect a line in raw mode so keystrokes do not echo. Pauses the shared
+ * line attach so its data listener cannot steal the bytes.
+ * @param stdin - a TTY ReadStream with `setRawMode`.
+ * @param stdout - where to write the finishing newline.
+ * @returns the typed secret.
+ */
+function readHiddenLine(stdin: NodeJS.ReadStream, stdout: NodeJS.WritableStream): Promise<string> {
+  const source = sources.get(stdin)
+  if (source !== undefined) source.paused = true
+  const previous = stdin.isRaw
+  stdin.setRawMode(true)
+  return new Promise((resolve, reject) => {
+    let buf = ''
+    const onData = (chunk: Buffer | string): void => {
+      for (const ch of String(chunk)) {
+        if (ch === '\n' || ch === '\r') {
+          cleanup()
+          stdout.write('\n')
+          resolve(buf)
+          return
+        }
+        if (ch === '\u0003') {
+          cleanup()
+          reject(new Error('first-run-setup: interrupted'))
+          return
+        }
+        if (ch === '\u007f' || ch === '\b') {
+          buf = buf.slice(0, -1)
+          continue
+        }
+        if (ch >= ' ' || ch === '\t') buf += ch
+      }
+    }
+    const cleanup = (): void => {
+      stdin.off('data', onData)
+      stdin.setRawMode(previous === true)
+      if (source !== undefined) source.paused = false
+    }
+    stdin.on('data', onData)
+  })
 }
 
 /**

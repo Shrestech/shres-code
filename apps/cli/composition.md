@@ -42,6 +42,14 @@ flowchart LR
   cfg --> plugin_roos_base_credentials
   plugin_roos_base_llm_pi_ai["llm-pi-ai<br/>@roos-code/roos-code-llm-pi-ai"]
   cfg --> plugin_roos_base_llm_pi_ai
+  plugin_roos_base_llama3_2["llama3.2<br/>Llama 3.2"]
+  cfg --> plugin_roos_base_llama3_2
+  plugin_roos_base_deepseek_v4_flash_cloud["deepseek-v4-flash:cloud<br/>DeepSeek V4 Flash (cloud)"]
+  cfg --> plugin_roos_base_deepseek_v4_flash_cloud
+  plugin_roos_base_deepseek_v4_pro_cloud["deepseek-v4-pro:cloud<br/>DeepSeek V4 Pro (cloud)"]
+  cfg --> plugin_roos_base_deepseek_v4_pro_cloud
+  plugin_roos_base_first_run_setup["first-run-setup<br/>@roos-code/roos-code-first-run-setup"]
+  cfg --> plugin_roos_base_first_run_setup
   plugin_roos_base_session_persistence_jsonl["session-persistence-jsonl<br/>@roos-code/roos-code-session-persistence-jsonl"]
   cfg --> plugin_roos_base_session_persistence_jsonl
   plugin_roos_base_attachment_local["attachment-local<br/>@roos-code/roos-code-attachment-local"]
@@ -185,6 +193,10 @@ flowchart LR
 | `settings` | `@roos-code/roos-code-settings-file` |
 | `credentials` | `@roos-code/roos-code-credentials-local` |
 | `llm-pi-ai` | `@roos-code/roos-code-llm-pi-ai` |
+| `llama3.2` | `Llama 3.2` |
+| `deepseek-v4-flash:cloud` | `DeepSeek V4 Flash (cloud)` |
+| `deepseek-v4-pro:cloud` | `DeepSeek V4 Pro (cloud)` |
+| `first-run-setup` | `@roos-code/roos-code-first-run-setup` |
 | `session-persistence-jsonl` | `@roos-code/roos-code-session-persistence-jsonl` |
 | `attachment-local` | `@roos-code/roos-code-attachment-local` |
 | `session-query-sqlite` | `@roos-code/roos-code-session-query-sqlite` |

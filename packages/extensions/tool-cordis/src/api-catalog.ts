@@ -563,6 +563,53 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'firstRunSetup',
+    summary: 'Owns first-run detection and the CLI picker.',
+    description: 'Owns first-run detection and the CLI picker. Web onboarding reads the same readiness rules from the Models join; this service is the host-side writer.',
+    methods: [
+      {
+        signature: 'resolvedConfig(): FirstRunResolvedConfig',
+        description: 'The resolved plugin config after schema defaults.',
+        parameters: [],
+        returns: 'a detached copy of the validated config.',
+      },
+      {
+        signature: 'detectLocalOllama(): Promise<LocalOllamaStatus>',
+        description: 'Probe local Ollama with this instance\'s configured URL and timeout.',
+        parameters: [],
+        returns: 'advertised models, or `reachable: false` when the endpoint is down.',
+      },
+      {
+        signature: 'templateRoutes(): readonly TemplateRoute[]',
+        description: 'The shipped template routes the picker offers beside live Ollama models.',
+        parameters: [],
+        returns: 'the template list.',
+      },
+      {
+        signature: 'async needsSetup(): Promise<boolean>',
+        description: 'Whether setup must run: no user-saved default, and the composition default cannot serve.',
+        parameters: [],
+        returns: 'true when the CLI picker or web card should appear.',
+      },
+      {
+        signature: 'async listOptions(): Promise<readonly PickerOption[]>',
+        description: 'Menu entries for the current host: live Ollama models, templates, custom.',
+        parameters: [],
+        returns: 'picker options in print order.',
+      },
+      {
+        signature: 'applyChoice(choice: FirstRunChoice): Promise<void>',
+        description: 'Persist one picker outcome.',
+        parameters: [{ name: 'choice', description: 'the selected route, key, and model.' }],
+      },
+      {
+        signature: 'async ensureReady(io: CliIo = defaultIo()): Promise<void>',
+        description: 'Run the CLI picker when setup is required. A non-TTY process fails loud.',
+        parameters: [{ name: 'io', description: 'streams; omitted uses process stdin/stderr.' }],
+      },
+    ],
+  },
+  {
     key: 'fs',
     summary: 'Abstract filesystem provider.',
     description: 'Abstract filesystem provider. Targets must preserve identity across aliases; reads expose regular UTF-8 text or typed errors, listings are stable and content-free, and mutations are atomic. Optional guards add stale protection without changing the unguarded provider contract.',
@@ -2747,6 +2794,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ClientResponse {\n    type: \'client-response\';\n    rpcId: RpcId;\n    result: RpcResult<unknown>;\n}',
   },
   {
+    name: 'CliIo',
+    declaration: 'export interface CliIo {\n    stdin: NodeJS.ReadableStream;\n    stdout: NodeJS.WritableStream;\n    stderr: NodeJS.WritableStream;\n    isTTY: boolean;\n}',
+  },
+  {
     name: 'CodeBindingErrorClass',
     declaration: 'export interface CodeBindingErrorClass {\n    name: string;\n    memberNameProperty: string;\n}',
   },
@@ -3043,6 +3094,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface FinishReasonMap {\n    \'stop\': {\n        kind: \'stop\';\n    };\n    \'tool-calls\': {\n        kind: \'tool-calls\';\n    };\n    \'max-tokens\': {\n        kind: \'max-tokens\';\n    };\n    \'aborted\': {\n        kind: \'aborted\';\n        failure: LlmFailure;\n    };\n    \'error\': {\n        kind: \'error\';\n        failure: LlmFailure;\n    };\n}',
   },
   {
+    name: 'FirstRunChoice',
+    declaration: 'export type FirstRunChoice = {\n    kind: \'ollama-local\';\n    model: string;\n} | {\n    kind: \'template\';\n    provider: string;\n    apiKey?: string;\n    model?: string;\n} | {\n    kind: \'custom\';\n    provider: string;\n    baseURL: string;\n    api?: string;\n    apiKey?: string;\n    model: string;\n    displayName?: string;\n};',
+  },
+  {
+    name: 'FirstRunResolvedConfig',
+    declaration: 'export interface FirstRunResolvedConfig {\n    ollamaBaseURL: string;\n    detectTimeoutMs: number;\n    autoRunCli: boolean;\n}',
+  },
+  {
     name: 'FsDirEntry',
     declaration: 'export interface FsDirEntry {\n    name: string;\n    type: \'file\' | \'directory\' | \'other\';\n    target: FsTarget;\n    version?: FsVersion;\n    size?: number;\n}',
   },
@@ -3315,6 +3374,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export class LlmRuntime extends Service {\n    constructor(ctx: Context);\n    registerAdapter(providers: string[], adapter: LlmAdapter): AdapterRegistrationHandle;\n    listProviders(): LlmProviderInfo[];\n    registerConfigurableProviders(entries: readonly LlmConfigurableProvider[]): DirectoryRegistrationHandle;\n    listConfigurableProviders(): LlmConfigurableProvider[];\n    registerModelDiscovery(settingsNs: string, discover: (request: LlmModelDiscoveryRequest) => Promise<readonly LlmDiscoveredModel[]>): () => void;\n    async discoverModels(settingsNs: string, request: LlmModelDiscoveryRequest): Promise<LlmDiscoveredModel[]>;\n    providerRetryPolicy(provider: string): ResolvedRetryPolicy;\n    async listModels(provider: string): Promise<LlmModelInfo[]>;\n    async resolveModelInfo(provider: string, model: string, signal?: AbortSignal): Promise<LlmResolvedModelInfo>;\n    async resolveCallConfig(config: LlmCallConfig, signal?: AbortSignal): Promise<LlmCallConfig>;\n    async prepareCall(config: LlmCallConfig, signal?: AbortSignal): Promise<PreparedLlmCall>;\n    stream(options: GenerateOptions): AsyncIterable<StreamChunk>;\n}',
   },
   {
+    name: 'LocalOllamaStatus',
+    declaration: 'export interface LocalOllamaStatus {\n    reachable: boolean;\n    models: readonly LlmDiscoveredModel[];\n}',
+  },
+  {
     name: 'LspHover',
     declaration: 'export interface LspHover {\n    readonly contents: string;\n    readonly range?: LspRange;\n}',
   },
@@ -3473,6 +3536,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'PermissionSelect',
     declaration: 'export interface PermissionSelect {\n    options: PresetOption[];\n    currentValue: string;\n}',
+  },
+  {
+    name: 'PickerOption',
+    declaration: 'export type PickerOption = {\n    kind: \'ollama-local\';\n    provider: \'ollama-local\';\n    model: string;\n    name: string;\n} | {\n    kind: \'template\';\n    provider: string;\n    label: string;\n    apiKeyEnv?: string;\n    defaultModel: string;\n} | {\n    kind: \'custom\';\n};',
   },
   {
     name: 'PostToolDecision',
@@ -4249,6 +4316,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'TableValueOf',
     declaration: 'export type TableValueOf<S extends DomainSpec, N extends keyof S[\'tables\']> = S[\'tables\'][N] extends DomainTableSpec<string, infer V> ? V : never;',
+  },
+  {
+    name: 'TemplateRoute',
+    declaration: 'export interface TemplateRoute {\n    provider: string;\n    label: string;\n    apiKeyEnv?: string;\n    defaultModel: string;\n}',
   },
   {
     name: 'TerminalBackend',

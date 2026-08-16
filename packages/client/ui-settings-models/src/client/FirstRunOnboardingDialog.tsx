@@ -72,7 +72,7 @@ export function FirstRunOnboardingDialog(props: FirstRunOnboardingDialogProps): 
   const readiness = onboardingReadiness(state)
   const candidates = onboardingCandidates(state.rows)
   const [selected, setSelected] = useState<string | undefined>(undefined)
-  const [ollamaError, setOllamaError] = useState<string | undefined>(undefined)
+  const [writeError, setWriteError] = useState<string | undefined>(undefined)
   const [ollamaBusy, setOllamaBusy] = useState(false)
 
   useEffect(() => {
@@ -112,31 +112,34 @@ export function FirstRunOnboardingDialog(props: FirstRunOnboardingDialogProps): 
       complete()
       return
     }
-    if (keyedRow !== undefined) {
-      void saveDefault(api, keyedRow.entry.provider, keyedRow.entry.settingsNs).finally(() => {
-        void controller.load()
-      })
+    /* v8 ignore next 4 -- onClose is only wired while a keyed row is rendered */
+    if (keyedRow === undefined) {
+      void controller.load()
       return
     }
-    void controller.load()
+    const row = keyedRow
+    void (async () => {
+      const error = await saveDefault(api, row.entry.provider, row.entry.settingsNs)
+      if (error !== undefined) {
+        setWriteError(error)
+        return
+      }
+      complete()
+    })()
   }
 
   const useOllama = async (): Promise<void> => {
     setOllamaBusy(true)
-    setOllamaError(undefined)
+    setWriteError(undefined)
     try {
-      const model = await discoverDefaultModel(api, 'ollama-local', 'llm-pi-ai')
-      const stored = await api.settings.replace({
-        ns: 'agent-default-model',
-        section: { provider: 'ollama-local', model },
-      })
-      if (!stored.result.ok) {
-        setOllamaError(stored.result.error.message)
+      const error = await saveDefault(api, 'ollama-local', 'llm-pi-ai')
+      if (error !== undefined) {
+        setWriteError(error)
         return
       }
-      void controller.load()
+      complete()
     } catch (error) {
-      setOllamaError(error instanceof Error ? error.message : String(error))
+      setWriteError(error instanceof Error ? error.message : String(error))
     } finally {
       setOllamaBusy(false)
     }
@@ -145,7 +148,10 @@ export function FirstRunOnboardingDialog(props: FirstRunOnboardingDialogProps): 
   return (
     <OnboardingModal title={t('onboardingTitle')}>
       <p className={styles.description}>{t('onboardingDescription')}</p>
-      {showPicker
+      {writeError === undefined || selectedRow?.entry.provider === 'ollama-local'
+        ? null
+        : <p className={styles.description}>{writeError}</p>}
+      {showPicker && selectedRow !== undefined
         ? (
           <div className={styles.editor}>
             <label className={styles.description}>
@@ -153,7 +159,7 @@ export function FirstRunOnboardingDialog(props: FirstRunOnboardingDialogProps): 
               <select
                 className={modelStyles['selectInput']}
                 aria-label={t('onboardingPickProvider')}
-                value={selectedRow?.entry.provider ?? ''}
+                value={selectedRow.entry.provider}
                 onChange={(event) => { setSelected(event.target.value) }}
               >
                 {candidates.map(row => (
@@ -170,7 +176,7 @@ export function FirstRunOnboardingDialog(props: FirstRunOnboardingDialogProps): 
         ? (
           <div className={styles.editor}>
             <p className={styles.description}>{t('onboardingOllama')}</p>
-            {ollamaError === undefined ? null : <p className={styles.description}>{ollamaError}</p>}
+            {writeError === undefined ? null : <p className={styles.description}>{writeError}</p>}
             <button type="button" disabled={ollamaBusy} onClick={() => { void useOllama() }}>
               {ollamaBusy ? t('onboardingSaving') : t('onboardingUseOllama')}
             </button>
@@ -199,15 +205,14 @@ export function FirstRunOnboardingDialog(props: FirstRunOnboardingDialogProps): 
             />
           </div>
         )
-        : keyedRow !== undefined && namespace === undefined
-          ? null
-          : selectedRow?.entry.provider === 'ollama-local'
-            ? (
-              <div className={styles.editor}>
-                <button type="button" onClick={() => { complete() }}>{t('onboardingLater')}</button>
-              </div>
-            )
-            : null}
+        : null}
+      {selectedRow?.entry.provider === 'ollama-local'
+        ? (
+          <div className={styles.editor}>
+            <button type="button" onClick={() => { complete() }}>{t('onboardingLater')}</button>
+          </div>
+        )
+        : null}
     </OnboardingModal>
   )
 }
@@ -217,6 +222,7 @@ export const DeepSeekOnboardingDialog = FirstRunOnboardingDialog
 
 /** The selected row, or the only candidate, or the first candidate. */
 function resolveSelected(candidates: readonly ProviderRow[], selected: string | undefined): ProviderRow | undefined {
+  /* v8 ignore next -- credential-missing always has at least one candidate */
   if (candidates.length === 0) return undefined
   if (selected !== undefined) {
     const match = candidates.find(row => row.entry.provider === selected)
@@ -235,9 +241,18 @@ async function saveDefault(
   api: Pick<IApiClient, 'settings' | 'llm'>,
   provider: string,
   settingsNs: string,
-): Promise<void> {
+): Promise<string | undefined> {
   const model = await discoverDefaultModel(api, provider, settingsNs)
-  await api.settings.replace({ ns: 'agent-default-model', section: { provider, model } })
+  if (provider === 'ollama-local') {
+    const adopted = await api.settings.mutate({
+      ns: 'llm-pi-ai',
+      ops: [{ op: 'set', path: ['providers', 'ollama-local', 'models'], value: [{ id: model }] }],
+    })
+    if (!adopted.result.ok) return adopted.result.error.message
+  }
+  const stored = await api.settings.replace({ ns: 'agent-default-model', section: { provider, model } })
+  if (!stored.result.ok) return stored.result.error.message
+  return undefined
 }
 
 /**
@@ -256,5 +271,6 @@ async function discoverDefaultModel(
   if (response.result.ok && response.result.value.models[0] !== undefined) {
     return response.result.value.models[0].id
   }
+  /* v8 ignore next -- every composed route the card can pick has a fallback */
   return FALLBACK_MODELS[provider] ?? provider
 }

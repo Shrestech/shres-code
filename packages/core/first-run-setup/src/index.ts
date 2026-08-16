@@ -25,7 +25,7 @@ export type {
 } from './types.ts'
 export { detectLocalOllama } from './detect.ts'
 export { applyChoice, deriveKeyRef } from './apply-choice.ts'
-export { formatMenu, numberOptions, runCliPicker } from './cli.ts'
+export { formatMenu, numberOptions, readSecret, runCliPicker } from './cli.ts'
 export { hasUserSelection, isDefaultUsable, listPickerOptions, noProviderError, TEMPLATE_ROUTES } from './options.ts'
 
 declare module '@roos-code/cordis' {
@@ -61,6 +61,16 @@ export const name = 'first-run-setup'
 /** Services required before the picker can read a default or list routes. */
 export const inject = ['agentDefaultModel', 'llm']
 
+/** Validated plugin config after schema defaults. */
+export interface FirstRunResolvedConfig {
+  /** OpenAI-compatible base URL used to probe local Ollama. */
+  ollamaBaseURL: string
+  /** Abort the local-Ollama GET after this many milliseconds. */
+  detectTimeoutMs: number
+  /** Whether {@link apply} runs the CLI picker during mount. */
+  autoRunCli: boolean
+}
+
 /** Runtime schema for {@link Config}. */
 export const Config: z<Config> = z.object({
   ollamaBaseURL: z.string().default(DEFAULT_OLLAMA_BASE_URL),
@@ -73,8 +83,23 @@ export const Config: z<Config> = z.object({
  * readiness rules from the Models join; this service is the host-side writer.
  */
 export class FirstRunSetup extends Service {
+  /** In-flight or completed local-Ollama probe shared by needsSetup and listOptions. */
+  private probe: Promise<LocalOllamaStatus> | undefined
+
   constructor(ctx: Context, private readonly config: Config) {
     super(ctx, 'firstRunSetup')
+  }
+
+  /**
+   * The resolved plugin config after schema defaults.
+   * @returns a detached copy of the validated config.
+   */
+  resolvedConfig(): FirstRunResolvedConfig {
+    return {
+      ollamaBaseURL: this.config.ollamaBaseURL,
+      detectTimeoutMs: this.config.detectTimeoutMs,
+      autoRunCli: this.config.autoRunCli,
+    }
   }
 
   /**
@@ -82,10 +107,20 @@ export class FirstRunSetup extends Service {
    * @returns advertised models, or `reachable: false` when the endpoint is down.
    */
   detectLocalOllama(): Promise<LocalOllamaStatus> {
-    return detectLocalOllama({
+    this.probe = detectLocalOllama({
       baseURL: this.config.ollamaBaseURL,
       timeoutMs: this.config.detectTimeoutMs,
     })
+    return this.probe
+  }
+
+  /** One probe per setup attempt; `listOptions` reuses `needsSetup`'s result. */
+  private cachedProbe(): Promise<LocalOllamaStatus> {
+    this.probe ??= detectLocalOllama({
+      baseURL: this.config.ollamaBaseURL,
+      timeoutMs: this.config.detectTimeoutMs,
+    })
+    return this.probe
   }
 
   /**
@@ -103,7 +138,12 @@ export class FirstRunSetup extends Service {
    */
   async needsSetup(): Promise<boolean> {
     if (hasUserSelection(this.ctx)) return false
-    const ollama = await this.detectLocalOllama()
+    const selection = this.ctx.get('agentDefaultModel')?.currentSelection()
+    // A non-Ollama default that already has its key does not need a probe.
+    if (selection !== undefined && selection.provider !== 'ollama-local') {
+      if (await isDefaultUsable(this.ctx, { reachable: false, models: [] })) return false
+    }
+    const ollama = await this.cachedProbe()
     return !(await isDefaultUsable(this.ctx, ollama))
   }
 
@@ -112,7 +152,7 @@ export class FirstRunSetup extends Service {
    * @returns picker options in print order.
    */
   async listOptions(): Promise<readonly PickerOption[]> {
-    return listPickerOptions(await this.detectLocalOllama())
+    return listPickerOptions(await this.cachedProbe())
   }
 
   /**
@@ -137,6 +177,11 @@ export class FirstRunSetup extends Service {
 
 /** Process streams for a production CLI run. Prompts use stderr. */
 export function defaultIo(): CliIo {
+  return internals.io()
+}
+
+/** Production stdin/stderr pair; tests replace {@link internals.io}. */
+export function processIo(): CliIo {
   return {
     stdin: process.stdin,
     stdout: process.stderr,
@@ -147,6 +192,15 @@ export function defaultIo(): CliIo {
 }
 
 /**
+ * Process-facing IO for {@link apply}'s `autoRunCli` path and {@link defaultIo}.
+ * Tests replace `io` to drive `autoRunCli: true` without touching process.stdin.
+ */
+export const internals = {
+  /** Factory for the CLI streams `apply` and {@link defaultIo} use. */
+  io: processIo,
+}
+
+/**
  * Mount the first-run service. Optional `autoRunCli` runs the picker during
  * apply; headless instead calls `ensureReady` after the loader settles.
  * @param ctx - plugin context.
@@ -154,7 +208,5 @@ export function defaultIo(): CliIo {
  */
 export async function apply(ctx: Context, config: Config): Promise<void> {
   const setup = new FirstRunSetup(ctx, config)
-  if (config.autoRunCli) await setup.ensureReady()
+  if (config.autoRunCli) await setup.ensureReady(internals.io())
 }
-
-export default apply

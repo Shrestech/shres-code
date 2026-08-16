@@ -33,6 +33,9 @@ export async function detectLocalOllama(options: DetectLocalOllamaOptions): Prom
     })
     return { reachable: true, models }
   } catch {
+    // discoverModels throws on timeout/abort, connect failure, non-2xx, or a
+    // non-listing body (DISCOVERY_FAILED). Every one of those means the
+    // endpoint is not usable for first-run; nothing else reaches this catch.
     return { reachable: false, models: [] }
   } finally {
     clearTimeout(timer)
