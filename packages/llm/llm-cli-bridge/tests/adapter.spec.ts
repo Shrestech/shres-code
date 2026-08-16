@@ -178,6 +178,19 @@ describe('CliLlmAdapter', () => {
     expect(spec.cwd).toBe('/tmp/ws')
   })
 
+  it('injects a resolved credential into spawn env', async () => {
+    const spawn = vi.fn((_spec: SubprocessSpawnSpec) => fakeChild())
+    const adapter = new CliLlmAdapter({
+      routes: () => resolveRoutes({ 'grok-cli': { apiKeyEnv: 'XAI_API_KEY' } }),
+      spawn,
+      cwd: () => '/tmp/ws',
+      disposeGraceMs: () => 3000,
+      resolveEnv: async route => ({ ...route.env, XAI_API_KEY: 'from-seam' }),
+    })
+    await collect(adapter.stream(options()))
+    expect(spawn.mock.calls[0]![0].env).toEqual({ XAI_API_KEY: 'from-seam' })
+  })
+
   it('throws UNSUPPORTED_OPTION when tools are present without allowDelegatedTools', async () => {
     const routes = resolveRoutes({
       'grok-cli': { allowDelegatedTools: false },
@@ -425,6 +438,10 @@ describe('parse, serialize, and resolveRoutes', () => {
       .toBeUndefined()
     expect(resolveRoutes({ 'grok-cli': { models: [{ id: 'only-id' }] } }).get('grok-cli')?.models)
       .toEqual([{ id: 'only-id' }])
+    expect(resolveRoutes({ 'grok-cli': { displayName: 'Grok' } }).get('grok-cli')?.apiKeyEnv)
+      .toBe('XAI_API_KEY')
+    expect(resolveRoutes({ extra: { displayName: 'E', binary: 'e', apiKeyEnv: 'CUSTOM_KEY' } })
+      .get('extra')?.apiKeyEnv).toBe('CUSTOM_KEY')
     expect(() => resolveRoutes({ extra: { displayName: 'X' } })).toThrow('displayName and binary')
     expect(() => resolveRoutes({ 'grok-cli': { efforts: [''] } })).toThrow('effort ids')
     expect(() => resolveRoutes({ 'grok-cli': { models: [{ id: '' }] } })).toThrow('model ids')
@@ -571,5 +588,56 @@ describe('plugin registration', () => {
       '@roos-code/roos-code-llm-cli-bridge',
       expect.any(Function),
     )
+  })
+})
+
+describe('resolveRouteEnv', () => {
+  it('returns the route overlay when no credential is named', async () => {
+    const ctx = new Context()
+    await expect(plugin.resolveRouteEnv(ctx, {
+      ...SHIPPED_ROUTES['grok-cli'],
+      apiKeyEnv: undefined,
+    })).resolves.toEqual({})
+    await expect(plugin.resolveRouteEnv(ctx, {
+      ...SHIPPED_ROUTES['grok-cli'],
+      apiKeyEnv: '',
+      env: { FLAG: '1' },
+    })).resolves.toEqual({ FLAG: '1' })
+  })
+
+  it('injects a credentials-seam secret and skips an empty named ref', async () => {
+    const keyed = new Context()
+    keyed.provide('credentials', {
+      resolve: async () => ({ value: 'sk-live', source: 'file' }),
+    })
+    await expect(plugin.resolveRouteEnv(keyed, SHIPPED_ROUTES['grok-cli']))
+      .resolves.toEqual({ XAI_API_KEY: 'sk-live' })
+
+    const missing = new Context()
+    missing.provide('credentials', {
+      resolve: async () => undefined,
+    })
+    await expect(plugin.resolveRouteEnv(missing, SHIPPED_ROUTES['grok-cli']))
+      .resolves.toEqual({})
+
+    const blank = new Context()
+    blank.provide('credentials', {
+      resolve: async () => ({ value: '', source: 'file' }),
+    })
+    await expect(plugin.resolveRouteEnv(blank, SHIPPED_ROUTES['grok-cli']))
+      .resolves.toEqual({})
+  })
+
+  it('reads the launch environment when the credentials seam is absent', async () => {
+    const previous = process.env.XAI_API_KEY
+    process.env.XAI_API_KEY = 'from-launch'
+    try {
+      const ctx = new Context()
+      await expect(plugin.resolveRouteEnv(ctx, SHIPPED_ROUTES['grok-cli']))
+        .resolves.toEqual({ XAI_API_KEY: 'from-launch' })
+    } finally {
+      if (previous === undefined) delete process.env.XAI_API_KEY
+      else process.env.XAI_API_KEY = previous
+    }
   })
 })

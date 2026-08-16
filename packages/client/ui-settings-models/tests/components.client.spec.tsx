@@ -9,7 +9,7 @@ import {
   ModelsSection, needsSetup, providerCopy, providerTargetLabel, removeProviderProfile,
 } from '../src/client/ModelsSection.tsx'
 import type { ModelsSectionInjected, ModelsSectionProps } from '../src/client/ModelsSection.tsx'
-import { pathOps } from '../src/client/ProviderEditor.tsx'
+import { pathOps, ProviderEditor } from '../src/client/ProviderEditor.tsx'
 import {
   DeepSeekModelsEditor, formatCapacity, modelDrafts, parseCapacity, validateDeepSeekModels,
 } from '../src/client/DeepSeekModelsEditor.tsx'
@@ -232,7 +232,7 @@ describe('ModelsSection', () => {
     expect(document.body.textContent).toBe('')
   })
 
-  it('shows a stock delegated route with a Delegated tag and writes route env', async () => {
+  it('shows a stock delegated route with a Delegated tag and stores the key through credentials', async () => {
     const scripted = scriptedFace()
     const namespaces: SettingsNamespaceView[] = [
       ...wireNamespaces(),
@@ -242,7 +242,7 @@ describe('ModelsSection', () => {
           routes: Schema.dict(Schema.object({
             displayName: Schema.string(),
             binary: Schema.string(),
-            env: Schema.dict(Schema.string()),
+            apiKeyEnv: Schema.string().role('credential-ref'),
           })),
           disposeGraceMs: Schema.number(),
         }).toJSON())) as unknown,
@@ -277,11 +277,8 @@ describe('ModelsSection', () => {
         displayName: 'Grok Build CLI (delegated)',
       }),
     }))
-    expect(screen.getByLabelText(en.cliEnv)).toBeTruthy()
-    fireEvent.change(screen.getByLabelText(en.cliEnvValue), { target: { value: 'xai-key' } })
-    fireEvent.change(screen.getByLabelText(en.cliEnvValue), { target: { value: '' } })
-    fireEvent.change(screen.getByLabelText(en.cliEnvValue), { target: { value: 'xai-key' } })
-    fireEvent.change(screen.getByLabelText(en.cliEnv), { target: { value: 'CUSTOM_KEY' } })
+    expect(screen.getByLabelText(en.keyInput)).toBeTruthy()
+    fireEvent.change(screen.getByLabelText(en.keyInput), { target: { value: 'xai-key' } })
     fireEvent.change(screen.getByLabelText(en.cliBinary), { target: { value: '/usr/bin/grok' } })
     fireEvent.click(screen.getByRole('button', { name: en.apply }))
     await waitFor(() => {
@@ -290,20 +287,32 @@ describe('ModelsSection', () => {
     const payload = scripted.mutate.mock.calls[0]![0] as { ops: { path: string[]; value?: unknown }[] }
     expect(payload.ops).toEqual(expect.arrayContaining([
       expect.objectContaining({
-        path: ['routes', 'grok-cli', 'env'],
-        value: { CUSTOM_KEY: 'xai-key' },
+        path: ['routes', 'grok-cli', 'apiKeyEnv'],
+        value: 'XAI_API_KEY',
       }),
       expect.objectContaining({
         path: ['routes', 'grok-cli', 'binary'],
         value: '/usr/bin/grok',
       }),
     ]))
+    expect(payload.ops.some(op => op.path.includes('env'))).toBe(false)
+    expect(scripted.set).toHaveBeenCalledWith({ ref: 'XAI_API_KEY', value: 'xai-key' })
+
+    fireEvent.click(await screen.findByRole('button', {
+      name: providerCopy(en.editProvider, {
+        provider: 'grok-cli',
+        displayName: 'Grok Build CLI (delegated)',
+      }),
+    }))
+    fireEvent.change(screen.getByLabelText(en.keyInput), { target: { value: 'NAME=value' } })
+    expect(screen.getByText(en.keyIllegalCharacters)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: en.cancel }))
 
     for (const entry of [
       { provider: 'kimi-cli', displayName: 'Kimi', key: 'MOONSHOT_API_KEY' },
       { provider: 'claude-cli', displayName: 'Claude', key: 'ANTHROPIC_API_KEY' },
       { provider: 'codex-cli', displayName: 'Codex', key: 'OPENAI_API_KEY' },
-      { provider: 'extra-cli', displayName: 'Extra', key: 'API_KEY' },
+      { provider: 'extra-cli', displayName: 'Extra', key: 'EXTRA_CLI_API_KEY' },
     ]) {
       scripted.face.llm.providers.mockImplementation(() => Promise.resolve(ok({
         providers: [{
@@ -322,9 +331,65 @@ describe('ModelsSection', () => {
           displayName: entry.displayName,
         }),
       }))
-      expect((screen.getByLabelText(en.cliEnv) as HTMLInputElement).placeholder).toBe(entry.key)
+      await waitFor(() => {
+        expect(scripted.face.credentials.describe).toHaveBeenCalledWith({ refs: [entry.key] })
+      })
       fireEvent.click(screen.getByRole('button', { name: en.cancel }))
     }
+  })
+
+  it('locks a launch-environment CLI key and hides binary in credential-only mode', async () => {
+    const namespace: SettingsNamespaceView = {
+      ns: 'llm-cli-bridge',
+      schema: JSON.parse(JSON.stringify(Schema.object({
+        routes: Schema.dict(Schema.object({
+          displayName: Schema.string(),
+          binary: Schema.string(),
+          apiKeyEnv: Schema.string().role('credential-ref'),
+        })),
+      }).toJSON())) as unknown,
+      value: {},
+      applies: 'live',
+      secrets: [],
+      revision: 0,
+    }
+    const api = {
+      settings: { mutate: vi.fn() },
+      credentials: {
+        describe: vi.fn(() => Promise.resolve(ok({
+          credentials: { XAI_API_KEY: { configured: true, source: 'env', writable: false } },
+        }))),
+        set: vi.fn(),
+      },
+      llm: { providers: vi.fn(), models: vi.fn() },
+    }
+    render(<ProviderEditor
+      provider="grok-cli"
+      displayName="Grok"
+      namespace={namespace}
+      settingsPath={['routes', 'grok-cli']}
+      api={api as never}
+      t={t}
+      readOnly={false}
+      onClose={vi.fn()}
+    />)
+    await waitFor(() => {
+      expect((screen.getByLabelText(en.keyInput) as HTMLInputElement).placeholder).toBe(en.keyEnvLocked)
+    })
+    expect(screen.getByLabelText(en.cliBinary)).toBeTruthy()
+    cleanup()
+    render(<ProviderEditor
+      provider="grok-cli"
+      displayName="Grok"
+      namespace={namespace}
+      settingsPath={['routes', 'grok-cli']}
+      api={api as never}
+      t={t}
+      readOnly={false}
+      credentialOnly
+      onClose={vi.fn()}
+    />)
+    expect(screen.queryByLabelText(en.cliBinary)).toBeNull()
   })
 
   it('renders the unkeyed whole-section provider as an open setup card in the first-run posture', async () => {

@@ -58,6 +58,11 @@ export interface CliBridgeRoute {
   /** Explicit child env layered after the subprocess scrub. */
   env: Record<string, string>
   /**
+   * Credential reference (and child env var name) resolved through the
+   * credentials seam. The secret is never stored in this section.
+   */
+  apiKeyEnv?: string
+  /**
    * When true, a non-empty `GenerateOptions.tools` is allowed because the
    * CLI will run its own tools. When false, that request throws
    * `UNSUPPORTED_OPTION`.
@@ -90,7 +95,8 @@ const routeSchema = z.object({
   promptStyle: z.union(['flag', 'trailing']),
   promptArg: z.string(),
   parseMode: z.union(['json', 'stream-json']),
-  env: z.dict(z.string()),
+  env: z.dict(z.string().role('secret')),
+  apiKeyEnv: z.string().role('credential-ref'),
   allowDelegatedTools: z.boolean(),
   contextWindow: z.number().step(1).min(1),
   defaultMaxTokens: z.number().step(1).min(1),
@@ -143,6 +149,7 @@ export const SHIPPED_ROUTES: Record<ShippedRouteId, CliBridgeRoute> = {
     promptArg: '-p',
     parseMode: 'json',
     env: {},
+    apiKeyEnv: 'ANTHROPIC_API_KEY',
     allowDelegatedTools: true,
     contextWindow: DEFAULT_CONTEXT_WINDOW,
     defaultMaxTokens: DEFAULT_MAX_TOKENS,
@@ -159,6 +166,7 @@ export const SHIPPED_ROUTES: Record<ShippedRouteId, CliBridgeRoute> = {
     promptStyle: 'trailing',
     parseMode: 'stream-json',
     env: {},
+    apiKeyEnv: 'OPENAI_API_KEY',
     allowDelegatedTools: true,
     contextWindow: DEFAULT_CONTEXT_WINDOW,
     defaultMaxTokens: DEFAULT_MAX_TOKENS,
@@ -176,6 +184,7 @@ export const SHIPPED_ROUTES: Record<ShippedRouteId, CliBridgeRoute> = {
     promptArg: '-p',
     parseMode: 'json',
     env: {},
+    apiKeyEnv: 'XAI_API_KEY',
     allowDelegatedTools: true,
     contextWindow: DEFAULT_CONTEXT_WINDOW,
     defaultMaxTokens: DEFAULT_MAX_TOKENS,
@@ -192,6 +201,7 @@ export const SHIPPED_ROUTES: Record<ShippedRouteId, CliBridgeRoute> = {
     promptArg: '-p',
     parseMode: 'stream-json',
     env: {},
+    apiKeyEnv: 'MOONSHOT_API_KEY',
     allowDelegatedTools: true,
     contextWindow: DEFAULT_CONTEXT_WINDOW,
     defaultMaxTokens: DEFAULT_MAX_TOKENS,
@@ -263,6 +273,9 @@ function mergeRoute(base: CliBridgeRoute, overlay: Partial<CliBridgeRoute> | und
       : { promptArg: overlay.promptArg ?? base.promptArg }),
     parseMode: overlay.parseMode ?? base.parseMode,
     env: { ...env },
+    ...((overlay.apiKeyEnv ?? base.apiKeyEnv) === undefined
+      ? {}
+      : { apiKeyEnv: overlay.apiKeyEnv ?? base.apiKeyEnv }),
     allowDelegatedTools: overlay.allowDelegatedTools ?? base.allowDelegatedTools,
     contextWindow: overlay.contextWindow ?? base.contextWindow,
     defaultMaxTokens: overlay.defaultMaxTokens ?? base.defaultMaxTokens,

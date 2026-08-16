@@ -37,6 +37,11 @@ export interface CliLlmAdapterOptions {
   cwd: (sessionId?: GenerateOptions['sessionId']) => string
   /** Process-tree termination grace. */
   disposeGraceMs: () => number
+  /**
+   * Child env after the subprocess scrub. Resolves `apiKeyEnv` through the
+   * credentials seam so the secret never lives in settings.
+   */
+  resolveEnv?: (route: CliBridgeRoute) => Promise<Record<string, string>> | Record<string, string>
 }
 
 /**
@@ -110,6 +115,9 @@ export class CliLlmAdapter extends LlmAdapter {
       ...options.reasoningEffort === undefined ? {} : { effort: String(options.reasoningEffort) },
       prompt: serializePrompt(options),
     })
+    const env = this.options.resolveEnv === undefined
+      ? route.env
+      : await this.options.resolveEnv(route)
     const child = this.options.spawn({
       argv,
       cwd: this.options.cwd(options.sessionId),
@@ -119,7 +127,7 @@ export class CliLlmAdapter extends LlmAdapter {
         stderr: 'inherit',
       },
       graceMs: this.options.disposeGraceMs(),
-      env: route.env,
+      env,
       signal: options.signal,
     })
     const onAbort = (): void => { child.terminate() }

@@ -5337,9 +5337,15 @@ importers:
       '@roos-code/cordis':
         specifier: workspace:^
         version: link:../../../vendor/cordis
+      '@roos-code/roos-code-credentials':
+        specifier: workspace:^
+        version: link:../../credentials/credentials
       '@roos-code/roos-code-invariants':
         specifier: workspace:^
         version: link:../../runtime-diagnostics/invariants
+      '@roos-code/roos-code-launch-environment':
+        specifier: workspace:^
+        version: link:../../util/launch-environment
       '@roos-code/roos-code-llm':
         specifier: workspace:^
         version: link:../llm

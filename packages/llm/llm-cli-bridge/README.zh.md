@@ -23,7 +23,7 @@
 
 ## 配置
 
-可选的 `llm-cli-bridge` settings 分节覆盖组合条目。每条路由接受 `binary`、`modelArg`、`effortArg`、`effortStyle`、`env`、`allowDelegatedTools` 以及一份建议 `models` 列表。API 密钥只有通过该路由的 `env` 覆盖才会到达子进程。
+可选的 `llm-cli-bridge` settings 分节覆盖组合条目。每条路由接受 `binary`、`modelArg`、`effortArg`、`effortStyle`、`apiKeyEnv`、`allowDelegatedTools` 以及一份建议 `models` 列表。API 密钥经凭据缝以只写方式存在 `apiKeyEnv` 下；适配器在 subprocess 清除之后把解析出的密钥注入 spawn env。若仍存在 `env` 值，它们带 `role('secret')`，Models 卡片不会写入它们。
 
 ## Model Experience
 

@@ -141,7 +141,7 @@ function defaultCliEnvKey(provider: string): string {
     case 'codex-cli':
       return 'OPENAI_API_KEY'
     default:
-      return 'API_KEY'
+      return deriveKeyRef(provider)
   }
 }
 
@@ -151,7 +151,8 @@ function refFor(namespace: SettingsNamespaceView, path: readonly string[], provi
   const named = typeof profile === 'object' && profile !== null
     ? (profile as { apiKeyEnv?: unknown }).apiKeyEnv
     : undefined
-  return typeof named === 'string' && named.length > 0 ? named : deriveKeyRef(provider)
+  if (typeof named === 'string' && named.length > 0) return named
+  return namespace.ns === 'llm-cli-bridge' ? defaultCliEnvKey(provider) : deriveKeyRef(provider)
 }
 
 /**
@@ -255,7 +256,8 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
     const ns = namespace.ns
     // A pi-ai profile names the conventional reference only when this page is
     // about to store a key. Otherwise the provider keeps its native auth path.
-    const next = layout === 'pi-ai' && stringAt(draft, 'apiKeyEnv') === undefined
+    const next = (layout === 'pi-ai' || layout === 'cli-bridge')
+      && stringAt(draft, 'apiKeyEnv') === undefined
       && stringAt(fallback, 'apiKeyEnv') === undefined && keyValue.length > 0
       ? setPath(draft, ['apiKeyEnv'], keyRef)
       : draft
@@ -485,61 +487,45 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
   }
 
   const cliBridgeFields = (): ReactNode => {
-    const envRecord = (): Record<string, string> => {
-      const value = getPath(draft, ['env']) ?? getPath(fallback, ['env'])
-      if (typeof value !== 'object' || value === null || Array.isArray(value)) return {}
-      return value as Record<string, string>
-    }
-    const env = envRecord()
-    const entries = Object.entries(env)
-    const [envName, envValue] = entries[0] ?? [defaultCliEnvKey(props.provider), '']
-    const setEnv = (name: string, value: string): void => {
-      const key = name.trim()
-      setDraft((current) => {
-        if (key.length === 0 || value.length === 0) return deletePath(current, ['env'])
-        return setPath(current, ['env'], { [key]: value })
-      })
-    }
+    const keyPlaceholder = keyLocked
+      ? t('keyEnvLocked')
+      : keyState?.configured === true && props.credentialRequired !== true
+        ? t('keyStored')
+        : t('keyPlaceholder')
     return (
       <>
         <p className={styles['advancedHint']}>{t('delegatedHint')}</p>
         <div className={styles['field']}>
-          <span className={styles['fieldLabel']}>{t('cliBinary')}</span>
-          <input
-            className={styles['input']}
-            type="text"
-            value={stringAt(draft, 'binary') ?? ''}
-            placeholder={stringAt(fallback, 'binary') ?? props.provider}
-            aria-label={t('cliBinary')}
-            disabled={disabled}
-            onChange={(event) => { setField('binary', event.target.value) }}
-          />
-        </div>
-        <div className={styles['field']}>
-          <span className={styles['fieldLabel']}>{t('cliEnv')}</span>
-          <input
-            className={styles['input']}
-            type="text"
-            value={envName}
-            placeholder={defaultCliEnvKey(props.provider)}
-            aria-label={t('cliEnv')}
-            disabled={disabled}
-            onChange={(event) => { setEnv(event.target.value, envValue) }}
-          />
-        </div>
-        <div className={styles['field']}>
-          <span className={styles['fieldLabel']}>{t('cliEnvValue')}</span>
+          <span className={styles['fieldLabel']}>{t('keyInput')}</span>
           <input
             className={styles['input']}
             type="password"
             autoComplete="off"
-            value={hasPath(draft, ['env']) ? envValue : ''}
-            placeholder={t('cliEnvHint')}
-            aria-label={t('cliEnvValue')}
-            disabled={disabled}
-            onChange={(event) => { setEnv(envName, event.target.value) }}
+            value={keyDraft}
+            placeholder={keyPlaceholder}
+            aria-label={t('keyInput')}
+            aria-invalid={shownKeyFailure !== undefined}
+            required={props.credentialRequired === true}
+            autoFocus={props.autoFocusCredential === true}
+            disabled={disabled || keyLocked}
+            onChange={(event) => { setKeyDraft(event.target.value) }}
           />
+          {shownKeyFailure === undefined ? null : <p className={styles['error']}>{t(shownKeyFailure)}</p>}
         </div>
+        {props.credentialOnly === true ? null : (
+          <div className={styles['field']}>
+            <span className={styles['fieldLabel']}>{t('cliBinary')}</span>
+            <input
+              className={styles['input']}
+              type="text"
+              value={stringAt(draft, 'binary') ?? ''}
+              placeholder={stringAt(fallback, 'binary') ?? props.provider}
+              aria-label={t('cliBinary')}
+              disabled={disabled}
+              onChange={(event) => { setField('binary', event.target.value) }}
+            />
+          </div>
+        )}
       </>
     )
   }
@@ -574,7 +560,7 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
         busy={busy}
         submitDisabled={disabled || layout === 'unknown'
           || (props.credentialOnly !== true && layout !== 'cli-bridge' && modelFailure !== undefined)
-          || (layout !== 'cli-bridge' && shownKeyFailure !== undefined)
+          || shownKeyFailure !== undefined
           || (props.credentialRequired === true && keyValue.length === 0)}
         submitLabel={props.submitLabel ?? 'apply'}
         submitBusyLabel={props.submitBusyLabel ?? 'applying'}

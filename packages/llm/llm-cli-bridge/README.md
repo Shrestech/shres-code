@@ -23,7 +23,7 @@ A non-empty `GenerateOptions.tools` without that route's `allowDelegatedTools: t
 
 ## Configuration
 
-The optional `llm-cli-bridge` settings section overlays the composition entry. Each route accepts `binary`, `modelArg`, `effortArg`, `effortStyle`, `env`, `allowDelegatedTools`, and an advisory `models` list. An API key reaches the child only through that route's `env` overlay.
+The optional `llm-cli-bridge` settings section overlays the composition entry. Each route accepts `binary`, `modelArg`, `effortArg`, `effortStyle`, `apiKeyEnv`, `allowDelegatedTools`, and an advisory `models` list. An API key is stored write-only through the credentials seam under `apiKeyEnv`; the adapter injects the resolved secret into spawn env after the subprocess scrub. `env` values, if present, are `role('secret')` and are not written by the Models card.
 
 ## Model Experience
 

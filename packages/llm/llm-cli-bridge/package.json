@@ -32,7 +32,9 @@
   ],
   "license": "MIT",
   "peerDependencies": {
+    "@roos-code/roos-code-credentials": "workspace:^",
     "@roos-code/roos-code-invariants": "workspace:^",
+    "@roos-code/roos-code-launch-environment": "workspace:^",
     "@roos-code/roos-code-llm": "workspace:^",
     "@roos-code/roos-code-session": "workspace:^",
     "@roos-code/roos-code-settings": "workspace:^",
@@ -41,6 +43,12 @@
     "@roos-code/cordis": "workspace:^"
   },
   "peerDependenciesMeta": {
+    "@roos-code/roos-code-credentials": {
+      "optional": true
+    },
+    "@roos-code/roos-code-launch-environment": {
+      "optional": true
+    },
     "@roos-code/roos-code-session": {
       "optional": true
     },
@@ -55,7 +63,9 @@
     "@roos-code/schemastery": "workspace:^"
   },
   "devDependencies": {
+    "@roos-code/roos-code-credentials": "workspace:^",
     "@roos-code/roos-code-invariants": "workspace:^",
+    "@roos-code/roos-code-launch-environment": "workspace:^",
     "@roos-code/roos-code-llm": "workspace:^",
     "@roos-code/roos-code-session": "workspace:^",
     "@roos-code/roos-code-settings": "workspace:^",

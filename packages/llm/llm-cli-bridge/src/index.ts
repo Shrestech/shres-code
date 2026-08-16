@@ -9,6 +9,9 @@
 
 import type { Context } from '@roos-code/cordis'
 import { MAX_TIMER_DELAY_MS } from '@roos-code/roos-code-timeout'
+import { credentialRef } from '@roos-code/roos-code-credentials'
+import type {} from '@roos-code/roos-code-credentials'
+import { launchEnvironmentOf } from '@roos-code/roos-code-launch-environment'
 import type {
   AdapterRegistrationHandle,
   DirectoryRegistrationHandle,
@@ -126,6 +129,28 @@ function sessionWorkspaceCwd(ctx: Context, sessionId: GenerateOptions['sessionId
 }
 
 /**
+ * Build child env: copy the route overlay, then inject the named credential
+ * after the subprocess scrub so the secret never lives in settings.
+ * @param ctx - context that may carry credentials.
+ * @param route - resolved route.
+ * @returns env passed to spawn.
+ */
+export async function resolveRouteEnv(
+  ctx: Context,
+  route: CliBridgeRoute,
+): Promise<Record<string, string>> {
+  const env = { ...route.env }
+  const ref = route.apiKeyEnv
+  if (ref === undefined || ref.length === 0) return env
+  const credentials = ctx.get('credentials')
+  const secret = credentials !== undefined
+    ? (await credentials.resolve(credentialRef(ref)))?.value
+    : launchEnvironmentOf(ctx).get(ref)?.value
+  if (secret !== undefined && secret.length > 0) env[ref] = secret
+  return env
+}
+
+/**
  * Register one CLI-bridge adapter for all configured routes.
  * @param ctx - context carrying the llm service and optional settings/subprocess.
  * @param config - composition entry; settings overlay the route dict.
@@ -158,6 +183,7 @@ export function apply(ctx: Context, config: Config): void {
     },
     cwd: sessionId => sessionWorkspaceCwd(ctx, sessionId),
     disposeGraceMs: () => readDisposeGraceMs(current().disposeGraceMs),
+    resolveEnv: route => resolveRouteEnv(ctx, route),
   })
 
   let directory: DirectoryRegistrationHandle | undefined
