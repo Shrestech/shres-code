@@ -8,162 +8,162 @@ The roos-base bundle patch every profile applies first; mode bundles (roos-web-a
 ```mermaid
 flowchart LR
   cfg["packages/bundle/base/cordis.patch.yml<br/>cordis.yml"]
-  plugin_dsh_base_timer["timer<br/>@roos-code/cordis-plugin-timer"]
-  cfg --> plugin_dsh_base_timer
-  plugin_dsh_base_hmr["hmr<br/>@roos-code/cordis-plugin-hmr"]
-  cfg --> plugin_dsh_base_hmr
-  plugin_dsh_base_llm["llm<br/>@roos-code/roos-code-llm"]
-  cfg --> plugin_dsh_base_llm
-  plugin_dsh_base_session["session<br/>@roos-code/roos-code-session"]
-  cfg --> plugin_dsh_base_session
-  plugin_dsh_base_typert["typert<br/>@roos-code/roos-code-typert-registry"]
-  cfg --> plugin_dsh_base_typert
-  plugin_dsh_base_typert_loader["typert-loader<br/>@roos-code/roos-code-typert-loader"]
-  cfg --> plugin_dsh_base_typert_loader
-  plugin_dsh_base_typert_gateway["typert-gateway<br/>@roos-code/roos-code-api-gateway"]
-  cfg --> plugin_dsh_base_typert_gateway
-  plugin_dsh_base_session_title["session-title<br/>@roos-code/roos-code-session-title"]
-  cfg --> plugin_dsh_base_session_title
-  plugin_dsh_base_session_title_llm["session-title-llm<br/>@roos-code/roos-code-session-title-first-prompt-llm"]
-  cfg --> plugin_dsh_base_session_title_llm
-  plugin_dsh_base_user_questions["user-questions<br/>@roos-code/roos-code-user-questions"]
-  cfg --> plugin_dsh_base_user_questions
-  plugin_dsh_base_agent["agent<br/>@roos-code/roos-code-agent"]
-  cfg --> plugin_dsh_base_agent
-  plugin_dsh_base_agent_default_model["agent-default-model<br/>@roos-code/roos-code-agent-default-model"]
-  cfg --> plugin_dsh_base_agent_default_model
-  plugin_dsh_base_jobs["jobs<br/>@roos-code/roos-code-jobs-local"]
-  cfg --> plugin_dsh_base_jobs
-  plugin_dsh_base_llm_retry["llm-retry<br/>@roos-code/roos-code-llm-retry"]
-  cfg --> plugin_dsh_base_llm_retry
-  plugin_dsh_base_settings["settings<br/>@roos-code/roos-code-settings-file"]
-  cfg --> plugin_dsh_base_settings
-  plugin_dsh_base_credentials["credentials<br/>@roos-code/roos-code-credentials-local"]
-  cfg --> plugin_dsh_base_credentials
-  plugin_dsh_base_llm_pi_ai["llm-pi-ai<br/>@roos-code/roos-code-llm-pi-ai"]
-  cfg --> plugin_dsh_base_llm_pi_ai
-  plugin_dsh_base_session_persistence_jsonl["session-persistence-jsonl<br/>@roos-code/roos-code-session-persistence-jsonl"]
-  cfg --> plugin_dsh_base_session_persistence_jsonl
-  plugin_dsh_base_attachment_local["attachment-local<br/>@roos-code/roos-code-attachment-local"]
-  cfg --> plugin_dsh_base_attachment_local
-  plugin_dsh_base_session_query_sqlite["session-query-sqlite<br/>@roos-code/roos-code-session-query-sqlite"]
-  cfg --> plugin_dsh_base_session_query_sqlite
-  plugin_dsh_base_session_projection["session-projection<br/>@roos-code/roos-code-session-projection"]
-  cfg --> plugin_dsh_base_session_projection
-  plugin_dsh_base_session_telemetry_otel["session-telemetry-otel<br/>@roos-code/roos-code-session-telemetry-otel"]
-  cfg --> plugin_dsh_base_session_telemetry_otel
-  plugin_dsh_base_subprocess["subprocess<br/>@roos-code/roos-code-subprocess-local"]
-  cfg --> plugin_dsh_base_subprocess
-  plugin_dsh_base_sandbox["sandbox<br/>@roos-code/roos-code-sandbox-local"]
-  cfg --> plugin_dsh_base_sandbox
-  plugin_dsh_base_sandbox_policy["sandbox-policy<br/>@roos-code/roos-code-sandbox-policy"]
-  cfg --> plugin_dsh_base_sandbox_policy
-  plugin_dsh_base_bash_sandbox["bash-sandbox<br/>@roos-code/roos-code-bash-sandbox"]
-  cfg --> plugin_dsh_base_bash_sandbox
-  plugin_dsh_base_pwsh_sandbox["pwsh-sandbox<br/>@roos-code/roos-code-pwsh-sandbox"]
-  cfg --> plugin_dsh_base_pwsh_sandbox
-  plugin_dsh_base_approval["approval<br/>@roos-code/roos-code-user-approval"]
-  cfg --> plugin_dsh_base_approval
-  plugin_dsh_base_permission["permission<br/>@roos-code/roos-code-permission-presets"]
-  cfg --> plugin_dsh_base_permission
-  plugin_dsh_base_shell_env["shell-env<br/>@roos-code/roos-code-shell-env"]
-  cfg --> plugin_dsh_base_shell_env
-  plugin_dsh_base_tool_bash["tool-bash<br/>@roos-code/roos-code-tool-bash"]
-  cfg --> plugin_dsh_base_tool_bash
-  plugin_dsh_base_tool_pwsh["tool-pwsh<br/>@roos-code/roos-code-tool-pwsh"]
-  cfg --> plugin_dsh_base_tool_pwsh
-  plugin_dsh_base_tool_jobs["tool-jobs<br/>@roos-code/roos-code-tool-jobs"]
-  cfg --> plugin_dsh_base_tool_jobs
-  plugin_dsh_base_fs_observation_policy["fs-observation-policy<br/>@roos-code/roos-code-fs-observation-policy"]
-  cfg --> plugin_dsh_base_fs_observation_policy
-  plugin_dsh_base_tool_fs["tool-fs<br/>@roos-code/roos-code-tool-fs"]
-  cfg --> plugin_dsh_base_tool_fs
-  plugin_dsh_base_tool_fs_search["tool-fs-search<br/>@roos-code/roos-code-tool-fs-search"]
-  cfg --> plugin_dsh_base_tool_fs_search
-  plugin_dsh_base_agent_instructions["agent-instructions<br/>@roos-code/roos-code-agent-instructions"]
-  cfg --> plugin_dsh_base_agent_instructions
-  plugin_dsh_base_skill["skill<br/>@roos-code/roos-code-skill"]
-  cfg --> plugin_dsh_base_skill
-  plugin_dsh_base_skill_filesystem["skill-filesystem<br/>@roos-code/roos-code-skill-filesystem"]
-  cfg --> plugin_dsh_base_skill_filesystem
-  plugin_dsh_base_skill_badge["skill-badge<br/>@roos-code/roos-code-skill-badge"]
-  cfg --> plugin_dsh_base_skill_badge
-  plugin_dsh_base_tool_skill["tool-skill<br/>@roos-code/roos-code-tool-skill"]
-  cfg --> plugin_dsh_base_tool_skill
-  plugin_dsh_base_commands["commands<br/>@roos-code/roos-code-commands"]
-  cfg --> plugin_dsh_base_commands
-  plugin_dsh_base_command_feedback["command-feedback<br/>@roos-code/roos-code-command-feedback"]
-  cfg --> plugin_dsh_base_command_feedback
-  plugin_dsh_base_goal["goal<br/>@roos-code/roos-code-goal"]
-  cfg --> plugin_dsh_base_goal
-  plugin_dsh_base_goal_round_driver["goal-round-driver<br/>@roos-code/roos-code-goal-round-driver"]
-  cfg --> plugin_dsh_base_goal_round_driver
-  plugin_dsh_base_command_goal["command-goal<br/>@roos-code/roos-code-command-goal"]
-  cfg --> plugin_dsh_base_command_goal
-  plugin_dsh_base_plan_mode["plan-mode<br/>@roos-code/roos-code-plan-mode"]
-  cfg --> plugin_dsh_base_plan_mode
-  plugin_dsh_base_token_meter["token-meter<br/>@roos-code/roos-code-token-meter"]
-  cfg --> plugin_dsh_base_token_meter
-  plugin_dsh_base_compaction_basic["compaction-basic<br/>@roos-code/roos-code-compaction-basic"]
-  cfg --> plugin_dsh_base_compaction_basic
-  plugin_dsh_base_command_compact["command-compact<br/>@roos-code/roos-code-command-compact"]
-  cfg --> plugin_dsh_base_command_compact
-  plugin_dsh_base_subagent["subagent<br/>@roos-code/roos-code-subagent"]
-  cfg --> plugin_dsh_base_subagent
-  plugin_dsh_base_subagent_spawn_in_process["subagent-spawn-in-process<br/>@roos-code/roos-code-subagent-spawn-in-process"]
-  cfg --> plugin_dsh_base_subagent_spawn_in_process
-  plugin_dsh_base_subagent_fork_in_process["subagent-fork-in-process<br/>@roos-code/roos-code-subagent-fork-in-process"]
-  cfg --> plugin_dsh_base_subagent_fork_in_process
-  plugin_dsh_base_tool_subagent_control["tool-subagent-control<br/>@roos-code/roos-code-tool-subagent-control"]
-  cfg --> plugin_dsh_base_tool_subagent_control
-  plugin_dsh_base_tool_subagent_list_agents["tool-subagent-list-agents<br/>@roos-code/roos-code-tool-subagent-control/list-agents"]
-  cfg --> plugin_dsh_base_tool_subagent_list_agents
-  plugin_dsh_base_tool_subagent["tool-subagent<br/>@roos-code/roos-code-tool-subagent"]
-  cfg --> plugin_dsh_base_tool_subagent
-  plugin_dsh_base_tool_subagent_fork["tool-subagent-fork<br/>@roos-code/roos-code-tool-subagent"]
-  cfg --> plugin_dsh_base_tool_subagent_fork
-  plugin_dsh_base_tool_subagent_report["tool-subagent-report<br/>@roos-code/roos-code-tool-subagent-report"]
-  cfg --> plugin_dsh_base_tool_subagent_report
-  plugin_dsh_base_workflow_worker_thread["workflow-worker-thread<br/>@roos-code/roos-code-workflow-worker-thread"]
-  cfg --> plugin_dsh_base_workflow_worker_thread
-  plugin_dsh_base_tool_workflow["tool-workflow<br/>@roos-code/roos-code-tool-workflow"]
-  cfg --> plugin_dsh_base_tool_workflow
-  plugin_dsh_base_timeout_policy["timeout-policy<br/>@roos-code/roos-code-tool-call-timeout-policy"]
-  cfg --> plugin_dsh_base_timeout_policy
-  plugin_dsh_base_spill_local["spill-local<br/>@roos-code/roos-code-spill-local"]
-  cfg --> plugin_dsh_base_spill_local
-  plugin_dsh_base_spill_policy["spill-policy<br/>@roos-code/roos-code-spill-policy"]
-  cfg --> plugin_dsh_base_spill_policy
-  plugin_dsh_base_session_checkpoint_policy["session-checkpoint-policy<br/>@roos-code/roos-code-session-checkpoint-policy"]
-  cfg --> plugin_dsh_base_session_checkpoint_policy
-  plugin_dsh_base_tool_result_pruner["tool-result-pruner<br/>@roos-code/roos-code-compaction-tool-result-pruner"]
-  cfg --> plugin_dsh_base_tool_result_pruner
-  plugin_dsh_base_tool_todo["tool-todo<br/>@roos-code/roos-code-tool-todo"]
-  cfg --> plugin_dsh_base_tool_todo
-  plugin_dsh_base_tool_goal["tool-goal<br/>@roos-code/roos-code-tool-goal"]
-  cfg --> plugin_dsh_base_tool_goal
-  plugin_dsh_base_tool_ralph["tool-ralph<br/>@roos-code/roos-code-tool-ralph"]
-  cfg --> plugin_dsh_base_tool_ralph
-  plugin_dsh_base_tool_str_replace_editor["tool-str-replace-editor<br/>@roos-code/roos-code-tool-str-replace-editor"]
-  cfg --> plugin_dsh_base_tool_str_replace_editor
-  plugin_dsh_base_repeat_tool_reminder["repeat-tool-reminder<br/>@roos-code/roos-code-repeat-tool-reminder"]
-  cfg --> plugin_dsh_base_repeat_tool_reminder
-  plugin_dsh_base_web["web<br/>@roos-code/roos-code-web"]
-  cfg --> plugin_dsh_base_web
-  plugin_dsh_base_web_search_deepseek["web-search-deepseek<br/>@roos-code/roos-code-web-search-deepseek"]
-  cfg --> plugin_dsh_base_web_search_deepseek
-  plugin_dsh_base_tool_web["tool-web<br/>@roos-code/roos-code-tool-web"]
-  cfg --> plugin_dsh_base_tool_web
-  plugin_dsh_base_tools["tools<br/>@roos-code/roos-code-tools"]
-  cfg --> plugin_dsh_base_tools
-  plugin_dsh_base_system_prompt["system-prompt<br/>@roos-code/roos-code-system-prompt"]
-  cfg --> plugin_dsh_base_system_prompt
-  plugin_dsh_base_agent_loop["agent-loop<br/>@roos-code/roos-code-agent-loop"]
-  cfg --> plugin_dsh_base_agent_loop
-  plugin_dsh_base_fs_sandbox["fs-sandbox<br/>@roos-code/roos-code-fs-sandbox"]
-  cfg --> plugin_dsh_base_fs_sandbox
-  plugin_dsh_base_llm_deepseek["llm-deepseek<br/>@roos-code/roos-code-llm-deepseek"]
-  cfg --> plugin_dsh_base_llm_deepseek
+  plugin_roos_base_timer["timer<br/>@roos-code/cordis-plugin-timer"]
+  cfg --> plugin_roos_base_timer
+  plugin_roos_base_hmr["hmr<br/>@roos-code/cordis-plugin-hmr"]
+  cfg --> plugin_roos_base_hmr
+  plugin_roos_base_llm["llm<br/>@roos-code/roos-code-llm"]
+  cfg --> plugin_roos_base_llm
+  plugin_roos_base_session["session<br/>@roos-code/roos-code-session"]
+  cfg --> plugin_roos_base_session
+  plugin_roos_base_typert["typert<br/>@roos-code/roos-code-typert-registry"]
+  cfg --> plugin_roos_base_typert
+  plugin_roos_base_typert_loader["typert-loader<br/>@roos-code/roos-code-typert-loader"]
+  cfg --> plugin_roos_base_typert_loader
+  plugin_roos_base_typert_gateway["typert-gateway<br/>@roos-code/roos-code-api-gateway"]
+  cfg --> plugin_roos_base_typert_gateway
+  plugin_roos_base_session_title["session-title<br/>@roos-code/roos-code-session-title"]
+  cfg --> plugin_roos_base_session_title
+  plugin_roos_base_session_title_llm["session-title-llm<br/>@roos-code/roos-code-session-title-first-prompt-llm"]
+  cfg --> plugin_roos_base_session_title_llm
+  plugin_roos_base_user_questions["user-questions<br/>@roos-code/roos-code-user-questions"]
+  cfg --> plugin_roos_base_user_questions
+  plugin_roos_base_agent["agent<br/>@roos-code/roos-code-agent"]
+  cfg --> plugin_roos_base_agent
+  plugin_roos_base_agent_default_model["agent-default-model<br/>@roos-code/roos-code-agent-default-model"]
+  cfg --> plugin_roos_base_agent_default_model
+  plugin_roos_base_jobs["jobs<br/>@roos-code/roos-code-jobs-local"]
+  cfg --> plugin_roos_base_jobs
+  plugin_roos_base_llm_retry["llm-retry<br/>@roos-code/roos-code-llm-retry"]
+  cfg --> plugin_roos_base_llm_retry
+  plugin_roos_base_settings["settings<br/>@roos-code/roos-code-settings-file"]
+  cfg --> plugin_roos_base_settings
+  plugin_roos_base_credentials["credentials<br/>@roos-code/roos-code-credentials-local"]
+  cfg --> plugin_roos_base_credentials
+  plugin_roos_base_llm_pi_ai["llm-pi-ai<br/>@roos-code/roos-code-llm-pi-ai"]
+  cfg --> plugin_roos_base_llm_pi_ai
+  plugin_roos_base_session_persistence_jsonl["session-persistence-jsonl<br/>@roos-code/roos-code-session-persistence-jsonl"]
+  cfg --> plugin_roos_base_session_persistence_jsonl
+  plugin_roos_base_attachment_local["attachment-local<br/>@roos-code/roos-code-attachment-local"]
+  cfg --> plugin_roos_base_attachment_local
+  plugin_roos_base_session_query_sqlite["session-query-sqlite<br/>@roos-code/roos-code-session-query-sqlite"]
+  cfg --> plugin_roos_base_session_query_sqlite
+  plugin_roos_base_session_projection["session-projection<br/>@roos-code/roos-code-session-projection"]
+  cfg --> plugin_roos_base_session_projection
+  plugin_roos_base_session_telemetry_otel["session-telemetry-otel<br/>@roos-code/roos-code-session-telemetry-otel"]
+  cfg --> plugin_roos_base_session_telemetry_otel
+  plugin_roos_base_subprocess["subprocess<br/>@roos-code/roos-code-subprocess-local"]
+  cfg --> plugin_roos_base_subprocess
+  plugin_roos_base_sandbox["sandbox<br/>@roos-code/roos-code-sandbox-local"]
+  cfg --> plugin_roos_base_sandbox
+  plugin_roos_base_sandbox_policy["sandbox-policy<br/>@roos-code/roos-code-sandbox-policy"]
+  cfg --> plugin_roos_base_sandbox_policy
+  plugin_roos_base_bash_sandbox["bash-sandbox<br/>@roos-code/roos-code-bash-sandbox"]
+  cfg --> plugin_roos_base_bash_sandbox
+  plugin_roos_base_pwsh_sandbox["pwsh-sandbox<br/>@roos-code/roos-code-pwsh-sandbox"]
+  cfg --> plugin_roos_base_pwsh_sandbox
+  plugin_roos_base_approval["approval<br/>@roos-code/roos-code-user-approval"]
+  cfg --> plugin_roos_base_approval
+  plugin_roos_base_permission["permission<br/>@roos-code/roos-code-permission-presets"]
+  cfg --> plugin_roos_base_permission
+  plugin_roos_base_shell_env["shell-env<br/>@roos-code/roos-code-shell-env"]
+  cfg --> plugin_roos_base_shell_env
+  plugin_roos_base_tool_bash["tool-bash<br/>@roos-code/roos-code-tool-bash"]
+  cfg --> plugin_roos_base_tool_bash
+  plugin_roos_base_tool_pwsh["tool-pwsh<br/>@roos-code/roos-code-tool-pwsh"]
+  cfg --> plugin_roos_base_tool_pwsh
+  plugin_roos_base_tool_jobs["tool-jobs<br/>@roos-code/roos-code-tool-jobs"]
+  cfg --> plugin_roos_base_tool_jobs
+  plugin_roos_base_fs_observation_policy["fs-observation-policy<br/>@roos-code/roos-code-fs-observation-policy"]
+  cfg --> plugin_roos_base_fs_observation_policy
+  plugin_roos_base_tool_fs["tool-fs<br/>@roos-code/roos-code-tool-fs"]
+  cfg --> plugin_roos_base_tool_fs
+  plugin_roos_base_tool_fs_search["tool-fs-search<br/>@roos-code/roos-code-tool-fs-search"]
+  cfg --> plugin_roos_base_tool_fs_search
+  plugin_roos_base_agent_instructions["agent-instructions<br/>@roos-code/roos-code-agent-instructions"]
+  cfg --> plugin_roos_base_agent_instructions
+  plugin_roos_base_skill["skill<br/>@roos-code/roos-code-skill"]
+  cfg --> plugin_roos_base_skill
+  plugin_roos_base_skill_filesystem["skill-filesystem<br/>@roos-code/roos-code-skill-filesystem"]
+  cfg --> plugin_roos_base_skill_filesystem
+  plugin_roos_base_skill_badge["skill-badge<br/>@roos-code/roos-code-skill-badge"]
+  cfg --> plugin_roos_base_skill_badge
+  plugin_roos_base_tool_skill["tool-skill<br/>@roos-code/roos-code-tool-skill"]
+  cfg --> plugin_roos_base_tool_skill
+  plugin_roos_base_commands["commands<br/>@roos-code/roos-code-commands"]
+  cfg --> plugin_roos_base_commands
+  plugin_roos_base_command_feedback["command-feedback<br/>@roos-code/roos-code-command-feedback"]
+  cfg --> plugin_roos_base_command_feedback
+  plugin_roos_base_goal["goal<br/>@roos-code/roos-code-goal"]
+  cfg --> plugin_roos_base_goal
+  plugin_roos_base_goal_round_driver["goal-round-driver<br/>@roos-code/roos-code-goal-round-driver"]
+  cfg --> plugin_roos_base_goal_round_driver
+  plugin_roos_base_command_goal["command-goal<br/>@roos-code/roos-code-command-goal"]
+  cfg --> plugin_roos_base_command_goal
+  plugin_roos_base_plan_mode["plan-mode<br/>@roos-code/roos-code-plan-mode"]
+  cfg --> plugin_roos_base_plan_mode
+  plugin_roos_base_token_meter["token-meter<br/>@roos-code/roos-code-token-meter"]
+  cfg --> plugin_roos_base_token_meter
+  plugin_roos_base_compaction_basic["compaction-basic<br/>@roos-code/roos-code-compaction-basic"]
+  cfg --> plugin_roos_base_compaction_basic
+  plugin_roos_base_command_compact["command-compact<br/>@roos-code/roos-code-command-compact"]
+  cfg --> plugin_roos_base_command_compact
+  plugin_roos_base_subagent["subagent<br/>@roos-code/roos-code-subagent"]
+  cfg --> plugin_roos_base_subagent
+  plugin_roos_base_subagent_spawn_in_process["subagent-spawn-in-process<br/>@roos-code/roos-code-subagent-spawn-in-process"]
+  cfg --> plugin_roos_base_subagent_spawn_in_process
+  plugin_roos_base_subagent_fork_in_process["subagent-fork-in-process<br/>@roos-code/roos-code-subagent-fork-in-process"]
+  cfg --> plugin_roos_base_subagent_fork_in_process
+  plugin_roos_base_tool_subagent_control["tool-subagent-control<br/>@roos-code/roos-code-tool-subagent-control"]
+  cfg --> plugin_roos_base_tool_subagent_control
+  plugin_roos_base_tool_subagent_list_agents["tool-subagent-list-agents<br/>@roos-code/roos-code-tool-subagent-control/list-agents"]
+  cfg --> plugin_roos_base_tool_subagent_list_agents
+  plugin_roos_base_tool_subagent["tool-subagent<br/>@roos-code/roos-code-tool-subagent"]
+  cfg --> plugin_roos_base_tool_subagent
+  plugin_roos_base_tool_subagent_fork["tool-subagent-fork<br/>@roos-code/roos-code-tool-subagent"]
+  cfg --> plugin_roos_base_tool_subagent_fork
+  plugin_roos_base_tool_subagent_report["tool-subagent-report<br/>@roos-code/roos-code-tool-subagent-report"]
+  cfg --> plugin_roos_base_tool_subagent_report
+  plugin_roos_base_workflow_worker_thread["workflow-worker-thread<br/>@roos-code/roos-code-workflow-worker-thread"]
+  cfg --> plugin_roos_base_workflow_worker_thread
+  plugin_roos_base_tool_workflow["tool-workflow<br/>@roos-code/roos-code-tool-workflow"]
+  cfg --> plugin_roos_base_tool_workflow
+  plugin_roos_base_timeout_policy["timeout-policy<br/>@roos-code/roos-code-tool-call-timeout-policy"]
+  cfg --> plugin_roos_base_timeout_policy
+  plugin_roos_base_spill_local["spill-local<br/>@roos-code/roos-code-spill-local"]
+  cfg --> plugin_roos_base_spill_local
+  plugin_roos_base_spill_policy["spill-policy<br/>@roos-code/roos-code-spill-policy"]
+  cfg --> plugin_roos_base_spill_policy
+  plugin_roos_base_session_checkpoint_policy["session-checkpoint-policy<br/>@roos-code/roos-code-session-checkpoint-policy"]
+  cfg --> plugin_roos_base_session_checkpoint_policy
+  plugin_roos_base_tool_result_pruner["tool-result-pruner<br/>@roos-code/roos-code-compaction-tool-result-pruner"]
+  cfg --> plugin_roos_base_tool_result_pruner
+  plugin_roos_base_tool_todo["tool-todo<br/>@roos-code/roos-code-tool-todo"]
+  cfg --> plugin_roos_base_tool_todo
+  plugin_roos_base_tool_goal["tool-goal<br/>@roos-code/roos-code-tool-goal"]
+  cfg --> plugin_roos_base_tool_goal
+  plugin_roos_base_tool_ralph["tool-ralph<br/>@roos-code/roos-code-tool-ralph"]
+  cfg --> plugin_roos_base_tool_ralph
+  plugin_roos_base_tool_str_replace_editor["tool-str-replace-editor<br/>@roos-code/roos-code-tool-str-replace-editor"]
+  cfg --> plugin_roos_base_tool_str_replace_editor
+  plugin_roos_base_repeat_tool_reminder["repeat-tool-reminder<br/>@roos-code/roos-code-repeat-tool-reminder"]
+  cfg --> plugin_roos_base_repeat_tool_reminder
+  plugin_roos_base_web["web<br/>@roos-code/roos-code-web"]
+  cfg --> plugin_roos_base_web
+  plugin_roos_base_web_search_deepseek["web-search-deepseek<br/>@roos-code/roos-code-web-search-deepseek"]
+  cfg --> plugin_roos_base_web_search_deepseek
+  plugin_roos_base_tool_web["tool-web<br/>@roos-code/roos-code-tool-web"]
+  cfg --> plugin_roos_base_tool_web
+  plugin_roos_base_tools["tools<br/>@roos-code/roos-code-tools"]
+  cfg --> plugin_roos_base_tools
+  plugin_roos_base_system_prompt["system-prompt<br/>@roos-code/roos-code-system-prompt"]
+  cfg --> plugin_roos_base_system_prompt
+  plugin_roos_base_agent_loop["agent-loop<br/>@roos-code/roos-code-agent-loop"]
+  cfg --> plugin_roos_base_agent_loop
+  plugin_roos_base_fs_sandbox["fs-sandbox<br/>@roos-code/roos-code-fs-sandbox"]
+  cfg --> plugin_roos_base_fs_sandbox
+  plugin_roos_base_llm_deepseek["llm-deepseek<br/>@roos-code/roos-code-llm-deepseek"]
+  cfg --> plugin_roos_base_llm_deepseek
 ```
 
 | Plugin id | Package / module |

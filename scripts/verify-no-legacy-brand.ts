@@ -2,7 +2,8 @@
  * Reject tracked leftovers of the pre-rebrand product identity outside the
  * keep-list (LICENSE, NOTICE, frozen Agent Notes, the rescope mapping page,
  * vendored upstream README/LICENSE, and the rebrand/rescope scripts that must
- * still mention old tokens as find-strings).
+ * still mention old tokens as find-strings). Also rejects slash-stripped
+ * catalog slugs (`deepseek-aidsh`) and leftover mermaid node ids (`pkg_*_dsh_*`).
  */
 
 import { execFileSync } from 'node:child_process'
@@ -18,6 +19,8 @@ const FORBIDDEN = [
   { id: 'home-dir', pattern: /~\/\.dsh\b/ },
   { id: 'python-sdk', pattern: /deepseek-harness-sdk/ },
   { id: 'product-prose', pattern: /DeepSeek Harness/ },
+  { id: 'slash-stripped-slug', pattern: /deepseek-aidsh/ },
+  { id: 'mermaid-dsh-node', pattern: /pkg_[A-Za-z0-9_]*_dsh_[A-Za-z0-9_]+/ },
 ] as const
 
 /** One tracked leftover of a retired brand token. */

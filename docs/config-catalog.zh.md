@@ -11,7 +11,7 @@
 
 `Requires:` 行列出插件通过 `inject` 注入的服务键：其 `cordis.yml` 树还必须加载这些服务的提供者。范围限定为 harness 层级（`packages/`）；配置树还可能加载的 vendored cordis 插件（`hmr`、控制台日志记录器等）固定为上游源代码（参见 [vendoring policy](../vendor/README.md)），未收录于此目录。
 
-<a id="deepseek-aidsh-acp"></a>
+<a id="roos-coderoos-code-acp"></a>
 
 ## `@roos-code/roos-code-acp`
 
@@ -33,7 +33,7 @@ export interface AcpConfig {
 
 来源：[`packages/acp/acp/src/index.ts:70`](../packages/acp/acp/src/index.ts)
 
-<a id="deepseek-aidsh-acp-demo"></a>
+<a id="roos-coderoos-code-acp-demo"></a>
 
 ## `@roos-code/roos-code-acp-demo`
 
@@ -84,11 +84,11 @@ export interface Config {
 }
 ```
 
-依赖：[`agentCore`](../packages/examples/agent-spine-demo/src/index.ts) · [`JsonlCompression`](../packages/session/session-persistence-jsonl/src/index.ts) · [`ToolsConfig`](#deepseek-aidsh-tools)
+依赖：[`agentCore`](../packages/examples/agent-spine-demo/src/index.ts) · [`JsonlCompression`](../packages/session/session-persistence-jsonl/src/index.ts) · [`ToolsConfig`](#roos-coderoos-code-tools)
 
 来源：[`packages/examples/acp-demo/src/index.ts:39`](../packages/examples/acp-demo/src/index.ts)
 
-<a id="deepseek-aidsh-agent-default-model"></a>
+<a id="roos-coderoos-code-agent-default-model"></a>
 
 ## `@roos-code/roos-code-agent-default-model`
 
@@ -104,7 +104,7 @@ export interface Config {
 
 来源：[`packages/core/agent-default-model/src/index.ts:41`](../packages/core/agent-default-model/src/index.ts)
 
-<a id="deepseek-aidsh-agent-instructions"></a>
+<a id="roos-coderoos-code-agent-instructions"></a>
 
 ## `@roos-code/roos-code-agent-instructions`
 
@@ -134,7 +134,7 @@ export interface Config {
 
 来源：[`packages/context/agent-instructions/src/config.ts:18`](../packages/context/agent-instructions/src/config.ts)
 
-<a id="deepseek-aidsh-agent-loop"></a>
+<a id="roos-coderoos-code-agent-loop"></a>
 
 ## `@roos-code/roos-code-agent-loop`
 
@@ -166,7 +166,7 @@ export interface Config {
 
 来源：[`packages/core/agent-loop/src/index.ts:255`](../packages/core/agent-loop/src/index.ts)
 
-<a id="deepseek-aidsh-agent-presets"></a>
+<a id="roos-coderoos-code-agent-presets"></a>
 
 ## `@roos-code/roos-code-agent-presets`
 
@@ -204,7 +204,7 @@ export type PresetTrust = 'system' | 'user'
 
 来源：[`packages/preset/agent-presets/src/preset.ts:52`](../packages/preset/agent-presets/src/preset.ts)
 
-<a id="deepseek-aidsh-agent-spine-demo"></a>
+<a id="roos-coderoos-code-agent-spine-demo"></a>
 
 ## `@roos-code/roos-code-agent-spine-demo`
 
@@ -292,11 +292,11 @@ export interface GoalConfig {
 }
 ```
 
-依赖：[`AgentLoopConfig`](#deepseek-aidsh-agent-loop) · [`GoalDomainConfig`](#deepseek-aidsh-goal) · [`InvariantConfig`](#deepseek-aidsh-invariants) · [`JobsConfig`](#deepseek-aidsh-jobs-local) · [`SessionTitleConfig`](#deepseek-aidsh-session-title) · [`SkillFileSystem`](../packages/skill/skill-filesystem/src/index.ts) · [`SkillRegistryConfig`](#deepseek-aidsh-skill) · [`SystemPromptConfig`](#deepseek-aidsh-system-prompt) · [`toolBash`](../packages/shell/tool-bash/src/index.ts) · [`toolGoal`](../packages/goal/tool-goal/src/index.ts) · [`toolJobs`](../packages/jobs/tool-jobs/src/index.ts) · [`ToolsConfig`](#deepseek-aidsh-tools) · [`toolSkill`](../packages/skill/tool-skill/src/index.ts) · [`workspaceContext`](../packages/context/agent-instructions/src/index.ts)
+依赖：[`AgentLoopConfig`](#roos-coderoos-code-agent-loop) · [`GoalDomainConfig`](#roos-coderoos-code-goal) · [`InvariantConfig`](#roos-coderoos-code-invariants) · [`JobsConfig`](#roos-coderoos-code-jobs-local) · [`SessionTitleConfig`](#roos-coderoos-code-session-title) · [`SkillFileSystem`](../packages/skill/skill-filesystem/src/index.ts) · [`SkillRegistryConfig`](#roos-coderoos-code-skill) · [`SystemPromptConfig`](#roos-coderoos-code-system-prompt) · [`toolBash`](../packages/shell/tool-bash/src/index.ts) · [`toolGoal`](../packages/goal/tool-goal/src/index.ts) · [`toolJobs`](../packages/jobs/tool-jobs/src/index.ts) · [`ToolsConfig`](#roos-coderoos-code-tools) · [`toolSkill`](../packages/skill/tool-skill/src/index.ts) · [`workspaceContext`](../packages/context/agent-instructions/src/index.ts)
 
 来源：[`packages/examples/agent-spine-demo/src/index.ts:92`](../packages/examples/agent-spine-demo/src/index.ts)
 
-<a id="deepseek-aidsh-agent-tool-presentation"></a>
+<a id="roos-coderoos-code-agent-tool-presentation"></a>
 
 ## `@roos-code/roos-code-agent-tool-presentation`
 
@@ -320,7 +320,7 @@ export interface Config {
 
 来源：[`packages/core/agent-tool-presentation/src/index.ts:38`](../packages/core/agent-tool-presentation/src/index.ts)
 
-<a id="deepseek-aidsh-attachment-local"></a>
+<a id="roos-coderoos-code-attachment-local"></a>
 
 ## `@roos-code/roos-code-attachment-local`
 
@@ -342,7 +342,7 @@ export interface Config {
 
 来源：[`packages/attachment/attachment-local/src/index.ts:24`](../packages/attachment/attachment-local/src/index.ts)
 
-<a id="deepseek-aidsh-bash-local"></a>
+<a id="roos-coderoos-code-bash-local"></a>
 
 ## `@roos-code/roos-code-bash-local`
 
@@ -368,7 +368,7 @@ export interface Config {
 
 来源：[`packages/shell/bash-local/src/index.ts:41`](../packages/shell/bash-local/src/index.ts)
 
-<a id="deepseek-aidsh-bash-sandbox"></a>
+<a id="roos-coderoos-code-bash-sandbox"></a>
 
 ## `@roos-code/roos-code-bash-sandbox`
 
@@ -385,11 +385,11 @@ export interface Config {
 export type Config = LocalConfig
 ```
 
-依赖：[`LocalConfig`](#deepseek-aidsh-bash-local)
+依赖：[`LocalConfig`](#roos-coderoos-code-bash-local)
 
 来源：[`packages/shell/bash-sandbox/src/index.ts:35`](../packages/shell/bash-sandbox/src/index.ts)
 
-<a id="deepseek-aidsh-client-connection"></a>
+<a id="roos-coderoos-code-client-connection"></a>
 
 ## `@roos-code/roos-code-client-connection`
 
@@ -414,7 +414,7 @@ export interface ConnectionConfig {
 
 来源：[`packages/client/connection/src/index.ts:50`](../packages/client/connection/src/index.ts)
 
-<a id="deepseek-aidsh-client-hmr"></a>
+<a id="roos-coderoos-code-client-hmr"></a>
 
 ## `@roos-code/roos-code-client-hmr`
 
@@ -430,7 +430,7 @@ export interface Config {
 
 来源：[`packages/client/hmr/src/index.ts:31`](../packages/client/hmr/src/index.ts)
 
-<a id="deepseek-aidsh-code-runtime-worker-thread"></a>
+<a id="roos-coderoos-code-code-runtime-worker-thread"></a>
 
 ## `@roos-code/roos-code-code-runtime-worker-thread`
 
@@ -467,7 +467,7 @@ export interface Config {
 
 来源：[`packages/code-runtime/code-runtime-worker-thread/src/index.ts:25`](../packages/code-runtime/code-runtime-worker-thread/src/index.ts)
 
-<a id="deepseek-aidsh-compaction-basic"></a>
+<a id="roos-coderoos-code-compaction-basic"></a>
 
 ## `@roos-code/roos-code-compaction-basic`
 
@@ -513,7 +513,7 @@ export interface ModelCompactPolicyConfig extends CompactionPolicyConfig {
 
 来源：[`packages/compaction/compaction-basic/src/types.ts:38`](../packages/compaction/compaction-basic/src/types.ts)
 
-<a id="deepseek-aidsh-compaction-tool-result-pruner"></a>
+<a id="roos-coderoos-code-compaction-tool-result-pruner"></a>
 
 ## `@roos-code/roos-code-compaction-tool-result-pruner`
 
@@ -533,7 +533,7 @@ export interface ToolResultPruneConfig {
 
 来源：[`packages/compaction/compaction-tool-result-pruner/src/types.ts:4`](../packages/compaction/compaction-tool-result-pruner/src/types.ts)
 
-<a id="deepseek-aidsh-cordis-host-runner"></a>
+<a id="roos-coderoos-code-cordis-host-runner"></a>
 
 ## `@roos-code/roos-code-cordis-host-runner`
 
@@ -549,7 +549,7 @@ export interface Config {
 
 来源：[`packages/extensions/cordis-host-runner/src/index.ts:88`](../packages/extensions/cordis-host-runner/src/index.ts)
 
-<a id="deepseek-aidsh-credentials-local"></a>
+<a id="roos-coderoos-code-credentials-local"></a>
 
 ## `@roos-code/roos-code-credentials-local`
 
@@ -569,7 +569,7 @@ export interface Config {
 
 来源：[`packages/credentials/credentials-local/src/index.ts:55`](../packages/credentials/credentials-local/src/index.ts)
 
-<a id="deepseek-aidsh-e2b"></a>
+<a id="roos-coderoos-code-e2b"></a>
 
 ## `@roos-code/roos-code-e2b`
 
@@ -587,7 +587,7 @@ export interface Config {
 
 来源：[`packages/e2b/e2b/src/index.ts:43`](../packages/e2b/e2b/src/index.ts)
 
-<a id="deepseek-aidsh-fs-local"></a>
+<a id="roos-coderoos-code-fs-local"></a>
 
 ## `@roos-code/roos-code-fs-local`
 
@@ -606,7 +606,7 @@ export interface Config {
 
 来源：[`packages/fs/fs-local/src/index.ts:41`](../packages/fs/fs-local/src/index.ts)
 
-<a id="deepseek-aidsh-fs-sandbox"></a>
+<a id="roos-coderoos-code-fs-sandbox"></a>
 
 ## `@roos-code/roos-code-fs-sandbox`
 
@@ -622,11 +622,11 @@ export interface Config {
 export type Config = LocalConfig
 ```
 
-依赖：[`LocalConfig`](#deepseek-aidsh-fs-local)
+依赖：[`LocalConfig`](#roos-coderoos-code-fs-local)
 
 来源：[`packages/fs/fs-sandbox/src/index.ts:49`](../packages/fs/fs-sandbox/src/index.ts)
 
-<a id="deepseek-aidsh-goal"></a>
+<a id="roos-coderoos-code-goal"></a>
 
 ## `@roos-code/roos-code-goal`
 
@@ -642,7 +642,7 @@ export interface Config {
 
 来源：[`packages/goal/goal/src/index.ts:116`](../packages/goal/goal/src/index.ts)
 
-<a id="deepseek-aidsh-headless"></a>
+<a id="roos-coderoos-code-headless"></a>
 
 ## `@roos-code/roos-code-headless`
 
@@ -658,7 +658,7 @@ export interface Config {
 
 来源：[`packages/bundle/headless/src/index.ts:31`](../packages/bundle/headless/src/index.ts)
 
-<a id="deepseek-aidsh-hooks-claude-code"></a>
+<a id="roos-coderoos-code-hooks-claude-code"></a>
 
 ## `@roos-code/roos-code-hooks-claude-code`
 
@@ -696,7 +696,7 @@ export interface Config {
 
 来源：[`packages/hooks/hooks-claude-code/src/index.ts:45`](../packages/hooks/hooks-claude-code/src/index.ts)
 
-<a id="deepseek-aidsh-hooks-codex"></a>
+<a id="roos-coderoos-code-hooks-codex"></a>
 
 ## `@roos-code/roos-code-hooks-codex`
 
@@ -723,7 +723,7 @@ export interface Config {
 
 来源：[`packages/hooks/hooks-codex/src/index.ts:44`](../packages/hooks/hooks-codex/src/index.ts)
 
-<a id="deepseek-aidsh-host-apiproxy"></a>
+<a id="roos-coderoos-code-host-apiproxy"></a>
 
 ## `@roos-code/roos-code-host-apiproxy`
 
@@ -757,7 +757,7 @@ export interface Config {
 
 来源：[`packages/host/apiproxy/src/index.ts:41`](../packages/host/apiproxy/src/index.ts)
 
-<a id="deepseek-aidsh-host-directory-picker-browse"></a>
+<a id="roos-coderoos-code-host-directory-picker-browse"></a>
 
 ## `@roos-code/roos-code-host-directory-picker-browse`
 
@@ -771,7 +771,7 @@ export interface Config {
 
 来源：[`packages/host/directory-picker-browse/src/index.ts:181`](../packages/host/directory-picker-browse/src/index.ts)
 
-<a id="deepseek-aidsh-host-frontend-static"></a>
+<a id="roos-coderoos-code-host-frontend-static"></a>
 
 ## `@roos-code/roos-code-host-frontend-static`
 
@@ -787,7 +787,7 @@ export interface Config {
 
 来源：[`packages/host/frontend-static/src/index.ts:28`](../packages/host/frontend-static/src/index.ts)
 
-<a id="deepseek-aidsh-host-webserver"></a>
+<a id="roos-coderoos-code-host-webserver"></a>
 
 ## `@roos-code/roos-code-host-webserver`
 
@@ -803,7 +803,7 @@ export interface Config {
 
 来源：[`packages/host/webserver/src/index.ts:45`](../packages/host/webserver/src/index.ts)
 
-<a id="deepseek-aidsh-invariants"></a>
+<a id="roos-coderoos-code-invariants"></a>
 
 ## `@roos-code/roos-code-invariants`
 
@@ -821,7 +821,7 @@ export interface Config {
 
 来源：[`packages/runtime-diagnostics/invariants/src/index.ts:15`](../packages/runtime-diagnostics/invariants/src/index.ts)
 
-<a id="deepseek-aidsh-jobs-local"></a>
+<a id="roos-coderoos-code-jobs-local"></a>
 
 ## `@roos-code/roos-code-jobs-local`
 
@@ -838,7 +838,7 @@ export interface Config {
 
 来源：[`packages/jobs/jobs-local/src/index.ts:31`](../packages/jobs/jobs-local/src/index.ts)
 
-<a id="deepseek-aidsh-llm-deepseek"></a>
+<a id="roos-coderoos-code-llm-deepseek"></a>
 
 ## `@roos-code/roos-code-llm-deepseek`
 
@@ -893,7 +893,7 @@ export interface DeepSeekCatalogModel {
 
 来源：[`packages/llm/llm-deepseek/src/index.ts:62`](../packages/llm/llm-deepseek/src/index.ts)
 
-<a id="deepseek-aidsh-llm-pi-ai"></a>
+<a id="roos-coderoos-code-llm-pi-ai"></a>
 
 ## `@roos-code/roos-code-llm-pi-ai`
 
@@ -1083,7 +1083,7 @@ type WithheldThinkingFormat = 'chat-template' | 'qwen-chat-template'
 
 来源：[`packages/llm/llm-pi-ai/src/config.ts:172`](../packages/llm/llm-pi-ai/src/config.ts)
 
-<a id="deepseek-aidsh-llm-replay"></a>
+<a id="roos-coderoos-code-llm-replay"></a>
 
 ## `@roos-code/roos-code-llm-replay`
 
@@ -1151,7 +1151,7 @@ export interface ReplayModelConfig {
 
 来源：[`packages/test-support/llm-replay/src/index.ts:776`](../packages/test-support/llm-replay/src/index.ts)
 
-<a id="deepseek-aidsh-llm-retry"></a>
+<a id="roos-coderoos-code-llm-retry"></a>
 
 ## `@roos-code/roos-code-llm-retry`
 
@@ -1164,7 +1164,7 @@ export type Config = Readonly<Record<string, never>>
 
 来源：[`packages/llm/llm-retry/src/index.ts:24`](../packages/llm/llm-retry/src/index.ts)
 
-<a id="deepseek-aidsh-lsp-stdio"></a>
+<a id="roos-coderoos-code-lsp-stdio"></a>
 
 ## `@roos-code/roos-code-lsp-stdio`
 
@@ -1206,7 +1206,7 @@ export interface LspLocalServerConfig {
 
 来源：[`packages/lsp/lsp-stdio/src/index.ts:82`](../packages/lsp/lsp-stdio/src/index.ts)
 
-<a id="deepseek-aidsh-mcp-client"></a>
+<a id="roos-coderoos-code-mcp-client"></a>
 
 ## `@roos-code/roos-code-mcp-client`
 
@@ -1279,7 +1279,7 @@ export interface ReconnectConfig {
 
 来源：[`packages/mcp/mcp-client/src/index.ts:98`](../packages/mcp/mcp-client/src/index.ts)
 
-<a id="deepseek-aidsh-message-feedback"></a>
+<a id="roos-coderoos-code-message-feedback"></a>
 
 ## `@roos-code/roos-code-message-feedback`
 
@@ -1295,7 +1295,7 @@ export interface Config {
 
 来源：[`packages/feedback/message-feedback/src/index.ts:49`](../packages/feedback/message-feedback/src/index.ts)
 
-<a id="deepseek-aidsh-permission-presets"></a>
+<a id="roos-coderoos-code-permission-presets"></a>
 
 ## `@roos-code/roos-code-permission-presets`
 
@@ -1334,7 +1334,7 @@ export interface PresetSpec {
 
 来源：[`packages/interaction/permission-presets/src/index.ts:140`](../packages/interaction/permission-presets/src/index.ts)
 
-<a id="deepseek-aidsh-persona"></a>
+<a id="roos-coderoos-code-persona"></a>
 
 ## `@roos-code/roos-code-persona`
 
@@ -1358,7 +1358,7 @@ export interface Config {
 
 来源：[`packages/preset/persona/src/index.ts:34`](../packages/preset/persona/src/index.ts)
 
-<a id="deepseek-aidsh-plan-mode"></a>
+<a id="roos-coderoos-code-plan-mode"></a>
 
 ## `@roos-code/roos-code-plan-mode`
 
@@ -1374,7 +1374,7 @@ export interface PlanModeConfig {
 
 来源：[`packages/plan/plan-mode/src/index.ts:70`](../packages/plan/plan-mode/src/index.ts)
 
-<a id="deepseek-aidsh-pwsh-local"></a>
+<a id="roos-coderoos-code-pwsh-local"></a>
 
 ## `@roos-code/roos-code-pwsh-local`
 
@@ -1407,7 +1407,7 @@ export interface Config {
 
 来源：[`packages/shell/pwsh-local/src/index.ts:58`](../packages/shell/pwsh-local/src/index.ts)
 
-<a id="deepseek-aidsh-pwsh-sandbox"></a>
+<a id="roos-coderoos-code-pwsh-sandbox"></a>
 
 ## `@roos-code/roos-code-pwsh-sandbox`
 
@@ -1425,11 +1425,11 @@ export interface Config {
 export type Config = LocalConfig
 ```
 
-依赖：[`LocalConfig`](#deepseek-aidsh-pwsh-local)
+依赖：[`LocalConfig`](#roos-coderoos-code-pwsh-local)
 
 来源：[`packages/shell/pwsh-sandbox/src/index.ts:40`](../packages/shell/pwsh-sandbox/src/index.ts)
 
-<a id="deepseek-aidsh-repeat-tool-reminder"></a>
+<a id="roos-coderoos-code-repeat-tool-reminder"></a>
 
 ## `@roos-code/roos-code-repeat-tool-reminder`
 
@@ -1463,7 +1463,7 @@ export interface Config {
 
 来源：[`packages/guard/repeat-tool-reminder/src/index.ts:28`](../packages/guard/repeat-tool-reminder/src/index.ts)
 
-<a id="deepseek-aidsh-sandbox-local"></a>
+<a id="roos-coderoos-code-sandbox-local"></a>
 
 ## `@roos-code/roos-code-sandbox-local`
 
@@ -1495,7 +1495,7 @@ export interface Config {
 
 来源：[`packages/sandbox/sandbox-local/src/index.ts:44`](../packages/sandbox/sandbox-local/src/index.ts)
 
-<a id="deepseek-aidsh-sandbox-policy"></a>
+<a id="roos-coderoos-code-sandbox-policy"></a>
 
 ## `@roos-code/roos-code-sandbox-policy`
 
@@ -1522,7 +1522,7 @@ export interface Config {
 
 来源：[`packages/sandbox/sandbox-policy/src/index.ts:67`](../packages/sandbox/sandbox-policy/src/index.ts)
 
-<a id="deepseek-aidsh-sdk-jsonrpc-server"></a>
+<a id="roos-coderoos-code-sdk-jsonrpc-server"></a>
 
 ## `@roos-code/roos-code-sdk-jsonrpc-server`
 
@@ -1546,7 +1546,7 @@ export interface JsonRpcConfig {
 
 来源：[`packages/sdk/server/src/index.ts:29`](../packages/sdk/server/src/index.ts)
 
-<a id="deepseek-aidsh-session-persistence-jsonl"></a>
+<a id="roos-coderoos-code-session-persistence-jsonl"></a>
 
 ## `@roos-code/roos-code-session-persistence-jsonl`
 
@@ -1585,7 +1585,7 @@ export type JsonlCompression = 'zstd' | 'none'
 
 来源：[`packages/session/session-persistence-jsonl/src/index.ts:60`](../packages/session/session-persistence-jsonl/src/index.ts)
 
-<a id="deepseek-aidsh-session-persistence-sqlite"></a>
+<a id="roos-coderoos-code-session-persistence-sqlite"></a>
 
 ## `@roos-code/roos-code-session-persistence-sqlite`
 
@@ -1630,7 +1630,7 @@ export type JournalMode = 'wal' | 'delete' | 'truncate' | 'persist'
 
 来源：[`packages/session/session-persistence-sqlite/src/index.ts:70`](../packages/session/session-persistence-sqlite/src/index.ts)
 
-<a id="deepseek-aidsh-session-projection-cache"></a>
+<a id="roos-coderoos-code-session-projection-cache"></a>
 
 ## `@roos-code/roos-code-session-projection-cache`
 
@@ -1653,7 +1653,7 @@ export interface Config {
 
 来源：[`packages/session/session-projection-cache/src/index.ts:42`](../packages/session/session-projection-cache/src/index.ts)
 
-<a id="deepseek-aidsh-session-query-sqlite"></a>
+<a id="roos-coderoos-code-session-query-sqlite"></a>
 
 ## `@roos-code/roos-code-session-query-sqlite`
 
@@ -1699,7 +1699,7 @@ export type JournalMode = 'wal' | 'delete' | 'truncate' | 'persist'
 
 来源：[`packages/session-query/session-query-sqlite/src/index.ts:89`](../packages/session-query/session-query-sqlite/src/index.ts)
 
-<a id="deepseek-aidsh-session-reference"></a>
+<a id="roos-coderoos-code-session-reference"></a>
 
 ## `@roos-code/roos-code-session-reference`
 
@@ -1719,7 +1719,7 @@ export interface Config {
 
 来源：[`packages/context/session-reference/src/config.ts:11`](../packages/context/session-reference/src/config.ts)
 
-<a id="deepseek-aidsh-session-telemetry-otel"></a>
+<a id="roos-coderoos-code-session-telemetry-otel"></a>
 
 ## `@roos-code/roos-code-session-telemetry-otel`
 
@@ -1765,7 +1765,7 @@ export enum SessionTelemetryMode {
 
 来源：[`packages/session/session-telemetry-otel/src/index.ts:91`](../packages/session/session-telemetry-otel/src/index.ts)
 
-<a id="deepseek-aidsh-session-title"></a>
+<a id="roos-coderoos-code-session-title"></a>
 
 ## `@roos-code/roos-code-session-title`
 
@@ -1785,7 +1785,7 @@ export interface Config {
 
 来源：[`packages/session/session-title/src/index.ts:79`](../packages/session/session-title/src/index.ts)
 
-<a id="deepseek-aidsh-session-title-all-prompts-llm"></a>
+<a id="roos-coderoos-code-session-title-all-prompts-llm"></a>
 
 ## `@roos-code/roos-code-session-title-all-prompts-llm`
 
@@ -1800,7 +1800,7 @@ export type Config = SessionTitleLlmConfig
 
 来源：[`packages/session/session-title-all-prompts-llm/src/index.ts:15`](../packages/session/session-title-all-prompts-llm/src/index.ts)
 
-<a id="deepseek-aidsh-session-title-first-prompt-llm"></a>
+<a id="roos-coderoos-code-session-title-first-prompt-llm"></a>
 
 ## `@roos-code/roos-code-session-title-first-prompt-llm`
 
@@ -1815,7 +1815,7 @@ export type Config = SessionTitleLlmConfig
 
 来源：[`packages/session/session-title-first-prompt-llm/src/index.ts:15`](../packages/session/session-title-first-prompt-llm/src/index.ts)
 
-<a id="deepseek-aidsh-settings-file"></a>
+<a id="roos-coderoos-code-settings-file"></a>
 
 ## `@roos-code/roos-code-settings-file`
 
@@ -1835,7 +1835,7 @@ export interface Config {
 
 来源：[`packages/settings/settings-file/src/index.ts:21`](../packages/settings/settings-file/src/index.ts)
 
-<a id="deepseek-aidsh-shell-env"></a>
+<a id="roos-coderoos-code-shell-env"></a>
 
 ## `@roos-code/roos-code-shell-env`
 
@@ -1849,7 +1849,7 @@ export interface Config {
 
 来源：[`packages/shell/shell-env/src/index.ts:29`](../packages/shell/shell-env/src/index.ts)
 
-<a id="deepseek-aidsh-skill"></a>
+<a id="roos-coderoos-code-skill"></a>
 
 ## `@roos-code/roos-code-skill`
 
@@ -1863,7 +1863,7 @@ export interface Config {
 
 来源：[`packages/skill/skill/src/index.ts:279`](../packages/skill/skill/src/index.ts)
 
-<a id="deepseek-aidsh-skill-filesystem"></a>
+<a id="roos-coderoos-code-skill-filesystem"></a>
 
 ## `@roos-code/roos-code-skill-filesystem`
 
@@ -1901,7 +1901,7 @@ export interface Config {
 
 来源：[`packages/skill/skill-filesystem/src/index.ts:49`](../packages/skill/skill-filesystem/src/index.ts)
 
-<a id="deepseek-aidsh-spill-local"></a>
+<a id="roos-coderoos-code-spill-local"></a>
 
 ## `@roos-code/roos-code-spill-local`
 
@@ -1919,7 +1919,7 @@ export interface Config {
 
 来源：[`packages/spill/spill-local/src/index.ts:22`](../packages/spill/spill-local/src/index.ts)
 
-<a id="deepseek-aidsh-spill-policy"></a>
+<a id="roos-coderoos-code-spill-policy"></a>
 
 ## `@roos-code/roos-code-spill-policy`
 
@@ -1939,7 +1939,7 @@ export interface Config {
 
 来源：[`packages/spill/spill-policy/src/index.ts:60`](../packages/spill/spill-policy/src/index.ts)
 
-<a id="deepseek-aidsh-storage-domain"></a>
+<a id="roos-coderoos-code-storage-domain"></a>
 
 ## `@roos-code/roos-code-storage-domain`
 
@@ -1962,7 +1962,7 @@ export interface Config {
 
 来源：[`packages/storage/storage-domain/src/index.ts:52`](../packages/storage/storage-domain/src/index.ts)
 
-<a id="deepseek-aidsh-storage-json"></a>
+<a id="roos-coderoos-code-storage-json"></a>
 
 ## `@roos-code/roos-code-storage-json`
 
@@ -1983,7 +1983,7 @@ export interface Config {
 
 来源：[`packages/storage/storage-json/src/index.ts:27`](../packages/storage/storage-json/src/index.ts)
 
-<a id="deepseek-aidsh-storage-sqlite"></a>
+<a id="roos-coderoos-code-storage-sqlite"></a>
 
 ## `@roos-code/roos-code-storage-sqlite`
 
@@ -2023,7 +2023,7 @@ export type JournalMode = 'wal' | 'delete' | 'truncate' | 'persist'
 
 来源：[`packages/storage/storage-sqlite/src/index.ts:24`](../packages/storage/storage-sqlite/src/index.ts)
 
-<a id="deepseek-aidsh-subagent-acp"></a>
+<a id="roos-coderoos-code-subagent-acp"></a>
 
 ## `@roos-code/roos-code-subagent-acp`
 
@@ -2076,7 +2076,7 @@ export type PermissionPolicy = 'allow' | 'reject'
 
 来源：[`packages/subagent/subagent-acp/src/index.ts:27`](../packages/subagent/subagent-acp/src/index.ts)
 
-<a id="deepseek-aidsh-subagent-claude-code"></a>
+<a id="roos-coderoos-code-subagent-claude-code"></a>
 
 ## `@roos-code/roos-code-subagent-claude-code`
 
@@ -2097,7 +2097,7 @@ export interface Config {
 
 来源：[`packages/subagent/subagent-claude-code/src/index.ts:32`](../packages/subagent/subagent-claude-code/src/index.ts)
 
-<a id="deepseek-aidsh-subagent-codex"></a>
+<a id="roos-coderoos-code-subagent-codex"></a>
 
 ## `@roos-code/roos-code-subagent-codex`
 
@@ -2118,9 +2118,25 @@ export interface Config {
 
 来源：[`packages/subagent/subagent-codex/src/index.ts:30`](../packages/subagent/subagent-codex/src/index.ts)
 
-<a id="deepseek-aidsh-subagent-roos-sdk"></a>
+<a id="roos-coderoos-code-subagent-roos-sdk"></a>
 
 ## `@roos-code/roos-code-subagent-roos-sdk`
+
+需要：`subagents`
+
+```ts config-catalog
+/** Config: the registry name to register the provider under. */
+export interface Config {
+  /** Provider name on `ctx.subagents` (default `fork`). */
+  providerName: string
+}
+```
+
+来源：[`packages/subagent/subagent-roos-sdk/src/index.ts:29`](../packages/subagent/subagent-fork-in-process/src/index.ts)
+
+<a id="roos-coderoos-code-subagent-fork-in-process"></a>
+
+## `@roos-code/roos-code-subagent-fork-in-process`
 
 需要：`subagents`
 
@@ -2169,25 +2185,9 @@ export interface Config {
 }
 ```
 
-来源：[`packages/subagent/subagent-roos-sdk/src/index.ts:29`](../packages/subagent/subagent-roos-sdk/src/index.ts)
+来源：[`packages/subagent/subagent-fork-in-process/src/index.ts:31`](../packages/subagent/subagent-roos-sdk/src/index.ts)
 
-<a id="deepseek-aidsh-subagent-fork-in-process"></a>
-
-## `@roos-code/roos-code-subagent-fork-in-process`
-
-需要：`subagents`
-
-```ts config-catalog
-/** Config: the registry name to register the provider under. */
-export interface Config {
-  /** Provider name on `ctx.subagents` (default `fork`). */
-  providerName: string
-}
-```
-
-来源：[`packages/subagent/subagent-fork-in-process/src/index.ts:31`](../packages/subagent/subagent-fork-in-process/src/index.ts)
-
-<a id="deepseek-aidsh-subagent-spawn-in-process"></a>
+<a id="roos-coderoos-code-subagent-spawn-in-process"></a>
 
 ## `@roos-code/roos-code-subagent-spawn-in-process`
 
@@ -2203,7 +2203,7 @@ export interface Config {
 
 来源：[`packages/subagent/subagent-spawn-in-process/src/index.ts:25`](../packages/subagent/subagent-spawn-in-process/src/index.ts)
 
-<a id="deepseek-aidsh-subprocess-e2b"></a>
+<a id="roos-coderoos-code-subprocess-e2b"></a>
 
 ## `@roos-code/roos-code-subprocess-e2b`
 
@@ -2219,7 +2219,7 @@ export interface Config {
 
 来源：[`packages/e2b/subprocess-e2b/src/index.ts:25`](../packages/e2b/subprocess-e2b/src/index.ts)
 
-<a id="deepseek-aidsh-system-prompt"></a>
+<a id="roos-coderoos-code-system-prompt"></a>
 
 ## `@roos-code/roos-code-system-prompt`
 
@@ -2246,7 +2246,7 @@ export interface Config {
 
 来源：[`packages/core/system-prompt/src/index.ts:186`](../packages/core/system-prompt/src/index.ts)
 
-<a id="deepseek-aidsh-terminal-bash"></a>
+<a id="roos-coderoos-code-terminal-bash"></a>
 
 ## `@roos-code/roos-code-terminal-bash`
 
@@ -2291,7 +2291,7 @@ export interface Config {
 
 来源：[`packages/terminal/terminal-bash/src/config.ts:6`](../packages/terminal/terminal-bash/src/config.ts)
 
-<a id="deepseek-aidsh-time-context"></a>
+<a id="roos-coderoos-code-time-context"></a>
 
 ## `@roos-code/roos-code-time-context`
 
@@ -2309,7 +2309,7 @@ export interface Config {
 
 来源：[`packages/context/time-context/src/index.ts:27`](../packages/context/time-context/src/index.ts)
 
-<a id="deepseek-aidsh-tmux-context"></a>
+<a id="roos-coderoos-code-tmux-context"></a>
 
 ## `@roos-code/roos-code-tmux-context`
 
@@ -2325,7 +2325,7 @@ export interface Config {
 
 来源：[`packages/context/tmux-context/src/index.ts:34`](../packages/context/tmux-context/src/index.ts)
 
-<a id="deepseek-aidsh-token-meter"></a>
+<a id="roos-coderoos-code-token-meter"></a>
 
 ## `@roos-code/roos-code-token-meter`
 
@@ -2336,7 +2336,7 @@ export type TokenMeterConfig = Record<string, never>
 
 来源：[`packages/llm/token-meter/src/types.ts:12`](../packages/llm/token-meter/src/types.ts)
 
-<a id="deepseek-aidsh-tool-bash"></a>
+<a id="roos-coderoos-code-tool-bash"></a>
 
 ## `@roos-code/roos-code-tool-bash`
 
@@ -2352,7 +2352,7 @@ export interface Config {
 
 来源：[`packages/shell/tool-bash/src/index.ts:34`](../packages/shell/tool-bash/src/index.ts)
 
-<a id="deepseek-aidsh-tool-bash-persistent"></a>
+<a id="roos-coderoos-code-tool-bash-persistent"></a>
 
 ## `@roos-code/roos-code-tool-bash-persistent`
 
@@ -2374,7 +2374,7 @@ export interface Config {
 
 来源：[`packages/shell/tool-bash-persistent/src/index.ts:405`](../packages/shell/tool-bash-persistent/src/index.ts)
 
-<a id="deepseek-aidsh-tool-fs"></a>
+<a id="roos-coderoos-code-tool-fs"></a>
 
 ## `@roos-code/roos-code-tool-fs`
 
@@ -2396,7 +2396,7 @@ export interface Config {
 
 来源：[`packages/fs/tool-fs/src/index.ts:25`](../packages/fs/tool-fs/src/index.ts)
 
-<a id="deepseek-aidsh-tool-fs-search"></a>
+<a id="roos-coderoos-code-tool-fs-search"></a>
 
 ## `@roos-code/roos-code-tool-fs-search`
 
@@ -2431,7 +2431,7 @@ export interface Config {
 
 来源：[`packages/fs/tool-fs-search/src/index.ts:73`](../packages/fs/tool-fs-search/src/index.ts)
 
-<a id="deepseek-aidsh-tool-goal"></a>
+<a id="roos-coderoos-code-tool-goal"></a>
 
 ## `@roos-code/roos-code-tool-goal`
 
@@ -2447,7 +2447,7 @@ export interface Config {
 
 来源：[`packages/goal/tool-goal/src/index.ts:26`](../packages/goal/tool-goal/src/index.ts)
 
-<a id="deepseek-aidsh-tool-jobs"></a>
+<a id="roos-coderoos-code-tool-jobs"></a>
 
 ## `@roos-code/roos-code-tool-jobs`
 
@@ -2481,7 +2481,7 @@ export type CompletionDelivery = 'quiet' | 'wakeup'
 
 来源：[`packages/jobs/tool-jobs/src/index.ts:32`](../packages/jobs/tool-jobs/src/index.ts)
 
-<a id="deepseek-aidsh-tool-lsp"></a>
+<a id="roos-coderoos-code-tool-lsp"></a>
 
 ## `@roos-code/roos-code-tool-lsp`
 
@@ -2501,7 +2501,7 @@ export interface Config {
 
 来源：[`packages/lsp/tool-lsp/src/index.ts:58`](../packages/lsp/tool-lsp/src/index.ts)
 
-<a id="deepseek-aidsh-tool-pwsh"></a>
+<a id="roos-coderoos-code-tool-pwsh"></a>
 
 ## `@roos-code/roos-code-tool-pwsh`
 
@@ -2517,7 +2517,7 @@ export interface Config {
 
 来源：[`packages/shell/tool-pwsh/src/index.ts:52`](../packages/shell/tool-pwsh/src/index.ts)
 
-<a id="deepseek-aidsh-tool-ralph"></a>
+<a id="roos-coderoos-code-tool-ralph"></a>
 
 ## `@roos-code/roos-code-tool-ralph`
 
@@ -2539,7 +2539,7 @@ export interface Config {
 
 来源：[`packages/workflow/tool-ralph/src/index.ts:23`](../packages/workflow/tool-ralph/src/index.ts)
 
-<a id="deepseek-aidsh-tool-session-query"></a>
+<a id="roos-coderoos-code-tool-session-query"></a>
 
 ## `@roos-code/roos-code-tool-session-query`
 
@@ -2557,7 +2557,7 @@ export interface Config {
 
 来源：[`packages/session-query/tool-session-query/src/index.ts:29`](../packages/session-query/tool-session-query/src/index.ts)
 
-<a id="deepseek-aidsh-tool-skill"></a>
+<a id="roos-coderoos-code-tool-skill"></a>
 
 ## `@roos-code/roos-code-tool-skill`
 
@@ -2573,7 +2573,7 @@ export interface Config {
 
 来源：[`packages/skill/tool-skill/src/index.ts:61`](../packages/skill/tool-skill/src/index.ts)
 
-<a id="deepseek-aidsh-tool-str-replace-editor"></a>
+<a id="roos-coderoos-code-tool-str-replace-editor"></a>
 
 ## `@roos-code/roos-code-tool-str-replace-editor`
 
@@ -2591,7 +2591,7 @@ export interface Config {
 
 来源：[`packages/fs/tool-str-replace-editor/src/index.ts:497`](../packages/fs/tool-str-replace-editor/src/index.ts)
 
-<a id="deepseek-aidsh-tool-subagent"></a>
+<a id="roos-coderoos-code-tool-subagent"></a>
 
 ## `@roos-code/roos-code-tool-subagent`
 
@@ -2656,7 +2656,7 @@ export interface Config {
 
 来源：[`packages/subagent/tool-subagent/src/index.ts:29`](../packages/subagent/tool-subagent/src/index.ts)
 
-<a id="deepseek-aidsh-tool-subagent-report"></a>
+<a id="roos-coderoos-code-tool-subagent-report"></a>
 
 ## `@roos-code/roos-code-tool-subagent-report`
 
@@ -2678,7 +2678,7 @@ export interface Config {
 
 来源：[`packages/subagent/tool-subagent-report/src/index.ts:27`](../packages/subagent/tool-subagent-report/src/index.ts)
 
-<a id="deepseek-aidsh-tool-terminal"></a>
+<a id="roos-coderoos-code-tool-terminal"></a>
 
 ## `@roos-code/roos-code-tool-terminal`
 
@@ -2696,7 +2696,7 @@ export interface Config {
 
 来源：[`packages/terminal/tool-terminal/src/index.ts:35`](../packages/terminal/tool-terminal/src/index.ts)
 
-<a id="deepseek-aidsh-tool-todo"></a>
+<a id="roos-coderoos-code-tool-todo"></a>
 
 ## `@roos-code/roos-code-tool-todo`
 
@@ -2718,7 +2718,7 @@ export interface Config {
 
 来源：[`packages/todo/tool-todo/src/index.ts:29`](../packages/todo/tool-todo/src/index.ts)
 
-<a id="deepseek-aidsh-tool-web"></a>
+<a id="roos-coderoos-code-tool-web"></a>
 
 ## `@roos-code/roos-code-tool-web`
 
@@ -2744,7 +2744,7 @@ export interface Config {
 
 来源：[`packages/web/tool-web/src/index.ts:37`](../packages/web/tool-web/src/index.ts)
 
-<a id="deepseek-aidsh-tool-workflow"></a>
+<a id="roos-coderoos-code-tool-workflow"></a>
 
 ## `@roos-code/roos-code-tool-workflow`
 
@@ -2762,7 +2762,7 @@ export interface Config {
 
 来源：[`packages/workflow/tool-workflow/src/index.ts:33`](../packages/workflow/tool-workflow/src/index.ts)
 
-<a id="deepseek-aidsh-tools"></a>
+<a id="roos-coderoos-code-tools"></a>
 
 ## `@roos-code/roos-code-tools`
 
@@ -2798,7 +2798,7 @@ export type ToolPresentationMode = 'native' | 'code' | 'both'
 
 来源：[`packages/core/tools/src/index.ts:654`](../packages/core/tools/src/index.ts)
 
-<a id="deepseek-aidsh-typert-loader"></a>
+<a id="roos-coderoos-code-typert-loader"></a>
 
 ## `@roos-code/roos-code-typert-loader`
 
@@ -2814,7 +2814,7 @@ export interface Config {
 
 来源：[`packages/typert/loader/src/index.ts:47`](../packages/typert/loader/src/index.ts)
 
-<a id="deepseek-aidsh-user-approval"></a>
+<a id="roos-coderoos-code-user-approval"></a>
 
 ## `@roos-code/roos-code-user-approval`
 
@@ -2845,7 +2845,7 @@ export type ApprovalPolicy = 'ask' | 'never'
 
 来源：[`packages/interaction/user-approval/src/index.ts:177`](../packages/interaction/user-approval/src/index.ts)
 
-<a id="deepseek-aidsh-web"></a>
+<a id="roos-coderoos-code-web"></a>
 
 ## `@roos-code/roos-code-web`
 
@@ -2866,7 +2866,7 @@ export interface WebRuntimeConfig {
 
 来源：[`packages/web/web/src/index.ts:55`](../packages/web/web/src/index.ts)
 
-<a id="deepseek-aidsh-web-app"></a>
+<a id="roos-coderoos-code-web-app"></a>
 
 ## `@roos-code/roos-code-web-app`
 
@@ -2891,7 +2891,7 @@ export interface Config {
 
 来源：[`packages/bundle/web-app/src/index.ts:38`](../packages/bundle/web-app/src/index.ts)
 
-<a id="deepseek-aidsh-web-fetch-http"></a>
+<a id="roos-coderoos-code-web-fetch-http"></a>
 
 ## `@roos-code/roos-code-web-fetch-http`
 
@@ -2917,7 +2917,7 @@ export interface Config {
 
 来源：[`packages/web/web-fetch-http/src/index.ts:34`](../packages/web/web-fetch-http/src/index.ts)
 
-<a id="deepseek-aidsh-web-search-deepseek"></a>
+<a id="roos-coderoos-code-web-search-deepseek"></a>
 
 ## `@roos-code/roos-code-web-search-deepseek`
 
@@ -2945,7 +2945,7 @@ export interface Config {
 
 来源：[`packages/web/web-search-deepseek/src/index.ts:46`](../packages/web/web-search-deepseek/src/index.ts)
 
-<a id="deepseek-aidsh-web-search-exa"></a>
+<a id="roos-coderoos-code-web-search-exa"></a>
 
 ## `@roos-code/roos-code-web-search-exa`
 
@@ -2969,7 +2969,7 @@ export interface Config {
 
 来源：[`packages/web/web-search-exa/src/index.ts:38`](../packages/web/web-search-exa/src/index.ts)
 
-<a id="deepseek-aidsh-web-search-perplexity"></a>
+<a id="roos-coderoos-code-web-search-perplexity"></a>
 
 ## `@roos-code/roos-code-web-search-perplexity`
 
@@ -2993,7 +2993,7 @@ export interface Config {
 
 来源：[`packages/web/web-search-perplexity/src/index.ts:32`](../packages/web/web-search-perplexity/src/index.ts)
 
-<a id="deepseek-aidsh-workflow-worker-thread"></a>
+<a id="roos-coderoos-code-workflow-worker-thread"></a>
 
 ## `@roos-code/roos-code-workflow-worker-thread`
 

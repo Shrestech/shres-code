@@ -699,7 +699,7 @@ function stripYamlScalar(value: string): string {
 
 const APP_EXAMPLES = [
   {
-    id: 'dsh_base',
+    id: 'roos_base',
     rel: 'apps/cli/composition.md',
     title: 'Roos Base Composition',
     label: 'packages/bundle/base/cordis.patch.yml',

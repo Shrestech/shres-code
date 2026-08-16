@@ -2998,14 +2998,6 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface DownloadsApi {\n    sessionLog(request: {\n        sessionId: SessionId;\n        includeDescendants?: boolean;\n    }, signal: AbortSignal): Promise<Response>;\n}',
   },
   {
-    name: 'RoosEnvironment',
-    declaration: 'export type RoosEnvironment = Readonly<Record<RoosEnvironmentKey, string>>;',
-  },
-  {
-    name: 'RoosEnvironmentKey',
-    declaration: 'export type RoosEnvironmentKey = `${typeof ROOS_ENV_PREFIX}${string}`;',
-  },
-  {
     name: 'DynamicCordisPackage',
     declaration: 'export interface DynamicCordisPackage {\n    pluginId: CordisDynamicPluginId;\n    packageId: CordisDynamicPackageId;\n    pluginRunId: CordisDynamicPluginRunId;\n    name: string;\n}',
   },
@@ -3624,6 +3616,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ResumeAgentOptions',
     declaration: 'export interface ResumeAgentOptions {\n    readonly resumeSessionId: SessionId;\n    readonly agentOptions?: AgentOptions;\n    readonly signal?: AbortSignal;\n    readonly setup?: AgentSetup;\n}',
+  },
+  {
+    name: 'RoosEnvironment',
+    declaration: 'export type RoosEnvironment = Readonly<Record<RoosEnvironmentKey, string>>;',
+  },
+  {
+    name: 'RoosEnvironmentKey',
+    declaration: 'export type RoosEnvironmentKey = `${typeof ROOS_ENV_PREFIX}${string}`;',
   },
   {
     name: 'RpcError',

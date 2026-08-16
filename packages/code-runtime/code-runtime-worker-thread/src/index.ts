@@ -81,7 +81,7 @@ const IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/
  * byte-identical and the body slices back out with the model's own
  * line/column positions intact.
  */
-const STRIP_WRAP = { prefix: 'async function __dsh_program__() {\n', suffix: '\n}' } as const
+const STRIP_WRAP = { prefix: 'async function __roos_program__() {\n', suffix: '\n}' } as const
 
 /** One in-flight run's host-side state, tracked for disposal. */
 interface LiveRun {

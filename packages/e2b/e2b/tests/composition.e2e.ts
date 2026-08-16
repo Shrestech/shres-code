@@ -64,12 +64,12 @@ describe.skipIf(!process.env.E2B_API_KEY)('E2B live Loader composition', () => {
       await expect(sandbox.files.read(profileLeakPath)).rejects.toBeInstanceOf(FileNotFoundError)
       const environmentProbe = ctx.subprocess.spawn({
         argv: ['/bin/bash', '-c', [
-          'dsh_leak=0',
-          'for dsh_pid in "$PPID" $(ps -o pid= --ppid "$PPID"); do',
-          '  [[ "$dsh_pid" == "$$" ]] && continue',
-          '  if tr "\\0" "\\n" < "/proc/$dsh_pid/environ" 2>/dev/null | grep -Fqx "NPM_TOKEN=sentinel-secret"; then dsh_leak=1; fi',
+          'roos_leak=0',
+          'for roos_pid in "$PPID" $(ps -o pid= --ppid "$PPID"); do',
+          '  [[ "$roos_pid" == "$$" ]] && continue',
+          '  if tr "\\0" "\\n" < "/proc/$roos_pid/environ" 2>/dev/null | grep -Fqx "NPM_TOKEN=sentinel-secret"; then roos_leak=1; fi',
           'done',
-          'printf "DIRECT=<%s> LEAK=<%s>\\n" "${NPM_TOKEN-}" "$dsh_leak"',
+          'printf "DIRECT=<%s> LEAK=<%s>\\n" "${NPM_TOKEN-}" "$roos_leak"',
         ].join('\n')],
         cwd: '/home/user',
         stdio: { stdin: 'ignore', stdout: { maxBytes: 1_024 }, stderr: { maxBytes: 1_024 } },
