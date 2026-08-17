@@ -21,10 +21,12 @@ export { repoRootFromSeat, resolveShieldEngine, siblingPluginPath } from './reso
 export const name = 'shres-shield'
 
 /**
- * Doctrine and tool seams need the host services the adapter probes. Approval
- * and jobs are feature-detected so a composition without them still loads.
+ * Doctrine and tool seams need `systemPrompt` and `tools`. Approval and jobs
+ * are listed so the payload adapter can probe `ctx.approval` / `ctx.jobs`
+ * without throw-as-absent. A composition that never provides them keeps the
+ * seat pending; product rows always mount both.
  */
-export const inject = ['systemPrompt', 'tools']
+export const inject = ['systemPrompt', 'tools', 'approval', 'jobs']
 
 /**
  * Temporary default license until a paid key exists. A non-empty value

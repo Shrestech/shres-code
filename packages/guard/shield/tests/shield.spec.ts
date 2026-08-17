@@ -42,6 +42,8 @@ afterEach(() => {
   applied.count = 0
   applied.config = undefined
   applied.disposed = 0
+  applied.approvalProbe = 'absent'
+  applied.jobsProbe = 'absent'
 })
 
 /** Wait until the async resolve/apply effect has published a terminal reason. */
@@ -58,12 +60,26 @@ async function setup(config: ShieldSeat.Config = {}, reason?: ShieldSeat.ShieldR
   const ctx = new Context()
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  ctx.provide('approval', { request: async () => 'unavailable' })
+  ctx.provide('jobs', { enqueue: () => undefined })
   await ctx.plugin(ShieldSeat, config)
   if (reason !== undefined) await waitForReason(ctx, reason)
   return ctx
 }
 
 describe('shres-shield host seat', () => {
+  it('lists approval and jobs so the adapter can probe them when present', async () => {
+    expect(ShieldSeat.inject).toEqual(['systemPrompt', 'tools', 'approval', 'jobs'])
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', fixtureUrl)
+    const ctx = await setup({ license: 'paid' }, 'active')
+    expect(ctx.shield.status.active).toBe(true)
+    expect(() => (ctx as { approval: unknown }).approval).not.toThrow()
+    expect(() => (ctx as { jobs: unknown }).jobs).not.toThrow()
+    expect(applied.approvalProbe).toBe('ok')
+    expect(applied.jobsProbe).toBe('ok')
+  })
+
   it('unloads the engine when the user switch is off', async () => {
     setEnv('SHRES_SHIELD', undefined)
     setEnv('SHRES_SHIELD_MODULE', fixtureUrl)

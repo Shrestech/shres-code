@@ -12,7 +12,7 @@ Default-on Cordis seat for the **paid** Shres Shield plugin. This package resolv
     posture: ask
 ```
 
-`shres-base` inserts this row on every profile. The row mounting is not the same as the engine screening. The Web Settings **Shield** page writes the `shres-shield` namespace (`posture`, `license`); this seat remounts the paid payload when that document changes.
+`shres-base` inserts this row on every profile. The row mounting is not the same as the engine screening. The seat injects `systemPrompt`, `tools`, `approval`, and `jobs` so the payload adapter can probe those services without throw-as-absent. The Web Settings **Shield** page writes the `shres-shield` namespace (`posture`, `license`); this seat remounts the paid payload when that document changes.
 
 ### Entitlement
 
