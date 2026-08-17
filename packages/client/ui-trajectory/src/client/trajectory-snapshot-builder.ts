@@ -6,7 +6,7 @@ import type {
 } from '@shres-code/shres-code-client-runtime/client'
 import type {
   TrajectoryConversationViewNode, TrajectoryRequestHeaderState,
-  TrajectorySnapshot,
+  TrajectoryShieldDecision, TrajectorySnapshot,
 } from './trajectory-contract.ts'
 
 const EMPTY_LIST: readonly never[] = []
@@ -21,6 +21,7 @@ export const EMPTY_TRAJECTORY_SNAPSHOT: TrajectorySnapshot = {
   callSchemas: new Map(),
   partial: null,
   runningCalls: EMPTY_LIST,
+  decisions: EMPTY_LIST,
 }
 
 function stepKey(turn: number, step: number): string {
@@ -190,6 +191,7 @@ export class TrajectorySnapshotBuilder implements ConversationViewBuilder<
     let previousTools: ReadonlyMap<string, ToolSchema> = new Map()
     let partial: TrajectorySnapshot['partial'] = null
     const runningCalls: TrajectorySnapshot['runningCalls'][number][] = []
+    const decisions: TrajectoryShieldDecision[] = []
 
     for (const contribution of this.contributions) {
       const data = contribution.data
@@ -233,6 +235,10 @@ export class TrajectorySnapshotBuilder implements ConversationViewBuilder<
         boundaries.push({ seq: data.seq, time: data.time })
         continue
       }
+      if (data.kind === 'shield-decision') {
+        decisions.push({ ...data.decision, seq: data.seq })
+        continue
+      }
       turnEndings.push({
         turn: data.turn,
         time: data.time,
@@ -252,6 +258,7 @@ export class TrajectorySnapshotBuilder implements ConversationViewBuilder<
       callSchemas,
       partial,
       runningCalls,
+      decisions,
     }
   }
 

@@ -389,6 +389,18 @@ export interface SurfaceIntent {
 }
 
 /**
+ * Optional envelope mark for a non-surface {@link Session.append}. Surface
+ * events take {@link SurfaceIntent} instead and cannot carry this field.
+ */
+export interface LogEventIntent {
+  /**
+   * Writer mark that a reader which does not recognize `type` may skip this
+   * event. Only `true` is stored; omit the option to leave the event required.
+   */
+  ignorable?: true
+}
+
+/**
  * One immutable entry in the session log.
  *
  * A proper discriminated union over `type` (not independent `type`/`data`

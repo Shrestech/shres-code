@@ -4,6 +4,7 @@
  * Export discipline: packages/client/AGENTS.md.
  */
 
+import type {} from '@shres-code/shres-code-api-remotes/client'
 import type { ClientContext } from '@shres-code/shres-code-client-runtime/client'
 import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
 import type {} from '@shres-code/shres-code-client-ui-settings/client'
@@ -29,7 +30,7 @@ declare module '@shres-code/shres-code-client-ui-slots' {
 const NS = 'settings.shield'
 
 /** Required services. */
-export const inject = ['slots', 'locale', 'settingsScope']
+export const inject = ['slots', 'locale', 'settingsScope', 'remote', 'remote.shield']
 
 /**
  * Register the Shield section once `settings.section` is declared.
@@ -40,7 +41,14 @@ export function apply(ctx: ClientContext): void {
   const t = ctx.locale.bind(NS) as ShieldSectionInjected['t']
   const scope = ctx.settingsScope.bind<ShieldSettings>({ namespace: SHIELD_SETTINGS_NAMESPACE })
   const useSnapshot = bindSnapshotSelector(scope)
-  const injected = (): ShieldSectionInjected => ({ scope, useSnapshot, t })
+  const loadSnapshot: ShieldSectionInjected['loadSnapshot'] = async (sessionId) => {
+    const result = await ctx.remote.shield.snapshot(sessionId)
+    if (!result.ok) {
+      throw new Error(`shield.snapshot failed: ${result.error.code}: ${result.error.message}`)
+    }
+    return result.value
+  }
+  const injected = (): ShieldSectionInjected => ({ scope, useSnapshot, t, loadSnapshot })
   ctx.effect(() => {
     const sync = (): void => {
       const snap = scope.getSnapshot()

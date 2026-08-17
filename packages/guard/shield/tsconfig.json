@@ -19,10 +19,16 @@
       "path": "../../core/system-prompt"
     },
     {
+      "path": "../../core/session"
+    },
+    {
       "path": "../../settings/settings"
     },
     {
       "path": "../../core/tools"
+    },
+    {
+      "path": "../../typert/protocol"
     },
     {
       "path": "../../runtime-diagnostics/invariants"

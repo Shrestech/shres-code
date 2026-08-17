@@ -90,7 +90,7 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 }[T]
 ```
 
-Sources: [`packages/core/session/src/types.ts:336`](../packages/core/session/src/types.ts) · [`packages/core/session/src/types.ts:343`](../packages/core/session/src/types.ts) · [`packages/core/session/src/types.ts:372`](../packages/core/session/src/types.ts) · [`packages/core/session/src/types.ts:404`](../packages/core/session/src/types.ts)
+Sources: [`packages/core/session/src/types.ts:336`](../packages/core/session/src/types.ts) · [`packages/core/session/src/types.ts:343`](../packages/core/session/src/types.ts) · [`packages/core/session/src/types.ts:372`](../packages/core/session/src/types.ts) · [`packages/core/session/src/types.ts:416`](../packages/core/session/src/types.ts)
 
 ## Events
 
@@ -662,6 +662,23 @@ Source: [`packages/session/session-title/src/index.ts:100`](../packages/session/
 Types: [SessionTitleLlmRequestEventData](subsystems/session-title.md)
 
 Source: [`packages/session/session-title-llm/src/index.ts:43`](../packages/session/session-title-llm/src/index.ts)
+
+### `shield/*`
+
+<a id="shielddecision--log-only"></a>
+
+#### `shield/decision` — log-only
+
+```ts persistence-catalog
+/**
+ * One Shield verdict for Trajectory and the reconstructable session log.
+ * Log-only and not surface. Writers set `ignorable: true` on the envelope.
+ * Carries no scanned text, tool args, or result body.
+ */
+'shield/decision': ShieldDecision
+```
+
+Source: [`packages/guard/shield/src/types.ts:136`](../packages/guard/shield/src/types.ts)
 
 ### `step/*`
 

@@ -171,6 +171,7 @@
       "@shres-code/shres-code-host-frontend-static": ["./packages/host/frontend-static/src"],
       "@shres-code/shres-code-host-plugin-inventory": ["./packages/host/plugin-inventory/src"],
       "@shres-code/shres-code-host-plugin-inventory/types": ["./packages/host/plugin-inventory/src/types.ts"],
+      "@shres-code/shres-code-shield/types": ["./packages/guard/shield/src/types.ts"],
       "@shres-code/shres-code-client-ui-slots": ["./packages/client/ui-slots/src"],
       "@shres-code/shres-code-client-ui-attachment": ["./packages/client/ui-attachment/src"],
       "@shres-code/shres-code-client-ui-primitives": ["./packages/client/ui-primitives/src"],

@@ -666,6 +666,97 @@ describe('TrajectoryTable', () => {
     })
   })
 
+  it('shows Shield badges without changing Completed or lane labels', () => {
+    const turns: readonly TrajectoryTurnModel[] = [{
+      turn: 1,
+      groups: [{
+        title: 'Message',
+        cells: [
+          {
+            index: 1,
+            kind: 'user',
+            text: 'hello',
+            timeSeconds: 0,
+            opensTurn: true,
+            shield: {
+              verdict: 'ask',
+              rule: 'sig.input',
+              channel: 'user_message',
+              sha16: 'aaaaaaaaaaaaaaaa',
+            },
+          },
+          {
+            index: 2,
+            kind: 'tool',
+            text: 'bash',
+            callId: 'c1',
+            outputDetail: 'ok',
+            result: 'ok',
+            timeSeconds: 0.2,
+            shield: {
+              verdict: 'deny',
+              rule: 'sig.literal',
+              channel: 'tool_result',
+              sha16: 'bbbbbbbbbbbbbbbb',
+              host: 'example.com',
+            },
+          },
+          {
+            index: 3,
+            kind: 'tool',
+            text: 'read',
+            callId: 'c2',
+            outputDetail: 'x',
+            result: 'x',
+            timeSeconds: 0.1,
+          },
+        ],
+      }],
+    }]
+    const view = render(<TrajectoryTable turns={turns} {...FOLD_PROPS} />)
+    expect(screen.getByRole('row', { name: /USER, hello, Asked/ })).toBeTruthy()
+    expect(screen.getByRole('row', { name: /TOOL, bash, Blocked/ })).toBeTruthy()
+    expect(screen.getByRole('row', { name: /TOOL, read/ }).getAttribute('aria-label')).not.toContain('Blocked')
+    expect(screen.getByText('Asked')).toBeTruthy()
+    expect(screen.getByText('Blocked')).toBeTruthy()
+    expect(view.container.querySelector('[data-shield-verdict="observe"]')).toBeNull()
+    expect(screen.queryByText('Input')).toBeNull()
+
+    fireEvent.click(screen.getByRole('row', { name: /TOOL, bash, Blocked/ }))
+    expect(screen.getByText('Completed')).toBeTruthy()
+    expect(screen.getByText('Verdict')).toBeTruthy()
+    expect(screen.getByText('Rule')).toBeTruthy()
+    expect(screen.getByText('sig.literal')).toBeTruthy()
+    expect(screen.getByText('Channel')).toBeTruthy()
+    expect(screen.getByText('tool_result')).toBeTruthy()
+    expect(screen.getByText('Host')).toBeTruthy()
+    expect(screen.getByText('example.com')).toBeTruthy()
+    expect(screen.getByText('sha16')).toBeTruthy()
+    expect(screen.getByText('bbbbbbbbbbbbbbbb')).toBeTruthy()
+
+    const observed: readonly TrajectoryTurnModel[] = [{
+      turn: 1,
+      groups: [{
+        title: 'Message',
+        cells: [{
+          index: 1,
+          kind: 'context',
+          text: 'note',
+          timeSeconds: 0,
+          shield: {
+            verdict: 'observe',
+            rule: 'sig.note',
+            channel: 'user_message',
+            sha16: 'cccccccccccccccc',
+          },
+        }],
+      }],
+    }]
+    cleanup()
+    render(<TrajectoryTable turns={observed} {...FOLD_PROPS} />)
+    expect(screen.getByText('Observed')).toBeTruthy()
+  })
+
   it('keeps running and failure semantics distinct from record roles', () => {
     const view = render(<TrajectoryTable turns={TURNS} {...FOLD_PROPS} />)
     expect(view.container.querySelector('tr[data-kind="tool"][data-running="true"]')).toBeTruthy()

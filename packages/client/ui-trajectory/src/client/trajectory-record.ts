@@ -33,6 +33,20 @@ export interface TrajectorySourceBlock {
   toolName?: string
 }
 
+/** Compact Shield verdict painted on a user, context, tool, or subtool row. */
+export interface TrajectoryShieldBadge {
+  /** Outcome shown as Blocked / Asked / Observed. */
+  verdict: 'observe' | 'ask' | 'deny'
+  /** Rule id that fired. */
+  rule: string
+  /** Screened channel. */
+  channel: string
+  /** First 16 hex chars of the content digest. */
+  sha16: string
+  /** Registrable host when the finding names one. */
+  host?: string
+}
+
 /** Data and optional presentation attributes for one trajectory record. */
 export interface TrajectoryCellProps extends HTMLAttributes<HTMLDivElement> {
   /** 1-based record index shown as `#N`. */
@@ -83,6 +97,8 @@ export interface TrajectoryCellProps extends HTMLAttributes<HTMLDivElement> {
   timeSeconds: number | null
   /** Unix epoch milliseconds when this operation actually started, when known. */
   startedAt?: number | null
+  /** Compact Shield verdict copied onto this existing row. Never creates a row. */
+  shield?: TrajectoryShieldBadge
   /** Message-only prompt token count. */
   input?: number
   /** Message-only input tokens served from a provider cache. */

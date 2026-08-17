@@ -33,6 +33,9 @@
       "path": "../../compaction/compaction"
     },
     {
+      "path": "../../guard/shield"
+    },
+    {
       "path": "../../runtime-diagnostics/invariants"
     }
   ]

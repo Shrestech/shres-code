@@ -29,7 +29,11 @@ An unentitled or missing payload keeps the seat loaded and `active: false`. The 
 
 ### `ctx.shield`
 
-`ShieldHost` on `ctx.shield`. Read `status.active` and `status.reason` (`active` | `panic` | `unlicensed` | `engine-missing`). The brand mark uses `active` to choose the blue-girl / green-shield lockup.
+`ShieldHost` on `ctx.shield`. Read `status.active` and `status.reason` (`active` | `panic` | `unlicensed` | `engine-missing` | `disabled`). The brand mark uses `active` to choose the blue-girl / green-shield lockup.
+
+`ctx.shield.snapshot(sessionId?)` is the Host Remote (`shield/snapshot`) for the Settings console. It returns `{ status, stats, definitions? }` for the current session cwd (`realpath(session.header.cwd)` when a live session is known). Counts live in the engine's per-repo store, not `settings.yaml`. Disable and panic remount the payload off and still read module-level `stats.snapshot()` so last persisted counts remain with `status.reason === 'disabled'` or `'panic'`.
+
+The seat declaration-merges `'shield/decision'` onto `SessionEventMap`. The payload is the W1 decision body (`verdict`, `rule`, `reasonCode`, `channel`, `sha16`, optional `host` / `callId` / `origin` / `turn` / `step`). Writers pass `{ ignorable: true }` so older readers resume. `SESSION_FORMAT_VERSION` stays `0`.
 
 ## Model Experience
 
@@ -52,3 +56,4 @@ Inactive: none. Active: the doctrine section is prefix-stable for a given plugin
 - **License strings are not signature-verified** — a non-empty `license` entitles a package-resolved payload; cryptographic verification is deferred to the paid release of `@shres-shield/plugin`.
 - **Ask posture needs an open-turn `ctx.approval.request`** — the payload adapter maps `'allowed-once'` and fail-closes without an `agent` on the live tool execution; headless compositions stay fail-closed.
 - **The payload is not a workspace dependency** — CI without a sibling checkout or `SHRES_SHIELD_MODULE` loads the seat as `engine-missing` and does not screen.
+- **Definition freshness is optional on the snapshot** — the pane shows `—` until the engine reports `definitions`. Update-now is not this seat.

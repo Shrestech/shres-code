@@ -159,7 +159,7 @@ export function closeStandInTurn(agent: Agent): void {
  * @param agent - Agent previously prepared by {@link attachOpenTurn}.
  */
 export function reopenStandInTurn(agent: Agent): void {
-  const session = agent.session as { append(type: string, data?: unknown): void }
+  const session = agent.session as unknown as { append(type: string, data?: unknown): void }
   session.append('turn/start', { turn: 2 })
 }
 
