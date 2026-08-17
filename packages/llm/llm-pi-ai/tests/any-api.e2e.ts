@@ -5,9 +5,9 @@
  */
 
 import { afterEach, describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import LlmRuntime, { createUserMessage } from '@roos-code/roos-code-llm'
-import * as LlmPiAi from '@roos-code/roos-code-llm-pi-ai'
+import { Context } from '@shres-code/cordis'
+import LlmRuntime, { createUserMessage } from '@shres-code/shres-code-llm'
+import * as LlmPiAi from '@shres-code/shres-code-llm-pi-ai'
 import { discoverModels } from '../src/discovery.ts'
 import { assemble, type AssembledResult } from './assemble.ts'
 

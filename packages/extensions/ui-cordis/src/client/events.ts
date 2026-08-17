@@ -1,7 +1,7 @@
 /** Client-safe dynamic Cordis vocabulary re-exported through the Remote assembly. */
 
 // Type-only: merges `ctx.remote` and the forwarded-event key set into this program.
-import type {} from '@roos-code/roos-code-api-remotes/client'
+import type {} from '@shres-code/shres-code-api-remotes/client'
 
 export type {
   ApprovalRequestId,
@@ -14,4 +14,4 @@ export type {
   DynamicCordisRequestResolved,
   DynamicCordisRetracted,
   DynamicCordisRunRequest,
-} from '@roos-code/roos-code-api-remotes/client'
+} from '@shres-code/shres-code-api-remotes/client'

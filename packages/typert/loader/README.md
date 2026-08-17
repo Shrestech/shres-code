@@ -1,4 +1,4 @@
-# @roos-code/roos-code-typert-loader
+# @shres-code/shres-code-typert-loader
 
 Node-only Loader integration for generated Typert artifacts. The plugin requires `ctx.loader` and `ctx.typert`; it does not provide the registry itself.
 

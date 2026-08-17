@@ -8,11 +8,11 @@
  * price is derived from THIS fold's nodes by the replace producer. A
  * projection replacement without a claim deliberately folds with zero delta.
  *
- * @module @roos-code/roos-code-token-meter/surface-fold
+ * @module @shres-code/shres-code-token-meter/surface-fold
  */
 
-import { deriveEventMessage } from '@roos-code/roos-code-session'
-import type { SurfaceEvent } from '@roos-code/roos-code-session'
+import { deriveEventMessage } from '@shres-code/shres-code-session'
+import type { SurfaceEvent } from '@shres-code/shres-code-session'
 import type { TokenSurfaceNode } from './types.ts'
 import { estimateMessage } from './estimate.ts'
 

@@ -1,11 +1,11 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { createUserMessage, CallId, createMessage } from '@roos-code/roos-code-llm'
-import type { ContentBlock, Message, TokenUsage } from '@roos-code/roos-code-llm'
-import SessionStore, { Session, SessionId, canonicalHeader } from '@roos-code/roos-code-session'
-import type { EpochHeader, SessionEvent } from '@roos-code/roos-code-session'
-import TokenMeter from '@roos-code/roos-code-token-meter'
-import type { TokenMeasurement, TokenMeterConfig } from '@roos-code/roos-code-token-meter'
+import { Context } from '@shres-code/cordis'
+import { createUserMessage, CallId, createMessage } from '@shres-code/shres-code-llm'
+import type { ContentBlock, Message, TokenUsage } from '@shres-code/shres-code-llm'
+import SessionStore, { Session, SessionId, canonicalHeader } from '@shres-code/shres-code-session'
+import type { EpochHeader, SessionEvent } from '@shres-code/shres-code-session'
+import TokenMeter from '@shres-code/shres-code-token-meter'
+import type { TokenMeasurement, TokenMeterConfig } from '@shres-code/shres-code-token-meter'
 
 function header(model: string, extras: Omit<EpochHeader, 'config'> = {}): EpochHeader {
   return canonicalHeader({ config: { provider: 'mock', model }, ...extras })

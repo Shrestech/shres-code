@@ -5,7 +5,7 @@ Status: implemented
 
 ## Problem
 
-Roos Code needed a capability-honest one-shot delegate to Moonshot's Kimi terminal agent, plus a model-picker route that can name that CLI's model and thinking control. Without a documented headless mode the only honest fallback is the Phase 4 `moonshotai` HTTP route.
+Shres Code needed a capability-honest one-shot delegate to Moonshot's Kimi terminal agent, plus a model-picker route that can name that CLI's model and thinking control. Without a documented headless mode the only honest fallback is the Phase 4 `moonshotai` HTTP route.
 
 ## Decision
 
@@ -27,4 +27,4 @@ Parse mode is **stream-json last result**: collect stdout, require exit 0, take 
 
 ## Consequences
 
-`subagent-kimi-cli` spawns `kimi -p … --output-format stream-json --yolo` through `ctx.subprocess`. `llm-cli-bridge` forwards `GenerateOptions.model` as `--model` and maps `off`/`high` onto `--no-thinking`/`--thinking`. `roos models set kimi-cli <model> --effort high` validates against that two-value list. The CLI's own tools bypass harness approval; that limit is stated on the picker and in the user guide.
+`subagent-kimi-cli` spawns `kimi -p … --output-format stream-json --yolo` through `ctx.subprocess`. `llm-cli-bridge` forwards `GenerateOptions.model` as `--model` and maps `off`/`high` onto `--no-thinking`/`--thinking`. `shres models set kimi-cli <model> --effort high` validates against that two-value list. The CLI's own tools bypass harness approval; that limit is stated on the picker and in the user guide.

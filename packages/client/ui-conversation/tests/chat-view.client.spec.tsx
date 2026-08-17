@@ -10,17 +10,17 @@ import type {
   AssistantMessageNode, CommandNode, CompactionSummaryNode, ConversationNode, ConversationSnapshot,
   ModelRetryNode, RunningToolCall, SessionId, SessionListState, ToolCallBlock, ToolResultNode, TurnErrorNode,
   TurnMaxTokensNode, UserMessageNode, WorkspaceListState,
-} from '@roos-code/roos-code-client-runtime/client'
-import { bindSnapshotSelector } from '@roos-code/roos-code-client-web-react'
+} from '@shres-code/shres-code-client-runtime/client'
+import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
 import {
   createSnapshotStore, EMPTY_CONVERSATION_VIEWS, PendingWait,
-} from '@roos-code/roos-code-client-runtime/client'
-import { RpcId } from '@roos-code/roos-code-client-connection/client'
+} from '@shres-code/shres-code-client-runtime/client'
+import { RpcId } from '@shres-code/shres-code-client-connection/client'
 import type {
   ChatNode, ChatNodeOwnerProps, ChatNodeViewProps, ChatViewSlotProps, SelectionTarget, UseChatNodeTurnData,
-} from '@roos-code/roos-code-client-ui-conversation/client'
-import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
-import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
+} from '@shres-code/shres-code-client-ui-conversation/client'
+import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
+import { en as commonEn } from '@shres-code/shres-code-client-locale/src/locales/en.ts'
 import { createChatStore } from '../src/client/stores.ts'
 import { ChatView } from '../src/client/chat/ChatView.tsx'
 import { en } from '../src/client/locales.ts'

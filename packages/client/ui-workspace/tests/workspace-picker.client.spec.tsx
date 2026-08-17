@@ -3,11 +3,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type {
   SessionListState, WorkspaceId, WorkspaceListState, WorkspaceView,
-} from '@roos-code/roos-code-client-runtime/client'
-import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
-import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
+} from '@shres-code/shres-code-client-runtime/client'
+import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
+import { en as commonEn } from '@shres-code/shres-code-client-locale/src/locales/en.ts'
 import type { DirectoryFlowOwnerProps, WorkspacePickerProps } from '../src/client/contract/slots.ts'
-import { bindSnapshotSelector } from '@roos-code/roos-code-client-web-react'
+import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
 import { WorkspacePicker } from '../src/client/WorkspacePicker.tsx'
 import { en } from '../src/client/locales.ts'
 

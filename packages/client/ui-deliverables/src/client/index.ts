@@ -7,17 +7,17 @@
  * composing this plugin out of cordis.yml removes both surfaces entirely;
  * the owning view renders an empty chain and inert prose at zero cost.
  */
-import type { ConnectionHandle } from '@roos-code/roos-code-client-connection/client'
-import type { ClientContext } from '@roos-code/roos-code-client-runtime/client'
-import type { ChatFileMentions } from '@roos-code/roos-code-client-ui-conversation/client'
-import type {} from '@roos-code/roos-code-client-locale/client'
+import type { ConnectionHandle } from '@shres-code/shres-code-client-connection/client'
+import type { ClientContext } from '@shres-code/shres-code-client-runtime/client'
+import type { ChatFileMentions } from '@shres-code/shres-code-client-ui-conversation/client'
+import type {} from '@shres-code/shres-code-client-locale/client'
 import { ProducedFiles } from './ProducedFiles.tsx'
 import { en, NS, type DeliverablesKey } from './locales.ts'
 import {
   deliverablesDefinition, producedFileMentions, selectProducedFiles,
 } from './turn-deliverables.ts'
 
-declare module '@roos-code/roos-code-client-ui-slots' {
+declare module '@shres-code/shres-code-client-ui-slots' {
   interface LocaleNamespaceMap {
     /** Produced-files row copy. */
     'deliverables': DeliverablesKey

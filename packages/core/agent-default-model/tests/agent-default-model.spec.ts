@@ -1,11 +1,11 @@
 /** Default Agent model settings layered over a real settings provider. */
 
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import AgentDefaultModelConfig, { AGENT_DEFAULT_MODEL_SETTINGS_NAMESPACE } from '../src/index.ts'
-import { SettingsProvider } from '@roos-code/roos-code-settings'
-import type { SettingsNamespace } from '@roos-code/roos-code-settings'
-import { ReasoningEffortId } from '@roos-code/roos-code-llm'
+import { SettingsProvider } from '@shres-code/shres-code-settings'
+import type { SettingsNamespace } from '@shres-code/shres-code-settings'
+import { ReasoningEffortId } from '@shres-code/shres-code-llm'
 
 /** The smallest real provider: one in-memory document, always writable. */
 class MemorySettings extends SettingsProvider {

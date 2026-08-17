@@ -3,12 +3,12 @@
  * The tool pauses until a UI provider returns a human answer, then feeds that
  * answer back into the agent loop as an ordinary tool result.
  *
- * @module @roos-code/roos-code-tool-ask-user
+ * @module @shres-code/shres-code-tool-ask-user
  */
 
-import type { Context } from '@roos-code/cordis'
-import { defineTool } from '@roos-code/roos-code-tools'
-import '@roos-code/roos-code-user-questions'
+import type { Context } from '@shres-code/cordis'
+import { defineTool } from '@shres-code/shres-code-tools'
+import '@shres-code/shres-code-user-questions'
 
 export const name = 'tool-ask-user'
 export const inject = ['tools', 'userQuestions']

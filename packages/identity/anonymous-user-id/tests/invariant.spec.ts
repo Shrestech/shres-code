@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import InvariantRegistry from '@roos-code/roos-code-invariants'
-import * as UserIdInvariant from '@roos-code/roos-code-anonymous-user-id/invariant'
+import { Context } from '@shres-code/cordis'
+import InvariantRegistry from '@shres-code/shres-code-invariants'
+import * as UserIdInvariant from '@shres-code/shres-code-anonymous-user-id/invariant'
 
 describe('invariant companion', () => {
   it('registers the package ownership with an empty installer', async () => {

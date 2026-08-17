@@ -5,12 +5,12 @@
  * `updatedAt` stamping and invalid-account pruning happen exactly once.
  * Not re-exported from the package entrypoint — consumers see only the
  * `Workspace` interface.
- * @module @roos-code/roos-code-workspace/src/entity
+ * @module @shres-code/shres-code-workspace/src/entity
  */
 
 import { stat } from 'node:fs/promises'
-import type { SessionHeader, SessionId } from '@roos-code/roos-code-session'
-import type { KvTable } from '@roos-code/roos-code-storage-domain'
+import type { SessionHeader, SessionId } from '@shres-code/shres-code-session'
+import type { KvTable } from '@shres-code/shres-code-storage-domain'
 import type { WorkspaceRecord } from './spec.ts'
 import type { Workspace, WorkspaceId } from './types.ts'
 import { realpathNormalize } from './paths.ts'

@@ -1,11 +1,11 @@
-import { createUserMessage } from '@roos-code/roos-code-llm'
+import { createUserMessage } from '@shres-code/shres-code-llm'
 import { afterEach, describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import LlmRuntime from '@roos-code/roos-code-llm'
-import * as LlmDeepSeek from '@roos-code/roos-code-llm-deepseek'
-import SessionStore, { SessionId } from '@roos-code/roos-code-session'
-import SessionTitleService from '@roos-code/roos-code-session-title'
-import * as FirstMessageTitleProvider from '@roos-code/roos-code-session-title-first-prompt-llm'
+import { Context } from '@shres-code/cordis'
+import LlmRuntime from '@shres-code/shres-code-llm'
+import * as LlmDeepSeek from '@shres-code/shres-code-llm-deepseek'
+import SessionStore, { SessionId } from '@shres-code/shres-code-session'
+import SessionTitleService from '@shres-code/shres-code-session-title'
+import * as FirstMessageTitleProvider from '@shres-code/shres-code-session-title-first-prompt-llm'
 
 const contexts: Context[] = []
 

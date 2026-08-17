@@ -2,31 +2,31 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import LlmRuntime, { createUserMessage, CallId, HarnessError  } from '@roos-code/roos-code-llm'
-import SessionStore, { SessionId } from '@roos-code/roos-code-session'
-import type { SessionEvent } from '@roos-code/roos-code-session'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import ToolRuntime, { RUN_CODE_NAME, defineTool } from '@roos-code/roos-code-tools'
-import type { ToolExecutionResult } from '@roos-code/roos-code-tools'
-import AgentRegistry, { type Agent } from '@roos-code/roos-code-agent'
+import { Context } from '@shres-code/cordis'
+import LlmRuntime, { createUserMessage, CallId, HarnessError  } from '@shres-code/shres-code-llm'
+import SessionStore, { SessionId } from '@shres-code/shres-code-session'
+import type { SessionEvent } from '@shres-code/shres-code-session'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import ToolRuntime, { RUN_CODE_NAME, defineTool } from '@shres-code/shres-code-tools'
+import type { ToolExecutionResult } from '@shres-code/shres-code-tools'
+import AgentRegistry, { type Agent } from '@shres-code/shres-code-agent'
 
-import AgentLoop from '@roos-code/roos-code-agent-loop'
-import { LocalBashExecutor } from '@roos-code/roos-code-bash-local'
-import * as BashEnvPlugin from '@roos-code/roos-code-shell-env'
-import LocalSubprocessRuntime from '@roos-code/roos-code-subprocess-local'
-import * as ToolBash from '@roos-code/roos-code-tool-bash'
-import * as LlmDeepSeek from '@roos-code/roos-code-llm-deepseek'
-import { WorkerThreadCodeRuntime } from '@roos-code/roos-code-code-runtime-worker-thread'
-import LocalFileSystem from '@roos-code/roos-code-fs-local'
-import * as ToolFs from '@roos-code/roos-code-tool-fs'
-import * as WorkspaceContext from '@roos-code/roos-code-agent-instructions'
-import LocalJobRegistry from '@roos-code/roos-code-jobs-local'
-import * as ToolTasks from '@roos-code/roos-code-tool-jobs'
-import CordisHostRunner from '@roos-code/roos-code-cordis-host-runner'
-import * as ToolCordis from '@roos-code/roos-code-tool-cordis'
-import ApprovalService from '@roos-code/roos-code-user-approval'
-import type { ApprovalOutcome } from '@roos-code/roos-code-user-approval'
+import AgentLoop from '@shres-code/shres-code-agent-loop'
+import { LocalBashExecutor } from '@shres-code/shres-code-bash-local'
+import * as BashEnvPlugin from '@shres-code/shres-code-shell-env'
+import LocalSubprocessRuntime from '@shres-code/shres-code-subprocess-local'
+import * as ToolBash from '@shres-code/shres-code-tool-bash'
+import * as LlmDeepSeek from '@shres-code/shres-code-llm-deepseek'
+import { WorkerThreadCodeRuntime } from '@shres-code/shres-code-code-runtime-worker-thread'
+import LocalFileSystem from '@shres-code/shres-code-fs-local'
+import * as ToolFs from '@shres-code/shres-code-tool-fs'
+import * as WorkspaceContext from '@shres-code/shres-code-agent-instructions'
+import LocalJobRegistry from '@shres-code/shres-code-jobs-local'
+import * as ToolTasks from '@shres-code/shres-code-tool-jobs'
+import CordisHostRunner from '@shres-code/shres-code-cordis-host-runner'
+import * as ToolCordis from '@shres-code/shres-code-tool-cordis'
+import ApprovalService from '@shres-code/shres-code-user-approval'
+import type { ApprovalOutcome } from '@shres-code/shres-code-user-approval'
 
 /**
  * With-key Code Mode proof: a real model receives only `run_code`, composes two
@@ -189,7 +189,7 @@ describe('Code Mode typed values: keyless real-worker contracts', () => {
   })
 
   it('returns a background job id, settles the outer run, and polls that id to completion', async () => {
-    workdir = await mkdtemp(join(tmpdir(), 'roos-code-mode-background-'))
+    workdir = await mkdtemp(join(tmpdir(), 'shres-code-mode-background-'))
     ctx = await backgroundCodeModeHarness(workdir)
 
     const jobId = completion(await runCode(ctx, `
@@ -212,7 +212,7 @@ describe('Code Mode typed values: keyless real-worker contracts', () => {
   }, 15_000)
 
   it('pre-abort spawns nothing; post-publication abort leaves job_kill as the cancellation owner', async () => {
-    workdir = await mkdtemp(join(tmpdir(), 'roos-code-mode-task-cancel-'))
+    workdir = await mkdtemp(join(tmpdir(), 'shres-code-mode-task-cancel-'))
     ctx = await backgroundCodeModeHarness(workdir)
 
     const pre = new AbortController()
@@ -249,7 +249,7 @@ describe('Code Mode typed values: keyless real-worker contracts', () => {
   }, 15_000)
 
   it('keeps foreground bash coupled to the outer signal', async () => {
-    workdir = await mkdtemp(join(tmpdir(), 'roos-code-mode-foreground-cancel-'))
+    workdir = await mkdtemp(join(tmpdir(), 'shres-code-mode-foreground-cancel-'))
     ctx = await backgroundCodeModeHarness(workdir)
     const controller = new AbortController()
     const startedAt = Date.now()
@@ -361,7 +361,7 @@ function waitForIdle(harness: Context, agent: Agent): Promise<void> {
 
 describe.skipIf(!process.env.DEEPSEEK_API_KEY)('Code Mode: real model writes a program over real tools', () => {
   it('collapses the wire tool list to [run_code], bridges sub-calls, and returns curated output', async () => {
-    workdir = await mkdtemp(join(tmpdir(), 'roos-code-mode-e2e-'))
+    workdir = await mkdtemp(join(tmpdir(), 'shres-code-mode-e2e-'))
     ctx = await codeModeHarness(workdir)
     const agent = ctx.agentLoop.create(SessionId('e2e-code-mode'), { provider: 'deepseek-official', model: 'deepseek-v4-flash' })
 
@@ -406,7 +406,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('Code Mode: real model writes a p
   }, 180_000)
 
   it('projects nested workspace instructions discovered by an fs sub-call', async () => {
-    workdir = await mkdtemp(join(tmpdir(), 'roos-code-mode-workspace-e2e-'))
+    workdir = await mkdtemp(join(tmpdir(), 'shres-code-mode-workspace-e2e-'))
     await mkdir(join(workdir, '.git'), { recursive: true })
     await mkdir(join(workdir, 'pkg/deep'), { recursive: true })
     await writeFile(join(workdir, 'pkg/AGENTS.md'), `If asked for the Code Mode workspace handshake, reply with exactly ${WORKSPACE_PROBE} and nothing else.\n`)

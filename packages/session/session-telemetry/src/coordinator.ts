@@ -11,12 +11,12 @@
  * stop-on-throw) or touch the agent loop. Composed by a backend in its
  * constructor.
  *
- * @module @roos-code/roos-code-session-telemetry/coordinator
+ * @module @shres-code/shres-code-session-telemetry/coordinator
  */
 
-import type { Context } from '@roos-code/cordis'
-import type { Session, SessionEvent } from '@roos-code/roos-code-session'
-import type { Agent } from '@roos-code/roos-code-agent'
+import type { Context } from '@shres-code/cordis'
+import type { Session, SessionEvent } from '@shres-code/shres-code-session'
+import type { Agent } from '@shres-code/shres-code-agent'
 import type { SessionTelemetrySink, SessionTelemetryRecord, SessionTelemetrySeverity } from './index.ts'
 
 /** Whether capture follows live events or reads the canonical log only when requested. */

@@ -1,11 +1,11 @@
 /**
  * Load-time validation and routed-model policy resolution for compaction-basic.
  *
- * @module @roos-code/roos-code-compaction-basic/config
+ * @module @shres-code/shres-code-compaction-basic/config
  */
 
-import { deepFreeze } from '@roos-code/roos-code-llm'
-import type { LlmCallConfig } from '@roos-code/roos-code-llm'
+import { deepFreeze } from '@shres-code/shres-code-llm'
+import type { LlmCallConfig } from '@shres-code/shres-code-llm'
 import type {
   BasicCompactionConfig,
   CompactionPolicyConfig,

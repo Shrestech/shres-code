@@ -8,15 +8,15 @@
  * composes and drives them directly, so this driver owns exactly one turn with
  * one result.
  *
- * @module @roos-code/roos-code-subagent-in-process-driver
+ * @module @shres-code/shres-code-subagent-in-process-driver
  */
 
 import { randomUUID } from 'node:crypto'
-import type { Context } from '@roos-code/cordis'
-import { foldConsumedWork } from '@roos-code/roos-code-agent'
-import type { Agent, AgentHandle } from '@roos-code/roos-code-agent'
-import { SessionId, type SessionEvent, type TurnEndReason } from '@roos-code/roos-code-session'
-import { createUserMessage, type ContentBlock } from '@roos-code/roos-code-llm'
+import type { Context } from '@shres-code/cordis'
+import { foldConsumedWork } from '@shres-code/shres-code-agent'
+import type { Agent, AgentHandle } from '@shres-code/shres-code-agent'
+import { SessionId, type SessionEvent, type TurnEndReason } from '@shres-code/shres-code-session'
+import { createUserMessage, type ContentBlock } from '@shres-code/shres-code-llm'
 import {
   appendDelegatedPolicyOverrides,
   applyChildComposition,
@@ -26,14 +26,14 @@ import {
   finalAssistantOutput,
   resolveChildAgentOptions,
   resolveChildDepth,
-} from '@roos-code/roos-code-subagent'
+} from '@shres-code/shres-code-subagent'
 import type {
   ResolvedSubagentStartRequest,
   SubagentDescriptorData,
   SubagentResult,
   SubagentRun,
   SubagentStopReason,
-} from '@roos-code/roos-code-subagent'
+} from '@shres-code/shres-code-subagent'
 import {
   attachStructuredRuntime,
   type StructuredAttachment,

@@ -2,30 +2,30 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { Context } from '@roos-code/cordis'
-import Loader from '@roos-code/cordis-plugin-loader'
-import { CallId } from '@roos-code/roos-code-llm'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import ToolRuntime, { TOOL_ABORTED_BEFORE_DISPATCH } from '@roos-code/roos-code-tools'
-import { assembleContextFor, type Agent } from '@roos-code/roos-code-agent'
-import AgentRegistry from '@roos-code/roos-code-agent'
-import AgentLoop from '@roos-code/roos-code-agent-loop'
-import { mountAgentLoopTestDependencies } from '@roos-code/roos-code-agent-loop-testkit'
-import JsonlSessionPersistence from '@roos-code/roos-code-session-persistence-jsonl'
-import SubagentRuntime from '@roos-code/roos-code-subagent'
-import type { SubagentStartRequest } from '@roos-code/roos-code-subagent'
-import LocalJobRegistry from '@roos-code/roos-code-jobs-local'
-import * as SubagentSpawn from '@roos-code/roos-code-subagent-spawn-in-process'
-import * as ToolTasks from '@roos-code/roos-code-tool-jobs'
+import { Context } from '@shres-code/cordis'
+import Loader from '@shres-code/cordis-plugin-loader'
+import { CallId } from '@shres-code/shres-code-llm'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import ToolRuntime, { TOOL_ABORTED_BEFORE_DISPATCH } from '@shres-code/shres-code-tools'
+import { assembleContextFor, type Agent } from '@shres-code/shres-code-agent'
+import AgentRegistry from '@shres-code/shres-code-agent'
+import AgentLoop from '@shres-code/shres-code-agent-loop'
+import { mountAgentLoopTestDependencies } from '@shres-code/shres-code-agent-loop-testkit'
+import JsonlSessionPersistence from '@shres-code/shres-code-session-persistence-jsonl'
+import SubagentRuntime from '@shres-code/shres-code-subagent'
+import type { SubagentStartRequest } from '@shres-code/shres-code-subagent'
+import LocalJobRegistry from '@shres-code/shres-code-jobs-local'
+import * as SubagentSpawn from '@shres-code/shres-code-subagent-spawn-in-process'
+import * as ToolTasks from '@shres-code/shres-code-tool-jobs'
 import { MockAdapter, textResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
 import * as mock from './scripted-provider.ts'
 import * as tool from '../src/index.ts'
-import { SessionId } from '@roos-code/roos-code-session'
+import { SessionId } from '@shres-code/shres-code-session'
 
 const testToolSignal = new AbortController().signal
 
 /**
- * Drives the REAL plugin body: mounts `roos-tool-subagent` on a real
+ * Drives the REAL plugin body: mounts `shres-tool-subagent` on a real
  * `ToolRuntime` + `SubagentRuntime`, with a package-local scripted child
  * boundary, and invokes the registered `subagent` tool through
  * `ctx.tools.execute`. Everything downstream of the child boundary is the
@@ -67,7 +67,7 @@ function text(result: { content: { type: string; text?: string }[] }): string {
   return result.content.filter(b => b.type === 'text').map(b => b.text).join('')
 }
 
-describe('roos-tool-subagent', () => {
+describe('shres-tool-subagent', () => {
   it('rejects continuable background policy when the provider cannot prepare continuable children', async () => {
     let failure: unknown
     try {
@@ -278,14 +278,14 @@ describe('roos-tool-subagent', () => {
     })
     await ctx.plugin(tool, {
       provider: 'capture',
-      description: 'Delegate design work to Boomer, the Architect seat.',
-      labelPrefix: 'Boomer',
+      description: 'Delegate design work to Aegis, the Architect seat.',
+      labelPrefix: 'Aegis',
       maxDepth: 'provider-managed',
     })
     const schema = ctx.tools.schemas().find(entry => entry.name === 'subagent')
-    expect(schema?.description.startsWith('Delegate design work to Boomer, the Architect seat.')).toBe(true)
+    expect(schema?.description.startsWith('Delegate design work to Aegis, the Architect seat.')).toBe(true)
     await callSubagent(ctx, { description: 'design the API', prompt: 'p' })
-    expect(seen?.label).toBe('Boomer: design the API')
+    expect(seen?.label).toBe('Aegis: design the API')
   })
 
   it('defaults toolName and omits agentOptions when apply() is called directly (schema bypass)', async () => {
@@ -785,7 +785,7 @@ describe('roos-tool-subagent', () => {
   })
 })
 
-describe('roos-tool-subagent background mode', () => {
+describe('shres-tool-subagent background mode', () => {
   /** A live parent with a dedicated scope fiber for structural task cleanup. */
   function ownerAgent(ctx: Context, sessionId: string, inject: (...args: unknown[]) => void = () => {}): Agent {
     const scopeFiber = ctx.plugin(() => {})
@@ -884,7 +884,7 @@ describe('roos-tool-subagent background mode', () => {
     const ctx = await setup({ provider: 'mock' })
     const result = await callSubagent(ctx, { description: 'd', prompt: 'p', run_in_background: true })
     expect(result.isError).toBe(true)
-    expect(text(result)).toContain('background jobs unavailable: load @roos-code/roos-code-jobs')
+    expect(text(result)).toContain('background jobs unavailable: load @shres-code/shres-code-jobs')
   })
 
   it('skips background startup when the tool signal is already aborted', async () => {
@@ -1014,7 +1014,7 @@ describe('roos-tool-subagent background mode', () => {
 
 })
 
-describe('roos-tool-subagent continuable background mode', () => {
+describe('shres-tool-subagent continuable background mode', () => {
   const roots: string[] = []
   afterEach(() => {
     for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
@@ -1024,7 +1024,7 @@ describe('roos-tool-subagent continuable background mode', () => {
   async function continuableSetup() {
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
-    const root = mkdtempSync(path.join(tmpdir(), 'roos-tool-subagent-continuable-'))
+    const root = mkdtempSync(path.join(tmpdir(), 'shres-tool-subagent-continuable-'))
     roots.push(root)
     await ctx.plugin(JsonlSessionPersistence, { root })
     await ctx.plugin(AgentLoop, { agents: [] })

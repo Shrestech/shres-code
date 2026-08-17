@@ -1,8 +1,8 @@
-import { createUserMessage, createMessage, createToolResultMessage, CallId } from '@roos-code/roos-code-llm'
+import { createUserMessage, createMessage, createToolResultMessage, CallId } from '@shres-code/shres-code-llm'
 // Minimal SessionEvent builders for orchestration tests (shape mirrors what the
 // host emits; only the fields the object layer reads).
-import type { ContentBlock } from '@roos-code/roos-code-llm/types'
-import type { SessionEvent } from '@roos-code/roos-code-session/types'
+import type { ContentBlock } from '@shres-code/shres-code-llm/types'
+import type { SessionEvent } from '@shres-code/shres-code-session/types'
 
 /** One text content block (local helper). */
 const text = (t: string): ContentBlock[] => [{ type: 'text', text: t }]

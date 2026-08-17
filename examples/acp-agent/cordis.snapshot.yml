@@ -5,11 +5,11 @@
 # recorded corpus (request headers, provenance, system prompt) was captured on flash,
 # so replay holds the recorded model to stay reproducible without a re-record. A config
 # patch replaces the whole app config, so the base fields are restated verbatim.
-# With `ROOS_SNAPSHOT=replay`, the app bin reads `ROOS_SNAPSHOT_FILE` and optional
-# `ROOS_SNAPSHOT_OVERRIDE` from the harness. The one-shot patch applies at include
+# With `SHRES_SNAPSHOT=replay`, the app bin reads `SHRES_SNAPSHOT_FILE` and optional
+# `SHRES_SNAPSHOT_OVERRIDE` from the harness. The one-shot patch applies at include
 # load time, and stdout remains reserved for ACP JSON-RPC.
 - id: base
-  name: '@roos-code/cordis-plugin-include'
+  name: '@shres-code/cordis-plugin-include'
   config:
     path: ./cordis.yml
     patches:
@@ -17,14 +17,14 @@
       # a logger exists. A renamed id leaves a stale adapter entry, but replay still
       # short-circuits through `llm-replay`.
       - id: llm-deepseek
-        name: '@roos-code/roos-code-llm-deepseek'
+        name: '@shres-code/shres-code-llm-deepseek'
         disabled: true
       - id: acp-agent
-        name: '@roos-code/roos-code-acp-demo'
+        name: '@shres-code/shres-code-acp-demo'
         config:
           provider: deepseek-official
           model: deepseek-v4-flash
-          persistenceRoot: !!js process.env.ROOS_SNAPSHOT_SESSIONS_ROOT ?? './.sessions'
+          persistenceRoot: !!js process.env.SHRES_SNAPSHOT_SESSIONS_ROOT ?? './.sessions'
           # Replay fixtures are raw JSONL; the whole-config patch must restate
           # the compression choice or the default zstd frames hide the logs
           # from the harness's harvest.
@@ -36,7 +36,7 @@
 
             Verify your work by running the code or tests. Keep answers brief and factual.
       - id: sandbox
-        name: '@roos-code/roos-code-sandbox-local'
+        name: '@shres-code/shres-code-sandbox-local'
         config:
           runnerCommand:
             - bash
@@ -47,7 +47,7 @@
             - 'passthrough-runner: profile rejected'
       - insert:
           - id: llm-replay
-            name: '@roos-code/roos-code-llm-replay'
+            name: '@shres-code/shres-code-llm-replay'
             config:
               providers:
                 - id: deepseek-official

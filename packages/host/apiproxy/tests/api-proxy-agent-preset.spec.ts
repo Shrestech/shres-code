@@ -8,18 +8,18 @@
 import { mkdtempSync, realpathSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { Context } from '@roos-code/cordis'
-import AgentRegistry, { type AgentFactory } from '@roos-code/roos-code-agent'
-import type { Agent } from '@roos-code/roos-code-agent'
-import SessionStore, { SessionId, type Session } from '@roos-code/roos-code-session'
-import UserQuestionService from '@roos-code/roos-code-user-questions'
+import { Context } from '@shres-code/cordis'
+import AgentRegistry, { type AgentFactory } from '@shres-code/shres-code-agent'
+import type { Agent } from '@shres-code/shres-code-agent'
+import SessionStore, { SessionId, type Session } from '@shres-code/shres-code-session'
+import UserQuestionService from '@shres-code/shres-code-user-questions'
 import { RpcId, type RpcRequest } from '../src/api/rpc.ts'
 import type { HostFrame } from '../src/api/events.ts'
 import {
   InvalidPresetIdError, PresetExistsError, resolveSessionPreset, UnknownPresetError,
-} from '@roos-code/roos-code-agent-presets'
-import type {} from '@roos-code/roos-code-agent-presets/types'
-import { GoalId } from '@roos-code/roos-code-goal'
+} from '@shres-code/shres-code-agent-presets'
+import type {} from '@shres-code/shres-code-agent-presets/types'
+import { GoalId } from '@shres-code/shres-code-goal'
 import { createApiProxy } from '../src/api-proxy.ts'
 import { describe, expect, it } from 'vitest'
 
@@ -106,7 +106,7 @@ async function harness(
   persistence?: unknown,
   options: { userIds?: readonly string[]; defaults?: Record<string, unknown> } = {},
 ) {
-  const cwd = realpathSync(mkdtempSync(join(tmpdir(), 'roos-apiproxy-preset-')))
+  const cwd = realpathSync(mkdtempSync(join(tmpdir(), 'shres-apiproxy-preset-')))
   const ctx = new Context()
   await ctx.plugin(SessionStore)
   await ctx.plugin(AgentRegistry)

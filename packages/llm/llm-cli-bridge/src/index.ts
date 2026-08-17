@@ -4,22 +4,22 @@
  * effort arg, and env come from the optional `llm-cli-bridge` settings
  * section over this composition entry.
  *
- * @module @roos-code/roos-code-llm-cli-bridge
+ * @module @shres-code/shres-code-llm-cli-bridge
  */
 
-import type { Context } from '@roos-code/cordis'
-import { MAX_TIMER_DELAY_MS } from '@roos-code/roos-code-timeout'
-import { credentialRef } from '@roos-code/roos-code-credentials'
-import type {} from '@roos-code/roos-code-credentials'
-import { launchEnvironmentOf } from '@roos-code/roos-code-launch-environment'
+import type { Context } from '@shres-code/cordis'
+import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
+import { credentialRef } from '@shres-code/shres-code-credentials'
+import type {} from '@shres-code/shres-code-credentials'
+import { launchEnvironmentOf } from '@shres-code/shres-code-launch-environment'
 import type {
   AdapterRegistrationHandle,
   DirectoryRegistrationHandle,
   GenerateOptions,
   LlmConfigurableProvider,
-} from '@roos-code/roos-code-llm'
-import type { SessionId } from '@roos-code/roos-code-session'
-import { deepEqualJson, installSettingsSection, settingsNamespace } from '@roos-code/roos-code-settings'
+} from '@shres-code/shres-code-llm'
+import type { SessionId } from '@shres-code/shres-code-session'
+import { deepEqualJson, installSettingsSection, settingsNamespace } from '@shres-code/shres-code-settings'
 import { CliLlmAdapter } from './adapter.ts'
 import {
   Config,

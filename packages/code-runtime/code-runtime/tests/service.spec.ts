@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { CodeRuntime } from '@roos-code/roos-code-code-runtime'
-import type { CodeRunRequest, CodeRunResult } from '@roos-code/roos-code-code-runtime'
+import { Context } from '@shres-code/cordis'
+import { CodeRuntime } from '@shres-code/shres-code-code-runtime'
+import type { CodeRunRequest, CodeRunResult } from '@shres-code/shres-code-code-runtime'
 
 /**
  * Minimal concrete runtime: records requests, "executes" by invoking every

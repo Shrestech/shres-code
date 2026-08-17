@@ -2,15 +2,15 @@ import { describe, expect, it, vi } from 'vitest'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { join, sep } from 'node:path'
 import { tmpdir } from 'node:os'
-import { Context } from '@roos-code/cordis'
-import Loader from '@roos-code/cordis-plugin-loader'
-import { renderPrompt, TOOL_ORDER_REST } from '@roos-code/roos-code-system-prompt'
+import { Context } from '@shres-code/cordis'
+import Loader from '@shres-code/cordis-plugin-loader'
+import { renderPrompt, TOOL_ORDER_REST } from '@shres-code/shres-code-system-prompt'
 import * as agentCore from '../src/index.ts'
-import { agentEvents, type Agent } from '@roos-code/roos-code-agent'
-import { SessionId } from '@roos-code/roos-code-session'
-import LocalBashExecutor from '@roos-code/roos-code-bash-local'
-import LocalFileSystem from '@roos-code/roos-code-fs-local'
-import * as ToolFs from '@roos-code/roos-code-tool-fs'
+import { agentEvents, type Agent } from '@shres-code/shres-code-agent'
+import { SessionId } from '@shres-code/shres-code-session'
+import LocalBashExecutor from '@shres-code/shres-code-bash-local'
+import LocalFileSystem from '@shres-code/shres-code-fs-local'
+import * as ToolFs from '@shres-code/shres-code-tool-fs'
 import { MockAdapter, textResponse, toolCallResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
 import {
   createUserMessage,
@@ -22,16 +22,16 @@ import {
   type Message,
   type ResolvedRetryPolicy,
   type StreamChunk,
-} from '@roos-code/roos-code-llm'
-import type { ToolExecution } from '@roos-code/roos-code-tools'
-import * as sessionInvariant from '@roos-code/roos-code-session/invariant'
-import * as agentInvariant from '@roos-code/roos-code-agent/invariant'
-import * as scopeInvariant from '@roos-code/roos-code-scope/invariant'
-import * as agentLoopInvariant from '@roos-code/roos-code-agent-loop/invariant'
+} from '@shres-code/shres-code-llm'
+import type { ToolExecution } from '@shres-code/shres-code-tools'
+import * as sessionInvariant from '@shres-code/shres-code-session/invariant'
+import * as agentInvariant from '@shres-code/shres-code-agent/invariant'
+import * as scopeInvariant from '@shres-code/shres-code-scope/invariant'
+import * as agentLoopInvariant from '@shres-code/shres-code-agent-loop/invariant'
 
 const testToolSignal = new AbortController().signal
 
-declare module '@roos-code/roos-code-jobs' {
+declare module '@shres-code/shres-code-jobs' {
   interface JobKindMap {
     probe: 'probe'
   }
@@ -53,7 +53,7 @@ async function composePrefix(ctx: Context, cwd: string): Promise<Message[]> {
 }
 
 /**
- * Unit coverage for the @roos-code/roos-code-agent-spine-demo bundle: mounting it brings
+ * Unit coverage for the @shres-code/shres-code-agent-spine-demo bundle: mounting it brings
  * up the whole default spine in one `ctx.plugin`, and the forwarded
  * `agents` config reaches the loop (default `[]`, or a pre-created agent).
  *
@@ -63,10 +63,10 @@ async function composePrefix(ctx: Context, cwd: string): Promise<Message[]> {
  * bin smokes; here we assert the composition + config forwarding.
  */
 async function mount(config: agentCore.Config, withBash = false): Promise<Context> {
-  const oldRoosHome = process.env.ROOS_HOME
-  const oldAgentsHome = process.env.ROOS_AGENTS_HOME
-  process.env.ROOS_HOME = await mkdtemp(join(tmpdir(), 'roos-agent-spine-demo-home-'))
-  process.env.ROOS_AGENTS_HOME = await mkdtemp(join(tmpdir(), 'roos-agent-spine-demo-agents-'))
+  const oldShresHome = process.env.SHRES_HOME
+  const oldAgentsHome = process.env.SHRES_AGENTS_HOME
+  process.env.SHRES_HOME = await mkdtemp(join(tmpdir(), 'shres-agent-spine-demo-home-'))
+  process.env.SHRES_AGENTS_HOME = await mkdtemp(join(tmpdir(), 'shres-agent-spine-demo-agents-'))
   const ctx = new Context()
   if (withBash) {
     ctx.provide('shell', {
@@ -83,36 +83,36 @@ async function mount(config: agentCore.Config, withBash = false): Promise<Contex
     await new Promise(resolve => setTimeout(resolve, 50))
     return ctx
   } finally {
-    if (oldRoosHome === undefined) {
-      delete process.env.ROOS_HOME
+    if (oldShresHome === undefined) {
+      delete process.env.SHRES_HOME
     } else {
-      process.env.ROOS_HOME = oldRoosHome
+      process.env.SHRES_HOME = oldShresHome
     }
     if (oldAgentsHome === undefined) {
-      delete process.env.ROOS_AGENTS_HOME
+      delete process.env.SHRES_AGENTS_HOME
     } else {
-      process.env.ROOS_AGENTS_HOME = oldAgentsHome
+      process.env.SHRES_AGENTS_HOME = oldAgentsHome
     }
   }
 }
 
 async function withIsolatedSkillHomes<T>(run: () => Promise<T>): Promise<T> {
-  const oldRoosHome = process.env.ROOS_HOME
-  const oldAgentsHome = process.env.ROOS_AGENTS_HOME
-  process.env.ROOS_HOME = await mkdtemp(join(tmpdir(), 'roos-agent-spine-demo-home-'))
-  process.env.ROOS_AGENTS_HOME = await mkdtemp(join(tmpdir(), 'roos-agent-spine-demo-agents-'))
+  const oldShresHome = process.env.SHRES_HOME
+  const oldAgentsHome = process.env.SHRES_AGENTS_HOME
+  process.env.SHRES_HOME = await mkdtemp(join(tmpdir(), 'shres-agent-spine-demo-home-'))
+  process.env.SHRES_AGENTS_HOME = await mkdtemp(join(tmpdir(), 'shres-agent-spine-demo-agents-'))
   try {
     return await run()
   } finally {
-    if (oldRoosHome === undefined) {
-      delete process.env.ROOS_HOME
+    if (oldShresHome === undefined) {
+      delete process.env.SHRES_HOME
     } else {
-      process.env.ROOS_HOME = oldRoosHome
+      process.env.SHRES_HOME = oldShresHome
     }
     if (oldAgentsHome === undefined) {
-      delete process.env.ROOS_AGENTS_HOME
+      delete process.env.SHRES_AGENTS_HOME
     } else {
-      process.env.ROOS_AGENTS_HOME = oldAgentsHome
+      process.env.SHRES_AGENTS_HOME = oldAgentsHome
     }
   }
 }
@@ -144,7 +144,7 @@ class TransientOnceAdapter extends LlmAdapter {
   }
 }
 
-describe('roos-agent-spine-demo bundle', () => {
+describe('shres-agent-spine-demo bundle', () => {
   it('brings up the full default spine', async () => {
     const ctx = await mount({ workspaceContext: false })
     // One service from each layer of the spine proves the children loaded.
@@ -227,8 +227,8 @@ describe('roos-agent-spine-demo bundle', () => {
 
     for (const invariants of [
       { enabled: false },
-      { package_allowlist: ['^@roos-code/roos-code-agent$'] },
-      { package_blocklist: ['^@roos-code/roos-code-session$'] },
+      { package_allowlist: ['^@shres-code/shres-code-agent$'] },
+      { package_blocklist: ['^@shres-code/shres-code-session$'] },
     ]) {
       const filtered = await mount({ workspaceContext: false, invariants })
       expect(() => { nestedTurn(filtered) }).not.toThrow()
@@ -353,7 +353,7 @@ describe('roos-agent-spine-demo bundle', () => {
   })
 
   it('loads workspace instructions into requests through the bundled spine', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'roos-agent-spine-demo-workspace-context-'))
+    const root = await mkdtemp(join(tmpdir(), 'shres-agent-spine-demo-workspace-context-'))
     try {
       await mkdir(join(root, '.git'), { recursive: true })
       await writeFile(join(root, 'AGENTS.md'), 'bundled project rule')
@@ -375,7 +375,7 @@ describe('roos-agent-spine-demo bundle', () => {
       const firstRequestText = adapter.requests[0]?.messages.map(messageText).join('\n')
       expect(firstRequestText).toContain('hi')
       expect(firstRequestText).toContain('bundled project rule')
-      expect(adapter.requests[0]?.system).toContain('You are an AI agent powered by Roos Code.')
+      expect(adapter.requests[0]?.system).toContain('You are an AI agent powered by Shres Code.')
       expect(adapter.requests[0]?.system).not.toContain('bundled project rule')
       await handle.dispose()
       await ctx.fiber.dispose()
@@ -385,7 +385,7 @@ describe('roos-agent-spine-demo bundle', () => {
   })
 
   it('forwards agent-instructions config to the bundled loader', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'roos-agent-spine-demo-workspace-context-disabled-'))
+    const root = await mkdtemp(join(tmpdir(), 'shres-agent-spine-demo-workspace-context-disabled-'))
     try {
       await mkdir(join(root, '.git'), { recursive: true })
       await writeFile(join(root, 'AGENTS.md'), 'must not be injected')
@@ -415,9 +415,9 @@ describe('roos-agent-spine-demo bundle', () => {
   })
 
   it('forwards skill config to the registry, local provider, and model-facing consumer', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'roos-agent-spine-demo-skill-home-'))
-    const agentsHome = await mkdtemp(join(tmpdir(), 'roos-agent-spine-demo-skill-agents-'))
-    const custom = await mkdtemp(join(tmpdir(), 'roos-agent-spine-demo-skill-custom-'))
+    const home = await mkdtemp(join(tmpdir(), 'shres-agent-spine-demo-skill-home-'))
+    const agentsHome = await mkdtemp(join(tmpdir(), 'shres-agent-spine-demo-skill-agents-'))
+    const custom = await mkdtemp(join(tmpdir(), 'shres-agent-spine-demo-skill-custom-'))
     await mkdir(custom, { recursive: true })
     await writeFile(join(custom, 'custom-skill.md'), '---\nname: custom-skill\ndescription: Custom skill\n---\n\nCustom body.\n')
     const ctx = await mount({
@@ -426,7 +426,7 @@ describe('roos-agent-spine-demo bundle', () => {
       skills: {
         registry: { collectCacheMaxEntries: 4 },
         filesystem: {
-          roosHome: join(home, '.roos'),
+          shresHome: join(home, '.shres'),
           agentsHome: join(agentsHome, '.agents'),
           customSkillDirs: [custom],
         },
@@ -439,8 +439,8 @@ describe('roos-agent-spine-demo bundle', () => {
   })
 
   it('snapshots a created project skill through catalog refresh and progressive loading', { timeout: 15_000 }, async () => {
-    const root = await mkdtemp(join(tmpdir(), 'roos-agent-spine-demo-skill-refresh-'))
-    const home = await mkdtemp(join(tmpdir(), 'roos-agent-spine-demo-skill-refresh-home-'))
+    const root = await mkdtemp(join(tmpdir(), 'shres-agent-spine-demo-skill-refresh-'))
+    const home = await mkdtemp(join(tmpdir(), 'shres-agent-spine-demo-skill-refresh-home-'))
     try {
       await mkdir(join(root, '.git'), { recursive: true })
       const skillPath = '.agents/skills/hot-skill/SKILL.md'
@@ -461,7 +461,7 @@ describe('roos-agent-spine-demo bundle', () => {
         workspaceContext: false,
         skills: {
           filesystem: {
-            roosHome: join(home, '.roos'),
+            shresHome: join(home, '.shres'),
             agentsHome: join(home, '.agents'),
             watchStabilityThresholdMs: 20,
             watchPollIntervalMs: 10,
@@ -594,14 +594,14 @@ describe('roos-agent-spine-demo bundle', () => {
     }
   })
 
-  it('shares top-level roosHome between local skills and the managed bash environment', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'roos-agent-core-shared-home-'))
-    const agentsHome = await mkdtemp(join(tmpdir(), 'roos-agent-core-shared-agents-'))
+  it('shares top-level shresHome between local skills and the managed bash environment', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'shres-agent-core-shared-home-'))
+    const agentsHome = await mkdtemp(join(tmpdir(), 'shres-agent-core-shared-agents-'))
     await mkdir(join(home, 'skills'), { recursive: true })
     await writeFile(join(home, 'skills', 'shared-skill.md'), '---\nname: shared-skill\ndescription: Shared home skill\n---\n\nShared body.\n')
 
     const ctx = await mount({
-      roosHome: home,
+      shresHome: home,
       workspaceContext: false,
       skills: { filesystem: { agentsHome } },
     }, true)
@@ -609,28 +609,28 @@ describe('roos-agent-spine-demo bundle', () => {
     expect((await ctx.skills.list()).map(skill => skill.name)).toEqual(['shared-skill'])
     const execution: ToolExecution = {
       signal: testToolSignal,
-      token: Symbol('agent-core-roos-home-test') as ToolExecution['token'],
-      callId: CallId('agent-core-roos-home'),
-      rootCallId: CallId('agent-core-roos-home'),
+      token: Symbol('agent-core-shres-home-test') as ToolExecution['token'],
+      callId: CallId('agent-core-shres-home'),
+      rootCallId: CallId('agent-core-shres-home'),
       name: 'bash',
       arguments: { command: 'true' },
     }
-    expect(ctx.shellEnv.collect(execution)).toMatchObject({ ROOS_HOME: home, ROOS_SHELL: '1' })
+    expect(ctx.shellEnv.collect(execution)).toMatchObject({ SHRES_HOME: home, SHRES_SHELL: '1' })
     await ctx.fiber.dispose()
   })
 
-  it('rejects conflicting global and nested Roos home directories', () => {
+  it('rejects conflicting global and nested Shres home directories', () => {
     expect(() => {
       agentCore.apply(new Context(), {
-        roosHome: '/global-roos-home',
+        shresHome: '/global-shres-home',
         workspaceContext: false,
-        skills: { filesystem: { roosHome: '/nested-roos-home' } },
+        skills: { filesystem: { shresHome: '/nested-shres-home' } },
       })
-    }).toThrow('agent-spine-demo: roosHome and skills.filesystem.roosHome must resolve to the same directory')
+    }).toThrow('agent-spine-demo: shresHome and skills.filesystem.shresHome must resolve to the same directory')
   })
 
   it('delivers workspace instructions ahead of the first-step skill catalog', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'roos-agent-spine-demo-prefix-order-'))
+    const root = await mkdtemp(join(tmpdir(), 'shres-agent-spine-demo-prefix-order-'))
     try {
       await mkdir(join(root, '.git'), { recursive: true })
       await writeFile(join(root, 'AGENTS.md'), 'workspace rule before skills')
@@ -743,7 +743,7 @@ describe('roos-agent-spine-demo bundle', () => {
       persona: 'You are merged.',
       toolOrder: ['zulu'],
       tools: { mode: 'native' as const },
-      roosHome: '/tmp/roos-home',
+      shresHome: '/tmp/shres-home',
       sessionTitle: { fallbackMaxWords: 3, fallbackMaxBytes: 24, maxTitleBytes: 60 },
       workspaceContext: false as const,
       skills: { enabled: false },
@@ -761,7 +761,7 @@ describe('roos-agent-spine-demo bundle', () => {
       persona: appConfig.persona,
       toolOrder: appConfig.toolOrder,
       tools: appConfig.tools,
-      roosHome: appConfig.roosHome,
+      shresHome: appConfig.shresHome,
       sessionTitle: appConfig.sessionTitle,
       workspaceContext: false,
       skills: appConfig.skills,

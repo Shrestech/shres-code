@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import AgentRegistry, { Inbox } from '@roos-code/roos-code-agent'
-import type { Agent, AgentCancelCause, InboxTarget } from '@roos-code/roos-code-agent'
-import type { UserMessage } from '@roos-code/roos-code-llm'
-import SessionStore, { SessionId } from '@roos-code/roos-code-session'
+import { Context } from '@shres-code/cordis'
+import AgentRegistry, { Inbox } from '@shres-code/shres-code-agent'
+import type { Agent, AgentCancelCause, InboxTarget } from '@shres-code/shres-code-agent'
+import type { UserMessage } from '@shres-code/shres-code-llm'
+import SessionStore, { SessionId } from '@shres-code/shres-code-session'
 import {
   ScheduleId,
   createAfterScheduleRecord,

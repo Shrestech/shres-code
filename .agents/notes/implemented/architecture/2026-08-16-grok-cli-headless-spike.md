@@ -5,7 +5,7 @@ Status: implemented
 
 ## Problem
 
-Roos Code needed a capability-honest way to delegate a one-shot task to the official xAI Grok Build CLI, and a model-picker route that can select that CLI's model and reasoning effort. The harness cannot invent a wire protocol; the product CLI's documented headless flags decide whether a spawn is usable.
+Shres Code needed a capability-honest way to delegate a one-shot task to the official xAI Grok Build CLI, and a model-picker route that can select that CLI's model and reasoning effort. The harness cannot invent a wire protocol; the product CLI's documented headless flags decide whether a spawn is usable.
 
 ## Decision
 
@@ -27,4 +27,4 @@ Parse mode for both the `grok-cli` subagent and the `grok-cli` llm-cli-bridge ro
 
 ## Consequences
 
-`subagent-grok-cli` spawns `grok -p … --output-format json --always-approve --no-auto-update` through `ctx.subprocess`. `llm-cli-bridge` forwards `GenerateOptions.model` as `--model` and `GenerateOptions.reasoningEffort` as `--effort`, and `resolveModel()` advertises `low` / `medium` / `high` / `xhigh` so `roos models set grok-cli <model> --effort <level>` validates before write. The CLI's own tools bypass harness approval; that limit is stated on the picker and in the user guide.
+`subagent-grok-cli` spawns `grok -p … --output-format json --always-approve --no-auto-update` through `ctx.subprocess`. `llm-cli-bridge` forwards `GenerateOptions.model` as `--model` and `GenerateOptions.reasoningEffort` as `--effort`, and `resolveModel()` advertises `low` / `medium` / `high` / `xhigh` so `shres models set grok-cli <model> --effort <level>` validates before write. The CLI's own tools bypass harness approval; that limit is stated on the picker and in the user guide.

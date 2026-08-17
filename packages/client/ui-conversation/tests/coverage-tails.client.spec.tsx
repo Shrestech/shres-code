@@ -3,10 +3,10 @@
 // without a settings service and AssistantMarkdown reasoning/unknown block arms.
 
 import { afterEach, describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { cleanup, render } from '@testing-library/react'
-import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
-import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
+import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
+import { en as commonEn } from '@shres-code/shres-code-client-locale/src/locales/en.ts'
 import { apply as nodeApply } from '../src/index.ts'
 import { AssistantMarkdown, type AssistantMarkdownProps } from '../src/client/chat/AssistantMarkdown.tsx'
 import { en } from '../src/client/locales.ts'

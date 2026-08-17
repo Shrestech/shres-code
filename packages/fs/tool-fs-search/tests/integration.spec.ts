@@ -14,12 +14,12 @@ import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { Context } from '@roos-code/cordis'
-import { CallId } from '@roos-code/roos-code-llm'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import ToolRuntime, { TOOL_ABORTED_BEFORE_DISPATCH } from '@roos-code/roos-code-tools'
-import LocalSubprocessRuntime from '@roos-code/roos-code-subprocess-local'
-import * as ToolFsSearch from '@roos-code/roos-code-tool-fs-search'
+import { Context } from '@shres-code/cordis'
+import { CallId } from '@shres-code/shres-code-llm'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import ToolRuntime, { TOOL_ABORTED_BEFORE_DISPATCH } from '@shres-code/shres-code-tools'
+import LocalSubprocessRuntime from '@shres-code/shres-code-subprocess-local'
+import * as ToolFsSearch from '@shres-code/shres-code-tool-fs-search'
 
 const testToolSignal = new AbortController().signal
 
@@ -46,7 +46,7 @@ const agent = () => ({ session: { header: { id: 'session-int', cwd: dir } } })
 
 describe('search tools over the real subprocess service + the packaged rg', () => {
   beforeEach(async () => {
-    dir = await mkdtemp(join(tmpdir(), 'roos-search-int-'))
+    dir = await mkdtemp(join(tmpdir(), 'shres-search-int-'))
     await mkdir(join(dir, 'src'), { recursive: true })
     await mkdir(join(dir, '.git'), { recursive: true })
     await mkdir(join(dir, 'spaced dir'), { recursive: true })
@@ -161,7 +161,7 @@ describe('search tools over the real subprocess service + the packaged rg', () =
 
   describe('per-session cwd', () => {
     it('resolves the search in the SESSION workspace, not the process cwd', async () => {
-      const sessionDir = await mkdtemp(join(tmpdir(), 'roos-search-session-'))
+      const sessionDir = await mkdtemp(join(tmpdir(), 'shres-search-session-'))
       try {
         await writeFile(join(sessionDir, 'only-here.ts'), 'const sessionFile = true\n')
         const agentObj = { session: { header: { id: 'session-int', cwd: sessionDir } } }

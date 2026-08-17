@@ -1,10 +1,10 @@
 /**
  * Pure translation between the harness lifecycle and the automation-only ACP wire.
- * @module @roos-code/roos-code-acp/codec
+ * @module @shres-code/shres-code-acp/codec
  */
 
 import type { ContentBlock as AcpContentBlock, StopReason } from '@agentclientprotocol/sdk'
-import type { TurnEndReason } from '@roos-code/roos-code-session'
+import type { TurnEndReason } from '@shres-code/shres-code-session'
 
 /**
  * Map a harness turn ending to ACP's terminal reason vocabulary.

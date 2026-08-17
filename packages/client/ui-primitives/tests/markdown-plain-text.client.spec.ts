@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { extractMarkdownPlainText } from '@roos-code/roos-code-client-ui-primitives'
+import { extractMarkdownPlainText } from '@shres-code/shres-code-client-ui-primitives'
 
 const MARKDOWN = [
   '# Release notes',

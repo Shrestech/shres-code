@@ -1,6 +1,6 @@
 /** Register the Tool call tree, details renderer, and built-in atomic views. */
-import type { ClientContext } from '@roos-code/roos-code-client-runtime/client'
-import type {} from '@roos-code/roos-code-client-ui-conversation/client'
+import type { ClientContext } from '@shres-code/shres-code-client-runtime/client'
+import type {} from '@shres-code/shres-code-client-ui-conversation/client'
 import { ToolCallTree } from './tool/ToolCallTree.tsx'
 import { ToolDetails } from './tool/ToolDetails.tsx'
 import { CONVERSATION_NS as NS } from './locale.ts'

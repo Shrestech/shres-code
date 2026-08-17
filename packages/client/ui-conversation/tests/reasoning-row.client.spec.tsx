@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
-import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
-import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
+import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
+import { en as commonEn } from '@shres-code/shres-code-client-locale/src/locales/en.ts'
 import { AssistantMarkdown } from '../src/client/chat/AssistantMarkdown.tsx'
 import { en } from '../src/client/locales.ts'
 

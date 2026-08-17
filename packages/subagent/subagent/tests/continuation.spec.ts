@@ -2,19 +2,19 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { Context } from '@roos-code/cordis'
-import type { Agent } from '@roos-code/roos-code-agent'
-import AgentLoop from '@roos-code/roos-code-agent-loop'
-import { mountAgentLoopTestDependencies } from '@roos-code/roos-code-agent-loop-testkit'
-import { SessionId } from '@roos-code/roos-code-session'
-import type { SessionEvent } from '@roos-code/roos-code-session'
-import JsonlSessionPersistence from '@roos-code/roos-code-session-persistence-jsonl'
-import * as SubagentSpawn from '@roos-code/roos-code-subagent-spawn-in-process'
-import * as SubagentFork from '@roos-code/roos-code-subagent-fork-in-process'
-import type { GenerateOptions, MessageId, StreamChunk } from '@roos-code/roos-code-llm'
-import { CallId, createUserMessage, LlmAdapter } from '@roos-code/roos-code-llm'
-import { defineTool } from '@roos-code/roos-code-tools'
-import InvariantRegistry from '@roos-code/roos-code-invariants'
+import { Context } from '@shres-code/cordis'
+import type { Agent } from '@shres-code/shres-code-agent'
+import AgentLoop from '@shres-code/shres-code-agent-loop'
+import { mountAgentLoopTestDependencies } from '@shres-code/shres-code-agent-loop-testkit'
+import { SessionId } from '@shres-code/shres-code-session'
+import type { SessionEvent } from '@shres-code/shres-code-session'
+import JsonlSessionPersistence from '@shres-code/shres-code-session-persistence-jsonl'
+import * as SubagentSpawn from '@shres-code/shres-code-subagent-spawn-in-process'
+import * as SubagentFork from '@shres-code/shres-code-subagent-fork-in-process'
+import type { GenerateOptions, MessageId, StreamChunk } from '@shres-code/shres-code-llm'
+import { CallId, createUserMessage, LlmAdapter } from '@shres-code/shres-code-llm'
+import { defineTool } from '@shres-code/shres-code-tools'
+import InvariantRegistry from '@shres-code/shres-code-invariants'
 import { MockAdapter, maxTokensResponse, textResponse, toolCallResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
 import SubagentRuntime, {
   SubagentError,
@@ -63,7 +63,7 @@ async function setupWith(adapter: LlmAdapter, options: { persistence?: boolean }
   let disposePersistence: (() => Promise<void>) | undefined
   let root: string | undefined
   if (options.persistence !== false) {
-    root = mkdtempSync(join(tmpdir(), 'roos-subagent-continuation-'))
+    root = mkdtempSync(join(tmpdir(), 'shres-subagent-continuation-'))
     roots.push(root)
     const persistenceFiber = await ctx.plugin(JsonlSessionPersistence, { root })
     disposePersistence = () => persistenceFiber.dispose()
@@ -1601,7 +1601,7 @@ describe('continuable settlement delivery', () => {
       { chunks: textResponse('parent ack') },
     ])
     const { ctx, parent } = await setupWith(adapter)
-    // The shipped durability checkpoint (`roos-session-checkpoint-policy`) is
+    // The shipped durability checkpoint (`shres-session-checkpoint-policy`) is
     // fail-closed at the step boundary, so a rejected write ends the turn after
     // it claimed its messages and before it entered a step.
     ctx.on('agent/pre-step', async ({ agent: subject, turn }, next) => {
@@ -2283,7 +2283,7 @@ describe('continuable errors', () => {
     const adapter = new GatedAdapter([{ chunks: textResponse('child'), gate: hold.promise }])
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
-    const root = mkdtempSync(join(tmpdir(), 'roos-subagent-continuation-'))
+    const root = mkdtempSync(join(tmpdir(), 'shres-subagent-continuation-'))
     roots.push(root)
     await ctx.plugin(JsonlSessionPersistence, { root })
     await ctx.plugin(AgentLoop, { agents: [] })

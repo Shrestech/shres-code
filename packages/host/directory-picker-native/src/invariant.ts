@@ -1,12 +1,12 @@
 /**
  * Package-owned invariant companion for the native directory-picker backend.
- * @module @roos-code/roos-code-host-directory-picker-native/invariant
+ * @module @shres-code/shres-code-host-directory-picker-native/invariant
  */
 
-import type { Context } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-host-directory-picker-native'
+const PACKAGE_NAME = '@shres-code/shres-code-host-directory-picker-native'
 
 /** Cordis companion plugin name. */
 export const name = 'host-directory-picker-native-invariant'

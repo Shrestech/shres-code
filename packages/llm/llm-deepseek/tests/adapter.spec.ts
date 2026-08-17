@@ -2,20 +2,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { Context } from '@roos-code/cordis'
-import { createLaunchEnvironmentSnapshot } from '@roos-code/roos-code-launch-environment'
+import { Context } from '@shres-code/cordis'
+import { createLaunchEnvironmentSnapshot } from '@shres-code/shres-code-launch-environment'
 import LlmRuntime, { createUserMessage,
   CONTEXT_WINDOW_EXCEEDED_CODE,
   ProviderRequestId,
   QUOTA_EXCEEDED_CODE,
   ReasoningEffortId,
   userAgent,
-} from '@roos-code/roos-code-llm'
-import { MAX_TIMER_DELAY_MS } from '@roos-code/roos-code-timeout'
-import { getOrCreateAnonymousUserId, type AnonymousUserId } from '@roos-code/roos-code-anonymous-user-id'
-import { SessionId } from '@roos-code/roos-code-session'
-import * as LlmDeepSeek from '@roos-code/roos-code-llm-deepseek'
-import { DeepSeekAdapter, resolveAdapterOptions } from '@roos-code/roos-code-llm-deepseek'
+} from '@shres-code/shres-code-llm'
+import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
+import { getOrCreateAnonymousUserId, type AnonymousUserId } from '@shres-code/shres-code-anonymous-user-id'
+import { SessionId } from '@shres-code/shres-code-session'
+import * as LlmDeepSeek from '@shres-code/shres-code-llm-deepseek'
+import { DeepSeekAdapter, resolveAdapterOptions } from '@shres-code/shres-code-llm-deepseek'
 import { httpErrorCode } from '../src/adapter.ts'
 import { assemble } from './assemble.ts'
 import { closeMockServers, mockServer, textEvents } from './mock-server.ts'
@@ -25,8 +25,8 @@ const TEST_USER_ID = '00000000-0000-4000-8000-000000000001' as AnonymousUserId
 let testHome: string
 
 beforeEach(() => {
-  testHome = mkdtempSync(join(tmpdir(), 'roos-llm-deepseek-'))
-  vi.stubEnv('ROOS_HOME', testHome)
+  testHome = mkdtempSync(join(tmpdir(), 'shres-llm-deepseek-'))
+  vi.stubEnv('SHRES_HOME', testHome)
 })
 
 afterEach(async () => {
@@ -82,12 +82,12 @@ describe('DeepSeekAdapter against a mock server', () => {
     })
     // App attribution and DeepSeek request identity are independent wire facts.
     expect(server.headers[0]?.['user-agent']).toBe(userAgent())
-    expect(server.headers[0]?.['x-roos-code-user-id']).toBe(getOrCreateAnonymousUserId())
-    expect(server.headers[0]).not.toHaveProperty('x-roos-code-session-id')
+    expect(server.headers[0]?.['x-shres-code-user-id']).toBe(getOrCreateAnonymousUserId())
+    expect(server.headers[0]).not.toHaveProperty('x-shres-code-session-id')
     expect(server.headers[0]).not.toHaveProperty('http-referer')
     expect(server.headers[0]).not.toHaveProperty('x-openrouter-title')
     expect(server.headers[0]).not.toHaveProperty('x-openrouter-categories')
-    expect(server.headers[0]).not.toHaveProperty('x-roos-code-compact')
+    expect(server.headers[0]).not.toHaveProperty('x-shres-code-compact')
   })
 
   it('streams raw chunks through ctx.llm.stream', async () => {
@@ -121,8 +121,8 @@ describe('DeepSeekAdapter against a mock server', () => {
       sessionId: SessionId('child-session'),
     })
 
-    expect(server.headers[0]?.['x-roos-code-session-id']).toBe('child-session')
-    expect(server.headers[0]?.['x-roos-code-user-id']).toBe(getOrCreateAnonymousUserId())
+    expect(server.headers[0]?.['x-shres-code-session-id']).toBe('child-session')
+    expect(server.headers[0]?.['x-shres-code-user-id']).toBe(getOrCreateAnonymousUserId())
   })
 
   it('marks the auxiliary compaction call on the wire', async () => {
@@ -138,7 +138,7 @@ describe('DeepSeekAdapter against a mock server', () => {
       purpose: 'compaction',
     })
 
-    expect(server.headers[0]?.['x-roos-code-compact']).toBe('1')
+    expect(server.headers[0]?.['x-shres-code-compact']).toBe('1')
   })
 
   it('switches dynamically from the configured high default through off to max', async () => {
@@ -975,7 +975,7 @@ describe('plugin registration and config', () => {
 
   it('takes DEEPSEEK_BASE_URL from any environment layer, with explicit config still on top', () => {
     const trusted = createLaunchEnvironmentSnapshot([
-      { source: 'user-env', path: '/home/.roos/.env', values: { DEEPSEEK_BASE_URL: 'https://user.example' } },
+      { source: 'user-env', path: '/home/.shres/.env', values: { DEEPSEEK_BASE_URL: 'https://user.example' } },
     ])
     expect(resolveAdapterOptions({}, trusted).baseURL).toBe('https://user.example')
     // The product trusts the project it is launched in, so a checkout can

@@ -5,8 +5,8 @@
  * unwired fail-loud, and re-attach overwriting a stale action set.
  */
 import { describe, expect, it, vi } from 'vitest'
-import { LayoutController } from '@roos-code/roos-code-client-ui-layout/src/client/service.ts'
-import type { PanelActions } from '@roos-code/roos-code-client-ui-layout/src/client/service.ts'
+import { LayoutController } from '@shres-code/shres-code-client-ui-layout/src/client/service.ts'
+import type { PanelActions } from '@shres-code/shres-code-client-ui-layout/src/client/service.ts'
 
 function fakePanels(): PanelActions {
   return {

@@ -1,19 +1,19 @@
 /**
  * Concrete session-query service with SQLite FTS5 over the live-preferred corpus.
  *
- * @module @roos-code/roos-code-session-query-sqlite
+ * @module @shres-code/shres-code-session-query-sqlite
  */
 
 import { createHash, randomUUID } from 'node:crypto'
 import type { DatabaseSync } from 'node:sqlite'
-import { Context, Service, type Fiber } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import type { Session, SessionEvent, SessionHeader, SessionId } from '@roos-code/roos-code-session'
-import type SessionPersistence from '@roos-code/roos-code-session-persistence'
+import { Context, Service, type Fiber } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import type { Session, SessionEvent, SessionHeader, SessionId } from '@shres-code/shres-code-session'
+import type SessionPersistence from '@shres-code/shres-code-session-persistence'
 import type {
   SessionPersistenceRevision,
   SessionPersistenceSnapshot,
-} from '@roos-code/roos-code-session-persistence'
+} from '@shres-code/shres-code-session-persistence'
 import SessionQueryEngine, {
   SESSION_QUERY_DEFAULT_PERSISTED_INSPECT_CONCURRENCY,
   SESSION_QUERY_READ_WINDOW_MAX,
@@ -21,7 +21,7 @@ import SessionQueryEngine, {
   SessionSearchCursor,
   assertSessionHeadersCompatible,
   buildSessionEventSearchDocuments,
-} from '@roos-code/roos-code-session-query'
+} from '@shres-code/shres-code-session-query'
 import type {
   Config as SessionQueryConfig,
   SessionEventSearchDocument,
@@ -33,7 +33,7 @@ import type {
   SessionSearchCursor as SessionSearchCursorValue,
   SessionSearchPage,
   SessionSearchRequest,
-} from '@roos-code/roos-code-session-query'
+} from '@shres-code/shres-code-session-query'
 import {
   type JournalMode,
   openSearchDatabase,
@@ -65,7 +65,7 @@ export {
 /** Boot-context slot for a launcher-owned absolute path to this process's derived query index. */
 export const SESSION_QUERY_SQLITE_PATH_KEY = 'launcherSessionQueryPath'
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     /** Launcher-owned absolute path to this process's disposable derived query index. */
     launcherSessionQueryPath?: string

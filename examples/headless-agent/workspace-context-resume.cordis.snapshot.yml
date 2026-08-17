@@ -3,29 +3,29 @@
 # while the session is offline, then resumes through the public agent service.
 
 - id: persistence
-  name: '@roos-code/roos-code-session-persistence-jsonl'
+  name: '@shres-code/shres-code-session-persistence-jsonl'
   config:
     root: './.sessions'
     compression: none
 
 - id: replay
-  name: '@roos-code/roos-code-llm-replay'
+  name: '@shres-code/shres-code-llm-replay'
   config:
-    file: !!js process.env.ROOS_SNAPSHOT_FILE
-    overrideFile: !!js process.env.ROOS_SNAPSHOT_OVERRIDE
+    file: !!js process.env.SHRES_SNAPSHOT_FILE
+    overrideFile: !!js process.env.SHRES_SNAPSHOT_OVERRIDE
 
 - id: fs-local
-  name: '@roos-code/roos-code-fs-local'
+  name: '@shres-code/shres-code-fs-local'
   config:
     cwd: !!js process.cwd()
 
 - id: agent
-  name: '@roos-code/roos-code-agent-spine-demo'
+  name: '@shres-code/shres-code-agent-spine-demo'
   config:
     agents: []
     workspaceContext:
       maxBytes: 65536
-      roosHome: !!js process.cwd() + '/.roos'
+      shresHome: !!js process.cwd() + '/.shres'
     skills:
       enabled: false
     toolBash: false

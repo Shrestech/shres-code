@@ -5,9 +5,9 @@
  * settings surface.
  */
 import { useState } from 'react'
-import type { PropsLocale, PropsRuntime, PropsStore } from '@roos-code/roos-code-client-ui-slots'
-import { IconChevronDownOutline14, Menu } from '@roos-code/roos-code-client-ui-primitives'
-import type {} from '@roos-code/roos-code-client-ui-settings/client'
+import type { PropsLocale, PropsRuntime, PropsStore } from '@shres-code/shres-code-client-ui-slots'
+import { IconChevronDownOutline14, Menu } from '@shres-code/shres-code-client-ui-primitives'
+import type {} from '@shres-code/shres-code-client-ui-settings/client'
 import type { createLanguageRowStore } from './settings-store.ts'
 import css from './LanguageRow.module.css'
 

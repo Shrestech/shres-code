@@ -1,17 +1,17 @@
 /**
  * Persistent shell PTY backend over the subprocess terminal primitive, shared
  * sandbox policy, bounded output, and provider-owned session cleanup.
- * @module @roos-code/roos-code-terminal-bash
+ * @module @shres-code/shres-code-terminal-bash
  */
 
-import { Context } from '@roos-code/cordis'
-import type { Agent } from '@roos-code/roos-code-agent'
-import type { Session, SessionEvent } from '@roos-code/roos-code-session'
-import { TerminalBackendCleanupError } from '@roos-code/roos-code-terminal'
-import type { TerminalBackend, TerminalBackendSpawnSpec } from '@roos-code/roos-code-terminal'
-import type { SubprocessTerminalHandle, SubprocessTerminalSpawnSpec } from '@roos-code/roos-code-subprocess'
-import type { SandboxExecutionPolicy } from '@roos-code/roos-code-sandbox'
-import { effectiveSandboxMode } from '@roos-code/roos-code-sandbox-policy'
+import { Context } from '@shres-code/cordis'
+import type { Agent } from '@shres-code/shres-code-agent'
+import type { Session, SessionEvent } from '@shres-code/shres-code-session'
+import { TerminalBackendCleanupError } from '@shres-code/shres-code-terminal'
+import type { TerminalBackend, TerminalBackendSpawnSpec } from '@shres-code/shres-code-terminal'
+import type { SubprocessTerminalHandle, SubprocessTerminalSpawnSpec } from '@shres-code/shres-code-subprocess'
+import type { SandboxExecutionPolicy } from '@shres-code/shres-code-sandbox'
+import { effectiveSandboxMode } from '@shres-code/shres-code-sandbox-policy'
 import { type Config, type ResolvedConfig, validateConfig } from './config.ts'
 import { LocalPtySession } from './session.ts'
 import { CONTROLLED_PROMPT } from './sanitize.ts'
@@ -62,9 +62,9 @@ function childEnvironment(spec: TerminalBackendSpawnSpec): Record<string, string
     PS1: CONTROLLED_PROMPT,
     PROMPT_COMMAND: 'printf "\\033]133;D;%s\\007" "$?"',
     BASH_SILENCE_DEPRECATION_WARNING: '1',
-    ROOS_SHELL: '1',
-    ROOS_SESSION_ID: spec.owner.id,
-    ROOS_PTY_SESSION_ID: spec.sessionId,
+    SHRES_SHELL: '1',
+    SHRES_SESSION_ID: spec.owner.id,
+    SHRES_PTY_SESSION_ID: spec.sessionId,
   }
 }
 

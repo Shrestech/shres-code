@@ -1,17 +1,17 @@
 /**
  * Durable, lifecycle-bound feedback for finalized assistant messages.
- * @module @roos-code/roos-code-message-feedback
+ * @module @shres-code/shres-code-message-feedback
  */
 
 import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
-import { Context, Service } from '@roos-code/cordis'
-import s from '@roos-code/schemastery'
-import { deriveEventMessage, isAppendSurfaceEvent } from '@roos-code/roos-code-session/surface'
-import type { SessionHeader, SessionId } from '@roos-code/roos-code-session/types'
-import type { SessionInspection } from '@roos-code/roos-code-session-persistence'
-import type { KvTable } from '@roos-code/roos-code-storage-domain'
-import { TypertRemoteService, Remote } from '@roos-code/roos-code-typert-protocol'
+import { Context, Service } from '@shres-code/cordis'
+import s from '@shres-code/schemastery'
+import { deriveEventMessage, isAppendSurfaceEvent } from '@shres-code/shres-code-session/surface'
+import type { SessionHeader, SessionId } from '@shres-code/shres-code-session/types'
+import type { SessionInspection } from '@shres-code/shres-code-session-persistence'
+import type { KvTable } from '@shres-code/shres-code-storage-domain'
+import { TypertRemoteService, Remote } from '@shres-code/shres-code-typert-protocol'
 import { messageFeedbackDomainSpec } from './spec.ts'
 import type { MessageFeedbackRow, MessageFeedbackSessionIdentity } from './spec.ts'
 import type {
@@ -51,7 +51,7 @@ export interface Config {
   readonly maxNoteBytes: number
 }
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     messageFeedback: MessageFeedbackService
   }

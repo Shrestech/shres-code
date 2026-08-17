@@ -1,6 +1,6 @@
 import {
   createSnapshotStore, type SnapshotStore,
-} from '@roos-code/roos-code-client-runtime/client'
+} from '@shres-code/shres-code-client-runtime/client'
 
 /**
  * Create the browser-wide trajectory duration preference source.
@@ -8,6 +8,6 @@ import {
  */
 export function createTrajectoryDurationStore(): SnapshotStore<boolean> {
   return createSnapshotStore(false, {
-    persist: { name: 'roos.trajectory.duration' },
+    persist: { name: 'shres.trajectory.duration' },
   })
 }

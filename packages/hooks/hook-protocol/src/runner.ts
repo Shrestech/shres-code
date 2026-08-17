@@ -3,10 +3,10 @@
  * process-group cancellation, and timeout machinery. The bridge supplies the
  * trusted stdin payload and dialect environment, then this module decodes the
  * captured outcome.
- * @module @roos-code/roos-code-hook-protocol/runner
+ * @module @shres-code/shres-code-hook-protocol/runner
  */
 
-import type { ShellExecutor } from '@roos-code/roos-code-shell'
+import type { ShellExecutor } from '@shres-code/shres-code-shell'
 import { parseHookOutput } from './codec.ts'
 import type { CommandHook, HookOutput } from './types.ts'
 

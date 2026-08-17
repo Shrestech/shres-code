@@ -1,20 +1,20 @@
-import { createUserMessage } from '@roos-code/roos-code-llm'
+import { createUserMessage } from '@shres-code/shres-code-llm'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { SessionId, type SessionEvent } from '@roos-code/roos-code-session'
-import JsonlSessionPersistence from '@roos-code/roos-code-session-persistence-jsonl'
-import type { Agent } from '@roos-code/roos-code-agent'
-import AgentLoop from '@roos-code/roos-code-agent-loop'
-import { mountAgentLoopTestDependencies } from '@roos-code/roos-code-agent-loop-testkit'
-import LocalJobRegistry from '@roos-code/roos-code-jobs-local'
-import * as ToolTasks from '@roos-code/roos-code-tool-jobs'
-import { LocalBashExecutor } from '@roos-code/roos-code-bash-local'
-import LocalSubprocessRuntime from '@roos-code/roos-code-subprocess-local'
-import * as ToolBash from '@roos-code/roos-code-tool-bash'
-import * as BashEnvPlugin from '@roos-code/roos-code-shell-env'
+import { SessionId, type SessionEvent } from '@shres-code/shres-code-session'
+import JsonlSessionPersistence from '@shres-code/shres-code-session-persistence-jsonl'
+import type { Agent } from '@shres-code/shres-code-agent'
+import AgentLoop from '@shres-code/shres-code-agent-loop'
+import { mountAgentLoopTestDependencies } from '@shres-code/shres-code-agent-loop-testkit'
+import LocalJobRegistry from '@shres-code/shres-code-jobs-local'
+import * as ToolTasks from '@shres-code/shres-code-tool-jobs'
+import { LocalBashExecutor } from '@shres-code/shres-code-bash-local'
+import LocalSubprocessRuntime from '@shres-code/shres-code-subprocess-local'
+import * as ToolBash from '@shres-code/shres-code-tool-bash'
+import * as BashEnvPlugin from '@shres-code/shres-code-shell-env'
 import { MockAdapter, textResponse, toolCallResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
 
 /**
@@ -23,7 +23,7 @@ import { MockAdapter, textResponse, toolCallResponse } from '../../../core/agent
  * (tool/call + tool/result session events, the generic `ctx.jobs` runtime,
  * agent.inject completion notices).
  */
-async function harness(adapter: MockAdapter, sessionRoot?: string, roosHome?: string) {
+async function harness(adapter: MockAdapter, sessionRoot?: string, shresHome?: string) {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
   if (sessionRoot !== undefined) {
@@ -33,7 +33,7 @@ async function harness(adapter: MockAdapter, sessionRoot?: string, roosHome?: st
   await ctx.plugin(LocalJobRegistry)
   await ctx.plugin(ToolTasks)
   await ctx.plugin(LocalSubprocessRuntime)
-  await ctx.plugin(BashEnvPlugin, roosHome === undefined ? {} : { roosHome })
+  await ctx.plugin(BashEnvPlugin, shresHome === undefined ? {} : { shresHome })
   await ctx.plugin(LocalBashExecutor, { timeoutMs: 10_000 })
   await ctx.plugin(ToolBash)
   ctx.llm.registerAdapter(['mock'], adapter)
@@ -94,18 +94,18 @@ async function pollUntil(predicate: () => boolean, timeoutMs = 5_000): Promise<v
 
 describe('bash tool through the agent loop', () => {
   it('first-turn bash receives session identity before the lazy JSONL file materializes', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'roos-bash-session-env-'))
+    const root = mkdtempSync(join(tmpdir(), 'shres-bash-session-env-'))
     dirs.push(root)
-    const roosHome = join(root, 'roos-home')
-    vi.stubEnv('ROOS_STALE_PARENT', 'stale')
+    const shresHome = join(root, 'shres-home')
+    vi.stubEnv('SHRES_STALE_PARENT', 'stale')
     const adapter = new MockAdapter([
       toolCallResponse('call-1', 'bash', {
-        command: 'printf \'%s\\n%s\\n%s\\n%s\\n%s\\n\' "$ROOS_HOME" "$ROOS_SHELL" "$ROOS_SESSION_ID" "$ROOS_SESSION_JSONL" "${ROOS_STALE_PARENT-unset}"; if [ -e "$ROOS_SESSION_JSONL" ]; then printf \'present\\n\'; else printf \'absent\\n\'; fi',
+        command: 'printf \'%s\\n%s\\n%s\\n%s\\n%s\\n\' "$SHRES_HOME" "$SHRES_SHELL" "$SHRES_SESSION_ID" "$SHRES_SESSION_JSONL" "${SHRES_STALE_PARENT-unset}"; if [ -e "$SHRES_SESSION_JSONL" ]; then printf \'present\\n\'; else printf \'absent\\n\'; fi',
         description: 'inspect session environment',
       }),
       textResponse('Session environment inspected.'),
     ])
-    const ctx = await harness(adapter, root, roosHome)
+    const ctx = await harness(adapter, root, shresHome)
     const handle = await ctx.agents.create({
       sessionId: SessionId('session-env-id'),
       agentOptions: { provider: 'mock', model: 'mock' },
@@ -118,7 +118,7 @@ describe('bash tool through the agent loop', () => {
     await waitForIdle(ctx, agent)
 
     const result = findEvent(events(agent), 'tool/result')
-    expect(resultText(result)).toBe(`${roosHome}\n1\nsession-env-id\n${location?.path}\nunset\nabsent\n`)
+    expect(resultText(result)).toBe(`${shresHome}\n1\nsession-env-id\n${location?.path}\nunset\nabsent\n`)
     await ctx.sessions.flush(agent.session)
     expect(existsSync(location!.path)).toBe(true)
     const header = JSON.parse(readFileSync(location!.path, 'utf8').split('\n')[0]!) as { type: string; id: string }
@@ -181,7 +181,7 @@ describe('bash tool through the agent loop', () => {
     // claim, which folds the notice into a turn whose scripted reply is final:
     // the turn then closes with an empty next-step inbox and the collection
     // entries are never reached.
-    const dir = mkdtempSync(join(tmpdir(), 'roos-bg-'))
+    const dir = mkdtempSync(join(tmpdir(), 'shres-bg-'))
     dirs.push(dir)
     const sentinel = join(dir, 'release')
     // The job id is deterministic (a fresh LocalJobRegistry counts per kind from 1),

@@ -5,8 +5,8 @@
  * RpcReceipt carrier receipt as the HTTP response body; the final outcome arrives in the resolved frame.
  */
 
-import type { ApprovalRequestId } from '@roos-code/roos-code-user-approval/types'
-import type { SessionId } from '@roos-code/roos-code-session/types'
+import type { ApprovalRequestId } from '@shres-code/shres-code-user-approval/types'
+import type { SessionId } from '@shres-code/shres-code-session/types'
 
 /**
  * Approval answer payload (the result.value slot of a client-response). outcome accepts only

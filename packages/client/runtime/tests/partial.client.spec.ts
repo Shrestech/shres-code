@@ -4,7 +4,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import type { StreamChunk } from '@roos-code/roos-code-api-remotes/client'
+import type { StreamChunk } from '@shres-code/shres-code-api-remotes/client'
 import { PartialAccumulator } from '../src/client/sessions/partial.ts'
 
 const chunk = (c: Record<string, unknown>): StreamChunk => c as unknown as StreamChunk

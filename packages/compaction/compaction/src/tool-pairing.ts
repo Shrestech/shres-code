@@ -2,10 +2,10 @@
  * Tool-pairing balance over a session surface. Compaction changes surface
  * positions, so safe cuts are derived from tool-call/result content in current
  * surface order rather than step markers.
- * @module @roos-code/roos-code-compaction/tool-pairing
+ * @module @shres-code/shres-code-compaction/tool-pairing
  */
 
-import type { Session, SessionEvent } from '@roos-code/roos-code-session'
+import type { Session, SessionEvent } from '@shres-code/shres-code-session'
 
 /** Incremental balance state for one session surface generation. */
 interface BalanceCache {

@@ -2,8 +2,8 @@
 
 import type {
   HostFrame, IApiClient, RpcError, RpcRequest, RpcResult, SessionId, WorkspaceId, WorkspaceView,
-} from '@roos-code/roos-code-api-remotes/client'
-import { transportError } from '@roos-code/roos-code-host-apiproxy/api'
+} from '@shres-code/shres-code-api-remotes/client'
+import { transportError } from '@shres-code/shres-code-host-apiproxy/api'
 import { Notifier } from '../sessions/notifier.ts'
 import { Workspace, type WorkspaceCreateInput } from './workspace.ts'
 

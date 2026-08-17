@@ -2,11 +2,11 @@
  * Deliverables plugin, node half. Registers the response-format guidance that
  * lets the browser half recognize final-response file references. The browser
  * half ships via exports["./client"], discovered through the package.json
- * roos.client declaration.
+ * shres.client declaration.
  */
 
-import type { Context } from '@roos-code/cordis'
-import type {} from '@roos-code/roos-code-system-prompt'
+import type { Context } from '@shres-code/cordis'
+import type {} from '@shres-code/shres-code-system-prompt'
 
 /** Services required for the model guidance paired with the browser renderer. */
 export const inject = ['systemPrompt']

@@ -1,13 +1,13 @@
 /**
  * Tests for the filesystem Service Definition: registration, duplicate-service
  * behavior, disposal, and the branded id factories. The provider primitives and
- * policy live in `roos-fs-local` and `roos-fs-observation-policy`; this seam owns only the
+ * policy live in `shres-fs-local` and `shres-fs-observation-policy`; this seam owns only the
  * abstract service contract, so a minimal fake backend exercises it.
  */
 
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { FileSystem, FsError, FsTargetKey, FsVersion } from '@roos-code/roos-code-fs'
+import { Context } from '@shres-code/cordis'
+import { FileSystem, FsError, FsTargetKey, FsVersion } from '@shres-code/shres-code-fs'
 import type {
   FsDirEntry,
   FsEditOutcome,
@@ -17,7 +17,7 @@ import type {
   FsTarget,
   FsWriteIntent,
   FsWriteOutcome,
-} from '@roos-code/roos-code-fs'
+} from '@shres-code/shres-code-fs'
 
 /** A minimal in-memory fake implementing the provider primitives. */
 class FakeFileSystem extends FileSystem {

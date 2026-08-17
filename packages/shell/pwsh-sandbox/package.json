@@ -1,13 +1,13 @@
 {
-  "name": "@roos-code/roos-code-pwsh-sandbox",
-  "description": "Sandbox-consuming implementation of the Roos Code PowerShell executor seam (confines every command via ctx.sandbox, reports denial/enforcement result facts)",
+  "name": "@shres-code/shres-code-pwsh-sandbox",
+  "description": "Sandbox-consuming implementation of the Shres Code PowerShell executor seam (confines every command via ctx.sandbox, reports denial/enforcement result facts)",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "packages/shell/pwsh-sandbox"
   },
   "type": "module",
@@ -32,21 +32,21 @@
   ],
   "license": "MIT",
   "peerDependencies": {
-    "@roos-code/roos-code-shell": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-pwsh-local": "workspace:^",
-    "@roos-code/roos-code-sandbox": "workspace:^",
-    "@roos-code/roos-code-sandbox-policy": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-shell": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-pwsh-local": "workspace:^",
+    "@shres-code/shres-code-sandbox": "workspace:^",
+    "@shres-code/shres-code-sandbox-policy": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   },
   "devDependencies": {
-    "@roos-code/roos-code-shell": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-pwsh-local": "workspace:^",
-    "@roos-code/roos-code-sandbox": "workspace:^",
-    "@roos-code/roos-code-sandbox-local": "workspace:^",
-    "@roos-code/roos-code-sandbox-policy": "workspace:^",
-    "@roos-code/roos-code-subprocess-local": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-shell": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-pwsh-local": "workspace:^",
+    "@shres-code/shres-code-sandbox": "workspace:^",
+    "@shres-code/shres-code-sandbox-local": "workspace:^",
+    "@shres-code/shres-code-sandbox-policy": "workspace:^",
+    "@shres-code/shres-code-subprocess-local": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   }
 }

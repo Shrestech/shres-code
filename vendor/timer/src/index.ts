@@ -1,6 +1,6 @@
-import { Context, Service } from '@roos-code/cordis'
+import { Context, Service } from '@shres-code/cordis'
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context extends Pick<TimerService, 'interval' | 'timeout' | 'throttle' | 'debounce' | 'setTimeout' | 'setInterval'> {
     timer: TimerService
   }

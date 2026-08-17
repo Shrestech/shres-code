@@ -6,35 +6,35 @@
 import { randomUUID } from 'node:crypto'
 import { mkdir, stat } from 'node:fs/promises'
 import { dirname } from 'node:path'
-import type { Context } from '@roos-code/cordis'
-import { installModelSelection } from '@roos-code/roos-code-agent'
-import type { Agent, ModelSelection, ModelSelectionRef, AgentOptions, AgentStatus } from '@roos-code/roos-code-agent'
-import type {} from '@roos-code/roos-code-agent-presets/types'
-import { AttachmentError } from '@roos-code/roos-code-attachment'
-import type { ImageAttachmentRef } from '@roos-code/roos-code-attachment'
-import { contentHasImage, createUserMessage, freezeMessage, ReasoningEffortId } from '@roos-code/roos-code-llm'
-import { errorChain } from '@roos-code/roos-code-llm'
-import type { ContentBlock, MessageSource } from '@roos-code/roos-code-llm'
-import { isAppendSurfaceEvent, isJsonValue } from '@roos-code/roos-code-session'
-import type { JsonValue, Session, SessionEvent, SessionEventMap, SessionHeader, SessionId, UserMessage } from '@roos-code/roos-code-session'
-import type { SessionPersistence } from '@roos-code/roos-code-session-persistence'
-import { SessionQueryError, type SessionSearchCursor } from '@roos-code/roos-code-session-query'
-import { SubagentError } from '@roos-code/roos-code-subagent'
-import type { SubagentListEntry as CatalogSubagentListEntry } from '@roos-code/roos-code-subagent'
-import { isUserInvocable } from '@roos-code/roos-code-skill'
-import type { Workspace, WorkspaceRecord } from '@roos-code/roos-code-workspace'
+import type { Context } from '@shres-code/cordis'
+import { installModelSelection } from '@shres-code/shres-code-agent'
+import type { Agent, ModelSelection, ModelSelectionRef, AgentOptions, AgentStatus } from '@shres-code/shres-code-agent'
+import type {} from '@shres-code/shres-code-agent-presets/types'
+import { AttachmentError } from '@shres-code/shres-code-attachment'
+import type { ImageAttachmentRef } from '@shres-code/shres-code-attachment'
+import { contentHasImage, createUserMessage, freezeMessage, ReasoningEffortId } from '@shres-code/shres-code-llm'
+import { errorChain } from '@shres-code/shres-code-llm'
+import type { ContentBlock, MessageSource } from '@shres-code/shres-code-llm'
+import { isAppendSurfaceEvent, isJsonValue } from '@shres-code/shres-code-session'
+import type { JsonValue, Session, SessionEvent, SessionEventMap, SessionHeader, SessionId, UserMessage } from '@shres-code/shres-code-session'
+import type { SessionPersistence } from '@shres-code/shres-code-session-persistence'
+import { SessionQueryError, type SessionSearchCursor } from '@shres-code/shres-code-session-query'
+import { SubagentError } from '@shres-code/shres-code-subagent'
+import type { SubagentListEntry as CatalogSubagentListEntry } from '@shres-code/shres-code-subagent'
+import { isUserInvocable } from '@shres-code/shres-code-skill'
+import type { Workspace, WorkspaceRecord } from '@shres-code/shres-code-workspace'
 import {
   workspaceDomainState, workspaceRecord, WorkspaceId as brandWorkspaceId,
   WorkspaceMoveInvalidError, WorkspaceOrderInvalidError, WorkspaceUnknownSessionError,
-} from '@roos-code/roos-code-workspace'
+} from '@shres-code/shres-code-workspace'
 // Type-only: brings the `ctx.tools` Context merge into this program (viewFor reads presenters).
 import {
   InvalidPresetIdError, PresetExistsError, PresetMountError,
   PresetNotWritableError, resolveSessionPreset,
   SETTINGS_NAMESPACE as AGENT_PRESET_SETTINGS_NAMESPACE, UnknownPresetError,
-} from '@roos-code/roos-code-agent-presets'
-import type { PresetBearingSession } from '@roos-code/roos-code-agent-presets'
-import type {} from '@roos-code/roos-code-tools'
+} from '@shres-code/shres-code-agent-presets'
+import type { PresetBearingSession } from '@shres-code/shres-code-agent-presets'
+import type {} from '@shres-code/shres-code-tools'
 import type {
   ApiProxy, ConfigurableProviderView, CredentialView, GoalRef, HistoryEntry, HostFrame,
   ModelCatalogFailure, ModelProviderGroup,
@@ -51,44 +51,44 @@ import {
   type SessionLogExportReady,
   type SessionLogCompressionLevel,
 } from './session-export.ts'
-import type { SessionRawArtifact } from '@roos-code/roos-code-session-persistence'
+import type { SessionRawArtifact } from '@shres-code/shres-code-session-persistence'
 import {
   SESSION_SEARCH_RESULT_LIMIT,
   SESSION_SEARCH_SNIPPET_MAX_CODE_POINTS,
   truncateUnicodeCodePoints,
 } from './api/session-search.ts'
 // Type-only: resolves `ctx.get('sessionProjections')` to the projection registry.
-import type {} from '@roos-code/roos-code-session-projection'
+import type {} from '@shres-code/shres-code-session-projection'
 // Type-only: resolves `ctx.get('tasks')` to the background job registry.
-import type {} from '@roos-code/roos-code-jobs'
-import type { JobSnapshot } from '@roos-code/roos-code-jobs'
+import type {} from '@shres-code/shres-code-jobs'
+import type { JobSnapshot } from '@shres-code/shres-code-jobs'
 // Type-only: resolves `ctx.get('sessionProjectionCache')` (the cold listing column).
-import type {} from '@roos-code/roos-code-session-projection-cache'
+import type {} from '@shres-code/shres-code-session-projection-cache'
 // GoalError narrows domain rejections to their stable codes at the wire boundary.
-import { GoalError } from '@roos-code/roos-code-goal'
-import type { GoalRef as CoreGoalRef } from '@roos-code/roos-code-goal'
+import { GoalError } from '@shres-code/shres-code-goal'
+import type { GoalRef as CoreGoalRef } from '@shres-code/shres-code-goal'
 // Type-only edges: resolve the command-change stream and `ctx.get('skills')`.
-import type {} from '@roos-code/roos-code-commands'
+import type {} from '@shres-code/shres-code-commands'
 // Type-only: the dynamic-package runner's forwarded-event declarations. Its
 // client-safe `./types` subpath deliberately, not the package root — the root
 // merges `ctx.dynamicCordisRunner`, and a dependency on that package would
 // rebuild the api-remotes cycle this direction exists to avoid.
-import type {} from '@roos-code/roos-code-cordis-host-runner/types'
-import type {} from '@roos-code/roos-code-skill'
+import type {} from '@shres-code/shres-code-cordis-host-runner/types'
+import type {} from '@shres-code/shres-code-skill'
 // The settings/credentials seams: brand guards run at this wire boundary; the
 // service reads stay optional (`ctx.get`) so a composition without either
 // provider still serves every other domain.
-import { SettingsConflictError, settingsNamespace } from '@roos-code/roos-code-settings'
-import type { SettingsDescriptor, SettingsNamespace, SettingsPathOp } from '@roos-code/roos-code-settings'
-import { credentialRef } from '@roos-code/roos-code-credentials'
+import { SettingsConflictError, settingsNamespace } from '@shres-code/shres-code-settings'
+import type { SettingsDescriptor, SettingsNamespace, SettingsPathOp } from '@shres-code/shres-code-settings'
+import { credentialRef } from '@shres-code/shres-code-credentials'
 // Value edge: the rename impl narrows the title service's validation failure; the import also resolves `ctx.get('sessionTitle')`.
-import { SessionTitleInvalidError } from '@roos-code/roos-code-session-title'
-import type { CallId } from '@roos-code/roos-code-llm/brand'
-import type { ScopeKey } from '@roos-code/roos-code-scope'
-import type { ApprovalOutcome, ApprovalRequestId } from '@roos-code/roos-code-user-approval'
+import { SessionTitleInvalidError } from '@shres-code/shres-code-session-title'
+import type { CallId } from '@shres-code/shres-code-llm/brand'
+import type { ScopeKey } from '@shres-code/shres-code-scope'
+import type { ApprovalOutcome, ApprovalRequestId } from '@shres-code/shres-code-user-approval'
 // Side-effect type import: resolves the `approval/request` waterfall and
 // `ctx.get('approval')` without a value dependency on the seam (optional composition).
-import type {} from '@roos-code/roos-code-user-approval'
+import type {} from '@shres-code/shres-code-user-approval'
 import { approvalResponsePayloadSchema } from './api/approvals.schema.ts'
 import { imageLimitsProjectionSchema, sessionListMetadataProjectionSchema } from './api/sessions.schema.ts'
 import { questionResponsePayloadSchema } from './api/questions.schema.ts'
@@ -96,9 +96,9 @@ import type { ClientResponse, RpcError, RpcReceipt, RpcRequest, RpcResponse } fr
 import { RpcId } from './api/rpc.ts'
 import type {
   AskUserQuestionAnswer, AskUserQuestionItem, AskUserQuestionRequest,
-} from '@roos-code/roos-code-user-questions'
-import { UserQuestionError } from '@roos-code/roos-code-user-questions'
-import { DirectoryPickerError } from '@roos-code/roos-code-host-directory-picker'
+} from '@shres-code/shres-code-user-questions'
+import { UserQuestionError } from '@shres-code/shres-code-user-questions'
+import { DirectoryPickerError } from '@shres-code/shres-code-host-directory-picker'
 import {
   ApiRemoteSessionNotFound as SessionNotFound,
   ApiRemoteSubagentSessionOwnership as SubagentSessionOwnership,
@@ -107,7 +107,7 @@ import {
   createApiRemoteAgentResolver,
   hasApiRemoteSubagentOwner,
   inspectApiRemoteSession,
-} from '@roos-code/roos-code-api-remotes'
+} from '@shres-code/shres-code-api-remotes'
 import { canOpenNativePath, openNativePath, openNativeTextFile } from './native-path-opener.ts'
 
 /** Page size when history is called without maxMessages. */
@@ -252,9 +252,10 @@ function referencedImage(events: readonly SessionEvent[], attachmentId: string):
  * The agent-preset namespace carries one field — which preset a session with
  * no explicit choice is composed from — and both browser surfaces that offer
  * that choice write it through `settings.update`, so it has to cross the
- * configuration boundary or the pickers silently fail to persist.
+ * configuration boundary or the pickers silently fail to persist. `shres-shield`
+ * is the Shield Settings page (posture and license).
  */
-const PRODUCT_SETTINGS_NAMESPACES = new Set(['ui-onboarding', 'agent-seats', AGENT_PRESET_SETTINGS_NAMESPACE])
+const PRODUCT_SETTINGS_NAMESPACES = new Set(['ui-onboarding', 'agent-seats', 'shres-shield', AGENT_PRESET_SETTINGS_NAMESPACE])
 
 /** Strict browser-zone profile: UTC or an IANA Area/Location-style identifier. */
 const IANA_TIME_ZONE = /^[A-Za-z][A-Za-z0-9_+.-]*(?:\/[A-Za-z0-9_+.-]+)+$/
@@ -944,7 +945,7 @@ function subagentPromptError(
 function projectionsUnavailableError(): RpcError {
   return {
     code: 'internal',
-    message: 'subagent catalog is unavailable: this deployment does not mount the sessionProjections registry (load @roos-code/roos-code-session-projection)',
+    message: 'subagent catalog is unavailable: this deployment does not mount the sessionProjections registry (load @shres-code/shres-code-session-projection)',
     details: {},
   }
 }
@@ -1308,7 +1309,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   // same state reference for every event, so no change frames are ever
   // pushed — baselines alone carry the value — and clients pre-check intake
   // and label upload affordances from it. Registered here, not in the
-  // attachment Service Definition: roos-llm depends on roos-attachment, so the
+  // attachment Service Definition: shres-llm depends on shres-attachment, so the
   // seam package cannot reference the projection registry without a cycle,
   // and the per-message rules the value describes are this proxy's own
   // admission checks. The child activates only while both seams are composed.
@@ -1801,7 +1802,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     const presets = ctx.get('agentPresets')
     const goals = presets?.serviceFor(agent, 'goals') ?? ctx.get('goals')
     if (goals === undefined) {
-      return { error: { code: 'internal', message: 'goal service is absent: neither this session\'s agent preset nor the host composition mounts @roos-code/roos-code-goal', details: {} } }
+      return { error: { code: 'internal', message: 'goal service is absent: neither this session\'s agent preset nor the host composition mounts @shres-code/shres-code-goal', details: {} } }
     }
     return goals
   }
@@ -1872,7 +1873,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
 
   /** Missing-service report shared by the settings domain (skills-domain stance). */
   function settingsAbsent(): RpcError {
-    return { code: 'internal', message: 'settings service is absent: this deployment does not mount a settings provider (e.g. @roos-code/roos-code-settings-file) in its composition', details: {} }
+    return { code: 'internal', message: 'settings service is absent: this deployment does not mount a settings provider (e.g. @shres-code/shres-code-settings-file) in its composition', details: {} }
   }
 
   /** Open one Host-resolved target and map native failures onto the wire vocabulary. */
@@ -1926,7 +1927,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
 
   /** Missing-service report shared by the credentials domain. */
   function credentialsAbsent(): RpcError {
-    return { code: 'internal', message: 'credentials service is absent: this deployment does not mount a credential provider (e.g. @roos-code/roos-code-credentials-local) in its composition', details: {} }
+    return { code: 'internal', message: 'credentials service is absent: this deployment does not mount a credential provider (e.g. @shres-code/shres-code-credentials-local) in its composition', details: {} }
   }
 
   /** Map one redacted settings descriptor to its wire view. */
@@ -2048,7 +2049,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         if (sessionQuery === undefined) {
           return err(request, {
             code: 'internal',
-            message: 'session search is unavailable: this deployment does not mount @roos-code/roos-code-session-query',
+            message: 'session search is unavailable: this deployment does not mount @shres-code/shres-code-session-query',
             details: {},
           })
         }
@@ -3136,7 +3137,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         }
       },
 
-      // Authoring is privileged (see PRIVILEGED_METHODS in roos-client-connection):
+      // Authoring is privileged (see PRIVILEGED_METHODS in shres-client-connection):
       // a composition names the plugins a session runs, so reading one is
       // reconnaissance, and copy/remove/openDocument manage the roster and
       // drive the host desktop.
@@ -3234,12 +3235,12 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         const presets = ctx.get('agentPresets')
         const scoped = live === undefined ? undefined : presets?.serviceFor(live, 'skills')
         // Same stance as the commands domain: a missing service means no
-        // composition mounts roos-skill, not an empty catalog. `ctx.get` also
+        // composition mounts shres-skill, not an empty catalog. `ctx.get` also
         // keeps this handler independent of the gateway plugin's inject list
         // (an undeclared `ctx.skills` property read fails the reflect proxy).
         const skillRegistry = scoped ?? ctx.get('skills')
         if (skillRegistry === undefined) {
-          return err(request, { code: 'internal', message: 'skill registry is absent: neither this session\'s agent preset nor the host composition mounts @roos-code/roos-code-skill', details: {} })
+          return err(request, { code: 'internal', message: 'skill registry is absent: neither this session\'s agent preset nor the host composition mounts @shres-code/shres-code-skill', details: {} })
         }
         // The scope presenters resolve in — the live agent, else the recorded
         // preset's standing key, else the global layer — so a cold session's

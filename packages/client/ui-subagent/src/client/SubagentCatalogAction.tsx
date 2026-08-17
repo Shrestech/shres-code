@@ -4,16 +4,16 @@ import {
 import {
   indexSubagentDescendants, type SessionId, type SessionListState, type SessionProjectionMap,
   type SessionSummary, type SubagentAddress, type SubagentCatalogSnapshot,
-} from '@roos-code/roos-code-client-runtime/client'
+} from '@shres-code/shres-code-client-runtime/client'
 import {
   HoppingRoo, IconChevronDownOutline14, IconChevronRightOutline14, IconRefreshOutline14,
   seatIdOf, StateDot, type SeatId,
-} from '@roos-code/roos-code-client-ui-primitives'
-import type { PropsLocale, PropsRuntime, TranslateNS } from '@roos-code/roos-code-client-ui-slots'
+} from '@shres-code/shres-code-client-ui-primitives'
+import type { PropsLocale, PropsRuntime, TranslateNS } from '@shres-code/shres-code-client-ui-slots'
 import { NS } from './locales.ts'
-import type {} from '@roos-code/roos-code-client-ui-conversation/client'
-import type {} from '@roos-code/roos-code-subagent/client'
-import type {} from '@roos-code/roos-code-token-meter/client'
+import type {} from '@shres-code/shres-code-client-ui-conversation/client'
+import type {} from '@shres-code/shres-code-subagent/client'
+import type {} from '@shres-code/shres-code-token-meter/client'
 import css from './SubagentCatalogAction.module.css'
 
 type CatalogEntry = SubagentCatalogSnapshot['entries'][number]
@@ -193,7 +193,7 @@ function runningSeatsOf(
     const seat = seatIdOf(summary.title) ?? seatIdOf(summary.displayTitle)
     if (seat !== undefined) found.add(seat)
   }
-  return (['boomer', 'joey', 'flyer'] as const).filter(id => found.has(id))
+  return (['aegis', 'stride', 'ward'] as const).filter(id => found.has(id))
 }
 
 /** Leading mark: a colored hopper while the child is working. */

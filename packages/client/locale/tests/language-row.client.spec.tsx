@@ -3,8 +3,8 @@
  * opens/closes, and selection drives setLocale. */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { createSnapshotStore, type SessionListState, type WorkspaceListState } from '@roos-code/roos-code-client-runtime/client'
-import { bindSnapshotSelector } from '@roos-code/roos-code-client-web-react'
+import { createSnapshotStore, type SessionListState, type WorkspaceListState } from '@shres-code/shres-code-client-runtime/client'
+import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
 import { LanguageRow } from '../src/client/LanguageRow.tsx'
 import type { LanguageRowComponentProps } from '../src/client/LanguageRow.tsx'
 import { createLanguageRowStore } from '../src/client/settings-store.ts'

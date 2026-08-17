@@ -1,16 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { AttachmentId, AttachmentStore } from '@roos-code/roos-code-attachment'
+import { Context } from '@shres-code/cordis'
+import { AttachmentId, AttachmentStore } from '@shres-code/shres-code-attachment'
 import type {
   ImageAttachmentLimits,
   ImageAttachmentRef,
   SaveImageAttachment,
   StoredImageAttachment,
-} from '@roos-code/roos-code-attachment'
-import LlmRuntime, { createUserMessage, CONTEXT_WINDOW_EXCEEDED_CODE, LlmError, ReasoningEffortId, userAgent } from '@roos-code/roos-code-llm'
-import * as LlmPiAi from '@roos-code/roos-code-llm-pi-ai'
-import { PiAiAdapter } from '@roos-code/roos-code-llm-pi-ai'
-import { MAX_TIMER_DELAY_MS } from '@roos-code/roos-code-timeout'
+} from '@shres-code/shres-code-attachment'
+import LlmRuntime, { createUserMessage, CONTEXT_WINDOW_EXCEEDED_CODE, LlmError, ReasoningEffortId, userAgent } from '@shres-code/shres-code-llm'
+import * as LlmPiAi from '@shres-code/shres-code-llm-pi-ai'
+import { PiAiAdapter } from '@shres-code/shres-code-llm-pi-ai'
+import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
 import { getBuiltinModels } from '@earendil-works/pi-ai/providers/all'
 import { resolveProfiles } from '../src/config.ts'
 import { assemble } from './assemble.ts'

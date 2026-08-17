@@ -1,5 +1,5 @@
 {
-  "name": "@roos-code/roos-code-typert-generator",
+  "name": "@shres-code/shres-code-typert-generator",
   "description": "TypeScript project analyzer and model-driven Typert artifact generator",
   "version": "0.1.0-rc.5",
   "publishConfig": {
@@ -7,7 +7,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "packages/typert/generator"
   },
   "type": "module",
@@ -41,14 +41,14 @@
     "typescript": "^6.0.3"
   },
   "peerDependencies": {
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   },
   "devDependencies": {
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-tool-cordis": "workspace:^",
-    "@roos-code/roos-code-typert-registry": "workspace:^",
-    "@roos-code/cordis": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-tool-cordis": "workspace:^",
+    "@shres-code/shres-code-typert-registry": "workspace:^",
+    "@shres-code/cordis": "workspace:^",
     "zod": "^4.4.3"
   }
 }

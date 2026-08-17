@@ -1,3 +1,3 @@
-import { Group } from '@roos-code/cordis-plugin-loader'
+import { Group } from '@shres-code/cordis-plugin-loader'
 
 export default Group

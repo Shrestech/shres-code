@@ -9,15 +9,15 @@
  * ui-slots): in THIS unit the map holds only this package's own merges, but
  * consumers merge more namespaces in and the intersection keeps them
  * string-typed. The rule fires on the narrow-map view, not real redundancy. */
-import type { Context } from '@roos-code/cordis'
+import type { Context } from '@shres-code/cordis'
 import {
   type BoundActions, type LocaleDictOf, type LocaleNamespaceMap, type Translate, type TranslateNS,
-} from '@roos-code/roos-code-client-ui-slots'
-import type { ClientContext, SettingsScope } from '@roos-code/roos-code-client-runtime/client'
+} from '@shres-code/shres-code-client-ui-slots'
+import type { ClientContext, SettingsScope } from '@shres-code/shres-code-client-runtime/client'
 // Type-only: the ctx.settingsScope Context merge and the settings slot types.
 // Cross-plugin collaboration goes through the service, never a value import
 // (client bundle purity gate).
-import type {} from '@roos-code/roos-code-client-ui-settings/client'
+import type {} from '@shres-code/shres-code-client-ui-settings/client'
 import {
   LOCALE_PREFERENCE_FIELD, LOCALE_SETTINGS_NAMESPACE, normalizeLocalePreference,
   type LocaleId, type LocaleSettings,
@@ -38,9 +38,9 @@ export type { LocaleId, LocaleSettings } from '../locale-settings.ts'
 // The translate currency lives in ui-slots (the render machinery synthesizes
 // the seat); re-exported here so dictionary owners import one package.
 // TranslateNS<'model'> is the namespace-addressed developer-facing form.
-export type { Translate, TranslateNS } from '@roos-code/roos-code-client-ui-slots'
+export type { Translate, TranslateNS } from '@shres-code/shres-code-client-ui-slots'
 
-declare module '@roos-code/roos-code-client-ui-slots' {
+declare module '@shres-code/shres-code-client-ui-slots' {
   interface LocaleNamespaceMap {
     /** Shared cross-feature vocabulary, consulted by the lookup chain after the entry's own namespace misses. */
     common: CommonKey
@@ -70,7 +70,7 @@ export interface LocaleSnapshot {
   revision: number
 }
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     locale: LocaleRuntime
   }

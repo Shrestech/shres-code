@@ -6,15 +6,15 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import LlmRuntime, { createUserMessage, LlmError, ReasoningEffortId  } from '@roos-code/roos-code-llm'
-import type { GenerateOptions, LlmModelReasoningInfo, LlmResolvedModelInfo, StreamChunk } from '@roos-code/roos-code-llm'
-import SessionStore, { Session, SessionId, foldRequestHeader } from '@roos-code/roos-code-session'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import ToolRuntime, { defineContentToolFixture } from '@roos-code/roos-code-tools'
-import AgentRegistry, { type Agent } from '@roos-code/roos-code-agent'
+import { Context } from '@shres-code/cordis'
+import LlmRuntime, { createUserMessage, LlmError, ReasoningEffortId  } from '@shres-code/shres-code-llm'
+import type { GenerateOptions, LlmModelReasoningInfo, LlmResolvedModelInfo, StreamChunk } from '@shres-code/shres-code-llm'
+import SessionStore, { Session, SessionId, foldRequestHeader } from '@shres-code/shres-code-session'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import ToolRuntime, { defineContentToolFixture } from '@shres-code/shres-code-tools'
+import AgentRegistry, { type Agent } from '@shres-code/shres-code-agent'
 
-import AgentLoop from '@roos-code/roos-code-agent-loop'
+import AgentLoop from '@shres-code/shres-code-agent-loop'
 import { MockAdapter, textResponse, toolCallResponse } from './mock-adapter.ts'
 
 async function harness(adapter: MockAdapter, persona = 'stable base') {

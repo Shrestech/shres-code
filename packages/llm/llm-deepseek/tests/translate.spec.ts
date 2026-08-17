@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { BlockAssembler, EMPTY_RESPONSE_CODE, LlmError } from '@roos-code/roos-code-llm'
-import type { StreamChunk } from '@roos-code/roos-code-llm'
+import { BlockAssembler, EMPTY_RESPONSE_CODE, LlmError } from '@shres-code/shres-code-llm'
+import type { StreamChunk } from '@shres-code/shres-code-llm'
 import { DONE } from '../src/sse.ts'
 import { mapFinishReason, mapUsage, translate } from '../src/translate.ts'
 

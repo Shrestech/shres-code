@@ -4,16 +4,16 @@
  * instance owns one `(provider id, canonical workspace)` process. Queries serialize through a single
  * queue so a cancellation that fails to stop the server can terminate it without killing unrelated
  * work; distinct instances run in parallel.
- * @module @roos-code/roos-code-lsp-stdio/instance
+ * @module @shres-code/shres-code-lsp-stdio/instance
  */
 
-import { LspError } from '@roos-code/roos-code-lsp'
+import { LspError } from '@shres-code/shres-code-lsp'
 import type {
   LspOperation,
   LspProviderQuery,
   LspQueryResult,
-} from '@roos-code/roos-code-lsp'
-import { deadline } from '@roos-code/roos-code-timeout'
+} from '@shres-code/shres-code-lsp'
+import { deadline } from '@shres-code/shres-code-timeout'
 import { abortable, abortError } from './abort.ts'
 import { LspConnection } from './connection.ts'
 import type { ConnectionSpawner, ConnectionSpec, ConnectionWriter } from './connection.ts'

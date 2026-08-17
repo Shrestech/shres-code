@@ -1,13 +1,13 @@
 {
-  "name": "@roos-code/roos-code-session-stats",
-  "description": "Whole-log conversation counts and wall times projection (sessionStats) for the Roos Code",
+  "name": "@shres-code/shres-code-session-stats",
+  "description": "Whole-log conversation counts and wall times projection (sessionStats) for the Shres Code",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "packages/session/session-stats"
   },
   "type": "module",
@@ -41,22 +41,22 @@
   ],
   "license": "MIT",
   "peerDependencies": {
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-llm": "workspace:^",
-    "@roos-code/roos-code-session": "workspace:^",
-    "@roos-code/roos-code-session-projection": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-session-projection": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   },
   "dependencies": {
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@roos-code/cordis-plugin-include": "workspace:^",
-    "@roos-code/cordis-plugin-loader": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-llm": "workspace:^",
-    "@roos-code/roos-code-session": "workspace:^",
-    "@roos-code/roos-code-session-projection": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/cordis-plugin-include": "workspace:^",
+    "@shres-code/cordis-plugin-loader": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-session-projection": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   }
 }

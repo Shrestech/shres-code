@@ -2,9 +2,9 @@ import { useState, type ReactNode } from 'react'
 import {
   DisclosureRow, IconChevronRightOutline14, StateDot,
   type DisclosureRowProps, type StateDotState,
-} from '@roos-code/roos-code-client-ui-primitives'
-import type { PropsLocale, PropsRuntime } from '@roos-code/roos-code-client-ui-slots'
-import { shallowEqual, type SessionId, type SessionListState } from '@roos-code/roos-code-client-runtime/client'
+} from '@shres-code/shres-code-client-ui-primitives'
+import type { PropsLocale, PropsRuntime } from '@shres-code/shres-code-client-ui-slots'
+import { shallowEqual, type SessionId, type SessionListState } from '@shres-code/shres-code-client-runtime/client'
 import type { WorkflowRunKey } from './locales.ts'
 import type {
   WorkflowRunMemberData, WorkflowRunPhaseData, WorkflowRunStatus,

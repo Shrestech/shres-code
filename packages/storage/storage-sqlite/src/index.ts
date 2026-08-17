@@ -2,14 +2,14 @@
  * SQLite storage backend for the storage hub: one database file hosts every
  * routed unit, document-per-row (`key TEXT` / `value TEXT` JSON). Registers
  * as backend `sqlite`; the disposer unregisters first, then closes the medium.
- * @module @roos-code/roos-code-storage-sqlite
+ * @module @shres-code/shres-code-storage-sqlite
  */
 
-import type { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
+import type { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
 import type { DatabaseSync } from 'node:sqlite'
-import { StorageError, UNIT_NAME_RE, storageBackendServiceKey } from '@roos-code/roos-code-storage'
-import type { KvFacet, KvUnit, KvUnitDescriptor, StorageBackend } from '@roos-code/roos-code-storage'
+import { StorageError, UNIT_NAME_RE, storageBackendServiceKey } from '@shres-code/shres-code-storage'
+import type { KvFacet, KvUnit, KvUnitDescriptor, StorageBackend } from '@shres-code/shres-code-storage'
 import { openDatabase, recordTableName, type JournalMode } from './schema.ts'
 import { SqliteKvUnit } from './unit.ts'
 

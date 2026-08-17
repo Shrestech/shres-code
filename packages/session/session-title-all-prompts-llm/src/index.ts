@@ -1,12 +1,12 @@
 /** All-human-messages model provider for `ctx.sessionTitle`. */
 
-import type { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
+import type { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
 import {
   registerSessionTitleLlmProvider,
   SessionTitleLlmConfigFields,
-} from '@roos-code/roos-code-session-title-llm'
-import type { SessionTitleLlmConfig } from '@roos-code/roos-code-session-title-llm'
+} from '@shres-code/shres-code-session-title-llm'
+import type { SessionTitleLlmConfig } from '@shres-code/shres-code-session-title-llm'
 
 export const name = 'session-title-all-prompts-llm'
 export const inject = ['sessionTitle', 'llm', 'sessions']

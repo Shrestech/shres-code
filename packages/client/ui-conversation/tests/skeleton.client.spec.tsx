@@ -4,17 +4,17 @@
 // owned draft, and the hero workspace picker (switching = retargetWorkspace).
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render } from '@testing-library/react'
-import { bindSnapshotSelector } from '@roos-code/roos-code-client-web-react'
+import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
 import {
   createSnapshotStore, EMPTY_CHAT_SNAPSHOT, EMPTY_CONVERSATION_VIEWS,
-} from '@roos-code/roos-code-client-runtime/client'
+} from '@shres-code/shres-code-client-runtime/client'
 import type {
   ConversationSnapshot, SessionId, SessionListState, WorkspaceId, WorkspaceListState, WorkspaceView,
-} from '@roos-code/roos-code-client-runtime/client'
+} from '@shres-code/shres-code-client-runtime/client'
 import type { ConversationRootProps } from '../src/client/skeleton/ConversationRoot.tsx'
-import type { ClientContext } from '@roos-code/roos-code-client-runtime/client'
-import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
-import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
+import type { ClientContext } from '@shres-code/shres-code-client-runtime/client'
+import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
+import { en as commonEn } from '@shres-code/shres-code-client-locale/src/locales/en.ts'
 import { createChatStore } from '../src/client/stores.ts'
 import { SessionInputShell } from '../src/client/input/facade.ts'
 import { en } from '../src/client/locales.ts'

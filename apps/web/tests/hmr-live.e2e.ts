@@ -1,4 +1,4 @@
-/** Published roos web + pnpm dev:web → browser HMR, with no page reload. */
+/** Published shres web + pnpm dev:web → browser HMR, with no page reload. */
 
 import { existsSync } from 'node:fs'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
@@ -6,10 +6,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { chromium } from 'playwright'
 import { expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import type { Fiber } from '@roos-code/cordis'
-import LocalSubprocessRuntime from '@roos-code/roos-code-subprocess-local'
-import type { SubprocessHandle, SubprocessSpawnSpec } from '@roos-code/roos-code-subprocess'
+import { Context } from '@shres-code/cordis'
+import type { Fiber } from '@shres-code/cordis'
+import LocalSubprocessRuntime from '@shres-code/shres-code-subprocess-local'
+import type { SubprocessHandle, SubprocessSpawnSpec } from '@shres-code/shres-code-subprocess'
 import { REPO_ROOT } from './support.ts'
 
 function spawnSpec(argv: readonly string[], cwd: string, env?: Record<string, string>): SubprocessSpawnSpec {
@@ -68,11 +68,11 @@ async function stopTree(child: SubprocessHandle): Promise<void> {
 }
 
 it('hot-reloads a real client-plugin source edit without refreshing the page', async () => {
-  const world = await mkdtemp(join(tmpdir(), 'roos-web-hmr-world-'))
+  const world = await mkdtemp(join(tmpdir(), 'shres-web-hmr-world-'))
   const sourcePath = join(REPO_ROOT, 'packages/client/ui-conversation/src/client/locales.ts')
   const bundlePath = join(REPO_ROOT, 'packages/client/ui-conversation/lib/client.js')
   const binPath = join(REPO_ROOT, 'apps/cli/lib/bin.js')
-  if (!existsSync(binPath)) throw new Error('HMR browser test needs the built roos bin; run pnpm run build first')
+  if (!existsSync(binPath)) throw new Error('HMR browser test needs the built shres bin; run pnpm run build first')
   const originalSource = await readFile(sourcePath)
   const originalBundle = await readFile(bundlePath)
   const oldText = 'Take the Leap'
@@ -96,10 +96,10 @@ it('hot-reloads a real client-plugin source edit without refreshing the page', a
       world,
       {
         DEEPSEEK_API_KEY: 'keyless-hmr-no-call',
-        ROOS_HOME: join(world, '.roos'),
+        SHRES_HOME: join(world, '.shres'),
       },
     ))
-    const baseUrl = await waitForOutput(host, /roos web: (http:\/\/[^\s]+)/, 'built roos web')
+    const baseUrl = await waitForOutput(host, /shres web: (http:\/\/[^\s]+)/, 'built shres web')
     browser = await chromium.launch()
     const page = await browser.newPage()
     const pageErrors: string[] = []
@@ -108,13 +108,13 @@ it('hot-reloads a real client-plugin source edit without refreshing the page', a
     await page.getByText(oldText, { exact: true }).waitFor({ timeout: 15_000 })
     const pageIdentity = await page.evaluate(() => {
       const identity = crypto.randomUUID()
-      Object.defineProperty(window, '__roosHmrPageIdentity', { value: identity })
+      Object.defineProperty(window, '__shresHmrPageIdentity', { value: identity })
       return identity
     })
 
     await writeFile(sourcePath, updatedSource)
     await page.getByText(newText, { exact: true }).waitFor({ timeout: 30_000 })
-    expect(await page.evaluate(() => (window as Window & { __roosHmrPageIdentity?: string }).__roosHmrPageIdentity))
+    expect(await page.evaluate(() => (window as Window & { __shresHmrPageIdentity?: string }).__shresHmrPageIdentity))
       .toBe(pageIdentity)
     expect(pageErrors).toEqual([])
   } catch (error) {

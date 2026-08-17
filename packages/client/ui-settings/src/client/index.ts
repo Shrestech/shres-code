@@ -8,7 +8,7 @@
  * because a shell dependency on ui-sidebar would close a reference cycle
  * through ui-layout and ui-theme. Export discipline: packages/client/AGENTS.md.
  */
-import type { ClientContext } from '@roos-code/roos-code-client-runtime/client'
+import type { ClientContext } from '@shres-code/shres-code-client-runtime/client'
 import { SettingsScopeBinder } from './settings-scope.ts'
 
 export type {

@@ -4,25 +4,25 @@
  * through the seam, and every write re-reads the document under a
  * cross-process writer lock before patching it as a comment-preserving
  * leaf-level diff.
- * @module @roos-code/roos-code-settings-file
+ * @module @shres-code/shres-code-settings-file
  */
 
-import { Context, Service } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
+import { Context, Service } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
 import { watch as chokidarWatch } from 'chokidar'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, extname, join, resolve } from 'node:path'
 import { Document, parseDocument } from 'yaml'
-import { withFileLock, writeFileAtomic } from '@roos-code/roos-code-atomic-write'
-import { canonicalizeWatchPath, resolveRoosHome } from '@roos-code/roos-code-home-paths'
-import { SettingsProvider, deepEqualJson, type SettingsNamespace } from '@roos-code/roos-code-settings'
+import { withFileLock, writeFileAtomic } from '@shres-code/shres-code-atomic-write'
+import { canonicalizeWatchPath, resolveShresHome } from '@shres-code/shres-code-home-paths'
+import { SettingsProvider, deepEqualJson, type SettingsNamespace } from '@shres-code/shres-code-settings'
 
 /** Plugin config: file location and hot-reload behavior. */
 export interface Config {
   /** Settings document path; defaults to `settings.yaml` under the harness home. */
   path?: string
-  /** Harness home used when `path` is omitted; defaults to `$ROOS_HOME` or `~/.roos`. */
-  roosHome?: string
+  /** Harness home used when `path` is omitted; defaults to `$SHRES_HOME` or `~/.shres`. */
+  shresHome?: string
   /** Watch the document and hot-publish external edits; defaults to true. */
   watch?: boolean
   /** Watcher write-settle window in milliseconds; defaults to 100. */
@@ -53,7 +53,7 @@ interface ResolvedSpec {
  * @returns the resolved file location, format, and watch behavior.
  */
 export function resolveSpec(config: Config): ResolvedSpec {
-  const filename = resolve(config.path ?? join(resolveRoosHome(config.roosHome), 'settings.yaml'))
+  const filename = resolve(config.path ?? join(resolveShresHome(config.shresHome), 'settings.yaml'))
   const format = FORMATS[extname(filename)]
   if (format === undefined) {
     throw new Error(`settings-file: extension "${extname(filename)}" is not supported (use .yaml, .yml, or .json)`)
@@ -105,7 +105,7 @@ function isEEXIST(error: unknown): boolean {
 export class FileSettingsProvider extends SettingsProvider {
   static Config: z<Config> = z.object({
     path: z.string(),
-    roosHome: z.string(),
+    shresHome: z.string(),
     watch: z.boolean().default(true),
     debounceMs: z.number().min(0).default(100),
   })

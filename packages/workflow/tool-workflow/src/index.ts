@@ -2,29 +2,29 @@
  * The model-facing `workflow` tool: run a JavaScript orchestration script that fans out
  * subagents, and return the script's final value. It owns the model-facing schema and run lifecycle; script
  * parsing, execution, caps, and cancellation live behind `ctx.workflowEngine`
- * (`@roos-code/roos-code-workflow`), so a hardened engine swaps in without touching what the model
+ * (`@shres-code/shres-code-workflow`), so a hardened engine swaps in without touching what the model
  * sees. Execution awaits `run.result` and always disposes the run; non-completed reasons become tool
  * errors, and background collection remains deferred. Presentation is an args-only generic card
  * titled from `meta.name`. Explicit-ask usage guidance is registered as the tool's own prompt
  * section rather than deployment persona prose.
- * @module @roos-code/roos-code-tool-workflow
+ * @module @shres-code/shres-code-tool-workflow
  */
 
-import type { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import { defineTool } from '@roos-code/roos-code-tools'
-import type { ToolCallView, ToolResultView } from '@roos-code/roos-code-tools'
-import type { ContentBlock } from '@roos-code/roos-code-llm'
-import type { JsonValue, Session, SessionEventMap } from '@roos-code/roos-code-session'
+import type { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import { defineTool } from '@shres-code/shres-code-tools'
+import type { ToolCallView, ToolResultView } from '@shres-code/shres-code-tools'
+import type { ContentBlock } from '@shres-code/shres-code-llm'
+import type { JsonValue, Session, SessionEventMap } from '@shres-code/shres-code-session'
 import type {
   WorkflowResult, WorkflowRun, WorkflowRunId, WorkflowStopReason,
-} from '@roos-code/roos-code-workflow'
+} from '@shres-code/shres-code-workflow'
 import type {
   ToolWorkflowAgentEndData, ToolWorkflowAgentStartData,
   ToolWorkflowRunEndData, ToolWorkflowRunStartData,
 } from './types.ts'
 // Declaration merge only: makes ctx.systemPrompt visible for the section registration.
-import type {} from '@roos-code/roos-code-system-prompt'
+import type {} from '@shres-code/shres-code-system-prompt'
 
 export const name = 'tool-workflow'
 export const inject = ['tools', 'workflowEngine', 'systemPrompt']

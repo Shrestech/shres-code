@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { PROTOCOL_VERSION } from '@agentclientprotocol/sdk'
-import { CallId } from '@roos-code/roos-code-llm'
-import type { Agent } from '@roos-code/roos-code-agent'
-import { SessionId } from '@roos-code/roos-code-session'
-import ApprovalService, { type ApprovalRequest } from '@roos-code/roos-code-user-approval'
+import { CallId } from '@shres-code/shres-code-llm'
+import type { Agent } from '@shres-code/shres-code-agent'
+import { SessionId } from '@shres-code/shres-code-session'
+import ApprovalService, { type ApprovalRequest } from '@shres-code/shres-code-user-approval'
 import { makeBridgeHarness, type BridgeHarness } from './harness.ts'
 
 describe('ACP machine permission policy', () => {

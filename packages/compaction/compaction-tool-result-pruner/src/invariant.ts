@@ -1,13 +1,13 @@
 /**
- * Package-owned invariant companion for `@roos-code/roos-code-compaction-tool-result-pruner`.
- * @module @roos-code/roos-code-compaction-tool-result-pruner/invariant
+ * Package-owned invariant companion for `@shres-code/shres-code-compaction-tool-result-pruner`.
+ * @module @shres-code/shres-code-compaction-tool-result-pruner/invariant
  */
 
 /* jscpd:ignore-start */
-import type { Context } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-compaction-tool-result-pruner'
+const PACKAGE_NAME = '@shres-code/shres-code-compaction-tool-result-pruner'
 
 /** Cordis companion plugin name. */
 export const name = 'compaction-tool-result-pruner-invariant'

@@ -1,5 +1,5 @@
 /**
- * SessionTelemetryBackend Service Definition for the Roos Code.
+ * SessionTelemetryBackend Service Definition for the Shres Code.
  *
  * This package owns the CAPTURE side of session-event reporting — which records
  * exist (the chunk projection), what they carry (the logical record), when
@@ -11,12 +11,12 @@
  * design and its trade-offs are pinned in
  * .agents/notes/implemented/feature/2026-07-23-session-telemetry-otel-revival.md.
  *
- * @module @roos-code/roos-code-session-telemetry
+ * @module @shres-code/shres-code-session-telemetry
  */
 
-import { Context, Service } from '@roos-code/cordis'
+import { Context, Service } from '@shres-code/cordis'
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     sessionTelemetry: SessionTelemetryBackend
   }

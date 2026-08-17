@@ -11,16 +11,16 @@
  * once, while the configuration key that made a route unserviceable can still be
  * named in the failure.
  *
- * @module roos-llm-pi-ai/config
+ * @module shres-llm-pi-ai/config
  */
 
 import type { CacheRetention, ModelThinkingLevel, Provider, ThinkingBudgets, Transport } from '@earendil-works/pi-ai'
-import z from '@roos-code/schemastery'
-import { credentialRef } from '@roos-code/roos-code-credentials'
-import type { CredentialRef } from '@roos-code/roos-code-credentials'
-import { MAX_TIMER_DELAY_MS } from '@roos-code/roos-code-timeout'
-import { resolveRetryPolicy, RetryPolicySchema } from '@roos-code/roos-code-llm'
-import type { ResolvedRetryPolicy, RetryPolicyConfig } from '@roos-code/roos-code-llm'
+import z from '@shres-code/schemastery'
+import { credentialRef } from '@shres-code/shres-code-credentials'
+import type { CredentialRef } from '@shres-code/shres-code-credentials'
+import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
+import { resolveRetryPolicy, RetryPolicySchema } from '@shres-code/shres-code-llm'
+import type { ResolvedRetryPolicy, RetryPolicyConfig } from '@shres-code/shres-code-llm'
 import { MODALITIES, resolveRouteModels, SUPPORTED_THINKING_FORMATS, THINKING_LEVELS } from './catalog.ts'
 import type {
   PiAiCompatProfile,
@@ -288,7 +288,7 @@ function rejectRemovedFields(provider: string, source: PiAiProviderProfile): voi
   if ('maxRetries' in legacy || 'maxRetryDelayMs' in legacy) {
     throw new Error(
       `llm-pi-ai: provider "${provider}" sets maxRetries or maxRetryDelayMs, which were removed;`
-      + ' compose agent recovery with roos-llm-retry',
+      + ' compose agent recovery with shres-llm-retry',
     )
   }
 }

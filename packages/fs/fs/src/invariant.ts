@@ -1,10 +1,10 @@
-/** Package-owned filesystem event-data invariants. @module @roos-code/roos-code-fs/invariant */
+/** Package-owned filesystem event-data invariants. @module @shres-code/shres-code-fs/invariant */
 
-import type { Context } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 import type { FsObservation, FsTarget } from './types.ts'
 
-const PACKAGE_NAME = '@roos-code/roos-code-fs'
+const PACKAGE_NAME = '@shres-code/shres-code-fs'
 
 /** Cordis companion plugin name. */
 export const name = 'fs-invariant'

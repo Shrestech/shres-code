@@ -4,12 +4,12 @@
  * removal — HMR safety), the inert node entry, and the invariant companion's
  * ownership reservation.
  */
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { describe, expect, it } from 'vitest'
-import InvariantRegistry from '@roos-code/roos-code-invariants'
-import { SlotRegistry } from '@roos-code/roos-code-client-runtime/client'
-import { stubSettingsScope } from '@roos-code/roos-code-client-test-runtime'
-import { apply as applyLocale, inject as localeInject } from '@roos-code/roos-code-client-locale/client'
+import InvariantRegistry from '@shres-code/shres-code-invariants'
+import { SlotRegistry } from '@shres-code/shres-code-client-runtime/client'
+import { stubSettingsScope } from '@shres-code/shres-code-client-test-runtime'
+import { apply as applyLocale, inject as localeInject } from '@shres-code/shres-code-client-locale/client'
 import { apply, inject } from '../src/client/index.ts'
 import { apply as applyNode } from '../src/index.ts'
 import * as JobInvariant from '../src/invariant.ts'

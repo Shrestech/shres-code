@@ -1,17 +1,17 @@
 /**
  * workspace domain contract. Wire projection of the host-side workspace
- * entity (@roos-code/roos-code-workspace): a stable id over a directory path,
+ * entity (@shres-code/shres-code-workspace): a stable id over a directory path,
  * a display title, and the ordered session account. Method signatures are the
  * source of truth, same as the sessions domain.
  */
 
-import type { SessionId } from '@roos-code/roos-code-session/types'
-import type { Branded } from '@roos-code/roos-code-brand'
+import type { SessionId } from '@shres-code/shres-code-session/types'
+import type { Branded } from '@shres-code/shres-code-brand'
 import type { RpcRequest, RpcResponse } from './rpc.ts'
 
 /**
  * Wire-side workspace id brand. Deliberately re-declared here rather than
- * imported from roos-workspace: api/ must stay browser-importable with zero
+ * imported from shres-workspace: api/ must stay browser-importable with zero
  * host-package dependencies, and the brand string matches, so both sides
  * agree structurally.
  */

@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import { Context, FiberState, Service, ValidationError } from '@roos-code/cordis'
-import Loader from '@roos-code/cordis-plugin-loader'
-import z from '@roos-code/schemastery'
-import InvariantRegistry from '@roos-code/roos-code-invariants'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import { Context, FiberState, Service, ValidationError } from '@shres-code/cordis'
+import Loader from '@shres-code/cordis-plugin-loader'
+import z from '@shres-code/schemastery'
+import InvariantRegistry from '@shres-code/shres-code-invariants'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 import { packageInvariantOwners } from './package-invariants.ts'
 import {
   TEST_INVARIANT_READY_SERVICE,
@@ -13,7 +13,7 @@ import {
   usesManualInvariantTree,
 } from './test-invariants.ts'
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     testInvariantProbe: TestInvariantProbe
   }

@@ -1,13 +1,13 @@
 {
-  "name": "@roos-code/roos-code-tool-fs",
-  "description": "Model-facing filesystem tools (read, write, edit) over the Roos Code filesystem seam (ctx.fs)",
+  "name": "@shres-code/shres-code-tool-fs",
+  "description": "Model-facing filesystem tools (read, write, edit) over the Shres Code filesystem seam (ctx.fs)",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "packages/fs/tool-fs"
   },
   "type": "module",
@@ -33,39 +33,39 @@
   "license": "MIT",
   "dependencies": {
     "diff": "^9.0.0",
-    "@roos-code/schemastery": "workspace:^"
+    "@shres-code/schemastery": "workspace:^"
   },
   "peerDependencies": {
-    "@roos-code/roos-code-attachment": "workspace:^",
-    "@roos-code/roos-code-fs": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-llm": "workspace:^",
-    "@roos-code/roos-code-sandbox": "workspace:^",
-    "@roos-code/roos-code-sandbox-policy": "workspace:^",
-    "@roos-code/roos-code-session": "workspace:^",
-    "@roos-code/roos-code-system-prompt": "workspace:^",
-    "@roos-code/roos-code-tools": "workspace:^",
-    "@roos-code/roos-code-user-approval": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-attachment": "workspace:^",
+    "@shres-code/shres-code-fs": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-sandbox": "workspace:^",
+    "@shres-code/shres-code-sandbox-policy": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-system-prompt": "workspace:^",
+    "@shres-code/shres-code-tools": "workspace:^",
+    "@shres-code/shres-code-user-approval": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   },
   "devDependencies": {
-    "@roos-code/roos-code-agent": "workspace:^",
-    "@roos-code/roos-code-agent-loop": "workspace:^",
-    "@roos-code/roos-code-agent-loop-testkit": "workspace:^",
-    "@roos-code/roos-code-attachment": "workspace:^",
-    "@roos-code/roos-code-fs": "workspace:^",
-    "@roos-code/roos-code-fs-local": "workspace:^",
-    "@roos-code/roos-code-fs-sandbox": "workspace:^",
-    "@roos-code/roos-code-fs-observation-policy": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-llm": "workspace:^",
-    "@roos-code/roos-code-llm-deepseek": "workspace:^",
-    "@roos-code/roos-code-sandbox": "workspace:^",
-    "@roos-code/roos-code-sandbox-policy": "workspace:^",
-    "@roos-code/roos-code-session": "workspace:^",
-    "@roos-code/roos-code-system-prompt": "workspace:^",
-    "@roos-code/roos-code-tools": "workspace:^",
-    "@roos-code/roos-code-user-approval": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-agent": "workspace:^",
+    "@shres-code/shres-code-agent-loop": "workspace:^",
+    "@shres-code/shres-code-agent-loop-testkit": "workspace:^",
+    "@shres-code/shres-code-attachment": "workspace:^",
+    "@shres-code/shres-code-fs": "workspace:^",
+    "@shres-code/shres-code-fs-local": "workspace:^",
+    "@shres-code/shres-code-fs-sandbox": "workspace:^",
+    "@shres-code/shres-code-fs-observation-policy": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-llm-deepseek": "workspace:^",
+    "@shres-code/shres-code-sandbox": "workspace:^",
+    "@shres-code/shres-code-sandbox-policy": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-system-prompt": "workspace:^",
+    "@shres-code/shres-code-tools": "workspace:^",
+    "@shres-code/shres-code-user-approval": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   }
 }

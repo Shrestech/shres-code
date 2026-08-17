@@ -3,17 +3,17 @@
  * promises to honor `exec.signal`; this wrapper arms that deadline and maps its
  * own expiry to `TOOL_TIMEOUT` without racing or abandoning the tool promise.
  *
- * FIXME: settle the intended `@roos-code/roos-code-timeout-guard` rename before the
+ * FIXME: settle the intended `@shres-code/shres-code-timeout-guard` rename before the
  * first tagged release — suggestion only, aligning the name with its `guard/`
  * home; decide at resolution time
  * ([regrouping Agent Note](../../../../.agents/notes/implemented/architecture/2026-07-29-package-regrouping.md)).
  *
- * @module @roos-code/roos-code-tool-call-timeout-policy
+ * @module @shres-code/shres-code-tool-call-timeout-policy
  */
 
-import type { Context } from '@roos-code/cordis'
-import { deadline, timeoutOf } from '@roos-code/roos-code-timeout'
-import type { ToolExecutionResult } from '@roos-code/roos-code-tools'
+import type { Context } from '@shres-code/cordis'
+import { deadline, timeoutOf } from '@shres-code/shres-code-timeout'
+import type { ToolExecutionResult } from '@shres-code/shres-code-tools'
 
 /**
  * The code owned by this plugin, used BOTH as the internal {@link deadline}

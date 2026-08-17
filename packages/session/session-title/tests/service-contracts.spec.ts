@@ -1,14 +1,14 @@
-import { createUserMessage } from '@roos-code/roos-code-llm'
-import { Context, type Fiber } from '@roos-code/cordis'
+import { createUserMessage } from '@shres-code/shres-code-llm'
+import { Context, type Fiber } from '@shres-code/cordis'
 import { describe, expect, it, vi } from 'vitest'
-import SessionStore, { Session, SessionId } from '@roos-code/roos-code-session'
+import SessionStore, { Session, SessionId } from '@shres-code/shres-code-session'
 import SessionTitleService, {
   SessionTitleProviderId,
   type Config,
   type SessionTitleProvider,
   type SessionTitleProviderRequest,
   type SessionTitleProviderResult,
-} from '@roos-code/roos-code-session-title'
+} from '@shres-code/shres-code-session-title'
 
 const CONFIG = {
   fallbackMaxWords: 5,

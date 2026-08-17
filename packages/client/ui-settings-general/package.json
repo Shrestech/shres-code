@@ -1,5 +1,5 @@
 {
-  "name": "@roos-code/roos-code-client-ui-settings-general",
+  "name": "@shres-code/shres-code-client-ui-settings-general",
   "description": "Settings ownerless-copy and product onboarding plugin: the General section, shell trigger/header chrome content, settings dictionaries, and the versioned welcome notice",
   "version": "0.1.0-rc.5",
   "publishConfig": {
@@ -7,7 +7,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "packages/client/ui-settings-general"
   },
   "type": "module",
@@ -29,15 +29,15 @@
     "./src/*": "./src/*",
     "./package.json": "./package.json"
   },
-  "roos": {
+  "shres": {
     "client": {
       "inject": [
-        "@roos-code/roos-code-client-runtime",
-        "@roos-code/roos-code-client-ui-settings",
-        "@roos-code/roos-code-client-locale",
-        "@roos-code/roos-code-client-connection",
-        "@roos-code/roos-code-api-remotes",
-        "@roos-code/roos-code-client-ui-sidebar"
+        "@shres-code/shres-code-client-runtime",
+        "@shres-code/shres-code-client-ui-settings",
+        "@shres-code/shres-code-client-locale",
+        "@shres-code/shres-code-client-connection",
+        "@shres-code/shres-code-api-remotes",
+        "@shres-code/shres-code-client-ui-sidebar"
       ],
       "platform": "web"
     }
@@ -48,37 +48,37 @@
   },
   "license": "MIT",
   "dependencies": {
-    "@roos-code/roos-code-settings": "workspace:^",
-    "@roos-code/schemastery": "workspace:^",
+    "@shres-code/shres-code-settings": "workspace:^",
+    "@shres-code/schemastery": "workspace:^",
     "clsx": "^2.0.0"
   },
   "peerDependencies": {
-    "@roos-code/roos-code-api-remotes": "workspace:^",
-    "@roos-code/roos-code-client-connection": "workspace:^",
-    "@roos-code/roos-code-client-locale": "workspace:^",
-    "@roos-code/roos-code-client-runtime": "workspace:^",
-    "@roos-code/roos-code-client-ui-primitives": "workspace:^",
-    "@roos-code/roos-code-client-ui-settings": "workspace:^",
-    "@roos-code/roos-code-client-ui-sidebar": "workspace:^",
-    "@roos-code/roos-code-client-ui-slots": "workspace:^",
-    "@roos-code/roos-code-client-web-react": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/cordis": "workspace:^",
+    "@shres-code/shres-code-api-remotes": "workspace:^",
+    "@shres-code/shres-code-client-connection": "workspace:^",
+    "@shres-code/shres-code-client-locale": "workspace:^",
+    "@shres-code/shres-code-client-runtime": "workspace:^",
+    "@shres-code/shres-code-client-ui-primitives": "workspace:^",
+    "@shres-code/shres-code-client-ui-settings": "workspace:^",
+    "@shres-code/shres-code-client-ui-sidebar": "workspace:^",
+    "@shres-code/shres-code-client-ui-slots": "workspace:^",
+    "@shres-code/shres-code-client-web-react": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/cordis": "workspace:^",
     "react": "^18.2.0"
   },
   "devDependencies": {
-    "@roos-code/roos-code-api-remotes": "workspace:^",
-    "@roos-code/roos-code-client-connection": "workspace:^",
-    "@roos-code/roos-code-client-locale": "workspace:^",
-    "@roos-code/roos-code-client-runtime": "workspace:^",
-    "@roos-code/roos-code-client-test-runtime": "workspace:^",
-    "@roos-code/roos-code-client-ui-primitives": "workspace:^",
-    "@roos-code/roos-code-client-ui-settings": "workspace:^",
-    "@roos-code/roos-code-client-ui-sidebar": "workspace:^",
-    "@roos-code/roos-code-client-ui-slots": "workspace:^",
-    "@roos-code/roos-code-client-web-react": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/cordis": "workspace:^",
+    "@shres-code/shres-code-api-remotes": "workspace:^",
+    "@shres-code/shres-code-client-connection": "workspace:^",
+    "@shres-code/shres-code-client-locale": "workspace:^",
+    "@shres-code/shres-code-client-runtime": "workspace:^",
+    "@shres-code/shres-code-client-test-runtime": "workspace:^",
+    "@shres-code/shres-code-client-ui-primitives": "workspace:^",
+    "@shres-code/shres-code-client-ui-settings": "workspace:^",
+    "@shres-code/shres-code-client-ui-sidebar": "workspace:^",
+    "@shres-code/shres-code-client-ui-slots": "workspace:^",
+    "@shres-code/shres-code-client-web-react": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/cordis": "workspace:^",
     "@types/react": "~18.3.1",
     "react": "^18.2.0"
   },

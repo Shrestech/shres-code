@@ -303,13 +303,13 @@ describe('normalizeSessionLog', () => {
       data: {
         content: [{
           type: 'text',
-          text: 'Full formatted result stored at: /tmp/roos-acp-snapshot-spill/session-c22bc3f1d2af/8a7b6c5d4e3f-bash.txt. Use read with offset/limit, or grep this path to search within it.',
+          text: 'Full formatted result stored at: /tmp/shres-acp-snapshot-spill/session-c22bc3f1d2af/8a7b6c5d4e3f-bash.txt. Use read with offset/limit, or grep this path to search within it.',
         }],
       },
     })
     const out = normalizeSessionLog(`${header({ cwd: ctx.cwd })}\n${ev}\n`, ctx)
     expect(out).toContain('{{spillLocator:bash.txt}}')
-    expect(out).not.toContain('/tmp/roos-acp-snapshot-spill')
+    expect(out).not.toContain('/tmp/shres-acp-snapshot-spill')
   })
 
   it('scrubs scenario-owned snapshot spill paths', () => {
@@ -318,13 +318,13 @@ describe('normalizeSessionLog', () => {
       data: {
         content: [{
           type: 'text',
-          text: 'Full formatted result stored at: /tmp/roos-acp-snap-012345678/session-c22bc3f1d2af/8a7b6c5d4e3f-bash.txt. Use read with offset/limit, or grep this path to search within it.',
+          text: 'Full formatted result stored at: /tmp/shres-acp-snap-012345678/session-c22bc3f1d2af/8a7b6c5d4e3f-bash.txt. Use read with offset/limit, or grep this path to search within it.',
         }],
       },
     })
     const out = normalizeSessionLog(`${header({ cwd: ctx.cwd })}\n${ev}\n`, ctx)
     expect(out).toContain('{{spillLocator:bash.txt}}')
-    expect(out).not.toContain('/tmp/roos-acp-snap-012345678')
+    expect(out).not.toContain('/tmp/shres-acp-snap-012345678')
   })
 
   it('scrubs scenario-owned snapshot spill paths with Windows drive and separators', () => {
@@ -333,13 +333,13 @@ describe('normalizeSessionLog', () => {
       data: {
         content: [{
           type: 'text',
-          text: String.raw`Full formatted result stored at: C:\t\roos-acp-snap-012345678\session-c22bc3f1d2af\8a7b6c5d4e3f-bash.txt. Use read with offset/limit, or grep this path to search within it.`,
+          text: String.raw`Full formatted result stored at: C:\t\shres-acp-snap-012345678\session-c22bc3f1d2af\8a7b6c5d4e3f-bash.txt. Use read with offset/limit, or grep this path to search within it.`,
         }],
       },
     })
     const out = normalizeSessionLog(`${header({ cwd: ctx.cwd })}\n${ev}\n`, ctx)
     expect(out).toContain('{{spillLocator:bash.txt}}')
-    expect(out).not.toContain('C:\\t\\roos-acp-snap-012345678')
+    expect(out).not.toContain('C:\\t\\shres-acp-snap-012345678')
   })
 
   it('shares cwd-rooted path handling with stdout normalization', () => {
@@ -498,13 +498,13 @@ describe('tokenizeSessionFixtureCwd', () => {
 describe('extractSnapshotSpillPaths', () => {
   it('maps each spill filename to its full matched path, last match wins per name', () => {
     const log = [
-      'Full formatted result stored at: /tmp/roos-acp-snapshot-spill/session-c22bc3f1d2af/8a7b6c5d4e3f-bash.txt. Use read with offset/limit, or grep this path to search within it.',
-      'stale copy at /tmp/roos-acp-snap-012345678/session-aaaaaaaaaaaa/bbbbbbbbbbbb-grep.txt then',
-      'fresh copy at /tmp/roos-acp-snap-012345678/session-cccccccccccc/dddddddddddd-grep.txt then',
+      'Full formatted result stored at: /tmp/shres-acp-snapshot-spill/session-c22bc3f1d2af/8a7b6c5d4e3f-bash.txt. Use read with offset/limit, or grep this path to search within it.',
+      'stale copy at /tmp/shres-acp-snap-012345678/session-aaaaaaaaaaaa/bbbbbbbbbbbb-grep.txt then',
+      'fresh copy at /tmp/shres-acp-snap-012345678/session-cccccccccccc/dddddddddddd-grep.txt then',
     ].join('\n')
     expect(extractSnapshotSpillPaths(log)).toEqual(new Map([
-      ['bash.txt', '/tmp/roos-acp-snapshot-spill/session-c22bc3f1d2af/8a7b6c5d4e3f-bash.txt'],
-      ['grep.txt', '/tmp/roos-acp-snap-012345678/session-cccccccccccc/dddddddddddd-grep.txt'],
+      ['bash.txt', '/tmp/shres-acp-snapshot-spill/session-c22bc3f1d2af/8a7b6c5d4e3f-bash.txt'],
+      ['grep.txt', '/tmp/shres-acp-snap-012345678/session-cccccccccccc/dddddddddddd-grep.txt'],
     ]))
   })
 

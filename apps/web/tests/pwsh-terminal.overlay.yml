@@ -8,13 +8,13 @@
 # must boot the pwsh executor, so the lane skips on hosts without a usable
 # `pwsh`.
 - id: bash-sandbox
-  name: '@roos-code/roos-code-bash-sandbox'
+  name: '@shres-code/shres-code-bash-sandbox'
   disabled: true
 - id: permission
-  name: '@roos-code/roos-code-permission-presets'
+  name: '@shres-code/shres-code-permission-presets'
   disabled: true
 - insert:
     - id: pwsh-local
-      name: '@roos-code/roos-code-pwsh-local'
+      name: '@shres-code/shres-code-pwsh-local'
     - id: tool-pwsh
-      name: '@roos-code/roos-code-tool-pwsh'
+      name: '@shres-code/shres-code-tool-pwsh'

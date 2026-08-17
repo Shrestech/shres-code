@@ -1,5 +1,5 @@
 {
-  "name": "@roos-code/roos-code-client-ui-settings",
+  "name": "@shres-code/shres-code-client-ui-settings",
   "description": "Settings domain base plugin: the settings-namespace scope service and the canonical settings slot-type contract",
   "version": "0.1.0-rc.5",
   "publishConfig": {
@@ -7,7 +7,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "packages/client/ui-settings"
   },
   "type": "module",
@@ -29,12 +29,12 @@
     "./src/*": "./src/*",
     "./package.json": "./package.json"
   },
-  "roos": {
+  "shres": {
     "client": {
       "inject": [
-        "@roos-code/roos-code-client-connection",
-        "@roos-code/roos-code-client-runtime",
-        "@roos-code/roos-code-api-remotes"
+        "@shres-code/shres-code-client-connection",
+        "@shres-code/shres-code-client-runtime",
+        "@shres-code/shres-code-api-remotes"
       ],
       "platform": "web"
     }
@@ -45,25 +45,25 @@
   },
   "license": "MIT",
   "peerDependencies": {
-    "@roos-code/cordis": "workspace:^",
-    "@roos-code/roos-code-api-remotes": "workspace:^",
-    "@roos-code/roos-code-client-connection": "workspace:^",
-    "@roos-code/roos-code-client-runtime": "workspace:^",
-    "@roos-code/roos-code-client-schema-form": "workspace:^",
-    "@roos-code/roos-code-client-ui-slots": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-settings": "workspace:^",
+    "@shres-code/cordis": "workspace:^",
+    "@shres-code/shres-code-api-remotes": "workspace:^",
+    "@shres-code/shres-code-client-connection": "workspace:^",
+    "@shres-code/shres-code-client-runtime": "workspace:^",
+    "@shres-code/shres-code-client-schema-form": "workspace:^",
+    "@shres-code/shres-code-client-ui-slots": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-settings": "workspace:^",
     "react": "^18.2.0"
   },
   "devDependencies": {
-    "@roos-code/cordis": "workspace:^",
-    "@roos-code/roos-code-api-remotes": "workspace:^",
-    "@roos-code/roos-code-client-runtime": "workspace:^",
-    "@roos-code/roos-code-client-schema-form": "workspace:^",
-    "@roos-code/roos-code-client-test-runtime": "workspace:^",
-    "@roos-code/roos-code-client-ui-slots": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-settings": "workspace:^",
+    "@shres-code/cordis": "workspace:^",
+    "@shres-code/shres-code-api-remotes": "workspace:^",
+    "@shres-code/shres-code-client-runtime": "workspace:^",
+    "@shres-code/shres-code-client-schema-form": "workspace:^",
+    "@shres-code/shres-code-client-test-runtime": "workspace:^",
+    "@shres-code/shres-code-client-ui-slots": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-settings": "workspace:^",
     "@types/react": "~18.3.1",
     "react": "^18.2.0"
   },

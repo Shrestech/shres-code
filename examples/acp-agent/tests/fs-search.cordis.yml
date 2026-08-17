@@ -1,23 +1,23 @@
 # Minimal live counterpart for the glob-sampling snapshot composition.
 - id: llm-deepseek
-  name: '@roos-code/roos-code-llm-deepseek'
+  name: '@shres-code/shres-code-llm-deepseek'
   config:
     models:
       - id: deepseek-v4-pro
 
 - id: subprocess
-  name: '@roos-code/roos-code-subprocess-local'
+  name: '@shres-code/shres-code-subprocess-local'
 
 - id: bash
-  name: '@roos-code/roos-code-bash-local'
+  name: '@shres-code/shres-code-bash-local'
 
 - id: acp-agent
-  name: '@roos-code/roos-code-acp-demo'
+  name: '@shres-code/shres-code-acp-demo'
   config:
     provider: deepseek-official
     model: deepseek-v4-pro
-    persistenceRoot: !!js process.env.ROOS_SNAPSHOT_SESSIONS_ROOT ?? './.sessions'
-    persistenceCompression: !!js "process.env.ROOS_SNAPSHOT === undefined ? 'zstd' : 'none'"
+    persistenceRoot: !!js process.env.SHRES_SNAPSHOT_SESSIONS_ROOT ?? './.sessions'
+    persistenceCompression: !!js "process.env.SHRES_SNAPSHOT === undefined ? 'zstd' : 'none'"
     workspaceContext: false
     skills:
       enabled: false
@@ -26,7 +26,7 @@
     persona: You are a concise snapshot agent working in {{cwd}}.
 
 - id: tool-fs-search
-  name: '@roos-code/roos-code-tool-fs-search'
+  name: '@shres-code/shres-code-tool-fs-search'
   config:
     sampleOverCapGlobResults: true
     globMaxResults: 4

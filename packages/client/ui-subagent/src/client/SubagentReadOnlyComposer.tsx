@@ -1,4 +1,4 @@
-import type { PropsLocale, PropsRuntime } from '@roos-code/roos-code-client-ui-slots'
+import type { PropsLocale, PropsRuntime } from '@shres-code/shres-code-client-ui-slots'
 import { NS } from './locales.ts'
 import css from './SubagentReadOnlyComposer.module.css'
 

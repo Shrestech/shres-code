@@ -5,25 +5,25 @@
  *
  * TODO(permissions): deployment policy belongs in `tools/pre-execute` and
  * sandboxing executors; see docs/architecture.md § Where new behavior goes.
- * @module @roos-code/roos-code-tool-bash
+ * @module @shres-code/shres-code-tool-bash
  */
 
-import type { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
+import type { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
 import { isAbsolute, resolve as resolvePath } from 'node:path'
-import { defineTool, TOOL_ABORTED } from '@roos-code/roos-code-tools'
-import type { GenericCallView, TerminalCallView, ToolExecution, ToolResult, ToolResultView } from '@roos-code/roos-code-tools'
-import { HarnessError } from '@roos-code/roos-code-llm'
-import type { Agent } from '@roos-code/roos-code-agent'
-import type {} from '@roos-code/roos-code-system-prompt'
-import type {} from '@roos-code/roos-code-jobs'
-import type {} from '@roos-code/roos-code-user-approval'
-import type {} from '@roos-code/roos-code-shell-env'
-import type { SandboxExecutionPolicy, SandboxMode } from '@roos-code/roos-code-sandbox'
-import { ESCALATION_TARGETS, approveEscalation, canonicalPath, validateEscalationArgs } from '@roos-code/roos-code-sandbox'
-import type { SandboxPolicyService } from '@roos-code/roos-code-sandbox-policy'
-import { ROOS_ENV_PREFIX } from '@roos-code/roos-code-shell'
-import type { ShellRunResult } from '@roos-code/roos-code-shell'
+import { defineTool, TOOL_ABORTED } from '@shres-code/shres-code-tools'
+import type { GenericCallView, TerminalCallView, ToolExecution, ToolResult, ToolResultView } from '@shres-code/shres-code-tools'
+import { HarnessError } from '@shres-code/shres-code-llm'
+import type { Agent } from '@shres-code/shres-code-agent'
+import type {} from '@shres-code/shres-code-system-prompt'
+import type {} from '@shres-code/shres-code-jobs'
+import type {} from '@shres-code/shres-code-user-approval'
+import type {} from '@shres-code/shres-code-shell-env'
+import type { SandboxExecutionPolicy, SandboxMode } from '@shres-code/shres-code-sandbox'
+import { ESCALATION_TARGETS, approveEscalation, canonicalPath, validateEscalationArgs } from '@shres-code/shres-code-sandbox'
+import type { SandboxPolicyService } from '@shres-code/shres-code-sandbox-policy'
+import { SHRES_ENV_PREFIX } from '@shres-code/shres-code-shell'
+import type { ShellRunResult } from '@shres-code/shres-code-shell'
 import { processOutcome } from './background.ts'
 import { parseExitStatus, renderProcessRead, renderResult } from './render.ts'
 
@@ -74,7 +74,7 @@ function bashDescription(backgroundEnabled: boolean, escalationModes: readonly S
   const base = 'Execute a bash command (`bash -c`) and return its stdout/stderr. '
     + 'Each call runs in a fresh shell: no state (cwd, variables, functions) persists between calls — '
     + 'pass `workdir` instead of using `cd`. Non-zero exits are reported as `[exit code: N]`. '
-    + `Current harness environment facts are exposed through managed \`$${ROOS_ENV_PREFIX}*\` variables; inspect them when needed. `
+    + `Current harness environment facts are exposed through managed \`$${SHRES_ENV_PREFIX}*\` variables; inspect them when needed. `
     + 'Commands may run under a file sandbox; a blocked file operation is reported as `[sandbox: file access denied under <mode> mode]` — a policy denial, not a bug in the command; do not retry another way. '
     + 'Long output is truncated to its tail; the full output is saved to a file whose path is reported when available. '
     + background
@@ -338,12 +338,12 @@ export function apply(ctx: Context, config: Config = {}): void {
         ? standingPolicy
         : { ...(standingPolicy as SandboxExecutionPolicy), mode: approvedMode }
       const workdir = resolveWorkdir(args.workdir, exec, standingPolicy?.workspaceRoot)
-      const roosEnv = ctx.shellEnv.collect(exec)
+      const shresEnv = ctx.shellEnv.collect(exec)
       const request = {
         command: args.command,
         ...workdir !== undefined ? { workdir } : {},
         ...args.timeoutMs !== undefined ? { timeoutMs: args.timeoutMs } : {},
-        roosEnv,
+        shresEnv,
         ...policy !== undefined ? { sandboxPolicy: policy } : {},
       }
       if (args.run_in_background === true) {
@@ -353,7 +353,7 @@ export function apply(ctx: Context, config: Config = {}): void {
         }
         const jobs = ctx.get('jobs')
         if (jobs === undefined) {
-          throw new Error('background jobs unavailable: load @roos-code/roos-code-jobs and @roos-code/roos-code-tool-jobs')
+          throw new Error('background jobs unavailable: load @shres-code/shres-code-jobs and @shres-code/shres-code-tool-jobs')
         }
         // The caller owns cancellation until ctx.jobs commits detached ownership.
         if (exec.signal.aborted) {

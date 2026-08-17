@@ -10,17 +10,17 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import AgentRegistry from '@roos-code/roos-code-agent'
-import type { Agent } from '@roos-code/roos-code-agent'
-import SessionStore from '@roos-code/roos-code-session'
-import type { Session } from '@roos-code/roos-code-session'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import ToolRuntime from '@roos-code/roos-code-tools'
-import SessionProjectionRegistry from '@roos-code/roos-code-session-projection'
-import UserQuestionService from '@roos-code/roos-code-user-questions'
-import { CommandId } from '@roos-code/roos-code-commands/brand'
-import PlanModeController from '@roos-code/roos-code-plan-mode'
+import { Context } from '@shres-code/cordis'
+import AgentRegistry from '@shres-code/shres-code-agent'
+import type { Agent } from '@shres-code/shres-code-agent'
+import SessionStore from '@shres-code/shres-code-session'
+import type { Session } from '@shres-code/shres-code-session'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import ToolRuntime from '@shres-code/shres-code-tools'
+import SessionProjectionRegistry from '@shres-code/shres-code-session-projection'
+import UserQuestionService from '@shres-code/shres-code-user-questions'
+import { CommandId } from '@shres-code/shres-code-commands/brand'
+import PlanModeController from '@shres-code/shres-code-plan-mode'
 
 interface Bench {
   ctx: Context

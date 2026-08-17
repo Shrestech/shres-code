@@ -10,8 +10,8 @@ import {
   parseLspArgs,
   presentLspCall,
   renderUri,
-} from '@roos-code/roos-code-tool-lsp'
-import type { LspLocation } from '@roos-code/roos-code-lsp'
+} from '@shres-code/shres-code-tool-lsp'
+import type { LspLocation } from '@shres-code/shres-code-lsp'
 
 const WS = resolve('/home/u/proj')
 const WS_URI = pathToFileURL(WS).href

@@ -1,14 +1,14 @@
 /**
  * Package-owned invariant companion for
- * `@roos-code/roos-code-subagent-claude-code`.
- * @module @roos-code/roos-code-subagent-claude-code/invariant
+ * `@shres-code/shres-code-subagent-claude-code`.
+ * @module @shres-code/shres-code-subagent-claude-code/invariant
  */
 
 /* jscpd:ignore-start */
-import type { Context } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-subagent-claude-code'
+const PACKAGE_NAME = '@shres-code/shres-code-subagent-claude-code'
 
 /** Cordis companion plugin name. */
 export const name = 'subagent-claude-code-invariant'

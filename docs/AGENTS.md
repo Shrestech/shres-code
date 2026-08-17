@@ -1,6 +1,6 @@
 # AGENTS.md — The documentation standard
 
-This file defines document structure, Markdown tiers, writing rules, and `verify-doc-budgets` ceilings. Use [roos-doc-standards](../.agents/skills/roos-doc-standards/SKILL.md) for placement and validation, and [roos-prose-standard](../.agents/skills/roos-prose-standard/SKILL.md) for required coverage and editorial judgment; the [doc-tiers Agent Note](../.agents/notes/implemented/process/2026-07-04-doc-tiers-and-budgets.md) owns rationale.
+This file defines document structure, Markdown tiers, writing rules, and `verify-doc-budgets` ceilings. Use [shres-doc-standards](../.agents/skills/shres-doc-standards/SKILL.md) for placement and validation, and [shres-prose-standard](../.agents/skills/shres-prose-standard/SKILL.md) for required coverage and editorial judgment; the [doc-tiers Agent Note](../.agents/notes/implemented/process/2026-07-04-doc-tiers-and-budgets.md) owns rationale.
 
 ## Document structure
 
@@ -41,7 +41,7 @@ Placement: bugs → postmortems; rationale → Agent Notes; procedures → cookb
 - **Fenced `ts` blocks must compile** (`doc-typecheck`); a pasted type declaration and its original JSDoc use ` ```ts type-equiv `, while a body-stripped public class declaration uses ` ```ts public-api `; register either in the manifest so neither can drift ([mechanics](development.md#documenting-types-verbatim-ts-type-equiv)).
 - **The owning [subsystems page](subsystems/README.md) updates in the same change** that reshapes a documented type. `verify-type-equiv` catches drifted pastes, not never-documented new types; a type is documented on its declaring package group's page ([page scoping](../.agents/notes/implemented/process/2026-08-03-package-anchored-subsystem-pages.md)).
 - **English-only documentation.** The product ships English docs, READMEs, Agent Notes, and UI locale. Conversation with the model may be any language; that is the model's job, not a harness translation layer.
-- **Comments and JSDoc state complete contracts, not reasoning transcripts.** Preserve behavior, failure, timing, ownership, modality, exceptions, consequences, and non-obvious orientation; delete narration, test walkthroughs, review analysis, and code restatement. Keep the local contract and link its rationale. Use [roos-prose-standard](../.agents/skills/roos-prose-standard/SKILL.md) for details.
+- **Comments and JSDoc state complete contracts, not reasoning transcripts.** Preserve behavior, failure, timing, ownership, modality, exceptions, consequences, and non-obvious orientation; delete narration, test walkthroughs, review analysis, and code restatement. Keep the local contract and link its rationale. Use [shres-prose-standard](../.agents/skills/shres-prose-standard/SKILL.md) for details.
 - Write directly: name actors and facts ([decision](../.agents/notes/implemented/process/2026-08-09-concrete-prose-names-actors-and-recorded-facts.md)). Reserve `seam` for the defined capability. Name the exact check, type, API, operation, or behavior instead of metaphorical "gate", "vocabulary", or "surface".
 
 ## Wordcount Budgets
@@ -58,7 +58,7 @@ Ceilings are guardrails, not reduction targets. At or below target, retain at le
 
 ## The slop checklist
 
-Hunt these in any doc; [roos-doc-standards](../.agents/skills/roos-doc-standards/SKILL.md) runs this list as an audit:
+Hunt these in any doc; [shres-doc-standards](../.agents/skills/shres-doc-standards/SKILL.md) runs this list as an audit:
 
 - The same rule stated in more than one home. Grep a distinctive phrase; keep one home and link the rest.
 - Narrated history or war stories: "previously", "now", "no longer", "used to", "renamed", "was moved", PRs, or commits. State the current fact; link an Agent Note or postmortem when needed.

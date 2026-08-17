@@ -3,11 +3,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import Loader from '@roos-code/cordis-plugin-loader'
-import Include from '@roos-code/cordis-plugin-include'
-import type { Agent } from '@roos-code/roos-code-agent'
-import CommandRuntime from '@roos-code/roos-code-commands'
+import { Context } from '@shres-code/cordis'
+import Loader from '@shres-code/cordis-plugin-loader'
+import Include from '@shres-code/cordis-plugin-include'
+import type { Agent } from '@shres-code/shres-code-agent'
+import CommandRuntime from '@shres-code/shres-code-commands'
 import {
   CompactionId,
   CompactionEngine,
@@ -15,9 +15,9 @@ import {
   type CompactionResult,
   type CompactionTrigger,
   type ManualCompactAgentContext,
-} from '@roos-code/roos-code-compaction'
-import * as commandCompact from '@roos-code/roos-code-command-compact'
-import { Session, SessionId } from '@roos-code/roos-code-session'
+} from '@shres-code/shres-code-compaction'
+import * as commandCompact from '@shres-code/shres-code-command-compact'
+import { Session, SessionId } from '@shres-code/shres-code-session'
 
 const COMPACTION_ID = CompactionId('loader-command-compact-test')
 
@@ -81,12 +81,12 @@ afterEach(async () => {
 
 describe('command-compact real Loader composition', () => {
   it('discovers and executes /compact through the assembled command plane', async () => {
-    root = await mkdtemp(join(tmpdir(), 'roos-command-compact-loader-'))
+    root = await mkdtemp(join(tmpdir(), 'shres-command-compact-loader-'))
     const configPath = join(root, 'cordis.yml')
     await writeFile(configPath, [
-      "- name: '@roos-code/roos-code-commands'",
+      "- name: '@shres-code/shres-code-commands'",
       "- name: '@test/compact-backend'",
-      "- name: '@roos-code/roos-code-command-compact'",
+      "- name: '@shres-code/shres-code-command-compact'",
       '',
     ].join('\n'))
 
@@ -95,9 +95,9 @@ describe('command-compact real Loader composition', () => {
     await context.plugin(Loader)
     context.loader.builtins.include = Include
     const modules = new Map<string, unknown>([
-      ['@roos-code/roos-code-commands', CommandRuntime],
+      ['@shres-code/shres-code-commands', CommandRuntime],
       ['@test/compact-backend', LoaderCompactionEngine],
-      ['@roos-code/roos-code-command-compact', commandCompact],
+      ['@shres-code/shres-code-command-compact', commandCompact],
     ])
     context.loader.internal = {
       version: 'v2',

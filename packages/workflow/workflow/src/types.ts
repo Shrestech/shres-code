@@ -3,11 +3,11 @@
  * consumes and produces, plus the fields in the `workflow/*` event payloads.
  * Types only (plus the id-brand factory), per the package convention.
  *
- * @module @roos-code/roos-code-workflow/types
+ * @module @shres-code/shres-code-workflow/types
  */
 
-import type { Branded } from '@roos-code/roos-code-brand'
-import type { SessionId } from '@roos-code/roos-code-session/types'
+import type { Branded } from '@shres-code/shres-code-brand'
+import type { SessionId } from '@shres-code/shres-code-session/types'
 
 /** Identifies one workflow run. */
 export type WorkflowRunId = Branded<'WorkflowRunId'>

@@ -9,7 +9,7 @@ For a resource Cordis does not already manage — a timer, a connection, a watch
 Create `lifecycle.ts` in `tmp/cordis-tutorial`:
 
 ```ts
-import type { Context } from '@roos-code/cordis'
+import type { Context } from '@shres-code/cordis'
 
 export const name = 'lifecycle-demo'
 
@@ -93,4 +93,4 @@ One ordering caveat: disposers start in reverse registration order, but multiple
 
 Next: [Services](03-services.md) — how plugins share capabilities.
 
-[![](https://img.shields.io/badge/powered_by-roos-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/roos-code/roos-code)
+[![](https://img.shields.io/badge/powered_by-shres-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/parthmstech/shres-code)

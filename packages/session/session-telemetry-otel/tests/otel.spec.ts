@@ -12,11 +12,11 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { gunzipSync } from 'node:zlib'
-import { Context } from '@roos-code/cordis'
-import { getOrCreateAnonymousUserId } from '@roos-code/roos-code-anonymous-user-id'
-import Loader from '@roos-code/cordis-plugin-loader'
-import { recordFeedback } from '@roos-code/roos-code-command-feedback'
-import SessionStore, { SessionId } from '@roos-code/roos-code-session'
+import { Context } from '@shres-code/cordis'
+import { getOrCreateAnonymousUserId } from '@shres-code/shres-code-anonymous-user-id'
+import Loader from '@shres-code/cordis-plugin-loader'
+import { recordFeedback } from '@shres-code/shres-code-command-feedback'
+import SessionStore, { SessionId } from '@shres-code/shres-code-session'
 import OpenTelemetrySessionBackend, { Config, DEFAULT_TELEMETRY_MODE, SessionTelemetryMode } from '../src/index.ts'
 
 interface Capture {
@@ -44,17 +44,17 @@ interface OtlpLogsRequest {
 const servers: Server[] = []
 
 // The backend resolves the harness home's anonymous user id at construction;
-// pin ROOS_HOME to a temp dir so the suite never touches the ambient ~/.roos.
+// pin SHRES_HOME to a temp dir so the suite never touches the ambient ~/.shres.
 let tempHome: string
-let previousRoosHome: string | undefined
+let previousShresHome: string | undefined
 beforeAll(() => {
-  tempHome = mkdtempSync(join(tmpdir(), 'roos-otel-home-'))
-  previousRoosHome = process.env.ROOS_HOME
-  process.env.ROOS_HOME = tempHome
+  tempHome = mkdtempSync(join(tmpdir(), 'shres-otel-home-'))
+  previousShresHome = process.env.SHRES_HOME
+  process.env.SHRES_HOME = tempHome
 })
 afterAll(() => {
-  if (previousRoosHome === undefined) delete process.env.ROOS_HOME
-  else process.env.ROOS_HOME = previousRoosHome
+  if (previousShresHome === undefined) delete process.env.SHRES_HOME
+  else process.env.SHRES_HOME = previousShresHome
   rmSync(tempHome, { recursive: true, force: true })
 })
 
@@ -140,12 +140,12 @@ describe('OpenTelemetrySessionBackend wire', () => {
     expect(authorization).toBe('Bearer test-token')
 
     const resource = first.body.resourceLogs[0]!.resource.attributes
-    expect(resource).toContainEqual({ key: 'service.name', value: { stringValue: 'roos-code' } })
+    expect(resource).toContainEqual({ key: 'service.name', value: { stringValue: 'shres-code' } })
     expect(resource).toContainEqual({ key: 'user.id', value: { stringValue: getOrCreateAnonymousUserId() } })
 
     const records = allRecords(captures)
-    const ledger = records.filter(r => r.scope === '@roos-code/roos-code-session-telemetry-otel')
-    const ops = records.filter(r => r.scope === '@roos-code/roos-code-session-telemetry-otel/ops')
+    const ledger = records.filter(r => r.scope === '@shres-code/shres-code-session-telemetry-otel')
+    const ops = records.filter(r => r.scope === '@shres-code/shres-code-session-telemetry-otel/ops')
 
     const start = ledger.find(r => r.record.attributes?.some(a => a.key === 'event.type' && a.value.stringValue === 'turn/start'))
     expect(start).toBeDefined()
@@ -195,7 +195,7 @@ describe('OpenTelemetrySessionBackend wire', () => {
     gate.resolve(true)
     await disposal
 
-    const ops = allRecords(captures).filter(r => r.scope === '@roos-code/roos-code-session-telemetry-otel/ops')
+    const ops = allRecords(captures).filter(r => r.scope === '@shres-code/shres-code-session-telemetry-otel/ops')
     expect(ops).toHaveLength(1)
     expect(ops[0]!.record.attributes).toContainEqual({ key: 'telemetry.op', value: { stringValue: 'shutdown' } })
   })
@@ -490,7 +490,7 @@ describe('OpenTelemetrySessionBackend config fails loud', () => {
   })
 })
 
-describe('roos-session-telemetry-otel real-load-path guard', () => {
+describe('shres-session-telemetry-otel real-load-path guard', () => {
   it('keeps the Service class with inject/Config through unwrapExports', async () => {
     const module = await import('../src/index.ts')
     const loader = Object.create(Loader.prototype) as Loader

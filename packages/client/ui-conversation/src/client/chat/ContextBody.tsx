@@ -5,8 +5,8 @@
 // even when this UI version has never seen its producer.
 
 import type { ReactNode } from 'react'
-import type { ContextMessageNode, KnownContextForm } from '@roos-code/roos-code-client-runtime/client'
-import { JsonBlock } from '@roos-code/roos-code-client-ui-primitives'
+import type { ContextMessageNode, KnownContextForm } from '@shres-code/shres-code-client-runtime/client'
+import { JsonBlock } from '@shres-code/shres-code-client-ui-primitives'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
 import css from './ContextBody.module.css'
 

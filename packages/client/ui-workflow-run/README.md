@@ -1,6 +1,6 @@
-# @roos-code/roos-code-client-ui-workflow-run
+# @shres-code/shres-code-client-ui-workflow-run
 
-The browser plugin that reconstructs durable top-level workflow runs as independent Chat nodes. It consumes the four `tool-workflow/*` Session events owned by [`roos-tool-workflow`](../../workflow/tool-workflow/README.md), registers one `ConversationNodeDefinition`, and renders through the keyed `conversation.chat.node` slot without changing the existing workflow tool card.
+The browser plugin that reconstructs durable top-level workflow runs as independent Chat nodes. It consumes the four `tool-workflow/*` Session events owned by [`shres-tool-workflow`](../../workflow/tool-workflow/README.md), registers one `ConversationNodeDefinition`, and renders through the keyed `conversation.chat.node` slot without changing the existing workflow tool card.
 
 ## Durable state and replay
 
@@ -28,6 +28,6 @@ None.
 
 ## Known Limitations and Deferred Work
 
-- Only top-level calls through `roos-tool-workflow` produce these records; nested Code Mode calls and direct `WorkflowEngine` consumers do not.
+- Only top-level calls through `shres-tool-workflow` produce these records; nested Code Mode calls and direct `WorkflowEngine` consumers do not.
 - Navigation is intentionally live-only. Terminal members remain visible for review but never expose a cold-session opener from this node.
 - The node shows run, phase, member identity, and status only; scripts, outputs, errors, logs, usage, static topology, and controls remain outside this surface.

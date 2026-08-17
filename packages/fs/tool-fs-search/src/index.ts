@@ -10,8 +10,8 @@
  * execute through `ctx.subprocess.spawn()` with fixed ripgrep argv templates —
  * never `ctx.shell`, never `ctx.shell.start()`, never a model-visible background
  * task. The tool layer owns schemas, argument validation, argv construction
- * ({@link module:@roos-code/roos-code-tool-fs-search/glob} /
- * {@link module:@roos-code/roos-code-tool-fs-search/grep}), result parsing,
+ * ({@link module:@shres-code/shres-code-tool-fs-search/glob} /
+ * {@link module:@shres-code/shres-code-tool-fs-search/grep}), result parsing,
  * retention, formatted-result spill, and timeout declaration; the subprocess
  * seam owns spawn execution, process-tree termination, environment scrubbing,
  * and raw output capture. The package injects `tools`, `systemPrompt`, and
@@ -23,12 +23,12 @@
  * filesystem `read` root are the same workspace — a documented v1 deployment
  * requirement, not runtime-validated.
  *
- * @module @roos-code/roos-code-tool-fs-search
+ * @module @shres-code/shres-code-tool-fs-search
  */
 
-import type { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import { MAX_TIMER_DELAY_MS } from '@roos-code/roos-code-timeout'
+import type { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
 import { GLOB_MAX_RESULTS, applyGlobTool } from './glob.ts'
 import { GREP_MAX_LINE_BYTES, GREP_MAX_MATCHES, applyGrepTool } from './grep.ts'
 import { RAW_OUTPUT_MAX_BYTES, SEARCH_GRACE_MS, SEARCH_META_MAX_BYTES, SEARCH_STDERR_MAX_BYTES, SEARCH_TIMEOUT_MS } from './search-core.ts'
@@ -90,7 +90,7 @@ export interface Config {
   stderrMaxBytes?: number
   /**
    * Cooperative tool-call timeout budget (ms) on both tools, enforced by
-   * `@roos-code/roos-code-tool-call-timeout-policy` through `exec.signal`.
+   * `@shres-code/shres-code-tool-call-timeout-policy` through `exec.signal`.
    */
   timeoutMs?: number
 }

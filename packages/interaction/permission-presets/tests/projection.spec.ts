@@ -10,16 +10,16 @@
  */
 
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import SessionStore, { SessionId } from '@roos-code/roos-code-session'
-import type { Session } from '@roos-code/roos-code-session'
-import type { Agent } from '@roos-code/roos-code-agent'
-import { createScope } from '@roos-code/roos-code-scope'
-import SessionProjectionRegistry from '@roos-code/roos-code-session-projection'
-import CommandRuntime from '@roos-code/roos-code-commands'
-import PermissionPresetService from '@roos-code/roos-code-permission-presets'
-import type { Config } from '@roos-code/roos-code-permission-presets'
-import ApprovalService from '@roos-code/roos-code-user-approval'
+import { Context } from '@shres-code/cordis'
+import SessionStore, { SessionId } from '@shres-code/shres-code-session'
+import type { Session } from '@shres-code/shres-code-session'
+import type { Agent } from '@shres-code/shres-code-agent'
+import { createScope } from '@shres-code/shres-code-scope'
+import SessionProjectionRegistry from '@shres-code/shres-code-session-projection'
+import CommandRuntime from '@shres-code/shres-code-commands'
+import PermissionPresetService from '@shres-code/shres-code-permission-presets'
+import type { Config } from '@shres-code/shres-code-permission-presets'
+import ApprovalService from '@shres-code/shres-code-user-approval'
 
 async function harness(options: { withPermission?: boolean; config?: Config } = {}): Promise<{ ctx: Context; session: Session }> {
   const ctx = new Context()

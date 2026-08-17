@@ -1,10 +1,10 @@
-import type { Context } from '@roos-code/cordis'
+import type { Context } from '@shres-code/cordis'
 import type {
   ChatConversationViewNode, ChatLocationNodeIndex, ChatNodeStore, ChatSnapshot,
   ConversationLocation, ConversationNode, ConversationTimelineSnapshot,
   ConversationViewBuilder, ConversationViewDefinition, LegacyConversationSlice,
   PartialAssistant, RunningToolCall,
-} from '@roos-code/roos-code-client-runtime/client'
+} from '@shres-code/shres-code-client-runtime/client'
 import type { ChatNode } from '../contract/chat-nodes.ts'
 import { isRunningTool } from '../contract/chat-nodes.ts'
 

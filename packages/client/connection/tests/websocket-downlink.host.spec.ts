@@ -5,8 +5,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import WebSocket from 'ws'
 import type {
   ApiProxy, HostFrame, MuxFrame, RpcRequest, ServerRequest,
-} from '@roos-code/roos-code-host-apiproxy/api'
-import { RpcId } from '@roos-code/roos-code-host-apiproxy/api'
+} from '@shres-code/shres-code-host-apiproxy/api'
+import { RpcId } from '@shres-code/shres-code-host-apiproxy/api'
 import { HOST_EVENTS_PATH, MUX_EVENTS_PATH } from '../src/api-path.ts'
 import { WebSocketDownlinks } from '../src/websocket-downlink.ts'
 
@@ -45,7 +45,7 @@ async function serve(downlinks: WebSocketDownlinks): Promise<{
 }> {
   const server = createServer()
   server.on('upgrade', (request, socket, head) => {
-    const pathname = new URL(request.url ?? '/', 'http://roos.internal').pathname
+    const pathname = new URL(request.url ?? '/', 'http://shres.internal').pathname
     if (pathname === MUX_EVENTS_PATH) downlinks.handleMux(request, socket, head)
     else if (pathname === HOST_EVENTS_PATH) downlinks.handleHost(request, socket, head)
     else socket.destroy()

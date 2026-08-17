@@ -9,10 +9,10 @@
  * with `removedCount` and marks a cancellation `outcome: 'canceled'`, which
  * separates a turn claiming its input from work being dropped unrun.
  *
- * @module @roos-code/roos-code-agent/consumed-work
+ * @module @shres-code/shres-code-agent/consumed-work
  */
 
-import type { SessionEvent, TurnEndReason } from '@roos-code/roos-code-session'
+import type { SessionEvent, TurnEndReason } from '@shres-code/shres-code-session'
 
 /** How one agent log accounts for the work it consumed. */
 export interface ConsumedWork {

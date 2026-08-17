@@ -5,8 +5,8 @@ import type {
   SubprocessOutcome,
   SubprocessTerminalForeground,
   SubprocessTerminalHandle,
-} from '@roos-code/roos-code-subprocess'
-import { TerminalError } from '@roos-code/roos-code-terminal'
+} from '@shres-code/shres-code-subprocess'
+import { TerminalError } from '@shres-code/shres-code-terminal'
 import type {
   TerminalBackendSession,
   TerminalReadRequest,
@@ -19,7 +19,7 @@ import type {
   TerminalSignal,
   TerminalSignalResult,
   TerminalWaitReason,
-} from '@roos-code/roos-code-terminal'
+} from '@shres-code/shres-code-terminal'
 import type { ResolvedConfig } from './config.ts'
 import { CONTROLLED_PROMPT, TerminalSanitizer } from './sanitize.ts'
 

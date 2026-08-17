@@ -1,16 +1,16 @@
 /** Canonical session URI and inline mention encoding. */
 
-import { SessionId, type SessionId as SessionIdType } from '@roos-code/roos-code-session'
+import { SessionId, type SessionId as SessionIdType } from '@shres-code/shres-code-session'
 import { SessionReferenceError } from './config.ts'
 import type { SessionReferenceInput } from './types.ts'
 
-/** URI scheme reserved for Roos Code session snapshots. */
-export const SESSION_REFERENCE_SCHEME = 'roos-session:'
+/** URI scheme reserved for Shres Code session snapshots. */
+export const SESSION_REFERENCE_SCHEME = 'shres-session:'
 
 /**
  * Encode any JavaScript session-id string as a canonical lossless URI.
  * @param sessionId - opaque session id to serialize.
- * @returns canonical `roos-session:` URI.
+ * @returns canonical `shres-session:` URI.
  */
 export function encodeSessionReferenceUri(sessionId: SessionIdType): string {
   const payload = Buffer.from(JSON.stringify(sessionId), 'utf8').toString('base64url')
@@ -67,7 +67,7 @@ export interface ParsedSessionReferenceText {
  */
 export function parseSessionReferenceText(text: string): ParsedSessionReferenceText {
   const references: SessionReferenceInput[] = []
-  const pattern = /@\[((?:\\.|[^\\\]])*)\]\((roos-session:[^\s)]*)\)|(roos-session:[A-Za-z0-9_-]+)/gu
+  const pattern = /@\[((?:\\.|[^\\\]])*)\]\((shres-session:[^\s)]*)\)|(shres-session:[A-Za-z0-9_-]+)/gu
   const rendered = text.replace(pattern, (
     _match,
     rawLabel: string | undefined,

@@ -1,12 +1,12 @@
-import type { Context } from '@roos-code/cordis'
+import type { Context } from '@shres-code/cordis'
 import type {
   ContextMessageNode, ConversationNodeDefinition, ConversationPreviousContext,
   SteeringMessageNode, UserMessageNode,
-} from '@roos-code/roos-code-client-runtime/client'
+} from '@shres-code/shres-code-client-runtime/client'
 import {
   contextForm, contextProvenance,
-} from '@roos-code/roos-code-client-runtime/client'
-import type {} from '@roos-code/roos-code-agent/types'
+} from '@shres-code/shres-code-client-runtime/client'
+import type {} from '@shres-code/shres-code-agent/types'
 import { trajectoryNode } from './trajectory-definition-common.ts'
 
 /* jscpd:ignore-start -- Target-owned Definitions intentionally keep their event

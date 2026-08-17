@@ -3,21 +3,21 @@
  * (`goToDefinition`/`findReferences`/`goToImplementation`/`hover`); it converts one-based UTF-16
  * cursor coordinates to the seam's zero-based positions, requires the session workspace with no
  * fallback, caps and renders results, and attaches a configurable timeout budget for
- * `roos-tool-call-timeout-policy` to enforce. It runtime-injects only `tools`, `lsp`, and `systemPrompt` and
+ * `shres-tool-call-timeout-policy` to enforce. It runtime-injects only `tools`, `lsp`, and `systemPrompt` and
  * imports no provider.
  *
  * Namespace plugin (named exports, no default export).
- * @module @roos-code/roos-code-tool-lsp
+ * @module @shres-code/shres-code-tool-lsp
  */
 
-import type { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import { defineTool } from '@roos-code/roos-code-tools'
-import { assertNever } from '@roos-code/roos-code-llm'
-import { LspError } from '@roos-code/roos-code-lsp'
-import type {} from '@roos-code/roos-code-lsp'
-import type {} from '@roos-code/roos-code-system-prompt'
-import { MAX_TIMER_DELAY_MS } from '@roos-code/roos-code-timeout'
+import type { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import { defineTool } from '@shres-code/shres-code-tools'
+import { assertNever } from '@shres-code/shres-code-llm'
+import { LspError } from '@shres-code/shres-code-lsp'
+import type {} from '@shres-code/shres-code-lsp'
+import type {} from '@shres-code/shres-code-system-prompt'
+import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
 import {
   DEFAULT_MAX_LOCATIONS,
   DEFAULT_MAX_RESULT_CHARS,

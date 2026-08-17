@@ -1,6 +1,6 @@
 /**
  * Named backend registry of the storage hub.
- * @module @roos-code/roos-code-storage/src/registry
+ * @module @shres-code/shres-code-storage/src/registry
  */
 
 import type { StorageBackend } from './backend.ts'

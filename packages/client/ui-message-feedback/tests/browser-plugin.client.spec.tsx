@@ -8,13 +8,13 @@
  * fiber (HMR safety). The node half and the invariant companion are exercised
  * over the same Context.
  */
-import { Context, Service } from '@roos-code/cordis'
+import { Context, Service } from '@shres-code/cordis'
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup } from '@testing-library/react'
-import { SlotRegistry, type SessionId } from '@roos-code/roos-code-client-runtime/client'
-import { LocaleRuntime } from '@roos-code/roos-code-client-locale/client'
-import type { MessageId } from '@roos-code/roos-code-client-connection/client'
-import type { MessageFeedbackItem, MessageFeedbackVersion } from '@roos-code/roos-code-message-feedback/types'
+import { SlotRegistry, type SessionId } from '@shres-code/shres-code-client-runtime/client'
+import { LocaleRuntime } from '@shres-code/shres-code-client-locale/client'
+import type { MessageId } from '@shres-code/shres-code-client-connection/client'
+import type { MessageFeedbackItem, MessageFeedbackVersion } from '@shres-code/shres-code-message-feedback/types'
 import type { MessageFeedbackInjected } from '../src/client/slots.ts'
 import { apply, inject } from '../src/client/index.ts'
 import { apply as nodeApply } from '../src/index.ts'

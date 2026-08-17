@@ -1,6 +1,6 @@
-import type { Context } from '@roos-code/cordis'
-import { setSandboxMode } from '@roos-code/roos-code-sandbox-policy'
-import type {} from '@roos-code/roos-code-agent'
+import type { Context } from '@shres-code/cordis'
+import { setSandboxMode } from '@shres-code/shres-code-sandbox-policy'
+import type {} from '@shres-code/shres-code-agent'
 
 export const name = 'parent-sandbox-override'
 

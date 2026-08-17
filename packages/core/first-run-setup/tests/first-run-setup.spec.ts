@@ -4,16 +4,16 @@ import { createServer } from 'node:http'
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
 import { PassThrough } from 'node:stream'
 import { afterEach, describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import LlmRuntime, { LlmAdapter } from '@roos-code/roos-code-llm'
-import type { GenerateOptions, StreamChunk } from '@roos-code/roos-code-llm'
-import * as LlmPiAi from '@roos-code/roos-code-llm-pi-ai'
-import AgentDefaultModelConfig from '@roos-code/roos-code-agent-default-model'
-import { credentialRef } from '@roos-code/roos-code-credentials'
-import { CredentialProvider } from '@roos-code/roos-code-credentials'
-import type { CredentialInfo, CredentialRef, ResolvedCredential } from '@roos-code/roos-code-credentials'
-import { SettingsProvider, settingsNamespace } from '@roos-code/roos-code-settings'
-import type { SettingsNamespace } from '@roos-code/roos-code-settings'
+import { Context } from '@shres-code/cordis'
+import LlmRuntime, { LlmAdapter } from '@shres-code/shres-code-llm'
+import type { GenerateOptions, StreamChunk } from '@shres-code/shres-code-llm'
+import * as LlmPiAi from '@shres-code/shres-code-llm-pi-ai'
+import AgentDefaultModelConfig from '@shres-code/shres-code-agent-default-model'
+import { credentialRef } from '@shres-code/shres-code-credentials'
+import { CredentialProvider } from '@shres-code/shres-code-credentials'
+import type { CredentialInfo, CredentialRef, ResolvedCredential } from '@shres-code/shres-code-credentials'
+import { SettingsProvider, settingsNamespace } from '@shres-code/shres-code-settings'
+import type { SettingsNamespace } from '@shres-code/shres-code-settings'
 import * as FirstRunSetup from '../src/index.ts'
 import { apply as installInvariant } from '../src/invariant.ts'
 import { formatMenu, numberOptions, readLine, readSecret, runCliPicker } from '../src/cli.ts'
@@ -556,7 +556,7 @@ describe('FirstRunSetup service', () => {
       },
     } as never)
     const dispose = await installInvariant(ctx)
-    expect(registered).toEqual(['@roos-code/roos-code-first-run-setup'])
+    expect(registered).toEqual(['@shres-code/shres-code-first-run-setup'])
     expect(typeof dispose).toBe('function')
     dispose()
     await ctx.fiber.dispose()

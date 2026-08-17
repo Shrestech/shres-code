@@ -1,12 +1,12 @@
 /**
- * Package-owned invariant companion for `@roos-code/roos-code-client-hmr`.
- * @module @roos-code/roos-code-client-hmr/invariant
+ * Package-owned invariant companion for `@shres-code/shres-code-client-hmr`.
+ * @module @shres-code/shres-code-client-hmr/invariant
  */
 
-import type { Context, Fiber } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context, Fiber } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-client-hmr'
+const PACKAGE_NAME = '@shres-code/shres-code-client-hmr'
 
 /** Cordis companion plugin name. */
 export const name = 'client-hmr-invariant'

@@ -15,13 +15,13 @@
  * filesystem alike), so it lives here in the policy package rather than in any
  * one capability's seam.
  *
- * @module roos-sandbox-policy/session-mode
+ * @module shres-sandbox-policy/session-mode
  */
 
-import type { Session, SessionEvent } from '@roos-code/roos-code-session'
-import type { SandboxMode } from '@roos-code/roos-code-sandbox'
+import type { Session, SessionEvent } from '@shres-code/shres-code-session'
+import type { SandboxMode } from '@shres-code/shres-code-sandbox'
 
-declare module '@roos-code/roos-code-session/types' {
+declare module '@shres-code/shres-code-session/types' {
   interface SessionEventMap {
     /**
      * The session's sandbox mode was switched — log-only (like `approval/*`;

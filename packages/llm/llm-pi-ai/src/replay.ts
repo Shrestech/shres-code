@@ -5,11 +5,11 @@
  * module stores only the provider-native metadata needed to reconstruct a
  * pi-ai assistant message on a later request.
  *
- * @module roos-llm-pi-ai/replay
+ * @module shres-llm-pi-ai/replay
  */
 
-import { LlmError } from '@roos-code/roos-code-llm'
-import type { Message, ModelMessageSource } from '@roos-code/roos-code-llm'
+import { LlmError } from '@shres-code/shres-code-llm'
+import type { Message, ModelMessageSource } from '@shres-code/shres-code-llm'
 import type { Api, AssistantMessage, Usage as PiUsage } from '@earendil-works/pi-ai'
 
 type PiAiReplayBlock =
@@ -147,9 +147,9 @@ function foreignAssistant(message: Message): AssistantMessage {
     content,
     // Deliberately never equals a catalog API: absent replay state is foreign
     // even if source names the same provider/model as this request.
-    api: 'roos-foreign',
-    provider: source?.provider ?? 'roos-foreign',
-    model: source?.model ?? 'roos-foreign',
+    api: 'shres-foreign',
+    provider: source?.provider ?? 'shres-foreign',
+    model: source?.model ?? 'shres-foreign',
     usage: emptyPiUsage(),
     stopReason: content.some(piece => piece.type === 'toolCall') ? 'toolUse' : 'stop',
     timestamp: 0,

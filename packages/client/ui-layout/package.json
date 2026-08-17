@@ -1,5 +1,5 @@
 {
-  "name": "@roos-code/roos-code-client-ui-layout",
+  "name": "@shres-code/shres-code-client-ui-layout",
   "description": "Shell plugin: three-column AppFrame with drag handles, ctx.layout viewing-state service (navigation + panels)",
   "version": "0.1.0-rc.5",
   "publishConfig": {
@@ -7,7 +7,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "packages/client/ui-layout"
   },
   "type": "module",
@@ -29,11 +29,11 @@
     "./src/*": "./src/*",
     "./package.json": "./package.json"
   },
-  "roos": {
+  "shres": {
     "client": {
       "inject": [
-        "@roos-code/roos-code-client-runtime",
-        "@roos-code/roos-code-client-ui-theme"
+        "@shres-code/shres-code-client-runtime",
+        "@shres-code/shres-code-client-ui-theme"
       ],
       "platform": "web"
     }
@@ -44,21 +44,21 @@
   },
   "license": "MIT",
   "peerDependencies": {
-    "@roos-code/roos-code-client-runtime": "workspace:^",
-    "@roos-code/roos-code-client-ui-slots": "workspace:^",
-    "@roos-code/roos-code-client-ui-theme": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/cordis": "workspace:^",
+    "@shres-code/shres-code-client-runtime": "workspace:^",
+    "@shres-code/shres-code-client-ui-slots": "workspace:^",
+    "@shres-code/shres-code-client-ui-theme": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/cordis": "workspace:^",
     "react": "^18.2.0"
   },
   "devDependencies": {
-    "@roos-code/roos-code-client-locale": "workspace:^",
-    "@roos-code/roos-code-client-runtime": "workspace:^",
-    "@roos-code/roos-code-client-ui-slots": "workspace:^",
-    "@roos-code/roos-code-client-ui-theme": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
+    "@shres-code/shres-code-client-locale": "workspace:^",
+    "@shres-code/shres-code-client-runtime": "workspace:^",
+    "@shres-code/shres-code-client-ui-slots": "workspace:^",
+    "@shres-code/shres-code-client-ui-theme": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
     "@types/react": "~18.3.1",
-    "@roos-code/cordis": "workspace:^",
+    "@shres-code/cordis": "workspace:^",
     "react": "^18.2.0"
   },
   "files": [

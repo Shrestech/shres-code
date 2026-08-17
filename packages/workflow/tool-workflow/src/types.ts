@@ -2,13 +2,13 @@
  * Browser-safe durable workflow-record events written by the model-facing
  * workflow tool into its calling parent Session.
  *
- * @module @roos-code/roos-code-tool-workflow/types
+ * @module @shres-code/shres-code-tool-workflow/types
  */
 
-import type { SessionId } from '@roos-code/roos-code-session/types'
+import type { SessionId } from '@shres-code/shres-code-session/types'
 import type {
   WorkflowAgentOutcome, WorkflowRunId, WorkflowStopReason,
-} from '@roos-code/roos-code-workflow/types'
+} from '@shres-code/shres-code-workflow/types'
 
 /** Opens one durable top-level workflow run record. */
 export interface ToolWorkflowRunStartData {
@@ -38,7 +38,7 @@ export interface ToolWorkflowRunEndData {
   readonly stopReason: WorkflowStopReason
 }
 
-declare module '@roos-code/roos-code-session/types' {
+declare module '@shres-code/shres-code-session/types' {
   interface SessionEventMap {
     /**
      * Opens one top-level workflow record.

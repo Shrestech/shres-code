@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import SessionStore, { SessionId, type Session } from '@roos-code/roos-code-session'
-import { createUserMessage, ProviderRequestId } from '@roos-code/roos-code-llm'
-import { MAX_TIMER_DELAY_MS } from '@roos-code/roos-code-timeout'
-import InvariantRegistry from '@roos-code/roos-code-invariants'
-import * as RetryInvariant from '@roos-code/roos-code-llm-retry/invariant'
-import { RetryId } from '@roos-code/roos-code-llm-retry'
+import { Context } from '@shres-code/cordis'
+import SessionStore, { SessionId, type Session } from '@shres-code/shres-code-session'
+import { createUserMessage, ProviderRequestId } from '@shres-code/shres-code-llm'
+import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
+import InvariantRegistry from '@shres-code/shres-code-invariants'
+import * as RetryInvariant from '@shres-code/shres-code-llm-retry/invariant'
+import { RetryId } from '@shres-code/shres-code-llm-retry'
 import { providerForOpenStep } from '../src/history.ts'
 
 async function setup(): Promise<Context> {

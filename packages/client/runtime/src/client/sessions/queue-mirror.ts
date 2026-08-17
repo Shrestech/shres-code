@@ -1,6 +1,6 @@
-import type { ContentBlock } from '@roos-code/roos-code-llm/types'
-import type { MuxFrame } from '@roos-code/roos-code-api-remotes/client'
-import type { SessionEvent } from '@roos-code/roos-code-session/types'
+import type { ContentBlock } from '@shres-code/shres-code-llm/types'
+import type { MuxFrame } from '@shres-code/shres-code-api-remotes/client'
+import type { SessionEvent } from '@shres-code/shres-code-session/types'
 import type { QueuedMessage } from './conversation.ts'
 
 const QUEUE_PREVIEW_CHARS = 200

@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import {
   bindTypertRemote,
@@ -11,9 +11,9 @@ import {
   type TypertContext,
   type TypertForwardableEvent,
   type TypertRemoteEvent,
-} from '@roos-code/roos-code-typert-protocol'
+} from '@shres-code/shres-code-typert-protocol'
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Events {
     /**
      * Test-only one-way event: bound to no Scope and returning nothing.
@@ -34,7 +34,7 @@ declare module '@roos-code/cordis' {
   }
 }
 
-declare module '@roos-code/roos-code-typert-protocol' {
+declare module '@shres-code/shres-code-typert-protocol' {
   interface TypertContextMap {
     metaFixture: TypertContext<string>
   }

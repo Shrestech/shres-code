@@ -4,17 +4,17 @@
  * prompt and settles when the whole agent next becomes idle.
  * Mirrors the Python SDK's `DeepSeekHarness`/`Session` pair.
  *
- * @module @roos-code/roos-code-sdk-client/api
+ * @module @shres-code/shres-code-sdk-client/api
  */
 
 import { randomUUID } from 'node:crypto'
 import { resolve } from 'node:path'
-import type { SessionEvent } from '@roos-code/roos-code-session'
+import type { SessionEvent } from '@shres-code/shres-code-session'
 import { HarnessClient, isRecord, SdkProtocolError } from './client.ts'
 import type { ContentBlock, DeepSeekHarnessOptions, HarnessClientOptions, HarnessNotification, RunResult } from './types.ts'
 
 /**
- * Reusable SDK for running Roos Code agent turns in a runtime
+ * Reusable SDK for running Shres Code agent turns in a runtime
  * subprocess. The subprocess starts lazily on first use and stays owned by
  * this instance until {@link close}; always close (or `await using`) so the
  * child is reaped.

@@ -1,13 +1,13 @@
 {
-  "name": "@roos-code/roos-code-cmdline",
-  "description": "Immutable command-line handoff from a roos launcher to any app plugin that injects cmdlineArgs",
+  "name": "@shres-code/shres-code-cmdline",
+  "description": "Immutable command-line handoff from a shres launcher to any app plugin that injects cmdlineArgs",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "packages/boot/cmdline"
   },
   "type": "module",
@@ -32,15 +32,15 @@
   ],
   "license": "MIT",
   "peerDependencies": {
-    "@roos-code/cordis-plugin-loader": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/cordis-plugin-loader": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   },
   "devDependencies": {
-    "@roos-code/cordis-plugin-include": "workspace:^",
-    "@roos-code/cordis-plugin-loader": "workspace:^",
+    "@shres-code/cordis-plugin-include": "workspace:^",
+    "@shres-code/cordis-plugin-loader": "workspace:^",
     "commander": "^15.0.0",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   }
 }

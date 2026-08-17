@@ -8,15 +8,15 @@
 
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { Context } from '@roos-code/cordis'
-import { LOADER_SMOKE_TEST_TIMEOUT_MS, runLoaderSmoke } from '@roos-code/roos-code-loader-smoke'
+import { Context } from '@shres-code/cordis'
+import { LOADER_SMOKE_TEST_TIMEOUT_MS, runLoaderSmoke } from '@shres-code/shres-code-loader-smoke'
 import SessionStore, {
   SESSION_FORMAT_VERSION,
   SessionId,
   type SessionEvent,
   type SessionHeader,
-} from '@roos-code/roos-code-session'
-import JsonlSessionPersistence from '@roos-code/roos-code-session-persistence-jsonl'
+} from '@shres-code/shres-code-session'
+import JsonlSessionPersistence from '@shres-code/shres-code-session-persistence-jsonl'
 import { describe, expect, it } from 'vitest'
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'workspace-context-resume-snapshots/offline-edit')
@@ -56,13 +56,13 @@ describe('session format guard through the assembled app', () => {
     let sessionPath = ''
     const result = await runLoaderSmoke({
       label: 'newer-format resume refusal',
-      tempDirPrefix: 'roos-format-guard-version-',
+      tempDirPrefix: 'shres-format-guard-version-',
       binScript,
       libBinScript: binScript,
       configPath,
       binArgs: [configPath, 'Try to resume.'],
       tsconfigPath,
-      env: { ROOS_SNAPSHOT_FILE: replayFixture },
+      env: { SHRES_SNAPSHOT_FILE: replayFixture },
       expectedExitCode: 1,
       prepare: async (runCwd) => {
         sessionPath = await seedSession(join(runCwd, '.sessions'), runCwd, SESSION_FORMAT_VERSION + 99, closedTurn())
@@ -81,13 +81,13 @@ describe('session format guard through the assembled app', () => {
     let sessionPath = ''
     const result = await runLoaderSmoke({
       label: 'unknown-event resume refusal',
-      tempDirPrefix: 'roos-format-guard-event-',
+      tempDirPrefix: 'shres-format-guard-event-',
       binScript,
       libBinScript: binScript,
       configPath,
       binArgs: [configPath, 'Try to resume.'],
       tsconfigPath,
-      env: { ROOS_SNAPSHOT_FILE: replayFixture },
+      env: { SHRES_SNAPSHOT_FILE: replayFixture },
       expectedExitCode: 1,
       prepare: async (runCwd) => {
         sessionPath = await seedSession(join(runCwd, '.sessions'), runCwd, SESSION_FORMAT_VERSION, [

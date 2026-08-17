@@ -6,7 +6,7 @@ import {
   MAX_TIMER_DELAY_MS,
   timeoutOf,
   TimeoutReason,
-} from '@roos-code/roos-code-timeout'
+} from '@shres-code/shres-code-timeout'
 
 describe('TimeoutReason', () => {
   it('is an Error carrying the code and elapsed ms', () => {

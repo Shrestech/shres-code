@@ -6,8 +6,8 @@
  */
 
 import { z } from 'zod'
-import { canonicalHeader } from '@roos-code/roos-code-session'
-import type { ProjectionDefinition } from '@roos-code/roos-code-session-projection'
+import { canonicalHeader } from '@shres-code/shres-code-session'
+import type { ProjectionDefinition } from '@shres-code/shres-code-session-projection'
 import { estimateSystemTokens, estimateToolsTokens } from './estimate.ts'
 import { foldSurfaceProjection } from './surface-projection.ts'
 import type { ShadowPriceClaim } from './surface-projection.ts'

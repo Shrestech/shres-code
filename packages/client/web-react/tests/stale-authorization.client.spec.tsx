@@ -6,11 +6,11 @@
 import { describe, expect, it } from 'vitest'
 import { act, render } from '@testing-library/react'
 import type { ReactNode } from 'react'
-import type { SlotEntryDef, SlotSpec, StoredEntry } from '@roos-code/roos-code-client-ui-slots'
+import type { SlotEntryDef, SlotSpec, StoredEntry } from '@shres-code/shres-code-client-ui-slots'
 import {
   createSlotRenderer, StaleAuthorizationError,
   type RenderOpts, type SlotRendererHost,
-} from '@roos-code/roos-code-client-web-react'
+} from '@shres-code/shres-code-client-web-react'
 
 type RenderSlotFn = (key: string, owner: object, opts?: RenderOpts) => ReactNode
 type DeclaredSpec = SlotSpec<SlotEntryDef>

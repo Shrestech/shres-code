@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
+import { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
 import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { settingsNamespace } from '@roos-code/roos-code-settings'
+import { settingsNamespace } from '@shres-code/shres-code-settings'
 import { FileSettingsProvider } from '../src/index.ts'
 
 // chokidar is the nondeterministic OS boundary: faking it lets these tests
@@ -51,7 +51,7 @@ afterEach(async () => {
 })
 
 async function tempDir(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), 'roos-settings-watch-'))
+  const dir = await mkdtemp(join(tmpdir(), 'shres-settings-watch-'))
   cleanups.push(() => rm(dir, { recursive: true, force: true }))
   return dir
 }

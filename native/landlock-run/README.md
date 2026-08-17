@@ -1,4 +1,4 @@
-# @roos-code/node-addon-landlock-run
+# @shres-code/node-addon-landlock-run
 
 A [Landlock](https://landlock.io/) self-restrict-then-exec launcher for confining subprocesses on Linux, distributed as prebuilt per-platform npm packages plus a thin JS entry package that resolves the binary and speaks its CLI contract. Built for agent harnesses and other hosts that need to run untrusted commands under a filesystem allow-list without confining themselves.
 
@@ -7,15 +7,15 @@ The tool is **`landlock-run`** — a self-restrict-then-exec [Landlock](https://
 ## Install
 
 ```sh
-npm install @roos-code/node-addon-landlock-run
+npm install @shres-code/node-addon-landlock-run
 ```
 
 Published packages use an entry package plus platform optional packages:
 
 ```text
-@roos-code/node-addon-landlock-run
-@roos-code/node-addon-landlock-run-linux-x64
-@roos-code/node-addon-landlock-run-linux-arm64
+@shres-code/node-addon-landlock-run
+@shres-code/node-addon-landlock-run-linux-x64
+@shres-code/node-addon-landlock-run-linux-arm64
 ```
 
 npm's `os`/`cpu` fields make installers fetch only the matching platform package. There is no install-time build fallback on purpose: on a host without a platform package the resolved path never exists, the probe reports `unusable`, and the consumer falls closed.
@@ -23,7 +23,7 @@ npm's `os`/`cpu` fields make installers fetch only the matching platform package
 ## Usage
 
 ```js
-import { grantArgs, launcherPath, probe } from '@roos-code/node-addon-landlock-run';
+import { grantArgs, launcherPath, probe } from '@shres-code/node-addon-landlock-run';
 
 const launcher = launcherPath();
 if (probe(launcher) !== 'unusable') {

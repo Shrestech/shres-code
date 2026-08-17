@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
+import { Context } from '@shres-code/cordis'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
 import {
   agentEvents,
   installModelSelection,
   type Agent,
   type ModelSelectionRef,
 } from '../src/index.ts'
-import { ReasoningEffortId, type LlmCallConfig } from '@roos-code/roos-code-llm'
+import { ReasoningEffortId, type LlmCallConfig } from '@shres-code/shres-code-llm'
 
 describe('installModelSelection()', () => {
   it('snapshots prompt variables and request routing together, then disposes both listeners', async () => {

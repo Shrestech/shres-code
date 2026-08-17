@@ -1,5 +1,5 @@
-import type { Context } from '@roos-code/cordis'
-import '@roos-code/roos-code-user-questions'
+import type { Context } from '@shres-code/cordis'
+import '@shres-code/shres-code-user-questions'
 
 /** Snapshot-only provider whose invocation means the child guard failed. */
 export const name = 'child-question-tripwire'

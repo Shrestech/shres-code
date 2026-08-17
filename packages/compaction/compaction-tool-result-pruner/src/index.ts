@@ -1,18 +1,18 @@
 /**
  * Replay-safe, model-free tool-result pruning service.
  *
- * @module @roos-code/roos-code-compaction-tool-result-pruner
+ * @module @shres-code/shres-code-compaction-tool-result-pruner
  */
 
-import { Context, Service } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import { freezeMessage } from '@roos-code/roos-code-llm'
-import type { ContentBlock } from '@roos-code/roos-code-llm'
-import type { Session, SessionEvent, ToolResultMessage } from '@roos-code/roos-code-session'
+import { Context, Service } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import { freezeMessage } from '@shres-code/shres-code-llm'
+import type { ContentBlock } from '@shres-code/shres-code-llm'
+import type { Session, SessionEvent, ToolResultMessage } from '@shres-code/shres-code-session'
 // Type-only: the `compaction/*` SessionEventMap merges (the shadow-price event).
-import type {} from '@roos-code/roos-code-compaction'
+import type {} from '@shres-code/shres-code-compaction'
 // Type-only: the `ctx.tokenMeter` Context merge for the declared injection.
-import type {} from '@roos-code/roos-code-token-meter'
+import type {} from '@shres-code/shres-code-token-meter'
 import { codePointLength, DEFAULTS, PRUNE_MARKER, resolveConfig } from './config.ts'
 import type {
   PrunedEntry,
@@ -29,7 +29,7 @@ export type {
   ToolResultPruneConfig,
 } from './types.ts'
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     toolResultPruner: ToolResultPruner
   }

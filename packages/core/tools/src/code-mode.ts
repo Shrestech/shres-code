@@ -3,14 +3,14 @@
  * tools through nested executions scheduled under the native concurrency
  * contract; each sub-dispatch is logged for reconstruction, while only the
  * outer curated result enters model history.
- * @module @roos-code/roos-code-tools/src/code-mode
+ * @module @shres-code/shres-code-tools/src/code-mode
  */
 
-import { CallId, HarnessError } from '@roos-code/roos-code-llm'
-import type { ContentBlock } from '@roos-code/roos-code-llm'
-import type { CodeBindingFunction, CodeRunResult, CodeRuntime } from '@roos-code/roos-code-code-runtime'
-import { snapshotJsonValue } from '@roos-code/roos-code-session'
-import type { JsonValue } from '@roos-code/roos-code-session'
+import { CallId, HarnessError } from '@shres-code/shres-code-llm'
+import type { ContentBlock } from '@shres-code/shres-code-llm'
+import type { CodeBindingFunction, CodeRunResult, CodeRuntime } from '@shres-code/shres-code-code-runtime'
+import { snapshotJsonValue } from '@shres-code/shres-code-session'
+import type { JsonValue } from '@shres-code/shres-code-session'
 import { defineTool, parameterSchemaSpecToJsonSchema } from './schema.ts'
 import { TOOL_RUNTIME_SCHEDULER } from './index.ts'
 import type { CodeDispatchLog, ToolDefinition, ToolExecutionResult, ToolRuntime, ToolRunContext } from './index.ts'
@@ -124,7 +124,7 @@ function resolveFlavor(peekRuntime: () => CodeRuntime | undefined): RunCodeFlavo
   const flavor = RUN_CODE_FLAVORS[runtime.language]
   if (!Object.hasOwn(RUN_CODE_FLAVORS, runtime.language) || flavor === undefined) {
     const known = Object.keys(RUN_CODE_FLAVORS).map(name => JSON.stringify(name)).join(', ')
-    throw new Error(`roos-tools: no run_code schema flavor registered for runtime language ${JSON.stringify(runtime.language)} (known: ${known})`)
+    throw new Error(`shres-tools: no run_code schema flavor registered for runtime language ${JSON.stringify(runtime.language)} (known: ${known})`)
   }
   return flavor
 }

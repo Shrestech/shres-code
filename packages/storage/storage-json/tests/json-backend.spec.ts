@@ -2,9 +2,9 @@ import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promise
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import Storage, { storageBackendServiceKey } from '@roos-code/roos-code-storage'
-import InvariantRegistry from '@roos-code/roos-code-invariants'
+import { Context } from '@shres-code/cordis'
+import Storage, { storageBackendServiceKey } from '@shres-code/shres-code-storage'
+import InvariantRegistry from '@shres-code/shres-code-invariants'
 import { runKvBackendContract } from '../../storage/tests/contract.ts'
 import { Config, JsonStorageBackend, apply } from '../src/index.ts'
 import * as InvariantCompanion from '../src/invariant.ts'
@@ -12,7 +12,7 @@ import * as InvariantCompanion from '../src/invariant.ts'
 const roots: string[] = []
 
 async function freshRoot(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), 'roos-storage-json-'))
+  const root = await mkdtemp(join(tmpdir(), 'shres-storage-json-'))
   roots.push(root)
   return root
 }

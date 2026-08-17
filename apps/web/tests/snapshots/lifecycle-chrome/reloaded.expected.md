@@ -12,10 +12,10 @@
 - text: Reply with the single word LIGHTHOUSE and stop. {{clock}}
 - button "Copy":
   - img
-- button "Context injection @roos-code/roos-code-system-prompt":
+- button "Context injection @shres-code/shres-code-system-prompt":
   - img
   - img
-  - text: Context injection @roos-code/roos-code-system-prompt
+  - text: Context injection @shres-code/shres-code-system-prompt
 - button "Think The user wants me to reply with a single word. Let me comply.":
   - img
   - img

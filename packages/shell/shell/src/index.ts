@@ -1,13 +1,13 @@
 /**
  * Service Definition for the `ctx.shell` capability seam, covering foreground commands and background process
  * handles. Job ids, ownership, polling, and notices belong to
- * `@roos-code/roos-code-jobs`, keeping executors independent of sessions.
- * @module @roos-code/roos-code-shell
+ * `@shres-code/shres-code-jobs`, keeping executors independent of sessions.
+ * @module @shres-code/shres-code-shell
  */
 
-import { Context, Service } from '@roos-code/cordis'
-import { settingsNamespace } from '@roos-code/roos-code-settings'
-import type { SandboxMode } from '@roos-code/roos-code-sandbox'
+import { Context, Service } from '@shres-code/cordis'
+import { settingsNamespace } from '@shres-code/shres-code-settings'
+import type { SandboxMode } from '@shres-code/shres-code-sandbox'
 import type { ShellExecRequest, ShellExecSpec, ShellProcess, ShellRunResult } from './types.ts'
 
 /**
@@ -21,7 +21,7 @@ import type { ShellExecRequest, ShellExecSpec, ShellProcess, ShellRunResult } fr
  */
 export const SHELL_SETTINGS_NAMESPACE = settingsNamespace('shell')
 
-export { ROOS_ENV_PREFIX } from './types.ts'
+export { SHRES_ENV_PREFIX } from './types.ts'
 export type {
   ShellExecRequest,
   ShellExecSpec,
@@ -31,13 +31,13 @@ export type {
   ShellRunResult,
   ShellSandboxInfo,
   CollectedOutput,
-  RoosEnvironment,
-  RoosEnvironmentKey,
+  ShresEnvironment,
+  ShresEnvironmentKey,
 } from './types.ts'
 export { parseExitStatus } from './render.ts'
 export type { ParsedExitStatus } from './render.ts'
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     shell: ShellExecutor
   }

@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { cleanup, render } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
-import * as primitives from '@roos-code/roos-code-client-ui-primitives'
+import * as primitives from '@shres-code/shres-code-client-ui-primitives'
 import {
   IconApiOutline14, IconArchiveOutline20, IconFolderClose16, IconGoalOutline16, IconSendOutline16,
-} from '@roos-code/roos-code-client-ui-primitives'
+} from '@shres-code/shres-code-client-ui-primitives'
 
 afterEach(cleanup)
 
@@ -55,38 +55,45 @@ describe('ic_ds_ icon set', () => {
 })
 
 describe('FishLogo', () => {
-  it('renders the kangaroo mark in currentColor as a square', () => {
+  it('renders the product mark at the native aspect and inherits the document lockup', () => {
     const { container } = render(<primitives.FishLogo />)
     const svg = container.querySelector('svg')!
-    expect(svg.getAttribute('width')).toBe('24')
+    expect(svg.getAttribute('width')).toBe('19')
     expect(svg.getAttribute('height')).toBe('24')
-    expect(svg.getAttribute('viewBox')).toBe('0 0 24 24')
-    expect(container.querySelectorAll('path')).toHaveLength(1)
+    expect(svg.getAttribute('viewBox')).toBe('0 0 623 802')
+    expect(svg.getAttribute('data-shres-shield')).toBeNull()
+    expect(container.querySelectorAll('path').length).toBeGreaterThanOrEqual(2)
+    expect(container.textContent).toContain('S')
+  })
+
+  it('forces the lockup off when the seat is inactive', () => {
+    const { container } = render(<primitives.FishLogo shieldActive={false} />)
+    expect(container.querySelector('svg')!.getAttribute('data-shres-shield')).toBe('off')
     expect(container.innerHTML).toContain('currentColor')
   })
 })
 
 describe('HoppingRoo', () => {
   it('colors each seat and infers ids from prefixed labels', () => {
-    expect(primitives.seatIdOf('Boomer: design the API')).toBe('boomer')
-    expect(primitives.seatIdOf('joey')).toBe('joey')
+    expect(primitives.seatIdOf('Aegis: design the API')).toBe('aegis')
+    expect(primitives.seatIdOf('stride')).toBe('stride')
     expect(primitives.seatIdOf('worker')).toBeUndefined()
-    const { container } = render(<primitives.HoppingRoo seat="flyer" hopping />)
-    const svg = container.querySelector('[data-hopping-roo="flyer"]')!
+    const { container } = render(<primitives.HoppingRoo seat="ward" hopping />)
+    const svg = container.querySelector('[data-hopping-roo="ward"]')!
     expect(svg.getAttribute('data-state')).toBe('ongoing')
     expect((svg as SVGElement).style.color.replace(/\s/g, '')).toMatch(/#3b7dd8|rgb\(59,125,216\)/)
   })
 })
 
 describe('BrandWordmark', () => {
-  it('renders live roos / CODE lettering and no leftover DeepSeek lockup', () => {
+  it('renders live shres / CODE lettering and no leftover DeepSeek lockup', () => {
     const { container } = render(<primitives.BrandWordmark />)
     const svg = container.querySelector('svg')!
-    expect(svg.getAttribute('viewBox')).toBe('0 0 142 32')
-    expect(container.textContent).toContain('ROOS')
+    expect(svg.getAttribute('viewBox')).toBe('0 0 168 48')
+    expect(container.textContent).toContain('SHRES')
     expect(container.textContent).toContain('CODE')
     expect(container.textContent).not.toMatch(/deepseek/i)
     expect(container.textContent).not.toMatch(/harness/i)
-    expect(container.innerHTML).toContain('currentColor')
+    expect(container.querySelector('svg')!.getAttribute('data-shres-shield')).toBeNull()
   })
 })

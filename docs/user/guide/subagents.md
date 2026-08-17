@@ -1,6 +1,6 @@
 # Delegate to product CLIs
 
-Roos Code can hand a task to another coding agent, or it can run that same agent as the conversation model. Those are two different contracts.
+Shres Code can hand a task to another coding agent, or it can run that same agent as the conversation model. Those are two different contracts.
 
 ## Subagent tools
 
@@ -10,7 +10,7 @@ The `code`, `standard`, and Cordis plugin-development presets ship the Grok and 
 
 ```yaml
 - id: subagent-grok-cli
-  name: '@roos-code/roos-code-subagent-grok-cli'
+  name: '@shres-code/shres-code-subagent-grok-cli'
   config:
     env:
       XAI_API_KEY: !!js process.env.XAI_API_KEY
@@ -20,13 +20,13 @@ An API key reaches the child only when `env` names it. The subprocess seam strip
 
 ## Delegated model routes
 
-`claude-cli`, `codex-cli`, `grok-cli`, and `kimi-cli` are model-picker routes. Selecting one makes the conversation completion that CLI, not an HTTP adapter. The Models page and `roos models list` mark them `delegated`.
+`claude-cli`, `codex-cli`, `grok-cli`, and `kimi-cli` are model-picker routes. Selecting one makes the conversation completion that CLI, not an HTTP adapter. The Models page and `shres models list` mark them `delegated`.
 
 ```sh
-roos models set grok-cli grok-4.6 --effort high
-roos models set kimi-cli kimi-code/k3 --effort high
+shres models set grok-cli grok-4.6 --effort high
+shres models set kimi-cli kimi-code/k3 --effort high
 ```
 
-`--effort` is validated against the efforts that CLI advertises (`grok-cli`: `low`/`medium`/`high`/`xhigh`; `kimi-cli`: `off`/`high`). The CLI's own tools do not go through Roos Code approval. That is the meaning of the Delegated tag.
+`--effort` is validated against the efforts that CLI advertises (`grok-cli`: `low`/`medium`/`high`/`xhigh`; `kimi-cli`: `off`/`high`). The CLI's own tools do not go through Shres Code approval. That is the meaning of the Delegated tag.
 
-The [CLI models guide](./models.md) owns `roos models` / `/model`. The [CLI agent bridges](../../../.agents/notes/implemented/architecture/2026-08-16-cli-agent-bridges.md) note owns the subagent-versus-route split.
+The [CLI models guide](./models.md) owns `shres models` / `/model`. The [CLI agent bridges](../../../.agents/notes/implemented/architecture/2026-08-16-cli-agent-bridges.md) note owns the subagent-versus-route split.

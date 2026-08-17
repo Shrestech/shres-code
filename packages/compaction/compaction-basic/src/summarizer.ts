@@ -1,15 +1,15 @@
 /**
  * Default one-shot summarization and durable checkpoint framing.
  *
- * @module @roos-code/roos-code-compaction-basic/summarizer
+ * @module @shres-code/shres-code-compaction-basic/summarizer
  */
 
-import type { Context } from '@roos-code/cordis'
-import { contentHasImage, createUserMessage, BlockAssembler, LlmError } from '@roos-code/roos-code-llm'
+import type { Context } from '@shres-code/cordis'
+import { contentHasImage, createUserMessage, BlockAssembler, LlmError } from '@shres-code/shres-code-llm'
 import type {
   ContentBlock, FinishReason, GenerateOptions, Message, TokenUsage, ToolSchema,
-} from '@roos-code/roos-code-llm'
-import type { Agent } from '@roos-code/roos-code-agent'
+} from '@shres-code/shres-code-llm'
+import type { Agent } from '@shres-code/shres-code-agent'
 
 interface SummaryConfig {
   readonly summarizationProvider: string
@@ -147,7 +147,7 @@ export async function summarizeWithLlm(
     ...input.messages,
     createUserMessage({
       content: [{ type: 'text', text: COMPACTION_INSTRUCTION }],
-      source: { kind: 'plugin', plugin: 'roos-compaction-basic' },
+      source: { kind: 'plugin', plugin: 'shres-compaction-basic' },
     }),
   ]
   const options: GenerateOptions = {

@@ -7,14 +7,14 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render } from '@testing-library/react'
-import { bindSnapshotSelector } from '@roos-code/roos-code-client-web-react'
+import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
 import {
   createSnapshotStore, EMPTY_CHAT_SNAPSHOT, EMPTY_CONVERSATION_VIEWS,
-} from '@roos-code/roos-code-client-runtime/client'
-import type { ClientContext, ConversationSnapshot, SessionId } from '@roos-code/roos-code-client-runtime/client'
-import type { SubmitOutcome } from '@roos-code/roos-code-client-ui-input-trigger/client'
-import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
-import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
+} from '@shres-code/shres-code-client-runtime/client'
+import type { ClientContext, ConversationSnapshot, SessionId } from '@shres-code/shres-code-client-runtime/client'
+import type { SubmitOutcome } from '@shres-code/shres-code-client-ui-input-trigger/client'
+import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
+import { en as commonEn } from '@shres-code/shres-code-client-locale/src/locales/en.ts'
 import { SessionInputShell } from '../src/client/input/facade.ts'
 import { InputBar } from '../src/client/skeleton/InputBar.tsx'
 import type { InputBarProps } from '../src/client/skeleton/InputBar.tsx'

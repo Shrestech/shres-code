@@ -1,5 +1,5 @@
 /**
- * Real-load-path guard for @roos-code/roos-code-tool-fs-search. `tool-fs-search` is
+ * Real-load-path guard for @shres-code/shres-code-tool-fs-search. `tool-fs-search` is
  * a NAMESPACE plugin with `inject` — so a stray `export default apply` would
  * make the cordis Loader's `unwrapExports` (`exports.default ?? exports`)
  * collapse the module to the bare `apply` function, DROPPING `inject`. The
@@ -15,14 +15,14 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import Loader from '@roos-code/cordis-plugin-loader'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import ToolRuntime from '@roos-code/roos-code-tools'
-import LocalSubprocessRuntime from '@roos-code/roos-code-subprocess-local'
-import * as toolFsSearch from '@roos-code/roos-code-tool-fs-search'
+import { Context } from '@shres-code/cordis'
+import Loader from '@shres-code/cordis-plugin-loader'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import ToolRuntime from '@shres-code/shres-code-tools'
+import LocalSubprocessRuntime from '@shres-code/shres-code-subprocess-local'
+import * as toolFsSearch from '@shres-code/shres-code-tool-fs-search'
 
-describe('roos-tool-fs-search real-load-path guard', () => {
+describe('shres-tool-fs-search real-load-path guard', () => {
   it('has no default export and keeps name/inject/Config through unwrapExports', () => {
     expect('default' in toolFsSearch).toBe(false)
 

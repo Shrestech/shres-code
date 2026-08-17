@@ -1,37 +1,37 @@
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import AgentLoop from '@roos-code/roos-code-agent-loop'
-import { mountAgentLoopTestDependencies } from '@roos-code/roos-code-agent-loop-testkit'
-import InvariantRegistry from '@roos-code/roos-code-invariants'
-import { CommandId } from '@roos-code/roos-code-commands/brand'
-import * as SessionInvariant from '@roos-code/roos-code-session/invariant'
-import * as AgentInvariant from '@roos-code/roos-code-agent/invariant'
-import * as AgentLoopInvariant from '@roos-code/roos-code-agent-loop/invariant'
-import * as CompactionInvariant from '@roos-code/roos-code-compaction/invariant'
-import * as CompactionBasicInvariant from '@roos-code/roos-code-compaction-basic/invariant'
-import { BasicCompactionEngine } from '@roos-code/roos-code-compaction-basic'
-import { CompactionId, isCompactCheckpointSource, ManualCompactionError } from '@roos-code/roos-code-compaction'
-import type { CompactionResult } from '@roos-code/roos-code-compaction'
+import { Context } from '@shres-code/cordis'
+import AgentLoop from '@shres-code/shres-code-agent-loop'
+import { mountAgentLoopTestDependencies } from '@shres-code/shres-code-agent-loop-testkit'
+import InvariantRegistry from '@shres-code/shres-code-invariants'
+import { CommandId } from '@shres-code/shres-code-commands/brand'
+import * as SessionInvariant from '@shres-code/shres-code-session/invariant'
+import * as AgentInvariant from '@shres-code/shres-code-agent/invariant'
+import * as AgentLoopInvariant from '@shres-code/shres-code-agent-loop/invariant'
+import * as CompactionInvariant from '@shres-code/shres-code-compaction/invariant'
+import * as CompactionBasicInvariant from '@shres-code/shres-code-compaction-basic/invariant'
+import { BasicCompactionEngine } from '@shres-code/shres-code-compaction-basic'
+import { CompactionId, isCompactCheckpointSource, ManualCompactionError } from '@shres-code/shres-code-compaction'
+import type { CompactionResult } from '@shres-code/shres-code-compaction'
 import {
   createAssistantMessage,
   createUserMessage,
   LlmAdapter,
-} from '@roos-code/roos-code-llm'
+} from '@shres-code/shres-code-llm'
 import type {
   ContentBlock,
   LlmResolvedModelInfo,
   Message,
   StreamChunk,
   TokenUsage,
-} from '@roos-code/roos-code-llm'
-import SessionStore, { Session, SessionId, type SessionEvent } from '@roos-code/roos-code-session'
-import LlmRuntime from '@roos-code/roos-code-llm'
-import TokenMeter from '@roos-code/roos-code-token-meter'
-import type { Agent } from '@roos-code/roos-code-agent'
+} from '@shres-code/shres-code-llm'
+import SessionStore, { Session, SessionId, type SessionEvent } from '@shres-code/shres-code-session'
+import LlmRuntime from '@shres-code/shres-code-llm'
+import TokenMeter from '@shres-code/shres-code-token-meter'
+import type { Agent } from '@shres-code/shres-code-agent'
 import type {
   SummarizationInput,
   SummaryResult,
-} from '@roos-code/roos-code-compaction-basic/src/summarizer.ts'
+} from '@shres-code/shres-code-compaction-basic/src/summarizer.ts'
 
 const MODEL = 'mock'
 const SIGNAL = new AbortController().signal

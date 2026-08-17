@@ -1,13 +1,13 @@
 /**
- * Package-owned invariant companion for `@roos-code/roos-code-session-telemetry-otel`.
- * @module @roos-code/roos-code-session-telemetry-otel/invariant
+ * Package-owned invariant companion for `@shres-code/shres-code-session-telemetry-otel`.
+ * @module @shres-code/shres-code-session-telemetry-otel/invariant
  */
 
 /* jscpd:ignore-start */
-import type { Context } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-session-telemetry-otel'
+const PACKAGE_NAME = '@shres-code/shres-code-session-telemetry-otel'
 
 /** Cordis companion plugin name. */
 export const name = 'session-telemetry-otel-invariant'

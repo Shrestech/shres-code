@@ -1,10 +1,10 @@
-/** Package-owned LLM stream-protocol invariants. @module @roos-code/roos-code-llm/invariant */
+/** Package-owned LLM stream-protocol invariants. @module @shres-code/shres-code-llm/invariant */
 
-import type { Context } from '@roos-code/cordis'
-import type { InvariantFailure, InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantFailure, InvariantInstaller } from '@shres-code/shres-code-invariants'
 import type { ContentBlockType, StreamChunk } from './types.ts'
 
-const PACKAGE_NAME = '@roos-code/roos-code-llm'
+const PACKAGE_NAME = '@shres-code/shres-code-llm'
 
 /** Cordis companion plugin name. */
 export const name = 'llm-invariant'

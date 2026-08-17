@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { SessionEvent, SurfaceEvent, SurfaceEventType } from '@roos-code/roos-code-session'
+import type { SessionEvent, SurfaceEvent, SurfaceEventType } from '@shres-code/shres-code-session'
 import {
   Session,
   SessionId,
@@ -8,8 +8,8 @@ import {
   isReplacementSurfaceEvent,
   isSurfaceEligibleType,
   isSurfaceEvent,
-} from '@roos-code/roos-code-session'
-import { SurfaceManager } from '@roos-code/roos-code-session/surface'
+} from '@shres-code/shres-code-session'
+import { SurfaceManager } from '@shres-code/shres-code-session/surface'
 import {
   createMessage,
   createToolResultMessage,
@@ -17,7 +17,7 @@ import {
   freezeMessage,
   CallId,
   MessageId,
-} from '@roos-code/roos-code-llm'
+} from '@shres-code/shres-code-llm'
 
 /** Build a minimal session with turn boundaries and a single user message. */
 function surfaceSession(): Session {

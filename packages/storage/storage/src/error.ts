@@ -1,6 +1,6 @@
 /**
  * Error vocabulary for the storage hub and its backends.
- * @module @roos-code/roos-code-storage/src/error
+ * @module @shres-code/shres-code-storage/src/error
  */
 
 /** Discriminant codes carried by every {@link StorageError}. */

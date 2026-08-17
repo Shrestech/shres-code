@@ -7,12 +7,12 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { createSnapshotStore } from '@roos-code/roos-code-client-runtime/client'
-import { bindSnapshotSelector } from '@roos-code/roos-code-client-web-react'
-import type { PlanProjection } from '@roos-code/roos-code-plan-mode/client'
+import { createSnapshotStore } from '@shres-code/shres-code-client-runtime/client'
+import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
+import type { PlanProjection } from '@shres-code/shres-code-plan-mode/client'
 import { PlanChip, type PlanChipProps } from '../src/client/PlanModeControl.tsx'
-import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
-import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
+import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
+import { en as commonEn } from '@shres-code/shres-code-client-locale/src/locales/en.ts'
 import { en } from '../src/client/locales.ts'
 
 afterEach(cleanup)

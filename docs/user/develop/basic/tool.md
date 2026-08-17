@@ -7,8 +7,8 @@ This tutorial adds a `greet` tool to the Web UI. Complete [Your first plugin](./
 Replace `scratch-plugin/src/my-plugin.ts` with:
 
 ```ts
-import type { Context } from '@roos-code/cordis'
-import { defineTool } from '@roos-code/roos-code-tools'
+import type { Context } from '@shres-code/cordis'
+import { defineTool } from '@shres-code/shres-code-tools'
 
 export const name = 'greet-tool'
 export const inject = ['tools']
@@ -38,7 +38,7 @@ export function apply(ctx: Context) {
 Restart the development command if it is not running:
 
 ```sh
-pnpm roos web --patch ./scratch-plugin/cordis.yml
+pnpm shres web --patch ./scratch-plugin/cordis.yml
 ```
 
 Open `http://127.0.0.1:3080` and ask: `Use the greet tool to greet Ada.` The model can call `greet` and receives `Hello, Ada!` as the tool result.

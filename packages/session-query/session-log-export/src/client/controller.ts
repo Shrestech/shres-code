@@ -1,6 +1,6 @@
 /** Browser download state shared by the Session Header button and `/export`. */
 
-import { createSnapshotStore, type SessionId, type SnapshotStore } from '@roos-code/roos-code-client-runtime/client'
+import { createSnapshotStore, type SessionId, type SnapshotStore } from '@shres-code/shres-code-client-runtime/client'
 
 /** Download phases presented by the shared modal. */
 export type SessionLogDownloadStatus = 'downloading' | 'success' | 'error'
@@ -28,7 +28,7 @@ const INITIAL: SessionLogDownloadState = { bySession: {} }
  * @returns one safe browser download filename.
  */
 export function sessionLogZipFilename(sessionId: SessionId): string {
-  return `roos-session-${String(sessionId).replace(/[^A-Za-z0-9_-]/g, '_')}.zip`
+  return `shres-session-${String(sessionId).replace(/[^A-Za-z0-9_-]/g, '_')}.zip`
 }
 
 /**
@@ -46,7 +46,7 @@ export function downloadUrl(url: string, filename: string): void {
 /** Resolve the browser's Host base with the connection carrier's null-origin fallback. */
 function hostBase(): string {
   const origin = (globalThis as { location?: { origin?: string } }).location?.origin
-  return origin !== undefined && origin !== 'null' ? origin : 'http://roos.internal'
+  return origin !== undefined && origin !== 'null' ? origin : 'http://shres.internal'
 }
 
 function messageOf(error: unknown): string {

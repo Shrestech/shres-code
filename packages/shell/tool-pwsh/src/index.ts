@@ -1,12 +1,12 @@
 /**
  * Model-facing PowerShell Consumer of the `ctx.shell` capability seam. Intended for
  * Windows compositions where a PowerShell executor (e.g.
- * `@roos-code/roos-code-pwsh-local`) backs `ctx.shell`; the tool contract is
+ * `@shres-code/shres-code-pwsh-local`) backs `ctx.shell`; the tool contract is
  * PowerShell-dialect: native `C:\...` paths and `$env:NAME` variables.
  *
- * Behavior mirrors `roos-tool-bash` call-for-call: foreground and
+ * Behavior mirrors `shres-tool-bash` call-for-call: foreground and
  * `run_in_background` execution (background handles register with the
- * generic `ctx.jobs` runtime), the managed `ROOS_*` environment through the
+ * generic `ctx.jobs` runtime), the managed `SHRES_*` environment through the
  * shared `shell-env` registry, the per-call sandbox policy resolution (the
  * calling session's mode and cwd travel to the confining executor), the
  * sandbox-denial rendering with the same-turn escalation surface
@@ -14,32 +14,32 @@
  * `ctx.approval`), and the bash marker/truncation rendering story. UI
  * presentation mirrors the bash tool's too: a completed foreground call is
  * a terminal card with the parsed exit-status pill, using the shared
- * exit-status parse from `@roos-code/roos-code-shell`.
+ * exit-status parse from `@shres-code/shres-code-shell`.
  *
- * @module @roos-code/roos-code-tool-pwsh
+ * @module @shres-code/shres-code-tool-pwsh
  */
 
 import { isAbsolute, resolve as resolvePath } from 'node:path'
-import type { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import { defineTool, TOOL_ABORTED } from '@roos-code/roos-code-tools'
-import type { GenericCallView, TerminalCallView, ToolExecution, ToolResult, ToolResultView } from '@roos-code/roos-code-tools'
-import { HarnessError } from '@roos-code/roos-code-llm'
-import type { Agent } from '@roos-code/roos-code-agent'
-import type {} from '@roos-code/roos-code-system-prompt'
-import type {} from '@roos-code/roos-code-jobs'
-import type {} from '@roos-code/roos-code-shell-env'
-import type {} from '@roos-code/roos-code-user-approval'
-import type { SandboxExecutionPolicy, SandboxMode } from '@roos-code/roos-code-sandbox'
-import { ESCALATION_TARGETS, approveEscalation, validateEscalationArgs } from '@roos-code/roos-code-sandbox'
-import type { SandboxPolicyService } from '@roos-code/roos-code-sandbox-policy'
-import type { ShellRunResult } from '@roos-code/roos-code-shell'
-import { parseExitStatus } from '@roos-code/roos-code-shell'
+import type { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import { defineTool, TOOL_ABORTED } from '@shres-code/shres-code-tools'
+import type { GenericCallView, TerminalCallView, ToolExecution, ToolResult, ToolResultView } from '@shres-code/shres-code-tools'
+import { HarnessError } from '@shres-code/shres-code-llm'
+import type { Agent } from '@shres-code/shres-code-agent'
+import type {} from '@shres-code/shres-code-system-prompt'
+import type {} from '@shres-code/shres-code-jobs'
+import type {} from '@shres-code/shres-code-shell-env'
+import type {} from '@shres-code/shres-code-user-approval'
+import type { SandboxExecutionPolicy, SandboxMode } from '@shres-code/shres-code-sandbox'
+import { ESCALATION_TARGETS, approveEscalation, validateEscalationArgs } from '@shres-code/shres-code-sandbox'
+import type { SandboxPolicyService } from '@shres-code/shres-code-sandbox-policy'
+import type { ShellRunResult } from '@shres-code/shres-code-shell'
+import { parseExitStatus } from '@shres-code/shres-code-shell'
 import { processOutcome } from './background.ts'
 import { renderPwshProcessRead, renderPwshResult } from './render.ts'
 import type { RenderablePwshResult } from './render.ts'
 
-declare module '@roos-code/roos-code-jobs' {
+declare module '@shres-code/shres-code-jobs' {
   interface JobKindMap {
     pwsh: 'pwsh'
   }
@@ -83,7 +83,7 @@ interface PwshForegroundResult {
   sandbox?: { mode: string; denied: boolean; enforcement?: string; runnerFailed?: boolean }
 }
 
-/* jscpd:ignore-start -- minimal mirror of roos-tool-bash's validation and execute plumbing (Agent Note). */
+/* jscpd:ignore-start -- minimal mirror of shres-tool-bash's validation and execute plumbing (Agent Note). */
 function validatePwshArgs(args: PwshToolArgs): void {
   if (args.command.trim().length === 0) {
     throw new Error('invalid command: expected a non-empty string')
@@ -108,7 +108,7 @@ function pwshDescription(backgroundEnabled: boolean, escalationModes: readonly S
     + 'Each call runs in a fresh pwsh process: no state (cwd, variables, functions) persists between calls — '
     + 'pass `workdir` instead of using `cd`. Paths use native Windows form (`C:\\...`); read environment '
     + 'variables with `$env:NAME`. Non-zero exits are reported as `[exit code: N]`. '
-    + 'Current harness environment facts are exposed through managed `$env:ROOS_*` variables; inspect them when needed. '
+    + 'Current harness environment facts are exposed through managed `$env:SHRES_*` variables; inspect them when needed. '
     + 'Commands may run under a file sandbox; a blocked file operation is reported as `[sandbox: file access denied under <mode> mode]` — a policy denial, not a bug in the command; do not retry another way. '
     + 'Long output is truncated to its tail; the full output is saved to a file whose path is reported when available. '
     + 'On Windows a force-killed command settles as `[exit code: 1]` without a signal marker — treat it as an interruption, not a command failure. '
@@ -171,7 +171,7 @@ function canonicalPwshResult(result: ShellRunResult): PwshForegroundResult {
     timedOut: result.timedOut,
     aborted: result.aborted,
     timeoutMs: result.timeoutMs,
-    /* jscpd:ignore-start -- the canonical projection and background-handle shape mirror roos-tool-bash's by design (Agent Note). */
+    /* jscpd:ignore-start -- the canonical projection and background-handle shape mirror shres-tool-bash's by design (Agent Note). */
     stdout: output(result.stdout),
     stderr: output(result.stderr),
     ...result.sandbox !== undefined ? {
@@ -192,7 +192,7 @@ const BACKGROUND_OUTPUT_PROPERTIES = {
 } as const
 /* jscpd:ignore-end */
 
-/* jscpd:ignore-start -- deliberate mirror of roos-tool-bash's apply() preamble (pwsh-tool-and-executor Agent Note). */
+/* jscpd:ignore-start -- deliberate mirror of shres-tool-bash's apply() preamble (pwsh-tool-and-executor Agent Note). */
 export function apply(ctx: Context, config: Config = {}): void {
   const backgroundEnabled = config.enableRunInBackground ?? true
   const defaultMode = ctx.shell.sandboxMode
@@ -206,7 +206,7 @@ export function apply(ctx: Context, config: Config = {}): void {
   const resolveSandboxPolicy = (exec: ToolExecution): SandboxExecutionPolicy | undefined =>
     sandboxPolicy?.resolve(exec.agent === undefined ? {} : { session: exec.agent.session })
 
-  /* jscpd:ignore-start -- deliberate mirror of roos-tool-bash's escalation resolver (pwsh-tool-and-executor Agent Note). */
+  /* jscpd:ignore-start -- deliberate mirror of shres-tool-bash's escalation resolver (pwsh-tool-and-executor Agent Note). */
   /**
    * Resolve a sandbox-escalation request through `ctx.approval` BEFORE
    * anything executes, delegating the shared fail-closed sequence (strict
@@ -252,7 +252,7 @@ export function apply(ctx: Context, config: Config = {}): void {
   ctx.tools.register(defineTool({
     name: 'pwsh',
     description: pwshDescription(backgroundEnabled, escalationModes),
-    /* jscpd:ignore-start -- deliberate mirror of roos-tool-bash's parameter surface (pwsh-tool-and-executor Agent Note). */
+    /* jscpd:ignore-start -- deliberate mirror of shres-tool-bash's parameter surface (pwsh-tool-and-executor Agent Note). */
     parameters: {
       command: { type: 'string', required: true, description: 'The PowerShell command to execute.' },
       description: {
@@ -281,10 +281,10 @@ export function apply(ctx: Context, config: Config = {}): void {
     },
     /* jscpd:ignore-end */
     output: {
-      // The foreground result wire shape mirrors roos-tool-bash's by contract —
+      // The foreground result wire shape mirrors shres-tool-bash's by contract —
       // consumers of one must accept the other (see the pwsh-tool-and-executor
       // Agent Note).
-      /* jscpd:ignore-start -- deliberate result-schema symmetry with roos-tool-bash. */
+      /* jscpd:ignore-start -- deliberate result-schema symmetry with shres-tool-bash. */
       schema: {
         oneOf: [
           {
@@ -344,7 +344,7 @@ export function apply(ctx: Context, config: Config = {}): void {
           : renderPwshResult(value as RenderablePwshResult, escalationModes),
       }],
     },
-    /* jscpd:ignore-start -- the execute path mirrors roos-tool-bash's by design (see the pwsh-tool-and-executor Agent Note). */
+    /* jscpd:ignore-start -- the execute path mirrors shres-tool-bash's by design (see the pwsh-tool-and-executor Agent Note). */
     async execute(args: PwshToolArgs, exec) {
       validatePwshArgs(args)
       // Description is display metadata; workdir defaults to the caller's session.
@@ -360,7 +360,7 @@ export function apply(ctx: Context, config: Config = {}): void {
         command: args.command,
         ...workdir !== undefined ? { workdir } : {},
         ...args.timeoutMs !== undefined ? { timeoutMs: args.timeoutMs } : {},
-        roosEnv: ctx.shellEnv.collect(exec),
+        shresEnv: ctx.shellEnv.collect(exec),
         ...policy !== undefined ? { sandboxPolicy: policy } : {},
       }
       if (args.run_in_background === true) {
@@ -370,7 +370,7 @@ export function apply(ctx: Context, config: Config = {}): void {
         }
         const jobs = ctx.get('jobs')
         if (jobs === undefined) {
-          throw new Error('background jobs unavailable: load @roos-code/roos-code-jobs and @roos-code/roos-code-tool-jobs')
+          throw new Error('background jobs unavailable: load @shres-code/shres-code-jobs and @shres-code/shres-code-tool-jobs')
         }
         // The caller owns cancellation until ctx.jobs commits detached ownership.
         if (exec.signal.aborted) {

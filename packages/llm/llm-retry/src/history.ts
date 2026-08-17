@@ -1,6 +1,6 @@
-/** Durable request-route lookup for one open model step. @module @roos-code/roos-code-llm-retry/history */
+/** Durable request-route lookup for one open model step. @module @shres-code/shres-code-llm-retry/history */
 
-import type { SessionEvent } from '@roos-code/roos-code-session'
+import type { SessionEvent } from '@shres-code/shres-code-session'
 
 /**
  * Find the provider in force for one currently open step.

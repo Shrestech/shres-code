@@ -1,9 +1,9 @@
 /**
- * Config-dump entry for `roos --profile <name> --dump-config`: compose the
+ * Config-dump entry for `shres --profile <name> --dump-config`: compose the
  * profile's patch layers through the include plugin's patch algorithm without
  * booting or evaluating `!!js`, with one source layer per bundle, the
  * profile's own patch file, and each `--patch` overlay.
- * @module @roos-code/roos-code/dump-config
+ * @module @shres-code/shres-code/dump-config
  */
 
 import { existsSync } from 'node:fs'
@@ -13,10 +13,10 @@ import {
   loadOverlayPatches,
   renderConfigDump,
   type ConfigDumpLayer,
-} from '@roos-code/roos-code-app-boot'
+} from '@shres-code/shres-code-app-boot'
 import { homePatchPath, prepareProfile, PROFILE_ROOT_FILENAME } from './profile-boot.ts'
 
-const NAME = 'roos'
+const NAME = 'shres'
 
 /* v8 ignore start -- built-bin acceptance drives this boot-free dispatch */
 /**

@@ -6,10 +6,10 @@
  * serialize per Session, and a disposed controller stops publishing.
  */
 import { describe, expect, it, vi } from 'vitest'
-import type { MessageId, SessionId } from '@roos-code/roos-code-client-connection/client'
+import type { MessageId, SessionId } from '@shres-code/shres-code-client-connection/client'
 import type {
   MessageFeedbackItem, MessageFeedbackVersion,
-} from '@roos-code/roos-code-message-feedback/types'
+} from '@shres-code/shres-code-message-feedback/types'
 import { MessageFeedbackController, type MessageFeedbackRemote } from '../src/client/controller.ts'
 
 const SESSION = 's-1' as SessionId

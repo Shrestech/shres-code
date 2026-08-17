@@ -1,6 +1,6 @@
 /* Full-bleed, fixed-height host for the trajectory ledger. */
 .root {
-  --roos-trajectory-toolbar-height: 32px;
+  --shres-trajectory-toolbar-height: 32px;
 
   display: flex;
   flex-direction: column;
@@ -24,5 +24,5 @@
   overflow: hidden;
 
   /* ConversationRoot publishes the floating composer's live height. */
-  --roos-trajectory-bottom-clearance: calc(var(--roos-composer-height, 152px) + 16px);
+  --shres-trajectory-bottom-clearance: calc(var(--shres-composer-height, 152px) + 16px);
 }

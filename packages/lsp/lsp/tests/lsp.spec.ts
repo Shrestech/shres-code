@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import Lsp, {
   finalExtension,
   LspError,
@@ -7,7 +7,7 @@ import Lsp, {
   type LspProvider,
   type LspProviderQuery,
   type LspQueryResult,
-} from '@roos-code/roos-code-lsp'
+} from '@shres-code/shres-code-lsp'
 
 /** A scripted provider that records the queries it receives. */
 function makeProvider(

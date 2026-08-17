@@ -8,17 +8,17 @@
  */
 /* oxlint-disable typescript/no-unsafe-assignment -- Vitest asymmetric matchers are typed as any. */
 
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { describe, expect, it, vi } from 'vitest'
-import InvariantService from '@roos-code/roos-code-invariants'
+import InvariantService from '@shres-code/shres-code-invariants'
 import type {
   ApprovalRequestId, CordisDynamicPackageId, CordisDynamicPluginId, CordisDynamicPluginRunId,
-} from '@roos-code/roos-code-api-remotes/client'
-import type { SessionId } from '@roos-code/roos-code-client-connection/client'
-import type { DynamicCordisInvokeResult } from '@roos-code/roos-code-api-remotes/client'
+} from '@shres-code/shres-code-api-remotes/client'
+import type { SessionId } from '@shres-code/shres-code-client-connection/client'
+import type { DynamicCordisInvokeResult } from '@shres-code/shres-code-api-remotes/client'
 // Type-only: resolves `ctx.remote` and with it the `$on`/`$dispatch` surface.
-import type {} from '@roos-code/roos-code-api-gateway/client'
-import { SlotRegistry } from '@roos-code/roos-code-client-runtime/client'
+import type {} from '@shres-code/shres-code-api-gateway/client'
+import { SlotRegistry } from '@shres-code/shres-code-client-runtime/client'
 import * as NodeHalf from '../src/index.ts'
 import * as Invariant from '../src/invariant.ts'
 import * as ClientHalf from '../src/client/index.ts'

@@ -1,9 +1,9 @@
 /**
  * Bounded per-session write batching for the shared persistence coordinator.
- * @module @roos-code/roos-code-session-persistence/write-behind
+ * @module @shres-code/shres-code-session-persistence/write-behind
  */
 
-import type { SessionEvent } from '@roos-code/roos-code-session'
+import type { SessionEvent } from '@shres-code/shres-code-session'
 
 /** Dependencies and scheduling policy for one live session's write controller. */
 export interface SessionWriteBehindOptions {

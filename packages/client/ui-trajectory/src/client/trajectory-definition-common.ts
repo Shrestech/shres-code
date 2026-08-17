@@ -1,4 +1,4 @@
-import type { ConversationNodeContext } from '@roos-code/roos-code-client-runtime/client'
+import type { ConversationNodeContext } from '@shres-code/shres-code-client-runtime/client'
 import type {
   TrajectoryContribution, TrajectoryConversationViewNode,
 } from './trajectory-contract.ts'

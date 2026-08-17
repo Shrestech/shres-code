@@ -1,17 +1,17 @@
-import { Context } from '@roos-code/cordis'
-import Loader from '@roos-code/cordis-plugin-loader'
+import { Context } from '@shres-code/cordis'
+import Loader from '@shres-code/cordis-plugin-loader'
 import { describe, expect, it, vi } from 'vitest'
-import type { Agent } from '@roos-code/roos-code-agent'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
-import type { ContentBlock } from '@roos-code/roos-code-llm'
-import SubagentRuntime from '@roos-code/roos-code-subagent'
-import { MAX_TIMER_DELAY_MS } from '@roos-code/roos-code-timeout'
+import type { Agent } from '@shres-code/shres-code-agent'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
+import type { ContentBlock } from '@shres-code/shres-code-llm'
+import SubagentRuntime from '@shres-code/shres-code-subagent'
+import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
 import type {
   SubprocessHandle,
   SubprocessOutcome,
   SubprocessSpawnSpec,
-} from '@roos-code/roos-code-subprocess'
-import LocalSubprocessRuntime from '@roos-code/roos-code-subprocess-local'
+} from '@shres-code/shres-code-subprocess'
+import LocalSubprocessRuntime from '@shres-code/shres-code-subprocess-local'
 import * as grok from '../src/index.ts'
 import * as invariant from '../src/invariant.ts'
 import {
@@ -287,7 +287,7 @@ describe('Grok CLI provider registration', () => {
     const ctx = { invariants: { register } } as unknown as Context
     await expect(invariant.apply(ctx)).resolves.toBe(dispose)
     expect(register).toHaveBeenCalledWith(
-      '@roos-code/roos-code-subagent-grok-cli',
+      '@shres-code/shres-code-subagent-grok-cli',
       expect.any(Function),
     )
     const install = register.mock.calls[0]![1]

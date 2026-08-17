@@ -11,11 +11,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import Loader from '@roos-code/cordis-plugin-loader'
-import Include from '@roos-code/cordis-plugin-include'
-import z from '@roos-code/schemastery'
-import { settingsNamespace, type SettingsScope } from '@roos-code/roos-code-settings'
+import { Context } from '@shres-code/cordis'
+import Loader from '@shres-code/cordis-plugin-loader'
+import Include from '@shres-code/cordis-plugin-include'
+import z from '@shres-code/schemastery'
+import { settingsNamespace, type SettingsScope } from '@shres-code/shres-code-settings'
 import FileSettingsProvider from '../src/index.ts'
 
 interface ThemeConfig {
@@ -49,7 +49,7 @@ async function loadComposition(
   options?: { withSettings?: boolean },
 ): Promise<{ ctx: Context; state: ConsumerState; settingsPath: string }> {
   const withSettings = options?.withSettings ?? true
-  root = await mkdtemp(join(tmpdir(), 'roos-settings-composition-'))
+  root = await mkdtemp(join(tmpdir(), 'shres-settings-composition-'))
   const settingsPath = join(root, 'settings.yaml')
   await writeFile(settingsPath, 'ui-theme:\n  theme: light\n')
 
@@ -79,7 +79,7 @@ async function loadComposition(
     ...withSettings
       ? [
         '- id: settings',
-        "  name: '@roos-code/roos-code-settings-file'",
+        "  name: '@shres-code/shres-code-settings-file'",
         '  config:',
         `    path: ${JSON.stringify(settingsPath)}`,
         '    debounceMs: 10',
@@ -96,7 +96,7 @@ async function loadComposition(
   await ctx.plugin(Loader)
   ctx.loader.builtins.include = Include
   const modules = new Map<string, unknown>([
-    ['@roos-code/roos-code-settings-file', FileSettingsProvider],
+    ['@shres-code/shres-code-settings-file', FileSettingsProvider],
     ['test-settings-consumer', consumer],
   ])
   ctx.loader.internal = {

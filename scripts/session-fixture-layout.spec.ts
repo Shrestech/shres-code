@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { decodeStorageRecord, type SessionEvent } from '@roos-code/roos-code-session'
+import { decodeStorageRecord, type SessionEvent } from '@shres-code/shres-code-session'
 import { canonicalSessionFixture } from './session-fixture-layout.ts'
 
 const HEADER = '  {"type":"session","version":0,"id":"fixture","createdAt":1,"delegationDepth":0}  '

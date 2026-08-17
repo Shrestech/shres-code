@@ -4,18 +4,18 @@
  * else references RequestPayload<'session.*'> / ResponseValue<'session.*'>.
  */
 
-import type { MessageId } from '@roos-code/roos-code-llm/brand'
-import type { AttachmentIdType, ImageAttachmentLimits, ImageAttachmentRef, ImageMediaType } from '@roos-code/roos-code-attachment'
-import type { ContentBlock } from '@roos-code/roos-code-llm/types'
-import type { SessionEvent, SessionId } from '@roos-code/roos-code-session/types'
+import type { MessageId } from '@shres-code/shres-code-llm/brand'
+import type { AttachmentIdType, ImageAttachmentLimits, ImageAttachmentRef, ImageMediaType } from '@shres-code/shres-code-attachment'
+import type { ContentBlock } from '@shres-code/shres-code-llm/types'
+import type { SessionEvent, SessionId } from '@shres-code/shres-code-session/types'
 // The pure-type outlet: api/ is browser-importable, and the package root's
-// cordis Context merge (via roos-agent) must not enter client aggregates.
-import type { SessionProjectionMap } from '@roos-code/roos-code-session-projection/types'
+// cordis Context merge (via shres-agent) must not enter client aggregates.
+import type { SessionProjectionMap } from '@shres-code/shres-code-session-projection/types'
 import type { RpcId, RpcRequest, RpcResponse } from './rpc.ts'
 import type { ToolEventView } from './events.ts'
 import type { WorkspaceId } from './workspace.ts'
 
-declare module '@roos-code/roos-code-session-projection/types' {
+declare module '@shres-code/shres-code-session-projection/types' {
   interface SessionProjectionMap {
     /**
      * Session-list hints persisted by the projection cache. `blank: false`
@@ -43,7 +43,7 @@ export interface SessionListMetadata {
   lastPromptAt: number | null
 }
 
-declare module '@roos-code/roos-code-llm' {
+declare module '@shres-code/shres-code-llm' {
   interface MessageSourceMap {
     /**
      * The prompt's rpcId is passed through MessageSource into the `user/message` event

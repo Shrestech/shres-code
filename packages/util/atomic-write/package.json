@@ -1,5 +1,5 @@
 {
-  "name": "@roos-code/roos-code-atomic-write",
+  "name": "@shres-code/shres-code-atomic-write",
   "description": "Zero-dependency atomic file replacement: exclusive-create random-suffix temp + rename carrying the caller-stated permissions (writeFileAtomic)",
   "version": "0.1.0-rc.5",
   "publishConfig": {
@@ -7,7 +7,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "packages/util/atomic-write"
   },
   "type": "module",
@@ -32,11 +32,11 @@
   ],
   "license": "MIT",
   "peerDependencies": {
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   },
   "devDependencies": {
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   }
 }

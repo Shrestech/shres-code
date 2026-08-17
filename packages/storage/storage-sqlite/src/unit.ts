@@ -4,12 +4,12 @@
  * `unit_globals` table. Each primitive is a single statement, so atomicity
  * comes from SQLite itself — no explicit transactions, and no write queue
  * (write ordering is the caller's responsibility per the KV contract).
- * @module @roos-code/roos-code-storage-sqlite/unit
+ * @module @shres-code/shres-code-storage-sqlite/unit
  */
 
 import type { DatabaseSync, StatementSync } from 'node:sqlite'
-import { StorageError } from '@roos-code/roos-code-storage'
-import type { KvUnit, KvUnitDescriptor } from '@roos-code/roos-code-storage'
+import { StorageError } from '@shres-code/shres-code-storage'
+import type { KvUnit, KvUnitDescriptor } from '@shres-code/shres-code-storage'
 import { recordTableName } from './schema.ts'
 
 /** Prepared statements for one declared table. */

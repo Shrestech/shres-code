@@ -1,5 +1,5 @@
 /**
- * Unit + real-load-path coverage for @roos-code/roos-code-tool-call-timeout-policy. The
+ * Unit + real-load-path coverage for @shres-code/shres-code-tool-call-timeout-policy. The
  * timeout-wins cases drive the deadline under fake timers (deterministic — no
  * wall-clock race) and use a COOPERATIVE tool that settles only when its
  * `exec.signal` aborts, mirroring how a real capability forwards the signal and
@@ -7,13 +7,13 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import Loader from '@roos-code/cordis-plugin-loader'
-import { CallId, HarnessError } from '@roos-code/roos-code-llm'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import ToolRuntime, { defineContentToolFixture, TOOL_ABORTED, type ToolExecutionInput, type PostToolDecision } from '@roos-code/roos-code-tools'
-import * as timeoutPolicy from '@roos-code/roos-code-tool-call-timeout-policy'
-import { TOOL_TIMEOUT } from '@roos-code/roos-code-tool-call-timeout-policy'
+import { Context } from '@shres-code/cordis'
+import Loader from '@shres-code/cordis-plugin-loader'
+import { CallId, HarnessError } from '@shres-code/shres-code-llm'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import ToolRuntime, { defineContentToolFixture, TOOL_ABORTED, type ToolExecutionInput, type PostToolDecision } from '@shres-code/shres-code-tools'
+import * as timeoutPolicy from '@shres-code/shres-code-tool-call-timeout-policy'
+import { TOOL_TIMEOUT } from '@shres-code/shres-code-tool-call-timeout-policy'
 
 const testToolSignal = new AbortController().signal
 
@@ -217,7 +217,7 @@ describe('timeout-policy disposal (HMR safety)', () => {
   })
 })
 
-describe('roos-tool-call-timeout-policy real-load-path guard', () => {
+describe('shres-tool-call-timeout-policy real-load-path guard', () => {
   it('has no default export and keeps name/inject through unwrapExports', () => {
     expect('default' in timeoutPolicy).toBe(false)
     const loader = Object.create(Loader.prototype) as Loader

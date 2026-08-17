@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { jsonSchemaToTs, renderToolsSdk } from '@roos-code/roos-code-tools/src/ts-types.ts'
-import type { ToolSdkSchema } from '@roos-code/roos-code-tools/src/ts-types.ts'
-import { parameterSchemaSpecToJsonSchema } from '@roos-code/roos-code-tools'
+import { jsonSchemaToTs, renderToolsSdk } from '@shres-code/shres-code-tools/src/ts-types.ts'
+import type { ToolSdkSchema } from '@shres-code/shres-code-tools/src/ts-types.ts'
+import { parameterSchemaSpecToJsonSchema } from '@shres-code/shres-code-tools'
 
 describe('jsonSchemaToTs', () => {
   it('maps every unified schema construct', () => {

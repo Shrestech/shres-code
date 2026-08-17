@@ -39,7 +39,7 @@ export function AppRoot(props: AppRootProps) {
   return (
     <div className={css.boot}>
       <div className={css.card}>
-        <div className={css.wordmark}>Roos Code</div>
+        <div className={css.wordmark}>Shres Code</div>
         {!loud
           ? (
             <>

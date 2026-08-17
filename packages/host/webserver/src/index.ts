@@ -1,5 +1,5 @@
 /**
- * @roos-code/roos-code-host-webserver — Web route-registration plugin: a node:http
+ * @shres-code/shres-code-host-webserver — Web route-registration plugin: a node:http
  * server plus the `webServer` service (HTTP and upgrade route registries,
  * index transform taps, and the single fallback seat for everything no route
  * claims). Knows no harness concepts and serves no files; the composing
@@ -12,10 +12,10 @@ import { createServer } from 'node:http'
 import type { IncomingMessage, ServerResponse, Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import type { Duplex } from 'node:stream'
-import { Context, Service } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
+import { Context, Service } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     webServer: WebServer
   }

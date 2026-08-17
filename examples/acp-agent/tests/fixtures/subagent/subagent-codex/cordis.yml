@@ -4,16 +4,16 @@
   name: './fixture.ts'
 
 - id: subagent
-  name: '@roos-code/roos-code-subagent'
+  name: '@shres-code/shres-code-subagent'
 
 - id: subprocess
-  name: '@roos-code/roos-code-subprocess-local'
+  name: '@shres-code/shres-code-subprocess-local'
 
 - id: subagent-codex
-  name: '@roos-code/roos-code-subagent-codex'
+  name: '@shres-code/shres-code-subagent-codex'
 
 - id: tool-subagent-codex
-  name: '@roos-code/roos-code-tool-subagent'
+  name: '@shres-code/shres-code-tool-subagent'
   config:
     provider: codex
     toolName: subagent_codex
@@ -21,7 +21,7 @@
     maxDepth: 'provider-managed'
 
 - id: agent-spine
-  name: '@roos-code/roos-code-agent-spine-demo'
+  name: '@shres-code/shres-code-agent-spine-demo'
   config:
     agents:
       - id: main
@@ -32,9 +32,9 @@
     workspaceContext: false
 
 - id: persistence
-  name: '@roos-code/roos-code-session-persistence-jsonl'
+  name: '@shres-code/shres-code-session-persistence-jsonl'
   config:
     root: './.sessions'
 
 - id: checkpoint-policy
-  name: '@roos-code/roos-code-session-checkpoint-policy'
+  name: '@shres-code/shres-code-session-checkpoint-policy'

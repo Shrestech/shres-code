@@ -2,17 +2,17 @@ import { describe, expect, it, vi } from 'vitest'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import type { Worker } from 'node:worker_threads'
-import { Context } from '@roos-code/cordis'
-import Loader from '@roos-code/cordis-plugin-loader'
-import type { Agent } from '@roos-code/roos-code-agent'
-import SubagentRuntime from '@roos-code/roos-code-subagent'
-import type { SubagentCapabilities, SubagentProvider, SubagentResult, SubagentRun, SubagentStartRequest } from '@roos-code/roos-code-subagent'
-import type { WorkflowMeta, WorkflowResult, WorkflowResultInfo, WorkflowRun, WorkflowRunInfo } from '@roos-code/roos-code-workflow'
+import { Context } from '@shres-code/cordis'
+import Loader from '@shres-code/cordis-plugin-loader'
+import type { Agent } from '@shres-code/shres-code-agent'
+import SubagentRuntime from '@shres-code/shres-code-subagent'
+import type { SubagentCapabilities, SubagentProvider, SubagentResult, SubagentRun, SubagentStartRequest } from '@shres-code/shres-code-subagent'
+import type { WorkflowMeta, WorkflowResult, WorkflowResultInfo, WorkflowRun, WorkflowRunInfo } from '@shres-code/shres-code-workflow'
 import * as workerEngineModule from '../src/index.ts'
 import WorkerThreadWorkflowEngine, { type Config } from '../src/index.ts'
 import { workerSpawnEnv } from '../src/host.ts'
 import { HostToWorkerType, WorkerToHostType } from '../src/protocol.ts'
-import { SessionId } from '@roos-code/roos-code-session'
+import { SessionId } from '@shres-code/shres-code-session'
 
 /** A minimal parent stand-in: the engine only threads it through to the provider. */
 function fakeParent(): Agent {
@@ -175,7 +175,7 @@ async function run(ctx: Context, parent: Agent, source: { script: string; meta: 
   }
 }
 
-describe('roos-workflow-worker-thread', () => {
+describe('shres-workflow-worker-thread', () => {
   describe('script execution over a real worker thread', () => {
     it('runs a script end-to-end: agent() text results, phases, log, args, return value, events', async () => {
       const { ctx, parent, provider } = await setup({ reply: (_request, index) => text(`answer-${index}`) })
@@ -610,7 +610,7 @@ describe('roos-workflow-worker-thread', () => {
       const { ctx, parent } = await setup()
       // The ACP snapshot harness runs the parent with its cwd OUTSIDE the
       // repo and pins the repo tsconfig through this variable; the worker
-      // must inherit the pin (or its roos-* imports silently resolve to
+      // must inherit the pin (or its shres-* imports silently resolve to
       // unbuilt lib/ bundles) while every other variable stays scrubbed.
       const tsconfig = fileURLToPath(new URL('../../../../tsconfig.json', import.meta.url))
       process.env.TSX_TSCONFIG_PATH = tsconfig

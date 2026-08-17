@@ -9,7 +9,7 @@
  * than at request time: an unserviceable route fails while its configuration is
  * being resolved, which is the earliest point that can name the offending key.
  *
- * @module roos-llm-pi-ai/catalog
+ * @module shres-llm-pi-ai/catalog
  */
 
 import { builtinProviders, getBuiltinModels, getBuiltinProviders } from '@earendil-works/pi-ai/providers/all'

@@ -3,11 +3,11 @@
 // TestSessions mints tagged scopes through the production createScope, so the
 // service's scopeOf/binding path runs against production resolution (no local
 // tag probe).
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { describe, expect, it, vi } from 'vitest'
-import { AttachmentId } from '@roos-code/roos-code-attachment'
-import { makeTranslate, SlotTestRuntime } from '@roos-code/roos-code-client-test-runtime'
-import type { QueuedMessage, SessionFace } from '@roos-code/roos-code-client-runtime/client'
+import { AttachmentId } from '@shres-code/shres-code-attachment'
+import { makeTranslate, SlotTestRuntime } from '@shres-code/shres-code-client-test-runtime'
+import type { QueuedMessage, SessionFace } from '@shres-code/shres-code-client-runtime/client'
 import { ComposerBlockRegistry } from '../src/client/input/blocks.ts'
 import { InputHub } from '../src/client/input/hub.ts'
 import { ConversationController, UnsupportedImageMediaTypeError } from '../src/client/service.ts'

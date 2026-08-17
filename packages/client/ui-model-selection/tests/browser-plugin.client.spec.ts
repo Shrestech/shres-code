@@ -8,14 +8,14 @@
  * (and the reverse), the one-shared-state contract of the dual entry.
  * Scope disposal drops the directory (HMR safety).
  */
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { describe, expect, it } from 'vitest'
-import { createScope } from '@roos-code/roos-code-client-runtime/client'
-import type { SessionId } from '@roos-code/roos-code-client-runtime/client'
-import { LocaleRuntime } from '@roos-code/roos-code-client-locale/client'
-import { TestRemote } from '@roos-code/roos-code-client-test-runtime'
-import type { ModelSelection } from '@roos-code/roos-code-api-remotes/client'
-import type { CommandDecoration, SelectOption } from '@roos-code/roos-code-client-ui-commands/client'
+import { createScope } from '@shres-code/shres-code-client-runtime/client'
+import type { SessionId } from '@shres-code/shres-code-client-runtime/client'
+import { LocaleRuntime } from '@shres-code/shres-code-client-locale/client'
+import { TestRemote } from '@shres-code/shres-code-client-test-runtime'
+import type { ModelSelection } from '@shres-code/shres-code-api-remotes/client'
+import type { CommandDecoration, SelectOption } from '@shres-code/shres-code-client-ui-commands/client'
 import type { ModelSelectInjected } from '../src/client/slots.ts'
 import { apply, inject } from '../src/client/index.ts'
 import { en } from '../src/client/locales.ts'

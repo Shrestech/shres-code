@@ -1,7 +1,7 @@
 /**
  * Default Agent driver over queued turns and step-boundary input. Every request
  * is derived from the session log.
- * @module roos-agent-loop/agent
+ * @module shres-agent-loop/agent
  */
 
 import type {
@@ -14,9 +14,9 @@ import type {
   InboxTarget,
   PreStepDecision,
   RequestErrorAction,
-} from '@roos-code/roos-code-agent'
-import { Inbox, agentEvents, assembleContextFor } from '@roos-code/roos-code-agent'
-import type { GenerateOptions, LlmCallConfig, Message, PreparedLlmCall } from '@roos-code/roos-code-llm'
+} from '@shres-code/shres-code-agent'
+import { Inbox, agentEvents, assembleContextFor } from '@shres-code/shres-code-agent'
+import type { GenerateOptions, LlmCallConfig, Message, PreparedLlmCall } from '@shres-code/shres-code-llm'
 import {
   BlockAssembler,
   LlmError,
@@ -24,14 +24,14 @@ import {
   deepFreeze,
   errorChain,
   markAgentLoopRequest,
-} from '@roos-code/roos-code-llm'
-import type { Scope } from '@roos-code/roos-code-scope'
-import { createScope } from '@roos-code/roos-code-scope'
-import type { EpochHeader, RequestContext, Session, SessionId, TurnEndReason, UserMessage } from '@roos-code/roos-code-session'
-import { canonicalHeader, headerEquals } from '@roos-code/roos-code-session'
-import { joinContextSections, renderContextSections, renderPrompt } from '@roos-code/roos-code-system-prompt'
-import type { PromptAssembly } from '@roos-code/roos-code-system-prompt'
-import type { Context } from '@roos-code/cordis'
+} from '@shres-code/shres-code-llm'
+import type { Scope } from '@shres-code/shres-code-scope'
+import { createScope } from '@shres-code/shres-code-scope'
+import type { EpochHeader, RequestContext, Session, SessionId, TurnEndReason, UserMessage } from '@shres-code/shres-code-session'
+import { canonicalHeader, headerEquals } from '@shres-code/shres-code-session'
+import { joinContextSections, renderContextSections, renderPrompt } from '@shres-code/shres-code-system-prompt'
+import type { PromptAssembly } from '@shres-code/shres-code-system-prompt'
+import type { Context } from '@shres-code/cordis'
 import { RuntimeContextProjection } from './runtime-context.ts'
 import { executeToolCalls } from './tool-calls.ts'
 

@@ -1,16 +1,16 @@
 /**
- * roos-llm's owned branded ids: tool-call correlation and provider request
+ * shres-llm's owned branded ids: tool-call correlation and provider request
  * diagnostics.
  *
- * The `Branded<B>` primitive itself lives in `@roos-code/roos-code-brand` (a
+ * The `Branded<B>` primitive itself lives in `@shres-code/shres-code-brand` (a
  * zero-dependency type-only package) so every owner of a cross-boundary id can
- * brand it without depending on roos-llm; see that package's README for the
+ * brand it without depending on shres-llm; see that package's README for the
  * nominal-typing policy.
  *
- * @module @roos-code/roos-code-llm/brand
+ * @module @shres-code/shres-code-llm/brand
  */
 
-import type { Branded } from '@roos-code/roos-code-brand'
+import type { Branded } from '@shres-code/shres-code-brand'
 
 /** Stable identity carried by one message across inbox, log, and model-request boundaries. */
 export type MessageId = Branded<'MessageId'>

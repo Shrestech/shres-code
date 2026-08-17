@@ -1,13 +1,13 @@
 {
-  "name": "@roos-code/roos-code-fs-local",
-  "description": "Local-filesystem implementation of the Roos Code filesystem seam (ctx.fs)",
+  "name": "@shres-code/shres-code-fs-local",
+  "description": "Local-filesystem implementation of the Shres Code filesystem seam (ctx.fs)",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "packages/fs/fs-local"
   },
   "type": "module",
@@ -32,18 +32,18 @@
   ],
   "license": "MIT",
   "peerDependencies": {
-    "@roos-code/roos-code-fs": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-fs": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   },
   "dependencies": {
     "koffi": "^3.1.0",
-    "@roos-code/schemastery": "workspace:^"
+    "@shres-code/schemastery": "workspace:^"
   },
   "devDependencies": {
-    "@roos-code/roos-code-fs": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-llm": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-fs": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   }
 }

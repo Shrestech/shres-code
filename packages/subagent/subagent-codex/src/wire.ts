@@ -4,13 +4,13 @@
  * product methods, current thread/turn association, unattended approval
  * responses, and terminal-answer selection.
  *
- * @module @roos-code/roos-code-subagent-codex/wire
+ * @module @shres-code/shres-code-subagent-codex/wire
  */
 
 import type { Readable, Writable } from 'node:stream'
-import type { ContentBlock } from '@roos-code/roos-code-llm'
-import type { SubagentResult } from '@roos-code/roos-code-subagent'
-import { JsonRpcLineTransport } from '@roos-code/roos-code-sdk-protocol'
+import type { ContentBlock } from '@shres-code/shres-code-llm'
+import type { SubagentResult } from '@shres-code/shres-code-subagent'
+import { JsonRpcLineTransport } from '@shres-code/shres-code-sdk-protocol'
 
 type JsonObject = Record<string, unknown>
 
@@ -132,8 +132,8 @@ export class CodexAppServerWire {
   async initialize(signal: AbortSignal): Promise<void> {
     object(await this.guarded(this.transport.request('initialize', {
       clientInfo: {
-        name: 'roos-code',
-        title: 'Roos Code',
+        name: 'shres-code',
+        title: 'Shres Code',
         version: '0.0.1',
       },
       capabilities: {

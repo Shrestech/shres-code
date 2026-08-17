@@ -1,10 +1,10 @@
-/** Package-owned permission-preset event invariants. @module @roos-code/roos-code-permission-presets/invariant */
+/** Package-owned permission-preset event invariants. @module @shres-code/shres-code-permission-presets/invariant */
 
-import type { Context } from '@roos-code/cordis'
-import type { Session, SessionEvent } from '@roos-code/roos-code-session'
-import type { InvariantFailure, InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { Session, SessionEvent } from '@shres-code/shres-code-session'
+import type { InvariantFailure, InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-permission-presets'
+const PACKAGE_NAME = '@shres-code/shres-code-permission-presets'
 
 /** Cordis companion plugin name. */
 export const name = 'permission-presets-invariant'

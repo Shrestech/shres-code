@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import AgentRegistry, { type Agent } from '@roos-code/roos-code-agent'
-import SessionStore from '@roos-code/roos-code-session'
-import UserQuestionService from '@roos-code/roos-code-user-questions'
-import type { ApiProxy, MuxFrame, RpcRequest } from '@roos-code/roos-code-host-apiproxy/api'
-import { RpcId } from '@roos-code/roos-code-host-apiproxy/api/rpc'
+import { Context } from '@shres-code/cordis'
+import AgentRegistry, { type Agent } from '@shres-code/shres-code-agent'
+import SessionStore from '@shres-code/shres-code-session'
+import UserQuestionService from '@shres-code/shres-code-user-questions'
+import type { ApiProxy, MuxFrame, RpcRequest } from '@shres-code/shres-code-host-apiproxy/api'
+import { RpcId } from '@shres-code/shres-code-host-apiproxy/api/rpc'
 import { createApiProxy } from '../src/api-proxy.ts'
 
 async function harness(): Promise<{ ctx: Context; api: ApiProxy }> {

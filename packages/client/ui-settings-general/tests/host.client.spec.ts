@@ -1,6 +1,6 @@
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { describe, expect, it } from 'vitest'
-import { SettingsProvider, settingsNamespace, type SettingsNamespace } from '@roos-code/roos-code-settings'
+import { SettingsProvider, settingsNamespace, type SettingsNamespace } from '@shres-code/shres-code-settings'
 import { apply } from '../src/index.ts'
 
 /** Mirrors the module-local namespace id in src/index.ts. */

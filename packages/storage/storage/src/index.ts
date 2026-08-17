@@ -2,10 +2,10 @@
  * Storage hub (`ctx.storage`): a named backend registry plus mounted
  * data-form facilities. The hub itself performs no IO — backends own media,
  * data forms (the domain layer first) own semantics.
- * @module @roos-code/roos-code-storage
+ * @module @shres-code/shres-code-storage
  */
 
-import { Context, Service } from '@roos-code/cordis'
+import { Context, Service } from '@shres-code/cordis'
 import { StorageError } from './error.ts'
 import { BackendRegistry } from './registry.ts'
 
@@ -27,7 +27,7 @@ export function storageBackendServiceKey(name: string): string {
   return `storage.backend.${name}`
 }
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     storage: Storage
   }

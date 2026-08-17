@@ -1,15 +1,15 @@
 /**
  * Instruction-file discovery and bounded, abort-aware provider reads.
  *
- * @module @roos-code/roos-code-agent-instructions/files
+ * @module @shres-code/shres-code-agent-instructions/files
  */
 
 import { createReadStream } from 'node:fs'
 import { stat } from 'node:fs/promises'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
-import type { FileSystem, FsInfo, FsTarget, FsVersion } from '@roos-code/roos-code-fs'
-import { assertNever } from '@roos-code/roos-code-llm'
-import { roosHomeDisplay } from '@roos-code/roos-code-home-paths'
+import type { FileSystem, FsInfo, FsTarget, FsVersion } from '@shres-code/shres-code-fs'
+import { assertNever } from '@shres-code/shres-code-llm'
+import { shresHomeDisplay } from '@shres-code/shres-code-home-paths'
 import { resolveConfig, resolveDiscoveryConfig, type ResolvedConfig } from './config.ts'
 import { trimmedInstructionDigest } from './digest.ts'
 import {
@@ -48,7 +48,7 @@ export interface ProbedInstructionFile extends InstructionFile {
 
 interface DiscoverOptions {
   cwd: string
-  roosHome?: string
+  shresHome?: string
   projectRootMarkers?: string[]
   instructionFileCandidates?: string[]
   localInstructionFileCandidates?: string[]
@@ -277,13 +277,13 @@ async function discoverInstructionFiles(
     files.push(file)
   }
 
-  const userGlobal = join(config.roosHome, USER_GLOBAL_FILE)
+  const userGlobal = join(config.shresHome, USER_GLOBAL_FILE)
   const userGlobalProbe = await statFile(userGlobal, fileSystem, options.signal)
   switch (userGlobalProbe.kind) {
     case 'present':
       addFile({
         absolutePath: userGlobal,
-        displayPath: userGlobalDisplayPath(config.roosHome),
+        displayPath: userGlobalDisplayPath(config.shresHome),
         ...userGlobalProbe.info,
       })
       break
@@ -466,7 +466,7 @@ export async function probeScopeInstruction(
 ): Promise<ScopeInstructionProbe> {
   const { directory, candidateName } = decodeScopeKey(scope)
   const dir = directory === USER_GLOBAL_DIRECTORY
-    ? resolved.roosHome
+    ? resolved.shresHome
     : directory === '.' ? projectRoot : join(projectRoot, directory)
   const absolutePath = join(dir, candidateName)
   // resolve() follows a final-component symlink; stat then classifies the target.
@@ -485,7 +485,7 @@ export async function probeScopeInstruction(
   const file: ProbedInstructionFile = {
     absolutePath,
     displayPath: directory === USER_GLOBAL_DIRECTORY
-      ? userGlobalDisplayPath(resolved.roosHome)
+      ? userGlobalDisplayPath(resolved.shresHome)
       : relativeDisplay(projectRoot, absolutePath),
     target,
     version: info.version,
@@ -518,6 +518,6 @@ export async function readScopeInstruction(
   }
 }
 
-function userGlobalDisplayPath(roosHome: string): string {
-  return `${roosHomeDisplay(roosHome)}/AGENTS.md`
+function userGlobalDisplayPath(shresHome: string): string {
+  return `${shresHomeDisplay(shresHome)}/AGENTS.md`
 }

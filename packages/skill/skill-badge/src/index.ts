@@ -1,29 +1,29 @@
 /**
- * Bundled `roos-badge` skill provider.
+ * Bundled `shres-badge` skill provider.
  *
- * @module @roos-code/roos-code-skill-badge
+ * @module @shres-code/shres-code-skill-badge
  */
 
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
-import type { Context } from '@roos-code/cordis'
+import type { Context } from '@shres-code/cordis'
 import {
   BUNDLED_SKILL_RANK,
   type SkillCandidate,
   type SkillDefinition,
   type SkillProvider,
-} from '@roos-code/roos-code-skill'
+} from '@shres-code/shres-code-skill'
 
-const PROVIDER_NAME = 'roos-badge'
-const SKILL_BODY_URL = new URL('../assets/roos-badge.md', import.meta.url)
+const PROVIDER_NAME = 'shres-badge'
+const SKILL_BODY_URL = new URL('../assets/shres-badge.md', import.meta.url)
 const RESOURCE_BASE = {
   kind: 'directory',
   path: fileURLToPath(new URL('../assets/', import.meta.url)),
 } as const
 const INVOCATION = { modelInvocable: true, userInvocable: true } as const
-const DESCRIPTION = 'Add the official “powered by roos” badge to documents, pull requests, merge requests, and other content produced with Roos Code. Use whenever creating a pull request or merge request. Also use when the user asks for a roos badge, powered-by-roos attribution, or a reusable roos badge asset or snippet.'
+const DESCRIPTION = 'Add the official “powered by shres” badge to documents, pull requests, merge requests, and other content produced with Shres Code. Use whenever creating a pull request or merge request. Also use when the user asks for a shres badge, powered-by-shres attribution, or a reusable shres badge asset or snippet.'
 const CANDIDATE: SkillCandidate = {
-  name: 'roos-badge',
+  name: 'shres-badge',
   description: DESCRIPTION,
   invocation: INVOCATION,
   provider: PROVIDER_NAME,
@@ -54,7 +54,7 @@ export const name = 'skill-badge'
 /** Service required by the bundled provider. */
 export const inject = ['skills']
 
-/** Register the bundled `roos-badge` provider on `ctx.skills`. */
+/** Register the bundled `shres-badge` provider on `ctx.skills`. */
 export function apply(ctx: Context): void {
   ctx.skills.registerProvider(() => provider)
 }

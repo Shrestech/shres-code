@@ -1,4 +1,4 @@
-declare module '@roos-code/roos-code-typert-protocol' {
+declare module '@shres-code/shres-code-typert-protocol' {
   export interface TypertLookup<Host, Wire> {
     readonly host: Host
     readonly wire: Wire

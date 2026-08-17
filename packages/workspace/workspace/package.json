@@ -1,13 +1,13 @@
 {
-  "name": "@roos-code/roos-code-workspace",
-  "description": "Workspace entity registry (ctx.workspaceRegistry): durable workspace records with validated session attachment over the domain data form for the Roos Code",
+  "name": "@shres-code/shres-code-workspace",
+  "description": "Workspace entity registry (ctx.workspaceRegistry): durable workspace records with validated session attachment over the domain data form for the Shres Code",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "packages/workspace/workspace"
   },
   "type": "module",
@@ -37,24 +37,24 @@
   ],
   "license": "MIT",
   "peerDependencies": {
-    "@roos-code/roos-code-brand": "workspace:^",
-    "@roos-code/roos-code-storage-domain": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-session": "workspace:^",
-    "@roos-code/roos-code-session-persistence": "workspace:^",
-    "@roos-code/roos-code-storage": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-brand": "workspace:^",
+    "@shres-code/shres-code-storage-domain": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-session-persistence": "workspace:^",
+    "@shres-code/shres-code-storage": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   },
   "dependencies": {
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@roos-code/roos-code-brand": "workspace:^",
-    "@roos-code/roos-code-storage-domain": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-session": "workspace:^",
-    "@roos-code/roos-code-session-persistence": "workspace:^",
-    "@roos-code/roos-code-storage": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-brand": "workspace:^",
+    "@shres-code/shres-code-storage-domain": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-session-persistence": "workspace:^",
+    "@shres-code/shres-code-storage": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   }
 }

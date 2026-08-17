@@ -1,5 +1,5 @@
 /**
- * @roos-code/roos-code-host-frontend-static — SPA dist server over the webserver
+ * @shres-code/shres-code-host-frontend-static — SPA dist server over the webserver
  * fallback seat: serves the built frontend directory with the semantics the
  * Web shell locked at step1 — traversal outside the dist root is 403, any
  * miss falls back to index.html with HTTP 200 (SPA routing), unknown
@@ -8,15 +8,15 @@
  * injection). The dist location is workspace knowledge of the composing
  * application, so `distIndex` is typically supplied through a `!!js`
  * expression, never hardcoded by a deployment.
- * @module @roos-code/roos-code-host-frontend-static
+ * @module @shres-code/shres-code-host-frontend-static
  */
 
 import type { ServerResponse } from 'node:http'
 import { readFile } from 'node:fs/promises'
 import { dirname, extname, join, normalize, resolve, sep } from 'node:path'
-import type { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import type {} from '@roos-code/roos-code-host-webserver'
+import type { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import type {} from '@shres-code/shres-code-host-webserver'
 
 /** Stable Cordis plugin name. */
 export const name = 'frontend-static'

@@ -2,15 +2,15 @@
   name: './cli-mock-llm.ts'
 
 - id: base
-  name: '@roos-code/cordis-plugin-include'
+  name: '@shres-code/cordis-plugin-include'
   config:
     path: ../../cordis.yml
     patches:
       - id: llm-deepseek
-        name: '@roos-code/roos-code-llm-deepseek'
+        name: '@shres-code/shres-code-llm-deepseek'
         disabled: true
       - id: agent-spine
-        name: '@roos-code/roos-code-agent-spine-demo'
+        name: '@shres-code/shres-code-agent-spine-demo'
         config:
           agents:
             - id: main
@@ -18,12 +18,12 @@
               model: cli-mock
               cwd: !!js process.cwd()
           workspaceContext: false
-          roosHome: './.roos-home'
+          shresHome: './.shres-home'
           skills:
             filesystem:
               agentsHome: './.agents-home'
           persona: 'Keyless headless-agent smoke.'
       - id: persistence
-        name: '@roos-code/roos-code-session-persistence-jsonl'
+        name: '@shres-code/shres-code-session-persistence-jsonl'
         config:
           root: './.sessions'

@@ -1,13 +1,13 @@
 {
-  "name": "@roos-code/roos-code-sandbox-windows-acl",
-  "description": "Windows ACL write-restriction sandbox backend (restricted-token spawn with capability-SID write allowlist) for the Roos Code sandbox seam",
+  "name": "@shres-code/shres-code-sandbox-windows-acl",
+  "description": "Windows ACL write-restriction sandbox backend (restricted-token spawn with capability-SID write allowlist) for the Shres Code sandbox seam",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "packages/sandbox/sandbox-windows-acl"
   },
   "type": "module",
@@ -38,16 +38,16 @@
   ],
   "license": "MIT",
   "peerDependencies": {
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   },
   "dependencies": {
     "koffi": "^3.1.0"
   },
   "devDependencies": {
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-pwsh-local": "workspace:^",
-    "@roos-code/roos-code-sandbox-local": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-pwsh-local": "workspace:^",
+    "@shres-code/shres-code-sandbox-local": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   }
 }

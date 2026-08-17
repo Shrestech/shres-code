@@ -1,16 +1,16 @@
 /** The `agent-loop` settings section layered over the composition entry. */
 
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import type { Fiber } from '@roos-code/cordis'
-import LlmRuntime from '@roos-code/roos-code-llm'
-import SessionStore from '@roos-code/roos-code-session'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import ToolRuntime from '@roos-code/roos-code-tools'
-import AgentRegistry from '@roos-code/roos-code-agent'
-import { SettingsProvider } from '@roos-code/roos-code-settings'
-import type { SettingsNamespace } from '@roos-code/roos-code-settings'
-import AgentLoop, { AGENT_LOOP_SETTINGS_NAMESPACE } from '@roos-code/roos-code-agent-loop'
+import { Context } from '@shres-code/cordis'
+import type { Fiber } from '@shres-code/cordis'
+import LlmRuntime from '@shres-code/shres-code-llm'
+import SessionStore from '@shres-code/shres-code-session'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import ToolRuntime from '@shres-code/shres-code-tools'
+import AgentRegistry from '@shres-code/shres-code-agent'
+import { SettingsProvider } from '@shres-code/shres-code-settings'
+import type { SettingsNamespace } from '@shres-code/shres-code-settings'
+import AgentLoop, { AGENT_LOOP_SETTINGS_NAMESPACE } from '@shres-code/shres-code-agent-loop'
 
 /** The smallest real provider: one in-memory document, always writable. */
 class MemorySettings extends SettingsProvider {

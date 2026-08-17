@@ -12,7 +12,7 @@
  * a running call always takes the generic path.
  * @module
  */
-import type { WebBlockProps } from '@roos-code/roos-code-client-ui-primitives'
+import type { WebBlockProps } from '@shres-code/shres-code-client-ui-primitives'
 import type { ToolCallBlock } from './tool-call-model.ts'
 
 /**

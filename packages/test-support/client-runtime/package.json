@@ -1,5 +1,5 @@
 {
-  "name": "@roos-code/roos-code-client-test-runtime",
+  "name": "@shres-code/shres-code-client-test-runtime",
   "description": "jsdom slot test runtime: real Cordis Context + SlotRegistry + web-react renderer with test-owned session/workspace doubles for feature specs",
   "version": "0.1.0-rc.5",
   "publishConfig": {
@@ -7,7 +7,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "packages/test-support/client-runtime"
   },
   "type": "module",
@@ -32,24 +32,24 @@
     "vitest": "^4.1.8"
   },
   "peerDependencies": {
-    "@roos-code/roos-code-client-runtime": "workspace:^",
-    "@roos-code/roos-code-client-ui-slots": "workspace:^",
-    "@roos-code/roos-code-client-web-react": "workspace:^",
-    "@roos-code/roos-code-host-apiproxy": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/cordis": "workspace:^",
+    "@shres-code/shres-code-client-runtime": "workspace:^",
+    "@shres-code/shres-code-client-ui-slots": "workspace:^",
+    "@shres-code/shres-code-client-web-react": "workspace:^",
+    "@shres-code/shres-code-host-apiproxy": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/cordis": "workspace:^",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
-    "@roos-code/roos-code-client-runtime": "workspace:^",
-    "@roos-code/roos-code-client-ui-slots": "workspace:^",
-    "@roos-code/roos-code-client-web-react": "workspace:^",
-    "@roos-code/roos-code-host-apiproxy": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
+    "@shres-code/shres-code-client-runtime": "workspace:^",
+    "@shres-code/shres-code-client-ui-slots": "workspace:^",
+    "@shres-code/shres-code-client-web-react": "workspace:^",
+    "@shres-code/shres-code-host-apiproxy": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
     "@types/react": "~18.3.1",
     "@types/react-dom": "~18.3.0",
-    "@roos-code/cordis": "workspace:^",
+    "@shres-code/cordis": "workspace:^",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },

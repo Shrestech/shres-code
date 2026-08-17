@@ -9,16 +9,16 @@
  * factory in the OWNING package (a plain cast inside — zero runtime cost);
  * comparison, logging, and serialization all behave as ordinary strings.
  *
- * Policy: a package brands the ids it owns — `CallId` in roos-llm (tool-call
- * correlation), the shared agent/session `SessionId` in roos-session, and
- * `JobId` in roos-jobs. Branding is for ids that cross package boundaries and
+ * Policy: a package brands the ids it owns — `CallId` in shres-llm (tool-call
+ * correlation), the shared agent/session `SessionId` in shres-session, and
+ * `JobId` in shres-jobs. Branding is for ids that cross package boundaries and
  * could plausibly be confused; not every string needs a brand.
  * This package owns ONLY the primitive — no concrete id, no runtime code beyond
  * the (erased) type — so the brand vocabulary stays dependency-free and a
  * package can brand its ids without depending on an unrelated capability
  * package.
  *
- * @module @roos-code/roos-code-brand
+ * @module @shres-code/shres-code-brand
  */
 
 declare const BRAND: unique symbol

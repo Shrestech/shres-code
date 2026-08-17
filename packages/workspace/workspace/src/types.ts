@@ -2,11 +2,11 @@
  * Public type vocabulary of the workspace entity: the `WorkspaceId` brand and
  * the `Workspace` consumer interface. Types only — the `WorkspaceId` factory
  * lives in `index.ts` (this file carries no runtime code).
- * @module @roos-code/roos-code-workspace/src/types
+ * @module @shres-code/shres-code-workspace/src/types
  */
 
-import type { Branded } from '@roos-code/roos-code-brand'
-import type { SessionId } from '@roos-code/roos-code-session'
+import type { Branded } from '@shres-code/shres-code-brand'
+import type { SessionId } from '@shres-code/shres-code-session'
 
 /**
  * Identifies one workspace record. A generated uuid, never the path: path

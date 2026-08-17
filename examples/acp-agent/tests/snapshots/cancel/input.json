@@ -5,7 +5,7 @@
     {
       "op": "promptAndCancel",
       "text": "Start a long task; this turn will be cancelled mid-stream.",
-      "waitForFile": { "path": ".roos-snapshot-stream-ready" }
+      "waitForFile": { "path": ".shres-snapshot-stream-ready" }
     },
     { "op": "waitForTurnEnd" }
   ]

@@ -4,15 +4,15 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import type { SandboxPolicy } from '@roos-code/roos-code-sandbox'
-import { LocalSandboxProvider } from '@roos-code/roos-code-sandbox-local'
+import { Context } from '@shres-code/cordis'
+import type { SandboxPolicy } from '@shres-code/shres-code-sandbox'
+import { LocalSandboxProvider } from '@shres-code/shres-code-sandbox-local'
 import { seatbeltProfileArgs } from '../src/profiles.ts'
 
 /**
  * Keyless backend integration through `confine()` and a real macOS Seatbelt process, with Linux
  * rungs forced off. Tests assert world effects and that the kernel denial matches the advertised
- * dialect; consumer coverage lives in roos-bash-sandbox. Skips off macOS or when the profile probe
+ * dialect; consumer coverage lives in shres-bash-sandbox. Skips off macOS or when the profile probe
  * fails. HOME-based workspaces avoid Seatbelt's wholesale temp-directory grants, so
  * workspace-write proves the workspace-root grant itself.
  */
@@ -30,7 +30,7 @@ afterEach(async () => {
 })
 
 async function tempDir(base: string): Promise<string> {
-  const dir = await mkdtemp(join(base, 'roos-seatbelt-e2e-'))
+  const dir = await mkdtemp(join(base, 'shres-seatbelt-e2e-'))
   tempDirs.push(dir)
   return dir
 }

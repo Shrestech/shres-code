@@ -2,10 +2,10 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import TypertRegistry from '@roos-code/roos-code-typert-registry'
-import type { TypertContribution } from '@roos-code/roos-code-typert-registry/types'
-import { EVENT_API, SERVICE_API, TYPE_API } from '@roos-code/roos-code-tool-cordis/src/api-catalog.ts'
+import { Context } from '@shres-code/cordis'
+import TypertRegistry from '@shres-code/shres-code-typert-registry'
+import type { TypertContribution } from '@shres-code/shres-code-typert-registry/types'
+import { EVENT_API, SERVICE_API, TYPE_API } from '@shres-code/shres-code-tool-cordis/src/api-catalog.ts'
 import { WorkspaceAnalyzer } from '../src/analyzer.ts'
 import { FaceModelEmitter } from '../src/emitter.ts'
 
@@ -16,16 +16,16 @@ afterEach(() => {
   for (const root of temporaryRoots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
 
-describe('model-driven roos-tools generation', () => {
+describe('model-driven shres-tools generation', () => {
   it('round-trips the complete service and event structure through the runtime registry', { timeout: 30_000 }, async () => {
     const workspace = new WorkspaceAnalyzer({
       root: workspaceRoot,
       faces: ['host'],
-      packages: ['@roos-code/roos-code-tools'],
+      packages: ['@shres-code/shres-code-tools'],
     }).analyze()
     const host = workspace.faces.find(candidate => candidate.face === 'host')
-    if (host === undefined) throw new Error('roos-tools has no analyzed host face')
-    const artifact = new FaceModelEmitter(host).emit('@roos-code/roos-code-tools')
+    if (host === undefined) throw new Error('shres-tools has no analyzed host face')
+    const artifact = new FaceModelEmitter(host).emit('@shres-code/shres-code-tools')
 
     const root = mkdtempSync(join(import.meta.dirname, '.generated-tools-'))
     temporaryRoots.push(root)
@@ -38,7 +38,7 @@ describe('model-driven roos-tools generation', () => {
     const ctx = new Context()
     await ctx.plugin(TypertRegistry)
     const dispose = ctx.typert.register(generated.TYPERT)
-    const record = ctx.typert.getPackage('@roos-code/roos-code-tools', 'host')
+    const record = ctx.typert.getPackage('@shres-code/shres-code-tools', 'host')
     const service = record?.model.services.find(candidate => candidate.key === 'tools')
     expect(service).toBeDefined()
     expect({
@@ -71,6 +71,6 @@ describe('model-driven roos-tools generation', () => {
     )
 
     await dispose()
-    expect(ctx.typert.getPackage('@roos-code/roos-code-tools', 'host')).toBeUndefined()
+    expect(ctx.typert.getPackage('@shres-code/shres-code-tools', 'host')).toBeUndefined()
   })
 })

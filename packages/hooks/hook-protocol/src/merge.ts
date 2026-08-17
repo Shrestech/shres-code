@@ -3,7 +3,7 @@
  * is `deny > ask > allow`; the first `continue:false` stop is sticky; reasons
  * for the winning rank are joined; and context and system messages accumulate
  * in hook order.
- * @module @roos-code/roos-code-hook-protocol/merge
+ * @module @shres-code/shres-code-hook-protocol/merge
  */
 
 import type { HookOutput } from './types.ts'

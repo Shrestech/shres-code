@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import SessionStore, { Session, SessionId } from '@roos-code/roos-code-session'
-import { ApprovalRequestId } from '@roos-code/roos-code-user-approval'
-import * as ApprovalInvariant from '@roos-code/roos-code-user-approval/invariant'
-import InvariantRegistry from '@roos-code/roos-code-invariants'
+import { Context } from '@shres-code/cordis'
+import SessionStore, { Session, SessionId } from '@shres-code/shres-code-session'
+import { ApprovalRequestId } from '@shres-code/shres-code-user-approval'
+import * as ApprovalInvariant from '@shres-code/shres-code-user-approval/invariant'
+import InvariantRegistry from '@shres-code/shres-code-invariants'
 
 async function setup(): Promise<Context> {
   const ctx = new Context()

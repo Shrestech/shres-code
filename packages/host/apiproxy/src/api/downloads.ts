@@ -5,7 +5,7 @@
  * `IApiClient` never exposes them.
  */
 
-import type { SessionId } from '@roos-code/roos-code-session/types'
+import type { SessionId } from '@shres-code/shres-code-session/types'
 
 /** Host-only download surfaces (no wire envelope; absent from IApiClient). */
 export interface DownloadsApi {

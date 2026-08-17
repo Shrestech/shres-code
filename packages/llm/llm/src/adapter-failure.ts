@@ -1,7 +1,7 @@
 /**
  * Normalization for values thrown by a final LLM adapter boundary.
  *
- * @module @roos-code/roos-code-llm/adapter-failure
+ * @module @shres-code/shres-code-llm/adapter-failure
  */
 
 import { HarnessError } from './error.ts'

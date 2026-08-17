@@ -20,7 +20,7 @@ export type TrajectoryKey =
   | 'toolbar.search'
   | 'toolbar.searchPlaceholder'
 
-declare module '@roos-code/roos-code-client-ui-slots' {
+declare module '@shres-code/shres-code-client-ui-slots' {
   interface LocaleNamespaceMap {
     /** The trajectory view tab label and toolbar strings. */
     'trajectory': TrajectoryKey

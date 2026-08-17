@@ -1,6 +1,6 @@
 /**
  * Ownership of one unpublished Session before registry publication.
- * @module @roos-code/roos-code-session/preparation
+ * @module @shres-code/shres-code-session/preparation
  */
 
 import type { Session } from './index.ts'

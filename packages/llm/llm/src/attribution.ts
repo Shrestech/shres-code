@@ -4,7 +4,7 @@
  * `.agents/notes/implemented/architecture/2026-06-21-mandatory-app-attribution-headers.md`.
  *
  * App-attribution vocabulary for provider requests.
- * @module @roos-code/roos-code-llm/attribution
+ * @module @shres-code/shres-code-llm/attribution
  */
 
 import { createRequire } from 'node:module'
@@ -38,9 +38,9 @@ export interface AppIdentity {
  * can suppress attribution entirely.
  */
 export const APP_IDENTITY: AppIdentity = {
-  product: 'roos-code',
+  product: 'shres-code',
   version,
-  url: 'https://github.com/roos-code/roos-code',
+  url: 'https://github.com/parthmstech/shres-code',
 }
 
 /**

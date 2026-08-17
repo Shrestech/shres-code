@@ -1,18 +1,18 @@
-import { createUserMessage } from '@roos-code/roos-code-llm'
+import { createUserMessage } from '@shres-code/shres-code-llm'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { Context } from '@roos-code/cordis'
-import Loader from '@roos-code/cordis-plugin-loader'
-import { SessionId, type SessionEvent } from '@roos-code/roos-code-session'
-import { defineContentToolFixture } from '@roos-code/roos-code-tools'
-import type { Agent } from '@roos-code/roos-code-agent'
-import AgentLoop from '@roos-code/roos-code-agent-loop'
-import { mountAgentLoopTestDependencies } from '@roos-code/roos-code-agent-loop-testkit'
-import { LocalBashExecutor } from '@roos-code/roos-code-bash-local'
-import LocalSubprocessRuntime from '@roos-code/roos-code-subprocess-local'
-import * as HooksCodex from '@roos-code/roos-code-hooks-codex'
+import { Context } from '@shres-code/cordis'
+import Loader from '@shres-code/cordis-plugin-loader'
+import { SessionId, type SessionEvent } from '@shres-code/shres-code-session'
+import { defineContentToolFixture } from '@shres-code/shres-code-tools'
+import type { Agent } from '@shres-code/shres-code-agent'
+import AgentLoop from '@shres-code/shres-code-agent-loop'
+import { mountAgentLoopTestDependencies } from '@shres-code/shres-code-agent-loop-testkit'
+import { LocalBashExecutor } from '@shres-code/shres-code-bash-local'
+import LocalSubprocessRuntime from '@shres-code/shres-code-subprocess-local'
+import * as HooksCodex from '@shres-code/shres-code-hooks-codex'
 import { MockAdapter, textResponse, toolCallResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
 
 /**
@@ -25,7 +25,7 @@ const dirs: string[] = []
 afterEach(() => { for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true }) })
 
 function configDir(): string {
-  const dir = mkdtempSync(join(tmpdir(), 'roos-hooks-codex-'))
+  const dir = mkdtempSync(join(tmpdir(), 'shres-hooks-codex-'))
   dirs.push(dir)
   return dir
 }

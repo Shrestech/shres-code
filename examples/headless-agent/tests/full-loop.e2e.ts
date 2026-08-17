@@ -1,11 +1,11 @@
-import { createUserMessage } from '@roos-code/roos-code-llm'
+import { createUserMessage } from '@shres-code/shres-code-llm'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import type { Context } from '@roos-code/cordis'
+import type { Context } from '@shres-code/cordis'
 import { codingHarness, finalText, SYSTEM_PROMPT, waitForIdle } from './harness.ts'
-import { SessionId } from '@roos-code/roos-code-session'
+import { SessionId } from '@shres-code/shres-code-session'
 
 /**
  * The first place a REAL model meets the REAL bash tool: the cheap canary
@@ -27,7 +27,7 @@ afterEach(async () => {
 
 describe.skipIf(!process.env.DEEPSEEK_API_KEY)('full loop: real model + real bash tool', () => {
   it('runs a bash command on request and reports its output', async () => {
-    workdir = await mkdtemp(join(tmpdir(), 'roos-full-loop-e2e-'))
+    workdir = await mkdtemp(join(tmpdir(), 'shres-full-loop-e2e-'))
     ctx = await codingHarness(workdir, { persona: SYSTEM_PROMPT })
     const agent = ctx.agentLoop.create(SessionId('e2e-loop'), { provider: 'deepseek-official', model: 'deepseek-v4-flash' })
 

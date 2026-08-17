@@ -1,6 +1,6 @@
 /** Page-store join: directory × namespaces × credentials, with last-good rows on failure. */
 import { describe, expect, it } from 'vitest'
-import type { RpcResponse } from '@roos-code/roos-code-api-remotes/client'
+import type { RpcResponse } from '@shres-code/shres-code-api-remotes/client'
 import { messageOf, ModelsSettingsStore, providerEnabled } from '../src/client/store.ts'
 
 let nextRpc = 0

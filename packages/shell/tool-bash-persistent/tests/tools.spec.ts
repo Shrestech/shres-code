@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { CallId } from '@roos-code/roos-code-llm'
-import { Session, SessionId } from '@roos-code/roos-code-session'
-import AgentRegistry, { Inbox } from '@roos-code/roos-code-agent'
-import type { Agent } from '@roos-code/roos-code-agent'
-import TerminalSessionService from '@roos-code/roos-code-terminal'
+import { Context } from '@shres-code/cordis'
+import { CallId } from '@shres-code/shres-code-llm'
+import { Session, SessionId } from '@shres-code/shres-code-session'
+import AgentRegistry, { Inbox } from '@shres-code/shres-code-agent'
+import type { Agent } from '@shres-code/shres-code-agent'
+import TerminalSessionService from '@shres-code/shres-code-terminal'
 import type {
   TerminalBackend,
   TerminalBackendSession,
@@ -14,10 +14,10 @@ import type {
   TerminalSessionStatus,
   TerminalSignal,
   TerminalWaitReason,
-} from '@roos-code/roos-code-terminal'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import ToolRuntime from '@roos-code/roos-code-tools'
-import * as ToolBashPersistent from '@roos-code/roos-code-tool-bash-persistent'
+} from '@shres-code/shres-code-terminal'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import ToolRuntime from '@shres-code/shres-code-tools'
+import * as ToolBashPersistent from '@shres-code/shres-code-tool-bash-persistent'
 
 const contexts: Context[] = []
 let callNumber = 0
@@ -100,7 +100,7 @@ type StubMode =
   | 'paged-scrollback'
 
 class StubPtySession implements TerminalBackendSession {
-  readonly motd = '__ROOS_PERSISTENT_BASH_PROMPT__ '
+  readonly motd = '__SHRES_PERSISTENT_BASH_PROMPT__ '
   readonly pid = 123
   statusValue: TerminalSessionStatus = { kind: 'running' }
   scrollback = this.motd
@@ -130,8 +130,8 @@ class StubPtySession implements TerminalBackendSession {
     if (this.mode === 'wait-for-abort' || this.mode === 'end-on-abort') {
       const done = new Promise<ReturnType<StubPtySession['result']>>((resolve) => {
         request.signal?.addEventListener('abort', () => {
-          const start = /__ROOS_PERSISTENT_BASH_START_[^_]+(?:-[^_]+)*__/.exec(request.text)?.[0]
-          const end = /__ROOS_PERSISTENT_BASH_END_[^:]+:/.exec(request.text)?.[0]
+          const start = /__SHRES_PERSISTENT_BASH_START_[^_]+(?:-[^_]+)*__/.exec(request.text)?.[0]
+          const end = /__SHRES_PERSISTENT_BASH_END_[^:]+:/.exec(request.text)?.[0]
           const output = this.mode === 'end-on-abort'
             ? `${start ?? ''}\ninterrupted\n${end ?? ''}130\n${this.motd}`
             : 'partial output'
@@ -148,7 +148,7 @@ class StubPtySession implements TerminalBackendSession {
     }
     if (this.mode === 'prompt-after-idle') {
       if (request.text.length > 0) {
-        const start = /__ROOS_PERSISTENT_BASH_START_[^_]+(?:-[^_]+)*__/.exec(request.text)?.[0]
+        const start = /__SHRES_PERSISTENT_BASH_START_[^_]+(?:-[^_]+)*__/.exec(request.text)?.[0]
         const output = `${start ?? ''}\npartial syntax output\n`
         this.scrollback += output
         return this.operation(Promise.resolve(this.result(output, 'inferred_idle')))
@@ -165,8 +165,8 @@ class StubPtySession implements TerminalBackendSession {
     }
     const sent = request.text.length > 0 ? request.text : this.pendingText
     this.pendingText = ''
-    const start = /__ROOS_PERSISTENT_BASH_START_[^_]+(?:-[^_]+)*__/.exec(sent)?.[0]
-    const end = /__ROOS_PERSISTENT_BASH_END_[^:]+:/.exec(sent)?.[0]
+    const start = /__SHRES_PERSISTENT_BASH_START_[^_]+(?:-[^_]+)*__/.exec(sent)?.[0]
+    const end = /__SHRES_PERSISTENT_BASH_END_[^:]+:/.exec(sent)?.[0]
     if (this.mode === 'incremental-fallback') {
       const incremental = `${start ?? ''}\nincrement\n${this.motd}`
       return this.operation(Promise.resolve(this.result(this.motd, 'stdin_read')), incremental)
@@ -343,13 +343,13 @@ describe('tool-bash-persistent', () => {
     session.mode = 'prompt-only'
     const promptFallback = text(await call(ctx, owner, 'bad {'))
     expect(promptFallback).toContain('bash: synt')
-    expect(promptFallback).not.toContain('ROOS_PERSISTENT_BASH_PROMPT')
+    expect(promptFallback).not.toContain('SHRES_PERSISTENT_BASH_PROMPT')
 
     session.mode = 'prompt-crlf'
     session.scrollback = ''
     const crlfPromptFallback = text(await call(ctx, owner, 'bad {'))
     expect(crlfPromptFallback).toContain('bash: synt')
-    expect(crlfPromptFallback).not.toContain('ROOS_PERSISTENT_BASH_PROMPT')
+    expect(crlfPromptFallback).not.toContain('SHRES_PERSISTENT_BASH_PROMPT')
 
     session.mode = 'end-only'
     session.scrollback = ''
@@ -444,8 +444,8 @@ describe('tool-bash-persistent', () => {
     const result = text(await call(ctx, owner, 'bad {'))
     expect(result).toContain('partial syntax output')
     expect(result).toContain('bash: syntax error')
-    expect(result).not.toContain('ROOS_PERSISTENT_BASH_PROMPT')
-    expect(result).not.toContain('ROOS_PERSISTENT_BASH_START')
+    expect(result).not.toContain('SHRES_PERSISTENT_BASH_PROMPT')
+    expect(result).not.toContain('SHRES_PERSISTENT_BASH_START')
   })
 
   it('does not attribute old scrollback truncation to a complete current command', async () => {

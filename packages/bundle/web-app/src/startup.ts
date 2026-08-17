@@ -1,14 +1,14 @@
 /**
- * The web app's command-line provider: it parses the `roos --profile web` flag
+ * The web app's command-line provider: it parses the `shres --profile web` flag
  * family (`--host`, `--port`, `--trusted-host`) and its `--help`
  * text, then provides the immutable values as {@link WEB_STARTUP_SERVICE}.
  * Ordinary rows inject that service before reading it from lazy config.
- * @module @roos-code/roos-code-web-app/startup
+ * @module @shres-code/shres-code-web-app/startup
  */
 
 import { Command } from 'commander'
-import type { Context } from '@roos-code/cordis'
-import { parseCmdline } from '@roos-code/roos-code-cmdline'
+import type { Context } from '@shres-code/cordis'
+import { parseCmdline } from '@shres-code/shres-code-cmdline'
 
 /** Stable Cordis plugin name. */
 export const name = 'web-startup'
@@ -42,16 +42,16 @@ interface WebOptions {
  */
 function webCommand(): Command {
   return new Command()
-    .name('roos --profile web')
-    .description('Serve the Roos Code browser UI.')
+    .name('shres --profile web')
+    .description('Serve the Shres Code browser UI.')
     .helpOption('-h, --help', 'show this help')
     .option('--host <host>', 'bind host')
     .option('--port <port>', 'listen port; pass 0 to let the OS pick a free one')
     .option('--trusted-host <authority...>', 'extra authority the /api browser-trust fence accepts (host or host:port; repeatable)')
     .addHelpText('after', `
 Examples:
-  roos --profile web                          serve on the composed host and port
-  roos --profile web --port 8080              serve on another port
+  shres --profile web                          serve on the composed host and port
+  shres --profile web --port 8080              serve on another port
 `)
 }
 

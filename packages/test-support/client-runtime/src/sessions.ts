@@ -1,17 +1,17 @@
 /** Test-owned sessions face: the SlotRegistry host contract over declarative fixtures. */
-import type { Context } from '@roos-code/cordis'
-import type { AttachmentIdType } from '@roos-code/roos-code-attachment'
-import { createScope, scopeOf, SessionProvideChannel } from '@roos-code/roos-code-client-runtime/client'
-import { createSnapshotStore } from '@roos-code/roos-code-client-runtime/client'
+import type { Context } from '@shres-code/cordis'
+import type { AttachmentIdType } from '@shres-code/shres-code-attachment'
+import { createScope, scopeOf, SessionProvideChannel } from '@shres-code/shres-code-client-runtime/client'
+import { createSnapshotStore } from '@shres-code/shres-code-client-runtime/client'
 import type {
   AgentContext, ConversationSnapshot, ISessions, ObservableSnapshot, ProjectionsFace, SessionFace, SessionId,
   SessionListState, SessionProvideDescriptor, SessionSearchResultItem, SessionSummary, SnapshotStore,
   SubagentAddress,
-} from '@roos-code/roos-code-client-runtime/client'
+} from '@shres-code/shres-code-client-runtime/client'
 // The double reports the wire schema's own search bound, like the production
 // service — a transport-varying limit would be a fiction no client can see.
-import { SESSION_SEARCH_RESULT_LIMIT } from '@roos-code/roos-code-host-apiproxy/api'
-import type { HostObservable, SessionMaybeProvideInfo, SessionProvideInfo } from '@roos-code/roos-code-client-ui-slots'
+import { SESSION_SEARCH_RESULT_LIMIT } from '@shres-code/shres-code-host-apiproxy/api'
+import type { HostObservable, SessionMaybeProvideInfo, SessionProvideInfo } from '@shres-code/shres-code-client-ui-slots'
 import { conversationSnapshot } from './fixtures.ts'
 import type { SessionFixture, Stabilizer } from './fixtures.ts'
 

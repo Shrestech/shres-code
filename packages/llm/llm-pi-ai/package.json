@@ -1,13 +1,13 @@
 {
-  "name": "@roos-code/roos-code-llm-pi-ai",
-  "description": "pi-ai-backed DeepSeek adapter for the Roos Code LLM seam (design-verification twin of roos-llm-deepseek)",
+  "name": "@shres-code/shres-code-llm-pi-ai",
+  "description": "pi-ai-backed DeepSeek adapter for the Shres Code LLM seam (design-verification twin of shres-llm-deepseek)",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "packages/llm/llm-pi-ai"
   },
   "type": "module",
@@ -32,28 +32,28 @@
   ],
   "license": "MIT",
   "peerDependencies": {
-    "@roos-code/roos-code-attachment": "workspace:^",
-    "@roos-code/roos-code-credentials": "workspace:^",
-    "@roos-code/roos-code-launch-environment": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-llm": "workspace:^",
-    "@roos-code/roos-code-settings": "workspace:^",
-    "@roos-code/roos-code-timeout": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-attachment": "workspace:^",
+    "@shres-code/shres-code-credentials": "workspace:^",
+    "@shres-code/shres-code-launch-environment": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-settings": "workspace:^",
+    "@shres-code/shres-code-timeout": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   },
   "dependencies": {
     "@earendil-works/pi-ai": "^0.82.1",
-    "@roos-code/schemastery": "workspace:^"
+    "@shres-code/schemastery": "workspace:^"
   },
   "devDependencies": {
-    "@roos-code/roos-code-attachment": "workspace:^",
-    "@roos-code/roos-code-credentials": "workspace:^",
-    "@roos-code/roos-code-launch-environment": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-llm": "workspace:^",
-    "@roos-code/roos-code-llm-deepseek": "workspace:^",
-    "@roos-code/roos-code-settings": "workspace:^",
-    "@roos-code/roos-code-timeout": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-attachment": "workspace:^",
+    "@shres-code/shres-code-credentials": "workspace:^",
+    "@shres-code/shres-code-launch-environment": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-llm-deepseek": "workspace:^",
+    "@shres-code/shres-code-settings": "workspace:^",
+    "@shres-code/shres-code-timeout": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   }
 }

@@ -23,13 +23,13 @@ const packageDir = fileURLToPath(new URL('..', import.meta.url))
 const repoRoot = fileURLToPath(new URL('../../../..', import.meta.url))
 const nativeDir = join(repoRoot, 'native/landlock-run')
 const sourceLauncher = join(nativeDir, 'packages', `linux-${process.arch}`, 'bin', 'landlock-run')
-const platformPackageName = `@roos-code/node-addon-landlock-run-linux-${process.arch}`
+const platformPackageName = `@shres-code/node-addon-landlock-run-linux-${process.arch}`
 
 /** The harness closure the consumer needs; native tarballs are packed through their mode-preserving release script. */
 const WORKSPACE_CLOSURE = [
   'packages/sandbox/sandbox-local',
   // sandbox-local's win32 chain rung is a runtime dependency: a packed
-  // consumer resolves it like any other @roos-code peer (koffi arrives
+  // consumer resolves it like any other @shres-code peer (koffi arrives
   // from the registry).
   'packages/sandbox/sandbox-windows-acl',
   'packages/sandbox/sandbox',
@@ -42,7 +42,7 @@ const WORKSPACE_CLOSURE = [
   'packages/util/timeout',
   'packages/runtime-diagnostics/invariants',
   // The framework and the vendored packages the closure declares outright:
-  // rescoped into @roos-code, so the consumer installs this repository's
+  // rescoped into @shres-code, so the consumer installs this repository's
   // copies. Schemastery is a hard dependency of three members above, not a
   // peer, so npm resolves it while installing them.
   'vendor/cordis',
@@ -75,9 +75,9 @@ let verdict: {
 
 describe.skipIf(!packable)('sandbox-local: packed-tarball distribution (publish-path rehearsal)', () => {
   beforeAll(async () => {
-    const packDest = mkdtempSync(join(tmpdir(), 'roos-pack-'))
-    consumerDir = mkdtempSync(join(tmpdir(), 'roos-packed-consumer-'))
-    workDir = mkdtempSync(join(tmpdir(), 'roos-packed-work-'))
+    const packDest = mkdtempSync(join(tmpdir(), 'shres-pack-'))
+    consumerDir = mkdtempSync(join(tmpdir(), 'shres-packed-consumer-'))
+    workDir = mkdtempSync(join(tmpdir(), 'shres-packed-work-'))
 
     const nativePackDest = join(packDest, 'native')
     const nativePack = spawnSync('node', ['./scripts/pack-release.mjs', nativePackDest, '--current-platform-only'], {
@@ -108,7 +108,7 @@ describe.skipIf(!packable)('sandbox-local: packed-tarball distribution (publish-
 
     // Peer ranges resolve to the tarballs, the framework peer included. Do not omit optional
     // dependencies because the launcher selects its OS/CPU package through one.
-    writeFileSync(join(consumerDir, 'package.json'), JSON.stringify({ name: 'roos-packed-consumer', private: true, type: 'module' }))
+    writeFileSync(join(consumerDir, 'package.json'), JSON.stringify({ name: 'shres-packed-consumer', private: true, type: 'module' }))
     const install = spawnSync('npm', ['install', '--no-audit', '--no-fund', ...tarballs], {
       cwd: consumerDir,
       encoding: 'utf8',
@@ -123,9 +123,9 @@ describe.skipIf(!packable)('sandbox-local: packed-tarball distribution (publish-
     writeFileSync(join(consumerDir, 'consumer.mjs'), `
       import { spawnSync } from 'node:child_process'
       import { existsSync } from 'node:fs'
-      import { Context } from '@roos-code/cordis'
-      import { launcherPath } from '@roos-code/node-addon-landlock-run'
-      import { LocalSandboxProvider } from '@roos-code/roos-code-sandbox-local'
+      import { Context } from '@shres-code/cordis'
+      import { launcherPath } from '@shres-code/node-addon-landlock-run'
+      import { LocalSandboxProvider } from '@shres-code/shres-code-sandbox-local'
       const ctx = new Context()
       await ctx.plugin(LocalSandboxProvider, {})
       const sandbox = ctx.sandbox

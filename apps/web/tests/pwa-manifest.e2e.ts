@@ -12,13 +12,13 @@ it('ships install metadata with the built web application', async () => {
   const manifest: unknown = JSON.parse(await readFile(join(DIST_ROOT, 'manifest.webmanifest'), 'utf8'))
   expect(manifest).toEqual({
     id: '/',
-    name: 'Roos Code',
-    short_name: 'Roos',
+    name: 'Shres Code',
+    short_name: 'Shres',
     start_url: '/',
     scope: '/',
     display: 'fullscreen',
     icons: [{
-      src: '/favicon.svg?v=roo2',
+      src: '/favicon.svg?v=shres4',
       sizes: 'any',
       type: 'image/svg+xml',
       purpose: 'any',

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import Loader from '@roos-code/cordis-plugin-loader'
-import type { Agent } from '@roos-code/roos-code-agent'
-import CommandRuntime, { type CommandResult } from '@roos-code/roos-code-commands'
+import { Context } from '@shres-code/cordis'
+import Loader from '@shres-code/cordis-plugin-loader'
+import type { Agent } from '@shres-code/shres-code-agent'
+import CommandRuntime, { type CommandResult } from '@shres-code/shres-code-commands'
 import {
   CompactionId,
   CompactionEngine,
@@ -11,9 +11,9 @@ import {
   type CompactionResult,
   type CompactionTrigger,
   type ManualCompactAgentContext,
-} from '@roos-code/roos-code-compaction'
-import { Session, SessionId } from '@roos-code/roos-code-session'
-import * as commandCompact from '@roos-code/roos-code-command-compact'
+} from '@shres-code/shres-code-compaction'
+import { Session, SessionId } from '@shres-code/shres-code-session'
+import * as commandCompact from '@shres-code/shres-code-command-compact'
 
 const COMPACTION_ID = CompactionId('command-compact-test')
 
@@ -153,7 +153,7 @@ function expectLastLifecycle(
   return runEvent.data.commandId
 }
 
-describe('@roos-code/roos-code-command-compact registration', () => {
+describe('@shres-code/shres-code-command-compact registration', () => {
   it('registers one argument-free command with Loader-safe exports and disposes it', async () => {
     const test = await harness()
     expect(commandCompact.name).toBe('command-compact')

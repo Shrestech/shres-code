@@ -1,9 +1,9 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { bindScopeParent, carrierKeyOf, createScope, isScopeCarrier, scopeChainOf, scopeOf, scopeParentOf, scopeTarget } from '@roos-code/roos-code-scope'
-import type { Scope, Scoped } from '@roos-code/roos-code-scope'
+import { Context } from '@shres-code/cordis'
+import { bindScopeParent, carrierKeyOf, createScope, isScopeCarrier, scopeChainOf, scopeOf, scopeParentOf, scopeTarget } from '@shres-code/shres-code-scope'
+import type { Scope, Scoped } from '@shres-code/shres-code-scope'
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Events {
     /**
      * Test-only event for scope-filtered dispatch.

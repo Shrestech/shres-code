@@ -1,10 +1,10 @@
 /**
  * Process-local dynamic Plugin registry and its opaque identity mints.
- * @module @roos-code/roos-code-cordis-host-runner/registry
+ * @module @shres-code/shres-code-cordis-host-runner/registry
  */
 
-import type { Fiber } from '@roos-code/cordis'
-import type { SessionId } from '@roos-code/roos-code-session/types'
+import type { Fiber } from '@shres-code/cordis'
+import type { SessionId } from '@shres-code/shres-code-session/types'
 import type {
   ApprovalRequestId, CordisDynamicPackageId, CordisDynamicPluginId, CordisDynamicPluginRunId,
   CordisDynamicRunMode, DynamicCordisRenderFailure, DynamicCordisRunAttempt,

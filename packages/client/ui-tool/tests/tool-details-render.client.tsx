@@ -1,9 +1,9 @@
 /** Test adapter for the production conversation.details.tool registration. */
 import type {
   ChatConversationViewNode, ChatSnapshot, ConversationNode, RunningToolCall, SessionId,
-} from '@roos-code/roos-code-client-runtime/client'
-import type { SessionProviderComponent, TranslateNS } from '@roos-code/roos-code-client-ui-slots'
-import type { DetailsSlotProps, DetailsToolOwnerProps } from '@roos-code/roos-code-client-ui-conversation/src/client/contract/slots.ts'
+} from '@shres-code/shres-code-client-runtime/client'
+import type { SessionProviderComponent, TranslateNS } from '@shres-code/shres-code-client-ui-slots'
+import type { DetailsSlotProps, DetailsToolOwnerProps } from '@shres-code/shres-code-client-ui-conversation/src/client/contract/slots.ts'
 import { ToolDetails } from '../src/client/tool/ToolDetails.tsx'
 
 /** Framework session-area seat used by direct DetailsPanel tests. */

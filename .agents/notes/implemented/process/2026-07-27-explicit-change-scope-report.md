@@ -4,7 +4,7 @@ Status: implemented
 
 ## Problem
 
-The [pre-push workflow](../../../skills/roos-pre-push-checks/SKILL.md) needs the diff against the actual base, but constructing `origin/<current-branch>` fails for a new worktree branch that tracks `origin/master` before its first push and misstates a stacked branch whose PR targets another feature branch. The [code-review](../../../skills/roos-code-review/SKILL.md) and [documentation-audit](../../../skills/roos-doc-standards/SKILL.md) workflows need the same current-base judgment.
+The [pre-push workflow](../../../skills/shres-pre-push-checks/SKILL.md) needs the diff against the actual base, but constructing `origin/<current-branch>` fails for a new worktree branch that tracks `origin/master` before its first push and misstates a stacked branch whose PR targets another feature branch. The [code-review](../../../skills/shres-code-review/SKILL.md) and [documentation-audit](../../../skills/shres-doc-standards/SKILL.md) workflows need the same current-base judgment.
 
 An incorrect range undermines evidence selection because it can omit affected paths. A three-dot committed diff also says nothing about Git's separate staged, unstaged, and untracked layers.
 

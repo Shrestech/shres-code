@@ -1,33 +1,33 @@
 /**
- * `roos models` / `roos providers` — product CLI over the same settings,
+ * `shres models` / `shres providers` — product CLI over the same settings,
  * credentials, and llm services the Web Settings → Models page uses.
  *
- * @module @roos-code/roos-code/models-cli
+ * @module @shres-code/shres-code/models-cli
  */
 
-import { Context } from '@roos-code/cordis'
-import type {} from '@roos-code/roos-code-credentials'
-import type {} from '@roos-code/roos-code-llm'
-import type {} from '@roos-code/roos-code-settings'
-import AgentDefaultModelConfig from '@roos-code/roos-code-agent-default-model'
-import type { ModelPurpose } from '@roos-code/roos-code-agent-default-model'
-import { MODEL_PURPOSES } from '@roos-code/roos-code-agent-default-model'
-import { validateSelection } from '@roos-code/roos-code-agent-default-model'
-import { credentialRef } from '@roos-code/roos-code-credentials'
-import CredentialsLocal from '@roos-code/roos-code-credentials-local'
-import { deriveKeyRef, readLine, readSecret } from '@roos-code/roos-code-first-run-setup'
-import type { CliIo } from '@roos-code/roos-code-first-run-setup'
-import LlmRuntime from '@roos-code/roos-code-llm'
-import { ReasoningEffortId } from '@roos-code/roos-code-llm'
-import * as LlmDeepseek from '@roos-code/roos-code-llm-deepseek'
-import * as LlmCliBridge from '@roos-code/roos-code-llm-cli-bridge'
-import * as LlmPiAi from '@roos-code/roos-code-llm-pi-ai'
-import { settingsNamespace } from '@roos-code/roos-code-settings'
-import SettingsFile from '@roos-code/roos-code-settings-file'
+import { Context } from '@shres-code/cordis'
+import type {} from '@shres-code/shres-code-credentials'
+import type {} from '@shres-code/shres-code-llm'
+import type {} from '@shres-code/shres-code-settings'
+import AgentDefaultModelConfig from '@shres-code/shres-code-agent-default-model'
+import type { ModelPurpose } from '@shres-code/shres-code-agent-default-model'
+import { MODEL_PURPOSES } from '@shres-code/shres-code-agent-default-model'
+import { validateSelection } from '@shres-code/shres-code-agent-default-model'
+import { credentialRef } from '@shres-code/shres-code-credentials'
+import CredentialsLocal from '@shres-code/shres-code-credentials-local'
+import { deriveKeyRef, readLine, readSecret } from '@shres-code/shres-code-first-run-setup'
+import type { CliIo } from '@shres-code/shres-code-first-run-setup'
+import LlmRuntime from '@shres-code/shres-code-llm'
+import { ReasoningEffortId } from '@shres-code/shres-code-llm'
+import * as LlmDeepseek from '@shres-code/shres-code-llm-deepseek'
+import * as LlmCliBridge from '@shres-code/shres-code-llm-cli-bridge'
+import * as LlmPiAi from '@shres-code/shres-code-llm-pi-ai'
+import { settingsNamespace } from '@shres-code/shres-code-settings'
+import SettingsFile from '@shres-code/shres-code-settings-file'
 
 const PI_AI = settingsNamespace('llm-pi-ai')
 
-/** Shipped template ids `roos providers add --template` accepts. */
+/** Shipped template ids `shres providers add --template` accepts. */
 export const PROVIDER_TEMPLATES = [
   'ollama-local',
   'ollama-cloud',
@@ -44,7 +44,7 @@ export const PROVIDER_TEMPLATES = [
 /** One shipped template id. */
 export type ProviderTemplate = (typeof PROVIDER_TEMPLATES)[number]
 
-/** Parsed `roos models` / `roos providers` invocation. */
+/** Parsed `shres models` / `shres providers` invocation. */
 export type ModelsCliCommand =
   | { kind: 'models-list' }
   | { kind: 'models-set'; provider: string; model: string; effort?: string; purpose?: ModelPurpose }
@@ -150,14 +150,14 @@ export function processIo(): ModelsCliIo {
 
 /**
  * Boot the settings + credentials + llm composition the Models page uses.
- * @param roosHome - harness home; omitted uses `$ROOS_HOME` / `~/.roos`.
+ * @param shresHome - harness home; omitted uses `$SHRES_HOME` / `~/.shres`.
  * @returns a live context. The caller must dispose it.
  */
-export async function bootModelsCli(roosHome?: string): Promise<Context> {
+export async function bootModelsCli(shresHome?: string): Promise<Context> {
   const ctx = new Context()
   await ctx.plugin(LlmRuntime)
-  await ctx.plugin(SettingsFile, { ...roosHome === undefined ? {} : { roosHome }, watch: false })
-  await ctx.plugin(CredentialsLocal, { ...roosHome === undefined ? {} : { roosHome }, watch: false })
+  await ctx.plugin(SettingsFile, { ...shresHome === undefined ? {} : { shresHome }, watch: false })
+  await ctx.plugin(CredentialsLocal, { ...shresHome === undefined ? {} : { shresHome }, watch: false })
   await ctx.plugin(AgentDefaultModelConfig, {
     provider: 'deepseek-official',
     model: 'deepseek-v4-flash',
@@ -172,15 +172,15 @@ export async function bootModelsCli(roosHome?: string): Promise<Context> {
  * Run one models/providers command and print the transcript.
  * @param command - parsed invocation.
  * @param io - streams and exit.
- * @param roosHome - optional harness home for tests.
+ * @param shresHome - optional harness home for tests.
  * @returns the process exit code.
  */
 export async function runModelsCli(
   command: ModelsCliCommand,
   io: ModelsCliIo = processIo(),
-  roosHome?: string,
+  shresHome?: string,
 ): Promise<number> {
-  const ctx = await bootModelsCli(roosHome)
+  const ctx = await bootModelsCli(shresHome)
   try {
     const text = await dispatch(ctx, command, io)
     if (text.length > 0) io.stdout.write(text.endsWith('\n') ? text : `${text}\n`)
@@ -210,7 +210,7 @@ async function dispatch(ctx: Context, command: ModelsCliCommand, io: ModelsCliIo
     /* v8 ignore next 4 -- closed-union exhaustiveness only */
     default: {
       const _never: never = command
-      throw new Error(`roos: unexpected models command ${JSON.stringify(_never)}`)
+      throw new Error(`shres: unexpected models command ${JSON.stringify(_never)}`)
     }
   }
 }
@@ -337,7 +337,7 @@ async function setModel(ctx: Context, command: Extract<ModelsCliCommand, { kind:
     ...ctx.llm.listProviders().map(provider => provider.id),
   ])
   if (!known.has(command.provider)) {
-    throw new Error(`roos models set: unknown provider "${command.provider}"`)
+    throw new Error(`shres models set: unknown provider "${command.provider}"`)
   }
   const requested = {
     provider: command.provider,
@@ -362,7 +362,7 @@ async function discoverModels(
   let existing: Record<string, unknown>[] | undefined
   if (command.add) {
     if (entry === undefined) {
-      throw new Error(`roos models discover: cannot --add models for unknown provider "${command.provider}"`)
+      throw new Error(`shres models discover: cannot --add models for unknown provider "${command.provider}"`)
     }
     existing = storedModelRows(ctx, entry.settingsNs, entry.settingsPath, command.provider)
   }
@@ -408,17 +408,17 @@ function storedModelRows(
 ): Record<string, unknown>[] {
   const descriptor = ctx.settings.describe().find(entry => entry.ns === settingsNs)
   if (descriptor === undefined) {
-    throw new Error(`roos models discover: cannot --add models; settings namespace "${settingsNs}" is not registered`)
+    throw new Error(`shres models discover: cannot --add models; settings namespace "${settingsNs}" is not registered`)
   }
   const userModels = declaredModelList(descriptor.user, settingsPath)
   const baseModels = declaredModelList(descriptor.base, settingsPath)
   const models = userModels ?? (baseModels !== undefined && baseModels.length > 0 ? baseModels : undefined)
   if (models === undefined) {
-    throw new Error(`roos models discover: cannot --add models; "${provider}" has no stored model list`)
+    throw new Error(`shres models discover: cannot --add models; "${provider}" has no stored model list`)
   }
   return models.map((row, index) => {
     if (typeof row !== 'object' || row === null || typeof (row as { id?: unknown }).id !== 'string') {
-      throw new Error(`roos models discover: cannot --add models; "${provider}" model list entry ${String(index)} is not a model object`)
+      throw new Error(`shres models discover: cannot --add models; "${provider}" model list entry ${String(index)} is not a model object`)
     }
     return { ...(row as Record<string, unknown>) }
   })
@@ -467,12 +467,12 @@ async function addCustom(
 ): Promise<string> {
   const provider = command.provider ?? await prompt(io, 'Provider ID (lowercase, e.g. acme-gateway):')
   if (!/^[a-z][a-z0-9-]*$/.test(provider)) {
-    throw new Error('roos providers add: Provider ID must start with a lowercase letter and use lowercase letters, digits, and dashes')
+    throw new Error('shres providers add: Provider ID must start with a lowercase letter and use lowercase letters, digits, and dashes')
   }
   const baseURL = command.baseURL ?? await prompt(io, 'Base URL (OpenAI-compatible, including /v1):')
-  if (baseURL.length === 0) throw new Error('roos providers add: a custom provider needs a base URL')
+  if (baseURL.length === 0) throw new Error('shres providers add: a custom provider needs a base URL')
   const model = command.model ?? await prompt(io, 'Model ID:')
-  if (model.length === 0) throw new Error('roos providers add: a custom provider needs a model id')
+  if (model.length === 0) throw new Error('shres providers add: a custom provider needs a model id')
   const apiKeyEnv = command.apiKeyEnv ?? deriveKeyRef(provider)
   const profile = {
     api: 'openai-completions',
@@ -487,14 +487,14 @@ async function addCustom(
 
 async function removeProvider(ctx: Context, provider: string): Promise<string> {
   const entry = ctx.llm.listConfigurableProviders().find(candidate => candidate.provider === provider)
-  if (entry === undefined) throw new Error(`roos providers remove: unknown provider "${provider}"`)
+  if (entry === undefined) throw new Error(`shres providers remove: unknown provider "${provider}"`)
   if (entry.settingsNs !== 'llm-pi-ai') {
-    throw new Error(`roos providers remove: "${provider}" is not a user-owned pi-ai route`)
+    throw new Error(`shres providers remove: "${provider}" is not a user-owned pi-ai route`)
   }
   const shipped = SHIPPED_PI_AI_PROVIDER_IDS.includes(provider)
   if (shipped && !userLayerHasProvider(ctx, provider)) {
     throw new Error(
-      `roos providers remove: "${provider}" is a shipped route; there is no user override to clear`,
+      `shres providers remove: "${provider}" is a shipped route; there is no user override to clear`,
     )
   }
   await ctx.settings.mutate(PI_AI, [{ op: 'unset', path: ['providers', provider] }])
@@ -525,7 +525,7 @@ async function promptTemplate(io: ModelsCliIo): Promise<ProviderTemplate> {
   write(io.stdout, `Template (${PROVIDER_TEMPLATES.join(', ')}):\n`)
   const value = await prompt(io, '')
   if (!(PROVIDER_TEMPLATES as readonly string[]).includes(value)) {
-    throw new Error(`roos providers add: unknown template "${value}"`)
+    throw new Error(`shres providers add: unknown template "${value}"`)
   }
   return value as ProviderTemplate
 }

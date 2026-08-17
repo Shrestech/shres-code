@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import {
   LOADER_SMOKE_TEST_TIMEOUT_MS,
   runLoaderSmoke,
-} from '@roos-code/roos-code-loader-smoke'
+} from '@shres-code/shres-code-loader-smoke'
 
 const fixtureDir = fileURLToPath(new URL(
   '../../../../examples/acp-agent/tests/fixtures/subagent/subagent-codex/',
@@ -18,7 +18,7 @@ describe('Codex provider public Loader composition', () => {
   it('loads the opt-in package and foreground tool without starting Codex', async () => {
     const { stdout, stderr } = await runLoaderSmoke({
       label: 'subagent-codex Loader composition',
-      tempDirPrefix: 'roos-subagent-codex-loader-',
+      tempDirPrefix: 'shres-subagent-codex-loader-',
       binScript: driver,
       libBinScript: driver,
       configPath,

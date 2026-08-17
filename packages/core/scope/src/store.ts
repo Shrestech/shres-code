@@ -1,10 +1,10 @@
 /**
  * Shared insertion-ordered storage and effect ownership for scope-aware registries.
  *
- * @module @roos-code/roos-code-scope
+ * @module @shres-code/shres-code-scope
  */
 
-import type { Context } from '@roos-code/cordis'
+import type { Context } from '@shres-code/cordis'
 import { scopeChainOf, scopeOf } from './index.ts'
 import type { ScopeKey } from './index.ts'
 

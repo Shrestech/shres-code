@@ -1,10 +1,10 @@
 /**
  * First-run picker choices and local-Ollama probe results.
  *
- * @module @roos-code/roos-code-first-run-setup/types
+ * @module @shres-code/shres-code-first-run-setup/types
  */
 
-import type { LlmDiscoveredModel } from '@roos-code/roos-code-llm'
+import type { LlmDiscoveredModel } from '@shres-code/shres-code-llm'
 
 /** Result of probing a local OpenAI-compatible Ollama endpoint. */
 export interface LocalOllamaStatus {

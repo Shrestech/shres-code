@@ -1,7 +1,7 @@
-import { createUserMessage } from '@roos-code/roos-code-llm'
+import { createUserMessage } from '@shres-code/shres-code-llm'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { PROTOCOL_VERSION } from '@agentclientprotocol/sdk'
-import { SessionId } from '@roos-code/roos-code-session'
+import { SessionId } from '@shres-code/shres-code-session'
 import {
   errorResponse,
   makeBridgeHarness,

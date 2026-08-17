@@ -8,18 +8,18 @@
  * exists: a domain ships projection support with zero client code. Per-key
  * bare observable faces feed `useProjection` (web-react binds them).
  */
-import type { SessionProjectionMap } from '@roos-code/roos-code-session-projection/types'
+import type { SessionProjectionMap } from '@shres-code/shres-code-session-projection/types'
 import type { ObservableSnapshot } from '../contract/store.ts'
 import { Notifier } from './notifier.ts'
 
 // The single projection type table, typed end to end (host unit, wire block,
 // client store, React hook) — the Service Definition package's pure-type outlet
-// (`/types`, zero imports), never the package root: the root's roos-agent →
-// roos-session chain would drag the host `Context.sessions` merge into the
+// (`/types`, zero imports), never the package root: the root's shres-agent →
+// shres-session chain would drag the host `Context.sessions` merge into the
 // client program (one program must not hold both sides). No second
 // client-side "views" table (rejected in the Alternatives of
 // .agents/notes/proposed/architecture/2026-07-27-session-projection-and-command-log.md).
-export type { SessionProjectionMap } from '@roos-code/roos-code-session-projection/types'
+export type { SessionProjectionMap } from '@shres-code/shres-code-session-projection/types'
 
 /**
  * The fifth framework hook seat (see the session-projection subsystem page,

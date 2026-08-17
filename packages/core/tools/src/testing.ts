@@ -1,7 +1,7 @@
-/** Canonical tool-definition fixtures for repository tests. @module roos-tools/testing */
+/** Canonical tool-definition fixtures for repository tests. @module shres-tools/testing */
 
-import type { ContentBlock } from '@roos-code/roos-code-llm'
-import type { JsonValue } from '@roos-code/roos-code-session'
+import type { ContentBlock } from '@shres-code/shres-code-llm'
+import type { JsonValue } from '@shres-code/shres-code-session'
 import { defineTool } from './schema.ts'
 import type { DefineToolOptions, ParameterSchemaSpec } from './schema.ts'
 import type { ToolDefinition, ToolRunContext } from './index.ts'

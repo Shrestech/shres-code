@@ -49,11 +49,11 @@ it('keeps the browser responsive while rendering 100,000 reasoning chunks', asyn
   let page: Page | undefined
   try {
     scaffold = await launchWebScaffold()
-    browser = await chromium.launch({ headless: process.env.ROOS_WEB_STRESS_HEADFUL !== '1' })
+    browser = await chromium.launch({ headless: process.env.SHRES_WEB_STRESS_HEADFUL !== '1' })
     page = await newEnglishPage(browser)
     const activePage = page
     await activePage.addInitScript(() => {
-      localStorage.setItem('roos.sessions.current', JSON.stringify({ sessionId: 'fx-alpha' }))
+      localStorage.setItem('shres.sessions.current', JSON.stringify({ sessionId: 'fx-alpha' }))
     })
     const tripwire = watchConsole(activePage)
     onTestFailed(() => saveFailureShot(activePage, 'web-stress-reasoning-chunks'))

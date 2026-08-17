@@ -2,17 +2,17 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { Context } from '@roos-code/cordis'
-import { CallId } from '@roos-code/roos-code-llm'
-import AgentLoop from '@roos-code/roos-code-agent-loop'
-import { mountAgentLoopTestDependencies } from '@roos-code/roos-code-agent-loop-testkit'
-import { SessionId } from '@roos-code/roos-code-session'
-import JsonlSessionPersistence from '@roos-code/roos-code-session-persistence-jsonl'
-import SessionProjectionRegistry from '@roos-code/roos-code-session-projection'
-import SubagentRuntime from '@roos-code/roos-code-subagent'
-import * as SubagentSpawn from '@roos-code/roos-code-subagent-spawn-in-process'
-import type { GenerateOptions, StreamChunk } from '@roos-code/roos-code-llm'
-import { LlmAdapter } from '@roos-code/roos-code-llm'
+import { Context } from '@shres-code/cordis'
+import { CallId } from '@shres-code/shres-code-llm'
+import AgentLoop from '@shres-code/shres-code-agent-loop'
+import { mountAgentLoopTestDependencies } from '@shres-code/shres-code-agent-loop-testkit'
+import { SessionId } from '@shres-code/shres-code-session'
+import JsonlSessionPersistence from '@shres-code/shres-code-session-persistence-jsonl'
+import SessionProjectionRegistry from '@shres-code/shres-code-session-projection'
+import SubagentRuntime from '@shres-code/shres-code-subagent'
+import * as SubagentSpawn from '@shres-code/shres-code-subagent-spawn-in-process'
+import type { GenerateOptions, StreamChunk } from '@shres-code/shres-code-llm'
+import { LlmAdapter } from '@shres-code/shres-code-llm'
 import { MockAdapter, textResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
 import * as tool from '../src/index.ts'
 import { parkParent } from './park-parent.ts'
@@ -53,7 +53,7 @@ afterEach(() => {
 async function setupWith(adapter: MockAdapter | GatedAdapter) {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
-  const root = mkdtempSync(join(tmpdir(), 'roos-tool-subagent-control-'))
+  const root = mkdtempSync(join(tmpdir(), 'shres-tool-subagent-control-'))
   roots.push(root)
   await ctx.plugin(JsonlSessionPersistence, { root })
   await ctx.plugin(AgentLoop, { agents: [] })
@@ -99,7 +99,7 @@ async function waitNoActivation(ctx: Context, childId: SessionId): Promise<void>
   }, { timeout: 5_000 })
 }
 
-describe('roos-tool-subagent-control', () => {
+describe('shres-tool-subagent-control', () => {
   it('registers send_message once, globally, with the two required parameters', async () => {
     const { ctx } = await setup([])
     const schemas = ctx.tools.schemas().filter(schema => schema.name === 'send_message')
@@ -224,7 +224,7 @@ describe('roos-tool-subagent-control', () => {
   })
 })
 
-describe('roos-tool-subagent-control interrupt_agent', () => {
+describe('shres-tool-subagent-control interrupt_agent', () => {
   it('registers interrupt_agent with the single agent_id parameter and current-turn wording', async () => {
     const { ctx } = await setup([])
     const schemas = ctx.tools.schemas().filter(schema => schema.name === 'interrupt_agent')

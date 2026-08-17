@@ -5,10 +5,10 @@
  */
 import type {
   ConversationNodeDefinition, ToolResultNode,
-} from '@roos-code/roos-code-client-runtime/client'
-import { isAppendSurfaceEvent } from '@roos-code/roos-code-client-runtime/client'
-import type { MarkdownFileMentions } from '@roos-code/roos-code-client-ui-primitives'
-import type { TurnTailOwnerProps } from '@roos-code/roos-code-client-ui-conversation/client'
+} from '@shres-code/shres-code-client-runtime/client'
+import { isAppendSurfaceEvent } from '@shres-code/shres-code-client-runtime/client'
+import type { MarkdownFileMentions } from '@shres-code/shres-code-client-ui-primitives'
+import type { TurnTailOwnerProps } from '@shres-code/shres-code-client-ui-conversation/client'
 
 interface ProducedPath {
   readonly seq: number
@@ -20,7 +20,7 @@ export interface DeliverablesTurnData {
   readonly produced: readonly ProducedPath[]
 }
 
-declare module '@roos-code/roos-code-client-runtime/client' {
+declare module '@shres-code/shres-code-client-runtime/client' {
   interface ConversationTurnDataMap {
     /** Successful mutation paths accumulated in this Turn. */
     deliverables: DeliverablesTurnData

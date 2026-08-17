@@ -1,4 +1,4 @@
-import { createToolResultMessage, createUserMessage } from '@roos-code/roos-code-llm'
+import { createToolResultMessage, createUserMessage } from '@shres-code/shres-code-llm'
 /**
  * Coordinator semantics against a bare fake backend — the RFC's named unit
  * tier for the seam: adoption (fresh, seeded, re-adoption via the handoff
@@ -7,9 +7,9 @@ import { createToolResultMessage, createUserMessage } from '@roos-code/roos-code
  */
 
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import SessionStore, { SessionId, type Session, type SessionEvent } from '@roos-code/roos-code-session'
-import type { Agent } from '@roos-code/roos-code-agent'
+import { Context } from '@shres-code/cordis'
+import SessionStore, { SessionId, type Session, type SessionEvent } from '@shres-code/shres-code-session'
+import type { Agent } from '@shres-code/shres-code-agent'
 import {
   SessionTelemetryCoordinator,
   type SessionTelemetrySink,
@@ -17,7 +17,7 @@ import {
   type SessionTelemetryRecord,
 } from '../src/index.ts'
 
-declare module '@roos-code/roos-code-session/types' {
+declare module '@shres-code/shres-code-session/types' {
   interface SessionEventMap {
     /**
      * Test-only merged event proving unknown types flow through unchanged.

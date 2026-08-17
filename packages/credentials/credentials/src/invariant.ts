@@ -1,12 +1,12 @@
 /**
- * Package-owned invariant companion for `@roos-code/roos-code-credentials`.
- * @module @roos-code/roos-code-credentials/invariant
+ * Package-owned invariant companion for `@shres-code/shres-code-credentials`.
+ * @module @shres-code/shres-code-credentials/invariant
  */
 
-import type { Context } from '@roos-code/cordis'
-import type { InvariantFailure, InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantFailure, InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-credentials'
+const PACKAGE_NAME = '@shres-code/shres-code-credentials'
 
 /** Cordis companion plugin name. */
 export const name = 'credentials-invariant'

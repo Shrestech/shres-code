@@ -2,10 +2,10 @@
  * Dialect-neutral vocabulary and log-only events shared by the Claude Code and
  * Codex hook bridges. Payload construction, matching differences, environment,
  * and extension-point-specific decision mapping remain owned by each bridge.
- * @module @roos-code/roos-code-hook-protocol/types
+ * @module @shres-code/shres-code-hook-protocol/types
  */
 
-declare module '@roos-code/roos-code-session/types' {
+declare module '@shres-code/shres-code-session/types' {
   interface SessionEventMap {
     /**
      * A hook command was invoked at a hook point — a log-only record (like

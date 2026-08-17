@@ -1,20 +1,20 @@
-import { createUserMessage } from '@roos-code/roos-code-llm'
+import { createUserMessage } from '@shres-code/shres-code-llm'
 import { describe, expect, it } from 'vitest'
-import { Context, symbols, type EffectMeta } from '@roos-code/cordis'
-import Loader from '@roos-code/cordis-plugin-loader'
-import AgentRegistry, { type Agent } from '@roos-code/roos-code-agent'
-import { SessionId } from '@roos-code/roos-code-session'
-import AgentLoop from '@roos-code/roos-code-agent-loop'
-import { mountAgentLoopTestDependencies } from '@roos-code/roos-code-agent-loop-testkit'
-import InvariantRegistry from '@roos-code/roos-code-invariants'
-import * as SessionInvariant from '@roos-code/roos-code-session/invariant'
-import * as AgentInvariant from '@roos-code/roos-code-agent/invariant'
-import * as AgentLoopInvariant from '@roos-code/roos-code-agent-loop/invariant'
-import SubagentRuntime, { type SubagentStartRequest } from '@roos-code/roos-code-subagent'
+import { Context, symbols, type EffectMeta } from '@shres-code/cordis'
+import Loader from '@shres-code/cordis-plugin-loader'
+import AgentRegistry, { type Agent } from '@shres-code/shres-code-agent'
+import { SessionId } from '@shres-code/shres-code-session'
+import AgentLoop from '@shres-code/shres-code-agent-loop'
+import { mountAgentLoopTestDependencies } from '@shres-code/shres-code-agent-loop-testkit'
+import InvariantRegistry from '@shres-code/shres-code-invariants'
+import * as SessionInvariant from '@shres-code/shres-code-session/invariant'
+import * as AgentInvariant from '@shres-code/shres-code-agent/invariant'
+import * as AgentLoopInvariant from '@shres-code/shres-code-agent-loop/invariant'
+import SubagentRuntime, { type SubagentStartRequest } from '@shres-code/shres-code-subagent'
 import { MockAdapter, maxTokensResponse, textResponse, toolCallResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
 import * as spawn from '../src/index.ts'
-import { STRUCTURED_OUTPUT_TOOL } from '@roos-code/roos-code-subagent-in-process-driver'
-import { defineContentToolFixture } from '@roos-code/roos-code-tools'
+import { STRUCTURED_OUTPUT_TOOL } from '@shres-code/shres-code-subagent-in-process-driver'
+import { defineContentToolFixture } from '@shres-code/shres-code-tools'
 
 type Script = ConstructorParameters<typeof MockAdapter>[0]
 
@@ -64,7 +64,7 @@ function disposeChildLifecycle(parent: Agent): void {
   void lifecycle()
 }
 
-describe('roos-subagent-spawn-in-process', () => {
+describe('shres-subagent-spawn-in-process', () => {
   it('runs a fresh child to completion and returns its final assistant output', async () => {
     // One model call for the child: a plain text answer.
     const { ctx, parent } = await setup([textResponse('child answer')])

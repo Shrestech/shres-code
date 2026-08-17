@@ -1,7 +1,7 @@
 /** Registers the sidebar shell into the layout-owned slot. */
-import type { ClientContext } from '@roos-code/roos-code-client-runtime/client'
+import type { ClientContext } from '@shres-code/shres-code-client-runtime/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
-import type {} from '@roos-code/roos-code-client-locale/client'
+import type {} from '@shres-code/shres-code-client-locale/client'
 import type { SidebarRootInjected } from './contract/slots.ts'
 import { SidebarRoot } from './SidebarRoot.tsx'
 import { en, type SidebarKey } from './locales.ts'
@@ -12,7 +12,7 @@ export type {
 } from './contract/slots.ts'
 export type { SidebarKey } from './locales.ts'
 
-declare module '@roos-code/roos-code-client-ui-slots' {
+declare module '@shres-code/shres-code-client-ui-slots' {
   interface LocaleNamespaceMap {
     /** Sidebar shell controls copy. */
     sidebar: SidebarKey

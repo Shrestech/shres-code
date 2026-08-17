@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { Context, type Plugin } from '@roos-code/cordis'
-import Loader from '@roos-code/cordis-plugin-loader'
-import { remoteMethods } from '@roos-code/roos-code-typert-protocol'
+import { Context, type Plugin } from '@shres-code/cordis'
+import Loader from '@shres-code/cordis-plugin-loader'
+import { remoteMethods } from '@shres-code/shres-code-typert-protocol'
 import PluginInventoryGateway from '../src/index.ts'
 
 const contexts: Context[] = []

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseHookOutput } from '@roos-code/roos-code-hook-protocol'
+import { parseHookOutput } from '@shres-code/shres-code-hook-protocol'
 
 describe('parseHookOutput — exit code semantics', () => {
   it('exit 0 with no stdout is a neutral success', () => {

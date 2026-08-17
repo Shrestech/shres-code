@@ -1,10 +1,10 @@
 /**
  * Map vendor search/tool payloads onto {@link WebSearchResult} without
  * requiring every backend to share one envelope.
- * @module @roos-code/roos-code-web-search-attached-cli/parse
+ * @module @shres-code/shres-code-web-search-attached-cli/parse
  */
 
-import type { WebSearchResult, WebSearchSource } from '@roos-code/roos-code-web'
+import type { WebSearchResult, WebSearchSource } from '@shres-code/shres-code-web'
 
 /** One collected citation while walking a vendor payload. */
 interface CollectedSource {

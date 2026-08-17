@@ -1,10 +1,10 @@
-import type { Context } from '@roos-code/cordis'
+import type { Context } from '@shres-code/cordis'
 import type {
   ConversationMatch, ConversationNodeContext, ConversationNodeDefinition, TurnMaxTokensNode,
-} from '@roos-code/roos-code-client-runtime/client'
+} from '@shres-code/shres-code-client-runtime/client'
 import { CHAT_SYNTHETIC_SEQ_OFFSETS, chatNode } from './common.ts'
 
-declare module '@roos-code/roos-code-client-ui-conversation/client' {
+declare module '@shres-code/shres-code-client-ui-conversation/client' {
   interface ChatNodeDataMap {
     /** Turn ended by the per-request output-token cap. */
     'turn-max-tokens': TurnMaxTokensNode

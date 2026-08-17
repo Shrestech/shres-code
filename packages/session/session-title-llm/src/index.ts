@@ -1,25 +1,25 @@
 /**
  * Shared route, framing, timeout, assembly, and validation policy for
  * model-backed session-title providers.
- * @module @roos-code/roos-code-session-title-llm
+ * @module @shres-code/shres-code-session-title-llm
  */
 
-import type { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import { createUserMessage, BlockAssembler, deepFreeze } from '@roos-code/roos-code-llm'
-import type { FinishReason, GenerateOptions, Message } from '@roos-code/roos-code-llm'
-import { deadline, MAX_TIMER_DELAY_MS } from '@roos-code/roos-code-timeout'
+import type { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import { createUserMessage, BlockAssembler, deepFreeze } from '@shres-code/shres-code-llm'
+import type { FinishReason, GenerateOptions, Message } from '@shres-code/shres-code-llm'
+import { deadline, MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
 import {
   normalizeSessionTitle,
   SessionTitleProviderId,
-} from '@roos-code/roos-code-session-title'
+} from '@shres-code/shres-code-session-title'
 import type {
   SessionTitleAutomaticMode,
   SessionTitleModelProvenance,
   SessionTitleProviderRequest,
   SessionTitleProviderResult,
   SessionTitleUserMessage,
-} from '@roos-code/roos-code-session-title'
+} from '@shres-code/shres-code-session-title'
 
 /** Exact model-visible request recorded before one auxiliary title dispatch. */
 export interface SessionTitleLlmRequestEventData {
@@ -37,7 +37,7 @@ export interface SessionTitleLlmRequestEventData {
   readonly maxTokens: number
 }
 
-declare module '@roos-code/roos-code-session/types' {
+declare module '@shres-code/shres-code-session/types' {
   interface SessionEventMap {
     /** Log-only pre-dispatch record of one session-title model request. */
     'session/title-llm-request': SessionTitleLlmRequestEventData
@@ -245,7 +245,7 @@ export async function generateSessionTitleWithLlm(
   const route = resolveRoute(config, request)
   const messages: Message[] = [createUserMessage({
     content: [{ type: 'text', text: framedInput }],
-    source: { kind: 'plugin', plugin: 'roos-session-title-llm' },
+    source: { kind: 'plugin', plugin: 'shres-session-title-llm' },
   })]
   const system = systemPrompt(config)
   using callDeadline = deadline(request.signal, config.timeoutMs, SESSION_TITLE_TIMEOUT_CODE)

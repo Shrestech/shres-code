@@ -5,15 +5,15 @@
  * signal. A provider timeout remains a backstop for direct service callers.
  */
 
-import type { Context } from '@roos-code/cordis'
+import type { Context } from '@shres-code/cordis'
 import TurndownService from 'turndown'
 import { gfm } from '@joplin/turndown-plugin-gfm'
-import { defineTool } from '@roos-code/roos-code-tools'
-import type { GenericCallView, JsonValue, ToolResult, WebFetchResultView } from '@roos-code/roos-code-tools'
-import type { WebFetchBody, WebFetchResult } from '@roos-code/roos-code-web'
-import { assertNever } from '@roos-code/roos-code-llm'
-import { escapeUntrusted, frameUntrusted, UNTRUSTED_INSTRUCTION_DISCLAIMER } from '@roos-code/roos-code-untrusted-frame'
-import type {} from '@roos-code/roos-code-system-prompt'
+import { defineTool } from '@shres-code/shres-code-tools'
+import type { GenericCallView, JsonValue, ToolResult, WebFetchResultView } from '@shres-code/shres-code-tools'
+import type { WebFetchBody, WebFetchResult } from '@shres-code/shres-code-web'
+import { assertNever } from '@shres-code/shres-code-llm'
+import { escapeUntrusted, frameUntrusted, UNTRUSTED_INSTRUCTION_DISCLAIMER } from '@shres-code/shres-code-untrusted-frame'
+import type {} from '@shres-code/shres-code-system-prompt'
 
 /** Tag wrapping the fetched page body. Status and truncation stay outside. */
 const UNTRUSTED_WEB_PAGE_TAG = 'untrusted-web-page'
@@ -87,7 +87,7 @@ turndown.addRule('tableRowWithoutSpanExpansion', {
  * Validate value constraints the schema DSL can't express: a non-blank `url`.
  * Throws a plain `Error` otherwise. No timeout parameter — the tool-call budget
  * is deployment policy declared via `fetchTimeoutMs` config and enforced by
- * `@roos-code/roos-code-tool-call-timeout-policy`, not a model argument.
+ * `@shres-code/shres-code-tool-call-timeout-policy`, not a model argument.
  *
  * @param args - the schema-validated `web_fetch` arguments.
  * @returns the arguments as the seam's request fields.
@@ -458,7 +458,7 @@ export function presentFetchResult(args: { url: string }, result: ToolResult): W
  * @param ctx - context whose `tools` and `systemPrompt` registries receive the
  *   registrations; both are effect-scoped and unregister on plugin dispose.
  * @param timeoutMs - the cooperative tool-call budget (ms) attached as the tool's
- *   `ToolDefinition.timeoutMs` for `@roos-code/roos-code-tool-call-timeout-policy` to enforce.
+ *   `ToolDefinition.timeoutMs` for `@shres-code/shres-code-tool-call-timeout-policy` to enforce.
  * @param maxOutputChars - cap on the complete rendered tool output (header,
  *   untrusted frame, and footer; see {@link formatFetchOutput}) and on source
  *   characters converted synchronously.

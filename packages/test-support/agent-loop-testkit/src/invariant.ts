@@ -1,13 +1,13 @@
 /**
- * Package-owned invariant companion for `@roos-code/roos-code-agent-loop-testkit`.
- * @module @roos-code/roos-code-agent-loop-testkit/invariant
+ * Package-owned invariant companion for `@shres-code/shres-code-agent-loop-testkit`.
+ * @module @shres-code/shres-code-agent-loop-testkit/invariant
  */
 
 /* jscpd:ignore-start */
-import type { Context } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-agent-loop-testkit'
+const PACKAGE_NAME = '@shres-code/shres-code-agent-loop-testkit'
 
 /** Cordis companion plugin name. */
 export const name = 'agent-loop-testkit-invariant'

@@ -1,9 +1,9 @@
-/** Package-owned invariant companion for the subprocess seam. @module @roos-code/roos-code-subprocess/invariant */
+/** Package-owned invariant companion for the subprocess seam. @module @shres-code/shres-code-subprocess/invariant */
 
-import type { Context } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-subprocess'
+const PACKAGE_NAME = '@shres-code/shres-code-subprocess'
 
 /** Cordis companion plugin name. */
 export const name = 'subprocess-invariant'

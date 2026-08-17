@@ -1,14 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import LlmRuntime, { LlmAdapter } from '@roos-code/roos-code-llm'
-import { credentialRef } from '@roos-code/roos-code-credentials'
-import { LocalCredentialProvider } from '@roos-code/roos-code-credentials-local'
-import { settingsNamespace } from '@roos-code/roos-code-settings'
-import { FileSettingsProvider } from '@roos-code/roos-code-settings-file'
-import * as LlmPiAi from '@roos-code/roos-code-llm-pi-ai'
+import LlmRuntime, { LlmAdapter } from '@shres-code/shres-code-llm'
+import { credentialRef } from '@shres-code/shres-code-credentials'
+import { LocalCredentialProvider } from '@shres-code/shres-code-credentials-local'
+import { settingsNamespace } from '@shres-code/shres-code-settings'
+import { FileSettingsProvider } from '@shres-code/shres-code-settings-file'
+import * as LlmPiAi from '@shres-code/shres-code-llm-pi-ai'
 import { assemble } from './assemble.ts'
 import { closeMockServers, mockServer, textEvents } from './mock-server.ts'
 
@@ -31,7 +31,7 @@ afterEach(async () => {
 })
 
 async function home(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), 'roos-pi-dynamic-'))
+  const dir = await mkdtemp(join(tmpdir(), 'shres-pi-dynamic-'))
   cleanups.push(() => rm(dir, { recursive: true, force: true }))
   return dir
 }

@@ -14,7 +14,7 @@ import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { join } from 'node:path'
-import { SessionId } from '@roos-code/roos-code-session'
+import { SessionId } from '@shres-code/shres-code-session'
 import {
   acknowledgeReloadConnectionLoss, assertFixtureInventory, captureStableAria, compareOrRefreshGolden,
   launchWebScaffold, watchConsole, webSnapshotMode, type WebScaffold,
@@ -254,7 +254,7 @@ describe('web e2e: settings modal and General preferences', () => {
       return {
         attr: document.body.hasAttribute('data-ds-dark-theme'),
         background: computed.backgroundColor,
-        legacy: localStorage.getItem('roos.theme'),
+        legacy: localStorage.getItem('shres.theme'),
         themeColor: metas[0]?.content ?? null,
         themeColorCount: metas.length,
         token: computed.getPropertyValue('--dsw-alias-bg-base').trim(),
@@ -350,7 +350,7 @@ describe('web e2e: settings modal and General preferences', () => {
     await dialog.getByRole('button', { name: 'Queue' }).click()
     await page.getByRole('menuitem', { name: 'Steer queued message' }).click()
     await dialog.getByRole('button', { name: 'Steer queued message' }).waitFor({ timeout: 10_000 })
-    expect(await page.evaluate(() => localStorage.getItem('roos.conversation.busyEnter'))).toBeNull()
+    expect(await page.evaluate(() => localStorage.getItem('shres.conversation.busyEnter'))).toBeNull()
     await expect.poll(async () => readFile(join(scaffold.harnessHome, 'settings.yaml'), 'utf8'), { timeout: 5_000 })
       .toMatch(/ui-conversation:\n\s+busyEnter: steer/)
     await page.keyboard.press('Escape')
@@ -373,7 +373,7 @@ describe('web e2e: settings modal and General preferences', () => {
       await secondPage.getByRole('button', { name: 'Settings', exact: true }).click()
       await secondPage.getByRole('dialog', { name: 'Settings' })
         .getByRole('button', { name: 'Steer queued message' }).waitFor({ timeout: 10_000 })
-      expect(await secondPage.evaluate(() => localStorage.getItem('roos.conversation.busyEnter'))).toBeNull()
+      expect(await secondPage.evaluate(() => localStorage.getItem('shres.conversation.busyEnter'))).toBeNull()
       expect(secondTripwire.pageErrors).toEqual([])
       expect(secondTripwire.warnings).toEqual([])
     } finally {
@@ -384,7 +384,7 @@ describe('web e2e: settings modal and General preferences', () => {
     await reloaded.getByRole('button', { name: 'Steer queued message' }).click()
     await page.getByRole('menuitem', { name: 'Queue' }).click()
     await reloaded.getByRole('button', { name: 'Queue' }).waitFor({ timeout: 10_000 })
-    expect(await page.evaluate(() => localStorage.getItem('roos.conversation.busyEnter'))).toBeNull()
+    expect(await page.evaluate(() => localStorage.getItem('shres.conversation.busyEnter'))).toBeNull()
     await expect.poll(async () => readFile(join(scaffold.harnessHome, 'settings.yaml'), 'utf8'), { timeout: 5_000 })
       .toMatch(/ui-conversation:\n\s+busyEnter: queue/)
     await page.keyboard.press('Escape')
@@ -408,7 +408,7 @@ describe('web e2e: settings modal and General preferences', () => {
     await enDialog.waitFor({ timeout: 10_000 })
     expect(await enDialog.getByRole('button', { name: 'General' }).getAttribute('aria-current')).toBe('true')
     await expect.poll(() => enDialog.getByText('Appearance', { exact: true }).count(), { timeout: 5_000 }).toBe(1)
-    expect(await page.evaluate(() => localStorage.getItem('roos.locale'))).toBeNull()
+    expect(await page.evaluate(() => localStorage.getItem('shres.locale'))).toBeNull()
     await expect.poll(async () => readFile(join(scaffold.harnessHome, 'settings.yaml'), 'utf8'), { timeout: 5_000 })
       .toMatch(/locale:\n\s+preference: en/)
     // Reload keeps English; then restore zh so shared page state (and the
@@ -432,7 +432,7 @@ describe('web e2e: settings modal and General preferences', () => {
       await secondPage.getByRole('button', { name: 'Settings', exact: true }).click()
       await secondPage.getByRole('dialog', { name: 'Settings' })
         .getByRole('button', { name: 'English' }).waitFor({ timeout: 10_000 })
-      expect(await secondPage.evaluate(() => localStorage.getItem('roos.locale'))).toBeNull()
+      expect(await secondPage.evaluate(() => localStorage.getItem('shres.locale'))).toBeNull()
       expect(secondTripwire.pageErrors).toEqual([])
       expect(secondTripwire.warnings).toEqual([])
     } finally {
@@ -444,7 +444,7 @@ describe('web e2e: settings modal and General preferences', () => {
     await page.getByRole('dialog', { name: 'Settings' }).getByRole('button', { name: 'English' }).click()
     await page.getByRole('menuitem', { name: 'Chinese' }).click()
     await page.getByRole('dialog', { name: 'Settings' }).waitFor({ timeout: 10_000 })
-    expect(await page.evaluate(() => localStorage.getItem('roos.locale'))).toBeNull()
+    expect(await page.evaluate(() => localStorage.getItem('shres.locale'))).toBeNull()
     await expect.poll(async () => readFile(join(scaffold.harnessHome, 'settings.yaml'), 'utf8'), { timeout: 5_000 })
       .toMatch(/locale:\n\s+preference: zh/)
     await page.keyboard.press('Escape')
@@ -461,7 +461,7 @@ describe('web e2e: settings modal and General preferences', () => {
     try {
       await enPage.goto(fresh.baseUrl, { waitUntil: 'load' })
       await enPage.waitForSelector('[class*="frame"]', { timeout: 30_000 })
-      expect(await enPage.evaluate(() => localStorage.getItem('roos.locale'))).toBeNull()
+      expect(await enPage.evaluate(() => localStorage.getItem('shres.locale'))).toBeNull()
       await enPage.getByRole('button', { name: 'Settings', exact: true }).click()
       const dialog = enPage.getByRole('dialog', { name: 'Settings' })
       await dialog.waitFor({ timeout: 10_000 })

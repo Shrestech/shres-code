@@ -26,5 +26,5 @@ Routine bilingual edits automatically selected the full translation skill. Even 
 
 - Ordinary development pays for the changed source text, its local counterpart context, and the terminology table rather than the extended workflow's briefing and subagent context.
 - The active agent owns the final routine translation in the same turn. The lightweight path deliberately gives up the extended workflow's generated alignment, delegated isolation, and separate prose-verification pass.
-- Explicit users can still invoke the full workflow through `/dsh-translate-docs` in Claude Code or `$dsh-translate-docs` in Codex.
+- Explicit users can still invoke the full workflow through `/shres-translate-docs` in Claude Code or `$shres-translate-docs` in Codex.
 - The Claude Code frontmatter and Codex policy file are separate product contracts; `doc-sync` rejects a skill that becomes manual-only on only one product or becomes unavailable to the Claude Code user as well as the model.

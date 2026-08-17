@@ -1,14 +1,14 @@
 /**
  * Session-visible workspace instruction state and dynamic reconciliation.
  *
- * @module @roos-code/roos-code-agent-instructions/state
+ * @module @shres-code/shres-code-agent-instructions/state
  */
 
-import type { Agent } from '@roos-code/roos-code-agent'
-import { createUserMessage } from '@roos-code/roos-code-llm'
-import type { Message } from '@roos-code/roos-code-llm'
-import type { Session, UserMessage } from '@roos-code/roos-code-session'
-import type { FileSystem, FsVersion } from '@roos-code/roos-code-fs'
+import type { Agent } from '@shres-code/shres-code-agent'
+import { createUserMessage } from '@shres-code/shres-code-llm'
+import type { Message } from '@shres-code/shres-code-llm'
+import type { Session, UserMessage } from '@shres-code/shres-code-session'
+import type { FileSystem, FsVersion } from '@shres-code/shres-code-fs'
 import type { ResolvedConfig } from './config.ts'
 import { instructionContentSha1, trimmedInstructionDigest } from './digest.ts'
 import {
@@ -45,7 +45,7 @@ export interface AgentInstructionSource {
   changes: AgentInstructionChange[]
 }
 
-declare module '@roos-code/roos-code-llm' {
+declare module '@shres-code/shres-code-llm' {
   interface MessageSourceMap {
     'agent-instructions': AgentInstructionSource
   }

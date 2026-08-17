@@ -1,12 +1,12 @@
 /**
- * Package-owned invariant companion for `@roos-code/roos-code-base`.
- * @module @roos-code/roos-code-base/invariant
+ * Package-owned invariant companion for `@shres-code/shres-code-base`.
+ * @module @shres-code/shres-code-base/invariant
  */
 
-import type { Context } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-base'
+const PACKAGE_NAME = '@shres-code/shres-code-base'
 
 /** Cordis companion plugin name. */
 export const name = 'base-bundle-invariant'

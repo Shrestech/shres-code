@@ -1,8 +1,8 @@
 /** General Settings row for the Composer's busy-state Enter preference. */
 import { useState } from 'react'
-import type { SnapshotStore } from '@roos-code/roos-code-client-runtime/client'
-import type { InjectFace, PropsLocale, PropsRuntime } from '@roos-code/roos-code-client-ui-slots'
-import { IconChevronDownOutline14, Menu } from '@roos-code/roos-code-client-ui-primitives'
+import type { SnapshotStore } from '@shres-code/shres-code-client-runtime/client'
+import type { InjectFace, PropsLocale, PropsRuntime } from '@shres-code/shres-code-client-ui-slots'
+import { IconChevronDownOutline14, Menu } from '@shres-code/shres-code-client-ui-primitives'
 import type { BusyEnterBehavior } from '../contract/composer-submission.ts'
 import type { ConversationKey } from '../locales.ts'
 import css from './EnterBehaviorRow.module.css'

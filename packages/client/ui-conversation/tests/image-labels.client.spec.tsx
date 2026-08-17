@@ -5,9 +5,9 @@
 
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
-import { AttachmentId } from '@roos-code/roos-code-attachment'
-import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
-import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
+import { AttachmentId } from '@shres-code/shres-code-attachment'
+import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
+import { en as commonEn } from '@shres-code/shres-code-client-locale/src/locales/en.ts'
 import { AssistantMarkdown } from '../src/client/chat/AssistantMarkdown.tsx'
 import { attachmentErrorText, imageSizeText } from '../src/client/image-labels.ts'
 import { en } from '../src/client/locales.ts'

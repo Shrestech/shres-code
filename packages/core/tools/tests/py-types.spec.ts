@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { jsonSchemaToPy, renderToolsSdkPy } from '@roos-code/roos-code-tools/src/py-types.ts'
-import { parameterSchemaSpecToJsonSchema } from '@roos-code/roos-code-tools'
-import type { ToolSdkSchema } from '@roos-code/roos-code-tools/src/ts-types.ts'
+import { jsonSchemaToPy, renderToolsSdkPy } from '@shres-code/shres-code-tools/src/py-types.ts'
+import { parameterSchemaSpecToJsonSchema } from '@shres-code/shres-code-tools'
+import type { ToolSdkSchema } from '@shres-code/shres-code-tools/src/ts-types.ts'
 
 describe('jsonSchemaToPy', () => {
   it('maps the defineTool DSL subset', () => {

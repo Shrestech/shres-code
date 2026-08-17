@@ -1,11 +1,11 @@
 /** Execution-time authority checks for the model-facing goal tools. */
 
-import type { Context } from '@roos-code/cordis'
-import type { Agent } from '@roos-code/roos-code-agent'
-import type { GoalView } from '@roos-code/roos-code-goal'
-import { HarnessError } from '@roos-code/roos-code-llm'
-import type { SessionEvent } from '@roos-code/roos-code-session'
-import type { ToolRunContext } from '@roos-code/roos-code-tools'
+import type { Context } from '@shres-code/cordis'
+import type { Agent } from '@shres-code/shres-code-agent'
+import type { GoalView } from '@shres-code/shres-code-goal'
+import { HarnessError } from '@shres-code/shres-code-llm'
+import type { SessionEvent } from '@shres-code/shres-code-session'
+import type { ToolRunContext } from '@shres-code/shres-code-tools'
 
 type TurnStartEvent = Extract<SessionEvent, { type: 'turn/start' }>
 

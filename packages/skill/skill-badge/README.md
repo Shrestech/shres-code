@@ -1,14 +1,14 @@
-# @roos-code/roos-code-skill-badge
+# @shres-code/shres-code-skill-badge
 
-Optional bundled skill provider that contributes `roos-badge` to `ctx.skills`. The skill supplies the official “powered by roos” Markdown snippets and the packaged PNG for systems that cannot import a remote image reliably.
+Optional bundled skill provider that contributes `shres-badge` to `ctx.skills`. The skill supplies the official “powered by shres” Markdown snippets and the packaged PNG for systems that cannot import a remote image reliably.
 
 Mount the plugin to enable the provider. It has no configuration. The shipped CLI composition includes the plugin as `disabled: true`; users must explicitly enable its `skill-badge` row before the skill enters a catalog.
 
-The provider exposes its packaged `assets/` directory as the skill resource base. `roos-badge.png` is the 726×120 source asset, and consumers render it at 121×20.
+The provider exposes its packaged `assets/` directory as the skill resource base. `shres-badge.png` is the 726×120 source asset, and consumers render it at 121×20.
 
 ## Model Experience
 
-Indirectly, through `@roos-code/roos-code-tool-skill`, which renders the catalog entry and selected skill body.
+Indirectly, through `@shres-code/shres-code-tool-skill`, which renders the catalog entry and selected skill body.
 
 #### KV Cache effect
 

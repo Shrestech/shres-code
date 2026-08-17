@@ -16,10 +16,10 @@ import { createHash } from 'node:crypto'
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { ListToolsResultSchema } from '@modelcontextprotocol/sdk/types.js'
 import { z } from 'zod'
-import type { Context } from '@roos-code/cordis'
-import type { ToolDefinition, ToolExecution } from '@roos-code/roos-code-tools'
-import { assertSupportedJsonSchema } from '@roos-code/roos-code-tools'
-import type { JsonSchemaNode, JsonValue } from '@roos-code/roos-code-tools'
+import type { Context } from '@shres-code/cordis'
+import type { ToolDefinition, ToolExecution } from '@shres-code/shres-code-tools'
+import { assertSupportedJsonSchema } from '@shres-code/shres-code-tools'
+import type { JsonSchemaNode, JsonValue } from '@shres-code/shres-code-tools'
 
 /** Resolved options relevant to tool bridging. */
 export interface ToolBridgeOptions {

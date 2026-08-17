@@ -2,22 +2,22 @@
  * Bridge for unmodified Claude Code command hooks on harness interception
  * extension points. It supports SessionStart, prompt/tool pre/post, Stop, and subagent
  * start/stop. It owns Claude payloads, environment, substitution, and decision
- * mapping; shared execution and parsing live in `roos-hook-protocol`.
+ * mapping; shared execution and parsing live in `shres-hook-protocol`.
  * `updatedInput` is logged and warned but not honored. Bespoke behavior should
  * use typed native plugins on the same extension points; see the
  * [hook-bridges Agent Note](../../../../.agents/notes/implemented/feature/2026-06-30-hook-bridges.md).
- * @module @roos-code/roos-code-hooks-claude-code
+ * @module @shres-code/shres-code-hooks-claude-code
  */
 
 import { readFileSync } from 'node:fs'
-import type { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import type { Agent, PreStepDecision } from '@roos-code/roos-code-agent'
-import { createUserMessage } from '@roos-code/roos-code-llm'
-import type { ContentBlock, MessageSource } from '@roos-code/roos-code-llm'
-import type { UserMessage } from '@roos-code/roos-code-session'
-import type {} from '@roos-code/roos-code-session-persistence'
-import type { PostToolDecision, PreToolDecision, ToolExecution, ToolExecutionResult } from '@roos-code/roos-code-tools'
+import type { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import type { Agent, PreStepDecision } from '@shres-code/shres-code-agent'
+import { createUserMessage } from '@shres-code/shres-code-llm'
+import type { ContentBlock, MessageSource } from '@shres-code/shres-code-llm'
+import type { UserMessage } from '@shres-code/shres-code-session'
+import type {} from '@shres-code/shres-code-session-persistence'
+import type { PostToolDecision, PreToolDecision, ToolExecution, ToolExecutionResult } from '@shres-code/shres-code-tools'
 import {
   appendHookInvoked,
   appendHookResult,
@@ -30,10 +30,10 @@ import {
   type HookOutput,
   type MatcherGroup,
   type MergedHookOutcome,
-} from '@roos-code/roos-code-hook-protocol'
+} from '@shres-code/shres-code-hook-protocol'
 // Pulls in the declaration-merged subagent events and the identity pairing their
 // start/end edges.
-import type { SubagentRunId } from '@roos-code/roos-code-subagent'
+import type { SubagentRunId } from '@shres-code/shres-code-subagent'
 import { parseClaudeCodeConfig, type ClaudeCodeHookConfig } from './config.ts'
 
 export const name = 'hooks-claude-code'

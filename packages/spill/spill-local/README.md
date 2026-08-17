@@ -1,6 +1,6 @@
-# @roos-code/roos-code-spill-local
+# @shres-code/shres-code-spill-local
 
-The **local-filesystem** implementation of the [`@roos-code/roos-code-spill`](../spill) storage seam. Registers as `ctx.spillStore` and persists a tool's oversized text to a private, session-scoped file; its locator is the file path and its retrieval hint tells the model to use `read` or `grep` on that path.
+The **local-filesystem** implementation of the [`@shres-code/shres-code-spill`](../spill) storage seam. Registers as `ctx.spillStore` and persists a tool's oversized text to a private, session-scoped file; its locator is the file path and its retrieval hint tells the model to use `read` or `grep` on that path.
 
 ## Storage layout
 

@@ -4,13 +4,13 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type {
   ChatConversationViewNode, ChatSnapshot, ConversationEventInput,
   ConversationNodeDefinition, ConversationViewDefinition,
-} from '@roos-code/roos-code-client-runtime/client'
-import { ConversationNodeAssembler } from '@roos-code/roos-code-client-runtime/client'
-import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
-import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
-import type { SessionEvent } from '@roos-code/roos-code-session/types'
-import { commandDefinition } from '@roos-code/roos-code-client-ui-conversation/src/client/conversation-nodes/command.ts'
-import { chatViewDefinition } from '@roos-code/roos-code-client-ui-conversation/src/client/conversation-nodes/chat-snapshot-builder.ts'
+} from '@shres-code/shres-code-client-runtime/client'
+import { ConversationNodeAssembler } from '@shres-code/shres-code-client-runtime/client'
+import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
+import { en as commonEn } from '@shres-code/shres-code-client-locale/src/locales/en.ts'
+import type { SessionEvent } from '@shres-code/shres-code-session/types'
+import { commandDefinition } from '@shres-code/shres-code-client-ui-conversation/src/client/conversation-nodes/command.ts'
+import { chatViewDefinition } from '@shres-code/shres-code-client-ui-conversation/src/client/conversation-nodes/chat-snapshot-builder.ts'
 import { GoalCommandInputView } from '../src/client/GoalCommandInputView.tsx'
 import {
   goalCommandInputDefinition, goalCommandText,

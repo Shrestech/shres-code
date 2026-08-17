@@ -1,16 +1,16 @@
 /**
  * Registry for ordered system sections, dynamic context, tool schemas, and prompt variables.
  *
- * @module @roos-code/roos-code-system-prompt
+ * @module @shres-code/shres-code-system-prompt
  */
 
-import { Context, Service } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import { AnonymousEntries, NamedEntries, ScopedLayers, scopeTarget } from '@roos-code/roos-code-scope'
-import type { ScopeKey, ScopeLayer, Scoped } from '@roos-code/roos-code-scope'
-import type { ContextSnapshotSection, ToolSchema } from '@roos-code/roos-code-llm'
+import { Context, Service } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import { AnonymousEntries, NamedEntries, ScopedLayers, scopeTarget } from '@shres-code/shres-code-scope'
+import type { ScopeKey, ScopeLayer, Scoped } from '@shres-code/shres-code-scope'
+import type { ContextSnapshotSection, ToolSchema } from '@shres-code/shres-code-llm'
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     systemPrompt: SystemPrompt
   }
@@ -18,7 +18,7 @@ declare module '@roos-code/cordis' {
   interface Events {
     /**
      * Expert waterfall over the assembled sections, contexts, tools, and variables.
-     * Scope-filtered dispatch (`@roos-code/roos-code-scope`): scoped listeners
+     * Scope-filtered dispatch (`@shres-code/shres-code-scope`): scoped listeners
      * receive only that scope's assemblies. The returned value is authoritative.
      * A supplied signal controls only this explicit assembly request and must not
      * be retained to control later turns. A registered complete section is
@@ -184,7 +184,7 @@ function compareToolNames(a: ToolSchema, b: ToolSchema): number {
 
 /** Plugin config: the deployment-authored fragment of the system prompt (see {@link Config.persona} for its contract). */
 export interface Config {
-  /** Include the fixed Roos Code identity before the deployment persona (default true). */
+  /** Include the fixed Shres Code identity before the deployment persona (default true). */
   includeHarnessIdentity?: boolean
   /** Include dynamic runtime-context snapshots in model history (default true). */
   includeRuntimeContext?: boolean
@@ -358,7 +358,7 @@ export class SystemPrompt extends Service {
       this.section({
         name: 'harness:identity',
         order: -100,
-        text: 'You are an AI agent powered by Roos Code.',
+        text: 'You are an AI agent powered by Shres Code.',
       })
     }
     this.section({

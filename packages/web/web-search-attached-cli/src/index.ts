@@ -3,16 +3,16 @@
  * vendor's hosted web-search API (Grok, Claude, Codex, Kimi, Ollama Cloud)
  * using the same credential that adapter already stores. It does not spawn
  * `grok`, `claude`, `codex`, or `kimi`.
- * @module @roos-code/roos-code-web-search-attached-cli
+ * @module @shres-code/shres-code-web-search-attached-cli
  */
 
-import type { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import { credentialRef } from '@roos-code/roos-code-credentials'
-import { installSettingsSection, settingsNamespace } from '@roos-code/roos-code-settings'
-import { launchEnvironmentOf } from '@roos-code/roos-code-launch-environment'
-import type {} from '@roos-code/roos-code-web'
-import type {} from '@roos-code/roos-code-agent-default-model'
+import type { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import { credentialRef } from '@shres-code/shres-code-credentials'
+import { installSettingsSection, settingsNamespace } from '@shres-code/shres-code-settings'
+import { launchEnvironmentOf } from '@shres-code/shres-code-launch-environment'
+import type {} from '@shres-code/shres-code-web'
+import type {} from '@shres-code/shres-code-agent-default-model'
 import {
   ATTACHED_CLI_BACKENDS,
   AttachedCliSearchProvider,

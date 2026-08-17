@@ -1,13 +1,13 @@
 /**
- * Package-owned invariant companion for `@roos-code/roos-code-client-ui-user-questions`.
- * @module @roos-code/roos-code-client-ui-user-questions/invariant
+ * Package-owned invariant companion for `@shres-code/shres-code-client-ui-user-questions`.
+ * @module @shres-code/shres-code-client-ui-user-questions/invariant
  */
 
 /* jscpd:ignore-start */
-import type { Context } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-client-ui-user-questions'
+const PACKAGE_NAME = '@shres-code/shres-code-client-ui-user-questions'
 
 /** Cordis companion plugin name. */
 export const name = 'client-ui-user-questions-invariant'

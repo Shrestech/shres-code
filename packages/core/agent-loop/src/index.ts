@@ -2,13 +2,13 @@
  * Concrete agent-loop plugin: creates scoped ReactLoopAgents, publishes them
  * through the agent/session registries, and owns their ordered teardown.
  *
- * @module @roos-code/roos-code-agent-loop
+ * @module @shres-code/shres-code-agent-loop
  */
 
-import { Context, FiberState, Service } from '@roos-code/cordis'
+import { Context, FiberState, Service } from '@shres-code/cordis'
 import { randomUUID } from 'node:crypto'
-import z from '@roos-code/schemastery'
-import { emitAgentEvent } from '@roos-code/roos-code-agent'
+import z from '@shres-code/schemastery'
+import { emitAgentEvent } from '@shres-code/shres-code-agent'
 import type {
   Agent,
   AgentFactory,
@@ -18,14 +18,14 @@ import type {
   CreateAgentOptions,
   ResumeAgentOptions,
   SessionStartSource,
-} from '@roos-code/roos-code-agent'
-import { errorChain } from '@roos-code/roos-code-llm'
-import { installSettingsSection, settingsNamespace } from '@roos-code/roos-code-settings'
-import { SessionId, SessionPreparation } from '@roos-code/roos-code-session'
-import type { Session, SessionHeader } from '@roos-code/roos-code-session'
-import type {} from '@roos-code/roos-code-system-prompt'
-import type {} from '@roos-code/roos-code-tools'
-import type { SessionPersistence } from '@roos-code/roos-code-session-persistence'
+} from '@shres-code/shres-code-agent'
+import { errorChain } from '@shres-code/shres-code-llm'
+import { installSettingsSection, settingsNamespace } from '@shres-code/shres-code-settings'
+import { SessionId, SessionPreparation } from '@shres-code/shres-code-session'
+import type { Session, SessionHeader } from '@shres-code/shres-code-session'
+import type {} from '@shres-code/shres-code-system-prompt'
+import type {} from '@shres-code/shres-code-tools'
+import type { SessionPersistence } from '@shres-code/shres-code-session-persistence'
 import { ReactLoopAgent } from './agent.ts'
 import { DEFAULT_MAX_PARALLEL_TOOL_CALLS } from './constants.ts'
 
@@ -157,7 +157,7 @@ interface PreparedAgent {
   dispose(): Promise<void>
 }
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     agentLoop: AgentLoop
     /**
@@ -653,7 +653,7 @@ export class AgentLoop extends Service implements AgentFactory {
   async resume(ownerCtx: Context, options: ResumeAgentOptions): Promise<AgentHandle> {
     const persistence = this.runtime.ctx.get('sessionPersistence')
     if (persistence === undefined) {
-      throw new Error('cannot resume: session persistence is not configured (load a roos-session-persistence backend)')
+      throw new Error('cannot resume: session persistence is not configured (load a shres-session-persistence backend)')
     }
     return this.resumeWith(ownerCtx, persistence, options)
   }

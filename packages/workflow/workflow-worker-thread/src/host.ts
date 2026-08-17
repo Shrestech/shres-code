@@ -3,20 +3,20 @@
  * cancellation-grace expiry owns settlement and closes message admission.
  * Pending starts share one abort signal; published children share idempotent
  * cleanup, and quiescence waits for both while synthesizing any missing end events.
- * @module @roos-code/roos-code-workflow-worker-thread/host
+ * @module @shres-code/shres-code-workflow-worker-thread/host
  */
 
 import { tmpdir } from 'node:os'
 import { Worker } from 'node:worker_threads'
 import type { WorkerOptions } from 'node:worker_threads'
 import { fileURLToPath } from 'node:url'
-import type { Context } from '@roos-code/cordis'
-import type { Agent } from '@roos-code/roos-code-agent'
-import { assertNever } from '@roos-code/roos-code-llm'
-import { snapshotJsonValue } from '@roos-code/roos-code-session'
-import type SubagentRuntime from '@roos-code/roos-code-subagent'
-import type { SubagentRun } from '@roos-code/roos-code-subagent'
-import type { WorkflowAgentEndInfo, WorkflowAgentInfo, WorkflowMeta, WorkflowResult, WorkflowRun, WorkflowRunId } from '@roos-code/roos-code-workflow'
+import type { Context } from '@shres-code/cordis'
+import type { Agent } from '@shres-code/shres-code-agent'
+import { assertNever } from '@shres-code/shres-code-llm'
+import { snapshotJsonValue } from '@shres-code/shres-code-session'
+import type SubagentRuntime from '@shres-code/shres-code-subagent'
+import type { SubagentRun } from '@shres-code/shres-code-subagent'
+import type { WorkflowAgentEndInfo, WorkflowAgentInfo, WorkflowMeta, WorkflowResult, WorkflowRun, WorkflowRunId } from '@shres-code/shres-code-workflow'
 import { renderThrown } from './realm.ts'
 import type { ExecutionObserver } from './runtime.ts'
 import { HostToWorkerType, WorkerToHostType } from './protocol.ts'

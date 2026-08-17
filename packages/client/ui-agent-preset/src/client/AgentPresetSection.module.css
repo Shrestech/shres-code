@@ -355,8 +355,8 @@
   line-height: 1.5;
   white-space: pre;
   tab-size: 2;
-  --roos-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
-  --roos-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
+  --shres-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
+  --shres-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
 }
 
 .error {

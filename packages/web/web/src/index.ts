@@ -3,11 +3,11 @@
  * fetch. Duplicate ids are rejected. At execution time, a configured provider must exist and
  * be usable; without one, exactly one usable provider is required, so selection never depends
  * on registration order.
- * @module @roos-code/roos-code-web
+ * @module @shres-code/shres-code-web
  */
 
-import { Context, Service } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
+import { Context, Service } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
 import type {
   WebFetchProvider,
   WebFetchRequest,
@@ -32,7 +32,7 @@ export type {
   WebSearchSource,
 } from './types.ts'
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     web: WebRuntime
   }
@@ -85,7 +85,7 @@ export interface WebRuntimeConfig {
 export class WebRuntime extends Service {
   /**
    * Provider selection config. Operational env overrides feed the SAME fields:
-   * `$ROOS_WEB_SEARCH_PROVIDER` / `$ROOS_WEB_FETCH_PROVIDER` are equivalent to
+   * `$SHRES_WEB_SEARCH_PROVIDER` / `$SHRES_WEB_FETCH_PROVIDER` are equivalent to
    * `searchProvider` / `fetchProvider` and are NOT a hidden priority chain.
    */
   static Config: z<WebRuntimeConfig> = z.object({
@@ -104,13 +104,13 @@ export class WebRuntime extends Service {
 
   constructor(ctx: Context, config: WebRuntimeConfig = {}) {
     super(ctx, 'web')
-    this.searchProviderId = config.searchProvider ?? process.env.ROOS_WEB_SEARCH_PROVIDER
+    this.searchProviderId = config.searchProvider ?? process.env.SHRES_WEB_SEARCH_PROVIDER
     this.searchProviderFallbackIds = splitProviderList(
-      config.searchProviders ?? splitEnvList(process.env.ROOS_WEB_SEARCH_PROVIDERS),
+      config.searchProviders ?? splitEnvList(process.env.SHRES_WEB_SEARCH_PROVIDERS),
     )
-    this.fetchProviderId = config.fetchProvider ?? process.env.ROOS_WEB_FETCH_PROVIDER
+    this.fetchProviderId = config.fetchProvider ?? process.env.SHRES_WEB_FETCH_PROVIDER
     this.fetchProviderFallbackIds = splitProviderList(
-      config.fetchProviders ?? splitEnvList(process.env.ROOS_WEB_FETCH_PROVIDERS),
+      config.fetchProviders ?? splitEnvList(process.env.SHRES_WEB_FETCH_PROVIDERS),
     )
   }
 
@@ -242,7 +242,7 @@ function splitProviderList(ids: readonly string[] | undefined): string[] | undef
 }
 
 /**
- * Split `$ROOS_WEB_*_PROVIDERS` (comma-separated) into ids.
+ * Split `$SHRES_WEB_*_PROVIDERS` (comma-separated) into ids.
  * @param value - raw environment value.
  * @returns ids, or `undefined` when the variable is unset or blank.
  */

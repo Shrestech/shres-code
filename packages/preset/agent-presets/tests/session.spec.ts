@@ -8,8 +8,8 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { SessionId } from '@roos-code/roos-code-session'
-import type { SessionEvent, SessionHeader } from '@roos-code/roos-code-session'
+import { SessionId } from '@shres-code/shres-code-session'
+import type { SessionEvent, SessionHeader } from '@shres-code/shres-code-session'
 import { resolveSessionPreset } from '../src/session.ts'
 
 /** A header carrying the creation-time preset, if any. */

@@ -1,16 +1,16 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import Loader from '@roos-code/cordis-plugin-loader'
-import Include from '@roos-code/cordis-plugin-include'
+import { Context } from '@shres-code/cordis'
+import Loader from '@shres-code/cordis-plugin-loader'
+import Include from '@shres-code/cordis-plugin-include'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import LlmRuntime, { createUserMessage, LlmAdapter  } from '@roos-code/roos-code-llm'
-import type { GenerateOptions, StreamChunk } from '@roos-code/roos-code-llm'
-import SessionStore, { SessionId } from '@roos-code/roos-code-session'
-import SessionTitleService from '@roos-code/roos-code-session-title'
-import * as providerPlugin from '@roos-code/roos-code-session-title-first-prompt-llm'
+import LlmRuntime, { createUserMessage, LlmAdapter  } from '@shres-code/shres-code-llm'
+import type { GenerateOptions, StreamChunk } from '@shres-code/shres-code-llm'
+import SessionStore, { SessionId } from '@shres-code/shres-code-session'
+import SessionTitleService from '@shres-code/shres-code-session-title'
+import * as providerPlugin from '@shres-code/shres-code-session-title-first-prompt-llm'
 
 let root: string | undefined
 let context: Context | undefined
@@ -33,17 +33,17 @@ afterEach(async () => {
 })
 
 async function loadComposition(): Promise<Context> {
-  root = await mkdtemp(join(tmpdir(), 'roos-title-loader-'))
+  root = await mkdtemp(join(tmpdir(), 'shres-title-loader-'))
   const configPath = join(root, 'cordis.yml')
   await writeFile(configPath, [
-    "- name: '@roos-code/roos-code-llm'",
-    "- name: '@roos-code/roos-code-session'",
-    "- name: '@roos-code/roos-code-session-title'",
+    "- name: '@shres-code/shres-code-llm'",
+    "- name: '@shres-code/shres-code-session'",
+    "- name: '@shres-code/shres-code-session-title'",
     '  config:',
     '    fallbackMaxWords: 5',
     '    fallbackMaxBytes: 40',
     '    maxTitleBytes: 80',
-    "- name: '@roos-code/roos-code-session-title-first-prompt-llm'",
+    "- name: '@shres-code/shres-code-session-title-first-prompt-llm'",
     '  config:',
     '    targetWords: 5',
     '    targetCjkCharacters: 10',
@@ -60,10 +60,10 @@ async function loadComposition(): Promise<Context> {
   await context.plugin(Loader)
   context.loader.builtins.include = Include
   const modules = new Map<string, unknown>([
-    ['@roos-code/roos-code-llm', LlmRuntime],
-    ['@roos-code/roos-code-session', SessionStore],
-    ['@roos-code/roos-code-session-title', SessionTitleService],
-    ['@roos-code/roos-code-session-title-first-prompt-llm', providerPlugin],
+    ['@shres-code/shres-code-llm', LlmRuntime],
+    ['@shres-code/shres-code-session', SessionStore],
+    ['@shres-code/shres-code-session-title', SessionTitleService],
+    ['@shres-code/shres-code-session-title-first-prompt-llm', providerPlugin],
   ])
   context.loader.internal = {
     version: 'v2',

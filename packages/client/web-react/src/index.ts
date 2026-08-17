@@ -1,5 +1,5 @@
 /** React bindings for the framework-neutral slot and snapshot contracts. */
-import type { SnapshotSelectorHook } from '@roos-code/roos-code-client-ui-slots'
+import type { SnapshotSelectorHook } from '@shres-code/shres-code-client-ui-slots'
 
 export { bindSnapshotSelector } from './bind.ts'
 
@@ -14,8 +14,8 @@ export type UseSession<Snap extends object = object> = SnapshotSelectorHook<Snap
 export type {
   ChainRenderOpts, HostObservable, RenderOpts, SessionProvideInfo, SnapshotSelectorHook,
   SlotRenderer, SlotRendererHost, StoreInstanceLike,
-} from '@roos-code/roos-code-client-ui-slots'
-export { SlotOwnershipError, StaleAuthorizationError } from '@roos-code/roos-code-client-ui-slots'
+} from '@shres-code/shres-code-client-ui-slots'
+export { SlotOwnershipError, StaleAuthorizationError } from '@shres-code/shres-code-client-ui-slots'
 export { createSlotRenderer } from './scoped-slots.tsx'
 
 export { SessionProvider, SlotAssemblyError, type SessionProviderProps } from './session-provider.tsx'

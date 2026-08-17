@@ -17,12 +17,12 @@ function fixture(options: {
   invariantExport?: string
   runtimeChunk?: string
 } = {}): { root: string; loaderUrl: string } {
-  const root = mkdtempSync(join(tmpdir(), 'roos-built-package-invariants-'))
+  const root = mkdtempSync(join(tmpdir(), 'shres-built-package-invariants-'))
   roots.push(root)
   const packageDir = join(root, 'packages/core/probe')
   mkdirSync(join(packageDir, 'lib'), { recursive: true })
   writeFileSync(join(packageDir, 'package.json'), `${JSON.stringify({
-    name: '@roos-code/roos-code-probe',
+    name: '@shres-code/shres-code-probe',
     type: 'module',
     files: ['lib/invariant.js'],
     exports: {
@@ -73,7 +73,7 @@ describe('built package invariant verifier', () => {
     const brokenExport = fixture({ invariantExport: './lib/missing.js' })
     const exportResult = verify(brokenExport.root, brokenExport.loaderUrl)
     expect(exportResult.status).toBe(1)
-    expect(exportResult.stderr).toContain('@roos-code/roos-code-probe')
+    expect(exportResult.stderr).toContain('@shres-code/shres-code-probe')
   })
 
   it('rejects an invariant bundle that needs an unstaged runtime chunk', () => {

@@ -2,31 +2,31 @@ import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { CallId } from '@roos-code/roos-code-llm'
-import { ShellExecutor } from '@roos-code/roos-code-shell'
-import type { ShellExecRequest, ShellExecSpec, ShellProcess, ShellProcessRead, ShellRunResult } from '@roos-code/roos-code-shell'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import ToolRuntime, { TOOL_ABORTED, TOOL_ABORTED_BEFORE_DISPATCH } from '@roos-code/roos-code-tools'
-import AgentRegistry from '@roos-code/roos-code-agent'
-import type { Agent } from '@roos-code/roos-code-agent'
-import SessionStore, { SessionId } from '@roos-code/roos-code-session'
-import JsonlSessionPersistence from '@roos-code/roos-code-session-persistence-jsonl'
-import LocalJobRegistry from '@roos-code/roos-code-jobs-local'
-import * as ToolTasks from '@roos-code/roos-code-tool-jobs'
-import ApprovalService from '@roos-code/roos-code-user-approval'
-import type { ApprovalOutcome } from '@roos-code/roos-code-user-approval'
-import { LocalBashExecutor } from '@roos-code/roos-code-bash-local'
-import LocalSubprocessRuntime from '@roos-code/roos-code-subprocess-local'
-import SandboxPolicyService from '@roos-code/roos-code-sandbox-policy'
-import * as ToolBash from '@roos-code/roos-code-tool-bash'
-import * as BashEnvPlugin from '@roos-code/roos-code-shell-env'
+import { Context } from '@shres-code/cordis'
+import { CallId } from '@shres-code/shres-code-llm'
+import { ShellExecutor } from '@shres-code/shres-code-shell'
+import type { ShellExecRequest, ShellExecSpec, ShellProcess, ShellProcessRead, ShellRunResult } from '@shres-code/shres-code-shell'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import ToolRuntime, { TOOL_ABORTED, TOOL_ABORTED_BEFORE_DISPATCH } from '@shres-code/shres-code-tools'
+import AgentRegistry from '@shres-code/shres-code-agent'
+import type { Agent } from '@shres-code/shres-code-agent'
+import SessionStore, { SessionId } from '@shres-code/shres-code-session'
+import JsonlSessionPersistence from '@shres-code/shres-code-session-persistence-jsonl'
+import LocalJobRegistry from '@shres-code/shres-code-jobs-local'
+import * as ToolTasks from '@shres-code/shres-code-tool-jobs'
+import ApprovalService from '@shres-code/shres-code-user-approval'
+import type { ApprovalOutcome } from '@shres-code/shres-code-user-approval'
+import { LocalBashExecutor } from '@shres-code/shres-code-bash-local'
+import LocalSubprocessRuntime from '@shres-code/shres-code-subprocess-local'
+import SandboxPolicyService from '@shres-code/shres-code-sandbox-policy'
+import * as ToolBash from '@shres-code/shres-code-tool-bash'
+import * as BashEnvPlugin from '@shres-code/shres-code-shell-env'
 import { processOutcome } from '../src/background.ts'
 import { renderProcessRead, renderResult } from '../src/render.ts'
 
 const testToolSignal = new AbortController().signal
 
-const spillDir = mkdtempSync(join(tmpdir(), 'roos-tool-bash-spec-'))
+const spillDir = mkdtempSync(join(tmpdir(), 'shres-tool-bash-spec-'))
 
 /** Foreground-only harness: no job runtime (backgrounding fails loud here). */
 async function setup() {
@@ -300,7 +300,7 @@ describe('bash tool', () => {
 
   it('surfaces spawn failures as isError', async () => {
     const ctx = await setup()
-    const result = await call(ctx, 'bash', { command: 'true', description: 'test command', workdir: '/nonexistent-roos' })
+    const result = await call(ctx, 'bash', { command: 'true', description: 'test command', workdir: '/nonexistent-shres' })
     expect(result.isError).toBe(true)
     expect(text(result)).toMatch(/ENOENT/)
   })
@@ -492,7 +492,7 @@ describe('background execution through the job runtime', () => {
     const ctx = await setup() // no LocalJobRegistry / ToolTasks
     const result = await call(ctx, 'bash', { command: 'sleep 60', description: 'test command', run_in_background: true })
     expect(result.isError).toBe(true)
-    expect(text(result)).toContain('background jobs unavailable: load @roos-code/roos-code-jobs and @roos-code/roos-code-tool-jobs')
+    expect(text(result)).toContain('background jobs unavailable: load @shres-code/shres-code-jobs and @shres-code/shres-code-tool-jobs')
   })
 
   it('a pre-aborted call is skipped before the process starts', async () => {
@@ -1051,7 +1051,7 @@ describe('tool-owned UI presentation (presentCall / presentResult)', () => {
 })
 
 describe('the model-facing bash tool builds its request from named args only (no {...args} forward)', () => {
-  const recordingRoosHome = join(spillDir, 'roos-home')
+  const recordingShresHome = join(spillDir, 'shres-home')
 
   /**
    * Records every {@link ShellExecRequest} the consumer hands to `resolve()`, so a
@@ -1062,7 +1062,7 @@ describe('the model-facing bash tool builds its request from named args only (no
    * future refactor that blindly forwards `...args` — which would silently thread
    * model input into the post-scrub `env` merge or per-run capture budget — NOT
    * to defend a trust boundary
-   * (the credential scrub in roos-bash-local is the security control; see the
+   * (the credential scrub in shres-bash-local is the security control; see the
    * bash-stdin-env Agent Note). Foreground `run()` returns a canned result; `start()`
    * hands back an already-settled fake handle so the task registration completes.
    */
@@ -1078,7 +1078,7 @@ describe('the model-facing bash tool builds its request from named args only (no
         ...request.signal ? { signal: request.signal } : {},
         ...request.stdin !== undefined ? { stdin: request.stdin } : {},
         ...request.env !== undefined ? { env: request.env } : {},
-        ...request.roosEnv !== undefined ? { roosEnv: request.roosEnv } : {},
+        ...request.shresEnv !== undefined ? { shresEnv: request.shresEnv } : {},
         sandboxPolicy: request.sandboxPolicy,
       }
     }
@@ -1111,7 +1111,7 @@ describe('the model-facing bash tool builds its request from named args only (no
     }
     await ctx.plugin(LocalJobRegistry)
     await ctx.plugin(ToolTasks)
-    await ctx.plugin(BashEnvPlugin, { roosHome: recordingRoosHome })
+    await ctx.plugin(BashEnvPlugin, { shresHome: recordingShresHome })
     await ctx.plugin(RecordingBashExecutor)
     await ctx.plugin(ToolBash)
     return { ctx, bash: ctx.shell as RecordingBashExecutor }
@@ -1120,8 +1120,8 @@ describe('the model-facing bash tool builds its request from named args only (no
   it('describes the managed harness environment namespace to the model', async () => {
     const { ctx } = await setupRecording()
     const description = ctx.tools.get('bash')?.description ?? ''
-    expect(description).toContain('$ROOS_*')
-    expect(description).not.toContain('ROOS_SESSION_JSONL')
+    expect(description).toContain('$SHRES_*')
+    expect(description).not.toContain('SHRES_SESSION_JSONL')
   })
 
   it('injects the session id and JSONL target path into a foreground request', async () => {
@@ -1137,11 +1137,11 @@ describe('the model-facing bash tool builds its request from named args only (no
       agent,
     })
 
-    expect(bash.requests[0]?.roosEnv).toEqual({
-      ROOS_HOME: recordingRoosHome,
-      ROOS_SESSION_ID: 'request-fg',
-      ROOS_SESSION_JSONL: path,
-      ROOS_SHELL: '1',
+    expect(bash.requests[0]?.shresEnv).toEqual({
+      SHRES_HOME: recordingShresHome,
+      SHRES_SESSION_ID: 'request-fg',
+      SHRES_SESSION_JSONL: path,
+      SHRES_SHELL: '1',
     })
   })
 
@@ -1158,24 +1158,24 @@ describe('the model-facing bash tool builds its request from named args only (no
         command: 'sleep 1',
         description: 'run command',
         run_in_background: true,
-        env: { ROOS_SESSION_ID: 'spoofed', ROOS_SESSION_JSONL: '/tmp/spoofed' },
+        env: { SHRES_SESSION_ID: 'spoofed', SHRES_SESSION_JSONL: '/tmp/spoofed' },
       },
       agent,
     })
 
     expect(bash.requests[0]?.env).toBeUndefined()
-    expect(bash.requests[0]?.roosEnv).toEqual({
-      ROOS_HOME: recordingRoosHome,
-      ROOS_SESSION_ID: 'request-bg',
-      ROOS_SESSION_JSONL: path,
-      ROOS_SHELL: '1',
+    expect(bash.requests[0]?.shresEnv).toEqual({
+      SHRES_HOME: recordingShresHome,
+      SHRES_SESSION_ID: 'request-bg',
+      SHRES_SESSION_JSONL: path,
+      SHRES_SHELL: '1',
     })
   })
 
   it('injects built-ins and the stable session id when no JSONL locator is available', async () => {
     const { ctx, bash } = await setupRecording()
     const agent = registerFakeAgent(ctx, 'request-id-only', () => undefined)
-    const ambient = process.env.ROOS_SESSION_ID
+    const ambient = process.env.SHRES_SESSION_ID
 
     await ctx.tools.execute({
       signal: testToolSignal,
@@ -1185,12 +1185,12 @@ describe('the model-facing bash tool builds its request from named args only (no
       agent,
     })
 
-    expect(bash.requests[0]?.roosEnv).toEqual({
-      ROOS_HOME: recordingRoosHome,
-      ROOS_SESSION_ID: 'request-id-only',
-      ROOS_SHELL: '1',
+    expect(bash.requests[0]?.shresEnv).toEqual({
+      SHRES_HOME: recordingShresHome,
+      SHRES_SESSION_ID: 'request-id-only',
+      SHRES_SHELL: '1',
     })
-    expect(process.env.ROOS_SESSION_ID).toBe(ambient)
+    expect(process.env.SHRES_SESSION_ID).toBe(ambient)
   })
 
   it('keeps parent and child agent session environments isolated', async () => {
@@ -1208,21 +1208,21 @@ describe('the model-facing bash tool builds its request from named args only (no
       })
     }
 
-    expect(bash.requests.map(request => request.roosEnv)).toEqual([
+    expect(bash.requests.map(request => request.shresEnv)).toEqual([
       {
-        ROOS_HOME: recordingRoosHome,
-        ROOS_SESSION_ID: 'request-parent',
-        ROOS_SESSION_JSONL: ctx.sessionPersistence.locate(parent.session.header)?.path,
-        ROOS_SHELL: '1',
+        SHRES_HOME: recordingShresHome,
+        SHRES_SESSION_ID: 'request-parent',
+        SHRES_SESSION_JSONL: ctx.sessionPersistence.locate(parent.session.header)?.path,
+        SHRES_SHELL: '1',
       },
       {
-        ROOS_HOME: recordingRoosHome,
-        ROOS_SESSION_ID: 'request-child',
-        ROOS_SESSION_JSONL: ctx.sessionPersistence.locate(child.session.header)?.path,
-        ROOS_SHELL: '1',
+        SHRES_HOME: recordingShresHome,
+        SHRES_SESSION_ID: 'request-child',
+        SHRES_SESSION_JSONL: ctx.sessionPersistence.locate(child.session.header)?.path,
+        SHRES_SHELL: '1',
       },
     ])
-    expect(bash.requests[0]?.roosEnv?.ROOS_SESSION_JSONL).not.toBe(bash.requests[1]?.roosEnv?.ROOS_SESSION_JSONL)
+    expect(bash.requests[0]?.shresEnv?.SHRES_SESSION_JSONL).not.toBe(bash.requests[1]?.shresEnv?.SHRES_SESSION_JSONL)
   })
 
   it('does not forward trusted-only fields even when the model includes them as extra arguments', async () => {

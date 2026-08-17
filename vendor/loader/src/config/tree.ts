@@ -1,5 +1,5 @@
-import { composeError, Context } from '@roos-code/cordis'
-import { isNonNullable, type Dict } from '@roos-code/cosmokit'
+import { composeError, Context } from '@shres-code/cordis'
+import { isNonNullable, type Dict } from '@shres-code/cosmokit'
 import { Entry, type EntryOptions } from './entry.ts'
 import { EntryGroup } from './group.ts'
 

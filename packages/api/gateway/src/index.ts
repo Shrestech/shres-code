@@ -1,11 +1,11 @@
 /**
  * Live Typert Remote dispatch over Cordis Services and registered providers.
  * Transport, request correlation, and response envelopes belong to Connection.
- * @module @roos-code/roos-code-api-gateway
+ * @module @shres-code/shres-code-api-gateway
  */
 
-import { Context, Service, symbols } from '@roos-code/cordis'
-import type { ConnectionRpcHandler } from '@roos-code/roos-code-client-connection'
+import { Context, Service, symbols } from '@shres-code/cordis'
+import type { ConnectionRpcHandler } from '@shres-code/shres-code-client-connection'
 import {
   remoteMethods,
   TypertLookupFailure,
@@ -13,7 +13,7 @@ import {
   type InvocationParameterDescriptor,
   type TypertCodec,
   type TypertGatewayBinding,
-} from '@roos-code/roos-code-typert-protocol'
+} from '@shres-code/shres-code-typert-protocol'
 import type {
   InvokeRemoteRequest,
   TypertGateway,

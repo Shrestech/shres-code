@@ -1,7 +1,7 @@
 /**
  * Compiler-independent Typert analysis model. TypeScript nodes and checker
  * objects are extraction inputs only; emitters consume this graph.
- * @module @roos-code/roos-code-typert-generator/model
+ * @module @shres-code/shres-code-typert-generator/model
  */
 
 /** One independently compiled side of the workspace. */

@@ -1,8 +1,8 @@
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { afterEach, describe, expect, it } from 'vitest'
-import ToolRuntime from '@roos-code/roos-code-tools'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import UserQuestionService from '@roos-code/roos-code-user-questions'
+import ToolRuntime from '@shres-code/shres-code-tools'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import UserQuestionService from '@shres-code/shres-code-user-questions'
 import { apply } from '../src/index.ts'
 
 let ctx: Context | undefined

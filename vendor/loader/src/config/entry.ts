@@ -1,5 +1,5 @@
-import { Context, Fiber, Inject } from '@roos-code/cordis'
-import { deepEqual, isNullable } from '@roos-code/cosmokit'
+import { Context, Fiber, Inject } from '@shres-code/cordis'
+import { deepEqual, isNullable } from '@shres-code/cosmokit'
 import { Loader } from '../index.ts'
 import { EntryGroup } from './group.ts'
 import { EntryTree } from './tree.ts'

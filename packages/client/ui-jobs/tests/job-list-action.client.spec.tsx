@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
-import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
-import type { SessionId, SessionListState, JobView } from '@roos-code/roos-code-client-runtime/client'
+import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
+import type { SessionId, SessionListState, JobView } from '@shres-code/shres-code-client-runtime/client'
 import { JobListAction, type JobListActionProps } from '../src/client/JobListAction.tsx'
 import { en } from '../src/client/locales.ts'
 

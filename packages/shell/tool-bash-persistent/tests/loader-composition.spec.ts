@@ -3,22 +3,22 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import Loader from '@roos-code/cordis-plugin-loader'
-import Include from '@roos-code/cordis-plugin-include'
-import { CallId } from '@roos-code/roos-code-llm'
-import { Session, SessionId } from '@roos-code/roos-code-session'
-import AgentRegistry, { Inbox } from '@roos-code/roos-code-agent'
-import type { Agent } from '@roos-code/roos-code-agent'
-import TerminalSessionService from '@roos-code/roos-code-terminal'
-import * as TerminalLocal from '@roos-code/roos-code-terminal-bash'
-import SandboxProvider from '@roos-code/roos-code-sandbox'
-import type { ConfinedArgv, SandboxPolicy } from '@roos-code/roos-code-sandbox'
-import SandboxPolicyService from '@roos-code/roos-code-sandbox-policy'
-import LocalSubprocessRuntime from '@roos-code/roos-code-subprocess-local'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import ToolRuntime from '@roos-code/roos-code-tools'
-import * as ToolBashPersistent from '@roos-code/roos-code-tool-bash-persistent'
+import { Context } from '@shres-code/cordis'
+import Loader from '@shres-code/cordis-plugin-loader'
+import Include from '@shres-code/cordis-plugin-include'
+import { CallId } from '@shres-code/shres-code-llm'
+import { Session, SessionId } from '@shres-code/shres-code-session'
+import AgentRegistry, { Inbox } from '@shres-code/shres-code-agent'
+import type { Agent } from '@shres-code/shres-code-agent'
+import TerminalSessionService from '@shres-code/shres-code-terminal'
+import * as TerminalLocal from '@shres-code/shres-code-terminal-bash'
+import SandboxProvider from '@shres-code/shres-code-sandbox'
+import type { ConfinedArgv, SandboxPolicy } from '@shres-code/shres-code-sandbox'
+import SandboxPolicyService from '@shres-code/shres-code-sandbox-policy'
+import LocalSubprocessRuntime from '@shres-code/shres-code-subprocess-local'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import ToolRuntime from '@shres-code/shres-code-tools'
+import * as ToolBashPersistent from '@shres-code/shres-code-tool-bash-persistent'
 
 let root: string | undefined
 let context: Context | undefined
@@ -67,20 +67,20 @@ const suite = process.platform === 'linux' || process.platform === 'darwin' ? de
 
 suite('persistent Bash through a real cordis.yml Loader composition', () => {
   it('preserves cwd and environment across calls', async () => {
-    root = await mkdtemp(join(tmpdir(), 'roos-persistent-bash-loader-'))
+    root = await mkdtemp(join(tmpdir(), 'shres-persistent-bash-loader-'))
     const configPath = join(root, 'cordis.yml')
     await writeFile(configPath, [
-      "- name: '@roos-code/roos-code-agent'",
-      "- name: '@roos-code/roos-code-system-prompt'",
-      "- name: '@roos-code/roos-code-tools'",
-      "- name: '@roos-code/roos-code-terminal'",
-      "- name: '@roos-code/roos-code-test-sandbox'",
-      "- name: '@roos-code/roos-code-sandbox-policy'",
+      "- name: '@shres-code/shres-code-agent'",
+      "- name: '@shres-code/shres-code-system-prompt'",
+      "- name: '@shres-code/shres-code-tools'",
+      "- name: '@shres-code/shres-code-terminal'",
+      "- name: '@shres-code/shres-code-test-sandbox'",
+      "- name: '@shres-code/shres-code-sandbox-policy'",
       '  config:',
       '    mode: danger-full-access',
       `    workspaceRoot: ${JSON.stringify(root)}`,
-      "- name: '@roos-code/roos-code-subprocess-local'",
-      "- name: '@roos-code/roos-code-terminal-bash'",
+      "- name: '@shres-code/shres-code-subprocess-local'",
+      "- name: '@shres-code/shres-code-terminal-bash'",
       '  config:',
       '    pollIntervalMs: 10',
       '    exactProbeAfterMs: 20',
@@ -89,7 +89,7 @@ suite('persistent Bash through a real cordis.yml Loader composition', () => {
       '    scrollbackLines: 20000',
       '    timeoutMs: 2000',
       '    disposeGraceMs: 500',
-      "- name: '@roos-code/roos-code-tool-bash-persistent'",
+      "- name: '@shres-code/shres-code-tool-bash-persistent'",
       '  config:',
       '    timeoutMs: 5000',
       '',
@@ -100,15 +100,15 @@ suite('persistent Bash through a real cordis.yml Loader composition', () => {
     await context.plugin(Loader)
     context.loader.builtins.include = Include
     const modules = new Map<string, unknown>([
-      ['@roos-code/roos-code-agent', AgentRegistry],
-      ['@roos-code/roos-code-system-prompt', SystemPrompt],
-      ['@roos-code/roos-code-tools', ToolRuntime],
-      ['@roos-code/roos-code-terminal', TerminalSessionService],
-      ['@roos-code/roos-code-test-sandbox', PassthroughSandbox],
-      ['@roos-code/roos-code-sandbox-policy', SandboxPolicyService],
-      ['@roos-code/roos-code-subprocess-local', LocalSubprocessRuntime],
-      ['@roos-code/roos-code-terminal-bash', TerminalLocal],
-      ['@roos-code/roos-code-tool-bash-persistent', ToolBashPersistent],
+      ['@shres-code/shres-code-agent', AgentRegistry],
+      ['@shres-code/shres-code-system-prompt', SystemPrompt],
+      ['@shres-code/shres-code-tools', ToolRuntime],
+      ['@shres-code/shres-code-terminal', TerminalSessionService],
+      ['@shres-code/shres-code-test-sandbox', PassthroughSandbox],
+      ['@shres-code/shres-code-sandbox-policy', SandboxPolicyService],
+      ['@shres-code/shres-code-subprocess-local', LocalSubprocessRuntime],
+      ['@shres-code/shres-code-terminal-bash', TerminalLocal],
+      ['@shres-code/shres-code-tool-bash-persistent', ToolBashPersistent],
     ])
     context.loader.internal = {
       version: 'v2',
@@ -134,14 +134,14 @@ suite('persistent Bash through a real cordis.yml Loader composition', () => {
     await execute('state', 'export KEEP=loader; mkdir -p nested; cd nested')
     const observed = text(await execute('observe', 'printf "cwd=%s keep=%s\\n" "$PWD" "$KEEP"'))
     expect(observed).toContain(`cwd=${join(root, 'nested')} keep=loader`)
-    expect(observed).not.toContain('ROOS_PERSISTENT_BASH')
+    expect(observed).not.toContain('SHRES_PERSISTENT_BASH')
 
     const multiline = text(await execute(
       'multiline',
       'value="line one"\nprintf "%s:%s\\n" "$value" "it\'s fine"',
     ))
     expect(multiline).toBe("line one:it's fine")
-    expect(multiline).not.toContain('ROOS_PERSISTENT_BASH')
+    expect(multiline).not.toContain('SHRES_PERSISTENT_BASH')
 
     const heredoc = text(await execute(
       'heredoc',

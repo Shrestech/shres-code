@@ -4,12 +4,12 @@
  * creation, flatten post-publication failures, and dispose to whole-tree
  * quiescence.
  *
- * @module @roos-code/roos-code-subagent-codex/run
+ * @module @shres-code/shres-code-subagent-codex/run
  */
 
 import { randomUUID } from 'node:crypto'
-import type { ContentBlock } from '@roos-code/roos-code-llm'
-import { SessionId } from '@roos-code/roos-code-session'
+import type { ContentBlock } from '@shres-code/shres-code-llm'
+import { SessionId } from '@shres-code/shres-code-session'
 import {
   settleRunResult,
   subprocessRunHandle,
@@ -17,8 +17,8 @@ import {
   type SubagentRun,
   type SubagentStartRequest,
   type SubagentStopReason,
-} from '@roos-code/roos-code-subagent'
-import type { SubprocessHandle, SubprocessSpawnSpec } from '@roos-code/roos-code-subprocess'
+} from '@shres-code/shres-code-subagent'
+import type { SubprocessHandle, SubprocessSpawnSpec } from '@shres-code/shres-code-subprocess'
 import { CodexAppServerWire } from './wire.ts'
 
 /** Default POSIX grace between subprocess termination tiers. */

@@ -1,11 +1,11 @@
 /**
  * Types shared by job producers, the registry, and controllers. The
  * service implementation lives in `./index.ts`.
- * @module @roos-code/roos-code-jobs/types
+ * @module @shres-code/shres-code-jobs/types
  */
 
-import type { Agent } from '@roos-code/roos-code-agent'
-import type { SessionId } from '@roos-code/roos-code-session'
+import type { Agent } from '@shres-code/shres-code-agent'
+import type { SessionId } from '@shres-code/shres-code-session'
 import type { JobId } from './brand.ts'
 
 export { JobId } from './brand.ts'

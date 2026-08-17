@@ -63,7 +63,7 @@ const homeAndGuide = englishPages([
   {
     source: 'docs/user/index.md',
     route: 'index.md',
-    label: 'Roos Code',
+    label: 'Shres Code',
     sidebar: null,
     section: 'Home',
     order: 0,

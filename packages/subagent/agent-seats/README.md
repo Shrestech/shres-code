@@ -1,14 +1,14 @@
-# @roos-code/roos-code-agent-seats
+# @shres-code/shres-code-agent-seats
 
-Product roster that remounts three named spawn children — **Boomer** (Architect), **Joey** (Worker), and **Flyer** (Reviewer) — as distinct `tool-subagent` instances. The conversation model stays the conductor. Each bound seat is a Roos child in the same workspace, routed through `provider: spawn` with that seat's stored `agentOptions.provider` / `agentOptions.model`.
+Product roster that remounts three named spawn children — **Aegis** (Architect), **Stride** (Worker), and **Ward** (Reviewer) — as distinct `tool-subagent` instances. The conversation model stays the conductor. Each bound seat is a Shres child in the same workspace, routed through `provider: spawn` with that seat's stored `agentOptions.provider` / `agentOptions.model`.
 
 The plugin registers the `agent-seats` settings section. A seat mounts only when both fields are non-empty; an omitted or cleared seat withdraws its tool. Settings changes remount the bound set in place. Default composition leaves every seat unbound.
 
 | Seat | Role | Tool name |
 |---|---|---|
-| Boomer | Architect — design and plan, do not implement | `boomer` |
-| Joey | Worker — bounded implementation | `joey` |
-| Flyer | Reviewer — report findings, do not rewrite unless asked | `flyer` |
+| Aegis | Architect — design and plan, do not implement | `aegis` |
+| Stride | Worker — bounded implementation | `stride` |
+| Ward | Reviewer — report findings, do not rewrite unless asked | `ward` |
 
 The Models page writes this section. Child personas and tool descriptions live in `src/roster.ts`.
 

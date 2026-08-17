@@ -26,12 +26,12 @@ The example keeps the producer declarations and client contribution in one block
 
 ```ts ignore-check
 import { createElement } from 'react'
-import type { Branded } from '@roos-code/roos-code-brand'
+import type { Branded } from '@shres-code/shres-code-brand'
 import type {
   ClientContext, ConversationLocation, ConversationNodeContext,
   ConversationNodeDefinition,
-} from '@roos-code/roos-code-client-runtime/client'
-import type { ChatNodeViewProps } from '@roos-code/roos-code-client-ui-conversation/client'
+} from '@shres-code/shres-code-client-runtime/client'
+import type { ChatNodeViewProps } from '@shres-code/shres-code-client-ui-conversation/client'
 
 type ReviewId = Branded<'ReviewId'>
 
@@ -56,7 +56,7 @@ interface ReviewEndData {
   readonly summary: string
 }
 
-declare module '@roos-code/roos-code-session/types' {
+declare module '@shres-code/shres-code-session/types' {
   interface SessionEventMap {
     /**
      * Opens one durable review job.
@@ -86,13 +86,13 @@ interface ReviewChatData {
   readonly summary?: string
 }
 
-declare module '@roos-code/roos-code-client-ui-conversation/client' {
+declare module '@shres-code/shres-code-client-ui-conversation/client' {
   interface ChatNodeDataMap {
     'review-job': ReviewChatData
   }
 }
 
-declare module '@roos-code/roos-code-client-runtime/client' {
+declare module '@shres-code/shres-code-client-runtime/client' {
   interface ConversationStepDataMap {
     'review-job': ReviewChatData
   }

@@ -1,10 +1,10 @@
 /** Current-surface projection and byte-bounded rendering. */
 
-import { isCompactCheckpointSource } from '@roos-code/roos-code-compaction'
-import type { SessionSurfaceSnapshot } from '@roos-code/roos-code-session-query'
-import { assertNever } from '@roos-code/roos-code-llm'
-import { TextRetainer } from '@roos-code/roos-code-output-retention'
-import { stringifyTagSafeJson } from '@roos-code/roos-code-untrusted-frame'
+import { isCompactCheckpointSource } from '@shres-code/shres-code-compaction'
+import type { SessionSurfaceSnapshot } from '@shres-code/shres-code-session-query'
+import { assertNever } from '@shres-code/shres-code-llm'
+import { TextRetainer } from '@shres-code/shres-code-output-retention'
+import { stringifyTagSafeJson } from '@shres-code/shres-code-untrusted-frame'
 import type { ReferencedConversationItem } from './types.ts'
 
 interface ProjectedItem extends ReferencedConversationItem {

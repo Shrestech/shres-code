@@ -6,13 +6,13 @@
 
 import type {
   IApiClient, SettingsNamespaceView,
-} from '@roos-code/roos-code-api-remotes/client'
+} from '@shres-code/shres-code-api-remotes/client'
 import {
   createSnapshotStore, type SnapshotStore,
-} from '@roos-code/roos-code-client-runtime/client'
+} from '@shres-code/shres-code-client-runtime/client'
 import {
   nodeAtPath, rehydrateSchema, type SchemaNode,
-} from '@roos-code/roos-code-client-schema-form'
+} from '@shres-code/shres-code-client-schema-form'
 import { displayPermissionPreset } from './presentation.ts'
 
 /** Permission's settings namespace on the host wire. */

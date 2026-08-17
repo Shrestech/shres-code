@@ -4,12 +4,12 @@ import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
-import type { AgentHandle } from '@roos-code/roos-code-agent'
-import { createUserMessage, LlmAdapter } from '@roos-code/roos-code-llm'
-import type { GenerateOptions, StreamChunk } from '@roos-code/roos-code-llm'
-import { SessionId, type SessionId as SessionIdValue } from '@roos-code/roos-code-session'
-import type {} from '@roos-code/roos-code-subagent'
-import type {} from '@roos-code/roos-code-workspace'
+import type { AgentHandle } from '@shres-code/shres-code-agent'
+import { createUserMessage, LlmAdapter } from '@shres-code/shres-code-llm'
+import type { GenerateOptions, StreamChunk } from '@shres-code/shres-code-llm'
+import { SessionId, type SessionId as SessionIdValue } from '@shres-code/shres-code-session'
+import type {} from '@shres-code/shres-code-subagent'
+import type {} from '@shres-code/shres-code-workspace'
 import {
   assertFixtureInventory,
   captureStableAria,

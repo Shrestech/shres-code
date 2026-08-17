@@ -7,19 +7,19 @@
    mid-slide. */
 
 .root {
-  --roos-sidebar-inline-padding: 12px;
+  --shres-sidebar-inline-padding: 12px;
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: 6px var(--roos-sidebar-inline-padding);
+  padding: 6px var(--shres-sidebar-inline-padding);
   box-sizing: border-box;
   background: var(--dsw-specific-sidebar-fill);
   color: var(--dsw-alias-label-primary);
   font-size: 14px;
   /* The sidebar is elevated above the conversation surface, so a revealed
      scrollbar uses the l2 pair. .quietBars hides it without changing layout. */
-  --roos-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
-  --roos-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
+  --shres-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
+  --shres-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
 }
 
 /* Rail geometry (figma rail spec): 36x36 control boxes centered in the 56px
@@ -38,8 +38,8 @@
    revealing the thumb never reflows a row. Rebinding contract and the two
    rendering paths it reaches: ui-theme's README. */
 .root.quietBars {
-  --roos-scrollbar-thumb: transparent;
-  --roos-scrollbar-thumb-hover: transparent;
+  --shres-scrollbar-thumb: transparent;
+  --shres-scrollbar-thumb-hover: transparent;
 }
 
 /* Collapse phase 1: the whole frozen-width content fades out in place over
@@ -93,7 +93,7 @@
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
-  height: 60px;
+  height: 64px;
   padding: 8px 0 8px 4px;
   margin-bottom: 8px;
   box-sizing: border-box;
@@ -230,7 +230,7 @@
   display: flex;
   flex-direction: column;
   margin-left: -4px;
-  margin-right: calc(-1 * var(--roos-sidebar-inline-padding));
+  margin-right: calc(-1 * var(--shres-sidebar-inline-padding));
   padding-left: 4px;
   overflow: hidden;
 }

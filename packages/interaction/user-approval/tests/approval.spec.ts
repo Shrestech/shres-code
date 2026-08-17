@@ -1,16 +1,16 @@
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import type { Agent } from '@roos-code/roos-code-agent'
-import { CallId } from '@roos-code/roos-code-llm'
-import { carrierKeyOf, createScope } from '@roos-code/roos-code-scope'
-import type { Scope } from '@roos-code/roos-code-scope'
-import SessionStore, { Session, SessionId } from '@roos-code/roos-code-session'
-import type { SessionEvent } from '@roos-code/roos-code-session'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
+import { Context } from '@shres-code/cordis'
+import type { Agent } from '@shres-code/shres-code-agent'
+import { CallId } from '@shres-code/shres-code-llm'
+import { carrierKeyOf, createScope } from '@shres-code/shres-code-scope'
+import type { Scope } from '@shres-code/shres-code-scope'
+import SessionStore, { Session, SessionId } from '@shres-code/shres-code-session'
+import type { SessionEvent } from '@shres-code/shres-code-session'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
 import ApprovalService, {
   ApprovalOutcome, ApprovalOutsideTurnError, ApprovalRequest, effectiveApprovalPolicy,
   isApprovalOutsideTurnError, setApprovalPolicy,
-} from '@roos-code/roos-code-user-approval'
+} from '@shres-code/shres-code-user-approval'
 
 /**
  * A minimal Agent stand-in — the service only reaches `agent.session.append`

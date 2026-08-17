@@ -18,24 +18,24 @@
  * disposed by then, and the release that wakes the parent's own settlement
  * watcher has already run. See {@link SubagentContinuationManager.notifySettlement}.
  *
- * @module @roos-code/roos-code-subagent
+ * @module @shres-code/shres-code-subagent
  */
 
 import { randomUUID } from 'node:crypto'
-import type { Context } from '@roos-code/cordis'
+import type { Context } from '@shres-code/cordis'
 import type {
   Agent,
   AgentHandle,
   AgentOptions,
   AgentSetupCommit,
   CreateAgentOptions,
-} from '@roos-code/roos-code-agent'
-import { boundContextSummary, createUserMessage, errorChain } from '@roos-code/roos-code-llm'
-import type { ContentBlock, MessageId, MessageSource } from '@roos-code/roos-code-llm'
-import { SessionId } from '@roos-code/roos-code-session'
-import type { SessionEvent } from '@roos-code/roos-code-session'
-import type { SessionPersistence } from '@roos-code/roos-code-session-persistence'
-import type { ToolRestriction } from '@roos-code/roos-code-tools'
+} from '@shres-code/shres-code-agent'
+import { boundContextSummary, createUserMessage, errorChain } from '@shres-code/shres-code-llm'
+import type { ContentBlock, MessageId, MessageSource } from '@shres-code/shres-code-llm'
+import { SessionId } from '@shres-code/shres-code-session'
+import type { SessionEvent } from '@shres-code/shres-code-session'
+import type { SessionPersistence } from '@shres-code/shres-code-session-persistence'
+import type { ToolRestriction } from '@shres-code/shres-code-tools'
 import { foldSubagentDescriptor, snapshotSubagentDescriptor } from './descriptor.ts'
 import type { SubagentDescriptorData } from './descriptor.ts'
 import {
@@ -89,7 +89,7 @@ export interface SubagentSettledMessageSource {
   readonly senderSessionId: SessionId
 }
 
-declare module '@roos-code/roos-code-llm' {
+declare module '@shres-code/shres-code-llm' {
   interface MessageSourceMap {
     coordinator: CoordinatorMessageSource
     'subagent-report': SubagentReportMessageSource
@@ -1471,7 +1471,7 @@ export class SubagentContinuationManager {
     const persistence = this.ctx.get('sessionPersistence')
     if (persistence === undefined) {
       throw new SubagentError(
-        'continuable subagents require session persistence (load a roos-session-persistence backend)',
+        'continuable subagents require session persistence (load a shres-session-persistence backend)',
         'PERSISTENCE_UNAVAILABLE',
       )
     }

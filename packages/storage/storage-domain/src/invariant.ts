@@ -1,19 +1,19 @@
 /**
- * Package-owned invariant companion for `@roos-code/roos-code-storage-domain`: every
+ * Package-owned invariant companion for `@shres-code/shres-code-storage-domain`: every
  * `domain/changed` event must agree with the emitting domain's authoritative
  * in-memory state (the owned event-stream ↔ mutable-data relationship of this
  * package). Writes emit strictly after mutating memory and the write chain
  * serializes them, so at emission time the event's snapshot equals the
  * current read — any divergence means a write path skipped the chain or
  * emitted a stale value.
- * @module @roos-code/roos-code-storage-domain/invariant
+ * @module @shres-code/shres-code-storage-domain/invariant
  */
 
-import type { Context } from '@roos-code/cordis'
-import type { InvariantFailure, InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantFailure, InvariantInstaller } from '@shres-code/shres-code-invariants'
 import type { DomainChanged } from './events.ts'
 
-const PACKAGE_NAME = '@roos-code/roos-code-storage-domain'
+const PACKAGE_NAME = '@shres-code/shres-code-storage-domain'
 
 /** Cordis companion plugin name. */
 export const name = 'storage-domain-invariant'

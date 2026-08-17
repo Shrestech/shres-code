@@ -4,9 +4,9 @@
 
 | Package | Role | ctx key |
 |---|---|---|
-| [`pty`](terminal/README.md) (`@roos-code/roos-code-terminal`) | Backend registry, branded ids, exact-Agent ownership, session operations, and awaited cleanup | `ctx.terminals` |
-| `terminal-bash` (`@roos-code/roos-code-terminal-bash`) | Shell backend over `ctx.subprocess.spawnTerminal`: readiness detection, bounded terminal state, sandbox policy, and session operations | registers on `ctx.terminals` |
-| `tool-terminal` (`@roos-code/roos-code-tool-terminal`) | Six model-facing tools and generic task integration for background sends | registers on `ctx.tools` |
+| [`pty`](terminal/README.md) (`@shres-code/shres-code-terminal`) | Backend registry, branded ids, exact-Agent ownership, session operations, and awaited cleanup | `ctx.terminals` |
+| `terminal-bash` (`@shres-code/shres-code-terminal-bash`) | Shell backend over `ctx.subprocess.spawnTerminal`: readiness detection, bounded terminal state, sandbox policy, and session operations | registers on `ctx.terminals` |
+| `tool-terminal` (`@shres-code/shres-code-tool-terminal`) | Six model-facing tools and generic task integration for background sends | registers on `ctx.tools` |
 
 The design and deferred boundaries live in the [persistent PTY Agent Note](../../.agents/notes/implemented/feature/2026-07-16-persistent-pty-sessions.md).
 

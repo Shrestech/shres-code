@@ -48,10 +48,10 @@ jobs:
         id: app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
         with:
-          client-id: ${{ vars.ROOS_ISSUE_APP_CLIENT_ID }}
-          private-key: ${{ secrets.ROOS_ISSUE_APP_PRIVATE_KEY }}
-          owner: roos-code
-          repositories: roos-code
+          client-id: ${{ vars.SHRES_ISSUE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.SHRES_ISSUE_APP_PRIVATE_KEY }}
+          owner: shres-code
+          repositories: shres-code
       - name: Handle repository event
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}

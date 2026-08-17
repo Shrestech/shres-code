@@ -1,13 +1,13 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
-import { Context } from '@roos-code/cordis'
-import { CallId } from '@roos-code/roos-code-llm'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import ToolRuntime, { type JsonValue } from '@roos-code/roos-code-tools'
-import { publicToolName, syncTools, type ToolBridgeOptions } from '@roos-code/roos-code-mcp-client/src/tools.ts'
-import { createTransport } from '@roos-code/roos-code-mcp-client/src/transport.ts'
-import type { Config } from '@roos-code/roos-code-mcp-client'
+import { Context } from '@shres-code/cordis'
+import { CallId } from '@shres-code/shres-code-llm'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import ToolRuntime, { type JsonValue } from '@shres-code/shres-code-tools'
+import { publicToolName, syncTools, type ToolBridgeOptions } from '@shres-code/shres-code-mcp-client/src/tools.ts'
+import { createTransport } from '@shres-code/shres-code-mcp-client/src/transport.ts'
+import type { Config } from '@shres-code/shres-code-mcp-client'
 
 const testToolSignal = new AbortController().signal
 

@@ -1,20 +1,20 @@
 /**
  * Service Definition for the approval capability seam, covering requests, cancellation, audit, and per-session policy. Missing
  * answerers fail closed; grants apply only to the requested action.
- * @module @roos-code/roos-code-user-approval
+ * @module @shres-code/shres-code-user-approval
  */
 
 import { randomUUID } from 'node:crypto'
-import { Context, Service } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import type { Agent } from '@roos-code/roos-code-agent'
-import { createUserMessage, type CallId } from '@roos-code/roos-code-llm'
-import { scopeTarget } from '@roos-code/roos-code-scope'
-import type { Scoped } from '@roos-code/roos-code-scope'
-import type { Session, SessionEvent } from '@roos-code/roos-code-session'
-import type {} from '@roos-code/roos-code-system-prompt'
+import { Context, Service } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import type { Agent } from '@shres-code/shres-code-agent'
+import { createUserMessage, type CallId } from '@shres-code/shres-code-llm'
+import { scopeTarget } from '@shres-code/shres-code-scope'
+import type { Scoped } from '@shres-code/shres-code-scope'
+import type { Session, SessionEvent } from '@shres-code/shres-code-session'
+import type {} from '@shres-code/shres-code-system-prompt'
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     approval: ApprovalService
   }
@@ -23,7 +23,7 @@ declare module '@roos-code/cordis' {
     /**
      * Ask composed answerers for one decision. Return an outcome to claim the
      * request or call `next()`; failure yields the fail-closed default.
-     * Scope-filtered dispatch (`@roos-code/roos-code-scope`): agent-scoped listeners receive only that agent.
+     * Scope-filtered dispatch (`@shres-code/shres-code-scope`): agent-scoped listeners receive only that agent.
      * @param req - the pending decision (agent, tool identity, reason, signal).
      * @mode waterfall
      */
@@ -31,7 +31,7 @@ declare module '@roos-code/cordis' {
   }
 }
 
-declare module '@roos-code/roos-code-session/types' {
+declare module '@shres-code/shres-code-session/types' {
   interface SessionEventMap {
     /**
      * An approval question was put to the answerer chain — log-only audit

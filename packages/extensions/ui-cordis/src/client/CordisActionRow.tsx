@@ -2,9 +2,9 @@
 
 import {
   IconInspectOutline12, IconStopFill16, IconTrashOutline16, StateDot,
-} from '@roos-code/roos-code-client-ui-primitives'
-import type { PropsLocale } from '@roos-code/roos-code-client-ui-slots'
-import type { ToolCallViewProps } from '@roos-code/roos-code-client-ui-tool/client'
+} from '@shres-code/shres-code-client-ui-primitives'
+import type { PropsLocale } from '@shres-code/shres-code-client-ui-slots'
+import type { ToolCallViewProps } from '@shres-code/shres-code-client-ui-tool/client'
 import { cordisActionCard } from './card-model.ts'
 import css from './CordisRunRow.module.css'
 

@@ -1,11 +1,11 @@
 /**
- * Shared wire protocol for the Roos Code SDK runtime: the
+ * Shared wire protocol for the Shres Code SDK runtime: the
  * newline-delimited JSON-RPC stdio transport plus the named request, result,
  * and notification types both wire ends speak. The runtime server plugin
- * (`@roos-code/roos-code-sdk-jsonrpc-server`) serves this protocol; SDK clients
- * (`@roos-code/roos-code-sdk-client`, the Python SDK) drive it.
+ * (`@shres-code/shres-code-sdk-jsonrpc-server`) serves this protocol; SDK clients
+ * (`@shres-code/shres-code-sdk-client`, the Python SDK) drive it.
  *
- * @module @roos-code/roos-code-sdk-protocol
+ * @module @shres-code/shres-code-sdk-protocol
  */
 
 export { JsonRpcLineTransport, JsonRpcResponseError } from './transport.ts'

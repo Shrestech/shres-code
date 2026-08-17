@@ -7,7 +7,7 @@ In the loader configuration used here, a Cordis plugin module named-exports an `
 In your `tmp/cordis-tutorial` directory (see [setup](index.md#setup)), create `hello.ts`:
 
 ```ts
-import type { Context } from '@roos-code/cordis'
+import type { Context } from '@shres-code/cordis'
 
 export const name = 'hello'
 
@@ -46,14 +46,14 @@ The process exits on its own once nothing is left running. What happened:
 2. The Loader read `cordis.yml`, resolved `./hello.ts`, and mounted it as a child plugin.
 3. Cordis called your `apply(ctx)`.
 
-There is no framework bootstrap code in your file: a plugin describes what it contributes, and `cordis.yml` composes the application. The [`roos` base](../../packages/bundle/base/cordis.patch.yml), for example, is a longer plugin composition that deployment overlays patch.
+There is no framework bootstrap code in your file: a plugin describes what it contributes, and `cordis.yml` composes the application. The [`shres` base](../../packages/bundle/base/cordis.patch.yml), for example, is a longer plugin composition that deployment overlays patch.
 
 ## The two other plugin shapes
 
 A function is the most common form, but Cordis accepts three:
 
 ```ts
-import { Service, type Context } from '@roos-code/cordis'
+import { Service, type Context } from '@shres-code/cordis'
 
 // 1. Function plugin (what you just wrote).
 export function apply(ctx: Context) {}
@@ -90,4 +90,4 @@ One caveat worth knowing early: a config entry whose module cannot be **resolved
 
 Next: [Lifecycle and effects](02-lifecycle-and-effects.md) — what happens when a plugin unloads.
 
-[![](https://img.shields.io/badge/powered_by-roos-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/roos-code/roos-code)
+[![](https://img.shields.io/badge/powered_by-shres-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/parthmstech/shres-code)

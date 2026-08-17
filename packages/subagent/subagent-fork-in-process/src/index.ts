@@ -4,21 +4,21 @@
  * parent's session log — so the child inherits the parent's conversation context instead of
  * starting fresh. The seed ends at the last `turn/end`: the current tool-call turn is
  * unbalanced and cannot be replayed as a valid child session.
- * @module @roos-code/roos-code-subagent-fork-in-process
+ * @module @shres-code/shres-code-subagent-fork-in-process
  */
 
-import type { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import type { SessionEvent } from '@roos-code/roos-code-session'
-import type { Agent } from '@roos-code/roos-code-agent'
+import type { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import type { SessionEvent } from '@shres-code/shres-code-session'
+import type { Agent } from '@shres-code/shres-code-agent'
 import type {
   ContinuableCreateRequest,
   ContinuableCreateSpec,
   ResolvedSubagentStartRequest,
   SubagentCapabilities,
   SubagentProvider,
-} from '@roos-code/roos-code-subagent'
-import { startInProcessRun } from '@roos-code/roos-code-subagent-in-process-driver'
+} from '@shres-code/shres-code-subagent'
+import { startInProcessRun } from '@shres-code/shres-code-subagent-in-process-driver'
 
 export const name = 'subagent-fork-in-process'
 // `tools` is deliberately NOT injected — same rationale as subagent-spawn-in-process: the

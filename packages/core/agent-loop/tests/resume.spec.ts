@@ -1,25 +1,25 @@
-import { createUserMessage } from '@roos-code/roos-code-llm'
+import { createUserMessage } from '@shres-code/shres-code-llm'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import LlmRuntime from '@roos-code/roos-code-llm'
-import SessionStore, { SESSION_FORMAT_VERSION, Session, SessionId, SessionPreparation } from '@roos-code/roos-code-session'
-import type { SessionEvent, SessionHeader } from '@roos-code/roos-code-session'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import ToolRuntime from '@roos-code/roos-code-tools'
-import AgentRegistry, { type Agent } from '@roos-code/roos-code-agent'
+import LlmRuntime from '@shres-code/shres-code-llm'
+import SessionStore, { SESSION_FORMAT_VERSION, Session, SessionId, SessionPreparation } from '@shres-code/shres-code-session'
+import type { SessionEvent, SessionHeader } from '@shres-code/shres-code-session'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import ToolRuntime from '@shres-code/shres-code-tools'
+import AgentRegistry, { type Agent } from '@shres-code/shres-code-agent'
 
-import JsonlSessionPersistence from '@roos-code/roos-code-session-persistence-jsonl'
-import AgentLoop from '@roos-code/roos-code-agent-loop'
+import JsonlSessionPersistence from '@shres-code/shres-code-session-persistence-jsonl'
+import AgentLoop from '@shres-code/shres-code-agent-loop'
 import { MockAdapter, textResponse } from './mock-adapter.ts'
 
 const dirs: string[] = []
 afterEach(async () => { for (const d of dirs.splice(0)) await rm(d, { recursive: true, force: true }) })
 
 async function persistentHarness(adapter: MockAdapter): Promise<{ ctx: Context; root: string }> {
-  const root = await mkdtemp(join(tmpdir(), 'roos-resume-'))
+  const root = await mkdtemp(join(tmpdir(), 'shres-resume-'))
   dirs.push(root)
   return { ctx: await mountPersistentHarness(root, adapter), root }
 }

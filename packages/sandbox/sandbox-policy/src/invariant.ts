@@ -1,11 +1,11 @@
-/** Package-owned session-event invariants for sandbox policy. @module @roos-code/roos-code-sandbox-policy/invariant */
+/** Package-owned session-event invariants for sandbox policy. @module @shres-code/shres-code-sandbox-policy/invariant */
 
-import type { Context } from '@roos-code/cordis'
-import type { Session, SessionEvent } from '@roos-code/roos-code-session'
-import type { InvariantFailure, InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { Session, SessionEvent } from '@shres-code/shres-code-session'
+import type { InvariantFailure, InvariantInstaller } from '@shres-code/shres-code-invariants'
 import { SANDBOX_MODES } from './session-mode.ts'
 
-const PACKAGE_NAME = '@roos-code/roos-code-sandbox-policy'
+const PACKAGE_NAME = '@shres-code/shres-code-sandbox-policy'
 
 /** Cordis companion plugin name. */
 export const name = 'sandbox-policy-invariant'

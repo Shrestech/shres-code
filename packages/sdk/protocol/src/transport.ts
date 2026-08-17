@@ -3,7 +3,7 @@
  * `method` are requests, `id` alone is a response, and `method` alone is a
  * notification. Malformed lines are ignored; handler failures become error frames.
  *
- * @module @roos-code/roos-code-sdk-protocol/transport
+ * @module @shres-code/shres-code-sdk-protocol/transport
  */
 
 import { randomUUID } from 'node:crypto'

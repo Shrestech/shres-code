@@ -1,13 +1,13 @@
 {
-  "name": "@roos-code/roos-code-storage-domain",
-  "description": "Domain data form (ctx.storage.domain): schema-validated, event-emitting KV domains over storage backends for the Roos Code",
+  "name": "@shres-code/shres-code-storage-domain",
+  "description": "Domain data form (ctx.storage.domain): schema-validated, event-emitting KV domains over storage backends for the Shres Code",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "packages/storage/storage-domain"
   },
   "type": "module",
@@ -32,17 +32,17 @@
   ],
   "license": "MIT",
   "peerDependencies": {
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-storage": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-storage": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   },
   "dependencies": {
-    "@roos-code/schemastery": "workspace:^",
+    "@shres-code/schemastery": "workspace:^",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-storage": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-storage": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   }
 }

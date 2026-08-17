@@ -1,6 +1,6 @@
 /** Opaque revision identity for lightweight persistence observations. */
 
-import type { Branded } from '@roos-code/roos-code-brand'
+import type { Branded } from '@shres-code/shres-code-brand'
 
 /**
  * Backend-owned token that identifies both one storage source and one revision

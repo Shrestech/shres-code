@@ -10,7 +10,7 @@ A second config file or an argv API key would split the store and leak secrets i
 
 ## Decision
 
-`roos models` and `roos providers` boot a minimal composition of settings-file, credentials-local, llm, llm-pi-ai, and llm-deepseek, then call the same services the Models page reaches (`llm.providers` / `listConfigurableProviders`, `llm.models` / `listModels`, `llm.discoverModels`, `agentDefaultModel.saveSelection`, `credentials.set`). Settings hot-reload keeps the two surfaces in sync.
+`shres models` and `shres providers` boot a minimal composition of settings-file, credentials-local, llm, llm-pi-ai, and llm-deepseek, then call the same services the Models page reaches (`llm.providers` / `listConfigurableProviders`, `llm.models` / `listModels`, `llm.discoverModels`, `agentDefaultModel.saveSelection`, `credentials.set`). Settings hot-reload keeps the two surfaces in sync.
 
 `--effort` writes `reasoningEffort` on the `agent-default-model` section after `resolveCallConfig` accepts that id against the adapter's `LlmReasoningEffortInfo`. An unknown effort fails before the write. `--purpose compaction|session-title` writes `purposes[purpose]` and leaves the conversation default in place.
 
@@ -40,4 +40,4 @@ The snapshot harness has no CLI-subcommand or mid-session `/model` fixture; pack
 
 ## Testing
 
-`apps/cli` specs cover `models list|set|discover` and `providers add|list|remove` against a temp `$ROOS_HOME`, including `--effort`, `--purpose`, prompted keys, unknown-effort failure, omitted-effort persistence, ollama-cloud `--add` pin survival, shipped-route remove, and CLI catalog ids matching the base bundle. `agent-default-model` specs cover `/model` parse/list/switch, user-authored `command/run`, `selectionFor` precedence, purpose persistence, materialized-default stripping, and subagent refusal. `ui-model-selection` specs cover the `/model` decoration.
+`apps/cli` specs cover `models list|set|discover` and `providers add|list|remove` against a temp `$SHRES_HOME`, including `--effort`, `--purpose`, prompted keys, unknown-effort failure, omitted-effort persistence, ollama-cloud `--add` pin survival, shipped-route remove, and CLI catalog ids matching the base bundle. `agent-default-model` specs cover `/model` parse/list/switch, user-authored `command/run`, `selectionFor` precedence, purpose persistence, materialized-default stripping, and subagent refusal. `ui-model-selection` specs cover the `/model` decoration.

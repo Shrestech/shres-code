@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import LlmRuntime, { createUserMessage, CallId, LlmError, MessageSource, ProviderRequestId, StreamChunk  } from '@roos-code/roos-code-llm'
-import SessionStore, { Session, SessionEvent, SessionId, TurnEndReason, type UserMessage } from '@roos-code/roos-code-session'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import ToolRuntime, { defineContentToolFixture, type PostToolDecision } from '@roos-code/roos-code-tools'
-import AgentRegistry, { type Agent } from '@roos-code/roos-code-agent'
-import AgentLoop from '@roos-code/roos-code-agent-loop'
+import { Context } from '@shres-code/cordis'
+import LlmRuntime, { createUserMessage, CallId, LlmError, MessageSource, ProviderRequestId, StreamChunk  } from '@shres-code/shres-code-llm'
+import SessionStore, { Session, SessionEvent, SessionId, TurnEndReason, type UserMessage } from '@shres-code/shres-code-session'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import ToolRuntime, { defineContentToolFixture, type PostToolDecision } from '@shres-code/shres-code-tools'
+import AgentRegistry, { type Agent } from '@shres-code/shres-code-agent'
+import AgentLoop from '@shres-code/shres-code-agent-loop'
 import { ReactLoopAgent } from '../src/agent.ts'
-import InvariantRegistry from '@roos-code/roos-code-invariants'
-import * as SessionInvariant from '@roos-code/roos-code-session/invariant'
-import * as AgentInvariant from '@roos-code/roos-code-agent/invariant'
-import * as AgentLoopInvariant from '@roos-code/roos-code-agent-loop/invariant'
+import InvariantRegistry from '@shres-code/shres-code-invariants'
+import * as SessionInvariant from '@shres-code/shres-code-session/invariant'
+import * as AgentInvariant from '@shres-code/shres-code-agent/invariant'
+import * as AgentLoopInvariant from '@shres-code/shres-code-agent-loop/invariant'
 import { MockAdapter, textResponse, toolCallResponse } from './mock-adapter.ts'
 
 async function mountInvariants(ctx: Context): Promise<void> {
@@ -810,7 +810,7 @@ describe('turn and step boundary recovery', () => {
     expect(adapter.requests).toHaveLength(1)
     expect(errors.map(error => error.message)).toEqual([
       'reject first step-end',
-      'invariant violated by "@roos-code/roos-code-session": turn/end 1 while step 1 is still open',
+      'invariant violated by "@shres-code/shres-code-session": turn/end 1 while step 1 is still open',
     ])
     expect(boundaryCounts(agent)).toMatchObject({
       turnStart: 1,

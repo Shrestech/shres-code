@@ -7,11 +7,11 @@
  * [SessionsPort](./sessions-port.ts). Widening this interface is the
  * explicit act of widening what features may do to the sessions domain.
  */
-import type { Context } from '@roos-code/cordis'
+import type { Context } from '@shres-code/cordis'
 import type {
   RpcResult, SessionId, SubagentAddress,
-} from '@roos-code/roos-code-api-remotes/client'
-import type { HostObservable, SessionMaybeProvideInfo } from '@roos-code/roos-code-client-ui-slots'
+} from '@shres-code/shres-code-api-remotes/client'
+import type { HostObservable, SessionMaybeProvideInfo } from '@shres-code/shres-code-client-ui-slots'
 import type { AgentContext } from '../agents/scope.ts'
 import type { SessionSearchResultItem } from '../sessions/manager.ts'
 import type {

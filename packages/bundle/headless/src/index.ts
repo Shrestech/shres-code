@@ -1,24 +1,24 @@
 /**
- * @roos-code/roos-code-headless — one-shot direct Agent driver. The bundle patch
- * rides over roos-base without Host, HTTP, or browser plugins; this runner
+ * @shres-code/shres-code-headless — one-shot direct Agent driver. The bundle patch
+ * rides over shres-base without Host, HTTP, or browser plugins; this runner
  * creates one Agent through the core registry, drives the task to quiescence,
  * flushes its Session, prints the final assistant text, and exits.
  *
- * @module @roos-code/roos-code-headless
+ * @module @shres-code/shres-code-headless
  */
 
 import { randomUUID } from 'node:crypto'
-import type { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import type {} from '@roos-code/roos-code-agent-default-model'
-import type {} from '@roos-code/roos-code-first-run-setup'
-import { createUserMessage } from '@roos-code/roos-code-llm'
-import { SessionId } from '@roos-code/roos-code-session'
-import type { SessionEvent } from '@roos-code/roos-code-session'
+import type { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import type {} from '@shres-code/shres-code-agent-default-model'
+import type {} from '@shres-code/shres-code-first-run-setup'
+import { createUserMessage } from '@shres-code/shres-code-llm'
+import { SessionId } from '@shres-code/shres-code-session'
+import type { SessionEvent } from '@shres-code/shres-code-session'
 // Empty type imports carry the loader Context merge for the settlement await
 // and the cmdline Context merge for the appExit host value.
-import type {} from '@roos-code/cordis-plugin-loader'
-import type {} from '@roos-code/roos-code-cmdline'
+import type {} from '@shres-code/cordis-plugin-loader'
+import type {} from '@shres-code/shres-code-cmdline'
 
 /** Stable Cordis plugin name. */
 export const name = 'headless-runner'
@@ -82,7 +82,7 @@ function summarize(events: readonly SessionEvent[], firstSeq: number): RunOutcom
 
 /** Report an unexpected direct-driver failure and request a failing exit. */
 function fail(io: HeadlessIo, error: unknown): void {
-  io.stderr.write(`roos: ${error instanceof Error ? error.message : String(error)}\n`)
+  io.stderr.write(`shres: ${error instanceof Error ? error.message : String(error)}\n`)
   io.exit(1)
 }
 
@@ -108,7 +108,7 @@ async function run(ctx: Context, task: string, io: HeadlessIo): Promise<void> {
   // This bundle composes no preset roster, so the model-facing rows sit in the
   // host plane and the agent reads them from the global layer. A deployment
   // that DOES configure one has to join it here first
-  // (@roos-code/roos-code-agent-presets README, "Composing a child agent").
+  // (@shres-code/shres-code-agent-presets README, "Composing a child agent").
   const { agent } = await agents.create({
     sessionId: SessionId(`session-${randomUUID()}`),
     meta: { cwd: process.cwd() },
@@ -131,7 +131,7 @@ async function run(ctx: Context, task: string, io: HeadlessIo): Promise<void> {
   const outcome = summarize(agent.session.events, firstSeq)
   io.stdout.write(outcome.text + '\n')
   if (outcome.reason?.kind === 'error') {
-    io.stderr.write(`roos: ${outcome.reason.error.code}: ${outcome.reason.error.message}\n`)
+    io.stderr.write(`shres: ${outcome.reason.error.code}: ${outcome.reason.error.message}\n`)
   }
   io.exit(outcome.reason?.kind === 'completed' ? 0 : 1)
 }

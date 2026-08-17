@@ -1,6 +1,6 @@
 /** Validated configuration for the local PTY backend. */
 
-import z from '@roos-code/schemastery'
+import z from '@shres-code/schemastery'
 
 /** Public plugin configuration. */
 export interface Config {

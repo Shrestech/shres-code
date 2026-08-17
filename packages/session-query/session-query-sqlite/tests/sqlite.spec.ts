@@ -1,18 +1,18 @@
-import { createAssistantMessage, createUserMessage } from '@roos-code/roos-code-llm'
+import { createAssistantMessage, createUserMessage } from '@shres-code/shres-code-llm'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Context, type Fiber } from '@roos-code/cordis'
+import { Context, type Fiber } from '@shres-code/cordis'
 import { DatabaseSync } from 'node:sqlite'
 import { chmod, mkdtemp, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import SessionStore, { SESSION_FORMAT_VERSION, SessionId } from '@roos-code/roos-code-session'
-import type { SessionEvent, SessionHeader, SessionId as SessionIdType } from '@roos-code/roos-code-session'
-import SessionPersistence, { SessionPersistenceRevision } from '@roos-code/roos-code-session-persistence'
-import type { SessionPersistenceSnapshot } from '@roos-code/roos-code-session-persistence'
-import SqliteSessionPersistence from '@roos-code/roos-code-session-persistence-sqlite'
+import SessionStore, { SESSION_FORMAT_VERSION, SessionId } from '@shres-code/shres-code-session'
+import type { SessionEvent, SessionHeader, SessionId as SessionIdType } from '@shres-code/shres-code-session'
+import SessionPersistence, { SessionPersistenceRevision } from '@shres-code/shres-code-session-persistence'
+import type { SessionPersistenceSnapshot } from '@shres-code/shres-code-session-persistence'
+import SqliteSessionPersistence from '@shres-code/shres-code-session-persistence-sqlite'
 import SqliteSessionQueryEngine, {
   SESSION_QUERY_SQLITE_SCHEMA_VERSION,
-} from '@roos-code/roos-code-session-query-sqlite'
+} from '@shres-code/shres-code-session-query-sqlite'
 import {
   SESSION_QUERY_DEFAULT_PERSISTED_INSPECT_CONCURRENCY,
   SessionQueryError,
@@ -20,7 +20,7 @@ import {
   type SessionAvailability,
   type SessionQueryErrorCode,
   type SessionSearchRequest,
-} from '@roos-code/roos-code-session-query'
+} from '@shres-code/shres-code-session-query'
 
 const temporaryDirectories: string[] = []
 
@@ -31,7 +31,7 @@ afterEach(async () => {
 })
 
 async function temporaryPath(name = 'search.db'): Promise<string> {
-  const directory = await mkdtemp(join(tmpdir(), 'roos-session-search-'))
+  const directory = await mkdtemp(join(tmpdir(), 'shres-session-search-'))
   temporaryDirectories.push(directory)
   return join(directory, name)
 }

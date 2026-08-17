@@ -5,13 +5,13 @@
  * that are already showing, so a default set from one converges the other.
  */
 
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { describe, expect, it, vi } from 'vitest'
-import { resolveSlotLabel } from '@roos-code/roos-code-client-ui-slots'
-import { SlotRegistry } from '@roos-code/roos-code-client-runtime/client'
-import { LocaleRuntime } from '@roos-code/roos-code-client-locale/client'
-import { TestRemote, usePinnedBrowserLanguages } from '@roos-code/roos-code-client-test-runtime'
-import { apply, inject } from '@roos-code/roos-code-client-ui-agent-preset/client'
+import { resolveSlotLabel } from '@shres-code/shres-code-client-ui-slots'
+import { SlotRegistry } from '@shres-code/shres-code-client-runtime/client'
+import { LocaleRuntime } from '@shres-code/shres-code-client-locale/client'
+import { TestRemote, usePinnedBrowserLanguages } from '@shres-code/shres-code-client-test-runtime'
+import { apply, inject } from '@shres-code/shres-code-client-ui-agent-preset/client'
 import { AgentPresetLabel } from '../src/client/AgentPresetLabel.tsx'
 import type { AgentPresetLabelInjected } from '../src/client/AgentPresetLabel.tsx'
 import { AgentPresetRow } from '../src/client/AgentPresetRow.tsx'

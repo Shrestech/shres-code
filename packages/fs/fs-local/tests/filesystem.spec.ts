@@ -3,7 +3,7 @@
  * file/streamed text reads, atomic guarded writes (createIfAbsent /
  * replaceIfVersion), version-guarded literal edits, concurrency races, symlink
  * identity, and HMR/disposal. Read WINDOWING is policy and lives in
- * `roos-fs-observation-policy`, so it is not exercised here.
+ * `shres-fs-observation-policy`, so it is not exercised here.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -12,10 +12,10 @@ import { mkdir, mkdtemp, readFile, realpath, rm, stat, symlink, unlink, utimes, 
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { Context } from '@roos-code/cordis'
-import { LocalFileSystem } from '@roos-code/roos-code-fs-local'
-import { FsVersion } from '@roos-code/roos-code-fs'
-import type { FsTarget } from '@roos-code/roos-code-fs'
+import { Context } from '@shres-code/cordis'
+import { LocalFileSystem } from '@shres-code/shres-code-fs-local'
+import { FsVersion } from '@shres-code/shres-code-fs'
+import type { FsTarget } from '@shres-code/shres-code-fs'
 
 let dir: string
 let ctx: Context
@@ -23,7 +23,7 @@ let fs: LocalFileSystem
 let fiber: Awaited<ReturnType<Context['plugin']>>
 
 beforeEach(async () => {
-  dir = await mkdtemp(join(tmpdir(), 'roos-fs-'))
+  dir = await mkdtemp(join(tmpdir(), 'shres-fs-'))
   ctx = new Context()
   fiber = await ctx.plugin(LocalFileSystem, { cwd: dir })
   fs = ctx.fs as LocalFileSystem
@@ -83,7 +83,7 @@ describe('resolve', () => {
   it('resolves a relative path against opts.cwd, not config.cwd', async () => {
     // config.cwd is `dir`; a call supplying a DIFFERENT cwd bases the relative
     // path there (the per-session workspace mapping — mirrors tool-bash workdir).
-    const other = await mkdtemp(join(tmpdir(), 'roos-fs-other-'))
+    const other = await mkdtemp(join(tmpdir(), 'shres-fs-other-'))
     try {
       await writeFile(join(other, 'x.txt'), 'in other')
       const viaOther = await fs.resolve('x.txt', { cwd: other })
@@ -171,7 +171,7 @@ describe('lstat', () => {
   })
 
   it('resolves relative paths against opts.cwd and honors a pre-aborted signal', async () => {
-    const other = await mkdtemp(join(tmpdir(), 'roos-fs-other-'))
+    const other = await mkdtemp(join(tmpdir(), 'shres-fs-other-'))
     try {
       await writeFile(join(other, 'x.txt'), 'in other')
       expect((await fs.lstat('x.txt', { cwd: other }))?.type).toBe('file')

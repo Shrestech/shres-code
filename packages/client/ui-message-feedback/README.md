@@ -1,4 +1,4 @@
-# @roos-code/roos-code-client-ui-message-feedback
+# @shres-code/shres-code-client-ui-message-feedback
 
 Per-message feedback plugin, browser half: a Like/Dislike pair plus an optional note, contributed as the `feedback` entry (order 10) of the `conversation.chat.assistant-actions` strip. The strip is declared by `ui-conversation` and rendered inside the finalized assistant message's IconActions row, between copy and branch, so the controls inherit that row's chrome and hover behavior. Only finalized messages reach the slot — an interruption-frozen partial carries no `messageId` and therefore no feedback controls. The strip renders once per turn, on the closing assistant message that owns the turn's IconActions row: earlier steps of a multi-step turn produce tool rows rather than a rateable body, so they present no controls even though the Host would accept them as targets.
 

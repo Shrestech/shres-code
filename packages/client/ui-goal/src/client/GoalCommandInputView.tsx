@@ -1,6 +1,6 @@
 import { memo } from 'react'
-import { MessageText } from '@roos-code/roos-code-client-ui-primitives'
-import type { PropsLocale, PropsRuntime } from '@roos-code/roos-code-client-ui-slots'
+import { MessageText } from '@shres-code/shres-code-client-ui-primitives'
+import type { PropsLocale, PropsRuntime } from '@shres-code/shres-code-client-ui-slots'
 import type { GoalCommandInputData } from './goal-command-input.ts'
 import css from './GoalCommandInputView.module.css'
 

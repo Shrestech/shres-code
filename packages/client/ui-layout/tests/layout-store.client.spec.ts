@@ -6,13 +6,13 @@
  * real engine instance (same create path as production).
  */
 import { beforeEach, describe, expect, it } from 'vitest'
-import { createLayoutStore } from '@roos-code/roos-code-client-ui-layout/src/client/stores.ts'
+import { createLayoutStore } from '@shres-code/shres-code-client-ui-layout/src/client/stores.ts'
 import {
   DETAILS_DEFAULT, DETAILS_MAX, DETAILS_MIN,
   SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN,
-} from '@roos-code/roos-code-client-ui-layout/src/client/columns.ts'
+} from '@shres-code/shres-code-client-ui-layout/src/client/columns.ts'
 
-const PERSIST_KEY = 'roos.layout.panels'
+const PERSIST_KEY = 'shres.layout.panels'
 
 beforeEach(() => { localStorage.clear() })
 

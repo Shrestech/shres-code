@@ -4,14 +4,14 @@
  */
 
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
-import { CallId } from '@roos-code/roos-code-llm'
-import SystemPrompt, { renderPrompt } from '@roos-code/roos-code-system-prompt'
-import ToolRuntime, { type ToolResult } from '@roos-code/roos-code-tools'
-import { FileSystem, FsError, FsTargetKey, FsVersion } from '@roos-code/roos-code-fs'
+import { CallId } from '@shres-code/shres-code-llm'
+import SystemPrompt, { renderPrompt } from '@shres-code/shres-code-system-prompt'
+import ToolRuntime, { type ToolResult } from '@shres-code/shres-code-tools'
+import { FileSystem, FsError, FsTargetKey, FsVersion } from '@shres-code/shres-code-fs'
 import type {
   FsDirEntry,
   FsEditOutcome,
@@ -21,16 +21,16 @@ import type {
   FsTarget,
   FsWriteIntent,
   FsWriteOutcome,
-} from '@roos-code/roos-code-fs'
-import * as FsPolicy from '@roos-code/roos-code-fs-observation-policy'
-import * as ToolFs from '@roos-code/roos-code-tool-fs'
+} from '@shres-code/shres-code-fs'
+import * as FsPolicy from '@shres-code/shres-code-fs-observation-policy'
+import * as ToolFs from '@shres-code/shres-code-tool-fs'
 import { STREAM_MIN_SIZE } from '../src/read.ts'
 import { formatReadOutput } from '../src/read-render.ts'
 import type { FileReadOutcome } from '../src/read-render.ts'
 import { sessionCwd } from '../src/session-cwd.ts'
-import ApprovalService from '@roos-code/roos-code-user-approval'
-import type { SandboxExecutionPolicy, SandboxMode } from '@roos-code/roos-code-sandbox'
-import SandboxPolicyService from '@roos-code/roos-code-sandbox-policy'
+import ApprovalService from '@shres-code/shres-code-user-approval'
+import type { SandboxExecutionPolicy, SandboxMode } from '@shres-code/shres-code-sandbox'
+import SandboxPolicyService from '@shres-code/shres-code-sandbox-policy'
 
 const testToolSignal = new AbortController().signal
 
@@ -136,7 +136,7 @@ describe('session cwd resolution', () => {
     expect(sessionCwd(execution(cwd) as never, 'file.txt')).toBe(cwd)
     expect(sessionCwd(execution(throughParent) as never, 'file.txt')).toBe(realpathSync.native(throughParent))
 
-    const root = mkdtempSync(join(tmpdir(), 'roos-tool-fs-session-cwd-'))
+    const root = mkdtempSync(join(tmpdir(), 'shres-tool-fs-session-cwd-'))
     const physical = join(root, 'physical')
     const link = join(root, 'link')
     try {

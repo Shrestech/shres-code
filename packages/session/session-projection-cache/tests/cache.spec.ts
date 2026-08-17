@@ -7,24 +7,24 @@
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { z } from 'zod'
-import Storage from '@roos-code/roos-code-storage'
-import { DomainFacility } from '@roos-code/roos-code-storage-domain'
-import SessionStore, { SessionId } from '@roos-code/roos-code-session'
-import type { Session, SessionEvent } from '@roos-code/roos-code-session'
-import SessionProjectionRegistry from '@roos-code/roos-code-session-projection'
-import type { ProjectionDefinition } from '@roos-code/roos-code-session-projection'
+import Storage from '@shres-code/shres-code-storage'
+import { DomainFacility } from '@shres-code/shres-code-storage-domain'
+import SessionStore, { SessionId } from '@shres-code/shres-code-session'
+import type { Session, SessionEvent } from '@shres-code/shres-code-session'
+import SessionProjectionRegistry from '@shres-code/shres-code-session-projection'
+import type { ProjectionDefinition } from '@shres-code/shres-code-session-projection'
 import { MemoryMediaPool, MemoryStorageBackend } from '../../../storage/storage-domain/tests/helpers/memory-backend.ts'
 import SessionProjectionCache from '../src/index.ts'
 
-declare module '@roos-code/roos-code-session-projection/types' {
+declare module '@shres-code/shres-code-session-projection/types' {
   interface SessionProjectionMap {
     'cache-test/marks': { marks: string[] }
   }
 }
 
-declare module '@roos-code/roos-code-session/types' {
+declare module '@shres-code/shres-code-session/types' {
   interface SessionEventMap {
     'cache-test/mark': { marks: string[] }
   }

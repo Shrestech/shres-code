@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import type { Agent } from '@roos-code/roos-code-agent'
-import * as AgentInvariant from '@roos-code/roos-code-agent/invariant'
-import { scopeTarget } from '@roos-code/roos-code-scope'
-import InvariantRegistry from '@roos-code/roos-code-invariants'
+import { Context } from '@shres-code/cordis'
+import type { Agent } from '@shres-code/shres-code-agent'
+import * as AgentInvariant from '@shres-code/shres-code-agent/invariant'
+import { scopeTarget } from '@shres-code/shres-code-scope'
+import InvariantRegistry from '@shres-code/shres-code-invariants'
 
 async function setup(): Promise<Context> {
   const ctx = new Context()

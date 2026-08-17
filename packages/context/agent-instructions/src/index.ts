@@ -6,15 +6,15 @@
  * Plugin lifecycle reads use the optional `ctx.fs` provider, so providerless products
  * mount it as a no-op.
  *
- * @module @roos-code/roos-code-agent-instructions
+ * @module @shres-code/shres-code-agent-instructions
  */
 
-import type { Context } from '@roos-code/cordis'
+import type { Context } from '@shres-code/cordis'
 import { isDeepStrictEqual } from 'node:util'
-import type { Agent, PreStepDecision } from '@roos-code/roos-code-agent'
-import { createUserMessage } from '@roos-code/roos-code-llm'
-import type { Session, UserMessage } from '@roos-code/roos-code-session'
-import type { ToolExecution, ToolExecutionResult, ToolExecutionToken } from '@roos-code/roos-code-tools'
+import type { Agent, PreStepDecision } from '@shres-code/shres-code-agent'
+import { createUserMessage } from '@shres-code/shres-code-llm'
+import type { Session, UserMessage } from '@shres-code/shres-code-session'
+import type { ToolExecution, ToolExecutionResult, ToolExecutionToken } from '@shres-code/shres-code-tools'
 import { Config, resolveConfig, workspaceBaselineIdentity, type ResolvedConfig } from './config.ts'
 import { findProjectRoot, loadBaselineInstructionSet } from './files.ts'
 import {
@@ -136,7 +136,7 @@ export function apply(ctx: Context, config: Config): void {
       const replacePreviousBaseline = baselinePresent && !keepVisibleBaseline
       const instructions = await loadBaselineInstructionSet({
         cwd,
-        roosHome: resolved.roosHome,
+        shresHome: resolved.shresHome,
         projectRootMarkers: resolved.projectRootMarkers,
         maxBytes: resolved.maxBytes,
         maxSourceBytes: resolved.maxSourceBytes,

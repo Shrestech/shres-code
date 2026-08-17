@@ -3,31 +3,31 @@
 # turn over stream-json; the replay adapter supplies the deterministic response.
 
 - id: persistence
-  name: '@roos-code/roos-code-session-persistence-jsonl'
+  name: '@shres-code/shres-code-session-persistence-jsonl'
   config:
     root: './.sessions'
     compression: none
 
 - id: checkpoint
-  name: '@roos-code/roos-code-session-checkpoint-policy'
+  name: '@shres-code/shres-code-session-checkpoint-policy'
 
 - id: replay
-  name: '@roos-code/roos-code-llm-replay'
+  name: '@shres-code/shres-code-llm-replay'
   config:
-    file: !!js process.env.ROOS_SNAPSHOT_FILE
-    overrideFile: !!js process.env.ROOS_SNAPSHOT_OVERRIDE
+    file: !!js process.env.SHRES_SNAPSHOT_FILE
+    overrideFile: !!js process.env.SHRES_SNAPSHOT_OVERRIDE
 
 # Managed child-process groups for the bash executor (spawn/kill/output plumbing).
 - id: subprocess
-  name: '@roos-code/roos-code-subprocess-local'
+  name: '@shres-code/shres-code-subprocess-local'
 
 - id: bash
-  name: '@roos-code/roos-code-bash-local'
+  name: '@shres-code/shres-code-bash-local'
   config:
     timeoutMs: 60000
 
 - id: agent
-  name: '@roos-code/roos-code-agent-spine-demo'
+  name: '@shres-code/shres-code-agent-spine-demo'
   config:
     agents: []
     workspaceContext: false

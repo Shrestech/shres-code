@@ -1,13 +1,13 @@
 /**
- * `roos plugin --profile <name> <args...>` — profile plugin management as a
+ * `shres plugin --profile <name> <args...>` — profile plugin management as a
  * thin pnpm forwarder: initialize the profile on first use, run
  * `pnpm <args...>` in the profile directory, then reconcile the
- * `roos.profile.bundles` layer list against the installed state (a dependency
- * resolving to a package that declares `roos.bundle` joins the layer stack; a
+ * `shres.profile.bundles` layer list against the installed state (a dependency
+ * resolving to a package that declares `shres.bundle` joins the layer stack; a
  * removed or bundle-less dependency leaves it). Reconciling by installed
  * state, not by dependency diff, means `update` activates a package that
- * gained its `roos.bundle` declaration in a newer version.
- * @module @roos-code/roos-code/plugin
+ * gained its `shres.bundle` declaration in a newer version.
+ * @module @shres-code/shres-code/plugin
  */
 
 import { spawnSync } from 'node:child_process'
@@ -22,16 +22,16 @@ import {
   resolveProfileDir,
   writeProfileManifest,
   type ProfileManifest,
-} from '@roos-code/roos-code-app-boot'
+} from '@shres-code/shres-code-app-boot'
 import { INSTALL_ANCHOR } from './profile-boot.ts'
 
-const NAME = 'roos'
+const NAME = 'shres'
 
 /**
  * Whether a resolved dependency exports a profile patch, i.e. is a bundle.
  * @param packageName - the dependency's package name.
  * @param profileDir - the profile directory (resolution anchor).
- * @returns true when the package manifest declares `roos.bundle`.
+ * @returns true when the package manifest declares `shres.bundle`.
  */
 function exportsPatch(packageName: string, profileDir: string): boolean {
   let dir: string
@@ -41,14 +41,14 @@ function exportsPatch(packageName: string, profileDir: string): boolean {
     return false // pnpm reported success yet the package is unresolvable — treat as plain
   }
   const manifest = readProfileManifest(NAME, dir)
-  return manifest.roos?.bundle?.patch !== undefined
+  return manifest.shres?.bundle?.patch !== undefined
 }
 
 /**
- * Reconcile `roos.profile.bundles` against the installed state: pnpm has
+ * Reconcile `shres.profile.bundles` against the installed state: pnpm has
  * already written the real installed names (so a git/path/tarball/alias spec
  * on the command line reconciles by its true package name) and materialized
- * the packages. A dependency that resolves to a `roos.bundle`-declaring
+ * the packages. A dependency that resolves to a `shres.bundle`-declaring
  * package joins the layer stack (appended in dependency order); a
  * dependency-listed name that no longer does — removed, or the installed
  * version dropped the declaration — leaves it. In-box bundles from the
@@ -60,7 +60,7 @@ function reconcilePlugins(before: ProfileManifest, profileDir: string): void {
   const after = readProfileManifest(NAME, profileDir)
   const beforeDeps = new Set(Object.keys(before.dependencies ?? {}))
   const dependencies = Object.keys(after.dependencies ?? {})
-  const plugins = after.roos?.profile?.bundles ?? []
+  const plugins = after.shres?.profile?.bundles ?? []
   let changed = false
   for (const packageName of dependencies) {
     const isBundle = exportsPatch(packageName, profileDir)
@@ -69,7 +69,7 @@ function reconcilePlugins(before: ProfileManifest, profileDir: string): void {
       changed = true
     } else if (!isBundle && !beforeDeps.has(packageName)) {
       process.stderr.write(
-        `${NAME}: warning: ${packageName} declares no roos.bundle — installed as a plain dependency, not a profile layer `
+        `${NAME}: warning: ${packageName} declares no shres.bundle — installed as a plain dependency, not a profile layer `
         + '(a later update that gains one activates it automatically)\n',
       )
     }
@@ -77,7 +77,7 @@ function reconcilePlugins(before: ProfileManifest, profileDir: string): void {
   const dependencySet = new Set(dependencies)
   for (const packageName of [...plugins]) {
     // Only dependency-managed entries are subject to removal; template
-    // bundles (roos-base and friends) are not dependencies.
+    // bundles (shres-base and friends) are not dependencies.
     const wasDependency = beforeDeps.has(packageName) || dependencySet.has(packageName)
     const stillBundle = dependencySet.has(packageName) && exportsPatch(packageName, profileDir)
     if (wasDependency && !stillBundle) {
@@ -86,7 +86,7 @@ function reconcilePlugins(before: ProfileManifest, profileDir: string): void {
     }
   }
   if (!changed) return
-  after.roos = { ...after.roos, profile: { ...after.roos?.profile, bundles: plugins } }
+  after.shres = { ...after.shres, profile: { ...after.shres?.profile, bundles: plugins } }
   writeProfileManifest(profileDir, after)
 }
 
@@ -98,7 +98,7 @@ function reconcilePlugins(before: ProfileManifest, profileDir: string): void {
  * specs, registry names, and every other pnpm argument pass through
  * untouched.
  * @param argument - one pnpm argument, verbatim from argv.
- * @param cwd - the directory `roos` was invoked from.
+ * @param cwd - the directory `shres` was invoked from.
  * @returns the argument with a relative path spec anchored to `cwd`.
  */
 function anchorPathSpec(argument: string, cwd: string): string {
@@ -112,7 +112,7 @@ function anchorPathSpec(argument: string, cwd: string): string {
 }
 
 /**
- * Run one `roos plugin` invocation: init if needed, forward to pnpm, reconcile.
+ * Run one `shres plugin` invocation: init if needed, forward to pnpm, reconcile.
  * @param profile - the profile name.
  * @param args - pnpm arguments with relative path specs anchored to the invoking directory.
  * @returns the pnpm exit code.

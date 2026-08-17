@@ -3,7 +3,7 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { LOADER_SMOKE_TEST_TIMEOUT_MS, runLoaderSmoke } from '@roos-code/roos-code-loader-smoke'
+import { LOADER_SMOKE_TEST_TIMEOUT_MS, runLoaderSmoke } from '@shres-code/shres-code-loader-smoke'
 
 const configPath = '/tmp/fixture.cordis.yml'
 const tsconfigPath = fileURLToPath(new URL('../../../../tsconfig.json', import.meta.url))
@@ -26,7 +26,7 @@ describe('runLoaderSmoke', () => {
       configPath: string
       args: string[]
       cwd: string
-      roosHome: string
+      shresHome: string
       agentsHome: string
       marker: string
       input: string
@@ -37,7 +37,7 @@ describe('runLoaderSmoke', () => {
       marker: 'present',
       input: '',
     })
-    expect(canonicalTempPath(output.roosHome)).toBe(canonicalTempPath(join(output.cwd, '.roos')))
+    expect(canonicalTempPath(output.shresHome)).toBe(canonicalTempPath(join(output.cwd, '.shres')))
     expect(canonicalTempPath(output.agentsHome)).toBe(canonicalTempPath(join(output.cwd, '.agents')))
     expect(result.stderr).toContain('fixture stderr')
     expect(existsSync(output.cwd)).toBe(false)

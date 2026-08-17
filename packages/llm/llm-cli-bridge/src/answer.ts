@@ -1,7 +1,7 @@
 /**
  * Shared CLI JSON answer extraction for delegated completion and one-shot
  * product-subagent stdout.
- * @module @roos-code/roos-code-llm-cli-bridge/answer
+ * @module @shres-code/shres-code-llm-cli-bridge/answer
  */
 
 /**

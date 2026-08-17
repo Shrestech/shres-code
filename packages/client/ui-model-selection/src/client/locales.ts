@@ -28,7 +28,7 @@ export const en = {
   'blocked.composer': 'This model is unavailable — select one to continue',
   'empty.efforts': 'This model provides no reasoning effort levels.',
   'delegated.tag': 'Delegated',
-  'delegated.hint': 'This route runs an external CLI. That CLI may call its own tools without Roos Code approval.',
+  'delegated.hint': 'This route runs an external CLI. That CLI may call its own tools without Shres Code approval.',
 } satisfies Record<string, string>
 
 /** The ModelKey union. */

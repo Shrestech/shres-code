@@ -1,11 +1,11 @@
 # Add Code Mode and Cordis tools to the headless spawn/workflow stack.
 - id: base
-  name: '@roos-code/cordis-plugin-include'
+  name: '@shres-code/cordis-plugin-include'
   config:
     path: ./cordis.yml
     patches:
       - id: agent-spine
-        name: '@roos-code/roos-code-agent-spine-demo'
+        name: '@shres-code/shres-code-agent-spine-demo'
         config:
           agents:
             - id: main
@@ -21,16 +21,16 @@
 
             Verify your work by running the code or tests. Keep answers brief and factual.
       - id: persistence
-        name: '@roos-code/roos-code-session-persistence-jsonl'
+        name: '@shres-code/shres-code-session-persistence-jsonl'
         config:
           root: './.sessions'
-          compression: !!js "process.env.ROOS_SNAPSHOT === undefined ? 'zstd' : 'none'"
+          compression: !!js "process.env.SHRES_SNAPSHOT === undefined ? 'zstd' : 'none'"
       - insert:
           - id: code-runtime
-            name: '@roos-code/roos-code-code-runtime-worker-thread'
+            name: '@shres-code/shres-code-code-runtime-worker-thread'
           - id: approval
-            name: '@roos-code/roos-code-user-approval'
+            name: '@shres-code/shres-code-user-approval'
           - id: cordis-host-runner
-            name: '@roos-code/roos-code-cordis-host-runner'
+            name: '@shres-code/shres-code-cordis-host-runner'
           - id: tool-cordis
-            name: '@roos-code/roos-code-tool-cordis'
+            name: '@shres-code/shres-code-tool-cordis'

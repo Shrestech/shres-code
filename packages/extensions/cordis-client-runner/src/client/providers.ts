@@ -1,9 +1,9 @@
 /** Built-in Client inspect providers over live Client-owned services. */
 
-import type { Context } from '@roos-code/cordis'
-import type { JsonValue } from '@roos-code/roos-code-api-remotes/client'
-import type { SlotRegistry } from '@roos-code/roos-code-client-runtime/client'
-import type {} from '@roos-code/roos-code-client-ui-theme/client'
+import type { Context } from '@shres-code/cordis'
+import type { JsonValue } from '@shres-code/shres-code-api-remotes/client'
+import type { SlotRegistry } from '@shres-code/shres-code-client-runtime/client'
+import type {} from '@shres-code/shres-code-client-ui-theme/client'
 import { queryEventApi, queryServiceApi } from './api-catalog.ts'
 import type { ClientCordisInspectProviderRegistration } from './inspect-registry.ts'
 import { CLIENT_SLOT_API } from './slot-catalog.ts'

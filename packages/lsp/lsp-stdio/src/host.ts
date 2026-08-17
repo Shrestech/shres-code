@@ -1,7 +1,7 @@
 /** Filesystem-seam source access for the generic stdio LSP provider. */
 
 import { Buffer } from 'node:buffer'
-import type { FileSystem, FsTarget } from '@roos-code/roos-code-fs'
+import type { FileSystem, FsTarget } from '@shres-code/shres-code-fs'
 import { throwIfAborted } from './abort.ts'
 
 /** A canonical workspace in the filesystem/subprocess execution world. */

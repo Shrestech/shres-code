@@ -8,11 +8,11 @@
 import clsx from 'clsx'
 import {
   IconDarkOutline16, IconFollowsystemOutline16, IconLightOutline16,
-} from '@roos-code/roos-code-client-ui-primitives'
-import type { PropsLocale, PropsRuntime, PropsStore } from '@roos-code/roos-code-client-ui-slots'
+} from '@shres-code/shres-code-client-ui-primitives'
+import type { PropsLocale, PropsRuntime, PropsStore } from '@shres-code/shres-code-client-ui-slots'
 import type { ThemePreference } from '../theme-settings.ts'
 import type { ThemeKey } from './locales.ts'
-import type {} from '@roos-code/roos-code-client-ui-settings/client'
+import type {} from '@shres-code/shres-code-client-ui-settings/client'
 import type { createAppearanceRowStore } from './settings-store.ts'
 import css from './AppearanceRow.module.css'
 

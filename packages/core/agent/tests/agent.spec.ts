@@ -1,12 +1,12 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import { Context, Service, symbols } from '@roos-code/cordis'
-import { createUserMessage, freezeMessage } from '@roos-code/roos-code-llm'
-import { Session, SessionId, type UserMessage } from '@roos-code/roos-code-session'
+import { Context, Service, symbols } from '@shres-code/cordis'
+import { createUserMessage, freezeMessage } from '@shres-code/shres-code-llm'
+import { Session, SessionId, type UserMessage } from '@shres-code/shres-code-session'
 import AgentRegistry, {
   agentEvents,
   Inbox,
-} from '@roos-code/roos-code-agent'
-import TypertRegistry from '@roos-code/roos-code-typert-registry'
+} from '@shres-code/shres-code-agent'
+import TypertRegistry from '@shres-code/shres-code-typert-registry'
 
 import type {
   Agent,
@@ -15,7 +15,7 @@ import type {
   AgentStatus,
   CreateAgentOptions,
   ResumeAgentOptions,
-} from '@roos-code/roos-code-agent'
+} from '@shres-code/shres-code-agent'
 
 function stubAgent(rawId: string, overrides: Partial<Agent> = {}): Agent {
   const id = SessionId(rawId)
@@ -155,8 +155,8 @@ describe('AgentRegistry', () => {
     expect(lookup).toMatchObject({
       parameter: 'agent',
       wire: 'agentId',
-      hostTypeSymbol: '@roos-code/roos-code-agent#Agent',
-      wireTypeSymbol: '@roos-code/roos-code-session/types#SessionId',
+      hostTypeSymbol: '@shres-code/shres-code-agent#Agent',
+      wireTypeSymbol: '@shres-code/shres-code-session/types#SessionId',
     })
     expect(lookup?.resolve(agent.id)).toBe(agent)
     expect(ctx.typert.contexts.getHost('agent')?.resolve(agent.id)).toBe(agent.ctx)

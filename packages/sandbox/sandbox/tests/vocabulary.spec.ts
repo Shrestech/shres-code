@@ -2,12 +2,12 @@
  * Vocabulary-contract tests for the sandbox seam: the fail-closed error's
  * structured identity is what tool results and consumers key on, so its
  * shape is pinned here, next to the vocabulary that owns it. Provider
- * behavior is each implementation's suite (`roos-sandbox-local`); consumer
- * behavior is each consumer's (`roos-bash-sandbox`).
+ * behavior is each implementation's suite (`shres-sandbox-local`); consumer
+ * behavior is each consumer's (`shres-bash-sandbox`).
  */
 
 import { describe, expect, it } from 'vitest'
-import { SANDBOX_UNAVAILABLE, SandboxUnavailableError, sandboxNetwork } from '@roos-code/roos-code-sandbox'
+import { SANDBOX_UNAVAILABLE, SandboxUnavailableError, sandboxNetwork } from '@shres-code/shres-code-sandbox'
 
 describe('SandboxUnavailableError', () => {
   it('carries the structured { name, code } identity consumers key on', () => {

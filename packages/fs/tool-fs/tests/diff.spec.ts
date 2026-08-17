@@ -7,7 +7,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { computeHunkDiffs, diffsFromMeta, DIFF_CONTEXT } from '../src/diff.ts'
-import type { JsonValue } from '@roos-code/roos-code-session'
+import type { JsonValue } from '@shres-code/shres-code-session'
 
 const lines = (n: number): string => Array.from({ length: n }, (_, i) => `line${i + 1}`).join('\n') + '\n'
 

@@ -1,13 +1,13 @@
 /**
- * Package-owned invariant companion for `@roos-code/roos-code-client-ui-input-trigger`.
- * @module @roos-code/roos-code-client-ui-input-trigger/invariant
+ * Package-owned invariant companion for `@shres-code/shres-code-client-ui-input-trigger`.
+ * @module @shres-code/shres-code-client-ui-input-trigger/invariant
  */
 
 /* jscpd:ignore-start */
-import type { Context } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-client-ui-input-trigger'
+const PACKAGE_NAME = '@shres-code/shres-code-client-ui-input-trigger'
 
 /** Cordis companion plugin name. */
 export const name = 'client-ui-input-trigger-invariant'

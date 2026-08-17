@@ -1,23 +1,23 @@
-import type { Context } from '@roos-code/cordis'
+import type { Context } from '@shres-code/cordis'
 import type {
   ConversationMatch, ConversationNodeContext, ConversationNodeDefinition, TurnLocation,
-} from '@roos-code/roos-code-client-runtime/client'
-import { isAppendSurfaceEvent, toAssistantBlocks } from '@roos-code/roos-code-client-runtime/client'
-import type {} from '@roos-code/roos-code-llm-retry/types'
+} from '@shres-code/shres-code-client-runtime/client'
+import { isAppendSurfaceEvent, toAssistantBlocks } from '@shres-code/shres-code-client-runtime/client'
+import type {} from '@shres-code/shres-code-llm-retry/types'
 import type {
   AssistantChatData, FinalAssistantChatData, TurnTailChatData,
 } from '../contract/chat-nodes.ts'
 import { deriveTurnMetrics } from '../chat/turn-metrics.ts'
 import { CHAT_SYNTHETIC_SEQ_OFFSETS, chatNode } from './common.ts'
 
-declare module '@roos-code/roos-code-client-ui-conversation/client' {
+declare module '@shres-code/shres-code-client-ui-conversation/client' {
   interface ChatNodeDataMap {
     /** Completed-turn actions and extension tail. */
     'turn-tail': TurnTailChatData
   }
 }
 
-declare module '@roos-code/roos-code-client-runtime/client' {
+declare module '@shres-code/shres-code-client-runtime/client' {
   interface ConversationTurnDataMap {
     /** Closing Assistant and footer facts derived for this completed Turn. */
     'turn-tail': TurnTailChatData

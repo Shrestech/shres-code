@@ -1,9 +1,9 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { type Agent } from '@roos-code/roos-code-agent'
+import { Context } from '@shres-code/cordis'
+import { type Agent } from '@shres-code/shres-code-agent'
 
-import { HarnessError } from '@roos-code/roos-code-llm'
-import { carrierKeyOf } from '@roos-code/roos-code-scope'
+import { HarnessError } from '@shres-code/shres-code-llm'
+import { carrierKeyOf } from '@shres-code/shres-code-scope'
 import SubagentRuntime, {
   foldSubagentDescriptor,
   snapshotSubagentDescriptor,
@@ -17,8 +17,8 @@ import SubagentRuntime, {
   type SubagentRun,
   type SubagentRunEndInfo,
   type SubagentStartRequest,
-} from '@roos-code/roos-code-subagent'
-import { SessionId, type SessionEvent } from '@roos-code/roos-code-session'
+} from '@shres-code/shres-code-subagent'
+import { SessionId, type SessionEvent } from '@shres-code/shres-code-session'
 
 function fakeParent(id = 'parent-1'): Agent {
   return { id: SessionId(id) } as unknown as Agent

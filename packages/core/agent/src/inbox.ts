@@ -1,11 +1,11 @@
 /**
  * Incremental projection of durable agent inbox events.
  *
- * @module @roos-code/roos-code-agent/inbox
+ * @module @shres-code/shres-code-agent/inbox
  */
 
-import type { MessageId } from '@roos-code/roos-code-llm'
-import type { Session, SessionEventMap, UserMessage } from '@roos-code/roos-code-session'
+import type { MessageId } from '@shres-code/shres-code-llm'
+import type { Session, SessionEventMap, UserMessage } from '@shres-code/shres-code-session'
 import type { InboxTarget } from './types.ts'
 
 /** Mutable state privately owned by an {@link Inbox}. */

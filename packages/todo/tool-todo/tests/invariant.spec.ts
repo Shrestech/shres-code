@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import SessionStore, { type Session, type SessionEvent } from '@roos-code/roos-code-session'
-import ToolRuntime from '@roos-code/roos-code-tools'
-import * as ToolTodo from '@roos-code/roos-code-tool-todo'
-import * as TodoInvariant from '@roos-code/roos-code-tool-todo/invariant'
-import InvariantRegistry from '@roos-code/roos-code-invariants'
+import { Context } from '@shres-code/cordis'
+import SessionStore, { type Session, type SessionEvent } from '@shres-code/shres-code-session'
+import ToolRuntime from '@shres-code/shres-code-tools'
+import * as ToolTodo from '@shres-code/shres-code-tool-todo'
+import * as TodoInvariant from '@shres-code/shres-code-tool-todo/invariant'
+import InvariantRegistry from '@shres-code/shres-code-invariants'
 
 async function setup(): Promise<Context> {
   const ctx = new Context()

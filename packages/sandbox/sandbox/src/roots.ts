@@ -3,14 +3,14 @@
  * expresses a mode as a canonical allow-list: `workspace-write` means "the
  * workspace root plus the platform temp areas", and this module is that
  * meaning's one home. The Seatbelt profile
- * (`@roos-code/roos-code-sandbox-local`) and the in-process filesystem fence
- * (`@roos-code/roos-code-fs-sandbox`) both derive their allow-list here, so "the
+ * (`@shres-code/shres-code-sandbox-local`) and the in-process filesystem fence
+ * (`@shres-code/shres-code-fs-sandbox`) both derive their allow-list here, so "the
  * write tool cannot write /tmp but bash can" asymmetries cannot arise between
  * them. The bwrap and Landlock dialects keep their own grant spellings (an
  * ephemeral `/tmp` mount, launcher-owned flags) — the honest per-runner
  * differences recorded in the sandbox RFC — with parity pinned by test.
  *
- * @module roos-sandbox/roots
+ * @module shres-sandbox/roots
  */
 
 import { realpathSync } from 'node:fs'

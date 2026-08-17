@@ -1,9 +1,9 @@
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { describe, expect, it } from 'vitest'
-import { SettingsProvider, settingsNamespace, type SettingsNamespace } from '@roos-code/roos-code-settings'
+import { SettingsProvider, settingsNamespace, type SettingsNamespace } from '@shres-code/shres-code-settings'
 import {
   CONVERSATION_SETTINGS_NAMESPACE, DEFAULT_BUSY_ENTER_BEHAVIOR, apply,
-} from '@roos-code/roos-code-client-ui-conversation'
+} from '@shres-code/shres-code-client-ui-conversation'
 
 class MemorySettings extends SettingsProvider {
   readonly writable = true

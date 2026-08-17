@@ -1,15 +1,15 @@
 /** Read-only Host plugin inventory registered into Web Settings. */
 
-import type {} from '@roos-code/roos-code-client-locale/client'
-import type { ClientContext } from '@roos-code/roos-code-client-runtime/client'
-import type {} from '@roos-code/roos-code-client-ui-settings/client'
+import type {} from '@shres-code/shres-code-client-locale/client'
+import type { ClientContext } from '@shres-code/shres-code-client-runtime/client'
+import type {} from '@shres-code/shres-code-client-ui-settings/client'
 import { PluginInventorySettingsTab, type PluginInventorySettingsTabInjected } from './PluginInventorySettingsTab.tsx'
 import { en, type PluginInventoryLocaleKey } from './locales.ts'
 
 export type { PluginInventorySettingsTabInjected, PluginInventorySettingsTabProps } from './PluginInventorySettingsTab.tsx'
 export type { PluginInventoryLocaleKey } from './locales.ts'
 
-declare module '@roos-code/roos-code-client-ui-slots' {
+declare module '@shres-code/shres-code-client-ui-slots' {
   interface LocaleNamespaceMap {
     /** Read-only Host plugin inventory copy. */
     'settings.pluginInventory': PluginInventoryLocaleKey

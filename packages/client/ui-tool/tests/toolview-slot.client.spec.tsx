@@ -11,13 +11,13 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup } from '@testing-library/react'
-import type { ISession, SessionId, ToolResultNode } from '@roos-code/roos-code-client-runtime/client'
-import type { PropsRenderSlots } from '@roos-code/roos-code-client-ui-slots'
-import { SlotTestRuntime, stubSettingsScope } from '@roos-code/roos-code-client-test-runtime'
-import { LocaleRuntime } from '@roos-code/roos-code-client-locale/client'
-import { apply as applyConversation, inject as injectConversation } from '@roos-code/roos-code-client-ui-conversation/client'
-import { apply as applyTool, inject as injectTool } from '@roos-code/roos-code-client-ui-tool/client'
-import type { ToolCallViewProps } from '@roos-code/roos-code-client-ui-tool/client'
+import type { ISession, SessionId, ToolResultNode } from '@shres-code/shres-code-client-runtime/client'
+import type { PropsRenderSlots } from '@shres-code/shres-code-client-ui-slots'
+import { SlotTestRuntime, stubSettingsScope } from '@shres-code/shres-code-client-test-runtime'
+import { LocaleRuntime } from '@shres-code/shres-code-client-locale/client'
+import { apply as applyConversation, inject as injectConversation } from '@shres-code/shres-code-client-ui-conversation/client'
+import { apply as applyTool, inject as injectTool } from '@shres-code/shres-code-client-ui-tool/client'
+import type { ToolCallViewProps } from '@shres-code/shres-code-client-ui-tool/client'
 import { toolChatSnapshot } from './tool-details-render.client.tsx'
 
 const SID = 's1' as SessionId

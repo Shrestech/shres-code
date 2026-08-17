@@ -3,9 +3,9 @@
  */
 
 import { z } from 'zod'
-import type { TokenUsage } from '@roos-code/roos-code-llm'
-import type { SessionEvent } from '@roos-code/roos-code-session'
-import type { ProjectionDefinition } from '@roos-code/roos-code-session-projection'
+import type { TokenUsage } from '@shres-code/shres-code-llm'
+import type { SessionEvent } from '@shres-code/shres-code-session'
+import type { ProjectionDefinition } from '@shres-code/shres-code-session-projection'
 import type { ContextPressureProjection, TokenUsageProjection } from './projection.ts'
 import { foldSurfaceProjection } from './surface-projection.ts'
 import type { ShadowPriceClaim } from './surface-projection.ts'

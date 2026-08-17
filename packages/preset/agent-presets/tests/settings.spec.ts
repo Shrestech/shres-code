@@ -8,19 +8,19 @@ import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { Context } from '@roos-code/cordis'
-import Loader from '@roos-code/cordis-plugin-loader'
-import Include from '@roos-code/cordis-plugin-include'
-import LlmRuntime from '@roos-code/roos-code-llm'
-import SessionStore, { SessionId } from '@roos-code/roos-code-session'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import ToolRuntime from '@roos-code/roos-code-tools'
-import AgentRegistry from '@roos-code/roos-code-agent'
-import AgentLoop from '@roos-code/roos-code-agent-loop'
-import FileSettingsProvider from '@roos-code/roos-code-settings-file'
-import { settingsNamespace } from '@roos-code/roos-code-settings'
+import { Context } from '@shres-code/cordis'
+import Loader from '@shres-code/cordis-plugin-loader'
+import Include from '@shres-code/cordis-plugin-include'
+import LlmRuntime from '@shres-code/shres-code-llm'
+import SessionStore, { SessionId } from '@shres-code/shres-code-session'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import ToolRuntime from '@shres-code/shres-code-tools'
+import AgentRegistry from '@shres-code/shres-code-agent'
+import AgentLoop from '@shres-code/shres-code-agent-loop'
+import FileSettingsProvider from '@shres-code/shres-code-settings-file'
+import { settingsNamespace } from '@shres-code/shres-code-settings'
 import { describe, expect, it } from 'vitest'
-import AgentPresets, { COMPOSITION_FILE, SETTINGS_NAMESPACE } from '@roos-code/roos-code-agent-presets'
+import AgentPresets, { COMPOSITION_FILE, SETTINGS_NAMESPACE } from '@shres-code/shres-code-agent-presets'
 
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), 'fixtures')
 const ROOTS = [{ path: join(FIXTURES, 'system'), trust: 'system' as const }]
@@ -33,7 +33,7 @@ const NS = settingsNamespace(SETTINGS_NAMESPACE)
 async function harness(
   extraRoots: readonly { path: string; trust: 'system' | 'user' }[] = [],
 ): Promise<{ ctx: Context; settingsFile: string; settingsFiber: { dispose: () => unknown } }> {
-  const home = await mkdtemp(join(tmpdir(), 'roos-preset-settings-'))
+  const home = await mkdtemp(join(tmpdir(), 'shres-preset-settings-'))
   const settingsFile = join(home, 'settings.yaml')
   await writeFile(settingsFile, '{}\n')
 
@@ -117,7 +117,7 @@ describe('the default preset as a user setting', () => {
   })
 
   it('clears a user default it has just deleted', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'roos-preset-authored-'))
+    const root = await mkdtemp(join(tmpdir(), 'shres-preset-authored-'))
     await mkdir(join(root, 'mine'))
     await writeFile(
       join(root, 'mine', COMPOSITION_FILE),

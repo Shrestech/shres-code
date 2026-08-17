@@ -5,9 +5,9 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { afterEach, describe, expect, it } from 'vitest'
-import type { WebServer, WebRoute } from '@roos-code/roos-code-host-webserver'
+import type { WebServer, WebRoute } from '@shres-code/shres-code-host-webserver'
 import { ClientModuleRegistry } from '../src/index.ts'
 
 let root: string | undefined
@@ -20,9 +20,9 @@ afterEach(() => {
 /** Create a resolvable package whose client export points at the returned path. */
 function writePackage(
   packageName: string,
-  metadata: Record<string, unknown> = { roos: { client: { platform: 'web' } } },
+  metadata: Record<string, unknown> = { shres: { client: { platform: 'web' } } },
 ): string {
-  root ??= realpathSync(mkdtempSync(join(tmpdir(), 'roos-client-modules-')))
+  root ??= realpathSync(mkdtempSync(join(tmpdir(), 'shres-client-modules-')))
   const pkgRoot = join(root, 'node_modules', ...packageName.split('/'))
   const clientPath = join(pkgRoot, 'lib', 'client.js')
   mkdirSync(pkgRoot, { recursive: true })
@@ -69,10 +69,10 @@ function construct(packageNames: string[]): ClientModuleRegistry {
 }
 
 describe('client bundle activation', () => {
-  it('allows sibling roos roles', () => {
+  it('allows sibling shres roles', () => {
     const currentName = '@fixture/current-client-field'
     const clientPath = writePackage(currentName, {
-      roos: {
+      shres: {
         bundle: { patch: './cordis.patch.yml' },
         client: { platform: 'web' },
         profile: { bundles: [] },

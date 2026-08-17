@@ -1,5 +1,5 @@
 /**
- * Rebrand DeepSeek Harness to Roos Code. Every product identity token is
+ * Rebrand Roos Code to Shres Code. Every product identity token is
  * rewritten in one pass: package names, env vars, home directory, GitHub URLs,
  * Python module names, CLI/bin names, and prose. Keep-list strings
  * (`DEEPSEEK_API_KEY`, `deepseek-official`, `cordis.yml`, …) are not tokens
@@ -10,7 +10,7 @@
  * listed in {@link EXACT_EDITS} with an exact hit count. Directory and file
  * renames live in {@link PATH_RENAMES}.
  *
- * Frozen trees (`.agents/notes/**`, `LICENSE`, vendored upstream README/LICENSE)
+ * Frozen trees (archived Agent Notes, `LICENSE`, vendored upstream README/LICENSE)
  * and this script (which must keep old tokens as find-strings) are skipped.
  *
  * Usage: `pnpm run rebrand [--apply|--check]`. Without a mode it reports what
@@ -41,39 +41,39 @@ export interface TokenRule {
 
 /**
  * Product-identity literals, longest first so a prefix cannot steal a longer
- * name (`@deepseek-ai/dsh-` before `@deepseek-ai/dsh`, `deepseek_harness_runtime`
- * before `deepseek_harness`).
+ * name (`github.com/roos-code/roos-code` before `roos-code`, `@roos-code/roos-code-`
+ * before `@roos-code/roos-code`, `roos_code_runtime` before `roos_code`).
  */
 export const TOKEN_RULES: readonly TokenRule[] = [
-  { id: 'github-deepseek-ai-repo', find: 'github.com/deepseek-ai/deepseek-harness', replace: 'github.com/roos-code/roos-code' },
-  { id: 'github-deepseek-harness-repo', find: 'github.com/deepseek-harness/deepseek-harness', replace: 'github.com/roos-code/roos-code' },
-  { id: 'python-runtime-bin', find: 'deepseek-harness-runtime-bin', replace: 'roos-code-runtime-bin' },
-  { id: 'doc-projector', find: 'deepseek-harness-doc-projector', replace: 'roos-code-doc-projector' },
-  { id: 'python-sdk-name', find: 'deepseek-harness-sdk', replace: 'roos-code-sdk' },
-  { id: 'python-runtime-module', find: 'deepseek_harness_runtime', replace: 'roos_code_runtime' },
-  { id: 'python-sdk-module', find: 'deepseek_harness', replace: 'roos_code' },
-  { id: 'product-slug', find: 'deepseek-harness', replace: 'roos-code' },
-  { id: 'product-prose', find: 'DeepSeek Harness', replace: 'Roos Code' },
+  { id: 'github-repo', find: 'github.com/roos-code/roos-code', replace: 'github.com/parthmstech/shres-code' },
+  { id: 'github-org', find: 'github.com/roos-code/', replace: 'github.com/parthmstech/' },
+  { id: 'python-runtime-bin', find: 'roos-code-runtime-bin', replace: 'shres-code-runtime-bin' },
+  { id: 'doc-projector', find: 'roos-code-doc-projector', replace: 'shres-code-doc-projector' },
+  { id: 'python-sdk-name', find: 'roos-code-sdk', replace: 'shres-code-sdk' },
+  { id: 'python-runtime-module', find: 'roos_code_runtime', replace: 'shres_code_runtime' },
+  { id: 'python-sdk-module', find: 'roos_code', replace: 'shres_code' },
+  { id: 'product-slug', find: 'roos-code', replace: 'shres-code' },
+  { id: 'product-prose', find: 'Roos Code', replace: 'Shres Code' },
   // Escaped-slash forms must precede the raw slash so a regex source is rewritten
-  // as a unit (`@deepseek-ai\/dsh-` → `@roos-code\/roos-code-`).
-  { id: 'pkg-dsh-prefix-dbl-esc', find: '@deepseek-ai\\\\/dsh-', replace: '@roos-code\\\\/roos-code-' },
-  { id: 'pkg-dsh-prefix-esc', find: '@deepseek-ai\\/dsh-', replace: '@roos-code\\/roos-code-' },
-  { id: 'pkg-dsh-prefix', find: '@deepseek-ai/dsh-', replace: '@roos-code/roos-code-' },
-  { id: 'pkg-dsh-exact-dbl-esc', find: '@deepseek-ai\\\\/dsh', replace: '@roos-code\\\\/roos-code' },
-  { id: 'pkg-dsh-exact-esc', find: '@deepseek-ai\\/dsh', replace: '@roos-code\\/roos-code' },
-  { id: 'pkg-dsh-exact', find: '@deepseek-ai/dsh', replace: '@roos-code/roos-code' },
-  { id: 'scope-dbl-esc', find: '@deepseek-ai\\\\/', replace: '@roos-code\\\\/' },
-  { id: 'scope-esc', find: '@deepseek-ai\\/', replace: '@roos-code\\/' },
-  { id: 'scope-slash', find: '@deepseek-ai/', replace: '@roos-code/' },
-  { id: 'scope-bare', find: '@deepseek-ai', replace: '@roos-code' },
-  { id: 'env-prefix', find: 'DSH_', replace: 'ROOS_' },
-  { id: 'home-display', find: '~/.dsh', replace: '~/.roos' },
-  { id: 'pascal-dsh', find: 'Dsh', replace: 'Roos' },
+  // as a unit (`@roos-code\/roos-code-` → `@shres-code\/shres-code-`).
+  { id: 'pkg-prefix-dbl-esc', find: '@roos-code\\\\/roos-code-', replace: '@shres-code\\\\/shres-code-' },
+  { id: 'pkg-prefix-esc', find: '@roos-code\\/roos-code-', replace: '@shres-code\\/shres-code-' },
+  { id: 'pkg-prefix', find: '@roos-code/roos-code-', replace: '@shres-code/shres-code-' },
+  { id: 'pkg-exact-dbl-esc', find: '@roos-code\\\\/roos-code', replace: '@shres-code\\\\/shres-code' },
+  { id: 'pkg-exact-esc', find: '@roos-code\\/roos-code', replace: '@shres-code\\/shres-code' },
+  { id: 'pkg-exact', find: '@roos-code/roos-code', replace: '@shres-code/shres-code' },
+  { id: 'scope-dbl-esc', find: '@roos-code\\\\/', replace: '@shres-code\\\\/' },
+  { id: 'scope-esc', find: '@roos-code\\/', replace: '@shres-code\\/' },
+  { id: 'scope-slash', find: '@roos-code/', replace: '@shres-code/' },
+  { id: 'scope-bare', find: '@roos-code', replace: '@shres-code' },
+  { id: 'env-prefix', find: 'ROOS_', replace: 'SHRES_' },
+  { id: 'home-display', find: '~/.roos', replace: '~/.shres' },
+  { id: 'pascal-roos', find: 'Roos', replace: 'Shres' },
 ]
 
-const CAMEL_DSH = /dsh(?=[A-Z])/g
-const WORD_DSH = /\bdsh\b/g
-const WORD_DSH_UPPER = /\bDSH\b/g
+const CAMEL_ROOS = /roos(?=[A-Z])/g
+const WORD_ROOS = /\broos\b/g
+const WORD_ROOS_UPPER = /\bROOS\b/g
 
 /**
  * Apply every token rule, then the word-boundary CLI/identifier rules.
@@ -85,9 +85,9 @@ export function rewriteText(text: string): string {
   for (const rule of TOKEN_RULES) {
     if (out.includes(rule.find)) out = out.split(rule.find).join(rule.replace)
   }
-  out = out.replace(CAMEL_DSH, 'roos')
-  out = out.replace(WORD_DSH, 'roos')
-  out = out.replace(WORD_DSH_UPPER, 'Roos')
+  out = out.replace(CAMEL_ROOS, 'shres')
+  out = out.replace(WORD_ROOS, 'shres')
+  out = out.replace(WORD_ROOS_UPPER, 'SHRES')
   return out
 }
 
@@ -114,94 +114,51 @@ interface PathRename {
   readonly to: string
 }
 
-const EXACT_EDITS: readonly ExactEdit[] = [
-  {
-    id: 'hygiene-rebrand-check',
-    file: 'package.json',
-    find: '"hygiene": "pnpm run rescope-vendor:check && pnpm run knip',
-    replace: '"hygiene": "pnpm run rescope-vendor:check && pnpm run rebrand:check && pnpm run knip',
-    expect: 1,
-  },
-  {
-    id: 'hygiene-legacy-brand',
-    file: 'package.json',
-    find: '&& pnpm run verify-vendored-links"',
-    replace: '&& pnpm run verify-vendored-links && pnpm run verify-no-legacy-brand && pnpm run purge-zh:check && pnpm run verify-no-zh-artifacts"',
-    expect: 1,
-  },
-  {
-    id: 'hygiene-leaf-rebrand',
-    file: 'scripts/run-gates.ts',
-    find: `    pnpmScript('rescope-vendor', 'rescope-vendor:check', { label: 'vendor rescope' }),
-    pnpmScript('knip', 'knip'),`,
-    replace: `    pnpmScript('rescope-vendor', 'rescope-vendor:check', { label: 'vendor rescope' }),
-    pnpmScript('rebrand', 'rebrand:check', { label: 'Roos Code rebrand' }),
-    pnpmScript('knip', 'knip'),`,
-    expect: 1,
-  },
-  {
-    id: 'hygiene-leaf-legacy-brand',
-    file: 'scripts/run-gates.ts',
-    find: `    pnpmScript('node-next-types', 'verify-node-next-types', {
-      label: 'node-next types',
-      ...artifactOptions,
-    }),
-  ]`,
-    replace: `    pnpmScript('node-next-types', 'verify-node-next-types', {
-      label: 'node-next types',
-      ...artifactOptions,
-    }),
-    pnpmScript('legacy-brand', 'verify-no-legacy-brand', { label: 'legacy brand residue' }),
-    pnpmScript('purge-zh', 'purge-zh:check', { label: 'Chinese-language file purge' }),
-    pnpmScript('no-zh-artifacts', 'verify-no-zh-artifacts', { label: 'Chinese-language residue' }),
-  ]`,
-    expect: 1,
-  },
-]
+const EXACT_EDITS: readonly ExactEdit[] = []
 
 const POSTCONDITIONS: readonly PostCondition[] = [
-  { file: 'vendor/cordis/package.json', text: '"name": "@roos-code/cordis"', count: 1 },
-  { file: 'apps/cli/package.json', text: '"name": "@roos-code/roos-code"', count: 1 },
-  { file: 'apps/cli/package.json', text: '"roos": "lib/bin.js"', count: 1 },
-  { file: 'package.json', text: '"name": "@roos-code/roos-code-root"', count: 1 },
+  { file: 'vendor/cordis/package.json', text: '"name": "@shres-code/cordis"', count: 1 },
+  { file: 'apps/cli/package.json', text: '"name": "@shres-code/shres-code"', count: 1 },
+  { file: 'apps/cli/package.json', text: '"shres": "lib/bin.js"', count: 1 },
+  { file: 'package.json', text: '"name": "@shres-code/shres-code-root"', count: 1 },
   { file: 'package.json', text: '"rebrand:check": "tsx scripts/rebrand.ts --check"', count: 1 },
   { file: 'package.json', text: 'pnpm run rebrand:check', count: 1 },
-  { file: 'packages/util/home-paths/src/index.ts', text: "export const ROOS_HOME_DIR_NAME = '.roos'", count: 1 },
-  { file: 'packages/util/home-paths/src/index.ts', text: "export const ROOS_HOME_ENV = 'ROOS_HOME'", count: 1 },
-  { file: 'apps/cli/src/args.ts', text: ".name('roos')", count: 1 },
-  { file: 'scripts/release/families.ts', text: "readonly id = 'roos'", count: 1 },
-  { file: 'scripts/release/families.ts', text: "readonly tagPrefix = 'roos-v'", count: 1 },
-  { file: 'packages/llm/llm/src/attribution.ts', text: "product: 'roos-code'", count: 1 },
-  { file: 'tsconfig.base.json', text: '"@roos-code/cordis-plugin-loader": ["./vendor/loader/src"]', count: 1 },
-  { file: 'pnpm-workspace.yaml', text: "'@roos-code/cosmokit': 'link:vendor/cosmokit'", count: 1 },
-  { file: 'website/package.json', text: '"name": "@roos-code/website"', count: 1 },
-  { file: 'website/.vitepress/config.ts', text: "title: 'Roos Code'", count: 1 },
-  { file: 'scripts/check-workspace-constraints.ts', text: "const repositoryUrl = 'git+https://github.com/roos-code/roos-code.git'", count: 1 },
-  { file: 'scripts/verify-roos-package-licenses.ts', text: '/^@roos-code\\/roos-code(?:-|$)/', count: 1 },
+  { file: 'packages/util/home-paths/src/index.ts', text: "export const SHRES_HOME_DIR_NAME = '.shres'", count: 1 },
+  { file: 'packages/util/home-paths/src/index.ts', text: "export const SHRES_HOME_ENV = 'SHRES_HOME'", count: 1 },
+  { file: 'apps/cli/src/args.ts', text: ".name('shres')", count: 1 },
+  { file: 'scripts/release/families.ts', text: "readonly id = 'shres'", count: 1 },
+  { file: 'scripts/release/families.ts', text: "readonly tagPrefix = 'shres-v'", count: 1 },
+  { file: 'packages/llm/llm/src/attribution.ts', text: "product: 'shres-code'", count: 1 },
+  { file: 'tsconfig.base.json', text: '"@shres-code/cordis-plugin-loader": ["./vendor/loader/src"]', count: 1 },
+  { file: 'pnpm-workspace.yaml', text: "'@shres-code/cosmokit': 'link:vendor/cosmokit'", count: 1 },
+  { file: 'website/package.json', text: '"name": "@shres-code/website"', count: 1 },
+  { file: 'website/.vitepress/config.ts', text: "title: 'Shres Code'", count: 1 },
+  { file: 'scripts/check-workspace-constraints.ts', text: "const repositoryUrl = 'git+https://github.com/parthmstech/shres-code.git'", count: 1 },
+  { file: 'scripts/verify-shres-package-licenses.ts', text: '/^@shres-code\\/shres-code(?:-|$)/', count: 1 },
 ]
 
 const PATH_RENAMES: readonly PathRename[] = [
-  { id: 'license-gate', from: 'scripts/verify-dsh-package-licenses.ts', to: 'scripts/verify-roos-package-licenses.ts' },
-  { id: 'license-gate-spec', from: 'scripts/verify-dsh-package-licenses.spec.ts', to: 'scripts/verify-roos-package-licenses.spec.ts' },
-  { id: 'python-sdk', from: 'python/sdk/src/deepseek_harness', to: 'python/sdk/src/roos_code' },
-  { id: 'python-runtime', from: 'python/sdk-runtime/src/deepseek_harness_runtime', to: 'python/sdk-runtime/src/roos_code_runtime' },
-  { id: 'python-runtime-json', from: 'python/sdk-runtime/src/roos_code_runtime/deepseek-harness-runtime.json', to: 'python/sdk-runtime/src/roos_code_runtime/roos-code-runtime.json' },
-  { id: 'skill-archive', from: '.agents/skills/dsh-archive-agent-notes', to: '.agents/skills/roos-archive-agent-notes' },
-  { id: 'skill-review', from: '.agents/skills/dsh-code-review', to: '.agents/skills/roos-code-review' },
-  { id: 'skill-doc-site', from: '.agents/skills/dsh-doc-site-sync', to: '.agents/skills/roos-doc-site-sync' },
-  { id: 'skill-doc-std', from: '.agents/skills/dsh-doc-standards', to: '.agents/skills/roos-doc-standards' },
-  { id: 'skill-simplifications', from: '.agents/skills/dsh-find-simplifications', to: '.agents/skills/roos-find-simplifications' },
-  { id: 'skill-stacks', from: '.agents/skills/dsh-merging-stacked-prs', to: '.agents/skills/roos-merging-stacked-prs' },
-  { id: 'skill-pre-push', from: '.agents/skills/dsh-pre-push-checks', to: '.agents/skills/roos-pre-push-checks' },
-  { id: 'skill-prose', from: '.agents/skills/dsh-prose-standard', to: '.agents/skills/roos-prose-standard' },
-  { id: 'skill-cot', from: '.agents/skills/dsh-trim-cot-leakage', to: '.agents/skills/roos-trim-cot-leakage' },
-  { id: 'subagent-sdk', from: 'packages/subagent/subagent-dsh-sdk', to: 'packages/subagent/subagent-roos-sdk' },
-  { id: 'subagent-sdk-fixture', from: 'examples/jsonrpc-agent/tests/fixtures/subagent/subagent-dsh-sdk', to: 'examples/jsonrpc-agent/tests/fixtures/subagent/subagent-roos-sdk' },
-  { id: 'cli-badge-fixture', from: 'apps/cli/tests/fixtures/dsh-badge', to: 'apps/cli/tests/fixtures/roos-badge' },
-  { id: 'cli-badge-snapshot', from: 'apps/cli/tests/dsh-badge.snapshot.ts', to: 'apps/cli/tests/roos-badge.snapshot.ts' },
-  { id: 'skill-badge-md', from: 'packages/skill/skill-badge/assets/dsh-badge.md', to: 'packages/skill/skill-badge/assets/roos-badge.md' },
-  { id: 'skill-badge-png', from: 'packages/skill/skill-badge/assets/dsh-badge.png', to: 'packages/skill/skill-badge/assets/roos-badge.png' },
-  { id: 'cookbook-review', from: 'docs/cookbook/maintaining-dsh-code-review.md', to: 'docs/cookbook/maintaining-roos-code-review.md' },
+  { id: 'license-gate', from: 'scripts/verify-roos-package-licenses.ts', to: 'scripts/verify-shres-package-licenses.ts' },
+  { id: 'license-gate-spec', from: 'scripts/verify-roos-package-licenses.spec.ts', to: 'scripts/verify-shres-package-licenses.spec.ts' },
+  { id: 'python-sdk', from: 'python/sdk/src/roos_code', to: 'python/sdk/src/shres_code' },
+  { id: 'python-runtime', from: 'python/sdk-runtime/src/roos_code_runtime', to: 'python/sdk-runtime/src/shres_code_runtime' },
+  { id: 'python-runtime-json', from: 'python/sdk-runtime/src/shres_code_runtime/roos-code-runtime.json', to: 'python/sdk-runtime/src/shres_code_runtime/shres-code-runtime.json' },
+  { id: 'skill-archive', from: '.agents/skills/roos-archive-agent-notes', to: '.agents/skills/shres-archive-agent-notes' },
+  { id: 'skill-review', from: '.agents/skills/roos-code-review', to: '.agents/skills/shres-code-review' },
+  { id: 'skill-doc-site', from: '.agents/skills/roos-doc-site-sync', to: '.agents/skills/shres-doc-site-sync' },
+  { id: 'skill-doc-std', from: '.agents/skills/roos-doc-standards', to: '.agents/skills/shres-doc-standards' },
+  { id: 'skill-simplifications', from: '.agents/skills/roos-find-simplifications', to: '.agents/skills/shres-find-simplifications' },
+  { id: 'skill-stacks', from: '.agents/skills/roos-merging-stacked-prs', to: '.agents/skills/shres-merging-stacked-prs' },
+  { id: 'skill-pre-push', from: '.agents/skills/roos-pre-push-checks', to: '.agents/skills/shres-pre-push-checks' },
+  { id: 'skill-prose', from: '.agents/skills/roos-prose-standard', to: '.agents/skills/shres-prose-standard' },
+  { id: 'skill-cot', from: '.agents/skills/roos-trim-cot-leakage', to: '.agents/skills/shres-trim-cot-leakage' },
+  { id: 'subagent-sdk', from: 'packages/subagent/subagent-roos-sdk', to: 'packages/subagent/subagent-shres-sdk' },
+  { id: 'subagent-sdk-fixture', from: 'examples/jsonrpc-agent/tests/fixtures/subagent/subagent-roos-sdk', to: 'examples/jsonrpc-agent/tests/fixtures/subagent/subagent-shres-sdk' },
+  { id: 'cli-badge-fixture', from: 'apps/cli/tests/fixtures/roos-badge', to: 'apps/cli/tests/fixtures/shres-badge' },
+  { id: 'cli-badge-snapshot', from: 'apps/cli/tests/roos-badge.snapshot.ts', to: 'apps/cli/tests/shres-badge.snapshot.ts' },
+  { id: 'skill-badge-md', from: 'packages/skill/skill-badge/assets/roos-badge.md', to: 'packages/skill/skill-badge/assets/shres-badge.md' },
+  { id: 'skill-badge-png', from: 'packages/skill/skill-badge/assets/roos-badge.png', to: 'packages/skill/skill-badge/assets/shres-badge.png' },
+  { id: 'cookbook-review', from: 'docs/cookbook/maintaining-roos-code-review.md', to: 'docs/cookbook/maintaining-shres-code-review.md' },
 ]
 
 /** Files the rebrand must never rewrite. */
@@ -209,9 +166,11 @@ function excluded(file: string): boolean {
   if (file === 'scripts/rebrand.ts' || file === 'scripts/rebrand.spec.ts') return true
   if (file === 'scripts/verify-no-legacy-brand.ts') return true
   if (file === 'scripts/purge-zh.ts' || file === 'scripts/purge-zh.spec.ts') return true
-  if (file === 'AGENTS.md' || file === 'CLAUDE.md') return true
+  if (file === 'CLAUDE.md' || file.endsWith('/CLAUDE.md')) return true
   if (file === 'LICENSE' || file === 'NOTICE') return true
-  if (file.startsWith('.agents/notes/')) return true
+  if (file.startsWith('.agents/notes/archived/')) return true
+  if (file === '.agents/notes/implemented/process/2026-08-16-rebrand-to-roos-code.md') return true
+  if (file === '.agents/notes/implemented/process/2026-08-17-rebrand-to-shres-code.md') return true
   if (file === 'pnpm-lock.yaml') return true
   if (/^vendor\/[^/]+\/(README\.md|LICENSE)$/.test(file)) return true
   return !EXTENSIONS.some(extension => file.endsWith(extension))
@@ -314,7 +273,7 @@ function main(): void {
     const state = pathRenameState(rename.from, rename.to)
     if (state === 'invalid') {
       // python-runtime-json depends on the parent directory rename.
-      if (rename.id === 'python-runtime-json' && existsSync(resolve(root, 'python/sdk-runtime/src/deepseek_harness_runtime/deepseek-harness-runtime.json'))) {
+      if (rename.id === 'python-runtime-json' && existsSync(resolve(root, 'python/sdk-runtime/src/roos_code_runtime/roos-code-runtime.json'))) {
         if (mode !== 'check') plannedRenames.push(rename)
         else failures.push(`path rename ${rename.id} did not land (${rename.from} → ${rename.to})`)
         continue
@@ -369,7 +328,7 @@ function main(): void {
     const ordered = [...plannedRenames].sort((left, right) => left.from.length - right.from.length)
     for (const rename of ordered) {
       const from = rename.id === 'python-runtime-json' && !existsSync(resolve(root, rename.from))
-        ? 'python/sdk-runtime/src/deepseek_harness_runtime/deepseek-harness-runtime.json'
+        ? 'python/sdk-runtime/src/roos_code_runtime/roos-code-runtime.json'
         : rename.from
       if (!existsSync(resolve(root, from))) {
         failures.push(`path rename ${rename.id}: ${from} is missing at apply time`)

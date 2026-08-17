@@ -1,20 +1,20 @@
 /**
  * Model-facing result rendering for the pwsh tool — the PowerShell twin of
- * `roos-tool-bash`'s renderer: stdout, a marked stderr section, sandbox
+ * `shres-tool-bash`'s renderer: stdout, a marked stderr section, sandbox
  * denial/runner-failure markers (with the same-turn escalation hint), and
  * truncation notices with spill paths, then exit-status markers. Non-zero
  * exits are reported, not errored — the model decides how to react; only
  * infrastructure failures (spawn errors, aborts) surface as isError
  * results.
  *
- * @module @roos-code/roos-code-tool-pwsh/render
+ * @module @shres-code/shres-code-tool-pwsh/render
  */
 
-import type { ShellProcessRead, ShellSandboxInfo, CollectedOutput } from '@roos-code/roos-code-shell'
-import type { SandboxMode } from '@roos-code/roos-code-sandbox'
-import { escalationHintMarker, sandboxDenialMarker } from '@roos-code/roos-code-sandbox'
+import type { ShellProcessRead, ShellSandboxInfo, CollectedOutput } from '@shres-code/shres-code-shell'
+import type { SandboxMode } from '@shres-code/shres-code-sandbox'
+import { escalationHintMarker, sandboxDenialMarker } from '@shres-code/shres-code-sandbox'
 
-/* jscpd:ignore-start -- deliberate twin of roos-tool-bash/render.ts (Agent Note). */
+/* jscpd:ignore-start -- deliberate twin of shres-tool-bash/render.ts (Agent Note). */
 
 /** Append the truncation notice (with the full-output spill path) to a stream's text. */
 function streamText(output: CollectedOutput): string {

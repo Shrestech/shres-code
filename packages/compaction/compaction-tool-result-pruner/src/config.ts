@@ -1,6 +1,6 @@
 /** Configuration resolution for deterministic tool-result pruning. */
 
-import { deepFreeze } from '@roos-code/roos-code-llm'
+import { deepFreeze } from '@shres-code/shres-code-llm'
 import type { ResolvedConfig, ToolResultPruneConfig } from './types.ts'
 
 /** Fixed marker substituted for every removed middle span. */

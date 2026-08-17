@@ -1,15 +1,15 @@
-/** Package-owned durable clock-context invariants. @module @roos-code/roos-code-time-context/invariant */
+/** Package-owned durable clock-context invariants. @module @shres-code/shres-code-time-context/invariant */
 
-import type { Context } from '@roos-code/cordis'
-import type { Session, SessionEvent } from '@roos-code/roos-code-session'
-import type { InvariantFailure, InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { Session, SessionEvent } from '@shres-code/shres-code-session'
+import type { InvariantFailure, InvariantInstaller } from '@shres-code/shres-code-invariants'
 import {
   deriveBrowserTimeZoneContext,
   renderBrowserTimeZoneContext,
 } from './request-zone.ts'
 import { createTimestampFormatter, formatTimestamp } from './timestamp.ts'
 
-const PACKAGE_NAME = '@roos-code/roos-code-time-context'
+const PACKAGE_NAME = '@shres-code/shres-code-time-context'
 const SOURCE_NAME = 'time-context'
 const READING = new RegExp(
   '^Time sampled while preparing turn (\\d+), step (\\d+): '

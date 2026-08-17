@@ -5,19 +5,19 @@
  * Background policy is selected by this plugin's configuration: one-shot
  * calls own a plain Task, while continuable calls use
  * `ctx.subagents.startContinuable()`.
- * @module @roos-code/roos-code-tool-subagent
+ * @module @shres-code/shres-code-tool-subagent
  */
 
-import type { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import { defineTool } from '@roos-code/roos-code-tools'
-import type { AgentOptions } from '@roos-code/roos-code-agent'
-import type { ContentBlock } from '@roos-code/roos-code-llm'
-import type { JsonValue } from '@roos-code/roos-code-session'
-import { assertSubagentMaxDepth, settleRun } from '@roos-code/roos-code-subagent'
-import type { SubagentProvider, SubagentResult, SubagentRun } from '@roos-code/roos-code-subagent'
-import type { JobOutcome } from '@roos-code/roos-code-jobs'
-import type {} from '@roos-code/roos-code-system-prompt'
+import type { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import { defineTool } from '@shres-code/shres-code-tools'
+import type { AgentOptions } from '@shres-code/shres-code-agent'
+import type { ContentBlock } from '@shres-code/shres-code-llm'
+import type { JsonValue } from '@shres-code/shres-code-session'
+import { assertSubagentMaxDepth, settleRun } from '@shres-code/shres-code-subagent'
+import type { SubagentProvider, SubagentResult, SubagentRun } from '@shres-code/shres-code-subagent'
+import type { JobOutcome } from '@shres-code/shres-code-jobs'
+import type {} from '@shres-code/shres-code-system-prompt'
 
 export const name = 'tool-subagent'
 export const inject = ['tools', 'subagents', 'systemPrompt']
@@ -154,7 +154,7 @@ function stopReasonError(result: SubagentResult): string | undefined {
 /**
  * Persist the model's short description, optionally prefixed for a named seat.
  * @param description - the model's 3-5 word `description` argument.
- * @param prefix - optional display prefix (`Boomer`, `Joey`, `Flyer`).
+ * @param prefix - optional display prefix (`Aegis`, `Stride`, `Ward`).
  * @returns the label stored on the child descriptor.
  */
 function childLabel(description: string, prefix: string | undefined): string {
@@ -420,7 +420,7 @@ export function apply(ctx: Context, config: Config): void {
           }
           const jobs = ctx.get('jobs')
           if (jobs === undefined) {
-            throw new Error('background jobs unavailable: load @roos-code/roos-code-jobs and @roos-code/roos-code-tool-jobs')
+            throw new Error('background jobs unavailable: load @shres-code/shres-code-jobs and @shres-code/shres-code-tool-jobs')
           }
           // One-shot background child: job preflight finishes before the
           // starter can spawn, and the task-owned signal covers startup.

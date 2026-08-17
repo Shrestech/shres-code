@@ -1,7 +1,7 @@
-# The roos-headless bundle patch: one-shot task mode directly over roos-base.
+# The shres-headless bundle patch: one-shot task mode directly over shres-base.
 # It mounts no Host, HTTP server, Web runtime, or browser plugin. An ordinary
 # provider plugin injects `cmdlineArgs`, parses the task positional
-# (`roos --profile headless "<task>"`) and this app's --help, then the direct
+# (`shres --profile headless "<task>"`) and this app's --help, then the direct
 # driver creates an Agent through the core registry and prints its durable result.
 
 - id: system-prompt
@@ -17,19 +17,19 @@
 - id: tools
   config:
     # Keep the same temporary process-wide Code Mode opt-in as the Web surface.
-    mode: !!js process.env.ROOS_TOOLS_MODE
+    mode: !!js process.env.SHRES_TOOLS_MODE
 
 - insert:
     # Code Mode is a core execution capability, not a Web component.
     - id: code-runtime
-      name: '@roos-code/roos-code-code-runtime-worker-thread'
+      name: '@shres-code/shres-code-code-runtime-worker-thread'
 
     - id: headless-startup
-      name: '@roos-code/roos-code-headless/startup'
+      name: '@shres-code/shres-code-headless/startup'
 
     # Reads its task from the ordinary headlessStartup provider.
     - id: headless-runner
-      name: '@roos-code/roos-code-headless'
+      name: '@shres-code/shres-code-headless'
       inject: [headlessStartup]
       config:
         task: !!js ctx.headlessStartup.task

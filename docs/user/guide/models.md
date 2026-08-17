@@ -1,28 +1,28 @@
 # Manage models from the CLI
 
-`roos models` and `roos providers` read and write the same `$ROOS_HOME/settings.yaml` and `$ROOS_HOME/.credentials.yaml` stores as **Settings → Models**. There is no second configuration path; a change on either surface is visible to the other after the next settings hot-reload.
+`shres models` and `shres providers` read and write the same `$SHRES_HOME/settings.yaml` and `$SHRES_HOME/.credentials.yaml` stores as **Settings → Models**. There is no second configuration path; a change on either surface is visible to the other after the next settings hot-reload.
 
 The [provider guide](./providers.md) owns first-run picking, custom route fields, and image-input claims. This page is the CLI command reference.
 
 ## List providers and models
 
 ```sh
-roos models list
+shres models list
 ```
 
 The transcript prints the current `agent-default-model` default, any stored purpose overrides, then every configurable provider and its advertised models. The default pair is marked. A route that names an `apiKeyEnv` whose credential is not stored is flagged `unusable until keyed`.
 
-`roos providers list` prints the same transcript.
+`shres providers list` prints the same transcript.
 
 ## Set the default model
 
 ```sh
-roos models set ollama-local llama3.2
-roos models set deepseek-official deepseek-v4-pro --effort max
-roos models set --purpose compaction ollama-local llama3.2
+shres models set ollama-local llama3.2
+shres models set deepseek-official deepseek-v4-pro --effort max
+shres models set --purpose compaction ollama-local llama3.2
 ```
 
-`set` writes the `agent-default-model` section. `--effort` stores `reasoningEffort` after the adapter metadata (`LlmReasoningEffortInfo`) accepts that level for the chosen model; omitting `--effort` writes only `{ provider, model }` and does not persist an adapter default. An unknown effort fails before anything is written. Delegated CLI routes (`grok-cli`, `kimi-cli`, `claude-cli`, `codex-cli`) advertise the efforts that CLI actually accepts, so `roos models set grok-cli grok-4.6 --effort high` is the same write path. `--purpose compaction` or `--purpose session-title` writes a purpose override and leaves the conversation default in place.
+`set` writes the `agent-default-model` section. `--effort` stores `reasoningEffort` after the adapter metadata (`LlmReasoningEffortInfo`) accepts that level for the chosen model; omitting `--effort` writes only `{ provider, model }` and does not persist an adapter default. An unknown effort fails before anything is written. Delegated CLI routes (`grok-cli`, `kimi-cli`, `claude-cli`, `codex-cli`) advertise the efforts that CLI actually accepts, so `shres models set grok-cli grok-4.6 --effort high` is the same write path. `--purpose compaction` or `--purpose session-title` writes a purpose override and leaves the conversation default in place.
 
 The [product CLI guide](./subagents.md) owns the subagent-versus-delegated-route split and the approval warning on those routes.
 
@@ -31,8 +31,8 @@ Compaction and session-title requests call `ctx.llm.stream()` with `purpose` set
 ## Discover models
 
 ```sh
-roos models discover ollama-local
-roos models discover ollama-local --base-url http://127.0.0.1:11434/v1 --add
+shres models discover ollama-local
+shres models discover ollama-local --base-url http://127.0.0.1:11434/v1 --add
 ```
 
 `discover` asks the same `GET /v1/models` path the Models page uses. `--add` appends advertised ids to that route's stored model list.
@@ -40,10 +40,10 @@ roos models discover ollama-local --base-url http://127.0.0.1:11434/v1 --add
 ## Add or remove a provider
 
 ```sh
-roos providers add --template ollama-local
-roos providers add --template openai
-roos providers add --template custom --provider acme-gateway --base-url https://gateway.example/v1 --model acme-large
-roos providers remove acme-gateway
+shres providers add --template ollama-local
+shres providers add --template openai
+shres providers add --template custom --provider acme-gateway --base-url https://gateway.example/v1 --model acme-large
+shres providers remove acme-gateway
 ```
 
 `--template` is one of `ollama-local`, `ollama-cloud`, `openai`, `anthropic`, `xai`, `moonshotai`, `openrouter`, `groq`, `zai`, or `custom`. Omitted flags are prompted on a TTY. A fully flag-driven invocation is valid for scripts.

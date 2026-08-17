@@ -2848,7 +2848,7 @@
             ],
             "source": {
               "kind": "plugin",
-              "plugin": "@roos-code/roos-code-system-prompt",
+              "plugin": "@shres-code/shres-code-system-prompt",
               "form": "snapshot",
               "sections": [
                 {
@@ -3552,7 +3552,7 @@
             ],
             "source": {
               "kind": "plugin",
-              "plugin": "@roos-code/roos-code-system-prompt",
+              "plugin": "@shres-code/shres-code-system-prompt",
               "form": "snapshot",
               "sections": [
                 {

@@ -2,9 +2,9 @@
 
 import { useEffect } from 'react'
 import type { ReactNode } from 'react'
-import { Button } from '@roos-code/roos-code-client-ui-primitives'
-import type { PropsLocale, PropsRuntime } from '@roos-code/roos-code-client-ui-slots'
-import type { SnapshotSelectorHook } from '@roos-code/roos-code-client-web-react'
+import { Button } from '@shres-code/shres-code-client-ui-primitives'
+import type { PropsLocale, PropsRuntime } from '@shres-code/shres-code-client-ui-slots'
+import type { SnapshotSelectorHook } from '@shres-code/shres-code-client-web-react'
 import type { SettingsDocumentState, SettingsDocumentStore } from './settings-document-store.ts'
 import css from './SettingsDocumentAction.module.css'
 

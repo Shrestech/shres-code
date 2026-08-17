@@ -1,10 +1,10 @@
-/** Package-owned durable plan-mode invariants. @module @roos-code/roos-code-plan-mode/invariant */
+/** Package-owned durable plan-mode invariants. @module @shres-code/shres-code-plan-mode/invariant */
 
-import type { Context } from '@roos-code/cordis'
-import type { Session, SessionEvent } from '@roos-code/roos-code-session'
-import type { InvariantFailure, InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { Session, SessionEvent } from '@shres-code/shres-code-session'
+import type { InvariantFailure, InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-plan-mode'
+const PACKAGE_NAME = '@shres-code/shres-code-plan-mode'
 
 /** Cordis companion plugin name. */
 export const name = 'plan-mode-invariant'

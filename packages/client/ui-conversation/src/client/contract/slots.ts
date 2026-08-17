@@ -1,18 +1,18 @@
 /** Conversation slot declarations and their composed component props. */
 import type { ReactNode, RefObject } from 'react'
-import type { ImageAttachmentRef } from '@roos-code/roos-code-attachment'
+import type { ImageAttachmentRef } from '@shres-code/shres-code-attachment'
 import type {
   InjectFace, MaybeSnapshotSelectorHook, PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore,
   SlotHookFactory, SnapshotSelectorHook,
-} from '@roos-code/roos-code-client-ui-slots'
+} from '@shres-code/shres-code-client-ui-slots'
 import type {
   CommandNode, CompactionSummaryNode, ConversationSnapshot, ConversationTurnDataMap,
   ObservableSnapshot, PendingInteraction, PendingWait, SessionId, ToolCallBlock,
   TurnLocation, WorkspaceId,
-} from '@roos-code/roos-code-client-runtime/client'
-import type { MarkdownFileMentions } from '@roos-code/roos-code-client-ui-primitives'
-import type { MessageId } from '@roos-code/roos-code-client-connection/client'
-import type {} from '@roos-code/roos-code-client-ui-layout/client'
+} from '@shres-code/shres-code-client-runtime/client'
+import type { MarkdownFileMentions } from '@shres-code/shres-code-client-ui-primitives'
+import type { MessageId } from '@shres-code/shres-code-client-connection/client'
+import type {} from '@shres-code/shres-code-client-ui-layout/client'
 import type { ComposerBlock } from '../input/blocks.ts'
 import type {
   ComposerKeyboard, DraftAttachmentId, EditSelection, InputActions, InputNotice, InputState,
@@ -30,7 +30,7 @@ export interface ComposerAttachment {
   previewUrl: string
 }
 
-declare module '@roos-code/roos-code-client-ui-slots' {
+declare module '@shres-code/shres-code-client-ui-slots' {
   interface SlotMap {
     /**
      * The entire body of one session: taking this seat means rendering that
@@ -306,7 +306,7 @@ export interface ChatFileMentions {
   forClosing(owner: TurnTailOwnerProps): MarkdownFileMentions | undefined
 }
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     /** Prose file-mention provider (ui-deliverables); reach via ctx.get — optional. */
     chatFileMentions: ChatFileMentions

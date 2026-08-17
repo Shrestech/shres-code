@@ -5,17 +5,17 @@
  * declaration, registration, scope, store, inject, rendering, updates, and
  * disposal without hand-building the machinery per suite.
  *
- * Not part of the product plugin graph (no `roos.client`); feature packages
+ * Not part of the product plugin graph (no `shres.client`); feature packages
  * depend on it in devDependencies only. It copies no SlotCore/renderer/store
  * machinery — everything mounts the production implementations.
- * @module @roos-code/roos-code-client-test-runtime
+ * @module @shres-code/shres-code-client-test-runtime
  */
 /* oxlint-disable typescript/no-redundant-type-constituents --
  * `keyof SlotMap & string` is the declare-merge key pattern (see ui-slots):
  * this compilation unit sees only the runtime's 'root' row, but consumer
  * programs merge their own keys in; the rule fires on the narrow-map view. */
-import { Context, Inject } from '@roos-code/cordis'
-import type { Fiber, Plugin } from '@roos-code/cordis'
+import { Context, Inject } from '@shres-code/cordis'
+import type { Fiber, Plugin } from '@shres-code/cordis'
 import { createElement, Fragment, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 import { act, render, within } from '@testing-library/react'
@@ -24,11 +24,11 @@ import type { queries } from '@testing-library/dom'
 import type { BoundFunctions } from '@testing-library/dom'
 import {
   ConversationEventRegistry, ConversationViewRegistry, SlotRegistry,
-} from '@roos-code/roos-code-client-runtime/client'
-import { createSlotRenderer } from '@roos-code/roos-code-client-web-react'
+} from '@shres-code/shres-code-client-runtime/client'
+import { createSlotRenderer } from '@shres-code/shres-code-client-web-react'
 import type {
   ChildrenDecl, ComposedProps, OwnerOf, SlotComponent, SlotMap, SlotRendererHost, StoreInstanceLike,
-} from '@roos-code/roos-code-client-ui-slots'
+} from '@shres-code/shres-code-client-ui-slots'
 import { registerDomSnapshotSerializer } from './snapshot.ts'
 import { TestSessions } from './sessions.ts'
 import { TestWorkspaces } from './workspaces.ts'

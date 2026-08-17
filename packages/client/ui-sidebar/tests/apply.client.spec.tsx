@@ -1,10 +1,10 @@
 /** Sidebar shell slot registration and its plain runtime/layout callbacks. */
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { describe, expect, it, vi } from 'vitest'
-import { SlotRegistry } from '@roos-code/roos-code-client-runtime/client'
-import { LocaleRuntime } from '@roos-code/roos-code-client-locale/client'
-import { apply, inject } from '@roos-code/roos-code-client-ui-sidebar/client'
-import type { SidebarRootInjected } from '@roos-code/roos-code-client-ui-sidebar/client'
+import { SlotRegistry } from '@shres-code/shres-code-client-runtime/client'
+import { LocaleRuntime } from '@shres-code/shres-code-client-locale/client'
+import { apply, inject } from '@shres-code/shres-code-client-ui-sidebar/client'
+import type { SidebarRootInjected } from '@shres-code/shres-code-client-ui-sidebar/client'
 
 async function bench(declare = true) {
   const ctx = new Context()

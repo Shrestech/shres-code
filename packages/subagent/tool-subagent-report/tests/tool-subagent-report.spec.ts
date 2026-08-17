@@ -2,19 +2,19 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { Context } from '@roos-code/cordis'
-import type { Agent } from '@roos-code/roos-code-agent'
-import { assembleContextFor } from '@roos-code/roos-code-agent'
-import AgentLoop from '@roos-code/roos-code-agent-loop'
-import { mountAgentLoopTestDependencies } from '@roos-code/roos-code-agent-loop-testkit'
-import { CallId, LlmAdapter } from '@roos-code/roos-code-llm'
-import type { GenerateOptions, StreamChunk } from '@roos-code/roos-code-llm'
-import { SessionId } from '@roos-code/roos-code-session'
-import type { SessionEvent } from '@roos-code/roos-code-session'
-import JsonlSessionPersistence from '@roos-code/roos-code-session-persistence-jsonl'
-import SubagentRuntime from '@roos-code/roos-code-subagent'
-import * as SubagentSpawn from '@roos-code/roos-code-subagent-spawn-in-process'
-import * as control from '@roos-code/roos-code-tool-subagent-control'
+import { Context } from '@shres-code/cordis'
+import type { Agent } from '@shres-code/shres-code-agent'
+import { assembleContextFor } from '@shres-code/shres-code-agent'
+import AgentLoop from '@shres-code/shres-code-agent-loop'
+import { mountAgentLoopTestDependencies } from '@shres-code/shres-code-agent-loop-testkit'
+import { CallId, LlmAdapter } from '@shres-code/shres-code-llm'
+import type { GenerateOptions, StreamChunk } from '@shres-code/shres-code-llm'
+import { SessionId } from '@shres-code/shres-code-session'
+import type { SessionEvent } from '@shres-code/shres-code-session'
+import JsonlSessionPersistence from '@shres-code/shres-code-session-persistence-jsonl'
+import SubagentRuntime from '@shres-code/shres-code-subagent'
+import * as SubagentSpawn from '@shres-code/shres-code-subagent-spawn-in-process'
+import * as control from '@shres-code/shres-code-tool-subagent-control'
 import { textResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
 import * as tool from '../src/index.ts'
 
@@ -48,7 +48,7 @@ afterEach(async () => {
 async function setup(options: { load?: boolean; config?: tool.Config } = {}) {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
-  const root = mkdtempSync(join(tmpdir(), 'roos-tool-subagent-report-'))
+  const root = mkdtempSync(join(tmpdir(), 'shres-tool-subagent-report-'))
   await ctx.plugin(JsonlSessionPersistence, { root })
   await ctx.plugin(AgentLoop, { agents: [] })
   await ctx.plugin(SubagentRuntime)
@@ -131,7 +131,7 @@ async function sectionNames(ctx: Context, agent: Agent): Promise<string[]> {
   return assembly.sections.map(section => section.name)
 }
 
-describe('roos-tool-subagent-report', () => {
+describe('shres-tool-subagent-report', () => {
   it('registers report only in continuable child scopes', async () => {
     const { ctx, parent } = await setup()
     expect(ctx.tools.schemas().map(schema => schema.name)).not.toContain('report')
@@ -540,7 +540,7 @@ function userTexts(events: readonly SessionEvent[]): string[] {
     : [])
 }
 
-describe('roos-tool-subagent-report result independence', () => {
+describe('shres-tool-subagent-report result independence', () => {
   it('does not report a final assistant answer automatically or create Jobs', async () => {
     const { ctx, parent, adapter } = await setup()
     const { started } = await startChild(ctx, parent)

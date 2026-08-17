@@ -1,6 +1,6 @@
 /**
  * `SandboxedFileSystem`: the sandbox-enforcing implementation of the
- * `@roos-code/roos-code-fs` Service Definition. It extends `LocalFileSystem` so all
+ * `@shres-code/shres-code-fs` Service Definition. It extends `LocalFileSystem` so all
  * text-storage mechanics — resolve, stat, read/stream, list, the atomic
  * write and the read-match-write edit critical section — are the local
  * implementation's, verbatim; this package adds the per-call POLICY fence
@@ -10,7 +10,7 @@
  * NOT a kernel boundary — the operations are the seam's own (open, rename),
  * and only the target path is untrusted, so canonicalize-then-contain is the
  * complete answer to this surface. Kernel-grade isolation of untrusted CODE
- * stays `ctx.shell`'s job (`@roos-code/roos-code-bash-sandbox`). This mirrors the
+ * stays `ctx.shell`'s job (`@shres-code/shres-code-bash-sandbox`). This mirrors the
  * `code-runtime` stance: containment, not a security boundary. The residual
  * TOCTOU (an ancestor symlink swapped between the containment re-check and the
  * syscall) is narrowed by re-canonicalizing immediately before delegating and
@@ -22,28 +22,28 @@
  * derived from the one `writableRoots` function so bash and fs cannot drift);
  * `danger-full-access` delegates unfenced, including credential reads and
  * writes. Under every other mode, content reads and mutations of
- * `$ROOS_HOME/.credentials.yaml`, any `*.credentials.yaml` basename
+ * `$SHRES_HOME/.credentials.yaml`, any `*.credentials.yaml` basename
  * (case-insensitive), and configured {@link Config.denyReadPaths} throw
  * `FS_SANDBOX_DENIED`. A denial throws the structured
  * `FS_SANDBOX_DENIED` — no text inference is needed (unlike bash's kernel
  * stderr), because an in-process fence knows exactly what it refused. The
- * escalation retry lives in the tool layer (`@roos-code/roos-code-tool-fs`),
+ * escalation retry lives in the tool layer (`@shres-code/shres-code-tool-fs`),
  * exactly as bash's does.
  *
- * @module @roos-code/roos-code-fs-sandbox
+ * @module @shres-code/shres-code-fs-sandbox
  */
 
 import { basename, join } from 'node:path'
-import { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import { LocalFileSystem } from '@roos-code/roos-code-fs-local'
-import type { Config as LocalConfig } from '@roos-code/roos-code-fs-local'
-import { FsError } from '@roos-code/roos-code-fs'
-import type { FsEditOutcome, FsEditRequest, FsTarget, FsVersion, FsWriteIntent, FsWriteOutcome } from '@roos-code/roos-code-fs'
-import { resolveRoosHome } from '@roos-code/roos-code-home-paths'
-import { writableRoots } from '@roos-code/roos-code-sandbox'
-import type { SandboxExecutionPolicy, SandboxMode } from '@roos-code/roos-code-sandbox'
-import type {} from '@roos-code/roos-code-sandbox-policy'
+import { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import { LocalFileSystem } from '@shres-code/shres-code-fs-local'
+import type { Config as LocalConfig } from '@shres-code/shres-code-fs-local'
+import { FsError } from '@shres-code/shres-code-fs'
+import type { FsEditOutcome, FsEditRequest, FsTarget, FsVersion, FsWriteIntent, FsWriteOutcome } from '@shres-code/shres-code-fs'
+import { resolveShresHome } from '@shres-code/shres-code-home-paths'
+import { writableRoots } from '@shres-code/shres-code-sandbox'
+import type { SandboxExecutionPolicy, SandboxMode } from '@shres-code/shres-code-sandbox'
+import type {} from '@shres-code/shres-code-sandbox-policy'
 import { isPathUnder } from './containment.ts'
 
 /** Managed credentials document name under the harness home, and the basename glob `*.credentials.yaml`. */
@@ -69,9 +69,9 @@ export interface Config extends LocalConfig {
 
 /**
  * Sandbox-enforcing filesystem backend. Registers as `ctx.fs` (loading it
- * INSTEAD OF `roos-fs-local`, together with a `ctx.sandboxPolicy`, is the whole
+ * INSTEAD OF `shres-fs-local`, together with a `ctx.sandboxPolicy`, is the whole
  * swap — the model-facing tools are untouched). Its configured default mode is
- * the capability fact exposed by {@link sandboxMode}; `roos-tool-fs` resolves
+ * the capability fact exposed by {@link sandboxMode}; `shres-tool-fs` resolves
  * each session's mode and cwd into a policy for every mutation, while an
  * approved escalation may stamp a strictly wider mode for one call.
  */
@@ -195,7 +195,7 @@ export class SandboxedFileSystem extends LocalFileSystem {
    * operation must use, so the checked identity is the one delegated (no
    * check-here-read/write-there TOCTOU). `danger-full-access` returns the
    * caller's target unfenced. A `read` re-canonicalizes NOW and denies
-   * `$ROOS_HOME/.credentials.yaml`, any `*.credentials.yaml` basename
+   * `$SHRES_HOME/.credentials.yaml`, any `*.credentials.yaml` basename
    * (case-insensitive), and configured {@link Config.denyReadPaths}. A
    * `write` keeps the mutation fence (`read-only` denies; `workspace-write`
    * re-canonicalizes and requires containment) and then applies the same
@@ -252,7 +252,7 @@ export class SandboxedFileSystem extends LocalFileSystem {
     const names = [basename(String(fresh.targetKey)), basename(fresh.displayPath), basename(requested.displayPath)]
     if (names.some(name => name.toLowerCase().endsWith(CREDENTIALS_BASENAME_SUFFIX))) return true
 
-    const homeTarget = await this.resolve(join(resolveRoosHome(), CREDENTIALS_FILENAME))
+    const homeTarget = await this.resolve(join(resolveShresHome(), CREDENTIALS_FILENAME))
     if (fresh.targetKey === homeTarget.targetKey) return true
     if (await isPathUnder(String(fresh.targetKey), String(homeTarget.targetKey))) return true
 

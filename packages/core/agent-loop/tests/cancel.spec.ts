@@ -1,20 +1,20 @@
-import { createUserMessage } from '@roos-code/roos-code-llm'
+import { createUserMessage } from '@shres-code/shres-code-llm'
 /**
  * Tests for the queue-aware `Agent.cancel()` primitive. The default clears
  * queued and steering work, while `keepInbox` preserves pending input for a
  * later wake after the active turn reaches quiescence. The suite
  * covers every landing window plus signal reset and `whenIdle()` quiescence.
- * @module roos-agent-loop/tests/cancel
+ * @module shres-agent-loop/tests/cancel
  */
 
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import LlmRuntime from '@roos-code/roos-code-llm'
-import SessionStore, { SessionId, TurnEndReason } from '@roos-code/roos-code-session'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import ToolRuntime, { defineContentToolFixture, TOOL_ABORTED_BEFORE_DISPATCH } from '@roos-code/roos-code-tools'
-import AgentRegistry, { type Agent } from '@roos-code/roos-code-agent'
-import AgentLoop from '@roos-code/roos-code-agent-loop'
+import { Context } from '@shres-code/cordis'
+import LlmRuntime from '@shres-code/shres-code-llm'
+import SessionStore, { SessionId, TurnEndReason } from '@shres-code/shres-code-session'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import ToolRuntime, { defineContentToolFixture, TOOL_ABORTED_BEFORE_DISPATCH } from '@shres-code/shres-code-tools'
+import AgentRegistry, { type Agent } from '@shres-code/shres-code-agent'
+import AgentLoop from '@shres-code/shres-code-agent-loop'
 import { MockAdapter, textResponse, toolCallResponse } from './mock-adapter.ts'
 
 function driverDone(agent: Agent): Promise<void> {

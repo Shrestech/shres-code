@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { createMessage, createUserMessage } from '@roos-code/roos-code-llm'
-import type { TokenUsage } from '@roos-code/roos-code-llm'
-import SessionStore from '@roos-code/roos-code-session'
-import type { Session } from '@roos-code/roos-code-session'
-import SessionProjectionRegistry from '@roos-code/roos-code-session-projection'
-import TokenMeter from '@roos-code/roos-code-token-meter'
-import type { ContextPressureProjection, TokenUsageProjection } from '@roos-code/roos-code-token-meter/client'
-import { CompactionId } from '@roos-code/roos-code-compaction'
+import { Context } from '@shres-code/cordis'
+import { createMessage, createUserMessage } from '@shres-code/shres-code-llm'
+import type { TokenUsage } from '@shres-code/shres-code-llm'
+import SessionStore from '@shres-code/shres-code-session'
+import type { Session } from '@shres-code/shres-code-session'
+import SessionProjectionRegistry from '@shres-code/shres-code-session-projection'
+import TokenMeter from '@shres-code/shres-code-token-meter'
+import type { ContextPressureProjection, TokenUsageProjection } from '@shres-code/shres-code-token-meter/client'
+import { CompactionId } from '@shres-code/shres-code-compaction'
 
 const ZERO: TokenUsageProjection = {
   uncachedInputTokens: 0,

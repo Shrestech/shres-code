@@ -1,12 +1,12 @@
 # Bash Executor
 
-The bash execution seam is split across a Service Definition ([roos-shell](../../packages/shell/shell), `ctx.shell`), Service Providers ([roos-bash-local](../../packages/shell/bash-local) and [roos-bash-sandbox](../../packages/shell/bash-sandbox)), and Consumer ([roos-tool-bash](../../packages/shell/tool-bash), the `bash` schema). Generic background-job ids, ownership, and controls live in [jobs.md](jobs.md); this seam returns a task-free process handle. Raw process-group mechanics live behind the [subprocess seam](subprocess.md).
+The bash execution seam is split across a Service Definition ([shres-shell](../../packages/shell/shell), `ctx.shell`), Service Providers ([shres-bash-local](../../packages/shell/bash-local) and [shres-bash-sandbox](../../packages/shell/bash-sandbox)), and Consumer ([shres-tool-bash](../../packages/shell/tool-bash), the `bash` schema). Generic background-job ids, ownership, and controls live in [jobs.md](jobs.md); this seam returns a task-free process handle. Raw process-group mechanics live behind the [subprocess seam](subprocess.md).
 
 Source: [`packages/shell/shell/src/types.ts`](../../packages/shell/shell/src/types.ts)
 
 ## Managed shell environment namespace
 
-`ROOS_*` variables are Harness-owned child-process facts. The model-facing bash tool collects them through `ctx.shellEnv` and passes them through `ShellExecRequest.roosEnv`; the subprocess service removes inherited `ROOS_*` names before merging the current snapshot. The `RoosEnvironmentKey`/`RoosEnvironment` vocabulary is owned by the [subprocess seam](subprocess.md) and re-exported by `roos-shell`.
+`SHRES_*` variables are Harness-owned child-process facts. The model-facing bash tool collects them through `ctx.shellEnv` and passes them through `ShellExecRequest.shresEnv`; the subprocess service removes inherited `SHRES_*` names before merging the current snapshot. The `ShresEnvironmentKey`/`ShresEnvironment` vocabulary is owned by the [subprocess seam](subprocess.md) and re-exported by `shres-shell`.
 
 ## Request vs. spec: the `resolve()` split
 
@@ -44,20 +44,20 @@ interface ShellExecRequest {
   stdin?: string | undefined
   /**
    * Ordinary environment entries for the command, merged after the credential
-   * scrub. Managed facts belong in {@link roosEnv}, which merges after this
+   * scrub. Managed facts belong in {@link shresEnv}, which merges after this
    * map, so an entry here can never displace one. Set by in-process plugins
    * (the hooks bridges set `CLAUDE_PROJECT_DIR`, `CLAUDE_PLUGIN_ROOT`, …); the
    * model-facing bash tool does not expose it as a parameter.
    */
   env?: Record<string, string> | undefined
   /**
-   * Harness-owned `ROOS_*` variables for this execution (typed to managed
-   * keys). Executors discard ambient `ROOS_*` entries before merging this
+   * Harness-owned `SHRES_*` variables for this execution (typed to managed
+   * keys). Executors discard ambient `SHRES_*` entries before merging this
    * snapshot last, so an unavailable current fact cannot inherit a stale
    * value from the harness process and a caller {@link env} entry cannot
    * displace a managed one.
    */
-  roosEnv?: RoosEnvironment | undefined
+  shresEnv?: ShresEnvironment | undefined
   /** Fully resolved per-call sandbox policy; sandboxing executors default it. */
   sandboxPolicy?: SandboxExecutionPolicy | undefined
 }
@@ -84,19 +84,19 @@ interface ShellExecSpec {
   stdin?: string | undefined
   /**
    * Ordinary environment entries carried through from
-   * {@link ShellExecRequest.env}; {@link roosEnv} still merges after them.
+   * {@link ShellExecRequest.env}; {@link shresEnv} still merges after them.
    * OPTIONAL on the spec for the same reason as `stdin`: absent means no
    * ordinary extra environment.
    */
   env?: Record<string, string> | undefined
-  /** Managed `ROOS_*` snapshot (typed to managed keys); merges after {@link env}. */
-  roosEnv?: RoosEnvironment | undefined
+  /** Managed `SHRES_*` snapshot (typed to managed keys); merges after {@link env}. */
+  shresEnv?: ShresEnvironment | undefined
   /** Resolved sandbox policy; ignored by executors that do not confine. */
   sandboxPolicy: SandboxExecutionPolicy | undefined
 }
 ```
 
-`stdin` and `env` are trusted in-process plugin inputs and are not exposed by `roos-tool-bash`. The local executor scrubs ambient credentials before merging explicit caller-supplied env. See [the bash-stdin-env Agent Note](../../.agents/notes/implemented/architecture/2026-06-30-bash-stdin-env-trusted-plugin-api.md).
+`stdin` and `env` are trusted in-process plugin inputs and are not exposed by `shres-tool-bash`. The local executor scrubs ambient credentials before merging explicit caller-supplied env. See [the bash-stdin-env Agent Note](../../.agents/notes/implemented/architecture/2026-06-30-bash-stdin-env-trusted-plugin-api.md).
 
 `stdoutMaxBytes` is also trusted-plugin-only. It lets a foreground consumer request complete stdout up to a bounded parser budget without changing stderr, background jobs, or the model-facing bash tool's ordinary output cap.
 
@@ -134,11 +134,11 @@ interface ShellRunResult {
 }
 ```
 
-Each stream is a `CollectedOutput` — the (possibly truncated) text plus recovery info; when truncated, `text` is the **tail** and the complete stream spills to a private file. The fields are owned by the [subprocess seam](subprocess.md) and re-exported by `roos-shell`.
+Each stream is a `CollectedOutput` — the (possibly truncated) text plus recovery info; when truncated, `text` is the **tail** and the complete stream spills to a private file. The fields are owned by the [subprocess seam](subprocess.md) and re-exported by `shres-shell`.
 
 ## File sandbox: `ShellSandboxInfo`
 
-A sandbox-consuming executor exposes its configured mode fallback through `ShellExecutor.sandboxMode`. The tool layer asks [`@roos-code/roos-code-sandbox-policy`](../../packages/sandbox/sandbox-policy/README.md) to resolve each calling session's durable `sandbox/mode` override and immutable cwd into `ShellExecRequest.sandboxPolicy`; a user-approved strictly wider call replaces only the mode. The mode/root/enforcement vocabulary is owned by the [`@roos-code/roos-code-sandbox` seam](sandbox.md); modes govern file effects only.
+A sandbox-consuming executor exposes its configured mode fallback through `ShellExecutor.sandboxMode`. The tool layer asks [`@shres-code/shres-code-sandbox-policy`](../../packages/sandbox/sandbox-policy/README.md) to resolve each calling session's durable `sandbox/mode` override and immutable cwd into `ShellExecRequest.sandboxPolicy`; a user-approved strictly wider call replaces only the mode. The mode/root/enforcement vocabulary is owned by the [`@shres-code/shres-code-sandbox` seam](sandbox.md); modes govern file effects only.
 
 A sandboxed run reports its mode, conservative denial classification, and enforcement completeness. `runnerFailed` marks a sandbox runner failure before the command ran; foreground execution throws `SANDBOX_UNAVAILABLE`, while a settled background process has only its facts channel.
 
@@ -164,7 +164,7 @@ The `SANDBOX_UNAVAILABLE` error code (owned by the [sandbox seam](sandbox.md)) i
 
 ## Background processes: `ShellProcess`
 
-`start()` returns a handle with no id or owner. `roos-tool-bash` adapts it into `ctx.jobs.start()` hooks; the generic runtime then owns job identity and lifecycle. `done` resolves when the process closes and never rejects, reads remain valid after settlement, and sandbox facts are stamped before `done` resolves.
+`start()` returns a handle with no id or owner. `shres-tool-bash` adapts it into `ctx.jobs.start()` hooks; the generic runtime then owns job identity and lifecycle. `done` resolves when the process closes and never rejects, reads remain valid after settlement, and sandbox facts are stamped before `done` resolves.
 
 ```ts type-equiv
 /**
@@ -216,7 +216,7 @@ interface ShellProcessRead {
 
 ## The service
 
-`ShellExecutor` owns `resolve`, foreground `run`, background-process `start`, and the `sandboxMode` capability fact. `roos-bash-local` owns command defaulting, timeout/abort classification, the terminal environment, and the background read merge; process groups, bounded collectors, spill files, credential scrubbing, and disposal quiescence are the [subprocess service](subprocess.md)'s. `roos-tool-bash` owns model-facing rendering and adapts background handles into the [generic job runtime](jobs.md). `roos-shell` owns the shell tools' shared exit-status contract: the exported `parseExitStatus`/`ParsedExitStatus` inverts the `[exit code: N]` / `[killed by signal: X]` markers `roos-tool-bash`'s `renderResult` and `roos-tool-pwsh`'s `renderPwshResult` append, and both tools' `presentResult` use it to split the rendered text into the terminal card's output body and its exit-status pill.
+`ShellExecutor` owns `resolve`, foreground `run`, background-process `start`, and the `sandboxMode` capability fact. `shres-bash-local` owns command defaulting, timeout/abort classification, the terminal environment, and the background read merge; process groups, bounded collectors, spill files, credential scrubbing, and disposal quiescence are the [subprocess service](subprocess.md)'s. `shres-tool-bash` owns model-facing rendering and adapts background handles into the [generic job runtime](jobs.md). `shres-shell` owns the shell tools' shared exit-status contract: the exported `parseExitStatus`/`ParsedExitStatus` inverts the `[exit code: N]` / `[killed by signal: X]` markers `shres-tool-bash`'s `renderResult` and `shres-tool-pwsh`'s `renderPwshResult` append, and both tools' `presentResult` use it to split the rendered text into the terminal card's output body and its exit-status pill.
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -270,7 +270,7 @@ Source: [`packages/shell/shell/src/index.ts:65`](../../packages/shell/shell/src/
 
 ### `ctx.shellEnv` — `ShellEnvRegistry`
 
-Registry (`ctx.shellEnv`) for trusted, per-execution `ROOS_*` variables. The namespace is rebuilt for every model shell call: ambient `ROOS_*` values are discarded by the executor, then the registry's current snapshot is injected. Built-in shell facts remain owned by the registry itself while plugins can register additional, enumerable facts with effect-scoped disposal.
+Registry (`ctx.shellEnv`) for trusted, per-execution `SHRES_*` variables. The namespace is rebuilt for every model shell call: ambient `SHRES_*` values are discarded by the executor, then the registry's current snapshot is injected. Built-in shell facts remain owned by the registry itself while plugins can register additional, enumerable facts with effect-scoped disposal.
 
 ```ts cordis-catalog
 /**
@@ -282,11 +282,11 @@ Registry (`ctx.shellEnv`) for trusted, per-execution `ROOS_*` variables. The nam
 register(contributor: BashEnvContributor): () => void
 
 /**
- * Build the trusted `ROOS_*` snapshot for one shell tool execution.
+ * Build the trusted `SHRES_*` snapshot for one shell tool execution.
  * @param execution - the current tool execution.
  * @returns an immutable environment overlay containing built-ins and current contributions.
  */
-collect(execution: ToolExecution): RoosEnvironment
+collect(execution: ToolExecution): ShresEnvironment
 
 /**
  * Enumerate plugin-contributed variables without executing their resolvers.
@@ -295,7 +295,7 @@ collect(execution: ToolExecution): RoosEnvironment
 list(): BashEnvVariableInfo[]
 ```
 
-Types: [RoosEnvironment](subprocess.md) · [ToolExecution](tools.md)
+Types: [ShresEnvironment](subprocess.md) · [ToolExecution](tools.md)
 
 Source: [`packages/shell/shell-env/src/index.ts:89`](../../packages/shell/shell-env/src/index.ts)
 <!-- END GENERATED cordis-surface -->

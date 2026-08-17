@@ -1,13 +1,13 @@
 {
-  "name": "@roos-code/roos-code-headless",
-  "description": "The roos one-shot bundle: a direct core Agent/Session runner over roos-base with no Host, HTTP, or browser layer",
+  "name": "@shres-code/shres-code-headless",
+  "description": "The shres one-shot bundle: a direct core Agent/Session runner over shres-base with no Host, HTTP, or browser layer",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "packages/bundle/headless"
   },
   "type": "module",
@@ -38,35 +38,35 @@
     "lib/types/**/*.d.ts"
   ],
   "license": "MIT",
-  "roos": {
+  "shres": {
     "bundle": {
       "patch": "./cordis.patch.yml"
     }
   },
   "dependencies": {
-    "@roos-code/roos-code-cmdline": "workspace:^",
-    "@roos-code/roos-code-code-runtime-worker-thread": "workspace:^",
-    "@roos-code/schemastery": "workspace:^",
+    "@shres-code/shres-code-cmdline": "workspace:^",
+    "@shres-code/shres-code-code-runtime-worker-thread": "workspace:^",
+    "@shres-code/schemastery": "workspace:^",
     "commander": "^15.0.0"
   },
   "peerDependencies": {
-    "@roos-code/cordis-plugin-loader": "workspace:^",
-    "@roos-code/roos-code-agent": "workspace:^",
-    "@roos-code/roos-code-agent-default-model": "workspace:^",
-    "@roos-code/roos-code-first-run-setup": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-llm": "workspace:^",
-    "@roos-code/roos-code-session": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/cordis-plugin-loader": "workspace:^",
+    "@shres-code/shres-code-agent": "workspace:^",
+    "@shres-code/shres-code-agent-default-model": "workspace:^",
+    "@shres-code/shres-code-first-run-setup": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   },
   "devDependencies": {
-    "@roos-code/cordis-plugin-loader": "workspace:^",
-    "@roos-code/roos-code-agent": "workspace:^",
-    "@roos-code/roos-code-agent-default-model": "workspace:^",
-    "@roos-code/roos-code-first-run-setup": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-llm": "workspace:^",
-    "@roos-code/roos-code-session": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/cordis-plugin-loader": "workspace:^",
+    "@shres-code/shres-code-agent": "workspace:^",
+    "@shres-code/shres-code-agent-default-model": "workspace:^",
+    "@shres-code/shres-code-first-run-setup": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   }
 }

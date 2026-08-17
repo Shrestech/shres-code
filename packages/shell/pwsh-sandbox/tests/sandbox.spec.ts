@@ -11,12 +11,12 @@ import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { Context, Service } from '@roos-code/cordis'
-import { SandboxProvider, SandboxUnavailableError } from '@roos-code/roos-code-sandbox'
-import type { ConfinedArgv, RunnerFailureRule, SandboxExecutionPolicy, SandboxPolicy } from '@roos-code/roos-code-sandbox'
-import { resolvePwshPath } from '@roos-code/roos-code-pwsh-local'
-import { SandboxPolicyService } from '@roos-code/roos-code-sandbox-policy'
-import LocalSubprocessRuntime from '@roos-code/roos-code-subprocess-local'
+import { Context, Service } from '@shres-code/cordis'
+import { SandboxProvider, SandboxUnavailableError } from '@shres-code/shres-code-sandbox'
+import type { ConfinedArgv, RunnerFailureRule, SandboxExecutionPolicy, SandboxPolicy } from '@shres-code/shres-code-sandbox'
+import { resolvePwshPath } from '@shres-code/shres-code-pwsh-local'
+import { SandboxPolicyService } from '@shres-code/shres-code-sandbox-policy'
+import LocalSubprocessRuntime from '@shres-code/shres-code-subprocess-local'
 import { SandboxPwshExecutor } from '../src/index.ts'
 import { classifyRunnerFailure, isRunnerSpawnFailure, matchesSignature } from '../src/helpers.ts'
 
@@ -27,7 +27,7 @@ function pwshAvailable(): boolean {
   return spawnSync(resolvePwshPath(), ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', '$true'], { encoding: 'utf8' }).status === 0
 }
 
-const spillDir = mkdtempSync(join(tmpdir(), 'roos-pwsh-sandbox-spec-'))
+const spillDir = mkdtempSync(join(tmpdir(), 'shres-pwsh-sandbox-spec-'))
 
 /** One recorded provider call: the argv handed over and the policy it rode with. */
 interface ConfineCall {
@@ -75,7 +75,7 @@ async function setup(
 }
 
 describe('helpers (pure)', () => {
-  const workdir = mkdtempSync(join(tmpdir(), 'roos-pwsh-sandbox-helpers-'))
+  const workdir = mkdtempSync(join(tmpdir(), 'shres-pwsh-sandbox-helpers-'))
   afterAll(() => {
     rmSync(workdir, { recursive: true, force: true })
   })
@@ -155,7 +155,7 @@ describe.skipIf(!pwshAvailable())('SandboxPwshExecutor', () => {
   // unit tests never attempt writes outside the system temp directory. On
   // win32 there is no POSIX mode denial; the real-sandbox denial coverage
   // lives in tests/acl.e2e.ts, where the ACL runner denies scratch paths.
-  const readOnlyDir = mkdtempSync(join(tmpdir(), 'roos-pwsh-sandbox-ro-'))
+  const readOnlyDir = mkdtempSync(join(tmpdir(), 'shres-pwsh-sandbox-ro-'))
   if (process.platform !== 'win32') chmodSync(readOnlyDir, 0o555)
   const deniedWriteCommand = `[IO.File]::WriteAllText('${join(readOnlyDir, 'probe.txt')}', 'x')`
 

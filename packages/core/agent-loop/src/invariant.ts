@@ -1,14 +1,14 @@
 /**
  * Package-owned request-reconstruction invariant for loop-built LLM calls.
- * @module @roos-code/roos-code-agent-loop/invariant
+ * @module @shres-code/shres-code-agent-loop/invariant
  */
 
-import type { Context } from '@roos-code/cordis'
-import { isAgentLoopRequest, type GenerateOptions } from '@roos-code/roos-code-llm'
-import type { InvariantFailure, InvariantInstaller } from '@roos-code/roos-code-invariants'
-import { foldRequestHeader } from '@roos-code/roos-code-session'
+import type { Context } from '@shres-code/cordis'
+import { isAgentLoopRequest, type GenerateOptions } from '@shres-code/shres-code-llm'
+import type { InvariantFailure, InvariantInstaller } from '@shres-code/shres-code-invariants'
+import { foldRequestHeader } from '@shres-code/shres-code-session'
 
-const PACKAGE_NAME = '@roos-code/roos-code-agent-loop'
+const PACKAGE_NAME = '@shres-code/shres-code-agent-loop'
 
 /** Cordis companion plugin name. */
 export const name = 'agent-loop-invariant'

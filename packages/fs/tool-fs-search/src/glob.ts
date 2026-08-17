@@ -6,15 +6,15 @@
  * argument validation, argv construction, result parsing, inline sampling,
  * and formatting; process concerns (spawn execution, tree termination,
  * environment scrubbing, output capture) stay behind `ctx.subprocess`.
- * @module @roos-code/roos-code-tool-fs-search/glob
+ * @module @shres-code/shres-code-tool-fs-search/glob
  */
 
-import type { Context } from '@roos-code/cordis'
+import type { Context } from '@shres-code/cordis'
 import { sep } from 'node:path'
-import { defineTool } from '@roos-code/roos-code-tools'
-import type { GenericCallView, SearchResultView, ToolResult } from '@roos-code/roos-code-tools'
-import type { SpillRef } from '@roos-code/roos-code-spill'
-import type {} from '@roos-code/roos-code-system-prompt'
+import { defineTool } from '@shres-code/shres-code-tools'
+import type { GenericCallView, SearchResultView, ToolResult } from '@shres-code/shres-code-tools'
+import type { SpillRef } from '@shres-code/shres-code-spill'
+import type {} from '@shres-code/shres-code-system-prompt'
 import { fenceSearchPath, runRipgrep, toWorkdirRelative, trySaveFormattedResult } from './search-core.ts'
 import { globSearchMeta, searchViewFromMeta } from './presentation.ts'
 import { acceptedDirectCallValue } from './direct-call.ts'

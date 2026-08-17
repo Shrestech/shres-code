@@ -6,7 +6,7 @@
  * guides/thinking_mode.mdx, guides/tool_calls.md), cross-checked against
  * live streams from the internal endpoint (2026-06).
  *
- * @module roos-llm-deepseek/types
+ * @module shres-llm-deepseek/types
  */
 
 /** Request body for `POST {baseURL}/chat/completions`. */

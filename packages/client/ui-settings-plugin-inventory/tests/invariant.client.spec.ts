@@ -1,6 +1,6 @@
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { describe, expect, it } from 'vitest'
-import InvariantRegistry from '@roos-code/roos-code-invariants'
+import InvariantRegistry from '@shres-code/shres-code-invariants'
 import * as PluginsInvariant from '../src/invariant.ts'
 
 describe('ui-settings-plugin-inventory invariant companion', () => {

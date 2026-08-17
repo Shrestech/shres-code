@@ -1,11 +1,11 @@
 /** Host BFF policy for resolving Remote Agent and Session identities. */
 
-import type { Context } from '@roos-code/cordis'
-import type { Agent, AgentOptions, AgentSetup } from '@roos-code/roos-code-agent'
-import type { Session, SessionEvent, SessionHeader, SessionId } from '@roos-code/roos-code-session'
-import type {} from '@roos-code/roos-code-session-persistence'
-import { TypertLookupFailure } from '@roos-code/roos-code-typert-protocol'
-import type {} from '@roos-code/roos-code-typert-registry'
+import type { Context } from '@shres-code/cordis'
+import type { Agent, AgentOptions, AgentSetup } from '@shres-code/shres-code-agent'
+import type { Session, SessionEvent, SessionHeader, SessionId } from '@shres-code/shres-code-session'
+import type {} from '@shres-code/shres-code-session-persistence'
+import { TypertLookupFailure } from '@shres-code/shres-code-typert-protocol'
+import type {} from '@shres-code/shres-code-typert-registry'
 
 /** Caller-facing failures preserved by the Gateway's RPC adapter. */
 export type ApiRemoteLookupError =
@@ -97,7 +97,7 @@ export async function inspectApiRemoteSession(
 ): Promise<{ meta: SessionHeader; events: SessionEvent[] }> {
   const persistence = ctx.get('sessionPersistence')
   if (persistence === undefined) {
-    throw new Error('session persistence is not configured (load a roos-session-persistence backend)')
+    throw new Error('session persistence is not configured (load a shres-session-persistence backend)')
   }
   const meta = (await persistence.list()).find(candidate => candidate.id === sessionId)
   if (meta === undefined || meta.cwd === undefined) {

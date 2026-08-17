@@ -1,13 +1,13 @@
 {
-  "name": "@roos-code/roos-code-user-approval",
-  "description": "User-approval seam (ctx.approval) for the Roos Code: one-shot permission decisions dispatched to composed answerers over the approval/request waterfall, fail-closed by default",
+  "name": "@shres-code/shres-code-user-approval",
+  "description": "User-approval seam (ctx.approval) for the Shres Code: one-shot permission decisions dispatched to composed answerers over the approval/request waterfall, fail-closed by default",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "packages/interaction/user-approval"
   },
   "type": "module",
@@ -37,26 +37,26 @@
   ],
   "license": "MIT",
   "peerDependencies": {
-    "@roos-code/roos-code-agent": "workspace:^",
-    "@roos-code/roos-code-brand": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-llm": "workspace:^",
-    "@roos-code/roos-code-scope": "workspace:^",
-    "@roos-code/roos-code-session": "workspace:^",
-    "@roos-code/roos-code-system-prompt": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-agent": "workspace:^",
+    "@shres-code/shres-code-brand": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-scope": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-system-prompt": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   },
   "dependencies": {
-    "@roos-code/schemastery": "workspace:^"
+    "@shres-code/schemastery": "workspace:^"
   },
   "devDependencies": {
-    "@roos-code/roos-code-agent": "workspace:^",
-    "@roos-code/roos-code-brand": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-llm": "workspace:^",
-    "@roos-code/roos-code-scope": "workspace:^",
-    "@roos-code/roos-code-session": "workspace:^",
-    "@roos-code/roos-code-system-prompt": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-agent": "workspace:^",
+    "@shres-code/shres-code-brand": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-scope": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-system-prompt": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   }
 }

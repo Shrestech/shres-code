@@ -6,16 +6,16 @@
  * classification, the model-friendly terminal environment, and the model-facing
  * stdout/stderr merge for background reads. Execution policy belongs in
  * `tools/pre-execute` or a sandboxing executor.
- * @module @roos-code/roos-code-bash-local
+ * @module @shres-code/shres-code-bash-local
  */
 
-import { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import { SHELL_SETTINGS_NAMESPACE, ShellExecutor } from '@roos-code/roos-code-shell'
-import type { ShellExecRequest, ShellExecSpec, ShellProcess, ShellProcessRead, ShellRunResult, CollectedOutput } from '@roos-code/roos-code-shell'
-import type { SubprocessCollect, SubprocessHandle, SubprocessOutputReader, SubprocessSpawnSpec } from '@roos-code/roos-code-subprocess'
-import { installSettingsSection } from '@roos-code/roos-code-settings'
-import { clampTimeout, deadline, MAX_TIMER_DELAY_MS, timeoutOf } from '@roos-code/roos-code-timeout'
+import { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import { SHELL_SETTINGS_NAMESPACE, ShellExecutor } from '@shres-code/shres-code-shell'
+import type { ShellExecRequest, ShellExecSpec, ShellProcess, ShellProcessRead, ShellRunResult, CollectedOutput } from '@shres-code/shres-code-shell'
+import type { SubprocessCollect, SubprocessHandle, SubprocessOutputReader, SubprocessSpawnSpec } from '@shres-code/shres-code-subprocess'
+import { installSettingsSection } from '@shres-code/shres-code-settings'
+import { clampTimeout, deadline, MAX_TIMER_DELAY_MS, timeoutOf } from '@shres-code/shres-code-timeout'
 
 /**
  * Model-friendly environment overrides: disable colors, pagers, and
@@ -158,11 +158,11 @@ export class LocalBashExecutor extends ShellExecutor {
       timeoutMs,
       stdoutMaxBytes,
       ...request.signal ? { signal: request.signal } : {},
-      // Carry stdin/ordinary env/trusted roosEnv through verbatim — optional,
+      // Carry stdin/ordinary env/trusted shresEnv through verbatim — optional,
       // no config default. The subprocess service owns the scrub and merge order.
       ...request.stdin !== undefined ? { stdin: request.stdin } : {},
       ...request.env !== undefined ? { env: request.env } : {},
-      ...request.roosEnv !== undefined ? { roosEnv: request.roosEnv } : {},
+      ...request.shresEnv !== undefined ? { shresEnv: request.shresEnv } : {},
       // Carry a sandbox policy through verbatim: this executor never
       // confines, so the field is inert here (the seam contract) — a
       // sandboxing subclass overrides resolve() to stamp its default instead.
@@ -190,10 +190,10 @@ export class LocalBashExecutor extends ShellExecutor {
       },
       graceMs: this.config.graceMs,
       signal,
-      // One explicit env map for the seam, layered so the trusted roosEnv
+      // One explicit env map for the seam, layered so the trusted shresEnv
       // snapshot beats both the caller's env and the terminal overrides; the
       // subprocess service merges the whole map after its ambient scrub.
-      env: { ...ENV_OVERRIDES, ...spec.env, ...spec.roosEnv },
+      env: { ...ENV_OVERRIDES, ...spec.env, ...spec.shresEnv },
     }
   }
 

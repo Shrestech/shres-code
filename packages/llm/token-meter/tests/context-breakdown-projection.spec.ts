@@ -2,15 +2,15 @@
 // plus the shared estimator's pricing branches.
 
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { createMessage, createUserMessage } from '@roos-code/roos-code-llm'
-import type { ContentBlock, ToolSchema } from '@roos-code/roos-code-llm'
-import SessionStore from '@roos-code/roos-code-session'
-import type { Session, SessionEvent } from '@roos-code/roos-code-session'
-import SessionProjectionRegistry from '@roos-code/roos-code-session-projection'
-import TokenMeter from '@roos-code/roos-code-token-meter'
-import type { ContextBreakdownProjection } from '@roos-code/roos-code-token-meter/client'
-import { CompactionId } from '@roos-code/roos-code-compaction'
+import { Context } from '@shres-code/cordis'
+import { createMessage, createUserMessage } from '@shres-code/shres-code-llm'
+import type { ContentBlock, ToolSchema } from '@shres-code/shres-code-llm'
+import SessionStore from '@shres-code/shres-code-session'
+import type { Session, SessionEvent } from '@shres-code/shres-code-session'
+import SessionProjectionRegistry from '@shres-code/shres-code-session-projection'
+import TokenMeter from '@shres-code/shres-code-token-meter'
+import type { ContextBreakdownProjection } from '@shres-code/shres-code-token-meter/client'
+import { CompactionId } from '@shres-code/shres-code-compaction'
 import { contextBreakdownProjectionDefinition } from '../src/breakdown-projection.ts'
 import {
   estimateContent,

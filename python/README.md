@@ -1,13 +1,13 @@
-# Roos Code Python SDK
+# Shres Code Python SDK
 
-Python packages for driving Roos Code as a subprocess. The client SDK communicates with the bundled runtime over newline-delimited JSON-RPC on stdio.
+Python packages for driving Shres Code as a subprocess. The client SDK communicates with the bundled runtime over newline-delimited JSON-RPC on stdio.
 
 ## Packages
 
 | Directory | Dist / module | Role |
 |---|---|---|
-| [sdk](sdk/README.md) | `roos-code-sdk` / `roos_code` | High-level turns API and lower-level JSON-RPC client |
-| [sdk-runtime](sdk-runtime/README.md) | `roos-code-runtime-bin` / `roos_code_runtime` | Bundled runtime binaries and default agent configuration |
+| [sdk](sdk/README.md) | `shres-code-sdk` / `shres_code` | High-level turns API and lower-level JSON-RPC client |
+| [sdk-runtime](sdk-runtime/README.md) | `shres-code-runtime-bin` / `shres_code_runtime` | Bundled runtime binaries and default agent configuration |
 
 ## Behavior
 

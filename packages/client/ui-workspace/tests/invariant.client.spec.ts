@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import * as WorkspaceInvariant from '@roos-code/roos-code-client-ui-workspace/invariant'
-import InvariantRegistry from '@roos-code/roos-code-invariants'
+import { Context } from '@shres-code/cordis'
+import * as WorkspaceInvariant from '@shres-code/shres-code-client-ui-workspace/invariant'
+import InvariantRegistry from '@shres-code/shres-code-invariants'
 
 describe('invariant companion', () => {
   it('registers under the package name with an empty installer', async () => {
@@ -11,7 +11,7 @@ describe('invariant companion', () => {
   })
 
   it('node-half apply is a no-op host placeholder', async () => {
-    const { apply } = await import('@roos-code/roos-code-client-ui-workspace')
+    const { apply } = await import('@shres-code/shres-code-client-ui-workspace')
     apply()
     expect(true).toBe(true) // reaching here without throw is the contract
   })

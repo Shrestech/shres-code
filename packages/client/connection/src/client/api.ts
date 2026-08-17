@@ -18,12 +18,12 @@ export type {
   CredentialsApi, CredentialView, ConfigurableProviderView, DiscoveredModelView, LlmApi,
   SubagentsApi, SubagentAddress, SubagentCatalog, SubagentListEntry, SubagentPromptReceipt,
   JobView,
-} from '@roos-code/roos-code-host-apiproxy/api'
-export type { ToolCallView, ToolResultView } from '@roos-code/roos-code-tools/presentation'
+} from '@shres-code/shres-code-host-apiproxy/api'
+export type { ToolCallView, ToolResultView } from '@shres-code/shres-code-tools/presentation'
 export type {
   RpcRequest, RpcResponse, RpcResult, RpcError, RpcErrorCode,
   ClientRequest, ServerResponse, ServerRequest, ClientResponse, RpcMessage, RpcReceipt,
-} from '@roos-code/roos-code-host-apiproxy/api'
+} from '@shres-code/shres-code-host-apiproxy/api'
 // transportError lives in the apiproxy api layer (beside RpcResult, its
 // subject); re-exported here so connection consumers keep one contract
 // entry point.
@@ -31,17 +31,17 @@ export {
   RpcId,
   SESSION_SEARCH_RESULT_LIMIT,
   transportError,
-} from '@roos-code/roos-code-host-apiproxy/api'
-export { AbstractApiClient } from '@roos-code/roos-code-host-apiproxy/client'
-export type { IApiClient } from '@roos-code/roos-code-host-apiproxy/client'
-export type { SessionId, SessionEvent } from '@roos-code/roos-code-session/types'
-export type { MessageId } from '@roos-code/roos-code-llm/brand'
-export type { ContentBlock, StreamChunk } from '@roos-code/roos-code-llm/types'
+} from '@shres-code/shres-code-host-apiproxy/api'
+export { AbstractApiClient } from '@shres-code/shres-code-host-apiproxy/client'
+export type { IApiClient } from '@shres-code/shres-code-host-apiproxy/client'
+export type { SessionId, SessionEvent } from '@shres-code/shres-code-session/types'
+export type { MessageId } from '@shres-code/shres-code-llm/brand'
+export type { ContentBlock, StreamChunk } from '@shres-code/shres-code-llm/types'
 
 /** Successful value returned by the connection-generation host handshake. */
-export type HostDescription = import('@roos-code/roos-code-host-apiproxy/api').ResponseValue<'host.describe'>
+export type HostDescription = import('@shres-code/shres-code-host-apiproxy/api').ResponseValue<'host.describe'>
 
-import type { RpcResponse, RpcResult } from '@roos-code/roos-code-host-apiproxy/api'
+import type { RpcResponse, RpcResult } from '@shres-code/shres-code-host-apiproxy/api'
 
 /**
  * Unwrap a unary response: RpcResponse<T> -> RpcResult<T> (business code only

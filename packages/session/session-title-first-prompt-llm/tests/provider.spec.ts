@@ -1,10 +1,10 @@
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { describe, expect, it, vi } from 'vitest'
-import LlmRuntime, { createUserMessage, LlmAdapter  } from '@roos-code/roos-code-llm'
-import type { GenerateOptions, StreamChunk } from '@roos-code/roos-code-llm'
-import SessionStore, { Session, SessionId } from '@roos-code/roos-code-session'
-import SessionTitleService, { type SessionTitleProvider } from '@roos-code/roos-code-session-title'
-import * as providerPlugin from '@roos-code/roos-code-session-title-first-prompt-llm'
+import LlmRuntime, { createUserMessage, LlmAdapter  } from '@shres-code/shres-code-llm'
+import type { GenerateOptions, StreamChunk } from '@shres-code/shres-code-llm'
+import SessionStore, { Session, SessionId } from '@shres-code/shres-code-session'
+import SessionTitleService, { type SessionTitleProvider } from '@shres-code/shres-code-session-title'
+import * as providerPlugin from '@shres-code/shres-code-session-title-first-prompt-llm'
 
 class RecordingAdapter extends LlmAdapter {
   readonly requests: GenerateOptions[] = []

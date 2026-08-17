@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import InvariantRegistry from '@roos-code/roos-code-invariants'
+import { Context } from '@shres-code/cordis'
+import InvariantRegistry from '@shres-code/shres-code-invariants'
 import { credentialRef } from '../src/index.ts'
 import * as CredentialsInvariant from '../src/invariant.ts'
 import { MemoryCredentials } from './memory.ts'
@@ -22,7 +22,7 @@ describe('credentials invariant companion', () => {
     await ctx.plugin(InvariantRegistry)
     await ctx.plugin(CredentialsInvariant)
 
-    expect(() => { ctx.emit('credentials/updated', REF) }).toThrow(/invariant violated by "@roos-code\/roos-code-credentials"/)
+    expect(() => { ctx.emit('credentials/updated', REF) }).toThrow(/invariant violated by "@shres-code\/shres-code-credentials"/)
   })
 
   it('reserves the package name against duplicate registration', async () => {
@@ -31,7 +31,7 @@ describe('credentials invariant companion', () => {
     await ctx.plugin(CredentialsInvariant)
 
     expect(() => {
-      ctx.invariants.register('@roos-code/roos-code-credentials', () => {})
+      ctx.invariants.register('@shres-code/shres-code-credentials', () => {})
     }).toThrow(/already registered/)
   })
 })

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { SettingsNamespaceView } from '@roos-code/roos-code-api-remotes/client'
+import type { SettingsNamespaceView } from '@shres-code/shres-code-api-remotes/client'
 import {
   PermissionPresetSettingsController, permissionDefaultOf, refreshPermissionIfLoaded,
 } from '../src/client/settings-store.ts'

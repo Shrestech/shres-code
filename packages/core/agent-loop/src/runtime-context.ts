@@ -1,15 +1,15 @@
 /**
  * Durable projection state for dynamic runtime context.
- * @module @roos-code/roos-code-agent-loop/runtime-context
+ * @module @shres-code/shres-code-agent-loop/runtime-context
  */
 
-import { createUserMessage } from '@roos-code/roos-code-llm'
-import type { ContextSnapshotSection } from '@roos-code/roos-code-llm'
-import type { Session, UserMessage } from '@roos-code/roos-code-session'
-import { isReplacementSurfaceEvent } from '@roos-code/roos-code-session'
-import type { Context } from '@roos-code/cordis'
+import { createUserMessage } from '@shres-code/shres-code-llm'
+import type { ContextSnapshotSection } from '@shres-code/shres-code-llm'
+import type { Session, UserMessage } from '@shres-code/shres-code-session'
+import { isReplacementSurfaceEvent } from '@shres-code/shres-code-session'
+import type { Context } from '@shres-code/cordis'
 
-const SOURCE = '@roos-code/roos-code-system-prompt'
+const SOURCE = '@shres-code/shres-code-system-prompt'
 const CLEARED = 'Current runtime context: none. Earlier runtime-context snapshots no longer apply.'
 
 function isOwned(message: UserMessage): boolean {

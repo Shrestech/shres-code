@@ -9,9 +9,9 @@ import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
-import { credentialRef } from '@roos-code/roos-code-credentials'
-import type { SessionEvent } from '@roos-code/roos-code-session'
-import { WEB_SEARCH_MAX_RESULTS } from '@roos-code/roos-code-tool-web'
+import { credentialRef } from '@shres-code/shres-code-credentials'
+import type { SessionEvent } from '@shres-code/shres-code-session'
+import { WEB_SEARCH_MAX_RESULTS } from '@shres-code/shres-code-tool-web'
 import {
   assertFixtureInventory, captureStableAria, compareOrRefreshGolden, fixtureUserPrompts,
   launchWebScaffold, recordFixture, watchConsole, webSnapshotMode, type WebScaffold,
@@ -22,9 +22,9 @@ const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/web-search-round', impor
 const FIXTURE = fileURLToPath(new URL('./snapshots/web-search-round/session.jsonl', import.meta.url))
 const UI_EXPECTED = fileURLToPath(new URL('./snapshots/web-search-round/ui.expected.md', import.meta.url))
 const MODE = webSnapshotMode()
-const QUERY = 'Roos Code snapshot search'
+const QUERY = 'Shres Code snapshot search'
 const PROMPT = `Use web_search to search exactly "${QUERY}". Then reply exactly SEARCH_DONE and stop.`
-const SEARCH_CREDENTIAL_REF = credentialRef('ROOS_WEB_SEARCH_E2E_KEY')
+const SEARCH_CREDENTIAL_REF = credentialRef('SHRES_WEB_SEARCH_E2E_KEY')
 const SEARCH_CREDENTIAL = 'snapshot-search-key'
 
 /**

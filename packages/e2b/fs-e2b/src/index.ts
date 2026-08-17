@@ -1,13 +1,13 @@
 /**
  * E2B provider for the filesystem capability seam. Paths, contents, and
  * atomic staging files remain inside the shared remote sandbox.
- * @module @roos-code/roos-code-fs-e2b
+ * @module @shres-code/shres-code-fs-e2b
  */
 
 import { createHash, randomUUID } from 'node:crypto'
 import { Buffer } from 'node:buffer'
 import { posix } from 'node:path'
-import { FileSystem, FsError, FsTargetKey, FsVersion } from '@roos-code/roos-code-fs'
+import { FileSystem, FsError, FsTargetKey, FsVersion } from '@shres-code/shres-code-fs'
 import type {
   FsDirEntry,
   FsEditOutcome,
@@ -17,17 +17,17 @@ import type {
   FsTarget,
   FsWriteIntent,
   FsWriteOutcome,
-} from '@roos-code/roos-code-fs'
+} from '@shres-code/shres-code-fs'
 import {
   CommandExitError,
   e2bControlEnvs,
   FileNotFoundError,
   FileType,
   quoteE2BShellArg,
-} from '@roos-code/roos-code-e2b'
-import type { EntryInfo, Sandbox } from '@roos-code/roos-code-e2b'
+} from '@shres-code/shres-code-e2b'
+import type { EntryInfo, Sandbox } from '@shres-code/shres-code-e2b'
 
-const VERSION_METADATA_KEY = 'roos-version'
+const VERSION_METADATA_KEY = 'shres-version'
 const BINARY_SAMPLE_BYTES = 8192
 const BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/
 
@@ -518,7 +518,7 @@ export class E2BFileSystem extends FileSystem {
     const sandbox = await this.ctx.e2b.getSandbox()
     const targetPath = String(target.targetKey)
     const versionId = randomUUID()
-    const stagingDirectory = posix.join(posix.dirname(targetPath), `.roos-${randomUUID()}.tmp`)
+    const stagingDirectory = posix.join(posix.dirname(targetPath), `.shres-${randomUUID()}.tmp`)
     const temporary = posix.join(stagingDirectory, 'content')
     let stagingDirectoryCreated = false
     try {

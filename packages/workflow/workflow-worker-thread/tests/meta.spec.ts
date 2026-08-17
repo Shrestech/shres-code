@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { WorkflowError } from '@roos-code/roos-code-workflow'
+import { WorkflowError } from '@shres-code/shres-code-workflow'
 import { validateMeta } from '../src/meta.ts'
 
 /** Assert a META_INVALID throw whose message matches every given fragment. */

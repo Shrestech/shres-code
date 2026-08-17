@@ -1,7 +1,7 @@
 /** Public session-reference request, candidate, and preparation records. */
 
-import type { ContentBlock } from '@roos-code/roos-code-llm'
-import type { SessionId, UserMessage } from '@roos-code/roos-code-session'
+import type { ContentBlock } from '@shres-code/shres-code-llm'
+import type { SessionId, UserMessage } from '@shres-code/shres-code-session'
 
 /** Durable source session, cited event seqs, and snapshot facts for prepared cross-session context. */
 export interface SessionReferenceSource {
@@ -23,7 +23,7 @@ export interface SessionReferenceSource {
   }[]
 }
 
-declare module '@roos-code/roos-code-llm' {
+declare module '@shres-code/shres-code-llm' {
   interface MessageSourceMap {
     'session-reference': SessionReferenceSource
   }

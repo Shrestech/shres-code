@@ -1,20 +1,20 @@
 # Image-scenario overlay: adds the durable attachment store the read_image tool
-# commits through. The store resolves its root from $ROOS_HOME, which the
+# commits through. The store resolves its root from $SHRES_HOME, which the
 # snapshot harness scopes per run, so the overlay itself carries no paths. The
 # app config is restated to re-pin `deepseek-v4-flash` (base ships pro; the
 # authored fixture and the pinned header class are flash), because a config
 # patch replaces the whole app config.
 - id: base
-  name: '@roos-code/cordis-plugin-include'
+  name: '@shres-code/cordis-plugin-include'
   config:
     path: ./cordis.yml
     patches:
       - id: acp-agent
-        name: '@roos-code/roos-code-acp-demo'
+        name: '@shres-code/shres-code-acp-demo'
         config:
           provider: deepseek-official
           model: deepseek-v4-flash
-          persistenceRoot: !!js process.env.ROOS_SNAPSHOT_SESSIONS_ROOT ?? './.sessions'
+          persistenceRoot: !!js process.env.SHRES_SNAPSHOT_SESSIONS_ROOT ?? './.sessions'
           persistenceCompression: none
           workspaceContext:
             maxBytes: 65536
@@ -24,4 +24,4 @@
             Verify your work by running the code or tests. Keep answers brief and factual.
       - insert:
           - id: attachment-local
-            name: '@roos-code/roos-code-attachment-local'
+            name: '@shres-code/shres-code-attachment-local'

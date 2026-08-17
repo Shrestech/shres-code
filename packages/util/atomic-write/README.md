@@ -1,20 +1,20 @@
-# roos-atomic-write
+# shres-atomic-write
 
-Zero-dependency atomic file replacement shared by file-backed stores that must never leave partial, symlink-hijacked, or wider-than-intended content on disk — the user-settings document (`roos-settings-file`) and the credentials store (`roos-credentials-local`).
+Zero-dependency atomic file replacement shared by file-backed stores that must never leave partial, symlink-hijacked, or wider-than-intended content on disk — the user-settings document (`shres-settings-file`) and the credentials store (`shres-credentials-local`).
 
 ## Surface
 
 ```ts
-import { withFileLock, writeFileAtomic } from '@roos-code/roos-code-atomic-write'
+import { withFileLock, writeFileAtomic } from '@shres-code/shres-code-atomic-write'
 
 declare const text: string
 declare const render: (previous: string) => string
 
-await writeFileAtomic('/home/u/.roos/settings.yaml', text, { mode: 0o600 })
+await writeFileAtomic('/home/u/.shres/settings.yaml', text, { mode: 0o600 })
 
 // Read-modify-write against the same file from several processes.
-await withFileLock('/home/u/.roos/settings.yaml', async () => {
-  await writeFileAtomic('/home/u/.roos/settings.yaml', render(text), { mode: 0o600 })
+await withFileLock('/home/u/.shres/settings.yaml', async () => {
+  await writeFileAtomic('/home/u/.shres/settings.yaml', render(text), { mode: 0o600 })
 })
 ```
 

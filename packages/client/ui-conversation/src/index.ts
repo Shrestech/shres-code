@@ -1,7 +1,7 @@
 /** Host registration for browser conversation preferences. */
 
-import type { Context } from '@roos-code/cordis'
-import { settingsNamespace } from '@roos-code/roos-code-settings'
+import type { Context } from '@shres-code/cordis'
+import { settingsNamespace } from '@shres-code/shres-code-settings'
 import { CONVERSATION_SETTINGS_NAMESPACE, ConversationSettingsSchema } from './submission-settings.ts'
 
 export {

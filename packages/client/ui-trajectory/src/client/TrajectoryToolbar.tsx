@@ -1,7 +1,7 @@
 /** Trajectory toolbar: timeline and ledger fold controls. */
 
-import type { TranslateNS } from '@roos-code/roos-code-client-ui-slots'
-import { IconSearchOutline16 } from '@roos-code/roos-code-client-ui-primitives'
+import type { TranslateNS } from '@shres-code/shres-code-client-ui-slots'
+import { IconSearchOutline16 } from '@shres-code/shres-code-client-ui-primitives'
 import type { NS } from './locales.ts'
 import css from './TrajectoryToolbar.module.css'
 

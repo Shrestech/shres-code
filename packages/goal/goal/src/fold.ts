@@ -1,7 +1,7 @@
 /** Pure replay fold and strict decoder for durable goal changes. */
 
-import type { MessageSource } from '@roos-code/roos-code-llm'
-import type { SessionEvent } from '@roos-code/roos-code-session'
+import type { MessageSource } from '@shres-code/shres-code-llm'
+import type { SessionEvent } from '@shres-code/shres-code-session'
 import { GOAL_CHANGE_VERSION, GoalId } from './runtime.ts'
 import type { GoalBlockReason, GoalPhase, GoalRef, GoalSnapshot } from './types.ts'
 import type {

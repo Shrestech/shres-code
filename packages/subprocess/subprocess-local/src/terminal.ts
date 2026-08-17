@@ -9,7 +9,7 @@ import type {
   SubprocessTerminalForeground,
   SubprocessTerminalHandle,
   SubprocessTerminalSignal,
-} from '@roos-code/roos-code-subprocess'
+} from '@shres-code/shres-code-subprocess'
 import type { ProcessIdentity, ProcessInspector } from './process-inspector.ts'
 
 function delay(ms: number): Promise<void> {

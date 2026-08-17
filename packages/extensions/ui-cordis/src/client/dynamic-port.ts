@@ -1,6 +1,6 @@
 /** Host operations used directly by the frame-wide Cordis panel. */
 
-import type { SessionId } from '@roos-code/roos-code-client-connection/client'
+import type { SessionId } from '@shres-code/shres-code-client-connection/client'
 import type {
   CordisDynamicPluginId, DynamicCordisInventoryRow,
 } from './events.ts'

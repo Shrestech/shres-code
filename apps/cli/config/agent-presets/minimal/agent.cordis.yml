@@ -6,7 +6,7 @@
 # persistent `bash` and `str_replace_editor`. Context compaction is absent.
 
 - id: persona
-  name: '@roos-code/roos-code-persona'
+  name: '@shres-code/shres-code-persona'
   config:
     text: You are a helpful software engineer assistant.
     complete: true
@@ -22,15 +22,15 @@
     terminals: true
   config:
     - id: pty
-      name: '@roos-code/roos-code-terminal'
+      name: '@shres-code/shres-code-terminal'
 
     - id: terminal-bash
-      name: '@roos-code/roos-code-terminal-bash'
+      name: '@shres-code/shres-code-terminal-bash'
       config:
         timeoutMs: 300000
 
     - id: persistent-bash
-      name: '@roos-code/roos-code-tool-bash-persistent'
+      name: '@shres-code/shres-code-tool-bash-persistent'
       config:
         timeoutMs: 300000
         description: |-
@@ -52,11 +52,11 @@
     fs: true
   config:
     - id: fs-local
-      name: '@roos-code/roos-code-fs-local'
+      name: '@shres-code/shres-code-fs-local'
       config:
-        cwd: !!js process.env.ROOS_CWD ?? process.cwd()
+        cwd: !!js process.env.SHRES_CWD ?? process.cwd()
 
     - id: str-replace-editor
-      name: '@roos-code/roos-code-tool-str-replace-editor'
+      name: '@shres-code/shres-code-tool-str-replace-editor'
       config:
         maxOutputChars: 16000

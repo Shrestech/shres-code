@@ -6,7 +6,7 @@
  * browser half-entry's re-export) for client aggregates — with zero content
  * duplication.
  *
- * @module @roos-code/roos-code-permission-presets/types
+ * @module @shres-code/shres-code-permission-presets/types
  */
 
 /** The select-option shape a presentation layer advertises for one preset (or for the derived `custom` state). */
@@ -31,7 +31,7 @@ export interface PermissionSelect {
   currentValue: string
 }
 
-declare module '@roos-code/roos-code-session-projection/types' {
+declare module '@shres-code/shres-code-session-projection/types' {
   interface SessionProjectionMap {
     /**
      * The session's permission select, folded from the three whole-value

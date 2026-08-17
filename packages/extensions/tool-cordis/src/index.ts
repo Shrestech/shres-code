@@ -1,20 +1,20 @@
 /**
  * Model-facing Cordis runtime/package inspection, define, run, stop, and remove tools.
- * @module @roos-code/roos-code-tool-cordis
+ * @module @shres-code/shres-code-tool-cordis
  */
 
-import type { Context } from '@roos-code/cordis'
-import type { Agent, PreStepDecision } from '@roos-code/roos-code-agent'
+import type { Context } from '@shres-code/cordis'
+import type { Agent, PreStepDecision } from '@shres-code/shres-code-agent'
 import {
   CordisDynamicPackageId, CordisDynamicPluginId,
-} from '@roos-code/roos-code-cordis-host-runner'
-import type { DynamicCordisReference } from '@roos-code/roos-code-cordis-host-runner'
-import { createUserMessage } from '@roos-code/roos-code-llm'
-import type { JsonValue } from '@roos-code/roos-code-session'
-import type { UserMessage } from '@roos-code/roos-code-session'
-import { defineTool } from '@roos-code/roos-code-tools'
-import type { ToolExecution } from '@roos-code/roos-code-tools'
-import type {} from '@roos-code/roos-code-system-prompt'
+} from '@shres-code/shres-code-cordis-host-runner'
+import type { DynamicCordisReference } from '@shres-code/shres-code-cordis-host-runner'
+import { createUserMessage } from '@shres-code/shres-code-llm'
+import type { JsonValue } from '@shres-code/shres-code-session'
+import type { UserMessage } from '@shres-code/shres-code-session'
+import { defineTool } from '@shres-code/shres-code-tools'
+import type { ToolExecution } from '@shres-code/shres-code-tools'
+import type {} from '@shres-code/shres-code-system-prompt'
 import { missingServices, providedServices } from './inspect.ts'
 import {
   presentDefineCall, presentInspectListCall, presentInspectQueryCall, presentInspectSelfCall, presentRunCall,
@@ -547,7 +547,7 @@ function renderUnavailableReference(id: string): string {
   return [
     '<cordis_dynamic_plugin_context>',
     `The user explicitly referenced @${id}, but this Plugin is unavailable in the current Session.`,
-    'It may have been removed, belong to another Session, or have been lost when the Roos process restarted.',
+    'It may have been removed, belong to another Session, or have been lost when the Shres process restarted.',
     'Do not claim that it was updated or silently create a replacement Plugin. Tell the user that the reference is currently unavailable.',
     '</cordis_dynamic_plugin_context>',
   ].join('\n')

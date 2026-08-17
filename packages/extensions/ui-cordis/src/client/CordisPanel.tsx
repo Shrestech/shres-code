@@ -5,11 +5,11 @@ import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import {
   IconCheckOutline16, IconCloseOutline16, IconCordisPluginOutline14, IconPlayOutline16,
   IconStopFill16, IconTrashOutline16, Tooltip,
-} from '@roos-code/roos-code-client-ui-primitives'
-import type { InjectFace, PropsLocale, PropsRuntime } from '@roos-code/roos-code-client-ui-slots'
-import type {} from '@roos-code/roos-code-client-ui-sidebar/client'
-import type { CordisRunActivity } from '@roos-code/roos-code-cordis-client-runner/client'
-import type { SessionId } from '@roos-code/roos-code-client-connection/client'
+} from '@shres-code/shres-code-client-ui-primitives'
+import type { InjectFace, PropsLocale, PropsRuntime } from '@shres-code/shres-code-client-ui-slots'
+import type {} from '@shres-code/shres-code-client-ui-sidebar/client'
+import type { CordisRunActivity } from '@shres-code/shres-code-cordis-client-runner/client'
+import type { SessionId } from '@shres-code/shres-code-client-connection/client'
 import type { CordisInventoryRow } from './dynamic-port.ts'
 import type { CordisPanelFace } from './slots.ts'
 import type { CordisKey } from './locales.ts'

@@ -1,5 +1,5 @@
 /**
- * End-to-end tests for roos-mcp-client. Exercises the REAL MCP protocol against:
+ * End-to-end tests for shres-mcp-client. Exercises the REAL MCP protocol against:
  * 1. A self-written fixture server over stdio (controlled edge cases)
  * 2. @modelcontextprotocol/server-everything (official integration test server)
  * 3. @modelcontextprotocol/server-filesystem (real filesystem operations)
@@ -14,17 +14,17 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { z } from 'zod'
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import ToolRuntime from '@roos-code/roos-code-tools'
-import { CallId } from '@roos-code/roos-code-llm'
-import { apply } from '@roos-code/roos-code-mcp-client/src/index.ts'
-import { publicToolName } from '@roos-code/roos-code-mcp-client/src/tools.ts'
-import type { Config } from '@roos-code/roos-code-mcp-client'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import ToolRuntime from '@shres-code/shres-code-tools'
+import { CallId } from '@shres-code/shres-code-llm'
+import { apply } from '@shres-code/shres-code-mcp-client/src/index.ts'
+import { publicToolName } from '@shres-code/shres-code-mcp-client/src/tools.ts'
+import type { Config } from '@shres-code/shres-code-mcp-client'
 
 const testToolSignal = new AbortController().signal
 

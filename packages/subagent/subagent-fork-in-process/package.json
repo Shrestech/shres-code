@@ -1,5 +1,5 @@
 {
-  "name": "@roos-code/roos-code-subagent-fork-in-process",
+  "name": "@shres-code/shres-code-subagent-fork-in-process",
   "description": "In-process fork subagent backend: runs a child agent seeded with a prefix of the parent's log",
   "version": "0.1.0-rc.5",
   "publishConfig": {
@@ -7,7 +7,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "packages/subagent/subagent-fork-in-process"
   },
   "type": "module",
@@ -32,27 +32,27 @@
   ],
   "license": "MIT",
   "peerDependencies": {
-    "@roos-code/roos-code-agent": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-session": "workspace:^",
-    "@roos-code/roos-code-subagent": "workspace:^",
-    "@roos-code/roos-code-subagent-in-process-driver": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-agent": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-subagent": "workspace:^",
+    "@shres-code/shres-code-subagent-in-process-driver": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   },
   "dependencies": {
-    "@roos-code/schemastery": "workspace:^"
+    "@shres-code/schemastery": "workspace:^"
   },
   "devDependencies": {
-    "@roos-code/cordis-plugin-loader": "workspace:^",
-    "@roos-code/roos-code-agent": "workspace:^",
-    "@roos-code/roos-code-agent-loop": "workspace:^",
-    "@roos-code/roos-code-agent-loop-testkit": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-llm": "workspace:^",
-    "@roos-code/roos-code-session": "workspace:^",
-    "@roos-code/roos-code-subagent": "workspace:^",
-    "@roos-code/roos-code-subagent-in-process-driver": "workspace:^",
-    "@roos-code/roos-code-subagent-spawn-in-process": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/cordis-plugin-loader": "workspace:^",
+    "@shres-code/shres-code-agent": "workspace:^",
+    "@shres-code/shres-code-agent-loop": "workspace:^",
+    "@shres-code/shres-code-agent-loop-testkit": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-subagent": "workspace:^",
+    "@shres-code/shres-code-subagent-in-process-driver": "workspace:^",
+    "@shres-code/shres-code-subagent-spawn-in-process": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   }
 }

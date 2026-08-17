@@ -16,13 +16,13 @@ function member(directory: string, name: string, manifest: Record<string, unknow
 }
 
 describe('release families', () => {
-  it('names one tag for the whole roos family and one per vendored package', () => {
-    const roos = releaseFamily('roos')
+  it('names one tag for the whole shres family and one per vendored package', () => {
+    const shres = releaseFamily('shres')
     const vendor = releaseFamily('vendor')
-    const cli = member('apps/cli', '@roos-code/roos-code')
-    const cordis = { ...member('vendor/cordis', '@roos-code/cordis'), version: '4.0.1' }
+    const cli = member('apps/cli', '@shres-code/shres-code')
+    const cordis = { ...member('vendor/cordis', '@shres-code/cordis'), version: '4.0.1' }
 
-    expect(roos.tagFor(cli)).toBe('roos-v0.0.1')
+    expect(shres.tagFor(cli)).toBe('shres-v0.0.1')
     expect(vendor.tagFor(cordis)).toBe('vendor-cordis-v4.0.1')
     // The prefix is constructed, not recovered from a tag: a version with a
     // hyphen would defeat any suffix-stripping.
@@ -31,18 +31,18 @@ describe('release families', () => {
   })
 
   it('rejects a family whose members disagree on the shared version', () => {
-    const roos = releaseFamily('roos')
-    const members = [member('apps/cli', '@roos-code/roos-code'), { ...member('apps/web', '@roos-code/roos-code-web-frontend'), version: '0.0.2' }]
+    const shres = releaseFamily('shres')
+    const members = [member('apps/cli', '@shres-code/shres-code'), { ...member('apps/web', '@shres-code/shres-code-web-frontend'), version: '0.0.2' }]
 
-    expect(() => { roos.verifyVersions(members) }).toThrow(/must share one version/)
-    expect(() => { roos.verifyVersions([members[0]!]) }).not.toThrow()
+    expect(() => { shres.verifyVersions(members) }).toThrow(/must share one version/)
+    expect(() => { shres.verifyVersions([members[0]!]) }).not.toThrow()
   })
 
   it('accepts independent vendored versions and rejects an unpublishable one', () => {
     const vendor = releaseFamily('vendor')
     const members = [
-      { ...member('vendor/cordis', '@roos-code/cordis'), version: '4.0.1' },
-      { ...member('vendor/cosmokit', '@roos-code/cosmokit'), version: '1.8.2' },
+      { ...member('vendor/cordis', '@shres-code/cordis'), version: '4.0.1' },
+      { ...member('vendor/cosmokit', '@shres-code/cosmokit'), version: '1.8.2' },
     ]
 
     expect(() => { vendor.verifyVersions(members) }).not.toThrow()
@@ -50,44 +50,44 @@ describe('release families', () => {
   })
 
   it('publishes a dependency before its consumer, and orders ties by name', () => {
-    const roos = releaseFamily('roos')
+    const shres = releaseFamily('shres')
     const members = [
-      member('packages/a/consumer', '@roos-code/roos-code-consumer', { dependencies: { '@roos-code/roos-code-library': 'workspace:^' } }),
-      member('packages/a/library', '@roos-code/roos-code-library'),
-      member('packages/a/zebra', '@roos-code/roos-code-zebra'),
+      member('packages/a/consumer', '@shres-code/shres-code-consumer', { dependencies: { '@shres-code/shres-code-library': 'workspace:^' } }),
+      member('packages/a/library', '@shres-code/shres-code-library'),
+      member('packages/a/zebra', '@shres-code/shres-code-zebra'),
     ]
 
-    expect(roos.publishOrder(members).map(entry => entry.name)).toEqual([
-      '@roos-code/roos-code-library',
-      '@roos-code/roos-code-consumer',
-      '@roos-code/roos-code-zebra',
+    expect(shres.publishOrder(members).map(entry => entry.name)).toEqual([
+      '@shres-code/shres-code-library',
+      '@shres-code/shres-code-consumer',
+      '@shres-code/shres-code-zebra',
     ])
   })
 
   it('reports a runtime dependency cycle instead of emitting an arbitrary order', () => {
-    const roos = releaseFamily('roos')
+    const shres = releaseFamily('shres')
     const members = [
-      member('packages/a/left', '@roos-code/roos-code-left', { dependencies: { '@roos-code/roos-code-right': 'workspace:^' } }),
-      member('packages/a/right', '@roos-code/roos-code-right', { dependencies: { '@roos-code/roos-code-left': 'workspace:^' } }),
+      member('packages/a/left', '@shres-code/shres-code-left', { dependencies: { '@shres-code/shres-code-right': 'workspace:^' } }),
+      member('packages/a/right', '@shres-code/shres-code-right', { dependencies: { '@shres-code/shres-code-left': 'workspace:^' } }),
     ]
 
-    expect(() => { roos.publishOrder(members) }).toThrow(/dependency cycle/)
+    expect(() => { shres.publishOrder(members) }).toThrow(/dependency cycle/)
   })
 
-  it('applies the harness payload policy to roos and keeps upstream payloads for vendored packages', () => {
-    const roos = releaseFamily('roos')
+  it('applies the harness payload policy to shres and keeps upstream payloads for vendored packages', () => {
+    const shres = releaseFamily('shres')
     const vendor = releaseFamily('vendor')
-    const harness = member('packages/a/library', '@roos-code/roos-code-library')
-    const vendored = member('vendor/cordis', '@roos-code/cordis')
+    const harness = member('packages/a/library', '@shres-code/shres-code-library')
+    const vendored = member('vendor/cordis', '@shres-code/cordis')
 
-    expect(() => { roos.validatePayload(harness, ['package/lib/index.js', 'package/src/index.ts']) })
+    expect(() => { shres.validatePayload(harness, ['package/lib/index.js', 'package/src/index.ts']) })
       .toThrow(/publishes source file/)
     expect(() => { vendor.validatePayload(vendored, ['package/lib/index.js', 'package/src/index.ts']) }).not.toThrow()
     expect(() => { vendor.validatePayload(vendored, []) }).toThrow(/empty tarball/)
   })
 
   it('drives the installed entry only for the family that publishes one', () => {
-    expect(releaseFamily('roos').installedEntry).toEqual({ packageName: '@roos-code/roos-code', binPath: 'lib/bin.js' })
+    expect(releaseFamily('shres').installedEntry).toEqual({ packageName: '@shres-code/shres-code', binPath: 'lib/bin.js' })
     expect(releaseFamily('vendor').installedEntry).toBeUndefined()
   })
 
@@ -142,10 +142,10 @@ describe('version precedence', () => {
 })
 
 describe('payload change judgement', () => {
-  const sourceShipping = member('vendor/cosmokit', '@roos-code/cosmokit', {
+  const sourceShipping = member('vendor/cosmokit', '@shres-code/cosmokit', {
     files: ['lib/index.js', 'lib/types/**/*.d.ts', 'src'],
   })
-  const buildOutputOnly = member('vendor/cordis', '@roos-code/cordis', {
+  const buildOutputOnly = member('vendor/cordis', '@shres-code/cordis', {
     files: ['lib/index.js', 'lib/types/**/*.d.ts', 'bin.js'],
   })
 
@@ -170,7 +170,7 @@ describe('payload change judgement', () => {
     // unnecessary patch bump, while under-reporting fails the next publish on a
     // version whose bytes moved.
     expect(reachesPayload(sourceShipping, 'vendor/cosmokit/README.i18n.yaml')).toBe(true)
-    expect(reachesPayload(member('packages/a/library', '@roos-code/roos-code-library', { files: ['lib/index.js'] }),
+    expect(reachesPayload(member('packages/a/library', '@shres-code/shres-code-library', { files: ['lib/index.js'] }),
       'packages/a/library/tests/library.spec.ts')).toBe(false)
   })
 })

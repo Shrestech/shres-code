@@ -1,17 +1,17 @@
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { describe, expect, it, vi } from 'vitest'
-import LlmRuntime, { createUserMessage, CallId, isAgentLoopRequest, LlmAdapter  } from '@roos-code/roos-code-llm'
-import type { FinishReason, GenerateOptions, StreamChunk } from '@roos-code/roos-code-llm'
-import SessionStore, { SessionId } from '@roos-code/roos-code-session'
-import { SessionTitleProviderId } from '@roos-code/roos-code-session-title'
-import type { SessionTitleProviderRequest } from '@roos-code/roos-code-session-title'
-import { MAX_TIMER_DELAY_MS } from '@roos-code/roos-code-timeout'
+import LlmRuntime, { createUserMessage, CallId, isAgentLoopRequest, LlmAdapter  } from '@shres-code/shres-code-llm'
+import type { FinishReason, GenerateOptions, StreamChunk } from '@shres-code/shres-code-llm'
+import SessionStore, { SessionId } from '@shres-code/shres-code-session'
+import { SessionTitleProviderId } from '@shres-code/shres-code-session-title'
+import type { SessionTitleProviderRequest } from '@shres-code/shres-code-session-title'
+import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
 import {
   generateSessionTitleWithLlm,
   resolveSessionTitleLlmConfig,
   SESSION_TITLE_TIMEOUT_CODE,
-} from '@roos-code/roos-code-session-title-llm'
-import type { SessionTitleLlmConfig } from '@roos-code/roos-code-session-title-llm'
+} from '@shres-code/shres-code-session-title-llm'
+import type { SessionTitleLlmConfig } from '@shres-code/shres-code-session-title-llm'
 
 class RecordingAdapter extends LlmAdapter {
   readonly requests: GenerateOptions[] = []

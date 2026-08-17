@@ -3,7 +3,7 @@
  * real CLI process under the shared subprocess owner, map only strict SDK
  * success to completion, and dispose to whole-tree quiescence.
  *
- * @module @roos-code/roos-code-subagent-claude-code/run
+ * @module @shres-code/shres-code-subagent-claude-code/run
  */
 
 import { randomUUID } from 'node:crypto'
@@ -15,8 +15,8 @@ import {
   type SDKResultMessage,
   type SpawnOptions,
 } from '@anthropic-ai/claude-agent-sdk'
-import type { ContentBlock } from '@roos-code/roos-code-llm'
-import { SessionId } from '@roos-code/roos-code-session'
+import type { ContentBlock } from '@shres-code/shres-code-llm'
+import { SessionId } from '@shres-code/shres-code-session'
 import {
   settleRunResult,
   subprocessRunHandle,
@@ -24,12 +24,12 @@ import {
   type SubagentRun,
   type SubagentStartRequest,
   type SubagentStopReason,
-} from '@roos-code/roos-code-subagent'
+} from '@shres-code/shres-code-subagent'
 import {
   scrubbedParentEnv,
   type SubprocessHandle,
   type SubprocessSpawnSpec,
-} from '@roos-code/roos-code-subprocess'
+} from '@shres-code/shres-code-subprocess'
 import {
   claudeSpawnSpec,
   ManagedClaudeCodeProcess,

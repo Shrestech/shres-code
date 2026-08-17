@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import SessionStore from '@roos-code/roos-code-session'
-import type { SessionEvent } from '@roos-code/roos-code-session'
-import SessionProjectionRegistry from '@roos-code/roos-code-session-projection'
+import { Context } from '@shres-code/cordis'
+import SessionStore from '@shres-code/shres-code-session'
+import type { SessionEvent } from '@shres-code/shres-code-session'
+import SessionProjectionRegistry from '@shres-code/shres-code-session-projection'
 import SubagentRuntime from '../src/index.ts'
 import { subagentTimingProjectionDefinition } from '../src/projection.ts'
 

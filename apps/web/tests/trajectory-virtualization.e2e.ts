@@ -8,8 +8,8 @@ import { join } from 'node:path'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
-import type { StreamChunk } from '@roos-code/roos-code-llm'
-import type { ReplayEntry } from '@roos-code/roos-code-llm-replay'
+import type { StreamChunk } from '@shres-code/shres-code-llm'
+import type { ReplayEntry } from '@shres-code/shres-code-llm-replay'
 import { createChatScrollFixture } from './chat-scroll-fixture.ts'
 import {
   captureStableAria,
@@ -179,7 +179,7 @@ describe('web e2e: Trajectory virtualization over tail-paged history', () => {
   let replayDir: string
 
   beforeAll(async () => {
-    replayDir = await mkdtemp(join(tmpdir(), 'roos-trajectory-virtualization-'))
+    replayDir = await mkdtemp(join(tmpdir(), 'shres-trajectory-virtualization-'))
     const replayFixture = join(replayDir, 'session.jsonl')
     const replayOverride = join(replayDir, 'replay.override.json')
     await writeFile(replayFixture, FIXTURE.log)

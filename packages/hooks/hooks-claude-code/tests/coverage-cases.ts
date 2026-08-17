@@ -1,20 +1,20 @@
-import { createUserMessage } from '@roos-code/roos-code-llm'
+import { createUserMessage } from '@shres-code/shres-code-llm'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, rmSync, writeFileSync, chmodSync, existsSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { Context } from '@roos-code/cordis'
-import { SessionId, type SessionEvent } from '@roos-code/roos-code-session'
-import JsonlSessionPersistence from '@roos-code/roos-code-session-persistence-jsonl'
-import { defineContentToolFixture } from '@roos-code/roos-code-tools'
-import type { Agent } from '@roos-code/roos-code-agent'
-import AgentLoop from '@roos-code/roos-code-agent-loop'
-import { mountAgentLoopTestDependencies } from '@roos-code/roos-code-agent-loop-testkit'
-import { LocalBashExecutor } from '@roos-code/roos-code-bash-local'
-import LocalSubprocessRuntime from '@roos-code/roos-code-subprocess-local'
-import { scopeTarget } from '@roos-code/roos-code-scope'
-import SubagentRuntime, { SubagentRunId } from '@roos-code/roos-code-subagent'
-import * as HooksClaude from '@roos-code/roos-code-hooks-claude-code'
+import { Context } from '@shres-code/cordis'
+import { SessionId, type SessionEvent } from '@shres-code/shres-code-session'
+import JsonlSessionPersistence from '@shres-code/shres-code-session-persistence-jsonl'
+import { defineContentToolFixture } from '@shres-code/shres-code-tools'
+import type { Agent } from '@shres-code/shres-code-agent'
+import AgentLoop from '@shres-code/shres-code-agent-loop'
+import { mountAgentLoopTestDependencies } from '@shres-code/shres-code-agent-loop-testkit'
+import { LocalBashExecutor } from '@shres-code/shres-code-bash-local'
+import LocalSubprocessRuntime from '@shres-code/shres-code-subprocess-local'
+import { scopeTarget } from '@shres-code/shres-code-scope'
+import SubagentRuntime, { SubagentRunId } from '@shres-code/shres-code-subagent'
+import * as HooksClaude from '@shres-code/shres-code-hooks-claude-code'
 import { MockAdapter, textResponse, toolCallResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
 
 const testToolSignal = new AbortController().signal
@@ -29,7 +29,7 @@ function subagentCarrier(ctx: Context) {
   return scopeTarget(ctx as unknown as SubagentRuntime, undefined)
 }
 
-function dir(): string { const d = mkdtempSync(join(tmpdir(), 'roos-hc-cov-')); dirs.push(d); return d }
+function dir(): string { const d = mkdtempSync(join(tmpdir(), 'shres-hc-cov-')); dirs.push(d); return d }
 function sh(d: string, name: string, body: string): string {
   const p = join(d, name); writeFileSync(p, body); chmodSync(p, 0o755); return p
 }
@@ -153,7 +153,7 @@ export function defineCoverageCases(group: CoverageGroup): void {
       const ctx = await harness(path, new MockAdapter([]))
       let ran = false
       ctx.tools.register(defineContentToolFixture({ name: 'echo', description: 'e', parameters: {}, async execute() { ran = true; return [{ type: 'text', text: 'x' }] } }))
-      const { CallId } = await import('@roos-code/roos-code-llm')
+      const { CallId } = await import('@shres-code/shres-code-llm')
       const result = await ctx.tools.execute({ signal: testToolSignal, callId: CallId('c1'), name: 'echo', arguments: {} })
       expect(ran).toBe(false)
       expect(result.isError).toBe(true)
@@ -479,7 +479,7 @@ export function defineCoverageCases(group: CoverageGroup): void {
       const adapter = new MockAdapter([textResponse('ran')])
       const ctx = await harness(path, adapter) // NB: no projectDir
       // The factory create() path honors meta.cwd (the plain agentLoop.create() does not).
-      const { SessionId } = await import('@roos-code/roos-code-session')
+      const { SessionId } = await import('@shres-code/shres-code-session')
       const handle = await ctx.agents.create({ sessionId: SessionId('s1'), meta: { cwd: workspace }, agentOptions: { provider: 'mock', model: 'mock' } })
       handle.agent.followup(createUserMessage({ content: [{ type: 'text', text: 'go' }], source: { kind: 'user' } }))
       await waitForIdle(ctx, handle.agent)
@@ -675,7 +675,7 @@ export function defineCoverageCases(group: CoverageGroup): void {
       ctx.llm.registerAdapter(['mock'], adapter)
       ctx.tools.register(defineContentToolFixture({ name: 'echo', description: 'e', parameters: {}, async execute() { return [{ type: 'text', text: 'ok' }] } }))
 
-      const { SessionId } = await import('@roos-code/roos-code-session')
+      const { SessionId } = await import('@shres-code/shres-code-session')
       const handle = await ctx.agents.create({ sessionId: SessionId('s1'), meta: { cwd: sessionDir }, agentOptions: { provider: 'mock', model: 'mock' } })
       handle.agent.followup(createUserMessage({ content: [{ type: 'text', text: 'go' }], source: { kind: 'user' } }))
       await waitForIdle(ctx, handle.agent)
@@ -703,7 +703,7 @@ export function defineCoverageCases(group: CoverageGroup): void {
       await ctx.plugin(HooksClaude, { configPath: join(serverDir, 'hooks.json') })
       ctx.llm.registerAdapter(['mock'], new MockAdapter([]))
 
-      const { SessionId } = await import('@roos-code/roos-code-session')
+      const { SessionId } = await import('@shres-code/shres-code-session')
       const childHandle = await ctx.agents.create({ sessionId: SessionId('child-stop-session'), meta: { cwd: childDir }, agentOptions: { provider: 'mock', model: 'mock' } })
       const runId = SubagentRunId('run-stop')
       const identity = { runId, provider: 'inproc', id: childHandle.agent.id, local: true }

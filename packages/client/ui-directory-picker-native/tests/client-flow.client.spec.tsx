@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { describe, expect, it, vi } from 'vitest'
 import { act, cleanup, render } from '@testing-library/react'
 import { afterEach } from 'vitest'
-import { SlotRegistry } from '@roos-code/roos-code-client-runtime/client'
-import type { DirectoryFlowOwnerProps } from '@roos-code/roos-code-client-ui-workspace/client'
+import { SlotRegistry } from '@shres-code/shres-code-client-runtime/client'
+import type { DirectoryFlowOwnerProps } from '@shres-code/shres-code-client-ui-workspace/client'
 import { apply, inject } from '../src/client/index.ts'
 import { NativeDirectoryFlow } from '../src/client/flow.ts'
 import { apply as nodeApply } from '../src/index.ts'

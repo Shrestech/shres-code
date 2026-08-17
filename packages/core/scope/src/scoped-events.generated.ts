@@ -1,8 +1,8 @@
 /**
- * Generated scoped-event routing-subject resolvers for roos-scope invariants.
+ * Generated scoped-event routing-subject resolvers for shres-scope invariants.
  * Do not edit by hand; run `pnpm run gen-scoped-events`.
  *
- * @module @roos-code/roos-code-scope/scoped-events.generated
+ * @module @shres-code/shres-code-scope/scoped-events.generated
  */
 
 type ScopedSubjectResolver = (args: readonly unknown[]) => unknown

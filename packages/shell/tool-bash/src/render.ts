@@ -1,12 +1,12 @@
 /**
  * Model-facing result rendering for the bash tool.
  *
- * @module @roos-code/roos-code-tool-bash/render
+ * @module @shres-code/shres-code-tool-bash/render
  */
 
-import type { ShellProcessRead, ShellRunResult, ShellSandboxInfo, CollectedOutput } from '@roos-code/roos-code-shell'
-import type { SandboxMode } from '@roos-code/roos-code-sandbox'
-import { escalationHintMarker, sandboxDenialMarker } from '@roos-code/roos-code-sandbox'
+import type { ShellProcessRead, ShellRunResult, ShellSandboxInfo, CollectedOutput } from '@shres-code/shres-code-shell'
+import type { SandboxMode } from '@shres-code/shres-code-sandbox'
+import { escalationHintMarker, sandboxDenialMarker } from '@shres-code/shres-code-sandbox'
 
 /** Append the truncation notice (with the full-output spill path) to a stream's text. */
 function streamText(output: CollectedOutput): string {
@@ -96,8 +96,8 @@ export function renderProcessRead(
 
 /**
  * The exit-status parse is the shared marker-contract half of the shell-tool
- * rendering story, owned by `@roos-code/roos-code-shell` so `roos-tool-pwsh` reuses
+ * rendering story, owned by `@shres-code/shres-code-shell` so `shres-tool-pwsh` reuses
  * it (its renderer emits the same markers). Re-exported here to keep
  * `../src/render.ts` a single import root for bash-tool consumers.
  */
-export { parseExitStatus, type ParsedExitStatus } from '@roos-code/roos-code-shell'
+export { parseExitStatus, type ParsedExitStatus } from '@shres-code/shres-code-shell'

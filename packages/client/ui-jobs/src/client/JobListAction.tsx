@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
-import type { JobView } from '@roos-code/roos-code-client-runtime/client'
-import { IconChevronDownOutline14, StateDot, type StateDotState } from '@roos-code/roos-code-client-ui-primitives'
-import type { PropsLocale, PropsRuntime, TranslateNS } from '@roos-code/roos-code-client-ui-slots'
+import type { JobView } from '@shres-code/shres-code-client-runtime/client'
+import { IconChevronDownOutline14, StateDot, type StateDotState } from '@shres-code/shres-code-client-ui-primitives'
+import type { PropsLocale, PropsRuntime, TranslateNS } from '@shres-code/shres-code-client-ui-slots'
 import { NS } from './locales.ts'
-import type {} from '@roos-code/roos-code-client-ui-conversation/client'
+import type {} from '@shres-code/shres-code-client-ui-conversation/client'
 import css from './JobListAction.module.css'
 
 /** Full props for the session-header background-job action. */

@@ -4,10 +4,10 @@
  * projection, and snapshot reference stability.
  */
 import { describe, expect, it } from 'vitest'
-import { createUserMessage } from '@roos-code/roos-code-llm'
-import type { ContentBlock, UserMessage } from '@roos-code/roos-code-llm/types'
-import type { SessionEvent } from '@roos-code/roos-code-session/types'
-import type { MessageId, MuxFrame, RpcId, SessionId } from '@roos-code/roos-code-api-remotes/client'
+import { createUserMessage } from '@shres-code/shres-code-llm'
+import type { ContentBlock, UserMessage } from '@shres-code/shres-code-llm/types'
+import type { SessionEvent } from '@shres-code/shres-code-session/types'
+import type { MessageId, MuxFrame, RpcId, SessionId } from '@shres-code/shres-code-api-remotes/client'
 import { Session } from '../src/client/sessions/session.ts'
 import { SessionManager } from '../src/client/sessions/manager.ts'
 import { FakeApiClient, fakeRemote } from './fake-api.client.ts'

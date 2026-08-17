@@ -2,21 +2,21 @@ import { existsSync, mkdirSync, mkdtempSync, realpathSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import AgentRegistry, { Inbox } from '@roos-code/roos-code-agent'
-import type { Agent, AgentFactory } from '@roos-code/roos-code-agent'
-import SessionStore, { SessionId } from '@roos-code/roos-code-session'
-import type { Session } from '@roos-code/roos-code-session'
-import Storage from '@roos-code/roos-code-storage'
-import { DomainFacility } from '@roos-code/roos-code-storage-domain'
-import UserQuestionService from '@roos-code/roos-code-user-questions'
-import { DirectoryPickerError } from '@roos-code/roos-code-host-directory-picker'
-import type { DirectoryPickerCapability } from '@roos-code/roos-code-host-directory-picker'
-import WorkspaceRegistry from '@roos-code/roos-code-workspace'
-import type { HostFrame, WorkspaceId } from '@roos-code/roos-code-host-apiproxy/api'
-import type { RpcRequest, RpcResponse } from '@roos-code/roos-code-host-apiproxy/api/rpc'
-import { RpcId } from '@roos-code/roos-code-host-apiproxy/api/rpc'
-import { createApiProxy } from '@roos-code/roos-code-host-apiproxy'
+import { Context } from '@shres-code/cordis'
+import AgentRegistry, { Inbox } from '@shres-code/shres-code-agent'
+import type { Agent, AgentFactory } from '@shres-code/shres-code-agent'
+import SessionStore, { SessionId } from '@shres-code/shres-code-session'
+import type { Session } from '@shres-code/shres-code-session'
+import Storage from '@shres-code/shres-code-storage'
+import { DomainFacility } from '@shres-code/shres-code-storage-domain'
+import UserQuestionService from '@shres-code/shres-code-user-questions'
+import { DirectoryPickerError } from '@shres-code/shres-code-host-directory-picker'
+import type { DirectoryPickerCapability } from '@shres-code/shres-code-host-directory-picker'
+import WorkspaceRegistry from '@shres-code/shres-code-workspace'
+import type { HostFrame, WorkspaceId } from '@shres-code/shres-code-host-apiproxy/api'
+import type { RpcRequest, RpcResponse } from '@shres-code/shres-code-host-apiproxy/api/rpc'
+import { RpcId } from '@shres-code/shres-code-host-apiproxy/api/rpc'
+import { createApiProxy } from '@shres-code/shres-code-host-apiproxy'
 import { MemoryStorageBackend } from '../../../storage/storage-domain/tests/helpers/memory-backend.ts'
 
 let nextRpc = 1
@@ -59,7 +59,7 @@ function stubAgent(session: Session): Agent {
 
 /** Compose the API over real Session, Agent, Storage, Domain, and Workspace services. */
 async function harness(
-  root = realpathSync.native(mkdtempSync(join(tmpdir(), 'roos-apiproxy-workspace-'))),
+  root = realpathSync.native(mkdtempSync(join(tmpdir(), 'shres-apiproxy-workspace-'))),
   picker: DirectoryPickerCapability = { kind: 'native', pick: async () => null },
   extras: {
     openPath?: (path: string, signal: AbortSignal) => Promise<void>

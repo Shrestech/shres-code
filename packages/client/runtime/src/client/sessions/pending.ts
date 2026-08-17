@@ -4,7 +4,7 @@
 
 import type {
   ClientResponse, MuxFrame, RpcId, RpcReceipt, SessionId,
-} from '@roos-code/roos-code-api-remotes/client'
+} from '@shres-code/shres-code-api-remotes/client'
 
 /** Kind-keyed payload map: the requested frame's domain fields (envelope fields stripped). */
 export interface PendingPayloads {

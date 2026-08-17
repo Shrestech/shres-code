@@ -8,20 +8,20 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import AgentRegistry from '@roos-code/roos-code-agent'
-import type { Agent } from '@roos-code/roos-code-agent'
-import SessionStore from '@roos-code/roos-code-session'
-import type { Session } from '@roos-code/roos-code-session'
-import UserQuestionService from '@roos-code/roos-code-user-questions'
-import { CommandId } from '@roos-code/roos-code-commands/brand'
+import { Context } from '@shres-code/cordis'
+import AgentRegistry from '@shres-code/shres-code-agent'
+import type { Agent } from '@shres-code/shres-code-agent'
+import SessionStore from '@shres-code/shres-code-session'
+import type { Session } from '@shres-code/shres-code-session'
+import UserQuestionService from '@shres-code/shres-code-user-questions'
+import { CommandId } from '@shres-code/shres-code-commands/brand'
 // Side-effect type imports: the knob-event SessionEventMap merges.
-import type {} from '@roos-code/roos-code-permission-presets'
-import type {} from '@roos-code/roos-code-sandbox-policy'
-import type {} from '@roos-code/roos-code-user-approval'
-import type { ApiProxy, RpcRequest } from '@roos-code/roos-code-host-apiproxy/api'
-import { RpcId } from '@roos-code/roos-code-host-apiproxy/api/rpc'
-import { createApiProxy } from '@roos-code/roos-code-host-apiproxy'
+import type {} from '@shres-code/shres-code-permission-presets'
+import type {} from '@shres-code/shres-code-sandbox-policy'
+import type {} from '@shres-code/shres-code-user-approval'
+import type { ApiProxy, RpcRequest } from '@shres-code/shres-code-host-apiproxy/api'
+import { RpcId } from '@shres-code/shres-code-host-apiproxy/api/rpc'
+import { createApiProxy } from '@shres-code/shres-code-host-apiproxy'
 
 let nextRpc = 1
 function request<P>(payload: P): RpcRequest<P> {

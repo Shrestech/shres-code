@@ -7,7 +7,7 @@ Status: implemented
 
 `renderSkillContent` embedded the skill body verbatim between `<skill_instructions>` and `</skill_content>`. A body that spelled those closing tags ended the wrapper early and could inject following markup as if the harness had written it.
 
-Not every skill is equally trusted. `bundled` and `user-*` skills come from the operator's install or home directory. `project-roos` and `project-agents` skills come from `<projectRoot>/.roos/skills` and `<projectRoot>/.agents/skills` — files in a checkout that another author can change. Those bodies can carry instructions, permission claims, or tool-shaped requests the current user did not write. The catalog already stays summary-only; the full body reaches the model through the `skill` tool result and the user-explicit `/name` injection, both of which share `renderSkillContent`.
+Not every skill is equally trusted. `bundled` and `user-*` skills come from the operator's install or home directory. `project-shres` and `project-agents` skills come from `<projectRoot>/.shres/skills` and `<projectRoot>/.agents/skills` — files in a checkout that another author can change. Those bodies can carry instructions, permission claims, or tool-shaped requests the current user did not write. The catalog already stays summary-only; the full body reaches the model through the `skill` tool result and the user-explicit `/name` injection, both of which share `renderSkillContent`.
 
 ## Decision
 
@@ -34,7 +34,7 @@ The catalog is unchanged: it still publishes `name` and description only.
 
 ## Consequences
 
-- Project skill renders grow by the header inside `<skill_content>`, and every `<` in those bodies becomes `\u003c`. Snapshots that load a `project-*` skill (ACP `skill-load`, the web skill-tool row, the agent-spine hot-skill path) carry those bytes. Bundled skill renders such as `roos-badge` stay byte-identical except for the new structured `source` field.
+- Project skill renders grow by the header inside `<skill_content>`, and every `<` in those bodies becomes `\u003c`. Snapshots that load a `project-*` skill (ACP `skill-load`, the web skill-tool row, the agent-spine hot-skill path) carry those bytes. Bundled skill renders such as `shres-badge` stay byte-identical except for the new structured `source` field.
 - A trusted body that mentioned the close-tag family now shows `\u003c/skill_content>` / `\u003c/skill_instructions>` (and case or spacing variants) inside the still-closed wrapper.
 - The catalog template and replacement lifecycle do not mention trust. A later catalog change is not required when only the body-render rule changes.
 - A new remote provider is untrusted until it is added to the trusted allowlist.

@@ -1,21 +1,21 @@
 # Keyless context-overflow composition for the assembled compaction snapshot.
 - id: base
-  name: '@roos-code/cordis-plugin-include'
+  name: '@shres-code/cordis-plugin-include'
   config:
     path: ./cordis.yml
     patches:
       - id: llm-deepseek
-        name: '@roos-code/roos-code-llm-deepseek'
+        name: '@shres-code/shres-code-llm-deepseek'
         disabled: true
       - id: compaction-basic
-        name: '@roos-code/roos-code-compaction-basic'
+        name: '@shres-code/shres-code-compaction-basic'
         config:
           thresholdRatio: 0.99
           retainTokens: 20
           maxTokens: 32
       - insert:
           - id: llm-replay
-            name: '@roos-code/roos-code-llm-replay'
+            name: '@shres-code/shres-code-llm-replay'
             config:
               providers:
                 - id: deepseek-official

@@ -1,13 +1,13 @@
 {
-  "name": "@roos-code/roos-code-llm-retry",
-  "description": "Provider-routed LLM request retry policy for the Roos Code",
+  "name": "@shres-code/shres-code-llm-retry",
+  "description": "Provider-routed LLM request retry policy for the Shres Code",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "packages/llm/llm-retry"
   },
   "type": "module",
@@ -36,34 +36,34 @@
   ],
   "license": "MIT",
   "peerDependencies": {
-    "@roos-code/roos-code-brand": "workspace:^",
-    "@roos-code/roos-code-agent": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-llm": "workspace:^",
-    "@roos-code/roos-code-session": "workspace:^",
-    "@roos-code/roos-code-timeout": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-brand": "workspace:^",
+    "@shres-code/shres-code-agent": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-timeout": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   },
   "dependencies": {
-    "@roos-code/schemastery": "workspace:^"
+    "@shres-code/schemastery": "workspace:^"
   },
   "devDependencies": {
-    "@roos-code/roos-code-brand": "workspace:^",
-    "@roos-code/cordis-plugin-include": "workspace:^",
-    "@roos-code/cordis-plugin-loader": "workspace:^",
-    "@roos-code/roos-code-agent": "workspace:^",
-    "@roos-code/roos-code-agent-loop": "workspace:^",
-    "@roos-code/roos-code-agent-loop-testkit": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-llm": "workspace:^",
-    "@roos-code/roos-code-llm-deepseek": "workspace:^",
-    "@roos-code/roos-code-llm-mock-server": "workspace:^",
-    "@roos-code/roos-code-session": "workspace:^",
-    "@roos-code/roos-code-session-persistence-jsonl": "workspace:^",
-    "@roos-code/roos-code-session-persistence-sqlite": "workspace:^",
-    "@roos-code/roos-code-system-prompt": "workspace:^",
-    "@roos-code/roos-code-timeout": "workspace:^",
-    "@roos-code/roos-code-tools": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-brand": "workspace:^",
+    "@shres-code/cordis-plugin-include": "workspace:^",
+    "@shres-code/cordis-plugin-loader": "workspace:^",
+    "@shres-code/shres-code-agent": "workspace:^",
+    "@shres-code/shres-code-agent-loop": "workspace:^",
+    "@shres-code/shres-code-agent-loop-testkit": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-llm-deepseek": "workspace:^",
+    "@shres-code/shres-code-llm-mock-server": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-session-persistence-jsonl": "workspace:^",
+    "@shres-code/shres-code-session-persistence-sqlite": "workspace:^",
+    "@shres-code/shres-code-system-prompt": "workspace:^",
+    "@shres-code/shres-code-timeout": "workspace:^",
+    "@shres-code/shres-code-tools": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   }
 }

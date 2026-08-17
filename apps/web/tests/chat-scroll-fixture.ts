@@ -7,14 +7,14 @@ import {
   createAssistantMessage,
   createToolResultMessage,
   createUserMessage,
-} from '@roos-code/roos-code-llm'
+} from '@shres-code/shres-code-llm'
 import {
   SESSION_FORMAT_VERSION,
   Session,
   SessionId,
-} from '@roos-code/roos-code-session'
+} from '@shres-code/shres-code-session'
 // Carries the session/title event declaration into this fixture builder.
-import type {} from '@roos-code/roos-code-session-title'
+import type {} from '@shres-code/shres-code-session-title'
 
 /** Options for one deterministic long-chat fixture. */
 export interface ChatScrollFixtureOptions {

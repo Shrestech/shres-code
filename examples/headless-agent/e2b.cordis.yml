@@ -8,41 +8,41 @@
 # falls back to /home/user/workspace while Bash and PTY keep targeting the
 # host path, so every tool call fails with a remote spawn error.
 - id: base
-  name: '@roos-code/cordis-plugin-include'
+  name: '@shres-code/cordis-plugin-include'
   config:
     path: ./advanced.cordis.yml
     patches:
       - id: subprocess
-        name: '@roos-code/roos-code-subprocess-local'
+        name: '@shres-code/shres-code-subprocess-local'
         disabled: true
       - id: fs-local
-        name: '@roos-code/roos-code-fs-local'
+        name: '@shres-code/shres-code-fs-local'
         disabled: true
       - insert:
           - id: e2b
-            name: '@roos-code/roos-code-e2b'
+            name: '@shres-code/shres-code-e2b'
             config:
               cwd: !!js process.cwd()
               timeoutMs: 300000
           - id: subprocess-e2b
-            name: '@roos-code/roos-code-subprocess-e2b'
+            name: '@shres-code/shres-code-subprocess-e2b'
           - id: fs-e2b
-            name: '@roos-code/roos-code-fs-e2b'
+            name: '@shres-code/shres-code-fs-e2b'
           - id: sandbox-policy
-            name: '@roos-code/roos-code-sandbox-policy'
+            name: '@shres-code/shres-code-sandbox-policy'
             config:
               mode: danger-full-access
               workspaceRoot: !!js process.cwd()
           - id: pty
-            name: '@roos-code/roos-code-terminal'
+            name: '@shres-code/shres-code-terminal'
           - id: terminal-bash
-            name: '@roos-code/roos-code-terminal-bash'
+            name: '@shres-code/shres-code-terminal-bash'
           - id: tool-terminal
-            name: '@roos-code/roos-code-tool-terminal'
+            name: '@shres-code/shres-code-tool-terminal'
           - id: lsp
-            name: '@roos-code/roos-code-lsp'
+            name: '@shres-code/shres-code-lsp'
           - id: lsp-stdio
-            name: '@roos-code/roos-code-lsp-stdio'
+            name: '@shres-code/shres-code-lsp-stdio'
             config:
               servers:
                 typescript:
@@ -54,4 +54,4 @@
                     .js: javascript
                     .jsx: javascriptreact
           - id: tool-lsp
-            name: '@roos-code/roos-code-tool-lsp'
+            name: '@shres-code/shres-code-tool-lsp'

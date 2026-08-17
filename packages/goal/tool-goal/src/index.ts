@@ -1,17 +1,17 @@
 /**
  * Model-facing `get_goal`, `create_goal`, and `update_goal` tools over the
  * persisted same-session goal domain.
- * @module @roos-code/roos-code-tool-goal
+ * @module @shres-code/shres-code-tool-goal
  */
 
-import type { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import { GoalId } from '@roos-code/roos-code-goal'
-import type { GoalRef, GoalView } from '@roos-code/roos-code-goal'
-import { boundContextSummary, createUserMessage, HarnessError } from '@roos-code/roos-code-llm'
-import { defineTool } from '@roos-code/roos-code-tools'
-import type { GenericCallView } from '@roos-code/roos-code-tools'
-import type {} from '@roos-code/roos-code-system-prompt'
+import type { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import { GoalId } from '@shres-code/shres-code-goal'
+import type { GoalRef, GoalView } from '@shres-code/shres-code-goal'
+import { boundContextSummary, createUserMessage, HarnessError } from '@shres-code/shres-code-llm'
+import { defineTool } from '@shres-code/shres-code-tools'
+import type { GenericCallView } from '@shres-code/shres-code-tools'
+import type {} from '@shres-code/shres-code-system-prompt'
 import {
   completionAuthority,
   goalToolExecution,

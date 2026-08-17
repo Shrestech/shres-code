@@ -8,10 +8,10 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { Context } from '@roos-code/cordis'
-import Loader from '@roos-code/cordis-plugin-loader'
-import Include from '@roos-code/cordis-plugin-include'
-import { internals, provideCmdline } from '@roos-code/roos-code-cmdline'
+import { Context } from '@shres-code/cordis'
+import Loader from '@shres-code/cordis-plugin-loader'
+import Include from '@shres-code/cordis-plugin-include'
+import { internals, provideCmdline } from '@shres-code/shres-code-cmdline'
 import { afterEach, describe, expect, it } from 'vitest'
 import { apply, HEADLESS_STARTUP_SERVICE, type HeadlessStartupValues } from '../src/startup.ts'
 
@@ -36,7 +36,7 @@ afterEach(async () => {
  * @returns the resolved service value and observed runner/process effects.
  */
 async function bootStartup(args: string[]): Promise<{ task: HeadlessStartupValues | undefined; observed: Observed }> {
-  const dir = mkdtempSync(join(tmpdir(), 'roos-headless-startup-'))
+  const dir = mkdtempSync(join(tmpdir(), 'shres-headless-startup-'))
   const observed: Observed = { exits: [], out: '' }
   writeFileSync(join(dir, 'row.mjs'), 'export function apply(_ctx, config) { globalThis.__headlessStartupObserved.runnerConfig = config }\n')
   // Loader imports through Node's resolver, so this fixture delegates to the
@@ -98,7 +98,7 @@ describe('headless command-line provider', () => {
 
   it('prints its own help and leaves the runner pending', async () => {
     const { task, observed } = await bootStartup(['--help'])
-    expect(observed.out).toContain('roos --profile headless')
+    expect(observed.out).toContain('shres --profile headless')
     expect(task).toBeUndefined()
     expect(observed.runnerConfig).toBeUndefined()
     expect(observed.exits).toEqual([0])

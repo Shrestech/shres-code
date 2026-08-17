@@ -2,31 +2,31 @@
 # compose across includes, so this applies the scenario config and model swap
 # directly to the live tree.
 - id: base
-  name: '@roos-code/cordis-plugin-include'
+  name: '@shres-code/cordis-plugin-include'
   config:
     path: ./cordis.yml
     patches:
       - id: llm-deepseek
-        name: '@roos-code/roos-code-llm-deepseek'
+        name: '@shres-code/shres-code-llm-deepseek'
         disabled: true
       - id: acp-agent
-        name: '@roos-code/roos-code-acp-demo'
+        name: '@shres-code/shres-code-acp-demo'
         config:
           provider: deepseek-official
           model: deepseek-v4-flash
-          persistenceRoot: !!js process.env.ROOS_SNAPSHOT_SESSIONS_ROOT ?? './.sessions'
+          persistenceRoot: !!js process.env.SHRES_SNAPSHOT_SESSIONS_ROOT ?? './.sessions'
           persistenceCompression: 'none'
           workspaceContext:
             maxBytes: 65536
-            roosHome: !!js process.cwd() + '/.roos'
+            shresHome: !!js process.cwd() + '/.shres'
             projectRootMarkers:
-              - .roos-project
+              - .shres-project
           persona: |
             You are a coding assistant powered by the {{model}} model. Your working directory is {{cwd}}.
 
             Verify your work by running the code or tests. Keep answers brief and factual.
       - insert:
           - id: llm-replay
-            name: '@roos-code/roos-code-llm-replay'
+            name: '@shres-code/shres-code-llm-replay'
           - id: workspace-context-compaction
             name: './tests/fixtures/workspace-context-compaction.ts'

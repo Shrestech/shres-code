@@ -11,18 +11,18 @@
  * process. One row per composition, not one per session.
  *
  * A code mode needs a TypeScript code runtime, which is a host-plane service
- * ([`roos-code-runtime-worker-thread`](../../code-runtime/code-runtime-worker/README.md)).
+ * ([`shres-code-runtime-worker-thread`](../../code-runtime/code-runtime-worker/README.md)).
  * This row therefore waits for it rather than assuming it: a preset selecting
  * Code Mode against a deployment that composes no runtime fails at mount, named
  * in the preset's own activation audit, instead of at the first prompt.
- * @module @roos-code/roos-code-agent-tool-presentation
+ * @module @shres-code/shres-code-agent-tool-presentation
  */
 
-import type { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import type { ToolPresentationMode } from '@roos-code/roos-code-tools'
+import type { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import type { ToolPresentationMode } from '@shres-code/shres-code-tools'
 // Type-only: brings the `ctx.tools` Context merge into this program.
-import type {} from '@roos-code/roos-code-tools'
+import type {} from '@shres-code/shres-code-tools'
 
 /** Cordis plugin name. */
 export const name = 'tool-presentation'
@@ -65,7 +65,7 @@ export function apply(ctx: Context, config: Config): void {
     return
   }
   // The wait is the loud failure: an entry still pending on `codeRuntime` is
-  // what `roos-agent-presets` reports as an unusable row, naming this id.
+  // what `shres-agent-presets` reports as an unusable row, naming this id.
   ctx.inject(['codeRuntime'], (runtimeCtx: Context) => {
     runtimeCtx.tools.presentAs(config.mode)
   })

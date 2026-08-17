@@ -10,8 +10,8 @@
  */
 import { describe, expect, it } from 'vitest'
 import { act, render } from '@testing-library/react'
-import type { SessionMaybeProvideInfo, StoredEntry } from '@roos-code/roos-code-client-ui-slots'
-import { createSlotRenderer, type SlotRendererHost } from '@roos-code/roos-code-client-web-react'
+import type { SessionMaybeProvideInfo, StoredEntry } from '@shres-code/shres-code-client-ui-slots'
+import { createSlotRenderer, type SlotRendererHost } from '@shres-code/shres-code-client-web-react'
 
 function observable<T>(initial: T) {
   let value = initial

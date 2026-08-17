@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { bindScopeParent, createScope, scopeOf } from '@roos-code/roos-code-scope'
-import { UNTRUSTED_INSTRUCTION_DISCLAIMER, UNTRUSTED_LT_ESCAPE } from '@roos-code/roos-code-untrusted-frame'
+import { Context } from '@shres-code/cordis'
+import { bindScopeParent, createScope, scopeOf } from '@shres-code/shres-code-scope'
+import { UNTRUSTED_INSTRUCTION_DISCLAIMER, UNTRUSTED_LT_ESCAPE } from '@shres-code/shres-code-untrusted-frame'
 import SkillRegistry, {
   isModelInvocable,
   isUserInvocable,
@@ -12,7 +12,7 @@ import SkillRegistry, {
   type SkillLookupOptions,
   type SkillProvider,
   type SkillProviderObservation,
-} from '@roos-code/roos-code-skill'
+} from '@shres-code/shres-code-skill'
 
 function memorySkill(name: string, description: string, rank: number, body = `${name} body.`): SkillCandidate {
   return {
@@ -1116,7 +1116,7 @@ describe('renderSkillContent', () => {
   })
 
   it('wraps untrusted instruction bodies and escapes every <', () => {
-    for (const source of ['project-roos', 'project-agents', 'marketplace'] as const) {
+    for (const source of ['project-shres', 'project-agents', 'marketplace'] as const) {
       const text = renderSkillContent({
         name: 'proj',
         source,
@@ -1133,7 +1133,7 @@ describe('renderSkillContent', () => {
   })
 
   it('keeps bundled, user-*, runtime, and custom sources as trusted local content', () => {
-    for (const source of ['bundled', 'user-roos', 'user-agents', 'runtime', 'custom'] as const) {
+    for (const source of ['bundled', 'user-shres', 'user-agents', 'runtime', 'custom'] as const) {
       const text = renderSkillContent({
         name: 'local',
         source,

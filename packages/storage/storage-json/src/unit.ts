@@ -4,12 +4,12 @@
  * NOT queued here — per the backend contract, write ordering belongs to the
  * caller (the domain layer's write chain); this unit only guarantees that
  * each single call publishes a complete, durable file.
- * @module @roos-code/roos-code-storage-json/src/unit
+ * @module @shres-code/shres-code-storage-json/src/unit
  */
 
 import { readFile } from 'node:fs/promises'
-import { StorageError } from '@roos-code/roos-code-storage'
-import type { KvUnit, KvUnitDescriptor } from '@roos-code/roos-code-storage'
+import { StorageError } from '@shres-code/shres-code-storage'
+import type { KvUnit, KvUnitDescriptor } from '@shres-code/shres-code-storage'
 import { writeAtomic } from './atomic.ts'
 import { parse, serialize } from './format.ts'
 import type { UnitState } from './format.ts'

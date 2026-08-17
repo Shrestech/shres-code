@@ -6,14 +6,14 @@
  * session's workspace), the never-reject result settlement, and the standard
  * run-handle publication. Backends compose these with their own wire drivers;
  * the process machinery itself (spawn, env scrub, tree-scoped teardown)
- * belongs to the `roos-subprocess` seam.
+ * belongs to the `shres-subprocess` seam.
  *
- * @module @roos-code/roos-code-subagent/out-of-process
+ * @module @shres-code/shres-code-subagent/out-of-process
  */
 
 import { accessSync, constants, statSync } from 'node:fs'
 import { isAbsolute, resolve } from 'node:path'
-import type { ContentBlock } from '@roos-code/roos-code-llm'
+import type { ContentBlock } from '@shres-code/shres-code-llm'
 import type { SubagentCapabilities, SubagentResult, SubagentRun, SubagentStopReason } from './types.ts'
 
 /**

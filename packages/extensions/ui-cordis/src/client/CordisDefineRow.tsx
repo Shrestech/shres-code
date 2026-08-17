@@ -3,9 +3,9 @@
 import { useId, useState, type ReactNode } from 'react'
 import {
   CodeBlock, DisclosureRow, IconCodeOutline16, IconInspectOutline12, StateDot,
-} from '@roos-code/roos-code-client-ui-primitives'
-import type { InjectFace, PropsLocale } from '@roos-code/roos-code-client-ui-slots'
-import type { ToolCallViewProps } from '@roos-code/roos-code-client-ui-tool/client'
+} from '@shres-code/shres-code-client-ui-primitives'
+import type { InjectFace, PropsLocale } from '@shres-code/shres-code-client-ui-slots'
+import type { ToolCallViewProps } from '@shres-code/shres-code-client-ui-tool/client'
 import { cordisDefineCard, type CordisToolState } from './card-model.ts'
 import type { CordisCardFace } from './slots.ts'
 import { cordisVisibleStatus, type CordisVisibleStatus } from './status.ts'

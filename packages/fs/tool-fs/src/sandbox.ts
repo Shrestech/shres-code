@@ -3,19 +3,19 @@
  * resolution for reads, the advertised escalation fields and one-approved
  * wider retry for writes/edits, and the denial-marker mapping — all
  * delegating the vocabulary and the fail-closed approval sequence to
- * `@roos-code/roos-code-sandbox` (the same pieces `@roos-code/roos-code-tool-bash`
+ * `@shres-code/shres-code-sandbox` (the same pieces `@shres-code/shres-code-tool-bash`
  * uses). Built ONCE per plugin from `ctx.fs.sandboxMode` (the capability
  * fact — is a confining backend mounted?) and shared by every fenced tool.
  *
- * @module @roos-code/roos-code-tool-fs/sandbox
+ * @module @shres-code/shres-code-tool-fs/sandbox
  */
 
-import type { Context } from '@roos-code/cordis'
-import type { ToolExecution } from '@roos-code/roos-code-tools'
-import type { SandboxExecutionPolicy, SandboxMode } from '@roos-code/roos-code-sandbox'
-import { ESCALATION_TARGETS, approveEscalation, escalationHintMarker, sandboxDenialMarker, validateEscalationArgs } from '@roos-code/roos-code-sandbox'
-import type { SandboxPolicyService } from '@roos-code/roos-code-sandbox-policy'
-import { FsError } from '@roos-code/roos-code-fs'
+import type { Context } from '@shres-code/cordis'
+import type { ToolExecution } from '@shres-code/shres-code-tools'
+import type { SandboxExecutionPolicy, SandboxMode } from '@shres-code/shres-code-sandbox'
+import { ESCALATION_TARGETS, approveEscalation, escalationHintMarker, sandboxDenialMarker, validateEscalationArgs } from '@shres-code/shres-code-sandbox'
+import type { SandboxPolicyService } from '@shres-code/shres-code-sandbox-policy'
+import { FsError } from '@shres-code/shres-code-fs'
 
 /** The two escalation arguments a mutating tool may carry (advertised only under a confining backend). */
 export interface FsEscalationArgs {

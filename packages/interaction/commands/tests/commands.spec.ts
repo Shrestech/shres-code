@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { createScope } from '@roos-code/roos-code-scope'
-import type { Scope } from '@roos-code/roos-code-scope'
-import type { Agent } from '@roos-code/roos-code-agent'
-import SessionStore, { SessionId } from '@roos-code/roos-code-session'
-import CommandRuntime, { parseCommand, type CommandDefinition } from '@roos-code/roos-code-commands'
+import { Context } from '@shres-code/cordis'
+import { createScope } from '@shres-code/shres-code-scope'
+import type { Scope } from '@shres-code/shres-code-scope'
+import type { Agent } from '@shres-code/shres-code-agent'
+import SessionStore, { SessionId } from '@shres-code/shres-code-session'
+import CommandRuntime, { parseCommand, type CommandDefinition } from '@shres-code/shres-code-commands'
 
 function command(name: string, text = `ran:${name}`): CommandDefinition {
   return {

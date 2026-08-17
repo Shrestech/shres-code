@@ -3,12 +3,12 @@
  * children. Kept apart from the service so composition helpers can read it
  * without importing the registry.
  *
- * @module @roos-code/roos-code-subagent/depth
+ * @module @shres-code/shres-code-subagent/depth
  */
 
-import type { Agent } from '@roos-code/roos-code-agent'
+import type { Agent } from '@shres-code/shres-code-agent'
 
-declare module '@roos-code/roos-code-agent' {
+declare module '@shres-code/shres-code-agent' {
   interface AgentOptions {
     /** Delegation depth: zero for a top-level agent and parent depth + 1 for a child. */
     subagentDepth?: number

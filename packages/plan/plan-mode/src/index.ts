@@ -20,22 +20,22 @@
  * Agent Note:
  * - .agents/notes/implemented/simplification/2026-07-22-plan-specific-collaboration-state.md
  *
- * @module @roos-code/roos-code-plan-mode
+ * @module @shres-code/shres-code-plan-mode
  */
 
-import { Context, Service } from '@roos-code/cordis'
+import { Context, Service } from '@shres-code/cordis'
 import { z as zod } from 'zod'
 import type { ZodType } from 'zod'
-import type { Agent, PreStepDecision } from '@roos-code/roos-code-agent'
-import { createUserMessage } from '@roos-code/roos-code-llm'
-import type { Session, SessionEvent, UserMessage } from '@roos-code/roos-code-session'
-import { defineTool } from '@roos-code/roos-code-tools'
-import type {} from '@roos-code/roos-code-system-prompt'
-import { UserQuestionError } from '@roos-code/roos-code-user-questions'
+import type { Agent, PreStepDecision } from '@shres-code/shres-code-agent'
+import { createUserMessage } from '@shres-code/shres-code-llm'
+import type { Session, SessionEvent, UserMessage } from '@shres-code/shres-code-session'
+import { defineTool } from '@shres-code/shres-code-tools'
+import type {} from '@shres-code/shres-code-system-prompt'
+import { UserQuestionError } from '@shres-code/shres-code-user-questions'
 // Type-only edge: resolves `ctx.commands` for the optional command child.
-import type {} from '@roos-code/roos-code-commands'
+import type {} from '@shres-code/shres-code-commands'
 // Type-only: resolves ctx.sessionProjections for the optional unit child.
-import type {} from '@roos-code/roos-code-session-projection'
+import type {} from '@shres-code/shres-code-session-projection'
 import type { PlanProjection } from './types.ts'
 // The `plan` projection-key declaration lives in src/types.ts (its one home);
 // this re-export projects the type face onto the package root AND keeps the
@@ -43,7 +43,7 @@ import type { PlanProjection } from './types.ts'
 // declarations still receive the SessionProjectionMap merge.
 export type * from './types.ts'
 
-declare module '@roos-code/roos-code-session/types' {
+declare module '@shres-code/shres-code-session/types' {
   interface SessionEventMap {
     /**
      * Whether plan mode is in force from this point on: log-only, non-surface,
@@ -54,7 +54,7 @@ declare module '@roos-code/roos-code-session/types' {
   }
 }
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     planMode: PlanModeController
   }
@@ -213,14 +213,14 @@ export class PlanModeController extends Service {
       try {
         this.onBoundary(agent.session)
       } catch (error) {
-        ctx.logger.warn('roos-plan-mode: failed to append selected plan mode at step start: %o', error)
+        ctx.logger.warn('shres-plan-mode: failed to append selected plan mode at step start: %o', error)
         return decision
       }
       return !pending.narrate || narration === undefined
         ? decision
         : { ...decision, messages: [...decision.messages, narration] }
     })
-    ctx.effect(() => () => { disposed = true }, 'roos-plan-mode: close service lifetime')
+    ctx.effect(() => () => { disposed = true }, 'shres-plan-mode: close service lifetime')
 
     ctx.systemPrompt.section({
       name: 'plan:policy',

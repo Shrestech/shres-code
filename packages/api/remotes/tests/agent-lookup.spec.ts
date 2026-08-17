@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import AgentRegistry from '@roos-code/roos-code-agent'
-import type { Agent } from '@roos-code/roos-code-agent'
-import SessionStore from '@roos-code/roos-code-session'
-import type { Session, SessionEvent, SessionHeader, SessionId } from '@roos-code/roos-code-session'
-import { createApiRemoteAgentResolver } from '@roos-code/roos-code-api-remotes'
-import { TypertLookupFailure } from '@roos-code/roos-code-typert-protocol'
-import TypertRegistry from '@roos-code/roos-code-typert-registry'
+import { Context } from '@shres-code/cordis'
+import AgentRegistry from '@shres-code/shres-code-agent'
+import type { Agent } from '@shres-code/shres-code-agent'
+import SessionStore from '@shres-code/shres-code-session'
+import type { Session, SessionEvent, SessionHeader, SessionId } from '@shres-code/shres-code-session'
+import { createApiRemoteAgentResolver } from '@shres-code/shres-code-api-remotes'
+import { TypertLookupFailure } from '@shres-code/shres-code-typert-protocol'
+import TypertRegistry from '@shres-code/shres-code-typert-registry'
 
 const sid = (value: string): SessionId => value as SessionId
 

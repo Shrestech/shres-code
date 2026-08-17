@@ -1,14 +1,14 @@
 // Cross-instance and writer-lock behavior: two providers on one document are
-// the in-process equivalent of two roos processes sharing a harness home —
+// the in-process equivalent of two shres processes sharing a harness home —
 // neither knows the other's cache, so only the read-modify-write cycle under
 // the `<file>.lock` sibling keeps both namespaces alive on disk.
 import { afterEach, describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
+import { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
 import { chmod, mkdtemp, readFile, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { settingsNamespace } from '@roos-code/roos-code-settings'
+import { settingsNamespace } from '@shres-code/shres-code-settings'
 import { FileSettingsProvider } from '../src/index.ts'
 
 const AlphaSchema: z<{ value: number }> = z.object({ value: z.number().default(0) })
@@ -21,7 +21,7 @@ afterEach(async () => {
 })
 
 async function tempDir(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), 'roos-settings-lock-'))
+  const dir = await mkdtemp(join(tmpdir(), 'shres-settings-lock-'))
   cleanups.push(() => rm(dir, { recursive: true, force: true }))
   return dir
 }

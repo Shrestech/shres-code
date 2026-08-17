@@ -1,13 +1,13 @@
 /**
  * Shared ownership of one E2B sandbox. Capability adapters await the same SDK
  * handle, so filesystem and process operations inhabit one remote Linux world.
- * @module @roos-code/roos-code-e2b
+ * @module @shres-code/shres-code-e2b
  */
 
 import { randomUUID } from 'node:crypto'
 import { posix } from 'node:path'
-import { Context, Service } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
+import { Context, Service } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
 import { FileType, Sandbox, SandboxNotFoundError } from 'e2b'
 
 export {
@@ -36,7 +36,7 @@ export function quoteE2BShellArg(value: string): string {
 export function e2bControlEnvs(
   overrides: Readonly<Record<string, string>> = {},
 ): Record<string, string> {
-  return { ...overrides, HOME: `/.roos-e2b-control-${randomUUID()}` }
+  return { ...overrides, HOME: `/.shres-e2b-control-${randomUUID()}` }
 }
 
 /** Configuration for the shared E2B sandbox owner. */
@@ -60,7 +60,7 @@ interface SchemaResolvedConfig extends Config {
   timeoutMs: number
 }
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     e2b: E2BRuntime
   }
@@ -99,7 +99,7 @@ export class E2BRuntime extends Service {
     }
     this.validate()
     this.cwd = this.config.cwd
-    this.runtimeRoot = posix.join(this.cwd, '.roos-e2b')
+    this.runtimeRoot = posix.join(this.cwd, '.shres-e2b')
     this.ready = this.open()
     // A deployment may load the owner before any adapter uses it. Keep a
     // failed eager connection observed; getSandbox() still returns the error.
@@ -138,13 +138,13 @@ export class E2BRuntime extends Service {
 
   private validate(): void {
     if (this.config.apiKey.length === 0) {
-      throw new Error('roos-e2b: configure apiKey or set E2B_API_KEY')
+      throw new Error('shres-e2b: configure apiKey or set E2B_API_KEY')
     }
     if (!posix.isAbsolute(this.config.cwd)) {
-      throw new Error(`roos-e2b: cwd must be an absolute Linux path: ${this.config.cwd}`)
+      throw new Error(`shres-e2b: cwd must be an absolute Linux path: ${this.config.cwd}`)
     }
     if (!Number.isFinite(this.config.timeoutMs) || this.config.timeoutMs <= 0) {
-      throw new Error('roos-e2b: timeoutMs must be a positive finite number')
+      throw new Error('shres-e2b: timeoutMs must be a positive finite number')
     }
   }
 
@@ -160,7 +160,7 @@ export class E2BRuntime extends Service {
       await sandbox.files.makeDir(this.runtimeRoot)
       const runtimeRoot = await sandbox.files.getInfo(this.runtimeRoot)
       if (runtimeRoot.type !== FileType.DIR || runtimeRoot.symlinkTarget !== undefined) {
-        throw new Error(`roos-e2b: runtime root must be a real directory: ${this.runtimeRoot}`)
+        throw new Error(`shres-e2b: runtime root must be a real directory: ${this.runtimeRoot}`)
       }
       await sandbox.commands.run(
         `chmod 700 -- ${quoteE2BShellArg(this.runtimeRoot)}`,

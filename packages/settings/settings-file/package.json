@@ -1,13 +1,13 @@
 {
-  "name": "@roos-code/roos-code-settings-file",
-  "description": "File-backed settings provider (settings.yaml) for the Roos Code",
+  "name": "@shres-code/shres-code-settings-file",
+  "description": "File-backed settings provider (settings.yaml) for the Shres Code",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "packages/settings/settings-file"
   },
   "type": "module",
@@ -32,22 +32,22 @@
   ],
   "license": "MIT",
   "peerDependencies": {
-    "@roos-code/roos-code-atomic-write": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-home-paths": "workspace:^",
-    "@roos-code/roos-code-settings": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-atomic-write": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-home-paths": "workspace:^",
+    "@shres-code/shres-code-settings": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   },
   "dependencies": {
     "chokidar": "^4.0.3",
-    "@roos-code/schemastery": "workspace:^",
+    "@shres-code/schemastery": "workspace:^",
     "yaml": "^2.9.0"
   },
   "devDependencies": {
-    "@roos-code/roos-code-atomic-write": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-home-paths": "workspace:^",
-    "@roos-code/roos-code-settings": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-atomic-write": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-home-paths": "workspace:^",
+    "@shres-code/shres-code-settings": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   }
 }

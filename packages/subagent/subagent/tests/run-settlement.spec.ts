@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { SessionId } from '@roos-code/roos-code-session'
+import { SessionId } from '@shres-code/shres-code-session'
 import { settleRun } from '../src/index.ts'
 
 describe('outcome mapping helpers', () => {

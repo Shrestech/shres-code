@@ -1,13 +1,13 @@
 {
-  "name": "@roos-code/roos-code-session-telemetry-otel",
-  "description": "OpenTelemetry backend for the Roos Code telemetry seam: hands captured session records to the OTel JS SDK's log pipeline",
+  "name": "@shres-code/shres-code-session-telemetry-otel",
+  "description": "OpenTelemetry backend for the Shres Code telemetry seam: hands captured session records to the OTel JS SDK's log pipeline",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "packages/session/session-telemetry-otel"
   },
   "type": "module",
@@ -38,25 +38,25 @@
     "@opentelemetry/otlp-exporter-base": "^0.220.0",
     "@opentelemetry/resources": "^2.9.0",
     "@opentelemetry/sdk-logs": "^0.220.0",
-    "@roos-code/schemastery": "workspace:^"
+    "@shres-code/schemastery": "workspace:^"
   },
   "peerDependencies": {
-    "@roos-code/roos-code-command-feedback": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-llm": "workspace:^",
-    "@roos-code/roos-code-session": "workspace:^",
-    "@roos-code/roos-code-session-telemetry": "workspace:^",
-    "@roos-code/roos-code-anonymous-user-id": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-command-feedback": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-session-telemetry": "workspace:^",
+    "@shres-code/shres-code-anonymous-user-id": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   },
   "devDependencies": {
-    "@roos-code/cordis-plugin-loader": "workspace:^",
-    "@roos-code/roos-code-command-feedback": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-llm": "workspace:^",
-    "@roos-code/roos-code-session": "workspace:^",
-    "@roos-code/roos-code-session-telemetry": "workspace:^",
-    "@roos-code/roos-code-anonymous-user-id": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/cordis-plugin-loader": "workspace:^",
+    "@shres-code/shres-code-command-feedback": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-session-telemetry": "workspace:^",
+    "@shres-code/shres-code-anonymous-user-id": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   }
 }

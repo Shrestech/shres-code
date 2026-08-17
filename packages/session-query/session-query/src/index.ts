@@ -1,13 +1,13 @@
 /**
  * Service Definition for combined session-history reads, traces, filters, and full-text search.
  *
- * @module @roos-code/roos-code-session-query
+ * @module @shres-code/shres-code-session-query
  */
 
-import { Context, Service } from '@roos-code/cordis'
-import { Session, snapshotSessionEvent, type SessionId } from '@roos-code/roos-code-session'
-import { foldSessionTitle } from '@roos-code/roos-code-session-title'
-import type { SessionTitleSnapshot } from '@roos-code/roos-code-session-title'
+import { Context, Service } from '@shres-code/cordis'
+import { Session, snapshotSessionEvent, type SessionId } from '@shres-code/shres-code-session'
+import { foldSessionTitle } from '@shres-code/shres-code-session-title'
+import type { SessionTitleSnapshot } from '@shres-code/shres-code-session-title'
 import type {
   SessionEventResultFilter,
   SessionEventSearchPage,
@@ -65,7 +65,7 @@ export {
 } from './filters.ts'
 export { assertSessionHeadersCompatible } from './sources.ts'
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     sessionQuery: SessionQueryEngine
   }

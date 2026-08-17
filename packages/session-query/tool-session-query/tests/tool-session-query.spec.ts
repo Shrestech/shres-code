@@ -1,16 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Context, type Fiber } from '@roos-code/cordis'
-import type { Agent } from '@roos-code/roos-code-agent'
-import { createUserMessage, CallId, HarnessError , createMessage } from '@roos-code/roos-code-llm'
-import { MAX_TIMER_DELAY_MS, TimeoutReason } from '@roos-code/roos-code-timeout'
-import * as TimeoutPolicy from '@roos-code/roos-code-tool-call-timeout-policy'
+import { Context, type Fiber } from '@shres-code/cordis'
+import type { Agent } from '@shres-code/shres-code-agent'
+import { createUserMessage, CallId, HarnessError , createMessage } from '@shres-code/shres-code-llm'
+import { MAX_TIMER_DELAY_MS, TimeoutReason } from '@shres-code/shres-code-timeout'
+import * as TimeoutPolicy from '@shres-code/shres-code-tool-call-timeout-policy'
 import SessionStore, {
   SESSION_FORMAT_VERSION,
   SessionId,
   type Session,
   type SessionHeader,
   type SessionId as SessionIdValue,
-} from '@roos-code/roos-code-session'
+} from '@shres-code/shres-code-session'
 import SessionQueryEngine, {
   SessionQueryError,
   SessionSearchCursor,
@@ -23,10 +23,10 @@ import SessionQueryEngine, {
   type SessionSearchPage,
   type SessionSearchRequest,
   type SessionTitleObservationResult,
-} from '@roos-code/roos-code-session-query'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import ToolRuntime, { type ToolExecutionResult } from '@roos-code/roos-code-tools'
-import * as ToolSessionQuery from '@roos-code/roos-code-tool-session-query'
+} from '@shres-code/shres-code-session-query'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import ToolRuntime, { type ToolExecutionResult } from '@shres-code/shres-code-tools'
+import * as ToolSessionQuery from '@shres-code/shres-code-tool-session-query'
 
 const activeContexts: Context[] = []
 

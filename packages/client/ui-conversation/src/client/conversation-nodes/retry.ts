@@ -1,12 +1,12 @@
-import type { Context } from '@roos-code/cordis'
+import type { Context } from '@shres-code/cordis'
 import type {
   ConversationLocation, ConversationNodeDefinition, ModelRetryNode,
-} from '@roos-code/roos-code-client-runtime/client'
-import type {} from '@roos-code/roos-code-llm-retry/types'
+} from '@shres-code/shres-code-client-runtime/client'
+import type {} from '@shres-code/shres-code-llm-retry/types'
 import type { RetryChatData } from '../contract/chat-nodes.ts'
 import { chatNode } from './common.ts'
 
-declare module '@roos-code/roos-code-client-ui-conversation/client' {
+declare module '@shres-code/shres-code-client-ui-conversation/client' {
   interface ChatNodeDataMap {
     /** Producer-correlated model retry chain. */
     'model-retry': RetryChatData

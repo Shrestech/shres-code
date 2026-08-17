@@ -21,7 +21,7 @@ Every workspace package publishes a separately built `./invariant` companion and
 
 The empty form is an explicit architectural conclusion, not a generated placeholder. A future package change that introduces mutable state or an event protocol must replace the explanation with the corresponding check.
 
-The central `dsh-invariants` service owns only configuration, registration uniqueness, child-fiber lifecycle, rollback, disposal, and package-attributed failure. It exposes no generic plugin-shape, service-shape, or startup-assertion helpers and imports no product package.
+The central `shres-invariants` service owns only configuration, registration uniqueness, child-fiber lifecycle, rollback, disposal, and package-attributed failure. It exposes no generic plugin-shape, service-shape, or startup-assertion helpers and imports no product package.
 
 ### Implemented checks
 
@@ -29,27 +29,27 @@ The current 103-package workspace has 21 executable companions and 82 justified 
 
 | Owner | Runtime relationship |
 |---|---|
-| `dsh-session` | Strict sequence growth, turn/step enclosure, and same-step tool call/result pairing. |
-| `dsh-agent` | Non-repeating agent status and terminal disposal transitions. |
-| `dsh-scope` | Scoped-event carrier presence and routed-subject consistency. |
-| `dsh-agent-loop` | Explicitly marked, frozen loop request reconstruction from the session event log. |
-| `dsh-llm` | Stream block grammar, delta type/index matching, single usage, closed blocks, and terminal finish. |
-| `dsh-llm-retry` | Durable retry records identify the open turn's latest closed step, remain unique per step, increase monotonically, and stay within retry and non-negative timer bounds. |
-| `dsh-tools` | Monotonic pre/execute/post stages and immutable final execution/result snapshots. |
-| `dsh-system-prompt` | Authoritative assembly section, tool, and variable data constraints. |
-| `dsh-compaction` | Compaction start/summary/end pairing, range endpoints, token counts, and successful-summary presence. |
-| `dsh-hook-protocol` | Hook invocation/result correlation, dialect, identity, and duration constraints. |
-| `dsh-sandbox-policy` | Durable `sandbox/mode` events use the closed sandbox-mode vocabulary. |
-| `dsh-fs` | Filesystem decision/observation events carry usable target and version identities. |
-| `dsh-goal` | Durable goal snapshots preserve source attribution, rendered content, revisions, lifecycle and timestamp relationships, and sequential admitted rounds. |
-| `dsh-goal-round-driver` | Goal-sourced continuation messages match the prompt reconstructed from the preceding durable goal state. |
-| `dsh-subagent` | Provider add/remove and child start/end events preserve identity and pairing. |
-| `dsh-permission-presets` | Durable permission decisions name a preset in the active permission table. |
-| `dsh-user-approval` | Approval asked/decided records pair by call and use valid outcomes and policies. |
-| `dsh-workflow` | Workflow and child-agent start/end events preserve run metadata, identity, outcome, count, and error relations. |
-| `dsh-jobs` | Current and terminal task snapshots preserve id/kind, owner, status, and timestamp relationships. |
-| `dsh-tool-todo` | Durable whole-list snapshots use unique trimmed items and closed statuses. |
-| `dsh-time-context` | Plugin-attributed clock readings agree with the session's open turn, next pre-step position, and elapsed baseline; rendered time parses and does not postdate its event. |
+| `shres-session` | Strict sequence growth, turn/step enclosure, and same-step tool call/result pairing. |
+| `shres-agent` | Non-repeating agent status and terminal disposal transitions. |
+| `shres-scope` | Scoped-event carrier presence and routed-subject consistency. |
+| `shres-agent-loop` | Explicitly marked, frozen loop request reconstruction from the session event log. |
+| `shres-llm` | Stream block grammar, delta type/index matching, single usage, closed blocks, and terminal finish. |
+| `shres-llm-retry` | Durable retry records identify the open turn's latest closed step, remain unique per step, increase monotonically, and stay within retry and non-negative timer bounds. |
+| `shres-tools` | Monotonic pre/execute/post stages and immutable final execution/result snapshots. |
+| `shres-system-prompt` | Authoritative assembly section, tool, and variable data constraints. |
+| `shres-compaction` | Compaction start/summary/end pairing, range endpoints, token counts, and successful-summary presence. |
+| `shres-hook-protocol` | Hook invocation/result correlation, dialect, identity, and duration constraints. |
+| `shres-sandbox-policy` | Durable `sandbox/mode` events use the closed sandbox-mode vocabulary. |
+| `shres-fs` | Filesystem decision/observation events carry usable target and version identities. |
+| `shres-goal` | Durable goal snapshots preserve source attribution, rendered content, revisions, lifecycle and timestamp relationships, and sequential admitted rounds. |
+| `shres-goal-round-driver` | Goal-sourced continuation messages match the prompt reconstructed from the preceding durable goal state. |
+| `shres-subagent` | Provider add/remove and child start/end events preserve identity and pairing. |
+| `shres-permission-presets` | Durable permission decisions name a preset in the active permission table. |
+| `shres-user-approval` | Approval asked/decided records pair by call and use valid outcomes and policies. |
+| `shres-workflow` | Workflow and child-agent start/end events preserve run metadata, identity, outcome, count, and error relations. |
+| `shres-jobs` | Current and terminal task snapshots preserve id/kind, owner, status, and timestamp relationships. |
+| `shres-tool-todo` | Durable whole-list snapshots use unique trimmed items and closed statuses. |
+| `shres-time-context` | Plugin-attributed clock readings agree with the session's open turn, next pre-step position, and elapsed baseline; rendered time parses and does not postdate its event. |
 
 Session-backed companions validate existing durable events when they load, using the prefix preceding each candidate where the relationship depends on event order. Other checks observe the authoritative live event boundary or mutable service result. Validation runs before publication where accepting an invalid event would otherwise commit bad state.
 

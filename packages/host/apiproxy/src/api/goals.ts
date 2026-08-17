@@ -9,8 +9,8 @@
  * every client through the mux stream carrying the same whole value).
  */
 
-import type { Branded } from '@roos-code/roos-code-brand'
-import type { SessionId } from '@roos-code/roos-code-session/types'
+import type { Branded } from '@shres-code/shres-code-brand'
+import type { SessionId } from '@shres-code/shres-code-session/types'
 import type { RpcRequest, RpcResponse } from './rpc.ts'
 
 /** Identifies one goal across its durable revisions. */

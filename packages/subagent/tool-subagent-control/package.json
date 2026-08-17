@@ -1,5 +1,5 @@
 {
-  "name": "@roos-code/roos-code-tool-subagent-control",
+  "name": "@shres-code/shres-code-tool-subagent-control",
   "description": "Globally named send_message, interrupt_agent, and list_agents tools over ctx.subagents continuations",
   "version": "0.1.0-rc.5",
   "publishConfig": {
@@ -7,7 +7,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "packages/subagent/tool-subagent-control"
   },
   "type": "module",
@@ -37,26 +37,26 @@
   ],
   "license": "MIT",
   "peerDependencies": {
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-llm": "workspace:^",
-    "@roos-code/roos-code-session": "workspace:^",
-    "@roos-code/roos-code-subagent": "workspace:^",
-    "@roos-code/roos-code-tools": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-subagent": "workspace:^",
+    "@shres-code/shres-code-tools": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   },
   "devDependencies": {
-    "@roos-code/roos-code-agent": "workspace:^",
-    "@roos-code/roos-code-agent-loop": "workspace:^",
-    "@roos-code/roos-code-agent-loop-testkit": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-llm": "workspace:^",
-    "@roos-code/roos-code-session": "workspace:^",
-    "@roos-code/roos-code-session-persistence": "workspace:^",
-    "@roos-code/roos-code-session-persistence-jsonl": "workspace:^",
-    "@roos-code/roos-code-session-projection": "workspace:^",
-    "@roos-code/roos-code-subagent": "workspace:^",
-    "@roos-code/roos-code-subagent-spawn-in-process": "workspace:^",
-    "@roos-code/roos-code-tools": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-agent": "workspace:^",
+    "@shres-code/shres-code-agent-loop": "workspace:^",
+    "@shres-code/shres-code-agent-loop-testkit": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-session-persistence": "workspace:^",
+    "@shres-code/shres-code-session-persistence-jsonl": "workspace:^",
+    "@shres-code/shres-code-session-projection": "workspace:^",
+    "@shres-code/shres-code-subagent": "workspace:^",
+    "@shres-code/shres-code-subagent-spawn-in-process": "workspace:^",
+    "@shres-code/shres-code-tools": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   }
 }

@@ -6,12 +6,12 @@
  * sink). Package-private; the hub alone constructs it and wires the scoped
  * event listeners onto it.
  */
-import type { ClientContext, ObservableSnapshot, SnapshotStore } from '@roos-code/roos-code-client-runtime/client'
-import { createSnapshotStore } from '@roos-code/roos-code-client-runtime/client'
+import type { ClientContext, ObservableSnapshot, SnapshotStore } from '@shres-code/shres-code-client-runtime/client'
+import { createSnapshotStore } from '@shres-code/shres-code-client-runtime/client'
 import type {
   ArbitrateKey, ArbitrateOutcome, CommandClaim, ConsumeTokenRequest, PickOutcome,
   ReferenceInsert, InputTriggerController, TokenSpan,
-} from '@roos-code/roos-code-client-ui-input-trigger/client'
+} from '@shres-code/shres-code-client-ui-input-trigger/client'
 import type {
   DraftAttachmentId, EditRange, EditSelection, InputActions, InputEffect, InputNotice, InputState,
   PasteComponent, QueuedMessage, SessionInput, SubmitAttempt,

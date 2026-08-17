@@ -13,11 +13,11 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, waitFor, within } from '@testing-library/react'
-import type { ISession, SessionId, WorkspaceId } from '@roos-code/roos-code-client-runtime/client'
-import type { PropsRenderSlots } from '@roos-code/roos-code-client-ui-slots'
-import { SlotTestRuntime, usePinnedBrowserLanguages } from '@roos-code/roos-code-client-test-runtime'
-import { LocaleRuntime } from '@roos-code/roos-code-client-locale/client'
-import { apply, inject } from '@roos-code/roos-code-client-ui-workspace/client'
+import type { ISession, SessionId, WorkspaceId } from '@shres-code/shres-code-client-runtime/client'
+import type { PropsRenderSlots } from '@shres-code/shres-code-client-ui-slots'
+import { SlotTestRuntime, usePinnedBrowserLanguages } from '@shres-code/shres-code-client-test-runtime'
+import { LocaleRuntime } from '@shres-code/shres-code-client-locale/client'
+import { apply, inject } from '@shres-code/shres-code-client-ui-workspace/client'
 
 // The service reads its initial locale from the browser; these specs assert
 // the shipped Chinese copy, so they state the browser they assume.

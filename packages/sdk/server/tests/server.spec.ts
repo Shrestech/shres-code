@@ -1,19 +1,19 @@
-import { createUserMessage } from '@roos-code/roos-code-llm'
+import { createUserMessage } from '@shres-code/shres-code-llm'
 import { createServer } from 'node:http'
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import AgentRegistry, { type Agent, type AgentHandle } from '@roos-code/roos-code-agent'
+import { Context } from '@shres-code/cordis'
+import AgentRegistry, { type Agent, type AgentHandle } from '@shres-code/shres-code-agent'
 
-import SessionStore, { SessionId } from '@roos-code/roos-code-session'
-import * as agentCore from '@roos-code/roos-code-agent-spine-demo'
-import JsonlSessionPersistence from '@roos-code/roos-code-session-persistence-jsonl'
-import * as LlmDeepSeek from '@roos-code/roos-code-llm-deepseek'
-import SubagentRuntime, { type SubagentResult, type SubagentRunEndInfo } from '@roos-code/roos-code-subagent'
-import type { JsonRpcTransportPeer } from '@roos-code/roos-code-sdk-protocol'
+import SessionStore, { SessionId } from '@shres-code/shres-code-session'
+import * as agentCore from '@shres-code/shres-code-agent-spine-demo'
+import JsonlSessionPersistence from '@shres-code/shres-code-session-persistence-jsonl'
+import * as LlmDeepSeek from '@shres-code/shres-code-llm-deepseek'
+import SubagentRuntime, { type SubagentResult, type SubagentRunEndInfo } from '@shres-code/shres-code-subagent'
+import type { JsonRpcTransportPeer } from '@shres-code/shres-code-sdk-protocol'
 import { HarnessSdkJsonRpcServer } from '../src/index.ts'
 
 class FakeTransport implements JsonRpcTransportPeer {
@@ -116,7 +116,7 @@ async function settleSubagent(
 
 describe('HarnessSdkJsonRpcServer', () => {
   it('creates a harness agent and calls the configured OpenAI-compatible endpoint', { timeout: 15_000 }, async () => {
-    const storageDir = await mkdtemp(join(tmpdir(), 'roos-jsonrpc-'))
+    const storageDir = await mkdtemp(join(tmpdir(), 'shres-jsonrpc-'))
     const llmServer = await mockCompletionServer()
     vi.stubEnv('DEEPSEEK_API_KEY', 'test-key')
     vi.stubEnv('DEEPSEEK_BASE_URL', llmServer.url)
@@ -131,7 +131,7 @@ describe('HarnessSdkJsonRpcServer', () => {
         model: 'dsagent-model',
         maxTokens: 321,
       }) as { serverInfo: { name: string } }
-      expect(init.serverInfo.name).toBe('roos-code-sdk-runtime')
+      expect(init.serverInfo.name).toBe('shres-code-sdk-runtime')
 
       const receipt = await server.handleRequest('session/prompt', {
         sessionId: 'main',
@@ -273,7 +273,7 @@ describe('HarnessSdkJsonRpcServer', () => {
   })
 
   it('notifies the host when a child session is created with parent lineage', async () => {
-    const storageDir = await mkdtemp(join(tmpdir(), 'roos-jsonrpc-subagent-'))
+    const storageDir = await mkdtemp(join(tmpdir(), 'shres-jsonrpc-subagent-'))
     const ctx = await makeHarness(storageDir)
     try {
       const transport = new FakeTransport()
@@ -302,7 +302,7 @@ describe('HarnessSdkJsonRpcServer', () => {
   })
 
   it('creates an SDK session without an optional system prompt', { timeout: 15_000 }, async () => {
-    const storageDir = await mkdtemp(join(tmpdir(), 'roos-jsonrpc-no-system-'))
+    const storageDir = await mkdtemp(join(tmpdir(), 'shres-jsonrpc-no-system-'))
     const llmServer = await mockCompletionServer()
     vi.stubEnv('DEEPSEEK_API_KEY', 'test-key')
     vi.stubEnv('DEEPSEEK_BASE_URL', llmServer.url)
@@ -325,7 +325,7 @@ describe('HarnessSdkJsonRpcServer', () => {
   })
 
   it('notifies the host when a subagent run settles', async () => {
-    const storageDir = await mkdtemp(join(tmpdir(), 'roos-jsonrpc-subagent-end-'))
+    const storageDir = await mkdtemp(join(tmpdir(), 'shres-jsonrpc-subagent-end-'))
     const ctx = await makeHarness(storageDir)
     try {
       const transport = new FakeTransport()
@@ -396,7 +396,7 @@ describe('HarnessSdkJsonRpcServer', () => {
   })
 
   it('ignores a remote run id that collides with a local child of the same parent', async () => {
-    const storageDir = await mkdtemp(join(tmpdir(), 'roos-jsonrpc-subagent-remote-collision-'))
+    const storageDir = await mkdtemp(join(tmpdir(), 'shres-jsonrpc-subagent-remote-collision-'))
     const ctx = await makeHarness(storageDir)
     try {
       const transport = new FakeTransport()
@@ -435,7 +435,7 @@ describe('HarnessSdkJsonRpcServer', () => {
   })
 
   it('retains locality across continuation runs on one live child', async () => {
-    const storageDir = await mkdtemp(join(tmpdir(), 'roos-jsonrpc-subagent-continuation-'))
+    const storageDir = await mkdtemp(join(tmpdir(), 'shres-jsonrpc-subagent-continuation-'))
     const ctx = await makeHarness(storageDir)
     try {
       const transport = new FakeTransport()
@@ -480,7 +480,7 @@ describe('HarnessSdkJsonRpcServer', () => {
   })
 
   it('correlates reused local ids by parent scope when runs settle out of order', async () => {
-    const storageDir = await mkdtemp(join(tmpdir(), 'roos-jsonrpc-subagent-reuse-'))
+    const storageDir = await mkdtemp(join(tmpdir(), 'shres-jsonrpc-subagent-reuse-'))
     const ctx = await makeHarness(storageDir)
     try {
       const transport = new FakeTransport()
@@ -579,7 +579,7 @@ describe('HarnessSdkJsonRpcServer', () => {
   })
 
   it('keeps locality bound to the accepted run across provider re-registration', async () => {
-    const storageDir = await mkdtemp(join(tmpdir(), 'roos-jsonrpc-subagent-provider-reuse-'))
+    const storageDir = await mkdtemp(join(tmpdir(), 'shres-jsonrpc-subagent-provider-reuse-'))
     const ctx = await makeHarness(storageDir)
     try {
       const transport = new FakeTransport()
@@ -671,7 +671,7 @@ describe('HarnessSdkJsonRpcServer', () => {
   })
 
   it('uses the recorded local flag when start was missed and ignores remote runs', async () => {
-    const storageDir = await mkdtemp(join(tmpdir(), 'roos-jsonrpc-subagent-fallback-'))
+    const storageDir = await mkdtemp(join(tmpdir(), 'shres-jsonrpc-subagent-fallback-'))
     const ctx = await makeHarness(storageDir)
     let parentHandle: AgentHandle | undefined
     let handle: AgentHandle | undefined
@@ -782,7 +782,7 @@ describe('HarnessSdkJsonRpcServer', () => {
   })
 
   it('does not re-register an LLM adapter whose provider already has an owner', async () => {
-    const storageDir = await mkdtemp(join(tmpdir(), 'roos-jsonrpc-existing-llm-'))
+    const storageDir = await mkdtemp(join(tmpdir(), 'shres-jsonrpc-existing-llm-'))
     const ctx = await makeHarness(storageDir)
     vi.stubEnv('DEEPSEEK_API_KEY', 'test-key')
     await ctx.plugin(LlmDeepSeek)
@@ -803,7 +803,7 @@ describe('HarnessSdkJsonRpcServer', () => {
   })
 
   it('rejects a missing DeepSeek provider instead of mounting a fallback', async () => {
-    const storageDir = await mkdtemp(join(tmpdir(), 'roos-jsonrpc-no-fallback-'))
+    const storageDir = await mkdtemp(join(tmpdir(), 'shres-jsonrpc-no-fallback-'))
     const ctx = await makeHarness(storageDir)
     try {
       const server = new HarnessSdkJsonRpcServer(ctx, new FakeTransport())
@@ -817,7 +817,7 @@ describe('HarnessSdkJsonRpcServer', () => {
   })
 
   it('rejects a missing non-DeepSeek provider when an LLM service already exists', async () => {
-    const storageDir = await mkdtemp(join(tmpdir(), 'roos-jsonrpc-new-llm-'))
+    const storageDir = await mkdtemp(join(tmpdir(), 'shres-jsonrpc-new-llm-'))
     const ctx = await makeHarness(storageDir)
     vi.stubEnv('DEEPSEEK_API_KEY', 'test-key')
     await ctx.plugin(LlmDeepSeek)
@@ -838,7 +838,7 @@ describe('HarnessSdkJsonRpcServer', () => {
   it.each([0, -1, 1.5, Number.NaN, Number.MAX_SAFE_INTEGER + 1])(
     'rejects invalid initialize maxTokens %s at the wire boundary',
     async (maxTokens) => {
-      const storageDir = await mkdtemp(join(tmpdir(), 'roos-jsonrpc-invalid-max-tokens-'))
+      const storageDir = await mkdtemp(join(tmpdir(), 'shres-jsonrpc-invalid-max-tokens-'))
       const ctx = await makeHarness(storageDir)
       try {
         const server = new HarnessSdkJsonRpcServer(ctx, new FakeTransport())
@@ -872,14 +872,14 @@ describe('HarnessSdkJsonRpcServer', () => {
   })
 
   it('rejects unknown JSON-RPC runtime methods', async () => {
-    const storageDir = await mkdtemp(join(tmpdir(), 'roos-jsonrpc-unknown-'))
+    const storageDir = await mkdtemp(join(tmpdir(), 'shres-jsonrpc-unknown-'))
     const ctx = await makeHarness(storageDir)
     try {
       const server = new HarnessSdkJsonRpcServer(ctx, new FakeTransport())
 
       await expect(server.handleRequest('does/not/exist', {}))
         .rejects
-        .toThrow('unknown Roos Code SDK runtime method: does/not/exist')
+        .toThrow('unknown Shres Code SDK runtime method: does/not/exist')
 
       await server.shutdown()
     } finally {

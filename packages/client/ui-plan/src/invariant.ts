@@ -1,13 +1,13 @@
 /**
- * Package-owned invariant companion for `@roos-code/roos-code-client-ui-plan`.
- * @module @roos-code/roos-code-client-ui-plan/invariant
+ * Package-owned invariant companion for `@shres-code/shres-code-client-ui-plan`.
+ * @module @shres-code/shres-code-client-ui-plan/invariant
  */
 
 /* jscpd:ignore-start */
-import type { Context } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-client-ui-plan'
+const PACKAGE_NAME = '@shres-code/shres-code-client-ui-plan'
 
 /** Cordis companion plugin name. */
 export const name = 'client-ui-plan-invariant'
@@ -16,7 +16,7 @@ export const inject = ['invariants']
 
 /**
  * No runtime invariant: plan state and boundary ownership are
- * audited by roos-plan-mode, while the control is a slot effect whose
+ * audited by shres-plan-mode, while the control is a slot effect whose
  * declaration, registration, and teardown are exercised by this package.
  */
 const install: InvariantInstaller = () => {}

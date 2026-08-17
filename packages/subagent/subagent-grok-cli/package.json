@@ -1,5 +1,5 @@
 {
-  "name": "@roos-code/roos-code-subagent-grok-cli",
+  "name": "@shres-code/shres-code-subagent-grok-cli",
   "description": "One-shot Grok Build CLI subagent provider",
   "version": "0.1.0-rc.5",
   "publishConfig": {
@@ -7,7 +7,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "packages/subagent/subagent-grok-cli"
   },
   "type": "module",
@@ -32,30 +32,30 @@
   ],
   "license": "MIT",
   "peerDependencies": {
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-llm": "workspace:^",
-    "@roos-code/roos-code-llm-cli-bridge": "workspace:^",
-    "@roos-code/roos-code-session": "workspace:^",
-    "@roos-code/roos-code-subagent": "workspace:^",
-    "@roos-code/roos-code-subprocess": "workspace:^",
-    "@roos-code/roos-code-timeout": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-llm-cli-bridge": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-subagent": "workspace:^",
+    "@shres-code/shres-code-subprocess": "workspace:^",
+    "@shres-code/shres-code-timeout": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   },
   "dependencies": {
-    "@roos-code/schemastery": "workspace:^"
+    "@shres-code/schemastery": "workspace:^"
   },
   "devDependencies": {
-    "@roos-code/cordis-plugin-loader": "workspace:^",
-    "@roos-code/roos-code-agent": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-llm": "workspace:^",
-    "@roos-code/roos-code-llm-cli-bridge": "workspace:^",
-    "@roos-code/roos-code-loader-smoke": "workspace:^",
-    "@roos-code/roos-code-session": "workspace:^",
-    "@roos-code/roos-code-subagent": "workspace:^",
-    "@roos-code/roos-code-subprocess": "workspace:^",
-    "@roos-code/roos-code-subprocess-local": "workspace:^",
-    "@roos-code/roos-code-timeout": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/cordis-plugin-loader": "workspace:^",
+    "@shres-code/shres-code-agent": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-llm-cli-bridge": "workspace:^",
+    "@shres-code/shres-code-loader-smoke": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-subagent": "workspace:^",
+    "@shres-code/shres-code-subprocess": "workspace:^",
+    "@shres-code/shres-code-subprocess-local": "workspace:^",
+    "@shres-code/shres-code-timeout": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   }
 }

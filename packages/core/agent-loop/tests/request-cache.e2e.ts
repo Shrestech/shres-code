@@ -1,14 +1,14 @@
-import { createUserMessage } from '@roos-code/roos-code-llm'
+import { createUserMessage } from '@shres-code/shres-code-llm'
 import { afterEach, describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import LlmRuntime from '@roos-code/roos-code-llm'
-import SessionStore, { SessionId } from '@roos-code/roos-code-session'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import ToolRuntime, { defineContentToolFixture } from '@roos-code/roos-code-tools'
-import AgentRegistry, { type Agent } from '@roos-code/roos-code-agent'
+import { Context } from '@shres-code/cordis'
+import LlmRuntime from '@shres-code/shres-code-llm'
+import SessionStore, { SessionId } from '@shres-code/shres-code-session'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import ToolRuntime, { defineContentToolFixture } from '@shres-code/shres-code-tools'
+import AgentRegistry, { type Agent } from '@shres-code/shres-code-agent'
 
-import AgentLoop from '@roos-code/roos-code-agent-loop'
-import * as LlmDeepSeek from '@roos-code/roos-code-llm-deepseek'
+import AgentLoop from '@shres-code/shres-code-agent-loop'
+import * as LlmDeepSeek from '@shres-code/shres-code-llm-deepseek'
 
 /**
  * With-key proof that log-derived requests translate into real provider cache hits: a

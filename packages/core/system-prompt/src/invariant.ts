@@ -1,10 +1,10 @@
-/** Package-owned prompt-assembly invariants. @module @roos-code/roos-code-system-prompt/invariant */
+/** Package-owned prompt-assembly invariants. @module @shres-code/shres-code-system-prompt/invariant */
 
-import type { Context } from '@roos-code/cordis'
-import type { InvariantFailure, InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantFailure, InvariantInstaller } from '@shres-code/shres-code-invariants'
 import type { PromptAssembly } from './index.ts'
 
-const PACKAGE_NAME = '@roos-code/roos-code-system-prompt'
+const PACKAGE_NAME = '@shres-code/shres-code-system-prompt'
 const VARIABLE_NAME = /^[a-z][a-z0-9_]*$/
 
 /** Cordis companion plugin name. */

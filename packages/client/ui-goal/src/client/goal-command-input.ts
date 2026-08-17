@@ -1,9 +1,9 @@
-import type { SessionEvent } from '@roos-code/roos-code-session/types'
-import type { CommandId } from '@roos-code/roos-code-commands/brand'
-import type {} from '@roos-code/roos-code-commands/types'
+import type { SessionEvent } from '@shres-code/shres-code-session/types'
+import type { CommandId } from '@shres-code/shres-code-commands/brand'
+import type {} from '@shres-code/shres-code-commands/types'
 import type {
   ConversationNodeDefinition,
-} from '@roos-code/roos-code-client-runtime/client'
+} from '@shres-code/shres-code-client-runtime/client'
 
 /** Goal-owned human command input projected independently of model messages. */
 export interface GoalCommandInputData {
@@ -12,7 +12,7 @@ export interface GoalCommandInputData {
   readonly time: number
 }
 
-declare module '@roos-code/roos-code-client-ui-conversation/client' {
+declare module '@shres-code/shres-code-client-ui-conversation/client' {
   interface ChatNodeDataMap {
     /** Human-entered `/goal` command input. */
     'command-input': GoalCommandInputData

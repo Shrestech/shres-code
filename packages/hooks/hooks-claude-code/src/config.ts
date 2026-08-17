@@ -3,10 +3,10 @@
  * Only command hooks run; other hook types are returned as skipped so the
  * bridge can warn. Plugin-root and project-directory substitutions are applied
  * to commands at parse time.
- * @module @roos-code/roos-code-hooks-claude-code/config
+ * @module @shres-code/shres-code-hooks-claude-code/config
  */
 
-import { matcherDiagnostic, type MatcherGroup } from '@roos-code/roos-code-hook-protocol'
+import { matcherDiagnostic, type MatcherGroup } from '@shres-code/shres-code-hook-protocol'
 
 const CLAUDE_EVENTS = [
   'SessionStart',

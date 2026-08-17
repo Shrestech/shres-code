@@ -1,4 +1,4 @@
-import type { SessionEvent } from '@roos-code/roos-code-session/types'
+import type { SessionEvent } from '@shres-code/shres-code-session/types'
 import { describe, expect, it } from 'vitest'
 import type { RunningToolCall, ToolCallBlock } from '../src/client/sessions/conversation.ts'
 import {

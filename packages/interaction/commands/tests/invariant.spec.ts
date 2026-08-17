@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import * as CommandInvariant from '@roos-code/roos-code-commands/invariant'
-import InvariantRegistry, { InvariantError } from '@roos-code/roos-code-invariants'
-import SessionStore, { SessionId, type Session } from '@roos-code/roos-code-session'
-import { CommandId } from '@roos-code/roos-code-commands'
+import { Context } from '@shres-code/cordis'
+import * as CommandInvariant from '@shres-code/shres-code-commands/invariant'
+import InvariantRegistry, { InvariantError } from '@shres-code/shres-code-invariants'
+import SessionStore, { SessionId, type Session } from '@shres-code/shres-code-session'
+import { CommandId } from '@shres-code/shres-code-commands'
 
 async function mount(installCompanion = true): Promise<{ ctx: Context; session: Session }> {
   const ctx = new Context()
@@ -50,7 +50,7 @@ describe('command lifecycle invariants', () => {
       })
     }).toThrow(expect.objectContaining<Partial<InvariantError>>({
       code: 'INVARIANT',
-      packageName: '@roos-code/roos-code-commands',
+      packageName: '@shres-code/shres-code-commands',
     }))
   })
 
@@ -68,7 +68,7 @@ describe('command lifecycle invariants', () => {
       })
     }).toThrow(expect.objectContaining<Partial<InvariantError>>({
       code: 'INVARIANT',
-      packageName: '@roos-code/roos-code-commands',
+      packageName: '@shres-code/shres-code-commands',
     }))
   })
 
@@ -83,7 +83,7 @@ describe('command lifecycle invariants', () => {
 
     await expect(ctx.plugin(CommandInvariant)).rejects.toMatchObject({
       code: 'INVARIANT',
-      packageName: '@roos-code/roos-code-commands',
+      packageName: '@shres-code/shres-code-commands',
     })
   })
 })

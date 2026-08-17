@@ -1,7 +1,7 @@
 /**
- * Node half of the client module system (`roos.client` dual-face package): scans
- * the host Loader's entries for packages declaring `roos.client`, composes the
- * `window.__ROOS_BOOT__` entry graph (wire single source: {@link WebBootEntry}
+ * Node half of the client module system (`shres.client` dual-face package): scans
+ * the host Loader's entries for packages declaring `shres.client`, composes the
+ * `window.__SHRES_BOOT__` entry graph (wire single source: {@link WebBootEntry}
  * in `./client/manifest.ts`), serves `/plugins/<id>/client.js` and its source
  * map, taps the index render to inject the boot manifest, and provides the
  * `clientModuleHost` service (the HMR node half's registration/notification
@@ -17,7 +17,7 @@
  * expires — plugin-set changes take effect on restart; bundle content
  * changes reach the graph only through
  * {@link ClientModuleRegistry.rebuilt}.
- * @module @roos-code/roos-code-client-modules
+ * @module @shres-code/shres-code-client-modules
  */
 
 import { createHash } from 'node:crypto'
@@ -26,32 +26,32 @@ import { readFile } from 'node:fs/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
-import { Service } from '@roos-code/cordis'
-import type { Context } from '@roos-code/cordis'
-import type {} from '@roos-code/cordis-plugin-loader'
-import type {} from '@roos-code/roos-code-host-webserver'
+import { Service } from '@shres-code/cordis'
+import type { Context } from '@shres-code/cordis'
+import type {} from '@shres-code/cordis-plugin-loader'
+import type {} from '@shres-code/shres-code-host-webserver'
 import type { WebBootEntry, WebBootGraph } from './client/manifest.ts'
 
 export type {
   BootManifest, BootModuleRow, BootPluginRow, WebBootEntry, WebBootGraph,
 } from './client/manifest.ts'
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     /** The web plugin table (provided by the client-modules node half). */
     clientModules: ClientModuleRegistry
   }
 }
 
-/** package.json `roos.client` declaration fields, validated one by one after reading the file. */
-interface RoosClientDeclaration {
+/** package.json `shres.client` declaration fields, validated one by one after reading the file. */
+interface ShresClientDeclaration {
   inject?: string[]
   platform: string
   /** Boot phase-one prefetch mark; absent means lazy (fetched on demand). */
   immediately?: boolean
 }
 
-/** Resolved package metadata for one `roos.client` package (cached per name, never expires). */
+/** Resolved package metadata for one `shres.client` package (cached per name, never expires). */
 interface PkgMeta {
   clientPath: string
   inject?: string[]
@@ -105,21 +105,21 @@ interface WebPluginRecord {
   clientPath: string
 }
 
-/** Narrow an unknown parsed JSON value to the `roos.client` declaration, throwing on malformed fields. */
-function parseRoosClient(pkgName: string, value: unknown): RoosClientDeclaration | undefined {
+/** Narrow an unknown parsed JSON value to the `shres.client` declaration, throwing on malformed fields. */
+function parseShresClient(pkgName: string, value: unknown): ShresClientDeclaration | undefined {
   if (value === undefined) return undefined
   if (typeof value !== 'object' || value === null) {
-    throw new Error(`client-modules: ${pkgName} has a non-object roos.client declaration`)
+    throw new Error(`client-modules: ${pkgName} has a non-object shres.client declaration`)
   }
   const decl = value as Record<string, unknown>
   if (typeof decl.platform !== 'string') {
-    throw new Error(`client-modules: ${pkgName} roos.client.platform must be a string`)
+    throw new Error(`client-modules: ${pkgName} shres.client.platform must be a string`)
   }
   if (decl.inject !== undefined && (!Array.isArray(decl.inject) || decl.inject.some(i => typeof i !== 'string'))) {
-    throw new Error(`client-modules: ${pkgName} roos.client.inject must be a string array`)
+    throw new Error(`client-modules: ${pkgName} shres.client.inject must be a string array`)
   }
   if (decl.immediately !== undefined && typeof decl.immediately !== 'boolean') {
-    throw new Error(`client-modules: ${pkgName} roos.client.immediately must be a boolean`)
+    throw new Error(`client-modules: ${pkgName} shres.client.immediately must be a boolean`)
   }
   return {
     platform: decl.platform,
@@ -158,7 +158,7 @@ function graphRow(id: string, rev: string, injectEdges: string[] | undefined, im
 }
 
 /**
- * Inject the boot entry graph into index.html: `window.__ROOS_BOOT__` as the
+ * Inject the boot entry graph into index.html: `window.__SHRES_BOOT__` as the
  * first script in <head> (before the shell bundle reads it). `<` is escaped in
  * the JSON so plugin-controlled strings cannot break out of the script element.
  * @param html - the index.html source.
@@ -167,7 +167,7 @@ function graphRow(id: string, rev: string, injectEdges: string[] | undefined, im
  */
 export function injectBootManifest(html: string, graph: WebBootGraph): string {
   const json = JSON.stringify(graph).replaceAll('<', '\\u003c')
-  const script = `<script>window.__ROOS_BOOT__ = ${json}</script>`
+  const script = `<script>window.__SHRES_BOOT__ = ${json}</script>`
   const head = html.indexOf('<head>')
   if (head !== -1) return `${html.slice(0, head + 6)}${script}${html.slice(head + 6)}`
   // Headless fixture pages may lack <head>; prepending keeps the read-before-shell ordering.
@@ -175,7 +175,7 @@ export function injectBootManifest(html: string, graph: WebBootGraph): string {
 }
 
 /**
- * The web plugin table service: incremental `roos.client` scan + wire composition
+ * The web plugin table service: incremental `shres.client` scan + wire composition
  * + bundle route + index tap. Construction runs the activation scan
  * synchronously — a malformed declaration or missing bundle among the
  * already-loaded entries aggregates into one loud throw (FAILED fiber; the
@@ -186,7 +186,7 @@ export class ClientModuleRegistry extends Service {
 
   private readonly table = new Map<string, WebPluginRecord>()
   // Negative verdicts (unresolvable specifier — builtins like cordis:include,
-  // subpath rows — or a package without a web `roos.client` declaration) are
+  // subpath rows — or a package without a web `shres.client` declaration) are
   // cached as null and never expire: plugin-set changes take effect on restart.
   private readonly pkgMeta = new Map<string, PkgMeta | null>()
   private readonly rebuildListeners = new Set<(id: string, rev: string) => void>()
@@ -250,7 +250,7 @@ export class ClientModuleRegistry extends Service {
 
   /**
    * Current composed entry graph (stable object between changes).
-   * @returns the graph served as `window.__ROOS_BOOT__`.
+   * @returns the graph served as `window.__SHRES_BOOT__`.
    */
   graph(): WebBootGraph {
     return this.composed
@@ -342,10 +342,10 @@ export class ClientModuleRegistry extends Service {
       return null
     }
     const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as Record<string, unknown>
-    const roos = pkg.roos
-    const decl = parseRoosClient(
+    const shres = pkg.shres
+    const decl = parseShresClient(
       pkgName,
-      roos !== null && typeof roos === 'object' ? (roos as Record<string, unknown>).client : undefined,
+      shres !== null && typeof shres === 'object' ? (shres as Record<string, unknown>).client : undefined,
     )
     if (decl === undefined || decl.platform !== 'web') {
       this.pkgMeta.set(pkgName, null)
@@ -353,7 +353,7 @@ export class ClientModuleRegistry extends Service {
     }
     const clientRel = clientExportOf(pkgName, pkg.exports)
     if (clientRel === undefined) {
-      throw new Error(`client-modules: ${pkgName} declares roos.client but exports no "./client" bundle`)
+      throw new Error(`client-modules: ${pkgName} declares shres.client but exports no "./client" bundle`)
     }
     const meta: PkgMeta = {
       clientPath: join(dirname(pkgPath), clientRel),

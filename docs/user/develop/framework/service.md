@@ -34,7 +34,7 @@ When `apply` runs, every service declared by `inject` is ready. If a service is 
 ### Extend Service
 
 ```ts
-import { Service, type Context } from '@roos-code/cordis'
+import { Service, type Context } from '@shres-code/cordis'
 
 export default class MetricsService extends Service {
   static inject = ['llm']  // A service may depend on other services.
@@ -65,9 +65,9 @@ export function apply(ctx: Context) {
 Use TypeScript declaration merging to type `ctx.metrics`:
 
 ```ts
-import { Service, type Context } from '@roos-code/cordis'
+import { Service, type Context } from '@shres-code/cordis'
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     metrics: MetricsService
   }
@@ -112,23 +112,23 @@ This prevents a plugin from calling a service that no longer exists.
 
 ```yaml
 - id: group-a
-  name: '@roos-code/cordis-plugin-group'
+  name: '@shres-code/cordis-plugin-group'
   group: true
   isolate:
     shell: true
   config:
-    - name: '@roos-code/roos-code-bash-local'
+    - name: '@shres-code/shres-code-bash-local'
       config:
         timeoutMs: 5000
     - name: './src/plugin-a.ts'
 
 - id: group-b
-  name: '@roos-code/cordis-plugin-group'
+  name: '@shres-code/cordis-plugin-group'
   group: true
   isolate:
     shell: true
   config:
-    - name: '@roos-code/roos-code-bash-local'
+    - name: '@shres-code/shres-code-bash-local'
       config:
         timeoutMs: 60000
     - name: './src/plugin-b.ts'

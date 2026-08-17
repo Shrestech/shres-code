@@ -4,16 +4,16 @@
  * surface events; a separate replacement `user/message` carries the summary.
  * Backend packages own configuration and retention policy; see
  * `.agents/notes/implemented/feature/2026-06-18-compaction-capability-seam.md`.
- * @module @roos-code/roos-code-compaction/types
+ * @module @shres-code/shres-code-compaction/types
  */
 
-import type { ContentBlock, TokenUsage } from '@roos-code/roos-code-llm'
-import type { CommandId } from '@roos-code/roos-code-commands/brand'
+import type { ContentBlock, TokenUsage } from '@shres-code/shres-code-llm'
+import type { CommandId } from '@shres-code/shres-code-commands/brand'
 import type { CompactionId } from './brand.ts'
 
 export type { CompactionId }
 
-declare module '@roos-code/roos-code-session/types' {
+declare module '@shres-code/shres-code-session/types' {
   interface SessionEventMap {
     /**
      * Marks the start of a compaction — log-only, holds the lock until

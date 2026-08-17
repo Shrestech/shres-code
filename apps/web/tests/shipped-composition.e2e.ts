@@ -7,17 +7,17 @@ import { readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { afterEach, expect, it } from 'vitest'
-import { CallId } from '@roos-code/roos-code-llm'
-import { canonicalPath, writableRoots } from '@roos-code/roos-code-sandbox'
-import { SessionId } from '@roos-code/roos-code-session'
+import { CallId } from '@shres-code/shres-code-llm'
+import { canonicalPath, writableRoots } from '@shres-code/shres-code-sandbox'
+import { SessionId } from '@shres-code/shres-code-session'
 // Empty type imports carry the tools/sandboxPolicy/approval Context merges.
-import type {} from '@roos-code/roos-code-tools'
-import type {} from '@roos-code/roos-code-sandbox-policy'
-import type {} from '@roos-code/roos-code-user-approval'
-import type {} from '@roos-code/roos-code-permission-presets'
-import type {} from '@roos-code/roos-code-agent-presets'
-import type {} from '@roos-code/roos-code-commands'
-import type {} from '@roos-code/roos-code-system-prompt'
+import type {} from '@shres-code/shres-code-tools'
+import type {} from '@shres-code/shres-code-sandbox-policy'
+import type {} from '@shres-code/shres-code-user-approval'
+import type {} from '@shres-code/shres-code-permission-presets'
+import type {} from '@shres-code/shres-code-agent-presets'
+import type {} from '@shres-code/shres-code-commands'
+import type {} from '@shres-code/shres-code-system-prompt'
 import { launchWebScaffold, type WebScaffold } from './scaffold.ts'
 
 const FILE_REFERENCE_PROMPT = fileURLToPath(new URL(
@@ -59,7 +59,7 @@ const EXPECTED_TOOLS = [
 ]
 
 /**
- * `glob` and `grep` come from `roos-tool-fs-search`, which spawns the PACKAGED
+ * `glob` and `grep` come from `shres-tool-fs-search`, which spawns the PACKAGED
  * ripgrep binary (`@vscode/ripgrep`) through the subprocess seam, so the pair
  * is always present on every host — asserted as fixed members, not a host
  * dependency.

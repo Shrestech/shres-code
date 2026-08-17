@@ -1,13 +1,13 @@
 {
-  "name": "@roos-code/roos-code-jobs-local",
-  "description": "Process-local implementation of the Roos Code background job registry seam",
+  "name": "@shres-code/shres-code-jobs-local",
+  "description": "Process-local implementation of the Shres Code background job registry seam",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "packages/jobs/jobs-local"
   },
   "type": "module",
@@ -32,26 +32,26 @@
   ],
   "license": "MIT",
   "peerDependencies": {
-    "@roos-code/roos-code-agent": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-scope": "workspace:^",
-    "@roos-code/roos-code-jobs": "workspace:^",
-    "@roos-code/roos-code-timeout": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-agent": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-scope": "workspace:^",
+    "@shres-code/shres-code-jobs": "workspace:^",
+    "@shres-code/shres-code-timeout": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   },
   "dependencies": {
-    "@roos-code/schemastery": "workspace:^"
+    "@shres-code/schemastery": "workspace:^"
   },
   "devDependencies": {
-    "@roos-code/cordis-plugin-include": "workspace:^",
-    "@roos-code/cordis-plugin-loader": "workspace:^",
-    "@roos-code/roos-code-agent": "workspace:^",
-    "@roos-code/roos-code-brand": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-scope": "workspace:^",
-    "@roos-code/roos-code-session": "workspace:^",
-    "@roos-code/roos-code-jobs": "workspace:^",
-    "@roos-code/roos-code-timeout": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/cordis-plugin-include": "workspace:^",
+    "@shres-code/cordis-plugin-loader": "workspace:^",
+    "@shres-code/shres-code-agent": "workspace:^",
+    "@shres-code/shres-code-brand": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-scope": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-jobs": "workspace:^",
+    "@shres-code/shres-code-timeout": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   }
 }

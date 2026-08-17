@@ -1,6 +1,6 @@
 /**
  * Shared exit-status parse contract: the inverse of the `[exit code: N]` /
- * `[killed by signal: X]` markers `roos-tool-bash` and `roos-tool-pwsh` append.
+ * `[killed by signal: X]` markers `shres-tool-bash` and `shres-tool-pwsh` append.
  * Both tools' presenter suites round-trip their own renderers through this
  * parse; this spec pins the parse's own edges (marker-like output, body
  * slicing) once, at the seam that owns it.

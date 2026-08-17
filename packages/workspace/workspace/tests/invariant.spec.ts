@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import InvariantRegistry from '@roos-code/roos-code-invariants'
-import type { DomainChanged } from '@roos-code/roos-code-storage-domain'
+import { Context } from '@shres-code/cordis'
+import InvariantRegistry from '@shres-code/shres-code-invariants'
+import type { DomainChanged } from '@shres-code/shres-code-storage-domain'
 import * as WorkspaceInvariant from '../src/invariant.ts'
 import { WorkspaceId } from '../src/index.ts'
 

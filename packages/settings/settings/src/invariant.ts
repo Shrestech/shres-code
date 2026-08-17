@@ -1,13 +1,13 @@
 /**
- * Package-owned invariant companion for `@roos-code/roos-code-settings`.
- * @module @roos-code/roos-code-settings/invariant
+ * Package-owned invariant companion for `@shres-code/shres-code-settings`.
+ * @module @shres-code/shres-code-settings/invariant
  */
 
-import type { Context } from '@roos-code/cordis'
-import type { InvariantFailure, InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantFailure, InvariantInstaller } from '@shres-code/shres-code-invariants'
 import { deepEqualJson } from './index.ts'
 
-const PACKAGE_NAME = '@roos-code/roos-code-settings'
+const PACKAGE_NAME = '@shres-code/shres-code-settings'
 
 /** Cordis companion plugin name. */
 export const name = 'settings-invariant'

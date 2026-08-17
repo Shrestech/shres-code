@@ -18,7 +18,7 @@ function declaration(over: Partial<SlotDeclaration> = {}): SlotDeclaration {
     kind: 'single',
     scope: 'root',
     jsDoc: '/** A seat. Registering here replaces the shipped entry. */',
-    package: '@roos-code/roos-code-client-demo',
+    package: '@shres-code/shres-code-client-demo',
     source: 'packages/client/demo/src/client/contract/slots.ts:1',
     ...over,
   }
@@ -28,7 +28,7 @@ function declaration(over: Partial<SlotDeclaration> = {}): SlotDeclaration {
 function registration(over: Partial<SlotRegistration> = {}): SlotRegistration {
   return {
     key: 'demo.seat',
-    package: '@roos-code/roos-code-client-demo',
+    package: '@shres-code/shres-code-client-demo',
     component: 'DemoSeat',
     children: [],
     source: 'packages/client/demo/src/client/index.ts:10',

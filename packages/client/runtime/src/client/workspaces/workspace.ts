@@ -2,8 +2,8 @@
 
 import type {
   IApiClient, RpcResult, WorkspaceView,
-} from '@roos-code/roos-code-api-remotes/client'
-import { transportError } from '@roos-code/roos-code-host-apiproxy/api'
+} from '@shres-code/shres-code-api-remotes/client'
+import { transportError } from '@shres-code/shres-code-host-apiproxy/api'
 import type { ObservableSnapshot } from '../contract/store.ts'
 import { Notifier } from '../sessions/notifier.ts'
 

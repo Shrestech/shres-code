@@ -1,5 +1,5 @@
 /**
- * Live Playwright walk of the running roos web app. Covers home, composer,
+ * Live Playwright walk of the running shres web app. Covers home, composer,
  * settings (General / Models / Plugins / Agent presets), seats, Z.AI, CLI
  * rows, and a mobile viewport. Prints a report; non-zero exit on failure.
  */
@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import { chromium } from 'playwright'
 
-const BASE = process.env.ROOS_WEB_URL ?? 'http://127.0.0.1:3080'
+const BASE = process.env.SHRES_WEB_URL ?? 'http://127.0.0.1:3080'
 const SHOT = join(fileURLToPath(new URL('../../../.artifacts/verify-app/', import.meta.url)))
 const failures = []
 const notes = []

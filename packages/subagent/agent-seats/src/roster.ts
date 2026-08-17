@@ -1,11 +1,11 @@
 /**
- * Product roster for the three named Roos child seats. Tool names, labels,
+ * Product roster for the three named Shres child seats. Tool names, labels,
  * and personas live here so the remount plugin and its tests share one table.
- * @module @roos-code/roos-code-agent-seats/roster
+ * @module @shres-code/shres-code-agent-seats/roster
  */
 
 /** Stable seat ids; each is also the model-facing tool name. */
-export const SEAT_IDS = ['boomer', 'joey', 'flyer'] as const
+export const SEAT_IDS = ['aegis', 'stride', 'ward'] as const
 
 /** One named seat the conductor can delegate to. */
 export type SeatId = (typeof SEAT_IDS)[number]
@@ -28,9 +28,9 @@ export interface AgentSeatsSettings {
 export interface SeatRosterEntry {
   /** Seat id and tool name. */
   readonly id: SeatId
-  /** Kangaroo display name written into child labels. */
+  /** Display name written into child labels. */
   readonly label: string
-  /** Role gloss shown next to the kangaroo name. */
+  /** Role gloss shown next to the seat name. */
   readonly role: string
   /** Short settings-page description of the role. */
   readonly hint: string
@@ -43,41 +43,41 @@ export interface SeatRosterEntry {
 /** The three product seats in display order. */
 export const SEAT_ROSTER: readonly SeatRosterEntry[] = [
   {
-    id: 'boomer',
-    label: 'Boomer',
+    id: 'aegis',
+    label: 'Aegis',
     role: 'Architect',
     hint: 'Designs the approach and a concrete plan. Does not implement.',
     persona:
-      'You are Boomer, the Architect. Design the approach, name the trade-offs, and return a concrete plan. '
+      'You are Aegis, the Architect. Design the approach, name the trade-offs, and return a concrete plan. '
       + 'Do not implement unless the parent explicitly asks you to. Stay in this workspace.',
     description:
-      'Delegate design work to Boomer, the Architect seat — a separate Roos child with its own model in this workspace. '
-      + 'Use it for architecture, trade-offs, and a concrete plan. Boomer does not implement. '
+      'Delegate design work to Aegis, the Architect seat — a separate Shres child with its own model in this workspace. '
+      + 'Use it for architecture, trade-offs, and a concrete plan. Aegis does not implement. '
       + 'Give a complete standalone prompt; it does not see this conversation.',
   },
   {
-    id: 'joey',
-    label: 'Joey',
+    id: 'stride',
+    label: 'Stride',
     role: 'Worker',
     hint: 'Implements a bounded piece of work in this workspace.',
     persona:
-      'You are Joey, the Worker. Implement the assigned work in this workspace. Stay inside the given bound. '
+      'You are Stride, the Worker. Implement the assigned work in this workspace. Stay inside the given bound. '
       + 'Do not redesign the plan unless it is blocked.',
     description:
-      'Delegate bounded implementation work to Joey, the Worker seat — a separate Roos child with its own model in this workspace. '
+      'Delegate bounded implementation work to Stride, the Worker seat — a separate Shres child with its own model in this workspace. '
       + 'Use it to write or change code inside a stated bound. Give a complete standalone prompt; it does not see this conversation.',
   },
   {
-    id: 'flyer',
-    label: 'Flyer',
+    id: 'ward',
+    label: 'Ward',
     role: 'Reviewer',
     hint: 'Reviews work and reports findings. Does not rewrite unless asked.',
     persona:
-      'You are Flyer, the Reviewer. Review the assigned work for correctness, regressions, and missed cases. '
+      'You are Ward, the Reviewer. Review the assigned work for correctness, regressions, and missed cases. '
       + 'Report findings; do not rewrite unless the parent asks.',
     description:
-      'Delegate review work to Flyer, the Reviewer seat — a separate Roos child with its own model in this workspace. '
-      + 'Use it to review diffs, tests, and missed cases. Flyer reports findings and does not rewrite unless asked. '
+      'Delegate review work to Ward, the Reviewer seat — a separate Shres child with its own model in this workspace. '
+      + 'Use it to review diffs, tests, and missed cases. Ward reports findings and does not rewrite unless asked. '
       + 'Give a complete standalone prompt; it does not see this conversation.',
   },
 ]

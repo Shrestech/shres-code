@@ -1,11 +1,11 @@
 /** Injected faces and the Package-owned `tool.view.cordis` slot declaration. */
 
-import type { SessionId } from '@roos-code/roos-code-client-connection/client'
-import type { HostObservable } from '@roos-code/roos-code-client-ui-slots'
+import type { SessionId } from '@shres-code/shres-code-client-connection/client'
+import type { HostObservable } from '@shres-code/shres-code-client-ui-slots'
 import type {
   CordisRunActivity, CordisRunFailure, CordisUserRunRequest, DynamicCordisLivePackage,
   DynamicCordisRenderFailure,
-} from '@roos-code/roos-code-cordis-client-runner/client'
+} from '@shres-code/shres-code-cordis-client-runner/client'
 import type { CordisActionResult } from './dynamic-port.ts'
 import type { CordisInventory } from './inventory.ts'
 import type { CordisRunCardPointer, CordisRunCardStore } from './run-card-index.ts'
@@ -20,7 +20,7 @@ export interface CordisToolViewOwnerProps {
   readonly pluginRunId: CordisDynamicPluginRunId
 }
 
-declare module '@roos-code/roos-code-client-ui-slots' {
+declare module '@shres-code/shres-code-client-ui-slots' {
   interface SlotMap {
     /**
      * Interactive Package-owned region rendered inside the latest eligible

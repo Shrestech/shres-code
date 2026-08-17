@@ -1,15 +1,15 @@
 /**
  * Semantic durability checkpoints for model requests, top-level tool dispatch,
  * and completed agent steps.
- * @module @roos-code/roos-code-session-checkpoint-policy
+ * @module @shres-code/shres-code-session-checkpoint-policy
  */
 
-import type { Context } from '@roos-code/cordis'
-import type { Session } from '@roos-code/roos-code-session'
-import type { StreamChunk } from '@roos-code/roos-code-llm'
-import { TOOL_ABORTED_BEFORE_DISPATCH, type ToolExecutionResult } from '@roos-code/roos-code-tools'
-import type { PreStepDecision } from '@roos-code/roos-code-agent'
-import type {} from '@roos-code/roos-code-session-persistence'
+import type { Context } from '@shres-code/cordis'
+import type { Session } from '@shres-code/shres-code-session'
+import type { StreamChunk } from '@shres-code/shres-code-llm'
+import { TOOL_ABORTED_BEFORE_DISPATCH, type ToolExecutionResult } from '@shres-code/shres-code-tools'
+import type { PreStepDecision } from '@shres-code/shres-code-agent'
+import type {} from '@shres-code/shres-code-session-persistence'
 
 /** Cordis plugin name used by Loader diagnostics. */
 export const name = 'session-checkpoint-policy'

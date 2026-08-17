@@ -5,15 +5,15 @@
 // views. callId/approvalId stay plain string here (narrow to real brands when
 // convenient).
 
-import type { CommandId } from '@roos-code/roos-code-commands/brand'
-import type { MessageId } from '@roos-code/roos-code-llm/brand'
-import type { ContentBlock } from '@roos-code/roos-code-llm/types'
-import type { ImageAttachmentRef } from '@roos-code/roos-code-attachment'
-import type { LlmRetryEventData } from '@roos-code/roos-code-llm-retry/types'
-import type { TodoItem } from '@roos-code/roos-code-session/types'
+import type { CommandId } from '@shres-code/shres-code-commands/brand'
+import type { MessageId } from '@shres-code/shres-code-llm/brand'
+import type { ContentBlock } from '@shres-code/shres-code-llm/types'
+import type { ImageAttachmentRef } from '@shres-code/shres-code-attachment'
+import type { LlmRetryEventData } from '@shres-code/shres-code-llm-retry/types'
+import type { TodoItem } from '@shres-code/shres-code-session/types'
 import type {
   RpcError, SessionId, SubagentAddress, ToolCallView, ToolResultView,
-} from '@roos-code/roos-code-api-remotes/client'
+} from '@shres-code/shres-code-api-remotes/client'
 import type { PendingInteraction } from './pending.ts'
 import type { ContextProvenanceView, KnownContextForm } from './context-provenance.ts'
 import type {

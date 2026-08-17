@@ -1,4 +1,4 @@
-import type { Dict } from '@roos-code/cosmokit'
+import type { Dict } from '@shres-code/cosmokit'
 import { EventsService } from './events.ts'
 import { LoggerService } from './logger.ts'
 import { ReflectService } from './reflect.ts'

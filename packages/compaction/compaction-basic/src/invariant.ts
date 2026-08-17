@@ -1,13 +1,13 @@
 /**
- * Package-owned invariant companion for `@roos-code/roos-code-compaction-basic`.
- * @module @roos-code/roos-code-compaction-basic/invariant
+ * Package-owned invariant companion for `@shres-code/shres-code-compaction-basic`.
+ * @module @shres-code/shres-code-compaction-basic/invariant
  */
 
 /* jscpd:ignore-start */
-import type { Context } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-compaction-basic'
+const PACKAGE_NAME = '@shres-code/shres-code-compaction-basic'
 
 /** Cordis companion plugin name. */
 export const name = 'compaction-basic-invariant'

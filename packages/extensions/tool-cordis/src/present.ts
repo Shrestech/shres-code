@@ -1,6 +1,6 @@
 /** Pure replay-safe render intents for Cordis tools. */
 
-import type { GenericCallView } from '@roos-code/roos-code-tools'
+import type { GenericCallView } from '@shres-code/shres-code-tools'
 
 /**
  * Render a runtime-inspection call.

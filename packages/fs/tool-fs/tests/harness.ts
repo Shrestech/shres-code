@@ -1,11 +1,11 @@
-import { Context } from '@roos-code/cordis'
-import type { Agent } from '@roos-code/roos-code-agent'
-import AgentLoop from '@roos-code/roos-code-agent-loop'
-import { mountAgentLoopTestDependencies } from '@roos-code/roos-code-agent-loop-testkit'
-import LocalFileSystem from '@roos-code/roos-code-fs-local'
-import * as FsPolicy from '@roos-code/roos-code-fs-observation-policy'
-import * as ToolFs from '@roos-code/roos-code-tool-fs'
-import * as LlmDeepSeek from '@roos-code/roos-code-llm-deepseek'
+import { Context } from '@shres-code/cordis'
+import type { Agent } from '@shres-code/shres-code-agent'
+import AgentLoop from '@shres-code/shres-code-agent-loop'
+import { mountAgentLoopTestDependencies } from '@shres-code/shres-code-agent-loop-testkit'
+import LocalFileSystem from '@shres-code/shres-code-fs-local'
+import * as FsPolicy from '@shres-code/shres-code-fs-observation-policy'
+import * as ToolFs from '@shres-code/shres-code-tool-fs'
+import * as LlmDeepSeek from '@shres-code/shres-code-llm-deepseek'
 
 /**
  * Build the real fs-tool stack for with-key e2e tests. Agents have no session

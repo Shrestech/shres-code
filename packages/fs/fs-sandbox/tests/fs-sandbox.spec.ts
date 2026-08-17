@@ -13,14 +13,14 @@ import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promis
 import { existsSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { join, parse } from 'node:path'
-import { Context } from '@roos-code/cordis'
-import { FsError, FsTargetKey } from '@roos-code/roos-code-fs'
-import type { FsTarget } from '@roos-code/roos-code-fs'
-import SandboxPolicyService from '@roos-code/roos-code-sandbox-policy'
-import type { SandboxMode } from '@roos-code/roos-code-sandbox'
-import { SandboxedFileSystem } from '@roos-code/roos-code-fs-sandbox'
-import type { Config as FsSandboxConfig } from '@roos-code/roos-code-fs-sandbox'
-import { resolveRoosHome } from '@roos-code/roos-code-home-paths'
+import { Context } from '@shres-code/cordis'
+import { FsError, FsTargetKey } from '@shres-code/shres-code-fs'
+import type { FsTarget } from '@shres-code/shres-code-fs'
+import SandboxPolicyService from '@shres-code/shres-code-sandbox-policy'
+import type { SandboxMode } from '@shres-code/shres-code-sandbox'
+import { SandboxedFileSystem } from '@shres-code/shres-code-fs-sandbox'
+import type { Config as FsSandboxConfig } from '@shres-code/shres-code-fs-sandbox'
+import { resolveShresHome } from '@shres-code/shres-code-home-paths'
 
 let base: string
 let workspace: string
@@ -42,7 +42,7 @@ beforeEach(async () => {
   // would be legitimately writable. Sibling dirs under HOME are outside every
   // grant, so containment failures are real denials. (The bwrap e2e roots its
   // workspaces under HOME for the same reason.)
-  base = await mkdtemp(join(homedir(), '.roos-fssbx-'))
+  base = await mkdtemp(join(homedir(), '.shres-fssbx-'))
   workspace = join(base, 'ws')
   outside = join(base, 'out')
   await mkdir(workspace)
@@ -100,7 +100,7 @@ describe('workspace-write containment', () => {
   })
 
   it('a write to the platform temp area lands (parity with the bash runner grant)', async () => {
-    const path = join(await mkdtemp(join(tmpdir(), 'roos-fssbx-tmp-')), 'temp.txt')
+    const path = join(await mkdtemp(join(tmpdir(), 'shres-fssbx-tmp-')), 'temp.txt')
     await fs.writeText(await target(path), 'temp')
     expect(await readFile(path, 'utf8')).toBe('temp')
   })
@@ -229,22 +229,22 @@ describe('registration and HMR safety', () => {
 })
 
 describe('the credential read fence', () => {
-  const previousHome = process.env.ROOS_HOME
+  const previousHome = process.env.SHRES_HOME
   let home: string
 
   beforeEach(async () => {
-    home = join(base, 'roos-home')
+    home = join(base, 'shres-home')
     await mkdir(home)
-    process.env.ROOS_HOME = home
+    process.env.SHRES_HOME = home
   })
   afterEach(() => {
-    if (previousHome === undefined) delete process.env.ROOS_HOME
-    else process.env.ROOS_HOME = previousHome
+    if (previousHome === undefined) delete process.env.SHRES_HOME
+    else process.env.SHRES_HOME = previousHome
   })
 
-  it('denies a direct read of $ROOS_HOME/.credentials.yaml under workspace-write', async () => {
+  it('denies a direct read of $SHRES_HOME/.credentials.yaml under workspace-write', async () => {
     await boot('workspace-write')
-    const path = join(resolveRoosHome(), '.credentials.yaml')
+    const path = join(resolveShresHome(), '.credentials.yaml')
     await writeFile(path, 'DEEPSEEK_API_KEY: sk-secret\n', { mode: 0o600 })
     await expect(fs.readText(await target(path))).rejects.toMatchObject({ code: 'FS_SANDBOX_DENIED' })
   })
@@ -265,17 +265,17 @@ describe('the credential read fence', () => {
     await expect(fs.readBytes(resolved, undefined, 1024)).rejects.toMatchObject({ code: 'FS_SANDBOX_DENIED' })
   })
 
-  it('denies the resolved identity of $ROOS_HOME/.credentials.yaml even when the target basename is harmless', async () => {
+  it('denies the resolved identity of $SHRES_HOME/.credentials.yaml even when the target basename is harmless', async () => {
     const real = join(outside, 'secret-store')
     await writeFile(real, 'sk-hidden\n')
-    await symlink(real, join(resolveRoosHome(), '.credentials.yaml'))
+    await symlink(real, join(resolveShresHome(), '.credentials.yaml'))
     await boot('workspace-write')
     await expect(fs.readText(await target(real))).rejects.toMatchObject({ code: 'FS_SANDBOX_DENIED' })
   })
 
   it('denies a symlink alias that resolves to the home credentials document', async () => {
     await boot('workspace-write')
-    const real = join(resolveRoosHome(), '.credentials.yaml')
+    const real = join(resolveShresHome(), '.credentials.yaml')
     await writeFile(real, 'DEEPSEEK_API_KEY: sk-secret\n', { mode: 0o600 })
     const alias = join(workspace, 'not-secrets.txt')
     await symlink(real, alias)
@@ -310,7 +310,7 @@ describe('the credential read fence', () => {
 
   it('lifts the read fence only under danger-full-access', async () => {
     await boot('danger-full-access')
-    const path = join(resolveRoosHome(), '.credentials.yaml')
+    const path = join(resolveShresHome(), '.credentials.yaml')
     await writeFile(path, 'DEEPSEEK_API_KEY: sk-secret\n', { mode: 0o600 })
     expect(await fs.readText(await target(path))).toBe('DEEPSEEK_API_KEY: sk-secret\n')
   })
@@ -333,8 +333,8 @@ describe('the credential read fence', () => {
     await expect(fs.readText(await target(file))).rejects.toMatchObject({ code: 'FS_SANDBOX_DENIED' })
   })
 
-  it('denies a nested path when $ROOS_HOME/.credentials.yaml is a directory', async () => {
-    const credsDir = join(resolveRoosHome(), '.credentials.yaml')
+  it('denies a nested path when $SHRES_HOME/.credentials.yaml is a directory', async () => {
+    const credsDir = join(resolveShresHome(), '.credentials.yaml')
     await mkdir(credsDir)
     const nested = join(credsDir, 'nested.key')
     await writeFile(nested, 'sk-nested\n')

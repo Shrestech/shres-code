@@ -1,14 +1,14 @@
 /**
- * Package-owned invariant companion for `@roos-code/roos-code-workspace`.
- * @module @roos-code/roos-code-workspace/invariant
+ * Package-owned invariant companion for `@shres-code/shres-code-workspace`.
+ * @module @shres-code/shres-code-workspace/invariant
  */
 
-import type { Context } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
-import type { DomainChanged } from '@roos-code/roos-code-storage-domain'
-import { WorkspaceId } from '@roos-code/roos-code-workspace'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
+import type { DomainChanged } from '@shres-code/shres-code-storage-domain'
+import { WorkspaceId } from '@shres-code/shres-code-workspace'
 
-const PACKAGE_NAME = '@roos-code/roos-code-workspace'
+const PACKAGE_NAME = '@shres-code/shres-code-workspace'
 
 /** Cordis companion plugin name. */
 export const name = 'workspace-invariant'

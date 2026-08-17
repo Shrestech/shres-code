@@ -1,4 +1,4 @@
-# @roos-code/roos-code-command-feedback
+# @shres-code/shres-code-command-feedback
 
 Trigger-independent session feedback plus human-facing `/feedback` capture. The package exports `recordFeedback(session, text)`, which appends one log-only `feedback/record` event. Its plugin registers one global command through [`ctx.commands`](../../interaction/commands/README.md), so every composed command adapter discovers it; the shipped Web client executes it without a model turn.
 
@@ -26,9 +26,9 @@ The disclosure states the deployment's current sharing policy only; it never pro
 
 ## What this plugin does and does not do
 
-`recordFeedback(session, text)` is the command-independent write path. It rejects empty normalized text and appends `feedback/record { text }`; a different UI, hook, or host integration can call it without constructing a slash command. The `/feedback` handler uses that producer and starts no model work. The optional [`roos-session-telemetry-otel`](../../session/session-telemetry-otel) consumer observes the event without changing its capture contract.
+`recordFeedback(session, text)` is the command-independent write path. It rejects empty normalized text and appends `feedback/record { text }`; a different UI, hook, or host integration can call it without constructing a slash command. The `/feedback` handler uses that producer and starts no model work. The optional [`shres-session-telemetry-otel`](../../session/session-telemetry-otel) consumer observes the event without changing its capture contract.
 
-The feedback text appears in exactly one durable payload: `feedback/record`. [`roos-commands`](../../interaction/commands/README.md) still appends its generic `command/run` / `command/done` pairing, but this definition sets `recordInput: false`, so `command/run` omits `args`; the paired `command/done` carries only the outcome. All three events are log-only and absent from the ordered surface, `deriveMessages()`, and model requests. These appends start persistence's ordinary eager drain, but neither producer forces `session/flush`, so acknowledgement means the feedback is in the log, not that it has reached disk. The acknowledgement identifies both the receiving session and the [shared anonymous user](../../identity/anonymous-user-id/); the first accepted feedback for a harness home can create `$ROOS_HOME/.anonymous-user-id`. Rejected empty input leaves only the command pairing settled as `kind: 'error'`, with no `feedback/record` and no user-id lookup.
+The feedback text appears in exactly one durable payload: `feedback/record`. [`shres-commands`](../../interaction/commands/README.md) still appends its generic `command/run` / `command/done` pairing, but this definition sets `recordInput: false`, so `command/run` omits `args`; the paired `command/done` carries only the outcome. All three events are log-only and absent from the ordered surface, `deriveMessages()`, and model requests. These appends start persistence's ordinary eager drain, but neither producer forces `session/flush`, so acknowledgement means the feedback is in the log, not that it has reached disk. The acknowledgement identifies both the receiving session and the [shared anonymous user](../../identity/anonymous-user-id/); the first accepted feedback for a harness home can create `$SHRES_HOME/.anonymous-user-id`. Rejected empty input leaves only the command pairing settled as `kind: 'error'`, with no `feedback/record` and no user-id lookup.
 
 The event is authoritative rather than the command record because feedback may arrive through a trigger other than `/feedback`. Keeping the payload out of `command/run` avoids two records carrying the same text.
 
@@ -38,12 +38,12 @@ The producer injects only `commands`. A custom app mounts the registry plus this
 
 ```yaml
 - id: commands
-  name: '@roos-code/roos-code-commands'
+  name: '@shres-code/shres-code-commands'
 - id: command-feedback
-  name: '@roos-code/roos-code-command-feedback'
+  name: '@shres-code/shres-code-command-feedback'
 ```
 
-The shipped `roos` base mounts this command unconditionally; it has no configuration and no dependency on the persisted-goal stack. The Web client exposes it through the command adapter. Headless mode, ACP automation, and JSON-RPC do not provide a command adapter, so they do not expose it.
+The shipped `shres` base mounts this command unconditionally; it has no configuration and no dependency on the persisted-goal stack. The Web client exposes it through the command adapter. Headless mode, ACP automation, and JSON-RPC do not provide a command adapter, so they do not expose it.
 
 ## Model Experience
 

@@ -8,22 +8,22 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
-import { bindSnapshotSelector } from '@roos-code/roos-code-client-web-react'
+import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
 import {
   createSnapshotStore, EMPTY_CONVERSATION_VIEWS,
-} from '@roos-code/roos-code-client-runtime/client'
+} from '@shres-code/shres-code-client-runtime/client'
 import type {
   ConversationSnapshot, RunningToolCall, SessionId, SessionListState, ToolResultNode, WorkspaceListState,
-} from '@roos-code/roos-code-client-runtime/client'
-import type { ToolResultView } from '@roos-code/roos-code-api-remotes/client'
-import type { SelectionTarget } from '@roos-code/roos-code-client-ui-conversation/client'
-import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
-import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
+} from '@shres-code/shres-code-client-runtime/client'
+import type { ToolResultView } from '@shres-code/shres-code-api-remotes/client'
+import type { SelectionTarget } from '@shres-code/shres-code-client-ui-conversation/client'
+import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
+import { en as commonEn } from '@shres-code/shres-code-client-locale/src/locales/en.ts'
 import { CHAT_SEARCH_MAX_LINES, searchCardModel } from '../src/client/tool/models/search-card-model.ts'
-import { en } from '@roos-code/roos-code-client-ui-conversation/src/client/locales.ts'
-import { createChatStore } from '@roos-code/roos-code-client-ui-conversation/src/client/stores.ts'
+import { en } from '@shres-code/shres-code-client-ui-conversation/src/client/locales.ts'
+import { createChatStore } from '@shres-code/shres-code-client-ui-conversation/src/client/stores.ts'
 import { GenericToolCard, type GenericToolCardProps } from '../src/client/tool/toolviews/GenericToolCard.tsx'
-import { DetailsPanel } from '@roos-code/roos-code-client-ui-conversation/src/client/skeleton/DetailsPanel.tsx'
+import { DetailsPanel } from '@shres-code/shres-code-client-ui-conversation/src/client/skeleton/DetailsPanel.tsx'
 import { SearchRow, searchToolview } from '../src/client/tool/toolviews/search-row.tsx'
 import { renderToolDetails, SessionProviderStub, toolChatSnapshot } from './tool-details-render.client.tsx'
 

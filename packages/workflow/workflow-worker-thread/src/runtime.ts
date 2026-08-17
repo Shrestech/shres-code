@@ -9,21 +9,21 @@
  * per-item nulls. Every returned promise has a rejection consumer so dropped script promises cannot
  * kill the worker. A cancelled script that never settles emits nothing; the host force-settles the
  * run within grace and terminates the thread.
- * @module @roos-code/roos-code-workflow-worker-thread/runtime
+ * @module @shres-code/shres-code-workflow-worker-thread/runtime
  */
 
 import * as vm from 'node:vm'
-import type { ContentBlock } from '@roos-code/roos-code-llm'
-import { SessionId } from '@roos-code/roos-code-session'
-import { assertObjectJsonSchema, JsonSchemaError } from '@roos-code/roos-code-tools'
-import type { ObjectJsonSchema } from '@roos-code/roos-code-tools'
-import { isFatalWorkflowError, WorkflowError } from '@roos-code/roos-code-workflow'
+import type { ContentBlock } from '@shres-code/shres-code-llm'
+import { SessionId } from '@shres-code/shres-code-session'
+import { assertObjectJsonSchema, JsonSchemaError } from '@shres-code/shres-code-tools'
+import type { ObjectJsonSchema } from '@shres-code/shres-code-tools'
+import { isFatalWorkflowError, WorkflowError } from '@shres-code/shres-code-workflow'
 import type {
   WorkflowAgentEndInfo,
   WorkflowAgentInfo,
   WorkflowMeta,
   WorkflowResult,
-} from '@roos-code/roos-code-workflow'
+} from '@shres-code/shres-code-workflow'
 import { materializeFromRealm, MaterializeError, renderThrown } from './realm.ts'
 import type { ChildHandle, ChildPort, WorkerLimits } from './types.ts'
 

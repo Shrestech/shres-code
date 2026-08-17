@@ -1,13 +1,13 @@
 /**
  * Agent-scoped Schedule management tools over the durable session fold.
- * @module @roos-code/roos-code-schedule
+ * @module @shres-code/shres-code-schedule
  */
 
-import type { Context } from '@roos-code/cordis'
-import type { Agent } from '@roos-code/roos-code-agent'
-import type { ContentBlock } from '@roos-code/roos-code-llm'
-import { defineTool } from '@roos-code/roos-code-tools'
-import type { GenericCallView } from '@roos-code/roos-code-tools'
+import type { Context } from '@shres-code/cordis'
+import type { Agent } from '@shres-code/shres-code-agent'
+import type { ContentBlock } from '@shres-code/shres-code-llm'
+import { defineTool } from '@shres-code/shres-code-tools'
+import type { GenericCallView } from '@shres-code/shres-code-tools'
 import {
   allocateScheduleId,
   createAfterScheduleRecord,

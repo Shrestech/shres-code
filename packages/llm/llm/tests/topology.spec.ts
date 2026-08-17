@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import LlmRuntime, { LlmAdapter, LlmError } from '@roos-code/roos-code-llm'
-import type { GenerateOptions, LlmConfigurableProvider, StreamChunk } from '@roos-code/roos-code-llm'
+import { Context } from '@shres-code/cordis'
+import LlmRuntime, { LlmAdapter, LlmError } from '@shres-code/shres-code-llm'
+import type { GenerateOptions, LlmConfigurableProvider, StreamChunk } from '@shres-code/shres-code-llm'
 
 class NoopAdapter extends LlmAdapter {
 

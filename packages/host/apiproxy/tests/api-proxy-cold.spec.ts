@@ -8,24 +8,24 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import SessionStore from '@roos-code/roos-code-session'
-import AgentRegistry from '@roos-code/roos-code-agent'
-import { TypertLookupFailure } from '@roos-code/roos-code-typert-protocol'
-import TypertRegistry from '@roos-code/roos-code-typert-registry'
-import { createUserMessage, MessageId } from '@roos-code/roos-code-llm'
-import type { Agent } from '@roos-code/roos-code-agent'
-import UserQuestionService from '@roos-code/roos-code-user-questions'
-import type { SessionEvent, SessionHeader, SessionId } from '@roos-code/roos-code-session'
+import { Context } from '@shres-code/cordis'
+import SessionStore from '@shres-code/shres-code-session'
+import AgentRegistry from '@shres-code/shres-code-agent'
+import { TypertLookupFailure } from '@shres-code/shres-code-typert-protocol'
+import TypertRegistry from '@shres-code/shres-code-typert-registry'
+import { createUserMessage, MessageId } from '@shres-code/shres-code-llm'
+import type { Agent } from '@shres-code/shres-code-agent'
+import UserQuestionService from '@shres-code/shres-code-user-questions'
+import type { SessionEvent, SessionHeader, SessionId } from '@shres-code/shres-code-session'
 import {
   PersistenceCoordinator,
   SessionPersistenceRevision,
   type PersistenceBackend,
   type StoredPrefix,
-} from '@roos-code/roos-code-session-persistence'
-import type { RpcRequest } from '@roos-code/roos-code-host-apiproxy/api/rpc'
-import { RpcId } from '@roos-code/roos-code-host-apiproxy/api/rpc'
-import { createApiProxy } from '@roos-code/roos-code-host-apiproxy'
+} from '@shres-code/shres-code-session-persistence'
+import type { RpcRequest } from '@shres-code/shres-code-host-apiproxy/api/rpc'
+import { RpcId } from '@shres-code/shres-code-host-apiproxy/api/rpc'
+import { createApiProxy } from '@shres-code/shres-code-host-apiproxy'
 
 const sid = (id: string): SessionId => id as SessionId
 
@@ -43,7 +43,7 @@ describe('sessions.list cold merge', () => {
     const ctx = new Context()
     await ctx.plugin(SessionStore)
     await ctx.plugin(UserQuestionService)
-    const root = mkdtempSync(join(tmpdir(), 'roos-cold-'))
+    const root = mkdtempSync(join(tmpdir(), 'shres-cold-'))
     const smallPath = join(root, 'small.log')
     const largePath = join(root, 'large.log')
     writeFileSync(smallPath, 'x'.repeat(1024))
@@ -163,7 +163,7 @@ describe('sessions.list cold merge', () => {
     await ctx.plugin(UserQuestionService)
     await ctx.plugin(AgentRegistry)
     const meta = header('attached-during-probe', 100)
-    const root = mkdtempSync(join(tmpdir(), 'roos-cold-race-'))
+    const root = mkdtempSync(join(tmpdir(), 'shres-cold-race-'))
     const path = join(root, 'small.log')
     writeFileSync(path, 'x')
     const started = Promise.withResolvers<undefined>()
@@ -339,7 +339,7 @@ describe('Remote Agent and Session lookup policy', () => {
       inspect,
       locate: () => undefined,
     } as never)
-    const resumedSession = { id: sessionId, header: meta, events: [] } as unknown as import('@roos-code/roos-code-session').Session
+    const resumedSession = { id: sessionId, header: meta, events: [] } as unknown as import('@shres-code/shres-code-session').Session
     const resumedAgent = { id: sessionId, session: resumedSession, status: 'idle', ctx } as Agent
     const release = Promise.withResolvers<undefined>()
     const resume = vi.spyOn(ctx.agents, 'resume').mockImplementation(async () => {

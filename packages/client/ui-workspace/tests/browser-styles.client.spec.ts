@@ -44,22 +44,22 @@ describe('WorkspaceBrowser.module.css list', () => {
   })
 
   it('counts the themed scrollbar inside the shell trailing inset', () => {
-    expect(root?.get('--roos-session-list-edge-inset')).toBe('var(--roos-sidebar-inline-padding)')
-    expect(root?.get('--roos-session-list-scrollbar-width')).toBe('8px')
-    expect(root?.get('--roos-session-list-scrollbar-offset')).toBe('2px')
-    expect(root?.get('padding-right')).toBe('var(--roos-session-list-edge-inset)')
+    expect(root?.get('--shres-session-list-edge-inset')).toBe('var(--shres-sidebar-inline-padding)')
+    expect(root?.get('--shres-session-list-scrollbar-width')).toBe('8px')
+    expect(root?.get('--shres-session-list-scrollbar-offset')).toBe('2px')
+    expect(root?.get('padding-right')).toBe('var(--shres-session-list-edge-inset)')
     expect(listArea?.get('margin-left')).toBe('-4px')
     expect(listArea?.get('padding-left')).toBe('4px')
-    expect(listArea?.get('margin-right')).toBe('calc(-1 * var(--roos-session-list-edge-inset))')
-    expect(declarations('.fade')?.get('right')).toBe('var(--roos-session-list-edge-inset)')
-    expect(list?.get('margin-right')).toBe('var(--roos-session-list-scrollbar-offset)')
+    expect(listArea?.get('margin-right')).toBe('calc(-1 * var(--shres-session-list-edge-inset))')
+    expect(declarations('.fade')?.get('right')).toBe('var(--shres-session-list-edge-inset)')
+    expect(list?.get('margin-right')).toBe('var(--shres-session-list-scrollbar-offset)')
     expect(list?.get('margin-left')).toBe('-4px')
     expect(list?.get('padding-left')).toBe('4px')
     expect(list?.get('padding-right')).toBe([
       'calc(',
-      'var(--roos-session-list-edge-inset)',
-      '- var(--roos-session-list-scrollbar-width)',
-      '- var(--roos-session-list-scrollbar-offset)',
+      'var(--shres-session-list-edge-inset)',
+      '- var(--shres-session-list-scrollbar-width)',
+      '- var(--shres-session-list-scrollbar-offset)',
       ')',
     ].join(' '))
     expect(declarations('.list::-webkit-scrollbar')).toBeUndefined()

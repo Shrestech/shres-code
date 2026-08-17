@@ -1,11 +1,11 @@
 /**
  * Human-facing `/compact` command over the backend-independent compaction seam.
- * @module @roos-code/roos-code-command-compact
+ * @module @shres-code/shres-code-command-compact
  */
 
-import type { Context } from '@roos-code/cordis'
-import { ManualCompactionError } from '@roos-code/roos-code-compaction'
-import type { CommandInvocation, CommandResult } from '@roos-code/roos-code-commands'
+import type { Context } from '@shres-code/cordis'
+import { ManualCompactionError } from '@shres-code/shres-code-compaction'
+import type { CommandInvocation, CommandResult } from '@shres-code/shres-code-commands'
 
 export const name = 'command-compact'
 export const inject = ['commands', 'compaction']

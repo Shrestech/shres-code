@@ -1,7 +1,7 @@
 /** Client-safe event declarations owned by the agent-preset domain. */
-import type { SessionId } from '@roos-code/roos-code-session/types'
+import type { SessionId } from '@shres-code/shres-code-session/types'
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Events {
     /**
      * One session committed a different agent preset to its durable log.

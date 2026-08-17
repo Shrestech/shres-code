@@ -1,4 +1,4 @@
-# @roos-code/roos-code-host-plugin-inventory
+# @shres-code/shres-code-host-plugin-inventory
 
 Read-only Host projection of the current Cordis Loader tree. `PluginInventoryGateway` registers the `pluginInventory` service and publishes one generated direct Remote, `pluginInventory/list`. Every call reads `ctx.loader.entries()` directly, skips structural group rows, and returns the remaining entries in Loader order with only their Loader entry id, module specifier, effective enablement, and current root Fiber phase.
 

@@ -11,12 +11,12 @@ import { tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { Agent } from '@roos-code/roos-code-agent'
-import SubagentRuntime from '@roos-code/roos-code-subagent'
-import type { SubprocessHandle } from '@roos-code/roos-code-subprocess'
-import LocalSubprocessRuntime from '@roos-code/roos-code-subprocess-local'
+import type { Agent } from '@shres-code/shres-code-agent'
+import SubagentRuntime from '@shres-code/shres-code-subagent'
+import type { SubprocessHandle } from '@shres-code/shres-code-subprocess'
+import LocalSubprocessRuntime from '@shres-code/shres-code-subprocess-local'
 import * as codex from '../src/index.ts'
 import {
   startResponsesFixture,
@@ -57,7 +57,7 @@ async function realHarness(script: readonly ResponsesBehavior[]): Promise<{
   readonly harness: RealHarness
   readonly fixture: ResponsesFixture
 }> {
-  const root = mkdtempSync(join(tmpdir(), 'roos-codex-real-'))
+  const root = mkdtempSync(join(tmpdir(), 'shres-codex-real-'))
   roots.push(root)
   const workspace = join(root, 'workspace')
   const codexHome = join(root, 'codex-home')
@@ -85,7 +85,7 @@ async function realHarness(script: readonly ResponsesBehavior[]): Promise<{
     '',
   ].join('\n'))
   const env = {
-    OPENAI_API_KEY: 'roos-fake-openai-key',
+    OPENAI_API_KEY: 'shres-fake-openai-key',
     CODEX_HOME: codexHome,
     HOME: root,
     XDG_CONFIG_HOME: join(root, 'xdg'),
@@ -168,7 +168,7 @@ describe('real @openai/codex 0.147.0 product', () => {
     const recorded = fixture.requests[0]!
     expect(recorded.method).toBe('POST')
     expect(recorded.path).toBe('/v1/responses')
-    expect(recorded.headers.authorization).toBe('Bearer roos-fake-openai-key')
+    expect(recorded.headers.authorization).toBe('Bearer shres-fake-openai-key')
     expect(responseInputTexts(recorded.body)).toContain(task)
     await expectQuiescent(harness.handles)
   }, 60_000)
@@ -220,7 +220,7 @@ describe('real @openai/codex 0.147.0 product', () => {
       tool.type === 'function' && tool.name === call.name
     )))).toBe(true)
     expect(fixture.requests.every(requestEntry =>
-      requestEntry.headers.authorization === 'Bearer roos-fake-openai-key',
+      requestEntry.headers.authorization === 'Bearer shres-fake-openai-key',
     )).toBe(true)
     await expectQuiescent(harness.handles)
   }, 60_000)

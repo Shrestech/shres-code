@@ -1,19 +1,19 @@
-Roos Code
-Copyright (c) 2026 Roos Code contributors
+Shres Code
+Copyright (c) 2026 Shres Code contributors
 
 This product is a derivative of DeepSeek Harness
 (https://github.com/deepseek-ai/deepseek-harness), originally published
 under the MIT License. The root LICENSE file retains the original
 copyright notice.
 
-Vendored framework packages published under the @roos-code scope
-(`@roos-code/cordis`, `@roos-code/cosmokit`, `@roos-code/schemastery`,
-and `@roos-code/cordis-plugin-*`) are source copies of the Cordis
+Vendored framework packages published under the @shres-code scope
+(`@shres-code/cordis`, `@shres-code/cosmokit`, `@shres-code/schemastery`,
+and `@shres-code/cordis-plugin-*`) are source copies of the Cordis
 framework and its foundation libraries by Shigma and contributors,
 originally published under the MIT License. Upstream names, versions,
 and licenses are recorded in vendor/README.md and THIRD_PARTY_NOTICES.md.
 
-The Landlock launcher (`@roos-code/node-addon-landlock-run` and its
+The Landlock launcher (`@shres-code/node-addon-landlock-run` and its
 platform packages) incorporates contributions originally published
 under the BSD-3-Clause license. Those contributors and terms are
 recorded in THIRD_PARTY_NOTICES.md.

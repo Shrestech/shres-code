@@ -38,7 +38,7 @@ env:
   PRIMARY_NODE_VERSION: '24'
   # CI runs must never report to the production telemetry endpoint baked
   # into apps/cli/cordis.yml (AppCLIEntry disables the row when set).
-  ROOS_TELEMETRY_DISABLED: '1'
+  SHRES_TELEMETRY_DISABLED: '1'
 
 jobs:
 
@@ -50,7 +50,7 @@ jobs:
   # all three jobs enter runner allocation independently.
   #
   # FAILOVER (Linux): each Linux enterprise job resolves its pool through the
-  # ROOS_CI_FAILOVER_LINUX repository variable. Unset (normal), the expressions
+  # SHRES_CI_FAILOVER_LINUX repository variable. Unset (normal), the expressions
   # pick the hosted enterprise pools below. Setting the variable to
   # 'selfhosted' (repo Settings → Actions → Variables; writer-manageable
   # repository state — not PR-editable, no merge required) retargets all
@@ -59,17 +59,17 @@ jobs:
   # see .agents/notes/implemented/process/2026-07-26-ci-failover-runbook.md. The
   # in-house pool's readiness is re-proven on every master push by the
   # serial-linux-selfhosted standby lane below. The Windows failover switch is
-  # the separate ROOS_CI_FAILOVER_WINDOWS variable on the windows-native job below.
+  # the separate SHRES_CI_FAILOVER_WINDOWS variable on the windows-native job below.
   node-24:
     if: github.event_name == 'pull_request'
     runs-on: >-
-      ${{ vars.ROOS_CI_FAILOVER_LINUX == 'selfhosted'
+      ${{ vars.SHRES_CI_FAILOVER_LINUX == 'selfhosted'
           && github.event.pull_request.user.login != 'dependabot[bot]'
           && fromJSON('["self-hosted", "linux", "x64", "vm-backup"]')
-          || 'roos-ubuntu-24-04-16core' }}
+          || 'shres-ubuntu-24-04-16core' }}
     name: node 24 / static
     env:
-      ROOS_GATE_CONCURRENCY: '8'
+      SHRES_GATE_CONCURRENCY: '8'
     steps:
       # Fetch complete history so the archive gate can read the trusted PR base from a reused shallow checkout.
       - uses: actions/checkout@v6
@@ -97,7 +97,7 @@ jobs:
       # compression and upload on the paid latency-critical path. Skipped
       # under failover — see the coverage lane's identical rationale.
       - uses: actions/cache/restore@v4
-        if: vars.ROOS_CI_FAILOVER_LINUX != 'selfhosted' || github.event.pull_request.user.login == 'dependabot[bot]'
+        if: vars.SHRES_CI_FAILOVER_LINUX != 'selfhosted' || github.event.pull_request.user.login == 'dependabot[bot]'
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
           key: ${{ runner.os }}-node-${{ env.PRIMARY_NODE_VERSION }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
@@ -109,24 +109,24 @@ jobs:
 
       - name: Run static gates
         env:
-          ROOS_ARCHIVE_BASE_REF: ${{ github.event.pull_request.base.sha }}
+          SHRES_ARCHIVE_BASE_REF: ${{ github.event.pull_request.base.sha }}
         run: pnpm run check:ci:static
 
   node-24-coverage:
     if: github.event_name == 'pull_request'
     runs-on: >-
-      ${{ vars.ROOS_CI_FAILOVER_LINUX == 'selfhosted'
+      ${{ vars.SHRES_CI_FAILOVER_LINUX == 'selfhosted'
           && github.event.pull_request.user.login != 'dependabot[bot]'
           && fromJSON('["self-hosted", "linux", "x64", "vm-backup"]')
-          || 'roos-ubuntu-24-04-16core' }}
+          || 'shres-ubuntu-24-04-16core' }}
     name: node 24 / coverage
     env:
       # The hosted 16-core runner uses six coverage workers. The failover pool
       # shares one 64-core VM across six always-on runner instances, so each
       # instance may use eight while keeping the worst case at 8 × 6 = 48
       # workers; process-bound suites remain isolated in forks.
-      ROOS_COVERAGE_MAX_WORKERS: ${{ vars.ROOS_CI_FAILOVER_LINUX == 'selfhosted' && github.event.pull_request.user.login != 'dependabot[bot]' && '8' || '6' }}
-      ROOS_GATE_CONCURRENCY: '3'
+      SHRES_COVERAGE_MAX_WORKERS: ${{ vars.SHRES_CI_FAILOVER_LINUX == 'selfhosted' && github.event.pull_request.user.login != 'dependabot[bot]' && '8' || '6' }}
+      SHRES_GATE_CONCURRENCY: '3'
     steps:
       - uses: actions/checkout@v6
         with:
@@ -152,7 +152,7 @@ jobs:
       # already serves warm installs, while restoring the hosted archive
       # would spend ~52 s pulling ~180 MB into that populated store.
       - uses: actions/cache/restore@v4
-        if: vars.ROOS_CI_FAILOVER_LINUX != 'selfhosted' || github.event.pull_request.user.login == 'dependabot[bot]'
+        if: vars.SHRES_CI_FAILOVER_LINUX != 'selfhosted' || github.event.pull_request.user.login == 'dependabot[bot]'
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
           key: ${{ runner.os }}-node-${{ env.PRIMARY_NODE_VERSION }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
@@ -178,18 +178,18 @@ jobs:
   node-24-consumers:
     if: github.event_name == 'pull_request'
     runs-on: >-
-      ${{ vars.ROOS_CI_FAILOVER_LINUX == 'selfhosted'
+      ${{ vars.SHRES_CI_FAILOVER_LINUX == 'selfhosted'
           && github.event.pull_request.user.login != 'dependabot[bot]'
           && fromJSON('["self-hosted", "linux", "x64", "vm-backup"]')
-          || 'roos-ubuntu-24-04-16core' }}
+          || 'shres-ubuntu-24-04-16core' }}
     name: node 24 / snapshots and artifacts
     env:
-      ROOS_GATE_CONCURRENCY: '8'
-      ROOS_NODE_COMPAT_SKIP_TYPECHECK: '1'
-      ROOS_OXLINT_THREADS: '8'
-      ROOS_PUBLINT_CONCURRENCY: '8'
+      SHRES_GATE_CONCURRENCY: '8'
+      SHRES_NODE_COMPAT_SKIP_TYPECHECK: '1'
+      SHRES_OXLINT_THREADS: '8'
+      SHRES_PUBLINT_CONCURRENCY: '8'
       # Failover halves snapshot concurrency for the shared 64-core VM.
-      ROOS_SNAPSHOT_MAX_CONCURRENCY: ${{ vars.ROOS_CI_FAILOVER_LINUX == 'selfhosted' && github.event.pull_request.user.login != 'dependabot[bot]' && '12' || '32' }}
+      SHRES_SNAPSHOT_MAX_CONCURRENCY: ${{ vars.SHRES_CI_FAILOVER_LINUX == 'selfhosted' && github.event.pull_request.user.login != 'dependabot[bot]' && '12' || '32' }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -213,7 +213,7 @@ jobs:
 
       # Skipped under failover — see the coverage lane's identical rationale.
       - uses: actions/cache/restore@v4
-        if: vars.ROOS_CI_FAILOVER_LINUX != 'selfhosted' || github.event.pull_request.user.login == 'dependabot[bot]'
+        if: vars.SHRES_CI_FAILOVER_LINUX != 'selfhosted' || github.event.pull_request.user.login == 'dependabot[bot]'
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
           key: ${{ runner.os }}-node-${{ env.PRIMARY_NODE_VERSION }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
@@ -223,7 +223,7 @@ jobs:
       # Pull requests restore the cache normally produced by serial-linux on
       # master; they do not pay compression and upload on the required path.
       - uses: actions/cache/restore@v4
-        if: vars.ROOS_CI_FAILOVER_LINUX != 'selfhosted' || github.event.pull_request.user.login == 'dependabot[bot]'
+        if: vars.SHRES_CI_FAILOVER_LINUX != 'selfhosted' || github.event.pull_request.user.login == 'dependabot[bot]'
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
@@ -244,14 +244,14 @@ jobs:
           exit "$sandbox_status"
 
       - name: Install Playwright Chromium and hosted dependencies
-        if: vars.ROOS_CI_FAILOVER_LINUX != 'selfhosted' || github.event.pull_request.user.login == 'dependabot[bot]'
-        run: pnpm --filter @roos-code/roos-code-web-frontend exec playwright install --with-deps chromium
+        if: vars.SHRES_CI_FAILOVER_LINUX != 'selfhosted' || github.event.pull_request.user.login == 'dependabot[bot]'
+        run: pnpm --filter @shres-code/shres-code-web-frontend exec playwright install --with-deps chromium
 
       # The persistent VM image owns Playwright's Linux system packages; do
       # not mutate the shared host with apt on every failover run.
       - name: Install Playwright Chromium on the failover VM
-        if: vars.ROOS_CI_FAILOVER_LINUX == 'selfhosted' && github.event.pull_request.user.login != 'dependabot[bot]'
-        run: pnpm --filter @roos-code/roos-code-web-frontend exec playwright install chromium
+        if: vars.SHRES_CI_FAILOVER_LINUX == 'selfhosted' && github.event.pull_request.user.login != 'dependabot[bot]'
+        run: pnpm --filter @shres-code/shres-code-web-frontend exec playwright install chromium
 
       - name: Run compatibility, snapshot, and artifact gates
         run: pnpm run check:ci:consumers
@@ -263,8 +263,8 @@ jobs:
     runs-on: ${{ matrix.runner }}
     name: ${{ matrix.name }}
     env:
-      ROOS_GATE_CONCURRENCY: ${{ matrix.gate_concurrency }}
-      ROOS_NODE_COMPAT_SKIP_TYPECHECK: '1'
+      SHRES_GATE_CONCURRENCY: ${{ matrix.gate_concurrency }}
+      SHRES_NODE_COMPAT_SKIP_TYPECHECK: '1'
     strategy:
       fail-fast: false
       matrix:
@@ -438,25 +438,25 @@ jobs:
   # its own unmasked conclusion but is deliberately absent from
   # all-checks-passed.needs, so it never delays or changes that required
   # verdict. Under normal operation it runs on the hosted larger runner; under
-  # Windows failover (ROOS_CI_FAILOVER_WINDOWS=selfhosted) it retargets onto the
+  # Windows failover (SHRES_CI_FAILOVER_WINDOWS=selfhosted) it retargets onto the
   # in-house self-hosted Windows pool. Dependabot PRs are excluded from the
   # self-hosted pool and stay queued for the hosted runner — see the failover
   # runbook. This Windows switch is independent of the Linux
-  # ROOS_CI_FAILOVER_LINUX variable that retargets the three required Linux jobs
+  # SHRES_CI_FAILOVER_LINUX variable that retargets the three required Linux jobs
   # and the all-checks-passed verdict above.
   windows-native:
     if: github.event_name == 'pull_request'
     runs-on: >-
-      ${{ vars.ROOS_CI_FAILOVER_WINDOWS == 'selfhosted'
+      ${{ vars.SHRES_CI_FAILOVER_WINDOWS == 'selfhosted'
           && github.event.pull_request.user.login != 'dependabot[bot]'
-          && fromJSON('["self-hosted", "roos-win-ci", "windows"]')
-          || 'roos-windows-2025-16core' }}
+          && fromJSON('["self-hosted", "shres-win-ci", "windows"]')
+          || 'shres-windows-2025-16core' }}
     name: windows node 24 / native complete
     timeout-minutes: 60
     env:
-      ROOS_COVERAGE_MAX_WORKERS: '2'
-      ROOS_GATE_CONCURRENCY: '2'
-      ROOS_PUBLINT_CONCURRENCY: '8'
+      SHRES_COVERAGE_MAX_WORKERS: '2'
+      SHRES_GATE_CONCURRENCY: '2'
+      SHRES_PUBLINT_CONCURRENCY: '8'
     steps:
       - uses: actions/checkout@v6
         with:
@@ -542,27 +542,27 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright Chromium and system dependencies
-        run: pnpm --filter @roos-code/roos-code-web-frontend exec playwright install --with-deps chromium
+        run: pnpm --filter @shres-code/shres-code-web-frontend exec playwright install --with-deps chromium
 
       - name: Prepare bubblewrap (unrestrict userns)
         run: bash scripts/prepare-ci-bubblewrap.sh
 
       - name: Run complete unsharded primary Node CI serially
         env:
-          ROOS_ARCHIVE_BASE_REF: ${{ github.event.before }}
-          ROOS_COVERAGE_MAX_WORKERS: '1'
-          ROOS_E2E_MAX_WORKERS: '1'
-          ROOS_GATE_CONCURRENCY: '1'
-          ROOS_OXLINT_THREADS: '1'
-          ROOS_PUBLINT_CONCURRENCY: '1'
-          ROOS_SNAPSHOT_MAX_CONCURRENCY: '1'
+          SHRES_ARCHIVE_BASE_REF: ${{ github.event.before }}
+          SHRES_COVERAGE_MAX_WORKERS: '1'
+          SHRES_E2E_MAX_WORKERS: '1'
+          SHRES_GATE_CONCURRENCY: '1'
+          SHRES_OXLINT_THREADS: '1'
+          SHRES_PUBLINT_CONCURRENCY: '1'
+          SHRES_SNAPSHOT_MAX_CONCURRENCY: '1'
         run: pnpm run check:ci:linux-primary
 
   # Hot-standby drill for the in-house self-hosted pool: every master move
   # re-runs the complete unsharded aggregate on the persistent 64-core VM,
   # continuously proving that environment can take over a required lane if
   # the hosted pools degrade (the switch is then setting the writer-manageable
-  # ROOS_CI_FAILOVER_LINUX variable — see the failover runbook, no merge required).
+  # SHRES_CI_FAILOVER_LINUX variable — see the failover runbook, no merge required).
   # Push-triggered, so this lane always executes the base branch's own
   # workflow definition. (Under failover, pull_request jobs do reach these
   # runners with the PR merge ref's workflow — the boundary there is
@@ -576,7 +576,7 @@ jobs:
     name: serial / linux (self-hosted standby)
     runs-on: [self-hosted, linux, x64, vm-backup]
     steps:
-      # Full history + ROOS_ARCHIVE_BASE_REF below: same frozen-archive
+      # Full history + SHRES_ARCHIVE_BASE_REF below: same frozen-archive
       # comparison as serial-linux. Depth 2 would miss github.event.before
       # on multi-commit or force pushes; full fetch is cheap here because
       # checkout resolves against the VM's local mirror.
@@ -601,20 +601,20 @@ jobs:
       # The persistent VM image owns Playwright's Linux system packages; this
       # step also proves that browser provisioning remains usable for failover.
       - name: Install Playwright Chromium
-        run: pnpm --filter @roos-code/roos-code-web-frontend exec playwright install chromium
+        run: pnpm --filter @shres-code/shres-code-web-frontend exec playwright install chromium
 
       - name: Prepare bubblewrap (unrestrict userns)
         run: bash scripts/prepare-ci-bubblewrap.sh
 
       - name: Run complete unsharded primary Node CI serially
         env:
-          ROOS_ARCHIVE_BASE_REF: ${{ github.event.before }}
-          ROOS_COVERAGE_MAX_WORKERS: '1'
-          ROOS_E2E_MAX_WORKERS: '1'
-          ROOS_GATE_CONCURRENCY: '1'
-          ROOS_OXLINT_THREADS: '1'
-          ROOS_PUBLINT_CONCURRENCY: '1'
-          ROOS_SNAPSHOT_MAX_CONCURRENCY: '1'
+          SHRES_ARCHIVE_BASE_REF: ${{ github.event.before }}
+          SHRES_COVERAGE_MAX_WORKERS: '1'
+          SHRES_E2E_MAX_WORKERS: '1'
+          SHRES_GATE_CONCURRENCY: '1'
+          SHRES_OXLINT_THREADS: '1'
+          SHRES_PUBLINT_CONCURRENCY: '1'
+          SHRES_SNAPSHOT_MAX_CONCURRENCY: '1'
         run: pnpm run check:ci:linux-primary
 
   serial-macos:
@@ -637,18 +637,18 @@ jobs:
 
       - name: Run complete unsharded primary Node CI serially
         env:
-          ROOS_COVERAGE_MAX_WORKERS: '1'
-          ROOS_E2E_MAX_WORKERS: '1'
-          ROOS_GATE_CONCURRENCY: '1'
-          ROOS_PUBLINT_CONCURRENCY: '1'
-          ROOS_SNAPSHOT_MAX_CONCURRENCY: '1'
+          SHRES_COVERAGE_MAX_WORKERS: '1'
+          SHRES_E2E_MAX_WORKERS: '1'
+          SHRES_GATE_CONCURRENCY: '1'
+          SHRES_PUBLINT_CONCURRENCY: '1'
+          SHRES_SNAPSHOT_MAX_CONCURRENCY: '1'
         run: pnpm run check:ci
 
   # Hot-standby drill for the in-house self-hosted Windows pool: every master
   # move re-runs the complete unsharded Windows gate inventory on the persistent
   # VM, continuously proving that environment can take over the required
   # `windows` lane if the hosted pool degrades (the switch is setting the
-  # writer-manageable ROOS_CI_FAILOVER_WINDOWS variable — see the failover
+  # writer-manageable SHRES_CI_FAILOVER_WINDOWS variable — see the failover
   # runbook, no merge required). Push-triggered, so this lane always executes
   # the base branch's own workflow definition. Non-blocking for pull requests;
   # absent from all-checks-passed.needs by design — the required `windows` job
@@ -658,7 +658,7 @@ jobs:
   serial-windows:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     name: serial / windows (self-hosted standby)
-    runs-on: [self-hosted, roos-win-ci, windows]
+    runs-on: [self-hosted, shres-win-ci, windows]
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
@@ -690,9 +690,9 @@ jobs:
       - name: Run complete unsharded Windows gate inventory serially
         shell: pwsh
         env:
-          ROOS_COVERAGE_MAX_WORKERS: '1'
-          ROOS_GATE_CONCURRENCY: '1'
-          ROOS_PUBLINT_CONCURRENCY: '1'
+          SHRES_COVERAGE_MAX_WORKERS: '1'
+          SHRES_GATE_CONCURRENCY: '1'
+          SHRES_PUBLINT_CONCURRENCY: '1'
         run: pnpm run check:ci:windows-complete
 
   # Manual, bounded comparison of the actual critical Linux and Windows lanes.
@@ -708,51 +708,51 @@ jobs:
         include:
           - platform: linux
             cores: '4'
-            runner: roos-ubuntu-24-04-4core
+            runner: shres-ubuntu-24-04-4core
             workload: typecheck
           - platform: linux
             cores: '8'
-            runner: roos-ubuntu-24-04-8core
+            runner: shres-ubuntu-24-04-8core
             workload: typecheck
           - platform: linux
             cores: '16'
-            runner: roos-ubuntu-24-04-16core
+            runner: shres-ubuntu-24-04-16core
             workload: typecheck
           - platform: linux
             cores: '32'
-            runner: roos-ubuntu-24-04-32core
+            runner: shres-ubuntu-24-04-32core
             workload: typecheck
           - platform: linux
             cores: '64'
-            runner: roos-ubuntu-24-04-64core
+            runner: shres-ubuntu-24-04-64core
             workload: typecheck
           - platform: linux
             cores: '96'
-            runner: roos-ubuntu-24-04-96core
+            runner: shres-ubuntu-24-04-96core
             workload: typecheck
           - platform: windows
             cores: '4'
-            runner: roos-windows-2025-4core
+            runner: shres-windows-2025-4core
             workload: production-site
           - platform: windows
             cores: '8'
-            runner: roos-windows-2025-8core
+            runner: shres-windows-2025-8core
             workload: production-site
           - platform: windows
             cores: '16'
-            runner: roos-windows-2025-16core
+            runner: shres-windows-2025-16core
             workload: production-site
           - platform: windows
             cores: '32'
-            runner: roos-windows-2025-32core
+            runner: shres-windows-2025-32core
             workload: production-site
           - platform: windows
             cores: '64'
-            runner: roos-windows-2025-64core
+            runner: shres-windows-2025-64core
             workload: production-site
           - platform: windows
             cores: '96'
-            runner: roos-windows-2025-96core
+            runner: shres-windows-2025-96core
             workload: production-site
     steps:
       - uses: actions/checkout@v6
@@ -799,51 +799,51 @@ jobs:
         include:
           - platform: linux
             cores: '4'
-            runner: roos-ubuntu-24-04-4core
+            runner: shres-ubuntu-24-04-4core
             workers: '4'
           - platform: linux
             cores: '8'
-            runner: roos-ubuntu-24-04-8core
+            runner: shres-ubuntu-24-04-8core
             workers: '8'
           - platform: linux
             cores: '16'
-            runner: roos-ubuntu-24-04-16core
+            runner: shres-ubuntu-24-04-16core
             workers: '16'
           - platform: linux
             cores: '32'
-            runner: roos-ubuntu-24-04-32core
+            runner: shres-ubuntu-24-04-32core
             workers: '32'
           - platform: linux
             cores: '64'
-            runner: roos-ubuntu-24-04-64core
+            runner: shres-ubuntu-24-04-64core
             workers: '32'
           - platform: linux
             cores: '96'
-            runner: roos-ubuntu-24-04-96core
+            runner: shres-ubuntu-24-04-96core
             workers: '32'
           - platform: windows
             cores: '4'
-            runner: roos-windows-2025-4core
+            runner: shres-windows-2025-4core
             workers: '2'
           - platform: windows
             cores: '8'
-            runner: roos-windows-2025-8core
+            runner: shres-windows-2025-8core
             workers: '2'
           - platform: windows
             cores: '16'
-            runner: roos-windows-2025-16core
+            runner: shres-windows-2025-16core
             workers: '2'
           - platform: windows
             cores: '32'
-            runner: roos-windows-2025-32core
+            runner: shres-windows-2025-32core
             workers: '2'
           - platform: windows
             cores: '64'
-            runner: roos-windows-2025-64core
+            runner: shres-windows-2025-64core
             workers: '2'
           - platform: windows
             cores: '96'
-            runner: roos-windows-2025-96core
+            runner: shres-windows-2025-96core
             workers: '2'
     steps:
       - uses: actions/checkout@v6
@@ -887,18 +887,18 @@ jobs:
       - name: Run complete unsharded primary Node CI concurrently
         if: matrix.platform == 'linux'
         env:
-          ROOS_COVERAGE_MAX_WORKERS: ${{ matrix.workers }}
-          ROOS_GATE_CONCURRENCY: ${{ matrix.workers }}
-          ROOS_OXLINT_THREADS: ${{ matrix.workers }}
-          ROOS_PUBLINT_CONCURRENCY: ${{ matrix.workers }}
-          ROOS_SNAPSHOT_MAX_CONCURRENCY: ${{ matrix.workers }}
+          SHRES_COVERAGE_MAX_WORKERS: ${{ matrix.workers }}
+          SHRES_GATE_CONCURRENCY: ${{ matrix.workers }}
+          SHRES_OXLINT_THREADS: ${{ matrix.workers }}
+          SHRES_PUBLINT_CONCURRENCY: ${{ matrix.workers }}
+          SHRES_SNAPSHOT_MAX_CONCURRENCY: ${{ matrix.workers }}
         run: pnpm run check:ci
 
       - name: Run blocking Windows builds concurrently
         if: matrix.platform == 'windows'
         shell: pwsh
         env:
-          ROOS_GATE_CONCURRENCY: ${{ matrix.workers }}
+          SHRES_GATE_CONCURRENCY: ${{ matrix.workers }}
         run: pnpm run check:ci:windows-blocking
 
   # Single stable required check for branch protection: require "all checks
@@ -918,10 +918,10 @@ jobs:
     # provisioning — and under Linux failover it follows the same selector as
     # the worker jobs it aggregates, so a standard-hosted outage cannot strand
     # the branch-protection verdict either. It retargets with the Linux switch
-    # (ROOS_CI_FAILOVER_LINUX), not the Windows one, because it aggregates the
+    # (SHRES_CI_FAILOVER_LINUX), not the Windows one, because it aggregates the
     # required Linux workers and runs on the vm-backup pool.
     runs-on: >-
-      ${{ vars.ROOS_CI_FAILOVER_LINUX == 'selfhosted'
+      ${{ vars.SHRES_CI_FAILOVER_LINUX == 'selfhosted'
           && github.event.pull_request.user.login != 'dependabot[bot]'
           && fromJSON('["self-hosted", "linux", "x64", "vm-backup"]')
           || 'ubuntu-latest' }}

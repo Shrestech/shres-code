@@ -2,11 +2,11 @@
  * Crash-recovery repair for an interrupted session log. It preserves a fully
  * written final turn and supplies the missing tool, step, and turn boundaries
  * needed to resume with a provider-valid transcript.
- * @module @roos-code/roos-code-session/repair
+ * @module @shres-code/shres-code-session/repair
  */
 
-import { MessageId, freezeMessage, type CallId } from '@roos-code/roos-code-llm'
-import type { ToolResultMessage } from '@roos-code/roos-code-llm'
+import { MessageId, freezeMessage, type CallId } from '@shres-code/shres-code-llm'
+import type { ToolResultMessage } from '@shres-code/shres-code-llm'
 import type { SessionEvent } from './types.ts'
 
 /** Recovery code for an assistant tool request that never reached a recorded call start. */

@@ -2,10 +2,10 @@
  * Cordis-free storage mechanics for the local spill backend: private
  * session-scoped directory selection, safe-name derivation, path-traversal
  * protection, and the exclusive owner-only write. Kept out of the service class
- * (like `roos-bash-local`'s `run.ts`) so the filesystem behavior is unit-testable
+ * (like `shres-bash-local`'s `run.ts`) so the filesystem behavior is unit-testable
  * without a `ctx` and without the OS temp dir.
  *
- * @module @roos-code/roos-code-spill-local/store
+ * @module @shres-code/shres-code-spill-local/store
  */
 
 import { createHash, randomBytes } from 'node:crypto'
@@ -25,7 +25,7 @@ let defaultRoot: string | undefined
  * @returns The lazily-created private spill root.
  */
 export function privateRoot(): string {
-  defaultRoot ??= mkdtempSync(join(tmpdir(), 'roos-spill-'))
+  defaultRoot ??= mkdtempSync(join(tmpdir(), 'shres-spill-'))
   return defaultRoot
 }
 

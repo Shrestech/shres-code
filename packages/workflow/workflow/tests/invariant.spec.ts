@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { SessionId } from '@roos-code/roos-code-session'
-import { WorkflowRunId } from '@roos-code/roos-code-workflow'
+import { Context } from '@shres-code/cordis'
+import { SessionId } from '@shres-code/shres-code-session'
+import { WorkflowRunId } from '@shres-code/shres-code-workflow'
 import type {
   WorkflowAgentEndInfo,
   WorkflowAgentInfo,
   WorkflowResultInfo,
   WorkflowRunInfo,
-} from '@roos-code/roos-code-workflow'
-import * as WorkflowInvariant from '@roos-code/roos-code-workflow/invariant'
-import InvariantRegistry from '@roos-code/roos-code-invariants'
+} from '@shres-code/shres-code-workflow'
+import * as WorkflowInvariant from '@shres-code/shres-code-workflow/invariant'
+import InvariantRegistry from '@shres-code/shres-code-invariants'
 
 async function setup(): Promise<Context> {
   const ctx = new Context()

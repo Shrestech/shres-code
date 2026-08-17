@@ -1,13 +1,13 @@
 /** Direct one-shot Agent driving, durable aggregation, flushing, and exit mapping. */
 
 import { afterEach, describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import AgentRegistry, { Inbox } from '@roos-code/roos-code-agent'
-import type { Agent, AgentHandle, CreateAgentOptions } from '@roos-code/roos-code-agent'
-import AgentDefaultModelConfig from '@roos-code/roos-code-agent-default-model'
-import { createAssistantMessage } from '@roos-code/roos-code-llm'
-import SessionStore from '@roos-code/roos-code-session'
-import type { Session, UserMessage } from '@roos-code/roos-code-session'
+import { Context } from '@shres-code/cordis'
+import AgentRegistry, { Inbox } from '@shres-code/shres-code-agent'
+import type { Agent, AgentHandle, CreateAgentOptions } from '@shres-code/shres-code-agent'
+import AgentDefaultModelConfig from '@shres-code/shres-code-agent-default-model'
+import { createAssistantMessage } from '@shres-code/shres-code-llm'
+import SessionStore from '@shres-code/shres-code-session'
+import type { Session, UserMessage } from '@shres-code/shres-code-session'
 import { apply, Config, internals } from '../src/index.ts'
 
 const originalInternals = { ...internals }
@@ -167,7 +167,7 @@ describe('headless runner', () => {
     expect(await test.run()).toMatchObject({
       code: 1,
       out: '\n',
-      err: 'roos: SERVER: provider unavailable\n',
+      err: 'shres: SERVER: provider unavailable\n',
     })
     await test.ctx.fiber.dispose()
   })
@@ -191,7 +191,7 @@ describe('headless runner', () => {
     ctx.provide('agents', { create: () => Promise.reject(new Error('factory exploded')) } as never)
     apply(ctx, { task: 't' })
     expect(await exited).toBe(1)
-    expect(err).toBe('roos: factory exploded\n')
+    expect(err).toBe('shres: factory exploded\n')
     await ctx.fiber.dispose()
   })
 
@@ -213,7 +213,7 @@ describe('headless runner', () => {
     ctx.provide('agents', { create: () => rejected } as never)
     apply(ctx, { task: 't' })
     expect(await exited).toBe(1)
-    expect(err).toBe('roos: factory exploded\n')
+    expect(err).toBe('shres: factory exploded\n')
     await ctx.fiber.dispose()
   })
 

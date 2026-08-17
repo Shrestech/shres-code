@@ -1,9 +1,9 @@
 /**
  * Lossless-JSON snapshots for the dependency-free source worker closure.
- * @module @roos-code/roos-code-code-runtime-worker-thread/worker-json
+ * @module @shres-code/shres-code-code-runtime-worker-thread/worker-json
  */
 
-import type { CodeJsonValue } from '@roos-code/roos-code-code-runtime'
+import type { CodeJsonValue } from '@shres-code/shres-code-code-runtime'
 
 /* jscpd:ignore-start -- the source worker mirrors session JSON helpers without workspace runtime imports */
 type IntrinsicCallable = (this: unknown, ...args: unknown[]) => unknown

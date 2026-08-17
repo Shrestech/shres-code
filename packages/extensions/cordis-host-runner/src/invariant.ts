@@ -1,13 +1,13 @@
 /**
- * Package-owned invariant companion for `@roos-code/roos-code-cordis-host-runner`.
- * @module @roos-code/roos-code-cordis-host-runner/invariant
+ * Package-owned invariant companion for `@shres-code/shres-code-cordis-host-runner`.
+ * @module @shres-code/shres-code-cordis-host-runner/invariant
  */
 
 /* jscpd:ignore-start */
-import type { Context } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-cordis-host-runner'
+const PACKAGE_NAME = '@shres-code/shres-code-cordis-host-runner'
 
 /** Cordis companion plugin name. */
 export const name = 'cordis-host-runner-invariant'

@@ -5,7 +5,7 @@
  * activate, against that plugin context) and the entry `disabled` field (at
  * every mount decision, against the loader context). Every other entry
  * metadata field stays static, so an expression there remains truthy data and
- * silently changes composition. Example configs and the roos Web composition
+ * silently changes composition. Example configs and the shres Web composition
  * resolve named plugins from their owning workspace manifests. Local example
  * packages must also be in the root TypeScript project graph.
  */
@@ -31,7 +31,7 @@ interface PluginReference {
 }
 
 const root = resolve(import.meta.dirname, '..')
-// These example files are overlays consumed by the built roos app, so their bare
+// These example files are overlays consumed by the built shres app, so their bare
 // specifiers resolve from apps/cli rather than the examples workspace.
 const appOverlayFiles = new Set([
   'examples/web-cordis/cordis.yml',
@@ -41,7 +41,7 @@ const appOverlayFiles = new Set([
 const metadataFields = ['id', 'name', 'group', 'inject', 'intercept', 'isolate'] as const
 
 /** The adaptive directory-picker chooser package (mounts a backend row at boot). */
-const CHOOSER_PACKAGE = '@roos-code/roos-code-host-directory-picker-auto'
+const CHOOSER_PACKAGE = '@shres-code/shres-code-host-directory-picker-auto'
 
 /**
  * The packages the chooser mounts by runtime string (mirror of its exported
@@ -51,10 +51,10 @@ const CHOOSER_PACKAGE = '@roos-code/roos-code-host-directory-picker-auto'
  * until a macOS boot.
  */
 const CHOOSER_BACKEND_PACKAGES = [
-  '@roos-code/roos-code-host-directory-picker-native',
-  '@roos-code/roos-code-host-directory-picker-browse',
-  '@roos-code/roos-code-client-ui-directory-picker-browse',
-  '@roos-code/roos-code-client-ui-directory-picker-native',
+  '@shres-code/shres-code-host-directory-picker-native',
+  '@shres-code/shres-code-host-directory-picker-browse',
+  '@shres-code/shres-code-client-ui-directory-picker-browse',
+  '@shres-code/shres-code-client-ui-directory-picker-native',
 ]
 const jsExprType = new yaml.Type('tag:yaml.org,2002:js', {
   kind: 'scalar',
@@ -102,7 +102,7 @@ if (import.meta.main) {
  * A browser plugin must declare the browser half it ships.
  *
  * The browser roster is discovered by scanning composed packages for a
- * `roos.client` block, and the node half of a surface plugin is an empty
+ * `shres.client` block, and the node half of a surface plugin is an empty
  * `apply`. A `packages/client` package that exports `./client` without that
  * block therefore composes, activates, and contributes nothing — its bundle is
  * never served and no error is raised anywhere. The mismatch is invisible in
@@ -110,20 +110,20 @@ if (import.meta.main) {
  * this group is checked: a Host package's `./client` export is the typed wire
  * face its browser consumers import, not a plugin the roster serves.
  * @returns one violation per client package whose `./client` export and
- * `roos.client` declaration disagree.
+ * `shres.client` declaration disagree.
  */
 function validateClientHalvesDeclared(): string[] {
   return globSync('packages/client/*/package.json', { cwd: root }).flatMap((manifestPath) => {
     const manifest = readManifest(manifestPath) as PackageManifest & {
       exports?: Record<string, unknown>
-      roos?: { client?: unknown }
+      shres?: { client?: unknown }
     }
     const shipsClient = manifest.exports !== undefined && Object.hasOwn(manifest.exports, './client')
-    const declaresClient = manifest.roos?.client !== undefined
+    const declaresClient = manifest.shres?.client !== undefined
     if (shipsClient === declaresClient) return []
     return [shipsClient
-      ? `${manifestPath}: exports "./client" but declares no roos.client, so its browser half is never served`
-      : `${manifestPath}: declares roos.client but exports no "./client" entry to serve`]
+      ? `${manifestPath}: exports "./client" but declares no shres.client, so its browser half is never served`
+      : `${manifestPath}: declares shres.client but exports no "./client" entry to serve`]
   })
 }
 
@@ -137,7 +137,7 @@ function validateClientHalvesDeclared(): string[] {
  * contributor to that service reaches nobody; a row that registers into a host
  * singleton registers once per live session, so the second one collides.
  *
- * Both have happened. `shell-env` in a preset realm left `ROOS_WEB_URL` reaching
+ * Both have happened. `shell-env` in a preset realm left `SHRES_WEB_URL` reaching
  * no shell, and `tool-subagent-report` handed every child `report` once per live
  * session until the second registration threw. Neither changes a tool catalog,
  * so no catalog assertion can see them — and the shipped presets are near-copies
@@ -204,7 +204,7 @@ function validateEntry(value: unknown, file: string, path: string): void {
   }
   recordPlugin(value, file)
   validateMetadata(value, file, path)
-  if ((value.group === true || value.name === '@roos-code/cordis-plugin-group') && isUnknownArray(value.config)) {
+  if ((value.group === true || value.name === '@shres-code/cordis-plugin-group') && isUnknownArray(value.config)) {
     for (let index = 0; index < value.config.length; index++) {
       validateEntry(value.config[index], file, `${path}.config[${index}]`)
     }
@@ -214,7 +214,7 @@ function validateEntry(value: unknown, file: string, path: string): void {
       validateEntry(value.insert[index], file, `${path}.insert[${index}]`)
     }
   }
-  if (value.name !== '@roos-code/cordis-plugin-include') return
+  if (value.name !== '@shres-code/cordis-plugin-include') return
   const config = value.config
   if (!isRecord(config) || !isUnknownArray(config.patches)) return
   for (let index = 0; index < config.patches.length; index++) {
@@ -261,7 +261,7 @@ function validateExampleResolution(): string[] {
 function validateAppResolution(): string[] {
   const violations: string[] = []
   // App overlays (and any config left under apps/cli/config) resolve from the
-  // roos app's own dependency surface — the profile module fallback mirrors it.
+  // shres app's own dependency surface — the profile module fallback mirrors it.
   const appDependencies = {
     ...readManifest('apps/cli/package.json').dependencies,
     // The fallback also links every bundle's own dependencies (healProfilesModuleFallback).
@@ -290,7 +290,7 @@ function validateAppResolution(): string[] {
 
 /**
  * Every configured specifier of a local workspace package must resolve through
- * the tsconfig `paths` facade to a `.ts`/`.tsx` source file. The `roos` source
+ * the tsconfig `paths` facade to a `.ts`/`.tsx` source file. The `shres` source
  * launch (tsx) and vitest resolve in the source plane; without a `paths` match
  * they fall back to package `exports`, which reach built `lib/` — present on a
  * built dev tree, absent on a clean one — so a missing mapping boots locally

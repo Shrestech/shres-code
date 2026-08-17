@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import AgentLoop from '@roos-code/roos-code-agent-loop'
-import { renderPrompt } from '@roos-code/roos-code-system-prompt'
+import { Context } from '@shres-code/cordis'
+import AgentLoop from '@shres-code/shres-code-agent-loop'
+import { renderPrompt } from '@shres-code/shres-code-system-prompt'
 import { mountAgentLoopTestDependencies } from '../src/index.ts'
 
-describe('roos-agent-loop-testkit', () => {
+describe('shres-agent-loop-testkit', () => {
   it('mounts a configurable prerequisite spine that can activate AgentLoop', async () => {
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx, {

@@ -4,15 +4,15 @@
  * and nothing here reaches a Host-only symbol, so a Client compilation face
  * reads exactly the signature the Host emits.
  *
- * @module @roos-code/roos-code-credentials/types
+ * @module @shres-code/shres-code-credentials/types
  */
 
-import type { Branded } from '@roos-code/roos-code-brand'
+import type { Branded } from '@shres-code/shres-code-brand'
 
 /** Nominal reference to one credential: a POSIX-style environment-variable name. */
 export type CredentialRef = Branded<'CredentialRef'>
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Events {
     /**
      * Committed change to a provider-managed credential source: a `set`, an

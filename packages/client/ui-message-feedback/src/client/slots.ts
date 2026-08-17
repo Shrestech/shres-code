@@ -5,15 +5,15 @@
  * merge lives here. Live per-message state arrives through the `feedback`
  * hook (the framework standard kit binds it into `useFeedback`); inject
  * carries the two mutation verbs plus the lazy loader.
- * @module @roos-code/roos-code-client-ui-message-feedback/client/slots
+ * @module @shres-code/shres-code-client-ui-message-feedback/client/slots
  */
 
 import type {
   HostObservable, InjectFace, PropsLocale, PropsRuntime,
-} from '@roos-code/roos-code-client-ui-slots'
-import type {} from '@roos-code/roos-code-client-ui-conversation/client'
-import type { MessageId } from '@roos-code/roos-code-client-connection/client'
-import type { MessageFeedbackRating } from '@roos-code/roos-code-message-feedback/types'
+} from '@shres-code/shres-code-client-ui-slots'
+import type {} from '@shres-code/shres-code-client-ui-conversation/client'
+import type { MessageId } from '@shres-code/shres-code-client-connection/client'
+import type { MessageFeedbackRating } from '@shres-code/shres-code-message-feedback/types'
 // Type-only: pulls this package's LocaleNamespaceMap merge (the 'feedback' seat).
 import type {} from './locales.ts'
 import type { MessageFeedbackActionResult, MessageFeedbackView } from './controller.ts'

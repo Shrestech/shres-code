@@ -1,12 +1,12 @@
 /**
  * Human-facing `/goal` command over the persisted same-session goal domain.
- * @module @roos-code/roos-code-command-goal
+ * @module @shres-code/shres-code-command-goal
  */
 
-import type { Context } from '@roos-code/cordis'
-import type { CommandInvocation, CommandResult } from '@roos-code/roos-code-commands'
-import { GoalError } from '@roos-code/roos-code-goal'
-import type { GoalPhase, GoalRef, GoalView } from '@roos-code/roos-code-goal'
+import type { Context } from '@shres-code/cordis'
+import type { CommandInvocation, CommandResult } from '@shres-code/shres-code-commands'
+import { GoalError } from '@shres-code/shres-code-goal'
+import type { GoalPhase, GoalRef, GoalView } from '@shres-code/shres-code-goal'
 
 export const name = 'command-goal'
 export const inject = ['commands', 'goals']

@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import type { Agent } from '@roos-code/roos-code-agent'
-import { CompactionId, compactCheckpointSource } from '@roos-code/roos-code-compaction'
-import { createUserMessage, CallId , createMessage, createToolResultMessage } from '@roos-code/roos-code-llm'
-import SessionStore, { Session, SessionId } from '@roos-code/roos-code-session'
-import SessionQueryEngine from '@roos-code/roos-code-session-query'
+import { Context } from '@shres-code/cordis'
+import type { Agent } from '@shres-code/shres-code-agent'
+import { CompactionId, compactCheckpointSource } from '@shres-code/shres-code-compaction'
+import { createUserMessage, CallId , createMessage, createToolResultMessage } from '@shres-code/shres-code-llm'
+import SessionStore, { Session, SessionId } from '@shres-code/shres-code-session'
+import SessionQueryEngine from '@shres-code/shres-code-session-query'
 import SessionReferenceResolver, {
   decodeSessionReferenceUri,
   encodeSessionReferenceUri,
@@ -12,8 +12,8 @@ import SessionReferenceResolver, {
   parseSessionReferenceText,
   type Config,
   type SessionReferenceErrorCode,
-} from '@roos-code/roos-code-session-reference'
-import { stringifyTagSafeJson } from '@roos-code/roos-code-untrusted-frame'
+} from '@shres-code/shres-code-session-reference'
+import { stringifyTagSafeJson } from '@shres-code/shres-code-untrusted-frame'
 
 class TestSessionQueryEngine extends SessionQueryEngine {
   override searchSessions(
@@ -218,23 +218,23 @@ describe('session reference URI and inline mentions', () => {
       { sessionId, label: sessionId },
     ])
 
-    expect(parseSessionReferenceText('what is a roos-session: URI?')).toEqual({
-      text: 'what is a roos-session: URI?',
+    expect(parseSessionReferenceText('what is a shres-session: URI?')).toEqual({
+      text: 'what is a shres-session: URI?',
       references: [],
     })
-    expect(parseSessionReferenceText('see roos-session:%%%')).toEqual({
-      text: 'see roos-session:%%%',
+    expect(parseSessionReferenceText('see shres-session:%%%')).toEqual({
+      text: 'see shres-session:%%%',
       references: [],
     })
   })
 
   it('rejects malformed explicit references and base64url-shaped bare candidates', () => {
     expect(() => decodeSessionReferenceUri('https://example.test')).toThrow(expectCode('SESSION_REFERENCE_INVALID_REFERENCE'))
-    expect(() => parseSessionReferenceText('see roos-session:IiJ')).toThrow(expectCode('SESSION_REFERENCE_INVALID_REFERENCE'))
-    expect(() => parseSessionReferenceText('@[bad](roos-session:%%%)')).toThrow(expectCode('SESSION_REFERENCE_INVALID_REFERENCE'))
-    const nonString = `roos-session:${Buffer.from(JSON.stringify({ id: 'x' })).toString('base64url')}`
+    expect(() => parseSessionReferenceText('see shres-session:IiJ')).toThrow(expectCode('SESSION_REFERENCE_INVALID_REFERENCE'))
+    expect(() => parseSessionReferenceText('@[bad](shres-session:%%%)')).toThrow(expectCode('SESSION_REFERENCE_INVALID_REFERENCE'))
+    const nonString = `shres-session:${Buffer.from(JSON.stringify({ id: 'x' })).toString('base64url')}`
     expect(() => decodeSessionReferenceUri(nonString)).toThrow(expectCode('SESSION_REFERENCE_INVALID_REFERENCE'))
-    expect(() => decodeSessionReferenceUri('roos-session:IiJ')).toThrow(expectCode('SESSION_REFERENCE_INVALID_REFERENCE'))
+    expect(() => decodeSessionReferenceUri('shres-session:IiJ')).toThrow(expectCode('SESSION_REFERENCE_INVALID_REFERENCE'))
   })
 })
 

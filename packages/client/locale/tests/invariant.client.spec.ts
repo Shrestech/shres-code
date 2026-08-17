@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { apply as nodeApply } from '@roos-code/roos-code-client-locale'
-import { apply as clientApply, COMMON_NS, LocaleRuntime, inject } from '@roos-code/roos-code-client-locale/client'
-import * as LocaleInvariant from '@roos-code/roos-code-client-locale/invariant'
-import { SlotRegistry } from '@roos-code/roos-code-client-runtime/client'
-import InvariantRegistry from '@roos-code/roos-code-invariants'
-import { stubSettingsScope } from '@roos-code/roos-code-client-test-runtime'
+import { Context } from '@shres-code/cordis'
+import { apply as nodeApply } from '@shres-code/shres-code-client-locale'
+import { apply as clientApply, COMMON_NS, LocaleRuntime, inject } from '@shres-code/shres-code-client-locale/client'
+import * as LocaleInvariant from '@shres-code/shres-code-client-locale/invariant'
+import { SlotRegistry } from '@shres-code/shres-code-client-runtime/client'
+import InvariantRegistry from '@shres-code/shres-code-invariants'
+import { stubSettingsScope } from '@shres-code/shres-code-client-test-runtime'
 
 describe('invariant companion', () => {
   it('registers under the package name with an empty installer', async () => {

@@ -45,7 +45,7 @@ describe.skipIf(!requiredArtifacts)('Goal Remote built LIB chain', () => {
     }).map(([key, path]) => [key, artifactUrl(path)]))
     const script = `
       import { createServer } from 'node:http'
-      import * as cordis from '@roos-code/cordis'
+      import * as cordis from '@shres-code/cordis'
 
       const urls = ${JSON.stringify(urls)}
       const { Context } = cordis
@@ -123,16 +123,16 @@ describe.skipIf(!requiredArtifacts)('Goal Remote built LIB chain', () => {
         const handoff = handoffs.get(id)
         if (handoff === undefined) throw new Error('missing Client bundle handoff ' + id)
         return handoff.factory(specifier => {
-          if (specifier === '@roos-code/cordis') return cordis
+          if (specifier === '@shres-code/cordis') return cordis
           throw new Error('unexpected Client external ' + specifier)
         })
       }
       const client = new Context()
       for (const id of [
-        '@roos-code/roos-code-typert-registry',
-        '@roos-code/roos-code-client-connection',
-        '@roos-code/roos-code-api-gateway',
-        '@roos-code/roos-code-api-remotes',
+        '@shres-code/shres-code-typert-registry',
+        '@shres-code/shres-code-client-connection',
+        '@shres-code/shres-code-api-gateway',
+        '@shres-code/shres-code-api-remotes',
       ]) {
         const plugin = instantiate(id)
         await client.plugin({ inject: plugin.inject, apply: plugin.apply })

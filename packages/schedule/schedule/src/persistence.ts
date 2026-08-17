@@ -1,7 +1,7 @@
 /** Schedule-owned use of the shared session durability barrier. */
 
-import type { Context } from '@roos-code/cordis'
-import type { Session } from '@roos-code/roos-code-session'
+import type { Context } from '@shres-code/cordis'
+import type { Session } from '@shres-code/shres-code-session'
 
 /** Failure to prove that the current live prefix reached a persistence listener. */
 export class SchedulePersistenceError extends Error {

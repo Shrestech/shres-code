@@ -3,14 +3,14 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import Loader from '@roos-code/cordis-plugin-loader'
-import Include from '@roos-code/cordis-plugin-include'
-import LlmRuntime from '@roos-code/roos-code-llm'
-import SessionStore from '@roos-code/roos-code-session'
-import TokenMeter from '@roos-code/roos-code-token-meter'
-import BasicCompactionEngine from '@roos-code/roos-code-compaction-basic'
-import ToolResultPruner from '@roos-code/roos-code-compaction-tool-result-pruner'
+import { Context } from '@shres-code/cordis'
+import Loader from '@shres-code/cordis-plugin-loader'
+import Include from '@shres-code/cordis-plugin-include'
+import LlmRuntime from '@shres-code/shres-code-llm'
+import SessionStore from '@shres-code/shres-code-session'
+import TokenMeter from '@shres-code/shres-code-token-meter'
+import BasicCompactionEngine from '@shres-code/shres-code-compaction-basic'
+import ToolResultPruner from '@shres-code/shres-code-compaction-tool-result-pruner'
 
 let root: string | undefined
 let context: Context | undefined
@@ -23,7 +23,7 @@ afterEach(async () => {
 })
 
 async function loadYaml(lines: readonly string[]): Promise<Context> {
-  root = await mkdtemp(join(tmpdir(), 'roos-token-meter-loader-'))
+  root = await mkdtemp(join(tmpdir(), 'shres-token-meter-loader-'))
   const configPath = join(root, 'cordis.yml')
   await writeFile(configPath, [...lines, ''].join('\n'))
 
@@ -32,11 +32,11 @@ async function loadYaml(lines: readonly string[]): Promise<Context> {
   await context.plugin(Loader)
   context.loader.builtins.include = Include
   const modules = new Map<string, unknown>([
-    ['@roos-code/roos-code-llm', LlmRuntime],
-    ['@roos-code/roos-code-session', SessionStore],
-    ['@roos-code/roos-code-token-meter', TokenMeter],
-    ['@roos-code/roos-code-compaction-tool-result-pruner', ToolResultPruner],
-    ['@roos-code/roos-code-compaction-basic', BasicCompactionEngine],
+    ['@shres-code/shres-code-llm', LlmRuntime],
+    ['@shres-code/shres-code-session', SessionStore],
+    ['@shres-code/shres-code-token-meter', TokenMeter],
+    ['@shres-code/shres-code-compaction-tool-result-pruner', ToolResultPruner],
+    ['@shres-code/shres-code-compaction-basic', BasicCompactionEngine],
   ])
   context.loader.internal = {
     version: 'v2',
@@ -56,15 +56,15 @@ async function loadYaml(lines: readonly string[]): Promise<Context> {
 describe('real Loader composition', () => {
   it('loads the shipped token-meter, pruning, and compaction-basic YAML order', async () => {
     const loaded = await loadYaml([
-      "- name: '@roos-code/roos-code-llm'",
-      "- name: '@roos-code/roos-code-session'",
-      "- name: '@roos-code/roos-code-token-meter'",
-      "- name: '@roos-code/roos-code-compaction-tool-result-pruner'",
+      "- name: '@shres-code/shres-code-llm'",
+      "- name: '@shres-code/shres-code-session'",
+      "- name: '@shres-code/shres-code-token-meter'",
+      "- name: '@shres-code/shres-code-compaction-tool-result-pruner'",
       '  config:',
       '    thresholdChars: 100',
       '    headChars: 20',
       '    tailChars: 10',
-      "- name: '@roos-code/roos-code-compaction-basic'",
+      "- name: '@shres-code/shres-code-compaction-basic'",
       '  config:',
       '    thresholdRatio: 0.5',
       '    retainRatio: 0.125',

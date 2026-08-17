@@ -1,4 +1,4 @@
-import type { CallId } from '@roos-code/roos-code-llm'
+import type { CallId } from '@shres-code/shres-code-llm'
 
 /** Character-budget policy for deterministic tool-result pruning. */
 export interface ToolResultPruneConfig {

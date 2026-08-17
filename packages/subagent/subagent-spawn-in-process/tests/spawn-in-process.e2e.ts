@@ -1,11 +1,11 @@
-import { createUserMessage } from '@roos-code/roos-code-llm'
+import { createUserMessage } from '@shres-code/shres-code-llm'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import type { Context } from '@roos-code/cordis'
+import type { Context } from '@shres-code/cordis'
 import { spawnHarness, waitForIdle } from './harness.ts'
-import { SessionId } from '@roos-code/roos-code-session'
+import { SessionId } from '@shres-code/shres-code-session'
 
 /** Key-gated smoke for a real parent delegating filesystem work to a real child. */
 
@@ -21,7 +21,7 @@ afterEach(async () => {
 
 describe.skipIf(!process.env.DEEPSEEK_API_KEY)('spawn backend with-key smoke', () => {
   it('a parent delegates to a child that writes a file on disk', async () => {
-    workdir = await mkdtemp(join(tmpdir(), 'roos-subagent-spawn-e2e-'))
+    workdir = await mkdtemp(join(tmpdir(), 'shres-subagent-spawn-e2e-'))
     ctx = await spawnHarness(workdir)
     const parent = ctx.agentLoop.create(SessionId('e2e-parent'), { provider: 'deepseek-official', model: 'deepseek-v4-flash' })
 

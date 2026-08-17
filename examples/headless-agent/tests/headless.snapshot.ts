@@ -12,12 +12,12 @@ import {
   tokenizeSessionFixtureCwd,
   type HarvestedLog,
   type NormalizeContext,
-} from '@roos-code/roos-code-acp-snapshot'
-import { LOADER_SMOKE_TEST_TIMEOUT_MS, runLoaderSmoke } from '@roos-code/roos-code-loader-smoke'
+} from '@shres-code/shres-code-acp-snapshot'
+import { LOADER_SMOKE_TEST_TIMEOUT_MS, runLoaderSmoke } from '@shres-code/shres-code-loader-smoke'
 import {
   decompressZstdFrame,
   scanZstdFrames,
-} from '@roos-code/roos-code-session-persistence-jsonl/src/zstd.ts'
+} from '@shres-code/shres-code-session-persistence-jsonl/src/zstd.ts'
 import { describe, expect, it } from 'vitest'
 
 const snapshotsDir = join(dirname(fileURLToPath(import.meta.url)), 'snapshots')
@@ -50,7 +50,7 @@ const settlementConfigPath = fileURLToPath(new URL('../subagent-settlement.cordi
 const startupFailureConfigPath = fileURLToPath(new URL('./fixtures/startup-activation-error/cordis.yml', import.meta.url))
 const startupFailureExpected = join(snapshotsDir, 'startup-activation-error', 'stderr.expected.txt')
 const binScript = fileURLToPath(new URL('./fixtures/headless-driver.ts', import.meta.url))
-const roosBinScript = fileURLToPath(new URL('../../../apps/cli/src/bin.ts', import.meta.url))
+const shresBinScript = fileURLToPath(new URL('../../../apps/cli/src/bin.ts', import.meta.url))
 const tsconfigPath = fileURLToPath(new URL('../../../tsconfig.json', import.meta.url))
 const reasoningConfigPath = fileURLToPath(new URL('./fixtures/cli.cordis.yml', import.meta.url))
 const deepseekDefaultsConfigPath = fileURLToPath(new URL('./fixtures/deepseek-defaults.cordis.yml', import.meta.url))
@@ -58,7 +58,7 @@ const headlessOverlayPath = fileURLToPath(new URL('./fixtures/headless-profile.c
 const headlessSessionExpected = join(snapshotsDir, 'headless-profile', 'session.expected.jsonl')
 const headlessFailureExpected = join(snapshotsDir, 'headless-profile', 'stderr.expected.txt')
 const cliMockLlmPluginPath = fileURLToPath(new URL('./fixtures/cli-mock-llm.ts', import.meta.url))
-const refreshing = process.env.ROOS_SNAPSHOT === 'refresh'
+const refreshing = process.env.SHRES_SNAPSHOT === 'refresh'
 
 interface JsonObject {
   [key: string]: unknown
@@ -210,7 +210,7 @@ async function persistedLogs(cwd: string, root: string = join(cwd, '.sessions'))
 
 /** Install the keyless product-CLI adapter into the temporary headless profile. */
 async function prepareCliMockFixture(cwd: string): Promise<void> {
-  const fixtureDir = join(cwd, '.roos', 'profiles', 'headless', 'snapshot-fixtures')
+  const fixtureDir = join(cwd, '.shres', 'profiles', 'headless', 'snapshot-fixtures')
   await mkdir(fixtureDir, { recursive: true })
   await Promise.all([
     copyFile(cliMockLlmPluginPath, join(fixtureDir, 'cli-mock-llm.ts')),
@@ -224,18 +224,18 @@ describe('headless stream-json snapshots', () => {
     const result = await runLoaderSmoke({
       label: 'product headless profile snapshot',
       tempDirPrefix: 'headless-snapshot-profile-',
-      binScript: roosBinScript,
+      binScript: shresBinScript,
       configPath: headlessOverlayPath,
       binArgs: ['--profile', 'headless', '--patch', headlessOverlayPath, task],
       tsconfigPath,
       env: {
-        ROOS_PERMISSION_MODE: 'danger-full-access',
-        ROOS_TELEMETRY_DISABLED: '1',
+        SHRES_PERMISSION_MODE: 'danger-full-access',
+        SHRES_TELEMETRY_DISABLED: '1',
         NODE_OPTIONS: [process.env.NODE_OPTIONS, '--disable-warning=ExperimentalWarning'].filter(Boolean).join(' '),
       },
       prepare: prepareCliMockFixture,
       inspect: async (cwd) => {
-        const logs = await persistedLogs(cwd, join(cwd, '.roos', 'sessions'))
+        const logs = await persistedLogs(cwd, join(cwd, '.shres', 'sessions'))
         expect(logs).toHaveLength(1)
         const actual = logs[0]
         if (actual === undefined) throw new Error('the headless profile did not persist its session')
@@ -256,14 +256,14 @@ describe('headless stream-json snapshots', () => {
     const result = await runLoaderSmoke({
       label: 'product headless profile model failure snapshot',
       tempDirPrefix: 'headless-snapshot-profile-failure-',
-      binScript: roosBinScript,
+      binScript: shresBinScript,
       configPath: headlessOverlayPath,
       binArgs: ['--profile', 'headless', '--patch', headlessOverlayPath, 'Trigger the keyless model failure.'],
       tsconfigPath,
       expectedExitCode: 1,
       env: {
-        ROOS_CLI_MOCK_FAILURE: '1',
-        ROOS_TELEMETRY_DISABLED: '1',
+        SHRES_CLI_MOCK_FAILURE: '1',
+        SHRES_TELEMETRY_DISABLED: '1',
         NODE_OPTIONS: [process.env.NODE_OPTIONS, '--disable-warning=ExperimentalWarning'].filter(Boolean).join(' '),
       },
       prepare: prepareCliMockFixture,
@@ -301,7 +301,7 @@ describe('headless stream-json snapshots', () => {
       binArgs: [retryConfigPath, prompt],
       tsconfigPath,
       env: {
-        ROOS_SNAPSHOT: 'replay',
+        SHRES_SNAPSHOT: 'replay',
         NODE_OPTIONS: [process.env.NODE_OPTIONS, '--disable-warning=ExperimentalWarning'].filter(Boolean).join(' '),
       },
       prepare: (cwd) => { runCwd = cwd },
@@ -342,8 +342,8 @@ describe('headless stream-json snapshots', () => {
       binArgs: [compactionConfigPath, prompt],
       tsconfigPath,
       env: {
-        ROOS_SNAPSHOT: 'replay',
-        ROOS_SNAPSHOT_FILE: compactionSessionFixture,
+        SHRES_SNAPSHOT: 'replay',
+        SHRES_SNAPSHOT_FILE: compactionSessionFixture,
         NODE_OPTIONS: [process.env.NODE_OPTIONS, '--disable-warning=ExperimentalWarning'].filter(Boolean).join(' '),
       },
       prepare: (cwd) => { runCwd = cwd },
@@ -411,7 +411,7 @@ describe('headless stream-json snapshots', () => {
       binArgs: [credentialsConfigPath, 'say pong'],
       tsconfigPath,
       env: {
-        // First-run posture: no key in the environment, none under ./.roos.
+        // First-run posture: no key in the environment, none under ./.shres.
         DEEPSEEK_API_KEY: '',
         DEEPSEEK_BASE_URL: '',
         NODE_OPTIONS: [process.env.NODE_OPTIONS, '--disable-warning=ExperimentalWarning'].filter(Boolean).join(' '),
@@ -533,7 +533,7 @@ describe('headless stream-json snapshots', () => {
           // Configuration carries only the reference; the key rides the
           // launching environment, which is the whole credential plane here.
           DEEPSEEK_API_KEY: 'snapshot-key',
-          ROOS_SNAPSHOT_BASE_URL: server.url,
+          SHRES_SNAPSHOT_BASE_URL: server.url,
           NODE_OPTIONS: [process.env.NODE_OPTIONS, '--disable-warning=ExperimentalWarning'].filter(Boolean).join(' '),
         },
       })
@@ -585,9 +585,9 @@ describe('headless stream-json snapshots', () => {
       binArgs: [advancedConfigPath, prompt],
       tsconfigPath,
       env: {
-        ROOS_SNAPSHOT: 'replay',
-        ROOS_SNAPSHOT_FILE: advancedSessionFixture,
-        ROOS_SNAPSHOT_CHILD_FILES: [
+        SHRES_SNAPSHOT: 'replay',
+        SHRES_SNAPSHOT_FILE: advancedSessionFixture,
+        SHRES_SNAPSHOT_CHILD_FILES: [
           join(advancedScenarioDir, 'session.1.jsonl'),
           join(advancedScenarioDir, 'session.2.jsonl'),
         ].join(delimiter),
@@ -657,9 +657,9 @@ describe('headless stream-json snapshots', () => {
       binArgs: [goalConfigPath, prompt],
       tsconfigPath,
       env: {
-        ROOS_SNAPSHOT: 'replay',
-        ROOS_SNAPSHOT_FILE: join(goalScenarioDir, 'session.jsonl'),
-        ROOS_SNAPSHOT_OVERRIDE: join(goalScenarioDir, 'replay.override.json'),
+        SHRES_SNAPSHOT: 'replay',
+        SHRES_SNAPSHOT_FILE: join(goalScenarioDir, 'session.jsonl'),
+        SHRES_SNAPSHOT_OVERRIDE: join(goalScenarioDir, 'replay.override.json'),
         NODE_OPTIONS: [process.env.NODE_OPTIONS, '--disable-warning=ExperimentalWarning'].filter(Boolean).join(' '),
       },
       prepare: (cwd) => { runCwd = cwd },
@@ -714,10 +714,10 @@ describe('headless stream-json snapshots', () => {
       binArgs: [ralphConfigPath, prompt],
       tsconfigPath,
       env: {
-        ROOS_SNAPSHOT: 'replay',
-        ROOS_SNAPSHOT_FILE: join(ralphScenarioDir, 'session.jsonl'),
-        ROOS_SNAPSHOT_OVERRIDE: join(ralphScenarioDir, 'replay.override.json'),
-        ROOS_SNAPSHOT_CHILD_FILES: [
+        SHRES_SNAPSHOT: 'replay',
+        SHRES_SNAPSHOT_FILE: join(ralphScenarioDir, 'session.jsonl'),
+        SHRES_SNAPSHOT_OVERRIDE: join(ralphScenarioDir, 'replay.override.json'),
+        SHRES_SNAPSHOT_CHILD_FILES: [
           join(ralphScenarioDir, 'session.1.jsonl'),
           join(ralphScenarioDir, 'session.2.jsonl'),
         ].join(delimiter),
@@ -798,9 +798,9 @@ describe('headless stream-json snapshots', () => {
       env: {
         // The override fully supplies the parent script; the child fixture
         // remains separate so replay binds it to the fresh child Session.
-        ROOS_SNAPSHOT_FILE: parentReplay,
-        ROOS_SNAPSHOT_OVERRIDE: parentOverride,
-        ROOS_SNAPSHOT_CHILD_FILES: childReplay,
+        SHRES_SNAPSHOT_FILE: parentReplay,
+        SHRES_SNAPSHOT_OVERRIDE: parentOverride,
+        SHRES_SNAPSHOT_CHILD_FILES: childReplay,
         NODE_OPTIONS: [process.env.NODE_OPTIONS, '--disable-warning=ExperimentalWarning'].filter(Boolean).join(' '),
       },
       prepare: (cwd) => { runCwd = cwd },
@@ -867,8 +867,8 @@ describe('headless stream-json snapshots', () => {
       binArgs: [ptyConfigPath, prompt],
       tsconfigPath,
       env: {
-        ROOS_SNAPSHOT: 'replay',
-        ROOS_SNAPSHOT_FILE: ptySessionFixture,
+        SHRES_SNAPSHOT: 'replay',
+        SHRES_SNAPSHOT_FILE: ptySessionFixture,
         NODE_OPTIONS: [process.env.NODE_OPTIONS, '--disable-warning=ExperimentalWarning'].filter(Boolean).join(' '),
       },
       prepare: (cwd) => { runCwd = cwd },

@@ -11,7 +11,7 @@ index 1ec12f796a822c78fba9ad7f6448c3987e325c23..5cd6b7d635f4752be5a6c5ff9cf9edf9
 -helperPath = helperPath.replace('app.asar', 'app.asar.unpacked');
 -helperPath = helperPath.replace('node_modules.asar', 'node_modules.asar.unpacked');
 +// A current external embedded-runtime consumer supplies a non-sibling helper.
-+var helperPath = process.env.ROOS_NODE_PTY_SPAWN_HELPER;
++var helperPath = process.env.SHRES_NODE_PTY_SPAWN_HELPER;
 +if (helperPath) {
 +    helperPath = path.resolve(helperPath);
 +}
@@ -43,7 +43,7 @@ index 98733dc0cd752b554bd94e45904ca341ad141bba..fa234291206617ae5a6d8605abf97712
 -helperPath = helperPath.replace('app.asar', 'app.asar.unpacked');
 -helperPath = helperPath.replace('node_modules.asar', 'node_modules.asar.unpacked');
 +// A current external embedded-runtime consumer supplies a non-sibling helper.
-+let helperPath = process.env.ROOS_NODE_PTY_SPAWN_HELPER;
++let helperPath = process.env.SHRES_NODE_PTY_SPAWN_HELPER;
 +if (helperPath) {
 +  helperPath = path.resolve(helperPath);
 +} else {

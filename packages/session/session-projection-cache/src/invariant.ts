@@ -1,13 +1,13 @@
 /**
- * Package-owned invariant companion for `@roos-code/roos-code-session-projection-cache`.
- * @module @roos-code/roos-code-session-projection-cache/invariant
+ * Package-owned invariant companion for `@shres-code/shres-code-session-projection-cache`.
+ * @module @shres-code/shres-code-session-projection-cache/invariant
  */
 
 /* jscpd:ignore-start */
-import type { Context } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-session-projection-cache'
+const PACKAGE_NAME = '@shres-code/shres-code-session-projection-cache'
 
 /** Cordis companion plugin name. */
 export const name = 'session-projection-cache-invariant'

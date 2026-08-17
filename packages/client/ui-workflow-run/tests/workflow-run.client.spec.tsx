@@ -1,16 +1,16 @@
 // @vitest-environment jsdom
-import { Context, Service } from '@roos-code/cordis'
+import { Context, Service } from '@shres-code/cordis'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   ConversationEventRegistry, ConversationNodeAssembler, SlotRegistry,
-} from '@roos-code/roos-code-client-runtime/client'
+} from '@shres-code/shres-code-client-runtime/client'
 import type {
   ChatConversationViewNode, ConversationEventInput, ConversationMatch, ConversationNodeDefinition,
   ConversationViewDefinition, SessionId, SessionListState,
-} from '@roos-code/roos-code-client-runtime/client'
-import { apply as applyLocale, inject as localeInject } from '@roos-code/roos-code-client-locale/client'
-import { makeTranslate, stubSettingsScope } from '@roos-code/roos-code-client-test-runtime'
+} from '@shres-code/shres-code-client-runtime/client'
+import { apply as applyLocale, inject as localeInject } from '@shres-code/shres-code-client-locale/client'
+import { makeTranslate, stubSettingsScope } from '@shres-code/shres-code-client-test-runtime'
 import {
   WorkflowRunPanel, type WorkflowRunInjected, type WorkflowRunPanelProps,
 } from '../src/client/WorkflowRunPanel.tsx'
@@ -584,6 +584,6 @@ describe('plugin lifecycle', () => {
       register: (pkg: string) => { registered.push(pkg); return () => {} },
     } as never)
     await applyInvariant(ctx)
-    expect(registered).toEqual(['@roos-code/roos-code-client-ui-workflow-run'])
+    expect(registered).toEqual(['@shres-code/shres-code-client-ui-workflow-run'])
   })
 })

@@ -1,5 +1,5 @@
 {
-  "name": "@roos-code/roos-code-api-gateway",
+  "name": "@shres-code/shres-code-api-gateway",
   "description": "Typert Remote Host dispatcher and Client API endpoint",
   "version": "0.1.0-rc.5",
   "publishConfig": {
@@ -7,7 +7,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "packages/api/gateway"
   },
   "type": "module",
@@ -33,11 +33,11 @@
     "./src/*": "./src/*",
     "./package.json": "./package.json"
   },
-  "roos": {
+  "shres": {
     "client": {
       "inject": [
-        "@roos-code/roos-code-typert-registry",
-        "@roos-code/roos-code-client-connection"
+        "@shres-code/shres-code-typert-registry",
+        "@shres-code/shres-code-client-connection"
       ],
       "platform": "web",
       "immediately": true
@@ -56,20 +56,20 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@roos-code/roos-code-typert-protocol": "workspace:^"
+    "@shres-code/shres-code-typert-protocol": "workspace:^"
   },
   "peerDependencies": {
-    "@roos-code/roos-code-client-connection": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-typert-registry": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-client-connection": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-typert-registry": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   },
   "devDependencies": {
-    "@roos-code/roos-code-client-connection": "workspace:^",
-    "@roos-code/roos-code-host-webserver": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-typert-registry": "workspace:^",
-    "@roos-code/cordis": "workspace:^",
+    "@shres-code/shres-code-client-connection": "workspace:^",
+    "@shres-code/shres-code-host-webserver": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-typert-registry": "workspace:^",
+    "@shres-code/cordis": "workspace:^",
     "zod": "^4.4.3"
   }
 }

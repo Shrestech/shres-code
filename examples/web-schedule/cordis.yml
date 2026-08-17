@@ -3,7 +3,7 @@
 
 - insert:
     - id: time-context
-      name: '@roos-code/roos-code-time-context'
+      name: '@shres-code/shres-code-time-context'
 
     - id: schedule
-      name: '@roos-code/roos-code-schedule'
+      name: '@shres-code/shres-code-schedule'

@@ -1,13 +1,13 @@
-# @roos-code/roos-code-tool-fs-search
+# @shres-code/shres-code-tool-fs-search
 
 The **model-facing filesystem discovery tools**—`glob`, `grep`—are backed by the **packaged ripgrep binary** (`@vscode/ripgrep`), not by `ctx.fs` provider methods and not by a system `rg` install. Registration is unconditional: the binary ships inside the npm dependency, so there is no load-time availability probe. Each call spawns the binary through the `ctx.subprocess` seam with a fixed argv vector (`--no-config` prepended so a host `RIPGREP_CONFIG_PATH` cannot inject a `--pre` preprocessor into the unconfined spawn; model-controlled values are plain argv elements — no shell layer exists, so no quoting applies), parses the raw `rg` output, and returns a workdir-relative canonical value. The package injects `tools`, `systemPrompt`, and `subprocess`—deliberately **not** `fs`; `ctx.spillStore` is read opportunistically with `ctx.get()` because formatted-result spill is optional.
 
 ```ts ignore-check
 // A deployment chooses how over-cap glob pages are selected.
-await ctx.plugin(LocalSubprocessRuntime)                     // @roos-code/roos-code-subprocess-local
+await ctx.plugin(LocalSubprocessRuntime)                     // @shres-code/shres-code-subprocess-local
 await ctx.plugin(ToolFsSearch, { sampleOverCapGlobResults: false })
 // Optional: a spill backend makes capped results fully recoverable.
-await ctx.plugin(LocalSpillStore)                           // @roos-code/roos-code-spill-local
+await ctx.plugin(LocalSpillStore)                           // @shres-code/shres-code-spill-local
 ```
 
 Why spawn-backed: local workspace discovery is naturally a process-backed `rg` workflow, and putting search on `ctx.fs` would force every filesystem backend to grow a search API. The subprocess seam owns spawn execution, process-tree termination, environment scrubbing, and bounded output capture; this package owns schemas, argument validation, argv construction, parsing, retention, formatted-result spill, and timeout declaration. The tools never expose a background job — the call returns only after `rg` exits, is terminated by the cooperative timeout, is aborted, or fails.
@@ -27,7 +27,7 @@ The binary ships with the package on every supported platform (macOS/Linux/Windo
 | `grepMaxMatches` | `250` | Max flat matches one `grep` call retains inline (matches Claude Code's `GrepTool` `head_limit`); later matches go to the formatted spill artifact. |
 | `grepMaxLineBytes` | `2000` | Byte cap per matched-line preview; the cut preserves UTF-8 boundaries and is marked `(line truncated)`. |
 | `rawOutputMaxBytes` | `20000000` | Max complete raw `rg` stdout a search will parse (matches Claude Code's ripgrep raw buffer); larger raw output fails with `SEARCH_RAW_OUTPUT_OVERFLOW`. |
-| `timeoutMs` | `30000` | Cooperative tool-call budget attached to both tool definitions, enforced by `@roos-code/roos-code-tool-call-timeout-policy` through `exec.signal`; the subprocess seam's terminate escalation is the hard kill. |
+| `timeoutMs` | `30000` | Cooperative tool-call budget attached to both tool definitions, enforced by `@shres-code/shres-code-tool-call-timeout-policy` through `exec.signal`; the subprocess seam's terminate escalation is the hard kill. |
 | `graceMs` | `3000` | Positive terminate-escalation grace the subprocess seam grants past `timeoutMs` before the search fails as `SEARCH_ABORTED`; it cannot exceed [`MAX_TIMER_DELAY_MS`](../../util/timeout/README.md). |
 | `stderrMaxBytes` | `65536` | Diagnostic-tail budget for `rg` stderr, captured through the subprocess seam's collect disposition; a lossy read keeps only the tail (marked `[stderr truncated]`). |
 
@@ -86,7 +86,7 @@ Prefix-stable while the plugin scope, sampling choice, and guidance text are unc
 
 #### What the model sees
 
-The glob description states the configured over-cap ordering. The generated [`glob` and `grep` schemas](../../../docs/tool-catalog.md#roos-coderoos-code-tool-fs-search) use `sampleOverCapGlobResults: true`; the tools are registered unconditionally.
+The glob description states the configured over-cap ordering. The generated [`glob` and `grep` schemas](../../../docs/tool-catalog.md#shres-codeshres-code-tool-fs-search) use `sampleOverCapGlobResults: true`; the tools are registered unconditionally.
 
 #### Token effect
 

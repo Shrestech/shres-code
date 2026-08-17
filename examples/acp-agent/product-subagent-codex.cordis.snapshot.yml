@@ -1,16 +1,16 @@
 # Keyless twin of product-subagent-codex.cordis.yml: keep the same product
 # provider/tool composition and replace only the external model adapter.
 - id: base
-  name: '@roos-code/cordis-plugin-include'
+  name: '@shres-code/cordis-plugin-include'
   config:
     path: ./cordis.yml
     patches:
       - id: llm-deepseek
-        name: '@roos-code/roos-code-llm-deepseek'
+        name: '@shres-code/shres-code-llm-deepseek'
         disabled: true
       - insert:
           - id: llm-replay
-            name: '@roos-code/roos-code-llm-replay'
+            name: '@shres-code/shres-code-llm-replay'
             config:
               providers:
                 - id: deepseek-official
@@ -19,9 +19,9 @@
                     - id: deepseek-v4-flash
                     - id: deepseek-v4-pro
           - id: subagent-codex
-            name: '@roos-code/roos-code-subagent-codex'
+            name: '@shres-code/shres-code-subagent-codex'
           - id: tool-subagent-codex
-            name: '@roos-code/roos-code-tool-subagent'
+            name: '@shres-code/shres-code-tool-subagent'
             config:
               provider: codex
               toolName: subagent_codex

@@ -1,21 +1,21 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { z } from 'zod'
 import TypertRegistry, {
   typertEndpoint,
   typertKey,
   typertPackageKey,
   type TypertContribution,
-} from '@roos-code/roos-code-typert-registry'
+} from '@shres-code/shres-code-typert-registry'
 import type {
   InvocationDescriptor,
   TypertContext,
   TypertLookup,
   TypertRemoteContribution,
-} from '@roos-code/roos-code-typert-protocol'
+} from '@shres-code/shres-code-typert-protocol'
 import { apply as applyClientRegistry, inject as clientRegistryInject } from '../src/client/index.ts'
 
-declare module '@roos-code/roos-code-typert-protocol' {
+declare module '@shres-code/shres-code-typert-protocol' {
   interface TypertLookupMap {
     fixture: TypertLookup<{ readonly id: string }, string>
   }
@@ -33,7 +33,7 @@ async function makeCtx(): Promise<Context> {
 
 function toolsContribution(schema: z.ZodType = z.object({ name: z.string() })): TypertContribution {
   return {
-    package: '@roos-code/roos-code-tools',
+    package: '@shres-code/shres-code-tools',
     face: 'host',
     schemas: [{ name: 'ToolInput', schema }],
     invocations: [],
@@ -103,16 +103,16 @@ describe('TypertRegistry', () => {
     const contribution = toolsContribution()
     ctx.typert.register(contribution)
 
-    expect(typertKey('@roos-code/roos-code-tools', 'ToolInput')).toBe('@roos-code/roos-code-tools#ToolInput')
-    expect(typertPackageKey('@roos-code/roos-code-tools', 'host')).toBe('@roos-code/roos-code-tools#host')
-    expect(ctx.typert.get('@roos-code/roos-code-tools#ToolInput')).toMatchObject({
-      package: '@roos-code/roos-code-tools',
+    expect(typertKey('@shres-code/shres-code-tools', 'ToolInput')).toBe('@shres-code/shres-code-tools#ToolInput')
+    expect(typertPackageKey('@shres-code/shres-code-tools', 'host')).toBe('@shres-code/shres-code-tools#host')
+    expect(ctx.typert.get('@shres-code/shres-code-tools#ToolInput')).toMatchObject({
+      package: '@shres-code/shres-code-tools',
       face: 'host',
       name: 'ToolInput',
     })
-    expect(ctx.typert.get('@roos-code/roos-code-tools#ToolInput')?.schema).toBe(contribution.schemas[0]?.schema)
-    expect(ctx.typert.getPackage('@roos-code/roos-code-tools', 'host')).toMatchObject({
-      key: '@roos-code/roos-code-tools#host',
+    expect(ctx.typert.get('@shres-code/shres-code-tools#ToolInput')?.schema).toBe(contribution.schemas[0]?.schema)
+    expect(ctx.typert.getPackage('@shres-code/shres-code-tools', 'host')).toMatchObject({
+      key: '@shres-code/shres-code-tools#host',
       model: { services: [{ key: 'tools' }] },
     })
     expect(ctx.typert.list()).toHaveLength(1)
@@ -122,12 +122,12 @@ describe('TypertRegistry', () => {
   it('withdraws schemas and package metadata through the exact contribution disposer', async () => {
     const ctx = await makeCtx()
     const dispose = ctx.typert.register(toolsContribution())
-    expect(ctx.typert.getPackage('@roos-code/roos-code-tools')).toBeDefined()
+    expect(ctx.typert.getPackage('@shres-code/shres-code-tools')).toBeDefined()
 
     await dispose()
 
-    expect(ctx.typert.get('@roos-code/roos-code-tools#ToolInput')).toBeUndefined()
-    expect(ctx.typert.getPackage('@roos-code/roos-code-tools')).toBeUndefined()
+    expect(ctx.typert.get('@shres-code/shres-code-tools#ToolInput')).toBeUndefined()
+    expect(ctx.typert.getPackage('@shres-code/shres-code-tools')).toBeUndefined()
     expect(ctx.typert.listPackages()).toEqual([])
   })
 
@@ -138,11 +138,11 @@ describe('TypertRegistry', () => {
       { inject: ['typert'] },
     ))
     await fiber
-    expect(ctx.typert.getPackage('@roos-code/roos-code-tools')).toBeDefined()
+    expect(ctx.typert.getPackage('@shres-code/shres-code-tools')).toBeDefined()
 
     await fiber.dispose()
 
-    expect(ctx.typert.getPackage('@roos-code/roos-code-tools')).toBeUndefined()
+    expect(ctx.typert.getPackage('@shres-code/shres-code-tools')).toBeUndefined()
     expect(ctx.typert.list()).toEqual([])
   })
 
@@ -152,7 +152,7 @@ describe('TypertRegistry', () => {
     ctx.typert.register(original)
 
     expect(() => ctx.typert.register(toolsContribution(z.never()))).toThrow('package face')
-    expect(ctx.typert.get('@roos-code/roos-code-tools#ToolInput')?.schema).toBe(original.schemas[0]?.schema)
+    expect(ctx.typert.get('@shres-code/shres-code-tools#ToolInput')?.schema).toBe(original.schemas[0]?.schema)
 
     const duplicateBatch: TypertContribution = {
       ...toolsContribution(),
@@ -192,13 +192,13 @@ describe('TypertRegistry', () => {
     const ctx = await makeCtx()
     ctx.typert.register(toolsContribution())
 
-    expect(ctx.typert.resolve('@roos-code/roos-code-tools#ToolInput').name).toBe('ToolInput')
-    expect(() => ctx.typert.resolve('@roos-code/roos-code-tools#Missing')).toThrow('contributes no schema named "Missing"')
+    expect(ctx.typert.resolve('@shres-code/shres-code-tools#ToolInput').name).toBe('ToolInput')
+    expect(() => ctx.typert.resolve('@shres-code/shres-code-tools#Missing')).toThrow('contributes no schema named "Missing"')
     expect(() => ctx.typert.resolve('@fixture/absent#Value')).toThrow('has no registered contribution')
     expect(() => ctx.typert.resolve('invalid')).toThrow('expected "<package>#<name>"')
-    const projected = ctx.typert.toJSONSchema('@roos-code/roos-code-tools#ToolInput')
+    const projected = ctx.typert.toJSONSchema('@shres-code/shres-code-tools#ToolInput')
     expect(projected).toMatchObject({ type: 'object', properties: { name: { type: 'string' } } })
-    expect(ctx.typert.toJSONSchema('@roos-code/roos-code-tools#ToolInput')).not.toBe(projected)
+    expect(ctx.typert.toJSONSchema('@shres-code/shres-code-tools#ToolInput')).not.toBe(projected)
   })
 
   it('registers local invocations atomically with generated reflection', async () => {
@@ -220,7 +220,7 @@ describe('TypertRegistry', () => {
     await dispose()
     expect(ctx.typert.local.list()).toEqual([])
     expect(ctx.typert.local.hasSeen('goals/create')).toBe(true)
-    expect(ctx.typert.getPackage('@roos-code/roos-code-tools')).toBeUndefined()
+    expect(ctx.typert.getPackage('@shres-code/shres-code-tools')).toBeUndefined()
     expect(changes).toEqual(['local:goals/create', 'local:goals/create'])
   })
 

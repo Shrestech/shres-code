@@ -2,11 +2,12 @@
  * The five ui-theme sheets are the sole token source (--dsw-*); the shell
  * links them here so tokens exist before any plugin CSS lands. scrollbar.css
  * follows design-platform.css because it reads that sheet's tokens. */
-@import '@roos-code/roos-code-client-ui-theme/styles/base.css';
-@import '@roos-code/roos-code-client-ui-theme/styles/design-platform.css';
-@import '@roos-code/roos-code-client-ui-theme/styles/scrollbar.css';
-@import '@roos-code/roos-code-client-ui-theme/styles/gradient-shadow-text.css';
-@import '@roos-code/roos-code-client-ui-theme/styles/shiki.css';
+@import '@shres-code/shres-code-client-ui-theme/styles/base.css';
+@import '@shres-code/shres-code-client-ui-theme/styles/design-platform.css';
+@import '@shres-code/shres-code-client-ui-theme/styles/mark-lockup.css';
+@import '@shres-code/shres-code-client-ui-theme/styles/scrollbar.css';
+@import '@shres-code/shres-code-client-ui-theme/styles/gradient-shadow-text.css';
+@import '@shres-code/shres-code-client-ui-theme/styles/shiki.css';
 
 html,
 body,

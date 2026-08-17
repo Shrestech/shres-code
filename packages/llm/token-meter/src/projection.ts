@@ -1,7 +1,7 @@
 /**
  * Pure client-safe token-projection vocabulary.
  *
- * @module @roos-code/roos-code-token-meter/projection
+ * @module @shres-code/shres-code-token-meter/projection
  */
 
 /**
@@ -65,7 +65,7 @@ export interface ContextBreakdownProjection {
   messageTokens: number
 }
 
-declare module '@roos-code/roos-code-session-projection/types' {
+declare module '@shres-code/shres-code-session-projection/types' {
   interface SessionProjectionMap {
     /** Provider-reported usage accumulated across the complete durable log. */
     tokenUsage: TokenUsageProjection

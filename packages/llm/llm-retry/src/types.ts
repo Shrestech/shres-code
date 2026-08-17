@@ -1,9 +1,9 @@
-import type { LlmFailure } from '@roos-code/roos-code-llm/types'
+import type { LlmFailure } from '@shres-code/shres-code-llm/types'
 import type { RetryId } from './brand.ts'
 
 export type { RetryId }
 
-declare module '@roos-code/roos-code-session/types' {
+declare module '@shres-code/shres-code-session/types' {
   interface SessionEventMap {
     /** Durable, non-surface record of one provider-routed retry scheduled after a failed request attempt. */
     'llm/retry': LlmRetryEventData

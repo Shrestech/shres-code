@@ -40,7 +40,7 @@ function main(): void {
     options: { family: { type: 'string' }, out: { type: 'string' } },
     allowPositionals: false,
   })
-  if (values.family === undefined) throw new Error('usage: pack.ts --family <roos|vendor> [--out dist/npm]')
+  if (values.family === undefined) throw new Error('usage: pack.ts --family <shres|vendor> [--out dist/npm]')
 
   const family = releaseFamily(values.family)
   const root = process.cwd()

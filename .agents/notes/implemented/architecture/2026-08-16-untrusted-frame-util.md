@@ -7,26 +7,26 @@ Status: implemented
 
 Untrusted text reaches the model from more than one consumer. Cross-session snapshots, fetched pages, and search answers or snippets can all contain instructions, permission claims, or tool-shaped requests that the current user did not write. A payload can also spell an XML-like closing tag and break out of whatever wrapper the consumer thought it owned.
 
-`roos-session-reference` already solved this for one caller: a trusted label that says not to follow instructions inside the payload, XML-like tags around the data, and lossless `<` → `\u003c` escaping so source text cannot close those tags. Web fetch and search rendered provider text with no equivalent wrapper. The next consumer (project-sourced skills) would have copied the same three pieces again, and the copies would drift.
+`shres-session-reference` already solved this for one caller: a trusted label that says not to follow instructions inside the payload, XML-like tags around the data, and lossless `<` → `\u003c` escaping so source text cannot close those tags. Web fetch and search rendered provider text with no equivalent wrapper. The next consumer (project-sourced skills) would have copied the same three pieces again, and the copies would drift.
 
 ## Decision
 
-`@roos-code/roos-code-untrusted-frame` lives under `packages/util/` and owns the mechanical wrapper only. It is a library of pure functions, **not** a Cordis service or plugin: it takes no `ctx`, registers nothing, holds no state, and emits no events.
+`@shres-code/shres-code-untrusted-frame` lives under `packages/util/` and owns the mechanical wrapper only. It is a library of pure functions, **not** a Cordis service or plugin: it takes no `ctx`, registers nothing, holds no state, and emits no events.
 
 The library exports `escapeUntrusted`, `stringifyTagSafeJson`, `wrapUntrusted`, `frameUntrusted`, the shared disclaimer `UNTRUSTED_INSTRUCTION_DISCLAIMER`, and the `\u003c` replacement `UNTRUSTED_LT_ESCAPE`. A caller chooses the tag name and the label's first sentence, then keeps trusted metadata outside the frame.
 
 Current callers:
 
-- `roos-session-reference` frames the JSON snapshot as `<referenced-sessions>`. The model-visible bytes are unchanged from the previous inlined prefix and suffix.
-- `roos-tool-web` `web_fetch` frames the decoded page as `<untrusted-web-page>`. The `Fetched <url> (HTTP <status>)` header and the truncation footer stay outside.
-- `roos-tool-web` `web_search` emits the shared disclaimer once when an answer or any source is present, wraps the answer in `<untrusted-web-answer>`, and wraps each snippet in `<untrusted-web-snippet>`. Source titles, URLs, dates, the refine-the-query note, and the cite instruction stay outside.
-- `roos-skill` `renderSkillContent` places the shared disclaimer inside `<skill_content>` for untrusted sources and wraps the instruction body with `wrapUntrusted`. Trusted sources reuse `UNTRUSTED_LT_ESCAPE` to neutralize a close-tag family. See the [skill framing Agent Note](2026-08-16-skill-body-escaping-trust-framing.md).
+- `shres-session-reference` frames the JSON snapshot as `<referenced-sessions>`. The model-visible bytes are unchanged from the previous inlined prefix and suffix.
+- `shres-tool-web` `web_fetch` frames the decoded page as `<untrusted-web-page>`. The `Fetched <url> (HTTP <status>)` header and the truncation footer stay outside.
+- `shres-tool-web` `web_search` emits the shared disclaimer once when an answer or any source is present, wraps the answer in `<untrusted-web-answer>`, and wraps each snippet in `<untrusted-web-snippet>`. Source titles, URLs, dates, the refine-the-query note, and the cite instruction stay outside.
+- `shres-skill` `renderSkillContent` places the shared disclaimer inside `<skill_content>` for untrusted sources and wraps the instruction body with `wrapUntrusted`. Trusted sources reuse `UNTRUSTED_LT_ESCAPE` to neutralize a close-tag family. See the [skill framing Agent Note](2026-08-16-skill-body-escaping-trust-framing.md).
 
 `stringifyTagSafeJson` remains the JSON form of the same escape so session-reference byte budgets still measure the framed payload.
 
 ## Alternatives considered
 
-**Duplicate the session-reference prefix and escape in `roos-tool-web`.** Rejected because the next untrusted consumer would copy it again, and a later change to the disclaimer or escape would not reach every site.
+**Duplicate the session-reference prefix and escape in `shres-tool-web`.** Rejected because the next untrusted consumer would copy it again, and a later change to the disclaimer or escape would not reach every site.
 
 **Warn in the system prompt only, without escaping.** Rejected because a payload that contains `</untrusted-web-page>` still closes the wrapper; a prompt sentence cannot restore a broken frame.
 

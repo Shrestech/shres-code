@@ -2,13 +2,13 @@ import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { LocalBashExecutor } from '@roos-code/roos-code-bash-local'
-import LocalSubprocessRuntime from '@roos-code/roos-code-subprocess-local'
-import { MAX_TIMER_DELAY_MS } from '@roos-code/roos-code-timeout'
-import type { ShellProcess } from '@roos-code/roos-code-shell'
+import { Context } from '@shres-code/cordis'
+import { LocalBashExecutor } from '@shres-code/shres-code-bash-local'
+import LocalSubprocessRuntime from '@shres-code/shres-code-subprocess-local'
+import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
+import type { ShellProcess } from '@shres-code/shres-code-shell'
 
-const spillDir = mkdtempSync(join(tmpdir(), 'roos-bash-exec-spec-'))
+const spillDir = mkdtempSync(join(tmpdir(), 'shres-bash-exec-spec-'))
 
 async function setup(config: ConstructorParameters<typeof LocalBashExecutor>[1] = {}) {
   const ctx = new Context()
@@ -130,31 +130,31 @@ describe('LocalBashExecutor.run', () => {
 
   it('rejects on spawn failure (bad workdir)', async () => {
     const { bash } = await setup()
-    await expect(bash.run(bash.resolve({ command: 'true', workdir: '/nonexistent-roos' }))).rejects.toThrow(/ENOENT/)
+    await expect(bash.run(bash.resolve({ command: 'true', workdir: '/nonexistent-shres' }))).rejects.toThrow(/ENOENT/)
   })
 
-  it('resolve() carries stdin/env/roosEnv onto the spec, and run() threads them to the command', async () => {
+  it('resolve() carries stdin/env/shresEnv onto the spec, and run() threads them to the command', async () => {
     const { bash } = await setup()
     const spec = bash.resolve({
-      command: 'cat; echo "[$SEAM_VAR][$ROOS_SEAM_VAR]"',
+      command: 'cat; echo "[$SEAM_VAR][$SHRES_SEAM_VAR]"',
       stdin: 'piped\n',
       env: { SEAM_VAR: 'env-ok' },
-      roosEnv: { ROOS_SEAM_VAR: 'roos-ok' },
+      shresEnv: { SHRES_SEAM_VAR: 'shres-ok' },
     })
     // resolve() keeps the optional input/environment fields verbatim.
     expect(spec.stdin).toBe('piped\n')
     expect(spec.env).toEqual({ SEAM_VAR: 'env-ok' })
-    expect(spec.roosEnv).toEqual({ ROOS_SEAM_VAR: 'roos-ok' })
+    expect(spec.shresEnv).toEqual({ SHRES_SEAM_VAR: 'shres-ok' })
     const result = await bash.run(spec)
-    expect(result.stdout.text).toBe('piped\n[env-ok][roos-ok]\n')
+    expect(result.stdout.text).toBe('piped\n[env-ok][shres-ok]\n')
   })
 
-  it('resolve() omits stdin/env/roosEnv when the request supplies none', async () => {
+  it('resolve() omits stdin/env/shresEnv when the request supplies none', async () => {
     const { bash } = await setup()
     const spec = bash.resolve({ command: 'true' })
     expect('stdin' in spec).toBe(false)
     expect('env' in spec).toBe(false)
-    expect('roosEnv' in spec).toBe(false)
+    expect('shresEnv' in spec).toBe(false)
   })
 })
 
@@ -173,12 +173,12 @@ describe('LocalBashExecutor.start (background process handles)', () => {
   it('threads stdin and extra env into a background process', async () => {
     const { bash } = await setup()
     const proc = bash.start(bash.resolve({
-      command: 'cat; echo "[$BG_VAR][$ROOS_BG_VAR]"',
+      command: 'cat; echo "[$BG_VAR][$SHRES_BG_VAR]"',
       stdin: 'bg-stdin\n',
       env: { BG_VAR: 'bg-env' },
-      roosEnv: { ROOS_BG_VAR: 'bg-roos-env' },
+      shresEnv: { SHRES_BG_VAR: 'bg-shres-env' },
     }))
-    const output = await readUntil(proc, '[bg-env][bg-roos-env]')
+    const output = await readUntil(proc, '[bg-env][bg-shres-env]')
     expect(output).toContain('bg-stdin')
     await proc.done
     expect(proc.exitCode).toBe(0)
@@ -290,7 +290,7 @@ describe('LocalBashExecutor.start (background process handles)', () => {
 
   it('a background spawn failure settles as killed with the error readable on stderr', async () => {
     const { bash } = await setup()
-    const proc = bash.start(bash.resolve({ command: 'true', workdir: '/nonexistent-roos' }))
+    const proc = bash.start(bash.resolve({ command: 'true', workdir: '/nonexistent-shres' }))
     // done resolves (never rejects) even though the process never ran.
     await expect(proc.done).resolves.toBeUndefined()
     expect(proc.status).toBe('killed')

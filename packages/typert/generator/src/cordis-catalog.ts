@@ -2,7 +2,7 @@
  * Cordis catalog-specific projection over the compiler-independent Typert
  * model. This module owns Cordis validation and text projection mechanics;
  * callers supply repository-specific type classifications and inherited data.
- * @module @roos-code/roos-code-typert-generator
+ * @module @shres-code/shres-code-typert-generator
  */
 
 import { WorkspaceAnalyzer, WorkspaceCaches } from './analyzer.ts'
@@ -682,7 +682,7 @@ function renderRuntimeApi(
     ' * the same AST walk as docs/cordis-catalog, so this data and the rendered',
     ' * docs cannot diverge.',
     ' *',
-    ' * @module @roos-code/roos-code-tool-cordis/api-catalog',
+    ' * @module @shres-code/shres-code-tool-cordis/api-catalog',
     ' */',
     '',
     '/* jscpd:ignore-start */',

@@ -15,14 +15,14 @@
  * absent `ctx.shell`, or a failed query is a no-op, never an error: an executor
  * rejection is contained and logged as a warning so the turn continues.
  *
- * @module @roos-code/roos-code-tmux-context
+ * @module @shres-code/shres-code-tmux-context
  */
 
-import type { Context, LoggerService } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import type { Agent, PreStepDecision } from '@roos-code/roos-code-agent'
-import type { ShellExecutor, ShellRunResult } from '@roos-code/roos-code-shell'
-import { createUserMessage } from '@roos-code/roos-code-llm'
+import type { Context, LoggerService } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import type { Agent, PreStepDecision } from '@shres-code/shres-code-agent'
+import type { ShellExecutor, ShellRunResult } from '@shres-code/shres-code-shell'
+import { createUserMessage } from '@shres-code/shres-code-llm'
 
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'tmux-context'

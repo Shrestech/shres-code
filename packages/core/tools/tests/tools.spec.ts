@@ -1,15 +1,15 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { createUserMessage, CallId, HarnessError, type ContentBlock  } from '@roos-code/roos-code-llm'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import type { Agent } from '@roos-code/roos-code-agent'
-import ApprovalService, { type ApprovalOutcome, type ApprovalRequest } from '@roos-code/roos-code-user-approval'
+import { Context } from '@shres-code/cordis'
+import { createUserMessage, CallId, HarnessError, type ContentBlock  } from '@shres-code/shres-code-llm'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import type { Agent } from '@shres-code/shres-code-agent'
+import ApprovalService, { type ApprovalOutcome, type ApprovalRequest } from '@shres-code/shres-code-user-approval'
 import ToolRuntime, {
   defineContentToolFixture, defineTool, JsonSchemaError, parameterSchemaSpecToJsonSchema, validateArgs, ToolArgsError, ToolNotFoundError,
   TOOL_ABORTED, TOOL_ABORTED_BEFORE_DISPATCH,
   type InferArgs, type JsonValue, type ParameterSchemaSpec, type PreToolDecision, type PostToolDecision,
   type JsonSchemaNode, type ToolDefinition, type ToolDispatchExecution, type ToolExecutionResult, type ToolExecutionToken,
-} from '@roos-code/roos-code-tools'
+} from '@shres-code/shres-code-tools'
 
 const testToolSignal = new AbortController().signal
 
@@ -665,7 +665,7 @@ describe('ToolRuntime', () => {
   })
 
   it('ToolNotFoundError carries a stable message and code', async () => {
-    const { HarnessError } = await import('@roos-code/roos-code-llm')
+    const { HarnessError } = await import('@shres-code/shres-code-llm')
     const err = new ToolNotFoundError('ghost')
     expect(err).toBeInstanceOf(HarnessError)
     expect(err.name).toBe('ToolNotFoundError')
@@ -2631,7 +2631,7 @@ describe('defineTool validation (the runtime-validation Agent Note, part 1)', ()
   })
 
   it('a tool throwing a HarnessError surfaces its name and code', async () => {
-    const { HarnessError } = await import('@roos-code/roos-code-llm')
+    const { HarnessError } = await import('@shres-code/shres-code-llm')
     const ctx = await setup()
     ctx.tools.register({
       ...echoTool,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { mergeHookOutputs } from '@roos-code/roos-code-hook-protocol'
-import type { HookOutput } from '@roos-code/roos-code-hook-protocol'
+import { mergeHookOutputs } from '@shres-code/shres-code-hook-protocol'
+import type { HookOutput } from '@shres-code/shres-code-hook-protocol'
 
 function out(over: Partial<HookOutput> = {}): HookOutput {
   return { exitCode: 0, stderr: '', stdout: '', ...over }

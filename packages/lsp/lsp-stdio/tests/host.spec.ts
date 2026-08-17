@@ -6,10 +6,10 @@ import { realpath } from 'node:fs/promises'
 import { execFile } from 'node:child_process'
 import { pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
-import { Context } from '@roos-code/cordis'
-import LocalFileSystem from '@roos-code/roos-code-fs-local'
-import { deadline } from '@roos-code/roos-code-timeout'
-import { canonicalizeWorkspace, readHostSource } from '@roos-code/roos-code-lsp-stdio'
+import { Context } from '@shres-code/cordis'
+import LocalFileSystem from '@shres-code/shres-code-fs-local'
+import { deadline } from '@shres-code/shres-code-timeout'
+import { canonicalizeWorkspace, readHostSource } from '@shres-code/shres-code-lsp-stdio'
 
 const execFileAsync = promisify(execFile)
 

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import SessionStore, { type Session, type SessionEvent } from '@roos-code/roos-code-session'
-import InvariantRegistry, { InvariantError } from '@roos-code/roos-code-invariants'
-import * as SandboxPolicyInvariant from '@roos-code/roos-code-sandbox-policy/invariant'
+import { Context } from '@shres-code/cordis'
+import SessionStore, { type Session, type SessionEvent } from '@shres-code/shres-code-session'
+import InvariantRegistry, { InvariantError } from '@shres-code/shres-code-invariants'
+import * as SandboxPolicyInvariant from '@shres-code/shres-code-sandbox-policy/invariant'
 
 async function setup(): Promise<Context> {
   const ctx = new Context()
@@ -36,7 +36,7 @@ describe('sandbox-policy invariants', () => {
   it('rejects and attributes an unknown durable sandbox mode', async () => {
     const ctx = await setup()
     expect(() => { ctx.emit('session/event', {} as Session, modeEvent('host-root')) })
-      .toThrow(new InvariantError('@roos-code/roos-code-sandbox-policy', 'sandbox/mode carries unknown mode "host-root"'))
+      .toThrow(new InvariantError('@shres-code/shres-code-sandbox-policy', 'sandbox/mode carries unknown mode "host-root"'))
   })
 
   it('rejects an unknown mode already present on late registration', async () => {
@@ -47,7 +47,7 @@ describe('sandbox-policy invariants', () => {
 
     await expect(ctx.plugin(SandboxPolicyInvariant).then(() => undefined)).rejects.toMatchObject({
       code: 'INVARIANT',
-      packageName: '@roos-code/roos-code-sandbox-policy',
+      packageName: '@shres-code/shres-code-sandbox-policy',
     })
   })
 })

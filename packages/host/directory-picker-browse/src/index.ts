@@ -6,20 +6,20 @@
  * serves remote clients the dialog backend cannot. Policy decisions (hidden
  * entries flagged but returned, symlinks followed, whole-filesystem scope) are
  * recorded in the directory-picker seam Agent Note.
- * @module @roos-code/roos-code-host-directory-picker-browse
+ * @module @shres-code/shres-code-host-directory-picker-browse
  */
 
 import { mkdir, opendir, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, dirname, join, posix, resolve, win32 } from 'node:path'
-import type { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
+import type { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
 import {
   DirectoryPicker, DirectoryPickerError,
-} from '@roos-code/roos-code-host-directory-picker'
+} from '@shres-code/shres-code-host-directory-picker'
 import type {
   DirectoryEntry, DirectoryListing, DirectoryPickerCapability,
-} from '@roos-code/roos-code-host-directory-picker'
+} from '@shres-code/shres-code-host-directory-picker'
 
 /**
  * Ancestor chain from the filesystem root to `target` inclusive — the

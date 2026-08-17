@@ -1,4 +1,4 @@
-# @roos-code/roos-code-agent-spine-demo
+# @shres-code/shres-code-agent-spine-demo
 
 The **default executor-less, UI-less agent spine** as ONE Cordis bundle plugin. It loads the fixed set of services every harness agent needs, including the local skill provider, and forwards the loop's `agents` list as its own config — so an app package composes a working agent by adding only an entry point and the swappable backends.
 
@@ -9,32 +9,32 @@ Read this package for the whole plugin tree and its composition order.
 `apply(ctx, config)` mounts each of these as a child of the bundle fiber:
 
 ```
-@roos-code/cordis-plugin-timer  timer service (writes nothing to stdout)
-@roos-code/roos-code-llm              abstract LLM service + content-block vocabulary
-@roos-code/roos-code-session          event-sourced session log + store
-@roos-code/roos-code-session-title    log-backed title service + deterministic fallback
-@roos-code/roos-code-system-prompt    prompt-section + tool-schema assembly
-@roos-code/roos-code-tools            registry + guarded pre/around/post/final-result pipeline
-@roos-code/roos-code-skill            skill provider registry
-@roos-code/roos-code-skill-filesystem      local filesystem skill provider
-@roos-code/roos-code-agent            agent registry + initiator scope + agent/* events
-@roos-code/roos-code-goal             optional persisted same-session goal domain
-@roos-code/roos-code-tool-goal        optional model-facing goal controls
-@roos-code/roos-code-goal-round-driver     optional same-session goal-round driver
-@roos-code/roos-code-llm-retry        provider-routed request retry policy
-@roos-code/roos-code-jobs-local      generic background-job registry
-@roos-code/roos-code-invariants       configurable invariant registry service
-@roos-code/roos-code-session/invariant
-@roos-code/roos-code-agent/invariant
-@roos-code/roos-code-scope/invariant
-@roos-code/roos-code-agent-loop/invariant
+@shres-code/cordis-plugin-timer  timer service (writes nothing to stdout)
+@shres-code/shres-code-llm              abstract LLM service + content-block vocabulary
+@shres-code/shres-code-session          event-sourced session log + store
+@shres-code/shres-code-session-title    log-backed title service + deterministic fallback
+@shres-code/shres-code-system-prompt    prompt-section + tool-schema assembly
+@shres-code/shres-code-tools            registry + guarded pre/around/post/final-result pipeline
+@shres-code/shres-code-skill            skill provider registry
+@shres-code/shres-code-skill-filesystem      local filesystem skill provider
+@shres-code/shres-code-agent            agent registry + initiator scope + agent/* events
+@shres-code/shres-code-goal             optional persisted same-session goal domain
+@shres-code/shres-code-tool-goal        optional model-facing goal controls
+@shres-code/shres-code-goal-round-driver     optional same-session goal-round driver
+@shres-code/shres-code-llm-retry        provider-routed request retry policy
+@shres-code/shres-code-jobs-local      generic background-job registry
+@shres-code/shres-code-invariants       configurable invariant registry service
+@shres-code/shres-code-session/invariant
+@shres-code/shres-code-agent/invariant
+@shres-code/shres-code-scope/invariant
+@shres-code/shres-code-agent-loop/invariant
                                   package-owned relational checks
-@roos-code/roos-code-tool-bash        the model-facing bash schema (unless toolBash=false)
-@roos-code/roos-code-agent-instructions  AGENTS.md/CLAUDE.md workspace context loader
-@roos-code/roos-code-tool-skill       session-prefix skill catalog + model-facing loader schema
-@roos-code/roos-code-tool-jobs       job_output/job_list/job_kill schemas + completion notices
-@roos-code/roos-code-agent-loop       THE concrete loop (gets the forwarded `agents`)
-                                  (roos-system-prompt gets the forwarded `persona`)
+@shres-code/shres-code-tool-bash        the model-facing bash schema (unless toolBash=false)
+@shres-code/shres-code-agent-instructions  AGENTS.md/CLAUDE.md workspace context loader
+@shres-code/shres-code-tool-skill       session-prefix skill catalog + model-facing loader schema
+@shres-code/shres-code-tool-jobs       job_output/job_list/job_kill schemas + completion notices
+@shres-code/shres-code-agent-loop       THE concrete loop (gets the forwarded `agents`)
+                                  (shres-system-prompt gets the forwarded `persona`)
 ```
 
 ## What it deliberately leaves OUTSIDE the bundle
@@ -52,14 +52,14 @@ This applies the [Service Definition / Service Provider / Consumer separation](.
 ## Config
 
 ```ts
-import type { Config } from '@roos-code/roos-code-agent-spine-demo'
-// { agents?, maxParallelToolCalls?, includeHarnessIdentity?, includeRuntimeContext?, persona?, toolOrder?, tools?, roosHome?, sessionTitle?, skills?, workspaceContext, toolBash?, jobs?, toolJobs?, goals?, invariants? }
+import type { Config } from '@shres-code/shres-code-agent-spine-demo'
+// { agents?, maxParallelToolCalls?, includeHarnessIdentity?, includeRuntimeContext?, persona?, toolOrder?, tools?, shresHome?, sessionTitle?, skills?, workspaceContext, toolBash?, jobs?, toolJobs?, goals?, invariants? }
 // workspaceContext requires { maxBytes } or false; the other owner schemas supply defaults.
 ```
 
-The bundle forwards each field to the child that owns it. App packages supply any pre-created agents: headless and JSON-RPC compositions create `main`, while the ACP app creates agents on demand at `session/new`. `includeRuntimeContext: false` is forwarded to `roos-system-prompt` and suppresses all dynamic context snapshots for fresh sessions without disabling their policy services. Prompt, tool, title, skill, agent-instructions, invariant, goal, and task settings retain the schemas and defaults documented by their owning packages; `jobs.maxConcurrentJobsPerOwner` configures the local provider independently of the model-facing `toolJobs` controls. `pickSpineConfig()` copies only fields owned by this bundle, and conflicting `roosHome` values fail during composition.
+The bundle forwards each field to the child that owns it. App packages supply any pre-created agents: headless and JSON-RPC compositions create `main`, while the ACP app creates agents on demand at `session/new`. `includeRuntimeContext: false` is forwarded to `shres-system-prompt` and suppresses all dynamic context snapshots for fresh sessions without disabling their policy services. Prompt, tool, title, skill, agent-instructions, invariant, goal, and task settings retain the schemas and defaults documented by their owning packages; `jobs.maxConcurrentJobsPerOwner` configures the local provider independently of the model-facing `toolJobs` controls. `pickSpineConfig()` copies only fields owned by this bundle, and conflicting `shresHome` values fail during composition.
 
-For example, `{ invariants: { enabled: true, package_allowlist: ['^@roos-code/roos-code-'], package_blocklist: ['agent-loop$'] } }` keeps the package-owned companions mounted but suppresses the blocked owner. Blocklist matches override allowlist matches; see [`roos-invariants`](../../runtime-diagnostics/invariants/README.md) for regex and lifecycle rules.
+For example, `{ invariants: { enabled: true, package_allowlist: ['^@shres-code/shres-code-'], package_blocklist: ['agent-loop$'] } }` keeps the package-owned companions mounted but suppresses the blocked owner. Blocklist matches override allowlist matches; see [`shres-invariants`](../../runtime-diagnostics/invariants/README.md) for regex and lifecycle rules.
 
 ## Why a code bundle, not a shared YAML include
 
@@ -69,7 +69,7 @@ The retry policy may repeat a failed request in a new numbered step. Retry statu
 
 ## Model Experience
 
-Indirectly, through `roos-system-prompt`, `roos-tool-skill`, `roos-tool-bash`, `roos-tools`, and `roos-llm-retry`, plus `roos-tool-goal` and goal-round prompts when `goals` is enabled. The bundle adds no model-bound wrapper content of its own.
+Indirectly, through `shres-system-prompt`, `shres-tool-skill`, `shres-tool-bash`, `shres-tools`, and `shres-llm-retry`, plus `shres-tool-goal` and goal-round prompts when `goals` is enabled. The bundle adds no model-bound wrapper content of its own.
 
 #### KV Cache effect
 

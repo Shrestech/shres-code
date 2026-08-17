@@ -4,12 +4,12 @@
  * mapped interfaces make the content, source, and finish unions extensible.
  */
 
-import type { Branded } from '@roos-code/roos-code-brand'
-import type { ImageAttachmentRef } from '@roos-code/roos-code-attachment'
+import type { Branded } from '@shres-code/shres-code-brand'
+import type { ImageAttachmentRef } from '@shres-code/shres-code-attachment'
 import type { CallId, ProviderRequestId, ReasoningEffortId } from './brand.ts'
 import type { Message } from './message.ts'
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Events {
     /**
      * The provider topology changed: an adapter registered or unregistered
@@ -322,8 +322,8 @@ export type StreamChunk =
 /**
  * JSON-schema description of a tool, as sent to the model.
  *
- * Declared here (not in roos-tools) because it is part of {@link GenerateOptions};
- * roos-tools' ToolDefinition and roos-system-prompt's PromptAssembly both import
+ * Declared here (not in shres-tools) because it is part of {@link GenerateOptions};
+ * shres-tools' ToolDefinition and shres-system-prompt's PromptAssembly both import
  * it from this package.
  */
 export interface ToolSchema {
@@ -343,7 +343,7 @@ export interface GenerateOptions {
   /**
    * Ordered conversation messages, exactly as the provider sees them (after
    * the `system` slot). A loop-built request assembles them as
-   * the derived history (roos-agent-loop); a hand-built one-shot passes any list.
+   * the derived history (shres-agent-loop); a hand-built one-shot passes any list.
    */
   messages: Message[]
   /** System prompt text (adapters map to the provider's system slot). */

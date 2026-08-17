@@ -1,11 +1,11 @@
 /**
  * Durable Tool event vocabulary shared with type-only consumers.
  *
- * @module @roos-code/roos-code-tools/types
+ * @module @shres-code/shres-code-tools/types
  */
 
-import type { CallId } from '@roos-code/roos-code-llm/brand'
-import type { ContentBlock } from '@roos-code/roos-code-llm/types'
+import type { CallId } from '@shres-code/shres-code-llm/brand'
+import type { ContentBlock } from '@shres-code/shres-code-llm/types'
 
 /** Payload recorded when one nested Code Mode Tool dispatch starts. */
 export interface CodeDispatchStartEventData {
@@ -22,7 +22,7 @@ export interface CodeDispatchEventData extends CodeDispatchStartEventData {
   content: ContentBlock[]
 }
 
-declare module '@roos-code/roos-code-session/types' {
+declare module '@shres-code/shres-code-session/types' {
   interface SessionEventMap {
     /**
      * One sub-dispatch STARTING inside a `run_code` program: the parent

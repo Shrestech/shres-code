@@ -3,7 +3,7 @@
  * the chat-history image gallery, the original-image lightbox, and the
  * full-page drop overlay. Owners resolve every string through their own
  * locale namespace and pass it down; nothing here reads application state.
- * @module @roos-code/roos-code-client-ui-attachment
+ * @module @shres-code/shres-code-client-ui-attachment
  */
 
 export { AttachmentRail } from './AttachmentRail.tsx'

@@ -1,13 +1,13 @@
 /**
- * Package-owned invariant companion for `@roos-code/roos-code-web-fetch-http`.
- * @module @roos-code/roos-code-web-fetch-http/invariant
+ * Package-owned invariant companion for `@shres-code/shres-code-web-fetch-http`.
+ * @module @shres-code/shres-code-web-fetch-http/invariant
  */
 
 /* jscpd:ignore-start */
-import type { Context } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-web-fetch-http'
+const PACKAGE_NAME = '@shres-code/shres-code-web-fetch-http'
 
 /** Cordis companion plugin name. */
 export const name = 'web-fetch-http-invariant'

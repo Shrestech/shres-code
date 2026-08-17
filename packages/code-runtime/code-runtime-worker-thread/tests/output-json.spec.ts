@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { CodeJsonValue } from '@roos-code/roos-code-code-runtime'
+import type { CodeJsonValue } from '@shres-code/shres-code-code-runtime'
 import { jsonStringBytesUpTo, jsonValueBytesUpTo, truncateJsonStringBytes } from '../src/output-json.ts'
 
 describe('truncateJsonStringBytes', () => {

@@ -9,16 +9,16 @@
  */
 
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import AgentRegistry, { Inbox } from '@roos-code/roos-code-agent'
-import type { Agent, AgentStatus } from '@roos-code/roos-code-agent'
-import { createUserMessage } from '@roos-code/roos-code-llm'
-import type { UserMessage } from '@roos-code/roos-code-session'
-import SessionStore from '@roos-code/roos-code-session'
-import type { Session } from '@roos-code/roos-code-session'
-import SessionProjectionRegistry from '@roos-code/roos-code-session-projection'
-import GoalService, { applyGoalProjection, foldGoal } from '@roos-code/roos-code-goal'
-import type { GoalRef } from '@roos-code/roos-code-goal'
+import { Context } from '@shres-code/cordis'
+import AgentRegistry, { Inbox } from '@shres-code/shres-code-agent'
+import type { Agent, AgentStatus } from '@shres-code/shres-code-agent'
+import { createUserMessage } from '@shres-code/shres-code-llm'
+import type { UserMessage } from '@shres-code/shres-code-session'
+import SessionStore from '@shres-code/shres-code-session'
+import type { Session } from '@shres-code/shres-code-session'
+import SessionProjectionRegistry from '@shres-code/shres-code-session-projection'
+import GoalService, { applyGoalProjection, foldGoal } from '@shres-code/shres-code-goal'
+import type { GoalRef } from '@shres-code/shres-code-goal'
 
 interface Bench {
   ctx: Context

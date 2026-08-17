@@ -1,6 +1,6 @@
 /** Shared immutable-header checks for logical session source observers. */
 
-import type { SessionHeader } from '@roos-code/roos-code-session'
+import type { SessionHeader } from '@shres-code/shres-code-session'
 import { SessionQueryError } from './config.ts'
 
 /**

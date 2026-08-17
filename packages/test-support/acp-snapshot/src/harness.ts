@@ -13,7 +13,7 @@
  *
  * See .agents/notes/implemented/testing/2026-06-19-acp-snapshot-tests.md.
  *
- * @module @roos-code/roos-code-acp-snapshot/harness
+ * @module @shres-code/shres-code-acp-snapshot/harness
  */
 
 import { cp, mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
@@ -158,7 +158,7 @@ export interface RunOptions {
   /**
    * Recorded SUBAGENT child-session fixture paths (replay). A nested-agent
    * scenario ships one per child (`session.1.jsonl`, …); the harness forwards
-   * them to `roos-llm-replay` via `$ROOS_SNAPSHOT_CHILD_FILES` so each child
+   * them to `shres-llm-replay` via `$SHRES_SNAPSHOT_CHILD_FILES` so each child
    * session replays from its own recorded script. Empty for single-session
    * scenarios. Ignored in record mode (children are harvested, not replayed).
    */
@@ -210,7 +210,7 @@ export function snapshotSpillRoot(
   const scenario = basename(dirname(fixtureFile))
   const key = createHash('sha256').update(scenario).digest('hex').slice(0, 9)
   const root = platform === 'win32' ? '/t' : '/tmp'
-  return `${root}/roos-acp-snap-${key}`
+  return `${root}/shres-acp-snap-${key}`
 }
 
 /**
@@ -246,15 +246,15 @@ export async function runScenario(input: InputScript, opts: RunOptions): Promise
     await opts.prepareWorkspace?.(cwd)
     const env: NodeJS.ProcessEnv = {
       ...opts.env,
-      ROOS_SNAPSHOT: opts.mode,
-      ROOS_SNAPSHOT_FILE: opts.fixtureFile,
-      ROOS_SNAPSHOT_SESSIONS_ROOT: sessionsRoot,
-      ROOS_SNAPSHOT_SPILL_ROOT: spillRoot,
-      ROOS_HOME: join(cwd, '.roos'),
-      ROOS_AGENTS_HOME: join(cwd, '.agents'),
-      ...opts.overrideFile !== undefined ? { ROOS_SNAPSHOT_OVERRIDE: opts.overrideFile } : {},
+      SHRES_SNAPSHOT: opts.mode,
+      SHRES_SNAPSHOT_FILE: opts.fixtureFile,
+      SHRES_SNAPSHOT_SESSIONS_ROOT: sessionsRoot,
+      SHRES_SNAPSHOT_SPILL_ROOT: spillRoot,
+      SHRES_HOME: join(cwd, '.shres'),
+      SHRES_AGENTS_HOME: join(cwd, '.agents'),
+      ...opts.overrideFile !== undefined ? { SHRES_SNAPSHOT_OVERRIDE: opts.overrideFile } : {},
       ...opts.childFiles !== undefined && opts.childFiles.length > 0
-        ? { ROOS_SNAPSHOT_CHILD_FILES: opts.childFiles.join(delimiter) }
+        ? { SHRES_SNAPSHOT_CHILD_FILES: opts.childFiles.join(delimiter) }
         : {},
     }
 
@@ -764,7 +764,7 @@ async function harvestSessionLogs(root: string): Promise<HarvestedLog[]> {
   // synchronously and strictly sequentially, so their createdAt values are
   // strictly ordered; the recordedId tiebreak only keeps a degenerate
   // same-millisecond collision (unreachable here) deterministic. This harvest
-  // order must match the replay load order in roos-llm-replay's loadSessionScripts
+  // order must match the replay load order in shres-llm-replay's loadSessionScripts
   // so session.<n>.jsonl maps to the same child on record and replay — replay
   // re-sorts childFiles by the same key, so the two stay consistent.
   logs.sort((a, b) => {

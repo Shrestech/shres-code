@@ -6,12 +6,12 @@
 import { readFile, readdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { Context } from '@roos-code/cordis'
-import { normalizeSessionLog, scrubRequestHeaders, type NormalizeContext } from '@roos-code/roos-code-acp-snapshot'
-import { LOADER_SMOKE_TEST_TIMEOUT_MS, runLoaderSmoke } from '@roos-code/roos-code-loader-smoke'
-import { createUserMessage } from '@roos-code/roos-code-llm'
-import SessionStore, { SESSION_FORMAT_VERSION, SessionId, type SessionEvent, type SessionHeader } from '@roos-code/roos-code-session'
-import JsonlSessionPersistence from '@roos-code/roos-code-session-persistence-jsonl'
+import { Context } from '@shres-code/cordis'
+import { normalizeSessionLog, scrubRequestHeaders, type NormalizeContext } from '@shres-code/shres-code-acp-snapshot'
+import { LOADER_SMOKE_TEST_TIMEOUT_MS, runLoaderSmoke } from '@shres-code/shres-code-loader-smoke'
+import { createUserMessage } from '@shres-code/shres-code-llm'
+import SessionStore, { SESSION_FORMAT_VERSION, SessionId, type SessionEvent, type SessionHeader } from '@shres-code/shres-code-session'
+import JsonlSessionPersistence from '@shres-code/shres-code-session-persistence-jsonl'
 import { describe, expect, it } from 'vitest'
 
 const fixtureDir = fileURLToPath(new URL('./subagent-inheritance-snapshots/parent-override', import.meta.url))
@@ -23,7 +23,7 @@ const configPath = fileURLToPath(new URL('../subagent-inheritance.cordis.snapsho
 const binScript = fileURLToPath(new URL('./fixtures/headless-driver.ts', import.meta.url))
 const tsconfigPath = fileURLToPath(new URL('../../../tsconfig.json', import.meta.url))
 const sessionId = SessionId('subagent-inheritance-parent')
-const refreshing = process.env.ROOS_SNAPSHOT === 'refresh'
+const refreshing = process.env.SHRES_SNAPSHOT === 'refresh'
 const task = 'Delegate the write probe to a subagent.'
 
 /** Seed a completed parent turn with the only read-only fact in the app. */
@@ -57,7 +57,7 @@ describe('parent-only override inheritance snapshot', () => {
     let cwd = ''
     const result = await runLoaderSmoke({
       label: 'subagent inheritance headless stream-json snapshot',
-      tempDirPrefix: 'roos-subagent-inherit-',
+      tempDirPrefix: 'shres-subagent-inherit-',
       binScript,
       libBinScript: binScript,
       configPath,
@@ -66,9 +66,9 @@ describe('parent-only override inheritance snapshot', () => {
       env: {
         // The primary fixture path must exist for llm-replay's config guard;
         // the override sidecar fully replaces the derived parent script.
-        ROOS_SNAPSHOT_FILE: replayOverride,
-        ROOS_SNAPSHOT_OVERRIDE: replayOverride,
-        ROOS_SNAPSHOT_CHILD_FILES: childReplay,
+        SHRES_SNAPSHOT_FILE: replayOverride,
+        SHRES_SNAPSHOT_OVERRIDE: replayOverride,
+        SHRES_SNAPSHOT_CHILD_FILES: childReplay,
       },
       prepare: async (runCwd) => {
         cwd = runCwd
@@ -105,13 +105,13 @@ describe('parent-only override inheritance snapshot', () => {
           }
           if (record.type !== 'user/message'
             || record.data?.source?.kind !== 'plugin'
-            || record.data.source.plugin !== '@roos-code/roos-code-system-prompt') return []
+            || record.data.source.plugin !== '@shres-code/shres-code-system-prompt') return []
           return record.data.content?.flatMap(block => block.type === 'text' && typeof block.text === 'string' ? [block.text] : []) ?? []
         })
         const policyContexts = [...runtimeContexts(parent), ...runtimeContexts(child)]
         expect(policyContexts).toHaveLength(2)
         for (const context of policyContexts) {
-          expect(context).toContain('Any available operation enforced by the Roos file sandbox cannot modify files in the standing mode.')
+          expect(context).toContain('Any available operation enforced by the Shres file sandbox cannot modify files in the standing mode.')
           expect(context).toContain('Do not refuse a required modification from this policy alone')
           expect(context).not.toContain('write and edit tools')
           expect(context).not.toContain('one-shot bash commands')

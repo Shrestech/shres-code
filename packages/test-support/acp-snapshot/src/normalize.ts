@@ -3,7 +3,7 @@
  * timestamps, and hook duration while preserving deterministic event sequence numbers.
  * Request-header scrubbers stay composable so one scenario per header class can pin prompt and
  * tool-schema sidecars.
- * @module @roos-code/roos-code-acp-snapshot/normalize
+ * @module @shres-code/shres-code-acp-snapshot/normalize
  */
 
 const SESSION_ID = '{{sessionId}}'
@@ -32,7 +32,7 @@ const LOCAL_SPILL_PATH_RE = new RegExp(
   'g',
 )
 const SNAPSHOT_SPILL_PATH_RE = new RegExp(
-  String.raw`(?:[A-Za-z]:)?[\\/](?:tmp|t)[\\/](?:roos-acp-snap-[0-9a-f]{9}|roos-acp-snapshot-spill)[\\/]session-[0-9a-f]{12}[\\/][0-9a-f]{12}-([A-Za-z0-9._~-]+?)`
+  String.raw`(?:[A-Za-z]:)?[\\/](?:tmp|t)[\\/](?:shres-acp-snap-[0-9a-f]{9}|shres-acp-snapshot-spill)[\\/]session-[0-9a-f]{12}[\\/][0-9a-f]{12}-([A-Za-z0-9._~-]+?)`
   + String.raw`(?=\. Use read with offset/limit|[\s)]|$)`,
   'g',
 )

@@ -2,12 +2,12 @@
  * Public request, value, and failure vocabulary for per-message feedback.
  * This module contains types only so generated Remote clients can consume it
  * without importing Host runtime code.
- * @module @roos-code/roos-code-message-feedback/types
+ * @module @shres-code/shres-code-message-feedback/types
  */
 
-import type { Branded } from '@roos-code/roos-code-brand'
-import type { MessageId } from '@roos-code/roos-code-llm/brand'
-import type { SessionId } from '@roos-code/roos-code-session/types'
+import type { Branded } from '@shres-code/shres-code-brand'
+import type { MessageId } from '@shres-code/shres-code-llm/brand'
+import type { SessionId } from '@shres-code/shres-code-session/types'
 
 /** Opaque compare-and-set token for one exact feedback item revision. */
 export type MessageFeedbackVersion = Branded<'MessageFeedbackVersion'>

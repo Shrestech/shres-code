@@ -2,12 +2,12 @@
  * Service Definition for the same-world process-confinement capability seam: wrap exact subprocess argv under a
  * host-path file policy. Containers, microVMs, and remote execution replace the
  * surrounding capability seam instead; this service shares the host kernel and filesystem.
- * @module @roos-code/roos-code-sandbox
+ * @module @shres-code/shres-code-sandbox
  */
 
-import { Context, Service } from '@roos-code/cordis'
-import { HarnessError } from '@roos-code/roos-code-llm'
-import type { SessionId } from '@roos-code/roos-code-session'
+import { Context, Service } from '@shres-code/cordis'
+import { HarnessError } from '@shres-code/shres-code-llm'
+import type { SessionId } from '@shres-code/shres-code-session'
 
 export {
   ESCALATION_TARGETS,
@@ -46,7 +46,7 @@ export interface SandboxExecutionPolicy {
   /** Absolute root directory `workspace-write` may write under. */
   workspaceRoot: string
   /**
-   * Opaque identity of the calling session (the branded `roos-session`
+   * Opaque identity of the calling session (the branded `shres-session`
    * SessionId). Backends key per-session state off it (e.g. windows-acl gives
    * each live session/workspace pair a random private temp directory and SID,
    * while the workspace SID and standing grant remain per-workspace); absent
@@ -165,7 +165,7 @@ export class SandboxUnavailableError extends HarnessError {
   }
 }
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     sandbox: SandboxProvider
   }

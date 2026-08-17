@@ -4,12 +4,12 @@
  * {@link CompactionEngine}. This interface necessarily depends on session and LLM
  * vocabulary; the rationale is in the
  * [compaction Agent Note](../../../../.agents/notes/implemented/feature/2026-06-18-compaction-capability-seam.md).
- * @module @roos-code/roos-code-compaction
+ * @module @shres-code/shres-code-compaction
  */
 
-import { Context, Service } from '@roos-code/cordis'
-import type { Session } from '@roos-code/roos-code-session'
-import type { CommandId } from '@roos-code/roos-code-commands/brand'
+import { Context, Service } from '@shres-code/cordis'
+import type { Session } from '@shres-code/shres-code-session'
+import type { CommandId } from '@shres-code/shres-code-commands/brand'
 import type { CompactionResult } from './types.ts'
 
 export type { CompactionResult } from './types.ts'
@@ -78,7 +78,7 @@ export interface ManualCompactAgentContext extends CompactionAgentContext {
   runMaintenance<T>(task: (signal: AbortSignal) => Promise<T>): Promise<T>
 }
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     compaction: CompactionEngine
   }

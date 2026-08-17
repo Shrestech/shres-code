@@ -15,7 +15,7 @@ import {
   grantArgs,
   launcherPath,
   probe,
-} from '@roos-code/node-addon-landlock-run';
+} from '@shres-code/node-addon-landlock-run';
 
 // --- constants are part of the CLI contract ---
 assert.equal(LAUNCHER_BIN, 'landlock-run');
@@ -36,7 +36,7 @@ assert.deepEqual(
 assert.deepEqual(grantArgs({ readOnly: ['/'], allowNetwork: false }), ['--ro', '/']);
 
 // --- launcherPath: resolves the platform package next to its package.json ---
-const platformPackage = `@roos-code/node-addon-landlock-run-${process.platform}-${process.arch}`;
+const platformPackage = `@shres-code/node-addon-landlock-run-${process.platform}-${process.arch}`;
 const resolvedViaSeam = launcherPath((specifier) => {
   assert.equal(specifier, `${platformPackage}/package.json`);
   return path.join('/fake-install', specifier);

@@ -5,9 +5,9 @@
 // Host machine.
 
 import { useLayoutEffect, useRef, useState } from 'react'
-import type { HostDescriptionSource } from '@roos-code/roos-code-client-connection/client'
-import type { InjectFace, PropsLocale } from '@roos-code/roos-code-client-ui-slots'
-import type { TurnTailOwnerProps } from '@roos-code/roos-code-client-ui-conversation/client'
+import type { HostDescriptionSource } from '@shres-code/shres-code-client-connection/client'
+import type { InjectFace, PropsLocale } from '@shres-code/shres-code-client-ui-slots'
+import type { TurnTailOwnerProps } from '@shres-code/shres-code-client-ui-conversation/client'
 import { basename } from './turn-deliverables.ts'
 import type { NS } from './locales.ts'
 import css from './ProducedFiles.module.css'

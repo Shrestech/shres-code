@@ -1,18 +1,18 @@
-import { Context, Service, type Plugin } from '@roos-code/cordis'
-import type { Dict } from '@roos-code/cosmokit'
-import { ModuleLoader, type ModuleJob, type ResolveResult } from '@roos-code/cordis-plugin-loader'
-import type { Include } from '@roos-code/cordis-plugin-include'
+import { Context, Service, type Plugin } from '@shres-code/cordis'
+import type { Dict } from '@shres-code/cosmokit'
+import { ModuleLoader, type ModuleJob, type ResolveResult } from '@shres-code/cordis-plugin-loader'
+import type { Include } from '@shres-code/cordis-plugin-include'
 import { FSWatcher, watch, type ChokidarOptions } from 'chokidar'
 import { dirname, relative, resolve } from 'node:path'
 import { realpath, stat } from 'node:fs/promises'
 import { handleError } from './error.ts'
-import type {} from '@roos-code/cordis-plugin-timer'
+import type {} from '@shres-code/cordis-plugin-timer'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { createRequire } from 'node:module'
 import picomatch from 'picomatch'
-import z from '@roos-code/schemastery'
+import z from '@shres-code/schemastery'
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     hmr: Hmr
   }
@@ -568,7 +568,7 @@ namespace Hmr {
     ]),
     debounce: z.natural().role('ms').default(100),
   })
-  // [roos-code] vendored modification: removed `.i18n({ 'en-US': enUS, 'zh-CN': zhCN })`
+  // [shres-code] vendored modification: removed `.i18n({ 'en-US': enUS, 'zh-CN': zhCN })`
   // and the corresponding `./locales/*.yml` imports, to avoid a runtime YAML import hook
   // (@cordisjs/unyaml) that we don't vendor. See vendor/README.md.
 }

@@ -1,10 +1,10 @@
-/** Package-owned invariant companion for `@roos-code/roos-code-api-remotes`. */
+/** Package-owned invariant companion for `@shres-code/shres-code-api-remotes`. */
 
 /* jscpd:ignore-start */
-import type { Context } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-api-remotes'
+const PACKAGE_NAME = '@shres-code/shres-code-api-remotes'
 
 /** Cordis companion plugin name. */
 export const name = 'api-remotes-invariant'

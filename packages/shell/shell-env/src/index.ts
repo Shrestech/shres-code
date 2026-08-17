@@ -1,22 +1,22 @@
 /**
  * Tool-independent shell environment plugin: owns the `ctx.shellEnv` registry of
- * trusted, per-execution `ROOS_*` variables consumed by the model-facing shell
- * tools (`roos-tool-bash`, `roos-tool-pwsh`). Built-in shell facts are owned by
+ * trusted, per-execution `SHRES_*` variables consumed by the model-facing shell
+ * tools (`shres-tool-bash`, `shres-tool-pwsh`). Built-in shell facts are owned by
  * the registry itself while plugins can register additional, enumerable facts
  * with effect-scoped disposal.
  *
- * @module @roos-code/roos-code-shell-env
+ * @module @shres-code/shres-code-shell-env
  */
 
-import { Service, type Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import { ROOS_ENV_PREFIX } from '@roos-code/roos-code-shell'
-import type { RoosEnvironment, RoosEnvironmentKey } from '@roos-code/roos-code-shell'
-import { ROOS_HOME_ENV, resolveRoosHome } from '@roos-code/roos-code-home-paths'
-import type { ToolExecution } from '@roos-code/roos-code-tools'
-import type {} from '@roos-code/roos-code-session-persistence'
+import { Service, type Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import { SHRES_ENV_PREFIX } from '@shres-code/shres-code-shell'
+import type { ShresEnvironment, ShresEnvironmentKey } from '@shres-code/shres-code-shell'
+import { SHRES_HOME_ENV, resolveShresHome } from '@shres-code/shres-code-home-paths'
+import type { ToolExecution } from '@shres-code/shres-code-tools'
+import type {} from '@shres-code/shres-code-session-persistence'
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     shellEnv: ShellEnvRegistry
   }
@@ -27,16 +27,16 @@ export const inject: string[] = []
 
 /** Plugin config (all optional — the built-in facts resolve without defaults). */
 export interface Config {
-  /** Roos Code home directory exposed as `ROOS_HOME`; defaults to `$ROOS_HOME` or `~/.roos`. */
-  roosHome?: string
+  /** Shres Code home directory exposed as `SHRES_HOME`; defaults to `$SHRES_HOME` or `~/.shres`. */
+  shresHome?: string
 }
 
 /** Runtime configuration schema for the shell-env plugin. */
 export const Config: z<Config> = z.object({
-  roosHome: z.string(),
+  shresHome: z.string(),
 })
 
-/** Model-visible metadata for one managed `ROOS_*` environment variable. */
+/** Model-visible metadata for one managed `SHRES_*` environment variable. */
 export interface BashEnvVariable {
   /** Concise description of the environment fact represented by the variable. */
   description: string
@@ -50,37 +50,37 @@ export interface BashEnvVariable {
 export interface BashEnvContributor {
   /** Stable contributor name used in diagnostics and duplicate detection. */
   name: string
-  /** Complete set of `ROOS_*` keys this contributor may return. */
-  variables: Readonly<Record<RoosEnvironmentKey, BashEnvVariable>>
+  /** Complete set of `SHRES_*` keys this contributor may return. */
+  variables: Readonly<Record<ShresEnvironmentKey, BashEnvVariable>>
   /**
    * Resolve this contributor's available values for one tool execution.
    * @param execution - the shell tool execution and its optional calling agent.
    * @returns a partial map containing only keys declared in {@link variables}.
    */
-  resolve(execution: ToolExecution): Readonly<Partial<Record<RoosEnvironmentKey, string>>>
+  resolve(execution: ToolExecution): Readonly<Partial<Record<ShresEnvironmentKey, string>>>
 }
 
 /** An enumerable declaration returned by {@link ShellEnvRegistry.list}. */
 export interface BashEnvVariableInfo extends BashEnvVariable {
   /** Contributor that owns the variable. */
   contributor: string
-  /** Declared `ROOS_*` environment variable name. */
-  key: RoosEnvironmentKey
+  /** Declared `SHRES_*` environment variable name. */
+  key: ShresEnvironmentKey
 }
 
-const ROOS_SHELL_KEY = `${ROOS_ENV_PREFIX}SHELL` as const
-const ROOS_SESSION_ID_KEY = `${ROOS_ENV_PREFIX}SESSION_ID` as const
-const ROOS_SESSION_JSONL_KEY = `${ROOS_ENV_PREFIX}SESSION_JSONL` as const
-const RESERVED_BASH_ENV_KEYS = new Set<RoosEnvironmentKey>([
-  ROOS_HOME_ENV,
-  ROOS_SHELL_KEY,
-  ROOS_SESSION_ID_KEY,
+const SHRES_SHELL_KEY = `${SHRES_ENV_PREFIX}SHELL` as const
+const SHRES_SESSION_ID_KEY = `${SHRES_ENV_PREFIX}SESSION_ID` as const
+const SHRES_SESSION_JSONL_KEY = `${SHRES_ENV_PREFIX}SESSION_JSONL` as const
+const RESERVED_BASH_ENV_KEYS = new Set<ShresEnvironmentKey>([
+  SHRES_HOME_ENV,
+  SHRES_SHELL_KEY,
+  SHRES_SESSION_ID_KEY,
 ])
 const BASH_ENV_KEY_SUFFIX = /^[A-Z][A-Z0-9_]*$/
 
 /**
- * Registry (`ctx.shellEnv`) for trusted, per-execution `ROOS_*` variables.
- * The namespace is rebuilt for every model shell call: ambient `ROOS_*` values
+ * Registry (`ctx.shellEnv`) for trusted, per-execution `SHRES_*` variables.
+ * The namespace is rebuilt for every model shell call: ambient `SHRES_*` values
  * are discarded by the executor, then the registry's current snapshot is
  * injected. Built-in shell facts remain owned by the registry itself while
  * plugins can register additional, enumerable facts with effect-scoped
@@ -88,8 +88,8 @@ const BASH_ENV_KEY_SUFFIX = /^[A-Z][A-Z0-9_]*$/
  */
 export class ShellEnvRegistry extends Service {
   private readonly contributors = new Map<string, BashEnvContributor>()
-  private readonly keyOwners = new Map<RoosEnvironmentKey, string>()
-  private readonly roosHome: string
+  private readonly keyOwners = new Map<ShresEnvironmentKey, string>()
+  private readonly shresHome: string
 
   /**
    * Create and install the `ctx.shellEnv` service.
@@ -98,7 +98,7 @@ export class ShellEnvRegistry extends Service {
    */
   constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'shellEnv')
-    this.roosHome = resolveRoosHome(config.roosHome)
+    this.shresHome = resolveShresHome(config.shresHome)
   }
 
   /**
@@ -116,10 +116,10 @@ export class ShellEnvRegistry extends Service {
         throw new Error(`bash env contributor "${contributor.name}" is already registered`)
       }
 
-      const variables = Object.entries(contributor.variables) as [RoosEnvironmentKey, BashEnvVariable][]
+      const variables = Object.entries(contributor.variables) as [ShresEnvironmentKey, BashEnvVariable][]
       for (const [key, variable] of variables) {
-        if (!key.startsWith(ROOS_ENV_PREFIX)
-          || !BASH_ENV_KEY_SUFFIX.test(key.slice(ROOS_ENV_PREFIX.length))) {
+        if (!key.startsWith(SHRES_ENV_PREFIX)
+          || !BASH_ENV_KEY_SUFFIX.test(key.slice(SHRES_ENV_PREFIX.length))) {
           throw new Error(`bash env contributor "${contributor.name}" declared invalid key "${key}"`)
         }
         if (RESERVED_BASH_ENV_KEYS.has(key)) {
@@ -145,23 +145,23 @@ export class ShellEnvRegistry extends Service {
   }
 
   /**
-   * Build the trusted `ROOS_*` snapshot for one shell tool execution.
+   * Build the trusted `SHRES_*` snapshot for one shell tool execution.
    * @param execution - the current tool execution.
    * @returns an immutable environment overlay containing built-ins and current contributions.
    */
-  collect(execution: ToolExecution): RoosEnvironment {
-    const values: Record<RoosEnvironmentKey, string> = {
-      [ROOS_HOME_ENV]: this.roosHome,
-      [ROOS_SHELL_KEY]: '1',
+  collect(execution: ToolExecution): ShresEnvironment {
+    const values: Record<ShresEnvironmentKey, string> = {
+      [SHRES_HOME_ENV]: this.shresHome,
+      [SHRES_SHELL_KEY]: '1',
     }
     if (execution.agent !== undefined) {
-      values[ROOS_SESSION_ID_KEY] = execution.agent.session.header.id
+      values[SHRES_SESSION_ID_KEY] = execution.agent.session.header.id
     }
 
     for (const contributor of [...this.contributors.values()].sort((left, right) => left.name.localeCompare(right.name))) {
       const resolved = contributor.resolve(execution)
       for (const [rawKey, value] of Object.entries(resolved)) {
-        const key = rawKey as RoosEnvironmentKey
+        const key = rawKey as ShresEnvironmentKey
         if (!Object.hasOwn(contributor.variables, key)) {
           throw new Error(`bash env contributor "${contributor.name}" returned undeclared key "${key}"`)
         }
@@ -186,7 +186,7 @@ export class ShellEnvRegistry extends Service {
       .flatMap(contributor => Object.entries(contributor.variables).map(([key, variable]) => ({
         contributor: contributor.name,
         description: variable.description,
-        key: key as RoosEnvironmentKey,
+        key: key as ShresEnvironmentKey,
       })))
       .sort((left, right) => left.key.localeCompare(right.key))
   }
@@ -194,7 +194,7 @@ export class ShellEnvRegistry extends Service {
 
 /**
  * Load the shell-env plugin: register the `ctx.shellEnv` service and the
- * shell-agnostic persistence contributor (`ROOS_SESSION_JSONL`).
+ * shell-agnostic persistence contributor (`SHRES_SESSION_JSONL`).
  * @param ctx - Cordis context that owns the service and registrations.
  * @param config - home-directory configuration for the built-in variables.
  */
@@ -203,7 +203,7 @@ export function apply(ctx: Context, config: Config = {}): void {
   registry.register({
     name: 'session-persistence',
     variables: {
-      [ROOS_SESSION_JSONL_KEY]: {
+      [SHRES_SESSION_JSONL_KEY]: {
         description: 'Absolute target path of the current session JSONL when the active persistence backend provides one.',
       },
     },
@@ -211,7 +211,7 @@ export function apply(ctx: Context, config: Config = {}): void {
       const agent = execution.agent
       if (agent === undefined) return {}
       const location = ctx.get('sessionPersistence')?.locate(agent.session.header)
-      return location?.kind === 'jsonl' ? { [ROOS_SESSION_JSONL_KEY]: location.path } : {}
+      return location?.kind === 'jsonl' ? { [SHRES_SESSION_JSONL_KEY]: location.path } : {}
     },
   })
 }

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import SessionStore, { SessionId } from '@roos-code/roos-code-session'
-import InvariantRegistry from '@roos-code/roos-code-invariants'
-import * as AgentLoopInvariant from '@roos-code/roos-code-agent-loop/invariant'
-import { createUserMessage, markAgentLoopRequest, type GenerateOptions  } from '@roos-code/roos-code-llm'
+import { Context } from '@shres-code/cordis'
+import SessionStore, { SessionId } from '@shres-code/shres-code-session'
+import InvariantRegistry from '@shres-code/shres-code-invariants'
+import * as AgentLoopInvariant from '@shres-code/shres-code-agent-loop/invariant'
+import { createUserMessage, markAgentLoopRequest, type GenerateOptions  } from '@shres-code/shres-code-llm'
 
 async function setup(): Promise<Context> {
   const ctx = new Context()

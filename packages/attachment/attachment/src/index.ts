@@ -1,6 +1,6 @@
-/** Durable attachment storage seam (`ctx.attachments`). @module @roos-code/roos-code-attachment */
+/** Durable attachment storage seam (`ctx.attachments`). @module @shres-code/shres-code-attachment */
 
-import { Context, Service } from '@roos-code/cordis'
+import { Context, Service } from '@shres-code/cordis'
 import type {
   ImageAttachmentLimits,
   ImageAttachmentRef,
@@ -19,7 +19,7 @@ export type {
   StoredImageAttachment,
 } from './types.ts'
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     attachments: AttachmentStore
   }

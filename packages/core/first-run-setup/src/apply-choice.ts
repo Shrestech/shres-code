@@ -2,12 +2,12 @@
  * Persist a first-run choice: `agent-default-model`, optional credential, and
  * an optional hand-declared pi-ai route.
  *
- * @module @roos-code/roos-code-first-run-setup/apply-choice
+ * @module @shres-code/shres-code-first-run-setup/apply-choice
  */
 
-import type { Context } from '@roos-code/cordis'
-import { credentialRef } from '@roos-code/roos-code-credentials'
-import { settingsNamespace } from '@roos-code/roos-code-settings'
+import type { Context } from '@shres-code/cordis'
+import { credentialRef } from '@shres-code/shres-code-credentials'
+import { settingsNamespace } from '@shres-code/shres-code-settings'
 import type { FirstRunChoice } from './types.ts'
 import { TEMPLATE_ROUTES } from './options.ts'
 

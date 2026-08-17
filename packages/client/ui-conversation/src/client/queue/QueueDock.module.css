@@ -6,23 +6,23 @@
   flex: none;
   width: calc(
     100% -
-    var(--roos-composer-side-clearance) -
-    var(--roos-composer-side-clearance) -
-    var(--roos-composer-dock-inset) -
-    var(--roos-composer-dock-inset)
+    var(--shres-composer-side-clearance) -
+    var(--shres-composer-side-clearance) -
+    var(--shres-composer-dock-inset) -
+    var(--shres-composer-dock-inset)
   );
   max-width: calc(
-    var(--roos-composer-card-max-width) -
-    var(--roos-composer-dock-inset) -
-    var(--roos-composer-dock-inset)
+    var(--shres-composer-card-max-width) -
+    var(--shres-composer-dock-inset) -
+    var(--shres-composer-dock-inset)
   );
   /* Cancel the stack gap after this item and tuck 3px under the input card
      (square bottom), reading as one attached surface. */
-  margin: 0 auto calc(0px - var(--roos-composer-stack-gap) - 3px);
+  margin: 0 auto calc(0px - var(--shres-composer-stack-gap) - 3px);
   /* Horizontal padding completes the shared dock inset (this wrapper only
      subtracts two insets from its width); no vertical padding, so the visual
      gap above the panel stays the uniform stack gap. */
-  padding: 0 var(--roos-composer-dock-inset);
+  padding: 0 var(--shres-composer-dock-inset);
 }
 
 .panel {
@@ -32,8 +32,8 @@
   padding: 2px 0;
   border-radius: 12px 12px 0 0;
   background: var(--dsw-specific-tip);
-  --roos-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
-  --roos-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
+  --shres-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
+  --shres-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
 }
 
 .panel::after {

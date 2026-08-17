@@ -1,6 +1,6 @@
 # Subprocess
 
-The subprocess seam is split across a Service Definition ([roos-subprocess](../../packages/subprocess/subprocess), `ctx.subprocess`) and Service Provider ([roos-subprocess-local](../../packages/subprocess/subprocess-local)); its Consumers are other capability seams and out-of-process backends: the [bash executor family](shell.md) uses collected batch output, LSP uses raw protocol pipes, the PTY backend uses the terminal primitive, and the ACP subagent backend uses piped ndjson plus inherited stderr. This seam owns the managed `ROOS_*` environment namespace, the shared credential scrub (`scrubbedParentEnv`), and the `CollectedOutput` shape; [roos-shell](../../packages/shell/shell) re-exports the vocabulary so bash consumers keep one import root.
+The subprocess seam is split across a Service Definition ([shres-subprocess](../../packages/subprocess/subprocess), `ctx.subprocess`) and Service Provider ([shres-subprocess-local](../../packages/subprocess/subprocess-local)); its Consumers are other capability seams and out-of-process backends: the [bash executor family](shell.md) uses collected batch output, LSP uses raw protocol pipes, the PTY backend uses the terminal primitive, and the ACP subagent backend uses piped ndjson plus inherited stderr. This seam owns the managed `SHRES_*` environment namespace, the shared credential scrub (`scrubbedParentEnv`), and the `CollectedOutput` shape; [shres-shell](../../packages/shell/shell) re-exports the vocabulary so bash consumers keep one import root.
 
 Source: [`packages/subprocess/subprocess/src/types.ts`](../../packages/subprocess/subprocess/src/types.ts) and [`packages/subprocess/subprocess/src/index.ts`](../../packages/subprocess/subprocess/src/index.ts)
 
@@ -10,16 +10,16 @@ One provider's spawn working directories, executable paths, ordinary processes, 
 
 ## Managed environment namespace and captured output
 
-`ROOS_*` variables are Harness-owned child-process facts; implementations discard ambient `ROOS_*` names before the caller's explicit `env` merges, so a current fact arrives only as a deliberate string entry, while an explicit `undefined` tombstone removes an ordinary ambient value. Each collected stream reports its truncation and spill-recovery state through `CollectedOutput`.
+`SHRES_*` variables are Harness-owned child-process facts; implementations discard ambient `SHRES_*` names before the caller's explicit `env` merges, so a current fact arrives only as a deliberate string entry, while an explicit `undefined` tombstone removes an ordinary ambient value. Each collected stream reports its truncation and spill-recovery state through `CollectedOutput`.
 
 ```ts type-equiv
-/** One environment key inside the managed {@link ROOS_ENV_PREFIX} namespace. */
-type RoosEnvironmentKey = `${typeof ROOS_ENV_PREFIX}${string}`
+/** One environment key inside the managed {@link SHRES_ENV_PREFIX} namespace. */
+type ShresEnvironmentKey = `${typeof SHRES_ENV_PREFIX}${string}`
 ```
 
 ```ts type-equiv
-/** Trusted Roos Code variables for one child-process execution. */
-type RoosEnvironment = Readonly<Record<RoosEnvironmentKey, string>>
+/** Trusted Shres Code variables for one child-process execution. */
+type ShresEnvironment = Readonly<Record<ShresEnvironmentKey, string>>
 ```
 
 ```ts type-equiv
@@ -92,7 +92,7 @@ The seam applies no defaults: every disposition, limit, and directory is explici
 /**
  * A fully-specified spawn request. This seam applies no defaults: every
  * disposition, limit, and directory is explicit, so the caller's own config —
- * not a hidden subprocess-service default — decides them (the `roos-shell`
+ * not a hidden subprocess-service default — decides them (the `shres-shell`
  * request/spec split is the owning template).
  */
 interface SubprocessSpawnSpec {
@@ -120,7 +120,7 @@ interface SubprocessSpawnSpec {
    * Explicit environment entries merged onto the implementation's scrubbed
    * parent base (see `scrubbedParentEnv`), with no namespace validation. A
    * string is a deliberate caller opt-in, so a forwarded credential-shaped
-   * entry or current `ROOS_*` fact survives the scrub; `undefined` is a
+   * entry or current `SHRES_*` fact survives the scrub; `undefined` is a
    * tombstone that removes an ordinary ambient entry from the child.
    */
   env?: NodeJS.ProcessEnv | undefined
@@ -244,7 +244,7 @@ The terminal spec fully specifies argv, cwd, environment overrides, dimensions, 
 
 ## Service behavior
 
-The abstract [`SubprocessRuntime`](../../packages/subprocess/subprocess/src/index.ts) Service Definition specifies execution-world coordinates, executable lookup, ordinary `spawn`, and `spawnTerminal`. [`LocalSubprocessRuntime`](../../packages/subprocess/subprocess-local/src/index.ts) provides them with detached process trees, per-disposition wiring, credential scrubbing, `node-pty`, platform process inspection, and terminate-and-join disposal. See [`roos-subprocess`](../../packages/subprocess/subprocess/README.md) for the Service Definition contract and [`roos-subprocess-local`](../../packages/subprocess/subprocess-local/README.md) for local mechanics.
+The abstract [`SubprocessRuntime`](../../packages/subprocess/subprocess/src/index.ts) Service Definition specifies execution-world coordinates, executable lookup, ordinary `spawn`, and `spawnTerminal`. [`LocalSubprocessRuntime`](../../packages/subprocess/subprocess-local/src/index.ts) provides them with detached process trees, per-disposition wiring, credential scrubbing, `node-pty`, platform process inspection, and terminate-and-join disposal. See [`shres-subprocess`](../../packages/subprocess/subprocess/README.md) for the Service Definition contract and [`shres-subprocess-local`](../../packages/subprocess/subprocess-local/README.md) for local mechanics.
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 

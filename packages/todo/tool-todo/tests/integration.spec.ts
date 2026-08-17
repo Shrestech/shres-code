@@ -1,11 +1,11 @@
-import { createUserMessage } from '@roos-code/roos-code-llm'
+import { createUserMessage } from '@shres-code/shres-code-llm'
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { SessionId, type SessionEvent } from '@roos-code/roos-code-session'
-import type { Agent } from '@roos-code/roos-code-agent'
-import AgentLoop from '@roos-code/roos-code-agent-loop'
-import { mountAgentLoopTestDependencies } from '@roos-code/roos-code-agent-loop-testkit'
-import * as ToolTodo from '@roos-code/roos-code-tool-todo'
+import { Context } from '@shres-code/cordis'
+import { SessionId, type SessionEvent } from '@shres-code/shres-code-session'
+import type { Agent } from '@shres-code/shres-code-agent'
+import AgentLoop from '@shres-code/shres-code-agent-loop'
+import { mountAgentLoopTestDependencies } from '@shres-code/shres-code-agent-loop-testkit'
+import * as ToolTodo from '@shres-code/shres-code-tool-todo'
 import { MockAdapter, textResponse, toolCallResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
 
 /**

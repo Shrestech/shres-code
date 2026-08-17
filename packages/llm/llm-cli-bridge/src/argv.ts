@@ -1,14 +1,14 @@
 /**
  * Per-route argv construction: binary, extra flags, model, effort, prompt.
- * @module @roos-code/roos-code-llm-cli-bridge/argv
+ * @module @shres-code/shres-code-llm-cli-bridge/argv
  */
 
-import { assertNever, LlmError } from '@roos-code/roos-code-llm'
+import { assertNever, LlmError } from '@shres-code/shres-code-llm'
 import type { CliBridgeRoute } from './config.ts'
 
 /** Inputs that become CLI flags for one delegated completion. */
 export interface CliArgvRequest {
-  /** Exact model id from {@link import('@roos-code/roos-code-llm').GenerateOptions.model}. */
+  /** Exact model id from {@link import('@shres-code/shres-code-llm').GenerateOptions.model}. */
   model: string
   /** Exact effort id, when the caller or resolver supplied one. */
   effort?: string

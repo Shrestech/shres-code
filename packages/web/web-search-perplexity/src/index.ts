@@ -1,16 +1,16 @@
 /**
- * `@roos-code/roos-code-web-search-perplexity`: registers a Perplexity-backed
+ * `@shres-code/shres-code-web-search-perplexity`: registers a Perplexity-backed
  * `WebSearchProvider` with `ctx.web`. A function/namespace plugin (NOT a
  * default-export service): it registers INTO the seam's provider registry, like
- * `@roos-code/roos-code-llm-deepseek` registers an adapter into `ctx.llm`.
+ * `@shres-code/shres-code-llm-deepseek` registers an adapter into `ctx.llm`.
  *
- * @module @roos-code/roos-code-web-search-perplexity
+ * @module @shres-code/shres-code-web-search-perplexity
  */
 
-import type { Context } from '@roos-code/cordis'
-import { launchEnvironmentOf } from '@roos-code/roos-code-launch-environment'
-import z from '@roos-code/schemastery'
-import type {} from '@roos-code/roos-code-web'
+import type { Context } from '@shres-code/cordis'
+import { launchEnvironmentOf } from '@shres-code/shres-code-launch-environment'
+import z from '@shres-code/schemastery'
+import type {} from '@shres-code/shres-code-web'
 import { PerplexitySearchProvider, PERPLEXITY_DEFAULT_BASE_URL, PERPLEXITY_DEFAULT_MAX_TOKENS, PERPLEXITY_DEFAULT_MODEL } from './provider.ts'
 
 export {

@@ -28,11 +28,11 @@
     color-mix(in srgb, var(--dsw-alias-bg-base) 60%, transparent) 55%,
     transparent 100%
   );
-  animation: roos-tool-row-sweep 2.6s ease-out infinite;
+  animation: shres-tool-row-sweep 2.6s ease-out infinite;
   pointer-events: none;
 }
 
-@keyframes roos-tool-row-sweep {
+@keyframes shres-tool-row-sweep {
   0% { left: -300px; }
   90%, 100% { left: 100%; }
 }

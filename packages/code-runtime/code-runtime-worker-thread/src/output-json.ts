@@ -1,6 +1,6 @@
-/** JSON string-prefix accounting for the outer-output ledger. @module @roos-code/roos-code-code-runtime-worker-thread/output-json */
+/** JSON string-prefix accounting for the outer-output ledger. @module @shres-code/shres-code-code-runtime-worker-thread/output-json */
 
-import type { CodeJsonValue } from '@roos-code/roos-code-code-runtime'
+import type { CodeJsonValue } from '@shres-code/shres-code-code-runtime'
 
 type IntrinsicCallable = (this: unknown, ...args: unknown[]) => unknown
 

@@ -1,13 +1,13 @@
 import { describe, expectTypeOf, it } from 'vitest'
-import type { Context } from '@roos-code/cordis'
-import { CallId } from '@roos-code/roos-code-llm'
-import { defineTool } from '@roos-code/roos-code-tools'
+import type { Context } from '@shres-code/cordis'
+import { CallId } from '@shres-code/shres-code-llm'
+import { defineTool } from '@shres-code/shres-code-tools'
 import type {
   ToolDispatchExecution,
   ToolExecution,
   ToolExecutionInput,
   ToolRunContext,
-} from '@roos-code/roos-code-tools'
+} from '@shres-code/shres-code-tools'
 
 function inputAndExecutionContracts(
   input: ToolExecutionInput,

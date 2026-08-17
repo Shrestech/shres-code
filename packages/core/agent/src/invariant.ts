@@ -1,10 +1,10 @@
-/** Package-owned agent lifecycle invariants. @module @roos-code/roos-code-agent/invariant */
+/** Package-owned agent lifecycle invariants. @module @shres-code/shres-code-agent/invariant */
 
-import type { Context } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
-import type { Agent, AgentStatus } from '@roos-code/roos-code-agent'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
+import type { Agent, AgentStatus } from '@shres-code/shres-code-agent'
 
-const PACKAGE_NAME = '@roos-code/roos-code-agent'
+const PACKAGE_NAME = '@shres-code/shres-code-agent'
 
 /** Cordis companion plugin name. */
 export const name = 'agent-invariant'

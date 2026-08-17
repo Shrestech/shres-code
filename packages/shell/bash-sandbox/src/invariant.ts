@@ -1,13 +1,13 @@
 /**
- * Package-owned invariant companion for `@roos-code/roos-code-bash-sandbox`.
- * @module @roos-code/roos-code-bash-sandbox/invariant
+ * Package-owned invariant companion for `@shres-code/shres-code-bash-sandbox`.
+ * @module @shres-code/shres-code-bash-sandbox/invariant
  */
 
 /* jscpd:ignore-start */
-import type { Context } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-bash-sandbox'
+const PACKAGE_NAME = '@shres-code/shres-code-bash-sandbox'
 
 /** Cordis companion plugin name. */
 export const name = 'bash-sandbox-invariant'

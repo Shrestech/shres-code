@@ -5,10 +5,10 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { PassThrough, Writable } from 'node:stream'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import * as agentCore from '@roos-code/roos-code-agent-spine-demo'
-import JsonlSessionPersistence from '@roos-code/roos-code-session-persistence-jsonl'
-import * as LlmDeepSeek from '@roos-code/roos-code-llm-deepseek'
+import { Context } from '@shres-code/cordis'
+import * as agentCore from '@shres-code/shres-code-agent-spine-demo'
+import JsonlSessionPersistence from '@shres-code/shres-code-session-persistence-jsonl'
+import * as LlmDeepSeek from '@shres-code/shres-code-llm-deepseek'
 import * as jsonrpc from '../src/index.ts'
 
 /**
@@ -151,9 +151,9 @@ async function mockCompletionServer(): Promise<{ url: string; requests: unknown[
   return { url: `http://127.0.0.1:${address.port}`, requests }
 }
 
-describe('roos-sdk-jsonrpc-server plugin apply', () => {
+describe('shres-sdk-jsonrpc-server plugin apply', () => {
   it('serves initialize over the injected stdio pair', async () => {
-    const storageDir = await mkdtemp(join(tmpdir(), 'roos-jsonrpc-apply-init-'))
+    const storageDir = await mkdtemp(join(tmpdir(), 'shres-jsonrpc-apply-init-'))
     vi.stubEnv('DEEPSEEK_API_KEY', 'test-key')
     const harness = await mountPlugin(storageDir)
     try {
@@ -163,7 +163,7 @@ describe('roos-sdk-jsonrpc-server plugin apply', () => {
       expect(response).toEqual({
         jsonrpc: '2.0',
         id: 'init-1',
-        result: { serverInfo: { name: 'roos-code-sdk-runtime', version: '0.0.1' } },
+        result: { serverInfo: { name: 'shres-code-sdk-runtime', version: '0.0.1' } },
       })
       expect(harness.exits()).toEqual([])
     } finally {
@@ -173,7 +173,7 @@ describe('roos-sdk-jsonrpc-server plugin apply', () => {
   })
 
   it('drives a session/prompt turn end-to-end and forwards session notifications as output frames', async () => {
-    const storageDir = await mkdtemp(join(tmpdir(), 'roos-jsonrpc-apply-prompt-'))
+    const storageDir = await mkdtemp(join(tmpdir(), 'shres-jsonrpc-apply-prompt-'))
     const llmServer = await mockCompletionServer()
     vi.stubEnv('DEEPSEEK_API_KEY', 'test-key')
     vi.stubEnv('DEEPSEEK_BASE_URL', llmServer.url)
@@ -215,7 +215,7 @@ describe('roos-sdk-jsonrpc-server plugin apply', () => {
   })
 
   it('answers shutdown before exiting 0 exactly once, even against a racing second shutdown', async () => {
-    const storageDir = await mkdtemp(join(tmpdir(), 'roos-jsonrpc-apply-shutdown-'))
+    const storageDir = await mkdtemp(join(tmpdir(), 'shres-jsonrpc-apply-shutdown-'))
     const harness = await mountPlugin(storageDir, { writeDelayMs: 10 })
     try {
       // One chunk makes the two deferred exit callbacks race.
@@ -258,7 +258,7 @@ describe('roos-sdk-jsonrpc-server plugin apply', () => {
   })
 
   it('still disposes and exits once when the flush callback fails', async () => {
-    const storageDir = await mkdtemp(join(tmpdir(), 'roos-jsonrpc-apply-flush-failure-'))
+    const storageDir = await mkdtemp(join(tmpdir(), 'shres-jsonrpc-apply-flush-failure-'))
     const harness = await mountPlugin(storageDir, { failFlush: true })
     try {
       harness.send({ jsonrpc: '2.0', id: 'sd-fail', method: 'shutdown' })
@@ -280,7 +280,7 @@ describe('roos-sdk-jsonrpc-server plugin apply', () => {
   })
 
   it('stops serving on a bare fiber dispose (HMR-style unload) without calling exit', async () => {
-    const storageDir = await mkdtemp(join(tmpdir(), 'roos-jsonrpc-apply-dispose-'))
+    const storageDir = await mkdtemp(join(tmpdir(), 'shres-jsonrpc-apply-dispose-'))
     const harness = await mountPlugin(storageDir)
     try {
       // Prove the handler-rejection path is live before disposal.
@@ -288,7 +288,7 @@ describe('roos-sdk-jsonrpc-server plugin apply', () => {
       const error = await harness.waitForFrame(frame => frame.id === 'probe-1', 'error response for unknown method')
       expect(error.error).toMatchObject({
         code: -32603,
-        message: 'unknown Roos Code SDK runtime method: nope/unknown',
+        message: 'unknown Shres Code SDK runtime method: nope/unknown',
       })
 
       await harness.fiber.dispose()

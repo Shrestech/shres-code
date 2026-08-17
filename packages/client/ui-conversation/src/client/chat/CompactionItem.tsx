@@ -7,13 +7,13 @@
 // non-expandable rather than empty.
 
 import { memo, useState } from 'react'
-import type { CompactionSummaryNode } from '@roos-code/roos-code-client-runtime/client'
+import type { CompactionSummaryNode } from '@shres-code/shres-code-client-runtime/client'
 import {
   IconApiOutline14,
   IconChevronDownOutline14,
   IconChevronRightOutline14,
   MarkdownText,
-} from '@roos-code/roos-code-client-ui-primitives'
+} from '@shres-code/shres-code-client-ui-primitives'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
 import css from './MessageItem.module.css'
 

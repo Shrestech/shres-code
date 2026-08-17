@@ -1,13 +1,13 @@
 /**
- * Package-owned invariant companion for `@roos-code/roos-code-subprocess-local`.
- * @module @roos-code/roos-code-subprocess-local/invariant
+ * Package-owned invariant companion for `@shres-code/shres-code-subprocess-local`.
+ * @module @shres-code/shres-code-subprocess-local/invariant
  */
 
 /* jscpd:ignore-start */
-import type { Context } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-subprocess-local'
+const PACKAGE_NAME = '@shres-code/shres-code-subprocess-local'
 
 /** Cordis companion plugin name. */
 export const name = 'subprocess-local-invariant'

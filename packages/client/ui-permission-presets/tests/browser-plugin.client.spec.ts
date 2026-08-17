@@ -8,13 +8,13 @@
  * disposal removes the contribution (HMR safety). The same plugin registers
  * its Settings row and invalidates that row on host settings changes.
  */
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { describe, expect, it } from 'vitest'
-import { SlotRegistry, type SessionId } from '@roos-code/roos-code-client-runtime/client'
-import { LocaleRuntime } from '@roos-code/roos-code-client-locale/client'
-import { TestRemote } from '@roos-code/roos-code-client-test-runtime'
-import type { CommandDecoration } from '@roos-code/roos-code-client-ui-commands/client'
-import type { PermissionSelect } from '@roos-code/roos-code-permission-presets/client'
+import { SlotRegistry, type SessionId } from '@shres-code/shres-code-client-runtime/client'
+import { LocaleRuntime } from '@shres-code/shres-code-client-locale/client'
+import { TestRemote } from '@shres-code/shres-code-client-test-runtime'
+import type { CommandDecoration } from '@shres-code/shres-code-client-ui-commands/client'
+import type { PermissionSelect } from '@shres-code/shres-code-permission-presets/client'
 import {
   PermissionRow, type PermissionRowInjected,
 } from '../src/client/PermissionRow.tsx'

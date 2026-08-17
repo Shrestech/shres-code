@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import clsx from 'clsx'
-import type { PermissionSelect as PermissionSelectValue } from '@roos-code/roos-code-permission-presets/client'
-import { IconChevronDownOutline14, Menu, RiskConfirmation } from '@roos-code/roos-code-client-ui-primitives'
-import type { MenuEntry } from '@roos-code/roos-code-client-ui-primitives'
+import type { PermissionSelect as PermissionSelectValue } from '@shres-code/shres-code-permission-presets/client'
+import { IconChevronDownOutline14, Menu, RiskConfirmation } from '@shres-code/shres-code-client-ui-primitives'
+import type { MenuEntry } from '@shres-code/shres-code-client-ui-primitives'
 import type { ComposerBarProps } from '../contract/slots.ts'
 import css from './PermissionSelect.module.css'
 

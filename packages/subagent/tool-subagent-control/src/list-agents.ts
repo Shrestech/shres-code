@@ -4,15 +4,15 @@
  * `descendants` scope, `ctx.subagents.listDescendants()`. It stays separately
  * loadable from the root `send_message` plugin so a deployment can register
  * continuation delivery without exposing discovery.
- * @module @roos-code/roos-code-tool-subagent-control/list-agents
+ * @module @shres-code/shres-code-tool-subagent-control/list-agents
  */
 
-import type { Context } from '@roos-code/cordis'
-import { defineTool } from '@roos-code/roos-code-tools'
-import type { Agent } from '@roos-code/roos-code-agent'
-import type { SessionId } from '@roos-code/roos-code-session'
-import { assertNever } from '@roos-code/roos-code-llm'
-import type { SubagentDescendantListEntry, SubagentListEntry } from '@roos-code/roos-code-subagent'
+import type { Context } from '@shres-code/cordis'
+import { defineTool } from '@shres-code/shres-code-tools'
+import type { Agent } from '@shres-code/shres-code-agent'
+import type { SessionId } from '@shres-code/shres-code-session'
+import { assertNever } from '@shres-code/shres-code-llm'
+import type { SubagentDescendantListEntry, SubagentListEntry } from '@shres-code/shres-code-subagent'
 
 export const name = 'tool-subagent-list-agents'
 export const inject = ['tools', 'subagents', 'agents']

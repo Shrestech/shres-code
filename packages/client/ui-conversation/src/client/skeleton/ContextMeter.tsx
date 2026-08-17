@@ -5,10 +5,10 @@
  * capacity. */
 
 import { useEffect, useRef, useState } from 'react'
-import type { UseProjection } from '@roos-code/roos-code-client-runtime/client'
+import type { UseProjection } from '@shres-code/shres-code-client-runtime/client'
 // Type-only: the `contextPressure` / `contextBreakdown` projection key merges.
-import type {} from '@roos-code/roos-code-token-meter/client'
-import { Tooltip } from '@roos-code/roos-code-client-ui-primitives'
+import type {} from '@shres-code/shres-code-token-meter/client'
+import { Tooltip } from '@shres-code/shres-code-client-ui-primitives'
 import type { ComposerBarProps } from '../contract/slots.ts'
 import { contextOccupancy, formatTokens } from '../chat/StatsLine.tsx'
 import css from './ContextMeter.module.css'

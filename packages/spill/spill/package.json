@@ -1,13 +1,13 @@
 {
-  "name": "@roos-code/roos-code-spill",
-  "description": "Abstract spill storage seam (ctx.spillStore) for the Roos Code — save oversized tool text and return a retrieval locator",
+  "name": "@shres-code/shres-code-spill",
+  "description": "Abstract spill storage seam (ctx.spillStore) for the Shres Code — save oversized tool text and return a retrieval locator",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "packages/spill/spill"
   },
   "type": "module",
@@ -32,17 +32,17 @@
   ],
   "license": "MIT",
   "peerDependencies": {
-    "@roos-code/roos-code-brand": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-llm": "workspace:^",
-    "@roos-code/roos-code-session": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-brand": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   },
   "devDependencies": {
-    "@roos-code/roos-code-brand": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-llm": "workspace:^",
-    "@roos-code/roos-code-session": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-brand": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   }
 }

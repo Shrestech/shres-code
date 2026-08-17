@@ -1,13 +1,13 @@
 /**
- * Package-owned invariant companion for `@roos-code/roos-code-timeout`.
- * @module @roos-code/roos-code-timeout/invariant
+ * Package-owned invariant companion for `@shres-code/shres-code-timeout`.
+ * @module @shres-code/shres-code-timeout/invariant
  */
 
 /* jscpd:ignore-start */
-import type { Context } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-timeout'
+const PACKAGE_NAME = '@shres-code/shres-code-timeout'
 
 /** Cordis companion plugin name. */
 export const name = 'timeout-invariant'

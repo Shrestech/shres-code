@@ -1,19 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import Loader from '@roos-code/cordis-plugin-loader'
-import AgentRegistry, { Inbox } from '@roos-code/roos-code-agent'
-import type { Agent, AgentStatus } from '@roos-code/roos-code-agent'
-import CommandRuntime from '@roos-code/roos-code-commands'
-import SessionStore, { foldSurface, Session, SessionId } from '@roos-code/roos-code-session'
-import { SessionTelemetryBackend, type SessionTelemetrySharingStatus } from '@roos-code/roos-code-session-telemetry'
-import * as commandFeedback from '@roos-code/roos-code-command-feedback'
+import { Context } from '@shres-code/cordis'
+import Loader from '@shres-code/cordis-plugin-loader'
+import AgentRegistry, { Inbox } from '@shres-code/shres-code-agent'
+import type { Agent, AgentStatus } from '@shres-code/shres-code-agent'
+import CommandRuntime from '@shres-code/shres-code-commands'
+import SessionStore, { foldSurface, Session, SessionId } from '@shres-code/shres-code-session'
+import { SessionTelemetryBackend, type SessionTelemetrySharingStatus } from '@shres-code/shres-code-session-telemetry'
+import * as commandFeedback from '@shres-code/shres-code-command-feedback'
 
 const { USER_ID, getOrCreateAnonymousUserId } = vi.hoisted(() => {
   const USER_ID = '01234567-89ab-4cde-8f01-23456789abcd'
   return { USER_ID, getOrCreateAnonymousUserId: vi.fn(() => USER_ID) }
 })
 
-vi.mock('@roos-code/roos-code-anonymous-user-id', () => ({
+vi.mock('@shres-code/shres-code-anonymous-user-id', () => ({
   getOrCreateAnonymousUserId,
 }))
 
@@ -98,7 +98,7 @@ function feedbackTexts(session: Session): string[] {
     .map(event => event.data.text)
 }
 
-describe('@roos-code/roos-code-command-feedback registration', () => {
+describe('@shres-code/shres-code-command-feedback registration', () => {
   it('registers one global command with Loader-safe exports and disposes it', async () => {
     const test = await harness()
     expect(commandFeedback.name).toBe('command-feedback')

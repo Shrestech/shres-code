@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import {
   AnonymousEntries,
   createScope,
@@ -8,7 +8,7 @@ import {
   type Scope,
   type ScopeKey,
   type ScopeLayer,
-} from '@roos-code/roos-code-scope'
+} from '@shres-code/shres-code-scope'
 
 class TestLayer implements ScopeLayer {
   readonly named: NamedEntries<number>

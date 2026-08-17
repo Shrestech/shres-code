@@ -8,11 +8,11 @@
 import { globSync, readFileSync } from 'node:fs'
 import { dirname, resolve, sep } from 'node:path'
 
-const SCOPE = '@roos-code/roos-code-'
+const SCOPE = '@shres-code/shres-code-'
 
 /** One harness package and its in-repo peer-dependency edges. */
 export interface PackageGraphNode {
-  /** Package name with the `@roos-code/roos-code-` prefix removed. */
+  /** Package name with the `@shres-code/shres-code-` prefix removed. */
   short: string
   /** Full npm package name. */
   name: string

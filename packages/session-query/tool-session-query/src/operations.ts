@@ -1,20 +1,20 @@
 /**
  * Tool operation orchestration over session-query service capabilities.
  *
- * @module @roos-code/roos-code-tool-session-query/operations
+ * @module @shres-code/shres-code-tool-session-query/operations
  */
 
-import type { Context } from '@roos-code/cordis'
-import { HarnessError } from '@roos-code/roos-code-llm'
-import type { SessionId } from '@roos-code/roos-code-session'
+import type { Context } from '@shres-code/cordis'
+import { HarnessError } from '@shres-code/shres-code-llm'
+import type { SessionId } from '@shres-code/shres-code-session'
 import {
   SessionQueryError,
   type SessionEventSearchPage,
   type SessionEventSurface,
   type SessionRecord,
   type SessionSearchCursor,
-} from '@roos-code/roos-code-session-query'
-import type { ToolRunContext } from '@roos-code/roos-code-tools'
+} from '@shres-code/shres-code-session-query'
+import type { ToolRunContext } from '@shres-code/shres-code-tools'
 import { toolInput } from './input.ts'
 import { presentation } from './presentation.ts'
 import { serviceBoundary } from './service-boundary.ts'

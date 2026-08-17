@@ -8,7 +8,7 @@ import {
   launchAcpTestAgent,
   type AgentUnderTest,
   type LaunchedAcpTestAgent,
-} from '@roos-code/roos-code-acp-snapshot'
+} from '@shres-code/shres-code-acp-snapshot'
 import { cleanupAcpExampleTest } from './cleanup.ts'
 
 /**
@@ -26,7 +26,7 @@ const AGENT: AgentUnderTest = {
   configPath: fileURLToPath(new URL('../cordis.yml', import.meta.url)),
   tsconfigPath: fileURLToPath(new URL('../../../tsconfig.json', import.meta.url)),
 }
-const DANGER_FULL_ACCESS_ENV = { ROOS_PERMISSION_MODE: 'danger-full-access' }
+const DANGER_FULL_ACCESS_ENV = { SHRES_PERMISSION_MODE: 'danger-full-access' }
 
 let spawned: LaunchedAcpTestAgent | undefined
 let workdir: string | undefined

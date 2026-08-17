@@ -1,9 +1,11 @@
 /**
- * Reject tracked leftovers of the pre-rebrand product identity outside the
- * keep-list (LICENSE, NOTICE, frozen Agent Notes, the rescope mapping page,
- * vendored upstream README/LICENSE, and the rebrand/rescope scripts that must
- * still mention old tokens as find-strings). Also rejects slash-stripped
- * catalog slugs (`deepseek-aidsh`) and leftover mermaid node ids (`pkg_*_dsh_*`).
+ * Reject tracked leftovers of retired product identities (DeepSeek Harness /
+ * DSH and Roos Code) outside the keep-list (LICENSE, NOTICE, archived Agent
+ * Notes, the historical rebrand notes, the rebrand/rescope/zh-purge scripts
+ * that must still mention old tokens as find-strings, and vendored upstream
+ * README/LICENSE). Also rejects the slash-stripped catalog slug
+ * `deepseek-aidsh` and leftover mermaid node ids (`pkg_*_dsh_*`, `pkg_*_roos_*`).
+ * Hyphenated `roos-code` / `shres-code` is not a slash-stripped slug.
  */
 
 import { execFileSync } from 'node:child_process'
@@ -22,6 +24,12 @@ const FORBIDDEN = [
   { id: 'product-vendor', pattern: /DeepSeek AI/ },
   { id: 'slash-stripped-slug', pattern: /deepseek-aidsh/ },
   { id: 'mermaid-dsh-node', pattern: /pkg_[A-Za-z0-9_]*_dsh_[A-Za-z0-9_]+/ },
+  { id: 'scoped-roos', pattern: /@roos-code/ },
+  { id: 'env-prefix-roos', pattern: /\bROOS_[A-Z]/ },
+  { id: 'home-dir-roos', pattern: /~\/\.roos\b/ },
+  { id: 'python-sdk-roos', pattern: /roos-code-sdk/ },
+  { id: 'product-prose-roos', pattern: /Roos Code/ },
+  { id: 'mermaid-roos-node', pattern: /pkg_[A-Za-z0-9_]*_roos_[A-Za-z0-9_]+/ },
 ] as const
 
 /** One tracked leftover of a retired brand token. */
@@ -36,12 +44,14 @@ export interface LegacyBrandReference {
 
 function keepListed(file: string): boolean {
   if (file === 'LICENSE' || file === 'NOTICE') return true
-  if (file.startsWith('.agents/notes/')) return true
-  if (file === 'docs/rescope.md') return true
-  if (/^vendor\/[^/]+\/(README\.md|LICENSE)$/.test(file)) return true
+  if (file.startsWith('.agents/notes/archived/')) return true
+  if (file === '.agents/notes/implemented/process/2026-08-16-rebrand-to-roos-code.md') return true
+  if (file === '.agents/notes/implemented/process/2026-08-17-rebrand-to-shres-code.md') return true
   if (file === 'scripts/rebrand.ts' || file === 'scripts/rebrand.spec.ts') return true
   if (file === 'scripts/rescope-vendor.ts' || file === 'scripts/rescope-vendor.spec.ts') return true
   if (file === 'scripts/verify-no-legacy-brand.ts') return true
+  if (file === 'scripts/purge-zh.ts' || file === 'scripts/purge-zh.spec.ts') return true
+  if (/^vendor\/[^/]+\/(README\.md|LICENSE)$/.test(file)) return true
   return false
 }
 

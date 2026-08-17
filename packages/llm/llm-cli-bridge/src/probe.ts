@@ -1,6 +1,6 @@
 /**
  * Whether a CLI binary is an executable path or a command on PATH.
- * @module @roos-code/roos-code-llm-cli-bridge/probe
+ * @module @shres-code/shres-code-llm-cli-bridge/probe
  */
 
 import { accessSync, constants } from 'node:fs'

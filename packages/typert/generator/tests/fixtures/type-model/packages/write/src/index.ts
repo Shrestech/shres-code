@@ -1,4 +1,4 @@
-import { Service } from '@roos-code/cordis'
+import { Service } from '@shres-code/cordis'
 
 /** Service whose public annotations are intentionally absent. */
 export class WritableService extends Service {
@@ -9,7 +9,7 @@ export class WritableService extends Service {
   }
 }
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     writable: WritableService
   }

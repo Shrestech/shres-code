@@ -1,34 +1,34 @@
-# Unattended coding-agent deployment for the bundled roos-jsonrpc-agent runtime.
+# Unattended coding-agent deployment for the bundled shres-jsonrpc-agent runtime.
 # stdout is reserved for JSON-RPC; do not add a console logger or terminal UI.
 
 - id: sdk-jsonrpc-server
-  name: '@roos-code/roos-code-sdk-jsonrpc-server'
+  name: '@shres-code/shres-code-sdk-jsonrpc-server'
   config:
-    maxTokensAsSuccess: !!js "process.env.ROOS_MAX_TOKENS_AS_SUCCESS === undefined ? true : JSON.parse(process.env.ROOS_MAX_TOKENS_AS_SUCCESS)"
+    maxTokensAsSuccess: !!js "process.env.SHRES_MAX_TOKENS_AS_SUCCESS === undefined ? true : JSON.parse(process.env.SHRES_MAX_TOKENS_AS_SUCCESS)"
 
 # The DeepSeek adapter. Shipped default: full thinking at max effort on every
 # request; exact-model resolution materializes request defaults before logging.
 # The model arrives per session over JSON-RPC, so it is not pinned here.
 - id: llm-deepseek
-  name: '@roos-code/roos-code-llm-deepseek'
+  name: '@shres-code/shres-code-llm-deepseek'
   config:
     thinking: enabled
     reasoningEffort: max
 
 # Managed child-process groups for the bash executor (spawn/kill/output plumbing).
 - id: subprocess
-  name: '@roos-code/roos-code-subprocess-local'
+  name: '@shres-code/shres-code-subprocess-local'
 
 - id: bash
-  name: '@roos-code/roos-code-bash-local'
+  name: '@shres-code/shres-code-bash-local'
   config:
-    cwd: !!js process.env.ROOS_CWD ?? process.cwd()
+    cwd: !!js process.env.SHRES_CWD ?? process.cwd()
     timeoutMs: 60000
 
 - id: agent-spine
-  name: '@roos-code/roos-code-agent-spine-demo'
+  name: '@shres-code/shres-code-agent-spine-demo'
   config:
-    persona: !!js process.env.ROOS_SYSTEM_PROMPT ?? 'You are a coding agent.'
+    persona: !!js process.env.SHRES_SYSTEM_PROMPT ?? 'You are a coding agent.'
     workspaceContext: false
     skills:
       enabled: false
@@ -37,51 +37,51 @@
     toolJobs: false
 
 - id: sessions
-  name: '@roos-code/roos-code-session-persistence-jsonl'
+  name: '@shres-code/shres-code-session-persistence-jsonl'
   config:
-    root: !!js process.env.ROOS_SESSION_ROOT ?? './.sessions'
+    root: !!js process.env.SHRES_SESSION_ROOT ?? './.sessions'
     # Snapshot runs read the raw JSONL back; production keeps zstd frames.
-    compression: !!js "process.env.ROOS_SNAPSHOT === undefined ? 'zstd' : 'none'"
+    compression: !!js "process.env.SHRES_SNAPSHOT === undefined ? 'zstd' : 'none'"
 
 - id: session-checkpoints
-  name: '@roos-code/roos-code-session-checkpoint-policy'
+  name: '@shres-code/shres-code-session-checkpoint-policy'
 
 - id: subagent
-  name: '@roos-code/roos-code-subagent'
+  name: '@shres-code/shres-code-subagent'
 
 - id: subagent-spawn-in-process
-  name: '@roos-code/roos-code-subagent-spawn-in-process'
+  name: '@shres-code/shres-code-subagent-spawn-in-process'
   config:
     providerName: spawn
 
 - id: tool-subagent
-  name: '@roos-code/roos-code-tool-subagent'
+  name: '@shres-code/shres-code-tool-subagent'
   config:
     provider: spawn
     toolName: subagent
     enableRunInBackground: false
 
 - id: tool-todo
-  name: '@roos-code/roos-code-tool-todo'
+  name: '@shres-code/shres-code-tool-todo'
   config:
     allowParallelInProgress: true
 
 - id: fs-local
-  name: '@roos-code/roos-code-fs-local'
+  name: '@shres-code/shres-code-fs-local'
   config:
-    cwd: !!js process.env.ROOS_CWD ?? process.cwd()
+    cwd: !!js process.env.SHRES_CWD ?? process.cwd()
 
 - id: fs-observation-policy
-  name: '@roos-code/roos-code-fs-observation-policy'
+  name: '@shres-code/shres-code-fs-observation-policy'
 
 - id: tool-fs
-  name: '@roos-code/roos-code-tool-fs'
+  name: '@shres-code/shres-code-tool-fs'
 
 - id: token-meter
-  name: '@roos-code/roos-code-token-meter'
+  name: '@shres-code/shres-code-token-meter'
 
 - id: compaction-basic
-  name: '@roos-code/roos-code-compaction-basic'
+  name: '@shres-code/shres-code-compaction-basic'
   config:
     thresholdRatio: 0.8
     retainRatio: 0.16

@@ -3,11 +3,11 @@
  * the one-shot background path uses Jobs; continuable children have no Task,
  * no per-message result, and no Task cancellation.
  *
- * @module @roos-code/roos-code-subagent/run-settlement
+ * @module @shres-code/shres-code-subagent/run-settlement
  */
 
-import type { ContentBlock } from '@roos-code/roos-code-llm'
-import type { JobOutcome } from '@roos-code/roos-code-jobs'
+import type { ContentBlock } from '@shres-code/shres-code-llm'
+import type { JobOutcome } from '@shres-code/shres-code-jobs'
 import type { SubagentResult, SubagentRun } from './types.ts'
 
 /** Flatten a child's final output blocks to the task's final text. */

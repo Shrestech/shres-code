@@ -10,13 +10,13 @@
  * it until asked again.
  */
 
-import type { Context } from '@roos-code/cordis'
+import type { Context } from '@shres-code/cordis'
 import type {
   ApprovalRequestId, CordisDynamicPluginId, DynamicCordisInvokeResult, JsonValue,
   DynamicCordisInventoryRow,
-} from '@roos-code/roos-code-api-remotes/client'
-import type { ClientModuleSystem } from '@roos-code/roos-code-client-modules/client'
-import type { SlotRegistry } from '@roos-code/roos-code-client-runtime/client'
+} from '@shres-code/shres-code-api-remotes/client'
+import type { ClientModuleSystem } from '@shres-code/shres-code-client-modules/client'
+import type { SlotRegistry } from '@shres-code/shres-code-client-runtime/client'
 // The Client Remote assembly is the one place the two planes meet: it mounts the
 // `dynamicCordisRunner` namespace and re-exports its payload vocabulary, so this
 // package names what it sends without importing a Host package.
@@ -54,7 +54,7 @@ export { ClientTimerService } from './timer.ts'
 export type {
   ApprovalRequestId, CordisDynamicPackageId, CordisDynamicPluginId, CordisDynamicPluginRunId,
   DynamicCordisPackage,
-} from '@roos-code/roos-code-api-remotes/client'
+} from '@shres-code/shres-code-api-remotes/client'
 
 
 /**
@@ -122,7 +122,7 @@ export interface CordisRunnerFace {
   isLoaded(pluginId: CordisDynamicPluginId): boolean
 }
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     /** Run orchestration and page-local load state: what run surfaces read and call. */
     dynamicCordisRunner: CordisRunnerFace

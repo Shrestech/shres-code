@@ -4,19 +4,19 @@
  * version this controller last observed, and a `version-conflict` reply carries
  * the authoritative item, so a lost race reconciles from the reply itself
  * instead of refetching the whole Session.
- * @module @roos-code/roos-code-client-ui-message-feedback/client/controller
+ * @module @shres-code/shres-code-client-ui-message-feedback/client/controller
  */
 
-import type { RemoteResult } from '@roos-code/roos-code-typert-protocol'
-import type { HostObservable } from '@roos-code/roos-code-client-ui-slots'
-import type { MessageId, SessionId } from '@roos-code/roos-code-client-connection/client'
+import type { RemoteResult } from '@shres-code/shres-code-typert-protocol'
+import type { HostObservable } from '@shres-code/shres-code-client-ui-slots'
+import type { MessageId, SessionId } from '@shres-code/shres-code-client-connection/client'
 import type {
   MessageFeedbackDeleteResult,
   MessageFeedbackItem,
   MessageFeedbackListResult,
   MessageFeedbackPutResult,
   MessageFeedbackRating,
-} from '@roos-code/roos-code-message-feedback/types'
+} from '@shres-code/shres-code-message-feedback/types'
 
 /**
  * The three Remote calls this controller needs. The generated face wraps every

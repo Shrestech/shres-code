@@ -7,7 +7,7 @@
  * locator and retrieval guidance.
  *
  * It registers NO service and owns NO storage or preview mechanics: preview is
- * `@roos-code/roos-code-output-retention` (`TextRetainer`), storage is `ctx.spillStore`.
+ * `@shres-code/shres-code-output-retention` (`TextRetainer`), storage is `ctx.spillStore`.
  * The policy only decides WHEN to spill and composes the notice.
  *
  * A second arm applies the SAME cap to the durable log: the
@@ -40,18 +40,18 @@
  * replaced content still has its replacement bounded, and value replacements
  * and `block` decisions pass through unchanged.
  *
- * @module @roos-code/roos-code-spill-policy
+ * @module @shres-code/shres-code-spill-policy
  */
 
-import type { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import type { ContentBlock } from '@roos-code/roos-code-llm'
-import { TextRetainer, describeOmitted } from '@roos-code/roos-code-output-retention'
-import type { Omitted } from '@roos-code/roos-code-output-retention'
-import type { SaveTextSpill, SpillRef } from '@roos-code/roos-code-spill'
-import type { SessionId } from '@roos-code/roos-code-session'
-import type { CallId } from '@roos-code/roos-code-llm'
-import type { PostToolDecision, ToolExecution } from '@roos-code/roos-code-tools'
+import type { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import type { ContentBlock } from '@shres-code/shres-code-llm'
+import { TextRetainer, describeOmitted } from '@shres-code/shres-code-output-retention'
+import type { Omitted } from '@shres-code/shres-code-output-retention'
+import type { SaveTextSpill, SpillRef } from '@shres-code/shres-code-spill'
+import type { SessionId } from '@shres-code/shres-code-session'
+import type { CallId } from '@shres-code/shres-code-llm'
+import type { PostToolDecision, ToolExecution } from '@shres-code/shres-code-tools'
 import type { SpillPolicyExec } from './types.ts'
 
 export type { SpillPolicyExec } from './types.ts'

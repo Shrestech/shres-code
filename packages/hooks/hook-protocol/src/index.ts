@@ -3,7 +3,7 @@
  * decoding, restrictive outcome merging, durable event helpers, and detached
  * run quiescence. Claude Code and Codex bridges own their distinct payloads,
  * environment rules, matcher mode, and typed extension-point mappings.
- * @module @roos-code/roos-code-hook-protocol
+ * @module @shres-code/shres-code-hook-protocol
  */
 
 export type {

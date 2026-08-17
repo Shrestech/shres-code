@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { ContentBlock } from '@roos-code/roos-code-llm'
-import type { SessionEvent } from '@roos-code/roos-code-session'
+import type { ContentBlock } from '@shres-code/shres-code-llm'
+import type { SessionEvent } from '@shres-code/shres-code-session'
 import { AssistantOutputFold, finalAssistantOutput } from '../src/assistant-output.ts'
 
 function message(content: ContentBlock[]): SessionEvent {

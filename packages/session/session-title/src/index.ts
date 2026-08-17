@@ -1,20 +1,20 @@
 /**
  * Log-backed session title service, deterministic fallback, and provider contract.
- * @module @roos-code/roos-code-session-title
+ * @module @shres-code/shres-code-session-title
  */
 
-import { Context, FiberState, Service, type Fiber } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
+import { Context, FiberState, Service, type Fiber } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
 import { z as zod } from 'zod'
-import type { Branded } from '@roos-code/roos-code-brand'
-import { assertNever, deepFreeze, isAgentLoopRequest } from '@roos-code/roos-code-llm'
-import type { GenerateOptions } from '@roos-code/roos-code-llm'
+import type { Branded } from '@shres-code/shres-code-brand'
+import { assertNever, deepFreeze, isAgentLoopRequest } from '@shres-code/shres-code-llm'
+import type { GenerateOptions } from '@shres-code/shres-code-llm'
 import type {
   Session,
   SessionEvent,
-} from '@roos-code/roos-code-session'
+} from '@shres-code/shres-code-session'
 // Type-only: resolves ctx.sessionProjections for the optional unit child.
-import type {} from '@roos-code/roos-code-session-projection'
+import type {} from '@shres-code/shres-code-session-projection'
 // The `title` projection-key declaration lives in src/types.ts (its one home);
 // this re-export projects the type face onto the package root AND keeps the
 // module edge in the emitted index.d.ts, so aggregate programs consuming the
@@ -85,13 +85,13 @@ export interface Config {
   readonly maxTitleBytes: number
 }
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     sessionTitle: SessionTitleService
   }
 }
 
-declare module '@roos-code/roos-code-session/types' {
+declare module '@shres-code/shres-code-session/types' {
   interface SessionEventMap {
     /**
      * Latest-wins session title snapshot. Log-only: it never enters the model

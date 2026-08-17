@@ -1,7 +1,7 @@
 /** Web Session-log download command over the host endpoint owned by ApiProxy. */
 
-import type { Context } from '@roos-code/cordis'
-import type { CommandResult } from '@roos-code/roos-code-commands'
+import type { Context } from '@shres-code/cordis'
+import type { CommandResult } from '@shres-code/shres-code-commands'
 
 export const name = 'session-log-download'
 export const inject = ['commands']

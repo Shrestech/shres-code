@@ -7,17 +7,17 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import AgentRegistry from '@roos-code/roos-code-agent'
-import type { Agent } from '@roos-code/roos-code-agent'
-import SessionStore from '@roos-code/roos-code-session'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import UserQuestionService from '@roos-code/roos-code-user-questions'
-import ApprovalService from '@roos-code/roos-code-user-approval'
-import type { ApprovalRequestId } from '@roos-code/roos-code-user-approval'
-import type { ApiProxy, MuxFrame, RpcRequest } from '@roos-code/roos-code-host-apiproxy/api'
-import type { RpcId } from '@roos-code/roos-code-host-apiproxy/api/rpc'
-import { RpcId as mintRpcId } from '@roos-code/roos-code-host-apiproxy/api/rpc'
+import { Context } from '@shres-code/cordis'
+import AgentRegistry from '@shres-code/shres-code-agent'
+import type { Agent } from '@shres-code/shres-code-agent'
+import SessionStore from '@shres-code/shres-code-session'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import UserQuestionService from '@shres-code/shres-code-user-questions'
+import ApprovalService from '@shres-code/shres-code-user-approval'
+import type { ApprovalRequestId } from '@shres-code/shres-code-user-approval'
+import type { ApiProxy, MuxFrame, RpcRequest } from '@shres-code/shres-code-host-apiproxy/api'
+import type { RpcId } from '@shres-code/shres-code-host-apiproxy/api/rpc'
+import { RpcId as mintRpcId } from '@shres-code/shres-code-host-apiproxy/api/rpc'
 import { createApiProxy } from '../src/api-proxy.ts'
 
 async function harness(): Promise<{ ctx: Context; api: ApiProxy }> {

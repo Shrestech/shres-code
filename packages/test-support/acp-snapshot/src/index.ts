@@ -13,7 +13,7 @@
  * NOTE: ./suite.ts imports vitest, so this package is importable only inside a
  * vitest run — a support-tier constraint stated in the README.
  *
- * @module @roos-code/roos-code-acp-snapshot
+ * @module @shres-code/shres-code-acp-snapshot
  */
 
 export {

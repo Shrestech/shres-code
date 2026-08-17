@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import SessionStore, { Session, SessionId, isJsonValue } from '@roos-code/roos-code-session'
-import type { SessionEvent, SessionHeader } from '@roos-code/roos-code-session'
+import { Context } from '@shres-code/cordis'
+import SessionStore, { Session, SessionId, isJsonValue } from '@shres-code/shres-code-session'
+import type { SessionEvent, SessionHeader } from '@shres-code/shres-code-session'
 import {
   DEFAULT_PREPARED_SESSION_CACHE_SIZE, DEFAULT_WRITE_BATCH_MAX_DELAY_MS, MAX_WRITE_BATCH_DELAY_MS,
   SessionPersistence, SessionPersistenceRevision, PersistenceCoordinator,

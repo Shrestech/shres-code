@@ -1,13 +1,13 @@
 {
-  "name": "@roos-code/roos-code-shell",
-  "description": "Abstract bash executor seam (ctx.shell) for the Roos Code",
+  "name": "@shres-code/shres-code-shell",
+  "description": "Abstract bash executor seam (ctx.shell) for the Shres Code",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "packages/shell/shell"
   },
   "type": "module",
@@ -32,17 +32,17 @@
   ],
   "license": "MIT",
   "peerDependencies": {
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-subprocess": "workspace:^",
-    "@roos-code/roos-code-sandbox": "workspace:^",
-    "@roos-code/cordis": "workspace:^",
-    "@roos-code/roos-code-settings": "workspace:^"
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-subprocess": "workspace:^",
+    "@shres-code/shres-code-sandbox": "workspace:^",
+    "@shres-code/cordis": "workspace:^",
+    "@shres-code/shres-code-settings": "workspace:^"
   },
   "devDependencies": {
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-subprocess": "workspace:^",
-    "@roos-code/roos-code-sandbox": "workspace:^",
-    "@roos-code/cordis": "workspace:^",
-    "@roos-code/roos-code-settings": "workspace:^"
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-subprocess": "workspace:^",
+    "@shres-code/shres-code-sandbox": "workspace:^",
+    "@shres-code/cordis": "workspace:^",
+    "@shres-code/shres-code-settings": "workspace:^"
   }
 }

@@ -1,6 +1,6 @@
 /** Pure first-run readiness projection over the shared Models join. */
 import { describe, expect, it } from 'vitest'
-import type { CredentialView } from '@roos-code/roos-code-api-remotes/client'
+import type { CredentialView } from '@shres-code/shres-code-api-remotes/client'
 import type { ModelsSettingsState, ProviderRow } from '../src/client/store.ts'
 import { onboardingCandidates, onboardingReadiness, providerUsable } from '../src/client/store.ts'
 

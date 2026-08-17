@@ -3,12 +3,12 @@
  * official `codex app-server --stdio` process in the delegating Session's
  * workspace and publishes only after an ephemeral thread exists.
  *
- * @module @roos-code/roos-code-subagent-codex
+ * @module @shres-code/shres-code-subagent-codex
  */
 
-import type { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import { MAX_TIMER_DELAY_MS } from '@roos-code/roos-code-timeout'
+import type { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
 import {
   assertPositiveFinite,
   NO_START_CAPABILITIES,
@@ -16,7 +16,7 @@ import {
   type ResolvedSubagentStartRequest,
   type SubagentCapabilities,
   type SubagentProvider,
-} from '@roos-code/roos-code-subagent'
+} from '@shres-code/shres-code-subagent'
 import {
   DEFAULT_DISPOSE_GRACE_MS,
   startCodexRun,

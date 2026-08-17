@@ -8,10 +8,10 @@
 
 import type {
   ConfigurableProviderView, CredentialView, IApiClient, SettingsNamespaceView,
-} from '@roos-code/roos-code-api-remotes/client'
-import type { SnapshotStore } from '@roos-code/roos-code-client-runtime/client'
-import { createSnapshotStore } from '@roos-code/roos-code-client-runtime/client'
-import { getPath, hasPath, nodeAtPath, rehydrateSchema } from '@roos-code/roos-code-client-schema-form'
+} from '@shres-code/shres-code-api-remotes/client'
+import type { SnapshotStore } from '@shres-code/shres-code-client-runtime/client'
+import { createSnapshotStore } from '@shres-code/shres-code-client-runtime/client'
+import { getPath, hasPath, nodeAtPath, rehydrateSchema } from '@shres-code/shres-code-client-schema-form'
 
 /**
  * Any route key walks a dict schema to the same profile node, so the lookup

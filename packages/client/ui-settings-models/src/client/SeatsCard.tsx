@@ -1,29 +1,29 @@
 /**
- * Models-page card that binds Boomer, Joey, and Flyer to enabled providers.
+ * Models-page card that binds Aegis, Stride, and Ward to enabled providers.
  */
 
 import { useEffect, useState, type ReactNode } from 'react'
-import type { IApiClient, ModelProviderGroup } from '@roos-code/roos-code-api-remotes/client'
-import { FishLogo } from '@roos-code/roos-code-client-ui-primitives'
-import { getPath } from '@roos-code/roos-code-client-schema-form'
+import type { IApiClient, ModelProviderGroup } from '@shres-code/shres-code-api-remotes/client'
+import { FishLogo } from '@shres-code/shres-code-client-ui-primitives'
+import { getPath } from '@shres-code/shres-code-client-schema-form'
 import { providerEnabled } from './store.ts'
 import type { ModelsSettingsState } from './store.ts'
 import type { en } from './locales.ts'
 import styles from './ModelsSection.module.css'
 
-const SEAT_IDS = ['boomer', 'joey', 'flyer'] as const
+const SEAT_IDS = ['aegis', 'stride', 'ward'] as const
 type SeatId = (typeof SEAT_IDS)[number]
 
 const SEAT_COLORS: Record<SeatId, string> = {
-  boomer: '#c9842a',
-  joey: '#2f9e62',
-  flyer: '#3b7dd8',
+  aegis: '#c9842a',
+  stride: '#2f9e62',
+  ward: '#3b7dd8',
 }
 
 const SEAT_COPY: Record<SeatId, { name: keyof typeof en; role: keyof typeof en; description: keyof typeof en }> = {
-  boomer: { name: 'seatBoomerName', role: 'seatBoomerRole', description: 'seatBoomerDescription' },
-  joey: { name: 'seatJoeyName', role: 'seatJoeyRole', description: 'seatJoeyDescription' },
-  flyer: { name: 'seatFlyerName', role: 'seatFlyerRole', description: 'seatFlyerDescription' },
+  aegis: { name: 'seatAegisName', role: 'seatAegisRole', description: 'seatAegisDescription' },
+  stride: { name: 'seatStrideName', role: 'seatStrideRole', description: 'seatStrideDescription' },
+  ward: { name: 'seatWardName', role: 'seatWardRole', description: 'seatWardDescription' },
 }
 
 /** One stored seat binding as the settings document carries it. */

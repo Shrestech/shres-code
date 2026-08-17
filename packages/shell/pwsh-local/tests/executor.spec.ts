@@ -1,5 +1,5 @@
 /**
- * Real-process tests for `@roos-code/roos-code-pwsh-local`: the LOCAL subprocess
+ * Real-process tests for `@shres-code/shres-code-pwsh-local`: the LOCAL subprocess
  * service plus a REAL pwsh executable, exercised through the executor seam
  * (`resolve` → `run`/`start`). These verify the world — actual PowerShell
  * runs, output capture, truncation and spill, deadlines, kill escalation, and
@@ -14,15 +14,15 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { PwshLocalExecutor, ENCODING_PREAMBLE, candidatePwshPaths, resolvePwshPath } from '@roos-code/roos-code-pwsh-local'
-import LocalSubprocessRuntime from '@roos-code/roos-code-subprocess-local'
-import SubprocessRuntime from '@roos-code/roos-code-subprocess'
-import type { SubprocessHandle, SubprocessOutputReader, SubprocessSpawnSpec } from '@roos-code/roos-code-subprocess'
-import { MAX_TIMER_DELAY_MS } from '@roos-code/roos-code-timeout'
-import type { ShellProcess } from '@roos-code/roos-code-shell'
+import { Context } from '@shres-code/cordis'
+import { PwshLocalExecutor, ENCODING_PREAMBLE, candidatePwshPaths, resolvePwshPath } from '@shres-code/shres-code-pwsh-local'
+import LocalSubprocessRuntime from '@shres-code/shres-code-subprocess-local'
+import SubprocessRuntime from '@shres-code/shres-code-subprocess'
+import type { SubprocessHandle, SubprocessOutputReader, SubprocessSpawnSpec } from '@shres-code/shres-code-subprocess'
+import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
+import type { ShellProcess } from '@shres-code/shres-code-shell'
 
-const spillDir = mkdtempSync(join(tmpdir(), 'roos-pwsh-exec-spec-'))
+const spillDir = mkdtempSync(join(tmpdir(), 'shres-pwsh-exec-spec-'))
 
 // The probe follows the executor's own resolution (Program Files installs on
 // Windows are found even when bare `pwsh` is not on PATH).
@@ -113,7 +113,7 @@ describe('resolvePwshPath and candidatePwshPaths (pure, every platform)', () => 
   })
 
   it('returns the first EXISTING win32 candidate, else pwsh', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'roos-pwsh-resolve-'))
+    const dir = mkdtempSync(join(tmpdir(), 'shres-pwsh-resolve-'))
     const store = join(dir, 'store')
     mkdirSync(store, { recursive: true })
     writeFileSync(join(store, 'pwsh.exe'), '')
@@ -130,7 +130,7 @@ describe('resolvePwshPath and candidatePwshPaths (pure, every platform)', () => 
   it('accepts a link-shaped PATH candidate whose target cannot be stat-ed', () => {
     // Store app execution aliases stat as EACCES but lstat as a link; a
     // dangling symlink reproduces that split on every platform.
-    const dir = mkdtempSync(join(tmpdir(), 'roos-pwsh-resolve-link-'))
+    const dir = mkdtempSync(join(tmpdir(), 'shres-pwsh-resolve-link-'))
     const store = join(dir, 'store')
     mkdirSync(store, { recursive: true })
     const link = join(store, 'pwsh.exe')
@@ -140,7 +140,7 @@ describe('resolvePwshPath and candidatePwshPaths (pure, every platform)', () => 
   })
 
   it('skips a directory candidate and falls through to the PATH-resolution default', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'roos-pwsh-resolve-dir-'))
+    const dir = mkdtempSync(join(tmpdir(), 'shres-pwsh-resolve-dir-'))
     const store = join(dir, 'store')
     mkdirSync(join(store, 'pwsh.exe'), { recursive: true })
     expect(resolvePwshPath(undefined, {
@@ -199,8 +199,8 @@ describe.skipIf(!hasPwsh)('PwshLocalExecutor.run', () => {
   })
 
   it('uses config cwd, overridable per call', async () => {
-    const first = mkdtempSync(join(tmpdir(), 'roos-pwsh-cwd-a-'))
-    const second = mkdtempSync(join(tmpdir(), 'roos-pwsh-cwd-b-'))
+    const first = mkdtempSync(join(tmpdir(), 'shres-pwsh-cwd-a-'))
+    const second = mkdtempSync(join(tmpdir(), 'shres-pwsh-cwd-b-'))
     const { bash } = await setup({ cwd: first })
     const fromConfig = await bash.run(bash.resolve({ command: '(Get-Location).Path' }))
     expect(samePath(fromConfig.stdout.text.trim(), first)).toBe(true)
@@ -289,31 +289,31 @@ describe.skipIf(!hasPwsh)('PwshLocalExecutor.run', () => {
 
   it('rejects on spawn failure (bad workdir)', async () => {
     const { bash } = await setup()
-    await expect(bash.run(bash.resolve({ command: 'Write-Output ok', workdir: '/nonexistent-roos' }))).rejects.toThrow(/ENOENT/)
+    await expect(bash.run(bash.resolve({ command: 'Write-Output ok', workdir: '/nonexistent-shres' }))).rejects.toThrow(/ENOENT/)
   })
 
-  it('resolve() carries stdin/env/roosEnv onto the spec, and run() threads them to the command', async () => {
+  it('resolve() carries stdin/env/shresEnv onto the spec, and run() threads them to the command', async () => {
     const { bash } = await setup()
     const spec = bash.resolve({
-      command: '$s = ([Console]::In.ReadToEnd()).TrimEnd(); Write-Output $s; Write-Output "[$env:SEAM_VAR][$env:ROOS_SEAM_VAR]"',
+      command: '$s = ([Console]::In.ReadToEnd()).TrimEnd(); Write-Output $s; Write-Output "[$env:SEAM_VAR][$env:SHRES_SEAM_VAR]"',
       stdin: 'piped\n',
       env: { SEAM_VAR: 'env-ok' },
-      roosEnv: { ROOS_SEAM_VAR: 'roos-ok' },
+      shresEnv: { SHRES_SEAM_VAR: 'shres-ok' },
     })
     // resolve() keeps the optional input/environment fields verbatim.
     expect(spec.stdin).toBe('piped\n')
     expect(spec.env).toEqual({ SEAM_VAR: 'env-ok' })
-    expect(spec.roosEnv).toEqual({ ROOS_SEAM_VAR: 'roos-ok' })
+    expect(spec.shresEnv).toEqual({ SHRES_SEAM_VAR: 'shres-ok' })
     const result = await bash.run(spec)
-    expect(lf(result.stdout.text)).toBe('piped\n[env-ok][roos-ok]\n')
+    expect(lf(result.stdout.text)).toBe('piped\n[env-ok][shres-ok]\n')
   })
 
-  it('resolve() omits stdin/env/roosEnv when the request supplies none', async () => {
+  it('resolve() omits stdin/env/shresEnv when the request supplies none', async () => {
     const { bash } = await setup()
     const spec = bash.resolve({ command: 'Write-Output ok' })
     expect('stdin' in spec).toBe(false)
     expect('env' in spec).toBe(false)
-    expect('roosEnv' in spec).toBe(false)
+    expect('shresEnv' in spec).toBe(false)
   })
 })
 
@@ -334,15 +334,15 @@ describe.skipIf(!hasPwsh)('PwshLocalExecutor.start (background process handles)'
   it('threads stdin and extra env into a background process', async () => {
     const { bash } = await setup()
     const proc = bash.start(bash.resolve({
-      command: '$s = ([Console]::In.ReadToEnd()).TrimEnd(); Write-Output $s; Write-Output "[$env:BG_VAR][$env:ROOS_BG_VAR]"',
+      command: '$s = ([Console]::In.ReadToEnd()).TrimEnd(); Write-Output $s; Write-Output "[$env:BG_VAR][$env:SHRES_BG_VAR]"',
       stdin: 'bg-stdin\n',
       env: { BG_VAR: 'bg-env' },
-      roosEnv: { ROOS_BG_VAR: 'bg-roos-env' },
+      shresEnv: { SHRES_BG_VAR: 'bg-shres-env' },
     }))
-    const partialOutput = await readUntil(proc, '[bg-env][bg-roos-env]')
+    const partialOutput = await readUntil(proc, '[bg-env][bg-shres-env]')
     await proc.done
     const output = partialOutput + lf(proc.readOutput().delta)
-    expect(output).toBe('bg-stdin\n[bg-env][bg-roos-env]\n')
+    expect(output).toBe('bg-stdin\n[bg-env][bg-shres-env]\n')
     expect(proc.exitCode).toBe(0)
   })
 
@@ -438,7 +438,7 @@ describe.skipIf(!hasPwsh)('PwshLocalExecutor.start (background process handles)'
 
   it('a background spawn failure settles as killed with the error readable on stderr', async () => {
     const { bash } = await setup()
-    const proc = bash.start(bash.resolve({ command: 'Write-Output ok', workdir: '/nonexistent-roos' }))
+    const proc = bash.start(bash.resolve({ command: 'Write-Output ok', workdir: '/nonexistent-shres' }))
     // done resolves (never rejects) even though the process never ran.
     await expect(proc.done).resolves.toBeUndefined()
     expect(proc.status).toBe('killed')

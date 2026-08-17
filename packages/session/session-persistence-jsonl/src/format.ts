@@ -5,13 +5,13 @@
  * per-project/session directory layout, header-line (de)serialization, and the
  * truncation-repair offset computation.
  *
- * @module roos-session-persistence-jsonl/format
+ * @module shres-session-persistence-jsonl/format
  */
 
 import { join } from 'node:path'
-import { decodeStorageRecord, packChunkRuns, SESSION_FORMAT_VERSION } from '@roos-code/roos-code-session'
-import type { SessionEvent, SessionHeader, SessionId, StorageRecord } from '@roos-code/roos-code-session'
-import { SessionFormatUnsupportedError, sessionFormatVersionRefusal } from '@roos-code/roos-code-session-persistence'
+import { decodeStorageRecord, packChunkRuns, SESSION_FORMAT_VERSION } from '@shres-code/shres-code-session'
+import type { SessionEvent, SessionHeader, SessionId, StorageRecord } from '@shres-code/shres-code-session'
+import { SessionFormatUnsupportedError, sessionFormatVersionRefusal } from '@shres-code/shres-code-session-persistence'
 
 /** Physical encoding selected for JSONL session artifacts. */
 export type JsonlCompression = 'zstd' | 'none'

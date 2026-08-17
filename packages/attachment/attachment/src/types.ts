@@ -1,4 +1,4 @@
-/** Durable attachment vocabulary. @module @roos-code/roos-code-attachment/types */
+/** Durable attachment vocabulary. @module @shres-code/shres-code-attachment/types */
 
 import type { AttachmentId } from './brand.ts'
 

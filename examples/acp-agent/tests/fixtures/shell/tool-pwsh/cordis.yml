@@ -1,27 +1,27 @@
 # Minimal tool-pwsh composition: real app boot path, real pwsh executor, real
 # foreground + background tool calls; driven by the package's loader.spec.ts.
 - id: system-prompt
-  name: '@roos-code/roos-code-system-prompt'
+  name: '@shres-code/shres-code-system-prompt'
 
 - id: tools
-  name: '@roos-code/roos-code-tools'
+  name: '@shres-code/shres-code-tools'
 
 - id: subprocess
-  name: '@roos-code/roos-code-subprocess-local'
+  name: '@shres-code/shres-code-subprocess-local'
 
 - id: bash
-  name: '@roos-code/roos-code-pwsh-local'
+  name: '@shres-code/shres-code-pwsh-local'
   config:
     graceMs: 200
 
 - id: shell-env
-  name: '@roos-code/roos-code-shell-env'
+  name: '@shres-code/shres-code-shell-env'
 
 - id: tasks
-  name: '@roos-code/roos-code-jobs-local'
+  name: '@shres-code/shres-code-jobs-local'
 
 - id: tool-jobs
-  name: '@roos-code/roos-code-tool-jobs'
+  name: '@shres-code/shres-code-tool-jobs'
 
 - id: tool-pwsh
-  name: '@roos-code/roos-code-tool-pwsh'
+  name: '@shres-code/shres-code-tool-pwsh'

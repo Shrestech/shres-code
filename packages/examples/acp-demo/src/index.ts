@@ -1,29 +1,29 @@
 /**
  * The ACP automation server app: the default agent spine
- * ({@link @roos-code/roos-code-agent-spine-demo}), JSONL session persistence, and
- * the {@link @roos-code/roos-code-acp} bridge. The app owns those plugins through one
+ * ({@link @shres-code/shres-code-agent-spine-demo}), JSONL session persistence, and
+ * the {@link @shres-code/shres-code-acp} bridge. The app owns those plugins through one
  * ordered lifecycle so ACP sessions quiesce before persistence detaches. It
  * writes nothing to stdout.
  * It pre-creates no agents and leaves adapters, executors, and optional tools to
  * the leaf, which must likewise avoid stdout loggers. Named exports are
  * required so Loader retains this plugin's `Config` schema (see
  * docs/postmortem/0001).
- * @module @roos-code/roos-code-acp-demo
+ * @module @shres-code/shres-code-acp-demo
  */
 
-import type { Context } from '@roos-code/cordis'
+import type { Context } from '@shres-code/cordis'
 import { join } from 'node:path'
-import z from '@roos-code/schemastery'
-import * as acp from '@roos-code/roos-code-acp'
-import * as agentCore from '@roos-code/roos-code-agent-spine-demo'
-import * as workspaceContext from '@roos-code/roos-code-agent-instructions'
-import ToolRuntime, { type Config as ToolsConfig } from '@roos-code/roos-code-tools'
+import z from '@shres-code/schemastery'
+import * as acp from '@shres-code/shres-code-acp'
+import * as agentCore from '@shres-code/shres-code-agent-spine-demo'
+import * as workspaceContext from '@shres-code/shres-code-agent-instructions'
+import ToolRuntime, { type Config as ToolsConfig } from '@shres-code/shres-code-tools'
 import JsonlSessionPersistence, {
   JsonlCompressionSchema,
   type JsonlCompression,
-} from '@roos-code/roos-code-session-persistence-jsonl'
-import * as sessionCheckpointPolicy from '@roos-code/roos-code-session-checkpoint-policy'
-import SqliteSessionQueryEngine from '@roos-code/roos-code-session-query-sqlite'
+} from '@shres-code/shres-code-session-persistence-jsonl'
+import * as sessionCheckpointPolicy from '@shres-code/shres-code-session-checkpoint-policy'
+import SqliteSessionQueryEngine from '@shres-code/shres-code-session-query-sqlite'
 
 export const name = 'acp-demo'
 const DEFAULT_PERSISTENCE_ROOT = './.sessions'
@@ -45,12 +45,12 @@ export interface Config {
   maxParallelToolCalls?: number
   /** Deployment persona (the system-prompt plugin's `persona` config). */
   persona?: string
-  /** Explicit model-facing tool order (the system-prompt plugin's `toolOrder` config; see roos-system-prompt). */
+  /** Explicit model-facing tool order (the system-prompt plugin's `toolOrder` config; see shres-system-prompt). */
   toolOrder?: string[]
-  /** Tool-registry config — its presentation `mode` (forwarded through agent-spine-demo; see roos-tools). */
+  /** Tool-registry config — its presentation `mode` (forwarded through agent-spine-demo; see shres-tools). */
   tools?: ToolsConfig
-  /** Roos Code home directory exposed to bash and used for local skill discovery. */
-  roosHome?: string
+  /** Shres Code home directory exposed to bash and used for local skill discovery. */
+  shresHome?: string
   /** Fallback session-title limits forwarded through agent-spine-demo. */
   sessionTitle?: NonNullable<agentCore.Config['sessionTitle']>
   /** Directory for JSONL sessions and the derived query index. Defaults to `./.sessions`. */
@@ -82,11 +82,11 @@ export const Config: z<Config> = z.object({
   maxParallelToolCalls: z.number().step(1).min(1),
   persona: z.string(),
   // The array default is forced to undefined: ABSENT means "lexicographic
-  // order" (the owning roos-system-prompt schema does the same), while
+  // order" (the owning shres-system-prompt schema does the same), while
   // schemastery's native [] default would read as an invalid configured list.
   toolOrder: z.array(z.string()).default(undefined as unknown as string[]),
   tools: ToolRuntime.Config,
-  roosHome: z.string(),
+  shresHome: z.string(),
   sessionTitle: agentCore.SessionTitleConfigSchema,
   persistenceRoot: z.string().default(DEFAULT_PERSISTENCE_ROOT),
   packChunks: z.boolean().default(true),

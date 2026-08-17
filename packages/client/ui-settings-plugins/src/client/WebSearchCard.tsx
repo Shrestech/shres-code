@@ -4,7 +4,7 @@
  * domain, never into a settings section.
  */
 
-import type { InjectFace, PropsLocale, PropsRuntime } from '@roos-code/roos-code-client-ui-slots'
+import type { InjectFace, PropsLocale, PropsRuntime } from '@shres-code/shres-code-client-ui-slots'
 import { SecretField, SwitchField, ValueField } from './fields.tsx'
 import { PluginCard } from './PluginCard.tsx'
 import css from './fields.module.css'

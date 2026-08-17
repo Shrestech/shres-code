@@ -1,5 +1,5 @@
 /** Shared agent-loop scheduler defaults.
- * @module roos-agent-loop/constants
+ * @module shres-agent-loop/constants
  */
 
 /** Default maximum in-flight parallel-safe calls per agent step. */

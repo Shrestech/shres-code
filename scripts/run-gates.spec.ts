@@ -84,11 +84,11 @@ describe('gate graph validation', () => {
   })
 
   it.each(['ci-primary', 'ci-static', 'check-all'] as const)(
-    'keeps the Roos package license policy in %s',
+    'keeps the Shres package license policy in %s',
     (mode) => {
       const ids = withPnpmEntrypoint(() => gatesForMode(mode).map(subject => subject.id))
 
-      expect(ids).toContain('roos-package-licenses')
+      expect(ids).toContain('shres-package-licenses')
     },
   )
 
@@ -135,7 +135,7 @@ describe('gate graph validation', () => {
 
 describe('Oxlint gate', () => {
   it('uses the package script when no worker bound is configured', () => {
-    const subject = withEnv('ROOS_OXLINT_THREADS', undefined, () =>
+    const subject = withEnv('SHRES_OXLINT_THREADS', undefined, () =>
       withPnpmEntrypoint(() => gatesForMode('ci-lint-contracts-ready')[0]))
 
     expect(subject).toMatchObject({
@@ -147,12 +147,12 @@ describe('Oxlint gate', () => {
   })
 
   it('surfaces the configured worker bound on the shared package script', () => {
-    const subject = withEnv('ROOS_OXLINT_THREADS', '4', () =>
+    const subject = withEnv('SHRES_OXLINT_THREADS', '4', () =>
       withPnpmEntrypoint(() => gatesForMode('ci-lint-contracts-ready')[0]))
 
     expect(subject).toMatchObject({
       id: 'lint',
-      displayCommand: 'ROOS_OXLINT_THREADS=4 pnpm run lint:contracts-ready',
+      displayCommand: 'SHRES_OXLINT_THREADS=4 pnpm run lint:contracts-ready',
       command: process.execPath,
       args: ['/private/pnpm.cjs', 'run', 'lint:contracts-ready'],
     })
@@ -161,7 +161,7 @@ describe('Oxlint gate', () => {
 
 describe('Typert contract preparation', () => {
   it('prepares primary source consumers once before they run', () => {
-    const subject = withEnv('ROOS_OXLINT_THREADS', undefined, () =>
+    const subject = withEnv('SHRES_OXLINT_THREADS', undefined, () =>
       withPnpmEntrypoint(() => gatesForMode('ci-primary')))
 
     expect(subject.find(item => item.id === 'typert-contracts')).toMatchObject({
@@ -263,9 +263,9 @@ describe('Node 24 lane ownership', () => {
     ]) {
       expect(subject.find(item => item.id === id)?.needs).toEqual(['built-package-invariants'])
     }
-    expect(subject.find(item => item.id === 'snapshot')?.env).toEqual({ ROOS_EXAMPLE_MODE: 'lib' })
+    expect(subject.find(item => item.id === 'snapshot')?.env).toEqual({ SHRES_EXAMPLE_MODE: 'lib' })
     expect(subject.find(item => item.id === 'doc-typecheck')?.env).toEqual({
-      ROOS_DOC_TYPECHECK_USE_BUILD_OUTPUT: '1',
+      SHRES_DOC_TYPECHECK_USE_BUILD_OUTPUT: '1',
     })
     expect(subject.find(item => item.id === 'built-bin-smoke')?.args).toEqual(
       expect.arrayContaining([
@@ -274,8 +274,8 @@ describe('Node 24 lane ownership', () => {
       ]),
     )
     expect(subject.find(item => item.id === 'web-snapshot')).toMatchObject({
-      displayCommand: 'ROOS_SNAPSHOT=replay pnpm run test:web:built',
-      env: { ROOS_SNAPSHOT: 'replay' },
+      displayCommand: 'SHRES_SNAPSHOT=replay pnpm run test:web:built',
+      env: { SHRES_SNAPSHOT: 'replay' },
     })
   })
 })
@@ -286,8 +286,8 @@ describe('Linux primary graph', () => {
     const web = subject.find(item => item.id === 'web-snapshot')
 
     expect(web).toMatchObject({
-      displayCommand: 'ROOS_SNAPSHOT=replay pnpm run test:web:built',
-      env: { ROOS_SNAPSHOT: 'replay' },
+      displayCommand: 'SHRES_SNAPSHOT=replay pnpm run test:web:built',
+      env: { SHRES_SNAPSHOT: 'replay' },
       needs: ['built-package-invariants'],
     })
   })

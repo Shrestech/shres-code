@@ -1,4 +1,4 @@
-/** `roos models` / `roos providers` against a temp $ROOS_HOME. */
+/** `shres models` / `shres providers` against a temp $SHRES_HOME. */
 
 import { createServer } from 'node:http'
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
@@ -9,8 +9,8 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { PassThrough } from 'node:stream'
 import { afterEach, describe, expect, it } from 'vitest'
-import { credentialRef } from '@roos-code/roos-code-credentials'
-import { settingsNamespace } from '@roos-code/roos-code-settings'
+import { credentialRef } from '@shres-code/shres-code-credentials'
+import { settingsNamespace } from '@shres-code/shres-code-settings'
 import {
   bootModelsCli,
   runModelsCli,
@@ -28,7 +28,7 @@ afterEach(async () => {
 })
 
 async function tempHome(): Promise<string> {
-  const home = await mkdtemp(join(tmpdir(), 'roos-models-cli-'))
+  const home = await mkdtemp(join(tmpdir(), 'shres-models-cli-'))
   homes.push(home)
   return home
 }
@@ -76,7 +76,7 @@ async function run(home: string, command: ModelsCliCommand, script: string[] = [
   return { exit, stdout: captured.stdout(), stderr: captured.stderr(), code: captured.code() }
 }
 
-describe('roos models / providers', () => {
+describe('shres models / providers', () => {
   it('lists shipped providers and flags missing-key routes', async () => {
     const home = await tempHome()
     const result = await run(home, { kind: 'models-list' })

@@ -1,4 +1,4 @@
-# The roos-base bundle patch: the shared core of every roos profile, applied as
+# The shres-base bundle patch: the shared core of every shres profile, applied as
 # ONE insert over the empty profile root. Later bundle patches and the user's
 # profile cordis.patch.yml address these rows by id, with the last write
 # winning per row.
@@ -14,37 +14,37 @@
 
 - insert:
     - id: timer
-      name: '@roos-code/cordis-plugin-timer'
+      name: '@shres-code/cordis-plugin-timer'
 
     - id: hmr
-      name: '@roos-code/cordis-plugin-hmr'
+      name: '@shres-code/cordis-plugin-hmr'
       config:
         root: ['.']
 
     - id: llm
-      name: '@roos-code/roos-code-llm'
+      name: '@shres-code/shres-code-llm'
 
     - id: session
-      name: '@roos-code/roos-code-session'
+      name: '@shres-code/shres-code-session'
 
     - id: typert
-      name: '@roos-code/roos-code-typert-registry'
+      name: '@shres-code/shres-code-typert-registry'
 
     - id: typert-loader
-      name: '@roos-code/roos-code-typert-loader'
+      name: '@shres-code/shres-code-typert-loader'
 
     - id: typert-gateway
-      name: '@roos-code/roos-code-api-gateway'
+      name: '@shres-code/shres-code-api-gateway'
 
     - id: session-title
-      name: '@roos-code/roos-code-session-title'
+      name: '@shres-code/shres-code-session-title'
       config:
         fallbackMaxWords: 5
         fallbackMaxBytes: 40
         maxTitleBytes: 80
 
     - id: session-title-llm
-      name: '@roos-code/roos-code-session-title-first-prompt-llm'
+      name: '@shres-code/shres-code-session-title-first-prompt-llm'
       config:
         targetWords: 5
         targetCjkCharacters: 10
@@ -53,37 +53,37 @@
         timeoutMs: 60000
 
     - id: user-questions
-      name: '@roos-code/roos-code-user-questions'
+      name: '@shres-code/shres-code-user-questions'
 
     - id: agent
-      name: '@roos-code/roos-code-agent'
+      name: '@shres-code/shres-code-agent'
 
     # The transport-independent default for Agents created by entry points.
     # Settings may supply a saved selection; consumers read it at creation time.
     - id: agent-default-model
-      name: '@roos-code/roos-code-agent-default-model'
+      name: '@shres-code/shres-code-agent-default-model'
       config:
         provider: deepseek-official
         model: deepseek-v4-flash
 
     - id: jobs
-      name: '@roos-code/roos-code-jobs-local'
+      name: '@shres-code/shres-code-jobs-local'
 
     - id: llm-retry
-      name: '@roos-code/roos-code-llm-retry'
+      name: '@shres-code/shres-code-llm-retry'
 
-    # User-settings document (`$ROOS_HOME/settings.yaml`, hot-reloaded): a
+    # User-settings document (`$SHRES_HOME/settings.yaml`, hot-reloaded): a
     # `llm-deepseek:` or `llm-pi-ai:` section there overrides the adapter entries
     # below without a restart, and is what the web Models page writes.
     - id: settings
-      name: '@roos-code/roos-code-settings-file'
+      name: '@shres-code/shres-code-settings-file'
 
     # Credential sources: inherited environment over the managed
-    # `$ROOS_HOME/.credentials.yaml`, with project and user `.env` fallbacks.
+    # `$SHRES_HOME/.credentials.yaml`, with project and user `.env` fallbacks.
     # Adapters resolve references per request; the Models page writes only the
     # managed document, which is never materialized into the process environment.
     - id: credentials
-      name: '@roos-code/roos-code-credentials-local'
+      name: '@shres-code/shres-code-credentials-local'
 
     # Default any-API routes. Named `apiKeyEnv` values stay unset until the user
     # stores a key (MISSING_CREDENTIAL on use). ollama-local is keyless: pi-ai's
@@ -93,7 +93,7 @@
     # disclose them. first-run-setup offers these routes when no usable default
     # exists; it never silently picks a vendor.
     - id: llm-pi-ai
-      name: '@roos-code/roos-code-llm-pi-ai'
+      name: '@shres-code/shres-code-llm-pi-ai'
       config:
         providers:
           ollama-local:
@@ -139,22 +139,22 @@
     # the Web process never blocks on stdin; headless calls ensureReady() after
     # the loader settles.
     - id: first-run-setup
-      name: '@roos-code/roos-code-first-run-setup'
+      name: '@shres-code/shres-code-first-run-setup'
       config:
         ollamaBaseURL: http://localhost:11434/v1
         detectTimeoutMs: 1500
         autoRunCli: false
 
     - id: session-persistence-jsonl
-      name: '@roos-code/roos-code-session-persistence-jsonl'
+      name: '@shres-code/shres-code-session-persistence-jsonl'
       config:
-        root: !!js roosHomePath('sessions')
+        root: !!js shresHomePath('sessions')
 
     # Durable image bytes live outside the append-only session log. Messages
     # keep content-addressed references that this shared backend resolves for
     # provider requests and authorized history reads.
     - id: attachment-local
-      name: '@roos-code/roos-code-attachment-local'
+      name: '@shres-code/shres-code-attachment-local'
 
     # Full-text session search is opt-in. `openAt: never` keeps
     # ctx.sessionQuery mounted — exact reads, titles, and lineage traces
@@ -165,7 +165,7 @@
     # `first-search` or `startup` in a later patch layer (profile
     # cordis.patch.yml or a --patch overlay), typically with a durable `path`.
     - id: session-query-sqlite
-      name: '@roos-code/roos-code-session-query-sqlite'
+      name: '@shres-code/shres-code-session-query-sqlite'
       config:
         path: ':memory:'
         openAt: never
@@ -174,17 +174,17 @@
     # through its registered units, so the `list_agents` surface below fails
     # loud without it; web layers reuse this same mount for list rows.
     - id: session-projection
-      name: '@roos-code/roos-code-session-projection'
+      name: '@shres-code/shres-code-session-projection'
 
-    # Session telemetry is mounted but disabled by default. ROOS_TELEMETRY_MODE
+    # Session telemetry is mounted but disabled by default. SHRES_TELEMETRY_MODE
     # explicitly opts into FULL or FEEDBACK_ONLY reporting; uploading mirrors
     # session-log records onto OTLP/HTTP logs with no session-telemetry/record redaction
     # rule, so exports are the raw captured copy. The deployment stance, env
     # seams, and follow-ups are pinned in the default-off Agent Note.
-    # ROOS_TELEMETRY_OTLP_URL overrides the production endpoint. A non-empty
-    # ROOS_TELEMETRY_DISABLED — any value, including '0'/'false' — opts the
+    # SHRES_TELEMETRY_OTLP_URL overrides the production endpoint. A non-empty
+    # SHRES_TELEMETRY_DISABLED — any value, including '0'/'false' — opts the
     # process out (the launchers patch the row disabled; config cannot disable
-    # a row). Exports carry the harness home's anonymous user id ($ROOS_HOME/.anonymous-user-id,
+    # a row). Exports carry the harness home's anonymous user id ($SHRES_HOME/.anonymous-user-id,
     # random UUID; delete the file to reset the identity) as the Resource's
     # user.id. The exporter/processor values normally bound the shutdown drain
     # to ~1s against an unreachable collector: exporter.timeoutMillis is both
@@ -196,12 +196,12 @@
     # promise never settles. Every CLI exit path drains it by disposing the root
     # on SIGINT/SIGTERM.
     - id: session-telemetry-otel
-      name: '@roos-code/roos-code-session-telemetry-otel'
+      name: '@shres-code/shres-code-session-telemetry-otel'
       config:
-        mode: !!js process.env.ROOS_TELEMETRY_MODE || 'DISABLED'
+        mode: !!js process.env.SHRES_TELEMETRY_MODE || 'DISABLED'
         shutdownTimeoutMillis: 3000
         exporter:
-          url: !!js process.env.ROOS_TELEMETRY_OTLP_URL ?? 'https://harness-telemetry.deepseeksvc.com/v1/logs'
+          url: !!js process.env.SHRES_TELEMETRY_OTLP_URL ?? 'https://harness-telemetry.deepseeksvc.com/v1/logs'
           compression: gzip
           timeoutMillis: 1000
         processor:
@@ -211,37 +211,37 @@
           exportTimeoutMillis: 1500
 
     - id: subprocess
-      name: '@roos-code/roos-code-subprocess-local'
+      name: '@shres-code/shres-code-subprocess-local'
 
     # Every shipped CLI mode starts with the same file-effect boundary.
     # The environment remains an explicit deployment override; otherwise fresh
     # sessions pin workspace-write + ask through the permission service below.
     - id: sandbox
-      name: '@roos-code/roos-code-sandbox-local'
+      name: '@shres-code/shres-code-sandbox-local'
 
     - id: sandbox-policy
-      name: '@roos-code/roos-code-sandbox-policy'
+      name: '@shres-code/shres-code-sandbox-policy'
       config:
-        mode: !!js process.env.ROOS_PERMISSION_MODE ?? 'workspace-write'
+        mode: !!js process.env.SHRES_PERMISSION_MODE ?? 'workspace-write'
         workspaceRoot: !!js process.cwd()
 
     - id: bash-sandbox
-      name: '@roos-code/roos-code-bash-sandbox'
+      name: '@shres-code/shres-code-bash-sandbox'
       disabled: !!js process.platform === 'win32'
       config:
         timeoutMs: 60000
 
     - id: pwsh-sandbox
-      name: '@roos-code/roos-code-pwsh-sandbox'
+      name: '@shres-code/shres-code-pwsh-sandbox'
       disabled: !!js process.platform !== 'win32'
 
     - id: approval
-      name: '@roos-code/roos-code-user-approval'
+      name: '@shres-code/shres-code-user-approval'
       config:
-        policy: !!js "(process.env.ROOS_PERMISSION_MODE ?? 'workspace-write') === 'danger-full-access' ? 'never' : 'ask'"
+        policy: !!js "(process.env.SHRES_PERMISSION_MODE ?? 'workspace-write') === 'danger-full-access' ? 'never' : 'ask'"
 
     - id: permission
-      name: '@roos-code/roos-code-permission-presets'
+      name: '@shres-code/shres-code-permission-presets'
       config:
         presets:
           read-only:
@@ -255,65 +255,65 @@
             approval: never
 
     - id: shell-env
-      name: '@roos-code/roos-code-shell-env'
+      name: '@shres-code/shres-code-shell-env'
 
     - id: tool-bash
-      name: '@roos-code/roos-code-tool-bash'
+      name: '@shres-code/shres-code-tool-bash'
       disabled: !!js process.platform === 'win32'
 
     - id: tool-pwsh
-      name: '@roos-code/roos-code-tool-pwsh'
+      name: '@shres-code/shres-code-tool-pwsh'
       disabled: !!js process.platform !== 'win32'
 
     - id: tool-jobs
-      name: '@roos-code/roos-code-tool-jobs'
+      name: '@shres-code/shres-code-tool-jobs'
 
     - id: fs-observation-policy
-      name: '@roos-code/roos-code-fs-observation-policy'
+      name: '@shres-code/shres-code-fs-observation-policy'
 
     - id: tool-fs
-      name: '@roos-code/roos-code-tool-fs'
+      name: '@shres-code/shres-code-tool-fs'
 
     - id: tool-fs-search
-      name: '@roos-code/roos-code-tool-fs-search'
+      name: '@shres-code/shres-code-tool-fs-search'
       config:
         sampleOverCapGlobResults: false
 
     - id: agent-instructions
-      name: '@roos-code/roos-code-agent-instructions'
+      name: '@shres-code/shres-code-agent-instructions'
       config:
         maxBytes: 65536
 
     - id: skill
-      name: '@roos-code/roos-code-skill'
+      name: '@shres-code/shres-code-skill'
 
     - id: skill-filesystem
-      name: '@roos-code/roos-code-skill-filesystem'
+      name: '@shres-code/shres-code-skill-filesystem'
 
     - id: skill-badge
-      name: '@roos-code/roos-code-skill-badge'
+      name: '@shres-code/shres-code-skill-badge'
       disabled: true
 
     - id: tool-skill
-      name: '@roos-code/roos-code-tool-skill'
+      name: '@shres-code/shres-code-tool-skill'
 
     - id: commands
-      name: '@roos-code/roos-code-commands'
+      name: '@shres-code/shres-code-commands'
 
     - id: command-feedback
-      name: '@roos-code/roos-code-command-feedback'
+      name: '@shres-code/shres-code-command-feedback'
 
     - id: goal
-      name: '@roos-code/roos-code-goal'
+      name: '@shres-code/shres-code-goal'
 
     - id: goal-round-driver
-      name: '@roos-code/roos-code-goal-round-driver'
+      name: '@shres-code/shres-code-goal-round-driver'
 
     - id: command-goal
-      name: '@roos-code/roos-code-command-goal'
+      name: '@shres-code/shres-code-command-goal'
 
     - id: plan-mode
-      name: '@roos-code/roos-code-plan-mode'
+      name: '@shres-code/shres-code-plan-mode'
       config:
         section: |
               You are in plan mode. Stay in plan mode until exit_plan_mode succeeds or the user switches the session mode. Imperative language to implement changes means plan the implementation, not execute it. A user's conversational agreement — including an answer confirming something you asked — approves nothing and does not end plan mode; fold the confirmed decision into the plan and submit it through exit_plan_mode.
@@ -329,55 +329,55 @@
               When ready, call exit_plan_mode with the complete plan markdown, starting with a # title. Make exit_plan_mode the only and final tool call in that assistant response: it presents the plan for approval, and implementation begins only in a later step after approval. Do not paste the final plan as a plain reply or ask "should I proceed?" through prose or ask_user_question. If review rejects it, incorporate the feedback and present again. If the review channel is unavailable or aborted, stay in plan mode and ask the user to switch modes manually; do not proceed with implementation.
 
     - id: token-meter
-      name: '@roos-code/roos-code-token-meter'
+      name: '@shres-code/shres-code-token-meter'
 
     - id: compaction-basic
-      name: '@roos-code/roos-code-compaction-basic'
+      name: '@shres-code/shres-code-compaction-basic'
 
     # Human `/compact`: one useful reduction below the automatic threshold. Backend
     # independent, so it follows whichever compaction service this leaf mounts.
     - id: command-compact
-      name: '@roos-code/roos-code-command-compact'
+      name: '@shres-code/shres-code-command-compact'
 
     - id: subagent
-      name: '@roos-code/roos-code-subagent'
+      name: '@shres-code/shres-code-subagent'
 
     - id: subagent-spawn-in-process
-      name: '@roos-code/roos-code-subagent-spawn-in-process'
+      name: '@shres-code/shres-code-subagent-spawn-in-process'
       config:
         providerName: spawn
 
     - id: subagent-fork-in-process
-      name: '@roos-code/roos-code-subagent-fork-in-process'
+      name: '@shres-code/shres-code-subagent-fork-in-process'
       config:
         providerName: fork
 
     # Continuable background children are selected per delegation tool. The
     # separately loaded follow-up tool registers the one global `send_message`.
     - id: tool-subagent-control
-      name: '@roos-code/roos-code-tool-subagent-control'
+      name: '@shres-code/shres-code-tool-subagent-control'
 
     - id: tool-subagent-list-agents
-      name: '@roos-code/roos-code-tool-subagent-control/list-agents'
+      name: '@shres-code/shres-code-tool-subagent-control/list-agents'
 
     - id: tool-subagent
-      name: '@roos-code/roos-code-tool-subagent'
+      name: '@shres-code/shres-code-tool-subagent'
       config:
         provider: spawn
         toolName: subagent
         backgroundMode: continuable
 
-    # Named Boomer / Joey / Flyer seats remount extra spawn tools from the
+    # Named Aegis / Stride / Ward seats remount extra spawn tools from the
     # `agent-seats` settings section. Unbound seats register nothing.
     - id: agent-seats
-      name: '@roos-code/roos-code-agent-seats'
+      name: '@shres-code/shres-code-agent-seats'
 
     # Fork stays one-shot: a continuable child's `report` tool and prompt
     # section precede the inherited history a fork exists to reuse; one-shot
     # fork children install neither, keeping the parent's request prefix.
     # See .agents/notes/implemented/architecture/2026-08-10-fork-children-stay-one-shot.md.
     - id: tool-subagent-fork
-      name: '@roos-code/roos-code-tool-subagent'
+      name: '@shres-code/shres-code-tool-subagent'
       config:
         provider: fork
         toolName: subagent_fork
@@ -385,65 +385,76 @@
 
     # Optional direct-child return channel; absent from roots and one-shot agents.
     - id: tool-subagent-report
-      name: '@roos-code/roos-code-tool-subagent-report'
+      name: '@shres-code/shres-code-tool-subagent-report'
 
     - id: workflow-worker-thread
-      name: '@roos-code/roos-code-workflow-worker-thread'
+      name: '@shres-code/shres-code-workflow-worker-thread'
       config:
         provider: spawn
 
     - id: tool-workflow
-      name: '@roos-code/roos-code-tool-workflow'
+      name: '@shres-code/shres-code-tool-workflow'
+
+    # Paid Shres Shield seat. Default-mounted; screens when the payload
+    # resolves and is entitled. License defaults to `shres-dev` until a
+    # paid key exists; SHRES_SHIELD_LICENSE overrides it. Panic:
+    # SHRES_SHIELD=off. See shres-shield docs/integration-shres-code.md.
+    - id: shres-shield
+      name: '@shres-code/shres-code-shield'
+      config:
+        license: !!js process.env.SHRES_SHIELD_LICENSE || 'shres-dev'
+        enabled: true
+        posture: ask
 
     - id: timeout-policy
-      name: '@roos-code/roos-code-tool-call-timeout-policy'
+      name: '@shres-code/shres-code-tool-call-timeout-policy'
 
     - id: spill-local
-      name: '@roos-code/roos-code-spill-local'
+      name: '@shres-code/shres-code-spill-local'
 
     - id: spill-policy
-      name: '@roos-code/roos-code-spill-policy'
+      name: '@shres-code/shres-code-spill-policy'
       config:
         maxInlineBytes: 50000
 
     # Durability checkpoints before each model request and top-level dispatch.
     - id: session-checkpoint-policy
-      name: '@roos-code/roos-code-session-checkpoint-policy'
+      name: '@shres-code/shres-code-session-checkpoint-policy'
 
     # Compacts oversized tool results before the broader conversation compactor
     # runs, preserving the model-visible result within the configured budget.
     - id: tool-result-pruner
-      name: '@roos-code/roos-code-compaction-tool-result-pruner'
+      name: '@shres-code/shres-code-compaction-tool-result-pruner'
       config:
         thresholdChars: 8192
         headChars: 4096
         tailChars: 1024
 
     - id: tool-todo
-      name: '@roos-code/roos-code-tool-todo'
+      name: '@shres-code/shres-code-tool-todo'
       config:
         allowParallelInProgress: true
 
     # Persisted same-session goals reach the model and the slash menu here; the
     # domain, driver, and `/goal` command are above.
     - id: tool-goal
-      name: '@roos-code/roos-code-tool-goal'
+      name: '@shres-code/shres-code-tool-goal'
 
     # Fresh-agent Ralph iteration over a build-time-fixed script.
     - id: tool-ralph
-      name: '@roos-code/roos-code-tool-ralph'
+      name: '@shres-code/shres-code-tool-ralph'
       config:
         subagentProvider: spawn
         maxRounds: 64
 
     - id: tool-str-replace-editor
-      name: '@roos-code/roos-code-tool-str-replace-editor'
+      name: '@shres-code/shres-code-tool-str-replace-editor'
       config:
         maxOutputChars: 16000
 
     # Consecutive-repeat reminders on the tool chain.
     - id: repeat-tool-reminder
-      name: '@roos-code/roos-code-repeat-tool-reminder'
+      name: '@shres-code/shres-code-repeat-tool-reminder'
       config:
         thresholds: [3, 5, 8]
         argumentsPreviewChars: 500
@@ -457,22 +468,22 @@
     # auxiliary model request with server-side retrieval, so this shipped route
     # gets 60s while the provider-neutral tool default remains 30s.
     - id: web
-      name: '@roos-code/roos-code-web'
+      name: '@shres-code/shres-code-web'
       config:
         searchProviders:
           - attached-cli
           - deepseek-official
 
     - id: web-search-attached-cli
-      name: '@roos-code/roos-code-web-search-attached-cli'
+      name: '@shres-code/shres-code-web-search-attached-cli'
 
     - id: web-search-deepseek
-      name: '@roos-code/roos-code-web-search-deepseek'
+      name: '@shres-code/shres-code-web-search-deepseek'
       config:
         apiKeyEnv: DEEPSEEK_API_KEY
 
     - id: tool-web
-      name: '@roos-code/roos-code-tool-web'
+      name: '@shres-code/shres-code-tool-web'
       config:
         fetch: false
         searchTimeoutMs: 60000
@@ -482,26 +493,26 @@
     # The tool registry. Presentation mode is a deployment choice; omitting it here
     # keeps the schema default (native).
     - id: tools
-      name: '@roos-code/roos-code-tools'
+      name: '@shres-code/shres-code-tools'
 
     # The deployment persona is a deployment choice; plan-mode and tool plugins own
     # their own prompt sections.
     - id: system-prompt
-      name: '@roos-code/roos-code-system-prompt'
+      name: '@shres-code/shres-code-system-prompt'
       config:
         persona: ''
 
     # Agents created at startup. The base stays empty; raw overlays may create
     # agents, while Web creates sessions on client request.
     - id: agent-loop
-      name: '@roos-code/roos-code-agent-loop'
+      name: '@shres-code/shres-code-agent-loop'
       config:
         agents: []
 
     # The sandboxed filesystem provider. `cwd` defaults to `process.cwd()`; an
     # overlay can pin another workspace.
     - id: fs-sandbox
-      name: '@roos-code/roos-code-fs-sandbox'
+      name: '@shres-code/shres-code-fs-sandbox'
 
     # The native DeepSeek adapter. No key or endpoint is inlined: both resolve per
     # request from the `llm-deepseek:` settings section over this entry, with the
@@ -509,10 +520,10 @@
     # choice.
     # Delegated CLI completions. Each route runs an external coding-agent
     # binary; its own tools bypass harness approval. The Models picker marks
-    # them delegated. `roos models set grok-cli <model> --effort <level>`
+    # them delegated. `shres models set grok-cli <model> --effort <level>`
     # writes through the same agent-default-model section as HTTP routes.
     - id: llm-cli-bridge
-      name: '@roos-code/roos-code-llm-cli-bridge'
+      name: '@shres-code/shres-code-llm-cli-bridge'
 
     - id: llm-deepseek
-      name: '@roos-code/roos-code-llm-deepseek'
+      name: '@shres-code/shres-code-llm-deepseek'

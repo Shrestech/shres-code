@@ -1,12 +1,12 @@
 /**
  * Configuration normalization for workspace instruction discovery and rendering.
  *
- * @module @roos-code/roos-code-agent-instructions/config
+ * @module @shres-code/shres-code-agent-instructions/config
  */
 
 import { relative } from 'node:path'
-import z from '@roos-code/schemastery'
-import { resolveRoosHome } from '@roos-code/roos-code-home-paths'
+import z from '@shres-code/schemastery'
+import { resolveShresHome } from '@shres-code/shres-code-home-paths'
 
 const DEFAULT_PROJECT_ROOT_MARKERS = ['.git'] as const
 const DEFAULT_INSTRUCTION_FILE_CANDIDATES = ['AGENTS.md', 'CLAUDE.md'] as const
@@ -16,8 +16,8 @@ const RESERVED_PATH_SEGMENTS = new Set(['', '.', '..'])
 
 /** User-facing workspace instruction loader configuration. */
 export interface Config {
-  /** Harness home containing the fixed user-global `AGENTS.md`; defaults to `$ROOS_HOME` or `~/.roos`. */
-  roosHome?: string
+  /** Harness home containing the fixed user-global `AGENTS.md`; defaults to `$SHRES_HOME` or `~/.shres`. */
+  shresHome?: string
   /** Directory entries that identify the project root while walking upward from the session cwd. */
   projectRootMarkers?: string[]
   /** UTF-8 byte cap for one rendered baseline or dynamic batch; non-positive or non-finite disables loading. */
@@ -37,7 +37,7 @@ export interface Config {
 }
 
 export const Config: z<Config> = z.object({
-  roosHome: z.string(),
+  shresHome: z.string(),
   projectRootMarkers: z.array(z.string()).default([...DEFAULT_PROJECT_ROOT_MARKERS]),
   maxBytes: z.number().required(),
   maxSourceBytes: z.number().step(1).min(1).default(DEFAULT_MAX_SOURCE_BYTES),
@@ -47,7 +47,7 @@ export const Config: z<Config> = z.object({
 
 /** Normalized instruction discovery configuration. */
 export interface ResolvedDiscoveryConfig {
-  roosHome: string
+  shresHome: string
   projectRootMarkers: string[]
   instructionFileCandidates: string[]
   localInstructionFileCandidates: string[]
@@ -100,10 +100,10 @@ export function resolveConfig(config: Config): ResolvedConfig {
  * @returns normalized home, root markers, and instruction candidates.
  */
 export function resolveDiscoveryConfig(
-  config: Pick<Config, 'roosHome' | 'projectRootMarkers' | 'instructionFileCandidates' | 'localInstructionFileCandidates'>,
+  config: Pick<Config, 'shresHome' | 'projectRootMarkers' | 'instructionFileCandidates' | 'localInstructionFileCandidates'>,
 ): ResolvedDiscoveryConfig {
   return {
-    roosHome: resolveRoosHome(config.roosHome),
+    shresHome: resolveShresHome(config.shresHome),
     projectRootMarkers: config.projectRootMarkers ?? [...DEFAULT_PROJECT_ROOT_MARKERS],
     instructionFileCandidates: resolveInstructionFileCandidates(
       config.instructionFileCandidates,

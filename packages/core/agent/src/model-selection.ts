@@ -1,10 +1,10 @@
 /**
  * Agent-scoped model selection shared by runtime entry points.
- * @module @roos-code/roos-code-agent/model-selection
+ * @module @shres-code/shres-code-agent/model-selection
  */
 
-import type { Context } from '@roos-code/cordis'
-import type { LlmCallConfig, ReasoningEffortId } from '@roos-code/roos-code-llm'
+import type { Context } from '@shres-code/cordis'
+import type { LlmCallConfig, ReasoningEffortId } from '@shres-code/shres-code-llm'
 
 /** Complete provider, model, and optional reasoning effort selected for one live Agent. */
 export interface ModelSelection {

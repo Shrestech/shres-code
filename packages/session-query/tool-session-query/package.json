@@ -1,5 +1,5 @@
 {
-  "name": "@roos-code/roos-code-tool-session-query",
+  "name": "@shres-code/shres-code-tool-session-query",
   "description": "Workspace-authorized model-facing session history search, trace, and event read tools",
   "version": "0.1.0-rc.5",
   "publishConfig": {
@@ -7,7 +7,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "packages/session-query/tool-session-query"
   },
   "type": "module",
@@ -32,32 +32,32 @@
   ],
   "license": "MIT",
   "peerDependencies": {
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-llm": "workspace:^",
-    "@roos-code/roos-code-session": "workspace:^",
-    "@roos-code/roos-code-session-query": "workspace:^",
-    "@roos-code/roos-code-system-prompt": "workspace:^",
-    "@roos-code/roos-code-timeout": "workspace:^",
-    "@roos-code/roos-code-tools": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-session-query": "workspace:^",
+    "@shres-code/shres-code-system-prompt": "workspace:^",
+    "@shres-code/shres-code-timeout": "workspace:^",
+    "@shres-code/shres-code-tools": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   },
   "dependencies": {
-    "@roos-code/schemastery": "workspace:^"
+    "@shres-code/schemastery": "workspace:^"
   },
   "devDependencies": {
-    "@roos-code/roos-code-agent": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-llm": "workspace:^",
-    "@roos-code/roos-code-session": "workspace:^",
-    "@roos-code/roos-code-session-persistence": "workspace:^",
-    "@roos-code/roos-code-session-persistence-jsonl": "workspace:^",
-    "@roos-code/roos-code-session-query": "workspace:^",
-    "@roos-code/roos-code-session-query-sqlite": "workspace:^",
-    "@roos-code/roos-code-session-title": "workspace:^",
-    "@roos-code/roos-code-system-prompt": "workspace:^",
-    "@roos-code/roos-code-timeout": "workspace:^",
-    "@roos-code/roos-code-tool-call-timeout-policy": "workspace:^",
-    "@roos-code/roos-code-tools": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-agent": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-session-persistence": "workspace:^",
+    "@shres-code/shres-code-session-persistence-jsonl": "workspace:^",
+    "@shres-code/shres-code-session-query": "workspace:^",
+    "@shres-code/shres-code-session-query-sqlite": "workspace:^",
+    "@shres-code/shres-code-session-title": "workspace:^",
+    "@shres-code/shres-code-system-prompt": "workspace:^",
+    "@shres-code/shres-code-timeout": "workspace:^",
+    "@shres-code/shres-code-tool-call-timeout-policy": "workspace:^",
+    "@shres-code/shres-code-tools": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   }
 }

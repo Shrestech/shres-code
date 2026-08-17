@@ -2,9 +2,9 @@
 /** Section, setup-card, and hand-written editor behavior over a scripted wire face. */
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import Schema from '@roos-code/schemastery'
-import { bindSnapshotSelector } from '@roos-code/roos-code-client-web-react'
-import type { RpcResponse, SettingsNamespaceView } from '@roos-code/roos-code-api-remotes/client'
+import Schema from '@shres-code/schemastery'
+import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
+import type { RpcResponse, SettingsNamespaceView } from '@shres-code/shres-code-api-remotes/client'
 import {
   ModelsSection, needsSetup, providerCopy, providerTargetLabel, removeProviderProfile,
 } from '../src/client/ModelsSection.tsx'

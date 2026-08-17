@@ -49,7 +49,7 @@ permissions:
 env:
   # CI runs must never report to the production telemetry endpoint baked
   # into apps/cli/cordis.yml (AppCLIEntry disables the row when set).
-  ROOS_TELEMETRY_DISABLED: '1'
+  SHRES_TELEMETRY_DISABLED: '1'
 
 jobs:
   e2e:
@@ -60,7 +60,7 @@ jobs:
     if: >-
       github.event_name != 'pull_request'
       || !(github.event.pull_request.head.repo.fork || github.event.pull_request.user.login == 'dependabot[bot]')
-    # Bounded file parallelism (ROOS_E2E_MAX_WORKERS), 120s/test, retry 2. 45m
+    # Bounded file parallelism (SHRES_E2E_MAX_WORKERS), 120s/test, retry 2. 45m
     # still bounds retry storms against a slow API while the happy path fans out.
     timeout-minutes: 45
     steps:
@@ -104,7 +104,7 @@ jobs:
           fi
           echo "DEEPSEEK_API_KEY present."
 
-      # The e2e suites boot the example bins in `lib` mode (ROOS_EXAMPLE_MODE=lib):
+      # The e2e suites boot the example bins in `lib` mode (SHRES_EXAMPLE_MODE=lib):
       # the built artifact under plain Node, resolving plugins through real package
       # exports — the shape a real consumer runs. That requires a prior build.
       - name: Build (lib for the e2e example bins)
@@ -118,6 +118,6 @@ jobs:
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY_EXTERNAL }}
           DEEPSEEK_BASE_URL: https://api.deepseek.com
-          ROOS_E2E_MAX_WORKERS: 14
-          ROOS_EXAMPLE_MODE: lib
+          SHRES_E2E_MAX_WORKERS: 14
+          SHRES_EXAMPLE_MODE: lib
         run: pnpm run test:e2e

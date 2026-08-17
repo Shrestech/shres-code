@@ -1,16 +1,16 @@
-# @roos-code/roos-code-fs-observation-policy
+# @shres-code/shres-code-fs-observation-policy
 
-The **fs-observation-policy plugin**: it records observed presence or absence and adds read-before-edit plus guarded write/edit on top of the `ctx.fs` provider contract ([`@roos-code/roos-code-fs`](../fs)) — through the `fs/*` event gate, **NOT** through a method service. This plugin registers **no** `ctx.fsPolicy` service and has no public `read`/`write`/`edit`/`resolve` methods. It is the policy third of the filesystem stack: not a swappable seam, but the policy that does not belong on the `FileSystem` provider base class.
+The **fs-observation-policy plugin**: it records observed presence or absence and adds read-before-edit plus guarded write/edit on top of the `ctx.fs` provider contract ([`@shres-code/shres-code-fs`](../fs)) — through the `fs/*` event gate, **NOT** through a method service. This plugin registers **no** `ctx.fsPolicy` service and has no public `read`/`write`/`edit`/`resolve` methods. It is the policy third of the filesystem stack: not a swappable seam, but the policy that does not belong on the `FileSystem` provider base class.
 
 ```ts
-import type { Context } from '@roos-code/cordis'
-import * as FsPolicy from '@roos-code/roos-code-fs-observation-policy'
+import type { Context } from '@shres-code/cordis'
+import * as FsPolicy from '@shres-code/shres-code-fs-observation-policy'
 
 declare const ctx: Context
 
 // No service to inject — this plugin only registers the three fs/* listeners.
-// Load it alongside a ctx.fs provider (e.g. @roos-code/roos-code-fs-local) and the
-// @roos-code/roos-code-tool-fs tools; the tools dispatch the fs/* events this plugin
+// Load it alongside a ctx.fs provider (e.g. @shres-code/shres-code-fs-local) and the
+// @shres-code/shres-code-tool-fs tools; the tools dispatch the fs/* events this plugin
 // decides. Order does not matter for resolution (no inject), but the policy
 // listener should be the first decider registered for the fs/*-intent slots.
 await ctx.plugin(FsPolicy)
@@ -20,14 +20,14 @@ await ctx.plugin(FsPolicy)
 
 | Layer | Package | Role |
 |---|---|---|
-| tool / executor | `@roos-code/roos-code-tool-fs` | model-facing schemas + read windowing + text rendering; reads/writes/edits via `ctx.fs`, dispatches the `fs/*` events |
-| policy | `@roos-code/roos-code-fs-observation-policy` (this) | observed-state + read-before-edit + version-guarded write/edit, contributed through the `fs/*` event gate (no service) |
-| provider contract | `@roos-code/roos-code-fs` | `ctx.fs`: text IO + atomic mutation primitives (optional version guard); owns the `fs/*` event vocabulary |
-| provider | `@roos-code/roos-code-fs-local` | local implementation of `ctx.fs` |
+| tool / executor | `@shres-code/shres-code-tool-fs` | model-facing schemas + read windowing + text rendering; reads/writes/edits via `ctx.fs`, dispatches the `fs/*` events |
+| policy | `@shres-code/shres-code-fs-observation-policy` (this) | observed-state + read-before-edit + version-guarded write/edit, contributed through the `fs/*` event gate (no service) |
+| provider contract | `@shres-code/shres-code-fs` | `ctx.fs`: text IO + atomic mutation primitives (optional version guard); owns the `fs/*` event vocabulary |
+| provider | `@shres-code/shres-code-fs-local` | local implementation of `ctx.fs` |
 
 ## How the gate participates
 
-Three `fs/*` events (declared by `@roos-code/roos-code-fs`, dispatched by `@roos-code/roos-code-tool-fs`):
+Three `fs/*` events (declared by `@shres-code/shres-code-fs`, dispatched by `@shres-code/shres-code-tool-fs`):
 
 | Event | This plugin's listener |
 |---|---|
@@ -45,7 +45,7 @@ The `fs/write-intent`/`fs/edit-intent` slots hold exactly one decider — this p
 
 ## No method coupling
 
-Because the plugin influences the world only through events, removing it does not break `@roos-code/roos-code-tool-fs` at a service-injection boundary: the tool falls through to the bare `ctx.fs` provider (unconditional write/edit, no observed-state). Loading it back layers the policy on. That graceful add/remove is the whole point of the event gate over a mandatory method service.
+Because the plugin influences the world only through events, removing it does not break `@shres-code/shres-code-tool-fs` at a service-injection boundary: the tool falls through to the bare `ctx.fs` provider (unconditional write/edit, no observed-state). Loading it back layers the policy on. That graceful add/remove is the whole point of the event gate over a mandatory method service.
 
 ## Model Experience
 
@@ -53,7 +53,7 @@ Because the plugin influences the world only through events, removing it does no
 
 #### What the model sees
 
-This plugin adds no prompt or schema. It rejects an edit without a prior observation with code `FS_NOT_OBSERVED` and exact message `edit requires reading "<path>" first`; editing a target just observed absent returns `FS_NOT_FOUND`. Guarded mutations whose positive observation is stale propagate the provider-owned `FS_STALE_VERSION` error. [`roos-tool-fs`](../tool-fs/README.md) owns the model-facing error wrapper, which appends the recovery instruction to `FS_STALE_VERSION` (`— re-read the file, then retry`) and `FS_NOT_OBSERVED` (`— read the file, then retry`) messages while preserving the code. Following the stale remedy on an externally deleted target now records absence: the next guarded write may recreate it with `createIfAbsent`, while the provider atomically preserves any concurrent creator.
+This plugin adds no prompt or schema. It rejects an edit without a prior observation with code `FS_NOT_OBSERVED` and exact message `edit requires reading "<path>" first`; editing a target just observed absent returns `FS_NOT_FOUND`. Guarded mutations whose positive observation is stale propagate the provider-owned `FS_STALE_VERSION` error. [`shres-tool-fs`](../tool-fs/README.md) owns the model-facing error wrapper, which appends the recovery instruction to `FS_STALE_VERSION` (`— re-read the file, then retry`) and `FS_NOT_OBSERVED` (`— read the file, then retry`) messages while preserving the code. Following the stale remedy on an externally deleted target now records absence: the next guarded write may recreate it with `createIfAbsent`, while the provider atomically preserves any concurrent creator.
 
 #### Token effect
 

@@ -2,21 +2,21 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { Context } from '@roos-code/cordis'
-import Loader from '@roos-code/cordis-plugin-loader'
-import { credentialRef } from '@roos-code/roos-code-credentials'
-import LocalCredentialProvider from '@roos-code/roos-code-credentials-local'
-import WebRuntime from '@roos-code/roos-code-web'
+import { Context } from '@shres-code/cordis'
+import Loader from '@shres-code/cordis-plugin-loader'
+import { credentialRef } from '@shres-code/shres-code-credentials'
+import LocalCredentialProvider from '@shres-code/shres-code-credentials-local'
+import WebRuntime from '@shres-code/shres-code-web'
 import {
   DeepSeekSearchProvider,
   DEEPSEEK_PROVIDER_ID,
-} from '@roos-code/roos-code-web-search-deepseek'
-import * as deepseekPlugin from '@roos-code/roos-code-web-search-deepseek'
+} from '@shres-code/shres-code-web-search-deepseek'
+import * as deepseekPlugin from '@shres-code/shres-code-web-search-deepseek'
 import { citationSnippets, mapAnthropicResponse } from '../src/provider.ts'
-import type { AnthropicResponse } from '@roos-code/roos-code-web-search-deepseek/src/types.ts'
+import type { AnthropicResponse } from '@shres-code/shres-code-web-search-deepseek/src/types.ts'
 
 /** Construct the provider over a fixed options value; production passes a live thunk. */
-import type { DeepSeekSearchProviderOptions } from '@roos-code/roos-code-web-search-deepseek'
+import type { DeepSeekSearchProviderOptions } from '@shres-code/shres-code-web-search-deepseek'
 
 const searchProvider = (options: DeepSeekSearchProviderOptions): DeepSeekSearchProvider =>
   new DeepSeekSearchProvider(() => options)
@@ -487,7 +487,7 @@ describe('web-search-deepseek plugin registration', () => {
   it('resolves the credential for each search so a stored or rotated key needs no restart', async () => {
     const previous = process.env.DEEPSEEK_API_KEY
     delete process.env.DEEPSEEK_API_KEY
-    const dir = await mkdtemp(join(tmpdir(), 'roos-web-search-credentials-'))
+    const dir = await mkdtemp(join(tmpdir(), 'shres-web-search-credentials-'))
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => jsonResponse(searchResponse()))
     vi.stubGlobal('fetch', fetchMock)
     const ctx = new Context()

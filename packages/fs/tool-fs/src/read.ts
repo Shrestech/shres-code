@@ -1,14 +1,14 @@
 /**
  * Model-facing UTF-8 read. It performs one provider stat for type, routing, and observed version,
  * streams large or size-unknown files, renders a bounded window, then emits the observation.
- * @module @roos-code/roos-code-tool-fs/src/read
+ * @module @shres-code/shres-code-tool-fs/src/read
  */
 
-import type { Context } from '@roos-code/cordis'
-import { defineTool } from '@roos-code/roos-code-tools'
-import type { GenericCallView, ReadResultView, ToolResult } from '@roos-code/roos-code-tools'
-import type {} from '@roos-code/roos-code-fs'
-import type {} from '@roos-code/roos-code-system-prompt'
+import type { Context } from '@shres-code/cordis'
+import { defineTool } from '@shres-code/shres-code-tools'
+import type { GenericCallView, ReadResultView, ToolResult } from '@shres-code/shres-code-tools'
+import type {} from '@shres-code/shres-code-fs'
+import type {} from '@shres-code/shres-code-system-prompt'
 import { remediateFsError } from './error.ts'
 import { buildWindow, formatReadOutput, langFromPath, readMetaFromMeta } from './read-render.ts'
 import { resolveRegularReadTarget } from './read-target.ts'

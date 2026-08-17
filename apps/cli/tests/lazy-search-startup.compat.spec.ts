@@ -4,7 +4,7 @@
  * Only the dedicated Node compatibility gate opts this test in after building
  * both artifacts; ordinary Vitest inventory deterministically skips it.
  * The child runs built artifacts under plain Node with the real shipped
- * web profile (roos-base + roos-web-app bundle patches, auto-initialized).
+ * web profile (shres-base + shres-web-app bundle patches, auto-initialized).
  * Its URL line follows the settled profile boot; SIGTERM then exercises the
  * shipped quiescent disposer.
  */
@@ -25,7 +25,7 @@ const webDist = join(repoRoot, 'apps/web/dist/index.html')
 // base patch carries the default, and the web restatement must not re-enable it.
 const baseConfigPath = join(repoRoot, 'packages/bundle/base/cordis.patch.yml')
 const webConfigPath = join(repoRoot, 'packages/bundle/web-app/cordis.patch.yml')
-const requireBuiltArtifacts = process.env.ROOS_REQUIRE_BUILT_CLI_SMOKE === '1'
+const requireBuiltArtifacts = process.env.SHRES_REQUIRE_BUILT_CLI_SMOKE === '1'
 
 interface ConfigRow {
   id?: string
@@ -48,8 +48,8 @@ function runBuiltWeb(cwd: string): Promise<{ stdout: string; stderr: string; cod
   return new Promise((resolveRun, rejectRun) => {
     const env: NodeJS.ProcessEnv = {
       ...process.env,
-      DEEPSEEK_API_KEY: 'roos-cli-smoke-dummy-key',
-      ROOS_HOME: join(cwd, '.roos'),
+      DEEPSEEK_API_KEY: 'shres-cli-smoke-dummy-key',
+      SHRES_HOME: join(cwd, '.shres'),
     }
     delete env.DEEPSEEK_BASE_URL
     delete env.NODE_OPTIONS
@@ -73,7 +73,7 @@ function runBuiltWeb(cwd: string): Promise<{ stdout: string; stderr: string; cod
     child.stderr.setEncoding('utf8')
     child.stdout.on('data', (chunk: string) => {
       stdout += chunk
-      if (!settled && /roos web: http:\/\/127\.0\.0\.1:\d+/u.test(stdout)) {
+      if (!settled && /shres web: http:\/\/127\.0\.0\.1:\d+/u.test(stdout)) {
         settled = true
         child.kill('SIGTERM')
       }
@@ -114,10 +114,10 @@ describe.skipIf(!requireBuiltArtifacts)('built CLI lazy-search startup', () => {
     expect(webRow?.config?.openAt).toBe('never')
     expect(webRow?.disabled).toBeUndefined()
 
-    const cwd = await mkdtemp(join(tmpdir(), 'roos-cli-lazy-search-'))
+    const cwd = await mkdtemp(join(tmpdir(), 'shres-cli-lazy-search-'))
     try {
       const result = await runBuiltWeb(cwd)
-      expect(result.stdout).toMatch(/roos web: http:\/\/127\.0\.0\.1:\d+/u)
+      expect(result.stdout).toMatch(/shres web: http:\/\/127\.0\.0\.1:\d+/u)
       expect(result.code).toBe(0)
       expect(result.stderr).not.toMatch(/ExperimentalWarning: SQLite/u)
     } finally {

@@ -1,21 +1,21 @@
 /**
  * Model argument schemas, normalization, and filter construction.
  *
- * @module @roos-code/roos-code-tool-session-query/input
+ * @module @shres-code/shres-code-tool-session-query/input
  */
 
 import {
   SessionId,
   type SessionEventType,
   type SessionId as SessionIdValue,
-} from '@roos-code/roos-code-session'
+} from '@shres-code/shres-code-session'
 import {
   SessionQueryError,
   type SessionAvailability,
   type SessionEventMetadataFilter,
   type SessionEventSurface,
   type SessionResultFilter,
-} from '@roos-code/roos-code-session-query'
+} from '@shres-code/shres-code-session-query'
 
 interface SessionSearchArgs {
   query: string

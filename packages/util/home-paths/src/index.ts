@@ -1,21 +1,21 @@
 /**
- * Shared filesystem path helpers for Roos Code user data.
+ * Shared filesystem path helpers for Shres Code user data.
  *
- * @module @roos-code/roos-code-home-paths
+ * @module @shres-code/shres-code-home-paths
  */
 
 import { opendir, realpath } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 
-/** Directory name for the default Roos Code home under the OS home. */
-export const ROOS_HOME_DIR_NAME = '.roos'
+/** Directory name for the default Shres Code home under the OS home. */
+export const SHRES_HOME_DIR_NAME = '.shres'
 
-/** Stable user-facing display form for the default Roos Code home. */
-export const DEFAULT_ROOS_HOME_DISPLAY = `~/${ROOS_HOME_DIR_NAME}`
+/** Stable user-facing display form for the default Shres Code home. */
+export const DEFAULT_SHRES_HOME_DISPLAY = `~/${SHRES_HOME_DIR_NAME}`
 
-/** Environment variable that overrides the default Roos Code home. */
-export const ROOS_HOME_ENV = 'ROOS_HOME'
+/** Environment variable that overrides the default Shres Code home. */
+export const SHRES_HOME_ENV = 'SHRES_HOME'
 
 /**
  * Give a native filesystem watcher one canonical spelling of a path, even
@@ -55,11 +55,11 @@ export async function canonicalizeWatchPath(path: string): Promise<string> {
 }
 
 /**
- * Resolve the default Roos Code home using Node's platform path rules.
+ * Resolve the default Shres Code home using Node's platform path rules.
  * @returns the absolute default harness home path.
  */
-export function defaultRoosHome(): string {
-  return join(homedir(), ROOS_HOME_DIR_NAME)
+export function defaultShresHome(): string {
+  return join(homedir(), SHRES_HOME_DIR_NAME)
 }
 
 /**
@@ -74,39 +74,39 @@ export function expandHomePath(path: string): string {
 }
 
 /**
- * Resolve the single-root Roos Code home.
+ * Resolve the single-root Shres Code home.
  *
- * Precedence, highest first: an explicit configured path, `$ROOS_HOME`, then
- * `~/.roos`. The harness keeps all user data under one root. An empty or
- * whitespace-only `$ROOS_HOME` is treated as unset, so a blank override never
+ * Precedence, highest first: an explicit configured path, `$SHRES_HOME`, then
+ * `~/.shres`. The harness keeps all user data under one root. An empty or
+ * whitespace-only `$SHRES_HOME` is treated as unset, so a blank override never
  * resolves the home to the current working directory.
  * @param configured - explicit harness-home override, which has highest precedence.
- * @param env - environment mapping used to read `ROOS_HOME`.
+ * @param env - environment mapping used to read `SHRES_HOME`.
  * @returns the normalized absolute harness home path.
  */
-export function resolveRoosHome(configured?: string, env: Record<string, string | undefined> = process.env): string {
-  const fromEnv = env[ROOS_HOME_ENV]
-  const selected = configured ?? (fromEnv !== undefined && fromEnv.trim().length > 0 ? fromEnv : defaultRoosHome())
+export function resolveShresHome(configured?: string, env: Record<string, string | undefined> = process.env): string {
+  const fromEnv = env[SHRES_HOME_ENV]
+  const selected = configured ?? (fromEnv !== undefined && fromEnv.trim().length > 0 ? fromEnv : defaultShresHome())
   return resolve(expandHomePath(selected))
 }
 
 /**
- * Join path segments onto the resolved Roos Code home.
+ * Join path segments onto the resolved Shres Code home.
  * @param segments - path segments appended to the Harness home; an empty list returns the home itself.
  * @returns the normalized absolute joined path.
  */
-export function roosHomePath(...segments: string[]): string {
-  return join(resolveRoosHome(), ...segments)
+export function shresHomePath(...segments: string[]): string {
+  return join(resolveShresHome(), ...segments)
 }
 
 /**
  * Describe a resolved harness home symbolically for user-facing display.
  *
  * It never returns an absolute machine path: the default home is labelled
- * `~/.roos`, and any configured home is labelled `$ROOS_HOME`.
- * @param resolvedHome - the absolute path returned by {@link resolveRoosHome}.
- * @returns `~/.roos` for the default home, otherwise `$ROOS_HOME`.
+ * `~/.shres`, and any configured home is labelled `$SHRES_HOME`.
+ * @param resolvedHome - the absolute path returned by {@link resolveShresHome}.
+ * @returns `~/.shres` for the default home, otherwise `$SHRES_HOME`.
  */
-export function roosHomeDisplay(resolvedHome: string): string {
-  return resolvedHome === resolve(defaultRoosHome()) ? DEFAULT_ROOS_HOME_DISPLAY : `$${ROOS_HOME_ENV}`
+export function shresHomeDisplay(resolvedHome: string): string {
+  return resolvedHome === resolve(defaultShresHome()) ? DEFAULT_SHRES_HOME_DISPLAY : `$${SHRES_HOME_ENV}`
 }

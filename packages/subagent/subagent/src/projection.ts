@@ -2,12 +2,12 @@
  * Pure session projections for subagent identity (mode/label) and active-turn
  * duration.
  *
- * @module @roos-code/roos-code-subagent/projection
+ * @module @shres-code/shres-code-subagent/projection
  */
 
 import { z } from 'zod'
-import type { ProjectionDefinition } from '@roos-code/roos-code-session-projection'
-import type { SessionEvent } from '@roos-code/roos-code-session'
+import type { ProjectionDefinition } from '@shres-code/shres-code-session-projection'
+import type { SessionEvent } from '@shres-code/shres-code-session'
 import { foldSubagentDescriptor } from './descriptor.ts'
 import type { SubagentDescriptorData } from './descriptor.ts'
 import type { SubagentIdentityProjection, SubagentTimingProjection } from './projection-types.ts'

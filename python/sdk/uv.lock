@@ -21,16 +21,16 @@ wheels = [
 ]
 
 [[package]]
-name = "roos-code-runtime-bin"
+name = "shres-code-runtime-bin"
 version = "0.0.0.dev0"
 source = { editable = "../sdk-runtime" }
 
 [[package]]
-name = "roos-code-sdk"
+name = "shres-code-sdk"
 version = "0.0.0.dev0"
 source = { editable = "." }
 dependencies = [
-    { name = "roos-code-runtime-bin" },
+    { name = "shres-code-runtime-bin" },
     { name = "pydantic" },
 ]
 
@@ -41,7 +41,7 @@ test = [
 
 [package.metadata]
 requires-dist = [
-    { name = "roos-code-runtime-bin", editable = "../sdk-runtime" },
+    { name = "shres-code-runtime-bin", editable = "../sdk-runtime" },
     { name = "pydantic", specifier = ">=2.12,<3" },
 ]
 

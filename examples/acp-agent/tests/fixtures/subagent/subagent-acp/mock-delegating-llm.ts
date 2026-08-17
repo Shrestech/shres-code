@@ -1,6 +1,6 @@
-import type { Context } from '@roos-code/cordis'
-import type { GenerateOptions, StreamChunk } from '@roos-code/roos-code-llm'
-import { CallId, LlmAdapter } from '@roos-code/roos-code-llm'
+import type { Context } from '@shres-code/cordis'
+import type { GenerateOptions, StreamChunk } from '@shres-code/shres-code-llm'
+import { CallId, LlmAdapter } from '@shres-code/shres-code-llm'
 
 /**
  * Test adapter for the `mock-delegate` model: the first request calls the

@@ -1,5 +1,5 @@
-import type { GenerateOptions, LlmModelReasoningInfo, LlmResolvedModelInfo, StreamChunk } from '@roos-code/roos-code-llm'
-import { CallId, LlmAdapter } from '@roos-code/roos-code-llm'
+import type { GenerateOptions, LlmModelReasoningInfo, LlmResolvedModelInfo, StreamChunk } from '@shres-code/shres-code-llm'
+import { CallId, LlmAdapter } from '@shres-code/shres-code-llm'
 
 /** Helpers to write scripted responses tersely. */
 export function textResponse(text: string): StreamChunk[] {

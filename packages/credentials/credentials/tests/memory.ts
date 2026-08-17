@@ -1,4 +1,4 @@
-import type { Context } from '@roos-code/cordis'
+import type { Context } from '@shres-code/cordis'
 import { CredentialProvider } from '../src/index.ts'
 import type { CredentialInfo, CredentialRef, ResolvedCredential } from '../src/index.ts'
 

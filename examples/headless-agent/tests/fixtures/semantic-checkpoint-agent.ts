@@ -3,8 +3,8 @@
  * @module semantic-checkpoint-agent
  */
 
-import type { Context } from '@roos-code/cordis'
-import type { SessionId } from '@roos-code/roos-code-session'
+import type { Context } from '@shres-code/cordis'
+import type { SessionId } from '@shres-code/shres-code-session'
 
 /** Fixture plugin name. */
 export const name = 'semantic-checkpoint-agent'

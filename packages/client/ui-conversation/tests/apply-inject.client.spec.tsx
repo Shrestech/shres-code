@@ -15,15 +15,15 @@
 // chat-toolview-slot.spec.tsx.
 
 import { describe, expect, it, vi } from 'vitest'
-import { SlotTestRuntime, usePinnedBrowserLanguages, stubSettingsScope } from '@roos-code/roos-code-client-test-runtime'
-import type { SessionBehaviorOverrides } from '@roos-code/roos-code-client-test-runtime'
-import { LocaleRuntime } from '@roos-code/roos-code-client-locale/client'
-import type { ISession, SessionId } from '@roos-code/roos-code-client-runtime/client'
-import { apply, inject } from '@roos-code/roos-code-client-ui-conversation/client'
+import { SlotTestRuntime, usePinnedBrowserLanguages, stubSettingsScope } from '@shres-code/shres-code-client-test-runtime'
+import type { SessionBehaviorOverrides } from '@shres-code/shres-code-client-test-runtime'
+import { LocaleRuntime } from '@shres-code/shres-code-client-locale/client'
+import type { ISession, SessionId } from '@shres-code/shres-code-client-runtime/client'
+import { apply, inject } from '@shres-code/shres-code-client-ui-conversation/client'
 import type {
   ChatViewInjected, ComposerBarInjected, ConversationInjected, ConversationSessionHeaderInjected,
   ConversationSessionInjected, DetailsInjected,
-} from '@roos-code/roos-code-client-ui-conversation/client'
+} from '@shres-code/shres-code-client-ui-conversation/client'
 import type { createChatStore } from '../src/client/stores.ts'
 
 // The service reads its initial locale from the browser; these specs assert

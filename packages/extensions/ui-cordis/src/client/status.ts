@@ -1,6 +1,6 @@
 /** Shared status derivation over Host inventory and this page's Client live set. */
 
-import type { DynamicCordisLivePackage } from '@roos-code/roos-code-cordis-client-runner/client'
+import type { DynamicCordisLivePackage } from '@shres-code/shres-code-cordis-client-runner/client'
 import type {
   CordisDynamicPackageId, DynamicCordisInventoryRow,
 } from './events.ts'

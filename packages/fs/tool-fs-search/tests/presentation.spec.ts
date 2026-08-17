@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import type { JsonValue } from '@roos-code/roos-code-session'
+import type { JsonValue } from '@shres-code/shres-code-session'
 import {
   globSearchMeta,
   grepSearchMeta,

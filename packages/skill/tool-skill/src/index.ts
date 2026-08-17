@@ -1,16 +1,16 @@
 /**
  * Durable session skill catalog and model-facing `skill` loader tool.
  *
- * @module @roos-code/roos-code-tool-skill
+ * @module @shres-code/shres-code-tool-skill
  */
 
 import { createHash } from 'node:crypto'
-import type { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import type { Agent, PreStepDecision } from '@roos-code/roos-code-agent'
-import { defineTool } from '@roos-code/roos-code-tools'
-import { createUserMessage } from '@roos-code/roos-code-llm'
-import type { UserMessage } from '@roos-code/roos-code-session'
+import type { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import type { Agent, PreStepDecision } from '@shres-code/shres-code-agent'
+import { defineTool } from '@shres-code/shres-code-tools'
+import { createUserMessage } from '@shres-code/shres-code-llm'
+import type { UserMessage } from '@shres-code/shres-code-session'
 import {
   escapeText,
   isModelInvocable,
@@ -19,7 +19,7 @@ import {
   renderSkillContent,
   type SkillInvocationSource,
   type SkillSummary,
-} from '@roos-code/roos-code-skill'
+} from '@shres-code/shres-code-skill'
 
 export const name = 'tool-skill'
 export const inject = ['agents', 'tools', 'skills']
@@ -40,7 +40,7 @@ export interface SkillCatalogSource {
   readonly entries: readonly { readonly name: string; readonly description: string }[]
 }
 
-declare module '@roos-code/roos-code-llm' {
+declare module '@shres-code/shres-code-llm' {
   interface MessageSourceMap {
     'skill-catalog': SkillCatalogSource
   }

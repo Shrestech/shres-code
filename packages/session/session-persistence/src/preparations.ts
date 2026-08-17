@@ -1,9 +1,9 @@
 /**
  * Bounded sharing and exclusive reservation of unpublished Sessions.
- * @module @roos-code/roos-code-session-persistence/preparations
+ * @module @shres-code/shres-code-session-persistence/preparations
  */
 
-import type { Session, SessionId } from '@roos-code/roos-code-session'
+import type { Session, SessionId } from '@shres-code/shres-code-session'
 
 interface PreparedSource {
   readonly session: Session

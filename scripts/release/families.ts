@@ -1,7 +1,7 @@
 /**
  * The three independent publish sequences this repository releases from
  * (`packages/` + `apps/`, `vendor/`, and `native/`) and the two this module
- * owns: `roos` and `vendor`. Each family carries its own version baseline, tag
+ * owns: `shres` and `vendor`. Each family carries its own version baseline, tag
  * naming, and publish set, so releasing one never republishes another
  * ([rationale](../../.agents/notes/implemented/process/2026-08-10-npm-release-sequences.md)).
  *
@@ -17,7 +17,7 @@ import { validateTarballPayload } from '../publication-payload.ts'
 const ORDER_SECTIONS = ['dependencies', 'optionalDependencies'] as const
 
 /** The workspace root manifest, which is never a release member. */
-const WORKSPACE_ROOT_PACKAGE = '@roos-code/roos-code-root'
+const WORKSPACE_ROOT_PACKAGE = '@shres-code/shres-code-root'
 
 /** One publishable package of a release family. */
 export interface ReleaseMember {
@@ -93,7 +93,7 @@ export abstract class ReleaseFamily {
       const name = requireString(manifest, 'name', normalized)
       const version = requireString(manifest, 'version', normalized)
       if (name === WORKSPACE_ROOT_PACKAGE) throw new Error(`${normalized} selected the workspace root`)
-      if (!name.startsWith('@roos-code/')) throw new Error(`${normalized} must name an @roos-code package`)
+      if (!name.startsWith('@shres-code/')) throw new Error(`${normalized} must name an @shres-code package`)
       if (seen.has(name)) throw new Error(`${name} appears twice in release family ${this.id}`)
       seen.add(name)
       members.push({
@@ -194,10 +194,10 @@ export abstract class ReleaseFamily {
 }
 
 /** `packages/*` and `apps/*`: one shared version across the whole family. */
-class RoosFamily extends ReleaseFamily {
-  readonly id = 'roos'
+class ShresFamily extends ReleaseFamily {
+  readonly id = 'shres'
   readonly patterns = ['packages/*/*/package.json', 'apps/*/package.json'] as const
-  readonly tagPrefix = 'roos-v'
+  readonly tagPrefix = 'shres-v'
 
   /**
    * Require one version across the family, the way a single tag can name it.
@@ -207,13 +207,13 @@ class RoosFamily extends ReleaseFamily {
     const versions = new Set(members.map(member => member.version))
     if (versions.size !== 1) {
       const detail = members.map(member => `${member.directory}: ${member.version}`).join('\n')
-      throw new Error(`roos release members must share one version:\n${detail}`)
+      throw new Error(`shres release members must share one version:\n${detail}`)
     }
   }
 
   /**
    * The single family prefix: every member shares one version, so one tag names it.
-   * @returns `roos-v`.
+   * @returns `shres-v`.
    */
   tagPrefixFor(): string {
     return this.tagPrefix
@@ -228,7 +228,7 @@ class RoosFamily extends ReleaseFamily {
     validateTarballPayload(files, member.name)
   }
 
-  readonly installedEntry = { packageName: '@roos-code/roos-code', binPath: 'lib/bin.js' }
+  readonly installedEntry = { packageName: '@shres-code/shres-code', binPath: 'lib/bin.js' }
 }
 
 /** `vendor/*`: every package keeps its own version line, so every package has its own tag. */
@@ -255,7 +255,7 @@ class VendorFamily extends ReleaseFamily {
    * @returns `vendor-<unscoped name>-v`.
    */
   tagPrefixFor(member: ReleaseMember): string {
-    return `${this.tagPrefix}${member.name.replace('@roos-code/', '')}-v`
+    return `${this.tagPrefix}${member.name.replace('@shres-code/', '')}-v`
   }
 
   /**
@@ -280,7 +280,7 @@ class VendorFamily extends ReleaseFamily {
 
 /** Every release family this module owns, in workflow order. */
 function releaseFamilies(): readonly ReleaseFamily[] {
-  return [new RoosFamily(), new VendorFamily()]
+  return [new ShresFamily(), new VendorFamily()]
 }
 
 /**

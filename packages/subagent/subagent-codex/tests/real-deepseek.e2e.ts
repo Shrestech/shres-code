@@ -11,12 +11,12 @@ import { tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { Agent } from '@roos-code/roos-code-agent'
-import SubagentRuntime from '@roos-code/roos-code-subagent'
-import type { SubprocessHandle } from '@roos-code/roos-code-subprocess'
-import LocalSubprocessRuntime from '@roos-code/roos-code-subprocess-local'
+import type { Agent } from '@shres-code/shres-code-agent'
+import SubagentRuntime from '@shres-code/shres-code-subagent'
+import type { SubprocessHandle } from '@shres-code/shres-code-subprocess'
+import LocalSubprocessRuntime from '@shres-code/shres-code-subprocess-local'
 import * as codex from '../src/index.ts'
 import {
   startDeepSeekResponsesBridge,
@@ -55,13 +55,13 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)(
     it('returns one unique nonce through the production provider and real Codex', async () => {
       const apiKey = process.env.DEEPSEEK_API_KEY
       if (apiKey === undefined) throw new Error('e2e ran without DEEPSEEK_API_KEY')
-      const root = mkdtempSync(join(tmpdir(), 'roos-codex-deepseek-e2e-'))
+      const root = mkdtempSync(join(tmpdir(), 'shres-codex-deepseek-e2e-'))
       roots.push(root)
       const workspace = join(root, 'workspace')
       const codexHome = join(root, 'codex-home')
       mkdirSync(workspace)
       mkdirSync(codexHome)
-      const nonce = `ROOS_CODEX_DEEPSEEK_${randomUUID()}`
+      const nonce = `SHRES_CODEX_DEEPSEEK_${randomUUID()}`
       const bridge = await startDeepSeekResponsesBridge(nonce)
       bridges.push(bridge)
       writeFileSync(join(codexHome, 'config.toml'), [

@@ -3,8 +3,8 @@
  * preference, clicks drive setTheme. */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { createSnapshotStore, type SessionListState, type WorkspaceListState } from '@roos-code/roos-code-client-runtime/client'
-import { bindSnapshotSelector } from '@roos-code/roos-code-client-web-react'
+import { createSnapshotStore, type SessionListState, type WorkspaceListState } from '@shres-code/shres-code-client-runtime/client'
+import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
 import { AppearanceRow } from '../src/client/AppearanceRow.tsx'
 import type { AppearanceRowComponentProps } from '../src/client/AppearanceRow.tsx'
 import { createAppearanceRowStore } from '../src/client/settings-store.ts'

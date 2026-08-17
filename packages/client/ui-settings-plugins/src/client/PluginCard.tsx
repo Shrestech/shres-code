@@ -16,7 +16,7 @@
 
 import { useState, type ReactNode } from 'react'
 import clsx from 'clsx'
-import { IconChevronDownOutline14 } from '@roos-code/roos-code-client-ui-primitives'
+import { IconChevronDownOutline14 } from '@shres-code/shres-code-client-ui-primitives'
 import type { CardShell } from './card-form.ts'
 import type { PluginsSettingsLocaleKey } from './locales.ts'
 import css from './PluginCard.module.css'

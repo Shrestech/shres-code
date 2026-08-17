@@ -7,12 +7,12 @@
  * payload, the scoped consume-token dispatch, per-session popupFor
  * lifecycle, and the directory invalidation event subscriptions.
  */
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { describe, expect, it, vi } from 'vitest'
-import type { CommandResult } from '@roos-code/roos-code-commands/types'
-import { createScope, scopeOf } from '@roos-code/roos-code-client-runtime/client'
-import type { SessionId } from '@roos-code/roos-code-client-runtime/client'
-import type { ClientSessionContext, ConsumeTokenRequest, InputTriggerPick, InputTriggerSource } from '@roos-code/roos-code-client-ui-input-trigger/client'
+import type { CommandResult } from '@shres-code/shres-code-commands/types'
+import { createScope, scopeOf } from '@shres-code/shres-code-client-runtime/client'
+import type { SessionId } from '@shres-code/shres-code-client-runtime/client'
+import type { ClientSessionContext, ConsumeTokenRequest, InputTriggerPick, InputTriggerSource } from '@shres-code/shres-code-client-ui-input-trigger/client'
 import type { CommandContribution, CommandDecoration, CommandUiSpec, SelectOption } from '../src/client/contract.ts'
 import type { CommandDescriptor } from '../src/client/directory.ts'
 import { CommandUiRuntime } from '../src/client/service.ts'

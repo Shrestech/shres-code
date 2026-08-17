@@ -3,14 +3,14 @@
  * appends one authoritative log-only event and does not start model work. The
  * append is eager but unflushed, so acknowledgement reports that the entry is
  * logged, not that it reached disk.
- * @module @roos-code/roos-code-command-feedback
+ * @module @shres-code/shres-code-command-feedback
  */
 
-import type { Context } from '@roos-code/cordis'
-import type { CommandInvocation, CommandResult } from '@roos-code/roos-code-commands'
-import type { SessionTelemetryBackend, SessionTelemetrySharingStatus } from '@roos-code/roos-code-session-telemetry'
-import type { Session } from '@roos-code/roos-code-session'
-import { getOrCreateAnonymousUserId } from '@roos-code/roos-code-anonymous-user-id'
+import type { Context } from '@shres-code/cordis'
+import type { CommandInvocation, CommandResult } from '@shres-code/shres-code-commands'
+import type { SessionTelemetryBackend, SessionTelemetrySharingStatus } from '@shres-code/shres-code-session-telemetry'
+import type { Session } from '@shres-code/shres-code-session'
+import { getOrCreateAnonymousUserId } from '@shres-code/shres-code-anonymous-user-id'
 
 export const name = 'command-feedback'
 export const inject = ['commands']
@@ -53,7 +53,7 @@ function sharingDisclosure(telemetry: SessionTelemetryBackend | undefined): stri
   return sharingSentence(telemetry.sharing)
 }
 
-declare module '@roos-code/roos-code-session/types' {
+declare module '@shres-code/shres-code-session/types' {
   interface SessionEventMap {
     /**
      * One recorded human remark about this session. Log-only and independent

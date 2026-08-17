@@ -1,15 +1,15 @@
 /**
  * Session-query service error containment and model-safe translation.
  *
- * @module @roos-code/roos-code-tool-session-query/service-boundary
+ * @module @shres-code/shres-code-tool-session-query/service-boundary
  */
 
-import type { Context } from '@roos-code/cordis'
-import { HarnessError } from '@roos-code/roos-code-llm'
+import type { Context } from '@shres-code/cordis'
+import { HarnessError } from '@shres-code/shres-code-llm'
 import {
   SessionQueryError,
   type SessionQueryErrorCode,
-} from '@roos-code/roos-code-session-query'
+} from '@shres-code/shres-code-session-query'
 
 interface ModelSafeServiceFailure {
   readonly code: SessionQueryErrorCode | 'SESSION_QUERY_TOOL_FAILED'

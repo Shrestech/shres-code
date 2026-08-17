@@ -1,4 +1,4 @@
-import type { Branded } from '@roos-code/roos-code-brand'
+import type { Branded } from '@shres-code/shres-code-brand'
 
 /** Stable identity shared by every attempt in one request-step retry chain. */
 export type RetryId = Branded<'RetryId'>

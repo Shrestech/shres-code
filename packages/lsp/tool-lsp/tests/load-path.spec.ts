@@ -1,15 +1,15 @@
 /**
- * Loader export-shape guard for @roos-code/roos-code-tool-lsp. It is a NAMESPACE plugin with `inject`, so a
+ * Loader export-shape guard for @shres-code/shres-code-tool-lsp. It is a NAMESPACE plugin with `inject`, so a
  * stray `export default apply` would make the Loader's `unwrapExports` collapse the module to the
  * bare `apply`, dropping `inject` (postmortem 0001). This verifies the namespace survives
  * `Loader.prototype.unwrapExports`; the `lsp-definition` ACP snapshot owns full app composition.
  */
 
 import { describe, expect, it } from 'vitest'
-import Loader from '@roos-code/cordis-plugin-loader'
-import * as toolLsp from '@roos-code/roos-code-tool-lsp'
+import Loader from '@shres-code/cordis-plugin-loader'
+import * as toolLsp from '@shres-code/shres-code-tool-lsp'
 
-describe('roos-tool-lsp Loader export-shape guard', () => {
+describe('shres-tool-lsp Loader export-shape guard', () => {
   it('has no default export and keeps name/inject/Config through unwrapExports', () => {
     expect('default' in toolLsp).toBe(false)
 

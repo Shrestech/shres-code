@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { assertUsableApiKey, INVALID_CREDENTIAL_CODE, normalizeApiKey } from '@roos-code/roos-code-llm'
+import { assertUsableApiKey, INVALID_CREDENTIAL_CODE, normalizeApiKey } from '@shres-code/shres-code-llm'
 
 describe('normalizeApiKey', () => {
   it('accepts a printable-ASCII key unchanged', () => {

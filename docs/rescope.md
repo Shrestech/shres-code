@@ -1,30 +1,30 @@
 # Vendored package rescope
 
-The Cordis framework and its foundation libraries are vendored under [`vendor/`](../vendor/README.md) and published under the `@roos-code` scope, because every harness package declares the framework as a peer dependency: publishing the harness publishes this layer with it, and under the upstream names that publication would squat them on the registry. This page is the name mapping; the decision and its consequences live in the [rescope Agent Note](../.agents/notes/implemented/process/2026-08-10-vendor-package-rescope.md), and the upstream commits in [`vendor/README.md`](../vendor/README.md).
+The Cordis framework and its foundation libraries are vendored under [`vendor/`](../vendor/README.md) and published under the `@shres-code` scope, because every harness package declares the framework as a peer dependency: publishing the harness publishes this layer with it, and under the upstream names that publication would squat them on the registry. This page is the name mapping; the decision and its consequences live in the [rescope Agent Note](../.agents/notes/implemented/process/2026-08-10-vendor-package-rescope.md), and the upstream commits in [`vendor/README.md`](../vendor/README.md).
 
 ## Name mapping
 
 | Directory | Upstream name | Published name | Version | Role |
 |---|---|---|---|---|
-| `vendor/cordis/` | `cordis` | `@roos-code/cordis` | 4.0.0-rc.7 | Framework core: `Context`, `Service`, `Fiber`, events |
-| `vendor/cosmokit/` | `cosmokit` | `@roos-code/cosmokit` | 1.8.1 | Shared utilities the framework and Schemastery build on |
-| `vendor/schemastery/` | `schemastery` | `@roos-code/schemastery` | 3.18.0 | Config schemas (`Schema`) behind every plugin's `Config` |
-| `vendor/loader/` | `@cordisjs/plugin-loader` | `@roos-code/cordis-plugin-loader` | 1.0.0-rc.5 | `cordis.yml` loading, plugin resolution, repository cache |
-| `vendor/include/` | `@cordisjs/plugin-include` | `@roos-code/cordis-plugin-include` | 1.0.4 | Config includes and patch overlays |
-| `vendor/group/` | `@cordisjs/plugin-group` | `@roos-code/cordis-plugin-group` | 1.0.0 | Nested plugin groups |
-| `vendor/timer/` | `@cordisjs/plugin-timer` | `@roos-code/cordis-plugin-timer` | 1.1.2 | Disposal-aware timers on `ctx` |
-| `vendor/hmr/` | `@cordisjs/plugin-hmr` | `@roos-code/cordis-plugin-hmr` | 1.0.15 | Hot module replacement for plugins and config |
-| `vendor/logger-console/` | `@cordisjs/plugin-logger-console` | `@roos-code/cordis-plugin-logger-console` | 1.0.0 | Console logger exporter |
+| `vendor/cordis/` | `cordis` | `@shres-code/cordis` | 4.0.0-rc.7 | Framework core: `Context`, `Service`, `Fiber`, events |
+| `vendor/cosmokit/` | `cosmokit` | `@shres-code/cosmokit` | 1.8.1 | Shared utilities the framework and Schemastery build on |
+| `vendor/schemastery/` | `schemastery` | `@shres-code/schemastery` | 3.18.0 | Config schemas (`Schema`) behind every plugin's `Config` |
+| `vendor/loader/` | `@cordisjs/plugin-loader` | `@shres-code/cordis-plugin-loader` | 1.0.0-rc.5 | `cordis.yml` loading, plugin resolution, repository cache |
+| `vendor/include/` | `@cordisjs/plugin-include` | `@shres-code/cordis-plugin-include` | 1.0.4 | Config includes and patch overlays |
+| `vendor/group/` | `@cordisjs/plugin-group` | `@shres-code/cordis-plugin-group` | 1.0.0 | Nested plugin groups |
+| `vendor/timer/` | `@cordisjs/plugin-timer` | `@shres-code/cordis-plugin-timer` | 1.1.2 | Disposal-aware timers on `ctx` |
+| `vendor/hmr/` | `@cordisjs/plugin-hmr` | `@shres-code/cordis-plugin-hmr` | 1.0.15 | Hot module replacement for plugins and config |
+| `vendor/logger-console/` | `@cordisjs/plugin-logger-console` | `@shres-code/cordis-plugin-logger-console` | 1.0.0 | Console logger exporter |
 
-Subpath exports keep their path: `@cordisjs/plugin-loader/repository` becomes `@roos-code/cordis-plugin-loader/repository`.
+Subpath exports keep their path: `@cordisjs/plugin-loader/repository` becomes `@shres-code/cordis-plugin-loader/repository`.
 
 ## What the rename does not touch
 
 - **Directory names and versions.** `vendor/hmr/` stays `vendor/hmr/`, and every package keeps the upstream version its manifest table row records, so the vendored tree still reads as an upstream snapshot.
-- **Dependency ranges.** A dependency entry changes its key, never its range: `"cordis": "^4.0.0-rc.7"` becomes `"@roos-code/cordis": "^4.0.0-rc.7"`. `linkWorkspacePackages` resolves those preserved ranges to the pinned workspaces.
+- **Dependency ranges.** A dependency entry changes its key, never its range: `"cordis": "^4.0.0-rc.7"` becomes `"@shres-code/cordis": "^4.0.0-rc.7"`. `linkWorkspacePackages` resolves those preserved ranges to the pinned workspaces.
 - **The Loader's `cordis:` builtin prefix.** `cordis:include` and `cordis:group` are a protocol prefix, not a package name.
 - **The `cordis.yml` configuration family**, including `*.cordis.yml`, `*.cordis.snapshot.yml`, and `cordis.patch.yml`.
-- **Harness packages whose own names contain the word**, such as `@roos-code/roos-code-tool-cordis`.
+- **Harness packages whose own names contain the word**, such as `@shres-code/shres-code-tool-cordis`.
 - **Upstream runtime identifiers**, such as Schemastery's `Symbol.for('schemastery')` and its `vendor:` metadata field.
 - **Prose outside `docs/`.** `vendor/*/README.md`, package READMEs, and Agent Notes keep the names they were written with; a bare `cordis` there can also be the Python SDK's option name or an agent-preset id. Inside `docs/`, prose and every Markdown fence follow the rename.
 
@@ -32,10 +32,10 @@ Subpath exports keep their path: `@cordisjs/plugin-loader/repository` becomes `@
 
 | Site | Before | After |
 |---|---|---|
-| Module import | `import { Context } from 'cordis'` | `import { Context } from '@roos-code/cordis'` |
-| Typed-event merge | `declare module 'cordis'` | `declare module '@roos-code/cordis'` |
-| `package.json` dependency key | `"@cordisjs/plugin-hmr": "^1.0.15"` | `"@roos-code/cordis-plugin-hmr": "^1.0.15"` |
-| `cordis.yml` plugin entry | `name: '@cordisjs/plugin-include'` | `name: '@roos-code/cordis-plugin-include'` |
+| Module import | `import { Context } from 'cordis'` | `import { Context } from '@shres-code/cordis'` |
+| Typed-event merge | `declare module 'cordis'` | `declare module '@shres-code/cordis'` |
+| `package.json` dependency key | `"@cordisjs/plugin-hmr": "^1.0.15"` | `"@shres-code/cordis-plugin-hmr": "^1.0.15"` |
+| `cordis.yml` plugin entry | `name: '@cordisjs/plugin-include'` | `name: '@shres-code/cordis-plugin-include'` |
 
 ## Applying, verifying, and reverting
 

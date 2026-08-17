@@ -1,14 +1,14 @@
-/** Package-owned durable retry-event invariants. @module @roos-code/roos-code-llm-retry/invariant */
+/** Package-owned durable retry-event invariants. @module @shres-code/shres-code-llm-retry/invariant */
 
-import type { Context } from '@roos-code/cordis'
-import type { Session, SessionEvent } from '@roos-code/roos-code-session'
-import type { LlmFailure } from '@roos-code/roos-code-llm'
-import { MAX_TIMER_DELAY_MS } from '@roos-code/roos-code-timeout'
-import type { InvariantFailure, InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { Session, SessionEvent } from '@shres-code/shres-code-session'
+import type { LlmFailure } from '@shres-code/shres-code-llm'
+import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
+import type { InvariantFailure, InvariantInstaller } from '@shres-code/shres-code-invariants'
 import { providerForOpenStep } from './history.ts'
 import type {} from './index.ts'
 
-const PACKAGE_NAME = '@roos-code/roos-code-llm-retry'
+const PACKAGE_NAME = '@shres-code/shres-code-llm-retry'
 
 /** Cordis companion plugin name. */
 export const name = 'llm-retry-invariant'

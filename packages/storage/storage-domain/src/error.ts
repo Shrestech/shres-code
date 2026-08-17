@@ -1,6 +1,6 @@
 /**
  * Error vocabulary of the domain data form.
- * @module @roos-code/roos-code-storage-domain/src/error
+ * @module @shres-code/shres-code-storage-domain/src/error
  */
 
 /** Discriminant codes carried by every {@link DomainError}. */

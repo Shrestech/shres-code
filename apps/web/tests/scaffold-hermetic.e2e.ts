@@ -2,9 +2,9 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
-import type {} from '@roos-code/roos-code-skill'
-import { SessionId } from '@roos-code/roos-code-session'
-import type {} from '@roos-code/roos-code-agent-presets'
+import type {} from '@shres-code/shres-code-skill'
+import { SessionId } from '@shres-code/shres-code-session'
+import type {} from '@shres-code/shres-code-agent-presets'
 import { launchWebScaffold, type WebScaffold } from './scaffold.ts'
 
 async function writeSkill(root: string, name: string): Promise<void> {
@@ -20,22 +20,22 @@ Ambient host state.
 }
 
 it('isolates replay skill discovery from every ambient host root', async () => {
-  const ambient = await mkdtemp(join(tmpdir(), 'roos-web-ambient-skills-'))
-  const roosHome = join(ambient, 'roos-home')
+  const ambient = await mkdtemp(join(tmpdir(), 'shres-web-ambient-skills-'))
+  const shresHome = join(ambient, 'shres-home')
   const agentsHome = join(ambient, 'agents-home')
   const bundled = join(ambient, 'bundled')
   await Promise.all([
-    writeSkill(join(roosHome, 'skills'), 'ambient-roos'),
+    writeSkill(join(shresHome, 'skills'), 'ambient-shres'),
     writeSkill(join(agentsHome, 'skills'), 'ambient-agents'),
     writeSkill(bundled, 'ambient-bundled'),
   ])
 
-  const originalRoosHome = process.env.ROOS_HOME
-  const originalAgentsHome = process.env.ROOS_AGENTS_HOME
-  const originalBundled = process.env.ROOS_BUNDLED_SKILL_DIR
-  process.env.ROOS_HOME = roosHome
-  process.env.ROOS_AGENTS_HOME = agentsHome
-  process.env.ROOS_BUNDLED_SKILL_DIR = bundled
+  const originalShresHome = process.env.SHRES_HOME
+  const originalAgentsHome = process.env.SHRES_AGENTS_HOME
+  const originalBundled = process.env.SHRES_BUNDLED_SKILL_DIR
+  process.env.SHRES_HOME = shresHome
+  process.env.SHRES_AGENTS_HOME = agentsHome
+  process.env.SHRES_BUNDLED_SKILL_DIR = bundled
   let scaffold: WebScaffold | undefined
   try {
     scaffold = await launchWebScaffold()
@@ -52,7 +52,7 @@ it('isolates replay skill discovery from every ambient host root', async () => {
       const skills = ctx.get('skills')
       if (skills === undefined) throw new Error('the composition mounts no skill registry')
       const names = (await skills.list({ cwd: scaffold.workspaceCwd, scope: handle.agent })).map(skill => skill.name)
-      expect(names).not.toContain('ambient-roos')
+      expect(names).not.toContain('ambient-shres')
       expect(names).not.toContain('ambient-agents')
       expect(names).not.toContain('ambient-bundled')
     } finally {
@@ -62,12 +62,12 @@ it('isolates replay skill discovery from every ambient host root', async () => {
     try {
       await scaffold?.close()
     } finally {
-      if (originalRoosHome === undefined) delete process.env.ROOS_HOME
-      else process.env.ROOS_HOME = originalRoosHome
-      if (originalAgentsHome === undefined) delete process.env.ROOS_AGENTS_HOME
-      else process.env.ROOS_AGENTS_HOME = originalAgentsHome
-      if (originalBundled === undefined) delete process.env.ROOS_BUNDLED_SKILL_DIR
-      else process.env.ROOS_BUNDLED_SKILL_DIR = originalBundled
+      if (originalShresHome === undefined) delete process.env.SHRES_HOME
+      else process.env.SHRES_HOME = originalShresHome
+      if (originalAgentsHome === undefined) delete process.env.SHRES_AGENTS_HOME
+      else process.env.SHRES_AGENTS_HOME = originalAgentsHome
+      if (originalBundled === undefined) delete process.env.SHRES_BUNDLED_SKILL_DIR
+      else process.env.SHRES_BUNDLED_SKILL_DIR = originalBundled
       await rm(ambient, { recursive: true, force: true })
     }
   }

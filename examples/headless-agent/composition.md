@@ -8,85 +8,85 @@ The headless snapshot composition combines the real DeepSeek adapter and coding 
 ```mermaid
 flowchart LR
   cfg["examples/headless-agent<br/>cordis.yml"]
-  plugin_headless_settings["settings<br/>@roos-code/roos-code-settings-file"]
+  plugin_headless_settings["settings<br/>@shres-code/shres-code-settings-file"]
   cfg --> plugin_headless_settings
-  plugin_headless_credentials["credentials<br/>@roos-code/roos-code-credentials-local"]
+  plugin_headless_credentials["credentials<br/>@shres-code/shres-code-credentials-local"]
   cfg --> plugin_headless_credentials
-  plugin_headless_llm_deepseek["llm-deepseek<br/>@roos-code/roos-code-llm-deepseek"]
+  plugin_headless_llm_deepseek["llm-deepseek<br/>@shres-code/shres-code-llm-deepseek"]
   cfg --> plugin_headless_llm_deepseek
-  plugin_headless_subprocess["subprocess<br/>@roos-code/roos-code-subprocess-local"]
+  plugin_headless_subprocess["subprocess<br/>@shres-code/shres-code-subprocess-local"]
   cfg --> plugin_headless_subprocess
-  plugin_headless_bash["bash<br/>@roos-code/roos-code-bash-local"]
+  plugin_headless_bash["bash<br/>@shres-code/shres-code-bash-local"]
   cfg --> plugin_headless_bash
-  plugin_headless_agent_spine["agent-spine<br/>@roos-code/roos-code-agent-spine-demo"]
+  plugin_headless_agent_spine["agent-spine<br/>@shres-code/shres-code-agent-spine-demo"]
   cfg --> plugin_headless_agent_spine
-  plugin_headless_persistence["persistence<br/>@roos-code/roos-code-session-persistence-jsonl"]
+  plugin_headless_persistence["persistence<br/>@shres-code/shres-code-session-persistence-jsonl"]
   cfg --> plugin_headless_persistence
-  plugin_headless_checkpoint_policy["checkpoint-policy<br/>@roos-code/roos-code-session-checkpoint-policy"]
+  plugin_headless_checkpoint_policy["checkpoint-policy<br/>@shres-code/shres-code-session-checkpoint-policy"]
   cfg --> plugin_headless_checkpoint_policy
-  plugin_headless_token_meter["token-meter<br/>@roos-code/roos-code-token-meter"]
+  plugin_headless_token_meter["token-meter<br/>@shres-code/shres-code-token-meter"]
   cfg --> plugin_headless_token_meter
-  plugin_headless_compaction_basic["compaction-basic<br/>@roos-code/roos-code-compaction-basic"]
+  plugin_headless_compaction_basic["compaction-basic<br/>@shres-code/shres-code-compaction-basic"]
   cfg --> plugin_headless_compaction_basic
-  plugin_headless_session_projection["session-projection<br/>@roos-code/roos-code-session-projection"]
+  plugin_headless_session_projection["session-projection<br/>@shres-code/shres-code-session-projection"]
   cfg --> plugin_headless_session_projection
-  plugin_headless_subagent["subagent<br/>@roos-code/roos-code-subagent"]
+  plugin_headless_subagent["subagent<br/>@shres-code/shres-code-subagent"]
   cfg --> plugin_headless_subagent
-  plugin_headless_subagent_spawn_in_process["subagent-spawn-in-process<br/>@roos-code/roos-code-subagent-spawn-in-process"]
+  plugin_headless_subagent_spawn_in_process["subagent-spawn-in-process<br/>@shres-code/shres-code-subagent-spawn-in-process"]
   cfg --> plugin_headless_subagent_spawn_in_process
-  plugin_headless_subagent_fork_in_process["subagent-fork-in-process<br/>@roos-code/roos-code-subagent-fork-in-process"]
+  plugin_headless_subagent_fork_in_process["subagent-fork-in-process<br/>@shres-code/shres-code-subagent-fork-in-process"]
   cfg --> plugin_headless_subagent_fork_in_process
-  plugin_headless_tool_subagent_control["tool-subagent-control<br/>@roos-code/roos-code-tool-subagent-control"]
+  plugin_headless_tool_subagent_control["tool-subagent-control<br/>@shres-code/shres-code-tool-subagent-control"]
   cfg --> plugin_headless_tool_subagent_control
-  plugin_headless_tool_subagent_report["tool-subagent-report<br/>@roos-code/roos-code-tool-subagent-report"]
+  plugin_headless_tool_subagent_report["tool-subagent-report<br/>@shres-code/shres-code-tool-subagent-report"]
   cfg --> plugin_headless_tool_subagent_report
-  plugin_headless_tool_subagent["tool-subagent<br/>@roos-code/roos-code-tool-subagent"]
+  plugin_headless_tool_subagent["tool-subagent<br/>@shres-code/shres-code-tool-subagent"]
   cfg --> plugin_headless_tool_subagent
-  plugin_headless_tool_subagent_fork["tool-subagent-fork<br/>@roos-code/roos-code-tool-subagent"]
+  plugin_headless_tool_subagent_fork["tool-subagent-fork<br/>@shres-code/shres-code-tool-subagent"]
   cfg --> plugin_headless_tool_subagent_fork
-  plugin_headless_workflow_worker_thread["workflow-worker-thread<br/>@roos-code/roos-code-workflow-worker-thread"]
+  plugin_headless_workflow_worker_thread["workflow-worker-thread<br/>@shres-code/shres-code-workflow-worker-thread"]
   cfg --> plugin_headless_workflow_worker_thread
-  plugin_headless_tool_workflow["tool-workflow<br/>@roos-code/roos-code-tool-workflow"]
+  plugin_headless_tool_workflow["tool-workflow<br/>@shres-code/shres-code-tool-workflow"]
   cfg --> plugin_headless_tool_workflow
-  plugin_headless_tool_ralph["tool-ralph<br/>@roos-code/roos-code-tool-ralph"]
+  plugin_headless_tool_ralph["tool-ralph<br/>@shres-code/shres-code-tool-ralph"]
   cfg --> plugin_headless_tool_ralph
-  plugin_headless_tool_todo["tool-todo<br/>@roos-code/roos-code-tool-todo"]
+  plugin_headless_tool_todo["tool-todo<br/>@shres-code/shres-code-tool-todo"]
   cfg --> plugin_headless_tool_todo
-  plugin_headless_fs_local["fs-local<br/>@roos-code/roos-code-fs-local"]
+  plugin_headless_fs_local["fs-local<br/>@shres-code/shres-code-fs-local"]
   cfg --> plugin_headless_fs_local
-  plugin_headless_fs_observation_policy["fs-observation-policy<br/>@roos-code/roos-code-fs-observation-policy"]
+  plugin_headless_fs_observation_policy["fs-observation-policy<br/>@shres-code/shres-code-fs-observation-policy"]
   cfg --> plugin_headless_fs_observation_policy
-  plugin_headless_tool_fs["tool-fs<br/>@roos-code/roos-code-tool-fs"]
+  plugin_headless_tool_fs["tool-fs<br/>@shres-code/shres-code-tool-fs"]
   cfg --> plugin_headless_tool_fs
 ```
 
 | Plugin id | Package / module |
 | --- | --- |
-| `settings` | `@roos-code/roos-code-settings-file` |
-| `credentials` | `@roos-code/roos-code-credentials-local` |
-| `llm-deepseek` | `@roos-code/roos-code-llm-deepseek` |
-| `subprocess` | `@roos-code/roos-code-subprocess-local` |
-| `bash` | `@roos-code/roos-code-bash-local` |
-| `agent-spine` | `@roos-code/roos-code-agent-spine-demo` |
-| `persistence` | `@roos-code/roos-code-session-persistence-jsonl` |
-| `checkpoint-policy` | `@roos-code/roos-code-session-checkpoint-policy` |
-| `token-meter` | `@roos-code/roos-code-token-meter` |
-| `compaction-basic` | `@roos-code/roos-code-compaction-basic` |
-| `session-projection` | `@roos-code/roos-code-session-projection` |
-| `subagent` | `@roos-code/roos-code-subagent` |
-| `subagent-spawn-in-process` | `@roos-code/roos-code-subagent-spawn-in-process` |
-| `subagent-fork-in-process` | `@roos-code/roos-code-subagent-fork-in-process` |
-| `tool-subagent-control` | `@roos-code/roos-code-tool-subagent-control` |
-| `tool-subagent-report` | `@roos-code/roos-code-tool-subagent-report` |
-| `tool-subagent` | `@roos-code/roos-code-tool-subagent` |
-| `tool-subagent-fork` | `@roos-code/roos-code-tool-subagent` |
-| `workflow-worker-thread` | `@roos-code/roos-code-workflow-worker-thread` |
-| `tool-workflow` | `@roos-code/roos-code-tool-workflow` |
-| `tool-ralph` | `@roos-code/roos-code-tool-ralph` |
-| `tool-todo` | `@roos-code/roos-code-tool-todo` |
-| `fs-local` | `@roos-code/roos-code-fs-local` |
-| `fs-observation-policy` | `@roos-code/roos-code-fs-observation-policy` |
-| `tool-fs` | `@roos-code/roos-code-tool-fs` |
+| `settings` | `@shres-code/shres-code-settings-file` |
+| `credentials` | `@shres-code/shres-code-credentials-local` |
+| `llm-deepseek` | `@shres-code/shres-code-llm-deepseek` |
+| `subprocess` | `@shres-code/shres-code-subprocess-local` |
+| `bash` | `@shres-code/shres-code-bash-local` |
+| `agent-spine` | `@shres-code/shres-code-agent-spine-demo` |
+| `persistence` | `@shres-code/shres-code-session-persistence-jsonl` |
+| `checkpoint-policy` | `@shres-code/shres-code-session-checkpoint-policy` |
+| `token-meter` | `@shres-code/shres-code-token-meter` |
+| `compaction-basic` | `@shres-code/shres-code-compaction-basic` |
+| `session-projection` | `@shres-code/shres-code-session-projection` |
+| `subagent` | `@shres-code/shres-code-subagent` |
+| `subagent-spawn-in-process` | `@shres-code/shres-code-subagent-spawn-in-process` |
+| `subagent-fork-in-process` | `@shres-code/shres-code-subagent-fork-in-process` |
+| `tool-subagent-control` | `@shres-code/shres-code-tool-subagent-control` |
+| `tool-subagent-report` | `@shres-code/shres-code-tool-subagent-report` |
+| `tool-subagent` | `@shres-code/shres-code-tool-subagent` |
+| `tool-subagent-fork` | `@shres-code/shres-code-tool-subagent` |
+| `workflow-worker-thread` | `@shres-code/shres-code-workflow-worker-thread` |
+| `tool-workflow` | `@shres-code/shres-code-tool-workflow` |
+| `tool-ralph` | `@shres-code/shres-code-tool-ralph` |
+| `tool-todo` | `@shres-code/shres-code-tool-todo` |
+| `fs-local` | `@shres-code/shres-code-fs-local` |
+| `fs-observation-policy` | `@shres-code/shres-code-fs-observation-policy` |
+| `tool-fs` | `@shres-code/shres-code-tool-fs` |
 
 Source config: [`examples/headless-agent/cordis.yml`](cordis.yml).
 

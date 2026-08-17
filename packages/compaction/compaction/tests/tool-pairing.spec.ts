@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { createUserMessage, CallId , createMessage, createToolResultMessage } from '@roos-code/roos-code-llm'
-import { toolPairingBalancedAfter, toolPairingBalancedBefore } from '@roos-code/roos-code-compaction'
-import { Session, SessionId } from '@roos-code/roos-code-session'
-import type { SessionEvent } from '@roos-code/roos-code-session'
+import { createUserMessage, CallId , createMessage, createToolResultMessage } from '@shres-code/shres-code-llm'
+import { toolPairingBalancedAfter, toolPairingBalancedBefore } from '@shres-code/shres-code-compaction'
+import { Session, SessionId } from '@shres-code/shres-code-session'
+import type { SessionEvent } from '@shres-code/shres-code-session'
 
 const SURFACE = { surfaceOp: 'append' as const }
 

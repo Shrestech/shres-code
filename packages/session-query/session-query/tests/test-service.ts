@@ -1,4 +1,4 @@
-import SessionQueryEngine from '@roos-code/roos-code-session-query'
+import SessionQueryEngine from '@shres-code/shres-code-session-query'
 import type {
   SessionEventSearchPage,
   SessionEventSearchRequest,
@@ -6,7 +6,7 @@ import type {
   SessionSearchHit,
   SessionSearchPage,
   SessionSearchRequest,
-} from '@roos-code/roos-code-session-query'
+} from '@shres-code/shres-code-session-query'
 
 /** Test-only concrete query service for backend-independent behavior. */
 export class TestSessionQueryEngine extends SessionQueryEngine {

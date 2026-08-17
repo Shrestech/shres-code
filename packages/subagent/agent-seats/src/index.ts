@@ -1,14 +1,14 @@
 /**
  * Remount named `tool-subagent` spawn seats from the `agent-seats` settings
- * section. Each bound seat is one Roos child tool (`boomer`, `joey`, `flyer`)
+ * section. Each bound seat is one Shres child tool (`aegis`, `stride`, `ward`)
  * with its own `agentOptions` provider/model. Unbound seats stay unmounted.
- * @module @roos-code/roos-code-agent-seats
+ * @module @shres-code/shres-code-agent-seats
  */
 
-import type { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import { deepEqualJson, installSettingsSection, settingsNamespace } from '@roos-code/roos-code-settings'
-import * as ToolSubagent from '@roos-code/roos-code-tool-subagent'
+import type { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import { deepEqualJson, installSettingsSection, settingsNamespace } from '@shres-code/shres-code-settings'
+import * as ToolSubagent from '@shres-code/shres-code-tool-subagent'
 import type { AgentSeatsSettings, BoundSeat, SeatBinding } from './roster.ts'
 import { boundSeats } from './roster.ts'
 
@@ -36,9 +36,9 @@ export interface Config extends AgentSeatsSettings {}
 /** Runtime schema for the seats section. */
 export const Config: z<Config> = z.object({
   seats: z.object({
-    boomer: seatBinding,
-    joey: seatBinding,
-    flyer: seatBinding,
+    aegis: seatBinding,
+    stride: seatBinding,
+    ward: seatBinding,
   }),
 })
 
@@ -63,7 +63,7 @@ export function seatToolConfig(seat: BoundSeat): ToolSubagent.Config {
 }
 
 /**
- * Remount `boomer` / `joey` / `flyer` whenever the seats document changes.
+ * Remount `aegis` / `stride` / `ward` whenever the seats document changes.
  * @param ctx - host context that already has tools, subagents, and systemPrompt.
  * @param config - composition entry used as the settings base.
  */

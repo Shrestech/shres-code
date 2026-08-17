@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import Schema from '@roos-code/schemastery'
-import { bindSnapshotSelector } from '@roos-code/roos-code-client-web-react'
-import type { RpcResponse, SettingsNamespaceView } from '@roos-code/roos-code-api-remotes/client'
+import Schema from '@shres-code/schemastery'
+import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
+import type { RpcResponse, SettingsNamespaceView } from '@shres-code/shres-code-api-remotes/client'
 import { ModelsSection } from '../src/client/ModelsSection.tsx'
 import type { ModelsSectionInjected } from '../src/client/ModelsSection.tsx'
 import { seatValueOf, writeSeat } from '../src/client/SeatsCard.tsx'
@@ -16,9 +16,9 @@ const t: ModelsSectionInjected['t'] = key => en[key]
 
 const SeatsConfig = Schema.object({
   seats: Schema.object({
-    boomer: Schema.object({ provider: Schema.string(), model: Schema.string() }),
-    joey: Schema.object({ provider: Schema.string(), model: Schema.string() }),
-    flyer: Schema.object({ provider: Schema.string(), model: Schema.string() }),
+    aegis: Schema.object({ provider: Schema.string(), model: Schema.string() }),
+    stride: Schema.object({ provider: Schema.string(), model: Schema.string() }),
+    ward: Schema.object({ provider: Schema.string(), model: Schema.string() }),
   }),
 })
 
@@ -40,19 +40,19 @@ function ok<T>(value: T): RpcResponse<T> {
 
 describe('seatValueOf / writeSeat', () => {
   it('reads a stored binding and writes set/unset ops', async () => {
-    expect(seatValueOf({ seats: { boomer: { provider: 'ollama-cloud', model: 'kimi-k3' } } }, 'boomer'))
+    expect(seatValueOf({ seats: { aegis: { provider: 'ollama-cloud', model: 'kimi-k3' } } }, 'aegis'))
       .toEqual({ provider: 'ollama-cloud', model: 'kimi-k3' })
-    expect(seatValueOf({}, 'joey')).toEqual({})
+    expect(seatValueOf({}, 'stride')).toEqual({})
     const mutate = vi.fn(() => Promise.resolve(ok({})))
-    await writeSeat({ settings: { mutate } as never }, 'flyer', { provider: 'p', model: 'm' })
+    await writeSeat({ settings: { mutate } as never }, 'ward', { provider: 'p', model: 'm' })
     expect(mutate).toHaveBeenCalledWith({
       ns: 'agent-seats',
-      ops: [{ op: 'set', path: ['seats', 'flyer'], value: { provider: 'p', model: 'm' } }],
+      ops: [{ op: 'set', path: ['seats', 'ward'], value: { provider: 'p', model: 'm' } }],
     })
-    await writeSeat({ settings: { mutate } as never }, 'flyer', undefined)
+    await writeSeat({ settings: { mutate } as never }, 'ward', undefined)
     expect(mutate).toHaveBeenLastCalledWith({
       ns: 'agent-seats',
-      ops: [{ op: 'unset', path: ['seats', 'flyer'] }],
+      ops: [{ op: 'unset', path: ['seats', 'ward'] }],
     })
   })
 })
@@ -114,20 +114,20 @@ describe('SeatsCard', () => {
       />,
     )
     expect(screen.getByText(en.seatsTitle)).toBeTruthy()
-    expect(screen.getByText(en.seatBoomerRole)).toBeTruthy()
-    expect(screen.getByText(en.seatJoeyRole)).toBeTruthy()
-    expect(screen.getByText(en.seatFlyerRole)).toBeTruthy()
-    expect(screen.getByText(en.seatBoomerDescription)).toBeTruthy()
+    expect(screen.getByText(en.seatAegisRole)).toBeTruthy()
+    expect(screen.getByText(en.seatStrideRole)).toBeTruthy()
+    expect(screen.getByText(en.seatWardRole)).toBeTruthy()
+    expect(screen.getByText(en.seatAegisDescription)).toBeTruthy()
     await waitFor(() => {
       expect(face.llm.models).toHaveBeenCalled()
     })
-    fireEvent.change(screen.getByLabelText(`${en.seatBoomerName} ${en.seatsProvider}`), {
+    fireEvent.change(screen.getByLabelText(`${en.seatAegisName} ${en.seatsProvider}`), {
       target: { value: 'ollama-cloud' },
     })
     await waitFor(() => {
       expect(mutate).toHaveBeenCalledWith({
         ns: 'agent-seats',
-        ops: [{ op: 'set', path: ['seats', 'boomer'], value: { provider: 'ollama-cloud' } }],
+        ops: [{ op: 'set', path: ['seats', 'aegis'], value: { provider: 'ollama-cloud' } }],
       })
     })
   })

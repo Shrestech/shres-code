@@ -1,8 +1,8 @@
 /** Host registration for the browser theme preference and pre-plugin palette. */
 
-import type { Context } from '@roos-code/cordis'
-import type {} from '@roos-code/roos-code-host-webserver'
-import { settingsNamespace } from '@roos-code/roos-code-settings'
+import type { Context } from '@shres-code/cordis'
+import type {} from '@shres-code/shres-code-host-webserver'
+import { settingsNamespace } from '@shres-code/shres-code-settings'
 import { injectBootTheme } from './boot-theme.ts'
 import {
   DEFAULT_PREFERENCE, THEME_SETTINGS_NAMESPACE, ThemeSettingsSchema,

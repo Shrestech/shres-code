@@ -2,12 +2,12 @@
  * Template routes offered by the first-run picker, plus the user-layer
  * and credential checks that decide whether setup is required.
  *
- * @module @roos-code/roos-code-first-run-setup/options
+ * @module @shres-code/shres-code-first-run-setup/options
  */
 
-import { credentialRef } from '@roos-code/roos-code-credentials'
-import type { Context } from '@roos-code/cordis'
-import { AGENT_DEFAULT_MODEL_SETTINGS_NAMESPACE } from '@roos-code/roos-code-agent-default-model'
+import { credentialRef } from '@shres-code/shres-code-credentials'
+import type { Context } from '@shres-code/cordis'
+import { AGENT_DEFAULT_MODEL_SETTINGS_NAMESPACE } from '@shres-code/shres-code-agent-default-model'
 import type { LocalOllamaStatus, PickerOption, TemplateRoute } from './types.ts'
 
 /** Shipped template routes. A named `apiKeyEnv` is unusable until stored. */
@@ -142,7 +142,7 @@ export function noProviderError(): Error {
   return new Error(
     'first-run-setup: no usable model provider and no agent-default-model selection. '
     + 'Store a provider key (Settings → Models, or the matching *_API_KEY), write '
-    + 'agent-default-model in $ROOS_HOME/settings.yaml, or run on a TTY to use the picker. '
-    + 'Roos Code does not silently default to a vendor.',
+    + 'agent-default-model in $SHRES_HOME/settings.yaml, or run on a TTY to use the picker. '
+    + 'Shres Code does not silently default to a vendor.',
   )
 }

@@ -1,5 +1,5 @@
 {
-  "name": "@roos-code/roos-code-client-runtime",
+  "name": "@shres-code/shres-code-client-runtime",
   "description": "Client core services: SlotRegistry, SessionRuntime (scope tree + object layer)",
   "version": "0.1.0-rc.5",
   "publishConfig": {
@@ -7,7 +7,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "packages/client/runtime"
   },
   "type": "module",
@@ -29,12 +29,12 @@
     "./src/*": "./src/*",
     "./package.json": "./package.json"
   },
-  "roos": {
+  "shres": {
     "client": {
       "inject": [
-        "@roos-code/roos-code-client-connection",
-        "@roos-code/roos-code-typert-registry",
-        "@roos-code/roos-code-api-remotes"
+        "@shres-code/shres-code-client-connection",
+        "@shres-code/shres-code-typert-registry",
+        "@shres-code/shres-code-api-remotes"
       ],
       "platform": "web",
       "immediately": true
@@ -42,36 +42,36 @@
   },
   "license": "MIT",
   "dependencies": {
-    "@roos-code/roos-code-agent": "workspace:^",
-    "@roos-code/roos-code-attachment": "workspace:^",
-    "@roos-code/roos-code-client-connection": "workspace:^",
-    "@roos-code/roos-code-commands": "workspace:^",
-    "@roos-code/roos-code-client-ui-slots": "workspace:^",
-    "@roos-code/roos-code-host-apiproxy": "workspace:^",
-    "@roos-code/roos-code-llm": "workspace:^",
-    "@roos-code/roos-code-llm-retry": "workspace:^",
-    "@roos-code/roos-code-session": "workspace:^",
-    "@roos-code/roos-code-session-projection": "workspace:^",
-    "@roos-code/roos-code-session-title": "workspace:^",
-    "@roos-code/roos-code-tools": "workspace:^",
+    "@shres-code/shres-code-agent": "workspace:^",
+    "@shres-code/shres-code-attachment": "workspace:^",
+    "@shres-code/shres-code-client-connection": "workspace:^",
+    "@shres-code/shres-code-commands": "workspace:^",
+    "@shres-code/shres-code-client-ui-slots": "workspace:^",
+    "@shres-code/shres-code-host-apiproxy": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-llm-retry": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-session-projection": "workspace:^",
+    "@shres-code/shres-code-session-title": "workspace:^",
+    "@shres-code/shres-code-tools": "workspace:^",
     "immer": "^10.1.1",
     "react": "^18.2.0",
     "zustand": "~4.4.7"
   },
   "peerDependencies": {
-    "@roos-code/cordis": "workspace:^",
-    "@roos-code/roos-code-api-remotes": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-typert-protocol": "workspace:^",
-    "@roos-code/roos-code-typert-registry": "workspace:^"
+    "@shres-code/cordis": "workspace:^",
+    "@shres-code/shres-code-api-remotes": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-typert-protocol": "workspace:^",
+    "@shres-code/shres-code-typert-registry": "workspace:^"
   },
   "devDependencies": {
-    "@roos-code/cordis": "workspace:^",
-    "@roos-code/roos-code-api-remotes": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-timeout": "workspace:^",
-    "@roos-code/roos-code-typert-protocol": "workspace:^",
-    "@roos-code/roos-code-typert-registry": "workspace:^",
+    "@shres-code/cordis": "workspace:^",
+    "@shres-code/shres-code-api-remotes": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-timeout": "workspace:^",
+    "@shres-code/shres-code-typert-protocol": "workspace:^",
+    "@shres-code/shres-code-typert-registry": "workspace:^",
     "@types/react": "~18.3.1"
   },
   "files": [

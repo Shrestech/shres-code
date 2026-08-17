@@ -2,16 +2,16 @@
  * Workspace entity registry (`ctx.workspaceRegistry`): durable workspace records,
  * stable registry order, and header-validated session membership over the
  * domain data form.
- * @module @roos-code/roos-code-workspace
+ * @module @shres-code/shres-code-workspace
  */
 
 import { randomUUID } from 'node:crypto'
 import { stat } from 'node:fs/promises'
 import { basename } from 'node:path'
-import { Context, Service } from '@roos-code/cordis'
-import type { SessionHeader, SessionId } from '@roos-code/roos-code-session'
-import type {} from '@roos-code/roos-code-session-persistence'
-import type { DomainGlobal, KvTable } from '@roos-code/roos-code-storage-domain'
+import { Context, Service } from '@shres-code/cordis'
+import type { SessionHeader, SessionId } from '@shres-code/shres-code-session'
+import type {} from '@shres-code/shres-code-session-persistence'
+import type { DomainGlobal, KvTable } from '@shres-code/shres-code-storage-domain'
 import { WorkspaceEntity } from './entity.ts'
 import type { WorkspaceEntityHost } from './entity.ts'
 
@@ -64,7 +64,7 @@ export class WorkspaceOrderInvalidError extends Error {
 }
 
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     workspaceRegistry: WorkspaceRegistry
   }

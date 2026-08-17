@@ -1,12 +1,12 @@
 /**
  * Test-only direct-agent turn driver shared by assembled Loader fixtures.
- * @module @roos-code/roos-code-loader-smoke/agent-turn
+ * @module @shres-code/shres-code-loader-smoke/agent-turn
  */
 
-import type { Context } from '@roos-code/cordis'
-import type { Agent } from '@roos-code/roos-code-agent'
-import { createUserMessage, type TokenUsage } from '@roos-code/roos-code-llm'
-import type { SessionEvent } from '@roos-code/roos-code-session'
+import type { Context } from '@shres-code/cordis'
+import type { Agent } from '@shres-code/shres-code-agent'
+import { createUserMessage, type TokenUsage } from '@shres-code/shres-code-llm'
+import type { SessionEvent } from '@shres-code/shres-code-session'
 
 /** Result envelope consumed only by snapshot and composition tests. */
 export interface FixtureTurnResult {

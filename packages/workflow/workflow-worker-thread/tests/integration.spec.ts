@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { SessionId } from '@roos-code/roos-code-session'
-import AgentLoop from '@roos-code/roos-code-agent-loop'
-import { mountAgentLoopTestDependencies } from '@roos-code/roos-code-agent-loop-testkit'
-import InvariantRegistry from '@roos-code/roos-code-invariants'
-import * as SessionInvariant from '@roos-code/roos-code-session/invariant'
-import * as AgentInvariant from '@roos-code/roos-code-agent/invariant'
-import * as AgentLoopInvariant from '@roos-code/roos-code-agent-loop/invariant'
-import SubagentRuntime from '@roos-code/roos-code-subagent'
-import * as spawn from '@roos-code/roos-code-subagent-spawn-in-process'
-import { STRUCTURED_OUTPUT_TOOL } from '@roos-code/roos-code-subagent-in-process-driver'
+import { Context } from '@shres-code/cordis'
+import { SessionId } from '@shres-code/shres-code-session'
+import AgentLoop from '@shres-code/shres-code-agent-loop'
+import { mountAgentLoopTestDependencies } from '@shres-code/shres-code-agent-loop-testkit'
+import InvariantRegistry from '@shres-code/shres-code-invariants'
+import * as SessionInvariant from '@shres-code/shres-code-session/invariant'
+import * as AgentInvariant from '@shres-code/shres-code-agent/invariant'
+import * as AgentLoopInvariant from '@shres-code/shres-code-agent-loop/invariant'
+import SubagentRuntime from '@shres-code/shres-code-subagent'
+import * as spawn from '@shres-code/shres-code-subagent-spawn-in-process'
+import { STRUCTURED_OUTPUT_TOOL } from '@shres-code/shres-code-subagent-in-process-driver'
 import { MockAdapter, textResponse, toolCallResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
 import WorkerThreadWorkflowEngine from '../src/index.ts'
 
@@ -44,7 +44,7 @@ async function setup(script: Script) {
   return { ctx, parent, adapter }
 }
 
-describe('roos-workflow-worker-thread over the real in-process stack', () => {
+describe('shres-workflow-worker-thread over the real in-process stack', () => {
   it('runs a two-stage workflow: a plain child, then a schema child through the structured runtime', async () => {
     const { ctx, parent } = await setup([
       textResponse('the file list is a.ts'),

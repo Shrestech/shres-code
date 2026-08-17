@@ -1,10 +1,10 @@
 /** Tool UI slot declarations and their composed component props. */
-import type { PropsLocale, PropsRenderSlots, PropsRuntime } from '@roos-code/roos-code-client-ui-slots'
-import type { ToolCallBlock } from '@roos-code/roos-code-client-runtime/client'
-import type {} from '@roos-code/roos-code-client-ui-conversation/client'
-import type {} from '@roos-code/roos-code-client-locale/client'
+import type { PropsLocale, PropsRenderSlots, PropsRuntime } from '@shres-code/shres-code-client-ui-slots'
+import type { ToolCallBlock } from '@shres-code/shres-code-client-runtime/client'
+import type {} from '@shres-code/shres-code-client-ui-conversation/client'
+import type {} from '@shres-code/shres-code-client-locale/client'
 
-declare module '@roos-code/roos-code-client-ui-slots' {
+declare module '@shres-code/shres-code-client-ui-slots' {
   interface SlotMap {
     /**
      * Keyed atomic Tool call view, dispatched by the wire Tool name. Register

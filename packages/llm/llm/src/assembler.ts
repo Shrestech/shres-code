@@ -3,7 +3,7 @@
  * algorithm used by the agent loop to build an assistant message from a chunk
  * stream while logging the raw chunks for replay fidelity.
  *
- * @module @roos-code/roos-code-llm/assembler
+ * @module @shres-code/shres-code-llm/assembler
  */
 
 import { CallId } from './brand.ts'
@@ -158,7 +158,7 @@ export class BlockAssembler {
    * @param source - producer attribution for the assembled message.
    * @returns a frozen assistant-role message over `blocks()` (same open-block assembly rules).
    */
-  message(source: MessageSource = { kind: 'plugin', plugin: 'roos-llm/assembler' }): Message {
+  message(source: MessageSource = { kind: 'plugin', plugin: 'shres-llm/assembler' }): Message {
     return createMessage({ role: 'assistant', content: this.blocks(), source })
   }
 }

@@ -7,17 +7,17 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { mkdtemp, readFile, realpath, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { Context } from '@roos-code/cordis'
-import type { Agent } from '@roos-code/roos-code-agent'
-import AgentLoop from '@roos-code/roos-code-agent-loop'
-import { mountAgentLoopTestDependencies } from '@roos-code/roos-code-agent-loop-testkit'
-import SandboxedFileSystem from '@roos-code/roos-code-fs-sandbox'
-import type { ContentBlock } from '@roos-code/roos-code-llm'
-import SandboxPolicyService, { setSandboxMode } from '@roos-code/roos-code-sandbox-policy'
-import { SessionId, type SessionEvent } from '@roos-code/roos-code-session'
-import * as ToolFs from '@roos-code/roos-code-tool-fs'
-import ApprovalService from '@roos-code/roos-code-user-approval'
-import { snapshotSubagentDescriptor } from '@roos-code/roos-code-subagent'
+import { Context } from '@shres-code/cordis'
+import type { Agent } from '@shres-code/shres-code-agent'
+import AgentLoop from '@shres-code/shres-code-agent-loop'
+import { mountAgentLoopTestDependencies } from '@shres-code/shres-code-agent-loop-testkit'
+import SandboxedFileSystem from '@shres-code/shres-code-fs-sandbox'
+import type { ContentBlock } from '@shres-code/shres-code-llm'
+import SandboxPolicyService, { setSandboxMode } from '@shres-code/shres-code-sandbox-policy'
+import { SessionId, type SessionEvent } from '@shres-code/shres-code-session'
+import * as ToolFs from '@shres-code/shres-code-tool-fs'
+import ApprovalService from '@shres-code/shres-code-user-approval'
+import { snapshotSubagentDescriptor } from '@shres-code/shres-code-subagent'
 import { MockAdapter, textResponse, toolCallResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
 import { startInProcessRun } from '../src/index.ts'
 
@@ -28,7 +28,7 @@ const contexts: Context[] = []
 let workspace: string
 
 beforeEach(async () => {
-  workspace = await realpath(await mkdtemp(join(tmpdir(), 'roos-inherit-')))
+  workspace = await realpath(await mkdtemp(join(tmpdir(), 'shres-inherit-')))
 })
 
 afterEach(async () => {
@@ -114,7 +114,7 @@ describe('in-process policy inheritance', () => {
       const runtimeContext = child.session.events.find(
         (event): event is SessionEvent<'user/message'> => event.type === 'user/message'
           && event.data.source.kind === 'plugin'
-          && event.data.source.plugin === '@roos-code/roos-code-system-prompt',
+          && event.data.source.plugin === '@shres-code/shres-code-system-prompt',
       )
       if (request === undefined || runtimeContext === undefined) throw new Error('child request lacks its runtime policy context')
       expect(runtimeContext.seq).toBeLessThan(request.seq)
@@ -122,7 +122,7 @@ describe('in-process policy inheritance', () => {
         .filter((block): block is Extract<ContentBlock, { type: 'text' }> => block.type === 'text')
         .map(block => block.text)
         .join('\n')
-      expect(contextText).toContain('Current Roos file policy: read-only')
+      expect(contextText).toContain('Current Shres file policy: read-only')
       expect(contextText).toContain('Approval prompts are disabled')
       // The statement rides runtime context; the system prompt stays uniform.
       expect(contextText).toContain('You are a delegated subagent')

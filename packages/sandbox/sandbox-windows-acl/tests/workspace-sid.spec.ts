@@ -31,13 +31,13 @@ describe('workspaceWriteSid', () => {
 
 describe('tempWriteSid', () => {
   it('derives a stable domain-separated SID per private temp path', () => {
-    const temp = tempWriteSid('C:\\Users\\agent\\AppData\\Local\\Temp\\roos-abc123')
-    expect(temp).toBe(tempWriteSid('C:\\Users\\agent\\AppData\\Local\\Temp\\roos-abc123'))
+    const temp = tempWriteSid('C:\\Users\\agent\\AppData\\Local\\Temp\\shres-abc123')
+    expect(temp).toBe(tempWriteSid('C:\\Users\\agent\\AppData\\Local\\Temp\\shres-abc123'))
     expect(temp).toMatch(/^S-1-4-\d+-\d+-1$/u)
-    expect(temp).not.toBe(workspaceWriteSid('C:\\Users\\agent\\AppData\\Local\\Temp\\roos-abc123'))
+    expect(temp).not.toBe(workspaceWriteSid('C:\\Users\\agent\\AppData\\Local\\Temp\\shres-abc123'))
   })
 
   it('derives distinct capabilities for distinct private temp paths', () => {
-    expect(tempWriteSid('C:\\Temp\\roos-a')).not.toBe(tempWriteSid('C:\\Temp\\roos-b'))
+    expect(tempWriteSid('C:\\Temp\\shres-a')).not.toBe(tempWriteSid('C:\\Temp\\shres-b'))
   })
 })

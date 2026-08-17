@@ -4,14 +4,14 @@
  * api-gateway's own coverage); each established connection generation emits
  * `connection/reset` for generation-scoped cache invalidation.
  */
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { describe, expect, it } from 'vitest'
-import type { ConnectionHandle, ConnectionSinks } from '@roos-code/roos-code-api-remotes/client'
-import TypertRegistry from '@roos-code/roos-code-typert-registry'
+import type { ConnectionHandle, ConnectionSinks } from '@shres-code/shres-code-api-remotes/client'
+import TypertRegistry from '@shres-code/shres-code-typert-registry'
 // Type-only: the api-remotes facade carries both the allowlist's selection seat
 // and the owner packages' `./types` declarations, which together give `$on` its
 // key face and per-event listener signatures.
-import type {} from '@roos-code/roos-code-api-remotes/client'
+import type {} from '@shres-code/shres-code-api-remotes/client'
 import * as RuntimeClient from '../src/client/index.ts'
 import { FakeApiClient, fakeRemote } from './fake-api.client.ts'
 

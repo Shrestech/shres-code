@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import InvariantRegistry, { InvariantError } from '@roos-code/roos-code-invariants'
-import SessionStore, { SessionId, type Session } from '@roos-code/roos-code-session'
-import { WorkflowRunId, type WorkflowRunId as WorkflowRunIdType } from '@roos-code/roos-code-workflow/types'
+import { Context } from '@shres-code/cordis'
+import InvariantRegistry, { InvariantError } from '@shres-code/shres-code-invariants'
+import SessionStore, { SessionId, type Session } from '@shres-code/shres-code-session'
+import { WorkflowRunId, type WorkflowRunId as WorkflowRunIdType } from '@shres-code/shres-code-workflow/types'
 import * as ToolWorkflowInvariant from '../src/invariant.ts'
 import type {} from '../src/types.ts'
 
@@ -53,7 +53,7 @@ describe('durable workflow-record invariants', () => {
       runId, seq: 1, outcome: 'completed',
     })).toThrow(expect.objectContaining<Partial<InvariantError>>({
       code: 'INVARIANT',
-      packageName: '@roos-code/roos-code-tool-workflow',
+      packageName: '@shres-code/shres-code-tool-workflow',
     }))
     expect(session.seq).toBe(before)
     expect(() => session.append('tool-workflow/run-end', {

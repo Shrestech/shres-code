@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import * as invariant from '@roos-code/roos-code-command-compact/invariant'
+import * as invariant from '@shres-code/shres-code-command-compact/invariant'
 
 describe('command-compact invariant companion', () => {
   it('registers the package-owned no-op installer', async () => {
@@ -8,7 +8,7 @@ describe('command-compact invariant companion', () => {
     const dispose = await invariant.apply(ctx)
     expect(invariant.name).toBe('command-compact-invariant')
     expect(invariant.inject).toEqual(['invariants'])
-    expect(register).toHaveBeenCalledWith('@roos-code/roos-code-command-compact', expect.any(Function))
+    expect(register).toHaveBeenCalledWith('@shres-code/shres-code-command-compact', expect.any(Function))
     expect(() => {
       const install = register.mock.calls[0]![1] as () => void
       install()

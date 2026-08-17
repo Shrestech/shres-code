@@ -5,12 +5,12 @@
  * never provider selection or network access.
  */
 
-import type { Context } from '@roos-code/cordis'
-import { defineTool } from '@roos-code/roos-code-tools'
-import type { GenericCallView, JsonValue, ToolResult, WebSearchResultView, WebSource } from '@roos-code/roos-code-tools'
-import type { WebSearchResult, WebSearchSource } from '@roos-code/roos-code-web'
-import { UNTRUSTED_INSTRUCTION_DISCLAIMER, wrapUntrusted } from '@roos-code/roos-code-untrusted-frame'
-import type {} from '@roos-code/roos-code-system-prompt'
+import type { Context } from '@shres-code/cordis'
+import { defineTool } from '@shres-code/shres-code-tools'
+import type { GenericCallView, JsonValue, ToolResult, WebSearchResultView, WebSource } from '@shres-code/shres-code-tools'
+import type { WebSearchResult, WebSearchSource } from '@shres-code/shres-code-web'
+import { UNTRUSTED_INSTRUCTION_DISCLAIMER, wrapUntrusted } from '@shres-code/shres-code-untrusted-frame'
+import type {} from '@shres-code/shres-code-system-prompt'
 
 const UNTRUSTED_WEB_ANSWER_TAG = 'untrusted-web-answer'
 const UNTRUSTED_WEB_SNIPPET_TAG = 'untrusted-web-snippet'
@@ -20,7 +20,7 @@ ${UNTRUSTED_INSTRUCTION_DISCLAIMER}`
 
 /**
  * Default upper bound on returned sources (the `searchMaxResults` config).
- * Owned by the consumer (not the provider or model), mirroring `roos-tool-fs`'s
+ * Owned by the consumer (not the provider or model), mirroring `shres-tool-fs`'s
  * `READ_LIMIT`. The model just asks a question; the product controls how much
  * context returns. The default `8` aligns with OpenCode's Exa default.
  */
@@ -217,7 +217,7 @@ export function presentSearchResult(args: { query: string }, result: ToolResult)
  * @param maxResults - the deployment's source cap, sent as every seam
  *   request's `maxResults`.
  * @param timeoutMs - the cooperative tool-call budget (ms) attached as the tool's
- *   `ToolDefinition.timeoutMs` for `@roos-code/roos-code-tool-call-timeout-policy` to enforce.
+ *   `ToolDefinition.timeoutMs` for `@shres-code/shres-code-tool-call-timeout-policy` to enforce.
  * @param fetchEnabled - whether the same composition exposes `web_fetch`, which
  *   controls whether search guidance may recommend that follow-up tool.
  */

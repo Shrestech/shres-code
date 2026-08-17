@@ -3,13 +3,13 @@
  * {@link agentEvents} couples the agent subject to its scope carrier, so the
  * scope key and the payload's `agent` cannot diverge; repeat dispatchers (the
  * loop driver) build it once in the agent's constructor and reuse it.
- * @module @roos-code/roos-code-agent/dispatch
+ * @module @shres-code/shres-code-agent/dispatch
  */
 
-import type { Context, Events } from '@roos-code/cordis'
-import { scopeTarget } from '@roos-code/roos-code-scope'
-import type { Scoped } from '@roos-code/roos-code-scope'
-import type { AssembleContext } from '@roos-code/roos-code-system-prompt'
+import type { Context, Events } from '@shres-code/cordis'
+import { scopeTarget } from '@shres-code/shres-code-scope'
+import type { Scoped } from '@shres-code/shres-code-scope'
+import type { AssembleContext } from '@shres-code/shres-code-system-prompt'
 import type { Agent } from './runtime-types.ts'
 
 /** Extract the parameter tuple from an event handler type (its `this` is not part of the tuple). */

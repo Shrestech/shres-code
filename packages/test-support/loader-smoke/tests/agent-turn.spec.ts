@@ -1,5 +1,5 @@
-import type { Context } from '@roos-code/cordis'
-import type { SessionEvent } from '@roos-code/roos-code-session'
+import type { Context } from '@shres-code/cordis'
+import type { SessionEvent } from '@shres-code/shres-code-session'
 import { describe, expect, it, vi } from 'vitest'
 import { runFixtureTurn } from '../src/agent-turn.ts'
 

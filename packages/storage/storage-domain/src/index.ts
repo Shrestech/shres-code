@@ -4,12 +4,12 @@
  * layer — consumers depend on this package and never touch backends directly.
  * Plugin `Config` is schemastery; record schemas inside domain specs are zod
  * (see `src/spec.ts` for the split rationale).
- * @module @roos-code/roos-code-storage-domain
+ * @module @shres-code/shres-code-storage-domain
  */
 
-import type { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import { storageBackendServiceKey } from '@roos-code/roos-code-storage'
+import type { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import { storageBackendServiceKey } from '@shres-code/shres-code-storage'
 import { DomainError } from './error.ts'
 import { descriptorOf } from './spec.ts'
 import type { DomainSpec } from './spec.ts'
@@ -26,13 +26,13 @@ export type {
 export type { DomainChanged } from './events.ts'
 export type { Domain, DomainGlobal, DomainGlobalHandleOf, KvTable } from './domain.ts'
 
-declare module '@roos-code/roos-code-storage' {
+declare module '@shres-code/shres-code-storage' {
   interface StorageForms {
     domain: DomainFacility
   }
 }
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     storageDomain: DomainFacility
   }

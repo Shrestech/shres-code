@@ -1,12 +1,12 @@
 /**
  * Shared path resolution and regular-file validation for model-facing read tools.
- * @module @roos-code/roos-code-tool-fs/src/read-target
+ * @module @shres-code/shres-code-tool-fs/src/read-target
  */
 
-import type { Context } from '@roos-code/cordis'
-import { FsError } from '@roos-code/roos-code-fs'
-import type { FsInfo, FsTarget } from '@roos-code/roos-code-fs'
-import type { ToolExecution } from '@roos-code/roos-code-tools'
+import type { Context } from '@shres-code/cordis'
+import { FsError } from '@shres-code/shres-code-fs'
+import type { FsInfo, FsTarget } from '@shres-code/shres-code-fs'
+import type { ToolExecution } from '@shres-code/shres-code-tools'
 import { sessionResolveOptions } from './session-cwd.ts'
 
 /**

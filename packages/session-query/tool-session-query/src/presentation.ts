@@ -1,7 +1,7 @@
 /**
  * Model text rendering and generic tool-call presentation.
  *
- * @module @roos-code/roos-code-tool-session-query/presentation
+ * @module @shres-code/shres-code-tool-session-query/presentation
  */
 
 import {
@@ -12,12 +12,12 @@ import {
   type SessionLineageTrace,
   type SessionRecord,
   type SessionSearchHit,
-} from '@roos-code/roos-code-session-query'
+} from '@shres-code/shres-code-session-query'
 import type {
   SessionEvent,
   SessionId,
-} from '@roos-code/roos-code-session'
-import type { GenericCallView } from '@roos-code/roos-code-tools'
+} from '@shres-code/shres-code-session'
+import type { GenericCallView } from '@shres-code/shres-code-tools'
 import { workspaceAccess } from './workspace-access.ts'
 
 type TitleView = Awaited<ReturnType<typeof workspaceAccess.readTitle>>

@@ -9,13 +9,13 @@
  * No caller supplies composition text: the inputs are ids the host resolves
  * against its own roots plus an optional display name, so authoring grants no
  * capability the copied preset did not already carry.
- * @module @roos-code/roos-code-agent-presets/authoring
+ * @module @shres-code/shres-code-agent-presets/authoring
  */
 
 import { chmod, cp, readdir, readFile, rm, stat } from 'node:fs/promises'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
-import { writeFileAtomic } from '@roos-code/roos-code-atomic-write'
-import { expandHomePath } from '@roos-code/roos-code-home-paths'
+import { writeFileAtomic } from '@shres-code/shres-code-atomic-write'
+import { expandHomePath } from '@shres-code/shres-code-home-paths'
 import { METADATA_FILE, renderPresetMetadata } from './metadata.ts'
 import { PRESET_ID, type AgentPreset, type PresetRoot } from './preset.ts'
 

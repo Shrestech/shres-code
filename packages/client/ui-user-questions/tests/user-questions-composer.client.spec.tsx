@@ -3,15 +3,15 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type {
   ConversationSnapshot, SessionId, SessionListState, WorkspaceListState,
-} from '@roos-code/roos-code-client-runtime/client'
-import { PendingWait } from '@roos-code/roos-code-client-runtime/client'
-import type { RpcReceipt } from '@roos-code/roos-code-api-remotes/client'
-import { RpcId } from '@roos-code/roos-code-client-connection/client'
-import type { SnapshotSelectorHook } from '@roos-code/roos-code-client-ui-slots'
+} from '@shres-code/shres-code-client-runtime/client'
+import { PendingWait } from '@shres-code/shres-code-client-runtime/client'
+import type { RpcReceipt } from '@shres-code/shres-code-api-remotes/client'
+import { RpcId } from '@shres-code/shres-code-client-connection/client'
+import type { SnapshotSelectorHook } from '@shres-code/shres-code-client-ui-slots'
 import { PendingQuestion, type QuestionComposerProps } from '../src/client/contract/slots.ts'
 import { QuestionComposer, parseRecommendedLabel } from '../src/client/QuestionComposer.tsx'
 import { en } from '../src/client/locales.ts'
-import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
+import { en as commonEn } from '@shres-code/shres-code-client-locale/src/locales/en.ts'
 
 afterEach(cleanup)
 

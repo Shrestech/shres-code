@@ -6,10 +6,10 @@
  */
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
-import { Context } from '@roos-code/cordis'
-import { SlotTestRuntime } from '@roos-code/roos-code-client-test-runtime'
-import type { SessionId } from '@roos-code/roos-code-client-runtime/client'
-import { buildRenderApp } from '@roos-code/roos-code-client-web/src/app.tsx'
+import { Context } from '@shres-code/cordis'
+import { SlotTestRuntime } from '@shres-code/shres-code-client-test-runtime'
+import type { SessionId } from '@shres-code/shres-code-client-runtime/client'
+import { buildRenderApp } from '@shres-code/shres-code-client-web/src/app.tsx'
 
 let runtime: SlotTestRuntime | undefined
 

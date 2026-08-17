@@ -7,8 +7,8 @@ import { execa } from 'execa'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 /**
- * Keyless built-artifact smoke: plain Node imports `@roos-code/roos-code-lsp` and
- * `@roos-code/roos-code-lsp-stdio` by name through their exports maps, spawns the fixture server, runs
+ * Keyless built-artifact smoke: plain Node imports `@shres-code/shres-code-lsp` and
+ * `@shres-code/shres-code-lsp-stdio` by name through their exports maps, spawns the fixture server, runs
  * one query (exercising real `Content-Length` framing over `lib/index.js`), and disposes (exercising
  * subprocess cleanup). Unit tests use `src/`; this pins the downstream `lib/` path. Skips when `lib/`
  * is absent; CI runs it after the build.
@@ -40,11 +40,11 @@ describe.skipIf(!built)('built lib real load path (plain node)', () => {
   it('runs a query through lib/index.js and disposes cleanly, framing over the base protocol', async () => {
     const location = JSON.stringify({ uri: pathToFileURL(join(ws, 'a.ts')).href, range: { start: { line: 0, character: 0 }, end: { line: 0, character: 3 } } })
     const script = `
-      const { Context } = await import('@roos-code/cordis')
-      const { default: Lsp } = await import('@roos-code/roos-code-lsp')
-      const LspLocal = await import('@roos-code/roos-code-lsp-stdio')
-      const { default: LocalFileSystem } = await import('@roos-code/roos-code-fs-local')
-      const { default: LocalSubprocessRuntime } = await import('@roos-code/roos-code-subprocess-local')
+      const { Context } = await import('@shres-code/cordis')
+      const { default: Lsp } = await import('@shres-code/shres-code-lsp')
+      const LspLocal = await import('@shres-code/shres-code-lsp-stdio')
+      const { default: LocalFileSystem } = await import('@shres-code/shres-code-fs-local')
+      const { default: LocalSubprocessRuntime } = await import('@shres-code/shres-code-subprocess-local')
       const ctx = new Context()
       await ctx.plugin(Lsp)
       await ctx.plugin(LocalSubprocessRuntime)

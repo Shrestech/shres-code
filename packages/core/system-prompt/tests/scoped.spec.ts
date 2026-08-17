@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { createScope, scopeOf } from '@roos-code/roos-code-scope'
-import type { Scope, ScopeKey } from '@roos-code/roos-code-scope'
-import SystemPrompt, { TOOL_ORDER_REST, renderContextSnapshot, renderPrompt } from '@roos-code/roos-code-system-prompt'
-import type { Config, PromptAssembly } from '@roos-code/roos-code-system-prompt'
+import { Context } from '@shres-code/cordis'
+import { createScope, scopeOf } from '@shres-code/shres-code-scope'
+import type { Scope, ScopeKey } from '@shres-code/shres-code-scope'
+import SystemPrompt, { TOOL_ORDER_REST, renderContextSnapshot, renderPrompt } from '@shres-code/shres-code-system-prompt'
+import type { Config, PromptAssembly } from '@shres-code/shres-code-system-prompt'
 
 async function mount(config: Config = {}): Promise<Context> {
   const ctx = new Context()

@@ -1,0 +1,23 @@
+/* Product mark lockup. The girl path is currentColor until Shield is on;
+ * the green S-shield overlay is hidden until then. `html` and any local
+ * svg may set data-shres-shield so a toggle does not need a React remount. */
+
+.shres-mark-shield {
+  display: none;
+}
+
+[data-shres-shield='on'] .shres-mark-girl {
+  fill: #2563eb;
+}
+
+[data-shres-shield='on'] .shres-mark-shield {
+  display: inline;
+}
+
+[data-shres-shield='off'] .shres-mark-girl {
+  fill: currentColor;
+}
+
+[data-shres-shield='off'] .shres-mark-shield {
+  display: none;
+}

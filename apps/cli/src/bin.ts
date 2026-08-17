@@ -1,17 +1,17 @@
 #!/usr/bin/env node
 /**
- * roos — command-line entry. Dynamic imports per mode keep unrelated modes out
+ * shres — command-line entry. Dynamic imports per mode keep unrelated modes out
  * of each dispatch path; the adapter prints and exits for
  * `--help`/`--version`/a parse error, so only a valid mode reaches the switch.
- * @module @roos-code/roos-code/bin
+ * @module @shres-code/shres-code/bin
  */
 
 /* v8 ignore file -- built-bin acceptance exercises this self-executing dispatch. */
 
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { loadLayeredEnv } from '@roos-code/roos-code-app-boot'
-import { parseRoosArgs } from './args.ts'
+import { loadLayeredEnv } from '@shres-code/shres-code-app-boot'
+import { parseShresArgs } from './args.ts'
 
 // Both the source tree (apps/cli/src) and the bundled bin (apps/cli/lib) sit
 // one directory under apps/cli, so the checked-in manifest resolves with the
@@ -24,13 +24,13 @@ function readVersion(): string {
   return typeof manifest.version === 'string' ? manifest.version : '0.0.0'
 }
 
-const invocation = parseRoosArgs(process.argv.slice(2), readVersion())
+const invocation = parseShresArgs(process.argv.slice(2), readVersion())
 
 switch (invocation.mode) {
   case 'profile': {
     const { runProfile } = await import('./profile-boot.ts')
     await runProfile({
-      environment: loadLayeredEnv('roos'),
+      environment: loadLayeredEnv('shres'),
       profile: invocation.profile,
       patchFiles: invocation.patches,
       args: invocation.args,
@@ -54,5 +54,5 @@ switch (invocation.mode) {
   }
   default:
     invocation satisfies never
-    throw new Error(`roos: unhandled invocation mode ${JSON.stringify(invocation)}`)
+    throw new Error(`shres: unhandled invocation mode ${JSON.stringify(invocation)}`)
 }

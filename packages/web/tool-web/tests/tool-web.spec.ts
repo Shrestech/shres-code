@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import TurndownService from 'turndown'
-import { CallId } from '@roos-code/roos-code-llm'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import ToolRuntime, { type ToolExecutionResult } from '@roos-code/roos-code-tools'
-import WebRuntime from '@roos-code/roos-code-web'
-import type { WebSearchProvider, WebSearchResult } from '@roos-code/roos-code-web'
-import * as ToolWeb from '@roos-code/roos-code-tool-web'
+import { CallId } from '@shres-code/shres-code-llm'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import ToolRuntime, { type ToolExecutionResult } from '@shres-code/shres-code-tools'
+import WebRuntime from '@shres-code/shres-code-web'
+import type { WebSearchProvider, WebSearchResult } from '@shres-code/shres-code-web'
+import * as ToolWeb from '@shres-code/shres-code-tool-web'
 import {
   formatSearchOutput,
   formatFetchOutput,
@@ -21,15 +21,15 @@ import {
   fetchMetaFromValue,
   fetchMetaFromResult,
   WEB_SEARCH_MAX_RESULTS,
-} from '@roos-code/roos-code-tool-web'
-import type { ContentBlock } from '@roos-code/roos-code-llm'
-import type { ToolResult } from '@roos-code/roos-code-tools'
+} from '@shres-code/shres-code-tool-web'
+import type { ContentBlock } from '@shres-code/shres-code-llm'
+import type { ToolResult } from '@shres-code/shres-code-tools'
 import {
   frameUntrusted,
   UNTRUSTED_INSTRUCTION_DISCLAIMER,
   UNTRUSTED_LT_ESCAPE,
   wrapUntrusted,
-} from '@roos-code/roos-code-untrusted-frame'
+} from '@shres-code/shres-code-untrusted-frame'
 
 const testToolSignal = new AbortController().signal
 
@@ -44,7 +44,7 @@ async function mountTools(opts: {
   config?: ToolWeb.Config
   webConfig?: ConstructorParameters<typeof WebRuntime>[1]
   search?: WebSearchProvider
-  fetchProvider?: import('@roos-code/roos-code-web').WebFetchProvider
+  fetchProvider?: import('@shres-code/shres-code-web').WebFetchProvider
 } = {}): Promise<{ ctx: Context; fiber: Awaited<ReturnType<Context['plugin']>>; call: (name: string, args: unknown) => Promise<ToolExecutionResult> }> {
   const ctx = new Context()
   await ctx.plugin(SystemPrompt)
@@ -659,7 +659,7 @@ describe('tool-web execution through the real registry', () => {
       truncated: false,
     })
     // The model schema exposes no timeout: the tool forwards only the url; the
-    // tool-call budget is owned by roos-tool-call-timeout-policy over exec.signal.
+    // tool-call budget is owned by shres-tool-call-timeout-policy over exec.signal.
     expect(seen.request).toEqual({ url: 'https://a.test' })
     expect(seen.signal).toBe(controller.signal)
     await fiber.dispose()

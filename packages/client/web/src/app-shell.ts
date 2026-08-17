@@ -3,12 +3,12 @@
  * graph and shell registry; there is no npm package behind it.
  */
 import type { ReactNode } from 'react'
-import type { Context } from '@roos-code/cordis'
-import { createSlotRenderer } from '@roos-code/roos-code-client-web-react'
+import type { Context } from '@shres-code/cordis'
+import { createSlotRenderer } from '@shres-code/shres-code-client-web-react'
 import { buildRenderApp } from './app.tsx'
 
 /** Shell-owned pseudo entry id under which the host graph mounts this plugin. */
-export const APP_SHELL_ID = '@roos-code/roos-code-client-app-shell'
+export const APP_SHELL_ID = '@shres-code/shres-code-client-app-shell'
 
 /** The assembled-UI face AppRoot renders once the boot settles. */
 export interface AppShellService {
@@ -16,7 +16,7 @@ export interface AppShellService {
   renderApp: () => ReactNode
 }
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     /** The shell assembly face, provided by the app-shell entry once its inject set is active. */
     appShell: AppShellService

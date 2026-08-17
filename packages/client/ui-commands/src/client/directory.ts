@@ -5,10 +5,10 @@
  * / epoch-guard behavior of the original global cache; the session-key axis
  * is the only extra dimension.
  */
-import type { CommandDescriptor } from '@roos-code/roos-code-commands/types'
-import type { SessionId } from '@roos-code/roos-code-client-runtime/client'
+import type { CommandDescriptor } from '@shres-code/shres-code-commands/types'
+import type { SessionId } from '@shres-code/shres-code-client-runtime/client'
 
-export type { CommandDescriptor } from '@roos-code/roos-code-commands/types'
+export type { CommandDescriptor } from '@shres-code/shres-code-commands/types'
 
 /**
  * cold = never pulled; pending = pull in flight with nothing servable;

@@ -1,4 +1,4 @@
-// Hero chrome for the blank-draft phase of ConversationRoot: kangaroo headline,
+// Hero chrome for the blank-draft phase of ConversationRoot: product headline,
 // glow backdrop, and the workspace row. Pure presentation — the resident
 // composer is NOT rendered here (it keeps its own stable tree position in
 // ConversationRoot so the textarea survives the hero → composer flip); CSS
@@ -8,8 +8,8 @@ import { useId } from 'react'
 import type { ReactNode, RefObject } from 'react'
 import {
   FishLogo, IconChevronDownOutline14, IconFolderClose16, IconFolderOpen16,
-} from '@roos-code/roos-code-client-ui-primitives'
-import { workspaceTitleOf } from '@roos-code/roos-code-client-runtime/client'
+} from '@shres-code/shres-code-client-ui-primitives'
+import { workspaceTitleOf } from '@shres-code/shres-code-client-runtime/client'
 import type { ConversationSlotProps } from '../contract/slots.ts'
 import css from './HeroShell.module.css'
 
@@ -117,9 +117,9 @@ export function HeroShell({ t, children }: HeroShellProps) {
     <div className={css.root}>
       <div className={css.stack}>
         <div className={css.headline}>
-          {/* Kangaroo mark 40×40 leading the headline, gap 10. */}
+          {/* Girl mark leads the headline; height matches the 26/32 title. */}
           <span className={css.fishHitbox}>
-            <FishLogo size={40} className={css.fish} />
+            <FishLogo size={48} className={css.fish} />
           </span>
           <span className={css.headlineText}>{t('hero.headline')}</span>
           <span className={css.previewBadge}>{t('hero.preview')}</span>

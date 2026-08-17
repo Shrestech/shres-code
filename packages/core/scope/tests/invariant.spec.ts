@@ -1,11 +1,11 @@
-import { freezeMessage, MessageId } from '@roos-code/roos-code-llm'
+import { freezeMessage, MessageId } from '@shres-code/shres-code-llm'
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import type { Events } from '@roos-code/cordis'
-import type { Agent } from '@roos-code/roos-code-agent'
-import { scopeTarget } from '@roos-code/roos-code-scope'
-import * as ScopeInvariant from '@roos-code/roos-code-scope/invariant'
-import InvariantRegistry from '@roos-code/roos-code-invariants'
+import { Context } from '@shres-code/cordis'
+import type { Events } from '@shres-code/cordis'
+import type { Agent } from '@shres-code/shres-code-agent'
+import { scopeTarget } from '@shres-code/shres-code-scope'
+import * as ScopeInvariant from '@shres-code/shres-code-scope/invariant'
+import InvariantRegistry from '@shres-code/shres-code-invariants'
 
 async function setup(): Promise<Context> {
   const ctx = new Context()

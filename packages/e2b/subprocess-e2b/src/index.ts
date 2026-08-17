@@ -1,22 +1,22 @@
 /**
  * E2B Service Provider for the subprocess capability seam. Each handle starts through the
  * shared sandbox and retains command output/status paths in that remote world.
- * @module @roos-code/roos-code-subprocess-e2b
+ * @module @shres-code/shres-code-subprocess-e2b
  */
 
 import { randomUUID } from 'node:crypto'
 import { posix } from 'node:path'
-import { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import { SubprocessRuntime } from '@roos-code/roos-code-subprocess'
-import { MAX_TIMER_DELAY_MS } from '@roos-code/roos-code-timeout'
+import { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import { SubprocessRuntime } from '@shres-code/shres-code-subprocess'
+import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
 import type {
   SubprocessHandle,
   SubprocessSpawnSpec,
   SubprocessTerminalHandle,
   SubprocessTerminalSpawnSpec,
-} from '@roos-code/roos-code-subprocess'
-import { e2bControlEnvs, quoteE2BShellArg } from '@roos-code/roos-code-e2b'
+} from '@shres-code/shres-code-subprocess'
+import { e2bControlEnvs, quoteE2BShellArg } from '@shres-code/shres-code-e2b'
 import { E2BSubprocessHandle } from './process.ts'
 import { asError, signalOpts } from './remote.ts'
 import { spawnE2BTerminal } from './terminal.ts'

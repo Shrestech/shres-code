@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { createUserMessage } from '@roos-code/roos-code-llm'
-import SessionStore, { SessionId } from '@roos-code/roos-code-session'
+import { Context } from '@shres-code/cordis'
+import { createUserMessage } from '@shres-code/shres-code-llm'
+import SessionStore, { SessionId } from '@shres-code/shres-code-session'
 import { RuntimeContextProjection } from '../src/runtime-context.ts'
 
-const SOURCE = '@roos-code/roos-code-system-prompt'
+const SOURCE = '@shres-code/shres-code-system-prompt'
 
 function contextMessage(text: string) {
   return createUserMessage({

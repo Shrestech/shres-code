@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { runNativeCommand } from '@roos-code/roos-code-native-command'
+import { runNativeCommand } from '@shres-code/shres-code-native-command'
 
 const node = process.execPath
 
@@ -25,7 +25,7 @@ describe('runNativeCommand', () => {
 
   it('rejects a missing executable with the spawn ENOENT code', async () => {
     const failure = await runNativeCommand(
-      'roos-definitely-missing-command',
+      'shres-definitely-missing-command',
       [],
       new AbortController().signal,
     ).then(() => { throw new Error('unexpected resolve') }, (error: unknown) => error)

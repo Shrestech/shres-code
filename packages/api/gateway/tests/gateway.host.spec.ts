@@ -1,10 +1,10 @@
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { describe, expect, it } from 'vitest'
-import { Context, Service, symbols } from '@roos-code/cordis'
+import { Context, Service, symbols } from '@shres-code/cordis'
 import { z } from 'zod'
-import { apply as applyConnection, inject as connectionInject } from '@roos-code/roos-code-client-connection'
-import type { WebServer, WebRoute } from '@roos-code/roos-code-host-webserver'
+import { apply as applyConnection, inject as connectionInject } from '@shres-code/shres-code-client-connection'
+import type { WebServer, WebRoute } from '@shres-code/shres-code-host-webserver'
 import {
   bindTypertRemote,
   Remote,
@@ -14,9 +14,9 @@ import {
   type TypertContext,
   type TypertLookup,
   type TypertLookupProvider,
-} from '@roos-code/roos-code-typert-protocol'
-import TypertRegistry, { type TypertContribution } from '@roos-code/roos-code-typert-registry'
-import TypertGatewayService, { TypertGatewayError } from '@roos-code/roos-code-api-gateway'
+} from '@shres-code/shres-code-typert-protocol'
+import TypertRegistry, { type TypertContribution } from '@shres-code/shres-code-typert-registry'
+import TypertGatewayService, { TypertGatewayError } from '@shres-code/shres-code-api-gateway'
 
 interface FixtureAgent {
   readonly id: string
@@ -26,7 +26,7 @@ interface MarkedContext extends Context {
   readonly fixtureScope?: string
 }
 
-declare module '@roos-code/roos-code-typert-protocol' {
+declare module '@shres-code/shres-code-typert-protocol' {
   interface TypertLookupMap {
     gatewayFixture: TypertLookup<FixtureAgent, string>
     gatewayFixtureAlias: TypertLookup<FixtureAgent, string>

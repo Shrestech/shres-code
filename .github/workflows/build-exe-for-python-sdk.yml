@@ -51,7 +51,7 @@ permissions:
 env:
   # CI runs must never report to the production telemetry endpoint baked
   # into apps/cli/cordis.yml (AppCLIEntry disables the row when set).
-  ROOS_TELEMETRY_DISABLED: '1'
+  SHRES_TELEMETRY_DISABLED: '1'
 
 jobs:
   # Job-level conditions cannot inspect `matrix`, so validate target names and
@@ -116,7 +116,7 @@ jobs:
 
   sdk-wheel:
     needs: plan
-    name: roos_code_sdk-${{ needs.plan.outputs.version }}-py3-none-any.whl
+    name: shres_code_sdk-${{ needs.plan.outputs.version }}-py3-none-any.whl
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -137,8 +137,8 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         with:
-          name: roos_code_sdk-${{ needs.plan.outputs.version }}-py3-none-any.whl
-          path: dist-python/roos_code_sdk-${{ needs.plan.outputs.version }}-py3-none-any.whl
+          name: shres_code_sdk-${{ needs.plan.outputs.version }}-py3-none-any.whl
+          path: dist-python/shres_code_sdk-${{ needs.plan.outputs.version }}-py3-none-any.whl
           if-no-files-found: error
           retention-days: 7
 
@@ -228,12 +228,12 @@ jobs:
         run: |
           set -euo pipefail
           platform="${TARGET#node24-}"
-          exe="$PWD/dist-exe/roos-jsonrpc-agent-pkg-$platform"
+          exe="$PWD/dist-exe/shres-jsonrpc-agent-pkg-$platform"
           [ -x "$exe" ] || { echo "::error::$exe missing or not executable"; exit 1; }
           case "$platform" in
-            linux-x64) wheel=roos_code_runtime_bin-$VERSION-py3-none-manylinux_2_28_x86_64.whl ;;
-            linux-arm64) wheel=roos_code_runtime_bin-$VERSION-py3-none-manylinux_2_28_aarch64.whl ;;
-            macos-arm64) wheel=roos_code_runtime_bin-$VERSION-py3-none-macosx_14_0_arm64.whl ;;
+            linux-x64) wheel=shres_code_runtime_bin-$VERSION-py3-none-manylinux_2_28_x86_64.whl ;;
+            linux-arm64) wheel=shres_code_runtime_bin-$VERSION-py3-none-manylinux_2_28_aarch64.whl ;;
+            macos-arm64) wheel=shres_code_runtime_bin-$VERSION-py3-none-macosx_14_0_arm64.whl ;;
             *) echo "::error::Unsupported runtime platform $platform"; exit 1 ;;
           esac
           echo "platform=$platform" >> "$GITHUB_OUTPUT"
@@ -257,7 +257,7 @@ jobs:
 
       - uses: actions/download-artifact@v8
         with:
-          name: roos_code_sdk-${{ needs.plan.outputs.version }}-py3-none-any.whl
+          name: shres_code_sdk-${{ needs.plan.outputs.version }}-py3-none-any.whl
           path: dist-python
 
       - name: Install only the SDK into a clean venv and run zero-config
@@ -265,11 +265,11 @@ jobs:
           VERSION: ${{ needs.plan.outputs.version }}
         run: |
           set -euo pipefail
-          python -m venv "$RUNNER_TEMP/roos-sdk-smoke"
-          "$RUNNER_TEMP/roos-sdk-smoke/bin/python" -m pip install \
+          python -m venv "$RUNNER_TEMP/shres-sdk-smoke"
+          "$RUNNER_TEMP/shres-sdk-smoke/bin/python" -m pip install \
             --find-links dist-python \
-            roos-code-sdk=="$VERSION"
-          "$RUNNER_TEMP/roos-sdk-smoke/bin/python" scripts/smoke-python-runtime.py \
+            shres-code-sdk=="$VERSION"
+          "$RUNNER_TEMP/shres-sdk-smoke/bin/python" scripts/smoke-python-runtime.py \
             --scenario sdk-default
 
       - name: Check Linux GLIBC requirements
@@ -304,10 +304,10 @@ jobs:
             ARM64) image=quay.io/pypa/manylinux_2_28_aarch64 ;;
             *) echo "::error::Unsupported Linux runner architecture $RUNNER_ARCH"; exit 1 ;;
           esac
-          docker run --rm -e VERSION -e ROOS_TELEMETRY_DISABLED -v "$PWD:/work" -w /work "$image" bash -euxo pipefail -c '
-            /opt/python/cp310-cp310/bin/python -m venv /tmp/roos-sdk
-            /tmp/roos-sdk/bin/python -m pip install --find-links /work/dist-python roos-code-sdk=="$VERSION"
-            /tmp/roos-sdk/bin/python /work/scripts/smoke-python-runtime.py --scenario sdk-default
+          docker run --rm -e VERSION -e SHRES_TELEMETRY_DISABLED -v "$PWD:/work" -w /work "$image" bash -euxo pipefail -c '
+            /opt/python/cp310-cp310/bin/python -m venv /tmp/shres-sdk
+            /tmp/shres-sdk/bin/python -m pip install --find-links /work/dist-python shres-code-sdk=="$VERSION"
+            /tmp/shres-sdk/bin/python /work/scripts/smoke-python-runtime.py --scenario sdk-default
           '
 
       - uses: actions/upload-artifact@v7

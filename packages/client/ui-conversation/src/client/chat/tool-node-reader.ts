@@ -1,7 +1,7 @@
 import type {
   ConversationSnapshot, ToolCallBlock,
-} from '@roos-code/roos-code-client-runtime/client'
-import { conversationContextKey } from '@roos-code/roos-code-client-runtime/client'
+} from '@shres-code/shres-code-client-runtime/client'
+import { conversationContextKey } from '@shres-code/shres-code-client-runtime/client'
 import type { ChatNode } from '../contract/chat-nodes.ts'
 
 function toolNode(node: ReturnType<ConversationSnapshot['chat']['nodes']['get']>): ChatNode<'tool-call'> | undefined {

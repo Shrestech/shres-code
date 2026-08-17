@@ -1,10 +1,10 @@
-import { createUserMessage } from '@roos-code/roos-code-llm'
+import { createUserMessage } from '@shres-code/shres-code-llm'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import type { Context } from '@roos-code/cordis'
-import { SessionId } from '@roos-code/roos-code-session'
+import type { Context } from '@shres-code/cordis'
+import { SessionId } from '@shres-code/shres-code-session'
 import { codingHarness, finalText, SYSTEM_PROMPT, waitForIdle } from './harness.ts'
 
 /**
@@ -32,7 +32,7 @@ afterEach(async () => {
 
 describe.skipIf(!process.env.DEEPSEEK_API_KEY)('resume: continue a persisted session across processes', () => {
   it('recalls a fact stored in a prior, separately-disposed session', async () => {
-    root = await mkdtemp(join(tmpdir(), 'roos-resume-e2e-'))
+    root = await mkdtemp(join(tmpdir(), 'shres-resume-e2e-'))
 
     // Run 1: a fresh agent on a KNOWN session id learns a secret, then we
     // dispose the whole context (simulating process exit) so only the JSONL

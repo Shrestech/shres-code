@@ -1,10 +1,10 @@
 /**
  * Remote decorators and explicit Gateway bindings backed only by private
  * module state. Strict reflection remains a Typert compiler responsibility.
- * @module @roos-code/roos-code-typert-protocol
+ * @module @shres-code/shres-code-typert-protocol
  */
 
-import { Service, type Context } from '@roos-code/cordis'
+import { Service, type Context } from '@shres-code/cordis'
 import type { TypertContextMap } from './types.ts'
 
 const TYPERT_REMOTE_SEGMENT_PATTERN = /^[A-Za-z0-9_$.-]+$/

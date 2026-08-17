@@ -1,12 +1,12 @@
-import { MessageId, createUserMessage, createMessage } from '@roos-code/roos-code-llm'
+import { MessageId, createUserMessage, createMessage } from '@shres-code/shres-code-llm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { appendFile, mkdtemp, mkdir, rm, readFile, writeFile, readdir, stat, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
-import SessionStore, { SessionId } from '@roos-code/roos-code-session'
-import type { Session, SessionEvent, SessionHeader } from '@roos-code/roos-code-session'
-import JsonlSessionPersistence from '@roos-code/roos-code-session-persistence-jsonl'
+import SessionStore, { SessionId } from '@shres-code/shres-code-session'
+import type { Session, SessionEvent, SessionHeader } from '@shres-code/shres-code-session'
+import JsonlSessionPersistence from '@shres-code/shres-code-session-persistence-jsonl'
 import {
   encodeSegment, eventLines, logPath, projectDir, projectKey, scanLog, sessionDir, SessionLogScanner, toHeaderLine,
 } from '../src/format.ts'
@@ -74,7 +74,7 @@ async function expectFlushCode(promise: Promise<unknown>, codes: readonly string
 }
 
 async function freshRoot(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), 'roos-jsonl-'))
+  const dir = await mkdtemp(join(tmpdir(), 'shres-jsonl-'))
   dirs.push(dir)
   return dir
 }
@@ -101,7 +101,7 @@ function appendClosedTurn(session: Session): void {
 
 // Run the shared backend contract against the real JSONL backend.
 runPersistenceContract('jsonl-none', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'roos-jsonl-'))
+  const dir = await mkdtemp(join(tmpdir(), 'shres-jsonl-'))
   const ctx = new Context()
   await ctx.plugin(SessionStore)
   const fiber = await ctx.plugin(JsonlSessionPersistence, { root: dir, compression: 'none' })
@@ -117,7 +117,7 @@ runPersistenceContract('jsonl-none', async () => {
 // Two mounts share this temp root to exercise reload. `corruptTail` appends a partial,
 // newline-less fragment past the committed region so coordinator repair runs on real file bytes.
 runCoordinatorContract('jsonl-none', async (): Promise<CoordinatorFixture> => {
-  const dir = await mkdtemp(join(tmpdir(), 'roos-jsonl-coord-'))
+  const dir = await mkdtemp(join(tmpdir(), 'shres-jsonl-coord-'))
   return {
     mount: async (ctx) => {
       const fiber = await ctx.plugin(JsonlSessionPersistence, { root: dir, compression: 'none' })
@@ -161,7 +161,7 @@ describe('JsonlSessionPersistence: format helpers', () => {
   })
 
   it('projectKey normalizes project paths into bounded readable names', () => {
-    expect(projectKey('/Users/qyj/work/roos-code')).toBe('--Users-qyj-work-roos-code--')
+    expect(projectKey('/Users/qyj/work/shres-code')).toBe('--Users-qyj-work-shres-code--')
     expect(projectKey('/a/b-c')).toBe(projectKey('/a-b/c'))
     expect(projectKey('C:\\work\\agent')).toBe('--C-work-agent--')
     expect(projectKey('/开发/~agent')).toBe('--~5F00~53D1-~007Eagent--')

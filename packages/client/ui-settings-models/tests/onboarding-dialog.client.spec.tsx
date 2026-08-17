@@ -2,9 +2,9 @@
 /** First-run provider picker over the shared Models join. */
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import Schema from '@roos-code/schemastery'
-import type { RpcResponse, SettingsNamespaceView } from '@roos-code/roos-code-api-remotes/client'
-import { bindSnapshotSelector } from '@roos-code/roos-code-client-web-react'
+import Schema from '@shres-code/schemastery'
+import type { RpcResponse, SettingsNamespaceView } from '@shres-code/shres-code-api-remotes/client'
+import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
 import { FirstRunOnboardingDialog } from '../src/client/FirstRunOnboardingDialog.tsx'
 import type { FirstRunOnboardingDialogProps } from '../src/client/FirstRunOnboardingDialog.tsx'
 import { ModelsSettingsStore } from '../src/client/store.ts'

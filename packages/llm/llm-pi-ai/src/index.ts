@@ -11,7 +11,7 @@
  *
  * ```yaml
  * - id: llm
- *   name: '@roos-code/roos-code-llm-pi-ai'
+ *   name: '@shres-code/shres-code-llm-pi-ai'
  *   config:
  *     providers:
  *       # Catalog route: everything but the credential comes from pi-ai.
@@ -52,14 +52,14 @@
  *               max: ultra
  * ```
  *
- * @module @roos-code/roos-code-llm-pi-ai
+ * @module @shres-code/shres-code-llm-pi-ai
  */
 
-import type { Context } from '@roos-code/cordis'
-import { launchEnvironmentOf } from '@roos-code/roos-code-launch-environment'
-import { assertUsableApiKey, LlmError } from '@roos-code/roos-code-llm'
-import type { AdapterRegistrationHandle, DirectoryRegistrationHandle, LlmConfigurableProvider } from '@roos-code/roos-code-llm'
-import { deepEqualJson, installSettingsSection, settingsNamespace } from '@roos-code/roos-code-settings'
+import type { Context } from '@shres-code/cordis'
+import { launchEnvironmentOf } from '@shres-code/shres-code-launch-environment'
+import { assertUsableApiKey, LlmError } from '@shres-code/shres-code-llm'
+import type { AdapterRegistrationHandle, DirectoryRegistrationHandle, LlmConfigurableProvider } from '@shres-code/shres-code-llm'
+import { deepEqualJson, installSettingsSection, settingsNamespace } from '@shres-code/shres-code-settings'
 import { PiAiAdapter } from './adapter.ts'
 import { catalogProviderIds, catalogProviderTakesApiKey } from './catalog.ts'
 import { assertServiceable, Config, resolveProfiles } from './config.ts'

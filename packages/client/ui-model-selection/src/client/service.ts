@@ -6,19 +6,19 @@
  *
  * Per-session storage follows the client service pattern (InputTriggerService /
  * CommandUiRuntime): a lazy service-internal map whose entry is deleted by the
- * owning scope's disposer. The host `roos-scope` ScopedLayers registry does
+ * owning scope's disposer. The host `shres-scope` ScopedLayers registry does
  * does not belong here: it derives scope from the host carrier mechanism
  * (object-keyed), while client scopes tag contexts with branded SessionId
  * strings, and it models global+shadow named registries — this is a
  * per-session singleton with no global layer to merge.
  */
-import { Service } from '@roos-code/cordis'
-import type { Context } from '@roos-code/cordis'
-import type { ConnectionHandle, SessionId } from '@roos-code/roos-code-api-remotes/client'
-import type { SessionRuntime } from '@roos-code/roos-code-client-runtime/client'
+import { Service } from '@shres-code/cordis'
+import type { Context } from '@shres-code/cordis'
+import type { ConnectionHandle, SessionId } from '@shres-code/shres-code-api-remotes/client'
+import type { SessionRuntime } from '@shres-code/shres-code-client-runtime/client'
 import { ModelDirectory } from './directory.ts'
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     modelDirectories: ModelDirectoryResolver
   }

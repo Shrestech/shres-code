@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { type Agent } from '@roos-code/roos-code-agent'
-import SubagentRuntime, { type SubagentStartRequest } from '@roos-code/roos-code-subagent'
-import { SessionId } from '@roos-code/roos-code-session'
+import { Context } from '@shres-code/cordis'
+import { type Agent } from '@shres-code/shres-code-agent'
+import SubagentRuntime, { type SubagentStartRequest } from '@shres-code/shres-code-subagent'
+import { SessionId } from '@shres-code/shres-code-session'
 import * as scripted from './scripted-provider.ts'
 
 /** A minimal parent; the scripted provider only reads its id. */

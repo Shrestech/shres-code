@@ -8,15 +8,15 @@
  * their CAS ref reads the session's current projected value at call time.
  * Goal creation stays on the /goal host command.
  */
-import type { ClientContext, SessionId } from '@roos-code/roos-code-client-runtime/client'
+import type { ClientContext, SessionId } from '@shres-code/shres-code-client-runtime/client'
 // Type-only: pulls the generated Remote API and ctx.remote merge through the Client assembly boundary.
-import type {} from '@roos-code/roos-code-api-remotes/client'
+import type {} from '@shres-code/shres-code-api-remotes/client'
 // Type-only: pulls the ui-conversation SlotMap merge (the input.dock entry).
-import type {} from '@roos-code/roos-code-client-ui-conversation/client'
+import type {} from '@shres-code/shres-code-client-ui-conversation/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
-import type {} from '@roos-code/roos-code-client-locale/client'
+import type {} from '@shres-code/shres-code-client-locale/client'
 // Type-only: the `goal` SessionProjectionMap key merge (single source, the domain's pure outlet).
-import type { GoalProjection, GoalRef } from '@roos-code/roos-code-goal/client'
+import type { GoalProjection, GoalRef } from '@shres-code/shres-code-goal/client'
 import type { GoalActionResult, GoalBarActions } from './slots.ts'
 import { GoalDock } from './GoalBar.tsx'
 import { GoalCommandInputView } from './GoalCommandInputView.tsx'
@@ -27,7 +27,7 @@ export { GoalBar, GoalDock } from './GoalBar.tsx'
 export type { GoalActionResult, GoalBarActions } from './slots.ts'
 export type { GoalKey } from './locales.ts'
 
-declare module '@roos-code/roos-code-client-ui-slots' {
+declare module '@shres-code/shres-code-client-ui-slots' {
   interface LocaleNamespaceMap {
     /** The goal strip's copy. */
     goal: GoalKey

@@ -5,13 +5,13 @@ import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 import { resolveDemoConfig } from '../src/resolveDemoConfig.ts'
 
-const NAME = 'roos-acp-demo'
+const NAME = 'shres-acp-demo'
 const FIRST_PARTY_LEAF = fileURLToPath(new URL('../../../../examples/acp-agent/cordis.yml', import.meta.url))
 
-const tmp = (): string => mkdtempSync(join(tmpdir(), 'roos-acp-demo-config-'))
+const tmp = (): string => mkdtempSync(join(tmpdir(), 'shres-acp-demo-config-'))
 
 afterEach(() => {
-  Reflect.deleteProperty(process.env, 'ROOS_HOME')
+  Reflect.deleteProperty(process.env, 'SHRES_HOME')
 })
 
 function writeConfig(dir: string, name: string, body: string): string {
@@ -74,7 +74,7 @@ describe('resolveDemoConfig', () => {
     const runtime = join(root, 'runtime')
     mkdirSync(join(runtime, 'node'), { recursive: true })
     const path = writeConfig(runtime, 'cordis.yml', '- config: !!js "1"\n')
-    const bin = join(runtime, 'node', 'node_modules', '@roos-code', 'roos-acp-demo', 'lib', 'bin.js')
+    const bin = join(runtime, 'node', 'node_modules', '@shres-code', 'shres-acp-demo', 'lib', 'bin.js')
     mkdirSync(dirname(bin), { recursive: true })
     writeFileSync(bin, '')
     expect(resolveDemoConfig({
@@ -91,14 +91,14 @@ describe('resolveDemoConfig', () => {
     const runtime = join(wheel, 'runtime')
     mkdirSync(runtime)
     const path = writeConfig(runtime, 'cordis.yml', '- config: !!js "1"\n')
-    const exe = join(runtime, 'roos-jsonrpc-agent-pkg-macos-arm64')
+    const exe = join(runtime, 'shres-jsonrpc-agent-pkg-macos-arm64')
     writeFileSync(exe, '')
     expect(resolveDemoConfig({
       requested: path,
       binName: NAME,
       cwd: tmp(),
       home: tmp(),
-      installAnchor: '/snapshot/node_modules/@roos-code/roos-code-acp-demo/lib/bin.js',
+      installAnchor: '/snapshot/node_modules/@shres-code/shres-code-acp-demo/lib/bin.js',
       execPath: exe,
     })).toBe(resolve(path))
   })
@@ -107,21 +107,21 @@ describe('resolveDemoConfig', () => {
     const hostile = tmp()
     mkdirSync(join(hostile, 'runtime'))
     const path = writeConfig(join(hostile, 'runtime'), 'cordis.yml', '- config: !!js "1"\n')
-    const exe = join(tmp(), 'roos-jsonrpc-agent-pkg-linux-x64')
+    const exe = join(tmp(), 'shres-jsonrpc-agent-pkg-linux-x64')
     writeFileSync(exe, '')
     expect(() => resolveDemoConfig({
       requested: path,
       binName: NAME,
       cwd: hostile,
       home: tmp(),
-      installAnchor: '/snapshot/node_modules/@roos-code/roos-code-acp-demo/lib/bin.js',
+      installAnchor: '/snapshot/node_modules/@shres-code/shres-code-acp-demo/lib/bin.js',
       execPath: exe,
     })).toThrow(/contains !!js/)
   })
 
   it('allows !!js inside an installed demo package directory', () => {
     const pkg = tmp()
-    writeFileSync(join(pkg, 'package.json'), JSON.stringify({ name: '@roos-code/roos-code-acp-demo' }))
+    writeFileSync(join(pkg, 'package.json'), JSON.stringify({ name: '@shres-code/shres-code-acp-demo' }))
     const path = writeConfig(pkg, 'trusted.yml', '- config: !!js "1"\n')
     expect(resolveDemoConfig({
       requested: path,
@@ -133,7 +133,7 @@ describe('resolveDemoConfig', () => {
     })).toBe(resolve(path))
   })
 
-  it('refuses !!js outside $ROOS_HOME and outside every first-party tree', () => {
+  it('refuses !!js outside $SHRES_HOME and outside every first-party tree', () => {
     const cwd = tmp()
     const path = writeConfig(cwd, 'cordis.yml', '- id: x\n  config: !!js "process.exit(0)"\n')
     expect(() => resolveDemoConfig({
@@ -142,14 +142,14 @@ describe('resolveDemoConfig', () => {
       cwd,
       home: tmp(),
       installAnchor: cwd,
-    })).toThrow(/contains !!js and is not under \$ROOS_HOME or a first-party\/packaged install tree/)
+    })).toThrow(/contains !!js and is not under \$SHRES_HOME or a first-party\/packaged install tree/)
     expect(() => resolveDemoConfig({
       requested: path,
       binName: NAME,
       cwd,
       home: tmp(),
       installAnchor: cwd,
-    })).toThrow(/Place the file under \$ROOS_HOME to pre-approve/)
+    })).toThrow(/Place the file under \$SHRES_HOME to pre-approve/)
   })
 
   it('refuses a relative plugin name with a space before the colon', () => {
@@ -188,7 +188,7 @@ describe('resolveDemoConfig', () => {
     })).toThrow(/contains !!js and a relative plugin name/)
   })
 
-  it('allows !!js inside $ROOS_HOME', () => {
+  it('allows !!js inside $SHRES_HOME', () => {
     const home = tmp()
     const path = writeConfig(home, 'approved.yml', '- config: !!js "1"\n')
     expect(resolveDemoConfig({
@@ -200,7 +200,7 @@ describe('resolveDemoConfig', () => {
     })).toBe(resolve(path))
   })
 
-  it('treats a config whose canonical path is $ROOS_HOME as inside home', () => {
+  it('treats a config whose canonical path is $SHRES_HOME as inside home', () => {
     const home = writeConfig(tmp(), 'home.yml', '- config: !!js "1"\n')
     expect(resolveDemoConfig({
       requested: home,
@@ -211,9 +211,9 @@ describe('resolveDemoConfig', () => {
     })).toBe(resolve(home))
   })
 
-  it('allows a file with neither construct outside $ROOS_HOME', () => {
+  it('allows a file with neither construct outside $SHRES_HOME', () => {
     const cwd = tmp()
-    const path = writeConfig(cwd, 'safe.yml', '- name: \'@roos-code/roos-code-acp-demo\'\n')
+    const path = writeConfig(cwd, 'safe.yml', '- name: \'@shres-code/shres-code-acp-demo\'\n')
     expect(resolveDemoConfig({
       requested: path,
       binName: NAME,
@@ -245,7 +245,7 @@ describe('resolveDemoConfig', () => {
     })).toThrow(new RegExp(`^${NAME}: failed to read config ${resolve(dir).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}: `))
   })
 
-  it('follows a symlink when deciding whether the file is under $ROOS_HOME', () => {
+  it('follows a symlink when deciding whether the file is under $SHRES_HOME', () => {
     const home = tmp()
     const outside = tmp()
     const real = writeConfig(outside, 'evil.yml', '- config: !!js "1"\n')
@@ -272,12 +272,12 @@ describe('resolveDemoConfig', () => {
     })).toBe(resolve(alias))
   })
 
-  it('uses process.cwd and resolveRoosHome when cwd and home are omitted', () => {
+  it('uses process.cwd and resolveShresHome when cwd and home are omitted', () => {
     const cwd = tmp()
     const home = tmp()
-    writeConfig(cwd, 'safe.yml', '- name: \'@roos-code/roos-code-acp-demo\'\n')
+    writeConfig(cwd, 'safe.yml', '- name: \'@shres-code/shres-code-acp-demo\'\n')
     const previous = process.cwd()
-    process.env.ROOS_HOME = home
+    process.env.SHRES_HOME = home
     process.chdir(cwd)
     try {
       expect(resolveDemoConfig({ requested: 'safe.yml', binName: NAME })).toBe(resolve(process.cwd(), 'safe.yml'))
@@ -286,7 +286,7 @@ describe('resolveDemoConfig', () => {
     }
   })
 
-  it('falls back to the spelled home path when $ROOS_HOME does not exist', () => {
+  it('falls back to the spelled home path when $SHRES_HOME does not exist', () => {
     const cwd = tmp()
     const path = writeConfig(cwd, 'js.yml', '- config: !!js "1"\n')
     expect(() => resolveDemoConfig({

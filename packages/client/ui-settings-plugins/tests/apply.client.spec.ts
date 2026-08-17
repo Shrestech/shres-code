@@ -1,16 +1,16 @@
 /** What the browser half registers, and that it all leaves with the fiber. */
 
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { describe, expect, it, vi } from 'vitest'
-import { resolveSlotLabel } from '@roos-code/roos-code-client-ui-slots'
-import { SlotRegistry } from '@roos-code/roos-code-client-runtime/client'
-import { LocaleRuntime } from '@roos-code/roos-code-client-locale/client'
-import { TestRemote, usePinnedBrowserLanguages } from '@roos-code/roos-code-client-test-runtime'
-import { SettingsScopeBinder } from '@roos-code/roos-code-client-ui-settings/client'
-import { apply, inject } from '@roos-code/roos-code-client-ui-settings-plugins/client'
+import { resolveSlotLabel } from '@shres-code/shres-code-client-ui-slots'
+import { SlotRegistry } from '@shres-code/shres-code-client-runtime/client'
+import { LocaleRuntime } from '@shres-code/shres-code-client-locale/client'
+import { TestRemote, usePinnedBrowserLanguages } from '@shres-code/shres-code-client-test-runtime'
+import { SettingsScopeBinder } from '@shres-code/shres-code-client-ui-settings/client'
+import { apply, inject } from '@shres-code/shres-code-client-ui-settings-plugins/client'
 import type {
   ConfigurablePluginsTabInjected, PluginsSettingsSectionInjected,
-} from '@roos-code/roos-code-client-ui-settings-plugins/client'
+} from '@shres-code/shres-code-client-ui-settings-plugins/client'
 
 // The service reads its initial locale from the browser; these specs assert
 // the shipped Chinese copy, so they state the browser they assume.

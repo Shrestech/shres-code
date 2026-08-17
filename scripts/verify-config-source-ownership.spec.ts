@@ -12,7 +12,7 @@ afterEach(() => {
 
 describe('configuration source ownership gate', () => {
   it('rejects inline endpoints in shipped bundle patches', () => {
-    const root = mkdtempSync(join(tmpdir(), 'roos-config-source-ownership-'))
+    const root = mkdtempSync(join(tmpdir(), 'shres-config-source-ownership-'))
     roots.push(root)
     const directory = join(root, 'packages/bundle/base')
     mkdirSync(directory, { recursive: true })

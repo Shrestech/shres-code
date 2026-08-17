@@ -3,19 +3,19 @@ import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promis
 import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { SandboxBashExecutor } from '@roos-code/roos-code-bash-sandbox'
-import LocalSubprocessRuntime from '@roos-code/roos-code-subprocess-local'
-import * as FsPolicy from '@roos-code/roos-code-fs-observation-policy'
-import SandboxedFileSystem from '@roos-code/roos-code-fs-sandbox'
-import { CallId } from '@roos-code/roos-code-llm'
-import { LocalSandboxProvider } from '@roos-code/roos-code-sandbox-local'
-import { seatbeltProfileArgs } from '@roos-code/roos-code-sandbox-local/src/profiles.ts'
-import SandboxPolicyService from '@roos-code/roos-code-sandbox-policy'
-import { SessionId } from '@roos-code/roos-code-session'
-import * as ToolFs from '@roos-code/roos-code-tool-fs'
-import type { ToolResult } from '@roos-code/roos-code-tools'
-import { launcherPath } from '@roos-code/node-addon-landlock-run'
+import { Context } from '@shres-code/cordis'
+import { SandboxBashExecutor } from '@shres-code/shres-code-bash-sandbox'
+import LocalSubprocessRuntime from '@shres-code/shres-code-subprocess-local'
+import * as FsPolicy from '@shres-code/shres-code-fs-observation-policy'
+import SandboxedFileSystem from '@shres-code/shres-code-fs-sandbox'
+import { CallId } from '@shres-code/shres-code-llm'
+import { LocalSandboxProvider } from '@shres-code/shres-code-sandbox-local'
+import { seatbeltProfileArgs } from '@shres-code/shres-code-sandbox-local/src/profiles.ts'
+import SandboxPolicyService from '@shres-code/shres-code-sandbox-policy'
+import { SessionId } from '@shres-code/shres-code-session'
+import * as ToolFs from '@shres-code/shres-code-tool-fs'
+import type { ToolResult } from '@shres-code/shres-code-tools'
+import { launcherPath } from '@shres-code/node-addon-landlock-run'
 import * as agentSpine from '../src/index.ts'
 
 const bwrapUsable = spawnSync('bwrap', [
@@ -32,7 +32,7 @@ let projectB: string
 const tempDirs: string[] = []
 
 async function projectDir(label: string): Promise<string> {
-  const dir = await mkdtemp(join(homedir(), `roos-${label}-`))
+  const dir = await mkdtemp(join(homedir(), `shres-${label}-`))
   tempDirs.push(dir)
   return dir
 }

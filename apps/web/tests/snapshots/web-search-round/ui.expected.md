@@ -9,17 +9,17 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-- text: Use web_search to search exactly "Roos Code snapshot search". Then reply exactly SEARCH_DONE and stop. {{clock}}
+- text: Use web_search to search exactly "Shres Code snapshot search". Then reply exactly SEARCH_DONE and stop. {{clock}}
 - button "Copy":
   - img
-- button "Context injection @roos-code/roos-code-system-prompt":
+- button "Context injection @shres-code/shres-code-system-prompt":
   - img
   - img
-  - text: Context injection @roos-code/roos-code-system-prompt
-- button "Search Roos Code snapshot search":
+  - text: Context injection @shres-code/shres-code-system-prompt
+- button "Search Shres Code snapshot search":
   - img
   - img
-  - text: Search Roos Code snapshot search
+  - text: Search Shres Code snapshot search
 - paragraph: SEARCH_DONE
 - button "Copy":
   - img

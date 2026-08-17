@@ -9,20 +9,20 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { Context } from '@roos-code/cordis'
-import { CodeRuntime } from '@roos-code/roos-code-code-runtime'
-import type { CodeRunRequest, CodeRunResult } from '@roos-code/roos-code-code-runtime'
-import { CallId, LlmAdapter, LlmRuntime } from '@roos-code/roos-code-llm'
-import type { GenerateOptions, LlmModelInfo, LlmResolvedModelInfo, StreamChunk } from '@roos-code/roos-code-llm'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import ToolRuntime, { RUN_CODE_NAME } from '@roos-code/roos-code-tools'
-import type { Config as ToolConfig } from '@roos-code/roos-code-tools'
-import LocalFileSystem from '@roos-code/roos-code-fs-local'
-import * as FsPolicy from '@roos-code/roos-code-fs-observation-policy'
-import LocalAttachmentStore from '@roos-code/roos-code-attachment-local'
-import { AttachmentId, AttachmentStore } from '@roos-code/roos-code-attachment'
-import type { ImageAttachmentLimits, ImageAttachmentRef, SaveImageAttachment, StoredImageAttachment } from '@roos-code/roos-code-attachment'
-import * as ToolFs from '@roos-code/roos-code-tool-fs'
+import { Context } from '@shres-code/cordis'
+import { CodeRuntime } from '@shres-code/shres-code-code-runtime'
+import type { CodeRunRequest, CodeRunResult } from '@shres-code/shres-code-code-runtime'
+import { CallId, LlmAdapter, LlmRuntime } from '@shres-code/shres-code-llm'
+import type { GenerateOptions, LlmModelInfo, LlmResolvedModelInfo, StreamChunk } from '@shres-code/shres-code-llm'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import ToolRuntime, { RUN_CODE_NAME } from '@shres-code/shres-code-tools'
+import type { Config as ToolConfig } from '@shres-code/shres-code-tools'
+import LocalFileSystem from '@shres-code/shres-code-fs-local'
+import * as FsPolicy from '@shres-code/shres-code-fs-observation-policy'
+import LocalAttachmentStore from '@shres-code/shres-code-attachment-local'
+import { AttachmentId, AttachmentStore } from '@shres-code/shres-code-attachment'
+import type { ImageAttachmentLimits, ImageAttachmentRef, SaveImageAttachment, StoredImageAttachment } from '@shres-code/shres-code-attachment'
+import * as ToolFs from '@shres-code/shres-code-tool-fs'
 import {
   applyReadImageTool,
   formatImageReadOutput,
@@ -81,8 +81,8 @@ let dir: string
 let home: string
 
 beforeEach(async () => {
-  dir = await mkdtemp(join(tmpdir(), 'roos-read-image-'))
-  home = await mkdtemp(join(tmpdir(), 'roos-read-image-home-'))
+  dir = await mkdtemp(join(tmpdir(), 'shres-read-image-'))
+  home = await mkdtemp(join(tmpdir(), 'shres-read-image-home-'))
 })
 afterEach(async () => {
   await rm(dir, { recursive: true, force: true })
@@ -108,7 +108,7 @@ async function setup(options: SetupOptions = {}) {
   await ctx.plugin(LocalFileSystem, { cwd: dir })
   await ctx.plugin(FsPolicy)
   if (options.attachments !== false) {
-    await ctx.plugin(LocalAttachmentStore, { roosHome: home, ...options.storeConfig })
+    await ctx.plugin(LocalAttachmentStore, { shresHome: home, ...options.storeConfig })
   }
   if (options.llm !== false) {
     await ctx.plugin(LlmRuntime)
@@ -448,7 +448,7 @@ describe('registration surface', () => {
     await ctx.plugin(ToolRuntime, { mode: 'native' })
     await ctx.plugin(LocalFileSystem, { cwd: dir })
     await ctx.plugin(FsPolicy)
-    const attachmentsFiber = await ctx.plugin(LocalAttachmentStore, { roosHome: home })
+    const attachmentsFiber = await ctx.plugin(LocalAttachmentStore, { shresHome: home })
     const toolFsFiber = await ctx.plugin(ToolFs)
     const names = () => ctx.tools.schemas().map(schema => schema.name).sort()
     expect(names()).toEqual(['edit', 'read', 'read_image', 'write'])
@@ -459,7 +459,7 @@ describe('registration surface', () => {
     expect(names()).toEqual(['edit', 'read', 'write'])
 
     // Remounting the store restores the conditional registration.
-    const remounted = await ctx.plugin(LocalAttachmentStore, { roosHome: home })
+    const remounted = await ctx.plugin(LocalAttachmentStore, { shresHome: home })
     expect(names()).toEqual(['edit', 'read', 'read_image', 'write'])
 
     // Disposing the whole plugin withdraws every tool, read_image included.

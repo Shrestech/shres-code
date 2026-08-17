@@ -4,7 +4,7 @@
 .frame {
   display: flex;
   justify-content: center;
-  padding: 6px calc(var(--roos-composer-side-clearance) + 16px) 10px;
+  padding: 6px calc(var(--shres-composer-side-clearance) + 16px) 10px;
 }
 
 /* Figma Input 973:36348 body over the 1019:36938 header: no banner strip —
@@ -13,7 +13,7 @@
   display: flex;
   flex-direction: column;
   width: 100%;
-  max-width: var(--roos-chat-content-width);
+  max-width: var(--shres-chat-content-width);
   /* Composer seat sits in a fixed-height conversation column (overflow
      hidden): cap the card against the viewport and scroll the option list
      so header and footer actions stay reachable on long batches. */
@@ -30,8 +30,8 @@
      on the card because the elevation belongs to the surface, and the custom
      properties inherit down to `.body` (see ui-theme styles/scrollbar.css
      for the rebinding contract). */
-  --roos-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
-  --roos-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
+  --shres-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
+  --shres-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
 }
 
 .card,

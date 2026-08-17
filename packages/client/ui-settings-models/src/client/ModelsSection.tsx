@@ -14,9 +14,9 @@
 
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import type { IApiClient } from '@roos-code/roos-code-api-remotes/client'
-import { Button, IconPlusOutline16, Modal } from '@roos-code/roos-code-client-ui-primitives'
-import type { SnapshotSelectorHook } from '@roos-code/roos-code-client-web-react'
+import type { IApiClient } from '@shres-code/shres-code-api-remotes/client'
+import { Button, IconPlusOutline16, Modal } from '@shres-code/shres-code-client-ui-primitives'
+import type { SnapshotSelectorHook } from '@shres-code/shres-code-client-web-react'
 import { CustomProviderCard } from './CustomProviderCard.tsx'
 import { deriveKeyRef, messageOf, protocolChoices, providerEnabled, providerUsable } from './store.ts'
 import type { ModelsSettingsState, ModelsSettingsStore, ProviderRow } from './store.ts'

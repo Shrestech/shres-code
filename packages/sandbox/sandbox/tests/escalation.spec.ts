@@ -2,7 +2,7 @@
  * Tests for the shared escalation vocabulary and choreography: the strictly-
  * wider ladder, the argument-pairing validation, the model-facing markers, and
  * {@link approveEscalation}'s ordered fail-closed sequence. Both enforcing tool
- * families (`roos-tool-bash`, `roos-tool-fs`) delegate here, so the ordering and
+ * families (`shres-tool-bash`, `shres-tool-fs`) delegate here, so the ordering and
  * verbatim texts are pinned once, next to the vocabulary that owns them.
  */
 
@@ -14,8 +14,8 @@ import {
   escalationHintMarker,
   sandboxDenialMarker,
   validateEscalationArgs,
-} from '@roos-code/roos-code-sandbox'
-import type { EscalationApprover, EscalationOutcome } from '@roos-code/roos-code-sandbox'
+} from '@shres-code/shres-code-sandbox'
+import type { EscalationApprover, EscalationOutcome } from '@shres-code/shres-code-sandbox'
 
 describe('the strictly-wider ladder', () => {
   it('read-only escalates to either wider mode; workspace-write only to full access', () => {

@@ -4,16 +4,16 @@
  * `ctx.subagents.interrupt()`. They perform no lifecycle routing of their own —
  * residency, cold resume, and interrupt authorization belong to the subagent
  * service — and they live apart from the provider-bound
- * `@roos-code/roos-code-tool-subagent` instances so multiple delegation tools share
+ * `@shres-code/shres-code-tool-subagent` instances so multiple delegation tools share
  * one control API.
- * @module @roos-code/roos-code-tool-subagent-control
+ * @module @shres-code/shres-code-tool-subagent-control
  */
 
-import type { Context } from '@roos-code/cordis'
-import { defineTool } from '@roos-code/roos-code-tools'
-import type { ContentBlock } from '@roos-code/roos-code-llm'
-import { SessionId } from '@roos-code/roos-code-session'
-import type {} from '@roos-code/roos-code-subagent'
+import type { Context } from '@shres-code/cordis'
+import { defineTool } from '@shres-code/shres-code-tools'
+import type { ContentBlock } from '@shres-code/shres-code-llm'
+import { SessionId } from '@shres-code/shres-code-session'
+import type {} from '@shres-code/shres-code-subagent'
 
 export const name = 'tool-subagent-control'
 export const inject = ['tools', 'subagents']

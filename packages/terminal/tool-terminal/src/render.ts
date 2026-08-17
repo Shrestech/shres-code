@@ -1,6 +1,6 @@
 /** Model and UI rendering for persistent terminal tool results. */
 
-import { TextRetainer } from '@roos-code/roos-code-output-retention'
+import { TextRetainer } from '@shres-code/shres-code-output-retention'
 
 interface RenderedSessionStatusRunning {
   kind: 'running'

@@ -3,16 +3,16 @@ import { randomUUID } from 'node:crypto'
 import { mkdtemp } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { Context } from '@roos-code/cordis'
-import Loader from '@roos-code/cordis-plugin-loader'
-import { agentEvents } from '@roos-code/roos-code-agent'
-import { TOOL_ORDER_REST } from '@roos-code/roos-code-system-prompt'
-import type { Message } from '@roos-code/roos-code-llm'
-import { SessionId } from '@roos-code/roos-code-session'
+import { Context } from '@shres-code/cordis'
+import Loader from '@shres-code/cordis-plugin-loader'
+import { agentEvents } from '@shres-code/shres-code-agent'
+import { TOOL_ORDER_REST } from '@shres-code/shres-code-system-prompt'
+import type { Message } from '@shres-code/shres-code-llm'
+import { SessionId } from '@shres-code/shres-code-session'
 import * as acpAgent from '../src/index.ts'
 
 /**
- * In-process unit coverage for the @roos-code/roos-code-acp-demo composition:
+ * In-process unit coverage for the @shres-code/shres-code-acp-demo composition:
  * mounting it brings up the agent-spine-demo spine + JSONL persistence + the ACP
  * bridge in one `ctx.plugin`. It loads no Loader-only plugin (no hmr), so it
  * mounts in a plain Context.
@@ -31,15 +31,15 @@ async function mount(config: acpAgent.Config, withBash = false): Promise<Context
       start() { throw new Error('composition test does not execute bash') },
     })
   }
-  config.persistenceRoot ??= await mkdtemp(join(tmpdir(), 'roos-acp-demo-persistence-'))
+  config.persistenceRoot ??= await mkdtemp(join(tmpdir(), 'shres-acp-demo-persistence-'))
   await ctx.plugin(acpAgent, config)
   return ctx
 }
 
 async function isolatedSkillsConfig(catalogDescriptionMaxLength?: number): Promise<NonNullable<acpAgent.Config['skills']>> {
-  const home = await mkdtemp(join(tmpdir(), 'roos-acp-demo-skills-'))
+  const home = await mkdtemp(join(tmpdir(), 'shres-acp-demo-skills-'))
   return {
-    filesystem: { roosHome: join(home, '.roos'), agentsHome: join(home, '.agents') },
+    filesystem: { shresHome: join(home, '.shres'), agentsHome: join(home, '.agents') },
     ...catalogDescriptionMaxLength !== undefined ? { tool: { catalogDescriptionMaxLength } } : {},
   }
 }
@@ -60,34 +60,34 @@ async function composePrefix(ctx: Context): Promise<Message[]> {
 }
 
 async function withIsolatedSkillHomes<T>(run: () => Promise<T>): Promise<T> {
-  const oldRoosHome = process.env.ROOS_HOME
-  const oldAgentsHome = process.env.ROOS_AGENTS_HOME
-  const home = await mkdtemp(join(tmpdir(), 'roos-acp-demo-default-skills-'))
-  process.env.ROOS_HOME = join(home, '.roos')
-  process.env.ROOS_AGENTS_HOME = join(home, '.agents')
+  const oldShresHome = process.env.SHRES_HOME
+  const oldAgentsHome = process.env.SHRES_AGENTS_HOME
+  const home = await mkdtemp(join(tmpdir(), 'shres-acp-demo-default-skills-'))
+  process.env.SHRES_HOME = join(home, '.shres')
+  process.env.SHRES_AGENTS_HOME = join(home, '.agents')
   try {
     return await run()
   } finally {
-    if (oldRoosHome === undefined) {
-      delete process.env.ROOS_HOME
+    if (oldShresHome === undefined) {
+      delete process.env.SHRES_HOME
     } else {
-      process.env.ROOS_HOME = oldRoosHome
+      process.env.SHRES_HOME = oldShresHome
     }
     if (oldAgentsHome === undefined) {
-      delete process.env.ROOS_AGENTS_HOME
+      delete process.env.SHRES_AGENTS_HOME
     } else {
-      process.env.ROOS_AGENTS_HOME = oldAgentsHome
+      process.env.SHRES_AGENTS_HOME = oldAgentsHome
     }
   }
 }
 
-describe('roos-acp-demo composition', () => {
+describe('shres-acp-demo composition', () => {
   it('brings up the spine + persistence + the ACP bridge', async () => {
     const ctx = await mount({
       provider: 'mock',
       model: 'mock',
       persona: 'hi',
-      persistenceRoot: '/tmp/roos-acp-demo-test',
+      persistenceRoot: '/tmp/shres-acp-demo-test',
       persistenceCompression: 'none',
       skills: await isolatedSkillsConfig(),
       workspaceContext: false,
@@ -143,7 +143,7 @@ describe('roos-acp-demo composition', () => {
       provider: 'mock',
       model: 'mock',
       persona: 'hi',
-      persistenceRoot: '/tmp/roos-acp-demo-workspace-context',
+      persistenceRoot: '/tmp/shres-acp-demo-workspace-context',
       workspaceContext: false,
     })
     expect(ctx.get('agents')).toBeDefined()
@@ -161,9 +161,9 @@ describe('roos-acp-demo composition', () => {
     })
   })
 
-  it('forwards skill config and roosHome into agent-spine-demo', async () => {
+  it('forwards skill config and shresHome into agent-spine-demo', async () => {
     const skills = await isolatedSkillsConfig(6)
-    const ctx = await mount({ provider: 'mock', model: 'mock', persona: 'hi', roosHome: skills.filesystem!.roosHome!, skills, workspaceContext: false })
+    const ctx = await mount({ provider: 'mock', model: 'mock', persona: 'hi', shresHome: skills.filesystem!.shresHome!, skills, workspaceContext: false })
     ctx.skills.register({ name: 'acp-skill', description: 'ACP skill', source: 'runtime', content: 'body' })
     expect(JSON.stringify(await composePrefix(ctx))).toContain('- `acp-skill`: ACP...')
     await ctx.fiber.dispose()
@@ -174,7 +174,7 @@ describe('roos-acp-demo composition', () => {
       provider: 'mock',
       model: 'mock',
       maxParallelToolCalls: 3,
-      persistenceRoot: '/tmp/roos-acp-demo-test-parallel',
+      persistenceRoot: '/tmp/shres-acp-demo-test-parallel',
       skills: await isolatedSkillsConfig(),
       workspaceContext: false,
     })
@@ -232,7 +232,7 @@ describe('roos-acp-demo composition', () => {
       provider: 'mock',
       model: 'mock',
       toolOrder: ['zulu', TOOL_ORDER_REST],
-      persistenceRoot: '/tmp/roos-acp-demo-test-tool-order',
+      persistenceRoot: '/tmp/shres-acp-demo-test-tool-order',
       workspaceContext: false,
     })
     // The bundle's own bash tools pend on the absent `ctx.shell` executor in

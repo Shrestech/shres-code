@@ -22,7 +22,7 @@ import {
   grantArgs,
   launcherPath,
   probe,
-} from '@roos-code/node-addon-landlock-run';
+} from '@shres-code/node-addon-landlock-run';
 
 const FATAL_PREFIX = 'landlock-run: ';
 const PARTIAL_NOTICE = 'landlock-run: partial enforcement (older Landlock ABI)';

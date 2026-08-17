@@ -1,17 +1,17 @@
 # Keyless replay keeps the LSP composition intact and replaces only the model adapter.
 - id: base
-  name: '@roos-code/cordis-plugin-include'
+  name: '@shres-code/cordis-plugin-include'
   config:
     path: ../cordis.yml
     patches:
       - id: llm-deepseek
-        name: '@roos-code/roos-code-llm-deepseek'
+        name: '@shres-code/shres-code-llm-deepseek'
         disabled: true
       - insert:
           - id: lsp
-            name: '@roos-code/roos-code-lsp'
+            name: '@shres-code/shres-code-lsp'
           - id: lsp-stdio
-            name: '@roos-code/roos-code-lsp-stdio'
+            name: '@shres-code/shres-code-lsp-stdio'
             config:
               servers:
                 fixture:
@@ -20,10 +20,10 @@
                   extensionToLanguage:
                     '.ts': typescript
           - id: timeout-policy
-            name: '@roos-code/roos-code-tool-call-timeout-policy'
+            name: '@shres-code/shres-code-tool-call-timeout-policy'
           - id: tool-lsp
-            name: '@roos-code/roos-code-tool-lsp'
+            name: '@shres-code/shres-code-tool-lsp'
             config:
               maxLocations: 1
           - id: llm-replay
-            name: '@roos-code/roos-code-llm-replay'
+            name: '@shres-code/shres-code-llm-replay'

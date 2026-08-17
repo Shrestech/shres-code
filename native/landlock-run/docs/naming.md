@@ -2,11 +2,11 @@
 
 ## npm packages
 
-The public package family belongs to the `@roos-code` scope and uses the `node-addon-landlock-run` package prefix; platform packages append platform information only:
+The public package family belongs to the `@shres-code` scope and uses the `node-addon-landlock-run` package prefix; platform packages append platform information only:
 
 ```text
-@roos-code/node-addon-landlock-run
-@roos-code/node-addon-landlock-run-<platform>
+@shres-code/node-addon-landlock-run
+@shres-code/node-addon-landlock-run-<platform>
 ```
 
 Platform suffixes carry no libc component (binaries are static musl) and no variant component — variants stay inside `prebuilds.json` and binary filenames.

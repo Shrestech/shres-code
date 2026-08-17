@@ -1,6 +1,6 @@
 /** In-memory ACP transport fixture over the real agent factory and loop. */
 
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import {
   ClientSideConnection,
   ndJsonStream,
@@ -11,9 +11,9 @@ import {
   type SessionNotification,
   type Stream,
 } from '@agentclientprotocol/sdk'
-import { type GenerateOptions, LlmAdapter, type StreamChunk } from '@roos-code/roos-code-llm'
-import AgentLoop from '@roos-code/roos-code-agent-loop'
-import { mountAgentLoopTestDependencies } from '@roos-code/roos-code-agent-loop-testkit'
+import { type GenerateOptions, LlmAdapter, type StreamChunk } from '@shres-code/shres-code-llm'
+import AgentLoop from '@shres-code/shres-code-agent-loop'
+import { mountAgentLoopTestDependencies } from '@shres-code/shres-code-agent-loop-testkit'
 import * as AcpPlugin from '../src/index.ts'
 import type { AcpConfig } from '../src/index.ts'
 

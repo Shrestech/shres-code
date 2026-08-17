@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { createScope, scopeTarget } from '@roos-code/roos-code-scope'
-import { createUserMessage, CallId, createMessage, createToolResultMessage, freezeMessage } from '@roos-code/roos-code-llm'
-import SessionStore, { SessionId, TOOL_NOT_STARTED } from '@roos-code/roos-code-session'
-import * as SessionInvariant from '@roos-code/roos-code-session/invariant'
-import InvariantRegistry, { InvariantError } from '@roos-code/roos-code-invariants'
+import { Context } from '@shres-code/cordis'
+import { createScope, scopeTarget } from '@shres-code/shres-code-scope'
+import { createUserMessage, CallId, createMessage, createToolResultMessage, freezeMessage } from '@shres-code/shres-code-llm'
+import SessionStore, { SessionId, TOOL_NOT_STARTED } from '@shres-code/shres-code-session'
+import * as SessionInvariant from '@shres-code/shres-code-session/invariant'
+import InvariantRegistry, { InvariantError } from '@shres-code/shres-code-invariants'
 
 async function setup(): Promise<{ ctx: Context; fiber: Awaited<ReturnType<Context['plugin']>> }> {
   const ctx = new Context()

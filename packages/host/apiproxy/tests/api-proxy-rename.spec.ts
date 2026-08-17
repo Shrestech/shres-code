@@ -8,17 +8,17 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import SessionStore from '@roos-code/roos-code-session'
-import AgentRegistry from '@roos-code/roos-code-agent'
-import type { Agent, AgentHandle, CreateAgentOptions } from '@roos-code/roos-code-agent'
-import { createUserMessage } from '@roos-code/roos-code-llm'
-import SessionTitleService from '@roos-code/roos-code-session-title'
-import UserQuestionService from '@roos-code/roos-code-user-questions'
-import type { Session, SessionId } from '@roos-code/roos-code-session'
-import type { RpcRequest } from '@roos-code/roos-code-host-apiproxy/api/rpc'
-import { RpcId } from '@roos-code/roos-code-host-apiproxy/api/rpc'
-import { createApiProxy } from '@roos-code/roos-code-host-apiproxy'
+import { Context } from '@shres-code/cordis'
+import SessionStore from '@shres-code/shres-code-session'
+import AgentRegistry from '@shres-code/shres-code-agent'
+import type { Agent, AgentHandle, CreateAgentOptions } from '@shres-code/shres-code-agent'
+import { createUserMessage } from '@shres-code/shres-code-llm'
+import SessionTitleService from '@shres-code/shres-code-session-title'
+import UserQuestionService from '@shres-code/shres-code-user-questions'
+import type { Session, SessionId } from '@shres-code/shres-code-session'
+import type { RpcRequest } from '@shres-code/shres-code-host-apiproxy/api/rpc'
+import { RpcId } from '@shres-code/shres-code-host-apiproxy/api/rpc'
+import { createApiProxy } from '@shres-code/shres-code-host-apiproxy'
 
 const sid = (id: string): SessionId => id as SessionId
 

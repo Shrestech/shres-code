@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
-import { AttachmentId } from '@roos-code/roos-code-attachment'
-import type { AttachmentStore, ImageAttachmentRef } from '@roos-code/roos-code-attachment'
-import { CallId, createMessage, createUserMessage } from '@roos-code/roos-code-llm'
-import type { ContentBlock, GenerateOptions, Message } from '@roos-code/roos-code-llm'
+import { AttachmentId } from '@shres-code/shres-code-attachment'
+import type { AttachmentStore, ImageAttachmentRef } from '@shres-code/shres-code-attachment'
+import { CallId, createMessage, createUserMessage } from '@shres-code/shres-code-llm'
+import type { ContentBlock, GenerateOptions, Message } from '@shres-code/shres-code-llm'
 import { toPiContext } from '../src/context.ts'
 import { toPiAssistant } from '../src/replay.ts'
 

@@ -10,16 +10,16 @@
  * disposing the old instance and creating a new one; identical `serverName`
  * reproduces identical public tool names.
  *
- * @module @roos-code/roos-code-mcp-client
+ * @module @shres-code/shres-code-mcp-client
  */
 
-import type { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import { MAX_TIMER_DELAY_MS } from '@roos-code/roos-code-timeout'
+import type { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
 import { RECONNECT_DEFAULTS, resolveReconnectPolicy, startConnection } from './connection.ts'
 import type { ReconnectConfig } from './connection.ts'
 // Side-effect type import: declaration-merges `ctx.tools` onto Context.
-import type {} from '@roos-code/roos-code-tools'
+import type {} from '@shres-code/shres-code-tools'
 
 export type { McpResult } from './tools.ts'
 export type { ReconnectConfig, ResolvedReconnectPolicy } from './connection.ts'

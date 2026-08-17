@@ -27,7 +27,7 @@
  *   web bodies). `head` / `tail` / `headTail`, preserving UTF-8 boundaries at
  *   {@link TextRetainer.finish}.
  *
- * @module @roos-code/roos-code-output-retention
+ * @module @shres-code/shres-code-output-retention
  */
 
 /**

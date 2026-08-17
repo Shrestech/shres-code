@@ -1,10 +1,10 @@
 /**
  * Public configuration and measurement vocabulary for replay token metering.
  *
- * @module @roos-code/roos-code-token-meter/types
+ * @module @shres-code/shres-code-token-meter/types
  */
 
-import type { TokenUsage } from '@roos-code/roos-code-llm'
+import type { TokenUsage } from '@shres-code/shres-code-llm'
 
 export type { ContextBreakdownProjection, ContextPressureProjection, TokenUsageProjection } from './projection.ts'
 

@@ -1,7 +1,7 @@
 /** Reconstruct durable steering identity from the event-sourced agent inbox. */
 
-import type { SessionEvent } from '@roos-code/roos-code-session/types'
-import type { InboxTarget } from '@roos-code/roos-code-agent/types'
+import type { SessionEvent } from '@shres-code/shres-code-session/types'
+import type { InboxTarget } from '@shres-code/shres-code-agent/types'
 
 /** Minimal pending identity retained while replaying durable inbox splices. */
 interface PendingIdentity {

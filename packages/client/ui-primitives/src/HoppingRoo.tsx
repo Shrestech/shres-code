@@ -1,22 +1,22 @@
 import type { IconProps } from './icons/props.ts'
-import { RooMarkGlyph, ROO_MARK_VIEWBOX } from './RooMark.tsx'
+import { RooMarkGlyph, ROO_MARK_VIEWBOX, shieldLockupAttr } from './RooMark.tsx'
 import css from './HoppingRoo.module.css'
 
-/** Named product seats that color a hopping kangaroo. */
-export const SEAT_IDS = ['boomer', 'joey', 'flyer'] as const
+/** Named product seats that color a hopping product mark. */
+export const SEAT_IDS = ['aegis', 'stride', 'ward'] as const
 
 /** One named seat id. */
 export type SeatId = (typeof SEAT_IDS)[number]
 
 /** Distinct fill colors for each seat (ochre / green / blue). */
 export const SEAT_COLORS: Record<SeatId, string> = {
-  boomer: '#c9842a',
-  joey: '#2f9e62',
-  flyer: '#3b7dd8',
+  aegis: '#c9842a',
+  stride: '#2f9e62',
+  ward: '#3b7dd8',
 }
 
 /**
- * Infer a seat from a tool name or catalog label (`Boomer: design the API`).
+ * Infer a seat from a tool name or catalog label (`Aegis: design the API`).
  * Role words such as `worker` are ignored so ad-hoc labels stay uncolored.
  * @param text - tool name, label, or title.
  * @returns the matching seat, or undefined.
@@ -24,7 +24,7 @@ export const SEAT_COLORS: Record<SeatId, string> = {
 export function seatIdOf(text: string | undefined): SeatId | undefined {
   if (text === undefined || text.length === 0) return undefined
   const head = text.trim().split(/[\s:]+/, 1)[0]?.toLowerCase()
-  return head === 'boomer' || head === 'joey' || head === 'flyer' ? head : undefined
+  return head === 'aegis' || head === 'stride' || head === 'ward' ? head : undefined
 }
 
 /** Props for {@link HoppingRoo}. */
@@ -38,7 +38,7 @@ export interface HoppingRooProps extends IconProps {
 }
 
 /**
- * Tiny kangaroo mark, optionally hopping, used while a child agent is working.
+ * Tiny product mark, optionally hopping, used while a child agent is working.
  * @param props.size - square edge in px (default 14).
  * @param props.hopping - whether to play the hop cycle.
  * @param props.seat - colors the mark for that product seat.
@@ -59,6 +59,7 @@ export function HoppingRoo({
       fill="none"
       aria-hidden="true"
       data-hopping-roo={seat ?? 'generic'}
+      data-shres-shield={shieldLockupAttr(false)}
       {...hopping ? { 'data-state': 'ongoing' } : {}}
     >
       <svg x="1.2" y="1.2" width="21.6" height="21.6" viewBox={ROO_MARK_VIEWBOX} overflow="visible">

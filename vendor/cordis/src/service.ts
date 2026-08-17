@@ -1,4 +1,4 @@
-import { defineProperty } from '@roos-code/cosmokit'
+import { defineProperty } from '@shres-code/cosmokit'
 import { Context } from './context.ts'
 import { createCallable, joinPrototype, symbols, type Tracker } from './utils.ts'
 

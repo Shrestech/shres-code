@@ -1,5 +1,5 @@
 /**
- * User patch-layer behavior of `roos-app-boot`: the optional patch-list loader
+ * User patch-layer behavior of `shres-app-boot`: the optional patch-list loader
  * (a profile's `cordis.patch.yml`) and `boot()` applying the user layer over
  * a real Loader tree, kept live through transactional HMR.
  */
@@ -9,11 +9,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import Hmr from '@roos-code/cordis-plugin-hmr'
-import Include, { type PatchOptions } from '@roos-code/cordis-plugin-include'
-import Loader from '@roos-code/cordis-plugin-loader'
-import Timer from '@roos-code/cordis-plugin-timer'
+import { Context } from '@shres-code/cordis'
+import Hmr from '@shres-code/cordis-plugin-hmr'
+import Include, { type PatchOptions } from '@shres-code/cordis-plugin-include'
+import Loader from '@shres-code/cordis-plugin-loader'
+import Timer from '@shres-code/cordis-plugin-timer'
 import {
   boot,
   loadOptionalPatches,
@@ -21,9 +21,9 @@ import {
   watchUserPatches,
 } from '../src/index.ts'
 
-const NAME = 'roos-test-bin'
+const NAME = 'shres-test-bin'
 
-const tmp = (): string => mkdtempSync(join(tmpdir(), 'roos-user-patches-'))
+const tmp = (): string => mkdtempSync(join(tmpdir(), 'shres-user-patches-'))
 
 async function eventually(test: () => boolean, message: string): Promise<void> {
   const deadline = Date.now() + 10_000
@@ -37,7 +37,7 @@ const settleChokidarChangeThrottle = (): Promise<void> => new Promise(resolve =>
 
 describe('loadOptionalPatches', () => {
   afterEach(() => {
-    delete process.env.ROOS_HOME
+    delete process.env.SHRES_HOME
   })
 
   it('returns undefined when no user patch file exists', () => {
@@ -48,19 +48,19 @@ describe('loadOptionalPatches', () => {
     const dir = tmp()
     writeFileSync(join(dir, PROFILE_PATCH_FILENAME), [
       '- id: agent-loop',
-      "  name: '@roos-code/roos-code-agent-loop'",
+      "  name: '@shres-code/shres-code-agent-loop'",
       '  config:',
-      '    model: !!js process.env.ROOS_SPEC_MODEL',
+      '    model: !!js process.env.SHRES_SPEC_MODEL',
       '- insert:',
       '    - id: llm',
-      "      name: '@roos-code/roos-code-llm-pi-ai'",
+      "      name: '@shres-code/shres-code-llm-pi-ai'",
       '',
     ].join('\n'))
     const patches = loadOptionalPatches(NAME, join(dir, PROFILE_PATCH_FILENAME))
     expect(patches).toHaveLength(2)
     expect(patches?.[0]).toMatchObject({
       id: 'agent-loop',
-      config: { model: { __jsExpr: 'process.env.ROOS_SPEC_MODEL' } },
+      config: { model: { __jsExpr: 'process.env.SHRES_SPEC_MODEL' } },
     })
     expect(patches?.[1]?.insert).toHaveLength(1)
   })
@@ -275,13 +275,13 @@ describe('boot with user patches', () => {
       '- id: noop',
       '  name: ./noop.mjs',
       '  config:',
-      '    value: !!js process.env.ROOS_APP_BOOT_USER_SPEC',
+      '    value: !!js process.env.SHRES_APP_BOOT_USER_SPEC',
       '- insert:',
       '    - id: user-extra',
       '      name: ./noop.mjs',
       '',
     ].join('\n'))
-    process.env['ROOS_APP_BOOT_USER_SPEC'] = 'user-value'
+    process.env['SHRES_APP_BOOT_USER_SPEC'] = 'user-value'
     const ctx = await boot(NAME, writeTree(dir), loadOptionalPatches(NAME, join(userDir, PROFILE_PATCH_FILENAME)))
     try {
       const noop = [...ctx.loader.entries()].find(entry => entry.options.id === 'noop')
@@ -290,7 +290,7 @@ describe('boot with user patches', () => {
       expect([...ctx.loader.entries()].some(entry => entry.options.id === 'user-extra')).toBe(true)
     } finally {
       await ctx.fiber.dispose()
-      delete process.env['ROOS_APP_BOOT_USER_SPEC']
+      delete process.env['SHRES_APP_BOOT_USER_SPEC']
     }
   })
 

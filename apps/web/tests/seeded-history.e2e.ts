@@ -7,7 +7,7 @@
 // command-row surfaces: the seeded manual `/compact` lifecycle folds into its
 // checkpoint, an Access-chip pick later runs `/permission` on the host, and
 // `/feedback` pins its expandable correlation ids. The seed is a recorded
-// fixture under the same record discipline as every other: ROOS_SNAPSHOT=record drives the turn
+// fixture under the same record discipline as every other: SHRES_SNAPSHOT=record drives the turn
 // live through the composer (real read tool against seeded workspace files)
 // and harvests seed.jsonl; replay/refresh seed it cold and only render.
 import { readFile, writeFile, mkdir } from 'node:fs/promises'
@@ -15,11 +15,11 @@ import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
-import { createUserMessage } from '@roos-code/roos-code-llm'
-import type { ContentBlock, Message } from '@roos-code/roos-code-llm'
-import { deriveEventMessage, SessionId } from '@roos-code/roos-code-session'
-import type { SessionEvent } from '@roos-code/roos-code-session'
-import type { TokenMeter } from '@roos-code/roos-code-token-meter'
+import { createUserMessage } from '@shres-code/shres-code-llm'
+import type { ContentBlock, Message } from '@shres-code/shres-code-llm'
+import { deriveEventMessage, SessionId } from '@shres-code/shres-code-session'
+import type { SessionEvent } from '@shres-code/shres-code-session'
+import type { TokenMeter } from '@shres-code/shres-code-token-meter'
 import { join } from 'node:path'
 import {
   assertFixtureInventory, captureStableAria, compareOrRefreshGolden, fixtureUserPrompts,
@@ -442,8 +442,8 @@ describe('web e2e: seeded history renders through cold resume', () => {
 
   it.skipIf(MODE === 'record')('reports full feedback correlation ids in an expandable two-line row', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-seeded-feedback-row'))
-    const previousRoosHome = process.env.ROOS_HOME
-    process.env.ROOS_HOME = scaffold.harnessHome
+    const previousShresHome = process.env.SHRES_HOME
+    process.env.SHRES_HOME = scaffold.harnessHome
     try {
       const input = page.locator('textarea').first()
       await input.fill('/feedback the diff view is unreadable')
@@ -473,8 +473,8 @@ describe('web e2e: seeded history renders through cold resume', () => {
         .split(userId).join('{{userId}}')
       await compareOrRefreshGolden(FEEDBACK_ROW_EXPECTED, snapshot, MODE)
     } finally {
-      if (previousRoosHome === undefined) delete process.env.ROOS_HOME
-      else process.env.ROOS_HOME = previousRoosHome
+      if (previousShresHome === undefined) delete process.env.SHRES_HOME
+      else process.env.SHRES_HOME = previousShresHome
     }
   }, 60_000)
 

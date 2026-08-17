@@ -1,11 +1,11 @@
 /**
  * Agent-scoped durable one-shot and fixed-rate reminders over the session event log.
- * @module @roos-code/roos-code-schedule
+ * @module @shres-code/shres-code-schedule
  */
 
-import type { Context } from '@roos-code/cordis'
-import type { Agent } from '@roos-code/roos-code-agent'
-import type {} from '@roos-code/roos-code-session-persistence'
+import type { Context } from '@shres-code/cordis'
+import type { Agent } from '@shres-code/shres-code-agent'
+import type {} from '@shres-code/shres-code-session-persistence'
 import { ScheduleRuntime } from './runtime.ts'
 import { registerScheduleTools } from './tools.ts'
 

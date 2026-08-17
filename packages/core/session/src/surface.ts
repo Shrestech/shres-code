@@ -5,10 +5,10 @@
  * Browser-safe: web clients consume this subpath export, so it must stay free
  * of `node:` imports (they break the vite bundle).
  *
- * @module @roos-code/roos-code-session/surface
+ * @module @shres-code/shres-code-session/surface
  */
 
-import type { Message } from '@roos-code/roos-code-llm'
+import type { Message } from '@shres-code/shres-code-llm'
 import type { SessionEvent, SurfaceEvent, SurfaceEventType, SurfaceOp } from './types.ts'
 
 /** Runtime counterpart of the message-producing event union. */

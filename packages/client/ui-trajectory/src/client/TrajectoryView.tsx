@@ -1,12 +1,12 @@
 /** Trajectory view: compact summary over a turn-aware event ledger. */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ConvViewProps } from '@roos-code/roos-code-client-ui-conversation/client'
-import type { InjectFace, PropsLocale } from '@roos-code/roos-code-client-ui-slots'
+import type { ConvViewProps } from '@shres-code/shres-code-client-ui-conversation/client'
+import type { InjectFace, PropsLocale } from '@shres-code/shres-code-client-ui-slots'
 import type {
   AssistantBlock, AssistantMessageNode, ConversationSnapshot,
   SnapshotStore,
-} from '@roos-code/roos-code-client-runtime/client'
+} from '@shres-code/shres-code-client-runtime/client'
 import {
   TrajectoryTable,
   type TrajectoryRequestNumber,

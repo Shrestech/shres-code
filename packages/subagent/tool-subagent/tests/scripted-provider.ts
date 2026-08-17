@@ -1,8 +1,8 @@
 /** Package-local scripted child boundary for deterministic tool-subagent tests. */
 
-import type { Context } from '@roos-code/cordis'
-import type { ContentBlock } from '@roos-code/roos-code-llm'
-import { SessionId } from '@roos-code/roos-code-session'
+import type { Context } from '@shres-code/cordis'
+import type { ContentBlock } from '@shres-code/shres-code-llm'
+import { SessionId } from '@shres-code/shres-code-session'
 import type {
   SubagentCapabilities,
   SubagentProvider,
@@ -10,7 +10,7 @@ import type {
   SubagentRun,
   SubagentStartRequest,
   SubagentStopReason,
-} from '@roos-code/roos-code-subagent'
+} from '@shres-code/shres-code-subagent'
 
 const DEFAULT_CAPABILITIES: SubagentCapabilities = {
   outputSchema: true,

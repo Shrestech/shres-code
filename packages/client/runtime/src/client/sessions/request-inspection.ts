@@ -1,4 +1,4 @@
-import type { ContentBlock, ToolSchema } from '@roos-code/roos-code-llm/types'
+import type { ContentBlock, ToolSchema } from '@shres-code/shres-code-llm/types'
 import type {
   AssistantProvenanceView, AssistantRequestConfig,
 } from './conversation.ts'

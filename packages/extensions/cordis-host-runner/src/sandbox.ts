@@ -8,7 +8,7 @@
  *
  * The browser half never reaches this module — it is evaluated by the client-side runner in a
  * closure, with its own facade.
- * @module @roos-code/roos-code-cordis-host-runner/sandbox
+ * @module @shres-code/shres-code-cordis-host-runner/sandbox
  */
 
 import { createContext, runInContext, Script } from 'node:vm'

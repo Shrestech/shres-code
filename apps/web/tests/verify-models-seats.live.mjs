@@ -1,13 +1,13 @@
 /**
  * Live Playwright walk of Settings → Models / Agent presets on the running
- * roos web at 127.0.0.1:3080. Prints a report; non-zero exit on failure.
+ * shres web at 127.0.0.1:3080. Prints a report; non-zero exit on failure.
  */
 import { mkdir } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import { chromium } from 'playwright'
 
-const BASE = process.env.ROOS_WEB_URL ?? 'http://127.0.0.1:3080'
+const BASE = process.env.SHRES_WEB_URL ?? 'http://127.0.0.1:3080'
 const SHOT = join(fileURLToPath(new URL('../../../.artifacts/verify-models-seats/', import.meta.url)))
 const failures = []
 const notes = []

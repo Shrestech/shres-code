@@ -1,23 +1,23 @@
-import type { Context } from '@roos-code/cordis'
+import type { Context } from '@shres-code/cordis'
 import type {
   AssistantBlock, AssistantMessageNode, ConversationLocation, ConversationMatch,
   ConversationNodeContext, ConversationNodeDefinition,
-} from '@roos-code/roos-code-client-runtime/client'
+} from '@shres-code/shres-code-client-runtime/client'
 import {
   emptyAssistantBlock, isAppendSurfaceEvent, isTokenDelta, toAssistantBlock, toAssistantBlocks,
-} from '@roos-code/roos-code-client-runtime/client'
-import type {} from '@roos-code/roos-code-llm-retry/types'
+} from '@shres-code/shres-code-client-runtime/client'
+import type {} from '@shres-code/shres-code-llm-retry/types'
 import type { AssistantChatData } from '../contract/chat-nodes.ts'
 import { CHAT_SYNTHETIC_SEQ_OFFSETS, chatNode } from './common.ts'
 
-declare module '@roos-code/roos-code-client-ui-conversation/client' {
+declare module '@shres-code/shres-code-client-ui-conversation/client' {
   interface ChatNodeDataMap {
     /** Streaming, settled, or interrupted Assistant step. */
     'assistant-step': AssistantChatData
   }
 }
 
-declare module '@roos-code/roos-code-client-runtime/client' {
+declare module '@shres-code/shres-code-client-runtime/client' {
   interface ConversationStepDataMap {
     /** Streaming, settled, or interrupted Assistant material for this Step. */
     'assistant-step': AssistantChatData

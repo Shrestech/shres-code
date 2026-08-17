@@ -1,13 +1,13 @@
-/** Package-owned goal-round prompt invariants. @module @roos-code/roos-code-goal-round-driver/invariant */
+/** Package-owned goal-round prompt invariants. @module @shres-code/shres-code-goal-round-driver/invariant */
 
 import { isDeepStrictEqual } from 'node:util'
-import type { Context } from '@roos-code/cordis'
-import { foldGoal, type FoldedGoal, type GoalMessageSource, type GoalView } from '@roos-code/roos-code-goal'
-import type { InvariantFailure, InvariantInstaller } from '@roos-code/roos-code-invariants'
-import type { Session, SessionEvent } from '@roos-code/roos-code-session'
+import type { Context } from '@shres-code/cordis'
+import { foldGoal, type FoldedGoal, type GoalMessageSource, type GoalView } from '@shres-code/shres-code-goal'
+import type { InvariantFailure, InvariantInstaller } from '@shres-code/shres-code-invariants'
+import type { Session, SessionEvent } from '@shres-code/shres-code-session'
 import { renderGoalRoundPrompt } from './prompt.ts'
 
-const PACKAGE_NAME = '@roos-code/roos-code-goal-round-driver'
+const PACKAGE_NAME = '@shres-code/shres-code-goal-round-driver'
 
 /** Cordis companion plugin name. */
 export const name = 'goal-round-driver-invariant'

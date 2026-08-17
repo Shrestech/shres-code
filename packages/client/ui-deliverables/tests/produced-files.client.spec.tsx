@@ -5,20 +5,20 @@
  * and opener wiring, and the plugin registrations' fiber-teardown removal
  * (HMR safety) against the real SlotRegistry.
  */
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { act, cleanup, fireEvent, render, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   ConversationEventRegistry, ConversationNodeAssembler, SlotRegistry,
-} from '@roos-code/roos-code-client-runtime/client'
+} from '@shres-code/shres-code-client-runtime/client'
 import type {
   ConversationEventInput, ConversationLocationDataStore, ConversationMatch, ConversationNodeDefinition,
   ConversationTimelineSnapshot, ConversationTurnDataMap, ConversationViewDefinition,
   ConversationViewNode, ToolResultNode, TurnLocation,
-} from '@roos-code/roos-code-client-runtime/client'
-import { apply as applyLocale, inject as localeInject } from '@roos-code/roos-code-client-locale/client'
-import type { ChatFileMentions, TurnTailOwnerProps } from '@roos-code/roos-code-client-ui-conversation/client'
-import { makeTranslate, stubSettingsScope } from '@roos-code/roos-code-client-test-runtime'
+} from '@shres-code/shres-code-client-runtime/client'
+import { apply as applyLocale, inject as localeInject } from '@shres-code/shres-code-client-locale/client'
+import type { ChatFileMentions, TurnTailOwnerProps } from '@shres-code/shres-code-client-ui-conversation/client'
+import { makeTranslate, stubSettingsScope } from '@shres-code/shres-code-client-test-runtime'
 import {
   fitProducedFiles, ProducedFiles, type ProducedFilesProps,
 } from '../src/client/ProducedFiles.tsx'
@@ -445,7 +445,7 @@ describe('package shells', () => {
       register: (pkg: string) => { registered.push(pkg); return () => {} },
     } as never)
     const dispose = await applyInvariant(ctx)
-    expect(registered).toEqual(['@roos-code/roos-code-client-ui-deliverables'])
+    expect(registered).toEqual(['@shres-code/shres-code-client-ui-deliverables'])
     expect(dispose).toBeTypeOf('function')
   })
 })

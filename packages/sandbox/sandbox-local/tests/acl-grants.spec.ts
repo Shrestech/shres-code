@@ -9,10 +9,10 @@ import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import type { SandboxPolicy } from '@roos-code/roos-code-sandbox'
-import { SessionId } from '@roos-code/roos-code-session'
-import { LocalSandboxProvider } from '@roos-code/roos-code-sandbox-local'
+import { Context } from '@shres-code/cordis'
+import type { SandboxPolicy } from '@shres-code/shres-code-sandbox'
+import { SessionId } from '@shres-code/shres-code-session'
+import { LocalSandboxProvider } from '@shres-code/shres-code-sandbox-local'
 
 /** Cross-file state shared with the vi.mock factory (hoisting contract). */
 const mockState = vi.hoisted(() => ({
@@ -24,7 +24,7 @@ const mockState = vi.hoisted(() => ({
   disposeFailure: undefined as Error | undefined,
 }))
 
-vi.mock('@roos-code/roos-code-sandbox-windows-acl', () => {
+vi.mock('@shres-code/shres-code-sandbox-windows-acl', () => {
   class MockAclWriteGrant {
     readonly writeSid: string
     readonly added: Array<{ path: string; standing: boolean }> = []
@@ -74,7 +74,7 @@ async function setup() {
 }
 
 function workspaceRoot(): string {
-  return mkdtempSync(join(tmpdir(), 'roos-acl-grants-ws-'))
+  return mkdtempSync(join(tmpdir(), 'shres-acl-grants-ws-'))
 }
 
 function flag(argv: readonly string[], name: string): string | undefined {
@@ -113,7 +113,7 @@ describe('windows-acl write grants (LocalSandboxProvider)', () => {
       const tempDir = flag(confined.argv, '--temp')
       const tempSid = flag(confined.argv, '--temp-write-sid')
       expect(tempDir).toBeDefined()
-      expect(basename(tempDir ?? '')).toMatch(/^roos-[A-Za-z0-9_-]{6}$/u)
+      expect(basename(tempDir ?? '')).toMatch(/^shres-[A-Za-z0-9_-]{6}$/u)
       expect(tempSid).toBe(`TEMP:${tempDir}`)
       expect(tempSid).not.toBe(WORKSPACE_SID)
       expect(confined.argv).toEqual([

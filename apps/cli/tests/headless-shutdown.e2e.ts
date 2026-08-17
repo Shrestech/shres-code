@@ -4,9 +4,9 @@ import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { execa } from 'execa'
 import { describe, expect, it } from 'vitest'
-import { LOADER_SMOKE_TEST_TIMEOUT_MS, resolveExampleLaunch } from '@roos-code/roos-code-loader-smoke'
+import { LOADER_SMOKE_TEST_TIMEOUT_MS, resolveExampleLaunch } from '@shres-code/shres-code-loader-smoke'
 
-const roosBinScript = fileURLToPath(new URL('../src/bin.ts', import.meta.url))
+const shresBinScript = fileURLToPath(new URL('../src/bin.ts', import.meta.url))
 const tsconfigPath = fileURLToPath(new URL('../../../tsconfig.json', import.meta.url))
 const neverDisposePlugin = pathToFileURL(
   fileURLToPath(new URL('./fixtures/never-dispose.mjs', import.meta.url)),
@@ -22,7 +22,7 @@ if pid == 0:
     os.chdir(cwd)
     os.execvpe(node, [node, *json.loads(launch_args_json)], env)
 
-markers = [b"roos-test: never-dispose ready", b"roos-test: never-dispose started"]
+markers = [b"shres-test: never-dispose ready", b"shres-test: never-dispose started"]
 output = bytearray()
 marker_index = 0
 deadline = time.monotonic() + float(timeout_seconds)
@@ -62,18 +62,18 @@ if actual_exit != 130:
 `
 
 async function runHeadlessPtySmoke(): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), 'roos-headless-shutdown-'))
+  const cwd = await mkdtemp(join(tmpdir(), 'shres-headless-shutdown-'))
   try {
-    const home = join(cwd, '.roos')
+    const home = join(cwd, '.shres')
     // Pre-initialize the headless profile with the never-dispose row in its
     // user patch layer (the same file a long-lived profile boot hot-reloads).
     const profileDir = join(home, 'profiles', 'headless')
     await mkdir(profileDir, { recursive: true })
     await writeFile(join(profileDir, 'package.json'), JSON.stringify({
-      name: 'roos-profile-headless',
+      name: 'shres-profile-headless',
       private: true,
       dependencies: {},
-      roos: { profile: { bundles: ['@roos-code/roos-code-base', '@roos-code/roos-code-headless'] } },
+      shres: { profile: { bundles: ['@shres-code/shres-code-base', '@shres-code/shres-code-headless'] } },
     }, undefined, 2))
     await writeFile(join(profileDir, 'cordis.patch.yml'), [
       '- insert:',
@@ -82,15 +82,15 @@ async function runHeadlessPtySmoke(): Promise<string> {
       '',
     ].join('\n'))
     const launch = resolveExampleLaunch({
-      srcBin: roosBinScript,
+      srcBin: shresBinScript,
       configArgs: ['--profile', 'headless', 'never complete'],
       tsconfigPath,
       env: {
-        ROOS_HOME: home,
-        ROOS_AGENTS_HOME: join(cwd, '.agents'),
+        SHRES_HOME: home,
+        SHRES_AGENTS_HOME: join(cwd, '.agents'),
         DEEPSEEK_API_KEY: 'keyless-shutdown-no-call',
-        ROOS_TELEMETRY_DISABLED: '1',
-        ROOS_TEST_SHUTDOWN_ARM_FILE: join(cwd, 'shutdown-armed'),
+        SHRES_TELEMETRY_DISABLED: '1',
+        SHRES_TEST_SHUTDOWN_ARM_FILE: join(cwd, 'shutdown-armed'),
       },
     })
     const timeoutMs = 15_000
@@ -110,10 +110,10 @@ async function runHeadlessPtySmoke(): Promise<string> {
       stripFinalNewline: false,
     })
     if (result.timedOut) {
-      throw new Error(`roos headless PTY driver did not exit. stdout:\n${result.stdout}\nstderr:\n${result.stderr}`)
+      throw new Error(`shres headless PTY driver did not exit. stdout:\n${result.stdout}\nstderr:\n${result.stderr}`)
     }
     if (result.failed) {
-      throw new Error(`roos headless PTY driver exited ${String(result.exitCode)}. stdout:\n${result.stdout}\nstderr:\n${result.stderr}`)
+      throw new Error(`shres headless PTY driver exited ${String(result.exitCode)}. stdout:\n${result.stdout}\nstderr:\n${result.stderr}`)
     }
     return result.stdout
   } finally {
@@ -124,8 +124,8 @@ async function runHeadlessPtySmoke(): Promise<string> {
 describe.skipIf(process.platform === 'win32')('headless process shutdown (real Loader tree in a PTY)', () => {
   it('lets a second Ctrl+C force exit while the first signal is draining', async () => {
     const output = await runHeadlessPtySmoke()
-    expect(output).not.toContain('roos: observing at ')
-    expect(output).toContain('roos-test: never-dispose ready')
-    expect(output).toContain('roos-test: never-dispose started')
+    expect(output).not.toContain('shres: observing at ')
+    expect(output).toContain('shres-test: never-dispose ready')
+    expect(output).toContain('shres-test: never-dispose started')
   }, LOADER_SMOKE_TEST_TIMEOUT_MS)
 })

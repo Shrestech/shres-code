@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
-import { Context, Service } from '@roos-code/cordis'
+import { Context, Service } from '@shres-code/cordis'
 import InvariantRegistry, {
   InvariantError,
   type Config,
-} from '@roos-code/roos-code-invariants'
+} from '@shres-code/shres-code-invariants'
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     invariantProbe: InvariantProbeService
   }
@@ -58,7 +58,7 @@ describe('InvariantRegistry selection', () => {
     const ctx = new Context()
     const service = new InvariantRegistry(ctx)
     const probe = vi.fn()
-    const registration = runtimeRegistration(service.register('@roos-code/roos-code-session', (child) => {
+    const registration = runtimeRegistration(service.register('@shres-code/shres-code-session', (child) => {
       child.on('invariants-test/ping', probe, { global: true })
     }))
     await registration
@@ -71,7 +71,7 @@ describe('InvariantRegistry selection', () => {
     for (const config of [{}, { package_allowlist: [], package_blocklist: [] }]) {
       const { ctx } = await setup(config)
       const probe = vi.fn()
-      await registerProbe(ctx, '@roos-code/roos-code-session', probe)
+      await registerProbe(ctx, '@shres-code/shres-code-session', probe)
       ctx.emit('invariants-test/ping')
       expect(probe).toHaveBeenCalledOnce()
     }
@@ -80,8 +80,8 @@ describe('InvariantRegistry selection', () => {
   it('disables every installer while still reserving package ownership', async () => {
     const { ctx } = await setup({ enabled: false })
     const probe = vi.fn()
-    const registration = await registerProbe(ctx, '@roos-code/roos-code-session', probe)
-    expect(() => ctx.invariants.register('@roos-code/roos-code-session', () => {}))
+    const registration = await registerProbe(ctx, '@shres-code/shres-code-session', probe)
+    expect(() => ctx.invariants.register('@shres-code/shres-code-session', () => {}))
       .toThrow(/already registered/)
     ctx.emit('invariants-test/ping')
     expect(probe).not.toHaveBeenCalled()
@@ -91,32 +91,32 @@ describe('InvariantRegistry selection', () => {
   it('uses unanchored, case-sensitive JavaScript regex sources', async () => {
     const unanchored = await setup({ package_allowlist: ['session'] })
     const unanchoredProbe = vi.fn()
-    await registerProbe(unanchored.ctx, '@roos-code/roos-code-session-extra', unanchoredProbe)
+    await registerProbe(unanchored.ctx, '@shres-code/shres-code-session-extra', unanchoredProbe)
     unanchored.ctx.emit('invariants-test/ping')
     expect(unanchoredProbe).toHaveBeenCalledOnce()
 
-    const anchored = await setup({ package_allowlist: ['^@roos-code/roos-code-session$'] })
+    const anchored = await setup({ package_allowlist: ['^@shres-code/shres-code-session$'] })
     const anchoredProbe = vi.fn()
-    await registerProbe(anchored.ctx, '@roos-code/roos-code-session-extra', anchoredProbe)
+    await registerProbe(anchored.ctx, '@shres-code/shres-code-session-extra', anchoredProbe)
     anchored.ctx.emit('invariants-test/ping')
     expect(anchoredProbe).not.toHaveBeenCalled()
 
     const caseSensitive = await setup({ package_allowlist: ['Session'] })
     const caseProbe = vi.fn()
-    await registerProbe(caseSensitive.ctx, '@roos-code/roos-code-session', caseProbe)
+    await registerProbe(caseSensitive.ctx, '@shres-code/shres-code-session', caseProbe)
     caseSensitive.ctx.emit('invariants-test/ping')
     expect(caseProbe).not.toHaveBeenCalled()
   })
 
   it('lets the blocklist override an allowlist match', async () => {
     const { ctx } = await setup({
-      package_allowlist: ['^@roos-code/roos-code-'],
+      package_allowlist: ['^@shres-code/shres-code-'],
       package_blocklist: ['session'],
     })
     const sessionProbe = vi.fn()
     const agentProbe = vi.fn()
-    await registerProbe(ctx, '@roos-code/roos-code-session', sessionProbe)
-    await registerProbe(ctx, '@roos-code/roos-code-agent', agentProbe)
+    await registerProbe(ctx, '@shres-code/shres-code-session', sessionProbe)
+    await registerProbe(ctx, '@shres-code/shres-code-agent', agentProbe)
     ctx.emit('invariants-test/ping')
     expect(sessionProbe).not.toHaveBeenCalled()
     expect(agentProbe).toHaveBeenCalledOnce()
@@ -126,7 +126,7 @@ describe('InvariantRegistry selection', () => {
     const { ctx } = await setup({ package_allowlist: ['^@later/invariants$'] })
     const now = vi.fn()
     const later = vi.fn()
-    await registerProbe(ctx, '@roos-code/roos-code-session', now)
+    await registerProbe(ctx, '@shres-code/shres-code-session', now)
     await registerProbe(ctx, '@later/invariants', later)
     ctx.emit('invariants-test/ping')
     expect(now).not.toHaveBeenCalled()
@@ -136,7 +136,7 @@ describe('InvariantRegistry selection', () => {
   it('allows the same source in both lists and applies blocklist precedence', async () => {
     const { ctx } = await setup({ package_allowlist: ['agent'], package_blocklist: ['agent'] })
     const probe = vi.fn()
-    await registerProbe(ctx, '@roos-code/roos-code-agent', probe)
+    await registerProbe(ctx, '@shres-code/shres-code-agent', probe)
     ctx.emit('invariants-test/ping')
     expect(probe).not.toHaveBeenCalled()
   })
@@ -179,7 +179,7 @@ describe('InvariantRegistry lifecycle', () => {
           expect(installerCtx.invariantProbe).toBeInstanceOf(InvariantProbeService)
         }, { inject: ['invariantProbe'] })
         expect(installer.inject).toEqual(['invariantProbe'])
-        registration = runtimeRegistration(child.invariants.register('@roos-code/roos-code-probe', installer))
+        registration = runtimeRegistration(child.invariants.register('@shres-code/shres-code-probe', installer))
         return Promise.resolve(registration)
       },
     })
@@ -188,7 +188,7 @@ describe('InvariantRegistry lifecycle', () => {
 
   it('attributes failures to the registering package with the stable code', async () => {
     const { ctx } = await setup()
-    const registration = runtimeRegistration(ctx.invariants.register('@roos-code/roos-code-session', (child, fail) => {
+    const registration = runtimeRegistration(ctx.invariants.register('@shres-code/shres-code-session', (child, fail) => {
       child.on('invariants-test/ping', () => fail('seq must strictly increase'), { global: true })
     }))
     await registration
@@ -202,22 +202,22 @@ describe('InvariantRegistry lifecycle', () => {
     expect(caught).toMatchObject({
       name: 'InvariantError',
       code: 'INVARIANT',
-      packageName: '@roos-code/roos-code-session',
-      message: 'invariant violated by "@roos-code/roos-code-session": seq must strictly increase',
+      packageName: '@shres-code/shres-code-session',
+      message: 'invariant violated by "@shres-code/shres-code-session": seq must strictly increase',
     })
   })
 
   it('disposes the child fiber completely and permits HMR re-registration', async () => {
     const { ctx } = await setup()
     const first = vi.fn()
-    const firstRegistration = await registerProbe(ctx, '@roos-code/roos-code-session', first)
+    const firstRegistration = await registerProbe(ctx, '@shres-code/shres-code-session', first)
     ctx.emit('invariants-test/ping')
     await firstRegistration.dispose()
     ctx.emit('invariants-test/ping')
     expect(first).toHaveBeenCalledOnce()
 
     const second = vi.fn()
-    await registerProbe(ctx, '@roos-code/roos-code-session', second)
+    await registerProbe(ctx, '@shres-code/shres-code-session', second)
     ctx.emit('invariants-test/ping')
     expect(first).toHaveBeenCalledOnce()
     expect(second).toHaveBeenCalledOnce()
@@ -227,18 +227,18 @@ describe('InvariantRegistry lifecycle', () => {
     const { ctx } = await setup()
     let finishDisposal!: () => void
     const disposalBarrier = new Promise<void>((resolve) => { finishDisposal = resolve })
-    const registration = runtimeRegistration(ctx.invariants.register('@roos-code/roos-code-session', (child) => {
+    const registration = runtimeRegistration(ctx.invariants.register('@shres-code/shres-code-session', (child) => {
       child.effect(() => async () => { await disposalBarrier })
     }))
     await registration
 
     const disposing = registration()
-    expect(() => ctx.invariants.register('@roos-code/roos-code-session', () => {}))
+    expect(() => ctx.invariants.register('@shres-code/shres-code-session', () => {}))
       .toThrow(/already registered/)
     finishDisposal()
     await disposing
 
-    const replacement = runtimeRegistration(ctx.invariants.register('@roos-code/roos-code-session', () => {}))
+    const replacement = runtimeRegistration(ctx.invariants.register('@shres-code/shres-code-session', () => {}))
     await replacement
     await replacement()
   })
@@ -246,7 +246,7 @@ describe('InvariantRegistry lifecycle', () => {
   it('rolls back listeners and ownership atomically when an installer fails', async () => {
     const { ctx } = await setup()
     const leaked = vi.fn()
-    const failed = runtimeRegistration(ctx.invariants.register('@roos-code/roos-code-session', (child) => {
+    const failed = runtimeRegistration(ctx.invariants.register('@shres-code/shres-code-session', (child) => {
       child.on('invariants-test/ping', leaked, { global: true })
       throw new Error('installer failed')
     }))
@@ -255,7 +255,7 @@ describe('InvariantRegistry lifecycle', () => {
     expect(leaked).not.toHaveBeenCalled()
 
     const retry = vi.fn()
-    await registerProbe(ctx, '@roos-code/roos-code-session', retry)
+    await registerProbe(ctx, '@shres-code/shres-code-session', retry)
     ctx.emit('invariants-test/ping')
     expect(retry).toHaveBeenCalledOnce()
   })
@@ -271,13 +271,13 @@ describe('InvariantRegistry lifecycle', () => {
       throw new Error('publication failed')
     })
 
-    const failed = runtimeRegistration(ctx.invariants.register('@roos-code/roos-code-publication-probe', () => {}))
+    const failed = runtimeRegistration(ctx.invariants.register('@shres-code/shres-code-publication-probe', () => {}))
     await expect(Promise.resolve(failed)).rejects.toThrow('publication failed')
     ctx.emit('invariants-test/ping')
     expect(leaked).not.toHaveBeenCalled()
     stopRejecting()
 
-    const retry = runtimeRegistration(ctx.invariants.register('@roos-code/roos-code-publication-probe', () => {}))
+    const retry = runtimeRegistration(ctx.invariants.register('@shres-code/shres-code-publication-probe', () => {}))
     await retry
     await retry()
   })
@@ -285,7 +285,7 @@ describe('InvariantRegistry lifecycle', () => {
   it('joins asynchronous checks and rolls back their effects on failure', async () => {
     const { ctx } = await setup()
     const leaked = vi.fn()
-    const failed = runtimeRegistration(ctx.invariants.register('@roos-code/roos-code-async-probe', async (child, fail) => {
+    const failed = runtimeRegistration(ctx.invariants.register('@shres-code/shres-code-async-probe', async (child, fail) => {
       child.on('invariants-test/ping', leaked, { global: true })
       await Promise.resolve()
       fail('asynchronous check failed')
@@ -294,7 +294,7 @@ describe('InvariantRegistry lifecycle', () => {
     ctx.emit('invariants-test/ping')
     expect(leaked).not.toHaveBeenCalled()
 
-    const retry = runtimeRegistration(ctx.invariants.register('@roos-code/roos-code-async-probe', async () => {
+    const retry = runtimeRegistration(ctx.invariants.register('@shres-code/shres-code-async-probe', async () => {
       await Promise.resolve()
     }))
     await retry
@@ -305,6 +305,6 @@ describe('InvariantRegistry lifecycle', () => {
     const { ctx, fiber } = await setup()
     const service = ctx.invariants
     await fiber.dispose()
-    expect(() => service.register('@roos-code/roos-code-session', () => {})).toThrow(/inactive/i)
+    expect(() => service.register('@shres-code/shres-code-session', () => {})).toThrow(/inactive/i)
   })
 })

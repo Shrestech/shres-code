@@ -4,52 +4,52 @@
 # context compaction are absent.
 
 - id: sdk-jsonrpc-server
-  name: '@roos-code/roos-code-sdk-jsonrpc-server'
+  name: '@shres-code/shres-code-sdk-jsonrpc-server'
   config:
     maxTokensAsSuccess: false
 
 - id: llm-deepseek
-  name: '@roos-code/roos-code-llm-deepseek'
+  name: '@shres-code/shres-code-llm-deepseek'
   config:
     apiKeyEnv: DEEPSEEK_API_KEY
     streamIdleTimeoutMs: 172800000
     models:
-      - id: !!js process.env.ROOS_MODEL ?? 'deepseek-v4-flash'
-        contextWindow: !!js Number(process.env.ROOS_CONTEXT_WINDOW ?? 1000000)
+      - id: !!js process.env.SHRES_MODEL ?? 'deepseek-v4-flash'
+        contextWindow: !!js Number(process.env.SHRES_CONTEXT_WINDOW ?? 1000000)
 
 - id: sandbox
-  name: '@roos-code/roos-code-sandbox-local'
+  name: '@shres-code/shres-code-sandbox-local'
 
 - id: sandbox-policy
-  name: '@roos-code/roos-code-sandbox-policy'
+  name: '@shres-code/shres-code-sandbox-policy'
   config:
     mode: danger-full-access
-    workspaceRoot: !!js process.env.ROOS_CWD ?? process.cwd()
+    workspaceRoot: !!js process.env.SHRES_CWD ?? process.cwd()
 
 - id: subprocess
-  name: '@roos-code/roos-code-subprocess-local'
+  name: '@shres-code/shres-code-subprocess-local'
 
 - id: pty
-  name: '@roos-code/roos-code-terminal'
+  name: '@shres-code/shres-code-terminal'
 
 - id: terminal-bash
-  name: '@roos-code/roos-code-terminal-bash'
+  name: '@shres-code/shres-code-terminal-bash'
   config:
     timeoutMs: 300000
 
 # The editor uses the bare local filesystem; persistent Bash still consumes the
 # shared danger-full-access sandbox policy above.
 - id: fs-local
-  name: '@roos-code/roos-code-fs-local'
+  name: '@shres-code/shres-code-fs-local'
   config:
-    cwd: !!js process.env.ROOS_CWD ?? process.cwd()
+    cwd: !!js process.env.SHRES_CWD ?? process.cwd()
 
 - id: agent-spine
-  name: '@roos-code/roos-code-agent-spine-demo'
+  name: '@shres-code/shres-code-agent-spine-demo'
   config:
     includeHarnessIdentity: false
     includeRuntimeContext: false
-    persona: !!js process.env.ROOS_SYSTEM_PROMPT ?? 'You are a helpful software engineer assistant.'
+    persona: !!js process.env.SHRES_SYSTEM_PROMPT ?? 'You are a helpful software engineer assistant.'
     workspaceContext: false
     skills:
       enabled: false
@@ -57,7 +57,7 @@
     toolJobs: false
 
 - id: persistent-bash
-  name: '@roos-code/roos-code-tool-bash-persistent'
+  name: '@shres-code/shres-code-tool-bash-persistent'
   config:
     timeoutMs: 300000
     description: |-
@@ -71,12 +71,12 @@
       * Please run long lived commands in the background, e.g. 'sleep 10 &' or start a server in the background.
 
 - id: str-replace-editor
-  name: '@roos-code/roos-code-tool-str-replace-editor'
+  name: '@shres-code/shres-code-tool-str-replace-editor'
   config:
     maxOutputChars: 16000
 
 - id: sessions
-  name: '@roos-code/roos-code-session-persistence-jsonl'
+  name: '@shres-code/shres-code-session-persistence-jsonl'
   config:
-    root: !!js process.env.ROOS_SESSION_ROOT ?? './.sessions'
+    root: !!js process.env.SHRES_SESSION_ROOT ?? './.sessions'
     compression: none

@@ -2,7 +2,7 @@
  * Worker-side execution logic, written as plain functions over an injected port so the unit
  * suite can run every line IN-PROCESS against a fake port (a real worker thread is a separate
  * V8 isolate the coverage provider cannot observe).
- * @module @roos-code/roos-code-code-runtime-worker-thread/src/bootstrap
+ * @module @shres-code/shres-code-code-runtime-worker-thread/src/bootstrap
  */
 
 import { inspect } from 'node:util'

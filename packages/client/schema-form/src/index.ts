@@ -3,7 +3,7 @@
  * serialized schemastery envelope, resolve nodes by settings path, validate
  * drafts, and edit them immutably by path. Editors render their own controls
  * (the Models page hand-writes its layout) on top of these helpers.
- * @module @roos-code/roos-code-client-schema-form
+ * @module @shres-code/shres-code-client-schema-form
  */
 
 export {

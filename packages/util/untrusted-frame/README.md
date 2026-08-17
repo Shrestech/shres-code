@@ -1,4 +1,4 @@
-# roos-untrusted-frame
+# shres-untrusted-frame
 
 Zero-dependency **untrusted-content frame** for model-visible text that did not come from the current user. The library owns the mechanical wrapper: a trusted label, XML-like tags, and lossless `<` → `\u003c` escaping so payload text cannot spell a framing tag.
 
@@ -12,7 +12,7 @@ It is a **library, not a service or plugin**: no `ctx`, registers nothing, holds
 import {
   escapeUntrusted, frameUntrusted, stringifyTagSafeJson, wrapUntrusted,
   UNTRUSTED_INSTRUCTION_DISCLAIMER, UNTRUSTED_LT_ESCAPE,
-} from '@roos-code/roos-code-untrusted-frame'
+} from '@shres-code/shres-code-untrusted-frame'
 ```
 
 | Export | Role |
@@ -30,7 +30,7 @@ import {
 import {
   frameUntrusted, stringifyTagSafeJson, wrapUntrusted,
   UNTRUSTED_INSTRUCTION_DISCLAIMER,
-} from '@roos-code/roos-code-untrusted-frame'
+} from '@shres-code/shres-code-untrusted-frame'
 
 declare const fetchedMarkdown: string
 declare const providerSnippet: string

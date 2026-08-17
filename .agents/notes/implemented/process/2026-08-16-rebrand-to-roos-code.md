@@ -40,6 +40,8 @@ The rewrite does not touch the DeepSeek API contract (`DEEPSEEK_API_KEY`, `DEEPS
 
 ## Consequences
 
+Current product identity is recorded in [Rebrand to Shres Code](./2026-08-17-rebrand-to-shres-code.md).
+
 - Installing or importing `@deepseek-ai/dsh-*` no longer resolves this repository. Consumers take `@roos-code/roos-code-*` and the `roos` bin.
 - Hook scripts and child environments that read `DSH_*` must switch to `ROOS_*` in the same change that upgrades.
 - User data created after the rebrand lives under `~/.roos`. Operators who want old settings copy them by hand; the product does not.

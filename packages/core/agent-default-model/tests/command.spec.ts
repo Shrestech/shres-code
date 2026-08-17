@@ -1,14 +1,14 @@
 /** `/model` parsing, listing, and session-local switch. */
 
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import type { Agent, ModelSelection } from '@roos-code/roos-code-agent'
-import CommandRuntime from '@roos-code/roos-code-commands'
-import { LlmError, ReasoningEffortId, type LlmCallConfig } from '@roos-code/roos-code-llm'
-import { SettingsProvider } from '@roos-code/roos-code-settings'
-import type { SettingsNamespace } from '@roos-code/roos-code-settings'
-import SessionStore, { SessionId } from '@roos-code/roos-code-session'
-import { createScope } from '@roos-code/roos-code-scope'
+import { Context } from '@shres-code/cordis'
+import type { Agent, ModelSelection } from '@shres-code/shres-code-agent'
+import CommandRuntime from '@shres-code/shres-code-commands'
+import { LlmError, ReasoningEffortId, type LlmCallConfig } from '@shres-code/shres-code-llm'
+import { SettingsProvider } from '@shres-code/shres-code-settings'
+import type { SettingsNamespace } from '@shres-code/shres-code-settings'
+import SessionStore, { SessionId } from '@shres-code/shres-code-session'
+import { createScope } from '@shres-code/shres-code-scope'
 import AgentDefaultModelConfig, {
   MODEL_COMMAND_USAGE,
   parseModelCommand,

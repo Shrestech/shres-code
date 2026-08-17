@@ -2,15 +2,15 @@
 
 ## Light palette
 
-- --roos-scrollbar-thumb, pointer outside the sidebar: rgba(0, 0, 0, 0)
+- --shres-scrollbar-thumb, pointer outside the sidebar: rgba(0, 0, 0, 0)
 - scrollbar-gutter: stable
 - ::-webkit-scrollbar width: 8px
 - ::-webkit-scrollbar-track background: rgba(0, 0, 0, 0)
 - scrollbar-width: auto
 - scrollbar-color: auto
-- ::-webkit-scrollbar-thumb:hover declarations: var(--roos-scrollbar-thumb-hover)
-- --roos-scrollbar-thumb, pointer over the list: rgb(229, 229, 229)
-- --roos-scrollbar-thumb-hover, pointer over the list: rgb(212, 212, 212)
+- ::-webkit-scrollbar-thumb:hover declarations: var(--shres-scrollbar-thumb-hover)
+- --shres-scrollbar-thumb, pointer over the list: rgb(229, 229, 229)
+- --shres-scrollbar-thumb-hover, pointer over the list: rgb(212, 212, 212)
 - list overflows: true
 - reserved band: 8px
 - scrollbar inset from the sidebar edge: 2px
@@ -21,15 +21,15 @@
 
 ## Dark palette
 
-- --roos-scrollbar-thumb, pointer outside the sidebar: rgba(0, 0, 0, 0)
+- --shres-scrollbar-thumb, pointer outside the sidebar: rgba(0, 0, 0, 0)
 - scrollbar-gutter: stable
 - ::-webkit-scrollbar width: 8px
 - ::-webkit-scrollbar-track background: rgba(0, 0, 0, 0)
 - scrollbar-width: auto
 - scrollbar-color: auto
-- ::-webkit-scrollbar-thumb:hover declarations: var(--roos-scrollbar-thumb-hover)
-- --roos-scrollbar-thumb, pointer over the list: rgb(84, 85, 87)
-- --roos-scrollbar-thumb-hover, pointer over the list: rgb(101, 103, 107)
+- ::-webkit-scrollbar-thumb:hover declarations: var(--shres-scrollbar-thumb-hover)
+- --shres-scrollbar-thumb, pointer over the list: rgb(84, 85, 87)
+- --shres-scrollbar-thumb-hover, pointer over the list: rgb(101, 103, 107)
 - list overflows: true
 - reserved band: 8px
 - scrollbar inset from the sidebar edge: 2px

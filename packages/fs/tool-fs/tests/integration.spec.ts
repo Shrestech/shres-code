@@ -9,15 +9,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { Context } from '@roos-code/cordis'
-import { CallId } from '@roos-code/roos-code-llm'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import ToolRuntime, { TOOL_ABORTED_BEFORE_DISPATCH } from '@roos-code/roos-code-tools'
-import { LocalFileSystem } from '@roos-code/roos-code-fs-local'
-import { SandboxedFileSystem } from '@roos-code/roos-code-fs-sandbox'
-import * as FsPolicy from '@roos-code/roos-code-fs-observation-policy'
-import SandboxPolicyService from '@roos-code/roos-code-sandbox-policy'
-import * as ToolFs from '@roos-code/roos-code-tool-fs'
+import { Context } from '@shres-code/cordis'
+import { CallId } from '@shres-code/shres-code-llm'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import ToolRuntime, { TOOL_ABORTED_BEFORE_DISPATCH } from '@shres-code/shres-code-tools'
+import { LocalFileSystem } from '@shres-code/shres-code-fs-local'
+import { SandboxedFileSystem } from '@shres-code/shres-code-fs-sandbox'
+import * as FsPolicy from '@shres-code/shres-code-fs-observation-policy'
+import SandboxPolicyService from '@shres-code/shres-code-sandbox-policy'
+import * as ToolFs from '@shres-code/shres-code-tool-fs'
 
 const testToolSignal = new AbortController().signal
 
@@ -50,9 +50,9 @@ afterEach(async () => {
 // --------------------------------------------------------------------------
 // DEFAULT deployment: the policy gate plugin is loaded.
 // --------------------------------------------------------------------------
-describe('default deployment (with roos-fs-observation-policy)', () => {
+describe('default deployment (with shres-fs-observation-policy)', () => {
   beforeEach(async () => {
-    dir = await mkdtemp(join(tmpdir(), 'roos-tool-fs-'))
+    dir = await mkdtemp(join(tmpdir(), 'shres-tool-fs-'))
     ctx = new Context()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
@@ -312,9 +312,9 @@ describe('default deployment (with roos-fs-observation-policy)', () => {
 // --------------------------------------------------------------------------
 // BARE deployment: the tool suite WITHOUT the policy gate.
 // --------------------------------------------------------------------------
-describe('bare provider (no roos-fs-observation-policy)', () => {
+describe('bare provider (no shres-fs-observation-policy)', () => {
   beforeEach(async () => {
-    dir = await mkdtemp(join(tmpdir(), 'roos-tool-fs-bare-'))
+    dir = await mkdtemp(join(tmpdir(), 'shres-tool-fs-bare-'))
     ctx = new Context()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
@@ -377,12 +377,12 @@ describe('bare provider (no roos-fs-observation-policy)', () => {
 
 // Per-session cwd: a relative file_path resolves against the calling session's workspace
 // (`exec.agent.session.header.cwd`), not the backend's config.cwd, so the
-// caller-selected session workspace wins, matching roos-tool-bash.
+// caller-selected session workspace wins, matching shres-tool-bash.
 describe('per-session cwd', () => {
   let sessionDir: string
   beforeEach(async () => {
-    dir = await mkdtemp(join(tmpdir(), 'roos-tool-fs-cfg-'))
-    sessionDir = await mkdtemp(join(tmpdir(), 'roos-tool-fs-session-'))
+    dir = await mkdtemp(join(tmpdir(), 'shres-tool-fs-cfg-'))
+    sessionDir = await mkdtemp(join(tmpdir(), 'shres-tool-fs-session-'))
     ctx = new Context()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
@@ -423,7 +423,7 @@ describe('per-session cwd', () => {
 
 describe('sandboxed credential-read transcript', () => {
   beforeEach(async () => {
-    dir = await mkdtemp(join(tmpdir(), 'roos-tool-fs-fence-'))
+    dir = await mkdtemp(join(tmpdir(), 'shres-tool-fs-fence-'))
     ctx = new Context()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
@@ -457,7 +457,7 @@ describe('sandboxed credential-read transcript', () => {
 // --------------------------------------------------------------------------
 describe('signal, concurrency, and the fs/observed contract', () => {
   beforeEach(async () => {
-    dir = await mkdtemp(join(tmpdir(), 'roos-tool-fs-'))
+    dir = await mkdtemp(join(tmpdir(), 'shres-tool-fs-'))
     ctx = new Context()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)

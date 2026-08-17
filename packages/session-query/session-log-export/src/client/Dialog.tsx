@@ -1,6 +1,6 @@
-import type { ObservableSnapshot, SessionId } from '@roos-code/roos-code-client-runtime/client'
-import { Button, Modal } from '@roos-code/roos-code-client-ui-primitives'
-import type { InjectFace, PropsLocale, PropsRuntime } from '@roos-code/roos-code-client-ui-slots'
+import type { ObservableSnapshot, SessionId } from '@shres-code/shres-code-client-runtime/client'
+import { Button, Modal } from '@shres-code/shres-code-client-ui-primitives'
+import type { InjectFace, PropsLocale, PropsRuntime } from '@shres-code/shres-code-client-ui-slots'
 import type { SessionLogDownloadState } from './controller.ts'
 import { NS } from './locales.ts'
 

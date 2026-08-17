@@ -1,9 +1,9 @@
 // Dynamic-key escape hatches and untouched-key behavior of the terminal core.
 import { describe, expect, it } from 'vitest'
-import type { SlotComponent } from '@roos-code/roos-code-client-ui-slots'
-import { SlotCore } from '@roos-code/roos-code-client-ui-slots'
+import type { SlotComponent } from '@shres-code/shres-code-client-ui-slots'
+import { SlotCore } from '@shres-code/shres-code-client-ui-slots'
 
-declare module '@roos-code/roos-code-client-ui-slots' {
+declare module '@shres-code/shres-code-client-ui-slots' {
   interface SlotMap {
     'dynamic.a': { kind: 'single'; scope: 'root' }
     'dynamic.b': { kind: 'single'; scope: 'root' }

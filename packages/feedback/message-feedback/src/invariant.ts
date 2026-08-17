@@ -1,10 +1,10 @@
-/** Package-owned invariant companion. @module @roos-code/roos-code-message-feedback/invariant */
+/** Package-owned invariant companion. @module @shres-code/shres-code-message-feedback/invariant */
 
 /* jscpd:ignore-start */
-import type { Context } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-message-feedback'
+const PACKAGE_NAME = '@shres-code/shres-code-message-feedback'
 
 /** Cordis companion plugin name. */
 export const name = 'message-feedback-invariant'

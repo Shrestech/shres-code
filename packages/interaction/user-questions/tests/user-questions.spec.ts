@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import AgentRegistry, { type Agent } from '@roos-code/roos-code-agent'
+import { Context } from '@shres-code/cordis'
+import AgentRegistry, { type Agent } from '@shres-code/shres-code-agent'
 import UserQuestionService, {
   UserQuestionError,
   type AskUserQuestionRequest,
   type UserQuestionProvider,
-} from '@roos-code/roos-code-user-questions'
+} from '@shres-code/shres-code-user-questions'
 
 function provider(answer = 'approved'): UserQuestionProvider & { seen: AskUserQuestionRequest[] } {
   const seen: AskUserQuestionRequest[] = []

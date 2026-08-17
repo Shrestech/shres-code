@@ -1,15 +1,15 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import type { Events } from '@roos-code/cordis'
-import { bindScopeParent, createScope } from '@roos-code/roos-code-scope'
-import type { Scope } from '@roos-code/roos-code-scope'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import ToolRuntime from '@roos-code/roos-code-tools'
-import type { PreToolDecision, ToolDefinition, ToolExecution, ToolExecutionInput, ToolExecutionToken } from '@roos-code/roos-code-tools'
-import type { Agent } from '@roos-code/roos-code-agent'
+import { Context } from '@shres-code/cordis'
+import type { Events } from '@shres-code/cordis'
+import { bindScopeParent, createScope } from '@shres-code/shres-code-scope'
+import type { Scope } from '@shres-code/shres-code-scope'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import ToolRuntime from '@shres-code/shres-code-tools'
+import type { PreToolDecision, ToolDefinition, ToolExecution, ToolExecutionInput, ToolExecutionToken } from '@shres-code/shres-code-tools'
+import type { Agent } from '@shres-code/shres-code-agent'
 
-import { CallId } from '@roos-code/roos-code-llm'
-import type { SessionId } from '@roos-code/roos-code-session'
+import { CallId } from '@shres-code/shres-code-llm'
+import type { SessionId } from '@shres-code/shres-code-session'
 
 const testToolSignal = new AbortController().signal
 

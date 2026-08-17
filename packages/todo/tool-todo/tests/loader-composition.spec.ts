@@ -6,16 +6,16 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import Loader from '@roos-code/cordis-plugin-loader'
-import Include from '@roos-code/cordis-plugin-include'
-import { CallId } from '@roos-code/roos-code-llm'
-import { Session, SessionId } from '@roos-code/roos-code-session'
-import AgentRegistry, { Inbox } from '@roos-code/roos-code-agent'
-import type { Agent } from '@roos-code/roos-code-agent'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import ToolRuntime from '@roos-code/roos-code-tools'
-import * as ToolTodo from '@roos-code/roos-code-tool-todo'
+import { Context } from '@shres-code/cordis'
+import Loader from '@shres-code/cordis-plugin-loader'
+import Include from '@shres-code/cordis-plugin-include'
+import { CallId } from '@shres-code/shres-code-llm'
+import { Session, SessionId } from '@shres-code/shres-code-session'
+import AgentRegistry, { Inbox } from '@shres-code/shres-code-agent'
+import type { Agent } from '@shres-code/shres-code-agent'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import ToolRuntime from '@shres-code/shres-code-tools'
+import * as ToolTodo from '@shres-code/shres-code-tool-todo'
 
 let root: string | undefined
 let context: Context | undefined
@@ -52,13 +52,13 @@ function resultText(result: { content: { type: string; text?: string }[] }): str
  * @returns the booted context.
  */
 async function boot(configLines: readonly string[]): Promise<Context> {
-  root = await mkdtemp(join(tmpdir(), 'roos-todo-loader-'))
+  root = await mkdtemp(join(tmpdir(), 'shres-todo-loader-'))
   const configPath = join(root, 'cordis.yml')
   await writeFile(configPath, [
-    "- name: '@roos-code/roos-code-agent'",
-    "- name: '@roos-code/roos-code-system-prompt'",
-    "- name: '@roos-code/roos-code-tools'",
-    "- name: '@roos-code/roos-code-tool-todo'",
+    "- name: '@shres-code/shres-code-agent'",
+    "- name: '@shres-code/shres-code-system-prompt'",
+    "- name: '@shres-code/shres-code-tools'",
+    "- name: '@shres-code/shres-code-tool-todo'",
     ...configLines.length > 0 ? ['  config:', ...configLines] : [],
     '',
   ].join('\n'))
@@ -69,10 +69,10 @@ async function boot(configLines: readonly string[]): Promise<Context> {
   await ctx.plugin(Loader)
   ctx.loader.builtins.include = Include
   const modules = new Map<string, unknown>([
-    ['@roos-code/roos-code-agent', AgentRegistry],
-    ['@roos-code/roos-code-system-prompt', SystemPrompt],
-    ['@roos-code/roos-code-tools', ToolRuntime],
-    ['@roos-code/roos-code-tool-todo', ToolTodo],
+    ['@shres-code/shres-code-agent', AgentRegistry],
+    ['@shres-code/shres-code-system-prompt', SystemPrompt],
+    ['@shres-code/shres-code-tools', ToolRuntime],
+    ['@shres-code/shres-code-tool-todo', ToolTodo],
   ])
   ctx.loader.internal = {
     version: 'v2',

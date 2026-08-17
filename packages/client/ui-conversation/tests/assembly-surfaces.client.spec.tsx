@@ -3,11 +3,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, waitFor, within } from '@testing-library/react'
 import { useState } from 'react'
-import { LocaleRuntime } from '@roos-code/roos-code-client-locale/client'
-import type { ISession, SessionId } from '@roos-code/roos-code-client-runtime/client'
-import type { PropsRenderSlots } from '@roos-code/roos-code-client-ui-slots'
-import { SlotTestRuntime, usePinnedBrowserLanguages, stubSettingsScope } from '@roos-code/roos-code-client-test-runtime'
-import { apply, inject, type EmptyWorkspaceOwnerProps } from '@roos-code/roos-code-client-ui-conversation/client'
+import { LocaleRuntime } from '@shres-code/shres-code-client-locale/client'
+import type { ISession, SessionId } from '@shres-code/shres-code-client-runtime/client'
+import type { PropsRenderSlots } from '@shres-code/shres-code-client-ui-slots'
+import { SlotTestRuntime, usePinnedBrowserLanguages, stubSettingsScope } from '@shres-code/shres-code-client-test-runtime'
+import { apply, inject, type EmptyWorkspaceOwnerProps } from '@shres-code/shres-code-client-ui-conversation/client'
 
 usePinnedBrowserLanguages('en-US')
 

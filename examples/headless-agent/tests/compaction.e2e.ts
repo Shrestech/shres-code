@@ -1,11 +1,11 @@
-import { createUserMessage } from '@roos-code/roos-code-llm'
+import { createUserMessage } from '@shres-code/shres-code-llm'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import type { Context } from '@roos-code/cordis'
+import type { Context } from '@shres-code/cordis'
 import { codingHarness, finalText, SYSTEM_PROMPT, waitForIdle } from './harness.ts'
-import { SessionId } from '@roos-code/roos-code-session'
+import { SessionId } from '@shres-code/shres-code-session'
 
 /**
  * Key-gated smoke for mid-session compaction. It verifies the compact event
@@ -26,7 +26,7 @@ afterEach(async () => {
 
 describe.skipIf(!process.env.DEEPSEEK_API_KEY)('compaction: a long session compacts mid-flight and keeps running', () => {
   it('summarizes older history into a checkpoint without breaking the task', async () => {
-    workdir = await mkdtemp(join(tmpdir(), 'roos-compaction-'))
+    workdir = await mkdtemp(join(tmpdir(), 'shres-compaction-'))
     for (let i = 1; i <= 4; i++) {
       await writeFile(join(workdir, `file${i}.txt`), `This is file number ${i}. `.repeat(50))
     }

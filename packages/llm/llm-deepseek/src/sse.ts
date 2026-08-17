@@ -8,11 +8,11 @@
  * an event dispatches only on its blank-line terminator, so an unterminated
  * tail at EOF is truncation, not a flushable payload.
  *
- * @module roos-llm-deepseek/sse
+ * @module shres-llm-deepseek/sse
  */
 
 import { EventSourceParserStream } from 'eventsource-parser/stream'
-import { LlmError } from '@roos-code/roos-code-llm'
+import { LlmError } from '@shres-code/shres-code-llm'
 
 /** The terminal payload DeepSeek (and OpenAI) send after the last chunk. */
 export const DONE = '[DONE]'

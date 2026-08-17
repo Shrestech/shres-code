@@ -1,11 +1,11 @@
 /**
  * Service Definition for the workflow capability seam. Service Providers execute orchestration scripts;
  * observe-only lifecycle events never expose run control.
- * @module @roos-code/roos-code-workflow
+ * @module @shres-code/shres-code-workflow
  */
 
-import { Context, Service } from '@roos-code/cordis'
-import { HarnessError } from '@roos-code/roos-code-llm'
+import { Context, Service } from '@shres-code/cordis'
+import { HarnessError } from '@shres-code/shres-code-llm'
 import type {
   WorkflowAgentEndInfo,
   WorkflowAgentInfo,
@@ -28,7 +28,7 @@ export type {
 } from './types.ts'
 export type { WorkflowRun, WorkflowStartRequest } from './runtime-types.ts'
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     workflowEngine: WorkflowEngine
   }

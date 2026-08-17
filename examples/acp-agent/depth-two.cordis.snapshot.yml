@@ -1,15 +1,15 @@
 # Keyless counterpart to depth-two.cordis.yml: apply the depth patch and replace
 # the live adapter with per-session replay.
 - id: base
-  name: '@roos-code/cordis-plugin-include'
+  name: '@shres-code/cordis-plugin-include'
   config:
     path: ./cordis.yml
     patches:
       - id: llm-deepseek
-        name: '@roos-code/roos-code-llm-deepseek'
+        name: '@shres-code/shres-code-llm-deepseek'
         disabled: true
       - id: sandbox
-        name: '@roos-code/roos-code-sandbox-local'
+        name: '@shres-code/shres-code-sandbox-local'
         config:
           runnerCommand:
             - bash
@@ -19,7 +19,7 @@
           runnerFailureSignatures:
             - 'passthrough-runner: profile rejected'
       - id: tool-subagent
-        name: '@roos-code/roos-code-tool-subagent'
+        name: '@shres-code/shres-code-tool-subagent'
         config:
           provider: spawn
           toolName: subagent
@@ -29,11 +29,11 @@
       # scenario's corpus was captured on flash. A config patch replaces the
       # whole app config, so the base fields are restated verbatim.
       - id: acp-agent
-        name: '@roos-code/roos-code-acp-demo'
+        name: '@shres-code/shres-code-acp-demo'
         config:
           provider: deepseek-official
           model: deepseek-v4-flash
-          persistenceRoot: !!js process.env.ROOS_SNAPSHOT_SESSIONS_ROOT ?? './.sessions'
+          persistenceRoot: !!js process.env.SHRES_SNAPSHOT_SESSIONS_ROOT ?? './.sessions'
           persistenceCompression: none
           workspaceContext:
             maxBytes: 65536
@@ -43,7 +43,7 @@
             Verify your work by running the code or tests. Keep answers brief and factual.
       - insert:
           - id: llm-replay
-            name: '@roos-code/roos-code-llm-replay'
+            name: '@shres-code/shres-code-llm-replay'
             config:
               providers:
                 - id: deepseek-official

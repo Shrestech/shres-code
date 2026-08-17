@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import type { PromptAssembly } from '@roos-code/roos-code-system-prompt'
-import * as SystemPromptInvariant from '@roos-code/roos-code-system-prompt/invariant'
-import InvariantRegistry from '@roos-code/roos-code-invariants'
+import { Context } from '@shres-code/cordis'
+import type { PromptAssembly } from '@shres-code/shres-code-system-prompt'
+import * as SystemPromptInvariant from '@shres-code/shres-code-system-prompt/invariant'
+import InvariantRegistry from '@shres-code/shres-code-invariants'
 
 async function setup(): Promise<Context> {
   const ctx = new Context()

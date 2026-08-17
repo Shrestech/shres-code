@@ -355,9 +355,9 @@ const KIND_EXAMPLE: Readonly<Record<string, readonly string[]>> = {
   chain: ['select: owner => null'],
 }
 
-/** Drop the `@roos-code/roos-code-` prefix so rows stay readable. */
+/** Drop the `@shres-code/shres-code-` prefix so rows stay readable. */
 function shortPackage(name: string): string {
-  return name.replace('@roos-code/roos-code-', '')
+  return name.replace('@shres-code/shres-code-', '')
 }
 
 /** Truncate an over-long declaration, naming the truncation. */
@@ -416,7 +416,7 @@ export function renderClientCatalog(entries: readonly SlotEntry[]): string {
     ' * mounted for the seat to exist. Data only — this module is the one legitimate',
     ' * meeting point of the two planes, so it carries strings, never client imports.',
     ' *',
-    ' * @module @roos-code/roos-code-cordis-client-runner/client/slot-catalog',
+    ' * @module @shres-code/shres-code-cordis-client-runner/client/slot-catalog',
     ' */',
     '',
     '/* jscpd:ignore-start */',

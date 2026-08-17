@@ -2,19 +2,19 @@
  * Dynamic Cordis Plugin service: immutable package definitions, one active run
  * per Plugin, one-shot Host-half approval, human-approved Client activation, and
  * Host/Client invocation.
- * @module @roos-code/roos-code-cordis-host-runner
+ * @module @shres-code/shres-code-cordis-host-runner
  */
 
-import { Context } from '@roos-code/cordis'
-import type { Fiber } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import type { Agent } from '@roos-code/roos-code-agent'
-import { assertNever, createUserMessage } from '@roos-code/roos-code-llm'
-import type { CallId } from '@roos-code/roos-code-llm'
-import type { JsonValue } from '@roos-code/roos-code-session/types'
-import { TypertRemoteService, Remote } from '@roos-code/roos-code-typert-protocol'
-import { isApprovalOutsideTurnError } from '@roos-code/roos-code-user-approval'
-import type { ApprovalOutcome } from '@roos-code/roos-code-user-approval'
+import { Context } from '@shres-code/cordis'
+import type { Fiber } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import type { Agent } from '@shres-code/shres-code-agent'
+import { assertNever, createUserMessage } from '@shres-code/shres-code-llm'
+import type { CallId } from '@shres-code/shres-code-llm'
+import type { JsonValue } from '@shres-code/shres-code-session/types'
+import { TypertRemoteService, Remote } from '@shres-code/shres-code-typert-protocol'
+import { isApprovalOutsideTurnError } from '@shres-code/shres-code-user-approval'
+import type { ApprovalOutcome } from '@shres-code/shres-code-user-approval'
 import { isPlugin, normalizeHandler } from './guard.ts'
 import { CordisInspectRegistryService } from './inspect-registry.ts'
 import { missingServices, startHostHalf } from './lifecycle.ts'
@@ -81,7 +81,7 @@ export function ApprovalRequestId(id: string): ApprovalRequestId {
   return id as ApprovalRequestId
 }
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     /** Process-local dynamic Plugin registry and lifecycle service. */
     dynamicCordisRunner: DynamicCordisRunnerService
@@ -1385,7 +1385,7 @@ function missingFor(ctx: Context, run: DynamicCordisRun): string[] {
 }
 
 function missingPluginMessage(id: CordisDynamicPluginId): string {
-  return `no dynamic plugin "${id}" in this process — it may have been removed or lost on Roos restart`
+  return `no dynamic plugin "${id}" in this process — it may have been removed or lost on Shres restart`
 }
 
 /**

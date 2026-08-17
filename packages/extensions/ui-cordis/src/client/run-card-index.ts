@@ -1,7 +1,7 @@
 /** Session-local ownership index for Package business views on `cordis_run` cards. */
 
-import type { SessionId } from '@roos-code/roos-code-client-connection/client'
-import type { HostObservable } from '@roos-code/roos-code-client-ui-slots'
+import type { SessionId } from '@shres-code/shres-code-client-connection/client'
+import type { HostObservable } from '@shres-code/shres-code-client-ui-slots'
 import type {
   CordisDynamicPackageId, CordisDynamicPluginId, CordisDynamicPluginRunId,
 } from './events.ts'

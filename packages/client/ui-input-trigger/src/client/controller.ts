@@ -7,8 +7,8 @@
  * only the source roster. One controller per session scope; the service
  * disposes it with the scope fiber.
  */
-import type { ClientContext, SessionId, SnapshotStore } from '@roos-code/roos-code-client-runtime/client'
-import { createSnapshotStore } from '@roos-code/roos-code-client-runtime/client'
+import type { ClientContext, SessionId, SnapshotStore } from '@shres-code/shres-code-client-runtime/client'
+import { createSnapshotStore } from '@shres-code/shres-code-client-runtime/client'
 import { detectTrigger } from '../core/detect.ts'
 import { MENU_CLOSED, menuReduce, seedGroups } from '../core/menu.ts'
 import type { MenuEvent, MenuState, TriggerHit } from '../core/contract.ts'

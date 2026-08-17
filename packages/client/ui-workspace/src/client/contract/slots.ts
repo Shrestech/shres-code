@@ -22,14 +22,14 @@
  * and a hole has exactly one declaring entry — they carry the same owner
  * contract and the same occupant.
  */
-import type { HostObservable, PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore, SnapshotSelectorHook } from '@roos-code/roos-code-client-ui-slots'
+import type { HostObservable, PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore, SnapshotSelectorHook } from '@shres-code/shres-code-client-ui-slots'
 // Type-only: pull the owner SlotMap merges into programs that resolve the
 // runtime shares below.
-import type {} from '@roos-code/roos-code-client-ui-sidebar/client'
-import type {} from '@roos-code/roos-code-client-ui-conversation/client'
+import type {} from '@shres-code/shres-code-client-ui-sidebar/client'
+import type {} from '@shres-code/shres-code-client-ui-conversation/client'
 import type {
   SessionId, SessionSearchResultItem, WorkspaceId, WorkspaceView,
-} from '@roos-code/roos-code-client-runtime/client'
+} from '@shres-code/shres-code-client-runtime/client'
 import type { createWorkspaceViewStore } from '../stores.ts'
 
 /**
@@ -50,7 +50,7 @@ export interface DirectoryFlowOwnerProps {
   onError: (message: string) => void
 }
 
-declare module '@roos-code/roos-code-client-ui-slots' {
+declare module '@shres-code/shres-code-client-ui-slots' {
   interface SlotMap {
     /** Directory-flow hole under the conversation empty-state picker (declared by the WorkspacePicker entry). */
     'conversation.hero.workspace.directoryFlow': { kind: 'single'; scope: 'root'; owner: DirectoryFlowOwnerProps }

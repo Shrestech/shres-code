@@ -1,4 +1,4 @@
-/** Lossless-JSON validation and detached snapshots for durable session data. @module @roos-code/roos-code-session/json */
+/** Lossless-JSON validation and detached snapshots for durable session data. @module @shres-code/shres-code-session/json */
 
 /**
  * A value that round-trips losslessly through JSON: `null`, a boolean, a finite

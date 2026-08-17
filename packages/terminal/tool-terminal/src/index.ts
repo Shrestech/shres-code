@@ -1,21 +1,21 @@
 /**
  * Six model-facing persistent terminal tools. Owner identity comes from the exact
  * tool execution Agent; generic `ctx.jobs` owns background ids and collection.
- * @module @roos-code/roos-code-tool-terminal
+ * @module @shres-code/shres-code-tool-terminal
  */
 
-import { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import type { Agent } from '@roos-code/roos-code-agent'
-import type { ContentBlock } from '@roos-code/roos-code-llm'
-import { TerminalSessionId } from '@roos-code/roos-code-terminal'
-import type { TerminalSendResult, TerminalSessionId as TerminalSessionIdType, TerminalSignal } from '@roos-code/roos-code-terminal'
-import type {} from '@roos-code/roos-code-jobs'
-import { defineTool } from '@roos-code/roos-code-tools'
-import type { ToolDefinition } from '@roos-code/roos-code-tools'
+import { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import type { Agent } from '@shres-code/shres-code-agent'
+import type { ContentBlock } from '@shres-code/shres-code-llm'
+import { TerminalSessionId } from '@shres-code/shres-code-terminal'
+import type { TerminalSendResult, TerminalSessionId as TerminalSessionIdType, TerminalSignal } from '@shres-code/shres-code-terminal'
+import type {} from '@shres-code/shres-code-jobs'
+import { defineTool } from '@shres-code/shres-code-tools'
+import type { ToolDefinition } from '@shres-code/shres-code-tools'
 import { boundTerminalText, renderList, renderRead, renderSend, renderSendRead, renderSpawn } from './render.ts'
 
-declare module '@roos-code/roos-code-jobs' {
+declare module '@shres-code/shres-code-jobs' {
   interface JobKindMap {
     'pty-send': 'pty-send'
   }
@@ -250,7 +250,7 @@ export function apply(ctx: Context, config: Config = {}): void {
       if (args.run_in_background === true) {
         if (!enableRunInBackground) throw new Error('background terminal sends are disabled by tool-terminal configuration')
         const jobs = ctx.get('jobs')
-        if (jobs === undefined) throw new Error('background terminal sends require @roos-code/roos-code-jobs and @roos-code/roos-code-tool-jobs')
+        if (jobs === undefined) throw new Error('background terminal sends require @shres-code/shres-code-jobs and @shres-code/shres-code-tool-jobs')
         let cancelRequested = false
         const jobId = jobs.start({
           kind: 'pty-send',

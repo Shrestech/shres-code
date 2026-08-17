@@ -1,20 +1,20 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { Agent } from '@roos-code/roos-code-agent'
-import { createUserMessage, CallId  } from '@roos-code/roos-code-llm'
+import type { Agent } from '@shres-code/shres-code-agent'
+import { createUserMessage, CallId  } from '@shres-code/shres-code-llm'
 import SessionStore, {
   SESSION_FORMAT_VERSION,
   SessionId,
   type Session,
-} from '@roos-code/roos-code-session'
-import JsonlSessionPersistence from '@roos-code/roos-code-session-persistence-jsonl'
-import SqliteSessionQueryEngine from '@roos-code/roos-code-session-query-sqlite'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import ToolRuntime from '@roos-code/roos-code-tools'
-import * as ToolSessionQuery from '@roos-code/roos-code-tool-session-query'
+} from '@shres-code/shres-code-session'
+import JsonlSessionPersistence from '@shres-code/shres-code-session-persistence-jsonl'
+import SqliteSessionQueryEngine from '@shres-code/shres-code-session-query-sqlite'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import ToolRuntime from '@shres-code/shres-code-tools'
+import * as ToolSessionQuery from '@shres-code/shres-code-tool-session-query'
 
 const temporaryDirectories: string[] = []
 const contexts: Context[] = []
@@ -32,7 +32,7 @@ function fakeAgent(session: Session): Agent {
 
 describe('tool-session-query with the real SQLite provider', () => {
   it('searches live prior-step history and a persisted same-workspace log', { timeout: 20_000 }, async () => {
-    const root = await mkdtemp(join(tmpdir(), 'roos-tool-session-query-'))
+    const root = await mkdtemp(join(tmpdir(), 'shres-tool-session-query-'))
     temporaryDirectories.push(root)
     const ctx = new Context()
     contexts.push(ctx)
@@ -101,7 +101,7 @@ describe('tool-session-query with the real SQLite provider', () => {
   })
 
   it('passes finite fractional epoch-millisecond bounds through SQLite comparisons', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'roos-tool-session-query-fractional-'))
+    const root = await mkdtemp(join(tmpdir(), 'shres-tool-session-query-fractional-'))
     temporaryDirectories.push(root)
     const ctx = new Context()
     contexts.push(ctx)

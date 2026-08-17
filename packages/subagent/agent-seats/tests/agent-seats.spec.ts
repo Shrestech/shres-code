@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import ToolRuntime from '@roos-code/roos-code-tools'
-import SubagentRuntime from '@roos-code/roos-code-subagent'
-import { SettingsProvider, type SettingsNamespace } from '@roos-code/roos-code-settings'
+import { Context } from '@shres-code/cordis'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import ToolRuntime from '@shres-code/shres-code-tools'
+import SubagentRuntime from '@shres-code/shres-code-subagent'
+import { SettingsProvider, type SettingsNamespace } from '@shres-code/shres-code-settings'
 import * as seats from '../src/index.ts'
 import { boundSeats, SEAT_ROSTER } from '../src/roster.ts'
 
@@ -55,21 +55,21 @@ function toolNames(ctx: Context): string[] {
 describe('boundSeats', () => {
   it('keeps a seat off until both provider and model are set', () => {
     expect(boundSeats({})).toEqual([])
-    expect(boundSeats({ seats: { boomer: { provider: 'ollama-cloud' } } })).toEqual([])
-    expect(boundSeats({ seats: { boomer: { provider: '  ', model: 'x' } } })).toEqual([])
-    const [boomer] = boundSeats({
-      seats: { boomer: { provider: 'ollama-cloud', model: 'kimi-k3' } },
+    expect(boundSeats({ seats: { aegis: { provider: 'ollama-cloud' } } })).toEqual([])
+    expect(boundSeats({ seats: { aegis: { provider: '  ', model: 'x' } } })).toEqual([])
+    const [aegis] = boundSeats({
+      seats: { aegis: { provider: 'ollama-cloud', model: 'kimi-k3' } },
     })
-    expect(boomer?.entry.id).toBe('boomer')
-    expect(boomer?.provider).toBe('ollama-cloud')
-    expect(boomer?.model).toBe('kimi-k3')
+    expect(aegis?.entry.id).toBe('aegis')
+    expect(aegis?.provider).toBe('ollama-cloud')
+    expect(aegis?.model).toBe('kimi-k3')
   })
 })
 
 describe('agent-seats remount', () => {
   it('registers no tools while every seat is unbound', async () => {
     const { ctx } = await boot()
-    expect(toolNames(ctx).filter(name => name === 'boomer' || name === 'joey' || name === 'flyer')).toEqual([])
+    expect(toolNames(ctx).filter(name => name === 'aegis' || name === 'stride' || name === 'ward')).toEqual([])
     await ctx.fiber.dispose()
   })
 
@@ -77,18 +77,18 @@ describe('agent-seats remount', () => {
     const { ctx } = await boot()
     await ctx.settings.replace(seats.AGENT_SEATS_SETTINGS_NAMESPACE, {
       seats: {
-        boomer: { provider: 'ollama-cloud', model: 'kimi-k3' },
-        flyer: { provider: 'deepseek-official', model: 'deepseek-v4-pro' },
+        aegis: { provider: 'ollama-cloud', model: 'kimi-k3' },
+        ward: { provider: 'deepseek-official', model: 'deepseek-v4-pro' },
       },
     })
-    expect(toolNames(ctx)).toEqual(expect.arrayContaining(['boomer', 'flyer']))
-    expect(toolNames(ctx)).not.toContain('joey')
-    const boomer = ctx.tools.schemas().find(schema => schema.name === 'boomer')
-    expect(boomer?.description).toContain('Architect')
-    expect(boomer?.description).toContain('does not implement')
+    expect(toolNames(ctx)).toEqual(expect.arrayContaining(['aegis', 'ward']))
+    expect(toolNames(ctx)).not.toContain('stride')
+    const aegis = ctx.tools.schemas().find(schema => schema.name === 'aegis')
+    expect(aegis?.description).toContain('Architect')
+    expect(aegis?.description).toContain('does not implement')
 
     await ctx.settings.replace(seats.AGENT_SEATS_SETTINGS_NAMESPACE, { seats: {} })
-    expect(toolNames(ctx).filter(name => name === 'boomer' || name === 'flyer')).toEqual([])
+    expect(toolNames(ctx).filter(name => name === 'aegis' || name === 'ward')).toEqual([])
     await ctx.fiber.dispose()
   })
 
@@ -100,19 +100,19 @@ describe('agent-seats remount', () => {
     await ctx.plugin(SubagentRuntime)
     registerSpawn(ctx)
     const fiber = await ctx.plugin(seats, {
-      seats: { boomer: { provider: 'ollama-cloud', model: 'kimi-k3' } },
+      seats: { aegis: { provider: 'ollama-cloud', model: 'kimi-k3' } },
     })
-    expect(toolNames(ctx)).toContain('boomer')
+    expect(toolNames(ctx)).toContain('aegis')
     await fiber.dispose()
-    expect(toolNames(ctx)).not.toContain('boomer')
+    expect(toolNames(ctx)).not.toContain('aegis')
     await ctx.fiber.dispose()
   })
 
   it('keeps roster labels aligned with the three product seats', () => {
     expect(SEAT_ROSTER.map(entry => [entry.id, entry.label, entry.role])).toEqual([
-      ['boomer', 'Boomer', 'Architect'],
-      ['joey', 'Joey', 'Worker'],
-      ['flyer', 'Flyer', 'Reviewer'],
+      ['aegis', 'Aegis', 'Architect'],
+      ['stride', 'Stride', 'Worker'],
+      ['ward', 'Ward', 'Reviewer'],
     ])
     expect(seats.seatToolConfig({
       entry: SEAT_ROSTER[0]!,
@@ -120,9 +120,9 @@ describe('agent-seats remount', () => {
       model: 'm',
     })).toMatchObject({
       provider: 'spawn',
-      toolName: 'boomer',
+      toolName: 'aegis',
       backgroundMode: 'continuable',
-      labelPrefix: 'Boomer',
+      labelPrefix: 'Aegis',
       agentOptions: { provider: 'p', model: 'm' },
     })
   })

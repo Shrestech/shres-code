@@ -19,17 +19,17 @@
   /* figma 75:8208: 12 between title block / workspace / card. */
   gap: 12px;
   width: 100%;
-  max-width: var(--roos-composer-card-max-width);
+  max-width: var(--shres-composer-card-max-width);
   overflow: visible;
 }
 
-/* Mark + title, gap 10, centered; 26/32 wt500. The preview
+/* Mark + title, tight gap, centered; 26/32 wt500. The preview
    badge is a product addition outside that source: a mono superscript pill
    riding the title's top-right. */
 .headline {
   display: grid;
-  grid-template-columns: 40px auto auto;
-  column-gap: 10px;
+  grid-template-columns: auto auto auto;
+  column-gap: 4px;
   align-items: center;
   justify-content: center;
   font-size: 26px;

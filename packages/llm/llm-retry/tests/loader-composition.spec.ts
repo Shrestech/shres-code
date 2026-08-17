@@ -3,16 +3,16 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import Loader from '@roos-code/cordis-plugin-loader'
-import Include from '@roos-code/cordis-plugin-include'
-import AgentRegistry from '@roos-code/roos-code-agent'
-import AgentLoop from '@roos-code/roos-code-agent-loop'
-import LlmRuntime, { createUserMessage, LlmAdapter, LlmError, resolveRetryPolicy  } from '@roos-code/roos-code-llm'
-import type { GenerateOptions, ResolvedRetryPolicy, StreamChunk } from '@roos-code/roos-code-llm'
-import SessionStore, { SessionId } from '@roos-code/roos-code-session'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import ToolRuntime from '@roos-code/roos-code-tools'
+import { Context } from '@shres-code/cordis'
+import Loader from '@shres-code/cordis-plugin-loader'
+import Include from '@shres-code/cordis-plugin-include'
+import AgentRegistry from '@shres-code/shres-code-agent'
+import AgentLoop from '@shres-code/shres-code-agent-loop'
+import LlmRuntime, { createUserMessage, LlmAdapter, LlmError, resolveRetryPolicy  } from '@shres-code/shres-code-llm'
+import type { GenerateOptions, ResolvedRetryPolicy, StreamChunk } from '@shres-code/shres-code-llm'
+import SessionStore, { SessionId } from '@shres-code/shres-code-session'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import ToolRuntime from '@shres-code/shres-code-tools'
 import * as retry from '../src/index.ts'
 
 let root: string | undefined
@@ -49,7 +49,7 @@ afterEach(async () => {
 })
 
 async function loadYaml(lines: readonly string[]): Promise<Context> {
-  root = await mkdtemp(join(tmpdir(), 'roos-llm-retry-loader-'))
+  root = await mkdtemp(join(tmpdir(), 'shres-llm-retry-loader-'))
   const configPath = join(root, 'cordis.yml')
   await writeFile(configPath, [...lines, ''].join('\n'))
 
@@ -58,13 +58,13 @@ async function loadYaml(lines: readonly string[]): Promise<Context> {
   await context.plugin(Loader)
   context.loader.builtins.include = Include
   const modules = new Map<string, unknown>([
-    ['@roos-code/roos-code-llm', LlmRuntime],
-    ['@roos-code/roos-code-session', SessionStore],
-    ['@roos-code/roos-code-system-prompt', SystemPrompt],
-    ['@roos-code/roos-code-tools', ToolRuntime],
-    ['@roos-code/roos-code-agent', AgentRegistry],
-    ['@roos-code/roos-code-llm-retry', retry],
-    ['@roos-code/roos-code-agent-loop', AgentLoop],
+    ['@shres-code/shres-code-llm', LlmRuntime],
+    ['@shres-code/shres-code-session', SessionStore],
+    ['@shres-code/shres-code-system-prompt', SystemPrompt],
+    ['@shres-code/shres-code-tools', ToolRuntime],
+    ['@shres-code/shres-code-agent', AgentRegistry],
+    ['@shres-code/shres-code-llm-retry', retry],
+    ['@shres-code/shres-code-agent-loop', AgentLoop],
   ])
   context.loader.internal = {
     version: 'v2',
@@ -87,13 +87,13 @@ describe('real Loader composition', () => {
   // to trip the default 5s budget on cold caches.
   it('loads provider-supplied policy and records recovery through the shipping loop', { timeout: 60_000 }, async () => {
     const loaded = await loadYaml([
-      "- name: '@roos-code/roos-code-llm'",
-      "- name: '@roos-code/roos-code-session'",
-      "- name: '@roos-code/roos-code-system-prompt'",
-      "- name: '@roos-code/roos-code-tools'",
-      "- name: '@roos-code/roos-code-agent'",
-      "- name: '@roos-code/roos-code-llm-retry'",
-      "- name: '@roos-code/roos-code-agent-loop'",
+      "- name: '@shres-code/shres-code-llm'",
+      "- name: '@shres-code/shres-code-session'",
+      "- name: '@shres-code/shres-code-system-prompt'",
+      "- name: '@shres-code/shres-code-tools'",
+      "- name: '@shres-code/shres-code-agent'",
+      "- name: '@shres-code/shres-code-llm-retry'",
+      "- name: '@shres-code/shres-code-agent-loop'",
     ])
 
     const unloaded = [...loaded.loader.entries()]

@@ -95,19 +95,19 @@ function checkManifest(
   if (!manifest.files?.includes('lib/invariant.js')) {
     addViolation(violations, owner.manifestPath, 'files must publish lib/invariant.js')
   }
-  if (owner.packageName === '@roos-code/roos-code-invariants') return
-  if (manifest.peerDependencies?.['@roos-code/roos-code-invariants'] !== 'workspace:^') {
+  if (owner.packageName === '@shres-code/shres-code-invariants') return
+  if (manifest.peerDependencies?.['@shres-code/shres-code-invariants'] !== 'workspace:^') {
     addViolation(
       violations,
       owner.manifestPath,
-      '@roos-code/roos-code-invariants must be a workspace:^ peerDependency',
+      '@shres-code/shres-code-invariants must be a workspace:^ peerDependency',
     )
   }
-  if (manifest.devDependencies?.['@roos-code/roos-code-invariants'] !== 'workspace:^') {
+  if (manifest.devDependencies?.['@shres-code/shres-code-invariants'] !== 'workspace:^') {
     addViolation(
       violations,
       owner.manifestPath,
-      '@roos-code/roos-code-invariants must also be a workspace:^ devDependency',
+      '@shres-code/shres-code-invariants must also be a workspace:^ devDependency',
     )
   }
 }
@@ -118,7 +118,7 @@ function checkBuild(
   violations: PackageInvariantViolation[],
 ): void {
   const tsconfigPath = `${owner.dir}/tsconfig.json`
-  if (owner.packageName !== '@roos-code/roos-code-invariants'
+  if (owner.packageName !== '@shres-code/shres-code-invariants'
     && !projectReferencesInvariants(root, owner.dir, tsconfigPath)) {
     addViolation(
       violations,

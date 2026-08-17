@@ -1,13 +1,13 @@
 /**
- * Package-owned invariant companion for `@roos-code/roos-code-credentials-local`.
- * @module @roos-code/roos-code-credentials-local/invariant
+ * Package-owned invariant companion for `@shres-code/shres-code-credentials-local`.
+ * @module @shres-code/shres-code-credentials-local/invariant
  */
 
 /* jscpd:ignore-start */
-import type { Context } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-credentials-local'
+const PACKAGE_NAME = '@shres-code/shres-code-credentials-local'
 
 /** Cordis companion plugin name. */
 export const name = 'credentials-local-invariant'
@@ -15,7 +15,7 @@ export const name = 'credentials-local-invariant'
 export const inject = ['invariants']
 
 /**
- * No runtime invariant: the Service Definition companion (`roos-credentials/invariant`) owns the
+ * No runtime invariant: the Service Definition companion (`shres-credentials/invariant`) owns the
  * `credentials/updated` lifecycle contract; this provider's file/environment layering is
  * asynchronous I/O pinned by its unit suite.
  */

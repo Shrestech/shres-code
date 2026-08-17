@@ -9,11 +9,11 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { createSnapshotStore } from '@roos-code/roos-code-client-runtime/client'
-import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
-import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
+import { createSnapshotStore } from '@shres-code/shres-code-client-runtime/client'
+import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
+import { en as commonEn } from '@shres-code/shres-code-client-locale/src/locales/en.ts'
 import { en } from '../src/client/locales.ts'
-import type { MenuState, TriggerHit } from '@roos-code/roos-code-client-ui-input-trigger/client'
+import type { MenuState, TriggerHit } from '@shres-code/shres-code-client-ui-input-trigger/client'
 import { MenuView } from '../src/client/MenuView.tsx'
 
 const hit: TriggerHit = {

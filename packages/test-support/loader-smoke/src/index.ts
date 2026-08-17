@@ -4,11 +4,11 @@
  *
  * It also owns the mode-aware launch resolver every example subprocess harness shares
  * ({@link resolveExampleLaunch}): booting an example bin from TypeScript source under `tsx` (the
- * zero-build dev path, resolving `@roos-code/roos-code-*` / `@cordisjs/*` through the tsconfig `paths`
+ * zero-build dev path, resolving `@shres-code/shres-code-*` / `@cordisjs/*` through the tsconfig `paths`
  * map) or from built `lib/` under plain Node (resolving bare packages through real `exports`, as an
  * installed consumer does, while Node type-strips relative example-local TypeScript plugins).
  *
- * @module @roos-code/roos-code-loader-smoke
+ * @module @shres-code/shres-code-loader-smoke
  */
 
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -31,13 +31,13 @@ export const LOADER_SMOKE_TEST_TIMEOUT_MS = DEFAULT_PROCESS_TIMEOUT_MS + 15_000
 export type ExampleMode = 'src' | 'lib'
 
 /** Environment variable selecting the mode; CI sets it to `lib`, dev leaves it unset (`src`). */
-export const EXAMPLE_MODE_ENV = 'ROOS_EXAMPLE_MODE'
+export const EXAMPLE_MODE_ENV = 'SHRES_EXAMPLE_MODE'
 
 /**
  * Parse an {@link ExampleMode} from a raw string, defaulting to `src` when absent so an unset
  * environment reproduces the dev/tsx behavior. Throws on any other value rather than silently
  * falling back, so a typo in a gate's env fails loud.
- * @param raw - the raw value; defaults to `process.env.ROOS_EXAMPLE_MODE`.
+ * @param raw - the raw value; defaults to `process.env.SHRES_EXAMPLE_MODE`.
  * @returns the validated mode.
  */
 export function resolveExampleMode(raw: string | undefined = process.env[EXAMPLE_MODE_ENV]): ExampleMode {
@@ -139,7 +139,7 @@ export interface LoaderSmokeOptions {
   readonly tsconfigPath: string
   /** Boot from source via tsx (`src`) or built lib via plain Node (`lib`); defaults to the environment's mode. */
   readonly mode?: ExampleMode
-  /** Environment overrides layered over the parent and isolated Roos homes. */
+  /** Environment overrides layered over the parent and isolated Shres homes. */
   readonly env?: Readonly<NodeJS.ProcessEnv>
   /** Process deadline override for harness tests. */
   readonly processTimeoutMs?: number
@@ -182,7 +182,7 @@ export async function runLoaderSmoke(options: LoaderSmokeOptions): Promise<Loade
       configArgs: options.binArgs ?? [options.configPath],
       ...options.mode !== undefined ? { mode: options.mode } : {},
       tsconfigPath: options.tsconfigPath,
-      env: { ROOS_HOME: join(cwd, '.roos'), ROOS_AGENTS_HOME: join(cwd, '.agents'), ...options.env },
+      env: { SHRES_HOME: join(cwd, '.shres'), SHRES_AGENTS_HOME: join(cwd, '.agents'), ...options.env },
     })
     // `input: ''` writes nothing and closes stdin — the fixture-visible
     // stdin-close contract. `reject: false` folds spawn errors, the SIGKILL

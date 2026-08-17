@@ -18,8 +18,8 @@ import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
-import type { SessionEvent, SessionId } from '@roos-code/roos-code-session'
-import type { Agent } from '@roos-code/roos-code-agent'
+import type { SessionEvent, SessionId } from '@shres-code/shres-code-session'
+import type { Agent } from '@shres-code/shres-code-agent'
 import {
   acknowledgeReloadConnectionLoss, assertFixtureInventory, captureStableAria, compareOrRefreshGolden,
   launchWebScaffold, watchConsole, webSnapshotMode, type WebScaffold,
@@ -93,7 +93,7 @@ describe.skipIf(MODE === 'record')('web e2e: composer interrupt for a running co
   const apiCalls: string[] = []
 
   beforeAll(async () => {
-    sidecarRoot = await mkdtemp(join(tmpdir(), 'roos-web-subagent-interrupt-ui-'))
+    sidecarRoot = await mkdtemp(join(tmpdir(), 'shres-web-subagent-interrupt-ui-'))
     const readyFile = join(sidecarRoot, 'hang-ready')
     rearmedReadyFile = join(sidecarRoot, 'hang-rearmed-ready')
     // The child claims this whole-script replacement: the offline and online

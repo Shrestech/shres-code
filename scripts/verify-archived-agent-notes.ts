@@ -17,13 +17,13 @@ import {
 const args = process.argv.slice(2)
 const writeMode = args.length === 1 && args[0] === '--write'
 const rebaseRequested = args.length === 1 && args[0] === '--rebase'
-const rebaseMode = rebaseRequested && process.env.ROOS_ARCHIVE_REBASE === '1'
+const rebaseMode = rebaseRequested && process.env.SHRES_ARCHIVE_REBASE === '1'
 if (args.length > 0 && !writeMode && !rebaseRequested) {
   console.error('verify-archived-agent-notes: usage: tsx scripts/verify-archived-agent-notes.ts [--write|--rebase]')
   process.exit(1)
 }
 if (rebaseRequested && !rebaseMode) {
-  console.error('verify-archived-agent-notes: --rebase requires ROOS_ARCHIVE_REBASE=1; only a new owner-sanctioned rewrite may set it.')
+  console.error('verify-archived-agent-notes: --rebase requires SHRES_ARCHIVE_REBASE=1; only a new owner-sanctioned rewrite may set it.')
   process.exit(1)
 }
 
@@ -92,7 +92,7 @@ if (existsSync(manifestPath)) {
 
 if (!rebaseMode) {
   // CI supplies its trusted pre-change commit; local writes compare with committed HEAD.
-  const baselineRef = process.env.ROOS_ARCHIVE_BASE_REF ?? 'HEAD'
+  const baselineRef = process.env.SHRES_ARCHIVE_BASE_REF ?? 'HEAD'
   try {
     const baseline = readBaselineManifest(baselineRef)
     errors.push(...validateArchiveManifestExtension(baseline, manifest))

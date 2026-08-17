@@ -8,12 +8,12 @@
  * Activation disposal, so no installation outlives either owner and no removed
  * contribution can be installed after revocation reports completion.
  *
- * @module @roos-code/roos-code-subagent/activation-setup-registry
+ * @module @shres-code/shres-code-subagent/activation-setup-registry
  */
 
-import type { Context } from '@roos-code/cordis'
-import type { AgentSetupCommit } from '@roos-code/roos-code-agent'
-import { errorChain } from '@roos-code/roos-code-llm'
+import type { Context } from '@shres-code/cordis'
+import type { AgentSetupCommit } from '@shres-code/shres-code-agent'
+import { errorChain } from '@shres-code/shres-code-llm'
 import { SubagentError } from './error.ts'
 
 /**

@@ -9,12 +9,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { stubSettingsScope } from '../src/settings-scope.ts'
 import { cleanup } from '@testing-library/react'
-import { defineStore } from '@roos-code/roos-code-client-runtime/client'
-import type { SessionId, WorkspaceId } from '@roos-code/roos-code-client-runtime/client'
-import type { PropsRenderSlots, SessionStandardProps } from '@roos-code/roos-code-client-ui-slots'
-import { SlotTestRuntime } from '@roos-code/roos-code-client-test-runtime'
+import { defineStore } from '@shres-code/shres-code-client-runtime/client'
+import type { SessionId, WorkspaceId } from '@shres-code/shres-code-client-runtime/client'
+import type { PropsRenderSlots, SessionStandardProps } from '@shres-code/shres-code-client-ui-slots'
+import { SlotTestRuntime } from '@shres-code/shres-code-client-test-runtime'
 
-declare module '@roos-code/roos-code-client-ui-slots' {
+declare module '@shres-code/shres-code-client-ui-slots' {
   interface SlotMap {
     'trt.panel': { kind: 'single'; scope: 'root'; owner: { label?: string } }
     'trt.chat': { kind: 'single'; scope: 'session' }

@@ -1,6 +1,6 @@
 /**
  * Showcase integration: the real `web_fetch` tool + the real spill stack
- * (`roos-spill-local` backend + `roos-spill-policy`), exercised through
+ * (`shres-spill-local` backend + `shres-spill-policy`), exercised through
  * `ctx.tools.execute()`. Proves the Agent Note's default local-backend path — a large
  * formatted fetch result is automatically retained and spilled with NO
  * tool-specific spill code, and the model-facing text changes ONLY by the
@@ -13,19 +13,19 @@ import { AddressInfo } from 'node:net'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { Context } from '@roos-code/cordis'
-import { CallId } from '@roos-code/roos-code-llm'
-import { SessionId } from '@roos-code/roos-code-session'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import ToolRuntime from '@roos-code/roos-code-tools'
-import type { ToolExecution } from '@roos-code/roos-code-tools'
+import { Context } from '@shres-code/cordis'
+import { CallId } from '@shres-code/shres-code-llm'
+import { SessionId } from '@shres-code/shres-code-session'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import ToolRuntime from '@shres-code/shres-code-tools'
+import type { ToolExecution } from '@shres-code/shres-code-tools'
 
 const testToolSignal = new AbortController().signal
-import WebRuntime from '@roos-code/roos-code-web'
-import * as WebFetchLocal from '@roos-code/roos-code-web-fetch-http'
-import LocalSpillStore from '@roos-code/roos-code-spill-local'
-import * as SpillPolicy from '@roos-code/roos-code-spill-policy'
-import * as ToolWeb from '@roos-code/roos-code-tool-web'
+import WebRuntime from '@shres-code/shres-code-web'
+import * as WebFetchLocal from '@shres-code/shres-code-web-fetch-http'
+import LocalSpillStore from '@shres-code/shres-code-spill-local'
+import * as SpillPolicy from '@shres-code/shres-code-spill-policy'
+import * as ToolWeb from '@shres-code/shres-code-tool-web'
 
 type Handler = (req: IncomingMessage, res: ServerResponse) => void
 
@@ -43,7 +43,7 @@ beforeEach(async () => {
   server = createServer((req, res) => { handler(req, res) })
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
-  spillRoot = mkdtempSync(join(tmpdir(), 'roos-spill-web-'))
+  spillRoot = mkdtempSync(join(tmpdir(), 'shres-spill-web-'))
 
   ctx = new Context()
   await ctx.plugin(SystemPrompt)

@@ -12,14 +12,14 @@
  * history outside the direct-parent continuation path.
  */
 // Type-only: the carrier types, the forwarded Host-event face and the ctx.remote merge.
-import type { ModelSelection, SessionModels } from '@roos-code/roos-code-api-remotes/client'
-import type { ClientContext } from '@roos-code/roos-code-client-runtime/client'
-import type { CommandUiContract, SelectOption } from '@roos-code/roos-code-client-ui-commands/client'
+import type { ModelSelection, SessionModels } from '@shres-code/shres-code-api-remotes/client'
+import type { ClientContext } from '@shres-code/shres-code-client-runtime/client'
+import type { CommandUiContract, SelectOption } from '@shres-code/shres-code-client-ui-commands/client'
 // Type-only: pulls the ui-conversation SlotMap merge (the input.model seat).
-import type {} from '@roos-code/roos-code-client-ui-conversation/client'
+import type {} from '@shres-code/shres-code-client-ui-conversation/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
-import type {} from '@roos-code/roos-code-client-locale/client'
-import type { TranslateNS } from '@roos-code/roos-code-client-ui-slots'
+import type {} from '@shres-code/shres-code-client-locale/client'
+import type { TranslateNS } from '@shres-code/shres-code-client-ui-slots'
 import type { ModelDirectoryState } from './directory.ts'
 import { ModelDirectoryResolver } from './service.ts'
 import type { ModelSelectInjected } from './slots.ts'
@@ -32,7 +32,7 @@ export { ModelDirectoryResolver } from './service.ts'
 export type { ModelSelectInjected } from './slots.ts'
 export type { ModelKey } from './locales.ts'
 
-declare module '@roos-code/roos-code-client-ui-slots' {
+declare module '@shres-code/shres-code-client-ui-slots' {
   interface LocaleNamespaceMap {
     /** The model selection surfaces' copy (/model popup + composer seat). */
     model: ModelKey

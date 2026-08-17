@@ -4,9 +4,9 @@
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { RunningToolCall, ToolResultNode } from '@roos-code/roos-code-client-runtime/client'
-import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
-import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
+import type { RunningToolCall, ToolResultNode } from '@shres-code/shres-code-client-runtime/client'
+import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
+import { en as commonEn } from '@shres-code/shres-code-client-locale/src/locales/en.ts'
 import { SkillRow } from '../src/client/SkillRow.tsx'
 import { en } from '../src/client/locales.ts'
 
@@ -22,7 +22,7 @@ function settled(over: Partial<ToolResultNode> = {}): ToolResultNode {
     seq: 3,
     time: 3_000,
     callId: 'call-skill',
-    call: { name: 'skill', argsRaw: '{"name":"roos-manage-issues"}' },
+    call: { name: 'skill', argsRaw: '{"name":"shres-manage-issues"}' },
     callTime: 2_000,
     content: [{ type: 'text', text: 'Follow the issue workflow.\nKeep project fields in sync.' }],
     isError: false,
@@ -33,7 +33,7 @@ function settled(over: Partial<ToolResultNode> = {}): ToolResultNode {
   }
 }
 
-function running(argsRaw = '{"name":"roos-manage-issues"}'): RunningToolCall {
+function running(argsRaw = '{"name":"shres-manage-issues"}'): RunningToolCall {
   return {
     callId: 'call-skill', name: 'skill', argsRaw, turn: 1, step: 1, time: 2_000, callView: null, subCalls: [],
   }
@@ -64,7 +64,7 @@ describe('SkillRow', () => {
     expect(row.getAttribute('aria-expanded')).toBe('true')
     const card = screen.getByLabelText('Instructions')
     expect(card.textContent).toBe('InstructionsFollow the issue workflow.\nKeep project fields in sync.')
-    expect(view.container.textContent).not.toContain('{"name":"roos-manage-issues"}')
+    expect(view.container.textContent).not.toContain('{"name":"shres-manage-issues"}')
     fireEvent.click(screen.getByRole('button', { name: 'Inspect' }))
     expect(inspect).toHaveBeenCalledTimes(1)
 
@@ -88,7 +88,7 @@ describe('SkillRow', () => {
     const row = view.container.querySelector('[data-tool="skill"] > div')!
     expect(row.getAttribute('role')).toBeNull()
     expect(view.container.textContent).toContain('Loading skill')
-    expect(view.container.textContent).toContain('roos-manage-issues')
+    expect(view.container.textContent).toContain('shres-manage-issues')
     expect(view.container.querySelector('svg [fill="currentColor"]')).not.toBeNull()
   })
 

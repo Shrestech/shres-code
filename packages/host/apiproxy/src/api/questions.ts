@@ -5,8 +5,8 @@
  * echoing that rpcId, with no resource id in the payload (rpcId suffices).
  */
 
-import type { AskUserQuestionAnswer } from '@roos-code/roos-code-user-questions/types'
-import type { SessionId } from '@roos-code/roos-code-session/types'
+import type { AskUserQuestionAnswer } from '@shres-code/shres-code-user-questions/types'
+import type { SessionId } from '@shres-code/shres-code-session/types'
 
 /**
  * Question answer payload (the result.value slot of a client-response):

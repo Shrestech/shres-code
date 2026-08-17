@@ -2,15 +2,15 @@
  * Multiplexed search provider that calls a vendor hosted web-search API using
  * the same credential the conversation adapter already stores. It does not
  * spawn `grok`, `claude`, `codex`, or `kimi`.
- * @module @roos-code/roos-code-web-search-attached-cli/provider
+ * @module @shres-code/shres-code-web-search-attached-cli/provider
  */
 
-import { WebError } from '@roos-code/roos-code-web'
+import { WebError } from '@shres-code/shres-code-web'
 import type {
   WebSearchProvider,
   WebSearchRequest,
   WebSearchResult,
-} from '@roos-code/roos-code-web'
+} from '@shres-code/shres-code-web'
 import { mapVendorSearchPayload } from './parse.ts'
 
 /** Stable id this provider registers under. */
@@ -61,7 +61,7 @@ export const BACKEND_DEFAULT_MODEL: Record<Exclude<AttachedCliBackendId, 'ollama
   'kimi-cli': 'kimi-k2.6',
 }
 
-const USER_AGENT = 'roos-code/0.0.1'
+const USER_AGENT = 'shres-code/0.0.1'
 
 /** One backend's resolved HTTP search target. */
 export interface AttachedCliBackend {

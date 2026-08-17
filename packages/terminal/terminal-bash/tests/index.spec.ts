@@ -1,24 +1,24 @@
 import { describe, expect, it, vi } from 'vitest'
 import { PassThrough } from 'node:stream'
-import { Context } from '@roos-code/cordis'
-import Loader from '@roos-code/cordis-plugin-loader'
-import SessionStore, { Session, SessionId } from '@roos-code/roos-code-session'
-import AgentRegistry, { Inbox, type Agent } from '@roos-code/roos-code-agent'
-import SandboxProvider from '@roos-code/roos-code-sandbox'
-import type { ConfinedArgv, SandboxPolicy } from '@roos-code/roos-code-sandbox'
-import SandboxPolicyService, { setSandboxMode } from '@roos-code/roos-code-sandbox-policy'
-import TerminalSessionService, { TerminalBackendCleanupError, TerminalSessionId } from '@roos-code/roos-code-terminal'
-import { BashTerminalBackend } from '@roos-code/roos-code-terminal-bash'
-import * as ptyLocal from '@roos-code/roos-code-terminal-bash'
-import type { ResolvedConfig } from '@roos-code/roos-code-terminal-bash/src/config.ts'
-import type { LocalPtySession } from '@roos-code/roos-code-terminal-bash/src/session.ts'
-import { SubprocessRuntime } from '@roos-code/roos-code-subprocess'
+import { Context } from '@shres-code/cordis'
+import Loader from '@shres-code/cordis-plugin-loader'
+import SessionStore, { Session, SessionId } from '@shres-code/shres-code-session'
+import AgentRegistry, { Inbox, type Agent } from '@shres-code/shres-code-agent'
+import SandboxProvider from '@shres-code/shres-code-sandbox'
+import type { ConfinedArgv, SandboxPolicy } from '@shres-code/shres-code-sandbox'
+import SandboxPolicyService, { setSandboxMode } from '@shres-code/shres-code-sandbox-policy'
+import TerminalSessionService, { TerminalBackendCleanupError, TerminalSessionId } from '@shres-code/shres-code-terminal'
+import { BashTerminalBackend } from '@shres-code/shres-code-terminal-bash'
+import * as ptyLocal from '@shres-code/shres-code-terminal-bash'
+import type { ResolvedConfig } from '@shres-code/shres-code-terminal-bash/src/config.ts'
+import type { LocalPtySession } from '@shres-code/shres-code-terminal-bash/src/session.ts'
+import { SubprocessRuntime } from '@shres-code/shres-code-subprocess'
 import type {
   SubprocessHandle,
   SubprocessSpawnSpec,
   SubprocessTerminalHandle,
   SubprocessTerminalSpawnSpec,
-} from '@roos-code/roos-code-subprocess'
+} from '@shres-code/shres-code-subprocess'
 
 class EmptySandbox extends SandboxProvider {
   confine(_argv: readonly string[], _policy: SandboxPolicy): ConfinedArgv {
@@ -207,8 +207,8 @@ describe('BashTerminalBackend startup rollback', () => {
       cwd: '/work',
       graceMs: 10,
       env: {
-        TERM: 'dumb', PAGER: 'cat', GIT_PAGER: 'cat', PS1: 'roos> ', BASH_SILENCE_DEPRECATION_WARNING: '1',
-        ROOS_SHELL: '1', ROOS_SESSION_ID: 'agent', ROOS_PTY_SESSION_ID: 'pty-1',
+        TERM: 'dumb', PAGER: 'cat', GIT_PAGER: 'cat', PS1: 'shres> ', BASH_SILENCE_DEPRECATION_WARNING: '1',
+        SHRES_SHELL: '1', SHRES_SESSION_ID: 'agent', SHRES_PTY_SESSION_ID: 'pty-1',
       },
     })
     expect(spawned?.env?.PTY_TEST_SECRET).toBeUndefined()
@@ -334,7 +334,7 @@ describe('BashTerminalBackend startup rollback', () => {
       async () => terminal,
     )
     const session = await backend.spawn(spec(agent(ctx)))
-    expect(session.motd).toBe('roos> ')
+    expect(session.motd).toBe('shres> ')
     await session.close('test complete')
   })
 })

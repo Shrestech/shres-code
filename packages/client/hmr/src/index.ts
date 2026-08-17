@@ -10,11 +10,11 @@
  */
 import { statSync } from 'node:fs'
 import type { ServerResponse } from 'node:http'
-import type { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
+import type { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
 // Empty type imports carry the clientModuleHost/webServer Context merges.
-import type {} from '@roos-code/roos-code-client-modules'
-import type {} from '@roos-code/roos-code-host-webserver'
+import type {} from '@shres-code/shres-code-client-modules'
+import type {} from '@shres-code/shres-code-host-webserver'
 import type { PluginsEventFrame } from './events.ts'
 import { EVENTS_ENDPOINT } from './events.ts'
 

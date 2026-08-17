@@ -15,17 +15,17 @@ import { parseArgs } from 'node:util'
 const root = resolve(import.meta.dirname, '..')
 
 /** The closure manifest whose dependencies define the executable. */
-const DEPLOY_ROOT_PACKAGE = 'roos-jsonrpc-agent-pkg'
+const DEPLOY_ROOT_PACKAGE = 'shres-jsonrpc-agent-pkg'
 /** The closed-runtime app entry inside the deployed closure. */
-const ENTRY_BIN = 'node_modules/@roos-code/roos-code-sdk-jsonrpc-demo/lib/packaged-bin.js'
-const OUTPUT_BASENAME = 'roos-jsonrpc-agent-pkg'
+const ENTRY_BIN = 'node_modules/@shres-code/shres-code-sdk-jsonrpc-demo/lib/packaged-bin.js'
+const OUTPUT_BASENAME = 'shres-jsonrpc-agent-pkg'
 /** Default Node major; SEA mode requires at least Node 22. */
 const DEFAULT_NODE_RANGE = 'node24'
 /** Pinned for reproducible builds. */
 const PKG_SPEC = '@yao-pkg/pkg@6.21.0'
 const OUT_DIR = 'dist-exe'
 /** Python package destination; created when absent. */
-const PYTHON_RUNTIME_DIR = 'python/sdk-runtime/src/roos_code_runtime/runtime'
+const PYTHON_RUNTIME_DIR = 'python/sdk-runtime/src/shres_code_runtime/runtime'
 /** The deployed closure doubles as the node-mode carrier. */
 const PYTHON_NODE_SUBDIR = 'node'
 /** Legacy deploy may hoist peer-specialized workspace packages back here. */

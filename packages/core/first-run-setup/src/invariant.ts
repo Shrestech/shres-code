@@ -5,13 +5,13 @@
  * writes go through those seams' own validation, and the picker is a
  * one-shot host prompt. The empty installer keeps that absence explicit.
  *
- * @module @roos-code/roos-code-first-run-setup/invariant
+ * @module @shres-code/shres-code-first-run-setup/invariant
  */
 
-import type { Context } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-first-run-setup'
+const PACKAGE_NAME = '@shres-code/shres-code-first-run-setup'
 
 /** Cordis companion plugin name. */
 export const name = 'first-run-setup-invariant'

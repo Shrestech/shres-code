@@ -5,17 +5,17 @@ import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
-import type { AgentHandle } from '@roos-code/roos-code-agent'
-import { CallId, createUserMessage, LlmAdapter } from '@roos-code/roos-code-llm'
-import type { GenerateOptions, StreamChunk } from '@roos-code/roos-code-llm'
-import { SessionId, type SessionEvent } from '@roos-code/roos-code-session'
+import type { AgentHandle } from '@shres-code/shres-code-agent'
+import { CallId, createUserMessage, LlmAdapter } from '@shres-code/shres-code-llm'
+import type { GenerateOptions, StreamChunk } from '@shres-code/shres-code-llm'
+import { SessionId, type SessionEvent } from '@shres-code/shres-code-session'
 import {
   ScheduleId,
   createEveryScheduleRecord,
   foldScheduleEvents,
   resolveEveryOccurrence,
   type EveryScheduleRecord,
-} from '@roos-code/roos-code-schedule'
+} from '@shres-code/shres-code-schedule'
 import {
   assertFixtureInventory,
   captureStableAria,
@@ -233,7 +233,7 @@ describe.skipIf(MODE === 'record')('web e2e: conversational reminders', () => {
       locale: 'en-US',
       timezoneId: AT_BROWSER_ZONE,
     })
-    await page.addInitScript(() => { localStorage.setItem('roos.locale', 'en') })
+    await page.addInitScript(() => { localStorage.setItem('shres.locale', 'en') })
     tripwire = watchConsole(page)
     await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })

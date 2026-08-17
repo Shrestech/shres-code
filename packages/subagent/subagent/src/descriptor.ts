@@ -18,14 +18,14 @@
  * durable descriptor, so it neither restores the prior budget nor inherits
  * the parent's current one; the resumed route's defaults apply instead.
  *
- * @module @roos-code/roos-code-subagent/descriptor
+ * @module @shres-code/shres-code-subagent/descriptor
  */
 
-import { snapshotJsonValue } from '@roos-code/roos-code-session'
-import type { SessionEvent } from '@roos-code/roos-code-session'
-import type { ToolRestriction } from '@roos-code/roos-code-tools'
+import { snapshotJsonValue } from '@shres-code/shres-code-session'
+import type { SessionEvent } from '@shres-code/shres-code-session'
+import type { ToolRestriction } from '@shres-code/shres-code-tools'
 
-declare module '@roos-code/roos-code-session/types' {
+declare module '@shres-code/shres-code-session/types' {
   interface SessionEventMap {
     /**
      * Durable identity and lifecycle mode of a session-backed subagent child,

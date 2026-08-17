@@ -1,4 +1,4 @@
-import type { AssistantBlock } from '@roos-code/roos-code-client-runtime/client'
+import type { AssistantBlock } from '@shres-code/shres-code-client-runtime/client'
 
 /**
  * Collect visible prose from one Assistant lifecycle.

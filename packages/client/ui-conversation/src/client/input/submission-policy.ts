@@ -5,7 +5,7 @@
  */
 import {
   createSnapshotStore, type SettingsScope, type SnapshotStore,
-} from '@roos-code/roos-code-client-runtime/client'
+} from '@shres-code/shres-code-client-runtime/client'
 import type {
   BusyEnterBehavior, ComposerSubmitGesture, InputSubmitMode,
 } from '../contract/composer-submission.ts'

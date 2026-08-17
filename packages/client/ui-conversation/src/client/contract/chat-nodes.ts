@@ -1,7 +1,7 @@
 import type {
   AssistantBlock, AssistantMessageNode, ChatConversationViewNode, CommandNode,
   CompactionSummaryNode, ModelRetryNode, RunningToolCall, ToolCallBlock,
-} from '@roos-code/roos-code-client-runtime/client'
+} from '@shres-code/shres-code-client-runtime/client'
 
 /** Merge-extensible payload registry keyed by final Chat renderer kind. */
 export interface ChatNodeDataMap {}

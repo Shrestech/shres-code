@@ -1,4 +1,4 @@
-# @roos-code/roos-code-web
+# @shres-code/shres-code-web
 
 The **`WebRuntime`** (`ctx.web`) defines WHAT web access the harness has — search the web, fetch a URL — over multiple providers, without binding the model contract to one vendor's API shape.
 
@@ -6,13 +6,13 @@ This package owns the Service Definition role of the web capability. Unlike shel
 
 | Package | Role |
 |---|---|
-| `@roos-code/roos-code-web` (this) | Service Definition: the service, provider registries, selection policy, request/result vocabulary, the `WebError` taxonomy |
-| `@roos-code/roos-code-web-search-exa` | Search provider: Exa |
-| `@roos-code/roos-code-web-search-perplexity` | Search provider: Perplexity |
-| `@roos-code/roos-code-web-search-deepseek` | Search provider: DeepSeek official |
-| `@roos-code/roos-code-web-search-attached-cli` | Search provider: attached CLI vendor (Grok, Claude, Codex, Kimi) |
-| `@roos-code/roos-code-web-fetch-http` | Fetch provider: anonymous public HTTP(S) |
-| `@roos-code/roos-code-tool-web` | Consumer: the model-facing `web_search` / `web_fetch` tool schemas over `ctx.web` |
+| `@shres-code/shres-code-web` (this) | Service Definition: the service, provider registries, selection policy, request/result vocabulary, the `WebError` taxonomy |
+| `@shres-code/shres-code-web-search-exa` | Search provider: Exa |
+| `@shres-code/shres-code-web-search-perplexity` | Search provider: Perplexity |
+| `@shres-code/shres-code-web-search-deepseek` | Search provider: DeepSeek official |
+| `@shres-code/shres-code-web-search-attached-cli` | Search provider: attached CLI vendor (Grok, Claude, Codex, Kimi) |
+| `@shres-code/shres-code-web-fetch-http` | Fetch provider: anonymous public HTTP(S) |
+| `@shres-code/shres-code-tool-web` | Consumer: the model-facing `web_search` / `web_fetch` tool schemas over `ctx.web` |
 
 Search and fetch share no request schema and no business logic, but they are deliberately one seam: `ctx.web` is a single web-access middle layer with one provider-selection policy owner, one abort/error vocabulary, and one product-facing "how this harness reaches the web" config surface. The `Search`/`Fetch` method pairs are deliberately parallel.
 
@@ -24,11 +24,11 @@ Search and fetch share no request schema and no business logic, but they are del
 | `search(request, signal?)` | Resolve the search provider and run one search. Enforces `request.maxResults` on the result (truncates `sources[]`, sets `truncated`). Throws `WebError` when the capability cannot run. |
 | `fetch(request, signal?)` | Resolve the fetch provider and retrieve one URL. A non-2xx response is a result, not a throw. Throws `WebError` for failures to safely retrieve or represent the resource. |
 
-Providers register **capabilities**, not tools. `roos-tool-web` is the only owner of model-facing names, descriptions, prompt guidance, JSON schemas, and presentation.
+Providers register **capabilities**, not tools. `shres-tool-web` is the only owner of model-facing names, descriptions, prompt guidance, JSON schemas, and presentation.
 
 ## Selection
 
-Selection never depends on registration, config, or HMR order. A singular pin (`searchProvider`/`fetchProvider`, or env `$ROOS_WEB_SEARCH_PROVIDER`/`$ROOS_WEB_FETCH_PROVIDER`) is exclusive. An ordered list (`searchProviders`/`fetchProviders`, or `$ROOS_WEB_*_PROVIDERS`) is first-usable-wins and is ignored when a singular pin is set. With neither, the seam auto-selects when exactly one usable provider is registered. `search()`/`fetch()` resolve the provider at execution time:
+Selection never depends on registration, config, or HMR order. A singular pin (`searchProvider`/`fetchProvider`, or env `$SHRES_WEB_SEARCH_PROVIDER`/`$SHRES_WEB_FETCH_PROVIDER`) is exclusive. An ordered list (`searchProviders`/`fetchProviders`, or `$SHRES_WEB_*_PROVIDERS`) is first-usable-wins and is ignored when a singular pin is set. With neither, the seam auto-selects when exactly one usable provider is registered. `search()`/`fetch()` resolve the provider at execution time:
 
 | Situation | Execution |
 |---|---|
@@ -41,7 +41,7 @@ Selection never depends on registration, config, or HMR order. A singular pin (`
 | no pin, no usable provider | `WEB_PROVIDER_UNAVAILABLE` |
 | no pin, multiple usable providers | `WEB_PROVIDER_AMBIGUOUS` |
 
-The failure branches throw `WebError`, whose structured code (plus message detail — the missing id, the ambiguous candidate set) is the direct callers route on. A provider's own `available()` is a cheap local check (credential presence, parseable config) that feeds this execution-time selection and **must not make network calls**; `roos-tool-web` never calls it — the tool executes through `ctx.web.search()`/`fetch()` and routes on the thrown codes, so provider selection has one owner.
+The failure branches throw `WebError`, whose structured code (plus message detail — the missing id, the ambiguous candidate set) is the direct callers route on. A provider's own `available()` is a cheap local check (credential presence, parseable config) that feeds this execution-time selection and **must not make network calls**; `shres-tool-web` never calls it — the tool executes through `ctx.web.search()`/`fetch()` and routes on the thrown codes, so provider selection has one owner.
 
 ## Vocabulary
 
@@ -49,7 +49,7 @@ The failure branches throw `WebError`, whose structured code (plus message detai
 
 ## Model Experience
 
-Indirectly, through `roos-tool-web`, which retains bounded normalized provider data or the exact configured-provider, unavailable-provider, no-provider, multiple-provider, and `Error: <message>` failures while this registry contributes no prompt or schema itself.
+Indirectly, through `shres-tool-web`, which retains bounded normalized provider data or the exact configured-provider, unavailable-provider, no-provider, multiple-provider, and `Error: <message>` failures while this registry contributes no prompt or schema itself.
 
 #### KV Cache effect
 

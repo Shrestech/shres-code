@@ -16,23 +16,23 @@ The surrounding runtime also loads JSONL session persistence and automatic conte
 | Variable | Purpose |
 |---|---|
 | `DEEPSEEK_API_KEY` | Credential passed to the OpenAI-compatible host endpoint |
-| `DEEPSEEK_BASE_URL` | Host endpoint used by `roos-llm-deepseek` |
-| `ROOS_CWD` | Agent workspace for bash and filesystem tools |
-| `ROOS_CONTEXT_WINDOW` | Context capacity recorded for the `ROOS_MODEL` catalog entry in the minimal variant |
-| `ROOS_MAX_TOKENS_AS_SUCCESS` | `true` (default) accepts token-limited results; `false` reports them as errors |
-| `ROOS_MODEL` | Default model used by `minimal.py`; `--model` takes precedence |
-| `ROOS_SESSION_ROOT` | JSONL session directory |
-| `ROOS_SYSTEM_PROMPT` | Deployment-provided coding persona |
+| `DEEPSEEK_BASE_URL` | Host endpoint used by `shres-llm-deepseek` |
+| `SHRES_CWD` | Agent workspace for bash and filesystem tools |
+| `SHRES_CONTEXT_WINDOW` | Context capacity recorded for the `SHRES_MODEL` catalog entry in the minimal variant |
+| `SHRES_MAX_TOKENS_AS_SUCCESS` | `true` (default) accepts token-limited results; `false` reports them as errors |
+| `SHRES_MODEL` | Default model used by `minimal.py`; `--model` takes precedence |
+| `SHRES_SESSION_ROOT` | JSONL session directory |
+| `SHRES_SYSTEM_PROMPT` | Deployment-provided coding persona |
 
-Pass the config path through the Python SDK's `cordis` option or `ROOS_CORDIS_CONFIG`. The bundled executable already carries every plugin named by this file; the target machine does not need Node.js.
+Pass the config path through the Python SDK's `cordis` option or `SHRES_CORDIS_CONFIG`. The bundled executable already carries every plugin named by this file; the target machine does not need Node.js.
 
 ## Minimal variant
 
-[`minimal.cordis.yml`](minimal.cordis.yml) is the complete standalone counterpart of the Web `minimal` preset. `ROOS_SYSTEM_PROMPT` selects its system prompt, with `You are a helpful software engineer assistant.` as the fallback. It suppresses every system-prompt runtime-context contribution for fresh sessions and mounts no context-compaction plugin. Its model-facing tools are exactly:
+[`minimal.cordis.yml`](minimal.cordis.yml) is the complete standalone counterpart of the Web `minimal` preset. `SHRES_SYSTEM_PROMPT` selects its system prompt, with `You are a helpful software engineer assistant.` as the fallback. It suppresses every system-prompt runtime-context contribution for fresh sessions and mounts no context-compaction plugin. Its model-facing tools are exactly:
 
 - owner-scoped persistent `bash`
 - `str_replace_editor` with `view`, `create`, `str_replace`, and `insert`
 
 It composes the local PTY, bare `fs-local` backend, danger-full-access policy for persistent Bash, and uncompressed JSONL persistence needed by the bundled runtime. Bash and absolute editor paths can modify any path available to the runtime process, so run this variant only against a disposable checkout or container. The persistent PTY requires a POSIX terminal environment and is not a Windows agent interface.
 
-[`minimal.py`](minimal.py) runs the composition through the Python SDK and uses `ROOS_MODEL` as its default model. The [Python SDK tutorial](../../docs/user/guide/python-sdk.md) covers installation, execution, workspace selection, and session identity; the [SDK reference](../../python/sdk/README.md) owns runtime lifecycle and result semantics.
+[`minimal.py`](minimal.py) runs the composition through the Python SDK and uses `SHRES_MODEL` as its default model. The [Python SDK tutorial](../../docs/user/guide/python-sdk.md) covers installation, execution, workspace selection, and session identity; the [SDK reference](../../python/sdk/README.md) owns runtime lifecycle and result semantics.

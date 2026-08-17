@@ -1,12 +1,12 @@
 /** Bridges the `conversation` locale namespace to the zero-cordis attachment
- * atoms' label props (`@roos-code/roos-code-client-ui-attachment` reads no
+ * atoms' label props (`@shres-code/shres-code-client-ui-attachment` reads no
  * application state; owners resolve every string). */
 
 import type {
   AttachmentRailLabels, DropOverlayLabels, ImageLightboxLabels, MessageImageLabels,
-} from '@roos-code/roos-code-client-ui-attachment'
-import type { ImageAttachmentLimits } from '@roos-code/roos-code-attachment'
-import type { Translate } from '@roos-code/roos-code-client-ui-slots'
+} from '@shres-code/shres-code-client-ui-attachment'
+import type { ImageAttachmentLimits } from '@shres-code/shres-code-attachment'
+import type { Translate } from '@shres-code/shres-code-client-ui-slots'
 import type { ConversationKey } from './locales.ts'
 
 /**

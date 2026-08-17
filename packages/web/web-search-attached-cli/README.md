@@ -1,4 +1,4 @@
-# @roos-code/roos-code-web-search-attached-cli
+# @shres-code/shres-code-web-search-attached-cli
 
 A `WebSearchProvider` that reuses an **attached conversation vendor's hosted search API** — Grok (xAI), Claude (Anthropic), Codex (OpenAI), Kimi (Moonshot), or Ollama Cloud — with the same credential that adapter already stores.
 
@@ -25,7 +25,7 @@ The Plugins **Web search** card turns each method on or off. The shipped web sea
 
 ```yaml
 - id: web-search-attached-cli
-  name: '@roos-code/roos-code-web-search-attached-cli'
+  name: '@shres-code/shres-code-web-search-attached-cli'
 ```
 
 ## Mapping
@@ -36,7 +36,7 @@ HTTP redirects are rejected before the `Location` target is contacted and surfac
 
 ## Model Experience
 
-Indirectly, through [`roos-tool-web`](../tool-web/README.md), which retains this provider's URLs, titles, snippets, and optional vendor answer text or its exact `attached CLI search aborted`, `attached CLI search request failed: <error>`, `attached CLI search (<id>) failed: HTTP <status>`, `attached CLI search (<id>) returned an unprocessable body: <error>`, and missing-credential failures under the consumer's error wrapper. A separate vendor model receives the query plus that vendor's native web-search tool; that request is not part of the conversation model's context.
+Indirectly, through [`shres-tool-web`](../tool-web/README.md), which retains this provider's URLs, titles, snippets, and optional vendor answer text or its exact `attached CLI search aborted`, `attached CLI search request failed: <error>`, `attached CLI search (<id>) failed: HTTP <status>`, `attached CLI search (<id>) returned an unprocessable body: <error>`, and missing-credential failures under the consumer's error wrapper. A separate vendor model receives the query plus that vendor's native web-search tool; that request is not part of the conversation model's context.
 
 #### KV Cache effect
 

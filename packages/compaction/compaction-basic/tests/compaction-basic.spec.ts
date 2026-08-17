@@ -1,18 +1,18 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { AttachmentId } from '@roos-code/roos-code-attachment'
-import BasicCompactionEngine from '@roos-code/roos-code-compaction-basic'
-import type { BasicCompactionConfig } from '@roos-code/roos-code-compaction-basic'
-import { selectCompactableRange } from '@roos-code/roos-code-compaction-basic/src/region.ts'
-import type { SummarizationInput, SummaryResult } from '@roos-code/roos-code-compaction-basic/src/summarizer.ts'
-import { CompactionId, toolPairingBalancedAfter, toolPairingBalancedBefore } from '@roos-code/roos-code-compaction'
+import { Context } from '@shres-code/cordis'
+import { AttachmentId } from '@shres-code/shres-code-attachment'
+import BasicCompactionEngine from '@shres-code/shres-code-compaction-basic'
+import type { BasicCompactionConfig } from '@shres-code/shres-code-compaction-basic'
+import { selectCompactableRange } from '@shres-code/shres-code-compaction-basic/src/region.ts'
+import type { SummarizationInput, SummaryResult } from '@shres-code/shres-code-compaction-basic/src/summarizer.ts'
+import { CompactionId, toolPairingBalancedAfter, toolPairingBalancedBefore } from '@shres-code/shres-code-compaction'
 import {
   resolveCompactSpec,
   resolveConfig,
   resolveTargetPolicy,
-} from '@roos-code/roos-code-compaction-basic/src/config.ts'
-import type { CompactionResult } from '@roos-code/roos-code-compaction'
-import LlmRuntime, { createUserMessage, CallId, CONTEXT_WINDOW_EXCEEDED_CODE, createToolResultMessage, LlmAdapter , createMessage } from '@roos-code/roos-code-llm'
+} from '@shres-code/shres-code-compaction-basic/src/config.ts'
+import type { CompactionResult } from '@shres-code/shres-code-compaction'
+import LlmRuntime, { createUserMessage, CallId, CONTEXT_WINDOW_EXCEEDED_CODE, createToolResultMessage, LlmAdapter , createMessage } from '@shres-code/shres-code-llm'
 import type {
   ContentBlock,
   GenerateOptions,
@@ -21,11 +21,11 @@ import type {
   Message,
   StreamChunk,
   TokenUsage,
-} from '@roos-code/roos-code-llm'
-import SessionStore, { Session, SessionId } from '@roos-code/roos-code-session'
-import TokenMeter from '@roos-code/roos-code-token-meter'
-import { agentEvents, type Agent, type RequestErrorAction } from '@roos-code/roos-code-agent'
-import ToolResultPruner from '@roos-code/roos-code-compaction-tool-result-pruner'
+} from '@shres-code/shres-code-llm'
+import SessionStore, { Session, SessionId } from '@shres-code/shres-code-session'
+import TokenMeter from '@shres-code/shres-code-token-meter'
+import { agentEvents, type Agent, type RequestErrorAction } from '@shres-code/shres-code-agent'
+import ToolResultPruner from '@shres-code/shres-code-compaction-tool-result-pruner'
 
 const SIGNAL = new AbortController().signal
 const MODEL = 'test-model'

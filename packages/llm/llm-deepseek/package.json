@@ -1,13 +1,13 @@
 {
-  "name": "@roos-code/roos-code-llm-deepseek",
-  "description": "DeepSeek chat-completions adapter for the Roos Code LLM seam",
+  "name": "@shres-code/shres-code-llm-deepseek",
+  "description": "DeepSeek chat-completions adapter for the Shres Code LLM seam",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "packages/llm/llm-deepseek"
   },
   "type": "module",
@@ -32,27 +32,27 @@
   ],
   "license": "MIT",
   "peerDependencies": {
-    "@roos-code/roos-code-credentials": "workspace:^",
-    "@roos-code/roos-code-launch-environment": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-llm": "workspace:^",
-    "@roos-code/roos-code-settings": "workspace:^",
-    "@roos-code/roos-code-timeout": "workspace:^",
-    "@roos-code/roos-code-anonymous-user-id": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-credentials": "workspace:^",
+    "@shres-code/shres-code-launch-environment": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-settings": "workspace:^",
+    "@shres-code/shres-code-timeout": "workspace:^",
+    "@shres-code/shres-code-anonymous-user-id": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   },
   "dependencies": {
     "eventsource-parser": "^3.1.0",
-    "@roos-code/schemastery": "workspace:^"
+    "@shres-code/schemastery": "workspace:^"
   },
   "devDependencies": {
-    "@roos-code/roos-code-credentials": "workspace:^",
-    "@roos-code/roos-code-launch-environment": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-llm": "workspace:^",
-    "@roos-code/roos-code-settings": "workspace:^",
-    "@roos-code/roos-code-timeout": "workspace:^",
-    "@roos-code/roos-code-anonymous-user-id": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-credentials": "workspace:^",
+    "@shres-code/shres-code-launch-environment": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-settings": "workspace:^",
+    "@shres-code/shres-code-timeout": "workspace:^",
+    "@shres-code/shres-code-anonymous-user-id": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   }
 }

@@ -5,7 +5,7 @@
  * register() receives the factory and the browser derives its PropsStore
  * share from the return type.
  */
-import { defineStore, type EngineStoreHandle } from '@roos-code/roos-code-client-runtime/client'
+import { defineStore, type EngineStoreHandle } from '@shres-code/shres-code-client-runtime/client'
 
 /** Browser-local order account for the hierarchy-free flat Session list. */
 export const FLAT_SESSION_ORDER_KEY = '__flat_session_order__'
@@ -58,7 +58,7 @@ export function createWorkspaceViewStore(): EngineStoreHandle<WorkspaceViewState
       sessionOrderByAccount: {},
       sessionUpdatedAtByAccount: {},
     }),
-    persist: 'roos.workspace.view.v5',
+    persist: 'shres.workspace.view.v5',
     actions: {
       setGroupBy: (d, mode: SessionGroupBy) => { d.groupBy = mode },
       setOrderBy: (d, mode: SessionOrderBy) => { d.orderBy = mode },

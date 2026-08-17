@@ -1,13 +1,13 @@
 {
-  "name": "@roos-code/roos-code-client-ui-primitives",
-  "description": "Pure React atoms for the roos web UI: controls, icons, markdown, and JSON inspectors (zero cordis)",
+  "name": "@shres-code/shres-code-client-ui-primitives",
+  "description": "Pure React atoms for the shres web UI: controls, icons, markdown, and JSON inspectors (zero cordis)",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "packages/client/ui-primitives"
   },
   "type": "module",
@@ -49,10 +49,10 @@
     "shiki": "^4.3.1"
   },
   "devDependencies": {
-    "@roos-code/roos-code-invariants": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
     "@types/react": "~18.3.1",
     "@types/react-dom": "~18.3.0",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/cordis": "workspace:^"
   },
   "files": [
     "lib/index.js",
@@ -60,7 +60,7 @@
     "lib/types/**/*.d.ts"
   ],
   "peerDependencies": {
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   }
 }

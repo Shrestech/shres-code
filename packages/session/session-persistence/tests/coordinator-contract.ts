@@ -1,4 +1,4 @@
-import { createUserMessage } from '@roos-code/roos-code-llm'
+import { createUserMessage } from '@shres-code/shres-code-llm'
 /**
  * Shared write-path orchestration contract for backends using {@link PersistenceCoordinator}.
  * Unlike the public storage-semantics suite in `contract.ts`, it covers SessionStore event wiring,
@@ -7,14 +7,14 @@ import { createUserMessage } from '@roos-code/roos-code-llm'
  *
  * Each real backend supplies a shared storage scope and optional torn-tail injector; backend specs
  * retain only storage-mechanics tests, while these scenarios run once per backend.
- * @module @roos-code/roos-code-session-persistence/tests/coordinator-contract
+ * @module @shres-code/shres-code-session-persistence/tests/coordinator-contract
  */
 
 import { describe, expect, it, vi } from 'vitest'
-import { Context, type Fiber } from '@roos-code/cordis'
-import { scopeTarget } from '@roos-code/roos-code-scope'
-import SessionStore, { SESSION_FORMAT_VERSION, Session, SessionId } from '@roos-code/roos-code-session'
-import type { SessionEvent } from '@roos-code/roos-code-session'
+import { Context, type Fiber } from '@shres-code/cordis'
+import { scopeTarget } from '@shres-code/shres-code-scope'
+import SessionStore, { SESSION_FORMAT_VERSION, Session, SessionId } from '@shres-code/shres-code-session'
+import type { SessionEvent } from '@shres-code/shres-code-session'
 import { meta, oneTurnLog, appendLog } from './contract.ts'
 
 /**

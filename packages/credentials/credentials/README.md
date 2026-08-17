@@ -1,4 +1,4 @@
-# roos-credentials
+# shres-credentials
 
 Credential Service Definition (`ctx.credentials`). One doctrine, three consequences:
 
@@ -11,8 +11,8 @@ Credential Service Definition (`ctx.credentials`). One doctrine, three consequen
 ## Surface
 
 ```ts
-import type { Context } from '@roos-code/cordis'
-import { credentialRef } from '@roos-code/roos-code-credentials'
+import type { Context } from '@shres-code/cordis'
+import { credentialRef } from '@shres-code/shres-code-credentials'
 
 declare const ctx: Context
 
@@ -29,7 +29,7 @@ The shadowing rule on `set`/`unset` is deliberate fail-loud: when a read-only so
 
 ## Providers
 
-[`roos-credentials-local`](../credentials-local/README.md) layers the inherited process environment over its managed `$ROOS_HOME/.credentials.yaml` document, with the launcher's project and user `.env` layers as fallbacks. The seam shape leaves room for keyring-, helper-command-, and KMS-backed providers; a remote settings provider never needs to carry secrets.
+[`shres-credentials-local`](../credentials-local/README.md) layers the inherited process environment over its managed `$SHRES_HOME/.credentials.yaml` document, with the launcher's project and user `.env` layers as fallbacks. The seam shape leaves room for keyring-, helper-command-, and KMS-backed providers; a remote settings provider never needs to carry secrets.
 
 ## Model Experience
 

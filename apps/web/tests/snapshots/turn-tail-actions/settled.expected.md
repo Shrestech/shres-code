@@ -12,10 +12,10 @@
 - text: Begin your reply with the plain sentence "Reading the workspace now." as text, and in that same message call the bash tool with the command "echo alpha". After the tool result, reply with the single word DONE and stop. {{clock}}
 - button "Copy":
   - img
-- button "Context injection @roos-code/roos-code-system-prompt":
+- button "Context injection @shres-code/shres-code-system-prompt":
   - img
   - img
-  - text: Context injection @roos-code/roos-code-system-prompt
+  - text: Context injection @shres-code/shres-code-system-prompt
 - button "Think The user wants me to begin with \"Reading the workspace now.\" and call bash with \"echo alpha\" in the same message. Then after the tool result, reply with the single word DONE and stop.":
   - img
   - img

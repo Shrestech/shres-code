@@ -1,12 +1,12 @@
-/** Package-owned durable goal-stream invariants. @module @roos-code/roos-code-goal/invariant */
+/** Package-owned durable goal-stream invariants. @module @shres-code/shres-code-goal/invariant */
 
-import type { Context } from '@roos-code/cordis'
-import type { InvariantFailure, InvariantInstaller } from '@roos-code/roos-code-invariants'
-import type { Session, SessionEvent } from '@roos-code/roos-code-session'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantFailure, InvariantInstaller } from '@shres-code/shres-code-invariants'
+import type { Session, SessionEvent } from '@shres-code/shres-code-session'
 import { applyGoalEvent, emptyGoalFoldState } from './fold.ts'
 import type { GoalFoldState } from './fold.ts'
 
-const PACKAGE_NAME = '@roos-code/roos-code-goal'
+const PACKAGE_NAME = '@shres-code/shres-code-goal'
 
 /** Cordis companion plugin name. */
 export const name = 'goal-invariant'

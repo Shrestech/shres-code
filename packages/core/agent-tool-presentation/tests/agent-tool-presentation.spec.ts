@@ -7,15 +7,15 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { createScope } from '@roos-code/roos-code-scope'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import { CodeRuntime } from '@roos-code/roos-code-code-runtime'
-import type { CodeRunRequest, CodeRunResult } from '@roos-code/roos-code-code-runtime'
-import ToolRuntime, { RUN_CODE_NAME, defineTool } from '@roos-code/roos-code-tools'
-import type { Agent } from '@roos-code/roos-code-agent'
-import { SessionId } from '@roos-code/roos-code-session'
-import { apply, Config, inject, name } from '@roos-code/roos-code-agent-tool-presentation'
+import { Context } from '@shres-code/cordis'
+import { createScope } from '@shres-code/shres-code-scope'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import { CodeRuntime } from '@shres-code/shres-code-code-runtime'
+import type { CodeRunRequest, CodeRunResult } from '@shres-code/shres-code-code-runtime'
+import ToolRuntime, { RUN_CODE_NAME, defineTool } from '@shres-code/shres-code-tools'
+import type { Agent } from '@shres-code/shres-code-agent'
+import { SessionId } from '@shres-code/shres-code-session'
+import { apply, Config, inject, name } from '@shres-code/shres-code-agent-tool-presentation'
 
 /** A runtime that never runs anything: presentation never dispatches. */
 class StubRuntime extends CodeRuntime {
@@ -103,7 +103,7 @@ describe('the tool-presentation row', () => {
 
     const { agent, row } = await mount(ctx, { mode: 'code' })
 
-    // Pending, not applied: `roos-agent-presets` rejects a mount holding a row
+    // Pending, not applied: `shres-agent-presets` rejects a mount holding a row
     // that never reached a usable state, naming this id — so the preset fails
     // where the operator can act, instead of at the first request.
     expect(row.ctx.get('codeRuntime')).toBeUndefined()

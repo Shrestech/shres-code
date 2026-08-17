@@ -1,16 +1,16 @@
-import type { Context } from '@roos-code/cordis'
+import type { Context } from '@shres-code/cordis'
 import type {
   CommandNode, CompactionSummaryNode, ConversationMatch, ConversationNodeContext,
   ConversationNodeDefinition,
-} from '@roos-code/roos-code-client-runtime/client'
-import { isReplacementSurfaceEvent } from '@roos-code/roos-code-client-runtime/client'
-import type { CompactionCheckpointSource } from '@roos-code/roos-code-compaction/checkpoint'
-import type {} from '@roos-code/roos-code-compaction/types'
-import type {} from '@roos-code/roos-code-commands/types'
+} from '@shres-code/shres-code-client-runtime/client'
+import { isReplacementSurfaceEvent } from '@shres-code/shres-code-client-runtime/client'
+import type { CompactionCheckpointSource } from '@shres-code/shres-code-compaction/checkpoint'
+import type {} from '@shres-code/shres-code-compaction/types'
+import type {} from '@shres-code/shres-code-commands/types'
 import type { ManualCompactionChatData } from '../contract/chat-nodes.ts'
 import { chatNode } from './common.ts'
 
-declare module '@roos-code/roos-code-client-ui-conversation/client' {
+declare module '@shres-code/shres-code-client-ui-conversation/client' {
   interface ChatNodeDataMap {
     /** Ordinary slash-command lifecycle. */
     command: CommandNode

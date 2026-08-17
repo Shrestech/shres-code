@@ -1,4 +1,4 @@
-/** Content-block structure helpers. @module @roos-code/roos-code-llm/content */
+/** Content-block structure helpers. @module @shres-code/shres-code-llm/content */
 
 import type { ContentBlock } from './types.ts'
 

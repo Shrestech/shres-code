@@ -13,7 +13,7 @@
  * until the result arrives.
  * @module
  */
-import type { ReadBlockLine, ReadBlockProps } from '@roos-code/roos-code-client-ui-primitives'
+import type { ReadBlockLine, ReadBlockProps } from '@shres-code/shres-code-client-ui-primitives'
 import { relativizeToCwd, type ToolCallBlock } from './tool-call-model.ts'
 
 /**

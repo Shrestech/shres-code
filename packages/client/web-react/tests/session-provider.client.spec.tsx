@@ -9,11 +9,11 @@
 import { useEffect, useRef } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { act, render } from '@testing-library/react'
-import type { SessionMaybeProvideInfo, StoredEntry } from '@roos-code/roos-code-client-ui-slots'
+import type { SessionMaybeProvideInfo, StoredEntry } from '@shres-code/shres-code-client-ui-slots'
 import {
   createSlotRenderer, SessionProvider,
   type SessionProvideInfo, type SlotRendererHost,
-} from '@roos-code/roos-code-client-web-react'
+} from '@shres-code/shres-code-client-web-react'
 
 function observable<T>(initial: T) {
   let value = initial

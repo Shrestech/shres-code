@@ -1,4 +1,4 @@
-# @roos-code/roos-code-token-meter
+# @shres-code/shres-code-token-meter
 
 Replay-aware token measurement through the singleton `ctx.tokenMeter` service. It advances one isolated fold per session from the durable log, so compaction and other pressure-sensitive plugins can share accounting without depending on `CompactionEngine`.
 
@@ -44,15 +44,15 @@ The [Agent Note](../../../.agents/notes/implemented/architecture/2026-07-29-proj
 ## Composition
 
 ```yaml
-- name: '@roos-code/roos-code-token-meter'
-- name: '@roos-code/roos-code-compaction-basic'
+- name: '@shres-code/shres-code-token-meter'
+- name: '@shres-code/shres-code-compaction-basic'
 ```
 
-Both plugins have usable defaults. The meter remains independent of model routing and optional compaction. A deployment configures capacity on its LLM adapter and compaction policy on `roos-compaction-basic`.
+Both plugins have usable defaults. The meter remains independent of model routing and optional compaction. A deployment configures capacity on its LLM adapter and compaction policy on `shres-compaction-basic`.
 
 ## Model Experience
 
-Indirectly, through consumers such as `roos-compaction-basic`; the service itself adds no prompt, message, schema, tool, or model call.
+Indirectly, through consumers such as `shres-compaction-basic`; the service itself adds no prompt, message, schema, tool, or model call.
 
 #### KV Cache effect
 

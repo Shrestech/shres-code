@@ -7,9 +7,9 @@
 
 import { describe, expect, it } from 'vitest'
 import fc from 'fast-check'
-import { isJsonValue } from '@roos-code/roos-code-session'
-import { parameterSchemaSpecToJsonSchema, validateArgs } from '@roos-code/roos-code-tools'
-import type { ParameterPropertySpec, ParameterSchemaSpec, ValueSchemaSpec } from '@roos-code/roos-code-tools'
+import { isJsonValue } from '@shres-code/shres-code-session'
+import { parameterSchemaSpecToJsonSchema, validateArgs } from '@shres-code/shres-code-tools'
+import type { ParameterPropertySpec, ParameterSchemaSpec, ValueSchemaSpec } from '@shres-code/shres-code-tools'
 
 /** Remove parameter-only requiredness before nesting a schema as an array item. */
 function asValueSchema(prop: ParameterPropertySpec): ValueSchemaSpec {

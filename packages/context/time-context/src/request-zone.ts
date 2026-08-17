@@ -1,7 +1,7 @@
 /** Browser-zone derivation and model-facing policy text for one open request turn. */
 
-import { assertNever } from '@roos-code/roos-code-llm'
-import type { UserMessage } from '@roos-code/roos-code-llm'
+import { assertNever } from '@shres-code/shres-code-llm'
+import type { UserMessage } from '@shres-code/shres-code-llm'
 
 const IANA_TIME_ZONE = /^[A-Za-z][A-Za-z0-9_+.-]*(?:\/[A-Za-z0-9_+.-]+)+$/
 

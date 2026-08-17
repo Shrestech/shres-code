@@ -1,4 +1,4 @@
-# @roos-code/roos-code-tool-skill
+# @shres-code/shres-code-tool-skill
 
 The model-facing skill catalog and `skill` tool.
 
@@ -20,7 +20,7 @@ The catalog is omitted when no model-invocable skills are initially available, a
 |---|---|---|
 | `name` | string (required) | Exact kebab-case skill name from the available skills listing. |
 
-Execution uses the calling agent's `session.header.cwd` so workspace-sensitive providers resolve the winning skill. A successful call returns canonical `{ name, provider, source, resourceBase?, content }`, excluding catalog ranking and provider-internal machinery; its Native renderer produces one text result containing `<skill_content name="...">`, `<skill_resources>`, and `<skill_instructions>`. Trusted sources (`bundled`, `user-*`, `runtime`, `custom`) neutralize a close-tag family in the body. Every other source, including `project-*`, places the [`roos-untrusted-frame`](../../util/untrusted-frame/README.md) header inside `<skill_content>` and escapes every `<` in the body.
+Execution uses the calling agent's `session.header.cwd` so workspace-sensitive providers resolve the winning skill. A successful call returns canonical `{ name, provider, source, resourceBase?, content }`, excluding catalog ranking and provider-internal machinery; its Native renderer produces one text result containing `<skill_content name="...">`, `<skill_resources>`, and `<skill_instructions>`. Trusted sources (`bundled`, `user-*`, `runtime`, `custom`) neutralize a close-tag family in the body. Every other source, including `project-*`, places the [`shres-untrusted-frame`](../../util/untrusted-frame/README.md) header inside `<skill_content>` and escapes every `<` in the body.
 
 Resource guidance resolves only paths or URLs explicitly referenced by the instructions against `resourceBase`; scripts, references, and assets load on demand, and the result does not enumerate a skill directory. Local providers may supply a directory, while remote or embedded providers may supply a URL or opaque loading guidance.
 
@@ -34,7 +34,7 @@ Tool execution does not add a synthetic context message. Its freshly loaded resu
 
 #### What the model sees
 
-If model-invocable skills exist and this exact `skill` tool is visible, the agent receives the catalog template below as a durable user-role message before the first request, with one data-dependent entry per sorted skill. Later membership, description, or visibility changes append a complete replacement using the same `<available_skills>` envelope; deleting every skill appends an empty envelope with an explicit instruction not to use older names. The template's closing sentence is the rule against double-loading: the user-explicit gesture boundary (the pre-step listener below) injects the same `renderSkillContent` output (shared from `@roos-code/roos-code-skill`) inline, and the catalog tells the model to follow that block instead of re-loading the skill through the tool; the replacement-catalog template carries the same sentence in both arms, including the emptied catalog.
+If model-invocable skills exist and this exact `skill` tool is visible, the agent receives the catalog template below as a durable user-role message before the first request, with one data-dependent entry per sorted skill. Later membership, description, or visibility changes append a complete replacement using the same `<available_skills>` envelope; deleting every skill appends an empty envelope with an explicit instruction not to use older names. The template's closing sentence is the rule against double-loading: the user-explicit gesture boundary (the pre-step listener below) injects the same `renderSkillContent` output (shared from `@shres-code/shres-code-skill`) inline, and the catalog tells the model to follow that block instead of re-loading the skill through the tool; the replacement-catalog template carries the same sentence in both arms, including the emptied catalog.
 
 ##### Skill catalog template
 
@@ -63,7 +63,7 @@ The initial durable catalog is appended after the existing reusable prefix. Dyna
 
 #### What the model sees
 
-The model sees the generated [`skill` schema](../../../docs/tool-catalog.md#roos-coderoos-code-tool-skill).
+The model sees the generated [`skill` schema](../../../docs/tool-catalog.md#shres-codeshres-code-tool-skill).
 
 #### Token effect
 
@@ -93,7 +93,7 @@ A successful call uses the result template and the provider-managed, directory, 
 </skill_content>
 ```
 
-An untrusted source (`project-*` or any label outside `bundled` / `user-*` / `runtime` / `custom`) places the [`roos-untrusted-frame`](../../util/untrusted-frame/README.md) header inside this block, above `<skill_instructions>`, and wraps the body so every `<` is escaped. The catalog stays summary-only and is not framed.
+An untrusted source (`project-*` or any label outside `bundled` / `user-*` / `runtime` / `custom`) places the [`shres-untrusted-frame`](../../util/untrusted-frame/README.md) header inside this block, above `<skill_instructions>`, and wraps the body so every `<` is escaped. The catalog stays summary-only and is not framed.
 
 ##### Provider-managed resource guidance
 

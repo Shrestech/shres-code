@@ -13,18 +13,18 @@
  * The General-settings row separately writes the default preset for sessions
  * created later through the host Settings API.
  */
-import type { ConnectionHandle } from '@roos-code/roos-code-api-remotes/client'
+import type { ConnectionHandle } from '@shres-code/shres-code-api-remotes/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
-import type {} from '@roos-code/roos-code-client-locale/client'
+import type {} from '@shres-code/shres-code-client-locale/client'
 // Type-only: the settings slot types (this package registers a General row).
-import type {} from '@roos-code/roos-code-client-ui-settings/client'
+import type {} from '@shres-code/shres-code-client-ui-settings/client'
 // Type-only: pulls the ctx.remote merge and the forwarded-event key face
 // (the settings invalidation rides the allowlist) into this program.
-import type {} from '@roos-code/roos-code-api-remotes/client'
-import type { ClientContext, SessionFace } from '@roos-code/roos-code-client-runtime/client'
-import type { CommandUiContract, SelectOption } from '@roos-code/roos-code-client-ui-commands/client'
-import type { ClientSessionContext } from '@roos-code/roos-code-client-ui-input-trigger/client'
-import type { PermissionSelect } from '@roos-code/roos-code-permission-presets/client'
+import type {} from '@shres-code/shres-code-api-remotes/client'
+import type { ClientContext, SessionFace } from '@shres-code/shres-code-client-runtime/client'
+import type { CommandUiContract, SelectOption } from '@shres-code/shres-code-client-ui-commands/client'
+import type { ClientSessionContext } from '@shres-code/shres-code-client-ui-input-trigger/client'
+import type { PermissionSelect } from '@shres-code/shres-code-permission-presets/client'
 import { PermissionRow } from './PermissionRow.tsx'
 import type { PermissionRowInjected } from './PermissionRow.tsx'
 import {

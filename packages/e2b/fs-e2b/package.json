@@ -1,13 +1,13 @@
 {
-  "name": "@roos-code/roos-code-fs-e2b",
-  "description": "E2B filesystem implementation for Roos Code",
+  "name": "@shres-code/shres-code-fs-e2b",
+  "description": "E2B filesystem implementation for Shres Code",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "packages/e2b/fs-e2b"
   },
   "type": "module",
@@ -32,15 +32,15 @@
   ],
   "license": "MIT",
   "peerDependencies": {
-    "@roos-code/roos-code-e2b": "workspace:^",
-    "@roos-code/roos-code-fs": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-e2b": "workspace:^",
+    "@shres-code/shres-code-fs": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   },
   "devDependencies": {
-    "@roos-code/roos-code-e2b": "workspace:^",
-    "@roos-code/roos-code-fs": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-e2b": "workspace:^",
+    "@shres-code/shres-code-fs": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   }
 }

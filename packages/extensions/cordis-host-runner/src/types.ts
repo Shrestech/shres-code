@@ -1,10 +1,10 @@
 /**
  * Client-safe wire vocabulary of the dynamic Cordis plugin runner.
- * @module @roos-code/roos-code-cordis-host-runner/types
+ * @module @shres-code/shres-code-cordis-host-runner/types
  */
 
-import type { Branded } from '@roos-code/roos-code-brand'
-import type { JsonValue, SessionId } from '@roos-code/roos-code-session/types'
+import type { Branded } from '@shres-code/shres-code-brand'
+import type { JsonValue, SessionId } from '@shres-code/shres-code-session/types'
 
 /** Stable identity of one dynamic plugin instance. */
 export type CordisDynamicPluginId = Branded<'CordisDynamicPluginId'>
@@ -362,7 +362,7 @@ export type DynamicCordisInvokeResult =
   | { ok: true; value: JsonValue }
   | ({ ok: false; code: 'plugin-not-running' | 'stale-run' | 'method-not-found' | 'handler-error' } & CordisErrorDetails)
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Events {
     /**
      * A Client-bearing activation needs a browser page, and may require a user decision.

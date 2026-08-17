@@ -2,11 +2,11 @@
  * Vocabulary for the filesystem Service Definition (`ctx.fs`): the opaque target/version
  * identities, the metadata `stat` returns, the write-intent and outcome shapes, the
  * literal-edit request/outcome, and the typed error taxonomy.
- * @module @roos-code/roos-code-fs/types
+ * @module @shres-code/shres-code-fs/types
  */
 
-import { HarnessError } from '@roos-code/roos-code-llm'
-import type { Branded } from '@roos-code/roos-code-brand'
+import { HarnessError } from '@shres-code/shres-code-llm'
+import type { Branded } from '@shres-code/shres-code-brand'
 
 /**
  * Opaque key for stale guards and target lookup. The local backend uses a
@@ -189,7 +189,7 @@ export type FsErrorCode =
 
 /**
  * Typed filesystem error. Extends {@link HarnessError} so it carries a stable
- * {@link FsErrorCode} and chains `cause`. `roos-fs` owns this vocabulary so
+ * {@link FsErrorCode} and chains `cause`. `shres-fs` owns this vocabulary so
  * backends and the policy layer raise the same codes instead of each inventing
  * message strings.
  */

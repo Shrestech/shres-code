@@ -1,6 +1,6 @@
 # Typert remote calls
 
-Types shared by generated Remote artifacts, the Host Gateway, and consumer API assemblies. The [Typert Gateway Agent Note](../../.agents/notes/implemented/architecture/2026-08-02-typert-remote-method-calls.md) owns the architecture and transport decisions; this page records the literal public contracts from [`roos-typert-protocol`](../../packages/typert/protocol/src/types.ts) and [`roos-api-gateway`](../../packages/api/gateway/src/types.ts).
+Types shared by generated Remote artifacts, the Host Gateway, and consumer API assemblies. The [Typert Gateway Agent Note](../../.agents/notes/implemented/architecture/2026-08-02-typert-remote-method-calls.md) owns the architecture and transport decisions; this page records the literal public contracts from [`shres-typert-protocol`](../../packages/typert/protocol/src/types.ts) and [`shres-api-gateway`](../../packages/api/gateway/src/types.ts).
 
 ## Lookup and Context declarations
 

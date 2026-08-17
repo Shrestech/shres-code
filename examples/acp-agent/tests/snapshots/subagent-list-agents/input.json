@@ -12,7 +12,7 @@
     },
     {
       "op": "waitForFile",
-      "path": ".roos-snapshot-subagent-settled"
+      "path": ".shres-snapshot-subagent-settled"
     },
     {
       "op": "waitForTurnStart",

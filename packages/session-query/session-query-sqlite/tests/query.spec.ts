@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { SessionId } from '@roos-code/roos-code-session'
-import { SessionSearchCursor, type SessionQueryErrorCode } from '@roos-code/roos-code-session-query'
+import { SessionId } from '@shres-code/shres-code-session'
+import { SessionSearchCursor, type SessionQueryErrorCode } from '@shres-code/shres-code-session-query'
 import {
   buildEventWhere,
   buildSessionWhere,

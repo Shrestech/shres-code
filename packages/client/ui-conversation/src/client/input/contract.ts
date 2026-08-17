@@ -5,12 +5,12 @@
  * conversation wiring layer alone sees the full SessionInput. InputMachine
  * (machine.ts) is package-private and never exported.
  */
-import type { ClientContext, SnapshotStore } from '@roos-code/roos-code-client-runtime/client'
-import type { Branded } from '@roos-code/roos-code-brand'
+import type { ClientContext, SnapshotStore } from '@shres-code/shres-code-client-runtime/client'
+import type { Branded } from '@shres-code/shres-code-brand'
 import type {
   ArbitrateKey, ArbitrateOutcome, CommandClaim, ConsumeTokenRequest, PickOutcome,
   ReferenceInsert, SubmitOutcome, TokenSpan,
-} from '@roos-code/roos-code-client-ui-input-trigger/client'
+} from '@shres-code/shres-code-client-ui-input-trigger/client'
 import type { QueueRow } from '../contract/queue.ts'
 import type { InputSubmitMode } from '../contract/composer-submission.ts'
 

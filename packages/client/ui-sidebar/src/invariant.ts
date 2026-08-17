@@ -1,13 +1,13 @@
 /**
- * Package-owned invariant companion for `@roos-code/roos-code-client-ui-sidebar`.
- * @module @roos-code/roos-code-client-ui-sidebar/invariant
+ * Package-owned invariant companion for `@shres-code/shres-code-client-ui-sidebar`.
+ * @module @shres-code/shres-code-client-ui-sidebar/invariant
  */
 
 /* jscpd:ignore-start */
-import type { Context } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-client-ui-sidebar'
+const PACKAGE_NAME = '@shres-code/shres-code-client-ui-sidebar'
 
 /** Cordis companion plugin name. */
 export const name = 'client-ui-sidebar-invariant'

@@ -14,10 +14,10 @@
 - text: Explain event sourcing in one sentence. {{clock}}
 - button "Copy":
   - img
-- button "Context injection @roos-code/roos-code-system-prompt":
+- button "Context injection @shres-code/shres-code-system-prompt":
   - img
   - img
-  - text: Context injection @roos-code/roos-code-system-prompt
+  - text: Context injection @shres-code/shres-code-system-prompt
 - paragraph: partial
 - status: Deep diving...
 - textbox "Parent session offline; sending is unavailable but you can still stop the run" [disabled]

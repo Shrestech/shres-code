@@ -1,12 +1,12 @@
 /**
  * Harness request-history conversion into pi-ai's Context vocabulary.
  *
- * @module roos-llm-pi-ai/context
+ * @module shres-llm-pi-ai/context
  */
 
-import { CallId, contentHasImage, LlmError } from '@roos-code/roos-code-llm'
-import type { ContentBlock, GenerateOptions, Message } from '@roos-code/roos-code-llm'
-import type { AttachmentStore } from '@roos-code/roos-code-attachment'
+import { CallId, contentHasImage, LlmError } from '@shres-code/shres-code-llm'
+import type { ContentBlock, GenerateOptions, Message } from '@shres-code/shres-code-llm'
+import type { AttachmentStore } from '@shres-code/shres-code-attachment'
 import type { Context as PiContext, ImageContent, Message as PiMessage, TextContent, Tool as PiTool } from '@earendil-works/pi-ai'
 import { toPiAssistant } from './replay.ts'
 

@@ -1,13 +1,13 @@
 {
-  "name": "@roos-code/roos-code-sdk-client",
-  "description": "TypeScript client SDK for driving a Roos Code runtime subprocess over stdio JSON-RPC: the DeepSeekHarness high-level turns API and the lower-level HarnessClient",
+  "name": "@shres-code/shres-code-sdk-client",
+  "description": "TypeScript client SDK for driving a Shres Code runtime subprocess over stdio JSON-RPC: the DeepSeekHarness high-level turns API and the lower-level HarnessClient",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "packages/sdk/client"
   },
   "type": "module",
@@ -31,17 +31,17 @@
   ],
   "license": "MIT",
   "peerDependencies": {
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-llm": "workspace:^",
-    "@roos-code/roos-code-sdk-protocol": "workspace:^",
-    "@roos-code/roos-code-session": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-sdk-protocol": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   },
   "devDependencies": {
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-llm": "workspace:^",
-    "@roos-code/roos-code-sdk-protocol": "workspace:^",
-    "@roos-code/roos-code-session": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-sdk-protocol": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   }
 }

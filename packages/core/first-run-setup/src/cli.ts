@@ -2,7 +2,7 @@
  * Interactive first-run menu. Prompts go to the supplied stdout (headless
  * uses stderr so the task answer stays on stdout).
  *
- * @module @roos-code/roos-code-first-run-setup/cli
+ * @module @shres-code/shres-code-first-run-setup/cli
  */
 
 import type { CliIo, FirstRunChoice, PickerOption } from './types.ts'

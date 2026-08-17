@@ -2,12 +2,12 @@
  * The background-job Service Definition (`ctx.jobs`). It owns the contract for
  * job ids, session-scoped access, lifecycle state, completion listeners, and
  * owner cleanup while producers retain their execution resources. The
- * process-local registry lives in `@roos-code/roos-code-jobs-local`.
- * @module @roos-code/roos-code-jobs
+ * process-local registry lives in `@shres-code/shres-code-jobs-local`.
+ * @module @shres-code/shres-code-jobs
  */
 
-import { Context, Service } from '@roos-code/cordis'
-import type { Agent } from '@roos-code/roos-code-agent'
+import { Context, Service } from '@shres-code/cordis'
+import type { Agent } from '@shres-code/shres-code-agent'
 import type {
   JobDoneListener, JobId, JobRead, JobSnapshot, JobStart, JobsChangedListener,
 } from './types.ts'
@@ -26,7 +26,7 @@ export type {
   JobsChangedListener,
 } from './types.ts'
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     jobs: JobRegistry
   }
@@ -65,7 +65,7 @@ export abstract class JobRegistry extends Service {
     // would register a ctx.jobs with no method implementations and fail far
     // from the misconfiguration. Fail loud at load instead.
     if (new.target === JobRegistry) {
-      throw new Error('@roos-code/roos-code-jobs is the abstract job registry seam; load an implementation such as @roos-code/roos-code-jobs-local instead')
+      throw new Error('@shres-code/shres-code-jobs is the abstract job registry seam; load an implementation such as @shres-code/shres-code-jobs-local instead')
     }
     super(ctx, 'jobs')
   }

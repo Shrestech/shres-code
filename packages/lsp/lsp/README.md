@@ -1,4 +1,4 @@
-# @roos-code/roos-code-lsp
+# @shres-code/shres-code-lsp
 
 The **LSP capability seam**: an abstract `LspService` (`ctx.lsp`) defining WHAT semantic code navigation the harness has — go to definition, find references, find implementations, hover — over language-server providers, without binding the model contract to local subprocesses.
 
@@ -6,9 +6,9 @@ This package owns the Service Definition role of the LSP capability:
 
 | Package | Role |
 |---|---|
-| `@roos-code/roos-code-lsp` (this) | Service Definition: the service, provider registry keyed by branded id + extension mapping, per-query selection, request/result vocabulary, the `LspError` taxonomy |
-| `@roos-code/roos-code-lsp-stdio` | Service Provider: a generic local backend that registers configured stdio language-server providers |
-| `@roos-code/roos-code-tool-lsp` | Consumer: the model-facing `lsp` tool over `ctx.lsp` |
+| `@shres-code/shres-code-lsp` (this) | Service Definition: the service, provider registry keyed by branded id + extension mapping, per-query selection, request/result vocabulary, the `LspError` taxonomy |
+| `@shres-code/shres-code-lsp-stdio` | Service Provider: a generic local backend that registers configured stdio language-server providers |
+| `@shres-code/shres-code-tool-lsp` | Consumer: the model-facing `lsp` tool over `ctx.lsp` |
 
 The seam exposes exactly four semantic operations — `goToDefinition`, `findReferences`, `goToImplementation`, `hover` — and no generic JSON-RPC escape hatch, so no protocol payload or unreviewed command/mutation reaches a provider through `ctx.lsp`.
 
@@ -21,7 +21,7 @@ The seam exposes exactly four semantic operations — `goToDefinition`, `findRef
 
 Selection is per query and order-independent: a provider owns a set of extensions exclusively, so registration and HMR order never change routing. Extension keys normalize to lowercase, leading-dot form; the `languageId` only synchronizes the transient document, never participates in selection. The first version has no glob, language-id, or explicit route selector.
 
-Providers register **capabilities**, not tools. `roos-tool-lsp` is the only owner of the model-facing name, description, prompt guidance, schema, and presentation.
+Providers register **capabilities**, not tools. `shres-tool-lsp` is the only owner of the model-facing name, description, prompt guidance, schema, and presentation.
 
 ## Vocabulary
 
@@ -29,11 +29,11 @@ Providers register **capabilities**, not tools. `roos-tool-lsp` is the only owne
 
 ## Model Experience
 
-Indirectly, through `roos-tool-lsp`, which owns the model-facing `lsp` schema, prompt, and rendered results while this registry contributes no prompt or schema itself.
+Indirectly, through `shres-tool-lsp`, which owns the model-facing `lsp` schema, prompt, and rendered results while this registry contributes no prompt or schema itself.
 
 #### KV Cache effect
 
-No direct invalidation; `roos-tool-lsp` owns request-prefix changes.
+No direct invalidation; `shres-tool-lsp` owns request-prefix changes.
 
 ## Known Limitations and Deferred Work
 

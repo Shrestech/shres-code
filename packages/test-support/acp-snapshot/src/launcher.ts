@@ -4,7 +4,7 @@
  * stdout tee, SDK client, update collection, permission fallback, and process
  * shutdown so e2e and snapshot suites do not each reconstruct that boundary.
  *
- * @module @roos-code/roos-code-acp-snapshot/launcher
+ * @module @shres-code/shres-code-acp-snapshot/launcher
  */
 
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
@@ -19,7 +19,7 @@ import {
   type RequestPermissionResponse,
   type SessionNotification,
 } from '@agentclientprotocol/sdk'
-import { resolveExampleLaunch } from '@roos-code/roos-code-loader-smoke'
+import { resolveExampleLaunch } from '@shres-code/shres-code-loader-smoke'
 
 const EXIT_MARKER_GRACE_MS = 250
 
@@ -84,8 +84,8 @@ export function launchAcpTestAgent(options: AcpTestLaunchOptions): LaunchedAcpTe
     tsconfigPath: agent.tsconfigPath,
     env: {
       ...options.env,
-      ROOS_HOME: join(cwd, '.roos'),
-      ROOS_AGENTS_HOME: join(cwd, '.agents'),
+      SHRES_HOME: join(cwd, '.shres'),
+      SHRES_AGENTS_HOME: join(cwd, '.agents'),
     },
   })
   const child = spawn(

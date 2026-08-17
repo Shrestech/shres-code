@@ -11,15 +11,15 @@
  * between this module and one in-package caller, not something a plugin may
  * depend on.
  *
- * @module @roos-code/roos-code-subagent/lifecycle
+ * @module @shres-code/shres-code-subagent/lifecycle
  */
 
 import { randomUUID } from 'node:crypto'
-import type { Context } from '@roos-code/cordis'
-import type { Agent } from '@roos-code/roos-code-agent'
-import type { ContentBlock } from '@roos-code/roos-code-llm'
-import { foldConsumedWork } from '@roos-code/roos-code-agent'
-import type { SessionEvent, SessionId } from '@roos-code/roos-code-session'
+import type { Context } from '@shres-code/cordis'
+import type { Agent } from '@shres-code/shres-code-agent'
+import type { ContentBlock } from '@shres-code/shres-code-llm'
+import { foldConsumedWork } from '@shres-code/shres-code-agent'
+import type { SessionEvent, SessionId } from '@shres-code/shres-code-session'
 import { finalAssistantOutput } from './assistant-output.ts'
 import { SubagentRunId } from './types.ts'
 import type { SubagentResult, SubagentRun, SubagentRunEndInfo, SubagentRunInfo } from './types.ts'

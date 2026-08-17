@@ -6,23 +6,23 @@
  */
 
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import AgentRegistry from '@roos-code/roos-code-agent'
-import SessionStore from '@roos-code/roos-code-session'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import ToolRuntime from '@roos-code/roos-code-tools'
-import UserQuestionService from '@roos-code/roos-code-user-questions'
-import LlmRuntime, { LlmAdapter } from '@roos-code/roos-code-llm'
-import type { GenerateOptions, LlmModelInfo, LlmProviderInfo, StreamChunk } from '@roos-code/roos-code-llm'
-import { SettingsProvider, settingsNamespace } from '@roos-code/roos-code-settings'
-import type { SettingsNamespace } from '@roos-code/roos-code-settings'
-import { CredentialProvider } from '@roos-code/roos-code-credentials'
-import type { CredentialInfo, CredentialRef, ResolvedCredential } from '@roos-code/roos-code-credentials'
+import { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import AgentRegistry from '@shres-code/shres-code-agent'
+import SessionStore from '@shres-code/shres-code-session'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import ToolRuntime from '@shres-code/shres-code-tools'
+import UserQuestionService from '@shres-code/shres-code-user-questions'
+import LlmRuntime, { LlmAdapter } from '@shres-code/shres-code-llm'
+import type { GenerateOptions, LlmModelInfo, LlmProviderInfo, StreamChunk } from '@shres-code/shres-code-llm'
+import { SettingsProvider, settingsNamespace } from '@shres-code/shres-code-settings'
+import type { SettingsNamespace } from '@shres-code/shres-code-settings'
+import { CredentialProvider } from '@shres-code/shres-code-credentials'
+import type { CredentialInfo, CredentialRef, ResolvedCredential } from '@shres-code/shres-code-credentials'
 import type { HostFrame } from '../src/api/index.ts'
 import type { RpcRequest, RpcResponse } from '../src/api/rpc.ts'
 import { RpcId } from '../src/api/rpc.ts'
-import { AGENT_DEFAULT_MODEL_SETTINGS_NAMESPACE } from '@roos-code/roos-code-agent-default-model'
+import { AGENT_DEFAULT_MODEL_SETTINGS_NAMESPACE } from '@shres-code/shres-code-agent-default-model'
 import { createApiProxy } from '../src/api-proxy.ts'
 
 const DEFAULTS = { defaultModelSelection: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp' }
@@ -248,7 +248,7 @@ describe('settings domain', () => {
     const api = createApiProxy(ctx, DEFAULTS)
     const error = expectErr(await api.settings.describe(request({})))
     expect(error.code).toBe('internal')
-    expect(error.message).toContain('roos-settings-file')
+    expect(error.message).toContain('shres-settings-file')
   })
 
   it('describes layered redacted namespaces with their secret slots', async () => {
@@ -446,20 +446,35 @@ describe('settings domain', () => {
     expect(frames).toEqual([forwardedSettings('ui-onboarding'), forwardedSettings('ui-theme')])
   })
 
-  it('serves the agent-seats namespace so the Models card can bind Boomer, Joey, and Flyer', async () => {
+  it('serves the agent-seats namespace so the Models card can bind Aegis, Stride, and Ward', async () => {
     const ctx = await harness()
     ctx.settings.register(settingsNamespace('agent-seats'), z.object({
       seats: z.object({
-        boomer: z.object({ provider: z.string(), model: z.string() }),
+        aegis: z.object({ provider: z.string(), model: z.string() }),
       }),
     }))
     const api = createApiProxy(ctx, DEFAULTS)
     expectOk(await api.settings.mutate(request({
       ns: 'agent-seats',
-      ops: [{ op: 'set', path: ['seats', 'boomer'], value: { provider: 'ollama-cloud', model: 'kimi-k3' } }],
+      ops: [{ op: 'set', path: ['seats', 'aegis'], value: { provider: 'ollama-cloud', model: 'kimi-k3' } }],
     })))
     expect(ctx.settings.describe().find(view => String(view.ns) === 'agent-seats')?.value)
-      .toEqual({ seats: { boomer: { provider: 'ollama-cloud', model: 'kimi-k3' } } })
+      .toEqual({ seats: { aegis: { provider: 'ollama-cloud', model: 'kimi-k3' } } })
+  })
+
+  it('serves the shres-shield namespace so the Shield settings page can persist posture and license', async () => {
+    const ctx = await harness()
+    ctx.settings.register(settingsNamespace('shres-shield'), z.object({
+      posture: z.union(['observe', 'ask', 'enforce'] as const),
+      license: z.string(),
+    }))
+    const api = createApiProxy(ctx, DEFAULTS)
+    expectOk(await api.settings.mutate(request({
+      ns: 'shres-shield',
+      ops: [{ op: 'set', path: ['posture'], value: 'enforce' }],
+    })))
+    expect(ctx.settings.describe().find(view => String(view.ns) === 'shres-shield')?.value)
+      .toEqual({ posture: 'enforce' })
   })
 
   it('serves the agent-preset namespace, so a browser preset picker can persist its choice', async () => {
@@ -616,7 +631,7 @@ describe('credentials domain', () => {
     const api = createApiProxy(ctx, DEFAULTS)
     const error = expectErr(await api.credentials.describe(request({ refs: ['A'] })))
     expect(error.code).toBe('internal')
-    expect(error.message).toContain('roos-credentials-local')
+    expect(error.message).toContain('shres-credentials-local')
   })
 
   it('describes value-free views and flips state through set/unset with frames', async () => {

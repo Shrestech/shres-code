@@ -2,9 +2,9 @@
  * Pure subagent-lineage aggregation over the retained session-list mirror.
  * Ordinary forks terminate propagation so each visible session owns only its
  * uninterrupted subagent subtree.
- * @module @roos-code/roos-code-client-runtime/client/sessions/subagent-lineage
+ * @module @shres-code/shres-code-client-runtime/client/sessions/subagent-lineage
  */
-import type { SessionId } from '@roos-code/roos-code-api-remotes/client'
+import type { SessionId } from '@shres-code/shres-code-api-remotes/client'
 import type { SessionSummary } from './service.ts'
 
 /** Descendant counts projected for one possible parent session. */

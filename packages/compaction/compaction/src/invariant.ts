@@ -1,15 +1,15 @@
-/** Package-owned compaction log-stream invariants. @module @roos-code/roos-code-compaction/invariant */
+/** Package-owned compaction log-stream invariants. @module @shres-code/shres-code-compaction/invariant */
 
-import type { Context } from '@roos-code/cordis'
-import { isReplacementSurfaceEvent } from '@roos-code/roos-code-session'
-import type { Session, SessionEvent } from '@roos-code/roos-code-session'
-import type { InvariantFailure, InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import { isReplacementSurfaceEvent } from '@shres-code/shres-code-session'
+import type { Session, SessionEvent } from '@shres-code/shres-code-session'
+import type { InvariantFailure, InvariantInstaller } from '@shres-code/shres-code-invariants'
 import type { CompactionId } from './brand.ts'
 import { isCompactCheckpointSource } from './checkpoint.ts'
 import type { CompactionCheckpointSource } from './checkpoint.ts'
 import type {} from './types.ts'
 
-const PACKAGE_NAME = '@roos-code/roos-code-compaction'
+const PACKAGE_NAME = '@shres-code/shres-code-compaction'
 
 /** Cordis companion plugin name. */
 export const name = 'compaction-invariant'

@@ -1,13 +1,13 @@
 /**
- * Package-owned invariant companion for `@roos-code/roos-code-client-web-react`.
- * @module @roos-code/roos-code-client-web-react/invariant
+ * Package-owned invariant companion for `@shres-code/shres-code-client-web-react`.
+ * @module @shres-code/shres-code-client-web-react/invariant
  */
 
 /* jscpd:ignore-start */
-import type { Context } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-client-web-react'
+const PACKAGE_NAME = '@shres-code/shres-code-client-web-react'
 
 /** Cordis companion plugin name. */
 export const name = 'client-web-react-invariant'

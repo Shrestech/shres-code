@@ -7,34 +7,34 @@
  * event ledger with its timing overview, and fiber disposal removes the tab.
  * Timeline projection and inclusive focus edge cases ride along.
  */
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { createElement, type ComponentProps, type FC, type ReactNode } from 'react'
-import { bindSnapshotSelector } from '@roos-code/roos-code-client-web-react'
-import { resolveSlotLabel } from '@roos-code/roos-code-client-ui-slots'
+import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
+import { resolveSlotLabel } from '@shres-code/shres-code-client-ui-slots'
 import {
   ConversationEventRegistry, ConversationViewRegistry, createSnapshotStore,
   EMPTY_CHAT_SNAPSHOT,
-} from '@roos-code/roos-code-client-runtime/client'
-import { SlotRegistry } from '@roos-code/roos-code-client-runtime/client'
+} from '@shres-code/shres-code-client-runtime/client'
+import { SlotRegistry } from '@shres-code/shres-code-client-runtime/client'
 import type {
   ConversationSnapshot, RequestView,
   SessionId, SessionListState, SnapshotStore, WorkspaceListState,
-} from '@roos-code/roos-code-client-runtime/client'
-import type { ConvViewProps, ViewTab } from '@roos-code/roos-code-client-ui-conversation/client'
+} from '@shres-code/shres-code-client-runtime/client'
+import type { ConvViewProps, ViewTab } from '@shres-code/shres-code-client-ui-conversation/client'
 import {
   ConversationSession, ConversationSessionHeader,
   type ConversationSessionHeaderProps, type ConversationSessionProps,
-} from '@roos-code/roos-code-client-ui-conversation/src/client/skeleton/ConversationSession.tsx'
-import { createChatStore } from '@roos-code/roos-code-client-ui-conversation/src/client/stores.ts'
-import { en as conversationEn } from '@roos-code/roos-code-client-ui-conversation/src/client/locales.ts'
-import { apply as localeApply, inject as localeInject } from '@roos-code/roos-code-client-locale/client'
-import { stubSettingsScope } from '@roos-code/roos-code-client-test-runtime'
-import type { LocaleKeysOf } from '@roos-code/roos-code-client-ui-slots'
+} from '@shres-code/shres-code-client-ui-conversation/src/client/skeleton/ConversationSession.tsx'
+import { createChatStore } from '@shres-code/shres-code-client-ui-conversation/src/client/stores.ts'
+import { en as conversationEn } from '@shres-code/shres-code-client-ui-conversation/src/client/locales.ts'
+import { apply as localeApply, inject as localeInject } from '@shres-code/shres-code-client-locale/client'
+import { stubSettingsScope } from '@shres-code/shres-code-client-test-runtime'
+import type { LocaleKeysOf } from '@shres-code/shres-code-client-ui-slots'
 import { en, type TrajectoryKey } from '../src/client/locales.ts'
-import { apply, inject } from '@roos-code/roos-code-client-ui-trajectory/client'
-import { apply as nodeApply } from '@roos-code/roos-code-client-ui-trajectory'
+import { apply, inject } from '@shres-code/shres-code-client-ui-trajectory/client'
+import { apply as nodeApply } from '@shres-code/shres-code-client-ui-trajectory'
 import type { TrajectoryTurnModel } from '../src/client/layout.ts'
 import { TrajectoryTimeline } from '../src/client/TrajectoryTimeline.tsx'
 import {
@@ -335,8 +335,8 @@ describe('plugin registration', () => {
     expect(second.hooks.duration).toBe(first.hooks.duration)
     first.setActualDuration(true)
     expect(second.hooks.duration.getSnapshot()).toBe(true)
-    expect(localStorage.getItem('roos.trajectory.duration')).toBe('true')
-    expect(localStorage.getItem(`roos.trajectory.duration.${SID}`)).toBeNull()
+    expect(localStorage.getItem('shres.trajectory.duration')).toBe('true')
+    expect(localStorage.getItem(`shres.trajectory.duration.${SID}`)).toBeNull()
   })
 
   it('reports whether loading older history changed the Trajectory snapshot', async () => {
@@ -1147,7 +1147,7 @@ describe('TrajectoryView state', () => {
 
     expect(duration.getAttribute('aria-pressed')).toBe('false')
     fireEvent.click(duration)
-    expect(localStorage.getItem('roos.trajectory.duration')).toBe('true')
+    expect(localStorage.getItem('shres.trajectory.duration')).toBe('true')
     first.unmount()
 
     const restoredDuration = createTrajectoryDurationStore()

@@ -13,13 +13,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import Loader from '@roos-code/cordis-plugin-loader'
-import Include from '@roos-code/cordis-plugin-include'
-import HttpServer from '@roos-code/roos-code-host-webserver'
-import type { DirectoryPicker } from '@roos-code/roos-code-host-directory-picker'
-import BrowseDirectoryPicker from '@roos-code/roos-code-host-directory-picker-browse'
-import NativeDirectoryPicker from '@roos-code/roos-code-host-directory-picker-native'
+import { Context } from '@shres-code/cordis'
+import Loader from '@shres-code/cordis-plugin-loader'
+import Include from '@shres-code/cordis-plugin-include'
+import HttpServer from '@shres-code/shres-code-host-webserver'
+import type { DirectoryPicker } from '@shres-code/shres-code-host-directory-picker'
+import BrowseDirectoryPicker from '@shres-code/shres-code-host-directory-picker-browse'
+import NativeDirectoryPicker from '@shres-code/shres-code-host-directory-picker-native'
 import * as DirectoryPickerAuto from '../src/index.ts'
 
 const renameControl = vi.hoisted(() => ({
@@ -45,11 +45,11 @@ vi.mock('node:fs/promises', async (importOriginal) => {
   }
 })
 
-const AUTO = '@roos-code/roos-code-host-directory-picker-auto'
-const NATIVE = '@roos-code/roos-code-host-directory-picker-native'
-const BROWSE = '@roos-code/roos-code-host-directory-picker-browse'
-const NATIVE_SURFACE = '@roos-code/roos-code-client-ui-directory-picker-native'
-const BROWSE_SURFACE = '@roos-code/roos-code-client-ui-directory-picker-browse'
+const AUTO = '@shres-code/shres-code-host-directory-picker-auto'
+const NATIVE = '@shres-code/shres-code-host-directory-picker-native'
+const BROWSE = '@shres-code/shres-code-host-directory-picker-browse'
+const NATIVE_SURFACE = '@shres-code/shres-code-client-ui-directory-picker-native'
+const BROWSE_SURFACE = '@shres-code/shres-code-client-ui-directory-picker-browse'
 
 /**
  * Loader-visible stand-in for a client surface package: the surfaces belong to
@@ -92,10 +92,10 @@ async function loadComposition(
   bindHost: '127.0.0.1' | '0.0.0.0',
   options: { failSurface?: boolean } = {},
 ): Promise<{ ctx: Context; configPath: string }> {
-  root = await mkdtemp(join(tmpdir(), 'roos-directory-picker-auto-'))
+  root = await mkdtemp(join(tmpdir(), 'shres-directory-picker-auto-'))
   const configPath = join(root, 'cordis.yml')
   await writeFile(configPath, [
-    "- name: '@roos-code/roos-code-host-webserver'",
+    "- name: '@shres-code/shres-code-host-webserver'",
     '  config:',
     `    host: '${bindHost}'`,
     '    port: 0',
@@ -108,7 +108,7 @@ async function loadComposition(
   await context.plugin(Loader)
   context.loader.builtins.include = Include
   const modules = new Map<string, unknown>([
-    ['@roos-code/roos-code-host-webserver', HttpServer],
+    ['@shres-code/shres-code-host-webserver', HttpServer],
     [AUTO, DirectoryPickerAuto],
     [NATIVE, NativeDirectoryPicker],
     [BROWSE, BrowseDirectoryPicker],
@@ -144,7 +144,7 @@ function entryNames(ctx: Context): string[] {
  * probe resolves identically on hosts with and without zenity/kdialog.
  */
 function stubAttendedHost(): void {
-  fakeBin = mkdtempSync(join(tmpdir(), 'roos-picker-bin-'))
+  fakeBin = mkdtempSync(join(tmpdir(), 'shres-picker-bin-'))
   const zenity = join(fakeBin, 'zenity')
   writeFileSync(zenity, '#!/bin/sh\n')
   chmodSync(zenity, 0o755)

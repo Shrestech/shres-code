@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
-import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
+import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
 import type {
   SessionId, SessionListState, SessionSummary, SubagentCatalogSnapshot,
-} from '@roos-code/roos-code-client-runtime/client'
+} from '@shres-code/shres-code-client-runtime/client'
 import {
   SubagentCatalogAction, type SubagentCatalogActionProps,
 } from '../src/client/SubagentCatalogAction.tsx'
@@ -88,12 +88,12 @@ function summary(id: SessionId, updatedAt: number): SessionSummary {
 }
 
 describe('SubagentCatalogAction', () => {
-  it('hops a colored kangaroo for a running named seat', () => {
+  it('hops a colored product mark for a running named seat', () => {
     const input = props({
       ...catalog(),
       entries: [
         {
-          kind: 'child', id: CHILD, mode: 'continuable', label: 'Boomer: design the API',
+          kind: 'child', id: CHILD, mode: 'continuable', label: 'Aegis: design the API',
           activity: 'running', hasChildren: false,
         },
       ],
@@ -103,15 +103,15 @@ describe('SubagentCatalogAction', () => {
         parentId: PARENT,
         origin: 'subagent',
         running: true,
-        title: 'Boomer: design the API',
-        displayTitle: 'Boomer: design the API',
+        title: 'Aegis: design the API',
+        displayTitle: 'Aegis: design the API',
       },
     })
     render(<SubagentCatalogAction {...input} />)
     const trigger = screen.getByRole('button', { name: '1 subagent running' })
-    expect(trigger.querySelector('[data-hopping-roo="boomer"]')).not.toBeNull()
+    expect(trigger.querySelector('[data-hopping-roo="aegis"]')).not.toBeNull()
     fireEvent.click(trigger)
-    expect(screen.getByRole('treeitem').querySelector('[data-hopping-roo="boomer"]')).not.toBeNull()
+    expect(screen.getByRole('treeitem').querySelector('[data-hopping-roo="aegis"]')).not.toBeNull()
   })
 
   it('aggregates live descendant activity onto the closed trigger', () => {

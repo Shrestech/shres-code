@@ -13,7 +13,7 @@ The Agent Note archive was a frozen bilingual triplet tree. `--write` is append-
 The product is English-only:
 
 - Tracked `*.zh.md` and `*.i18n.yaml` outside `vendor/` are gone. `scripts/purge-zh.ts --apply/--check` is the idempotent re-run surface; `purge-zh:check` is a hygiene leaf.
-- The `roos-translate-docs` skill and its `.claude` mirror are gone. Translation scripts, pairing records, merge drivers, and `docs/i18n/` policy pages are gone. `doc-sync` no longer runs pairing checks.
+- The `shres-translate-docs` skill and its `.claude` mirror are gone. Translation scripts, pairing records, merge drivers, and `docs/i18n/` policy pages are gone. `doc-sync` no longer runs pairing checks.
 - The browser client ships `LOCALE_IDS = ['en']`. A persisted `zh` preference normalizes to `en` on read and is not rewritten on disk.
 - The documentation site projects English sources onto the root locale only.
 - `scripts/verify-no-zh-artifacts.ts` rejects leftover `*.zh.md` / `*.i18n.yaml` and CJK code points in tracked text outside an explicit allowlist. Frozen archived English notes, vendored upstream, and UTF-8 test fixtures are the legitimate remainders.

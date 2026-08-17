@@ -1,17 +1,17 @@
 /**
- * `@roos-code/roos-code-web-search-exa`: registers an Exa-backed `WebSearchProvider`
+ * `@shres-code/shres-code-web-search-exa`: registers an Exa-backed `WebSearchProvider`
  * with `ctx.web`. A function/namespace plugin (NOT a default-export service):
  * a search provider does not own the `ctx.web` key — it registers INTO the
- * seam's provider registry, exactly as `@roos-code/roos-code-llm-deepseek`
- * registers an adapter into `ctx.llm`. The key is owned by `@roos-code/roos-code-web`.
+ * seam's provider registry, exactly as `@shres-code/shres-code-llm-deepseek`
+ * registers an adapter into `ctx.llm`. The key is owned by `@shres-code/shres-code-web`.
  *
- * @module @roos-code/roos-code-web-search-exa
+ * @module @shres-code/shres-code-web-search-exa
  */
 
-import type { Context } from '@roos-code/cordis'
-import { launchEnvironmentOf } from '@roos-code/roos-code-launch-environment'
-import z from '@roos-code/schemastery'
-import type {} from '@roos-code/roos-code-web'
+import type { Context } from '@shres-code/cordis'
+import { launchEnvironmentOf } from '@shres-code/shres-code-launch-environment'
+import z from '@shres-code/schemastery'
+import type {} from '@shres-code/shres-code-web'
 import {
   ExaSearchProvider,
   EXA_DEFAULT_BASE_URL,

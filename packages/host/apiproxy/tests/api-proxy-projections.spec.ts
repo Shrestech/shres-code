@@ -8,22 +8,22 @@
  */
 
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { z } from 'zod'
-import AgentRegistry, { Inbox } from '@roos-code/roos-code-agent'
-import { AttachmentStore } from '@roos-code/roos-code-attachment'
-import type { Agent } from '@roos-code/roos-code-agent'
-import { createUserMessage } from '@roos-code/roos-code-llm'
-import SessionStore, { SessionId } from '@roos-code/roos-code-session'
-import type { Session } from '@roos-code/roos-code-session'
-import SessionProjectionRegistry from '@roos-code/roos-code-session-projection'
-import type { ProjectionDefinition } from '@roos-code/roos-code-session-projection'
-import UserQuestionService from '@roos-code/roos-code-user-questions'
-import type { MuxFrame, RpcRequest } from '@roos-code/roos-code-host-apiproxy/api'
-import { RpcId } from '@roos-code/roos-code-host-apiproxy/api/rpc'
-import { createApiProxy } from '@roos-code/roos-code-host-apiproxy'
+import AgentRegistry, { Inbox } from '@shres-code/shres-code-agent'
+import { AttachmentStore } from '@shres-code/shres-code-attachment'
+import type { Agent } from '@shres-code/shres-code-agent'
+import { createUserMessage } from '@shres-code/shres-code-llm'
+import SessionStore, { SessionId } from '@shres-code/shres-code-session'
+import type { Session } from '@shres-code/shres-code-session'
+import SessionProjectionRegistry from '@shres-code/shres-code-session-projection'
+import type { ProjectionDefinition } from '@shres-code/shres-code-session-projection'
+import UserQuestionService from '@shres-code/shres-code-user-questions'
+import type { MuxFrame, RpcRequest } from '@shres-code/shres-code-host-apiproxy/api'
+import { RpcId } from '@shres-code/shres-code-host-apiproxy/api/rpc'
+import { createApiProxy } from '@shres-code/shres-code-host-apiproxy'
 
-declare module '@roos-code/roos-code-session-projection/types' {
+declare module '@shres-code/shres-code-session-projection/types' {
   interface SessionProjectionMap {
     'test/last-user': { text: string } | null
   }

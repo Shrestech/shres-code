@@ -1,13 +1,13 @@
 {
-  "name": "@roos-code/roos-code-subprocess-local",
-  "description": "Local-subprocess implementation of the Roos Code subprocess seam",
+  "name": "@shres-code/shres-code-subprocess-local",
+  "description": "Local-subprocess implementation of the Shres Code subprocess seam",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "packages/subprocess/subprocess-local"
   },
   "type": "module",
@@ -36,19 +36,19 @@
   },
   "license": "MIT",
   "peerDependencies": {
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-subprocess": "workspace:^",
-    "@roos-code/roos-code-timeout": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-subprocess": "workspace:^",
+    "@shres-code/shres-code-timeout": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   },
   "dependencies": {
     "node-pty": "^1.1.0"
   },
   "devDependencies": {
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-loader-smoke": "workspace:^",
-    "@roos-code/roos-code-subprocess": "workspace:^",
-    "@roos-code/roos-code-timeout": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-loader-smoke": "workspace:^",
+    "@shres-code/shres-code-subprocess": "workspace:^",
+    "@shres-code/shres-code-timeout": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   }
 }

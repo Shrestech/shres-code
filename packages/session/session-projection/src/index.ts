@@ -14,14 +14,14 @@
  * carry the complete post-change state, never a bare delta — it keeps every
  * unit's transition trivially cheap and every served value self-describing.
  *
- * @module @roos-code/roos-code-session-projection
+ * @module @shres-code/shres-code-session-projection
  */
 
-import { Context, Service } from '@roos-code/cordis'
+import { Context, Service } from '@shres-code/cordis'
 import type { ZodType } from 'zod'
-import type { Session, SessionEvent } from '@roos-code/roos-code-session'
+import type { Session, SessionEvent } from '@shres-code/shres-code-session'
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     sessionProjections: SessionProjectionRegistry
   }

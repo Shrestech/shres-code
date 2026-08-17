@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { SessionEvent } from '@roos-code/roos-code-session'
+import type { SessionEvent } from '@shres-code/shres-code-session'
 import { SessionWriteBehind } from '../src/write-behind.ts'
 
 /** Minimal ordered event fixture; batching does not interpret event vocabulary. */

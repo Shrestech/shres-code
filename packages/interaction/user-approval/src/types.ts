@@ -2,10 +2,10 @@
  * Wire-safe approval identifiers and outcome vocabulary, free of
  * cordis/service imports so browser type chains (apiproxy api → client) can
  * consume them without loading this package's Context augmentation.
- * @module @roos-code/roos-code-user-approval/types
+ * @module @shres-code/shres-code-user-approval/types
  */
 
-import type { Branded } from '@roos-code/roos-code-brand'
+import type { Branded } from '@shres-code/shres-code-brand'
 
 /**
  * Pairs one `approval/asked` audit event with its `approval/decided`.

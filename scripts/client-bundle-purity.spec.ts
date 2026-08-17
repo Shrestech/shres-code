@@ -14,17 +14,17 @@ interface CssModulePlugin {
   load?: (this: { addWatchFile: (id: string) => void }, id: string) => Promise<unknown>
 }
 
-function clientConfigs(id = '@roos-code/roos-code-client-test') {
+function clientConfigs(id = '@shres-code/shres-code-client-test') {
   return clientBundle(id, ['lib/types/index.js', 'lib/types/invariant.js'])(
-    { env: { ROOS_BUILD_FACE: 'client' } },
+    { env: { SHRES_BUILD_FACE: 'client' } },
   ).filter(config => config.platform === 'browser')
 }
 
 describe('client bundle build faces', () => {
   it('watches source in development and consumes emitted JavaScript in the Client build', () => {
-    const bundle = clientBundle('@roos-code/roos-code-client-test', ['lib/types/index.js'])
+    const bundle = clientBundle('@shres-code/shres-code-client-test', ['lib/types/index.js'])
     const development = bundle({ env: {} }).find(config => config.platform === 'browser')
-    const artifact = bundle({ env: { ROOS_BUILD_FACE: 'client' } })
+    const artifact = bundle({ env: { SHRES_BUILD_FACE: 'client' } })
       .find(config => config.platform === 'browser')
 
     expect(development?.entry).toEqual({ client: 'src/client/index.ts' })
@@ -41,7 +41,7 @@ function purityResolveId(): ResolveId {
   // package-invariants text check can see the invariant entry per package.
   const configs = clientConfigs()
   const plugins = (configs[0] as { plugins: { name: string; resolveId?: unknown }[] }).plugins
-  const gate = plugins.find(p => p.name === 'roos-client-bundle-purity')
+  const gate = plugins.find(p => p.name === 'shres-client-bundle-purity')
   if (gate?.resolveId === undefined) throw new Error('purity plugin missing from client config')
   return gate.resolveId as ResolveId
 }
@@ -49,7 +49,7 @@ function purityResolveId(): ResolveId {
 function cssModulePlugin(): CssModulePlugin {
   const configs = clientConfigs()
   const plugins = (configs[0] as { plugins: CssModulePlugin[] }).plugins
-  const plugin = plugins.find(candidate => candidate.name === 'roos-css-modules-inline')
+  const plugin = plugins.find(candidate => candidate.name === 'shres-css-modules-inline')
   if (plugin?.resolveId === undefined || plugin.load === undefined) {
     throw new Error('CSS Modules plugin missing from client config')
   }
@@ -60,46 +60,46 @@ describe('client bundle purity gate', () => {
   const resolveId = purityResolveId()
 
   it('leaves platform table entries and non-scoped specifiers alone', () => {
-    expect(resolveId('@roos-code/roos-code-client-ui-slots')).toBeNull()
-    expect(resolveId('@roos-code/roos-code-client-web-react')).toBeNull()
-    expect(resolveId('@roos-code/roos-code-client-ui-primitives')).toBeNull()
+    expect(resolveId('@shres-code/shres-code-client-ui-slots')).toBeNull()
+    expect(resolveId('@shres-code/shres-code-client-web-react')).toBeNull()
+    expect(resolveId('@shres-code/shres-code-client-ui-primitives')).toBeNull()
     expect(resolveId('react')).toBeNull()
     expect(resolveId('zod')).toBeNull()
   })
 
   it('rejects retired table entries (web-react/store left the 8-entry seed)', () => {
-    expect(() => resolveId('@roos-code/roos-code-client-web-react/store')).toThrow(/purity/)
+    expect(() => resolveId('@shres-code/shres-code-client-web-react/store')).toThrow(/purity/)
   })
 
   it('lets inline-safe wire layers inline', () => {
-    expect(resolveId('@roos-code/roos-code-host-apiproxy/api')).toBeNull()
-    expect(resolveId('@roos-code/roos-code-session/surface')).toBeNull()
-    expect(resolveId('@roos-code/roos-code-brand')).toBeNull()
+    expect(resolveId('@shres-code/shres-code-host-apiproxy/api')).toBeNull()
+    expect(resolveId('@shres-code/shres-code-session/surface')).toBeNull()
+    expect(resolveId('@shres-code/shres-code-brand')).toBeNull()
   })
 
   it('lets exact generated Remote contributions inline without admitting their package implementation', () => {
-    expect(resolveId('@roos-code/roos-code-goal/remote')).toBeNull()
-    expect(() => resolveId('@roos-code/roos-code-goal')).toThrow(/purity/)
-    expect(() => resolveId('@roos-code/roos-code-goal/client')).toThrow(/purity/)
-    expect(() => resolveId('@roos-code/roos-code-goal/remote/nested')).toThrow(/purity/)
+    expect(resolveId('@shres-code/shres-code-goal/remote')).toBeNull()
+    expect(() => resolveId('@shres-code/shres-code-goal')).toThrow(/purity/)
+    expect(() => resolveId('@shres-code/shres-code-goal/client')).toThrow(/purity/)
+    expect(() => resolveId('@shres-code/shres-code-goal/remote/nested')).toThrow(/purity/)
   })
 
-  it('throws on any other @roos-code leak', () => {
-    expect(() => resolveId('@roos-code/roos-code-agent')).toThrow(/purity/)
-    expect(() => resolveId('@roos-code/roos-code-client-web')).toThrow(/purity/)
+  it('throws on any other @shres-code leak', () => {
+    expect(() => resolveId('@shres-code/shres-code-agent')).toThrow(/purity/)
+    expect(() => resolveId('@shres-code/shres-code-client-web')).toThrow(/purity/)
   })
 
   it('throws on cross-plugin value imports — bare plugin names and /client subpaths alike (the rewrite arm is gone)', () => {
-    expect(() => resolveId('@roos-code/roos-code-client-connection')).toThrow(/purity/)
-    expect(() => resolveId('@roos-code/roos-code-client-runtime')).toThrow(/purity/)
-    expect(() => resolveId('@roos-code/roos-code-client-ui-layout/client')).toThrow(/purity/)
+    expect(() => resolveId('@shres-code/shres-code-client-connection')).toThrow(/purity/)
+    expect(() => resolveId('@shres-code/shres-code-client-runtime')).toThrow(/purity/)
+    expect(() => resolveId('@shres-code/shres-code-client-ui-layout/client')).toThrow(/purity/)
   })
 
   it('carries exactly one documented temporary exemption: runtime/client (store engine pending rehoming)', () => {
-    expect(resolveId('@roos-code/roos-code-client-runtime/client')).toBeNull()
+    expect(resolveId('@shres-code/shres-code-client-runtime/client')).toBeNull()
     const clientChannels = CLIENT_EXTERNALS.filter(
-      entry => entry.startsWith('@roos-code/') && entry.endsWith('/client'))
-    expect(clientChannels).toEqual(['@roos-code/roos-code-client-runtime/client'])
+      entry => entry.startsWith('@shres-code/') && entry.endsWith('/client'))
+    expect(clientChannels).toEqual(['@shres-code/shres-code-client-runtime/client'])
   })
 })
 
@@ -110,7 +110,7 @@ describe('client bundle debug artifacts', () => {
   })
 
   it('maps first-party sources to their repository package paths', () => {
-    const configs = clientConfigs('@roos-code/roos-code-client-ui-goal')
+    const configs = clientConfigs('@shres-code/shres-code-client-ui-goal')
     const outputOptions = configs[0]?.outputOptions
     if (typeof outputOptions !== 'object' || outputOptions === null) throw new Error('client output options missing')
     const transform = outputOptions.sourcemapPathTransform
@@ -118,12 +118,12 @@ describe('client bundle debug artifacts', () => {
 
     const source = transform('../src/client/GoalBar.tsx', clientSourceMapPath('client/ui-goal'))
     expect(source).toBe('../../../packages/client/ui-goal/src/client/GoalBar.tsx')
-    const resolved = new URL(source, 'https://roos.test/plugins/@roos-code/roos-code-client-ui-goal/client.js.map')
+    const resolved = new URL(source, 'https://shres.test/plugins/@shres-code/shres-code-client-ui-goal/client.js.map')
     expect(resolved.pathname).toBe('/packages/client/ui-goal/src/client/GoalBar.tsx')
   })
 
   it('maps dual-face host sources to the host package group', () => {
-    const configs = clientConfigs('@roos-code/roos-code-host-directory-picker-native')
+    const configs = clientConfigs('@shres-code/shres-code-host-directory-picker-native')
     const outputOptions = configs[0]?.outputOptions
     if (typeof outputOptions !== 'object' || outputOptions === null) throw new Error('client output options missing')
     const transform = outputOptions.sourcemapPathTransform
@@ -134,7 +134,7 @@ describe('client bundle debug artifacts', () => {
   })
 
   it('maps inlined workspace sources to packages and leaves dependencies outside it unchanged', () => {
-    const configs = clientConfigs('@roos-code/roos-code-client-connection')
+    const configs = clientConfigs('@shres-code/shres-code-client-connection')
     const outputOptions = configs[0]?.outputOptions
     if (typeof outputOptions !== 'object' || outputOptions === null) throw new Error('client output options missing')
     const transform = outputOptions.sourcemapPathTransform
@@ -143,7 +143,7 @@ describe('client bundle debug artifacts', () => {
     const sourceMapPath = clientSourceMapPath('client/connection')
     const workspaceSource = transform('../../../host/apiproxy/src/api/rpc.ts', sourceMapPath)
     expect(workspaceSource).toBe('../../../packages/host/apiproxy/src/api/rpc.ts')
-    const resolved = new URL(workspaceSource, 'https://roos.test/plugins/@roos-code/roos-code-client-connection/client.js.map')
+    const resolved = new URL(workspaceSource, 'https://shres.test/plugins/@shres-code/shres-code-client-connection/client.js.map')
     expect(resolved.pathname).toBe('/packages/host/apiproxy/src/api/rpc.ts')
 
     const dependencySource = '../../../../node_modules/.pnpm/zod@4.4.3/node_modules/zod/index.js'

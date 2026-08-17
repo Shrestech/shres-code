@@ -1,15 +1,15 @@
 # Opt-in persistent PTY composition for the PTY snapshot scenario. The base
 # deployment already owns the shared sandbox provider and policy.
 - id: base
-  name: '@roos-code/cordis-plugin-include'
+  name: '@shres-code/cordis-plugin-include'
   config:
     path: ./cordis.yml
     patches:
       - insert:
           - id: pty
-            name: '@roos-code/roos-code-terminal'
+            name: '@shres-code/shres-code-terminal'
           - id: terminal-bash
-            name: '@roos-code/roos-code-terminal-bash'
+            name: '@shres-code/shres-code-terminal-bash'
             config:
               pollIntervalMs: 10
               exactProbeAfterMs: 20
@@ -18,4 +18,4 @@
               timeoutMs: 2000
               disposeGraceMs: 500
           - id: tool-terminal
-            name: '@roos-code/roos-code-tool-terminal'
+            name: '@shres-code/shres-code-tool-terminal'

@@ -1,4 +1,4 @@
-import { Context, CordisError, FiberState, type Fiber } from '@roos-code/cordis'
+import { Context, CordisError, FiberState, type Fiber } from '@shres-code/cordis'
 import { describe, expect, it } from 'vitest'
 
 /**

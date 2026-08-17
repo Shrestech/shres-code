@@ -2,13 +2,13 @@
 // history fold derive AssistantTiming from the same step/start -> first token
 // delta -> assistant/message sequence.
 
-import { isTokenDelta } from '@roos-code/roos-code-llm/message'
-import type { SessionEvent } from '@roos-code/roos-code-session/types'
+import { isTokenDelta } from '@shres-code/shres-code-llm/message'
+import type { SessionEvent } from '@shres-code/shres-code-session/types'
 import type { AssistantTiming } from './conversation.ts'
 
-// The first-token predicate lives beside the StreamChunk type in roos-llm;
+// The first-token predicate lives beside the StreamChunk type in shres-llm;
 // re-exported here so Chat Definitions keep their client-runtime import.
-export { isTokenDelta } from '@roos-code/roos-code-llm/message'
+export { isTokenDelta } from '@shres-code/shres-code-llm/message'
 
 /** Pre-finalize timing boundaries for one assistant step (start + first token). */
 export interface AssistantStepMetadata {

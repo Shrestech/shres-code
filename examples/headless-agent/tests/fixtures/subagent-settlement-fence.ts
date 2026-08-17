@@ -3,9 +3,9 @@
  * @module subagent-settlement-fence
  */
 
-import type { Context } from '@roos-code/cordis'
-import type {} from '@roos-code/roos-code-agent-loop'
-import type {} from '@roos-code/roos-code-subagent'
+import type { Context } from '@shres-code/cordis'
+import type {} from '@shres-code/shres-code-agent-loop'
+import type {} from '@shres-code/shres-code-subagent'
 
 /** Fixture plugin name. */
 export const name = 'subagent-settlement-fence'

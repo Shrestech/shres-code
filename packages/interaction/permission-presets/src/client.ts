@@ -4,7 +4,7 @@
  * (repo discipline), so `./client` projects the same single-source content
  * `./types` serves to host consumers — zero duplication.
  *
- * @module @roos-code/roos-code-permission-presets/client
+ * @module @shres-code/shres-code-permission-presets/client
  */
 
 export type * from './types.ts'

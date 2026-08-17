@@ -10,8 +10,8 @@
  * (`LlmRuntime.registerAdapter`), not the single-service bash executor.
  *
  * This package owns the Service Definition role of the capability seam. Service Providers
- * (`@roos-code/roos-code-subagent-spawn-in-process`, `-fork`, `-acp`) and the model-facing
- * consumer (`@roos-code/roos-code-tool-subagent`) are separate packages.
+ * (`@shres-code/shres-code-subagent-spawn-in-process`, `-fork`, `-acp`) and the model-facing
+ * consumer (`@shres-code/shres-code-tool-subagent`) are separate packages.
  *
  * Public operations express caller intent: `start` returns one published owned
  * one-shot run, `startContinuable` establishes a durable continuable child, and
@@ -28,16 +28,16 @@
  * serialization and hostile-input validation belong at real process, worker,
  * persistence, and model boundaries.
  *
- * @module @roos-code/roos-code-subagent
+ * @module @shres-code/shres-code-subagent
  */
 
-import { Context, Service } from '@roos-code/cordis'
-import { scopeTarget } from '@roos-code/roos-code-scope'
-import type { Scoped } from '@roos-code/roos-code-scope'
-import { assertObjectJsonSchema } from '@roos-code/roos-code-tools'
-import type { ContentBlock, MessageId } from '@roos-code/roos-code-llm'
-import type { Agent } from '@roos-code/roos-code-agent'
-import type { SessionId } from '@roos-code/roos-code-session'
+import { Context, Service } from '@shres-code/cordis'
+import { scopeTarget } from '@shres-code/shres-code-scope'
+import type { Scoped } from '@shres-code/shres-code-scope'
+import { assertObjectJsonSchema } from '@shres-code/shres-code-tools'
+import type { ContentBlock, MessageId } from '@shres-code/shres-code-llm'
+import type { Agent } from '@shres-code/shres-code-agent'
+import type { SessionId } from '@shres-code/shres-code-session'
 import type {
   ContinuableCreateRequest,
   ContinuableCreateSpec,
@@ -126,7 +126,7 @@ export type { SubagentDescendantListEntry, SubagentListEntry } from './list-chil
 export type { SubagentRunEndInfo, SubagentRunInfo } from './types.ts'
 export type { SubagentIdentityProjection, SubagentTimingProjection } from './projection-types.ts'
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     subagents: SubagentRuntime
   }
@@ -151,7 +151,7 @@ declare module '@roos-code/cordis' {
      * parent-scoped listener observes only its own delegations. Paired with
      * `subagent/end`.
      * @param info - the provider and published child identity.
-     * @roosScopeScan unsupported
+     * @shresScopeScan unsupported
      * @mode emit
      */
     'subagent/start'(this: Scoped<SubagentRuntime>, info: SubagentRunInfo): void
@@ -160,7 +160,7 @@ declare module '@roos-code/cordis' {
      * parent carrier as `subagent/start`, so the lifecycle pair reaches the
      * same scoped audience.
      * @param info - the run identity and terminal outcome.
-     * @roosScopeScan unsupported
+     * @shresScopeScan unsupported
      * @mode emit
      */
     'subagent/end'(this: Scoped<SubagentRuntime>, info: SubagentRunEndInfo): void

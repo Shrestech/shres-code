@@ -1,11 +1,11 @@
-/** Package-owned durable workflow-record invariants. @module @roos-code/roos-code-tool-workflow/invariant */
+/** Package-owned durable workflow-record invariants. @module @shres-code/shres-code-tool-workflow/invariant */
 
-import type { Context } from '@roos-code/cordis'
-import type { Session, SessionEvent } from '@roos-code/roos-code-session'
-import type { InvariantFailure, InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { Session, SessionEvent } from '@shres-code/shres-code-session'
+import type { InvariantFailure, InvariantInstaller } from '@shres-code/shres-code-invariants'
 import type {} from './types.ts'
 
-const PACKAGE_NAME = '@roos-code/roos-code-tool-workflow'
+const PACKAGE_NAME = '@shres-code/shres-code-tool-workflow'
 
 /** Cordis companion plugin name. */
 export const name = 'tool-workflow-invariant'

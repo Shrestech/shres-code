@@ -1,13 +1,13 @@
 {
-  "name": "@roos-code/roos-code-sdk-jsonrpc-server",
-  "description": "Stdio JSON-RPC server plugin for out-of-process Roos Code SDK clients",
+  "name": "@shres-code/shres-code-sdk-jsonrpc-server",
+  "description": "Stdio JSON-RPC server plugin for out-of-process Shres Code SDK clients",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "packages/sdk/server"
   },
   "type": "module",
@@ -32,30 +32,30 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@roos-code/schemastery": "workspace:^"
+    "@shres-code/schemastery": "workspace:^"
   },
   "peerDependencies": {
-    "@roos-code/roos-code-agent": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-llm": "workspace:^",
-    "@roos-code/roos-code-scope": "workspace:^",
-    "@roos-code/roos-code-sdk-protocol": "workspace:^",
-    "@roos-code/roos-code-session": "workspace:^",
-    "@roos-code/roos-code-subagent": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-agent": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-scope": "workspace:^",
+    "@shres-code/shres-code-sdk-protocol": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-subagent": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   },
   "devDependencies": {
-    "@roos-code/cordis-plugin-loader": "workspace:^",
-    "@roos-code/roos-code-agent": "workspace:^",
-    "@roos-code/roos-code-agent-spine-demo": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-llm": "workspace:^",
-    "@roos-code/roos-code-llm-deepseek": "workspace:^",
-    "@roos-code/roos-code-scope": "workspace:^",
-    "@roos-code/roos-code-sdk-protocol": "workspace:^",
-    "@roos-code/roos-code-session": "workspace:^",
-    "@roos-code/roos-code-session-persistence-jsonl": "workspace:^",
-    "@roos-code/roos-code-subagent": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/cordis-plugin-loader": "workspace:^",
+    "@shres-code/shres-code-agent": "workspace:^",
+    "@shres-code/shres-code-agent-spine-demo": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-llm-deepseek": "workspace:^",
+    "@shres-code/shres-code-scope": "workspace:^",
+    "@shres-code/shres-code-sdk-protocol": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-session-persistence-jsonl": "workspace:^",
+    "@shres-code/shres-code-subagent": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   }
 }

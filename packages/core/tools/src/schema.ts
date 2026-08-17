@@ -1,8 +1,8 @@
-/** Unified JSON-value schema DSL, inference, compilation, and typed tool helper. @module roos-tools/schema */
+/** Unified JSON-value schema DSL, inference, compilation, and typed tool helper. @module shres-tools/schema */
 
-import { HarnessError } from '@roos-code/roos-code-llm'
-import type { ContentBlock } from '@roos-code/roos-code-llm'
-import type { JsonValue } from '@roos-code/roos-code-session'
+import { HarnessError } from '@shres-code/shres-code-llm'
+import type { ContentBlock } from '@shres-code/shres-code-llm'
+import type { JsonValue } from '@shres-code/shres-code-session'
 import type { ToolDefinition, ToolExecution, ToolExecutionResult, ToolRunContext, ToolResult } from './index.ts'
 import { assertSupportedJsonSchema, isJsonSchemaRecord, isPlainJsonArray, JsonSchemaError, validateJsonSchemaValue } from './json-schema.ts'
 import type { JsonSchemaNode, JsonSchemaScalar, ObjectJsonSchema } from './json-schema.ts'

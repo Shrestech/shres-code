@@ -7,8 +7,8 @@ Each `cordis.yml` entry can carry a `config` block, and the plugin declares a sc
 Create `config-demo.ts` in `tmp/cordis-tutorial`:
 
 ```ts
-import type { Context } from '@roos-code/cordis'
-import Schema from '@roos-code/schemastery'
+import type { Context } from '@shres-code/cordis'
+import Schema from '@shres-code/schemastery'
 
 export const name = 'config-demo'
 
@@ -79,4 +79,4 @@ The loader used in this repo supports a `!!js` tag for config values that must b
 
 Next: [Composition and HMR](06-composition-and-hmr.md) — treating `cordis.yml` as the application.
 
-[![](https://img.shields.io/badge/powered_by-roos-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/roos-code/roos-code)
+[![](https://img.shields.io/badge/powered_by-shres-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/parthmstech/shres-code)

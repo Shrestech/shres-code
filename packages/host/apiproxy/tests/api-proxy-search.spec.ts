@@ -5,21 +5,21 @@
  */
 
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { stat } from 'node:fs/promises'
-import AgentRegistry from '@roos-code/roos-code-agent'
-import { createUserMessage } from '@roos-code/roos-code-llm'
-import SessionStore from '@roos-code/roos-code-session'
-import type { SessionHeader, SessionId } from '@roos-code/roos-code-session'
-import UserQuestionService from '@roos-code/roos-code-user-questions'
+import AgentRegistry from '@shres-code/shres-code-agent'
+import { createUserMessage } from '@shres-code/shres-code-llm'
+import SessionStore from '@shres-code/shres-code-session'
+import type { SessionHeader, SessionId } from '@shres-code/shres-code-session'
+import UserQuestionService from '@shres-code/shres-code-user-questions'
 import {
   SessionQueryError,
   type SessionSearchHit,
   type SessionSearchRequest,
-} from '@roos-code/roos-code-session-query'
-import type { RpcRequest } from '@roos-code/roos-code-host-apiproxy/api'
-import { RpcId } from '@roos-code/roos-code-host-apiproxy/api'
-import { createApiProxy } from '@roos-code/roos-code-host-apiproxy'
+} from '@shres-code/shres-code-session-query'
+import type { RpcRequest } from '@shres-code/shres-code-host-apiproxy/api'
+import { RpcId } from '@shres-code/shres-code-host-apiproxy/api'
+import { createApiProxy } from '@shres-code/shres-code-host-apiproxy'
 
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>()

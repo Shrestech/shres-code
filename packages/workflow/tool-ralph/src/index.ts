@@ -2,19 +2,19 @@
  * Model-facing foreground Ralph loop over the workflow and subagent seams. A
  * fixed script starts one fresh structured-output child per round, carrying
  * only the immutable objective and the previous bounded handoff between them.
- * @module @roos-code/roos-code-tool-ralph
+ * @module @shres-code/shres-code-tool-ralph
  */
 
-import type { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import type { ContentBlock } from '@roos-code/roos-code-llm'
-import type { JsonValue } from '@roos-code/roos-code-session'
-import type { SubagentProvider } from '@roos-code/roos-code-subagent'
-import { defineTool } from '@roos-code/roos-code-tools'
-import type { ToolCallView, ToolResultView } from '@roos-code/roos-code-tools'
-import type { WorkflowResult, WorkflowRun } from '@roos-code/roos-code-workflow'
+import type { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import type { ContentBlock } from '@shres-code/shres-code-llm'
+import type { JsonValue } from '@shres-code/shres-code-session'
+import type { SubagentProvider } from '@shres-code/shres-code-subagent'
+import { defineTool } from '@shres-code/shres-code-tools'
+import type { ToolCallView, ToolResultView } from '@shres-code/shres-code-tools'
+import type { WorkflowResult, WorkflowRun } from '@shres-code/shres-code-workflow'
 // Declaration merge only: makes ctx.systemPrompt visible for section registration.
-import type {} from '@roos-code/roos-code-system-prompt'
+import type {} from '@shres-code/shres-code-system-prompt'
 
 export const name = 'tool-ralph'
 export const inject = ['tools', 'workflowEngine', 'subagents', 'systemPrompt']

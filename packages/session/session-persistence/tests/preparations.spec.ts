@@ -1,7 +1,7 @@
 /** Unit coverage for unpublished Session preparation ownership and sharing. */
 
 import { describe, expect, it, vi } from 'vitest'
-import { Session, SessionId } from '@roos-code/roos-code-session'
+import { Session, SessionId } from '@shres-code/shres-code-session'
 import { observeQueuedAbort, SessionPreparations } from '../src/preparations.ts'
 
 interface PreparedSource {

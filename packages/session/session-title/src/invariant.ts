@@ -1,14 +1,14 @@
 /**
- * Package-owned invariant companion for `@roos-code/roos-code-session-title`.
- * @module @roos-code/roos-code-session-title/invariant
+ * Package-owned invariant companion for `@shres-code/shres-code-session-title`.
+ * @module @shres-code/shres-code-session-title/invariant
  */
 
 /* jscpd:ignore-start */
-import type { Context } from '@roos-code/cordis'
-import type { InvariantFailure, InvariantInstaller } from '@roos-code/roos-code-invariants'
-import type { SessionEvent } from '@roos-code/roos-code-session'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantFailure, InvariantInstaller } from '@shres-code/shres-code-invariants'
+import type { SessionEvent } from '@shres-code/shres-code-session'
 
-const PACKAGE_NAME = '@roos-code/roos-code-session-title'
+const PACKAGE_NAME = '@shres-code/shres-code-session-title'
 
 /** Cordis companion plugin name. */
 export const name = 'session-title-invariant'

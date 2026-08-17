@@ -2,15 +2,15 @@
  * Provider-routed model-request retry policy on the agent loop's request
  * recovery extension point. Each scheduled retry is durable before its cancellable wait.
  *
- * @module @roos-code/roos-code-llm-retry
+ * @module @shres-code/shres-code-llm-retry
  */
 
 import { randomUUID } from 'node:crypto'
-import type { Context, Events } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import type { Agent, RequestErrorAction } from '@roos-code/roos-code-agent'
-import type { LlmFailure, ResolvedRetryPolicy } from '@roos-code/roos-code-llm'
-import type { SessionEvent } from '@roos-code/roos-code-session'
+import type { Context, Events } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import type { Agent, RequestErrorAction } from '@shres-code/shres-code-agent'
+import type { LlmFailure, ResolvedRetryPolicy } from '@shres-code/shres-code-llm'
+import type { SessionEvent } from '@shres-code/shres-code-session'
 import { RetryId } from './brand.ts'
 import type { LlmRetryEventData } from './types.ts'
 

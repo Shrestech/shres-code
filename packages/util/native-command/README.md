@@ -1,15 +1,15 @@
-# roos-native-command
+# shres-native-command
 
 A **zero-dependency no-shell `execFile` runner** shared by host-native OS integrations: one `runNativeCommand(command, args, signal)` call spawns the executable directly (never a shell string), captures utf8 stdout/stderr, propagates the caller's abort into child termination, and hides the transient console window on Windows. Failures reject with the exit `code` and both captured streams attached, so callers classify (missing tool, cancelled, real failure) without re-running anything.
 
-Its two consumers are the host-side native integrations: the [`directory-picker-native`](../../host/directory-picker-native/README.md) backend's OS chooser commands and the gateway's open-with-default-application hand-off ([`roos-host-apiproxy`](../../host/apiproxy/README.md) `host.openPath`). The `NativeCommandRunner` type is their injectable command boundary.
+Its two consumers are the host-side native integrations: the [`directory-picker-native`](../../host/directory-picker-native/README.md) backend's OS chooser commands and the gateway's open-with-default-application hand-off ([`shres-host-apiproxy`](../../host/apiproxy/README.md) `host.openPath`). The `NativeCommandRunner` type is their injectable command boundary.
 
 It is a **library, not a service or plugin**: no `ctx`, registers nothing, holds no state, emits no events.
 
 ## Surface
 
 ```ts
-import { runNativeCommand, type NativeCommandRunner } from '@roos-code/roos-code-native-command'
+import { runNativeCommand, type NativeCommandRunner } from '@shres-code/shres-code-native-command'
 ```
 
 ## Model Experience
@@ -22,4 +22,4 @@ None; this package neither assembles nor sends a provider request.
 
 ## Known Limitations and Deferred Work
 
-- **No output bounding** — both streams buffer unbounded in memory; every current caller invokes small native tools whose output is a path or an error line. Adopt `roos-output-retention` bounding before pointing this at commands with meaningful output volume.
+- **No output bounding** — both streams buffer unbounded in memory; every current caller invokes small native tools whose output is a path or an error line. Adopt `shres-output-retention` bounding before pointing this at commands with meaningful output volume.

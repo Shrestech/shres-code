@@ -1,9 +1,9 @@
-import { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
+import { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
 import { describe, expect, it, vi } from 'vitest'
-import type { RpcResponse, SettingsNamespaceView } from '@roos-code/roos-code-api-remotes/client'
-import { TestRemote } from '@roos-code/roos-code-client-test-runtime'
-import type { SettingsScope } from '@roos-code/roos-code-client-runtime/client'
+import type { RpcResponse, SettingsNamespaceView } from '@shres-code/shres-code-api-remotes/client'
+import { TestRemote } from '@shres-code/shres-code-client-test-runtime'
+import type { SettingsScope } from '@shres-code/shres-code-client-runtime/client'
 import { SettingsScopeController, SettingsScopeBinder } from '../src/client/settings-scope.ts'
 
 interface UiTestSettings {

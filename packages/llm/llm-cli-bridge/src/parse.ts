@@ -1,9 +1,9 @@
 /**
  * Extract final assistant text and optional usage from CLI stdout.
- * @module @roos-code/roos-code-llm-cli-bridge/parse
+ * @module @shres-code/shres-code-llm-cli-bridge/parse
  */
 
-import type { TokenUsage } from '@roos-code/roos-code-llm'
+import type { TokenUsage } from '@shres-code/shres-code-llm'
 import { answerFromObject } from './answer.ts'
 import type { CliBridgeRoute } from './config.ts'
 

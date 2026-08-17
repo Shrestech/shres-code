@@ -4,9 +4,9 @@
  * participates in method lookup, invocation, or type exposure.
  */
 
-import { Service } from '@roos-code/cordis'
-import type { Context, Events } from '@roos-code/cordis'
-import type { ConnectionHandle } from '@roos-code/roos-code-client-connection/client'
+import { Service } from '@shres-code/cordis'
+import type { Context, Events } from '@shres-code/cordis'
+import type { ConnectionHandle } from '@shres-code/shres-code-client-connection/client'
 import type {
   InvocationDescriptor,
   TypertClientRemote,
@@ -15,7 +15,7 @@ import type {
   TypertDisposer,
   TypertRemoteContribution,
   TypertRemoteEvent,
-} from '@roos-code/roos-code-typert-protocol'
+} from '@shres-code/shres-code-typert-protocol'
 
 interface MountToken {
   active: boolean
@@ -55,7 +55,7 @@ interface RemoteNamespaceHandle {
 /** Typed Remote service augmented by generated direct namespaces. */
 export type ClientRemote = TypertClientRemote
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     /** Generated Remote namespaces selected by the Client assembly. */
     remote: ClientRemote

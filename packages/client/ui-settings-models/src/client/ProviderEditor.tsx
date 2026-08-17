@@ -23,10 +23,10 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { CredentialView, IApiClient, SettingsNamespaceView, SettingsPathOpView } from '@roos-code/roos-code-api-remotes/client'
+import type { CredentialView, IApiClient, SettingsNamespaceView, SettingsPathOpView } from '@shres-code/shres-code-api-remotes/client'
 import {
   deletePath, getPath, hasPath, nodeAtPath, rehydrateSchema, setPath, validateDraft,
-} from '@roos-code/roos-code-client-schema-form'
+} from '@shres-code/shres-code-client-schema-form'
 import {
   DeepSeekModelsEditor, modelDrafts, validateDeepSeekModels,
 } from './DeepSeekModelsEditor.tsx'

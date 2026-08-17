@@ -16,8 +16,8 @@
 
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import type { DiscoveredModelView, IApiClient } from '@roos-code/roos-code-api-remotes/client'
-import { Button, Modal } from '@roos-code/roos-code-client-ui-primitives'
+import type { DiscoveredModelView, IApiClient } from '@shres-code/shres-code-api-remotes/client'
+import { Button, Modal } from '@shres-code/shres-code-client-ui-primitives'
 import { formatCapacity, parseCapacity } from './DeepSeekModelsEditor.tsx'
 import type { DeepSeekModelDraft } from './DeepSeekModelsEditor.tsx'
 import { messageOf } from './store.ts'

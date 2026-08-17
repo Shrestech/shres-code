@@ -5,10 +5,10 @@
  * operation, so a changed credential reaches the next operation without any
  * plugin restart, and configuration surfaces describe a reference without
  * ever seeing its value.
- * @module @roos-code/roos-code-credentials
+ * @module @shres-code/shres-code-credentials
  */
 
-import { Context, Service } from '@roos-code/cordis'
+import { Context, Service } from '@shres-code/cordis'
 import type { CredentialRef } from './types.ts'
 
 export type { CredentialRef } from './types.ts'
@@ -45,7 +45,7 @@ export interface CredentialInfo {
   writable: boolean
 }
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     credentials: CredentialProvider
   }

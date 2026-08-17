@@ -1,13 +1,13 @@
 {
-  "name": "@roos-code/roos-code-shell-env",
-  "description": "Tool-independent managed ROOS_* shell environment registry",
+  "name": "@shres-code/shres-code-shell-env",
+  "description": "Tool-independent managed SHRES_* shell environment registry",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "packages/shell/shell-env"
   },
   "type": "module",
@@ -32,24 +32,24 @@
   ],
   "license": "MIT",
   "peerDependencies": {
-    "@roos-code/roos-code-shell": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-home-paths": "workspace:^",
-    "@roos-code/roos-code-session-persistence": "workspace:^",
-    "@roos-code/roos-code-tools": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-shell": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-home-paths": "workspace:^",
+    "@shres-code/shres-code-session-persistence": "workspace:^",
+    "@shres-code/shres-code-tools": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   },
   "dependencies": {
-    "@roos-code/schemastery": "workspace:^"
+    "@shres-code/schemastery": "workspace:^"
   },
   "devDependencies": {
-    "@roos-code/roos-code-agent": "workspace:^",
-    "@roos-code/roos-code-shell": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-llm": "workspace:^",
-    "@roos-code/roos-code-home-paths": "workspace:^",
-    "@roos-code/roos-code-session-persistence": "workspace:^",
-    "@roos-code/roos-code-tools": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-agent": "workspace:^",
+    "@shres-code/shres-code-shell": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-home-paths": "workspace:^",
+    "@shres-code/shres-code-session-persistence": "workspace:^",
+    "@shres-code/shres-code-tools": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   }
 }

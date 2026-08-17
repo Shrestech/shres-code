@@ -8,17 +8,17 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import AgentRegistry, { Inbox } from '@roos-code/roos-code-agent'
-import type { Agent } from '@roos-code/roos-code-agent'
-import SessionStore, { SessionId } from '@roos-code/roos-code-session'
-import type { Session } from '@roos-code/roos-code-session'
-import UserQuestionService from '@roos-code/roos-code-user-questions'
-import LocalJobRegistry from '@roos-code/roos-code-jobs-local'
-import type { JobOutcome } from '@roos-code/roos-code-jobs'
-import type { MuxFrame, RpcRequest } from '@roos-code/roos-code-host-apiproxy/api'
-import { RpcId } from '@roos-code/roos-code-host-apiproxy/api/rpc'
-import { createApiProxy } from '@roos-code/roos-code-host-apiproxy'
+import { Context } from '@shres-code/cordis'
+import AgentRegistry, { Inbox } from '@shres-code/shres-code-agent'
+import type { Agent } from '@shres-code/shres-code-agent'
+import SessionStore, { SessionId } from '@shres-code/shres-code-session'
+import type { Session } from '@shres-code/shres-code-session'
+import UserQuestionService from '@shres-code/shres-code-user-questions'
+import LocalJobRegistry from '@shres-code/shres-code-jobs-local'
+import type { JobOutcome } from '@shres-code/shres-code-jobs'
+import type { MuxFrame, RpcRequest } from '@shres-code/shres-code-host-apiproxy/api'
+import { RpcId } from '@shres-code/shres-code-host-apiproxy/api/rpc'
+import { createApiProxy } from '@shres-code/shres-code-host-apiproxy'
 
 type JobFrame = Extract<MuxFrame, { type: 'session/jobs' }>
 

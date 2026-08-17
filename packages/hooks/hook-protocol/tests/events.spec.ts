@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { Session, SessionId } from '@roos-code/roos-code-session'
-import { appendHookInvoked, appendHookResult, summarizeStderr, type HookOutput } from '@roos-code/roos-code-hook-protocol'
+import { Session, SessionId } from '@shres-code/shres-code-session'
+import { appendHookInvoked, appendHookResult, summarizeStderr, type HookOutput } from '@shres-code/shres-code-hook-protocol'
 
 /** A {@link HookOutput} with the required stream fields defaulted. */
 function output(over: Partial<HookOutput> = {}): HookOutput {

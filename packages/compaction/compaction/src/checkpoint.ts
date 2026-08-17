@@ -3,17 +3,17 @@
  * every backend uses for its replacement user message, plus the predicate that
  * recognizes persisted checkpoints.
  *
- * The seam itself lives in `@roos-code/roos-code-compaction`, which re-exports these
+ * The seam itself lives in `@shres-code/shres-code-compaction`, which re-exports these
  * contracts; this module is a pure type/value/predicate outlet (no cordis
  * imports, no module augmentation) so client and wire programs can name the
  * checkpoint source without loading the host plugin's Context merges — the
- * `roos-commands/brand` shape.
+ * `shres-commands/brand` shape.
  *
- * @module @roos-code/roos-code-compaction/checkpoint
+ * @module @shres-code/shres-code-compaction/checkpoint
  */
 
-import type { MessageSource } from '@roos-code/roos-code-llm/message'
-import type { CommandId } from '@roos-code/roos-code-commands/brand'
+import type { MessageSource } from '@shres-code/shres-code-llm/message'
+import type { CommandId } from '@shres-code/shres-code-commands/brand'
 import type { CompactionId } from './brand.ts'
 
 const COMPACT_CHECKPOINT_MARKER = Object.freeze({ kind: 'plugin', plugin: 'compact' } as const)

@@ -1,19 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import Loader from '@roos-code/cordis-plugin-loader'
-import { CallId } from '@roos-code/roos-code-llm'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import ToolRuntime from '@roos-code/roos-code-tools'
-import { Session, SessionId } from '@roos-code/roos-code-session'
-import type { TodoItem } from '@roos-code/roos-code-session'
-import { type Agent } from '@roos-code/roos-code-agent'
+import { Context } from '@shres-code/cordis'
+import Loader from '@shres-code/cordis-plugin-loader'
+import { CallId } from '@shres-code/shres-code-llm'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import ToolRuntime from '@shres-code/shres-code-tools'
+import { Session, SessionId } from '@shres-code/shres-code-session'
+import type { TodoItem } from '@shres-code/shres-code-session'
+import { type Agent } from '@shres-code/shres-code-agent'
 
 import * as tool from '../src/index.ts'
 
 const testToolSignal = new AbortController().signal
 
 /**
- * Drives the REAL plugin body: mounts `roos-tool-todo` on a real `ToolRuntime`
+ * Drives the REAL plugin body: mounts `shres-tool-todo` on a real `ToolRuntime`
  * and invokes the registered `todo_write` tool through `ctx.tools.execute`,
  * with a fake parent Agent carrying a real `Session` — so the append the tool
  * makes is observable on a genuine session log (only the agent wrapper is a
@@ -50,7 +50,7 @@ function text(result: { content: { type: string; text?: string }[] }): string {
   return result.content.filter(b => b.type === 'text').map(b => b.text).join('')
 }
 
-describe('roos-tool-todo', () => {
+describe('shres-tool-todo', () => {
   it('registers a `todo_write` tool whose schema is an array of {content,status}', async () => {
     const ctx = await setup(true)
     const schema = ctx.tools.schemas().find(s => s.name === 'todo_write')

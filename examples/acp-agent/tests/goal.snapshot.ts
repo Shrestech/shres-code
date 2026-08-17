@@ -9,9 +9,9 @@ import {
   type AgentUnderTest,
   type InputScript,
   type NormalizeContext,
-} from '@roos-code/roos-code-acp-snapshot'
-import { foldGoal } from '@roos-code/roos-code-goal'
-import type { SessionEvent } from '@roos-code/roos-code-session'
+} from '@shres-code/shres-code-acp-snapshot'
+import { foldGoal } from '@shres-code/shres-code-goal'
+import type { SessionEvent } from '@shres-code/shres-code-session'
 import { describe, expect, it } from 'vitest'
 
 // This lifecycle proof has goal-specific timestamp normalization and semantic
@@ -22,7 +22,7 @@ const overrideFile = join(scenarioDir, 'replay.override.json')
 const stdoutExpected = join(scenarioDir, 'stdout.expected.jsonl')
 const sessionExpected = join(scenarioDir, 'session.expected.jsonl')
 const wrapupDir = join(dirname(fileURLToPath(import.meta.url)), 'goal-snapshots/goal-wrapup')
-const refreshing = process.env.ROOS_SNAPSHOT === 'refresh'
+const refreshing = process.env.SHRES_SNAPSHOT === 'refresh'
 
 const agent: AgentUnderTest = {
   binScript: fileURLToPath(new URL('../../../packages/examples/acp-demo/src/bin.ts', import.meta.url)),

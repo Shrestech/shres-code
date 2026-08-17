@@ -3,16 +3,16 @@
  * with logged model context without vetoing or rewriting calls. Configuration
  * and chain semantics live in the package README; rationale lives in the
  * repeat-tool-reminder Agent Note.
- * @module @roos-code/roos-code-repeat-tool-reminder
+ * @module @shres-code/shres-code-repeat-tool-reminder
  */
 
-import type { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import type { Agent, PreStepDecision } from '@roos-code/roos-code-agent'
-import { createUserMessage } from '@roos-code/roos-code-llm'
-import type { MessageSource } from '@roos-code/roos-code-llm'
-import type { UserMessage } from '@roos-code/roos-code-session'
-import type { PostToolDecision, ToolExecution } from '@roos-code/roos-code-tools'
+import type { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import type { Agent, PreStepDecision } from '@shres-code/shres-code-agent'
+import { createUserMessage } from '@shres-code/shres-code-llm'
+import type { MessageSource } from '@shres-code/shres-code-llm'
+import type { UserMessage } from '@shres-code/shres-code-session'
+import type { PostToolDecision, ToolExecution } from '@shres-code/shres-code-tools'
 
 export const name = 'repeat-tool-reminder'
 

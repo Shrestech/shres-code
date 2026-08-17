@@ -5,13 +5,13 @@ import { expect, it } from 'vitest'
 import type { TsdownBundle } from 'tsdown'
 import { discoverPluginDirs, watchClientPlugins } from './dev-web.ts'
 
-it('discovers roos.client packages with sibling roles', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'roos-dev-web-discovery-'))
+it('discovers shres.client packages with sibling roles', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'shres-dev-web-discovery-'))
   try {
     const current = join(root, 'packages', 'client', 'current')
     await mkdir(current, { recursive: true })
     await writeFile(join(current, 'package.json'), JSON.stringify({
-      roos: {
+      shres: {
         bundle: { patch: './cordis.patch.yml' },
         client: { platform: 'web' },
         profile: { bundles: [] },
@@ -25,11 +25,11 @@ it('discovers roos.client packages with sibling roles', async () => {
 })
 
 it('rebuilds a client-plugin bundle after its source changes', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'roos-dev-web-watch-'))
+  const root = await mkdtemp(join(tmpdir(), 'shres-dev-web-watch-'))
   let bundles: TsdownBundle[] = []
   try {
     await symlink(join(import.meta.dirname, '..', 'node_modules'), join(root, 'node_modules'), 'dir')
-    await writeFile(join(root, 'package.json'), JSON.stringify({ name: '@roos-test/dev-web-watch', private: true, type: 'module' }))
+    await writeFile(join(root, 'package.json'), JSON.stringify({ name: '@shres-test/dev-web-watch', private: true, type: 'module' }))
     await writeFile(join(root, 'tsdown.config.ts'), `
 import { defineConfig } from 'tsdown'
 export default defineConfig({

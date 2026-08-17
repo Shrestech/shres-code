@@ -6,14 +6,14 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import Loader from '@roos-code/cordis-plugin-loader'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import ToolRuntime from '@roos-code/roos-code-tools'
-import WebRuntime from '@roos-code/roos-code-web'
-import * as toolWeb from '@roos-code/roos-code-tool-web'
+import { Context } from '@shres-code/cordis'
+import Loader from '@shres-code/cordis-plugin-loader'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import ToolRuntime from '@shres-code/shres-code-tools'
+import WebRuntime from '@shres-code/shres-code-web'
+import * as toolWeb from '@shres-code/shres-code-tool-web'
 
-describe('roos-tool-web real-load-path guard', () => {
+describe('shres-tool-web real-load-path guard', () => {
   it('has no default export and keeps name/inject/Config through unwrapExports', () => {
     expect('default' in toolWeb).toBe(false)
 

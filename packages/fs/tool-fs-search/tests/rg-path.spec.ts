@@ -7,10 +7,10 @@
  */
 
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { CallId } from '@roos-code/roos-code-llm'
-import type { ToolExecution } from '@roos-code/roos-code-tools'
-import { resolveRgPath, runRipgrep } from '@roos-code/roos-code-tool-fs-search'
+import { Context } from '@shres-code/cordis'
+import { CallId } from '@shres-code/shres-code-llm'
+import type { ToolExecution } from '@shres-code/shres-code-tools'
+import { resolveRgPath, runRipgrep } from '@shres-code/shres-code-tool-fs-search'
 
 // Any access to the mocked module's surface throws — the shape a missing
 // platform package produces at module evaluation.

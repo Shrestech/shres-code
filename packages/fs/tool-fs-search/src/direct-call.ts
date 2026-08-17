@@ -1,7 +1,7 @@
-/** Shared top-level-call post-policy selection for search result spill. @module roos-tool-fs-search/direct-call */
+/** Shared top-level-call post-policy selection for search result spill. @module shres-tool-fs-search/direct-call */
 
-import type { Context } from '@roos-code/cordis'
-import type { JsonValue, PostToolDecision, ToolDefinition, ToolExecution, ToolExecutionResult } from '@roos-code/roos-code-tools'
+import type { Context } from '@shres-code/cordis'
+import type { JsonValue, PostToolDecision, ToolDefinition, ToolExecution, ToolExecutionResult } from '@shres-code/shres-code-tools'
 
 /**
  * Return the accepted canonical value only when this tool still owns a direct

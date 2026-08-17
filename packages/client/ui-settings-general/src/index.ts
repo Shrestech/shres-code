@@ -1,8 +1,8 @@
 /** Host loader entry for the browser implementation exported from `./client`. */
 
-import type { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import { settingsNamespace } from '@roos-code/roos-code-settings'
+import type { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import { settingsNamespace } from '@shres-code/shres-code-settings'
 
 /** Durable settings namespace for product-wide GUI onboarding facts. */
 const ONBOARDING_SETTINGS_NAMESPACE = 'ui-onboarding'

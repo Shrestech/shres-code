@@ -9,9 +9,9 @@ This file is GENERATED from source (`scripts/gen-config-catalog.ts`) and verifie
 
 A `Requires:` line lists the service keys the plugin `inject`s: its `cordis.yml` tree must also load providers for those services. Scope is the harness tier (`packages/`); the vendored cordis plugins a config tree may also load (`hmr`, the console logger, …) are pinned upstream source ([vendoring policy](../vendor/README.md)) and not catalogued here.
 
-<a id="roos-coderoos-code-acp"></a>
+<a id="shres-codeshres-code-acp"></a>
 
-## `@roos-code/roos-code-acp`
+## `@shres-code/shres-code-acp`
 
 Requires: `agents`
 
@@ -31,9 +31,9 @@ Depends on: `Stream` (`@agentclientprotocol/sdk`)
 
 Source: [`packages/acp/acp/src/index.ts:70`](../packages/acp/acp/src/index.ts)
 
-<a id="roos-coderoos-code-acp-demo"></a>
+<a id="shres-codeshres-code-acp-demo"></a>
 
-## `@roos-code/roos-code-acp-demo`
+## `@shres-code/shres-code-acp-demo`
 
 ```ts config-catalog
 /**
@@ -53,12 +53,12 @@ export interface Config {
   maxParallelToolCalls?: number
   /** Deployment persona (the system-prompt plugin's `persona` config). */
   persona?: string
-  /** Explicit model-facing tool order (the system-prompt plugin's `toolOrder` config; see roos-system-prompt). */
+  /** Explicit model-facing tool order (the system-prompt plugin's `toolOrder` config; see shres-system-prompt). */
   toolOrder?: string[]
-  /** Tool-registry config — its presentation `mode` (forwarded through agent-spine-demo; see roos-tools). */
+  /** Tool-registry config — its presentation `mode` (forwarded through agent-spine-demo; see shres-tools). */
   tools?: ToolsConfig
-  /** Roos Code home directory exposed to bash and used for local skill discovery. */
-  roosHome?: string
+  /** Shres Code home directory exposed to bash and used for local skill discovery. */
+  shresHome?: string
   /** Fallback session-title limits forwarded through agent-spine-demo. */
   sessionTitle?: NonNullable<agentCore.Config['sessionTitle']>
   /** Directory for JSONL sessions and the derived query index. Defaults to `./.sessions`. */
@@ -82,13 +82,13 @@ export interface Config {
 }
 ```
 
-Depends on: [`agentCore`](../packages/examples/agent-spine-demo/src/index.ts) · [`JsonlCompression`](../packages/session/session-persistence-jsonl/src/index.ts) · [`ToolsConfig`](#roos-coderoos-code-tools)
+Depends on: [`agentCore`](../packages/examples/agent-spine-demo/src/index.ts) · [`JsonlCompression`](../packages/session/session-persistence-jsonl/src/index.ts) · [`ToolsConfig`](#shres-codeshres-code-tools)
 
 Source: [`packages/examples/acp-demo/src/index.ts:39`](../packages/examples/acp-demo/src/index.ts)
 
-<a id="roos-coderoos-code-agent-default-model"></a>
+<a id="shres-codeshres-code-agent-default-model"></a>
 
-## `@roos-code/roos-code-agent-default-model`
+## `@shres-code/shres-code-agent-default-model`
 
 ```ts config-catalog
 /** Composition entry for the default model selection. */
@@ -102,15 +102,15 @@ export interface Config {
 
 Source: [`packages/core/agent-default-model/src/index.ts:75`](../packages/core/agent-default-model/src/index.ts)
 
-<a id="roos-coderoos-code-agent-instructions"></a>
+<a id="shres-codeshres-code-agent-instructions"></a>
 
-## `@roos-code/roos-code-agent-instructions`
+## `@shres-code/shres-code-agent-instructions`
 
 ```ts config-catalog
 /** User-facing workspace instruction loader configuration. */
 export interface Config {
-  /** Harness home containing the fixed user-global `AGENTS.md`; defaults to `$ROOS_HOME` or `~/.roos`. */
-  roosHome?: string
+  /** Harness home containing the fixed user-global `AGENTS.md`; defaults to `$SHRES_HOME` or `~/.shres`. */
+  shresHome?: string
   /** Directory entries that identify the project root while walking upward from the session cwd. */
   projectRootMarkers?: string[]
   /** UTF-8 byte cap for one rendered baseline or dynamic batch; non-positive or non-finite disables loading. */
@@ -132,9 +132,9 @@ export interface Config {
 
 Source: [`packages/context/agent-instructions/src/config.ts:18`](../packages/context/agent-instructions/src/config.ts)
 
-<a id="roos-coderoos-code-agent-loop"></a>
+<a id="shres-codeshres-code-agent-loop"></a>
 
-## `@roos-code/roos-code-agent-loop`
+## `@shres-code/shres-code-agent-loop`
 
 Requires: `agents` · `sessions` · `llm` · `tools` · `systemPrompt`
 
@@ -164,9 +164,9 @@ Depends on: [`AgentOptions`](subsystems/core.md) · [`SessionId`](subsystems/cor
 
 Source: [`packages/core/agent-loop/src/index.ts:255`](../packages/core/agent-loop/src/index.ts)
 
-<a id="roos-coderoos-code-agent-presets"></a>
+<a id="shres-codeshres-code-agent-presets"></a>
 
-## `@roos-code/roos-code-agent-presets`
+## `@shres-code/shres-code-agent-presets`
 
 Requires: `loader`
 
@@ -202,9 +202,9 @@ export type PresetTrust = 'system' | 'user'
 
 Source: [`packages/preset/agent-presets/src/preset.ts:52`](../packages/preset/agent-presets/src/preset.ts)
 
-<a id="roos-coderoos-code-agent-spine-demo"></a>
+<a id="shres-codeshres-code-agent-spine-demo"></a>
 
-## `@roos-code/roos-code-agent-spine-demo`
+## `@shres-code/shres-code-agent-spine-demo`
 
 ```ts config-catalog
 /**
@@ -214,7 +214,7 @@ Source: [`packages/preset/agent-presets/src/preset.ts:52`](../packages/preset/ag
  * `persona`, and `toolOrder` to the system-prompt plugin (the fixed opener,
  * dynamic-context policy, deployment persona, and explicit model-facing tool
  * order), the `tools` object to the tool registry (its presentation `mode`),
- * `roosHome` to bash environment and local skill discovery, `sessionTitle` to
+ * `shresHome` to bash environment and local skill discovery, `sessionTitle` to
  * the fallback title service, `skills` to the
  * skill registry/local provider/tool consumer, `workspaceContext` to the
  * agent-instructions loader, `jobs` to the process-local job provider, and
@@ -231,7 +231,7 @@ Source: [`packages/preset/agent-presets/src/preset.ts:52`](../packages/preset/ag
  * `bash` name.
  */
 export interface Config {
-  /** The agent-loop `agents` list (see roos-agent-loop's `Config`). */
+  /** The agent-loop `agents` list (see shres-agent-loop's `Config`). */
   agents?: AgentLoopConfig['agents']
   /** Agent-loop concurrency cap; `1` is serial. */
   maxParallelToolCalls?: AgentLoopConfig['maxParallelToolCalls']
@@ -239,14 +239,14 @@ export interface Config {
   includeHarnessIdentity?: SystemPromptConfig['includeHarnessIdentity']
   /** Whether model history includes dynamic runtime-context snapshots (default true). */
   includeRuntimeContext?: SystemPromptConfig['includeRuntimeContext']
-  /** The deployment persona (see roos-system-prompt's `Config`). */
+  /** The deployment persona (see shres-system-prompt's `Config`). */
   persona?: SystemPromptConfig['persona']
-  /** The explicit model-facing tool order (see roos-system-prompt's `Config`). */
+  /** The explicit model-facing tool order (see shres-system-prompt's `Config`). */
   toolOrder?: SystemPromptConfig['toolOrder']
-  /** The tool registry's config — its presentation `mode` (see roos-tools' `Config`). */
+  /** The tool registry's config — its presentation `mode` (see shres-tools' `Config`). */
   tools?: ToolsConfig
-  /** Roos Code home directory shared by shell context and local skill discovery. */
-  roosHome?: string
+  /** Shres Code home directory shared by shell context and local skill discovery. */
+  shresHome?: string
   /** Deterministic fallback and accepted-title limits; omission uses the bundle's example policy. */
   sessionTitle?: SessionTitleConfig
   /** Workspace-context loader controls with an explicit byte budget; set `false` for hermetic prompts. */
@@ -290,13 +290,13 @@ export interface GoalConfig {
 }
 ```
 
-Depends on: [`AgentLoopConfig`](#roos-coderoos-code-agent-loop) · [`GoalDomainConfig`](#roos-coderoos-code-goal) · [`InvariantConfig`](#roos-coderoos-code-invariants) · [`JobsConfig`](#roos-coderoos-code-jobs-local) · [`SessionTitleConfig`](#roos-coderoos-code-session-title) · [`SkillFileSystem`](../packages/skill/skill-filesystem/src/index.ts) · [`SkillRegistryConfig`](#roos-coderoos-code-skill) · [`SystemPromptConfig`](#roos-coderoos-code-system-prompt) · [`toolBash`](../packages/shell/tool-bash/src/index.ts) · [`toolGoal`](../packages/goal/tool-goal/src/index.ts) · [`toolJobs`](../packages/jobs/tool-jobs/src/index.ts) · [`ToolsConfig`](#roos-coderoos-code-tools) · [`toolSkill`](../packages/skill/tool-skill/src/index.ts) · [`workspaceContext`](../packages/context/agent-instructions/src/index.ts)
+Depends on: [`AgentLoopConfig`](#shres-codeshres-code-agent-loop) · [`GoalDomainConfig`](#shres-codeshres-code-goal) · [`InvariantConfig`](#shres-codeshres-code-invariants) · [`JobsConfig`](#shres-codeshres-code-jobs-local) · [`SessionTitleConfig`](#shres-codeshres-code-session-title) · [`SkillFileSystem`](../packages/skill/skill-filesystem/src/index.ts) · [`SkillRegistryConfig`](#shres-codeshres-code-skill) · [`SystemPromptConfig`](#shres-codeshres-code-system-prompt) · [`toolBash`](../packages/shell/tool-bash/src/index.ts) · [`toolGoal`](../packages/goal/tool-goal/src/index.ts) · [`toolJobs`](../packages/jobs/tool-jobs/src/index.ts) · [`ToolsConfig`](#shres-codeshres-code-tools) · [`toolSkill`](../packages/skill/tool-skill/src/index.ts) · [`workspaceContext`](../packages/context/agent-instructions/src/index.ts)
 
 Source: [`packages/examples/agent-spine-demo/src/index.ts:92`](../packages/examples/agent-spine-demo/src/index.ts)
 
-<a id="roos-coderoos-code-agent-tool-presentation"></a>
+<a id="shres-codeshres-code-agent-tool-presentation"></a>
 
-## `@roos-code/roos-code-agent-tool-presentation`
+## `@shres-code/shres-code-agent-tool-presentation`
 
 Requires: `tools`
 
@@ -318,15 +318,15 @@ Depends on: [`ToolPresentationMode`](subsystems/tools.md)
 
 Source: [`packages/core/agent-tool-presentation/src/index.ts:38`](../packages/core/agent-tool-presentation/src/index.ts)
 
-<a id="roos-coderoos-code-attachment-local"></a>
+<a id="shres-codeshres-code-attachment-local"></a>
 
-## `@roos-code/roos-code-attachment-local`
+## `@shres-code/shres-code-attachment-local`
 
 ```ts config-catalog
 /** Local attachment backend configuration. */
 export interface Config {
-  /** Explicit harness home; omitted follows `ROOS_HOME`, then `~/.roos`. */
-  roosHome?: string
+  /** Explicit harness home; omitted follows `SHRES_HOME`, then `~/.shres`. */
+  shresHome?: string
   /** Maximum encoded bytes accepted for one image. */
   maxImageBytes?: number
   /** Maximum image count accepted in one submitted message. */
@@ -340,9 +340,9 @@ export interface Config {
 
 Source: [`packages/attachment/attachment-local/src/index.ts:24`](../packages/attachment/attachment-local/src/index.ts)
 
-<a id="roos-coderoos-code-bash-local"></a>
+<a id="shres-codeshres-code-bash-local"></a>
 
-## `@roos-code/roos-code-bash-local`
+## `@shres-code/shres-code-bash-local`
 
 Requires: `subprocess`
 
@@ -366,9 +366,9 @@ export interface Config {
 
 Source: [`packages/shell/bash-local/src/index.ts:41`](../packages/shell/bash-local/src/index.ts)
 
-<a id="roos-coderoos-code-bash-sandbox"></a>
+<a id="shres-codeshres-code-bash-sandbox"></a>
 
-## `@roos-code/roos-code-bash-sandbox`
+## `@shres-code/shres-code-bash-sandbox`
 
 Requires: `subprocess` · `sandbox` · `sandboxPolicy`
 
@@ -376,20 +376,20 @@ Requires: `subprocess` · `sandbox` · `sandboxPolicy`
 /**
  * Plugin config: the local executor's knobs, verbatim. The sandbox policy —
  * the default mode and fallback `workspace-write` root — is NOT here: it lives
- * on `ctx.sandboxPolicy` (`@roos-code/roos-code-sandbox-policy`), which resolves
+ * on `ctx.sandboxPolicy` (`@shres-code/shres-code-sandbox-policy`), which resolves
  * each calling session's mode and cwd for every enforcing capability. The runner
  * choice is likewise the `ctx.sandbox` provider's config, not this executor's.
  */
 export type Config = LocalConfig
 ```
 
-Depends on: [`LocalConfig`](#roos-coderoos-code-bash-local)
+Depends on: [`LocalConfig`](#shres-codeshres-code-bash-local)
 
 Source: [`packages/shell/bash-sandbox/src/index.ts:35`](../packages/shell/bash-sandbox/src/index.ts)
 
-<a id="roos-coderoos-code-client-connection"></a>
+<a id="shres-codeshres-code-client-connection"></a>
 
-## `@roos-code/roos-code-client-connection`
+## `@shres-code/shres-code-client-connection`
 
 Requires: `webServer`
 
@@ -401,7 +401,7 @@ export interface ConnectionConfig {
    * port-less `host` matching any port. The /api trust fence refuses any
    * request whose Host is neither loopback nor listed here, so a
    * non-loopback (`0.0.0.0`) deployment must declare the names it is reached
-   * by (the roos CLI derives the machine's LAN IP literals itself). An entry
+   * by (the shres CLI derives the machine's LAN IP literals itself). An entry
    * that is not a bare, canonical authority fails the plugin load.
    */
   trustedHosts?: string[]
@@ -412,9 +412,9 @@ export interface ConnectionConfig {
 
 Source: [`packages/client/connection/src/index.ts:50`](../packages/client/connection/src/index.ts)
 
-<a id="roos-coderoos-code-client-hmr"></a>
+<a id="shres-codeshres-code-client-hmr"></a>
 
-## `@roos-code/roos-code-client-hmr`
+## `@shres-code/shres-code-client-hmr`
 
 Requires: `clientModules` · `webServer`
 
@@ -428,9 +428,9 @@ export interface Config {
 
 Source: [`packages/client/hmr/src/index.ts:31`](../packages/client/hmr/src/index.ts)
 
-<a id="roos-coderoos-code-code-runtime-worker-thread"></a>
+<a id="shres-codeshres-code-code-runtime-worker-thread"></a>
 
-## `@roos-code/roos-code-code-runtime-worker-thread`
+## `@shres-code/shres-code-code-runtime-worker-thread`
 
 ```ts config-catalog
 /** Plugin config: every execution cap, changeable from `cordis.yml` (no hardcoded tunables). */
@@ -465,9 +465,9 @@ export interface Config {
 
 Source: [`packages/code-runtime/code-runtime-worker-thread/src/index.ts:25`](../packages/code-runtime/code-runtime-worker-thread/src/index.ts)
 
-<a id="roos-coderoos-code-compaction-basic"></a>
+<a id="shres-codeshres-code-compaction-basic"></a>
 
-## `@roos-code/roos-code-compaction-basic`
+## `@shres-code/shres-code-compaction-basic`
 
 Requires: `llm` · `tokenMeter` · `sessions`
 
@@ -511,9 +511,9 @@ export interface ModelCompactPolicyConfig extends CompactionPolicyConfig {
 
 Source: [`packages/compaction/compaction-basic/src/types.ts:38`](../packages/compaction/compaction-basic/src/types.ts)
 
-<a id="roos-coderoos-code-compaction-tool-result-pruner"></a>
+<a id="shres-codeshres-code-compaction-tool-result-pruner"></a>
 
-## `@roos-code/roos-code-compaction-tool-result-pruner`
+## `@shres-code/shres-code-compaction-tool-result-pruner`
 
 Requires: `tokenMeter`
 
@@ -531,9 +531,9 @@ export interface ToolResultPruneConfig {
 
 Source: [`packages/compaction/compaction-tool-result-pruner/src/types.ts:4`](../packages/compaction/compaction-tool-result-pruner/src/types.ts)
 
-<a id="roos-coderoos-code-cordis-host-runner"></a>
+<a id="shres-codeshres-code-cordis-host-runner"></a>
 
-## `@roos-code/roos-code-cordis-host-runner`
+## `@shres-code/shres-code-cordis-host-runner`
 
 Requires: `tools` · `approval`
 
@@ -553,17 +553,17 @@ export interface Config {
 
 Source: [`packages/extensions/cordis-host-runner/src/index.ts:94`](../packages/extensions/cordis-host-runner/src/index.ts)
 
-<a id="roos-coderoos-code-credentials-local"></a>
+<a id="shres-codeshres-code-credentials-local"></a>
 
-## `@roos-code/roos-code-credentials-local`
+## `@shres-code/shres-code-credentials-local`
 
 ```ts config-catalog
 /** Plugin config: file location and hot-reload behavior. */
 export interface Config {
   /** Credentials document path; defaults to `.credentials.yaml` under the harness home. */
   path?: string
-  /** Harness home used when `path` is omitted; defaults to `$ROOS_HOME` or `~/.roos`. */
-  roosHome?: string
+  /** Harness home used when `path` is omitted; defaults to `$SHRES_HOME` or `~/.shres`. */
+  shresHome?: string
   /** Watch the document and hot-publish external edits; defaults to true. */
   watch?: boolean
   /** Watcher write-settle window in milliseconds; defaults to 100. */
@@ -573,9 +573,9 @@ export interface Config {
 
 Source: [`packages/credentials/credentials-local/src/index.ts:55`](../packages/credentials/credentials-local/src/index.ts)
 
-<a id="roos-coderoos-code-e2b"></a>
+<a id="shres-codeshres-code-e2b"></a>
 
-## `@roos-code/roos-code-e2b`
+## `@shres-code/shres-code-e2b`
 
 ```ts config-catalog
 /** Configuration for the shared E2B sandbox owner. */
@@ -591,9 +591,9 @@ export interface Config {
 
 Source: [`packages/e2b/e2b/src/index.ts:43`](../packages/e2b/e2b/src/index.ts)
 
-<a id="roos-coderoos-code-first-run-setup"></a>
+<a id="shres-codeshres-code-first-run-setup"></a>
 
-## `@roos-code/roos-code-first-run-setup`
+## `@shres-code/shres-code-first-run-setup`
 
 Requires: `agentDefaultModel` · `llm`
 
@@ -615,9 +615,9 @@ export interface Config {
 
 Source: [`packages/core/first-run-setup/src/index.ts:45`](../packages/core/first-run-setup/src/index.ts)
 
-<a id="roos-coderoos-code-fs-local"></a>
+<a id="shres-codeshres-code-fs-local"></a>
 
-## `@roos-code/roos-code-fs-local`
+## `@shres-code/shres-code-fs-local`
 
 ```ts config-catalog
 /** Configuration for the local filesystem backend. */
@@ -634,9 +634,9 @@ export interface Config {
 
 Source: [`packages/fs/fs-local/src/index.ts:41`](../packages/fs/fs-local/src/index.ts)
 
-<a id="roos-coderoos-code-fs-sandbox"></a>
+<a id="shres-codeshres-code-fs-sandbox"></a>
 
-## `@roos-code/roos-code-fs-sandbox`
+## `@shres-code/shres-code-fs-sandbox`
 
 Requires: `sandboxPolicy`
 
@@ -659,13 +659,13 @@ export interface Config extends LocalConfig {
 }
 ```
 
-Depends on: [`LocalConfig`](#roos-coderoos-code-fs-local)
+Depends on: [`LocalConfig`](#shres-codeshres-code-fs-local)
 
 Source: [`packages/fs/fs-sandbox/src/index.ts:60`](../packages/fs/fs-sandbox/src/index.ts)
 
-<a id="roos-coderoos-code-goal"></a>
+<a id="shres-codeshres-code-goal"></a>
 
-## `@roos-code/roos-code-goal`
+## `@shres-code/shres-code-goal`
 
 Requires: `agents`
 
@@ -679,9 +679,9 @@ export interface Config {
 
 Source: [`packages/goal/goal/src/index.ts:116`](../packages/goal/goal/src/index.ts)
 
-<a id="roos-coderoos-code-headless"></a>
+<a id="shres-codeshres-code-headless"></a>
 
-## `@roos-code/roos-code-headless`
+## `@shres-code/shres-code-headless`
 
 Requires: `agentDefaultModel` · `agents` · `sessions`
 
@@ -695,9 +695,9 @@ export interface Config {
 
 Source: [`packages/bundle/headless/src/index.ts:30`](../packages/bundle/headless/src/index.ts)
 
-<a id="roos-coderoos-code-hooks-claude-code"></a>
+<a id="shres-codeshres-code-hooks-claude-code"></a>
 
-## `@roos-code/roos-code-hooks-claude-code`
+## `@shres-code/shres-code-hooks-claude-code`
 
 Requires: `shell`
 
@@ -733,9 +733,9 @@ export interface Config {
 
 Source: [`packages/hooks/hooks-claude-code/src/index.ts:45`](../packages/hooks/hooks-claude-code/src/index.ts)
 
-<a id="roos-coderoos-code-hooks-codex"></a>
+<a id="shres-codeshres-code-hooks-codex"></a>
 
-## `@roos-code/roos-code-hooks-codex`
+## `@shres-code/shres-code-hooks-codex`
 
 Requires: `shell`
 
@@ -760,9 +760,9 @@ export interface Config {
 
 Source: [`packages/hooks/hooks-codex/src/index.ts:44`](../packages/hooks/hooks-codex/src/index.ts)
 
-<a id="roos-coderoos-code-host-apiproxy"></a>
+<a id="shres-codeshres-code-host-apiproxy"></a>
 
-## `@roos-code/roos-code-host-apiproxy`
+## `@shres-code/shres-code-host-apiproxy`
 
 Requires: `agentDefaultModel` · `agents` · `attachments` · `directoryPicker` · `llm` · `sessions` · `subagents` · `sessionQuery` · `tools` · `userQuestions` · `workspaceRegistry`
 
@@ -794,9 +794,9 @@ export interface Config {
 
 Source: [`packages/host/apiproxy/src/index.ts:41`](../packages/host/apiproxy/src/index.ts)
 
-<a id="roos-coderoos-code-host-directory-picker-browse"></a>
+<a id="shres-codeshres-code-host-directory-picker-browse"></a>
 
-## `@roos-code/roos-code-host-directory-picker-browse`
+## `@shres-code/shres-code-host-directory-picker-browse`
 
 ```ts config-catalog
 /** Validated plugin configuration. */
@@ -808,9 +808,9 @@ export interface Config {
 
 Source: [`packages/host/directory-picker-browse/src/index.ts:181`](../packages/host/directory-picker-browse/src/index.ts)
 
-<a id="roos-coderoos-code-host-frontend-static"></a>
+<a id="shres-codeshres-code-host-frontend-static"></a>
 
-## `@roos-code/roos-code-host-frontend-static`
+## `@shres-code/shres-code-host-frontend-static`
 
 Requires: `webServer`
 
@@ -824,9 +824,9 @@ export interface Config {
 
 Source: [`packages/host/frontend-static/src/index.ts:28`](../packages/host/frontend-static/src/index.ts)
 
-<a id="roos-coderoos-code-host-webserver"></a>
+<a id="shres-codeshres-code-host-webserver"></a>
 
-## `@roos-code/roos-code-host-webserver`
+## `@shres-code/shres-code-host-webserver`
 
 ```ts config-catalog
 /** Gateway config: the listen address. */
@@ -840,9 +840,9 @@ export interface Config {
 
 Source: [`packages/host/webserver/src/index.ts:45`](../packages/host/webserver/src/index.ts)
 
-<a id="roos-coderoos-code-invariants"></a>
+<a id="shres-codeshres-code-invariants"></a>
 
-## `@roos-code/roos-code-invariants`
+## `@shres-code/shres-code-invariants`
 
 ```ts config-catalog
 /** Runtime invariant selection configured on the service plugin. */
@@ -858,9 +858,9 @@ export interface Config {
 
 Source: [`packages/runtime-diagnostics/invariants/src/index.ts:15`](../packages/runtime-diagnostics/invariants/src/index.ts)
 
-<a id="roos-coderoos-code-jobs-local"></a>
+<a id="shres-codeshres-code-jobs-local"></a>
 
-## `@roos-code/roos-code-jobs-local`
+## `@shres-code/shres-code-jobs-local`
 
 ```ts config-catalog
 /** Configuration for the process-local job registry. */
@@ -875,9 +875,9 @@ export interface Config {
 
 Source: [`packages/jobs/jobs-local/src/index.ts:31`](../packages/jobs/jobs-local/src/index.ts)
 
-<a id="roos-coderoos-code-llm-deepseek"></a>
+<a id="shres-codeshres-code-llm-deepseek"></a>
 
-## `@roos-code/roos-code-llm-deepseek`
+## `@shres-code/shres-code-llm-deepseek`
 
 Requires: `llm`
 
@@ -930,9 +930,9 @@ Depends on: [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts)
 
 Source: [`packages/llm/llm-deepseek/src/index.ts:62`](../packages/llm/llm-deepseek/src/index.ts)
 
-<a id="roos-coderoos-code-llm-pi-ai"></a>
+<a id="shres-codeshres-code-llm-pi-ai"></a>
 
-## `@roos-code/roos-code-llm-pi-ai`
+## `@shres-code/shres-code-llm-pi-ai`
 
 Requires: `llm`
 
@@ -1120,21 +1120,21 @@ Depends on: `Api` (`@earendil-works/pi-ai`) · `CacheRetention` (`@earendil-work
 
 Source: [`packages/llm/llm-pi-ai/src/config.ts:172`](../packages/llm/llm-pi-ai/src/config.ts)
 
-<a id="roos-coderoos-code-llm-replay"></a>
+<a id="shres-codeshres-code-llm-replay"></a>
 
-## `@roos-code/roos-code-llm-replay`
+## `@shres-code/shres-code-llm-replay`
 
 Requires: `llm`
 
 ```ts config-catalog
-/** Plugin config: the {@link ReplayConfig} inputs, each defaulting to its `ROOS_SNAPSHOT_*` env var in `apply`. */
+/** Plugin config: the {@link ReplayConfig} inputs, each defaulting to its `SHRES_SNAPSHOT_*` env var in `apply`. */
 export interface Config {
-  /** Override the fixture path; defaults to `$ROOS_SNAPSHOT_FILE`. */
+  /** Override the fixture path; defaults to `$SHRES_SNAPSHOT_FILE`. */
   file?: string
-  /** Override the sidecar path; defaults to `$ROOS_SNAPSHOT_OVERRIDE`. */
+  /** Override the sidecar path; defaults to `$SHRES_SNAPSHOT_OVERRIDE`. */
   overrideFile?: string
   /**
-   * Override the child-log paths; defaults to `$ROOS_SNAPSHOT_CHILD_FILES` (a
+   * Override the child-log paths; defaults to `$SHRES_SNAPSHOT_CHILD_FILES` (a
    * path-separator-delimited list). Each is a recorded subagent session log for
    * a nested-agent scenario; absent/empty for a single-session scenario.
    */
@@ -1188,9 +1188,9 @@ Depends on: [`ModelModality`](../packages/llm/llm/src/index.ts) · [`RetryPolicy
 
 Source: [`packages/test-support/llm-replay/src/index.ts:776`](../packages/test-support/llm-replay/src/index.ts)
 
-<a id="roos-coderoos-code-llm-retry"></a>
+<a id="shres-codeshres-code-llm-retry"></a>
 
-## `@roos-code/roos-code-llm-retry`
+## `@shres-code/shres-code-llm-retry`
 
 Requires: `agents`
 
@@ -1201,9 +1201,9 @@ export type Config = Readonly<Record<string, never>>
 
 Source: [`packages/llm/llm-retry/src/index.ts:24`](../packages/llm/llm-retry/src/index.ts)
 
-<a id="roos-coderoos-code-lsp-stdio"></a>
+<a id="shres-codeshres-code-lsp-stdio"></a>
 
-## `@roos-code/roos-code-lsp-stdio`
+## `@shres-code/shres-code-lsp-stdio`
 
 Requires: `fs` · `lsp` · `subprocess`
 
@@ -1243,9 +1243,9 @@ export interface LspLocalServerConfig {
 
 Source: [`packages/lsp/lsp-stdio/src/index.ts:82`](../packages/lsp/lsp-stdio/src/index.ts)
 
-<a id="roos-coderoos-code-mcp-client"></a>
+<a id="shres-codeshres-code-mcp-client"></a>
 
-## `@roos-code/roos-code-mcp-client`
+## `@shres-code/shres-code-mcp-client`
 
 Requires: `tools`
 
@@ -1316,9 +1316,9 @@ export interface ReconnectConfig {
 
 Source: [`packages/mcp/mcp-client/src/index.ts:98`](../packages/mcp/mcp-client/src/index.ts)
 
-<a id="roos-coderoos-code-message-feedback"></a>
+<a id="shres-codeshres-code-message-feedback"></a>
 
-## `@roos-code/roos-code-message-feedback`
+## `@shres-code/shres-code-message-feedback`
 
 Requires: `storageDomain` · `sessionPersistence` · `sessions`
 
@@ -1332,9 +1332,9 @@ export interface Config {
 
 Source: [`packages/feedback/message-feedback/src/index.ts:49`](../packages/feedback/message-feedback/src/index.ts)
 
-<a id="roos-coderoos-code-permission-presets"></a>
+<a id="shres-codeshres-code-permission-presets"></a>
 
-## `@roos-code/roos-code-permission-presets`
+## `@shres-code/shres-code-permission-presets`
 
 Requires: `shell` · `approval` · `sessions`
 
@@ -1371,9 +1371,9 @@ Depends on: [`ApprovalPolicy`](subsystems/approval.md) · [`SandboxMode`](subsys
 
 Source: [`packages/interaction/permission-presets/src/index.ts:140`](../packages/interaction/permission-presets/src/index.ts)
 
-<a id="roos-coderoos-code-persona"></a>
+<a id="shres-codeshres-code-persona"></a>
 
-## `@roos-code/roos-code-persona`
+## `@shres-code/shres-code-persona`
 
 Requires: `systemPrompt`
 
@@ -1395,9 +1395,9 @@ export interface Config {
 
 Source: [`packages/preset/persona/src/index.ts:34`](../packages/preset/persona/src/index.ts)
 
-<a id="roos-coderoos-code-plan-mode"></a>
+<a id="shres-codeshres-code-plan-mode"></a>
 
-## `@roos-code/roos-code-plan-mode`
+## `@shres-code/shres-code-plan-mode`
 
 Requires: `tools` · `systemPrompt`
 
@@ -1411,9 +1411,9 @@ export interface PlanModeConfig {
 
 Source: [`packages/plan/plan-mode/src/index.ts:70`](../packages/plan/plan-mode/src/index.ts)
 
-<a id="roos-coderoos-code-pwsh-local"></a>
+<a id="shres-codeshres-code-pwsh-local"></a>
 
-## `@roos-code/roos-code-pwsh-local`
+## `@shres-code/shres-code-pwsh-local`
 
 Requires: `subprocess`
 
@@ -1444,9 +1444,9 @@ export interface Config {
 
 Source: [`packages/shell/pwsh-local/src/index.ts:58`](../packages/shell/pwsh-local/src/index.ts)
 
-<a id="roos-coderoos-code-pwsh-sandbox"></a>
+<a id="shres-codeshres-code-pwsh-sandbox"></a>
 
-## `@roos-code/roos-code-pwsh-sandbox`
+## `@shres-code/shres-code-pwsh-sandbox`
 
 Requires: `subprocess` · `sandbox` · `sandboxPolicy`
 
@@ -1454,7 +1454,7 @@ Requires: `subprocess` · `sandbox` · `sandboxPolicy`
 /**
  * Plugin config: the local executor's knobs, verbatim. The sandbox policy —
  * the default mode and fallback `workspace-write` root — is NOT here: it lives
- * on `ctx.sandboxPolicy` (`@roos-code/roos-code-sandbox-policy`), which resolves
+ * on `ctx.sandboxPolicy` (`@shres-code/shres-code-sandbox-policy`), which resolves
  * each calling session's mode and cwd for every enforcing capability. The
  * runner choice is likewise the `ctx.sandbox` provider's config, not this
  * executor's.
@@ -1462,13 +1462,13 @@ Requires: `subprocess` · `sandbox` · `sandboxPolicy`
 export type Config = LocalConfig
 ```
 
-Depends on: [`LocalConfig`](#roos-coderoos-code-pwsh-local)
+Depends on: [`LocalConfig`](#shres-codeshres-code-pwsh-local)
 
 Source: [`packages/shell/pwsh-sandbox/src/index.ts:40`](../packages/shell/pwsh-sandbox/src/index.ts)
 
-<a id="roos-coderoos-code-repeat-tool-reminder"></a>
+<a id="shres-codeshres-code-repeat-tool-reminder"></a>
 
-## `@roos-code/roos-code-repeat-tool-reminder`
+## `@shres-code/shres-code-repeat-tool-reminder`
 
 ```ts config-catalog
 /**
@@ -1500,9 +1500,9 @@ export interface Config {
 
 Source: [`packages/guard/repeat-tool-reminder/src/index.ts:28`](../packages/guard/repeat-tool-reminder/src/index.ts)
 
-<a id="roos-coderoos-code-sandbox-local"></a>
+<a id="shres-codeshres-code-sandbox-local"></a>
 
-## `@roos-code/roos-code-sandbox-local`
+## `@shres-code/shres-code-sandbox-local`
 
 ```ts config-catalog
 /** Plugin config. All optional — `static Config` supplies the defaults. */
@@ -1532,9 +1532,9 @@ export interface Config {
 
 Source: [`packages/sandbox/sandbox-local/src/index.ts:44`](../packages/sandbox/sandbox-local/src/index.ts)
 
-<a id="roos-coderoos-code-sandbox-policy"></a>
+<a id="shres-codeshres-code-sandbox-policy"></a>
 
-## `@roos-code/roos-code-sandbox-policy`
+## `@shres-code/shres-code-sandbox-policy`
 
 ```ts config-catalog
 /**
@@ -1565,9 +1565,9 @@ Depends on: [`SandboxMode`](subsystems/sandbox.md) · [`SandboxNetwork`](../pack
 
 Source: [`packages/sandbox/sandbox-policy/src/index.ts:67`](../packages/sandbox/sandbox-policy/src/index.ts)
 
-<a id="roos-coderoos-code-sdk-jsonrpc-server"></a>
+<a id="shres-codeshres-code-sdk-jsonrpc-server"></a>
 
-## `@roos-code/roos-code-sdk-jsonrpc-server`
+## `@shres-code/shres-code-sdk-jsonrpc-server`
 
 Requires: `agents`
 
@@ -1589,9 +1589,9 @@ Depends on: `Readable` (`node:stream`) · `Writable` (`node:stream`)
 
 Source: [`packages/sdk/server/src/index.ts:25`](../packages/sdk/server/src/index.ts)
 
-<a id="roos-coderoos-code-session-persistence-jsonl"></a>
+<a id="shres-codeshres-code-session-persistence-jsonl"></a>
 
-## `@roos-code/roos-code-session-persistence-jsonl`
+## `@shres-code/shres-code-session-persistence-jsonl`
 
 Requires: `sessions`
 
@@ -1628,9 +1628,9 @@ export type JsonlCompression = 'zstd' | 'none'
 
 Source: [`packages/session/session-persistence-jsonl/src/index.ts:60`](../packages/session/session-persistence-jsonl/src/index.ts)
 
-<a id="roos-coderoos-code-session-persistence-sqlite"></a>
+<a id="shres-codeshres-code-session-persistence-sqlite"></a>
 
-## `@roos-code/roos-code-session-persistence-sqlite`
+## `@shres-code/shres-code-session-persistence-sqlite`
 
 Requires: `sessions`
 
@@ -1673,9 +1673,9 @@ export type JournalMode = 'wal' | 'delete' | 'truncate' | 'persist'
 
 Source: [`packages/session/session-persistence-sqlite/src/index.ts:70`](../packages/session/session-persistence-sqlite/src/index.ts)
 
-<a id="roos-coderoos-code-session-projection-cache"></a>
+<a id="shres-codeshres-code-session-projection-cache"></a>
 
-## `@roos-code/roos-code-session-projection-cache`
+## `@shres-code/shres-code-session-projection-cache`
 
 Requires: `storageDomain` · `sessionProjections` · `sessionPersistence` · `sessions`
 
@@ -1696,9 +1696,9 @@ export interface Config {
 
 Source: [`packages/session/session-projection-cache/src/index.ts:42`](../packages/session/session-projection-cache/src/index.ts)
 
-<a id="roos-coderoos-code-session-query-sqlite"></a>
+<a id="shres-codeshres-code-session-query-sqlite"></a>
 
-## `@roos-code/roos-code-session-query-sqlite`
+## `@shres-code/shres-code-session-query-sqlite`
 
 Requires: `sessions`
 
@@ -1742,9 +1742,9 @@ Depends on: [`SessionQueryConfig`](../packages/session-query/session-query/src/i
 
 Source: [`packages/session-query/session-query-sqlite/src/index.ts:89`](../packages/session-query/session-query-sqlite/src/index.ts)
 
-<a id="roos-coderoos-code-session-reference"></a>
+<a id="shres-codeshres-code-session-reference"></a>
 
-## `@roos-code/roos-code-session-reference`
+## `@shres-code/shres-code-session-reference`
 
 Requires: `sessionQuery`
 
@@ -1762,16 +1762,16 @@ export interface Config {
 
 Source: [`packages/context/session-reference/src/config.ts:11`](../packages/context/session-reference/src/config.ts)
 
-<a id="roos-coderoos-code-session-telemetry-otel"></a>
+<a id="shres-codeshres-code-session-telemetry-otel"></a>
 
-## `@roos-code/roos-code-session-telemetry-otel`
+## `@shres-code/shres-code-session-telemetry-otel`
 
 Requires: `sessions`
 
 ```ts config-catalog
 /**
  * Plugin configuration: one sharing policy, two verbatim SDK option objects,
- * and one Roos-owned shutdown bound. Uploading modes validate their endpoint
+ * and one Shres-owned shutdown bound. Uploading modes validate their endpoint
  * and shutdown deadline at plugin load; `DISABLED` reads neither.
  */
 export interface Config {
@@ -1808,9 +1808,9 @@ Depends on: `BatchLogRecordProcessorOptions` (`@opentelemetry/sdk-logs`) · `OTL
 
 Source: [`packages/session/session-telemetry-otel/src/index.ts:91`](../packages/session/session-telemetry-otel/src/index.ts)
 
-<a id="roos-coderoos-code-session-title"></a>
+<a id="shres-codeshres-code-session-title"></a>
 
-## `@roos-code/roos-code-session-title`
+## `@shres-code/shres-code-session-title`
 
 Requires: `sessions`
 
@@ -1828,9 +1828,9 @@ export interface Config {
 
 Source: [`packages/session/session-title/src/index.ts:79`](../packages/session/session-title/src/index.ts)
 
-<a id="roos-coderoos-code-session-title-all-prompts-llm"></a>
+<a id="shres-codeshres-code-session-title-all-prompts-llm"></a>
 
-## `@roos-code/roos-code-session-title-all-prompts-llm`
+## `@shres-code/shres-code-session-title-all-prompts-llm`
 
 Requires: `sessionTitle` · `llm` · `sessions`
 
@@ -1843,9 +1843,9 @@ Depends on: [`SessionTitleLlmConfig`](../packages/session/session-title-llm/src/
 
 Source: [`packages/session/session-title-all-prompts-llm/src/index.ts:15`](../packages/session/session-title-all-prompts-llm/src/index.ts)
 
-<a id="roos-coderoos-code-session-title-first-prompt-llm"></a>
+<a id="shres-codeshres-code-session-title-first-prompt-llm"></a>
 
-## `@roos-code/roos-code-session-title-first-prompt-llm`
+## `@shres-code/shres-code-session-title-first-prompt-llm`
 
 Requires: `sessionTitle` · `llm` · `sessions`
 
@@ -1858,17 +1858,17 @@ Depends on: [`SessionTitleLlmConfig`](../packages/session/session-title-llm/src/
 
 Source: [`packages/session/session-title-first-prompt-llm/src/index.ts:15`](../packages/session/session-title-first-prompt-llm/src/index.ts)
 
-<a id="roos-coderoos-code-settings-file"></a>
+<a id="shres-codeshres-code-settings-file"></a>
 
-## `@roos-code/roos-code-settings-file`
+## `@shres-code/shres-code-settings-file`
 
 ```ts config-catalog
 /** Plugin config: file location and hot-reload behavior. */
 export interface Config {
   /** Settings document path; defaults to `settings.yaml` under the harness home. */
   path?: string
-  /** Harness home used when `path` is omitted; defaults to `$ROOS_HOME` or `~/.roos`. */
-  roosHome?: string
+  /** Harness home used when `path` is omitted; defaults to `$SHRES_HOME` or `~/.shres`. */
+  shresHome?: string
   /** Watch the document and hot-publish external edits; defaults to true. */
   watch?: boolean
   /** Watcher write-settle window in milliseconds; defaults to 100. */
@@ -1878,23 +1878,23 @@ export interface Config {
 
 Source: [`packages/settings/settings-file/src/index.ts:21`](../packages/settings/settings-file/src/index.ts)
 
-<a id="roos-coderoos-code-shell-env"></a>
+<a id="shres-codeshres-code-shell-env"></a>
 
-## `@roos-code/roos-code-shell-env`
+## `@shres-code/shres-code-shell-env`
 
 ```ts config-catalog
 /** Plugin config (all optional — the built-in facts resolve without defaults). */
 export interface Config {
-  /** Roos Code home directory exposed as `ROOS_HOME`; defaults to `$ROOS_HOME` or `~/.roos`. */
-  roosHome?: string
+  /** Shres Code home directory exposed as `SHRES_HOME`; defaults to `$SHRES_HOME` or `~/.shres`. */
+  shresHome?: string
 }
 ```
 
 Source: [`packages/shell/shell-env/src/index.ts:29`](../packages/shell/shell-env/src/index.ts)
 
-<a id="roos-coderoos-code-skill"></a>
+<a id="shres-codeshres-code-skill"></a>
 
-## `@roos-code/roos-code-skill`
+## `@shres-code/shres-code-skill`
 
 ```ts config-catalog
 /** Skill registry configuration. */
@@ -1906,9 +1906,9 @@ export interface Config {
 
 Source: [`packages/skill/skill/src/index.ts:279`](../packages/skill/skill/src/index.ts)
 
-<a id="roos-coderoos-code-skill-filesystem"></a>
+<a id="shres-codeshres-code-skill-filesystem"></a>
 
-## `@roos-code/roos-code-skill-filesystem`
+## `@shres-code/shres-code-skill-filesystem`
 
 Requires: `skills`
 
@@ -1919,9 +1919,9 @@ export interface Config {
   providerName?: string
   /** Whether project and user roots are included around custom roots. */
   includeDefaultRoots?: boolean
-  /** Roos Code config root. Defaults to `$ROOS_HOME` or `~/.roos`. */
-  roosHome?: string
-  /** Shared agent config root. Defaults to `$ROOS_AGENTS_HOME` or `~/.agents`. */
+  /** Shres Code config root. Defaults to `$SHRES_HOME` or `~/.shres`. */
+  shresHome?: string
+  /** Shared agent config root. Defaults to `$SHRES_AGENTS_HOME` or `~/.agents`. */
   agentsHome?: string
   /** Additional skill roots scanned after project roots and before user roots. */
   customSkillDirs?: string[]
@@ -1937,16 +1937,16 @@ export interface Config {
   watchMaxProjects?: number
   /** Whether watched symbolic links follow their target files. */
   watchFollowSymlinks?: boolean
-  /** Bundled skill root; defaults to `$ROOS_BUNDLED_SKILL_DIR` when default roots are included, otherwise mounts none. */
+  /** Bundled skill root; defaults to `$SHRES_BUNDLED_SKILL_DIR` when default roots are included, otherwise mounts none. */
   bundledSkillDir?: string
 }
 ```
 
 Source: [`packages/skill/skill-filesystem/src/index.ts:49`](../packages/skill/skill-filesystem/src/index.ts)
 
-<a id="roos-coderoos-code-spill-local"></a>
+<a id="shres-codeshres-code-spill-local"></a>
 
-## `@roos-code/roos-code-spill-local`
+## `@shres-code/shres-code-spill-local`
 
 ```ts config-catalog
 /** Plugin config (all optional — `static Config` supplies the defaults). */
@@ -1962,9 +1962,9 @@ export interface Config {
 
 Source: [`packages/spill/spill-local/src/index.ts:22`](../packages/spill/spill-local/src/index.ts)
 
-<a id="roos-coderoos-code-spill-policy"></a>
+<a id="shres-codeshres-code-spill-policy"></a>
 
-## `@roos-code/roos-code-spill-policy`
+## `@shres-code/shres-code-spill-policy`
 
 Requires: `tools`
 
@@ -1982,9 +1982,9 @@ export interface Config {
 
 Source: [`packages/spill/spill-policy/src/index.ts:60`](../packages/spill/spill-policy/src/index.ts)
 
-<a id="roos-coderoos-code-storage-domain"></a>
+<a id="shres-codeshres-code-storage-domain"></a>
 
-## `@roos-code/roos-code-storage-domain`
+## `@shres-code/shres-code-storage-domain`
 
 Requires: `storage`
 
@@ -2005,9 +2005,9 @@ export interface Config {
 
 Source: [`packages/storage/storage-domain/src/index.ts:52`](../packages/storage/storage-domain/src/index.ts)
 
-<a id="roos-coderoos-code-storage-json"></a>
+<a id="shres-codeshres-code-storage-json"></a>
 
-## `@roos-code/roos-code-storage-json`
+## `@shres-code/shres-code-storage-json`
 
 Requires: `storage`
 
@@ -2026,9 +2026,9 @@ export interface Config {
 
 Source: [`packages/storage/storage-json/src/index.ts:27`](../packages/storage/storage-json/src/index.ts)
 
-<a id="roos-coderoos-code-storage-sqlite"></a>
+<a id="shres-codeshres-code-storage-sqlite"></a>
 
-## `@roos-code/roos-code-storage-sqlite`
+## `@shres-code/shres-code-storage-sqlite`
 
 Requires: `storage`
 
@@ -2066,9 +2066,9 @@ export type JournalMode = 'wal' | 'delete' | 'truncate' | 'persist'
 
 Source: [`packages/storage/storage-sqlite/src/index.ts:24`](../packages/storage/storage-sqlite/src/index.ts)
 
-<a id="roos-coderoos-code-subagent-acp"></a>
+<a id="shres-codeshres-code-subagent-acp"></a>
 
-## `@roos-code/roos-code-subagent-acp`
+## `@shres-code/shres-code-subagent-acp`
 
 Requires: `subagents` · `subprocess`
 
@@ -2119,9 +2119,9 @@ export type PermissionPolicy = 'allow' | 'reject'
 
 Source: [`packages/subagent/subagent-acp/src/index.ts:27`](../packages/subagent/subagent-acp/src/index.ts)
 
-<a id="roos-coderoos-code-subagent-claude-code"></a>
+<a id="shres-codeshres-code-subagent-claude-code"></a>
 
-## `@roos-code/roos-code-subagent-claude-code`
+## `@shres-code/shres-code-subagent-claude-code`
 
 Requires: `subagents` · `subprocess`
 
@@ -2140,9 +2140,9 @@ export interface Config {
 
 Source: [`packages/subagent/subagent-claude-code/src/index.ts:32`](../packages/subagent/subagent-claude-code/src/index.ts)
 
-<a id="roos-coderoos-code-subagent-codex"></a>
+<a id="shres-codeshres-code-subagent-codex"></a>
 
-## `@roos-code/roos-code-subagent-codex`
+## `@shres-code/shres-code-subagent-codex`
 
 Requires: `subagents` · `subprocess`
 
@@ -2161,9 +2161,9 @@ export interface Config {
 
 Source: [`packages/subagent/subagent-codex/src/index.ts:30`](../packages/subagent/subagent-codex/src/index.ts)
 
-<a id="roos-coderoos-code-subagent-fork-in-process"></a>
+<a id="shres-codeshres-code-subagent-fork-in-process"></a>
 
-## `@roos-code/roos-code-subagent-fork-in-process`
+## `@shres-code/shres-code-subagent-fork-in-process`
 
 Requires: `subagents`
 
@@ -2177,16 +2177,16 @@ export interface Config {
 
 Source: [`packages/subagent/subagent-fork-in-process/src/index.ts:31`](../packages/subagent/subagent-fork-in-process/src/index.ts)
 
-<a id="roos-coderoos-code-subagent-roos-sdk"></a>
+<a id="shres-codeshres-code-subagent-shres-sdk"></a>
 
-## `@roos-code/roos-code-subagent-roos-sdk`
+## `@shres-code/shres-code-subagent-shres-sdk`
 
 Requires: `subagents`
 
 ```ts config-catalog
 /** Config: how to spawn and drive the child SDK runtime process. */
 export interface Config {
-  /** Provider name on `ctx.subagents` (default `roos-sdk`). */
+  /** Provider name on `ctx.subagents` (default `shres-sdk`). */
   providerName: string
   /** The executable to spawn for each run (the child runtime bin or packaged exe). */
   command: string
@@ -2209,7 +2209,7 @@ export interface Config {
   maxTokens?: number
   /**
    * Extra environment variables for the child process — e.g. the child
-   * runtime's own `DEEPSEEK_API_KEY`, or `ROOS_CORDIS_CONFIG` naming its
+   * runtime's own `DEEPSEEK_API_KEY`, or `SHRES_CORDIS_CONFIG` naming its
    * config. Forwarded on top of a credential-scrubbed copy of the parent
    * env, so an explicit key here reaches the child while ambient secrets do
    * not leak implicitly.
@@ -2228,11 +2228,11 @@ export interface Config {
 }
 ```
 
-Source: [`packages/subagent/subagent-roos-sdk/src/index.ts:29`](../packages/subagent/subagent-roos-sdk/src/index.ts)
+Source: [`packages/subagent/subagent-shres-sdk/src/index.ts:29`](../packages/subagent/subagent-shres-sdk/src/index.ts)
 
-<a id="roos-coderoos-code-subagent-spawn-in-process"></a>
+<a id="shres-codeshres-code-subagent-spawn-in-process"></a>
 
-## `@roos-code/roos-code-subagent-spawn-in-process`
+## `@shres-code/shres-code-subagent-spawn-in-process`
 
 Requires: `subagents`
 
@@ -2246,9 +2246,9 @@ export interface Config {
 
 Source: [`packages/subagent/subagent-spawn-in-process/src/index.ts:25`](../packages/subagent/subagent-spawn-in-process/src/index.ts)
 
-<a id="roos-coderoos-code-subprocess-e2b"></a>
+<a id="shres-codeshres-code-subprocess-e2b"></a>
 
-## `@roos-code/roos-code-subprocess-e2b`
+## `@shres-code/shres-code-subprocess-e2b`
 
 Requires: `e2b`
 
@@ -2262,14 +2262,14 @@ export interface Config {
 
 Source: [`packages/e2b/subprocess-e2b/src/index.ts:25`](../packages/e2b/subprocess-e2b/src/index.ts)
 
-<a id="roos-coderoos-code-system-prompt"></a>
+<a id="shres-codeshres-code-system-prompt"></a>
 
-## `@roos-code/roos-code-system-prompt`
+## `@shres-code/shres-code-system-prompt`
 
 ```ts config-catalog
 /** Plugin config: the deployment-authored fragment of the system prompt (see {@link Config.persona} for its contract). */
 export interface Config {
-  /** Include the fixed Roos Code identity before the deployment persona (default true). */
+  /** Include the fixed Shres Code identity before the deployment persona (default true). */
   includeHarnessIdentity?: boolean
   /** Include dynamic runtime-context snapshots in model history (default true). */
   includeRuntimeContext?: boolean
@@ -2289,9 +2289,9 @@ export interface Config {
 
 Source: [`packages/core/system-prompt/src/index.ts:186`](../packages/core/system-prompt/src/index.ts)
 
-<a id="roos-coderoos-code-terminal-bash"></a>
+<a id="shres-codeshres-code-terminal-bash"></a>
 
-## `@roos-code/roos-code-terminal-bash`
+## `@shres-code/shres-code-terminal-bash`
 
 Requires: `terminals` · `sandboxPolicy` · `subprocess`
 
@@ -2334,9 +2334,9 @@ export interface Config {
 
 Source: [`packages/terminal/terminal-bash/src/config.ts:6`](../packages/terminal/terminal-bash/src/config.ts)
 
-<a id="roos-coderoos-code-time-context"></a>
+<a id="shres-codeshres-code-time-context"></a>
 
-## `@roos-code/roos-code-time-context`
+## `@shres-code/shres-code-time-context`
 
 Requires: `agents`
 
@@ -2352,9 +2352,9 @@ export interface Config {
 
 Source: [`packages/context/time-context/src/index.ts:27`](../packages/context/time-context/src/index.ts)
 
-<a id="roos-coderoos-code-tmux-context"></a>
+<a id="shres-codeshres-code-tmux-context"></a>
 
-## `@roos-code/roos-code-tmux-context`
+## `@shres-code/shres-code-tmux-context`
 
 Requires: `agents`
 
@@ -2368,9 +2368,9 @@ export interface Config {
 
 Source: [`packages/context/tmux-context/src/index.ts:34`](../packages/context/tmux-context/src/index.ts)
 
-<a id="roos-coderoos-code-token-meter"></a>
+<a id="shres-codeshres-code-token-meter"></a>
 
-## `@roos-code/roos-code-token-meter`
+## `@shres-code/shres-code-token-meter`
 
 ```ts config-catalog
 /** Token-meter plugin configuration; the fixed estimator has no settings. */
@@ -2379,9 +2379,9 @@ export type TokenMeterConfig = Record<string, never>
 
 Source: [`packages/llm/token-meter/src/types.ts:12`](../packages/llm/token-meter/src/types.ts)
 
-<a id="roos-coderoos-code-tool-bash"></a>
+<a id="shres-codeshres-code-tool-bash"></a>
 
-## `@roos-code/roos-code-tool-bash`
+## `@shres-code/shres-code-tool-bash`
 
 Requires: `tools` · `shell` · `systemPrompt` · `shellEnv`
 
@@ -2395,9 +2395,9 @@ export interface Config {
 
 Source: [`packages/shell/tool-bash/src/index.ts:34`](../packages/shell/tool-bash/src/index.ts)
 
-<a id="roos-coderoos-code-tool-bash-persistent"></a>
+<a id="shres-codeshres-code-tool-bash-persistent"></a>
 
-## `@roos-code/roos-code-tool-bash-persistent`
+## `@shres-code/shres-code-tool-bash-persistent`
 
 Requires: `tools` · `terminals`
 
@@ -2417,9 +2417,9 @@ export interface Config {
 
 Source: [`packages/shell/tool-bash-persistent/src/index.ts:405`](../packages/shell/tool-bash-persistent/src/index.ts)
 
-<a id="roos-coderoos-code-tool-fs"></a>
+<a id="shres-codeshres-code-tool-fs"></a>
 
-## `@roos-code/roos-code-tool-fs`
+## `@shres-code/shres-code-tool-fs`
 
 Requires: `tools` · `fs` · `systemPrompt`
 
@@ -2439,9 +2439,9 @@ export interface Config {
 
 Source: [`packages/fs/tool-fs/src/index.ts:25`](../packages/fs/tool-fs/src/index.ts)
 
-<a id="roos-coderoos-code-tool-fs-search"></a>
+<a id="shres-codeshres-code-tool-fs-search"></a>
 
-## `@roos-code/roos-code-tool-fs-search`
+## `@shres-code/shres-code-tool-fs-search`
 
 Requires: `tools` · `systemPrompt` · `subprocess`
 
@@ -2466,7 +2466,7 @@ export interface Config {
   stderrMaxBytes?: number
   /**
    * Cooperative tool-call timeout budget (ms) on both tools, enforced by
-   * `@roos-code/roos-code-tool-call-timeout-policy` through `exec.signal`.
+   * `@shres-code/shres-code-tool-call-timeout-policy` through `exec.signal`.
    */
   timeoutMs?: number
 }
@@ -2474,9 +2474,9 @@ export interface Config {
 
 Source: [`packages/fs/tool-fs-search/src/index.ts:73`](../packages/fs/tool-fs-search/src/index.ts)
 
-<a id="roos-coderoos-code-tool-goal"></a>
+<a id="shres-codeshres-code-tool-goal"></a>
 
-## `@roos-code/roos-code-tool-goal`
+## `@shres-code/shres-code-tool-goal`
 
 Requires: `agents` · `goals` · `tools` · `systemPrompt`
 
@@ -2490,9 +2490,9 @@ export interface Config {
 
 Source: [`packages/goal/tool-goal/src/index.ts:26`](../packages/goal/tool-goal/src/index.ts)
 
-<a id="roos-coderoos-code-tool-jobs"></a>
+<a id="shres-codeshres-code-tool-jobs"></a>
 
-## `@roos-code/roos-code-tool-jobs`
+## `@shres-code/shres-code-tool-jobs`
 
 Requires: `tools` · `jobs` · `systemPrompt`
 
@@ -2524,9 +2524,9 @@ export type CompletionDelivery = 'quiet' | 'wakeup'
 
 Source: [`packages/jobs/tool-jobs/src/index.ts:32`](../packages/jobs/tool-jobs/src/index.ts)
 
-<a id="roos-coderoos-code-tool-lsp"></a>
+<a id="shres-codeshres-code-tool-lsp"></a>
 
-## `@roos-code/roos-code-tool-lsp`
+## `@shres-code/shres-code-tool-lsp`
 
 Requires: `tools` · `lsp` · `systemPrompt`
 
@@ -2544,9 +2544,9 @@ export interface Config {
 
 Source: [`packages/lsp/tool-lsp/src/index.ts:58`](../packages/lsp/tool-lsp/src/index.ts)
 
-<a id="roos-coderoos-code-tool-pwsh"></a>
+<a id="shres-codeshres-code-tool-pwsh"></a>
 
-## `@roos-code/roos-code-tool-pwsh`
+## `@shres-code/shres-code-tool-pwsh`
 
 Requires: `tools` · `shell` · `systemPrompt` · `shellEnv`
 
@@ -2560,9 +2560,9 @@ export interface Config {
 
 Source: [`packages/shell/tool-pwsh/src/index.ts:52`](../packages/shell/tool-pwsh/src/index.ts)
 
-<a id="roos-coderoos-code-tool-ralph"></a>
+<a id="shres-codeshres-code-tool-ralph"></a>
 
-## `@roos-code/roos-code-tool-ralph`
+## `@shres-code/shres-code-tool-ralph`
 
 Requires: `tools` · `workflowEngine` · `subagents` · `systemPrompt`
 
@@ -2582,9 +2582,9 @@ export interface Config {
 
 Source: [`packages/workflow/tool-ralph/src/index.ts:23`](../packages/workflow/tool-ralph/src/index.ts)
 
-<a id="roos-coderoos-code-tool-session-query"></a>
+<a id="shres-codeshres-code-tool-session-query"></a>
 
-## `@roos-code/roos-code-tool-session-query`
+## `@shres-code/shres-code-tool-session-query`
 
 Requires: `tools` · `systemPrompt` · `sessionQuery`
 
@@ -2600,9 +2600,9 @@ export interface Config {
 
 Source: [`packages/session-query/tool-session-query/src/index.ts:29`](../packages/session-query/tool-session-query/src/index.ts)
 
-<a id="roos-coderoos-code-tool-skill"></a>
+<a id="shres-codeshres-code-tool-skill"></a>
 
-## `@roos-code/roos-code-tool-skill`
+## `@shres-code/shres-code-tool-skill`
 
 Requires: `agents` · `tools` · `skills`
 
@@ -2616,9 +2616,9 @@ export interface Config {
 
 Source: [`packages/skill/tool-skill/src/index.ts:61`](../packages/skill/tool-skill/src/index.ts)
 
-<a id="roos-coderoos-code-tool-str-replace-editor"></a>
+<a id="shres-codeshres-code-tool-str-replace-editor"></a>
 
-## `@roos-code/roos-code-tool-str-replace-editor`
+## `@shres-code/shres-code-tool-str-replace-editor`
 
 Requires: `tools` · `fs`
 
@@ -2634,9 +2634,9 @@ export interface Config {
 
 Source: [`packages/fs/tool-str-replace-editor/src/index.ts:497`](../packages/fs/tool-str-replace-editor/src/index.ts)
 
-<a id="roos-coderoos-code-tool-subagent"></a>
+<a id="shres-codeshres-code-tool-subagent"></a>
 
-## `@roos-code/roos-code-tool-subagent`
+## `@shres-code/shres-code-tool-subagent`
 
 Requires: `tools` · `subagents` · `systemPrompt`
 
@@ -2699,9 +2699,9 @@ Depends on: [`AgentOptions`](subsystems/core.md)
 
 Source: [`packages/subagent/tool-subagent/src/index.ts:29`](../packages/subagent/tool-subagent/src/index.ts)
 
-<a id="roos-coderoos-code-tool-subagent-report"></a>
+<a id="shres-codeshres-code-tool-subagent-report"></a>
 
-## `@roos-code/roos-code-tool-subagent-report`
+## `@shres-code/shres-code-tool-subagent-report`
 
 Requires: `subagents` · `tools` · `systemPrompt`
 
@@ -2721,9 +2721,9 @@ Depends on: [`SubagentReportDelivery`](subsystems/subagent.md)
 
 Source: [`packages/subagent/tool-subagent-report/src/index.ts:27`](../packages/subagent/tool-subagent-report/src/index.ts)
 
-<a id="roos-coderoos-code-tool-terminal"></a>
+<a id="shres-codeshres-code-tool-terminal"></a>
 
-## `@roos-code/roos-code-tool-terminal`
+## `@shres-code/shres-code-tool-terminal`
 
 Requires: `terminals` · `tools` · `systemPrompt`
 
@@ -2739,9 +2739,9 @@ export interface Config {
 
 Source: [`packages/terminal/tool-terminal/src/index.ts:35`](../packages/terminal/tool-terminal/src/index.ts)
 
-<a id="roos-coderoos-code-tool-todo"></a>
+<a id="shres-codeshres-code-tool-todo"></a>
 
-## `@roos-code/roos-code-tool-todo`
+## `@shres-code/shres-code-tool-todo`
 
 Requires: `tools`
 
@@ -2761,9 +2761,9 @@ export interface Config {
 
 Source: [`packages/todo/tool-todo/src/index.ts:29`](../packages/todo/tool-todo/src/index.ts)
 
-<a id="roos-coderoos-code-tool-web"></a>
+<a id="shres-codeshres-code-tool-web"></a>
 
-## `@roos-code/roos-code-tool-web`
+## `@shres-code/shres-code-tool-web`
 
 Requires: `tools` · `web` · `systemPrompt`
 
@@ -2787,9 +2787,9 @@ export interface Config {
 
 Source: [`packages/web/tool-web/src/index.ts:37`](../packages/web/tool-web/src/index.ts)
 
-<a id="roos-coderoos-code-tool-workflow"></a>
+<a id="shres-codeshres-code-tool-workflow"></a>
 
-## `@roos-code/roos-code-tool-workflow`
+## `@shres-code/shres-code-tool-workflow`
 
 Requires: `tools` · `workflowEngine` · `systemPrompt`
 
@@ -2805,9 +2805,9 @@ export interface Config {
 
 Source: [`packages/workflow/tool-workflow/src/index.ts:33`](../packages/workflow/tool-workflow/src/index.ts)
 
-<a id="roos-coderoos-code-tools"></a>
+<a id="shres-codeshres-code-tools"></a>
 
-## `@roos-code/roos-code-tools`
+## `@shres-code/shres-code-tools`
 
 Requires: `systemPrompt`
 
@@ -2841,9 +2841,9 @@ export type ToolPresentationMode = 'native' | 'code' | 'both'
 
 Source: [`packages/core/tools/src/index.ts:654`](../packages/core/tools/src/index.ts)
 
-<a id="roos-coderoos-code-typert-loader"></a>
+<a id="shres-codeshres-code-typert-loader"></a>
 
-## `@roos-code/roos-code-typert-loader`
+## `@shres-code/shres-code-typert-loader`
 
 Requires: `typert` · `loader`
 
@@ -2857,9 +2857,9 @@ export interface Config {
 
 Source: [`packages/typert/loader/src/index.ts:47`](../packages/typert/loader/src/index.ts)
 
-<a id="roos-coderoos-code-user-approval"></a>
+<a id="shres-codeshres-code-user-approval"></a>
 
-## `@roos-code/roos-code-user-approval`
+## `@shres-code/shres-code-user-approval`
 
 ```ts config-catalog
 /** Plugin config. All optional — `static Config` supplies the defaults. */
@@ -2888,9 +2888,9 @@ export type ApprovalPolicy = 'ask' | 'never'
 
 Source: [`packages/interaction/user-approval/src/index.ts:177`](../packages/interaction/user-approval/src/index.ts)
 
-<a id="roos-coderoos-code-web"></a>
+<a id="shres-codeshres-code-web"></a>
 
-## `@roos-code/roos-code-web`
+## `@shres-code/shres-code-web`
 
 ```ts config-catalog
 /**
@@ -2909,9 +2909,9 @@ export interface WebRuntimeConfig {
 
 Source: [`packages/web/web/src/index.ts:55`](../packages/web/web/src/index.ts)
 
-<a id="roos-coderoos-code-web-app"></a>
+<a id="shres-codeshres-code-web-app"></a>
 
-## `@roos-code/roos-code-web-app`
+## `@shres-code/shres-code-web-app`
 
 Requires: `webServer`
 
@@ -2922,7 +2922,7 @@ export interface Config {
   printUrl: boolean
   /**
    * Register the model-visible surface context (the `app:web-surface` prompt
-   * section and the `ROOS_WEB_URL` bash variable). A one-shot non-interactive
+   * section and the `SHRES_WEB_URL` bash variable). A one-shot non-interactive
    * layer can turn it off when its user is not in the GUI, so the
    * orientation text would be false.
    */
@@ -2934,9 +2934,9 @@ export interface Config {
 
 Source: [`packages/bundle/web-app/src/index.ts:38`](../packages/bundle/web-app/src/index.ts)
 
-<a id="roos-coderoos-code-web-fetch-http"></a>
+<a id="shres-codeshres-code-web-fetch-http"></a>
 
-## `@roos-code/roos-code-web-fetch-http`
+## `@shres-code/shres-code-web-fetch-http`
 
 Requires: `web`
 
@@ -2960,9 +2960,9 @@ export interface Config {
 
 Source: [`packages/web/web-fetch-http/src/index.ts:34`](../packages/web/web-fetch-http/src/index.ts)
 
-<a id="roos-coderoos-code-web-search-deepseek"></a>
+<a id="shres-codeshres-code-web-search-deepseek"></a>
 
-## `@roos-code/roos-code-web-search-deepseek`
+## `@shres-code/shres-code-web-search-deepseek`
 
 Requires: `web`
 
@@ -2988,9 +2988,9 @@ export interface Config {
 
 Source: [`packages/web/web-search-deepseek/src/index.ts:46`](../packages/web/web-search-deepseek/src/index.ts)
 
-<a id="roos-coderoos-code-web-search-exa"></a>
+<a id="shres-codeshres-code-web-search-exa"></a>
 
-## `@roos-code/roos-code-web-search-exa`
+## `@shres-code/shres-code-web-search-exa`
 
 Requires: `web`
 
@@ -3012,9 +3012,9 @@ export interface Config {
 
 Source: [`packages/web/web-search-exa/src/index.ts:38`](../packages/web/web-search-exa/src/index.ts)
 
-<a id="roos-coderoos-code-web-search-perplexity"></a>
+<a id="shres-codeshres-code-web-search-perplexity"></a>
 
-## `@roos-code/roos-code-web-search-perplexity`
+## `@shres-code/shres-code-web-search-perplexity`
 
 Requires: `web`
 
@@ -3036,9 +3036,9 @@ export interface Config {
 
 Source: [`packages/web/web-search-perplexity/src/index.ts:32`](../packages/web/web-search-perplexity/src/index.ts)
 
-<a id="roos-coderoos-code-workflow-worker-thread"></a>
+<a id="shres-codeshres-code-workflow-worker-thread"></a>
 
-## `@roos-code/roos-code-workflow-worker-thread`
+## `@shres-code/shres-code-workflow-worker-thread`
 
 Requires: `subagents`
 
@@ -3070,127 +3070,127 @@ Source: [`packages/workflow/workflow-worker-thread/src/index.ts:32`](../packages
 
 These load from a `cordis.yml` entry with no `config:` block; they declare no configuration API.
 
-- `@roos-code/roos-code-agent` ([`packages/core/agent/src/index.ts`](../packages/core/agent/src/index.ts))
-- `@roos-code/roos-code-api-gateway` — requires `typert` ([`packages/api/gateway/src/index.ts`](../packages/api/gateway/src/index.ts))
-- `@roos-code/roos-code-api-remotes` ([`packages/api/remotes/src/index.ts`](../packages/api/remotes/src/index.ts))
-- `@roos-code/roos-code-client-locale` ([`packages/client/locale/src/index.ts`](../packages/client/locale/src/index.ts))
-- `@roos-code/roos-code-client-modules` — requires `webServer` · `loader` ([`packages/client/modules/src/index.ts`](../packages/client/modules/src/index.ts))
-- `@roos-code/roos-code-client-runtime` ([`packages/client/runtime/src/index.ts`](../packages/client/runtime/src/index.ts))
-- `@roos-code/roos-code-client-ui-agent-preset` ([`packages/client/ui-agent-preset/src/index.ts`](../packages/client/ui-agent-preset/src/index.ts))
-- `@roos-code/roos-code-client-ui-commands` ([`packages/client/ui-commands/src/index.ts`](../packages/client/ui-commands/src/index.ts))
-- `@roos-code/roos-code-client-ui-conversation` ([`packages/client/ui-conversation/src/index.ts`](../packages/client/ui-conversation/src/index.ts))
-- `@roos-code/roos-code-client-ui-cordis` ([`packages/extensions/ui-cordis/src/index.ts`](../packages/extensions/ui-cordis/src/index.ts))
-- `@roos-code/roos-code-client-ui-deliverables` — requires `systemPrompt` ([`packages/client/ui-deliverables/src/index.ts`](../packages/client/ui-deliverables/src/index.ts))
-- `@roos-code/roos-code-client-ui-directory-picker-browse` ([`packages/client/ui-directory-picker-browse/src/index.ts`](../packages/client/ui-directory-picker-browse/src/index.ts))
-- `@roos-code/roos-code-client-ui-directory-picker-native` ([`packages/client/ui-directory-picker-native/src/index.ts`](../packages/client/ui-directory-picker-native/src/index.ts))
-- `@roos-code/roos-code-client-ui-goal` ([`packages/client/ui-goal/src/index.ts`](../packages/client/ui-goal/src/index.ts))
-- `@roos-code/roos-code-client-ui-input-trigger` ([`packages/client/ui-input-trigger/src/index.ts`](../packages/client/ui-input-trigger/src/index.ts))
-- `@roos-code/roos-code-client-ui-jobs` ([`packages/client/ui-jobs/src/index.ts`](../packages/client/ui-jobs/src/index.ts))
-- `@roos-code/roos-code-client-ui-layout` ([`packages/client/ui-layout/src/index.ts`](../packages/client/ui-layout/src/index.ts))
-- `@roos-code/roos-code-client-ui-message-feedback` ([`packages/client/ui-message-feedback/src/index.ts`](../packages/client/ui-message-feedback/src/index.ts))
-- `@roos-code/roos-code-client-ui-model-selection` ([`packages/client/ui-model-selection/src/index.ts`](../packages/client/ui-model-selection/src/index.ts))
-- `@roos-code/roos-code-client-ui-permission-presets` ([`packages/client/ui-permission-presets/src/index.ts`](../packages/client/ui-permission-presets/src/index.ts))
-- `@roos-code/roos-code-client-ui-plan` ([`packages/client/ui-plan/src/index.ts`](../packages/client/ui-plan/src/index.ts))
-- `@roos-code/roos-code-client-ui-settings` ([`packages/client/ui-settings/src/index.ts`](../packages/client/ui-settings/src/index.ts))
-- `@roos-code/roos-code-client-ui-settings-general` ([`packages/client/ui-settings-general/src/index.ts`](../packages/client/ui-settings-general/src/index.ts))
-- `@roos-code/roos-code-client-ui-settings-models` ([`packages/client/ui-settings-models/src/index.ts`](../packages/client/ui-settings-models/src/index.ts))
-- `@roos-code/roos-code-client-ui-settings-plugin-inventory` ([`packages/client/ui-settings-plugin-inventory/src/index.ts`](../packages/client/ui-settings-plugin-inventory/src/index.ts))
-- `@roos-code/roos-code-client-ui-settings-plugins` ([`packages/client/ui-settings-plugins/src/index.ts`](../packages/client/ui-settings-plugins/src/index.ts))
-- `@roos-code/roos-code-client-ui-sidebar` ([`packages/client/ui-sidebar/src/index.ts`](../packages/client/ui-sidebar/src/index.ts))
-- `@roos-code/roos-code-client-ui-skill` ([`packages/client/ui-skill/src/index.ts`](../packages/client/ui-skill/src/index.ts))
-- `@roos-code/roos-code-client-ui-subagent` ([`packages/client/ui-subagent/src/index.ts`](../packages/client/ui-subagent/src/index.ts))
-- `@roos-code/roos-code-client-ui-theme` ([`packages/client/ui-theme/src/index.ts`](../packages/client/ui-theme/src/index.ts))
-- `@roos-code/roos-code-client-ui-tool` ([`packages/client/ui-tool/src/index.ts`](../packages/client/ui-tool/src/index.ts))
-- `@roos-code/roos-code-client-ui-trajectory` ([`packages/client/ui-trajectory/src/index.ts`](../packages/client/ui-trajectory/src/index.ts))
-- `@roos-code/roos-code-client-ui-user-questions` ([`packages/client/ui-user-questions/src/index.ts`](../packages/client/ui-user-questions/src/index.ts))
-- `@roos-code/roos-code-client-ui-workflow-run` ([`packages/client/ui-workflow-run/src/index.ts`](../packages/client/ui-workflow-run/src/index.ts))
-- `@roos-code/roos-code-client-ui-workspace` ([`packages/client/ui-workspace/src/index.ts`](../packages/client/ui-workspace/src/index.ts))
-- `@roos-code/roos-code-command-compact` — requires `commands` · `compaction` ([`packages/compaction/command-compact/src/index.ts`](../packages/compaction/command-compact/src/index.ts))
-- `@roos-code/roos-code-command-feedback` — requires `commands` ([`packages/feedback/command-feedback/src/index.ts`](../packages/feedback/command-feedback/src/index.ts))
-- `@roos-code/roos-code-command-goal` — requires `commands` · `goals` ([`packages/goal/command-goal/src/index.ts`](../packages/goal/command-goal/src/index.ts))
-- `@roos-code/roos-code-commands` ([`packages/interaction/commands/src/index.ts`](../packages/interaction/commands/src/index.ts))
-- `@roos-code/roos-code-cordis-client-runner` ([`packages/extensions/cordis-client-runner/src/index.ts`](../packages/extensions/cordis-client-runner/src/index.ts))
-- `@roos-code/roos-code-fs-e2b` — requires `e2b` ([`packages/e2b/fs-e2b/src/index.ts`](../packages/e2b/fs-e2b/src/index.ts))
-- `@roos-code/roos-code-fs-observation-policy` ([`packages/fs/fs-observation-policy/src/index.ts`](../packages/fs/fs-observation-policy/src/index.ts))
-- `@roos-code/roos-code-goal-round-driver` — requires `agents` · `goals` · `sessions` ([`packages/goal/goal-round-driver/src/index.ts`](../packages/goal/goal-round-driver/src/index.ts))
-- `@roos-code/roos-code-host-directory-picker-auto` — requires `webServer` · `loader` ([`packages/host/directory-picker-auto/src/index.ts`](../packages/host/directory-picker-auto/src/index.ts))
-- `@roos-code/roos-code-host-directory-picker-native` ([`packages/host/directory-picker-native/src/index.ts`](../packages/host/directory-picker-native/src/index.ts))
-- `@roos-code/roos-code-host-plugin-inventory` — requires `loader` ([`packages/host/plugin-inventory/src/index.ts`](../packages/host/plugin-inventory/src/index.ts))
-- `@roos-code/roos-code-llm` ([`packages/llm/llm/src/index.ts`](../packages/llm/llm/src/index.ts))
-- `@roos-code/roos-code-lsp` ([`packages/lsp/lsp/src/index.ts`](../packages/lsp/lsp/src/index.ts))
-- `@roos-code/roos-code-schedule` — requires `agents` · `sessions` · `tools` · `sessionPersistence` ([`packages/schedule/schedule/src/index.ts`](../packages/schedule/schedule/src/index.ts))
-- `@roos-code/roos-code-session` ([`packages/core/session/src/index.ts`](../packages/core/session/src/index.ts))
-- `@roos-code/roos-code-session-checkpoint-policy` — requires `llm` · `sessionPersistence` · `sessions` · `tools` ([`packages/session/session-checkpoint-policy/src/index.ts`](../packages/session/session-checkpoint-policy/src/index.ts))
-- `@roos-code/roos-code-session-log-export` — requires `commands` ([`packages/session-query/session-log-export/src/index.ts`](../packages/session-query/session-log-export/src/index.ts))
-- `@roos-code/roos-code-session-projection` ([`packages/session/session-projection/src/index.ts`](../packages/session/session-projection/src/index.ts))
-- `@roos-code/roos-code-session-stats` — requires `sessionProjections` ([`packages/session/session-stats/src/index.ts`](../packages/session/session-stats/src/index.ts))
-- `@roos-code/roos-code-skill-badge` — requires `skills` ([`packages/skill/skill-badge/src/index.ts`](../packages/skill/skill-badge/src/index.ts))
-- `@roos-code/roos-code-storage` ([`packages/storage/storage/src/index.ts`](../packages/storage/storage/src/index.ts))
-- `@roos-code/roos-code-subagent` ([`packages/subagent/subagent/src/index.ts`](../packages/subagent/subagent/src/index.ts))
-- `@roos-code/roos-code-subprocess-local` ([`packages/subprocess/subprocess-local/src/index.ts`](../packages/subprocess/subprocess-local/src/index.ts))
-- `@roos-code/roos-code-terminal` ([`packages/terminal/terminal/src/index.ts`](../packages/terminal/terminal/src/index.ts))
-- `@roos-code/roos-code-tool-ask-user` — requires `tools` · `userQuestions` ([`packages/interaction/tool-ask-user/src/index.ts`](../packages/interaction/tool-ask-user/src/index.ts))
-- `@roos-code/roos-code-tool-call-timeout-policy` — requires `tools` ([`packages/guard/timeout-policy/src/index.ts`](../packages/guard/timeout-policy/src/index.ts))
-- `@roos-code/roos-code-tool-cordis` — requires `tools` · `systemPrompt` · `dynamicCordisRunner` · `cordisInspect` ([`packages/extensions/tool-cordis/src/index.ts`](../packages/extensions/tool-cordis/src/index.ts))
-- `@roos-code/roos-code-tool-subagent-control` — requires `tools` · `subagents` ([`packages/subagent/tool-subagent-control/src/index.ts`](../packages/subagent/tool-subagent-control/src/index.ts))
-- `@roos-code/roos-code-user-questions` ([`packages/interaction/user-questions/src/index.ts`](../packages/interaction/user-questions/src/index.ts))
-- `@roos-code/roos-code-workspace` — requires `storageDomain` · `sessionPersistence` ([`packages/workspace/workspace/src/index.ts`](../packages/workspace/workspace/src/index.ts))
+- `@shres-code/shres-code-agent` ([`packages/core/agent/src/index.ts`](../packages/core/agent/src/index.ts))
+- `@shres-code/shres-code-api-gateway` — requires `typert` ([`packages/api/gateway/src/index.ts`](../packages/api/gateway/src/index.ts))
+- `@shres-code/shres-code-api-remotes` ([`packages/api/remotes/src/index.ts`](../packages/api/remotes/src/index.ts))
+- `@shres-code/shres-code-client-locale` ([`packages/client/locale/src/index.ts`](../packages/client/locale/src/index.ts))
+- `@shres-code/shres-code-client-modules` — requires `webServer` · `loader` ([`packages/client/modules/src/index.ts`](../packages/client/modules/src/index.ts))
+- `@shres-code/shres-code-client-runtime` ([`packages/client/runtime/src/index.ts`](../packages/client/runtime/src/index.ts))
+- `@shres-code/shres-code-client-ui-agent-preset` ([`packages/client/ui-agent-preset/src/index.ts`](../packages/client/ui-agent-preset/src/index.ts))
+- `@shres-code/shres-code-client-ui-commands` ([`packages/client/ui-commands/src/index.ts`](../packages/client/ui-commands/src/index.ts))
+- `@shres-code/shres-code-client-ui-conversation` ([`packages/client/ui-conversation/src/index.ts`](../packages/client/ui-conversation/src/index.ts))
+- `@shres-code/shres-code-client-ui-cordis` ([`packages/extensions/ui-cordis/src/index.ts`](../packages/extensions/ui-cordis/src/index.ts))
+- `@shres-code/shres-code-client-ui-deliverables` — requires `systemPrompt` ([`packages/client/ui-deliverables/src/index.ts`](../packages/client/ui-deliverables/src/index.ts))
+- `@shres-code/shres-code-client-ui-directory-picker-browse` ([`packages/client/ui-directory-picker-browse/src/index.ts`](../packages/client/ui-directory-picker-browse/src/index.ts))
+- `@shres-code/shres-code-client-ui-directory-picker-native` ([`packages/client/ui-directory-picker-native/src/index.ts`](../packages/client/ui-directory-picker-native/src/index.ts))
+- `@shres-code/shres-code-client-ui-goal` ([`packages/client/ui-goal/src/index.ts`](../packages/client/ui-goal/src/index.ts))
+- `@shres-code/shres-code-client-ui-input-trigger` ([`packages/client/ui-input-trigger/src/index.ts`](../packages/client/ui-input-trigger/src/index.ts))
+- `@shres-code/shres-code-client-ui-jobs` ([`packages/client/ui-jobs/src/index.ts`](../packages/client/ui-jobs/src/index.ts))
+- `@shres-code/shres-code-client-ui-layout` ([`packages/client/ui-layout/src/index.ts`](../packages/client/ui-layout/src/index.ts))
+- `@shres-code/shres-code-client-ui-message-feedback` ([`packages/client/ui-message-feedback/src/index.ts`](../packages/client/ui-message-feedback/src/index.ts))
+- `@shres-code/shres-code-client-ui-model-selection` ([`packages/client/ui-model-selection/src/index.ts`](../packages/client/ui-model-selection/src/index.ts))
+- `@shres-code/shres-code-client-ui-permission-presets` ([`packages/client/ui-permission-presets/src/index.ts`](../packages/client/ui-permission-presets/src/index.ts))
+- `@shres-code/shres-code-client-ui-plan` ([`packages/client/ui-plan/src/index.ts`](../packages/client/ui-plan/src/index.ts))
+- `@shres-code/shres-code-client-ui-settings` ([`packages/client/ui-settings/src/index.ts`](../packages/client/ui-settings/src/index.ts))
+- `@shres-code/shres-code-client-ui-settings-general` ([`packages/client/ui-settings-general/src/index.ts`](../packages/client/ui-settings-general/src/index.ts))
+- `@shres-code/shres-code-client-ui-settings-models` ([`packages/client/ui-settings-models/src/index.ts`](../packages/client/ui-settings-models/src/index.ts))
+- `@shres-code/shres-code-client-ui-settings-plugin-inventory` ([`packages/client/ui-settings-plugin-inventory/src/index.ts`](../packages/client/ui-settings-plugin-inventory/src/index.ts))
+- `@shres-code/shres-code-client-ui-settings-plugins` ([`packages/client/ui-settings-plugins/src/index.ts`](../packages/client/ui-settings-plugins/src/index.ts))
+- `@shres-code/shres-code-client-ui-sidebar` ([`packages/client/ui-sidebar/src/index.ts`](../packages/client/ui-sidebar/src/index.ts))
+- `@shres-code/shres-code-client-ui-skill` ([`packages/client/ui-skill/src/index.ts`](../packages/client/ui-skill/src/index.ts))
+- `@shres-code/shres-code-client-ui-subagent` ([`packages/client/ui-subagent/src/index.ts`](../packages/client/ui-subagent/src/index.ts))
+- `@shres-code/shres-code-client-ui-theme` ([`packages/client/ui-theme/src/index.ts`](../packages/client/ui-theme/src/index.ts))
+- `@shres-code/shres-code-client-ui-tool` ([`packages/client/ui-tool/src/index.ts`](../packages/client/ui-tool/src/index.ts))
+- `@shres-code/shres-code-client-ui-trajectory` ([`packages/client/ui-trajectory/src/index.ts`](../packages/client/ui-trajectory/src/index.ts))
+- `@shres-code/shres-code-client-ui-user-questions` ([`packages/client/ui-user-questions/src/index.ts`](../packages/client/ui-user-questions/src/index.ts))
+- `@shres-code/shres-code-client-ui-workflow-run` ([`packages/client/ui-workflow-run/src/index.ts`](../packages/client/ui-workflow-run/src/index.ts))
+- `@shres-code/shres-code-client-ui-workspace` ([`packages/client/ui-workspace/src/index.ts`](../packages/client/ui-workspace/src/index.ts))
+- `@shres-code/shres-code-command-compact` — requires `commands` · `compaction` ([`packages/compaction/command-compact/src/index.ts`](../packages/compaction/command-compact/src/index.ts))
+- `@shres-code/shres-code-command-feedback` — requires `commands` ([`packages/feedback/command-feedback/src/index.ts`](../packages/feedback/command-feedback/src/index.ts))
+- `@shres-code/shres-code-command-goal` — requires `commands` · `goals` ([`packages/goal/command-goal/src/index.ts`](../packages/goal/command-goal/src/index.ts))
+- `@shres-code/shres-code-commands` ([`packages/interaction/commands/src/index.ts`](../packages/interaction/commands/src/index.ts))
+- `@shres-code/shres-code-cordis-client-runner` ([`packages/extensions/cordis-client-runner/src/index.ts`](../packages/extensions/cordis-client-runner/src/index.ts))
+- `@shres-code/shres-code-fs-e2b` — requires `e2b` ([`packages/e2b/fs-e2b/src/index.ts`](../packages/e2b/fs-e2b/src/index.ts))
+- `@shres-code/shres-code-fs-observation-policy` ([`packages/fs/fs-observation-policy/src/index.ts`](../packages/fs/fs-observation-policy/src/index.ts))
+- `@shres-code/shres-code-goal-round-driver` — requires `agents` · `goals` · `sessions` ([`packages/goal/goal-round-driver/src/index.ts`](../packages/goal/goal-round-driver/src/index.ts))
+- `@shres-code/shres-code-host-directory-picker-auto` — requires `webServer` · `loader` ([`packages/host/directory-picker-auto/src/index.ts`](../packages/host/directory-picker-auto/src/index.ts))
+- `@shres-code/shres-code-host-directory-picker-native` ([`packages/host/directory-picker-native/src/index.ts`](../packages/host/directory-picker-native/src/index.ts))
+- `@shres-code/shres-code-host-plugin-inventory` — requires `loader` ([`packages/host/plugin-inventory/src/index.ts`](../packages/host/plugin-inventory/src/index.ts))
+- `@shres-code/shres-code-llm` ([`packages/llm/llm/src/index.ts`](../packages/llm/llm/src/index.ts))
+- `@shres-code/shres-code-lsp` ([`packages/lsp/lsp/src/index.ts`](../packages/lsp/lsp/src/index.ts))
+- `@shres-code/shres-code-schedule` — requires `agents` · `sessions` · `tools` · `sessionPersistence` ([`packages/schedule/schedule/src/index.ts`](../packages/schedule/schedule/src/index.ts))
+- `@shres-code/shres-code-session` ([`packages/core/session/src/index.ts`](../packages/core/session/src/index.ts))
+- `@shres-code/shres-code-session-checkpoint-policy` — requires `llm` · `sessionPersistence` · `sessions` · `tools` ([`packages/session/session-checkpoint-policy/src/index.ts`](../packages/session/session-checkpoint-policy/src/index.ts))
+- `@shres-code/shres-code-session-log-export` — requires `commands` ([`packages/session-query/session-log-export/src/index.ts`](../packages/session-query/session-log-export/src/index.ts))
+- `@shres-code/shres-code-session-projection` ([`packages/session/session-projection/src/index.ts`](../packages/session/session-projection/src/index.ts))
+- `@shres-code/shres-code-session-stats` — requires `sessionProjections` ([`packages/session/session-stats/src/index.ts`](../packages/session/session-stats/src/index.ts))
+- `@shres-code/shres-code-skill-badge` — requires `skills` ([`packages/skill/skill-badge/src/index.ts`](../packages/skill/skill-badge/src/index.ts))
+- `@shres-code/shres-code-storage` ([`packages/storage/storage/src/index.ts`](../packages/storage/storage/src/index.ts))
+- `@shres-code/shres-code-subagent` ([`packages/subagent/subagent/src/index.ts`](../packages/subagent/subagent/src/index.ts))
+- `@shres-code/shres-code-subprocess-local` ([`packages/subprocess/subprocess-local/src/index.ts`](../packages/subprocess/subprocess-local/src/index.ts))
+- `@shres-code/shres-code-terminal` ([`packages/terminal/terminal/src/index.ts`](../packages/terminal/terminal/src/index.ts))
+- `@shres-code/shres-code-tool-ask-user` — requires `tools` · `userQuestions` ([`packages/interaction/tool-ask-user/src/index.ts`](../packages/interaction/tool-ask-user/src/index.ts))
+- `@shres-code/shres-code-tool-call-timeout-policy` — requires `tools` ([`packages/guard/timeout-policy/src/index.ts`](../packages/guard/timeout-policy/src/index.ts))
+- `@shres-code/shres-code-tool-cordis` — requires `tools` · `systemPrompt` · `dynamicCordisRunner` · `cordisInspect` ([`packages/extensions/tool-cordis/src/index.ts`](../packages/extensions/tool-cordis/src/index.ts))
+- `@shres-code/shres-code-tool-subagent-control` — requires `tools` · `subagents` ([`packages/subagent/tool-subagent-control/src/index.ts`](../packages/subagent/tool-subagent-control/src/index.ts))
+- `@shres-code/shres-code-user-questions` ([`packages/interaction/user-questions/src/index.ts`](../packages/interaction/user-questions/src/index.ts))
+- `@shres-code/shres-code-workspace` — requires `storageDomain` · `sessionPersistence` ([`packages/workspace/workspace/src/index.ts`](../packages/workspace/workspace/src/index.ts))
 
 ## Seam packages (not directly loadable)
 
 Abstract service classes — a deployment loads a concrete implementation package instead ([capability seams](../.agents/notes/implemented/architecture/2026-06-13-capability-seams.md)).
 
-- `@roos-code/roos-code-attachment` — abstract `AttachmentStore` ([`packages/attachment/attachment/src/index.ts`](../packages/attachment/attachment/src/index.ts))
-- `@roos-code/roos-code-code-runtime` — abstract `CodeRuntime` ([`packages/code-runtime/code-runtime/src/index.ts`](../packages/code-runtime/code-runtime/src/index.ts))
-- `@roos-code/roos-code-compaction` — abstract `CompactionEngine` ([`packages/compaction/compaction/src/index.ts`](../packages/compaction/compaction/src/index.ts))
-- `@roos-code/roos-code-credentials` — abstract `CredentialProvider` ([`packages/credentials/credentials/src/index.ts`](../packages/credentials/credentials/src/index.ts))
-- `@roos-code/roos-code-fs` — abstract `FileSystem` ([`packages/fs/fs/src/index.ts`](../packages/fs/fs/src/index.ts))
-- `@roos-code/roos-code-host-directory-picker` — abstract `DirectoryPicker` ([`packages/host/directory-picker/src/index.ts`](../packages/host/directory-picker/src/index.ts))
-- `@roos-code/roos-code-jobs` — abstract `JobRegistry` ([`packages/jobs/jobs/src/index.ts`](../packages/jobs/jobs/src/index.ts))
-- `@roos-code/roos-code-sandbox` — abstract `SandboxProvider` ([`packages/sandbox/sandbox/src/index.ts`](../packages/sandbox/sandbox/src/index.ts))
-- `@roos-code/roos-code-session-persistence` — abstract `SessionPersistence` ([`packages/session/session-persistence/src/index.ts`](../packages/session/session-persistence/src/index.ts))
-- `@roos-code/roos-code-session-query` — abstract `SessionQueryEngine` ([`packages/session-query/session-query/src/index.ts`](../packages/session-query/session-query/src/index.ts))
-- `@roos-code/roos-code-settings` — abstract `SettingsProvider` ([`packages/settings/settings/src/index.ts`](../packages/settings/settings/src/index.ts))
-- `@roos-code/roos-code-shell` — abstract `ShellExecutor` ([`packages/shell/shell/src/index.ts`](../packages/shell/shell/src/index.ts))
-- `@roos-code/roos-code-spill` — abstract `SpillStore` ([`packages/spill/spill/src/index.ts`](../packages/spill/spill/src/index.ts))
-- `@roos-code/roos-code-subprocess` — abstract `SubprocessRuntime` ([`packages/subprocess/subprocess/src/index.ts`](../packages/subprocess/subprocess/src/index.ts))
-- `@roos-code/roos-code-workflow` — abstract `WorkflowEngine` ([`packages/workflow/workflow/src/index.ts`](../packages/workflow/workflow/src/index.ts))
+- `@shres-code/shres-code-attachment` — abstract `AttachmentStore` ([`packages/attachment/attachment/src/index.ts`](../packages/attachment/attachment/src/index.ts))
+- `@shres-code/shres-code-code-runtime` — abstract `CodeRuntime` ([`packages/code-runtime/code-runtime/src/index.ts`](../packages/code-runtime/code-runtime/src/index.ts))
+- `@shres-code/shres-code-compaction` — abstract `CompactionEngine` ([`packages/compaction/compaction/src/index.ts`](../packages/compaction/compaction/src/index.ts))
+- `@shres-code/shres-code-credentials` — abstract `CredentialProvider` ([`packages/credentials/credentials/src/index.ts`](../packages/credentials/credentials/src/index.ts))
+- `@shres-code/shres-code-fs` — abstract `FileSystem` ([`packages/fs/fs/src/index.ts`](../packages/fs/fs/src/index.ts))
+- `@shres-code/shres-code-host-directory-picker` — abstract `DirectoryPicker` ([`packages/host/directory-picker/src/index.ts`](../packages/host/directory-picker/src/index.ts))
+- `@shres-code/shres-code-jobs` — abstract `JobRegistry` ([`packages/jobs/jobs/src/index.ts`](../packages/jobs/jobs/src/index.ts))
+- `@shres-code/shres-code-sandbox` — abstract `SandboxProvider` ([`packages/sandbox/sandbox/src/index.ts`](../packages/sandbox/sandbox/src/index.ts))
+- `@shres-code/shres-code-session-persistence` — abstract `SessionPersistence` ([`packages/session/session-persistence/src/index.ts`](../packages/session/session-persistence/src/index.ts))
+- `@shres-code/shres-code-session-query` — abstract `SessionQueryEngine` ([`packages/session-query/session-query/src/index.ts`](../packages/session-query/session-query/src/index.ts))
+- `@shres-code/shres-code-settings` — abstract `SettingsProvider` ([`packages/settings/settings/src/index.ts`](../packages/settings/settings/src/index.ts))
+- `@shres-code/shres-code-shell` — abstract `ShellExecutor` ([`packages/shell/shell/src/index.ts`](../packages/shell/shell/src/index.ts))
+- `@shres-code/shres-code-spill` — abstract `SpillStore` ([`packages/spill/spill/src/index.ts`](../packages/spill/spill/src/index.ts))
+- `@shres-code/shres-code-subprocess` — abstract `SubprocessRuntime` ([`packages/subprocess/subprocess/src/index.ts`](../packages/subprocess/subprocess/src/index.ts))
+- `@shres-code/shres-code-workflow` — abstract `WorkflowEngine` ([`packages/workflow/workflow/src/index.ts`](../packages/workflow/workflow/src/index.ts))
 
 ## Library packages (no plugin entry)
 
 Imported as libraries by other packages; a `cordis.yml` cannot load them.
 
-- `@roos-code/roos-code-acp-snapshot` ([`packages/test-support/acp-snapshot/src/index.ts`](../packages/test-support/acp-snapshot/src/index.ts))
-- `@roos-code/roos-code-agent-loop-testkit` ([`packages/test-support/agent-loop-testkit/src/index.ts`](../packages/test-support/agent-loop-testkit/src/index.ts))
-- `@roos-code/roos-code-anonymous-user-id` ([`packages/identity/anonymous-user-id/src/index.ts`](../packages/identity/anonymous-user-id/src/index.ts))
-- `@roos-code/roos-code-app-boot` ([`packages/boot/app-boot/src/index.ts`](../packages/boot/app-boot/src/index.ts))
-- `@roos-code/roos-code-atomic-write` ([`packages/util/atomic-write/src/index.ts`](../packages/util/atomic-write/src/index.ts))
-- `@roos-code/roos-code-base` ([`packages/bundle/base/src/index.ts`](../packages/bundle/base/src/index.ts))
-- `@roos-code/roos-code-brand` ([`packages/util/brand/src/index.ts`](../packages/util/brand/src/index.ts))
-- `@roos-code/roos-code-client-schema-form` ([`packages/client/schema-form/src/index.ts`](../packages/client/schema-form/src/index.ts))
-- `@roos-code/roos-code-client-test-runtime` ([`packages/test-support/client-runtime/src/index.ts`](../packages/test-support/client-runtime/src/index.ts))
-- `@roos-code/roos-code-client-ui-attachment` ([`packages/client/ui-attachment/src/index.ts`](../packages/client/ui-attachment/src/index.ts))
-- `@roos-code/roos-code-client-ui-primitives` ([`packages/client/ui-primitives/src/index.ts`](../packages/client/ui-primitives/src/index.ts))
-- `@roos-code/roos-code-client-ui-slots` ([`packages/client/ui-slots/src/index.ts`](../packages/client/ui-slots/src/index.ts))
-- `@roos-code/roos-code-client-web` ([`packages/client/web/src/index.ts`](../packages/client/web/src/index.ts))
-- `@roos-code/roos-code-client-web-react` ([`packages/client/web-react/src/index.ts`](../packages/client/web-react/src/index.ts))
-- `@roos-code/roos-code-cmdline` ([`packages/boot/cmdline/src/index.ts`](../packages/boot/cmdline/src/index.ts))
-- `@roos-code/roos-code-home-paths` ([`packages/util/home-paths/src/index.ts`](../packages/util/home-paths/src/index.ts))
-- `@roos-code/roos-code-hook-protocol` ([`packages/hooks/hook-protocol/src/index.ts`](../packages/hooks/hook-protocol/src/index.ts))
-- `@roos-code/roos-code-launch-environment` ([`packages/util/launch-environment/src/index.ts`](../packages/util/launch-environment/src/index.ts))
-- `@roos-code/roos-code-llm-mock-server` ([`packages/test-support/llm-mock-server/src/index.ts`](../packages/test-support/llm-mock-server/src/index.ts))
-- `@roos-code/roos-code-loader-smoke` ([`packages/test-support/loader-smoke/src/index.ts`](../packages/test-support/loader-smoke/src/index.ts))
-- `@roos-code/roos-code-native-command` ([`packages/util/native-command/src/index.ts`](../packages/util/native-command/src/index.ts))
-- `@roos-code/roos-code-output-retention` ([`packages/util/output-retention/src/index.ts`](../packages/util/output-retention/src/index.ts))
-- `@roos-code/roos-code-sandbox-windows-acl` ([`packages/sandbox/sandbox-windows-acl/src/index.ts`](../packages/sandbox/sandbox-windows-acl/src/index.ts))
-- `@roos-code/roos-code-scope` ([`packages/core/scope/src/index.ts`](../packages/core/scope/src/index.ts))
-- `@roos-code/roos-code-sdk-client` ([`packages/sdk/client/src/index.ts`](../packages/sdk/client/src/index.ts))
-- `@roos-code/roos-code-sdk-jsonrpc-demo` ([`packages/examples/jsonrpc-demo/src/index.ts`](../packages/examples/jsonrpc-demo/src/index.ts))
-- `@roos-code/roos-code-sdk-protocol` ([`packages/sdk/protocol/src/index.ts`](../packages/sdk/protocol/src/index.ts))
-- `@roos-code/roos-code-session-telemetry` ([`packages/session/session-telemetry/src/index.ts`](../packages/session/session-telemetry/src/index.ts))
-- `@roos-code/roos-code-session-title-llm` ([`packages/session/session-title-llm/src/index.ts`](../packages/session/session-title-llm/src/index.ts))
-- `@roos-code/roos-code-subagent-in-process-driver` ([`packages/subagent/subagent-in-process-driver/src/index.ts`](../packages/subagent/subagent-in-process-driver/src/index.ts))
-- `@roos-code/roos-code-timeout` ([`packages/util/timeout/src/index.ts`](../packages/util/timeout/src/index.ts))
-- `@roos-code/roos-code-typert-generator` ([`packages/typert/generator/src/index.ts`](../packages/typert/generator/src/index.ts))
-- `@roos-code/roos-code-typert-protocol` ([`packages/typert/protocol/src/index.ts`](../packages/typert/protocol/src/index.ts))
-- `@roos-code/roos-code-typert-registry` ([`packages/typert/registry/src/index.ts`](../packages/typert/registry/src/index.ts))
+- `@shres-code/shres-code-acp-snapshot` ([`packages/test-support/acp-snapshot/src/index.ts`](../packages/test-support/acp-snapshot/src/index.ts))
+- `@shres-code/shres-code-agent-loop-testkit` ([`packages/test-support/agent-loop-testkit/src/index.ts`](../packages/test-support/agent-loop-testkit/src/index.ts))
+- `@shres-code/shres-code-anonymous-user-id` ([`packages/identity/anonymous-user-id/src/index.ts`](../packages/identity/anonymous-user-id/src/index.ts))
+- `@shres-code/shres-code-app-boot` ([`packages/boot/app-boot/src/index.ts`](../packages/boot/app-boot/src/index.ts))
+- `@shres-code/shres-code-atomic-write` ([`packages/util/atomic-write/src/index.ts`](../packages/util/atomic-write/src/index.ts))
+- `@shres-code/shres-code-base` ([`packages/bundle/base/src/index.ts`](../packages/bundle/base/src/index.ts))
+- `@shres-code/shres-code-brand` ([`packages/util/brand/src/index.ts`](../packages/util/brand/src/index.ts))
+- `@shres-code/shres-code-client-schema-form` ([`packages/client/schema-form/src/index.ts`](../packages/client/schema-form/src/index.ts))
+- `@shres-code/shres-code-client-test-runtime` ([`packages/test-support/client-runtime/src/index.ts`](../packages/test-support/client-runtime/src/index.ts))
+- `@shres-code/shres-code-client-ui-attachment` ([`packages/client/ui-attachment/src/index.ts`](../packages/client/ui-attachment/src/index.ts))
+- `@shres-code/shres-code-client-ui-primitives` ([`packages/client/ui-primitives/src/index.ts`](../packages/client/ui-primitives/src/index.ts))
+- `@shres-code/shres-code-client-ui-slots` ([`packages/client/ui-slots/src/index.ts`](../packages/client/ui-slots/src/index.ts))
+- `@shres-code/shres-code-client-web` ([`packages/client/web/src/index.ts`](../packages/client/web/src/index.ts))
+- `@shres-code/shres-code-client-web-react` ([`packages/client/web-react/src/index.ts`](../packages/client/web-react/src/index.ts))
+- `@shres-code/shres-code-cmdline` ([`packages/boot/cmdline/src/index.ts`](../packages/boot/cmdline/src/index.ts))
+- `@shres-code/shres-code-home-paths` ([`packages/util/home-paths/src/index.ts`](../packages/util/home-paths/src/index.ts))
+- `@shres-code/shres-code-hook-protocol` ([`packages/hooks/hook-protocol/src/index.ts`](../packages/hooks/hook-protocol/src/index.ts))
+- `@shres-code/shres-code-launch-environment` ([`packages/util/launch-environment/src/index.ts`](../packages/util/launch-environment/src/index.ts))
+- `@shres-code/shres-code-llm-mock-server` ([`packages/test-support/llm-mock-server/src/index.ts`](../packages/test-support/llm-mock-server/src/index.ts))
+- `@shres-code/shres-code-loader-smoke` ([`packages/test-support/loader-smoke/src/index.ts`](../packages/test-support/loader-smoke/src/index.ts))
+- `@shres-code/shres-code-native-command` ([`packages/util/native-command/src/index.ts`](../packages/util/native-command/src/index.ts))
+- `@shres-code/shres-code-output-retention` ([`packages/util/output-retention/src/index.ts`](../packages/util/output-retention/src/index.ts))
+- `@shres-code/shres-code-sandbox-windows-acl` ([`packages/sandbox/sandbox-windows-acl/src/index.ts`](../packages/sandbox/sandbox-windows-acl/src/index.ts))
+- `@shres-code/shres-code-scope` ([`packages/core/scope/src/index.ts`](../packages/core/scope/src/index.ts))
+- `@shres-code/shres-code-sdk-client` ([`packages/sdk/client/src/index.ts`](../packages/sdk/client/src/index.ts))
+- `@shres-code/shres-code-sdk-jsonrpc-demo` ([`packages/examples/jsonrpc-demo/src/index.ts`](../packages/examples/jsonrpc-demo/src/index.ts))
+- `@shres-code/shres-code-sdk-protocol` ([`packages/sdk/protocol/src/index.ts`](../packages/sdk/protocol/src/index.ts))
+- `@shres-code/shres-code-session-telemetry` ([`packages/session/session-telemetry/src/index.ts`](../packages/session/session-telemetry/src/index.ts))
+- `@shres-code/shres-code-session-title-llm` ([`packages/session/session-title-llm/src/index.ts`](../packages/session/session-title-llm/src/index.ts))
+- `@shres-code/shres-code-subagent-in-process-driver` ([`packages/subagent/subagent-in-process-driver/src/index.ts`](../packages/subagent/subagent-in-process-driver/src/index.ts))
+- `@shres-code/shres-code-timeout` ([`packages/util/timeout/src/index.ts`](../packages/util/timeout/src/index.ts))
+- `@shres-code/shres-code-typert-generator` ([`packages/typert/generator/src/index.ts`](../packages/typert/generator/src/index.ts))
+- `@shres-code/shres-code-typert-protocol` ([`packages/typert/protocol/src/index.ts`](../packages/typert/protocol/src/index.ts))
+- `@shres-code/shres-code-typert-registry` ([`packages/typert/registry/src/index.ts`](../packages/typert/registry/src/index.ts))

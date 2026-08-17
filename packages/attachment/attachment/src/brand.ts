@@ -1,6 +1,6 @@
-/** Attachment identifier brand. @module @roos-code/roos-code-attachment/brand */
+/** Attachment identifier brand. @module @shres-code/shres-code-attachment/brand */
 
-import type { Branded } from '@roos-code/roos-code-brand'
+import type { Branded } from '@shres-code/shres-code-brand'
 
 /** Opaque content-addressed identifier for one immutable attachment object. */
 export type AttachmentId = Branded<'AttachmentId'>

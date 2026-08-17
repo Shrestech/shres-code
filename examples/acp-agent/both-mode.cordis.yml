@@ -3,17 +3,17 @@
 # this overlay for snapshot recording and the sibling overlay for replay. A config
 # patch replaces the whole app config, so unchanged base fields are restated below.
 - id: base
-  name: '@roos-code/cordis-plugin-include'
+  name: '@shres-code/cordis-plugin-include'
   config:
     path: ./cordis.yml
     patches:
       - id: acp-agent
-        name: '@roos-code/roos-code-acp-demo'
+        name: '@shres-code/shres-code-acp-demo'
         config:
           provider: deepseek-official
           model: deepseek-v4-pro
-          persistenceRoot: !!js process.env.ROOS_SNAPSHOT_SESSIONS_ROOT ?? './.sessions'
-          persistenceCompression: !!js "process.env.ROOS_SNAPSHOT === undefined ? 'zstd' : 'none'"
+          persistenceRoot: !!js process.env.SHRES_SNAPSHOT_SESSIONS_ROOT ?? './.sessions'
+          persistenceCompression: !!js "process.env.SHRES_SNAPSHOT === undefined ? 'zstd' : 'none'"
           workspaceContext:
             maxBytes: 65536
           tools:
@@ -24,4 +24,4 @@
             Verify your work by running the code or tests. Keep answers brief and factual.
       - insert:
           - id: code-runtime
-            name: '@roos-code/roos-code-code-runtime-worker-thread'
+            name: '@shres-code/shres-code-code-runtime-worker-thread'

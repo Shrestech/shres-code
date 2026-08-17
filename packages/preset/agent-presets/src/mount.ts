@@ -11,15 +11,15 @@
  * published a service into the ROOT realm is rejected, because such a service
  * is process-global rather than per-session and the second session mounting the
  * same preset collides with the first.
- * @module @roos-code/roos-code-agent-presets/mount
+ * @module @shres-code/shres-code-agent-presets/mount
  */
 
 import { isAbsolute } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { Context, type Fiber } from '@roos-code/cordis'
-import { Include } from '@roos-code/cordis-plugin-include'
-import type { EntryTree } from '@roos-code/cordis-plugin-loader'
-import { scopeOf, scopeParentOf, type ScopeKey } from '@roos-code/roos-code-scope'
+import { Context, type Fiber } from '@shres-code/cordis'
+import { Include } from '@shres-code/cordis-plugin-include'
+import type { EntryTree } from '@shres-code/cordis-plugin-loader'
+import { scopeOf, scopeParentOf, type ScopeKey } from '@shres-code/shres-code-scope'
 import { PresetMountError, type AgentPreset } from './preset.ts'
 
 /** What one mounted subtree publishes about itself for the audit to read. */
@@ -68,7 +68,7 @@ class PresetTree extends Include {
    * relative specifier — a preset's own files travel with it — and wrong for
    * a package name: a locally authored preset lives under the user's home,
    * where Node's upward `node_modules` walk never reaches the harness's own
-   * dependencies, so every `@roos-code/roos-code-*` row would fail to import. The
+   * dependencies, so every `@shres-code/shres-code-*` row would fail to import. The
    * mount records the host composition's base instead, which is inside the
    * installed harness, and bare names resolve from there. An absolute
    * filesystem path names neither base and becomes a file URL before Node's
@@ -132,7 +132,7 @@ const mounts = new Set<PresetMount>()
  *
  * Pruning therefore has to happen on a path this module owns. Reading is one
  * such path, but not a reliable one: the only production reader is the
- * invariant companion's service listener, and `roos-invariants` is a
+ * invariant companion's service listener, and `shres-invariants` is a
  * development composition — a shipped host never loads it. Mounting is the
  * other, and it is the one every session takes, which bounds the set at one
  * generation of dead records rather than one per session ever composed. Each

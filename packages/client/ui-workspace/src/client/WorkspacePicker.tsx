@@ -12,11 +12,11 @@ import type { ReactNode, RefObject } from 'react'
 import { useCallback, useEffect, useState } from 'react'
 import {
   Button, IconFolderClose16, IconPlusOutline16, Menu, Modal, type MenuEntry,
-} from '@roos-code/roos-code-client-ui-primitives'
+} from '@shres-code/shres-code-client-ui-primitives'
 import type {
   WorkspaceId, WorkspaceListState, WorkspaceView,
-} from '@roos-code/roos-code-client-runtime/client'
-import type { SnapshotSelectorHook } from '@roos-code/roos-code-client-ui-slots'
+} from '@shres-code/shres-code-client-runtime/client'
+import type { SnapshotSelectorHook } from '@shres-code/shres-code-client-ui-slots'
 import type { DirectoryFlowOwnerProps, WorkspacePickerProps } from './contract/slots.ts'
 import css from './WorkspacePicker.module.css'
 

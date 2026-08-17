@@ -5,19 +5,19 @@
 # `deepseek-v4-pro`, but the recorded corpus was captured on flash, and a config
 # patch replaces the whole app config, so the base fields are restated verbatim.
 - id: base
-  name: '@roos-code/cordis-plugin-include'
+  name: '@shres-code/cordis-plugin-include'
   config:
     path: ./cordis.yml
     patches:
       - id: llm-deepseek
-        name: '@roos-code/roos-code-llm-deepseek'
+        name: '@shres-code/shres-code-llm-deepseek'
         disabled: true
       - id: acp-agent
-        name: '@roos-code/roos-code-acp-demo'
+        name: '@shres-code/shres-code-acp-demo'
         config:
           provider: deepseek-official
           model: deepseek-v4-flash
-          persistenceRoot: !!js process.env.ROOS_SNAPSHOT_SESSIONS_ROOT ?? './.sessions'
+          persistenceRoot: !!js process.env.SHRES_SNAPSHOT_SESSIONS_ROOT ?? './.sessions'
           persistenceCompression: none
           workspaceContext:
             maxBytes: 65536
@@ -27,15 +27,15 @@
             Verify your work by running the code or tests. Keep answers brief and factual.
       - insert:
           - id: spill-local
-            name: '@roos-code/roos-code-spill-local'
+            name: '@shres-code/shres-code-spill-local'
             config:
-              root: !!js process.env.ROOS_SNAPSHOT_SPILL_ROOT ?? './.spill'
+              root: !!js process.env.SHRES_SNAPSHOT_SPILL_ROOT ?? './.spill'
           - id: spill-policy
-            name: '@roos-code/roos-code-spill-policy'
+            name: '@shres-code/shres-code-spill-policy'
             config:
               maxInlineBytes: 800
           - id: llm-replay
-            name: '@roos-code/roos-code-llm-replay'
+            name: '@shres-code/shres-code-llm-replay'
             config:
               providers:
                 - id: deepseek-official

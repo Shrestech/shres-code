@@ -2,24 +2,24 @@
 # rows an Agent Preset may contribute. Loading the composition starts neither
 # product; the scenario pins both model-visible schemas.
 - id: base
-  name: '@roos-code/cordis-plugin-include'
+  name: '@shres-code/cordis-plugin-include'
   config:
     path: ./cordis.yml
     patches:
       - insert:
           - id: subagent-codex
-            name: '@roos-code/roos-code-subagent-codex'
+            name: '@shres-code/shres-code-subagent-codex'
           - id: subagent-claude-code
-            name: '@roos-code/roos-code-subagent-claude-code'
+            name: '@shres-code/shres-code-subagent-claude-code'
           - id: tool-subagent-codex
-            name: '@roos-code/roos-code-tool-subagent'
+            name: '@shres-code/shres-code-tool-subagent'
             config:
               provider: codex
               toolName: subagent_codex
               enableRunInBackground: false
               maxDepth: provider-managed
           - id: tool-subagent-claude-code
-            name: '@roos-code/roos-code-tool-subagent'
+            name: '@shres-code/shres-code-tool-subagent'
             config:
               provider: claude-code
               toolName: subagent_claude_code

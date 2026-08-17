@@ -1,18 +1,18 @@
-# roos-home-paths
+# shres-home-paths
 
-Shared filesystem path helpers for Roos Code user data.
+Shared filesystem path helpers for Shres Code user data.
 
-## Roos home
+## Shres home
 
-`resolveRoosHome()` resolves the single-root Roos Code home. Precedence, highest first: an explicit configured path, `$ROOS_HOME`, then `~/.roos`. The harness keeps all user data under one root.
+`resolveShresHome()` resolves the single-root Shres Code home. Precedence, highest first: an explicit configured path, `$SHRES_HOME`, then `~/.shres`. The harness keeps all user data under one root.
 
-`roosHomePath(...segments)` joins child segments onto that resolved home with Node's platform path rules. With no segments it returns the home itself.
+`shresHomePath(...segments)` joins child segments onto that resolved home with Node's platform path rules. With no segments it returns the home itself.
 
-`roosHomeDisplay()` names an active root symbolically for user-facing paths: `~/.roos` for the default home, `$ROOS_HOME` for any configured home. It never leaks an absolute machine path.
+`shresHomeDisplay()` names an active root symbolically for user-facing paths: `~/.shres` for the default home, `$SHRES_HOME` for any configured home. It never leaks an absolute machine path.
 
-`ROOS_HOME_DIR_NAME` owns the default user-data directory name: `.roos`.
+`SHRES_HOME_DIR_NAME` owns the default user-data directory name: `.shres`.
 
-`defaultRoosHome()` returns the default Roos Code home by joining the operating-system home directory with `.roos`, using Node's platform path rules.
+`defaultShresHome()` returns the default Shres Code home by joining the operating-system home directory with `.shres`, using Node's platform path rules.
 
 `expandHomePath()` expands `~`, `~/...`, and Windows-style `~\...` prefixes against the operating-system home directory. It leaves non-tilde paths and `~user/...` untouched.
 

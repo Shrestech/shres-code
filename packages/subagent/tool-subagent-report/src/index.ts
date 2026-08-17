@@ -3,16 +3,16 @@
  * continuable in-process child's unpublished context. Roots, one-shot children,
  * remote providers, and agentless executions never see the registration.
  *
- * @module @roos-code/roos-code-tool-subagent-report
+ * @module @shres-code/shres-code-tool-subagent-report
  */
 
-import type { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import type { Agent } from '@roos-code/roos-code-agent'
-import type { ContentBlock } from '@roos-code/roos-code-llm'
-import type { SubagentReportDelivery } from '@roos-code/roos-code-subagent'
-import type {} from '@roos-code/roos-code-system-prompt'
-import { defineTool } from '@roos-code/roos-code-tools'
+import type { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import type { Agent } from '@shres-code/shres-code-agent'
+import type { ContentBlock } from '@shres-code/shres-code-llm'
+import type { SubagentReportDelivery } from '@shres-code/shres-code-subagent'
+import type {} from '@shres-code/shres-code-system-prompt'
+import { defineTool } from '@shres-code/shres-code-tools'
 
 export const name = 'tool-subagent-report'
 // The contribution registers only through childCtx.tools and

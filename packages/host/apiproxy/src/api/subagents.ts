@@ -4,9 +4,9 @@
  * direct parent into the child's Agent inbox.
  */
 
-import type { MessageId } from '@roos-code/roos-code-llm/brand'
-import type { ContentBlock } from '@roos-code/roos-code-llm/types'
-import type { SessionId } from '@roos-code/roos-code-session/types'
+import type { MessageId } from '@shres-code/shres-code-llm/brand'
+import type { ContentBlock } from '@shres-code/shres-code-llm/types'
+import type { SessionId } from '@shres-code/shres-code-session/types'
 import type { RpcRequest, RpcResponse } from './rpc.ts'
 import type { HistoryEntry, SessionProjectionsBlock } from './sessions.ts'
 

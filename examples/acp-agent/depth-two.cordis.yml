@@ -1,12 +1,12 @@
 # Depth-limit snapshot overlay: keep the default composition and allow two
 # generations of spawn children before runtime enforcement rejects another.
 - id: base
-  name: '@roos-code/cordis-plugin-include'
+  name: '@shres-code/cordis-plugin-include'
   config:
     path: ./cordis.yml
     patches:
       - id: tool-subagent
-        name: '@roos-code/roos-code-tool-subagent'
+        name: '@shres-code/shres-code-tool-subagent'
         config:
           provider: spawn
           toolName: subagent

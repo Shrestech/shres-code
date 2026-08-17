@@ -2,14 +2,14 @@
  * Per-message feedback controls: a Like/Dislike pair plus an optional note.
  * Rendered inside the assistant message's IconActions row, so the buttons
  * reuse that row's chrome and sit between copy and branch.
- * @module @roos-code/roos-code-client-ui-message-feedback/client/MessageFeedbackActions
+ * @module @shres-code/shres-code-client-ui-message-feedback/client/MessageFeedbackActions
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   IconDislikeOutline16, IconLikeOutline16, Tooltip,
-} from '@roos-code/roos-code-client-ui-primitives'
-import type { MessageFeedbackRating } from '@roos-code/roos-code-message-feedback/types'
+} from '@shres-code/shres-code-client-ui-primitives'
+import type { MessageFeedbackRating } from '@shres-code/shres-code-message-feedback/types'
 import type { MessageFeedbackActionProps } from './slots.ts'
 import css from './MessageFeedbackActions.module.css'
 

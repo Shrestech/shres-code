@@ -10,12 +10,12 @@
  * preset decides the tool schemas and prompt sections the model sees.
  *
  * Reconstruction reads {@link resolveSessionPreset}, never the header alone.
- * @module @roos-code/roos-code-agent-presets/session
+ * @module @shres-code/shres-code-agent-presets/session
  */
 
-import type { SessionEvent, SessionHeader } from '@roos-code/roos-code-session'
+import type { SessionEvent, SessionHeader } from '@shres-code/shres-code-session'
 
-declare module '@roos-code/roos-code-session/types' {
+declare module '@shres-code/shres-code-session/types' {
   interface SessionEventMap {
     /**
      * The session's agent preset was chosen after creation, while the session

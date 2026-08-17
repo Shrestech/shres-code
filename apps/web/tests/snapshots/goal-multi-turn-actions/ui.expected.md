@@ -18,10 +18,10 @@
   - img
   - img
   - text: Context injection goal
-- button "Context injection @roos-code/roos-code-system-prompt":
+- button "Context injection @shres-code/shres-code-system-prompt":
   - img
   - img
-  - text: Context injection @roos-code/roos-code-system-prompt
+  - text: Context injection @shres-code/shres-code-system-prompt
 - 'button "Think The user''s goal is: \"Do two turns; each turn output the file structure of a random package. After you finish a turn, output the content and stop. The system will open another turn; do a similar one.\" — which translates to: \"Do two turns, each turn output the file structure of a random package. Note that after you finish one turn, directly output the content and stop; our system will help you open another turn, and you just do something similar.\""':
   - img
   - img

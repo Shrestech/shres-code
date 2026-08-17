@@ -11,19 +11,19 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { join, sep } from 'node:path'
-import { resolveRoosHome } from '@roos-code/roos-code-home-paths'
-import { createUserMessage, CallId } from '@roos-code/roos-code-llm'
-import SystemPrompt, { renderPrompt } from '@roos-code/roos-code-system-prompt'
-import ToolRuntime, { TOOL_ABORTED_BEFORE_DISPATCH, type ToolExecution, type ToolExecutionToken } from '@roos-code/roos-code-tools'
-import { SubprocessRuntime } from '@roos-code/roos-code-subprocess'
-import type { SubprocessCollectedOutputs, SubprocessHandle, SubprocessOutcome, SubprocessOutputRead, SubprocessOutputReader, SubprocessSpawnSpec } from '@roos-code/roos-code-subprocess'
-import { MAX_TIMER_DELAY_MS } from '@roos-code/roos-code-timeout'
+import { resolveShresHome } from '@shres-code/shres-code-home-paths'
+import { createUserMessage, CallId } from '@shres-code/shres-code-llm'
+import SystemPrompt, { renderPrompt } from '@shres-code/shres-code-system-prompt'
+import ToolRuntime, { TOOL_ABORTED_BEFORE_DISPATCH, type ToolExecution, type ToolExecutionToken } from '@shres-code/shres-code-tools'
+import { SubprocessRuntime } from '@shres-code/shres-code-subprocess'
+import type { SubprocessCollectedOutputs, SubprocessHandle, SubprocessOutcome, SubprocessOutputRead, SubprocessOutputReader, SubprocessSpawnSpec } from '@shres-code/shres-code-subprocess'
+import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
 import { rgPath } from '@vscode/ripgrep'
-import { SpillLocator, SpillStore } from '@roos-code/roos-code-spill'
-import type { SaveTextSpill, SpillRef } from '@roos-code/roos-code-spill'
-import * as ToolFsSearch from '@roos-code/roos-code-tool-fs-search'
+import { SpillLocator, SpillStore } from '@shres-code/shres-code-spill'
+import type { SaveTextSpill, SpillRef } from '@shres-code/shres-code-spill'
+import * as ToolFsSearch from '@shres-code/shres-code-tool-fs-search'
 import {
   buildGlobCommand,
   buildGrepCommand,
@@ -39,7 +39,7 @@ import {
   runRipgrep,
   sampleAcrossTopLevel,
   toWorkdirRelative,
-} from '@roos-code/roos-code-tool-fs-search'
+} from '@shres-code/shres-code-tool-fs-search'
 
 const testToolSignal = new AbortController().signal
 
@@ -365,7 +365,7 @@ describe('command construction (plain argv)', () => {
       agent: { session: { header: { cwd: process.cwd() } } },
       signal: testToolSignal,
     } as ToolExecution
-    expect(() => fenceSearchPath(ctx, exec, 'grep', join(resolveRoosHome(), '.credentials.yaml')))
+    expect(() => fenceSearchPath(ctx, exec, 'grep', join(resolveShresHome(), '.credentials.yaml')))
       .toThrow(/credentials/)
   })
 

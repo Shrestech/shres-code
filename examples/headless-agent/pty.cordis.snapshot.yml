@@ -1,24 +1,24 @@
 # Keyless opt-in PTY composition for the headless stream-json snapshot.
 - id: base
-  name: '@roos-code/cordis-plugin-include'
+  name: '@shres-code/cordis-plugin-include'
   config:
     path: ./cordis.yml
     patches:
       - id: llm-deepseek
-        name: '@roos-code/roos-code-llm-deepseek'
+        name: '@shres-code/shres-code-llm-deepseek'
         disabled: true
       - insert:
           - id: sandbox-policy
-            name: '@roos-code/roos-code-sandbox-policy'
+            name: '@shres-code/shres-code-sandbox-policy'
             config:
               mode: danger-full-access
           - id: pty
-            name: '@roos-code/roos-code-terminal'
+            name: '@shres-code/shres-code-terminal'
           - id: pty-snapshot-backend
             name: '../acp-agent/pty-snapshot-backend.mjs'
           - id: tool-terminal
-            name: '@roos-code/roos-code-tool-terminal'
+            name: '@shres-code/shres-code-tool-terminal'
             config:
               maxResultBytes: 64
           - id: llm-replay
-            name: '@roos-code/roos-code-llm-replay'
+            name: '@shres-code/shres-code-llm-replay'

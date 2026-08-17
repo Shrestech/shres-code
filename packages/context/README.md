@@ -1,6 +1,6 @@
 # context/ — request-context extensions
 
-Product plugins that add model-visible request context without defining a tool. `agent-instructions` is included by the default `roos-agent-spine-demo` bundle and can be disabled through bundle config; `time-context`, `tmux-context`, and `session-reference` are opt-in.
+Product plugins that add model-visible request context without defining a tool. `agent-instructions` is included by the default `shres-agent-spine-demo` bundle and can be disabled through bundle config; `time-context`, `tmux-context`, and `session-reference` are opt-in.
 
 | Package | Role | ctx key |
 |---|---|---|

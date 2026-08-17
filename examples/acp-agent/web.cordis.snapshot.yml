@@ -2,26 +2,26 @@
 # fixture server stay real (the tool call re-executes the actual HTTP fetch and
 # markdown rendering); only the model adapter is replaced by replay.
 - id: base
-  name: '@roos-code/cordis-plugin-include'
+  name: '@shres-code/cordis-plugin-include'
   config:
     path: ./cordis.yml
     patches:
       - id: llm-deepseek
-        name: '@roos-code/roos-code-llm-deepseek'
+        name: '@shres-code/shres-code-llm-deepseek'
         disabled: true
       - insert:
           - id: web
-            name: '@roos-code/roos-code-web'
+            name: '@shres-code/shres-code-web'
           - id: web-fetch-http
-            name: '@roos-code/roos-code-web-fetch-http'
+            name: '@shres-code/shres-code-web-fetch-http'
           - id: web-fetch-fixture
             name: './web-fetch-fixture-server.mjs'
           - id: tool-web
-            name: '@roos-code/roos-code-tool-web'
+            name: '@shres-code/shres-code-tool-web'
             config:
               search: false
           - id: llm-replay
-            name: '@roos-code/roos-code-llm-replay'
+            name: '@shres-code/shres-code-llm-replay'
             config:
               providers:
                 - id: deepseek-official

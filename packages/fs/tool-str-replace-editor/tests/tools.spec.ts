@@ -2,19 +2,19 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { FsVersion } from '@roos-code/roos-code-fs'
-import { CallId } from '@roos-code/roos-code-llm'
-import { Session, SessionId } from '@roos-code/roos-code-session'
-import AgentRegistry, { Inbox } from '@roos-code/roos-code-agent'
-import type { Agent } from '@roos-code/roos-code-agent'
-import LocalFileSystem from '@roos-code/roos-code-fs-local'
-import * as FsPolicy from '@roos-code/roos-code-fs-observation-policy'
-import SandboxedFileSystem from '@roos-code/roos-code-fs-sandbox'
-import SandboxPolicy from '@roos-code/roos-code-sandbox-policy'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import ToolRuntime from '@roos-code/roos-code-tools'
-import * as ToolStrReplaceEditor from '@roos-code/roos-code-tool-str-replace-editor'
+import { Context } from '@shres-code/cordis'
+import { FsVersion } from '@shres-code/shres-code-fs'
+import { CallId } from '@shres-code/shres-code-llm'
+import { Session, SessionId } from '@shres-code/shres-code-session'
+import AgentRegistry, { Inbox } from '@shres-code/shres-code-agent'
+import type { Agent } from '@shres-code/shres-code-agent'
+import LocalFileSystem from '@shres-code/shres-code-fs-local'
+import * as FsPolicy from '@shres-code/shres-code-fs-observation-policy'
+import SandboxedFileSystem from '@shres-code/shres-code-fs-sandbox'
+import SandboxPolicy from '@shres-code/shres-code-sandbox-policy'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import ToolRuntime from '@shres-code/shres-code-tools'
+import * as ToolStrReplaceEditor from '@shres-code/shres-code-tool-str-replace-editor'
 
 const contexts: Context[] = []
 const roots: string[] = []
@@ -66,7 +66,7 @@ async function setup(
   config: ToolStrReplaceEditor.Config = {},
   options: { fsPolicy?: boolean; sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access' } = {},
 ) {
-  const root = await mkdtemp(join(tmpdir(), 'roos-tool-str-replace-editor-'))
+  const root = await mkdtemp(join(tmpdir(), 'shres-tool-str-replace-editor-'))
   roots.push(root)
   const ctx = new Context()
   contexts.push(ctx)
@@ -526,7 +526,7 @@ describe('tool-str-replace-editor', () => {
   })
 
   it('reports missing sandbox-policy composition during plugin startup', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'roos-tool-str-replace-editor-missing-policy-'))
+    const root = await mkdtemp(join(tmpdir(), 'shres-tool-str-replace-editor-missing-policy-'))
     roots.push(root)
     const ctx = new Context()
     contexts.push(ctx)

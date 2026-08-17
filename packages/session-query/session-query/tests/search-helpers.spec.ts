@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { createUserMessage, CallId , createMessage, createToolResultMessage } from '@roos-code/roos-code-llm'
+import { Context } from '@shres-code/cordis'
+import { createUserMessage, CallId , createMessage, createToolResultMessage } from '@shres-code/shres-code-llm'
 import SessionStore, {
   SESSION_FORMAT_VERSION,
   SessionId,
-} from '@roos-code/roos-code-session'
-import type { SessionEvent, SessionHeader } from '@roos-code/roos-code-session'
+} from '@shres-code/shres-code-session'
+import type { SessionEvent, SessionHeader } from '@shres-code/shres-code-session'
 import {
   buildSessionEventRecords,
   buildSessionEventSearchDocuments,
@@ -16,7 +16,7 @@ import {
   materializeSessionEventResultFilters,
   materializeSessionResultFilters,
   type SessionQueryErrorCode,
-} from '@roos-code/roos-code-session-query'
+} from '@shres-code/shres-code-session-query'
 import { TestSessionQueryEngine } from './test-service.ts'
 
 const id = SessionId('session')

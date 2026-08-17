@@ -1,12 +1,12 @@
 import type {
   ChatConversationViewNode, ConversationLocation, ConversationNodeContext,
   ConversationNodeDefinition,
-} from '@roos-code/roos-code-client-runtime/client'
-import type { SessionId } from '@roos-code/roos-code-session/types'
+} from '@shres-code/shres-code-client-runtime/client'
+import type { SessionId } from '@shres-code/shres-code-session/types'
 import type {
   ToolWorkflowAgentEndData, ToolWorkflowAgentStartData,
-} from '@roos-code/roos-code-tool-workflow/types'
-import type { WorkflowAgentOutcome, WorkflowStopReason } from '@roos-code/roos-code-workflow/types'
+} from '@shres-code/shres-code-tool-workflow/types'
+import type { WorkflowAgentOutcome, WorkflowStopReason } from '@shres-code/shres-code-workflow/types'
 
 /** Status shown for a workflow, phase, or member. */
 export type WorkflowRunStatus = 'running' | 'completed' | 'failed' | 'cancelled' | 'interrupted'
@@ -34,7 +34,7 @@ export interface WorkflowRunChatData {
   readonly phases: readonly WorkflowRunPhaseData[]
 }
 
-declare module '@roos-code/roos-code-client-ui-conversation/client' {
+declare module '@shres-code/shres-code-client-ui-conversation/client' {
   interface ChatNodeDataMap {
     /** Durable top-level workflow run and all members that actually started. */
     'workflow-run': WorkflowRunChatData

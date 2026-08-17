@@ -4,12 +4,12 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import AgentLoop from '@roos-code/roos-code-agent-loop'
-import { mountAgentLoopTestDependencies } from '@roos-code/roos-code-agent-loop-testkit'
-import { LlmAdapter, type GenerateOptions, type StreamChunk } from '@roos-code/roos-code-llm'
-import SessionStore, { SessionId } from '@roos-code/roos-code-session'
-import JsonlSessionPersistence from '@roos-code/roos-code-session-persistence-jsonl'
+import { Context } from '@shres-code/cordis'
+import AgentLoop from '@shres-code/shres-code-agent-loop'
+import { mountAgentLoopTestDependencies } from '@shres-code/shres-code-agent-loop-testkit'
+import { LlmAdapter, type GenerateOptions, type StreamChunk } from '@shres-code/shres-code-llm'
+import SessionStore, { SessionId } from '@shres-code/shres-code-session'
+import JsonlSessionPersistence from '@shres-code/shres-code-session-persistence-jsonl'
 import * as toolSchedule from '../src/index.ts'
 import {
   ScheduleId,
@@ -82,7 +82,7 @@ async function settleCurrentTasks(): Promise<void> {
 
 describe('Schedule production JSONL restart', () => {
   it('resumes one overdue reminder exactly once across fresh runtime mounts', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'roos-schedule-jsonl-'))
+    const root = await mkdtemp(join(tmpdir(), 'shres-schedule-jsonl-'))
     roots.push(root)
     const sessionId = SessionId('schedule-jsonl-restart')
     const first = await mountPersistence(root)

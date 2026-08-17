@@ -32,26 +32,26 @@ const repoTsconfig = fileURLToPath(new URL('../../../../tsconfig.json', import.m
 // session-query consumer/policies, inlined so the package test owns its fixture.
 const CORDIS_YML = `
 - id: llm-deepseek
-  name: '@roos-code/roos-code-llm-deepseek'
+  name: '@shres-code/shres-code-llm-deepseek'
 - id: subprocess
-  name: '@roos-code/roos-code-subprocess-local'
+  name: '@shres-code/shres-code-subprocess-local'
 - id: bash
-  name: '@roos-code/roos-code-bash-local'
+  name: '@shres-code/shres-code-bash-local'
 - id: acp-agent
-  name: '@roos-code/roos-code-acp-demo'
+  name: '@shres-code/shres-code-acp-demo'
   config:
     provider: deepseek-official
     model: deepseek-v4-flash
     persona: 'You are a test agent.'
     workspaceContext: false
 - id: tool-session-query
-  name: '@roos-code/roos-code-tool-session-query'
+  name: '@shres-code/shres-code-tool-session-query'
 - id: timeout-policy
-  name: '@roos-code/roos-code-tool-call-timeout-policy'
+  name: '@shres-code/shres-code-tool-call-timeout-policy'
 - id: spill-local
-  name: '@roos-code/roos-code-spill-local'
+  name: '@shres-code/shres-code-spill-local'
 - id: spill-policy
-  name: '@roos-code/roos-code-spill-policy'
+  name: '@shres-code/shres-code-spill-policy'
   config:
     maxInlineBytes: 50000
 `
@@ -89,8 +89,8 @@ async function boot(): Promise<Spawned & { cwd: string }> {
         TSX_TSCONFIG_PATH: repoTsconfig,
         // Key-present check only; no prompt is sent, so the model is never called.
         DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY ?? 'keyless-acp-agent-smoke',
-        ROOS_HOME: join(cwd, '.roos'),
-        ROOS_AGENTS_HOME: join(cwd, '.agents'),
+        SHRES_HOME: join(cwd, '.shres'),
+        SHRES_AGENTS_HOME: join(cwd, '.agents'),
       },
       stdio: ['pipe', 'pipe', 'pipe'],
     },
@@ -115,7 +115,7 @@ async function boot(): Promise<Spawned & { cwd: string }> {
   return { ...spawned, cwd }
 }
 
-describe('roos-acp-demo real-load-path smoke (bin + Loader, keyless)', () => {
+describe('shres-acp-demo real-load-path smoke (bin + Loader, keyless)', () => {
   it('boots via its bin and exposes only fresh text sessions', async () => {
     const { client, cwd, stderr } = await boot()
     // initialize: a broken export shape (collapsed bridge plugin, dropped inject)

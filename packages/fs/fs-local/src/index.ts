@@ -1,15 +1,15 @@
 /**
  * Host-filesystem implementation of `ctx.fs`. Realpath-derived target identity makes aliases
  * share stale guards, and writes through a symlink update its target without replacing the link.
- * @module @roos-code/roos-code-fs-local
+ * @module @shres-code/shres-code-fs-local
  */
 
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { constants as bufferConstants } from 'node:buffer'
 import { isAbsolute, relative, resolve, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import z from '@roos-code/schemastery'
-import { FileSystem, FsError, FsVersion } from '@roos-code/roos-code-fs'
+import z from '@shres-code/schemastery'
+import { FileSystem, FsError, FsVersion } from '@shres-code/shres-code-fs'
 import type {
   FsDirEntry,
   FsEditOutcome,
@@ -19,7 +19,7 @@ import type {
   FsTarget,
   FsWriteIntent,
   FsWriteOutcome,
-} from '@roos-code/roos-code-fs'
+} from '@shres-code/shres-code-fs'
 import {
   applyLiteralEdit,
   listDirectory,

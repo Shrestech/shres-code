@@ -1,9 +1,9 @@
 {
-  "organization": "roos-code",
-  "repository": "roos-code",
+  "organization": "shres-code",
+  "repository": "shres-code",
   "projectNumber": 1,
-  "projectTitle": "Roos Issue Management",
-  "lifecycleActor": "roos-issue-management",
+  "projectTitle": "Shres Issue Management",
+  "lifecycleActor": "shres-issue-management",
   "priorityField": "Priority",
   "allowUnassignedOwner": true,
   "statuses": [

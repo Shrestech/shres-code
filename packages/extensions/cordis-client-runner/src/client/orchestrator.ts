@@ -17,8 +17,8 @@ import type {
   DynamicCordisResolveAck,
   DynamicCordisRunResolution,
   DynamicCordisRunResponse,
-} from '@roos-code/roos-code-api-remotes/client'
-import type { SessionId } from '@roos-code/roos-code-client-connection/client'
+} from '@shres-code/shres-code-api-remotes/client'
+import type { SessionId } from '@shres-code/shres-code-client-connection/client'
 import { errorDetails } from './runtime.ts'
 import type { CordisErrorDetails, CordisObservable, DynamicCordisPackageRunner } from './runtime.ts'
 

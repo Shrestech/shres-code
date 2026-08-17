@@ -1,14 +1,14 @@
 /**
- * Package-owned invariant companion for `@roos-code/roos-code-commands`:
+ * Package-owned invariant companion for `@shres-code/shres-code-commands`:
  * command lifecycle events pair by commandId within one session log.
- * @module @roos-code/roos-code-commands/invariant
+ * @module @shres-code/shres-code-commands/invariant
  */
 
-import type { Context } from '@roos-code/cordis'
-import type { Session, SessionEvent } from '@roos-code/roos-code-session'
-import type { InvariantFailure, InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { Session, SessionEvent } from '@shres-code/shres-code-session'
+import type { InvariantFailure, InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-commands'
+const PACKAGE_NAME = '@shres-code/shres-code-commands'
 
 /** Cordis companion plugin name. */
 export const name = 'commands-invariant'

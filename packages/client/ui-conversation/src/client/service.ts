@@ -7,13 +7,13 @@
  * through one property read; assignment through the tracker proxy and `#`
  * private fields bypass that rebinding.
  */
-import { Service } from '@roos-code/cordis'
-import type { Context } from '@roos-code/cordis'
+import { Service } from '@shres-code/cordis'
+import type { Context } from '@shres-code/cordis'
 // Type-only imports: a plugin-to-plugin value import is a bundle purity
 // error, so scope resolution goes through the sessions service (scopeOf
 // method) instead of the standalone helper.
-import type { ISessions, SessionFace, SessionId } from '@roos-code/roos-code-client-runtime/client'
-import type { ImageAttachmentRef, ImageMediaType } from '@roos-code/roos-code-attachment'
+import type { ISessions, SessionFace, SessionId } from '@shres-code/shres-code-client-runtime/client'
+import type { ImageAttachmentRef, ImageMediaType } from '@shres-code/shres-code-attachment'
 import type { ComposerAttachment } from './contract/slots.ts'
 import type { QueueAction, QueueItemId } from './contract/queue.ts'
 import type { ComposerBlocks } from './input/blocks.ts'

@@ -7,8 +7,8 @@
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { bindSnapshotSelector } from '@roos-code/roos-code-client-web-react'
-import { createSnapshotStore } from '@roos-code/roos-code-client-runtime/client'
+import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
+import { createSnapshotStore } from '@shres-code/shres-code-client-runtime/client'
 import { AgentLoopCard } from '../src/client/AgentLoopCard.tsx'
 import type { AgentLoopCardProps } from '../src/client/AgentLoopCard.tsx'
 import { BashCard } from '../src/client/BashCard.tsx'

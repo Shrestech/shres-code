@@ -1,4 +1,4 @@
-# @roos-code/roos-code-client-hmr
+# @shres-code/shres-code-client-hmr
 
 Hot reload for script-loaded client plugins. The web bundle mounts the row unconditionally; without a rebuild watcher (`pnpm run dev:web`) rewriting client bundles, the poll observes no changes and the chain stays idle.
 

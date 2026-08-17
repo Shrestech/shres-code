@@ -1,9 +1,9 @@
 /**
  * Extract the final Grok Build headless answer from one-shot JSON stdout.
- * @module @roos-code/roos-code-subagent-grok-cli/parse
+ * @module @shres-code/shres-code-subagent-grok-cli/parse
  */
 
-import { answerFromObject } from '@roos-code/roos-code-llm-cli-bridge'
+import { answerFromObject } from '@shres-code/shres-code-llm-cli-bridge'
 
 export { answerFromObject }
 

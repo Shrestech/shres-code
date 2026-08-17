@@ -9,17 +9,17 @@
  * settings scope, which keeps them unaware of one another and of other tabs.
  */
 
-import type { ConnectionHandle } from '@roos-code/roos-code-client-connection/client'
+import type { ConnectionHandle } from '@shres-code/shres-code-client-connection/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
-import type {} from '@roos-code/roos-code-client-locale/client'
+import type {} from '@shres-code/shres-code-client-locale/client'
 // Type-only: the settings shell's SlotMap merge (the 'settings.section' entry)
 // and the ctx.settingsScope Context merge. Cross-plugin collaboration goes
 // through the service, never a value import (client bundle purity gate).
-import type {} from '@roos-code/roos-code-client-ui-settings/client'
-import type { ClientContext } from '@roos-code/roos-code-client-runtime/client'
-import { resolveSlotLabel } from '@roos-code/roos-code-client-ui-slots'
+import type {} from '@shres-code/shres-code-client-ui-settings/client'
+import type { ClientContext } from '@shres-code/shres-code-client-runtime/client'
+import { resolveSlotLabel } from '@shres-code/shres-code-client-ui-slots'
 // Type-only: the ctx.remote Context merge and the forwarded-event key face.
-import type {} from '@roos-code/roos-code-api-remotes/client'
+import type {} from '@shres-code/shres-code-api-remotes/client'
 import { AgentLoopCard } from './AgentLoopCard.tsx'
 import { BashCard } from './BashCard.tsx'
 import { ConfigurablePluginsTab } from './ConfigurablePluginsTab.tsx'

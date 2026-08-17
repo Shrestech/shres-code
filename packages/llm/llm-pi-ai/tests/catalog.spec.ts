@@ -2,13 +2,13 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import LlmRuntime, { createUserMessage } from '@roos-code/roos-code-llm'
-import type { StreamChunk } from '@roos-code/roos-code-llm'
-import FileSettingsProvider from '@roos-code/roos-code-settings-file'
-import { settingsNamespace } from '@roos-code/roos-code-settings'
-import * as LlmPiAi from '@roos-code/roos-code-llm-pi-ai'
-import { PiAiAdapter } from '@roos-code/roos-code-llm-pi-ai'
+import { Context } from '@shres-code/cordis'
+import LlmRuntime, { createUserMessage } from '@shres-code/shres-code-llm'
+import type { StreamChunk } from '@shres-code/shres-code-llm'
+import FileSettingsProvider from '@shres-code/shres-code-settings-file'
+import { settingsNamespace } from '@shres-code/shres-code-settings'
+import * as LlmPiAi from '@shres-code/shres-code-llm-pi-ai'
+import { PiAiAdapter } from '@shres-code/shres-code-llm-pi-ai'
 import { getBuiltinModels } from '@earendil-works/pi-ai/providers/all'
 import { createModels, getSupportedThinkingLevels } from '@earendil-works/pi-ai'
 import type { Api, Model, OpenAICompletionsCompat, Provider } from '@earendil-works/pi-ai'
@@ -34,9 +34,9 @@ afterEach(async () => {
   await Promise.all(homes.splice(0).map(dir => rm(dir, { recursive: true, force: true })))
 })
 
-/** A throwaway $ROOS_HOME with an empty settings document. */
+/** A throwaway $SHRES_HOME with an empty settings document. */
 async function home(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), 'roos-pi-catalog-'))
+  const dir = await mkdtemp(join(tmpdir(), 'shres-pi-catalog-'))
   homes.push(dir)
   await writeFile(join(dir, 'settings.yaml'), '')
   return dir

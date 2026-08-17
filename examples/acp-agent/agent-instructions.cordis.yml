@@ -2,22 +2,22 @@
 # discovery inside the scenario's temporary cwd. The app config patch replaces
 # the whole base config, so the base fields are restated verbatim.
 - id: base
-  name: '@roos-code/cordis-plugin-include'
+  name: '@shres-code/cordis-plugin-include'
   config:
     path: ./cordis.yml
     patches:
       - id: acp-agent
-        name: '@roos-code/roos-code-acp-demo'
+        name: '@shres-code/shres-code-acp-demo'
         config:
           provider: deepseek-official
           model: deepseek-v4-pro
-          persistenceRoot: !!js process.env.ROOS_SNAPSHOT_SESSIONS_ROOT ?? './.sessions'
-          persistenceCompression: !!js "process.env.ROOS_SNAPSHOT === undefined ? 'zstd' : 'none'"
+          persistenceRoot: !!js process.env.SHRES_SNAPSHOT_SESSIONS_ROOT ?? './.sessions'
+          persistenceCompression: !!js "process.env.SHRES_SNAPSHOT === undefined ? 'zstd' : 'none'"
           workspaceContext:
             maxBytes: 65536
-            roosHome: !!js process.cwd() + '/.roos'
+            shresHome: !!js process.cwd() + '/.shres'
             projectRootMarkers:
-              - .roos-project
+              - .shres-project
           persona: |
             You are a coding assistant powered by the {{model}} model. Your working directory is {{cwd}}.
 

@@ -1,13 +1,13 @@
 /**
- * Package-owned invariant companion for `@roos-code/roos-code-session-query`.
- * @module @roos-code/roos-code-session-query/invariant
+ * Package-owned invariant companion for `@shres-code/shres-code-session-query`.
+ * @module @shres-code/shres-code-session-query/invariant
  */
 
 /* jscpd:ignore-start */
-import type { Context } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-session-query'
+const PACKAGE_NAME = '@shres-code/shres-code-session-query'
 
 /** Cordis companion plugin name. */
 export const name = 'session-query-invariant'

@@ -1,8 +1,8 @@
 /**
- * Watch-build for client-plugin HMR: runs every `roos.client` plugin package
+ * Watch-build for client-plugin HMR: runs every `shres.client` plugin package
  * through the tsdown JS API in watch mode. Reload signaling is not this
  * script's business — the host webserver stat-polls the bundles it serves and
- * broadcasts `rebuilt` frames itself (`roos web`), so any process that
+ * broadcasts `rebuilt` frames itself (`shres web`), so any process that
  * rewrites `lib/client.js` files triggers reloads; this script is merely the
  * convenient way to keep them all rebuilt on source change.
  *
@@ -27,7 +27,7 @@ const repoRoot = fileURLToPath(new URL('..', import.meta.url))
 
 /**
  * Discover the watch workspace by declaration: every packages/<group>/<name>
- * whose package.json carries `roos.client` with platform "web" is a client
+ * whose package.json carries `shres.client` with platform "web" is a client
  * plugin bundle emitter. Scanned once at startup — a package added while
  * watching means restarting this script.
  * @param root - repository root containing the grouped package directories.
@@ -37,9 +37,9 @@ export function discoverPluginDirs(root = repoRoot): string[] {
   const dirs: string[] = []
   for (const manifestPath of globSync('packages/*/*/package.json', { cwd: root }).sort()) {
     const manifest = JSON.parse(readFileSync(join(root, manifestPath), 'utf8')) as {
-      roos?: { client?: { platform?: unknown } }
+      shres?: { client?: { platform?: unknown } }
     }
-    if (manifest.roos?.client?.platform === 'web') dirs.push(dirname(manifestPath).split(sep).join('/'))
+    if (manifest.shres?.client?.platform === 'web') dirs.push(dirname(manifestPath).split(sep).join('/'))
   }
   return dirs
 }
@@ -90,7 +90,7 @@ const isMain = invokedPath !== undefined && import.meta.url === pathToFileURL(re
 if (isMain) {
   const pluginDirs = discoverPluginDirs()
   if (pluginDirs.length === 0) {
-    console.error('dev-web: no roos.client (platform "web") packages found under packages/')
+    console.error('dev-web: no shres.client (platform "web") packages found under packages/')
     process.exit(1)
   }
 
@@ -108,7 +108,7 @@ if (isMain) {
 
   await watchClientPlugins(repoRoot, pluginDirs, pollInterval)
   console.log(
-    `dev-web: watching ${String(pluginDirs.length)} roos.client plugin packages`
+    `dev-web: watching ${String(pluginDirs.length)} shres.client plugin packages`
     + `${pollInterval !== undefined ? ` (polling ${String(pollInterval)}ms)` : ''}:\n  ${pluginDirs.join('\n  ')}`,
   )
 }

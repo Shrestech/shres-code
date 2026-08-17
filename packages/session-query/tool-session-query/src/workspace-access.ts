@@ -1,22 +1,22 @@
 /**
  * Caller identity, workspace authorization, and visible lineage projection.
  *
- * @module @roos-code/roos-code-tool-session-query/workspace-access
+ * @module @shres-code/shres-code-tool-session-query/workspace-access
  */
 
-import type { Context } from '@roos-code/cordis'
-import { HarnessError } from '@roos-code/roos-code-llm'
+import type { Context } from '@shres-code/cordis'
+import { HarnessError } from '@shres-code/shres-code-llm'
 import {
   SessionId,
   type SessionEvent,
   type SessionHeader,
   type SessionId as SessionIdValue,
-} from '@roos-code/roos-code-session'
+} from '@shres-code/shres-code-session'
 import type {
   SessionLineageNode,
   SessionRecord,
-} from '@roos-code/roos-code-session-query'
-import type { ToolRunContext } from '@roos-code/roos-code-tools'
+} from '@shres-code/shres-code-session-query'
+import type { ToolRunContext } from '@shres-code/shres-code-tools'
 import { serviceBoundary } from './service-boundary.ts'
 
 interface Caller {

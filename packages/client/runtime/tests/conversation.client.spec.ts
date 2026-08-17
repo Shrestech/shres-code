@@ -1,8 +1,8 @@
 /** Assistant block classifier (moved here with sessions/conversation.ts). */
 
 import { describe, expect, it } from 'vitest'
-import { AttachmentId } from '@roos-code/roos-code-attachment'
-import type { ContentBlock } from '@roos-code/roos-code-api-remotes/client'
+import { AttachmentId } from '@shres-code/shres-code-attachment'
+import type { ContentBlock } from '@shres-code/shres-code-api-remotes/client'
 import { toAssistantBlock, toAssistantBlocks } from '../src/client/sessions/conversation.ts'
 
 describe('toAssistantBlock', () => {

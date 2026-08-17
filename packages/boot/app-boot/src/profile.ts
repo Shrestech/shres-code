@@ -1,25 +1,25 @@
 /**
  * Profile discovery, initialization, and patch-layer composition for the
- * `roos --profile` launcher family.
+ * `shres --profile` launcher family.
  *
- * A profile is a directory under `$ROOS_HOME/profiles/<name>` holding a
+ * A profile is a directory under `$SHRES_HOME/profiles/<name>` holding a
  * `package.json` (out-of-tree plugin dependencies plus the profile manifest
- * `roos.profile` with its ordered `bundles` list) and a `cordis.patch.yml`
+ * `shres.profile` with its ordered `bundles` list) and a `cordis.patch.yml`
  * (the user's own patch layer, applied after every bundle layer). Bundles are
  * npm packages whose manifest declares
- * `"roos": { "bundle": { "patch": "./cordis.patch.yml" } }`; the tree is
- * composed by applying each bundle's patch list in `roos.profile.bundles` order over
+ * `"shres": { "bundle": { "patch": "./cordis.patch.yml" } }`; the tree is
+ * composed by applying each bundle's patch list in `shres.profile.bundles` order over
  * an empty entry list, then the profile's own patches, then any launcher
  * layers (`--patch` files and flag-derived patches).
  *
  * Module resolution is two-anchor by construction: a bundle name resolves
- * first from the roos installation (the launcher's own package), then from the
+ * first from the shres installation (the launcher's own package), then from the
  * profile directory. The Loader's `baseUrl` is the profile directory, whose
  * `node_modules` pnpm manages for out-of-tree plugins, while the maintained
- * flat fallback directory `$ROOS_HOME/profiles/node_modules` (one symlink per
+ * flat fallback directory `$SHRES_HOME/profiles/node_modules` (one symlink per
  * package the installation's app and bundles depend on) makes every in-box
  * plugin Node-resolvable from any profile through the ordinary parent-walk.
- * @module @roos-code/roos-code-app-boot/profile
+ * @module @shres-code/shres-code-app-boot/profile
  */
 
 import { createRequire } from 'node:module'
@@ -27,9 +27,9 @@ import {
   existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, symlinkSync, unlinkSync, writeFileSync,
 } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
-import type { EntryOptions } from '@roos-code/cordis-plugin-loader'
-import { applyEntryPatches, type PatchOptions } from '@roos-code/cordis-plugin-include'
-import { resolveRoosHome } from '@roos-code/roos-code-home-paths'
+import type { EntryOptions } from '@shres-code/cordis-plugin-loader'
+import { applyEntryPatches, type PatchOptions } from '@shres-code/cordis-plugin-include'
+import { resolveShresHome } from '@shres-code/shres-code-home-paths'
 import { loadOverlayPatches } from './index.ts'
 
 /** Directory under the Harness home holding every profile. */
@@ -38,27 +38,27 @@ export const PROFILES_DIR = 'profiles'
 /** The user patch layer inside a profile directory (hot-reloaded on long-lived surfaces). */
 export const PROFILE_PATCH_FILENAME = 'cordis.patch.yml'
 
-/** The bundle half of the `roos` manifest section: what a bundle package exports. */
-export interface RoosBundleManifest {
+/** The bundle half of the `shres` manifest section: what a bundle package exports. */
+export interface ShresBundleManifest {
   /** The patch layer this bundle exports, relative to its package root. */
   patch: string
 }
 
-/** The profile half of the `roos` manifest section: what a profile directory composes. */
-export interface RoosProfileManifest {
+/** The profile half of the `shres` manifest section: what a profile directory composes. */
+export interface ShresProfileManifest {
   /** Ordered bundle layer list (package names). */
   bundles?: string[]
 }
 
 /**
- * The profile-launcher slice of the `roos`-owned package.json section. A
+ * The profile-launcher slice of the `shres`-owned package.json section. A
  * manifest may declare both roles; other consumers own additional keys.
  */
-export interface RoosManifestSection {
+export interface ShresManifestSection {
   /** Bundle metadata consumed by the profile launcher. */
-  bundle?: RoosBundleManifest
+  bundle?: ShresBundleManifest
   /** Profile metadata consumed by the profile launcher. */
-  profile?: RoosProfileManifest
+  profile?: ShresProfileManifest
 }
 
 /** The slice of package.json both profiles and bundles use. */
@@ -66,12 +66,12 @@ export interface ProfileManifest {
   name?: string
   dependencies?: Record<string, string>
   peerDependencies?: Record<string, string>
-  roos?: RoosManifestSection
+  shres?: ShresManifestSection
 }
 
 /** One resolved bundle layer of a profile. */
 export interface ProfileLayer {
-  /** The bundle's package name, as listed in `roos.profile.bundles`. */
+  /** The bundle's package name, as listed in `shres.profile.bundles`. */
   packageName: string
   /** Absolute directory of the resolved bundle package. */
   packageDir: string
@@ -87,7 +87,7 @@ export interface Profile {
   name: string
   /** Absolute profile directory. */
   dir: string
-  /** Bundle layers in `roos.profile.bundles` order. */
+  /** Bundle layers in `shres.profile.bundles` order. */
   layers: ProfileLayer[]
   /** Absolute path of the profile's own patch file. */
   patchPath: string
@@ -97,34 +97,34 @@ export interface Profile {
 
 /**
  * Resolve a profile's directory under the Harness home.
- * @param name - the profile name (`roos --profile <name>`).
- * @param home - the Harness home; defaults to {@link resolveRoosHome}.
+ * @param name - the profile name (`shres --profile <name>`).
+ * @param home - the Harness home; defaults to {@link resolveShresHome}.
  * @returns the absolute profile directory (which may not exist yet).
  */
-export function resolveProfileDir(name: string, home: string = resolveRoosHome()): string {
+export function resolveProfileDir(name: string, home: string = resolveShresHome()): string {
   if (name === '' || name.includes('/') || name.includes('\\') || name === '.' || name === '..'
     // The launcher-maintained flat module fallback lives at this sibling path.
     || name === 'node_modules') {
-    throw new Error(`roos: invalid profile name ${JSON.stringify(name)}`)
+    throw new Error(`shres: invalid profile name ${JSON.stringify(name)}`)
   }
   return join(home, PROFILES_DIR, name)
 }
 
 /** The shipped profile templates auto-initialized on first use, by name. */
 export const PROFILE_TEMPLATES: Record<string, readonly string[]> = {
-  web: ['@roos-code/roos-code-base', '@roos-code/roos-code-web-app'],
-  headless: ['@roos-code/roos-code-base', '@roos-code/roos-code-headless'],
+  web: ['@shres-code/shres-code-base', '@shres-code/shres-code-web-app'],
+  headless: ['@shres-code/shres-code-base', '@shres-code/shres-code-headless'],
 }
 
 /** Installation-owned bundle tuples normalized to the shipped template. */
 const INSTALLATION_OWNED_PROFILE_TUPLES: Record<string, readonly string[]> = {
-  headless: ['@roos-code/roos-code-base', '@roos-code/roos-code-web-app', '@roos-code/roos-code-headless'],
+  headless: ['@shres-code/shres-code-base', '@shres-code/shres-code-web-app', '@shres-code/shres-code-headless'],
 }
 
-/** The bundle list a `roos plugin` init uses for a name with no shipped template. */
-export const DEFAULT_PROFILE_BUNDLES: readonly string[] = ['@roos-code/roos-code-base']
+/** The bundle list a `shres plugin` init uses for a name with no shipped template. */
+export const DEFAULT_PROFILE_BUNDLES: readonly string[] = ['@shres-code/shres-code-base']
 
-const PROFILE_PATCH_TEMPLATE = `# Your patch layer for this roos profile, applied after every bundle layer:
+const PROFILE_PATCH_TEMPLATE = `# Your patch layer for this shres profile, applied after every bundle layer:
 # a top-level YAML array of loader patch entries (id-targeted config
 # overrides, disables, and insert lists; \`!!js\` expressions allowed).
 []
@@ -147,17 +147,17 @@ autoInstallPeers: false
  * pnpm settings out-of-tree plugins need. Existing files are never touched,
  * so re-running is a no-op on an initialized profile.
  * @param dir - the profile directory from {@link resolveProfileDir}.
- * @param bundles - the initial `roos.profile.bundles` layer list.
+ * @param bundles - the initial `shres.profile.bundles` layer list.
  */
 export function initProfile(dir: string, bundles: readonly string[]): void {
   mkdirSync(dir, { recursive: true })
   const manifestPath = join(dir, 'package.json')
   if (!existsSync(manifestPath)) {
     const manifest: ProfileManifest & { private: boolean } = {
-      name: `roos-profile-${basename(dir)}`,
+      name: `shres-profile-${basename(dir)}`,
       private: true,
       dependencies: {},
-      roos: { profile: { bundles: [...bundles] } },
+      shres: { profile: { bundles: [...bundles] } },
     }
     writeFileSync(manifestPath, JSON.stringify(manifest, undefined, 2) + '\n')
   }
@@ -179,7 +179,7 @@ function ensureSymlink(link: string, target: string): void {
   }
   if (stat !== undefined) {
     if (!stat.isSymbolicLink()) {
-      throw new Error(`roos: ${link} exists and is not a symlink; remove it so roos can manage the installation fallback`)
+      throw new Error(`shres: ${link} exists and is not a symlink; remove it so shres can manage the installation fallback`)
     }
     if (readlinkSync(link) === target) return
     // unlink deletes the reparse point itself on Windows too; rmSync treats a
@@ -202,25 +202,25 @@ function ensureSymlink(link: string, target: string): void {
 }
 
 /**
- * Maintain the flat module fallback `$ROOS_HOME/profiles/node_modules`: one
- * symlink per package in the roos app's resolvable dependency CLOSURE (BFS
+ * Maintain the flat module fallback `$SHRES_HOME/profiles/node_modules`: one
+ * symlink per package in the shres app's resolvable dependency CLOSURE (BFS
  * over `dependencies` from the app manifest), each resolved from its own
  * real location. Node's parent-directory walk from any profile finds this
  * directory after the profile's own `node_modules`, so every in-box plugin
  * resolves without pnpm ever managing it — the exact "bundles come from the
  * installation" contract. The closure (not just direct dependencies) is
  * required for out-of-tree plugins: their peer dependencies name Service
- * Definition packages (`roos-compaction`, `roos-invariants`, ...) that the app
+ * Definition packages (`shres-compaction`, `shres-invariants`, ...) that the app
  * reaches only through its Service Provider packages. Symlinked packages
  * resolve their own dependencies from their real directories (Node's default
  * symlink-following), so each package needs only its one flat link.
  * Idempotent: correct links are kept and moved installations are
  * re-pointed; a stale link to a vanished package stays until its name is
  * reused (dangling links are invisible to resolution).
- * @param installAnchor - absolute path of the roos app's package.json.
- * @param home - the Harness home; defaults to {@link resolveRoosHome}.
+ * @param installAnchor - absolute path of the shres app's package.json.
+ * @param home - the Harness home; defaults to {@link resolveShresHome}.
  */
-export function healProfilesModuleFallback(installAnchor: string, home: string = resolveRoosHome()): void {
+export function healProfilesModuleFallback(installAnchor: string, home: string = resolveShresHome()): void {
   const profilesDir = join(home, PROFILES_DIR)
   const modulesDir = join(profilesDir, 'node_modules')
   mkdirSync(modulesDir, { recursive: true })
@@ -232,8 +232,8 @@ export function healProfilesModuleFallback(installAnchor: string, home: string =
   // map itself (first resolution wins, matching Node's own nearest-wins).
   const queue: { anchor: string; manifest: ProfileManifest }[] = [{ anchor: installAnchor, manifest: appManifest }]
   for (let next = queue.shift(); next !== undefined; next = queue.shift()) {
-    // Peer dependencies participate: Service Definition packages (roos-subprocess,
-    // roos-compaction, ...) are peers of their implementations, never plain
+    // Peer dependencies participate: Service Definition packages (shres-subprocess,
+    // shres-compaction, ...) are peers of their implementations, never plain
     // dependencies, yet out-of-tree plugins import them directly.
     /* v8 ignore next -- a real app manifest always declares dependencies */
     for (const dep of [...Object.keys(next.manifest.dependencies ?? {}), ...Object.keys(next.manifest.peerDependencies ?? {})]) {
@@ -297,14 +297,14 @@ function sameBundles(left: readonly string[], right: readonly string[]): boolean
 function normalizeShippedProfile(name: string, dir: string, manifest: ProfileManifest): ProfileManifest {
   const installationOwned = INSTALLATION_OWNED_PROFILE_TUPLES[name]
   const current = PROFILE_TEMPLATES[name]
-  const bundles = manifest.roos?.profile?.bundles
+  const bundles = manifest.shres?.profile?.bundles
   if (installationOwned === undefined || current === undefined || bundles === undefined
     || !sameBundles(bundles, installationOwned)) return manifest
   const normalized: ProfileManifest = {
     ...manifest,
-    roos: {
-      ...manifest.roos,
-      profile: { ...manifest.roos?.profile, bundles: [...current] },
+    shres: {
+      ...manifest.shres,
+      profile: { ...manifest.shres?.profile, bundles: [...current] },
     },
   }
   writeProfileManifest(dir, normalized)
@@ -332,12 +332,12 @@ function packageDirFromAnchor(anchor: string, packageName: string): string | und
 /**
  * Resolve one bundle package's directory: installation anchor first, then the
  * profile directory. The installation-first order is the contract that
- * `@roos-code/roos-code-base` (and every other in-box bundle) always comes from
- * the same installation as the running roos, never from a profile-local copy.
+ * `@shres-code/shres-code-base` (and every other in-box bundle) always comes from
+ * the same installation as the running shres, never from a profile-local copy.
  * Resolution does not require the package to export `./package.json`.
  * @param binName - the diagnostic prefix on the thrown error.
- * @param packageName - the bundle's package name from `roos.profile.bundles`.
- * @param installAnchor - absolute path of a file inside the roos app package (its package.json).
+ * @param packageName - the bundle's package name from `shres.profile.bundles`.
+ * @param installAnchor - absolute path of a file inside the shres app package (its package.json).
  * @param profileDir - the profile directory (second anchor).
  * @returns the bundle package's absolute directory.
  */
@@ -349,27 +349,27 @@ export function resolveBundleDir(
     if (dir !== undefined) return dir
   }
   throw new Error(
-    `${binName}: cannot resolve profile bundle ${JSON.stringify(packageName)} from the roos installation or ${profileDir}; `
-    + `run 'roos plugin --profile ${basename(profileDir)} install' if its dependency is not installed`,
+    `${binName}: cannot resolve profile bundle ${JSON.stringify(packageName)} from the shres installation or ${profileDir}; `
+    + `run 'shres plugin --profile ${basename(profileDir)} install' if its dependency is not installed`,
   )
 }
 
 /**
- * Load a profile: resolve every `roos.profile.bundles` entry to its patch
+ * Load a profile: resolve every `shres.profile.bundles` entry to its patch
  * layer and parse the profile's own patch file. A listed bundle without a
- * `roos.bundle` manifest fails loud — naming a bundle-less package as a layer
+ * `shres.bundle` manifest fails loud — naming a bundle-less package as a layer
  * is a misconfiguration, not "no patches".
  * @param binName - the diagnostic prefix on thrown errors.
  * @param name - the profile name.
- * @param installAnchor - absolute path of the roos app's package.json (first resolution anchor).
- * @param home - the Harness home; defaults to {@link resolveRoosHome}.
+ * @param installAnchor - absolute path of the shres app's package.json (first resolution anchor).
+ * @param home - the Harness home; defaults to {@link resolveShresHome}.
  * @param options - `userLayer: false` skips reading `cordis.patch.yml`, so a
  * bundles-only consumer (`--dump-default-config`, a recovery diagnostic)
  * cannot fail on a broken user layer.
  * @returns the loaded profile (empty `patches` when the user layer is skipped).
  */
 export function loadProfile(
-  binName: string, name: string, installAnchor: string, home: string = resolveRoosHome(),
+  binName: string, name: string, installAnchor: string, home: string = resolveShresHome(),
   options: { userLayer?: boolean } = {},
 ): Profile {
   const dir = resolveProfileDir(name, home)
@@ -377,20 +377,20 @@ export function loadProfile(
     const template = PROFILE_TEMPLATES[name]
     if (template === undefined) {
       throw new Error(
-        `${binName}: profile ${JSON.stringify(name)} does not exist; create it with 'roos plugin --profile ${name} add <package>'`,
+        `${binName}: profile ${JSON.stringify(name)} does not exist; create it with 'shres plugin --profile ${name} add <package>'`,
       )
     }
     initProfile(dir, template)
   }
   const manifest = normalizeShippedProfile(name, dir, readProfileManifest(binName, dir))
-  // A hand-written profile manifest may omit the roos section entirely.
-  const bundles = manifest.roos?.profile?.bundles ?? []
+  // A hand-written profile manifest may omit the shres section entirely.
+  const bundles = manifest.shres?.profile?.bundles ?? []
   const layers = bundles.map((packageName): ProfileLayer => {
     const packageDir = resolveBundleDir(binName, packageName, installAnchor, dir)
     const bundleManifest = JSON.parse(readFileSync(join(packageDir, 'package.json'), 'utf8')) as ProfileManifest
-    const declared = bundleManifest.roos?.bundle?.patch
+    const declared = bundleManifest.shres?.bundle?.patch
     if (declared === undefined) {
-      throw new Error(`${binName}: profile bundle ${JSON.stringify(packageName)} declares no roos.bundle in its package.json`)
+      throw new Error(`${binName}: profile bundle ${JSON.stringify(packageName)} declares no shres.bundle in its package.json`)
     }
     const patchPath = join(packageDir, declared)
     return { packageName, packageDir, patchPath, patches: loadOverlayPatches(binName, patchPath) }

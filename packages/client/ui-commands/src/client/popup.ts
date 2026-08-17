@@ -9,9 +9,9 @@
  * Input side owns the span/bare-token CAS guard) and focuses the composer;
  * the controller never touches the input machine.
  */
-import { createSnapshotStore } from '@roos-code/roos-code-client-runtime/client'
-import type { SnapshotStore } from '@roos-code/roos-code-client-runtime/client'
-import type { TokenSpan } from '@roos-code/roos-code-client-ui-input-trigger/client'
+import { createSnapshotStore } from '@shres-code/shres-code-client-runtime/client'
+import type { SnapshotStore } from '@shres-code/shres-code-client-runtime/client'
+import type { TokenSpan } from '@shres-code/shres-code-client-ui-input-trigger/client'
 import type { SelectOption } from './contract.ts'
 
 /**

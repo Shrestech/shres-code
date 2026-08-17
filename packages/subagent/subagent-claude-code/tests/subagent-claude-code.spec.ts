@@ -6,8 +6,8 @@ import type {
   SDKResultMessage,
   SpawnOptions,
 } from '@anthropic-ai/claude-agent-sdk'
-import { Context } from '@roos-code/cordis'
-import Loader from '@roos-code/cordis-plugin-loader'
+import { Context } from '@shres-code/cordis'
+import Loader from '@shres-code/cordis-plugin-loader'
 import {
   afterEach,
   beforeEach,
@@ -17,17 +17,17 @@ import {
   type Mock,
   vi,
 } from 'vitest'
-import type { Agent } from '@roos-code/roos-code-agent'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
-import type { ContentBlock } from '@roos-code/roos-code-llm'
-import SubagentRuntime from '@roos-code/roos-code-subagent'
+import type { Agent } from '@shres-code/shres-code-agent'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
+import type { ContentBlock } from '@shres-code/shres-code-llm'
+import SubagentRuntime from '@shres-code/shres-code-subagent'
 import type {
   SubprocessHandle,
   SubprocessOutcome,
   SubprocessSpawnSpec,
-} from '@roos-code/roos-code-subprocess'
-import LocalSubprocessRuntime from '@roos-code/roos-code-subprocess-local'
-import { MAX_TIMER_DELAY_MS } from '@roos-code/roos-code-timeout'
+} from '@shres-code/shres-code-subprocess'
+import LocalSubprocessRuntime from '@shres-code/shres-code-subprocess-local'
+import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
 import * as claudeCode from '../src/index.ts'
 import * as invariant from '../src/invariant.ts'
 import {
@@ -338,8 +338,8 @@ describe('task admission and package contracts', () => {
     await ctx.plugin(claudeCode, {
       env: {
         ANTHROPIC_API_KEY: 'provider-fake-key',
-        CLAUDE_CONFIG_DIR: '/private/tmp/roos-claude-code-unit-config',
-        HOME: '/private/tmp/roos-claude-code-unit-home',
+        CLAUDE_CONFIG_DIR: '/private/tmp/shres-claude-code-unit-config',
+        HOME: '/private/tmp/shres-claude-code-unit-home',
       },
       disposeGraceMs: 29,
     })
@@ -403,7 +403,7 @@ describe('task admission and package contracts', () => {
     const ctx = { invariants: { register } } as unknown as Context
     await expect(invariant.apply(ctx)).resolves.toBe(dispose)
     expect(register).toHaveBeenCalledWith(
-      '@roos-code/roos-code-subagent-claude-code',
+      '@shres-code/shres-code-subagent-claude-code',
       expect.any(Function),
     )
     const install = register.mock.calls[0]![1]
@@ -464,11 +464,11 @@ describe('official spawn projection', () => {
     }), 7, 'win32')
 
     expect(spec.argv).toEqual([
-      'cmd.exe', '/d', '/v:off', '/s', '/c', '%ROOS_CLAUDE_CODE_EXECUTABLE%',
+      'cmd.exe', '/d', '/v:off', '/s', '/c', '%SHRES_CLAUDE_CODE_EXECUTABLE%',
       '--output-format', 'stream-json',
     ])
     expect(spec.env).toEqual(expect.objectContaining({
-      ROOS_CLAUDE_CODE_EXECUTABLE: `"${command}"`,
+      SHRES_CLAUDE_CODE_EXECUTABLE: `"${command}"`,
     }))
   })
 
@@ -533,7 +533,7 @@ describe('query options and result mapping', () => {
   it('builds the fixed unattended options over the scrubbed environment', () => {
     vi.stubEnv('HOST_VISIBLE', 'visible')
     vi.stubEnv('HOST_SECRET_TOKEN', 'must-not-leak')
-    vi.stubEnv('ROOS_INTERNAL', 'must-not-leak')
+    vi.stubEnv('SHRES_INTERNAL', 'must-not-leak')
     const child = fakeChild()
     const spawn = vi.fn(() => child.handle)
     const captured: SubprocessHandle[] = []
@@ -564,7 +564,7 @@ describe('query options and result mapping', () => {
       ANTHROPIC_API_KEY: 'explicit-fake-key',
     })
     expect(options.env).not.toHaveProperty('HOST_SECRET_TOKEN')
-    expect(options.env).not.toHaveProperty('ROOS_INTERNAL')
+    expect(options.env).not.toHaveProperty('SHRES_INTERNAL')
     for (const omitted of [
       'settingSources',
       'canUseTool',

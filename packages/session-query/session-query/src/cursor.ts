@@ -1,6 +1,6 @@
 /** Opaque cursor identity for session-search pagination. */
 
-import type { Branded } from '@roos-code/roos-code-brand'
+import type { Branded } from '@shres-code/shres-code-brand'
 
 /** Provider-owned opaque continuation token returned by session search. */
 export type SessionSearchCursor = Branded<'SessionSearchCursor'>

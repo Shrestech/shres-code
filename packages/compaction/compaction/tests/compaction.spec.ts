@@ -1,16 +1,16 @@
-import { createUserMessage } from '@roos-code/roos-code-llm'
+import { createUserMessage } from '@shres-code/shres-code-llm'
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import {
   CompactionId,
   CompactionEngine,
   compactCheckpointSource,
   isCompactCheckpointSource,
-} from '@roos-code/roos-code-compaction'
-import type { CompactionResult, CompactionTrigger } from '@roos-code/roos-code-compaction'
-import { Session, SessionId } from '@roos-code/roos-code-session'
-import type { CompactionAgentContext } from '@roos-code/roos-code-compaction'
-import type { ManualCompactAgentContext } from '@roos-code/roos-code-compaction'
+} from '@shres-code/shres-code-compaction'
+import type { CompactionResult, CompactionTrigger } from '@shres-code/shres-code-compaction'
+import { Session, SessionId } from '@shres-code/shres-code-session'
+import type { CompactionAgentContext } from '@shres-code/shres-code-compaction'
+import type { ManualCompactAgentContext } from '@shres-code/shres-code-compaction'
 
 /**
  * A trivial concrete CompactionEngine implementing the abstract contract. The

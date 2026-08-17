@@ -14,13 +14,13 @@
  * armed claim folds with zero delta because bounded state cannot reconstruct
  * the replaced range; this preserves replay at the cost of possible drift.
  *
- * @module @roos-code/roos-code-token-meter/surface-projection
+ * @module @shres-code/shres-code-token-meter/surface-projection
  */
 
-import { deriveEventMessage, isSurfaceEvent } from '@roos-code/roos-code-session'
-import type { SessionEvent } from '@roos-code/roos-code-session'
+import { deriveEventMessage, isSurfaceEvent } from '@shres-code/shres-code-session'
+import type { SessionEvent } from '@shres-code/shres-code-session'
 // Type-only: the `compaction/*` SessionEventMap merges (shadow-price events).
-import type {} from '@roos-code/roos-code-compaction'
+import type {} from '@shres-code/shres-code-compaction'
 import { estimateMessage } from './estimate.ts'
 
 /**

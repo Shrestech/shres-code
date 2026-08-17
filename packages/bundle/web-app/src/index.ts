@@ -1,31 +1,31 @@
 /**
- * @roos-code/roos-code-web-app — the browser-surface bundle's runtime glue plugin
- * plus the bundle patch (`cordis.patch.yml`, declared by the `roos.bundle.patch`
+ * @shres-code/shres-code-web-app — the browser-surface bundle's runtime glue plugin
+ * plus the bundle patch (`cordis.patch.yml`, declared by the `shres.bundle.patch`
  * manifest field). The plugin owns the browser-surface glue: it resolves
  * the built frontend dist (workspace knowledge of this bundle, never user
  * config), mounts the `frontend-static` fallback owner over it, registers the
  * harness-source and web-surface prompt sections, the bash-visible web runtime
  * variable, and the URL line. App command-line values arrive through the
  * `webStartup` service expressions in the bundle patch.
- * @module @roos-code/roos-code-web-app
+ * @module @shres-code/shres-code-web-app
  */
 
 import { createRequire } from 'node:module'
 import { networkInterfaces } from 'node:os'
 import { fileURLToPath } from 'node:url'
-import type { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import { addHarnessSourceSection } from '@roos-code/roos-code-app-boot'
-import * as FrontendStatic from '@roos-code/roos-code-host-frontend-static'
-import type {} from '@roos-code/cordis-plugin-loader'
-import type {} from '@roos-code/roos-code-host-webserver'
-import type {} from '@roos-code/roos-code-system-prompt'
-import type {} from '@roos-code/roos-code-shell-env'
+import type { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import { addHarnessSourceSection } from '@shres-code/shres-code-app-boot'
+import * as FrontendStatic from '@shres-code/shres-code-host-frontend-static'
+import type {} from '@shres-code/cordis-plugin-loader'
+import type {} from '@shres-code/shres-code-host-webserver'
+import type {} from '@shres-code/shres-code-system-prompt'
+import type {} from '@shres-code/shres-code-shell-env'
 
 /** Stable Cordis plugin name. */
 export const name = 'web-app'
 
-/** This roos installation's root, from either this package's source or built entry. */
+/** This shres installation's root, from either this package's source or built entry. */
 const SOURCE_ROOT = fileURLToPath(new URL('../../../..', import.meta.url))
 
 /** Runtime service that releases Web rows after bind-dependent values resolve. */
@@ -40,7 +40,7 @@ export interface Config {
   printUrl: boolean
   /**
    * Register the model-visible surface context (the `app:web-surface` prompt
-   * section and the `ROOS_WEB_URL` bash variable). A one-shot non-interactive
+   * section and the `SHRES_WEB_URL` bash variable). A one-shot non-interactive
    * layer can turn it off when its user is not in the GUI, so the
    * orientation text would be false.
    */
@@ -64,7 +64,7 @@ export interface WebRuntimeValues {
 }
 
 /** Environment variable naming the canonical local URL of this Web GUI. */
-const ROOS_WEB_URL = 'ROOS_WEB_URL' as const
+const SHRES_WEB_URL = 'SHRES_WEB_URL' as const
 
 // Display-only mirror of the webserver schema's loopback host: the address the
 // local URL always prints. Not a source of truth — the schema is.
@@ -91,17 +91,17 @@ export function resolveLanTrust(bindHost: string, extra: readonly string[]): Web
   return { lanAddresses, trustedHosts: [...lanAddresses, ...extra] }
 }
 
-/** Model-visible orientation and acceptance boundary for sessions created through `roos web`. */
+/** Model-visible orientation and acceptance boundary for sessions created through `shres web`. */
 function webSurfacePrompt(webUrl: string): string {
   const updateContract = 'The client-plugin HMR receiver is active, but client-plugin changes reload without a refresh only while '
     + '`pnpm run dev:web` is also running from this same checkout to rebuild their bundles; verify that watcher before promising automatic updates. '
     + 'Every other change — the apps/web shell and plain packages — requires rebuilding the affected Web artifacts and verifying this existing URL after a page refresh. '
-  return `You are interacting with the user through the Roos Code Web GUI at ${webUrl}. `
+  return `You are interacting with the user through the Shres Code Web GUI at ${webUrl}. `
     + 'When the user refers to "this page", "this GUI", or "this app" without naming another target, they mean this GUI. '
     + 'The browser provides no implicit DOM, route, or screenshot context. '
     + updateContract
     + 'Starting another server does not update this GUI. '
-    + 'The apps/web Vite entry builds the shell but is not a standalone application because only roos web injects window.__ROOS_BOOT__. '
+    + 'The apps/web Vite entry builds the shell but is not a standalone application because only shres web injects window.__SHRES_BOOT__. '
     + 'Do not start a replacement server unless the user asks; if one is needed, use a managed background job and verify its exact URL.'
 }
 
@@ -116,7 +116,7 @@ function localWebUrl(ctx: Context): string {
 function resolveDistIndex(): string {
   const require = createRequire(import.meta.url)
   try {
-    return require.resolve('@roos-code/roos-code-web-frontend/dist/index.html')
+    return require.resolve('@shres-code/shres-code-web-frontend/dist/index.html')
   } catch {
     /* v8 ignore next 2 -- reachable only on a checkout without a built dist; the test tree builds it */
     throw new Error('web-app: frontend dist not built; run pnpm run build from the repository root first')
@@ -150,9 +150,9 @@ export function apply(ctx: Context, config: Config): void {
       runtimeCtx.shellEnv.register({
         name: 'web-runtime',
         variables: {
-          [ROOS_WEB_URL]: { description: 'Canonical local URL of the Roos Code Web GUI serving this session.' },
+          [SHRES_WEB_URL]: { description: 'Canonical local URL of the Shres Code Web GUI serving this session.' },
         },
-        resolve: () => ({ [ROOS_WEB_URL]: localWebUrl(runtimeCtx) }),
+        resolve: () => ({ [SHRES_WEB_URL]: localWebUrl(runtimeCtx) }),
       })
     })
   }
@@ -165,7 +165,7 @@ export function apply(ctx: Context, config: Config): void {
       // Reuse the exact LAN snapshot provided to the /api trust fence.
       const lanCandidate = runtime.lanAddresses[0]
       const port = ctx.webServer.port
-      console.log(`roos web: ${localWebUrl(ctx)}${lanCandidate === undefined ? '' : ` (LAN: http://${lanCandidate}:${String(port)})`}`)
+      console.log(`shres web: ${localWebUrl(ctx)}${lanCandidate === undefined ? '' : ` (LAN: http://${lanCandidate}:${String(port)})`}`)
     }
     // This row's own activation can precede a sibling failure. The app owns
     // readiness by waiting for its Loader tree, or prints at once in a

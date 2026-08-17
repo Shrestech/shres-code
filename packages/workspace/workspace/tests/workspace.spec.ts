@@ -2,13 +2,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
-import { Context } from '@roos-code/cordis'
-import Storage from '@roos-code/roos-code-storage'
-import type { StorageBackend } from '@roos-code/roos-code-storage'
-import { DomainFacility } from '@roos-code/roos-code-storage-domain'
-import type { DomainChanged } from '@roos-code/roos-code-storage-domain'
-import SessionStore, { SessionId } from '@roos-code/roos-code-session'
-import type { SessionHeader } from '@roos-code/roos-code-session'
+import { Context } from '@shres-code/cordis'
+import Storage from '@shres-code/shres-code-storage'
+import type { StorageBackend } from '@shres-code/shres-code-storage'
+import { DomainFacility } from '@shres-code/shres-code-storage-domain'
+import type { DomainChanged } from '@shres-code/shres-code-storage-domain'
+import SessionStore, { SessionId } from '@shres-code/shres-code-session'
+import type { SessionHeader } from '@shres-code/shres-code-session'
 import { MemoryMediaPool, MemoryStorageBackend } from '../../../storage/storage-domain/tests/helpers/memory-backend.ts'
 import WorkspaceRegistry, {
   WorkspaceId,
@@ -171,7 +171,7 @@ let base: string
 const tempDirs: string[] = []
 
 async function makeDir(name: string): Promise<string> {
-  base ??= await realpath(await mkdtemp(join(tmpdir(), 'roos-workspace-')))
+  base ??= await realpath(await mkdtemp(join(tmpdir(), 'shres-workspace-')))
   if (tempDirs.length === 0) tempDirs.push(base)
   const dir = join(base, name)
   await mkdir(dir, { recursive: true })

@@ -1,4 +1,4 @@
-import { Service } from '@roos-code/cordis'
+import { Service } from '@shres-code/cordis'
 import type HostDefault from '@fixture/host'
 import type * as Host from '@fixture/host'
 import type { AgentPhase } from '@fixture/host'
@@ -30,7 +30,7 @@ export class ClientBridge extends Service {
   }
 }
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     clientBridge: ClientBridge
   }

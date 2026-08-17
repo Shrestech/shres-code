@@ -1,15 +1,15 @@
 /**
  * Durable agent session-event vocabulary shared with type-only consumers.
  *
- * @module @roos-code/roos-code-agent/types
+ * @module @shres-code/shres-code-agent/types
  */
 
-import type { UserMessage } from '@roos-code/roos-code-llm/types'
+import type { UserMessage } from '@shres-code/shres-code-llm/types'
 
 /** One of the two ordered pending-message lists owned by an agent. */
 export type InboxTarget = 'next-turn' | 'next-step'
 
-declare module '@roos-code/roos-code-session/types' {
+declare module '@shres-code/shres-code-session/types' {
   interface SessionEventMap {
     /**
      * One normalized mutation of an agent's durable pending-message lists.

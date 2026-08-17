@@ -1,7 +1,7 @@
 /** Model-visible continuation prompt for one same-session goal round. */
 
-import type { ContentBlock } from '@roos-code/roos-code-llm'
-import type { GoalView } from '@roos-code/roos-code-goal'
+import type { ContentBlock } from '@shres-code/shres-code-llm'
+import type { GoalView } from '@shres-code/shres-code-goal'
 
 /**
  * Render the complete goal-round instruction retained in session history.

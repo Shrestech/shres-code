@@ -2,7 +2,7 @@
  * Shared timeout arithmetic, signal fusion, and classification. The library
  * only notifies through abort signals; each capability still owns the mechanism
  * that stops its work and translates timeout reasons into public outcomes.
- * @module @roos-code/roos-code-timeout
+ * @module @shres-code/shres-code-timeout
  */
 
 /**

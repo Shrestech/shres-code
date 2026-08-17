@@ -1,9 +1,9 @@
-import { Context } from '@roos-code/cordis'
-import SystemPrompt, { renderPrompt } from '@roos-code/roos-code-system-prompt'
-import { createScope, type ScopeKey } from '@roos-code/roos-code-scope'
+import { Context } from '@shres-code/cordis'
+import SystemPrompt, { renderPrompt } from '@shres-code/shres-code-system-prompt'
+import { createScope, type ScopeKey } from '@shres-code/shres-code-scope'
 import { describe, expect, it } from 'vitest'
-import * as Persona from '@roos-code/roos-code-persona'
-import { PERSONA_SECTION } from '@roos-code/roos-code-persona'
+import * as Persona from '@shres-code/shres-code-persona'
+import { PERSONA_SECTION } from '@shres-code/shres-code-persona'
 
 async function harness(deploymentPersona: string): Promise<Context> {
   const ctx = new Context()

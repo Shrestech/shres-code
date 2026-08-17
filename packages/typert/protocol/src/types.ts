@@ -1,10 +1,10 @@
 /**
  * Compiler-independent Typert protocol shared by business packages, generated
  * Remote artifacts, the Host Gateway, and Client API implementations.
- * @module @roos-code/roos-code-typert-protocol/types
+ * @module @shres-code/shres-code-typert-protocol/types
  */
 
-import type { Context, Events } from '@roos-code/cordis'
+import type { Context, Events } from '@shres-code/cordis'
 
 declare const LOOKUP_HOST: unique symbol
 declare const LOOKUP_WIRE: unique symbol
@@ -484,7 +484,7 @@ export interface TypertRegistryContract {
   readonly contexts: TypertContextRegistry
 }
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     typert: TypertRegistryContract
   }

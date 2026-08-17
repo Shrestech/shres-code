@@ -2,7 +2,7 @@
 # first; storage and project selection remain Engram-owned.
 - insert:
     - id: memory-engram
-      name: '@roos-code/roos-code-mcp-client'
+      name: '@shres-code/shres-code-mcp-client'
       config:
         serverName: engram
         transport: stdio

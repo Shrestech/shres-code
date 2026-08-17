@@ -3,16 +3,16 @@
  * an escapable vm context on a fresh worker and bridges `agent()` calls to host
  * subagents. The thread prevents synchronous script work from blocking the host
  * and permits forced termination, but it is containment rather than a security boundary.
- * @module @roos-code/roos-code-workflow-worker-thread
+ * @module @shres-code/shres-code-workflow-worker-thread
  */
 
 import { randomUUID } from 'node:crypto'
 import { availableParallelism } from 'node:os'
 import * as vm from 'node:vm'
-import type { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import WorkflowEngine, { WorkflowError, WorkflowRunId } from '@roos-code/roos-code-workflow'
-import type { WorkflowRun, WorkflowRunInfo, WorkflowStartRequest } from '@roos-code/roos-code-workflow'
+import type { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import WorkflowEngine, { WorkflowError, WorkflowRunId } from '@shres-code/shres-code-workflow'
+import type { WorkflowRun, WorkflowRunInfo, WorkflowStartRequest } from '@shres-code/shres-code-workflow'
 import { WorkerRun } from './host.ts'
 import { validateMeta } from './meta.ts'
 import type { WorkerInit, WorkerLimits } from './types.ts'

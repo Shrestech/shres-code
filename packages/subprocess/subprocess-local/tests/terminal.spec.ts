@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { IDisposable, IPty } from 'node-pty'
-import { LocalTerminalHandle } from '@roos-code/roos-code-subprocess-local/src/terminal.ts'
+import { LocalTerminalHandle } from '@shres-code/shres-code-subprocess-local/src/terminal.ts'
 import type {
   ProcessIdentity,
   ProcessInspector,
-} from '@roos-code/roos-code-subprocess-local/src/process-inspector.ts'
-import type { SubprocessTerminalSignal } from '@roos-code/roos-code-subprocess'
+} from '@shres-code/shres-code-subprocess-local/src/process-inspector.ts'
+import type { SubprocessTerminalSignal } from '@shres-code/shres-code-subprocess'
 
 class FakePty {
   pid = 123

@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { fileURLToPath } from 'node:url'
-import { LspConnection } from '@roos-code/roos-code-lsp-stdio'
-import type { ConnectionWriter } from '@roos-code/roos-code-lsp-stdio/src/connection.ts'
-import { scrubbedParentEnv } from '@roos-code/roos-code-subprocess'
-import { spawnSubprocess } from '@roos-code/roos-code-subprocess-local/src/spawn.ts'
+import { LspConnection } from '@shres-code/shres-code-lsp-stdio'
+import type { ConnectionWriter } from '@shres-code/shres-code-lsp-stdio/src/connection.ts'
+import { scrubbedParentEnv } from '@shres-code/shres-code-subprocess'
+import { spawnSubprocess } from '@shres-code/shres-code-subprocess-local/src/spawn.ts'
 
 const fixtureServer = fileURLToPath(new URL('./fixture-server.ts', import.meta.url))
 
@@ -51,11 +51,11 @@ describe('LspConnection', () => {
     expect(conn.pid).toBeGreaterThan(0)
   })
 
-  it('forwards explicit ROOS_* env entries to the child', async () => {
-    // A configured ROOS_* fact must reach the child: the seam scrubs only the
+  it('forwards explicit SHRES_* env entries to the child', async () => {
+    // A configured SHRES_* fact must reach the child: the seam scrubs only the
     // ambient namespace, and the explicit entry merges after that scrub. The
     // fixture echoes the named variable back as hover text.
-    const conn = connect({ LSP_FAKE_ECHO_ENV: 'ROOS_LSP_TEST_FACT', ROOS_LSP_TEST_FACT: 'managed' })
+    const conn = connect({ LSP_FAKE_ECHO_ENV: 'SHRES_LSP_TEST_FACT', SHRES_LSP_TEST_FACT: 'managed' })
     await conn.request('initialize', { capabilities: {} })
     expect(await conn.request('textDocument/hover', {})).toEqual({ contents: 'managed' })
   })

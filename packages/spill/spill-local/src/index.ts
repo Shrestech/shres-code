@@ -1,18 +1,18 @@
 /**
  * `LocalSpillStore`: the host-filesystem implementation of the
- * `@roos-code/roos-code-spill` storage seam. Persists a tool's oversized text to a
+ * `@shres-code/shres-code-spill` storage seam. Persists a tool's oversized text to a
  * private, session-scoped file (see `./store.ts` for the traversal-safe naming
  * and exclusive owner-only write) and returns a path locator plus local
  * read/grep retrieval guidance.
  *
- * @module @roos-code/roos-code-spill-local
+ * @module @shres-code/shres-code-spill-local
  */
 
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { resolve } from 'node:path'
-import z from '@roos-code/schemastery'
-import { SpillLocator, SpillStore } from '@roos-code/roos-code-spill'
-import type { SaveTextSpill, SpillRef } from '@roos-code/roos-code-spill'
+import z from '@shres-code/schemastery'
+import { SpillLocator, SpillStore } from '@shres-code/shres-code-spill'
+import type { SaveTextSpill, SpillRef } from '@shres-code/shres-code-spill'
 import { privateRoot, saveTextFile } from './store.ts'
 
 export { encodeSegment, privateRoot, saveTextFile, sessionDir } from './store.ts'

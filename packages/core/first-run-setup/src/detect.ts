@@ -3,10 +3,10 @@
  * in one place; this module only supplies the timeout and maps a miss to
  * `reachable: false` instead of throwing.
  *
- * @module @roos-code/roos-code-first-run-setup/detect
+ * @module @shres-code/shres-code-first-run-setup/detect
  */
 
-import { discoverModels } from '@roos-code/roos-code-llm-pi-ai'
+import { discoverModels } from '@shres-code/shres-code-llm-pi-ai'
 import type { LocalOllamaStatus } from './types.ts'
 
 /** Options for one local-Ollama listing probe. */

@@ -9,16 +9,16 @@ import {
   FileNotFoundError,
   SandboxNotFoundError,
   quoteE2BShellArg,
-} from '@roos-code/roos-code-e2b'
-import type { CommandHandle, CommandResult, Sandbox } from '@roos-code/roos-code-e2b'
+} from '@shres-code/shres-code-e2b'
+import type { CommandHandle, CommandResult, Sandbox } from '@shres-code/shres-code-e2b'
 import type {
   SubprocessCollect,
   SubprocessHandle,
   SubprocessOutcome,
   SubprocessOutputMode,
   SubprocessSpawnSpec,
-} from '@roos-code/roos-code-subprocess'
-import type E2BRuntime from '@roos-code/roos-code-e2b'
+} from '@shres-code/shres-code-subprocess'
+import type E2BRuntime from '@shres-code/shres-code-e2b'
 import { bootstrapEnvironment, readRemoteEnvironment, serializeRemoteEnvironment } from './environment.ts'
 import { E2BBase64Decoder, E2B_OUTPUT_COMPLETE_FRAME, E2BOutputReader } from './output.ts'
 import { asError, commandOpts, signalRemoteGroups, waitTick } from './remote.ts'
@@ -133,7 +133,7 @@ function commandText(spec: SubprocessSpawnSpec, paths: RemotePaths): string {
     'for roos_e2b_tool in "$roos_e2b_env_bin" "$roos_e2b_setsid" "$roos_e2b_bash" "$roos_e2b_node" "$roos_e2b_ps" "$roos_e2b_tr" "$roos_e2b_tee" "$roos_e2b_head" "$roos_e2b_rm"; do',
     '  [[ "$roos_e2b_tool" == /* && -x "$roos_e2b_tool" ]] || exit 125',
     'done',
-    `exec "$roos_e2b_env_bin" -i -- "\${roos_e2b_env[@]}" "$roos_e2b_setsid" --wait -- "$roos_e2b_bash" -c ${quoteE2BShellArg(inner)} roos-e2b "$roos_e2b_env_bin" "$roos_e2b_node" "$roos_e2b_ps" "$roos_e2b_tr" "$roos_e2b_tee" "$roos_e2b_head" "$roos_e2b_rm" ${argv}`,
+    `exec "$roos_e2b_env_bin" -i -- "\${roos_e2b_env[@]}" "$roos_e2b_setsid" --wait -- "$roos_e2b_bash" -c ${quoteE2BShellArg(inner)} shres-e2b "$roos_e2b_env_bin" "$roos_e2b_node" "$roos_e2b_ps" "$roos_e2b_tr" "$roos_e2b_tee" "$roos_e2b_head" "$roos_e2b_rm" ${argv}`,
   ].join('\n')
   return bootstrap
 }

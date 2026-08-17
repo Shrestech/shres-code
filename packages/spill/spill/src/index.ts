@@ -3,24 +3,24 @@
  * spill backend does — persist a tool's oversized text and return a model-facing
  * locator plus retrieval guidance — without saying HOW. Implementations
  * subclass {@link SpillStore} and register as the `spillStore` service;
- * `@roos-code/roos-code-spill-local` (host filesystem) is the first.
+ * `@shres-code/shres-code-spill-local` (host filesystem) is the first.
  *
  * The Service Definition is deliberately minimal: `saveText` and nothing else. It owns NO
- * retention policy (that is `@roos-code/roos-code-output-retention`), NO tool-result
- * replacement (that is `@roos-code/roos-code-spill-policy`), and NO retrieval or
+ * retention policy (that is `@shres-code/shres-code-output-retention`), NO tool-result
+ * replacement (that is `@shres-code/shres-code-spill-policy`), and NO retrieval or
  * search API. The backend supplies the locator and retrieval hint appropriate
  * for its storage substrate.
  *
- * @module @roos-code/roos-code-spill
+ * @module @shres-code/shres-code-spill
  */
 
-import { Context, Service } from '@roos-code/cordis'
+import { Context, Service } from '@shres-code/cordis'
 import type { SaveTextSpill, SpillRef } from './types.ts'
 
 export { SpillLocator } from './types.ts'
 export type { SaveTextSpill, SpillOwner, SpillRef, SpillSource } from './types.ts'
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     spillStore: SpillStore
   }

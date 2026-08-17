@@ -1,9 +1,9 @@
 /**
  * Flatten harness messages into one CLI prompt string.
- * @module @roos-code/roos-code-llm-cli-bridge/serialize
+ * @module @shres-code/shres-code-llm-cli-bridge/serialize
  */
 
-import type { ContentBlock, GenerateOptions, Message } from '@roos-code/roos-code-llm'
+import type { ContentBlock, GenerateOptions, Message } from '@shres-code/shres-code-llm'
 
 /**
  * Render one content-block list as plain text.

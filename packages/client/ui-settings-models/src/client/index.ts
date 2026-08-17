@@ -6,16 +6,16 @@
  * Export discipline:
  * packages/client/AGENTS.md.
  */
-import type { ClientContext } from '@roos-code/roos-code-client-runtime/client'
-import type { ConnectionHandle } from '@roos-code/roos-code-api-remotes/client'
-import { bindSnapshotSelector } from '@roos-code/roos-code-client-web-react'
+import type { ClientContext } from '@shres-code/shres-code-client-runtime/client'
+import type { ConnectionHandle } from '@shres-code/shres-code-api-remotes/client'
+import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
 // Type-only: pulls the shell's SlotMap merge (the 'settings.section' entry).
-import type {} from '@roos-code/roos-code-client-ui-settings/client'
+import type {} from '@shres-code/shres-code-client-ui-settings/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
-import type {} from '@roos-code/roos-code-client-locale/client'
+import type {} from '@shres-code/shres-code-client-locale/client'
 // Type-only: pulls the ctx.remote merge and the forwarded-event key face
 // (settings/credentials invalidations ride the allowlist) into this program.
-import type {} from '@roos-code/roos-code-api-remotes/client'
+import type {} from '@shres-code/shres-code-api-remotes/client'
 import { ModelsSection } from './ModelsSection.tsx'
 import type { ModelsSectionInjected } from './ModelsSection.tsx'
 import { FirstRunOnboardingDialog } from './FirstRunOnboardingDialog.tsx'
@@ -30,7 +30,7 @@ import { WELCOME_NOTICE_SETTINGS_NAMESPACE } from '../onboarding-copy.ts'
 export type { ModelsSectionInjected, ModelsSectionProps } from './ModelsSection.tsx'
 export type { ModelsKey } from './locales.ts'
 
-declare module '@roos-code/roos-code-client-ui-slots' {
+declare module '@shres-code/shres-code-client-ui-slots' {
   interface LocaleNamespaceMap {
     /** The Models page + product-onboarding copy. */
     'settings.models': ModelsKey

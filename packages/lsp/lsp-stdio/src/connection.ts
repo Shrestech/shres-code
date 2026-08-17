@@ -7,11 +7,11 @@
  * fatal close, and exposes tree-scoped termination through the handle so the
  * instance owns teardown; group/tree mechanics live in the subprocess
  * Service Provider.
- * @module @roos-code/roos-code-lsp-stdio/connection
+ * @module @shres-code/shres-code-lsp-stdio/connection
  */
 
 import type { Writable } from 'node:stream'
-import type { SubprocessHandle, SubprocessSpawnSpec } from '@roos-code/roos-code-subprocess'
+import type { SubprocessHandle, SubprocessSpawnSpec } from '@shres-code/shres-code-subprocess'
 import { encodeMessage, MessageDecoder } from './framing.ts'
 
 /** How to launch the server and answer its config requests. */
@@ -99,7 +99,7 @@ export class LspConnection {
       },
       graceMs: spec.killGraceMs,
       // The seam merges explicit config entries after its ambient scrub, so a
-      // configured credential or ROOS_* fact reaches the child deliberately.
+      // configured credential or SHRES_* fact reaches the child deliberately.
       env: spec.env,
     })
     /* v8 ignore start -- 'pipe' dispositions expose both streams by the seam contract; defensive. */

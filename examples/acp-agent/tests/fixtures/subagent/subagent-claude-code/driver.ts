@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /** Inspect both public product-provider compositions without invoking them. */
 
-import { boot, resolveConfigPath } from '@roos-code/roos-code-app-boot'
-import type {} from '@roos-code/roos-code-subagent'
-import type {} from '@roos-code/roos-code-tools'
+import { boot, resolveConfigPath } from '@shres-code/shres-code-app-boot'
+import type {} from '@shres-code/shres-code-subagent'
+import type {} from '@shres-code/shres-code-tools'
 
 const configPath = process.argv[2]
 if (configPath === undefined) {

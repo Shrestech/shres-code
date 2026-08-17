@@ -1,17 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { credentialRef } from '@roos-code/roos-code-credentials'
+import { credentialRef } from '@shres-code/shres-code-credentials'
 import { LocalCredentialProvider } from '../src/index.ts'
 
 // The atomic write is the gated asynchronous hold point inside a queued
 // write; gating it makes the dispose-versus-queued-write race fully
 // deterministic. The lock helper passes through so the gated operation still
 // runs inside its real acquire/release cycle.
-vi.mock('@roos-code/roos-code-atomic-write', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@roos-code/roos-code-atomic-write')>()
+vi.mock('@shres-code/shres-code-atomic-write', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@shres-code/shres-code-atomic-write')>()
   let gate: Promise<void> = Promise.resolve()
   return {
     ...actual,
@@ -23,12 +23,12 @@ vi.mock('@roos-code/roos-code-atomic-write', async (importOriginal) => {
 })
 
 async function setGate(next: Promise<void>): Promise<void> {
-  const mocked = await import('@roos-code/roos-code-atomic-write') as unknown as { __setGate: (next: Promise<void>) => void }
+  const mocked = await import('@shres-code/shres-code-atomic-write') as unknown as { __setGate: (next: Promise<void>) => void }
   mocked.__setGate(next)
 }
 
-const KEY = credentialRef('ROOS_CRED_DRAIN_A')
-const OTHER = credentialRef('ROOS_CRED_DRAIN_B')
+const KEY = credentialRef('SHRES_CRED_DRAIN_A')
+const OTHER = credentialRef('SHRES_CRED_DRAIN_B')
 
 const cleanups: Array<() => Promise<void>> = []
 
@@ -39,7 +39,7 @@ afterEach(async () => {
 
 describe('write-drain teardown', () => {
   it('lets the in-flight write land and fails the queued one after disposal', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'roos-credentials-drain-'))
+    const dir = await mkdtemp(join(tmpdir(), 'shres-credentials-drain-'))
     cleanups.push(() => rm(dir, { recursive: true, force: true }))
     const ctx = new Context()
     const fiber = ctx.plugin(LocalCredentialProvider, { path: join(dir, '.credentials.yaml'), watch: false })

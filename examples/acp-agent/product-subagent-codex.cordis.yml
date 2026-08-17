@@ -2,15 +2,15 @@
 # the real ACP composition. The model is told not to call it; the scenario pins
 # the assembled request schema without starting Codex.
 - id: base
-  name: '@roos-code/cordis-plugin-include'
+  name: '@shres-code/cordis-plugin-include'
   config:
     path: ./cordis.yml
     patches:
       - insert:
           - id: subagent-codex
-            name: '@roos-code/roos-code-subagent-codex'
+            name: '@shres-code/shres-code-subagent-codex'
           - id: tool-subagent-codex
-            name: '@roos-code/roos-code-tool-subagent'
+            name: '@shres-code/shres-code-tool-subagent'
             config:
               provider: codex
               toolName: subagent_codex

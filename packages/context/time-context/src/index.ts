@@ -2,14 +2,14 @@
  * Opt-in request clock context. Eligible steps add durable,
  * source-attributed time readings to the request history.
  *
- * @module @roos-code/roos-code-time-context
+ * @module @shres-code/shres-code-time-context
  */
 
-import type { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import type { Agent, PreStepDecision } from '@roos-code/roos-code-agent'
-import { createUserMessage } from '@roos-code/roos-code-llm'
-import type { UserMessage } from '@roos-code/roos-code-llm'
+import type { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import type { Agent, PreStepDecision } from '@shres-code/shres-code-agent'
+import { createUserMessage } from '@shres-code/shres-code-llm'
+import type { UserMessage } from '@shres-code/shres-code-llm'
 import {
   deriveBrowserTimeZoneContext,
   renderBrowserTimeZoneContext,

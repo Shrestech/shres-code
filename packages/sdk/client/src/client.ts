@@ -1,15 +1,15 @@
 /**
- * Low-level JSON-RPC client for a Roos Code SDK runtime subprocess.
+ * Low-level JSON-RPC client for a Shres Code SDK runtime subprocess.
  * {@link HarnessClient} owns the child process: it spawns the runtime, speaks
- * the `@roos-code/roos-code-sdk-protocol` wire over the child's stdio, fans
+ * the `@shres-code/shres-code-sdk-protocol` wire over the child's stdio, fans
  * server notifications out to subscriptions, and tears the child down to
  * quiescence through a private EOF → SIGTERM → SIGKILL ladder. The design
  * twin is the Python SDK's `HarnessClient` (`python/sdk`); both drive the
  * same runtime protocol. This client runs OUTSIDE any harness context, so it
- * spawns directly rather than through the `roos-subprocess` service — the
+ * spawns directly rather than through the `shres-subprocess` service — the
  * seam's documented exception for SDK-managed transports.
  *
- * @module @roos-code/roos-code-sdk-client/client
+ * @module @shres-code/shres-code-sdk-client/client
  */
 
 import { spawn, type ChildProcess } from 'node:child_process'
@@ -19,8 +19,8 @@ import {
   type InitializeParams,
   type InitializeResult,
   type SessionPromptParams,
-} from '@roos-code/roos-code-sdk-protocol'
-import type { ContentBlock } from '@roos-code/roos-code-llm'
+} from '@shres-code/shres-code-sdk-protocol'
+import type { ContentBlock } from '@shres-code/shres-code-llm'
 import { disposeRuntimeProcess } from './dispose.ts'
 import type { HarnessClientOptions, HarnessNotification, NotificationFilter } from './types.ts'
 
@@ -173,7 +173,7 @@ class NotificationSubscriptionImpl implements NotificationSubscription {
 }
 
 /**
- * JSON-RPC client for the Roos Code SDK runtime over subprocess stdio.
+ * JSON-RPC client for the Shres Code SDK runtime over subprocess stdio.
  *
  * The subprocess starts lazily on {@link start} and is owned by this instance
  * until {@link close}, which requests protocol `shutdown` and then walks the
@@ -201,7 +201,7 @@ export class HarnessClient {
    * the process is live; rejects reuse after {@link close}.
    */
   start(): void {
-    if (this.closeTask !== undefined) throw new TransportClosedError('Roos Code runtime client is closed')
+    if (this.closeTask !== undefined) throw new TransportClosedError('Shres Code runtime client is closed')
     if (this.child !== undefined) return
     const child = spawn(this.options.command, this.options.args ?? [], {
       cwd: this.options.cwd,
@@ -214,7 +214,7 @@ export class HarnessClient {
       // A spawn failure destroys the pipes without an input 'end' edge, so the
       // transport's pending requests must be failed here.
       this.transport?.close()
-      this.failSubscriptions(this.closedError('Roos Code runtime failed to start'))
+      this.failSubscriptions(this.closedError('Shres Code runtime failed to start'))
     })
     // Writes racing the runtime's death EPIPE on stdin; the exit edge below is
     // the real signal, so the stream-level error only needs to be non-fatal.
@@ -246,7 +246,7 @@ export class HarnessClient {
       this.exitCode = code
       settled.exited = true
       maybeSettle()
-      this.failSubscriptions(this.closedError('Roos Code runtime exited'))
+      this.failSubscriptions(this.closedError('Shres Code runtime exited'))
     })
     child.once('close', () => {
       // All stdio has settled: stdout 'end' already drained every tail frame,
@@ -304,11 +304,11 @@ export class HarnessClient {
     // writing into a destroyed pipe and hanging until the timeout.
     if (this.exitCode !== undefined || this.spawnError !== undefined) {
       await this.settleStreams()
-      throw this.closedError('Roos Code runtime is not running')
+      throw this.closedError('Shres Code runtime is not running')
     }
     const transport = this.transport
     /* v8 ignore next -- start() either sets the transport or throws */
-    if (transport === undefined) throw new TransportClosedError('Roos Code runtime is not running')
+    if (transport === undefined) throw new TransportClosedError('Shres Code runtime is not running')
     const timeout = timeoutMs ?? this.options.requestTimeoutMs
     try {
       if (timeout === undefined) return await transport.request(method, params ?? {})
@@ -317,7 +317,7 @@ export class HarnessClient {
       // retain no per-call state (the server-side work still runs to close).
       const abandon = new AbortController()
       const timer = setTimeout(() => {
-        abandon.abort(new RequestTimeoutError(`${method} timed out after ${timeout}ms waiting for the Roos Code runtime`))
+        abandon.abort(new RequestTimeoutError(`${method} timed out after ${timeout}ms waiting for the Shres Code runtime`))
       }, timeout)
       try {
         return await transport.request(method, params ?? {}, abandon.signal)
@@ -344,7 +344,7 @@ export class HarnessClient {
     const state: SubscriptionState = { queue: [], waiters: [], filter, failure: undefined }
     const subscription = new NotificationSubscriptionImpl(state, () => { this.subscriptions.delete(id) })
     if (this.closeTask !== undefined || this.exitCode !== undefined || this.spawnError !== undefined) {
-      subscription.fail(this.closedError('Roos Code runtime closed'))
+      subscription.fail(this.closedError('Shres Code runtime closed'))
       return subscription
     }
     this.subscriptions.set(id, subscription)
@@ -397,7 +397,7 @@ export class HarnessClient {
       disposeGraceMs: this.options.disposeGraceMs ?? 3_000,
     })
     this.transport?.close()
-    this.failSubscriptions(this.closedError('Roos Code runtime closed'))
+    this.failSubscriptions(this.closedError('Shres Code runtime closed'))
   }
 
   private dispatchNotification(notification: HarnessNotification): void {

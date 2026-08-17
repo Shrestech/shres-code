@@ -1,4 +1,4 @@
-# @roos-code/roos-code-first-run-setup
+# @shres-code/shres-code-first-run-setup
 
 First-run model picker. `FirstRunSetup` provides `ctx.firstRunSetup`; it probes local Ollama, decides whether the current `agent-default-model` selection can already serve, and on a TTY prints a menu that writes that settings section plus any typed key through the credentials seam.
 

@@ -1,11 +1,11 @@
 /**
  * Per-route CLI settings for delegated completion.
- * @module @roos-code/roos-code-llm-cli-bridge/config
+ * @module @shres-code/shres-code-llm-cli-bridge/config
  */
 
-import z from '@roos-code/schemastery'
-import { ReasoningEffortId } from '@roos-code/roos-code-llm'
-import type { LlmReasoningEffortInfo } from '@roos-code/roos-code-llm'
+import z from '@shres-code/schemastery'
+import { ReasoningEffortId } from '@shres-code/shres-code-llm'
+import type { LlmReasoningEffortInfo } from '@shres-code/shres-code-llm'
 
 /** How a route turns `GenerateOptions.reasoningEffort` into argv. */
 export type EffortStyle = 'flag' | 'thinking-bool' | 'codex-config'
@@ -24,7 +24,7 @@ export const DEFAULT_DISPOSE_GRACE_MS = 3_000
 
 /** One advisory model listed for a CLI route. */
 export interface CliBridgeModel {
-  /** Model id passed to {@link import('@roos-code/roos-code-llm').GenerateOptions.model}. */
+  /** Model id passed to {@link import('@shres-code/shres-code-llm').GenerateOptions.model}. */
   id: string
   /** Selector label; defaults to {@link id}. */
   name?: string

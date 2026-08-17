@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { credentialRef } from '@roos-code/roos-code-credentials'
-import { createLaunchEnvironmentSnapshot, ROOS_LAUNCH_ENVIRONMENT_KEY } from '@roos-code/roos-code-launch-environment'
-import type { CredentialRef } from '@roos-code/roos-code-credentials'
+import { credentialRef } from '@shres-code/shres-code-credentials'
+import { createLaunchEnvironmentSnapshot, SHRES_LAUNCH_ENVIRONMENT_KEY } from '@shres-code/shres-code-launch-environment'
+import type { CredentialRef } from '@shres-code/shres-code-credentials'
 import { LocalCredentialProvider, resolveSpec } from '../src/index.ts'
 
 /** Credential documents are seeded owner-only, exactly as the provider creates them. */
@@ -13,8 +13,8 @@ function writeCredentials(file: string, text: string): Promise<void> {
   return writeFile(file, text, { mode: 0o600 })
 }
 
-const KEY = credentialRef('ROOS_CRED_TEST')
-const OTHER = credentialRef('ROOS_CRED_OTHER')
+const KEY = credentialRef('SHRES_CRED_TEST')
+const OTHER = credentialRef('SHRES_CRED_OTHER')
 
 const cleanups: Array<() => Promise<void>> = []
 
@@ -24,7 +24,7 @@ afterEach(async () => {
 })
 
 async function tempDir(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), 'roos-credentials-local-'))
+  const dir = await mkdtemp(join(tmpdir(), 'shres-credentials-local-'))
   cleanups.push(() => rm(dir, { recursive: true, force: true }))
   return dir
 }
@@ -49,13 +49,13 @@ function updates(ctx: Context): CredentialRef[] {
 
 describe('resolveSpec', () => {
   it('defaults to .credentials.yaml under the harness home with watching on', () => {
-    const spec = resolveSpec({ roosHome: '/custom/home' })
+    const spec = resolveSpec({ shresHome: '/custom/home' })
     expect(spec).toEqual({ filename: resolve('/custom/home/.credentials.yaml'), watch: true, debounceMs: 100 })
   })
 
   it('lets an explicit path win over the home', () => {
-    const spec = resolveSpec({ path: '/etc/roos/creds.yaml', roosHome: '/ignored', watch: false, debounceMs: 5 })
-    expect(spec).toEqual({ filename: resolve('/etc/roos/creds.yaml'), watch: false, debounceMs: 5 })
+    const spec = resolveSpec({ path: '/etc/shres/creds.yaml', shresHome: '/ignored', watch: false, debounceMs: 5 })
+    expect(spec).toEqual({ filename: resolve('/etc/shres/creds.yaml'), watch: false, debounceMs: 5 })
   })
 })
 
@@ -70,7 +70,7 @@ describe('layering and reads', () => {
   it('serves file entries alongside comments and quoted values', async () => {
     const dir = await tempDir()
     const path = join(dir, '.credentials.yaml')
-    await writeCredentials(path, '# notes\nROOS_CRED_TEST: plain\nROOS_CRED_OTHER: "with space"\n')
+    await writeCredentials(path, '# notes\nSHRES_CRED_TEST: plain\nSHRES_CRED_OTHER: "with space"\n')
     const ctx = await boot({ path, watch: false })
     expect(await ctx.credentials.resolve(KEY)).toEqual({ value: 'plain', source: 'file' })
     expect(await ctx.credentials.resolve(OTHER)).toEqual({ value: 'with space', source: 'file' })
@@ -80,9 +80,9 @@ describe('layering and reads', () => {
   it('lets a non-empty process environment win read-only over the file', async () => {
     const dir = await tempDir()
     const path = join(dir, '.credentials.yaml')
-    await writeCredentials(path, 'ROOS_CRED_TEST: from-file\n')
+    await writeCredentials(path, 'SHRES_CRED_TEST: from-file\n')
     const ctx = await boot({ path, watch: false })
-    vi.stubEnv('ROOS_CRED_TEST', 'from-env')
+    vi.stubEnv('SHRES_CRED_TEST', 'from-env')
     expect(await ctx.credentials.resolve(KEY)).toEqual({ value: 'from-env', source: 'env' })
     expect(await ctx.credentials.describe(KEY)).toEqual({ configured: true, source: 'env', writable: false })
   })
@@ -90,9 +90,9 @@ describe('layering and reads', () => {
   it('treats an empty environment value as absent, falling through to the file', async () => {
     const dir = await tempDir()
     const path = join(dir, '.credentials.yaml')
-    await writeCredentials(path, 'ROOS_CRED_TEST: stored\n')
+    await writeCredentials(path, 'SHRES_CRED_TEST: stored\n')
     const ctx = await boot({ path, watch: false })
-    vi.stubEnv('ROOS_CRED_TEST', '')
+    vi.stubEnv('SHRES_CRED_TEST', '')
     expect(await ctx.credentials.resolve(KEY)).toEqual({ value: 'stored', source: 'file' })
     expect(await ctx.credentials.describe(KEY)).toEqual({ configured: true, source: 'file', writable: true })
   })
@@ -107,14 +107,14 @@ describe('layering and reads', () => {
 })
 
 describe('layer ladder', () => {
-  // inherited process env > .credentials.yaml > $ROOS_HOME/.env, and the
+  // inherited process env > .credentials.yaml > $SHRES_HOME/.env, and the
   // invoking directory's .env supplies no credential at all.
   async function bootLayered(
     path: string,
     layers: Parameters<typeof createLaunchEnvironmentSnapshot>[0],
   ): Promise<Context> {
     const ctx = new Context()
-    ctx.provide(ROOS_LAUNCH_ENVIRONMENT_KEY, createLaunchEnvironmentSnapshot(layers))
+    ctx.provide(SHRES_LAUNCH_ENVIRONMENT_KEY, createLaunchEnvironmentSnapshot(layers))
     const fiber = ctx.plugin(LocalCredentialProvider, { path, watch: false })
     cleanups.push(async () => { await fiber.dispose() })
     await fiber
@@ -124,10 +124,10 @@ describe('layer ladder', () => {
   it('lets the stored value beat the user .env, so a UI write takes effect immediately', async () => {
     const dir = await tempDir()
     const path = join(dir, '.credentials.yaml')
-    await writeCredentials(path, 'ROOS_CRED_TEST: stored\n')
+    await writeCredentials(path, 'SHRES_CRED_TEST: stored\n')
     const ctx = await bootLayered(path, [
       { source: 'process', values: {} },
-      { source: 'user-env', path: '/home/.roos/.env', values: { ROOS_CRED_TEST: 'older-user-env' } },
+      { source: 'user-env', path: '/home/.shres/.env', values: { SHRES_CRED_TEST: 'older-user-env' } },
     ])
     expect(await ctx.credentials.resolve(KEY)).toEqual({ value: 'stored', source: 'file' })
     // A key sitting in the user's .env does not make the stored one
@@ -141,7 +141,7 @@ describe('layer ladder', () => {
     const dir = await tempDir()
     const ctx = await bootLayered(join(dir, '.credentials.yaml'), [
       { source: 'process', values: {} },
-      { source: 'user-env', path: '/home/.roos/.env', values: { ROOS_CRED_TEST: 'from-user-env' } },
+      { source: 'user-env', path: '/home/.shres/.env', values: { SHRES_CRED_TEST: 'from-user-env' } },
     ])
     expect(await ctx.credentials.resolve(KEY)).toEqual({ value: 'from-user-env', source: 'user-env' })
     // Writable: storing a key replaces it as the effective one.
@@ -156,14 +156,14 @@ describe('layer ladder', () => {
     // wins) and below the managed store, which a stored key must never lose to.
     const layers = [
       { source: 'process' as const, values: {} },
-      { source: 'project-env' as const, path: '/work/.env', values: { ROOS_CRED_TEST: 'from-project' } },
-      { source: 'user-env' as const, path: '/home/.roos/.env', values: { ROOS_CRED_TEST: 'from-user' } },
+      { source: 'project-env' as const, path: '/work/.env', values: { SHRES_CRED_TEST: 'from-project' } },
+      { source: 'user-env' as const, path: '/home/.shres/.env', values: { SHRES_CRED_TEST: 'from-user' } },
     ]
     const bare = await bootLayered(path, layers)
     expect(await bare.credentials.resolve(KEY)).toEqual({ value: 'from-project', source: 'project-env' })
     expect(await bare.credentials.describe(KEY)).toEqual({ configured: true, source: 'project-env', writable: true })
 
-    await writeCredentials(path, 'ROOS_CRED_TEST: stored\n')
+    await writeCredentials(path, 'SHRES_CRED_TEST: stored\n')
     const stored = await bootLayered(path, layers)
     expect(await stored.credentials.resolve(KEY)).toEqual({ value: 'stored', source: 'file' })
   })
@@ -171,7 +171,7 @@ describe('layer ladder', () => {
   it.skipIf(process.platform === 'win32')('refuses a document other OS users can read', async () => {
     const dir = await tempDir()
     const path = join(dir, '.credentials.yaml')
-    await writeFile(path, 'ROOS_CRED_TEST: leaked\n', { mode: 0o644 })
+    await writeFile(path, 'SHRES_CRED_TEST: leaked\n', { mode: 0o644 })
     const ctx = new Context()
     // Before the contents are read at all: serving secrets out of a
     // world-readable file would make the 0600 the provider writes meaningless.
@@ -212,10 +212,10 @@ describe('layer ladder', () => {
   it('lets only the inherited environment shadow the store, read-only', async () => {
     const dir = await tempDir()
     const path = join(dir, '.credentials.yaml')
-    await writeCredentials(path, 'ROOS_CRED_TEST: stored\n')
+    await writeCredentials(path, 'SHRES_CRED_TEST: stored\n')
     const ctx = await bootLayered(path, [
-      { source: 'process', values: { ROOS_CRED_TEST: 'from-shell' } },
-      { source: 'user-env', path: '/home/.roos/.env', values: { ROOS_CRED_TEST: 'from-user-env' } },
+      { source: 'process', values: { SHRES_CRED_TEST: 'from-shell' } },
+      { source: 'user-env', path: '/home/.shres/.env', values: { SHRES_CRED_TEST: 'from-user-env' } },
     ])
     expect(await ctx.credentials.resolve(KEY)).toEqual({ value: 'from-shell', source: 'env' })
     expect(await ctx.credentials.describe(KEY)).toEqual({ configured: true, source: 'env', writable: false })
@@ -229,12 +229,12 @@ describe('document validation', () => {
   // "the secret I stored has no effect".
   it.each([
     ['a non-mapping root', 'just a string\n', /must be a mapping/],
-    ['a sequence root', '- ROOS_CRED_TEST\n', /must be a mapping/],
+    ['a sequence root', '- SHRES_CRED_TEST\n', /must be a mapping/],
     ['a key that is not a POSIX identifier', 'not-a-ref: value\n', /credential ref/],
-    ['a non-string value', 'ROOS_CRED_TEST: 123\n', /must be a string/],
-    ['an empty value', 'ROOS_CRED_TEST: ""\n', /is empty/],
-    ['duplicate keys', 'ROOS_CRED_TEST: one\nROOS_CRED_TEST: two\n', /invalid document/],
-    ['malformed yaml', 'ROOS_CRED_TEST: "unterminated\n', /invalid document/],
+    ['a non-string value', 'SHRES_CRED_TEST: 123\n', /must be a string/],
+    ['an empty value', 'SHRES_CRED_TEST: ""\n', /is empty/],
+    ['duplicate keys', 'SHRES_CRED_TEST: one\nSHRES_CRED_TEST: two\n', /invalid document/],
+    ['malformed yaml', 'SHRES_CRED_TEST: "unterminated\n', /invalid document/],
   ])('fails boot on %s', async (_case, text, message) => {
     const dir = await tempDir()
     const path = join(dir, '.credentials.yaml')
@@ -250,7 +250,7 @@ describe('document validation', () => {
     // The yaml parser's own message quotes the offending source line, which in
     // this document is the secret itself. Boot stderr and the watcher's logger
     // both receive whatever this throws.
-    await writeCredentials(path, `ROOS_CRED_TEST: "${secret}\n`)
+    await writeCredentials(path, `SHRES_CRED_TEST: "${secret}\n`)
     let failure: unknown
     try {
       await new Context().plugin(LocalCredentialProvider, { path, watch: false })
@@ -280,7 +280,7 @@ describe('document writes', () => {
     const ctx = await boot({ path, watch: false })
     const seen = updates(ctx)
     await ctx.credentials.set(KEY, 'sk-fresh')
-    expect(await readFile(path, 'utf8')).toBe('ROOS_CRED_TEST: sk-fresh\n')
+    expect(await readFile(path, 'utf8')).toBe('SHRES_CRED_TEST: sk-fresh\n')
     if (process.platform !== 'win32') expect((await stat(path)).mode & 0o777).toBe(0o600)
     expect(await ctx.credentials.resolve(KEY)).toEqual({ value: 'sk-fresh', source: 'file' })
     expect(seen).toEqual([KEY])
@@ -289,11 +289,11 @@ describe('document writes', () => {
   it('patches one entry, preserving comments and every untouched entry', async () => {
     const dir = await tempDir()
     const path = join(dir, '.credentials.yaml')
-    await writeCredentials(path, '# deployment notes\nROOS_CRED_OTHER: keep\n\n# the one under edit\nROOS_CRED_TEST: old\n')
+    await writeCredentials(path, '# deployment notes\nSHRES_CRED_OTHER: keep\n\n# the one under edit\nSHRES_CRED_TEST: old\n')
     const ctx = await boot({ path, watch: false })
     await ctx.credentials.set(KEY, 'new value!')
     expect(await readFile(path, 'utf8')).toBe(
-      '# deployment notes\nROOS_CRED_OTHER: keep\n\n# the one under edit\nROOS_CRED_TEST: new value!\n',
+      '# deployment notes\nSHRES_CRED_OTHER: keep\n\n# the one under edit\nSHRES_CRED_TEST: new value!\n',
     )
   })
 
@@ -317,11 +317,11 @@ describe('document writes', () => {
     // Comments above an entry are that entry's annotation and go with it when
     // it is removed — including anything above the document's first entry.
     // Every other entry keeps its own comments.
-    await writeCredentials(path, '# about the doomed one\nROOS_CRED_TEST: gone\n# about the survivor\nROOS_CRED_OTHER: stays\n')
+    await writeCredentials(path, '# about the doomed one\nSHRES_CRED_TEST: gone\n# about the survivor\nSHRES_CRED_OTHER: stays\n')
     const ctx = await boot({ path, watch: false })
     const seen = updates(ctx)
     await ctx.credentials.unset(KEY)
-    expect(await readFile(path, 'utf8')).toBe('# about the survivor\nROOS_CRED_OTHER: stays\n')
+    expect(await readFile(path, 'utf8')).toBe('# about the survivor\nSHRES_CRED_OTHER: stays\n')
     await ctx.credentials.unset(KEY)
     expect(seen).toEqual([KEY])
   })
@@ -329,12 +329,12 @@ describe('document writes', () => {
   it('rejects empty values and writes the environment would shadow', async () => {
     const dir = await tempDir()
     const path = join(dir, '.credentials.yaml')
-    await writeCredentials(path, 'ROOS_CRED_TEST: stored\n')
+    await writeCredentials(path, 'SHRES_CRED_TEST: stored\n')
     const ctx = await boot({ path, watch: false })
 
     await expect(ctx.credentials.set(KEY, '')).rejects.toThrow(/empty value/)
 
-    vi.stubEnv('ROOS_CRED_TEST', 'shadowing')
+    vi.stubEnv('SHRES_CRED_TEST', 'shadowing')
     await expect(ctx.credentials.set(KEY, 'next')).rejects.toThrow(/shadowed/)
     await expect(ctx.credentials.unset(KEY)).rejects.toThrow(/shadowed/)
   })
@@ -342,7 +342,7 @@ describe('document writes', () => {
   it('leaves an empty mapping after unsetting the only entry', async () => {
     const dir = await tempDir()
     const path = join(dir, '.credentials.yaml')
-    await writeCredentials(path, 'ROOS_CRED_TEST: only\n')
+    await writeCredentials(path, 'SHRES_CRED_TEST: only\n')
     const ctx = await boot({ path, watch: false })
     await ctx.credentials.unset(KEY)
     expect(await readFile(path, 'utf8')).toBe('{}\n')
@@ -357,7 +357,7 @@ describe('document writes', () => {
     const ctx = await boot({ path, watch: false })
     // An external editor left the document unparsable: the read-modify-write
     // must refuse rather than overwrite content it cannot understand.
-    await writeCredentials(path, 'ROOS_CRED_TEST: "unterminated\n')
+    await writeCredentials(path, 'SHRES_CRED_TEST: "unterminated\n')
     await expect(ctx.credentials.set(OTHER, 'lands')).rejects.toThrow(/invalid document/)
   })
 
@@ -369,7 +369,7 @@ describe('document writes', () => {
     const good = ctx.credentials.set(OTHER, 'lands')
     await bad
     await good
-    expect(await readFile(path, 'utf8')).toBe('ROOS_CRED_OTHER: lands\n')
+    expect(await readFile(path, 'utf8')).toBe('SHRES_CRED_OTHER: lands\n')
   })
 
   it('serializes concurrent writes so both land in the one document', async () => {
@@ -380,7 +380,7 @@ describe('document writes', () => {
       ctx.credentials.set(KEY, 'one'),
       ctx.credentials.set(OTHER, 'two'),
     ])
-    expect(await readFile(path, 'utf8')).toBe('ROOS_CRED_TEST: one\nROOS_CRED_OTHER: two\n')
+    expect(await readFile(path, 'utf8')).toBe('SHRES_CRED_TEST: one\nSHRES_CRED_OTHER: two\n')
   })
 
   it('refuses writes after disposal', async () => {
@@ -401,17 +401,17 @@ describe('real hot reload', () => {
     const path = join(dir, '.credentials.yaml')
     // Watching starts on an existing document: creation racing watcher setup
     // is a chokidar readiness gap, not the reload contract under test.
-    await writeCredentials(path, 'ROOS_CRED_TEST: boot\n')
+    await writeCredentials(path, 'SHRES_CRED_TEST: boot\n')
     const ctx = await boot({ path, debounceMs: 10 })
     const seen = updates(ctx)
 
-    await writeCredentials(path, 'ROOS_CRED_TEST: live\nROOS_CRED_OTHER: extra\n')
+    await writeCredentials(path, 'SHRES_CRED_TEST: live\nSHRES_CRED_OTHER: extra\n')
     await vi.waitFor(async () => {
       expect(await ctx.credentials.resolve(KEY)).toEqual({ value: 'live', source: 'file' })
     })
 
     // Wholesale replacement: an entry deleted on disk never lingers in memory.
-    await writeCredentials(path, 'ROOS_CRED_TEST: live\n')
+    await writeCredentials(path, 'SHRES_CRED_TEST: live\n')
     await vi.waitFor(async () => {
       expect(await ctx.credentials.resolve(OTHER)).toBeUndefined()
     })

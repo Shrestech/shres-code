@@ -8,9 +8,9 @@
 
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { IApiClient } from '@roos-code/roos-code-api-remotes/client'
-import type { SnapshotStore } from '@roos-code/roos-code-client-runtime/client'
-import type { InjectFace, PropsRuntime } from '@roos-code/roos-code-client-ui-slots'
+import type { IApiClient } from '@shres-code/shres-code-api-remotes/client'
+import type { SnapshotStore } from '@shres-code/shres-code-client-runtime/client'
+import type { InjectFace, PropsRuntime } from '@shres-code/shres-code-client-ui-slots'
 import type { ModelsSettingsState, ModelsSettingsStore, ProviderRow } from './store.ts'
 import { onboardingCandidates, onboardingReadiness } from './store.ts'
 import { ProviderEditor } from './ProviderEditor.tsx'

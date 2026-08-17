@@ -1,9 +1,9 @@
 /**
- * Shared boot glue for the app bins (`roos`, `roos-acp-demo`): load the gitignored
+ * Shared boot glue for the app bins (`shres`, `shres-acp-demo`): load the gitignored
  * `.env`, install the fail-loud Loader guards, resolve the config path (snapshot-aware), load the
- * optional user patch layers from the Harness home (`~/.roos`), expose its path resolver to
+ * optional user patch layers from the Harness home (`~/.shres`), expose its path resolver to
  * config expressions, and drive the Cordis Loader against a leaf `cordis.yml` until the tree settles.
- * @module @roos-code/roos-code-app-boot
+ * @module @shres-code/shres-code-app-boot
  */
 
 import { pathToFileURL } from 'node:url'
@@ -11,20 +11,20 @@ import { readFileSync } from 'node:fs'
 import { parseEnv } from 'node:util'
 import { basename, dirname, isAbsolute, resolve } from 'node:path'
 import * as yaml from 'js-yaml'
-import { Context, type FiberState } from '@roos-code/cordis'
-import Loader, { type Entry, type EntryOptions } from '@roos-code/cordis-plugin-loader'
-import Include, { applyEntryPatches, entryListSchema, type PatchOptions } from '@roos-code/cordis-plugin-include'
-import Group from '@roos-code/cordis-plugin-group'
-import { roosHomePath, resolveRoosHome } from '@roos-code/roos-code-home-paths'
-import { createLaunchEnvironmentSnapshot, type LaunchEnvironmentSnapshot } from '@roos-code/roos-code-launch-environment'
-import type {} from '@roos-code/cordis-plugin-hmr'
+import { Context, type FiberState } from '@shres-code/cordis'
+import Loader, { type Entry, type EntryOptions } from '@shres-code/cordis-plugin-loader'
+import Include, { applyEntryPatches, entryListSchema, type PatchOptions } from '@shres-code/cordis-plugin-include'
+import Group from '@shres-code/cordis-plugin-group'
+import { shresHomePath, resolveShresHome } from '@shres-code/shres-code-home-paths'
+import { createLaunchEnvironmentSnapshot, type LaunchEnvironmentSnapshot } from '@shres-code/shres-code-launch-environment'
+import type {} from '@shres-code/cordis-plugin-hmr'
 // Side-effect type import: resolves `ctx.get('systemPrompt')` to the service.
-import type {} from '@roos-code/roos-code-system-prompt'
+import type {} from '@shres-code/shres-code-system-prompt'
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     /** Harness-home path resolver available to Loader `!!js` config expressions. */
-    roosHomePath?: typeof roosHomePath
+    shresHomePath?: typeof shresHomePath
   }
 }
 
@@ -41,9 +41,9 @@ export {
   resolveBundleDir,
   resolveProfileDir,
   writeProfileManifest,
-  type RoosBundleManifest,
-  type RoosManifestSection,
-  type RoosProfileManifest,
+  type ShresBundleManifest,
+  type ShresManifestSection,
+  type ShresProfileManifest,
   type Profile,
   type ProfileLayer,
   type ProfileManifest,
@@ -53,7 +53,7 @@ export {
  * Resolve the config to boot. Replay swaps a `cordis.yml` basename for
  * `cordis.snapshot.yml` in the same directory; every other mode keeps the path.
  * @param configPath - the requested config path (absolute, or relative to `cwd`).
- * @param snapshotMode - the bin's `$ROOS_SNAPSHOT` value; only `'replay'` swaps the
+ * @param snapshotMode - the bin's `$SHRES_SNAPSHOT` value; only `'replay'` swaps the
  *   basename.
  * @param cwd - the base a relative `configPath` resolves against.
  * @returns the absolute path of the config to boot.
@@ -114,7 +114,7 @@ const BOOTSTRAP_NAMES = new Set([
 ])
 
 /** Name prefixes no discovered file may set. */
-const BOOTSTRAP_PREFIXES = ['ROOS_', 'XDG_', 'DYLD_', 'BASH_FUNC_']
+const BOOTSTRAP_PREFIXES = ['SHRES_', 'XDG_', 'DYLD_', 'BASH_FUNC_']
 
 /**
  * Whether a variable may come only from the inherited process environment
@@ -178,7 +178,7 @@ export function loadLayeredEnv(
   binName: string, cwd: string = process.cwd(),
   warn: (line: string) => void = line => void process.stderr.write(line),
 ): LaunchEnvironmentSnapshot {
-  const home = resolveRoosHome()
+  const home = resolveShresHome()
   const inherited = { ...process.env } as Record<string, string>
   // Parse both layers first: a rejection must not leave one file applied.
   const project = readEnvLayer(binName, cwd, warn)
@@ -266,7 +266,7 @@ export async function watchUserPatches(
 
 /**
  * Load an optional patch-list file: a top-level YAML array of loader patch
- * entries (`@roos-code/cordis-plugin-include`'s `PatchOptions`): id-targeted config
+ * entries (`@shres-code/cordis-plugin-include`'s `PatchOptions`): id-targeted config
  * overrides and `insert` lists, with `!!js` expressions allowed. A missing
  * file means "no layer"; an unreadable, unparsable, or non-array file throws —
  * a present patch file that cannot apply is a misconfiguration and must fail
@@ -306,7 +306,7 @@ export function loadOverlayPatches(binName: string, file: string): PatchOptions[
 }
 /**
  * Parse one loader patch list: a top-level YAML array of
- * `@roos-code/cordis-plugin-include` `PatchOptions` (id-targeted config overrides and
+ * `@shres-code/cordis-plugin-include` `PatchOptions` (id-targeted config overrides and
  * `insert` lists, `!!js` expressions allowed). Every invalid field or value throws,
  * because a patch file that cannot be applied at all is a misconfiguration; a
  * single patch whose target row is absent stays a per-entry Loader warning, so
@@ -504,7 +504,7 @@ export async function mountRootInclude(
     }
   // `cordis:group` alongside it: a group row is how a composition gives one
   // `isolate` realm to a provider and its consumers together, and an agent
-  // preset living outside this workspace cannot resolve `@roos-code/cordis-plugin-group`
+  // preset living outside this workspace cannot resolve `@shres-code/cordis-plugin-group`
   // by name. Both builtins load through the ambient module pipeline, so neither
   // depends on the included tree's own specifier resolution.
   ctx.loader.builtins.group = Group
@@ -767,7 +767,7 @@ export async function boot(
   let stage = 'host preparation failed'
   try {
     ctx.baseUrl = pathToFileURL(dirname(absoluteConfigPath)).href + '/'
-    ctx.provide('roosHomePath', roosHomePath)
+    ctx.provide('shresHomePath', shresHomePath)
     await ctx.plugin(Loader)
     await prepare?.(ctx)
     stage = 'plugin tree failed to load'
@@ -807,7 +807,7 @@ export const HARNESS_SOURCE_SECTION = 'harness:source'
 /**
  * Add a global prompt section naming the on-disk harness source checkout while
  * explicitly distinguishing it from the task workspace and current working
- * directory. The self-referential `roos-tool-cordis` toolset reads and edits this
+ * directory. The self-referential `shres-tool-cordis` toolset reads and edits this
  * checkout. Call once on the settled boot context ({@link boot}); the section
  * orders just after the harness identity opener (`-100`) and before the deployment
  * persona (`0`). A booted tree with no `systemPrompt` service has no prompt to
@@ -824,6 +824,6 @@ export function addHarnessSourceSection(ctx: Context, sourceRoot: string): (() =
   return systemPrompt.section({
     name: HARNESS_SOURCE_SECTION,
     order: -99,
-    text: `The Roos Code implementation checkout is at ${sourceRoot}. The checkout location and current working directory are separate values and may differ; never infer the working directory from this path. Use pwd to determine the current working directory. Use this checkout only to inspect or extend Roos Code itself.`,
+    text: `The Shres Code implementation checkout is at ${sourceRoot}. The checkout location and current working directory are separate values and may differ; never infer the working directory from this path. Use pwd to determine the current working directory. Use this checkout only to inspect or extend Shres Code itself.`,
   })
 }

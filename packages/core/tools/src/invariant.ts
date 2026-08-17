@@ -1,11 +1,11 @@
-/** Package-owned tool-pipeline invariants. @module @roos-code/roos-code-tools/invariant */
+/** Package-owned tool-pipeline invariants. @module @shres-code/shres-code-tools/invariant */
 
-import type { Context } from '@roos-code/cordis'
-import type { Session, SessionEvent } from '@roos-code/roos-code-session'
-import type { InvariantFailure, InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { Session, SessionEvent } from '@shres-code/shres-code-session'
+import type { InvariantFailure, InvariantInstaller } from '@shres-code/shres-code-invariants'
 import type { ToolExecution, ToolExecutionResult } from './index.ts'
 
-const PACKAGE_NAME = '@roos-code/roos-code-tools'
+const PACKAGE_NAME = '@shres-code/shres-code-tools'
 
 /** Cordis companion plugin name. */
 export const name = 'tools-invariant'

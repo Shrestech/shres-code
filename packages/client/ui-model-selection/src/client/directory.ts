@@ -7,9 +7,9 @@
  */
 import type {
   IApiClient, ModelCatalogFailure, ModelProviderGroup, ModelSelection, SessionId, SessionModels,
-} from '@roos-code/roos-code-api-remotes/client'
-import type { SnapshotStore } from '@roos-code/roos-code-client-runtime/client'
-import { createSnapshotStore } from '@roos-code/roos-code-client-runtime/client'
+} from '@shres-code/shres-code-api-remotes/client'
+import type { SnapshotStore } from '@shres-code/shres-code-client-runtime/client'
+import { createSnapshotStore } from '@shres-code/shres-code-client-runtime/client'
 
 /** Directory snapshot both entries render from. */
 export interface ModelDirectoryState {

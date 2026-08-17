@@ -3,13 +3,13 @@
  * Every workspace package registers checks from a `./invariant` companion;
  * ordinary package entrypoints stay independent of diagnostics.
  *
- * @module @roos-code/roos-code-invariants
+ * @module @shres-code/shres-code-invariants
  */
 
-import { Context, Service } from '@roos-code/cordis'
-import type { Inject } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import type Schema from '@roos-code/schemastery'
+import { Context, Service } from '@shres-code/cordis'
+import type { Inject } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import type Schema from '@shres-code/schemastery'
 
 /** Runtime invariant selection configured on the service plugin. */
 export interface Config {
@@ -65,7 +65,7 @@ export class InvariantError extends Error {
   }
 }
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     invariants: InvariantRegistry
   }

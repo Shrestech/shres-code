@@ -3,10 +3,10 @@
  * vocabulary remains in `./types` so Client programs never import Agent or
  * host Cordis context declarations.
  *
- * @module @roos-code/roos-code-workflow
+ * @module @shres-code/shres-code-workflow
  */
 
-import type { Agent } from '@roos-code/roos-code-agent'
+import type { Agent } from '@shres-code/shres-code-agent'
 import type {
   WorkflowMeta, WorkflowResult, WorkflowRunId,
 } from './types.ts'

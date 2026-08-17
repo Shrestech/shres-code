@@ -3,11 +3,11 @@
  * record of the child's declared composition before its first request, so a
  * later cold resume can reconstruct it from its own log.
  *
- * @module @roos-code/roos-code-subagent/descriptor-seed
+ * @module @shres-code/shres-code-subagent/descriptor-seed
  */
 
-import { Session } from '@roos-code/roos-code-session'
-import type { SessionEvent, SessionId } from '@roos-code/roos-code-session'
+import { Session } from '@shres-code/shres-code-session'
+import type { SessionEvent, SessionId } from '@shres-code/shres-code-session'
 import type { SubagentDescriptorData } from './descriptor.ts'
 
 /**

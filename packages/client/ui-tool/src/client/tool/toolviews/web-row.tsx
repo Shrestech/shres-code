@@ -9,9 +9,9 @@
 // no web card (the tools keep a generic pending view), so a running row is the
 // summary line alone.
 
-import type { Context } from '@roos-code/cordis'
-import { IconBrowseOutline16, IconGlobeOutline14 } from '@roos-code/roos-code-client-ui-primitives'
-import type { PropsLocale } from '@roos-code/roos-code-client-ui-slots'
+import type { Context } from '@shres-code/cordis'
+import { IconBrowseOutline16, IconGlobeOutline14 } from '@shres-code/shres-code-client-ui-primitives'
+import type { PropsLocale } from '@shres-code/shres-code-client-ui-slots'
 import type { ToolCallViewProps } from '../../contract/slots.ts'
 import { webCardModel } from '../models/web-card-model.ts'
 import { toolRowModel } from '../models/tool-call-model.ts'

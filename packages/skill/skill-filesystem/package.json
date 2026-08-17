@@ -1,13 +1,13 @@
 {
-  "name": "@roos-code/roos-code-skill-filesystem",
-  "description": "Local filesystem skill provider for the Roos Code",
+  "name": "@shres-code/shres-code-skill-filesystem",
+  "description": "Local filesystem skill provider for the Shres Code",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "packages/skill/skill-filesystem"
   },
   "type": "module",
@@ -32,22 +32,22 @@
   ],
   "license": "MIT",
   "peerDependencies": {
-    "@roos-code/roos-code-fs": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-home-paths": "workspace:^",
-    "@roos-code/roos-code-skill": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-fs": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-home-paths": "workspace:^",
+    "@shres-code/shres-code-skill": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   },
   "dependencies": {
     "chokidar": "^5.0.0",
-    "@roos-code/schemastery": "workspace:^",
+    "@shres-code/schemastery": "workspace:^",
     "yaml": "^2.4.2"
   },
   "devDependencies": {
-    "@roos-code/roos-code-fs": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-home-paths": "workspace:^",
-    "@roos-code/roos-code-skill": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-fs": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-home-paths": "workspace:^",
+    "@shres-code/shres-code-skill": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   }
 }

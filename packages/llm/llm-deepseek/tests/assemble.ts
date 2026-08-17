@@ -5,9 +5,9 @@
  * one-shot convenience method.
  */
 
-import { BlockAssembler } from '@roos-code/roos-code-llm'
-import type { Context } from '@roos-code/cordis'
-import type { FinishReason, GenerateOptions, Message, TokenUsage } from '@roos-code/roos-code-llm'
+import { BlockAssembler } from '@shres-code/shres-code-llm'
+import type { Context } from '@shres-code/cordis'
+import type { FinishReason, GenerateOptions, Message, TokenUsage } from '@shres-code/shres-code-llm'
 
 export interface AssembledResult {
   message: Message

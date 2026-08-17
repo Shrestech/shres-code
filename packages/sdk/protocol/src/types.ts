@@ -1,16 +1,16 @@
 /**
- * Named wire types for the Roos Code SDK runtime protocol: the three
+ * Named wire types for the Shres Code SDK runtime protocol: the three
  * request/result pairs and the four server-to-client notification payloads
  * exchanged over the newline-delimited JSON-RPC stdio transport. The server
- * plugin (`@roos-code/roos-code-sdk-jsonrpc-server`) and SDK clients share these shapes;
- * `serverInfo.name` stays the wire-stable `roos-code-sdk-runtime`.
+ * plugin (`@shres-code/shres-code-sdk-jsonrpc-server`) and SDK clients share these shapes;
+ * `serverInfo.name` stays the wire-stable `shres-code-sdk-runtime`.
  *
- * @module @roos-code/roos-code-sdk-protocol/types
+ * @module @shres-code/shres-code-sdk-protocol/types
  */
 
-import type { ContentBlock } from '@roos-code/roos-code-llm'
-import type { SessionEvent } from '@roos-code/roos-code-session'
-import type { SubagentStopReason } from '@roos-code/roos-code-subagent'
+import type { ContentBlock } from '@shres-code/shres-code-llm'
+import type { SessionEvent } from '@shres-code/shres-code-session'
+import type { SubagentStopReason } from '@shres-code/shres-code-subagent'
 
 /** Parameters for the process-wide SDK handshake. */
 export interface InitializeParams {
@@ -26,7 +26,7 @@ export interface InitializeParams {
 
 /** Wire-stable server identity returned by initialization. */
 export interface InitializeResult {
-  /** Wire-stable server identity (`roos-code-sdk-runtime`) and version. */
+  /** Wire-stable server identity (`shres-code-sdk-runtime`) and version. */
   serverInfo: { name: string; version: string }
 }
 

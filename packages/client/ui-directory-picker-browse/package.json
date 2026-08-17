@@ -1,5 +1,5 @@
 {
-  "name": "@roos-code/roos-code-client-ui-directory-picker-browse",
+  "name": "@shres-code/shres-code-client-ui-directory-picker-browse",
   "description": "In-app directory browsing surface: the workspace directory-flow owner rendering the host's listing and creation primitives",
   "version": "0.1.0-rc.5",
   "publishConfig": {
@@ -7,7 +7,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "packages/client/ui-directory-picker-browse"
   },
   "type": "module",
@@ -29,12 +29,12 @@
     "./src/*": "./src/*",
     "./package.json": "./package.json"
   },
-  "roos": {
+  "shres": {
     "client": {
       "inject": [
-        "@roos-code/roos-code-client-runtime",
-        "@roos-code/roos-code-client-ui-workspace",
-        "@roos-code/roos-code-client-locale"
+        "@shres-code/shres-code-client-runtime",
+        "@shres-code/shres-code-client-ui-workspace",
+        "@shres-code/shres-code-client-locale"
       ],
       "platform": "web"
     }
@@ -48,26 +48,26 @@
     "clsx": "^2.0.0"
   },
   "peerDependencies": {
-    "@roos-code/roos-code-client-locale": "workspace:^",
-    "@roos-code/roos-code-client-runtime": "workspace:^",
-    "@roos-code/roos-code-client-ui-primitives": "workspace:^",
-    "@roos-code/roos-code-client-ui-slots": "workspace:^",
-    "@roos-code/roos-code-client-ui-workspace": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/cordis": "workspace:^",
+    "@shres-code/shres-code-client-locale": "workspace:^",
+    "@shres-code/shres-code-client-runtime": "workspace:^",
+    "@shres-code/shres-code-client-ui-primitives": "workspace:^",
+    "@shres-code/shres-code-client-ui-slots": "workspace:^",
+    "@shres-code/shres-code-client-ui-workspace": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/cordis": "workspace:^",
     "react": "^18.2.0"
   },
   "devDependencies": {
-    "@roos-code/roos-code-client-locale": "workspace:^",
-    "@roos-code/roos-code-client-runtime": "workspace:^",
-    "@roos-code/roos-code-client-test-runtime": "workspace:^",
-    "@roos-code/roos-code-client-ui-primitives": "workspace:^",
-    "@roos-code/roos-code-client-ui-slots": "workspace:^",
-    "@roos-code/roos-code-client-ui-workspace": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
+    "@shres-code/shres-code-client-locale": "workspace:^",
+    "@shres-code/shres-code-client-runtime": "workspace:^",
+    "@shres-code/shres-code-client-test-runtime": "workspace:^",
+    "@shres-code/shres-code-client-ui-primitives": "workspace:^",
+    "@shres-code/shres-code-client-ui-slots": "workspace:^",
+    "@shres-code/shres-code-client-ui-workspace": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
     "@testing-library/react": "^16.1.0",
     "@types/react": "~18.3.1",
-    "@roos-code/cordis": "workspace:^",
+    "@shres-code/cordis": "workspace:^",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },

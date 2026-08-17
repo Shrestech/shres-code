@@ -1,13 +1,13 @@
 /**
- * Package-owned invariant companion for `@roos-code/roos-code-output-retention`.
- * @module @roos-code/roos-code-output-retention/invariant
+ * Package-owned invariant companion for `@shres-code/shres-code-output-retention`.
+ * @module @shres-code/shres-code-output-retention/invariant
  */
 
 /* jscpd:ignore-start */
-import type { Context } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-output-retention'
+const PACKAGE_NAME = '@shres-code/shres-code-output-retention'
 
 /** Cordis companion plugin name. */
 export const name = 'output-retention-invariant'

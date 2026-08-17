@@ -1,10 +1,10 @@
 /**
  * Browser-side judgement of a typed API key.
- * @module @roos-code/roos-code-client-ui-settings-models/apiKey
+ * @module @shres-code/shres-code-client-ui-settings-models/apiKey
  */
 
 /**
- * Twin of `normalizeApiKey` in `@roos-code/roos-code-llm`: printable ASCII, space
+ * Twin of `normalizeApiKey` in `@shres-code/shres-code-llm`: printable ASCII, space
  * excluded. Client packages reference only client packages, so the charset
  * rule is mirrored here rather than imported; keep the two in step, as
  * `validateDeepSeekModels` is kept in step with the host's `catalogModel`.

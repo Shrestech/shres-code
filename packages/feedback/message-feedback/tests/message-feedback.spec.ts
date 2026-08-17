@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import type { MessageId } from '@roos-code/roos-code-llm/brand'
-import { Session, SessionId } from '@roos-code/roos-code-session'
-import { remoteMethods } from '@roos-code/roos-code-typert-protocol'
+import { Context } from '@shres-code/cordis'
+import type { MessageId } from '@shres-code/shres-code-llm/brand'
+import { Session, SessionId } from '@shres-code/shres-code-session'
+import { remoteMethods } from '@shres-code/shres-code-typert-protocol'
 import MessageFeedbackService, { messageFeedbackRowSchema } from '../src/index.ts'
 import type {
   MessageFeedbackItem,

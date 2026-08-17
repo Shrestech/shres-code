@@ -2,14 +2,14 @@
  * Derive the working directory a filesystem tool resolves relative paths against: the calling
  * agent's per-session workspace (`exec.agent.session.header.cwd`), so each session's
  * `read`/`write`/`edit` act on ITS workspace, not the server's launch dir — mirroring how
- * `roos-tool-bash` defaults a bash `workdir` to the session cwd.
+ * `shres-tool-bash` defaults a bash `workdir` to the session cwd.
  * Non-agent calls return `undefined`, leaving the fallback in the provider rather than reading
  * `process.cwd()` at the tool boundary.
- * @module @roos-code/roos-code-tool-fs/session-cwd
+ * @module @shres-code/shres-code-tool-fs/session-cwd
  */
 
-import type { ToolExecution } from '@roos-code/roos-code-tools'
-import { canonicalPath } from '@roos-code/roos-code-sandbox'
+import type { ToolExecution } from '@shres-code/shres-code-tools'
+import { canonicalPath } from '@shres-code/shres-code-sandbox'
 
 const PARENT_PATH_SEGMENT = /(?:^|[\\/])\.\.(?:[\\/]|$)/
 

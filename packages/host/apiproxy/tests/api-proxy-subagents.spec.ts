@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import type { SessionEvent, SessionHeader, SessionId } from '@roos-code/roos-code-session'
-import { SubagentError } from '@roos-code/roos-code-subagent'
+import { Context } from '@shres-code/cordis'
+import type { SessionEvent, SessionHeader, SessionId } from '@shres-code/shres-code-session'
+import { SubagentError } from '@shres-code/shres-code-subagent'
 import { RpcId } from '../src/api/rpc.ts'
 import type { RpcRequest } from '../src/api/rpc.ts'
 import { createApiProxy } from '../src/api-proxy.ts'
@@ -235,12 +235,12 @@ describe('subagent gateway', () => {
 
   it('maps the missing projections capability to one wire face on list, history, and prompt', async () => {
     const listError = () => new SubagentError(
-      'listing subagents requires the sessionProjections registry (load @roos-code/roos-code-session-projection)',
+      'listing subagents requires the sessionProjections registry (load @shres-code/shres-code-session-projection)',
       'SUBAGENT_CONTROL_PROJECTIONS_UNAVAILABLE',
     )
     const expected = {
       code: 'internal',
-      message: 'subagent catalog is unavailable: this deployment does not mount the sessionProjections registry (load @roos-code/roos-code-session-projection)',
+      message: 'subagent catalog is unavailable: this deployment does not mount the sessionProjections registry (load @shres-code/shres-code-session-projection)',
     }
 
     const list = bench({ listError: listError() })

@@ -1,20 +1,20 @@
 /**
  * Delegated-completion adapter: spawn a product CLI and emit a text stream.
- * @module @roos-code/roos-code-llm-cli-bridge/adapter
+ * @module @shres-code/shres-code-llm-cli-bridge/adapter
  */
 
 import {
   LlmAdapter,
   LlmError,
-} from '@roos-code/roos-code-llm'
+} from '@shres-code/shres-code-llm'
 import type {
   GenerateOptions,
   LlmModelInfo,
   LlmProviderInfo,
   LlmResolvedModelInfo,
   StreamChunk,
-} from '@roos-code/roos-code-llm'
-import type { SubprocessHandle, SubprocessSpawnSpec } from '@roos-code/roos-code-subprocess'
+} from '@shres-code/shres-code-llm'
+import type { SubprocessHandle, SubprocessSpawnSpec } from '@shres-code/shres-code-subprocess'
 import { buildCliArgv } from './argv.ts'
 import {
   STDOUT_COLLECT_MAX_BYTES,

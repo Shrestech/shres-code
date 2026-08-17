@@ -2,12 +2,12 @@
  * Fixed Kimi Code CLI one-shot subagent provider. Every accepted run starts a
  * fresh official `kimi -p` process in the delegating Session's workspace.
  *
- * @module @roos-code/roos-code-subagent-kimi-cli
+ * @module @shres-code/shres-code-subagent-kimi-cli
  */
 
-import type { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import { MAX_TIMER_DELAY_MS } from '@roos-code/roos-code-timeout'
+import type { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
 import {
   assertPositiveFinite,
   NO_START_CAPABILITIES,
@@ -15,7 +15,7 @@ import {
   type ResolvedSubagentStartRequest,
   type SubagentCapabilities,
   type SubagentProvider,
-} from '@roos-code/roos-code-subagent'
+} from '@shres-code/shres-code-subagent'
 import {
   DEFAULT_DISPOSE_GRACE_MS,
   DEFAULT_EXECUTABLE,

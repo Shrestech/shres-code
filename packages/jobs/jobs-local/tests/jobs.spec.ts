@@ -1,15 +1,15 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { Session, SessionId } from '@roos-code/roos-code-session'
-import AgentRegistry, { Inbox } from '@roos-code/roos-code-agent'
-import type { Agent } from '@roos-code/roos-code-agent'
-import { bindScopeParent, createScope, scopeOf } from '@roos-code/roos-code-scope'
-import type { ScopeKey } from '@roos-code/roos-code-scope'
-import { JobId } from '@roos-code/roos-code-jobs'
-import type { JobHooks, JobKind, JobOutcome, JobSnapshot, JobStart } from '@roos-code/roos-code-jobs'
-import LocalJobRegistry, { type Config as JobsConfig } from '@roos-code/roos-code-jobs-local'
+import { Context } from '@shres-code/cordis'
+import { Session, SessionId } from '@shres-code/shres-code-session'
+import AgentRegistry, { Inbox } from '@shres-code/shres-code-agent'
+import type { Agent } from '@shres-code/shres-code-agent'
+import { bindScopeParent, createScope, scopeOf } from '@shres-code/shres-code-scope'
+import type { ScopeKey } from '@shres-code/shres-code-scope'
+import { JobId } from '@shres-code/shres-code-jobs'
+import type { JobHooks, JobKind, JobOutcome, JobSnapshot, JobStart } from '@shres-code/shres-code-jobs'
+import LocalJobRegistry, { type Config as JobsConfig } from '@shres-code/shres-code-jobs-local'
 
-declare module '@roos-code/roos-code-jobs' {
+declare module '@shres-code/shres-code-jobs' {
   interface JobKindMap {
     workflow: 'workflow'
   }
@@ -119,7 +119,7 @@ describe('LocalJobRegistry.start', () => {
     const ctx = new Context()
     await ctx.plugin(LocalJobRegistry)
     expect(() => ctx.jobs.start(producer().spec))
-      .toThrow('background jobs unavailable: no job controller serves this agent (load @roos-code/roos-code-tool-jobs in its composition)')
+      .toThrow('background jobs unavailable: no job controller serves this agent (load @shres-code/shres-code-tool-jobs in its composition)')
   })
 
   it('refuses an owner whose own composition attaches no controller', async () => {

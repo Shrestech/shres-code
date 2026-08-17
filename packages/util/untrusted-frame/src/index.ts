@@ -9,7 +9,7 @@
  * This is a library, not a Cordis service or plugin: it takes no `ctx`,
  * registers nothing, holds no state, and emits no events.
  *
- * @module @roos-code/roos-code-untrusted-frame
+ * @module @shres-code/shres-code-untrusted-frame
  */
 
 /**

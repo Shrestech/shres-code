@@ -1,11 +1,11 @@
-/** Package-owned scoped-dispatch invariants. @module @roos-code/roos-code-scope/invariant */
+/** Package-owned scoped-dispatch invariants. @module @shres-code/shres-code-scope/invariant */
 
-import type { Context } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
-import { carrierKeyOf, isScopeCarrier } from '@roos-code/roos-code-scope'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
+import { carrierKeyOf, isScopeCarrier } from '@shres-code/shres-code-scope'
 import { scopedSubjectResolverFor } from './scoped-events.generated.ts'
 
-const PACKAGE_NAME = '@roos-code/roos-code-scope'
+const PACKAGE_NAME = '@shres-code/shres-code-scope'
 
 /** Cordis companion plugin name. */
 export const name = 'scope-invariant'

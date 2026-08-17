@@ -1,6 +1,6 @@
 /** Bounded Markdown-to-text projection shared by trajectory consumers. */
 
-import { extractMarkdownPlainText } from '@roos-code/roos-code-client-ui-primitives'
+import { extractMarkdownPlainText } from '@shres-code/shres-code-client-ui-primitives'
 
 const PREVIEW_SOURCE_CHARACTERS = 2_048
 const PREVIEW_OUTPUT_CHARACTERS = 512

@@ -5,7 +5,7 @@
  * resolved differently from the code under test could exempt a file whose
  * suites actually run.
  *
- * @module @roos-code/roos-code-pwsh-local/resolve
+ * @module @shres-code/shres-code-pwsh-local/resolve
  */
 
 import { lstatSync } from 'node:fs'

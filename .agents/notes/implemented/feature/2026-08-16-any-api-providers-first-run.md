@@ -10,11 +10,11 @@ The pi-ai adapter could already serve OpenAI-compatible and catalog providers, b
 
 The base bundle composes a default `llm-pi-ai` route set: `ollama-local` (keyless `http://localhost:11434/v1` with `Authorization: Bearer ollama`), `ollama-cloud` (`https://ollama.com/v1`, `OLLAMA_API_KEY`, `:cloud` model ids), and catalog routes `openai`, `anthropic`, `xai` (`XAI_API_KEY`), `moonshotai` (`MOONSHOT_API_KEY`), `openrouter`, and `groq`. Named-but-unset keys fail `MISSING_CREDENTIAL`; the routes stay visible in the picker.
 
-`@roos-code/roos-code-first-run-setup` owns first-run as one package. It reuses `discoverModels` for `GET {ollamaBaseURL}/models` with a configured timeout. Setup is required when the user layer of `agent-default-model` is empty and the current default cannot serve. Local Ollama is usable only while that probe succeeds. A TTY menu offers detected local models, the template routes, and a custom base URL, then writes the default and any typed key. A non-TTY process fails loud and names those configuration paths. Headless calls `ensureReady()` after the loader settles; the base bundle leaves `autoRunCli` false so Web never blocks on stdin.
+`@shres-code/shres-code-first-run-setup` owns first-run as one package. It reuses `discoverModels` for `GET {ollamaBaseURL}/models` with a configured timeout. Setup is required when the user layer of `agent-default-model` is empty and the current default cannot serve. Local Ollama is usable only while that probe succeeds. A TTY menu offers detected local models, the template routes, and a custom base URL, then writes the default and any typed key. A non-TTY process fails loud and names those configuration paths. Headless calls `ensureReady()` after the loader settles; the base bundle leaves `autoRunCli` false so Web never blocks on stdin.
 
 Web onboarding no longer special-cases DeepSeek. Any keyed usable provider ends the step. Local Ollama is always composed and keyless, so it does not itself end the step; the card offers every incomplete keyed route plus `ollama-local`, and a successful pick writes `agent-default-model`.
 
-The SDK server no longer auto-mounts `roos-llm-deepseek`. `initialize` reuses a pre-registered adapter and fails if the named provider has none. A DeepSeek default is used only when composition already registered that adapter and the matching credential is present.
+The SDK server no longer auto-mounts `shres-llm-deepseek`. `initialize` reuses a pre-registered adapter and fails if the named provider has none. A DeepSeek default is used only when composition already registered that adapter and the matching credential is present.
 
 ### Ollama cloud model ids
 

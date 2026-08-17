@@ -5,17 +5,17 @@
 import { mkdtempSync, rmSync, statSync, unlinkSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { WebBootGraph, ClientModuleRegistry } from '@roos-code/roos-code-client-modules'
-import type { WebRoute, WebServer } from '@roos-code/roos-code-host-webserver'
+import type { WebBootGraph, ClientModuleRegistry } from '@shres-code/shres-code-client-modules'
+import type { WebRoute, WebServer } from '@shres-code/shres-code-host-webserver'
 import { apply, Config, EVENTS_ENDPOINT, inject } from '../src/index.ts'
 
 const POLL_MS = 20
 
 let dir: string
 
-beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'roos-hmr-')) })
+beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'shres-hmr-')) })
 afterEach(() => { rmSync(dir, { recursive: true, force: true }) })
 
 /**

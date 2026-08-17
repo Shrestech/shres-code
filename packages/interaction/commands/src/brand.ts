@@ -1,16 +1,16 @@
 /**
- * roos-commands' owned branded id: command lifecycle pairing across the
+ * shres-commands' owned branded id: command lifecycle pairing across the
  * session log, the wire admission response, and client-side flow pairing.
  *
- * The `Branded<B>` primitive lives in `@roos-code/roos-code-brand`; this module
+ * The `Branded<B>` primitive lives in `@shres-code/shres-code-brand`; this module
  * is a pure type/constructor outlet (no cordis imports, no module
  * augmentation) so wire and client programs can name the brand without
- * loading the host plugin's Context merges — the `roos-llm/brand` shape.
+ * loading the host plugin's Context merges — the `shres-llm/brand` shape.
  *
- * @module @roos-code/roos-code-commands/brand
+ * @module @shres-code/shres-code-commands/brand
  */
 
-import type { Branded } from '@roos-code/roos-code-brand'
+import type { Branded } from '@shres-code/shres-code-brand'
 
 /**
  * Pairs one command execution's `command/run`/`command/done` lifecycle

@@ -1,17 +1,17 @@
 /**
  * Single replay-aware token-meter service for request and surface pressure.
  *
- * @module @roos-code/roos-code-token-meter
+ * @module @shres-code/shres-code-token-meter
  */
 
-import { Context, Service } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import { BlockAssembler, deepFreeze } from '@roos-code/roos-code-llm'
-import type { Message, TokenUsage } from '@roos-code/roos-code-llm'
-import type { EpochHeader, Session, SessionEvent } from '@roos-code/roos-code-session'
-import { canonicalHeader, headerEquals, isSurfaceEvent } from '@roos-code/roos-code-session'
+import { Context, Service } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import { BlockAssembler, deepFreeze } from '@shres-code/shres-code-llm'
+import type { Message, TokenUsage } from '@shres-code/shres-code-llm'
+import type { EpochHeader, Session, SessionEvent } from '@shres-code/shres-code-session'
+import { canonicalHeader, headerEquals, isSurfaceEvent } from '@shres-code/shres-code-session'
 // Type-only: resolves the optional projection registry Context declaration.
-import type {} from '@roos-code/roos-code-session-projection'
+import type {} from '@shres-code/shres-code-session-projection'
 import type {
   TokenMeasurement,
   TokenMeasurementBaseline,
@@ -64,7 +64,7 @@ function validateConfigKeys(config: TokenMeterConfig): void {
   }
 }
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     tokenMeter: TokenMeter
   }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { SessionId, SessionSummary } from '@roos-code/roos-code-client-runtime/client'
-import { indexSubagentDescendants } from '@roos-code/roos-code-client-runtime/client'
+import type { SessionId, SessionSummary } from '@shres-code/shres-code-client-runtime/client'
+import { indexSubagentDescendants } from '@shres-code/shres-code-client-runtime/client'
 
 const sid = (id: string) => id as SessionId
 

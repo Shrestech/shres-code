@@ -6,11 +6,11 @@
 // entries. Tool composition belongs to ui-tool and its machinery spec.
 
 import { describe, expect, it, vi } from 'vitest'
-import { SlotTestRuntime, usePinnedBrowserLanguages, stubSettingsScope } from '@roos-code/roos-code-client-test-runtime'
-import { resolveSlotLabel } from '@roos-code/roos-code-client-ui-slots'
-import { LocaleRuntime } from '@roos-code/roos-code-client-locale/client'
-import type { SessionId } from '@roos-code/roos-code-client-runtime/client'
-import { apply, inject } from '@roos-code/roos-code-client-ui-conversation/client'
+import { SlotTestRuntime, usePinnedBrowserLanguages, stubSettingsScope } from '@shres-code/shres-code-client-test-runtime'
+import { resolveSlotLabel } from '@shres-code/shres-code-client-ui-slots'
+import { LocaleRuntime } from '@shres-code/shres-code-client-locale/client'
+import type { SessionId } from '@shres-code/shres-code-client-runtime/client'
+import { apply, inject } from '@shres-code/shres-code-client-ui-conversation/client'
 
 // The service reads its initial locale from the browser; these specs assert
 // the shipped Chinese copy, so they state the browser they assume.

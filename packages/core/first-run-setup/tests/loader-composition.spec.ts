@@ -9,11 +9,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import Loader from '@roos-code/cordis-plugin-loader'
-import Include from '@roos-code/cordis-plugin-include'
-import LlmRuntime from '@roos-code/roos-code-llm'
-import AgentDefaultModelConfig from '@roos-code/roos-code-agent-default-model'
+import { Context } from '@shres-code/cordis'
+import Loader from '@shres-code/cordis-plugin-loader'
+import Include from '@shres-code/cordis-plugin-include'
+import LlmRuntime from '@shres-code/shres-code-llm'
+import AgentDefaultModelConfig from '@shres-code/shres-code-agent-default-model'
 import * as FirstRunSetup from '../src/index.ts'
 
 let root: string | undefined
@@ -28,18 +28,18 @@ afterEach(async () => {
 
 describe('first-run-setup Loader composition', () => {
   it('mounts ctx.firstRunSetup with schema defaults from a YAML row', async () => {
-    root = await mkdtemp(join(tmpdir(), 'roos-first-run-composition-'))
+    root = await mkdtemp(join(tmpdir(), 'shres-first-run-composition-'))
     const configPath = join(root, 'cordis.yml')
     await writeFile(configPath, [
       '- id: llm',
       "  name: 'test-llm-service'",
       '- id: agent-default-model',
-      "  name: '@roos-code/roos-code-agent-default-model'",
+      "  name: '@shres-code/shres-code-agent-default-model'",
       '  config:',
       '    provider: deepseek-official',
       '    model: deepseek-v4-flash',
       '- id: first-run-setup',
-      "  name: '@roos-code/roos-code-first-run-setup'",
+      "  name: '@shres-code/shres-code-first-run-setup'",
       '',
     ].join('\n'))
 
@@ -50,8 +50,8 @@ describe('first-run-setup Loader composition', () => {
     ctx.loader.builtins.include = Include
     const modules = new Map<string, unknown>([
       ['test-llm-service', LlmRuntime],
-      ['@roos-code/roos-code-agent-default-model', AgentDefaultModelConfig],
-      ['@roos-code/roos-code-first-run-setup', FirstRunSetup],
+      ['@shres-code/shres-code-agent-default-model', AgentDefaultModelConfig],
+      ['@shres-code/shres-code-first-run-setup', FirstRunSetup],
     ])
     ctx.loader.internal = {
       version: 'v2',

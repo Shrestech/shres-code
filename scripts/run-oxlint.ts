@@ -23,14 +23,14 @@ export interface OxlintInvocation {
  * @returns the complete CLI arguments and child environment.
  */
 export function resolveOxlintInvocation(args: readonly string[], env: NodeJS.ProcessEnv): OxlintInvocation {
-  const raw = env.ROOS_OXLINT_THREADS
+  const raw = env.SHRES_OXLINT_THREADS
   if (raw === undefined || raw === '') return { args: [...args], env: { ...env } }
   const parsed = Number.parseInt(raw, 10)
   if (!Number.isSafeInteger(parsed) || parsed < 1 || String(parsed) !== raw) {
-    throw new Error(`run-oxlint: ROOS_OXLINT_THREADS must be a positive integer, got ${JSON.stringify(raw)}.`)
+    throw new Error(`run-oxlint: SHRES_OXLINT_THREADS must be a positive integer, got ${JSON.stringify(raw)}.`)
   }
   if (args.some(arg => arg === '--threads' || arg.startsWith('--threads='))) {
-    throw new Error('run-oxlint: use ROOS_OXLINT_THREADS instead of passing --threads directly.')
+    throw new Error('run-oxlint: use SHRES_OXLINT_THREADS instead of passing --threads directly.')
   }
   return {
     args: [...args, `--threads=${raw}`],

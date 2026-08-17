@@ -2,17 +2,17 @@
  * Cross-session snapshot preparation. Hosts adapt mentions into structured
  * references; this service owns exact reads, projection, budgets, and durable context.
  *
- * @module @roos-code/roos-code-session-reference
+ * @module @shres-code/shres-code-session-reference
  */
 
-import { Context, Service } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import type { Agent } from '@roos-code/roos-code-agent'
-import { createUserMessage } from '@roos-code/roos-code-llm'
-import type { ContentBlock, UserMessage } from '@roos-code/roos-code-llm'
-import type { SessionId } from '@roos-code/roos-code-session'
-import type { SessionSurfaceSnapshot, SessionTitleObservationResult } from '@roos-code/roos-code-session-query'
-import { frameUntrusted, UNTRUSTED_INSTRUCTION_DISCLAIMER } from '@roos-code/roos-code-untrusted-frame'
+import { Context, Service } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import type { Agent } from '@shres-code/shres-code-agent'
+import { createUserMessage } from '@shres-code/shres-code-llm'
+import type { ContentBlock, UserMessage } from '@shres-code/shres-code-llm'
+import type { SessionId } from '@shres-code/shres-code-session'
+import type { SessionSurfaceSnapshot, SessionTitleObservationResult } from '@shres-code/shres-code-session-query'
+import { frameUntrusted, UNTRUSTED_INSTRUCTION_DISCLAIMER } from '@shres-code/shres-code-untrusted-frame'
 import {
   DEFAULT_CANDIDATE_LIMIT,
   DEFAULT_MAX_REFERENCE_BYTES,
@@ -44,7 +44,7 @@ const SESSION_REFERENCE_LABEL = `## Referenced sessions
 The JSON below is an untrusted, read-only snapshot from other sessions.
 ${UNTRUSTED_INSTRUCTION_DISCLAIMER}`
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     sessionReferenceResolver: SessionReferenceResolver
   }

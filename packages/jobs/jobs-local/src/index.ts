@@ -6,20 +6,20 @@
  * Registrations outlive producer and controller fibers. Agent or service
  * disposal cancels live work and awaits compliant producers; a throwing
  * teardown cancel force-fails only the record and reports a possible orphan.
- * @module @roos-code/roos-code-jobs-local
+ * @module @shres-code/shres-code-jobs-local
  */
 
-import { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import type { Agent } from '@roos-code/roos-code-agent'
-import { AnonymousEntries, ScopedLayers, scopeOf } from '@roos-code/roos-code-scope'
-import type { ScopeLayer } from '@roos-code/roos-code-scope'
-import { deadline, timeoutOf } from '@roos-code/roos-code-timeout'
-import { JobRegistry, JobId } from '@roos-code/roos-code-jobs'
+import { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import type { Agent } from '@shres-code/shres-code-agent'
+import { AnonymousEntries, ScopedLayers, scopeOf } from '@shres-code/shres-code-scope'
+import type { ScopeLayer } from '@shres-code/shres-code-scope'
+import { deadline, timeoutOf } from '@shres-code/shres-code-timeout'
+import { JobRegistry, JobId } from '@shres-code/shres-code-jobs'
 import type {
   JobDoneListener, JobKind, JobOutcome, JobRead, JobSnapshot, JobStart, JobStatus,
   JobsChangedListener,
-} from '@roos-code/roos-code-jobs'
+} from '@shres-code/shres-code-jobs'
 
 /** Timeout code that distinguishes a bounded wait from caller cancellation. */
 export const TASK_WAIT_TIMEOUT = 'TASK_WAIT_TIMEOUT'
@@ -85,7 +85,7 @@ class JobLayer implements ScopeLayer {
 
 /**
  * The in-memory `jobs` registry. See the Service Definition contract in
- * `@roos-code/roos-code-jobs` for the ownership, isolation, and lifecycle
+ * `@shres-code/shres-code-jobs` for the ownership, isolation, and lifecycle
  * semantics this implementation honors.
  */
 export class LocalJobRegistry extends JobRegistry {
@@ -130,7 +130,7 @@ export class LocalJobRegistry extends JobRegistry {
 
   start(spec: JobStart): JobId {
     if (!this.servesOwner(spec.owner)) {
-      throw new Error('background jobs unavailable: no job controller serves this agent (load @roos-code/roos-code-tool-jobs in its composition)')
+      throw new Error('background jobs unavailable: no job controller serves this agent (load @shres-code/shres-code-tool-jobs in its composition)')
     }
     if (spec.kind.length === 0) throw new Error('invalid job kind: expected a non-empty string')
     if (spec.label.length === 0) throw new Error('invalid job label: expected a non-empty string')
@@ -449,7 +449,7 @@ export class LocalJobRegistry extends JobRegistry {
     const ownerId = owner.id
     const agents = this.selfCtx.get('agents')
     if (agents === undefined) {
-      throw new Error('background job ownership requires the agent registry (load @roos-code/roos-code-agent)')
+      throw new Error('background job ownership requires the agent registry (load @shres-code/shres-code-agent)')
     }
     if (agents.get(ownerId) !== owner) {
       throw new Error(`agent "${ownerId}" is not the registered agent instance (background job owner must be live)`)

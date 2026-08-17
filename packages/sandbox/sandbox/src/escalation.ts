@@ -1,6 +1,6 @@
 /**
  * The escalation vocabulary and choreography shared by every sandbox-enforcing
- * tool family (`@roos-code/roos-code-tool-bash`, `@roos-code/roos-code-tool-fs`): the
+ * tool family (`@shres-code/shres-code-tool-bash`, `@shres-code/shres-code-tool-fs`): the
  * strictly-wider ladder, the argument-pairing validation, the model-facing
  * denial/hint markers, and {@link approveEscalation} — the ordered fail-closed
  * sequence that resolves a `sandbox_permissions` request through a
@@ -13,10 +13,10 @@
  * hands the closure down, so this package never depends on the approval or
  * agent packages.
  *
- * @module roos-sandbox/escalation
+ * @module shres-sandbox/escalation
  */
 
-import { assertNever } from '@roos-code/roos-code-llm'
+import { assertNever } from '@shres-code/shres-code-llm'
 import type { SandboxMode } from './index.ts'
 
 /**

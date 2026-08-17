@@ -7,15 +7,15 @@
  * scope-birth roster warm — is InputTriggerController behavior, tested on a real
  * session scope (createScope).
  */
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { describe, expect, it, vi } from 'vitest'
-import { createScope, scopeOf } from '@roos-code/roos-code-client-runtime/client'
-import type { SessionId } from '@roos-code/roos-code-client-runtime/client'
-import { InputTriggerController, InputTriggerService } from '@roos-code/roos-code-client-ui-input-trigger/client'
+import { createScope, scopeOf } from '@shres-code/shres-code-client-runtime/client'
+import type { SessionId } from '@shres-code/shres-code-client-runtime/client'
+import { InputTriggerController, InputTriggerService } from '@shres-code/shres-code-client-ui-input-trigger/client'
 import type {
   BeginCommandRequest, ClientSessionContext, CommandClaim, InsertReferenceRequest, PickOutcome,
   ReferenceInsert, InputTriggerCandidate, InputTriggerPick, InputTriggerSource, SourceRoster, TriggerChar,
-} from '@roos-code/roos-code-client-ui-input-trigger/client'
+} from '@shres-code/shres-code-client-ui-input-trigger/client'
 
 const sid = (k: string): SessionId => k as SessionId
 

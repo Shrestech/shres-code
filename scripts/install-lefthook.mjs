@@ -17,15 +17,15 @@ import { dirname, isAbsolute, join, resolve } from 'node:path'
 import lefthookPackage from 'lefthook/package.json' with { type: 'json' }
 
 const MINIMUM_GIT = [2, 26, 0]
-const HOOKS_DIRECTORY = 'roos-hooks'
-const OWNERSHIP_MARKER = '.roos-lefthook-owned'
+const HOOKS_DIRECTORY = 'shres-hooks'
+const OWNERSHIP_MARKER = '.shres-lefthook-owned'
 const OWNERSHIP_MARKER_VERSION = 1
-const OWNERSHIP_MARKER_OWNER = 'roos-code worktree-local lefthook hooks'
-const INSTALL_LOCK = 'roos-lefthook-install.lock'
+const OWNERSHIP_MARKER_OWNER = 'shres-code worktree-local lefthook hooks'
+const INSTALL_LOCK = 'shres-lefthook-install.lock'
 const INSTALL_LOCK_TIMEOUT_MS = 30_000
 const INSTALL_LOCK_INITIALIZATION_TIMEOUT_MS = 1_000
 const INSTALL_LOCK_POLL_MS = 50
-const ALLOW_HOOKS_PATH_OVERRIDE = 'ROOS_LEFTHOOK_ALLOW_HOOKS_PATH_OVERRIDE'
+const ALLOW_HOOKS_PATH_OVERRIDE = 'SHRES_LEFTHOOK_ALLOW_HOOKS_PATH_OVERRIDE'
 const REPOSITORY_EXTENSION_PATTERN = '^extensions\\.'
 function errorCode(error) {
   return typeof error === 'object' && error !== null && 'code' in error
@@ -375,7 +375,7 @@ async function acquireInstallLock(commonDirectory) {
       let ownedStat
       try {
         ownedStat = fstatSync(lockHandle)
-        const writeDelay = Number(process.env.ROOS_TEST_LEFTHOOK_LOCK_WRITE_DELAY_MS ?? 0)
+        const writeDelay = Number(process.env.SHRES_TEST_LEFTHOOK_LOCK_WRITE_DELAY_MS ?? 0)
         if (writeDelay > 0) {
           await new Promise(resolveWait => setTimeout(resolveWait, writeDelay))
         }

@@ -2,7 +2,7 @@
 
 export const NS = 'cordis'
 
-declare module '@roos-code/roos-code-client-ui-slots' {
+declare module '@shres-code/shres-code-client-ui-slots' {
   interface LocaleNamespaceMap {
     /** Dynamic Cordis UI copy. */
     cordis: CordisKey

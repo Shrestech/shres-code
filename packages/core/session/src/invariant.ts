@@ -1,18 +1,18 @@
 /**
  * Package-owned relational invariants for the session event log. Load this
- * companion beside `@roos-code/roos-code-invariants` to enable the checks.
+ * companion beside `@shres-code/shres-code-invariants` to enable the checks.
  *
- * @module @roos-code/roos-code-session/invariant
+ * @module @shres-code/shres-code-session/invariant
  */
 
-import type { Context } from '@roos-code/cordis'
-import { assertNever } from '@roos-code/roos-code-llm'
-import type { CallId } from '@roos-code/roos-code-llm'
-import type { InvariantFailure, InvariantInstaller } from '@roos-code/roos-code-invariants'
-import type { Session, SessionEvent } from '@roos-code/roos-code-session'
+import type { Context } from '@shres-code/cordis'
+import { assertNever } from '@shres-code/shres-code-llm'
+import type { CallId } from '@shres-code/shres-code-llm'
+import type { InvariantFailure, InvariantInstaller } from '@shres-code/shres-code-invariants'
+import type { Session, SessionEvent } from '@shres-code/shres-code-session'
 import { TOOL_NOT_STARTED } from './repair.ts'
 
-const PACKAGE_NAME = '@roos-code/roos-code-session'
+const PACKAGE_NAME = '@shres-code/shres-code-session'
 
 /** Cordis companion plugin name. */
 export const name = 'session-invariant'

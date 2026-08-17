@@ -13,13 +13,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import Loader from '@roos-code/cordis-plugin-loader'
-import Include from '@roos-code/cordis-plugin-include'
-import LlmRuntime from '@roos-code/roos-code-llm'
-import LocalCredentialProvider from '@roos-code/roos-code-credentials-local'
-import FileSettingsProvider from '@roos-code/roos-code-settings-file'
-import * as LlmPiAi from '@roos-code/roos-code-llm-pi-ai'
+import { Context } from '@shres-code/cordis'
+import Loader from '@shres-code/cordis-plugin-loader'
+import Include from '@shres-code/cordis-plugin-include'
+import LlmRuntime from '@shres-code/shres-code-llm'
+import LocalCredentialProvider from '@shres-code/shres-code-credentials-local'
+import FileSettingsProvider from '@shres-code/shres-code-settings-file'
+import * as LlmPiAi from '@shres-code/shres-code-llm-pi-ai'
 import { assemble } from './assemble.ts'
 import { closeMockServers, mockServer, textEvents } from './mock-server.ts'
 
@@ -37,7 +37,7 @@ afterEach(async () => {
 
 /** Boot the dormant composition: a bare `llm-pi-ai` row with no config at all. */
 async function loadComposition(): Promise<{ ctx: Context; settingsPath: string }> {
-  root = await mkdtemp(join(tmpdir(), 'roos-pi-composition-'))
+  root = await mkdtemp(join(tmpdir(), 'shres-pi-composition-'))
   const settingsPath = join(root, 'settings.yaml')
   await writeFile(settingsPath, '# personal settings\n')
   await writeFile(join(root, '.credentials.yaml'), 'PI_COMPOSITION_KEY: key-from-store\n', { mode: 0o600 })
@@ -47,17 +47,17 @@ async function loadComposition(): Promise<{ ctx: Context; settingsPath: string }
     '- id: llm',
     "  name: 'test-llm-service'",
     '- id: settings',
-    "  name: '@roos-code/roos-code-settings-file'",
+    "  name: '@shres-code/shres-code-settings-file'",
     '  config:',
     `    path: ${JSON.stringify(settingsPath)}`,
     '    debounceMs: 10',
     '- id: credentials',
-    "  name: '@roos-code/roos-code-credentials-local'",
+    "  name: '@shres-code/shres-code-credentials-local'",
     '  config:',
     `    path: ${JSON.stringify(join(root, '.credentials.yaml'))}`,
     '    debounceMs: 10',
     '- id: llm-pi-ai',
-    "  name: '@roos-code/roos-code-llm-pi-ai'",
+    "  name: '@shres-code/shres-code-llm-pi-ai'",
     '',
   ].join('\n'))
 
@@ -68,9 +68,9 @@ async function loadComposition(): Promise<{ ctx: Context; settingsPath: string }
   ctx.loader.builtins.include = Include
   const modules = new Map<string, unknown>([
     ['test-llm-service', LlmRuntime],
-    ['@roos-code/roos-code-settings-file', FileSettingsProvider],
-    ['@roos-code/roos-code-credentials-local', LocalCredentialProvider],
-    ['@roos-code/roos-code-llm-pi-ai', LlmPiAi],
+    ['@shres-code/shres-code-settings-file', FileSettingsProvider],
+    ['@shres-code/shres-code-credentials-local', LocalCredentialProvider],
+    ['@shres-code/shres-code-llm-pi-ai', LlmPiAi],
   ])
   ctx.loader.internal = {
     version: 'v2',

@@ -4,10 +4,10 @@
  * unions derived from them. Payloads are plain JSON by construction for structured clone. Both
  * directions are closed engine protocols whose receivers use `assertNever`; generic typed senders
  * make tag/payload mismatches compile-time errors rather than silently skipped messages.
- * @module @roos-code/roos-code-workflow-worker-thread/protocol
+ * @module @shres-code/shres-code-workflow-worker-thread/protocol
  */
 
-import type { WorkflowAgentEndInfo, WorkflowAgentInfo, WorkflowResult } from '@roos-code/roos-code-workflow'
+import type { WorkflowAgentEndInfo, WorkflowAgentInfo, WorkflowResult } from '@shres-code/shres-code-workflow'
 import type { ChildResult, ChildStartRequest } from './types.ts'
 
 /** Message tags the worker sends the host (the wire values are the tag strings). */

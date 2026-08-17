@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /** Snapshot-only Loader driver: stream one fixture turn as canonical JSONL. */
 
-import type { Context } from '@roos-code/cordis'
-import { boot, installFailLoud, loadEnv, resolveConfigPath } from '@roos-code/roos-code-app-boot'
-import { runFixtureTurn } from '@roos-code/roos-code-loader-smoke'
-import type { SessionEvent } from '@roos-code/roos-code-session'
+import type { Context } from '@shres-code/cordis'
+import { boot, installFailLoud, loadEnv, resolveConfigPath } from '@shres-code/shres-code-app-boot'
+import { runFixtureTurn } from '@shres-code/shres-code-loader-smoke'
+import type { SessionEvent } from '@shres-code/shres-code-session'
 
 const NAME = 'headless-test-driver'
 const [configPath, ...taskParts] = process.argv.slice(2)

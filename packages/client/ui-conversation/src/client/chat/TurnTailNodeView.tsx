@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import type { PropsRenderSlots } from '@roos-code/roos-code-client-ui-slots'
+import type { PropsRenderSlots } from '@shres-code/shres-code-client-ui-slots'
 import type { ChatNodeViewProps, TurnTailOwnerProps } from '../contract/slots.ts'
 import { MessageIconActions } from './MessageIconActions.tsx'
 import { assistantText } from './turn-assistant.ts'

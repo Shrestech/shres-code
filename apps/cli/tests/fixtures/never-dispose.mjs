@@ -4,16 +4,16 @@ import { existsSync } from 'node:fs'
 
 /**
  * Register a disposer that keeps process shutdown pending until it is forced.
- * @param {import('@roos-code/cordis').Context} ctx - loader-mounted test plugin context.
+ * @param {import('@shres-code/cordis').Context} ctx - loader-mounted test plugin context.
  */
 export function apply(ctx) {
   const keepAlive = setInterval(() => {}, 60_000)
-  process.stderr.write('roos-test: never-dispose ready\n')
+  process.stderr.write('shres-test: never-dispose ready\n')
   ctx.effect(() => async () => {
     clearInterval(keepAlive)
-    const armFile = process.env.ROOS_TEST_SHUTDOWN_ARM_FILE
+    const armFile = process.env.SHRES_TEST_SHUTDOWN_ARM_FILE
     if (armFile === undefined || !existsSync(armFile)) return
-    process.stderr.write('roos-test: never-dispose started\n')
+    process.stderr.write('shres-test: never-dispose started\n')
     await new Promise(() => {})
   })
 }

@@ -1,6 +1,6 @@
 # Configure models
 
-This guide assumes you started the Web UI through the [root README](../../../README.md#run), or `roos --profile headless` on a TTY. Model changes take effect on the next request without restarting the server.
+This guide assumes you started the Web UI through the [root README](../../../README.md#run), or `shres --profile headless` on a TTY. Model changes take effect on the next request without restarting the server.
 
 First run with no usable default opens a picker instead of silently choosing a vendor. Headless prints detected local Ollama models, the shipped template routes, and a custom base URL; Web shows the same routes on the onboarding card. A non-TTY process with no usable default fails and names those configuration paths.
 
@@ -12,7 +12,7 @@ Open **Settings → Models**. The page lists the composed routes: DeepSeek, loca
 
 Each keyed card exposes one API-key field; enter the key and save it. Named-but-unset keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `XAI_API_KEY`, `MOONSHOT_API_KEY`, `OLLAMA_API_KEY`, `OPENROUTER_API_KEY`, `GROQ_API_KEY`, `ZAI_API_KEY`, `DEEPSEEK_API_KEY`) fail a request with `MISSING_CREDENTIAL` until stored.
 
-Keys are write-only. The page receives a redacted descriptor after saving, never the literal secret. The key is stored in `$ROOS_HOME/.credentials.yaml`, while settings retain only its credential reference.
+Keys are write-only. The page receives a redacted descriptor after saving, never the literal secret. The key is stored in `$SHRES_HOME/.credentials.yaml`, while settings retain only its credential reference.
 
 ### Local Ollama
 
@@ -42,7 +42,7 @@ Under **Model catalog**, choose **Fetch available models** to query the base URL
 
 A model you enter by hand is treated as text-only until it says otherwise, because nothing can ask an endpoint which modalities it accepts. Attaching an image to such a model is refused before it is sent, naming the model.
 
-A vision model on a custom provider therefore needs one line. The form has no field for it; add `input` to the model in `$ROOS_HOME/settings.yaml`:
+A vision model on a custom provider therefore needs one line. The form has no field for it; add `input` to the model in `$SHRES_HOME/settings.yaml`:
 
 ```yaml
 llm-pi-ai:
@@ -98,7 +98,7 @@ If a saved default names a provider that was deleted, the composer displays **Se
 ## Troubleshooting
 
 - **`MISSING_CREDENTIAL`** — Store the provider key through the Models page or supply the referenced environment variable.
-- **First-run picker on every headless run** — No user-saved `agent-default-model` exists and the composition default cannot serve. Pick a route, export a key, or write the section in `$ROOS_HOME/settings.yaml`.
+- **First-run picker on every headless run** — No user-saved `agent-default-model` exists and the composition default cannot serve. Pick a route, export a key, or write the section in `$SHRES_HOME/settings.yaml`.
 - **Local Ollama is missing from the picker** — `GET http://localhost:11434/v1/models` did not answer. Start Ollama and retry; the shipped route still appears on the Models page.
 - **`UNKNOWN_MODEL`** — Select a configured model or add the missing model to the custom provider.
 - **Fetching available models returns 401** — Check the key. Model discovery calls the OpenAI-compatible `GET /models` endpoint; enter models manually for endpoints that do not provide it.
@@ -107,4 +107,4 @@ If a saved default names a provider that was deleted, the composer displays **Se
 
 ## Advanced configuration
 
-The generated [plugin configuration catalog](../../config-catalog.md) lists every supported field and default. The [`roos-llm-pi-ai`](../../../packages/llm/llm-pi-ai/README.md) and [`roos-llm-deepseek`](../../../packages/llm/llm-deepseek/README.md) references own direct `settings.yaml` configuration, catalog resolution, reasoning controls, credentials, and adapter errors. The first-run picker contract lives in [`roos-first-run-setup`](../../../packages/core/first-run-setup/README.md). The [CLI models guide](./models.md) owns `roos models` and `roos providers`.
+The generated [plugin configuration catalog](../../config-catalog.md) lists every supported field and default. The [`shres-llm-pi-ai`](../../../packages/llm/llm-pi-ai/README.md) and [`shres-llm-deepseek`](../../../packages/llm/llm-deepseek/README.md) references own direct `settings.yaml` configuration, catalog resolution, reasoning controls, credentials, and adapter errors. The first-run picker contract lives in [`shres-first-run-setup`](../../../packages/core/first-run-setup/README.md). The [CLI models guide](./models.md) owns `shres models` and `shres providers`.

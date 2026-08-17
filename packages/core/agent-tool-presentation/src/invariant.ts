@@ -1,13 +1,13 @@
 /**
- * Package-owned invariant companion for `@roos-code/roos-code-agent-tool-presentation`.
- * @module @roos-code/roos-code-agent-tool-presentation/invariant
+ * Package-owned invariant companion for `@shres-code/shres-code-agent-tool-presentation`.
+ * @module @shres-code/shres-code-agent-tool-presentation/invariant
  */
 
 /* jscpd:ignore-start */
-import type { Context } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-agent-tool-presentation'
+const PACKAGE_NAME = '@shres-code/shres-code-agent-tool-presentation'
 
 /** Cordis companion plugin name. */
 export const name = 'tool-presentation-invariant'
@@ -18,7 +18,7 @@ export const inject = ['invariants']
  * No runtime invariant: this package makes exactly one scoped call into
  * `ctx.tools` and owns no event or snapshot of its own; the relation it
  * establishes — which presentation one agent's assembly uses — is the tool
- * registry's to hold, and `roos-tools` observes it there.
+ * registry's to hold, and `shres-tools` observes it there.
  */
 const install: InvariantInstaller = () => {}
 

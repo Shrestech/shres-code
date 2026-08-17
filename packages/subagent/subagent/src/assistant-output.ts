@@ -7,11 +7,11 @@
  * select the accumulated assistant text. Selection is independent of the
  * run's stop reason.
  *
- * @module @roos-code/roos-code-subagent/assistant-output
+ * @module @shres-code/shres-code-subagent/assistant-output
  */
 
-import type { ContentBlock } from '@roos-code/roos-code-llm'
-import type { SessionEvent } from '@roos-code/roos-code-session'
+import type { ContentBlock } from '@shres-code/shres-code-llm'
+import type { SessionEvent } from '@shres-code/shres-code-session'
 
 /**
  * Incremental fold of the selection rule, for backends that observe a child's

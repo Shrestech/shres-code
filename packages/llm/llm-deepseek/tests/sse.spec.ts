@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { LlmError } from '@roos-code/roos-code-llm'
+import { LlmError } from '@shres-code/shres-code-llm'
 import { DONE, parseSse } from '../src/sse.ts'
 
 /**

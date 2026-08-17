@@ -1,13 +1,13 @@
 /**
- * Package-owned invariant companion for `@roos-code/roos-code-code-runtime-worker-thread`.
- * @module @roos-code/roos-code-code-runtime-worker-thread/invariant
+ * Package-owned invariant companion for `@shres-code/shres-code-code-runtime-worker-thread`.
+ * @module @shres-code/shres-code-code-runtime-worker-thread/invariant
  */
 
 /* jscpd:ignore-start */
-import type { Context } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-code-runtime-worker-thread'
+const PACKAGE_NAME = '@shres-code/shres-code-code-runtime-worker-thread'
 
 /** Cordis companion plugin name. */
 export const name = 'code-runtime-worker-thread-invariant'

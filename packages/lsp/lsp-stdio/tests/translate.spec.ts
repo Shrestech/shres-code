@@ -6,8 +6,8 @@ import {
   requestMethod,
   supportsOperation,
   supportsTransientOpen,
-} from '@roos-code/roos-code-lsp-stdio'
-import type { WireServerCapabilities } from '@roos-code/roos-code-lsp-stdio/src/protocol.ts'
+} from '@shres-code/shres-code-lsp-stdio'
+import type { WireServerCapabilities } from '@shres-code/shres-code-lsp-stdio/src/protocol.ts'
 
 const RANGE = { start: { line: 1, character: 2 }, end: { line: 1, character: 5 } }
 

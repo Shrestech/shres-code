@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import {
   resolveRetryPolicy,
   RetryPolicySchema,
-} from '@roos-code/roos-code-llm'
-import type { RetryPolicyConfig } from '@roos-code/roos-code-llm'
-import { MAX_TIMER_DELAY_MS } from '@roos-code/roos-code-timeout'
+} from '@shres-code/shres-code-llm'
+import type { RetryPolicyConfig } from '@shres-code/shres-code-llm'
+import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
 
 describe('provider retry policy', () => {
   it('resolves immutable normal defaults', () => {

@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { scopeTarget } from '@roos-code/roos-code-scope'
-import { CallId } from '@roos-code/roos-code-llm'
-import SessionStore, { Session, SessionId } from '@roos-code/roos-code-session'
-import type { ToolExecution, ToolExecutionResult, ToolExecutionToken } from '@roos-code/roos-code-tools'
-import * as ToolsInvariant from '@roos-code/roos-code-tools/invariant'
-import InvariantRegistry from '@roos-code/roos-code-invariants'
+import { Context } from '@shres-code/cordis'
+import { scopeTarget } from '@shres-code/shres-code-scope'
+import { CallId } from '@shres-code/shres-code-llm'
+import SessionStore, { Session, SessionId } from '@shres-code/shres-code-session'
+import type { ToolExecution, ToolExecutionResult, ToolExecutionToken } from '@shres-code/shres-code-tools'
+import * as ToolsInvariant from '@shres-code/shres-code-tools/invariant'
+import InvariantRegistry from '@shres-code/shres-code-invariants'
 
 const testToolSignal = new AbortController().signal
 

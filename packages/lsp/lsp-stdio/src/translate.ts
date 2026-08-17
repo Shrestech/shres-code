@@ -2,7 +2,7 @@
  * Pure protocol translation for the local host: what the server's capabilities allow, and how its
  * `Location`/`LocationLink`/`Hover` payloads normalize into the seam's closed result unions. No I/O
  * or process state — every function here is a pure transform, which the fake-stdio tests pin exactly.
- * @module @roos-code/roos-code-lsp-stdio/translate
+ * @module @shres-code/shres-code-lsp-stdio/translate
  */
 
 import type {
@@ -10,9 +10,9 @@ import type {
   LspLocation,
   LspOperation,
   LspRange,
-} from '@roos-code/roos-code-lsp'
-import { LspError } from '@roos-code/roos-code-lsp'
-import { assertNever } from '@roos-code/roos-code-llm'
+} from '@shres-code/shres-code-lsp'
+import { LspError } from '@shres-code/shres-code-lsp'
+import { assertNever } from '@shres-code/shres-code-llm'
 import type {
   WireHover,
   WireLocation,

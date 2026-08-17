@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { createUserMessage, CallId , createMessage } from '@roos-code/roos-code-llm'
-import SessionStore, { Session, SessionForkError, SessionId } from '@roos-code/roos-code-session'
-import type { SessionEvent, TurnEndReason } from '@roos-code/roos-code-session'
+import { Context } from '@shres-code/cordis'
+import { createUserMessage, CallId , createMessage } from '@shres-code/shres-code-llm'
+import SessionStore, { Session, SessionForkError, SessionId } from '@shres-code/shres-code-session'
+import type { SessionEvent, TurnEndReason } from '@shres-code/shres-code-session'
 
-declare module '@roos-code/roos-code-session/types' {
+declare module '@shres-code/shres-code-session/types' {
   interface SessionEventMap {
     'test/log-only': { value: string }
     /** Stands in for a plugin's open/close bracket (`compaction/start`). */

@@ -64,8 +64,8 @@ it('keeps scenario-owned snapshot spill root length stable across platforms', ()
   const fixtureFile = '/fixtures/scenario/session.jsonl'
   const posix = snapshotSpillRoot(fixtureFile, 'linux')
   const windows = snapshotSpillRoot(fixtureFile, 'win32')
-  expect(posix).toMatch(/^\/tmp\/roos-acp-snap-[0-9a-f]{9}$/)
-  expect(windows).toMatch(/^\/t\/roos-acp-snap-[0-9a-f]{9}$/)
+  expect(posix).toMatch(/^\/tmp\/shres-acp-snap-[0-9a-f]{9}$/)
+  expect(windows).toMatch(/^\/t\/shres-acp-snap-[0-9a-f]{9}$/)
   expect(windows.length + 2).toBe(posix.length)
 })
 
@@ -104,9 +104,9 @@ describe('runScenario', () => {
       cwd: dir,
       configPath: AGENT.configPath,
       env: {
-        ROOS_SNAPSHOT: 'replay',
-        ROOS_SNAPSHOT_FILE: fixtureFile,
-        ROOS_SNAPSHOT_SESSIONS_ROOT: sessionsRoot,
+        SHRES_SNAPSHOT: 'replay',
+        SHRES_SNAPSHOT_FILE: fixtureFile,
+        SHRES_SNAPSHOT_SESSIONS_ROOT: sessionsRoot,
       },
     })
     await launched.client.initialize({ protocolVersion: PROTOCOL_VERSION, clientCapabilities: {} })
@@ -147,7 +147,7 @@ describe('runScenario', () => {
     const launched = launchAcpTestAgent({
       agent: AGENT,
       cwd: dir,
-      env: { ROOS_SNAPSHOT_FILE: fixtureFile },
+      env: { SHRES_SNAPSHOT_FILE: fixtureFile },
     })
     await launched.client.initialize({ protocolVersion: PROTOCOL_VERSION, clientCapabilities: {} })
     await launched.client.newSession({ cwd: dir, mcpServers: [] })
@@ -326,7 +326,7 @@ describe('runScenario', () => {
     const launched = launchAcpTestAgent({
       agent: AGENT,
       cwd: dir,
-      env: { ROOS_SNAPSHOT_FILE: fixtureFile },
+      env: { SHRES_SNAPSHOT_FILE: fixtureFile },
       async requestPermission() {
         markPermissionStarted?.()
         await permissionReleased
@@ -361,7 +361,7 @@ describe('runScenario', () => {
 
   it('preserves launch-resolution errors when no child process exists', async () => {
     const { dir, fixtureFile } = await scenario({})
-    vi.stubEnv('ROOS_EXAMPLE_MODE', 'lib')
+    vi.stubEnv('SHRES_EXAMPLE_MODE', 'lib')
     try {
       await expect(runScenario(
         { steps: [] },

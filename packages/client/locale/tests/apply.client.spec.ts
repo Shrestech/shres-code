@@ -1,15 +1,15 @@
 /** locale apply wiring: service + dictionaries provision, declaration-aware
  * Language row registration, snapshot projection into the row store, and
  * recovery after an HMR collapse of the declaring entry. */
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { SlotRegistry } from '@roos-code/roos-code-client-runtime/client'
-import { SettingsScopeBinder } from '@roos-code/roos-code-client-ui-settings/client'
-import { TestRemote } from '@roos-code/roos-code-client-test-runtime'
+import { SlotRegistry } from '@shres-code/shres-code-client-runtime/client'
+import { SettingsScopeBinder } from '@shres-code/shres-code-client-ui-settings/client'
+import { TestRemote } from '@shres-code/shres-code-client-test-runtime'
 import {
   apply, inject, SETTINGS_NS,
-} from '@roos-code/roos-code-client-locale/client'
-import type { LanguageRowInjected, LocaleRuntime } from '@roos-code/roos-code-client-locale/client'
+} from '@shres-code/shres-code-client-locale/client'
+import type { LanguageRowInjected, LocaleRuntime } from '@shres-code/shres-code-client-locale/client'
 import { LOCALE_SETTINGS_NAMESPACE, LocaleSettingsSchema } from '../src/locale-settings.ts'
 import { LanguageRow } from '../src/client/LanguageRow.tsx'
 import type { createLanguageRowStore } from '../src/client/settings-store.ts'

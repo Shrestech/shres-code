@@ -3,20 +3,20 @@
  *
  * This package owns the Service Definition role of the skill capability seam.
  * Concrete
- * providers such as `@roos-code/roos-code-skill-filesystem` decide where skills come
+ * providers such as `@shres-code/shres-code-skill-filesystem` decide where skills come
  * from; this service only merges provider catalogs, resolves the winning skill
  * for a name, and exposes the winning summaries and definitions to consumers.
  *
- * @module @roos-code/roos-code-skill
+ * @module @shres-code/shres-code-skill
  */
 
-import { Context, Service } from '@roos-code/cordis'
-import { assertNever } from '@roos-code/roos-code-llm'
-import { NamedEntries, ScopedLayers, scopeChainOf, scopeOf } from '@roos-code/roos-code-scope'
-import type { ScopeKey, ScopeLayer } from '@roos-code/roos-code-scope'
-import { UNTRUSTED_INSTRUCTION_DISCLAIMER, UNTRUSTED_LT_ESCAPE, wrapUntrusted } from '@roos-code/roos-code-untrusted-frame'
-import z from '@roos-code/schemastery'
-import type Schema from '@roos-code/schemastery'
+import { Context, Service } from '@shres-code/cordis'
+import { assertNever } from '@shres-code/shres-code-llm'
+import { NamedEntries, ScopedLayers, scopeChainOf, scopeOf } from '@shres-code/shres-code-scope'
+import type { ScopeKey, ScopeLayer } from '@shres-code/shres-code-scope'
+import { UNTRUSTED_INSTRUCTION_DISCLAIMER, UNTRUSTED_LT_ESCAPE, wrapUntrusted } from '@shres-code/shres-code-untrusted-frame'
+import z from '@shres-code/schemastery'
+import type Schema from '@shres-code/schemastery'
 
 const SKILL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const DEFAULT_COLLECT_CACHE_ENTRIES = 128
@@ -42,7 +42,7 @@ export function isSkillName(name: string): boolean {
  * `bundled`, `user-*`, `runtime`, and `custom` as trusted local content;
  * `project-*` and every other label, including a missing source, are untrusted.
  */
-export type SkillSource = 'project-roos' | 'project-agents' | 'runtime' | 'user-roos' | 'user-agents' | 'custom' | 'bundled' | (string & {})
+export type SkillSource = 'project-shres' | 'project-agents' | 'runtime' | 'user-shres' | 'user-agents' | 'custom' | 'bundled' | (string & {})
 
 /** Optional provider-specific base used by loaded skill bodies to resolve relative resources. */
 export type SkillResourceBase =
@@ -158,7 +158,7 @@ export interface SkillInvocationSource {
   readonly form: 'instructions'
 }
 
-declare module '@roos-code/roos-code-llm' {
+declare module '@shres-code/shres-code-llm' {
   interface MessageSourceMap {
     /** A user-explicit skill invocation injected by the host. */
     'skill-invocation': SkillInvocationSource
@@ -317,7 +317,7 @@ export interface Config {
   readonly collectCacheMaxEntries?: number
 }
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     skills: SkillRegistry
   }

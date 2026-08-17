@@ -22,18 +22,18 @@
  * that do not use a `./typert` artifact (hand-written wire schemas,
  * tests, non-loader compositions).
  *
- * @module @roos-code/roos-code-typert-loader
+ * @module @shres-code/shres-code-typert-loader
  */
 
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import type { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import type {} from '@roos-code/cordis-plugin-loader'
-import type {} from '@roos-code/roos-code-typert-registry'
-import type { TypertContribution } from '@roos-code/roos-code-typert-registry/types'
+import type { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import type {} from '@shres-code/cordis-plugin-loader'
+import type {} from '@shres-code/shres-code-typert-registry'
+import type { TypertContribution } from '@shres-code/shres-code-typert-registry/types'
 
 /** The package.json exports key naming a package's host-face typert artifact. */
 export const TYPERT_HOST_EXPORT = './typert'

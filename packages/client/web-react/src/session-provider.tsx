@@ -3,7 +3,7 @@ import { createContext, useContext, type ReactNode } from 'react'
 import type {
   HostObservable, MaybeSnapshotSelectorHook, SessionMaybeProvideInfo, SessionProvideInfo,
   SlotRendererHost, SnapshotSelectorHook,
-} from '@roos-code/roos-code-client-ui-slots'
+} from '@shres-code/shres-code-client-ui-slots'
 import { bindSnapshotSelector } from './bind.ts'
 
 /**

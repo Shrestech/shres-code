@@ -7,9 +7,9 @@
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { SessionEvent } from '@roos-code/roos-code-session/types'
-import type {} from '@roos-code/roos-code-commands/types'
-import type { SessionId } from '@roos-code/roos-code-api-remotes/client'
+import type { SessionEvent } from '@shres-code/shres-code-session/types'
+import type {} from '@shres-code/shres-code-commands/types'
+import type { SessionId } from '@shres-code/shres-code-api-remotes/client'
 import { Session } from '../src/client/sessions/session.ts'
 import type {
   ChatConversationViewNode, ChatLocationNodeIndex, ChatNodeStore, ChatSnapshot,

@@ -3,30 +3,30 @@
 # echoes its process cwd and announced session cwd, so parent-session cwd
 # inheritance is asserted keylessly end to end. `cwd` is deliberately omitted —
 # the inheritance branch under test. The child command path is machine-absolute,
-# so the driving e2e supplies it via ROOS_TEST_MOCK_ACP_SERVER.
+# so the driving e2e supplies it via SHRES_TEST_MOCK_ACP_SERVER.
 - id: mock-llm
   name: './mock-delegating-llm.ts'
 
 - id: subagent
-  name: '@roos-code/roos-code-subagent'
+  name: '@shres-code/shres-code-subagent'
 
 # The out-of-process ACP backend spawns its child through the subprocess seam.
 - id: subprocess
-  name: '@roos-code/roos-code-subprocess-local'
+  name: '@shres-code/shres-code-subprocess-local'
 
 - id: subagent-acp
-  name: '@roos-code/roos-code-subagent-acp'
+  name: '@shres-code/shres-code-subagent-acp'
   config:
     providerName: acp
     command: !!js process.execPath
     args:
-      - !!js process.env.ROOS_TEST_MOCK_ACP_SERVER
+      - !!js process.env.SHRES_TEST_MOCK_ACP_SERVER
     permission: reject
     env:
       MOCK_ECHO_CWD: '1'
 
 - id: tool-subagent
-  name: '@roos-code/roos-code-tool-subagent'
+  name: '@shres-code/shres-code-tool-subagent'
   config:
     provider: acp
     toolName: subagent
@@ -35,7 +35,7 @@
     maxDepth: 'provider-managed'
 
 - id: agent-spine
-  name: '@roos-code/roos-code-agent-spine-demo'
+  name: '@shres-code/shres-code-agent-spine-demo'
   config:
     agents:
       - id: main
@@ -46,10 +46,10 @@
     workspaceContext: false
 
 - id: persistence
-  name: '@roos-code/roos-code-session-persistence-jsonl'
+  name: '@shres-code/shres-code-session-persistence-jsonl'
   config:
     root: './.sessions'
     compression: 'none'
 
 - id: checkpoint-policy
-  name: '@roos-code/roos-code-session-checkpoint-policy'
+  name: '@shres-code/shres-code-session-checkpoint-policy'

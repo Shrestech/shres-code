@@ -1,17 +1,17 @@
 /**
  * Default model selection for an Agent without a session-specific selection.
  *
- * @module @roos-code/roos-code-agent-default-model
+ * @module @shres-code/shres-code-agent-default-model
  */
 
-import { Context, Service } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import { installModelSelection } from '@roos-code/roos-code-agent'
-import type { Agent, ModelSelection, ModelSelectionRef } from '@roos-code/roos-code-agent'
-import type {} from '@roos-code/roos-code-commands'
-import { ReasoningEffortId } from '@roos-code/roos-code-llm'
-import type {} from '@roos-code/roos-code-llm'
-import { installSettingsSection, settingsNamespace } from '@roos-code/roos-code-settings'
+import { Context, Service } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import { installModelSelection } from '@shres-code/shres-code-agent'
+import type { Agent, ModelSelection, ModelSelectionRef } from '@shres-code/shres-code-agent'
+import type {} from '@shres-code/shres-code-commands'
+import { ReasoningEffortId } from '@shres-code/shres-code-llm'
+import type {} from '@shres-code/shres-code-llm'
+import { installSettingsSection, settingsNamespace } from '@shres-code/shres-code-settings'
 import { handleModelCommand } from './command.ts'
 
 export {
@@ -25,7 +25,7 @@ export {
 } from './command.ts'
 export type { ParsedModelCommand } from './command.ts'
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     /** Default model selection for Agents created without an explicit model. */
     agentDefaultModel: AgentDefaultModelConfig

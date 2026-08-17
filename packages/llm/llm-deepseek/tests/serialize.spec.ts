@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { AttachmentId } from '@roos-code/roos-code-attachment'
-import { createUserMessage, CallId, ReasoningEffortId, createMessage } from '@roos-code/roos-code-llm'
-import type { ContentBlock, GenerateOptions, Message } from '@roos-code/roos-code-llm'
+import { AttachmentId } from '@shres-code/shres-code-attachment'
+import { createUserMessage, CallId, ReasoningEffortId, createMessage } from '@shres-code/shres-code-llm'
+import type { ContentBlock, GenerateOptions, Message } from '@shres-code/shres-code-llm'
 import { serializeMessages, serializeRequest } from '../src/serialize.ts'
 
 function request(overrides: Partial<GenerateOptions> = {}): GenerateOptions {

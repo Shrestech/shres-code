@@ -1,10 +1,10 @@
-import { createUserMessage } from '@roos-code/roos-code-llm'
+import { createUserMessage } from '@shres-code/shres-code-llm'
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import type { ContentBlock } from '@roos-code/roos-code-llm'
-import SessionStore, { Session, SessionId, type SessionEvent } from '@roos-code/roos-code-session'
-import * as TimeInvariant from '@roos-code/roos-code-time-context/invariant'
-import InvariantRegistry from '@roos-code/roos-code-invariants'
+import { Context } from '@shres-code/cordis'
+import type { ContentBlock } from '@shres-code/shres-code-llm'
+import SessionStore, { Session, SessionId, type SessionEvent } from '@shres-code/shres-code-session'
+import * as TimeInvariant from '@shres-code/shres-code-time-context/invariant'
+import InvariantRegistry from '@shres-code/shres-code-invariants'
 
 const SECOND = Date.parse('2026-07-14T00:00:00Z')
 

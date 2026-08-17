@@ -3,11 +3,11 @@
  * pure context-breakdown projection, so both surfaces price identical content
  * to identical numbers.
  *
- * @module @roos-code/roos-code-token-meter/estimate
+ * @module @shres-code/shres-code-token-meter/estimate
  */
 
-import type { ContentBlock, Message } from '@roos-code/roos-code-llm'
-import type { EpochHeader } from '@roos-code/roos-code-session'
+import type { ContentBlock, Message } from '@shres-code/shres-code-llm'
+import type { EpochHeader } from '@shres-code/shres-code-session'
 
 /** Fixed text-density estimate used until exact tokenization is needed. */
 const CHARS_PER_TOKEN = 4

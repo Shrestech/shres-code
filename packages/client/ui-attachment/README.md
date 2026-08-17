@@ -1,6 +1,6 @@
-# @roos-code/roos-code-client-ui-attachment
+# @shres-code/shres-code-client-ui-attachment
 
-Pure React attachment atoms (zero cordis): the composer draft-image rail (`AttachmentRail`), the chat-history image gallery (`MessageImage`/`ImageGallery`), the original-image lightbox (`ImageLightbox`), and the full-page drop overlay (`DropOverlay`). Every string arrives through label props resolved by the owning plugin's own locale namespace, and nothing here reads application state; `@roos-code/roos-code-client-ui-conversation` is the current consumer, bridging its `conversation` dictionary through its `image-labels` module.
+Pure React attachment atoms (zero cordis): the composer draft-image rail (`AttachmentRail`), the chat-history image gallery (`MessageImage`/`ImageGallery`), the original-image lightbox (`ImageLightbox`), and the full-page drop overlay (`DropOverlay`). Every string arrives through label props resolved by the owning plugin's own locale namespace, and nothing here reads application state; `@shres-code/shres-code-client-ui-conversation` is the current consumer, bridging its `conversation` dictionary through its `image-labels` module.
 
 ## Attachment rail
 

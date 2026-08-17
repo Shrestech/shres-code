@@ -1,4 +1,4 @@
-# @roos-code/roos-code-client-ui-tool
+# @shres-code/shres-code-client-ui-tool
 
 Client Tool presentation plugin. `ui-conversation` dispatches each ordered `tool-call` Conversation Node through the matching key of `conversation.chat.node`; this package renders its root and Code Dispatch children, then dispatches every atomic call through the keyed `tool.call.toolview` slot. Unregistered Tool names use the generic card.
 

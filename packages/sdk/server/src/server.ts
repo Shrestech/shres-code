@@ -2,17 +2,17 @@
  * JSON-RPC methods and notifications for out-of-process harness SDKs.
  * The surrounding context owns plugins, persistence, and configured adapters.
  *
- * @module @roos-code/roos-code-sdk-jsonrpc-server/server
+ * @module @shres-code/shres-code-sdk-jsonrpc-server/server
  */
 
-import type { Context } from '@roos-code/cordis'
+import type { Context } from '@shres-code/cordis'
 import { resolve } from 'node:path'
-import type { Agent, AgentHandle } from '@roos-code/roos-code-agent'
-import { createUserMessage } from '@roos-code/roos-code-llm'
-import { carrierKeyOf, type Scoped } from '@roos-code/roos-code-scope'
-import { SessionId } from '@roos-code/roos-code-session'
-import type SubagentRuntime from '@roos-code/roos-code-subagent'
-import type { SubagentRunEndInfo } from '@roos-code/roos-code-subagent'
+import type { Agent, AgentHandle } from '@shres-code/shres-code-agent'
+import { createUserMessage } from '@shres-code/shres-code-llm'
+import { carrierKeyOf, type Scoped } from '@shres-code/shres-code-scope'
+import { SessionId } from '@shres-code/shres-code-session'
+import type SubagentRuntime from '@shres-code/shres-code-subagent'
+import type { SubagentRunEndInfo } from '@shres-code/shres-code-subagent'
 import type {
   InitializeParams,
   InitializeResult,
@@ -22,7 +22,7 @@ import type {
   SessionPromptResult,
   SubagentFinishedNotification,
   SubagentStartedNotification,
-} from '@roos-code/roos-code-sdk-protocol'
+} from '@shres-code/shres-code-sdk-protocol'
 
 interface SessionRecord {
   handle: AgentHandle
@@ -120,7 +120,7 @@ export class HarnessSdkJsonRpcServer {
     if (!this.hasAdapterFor(this.provider)) {
       throw new Error(`no adapter registered for provider "${this.provider}"`)
     }
-    return { serverInfo: { name: 'roos-code-sdk-runtime', version: '0.0.1' } }
+    return { serverInfo: { name: 'shres-code-sdk-runtime', version: '0.0.1' } }
   }
 
   /**
@@ -193,7 +193,7 @@ export class HarnessSdkJsonRpcServer {
       case 'shutdown':
         return this.shutdown()
       default:
-        throw new Error(`unknown Roos Code SDK runtime method: ${method}`)
+        throw new Error(`unknown Shres Code SDK runtime method: ${method}`)
     }
   }
 
@@ -216,7 +216,7 @@ export class HarnessSdkJsonRpcServer {
     // No preset composition: this server's compositions keep the model-facing
     // rows in the host plane, so this agent reads them from the global layer. A
     // deployment that configures a roster has to join one here first
-    // (@roos-code/roos-code-agent-presets README, "Composing a child agent").
+    // (@shres-code/shres-code-agent-presets README, "Composing a child agent").
     const handle = await this.ctx.agents.create({
       sessionId: SessionId(sessionId),
       meta: { cwd: this.cwd },

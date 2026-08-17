@@ -4,12 +4,12 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { launcherPath } from '@roos-code/node-addon-landlock-run'
-import { LocalSandboxProvider } from '@roos-code/roos-code-sandbox-local'
-import { SandboxPolicyService } from '@roos-code/roos-code-sandbox-policy'
-import { SandboxBashExecutor } from '@roos-code/roos-code-bash-sandbox'
-import LocalSubprocessRuntime from '@roos-code/roos-code-subprocess-local'
+import { Context } from '@shres-code/cordis'
+import { launcherPath } from '@shres-code/node-addon-landlock-run'
+import { LocalSandboxProvider } from '@shres-code/shres-code-sandbox-local'
+import { SandboxPolicyService } from '@shres-code/shres-code-sandbox-policy'
+import { SandboxBashExecutor } from '@shres-code/shres-code-bash-sandbox'
+import LocalSubprocessRuntime from '@shres-code/shres-code-subprocess-local'
 
 /**
  * KEYLESS consumer-integration proof: the REAL `LocalSandboxProvider` (bwrap
@@ -17,7 +17,7 @@ import LocalSubprocessRuntime from '@roos-code/roos-code-subprocess-local'
  * REAL `SandboxBashExecutor`, driven through the executor's public run/start
  * paths. Verifies the WORLD (files exist or don't) plus the stamped result
  * facts; the backend-only confinement proofs live with
- * `@roos-code/roos-code-sandbox-local`.
+ * `@shres-code/shres-code-sandbox-local`.
  *
  * Self-skips when the running kernel does not enforce Landlock. CI builds the launcher from
  * `native/landlock-run` before running this file.
@@ -38,7 +38,7 @@ afterEach(async () => {
 })
 
 async function tempDir(base: string): Promise<string> {
-  const dir = await mkdtemp(join(base, 'roos-landlock-e2e-'))
+  const dir = await mkdtemp(join(base, 'shres-landlock-e2e-'))
   tempDirs.push(dir)
   return dir
 }

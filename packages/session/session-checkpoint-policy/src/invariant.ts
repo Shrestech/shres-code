@@ -1,13 +1,13 @@
 /**
- * Package-owned invariant companion for `@roos-code/roos-code-session-checkpoint-policy`.
- * @module @roos-code/roos-code-session-checkpoint-policy/invariant
+ * Package-owned invariant companion for `@shres-code/shres-code-session-checkpoint-policy`.
+ * @module @shres-code/shres-code-session-checkpoint-policy/invariant
  */
 
 /* jscpd:ignore-start */
-import type { Context } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-session-checkpoint-policy'
+const PACKAGE_NAME = '@shres-code/shres-code-session-checkpoint-policy'
 
 /** Cordis companion plugin name. */
 export const name = 'session-checkpoint-policy-invariant'

@@ -2,8 +2,8 @@ import { readFile, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { type SessionEvent } from '@roos-code/roos-code-session'
-import { LOADER_SMOKE_TEST_TIMEOUT_MS, runLoaderSmoke } from '@roos-code/roos-code-loader-smoke'
+import { type SessionEvent } from '@shres-code/shres-code-session'
+import { LOADER_SMOKE_TEST_TIMEOUT_MS, runLoaderSmoke } from '@shres-code/shres-code-loader-smoke'
 
 // Keep the Loader config under examples so both modes exercise the same deployable
 // topology: local fixture source plus bare plugins owned by the examples workspace.

@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { scopeTarget } from '@roos-code/roos-code-scope'
-import { SessionId } from '@roos-code/roos-code-session'
-import SubagentRuntime, { SubagentRunId } from '@roos-code/roos-code-subagent'
+import { Context } from '@shres-code/cordis'
+import { scopeTarget } from '@shres-code/shres-code-scope'
+import { SessionId } from '@shres-code/shres-code-session'
+import SubagentRuntime, { SubagentRunId } from '@shres-code/shres-code-subagent'
 import type {
   SubagentProvider,
   SubagentRunEndInfo,
   SubagentRunInfo,
-} from '@roos-code/roos-code-subagent'
-import * as SubagentInvariant from '@roos-code/roos-code-subagent/invariant'
-import InvariantRegistry from '@roos-code/roos-code-invariants'
+} from '@shres-code/shres-code-subagent'
+import * as SubagentInvariant from '@shres-code/shres-code-subagent/invariant'
+import InvariantRegistry from '@shres-code/shres-code-invariants'
 
 async function setup(): Promise<Context> {
   const ctx = new Context()

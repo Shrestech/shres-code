@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import SessionStore, { Session, SessionId } from '@roos-code/roos-code-session'
-import { createUserMessage } from '@roos-code/roos-code-llm'
-import { CompactionId, compactCheckpointSource } from '@roos-code/roos-code-compaction'
-import * as CompactionInvariant from '@roos-code/roos-code-compaction/invariant'
-import { CommandId } from '@roos-code/roos-code-commands/brand'
-import InvariantRegistry from '@roos-code/roos-code-invariants'
+import { Context } from '@shres-code/cordis'
+import SessionStore, { Session, SessionId } from '@shres-code/shres-code-session'
+import { createUserMessage } from '@shres-code/shres-code-llm'
+import { CompactionId, compactCheckpointSource } from '@shres-code/shres-code-compaction'
+import * as CompactionInvariant from '@shres-code/shres-code-compaction/invariant'
+import { CommandId } from '@shres-code/shres-code-commands/brand'
+import InvariantRegistry from '@shres-code/shres-code-invariants'
 
 async function setup(): Promise<Context> {
   const ctx = new Context()

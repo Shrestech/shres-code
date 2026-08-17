@@ -2,7 +2,7 @@
  * Projection from the shared managed-process handle to the official Claude
  * Agent SDK's custom-spawn process interface.
  *
- * @module @roos-code/roos-code-subagent-claude-code/process
+ * @module @shres-code/shres-code-subagent-claude-code/process
  */
 
 import { EventEmitter } from 'node:events'
@@ -15,9 +15,9 @@ import {
   scrubbedParentEnv,
   type SubprocessHandle,
   type SubprocessSpawnSpec,
-} from '@roos-code/roos-code-subprocess'
+} from '@shres-code/shres-code-subprocess'
 
-const WINDOWS_BATCH_EXECUTABLE_ENV = 'ROOS_CLAUDE_CODE_EXECUTABLE'
+const WINDOWS_BATCH_EXECUTABLE_ENV = 'SHRES_CLAUDE_CODE_EXECUTABLE'
 
 function thrown(value: unknown): Error {
   /* v8 ignore next -- the subprocess seam rejects with Error. */

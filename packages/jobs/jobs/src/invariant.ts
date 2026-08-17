@@ -1,11 +1,11 @@
-/** Package-owned background-job snapshot invariants. @module @roos-code/roos-code-jobs/invariant */
+/** Package-owned background-job snapshot invariants. @module @shres-code/shres-code-jobs/invariant */
 
-import type { Context } from '@roos-code/cordis'
-import type { Agent } from '@roos-code/roos-code-agent'
-import type { InvariantFailure, InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { Agent } from '@shres-code/shres-code-agent'
+import type { InvariantFailure, InvariantInstaller } from '@shres-code/shres-code-invariants'
 import type { JobSnapshot } from './types.ts'
 
-const PACKAGE_NAME = '@roos-code/roos-code-jobs'
+const PACKAGE_NAME = '@shres-code/shres-code-jobs'
 const TERMINAL_STATUSES = new Set(['completed', 'killed', 'failed'])
 
 /** Cordis companion plugin name. */

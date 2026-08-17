@@ -4,10 +4,10 @@
  * no runtime code, and nothing here reaches a Host-only symbol, so a Client
  * compilation face reads exactly the signatures the Host emits.
  *
- * @module @roos-code/roos-code-settings/types
+ * @module @shres-code/shres-code-settings/types
  */
 
-import type { Branded } from '@roos-code/roos-code-brand'
+import type { Branded } from '@shres-code/shres-code-brand'
 
 /** Nominal id of one registered settings namespace. */
 export type SettingsNamespace = Branded<'SettingsNamespace'>
@@ -15,7 +15,7 @@ export type SettingsNamespace = Branded<'SettingsNamespace'>
 /** Origin of one committed settings change. */
 export type SettingsUpdateSource = 'update' | 'provider'
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Events {
     /**
      * Committed change to one registered namespace's resolved value. Emitted

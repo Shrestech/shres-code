@@ -3,10 +3,10 @@
  * Isolated file so vi.mock of the MCP SDK doesn't pollute other test suites.
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import ToolRuntime from '@roos-code/roos-code-tools'
-import type { Config } from '@roos-code/roos-code-mcp-client'
+import { Context } from '@shres-code/cordis'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import ToolRuntime from '@shres-code/shres-code-tools'
+import type { Config } from '@shres-code/shres-code-mcp-client'
 
 // ---- Mock MCP SDK ----
 
@@ -54,7 +54,7 @@ vi.mock('@modelcontextprotocol/sdk/client/streamableHttp.js', () => ({
 
 // vi.mock is hoisted above static imports, so the module under test sees the
 // mocked SDK even through a static import.
-import { apply, name, inject, Config as ConfigSchema } from '@roos-code/roos-code-mcp-client/src/index.ts'
+import { apply, name, inject, Config as ConfigSchema } from '@shres-code/shres-code-mcp-client/src/index.ts'
 
 // ---- Helpers ----
 

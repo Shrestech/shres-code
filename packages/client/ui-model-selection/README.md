@@ -1,4 +1,4 @@
-# @roos-code/roos-code-client-ui-model-selection
+# @shres-code/shres-code-client-ui-model-selection
 
 Model selection plugin, browser half: TWO entries over ONE per-session directory owned by `ModelDirectoryResolver` (`ctx.modelDirectories`). For ordinary sessions, the `/model` popupSelect decoration (registered through `ctx.commandUi.decorate` on the host `/model` command) and the composer's named `conversation.input.model` seat both load the session's advisory directory through `session.models` and submit through `session.selectModel` via the same `ModelDirectory` instance. The compact composer trigger opens a two-level Model/Effort menu: models stay provider-grouped, while the selected exact model supplies its adapter-owned effort names, descriptions, and default. `/model` applies the selected model's default effort, and the composer can then choose any advertised effort.
 

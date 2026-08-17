@@ -1,7 +1,7 @@
 /** Shared trajectory record data and formatting contracts. */
 
 import type { HTMLAttributes } from 'react'
-import type { ConversationPromptSnapshot } from '@roos-code/roos-code-client-runtime/client'
+import type { ConversationPromptSnapshot } from '@shres-code/shres-code-client-runtime/client'
 
 /** Closed set of trajectory record kinds. */
 export type TrajectoryCellKind =

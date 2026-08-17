@@ -1,5 +1,5 @@
 {
-  "name": "@roos-code/cordis-plugin-include",
+  "name": "@shres-code/cordis-plugin-include",
   "description": "Include files in cordis configurations",
   "version": "1.0.6",
   "publishConfig": {
@@ -7,7 +7,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "vendor/include"
   },
   "type": "module",
@@ -30,11 +30,11 @@
   "author": "Shigma <shigma10826@gmail.com>",
   "license": "MIT",
   "peerDependencies": {
-    "@roos-code/cordis-plugin-loader": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/cordis-plugin-loader": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   },
   "dependencies": {
-    "@roos-code/cosmokit": "workspace:^",
+    "@shres-code/cosmokit": "workspace:^",
     "js-yaml": "^4.1.0"
   }
 }

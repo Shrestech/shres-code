@@ -7,13 +7,13 @@
  * `sidebar.settings` registrant's (ui-settings), followed by optional footer
  * actions in `sidebar.footer.action`.
  */
-import type { PropsLocale, PropsRenderSlots, PropsRuntime } from '@roos-code/roos-code-client-ui-slots'
+import type { PropsLocale, PropsRenderSlots, PropsRuntime } from '@shres-code/shres-code-client-ui-slots'
 // Type-only: pulls ui-layout's SlotMap merge (the 'sidebar' entry) into every
 // program that sees this contract, so PropsRuntime<'sidebar'> resolves.
-import type {} from '@roos-code/roos-code-client-ui-layout/client'
-import type { WorkspaceId } from '@roos-code/roos-code-client-runtime/client'
+import type {} from '@shres-code/shres-code-client-ui-layout/client'
+import type { WorkspaceId } from '@shres-code/shres-code-client-runtime/client'
 
-declare module '@roos-code/roos-code-client-ui-slots' {
+declare module '@shres-code/shres-code-client-ui-slots' {
   interface SlotMap {
     /**
      * The workspace/session browsing region: section header, search, the

@@ -1,6 +1,6 @@
 # Minimal keyless composition: real app, pwsh executor, and pwsh tool; replayed model.
 - id: llm-replay
-  name: '@roos-code/roos-code-llm-replay'
+  name: '@shres-code/shres-code-llm-replay'
   config:
     providers:
       - id: deepseek-official
@@ -9,20 +9,20 @@
           - id: deepseek-v4-pro
 
 - id: subprocess
-  name: '@roos-code/roos-code-subprocess-local'
+  name: '@shres-code/shres-code-subprocess-local'
 
 - id: bash
-  name: '@roos-code/roos-code-pwsh-local'
+  name: '@shres-code/shres-code-pwsh-local'
 
 - id: shell-env
-  name: '@roos-code/roos-code-shell-env'
+  name: '@shres-code/shres-code-shell-env'
 
 - id: acp-agent
-  name: '@roos-code/roos-code-acp-demo'
+  name: '@shres-code/shres-code-acp-demo'
   config:
     provider: deepseek-official
     model: deepseek-v4-pro
-    persistenceRoot: !!js process.env.ROOS_SNAPSHOT_SESSIONS_ROOT ?? './.sessions'
+    persistenceRoot: !!js process.env.SHRES_SNAPSHOT_SESSIONS_ROOT ?? './.sessions'
     persistenceCompression: none
     workspaceContext: false
     skills:
@@ -35,4 +35,4 @@
     persona: You are a concise snapshot agent working in {{cwd}}.
 
 - id: tool-pwsh
-  name: '@roos-code/roos-code-tool-pwsh'
+  name: '@shres-code/shres-code-tool-pwsh'

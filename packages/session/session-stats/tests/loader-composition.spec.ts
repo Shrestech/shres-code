@@ -10,12 +10,12 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import Loader from '@roos-code/cordis-plugin-loader'
-import Include from '@roos-code/cordis-plugin-include'
-import SessionStore, { SessionId } from '@roos-code/roos-code-session'
-import SessionProjectionRegistry from '@roos-code/roos-code-session-projection'
-import * as SessionStatsPlugin from '@roos-code/roos-code-session-stats'
+import { Context } from '@shres-code/cordis'
+import Loader from '@shres-code/cordis-plugin-loader'
+import Include from '@shres-code/cordis-plugin-include'
+import SessionStore, { SessionId } from '@shres-code/shres-code-session'
+import SessionProjectionRegistry from '@shres-code/shres-code-session-projection'
+import * as SessionStatsPlugin from '@shres-code/shres-code-session-stats'
 
 let root: string | undefined
 let context: Context | undefined
@@ -28,7 +28,7 @@ afterEach(async () => {
 })
 
 async function loadYaml(lines: readonly string[]): Promise<Context> {
-  root = await mkdtemp(join(tmpdir(), 'roos-session-stats-loader-'))
+  root = await mkdtemp(join(tmpdir(), 'shres-session-stats-loader-'))
   const configPath = join(root, 'cordis.yml')
   await writeFile(configPath, [...lines, ''].join('\n'))
 
@@ -37,9 +37,9 @@ async function loadYaml(lines: readonly string[]): Promise<Context> {
   await context.plugin(Loader)
   context.loader.builtins.include = Include
   const modules = new Map<string, unknown>([
-    ['@roos-code/roos-code-session', SessionStore],
-    ['@roos-code/roos-code-session-projection', SessionProjectionRegistry],
-    ['@roos-code/roos-code-session-stats', SessionStatsPlugin],
+    ['@shres-code/shres-code-session', SessionStore],
+    ['@shres-code/shres-code-session-projection', SessionProjectionRegistry],
+    ['@shres-code/shres-code-session-stats', SessionStatsPlugin],
   ])
   context.loader.internal = {
     version: 'v2',
@@ -59,9 +59,9 @@ async function loadYaml(lines: readonly string[]): Promise<Context> {
 describe('real Loader composition', () => {
   it('loads the shipped session-stats YAML shape and serves whole-log counts', async () => {
     const loaded = await loadYaml([
-      "- name: '@roos-code/roos-code-session'",
-      "- name: '@roos-code/roos-code-session-projection'",
-      "- name: '@roos-code/roos-code-session-stats'",
+      "- name: '@shres-code/shres-code-session'",
+      "- name: '@shres-code/shres-code-session-projection'",
+      "- name: '@shres-code/shres-code-session-stats'",
     ])
 
     const unloaded = [...loaded.loader.entries()]

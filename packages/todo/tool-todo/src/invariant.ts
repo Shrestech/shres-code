@@ -1,10 +1,10 @@
-/** Package-owned durable todo-snapshot invariants. @module @roos-code/roos-code-tool-todo/invariant */
+/** Package-owned durable todo-snapshot invariants. @module @shres-code/shres-code-tool-todo/invariant */
 
-import type { Context } from '@roos-code/cordis'
-import type { Session, SessionEvent } from '@roos-code/roos-code-session'
-import type { InvariantFailure, InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { Session, SessionEvent } from '@shres-code/shres-code-session'
+import type { InvariantFailure, InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-tool-todo'
+const PACKAGE_NAME = '@shres-code/shres-code-tool-todo'
 const TODO_STATUSES = new Set(['pending', 'in_progress', 'completed'])
 
 /** Cordis companion plugin name. */

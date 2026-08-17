@@ -1,6 +1,6 @@
 # User Approval
 
-The user-approval seam of [roos-user-approval](../../packages/interaction/user-approval) answers one question: may this specific action proceed? It owns the shared request/outcome vocabulary, the `ctx.approval` dispatch service, the `approval/request` answerer waterfall, the log-only audit pair, and the per-session `ask`/`never` policy. UI channels may provide human answerers; the [ACP automation bridge](../../packages/acp/acp) provides one-shot machine decisions for its own agents. Callers such as [roos-tools](../../packages/core/tools) and [roos-tool-bash](../../packages/shell/tool-bash) consume the closed outcome and fail closed unless it is `allowed-once`.
+The user-approval seam of [shres-user-approval](../../packages/interaction/user-approval) answers one question: may this specific action proceed? It owns the shared request/outcome vocabulary, the `ctx.approval` dispatch service, the `approval/request` answerer waterfall, the log-only audit pair, and the per-session `ask`/`never` policy. UI channels may provide human answerers; the [ACP automation bridge](../../packages/acp/acp) provides one-shot machine decisions for its own agents. Callers such as [shres-tools](../../packages/core/tools) and [shres-tool-bash](../../packages/shell/tool-bash) consume the closed outcome and fail closed unless it is `allowed-once`.
 
 Source: [`packages/interaction/user-approval/src/index.ts`](../../packages/interaction/user-approval/src/index.ts)
 
@@ -149,13 +149,13 @@ Source: [`packages/interaction/user-approval/src/index.ts:192`](../../packages/i
 
 #### `approval/request` — waterfall
 
-Ask composed answerers for one decision. Return an outcome to claim the request or call `next()`; failure yields the fail-closed default. Scope-filtered dispatch (`@roos-code/roos-code-scope`): agent-scoped listeners receive only that agent.
+Ask composed answerers for one decision. Return an outcome to claim the request or call `next()`; failure yields the fail-closed default. Scope-filtered dispatch (`@shres-code/shres-code-scope`): agent-scoped listeners receive only that agent.
 
 ```ts cordis-catalog
 /**
  * Ask composed answerers for one decision. Return an outcome to claim the
  * request or call `next()`; failure yields the fail-closed default.
- * Scope-filtered dispatch (`@roos-code/roos-code-scope`): agent-scoped listeners receive only that agent.
+ * Scope-filtered dispatch (`@shres-code/shres-code-scope`): agent-scoped listeners receive only that agent.
  * @param req - the pending decision (agent, tool identity, reason, signal).
  * @mode waterfall
  */

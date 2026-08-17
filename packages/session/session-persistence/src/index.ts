@@ -2,16 +2,16 @@
  * Durable session-persistence Service Definition (`ctx.sessionPersistence`). Backends store
  * {@link SessionEvent}s as the event-sourced log and carry non-replayable
  * {@link SessionHeader} metadata separately.
- * @module @roos-code/roos-code-session-persistence
+ * @module @shres-code/shres-code-session-persistence
  */
 
-import { Context, Service } from '@roos-code/cordis'
-import { SessionPreparation } from '@roos-code/roos-code-session'
-import type { SessionEvent, SessionId, SessionHeader } from '@roos-code/roos-code-session'
+import { Context, Service } from '@shres-code/cordis'
+import { SessionPreparation } from '@shres-code/shres-code-session'
+import type { SessionEvent, SessionId, SessionHeader } from '@shres-code/shres-code-session'
 import type { SessionPersistenceRevision } from './revision.ts'
 
 // Re-export the metadata vocabulary so Consumers import it from the Service Definition.
-export type { SessionHeader } from '@roos-code/roos-code-session'
+export type { SessionHeader } from '@shres-code/shres-code-session'
 export { SessionPersistenceRevision } from './revision.ts'
 
 /** Lightweight immutable source identity returned without loading a full log. */
@@ -57,7 +57,7 @@ export type {
   StoredSuffix,
 } from './coordinator.ts'
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     sessionPersistence: SessionPersistence
   }

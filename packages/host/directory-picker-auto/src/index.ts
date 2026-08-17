@@ -8,13 +8,13 @@
  * entries, so the surface is discovered exactly as a config-row's would be
  * and one resolved choice still swaps both faces; pinning an interaction
  * remains composing that pair directly instead of this row.
- * @module @roos-code/roos-code-host-directory-picker-auto
+ * @module @shres-code/shres-code-host-directory-picker-auto
  */
 
-import type { Context } from '@roos-code/cordis'
+import type { Context } from '@shres-code/cordis'
 // Empty type imports carry the `loader` and `webServer` Context merges for the reads below.
-import type {} from '@roos-code/cordis-plugin-loader'
-import type {} from '@roos-code/roos-code-host-webserver'
+import type {} from '@shres-code/cordis-plugin-loader'
+import type {} from '@shres-code/shres-code-host-webserver'
 import { canExecute, hasLinuxChooserBinary } from './probe.ts'
 import type { DirectoryPickerBackendKind } from './resolve.ts'
 import { resolveDirectoryPickerBackend } from './resolve.ts'
@@ -35,8 +35,8 @@ export const inject = ['webServer', 'loader']
  * app composing this chooser to declare both values as dependencies.
  */
 export const BACKEND_PACKAGES: Record<DirectoryPickerBackendKind, string> = {
-  native: '@roos-code/roos-code-host-directory-picker-native',
-  browse: '@roos-code/roos-code-host-directory-picker-browse',
+  native: '@shres-code/shres-code-host-directory-picker-native',
+  browse: '@shres-code/shres-code-host-directory-picker-browse',
 }
 
 /**
@@ -48,8 +48,8 @@ export const BACKEND_PACKAGES: Record<DirectoryPickerBackendKind, string> = {
  * workspace.
  */
 export const SURFACE_PACKAGES: Record<DirectoryPickerBackendKind, string> = {
-  native: '@roos-code/roos-code-client-ui-directory-picker-native',
-  browse: '@roos-code/roos-code-client-ui-directory-picker-browse',
+  native: '@shres-code/shres-code-client-ui-directory-picker-native',
+  browse: '@shres-code/shres-code-client-ui-directory-picker-browse',
 }
 
 /**

@@ -1,4 +1,4 @@
-import { Service } from '@roos-code/cordis'
+import { Service } from '@shres-code/cordis'
 import type { ZodType } from 'zod'
 import type { AgentPhase, Box, Entity, Flags, Payload, Present, SyntaxZoo } from './models.ts'
 
@@ -95,7 +95,7 @@ export class DemoService extends Service {
   }
 }
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     demo: DemoService
     aliased: AliasedService
@@ -130,7 +130,7 @@ declare module '@roos-code/cordis' {
   type IgnoredDeclaration = string
 }
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     demo: DemoService
   }

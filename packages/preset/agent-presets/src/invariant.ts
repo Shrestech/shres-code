@@ -1,20 +1,20 @@
 /**
- * Package-owned invariant companion for `@roos-code/roos-code-agent-presets`.
- * @module @roos-code/roos-code-agent-presets/invariant
+ * Package-owned invariant companion for `@shres-code/shres-code-agent-presets`.
+ * @module @shres-code/shres-code-agent-presets/invariant
  */
 
-import type { Context } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 // Type-only: resolves the `system-prompt/assemble` waterfall this companion
-// joins, and the `agent` field `roos-agent` merges into its context.
-import type {} from '@roos-code/roos-code-system-prompt'
-import type {} from '@roos-code/roos-code-agent'
+// joins, and the `agent` field `shres-agent` merges into its context.
+import type {} from '@shres-code/shres-code-system-prompt'
+import type {} from '@shres-code/shres-code-agent'
 // Imported through the package name, not `./mount.ts`: a module shared between
 // the two build entry points becomes a third chunk that the published `files`
 // list does not carry, which `verify-built-package-invariants` rejects.
-import { leakedServices, livePresetMounts } from '@roos-code/roos-code-agent-presets'
+import { leakedServices, livePresetMounts } from '@shres-code/shres-code-agent-presets'
 
-const PACKAGE_NAME = '@roos-code/roos-code-agent-presets'
+const PACKAGE_NAME = '@shres-code/shres-code-agent-presets'
 
 /** Cordis companion plugin name. */
 export const name = 'agent-presets-invariant'

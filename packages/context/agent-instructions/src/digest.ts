@@ -1,7 +1,7 @@
 /**
  * Content identity for workspace instruction duplicate suppression.
  *
- * @module @roos-code/roos-code-agent-instructions/digest
+ * @module @shres-code/shres-code-agent-instructions/digest
  */
 
 import { createHash } from 'node:crypto'

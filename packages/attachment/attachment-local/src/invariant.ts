@@ -1,13 +1,13 @@
 /**
- * Package-owned invariant companion for `@roos-code/roos-code-attachment-local`.
- * @module @roos-code/roos-code-attachment-local/invariant
+ * Package-owned invariant companion for `@shres-code/shres-code-attachment-local`.
+ * @module @shres-code/shres-code-attachment-local/invariant
  */
 
 /* jscpd:ignore-start */
-import type { Context } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-attachment-local'
+const PACKAGE_NAME = '@shres-code/shres-code-attachment-local'
 /** Cordis companion plugin name. */
 export const name = 'attachment-local-invariant'
 /** Services required before package ownership can be reserved. */

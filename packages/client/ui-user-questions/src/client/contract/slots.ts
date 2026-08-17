@@ -6,12 +6,12 @@
  * cancelled error encoding, receipt checks — lives HERE, with the package
  * that consumes it.
  */
-import type { PropsLocale, PropsRuntime } from '@roos-code/roos-code-client-ui-slots'
+import type { PropsLocale, PropsRuntime } from '@shres-code/shres-code-client-ui-slots'
 // Also pulls ui-conversation's SlotMap merge (the 'conversation.composer'
 // entry) into every program that sees this contract, so PropsRuntime resolves.
-import type {} from '@roos-code/roos-code-client-ui-conversation/client'
-import type { PendingWait } from '@roos-code/roos-code-client-runtime/client'
-import type { QuestionResponsePayload } from '@roos-code/roos-code-api-remotes/client'
+import type {} from '@shres-code/shres-code-client-ui-conversation/client'
+import type { PendingWait } from '@shres-code/shres-code-client-runtime/client'
+import type { QuestionResponsePayload } from '@shres-code/shres-code-api-remotes/client'
 
 /** The pending question carrier the owner dispatches into the composer slot. */
 export type QuestionWait = PendingWait<'question'>

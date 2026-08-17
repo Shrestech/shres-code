@@ -8,13 +8,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import Loader from '@roos-code/cordis-plugin-loader'
-import Include from '@roos-code/cordis-plugin-include'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import ToolRuntime from '@roos-code/roos-code-tools'
-import SubagentRuntime from '@roos-code/roos-code-subagent'
-import FileSettingsProvider from '@roos-code/roos-code-settings-file'
+import { Context } from '@shres-code/cordis'
+import Loader from '@shres-code/cordis-plugin-loader'
+import Include from '@shres-code/cordis-plugin-include'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import ToolRuntime from '@shres-code/shres-code-tools'
+import SubagentRuntime from '@shres-code/shres-code-subagent'
+import FileSettingsProvider from '@shres-code/shres-code-settings-file'
 import * as seats from '../src/index.ts'
 
 let root: string | undefined
@@ -44,26 +44,26 @@ const spawnStub = {
 }
 
 async function loadComposition(): Promise<{ ctx: Context; settingsPath: string }> {
-  root = await mkdtemp(join(tmpdir(), 'roos-agent-seats-composition-'))
+  root = await mkdtemp(join(tmpdir(), 'shres-agent-seats-composition-'))
   const settingsPath = join(root, 'settings.yaml')
   await writeFile(settingsPath, '# personal settings\n')
   const configPath = join(root, 'cordis.yml')
   await writeFile(configPath, [
     '- id: tools',
-    "  name: '@roos-code/roos-code-tools'",
+    "  name: '@shres-code/shres-code-tools'",
     '- id: system-prompt',
-    "  name: '@roos-code/roos-code-system-prompt'",
+    "  name: '@shres-code/shres-code-system-prompt'",
     '- id: subagents',
-    "  name: '@roos-code/roos-code-subagent'",
+    "  name: '@shres-code/shres-code-subagent'",
     '- id: spawn-stub',
     "  name: 'test-spawn-stub'",
     '- id: settings',
-    "  name: '@roos-code/roos-code-settings-file'",
+    "  name: '@shres-code/shres-code-settings-file'",
     '  config:',
     `    path: ${JSON.stringify(settingsPath)}`,
     '    debounceMs: 10',
     '- id: agent-seats',
-    "  name: '@roos-code/roos-code-agent-seats'",
+    "  name: '@shres-code/shres-code-agent-seats'",
     '',
   ].join('\n'))
 
@@ -73,12 +73,12 @@ async function loadComposition(): Promise<{ ctx: Context; settingsPath: string }
   await ctx.plugin(Loader)
   ctx.loader.builtins.include = Include
   const modules = new Map<string, unknown>([
-    ['@roos-code/roos-code-tools', ToolRuntime],
-    ['@roos-code/roos-code-system-prompt', SystemPrompt],
-    ['@roos-code/roos-code-subagent', SubagentRuntime],
+    ['@shres-code/shres-code-tools', ToolRuntime],
+    ['@shres-code/shres-code-system-prompt', SystemPrompt],
+    ['@shres-code/shres-code-subagent', SubagentRuntime],
     ['test-spawn-stub', spawnStub],
-    ['@roos-code/roos-code-settings-file', FileSettingsProvider],
-    ['@roos-code/roos-code-agent-seats', seats],
+    ['@shres-code/shres-code-settings-file', FileSettingsProvider],
+    ['@shres-code/shres-code-agent-seats', seats],
   ])
   ctx.loader.internal = {
     version: 'v2',
@@ -96,20 +96,20 @@ async function loadComposition(): Promise<{ ctx: Context; settingsPath: string }
 }
 
 describe('agent-seats real composition', () => {
-  it('boots unbound and remounts Boomer when settings bind the seat', async () => {
+  it('boots unbound and remounts Aegis when settings bind the seat', async () => {
     const { ctx, settingsPath } = await loadComposition()
-    expect(ctx.tools.schemas().some(schema => schema.name === 'boomer')).toBe(false)
+    expect(ctx.tools.schemas().some(schema => schema.name === 'aegis')).toBe(false)
 
     await writeFile(settingsPath, [
       'agent-seats:',
       '  seats:',
-      '    boomer:',
+      '    aegis:',
       '      provider: ollama-cloud',
       '      model: kimi-k3',
       '',
     ].join('\n'))
     await vi.waitFor(() => {
-      expect(ctx.tools.schemas().some(schema => schema.name === 'boomer')).toBe(true)
+      expect(ctx.tools.schemas().some(schema => schema.name === 'aegis')).toBe(true)
     }, { timeout: 5000 })
   })
 })

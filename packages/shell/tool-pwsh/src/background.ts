@@ -1,13 +1,13 @@
 /**
  * Generic-task adaptation for background pwsh process handles — the shell-agnostic
- * twin of `roos-tool-bash`'s background adaptation.
+ * twin of `shres-tool-bash`'s background adaptation.
  *
- * @module @roos-code/roos-code-tool-pwsh/background
+ * @module @shres-code/shres-code-tool-pwsh/background
  */
 
-import type { ShellProcess } from '@roos-code/roos-code-shell'
+import type { ShellProcess } from '@shres-code/shres-code-shell'
 
-/* jscpd:ignore-start -- deliberate twin of roos-tool-bash/background.ts (Agent Note). */
+/* jscpd:ignore-start -- deliberate twin of shres-tool-bash/background.ts (Agent Note). */
 
 /**
  * Map a settled background process onto the generic task-outcome vocabulary:

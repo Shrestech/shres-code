@@ -1,6 +1,6 @@
 /**
  * Path canonicalization for workspace identity.
- * @module @roos-code/roos-code-workspace/src/paths
+ * @module @shres-code/shres-code-workspace/src/paths
  */
 
 import { realpath } from 'node:fs/promises'

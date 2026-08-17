@@ -1,22 +1,22 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { CallId , createMessage, createToolResultMessage } from '@roos-code/roos-code-llm'
-import type { ContentBlock } from '@roos-code/roos-code-llm'
+import { Context } from '@shres-code/cordis'
+import { CallId , createMessage, createToolResultMessage } from '@shres-code/shres-code-llm'
+import type { ContentBlock } from '@shres-code/shres-code-llm'
 import SessionStore, {
   Session,
   SessionId,
-} from '@roos-code/roos-code-session'
-import type { SurfaceEvent } from '@roos-code/roos-code-session'
-import * as SessionInvariant from '@roos-code/roos-code-session/invariant'
-import InvariantRegistry from '@roos-code/roos-code-invariants'
-import TokenMeter from '@roos-code/roos-code-token-meter'
+} from '@shres-code/shres-code-session'
+import type { SurfaceEvent } from '@shres-code/shres-code-session'
+import * as SessionInvariant from '@shres-code/shres-code-session/invariant'
+import InvariantRegistry from '@shres-code/shres-code-invariants'
+import TokenMeter from '@shres-code/shres-code-token-meter'
 import ToolResultPruner, {
   codePointLength,
   DEFAULTS,
   PRUNE_MARKER,
   resolveConfig,
-} from '@roos-code/roos-code-compaction-tool-result-pruner'
-import type { ToolResultPruneConfig } from '@roos-code/roos-code-compaction-tool-result-pruner'
+} from '@shres-code/shres-code-compaction-tool-result-pruner'
+import type { ToolResultPruneConfig } from '@shres-code/shres-code-compaction-tool-result-pruner'
 
 const MODEL = 'test-model'
 const SMALL: ToolResultPruneConfig = {

@@ -11,8 +11,8 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { act, cleanup, render } from '@testing-library/react'
 
 afterEach(cleanup)
-import { AppRoot } from '@roos-code/roos-code-client-web/src/AppRoot.tsx'
-import { createLoaderStatusStore, createSignal } from '@roos-code/roos-code-client-web/src/loader-status.ts'
+import { AppRoot } from '@shres-code/shres-code-client-web/src/AppRoot.tsx'
+import { createLoaderStatusStore, createSignal } from '@shres-code/shres-code-client-web/src/loader-status.ts'
 
 function mount() {
   const settled = createSignal(false)
@@ -33,7 +33,7 @@ function mount() {
 describe('AppRoot', () => {
   it('shows the loading page and never calls renderApp before settled', () => {
     const { queryByTestId, counts, getByText } = mount()
-    expect(getByText('Roos Code')).toBeTruthy()
+    expect(getByText('Shres Code')).toBeTruthy()
     expect(queryByTestId('real-ui')).toBeNull()
     expect(counts()).toBe(0)
   })
@@ -50,11 +50,11 @@ describe('AppRoot', () => {
   it('lists failed entries and stays on the loading page', () => {
     const { status, getByText, queryByTestId } = mount()
     act(() => {
-      status.set('@roos-code/roos-code-client-ui-layout', 'failed')
+      status.set('@shres-code/shres-code-client-ui-layout', 'failed')
       status.set('ok', 'active')
     })
     expect(getByText('Failed to load plugins')).toBeTruthy()
-    expect(getByText('@roos-code/roos-code-client-ui-layout')).toBeTruthy()
+    expect(getByText('@shres-code/shres-code-client-ui-layout')).toBeTruthy()
     expect(queryByTestId('real-ui')).toBeNull()
   })
 
@@ -70,7 +70,7 @@ describe('AppRoot', () => {
     const { settled, getByTestId, queryByText, counts } = mount()
     act(() => { settled.set(true) })
     expect(getByTestId('real-ui')).toBeTruthy()
-    expect(queryByText('Roos Code')).toBeNull()
+    expect(queryByText('Shres Code')).toBeNull()
     expect(counts()).toBe(1)
   })
 })

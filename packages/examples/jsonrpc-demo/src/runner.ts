@@ -1,14 +1,14 @@
 /**
  * Shared process lifecycle for the generic and closed-runtime JSON-RPC bins.
  *
- * @module @roos-code/roos-code-sdk-jsonrpc-demo/runner
+ * @module @shres-code/shres-code-sdk-jsonrpc-demo/runner
  */
 
-import { boot, installFailLoud, loadLayeredEnv } from '@roos-code/roos-code-app-boot'
+import { boot, installFailLoud, loadLayeredEnv } from '@shres-code/shres-code-app-boot'
 import { resolveDemoConfig, selectExplicitConfigPath } from './resolveDemoConfig.ts'
 
 /* v8 ignore start -- composition over tested app-boot/jsonrpc and executable acceptance paths */
-const NAME = 'roos-jsonrpc-agent'
+const NAME = 'shres-jsonrpc-agent'
 
 /**
  * Boot the explicitly selected external configuration and own process exit.
@@ -25,7 +25,7 @@ export async function runJsonrpcAgent(bareModuleBaseUrl?: string): Promise<void>
   const requested = selectExplicitConfigPath()
   if (requested === undefined) {
     process.stderr.write(
-      `usage: ${NAME} <path/to/cordis.yml> (or set ROOS_CORDIS_CONFIG=<path>, which wins); the config is required — there is no built-in fallback\n`,
+      `usage: ${NAME} <path/to/cordis.yml> (or set SHRES_CORDIS_CONFIG=<path>, which wins); the config is required — there is no built-in fallback\n`,
     )
     process.exit(1)
   }

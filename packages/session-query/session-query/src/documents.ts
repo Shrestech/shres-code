@@ -1,7 +1,7 @@
 /** Shared event metadata and semantic-document projection. */
 
-import { foldSurface } from '@roos-code/roos-code-session'
-import type { SessionEvent, SessionId } from '@roos-code/roos-code-session'
+import { foldSurface } from '@shres-code/shres-code-session'
+import type { SessionEvent, SessionId } from '@shres-code/shres-code-session'
 import type { SessionEventRecord, SessionEventSearchDocument, SessionEventSurface } from './types.ts'
 import { SessionQueryError } from './config.ts'
 import { extractSessionEventText } from './extraction.ts'

@@ -2,7 +2,7 @@
  * Public records for exact reads and relationship traces over the
  * live-preferred logical session corpus.
  *
- * @module @roos-code/roos-code-session-query/types
+ * @module @shres-code/shres-code-session-query/types
  */
 
 import type {
@@ -11,8 +11,8 @@ import type {
   SessionHeader,
   SessionId,
   SurfaceEvent,
-} from '@roos-code/roos-code-session'
-import type { SessionTitleSnapshot } from '@roos-code/roos-code-session-title'
+} from '@shres-code/shres-code-session'
+import type { SessionTitleSnapshot } from '@shres-code/shres-code-session-title'
 import type { SessionSearchCursor } from './cursor.ts'
 
 export type { SessionSearchCursor } from './cursor.ts'

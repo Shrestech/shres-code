@@ -3,25 +3,25 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { z } from 'zod'
-import { Context } from '@roos-code/cordis'
-import { createUserMessage } from '@roos-code/roos-code-llm'
-import AgentLoop from '@roos-code/roos-code-agent-loop'
-import { mountAgentLoopTestDependencies } from '@roos-code/roos-code-agent-loop-testkit'
-import SessionStore, { SESSION_FORMAT_VERSION, SessionId } from '@roos-code/roos-code-session'
-import type { SessionEvent, SessionHeader } from '@roos-code/roos-code-session'
-import JsonlSessionPersistence from '@roos-code/roos-code-session-persistence-jsonl'
-import SessionProjectionRegistry from '@roos-code/roos-code-session-projection'
-import type { ProjectionDefinition } from '@roos-code/roos-code-session-projection'
-import SessionProjectionCache from '@roos-code/roos-code-session-projection-cache'
-import Storage from '@roos-code/roos-code-storage'
-import { DomainFacility } from '@roos-code/roos-code-storage-domain'
+import { Context } from '@shres-code/cordis'
+import { createUserMessage } from '@shres-code/shres-code-llm'
+import AgentLoop from '@shres-code/shres-code-agent-loop'
+import { mountAgentLoopTestDependencies } from '@shres-code/shres-code-agent-loop-testkit'
+import SessionStore, { SESSION_FORMAT_VERSION, SessionId } from '@shres-code/shres-code-session'
+import type { SessionEvent, SessionHeader } from '@shres-code/shres-code-session'
+import JsonlSessionPersistence from '@shres-code/shres-code-session-persistence-jsonl'
+import SessionProjectionRegistry from '@shres-code/shres-code-session-projection'
+import type { ProjectionDefinition } from '@shres-code/shres-code-session-projection'
+import SessionProjectionCache from '@shres-code/shres-code-session-projection-cache'
+import Storage from '@shres-code/shres-code-storage'
+import { DomainFacility } from '@shres-code/shres-code-storage-domain'
 import { MemoryMediaPool, MemoryStorageBackend } from '../../../storage/storage-domain/tests/helpers/memory-backend.ts'
 import SubagentRuntime, {
   SUBAGENT_DESCRIPTOR_VERSION,
   SubagentError,
-} from '@roos-code/roos-code-subagent'
-import * as SubagentSpawn from '@roos-code/roos-code-subagent-spawn-in-process'
-import * as SubagentFork from '@roos-code/roos-code-subagent-fork-in-process'
+} from '@shres-code/shres-code-subagent'
+import * as SubagentSpawn from '@shres-code/shres-code-subagent-spawn-in-process'
+import * as SubagentFork from '@shres-code/shres-code-subagent-fork-in-process'
 import { MockAdapter, textResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
 
 type Script = ConstructorParameters<typeof MockAdapter>[0]
@@ -38,7 +38,7 @@ async function setup(
 ) {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
-  const root = mkdtempSync(join(tmpdir(), 'roos-subagent-list-'))
+  const root = mkdtempSync(join(tmpdir(), 'shres-subagent-list-'))
   roots.push(root)
   await ctx.plugin(JsonlSessionPersistence, { root })
   await ctx.plugin(AgentLoop, { agents: [] })
@@ -117,7 +117,7 @@ function descriptorPayload(label: string, version = SUBAGENT_DESCRIPTOR_VERSION)
   return { version, mode: 'continuable' as const, provider: 'spawn', label }
 }
 
-declare module '@roos-code/roos-code-session-projection/types' {
+declare module '@shres-code/shres-code-session-projection/types' {
   interface SessionProjectionMap {
     /** Test-only hostile probe proving per-child isolation of foreign unit failures. */
     subagentListHostileProbe: null

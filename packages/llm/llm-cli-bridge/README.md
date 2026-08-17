@@ -1,6 +1,6 @@
-# @roos-code/roos-code-llm-cli-bridge
+# @shres-code/shres-code-llm-cli-bridge
 
-Delegated-completion adapter: `stream()` serializes `system` plus `messages` into a prompt, spawns a product CLI through [`roos-subprocess`](../../subprocess/subprocess/README.md), and emits `block-start` → `text-delta` → `block-end` → optional `usage` → `finish: stop`. There is no HTTP request, so `attributionHeaders()` does not apply.
+Delegated-completion adapter: `stream()` serializes `system` plus `messages` into a prompt, spawns a product CLI through [`shres-subprocess`](../../subprocess/subprocess/README.md), and emits `block-start` → `text-delta` → `block-end` → optional `usage` → `finish: stop`. There is no HTTP request, so `attributionHeaders()` does not apply.
 
 The four shipped routes are `claude-cli`, `codex-cli`, `grok-cli`, and `kimi-cli`. They are marked `kind: 'delegated'` on `providerInfo()` and in the configurable-provider directory. The CLI's own tools bypass harness approval; the Models picker shows a Delegated tag. See the [CLI agent bridges](../../../.agents/notes/implemented/architecture/2026-08-16-cli-agent-bridges.md) note.
 
@@ -10,7 +10,7 @@ A non-empty `GenerateOptions.tools` without that route's `allowDelegatedTools: t
 
 ## Model and effort
 
-`stream()` forwards `GenerateOptions.model` and `GenerateOptions.reasoningEffort` through the per-route flag map. `resolveModel()` advertises conservative `contextWindow` / `defaultMaxTokens` and the efforts that CLI accepts, so `roos models set grok-cli <model> --effort <level>` validates through `resolveCallConfig()`.
+`stream()` forwards `GenerateOptions.model` and `GenerateOptions.reasoningEffort` through the per-route flag map. `resolveModel()` advertises conservative `contextWindow` / `defaultMaxTokens` and the efforts that CLI accepts, so `shres models set grok-cli <model> --effort <level>` validates through `resolveCallConfig()`.
 
 | Route | Binary | Model flag | Effort |
 |---|---|---|---|

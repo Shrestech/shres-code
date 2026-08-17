@@ -6,15 +6,15 @@
  * permission decisions; presentation and human-interaction features stay with
  * the harness's UI modules.
  *
- * @module @roos-code/roos-code-acp
+ * @module @shres-code/shres-code-acp
  */
 
-import type { Context } from '@roos-code/cordis'
+import type { Context } from '@shres-code/cordis'
 import { randomUUID } from 'node:crypto'
 import { isAbsolute } from 'node:path'
 import { Readable, Writable } from 'node:stream'
-import Schema from '@roos-code/schemastery'
-import { createUserMessage, errorChain } from '@roos-code/roos-code-llm'
+import Schema from '@shres-code/schemastery'
+import { createUserMessage, errorChain } from '@shres-code/shres-code-llm'
 import {
   AgentSideConnection,
   ndJsonStream,
@@ -33,10 +33,10 @@ import {
   type StopReason,
   type Stream,
 } from '@agentclientprotocol/sdk'
-import type { Agent } from '@roos-code/roos-code-agent'
-import { SessionId, type SessionEvent, type TurnEndReason } from '@roos-code/roos-code-session'
+import type { Agent } from '@shres-code/shres-code-agent'
+import { SessionId, type SessionEvent, type TurnEndReason } from '@shres-code/shres-code-session'
 // Side-effect type import: declaration-merges the approval waterfall answered below.
-import type {} from '@roos-code/roos-code-user-approval'
+import type {} from '@shres-code/shres-code-user-approval'
 import { acpPromptToText, promptHasUnsupportedContent, turnEndToStopReason } from './codec.ts'
 
 export const name = 'acp'
@@ -210,7 +210,7 @@ export function apply(ctx: Context, config: AcpConfig): void {
   })
 
   // Permission requests are a machine policy channel for ACP clients such as
-  // roos-subagent-acp. The bridge offers one-shot choices only and never infers a
+  // shres-subagent-acp. The bridge offers one-shot choices only and never infers a
   // durable grant from an unknown client response.
   ctx.on('approval/request', (request, next) => {
     const record = ownedRecord(request.agent)
@@ -236,7 +236,7 @@ export function apply(ctx: Context, config: AcpConfig): void {
         // the latest supported" both resolve to this server's one version.
         return Promise.resolve({
           protocolVersion: PROTOCOL_VERSION,
-          agentInfo: { name: 'roos-code-acp', version: '0.0.1' },
+          agentInfo: { name: 'shres-code-acp', version: '0.0.1' },
           agentCapabilities: {
             promptCapabilities: { image: false, audio: false, embeddedContext: false },
           },
@@ -255,7 +255,7 @@ export function apply(ctx: Context, config: AcpConfig): void {
         // No preset composition: the ACP bundle keeps the model-facing rows in
         // the host plane, so this agent reads them from the global layer. A
         // deployment that configures a roster has to join one here first
-        // (@roos-code/roos-code-agent-presets README, "Composing a child agent").
+        // (@shres-code/shres-code-agent-presets README, "Composing a child agent").
         const handle = await agents.create({
           sessionId,
           meta: { cwd: params.cwd },

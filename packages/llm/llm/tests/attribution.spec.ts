@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module'
 import { describe, expect, it } from 'vitest'
-import { APP_IDENTITY, attributionHeaders, userAgent } from '@roos-code/roos-code-llm'
-import type { AppIdentity } from '@roos-code/roos-code-llm'
+import { APP_IDENTITY, attributionHeaders, userAgent } from '@shres-code/shres-code-llm'
+import type { AppIdentity } from '@shres-code/shres-code-llm'
 
 const manifest = createRequire(import.meta.url)('../package.json') as { version: string }
 
@@ -19,9 +19,9 @@ describe('APP_IDENTITY', () => {
 
   it('carries only static public product facts', () => {
     expect(APP_IDENTITY).toEqual({
-      product: 'roos-code',
+      product: 'shres-code',
       version: manifest.version,
-      url: 'https://github.com/roos-code/roos-code',
+      url: 'https://github.com/parthmstech/shres-code',
     })
   })
 })
@@ -29,7 +29,7 @@ describe('APP_IDENTITY', () => {
 describe('userAgent', () => {
   it('renders product/version with the +url comment', () => {
     expect(userAgent()).toBe(
-      `roos-code/${manifest.version} (+https://github.com/roos-code/roos-code)`,
+      `shres-code/${manifest.version} (+https://github.com/parthmstech/shres-code)`,
     )
   })
 

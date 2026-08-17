@@ -1,10 +1,10 @@
 /**
  * Typed failures shared by subagent service and provider operations.
  *
- * @module @roos-code/roos-code-subagent
+ * @module @shres-code/shres-code-subagent
  */
 
-import { HarnessError } from '@roos-code/roos-code-llm'
+import { HarnessError } from '@shres-code/shres-code-llm'
 
 /** Typed failure for the subagent seam. */
 export class SubagentError extends HarnessError {

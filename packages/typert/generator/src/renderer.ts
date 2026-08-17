@@ -1,7 +1,7 @@
 /**
  * Rendering and traversal over the compiler-independent TypeGraph. Emitters
  * use this module instead of reaching back into TypeScript AST nodes.
- * @module @roos-code/roos-code-typert-generator/renderer
+ * @module @shres-code/shres-code-typert-generator/renderer
  */
 
 import { childTypeNodeIds } from './model.ts'

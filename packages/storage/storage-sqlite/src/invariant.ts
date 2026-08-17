@@ -1,13 +1,13 @@
 /**
- * Package-owned invariant companion for `@roos-code/roos-code-storage-sqlite`.
- * @module @roos-code/roos-code-storage-sqlite/invariant
+ * Package-owned invariant companion for `@shres-code/shres-code-storage-sqlite`.
+ * @module @shres-code/shres-code-storage-sqlite/invariant
  */
 
 /* jscpd:ignore-start */
-import type { Context } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-storage-sqlite'
+const PACKAGE_NAME = '@shres-code/shres-code-storage-sqlite'
 
 /** Cordis companion plugin name. */
 export const name = 'storage-sqlite-invariant'

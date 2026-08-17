@@ -8,18 +8,18 @@
  *
  * Namespace plugin (named exports, no default export). Lifecycle is effect-scoped: disposal
  * unregisters from `ctx.lsp` and tears down every live server.
- * @module @roos-code/roos-code-lsp-stdio
+ * @module @shres-code/shres-code-lsp-stdio
  */
 
-import type { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import { LspError, LspProviderId } from '@roos-code/roos-code-lsp'
+import type { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import { LspError, LspProviderId } from '@shres-code/shres-code-lsp'
 import type {
   LspProvider,
   LspProviderQuery,
   LspQueryResult,
-} from '@roos-code/roos-code-lsp'
-import { MAX_TIMER_DELAY_MS } from '@roos-code/roos-code-timeout'
+} from '@shres-code/shres-code-lsp'
+import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
 import { abortable, abortError } from './abort.ts'
 import { canonicalizeWorkspace, readHostSource } from './host.ts'
 import type { HostWorkspace } from './host.ts'

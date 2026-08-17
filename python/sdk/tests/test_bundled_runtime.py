@@ -10,9 +10,9 @@ from pathlib import Path
 
 import pytest
 
-from roos_code import DeepSeekHarness, HarnessClient, HarnessConfig
-from roos_code.errors import TransportClosedError
-from roos_code_runtime import resolve_bundled_launch_args
+from shres_code import DeepSeekHarness, HarnessClient, HarnessConfig
+from shres_code.errors import TransportClosedError
+from shres_code_runtime import resolve_bundled_launch_args
 
 _MODES = ("exe", "node")
 _REPO_ROOT = Path(__file__).parents[3]
@@ -21,25 +21,25 @@ _MINIMAL_CONFIG = _REPO_ROOT / "examples" / "jsonrpc-agent" / "minimal.cordis.ym
 # The config must include the JSON-RPC serving plugin.
 _CORDIS_YML = """\
 - id: sdk-jsonrpc-server
-  name: '@roos-code/roos-code-sdk-jsonrpc-server'
+  name: '@shres-code/shres-code-sdk-jsonrpc-server'
 - id: agent-core
-  name: '@roos-code/roos-code-agent-spine-demo'
+  name: '@shres-code/shres-code-agent-spine-demo'
   config:
     workspaceContext: false
 - id: sessions
-  name: '@roos-code/roos-code-session-persistence-jsonl'
+  name: '@shres-code/shres-code-session-persistence-jsonl'
   config:
     root: './sessions'
 - id: session-checkpoints
-  name: '@roos-code/roos-code-session-checkpoint-policy'
+  name: '@shres-code/shres-code-session-checkpoint-policy'
 - id: subprocess
-  name: '@roos-code/roos-code-subprocess-local'
+  name: '@shres-code/shres-code-subprocess-local'
 - id: bash
-  name: '@roos-code/roos-code-bash-local'
+  name: '@shres-code/shres-code-bash-local'
   config:
     cwd: '.'
 - id: todo
-  name: '@roos-code/roos-code-tool-todo'
+  name: '@shres-code/shres-code-tool-todo'
   config:
     allowParallelInProgress: true
 """
@@ -58,9 +58,9 @@ def _client(tmp_path: Path, launch_args: tuple[str, ...]) -> HarnessClient:
             launch_args_override=launch_args,
             cwd=str(tmp_path),
             env={
-                "ROOS_CORDIS_CONFIG": "./cordis.yml",
-                "ROOS_SESSION_ROOT": str(tmp_path / "sessions"),
-                "ROOS_CWD": str(tmp_path),
+                "SHRES_CORDIS_CONFIG": "./cordis.yml",
+                "SHRES_SESSION_ROOT": str(tmp_path / "sessions"),
+                "SHRES_CWD": str(tmp_path),
                 # The lazily mounted adapter requires a key even without a model call.
                 "DEEPSEEK_API_KEY": "sk-dummy-for-boot",
                 "DEEPSEEK_BASE_URL": "http://127.0.0.1:9",
@@ -79,7 +79,7 @@ def test_bundled_runtime_boots_a_cordis_config(tmp_path: Path, mode: str) -> Non
         init = client.initialize(provider="deepseek-official", cwd=str(tmp_path), model="deepseek-v4-pro")
 
     assert init.serverInfo is not None
-    assert init.serverInfo.name == "roos-code-sdk-runtime"
+    assert init.serverInfo.name == "shres-code-sdk-runtime"
 
 
 @pytest.mark.parametrize("mode", _MODES)
@@ -92,9 +92,9 @@ def test_python_sdk_boots_minimal_jsonrpc_config(tmp_path: Path, mode: str) -> N
         session_root=str(tmp_path / "sessions"),
         cordis=str(_MINIMAL_CONFIG),
         env={
-            "ROOS_MODEL": model,
-            "ROOS_CONTEXT_WINDOW": "1000000",
-            "ROOS_SYSTEM_PROMPT": "You are the Python SDK minimal boot test agent.",
+            "SHRES_MODEL": model,
+            "SHRES_CONTEXT_WINDOW": "1000000",
+            "SHRES_SYSTEM_PROMPT": "You are the Python SDK minimal boot test agent.",
         },
         api_key="sk-dummy-for-boot",
         base_url="http://127.0.0.1:9",
@@ -110,7 +110,7 @@ def test_python_sdk_boots_minimal_jsonrpc_config(tmp_path: Path, mode: str) -> N
 def test_bundled_runtime_surfaces_unbundled_plugin_failure(tmp_path: Path, mode: str) -> None:
     launch_args = _launch_args(mode)
     (tmp_path / "cordis.yml").write_text(
-        "- id: missing\n  name: '@roos-code/roos-code-does-not-exist'\n"
+        "- id: missing\n  name: '@shres-code/shres-code-does-not-exist'\n"
     )
 
     client = _client(tmp_path, launch_args)
@@ -121,7 +121,7 @@ def test_bundled_runtime_surfaces_unbundled_plugin_failure(tmp_path: Path, mode:
     finally:
         client.close()
 
-    assert "@roos-code/roos-code-does-not-exist" in str(excinfo.value)
+    assert "@shres-code/shres-code-does-not-exist" in str(excinfo.value)
 
 
 @pytest.mark.parametrize("mode", _MODES)
@@ -130,11 +130,11 @@ def test_zero_config_run_injects_bundled_default_cordis_config(
     tmp_path: Path, mode: str, ambient_config: str | None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _launch_args(mode)  # skip early when this carrier is unavailable
-    monkeypatch.setenv("ROOS_RUNTIME_MODE", mode)
+    monkeypatch.setenv("SHRES_RUNTIME_MODE", mode)
     if ambient_config is None:
-        monkeypatch.delenv("ROOS_CORDIS_CONFIG", raising=False)
+        monkeypatch.delenv("SHRES_CORDIS_CONFIG", raising=False)
     else:
-        monkeypatch.setenv("ROOS_CORDIS_CONFIG", ambient_config)
+        monkeypatch.setenv("SHRES_CORDIS_CONFIG", ambient_config)
 
     harness = DeepSeekHarness(
         model="deepseek-v4-pro",

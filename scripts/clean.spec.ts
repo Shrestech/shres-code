@@ -8,7 +8,7 @@ import { RepositoryCleaner } from './clean.ts'
 const roots: string[] = []
 
 function fixture(): string {
-  const root = mkdtempSync(join(tmpdir(), 'roos-clean-'))
+  const root = mkdtempSync(join(tmpdir(), 'shres-clean-'))
   roots.push(root)
   return root
 }

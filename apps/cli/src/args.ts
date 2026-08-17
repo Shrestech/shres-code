@@ -1,19 +1,19 @@
 /**
- * Commander adapter for the `roos` command line.
+ * Commander adapter for the `shres` command line.
  *
  * The launcher parses only what it owns — which profile to boot, which extra
  * patch overlays to apply, and the config dumps — and hands **everything after
  * its own flags** to the booted tree verbatim, where injected app plugins parse
  * their own flag families and print their own `--help` (see
- * `@roos-code/roos-code-cmdline`). Launcher flags therefore come first: the first
+ * `@shres-code/shres-code-cmdline`). Launcher flags therefore come first: the first
  * token this parser does not recognize starts the inner arguments, so
- * `roos --profile tui --resume abc` boots the tui profile with `--resume abc`,
- * and `roos --profile web -h` prints the web app's help, not this one's.
+ * `shres --profile tui --resume abc` boots the tui profile with `--resume abc`,
+ * and `shres --profile web -h` prints the web app's help, not this one's.
  *
  * `web` is a hardcoded alias for `--profile web`; `plugin` manages a profile's
  * plugin dependencies by forwarding to pnpm; `models` and `providers` manage
  * the same settings and credentials the Web Settings → Models page uses.
- * @module @roos-code/roos-code/args
+ * @module @shres-code/shres-code/args
  */
 
 import { Command, CommanderError } from 'commander'
@@ -47,14 +47,14 @@ interface PluginInvocation {
   args: string[]
 }
 
-/** Manage models or providers against `$ROOS_HOME` settings and credentials. */
+/** Manage models or providers against `$SHRES_HOME` settings and credentials. */
 interface ModelsInvocation {
   mode: 'models'
   command: ModelsCliCommand
 }
 
-/** The resolved `roos` invocation. Help, version, and errors exit inside {@link parseRoosArgs}. */
-export type RoosInvocation = ProfileInvocation | DumpConfigInvocation | PluginInvocation | ModelsInvocation
+/** The resolved `shres` invocation. Help, version, and errors exit inside {@link parseShresArgs}. */
+export type ShresInvocation = ProfileInvocation | DumpConfigInvocation | PluginInvocation | ModelsInvocation
 
 /** Launcher flags shared by the default command and the `web` alias. */
 interface BootOptions {
@@ -72,15 +72,15 @@ const collect = (value: string, previous: string[] = []): string[] => [...previo
 /** The launcher's own help text; each app prints its own. */
 const HELP_EXAMPLES = `
 Examples:
-  roos --profile web                          boot the web profile (same as: roos web)
-  roos --profile headless "run the tests"     answer one task, print the result, and exit
-  roos --profile tui --patch ./extra.yml      boot a custom profile with one extra overlay
-  roos --profile tui --resume <session>       arguments after the launcher flags reach the app
-  roos --profile web --help                   the web app's own flags and help
-  roos plugin --profile tui add <package>     install a plugin into the tui profile
-  roos models list                            list providers and models from the same store as Settings → Models
-  roos models set ollama-local llama3.2 --effort high
-  roos providers add --template ollama-local
+  shres --profile web                          boot the web profile (same as: shres web)
+  shres --profile headless "run the tests"     answer one task, print the result, and exit
+  shres --profile tui --patch ./extra.yml      boot a custom profile with one extra overlay
+  shres --profile tui --resume <session>       arguments after the launcher flags reach the app
+  shres --profile web --help                   the web app's own flags and help
+  shres plugin --profile tui add <package>     install a plugin into the tui profile
+  shres models list                            list providers and models from the same store as Settings → Models
+  shres models set ollama-local llama3.2 --effort high
+  shres providers add --template ollama-local
 `
 
 /**
@@ -92,7 +92,7 @@ Examples:
  * @param args - the leftover arguments, in argv order.
  * @returns the resolved invocation.
  */
-function resolveBoot(program: Command, profile: string, options: BootOptions, args: string[]): RoosInvocation {
+function resolveBoot(program: Command, profile: string, options: BootOptions, args: string[]): ShresInvocation {
   const patches = options.patch ?? []
   if (patches.includes('')) program.error('error: --patch needs a path')
   if (options.dumpConfig !== true && options.dumpDefaultConfig !== true) {
@@ -121,32 +121,32 @@ function resolveBoot(program: Command, profile: string, options: BootOptions, ar
  * @param version - version string printed by `--version`.
  * @returns the resolved invocation.
  */
-export function parseRoosArgs(argv: readonly string[], version: string): RoosInvocation {
-  let resolved: RoosInvocation | undefined
+export function parseShresArgs(argv: readonly string[], version: string): ShresInvocation {
+  let resolved: ShresInvocation | undefined
   // Annotated, not inferred: the actions below call back into `program`, and an
   // inferred type would be circular through its own chain.
   const program: Command = new Command()
   program
-    .name('roos')
+    .name('shres')
     .version(version, '-V, --version', 'output the version number')
-    .description('roos: boot a Roos Code profile — an ordered stack of plugin-bundle patch layers under your own overrides.')
+    .description('shres: boot a Shres Code profile — an ordered stack of plugin-bundle patch layers under your own overrides.')
     .addHelpText('after', HELP_EXAMPLES)
     .exitOverride()
     // The launcher's flags come first and end at the first token it does not
     // know; everything from there on belongs to the booted app, including
-    // its -h. `roos -h` with no profile still prints this help, below.
+    // its -h. `shres -h` with no profile still prints this help, below.
     .helpOption(false)
     .allowUnknownOption()
     .passThroughOptions()
     .enablePositionalOptions()
-    .argument('[args...]', 'arguments for the booted profile\'s app (see: roos --profile <name> --help)')
-    .option('--profile <name>', 'the profile under $ROOS_HOME/profiles to boot')
+    .argument('[args...]', 'arguments for the booted profile\'s app (see: shres --profile <name> --help)')
+    .option('--profile <name>', 'the profile under $SHRES_HOME/profiles to boot')
     .option('--patch <path>', 'extra patch-list overlay applied after the profile layer (repeatable)', collect)
     .option('--dump-config', 'print the composed profile tree and exit')
     .option('--dump-default-config', 'print the profile tree without its user layer or --patch overlays and exit')
     .action((args: string[], options: BootOptions & { profile?: string }) => {
       // With the app owning -h, the launcher's own help is what a bare
-      // `roos -h` (no profile to hand it to) must print.
+      // `shres -h` (no profile to hand it to) must print.
       if (options.profile === undefined) {
         if (args.some(argument => argument === '-h' || argument === '--help')) program.help()
         program.error('error: --profile <name> is required')
@@ -171,7 +171,7 @@ export function parseRoosArgs(argv: readonly string[], version: string): RoosInv
     .allowUnknownOption()
     .passThroughOptions()
     .enablePositionalOptions()
-    .argument('[args...]', 'arguments for the web app (see: roos web --help)')
+    .argument('[args...]', 'arguments for the web app (see: shres web --help)')
     .option('--patch <path>', 'extra patch-list overlay applied after the profile layer (repeatable)', collect)
     .option('--dump-config', 'print the composed web-profile tree (with the user layer and any --patch) and exit')
     .option('--dump-default-config', 'print the web profile\'s bundle layers (no user layer) and exit')
@@ -296,7 +296,7 @@ export function parseRoosArgs(argv: readonly string[], version: string): RoosInv
     return process.exit(error instanceof CommanderError ? error.exitCode : 1)
   }
   /* v8 ignore next -- an action resolves or Commander throws */
-  if (resolved === undefined) throw new Error('roos: no invocation resolved')
+  if (resolved === undefined) throw new Error('shres: no invocation resolved')
   return resolved
 }
 

@@ -5,14 +5,14 @@
  * `./types` for host consumers, `./client/types` (the browser half-entry's
  * re-export) for client aggregates — with zero content duplication.
  *
- * @module @roos-code/roos-code-session-title/types
+ * @module @shres-code/shres-code-session-title/types
  */
 
 // Marks this file a module so the declaration below AUGMENTS the projection
 // table instead of declaring an ambient module.
 export {}
 
-declare module '@roos-code/roos-code-session-projection/types' {
+declare module '@shres-code/shres-code-session-projection/types' {
   interface SessionProjectionMap {
     /**
      * The session's current normalized title — the latest `session/title`

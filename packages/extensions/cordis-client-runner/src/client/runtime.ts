@@ -14,14 +14,14 @@
  * serialization keeps a second request from interleaving with one in flight.
  */
 
-import type { Context } from '@roos-code/cordis'
-import type { Loader } from '@roos-code/cordis-plugin-loader'
+import type { Context } from '@shres-code/cordis'
+import type { Loader } from '@shres-code/cordis-plugin-loader'
 import type {
   CordisDynamicPackageId, CordisDynamicPluginId, CordisDynamicPluginRunId, DynamicCordisPackage,
-} from '@roos-code/roos-code-api-remotes/client'
-import type { SessionId } from '@roos-code/roos-code-client-connection/client'
-import type { ClientModuleSystem } from '@roos-code/roos-code-client-modules/client'
-import type { SlotRegistry } from '@roos-code/roos-code-client-runtime/client'
+} from '@shres-code/shres-code-api-remotes/client'
+import type { SessionId } from '@shres-code/shres-code-client-connection/client'
+import type { ClientModuleSystem } from '@shres-code/shres-code-client-modules/client'
+import type { SlotRegistry } from '@shres-code/shres-code-client-runtime/client'
 import { DynamicCordisStyles, evaluateClientHalf, DYNAMIC_CLIENT_REDIRECTS } from './evaluator.ts'
 import type { DynamicCordisEvaluatedPlugin } from './evaluator.ts'
 import { dynamicCordisContext } from './guard.ts'

@@ -1,11 +1,11 @@
 /**
  * The writable root is this package's own, not an assembly fact each app must
  * remember: a roster configured with only a `system` root still discovers and
- * authors into `<roosHome>/.agent-presets`, the way `roos-skill-filesystem` owns
- * `<roosHome>/skills`. `includeUserRoot: false` is how a deployment — or a test
+ * authors into `<shresHome>/.agent-presets`, the way `shres-skill-filesystem` owns
+ * `<shresHome>/skills`. `includeUserRoot: false` is how a deployment — or a test
  * pinning an exact roster — opts out.
  *
- * `$ROOS_HOME` is repointed per test because the derived root is resolved in the
+ * `$SHRES_HOME` is repointed per test because the derived root is resolved in the
  * constructor: the plugin must be mounted while the environment names the
  * temporary home, or it would reach the developer's real one.
  */
@@ -15,11 +15,11 @@ import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { Context } from '@roos-code/cordis'
-import Loader from '@roos-code/cordis-plugin-loader'
-import Include from '@roos-code/cordis-plugin-include'
+import { Context } from '@shres-code/cordis'
+import Loader from '@shres-code/cordis-plugin-loader'
+import Include from '@shres-code/cordis-plugin-include'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import AgentPresets, { COMPOSITION_FILE, type Config } from '@roos-code/roos-code-agent-presets'
+import AgentPresets, { COMPOSITION_FILE, type Config } from '@shres-code/shres-code-agent-presets'
 
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), 'fixtures')
 const SYSTEM_ROOT = join(FIXTURES, 'system')
@@ -31,14 +31,14 @@ let home: string
 let previousHome: string | undefined
 
 beforeEach(async () => {
-  home = await mkdtemp(join(tmpdir(), 'roos-preset-home-'))
-  previousHome = process.env.ROOS_HOME
-  process.env.ROOS_HOME = home
+  home = await mkdtemp(join(tmpdir(), 'shres-preset-home-'))
+  previousHome = process.env.SHRES_HOME
+  process.env.SHRES_HOME = home
 })
 
 afterEach(() => {
-  if (previousHome === undefined) delete process.env.ROOS_HOME
-  else process.env.ROOS_HOME = previousHome
+  if (previousHome === undefined) delete process.env.SHRES_HOME
+  else process.env.SHRES_HOME = previousHome
 })
 
 /** Boot a roster over the fixture system root, with the derived root left to the plugin. */
@@ -115,7 +115,7 @@ describe('the harness-home preset root', () => {
   })
 
   it('yields to a configured user root for authoring, which writableRoot takes first', async () => {
-    const explicit = await mkdtemp(join(tmpdir(), 'roos-preset-explicit-'))
+    const explicit = await mkdtemp(join(tmpdir(), 'shres-preset-explicit-'))
     const ctx = await roster({
       roots: [
         { path: SYSTEM_ROOT, trust: 'system' as const },

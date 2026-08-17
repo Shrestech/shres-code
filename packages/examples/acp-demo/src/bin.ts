@@ -1,26 +1,26 @@
 #!/usr/bin/env node
 /**
  * Boot an ACP stdio server from an explicit `cordis.yml`; usage is
- * `roos-acp-demo --config path`. There is no CWD or built-in fallback.
+ * `shres-acp-demo --config path`. There is no CWD or built-in fallback.
  * Shared env loading, Loader guards, snapshot config selection, and settled-tree
- * boot live in roos-app-boot. Replay skips `.env` and selects sibling
+ * boot live in shres-app-boot. Replay skips `.env` and selects sibling
  * `cordis.snapshot.yml` so a stray key cannot trigger a model call. EOF disposes
  * and flushes snapshot runs; the calling automation owns process lifetime. Stdout is
  * reserved for JSON-RPC, so diagnostics go only to stderr.
- * @module @roos-code/roos-code-acp-demo/bin
+ * @module @shres-code/shres-code-acp-demo/bin
  */
 
 import { parseArgs } from 'node:util'
-import { boot, installFailLoud, loadLayeredEnv, resolveConfigPath } from '@roos-code/roos-code-app-boot'
+import { boot, installFailLoud, loadLayeredEnv, resolveConfigPath } from '@shres-code/shres-code-app-boot'
 import { resolveDemoConfig } from './resolveDemoConfig.ts'
 
-const NAME = 'roos-acp-demo'
+const NAME = 'shres-acp-demo'
 
 /* v8 ignore start -- thin self-executing composition over the unit-tested
-   roos-app-boot helpers; exercised end-to-end by the snapshot suite and the
+   shres-app-boot helpers; exercised end-to-end by the snapshot suite and the
    built-bin smoke */
 installFailLoud(NAME)
-const snapshotMode = process.env['ROOS_SNAPSHOT']
+const snapshotMode = process.env['SHRES_SNAPSHOT']
 if (snapshotMode !== 'replay') loadLayeredEnv(NAME)
 const { values } = parseArgs({
   args: process.argv.slice(2),

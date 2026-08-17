@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import type { CommandDefinition, CommandInvocation } from '@roos-code/roos-code-commands'
+import { Context } from '@shres-code/cordis'
+import type { CommandDefinition, CommandInvocation } from '@shres-code/shres-code-commands'
 import * as SessionLogDownload from '../src/index.ts'
 
 describe('/export Web download command', () => {

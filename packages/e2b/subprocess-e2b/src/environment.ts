@@ -2,9 +2,9 @@
 
 import { Buffer } from 'node:buffer'
 import { posix } from 'node:path'
-import { e2bControlEnvs } from '@roos-code/roos-code-e2b'
-import type { Sandbox } from '@roos-code/roos-code-e2b'
-import { SENSITIVE_ENV_PATTERN } from '@roos-code/roos-code-subprocess'
+import { e2bControlEnvs } from '@shres-code/shres-code-e2b'
+import type { Sandbox } from '@shres-code/shres-code-e2b'
+import { SENSITIVE_ENV_PATTERN } from '@shres-code/shres-code-subprocess'
 
 const BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/
 
@@ -62,7 +62,7 @@ export async function readRemoteEnvironment(sandbox: Sandbox, signal?: AbortSign
 export function scrubRemoteEnvironment(raw: string): Map<string, string> {
   const environment = new Map<string, string>()
   for (const [name, value] of remoteEnvironmentEntries(raw)) {
-    if (name.startsWith('ROOS_') || SENSITIVE_ENV_PATTERN.test(name)) continue
+    if (name.startsWith('SHRES_') || SENSITIVE_ENV_PATTERN.test(name)) continue
     environment.set(name, value)
   }
   return environment
@@ -76,7 +76,7 @@ export function scrubRemoteEnvironment(raw: string): Map<string, string> {
 export function bootstrapEnvironment(raw: string): Record<string, string> {
   const environment: Record<string, string> = { TERM: 'dumb' }
   for (const [name] of remoteEnvironmentEntries(raw)) {
-    if (name.startsWith('ROOS_') || SENSITIVE_ENV_PATTERN.test(name)) environment[name] = ''
+    if (name.startsWith('SHRES_') || SENSITIVE_ENV_PATTERN.test(name)) environment[name] = ''
   }
   return environment
 }

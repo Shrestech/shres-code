@@ -3,8 +3,8 @@
  * @module subagent-report-fence
  */
 
-import type { Context } from '@roos-code/cordis'
-import type {} from '@roos-code/roos-code-agent-loop'
+import type { Context } from '@shres-code/cordis'
+import type {} from '@shres-code/shres-code-agent-loop'
 
 /** Fixture plugin name. */
 export const name = 'subagent-report-fence'

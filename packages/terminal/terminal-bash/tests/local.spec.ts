@@ -2,17 +2,17 @@ import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { Session, SessionId } from '@roos-code/roos-code-session'
-import AgentRegistry, { Inbox } from '@roos-code/roos-code-agent'
-import type { Agent } from '@roos-code/roos-code-agent'
-import TerminalSessionService from '@roos-code/roos-code-terminal'
-import type { TerminalSendOperation } from '@roos-code/roos-code-terminal'
-import SandboxProvider from '@roos-code/roos-code-sandbox'
-import type { ConfinedArgv, SandboxPolicy } from '@roos-code/roos-code-sandbox'
-import SandboxPolicyService from '@roos-code/roos-code-sandbox-policy'
-import LocalSubprocessRuntime from '@roos-code/roos-code-subprocess-local'
-import * as ptyLocal from '@roos-code/roos-code-terminal-bash'
+import { Context } from '@shres-code/cordis'
+import { Session, SessionId } from '@shres-code/shres-code-session'
+import AgentRegistry, { Inbox } from '@shres-code/shres-code-agent'
+import type { Agent } from '@shres-code/shres-code-agent'
+import TerminalSessionService from '@shres-code/shres-code-terminal'
+import type { TerminalSendOperation } from '@shres-code/shres-code-terminal'
+import SandboxProvider from '@shres-code/shres-code-sandbox'
+import type { ConfinedArgv, SandboxPolicy } from '@shres-code/shres-code-sandbox'
+import SandboxPolicyService from '@shres-code/shres-code-sandbox-policy'
+import LocalSubprocessRuntime from '@shres-code/shres-code-subprocess-local'
+import * as ptyLocal from '@shres-code/shres-code-terminal-bash'
 
 const roots: string[] = []
 const contexts: Context[] = []
@@ -50,7 +50,7 @@ async function harness(
   mode: 'danger-full-access' | 'workspace-write',
   timing: { idleSilenceMs?: number; handoffGraceMs?: number; timeoutMs?: number } = {},
 ) {
-  const root = mkdtempSync(join(tmpdir(), 'roos-pty-local-'))
+  const root = mkdtempSync(join(tmpdir(), 'shres-pty-local-'))
   roots.push(root)
   const ctx = new Context()
   contexts.push(ctx)
@@ -116,24 +116,24 @@ function processIsRunning(pid: number): boolean {
 
 describe('terminal-bash real shell', () => {
   it('persists cwd and environment across sends, scrubs secrets, and closes', async () => {
-    const previous = process.env.ROOS_TEST_SECRET
-    process.env.ROOS_TEST_SECRET = 'must-not-leak'
+    const previous = process.env.SHRES_TEST_SECRET
+    process.env.SHRES_TEST_SECRET = 'must-not-leak'
     try {
       const { ctx, root, agent } = await harness('danger-full-access')
       const created = await ctx.terminals.spawn(agent, { type: 'shell', name: 'main', cwd: root })
-      expect(created.motd).toContain('roos> ')
+      expect(created.motd).toContain('shres> ')
 
       const first = ctx.terminals.startSend(agent, created.sessionId, { text: 'export KEEP=ok; cd /', submit: true })
       expect((await first.done).waitReason).toBe('stdin_read')
-      const second = ctx.terminals.startSend(agent, created.sessionId, { text: 'printf "cwd=%s keep=%s secret=%s\\n" "$PWD" "$KEEP" "${ROOS_TEST_SECRET-unset}"', submit: true })
+      const second = ctx.terminals.startSend(agent, created.sessionId, { text: 'printf "cwd=%s keep=%s secret=%s\\n" "$PWD" "$KEEP" "${SHRES_TEST_SECRET-unset}"', submit: true })
       expect((await second.done).viewport).toContain('cwd=/ keep=ok secret=unset')
 
       expect(ctx.terminals.read(agent, created.sessionId, { offset: 0, count: 20 }).text).toContain('cwd=/ keep=ok secret=unset')
       expect(await ctx.terminals.kill(agent, created.sessionId)).toBe(true)
       expect(ctx.terminals.list(agent)).toEqual([])
     } finally {
-      if (previous === undefined) delete process.env.ROOS_TEST_SECRET
-      else process.env.ROOS_TEST_SECRET = previous
+      if (previous === undefined) delete process.env.SHRES_TEST_SECRET
+      else process.env.SHRES_TEST_SECRET = previous
     }
   }, 10_000)
 
@@ -179,7 +179,7 @@ describe('terminal-bash real shell', () => {
     let pid: number | undefined
     try {
       const background = ctx.terminals.startSend(agent, created.sessionId, {
-        text: `sh -c 'trap "" TERM; printf "%s" "$$" > "$1"; sleep 60' roos "${pidFile}" & disown`,
+        text: `sh -c 'trap "" TERM; printf "%s" "$$" > "$1"; sleep 60' shres "${pidFile}" & disown`,
         submit: true,
       })
       await background.done

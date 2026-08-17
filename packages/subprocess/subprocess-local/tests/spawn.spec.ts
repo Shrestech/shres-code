@@ -8,8 +8,8 @@ import {
   spawnSubprocess,
   taskkillProcessTree,
 } from '../src/spawn.ts'
-import type { SubprocessHandle, SubprocessOutputReader } from '@roos-code/roos-code-subprocess'
-import { MAX_TIMER_DELAY_MS } from '@roos-code/roos-code-timeout'
+import type { SubprocessHandle, SubprocessOutputReader } from '@shres-code/shres-code-subprocess'
+import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
 
 const { failNextClose, failNextUnlink } = vi.hoisted(() => ({
   failNextClose: { value: false },
@@ -36,7 +36,7 @@ vi.mock('node:fs', async (importOriginal) => {
   }
 })
 
-const spillDir = mkdtempSync(join(tmpdir(), 'roos-subprocess-spec-'))
+const spillDir = mkdtempSync(join(tmpdir(), 'shres-subprocess-spec-'))
 
 type SpecOverrides = Partial<Parameters<typeof spawnSubprocess>[0]> & {
   stdoutMaxBytes?: number
@@ -266,7 +266,7 @@ describe('spawnSubprocess', () => {
   })
 
   it('rejects with a spawn error for a nonexistent cwd', async () => {
-    await expect(spawnSubprocess(spec('echo hi', { cwd: '/nonexistent-dir-roos-test' })).done)
+    await expect(spawnSubprocess(spec('echo hi', { cwd: '/nonexistent-dir-shres-test' })).done)
       .rejects.toThrow(/ENOENT/)
   })
 
@@ -705,8 +705,8 @@ describe('tree-survivor escalation (terminate and bounded waits reach helpers th
   })
 
   it('service teardown awaits tree survivors, not just handle settlement', async () => {
-    const { Context } = await import('@roos-code/cordis')
-    const { default: LocalSubprocessRuntime } = await import('@roos-code/roos-code-subprocess-local')
+    const { Context } = await import('@shres-code/cordis')
+    const { default: LocalSubprocessRuntime } = await import('@shres-code/shres-code-subprocess-local')
     const ctx = new Context()
     const fiber = await ctx.plugin(LocalSubprocessRuntime)
     ;(ctx.subprocess as InstanceType<typeof LocalSubprocessRuntime>).internals = { spillDir }
@@ -734,7 +734,7 @@ describe('coverage seams', () => {
   })
 
   it('a spawn-failed handle rejects done while waitForExit reports gone', async () => {
-    const running = spawnSubprocess(spec('true', { cwd: '/nonexistent-dir-roos-dispose-test' }))
+    const running = spawnSubprocess(spec('true', { cwd: '/nonexistent-dir-shres-dispose-test' }))
     await expect(running.done).rejects.toThrow()
     await expect(running.waitForExit()).resolves.toBe(true)
   })
@@ -792,7 +792,7 @@ describe('coverage seams', () => {
   })
 
   it('waitForExit on a failed spawn reports exited immediately', async () => {
-    const running = spawnSubprocess(spec('true', { cwd: '/nonexistent-dir-roos-spawn-test' }))
+    const running = spawnSubprocess(spec('true', { cwd: '/nonexistent-dir-shres-spawn-test' }))
     await expect(running.done).rejects.toThrow()
     await expect(running.waitForExit()).resolves.toBe(true)
   })
@@ -898,35 +898,35 @@ describe('abort edge cases', () => {
 })
 
 describe('environment and spill-file hardening', () => {
-  it('scrubs credential-shaped and ambient Roos env vars from child processes', async () => {
-    process.env.ROOS_TEST_API_KEY = 'super-secret'
-    process.env.ROOS_TEST_TOKEN = 'also-secret'
+  it('scrubs credential-shaped and ambient Shres env vars from child processes', async () => {
+    process.env.SHRES_TEST_API_KEY = 'super-secret'
+    process.env.SHRES_TEST_TOKEN = 'also-secret'
     process.env.SUBPROCESS_TEST_PASSWORD = 'password-secret'
-    process.env.ROOS_TEST_PLAIN = 'visible'
+    process.env.SHRES_TEST_PLAIN = 'visible'
     try {
       const result = await finish(spawnSubprocess(spec(
-        'echo "[${ROOS_TEST_API_KEY:-absent}|${ROOS_TEST_TOKEN:-absent}|${SUBPROCESS_TEST_PASSWORD:-absent}|${ROOS_TEST_PLAIN:-absent}]"',
+        'echo "[${SHRES_TEST_API_KEY:-absent}|${SHRES_TEST_TOKEN:-absent}|${SUBPROCESS_TEST_PASSWORD:-absent}|${SHRES_TEST_PLAIN:-absent}]"',
       )))
       expect(result.stdout.text.trim()).toBe('[absent|absent|absent|absent]')
     } finally {
-      delete process.env.ROOS_TEST_API_KEY
-      delete process.env.ROOS_TEST_TOKEN
+      delete process.env.SHRES_TEST_API_KEY
+      delete process.env.SHRES_TEST_TOKEN
       delete process.env.SUBPROCESS_TEST_PASSWORD
-      delete process.env.ROOS_TEST_PLAIN
+      delete process.env.SHRES_TEST_PLAIN
     }
   })
 
-  it('forwards explicit ROOS_* env entries while scrubbing ambient ones', async () => {
-    // Both facts through one explicit map: the ambient ROOS_STALE is dropped by
+  it('forwards explicit SHRES_* env entries while scrubbing ambient ones', async () => {
+    // Both facts through one explicit map: the ambient SHRES_STALE is dropped by
     // the scrub, and the deliberately supplied current values merge after it.
-    process.env.ROOS_STALE = 'old-value'
+    process.env.SHRES_STALE = 'old-value'
     try {
-      const result = await finish(spawnSubprocess(spec('echo "[${ROOS_STALE:-absent}|$ROOS_SHELL|$ROOS_SESSION_ID]"', {
-        env: { ROOS_SHELL: '1', ROOS_SESSION_ID: 'current-session' },
+      const result = await finish(spawnSubprocess(spec('echo "[${SHRES_STALE:-absent}|$SHRES_SHELL|$SHRES_SESSION_ID]"', {
+        env: { SHRES_SHELL: '1', SHRES_SESSION_ID: 'current-session' },
       })))
       expect(result.stdout.text.trim()).toBe('[absent|1|current-session]')
     } finally {
-      delete process.env.ROOS_STALE
+      delete process.env.SHRES_STALE
     }
   })
 
@@ -936,7 +936,7 @@ describe('environment and spill-file hardening', () => {
       { spillDir },
     ))
     const path = result.stdout.spillPath!
-    expect(path).toMatch(/roos-subprocess-\d+-\d+-[0-9a-f]{12}-stdout\.log$/)
+    expect(path).toMatch(/shres-subprocess-\d+-\d+-[0-9a-f]{12}-stdout\.log$/)
     const mode = statSync(path).mode & 0o777
     expect(mode).toBe(0o600)
   })
@@ -946,7 +946,7 @@ describe('environment and spill-file hardening', () => {
       spec('for i in $(seq 1 200); do printf "line-%04d\\n" $i; done', { stdoutMaxBytes: 500, stderrMaxBytes: 500 }),
     ))
     const dir = dirname(result.stdout.spillPath!)
-    expect(dir).toMatch(/roos-subprocess-/)
+    expect(dir).toMatch(/shres-subprocess-/)
     const mode = statSync(dir).mode & 0o777
     expect(mode).toBe(0o700)
   })

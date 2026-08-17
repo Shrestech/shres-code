@@ -57,7 +57,7 @@ describe('Typert-backed Cordis catalog', () => {
     // plugin provides them, so describing one as a service would answer "add the
     // plugin that provides it" for a key where no such plugin exists.
     expect(byKey.has('headlessIo')).toBe(false)
-    expect(byKey.has('roosHomePath')).toBe(false)
+    expect(byKey.has('shresHomePath')).toBe(false)
     expect(byKey.has('launcherEnvironment')).toBe(false)
   })
 })

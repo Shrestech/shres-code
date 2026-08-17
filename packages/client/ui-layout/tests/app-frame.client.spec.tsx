@@ -13,13 +13,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, render } from '@testing-library/react'
 import { useSyncExternalStore } from 'react'
-import { AppFrame } from '@roos-code/roos-code-client-ui-layout/src/client/AppFrame.tsx'
-import type { AppFrameProps } from '@roos-code/roos-code-client-ui-layout/src/client/AppFrame.tsx'
-import { SIDEBAR_COLLAPSED } from '@roos-code/roos-code-client-ui-layout/src/client/columns.ts'
-import { createLayoutStore } from '@roos-code/roos-code-client-ui-layout/src/client/stores.ts'
+import { AppFrame } from '@shres-code/shres-code-client-ui-layout/src/client/AppFrame.tsx'
+import type { AppFrameProps } from '@shres-code/shres-code-client-ui-layout/src/client/AppFrame.tsx'
+import { SIDEBAR_COLLAPSED } from '@shres-code/shres-code-client-ui-layout/src/client/columns.ts'
+import { createLayoutStore } from '@shres-code/shres-code-client-ui-layout/src/client/stores.ts'
 import type {
   SessionId, SessionListState, WorkspaceListState,
-} from '@roos-code/roos-code-client-runtime/client'
+} from '@shres-code/shres-code-client-runtime/client'
 
 // Session selection controls for the SessionProvider and useSessions stubs.
 const selectedSession = { current: 's-test' as SessionId | undefined }

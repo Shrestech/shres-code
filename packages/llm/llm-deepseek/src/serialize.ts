@@ -4,11 +4,11 @@
  * Assistant reasoning is replayed as `reasoning_content` only on tool-call turns, as required by
  * thinking-mode passback. Core image blocks are rejected explicitly because this wire route is text-only;
  * unknown declaration-merged block types retain the adapter's documented extension fallback.
- * @module roos-llm-deepseek/serialize
+ * @module shres-llm-deepseek/serialize
  */
 
-import { contentHasImage, LlmError } from '@roos-code/roos-code-llm'
-import type { ContentBlock, GenerateOptions, Message } from '@roos-code/roos-code-llm'
+import { contentHasImage, LlmError } from '@shres-code/shres-code-llm'
+import type { ContentBlock, GenerateOptions, Message } from '@shres-code/shres-code-llm'
 import type { WireMessage, WireRequest, WireTool } from './types.ts'
 
 /** Adapter-level request defaults (from plugin config). */

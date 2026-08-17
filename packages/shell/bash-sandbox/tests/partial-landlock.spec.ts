@@ -8,13 +8,13 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { LAUNCHER_FAILURE_EXIT } from '@roos-code/node-addon-landlock-run'
-import { SANDBOX_UNAVAILABLE, SandboxUnavailableError } from '@roos-code/roos-code-sandbox'
-import { LocalSandboxProvider } from '@roos-code/roos-code-sandbox-local'
-import { SandboxPolicyService } from '@roos-code/roos-code-sandbox-policy'
-import { SandboxBashExecutor } from '@roos-code/roos-code-bash-sandbox'
-import LocalSubprocessRuntime from '@roos-code/roos-code-subprocess-local'
+import { Context } from '@shres-code/cordis'
+import { LAUNCHER_FAILURE_EXIT } from '@shres-code/node-addon-landlock-run'
+import { SANDBOX_UNAVAILABLE, SandboxUnavailableError } from '@shres-code/shres-code-sandbox'
+import { LocalSandboxProvider } from '@shres-code/shres-code-sandbox-local'
+import { SandboxPolicyService } from '@shres-code/shres-code-sandbox-policy'
+import { SandboxBashExecutor } from '@shres-code/shres-code-bash-sandbox'
+import LocalSubprocessRuntime from '@shres-code/shres-code-subprocess-local'
 
 const NOTICE = 'landlock-run: partial enforcement (older Landlock ABI)'
 const FATAL_PREFIX = 'landlock-run: '
@@ -30,7 +30,7 @@ afterEach(async () => {
 
 /** Write a fake native launcher that reports partial enforcement, then execs or fails. */
 async function fakeLauncher(fatalExit?: number): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), 'roos-partial-landlock-'))
+  const dir = await mkdtemp(join(tmpdir(), 'shres-partial-landlock-'))
   tempDirs.push(dir)
   const launcher = join(dir, 'landlock-run')
   const fatalBranch = fatalExit === undefined ? '' : `printf '%s\\n' '${FATAL}' >&2\nexit ${fatalExit}\n`
@@ -80,12 +80,12 @@ async function setupConfiguredRunner(runner: string): Promise<SandboxBashExecuto
 
 describe('partial Landlock runner-failure classification', () => {
   it.each(['missing', 'unexecutable', 'missing-interpreter'] as const)('classifies a %s configured runner through the direct spawn error channel', async (kind) => {
-    const dir = await mkdtemp(join(tmpdir(), 'roos-unusable-sandbox-runner-'))
+    const dir = await mkdtemp(join(tmpdir(), 'shres-unusable-sandbox-runner-'))
     tempDirs.push(dir)
     const runner = join(dir, `${kind}-runner`)
     if (kind === 'unexecutable') await writeFile(runner, '#!/bin/sh\nexit 0\n', { mode: 0o644 })
     if (kind === 'missing-interpreter') {
-      await writeFile(runner, '#!/roos-definitely-missing-sandbox-interpreter\nexit 0\n', { mode: 0o755 })
+      await writeFile(runner, '#!/shres-definitely-missing-sandbox-interpreter\nexit 0\n', { mode: 0o755 })
     }
     const bash = await setupConfiguredRunner(runner)
 
@@ -111,11 +111,11 @@ describe('partial Landlock runner-failure classification', () => {
   it.each(['bare-name', 'relative'] as const)(
     'classifies a %s runner whose shebang interpreter is missing',
     async (form) => {
-      const dir = await mkdtemp(join(tmpdir(), 'roos-argv-form-sandbox-runner-'))
+      const dir = await mkdtemp(join(tmpdir(), 'shres-argv-form-sandbox-runner-'))
       tempDirs.push(dir)
       const filename = 'missing-interpreter-runner'
       const runner = form === 'bare-name' ? filename : `./${filename}`
-      await writeFile(join(dir, filename), '#!/roos-definitely-missing-sandbox-interpreter\nexit 0\n', { mode: 0o755 })
+      await writeFile(join(dir, filename), '#!/shres-definitely-missing-sandbox-interpreter\nexit 0\n', { mode: 0o755 })
       const bash = await setupConfiguredRunner(runner)
       const request = form === 'bare-name'
         ? { command: 'true', env: { PATH: dir } }
@@ -142,7 +142,7 @@ describe('partial Landlock runner-failure classification', () => {
   )
 
   it('keeps a real malformed executable ordinary across no-shebang spawn behavior', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'roos-malformed-sandbox-runner-'))
+    const dir = await mkdtemp(join(tmpdir(), 'shres-malformed-sandbox-runner-'))
     tempDirs.push(dir)
     const runner = join(dir, 'malformed-runner')
     await writeFile(runner, 'not a native executable or shebang script\n', { mode: 0o755 })

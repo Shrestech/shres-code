@@ -3,7 +3,7 @@
  * platform on its own rows (`disabled: !!js process.platform`), so exactly
  * one shell stack mounts per host and no separate platform layer exists —
  * the launcher applies nothing beyond the bundle layers. The spec composes
- * the REAL shipped bundle layers (roos-base + roos-web-app resolved from the
+ * the REAL shipped bundle layers (shres-base + shres-web-app resolved from the
  * app installation anchor) through the boot's patch algorithm and pins the
  * effective per-platform roster, the preset-level gates that keep tool-bash
  * out of win32 sessions and tool-pwsh out of POSIX sessions, and the
@@ -16,9 +16,9 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import yaml from 'js-yaml'
-import { entryListSchema } from '@roos-code/cordis-plugin-include'
-import { evaluate } from '@roos-code/cordis-plugin-loader'
-import { composeEntries, initProfile, loadProfile, PROFILES_DIR } from '@roos-code/roos-code-app-boot'
+import { entryListSchema } from '@shres-code/cordis-plugin-include'
+import { evaluate } from '@shres-code/cordis-plugin-loader'
+import { composeEntries, initProfile, loadProfile, PROFILES_DIR } from '@shres-code/shres-code-app-boot'
 
 /**
  * The effective disabled state of one row on one platform: a `!!js` expression
@@ -36,14 +36,14 @@ describe('the shipped shell composition (real bundle layers)', () => {
   let home: string
   afterEach(() => { if (home !== undefined) rmSync(home, { recursive: true, force: true }) })
   // The app installation anchor, mirroring profile-boot.ts: the bundle layers
-  // resolve from the REAL roos-base/roos-web-app packages through it, so this
+  // resolve from the REAL shres-base/shres-web-app packages through it, so this
   // suite composes the shipped patch files, not test fixtures.
   const anchor = fileURLToPath(new URL('../package.json', import.meta.url))
 
   it('composes the confined pwsh roster on win32 and the bash roster on POSIX from the same rows', () => {
-    home = mkdtempSync(join(tmpdir(), 'roos-windows-home-'))
-    initProfile(join(home, PROFILES_DIR, 'web'), ['@roos-code/roos-code-base', '@roos-code/roos-code-web-app'])
-    const profile = loadProfile('roos', 'web', anchor, home)
+    home = mkdtempSync(join(tmpdir(), 'shres-windows-home-'))
+    initProfile(join(home, PROFILES_DIR, 'web'), ['@shres-code/shres-code-base', '@shres-code/shres-code-web-app'])
+    const profile = loadProfile('shres', 'web', anchor, home)
     const warnings: string[] = []
     const rows = composeEntries(
       profile.layers.map(layer => layer.patches),
@@ -72,16 +72,16 @@ describe('the shipped shell composition (real bundle layers)', () => {
     // dependency closure into the profile's node_modules, so every bare
     // plugin name in the base patch must resolve from there.
     const cliManifest = JSON.parse(readFileSync(anchor, 'utf8')) as { dependencies?: Record<string, string> }
-    for (const name of ['@roos-code/roos-code-pwsh-sandbox', '@roos-code/roos-code-tool-pwsh']) {
+    for (const name of ['@shres-code/shres-code-pwsh-sandbox', '@shres-code/shres-code-tool-pwsh']) {
       expect(cliManifest.dependencies?.[name], `cold-start closure must reach ${name}`).toBeDefined()
     }
     expect(warnings).toEqual([])
   })
 
   it('base-only profiles carry both stacks with the same platform gating', () => {
-    home = mkdtempSync(join(tmpdir(), 'roos-windows-home-'))
-    initProfile(join(home, PROFILES_DIR, 'base-only'), ['@roos-code/roos-code-base'])
-    const profile = loadProfile('roos', 'base-only', anchor, home)
+    home = mkdtempSync(join(tmpdir(), 'shres-windows-home-'))
+    initProfile(join(home, PROFILES_DIR, 'base-only'), ['@shres-code/shres-code-base'])
+    const profile = loadProfile('shres', 'base-only', anchor, home)
     const warnings: string[] = []
     const rows = composeEntries(
       profile.layers.map(layer => layer.patches),

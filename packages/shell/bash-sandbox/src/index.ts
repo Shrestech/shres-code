@@ -5,12 +5,12 @@
  * the command never ran: foreground calls throw `SANDBOX_UNAVAILABLE`, while
  * background processes carry `runnerFailed`; other spawn rejections retain
  * local-executor semantics. The tool owns approval and passes a complete per-call policy.
- * @module @roos-code/roos-code-bash-sandbox
+ * @module @shres-code/shres-code-bash-sandbox
  */
 
-import { Context } from '@roos-code/cordis'
-import type { ShellExecRequest, ShellExecSpec, ShellProcess, ShellRunResult } from '@roos-code/roos-code-shell'
-import { SandboxUnavailableError } from '@roos-code/roos-code-sandbox'
+import { Context } from '@shres-code/cordis'
+import type { ShellExecRequest, ShellExecSpec, ShellProcess, ShellRunResult } from '@shres-code/shres-code-shell'
+import { SandboxUnavailableError } from '@shres-code/shres-code-sandbox'
 import type {
   ConfinedArgv,
   ConfinedSandboxMode,
@@ -19,16 +19,16 @@ import type {
   SandboxExecutionPolicy,
   SandboxMode,
   SandboxPolicy,
-} from '@roos-code/roos-code-sandbox'
-import type {} from '@roos-code/roos-code-sandbox-policy'
-import { LocalBashExecutor } from '@roos-code/roos-code-bash-local'
-import type { Config as LocalConfig } from '@roos-code/roos-code-bash-local'
+} from '@shres-code/shres-code-sandbox'
+import type {} from '@shres-code/shres-code-sandbox-policy'
+import { LocalBashExecutor } from '@shres-code/shres-code-bash-local'
+import type { Config as LocalConfig } from '@shres-code/shres-code-bash-local'
 import { classifyDenial, classifyRunnerFailure, isRunnerSpawnFailure, matchesSignature } from './helpers.ts'
 
 /**
  * Plugin config: the local executor's knobs, verbatim. The sandbox policy —
  * the default mode and fallback `workspace-write` root — is NOT here: it lives
- * on `ctx.sandboxPolicy` (`@roos-code/roos-code-sandbox-policy`), which resolves
+ * on `ctx.sandboxPolicy` (`@shres-code/shres-code-sandbox-policy`), which resolves
  * each calling session's mode and cwd for every enforcing capability. The runner
  * choice is likewise the `ctx.sandbox` provider's config, not this executor's.
  */

@@ -1,7 +1,7 @@
 /** State owner for the optional local settings-document action. */
 
-import type { IApiClient } from '@roos-code/roos-code-api-remotes/client'
-import { createSnapshotStore, type SnapshotStore } from '@roos-code/roos-code-client-runtime/client'
+import type { IApiClient } from '@shres-code/shres-code-api-remotes/client'
+import { createSnapshotStore, type SnapshotStore } from '@shres-code/shres-code-client-runtime/client'
 
 /** Browser state of the Host-owned settings document. */
 export interface SettingsDocumentState {

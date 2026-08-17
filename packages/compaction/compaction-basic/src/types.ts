@@ -1,10 +1,10 @@
 /**
  * Configuration vocabulary for the replay-aware basic compaction backend.
  *
- * @module @roos-code/roos-code-compaction-basic/types
+ * @module @shres-code/shres-code-compaction-basic/types
  */
 
-import type { LlmCallConfig } from '@roos-code/roos-code-llm'
+import type { LlmCallConfig } from '@shres-code/shres-code-llm'
 
 /** Policy fields shared by the default policy and exact model overrides. */
 export interface CompactionPolicyConfig {

@@ -1,8 +1,8 @@
-import type { Context } from '@roos-code/cordis'
-import type {} from '@roos-code/roos-code-agent'
-import { CompactionId, compactCheckpointSource } from '@roos-code/roos-code-compaction'
-import { createUserMessage } from '@roos-code/roos-code-llm'
-import type {} from '@roos-code/roos-code-tools'
+import type { Context } from '@shres-code/cordis'
+import type {} from '@shres-code/shres-code-agent'
+import { CompactionId, compactCheckpointSource } from '@shres-code/shres-code-compaction'
+import { createUserMessage } from '@shres-code/shres-code-llm'
+import type {} from '@shres-code/shres-code-tools'
 
 export const name = 'workspace-context-compaction'
 

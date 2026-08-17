@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { CallId } from '@roos-code/roos-code-llm'
-import AgentRegistry, { type Agent } from '@roos-code/roos-code-agent'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import ToolRuntime from '@roos-code/roos-code-tools'
-import UserQuestionService, { type AskUserQuestionRequest } from '@roos-code/roos-code-user-questions'
-import * as toolAskUser from '@roos-code/roos-code-tool-ask-user'
+import { Context } from '@shres-code/cordis'
+import { CallId } from '@shres-code/shres-code-llm'
+import AgentRegistry, { type Agent } from '@shres-code/shres-code-agent'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import ToolRuntime from '@shres-code/shres-code-tools'
+import UserQuestionService, { type AskUserQuestionRequest } from '@shres-code/shres-code-user-questions'
+import * as toolAskUser from '@shres-code/shres-code-tool-ask-user'
 
 const testToolSignal = new AbortController().signal
 

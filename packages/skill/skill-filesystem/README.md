@@ -1,8 +1,8 @@
-# @roos-code/roos-code-skill-filesystem
+# @shres-code/shres-code-skill-filesystem
 
 Local filesystem provider for the `ctx.skills` registry.
 
-This package implements one skill source. It scans local project, custom, and user skill roots, parses `SKILL.md` or flat Markdown skill files, and registers the provider on `ctx.skills`. The registry remains in `@roos-code/roos-code-skill`; the durable session catalogs and model-facing loader tool remain in `@roos-code/roos-code-tool-skill`.
+This package implements one skill source. It scans local project, custom, and user skill roots, parses `SKILL.md` or flat Markdown skill files, and registers the provider on `ctx.skills`. The registry remains in `@shres-code/shres-code-skill`; the durable session catalogs and model-facing loader tool remain in `@shres-code/shres-code-tool-skill`.
 
 ## Plugin
 
@@ -14,8 +14,8 @@ Requires `ctx.skills` (`inject: ['skills']`).
 |---|---|---|
 | `providerName` | `filesystem` | Unique name used to register this provider on `ctx.skills`. |
 | `includeDefaultRoots` | `true` | Include project and user roots around `customSkillDirs`; set false for an isolated custom-root provider. |
-| `roosHome` | `$ROOS_HOME` or `~/.roos` | Roos Code config root resolved by [`@roos-code/roos-code-home-paths`](../../util/home-paths/README.md); scans `skills` under this directory. |
-| `agentsHome` | `$ROOS_AGENTS_HOME` or `~/.agents` | Shared agent config root scanned for compatible skills. |
+| `shresHome` | `$SHRES_HOME` or `~/.shres` | Shres Code config root resolved by [`@shres-code/shres-code-home-paths`](../../util/home-paths/README.md); scans `skills` under this directory. |
+| `agentsHome` | `$SHRES_AGENTS_HOME` or `~/.agents` | Shared agent config root scanned for compatible skills. |
 | `customSkillDirs` | `[]` | Additional local skill roots scanned after project roots and before user roots. |
 | `watch` | `true` | Watch host-local roots and invalidate the local provider when catalog membership or frontmatter may have changed. |
 | `watchUsePolling` | `false` | Use Chokidar polling instead of native events for existing skill roots. |
@@ -30,13 +30,13 @@ Default roots are resolved in this provider's rank order:
 
 | Rank | Source | Path |
 |---|---|---|
-| 100 | `project-roos` | `<projectRoot>/.roos/skills` |
+| 100 | `project-shres` | `<projectRoot>/.shres/skills` |
 | 200 | `project-agents` | `<projectRoot>/.agents/skills` |
 | 300 | `custom` | `Config.customSkillDirs` |
-| 400 | `user-roos` | `<roosHome>/skills` |
+| 400 | `user-shres` | `<shresHome>/skills` |
 | 500 | `user-agents` | `<agentsHome>/skills` |
 
-The project root is the nearest ancestor containing `.git`; without one, the current cwd is used. The user Roos root skips its `.system` child so system-owned directories are not treated as normal user skills. `includeDefaultRoots: false` omits the project and user rows and the `$ROOS_BUNDLED_SKILL_DIR` environment default while retaining explicitly configured custom and bundled roots, allowing several uniquely named isolated providers to see only their own roots. This provider supplies project and user skills; another provider may supply built-in system skills.
+The project root is the nearest ancestor containing `.git`; without one, the current cwd is used. The user Shres root skips its `.system` child so system-owned directories are not treated as normal user skills. `includeDefaultRoots: false` omits the project and user rows and the `$SHRES_BUNDLED_SKILL_DIR` environment default while retaining explicitly configured custom and bundled roots, allowing several uniquely named isolated providers to see only their own roots. This provider supplies project and user skills; another provider may supply built-in system skills.
 
 When `ctx.fs` is available, discovery lists roots through `ctx.fs.listDir`, reads skill files through `ctx.fs.readText`, and probes `.git` through the filesystem service. Full skill loads forward the lookup abort signal to filesystem metadata and content reads. Without a filesystem service, the provider falls back to abortable Node filesystem I/O so minimal local contexts can still load skills. Confirmed missing paths are valid empty state, malformed or non-text entries warn and skip, and unexpected discovery/read failures make the registry snapshot incomplete rather than replacing a last-good model catalog with a misleading deletion.
 
@@ -58,7 +58,7 @@ The catalog and body have separate lifecycles. Discovery parses frontmatter to p
 
 ## Model Experience
 
-Indirectly, through `roos-tool-skill`, which renders this provider's invocable names and capped descriptions into the initial or replacement catalog and a selected current instruction body plus resource-base guidance into retained tool history while paths, provider ranks, and disabled skills remain hidden.
+Indirectly, through `shres-tool-skill`, which renders this provider's invocable names and capped descriptions into the initial or replacement catalog and a selected current instruction body plus resource-base guidance into retained tool history while paths, provider ranks, and disabled skills remain hidden.
 
 #### KV Cache effect
 

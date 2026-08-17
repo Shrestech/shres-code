@@ -2,14 +2,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 
-import type { RunningToolCall, ToolResultNode } from '@roos-code/roos-code-client-runtime/client'
-import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
-import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
-import { resolveWorkspacePath } from '@roos-code/roos-code-client-runtime/client'
+import type { RunningToolCall, ToolResultNode } from '@shres-code/shres-code-client-runtime/client'
+import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
+import { en as commonEn } from '@shres-code/shres-code-client-locale/src/locales/en.ts'
+import { resolveWorkspacePath } from '@shres-code/shres-code-client-runtime/client'
 import { classifyTool, resultText, toolRowModel } from '../src/client/tool/models/tool-call-model.ts'
 import { ToolRow } from '../src/client/tool/components/ToolRow.tsx'
 import { GenericToolCard, type GenericToolCardProps } from '../src/client/tool/toolviews/GenericToolCard.tsx'
-import { en } from '@roos-code/roos-code-client-ui-conversation/src/client/locales.ts'
+import { en } from '@shres-code/shres-code-client-ui-conversation/src/client/locales.ts'
 
 afterEach(() => {
   cleanup()
@@ -395,11 +395,11 @@ describe('GenericToolCard', () => {
     expect(view.container.querySelector('[data-state="running"]')).not.toBeNull()
   })
 
-  it('hops a colored kangaroo while a named seat tool is running', () => {
+  it('hops a colored product mark while a named seat tool is running', () => {
     const view = render(
-      <GenericToolCard {...props('joey', running({ name: 'joey', argsRaw: '{"description":"implement the API"}' }))} />,
+      <GenericToolCard {...props('stride', running({ name: 'stride', argsRaw: '{"description":"implement the API"}' }))} />,
     )
-    expect(view.container.querySelector('[data-hopping-roo="joey"]')).not.toBeNull()
+    expect(view.container.querySelector('[data-hopping-roo="stride"]')).not.toBeNull()
   })
 
   it('renders edit with its dedicated title, icon variant, and path summary', () => {

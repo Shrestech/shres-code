@@ -2,14 +2,14 @@
  * Resolve the JSON-RPC demo bin's Cordis config. The bin never invents a
  * CWD-relative default. An explicit path is consent to load that file;
  * `!!js` or a relative plugin `name:` is refused unless the file is under
- * `$ROOS_HOME` or a first-party / packaged install tree.
- * @module @roos-code/roos-code-sdk-jsonrpc-demo/resolveDemoConfig
+ * `$SHRES_HOME` or a first-party / packaged install tree.
+ * @module @shres-code/shres-code-sdk-jsonrpc-demo/resolveDemoConfig
  */
 
 import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs'
 import { dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { resolveRoosHome } from '@roos-code/roos-code-home-paths'
+import { resolveShresHome } from '@shres-code/shres-code-home-paths'
 
 /**
  * YAML `name:` whose value starts with `./` or `../` (quoted or unquoted).
@@ -19,8 +19,8 @@ const RELATIVE_PLUGIN_NAME = /\bname\s*:\s*(?:!!\w+\s+)?['"]?\.\.?(?:\/|\\)/
 
 /** Package names whose on-disk directory is a first-party demo install. */
 const DEMO_PACKAGE_NAMES = new Set([
-  '@roos-code/roos-code-acp-demo',
-  '@roos-code/roos-code-sdk-jsonrpc-demo',
+  '@shres-code/shres-code-acp-demo',
+  '@shres-code/shres-code-sdk-jsonrpc-demo',
 ])
 
 /**
@@ -28,7 +28,7 @@ const DEMO_PACKAGE_NAMES = new Set([
  */
 export interface ResolveDemoConfigOptions {
   /**
-   * Explicit `$ROOS_CORDIS_CONFIG` or argv path. An empty string is treated as
+   * Explicit `$SHRES_CORDIS_CONFIG` or argv path. An empty string is treated as
    * absent.
    */
   requested?: string | undefined
@@ -58,9 +58,9 @@ export interface ResolveDemoConfigOptions {
 }
 
 /**
- * Select the explicit config channel: `$ROOS_CORDIS_CONFIG` wins over `argv[2]`.
+ * Select the explicit config channel: `$SHRES_CORDIS_CONFIG` wins over `argv[2]`.
  * Empty values are absent. This never consults the working directory.
- * @param env - environment mapping that may carry `ROOS_CORDIS_CONFIG`.
+ * @param env - environment mapping that may carry `SHRES_CORDIS_CONFIG`.
  * @param argv - process argument vector; index 2 is the positional path.
  * @returns the first non-empty explicit path, or `undefined` when both channels
  * are absent.
@@ -69,7 +69,7 @@ export function selectExplicitConfigPath(
   env: NodeJS.ProcessEnv = process.env,
   argv: readonly string[] = process.argv,
 ): string | undefined {
-  const fromEnv = env['ROOS_CORDIS_CONFIG']
+  const fromEnv = env['SHRES_CORDIS_CONFIG']
   if (fromEnv !== undefined && fromEnv !== '') return fromEnv
   const fromArgv = argv[2]
   if (fromArgv !== undefined && fromArgv !== '') return fromArgv
@@ -81,7 +81,7 @@ export function selectExplicitConfigPath(
  *
  * With no `requested` path and no bundled default, the call throws. An
  * explicit path must exist; a missing file fails as not found. When the file
- * contains `!!js` or a relative plugin `name:` and is not under `$ROOS_HOME`
+ * contains `!!js` or a relative plugin `name:` and is not under `$SHRES_HOME`
  * and not inside a first-party checkout or packaged runtime tree, the call
  * throws. The raw-text scan is best-effort; the hard guarantee is that this
  * bin never loads a CWD `cordis.yml` by default.
@@ -92,7 +92,7 @@ export function selectExplicitConfigPath(
  */
 export function resolveDemoConfig(options: ResolveDemoConfigOptions): string {
   const cwd = options.cwd ?? process.cwd()
-  const home = options.home ?? resolveRoosHome()
+  const home = options.home ?? resolveShresHome()
   const installAnchor = options.installAnchor ?? fileURLToPath(import.meta.url)
   const execPath = options.execPath ?? process.execPath
   const requested = options.requested !== undefined && options.requested !== ''
@@ -136,8 +136,8 @@ function assertTrustedExplicitConfig(
   if (reasons.length === 0 || isPreapprovedLocation(absolute, home, installAnchor, execPath)) return
   throw new Error(
     `${binName}: refused to load ${absolute}: it contains ${reasons.join(' and ')}`
-    + ' and is not under $ROOS_HOME or a first-party/packaged install tree.'
-    + ' Place the file under $ROOS_HOME to pre-approve !!js or relative plugin names.',
+    + ' and is not under $SHRES_HOME or a first-party/packaged install tree.'
+    + ' Place the file under $SHRES_HOME to pre-approve !!js or relative plugin names.',
   )
 }
 
@@ -154,7 +154,7 @@ function untrustedConstructs(content: string): string[] {
 }
 
 /**
- * Whether the file is under `$ROOS_HOME` or a first-party / packaged tree.
+ * Whether the file is under `$SHRES_HOME` or a first-party / packaged tree.
  * @param filePath - the config path that was read.
  * @param home - the Harness home.
  * @param installAnchor - module path used to discover first-party / packaged roots.

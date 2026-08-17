@@ -4,7 +4,7 @@
  * per push.
  */
 
-import type { JobId } from '@roos-code/roos-code-jobs/brand'
+import type { JobId } from '@shres-code/shres-code-jobs/brand'
 
 /**
  * One background job as the client sees it.

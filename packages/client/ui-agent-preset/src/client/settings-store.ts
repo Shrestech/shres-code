@@ -7,8 +7,8 @@
  * namespace's `default` field, which is what the host resolves at creation.
  */
 
-import type { IApiClient } from '@roos-code/roos-code-api-remotes/client'
-import { createSnapshotStore, type SnapshotStore } from '@roos-code/roos-code-client-runtime/client'
+import type { IApiClient } from '@shres-code/shres-code-api-remotes/client'
+import { createSnapshotStore, type SnapshotStore } from '@shres-code/shres-code-client-runtime/client'
 
 /** The agent-preset settings namespace on the host wire. */
 export const AGENT_PRESET_SETTINGS_NS = 'agent-presets'

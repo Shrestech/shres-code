@@ -15,16 +15,16 @@
  * reads session state once at each operation boundary; executors and providers
  * remain session-free.
  *
- * @module @roos-code/roos-code-sandbox-policy
+ * @module @shres-code/shres-code-sandbox-policy
  */
 
 import { resolve as resolvePath } from 'node:path'
-import { Context, Service } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import type {} from '@roos-code/roos-code-agent'
-import { canonicalPath, type SandboxExecutionPolicy, type SandboxMode, type SandboxNetwork } from '@roos-code/roos-code-sandbox'
-import type { Session } from '@roos-code/roos-code-session'
-import type {} from '@roos-code/roos-code-system-prompt'
+import { Context, Service } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import type {} from '@shres-code/shres-code-agent'
+import { canonicalPath, type SandboxExecutionPolicy, type SandboxMode, type SandboxNetwork } from '@shres-code/shres-code-sandbox'
+import type { Session } from '@shres-code/shres-code-session'
+import type {} from '@shres-code/shres-code-system-prompt'
 import { effectiveSandboxMode } from './session-mode.ts'
 
 export { SANDBOX_MODES, effectiveSandboxMode, setSandboxMode } from './session-mode.ts'
@@ -38,11 +38,11 @@ function resolveWorkspaceRoot(path: string): string {
 function renderPolicyContext(policy: SandboxExecutionPolicy): string {
   switch (policy.mode) {
     case 'read-only':
-      return 'Current Roos file policy: read-only. Any available operation enforced by the Roos file sandbox cannot modify files in the standing mode. Do not refuse a required modification from this policy alone: try an available tool normally and follow any denial and escalation guidance it returns.'
+      return 'Current Shres file policy: read-only. Any available operation enforced by the Shres file sandbox cannot modify files in the standing mode. Do not refuse a required modification from this policy alone: try an available tool normally and follow any denial and escalation guidance it returns.'
     case 'workspace-write':
-      return `Current Roos file policy: workspace-write. Any available operation enforced by the Roos file sandbox may modify files under the session workspace: ${JSON.stringify(policy.workspaceRoot)}. Some platform temporary areas may also be writable.`
+      return `Current Shres file policy: workspace-write. Any available operation enforced by the Shres file sandbox may modify files under the session workspace: ${JSON.stringify(policy.workspaceRoot)}. Some platform temporary areas may also be writable.`
     case 'danger-full-access':
-      return 'Current Roos file policy: danger-full-access. The Roos file sandbox does not restrict file modifications by available operations.'
+      return 'Current Shres file policy: danger-full-access. The Shres file sandbox does not restrict file modifications by available operations.'
     /* v8 ignore next 4 -- SandboxMode is a typed same-process closed union; this branch is only the static exhaustiveness guard. */
     default: {
       const mode: never = policy.mode
@@ -51,7 +51,7 @@ function renderPolicyContext(policy: SandboxExecutionPolicy): string {
   }
 }
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     sandboxPolicy: SandboxPolicyService
   }

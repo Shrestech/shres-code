@@ -1,14 +1,14 @@
 /**
  * Plugin-owned human-command registry shared by interactive UI adapters.
- * @module @roos-code/roos-code-commands
+ * @module @shres-code/shres-code-commands
  */
 
-import { Context } from '@roos-code/cordis'
-import type { Agent } from '@roos-code/roos-code-agent'
-import { NamedEntries, ScopedLayers } from '@roos-code/roos-code-scope'
-import type { ScopeKey, ScopeLayer } from '@roos-code/roos-code-scope'
-import type { Session, SessionEvent, SessionEventMap } from '@roos-code/roos-code-session'
-import { TypertRemoteService, Remote } from '@roos-code/roos-code-typert-protocol'
+import { Context } from '@shres-code/cordis'
+import type { Agent } from '@shres-code/shres-code-agent'
+import { NamedEntries, ScopedLayers } from '@shres-code/shres-code-scope'
+import type { ScopeKey, ScopeLayer } from '@shres-code/shres-code-scope'
+import type { Session, SessionEvent, SessionEventMap } from '@shres-code/shres-code-session'
+import { TypertRemoteService, Remote } from '@shres-code/shres-code-typert-protocol'
 import { CommandId } from './brand.ts'
 import type {
   CommandDescriptor,
@@ -87,7 +87,7 @@ class CommandLayer implements ScopeLayer {
   }
 }
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     commands: CommandRuntime
   }

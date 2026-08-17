@@ -8,18 +8,18 @@
  * tool result enters durable session history, so emitting an image on a route
  * that cannot carry it would break that route's continuation. Unknown
  * capability therefore refuses instead of relying on the adapter guard.
- * @module @roos-code/roos-code-tool-fs/src/read-image
+ * @module @shres-code/shres-code-tool-fs/src/read-image
  */
 
 import { basename, extname } from 'node:path'
-import type { Context } from '@roos-code/cordis'
-import { AttachmentError, AttachmentId } from '@roos-code/roos-code-attachment'
-import type { ImageAttachmentRef, ImageMediaType } from '@roos-code/roos-code-attachment'
-import { createUserMessage } from '@roos-code/roos-code-llm'
-import type { ContentBlock } from '@roos-code/roos-code-llm'
-import { defineTool } from '@roos-code/roos-code-tools'
-import type { GenericCallView, ToolExecution } from '@roos-code/roos-code-tools'
-import type {} from '@roos-code/roos-code-fs'
+import type { Context } from '@shres-code/cordis'
+import { AttachmentError, AttachmentId } from '@shres-code/shres-code-attachment'
+import type { ImageAttachmentRef, ImageMediaType } from '@shres-code/shres-code-attachment'
+import { createUserMessage } from '@shres-code/shres-code-llm'
+import type { ContentBlock } from '@shres-code/shres-code-llm'
+import { defineTool } from '@shres-code/shres-code-tools'
+import type { GenericCallView, ToolExecution } from '@shres-code/shres-code-tools'
+import type {} from '@shres-code/shres-code-fs'
 import { remediateFsError } from './error.ts'
 import { resolveRegularReadTarget } from './read-target.ts'
 import type { FsSandboxController } from './sandbox.ts'

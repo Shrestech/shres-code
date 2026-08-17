@@ -1,11 +1,11 @@
 /** Event-level policy tests; no filesystem provider is needed because the plugin performs no I/O. */
 
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { FsTargetKey, FsVersion } from '@roos-code/roos-code-fs'
-import type { FsObservation, FsTarget, FsWriteIntent } from '@roos-code/roos-code-fs'
-import * as FsPolicy from '@roos-code/roos-code-fs-observation-policy'
-import type { FsObservationActor } from '@roos-code/roos-code-fs-observation-policy'
+import { Context } from '@shres-code/cordis'
+import { FsTargetKey, FsVersion } from '@shres-code/shres-code-fs'
+import type { FsObservation, FsTarget, FsWriteIntent } from '@shres-code/shres-code-fs'
+import * as FsPolicy from '@shres-code/shres-code-fs-observation-policy'
+import type { FsObservationActor } from '@shres-code/shres-code-fs-observation-policy'
 
 function target(path: string): FsTarget {
   return { targetKey: FsTargetKey(path), displayPath: path }

@@ -1,22 +1,22 @@
-import { createUserMessage } from '@roos-code/roos-code-llm'
+import { createUserMessage } from '@shres-code/shres-code-llm'
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import LlmRuntime from '@roos-code/roos-code-llm'
-import SessionStore, { SessionId } from '@roos-code/roos-code-session'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import ToolRuntime from '@roos-code/roos-code-tools'
-import AgentRegistry from '@roos-code/roos-code-agent'
-import type { Agent } from '@roos-code/roos-code-agent'
-import AgentLoop from '@roos-code/roos-code-agent-loop'
-import * as LlmDeepSeek from '@roos-code/roos-code-llm-deepseek'
-import * as WorkspaceContext from '@roos-code/roos-code-agent-instructions'
+import { Context } from '@shres-code/cordis'
+import LlmRuntime from '@shres-code/shres-code-llm'
+import SessionStore, { SessionId } from '@shres-code/shres-code-session'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import ToolRuntime from '@shres-code/shres-code-tools'
+import AgentRegistry from '@shres-code/shres-code-agent'
+import type { Agent } from '@shres-code/shres-code-agent'
+import AgentLoop from '@shres-code/shres-code-agent-loop'
+import * as LlmDeepSeek from '@shres-code/shres-code-llm-deepseek'
+import * as WorkspaceContext from '@shres-code/shres-code-agent-instructions'
 import { candidateScopeKey } from '../src/render.ts'
-import LocalFileSystem from '@roos-code/roos-code-fs-local'
-import * as ToolFs from '@roos-code/roos-code-tool-fs'
-import type { SessionEvent } from '@roos-code/roos-code-session'
+import LocalFileSystem from '@shres-code/shres-code-fs-local'
+import * as ToolFs from '@shres-code/shres-code-tool-fs'
+import type { SessionEvent } from '@shres-code/shres-code-session'
 
 const PROBE = 'banana-271828'
 const NESTED_PROBE = 'papaya-314159'
@@ -33,7 +33,7 @@ afterEach(async () => {
 })
 
 async function harness(): Promise<{ ctx: Context; agent: Agent }> {
-  workdir = await mkdtemp(join(tmpdir(), 'roos-workspace-context-e2e-'))
+  workdir = await mkdtemp(join(tmpdir(), 'shres-workspace-context-e2e-'))
   await mkdir(join(workdir, '.git'), { recursive: true })
   await writeFile(join(workdir, 'AGENTS.md'), `If the user asks for the workspace context handshake, reply with exactly this string and nothing else: ${PROBE}.\n`)
   ctx = new Context()

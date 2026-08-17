@@ -1,6 +1,6 @@
 /** First-party semantic text extraction for session-query consumers. */
 
-import type { SessionEvent } from '@roos-code/roos-code-session'
+import type { SessionEvent } from '@shres-code/shres-code-session'
 
 /**
  * Extract searchable semantic text from one first-party session event.

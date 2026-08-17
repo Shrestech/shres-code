@@ -5,13 +5,13 @@
  * to the same append-only / contiguous-seq / lazy-materialization / crash
  * semantics. The JSONL backend's own spec adds file-specific tests on top.
  *
- * @module @roos-code/roos-code-session-persistence/tests/contract
+ * @module @shres-code/shres-code-session-persistence/tests/contract
  */
 
 import { describe, expect, it } from 'vitest'
-import { SESSION_FORMAT_VERSION, Session, SessionId, TOOL_NOT_STARTED, TOOL_OUTCOME_UNKNOWN } from '@roos-code/roos-code-session'
-import type { SessionEvent, SessionHeader, SurfaceEventType, SurfaceIntent } from '@roos-code/roos-code-session'
-import { CallId, MessageId, createMessage, freezeMessage } from '@roos-code/roos-code-llm'
+import { SESSION_FORMAT_VERSION, Session, SessionId, TOOL_NOT_STARTED, TOOL_OUTCOME_UNKNOWN } from '@shres-code/shres-code-session'
+import type { SessionEvent, SessionHeader, SurfaceEventType, SurfaceIntent } from '@shres-code/shres-code-session'
+import { CallId, MessageId, createMessage, freezeMessage } from '@shres-code/shres-code-llm'
 import type { SessionPersistence } from '../src/index.ts'
 
 /** A backend under test plus its teardown. */

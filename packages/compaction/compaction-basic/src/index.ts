@@ -1,21 +1,21 @@
 /**
  * Basic replay-aware compaction backend.
  *
- * @module @roos-code/roos-code-compaction-basic
+ * @module @shres-code/shres-code-compaction-basic
  */
 
-import { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import { CompactionEngine, ManualCompactionError } from '@roos-code/roos-code-compaction'
-import type { CompactionResult, CompactionTrigger } from '@roos-code/roos-code-compaction'
-import type { TokenMeter } from '@roos-code/roos-code-token-meter'
-import type { Session } from '@roos-code/roos-code-session'
-import { CONTEXT_WINDOW_EXCEEDED_CODE, assertNever } from '@roos-code/roos-code-llm'
-import type { LlmCallConfig } from '@roos-code/roos-code-llm'
-import type { Agent, PreStepDecision } from '@roos-code/roos-code-agent'
-import type { CommandId } from '@roos-code/roos-code-commands/brand'
+import { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import { CompactionEngine, ManualCompactionError } from '@shres-code/shres-code-compaction'
+import type { CompactionResult, CompactionTrigger } from '@shres-code/shres-code-compaction'
+import type { TokenMeter } from '@shres-code/shres-code-token-meter'
+import type { Session } from '@shres-code/shres-code-session'
+import { CONTEXT_WINDOW_EXCEEDED_CODE, assertNever } from '@shres-code/shres-code-llm'
+import type { LlmCallConfig } from '@shres-code/shres-code-llm'
+import type { Agent, PreStepDecision } from '@shres-code/shres-code-agent'
+import type { CommandId } from '@shres-code/shres-code-commands/brand'
 // Type-only: makes the optional sibling service available to `ctx.get()`.
-import type {} from '@roos-code/roos-code-compaction-tool-result-pruner'
+import type {} from '@shres-code/shres-code-compaction-tool-result-pruner'
 import {
   resolveCompactSpec,
   resolveConfig,

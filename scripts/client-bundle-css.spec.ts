@@ -16,20 +16,20 @@ interface CssPlugin {
 
 function cssPlugin(): CssPlugin {
   const configs = clientBundle(
-    '@roos-code/roos-code-client-test',
+    '@shres-code/shres-code-client-test',
     ['lib/types/index.js', 'lib/types/invariant.js'],
-  )({ env: { ROOS_BUILD_FACE: 'client' } })
+  )({ env: { SHRES_BUILD_FACE: 'client' } })
   const client = configs.find(config => config.platform === 'browser')
   if (client === undefined) throw new Error('client config missing')
   const plugins = (client as { plugins: CssPlugin[] }).plugins
-  const plugin = plugins.find(candidate => candidate.name === 'roos-css-modules-inline')
+  const plugin = plugins.find(candidate => candidate.name === 'shres-css-modules-inline')
   if (plugin === undefined) throw new Error('CSS Modules plugin missing from client config')
   return plugin
 }
 
 describe('client bundle CSS Modules', () => {
   it('registers the source stylesheet as a watch dependency', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'roos-client-css-watch-'))
+    const root = await mkdtemp(join(tmpdir(), 'shres-client-css-watch-'))
     try {
       const stylesheet = join(root, 'Fixture.module.css')
       const importer = join(root, 'index.ts')

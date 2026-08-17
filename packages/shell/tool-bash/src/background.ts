@@ -1,10 +1,10 @@
 /**
  * Generic-task adaptation for background bash process handles.
  *
- * @module @roos-code/roos-code-tool-bash/background
+ * @module @shres-code/shres-code-tool-bash/background
  */
 
-import type { ShellProcess } from '@roos-code/roos-code-shell'
+import type { ShellProcess } from '@shres-code/shres-code-shell'
 
 /**
  * Map a settled background process onto the generic task-outcome vocabulary:

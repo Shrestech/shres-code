@@ -2,10 +2,10 @@
  * Runtime registry for generated Typert reflection, Remote invocations, and
  * dependency-inverted lookup/Context providers. It performs no TypeScript
  * analysis or schema generation.
- * @module @roos-code/roos-code-typert-registry
+ * @module @shres-code/shres-code-typert-registry
  */
 
-import { Context, Service } from '@roos-code/cordis'
+import { Context, Service } from '@shres-code/cordis'
 import { z } from 'zod'
 import type {
   InvocationDescriptor,
@@ -29,7 +29,7 @@ import type {
   TypertRegistryChange,
   TypertRegistryListener,
   TypertRegistryContract,
-} from '@roos-code/roos-code-typert-protocol'
+} from '@shres-code/shres-code-typert-protocol'
 import type {
   TypertContribution,
   TypertFace,

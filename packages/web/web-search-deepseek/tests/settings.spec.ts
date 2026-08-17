@@ -1,13 +1,13 @@
 /** The `web-search-deepseek` settings section layered over the composition entry. */
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import type { Fiber } from '@roos-code/cordis'
-import { SettingsProvider } from '@roos-code/roos-code-settings'
-import type { SettingsNamespace } from '@roos-code/roos-code-settings'
-import WebRuntime from '@roos-code/roos-code-web'
-import * as deepseekPlugin from '@roos-code/roos-code-web-search-deepseek'
-import { WEB_SEARCH_DEEPSEEK_SETTINGS_NAMESPACE } from '@roos-code/roos-code-web-search-deepseek'
+import { Context } from '@shres-code/cordis'
+import type { Fiber } from '@shres-code/cordis'
+import { SettingsProvider } from '@shres-code/shres-code-settings'
+import type { SettingsNamespace } from '@shres-code/shres-code-settings'
+import WebRuntime from '@shres-code/shres-code-web'
+import * as deepseekPlugin from '@shres-code/shres-code-web-search-deepseek'
+import { WEB_SEARCH_DEEPSEEK_SETTINGS_NAMESPACE } from '@shres-code/shres-code-web-search-deepseek'
 
 /** The smallest real provider: one in-memory document, always writable. */
 class MemorySettings extends SettingsProvider {

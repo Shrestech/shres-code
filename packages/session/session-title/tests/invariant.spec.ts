@@ -1,10 +1,10 @@
 // Title-source invariant: `messageSeqs` is empty iff `source.kind` is `user`.
 // — the durable relationship every appended session/title event must keep.
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import * as SessionTitleInvariantCompanion from '@roos-code/roos-code-session-title/invariant'
-import InvariantRegistry, { InvariantError } from '@roos-code/roos-code-invariants'
-import SessionStore, { SessionId } from '@roos-code/roos-code-session'
+import { Context } from '@shres-code/cordis'
+import * as SessionTitleInvariantCompanion from '@shres-code/shres-code-session-title/invariant'
+import InvariantRegistry, { InvariantError } from '@shres-code/shres-code-invariants'
+import SessionStore, { SessionId } from '@shres-code/shres-code-session'
 
 async function setup(): Promise<Context> {
   const ctx = new Context()
@@ -31,13 +31,13 @@ describe('session-title source invariant', () => {
       session.append('session/title', { title: 'auto', messageSeqs: [], source: { kind: 'fallback' } })
     }).toThrow(expect.objectContaining<Partial<InvariantError>>({
       code: 'INVARIANT',
-      packageName: '@roos-code/roos-code-session-title',
+      packageName: '@shres-code/shres-code-session-title',
     }))
     expect(() => {
       session.append('session/title', { title: 'named', messageSeqs: [1], source: { kind: 'user' } })
     }).toThrow(expect.objectContaining<Partial<InvariantError>>({
       code: 'INVARIANT',
-      packageName: '@roos-code/roos-code-session-title',
+      packageName: '@shres-code/shres-code-session-title',
     }))
     expect(session.seq).toBe(0)
   })

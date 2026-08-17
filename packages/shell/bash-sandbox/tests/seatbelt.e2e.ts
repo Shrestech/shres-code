@@ -4,18 +4,18 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { LocalSandboxProvider } from '@roos-code/roos-code-sandbox-local'
-import { SandboxPolicyService } from '@roos-code/roos-code-sandbox-policy'
-import { seatbeltProfileArgs } from '@roos-code/roos-code-sandbox-local/src/profiles.ts'
-import { SandboxBashExecutor } from '@roos-code/roos-code-bash-sandbox'
-import LocalSubprocessRuntime from '@roos-code/roos-code-subprocess-local'
+import { Context } from '@shres-code/cordis'
+import { LocalSandboxProvider } from '@shres-code/shres-code-sandbox-local'
+import { SandboxPolicyService } from '@shres-code/shres-code-sandbox-policy'
+import { seatbeltProfileArgs } from '@shres-code/shres-code-sandbox-local/src/profiles.ts'
+import { SandboxBashExecutor } from '@shres-code/shres-code-bash-sandbox'
+import LocalSubprocessRuntime from '@shres-code/shres-code-subprocess-local'
 
 /**
  * Keyless macOS integration of the real provider and executor through public run/start paths.
  * Linux rungs are forced off so Seatbelt is selected. The tests check world effects and stamped
  * facts, including EPERM classification through the wrap-carried dialect; backend-only
- * confinement is covered by `@roos-code/roos-code-sandbox-local`. Skips off macOS or when
+ * confinement is covered by `@shres-code/shres-code-sandbox-local`. Skips off macOS or when
  * `sandbox-exec` rejects the profile.
  */
 
@@ -32,7 +32,7 @@ afterEach(async () => {
 })
 
 async function tempDir(base: string): Promise<string> {
-  const dir = await mkdtemp(join(base, 'roos-seatbelt-e2e-'))
+  const dir = await mkdtemp(join(base, 'shres-seatbelt-e2e-'))
   tempDirs.push(dir)
   return dir
 }
@@ -83,8 +83,8 @@ describe.skipIf(!seatbeltUsable)('bash-sandbox: real Seatbelt confinement throug
     const insideProbe = join(workdir, 'hook-ran.txt')
     const outsideProbe = join(outside, 'escaped.txt')
     await writeFile(hook, [
-      'printf hook > "$ROOS_BASH_ENV_INSIDE"',
-      'printf escaped > "$ROOS_BASH_ENV_OUTSIDE"',
+      'printf hook > "$SHRES_BASH_ENV_INSIDE"',
+      'printf escaped > "$SHRES_BASH_ENV_OUTSIDE"',
       '',
     ].join('\n'))
     const bash = await sandboxedBash(workdir, 'workspace-write')
@@ -92,9 +92,9 @@ describe.skipIf(!seatbeltUsable)('bash-sandbox: real Seatbelt confinement throug
     await bash.run(bash.resolve({
       command: 'true',
       env: { BASH_ENV: hook },
-      roosEnv: {
-        ROOS_BASH_ENV_INSIDE: insideProbe,
-        ROOS_BASH_ENV_OUTSIDE: outsideProbe,
+      shresEnv: {
+        SHRES_BASH_ENV_INSIDE: insideProbe,
+        SHRES_BASH_ENV_OUTSIDE: outsideProbe,
       },
     }))
 

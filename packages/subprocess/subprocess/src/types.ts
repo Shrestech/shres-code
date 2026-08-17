@@ -4,19 +4,19 @@
  * recovery, raw piped streams, and tree-scoped termination. Command
  * defaulting, shell semantics, protocol framing, and presentation belong to
  * consumers such as the bash executor seam.
- * @module roos-subprocess/types
+ * @module shres-subprocess/types
  */
 
 import type { Readable, Writable } from 'node:stream'
 
-/** Namespace prefix reserved for Roos Code-managed child environment facts. */
-export const ROOS_ENV_PREFIX = 'ROOS_' as const
+/** Namespace prefix reserved for Shres Code-managed child environment facts. */
+export const SHRES_ENV_PREFIX = 'SHRES_' as const
 
-/** One environment key inside the managed {@link ROOS_ENV_PREFIX} namespace. */
-export type RoosEnvironmentKey = `${typeof ROOS_ENV_PREFIX}${string}`
+/** One environment key inside the managed {@link SHRES_ENV_PREFIX} namespace. */
+export type ShresEnvironmentKey = `${typeof SHRES_ENV_PREFIX}${string}`
 
-/** Trusted Roos Code variables for one child-process execution. */
-export type RoosEnvironment = Readonly<Record<RoosEnvironmentKey, string>>
+/** Trusted Shres Code variables for one child-process execution. */
+export type ShresEnvironment = Readonly<Record<ShresEnvironmentKey, string>>
 
 /** One captured stream: the (possibly truncated) text plus recovery info. */
 export interface CollectedOutput {
@@ -69,7 +69,7 @@ export interface SubprocessStdio {
 /**
  * A fully-specified spawn request. This seam applies no defaults: every
  * disposition, limit, and directory is explicit, so the caller's own config —
- * not a hidden subprocess-service default — decides them (the `roos-shell`
+ * not a hidden subprocess-service default — decides them (the `shres-shell`
  * request/spec split is the owning template).
  */
 export interface SubprocessSpawnSpec {
@@ -97,7 +97,7 @@ export interface SubprocessSpawnSpec {
    * Explicit environment entries merged onto the implementation's scrubbed
    * parent base (see `scrubbedParentEnv`), with no namespace validation. A
    * string is a deliberate caller opt-in, so a forwarded credential-shaped
-   * entry or current `ROOS_*` fact survives the scrub; `undefined` is a
+   * entry or current `SHRES_*` fact survives the scrub; `undefined` is a
    * tombstone that removes an ordinary ambient entry from the child.
    */
   env?: NodeJS.ProcessEnv | undefined
@@ -195,7 +195,7 @@ export interface SubprocessHandle {
 
 /**
  * Signals supported by the terminal-process primitive. Kept member-identical
- * to `TerminalSignal` in `@roos-code/roos-code-terminal` without a cross-seam dependency;
+ * to `TerminalSignal` in `@shres-code/shres-code-terminal` without a cross-seam dependency;
  * change both together.
  */
 export type SubprocessTerminalSignal = 'SIGINT' | 'SIGTERM' | 'SIGKILL' | 'SIGTSTP' | 'SIGHUP'

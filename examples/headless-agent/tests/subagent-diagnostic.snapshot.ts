@@ -7,12 +7,12 @@
 import { readFile, readdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { Context } from '@roos-code/cordis'
-import { normalizeSessionLog, scrubRequestHeaders, type NormalizeContext } from '@roos-code/roos-code-acp-snapshot'
-import { LOADER_SMOKE_TEST_TIMEOUT_MS, runLoaderSmoke } from '@roos-code/roos-code-loader-smoke'
-import { createUserMessage } from '@roos-code/roos-code-llm'
-import SessionStore, { SESSION_FORMAT_VERSION, SessionId, type SessionEvent, type SessionHeader } from '@roos-code/roos-code-session'
-import JsonlSessionPersistence from '@roos-code/roos-code-session-persistence-jsonl'
+import { Context } from '@shres-code/cordis'
+import { normalizeSessionLog, scrubRequestHeaders, type NormalizeContext } from '@shres-code/shres-code-acp-snapshot'
+import { LOADER_SMOKE_TEST_TIMEOUT_MS, runLoaderSmoke } from '@shres-code/shres-code-loader-smoke'
+import { createUserMessage } from '@shres-code/shres-code-llm'
+import SessionStore, { SESSION_FORMAT_VERSION, SessionId, type SessionEvent, type SessionHeader } from '@shres-code/shres-code-session'
+import JsonlSessionPersistence from '@shres-code/shres-code-session-persistence-jsonl'
 import { describe, expect, it } from 'vitest'
 
 const fixtureDir = fileURLToPath(new URL('./subagent-diagnostic-snapshots/descriptorless-child', import.meta.url))
@@ -23,7 +23,7 @@ const binScript = fileURLToPath(new URL('./fixtures/headless-driver.ts', import.
 const tsconfigPath = fileURLToPath(new URL('../../../tsconfig.json', import.meta.url))
 const parentId = SessionId('subagent-diagnostic-parent')
 const childId = SessionId('subagent-diagnostic-child')
-const refreshing = process.env.ROOS_SNAPSHOT === 'refresh'
+const refreshing = process.env.SHRES_SNAPSHOT === 'refresh'
 const task = 'Call list_agents once and report what it shows.'
 
 /**
@@ -75,15 +75,15 @@ describe('descriptor-less cold child diagnostic snapshot', () => {
     let cwd = ''
     const result = await runLoaderSmoke({
       label: 'subagent diagnostic headless stream-json snapshot',
-      tempDirPrefix: 'roos-subagent-diag-',
+      tempDirPrefix: 'shres-subagent-diag-',
       binScript,
       libBinScript: binScript,
       configPath,
       binArgs: [configPath, task],
       tsconfigPath,
       env: {
-        ROOS_SNAPSHOT_FILE: replayOverride,
-        ROOS_SNAPSHOT_OVERRIDE: replayOverride,
+        SHRES_SNAPSHOT_FILE: replayOverride,
+        SHRES_SNAPSHOT_OVERRIDE: replayOverride,
       },
       prepare: async (runCwd) => {
         cwd = runCwd

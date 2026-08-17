@@ -6,7 +6,7 @@ import {
   UNTRUSTED_INSTRUCTION_DISCLAIMER,
   UNTRUSTED_LT_ESCAPE,
   wrapUntrusted,
-} from '@roos-code/roos-code-untrusted-frame'
+} from '@shres-code/shres-code-untrusted-frame'
 
 describe('escapeUntrusted', () => {
   it('replaces every < with the lossless JSON escape and leaves other text', () => {

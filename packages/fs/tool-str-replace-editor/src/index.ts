@@ -1,18 +1,18 @@
 /**
  * Model-facing `str_replace_editor` over the Harness filesystem seam.
- * @module @roos-code/roos-code-tool-str-replace-editor
+ * @module @shres-code/shres-code-tool-str-replace-editor
  */
 
 import { isAbsolute } from 'node:path'
-import type { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import { FsError } from '@roos-code/roos-code-fs'
-import type { FsInfo, FsTarget, FsWriteIntent } from '@roos-code/roos-code-fs'
-import { sandboxDenialMarker } from '@roos-code/roos-code-sandbox'
-import type { SandboxExecutionPolicy } from '@roos-code/roos-code-sandbox'
-import type { SandboxPolicyService } from '@roos-code/roos-code-sandbox-policy'
-import { defineTool } from '@roos-code/roos-code-tools'
-import type { ToolCallView, ToolRunContext } from '@roos-code/roos-code-tools'
+import type { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import { FsError } from '@shres-code/shres-code-fs'
+import type { FsInfo, FsTarget, FsWriteIntent } from '@shres-code/shres-code-fs'
+import { sandboxDenialMarker } from '@shres-code/shres-code-sandbox'
+import type { SandboxExecutionPolicy } from '@shres-code/shres-code-sandbox'
+import type { SandboxPolicyService } from '@shres-code/shres-code-sandbox-policy'
+import { defineTool } from '@shres-code/shres-code-tools'
+import type { ToolCallView, ToolRunContext } from '@shres-code/shres-code-tools'
 
 const TRUNCATED_MESSAGE = '<response clipped><NOTE>To save on context only part of this file has been shown to you. You should retry this tool after you have searched inside the file with `grep -n` in order to find the line numbers of what you are looking for.</NOTE>'
 

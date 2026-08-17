@@ -7,14 +7,14 @@
 
 import { randomBytes } from 'node:crypto'
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { unzipSync, strFromU8 } from 'fflate'
-import type { ImageAttachmentRef } from '@roos-code/roos-code-attachment'
-import UserQuestionService from '@roos-code/roos-code-user-questions'
-import type { SessionHeader, SessionId } from '@roos-code/roos-code-session'
-import type { SessionLineageNode } from '@roos-code/roos-code-session-query'
-import type { SessionRawArtifact } from '@roos-code/roos-code-session-persistence'
-import ApiProxyService, { createApiProxy, toFetchHandler } from '@roos-code/roos-code-host-apiproxy'
+import type { ImageAttachmentRef } from '@shres-code/shres-code-attachment'
+import UserQuestionService from '@shres-code/shres-code-user-questions'
+import type { SessionHeader, SessionId } from '@shres-code/shres-code-session'
+import type { SessionLineageNode } from '@shres-code/shres-code-session-query'
+import type { SessionRawArtifact } from '@shres-code/shres-code-session-persistence'
+import ApiProxyService, { createApiProxy, toFetchHandler } from '@shres-code/shres-code-host-apiproxy'
 
 const sid = (id: string): SessionId => id as SessionId
 
@@ -161,7 +161,7 @@ describe('session.export download endpoint', () => {
     )
     expect(response.status).toBe(200)
     expect(response.headers.get('content-type')).toBe('application/zip')
-    expect(response.headers.get('content-disposition')).toContain('roos-session-session-root.zip')
+    expect(response.headers.get('content-disposition')).toContain('shres-session-session-root.zip')
     const files = unzipSync(await responseBytes(response))
     expect(Object.keys(files)).toEqual(['session.jsonl'])
     expect(strFromU8(files['session.jsonl'] as Uint8Array)).toBe(artifact('session-root').content)
@@ -176,7 +176,7 @@ describe('session.export download endpoint', () => {
 
     expect(response.status).toBe(200)
     expect(response.headers.get('content-type')).toBe('application/zip')
-    expect(response.headers.get('content-disposition')).toContain('roos-session-session-root.zip')
+    expect(response.headers.get('content-disposition')).toContain('shres-session-session-root.zip')
     expect(response.body).toBeNull()
     expect(readRaw).toHaveBeenCalledOnce()
   })

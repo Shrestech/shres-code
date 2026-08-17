@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import {
   LOADER_SMOKE_TEST_TIMEOUT_MS,
   runLoaderSmoke,
-} from '@roos-code/roos-code-loader-smoke'
+} from '@shres-code/shres-code-loader-smoke'
 
 const fixtureDir = fileURLToPath(new URL(
   '../../../../examples/acp-agent/tests/fixtures/subagent/subagent-claude-code/',
@@ -18,7 +18,7 @@ describe('product-provider public Loader composition', () => {
   it('loads both opt-in packages and foreground tools without starting either product', async () => {
     const { stdout, stderr } = await runLoaderSmoke({
       label: 'product-provider Loader composition',
-      tempDirPrefix: 'roos-product-provider-loader-',
+      tempDirPrefix: 'shres-product-provider-loader-',
       binScript: driver,
       libBinScript: driver,
       configPath,

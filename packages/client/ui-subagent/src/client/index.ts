@@ -13,17 +13,17 @@
  */
 import type {
   ClientContext, SessionId, SubagentAddress,
-} from '@roos-code/roos-code-client-runtime/client'
-import type { ComposerChainProps } from '@roos-code/roos-code-client-ui-conversation/client'
-import type { ClientSessionContext, InputTriggerServiceContract, InputTriggerSource } from '@roos-code/roos-code-client-ui-input-trigger/client'
+} from '@shres-code/shres-code-client-runtime/client'
+import type { ComposerChainProps } from '@shres-code/shres-code-client-ui-conversation/client'
+import type { ClientSessionContext, InputTriggerServiceContract, InputTriggerSource } from '@shres-code/shres-code-client-ui-input-trigger/client'
 import { SubagentCatalogAction, type SubagentCatalogInjected } from './SubagentCatalogAction.tsx'
 import {
   SubagentReadOnlyComposer, type SubagentReadOnlyMatch,
 } from './SubagentReadOnlyComposer.tsx'
-import type {} from '@roos-code/roos-code-client-locale/client'
+import type {} from '@shres-code/shres-code-client-locale/client'
 import { en, NS, type SubagentKey } from './locales.ts'
 
-declare module '@roos-code/roos-code-client-ui-slots' {
+declare module '@shres-code/shres-code-client-ui-slots' {
   interface LocaleNamespaceMap {
     /** Subagent catalog and read-only composer copy. */
     'subagent': SubagentKey

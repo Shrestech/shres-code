@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import type { Agent } from '@roos-code/roos-code-agent'
-import AgentLoop from '@roos-code/roos-code-agent-loop'
-import { mountAgentLoopTestDependencies } from '@roos-code/roos-code-agent-loop-testkit'
-import { createUserMessage, CallId  } from '@roos-code/roos-code-llm'
-import { SessionId } from '@roos-code/roos-code-session'
-import SubagentRuntime from '@roos-code/roos-code-subagent'
-import { STRUCTURED_OUTPUT_TOOL } from '@roos-code/roos-code-subagent-in-process-driver'
-import * as spawn from '@roos-code/roos-code-subagent-spawn-in-process'
-import WorkerThreadWorkflowEngine from '@roos-code/roos-code-workflow-worker-thread'
+import { Context } from '@shres-code/cordis'
+import type { Agent } from '@shres-code/shres-code-agent'
+import AgentLoop from '@shres-code/shres-code-agent-loop'
+import { mountAgentLoopTestDependencies } from '@shres-code/shres-code-agent-loop-testkit'
+import { createUserMessage, CallId  } from '@shres-code/shres-code-llm'
+import { SessionId } from '@shres-code/shres-code-session'
+import SubagentRuntime from '@shres-code/shres-code-subagent'
+import { STRUCTURED_OUTPUT_TOOL } from '@shres-code/shres-code-subagent-in-process-driver'
+import * as spawn from '@shres-code/shres-code-subagent-spawn-in-process'
+import WorkerThreadWorkflowEngine from '@shres-code/shres-code-workflow-worker-thread'
 import { MockAdapter, maxTokensResponse, textResponse, toolCallResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
 import * as toolRalph from '../src/index.ts'
 
@@ -34,7 +34,7 @@ async function mountRalph(script: MockScript, config: toolRalph.Config) {
   return { ctx, adapter, parentHandle, parent: parentHandle.agent }
 }
 
-describe('roos-tool-ralph over the real spawn and worker-thread stack', () => {
+describe('shres-tool-ralph over the real spawn and worker-thread stack', () => {
   it('uses distinct empty-seed children, shared cwd, and only the prior bounded handoff', async () => {
     const firstReport = {
       status: 'continue',

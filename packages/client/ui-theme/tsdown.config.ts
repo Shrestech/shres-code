@@ -1,7 +1,7 @@
 import { clientBundle } from '../tsdown.client.ts'
 
 export default clientBundle(
-  '@roos-code/roos-code-client-ui-theme',
+  '@shres-code/shres-code-client-ui-theme',
   ['lib/types/index.js', 'lib/types/invariant.js'],
   {
     lib: {

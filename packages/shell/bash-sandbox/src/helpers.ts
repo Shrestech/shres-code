@@ -1,12 +1,12 @@
 /**
  * Internal sandbox-result classification helpers.
  *
- * @module @roos-code/roos-code-bash-sandbox/helpers
+ * @module @shres-code/shres-code-bash-sandbox/helpers
  */
 
 import { accessSync, constants, statSync } from 'node:fs'
-import type { ShellRunResult } from '@roos-code/roos-code-shell'
-import type { RunnerFailureRule } from '@roos-code/roos-code-sandbox'
+import type { ShellRunResult } from '@shres-code/shres-code-shell'
+import type { RunnerFailureRule } from '@shres-code/shres-code-sandbox'
 
 /** Node-local spawn codes proven to identify executable resolution or permission failure. */
 const EXECUTABLE_SPAWN_CODES = new Set(['EACCES', 'ENOENT'])

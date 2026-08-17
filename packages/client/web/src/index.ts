@@ -4,7 +4,7 @@
  * gate, app-shell assembly entry, module-table staticModules, platform constants) is
  * internal to the boot chain. PLATFORM_MODULES is re-exported as the
  * single source of truth for the tsdown client externals projection.
- * @module @roos-code/roos-code-client-web
+ * @module @shres-code/shres-code-client-web
  */
 
 export { AppWebEntry, type BootSeams } from './boot.tsx'

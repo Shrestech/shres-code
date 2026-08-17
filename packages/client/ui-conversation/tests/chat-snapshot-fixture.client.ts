@@ -3,7 +3,7 @@ import type {
   ChatLocationNodeIndex, ChatNodeStore, CompactionSummaryNode, ConversationLocationDataStore,
   ConversationTurnDataMap, LegacyConversationSlice, PartialAssistant, RunningToolCall,
   ToolCallBlock, TurnLocation,
-} from '@roos-code/roos-code-client-runtime/client'
+} from '@shres-code/shres-code-client-runtime/client'
 import { deriveTurnMetrics } from '../src/client/chat/turn-metrics.ts'
 
 const EMPTY: readonly never[] = []

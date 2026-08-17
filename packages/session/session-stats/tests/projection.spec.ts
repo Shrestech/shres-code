@@ -11,14 +11,14 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { createMessage } from '@roos-code/roos-code-llm'
-import SessionStore, { SessionId } from '@roos-code/roos-code-session'
-import type { Session, SessionEvent } from '@roos-code/roos-code-session'
-import SessionProjectionRegistry from '@roos-code/roos-code-session-projection'
-import * as SessionStatsPlugin from '@roos-code/roos-code-session-stats'
-import { sessionStatsProjectionDefinition } from '@roos-code/roos-code-session-stats/src/projection.ts'
-import type { SessionStatsProjection } from '@roos-code/roos-code-session-stats/types'
+import { Context } from '@shres-code/cordis'
+import { createMessage } from '@shres-code/shres-code-llm'
+import SessionStore, { SessionId } from '@shres-code/shres-code-session'
+import type { Session, SessionEvent } from '@shres-code/shres-code-session'
+import SessionProjectionRegistry from '@shres-code/shres-code-session-projection'
+import * as SessionStatsPlugin from '@shres-code/shres-code-session-stats'
+import { sessionStatsProjectionDefinition } from '@shres-code/shres-code-session-stats/src/projection.ts'
+import type { SessionStatsProjection } from '@shres-code/shres-code-session-stats/types'
 
 async function harness(withStatsPlugin: boolean): Promise<{ ctx: Context; session: Session }> {
   const ctx = new Context()

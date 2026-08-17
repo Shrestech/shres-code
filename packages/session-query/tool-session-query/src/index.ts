@@ -1,14 +1,14 @@
 /**
  * Model-facing, workspace-authorized session-history search and read tools.
  *
- * @module @roos-code/roos-code-tool-session-query
+ * @module @shres-code/shres-code-tool-session-query
  */
 
-import type { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import { MAX_TIMER_DELAY_MS } from '@roos-code/roos-code-timeout'
-import { defineTool } from '@roos-code/roos-code-tools'
-import type {} from '@roos-code/roos-code-system-prompt'
+import type { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
+import { defineTool } from '@shres-code/shres-code-tools'
+import type {} from '@shres-code/shres-code-system-prompt'
 import { toolInput } from './input.ts'
 import { operations } from './operations.ts'
 import { presentation } from './presentation.ts'

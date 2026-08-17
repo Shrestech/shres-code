@@ -5,10 +5,10 @@
  * operation and the bearer token through a per-request resolver, so the
  * registering plugin owns validation, layering, and credential policy.
  *
- * @module roos-llm-deepseek/adapter
+ * @module shres-llm-deepseek/adapter
  */
 
-import { attributionHeaders, CONTEXT_WINDOW_EXCEEDED_CODE, isContextWindowExceededError, isQuotaExceededError, LlmAdapter, LlmError, ProviderRequestId, QUOTA_EXCEEDED_CODE, ReasoningEffortId } from '@roos-code/roos-code-llm'
+import { attributionHeaders, CONTEXT_WINDOW_EXCEEDED_CODE, isContextWindowExceededError, isQuotaExceededError, LlmAdapter, LlmError, ProviderRequestId, QUOTA_EXCEEDED_CODE, ReasoningEffortId } from '@shres-code/shres-code-llm'
 import type {
   GenerateOptions,
   LlmModelInfo,
@@ -16,10 +16,10 @@ import type {
   LlmResolvedModelInfo,
   ResolvedRetryPolicy,
   StreamChunk,
-} from '@roos-code/roos-code-llm'
-import type { CredentialRef } from '@roos-code/roos-code-credentials'
-import { idleWatchdog, timeoutOf } from '@roos-code/roos-code-timeout'
-import type { AnonymousUserId } from '@roos-code/roos-code-anonymous-user-id'
+} from '@shres-code/shres-code-llm'
+import type { CredentialRef } from '@shres-code/shres-code-credentials'
+import { idleWatchdog, timeoutOf } from '@shres-code/shres-code-timeout'
+import type { AnonymousUserId } from '@shres-code/shres-code-anonymous-user-id'
 import { serializeRequest } from './serialize.ts'
 import type { RequestDefaults } from './serialize.ts'
 import { parseSse } from './sse.ts'
@@ -285,12 +285,12 @@ export class DeepSeekAdapter extends LlmAdapter {
       'content-type': 'application/json',
       'accept': 'text/event-stream',
       ...attributionHeaders(),
-      'x-roos-code-user-id': String(userId),
+      'x-shres-code-user-id': String(userId),
       ...options.sessionId !== undefined
-        ? { 'x-roos-code-session-id': String(options.sessionId) }
+        ? { 'x-shres-code-session-id': String(options.sessionId) }
         : {},
       ...options.purpose === 'compaction'
-        ? { 'x-roos-code-compact': '1' }
+        ? { 'x-shres-code-compact': '1' }
         : {},
     }
 

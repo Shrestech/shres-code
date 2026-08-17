@@ -1,15 +1,15 @@
 // SessionTitleService.rename: user-source acceptance, normalization/rejection
 // boundaries, and the pin (a user-sourced latest title schedules no automatic
 // revision; explicit refresh stays the unpin).
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { describe, expect, it, vi } from 'vitest'
-import { createUserMessage } from '@roos-code/roos-code-llm'
-import SessionStore, { Session, SessionId } from '@roos-code/roos-code-session'
+import { createUserMessage } from '@shres-code/shres-code-llm'
+import SessionStore, { Session, SessionId } from '@shres-code/shres-code-session'
 import SessionTitleService, {
   SessionTitleProviderId,
   foldSessionTitle,
   type SessionTitleProviderRequest,
-} from '@roos-code/roos-code-session-title'
+} from '@shres-code/shres-code-session-title'
 
 const CONFIG = {
   fallbackMaxWords: 5,

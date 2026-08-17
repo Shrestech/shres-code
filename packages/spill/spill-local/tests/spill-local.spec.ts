@@ -7,19 +7,19 @@
  */
 
 import { describe, expect, it, beforeEach, afterEach } from 'vitest'
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, dirname, isAbsolute, join, normalize } from 'node:path'
-import { CallId } from '@roos-code/roos-code-llm'
-import { SessionId } from '@roos-code/roos-code-session'
-import type { SaveTextSpill } from '@roos-code/roos-code-spill'
-import LocalSpillStore, { encodeSegment, privateRoot, saveTextFile, sessionDir } from '@roos-code/roos-code-spill-local'
+import { CallId } from '@shres-code/shres-code-llm'
+import { SessionId } from '@shres-code/shres-code-session'
+import type { SaveTextSpill } from '@shres-code/shres-code-spill'
+import LocalSpillStore, { encodeSegment, privateRoot, saveTextFile, sessionDir } from '@shres-code/shres-code-spill-local'
 
 let root: string
 
 beforeEach(() => {
-  root = mkdtempSync(join(tmpdir(), 'roos-spill-test-'))
+  root = mkdtempSync(join(tmpdir(), 'shres-spill-test-'))
 })
 afterEach(() => {
   rmSync(root, { recursive: true, force: true })

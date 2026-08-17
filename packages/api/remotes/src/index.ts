@@ -1,18 +1,18 @@
 /** Host BFF entry and Loader shell for the Remote contribution assembly. */
 
-import type { TypertForwardableEvent } from '@roos-code/roos-code-typert-protocol'
+import type { TypertForwardableEvent } from '@shres-code/shres-code-typert-protocol'
 import { API_REMOTE_FORWARDED_EVENTS } from './remote-events.ts'
 
 // The owner packages' client-safe `./types` exports carry the cordis `Events`
 // declarations for every allowlisted event. Pulling them into this face is what
 // makes the shape assertion below judge real signatures rather than an empty
 // event vocabulary.
-import type {} from '@roos-code/roos-code-commands/types'
-import type {} from '@roos-code/roos-code-cordis-host-runner/types'
-import type {} from '@roos-code/roos-code-credentials/types'
-import type {} from '@roos-code/roos-code-llm/types'
-import type {} from '@roos-code/roos-code-agent-presets/types'
-import type {} from '@roos-code/roos-code-settings/types'
+import type {} from '@shres-code/shres-code-commands/types'
+import type {} from '@shres-code/shres-code-cordis-host-runner/types'
+import type {} from '@shres-code/shres-code-credentials/types'
+import type {} from '@shres-code/shres-code-llm/types'
+import type {} from '@shres-code/shres-code-agent-presets/types'
+import type {} from '@shres-code/shres-code-settings/types'
 
 export {
   ApiRemoteSessionNotFound,

@@ -1,6 +1,6 @@
-import { Context, Exporter, Formatter, Logger, Message } from '@roos-code/cordis'
-import { Time } from '@roos-code/cosmokit'
-import z from '@roos-code/schemastery'
+import { Context, Exporter, Formatter, Logger, Message } from '@shres-code/cordis'
+import { Time } from '@shres-code/cosmokit'
+import z from '@shres-code/schemastery'
 
 /** Terminal color support level compatible with supports-color. */
 export type ColorSupportLevel = 0 | 1 | 2 | 3

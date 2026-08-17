@@ -4,7 +4,7 @@ Status: implemented
 
 ## Problem
 
-pi-ai already ships `zai` (`https://api.z.ai/api/coding/paas/v4`, `ZAI_API_KEY`, GLM catalog). The Models page only listed it under **Add a custom provider**, so a Z.AI key had no first-class card, first-run slot, or `roos providers add --template`.
+pi-ai already ships `zai` (`https://api.z.ai/api/coding/paas/v4`, `ZAI_API_KEY`, GLM catalog). The Models page only listed it under **Add a custom provider**, so a Z.AI key had no first-class card, first-run slot, or `shres providers add --template`.
 
 ## Decision
 
@@ -12,7 +12,7 @@ pi-ai already ships `zai` (`https://api.z.ai/api/coding/paas/v4`, `ZAI_API_KEY`,
 
 - Base composition: `apiKeyEnv: ZAI_API_KEY`. Endpoint, protocol, and models stay the installed catalog (`glm-5.2`, `glm-5.1`, `glm-5-turbo`, `glm-4.7`, …).
 - First-run and onboarding offer **Z.AI (GLM)** with default model `glm-5.2`.
-- `roos providers add --template zai` writes that same profile.
+- `shres providers add --template zai` writes that same profile.
 
 `zai-coding-cn` stays an add-from-catalog option, not a shipped card.
 

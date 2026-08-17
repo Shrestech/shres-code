@@ -2,11 +2,11 @@
  * Scoped-context primitive: mint a Cordis context that tags registrations with
  * an opaque identity and build routing-only event carriers for that identity.
  *
- * @module @roos-code/roos-code-scope
+ * @module @shres-code/shres-code-scope
  */
 
-import type { Context, Fiber } from '@roos-code/cordis'
-import { Context as CordisContext } from '@roos-code/cordis'
+import type { Context, Fiber } from '@shres-code/cordis'
+import { Context as CordisContext } from '@shres-code/cordis'
 
 export { AnonymousEntries, NamedEntries, ScopedLayers } from './store.ts'
 export type { ScopeLayer } from './store.ts'
@@ -15,7 +15,7 @@ export type { ScopeLayer } from './store.ts'
 export type ScopeKey = object
 
 /** Context tag written by {@link createScope}. */
-const kScope = Symbol('roos.scope')
+const kScope = Symbol('shres.scope')
 
 declare const ScopedBrand: unique symbol
 
@@ -53,7 +53,7 @@ export interface ScopeParentBinding {
 /** Cycle-checked write shared by the bind and every rebind. */
 function linkScopeParent(key: ScopeKey, parent: ScopeKey): void {
   for (let cursor: ScopeKey | undefined = parent; cursor !== undefined; cursor = scopeParents.get(cursor)) {
-    if (cursor === key) throw new Error('roos-scope: scope parent link would form a cycle')
+    if (cursor === key) throw new Error('shres-scope: scope parent link would form a cycle')
   }
   scopeParents.set(key, parent)
 }
@@ -71,7 +71,7 @@ function linkScopeParent(key: ScopeKey, parent: ScopeKey): void {
  */
 export function bindScopeParent(key: ScopeKey, parent: ScopeKey): ScopeParentBinding {
   if (scopeParents.has(key)) {
-    throw new Error('roos-scope: scope key is already bound to a parent; re-linking requires the binding returned by the original bind')
+    throw new Error('shres-scope: scope key is already bound to a parent; re-linking requires the binding returned by the original bind')
   }
   linkScopeParent(key, parent)
   return {

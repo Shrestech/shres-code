@@ -1,6 +1,6 @@
 /**
  * Client Agent-scope primitive: mint a Cordis context tagged with the owning
- * Agent's identity. The mechanism mirrors the host `roos-scope` architecture
+ * Agent's identity. The mechanism mirrors the host `shres-scope` architecture
  * (no-op plugin fiber + context tag + `Context.filter` routing predicate);
  * the shape deliberately diverges: the filter lives on the actx itself
  * instead of a separate carrier object, so scoped dispatch is plain cordis —
@@ -15,10 +15,10 @@
  * — a cold session's host Agent is already disposed while its client actx
  * stays alive for history viewing.
  */
-import { Context as CordisContext } from '@roos-code/cordis'
-import type { Context, Fiber } from '@roos-code/cordis'
-import type { SessionId } from '@roos-code/roos-code-api-remotes/client'
-import type { TypertClientRemote, TypertRemoteScopeApi } from '@roos-code/roos-code-typert-protocol'
+import { Context as CordisContext } from '@shres-code/cordis'
+import type { Context, Fiber } from '@shres-code/cordis'
+import type { SessionId } from '@shres-code/shres-code-api-remotes/client'
+import type { TypertClientRemote, TypertRemoteScopeApi } from '@shres-code/shres-code-typert-protocol'
 
 /** Client Cordis Context carrying one Agent identity and its scoped Remote namespaces. */
 export type AgentContext = Omit<Context, 'remote'> & {
@@ -26,7 +26,7 @@ export type AgentContext = Omit<Context, 'remote'> & {
 }
 
 /** Context tag written by {@link createScope}. */
-const kScope = Symbol('roos.client.scope')
+const kScope = Symbol('shres.client.scope')
 
 /** A minted Agent scope and its disposal boundary. */
 export interface AgentScopeHandle {

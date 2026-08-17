@@ -1,11 +1,11 @@
 /**
- * roos-lsp's owned branded id: {@link LspProviderId}, the opaque identity a provider reserves on
- * `ctx.lsp`. The `Branded<B>` primitive lives in `@roos-code/roos-code-brand`; keeping the type and its
+ * shres-lsp's owned branded id: {@link LspProviderId}, the opaque identity a provider reserves on
+ * `ctx.lsp`. The `Branded<B>` primitive lives in `@shres-code/shres-code-brand`; keeping the type and its
  * factory together here lets `index.ts` re-export both under one name.
- * @module @roos-code/roos-code-lsp/brand
+ * @module @shres-code/shres-code-lsp/brand
  */
 
-import type { Branded } from '@roos-code/roos-code-brand'
+import type { Branded } from '@shres-code/shres-code-brand'
 
 /** Opaque provider identity, reserved atomically with its extension mappings at registration. */
 export type LspProviderId = Branded<'LspProviderId'>

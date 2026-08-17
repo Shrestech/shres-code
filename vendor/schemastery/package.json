@@ -1,5 +1,5 @@
 {
-  "name": "@roos-code/schemastery",
+  "name": "@shres-code/schemastery",
   "description": "Type driven schema validator",
   "version": "3.18.1",
   "publishConfig": {
@@ -7,7 +7,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "vendor/schemastery"
   },
   "type": "module",
@@ -34,6 +34,6 @@
   "license": "MIT",
   "dependencies": {
     "@standard-schema/spec": "^1.1.0",
-    "@roos-code/cosmokit": "workspace:^"
+    "@shres-code/cosmokit": "workspace:^"
   }
 }

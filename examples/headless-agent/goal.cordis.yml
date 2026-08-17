@@ -1,11 +1,11 @@
 # Add the persisted goal domain and its model-facing tools to the real one-shot app.
 - id: base
-  name: '@roos-code/cordis-plugin-include'
+  name: '@shres-code/cordis-plugin-include'
   config:
     path: ./cordis.yml
     patches:
       - insert:
           - id: goal
-            name: '@roos-code/roos-code-goal'
+            name: '@shres-code/shres-code-goal'
           - id: tool-goal
-            name: '@roos-code/roos-code-tool-goal'
+            name: '@shres-code/shres-code-tool-goal'

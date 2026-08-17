@@ -7,10 +7,10 @@ import { memo, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import type {
   ModelRetryNode, TurnErrorNode, UserMessageNode,
-} from '@roos-code/roos-code-client-runtime/client'
-import { JsonBlock, MessageText, StateDot } from '@roos-code/roos-code-client-ui-primitives'
+} from '@shres-code/shres-code-client-runtime/client'
+import { JsonBlock, MessageText, StateDot } from '@shres-code/shres-code-client-ui-primitives'
 import type { ChatNodeViewProps, ChatViewSlotProps } from '../contract/slots.ts'
-import { ImageGallery, type ImageLoader } from '@roos-code/roos-code-client-ui-attachment'
+import { ImageGallery, type ImageLoader } from '@shres-code/shres-code-client-ui-attachment'
 import { messageImageLabels } from '../image-labels.ts'
 import { CompactionItem } from './CompactionItem.tsx'
 import { ContextInjectionRow } from './ContextInjectionRow.tsx'

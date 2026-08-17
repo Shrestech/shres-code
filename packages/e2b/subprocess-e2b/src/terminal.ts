@@ -10,16 +10,16 @@ import {
   FileNotFoundError,
   SandboxNotFoundError,
   quoteE2BShellArg,
-} from '@roos-code/roos-code-e2b'
-import type { CommandHandle, CommandResult, Sandbox } from '@roos-code/roos-code-e2b'
+} from '@shres-code/shres-code-e2b'
+import type { CommandHandle, CommandResult, Sandbox } from '@shres-code/shres-code-e2b'
 import type {
   SubprocessOutcome,
   SubprocessTerminalForeground,
   SubprocessTerminalHandle,
   SubprocessTerminalSignal,
   SubprocessTerminalSpawnSpec,
-} from '@roos-code/roos-code-subprocess'
-import type E2BRuntime from '@roos-code/roos-code-e2b'
+} from '@shres-code/shres-code-subprocess'
+import type E2BRuntime from '@shres-code/shres-code-e2b'
 import {
   bootstrapEnvironment,
   readRemoteEnvironment,
@@ -469,7 +469,7 @@ export async function spawnE2BTerminal(
     argv: posix.join(stateDir, 'argv'),
     outputMarker: posix.join(stateDir, 'output-marker'),
   }
-  const outputMarker = Buffer.from(`roos-e2b-bootstrap:${randomUUID()}`)
+  const outputMarker = Buffer.from(`shres-e2b-bootstrap:${randomUUID()}`)
   const output = new PassThrough()
   const outputFilter = new BootstrapOutputFilter(outputMarker, output)
   let handle: CommandHandle | undefined

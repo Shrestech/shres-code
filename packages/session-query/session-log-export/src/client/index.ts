@@ -1,21 +1,21 @@
 /** Browser plugin owning Session export download state and its shared modal. */
 
-import type { ClientContext, SessionId } from '@roos-code/roos-code-client-runtime/client'
-import type {} from '@roos-code/roos-code-client-locale/client'
-import type {} from '@roos-code/roos-code-client-ui-commands/client'
-import type {} from '@roos-code/roos-code-client-ui-conversation/client'
+import type { ClientContext, SessionId } from '@shres-code/shres-code-client-runtime/client'
+import type {} from '@shres-code/shres-code-client-locale/client'
+import type {} from '@shres-code/shres-code-client-ui-commands/client'
+import type {} from '@shres-code/shres-code-client-ui-conversation/client'
 import { SessionLogDownloadController } from './controller.ts'
 import type { SessionLogDownloadDialogInjected } from './Dialog.tsx'
 import { SessionLogDownloadHeaderAction } from './HeaderAction.tsx'
 import { en, NS, type SessionLogDownloadKey } from './locales.ts'
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     sessionLogDownload: SessionLogDownloadController
   }
 }
 
-declare module '@roos-code/roos-code-client-ui-slots' {
+declare module '@shres-code/shres-code-client-ui-slots' {
   interface LocaleNamespaceMap {
     'session-log-download': SessionLogDownloadKey
   }

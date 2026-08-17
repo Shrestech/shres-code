@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Context, Service } from '@roos-code/cordis'
-import { CredentialProvider } from '@roos-code/roos-code-credentials'
-import type { CredentialInfo, CredentialRef, ResolvedCredential } from '@roos-code/roos-code-credentials'
-import { SettingsProvider } from '@roos-code/roos-code-settings'
-import type { SettingsNamespace } from '@roos-code/roos-code-settings'
-import WebRuntime from '@roos-code/roos-code-web'
-import * as attachedCliPlugin from '@roos-code/roos-code-web-search-attached-cli'
-import { enabledBackends } from '@roos-code/roos-code-web-search-attached-cli'
+import { Context, Service } from '@shres-code/cordis'
+import { CredentialProvider } from '@shres-code/shres-code-credentials'
+import type { CredentialInfo, CredentialRef, ResolvedCredential } from '@shres-code/shres-code-credentials'
+import { SettingsProvider } from '@shres-code/shres-code-settings'
+import type { SettingsNamespace } from '@shres-code/shres-code-settings'
+import WebRuntime from '@shres-code/shres-code-web'
+import * as attachedCliPlugin from '@shres-code/shres-code-web-search-attached-cli'
+import { enabledBackends } from '@shres-code/shres-code-web-search-attached-cli'
 import {
   ATTACHED_CLI_PROVIDER_ID,
   AttachedCliSearchProvider,
@@ -19,7 +19,7 @@ import {
   type AttachedCliBackend,
   type AttachedCliBackendId,
   type AttachedCliSearchOptions,
-} from '@roos-code/roos-code-web-search-attached-cli'
+} from '@shres-code/shres-code-web-search-attached-cli'
 
 function backend(id: AttachedCliBackendId, apiKey?: string): AttachedCliBackend {
   return {

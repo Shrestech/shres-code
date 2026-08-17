@@ -2,9 +2,9 @@ import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
-import { createMessage, createUserMessage } from '@roos-code/roos-code-llm'
-import { SESSION_FORMAT_VERSION, Session, SessionId } from '@roos-code/roos-code-session'
-import type {} from '@roos-code/roos-code-session-title'
+import { createMessage, createUserMessage } from '@shres-code/shres-code-llm'
+import { SESSION_FORMAT_VERSION, Session, SessionId } from '@shres-code/shres-code-session'
+import type {} from '@shres-code/shres-code-session-title'
 import {
   assertFixtureInventory,
   captureStableAria,

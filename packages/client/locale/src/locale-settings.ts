@@ -1,6 +1,6 @@
 /** Locale preference stored in the Host user-settings document. */
 
-import z from '@roos-code/schemastery'
+import z from '@shres-code/schemastery'
 
 /** Settings namespace owned by the locale plugin. */
 export const LOCALE_SETTINGS_NAMESPACE = 'locale'

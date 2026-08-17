@@ -6,16 +6,16 @@
  */
 
 import { expect } from 'vitest'
-import { FiberState, Inject, RegistryService, ValidationError } from '@roos-code/cordis'
-import type { Context, Plugin } from '@roos-code/cordis'
-import { AttachmentStore } from '@roos-code/roos-code-attachment'
+import { FiberState, Inject, RegistryService, ValidationError } from '@shres-code/cordis'
+import type { Context, Plugin } from '@shres-code/cordis'
+import { AttachmentStore } from '@shres-code/shres-code-attachment'
 import type {
   ImageAttachmentLimits,
   ImageAttachmentRef,
   SaveImageAttachment,
   StoredImageAttachment,
-} from '@roos-code/roos-code-attachment'
-import InvariantRegistry from '@roos-code/roos-code-invariants'
+} from '@shres-code/shres-code-attachment'
+import InvariantRegistry from '@shres-code/shres-code-invariants'
 
 declare global {
   interface ImportMeta {

@@ -1,4 +1,4 @@
-import type { Context } from '@roos-code/cordis'
+import type { Context } from '@shres-code/cordis'
 import {
   CallId,
   LlmAdapter,
@@ -6,7 +6,7 @@ import {
   type GenerateOptions,
   type LlmResolvedModelInfo,
   type StreamChunk,
-} from '@roos-code/roos-code-llm'
+} from '@shres-code/shres-code-llm'
 
 const HIGH = ReasoningEffortId('high')
 const OFF = ReasoningEffortId('off')
@@ -29,7 +29,7 @@ class CliMockAdapter extends LlmAdapter {
   }
 
   async * stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
-    if (process.env.ROOS_CLI_MOCK_FAILURE === '1') {
+    if (process.env.SHRES_CLI_MOCK_FAILURE === '1') {
       yield { type: 'finish', reason: { kind: 'error', failure: { code: 'SERVER', message: 'CLI mock provider failed' } } }
       return
     }

@@ -1,5 +1,5 @@
 {
-  "name": "@roos-code/cordis",
+  "name": "@shres-code/cordis",
   "description": "Meta-Framework for Modern JavaScript Applications",
   "version": "4.0.1",
   "publishConfig": {
@@ -7,7 +7,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "vendor/cordis"
   },
   "sideEffects": false,
@@ -33,19 +33,19 @@
   "author": "Shigma <shigma10826@gmail.com>",
   "license": "MIT",
   "peerDependencies": {
-    "@roos-code/cordis-plugin-include": "workspace:^",
-    "@roos-code/cordis-plugin-loader": "workspace:^"
+    "@shres-code/cordis-plugin-include": "workspace:^",
+    "@shres-code/cordis-plugin-loader": "workspace:^"
   },
   "peerDependenciesMeta": {
-    "@roos-code/cordis-plugin-include": {
+    "@shres-code/cordis-plugin-include": {
       "optional": true
     },
-    "@roos-code/cordis-plugin-loader": {
+    "@shres-code/cordis-plugin-loader": {
       "optional": true
     }
   },
   "dependencies": {
     "@standard-schema/spec": "^1.1.0",
-    "@roos-code/cosmokit": "workspace:^"
+    "@shres-code/cosmokit": "workspace:^"
   }
 }

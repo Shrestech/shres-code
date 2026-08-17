@@ -1,11 +1,11 @@
 /**
  * Owner-scoped persistent PTY registry. Backends own terminal mechanics while
  * this service owns ids, publication, authorization, and awaited cleanup.
- * @module @roos-code/roos-code-terminal
+ * @module @shres-code/shres-code-terminal
  */
 
-import { Context, Service } from '@roos-code/cordis'
-import type { Agent } from '@roos-code/roos-code-agent'
+import { Context, Service } from '@shres-code/cordis'
+import type { Agent } from '@shres-code/shres-code-agent'
 import { TerminalBackendCleanupError } from './types.ts'
 import type {
   TerminalBackend,
@@ -45,7 +45,7 @@ export { TerminalBackendCleanupError } from './types.ts'
 /** Opaque identity minted by {@link TerminalSessionService} for one live PTY session. */
 export type TerminalSessionId = TerminalSessionIdValue
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     terminals: TerminalSessionService
   }

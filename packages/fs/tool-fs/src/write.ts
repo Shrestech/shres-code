@@ -2,15 +2,15 @@
  * Model-facing full-file write. It obtains an optional intent from the single policy slot, calls
  * `ctx.fs.writeText` without a stat, then records the resulting version; no policy means an
  * unconditional atomic create-or-overwrite.
- * @module @roos-code/roos-code-tool-fs/src/write
+ * @module @shres-code/shres-code-tool-fs/src/write
  */
 
-import type { Context } from '@roos-code/cordis'
-import { defineTool } from '@roos-code/roos-code-tools'
-import type { DiffCallView, DiffResultView, ToolResult } from '@roos-code/roos-code-tools'
-import type { FsWriteOutcome } from '@roos-code/roos-code-fs'
-import type {} from '@roos-code/roos-code-fs'
-import type {} from '@roos-code/roos-code-system-prompt'
+import type { Context } from '@shres-code/cordis'
+import { defineTool } from '@shres-code/shres-code-tools'
+import type { DiffCallView, DiffResultView, ToolResult } from '@shres-code/shres-code-tools'
+import type { FsWriteOutcome } from '@shres-code/shres-code-fs'
+import type {} from '@shres-code/shres-code-fs'
+import type {} from '@shres-code/shres-code-system-prompt'
 import { computeHunkDiffs, diffsFromMeta } from './diff.ts'
 import { remediateFsError } from './error.ts'
 import { sessionResolveOptions } from './session-cwd.ts'

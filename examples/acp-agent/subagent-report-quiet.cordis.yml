@@ -4,12 +4,12 @@
 # authored order. Quiet delivery leaves settlement as the only wake, while the
 # fixture below holds the child until the parent's spawn turn has closed.
 - id: base
-  name: '@roos-code/cordis-plugin-include'
+  name: '@shres-code/cordis-plugin-include'
   config:
     path: ./cordis.yml
     patches:
       - id: tool-subagent-report
-        name: '@roos-code/roos-code-tool-subagent-report'
+        name: '@shres-code/shres-code-tool-subagent-report'
         config:
           reportDelivery: quiet
 

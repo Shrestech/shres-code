@@ -1,13 +1,13 @@
-import { createUserMessage } from '@roos-code/roos-code-llm'
+import { createUserMessage } from '@shres-code/shres-code-llm'
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import {
   GoalId,
   type GoalSnapshotChangeMeta,
-} from '@roos-code/roos-code-goal'
-import * as GoalInvariantCompanion from '@roos-code/roos-code-goal/invariant'
-import InvariantRegistry, { InvariantError } from '@roos-code/roos-code-invariants'
-import SessionStore, { SessionId } from '@roos-code/roos-code-session'
+} from '@shres-code/shres-code-goal'
+import * as GoalInvariantCompanion from '@shres-code/shres-code-goal/invariant'
+import InvariantRegistry, { InvariantError } from '@shres-code/shres-code-invariants'
+import SessionStore, { SessionId } from '@shres-code/shres-code-session'
 
 const change: GoalSnapshotChangeMeta = {
   kind: 'goal/change',
@@ -54,7 +54,7 @@ describe('goal stream invariants', () => {
       session.append('goal/change', { ...change, extra: true } as never)
     }).toThrow(expect.objectContaining<Partial<InvariantError>>({
       code: 'INVARIANT',
-      packageName: '@roos-code/roos-code-goal',
+      packageName: '@shres-code/shres-code-goal',
     }))
     expect(session.seq).toBe(0)
     expect(() => {

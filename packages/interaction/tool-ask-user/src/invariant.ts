@@ -1,13 +1,13 @@
 /**
- * Package-owned invariant companion for `@roos-code/roos-code-tool-ask-user`.
- * @module @roos-code/roos-code-tool-ask-user/invariant
+ * Package-owned invariant companion for `@shres-code/shres-code-tool-ask-user`.
+ * @module @shres-code/shres-code-tool-ask-user/invariant
  */
 
 /* jscpd:ignore-start */
-import type { Context } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-tool-ask-user'
+const PACKAGE_NAME = '@shres-code/shres-code-tool-ask-user'
 
 /** Cordis companion plugin name. */
 export const name = 'tool-ask-user-invariant'

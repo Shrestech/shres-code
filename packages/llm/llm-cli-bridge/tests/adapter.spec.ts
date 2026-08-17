@@ -1,16 +1,16 @@
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import LlmRuntime, {
   createAssistantMessage,
   createUserMessage,
   LlmError,
   ReasoningEffortId,
-} from '@roos-code/roos-code-llm'
-import type { ContentBlock, GenerateOptions, StreamChunk } from '@roos-code/roos-code-llm'
-import { SessionId } from '@roos-code/roos-code-session'
-import { SettingsProvider, settingsNamespace } from '@roos-code/roos-code-settings'
-import type { SettingsNamespace } from '@roos-code/roos-code-settings'
-import type { SubprocessHandle, SubprocessOutcome, SubprocessSpawnSpec } from '@roos-code/roos-code-subprocess'
+} from '@shres-code/shres-code-llm'
+import type { ContentBlock, GenerateOptions, StreamChunk } from '@shres-code/shres-code-llm'
+import { SessionId } from '@shres-code/shres-code-session'
+import { SettingsProvider, settingsNamespace } from '@shres-code/shres-code-settings'
+import type { SettingsNamespace } from '@shres-code/shres-code-settings'
+import type { SubprocessHandle, SubprocessOutcome, SubprocessSpawnSpec } from '@shres-code/shres-code-subprocess'
 import { CliLlmAdapter } from '../src/adapter.ts'
 import { buildCliArgv, effortFlags } from '../src/argv.ts'
 import { resolveRoutes, SHIPPED_ROUTES } from '../src/config.ts'
@@ -626,7 +626,7 @@ describe('plugin registration', () => {
     const ctx = { invariants: { register } } as unknown as Context
     await expect(invariant.apply(ctx)).resolves.toBe(dispose)
     expect(register).toHaveBeenCalledWith(
-      '@roos-code/roos-code-llm-cli-bridge',
+      '@shres-code/shres-code-llm-cli-bridge',
       expect.any(Function),
     )
   })

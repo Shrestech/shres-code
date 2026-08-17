@@ -1,5 +1,5 @@
 - dialog "Internal Testing Notice":
   - heading "Internal Testing Notice" [level=2]
-  - paragraph: Roos Code 0.1 remains in testing for Harness developers. Many areas need further improvement, and we welcome feedback from the developer community. Roos Code's core plugins and foundational APIs will continue to evolve rapidly over the coming months.
-  - paragraph: We look forward to exploring the limits of intelligence with developers around the world, building on open-source, open, reusable, and composable infrastructure. We welcome Harness developers everywhere to join the Roos plugin ecosystem.
+  - paragraph: Shres Code 0.1 remains in testing for Harness developers. Many areas need further improvement, and we welcome feedback from the developer community. Shres Code's core plugins and foundational APIs will continue to evolve rapidly over the coming months.
+  - paragraph: We look forward to exploring the limits of intelligence with developers around the world, building on open-source, open, reusable, and composable infrastructure. We welcome Harness developers everywhere to join the Shres plugin ecosystem.
   - button "Continue"

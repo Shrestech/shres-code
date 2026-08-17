@@ -1,13 +1,13 @@
 /**
- * Package-owned invariant companion for `@roos-code/roos-code-session-query-sqlite`.
- * @module @roos-code/roos-code-session-query-sqlite/invariant
+ * Package-owned invariant companion for `@shres-code/shres-code-session-query-sqlite`.
+ * @module @shres-code/shres-code-session-query-sqlite/invariant
  */
 
 /* jscpd:ignore-start */
-import type { Context } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-session-query-sqlite'
+const PACKAGE_NAME = '@shres-code/shres-code-session-query-sqlite'
 
 /** Cordis companion plugin name. */
 export const name = 'session-query-sqlite-invariant'

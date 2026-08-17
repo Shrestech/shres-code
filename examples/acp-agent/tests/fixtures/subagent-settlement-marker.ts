@@ -1,13 +1,13 @@
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { Context } from '@roos-code/cordis'
-import type {} from '@roos-code/roos-code-subagent'
+import type { Context } from '@shres-code/cordis'
+import type {} from '@shres-code/shres-code-subagent'
 
 export const name = 'subagent-settlement-marker'
 
 /** Publish a workspace marker after a subagent lifecycle end. */
 export function apply(ctx: Context): void {
   ctx.on('subagent/end', () => {
-    writeFileSync(join(process.cwd(), '.roos-snapshot-subagent-settled'), '')
+    writeFileSync(join(process.cwd(), '.shres-snapshot-subagent-settled'), '')
   })
 }

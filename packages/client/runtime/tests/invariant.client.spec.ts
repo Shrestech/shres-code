@@ -3,9 +3,9 @@
  * a fired key must already carry a bumped version (emission follows the
  * applied mutation), bogus payloads fail loud, foreign events pass.
  */
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { describe, expect, it } from 'vitest'
-import InvariantRegistry from '@roos-code/roos-code-invariants'
+import InvariantRegistry from '@shres-code/shres-code-invariants'
 import * as RuntimeInvariant from '../src/invariant.ts'
 import { SlotRegistry } from '../src/client/slots.ts'
 

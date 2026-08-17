@@ -1,16 +1,16 @@
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import Loader from '@roos-code/cordis-plugin-loader'
-import type { Agent } from '@roos-code/roos-code-agent'
-import { CallId } from '@roos-code/roos-code-llm'
-import { SessionId } from '@roos-code/roos-code-session'
-import SubagentRuntime from '@roos-code/roos-code-subagent'
-import type { SubagentCapabilities, SubagentProvider, SubagentRun, SubagentStartRequest } from '@roos-code/roos-code-subagent'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import ToolRuntime, { TOOL_ABORTED_BEFORE_DISPATCH } from '@roos-code/roos-code-tools'
-import type { ToolExecutionResult } from '@roos-code/roos-code-tools'
-import { WorkflowRunId, WorkflowEngine } from '@roos-code/roos-code-workflow'
-import type { WorkflowResult, WorkflowRun, WorkflowStartRequest } from '@roos-code/roos-code-workflow'
+import { Context } from '@shres-code/cordis'
+import Loader from '@shres-code/cordis-plugin-loader'
+import type { Agent } from '@shres-code/shres-code-agent'
+import { CallId } from '@shres-code/shres-code-llm'
+import { SessionId } from '@shres-code/shres-code-session'
+import SubagentRuntime from '@shres-code/shres-code-subagent'
+import type { SubagentCapabilities, SubagentProvider, SubagentRun, SubagentStartRequest } from '@shres-code/shres-code-subagent'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import ToolRuntime, { TOOL_ABORTED_BEFORE_DISPATCH } from '@shres-code/shres-code-tools'
+import type { ToolExecutionResult } from '@shres-code/shres-code-tools'
+import { WorkflowRunId, WorkflowEngine } from '@shres-code/shres-code-workflow'
+import type { WorkflowResult, WorkflowRun, WorkflowStartRequest } from '@shres-code/shres-code-workflow'
 import * as toolRalph from '../src/index.ts'
 
 const testToolSignal = new AbortController().signal
@@ -141,7 +141,7 @@ async function settleCompleted(
   return pending
 }
 
-describe('roos-tool-ralph', () => {
+describe('shres-tool-ralph', () => {
   it('starts the fixed workflow through the configured fresh provider and renders completion', async () => {
     const { ctx, engine, parent } = await setup({ config: { maxRounds: 9, maxHandoffChars: 9000 } })
     const pending = execute(ctx, { objective: '  Finish the migration.  ', maxRounds: 4 }, { agent: parent })

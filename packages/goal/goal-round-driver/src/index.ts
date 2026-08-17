@@ -1,16 +1,16 @@
 /**
  * Same-session goal-round driver over public agent, session, and goal services.
- * @module @roos-code/roos-code-goal-round-driver
+ * @module @shres-code/shres-code-goal-round-driver
  */
 
 import { isDeepStrictEqual } from 'node:util'
-import { FiberState } from '@roos-code/cordis'
-import type { Context } from '@roos-code/cordis'
-import type { Agent, PreStepDecision } from '@roos-code/roos-code-agent'
-import type { GoalMessageSource, GoalRef, GoalView } from '@roos-code/roos-code-goal'
-import { createUserMessage } from '@roos-code/roos-code-llm'
-import type { ContentBlock, MessageId, MessageSource } from '@roos-code/roos-code-llm'
-import type { Session, SessionEvent, UserMessage } from '@roos-code/roos-code-session'
+import { FiberState } from '@shres-code/cordis'
+import type { Context } from '@shres-code/cordis'
+import type { Agent, PreStepDecision } from '@shres-code/shres-code-agent'
+import type { GoalMessageSource, GoalRef, GoalView } from '@shres-code/shres-code-goal'
+import { createUserMessage } from '@shres-code/shres-code-llm'
+import type { ContentBlock, MessageId, MessageSource } from '@shres-code/shres-code-llm'
+import type { Session, SessionEvent, UserMessage } from '@shres-code/shres-code-session'
 import { renderGoalRoundPrompt } from './prompt.ts'
 
 export { renderGoalRoundPrompt } from './prompt.ts'

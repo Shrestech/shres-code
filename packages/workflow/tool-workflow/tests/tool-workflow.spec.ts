@@ -1,20 +1,20 @@
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import Loader from '@roos-code/cordis-plugin-loader'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import ToolRuntime, { TOOL_ABORTED_BEFORE_DISPATCH } from '@roos-code/roos-code-tools'
-import type { ToolExecutionResult, ToolExecutionToken } from '@roos-code/roos-code-tools'
-import type { Agent } from '@roos-code/roos-code-agent'
-import { WorkflowRunId, WorkflowEngine } from '@roos-code/roos-code-workflow'
+import { Context } from '@shres-code/cordis'
+import Loader from '@shres-code/cordis-plugin-loader'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import ToolRuntime, { TOOL_ABORTED_BEFORE_DISPATCH } from '@shres-code/shres-code-tools'
+import type { ToolExecutionResult, ToolExecutionToken } from '@shres-code/shres-code-tools'
+import type { Agent } from '@shres-code/shres-code-agent'
+import { WorkflowRunId, WorkflowEngine } from '@shres-code/shres-code-workflow'
 import type {
   WorkflowAgentEndInfo, WorkflowAgentInfo, WorkflowResult, WorkflowRun,
   WorkflowRunId as WorkflowRunIdType, WorkflowStartRequest,
-} from '@roos-code/roos-code-workflow'
-import { CallId } from '@roos-code/roos-code-llm'
-import SubagentRuntime from '@roos-code/roos-code-subagent'
-import WorkerThreadWorkflowEngine from '@roos-code/roos-code-workflow-worker-thread'
+} from '@shres-code/shres-code-workflow'
+import { CallId } from '@shres-code/shres-code-llm'
+import SubagentRuntime from '@shres-code/shres-code-subagent'
+import WorkerThreadWorkflowEngine from '@shres-code/shres-code-workflow-worker-thread'
 import * as toolWorkflow from '../src/index.ts'
-import { Session, SessionId } from '@roos-code/roos-code-session'
+import { Session, SessionId } from '@shres-code/shres-code-session'
 
 const testToolSignal = new AbortController().signal
 
@@ -105,7 +105,7 @@ function execute(ctx: Context, args: unknown, extra?: {
   })
 }
 
-describe('roos-tool-workflow', () => {
+describe('shres-tool-workflow', () => {
   it('starts a run with the script/args/parent/signal and renders the completed value', async () => {
     const { ctx, engine, parent } = await setup()
     const controller = new AbortController()

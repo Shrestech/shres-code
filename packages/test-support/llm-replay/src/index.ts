@@ -4,15 +4,15 @@
  * compaction calls, then binds fresh live sessions to parent/child scripts by
  * first-call order. Throw and hang cases require an explicit override because
  * a session log cannot reconstruct them alone.
- * @module @roos-code/roos-code-llm-replay
+ * @module @shres-code/shres-code-llm-replay
  */
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { delimiter as pathDelimiter } from 'node:path'
-import type { Context } from '@roos-code/cordis'
-import type {} from '@roos-code/roos-code-compaction'
-import { decodeStorageRecord } from '@roos-code/roos-code-session'
-import type { SessionEvent } from '@roos-code/roos-code-session'
+import type { Context } from '@shres-code/cordis'
+import type {} from '@shres-code/shres-code-compaction'
+import { decodeStorageRecord } from '@shres-code/shres-code-session'
+import type { SessionEvent } from '@shres-code/shres-code-session'
 import type {
   ContentBlock,
   GenerateOptions,
@@ -24,8 +24,8 @@ import type {
   RetryPolicyConfig,
   StreamChunk,
   TokenUsage,
-} from '@roos-code/roos-code-llm'
-import { LlmAdapter, LlmError, ReasoningEffortId, assertNever, resolveRetryPolicy } from '@roos-code/roos-code-llm'
+} from '@shres-code/shres-code-llm'
+import { LlmAdapter, LlmError, ReasoningEffortId, assertNever, resolveRetryPolicy } from '@shres-code/shres-code-llm'
 
 /**
  * One recorded model call. `throw` may replay prefix chunks before failing;
@@ -772,14 +772,14 @@ export function installLlmReplay(ctx: Context, config: ReplayConfig): ReplayHand
 export const name = 'llm-replay'
 export const inject = ['llm']
 
-/** Plugin config: the {@link ReplayConfig} inputs, each defaulting to its `ROOS_SNAPSHOT_*` env var in `apply`. */
+/** Plugin config: the {@link ReplayConfig} inputs, each defaulting to its `SHRES_SNAPSHOT_*` env var in `apply`. */
 export interface Config {
-  /** Override the fixture path; defaults to `$ROOS_SNAPSHOT_FILE`. */
+  /** Override the fixture path; defaults to `$SHRES_SNAPSHOT_FILE`. */
   file?: string
-  /** Override the sidecar path; defaults to `$ROOS_SNAPSHOT_OVERRIDE`. */
+  /** Override the sidecar path; defaults to `$SHRES_SNAPSHOT_OVERRIDE`. */
   overrideFile?: string
   /**
-   * Override the child-log paths; defaults to `$ROOS_SNAPSHOT_CHILD_FILES` (a
+   * Override the child-log paths; defaults to `$SHRES_SNAPSHOT_CHILD_FILES` (a
    * path-separator-delimited list). Each is a recorded subagent session log for
    * a nested-agent scenario; absent/empty for a single-session scenario.
    */
@@ -807,13 +807,13 @@ function validateConfiguredModalities(providers: ReplayProviderConfig[] | undefi
 }
 
 export function apply(ctx: Context, config: Config = {}): void {
-  const file = config.file ?? process.env.ROOS_SNAPSHOT_FILE
+  const file = config.file ?? process.env.SHRES_SNAPSHOT_FILE
   if (file === undefined || file.length === 0) {
-    throw new Error('llm-replay: a fixture path is required (Config.file or $ROOS_SNAPSHOT_FILE)')
+    throw new Error('llm-replay: a fixture path is required (Config.file or $SHRES_SNAPSHOT_FILE)')
   }
   validateConfiguredModalities(config.providers)
-  const overrideFile = config.overrideFile ?? process.env.ROOS_SNAPSHOT_OVERRIDE
-  const childEnv = process.env.ROOS_SNAPSHOT_CHILD_FILES
+  const overrideFile = config.overrideFile ?? process.env.SHRES_SNAPSHOT_OVERRIDE
+  const childEnv = process.env.SHRES_SNAPSHOT_CHILD_FILES
   const childFiles = config.childFiles
     ?? (childEnv !== undefined && childEnv.length > 0 ? childEnv.split(pathDelimiter) : [])
   installLlmReplay(ctx, {

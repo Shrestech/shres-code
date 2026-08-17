@@ -4,18 +4,18 @@
  * window.__ModuleLoader__.load, resolves externals through the injected
  * require, returns the exports (apply + inject), and a mounted apply
  * registers the view tab into a real SlotRegistry ring. Skips when dist/ is
- * not built (`pnpm --filter @roos-code/roos-code-client-ui-trajectory bundle`).
+ * not built (`pnpm --filter @shres-code/shres-code-client-ui-trajectory bundle`).
  */
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { Context } from '@roos-code/cordis'
-import { stubSettingsScope } from '@roos-code/roos-code-client-test-runtime'
+import { Context } from '@shres-code/cordis'
+import { stubSettingsScope } from '@shres-code/shres-code-client-test-runtime'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   ConversationEventRegistry, ConversationViewRegistry, SlotRegistry,
-} from '@roos-code/roos-code-client-runtime/client'
+} from '@shres-code/shres-code-client-runtime/client'
 
-const PLUGIN_ID = '@roos-code/roos-code-client-ui-trajectory'
+const PLUGIN_ID = '@shres-code/shres-code-client-ui-trajectory'
 
 interface Handoff { id: string; factory: (require: (spec: string) => unknown) => Record<string, unknown> }
 type Win = { __ModuleLoader__?: { load(h: Handoff): void } }
@@ -50,8 +50,8 @@ describe('tsdown client artifact', () => {
       ['react', await import('react')],
       ['react/jsx-runtime', await import('react/jsx-runtime')],
       ['react-dom', await import('react-dom')],
-      ['@roos-code/roos-code-client-runtime/client', await import('@roos-code/roos-code-client-runtime/client')],
-      ['@roos-code/roos-code-client-ui-primitives', await import('@roos-code/roos-code-client-ui-primitives')],
+      ['@shres-code/shres-code-client-runtime/client', await import('@shres-code/shres-code-client-runtime/client')],
+      ['@shres-code/shres-code-client-ui-primitives', await import('@shres-code/shres-code-client-ui-primitives')],
     ])
     const exports = handoff!.factory((spec) => {
       if (!modules.has(spec)) throw new Error(`unexpected require: ${spec}`)
@@ -88,7 +88,7 @@ describe('tsdown client artifact', () => {
     ctx.provide('connection', { api: { settings: {} }, isLoopback: false } as never)
     ctx.provide('remote', { $on: () => () => {} } as never)
     ctx.provide('settingsScope', { bind: () => stubSettingsScope().scope } as never)
-    const locale = await import('@roos-code/roos-code-client-locale/client')
+    const locale = await import('@shres-code/shres-code-client-locale/client')
     ctx.plugin({ inject: [...locale.inject], apply: locale.apply })
     const fiber = ctx.plugin(exports as { apply: (ctx: Context) => void })
     await fiber.await()

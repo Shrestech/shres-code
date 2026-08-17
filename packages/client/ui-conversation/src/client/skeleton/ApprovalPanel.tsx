@@ -13,8 +13,8 @@
 // resolved frame.
 
 import { useMemo, useState } from 'react'
-import { Button } from '@roos-code/roos-code-client-ui-primitives'
-import type { RunningToolCall } from '@roos-code/roos-code-client-runtime/client'
+import { Button } from '@shres-code/shres-code-client-ui-primitives'
+import type { RunningToolCall } from '@shres-code/shres-code-client-runtime/client'
 import { PendingApproval, type ApprovalComposerProps } from '../contract/slots.ts'
 import { rootToolCall } from '../chat/tool-node-reader.ts'
 import css from './ApprovalPanel.module.css'

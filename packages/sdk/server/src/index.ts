@@ -6,13 +6,13 @@
  * owns EOF and signal exits. Keep named plugin exports with no default export so
  * Loader `unwrapExports` preserves `name`, `inject`, `Config`, and `apply`.
  *
- * @module @roos-code/roos-code-sdk-jsonrpc-server
+ * @module @shres-code/shres-code-sdk-jsonrpc-server
  */
 
-import type { Context } from '@roos-code/cordis'
+import type { Context } from '@shres-code/cordis'
 import type { Readable, Writable } from 'node:stream'
-import Schema from '@roos-code/schemastery'
-import { JsonRpcLineTransport } from '@roos-code/roos-code-sdk-protocol'
+import Schema from '@shres-code/schemastery'
+import { JsonRpcLineTransport } from '@shres-code/shres-code-sdk-protocol'
 import { HarnessSdkJsonRpcServer } from './server.ts'
 
 export * from './server.ts'

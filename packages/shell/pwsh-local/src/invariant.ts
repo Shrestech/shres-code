@@ -1,13 +1,13 @@
 /**
- * Package-owned invariant companion for `@roos-code/roos-code-pwsh-local`.
- * @module @roos-code/roos-code-pwsh-local/invariant
+ * Package-owned invariant companion for `@shres-code/shres-code-pwsh-local`.
+ * @module @shres-code/shres-code-pwsh-local/invariant
  */
 
 /* jscpd:ignore-start */
-import type { Context } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-pwsh-local'
+const PACKAGE_NAME = '@shres-code/shres-code-pwsh-local'
 
 /** Cordis companion plugin name. */
 export const name = 'pwsh-local-invariant'

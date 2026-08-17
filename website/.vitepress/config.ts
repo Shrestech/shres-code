@@ -112,14 +112,14 @@ const sharedTheme: Pick<DefaultTheme.Config, 'search' | 'socialLinks' | 'editLin
     provider: 'local',
   },
   socialLinks: [
-    { icon: 'github', link: 'https://github.com/roos-code/roos-code' },
+    { icon: 'github', link: 'https://github.com/parthmstech/shres-code' },
   ],
   editLink: {
     pattern: ({ frontmatter }: PageData) => {
       const data: unknown = frontmatter
       const editSource: unknown = typeof data === 'object' && data !== null ? Reflect.get(data, 'editSource') : undefined
       if (typeof editSource !== 'string') throw new Error('Projected documentation page has no editSource frontmatter.')
-      return `https://github.com/roos-code/roos-code/edit/master/${editSource}`
+      return `https://github.com/parthmstech/shres-code/edit/master/${editSource}`
     },
     text: 'Edit this page on GitHub',
   },
@@ -129,12 +129,12 @@ const sharedTheme: Pick<DefaultTheme.Config, 'search' | 'socialLinks' | 'editLin
 const base = process.env.DOCS_BASE ?? '/'
 
 /**
- * The DeepSeek wordmark, inlined so its `currentColor` fills follow the active
+ * The Shres wordmark, inlined so its `currentColor` fills follow the active
  * theme. An `<img>` would freeze the mark at the colors the file declares.
  */
 const wordmark = readFileSync(resolve(import.meta.dirname, '../public/wordmark.svg'), 'utf8')
   .trim()
-  .replace('<svg ', '<svg class="roos-wordmark" ')
+  .replace('<svg ', '<svg class="shres-wordmark" ')
 
 /**
  * Styles the default theme does not provide, carried inline because the site
@@ -148,9 +148,9 @@ const wordmark = readFileSync(resolve(import.meta.dirname, '../public/wordmark.s
  * stay behind a query only Firefox answers.
  */
 const siteStyle = `
-.roos-lockup { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
-.roos-wordmark { display: block; height: 22px; width: auto; color: var(--vp-c-text-1); }
-.roos-tag {
+.shres-lockup { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.shres-wordmark { display: block; height: 22px; width: auto; color: var(--vp-c-text-1); }
+.shres-tag {
   display: inline-flex;
   align-items: center;
   border: 1px solid var(--vp-c-brand-soft);
@@ -201,18 +201,18 @@ const scrollbarScript = `
 `
 
 /**
- * Navigation-bar title: the DeepSeek wordmark and the release-stage tag.
+ * Navigation-bar title: the Shres wordmark and the release-stage tag.
  * VitePress renders `siteTitle` as HTML.
  *
  * @param previewTag - Localized release-stage label.
  * @returns Markup placed beside the navigation-bar home link.
  */
 function siteTitle(previewTag: string): string {
-  return `<span class="roos-lockup">${wordmark}<span class="roos-tag">${previewTag}</span></span>`
+  return `<span class="shres-lockup">${wordmark}<span class="shres-tag">${previewTag}</span></span>`
 }
 
 export default withMermaid({
-  title: 'Roos Code',
+  title: 'Shres Code',
   description: 'A plugin-based SDK for building an agent harness',
   base,
   head: [
@@ -257,7 +257,7 @@ export default withMermaid({
     publicDir: resolve(import.meta.dirname, '../public'),
     plugins: [
       {
-        name: 'roos-code-doc-projector',
+        name: 'shres-code-doc-projector',
         configureServer: watchCanonicalDocs,
       },
     ],

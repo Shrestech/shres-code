@@ -1,10 +1,10 @@
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { describe, expect, it } from 'vitest'
-import type { WebServer } from '@roos-code/roos-code-host-webserver'
-import { SettingsProvider, settingsNamespace, type SettingsNamespace } from '@roos-code/roos-code-settings'
+import type { WebServer } from '@shres-code/shres-code-host-webserver'
+import { SettingsProvider, settingsNamespace, type SettingsNamespace } from '@shres-code/shres-code-settings'
 import {
   DEFAULT_PREFERENCE, THEME_SETTINGS_NAMESPACE, apply,
-} from '@roos-code/roos-code-client-ui-theme'
+} from '@shres-code/shres-code-client-ui-theme'
 
 class MemorySettings extends SettingsProvider {
   readonly writable = true

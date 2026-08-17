@@ -1,14 +1,14 @@
 /**
  * Vocabulary for the spill storage Service Definition. Types only — the abstract service
  * lives in `./index.ts`, implementations in sibling packages
- * (`@roos-code/roos-code-spill-local` first).
+ * (`@shres-code/shres-code-spill-local` first).
  *
- * @module @roos-code/roos-code-spill/types
+ * @module @shres-code/shres-code-spill/types
  */
 
-import type { Branded } from '@roos-code/roos-code-brand'
-import type { CallId } from '@roos-code/roos-code-llm'
-import type { SessionId } from '@roos-code/roos-code-session'
+import type { Branded } from '@shres-code/shres-code-brand'
+import type { CallId } from '@shres-code/shres-code-llm'
+import type { SessionId } from '@shres-code/shres-code-session'
 
 /**
  * Opaque model-facing handle for one spilled artifact. A local backend may use a

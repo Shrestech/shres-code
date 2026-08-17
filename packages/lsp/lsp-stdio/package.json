@@ -1,13 +1,13 @@
 {
-  "name": "@roos-code/roos-code-lsp-stdio",
-  "description": "Generic stdio language-server provider for the Roos Code LSP capability seam (ctx.lsp) — spawns configured servers, translates JSON-RPC, and serves transient-open goToDefinition/findReferences/goToImplementation/hover queries in the host filesystem namespace",
+  "name": "@shres-code/shres-code-lsp-stdio",
+  "description": "Generic stdio language-server provider for the Shres Code LSP capability seam (ctx.lsp) — spawns configured servers, translates JSON-RPC, and serves transient-open goToDefinition/findReferences/goToImplementation/hover queries in the host filesystem namespace",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "packages/lsp/lsp-stdio"
   },
   "type": "module",
@@ -32,29 +32,29 @@
   ],
   "license": "MIT",
   "peerDependencies": {
-    "@roos-code/roos-code-brand": "workspace:^",
-    "@roos-code/roos-code-fs": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-llm": "workspace:^",
-    "@roos-code/roos-code-lsp": "workspace:^",
-    "@roos-code/roos-code-subprocess": "workspace:^",
-    "@roos-code/roos-code-timeout": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-brand": "workspace:^",
+    "@shres-code/shres-code-fs": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-lsp": "workspace:^",
+    "@shres-code/shres-code-subprocess": "workspace:^",
+    "@shres-code/shres-code-timeout": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   },
   "dependencies": {
-    "@roos-code/schemastery": "workspace:^"
+    "@shres-code/schemastery": "workspace:^"
   },
   "devDependencies": {
-    "@roos-code/roos-code-brand": "workspace:^",
-    "@roos-code/roos-code-fs": "workspace:^",
-    "@roos-code/roos-code-fs-local": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-llm": "workspace:^",
-    "@roos-code/roos-code-lsp": "workspace:^",
-    "@roos-code/roos-code-subprocess": "workspace:^",
-    "@roos-code/roos-code-subprocess-local": "workspace:^",
-    "@roos-code/roos-code-timeout": "workspace:^",
-    "@roos-code/cordis": "workspace:^",
+    "@shres-code/shres-code-brand": "workspace:^",
+    "@shres-code/shres-code-fs": "workspace:^",
+    "@shres-code/shres-code-fs-local": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-lsp": "workspace:^",
+    "@shres-code/shres-code-subprocess": "workspace:^",
+    "@shres-code/shres-code-subprocess-local": "workspace:^",
+    "@shres-code/shres-code-timeout": "workspace:^",
+    "@shres-code/cordis": "workspace:^",
     "typescript": "^6.0.3",
     "typescript-language-server": "^5.0.0"
   }

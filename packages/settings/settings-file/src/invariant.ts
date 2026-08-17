@@ -1,13 +1,13 @@
 /**
- * Package-owned invariant companion for `@roos-code/roos-code-settings-file`.
- * @module @roos-code/roos-code-settings-file/invariant
+ * Package-owned invariant companion for `@shres-code/shres-code-settings-file`.
+ * @module @shres-code/shres-code-settings-file/invariant
  */
 
 /* jscpd:ignore-start */
-import type { Context } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-settings-file'
+const PACKAGE_NAME = '@shres-code/shres-code-settings-file'
 
 /** Cordis companion plugin name. */
 export const name = 'settings-file-invariant'
@@ -17,7 +17,7 @@ export const inject = ['invariants']
 /**
  * No runtime invariant: this provider's contracts are file round-trip,
  * watcher timing, and atomic-write behavior — IO effects proven by package
- * tests; the in-process commit relation is owned by `@roos-code/roos-code-settings`.
+ * tests; the in-process commit relation is owned by `@shres-code/shres-code-settings`.
  */
 const install: InvariantInstaller = () => {}
 

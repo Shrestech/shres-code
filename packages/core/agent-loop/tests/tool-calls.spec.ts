@@ -4,17 +4,17 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { createUserMessage, CallId, StreamChunk  } from '@roos-code/roos-code-llm'
-import SessionStore, { SessionEvent, SessionId } from '@roos-code/roos-code-session'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import LlmRuntime from '@roos-code/roos-code-llm'
-import ToolRuntime, { defineContentToolFixture, TOOL_ABORTED_BEFORE_DISPATCH, TOOL_RUNTIME_SCHEDULER, type PostToolDecision, type PreToolDecision } from '@roos-code/roos-code-tools'
-import AgentRegistry, { type Agent } from '@roos-code/roos-code-agent'
-import AgentLoop, { DEFAULT_MAX_PARALLEL_TOOL_CALLS } from '@roos-code/roos-code-agent-loop'
+import { Context } from '@shres-code/cordis'
+import { createUserMessage, CallId, StreamChunk  } from '@shres-code/shres-code-llm'
+import SessionStore, { SessionEvent, SessionId } from '@shres-code/shres-code-session'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import LlmRuntime from '@shres-code/shres-code-llm'
+import ToolRuntime, { defineContentToolFixture, TOOL_ABORTED_BEFORE_DISPATCH, TOOL_RUNTIME_SCHEDULER, type PostToolDecision, type PreToolDecision } from '@shres-code/shres-code-tools'
+import AgentRegistry, { type Agent } from '@shres-code/shres-code-agent'
+import AgentLoop, { DEFAULT_MAX_PARALLEL_TOOL_CALLS } from '@shres-code/shres-code-agent-loop'
 import { MockAdapter, textResponse } from './mock-adapter.ts'
-import { CodeRuntime } from '@roos-code/roos-code-code-runtime'
-import type { CodeRunRequest, CodeRunResult } from '@roos-code/roos-code-code-runtime'
+import { CodeRuntime } from '@shres-code/shres-code-code-runtime'
+import type { CodeRunRequest, CodeRunResult } from '@shres-code/shres-code-code-runtime'
 
 async function harness(adapter: MockAdapter, maxParallelToolCalls?: number) {
   const ctx = new Context()

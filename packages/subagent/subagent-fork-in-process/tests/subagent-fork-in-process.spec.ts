@@ -1,20 +1,20 @@
-import { createUserMessage } from '@roos-code/roos-code-llm'
+import { createUserMessage } from '@shres-code/shres-code-llm'
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import Loader from '@roos-code/cordis-plugin-loader'
-import AgentRegistry from '@roos-code/roos-code-agent'
-import { SessionId } from '@roos-code/roos-code-session'
-import AgentLoop from '@roos-code/roos-code-agent-loop'
-import { mountAgentLoopTestDependencies } from '@roos-code/roos-code-agent-loop-testkit'
-import InvariantRegistry from '@roos-code/roos-code-invariants'
-import * as SessionInvariant from '@roos-code/roos-code-session/invariant'
-import * as AgentInvariant from '@roos-code/roos-code-agent/invariant'
-import * as AgentLoopInvariant from '@roos-code/roos-code-agent-loop/invariant'
-import SubagentRuntime, { type SubagentStartRequest } from '@roos-code/roos-code-subagent'
+import { Context } from '@shres-code/cordis'
+import Loader from '@shres-code/cordis-plugin-loader'
+import AgentRegistry from '@shres-code/shres-code-agent'
+import { SessionId } from '@shres-code/shres-code-session'
+import AgentLoop from '@shres-code/shres-code-agent-loop'
+import { mountAgentLoopTestDependencies } from '@shres-code/shres-code-agent-loop-testkit'
+import InvariantRegistry from '@shres-code/shres-code-invariants'
+import * as SessionInvariant from '@shres-code/shres-code-session/invariant'
+import * as AgentInvariant from '@shres-code/shres-code-agent/invariant'
+import * as AgentLoopInvariant from '@shres-code/shres-code-agent-loop/invariant'
+import SubagentRuntime, { type SubagentStartRequest } from '@shres-code/shres-code-subagent'
 import { MockAdapter, textResponse, toolCallResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
-import type { StreamChunk } from '@roos-code/roos-code-llm'
+import type { StreamChunk } from '@shres-code/shres-code-llm'
 import * as fork from '../src/index.ts'
-import { STRUCTURED_OUTPUT_TOOL } from '@roos-code/roos-code-subagent-in-process-driver'
+import { STRUCTURED_OUTPUT_TOOL } from '@shres-code/shres-code-subagent-in-process-driver'
 
 type Script = ConstructorParameters<typeof MockAdapter>[0]
 
@@ -55,7 +55,7 @@ function text(blocks: { type: string; text?: string }[]): string {
   return blocks.filter(b => b.type === 'text').map(b => b.text).join('')
 }
 
-describe('roos-subagent-fork-in-process', () => {
+describe('shres-subagent-fork-in-process', () => {
   it('emits subagent/start only after the seeded child is published', async () => {
     const { ctx, parent } = await setup([textResponse('child answer')])
     let childAtStart: ReturnType<typeof ctx.agents.get>

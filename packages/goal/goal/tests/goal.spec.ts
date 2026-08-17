@@ -1,16 +1,16 @@
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import AgentRegistry, { agentEvents, Inbox } from '@roos-code/roos-code-agent'
-import type { Agent } from '@roos-code/roos-code-agent'
-import { createUserMessage, HarnessError } from '@roos-code/roos-code-llm'
-import SessionStore, { Session, SessionId, type UserMessage } from '@roos-code/roos-code-session'
+import { Context } from '@shres-code/cordis'
+import AgentRegistry, { agentEvents, Inbox } from '@shres-code/shres-code-agent'
+import type { Agent } from '@shres-code/shres-code-agent'
+import { createUserMessage, HarnessError } from '@shres-code/shres-code-llm'
+import SessionStore, { Session, SessionId, type UserMessage } from '@shres-code/shres-code-session'
 import GoalService, {
   GoalError,
   GoalId,
   decodeGoalChange,
   foldGoal,
-} from '@roos-code/roos-code-goal'
-import type { GoalChangeMeta, GoalRef, GoalSnapshotChangeMeta } from '@roos-code/roos-code-goal'
+} from '@shres-code/shres-code-goal'
+import type { GoalChangeMeta, GoalRef, GoalSnapshotChangeMeta } from '@shres-code/shres-code-goal'
 
 interface StubAgent {
   agent: Agent
@@ -53,7 +53,7 @@ function stubAgentForSession(session: Session): StubAgent {
 }
 
 /** Build a registry-compatible agent around a fresh session. */
-function stubAgent(rawId: string, seed?: readonly import('@roos-code/roos-code-session').SessionEvent[]): StubAgent {
+function stubAgent(rawId: string, seed?: readonly import('@shres-code/shres-code-session').SessionEvent[]): StubAgent {
   return stubAgentForSession(Session.create(SessionId(rawId), seed))
 }
 

@@ -4,16 +4,16 @@
  * `agent-default-model` plus credentials. A non-TTY process with no usable
  * default fails loud; the service never silently selects a vendor.
  *
- * @module @roos-code/roos-code-first-run-setup
+ * @module @shres-code/shres-code-first-run-setup
  */
 
-import { Context, Service } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import { MAX_TIMER_DELAY_MS } from '@roos-code/roos-code-timeout'
-import type {} from '@roos-code/roos-code-agent-default-model'
-import type {} from '@roos-code/roos-code-llm'
-import type {} from '@roos-code/roos-code-settings'
-import type {} from '@roos-code/roos-code-credentials'
+import { Context, Service } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
+import type {} from '@shres-code/shres-code-agent-default-model'
+import type {} from '@shres-code/shres-code-llm'
+import type {} from '@shres-code/shres-code-settings'
+import type {} from '@shres-code/shres-code-credentials'
 import { applyChoice } from './apply-choice.ts'
 import { runCliPicker } from './cli.ts'
 import { detectLocalOllama } from './detect.ts'
@@ -28,7 +28,7 @@ export { applyChoice, deriveKeyRef } from './apply-choice.ts'
 export { formatMenu, numberOptions, readLine, readSecret, runCliPicker } from './cli.ts'
 export { hasUserSelection, isDefaultUsable, listPickerOptions, noProviderError, TEMPLATE_ROUTES } from './options.ts'
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     /** First-run model picker and local-Ollama probe. */
     firstRunSetup: FirstRunSetup

@@ -7,9 +7,9 @@
  * through the credentials domain, never into a settings section.
  */
 
-import type { IApiClient } from '@roos-code/roos-code-client-connection/client'
-import type { SettingsScope, SettingsScopeSnapshot, SnapshotStore } from '@roos-code/roos-code-client-runtime/client'
-import { createSnapshotStore } from '@roos-code/roos-code-client-runtime/client'
+import type { IApiClient } from '@shres-code/shres-code-client-connection/client'
+import type { SettingsScope, SettingsScopeSnapshot, SnapshotStore } from '@shres-code/shres-code-client-runtime/client'
+import { createSnapshotStore } from '@shres-code/shres-code-client-runtime/client'
 import {
   CardForm, booleanField, numberField, textField,
   type CardActions, type CardFieldState, type CardShell,

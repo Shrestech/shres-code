@@ -1,6 +1,6 @@
 /**
  * Workspace-level discovery and model-driven Typert generation.
- * @module @roos-code/roos-code-typert-generator/workspace
+ * @module @shres-code/shres-code-typert-generator/workspace
  */
 
 import { readFileSync } from 'node:fs'

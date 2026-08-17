@@ -8,18 +8,18 @@
  * anything, while an in-flight stream keeps the facts it started with. The
  * one registration-captured fact — the retry policy — re-registers the route
  * in place when it changes.
- * @module @roos-code/roos-code-llm-deepseek
+ * @module @shres-code/shres-code-llm-deepseek
  */
 
-import type { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import { assertUsableApiKey, LlmError, resolveRetryPolicy, RetryPolicySchema } from '@roos-code/roos-code-llm'
-import type { RetryPolicyConfig } from '@roos-code/roos-code-llm'
-import { credentialRef } from '@roos-code/roos-code-credentials'
-import { launchEnvironmentOf, type LaunchEnvironmentSnapshot } from '@roos-code/roos-code-launch-environment'
-import { deepEqualJson, installSettingsSection, settingsNamespace } from '@roos-code/roos-code-settings'
-import { MAX_TIMER_DELAY_MS } from '@roos-code/roos-code-timeout'
-import { getOrCreateAnonymousUserId, type AnonymousUserId } from '@roos-code/roos-code-anonymous-user-id'
+import type { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import { assertUsableApiKey, LlmError, resolveRetryPolicy, RetryPolicySchema } from '@shres-code/shres-code-llm'
+import type { RetryPolicyConfig } from '@shres-code/shres-code-llm'
+import { credentialRef } from '@shres-code/shres-code-credentials'
+import { launchEnvironmentOf, type LaunchEnvironmentSnapshot } from '@shres-code/shres-code-launch-environment'
+import { deepEqualJson, installSettingsSection, settingsNamespace } from '@shres-code/shres-code-settings'
+import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
+import { getOrCreateAnonymousUserId, type AnonymousUserId } from '@shres-code/shres-code-anonymous-user-id'
 import {
   DEFAULT_CONTEXT_WINDOW,
   DEFAULT_MAX_TOKENS,

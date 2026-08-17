@@ -1,20 +1,20 @@
 /**
  * Same-session goal domain: event-sourced state, compare-and-set mutations,
  * and process-local continuation activation.
- * @module @roos-code/roos-code-goal
+ * @module @shres-code/shres-code-goal
  */
 
 import { randomUUID } from 'node:crypto'
-import { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
+import { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
 import { z as zod } from 'zod'
 import type { ZodType } from 'zod'
-import { agentEvents } from '@roos-code/roos-code-agent'
-import type { Agent } from '@roos-code/roos-code-agent'
-import type { Session, SessionEvent } from '@roos-code/roos-code-session'
-import { TypertRemoteService, Remote } from '@roos-code/roos-code-typert-protocol'
+import { agentEvents } from '@shres-code/shres-code-agent'
+import type { Agent } from '@shres-code/shres-code-agent'
+import type { Session, SessionEvent } from '@shres-code/shres-code-session'
+import { TypertRemoteService, Remote } from '@shres-code/shres-code-typert-protocol'
 // Type-only: resolves ctx.sessionProjections for the optional unit child.
-import type {} from '@roos-code/roos-code-session-projection'
+import type {} from '@shres-code/shres-code-session-projection'
 import {
   applyGoalEvent,
   decodeGoalChange,
@@ -56,7 +56,7 @@ export type * from './domain.ts'
 export { GOAL_CHANGE_VERSION, GoalError, GoalId } from './runtime.ts'
 export { decodeGoalChange, foldGoal, goalChangeRef } from './fold.ts'
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     goals: GoalService
   }

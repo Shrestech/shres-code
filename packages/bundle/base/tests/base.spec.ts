@@ -1,5 +1,5 @@
 /**
- * The bundle's substance is its patch file: the `roos.bundle.patch` manifest
+ * The bundle's substance is its patch file: the `shres.bundle.patch` manifest
  * field must name a real, parseable patch list.
  */
 
@@ -8,21 +8,21 @@ import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import * as yaml from 'js-yaml'
-import { entryListSchema } from '@roos-code/cordis-plugin-include'
-import { evaluate } from '@roos-code/cordis-plugin-loader'
+import { entryListSchema } from '@shres-code/cordis-plugin-include'
+import { evaluate } from '@shres-code/cordis-plugin-loader'
 
-describe('roos-base bundle', () => {
-  it('declares a parseable patch list through the roos.bundle.patch manifest field', () => {
+describe('shres-base bundle', () => {
+  it('declares a parseable patch list through the shres.bundle.patch manifest field', () => {
     const root = fileURLToPath(new URL('..', import.meta.url))
     const manifest = JSON.parse(
       readFileSync(resolve(root, 'package.json'), 'utf8'),
     ) as {
       dependencies?: Record<string, string>
-      roos?: { bundle?: { patch?: string } }
+      shres?: { bundle?: { patch?: string } }
     }
-    expect(manifest.roos?.bundle?.patch).toBe('./cordis.patch.yml')
+    expect(manifest.shres?.bundle?.patch).toBe('./cordis.patch.yml')
     const parsed = yaml.load(
-      readFileSync(resolve(root, manifest.roos!.bundle!.patch!), 'utf8'),
+      readFileSync(resolve(root, manifest.shres!.bundle!.patch!), 'utf8'),
       { schema: entryListSchema },
     )
     expect(Array.isArray(parsed)).toBe(true)
@@ -33,12 +33,12 @@ describe('roos-base bundle', () => {
     expect(rows.length).toBeGreaterThan(50)
     expect(rows.some(row => row.id === 'agent-loop')).toBe(true)
     expect(rows.find(row => row.id === 'session-telemetry-otel')?.config?.['mode']).toEqual({
-      __jsExpr: "process.env.ROOS_TELEMETRY_MODE || 'DISABLED'",
+      __jsExpr: "process.env.SHRES_TELEMETRY_MODE || 'DISABLED'",
     })
     expect(rows.filter(row => row.id === 'subagent-codex')).toHaveLength(0)
     expect(rows.filter(row => row.id === 'subagent-claude-code')).toHaveLength(0)
-    expect(manifest.dependencies).not.toHaveProperty('@roos-code/roos-code-subagent-codex')
-    expect(manifest.dependencies).not.toHaveProperty('@roos-code/roos-code-subagent-claude-code')
+    expect(manifest.dependencies).not.toHaveProperty('@shres-code/shres-code-subagent-codex')
+    expect(manifest.dependencies).not.toHaveProperty('@shres-code/shres-code-subagent-claude-code')
   })
 
   it('gates each shell stack by platform with a symmetric disabled expression', () => {

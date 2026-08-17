@@ -2,7 +2,7 @@
  * Surface retention selection and the shared log-recorded compaction
  * transaction for automatic open-turn and manual idle-session compaction.
  *
- * @module @roos-code/roos-code-compaction-basic/region
+ * @module @shres-code/shres-code-compaction-basic/region
  */
 
 import { randomUUID } from 'node:crypto'
@@ -13,14 +13,14 @@ import {
   compactCheckpointSource,
   toolPairingBalancedAfter,
   toolPairingBalancedBefore,
-} from '@roos-code/roos-code-compaction'
-import type { CompactionResult } from '@roos-code/roos-code-compaction'
-import type { CommandId } from '@roos-code/roos-code-commands/brand'
-import { createUserMessage, errorChain } from '@roos-code/roos-code-llm'
-import type { Message, UserMessage } from '@roos-code/roos-code-llm'
-import type { TokenMeasurement, TokenMeter } from '@roos-code/roos-code-token-meter'
-import type { Session, SessionEvent } from '@roos-code/roos-code-session'
-import type { Agent } from '@roos-code/roos-code-agent'
+} from '@shres-code/shres-code-compaction'
+import type { CompactionResult } from '@shres-code/shres-code-compaction'
+import type { CommandId } from '@shres-code/shres-code-commands/brand'
+import { createUserMessage, errorChain } from '@shres-code/shres-code-llm'
+import type { Message, UserMessage } from '@shres-code/shres-code-llm'
+import type { TokenMeasurement, TokenMeter } from '@shres-code/shres-code-token-meter'
+import type { Session, SessionEvent } from '@shres-code/shres-code-session'
+import type { Agent } from '@shres-code/shres-code-agent'
 import { frameSummary } from './summarizer.ts'
 import type { SummarizationInput, SummaryResult } from './summarizer.ts'
 

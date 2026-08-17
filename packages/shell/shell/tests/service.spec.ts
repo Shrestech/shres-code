@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { ShellExecutor } from '@roos-code/roos-code-shell'
-import type { ShellExecRequest, ShellExecSpec, ShellProcess, ShellProcessRead, ShellRunResult } from '@roos-code/roos-code-shell'
+import { Context } from '@shres-code/cordis'
+import { ShellExecutor } from '@shres-code/shres-code-shell'
+import type { ShellExecRequest, ShellExecSpec, ShellProcess, ShellProcessRead, ShellRunResult } from '@shres-code/shres-code-shell'
 
 /**
  * Minimal concrete executor: canned foreground results, a hand-built process

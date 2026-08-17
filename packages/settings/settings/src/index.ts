@@ -3,11 +3,11 @@
  * per-namespace sections; plugins register a namespace schema and read the
  * resolved value, which layers schema defaults, the registrant's composition
  * `base`, and the user document section, in that order.
- * @module @roos-code/roos-code-settings
+ * @module @shres-code/shres-code-settings
  */
 
-import { Context, Service } from '@roos-code/cordis'
-import type z from '@roos-code/schemastery'
+import { Context, Service } from '@shres-code/cordis'
+import type z from '@shres-code/schemastery'
 import { redactSecrets } from './redact.ts'
 import type { RedactedSecret } from './redact.ts'
 import type { SettingsNamespace, SettingsUpdateSource } from './types.ts'
@@ -128,7 +128,7 @@ export interface SettingsScope<T> {
   replace(section: object): Promise<void>
 }
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     settings: SettingsProvider
   }

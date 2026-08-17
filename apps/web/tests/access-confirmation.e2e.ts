@@ -28,7 +28,7 @@ describe('web e2e: Full access confirmation', () => {
     // CI uses Playwright's pinned browser. A developer may point this one
     // scenario at an installed Chromium when the matching browser download
     // is temporarily unavailable.
-    const executablePath = process.env.ROOS_PLAYWRIGHT_EXECUTABLE_PATH
+    const executablePath = process.env.SHRES_PLAYWRIGHT_EXECUTABLE_PATH
     browser = await chromium.launch(executablePath === undefined ? {} : { executablePath })
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)

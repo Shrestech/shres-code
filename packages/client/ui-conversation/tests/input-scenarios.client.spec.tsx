@@ -8,24 +8,24 @@
  * itself is not a dependency of this package; the source below is the
  * decision-table contract at the `InputTriggerSource` boundary.
  */
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import {
   EMPTY_CHAT_SNAPSHOT, EMPTY_CONVERSATION_VIEWS, SessionRuntime,
-} from '@roos-code/roos-code-client-runtime/client'
-import { InputTriggerService } from '@roos-code/roos-code-client-ui-input-trigger/client'
-import type { ClientSessionContext, CommandClaim, PickOutcome, SubmitOutcome } from '@roos-code/roos-code-client-ui-input-trigger/client'
+} from '@shres-code/shres-code-client-runtime/client'
+import { InputTriggerService } from '@shres-code/shres-code-client-ui-input-trigger/client'
+import type { ClientSessionContext, CommandClaim, PickOutcome, SubmitOutcome } from '@shres-code/shres-code-client-ui-input-trigger/client'
 import { FakeApiClient, fakeRemote, ok } from '../../runtime/tests/fake-api.client.ts'
-import { makeTranslate } from '@roos-code/roos-code-client-test-runtime'
-import { en as commonEn } from '@roos-code/roos-code-client-locale/src/locales/en.ts'
+import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
+import { en as commonEn } from '@shres-code/shres-code-client-locale/src/locales/en.ts'
 import { SessionInputShell } from '../src/client/input/facade.ts'
 import { InputBar } from '../src/client/skeleton/InputBar.tsx'
 import type { InputBarProps } from '../src/client/skeleton/InputBar.tsx'
 import { en } from '../src/client/locales.ts'
-import { bindSnapshotSelector } from '@roos-code/roos-code-client-web-react'
-import { createSnapshotStore } from '@roos-code/roos-code-client-runtime/client'
-import type { ConversationSnapshot } from '@roos-code/roos-code-client-runtime/client'
+import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
+import { createSnapshotStore } from '@shres-code/shres-code-client-runtime/client'
+import type { ConversationSnapshot } from '@shres-code/shres-code-client-runtime/client'
 
 afterEach(cleanup)
 

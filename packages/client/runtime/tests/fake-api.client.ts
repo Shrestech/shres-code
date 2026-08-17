@@ -5,8 +5,8 @@ import type {
   ClientResponse, HostFrame, IApiClient, ModelSelection, MuxFrame,
   RpcError, RpcReceipt, RpcRequest, RpcResponse, SessionId, SessionModels, SessionSearchItem, SkillEntry,
   WorkspaceId, WorkspaceView,
-} from '@roos-code/roos-code-api-remotes/client'
-import { RpcId } from '@roos-code/roos-code-client-connection/client'
+} from '@shres-code/shres-code-api-remotes/client'
+import { RpcId } from '@shres-code/shres-code-client-connection/client'
 import type { SessionRemotes } from '../src/client/sessions/remotes.ts'
 
 /** Programmable-default workspace row (branded id, ISO-ish times). */

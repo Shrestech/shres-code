@@ -2,11 +2,11 @@
  * Types for the TypeScript SDK client: launch options, notification shapes,
  * and owned activity results.
  *
- * @module @roos-code/roos-code-sdk-client/types
+ * @module @shres-code/shres-code-sdk-client/types
  */
 
-import type { ContentBlock } from '@roos-code/roos-code-llm'
-import type { SessionEvent } from '@roos-code/roos-code-session'
+import type { ContentBlock } from '@shres-code/shres-code-llm'
+import type { SessionEvent } from '@shres-code/shres-code-session'
 
 /** One server-to-client notification as received off the wire. */
 export interface HarnessNotification {
@@ -21,7 +21,7 @@ export type NotificationFilter = (notification: HarnessNotification) => boolean
 
 /** Launch and timeout options for {@link HarnessClient}. */
 export interface HarnessClientOptions {
-  /** The runtime executable (the `roos-jsonrpc-agent` bin, a packaged exe, or `node`). */
+  /** The runtime executable (the `shres-jsonrpc-agent` bin, a packaged exe, or `node`). */
   command: string
   /** Arguments passed to {@link command}. */
   args?: string[]
@@ -30,7 +30,7 @@ export interface HarnessClientOptions {
   /**
    * The complete child environment. `undefined` inherits the parent env
    * verbatim; passing an object replaces it entirely, so callers own
-   * credential policy (see `scrubbedParentEnv` in `@roos-code/roos-code-subprocess`
+   * credential policy (see `scrubbedParentEnv` in `@shres-code/shres-code-subprocess`
    * for the shared scrub-then-merge base).
    */
   env?: NodeJS.ProcessEnv

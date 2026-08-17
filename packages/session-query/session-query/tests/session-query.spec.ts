@@ -1,15 +1,15 @@
-import { createUserMessage, createMessage } from '@roos-code/roos-code-llm'
+import { createUserMessage, createMessage } from '@shres-code/shres-code-llm'
 import { describe, expect, it, vi } from 'vitest'
-import { Context, type Fiber } from '@roos-code/cordis'
-import SessionStore, { SESSION_FORMAT_VERSION, SessionId } from '@roos-code/roos-code-session'
-import type { SessionEvent, SessionHeader, SessionId as SessionIdType } from '@roos-code/roos-code-session'
-import SessionPersistence, { SessionPersistenceCorruptionError, SessionPersistenceRevision } from '@roos-code/roos-code-session-persistence'
+import { Context, type Fiber } from '@shres-code/cordis'
+import SessionStore, { SESSION_FORMAT_VERSION, SessionId } from '@shres-code/shres-code-session'
+import type { SessionEvent, SessionHeader, SessionId as SessionIdType } from '@shres-code/shres-code-session'
+import SessionPersistence, { SessionPersistenceCorruptionError, SessionPersistenceRevision } from '@shres-code/shres-code-session-persistence'
 import SessionQueryEngine, {
   SESSION_QUERY_DEFAULT_PERSISTED_INSPECT_CONCURRENCY,
   type SessionEventSurface,
   type SessionQueryErrorCode,
-} from '@roos-code/roos-code-session-query'
-import { SessionTitleProviderId } from '@roos-code/roos-code-session-title'
+} from '@shres-code/shres-code-session-query'
+import { SessionTitleProviderId } from '@shres-code/shres-code-session-title'
 import { TestSessionQueryEngine } from './test-service.ts'
 
 function header(id: string, createdAt = 1, extra: Partial<SessionHeader> = {}): SessionHeader {

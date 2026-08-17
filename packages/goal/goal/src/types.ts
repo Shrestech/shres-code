@@ -1,16 +1,16 @@
 /**
  * Pure types of the goal domain: the ONE home of the `goal` projection-key
  * declaration plus the durable payload vocabulary it carries, free of this
- * package's host-side imports (cordis events, roos-agent, roos-llm, the
+ * package's host-side imports (cordis events, shres-agent, shres-llm, the
  * service). Two namespace projections serve it — `./types` for host
  * consumers, `./client` (the browser half-entry's re-export) for client
  * aggregates — with zero content duplication. Host-coupled domain
  * vocabulary (message sources, events, fold shapes) lives in ./domain.ts.
  *
- * @module @roos-code/roos-code-goal/types
+ * @module @shres-code/shres-code-goal/types
  */
 
-import type { Branded } from '@roos-code/roos-code-brand'
+import type { Branded } from '@shres-code/shres-code-brand'
 
 /** Identifies one goal across its durable revisions. */
 export type GoalId = Branded<'GoalId'>
@@ -99,7 +99,7 @@ export interface GoalProjection {
   readonly updatedAt: number
 }
 
-declare module '@roos-code/roos-code-session-projection/types' {
+declare module '@shres-code/shres-code-session-projection/types' {
   interface SessionProjectionMap {
     /**
      * The session's current goal (the latest `goal/change` whole value), or

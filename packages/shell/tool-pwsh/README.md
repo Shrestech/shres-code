@@ -1,6 +1,6 @@
-# @roos-code/roos-code-tool-pwsh
+# @shres-code/shres-code-tool-pwsh
 
-The model-facing `pwsh` tool registered over the `ctx.shell` executor seam. Intended for Windows compositions where a PowerShell executor (e.g. `@roos-code/roos-code-pwsh-local`) backs `ctx.shell`; the tool contract is PowerShell-dialect: native `C:\...` paths and `$env:NAME` variables. Behavior mirrors `roos-tool-bash` call-for-call — foreground and `run_in_background` execution through the generic job runtime, the managed `ROOS_*` environment through the shared `shell-env` registry, the sandbox denial rendering with the same-turn `sandbox_permissions` escalation surface, and the bash marker/truncation rendering story (a clean exit produces no marker).
+The model-facing `pwsh` tool registered over the `ctx.shell` executor seam. Intended for Windows compositions where a PowerShell executor (e.g. `@shres-code/shres-code-pwsh-local`) backs `ctx.shell`; the tool contract is PowerShell-dialect: native `C:\...` paths and `$env:NAME` variables. Behavior mirrors `shres-tool-bash` call-for-call — foreground and `run_in_background` execution through the generic job runtime, the managed `SHRES_*` environment through the shared `shell-env` registry, the sandbox denial rendering with the same-turn `sandbox_permissions` escalation surface, and the bash marker/truncation rendering story (a clean exit produces no marker).
 
 Requires a loaded executor implementation and the `shell-env` plugin; the tool stays pending until both exist (`inject: ['tools', 'bash', 'systemPrompt', 'bashEnv']`).
 
@@ -26,7 +26,7 @@ The plugin also contributes the `tool:pwsh` prompt section (order 105): non-zero
 
 ### Managed shell environment
 
-Every foreground and background model pwsh call receives a freshly collected trusted `ROOS_*` environment through the shared [`roos-shell-env`](../shell-env/) registry: `ROOS_HOME` (the absolute Harness home), `ROOS_SHELL=1`, the agent's `ROOS_SESSION_ID`, and `ROOS_SESSION_JSONL` when the active persistence backend locates one. Plugins contributing `ROOS_*` facts to `ctx.shellEnv` apply to pwsh calls exactly as they do to bash calls. The snapshot passes through the dedicated `ShellExecRequest.roosEnv` channel; `process.env` is never modified. The description teaches the generic `$env:ROOS_*` convention rather than naming persistence-specific variables.
+Every foreground and background model pwsh call receives a freshly collected trusted `SHRES_*` environment through the shared [`shres-shell-env`](../shell-env/) registry: `SHRES_HOME` (the absolute Harness home), `SHRES_SHELL=1`, the agent's `SHRES_SESSION_ID`, and `SHRES_SESSION_JSONL` when the active persistence backend locates one. Plugins contributing `SHRES_*` facts to `ctx.shellEnv` apply to pwsh calls exactly as they do to bash calls. The snapshot passes through the dedicated `ShellExecRequest.shresEnv` channel; `process.env` is never modified. The description teaches the generic `$env:SHRES_*` convention rather than naming persistence-specific variables.
 
 Result text contains stdout, an optional `[stderr]` section, then applicable truncation, sandbox-denial (with the same-turn escalation hint when the composition advertises escalation), timeout, signal, and exit markers. A clean exit (0, no signal) produces no marker; an empty body renders as `(no output)`. Truncation links a safe complete spill file or reports it unavailable. Timeout is reported independently of final exit status; nonzero exit remains a model-interpreted result rather than `isError`. Windows reports forced termination as exit 1 without a signal, so `[killed by signal: …]` is POSIX-only there. Only infrastructure failures — spawn errors and aborts (`tool call aborted`) — produce `isError`.
 
@@ -36,7 +36,7 @@ When `run_in_background` is true, this plugin preflights `ctx.jobs.start()` befo
 
 ## UI presentation
 
-The tool owns its `presentCall`/`presentResult` render intent. A foreground call is a `terminal` card carrying command, description, and optional cwd; a `run_in_background` call is a `generic` card with the raw command, mirroring the bash tool's background presentation. A completed foreground result is a `terminal` card too: the exit marker becomes the card's exit-status pill (`exitCode`/`signal`), and the marker-free body is the card's output — exactly the bash tool's terminal-card story, via the shared exit-status parse from `@roos-code/roos-code-shell`. Background acks and execution errors stay `generic` cards with the rendered output in a `console` fence. These presenters are pure and replay-safe.
+The tool owns its `presentCall`/`presentResult` render intent. A foreground call is a `terminal` card carrying command, description, and optional cwd; a `run_in_background` call is a `generic` card with the raw command, mirroring the bash tool's background presentation. A completed foreground result is a `terminal` card too: the exit marker becomes the card's exit-status pill (`exitCode`/`signal`), and the marker-free body is the card's output — exactly the bash tool's terminal-card story, via the shared exit-status parse from `@shres-code/shres-code-shell`. Background acks and execution errors stay `generic` cards with the rendered output in a `console` fence. These presenters are pure and replay-safe.
 
 ## Model Experience
 
@@ -64,7 +64,7 @@ Prefix-stable while the registration scope and prompt text are unchanged. Plugin
 
 #### What the model sees
 
-The model sees the generated [`pwsh` schema](../../../docs/tool-catalog.md#roos-coderoos-code-tool-pwsh). Agent-scoped tool restrictions can remove the definition for that agent.
+The model sees the generated [`pwsh` schema](../../../docs/tool-catalog.md#shres-codeshres-code-tool-pwsh). Agent-scoped tool restrictions can remove the definition for that agent.
 
 #### Token effect
 
@@ -106,7 +106,7 @@ Append-only; newly visible content follows the reusable request prefix and does 
 
 #### What the model sees
 
-Validation and infrastructure failures are normalized as `Error: <message>`. This package's stable messages are `invalid command: expected a non-empty string`, `invalid description: expected a non-empty string`, `invalid timeoutMs: expected a positive number, got <value>`, `invalid escalation: sandbox_permissions requires a justification`, `invalid escalation: justification is only valid together with sandbox_permissions`, `invalid justification: expected a non-empty sentence`, `sandbox_permissions is not available in this composition (no sandboxing executor to escalate)`, the shared escalation failures (not strictly wider / no approval service / no agent to route / no approval channel / user rejected / was cancelled), `run_in_background is disabled for this deployment (enableRunInBackground: false)`, `background jobs unavailable: load @roos-code/roos-code-jobs and @roos-code/roos-code-tool-jobs`, and `tool call aborted`.
+Validation and infrastructure failures are normalized as `Error: <message>`. This package's stable messages are `invalid command: expected a non-empty string`, `invalid description: expected a non-empty string`, `invalid timeoutMs: expected a positive number, got <value>`, `invalid escalation: sandbox_permissions requires a justification`, `invalid escalation: justification is only valid together with sandbox_permissions`, `invalid justification: expected a non-empty sentence`, `sandbox_permissions is not available in this composition (no sandboxing executor to escalate)`, the shared escalation failures (not strictly wider / no approval service / no agent to route / no approval channel / user rejected / was cancelled), `run_in_background is disabled for this deployment (enableRunInBackground: false)`, `background jobs unavailable: load @shres-code/shres-code-jobs and @shres-code/shres-code-tool-jobs`, and `tool call aborted`.
 
 #### Token effect
 

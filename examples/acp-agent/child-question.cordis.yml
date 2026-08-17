@@ -1,14 +1,14 @@
 # Snapshot-only human-interaction composition. The provider is a tripwire: the
 # runtime-owned child must be rejected by the seam before any UI wait begins.
 - id: base
-  name: '@roos-code/cordis-plugin-include'
+  name: '@shres-code/cordis-plugin-include'
   config:
     path: ./cordis.yml
     patches:
       - insert:
           - id: user-questions
-            name: '@roos-code/roos-code-user-questions'
+            name: '@shres-code/shres-code-user-questions'
           - id: tool-ask-user
-            name: '@roos-code/roos-code-tool-ask-user'
+            name: '@shres-code/shres-code-tool-ask-user'
           - id: child-question-tripwire
             name: './tests/fixtures/child-question-tripwire.ts'

@@ -4,11 +4,11 @@
  * not the only correct recovery (re-read / read the file), so this package
  * appends the remedy at the model boundary; provider messages stay
  * machine-oriented and unchanged.
- * @module @roos-code/roos-code-tool-fs/src/error
+ * @module @shres-code/shres-code-tool-fs/src/error
  */
 
-import { FsError } from '@roos-code/roos-code-fs'
-import type { FsErrorCode } from '@roos-code/roos-code-fs'
+import { FsError } from '@shres-code/shres-code-fs'
+import type { FsErrorCode } from '@shres-code/shres-code-fs'
 
 /** The remedy appended to each remediable failure code's message. */
 const REMEDIES: Partial<Record<FsErrorCode, string>> = {

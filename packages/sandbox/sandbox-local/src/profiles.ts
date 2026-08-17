@@ -1,18 +1,18 @@
 /**
  * Internal platform-profile builders for the local sandbox provider.
  *
- * @module @roos-code/roos-code-sandbox-local/profiles
+ * @module @shres-code/shres-code-sandbox-local/profiles
  */
 
 import { join } from 'node:path'
-import { grantArgs as landlockGrantArgs } from '@roos-code/node-addon-landlock-run'
-import { resolveRoosHome } from '@roos-code/roos-code-home-paths'
-import { sandboxNetwork, writableRoots } from '@roos-code/roos-code-sandbox'
-import type { SandboxPolicy } from '@roos-code/roos-code-sandbox'
+import { grantArgs as landlockGrantArgs } from '@shres-code/node-addon-landlock-run'
+import { resolveShresHome } from '@shres-code/shres-code-home-paths'
+import { sandboxNetwork, writableRoots } from '@shres-code/shres-code-sandbox'
+import type { SandboxPolicy } from '@shres-code/shres-code-sandbox'
 
 /** Home credentials document the in-process fs fence also denies. */
 function credentialsReadDenyPath(): string {
-  return join(resolveRoosHome(), '.credentials.yaml')
+  return join(resolveShresHome(), '.credentials.yaml')
 }
 
 /**
@@ -36,7 +36,7 @@ export function bwrapProfileArgs(policy: SandboxPolicy): string[] {
 /**
  * Build the Landlock launcher grants for one file-effect policy. Filesystem
  * grants are unchanged — Landlock is allow-list only, so a `/` read grant
- * cannot subtract `$ROOS_HOME/.credentials.yaml` (Seatbelt/bwrap + `ctx.fs`
+ * cannot subtract `$SHRES_HOME/.credentials.yaml` (Seatbelt/bwrap + `ctx.fs`
  * / search fences close that path). `network: allow` lifts the launcher's
  * default TCP deny via `--allow-net`.
  * @param policy - file-effect policy to express as Landlock allow-list grants.
@@ -63,7 +63,7 @@ function sbplString(path: string): string {
  * Build the sandbox-exec arguments and SBPL profile for one policy. The
  * writable roots come from the shared {@link writableRoots} helper (canonical,
  * deduplicated) so the Seatbelt grant and the in-process fs fence
- * (`@roos-code/roos-code-fs-sandbox`) can never drift apart. Default
+ * (`@shres-code/shres-code-fs-sandbox`) can never drift apart. Default
  * `network: deny` adds `(deny network-outbound)`.
  * @param policy - file-effect policy to express as an SBPL profile.
  * @returns sandbox-exec arguments before the trailing separator and command argv.

@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { Session, SessionId } from '@roos-code/roos-code-session'
-import AgentRegistry, { agentEvents, Inbox, type Agent } from '@roos-code/roos-code-agent'
-import { createUserMessage } from '@roos-code/roos-code-llm'
-import { ShellExecutor } from '@roos-code/roos-code-shell'
-import type { ShellExecRequest, ShellExecSpec, ShellProcess, ShellRunResult } from '@roos-code/roos-code-shell'
-import * as tmuxContext from '@roos-code/roos-code-tmux-context'
-import type { Config } from '@roos-code/roos-code-tmux-context'
+import { Context } from '@shres-code/cordis'
+import { Session, SessionId } from '@shres-code/shres-code-session'
+import AgentRegistry, { agentEvents, Inbox, type Agent } from '@shres-code/shres-code-agent'
+import { createUserMessage } from '@shres-code/shres-code-llm'
+import { ShellExecutor } from '@shres-code/shres-code-shell'
+import type { ShellExecRequest, ShellExecSpec, ShellProcess, ShellRunResult } from '@shres-code/shres-code-shell'
+import * as tmuxContext from '@shres-code/shres-code-tmux-context'
+import type { Config } from '@shres-code/shres-code-tmux-context'
 
 const SIGNAL = new AbortController().signal
 

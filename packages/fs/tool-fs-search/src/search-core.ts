@@ -16,19 +16,19 @@
  * artifact is the formatted result saved through `ctx.spillStore.saveText()`
  * ({@link trySaveFormattedResult}).
  *
- * @module @roos-code/roos-code-tool-fs-search/search-core
+ * @module @shres-code/shres-code-tool-fs-search/search-core
  */
 
 import { basename, isAbsolute, join, relative, resolve, sep } from 'node:path'
-import type { Context } from '@roos-code/cordis'
-import { resolveRoosHome } from '@roos-code/roos-code-home-paths'
-import { HarnessError } from '@roos-code/roos-code-llm'
-import type { SandboxPolicyService } from '@roos-code/roos-code-sandbox-policy'
-import { ItemRetainer, TextRetainer } from '@roos-code/roos-code-output-retention'
-import type { RetainedItems } from '@roos-code/roos-code-output-retention'
-import type { SubprocessHandle, SubprocessOutcome, SubprocessOutputRead, SubprocessSpawnSpec } from '@roos-code/roos-code-subprocess'
-import type { SaveTextSpill, SpillRef } from '@roos-code/roos-code-spill'
-import type { ToolExecution } from '@roos-code/roos-code-tools'
+import type { Context } from '@shres-code/cordis'
+import { resolveShresHome } from '@shres-code/shres-code-home-paths'
+import { HarnessError } from '@shres-code/shres-code-llm'
+import type { SandboxPolicyService } from '@shres-code/shres-code-sandbox-policy'
+import { ItemRetainer, TextRetainer } from '@shres-code/shres-code-output-retention'
+import type { RetainedItems } from '@shres-code/shres-code-output-retention'
+import type { SubprocessHandle, SubprocessOutcome, SubprocessOutputRead, SubprocessSpawnSpec } from '@shres-code/shres-code-subprocess'
+import type { SaveTextSpill, SpillRef } from '@shres-code/shres-code-spill'
+import type { ToolExecution } from '@shres-code/shres-code-tools'
 
 /**
  * Default cap on the complete raw `rg` stdout the tools will parse (the
@@ -39,7 +39,7 @@ export const RAW_OUTPUT_MAX_BYTES = 20_000_000
 /**
  * Default cooperative tool-call timeout budget in milliseconds (the `timeoutMs`
  * config), attached to both tool definitions for
- * `@roos-code/roos-code-tool-call-timeout-policy` to enforce through `exec.signal`.
+ * `@shres-code/shres-code-tool-call-timeout-policy` to enforce through `exec.signal`.
  */
 export const SEARCH_TIMEOUT_MS = 30_000
 
@@ -59,7 +59,7 @@ export const SEARCH_GRACE_MS = 3_000
  * COUNT, but retained matches of a broad search (many long lines) can still
  * serialize to hundreds of kilobytes, and `meta` is persisted with the session
  * log and re-sent on every request. A deployment's final output budget
- * (`roos-spill-policy`) only shrinks a result's `content`, never its `meta`, so the
+ * (`shres-spill-policy`) only shrinks a result's `content`, never its `meta`, so the
  * projection owns this cap. 64 KiB holds the full default-capped result of a
  * typical search while bounding the pathological one.
  */
@@ -203,7 +203,7 @@ export function fenceSearchPath(
   if (basename(target).toLowerCase().endsWith(CREDENTIALS_BASENAME_SUFFIX)) {
     throw new SearchError(`${toolName} cannot search a credentials document`, 'SEARCH_FAILED')
   }
-  const homeDoc = join(resolveRoosHome(), '.credentials.yaml')
+  const homeDoc = join(resolveShresHome(), '.credentials.yaml')
   if (target === homeDoc || isPathInside(target, homeDoc)) {
     throw new SearchError(`${toolName} cannot search a credentials document`, 'SEARCH_FAILED')
   }
@@ -224,7 +224,7 @@ export function fenceSearchPath(
  * complete raw stdout. The working directory is the calling agent's session
  * cwd (`exec.agent.session.header.cwd`) when available, else
  * `process.cwd()`. `exec.signal` is forwarded so the cooperative tool timeout
- * (`@roos-code/roos-code-tool-call-timeout-policy`) and caller cancellation terminate the
+ * (`@shres-code/shres-code-tool-call-timeout-policy`) and caller cancellation terminate the
  * process tree.
  *
  * The spawn is unconfined (a plain `ctx.subprocess` call), so `--no-config`
@@ -366,9 +366,9 @@ export function previewLine(line: string, maxBytes: number): string {
 /**
  * Apply the shared inline cap to a canonical `grep` match list: preview each
  * retained line to `maxLineBytes` and keep the first `maxMatches`. The single
- * retention pass both the model-facing render ({@link module:@roos-code/roos-code-tool-fs-search/grep}
+ * retention pass both the model-facing render ({@link module:@shres-code/shres-code-tool-fs-search/grep}
  * `formatGrepOutput`) and the search-card projection
- * ({@link module:@roos-code/roos-code-tool-fs-search/presentation} `grepSearchMeta`)
+ * ({@link module:@shres-code/shres-code-tool-fs-search/presentation} `grepSearchMeta`)
  * consume, so text and card never disagree about which matches survived.
  *
  * @param matches - every match the search parsed (the canonical value's matches).

@@ -2,17 +2,17 @@
  * Agent service: live registry, factory delegation, and process-local
  * initiator scope. Concrete creation and driving belong to the loop.
  *
- * @module @roos-code/roos-code-agent
+ * @module @shres-code/shres-code-agent
  */
 
-import { Context, FiberState, getTraceable, Service, symbols } from '@roos-code/cordis'
-import type { Fiber } from '@roos-code/cordis'
+import { Context, FiberState, getTraceable, Service, symbols } from '@shres-code/cordis'
+import type { Fiber } from '@shres-code/cordis'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { isPromise } from 'node:util/types'
-import { scopeTarget } from '@roos-code/roos-code-scope'
-import type { Scoped } from '@roos-code/roos-code-scope'
-import type { SessionEvent, SessionId } from '@roos-code/roos-code-session'
-import type { TypertContext, TypertLookup } from '@roos-code/roos-code-typert-protocol'
+import { scopeTarget } from '@shres-code/shres-code-scope'
+import type { Scoped } from '@shres-code/shres-code-scope'
+import type { SessionEvent, SessionId } from '@shres-code/shres-code-session'
+import type { TypertContext, TypertLookup } from '@shres-code/shres-code-typert-protocol'
 import type { Agent, AgentOptions } from './runtime-types.ts'
 
 export * from './runtime-types.ts'
@@ -23,7 +23,7 @@ export * from './model-selection.ts'
 export { agentCarrier, agentEvents, assembleContextFor, emitAgentEvent } from './dispatch.ts'
 export type { AgentEventDispatch, AgentSubjectEvent } from './dispatch.ts'
 
-declare module '@roos-code/roos-code-typert-protocol' {
+declare module '@shres-code/shres-code-typert-protocol' {
   interface TypertLookupMap {
     agent: TypertLookup<Agent, SessionId>
   }
@@ -33,14 +33,14 @@ declare module '@roos-code/roos-code-typert-protocol' {
   }
 }
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     agents: AgentRegistry
     /**
      * The agent association installed as an own property on `Agent.ctx`, or
      * `undefined` on a plain context. Contexts derived from `Agent.ctx` inherit
      * the association; a deliberately nested scope may carry a nearer
-     * `roos-scope` tag while retaining it, so this field is DX context rather
+     * `shres-scope` tag while retaining it, so this field is DX context rather
      * than the scope resolver. {@link AgentRegistry} registers a root accessor
      * defaulting to `undefined`, and core packages below the agent layer use
      * `scopeOf()` for layer selection instead of reading this field.
@@ -85,7 +85,7 @@ export interface CreateAgentOptions {
    * fork lineage, the `seedLength` seed boundary, the coarse `origin`
    * classification, and the `delegationDepth` recursion budget. Mirrors the
    * `cwd`/`parentSession`/`seedLength`/`origin`/`delegationDepth` fields of
-   * {@link CreateSessionOptions.meta} in roos-session (the internal-only
+   * {@link CreateSessionOptions.meta} in shres-session (the internal-only
    * `createdAt`, used when reconstructing a persisted session, is deliberately
    * excluded — a factory caller never sets it). This is durable session data,
    * so the session boundary validates and snapshots it before asynchronous
@@ -176,9 +176,9 @@ export interface AgentHandle {
 
 /**
  * The agent-creation factory the loop implementation provides to the registry
- * via {@link AgentRegistry.setFactory}. Kept on the `roos-agent` interface so
+ * via {@link AgentRegistry.setFactory}. Kept on the `shres-agent` interface so
  * consumers (e.g. the ACP bridge) program against `ctx.agents` without
- * depending on the concrete `roos-agent-loop` package.
+ * depending on the concrete `shres-agent-loop` package.
  */
 export interface AgentFactory {
   /**
@@ -245,7 +245,7 @@ interface FactorySlot {
  * Agent service (`ctx.agents`): tracks live agents and carries the initiating
  * Agent through one process-local asynchronous driver chain. Agent *creation*
  * is provided by whichever plugin implements the {@link AgentFactory}
- * (`@roos-code/roos-code-agent-loop`), registered via {@link setFactory}.
+ * (`@shres-code/shres-code-agent-loop`), registered via {@link setFactory}.
  *
  * Initiator methods provide same-process causal attribution only. Ambient
  * presence is neither liveness proof nor authorization; subjects and owners
@@ -269,13 +269,13 @@ export class AgentRegistry extends Service {
       typeCtx.typert.lookups.register('agent', {
         parameter: 'agent',
         wire: 'agentId',
-        hostTypeSymbol: '@roos-code/roos-code-agent#Agent',
-        wireTypeSymbol: '@roos-code/roos-code-session/types#SessionId',
+        hostTypeSymbol: '@shres-code/shres-code-agent#Agent',
+        wireTypeSymbol: '@shres-code/shres-code-session/types#SessionId',
         resolve: sessionId => this.get(sessionId),
       })
       typeCtx.typert.contexts.registerHost('agent', {
         wire: 'agentId',
-        wireTypeSymbol: '@roos-code/roos-code-session/types#SessionId',
+        wireTypeSymbol: '@shres-code/shres-code-session/types#SessionId',
         resolve: sessionId => this.get(sessionId)?.ctx,
       })
     })

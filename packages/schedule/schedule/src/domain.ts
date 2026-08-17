@@ -1,9 +1,9 @@
 /**
  * Strict Schedule decoding, replay, time validation, and framing.
- * @module @roos-code/roos-code-schedule
+ * @module @shres-code/shres-code-schedule
  */
 
-import type { SessionEvent } from '@roos-code/roos-code-session'
+import type { SessionEvent } from '@shres-code/shres-code-session'
 import type {
   AfterScheduleRecord,
   AtInput,

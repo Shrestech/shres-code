@@ -1,4 +1,4 @@
-import { TypertRemoteService, Remote, RemoteScope } from '@roos-code/roos-code-typert-protocol'
+import { TypertRemoteService, Remote, RemoteScope } from '@shres-code/shres-code-typert-protocol'
 import type { Agent } from '@fixture/domain'
 import type {
   CreateGoalRequest,

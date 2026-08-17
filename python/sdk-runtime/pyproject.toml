@@ -3,28 +3,28 @@ requires = ["hatchling==1.30.1"]
 build-backend = "hatchling.build"
 
 [project]
-name = "roos-code-runtime-bin"
+name = "shres-code-runtime-bin"
 version = "0.0.0.dev0"
-description = "Pinned Roos Code runtime for the Python SDK"
+description = "Pinned Shres Code runtime for the Python SDK"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 authors = [{ name = "DeepSeek" }]
 
 [project.urls]
-Homepage = "https://github.com/roos-code/roos-code"
-Documentation = "https://github.com/roos-code/roos-code/blob/master/python/sdk-runtime/README.md"
-Issues = "https://github.com/roos-code/roos-code/issues"
-Source = "https://github.com/roos-code/roos-code"
+Homepage = "https://github.com/parthmstech/shres-code"
+Documentation = "https://github.com/parthmstech/shres-code/blob/master/python/sdk-runtime/README.md"
+Issues = "https://github.com/parthmstech/shres-code/issues"
+Source = "https://github.com/parthmstech/shres-code"
 
 # Include the injected executable and default config; exclude the dev-only node
 # closure from wheels and sdists.
 [tool.hatch.build]
-artifacts = ["src/roos_code_runtime/runtime/roos-jsonrpc-agent-*"]
-exclude = ["src/roos_code_runtime/runtime/node"]
+artifacts = ["src/shres_code_runtime/runtime/shres-jsonrpc-agent-*"]
+exclude = ["src/shres_code_runtime/runtime/node"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/roos_code_runtime"]
+packages = ["src/shres_code_runtime"]
 
 [tool.hatch.build.targets.wheel.hooks.custom]
 

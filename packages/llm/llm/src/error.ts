@@ -1,7 +1,7 @@
 /**
  * Harness error base with a stable machine-routable code and chained cause.
  * Package errors extend it so tool results and replay can retain failure class.
- * @module @roos-code/roos-code-llm/error
+ * @module @shres-code/shres-code-llm/error
  */
 
 /**

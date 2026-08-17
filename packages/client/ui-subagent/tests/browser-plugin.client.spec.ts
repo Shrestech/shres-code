@@ -11,17 +11,17 @@
  * projections. Direct driving is deliberate: this spec owns only the
  * source's own contract.
  */
-import { Context } from '@roos-code/cordis'
-import { stubSettingsScope } from '@roos-code/roos-code-client-test-runtime'
+import { Context } from '@shres-code/cordis'
+import { stubSettingsScope } from '@shres-code/shres-code-client-test-runtime'
 import { describe, expect, it } from 'vitest'
 import {
   SlotRegistry, type ConversationSnapshot, type SessionId, type SessionListState,
   type SessionSummary, type SubagentAddress,
-} from '@roos-code/roos-code-client-runtime/client'
-import type { ComposerChainProps } from '@roos-code/roos-code-client-ui-conversation/client'
-import { InputTriggerService } from '@roos-code/roos-code-client-ui-input-trigger/client'
-import type { ClientSessionContext, InputTriggerSource } from '@roos-code/roos-code-client-ui-input-trigger/client'
-import { apply as applyLocale, inject as localeInject } from '@roos-code/roos-code-client-locale/client'
+} from '@shres-code/shres-code-client-runtime/client'
+import type { ComposerChainProps } from '@shres-code/shres-code-client-ui-conversation/client'
+import { InputTriggerService } from '@shres-code/shres-code-client-ui-input-trigger/client'
+import type { ClientSessionContext, InputTriggerSource } from '@shres-code/shres-code-client-ui-input-trigger/client'
+import { apply as applyLocale, inject as localeInject } from '@shres-code/shres-code-client-locale/client'
 import {
   SubagentCatalogAction, type SubagentCatalogInjected,
 } from '../src/client/SubagentCatalogAction.tsx'

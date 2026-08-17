@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import { FsTargetKey, FsVersion } from '@roos-code/roos-code-fs'
-import type { FsTarget } from '@roos-code/roos-code-fs'
-import * as FsInvariant from '@roos-code/roos-code-fs/invariant'
-import InvariantRegistry from '@roos-code/roos-code-invariants'
+import { Context } from '@shres-code/cordis'
+import { FsTargetKey, FsVersion } from '@shres-code/shres-code-fs'
+import type { FsTarget } from '@shres-code/shres-code-fs'
+import * as FsInvariant from '@shres-code/shres-code-fs/invariant'
+import InvariantRegistry from '@shres-code/shres-code-invariants'
 
 async function setup(): Promise<Context> {
   const ctx = new Context()

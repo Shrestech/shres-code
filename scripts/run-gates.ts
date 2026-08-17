@@ -81,11 +81,11 @@ async function main(args: string[]): Promise<number> {
   const mode = parseMode(args[0])
   const gates = gatesForMode(mode)
   const concurrencyDefault = defaultConcurrency(mode, gates.length)
-  const concurrencyOverride = process.env.ROOS_GATE_CONCURRENCY
-  const maxConcurrency = concurrencyFromEnv('ROOS_GATE_CONCURRENCY', concurrencyDefault.workers)
+  const concurrencyOverride = process.env.SHRES_GATE_CONCURRENCY
+  const maxConcurrency = concurrencyFromEnv('SHRES_GATE_CONCURRENCY', concurrencyDefault.workers)
   const concurrencySource = concurrencyOverride === undefined || concurrencyOverride === ''
     ? concurrencyDefault.source
-    : '$ROOS_GATE_CONCURRENCY'
+    : '$SHRES_GATE_CONCURRENCY'
   const startedAt = performance.now()
   console.log(`run-gates: ${mode} running ${gates.length} gate(s) with ${maxConcurrency} worker(s) from ${concurrencySource}.`)
 
@@ -232,7 +232,7 @@ export function gatesForMode(selected: Mode): Gate[] {
         ...hygieneLeafGates({ artifactNeeds: ['build'] }),
         ...docSyncLeafGates({
           docTypecheckNeeds: ['build'],
-          docTypecheckEnv: { ROOS_DOC_TYPECHECK_USE_BUILD_OUTPUT: '1' },
+          docTypecheckEnv: { SHRES_DOC_TYPECHECK_USE_BUILD_OUTPUT: '1' },
           docTypecheckScript: 'doc-typecheck:contracts-ready',
         }),
         pnpmScript('module-graph', 'verify-module-graph', { label: 'module graph' }),
@@ -246,7 +246,7 @@ function ciSharedStaticGates(): Gate[] {
   return [
     pnpmScript('runtime-closure', 'verify-runtime-closure', { label: 'runtime closure' }),
     pnpmScript('constraints', 'constraints'),
-    pnpmScript('roos-package-licenses', 'verify-roos-package-licenses', { label: 'Roos package licenses' }),
+    pnpmScript('shres-package-licenses', 'verify-shres-package-licenses', { label: 'Shres package licenses' }),
     pnpmScript('package-invariants', 'verify-package-invariants', { label: 'package invariants' }),
     pnpmScript('cordis-config', 'verify-cordis-config', { label: 'Cordis config' }),
     pnpmScript('issue-management', 'test:issue-management', { label: 'Issue management policy' }),
@@ -284,7 +284,7 @@ function ciPrimaryGates(): Gate[] {
 }
 
 function nodeCompatGates(): Gate[] {
-  const typecheck = flagEnabled('ROOS_NODE_COMPAT_SKIP_TYPECHECK')
+  const typecheck = flagEnabled('SHRES_NODE_COMPAT_SKIP_TYPECHECK')
     ? []
     : [pnpmScript('typecheck', 'typecheck')]
   if (runningNodeMajor() !== 22) {
@@ -315,11 +315,11 @@ function nodeCompatSmokeGates(options: { cliSmoke?: boolean } = {}): Gate[] {
       'run',
       'packages/session/session-persistence-jsonl/tests/zstd.compat.spec.ts',
     ], { label: 'JSONL Zstandard smoke' }),
-    pnpmExec('roos-source-launch-smoke', [
+    pnpmExec('shres-source-launch-smoke', [
       'vitest',
       'run',
       'apps/cli/tests/source-launch.compat.spec.ts',
-    ], { label: 'roos source-launch smoke' }),
+    ], { label: 'shres source-launch smoke' }),
     pnpmExec('vitest-jsdom-smoke', [
       'vitest',
       'run',
@@ -334,7 +334,7 @@ function nodeCompatSmokeGates(options: { cliSmoke?: boolean } = {}): Gate[] {
         'apps/cli/tests/lazy-search-startup.compat.spec.ts',
       ], {
         label: 'CLI lazy-search startup smoke',
-        env: { ROOS_REQUIRE_BUILT_CLI_SMOKE: '1' },
+        env: { SHRES_REQUIRE_BUILT_CLI_SMOKE: '1' },
         needs: ['build:web'],
       }),
     )
@@ -355,7 +355,7 @@ function ciStaticGates(options: { ownsBuild: boolean }): Gate[] {
   return [
     ...ciSharedStaticGates(),
     pnpmScript('rescope-vendor-ci', 'rescope-vendor:check', { label: 'vendor rescope (ci-static)' }),
-    pnpmScript('rebrand-ci', 'rebrand:check', { label: 'Roos Code rebrand (ci-static)' }),
+    pnpmScript('rebrand-ci', 'rebrand:check', { label: 'Shres Code rebrand (ci-static)' }),
     pnpmScript('legacy-brand-ci', 'verify-no-legacy-brand', { label: 'legacy brand residue (ci-static)' }),
     pnpmScript('purge-zh-ci', 'purge-zh:check', { label: 'Chinese-language file purge (ci-static)' }),
     pnpmScript('no-zh-ci', 'verify-no-zh-artifacts', { label: 'Chinese-language residue (ci-static)' }),
@@ -365,7 +365,7 @@ function ciStaticGates(options: { ownsBuild: boolean }): Gate[] {
       ...options.ownsBuild
         ? {
           docTypecheckNeeds: ['build'],
-          docTypecheckEnv: { ROOS_DOC_TYPECHECK_USE_BUILD_OUTPUT: '1' },
+          docTypecheckEnv: { SHRES_DOC_TYPECHECK_USE_BUILD_OUTPUT: '1' },
           docTypecheckScript: 'doc-typecheck:contracts-ready',
         }
         : {},
@@ -405,7 +405,7 @@ function ciConsumerGates(): Gate[] {
     webSnapshotGate(validatedBuild),
     pnpmScript('doc-typecheck', 'doc-typecheck:contracts-ready', {
       needs: validatedBuild,
-      env: { ROOS_DOC_TYPECHECK_USE_BUILD_OUTPUT: '1' },
+      env: { SHRES_DOC_TYPECHECK_USE_BUILD_OUTPUT: '1' },
     }),
     pnpmScript('node-next-types', 'verify-node-next-types', {
       label: 'node-next types',
@@ -418,8 +418,8 @@ function ciConsumerGates(): Gate[] {
 function webSnapshotGate(needs: string[]): Gate {
   return pnpmScript('web-snapshot', 'test:web:built', {
     label: 'web browser snapshot',
-    displayCommand: 'ROOS_SNAPSHOT=replay pnpm run test:web:built',
-    env: { ROOS_SNAPSHOT: 'replay' },
+    displayCommand: 'SHRES_SNAPSHOT=replay pnpm run test:web:built',
+    env: { SHRES_SNAPSHOT: 'replay' },
     needs,
   })
 }
@@ -465,12 +465,12 @@ function typertContractsGate(): Gate {
 }
 
 function lintGate(options: { needs?: string[] } = {}): Gate {
-  const raw = process.env.ROOS_OXLINT_THREADS
+  const raw = process.env.SHRES_OXLINT_THREADS
   const script = 'lint:contracts-ready'
   return pnpmScript('lint', script, {
     ...raw === undefined || raw === ''
       ? {}
-      : { displayCommand: `ROOS_OXLINT_THREADS=${raw} pnpm run ${script}` },
+      : { displayCommand: `SHRES_OXLINT_THREADS=${raw} pnpm run ${script}` },
     ...options.needs === undefined ? {} : { needs: options.needs },
   })
 }
@@ -480,15 +480,15 @@ function lintGate(options: { needs?: string[] } = {}): Gate {
 // under v8 instrumentation while contributing nothing the thresholds need
 // (membership rules in scripts/coverage-exempt.ts).
 //
-// ROOS_COVERAGE_MAX_WORKERS is the lane's worker budget, so the two parallel
+// SHRES_COVERAGE_MAX_WORKERS is the lane's worker budget, so the two parallel
 // gates split it instead of each claiming it whole (the failover pool's
 // 8 x 6-instance bound assumes one lane never exceeds its value). The exempt
 // gate's wall clock is dominated by its longest single file, so it takes the
 // small share. A budget of 1 gives each gate 1 worker; lanes that need a
 // strict total of one (the serial reference jobs) also set
-// ROOS_GATE_CONCURRENCY=1, which keeps the gates from overlapping at all.
+// SHRES_GATE_CONCURRENCY=1, which keeps the gates from overlapping at all.
 function coverageWorkerArgs(): { instrumented: string[]; exempt: string[] } {
-  const [flag] = positiveIntArg('ROOS_COVERAGE_MAX_WORKERS', '--maxWorkers')
+  const [flag] = positiveIntArg('SHRES_COVERAGE_MAX_WORKERS', '--maxWorkers')
   if (flag === undefined) return { instrumented: [], exempt: [] }
   const total = Number.parseInt(flag.split('=')[1] ?? '', 10)
   const exempt = Math.max(1, Math.floor(total / 3))
@@ -527,7 +527,7 @@ function coverageGates(): Gate[] {
 // Callers wait either on `build` or on a validation gate that transitively owns that build.
 function snapshotGate(needs: string[] = ['build']): Gate {
   return pnpmScript('snapshot', 'test:snapshot', {
-    env: { ROOS_EXAMPLE_MODE: 'lib' },
+    env: { SHRES_EXAMPLE_MODE: 'lib' },
     needs,
   })
 }
@@ -560,11 +560,11 @@ function hygieneLeafGates(options: { artifactNeeds?: string[] } = {}): Gate[] {
   const artifactOptions = options.artifactNeeds === undefined ? {} : { needs: options.artifactNeeds }
   return [
     pnpmScript('rescope-vendor', 'rescope-vendor:check', { label: 'vendor rescope' }),
-    pnpmScript('rebrand', 'rebrand:check', { label: 'Roos Code rebrand' }),
+    pnpmScript('rebrand', 'rebrand:check', { label: 'Shres Code rebrand' }),
     pnpmScript('knip', 'knip'),
     pnpmScript('publint', 'publint', artifactOptions),
     pnpmScript('constraints', 'constraints'),
-    pnpmScript('roos-package-licenses', 'verify-roos-package-licenses', { label: 'Roos package licenses' }),
+    pnpmScript('shres-package-licenses', 'verify-shres-package-licenses', { label: 'Shres package licenses' }),
     pnpmScript('package-invariants', 'verify-package-invariants', { label: 'package invariants' }),
     builtPackageInvariantsGate(options.artifactNeeds),
     pnpmScript('node-next-types', 'verify-node-next-types', {
@@ -645,7 +645,7 @@ function builtBinSmokeGate(needs: string[] = ['build']): Gate {
   ], {
     label: 'built-bin smoke',
     needs,
-    env: { ROOS_EXAMPLE_MODE: 'lib' },
+    env: { SHRES_EXAMPLE_MODE: 'lib' },
   })
 }
 
@@ -852,7 +852,7 @@ export function formatGateResultReason(result: GateResult): string {
 }
 
 function printResult(result: GateResult): void {
-  const verbose = process.env.ROOS_GATE_VERBOSE === '1'
+  const verbose = process.env.SHRES_GATE_VERBOSE === '1'
   const seconds = (result.durationMs / 1000).toFixed(2)
   if (result.status === 'passed' && !verbose) {
     console.log(`run-gates: PASS ${result.gate.label} (${seconds}s)`)

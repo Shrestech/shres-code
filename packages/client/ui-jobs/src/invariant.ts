@@ -1,13 +1,13 @@
 /**
- * Package-owned invariant companion for `@roos-code/roos-code-client-ui-jobs`.
- * @module @roos-code/roos-code-client-ui-jobs/invariant
+ * Package-owned invariant companion for `@shres-code/shres-code-client-ui-jobs`.
+ * @module @shres-code/shres-code-client-ui-jobs/invariant
  */
 
 /* jscpd:ignore-start */
-import type { Context } from '@roos-code/cordis'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-client-ui-jobs'
+const PACKAGE_NAME = '@shres-code/shres-code-client-ui-jobs'
 
 /** Cordis companion plugin name. */
 export const name = 'client-ui-jobs-invariant'

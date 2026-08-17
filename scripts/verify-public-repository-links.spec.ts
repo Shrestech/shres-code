@@ -11,7 +11,7 @@ describe('repository link policy', () => {
     const jsonEscapedRepository = unavailableRepository.replace('/', '\\/')
     const unicodeEscapedRepository = unavailableRepository.replace('/', String.raw`\u002f`)
     const source = [
-      'https://github.com/roos-code/roos-code',
+      'https://github.com/parthmstech/shres-code',
       `https://github.com/${unavailableRepository.toUpperCase()}/issues/1`,
       `https://github.com/${encodedRepository}/issues/2`,
       `https://github.com/${htmlEncodedRepository}/issues/3`,
@@ -31,7 +31,7 @@ describe('repository link policy', () => {
   })
 
   it('preserves frozen archived Agent Notes', () => {
-    const unavailableRepository = ['deepseek-ai', 'roos-code-sdk'].join('/')
+    const unavailableRepository = ['deepseek-ai', 'shres-code-sdk'].join('/')
 
     expect(findUnavailableRepositoryReferences(
       '.agents/notes/archived/process/historical-record.md',

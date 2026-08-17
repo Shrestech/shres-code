@@ -4,11 +4,11 @@ Pre-composed plugin bundles a thin leaf `cordis.yml` loads instead of assembling
 
 | Package | npm name | Role |
 |---|---|---|
-| [`agent-spine-demo/`](agent-spine-demo/README.md) | `@roos-code/roos-code-agent-spine-demo` | Reusable agent-spine bundle |
-| [`acp-demo/`](acp-demo/README.md) | `@roos-code/roos-code-acp-demo` | ACP automation application bundle |
-| [`jsonrpc-demo/`](jsonrpc-demo/README.md) | `@roos-code/roos-code-sdk-jsonrpc-demo` | External-config JSON-RPC runtime |
+| [`agent-spine-demo/`](agent-spine-demo/README.md) | `@shres-code/shres-code-agent-spine-demo` | Reusable agent-spine bundle |
+| [`acp-demo/`](acp-demo/README.md) | `@shres-code/shres-code-acp-demo` | ACP automation application bundle |
+| [`jsonrpc-demo/`](jsonrpc-demo/README.md) | `@shres-code/shres-code-sdk-jsonrpc-demo` | External-config JSON-RPC runtime |
 
-`agent-spine-demo` is the shared bundle; `acp-demo` adds its automation entry point, while `jsonrpc-demo` boots a deployment-owned plugin tree. Product one-shot execution belongs to `roos --profile headless`; no package in this directory provides it.
+`agent-spine-demo` is the shared bundle; `acp-demo` adds its automation entry point, while `jsonrpc-demo` boots a deployment-owned plugin tree. Product one-shot execution belongs to `shres --profile headless`; no package in this directory provides it.
 
 These packages are not product API. Product seams and entry points remain in their owning groups; demo bundles select concrete compositions.
 

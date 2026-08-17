@@ -1,4 +1,4 @@
-import { createUserMessage } from '@roos-code/roos-code-llm'
+import { createUserMessage } from '@shres-code/shres-code-llm'
 /**
  * The `session-telemetry/record` waterfall contract: pass-through when no listener is
  * mounted, listener stacking and replacement, ops-record coverage, the
@@ -6,8 +6,8 @@ import { createUserMessage } from '@roos-code/roos-code-llm'
  */
 
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import SessionStore, { SessionId } from '@roos-code/roos-code-session'
+import { Context } from '@shres-code/cordis'
+import SessionStore, { SessionId } from '@shres-code/shres-code-session'
 import {
   SessionTelemetryCoordinator,
   type SessionTelemetrySink,

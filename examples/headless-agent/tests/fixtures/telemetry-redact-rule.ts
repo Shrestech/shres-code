@@ -1,4 +1,4 @@
-import type { Context } from '@roos-code/cordis'
+import type { Context } from '@shres-code/cordis'
 
 /**
  * Deployment-style redaction rule for the telemetry e2e: scrubs the fixture

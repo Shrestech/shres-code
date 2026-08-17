@@ -10,13 +10,13 @@ When a capability is general enough to need replaceable providers, such as Bash 
 
 The Bash execution capability consists of:
 
-- **Service Definition** (`roos-shell`) — defines the Cordis service and Bash request and result types
-- **Service Provider** (`roos-bash-local`) — executes commands on the local machine
-- **Consumer** (`roos-tool-bash`) — exposes the capability as a model-callable tool
+- **Service Definition** (`shres-shell`) — defines the Cordis service and Bash request and result types
+- **Service Provider** (`shres-bash-local`) — executes commands on the local machine
+- **Consumer** (`shres-tool-bash`) — exposes the capability as a model-callable tool
 
 ```
 ┌─────────────┐     ┌──────────────────┐     ┌──────────────┐
-│  roos-shell   │────▶│  roos-bash-local  │     │ roos-tool-bash│
+│  shres-shell   │────▶│  shres-bash-local  │     │ shres-tool-bash│
 │(definition) │     │    (provider)     │     │(consumer/tool)│
 └─────────────┘     └──────────────────┘     └──────────────┘
        ▲                                            │
@@ -32,7 +32,7 @@ One Service Definition can have multiple providers selected through `cordis.yml`
 
 ```yaml
 # Local execution
-- name: '@roos-code/roos-code-bash-local'
+- name: '@shres-code/shres-code-bash-local'
 
 # Replace this row with another package that provides the same service.
 ```
@@ -59,9 +59,9 @@ The [capability-seam reference](../../../capability-seams.md) owns the current b
 
 ```ts ignore-check
 // packages/my-cap/my-cap/src/index.ts
-import { Service, type Context } from '@roos-code/cordis'
+import { Service, type Context } from '@shres-code/cordis'
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     myCap: MyCapService
   }
@@ -89,8 +89,8 @@ export interface MyCapResult {
 
 ```ts ignore-check
 // packages/my-cap/my-cap-local/src/index.ts
-import type { Context } from '@roos-code/cordis'
-import { MyCapService, type MyCapRequest, type MyCapResult } from '@roos-code/roos-code-my-cap'
+import type { Context } from '@shres-code/cordis'
+import { MyCapService, type MyCapRequest, type MyCapResult } from '@shres-code/shres-code-my-cap'
 
 class MyCapLocal extends MyCapService {
   async execute(request: MyCapRequest): Promise<MyCapResult> {
@@ -110,8 +110,8 @@ export function apply(ctx: Context) {
 
 ```ts ignore-check
 // packages/my-cap/tool-my-cap/src/index.ts
-import type { Context } from '@roos-code/cordis'
-import { defineTool } from '@roos-code/roos-code-tools'
+import type { Context } from '@shres-code/cordis'
+import { defineTool } from '@shres-code/shres-code-tools'
 
 export const name = 'tool-my-cap'
 export const inject = ['tools', 'myCap']
@@ -138,8 +138,8 @@ export function apply(ctx: Context) {
 ### Compose them in cordis.yml
 
 ```yaml
-- name: '@roos-code/roos-code-my-cap-local'
-- name: '@roos-code/roos-code-tool-my-cap'
+- name: '@shres-code/shres-code-my-cap-local'
+- name: '@shres-code/shres-code-tool-my-cap'
 ```
 
 ## Design points

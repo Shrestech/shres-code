@@ -16,12 +16,12 @@ import type {
   SDKMessage,
   SDKSystemMessage,
 } from '@anthropic-ai/claude-agent-sdk'
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import type { Agent } from '@roos-code/roos-code-agent'
-import SubagentRuntime from '@roos-code/roos-code-subagent'
-import type { SubprocessHandle, SubprocessSpawnSpec } from '@roos-code/roos-code-subprocess'
-import LocalSubprocessRuntime from '@roos-code/roos-code-subprocess-local'
+import type { Agent } from '@shres-code/shres-code-agent'
+import SubagentRuntime from '@shres-code/shres-code-subagent'
+import type { SubprocessHandle, SubprocessSpawnSpec } from '@shres-code/shres-code-subprocess'
+import LocalSubprocessRuntime from '@shres-code/shres-code-subprocess-local'
 import * as claudeCode from '../src/index.ts'
 import {
   startMessagesFixture,
@@ -80,8 +80,8 @@ const claudeBin = join(
   platformRoot,
   process.platform === 'win32' ? 'claude.exe' : 'claude',
 )
-const settingsModel = 'roos-settings-inheritance-marker'
-const fakeKey = 'roos-fake-anthropic-key'
+const settingsModel = 'shres-settings-inheritance-marker'
+const fakeKey = 'shres-fake-anthropic-key'
 
 const roots: string[] = []
 const fixtures: MessagesFixture[] = []
@@ -126,7 +126,7 @@ async function realHarness(behavior: MessagesBehavior): Promise<{
   readonly harness: RealHarness
   readonly fixture: MessagesFixture
 }> {
-  const root = mkdtempSync(join(tmpdir(), 'roos-claude-code-real-'))
+  const root = mkdtempSync(join(tmpdir(), 'shres-claude-code-real-'))
   roots.push(root)
   const workspace = join(root, 'workspace')
   const claudeConfig = join(root, 'claude-config')
@@ -244,9 +244,9 @@ describe('real Claude Agent SDK 0.3.220 and its distributed Claude Code 2.1.220 
     expect(initMessage?.claude_code_version).toBe('2.1.220')
     if (process.platform === 'win32') {
       expect(harness.spawnSpecs[0]?.argv.slice(0, 6)).toEqual([
-        'cmd.exe', '/d', '/v:off', '/s', '/c', '%ROOS_CLAUDE_CODE_EXECUTABLE%',
+        'cmd.exe', '/d', '/v:off', '/s', '/c', '%SHRES_CLAUDE_CODE_EXECUTABLE%',
       ])
-      const batchExecutable = harness.spawnSpecs[0]?.env?.ROOS_CLAUDE_CODE_EXECUTABLE
+      const batchExecutable = harness.spawnSpecs[0]?.env?.SHRES_CLAUDE_CODE_EXECUTABLE
       expect(batchExecutable?.startsWith('"')).toBe(true)
       expect(batchExecutable?.endsWith('"')).toBe(true)
       expect(batchExecutable?.slice(1, -1).toLowerCase())

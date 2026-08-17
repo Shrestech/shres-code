@@ -8,21 +8,21 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { z } from 'zod'
-import SessionStore from '@roos-code/roos-code-session'
-import type { Session, SessionEvent } from '@roos-code/roos-code-session'
-import SessionProjectionRegistry from '@roos-code/roos-code-session-projection'
-import type { ProjectionDefinition } from '@roos-code/roos-code-session-projection'
+import SessionStore from '@shres-code/shres-code-session'
+import type { Session, SessionEvent } from '@shres-code/shres-code-session'
+import SessionProjectionRegistry from '@shres-code/shres-code-session-projection'
+import type { ProjectionDefinition } from '@shres-code/shres-code-session-projection'
 
-declare module '@roos-code/roos-code-session-projection/types' {
+declare module '@shres-code/shres-code-session-projection/types' {
   interface SessionProjectionMap {
     'test/marks': { marks: string[] }
     'test/count': number
   }
 }
 
-declare module '@roos-code/roos-code-session/types' {
+declare module '@shres-code/shres-code-session/types' {
   interface SessionEventMap {
     'test/mark': { marks: string[] }
   }

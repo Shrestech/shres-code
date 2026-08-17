@@ -1,14 +1,14 @@
-import { createUserMessage, createMessage } from '@roos-code/roos-code-llm'
+import { createUserMessage, createMessage } from '@shres-code/shres-code-llm'
 import { afterEach, describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { existsSync } from 'node:fs'
 import { chmod, mkdtemp, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import SessionStore, { SessionId } from '@roos-code/roos-code-session'
-import type { Session, SessionEvent, SurfaceEvent, SurfaceEventType } from '@roos-code/roos-code-session'
-import SqliteSessionPersistence, { SCHEMA_VERSION } from '@roos-code/roos-code-session-persistence-sqlite'
+import SessionStore, { SessionId } from '@shres-code/shres-code-session'
+import type { Session, SessionEvent, SurfaceEvent, SurfaceEventType } from '@shres-code/shres-code-session'
+import SqliteSessionPersistence, { SCHEMA_VERSION } from '@shres-code/shres-code-session-persistence-sqlite'
 import {
   openDatabase,
   rowToEvent,
@@ -35,7 +35,7 @@ async function expectFlushError(promise: Promise<unknown>, message: RegExp): Pro
 }
 
 async function freshDbPath(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), 'roos-sqlite-'))
+  const dir = await mkdtemp(join(tmpdir(), 'shres-sqlite-'))
   dirs.push(dir)
   return join(dir, 'sessions.db')
 }
@@ -62,7 +62,7 @@ runPersistenceContract('sqlite', async () => {
 // A file-backed database lets two mounts share rows across reload. `corruptTail` inserts invalid
 // JSON past the committed seq, exercising coordinator repair against real database rows.
 runCoordinatorContract('sqlite', async (): Promise<CoordinatorFixture> => {
-  const dir = await mkdtemp(join(tmpdir(), 'roos-sqlite-coord-'))
+  const dir = await mkdtemp(join(tmpdir(), 'shres-sqlite-coord-'))
   const path = join(dir, 'sessions.db')
   return {
     mount: async ctx => ctx.plugin(SqliteSessionPersistence, { path }),

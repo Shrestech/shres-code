@@ -61,8 +61,8 @@
  * fiberless (the next rebuilt frame retries from scratch); an apply failure
  * leaves a FAILED fiber for the shell's status projection. Both log loudly.
  */
-import type { Context } from '@roos-code/cordis'
-import type { Entry, Loader } from '@roos-code/cordis-plugin-loader'
+import type { Context } from '@shres-code/cordis'
+import type { Entry, Loader } from '@shres-code/cordis-plugin-loader'
 import type { PluginsEventFrame } from '../events.ts'
 import { EVENTS_ENDPOINT } from '../events.ts'
 

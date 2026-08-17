@@ -1,8 +1,8 @@
-import type { Context } from '@roos-code/cordis'
+import type { Context } from '@shres-code/cordis'
 import type {
   ConversationMatch, ConversationNodeDefinition, RequestView,
-} from '@roos-code/roos-code-client-runtime/client'
-import type {} from '@roos-code/roos-code-compaction/types'
+} from '@shres-code/shres-code-client-runtime/client'
+import type {} from '@shres-code/shres-code-compaction/types'
 import { trajectoryNode } from './trajectory-definition-common.ts'
 
 interface CompactionState {

@@ -2,10 +2,10 @@
  * Shared buffering, serialization, adoption, repair, and disposal orchestration
  * for first-party backends. Third-party backends may implement the public
  * persistence seam directly.
- * @module @roos-code/roos-code-session-persistence/coordinator
+ * @module @shres-code/shres-code-session-persistence/coordinator
  */
 
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import {
   adoptSessionEvent,
   interruptedTurnClosers,
@@ -14,9 +14,9 @@ import {
   SessionPreparation,
   snapshotJsonValue,
   snapshotSessionEvent,
-} from '@roos-code/roos-code-session'
-import type { Session, SessionEvent, SessionId, SessionHeader } from '@roos-code/roos-code-session'
-import { MAX_TIMER_DELAY_MS } from '@roos-code/roos-code-timeout'
+} from '@shres-code/shres-code-session'
+import type { Session, SessionEvent, SessionId, SessionHeader } from '@shres-code/shres-code-session'
+import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
 import type { SessionInspection, SessionLocation } from './index.ts'
 import type { SessionPersistenceRevision } from './revision.ts'
 import { observeQueuedAbort, SessionPreparations } from './preparations.ts'
@@ -1132,7 +1132,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
     ctx.on('session/disposed', (session) => { this.retire(session) })
 
     // HMR: a hot reload does not replay session/created, so seed existing live
-    // sessions (mirrors roos-invariants).
+    // sessions (mirrors shres-invariants).
     for (const session of ctx.sessions.list()) void this.initFor(session)
   }
 

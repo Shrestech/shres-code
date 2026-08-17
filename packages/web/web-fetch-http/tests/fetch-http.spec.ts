@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { AddressInfo } from 'node:net'
-import { Context } from '@roos-code/cordis'
-import WebRuntime from '@roos-code/roos-code-web'
-import { HttpFetchProvider, LOCAL_FETCH_PROVIDER_ID } from '@roos-code/roos-code-web-fetch-http'
-import type { HttpFetchLimits } from '@roos-code/roos-code-web-fetch-http'
-import * as fetchPlugin from '@roos-code/roos-code-web-fetch-http'
+import { Context } from '@shres-code/cordis'
+import WebRuntime from '@shres-code/shres-code-web'
+import { HttpFetchProvider, LOCAL_FETCH_PROVIDER_ID } from '@shres-code/shres-code-web-fetch-http'
+import type { HttpFetchLimits } from '@shres-code/shres-code-web-fetch-http'
+import * as fetchPlugin from '@shres-code/shres-code-web-fetch-http'
 import { classifyContentType, decoderForCharset, isSameOrigin, parseCharset, validateFetchUrl } from '../src/policy.ts'
 
 const limits: HttpFetchLimits = {

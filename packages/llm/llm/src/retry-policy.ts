@@ -2,13 +2,13 @@
  * Provider-owned request-retry policy configuration and resolution.
  *
  * Adapters expose one resolved policy per registered provider route; the
- * optional roos-llm-retry plugin executes it on the agent's failed-step extension point.
+ * optional shres-llm-retry plugin executes it on the agent's failed-step extension point.
  *
- * @module @roos-code/roos-code-llm/retry-policy
+ * @module @shres-code/shres-code-llm/retry-policy
  */
 
-import z from '@roos-code/schemastery'
-import { MAX_TIMER_DELAY_MS } from '@roos-code/roos-code-timeout'
+import z from '@shres-code/schemastery'
+import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
 import { EMPTY_RESPONSE_CODE } from './error.ts'
 
 const DEFAULT_MAX_RETRIES = 2

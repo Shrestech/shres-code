@@ -6,14 +6,14 @@
  * continuation host in `./continuation.ts` — so this module stays the published
  * surface rather than a bag of everything type-shaped.
  *
- * @module @roos-code/roos-code-subagent/types
+ * @module @shres-code/shres-code-subagent/types
  */
 
-import type { Agent, AgentOptions } from '@roos-code/roos-code-agent'
-import type { Branded } from '@roos-code/roos-code-brand'
-import type { ContentBlock } from '@roos-code/roos-code-llm'
-import type { SessionEvent, SessionId } from '@roos-code/roos-code-session'
-import type { ObjectJsonSchema, ToolRestriction } from '@roos-code/roos-code-tools'
+import type { Agent, AgentOptions } from '@shres-code/shres-code-agent'
+import type { Branded } from '@shres-code/shres-code-brand'
+import type { ContentBlock } from '@shres-code/shres-code-llm'
+import type { SessionEvent, SessionId } from '@shres-code/shres-code-session'
+import type { ObjectJsonSchema, ToolRestriction } from '@shres-code/shres-code-tools'
 import type { SubagentDescriptorData } from './descriptor.ts'
 
 /** Identifies one accepted subagent run across its lifecycle event pair. */

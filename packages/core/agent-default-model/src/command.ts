@@ -1,13 +1,13 @@
 /**
  * `/model` command: print or switch the receiving Agent's ModelSelection.
  *
- * @module @roos-code/roos-code-agent-default-model/command
+ * @module @shres-code/shres-code-agent-default-model/command
  */
 
-import type { Agent, ModelSelection } from '@roos-code/roos-code-agent'
-import type { CommandResult } from '@roos-code/roos-code-commands'
-import { LlmError, ReasoningEffortId } from '@roos-code/roos-code-llm'
-import type { LlmResolvedModelInfo } from '@roos-code/roos-code-llm'
+import type { Agent, ModelSelection } from '@shres-code/shres-code-agent'
+import type { CommandResult } from '@shres-code/shres-code-commands'
+import { LlmError, ReasoningEffortId } from '@shres-code/shres-code-llm'
+import type { LlmResolvedModelInfo } from '@shres-code/shres-code-llm'
 import type { AgentDefaultModelConfig } from './index.ts'
 
 /** Usage printed for a malformed `/model` line. */

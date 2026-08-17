@@ -1,7 +1,7 @@
 /**
- * Integration: the real fetch backend (`roos-web-fetch-http`) + a real search provider
- * (`roos-web-search-exa`) + the real seam (`roos-web`) + the model tool (`roos-tool-web`) + the
- * tool-call timeout policy (`roos-tool-call-timeout-policy`), exercised through `ctx.tools.execute()` —
+ * Integration: the real fetch backend (`shres-web-fetch-http`) + a real search provider
+ * (`shres-web-search-exa`) + the real seam (`shres-web`) + the model tool (`shres-tool-web`) + the
+ * tool-call timeout policy (`shres-tool-call-timeout-policy`), exercised through `ctx.tools.execute()` —
  * nothing bypasses the tool registry. Fetch verifies world effects against loopback HTTP; search
  * uses the real Exa provider with only its network boundary stubbed.
  */
@@ -9,15 +9,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { AddressInfo } from 'node:net'
-import { Context } from '@roos-code/cordis'
-import { CallId } from '@roos-code/roos-code-llm'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import ToolRuntime, { type ToolExecutionResult } from '@roos-code/roos-code-tools'
-import WebRuntime from '@roos-code/roos-code-web'
-import * as WebFetchLocal from '@roos-code/roos-code-web-fetch-http'
-import * as WebSearchExa from '@roos-code/roos-code-web-search-exa'
-import * as ToolWeb from '@roos-code/roos-code-tool-web'
-import * as TimeoutPolicy from '@roos-code/roos-code-tool-call-timeout-policy'
+import { Context } from '@shres-code/cordis'
+import { CallId } from '@shres-code/shres-code-llm'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import ToolRuntime, { type ToolExecutionResult } from '@shres-code/shres-code-tools'
+import WebRuntime from '@shres-code/shres-code-web'
+import * as WebFetchLocal from '@shres-code/shres-code-web-fetch-http'
+import * as WebSearchExa from '@shres-code/shres-code-web-search-exa'
+import * as ToolWeb from '@shres-code/shres-code-tool-web'
+import * as TimeoutPolicy from '@shres-code/shres-code-tool-call-timeout-policy'
 
 const testToolSignal = new AbortController().signal
 
@@ -150,7 +150,7 @@ describe('tool-call timeout returns TOOL_TIMEOUT (deadline wins over a slow fetc
   it('returns a structured TOOL_TIMEOUT (not the provider WEB_FETCH_TIMEOUT) when the tool-call budget wins', async () => {
     const out = await tctx.tools.execute({ signal: testToolSignal, callId: CallId('slow-1'), name: 'web_fetch', arguments: { url: slowBase } })
     expect(out.isError).toBe(true)
-    // The outer tool-call deadline won: TOOL_TIMEOUT, owned by roos-tool-call-timeout-policy,
+    // The outer tool-call deadline won: TOOL_TIMEOUT, owned by shres-tool-call-timeout-policy,
     // NOT the provider's own WEB_FETCH_TIMEOUT (its 30s backstop never fired).
     expect(out.error?.info?.code).toBe('TOOL_TIMEOUT')
     const text = out.content.map(b => (b.type === 'text' ? b.text : '')).join('')

@@ -1,6 +1,6 @@
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
-import { snapshotJsonValue } from '@roos-code/roos-code-session'
+import { snapshotJsonValue } from '@shres-code/shres-code-session'
 import { decodeWorkerJson, encodeWorkerJson, snapshotCodeJsonValue } from '../src/worker-json.ts'
 
 describe('snapshotCodeJsonValue', () => {

@@ -4,19 +4,19 @@
  * producers. It also delivers unreported completions to the owning agent:
  * injected into a busy owner's next step, or opening a turn on an idle one
  * under the default `wakeup` delivery, bounded per owner.
- * @module @roos-code/roos-code-tool-jobs
+ * @module @shres-code/shres-code-tool-jobs
  */
 
-import type { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
-import { boundContextSummary, createUserMessage, type ContentBlock } from '@roos-code/roos-code-llm'
-import { TextRetainer } from '@roos-code/roos-code-output-retention'
-import { defineTool } from '@roos-code/roos-code-tools'
-import type { GenericCallView, ToolDefinition, ToolExecution } from '@roos-code/roos-code-tools'
-import { JobId } from '@roos-code/roos-code-jobs'
-import type { JobSnapshot } from '@roos-code/roos-code-jobs'
-import type {} from '@roos-code/roos-code-system-prompt'
-import type { Agent } from '@roos-code/roos-code-agent'
+import type { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
+import { boundContextSummary, createUserMessage, type ContentBlock } from '@shres-code/shres-code-llm'
+import { TextRetainer } from '@shres-code/shres-code-output-retention'
+import { defineTool } from '@shres-code/shres-code-tools'
+import type { GenericCallView, ToolDefinition, ToolExecution } from '@shres-code/shres-code-tools'
+import { JobId } from '@shres-code/shres-code-jobs'
+import type { JobSnapshot } from '@shres-code/shres-code-jobs'
+import type {} from '@shres-code/shres-code-system-prompt'
+import type { Agent } from '@shres-code/shres-code-agent'
 
 export const name = 'tool-jobs'
 export const inject = ['tools', 'jobs', 'systemPrompt']

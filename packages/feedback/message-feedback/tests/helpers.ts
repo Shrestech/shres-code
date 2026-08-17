@@ -1,25 +1,25 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { Context } from '@roos-code/cordis'
-import { createAssistantMessage, createUserMessage } from '@roos-code/roos-code-llm'
-import type { MessageId } from '@roos-code/roos-code-llm/brand'
+import { Context } from '@shres-code/cordis'
+import { createAssistantMessage, createUserMessage } from '@shres-code/shres-code-llm'
+import type { MessageId } from '@shres-code/shres-code-llm/brand'
 import SessionStore, {
   SESSION_FORMAT_VERSION,
   Session,
   SessionId,
   type SessionEvent,
   type SessionHeader,
-} from '@roos-code/roos-code-session'
+} from '@shres-code/shres-code-session'
 import SessionPersistence, {
   SessionPersistenceRevision,
   type SessionInspection,
   type SessionLocation,
   type SessionPersistenceSnapshot,
-} from '@roos-code/roos-code-session-persistence'
-import Storage from '@roos-code/roos-code-storage'
-import * as StorageDomain from '@roos-code/roos-code-storage-domain'
-import * as StorageJson from '@roos-code/roos-code-storage-json'
+} from '@shres-code/shres-code-session-persistence'
+import Storage from '@shres-code/shres-code-storage'
+import * as StorageDomain from '@shres-code/shres-code-storage-domain'
+import * as StorageJson from '@shres-code/shres-code-storage-json'
 import MessageFeedbackService from '../src/index.ts'
 
 export interface MessageFixture {
@@ -185,7 +185,7 @@ export interface TestHarness {
 
 /** Compose the service over the real storage hub/domain/JSON backend. */
 export async function setupHarness(maxNoteBytes = 64): Promise<TestHarness> {
-  const root = await mkdtemp(join(tmpdir(), 'roos-message-feedback-test-'))
+  const root = await mkdtemp(join(tmpdir(), 'shres-message-feedback-test-'))
   const ctx = new Context()
   let disposeFeedback: (() => Promise<void>) | undefined
   try {

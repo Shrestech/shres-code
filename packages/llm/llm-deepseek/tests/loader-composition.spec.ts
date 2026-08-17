@@ -13,16 +13,16 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import Loader from '@roos-code/cordis-plugin-loader'
-import Include from '@roos-code/cordis-plugin-include'
-import LlmRuntime from '@roos-code/roos-code-llm'
-import { credentialRef } from '@roos-code/roos-code-credentials'
-import LocalCredentialProvider from '@roos-code/roos-code-credentials-local'
-import { settingsNamespace } from '@roos-code/roos-code-settings'
-import FileSettingsProvider from '@roos-code/roos-code-settings-file'
-import { getOrCreateAnonymousUserId } from '@roos-code/roos-code-anonymous-user-id'
-import * as LlmDeepSeek from '@roos-code/roos-code-llm-deepseek'
+import { Context } from '@shres-code/cordis'
+import Loader from '@shres-code/cordis-plugin-loader'
+import Include from '@shres-code/cordis-plugin-include'
+import LlmRuntime from '@shres-code/shres-code-llm'
+import { credentialRef } from '@shres-code/shres-code-credentials'
+import LocalCredentialProvider from '@shres-code/shres-code-credentials-local'
+import { settingsNamespace } from '@shres-code/shres-code-settings'
+import FileSettingsProvider from '@shres-code/shres-code-settings-file'
+import { getOrCreateAnonymousUserId } from '@shres-code/shres-code-anonymous-user-id'
+import * as LlmDeepSeek from '@shres-code/shres-code-llm-deepseek'
 import { assemble } from './assemble.ts'
 import { closeMockServers, mockServer, textEvents } from './mock-server.ts'
 
@@ -47,8 +47,8 @@ async function loadComposition(
   // A reused root is the restart case: the same harness home, its documents
   // exactly as the previous process left them.
   const fresh = options.reuseRoot === undefined
-  root = options.reuseRoot ?? await mkdtemp(join(tmpdir(), 'roos-llm-composition-'))
-  vi.stubEnv('ROOS_HOME', root)
+  root = options.reuseRoot ?? await mkdtemp(join(tmpdir(), 'shres-llm-composition-'))
+  vi.stubEnv('SHRES_HOME', root)
   const settingsPath = join(root, 'settings.yaml')
   const credentialsPath = join(root, '.credentials.yaml')
   if (options.withDynamic && fresh) {
@@ -63,19 +63,19 @@ async function loadComposition(
     ...options.withDynamic
       ? [
         '- id: settings',
-        "  name: '@roos-code/roos-code-settings-file'",
+        "  name: '@shres-code/shres-code-settings-file'",
         '  config:',
         `    path: ${JSON.stringify(settingsPath)}`,
         '    debounceMs: 10',
         '- id: credentials',
-        "  name: '@roos-code/roos-code-credentials-local'",
+        "  name: '@shres-code/shres-code-credentials-local'",
         '  config:',
         `    path: ${JSON.stringify(credentialsPath)}`,
         '    debounceMs: 10',
       ]
       : [],
     '- id: llm-deepseek',
-    "  name: '@roos-code/roos-code-llm-deepseek'",
+    "  name: '@shres-code/shres-code-llm-deepseek'",
     '  config:',
     `    baseURL: ${JSON.stringify(options.baseURL)}`,
     '',
@@ -88,9 +88,9 @@ async function loadComposition(
   ctx.loader.builtins.include = Include
   const modules = new Map<string, unknown>([
     ['test-llm-service', LlmRuntime],
-    ['@roos-code/roos-code-settings-file', FileSettingsProvider],
-    ['@roos-code/roos-code-credentials-local', LocalCredentialProvider],
-    ['@roos-code/roos-code-llm-deepseek', LlmDeepSeek],
+    ['@shres-code/shres-code-settings-file', FileSettingsProvider],
+    ['@shres-code/shres-code-credentials-local', LocalCredentialProvider],
+    ['@shres-code/shres-code-llm-deepseek', LlmDeepSeek],
   ])
   ctx.loader.internal = {
     version: 'v2',
@@ -117,7 +117,7 @@ describe('llm-deepseek real dynamic composition', () => {
     expect(ctx.get('settings')!.describe().map(entry => entry.ns)).toEqual([NS])
     await assemble(ctx, { model: 'deepseek-v4-flash', messages: [] })
     expect(serverA.headers[0]?.authorization).toBe('Bearer boot-key')
-    expect(serverA.headers[0]?.['x-roos-code-user-id']).toBe(getOrCreateAnonymousUserId())
+    expect(serverA.headers[0]?.['x-shres-code-user-id']).toBe(getOrCreateAnonymousUserId())
 
     // External edits, exactly as a user or the web UI would leave them on disk.
     await writeFile(settingsPath, `llm-deepseek:\n  baseURL: ${serverB.url}\n`)

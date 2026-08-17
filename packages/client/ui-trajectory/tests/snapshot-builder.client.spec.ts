@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { RequestView } from '@roos-code/roos-code-client-runtime/client'
+import type { RequestView } from '@shres-code/shres-code-client-runtime/client'
 import type {
   TrajectoryContribution, TrajectoryConversationViewNode, TrajectoryRequestHeaderState,
 } from '../src/client/trajectory-contract.ts'

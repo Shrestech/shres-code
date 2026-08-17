@@ -18,8 +18,8 @@ import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import {
   SESSION_FORMAT_VERSION, SessionId as sessionId, type SessionEvent, type SessionId,
-} from '@roos-code/roos-code-session'
-import { snapshotSubagentDescriptor } from '@roos-code/roos-code-subagent'
+} from '@shres-code/shres-code-session'
+import { snapshotSubagentDescriptor } from '@shres-code/shres-code-subagent'
 import {
   captureStableAria, compareOrRefreshGolden, launchWebScaffold, seedSession, watchConsole,
   webSnapshotMode, type WebScaffold,

@@ -1,16 +1,16 @@
 /**
- * roos-jobs' owned branded id, carried across the registry, the model-facing
+ * shres-jobs' owned branded id, carried across the registry, the model-facing
  * control surface, and the client wire.
  *
  * It lives in its own leaf because the package root and `./types` both reach
- * `roos-agent` through the owner and listener signatures, which a Client program
+ * `shres-agent` through the owner and listener signatures, which a Client program
  * cannot resolve even as a type. A browser-safe consumer imports the id here;
- * `Branded<B>` itself comes from the zero-dependency `@roos-code/roos-code-brand`.
+ * `Branded<B>` itself comes from the zero-dependency `@shres-code/shres-code-brand`.
  *
- * @module @roos-code/roos-code-jobs/brand
+ * @module @shres-code/shres-code-jobs/brand
  */
 
-import type { Branded } from '@roos-code/roos-code-brand'
+import type { Branded } from '@shres-code/shres-code-brand'
 
 /**
  * Identifies a background job. The registry generates `<kind>-N`; predictable

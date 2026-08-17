@@ -3,7 +3,7 @@
 # The redact-rule entry models a deployment mounting its own scrub rule on the
 # session-telemetry/record waterfall — the seam itself ships no rules.
 - id: logger-console
-  name: '@roos-code/cordis-plugin-logger-console'
+  name: '@shres-code/cordis-plugin-logger-console'
   config:
     colors: false
     levels:
@@ -18,20 +18,20 @@
 
 # Managed child-process groups required by the bash executor.
 - id: subprocess
-  name: '@roos-code/roos-code-subprocess-local'
+  name: '@shres-code/shres-code-subprocess-local'
 
 - id: bash
-  name: '@roos-code/roos-code-bash-local'
+  name: '@shres-code/shres-code-bash-local'
 
 - id: session-telemetry-otel
-  name: '@roos-code/roos-code-session-telemetry-otel'
+  name: '@shres-code/shres-code-session-telemetry-otel'
   config:
-    mode: !!js process.env.ROOS_TELEMETRY_E2E_MODE || 'FULL'
+    mode: !!js process.env.SHRES_TELEMETRY_E2E_MODE || 'FULL'
     exporter:
-      url: !!js process.env.ROOS_TELEMETRY_E2E_URL
+      url: !!js process.env.SHRES_TELEMETRY_E2E_URL
 
 - id: agent-spine
-  name: '@roos-code/roos-code-agent-spine-demo'
+  name: '@shres-code/shres-code-agent-spine-demo'
   config:
     agents:
       - id: main
@@ -42,10 +42,10 @@
     workspaceContext: false
 
 - id: persistence
-  name: '@roos-code/roos-code-session-persistence-jsonl'
+  name: '@shres-code/shres-code-session-persistence-jsonl'
   config:
     root: './.sessions'
     compression: 'none'
 
 - id: checkpoint-policy
-  name: '@roos-code/roos-code-session-checkpoint-policy'
+  name: '@shres-code/shres-code-session-checkpoint-policy'

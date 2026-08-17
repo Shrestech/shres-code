@@ -1,5 +1,5 @@
 # ACP automation server and backend snapshot-record composition. With
-# `ROOS_SNAPSHOT=record`, the app bin runs the real DeepSeek adapter and the
+# `SHRES_SNAPSHOT=record`, the app bin runs the real DeepSeek adapter and the
 # harness harvests its persisted log. The bin loads the gitignored root `.env`
 # before this config. This tree has no stdout logger or HMR because stdout
 # carries ACP JSON-RPC.
@@ -7,7 +7,7 @@
 # The DeepSeek adapter. Shipped default: full thinking at max effort on every
 # request; exact-model resolution materializes request defaults before logging.
 - id: llm-deepseek
-  name: '@roos-code/roos-code-llm-deepseek'
+  name: '@shres-code/shres-code-llm-deepseek'
   config:
     thinking: enabled
     reasoningEffort: max
@@ -18,43 +18,43 @@
 # The default composition confines bash AND the filesystem tools to the
 # workspace and asks before a wider retry. Snapshot runs select
 # danger-full-access so the established scenarios remain runner-independent;
-# ROOS_PERMISSION_MODE provides the same explicit deployment/test override
+# SHRES_PERMISSION_MODE provides the same explicit deployment/test override
 # outside the snapshot harness. The sandbox default + fallback root live on
 # ctx.sandboxPolicy; agent calls resolve both families against the session cwd.
 - id: sandbox
-  name: '@roos-code/roos-code-sandbox-local'
+  name: '@shres-code/shres-code-sandbox-local'
 
 - id: sandbox-policy
-  name: '@roos-code/roos-code-sandbox-policy'
+  name: '@shres-code/shres-code-sandbox-policy'
   config:
-    mode: !!js "process.env.ROOS_PERMISSION_MODE ?? (process.env.ROOS_SNAPSHOT === undefined ? 'workspace-write' : 'danger-full-access')"
+    mode: !!js "process.env.SHRES_PERMISSION_MODE ?? (process.env.SHRES_SNAPSHOT === undefined ? 'workspace-write' : 'danger-full-access')"
     workspaceRoot: !!js process.cwd()
 
 # Managed child-process groups for the bash executor (spawn/kill/output plumbing).
 - id: subprocess
-  name: '@roos-code/roos-code-subprocess-local'
+  name: '@shres-code/shres-code-subprocess-local'
 
 - id: bash
-  name: '@roos-code/roos-code-bash-sandbox'
+  name: '@shres-code/shres-code-bash-sandbox'
   config:
     timeoutMs: 60000
 
 - id: approval
-  name: '@roos-code/roos-code-user-approval'
+  name: '@shres-code/shres-code-user-approval'
   config:
-    policy: !!js "(process.env.ROOS_PERMISSION_MODE ?? (process.env.ROOS_SNAPSHOT === undefined ? 'workspace-write' : 'danger-full-access')) === 'danger-full-access' ? 'never' : 'ask'"
+    policy: !!js "(process.env.SHRES_PERMISSION_MODE ?? (process.env.SHRES_SNAPSHOT === undefined ? 'workspace-write' : 'danger-full-access')) === 'danger-full-access' ? 'never' : 'ask'"
 
 # The ACP automation app: agent spine + JSONL persistence + protocol bridge.
-# Persistence root: $ROOS_SNAPSHOT_SESSIONS_ROOT when the snapshot harness sets it
+# Persistence root: $SHRES_SNAPSHOT_SESSIONS_ROOT when the snapshot harness sets it
 # (so it can harvest / isolate the log), else ./.sessions for the demo.
 # Snapshot modes use raw JSONL fixtures; ordinary runs keep the compressed default.
 - id: acp-agent
-  name: '@roos-code/roos-code-acp-demo'
+  name: '@shres-code/shres-code-acp-demo'
   config:
     provider: deepseek-official
     model: deepseek-v4-pro
-    persistenceRoot: !!js process.env.ROOS_SNAPSHOT_SESSIONS_ROOT ?? './.sessions'
-    persistenceCompression: !!js "process.env.ROOS_SNAPSHOT === undefined ? 'zstd' : 'none'"
+    persistenceRoot: !!js process.env.SHRES_SNAPSHOT_SESSIONS_ROOT ?? './.sessions'
+    persistenceCompression: !!js "process.env.SHRES_SNAPSHOT === undefined ? 'zstd' : 'none'"
     workspaceContext:
       maxBytes: 65536
     # Keep the persona to identity and behavior; tool plugins own tool guidance.
@@ -66,12 +66,12 @@
 
 # Replay-aware request pressure; the routed adapter supplies model capacity.
 - id: token-meter
-  name: '@roos-code/roos-code-token-meter'
+  name: '@shres-code/shres-code-token-meter'
 
 # Summarize an older range after measured pressure or a canonical provider overflow.
 # Ratios scale against the routed model's context window.
 - id: compaction-basic
-  name: '@roos-code/roos-code-compaction-basic'
+  name: '@shres-code/shres-code-compaction-basic'
   config:
     thresholdRatio: 0.8
     retainRatio: 0.08
@@ -82,21 +82,21 @@
 # its registered units; the catalog surfaces (`list_agents`, subagent listing)
 # fail loud without the capability.
 - id: session-projection
-  name: '@roos-code/roos-code-session-projection'
+  name: '@shres-code/shres-code-session-projection'
 
 # Expose fresh-child `spawn` and completed-prefix `fork` through separate tool
 # names so multi-child scenarios exercise both transports. These leaves follow
 # the app because it provides `ctx.agents` and `ctx.tools`.
 - id: subagent
-  name: '@roos-code/roos-code-subagent'
+  name: '@shres-code/shres-code-subagent'
 
 - id: subagent-spawn-in-process
-  name: '@roos-code/roos-code-subagent-spawn-in-process'
+  name: '@shres-code/shres-code-subagent-spawn-in-process'
   config:
     providerName: spawn
 
 - id: subagent-fork-in-process
-  name: '@roos-code/roos-code-subagent-fork-in-process'
+  name: '@shres-code/shres-code-subagent-fork-in-process'
   config:
     providerName: fork
 
@@ -105,16 +105,16 @@
 # list plugin registers `list_agents`, served through the sessionProjections
 # registry mounted above. `report` is installed only in continuable child scopes.
 - id: tool-subagent-control
-  name: '@roos-code/roos-code-tool-subagent-control'
+  name: '@shres-code/shres-code-tool-subagent-control'
 
 - id: tool-subagent-list-agents
-  name: '@roos-code/roos-code-tool-subagent-control/list-agents'
+  name: '@shres-code/shres-code-tool-subagent-control/list-agents'
 
 - id: tool-subagent-report
-  name: '@roos-code/roos-code-tool-subagent-report'
+  name: '@shres-code/shres-code-tool-subagent-report'
 
 - id: tool-subagent
-  name: '@roos-code/roos-code-tool-subagent'
+  name: '@shres-code/shres-code-tool-subagent'
   config:
     provider: spawn
     toolName: subagent
@@ -125,7 +125,7 @@
 # section precede the inherited history a fork reuses; `run_in_background` is off
 # because this example mounts no task service. See .agents/notes/implemented/architecture/2026-08-10-fork-children-stay-one-shot.md.
 - id: tool-subagent-fork
-  name: '@roos-code/roos-code-tool-subagent'
+  name: '@shres-code/shres-code-tool-subagent'
   config:
     provider: fork
     toolName: subagent_fork
@@ -137,41 +137,41 @@
 # The worker-thread workflow engine fans a model-written JavaScript script's
 # `agent()` calls out through the spawn backend; the adjacent tool exposes it to the model.
 - id: workflow-worker-thread
-  name: '@roos-code/roos-code-workflow-worker-thread'
+  name: '@shres-code/shres-code-workflow-worker-thread'
   config:
     provider: spawn
 
 - id: tool-workflow
-  name: '@roos-code/roos-code-tool-workflow'
+  name: '@shres-code/shres-code-tool-workflow'
 
 - id: tool-ralph
-  name: '@roos-code/roos-code-tool-ralph'
+  name: '@shres-code/shres-code-tool-ralph'
 # `todo_write` replaces the logged whole list for later model requests.
 - id: tool-todo
-  name: '@roos-code/roos-code-tool-todo'
+  name: '@shres-code/shres-code-tool-todo'
   config:
     allowParallelInProgress: true
 
 # Identical repeat calls trigger advisory context, never a block, at the default
 # thresholds [3, 5, 8]. Only the repeat-tool-reminder snapshot scenario reaches them.
 - id: repeat-tool-reminder
-  name: '@roos-code/roos-code-repeat-tool-reminder'
+  name: '@shres-code/shres-code-repeat-tool-reminder'
 
-# The filesystem stack rides the SAME sandbox policy as bash: roos-fs-sandbox
-# replaces roos-fs-local behind ctx.fs and fences write/edit by the effective
+# The filesystem stack rides the SAME sandbox policy as bash: shres-fs-sandbox
+# replaces shres-fs-local behind ctx.fs and fences write/edit by the effective
 # mode (read-only denies, workspace-write contains to the workspace + temp
 # roots, danger-full-access passes through), so read/write/edit are available
 # under every mode. fs-observation-policy (read-before-edit) composes orthogonally on top.
 - id: fs-sandbox
-  name: '@roos-code/roos-code-fs-sandbox'
+  name: '@shres-code/shres-code-fs-sandbox'
   config:
     cwd: !!js process.cwd()
 
 - id: fs-observation-policy
-  name: '@roos-code/roos-code-fs-observation-policy'
+  name: '@shres-code/shres-code-fs-observation-policy'
 
 - id: tool-fs
-  name: '@roos-code/roos-code-tool-fs'
+  name: '@shres-code/shres-code-tool-fs'
 
 # `configPath` is read once at load and resolves from the server launch cwd, not
 # `session/new.cwd`; one `hooks.json` therefore applies to every session and a
@@ -179,7 +179,7 @@
 # commands still run in the session cwd. Warnings use `ctx.logger`, never stdout;
 # see packages/hooks/hooks-claude-code/README.md for the deferred per-session design.
 - id: hooks-claude-code
-  name: '@roos-code/roos-code-hooks-claude-code'
+  name: '@shres-code/shres-code-hooks-claude-code'
   config:
     configPath: ./hooks.json
 
@@ -187,6 +187,6 @@
 # cannot share Claude's file. It has the same process-level, read-once, missing-is-no-op,
 # logger-only contract. Shipping both bridges lets a scenario seed and exercise either dialect.
 - id: hooks-codex
-  name: '@roos-code/roos-code-hooks-codex'
+  name: '@shres-code/shres-code-hooks-codex'
   config:
     configPath: ./codex-hooks.json

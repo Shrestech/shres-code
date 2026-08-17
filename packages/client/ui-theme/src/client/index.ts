@@ -7,14 +7,14 @@
  * document. The plugin also registers the Appearance preference row into the
  * settings General section — the theme feature owns its own settings surface.
  */
-import type { Context } from '@roos-code/cordis'
-import type { BoundActions } from '@roos-code/roos-code-client-ui-slots'
-import type { ClientContext, SettingsScope } from '@roos-code/roos-code-client-runtime/client'
+import type { Context } from '@shres-code/cordis'
+import type { BoundActions } from '@shres-code/shres-code-client-ui-slots'
+import type { ClientContext, SettingsScope } from '@shres-code/shres-code-client-runtime/client'
 // Type-only: the ctx.settingsScope Context merge. Cross-plugin collaboration
 // goes through the service, never a value import (client bundle purity gate).
-import type {} from '@roos-code/roos-code-client-ui-settings/client'
+import type {} from '@shres-code/shres-code-client-ui-settings/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
-import type {} from '@roos-code/roos-code-client-locale/client'
+import type {} from '@shres-code/shres-code-client-locale/client'
 import type { AppearanceRowInjected } from './AppearanceRow.tsx'
 import { AppearanceRow } from './AppearanceRow.tsx'
 import { createAppearanceRowStore } from './settings-store.ts'
@@ -32,7 +32,7 @@ export type { ThemePreference, ThemeSettings } from '../theme-settings.ts'
 /** Namespace owning this feature's settings-row copy. */
 export const SETTINGS_NS = 'settings.theme'
 
-declare module '@roos-code/roos-code-client-ui-slots' {
+declare module '@shres-code/shres-code-client-ui-slots' {
   interface LocaleNamespaceMap {
     /** The Appearance settings row's copy. */
     'settings.theme': ThemeKey
@@ -100,7 +100,7 @@ export interface ThemeTokenInspection {
   cssVariable?: string
 }
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     theme: ThemeRuntime
   }

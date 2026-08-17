@@ -3,11 +3,11 @@
  * events in one append-only file per session, and delegates orchestration to
  * {@link PersistenceCoordinator}. Its side-effect-free locator returns the
  * absolute per-session log target before materialization.
- * @module @roos-code/roos-code-session-persistence-jsonl
+ * @module @shres-code/shres-code-session-persistence-jsonl
  */
 
-import { Context } from '@roos-code/cordis'
-import z from '@roos-code/schemastery'
+import { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
 import { readdirSync } from 'node:fs'
 import { open, mkdir, readFile, readdir, realpath, link, rm, stat, truncate } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
@@ -20,8 +20,8 @@ import {
   type PersistenceBackend, type SessionLocation, type SessionPersistenceSnapshot,
   type SessionInspection, type SessionPersistenceRevision as PersistenceRevision, type SessionRawArtifact,
   type StoredPrefix,
-} from '@roos-code/roos-code-session-persistence'
-import type { SessionEvent, SessionId, SessionHeader, SessionPreparation } from '@roos-code/roos-code-session'
+} from '@shres-code/shres-code-session-persistence'
+import type { SessionEvent, SessionId, SessionHeader, SessionPreparation } from '@shres-code/shres-code-session'
 import {
   encodeSegment, eventLines, logPath, logSuffix, parseHeaderMeta, projectDir, scanLog, sessionDir,
   SessionLogScanner, toHeaderLine,

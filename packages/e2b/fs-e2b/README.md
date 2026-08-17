@@ -1,6 +1,6 @@
-# @roos-code/roos-code-fs-e2b
+# @shres-code/shres-code-fs-e2b
 
-E2B implementation of the [`@roos-code/roos-code-fs`](../../fs/fs/README.md) provider contract. It has no config: load [`@roos-code/roos-code-e2b`](../e2b/README.md) first, then this service in place of `roos-fs-local`. The provider uses the owner's remote cwd and SDK handle, so file tools observe the same world as E2B-backed Bash processes.
+E2B implementation of the [`@shres-code/shres-code-fs`](../../fs/fs/README.md) provider contract. It has no config: load [`@shres-code/shres-code-e2b`](../e2b/README.md) first, then this service in place of `shres-fs-local`. The provider uses the owner's remote cwd and SDK handle, so file tools observe the same world as E2B-backed Bash processes.
 
 ## Behavior
 
@@ -15,7 +15,7 @@ The provider does not copy, mount, or reconcile the host workspace. Giving it a 
 
 ## Model Experience
 
-Indirectly, through [`roos-tool-fs`](../../fs/tool-fs/README.md), which renders remote UTF-8 content, directory results, mutation acknowledgements, and provider errors while E2B identity and transport remain internal.
+Indirectly, through [`shres-tool-fs`](../../fs/tool-fs/README.md), which renders remote UTF-8 content, directory results, mutation acknowledgements, and provider errors while E2B identity and transport remain internal.
 
 #### KV Cache effect
 

@@ -1,4 +1,4 @@
-# @roos-code/roos-code-tool-jobs
+# @shres-code/shres-code-tool-jobs
 
 The model-facing controller for `ctx.jobs`: three kind-independent tools, completion notices, and one background-work prompt section. Loading the plugin attaches the controller required by `ctx.jobs.start()`.
 
@@ -61,7 +61,7 @@ Prefix-stable while the plugin scope and guidance text are unchanged. Activation
 
 #### What the model sees
 
-The generated [`job_output`, `job_list`, and `job_kill` schemas](../../../docs/tool-catalog.md#roos-coderoos-code-tool-jobs) while this tool set is visible.
+The generated [`job_output`, `job_list`, and `job_kill` schemas](../../../docs/tool-catalog.md#shres-codeshres-code-tool-jobs) while this tool set is visible.
 
 #### Token effect
 

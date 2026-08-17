@@ -1,11 +1,11 @@
 /**
  * Keyless snapshot coverage for the TypeScript SDK path: each scenario spawns
- * the REAL `roos-jsonrpc-agent` runtime (per `ROOS_EXAMPLE_MODE`) through the
- * REAL `@roos-code/roos-code-sdk-client`, drives one turn over stdio JSON-RPC,
+ * the REAL `shres-jsonrpc-agent` runtime (per `SHRES_EXAMPLE_MODE`) through the
+ * REAL `@shres-code/shres-code-sdk-client`, drives one turn over stdio JSON-RPC,
  * and pins the SDK `RunResult`, the complete notification stream, and the
  * persisted session logs. Replay serves recorded model
- * responses via `llm-replay` (`cordis.snapshot.yml`); `ROOS_SNAPSHOT=record`
- * re-records against the live API; `ROOS_SNAPSHOT=refresh` replays committed
+ * responses via `llm-replay` (`cordis.snapshot.yml`); `SHRES_SNAPSHOT=record`
+ * re-records against the live API; `SHRES_SNAPSHOT=refresh` replays committed
  * fixtures and rewrites expected outputs.
  */
 
@@ -25,9 +25,9 @@ import {
   tokenizeSessionFixtureCwd,
   type HarvestedLog,
   type NormalizeContext,
-} from '@roos-code/roos-code-acp-snapshot'
-import { resolveExampleLaunch } from '@roos-code/roos-code-loader-smoke'
-import { DeepSeekHarness, type HarnessNotification, type RunResult } from '@roos-code/roos-code-sdk-client'
+} from '@shres-code/shres-code-acp-snapshot'
+import { resolveExampleLaunch } from '@shres-code/shres-code-loader-smoke'
+import { DeepSeekHarness, type HarnessNotification, type RunResult } from '@shres-code/shres-code-sdk-client'
 
 const testsDir = dirOf(import.meta.url)
 const snapshotsDir = join(testsDir, 'snapshots')
@@ -48,7 +48,7 @@ const MINIMAL_BASH_DESCRIPTION = `Run commands in a bash shell
 * Please avoid commands that may produce a very large amount of output.
 * Please run long lived commands in the background, e.g. 'sleep 10 &' or start a server in the background.`
 
-const mode = process.env.ROOS_SNAPSHOT ?? 'replay'
+const mode = process.env.SHRES_SNAPSHOT ?? 'replay'
 const recording = mode === 'record'
 const refreshing = mode === 'refresh'
 
@@ -90,7 +90,7 @@ const SCENARIOS: SdkScenario[] = [
   },
   {
     name: 'bash-tool',
-    prompt: 'Run this exact command with your bash tool, then reply with its stdout only: echo roos-sdk-proof-7391',
+    prompt: 'Run this exact command with your bash tool, then reply with its stdout only: echo shres-sdk-proof-7391',
     sessionId: 'sdk-snapshot-bash',
     children: 0,
   },
@@ -106,7 +106,7 @@ const SCENARIOS: SdkScenario[] = [
     sessionId: 'persistent-tools-snapshot',
     children: 0,
     configs: { live: minimalLiveConfig, replay: minimalReplayConfig },
-    environment: { ROOS_SYSTEM_PROMPT: MINIMAL_SYSTEM_PROMPT },
+    environment: { SHRES_SYSTEM_PROMPT: MINIMAL_SYSTEM_PROMPT },
     expectedFiles: { 'note.txt': 'target:\n\tnew\n' },
     expectedTools: { bash: ['command'], str_replace_editor: ['command', 'path'] },
     expectedSystem: MINIMAL_SYSTEM_PROMPT,
@@ -187,7 +187,7 @@ function assembledRuntimeContexts(log: PersistedLog): string[] {
     }
     if (event.type !== 'user/message'
       || event.data?.source?.kind !== 'plugin'
-      || event.data.source.plugin !== '@roos-code/roos-code-system-prompt') return []
+      || event.data.source.plugin !== '@shres-code/shres-code-system-prompt') return []
     return event.data.content?.flatMap(block => block.type === 'text' && typeof block.text === 'string' ? [block.text] : []) ?? []
   })
 }
@@ -278,16 +278,16 @@ async function runScenario(scenario: SdkScenario): Promise<{
   const env: Record<string, string> = {
     ...Object.fromEntries(Object.entries(process.env).filter(([, value]) => value !== undefined)) as Record<string, string>,
     ...Object.fromEntries(Object.entries(launch.env).filter(([, value]) => value !== undefined)) as Record<string, string>,
-    ROOS_CORDIS_CONFIG: recording
+    SHRES_CORDIS_CONFIG: recording
       ? scenario.configs?.live ?? liveConfig
       : scenario.configs?.replay ?? replayConfig,
-    ROOS_SESSION_ROOT: sessionsRoot,
-    ROOS_CWD: cwd,
-    ROOS_SNAPSHOT: mode,
+    SHRES_SESSION_ROOT: sessionsRoot,
+    SHRES_CWD: cwd,
+    SHRES_SNAPSHOT: mode,
     NODE_OPTIONS: [process.env.NODE_OPTIONS, '--disable-warning=ExperimentalWarning'].filter(Boolean).join(' '),
     ...parentFixture === undefined ? {} : {
-      ROOS_SNAPSHOT_FILE: parentFixture,
-      ...childFixtures.length > 0 ? { ROOS_SNAPSHOT_CHILD_FILES: childFixtures.join(delimiter) } : {},
+      SHRES_SNAPSHOT_FILE: parentFixture,
+      ...childFixtures.length > 0 ? { SHRES_SNAPSHOT_CHILD_FILES: childFixtures.join(delimiter) } : {},
     },
     ...scenario.environment,
   }

@@ -1,12 +1,12 @@
 /**
  * Durable storage-domain declaration for lifecycle-bound message feedback.
- * @module @roos-code/roos-code-message-feedback/src/spec
+ * @module @shres-code/shres-code-message-feedback/src/spec
  */
 
 import { z } from 'zod'
-import type { MessageId } from '@roos-code/roos-code-llm/brand'
-import type { SessionId } from '@roos-code/roos-code-session/types'
-import { defineDomain, domainTable } from '@roos-code/roos-code-storage-domain'
+import type { MessageId } from '@shres-code/shres-code-llm/brand'
+import type { SessionId } from '@shres-code/shres-code-session/types'
+import { defineDomain, domainTable } from '@shres-code/shres-code-storage-domain'
 import type { MessageFeedbackItem, MessageFeedbackRating, MessageFeedbackVersion } from './types.ts'
 
 const nonNegativeSafeInteger = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER)

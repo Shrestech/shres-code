@@ -3,10 +3,10 @@
  * provider — the pure, network-free half. The provider's `fetch()` composes
  * these with transport (redirect following, byte caps, decoding).
  *
- * @module @roos-code/roos-code-web-fetch-http/policy
+ * @module @shres-code/shres-code-web-fetch-http/policy
  */
 
-import { WebError } from '@roos-code/roos-code-web'
+import { WebError } from '@shres-code/shres-code-web'
 
 /** The body kinds this provider decodes. */
 export type FetchableKind = 'html' | 'text'

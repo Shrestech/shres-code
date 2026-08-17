@@ -1,10 +1,10 @@
-/** Package-owned subagent registry and lifecycle invariants. @module @roos-code/roos-code-subagent/invariant */
+/** Package-owned subagent registry and lifecycle invariants. @module @shres-code/shres-code-subagent/invariant */
 
-import type { Context } from '@roos-code/cordis'
-import type { InvariantFailure, InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { InvariantFailure, InvariantInstaller } from '@shres-code/shres-code-invariants'
 import type { SubagentProvider, SubagentRunEndInfo, SubagentRunInfo } from './types.ts'
 
-const PACKAGE_NAME = '@roos-code/roos-code-subagent'
+const PACKAGE_NAME = '@shres-code/shres-code-subagent'
 
 /** Cordis companion plugin name. */
 export const name = 'subagent-invariant'

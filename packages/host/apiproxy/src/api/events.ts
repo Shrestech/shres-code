@@ -6,20 +6,20 @@
  * signal is a local stream-control parameter, independent of the request (never on the wire).
  */
 
-import type { AskUserQuestionItem } from '@roos-code/roos-code-user-questions/types'
-import type { ApprovalOutcome, ApprovalRequestId } from '@roos-code/roos-code-user-approval/types'
-import type { Message } from '@roos-code/roos-code-llm/types'
-import type { MessageId } from '@roos-code/roos-code-llm/brand'
-import type { CallId } from '@roos-code/roos-code-llm/brand'
-import type { JsonValue, SessionEvent, SessionId } from '@roos-code/roos-code-session/types'
-import type { ToolCallView, ToolResultView } from '@roos-code/roos-code-tools/presentation'
+import type { AskUserQuestionItem } from '@shres-code/shres-code-user-questions/types'
+import type { ApprovalOutcome, ApprovalRequestId } from '@shres-code/shres-code-user-approval/types'
+import type { Message } from '@shres-code/shres-code-llm/types'
+import type { MessageId } from '@shres-code/shres-code-llm/brand'
+import type { CallId } from '@shres-code/shres-code-llm/brand'
+import type { JsonValue, SessionEvent, SessionId } from '@shres-code/shres-code-session/types'
+import type { ToolCallView, ToolResultView } from '@shres-code/shres-code-tools/presentation'
 import type { RpcError, RpcId, RpcRequest } from './rpc.ts'
 import type { JobView } from './jobs.ts'
 import type { WorkspaceView } from './workspace.ts'
 
 // Client-side consumers take the render-intent vocabulary from the contract;
-// roos-tools remains its owner.
-export type { ToolCallView, ToolResultView } from '@roos-code/roos-code-tools/presentation'
+// shres-tools remains its owner.
+export type { ToolCallView, ToolResultView } from '@shres-code/shres-code-tools/presentation'
 
 /**
  * Host-computed render intent accompanying a `tool/call` or `tool/result`
@@ -143,7 +143,7 @@ export type HostFrame =
   | { type: 'host/archived-sessions-changed'; archivedSessionIds: SessionId[] }
   /**
    * One allowlisted host cordis event forwarded verbatim. The allowlist is
-   * owned by `@roos-code/roos-code-api-remotes` (`API_REMOTE_FORWARDED_EVENTS`),
+   * owned by `@shres-code/shres-code-api-remotes` (`API_REMOTE_FORWARDED_EVENTS`),
    * which is also the only control point over what a consumer can receive.
    * `event` is the host's own event name and `args` its argument list: this
    * path applies no projection, no redaction, and no renaming, so the payload

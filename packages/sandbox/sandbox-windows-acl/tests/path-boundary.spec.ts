@@ -15,7 +15,7 @@ describe('Windows ACL temp path boundary', () => {
   })
 
   function scratch(): string {
-    const dir = mkdtempSync(join(tmpdir(), 'roos-acl-boundary-'))
+    const dir = mkdtempSync(join(tmpdir(), 'shres-acl-boundary-'))
     scratchDirs.push(dir)
     return dir
   }

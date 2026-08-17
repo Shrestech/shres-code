@@ -9,19 +9,19 @@
  */
 
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import Loader from '@roos-code/cordis-plugin-loader'
-import { createUserMessage, CallId } from '@roos-code/roos-code-llm'
-import type { ContentBlock } from '@roos-code/roos-code-llm'
-import { SessionId } from '@roos-code/roos-code-session'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import ToolRuntime, { defineContentToolFixture } from '@roos-code/roos-code-tools'
-import type { ToolDefinition } from '@roos-code/roos-code-tools'
-import type { PostToolDecision, ToolExecution, ToolExecutionToken } from '@roos-code/roos-code-tools'
-import { SpillLocator, SpillStore } from '@roos-code/roos-code-spill'
-import type { SaveTextSpill, SpillRef } from '@roos-code/roos-code-spill'
-import * as SpillPolicy from '@roos-code/roos-code-spill-policy'
-import { WorkerThreadCodeRuntime } from '@roos-code/roos-code-code-runtime-worker-thread'
+import { Context } from '@shres-code/cordis'
+import Loader from '@shres-code/cordis-plugin-loader'
+import { createUserMessage, CallId } from '@shres-code/shres-code-llm'
+import type { ContentBlock } from '@shres-code/shres-code-llm'
+import { SessionId } from '@shres-code/shres-code-session'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import ToolRuntime, { defineContentToolFixture } from '@shres-code/shres-code-tools'
+import type { ToolDefinition } from '@shres-code/shres-code-tools'
+import type { PostToolDecision, ToolExecution, ToolExecutionToken } from '@shres-code/shres-code-tools'
+import { SpillLocator, SpillStore } from '@shres-code/shres-code-spill'
+import type { SaveTextSpill, SpillRef } from '@shres-code/shres-code-spill'
+import * as SpillPolicy from '@shres-code/shres-code-spill-policy'
+import { WorkerThreadCodeRuntime } from '@shres-code/shres-code-code-runtime-worker-thread'
 
 const testToolSignal = new AbortController().signal
 

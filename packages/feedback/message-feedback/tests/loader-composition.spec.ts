@@ -3,15 +3,15 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import Include from '@roos-code/cordis-plugin-include'
-import Loader from '@roos-code/cordis-plugin-loader'
-import SessionStore, { SessionId } from '@roos-code/roos-code-session'
-import JsonlSessionPersistence from '@roos-code/roos-code-session-persistence-jsonl'
-import Storage from '@roos-code/roos-code-storage'
-import * as StorageDomain from '@roos-code/roos-code-storage-domain'
-import * as StorageJson from '@roos-code/roos-code-storage-json'
-import { remoteMethods } from '@roos-code/roos-code-typert-protocol'
+import { Context } from '@shres-code/cordis'
+import Include from '@shres-code/cordis-plugin-include'
+import Loader from '@shres-code/cordis-plugin-loader'
+import SessionStore, { SessionId } from '@shres-code/shres-code-session'
+import JsonlSessionPersistence from '@shres-code/shres-code-session-persistence-jsonl'
+import Storage from '@shres-code/shres-code-storage'
+import * as StorageDomain from '@shres-code/shres-code-storage-domain'
+import * as StorageJson from '@shres-code/shres-code-storage-json'
+import { remoteMethods } from '@shres-code/shres-code-typert-protocol'
 import MessageFeedbackService from '../src/index.ts'
 import { appendMessageFixture } from './helpers.ts'
 
@@ -30,12 +30,12 @@ async function loadComposition(configPath: string): Promise<Context> {
   await ctx.plugin(Loader)
   ctx.loader.builtins.include = Include
   const modules = new Map<string, unknown>([
-    ['@roos-code/roos-code-session', SessionStore],
-    ['@roos-code/roos-code-session-persistence-jsonl', JsonlSessionPersistence],
-    ['@roos-code/roos-code-storage', Storage],
-    ['@roos-code/roos-code-storage-json', StorageJson],
-    ['@roos-code/roos-code-storage-domain', StorageDomain],
-    ['@roos-code/roos-code-message-feedback', MessageFeedbackService],
+    ['@shres-code/shres-code-session', SessionStore],
+    ['@shres-code/shres-code-session-persistence-jsonl', JsonlSessionPersistence],
+    ['@shres-code/shres-code-storage', Storage],
+    ['@shres-code/shres-code-storage-json', StorageJson],
+    ['@shres-code/shres-code-storage-domain', StorageDomain],
+    ['@shres-code/shres-code-message-feedback', MessageFeedbackService],
   ])
   ctx.loader.internal = {
     version: 'v2',
@@ -58,23 +58,23 @@ async function loadComposition(configPath: string): Promise<Context> {
 
 describe('message feedback through a real Loader composition', () => {
   it('persists a checkpointed target and its sidecar across a cold restart', async () => {
-    root = await mkdtemp(join(tmpdir(), 'roos-message-feedback-loader-'))
+    root = await mkdtemp(join(tmpdir(), 'shres-message-feedback-loader-'))
     const configPath = join(root, 'cordis.yml')
     await writeFile(configPath, [
-      "- name: '@roos-code/roos-code-session'",
-      "- name: '@roos-code/roos-code-session-persistence-jsonl'",
+      "- name: '@shres-code/shres-code-session'",
+      "- name: '@shres-code/shres-code-session-persistence-jsonl'",
       '  config:',
       `    root: ${JSON.stringify(join(root, 'sessions'))}`,
       '    compression: none',
       '    writeBatchMaxDelayMs: 1',
-      "- name: '@roos-code/roos-code-storage'",
-      "- name: '@roos-code/roos-code-storage-json'",
+      "- name: '@shres-code/shres-code-storage'",
+      "- name: '@shres-code/shres-code-storage-json'",
       '  config:',
       `    root: ${JSON.stringify(join(root, 'storage'))}`,
-      "- name: '@roos-code/roos-code-storage-domain'",
+      "- name: '@shres-code/shres-code-storage-domain'",
       '  config:',
       '    backend: json',
-      "- name: '@roos-code/roos-code-message-feedback'",
+      "- name: '@shres-code/shres-code-message-feedback'",
       '  config:',
       '    maxNoteBytes: 32',
       '',

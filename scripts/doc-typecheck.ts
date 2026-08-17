@@ -224,7 +224,7 @@ if (checked.length === 0) {
   process.exit(0)
 }
 
-const useBuiltTypes = process.env.ROOS_DOC_TYPECHECK_USE_BUILD_OUTPUT === '1'
+const useBuiltTypes = process.env.SHRES_DOC_TYPECHECK_USE_BUILD_OUTPUT === '1'
 const compilationError = useBuiltTypes
   ? (() => {
     const diagnostics = compileBlocksAgainstBuiltTypes(checked)

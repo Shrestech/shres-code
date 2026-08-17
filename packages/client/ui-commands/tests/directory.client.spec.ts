@@ -6,7 +6,7 @@
  * gate, and the per-key ensureReady strong-wait policy.
  */
 import { describe, expect, it } from 'vitest'
-import type { SessionId } from '@roos-code/roos-code-api-remotes/client'
+import type { SessionId } from '@shres-code/shres-code-api-remotes/client'
 import type { CommandDescriptor } from '../src/client/directory.ts'
 import { CommandDirectory } from '../src/client/directory.ts'
 

@@ -3,11 +3,11 @@
  * conversion, workspace-grouped location rendering with `file:`-URI resolution, complete-result
  * capping, and UI presentation. No I/O — a UI may call the presenter on live streaming and on
  * replay, so it depends only on the tool arguments.
- * @module @roos-code/roos-code-tool-lsp/render
+ * @module @shres-code/shres-code-tool-lsp/render
  */
 
-import type { GenericCallView } from '@roos-code/roos-code-tools'
-import type { LspHover, LspLocation, LspOperation, LspPosition } from '@roos-code/roos-code-lsp'
+import type { GenericCallView } from '@shres-code/shres-code-tools'
+import type { LspHover, LspLocation, LspOperation, LspPosition } from '@shres-code/shres-code-lsp'
 import { posix, win32 } from 'node:path'
 import { fileURLToPath } from 'node:url'
 

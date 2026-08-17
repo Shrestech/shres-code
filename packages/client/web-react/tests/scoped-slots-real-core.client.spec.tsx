@@ -9,10 +9,10 @@
  */
 import { describe, expect, it, vi } from 'vitest'
 import { act, render } from '@testing-library/react'
-import { SlotCore, type PropsRenderSlots, type SlotRendererHost } from '@roos-code/roos-code-client-ui-slots'
-import { createSlotRenderer, StaleAuthorizationError } from '@roos-code/roos-code-client-web-react'
+import { SlotCore, type PropsRenderSlots, type SlotRendererHost } from '@shres-code/shres-code-client-ui-slots'
+import { createSlotRenderer, StaleAuthorizationError } from '@shres-code/shres-code-client-web-react'
 
-declare module '@roos-code/roos-code-client-ui-slots' {
+declare module '@shres-code/shres-code-client-ui-slots' {
   interface SlotMap {
     // No 'root' merge: the aggregate client program already carries runtime's
     // authoritative 'root' declaration (a private merge would TS2717-collide);

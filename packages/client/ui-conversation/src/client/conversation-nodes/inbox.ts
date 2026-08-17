@@ -1,8 +1,8 @@
-import type { Context } from '@roos-code/cordis'
+import type { Context } from '@shres-code/cordis'
 import type {
   ConversationNodeDefinition, ConversationPreviousContext,
-} from '@roos-code/roos-code-client-runtime/client'
-import type { InboxTarget } from '@roos-code/roos-code-agent/types'
+} from '@shres-code/shres-code-client-runtime/client'
+import type { InboxTarget } from '@shres-code/shres-code-agent/types'
 
 interface InboxIdentity {
   readonly id: string

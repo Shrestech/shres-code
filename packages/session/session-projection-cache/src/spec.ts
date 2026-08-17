@@ -6,12 +6,12 @@
  * the storage-domain routing decides the medium (the shipped composition's
  * json backend lands it at `<root>/session_projcache.json`, beside
  * `workspace.json`).
- * @module @roos-code/roos-code-session-projection-cache/src/spec
+ * @module @shres-code/shres-code-session-projection-cache/src/spec
  */
 
 import { z } from 'zod'
-import { SessionId } from '@roos-code/roos-code-session'
-import { defineDomain, domainTable } from '@roos-code/roos-code-storage-domain'
+import { SessionId } from '@shres-code/shres-code-session'
+import { defineDomain, domainTable } from '@shres-code/shres-code-storage-domain'
 
 /**
  * One persisted checkpoint row (the RFC's `(sessionId, key, ver, seq, val)`

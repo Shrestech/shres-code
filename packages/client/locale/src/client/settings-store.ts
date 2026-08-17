@@ -3,7 +3,7 @@
  * plugin's apply-world change listener is the only writer; the row component
  * reads via props.useStore.
  */
-import { defineStore, type EngineStoreHandle } from '@roos-code/roos-code-client-runtime/client'
+import { defineStore, type EngineStoreHandle } from '@shres-code/shres-code-client-runtime/client'
 
 /** One selectable locale row (id + self-described label). */
 export interface LanguageOptionRow {

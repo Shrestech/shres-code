@@ -1,0 +1,31 @@
+/** Copy dictionaries for the Shield settings section. */
+
+/** English strings (the key-set source of truth). */
+export const en = {
+  nav: 'Shield',
+  title: 'Shield',
+  intro: 'Shres Shield is the paid on-device prompt-injection plugin. It screens user messages, tool arguments, and tool results before they reach the model.',
+  activate: 'Activate',
+  disable: 'Disable',
+  active: 'Active',
+  inactive: 'Disabled',
+  toggleHint: 'Turn Shield on or off. The mark is blue and green while it is screening.',
+  unavailable: 'The Shield host seat is not mounted in this deployment, so this page cannot load its settings.',
+  loading: 'Loading Shield settings…',
+  readOnly: 'The settings document is read-only in this deployment.',
+  posture: 'Posture',
+  postureHint: 'Ask is the default: warn and confirm when unsure. Observe only records. Enforce blocks deterministic denies without asking.',
+  postureObserve: 'Observe',
+  postureAsk: 'Ask',
+  postureEnforce: 'Enforce',
+  license: 'License',
+  licenseHint: 'Defaults to shres-dev until a paid key exists. SHRES_SHIELD_LICENSE overrides this field.',
+  licensePlaceholder: 'shres-dev',
+  licenseStored: 'A license is stored (default shres-dev). Enter a new value to replace it.',
+  apply: 'Apply',
+  applying: 'Applying…',
+  panic: 'SHRES_SHIELD=off is the panic switch. It keeps this page but stops screening and restores the monochrome mark.',
+}
+
+/** The ShieldKey union. */
+export type ShieldKey = keyof typeof en

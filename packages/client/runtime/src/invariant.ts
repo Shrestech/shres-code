@@ -1,6 +1,6 @@
 /**
- * Package-owned invariant companion for `@roos-code/roos-code-client-runtime`.
- * @module @roos-code/roos-code-client-runtime/invariant
+ * Package-owned invariant companion for `@shres-code/shres-code-client-runtime`.
+ * @module @shres-code/shres-code-client-runtime/invariant
  */
 
 /* jscpd:ignore-start */
@@ -8,11 +8,11 @@
  * `keyof SlotMap & string` is the declare-merge key pattern: SlotMap is empty
  * in this compilation unit (intersection reads `never`) but consumers merge
  * keys in; the rule fires on the empty-map view, not on real redundancy. */
-import type { Context } from '@roos-code/cordis'
-import type { SlotMap } from '@roos-code/roos-code-client-ui-slots'
-import type { InvariantInstaller } from '@roos-code/roos-code-invariants'
+import type { Context } from '@shres-code/cordis'
+import type { SlotMap } from '@shres-code/shres-code-client-ui-slots'
+import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 
-const PACKAGE_NAME = '@roos-code/roos-code-client-runtime'
+const PACKAGE_NAME = '@shres-code/shres-code-client-runtime'
 
 /** Cordis companion plugin name. */
 export const name = 'client-runtime-invariant'

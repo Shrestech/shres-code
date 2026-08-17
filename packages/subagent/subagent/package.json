@@ -1,5 +1,5 @@
 {
-  "name": "@roos-code/roos-code-subagent",
+  "name": "@shres-code/shres-code-subagent",
   "description": "Abstract subagent seam (ctx.subagents): named-provider registry for delegating to child agents",
   "version": "0.1.0-rc.5",
   "publishConfig": {
@@ -7,7 +7,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roos-code/roos-code.git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
     "directory": "packages/subagent/subagent"
   },
   "type": "module",
@@ -40,67 +40,67 @@
     "zod": "^4.4.3"
   },
   "peerDependencies": {
-    "@roos-code/roos-code-agent": "workspace:^",
-    "@roos-code/roos-code-agent-presets": "workspace:^",
-    "@roos-code/roos-code-brand": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-llm": "workspace:^",
-    "@roos-code/roos-code-sandbox": "workspace:^",
-    "@roos-code/roos-code-sandbox-policy": "workspace:^",
-    "@roos-code/roos-code-scope": "workspace:^",
-    "@roos-code/roos-code-session": "workspace:^",
-    "@roos-code/roos-code-session-persistence": "workspace:^",
-    "@roos-code/roos-code-session-projection": "workspace:^",
-    "@roos-code/roos-code-session-projection-cache": "workspace:^",
-    "@roos-code/roos-code-jobs": "workspace:^",
-    "@roos-code/roos-code-tools": "workspace:^",
-    "@roos-code/roos-code-user-approval": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-agent": "workspace:^",
+    "@shres-code/shres-code-agent-presets": "workspace:^",
+    "@shres-code/shres-code-brand": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-sandbox": "workspace:^",
+    "@shres-code/shres-code-sandbox-policy": "workspace:^",
+    "@shres-code/shres-code-scope": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-session-persistence": "workspace:^",
+    "@shres-code/shres-code-session-projection": "workspace:^",
+    "@shres-code/shres-code-session-projection-cache": "workspace:^",
+    "@shres-code/shres-code-jobs": "workspace:^",
+    "@shres-code/shres-code-tools": "workspace:^",
+    "@shres-code/shres-code-user-approval": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   },
   "peerDependenciesMeta": {
-    "@roos-code/roos-code-agent-presets": {
+    "@shres-code/shres-code-agent-presets": {
       "optional": true
     },
-    "@roos-code/roos-code-sandbox": {
+    "@shres-code/shres-code-sandbox": {
       "optional": true
     },
-    "@roos-code/roos-code-sandbox-policy": {
+    "@shres-code/shres-code-sandbox-policy": {
       "optional": true
     },
-    "@roos-code/roos-code-session-persistence": {
+    "@shres-code/shres-code-session-persistence": {
       "optional": true
     },
-    "@roos-code/roos-code-session-projection": {
+    "@shres-code/shres-code-session-projection": {
       "optional": true
     },
-    "@roos-code/roos-code-session-projection-cache": {
+    "@shres-code/shres-code-session-projection-cache": {
       "optional": true
     },
-    "@roos-code/roos-code-jobs": {
+    "@shres-code/shres-code-jobs": {
       "optional": true
     },
-    "@roos-code/roos-code-user-approval": {
+    "@shres-code/shres-code-user-approval": {
       "optional": true
     }
   },
   "devDependencies": {
-    "@roos-code/roos-code-agent": "workspace:^",
-    "@roos-code/roos-code-agent-presets": "workspace:^",
-    "@roos-code/roos-code-brand": "workspace:^",
-    "@roos-code/roos-code-invariants": "workspace:^",
-    "@roos-code/roos-code-llm": "workspace:^",
-    "@roos-code/roos-code-sandbox": "workspace:^",
-    "@roos-code/roos-code-sandbox-policy": "workspace:^",
-    "@roos-code/roos-code-scope": "workspace:^",
-    "@roos-code/roos-code-session": "workspace:^",
-    "@roos-code/roos-code-session-persistence": "workspace:^",
-    "@roos-code/roos-code-session-projection": "workspace:^",
-    "@roos-code/roos-code-session-projection-cache": "workspace:^",
-    "@roos-code/roos-code-storage": "workspace:^",
-    "@roos-code/roos-code-storage-domain": "workspace:^",
-    "@roos-code/roos-code-jobs": "workspace:^",
-    "@roos-code/roos-code-tools": "workspace:^",
-    "@roos-code/roos-code-user-approval": "workspace:^",
-    "@roos-code/cordis": "workspace:^"
+    "@shres-code/shres-code-agent": "workspace:^",
+    "@shres-code/shres-code-agent-presets": "workspace:^",
+    "@shres-code/shres-code-brand": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-sandbox": "workspace:^",
+    "@shres-code/shres-code-sandbox-policy": "workspace:^",
+    "@shres-code/shres-code-scope": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-session-persistence": "workspace:^",
+    "@shres-code/shres-code-session-projection": "workspace:^",
+    "@shres-code/shres-code-session-projection-cache": "workspace:^",
+    "@shres-code/shres-code-storage": "workspace:^",
+    "@shres-code/shres-code-storage-domain": "workspace:^",
+    "@shres-code/shres-code-jobs": "workspace:^",
+    "@shres-code/shres-code-tools": "workspace:^",
+    "@shres-code/shres-code-user-approval": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
   }
 }

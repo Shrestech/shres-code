@@ -5,12 +5,12 @@
  */
 
 import { expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import type { Agent } from '@roos-code/roos-code-agent'
-import SubagentRuntime from '@roos-code/roos-code-subagent'
-import type { SubagentProvider } from '@roos-code/roos-code-subagent'
+import { Context } from '@shres-code/cordis'
+import type { Agent } from '@shres-code/shres-code-agent'
+import SubagentRuntime from '@shres-code/shres-code-subagent'
+import type { SubagentProvider } from '@shres-code/shres-code-subagent'
 import WorkerThreadWorkflowEngine from '../src/index.ts'
-import { SessionId } from '@roos-code/roos-code-session'
+import { SessionId } from '@shres-code/shres-code-session'
 
 // A fresh thread compiles the source runtime. Leave contention headroom on
 // shared CI runners without weakening any engine-level timeout assertion.

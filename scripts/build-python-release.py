@@ -17,8 +17,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SDK_DISTRIBUTION = "roos-code-sdk"
-RUNTIME_DISTRIBUTION = "roos-code-runtime-bin"
+SDK_DISTRIBUTION = "shres-code-sdk"
+RUNTIME_DISTRIBUTION = "shres-code-runtime-bin"
 PLATFORM_MANIFEST = ROOT / "python" / "sdk-runtime" / "platforms.json"
 
 
@@ -73,17 +73,17 @@ def main() -> None:
 
     output_dir = args.output_dir.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="roos-python-release-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="shres-python-release-") as temporary:
         staging = Path(temporary) / args.package
         if args.package == "sdk":
             stage_sdk(staging, wheel_version)
             environment = None
-            expected = output_dir / f"roos_code_sdk-{wheel_version}-py3-none-any.whl"
+            expected = output_dir / f"shres_code_sdk-{wheel_version}-py3-none-any.whl"
         else:
             platform_tag, executable_name = PLATFORMS[args.platform]
             stage_runtime(staging, wheel_version, args.runtime_exe.resolve(), executable_name)
-            environment = {"ROOS_RUNTIME_PLATFORM_TAG": platform_tag}
-            expected = output_dir / f"roos_code_runtime_bin-{wheel_version}-py3-none-{platform_tag}.whl"
+            environment = {"SHRES_RUNTIME_PLATFORM_TAG": platform_tag}
+            expected = output_dir / f"shres_code_runtime_bin-{wheel_version}-py3-none-{platform_tag}.whl"
         command = ["uv", "build", "--wheel", "--out-dir", str(output_dir), str(staging)]
         subprocess.run(command, cwd=ROOT, env=None if environment is None else {**os.environ, **environment}, check=True)
     if not expected.is_file():
@@ -149,7 +149,7 @@ def copy_package(source: Path, destination: Path) -> None:
             "*.pyc",
             "dist",
             "node_modules",
-            "roos-jsonrpc-agent-pkg-*",
+            "shres-jsonrpc-agent-pkg-*",
         ),
     )
 
@@ -193,8 +193,8 @@ def stage_sdk(destination: Path, version: str) -> None:
     pyproject = destination / "pyproject.toml"
     rewrite_version(pyproject, version)
     text, count = re.subn(
-        r'"roos-code-runtime-bin==[^"]+"',
-        f'"roos-code-runtime-bin=={version}"',
+        r'"shres-code-runtime-bin==[^"]+"',
+        f'"shres-code-runtime-bin=={version}"',
         pyproject.read_text(),
         count=1,
     )
@@ -207,7 +207,7 @@ def stage_runtime(destination: Path, version: str, executable: Path, executable_
     copy_package(ROOT / "python" / "sdk-runtime", destination)
     stage_license_files(destination, include_notices=True)
     rewrite_version(destination / "pyproject.toml", version)
-    runtime_dir = destination / "src" / "roos_code_runtime" / "runtime"
+    runtime_dir = destination / "src" / "shres_code_runtime" / "runtime"
     runtime_dir.mkdir(parents=True, exist_ok=True)
     for suffix in runtime_suffixes(executable_name):
         shutil.copy2(Path(f"{executable}{suffix}"), runtime_dir / f"{executable_name}{suffix}")
@@ -245,7 +245,7 @@ def verify_wheel(
                 f"{wheel} has license files {license_files}, expected {expected_license_files}"
             )
         runtime_files = [
-            name for name in archive.namelist() if "/runtime/roos-jsonrpc-agent-pkg-" in name
+            name for name in archive.namelist() if "/runtime/shres-jsonrpc-agent-pkg-" in name
         ]
         if package == "runtime":
             assert platform is not None

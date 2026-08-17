@@ -1,6 +1,6 @@
-import { Context } from '@roos-code/cordis'
+import { Context } from '@shres-code/cordis'
 import { describe, expect, it, vi } from 'vitest'
-import type { SessionId } from '@roos-code/roos-code-api-remotes/client'
+import type { SessionId } from '@shres-code/shres-code-api-remotes/client'
 import { ConversationEventRegistry } from '../src/client/conversation/event-registry.ts'
 import { ConversationViewRegistry } from '../src/client/conversation/view-registry.ts'
 import type {

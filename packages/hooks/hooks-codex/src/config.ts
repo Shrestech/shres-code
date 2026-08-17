@@ -2,10 +2,10 @@
  * Parse Codex's five-event hook subset into shared {@link MatcherGroup}s. Only synchronous command
  * hooks run; other types and `async: true` commands are recorded as skipped. Codex performs no
  * command substitution.
- * @module @roos-code/roos-code-hooks-codex/config
+ * @module @shres-code/shres-code-hooks-codex/config
  */
 
-import { matcherDiagnostic, type MatcherGroup } from '@roos-code/roos-code-hook-protocol'
+import { matcherDiagnostic, type MatcherGroup } from '@shres-code/shres-code-hook-protocol'
 
 /** The five Codex hook points this bridge supports. */
 export const CODEX_EVENTS = ['PreToolUse', 'PostToolUse', 'SessionStart', 'UserPromptSubmit', 'Stop'] as const

@@ -1,19 +1,19 @@
 /** Session-fork boundaries, lineage, and inherited model routing. */
 
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@roos-code/cordis'
-import AgentRegistry, { agentEvents } from '@roos-code/roos-code-agent'
-import type { Agent, AgentHandle, CreateAgentOptions } from '@roos-code/roos-code-agent'
-import { createUserMessage, ReasoningEffortId } from '@roos-code/roos-code-llm'
-import type { LlmCallConfig } from '@roos-code/roos-code-llm'
-import SessionStore from '@roos-code/roos-code-session'
-import type { Session, SessionEvent, SessionHeader, SessionId } from '@roos-code/roos-code-session'
-import SystemPrompt from '@roos-code/roos-code-system-prompt'
-import UserQuestionService from '@roos-code/roos-code-user-questions'
-import type { Workspace } from '@roos-code/roos-code-workspace'
-import type { RpcRequest } from '@roos-code/roos-code-host-apiproxy/api/rpc'
-import { RpcId } from '@roos-code/roos-code-host-apiproxy/api/rpc'
-import { createApiProxy } from '@roos-code/roos-code-host-apiproxy'
+import { Context } from '@shres-code/cordis'
+import AgentRegistry, { agentEvents } from '@shres-code/shres-code-agent'
+import type { Agent, AgentHandle, CreateAgentOptions } from '@shres-code/shres-code-agent'
+import { createUserMessage, ReasoningEffortId } from '@shres-code/shres-code-llm'
+import type { LlmCallConfig } from '@shres-code/shres-code-llm'
+import SessionStore from '@shres-code/shres-code-session'
+import type { Session, SessionEvent, SessionHeader, SessionId } from '@shres-code/shres-code-session'
+import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import UserQuestionService from '@shres-code/shres-code-user-questions'
+import type { Workspace } from '@shres-code/shres-code-workspace'
+import type { RpcRequest } from '@shres-code/shres-code-host-apiproxy/api/rpc'
+import { RpcId } from '@shres-code/shres-code-host-apiproxy/api/rpc'
+import { createApiProxy } from '@shres-code/shres-code-host-apiproxy'
 
 const sid = (id: string): SessionId => id as SessionId
 

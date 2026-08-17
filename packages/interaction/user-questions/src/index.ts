@@ -1,17 +1,17 @@
 /**
  * Service Definition for the user-questions capability seam (`ctx.userQuestions`): a UI-backed service for
  * pausing an agent tool call until the human answers a question. The model-
- * facing tool lives in `@roos-code/roos-code-tool-ask-user`; UI packages provide
+ * facing tool lives in `@shres-code/shres-code-tool-ask-user`; UI packages provide
  * the single active provider.
  *
- * @module @roos-code/roos-code-user-questions
+ * @module @shres-code/shres-code-user-questions
  */
 
-import { Context, Service } from '@roos-code/cordis'
-import type { Agent } from '@roos-code/roos-code-agent'
-import { HarnessError } from '@roos-code/roos-code-llm'
+import { Context, Service } from '@shres-code/cordis'
+import type { Agent } from '@shres-code/shres-code-agent'
+import { HarnessError } from '@shres-code/shres-code-llm'
 
-declare module '@roos-code/cordis' {
+declare module '@shres-code/cordis' {
   interface Context {
     userQuestions: UserQuestionService
   }

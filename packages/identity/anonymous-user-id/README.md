@@ -1,6 +1,6 @@
-# @roos-code/roos-code-anonymous-user-id
+# @shres-code/shres-code-anonymous-user-id
 
-Shared anonymous identity for session telemetry, direct feedback acknowledgement, and DeepSeek provider requests. `getOrCreateAnonymousUserId()` returns a random UUID v4 scoped to one harness home, persisted as the bare line `$ROOS_HOME/.anonymous-user-id` (`~/.roos/.anonymous-user-id` when `ROOS_HOME` is unset). The OpenTelemetry backend reports it as Resource `user.id`; `/feedback` includes the same value in its acknowledgement; and `roos-llm-deepseek` sends it as `x-roos-code-user-id`, allowing the receiving systems to correlate records without independently generated identities.
+Shared anonymous identity for session telemetry, direct feedback acknowledgement, and DeepSeek provider requests. `getOrCreateAnonymousUserId()` returns a random UUID v4 scoped to one harness home, persisted as the bare line `$SHRES_HOME/.anonymous-user-id` (`~/.shres/.anonymous-user-id` when `SHRES_HOME` is unset). The OpenTelemetry backend reports it as Resource `user.id`; `/feedback` includes the same value in its acknowledgement; and `shres-llm-deepseek` sends it as `x-shres-code-user-id`, allowing the receiving systems to correlate records without independently generated identities.
 
 The identity is never derived from the hostname, network address, git remote, or another identifying source. Deleting `.anonymous-user-id` resets the identity on the next process launch. Separate harness homes have separate identities.
 
@@ -10,7 +10,7 @@ Reads and writes are synchronous because both boot-time telemetry construction a
 
 ## Composition
 
-This package is a shared library, not a Cordis plugin. Consumers import `getOrCreateAnonymousUserId()` directly. Its invariant companion is intentionally empty because the package owns no event stream or public mutable relation that can be checked without creating the identity as a side effect. `ROOS_TELEMETRY_DISABLED` stops telemetry export only; it does not suppress direct feedback acknowledgement or the DeepSeek provider header.
+This package is a shared library, not a Cordis plugin. Consumers import `getOrCreateAnonymousUserId()` directly. Its invariant companion is intentionally empty because the package owns no event stream or public mutable relation that can be checked without creating the identity as a side effect. `SHRES_TELEMETRY_DISABLED` stops telemetry export only; it does not suppress direct feedback acknowledgement or the DeepSeek provider header.
 
 ## Model Experience
 
@@ -24,5 +24,5 @@ None; the transport header changes neither tokens nor the model-visible prefix.
 
 - **No recovery after deletion** — loss mints a new anonymous identity by design; recovery would require stable derivation material that weakens anonymity.
 - **Best-effort concurrency** — a reader landing in the narrow interval between a concurrent process's exclusive create and completed write can use a different in-memory UUID for that run; later launches converge on the persisted value.
-- **No cross-home identity** — different `$ROOS_HOME` values cannot be correlated.
-- **Configured DeepSeek gateways receive the id** — `roos-llm-deepseek` sends the stable header to its resolved `baseURL`, including deployment overrides, independently of telemetry sharing mode.
+- **No cross-home identity** — different `$SHRES_HOME` values cannot be correlated.
+- **Configured DeepSeek gateways receive the id** — `shres-llm-deepseek` sends the stable header to its resolved `baseURL`, including deployment overrides, independently of telemetry sharing mode.

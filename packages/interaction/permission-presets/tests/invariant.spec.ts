@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { Context, Service } from '@roos-code/cordis'
-import SessionStore, { type Session, type SessionEvent } from '@roos-code/roos-code-session'
-import * as PermissionInvariant from '@roos-code/roos-code-permission-presets/invariant'
-import InvariantRegistry from '@roos-code/roos-code-invariants'
+import { Context, Service } from '@shres-code/cordis'
+import SessionStore, { type Session, type SessionEvent } from '@shres-code/shres-code-session'
+import * as PermissionInvariant from '@shres-code/shres-code-permission-presets/invariant'
+import InvariantRegistry from '@shres-code/shres-code-invariants'
 
 class PermissionProbe extends Service {
   readonly names = ['safe', 'trusted']

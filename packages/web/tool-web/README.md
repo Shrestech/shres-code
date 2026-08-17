@@ -1,6 +1,6 @@
-# @roos-code/roos-code-tool-web
+# @shres-code/shres-code-tool-web
 
-The model-facing web tool suite — `web_search` and `web_fetch` — over the [web capability seam](../web/README.md) (`ctx.web`). It owns model-facing concerns only: tool names, JSON schemas, snake_case argument names, prompt sections, the result-count bound, result formatting, HTML→markdown presentation, and the UI presentation projection — `presentCall`, `presentResult` (a `card: 'web'` result card discriminated by `kind: 'search' | 'fetch'`), and the `output.presentationMeta` that carries the structured search sources or the fetch summary the lossy render text cannot (see the [web-result-card Agent Note](../../../.agents/notes/implemented/feature/2026-07-30-web-result-card.md)). All web access goes through `ctx.web`; this package never imports a concrete provider. Neither tool exposes a model-facing timeout — each tool's cooperative tool-call budget is declared here via config (`fetchTimeoutMs`/`searchTimeoutMs`, attached as `ToolDefinition.timeoutMs`) and enforced by [`@roos-code/roos-code-tool-call-timeout-policy`](../../guard/timeout-policy/README.md) (a `tools/execute` wrapper); each tool just forwards `exec.signal` to the seam.
+The model-facing web tool suite — `web_search` and `web_fetch` — over the [web capability seam](../web/README.md) (`ctx.web`). It owns model-facing concerns only: tool names, JSON schemas, snake_case argument names, prompt sections, the result-count bound, result formatting, HTML→markdown presentation, and the UI presentation projection — `presentCall`, `presentResult` (a `card: 'web'` result card discriminated by `kind: 'search' | 'fetch'`), and the `output.presentationMeta` that carries the structured search sources or the fetch summary the lossy render text cannot (see the [web-result-card Agent Note](../../../.agents/notes/implemented/feature/2026-07-30-web-result-card.md)). All web access goes through `ctx.web`; this package never imports a concrete provider. Neither tool exposes a model-facing timeout — each tool's cooperative tool-call budget is declared here via config (`fetchTimeoutMs`/`searchTimeoutMs`, attached as `ToolDefinition.timeoutMs`) and enforced by [`@shres-code/shres-code-tool-call-timeout-policy`](../../guard/timeout-policy/README.md) (a `tools/execute` wrapper); each tool just forwards `exec.signal` to the seam.
 
 Each tool is registered independently; a product that wants only one disables the other via config (`{ search: false }` / `{ fetch: false }`). Search guidance mentions `web_fetch` only when fetch is also config-enabled; a search-only composition instead tells the model to use returned snippets and cite their URLs.
 
@@ -9,7 +9,7 @@ Each tool is registered independently; a product that wants only one disables th
 | Tool | Args | Behavior |
 |---|---|---|
 | `web_search` | `query` (string) | Discovery. Returns an optional answer plus source URLs. `max_results` is **not** model-facing — the tool sets the bound (the `searchMaxResults` config, default 8) and passes it to the seam. |
-| `web_fetch` | `url` (string) | Retrieves a specific URL. HTML bodies are rendered to markdown (turndown with GFM tables/strikethrough); text bodies pass through. A non-2xx status is reported, not an error. The tool-call timeout is deployment policy (`roos-tool-call-timeout-policy`), not a model argument. |
+| `web_fetch` | `url` (string) | Retrieves a specific URL. HTML bodies are rendered to markdown (turndown with GFM tables/strikethrough); text bodies pass through. A non-2xx status is reported, not an error. The tool-call timeout is deployment policy (`shres-tool-call-timeout-policy`), not a model argument. |
 
 Both tools opt into concurrent scheduling because provider reads return content without mutating parent-agent state.
 
@@ -26,11 +26,11 @@ The normalized service results are also the canonical tool values: `WebSearchRes
 | `searchTimeoutMs` | `30000` | Cooperative tool-call timeout budget (ms) for `web_search`. |
 | `fetchMaxOutputChars` | `200000` | Cap on source characters converted synchronously and on one complete `web_fetch` output (header, untrusted frame, and footer); a cut body gets the truncation notice when it fits. |
 
-`fetchTimeoutMs`/`searchTimeoutMs` declare each tool's cooperative timeout budget (attached as `ToolDefinition.timeoutMs`), enforced by [`@roos-code/roos-code-tool-call-timeout-policy`](../../guard/timeout-policy/README.md); the model-facing schema exposes no timeout argument. `fetchMaxOutputChars` bounds both synchronous conversion work and the complete rendered result: only that many source characters are converted, and the header, untrusted frame, and truncation notice are then capped together. The default leaves headroom above the local provider's 100,000-character body cap, but rendered expansion can still make the final bound truncate the result.
+`fetchTimeoutMs`/`searchTimeoutMs` declare each tool's cooperative timeout budget (attached as `ToolDefinition.timeoutMs`), enforced by [`@shres-code/shres-code-tool-call-timeout-policy`](../../guard/timeout-policy/README.md); the model-facing schema exposes no timeout argument. `fetchMaxOutputChars` bounds both synchronous conversion work and the complete rendered result: only that many source characters are converted, and the header, untrusted frame, and truncation notice are then capped together. The default leaves headroom above the local provider's 100,000-character body cap, but rendered expansion can still make the final bound truncate the result.
 
 ```yaml
 - id: tool-web
-  name: '@roos-code/roos-code-tool-web'
+  name: '@shres-code/shres-code-tool-web'
 ```
 
 ## Stable registration
@@ -77,7 +77,7 @@ Prefix-stable while enabled tools, scope, and guidance text are unchanged. Confi
 
 #### What the model sees
 
-The model sees the generated [`web_search` and `web_fetch` schemas](../../../docs/tool-catalog.md#roos-coderoos-code-tool-web). Result-count and timeout budgets are deployment settings, not model arguments.
+The model sees the generated [`web_search` and `web_fetch` schemas](../../../docs/tool-catalog.md#shres-codeshres-code-tool-web). Result-count and timeout budgets are deployment settings, not model arguments.
 
 #### Token effect
 
@@ -91,7 +91,7 @@ Prefix-stable while definitions and visibility are unchanged. Config enablement,
 
 #### What the model sees
 
-When the provider returned an answer or any source, the shared [`roos-untrusted-frame`](../../util/untrusted-frame/README.md) disclaimer precedes those fragments. The optional provider-owned answer is wrapped in `<untrusted-web-answer>`; each snippet is wrapped in `<untrusted-web-snippet>`. Then `Sources:` and data-dependent lines shaped exactly `- [<title-or-url>](<url>)`, optionally suffixed ` — <framed-snippet> (<publishedAt>)`. With neither answer nor sources the result says `No results found.` A capped list adds `(Showing the first <count> sources. Refine the query for more.)`; every result ends `Cite the relevant URLs above as markdown links in your answer.` The disclaimer, source titles/URLs, dates, truncation note, and citation instruction stay outside the tagged fragments.
+When the provider returned an answer or any source, the shared [`shres-untrusted-frame`](../../util/untrusted-frame/README.md) disclaimer precedes those fragments. The optional provider-owned answer is wrapped in `<untrusted-web-answer>`; each snippet is wrapped in `<untrusted-web-snippet>`. Then `Sources:` and data-dependent lines shaped exactly `- [<title-or-url>](<url>)`, optionally suffixed ` — <framed-snippet> (<publishedAt>)`. With neither answer nor sources the result says `No results found.` A capped list adds `(Showing the first <count> sources. Refine the query for more.)`; every result ends `Cite the relevant URLs above as markdown links in your answer.` The disclaimer, source titles/URLs, dates, truncation note, and citation instruction stay outside the tagged fragments.
 
 #### Token effect
 
@@ -105,7 +105,7 @@ Append-only; newly visible content follows the reusable request prefix and does 
 
 #### What the model sees
 
-A successful fetch is `Fetched <finalUrl> (HTTP <statusCode>)`, a blank line, then an [`roos-untrusted-frame`](../../util/untrusted-frame/README.md) labeled for remote page content whose `<untrusted-web-page>` body is the provider-owned decoded page. Truncation adds a blank line and `(Content truncated. Fetch a more specific URL or section for the full text.)` after the closing tag; failures become `Error: <message>`. Queries and URLs remain in call history. The status header and truncation footer stay outside the frame.
+A successful fetch is `Fetched <finalUrl> (HTTP <statusCode>)`, a blank line, then an [`shres-untrusted-frame`](../../util/untrusted-frame/README.md) labeled for remote page content whose `<untrusted-web-page>` body is the provider-owned decoded page. Truncation adds a blank line and `(Content truncated. Fetch a more specific URL or section for the full text.)` after the closing tag; failures become `Error: <message>`. Queries and URLs remain in call history. The status header and truncation footer stay outside the frame.
 
 #### Token effect
 
