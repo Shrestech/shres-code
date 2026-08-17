@@ -25,6 +25,20 @@ export const en = {
   apply: 'Apply',
   applying: 'Applying…',
   panic: 'SHRES_SHIELD=off is the panic switch. It keeps this page but stops screening and restores the monochrome mark.',
+  console: 'This repo',
+  screened: 'Screened',
+  asked: 'Asked',
+  blocked: 'Blocked',
+  observed: 'Observed',
+  definitions: 'Definitions',
+  recent: 'Recent',
+  noFindings: 'No findings for this repo',
+  snapshotLoading: 'Loading repo counts…',
+  snapshotUnavailable: 'Repo counts are unavailable.',
+  retry: 'Retry',
+  verdictBlocked: 'Blocked',
+  verdictAsked: 'Asked',
+  verdictObserved: 'Observed',
 }
 
 /** The ShieldKey union. */

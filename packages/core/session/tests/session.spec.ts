@@ -1088,6 +1088,15 @@ describe('Session', () => {
     ])
     expect(marked.events[0]?.ignorable).toBe(true)
   })
+
+  it('lets a non-surface append set ignorable on the envelope', () => {
+    const session = Session.create(SessionId('append-ignorable'))
+    const event = session.append('turn/start', { turn: 1 }, { ignorable: true })
+    expect(event.ignorable).toBe(true)
+    expect(session.events[0]?.ignorable).toBe(true)
+    const required = session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+    expect(required.ignorable).toBeUndefined()
+  })
 })
 
 

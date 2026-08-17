@@ -69,6 +69,11 @@ function recordSources(
     searchableJson(cell.messageSource),
     searchableJson(cell.promptDetail),
     searchableJson(cell.previousPromptDetail),
+    cell.shield?.verdict === 'deny' ? 'Blocked' : '',
+    cell.shield?.verdict === 'ask' ? 'Asked' : '',
+    cell.shield?.verdict === 'observe' ? 'Observed' : '',
+    cell.shield?.rule ?? '',
+    cell.shield?.channel ?? '',
   ]
 }
 

@@ -56,6 +56,7 @@
     "@shres-code/shres-code-client-ui-primitives": "workspace:^",
     "@shres-code/cordis": "workspace:^",
     "@shres-code/shres-code-compaction": "workspace:^",
+    "@shres-code/shres-code-shield": "workspace:^",
     "@shres-code/shres-code-tools": "workspace:^",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
@@ -70,6 +71,7 @@
     "@shres-code/shres-code-client-ui-slots": "workspace:^",
     "@shres-code/shres-code-compaction": "workspace:^",
     "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-shield": "workspace:^",
     "@shres-code/shres-code-tools": "workspace:^",
     "@types/react": "~18.3.1",
     "@types/react-dom": "~18.3.0",

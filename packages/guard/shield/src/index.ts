@@ -6,14 +6,24 @@
  * @module @shres-code/shres-code-shield
  */
 
-import { Context, Service } from '@shres-code/cordis'
+import { realpathSync } from 'node:fs'
+import { Context } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
+import { SessionId } from '@shres-code/shres-code-session'
 import { installSettingsSection, settingsNamespace } from '@shres-code/shres-code-settings'
+import { Remote, TypertRemoteService } from '@shres-code/shres-code-typert-protocol'
+// Typert-generated ./typert and ./remote artifacts import Zod at runtime.
+import type {} from 'zod'
 import { resolveShieldEngine } from './resolve.ts'
-import type { ShieldEngineSource, ShieldReason, ShieldStatus } from './types.ts'
+import type {
+  ShieldCounterSplit, ShieldDefinitions, ShieldEngineSource, ShieldFindingSummary,
+  ShieldReason, ShieldRepoStats, ShieldSnapshot, ShieldStatus,
+} from './types.ts'
 
 export type {
-  ShieldEngine, ShieldEngineApply, ShieldEngineSource, ShieldInactiveReason, ShieldReason, ShieldStatus,
+  ShieldCounterSplit, ShieldDecision, ShieldDefinitions, ShieldEngine, ShieldEngineApply,
+  ShieldEngineSource, ShieldFindingSummary, ShieldInactiveReason, ShieldReason,
+  ShieldRepoStats, ShieldSnapshot, ShieldStatus,
 } from './types.ts'
 export { repoRootFromSeat, resolveShieldEngine, siblingPluginPath } from './resolve.ts'
 
@@ -66,13 +76,154 @@ declare module '@shres-code/cordis' {
   }
 }
 
+const EMPTY_SPLIT: ShieldCounterSplit = {
+  screened: 0,
+  observed: 0,
+  asked: 0,
+  askedGranted: 0,
+  askedDenied: 0,
+  blocked: 0,
+}
+
 /**
- * Published Shield status. `active` is the brand-mark switch: blue girl and
- * green shield only while the paid engine is screening.
+ * Zeroed per-repo stats used when the engine has not reported any counts.
+ * @param cwd - session workspace realpath, or `null` when none is known.
+ * @returns a fresh stats object the pane can render.
  */
-export class ShieldHost extends Service {
+export function emptyRepoStats(cwd: string | null): ShieldRepoStats {
+  return { cwd, ...EMPTY_SPLIT, byChannel: {}, recent: [] }
+}
+
+function isCounterSplit(value: unknown): value is ShieldCounterSplit {
+  if (value === null || typeof value !== 'object') return false
+  const row = value as Record<string, unknown>
+  return typeof row.screened === 'number'
+    && typeof row.observed === 'number'
+    && typeof row.asked === 'number'
+    && typeof row.blocked === 'number'
+}
+
+function toCounterSplit(value: ShieldCounterSplit): ShieldCounterSplit {
+  return {
+    screened: value.screened,
+    observed: value.observed,
+    asked: value.asked,
+    askedGranted: typeof value.askedGranted === 'number' ? value.askedGranted : 0,
+    askedDenied: typeof value.askedDenied === 'number' ? value.askedDenied : 0,
+    blocked: value.blocked,
+  }
+}
+
+function toFinding(value: unknown): ShieldFindingSummary | undefined {
+  if (value === null || typeof value !== 'object') return undefined
+  const row = value as Record<string, unknown>
+  if (typeof row.at !== 'number' || typeof row.rule !== 'string' || typeof row.channel !== 'string'
+    || typeof row.sha16 !== 'string') return undefined
+  if (row.verdict !== 'observe' && row.verdict !== 'ask' && row.verdict !== 'deny') return undefined
+  return {
+    at: row.at,
+    verdict: row.verdict,
+    rule: row.rule,
+    channel: row.channel,
+    sha16: row.sha16,
+    ...(typeof row.host === 'string' ? { host: row.host } : {}),
+    ...(typeof row.callId === 'string' ? { callId: row.callId } : {}),
+  }
+}
+
+function toRepoStats(value: unknown, cwd: string | null): ShieldRepoStats | undefined {
+  if (!isCounterSplit(value)) return undefined
+  const row = value as ShieldCounterSplit & {
+    cwd?: unknown
+    byChannel?: unknown
+    recent?: unknown
+  }
+  const byChannel: Record<string, ShieldCounterSplit> = {}
+  if (row.byChannel !== null && typeof row.byChannel === 'object') {
+    for (const [channel, split] of Object.entries(row.byChannel as Record<string, unknown>)) {
+      if (isCounterSplit(split)) byChannel[channel] = toCounterSplit(split)
+    }
+  }
+  const recent: ShieldFindingSummary[] = []
+  if (Array.isArray(row.recent)) {
+    for (const item of row.recent) {
+      const finding = toFinding(item)
+      if (finding !== undefined) recent.push(finding)
+    }
+  }
+  const reported = typeof row.cwd === 'string' ? row.cwd : null
+  return {
+    cwd: reported ?? cwd,
+    ...toCounterSplit(value),
+    byChannel,
+    recent,
+  }
+}
+
+function toDefinitions(value: unknown): ShieldDefinitions | undefined {
+  if (value === null || typeof value !== 'object') return undefined
+  const row = value as Record<string, unknown>
+  if (typeof row.version !== 'string' || typeof row.stale !== 'boolean') return undefined
+  if (row.updatedAt !== null && typeof row.updatedAt !== 'number') return undefined
+  return { version: row.version, updatedAt: row.updatedAt, stale: row.stale }
+}
+
+function callSnapshot(holder: unknown, cwd: string | null): unknown {
+  if (holder === null || typeof holder !== 'object') return undefined
+  const stats = (holder as { stats?: { snapshot?: (key?: string | null) => unknown } }).stats
+  if (stats === undefined || typeof stats.snapshot !== 'function') return undefined
+  try {
+    return stats.snapshot(cwd)
+  } catch {
+    // Engine snapshot is best-effort; the pane still shows last persisted counts.
+    return undefined
+  }
+}
+
+function readEngineSnapshot(
+  payload: unknown,
+  cwd: string | null,
+): { stats: ShieldRepoStats; definitions?: ShieldDefinitions } | undefined {
+  if (payload === null || typeof payload !== 'object') return undefined
+  const direct = callSnapshot(payload, cwd)
+  const nested = direct === undefined
+    ? callSnapshot((payload as { shield?: unknown }).shield, cwd)
+    : direct
+  const stats = toRepoStats(nested, cwd)
+    ?? toRepoStats(
+      nested !== null && typeof nested === 'object'
+        ? (nested as { stats?: unknown }).stats
+        : undefined,
+      cwd,
+    )
+  if (stats === undefined) return undefined
+  const definitions = toDefinitions(
+    nested !== null && typeof nested === 'object'
+      ? (nested as { definitions?: unknown }).definitions
+      : undefined,
+  )
+  return definitions === undefined ? { stats } : { stats, definitions }
+}
+
+function resolveRepoPath(cwd: string): string {
+  try {
+    return realpathSync(cwd)
+  } catch {
+    return cwd
+  }
+}
+
+/**
+ * Published Shield status and a read-only snapshot RPC. `active` is the
+ * brand-mark switch: blue girl and green shield only while the paid engine is
+ * screening. The seat owns this service name; the paid plugin must not replace it.
+ */
+export class ShieldHost extends TypertRemoteService {
   /** Current screening status. */
   readonly status: ShieldStatus
+  private payload: unknown
+  private lastStats: ShieldRepoStats
+  private lastDefinitions: ShieldDefinitions | undefined
 
   /**
    * @param ctx - owning context.
@@ -81,6 +232,67 @@ export class ShieldHost extends Service {
   constructor(ctx: Context, status: ShieldStatus) {
     super(ctx, 'shield')
     this.status = status
+    this.lastStats = emptyRepoStats(null)
+  }
+
+  /**
+   * Remember the live paid instance so {@link snapshot} can read its stats.
+   * @param payload - value returned by the paid `apply`, or `undefined` after dispose.
+   */
+  bindPayload(payload: unknown): void {
+    this.payload = payload
+    const read = payload === undefined ? undefined : readEngineSnapshot(payload, this.lastStats.cwd)
+    if (read === undefined) return
+    this.lastStats = read.stats
+    if (read.definitions !== undefined) this.lastDefinitions = read.definitions
+  }
+
+  /**
+   * Per-repo counters for the current session cwd. Disable remounts the payload
+   * off but still returns last persisted counts with `status.reason === 'disabled'`.
+   * @param sessionId - live session whose `header.cwd` keys the stats; omitted
+   *   uses the most recently created live session that has a cwd.
+   * @returns a JSON copy, never a live alias of seat or engine state.
+   */
+  @Remote('snapshot')
+  snapshot(sessionId?: string): ShieldSnapshot {
+    const cwd = this.resolveCwd(sessionId)
+    const live = this.payload === undefined ? undefined : readEngineSnapshot(this.payload, cwd)
+    if (live !== undefined) {
+      this.lastStats = live.stats
+      if (live.definitions !== undefined) this.lastDefinitions = live.definitions
+    } else if (cwd !== this.lastStats.cwd) {
+      this.lastStats = { ...this.lastStats, cwd }
+    }
+    return {
+      status: { active: this.status.active, reason: this.status.reason },
+      stats: {
+        ...toCounterSplit(this.lastStats),
+        cwd: this.lastStats.cwd,
+        byChannel: { ...this.lastStats.byChannel },
+        recent: [...this.lastStats.recent],
+      },
+      ...(this.lastDefinitions === undefined ? {} : { definitions: { ...this.lastDefinitions } }),
+    }
+  }
+
+  private resolveCwd(sessionId?: string): string | null {
+    const sessions = this.ctx.get('sessions') as {
+      get?(id: SessionId): { header: { cwd?: string } } | undefined
+      list?(): Array<{ header: { cwd?: string } }>
+    } | undefined
+    if (sessions !== undefined) {
+      if (sessionId !== undefined) {
+        const header = sessions.get?.(SessionId(sessionId))?.header
+        if (header?.cwd !== undefined) return resolveRepoPath(header.cwd)
+      }
+      const listed = sessions.list?.() ?? []
+      for (let i = listed.length - 1; i >= 0; i -= 1) {
+        const cwd = listed[i]?.header.cwd
+        if (cwd !== undefined) return resolveRepoPath(cwd)
+      }
+    }
+    return this.lastStats.cwd
   }
 }
 
@@ -133,7 +345,7 @@ function setStatus(status: { active: boolean; reason: ShieldReason }, next: Shie
  */
 export function apply(ctx: Context, config: Config): void {
   const status = { active: false, reason: 'engine-missing' as ShieldReason }
-  new ShieldHost(ctx, status)
+  const host = new ShieldHost(ctx, status)
   const entry: Config = {
     license: config.license !== undefined && config.license.length > 0 ? config.license : DEFAULT_SHIELD_LICENSE,
     enabled: config.enabled !== false,
@@ -150,6 +362,7 @@ export function apply(ctx: Context, config: Config): void {
       if (instance !== undefined) {
         await instance.dispose()
         instance = undefined
+        host.bindPayload(undefined)
       }
       if (isPanicDisabled()) {
         setStatus(status, { active: false, reason: 'panic' })
@@ -175,8 +388,10 @@ export function apply(ctx: Context, config: Config): void {
       if (stopped) {
         await instance.dispose()
         instance = undefined
+        host.bindPayload(undefined)
         return
       }
+      host.bindPayload(instance)
       setStatus(status, { active: true, reason: 'active' })
     }).catch(() => {
       setStatus(status, { active: false, reason: 'engine-missing' })
@@ -192,6 +407,7 @@ export function apply(ctx: Context, config: Config): void {
     stopped = true
     return chain.then(async () => {
       if (instance !== undefined) await instance.dispose()
+      host.bindPayload(undefined)
     })
   }, 'shres-shield: withdraw engine')
 }

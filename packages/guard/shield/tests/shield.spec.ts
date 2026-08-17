@@ -7,7 +7,10 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { Context, FiberState } from '@shres-code/cordis'
 import SystemPrompt from '@shres-code/shres-code-system-prompt'
 import ToolRuntime from '@shres-code/shres-code-tools'
+import { remoteMethods } from '@shres-code/shres-code-typert-protocol'
 import * as ShieldSeat from '@shres-code/shres-code-shield'
+import type { ShieldDecision } from '@shres-code/shres-code-shield/types'
+import { Session, SessionId } from '@shres-code/shres-code-session'
 import { fileURLToPath } from 'node:url'
 import { applied } from './fixtures/fake-shield-plugin.ts'
 
@@ -169,5 +172,208 @@ describe('shres-shield host seat', () => {
     expect(ShieldSeat.isEntitled('key', 'package')).toBe(true)
     expect(ShieldSeat.isEntitled('', 'sibling')).toBe(true)
     expect(ShieldSeat.isEntitled('', 'env')).toBe(true)
+  })
+
+  it('publishes a direct snapshot remote and empty stats before the engine binds', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', '/no/such-shield-module.js')
+    const ctx = await setup({ license: 'paid' }, 'engine-missing')
+    expect(ctx.shield.typertRemote).toMatchObject({
+      serviceKey: 'shield',
+      namespace: 'shield',
+    })
+    expect(remoteMethods(ctx.shield)).toEqual([
+      { method: 'snapshot', invocation: { kind: 'direct' } },
+    ])
+    expect(ctx.shield.snapshot()).toEqual({
+      status: { active: false, reason: 'engine-missing' },
+      stats: ShieldSeat.emptyRepoStats(null),
+    })
+  })
+
+  it('copies engine stats onto the snapshot and keeps them after disable', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', fixtureUrl)
+    const ctx = await setup({ license: 'paid' }, 'active')
+    const live = ctx.shield.snapshot()
+    expect(live.status).toEqual({ active: true, reason: 'active' })
+    expect(live.stats).toMatchObject({
+      cwd: '/tmp/shield-fixture',
+      screened: 4,
+      asked: 2,
+      askedGranted: 1,
+      askedDenied: 1,
+      blocked: 1,
+      observed: 1,
+    })
+    expect(live.stats).not.toBe(applied.stats)
+
+    ctx.shield.bindPayload(undefined)
+    const { status } = ctx.shield
+    status.active = false
+    status.reason = 'disabled'
+    const disabled = ctx.shield.snapshot()
+    expect(disabled.status).toEqual({ active: false, reason: 'disabled' })
+    expect(disabled.stats.screened).toBe(4)
+    expect(disabled.stats.asked).toBe(2)
+  })
+
+  it('keys snapshot stats by a live session cwd', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', fixtureUrl)
+    const ctx = await setup({ license: 'paid' }, 'active')
+    ctx.provide('sessions', {
+      get: (id: SessionId) => id === SessionId('s1') ? { header: { cwd: '/from-id' } } : undefined,
+      list: () => [{ header: { cwd: '/from-list' } }],
+    })
+    expect(ctx.shield.snapshot('s1').stats.cwd).toBe('/from-id')
+    expect(ctx.shield.snapshot().stats.cwd).toBe('/from-list')
+  })
+
+  it('reads nested engine stats and keeps last counts when snapshot throws', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', '/no/such-shield-module.js')
+    const ctx = await setup({ license: 'paid' }, 'engine-missing')
+    ctx.shield.bindPayload({
+      shield: {
+        stats: {
+          snapshot: () => ({
+            cwd: '/nested',
+            screened: 9,
+            observed: 0,
+            asked: 1,
+            blocked: 2,
+            byChannel: { tool_args: { screened: 9, observed: 0, asked: 1, blocked: 2 } },
+            recent: [{
+              at: 1,
+              verdict: 'deny',
+              rule: 'sig.x',
+              channel: 'tool_args',
+              sha16: '0123456789abcdef',
+              host: 'example.com',
+            }],
+            definitions: { version: 'v1', updatedAt: 2, stale: false },
+          }),
+        },
+      },
+    })
+    const live = ctx.shield.snapshot()
+    expect(live.stats.screened).toBe(9)
+    expect(live.stats.askedGranted).toBe(0)
+    expect(live.stats.recent[0]).toMatchObject({ host: 'example.com' })
+    expect(live.definitions).toEqual({ version: 'v1', updatedAt: 2, stale: false })
+
+    ctx.shield.bindPayload({
+      stats: {
+        snapshot: () => {
+          throw new Error('engine snapshot failed')
+        },
+      },
+    })
+    expect(ctx.shield.snapshot().stats.screened).toBe(9)
+  })
+
+  it('skips malformed engine stats and still returns last good counts', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', '/no/such-shield-module.js')
+    const ctx = await setup({ license: 'paid' }, 'engine-missing')
+    ctx.shield.bindPayload({ stats: { snapshot: () => 'nope' } })
+    expect(ctx.shield.snapshot().stats).toEqual(ShieldSeat.emptyRepoStats(null))
+    ctx.provide('sessions', {
+      get: () => undefined,
+      list: () => [{ header: { cwd: '/only-list' } }],
+    })
+    expect(ctx.shield.snapshot().stats.cwd).toBe('/only-list')
+    ctx.shield.bindPayload({
+      stats: {
+        snapshot: () => ({
+          screened: 1,
+          observed: 0,
+          asked: 0,
+          blocked: 0,
+          cwd: 1,
+          byChannel: { bad: 'no', tool_args: { screened: 1, observed: 0, asked: 0, blocked: 0 } },
+          recent: [
+            null,
+            { at: 1, rule: 'x', channel: 'y', sha16: 'z', verdict: 'nope' },
+            { at: 2, rule: 'ok', channel: 'user_message', sha16: '0123456789abcdef', verdict: 'observe' },
+          ],
+          definitions: { version: 'v', updatedAt: 'no', stale: false },
+        }),
+      },
+    })
+    const next = ctx.shield.snapshot()
+    expect(next.stats.screened).toBe(1)
+    expect(next.stats.recent).toHaveLength(1)
+    expect(next.definitions).toBeUndefined()
+  })
+
+  it('accepts wrapped engine stats, call ids, and a null definition stamp', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', '/no/such-shield-module.js')
+    const ctx = await setup({ license: 'paid' }, 'engine-missing')
+    ctx.shield.bindPayload(null)
+    expect(ctx.shield.snapshot().stats.screened).toBe(0)
+    ctx.shield.bindPayload({})
+    ctx.shield.bindPayload({
+      stats: {
+        snapshot: () => ({
+          stats: {
+            screened: 3,
+            observed: 0,
+            asked: 0,
+            blocked: 0,
+            byChannel: null,
+            recent: 'no',
+            callId: 'ignored',
+          },
+          definitions: { version: 'seed', updatedAt: null, stale: true },
+        }),
+      },
+    })
+    const wrapped = ctx.shield.snapshot()
+    expect(wrapped.stats.screened).toBe(3)
+    expect(wrapped.stats.recent).toEqual([])
+    expect(wrapped.definitions).toEqual({ version: 'seed', updatedAt: null, stale: true })
+    ctx.shield.bindPayload({
+      stats: {
+        snapshot: () => ({
+          screened: 1,
+          observed: 0,
+          asked: 0,
+          blocked: 0,
+          recent: [{
+            at: 3,
+            rule: 'sig.y',
+            channel: 'tool_result',
+            sha16: 'ffffffffffffffff',
+            verdict: 'ask',
+            callId: 'c1',
+          }],
+        }),
+      },
+    })
+    expect(ctx.shield.snapshot().stats.recent[0]).toMatchObject({ callId: 'c1', verdict: 'ask' })
+    ctx.provide('sessions', {
+      get: (id: SessionId) => id === SessionId('empty') ? { header: {} } : undefined,
+      list: () => [{ header: {} }, { header: { cwd: '/listed' } }],
+    })
+    expect(ctx.shield.snapshot('empty').stats.cwd).toBe('/listed')
+    expect(ctx.shield.snapshot('missing').stats.cwd).toBe('/listed')
+  })
+
+  it('declares shield/decision as an ignorable session event', () => {
+    const session = Session.create(SessionId('shield-decision'))
+    const data: ShieldDecision = {
+      verdict: 'deny',
+      rule: 'sig.literal',
+      reasonCode: 'deny-literal',
+      channel: 'tool_result',
+      sha16: '0123456789abcdef',
+    }
+    const event = session.append('shield/decision', data, { ignorable: true })
+    expect(event.ignorable).toBe(true)
+    expect(event.data).toEqual(data)
+    expect(event.type).toBe('shield/decision')
   })
 })

@@ -921,6 +921,9 @@ importers:
       '@shres-code/shres-code-settings':
         specifier: workspace:^
         version: link:../../settings/settings
+      '@shres-code/shres-code-shield':
+        specifier: workspace:^
+        version: link:../../guard/shield
       '@shres-code/shres-code-typert-registry':
         specifier: workspace:^
         version: link:../../typert/registry
@@ -2691,6 +2694,9 @@ importers:
       '@shres-code/cordis':
         specifier: workspace:^
         version: link:../../../vendor/cordis
+      '@shres-code/shres-code-api-remotes':
+        specifier: workspace:^
+        version: link:../../api/remotes
       '@shres-code/shres-code-client-locale':
         specifier: workspace:^
         version: link:../locale
@@ -3005,6 +3011,9 @@ importers:
       '@shres-code/shres-code-invariants':
         specifier: workspace:^
         version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-shield':
+        specifier: workspace:^
+        version: link:../../guard/shield
       '@shres-code/shres-code-tools':
         specifier: workspace:^
         version: link:../../core/tools
@@ -4746,6 +4755,9 @@ importers:
       '@shres-code/schemastery':
         specifier: link:../../../vendor/schemastery
         version: link:../../../vendor/schemastery
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@shres-code/cordis':
         specifier: workspace:^
@@ -4753,6 +4765,9 @@ importers:
       '@shres-code/shres-code-invariants':
         specifier: workspace:^
         version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-session':
+        specifier: workspace:^
+        version: link:../../core/session
       '@shres-code/shres-code-settings':
         specifier: workspace:^
         version: link:../../settings/settings
@@ -4762,6 +4777,9 @@ importers:
       '@shres-code/shres-code-tools':
         specifier: workspace:^
         version: link:../../core/tools
+      '@shres-code/shres-code-typert-protocol':
+        specifier: workspace:^
+        version: link:../../typert/protocol
 
   packages/guard/timeout-policy:
     devDependencies:

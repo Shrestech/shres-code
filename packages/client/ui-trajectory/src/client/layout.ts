@@ -14,7 +14,9 @@ import type {
   ToolResultNode,
 } from '@shres-code/shres-code-client-runtime/client'
 import type {
+  TrajectoryCellKind,
   TrajectoryCellProps,
+  TrajectoryShieldBadge,
   TrajectorySourceBlock,
 } from './trajectory-record.ts'
 import { formatElapsedSeconds } from './trajectory-record.ts'
@@ -40,7 +42,26 @@ export interface TrajectoryLayoutInput {
   runningCalls: ConversationSnapshot['runningCalls']
   requests?: readonly RequestView[]
   callSchemas?: RequestInspectionSnapshot['callSchemas']
+  /** Folded `shield/decision` events; attached onto existing rows only. */
+  decisions?: readonly TrajectoryShieldMatch[]
 }
+
+/** Decision fields used to match an existing user/context/tool cell. */
+export interface TrajectoryShieldMatch {
+  verdict: TrajectoryShieldBadge['verdict']
+  rule: string
+  channel: string
+  sha16: string
+  host?: string
+  callId?: string
+  turn?: number
+  step?: number
+}
+
+const SHIELD_SEVERITY = { observe: 0, ask: 1, deny: 2 } as const
+const SHIELD_KINDS: ReadonlySet<TrajectoryCellKind> = new Set([
+  'user', 'context', 'tool', 'subtool',
+])
 
 interface UsageLike {
   inputTokens?: number
@@ -138,6 +159,7 @@ function inputCellDetail(node: InputNode): Pick<
 export function deriveTrajectoryLayout(input: TrajectoryLayoutInput): readonly TrajectoryTurnModel[] {
   const {
     nodes, eventLocations, partial, runningCalls, requests = [], callSchemas,
+    decisions = [],
   } = input
   const resultByCall = indexResults(nodes)
   const callById = new Map<string, ToolCallBlock>(resultByCall)
@@ -516,10 +538,80 @@ export function deriveTrajectoryLayout(input: TrajectoryLayoutInput): readonly T
     }
   }
 
-  return [
+  const models = [
     ...[...turns.entries()].map(([turn, entry]) => toTurnModel(turn, entry)),
     ...standaloneCompactions.map(entry => toTurnModel(null, entry)),
   ].sort((left, right) => firstCellIndex(left) - firstCellIndex(right))
+  attachShieldDecisions(models, decisions)
+  return models
+}
+
+function compactShield(decision: TrajectoryShieldMatch): TrajectoryShieldBadge {
+  return {
+    verdict: decision.verdict,
+    rule: decision.rule,
+    channel: decision.channel,
+    sha16: decision.sha16,
+    ...(decision.host === undefined ? {} : { host: decision.host }),
+  }
+}
+
+function inputCellsInGroup(
+  turn: TrajectoryTurnModel,
+  title: string,
+): TrajectoryCellProps[] {
+  return turn.groups
+    .filter(group => group.title === title)
+    .flatMap(group => group.cells.filter(cell => cell.kind === 'user' || cell.kind === 'context'))
+}
+
+/**
+ * Match one decision onto an existing cell.
+ * `callId` wins. Otherwise `turn` (0 folds to 1) plus optional `step`.
+ * Highest severity wins; later equal severity replaces earlier.
+ */
+function matchShieldCell(
+  models: readonly TrajectoryTurnModel[],
+  decision: TrajectoryShieldMatch,
+): TrajectoryCellProps | undefined {
+  if (decision.callId !== undefined && decision.callId.length > 0) {
+    for (const turn of models) {
+      for (const group of turn.groups) {
+        for (const cell of group.cells) {
+          if (
+            (cell.kind === 'tool' || cell.kind === 'subtool')
+            && cell.callId === decision.callId
+          ) return cell
+        }
+      }
+    }
+    return undefined
+  }
+  if (decision.turn === undefined) return undefined
+  const wanted = decision.turn === 0 ? 1 : decision.turn
+  const turn = models.find(entry => entry.turn === wanted)
+  if (turn === undefined) return undefined
+  if (decision.step !== undefined && decision.step > 0) {
+    const stepped = inputCellsInGroup(turn, `Step ${decision.step}`)
+    if (stepped[0] !== undefined) return stepped[0]
+  }
+  const message = inputCellsInGroup(turn, 'Message')
+  return message.find(cell => cell.opensTurn === true) ?? message[0]
+}
+
+function attachShieldDecisions(
+  models: readonly TrajectoryTurnModel[],
+  decisions: readonly TrajectoryShieldMatch[],
+): void {
+  for (const decision of decisions) {
+    const cell = matchShieldCell(models, decision)
+    if (cell === undefined || !SHIELD_KINDS.has(cell.kind)) continue
+    const next = compactShield(decision)
+    const previous = cell.shield
+    if (previous === undefined || SHIELD_SEVERITY[next.verdict] >= SHIELD_SEVERITY[previous.verdict]) {
+      cell.shield = next
+    }
+  }
 }
 
 /**

@@ -818,6 +818,31 @@
   padding-left: 26px;
 }
 
+.shieldBadge {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  margin-left: 8px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font: var(--dsw-font-xxs-12);
+}
+
+.shieldBlocked {
+  background: var(--dsw-alias-state-danger-bg, color-mix(in srgb, var(--dsw-alias-state-warn-label) 16%, transparent));
+  color: var(--dsw-alias-state-danger-label, var(--dsw-alias-state-warn-label));
+}
+
+.shieldAsked {
+  background: color-mix(in srgb, var(--dsw-alias-state-warn-label) 16%, transparent);
+  color: var(--dsw-alias-state-warn-label);
+}
+
+.shieldObserved {
+  background: var(--dsw-alias-bg-module-platform);
+  color: var(--dsw-alias-label-secondary);
+}
+
 .inlineResult {
   display: flex;
   align-items: center;

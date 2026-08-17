@@ -32,6 +32,7 @@
   "shres": {
     "client": {
       "inject": [
+        "@shres-code/shres-code-api-remotes",
         "@shres-code/shres-code-client-runtime",
         "@shres-code/shres-code-client-ui-settings",
         "@shres-code/shres-code-client-locale"
@@ -46,6 +47,7 @@
   "license": "MIT",
   "peerDependencies": {
     "@shres-code/cordis": "workspace:^",
+    "@shres-code/shres-code-api-remotes": "workspace:^",
     "@shres-code/shres-code-client-runtime": "workspace:^",
     "@shres-code/shres-code-client-ui-primitives": "workspace:^",
     "@shres-code/shres-code-client-ui-slots": "workspace:^",
@@ -54,6 +56,7 @@
     "react": "^18.2.0"
   },
   "devDependencies": {
+    "@shres-code/shres-code-api-remotes": "workspace:^",
     "@shres-code/shres-code-client-locale": "workspace:^",
     "@shres-code/shres-code-client-runtime": "workspace:^",
     "@shres-code/shres-code-client-test-runtime": "workspace:^",

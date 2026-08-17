@@ -91,6 +91,132 @@ describe('deriveTrajectoryLayout', () => {
     expect(tool?.timeSeconds).toBe(1.3)
   })
 
+  it('attaches shield verdicts to a user row and one tool while leaving the other unflagged', () => {
+    const nodes = [
+      { kind: 'user', seq: 1, time: 1_000, content: [{ type: 'text', text: 'hello' }], source: null },
+      {
+        kind: 'assistant', seq: 2, time: 6_000, turn: 1, step: 1,
+        blocks: [
+          { kind: 'tool-call', callId: 'c1', name: 'bash', argsRaw: '{}' },
+          { kind: 'tool-call', callId: 'c2', name: 'read', argsRaw: '{}' },
+        ],
+      },
+      {
+        kind: 'tool-result', seq: 3, time: 7_000, callId: 'c1',
+        call: { name: 'bash', argsRaw: '{}' }, callTime: 6_200,
+        content: [{ type: 'text', text: 'ok' }], isError: false, callView: null, resultView: null,
+      },
+      {
+        kind: 'tool-result', seq: 4, time: 7_100, callId: 'c2',
+        call: { name: 'read', argsRaw: '{}' }, callTime: 6_300,
+        content: [{ type: 'text', text: 'x' }], isError: false, callView: null, resultView: null,
+      },
+    ] as unknown as ConversationSnapshot['nodes']
+    const turns = deriveTrajectoryLayout({
+      nodes,
+      partial: null,
+      runningCalls: [],
+      decisions: [
+        {
+          verdict: 'ask',
+          rule: 'sig.input',
+          channel: 'user_message',
+          sha16: 'aaaaaaaaaaaaaaaa',
+          turn: 1,
+        },
+        {
+          verdict: 'deny',
+          rule: 'sig.literal',
+          channel: 'tool_result',
+          sha16: 'bbbbbbbbbbbbbbbb',
+          callId: 'c1',
+          host: 'example.com',
+        },
+      ],
+    })
+    const cells = turns[0]?.groups.flatMap(group => group.cells) ?? []
+    const user = cells.find(cell => cell.kind === 'user')
+    const flagged = cells.find(cell => cell.callId === 'c1')
+    const clean = cells.find(cell => cell.callId === 'c2')
+    expect(user?.shield).toEqual({
+      verdict: 'ask',
+      rule: 'sig.input',
+      channel: 'user_message',
+      sha16: 'aaaaaaaaaaaaaaaa',
+    })
+    expect(flagged?.shield).toEqual({
+      verdict: 'deny',
+      rule: 'sig.literal',
+      channel: 'tool_result',
+      sha16: 'bbbbbbbbbbbbbbbb',
+      host: 'example.com',
+    })
+    expect(clean?.shield).toBeUndefined()
+    expect(flagged?.isError).toBe(false)
+    expect(flagged?.timeSeconds).toBeCloseTo(0.8)
+    expect(clean?.outputDetail).toBeDefined()
+  })
+
+  it('prefers a Step group for input-path decisions and keeps the highest severity', () => {
+    const nodes = [
+      { kind: 'user', seq: 1, time: 1_000, content: [{ type: 'text', text: 'open' }], source: null },
+      {
+        kind: 'steering', seq: 2, time: 2_000,
+        content: [{ type: 'text', text: 'steer' }], source: null,
+      },
+    ] as unknown as ConversationSnapshot['nodes']
+    const data = { get: () => undefined }
+    const step = { turn: 1, step: 1, start: undefined, end: undefined, status: 'open' as const, data }
+    const turn = {
+      turn: 1, start: undefined, end: undefined, status: 'open' as const, steps: [step], data,
+    }
+    const eventLocations = new Map<number, ConversationLocation>([[
+      2,
+      { kind: 'step', turn, step },
+    ]])
+    const turns = deriveTrajectoryLayout({
+      nodes,
+      eventLocations,
+      partial: { turn: 1, step: 1, blocks: [] },
+      runningCalls: [],
+      decisions: [
+        {
+          verdict: 'observe',
+          rule: 'sig.a',
+          channel: 'user_message',
+          sha16: '1111111111111111',
+          turn: 0,
+        },
+        {
+          verdict: 'deny',
+          rule: 'sig.b',
+          channel: 'user_message',
+          sha16: '2222222222222222',
+          turn: 1,
+        },
+        {
+          verdict: 'ask',
+          rule: 'sig.c',
+          channel: 'user_message',
+          sha16: '3333333333333333',
+          turn: 1,
+          step: 1,
+        },
+        {
+          verdict: 'observe',
+          rule: 'sig.d',
+          channel: 'user_message',
+          sha16: '4444444444444444',
+        },
+      ],
+    })
+    const cells = turns.flatMap(entry => entry.groups.flatMap(group => group.cells))
+    const user = cells.find(cell => cell.kind === 'user' && cell.opensTurn === true)
+    const steer = cells.find(cell => cell.kind === 'user' && cell.opensTurn !== true)
+    expect(user?.shield?.verdict).toBe('deny')
+    expect(steer?.shield?.verdict).toBe('ask')
+  })
+
   it('adds runningCalls not already present and leaves their time blank', () => {
     const turns = deriveTrajectoryLayout({
       nodes: [],

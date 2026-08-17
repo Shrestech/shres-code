@@ -680,6 +680,12 @@ function statusLabel(state: RecordState): string {
   return 'Completed'
 }
 
+function shieldBadgeLabel(verdict: 'observe' | 'ask' | 'deny'): string {
+  if (verdict === 'deny') return 'Blocked'
+  if (verdict === 'ask') return 'Asked'
+  return 'Observed'
+}
+
 function TokenRows({ cell }: { cell: TrajectoryCellProps }) {
   const content = cell.output !== undefined && cell.think !== undefined
     ? Math.max(0, cell.output - cell.think)
@@ -2311,7 +2317,7 @@ export function TrajectoryTable({
                         ? `Collapsed ${record.collapsedSummaryKind} summary, ${record.collapsedSummary}`
                         : isRequestOnly
                           ? `Request ${request ?? ''}, compaction`
-                          : `${request === undefined ? '' : `Request ${request}, `}${KIND_LABEL[record.cell.kind]}, ${listDisplayText || 'no content'}`}
+                          : `${request === undefined ? '' : `Request ${request}, `}${KIND_LABEL[record.cell.kind]}, ${listDisplayText || 'no content'}${record.cell.shield === undefined ? '' : `, ${shieldBadgeLabel(record.cell.shield.verdict)}`}`}
                       aria-selected={!isCollapsedSummary && !isRequestOnly && selectedIndex === record.cell.index}
                       data-kind={record.cell.kind}
                       data-trajectory-row-key={trajectoryVirtualRecordKey(record)}
@@ -2504,6 +2510,18 @@ export function TrajectoryTable({
                                     >
                                       {resultText}
                                     </span>
+                                  </span>
+                                )}
+                                {record.cell.shield !== undefined && (
+                                  <span
+                                    className={`${css.shieldBadge} ${record.cell.shield.verdict === 'deny'
+                                      ? css.shieldBlocked
+                                      : record.cell.shield.verdict === 'ask'
+                                        ? css.shieldAsked
+                                        : css.shieldObserved}`}
+                                    data-shield-verdict={record.cell.shield.verdict}
+                                  >
+                                    {shieldBadgeLabel(record.cell.shield.verdict)}
                                   </span>
                                 )}
                               </span>
@@ -2972,6 +2990,32 @@ export function TrajectoryTable({
                       {statusLabel(selectedState)}
                     </dd>
                   </div>
+                  {selected.cell.shield !== undefined && (
+                    <>
+                      <div>
+                        <dt>Verdict</dt>
+                        <dd>{shieldBadgeLabel(selected.cell.shield.verdict)}</dd>
+                      </div>
+                      <div>
+                        <dt>Rule</dt>
+                        <dd>{selected.cell.shield.rule}</dd>
+                      </div>
+                      <div>
+                        <dt>Channel</dt>
+                        <dd>{selected.cell.shield.channel}</dd>
+                      </div>
+                      {selected.cell.shield.host !== undefined && (
+                        <div>
+                          <dt>Host</dt>
+                          <dd>{selected.cell.shield.host}</dd>
+                        </div>
+                      )}
+                      <div>
+                        <dt>sha16</dt>
+                        <dd>{selected.cell.shield.sha16}</dd>
+                      </div>
+                    </>
+                  )}
                   {selected.cell.kind === 'message' && (
                     <TokenRows cell={selected.cell} />
                   )}

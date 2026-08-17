@@ -3,6 +3,7 @@ import type {
   ConversationPromptSnapshot, ConversationViewNode, PartialAssistant,
   RequestPromptChange, RequestView, RunningToolCall, ToolCallBlock,
 } from '@shres-code/shres-code-client-runtime/client'
+import type { ShieldDecision } from '@shres-code/shres-code-shield/types'
 
 /** Request-header facts retained by the Trajectory target. */
 export interface TrajectoryRequestHeaderState {
@@ -48,6 +49,17 @@ export type TrajectoryContribution =
     readonly time: number
     readonly error?: string
   }
+  | {
+    readonly kind: 'shield-decision'
+    readonly decision: ShieldDecision
+    readonly seq: number
+  }
+
+/** One folded Shield verdict attached to an existing Trajectory row. */
+export interface TrajectoryShieldDecision extends ShieldDecision {
+  /** Session-event seq that produced this verdict. */
+  readonly seq: number
+}
 
 /** Target envelope consumed by the Trajectory snapshot builder. */
 export interface TrajectoryConversationViewNode extends ConversationViewNode {
@@ -65,6 +77,7 @@ export interface TrajectorySnapshot {
   readonly callSchemas: ReadonlyMap<string, ConversationPromptSnapshot['tools'][number]>
   readonly partial: PartialAssistant | null
   readonly runningCalls: readonly RunningToolCall[]
+  readonly decisions: readonly TrajectoryShieldDecision[]
 }
 
 declare module '@shres-code/shres-code-client-runtime/client' {

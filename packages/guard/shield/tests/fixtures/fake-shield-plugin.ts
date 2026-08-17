@@ -11,12 +11,34 @@ export const applied: {
   disposed: number
   approvalProbe: ServiceProbe
   jobsProbe: ServiceProbe
+  stats: {
+    cwd: string | null
+    screened: number
+    observed: number
+    asked: number
+    askedGranted: number
+    askedDenied: number
+    blocked: number
+    byChannel: Record<string, never>
+    recent: readonly never[]
+  }
 } = {
   count: 0,
   config: undefined,
   disposed: 0,
   approvalProbe: 'absent',
   jobsProbe: 'absent',
+  stats: {
+    cwd: '/tmp/shield-fixture',
+    screened: 4,
+    observed: 1,
+    asked: 2,
+    askedGranted: 1,
+    askedDenied: 1,
+    blocked: 1,
+    byChannel: {},
+    recent: [],
+  },
 }
 
 /**
@@ -41,12 +63,22 @@ function probe(ctx: unknown, key: 'approval' | 'jobs'): ServiceProbe {
  * @param config - forwarded seat config.
  * @returns a plugin instance whose dispose increments {@link applied.disposed}.
  */
-export async function apply(ctx: unknown, config: unknown): Promise<{ dispose(): Promise<void> }> {
+export async function apply(ctx: unknown, config: unknown): Promise<{
+  dispose(): Promise<void>
+  stats: { snapshot(cwd?: string | null): typeof applied.stats }
+}> {
   applied.count += 1
   applied.config = config
   applied.approvalProbe = probe(ctx, 'approval')
   applied.jobsProbe = probe(ctx, 'jobs')
   return {
+    stats: {
+      snapshot(cwd?: string | null) {
+        return cwd === undefined || cwd === null
+          ? applied.stats
+          : { ...applied.stats, cwd }
+      },
+    },
     dispose: async () => {
       applied.disposed += 1
     },

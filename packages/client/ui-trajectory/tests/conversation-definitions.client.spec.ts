@@ -9,6 +9,7 @@ import { registerTrajectoryCompactionDefinitions } from '../src/client/trajector
 import type { TrajectorySnapshot } from '../src/client/trajectory-contract.ts'
 import { registerTrajectoryMessageDefinitions } from '../src/client/trajectory-message-definitions.ts'
 import { registerTrajectoryRequestHeaderDefinition } from '../src/client/trajectory-request-header-definition.ts'
+import { registerTrajectoryShieldDefinition } from '../src/client/trajectory-shield-definition.ts'
 import { trajectoryViewDefinition } from '../src/client/trajectory-snapshot-builder.ts'
 import { registerTrajectoryToolDefinition } from '../src/client/trajectory-tool-definition.ts'
 
@@ -26,6 +27,7 @@ registerTrajectoryMessageDefinitions(registrationContext)
 registerTrajectoryRequestHeaderDefinition(registrationContext)
 registerTrajectoryAssistantDefinition(registrationContext)
 registerTrajectoryToolDefinition(registrationContext)
+registerTrajectoryShieldDefinition(registrationContext)
 registerTrajectoryCompactionDefinitions(registrationContext)
 
 class TestEventDefinitions {
@@ -283,5 +285,47 @@ describe('Trajectory conversation Definitions', () => {
     expect(current.requests.map(request => request.purpose === 'assistant'
       ? request.promptChange?.kind
       : undefined)).toEqual(['initial', undefined])
+  })
+
+  it('folds shield/decision into decisions and not eventNodes', () => {
+    const current = snapshot(assembler([
+      at(1, 'user/message', {
+        content: [{ type: 'text', text: 'hello' }],
+        source: { kind: 'user' },
+      }, { surfaceOp: 'append' }),
+      at(2, 'shield/decision', {
+        verdict: 'ask',
+        rule: 'sig.input',
+        reasonCode: 'ask-shape',
+        channel: 'user_message',
+        sha16: 'aaaaaaaaaaaaaaaa',
+        turn: 1,
+      }),
+      at(3, 'tool/call', {
+        turn: 1, step: 1, callId: 'c1', name: 'bash', arguments: '{}',
+      }),
+      at(4, 'shield/decision', {
+        verdict: 'deny',
+        rule: 'sig.literal',
+        reasonCode: 'deny-literal',
+        channel: 'tool_result',
+        sha16: 'bbbbbbbbbbbbbbbb',
+        callId: 'c1',
+      }),
+    ]))
+
+    expect(current.decisions).toMatchObject([
+      { verdict: 'ask', turn: 1, seq: 2 },
+      { verdict: 'deny', callId: 'c1', seq: 4 },
+    ])
+    expect(current.eventNodes.some(node => 'verdict' in node)).toBe(false)
+    expect(current.eventNodes.map(node => node.kind)).not.toContain('shield-decision')
+
+    const definition = DEFINITIONS.find(entry => entry.kind === 'trajectory-shield-decision')
+    expect(definition?.match({ type: 'turn/start', data: { turn: 1 } } as never)).toBeNull()
+    expect(() => definition?.start(
+      {} as never,
+      { event: { type: 'turn/start', data: { turn: 1 } } } as never,
+    )).toThrow('trajectory-shield-decision start requires shield/decision')
   })
 })
