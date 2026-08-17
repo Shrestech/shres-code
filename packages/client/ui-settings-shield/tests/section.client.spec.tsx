@@ -73,6 +73,7 @@ function mount(
       loadSnapshot={loadSnapshot}
       useSessions={select => select({ current: currentSessionId ?? undefined } as never)}
       useWorkspaces={() => undefined as never}
+      close={vi.fn()}
     />,
   )
   return { set }
@@ -202,6 +203,7 @@ describe('ShieldSection', () => {
         loadSnapshot={() => deferred.promise}
         useSessions={select => select({ current: 's-test' } as never)}
         useWorkspaces={() => undefined as never}
+        close={vi.fn()}
       />,
     )
     expect(screen.getByText(en.snapshotLoading)).toBeTruthy()
@@ -300,6 +302,7 @@ describe('ShieldSection', () => {
         loadSnapshot={() => deferred.promise}
         useSessions={select => select({ current: 's-test' } as never)}
         useWorkspaces={() => undefined as never}
+        close={vi.fn()}
       />,
     )
     view.unmount()
