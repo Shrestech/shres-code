@@ -375,6 +375,22 @@ describe('shres-shield host seat', () => {
     expect(ctx.shield.snapshot('missing').stats.cwd).toBe('/listed')
   })
 
+  it('returns zeroed stats when SessionId resolution throws', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', '/no/such-shield-module.js')
+    const ctx = await setup({ license: 'paid' }, 'engine-missing')
+    ctx.provide('sessions', {
+      get: () => {
+        throw new Error('malformed session id')
+      },
+      list: () => [{ header: { cwd: '/listed' } }],
+    })
+    expect(ctx.shield.snapshot('!!!')).toEqual({
+      status: { active: false, reason: 'engine-missing' },
+      stats: ShieldSeat.emptyRepoStats(null),
+    })
+  })
+
   it('declares shield/decision as an ignorable session event', () => {
     const session = Session.create(SessionId('shield-decision'))
     const data: ShieldDecision = {

@@ -16,11 +16,14 @@ const trajectoryShieldDefinition: ConversationNodeDefinition<ShieldDecision> = {
     return match.event.data
   },
   update: context => context.state,
-  buildViewNode: context => trajectoryNode(context, context.start.event.seq, {
-    kind: 'shield-decision',
-    decision: context.state,
-    seq: context.start.event.seq,
-  }),
+  buildViewNode: (context) => {
+    if (context.start === undefined || context.state === undefined) return null
+    return trajectoryNode(context, context.start.event.seq, {
+      kind: 'shield-decision',
+      decision: context.state,
+      seq: context.start.event.seq,
+    })
+  },
 }
 
 /**

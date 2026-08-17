@@ -12,7 +12,7 @@ The host seat keeps `ctx.shield` as `ShieldHost`. The paid plugin must not repla
 
 `'shield/decision'` is a `SessionEventMap` member on the seat types face. The body is the W1 decision (`verdict`, `rule`, `reasonCode`, `channel`, `sha16`, optional `host` / `callId` / `origin`) plus optional `turn` / `step` for input-path rows. Writers call `session.append(..., { ignorable: true })`. `SESSION_FORMAT_VERSION` stays `0`.
 
-Settings → Shield stays one page. The existing switch, posture, and license still write the `shres-shield` namespace. The same `ShieldSection` binds `loadSnapshot` and shows this-repo path, four counters, recent findings, and a definition stamp (`—` until the engine reports one).
+Settings → Shield stays one page. The existing switch, posture, and license still write the `shres-shield` namespace. The same `ShieldSection` binds `loadSnapshot` and shows this-repo path, four counters, the top fired rule ids (`byRule`), recent findings, and a definition stamp (`—` until the engine reports one). `ShieldRepoStats` copies `byRule` and `otherRules` from the engine; the seat validator no longer drops the histogram. A throwing `SessionId` / `sessions.get` on the snapshot RPC returns zeroed stats instead of failing the Remote.
 
 Trajectory keeps three lanes named Input / Model / Tools. A matching user, context, tool, or subtool row shows Blocked / Asked / Observed. Inspector Summary adds Verdict / Rule / Channel / Host / sha16. Completed / Pending / Failed stay execution state. Multiple decisions on one row keep the highest severity (`deny` > `ask` > `observe`); later equal severity replaces earlier.
 
@@ -26,10 +26,12 @@ Trajectory keeps three lanes named Input / Model / Tools. A matching user, conte
 
 **Bump `SESSION_FORMAT_VERSION` for `shield/decision`.** Rejected: this is vocabulary growth. `ignorable: true` is the skip contract for older readers.
 
+**Make the seat a runtime dependant of `@shres-shield/plugin` for `RepoStats`.** Rejected: the payload stays out of the harness tarball. The seat keeps its own validators and `import type` is not required while the plugin is a sibling, not a workspace package.
+
 ## Consequences
 
 The Client remotes assembly mounts `shield/snapshot`. The Settings plugin injects `remote.shield` and must not import the Host seat package. Trajectory imports `@shres-code/shres-code-shield/types` so `match(event)` sees the merge. The engine still owns the on-disk stats store and `appendDecision`; this change only types the event, exposes a snapshot RPC, and paints the face.
 
 ## Testing
 
-Package tests cover the snapshot Remote, disable-keeps-counts, pane empty/disabled/loading/unavailable states, and Trajectory attach for one flagged tool, one flagged user, and one unflagged tool. `gen-persistence-catalog` lists `shield/decision` in `KNOWN_SESSION_EVENT_TYPES`.
+Package tests cover the snapshot Remote, disable-keeps-counts, pane empty/disabled/loading/unavailable states, byRule top-N copy, a throwing session-id snapshot, and Trajectory attach for one flagged tool, one flagged user, and one unflagged tool. `gen-persistence-catalog` lists `shield/decision` in `KNOWN_SESSION_EVENT_TYPES`.

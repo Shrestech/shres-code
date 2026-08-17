@@ -31,6 +31,8 @@ function emptyStats(cwd: string | null = null): ShieldSnapshot['stats'] {
     askedDenied: 0,
     blocked: 0,
     byChannel: {},
+    byRule: {},
+    otherRules: { observed: 0, asked: 0, blocked: 0 },
     recent: [],
   }
 }
@@ -69,7 +71,6 @@ function mount(
       useSnapshot={select => select(snap)}
       t={key => en[key]}
       loadSnapshot={loadSnapshot}
-      renderSlot={() => null}
       useSessions={select => select({ current: currentSessionId ?? undefined } as never)}
       useWorkspaces={() => undefined as never}
     />,
@@ -111,7 +112,28 @@ describe('ShieldSection', () => {
       .map(node => node.textContent)
     expect(counts).toEqual(['0', '0', '0', '0'])
     expect(screen.getByText(en.noFindings)).toBeTruthy()
+    expect(screen.getByText(en.noPatterns)).toBeTruthy()
     expect(screen.getByText((_, node) => node?.textContent === `${en.definitions} · —`)).toBeTruthy()
+  })
+
+  it('lists top byRule patterns from the snapshot', async () => {
+    mount(
+      snapshot({}),
+      vi.fn(async () => {}),
+      () => Promise.resolve(consoleSnapshot({
+        stats: {
+          ...emptyStats('/repo'),
+          screened: 4,
+          byRule: {
+            'deny-keylogger': { observed: 0, asked: 0, blocked: 3 },
+            'ask-rm-rf': { observed: 0, asked: 2, blocked: 0 },
+          },
+        },
+      })),
+    )
+    expect(await screen.findByText('deny-keylogger · blocked 3 · asked 0 · observed 0')).toBeTruthy()
+    expect(screen.getByText('ask-rm-rf · blocked 0 · asked 2 · observed 0')).toBeTruthy()
+    expect(screen.getByText(en.patterns)).toBeTruthy()
   })
 
   it('keeps persisted counts visible when Shield is disabled', async () => {
@@ -178,7 +200,6 @@ describe('ShieldSection', () => {
         useSnapshot={select => select(snapshot({}))}
         t={key => en[key]}
         loadSnapshot={() => deferred.promise}
-        renderSlot={() => null}
         useSessions={select => select({ current: 's-test' } as never)}
         useWorkspaces={() => undefined as never}
       />,
@@ -277,7 +298,6 @@ describe('ShieldSection', () => {
         useSnapshot={select => select(snapshot({}))}
         t={key => en[key]}
         loadSnapshot={() => deferred.promise}
-        renderSlot={() => null}
         useSessions={select => select({ current: 's-test' } as never)}
         useWorkspaces={() => undefined as never}
       />,

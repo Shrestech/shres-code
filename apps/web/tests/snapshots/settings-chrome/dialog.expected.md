@@ -4,9 +4,12 @@
     - button "General":
       - img
       - text: General
-    - button "Model":
+    - button "Models":
       - img
-      - text: Model
+      - text: Models
+    - button "Shield":
+      - img
+      - text: Shield
     - button "Plugins":
       - img
       - text: Plugins
@@ -17,7 +20,7 @@
   - button "Close":
     - img
     - text: Close
-  - text: Agent presets  afternew Sessions。Running Sessionsopen when preset。
+  - text: Agent preset Applies to sessions you start from now on. Running sessions keep the preset they began with.
   - button "Standard mode":
     - text: Standard mode
     - img
@@ -26,8 +29,8 @@
     - text: Workspace Write
     - img
   - text: Language
-  - button "Chinese":
-    - text: Chinese
+  - button "English":
+    - text: English
     - img
   - text: Appearance
   - button "Light":

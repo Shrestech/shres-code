@@ -61,6 +61,24 @@ function formatFinding(
   return parts.join(' · ')
 }
 
+const RULE_TOP_N = 5
+
+function topRules(byRule: ShieldSnapshot['stats']['byRule']): Array<{
+  rule: string
+  observed: number
+  asked: number
+  blocked: number
+}> {
+  return Object.entries(byRule)
+    .map(([rule, hist]) => ({ rule, observed: hist.observed, asked: hist.asked, blocked: hist.blocked }))
+    .sort((a, b) => (b.observed + b.asked + b.blocked) - (a.observed + a.asked + a.blocked) || a.rule.localeCompare(b.rule))
+    .slice(0, RULE_TOP_N)
+}
+
+function formatRuleRow(row: { rule: string; observed: number; asked: number; blocked: number }): string {
+  return `${row.rule} · blocked ${row.blocked} · asked ${row.asked} · observed ${row.observed}`
+}
+
 function definitionsStamp(snapshot: ShieldSnapshot): string {
   const definitions = snapshot.definitions
   if (definitions === undefined) return '—'
@@ -240,6 +258,18 @@ export function ShieldSection({
                   {' · '}
                   {definitionsStamp(consoleState.snapshot)}
                 </p>
+                <div className={css.recent}>
+                  <h3 className={css.recentTitle}>{t('patterns')}</h3>
+                  {topRules(consoleState.snapshot.stats.byRule).length === 0 ? (
+                    <p className={css.status}>{t('noPatterns')}</p>
+                  ) : (
+                    <ul className={css.findings}>
+                      {topRules(consoleState.snapshot.stats.byRule).map(row => (
+                        <li key={row.rule}>{formatRuleRow(row)}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
                 <div className={css.recent}>
                   <h3 className={css.recentTitle}>{t('recent')}</h3>
                   {consoleState.snapshot.stats.recent.length === 0 ? (

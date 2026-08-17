@@ -17,13 +17,13 @@ import type {} from 'zod'
 import { resolveShieldEngine } from './resolve.ts'
 import type {
   ShieldCounterSplit, ShieldDefinitions, ShieldEngineSource, ShieldFindingSummary,
-  ShieldReason, ShieldRepoStats, ShieldSnapshot, ShieldStatus,
+  ShieldReason, ShieldRepoStats, ShieldRuleHistogram, ShieldSnapshot, ShieldStatus,
 } from './types.ts'
 
 export type {
   ShieldCounterSplit, ShieldDecision, ShieldDefinitions, ShieldEngine, ShieldEngineApply,
   ShieldEngineSource, ShieldFindingSummary, ShieldInactiveReason, ShieldReason,
-  ShieldRepoStats, ShieldSnapshot, ShieldStatus,
+  ShieldRepoStats, ShieldRuleHistogram, ShieldSnapshot, ShieldStatus,
 } from './types.ts'
 export { repoRootFromSeat, resolveShieldEngine, siblingPluginPath } from './resolve.ts'
 
@@ -90,8 +90,10 @@ const EMPTY_SPLIT: ShieldCounterSplit = {
  * @param cwd - session workspace realpath, or `null` when none is known.
  * @returns a fresh stats object the pane can render.
  */
+const EMPTY_HISTOGRAM: ShieldRuleHistogram = { observed: 0, asked: 0, blocked: 0 }
+
 export function emptyRepoStats(cwd: string | null): ShieldRepoStats {
-  return { cwd, ...EMPTY_SPLIT, byChannel: {}, recent: [] }
+  return { cwd, ...EMPTY_SPLIT, byChannel: {}, byRule: {}, otherRules: EMPTY_HISTOGRAM, recent: [] }
 }
 
 function isCounterSplit(value: unknown): value is ShieldCounterSplit {
@@ -131,17 +133,35 @@ function toFinding(value: unknown): ShieldFindingSummary | undefined {
   }
 }
 
+function toHistogram(value: unknown): ShieldRuleHistogram | undefined {
+  if (value === null || typeof value !== 'object') return undefined
+  const row = value as Record<string, unknown>
+  if (typeof row.observed !== 'number' || typeof row.asked !== 'number' || typeof row.blocked !== 'number') {
+    return undefined
+  }
+  return { observed: row.observed, asked: row.asked, blocked: row.blocked }
+}
+
 function toRepoStats(value: unknown, cwd: string | null): ShieldRepoStats | undefined {
   if (!isCounterSplit(value)) return undefined
   const row = value as ShieldCounterSplit & {
     cwd?: unknown
     byChannel?: unknown
+    byRule?: unknown
+    otherRules?: unknown
     recent?: unknown
   }
   const byChannel: Record<string, ShieldCounterSplit> = {}
   if (row.byChannel !== null && typeof row.byChannel === 'object') {
     for (const [channel, split] of Object.entries(row.byChannel as Record<string, unknown>)) {
       if (isCounterSplit(split)) byChannel[channel] = toCounterSplit(split)
+    }
+  }
+  const byRule: Record<string, ShieldRuleHistogram> = {}
+  if (row.byRule !== null && typeof row.byRule === 'object') {
+    for (const [rule, hist] of Object.entries(row.byRule as Record<string, unknown>)) {
+      const parsed = toHistogram(hist)
+      if (parsed !== undefined) byRule[rule] = parsed
     }
   }
   const recent: ShieldFindingSummary[] = []
@@ -156,6 +176,8 @@ function toRepoStats(value: unknown, cwd: string | null): ShieldRepoStats | unde
     cwd: reported ?? cwd,
     ...toCounterSplit(value),
     byChannel,
+    byRule,
+    otherRules: toHistogram(row.otherRules) ?? EMPTY_HISTOGRAM,
     recent,
   }
 }
@@ -265,26 +287,35 @@ export class ShieldHost extends TypertRemoteService {
    */
   @Remote('snapshot')
   snapshot(sessionId?: string): ShieldSnapshot {
-    const cwd = this.resolveCwd(sessionId)
-    const source = this.payload !== undefined
-      ? this.payload
-      : this.persisted === undefined ? undefined : { stats: { snapshot: this.persisted } }
-    const live = source === undefined ? undefined : readEngineSnapshot(source, cwd)
-    if (live !== undefined) {
-      this.lastStats = live.stats
-      if (live.definitions !== undefined) this.lastDefinitions = live.definitions
-    } else if (cwd !== this.lastStats.cwd) {
-      this.lastStats = { ...this.lastStats, cwd }
-    }
-    return {
-      status: { active: this.status.active, reason: this.status.reason },
-      stats: {
-        ...toCounterSplit(this.lastStats),
-        cwd: this.lastStats.cwd,
-        byChannel: { ...this.lastStats.byChannel },
-        recent: [...this.lastStats.recent],
-      },
-      ...(this.lastDefinitions === undefined ? {} : { definitions: { ...this.lastDefinitions } }),
+    try {
+      const cwd = this.resolveCwd(sessionId)
+      const source = this.payload !== undefined
+        ? this.payload
+        : this.persisted === undefined ? undefined : { stats: { snapshot: this.persisted } }
+      const live = source === undefined ? undefined : readEngineSnapshot(source, cwd)
+      if (live !== undefined) {
+        this.lastStats = live.stats
+        if (live.definitions !== undefined) this.lastDefinitions = live.definitions
+      } else if (cwd !== this.lastStats.cwd) {
+        this.lastStats = { ...this.lastStats, cwd }
+      }
+      return {
+        status: { active: this.status.active, reason: this.status.reason },
+        stats: {
+          ...toCounterSplit(this.lastStats),
+          cwd: this.lastStats.cwd,
+          byChannel: { ...this.lastStats.byChannel },
+          byRule: { ...this.lastStats.byRule },
+          otherRules: { ...this.lastStats.otherRules },
+          recent: [...this.lastStats.recent],
+        },
+        ...(this.lastDefinitions === undefined ? {} : { definitions: { ...this.lastDefinitions } }),
+      }
+    } catch {
+      return {
+        status: { active: this.status.active, reason: this.status.reason },
+        stats: emptyRepoStats(null),
+      }
     }
   }
 

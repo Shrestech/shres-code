@@ -73,12 +73,23 @@ export interface ShieldFindingSummary {
   callId?: string
 }
 
+/** Per-rule observe/ask/block counts shown as the pane's "what kind of pattern" list. */
+export interface ShieldRuleHistogram {
+  observed: number
+  asked: number
+  blocked: number
+}
+
 /** Per-repo counters the Settings pane binds. Stats are not settings. */
 export interface ShieldRepoStats extends ShieldCounterSplit {
   /** Realpath of the session workspace, or `null` when no cwd is known. */
   cwd: string | null
   /** The same six counters split by channel name. */
   byChannel: Readonly<Record<string, ShieldCounterSplit>>
+  /** Histogram of fired rule ids. Overflow past the engine cap lands in `otherRules`. */
+  byRule: Readonly<Record<string, ShieldRuleHistogram>>
+  /** Combined counts for rule ids that did not fit `byRule`. */
+  otherRules: ShieldRuleHistogram
   /** Last 20 decision summaries for this repo. */
   recent: readonly ShieldFindingSummary[]
 }

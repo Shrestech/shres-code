@@ -89,9 +89,13 @@ describe('web e2e: settings modal and General preferences', () => {
     const snapshot = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(DIALOG_EXPECTED, snapshot, MODE)
     // Section switch: aria-current moves (the Models page itself has its own scenario file).
-    await dialog.getByRole('button', { name: 'Model' }).click()
-    await expect.poll(() => dialog.getByRole('button', { name: 'Model' }).getAttribute('aria-current'), { timeout: 5_000 }).toBe('true')
+    await dialog.getByRole('button', { name: 'Models', exact: true }).click()
+    await expect.poll(() => dialog.getByRole('button', { name: 'Models', exact: true }).getAttribute('aria-current'), { timeout: 5_000 }).toBe('true')
     expect(await dialog.getByRole('button', { name: 'General' }).getAttribute('aria-current')).toBeNull()
+    await dialog.getByRole('button', { name: 'Shield', exact: true }).click()
+    await expect.poll(() => dialog.getByRole('button', { name: 'Shield', exact: true }).getAttribute('aria-current'), { timeout: 5_000 }).toBe('true')
+    await dialog.getByRole('heading', { name: 'Shield', exact: true }).waitFor({ timeout: 10_000 })
+    expect(await dialog.getByRole('switch').count()).toBeGreaterThan(0)
     // Plugins is a read-only projection of the same assembled Loader tree.
     // Capture one stable shipped row rather than the whole inventory so adding
     // an unrelated plugin does not rewrite this surface's golden.
@@ -109,7 +113,8 @@ describe('web e2e: settings modal and General preferences', () => {
       .toBe(String(expectedPluginCount))
     expect(await dialog.getByRole('button', { name: 'Plugins', exact: true }).getAttribute('aria-current')).toBe('true')
     expect(await dialog.getByRole('tab', { name: 'Plugin list', exact: true }).getAttribute('aria-selected')).toBe('true')
-    expect(await dialog.getByRole('button', { name: 'Model' }).getAttribute('aria-current')).toBeNull()
+    expect(await dialog.getByRole('button', { name: 'Models', exact: true }).getAttribute('aria-current')).toBeNull()
+    expect(await dialog.getByRole('button', { name: 'Shield', exact: true }).getAttribute('aria-current')).toBeNull()
     const pluginsSnapshot = await captureStableAria(
       page,
       PLUGIN_ROW_SELECTOR,

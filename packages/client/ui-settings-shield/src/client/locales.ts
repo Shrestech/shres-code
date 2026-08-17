@@ -31,6 +31,8 @@ export const en = {
   blocked: 'Blocked',
   observed: 'Observed',
   definitions: 'Definitions',
+  patterns: 'Patterns',
+  noPatterns: 'No pattern counts for this repo',
   recent: 'Recent',
   noFindings: 'No findings for this repo',
   snapshotLoading: 'Loading repo counts…',

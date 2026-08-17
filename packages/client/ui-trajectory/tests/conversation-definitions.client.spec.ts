@@ -327,6 +327,7 @@ describe('Trajectory conversation Definitions', () => {
     expect(() => definition?.start(
       {} as never,
       { event: { type: 'turn/start', data: { turn: 1 } } } as never,
+      {} as never,
     )).toThrow('trajectory-shield-decision start requires shield/decision')
   })
 

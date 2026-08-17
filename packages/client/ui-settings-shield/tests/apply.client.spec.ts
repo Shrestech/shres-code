@@ -18,7 +18,7 @@ async function bench() {
   await ctx.plugin(SlotRegistry).await()
   const locale = new LocaleRuntime(ctx)
   ctx.provide('locale', locale)
-  const snapshot = vi.fn(async () => ({ ok: true as const, value: { status: { active: false, reason: 'engine-missing' as const }, stats: { cwd: null, screened: 0, observed: 0, asked: 0, askedGranted: 0, askedDenied: 0, blocked: 0, byChannel: {}, recent: [] } } }))
+  const snapshot = vi.fn(async () => ({ ok: true as const, value: { status: { active: false, reason: 'engine-missing' as const }, stats: { cwd: null, screened: 0, observed: 0, asked: 0, askedGranted: 0, askedDenied: 0, blocked: 0, byChannel: {}, byRule: {}, otherRules: { observed: 0, asked: 0, blocked: 0 }, recent: [] } } }))
   const remote = new TestRemote(ctx)
   Object.assign(remote, { shield: { snapshot } })
   ctx.provide('remote.shield', { snapshot })

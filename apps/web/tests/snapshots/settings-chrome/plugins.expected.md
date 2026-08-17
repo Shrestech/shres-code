@@ -1,6 +1,6 @@
 - listitem:
-  - button "ui-settings, Mounted, Enabled":
-    - strong: ui-settings
+  - button "code-client-ui-settings, Mounted, Enabled":
+    - strong: code-client-ui-settings
     - img "Mounted"
     - text: Enabled
     - img

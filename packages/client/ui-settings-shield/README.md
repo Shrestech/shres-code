@@ -4,7 +4,7 @@ Browser Settings page for the paid Shres Shield host seat. It registers a `setti
 
 The page leads with an activate/disable switch beside the Shield mark (blue/green while on). It edits `posture` (`observe` / `ask` / `enforce`) immediately and writes `license` only when Apply is pressed. License defaults to `shres-dev` until a paid key exists. `SHRES_SHIELD=off` remains the panic switch and is not a settings field.
 
-Below the switch the same page is the security console: this-repo path, screened / asked / blocked / observed, recent findings, and a definition stamp (`—` until the engine reports one). Those fields come from `ctx.remote.shield.snapshot()`, not from the `shres-shield` settings document. Disable stops new increments and still shows last persisted counts.
+Below the switch the same page is the security console: this-repo path, screened / asked / blocked / observed, the top fired rule ids, recent findings, and a definition stamp (`—` until the engine reports one). Those fields come from `ctx.remote.shield.snapshot()`, not from the `shres-shield` settings document. Disable stops new increments and still shows last persisted counts.
 
 The Host seat (`@shres-code/shres-code-shield`) owns the namespace and remounts the paid payload when these fields change. This package never imports the Host package.
 

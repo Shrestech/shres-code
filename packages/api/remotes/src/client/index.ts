@@ -13,7 +13,7 @@ export type { TypertClientRemote as ClientRemote } from '@shres-code/shres-code-
 export type { PluginInventorySnapshot } from '@shres-code/shres-code-host-plugin-inventory/types'
 export type {
   ShieldCounterSplit, ShieldDefinitions, ShieldFindingSummary, ShieldReason,
-  ShieldRepoStats, ShieldSnapshot, ShieldStatus,
+  ShieldRepoStats, ShieldRuleHistogram, ShieldSnapshot, ShieldStatus,
 } from '@shres-code/shres-code-shield/types'
 export type {} from '@shres-code/shres-code-commands/remote'
 export type {} from '@shres-code/shres-code-goal/remote'
