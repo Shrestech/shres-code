@@ -12,6 +12,7 @@ import { registerTrajectoryRequestHeaderDefinition } from '../src/client/traject
 import { registerTrajectoryShieldDefinition } from '../src/client/trajectory-shield-definition.ts'
 import { trajectoryViewDefinition } from '../src/client/trajectory-snapshot-builder.ts'
 import { registerTrajectoryToolDefinition } from '../src/client/trajectory-tool-definition.ts'
+import { deriveTrajectoryLayout } from '../src/client/layout.ts'
 
 const DEFINITIONS: ConversationNodeDefinition[] = []
 const registrationContext = {
@@ -327,5 +328,54 @@ describe('Trajectory conversation Definitions', () => {
       {} as never,
       { event: { type: 'turn/start', data: { turn: 1 } } } as never,
     )).toThrow('trajectory-shield-decision start requires shield/decision')
+  })
+
+  it('keeps two decisions on the same callId and paints Blocked', () => {
+    const assemble = (): TrajectorySnapshot => snapshot(assembler([
+      at(1, 'user/message', {
+        content: [{ type: 'text', text: 'hello' }],
+        source: { kind: 'user' },
+      }, { surfaceOp: 'append' }),
+      at(2, 'turn/start', { turn: 1 }),
+      at(3, 'step/start', { turn: 1, step: 1 }),
+      at(4, 'tool/call', {
+        turn: 1, step: 1, callId: 'c1', name: 'bash', arguments: '{}',
+      }),
+      at(5, 'tool/call', {
+        turn: 1, step: 1, callId: 'c2', name: 'read', arguments: '{}',
+      }),
+      at(6, 'shield/decision', {
+        verdict: 'ask',
+        rule: 'sig.input',
+        reasonCode: 'ask-shape',
+        channel: 'tool_args',
+        sha16: 'aaaaaaaaaaaaaaaa',
+        callId: 'c1',
+      }),
+      at(7, 'shield/decision', {
+        verdict: 'deny',
+        rule: 'sig.literal',
+        reasonCode: 'deny-literal',
+        channel: 'tool_result',
+        sha16: 'bbbbbbbbbbbbbbbb',
+        callId: 'c1',
+      }),
+    ]))
+
+    expect(assemble).not.toThrow()
+    const current = assemble()
+    expect(current.decisions).toMatchObject([
+      { verdict: 'ask', callId: 'c1', seq: 6 },
+      { verdict: 'deny', callId: 'c1', seq: 7 },
+    ])
+    const cells = deriveTrajectoryLayout({
+      nodes: current.eventNodes,
+      eventLocations: current.eventLocations,
+      partial: null,
+      runningCalls: current.runningCalls,
+      decisions: current.decisions,
+    }).flatMap(turn => turn.groups.flatMap(group => group.cells))
+    expect(cells.find(cell => cell.callId === 'c1')?.shield?.verdict).toBe('deny')
+    expect(cells.find(cell => cell.callId === 'c2')?.shield).toBeUndefined()
   })
 })

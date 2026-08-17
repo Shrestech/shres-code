@@ -619,18 +619,21 @@ function attachShieldDecisions(
  * @param turns - Finalized layout derived with an empty-block partial anchor.
  * @param partial - Current in-flight assistant projection.
  * @param lastIndex - Highest cell index in the finalized layout.
+ * @param decisions - Folded Shield verdicts reattached onto streamed tool cells.
  * @returns The original layout without a partial, otherwise a layout sharing every unaffected turn.
  */
 export function appendTrajectoryPartialLayout(
   turns: readonly TrajectoryTurnModel[],
   partial: ConversationSnapshot['partial'],
   lastIndex: number,
+  decisions: readonly TrajectoryShieldMatch[] = [],
 ): readonly TrajectoryTurnModel[] {
   if (partial === null) return turns
   const partialTurn = deriveTrajectoryLayout({
     nodes: [],
     partial,
     runningCalls: [],
+    decisions,
   }).at(0)
   if (partialTurn === undefined) return turns
   const streamed: TrajectoryTurnModel = {
@@ -658,6 +661,11 @@ export function appendTrajectoryPartialLayout(
     const streamedCallIds = new Set(
       streamedGroup.cells.flatMap(cell => cell.callId === undefined ? [] : [cell.callId]),
     )
+    const previousByCall = new Map(
+      group.cells.flatMap(cell =>
+        cell.callId === undefined || cell.shield === undefined ? [] : [[cell.callId, cell.shield]],
+      ),
+    )
     groups[groupIndex] = {
       ...streamedGroup,
       cells: [
@@ -665,7 +673,11 @@ export function appendTrajectoryPartialLayout(
           cell.requestOnly !== true
           && (cell.callId === undefined || !streamedCallIds.has(cell.callId)),
         ),
-        ...streamedGroup.cells,
+        ...streamedGroup.cells.map((cell) => {
+          if (cell.shield !== undefined || cell.callId === undefined) return cell
+          const previous = previousByCall.get(cell.callId)
+          return previous === undefined ? cell : { ...cell, shield: previous }
+        }),
       ],
     }
   }

@@ -222,6 +222,7 @@ export class ShieldHost extends TypertRemoteService {
   /** Current screening status. */
   readonly status: ShieldStatus
   private payload: unknown
+  private persisted: ((cwd?: string | null) => unknown) | undefined
   private lastStats: ShieldRepoStats
   private lastDefinitions: ShieldDefinitions | undefined
 
@@ -248,6 +249,14 @@ export class ShieldHost extends TypertRemoteService {
   }
 
   /**
+   * Remember a module-level stats reader used when screening is off.
+   * @param reader - `stats.snapshot` from the resolved payload module, or `undefined`.
+   */
+  bindPersistedReader(reader: ((cwd?: string | null) => unknown) | undefined): void {
+    this.persisted = reader
+  }
+
+  /**
    * Per-repo counters for the current session cwd. Disable remounts the payload
    * off but still returns last persisted counts with `status.reason === 'disabled'`.
    * @param sessionId - live session whose `header.cwd` keys the stats; omitted
@@ -257,7 +266,10 @@ export class ShieldHost extends TypertRemoteService {
   @Remote('snapshot')
   snapshot(sessionId?: string): ShieldSnapshot {
     const cwd = this.resolveCwd(sessionId)
-    const live = this.payload === undefined ? undefined : readEngineSnapshot(this.payload, cwd)
+    const source = this.payload !== undefined
+      ? this.payload
+      : this.persisted === undefined ? undefined : { stats: { snapshot: this.persisted } }
+    const live = source === undefined ? undefined : readEngineSnapshot(source, cwd)
     if (live !== undefined) {
       this.lastStats = live.stats
       if (live.definitions !== undefined) this.lastDefinitions = live.definitions
@@ -364,6 +376,9 @@ export function apply(ctx: Context, config: Config): void {
         instance = undefined
         host.bindPayload(undefined)
       }
+      const engine = await resolveShieldEngine()
+      if (stopped) return
+      host.bindPersistedReader(engine?.snapshot)
       if (isPanicDisabled()) {
         setStatus(status, { active: false, reason: 'panic' })
         return
@@ -374,8 +389,6 @@ export function apply(ctx: Context, config: Config): void {
         return
       }
       const license = readLicense(current)
-      const engine = await resolveShieldEngine()
-      if (stopped) return
       if (engine === undefined) {
         setStatus(status, { active: false, reason: 'engine-missing' })
         return

@@ -31,7 +31,7 @@ An unentitled or missing payload keeps the seat loaded and `active: false`. The 
 
 `ShieldHost` on `ctx.shield`. Read `status.active` and `status.reason` (`active` | `panic` | `unlicensed` | `engine-missing` | `disabled`). The brand mark uses `active` to choose the blue-girl / green-shield lockup.
 
-`ctx.shield.snapshot(sessionId?)` is the Host Remote (`shield/snapshot`) for the Settings console. It returns `{ status, stats, definitions? }` for the current session cwd (`realpath(session.header.cwd)` when a live session is known). Counts live in the engine's per-repo store, not `settings.yaml`. Disable remounts the payload off and keeps last persisted counts with `status.reason === 'disabled'`.
+`ctx.shield.snapshot(sessionId?)` is the Host Remote (`shield/snapshot`) for the Settings console. It returns `{ status, stats, definitions? }` for the current session cwd (`realpath(session.header.cwd)` when a live session is known). Counts live in the engine's per-repo store, not `settings.yaml`. Disable and panic remount the payload off and still read module-level `stats.snapshot()` so last persisted counts remain with `status.reason === 'disabled'` or `'panic'`.
 
 The seat declaration-merges `'shield/decision'` onto `SessionEventMap`. The payload is the W1 decision body (`verdict`, `rule`, `reasonCode`, `channel`, `sha16`, optional `host` / `callId` / `origin` / `turn` / `step`). Writers pass `{ ignorable: true }` so older readers resume. `SESSION_FORMAT_VERSION` stays `0`.
 

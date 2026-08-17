@@ -279,15 +279,17 @@ export function TrajectoryView({
     },
   [partialStep, partialTurn, timelinePartialSignature])
   const timelineTurns = useMemo(
-    () => appendTrajectoryPartialLayout(finalized.turns, timelinePartial, finalized.lastIndex),
-    [finalized, timelinePartial],
+    () => appendTrajectoryPartialLayout(
+      finalized.turns, timelinePartial, finalized.lastIndex, inspection.decisions,
+    ),
+    [finalized, timelinePartial, inspection.decisions],
   )
   const timelineMode: TrajectoryTimelineMode = actualDuration
     ? actualTime ? 'actual' : 'duration'
     : actualTime ? 'time' : 'sequence'
   const partialSearchTurns = useMemo(
-    () => appendTrajectoryPartialLayout([], partial, finalized.lastIndex),
-    [finalized.lastIndex, partial],
+    () => appendTrajectoryPartialLayout([], partial, finalized.lastIndex, inspection.decisions),
+    [finalized.lastIndex, partial, inspection.decisions],
   )
   const searchLayouts = useMemo(
     () => [finalized.turns, partialSearchTurns] as const,

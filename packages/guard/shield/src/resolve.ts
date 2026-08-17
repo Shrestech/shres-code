@@ -32,14 +32,31 @@ function asApply(mod: unknown): ShieldEngineApply | undefined {
   return typeof apply === 'function' ? apply as ShieldEngineApply : undefined
 }
 
-async function importSpecifier(specifier: string): Promise<ShieldEngineApply | undefined> {
+function asSnapshot(mod: unknown): ((cwd?: string | null) => unknown) | undefined {
+  if (mod === null || typeof mod !== 'object') return undefined
+  const stats = (mod as { stats?: { snapshot?: unknown } }).stats
+  if (stats !== undefined && typeof stats.snapshot === 'function') {
+    return (cwd?: string | null) => (stats.snapshot as (cwd?: string | null) => unknown)(cwd)
+  }
+  const snapshot = (mod as { snapshot?: unknown }).snapshot
+  return typeof snapshot === 'function' ? snapshot as (cwd?: string | null) => unknown : undefined
+}
+
+function toEngine(source: ShieldEngine['source'], mod: unknown): ShieldEngine | undefined {
+  const apply = asApply(mod)
+  if (apply === undefined) return undefined
+  const snapshot = asSnapshot(mod)
+  return snapshot === undefined ? { source, apply } : { source, apply, snapshot }
+}
+
+async function importSpecifier(specifier: string): Promise<unknown> {
   try {
     const href = specifier.startsWith('file:')
       ? specifier
       : isAbsolute(specifier) || specifier.startsWith('.')
         ? pathToFileURL(resolve(specifier)).href
         : specifier
-    return asApply(await import(href))
+    return await import(href)
   } catch {
     return undefined
   }
@@ -53,17 +70,14 @@ async function importSpecifier(specifier: string): Promise<ShieldEngineApply | u
 export async function resolveShieldEngine(): Promise<ShieldEngine | undefined> {
   const fromEnv = process.env.SHRES_SHIELD_MODULE
   if (fromEnv !== undefined && fromEnv.length > 0) {
-    const apply = await importSpecifier(fromEnv)
-    return apply === undefined ? undefined : { source: 'env', apply }
+    return toEngine('env', await importSpecifier(fromEnv))
   }
 
   const sibling = siblingPluginPath()
   if (existsSync(sibling)) {
-    const apply = await importSpecifier(sibling)
-    if (apply !== undefined) return { source: 'sibling', apply }
+    const engine = toEngine('sibling', await importSpecifier(sibling))
+    if (engine !== undefined) return engine
   }
 
-  const fromPackage = await importSpecifier('@shres-shield/plugin')
-  if (fromPackage !== undefined) return { source: 'package', apply: fromPackage }
-  return undefined
+  return toEngine('package', await importSpecifier('@shres-shield/plugin'))
 }

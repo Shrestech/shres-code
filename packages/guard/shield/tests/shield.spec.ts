@@ -120,6 +120,7 @@ describe('shres-shield host seat', () => {
     const ctx = await setup({ enabled: false, license: 'paid' }, 'disabled')
     expect(ctx.shield.status).toEqual({ active: false, reason: 'disabled' })
     expect(applied.count).toBe(0)
+    expect(ctx.shield.snapshot().stats.screened).toBe(4)
   })
 
   it('stays inactive and does not apply the engine when SHRES_SHIELD=off', async () => {
@@ -128,6 +129,18 @@ describe('shres-shield host seat', () => {
     const ctx = await setup({ license: 'paid' }, 'panic')
     expect(ctx.shield.status).toEqual({ active: false, reason: 'panic' })
     expect(applied.count).toBe(0)
+    expect(ctx.shield.snapshot().stats.screened).toBe(4)
+  })
+
+  it('returns persisted counts on a never-applied disabled seat', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', fixtureUrl)
+    const ctx = await setup({ enabled: false, license: 'paid' }, 'disabled')
+    expect(applied.count).toBe(0)
+    expect(ctx.shield.snapshot()).toMatchObject({
+      status: { active: false, reason: 'disabled' },
+      stats: { screened: 4, asked: 2, blocked: 1, observed: 1 },
+    })
   })
 
   it('reports engine-missing when no payload resolves', async () => {

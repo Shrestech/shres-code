@@ -298,6 +298,44 @@ describe('deriveTrajectoryLayout', () => {
     expect(cells.filter(cell => cell.callId === 'c1')).toHaveLength(1)
   })
 
+  it('keeps a deny badge on a streamed running tool cell', () => {
+    const decision = {
+      verdict: 'deny' as const,
+      rule: 'sig.literal',
+      channel: 'tool_args',
+      sha16: 'bbbbbbbbbbbbbbbb',
+      callId: 'c1',
+    }
+    const partial = {
+      turn: 1,
+      step: 1,
+      blocks: [{
+        kind: 'tool-call' as const,
+        callId: 'c1',
+        name: 'bash',
+        argsRaw: '{}',
+      }],
+    }
+    const base = deriveTrajectoryLayout({
+      nodes: [],
+      partial: { ...partial, blocks: [] },
+      runningCalls: [{
+        callId: 'c1', name: 'bash', argsRaw: '{}',
+        turn: 1, step: 1, time: 9_000, callView: null, subCalls: [],
+      }],
+      decisions: [decision],
+    })
+    expect(base[0]?.groups.flatMap(group => group.cells)
+      .find(cell => cell.callId === 'c1')?.shield?.verdict).toBe('deny')
+
+    const streamed = appendTrajectoryPartialLayout(base, partial, 1, [decision])
+    expect(streamed[0]?.groups.flatMap(group => group.cells)
+      .find(cell => cell.callId === 'c1')?.shield?.verdict).toBe('deny')
+    const copied = appendTrajectoryPartialLayout(base, partial, 1)
+    expect(copied[0]?.groups.flatMap(group => group.cells)
+      .find(cell => cell.callId === 'c1')?.shield?.verdict).toBe('deny')
+  })
+
   it('omits duration when node times are missing instead of rendering NaN', () => {
     const nodes = [
       { kind: 'user', seq: 1, content: [{ type: 'text', text: 'hi' }], source: null },

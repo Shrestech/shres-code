@@ -7,7 +7,7 @@ const trajectoryShieldDefinition: ConversationNodeDefinition<ShieldDecision> = {
   kind: 'trajectory-shield-decision',
   target: 'trajectory',
   match: event => event.type === 'shield/decision'
-    ? { id: event.data.callId ?? String(event.seq), role: 'start' }
+    ? { id: String(event.seq), role: 'start' }
     : null,
   start: (_context, match) => {
     if (match.event.type !== 'shield/decision') {

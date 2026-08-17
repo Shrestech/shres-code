@@ -41,8 +41,8 @@ export function apply(ctx: ClientContext): void {
   const t = ctx.locale.bind(NS) as ShieldSectionInjected['t']
   const scope = ctx.settingsScope.bind<ShieldSettings>({ namespace: SHIELD_SETTINGS_NAMESPACE })
   const useSnapshot = bindSnapshotSelector(scope)
-  const loadSnapshot: ShieldSectionInjected['loadSnapshot'] = async () => {
-    const result = await ctx.remote.shield.snapshot()
+  const loadSnapshot: ShieldSectionInjected['loadSnapshot'] = async (sessionId) => {
+    const result = await ctx.remote.shield.snapshot(sessionId)
     if (!result.ok) {
       throw new Error(`shield.snapshot failed: ${result.error.code}: ${result.error.message}`)
     }

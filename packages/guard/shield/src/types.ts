@@ -32,6 +32,11 @@ export interface ShieldEngineApply {
 export interface ShieldEngine {
   readonly source: ShieldEngineSource
   readonly apply: ShieldEngineApply
+  /**
+   * Module-level stats reader used when screening is off. `apply` is not
+   * invoked; the engine must not register seams for this read.
+   */
+  readonly snapshot?: (cwd?: string | null) => unknown
 }
 
 /** One counter split used both at repo scope and per channel. */

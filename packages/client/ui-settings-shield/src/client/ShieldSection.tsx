@@ -30,7 +30,7 @@ export interface ShieldSectionInjected {
   /** Section copy. */
   t: (key: keyof typeof en) => string
   /** Read-only per-repo console payload. Not a settings field. */
-  loadSnapshot: () => Promise<ShieldSnapshot>
+  loadSnapshot: (sessionId?: string) => Promise<ShieldSnapshot>
 }
 
 /** Full component props. */
@@ -63,7 +63,8 @@ function formatFinding(
 
 function definitionsStamp(snapshot: ShieldSnapshot): string {
   const definitions = snapshot.definitions
-  if (definitions === undefined || definitions.updatedAt === null) return '—'
+  if (definitions === undefined) return '—'
+  if (definitions.updatedAt === null) return `${definitions.version} · —`
   return `${definitions.version} · ${new Date(definitions.updatedAt).toISOString()}`
 }
 
@@ -73,9 +74,10 @@ function definitionsStamp(snapshot: ShieldSnapshot): string {
  * @returns the section.
  */
 export function ShieldSection({
-  scope, useSnapshot, t, loadSnapshot,
+  scope, useSnapshot, t, loadSnapshot, useSessions,
 }: ShieldSectionProps): ReactNode {
   const settings = useSnapshot(current => current)
+  const currentSessionId = useSessions(state => state.current)
   const [licenseDraft, setLicenseDraft] = useState('')
   const [saving, setSaving] = useState(false)
   const [request, setRequest] = useState(0)
@@ -87,12 +89,12 @@ export function ShieldSection({
   useEffect(() => {
     let current = true
     setConsoleState({ status: 'loading' })
-    void Promise.resolve().then(() => loadSnapshot()).then(
+    void Promise.resolve().then(() => loadSnapshot(currentSessionId)).then(
       (snapshot) => { if (current) setConsoleState({ status: 'ready', snapshot }) },
       () => { if (current) setConsoleState({ status: 'error' }) },
     )
     return () => { current = false }
-  }, [loadSnapshot, request])
+  }, [loadSnapshot, currentSessionId, request])
 
   const bothMissing = settings.status === 'unavailable' && consoleState.status === 'error'
   const formDisabled = settings.status !== 'ready' || !settings.writable || saving
@@ -213,7 +215,7 @@ export function ShieldSection({
                 <p className={css.repoPath}>
                   {t('console')}
                   {' · '}
-                  {consoleState.snapshot.stats.cwd ?? '—'}
+                  {currentSessionId === undefined ? '—' : consoleState.snapshot.stats.cwd ?? '—'}
                 </p>
                 <dl className={css.counters}>
                   <div>

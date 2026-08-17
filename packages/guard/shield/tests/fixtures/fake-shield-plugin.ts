@@ -58,6 +58,22 @@ function probe(ctx: unknown, key: 'approval' | 'jobs'): ServiceProbe {
 }
 
 /**
+ * Module-level stats reader. The seat uses this when screening is off so
+ * disable/panic can show persisted counts without calling {@link apply}.
+ */
+export const stats = {
+  /**
+   * @param cwd - session workspace used as the stats key.
+   * @returns the fixture counters, rebound to `cwd` when one is supplied.
+   */
+  snapshot(cwd?: string | null): typeof applied.stats {
+    return cwd === undefined || cwd === null
+      ? applied.stats
+      : { ...applied.stats, cwd }
+  },
+}
+
+/**
  * Record apply and return a disposer the seat must register.
  * @param ctx - host context the seat forwards into the paid payload.
  * @param config - forwarded seat config.
@@ -65,20 +81,14 @@ function probe(ctx: unknown, key: 'approval' | 'jobs'): ServiceProbe {
  */
 export async function apply(ctx: unknown, config: unknown): Promise<{
   dispose(): Promise<void>
-  stats: { snapshot(cwd?: string | null): typeof applied.stats }
+  stats: typeof stats
 }> {
   applied.count += 1
   applied.config = config
   applied.approvalProbe = probe(ctx, 'approval')
   applied.jobsProbe = probe(ctx, 'jobs')
   return {
-    stats: {
-      snapshot(cwd?: string | null) {
-        return cwd === undefined || cwd === null
-          ? applied.stats
-          : { ...applied.stats, cwd }
-      },
-    },
+    stats,
     dispose: async () => {
       applied.disposed += 1
     },

@@ -54,7 +54,8 @@ async function readyConsole(cwd = '/repo'): Promise<void> {
 function mount(
   snap: SettingsScopeSnapshot<ShieldSettings>,
   set = vi.fn(async () => {}),
-  loadSnapshot: () => Promise<ShieldSnapshot> = () => Promise.resolve(consoleSnapshot()),
+  loadSnapshot: (sessionId?: string) => Promise<ShieldSnapshot> = () => Promise.resolve(consoleSnapshot()),
+  currentSessionId: string | null = 's-test',
 ) {
   const scope = {
     getSnapshot: () => snap,
@@ -69,7 +70,7 @@ function mount(
       t={key => en[key]}
       loadSnapshot={loadSnapshot}
       renderSlot={() => null}
-      useSessions={() => undefined as never}
+      useSessions={select => select({ current: currentSessionId ?? undefined } as never)}
       useWorkspaces={() => undefined as never}
     />,
   )
@@ -178,7 +179,7 @@ describe('ShieldSection', () => {
         t={key => en[key]}
         loadSnapshot={() => deferred.promise}
         renderSlot={() => null}
-        useSessions={() => undefined as never}
+        useSessions={select => select({ current: 's-test' } as never)}
         useWorkspaces={() => undefined as never}
       />,
     )
@@ -207,6 +208,26 @@ describe('ShieldSection', () => {
     })))
     expect(await screen.findByText(/Blocked · tool_result · sig.literal · example.com/)).toBeTruthy()
     expect(screen.getByText((_, node) => node?.textContent === `${en.definitions} · v12 · ${new Date(1_700_000_100_000).toISOString()}`)).toBeTruthy()
+  })
+
+  it('shows the definition version when updatedAt is null', async () => {
+    mount(snapshot({}), vi.fn(async () => {}), () => Promise.resolve(consoleSnapshot({
+      definitions: { version: 'v12', updatedAt: null, stale: true },
+    })))
+    expect(await screen.findByText((_, node) => node?.textContent === `${en.definitions} · v12 · —`)).toBeTruthy()
+  })
+
+  it('passes the current session id to snapshot and hides a foreign cwd without one', async () => {
+    const loadSnapshot = vi.fn((sessionId?: string) => Promise.resolve(consoleSnapshot({
+      stats: emptyStats(sessionId === undefined ? '/other' : '/repo'),
+    })))
+    mount(snapshot({}), vi.fn(async () => {}), loadSnapshot, 's-current')
+    await readyConsole('/repo')
+    expect(loadSnapshot).toHaveBeenCalledWith('s-current')
+    cleanup()
+    mount(snapshot({}), vi.fn(async () => {}), loadSnapshot, null)
+    expect(await screen.findByText((_, node) => node?.textContent === repoLabel('—'))).toBeTruthy()
+    expect(loadSnapshot).toHaveBeenLastCalledWith(undefined)
   })
 
   it('lists an asked finding and a stored license placeholder', async () => {
@@ -257,7 +278,7 @@ describe('ShieldSection', () => {
         t={key => en[key]}
         loadSnapshot={() => deferred.promise}
         renderSlot={() => null}
-        useSessions={() => undefined as never}
+        useSessions={select => select({ current: 's-test' } as never)}
         useWorkspaces={() => undefined as never}
       />,
     )
