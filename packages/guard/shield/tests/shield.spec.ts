@@ -4,7 +4,7 @@
  */
 
 import { afterEach, describe, expect, it } from 'vitest'
-import { Context } from '@shres-code/cordis'
+import { Context, FiberState } from '@shres-code/cordis'
 import SystemPrompt from '@shres-code/shres-code-system-prompt'
 import ToolRuntime from '@shres-code/shres-code-tools'
 import * as ShieldSeat from '@shres-code/shres-code-shield'
@@ -55,29 +55,60 @@ async function waitForReason(ctx: Context, reason: ShieldSeat.ShieldReason): Pro
   throw new Error(`shield status stayed ${JSON.stringify(ctx.shield.status)}, wanted ${reason}`)
 }
 
-/** Mount prompt + tools + the seat and wait for resolve to settle. */
+/**
+ * Mount `approval` and `jobs` as sibling plugins, matching product Loader
+ * topology. Root `ctx.provide` would make an uninjected seat read succeed.
+ */
+async function provideApprovalAndJobs(ctx: Context): Promise<void> {
+  await ctx.plugin({
+    name: 'approval-stub',
+    apply: (c: Context) => {
+      c.provide('approval', { request: async () => 'unavailable' })
+    },
+  })
+  await ctx.plugin({
+    name: 'jobs-stub',
+    apply: (c: Context) => {
+      c.provide('jobs', { enqueue: () => undefined })
+    },
+  })
+}
+
+/** Mount prompt + tools + sibling approval/jobs + the seat and wait for resolve. */
 async function setup(config: ShieldSeat.Config = {}, reason?: ShieldSeat.ShieldReason): Promise<Context> {
   const ctx = new Context()
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
-  ctx.provide('approval', { request: async () => 'unavailable' })
-  ctx.provide('jobs', { enqueue: () => undefined })
+  await provideApprovalAndJobs(ctx)
   await ctx.plugin(ShieldSeat, config)
   if (reason !== undefined) await waitForReason(ctx, reason)
   return ctx
 }
 
 describe('shres-shield host seat', () => {
-  it('lists approval and jobs so the adapter can probe them when present', async () => {
+  it('lists approval and jobs so sibling services are readable from the seat ctx', async () => {
     expect(ShieldSeat.inject).toEqual(['systemPrompt', 'tools', 'approval', 'jobs'])
     setEnv('SHRES_SHIELD', undefined)
     setEnv('SHRES_SHIELD_MODULE', fixtureUrl)
     const ctx = await setup({ license: 'paid' }, 'active')
     expect(ctx.shield.status.active).toBe(true)
-    expect(() => (ctx as { approval: unknown }).approval).not.toThrow()
-    expect(() => (ctx as { jobs: unknown }).jobs).not.toThrow()
     expect(applied.approvalProbe).toBe('ok')
     expect(applied.jobsProbe).toBe('ok')
+  })
+
+  it('stays pending and does not apply the engine without sibling approval and jobs', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', fixtureUrl)
+    const ctx = new Context()
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRuntime)
+    // Do not await: a forever-PENDING fiber's thenable does not settle.
+    const fiber = ctx.plugin(ShieldSeat, { license: 'paid' })
+    await Promise.resolve()
+    expect(fiber.state).toBe(FiberState.PENDING)
+    expect(applied.count).toBe(0)
+    expect(ctx.get('shield')).toBeUndefined()
+    await fiber.dispose()
   })
 
   it('unloads the engine when the user switch is off', async () => {
