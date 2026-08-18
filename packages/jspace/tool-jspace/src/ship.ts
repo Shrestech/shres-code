@@ -22,7 +22,10 @@ function latestCheckpointSeq(events: readonly SessionEvent[]): number | undefine
       continue
     }
     if (event.type !== 'jspace/card') continue
-    const { length } = event.data.checked
+    const checked = event.data?.checked
+    // Skip an unreadable payload so the last well-formed length stays the baseline.
+    if (!Array.isArray(checked)) continue
+    const length = checked.length
     if (length > previous) last = event.seq
     previous = length
   }

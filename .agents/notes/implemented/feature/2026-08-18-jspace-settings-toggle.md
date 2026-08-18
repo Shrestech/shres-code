@@ -4,7 +4,7 @@ Status: implemented
 
 ## Problem
 
-A third-party skill named J-Space asks the model to keep a working ledger, classify work into `fast` / `full` / `loop`, and verify before shipping. That protocol lives in `SKILL.md`. It disappears when the user does not invoke `/j-space`, when compaction drops the middle of the session, or when the model stops obeying the ritual. Independent A/B runs of that skill on DeepSeek V4-Flash showed no completion gain and a large input-token tax.
+A third-party skill named J-Space asks the model to keep a working ledger, classify work into `fast` / `full` / `loop`, and verify before shipping. That protocol lives in `SKILL.md`. It disappears when the user does not invoke `/j-space`, when compaction drops the middle of the session, or when the model stops obeying the ritual. This harness has not measured that skill's completion or token cost; the W0 measurement arm is the instrument that settles it.
 
 This harness already keeps durable task state, but the model is not forced to see it. [`ctx.goals`](../../../../packages/goal/goal/README.md) persists one objective and [does not inject it into the prompt](../architecture/2026-07-31-goal-owned-durable-events.md). [`todo_write`](../../../../packages/todo/tool-todo/README.md) is a standing plan that [clears on the next `turn/start`](2026-07-28-todo-plan-clears-on-next-turn.md). Plan mode is soft guidance. None of these remount when a user flips a Settings switch the way [Shres Shield](../../../../packages/guard/shield/README.md) remounts its engine.
 
@@ -135,7 +135,7 @@ New group `packages/jspace/` (the existing [`workspace/`](../../../../packages/w
 
 **Sibling repo + seat, like Shield.** Rejected for v1. Shield’s payload is a paid detection engine that must not live in this tree. A working card is model-visible session state and belongs in the session log here. Extract a payload later only if the control protocol versions independently of the harness.
 
-**Default `enabled: true` and `mode: always-open`.** Rejected because that reprints a card on every chat, including one-step questions. That is the independent A/B cost. Security screening defaults on; a working card does not.
+**Default `enabled: true` and `mode: always-open`.** Rejected because that reprints a card on every chat, including one-step questions, and taxes tokens. Security screening defaults on; a working card does not.
 
 **Replace todo and GoalBar in the first ship.** Rejected because those surfaces have shipped projections, snapshots, and a documented turn-boundary lifetime. The card ships beside them.
 
@@ -161,7 +161,7 @@ Host package specs cover remount, fold/fault, fork-copy, coverage matching (word
 
 ## Deferred
 
-- **W0 measurement** (owner-gated): productivity arm and poisoning chain on the `test_break` rig. The only evidence behind this note is an A/B of the third-party skill.
+- **W0 measurement** (owner-gated): productivity arm and poisoning chain on the `test_break` rig. The third-party skill's completion and token cost are unmeasured here.
 - **Shield voice registration:** `jspace:card` is not yet in the shield repo's authority-spoof set.
 - **Identical tool-call retry with diagnosis** when a card is open (`tools/pre-execute` consumer).
 - **Unify GoalBar and the todo strip** into this card and change todo’s turn-boundary lifetime. The [todo clearance note](2026-07-28-todo-plan-clears-on-next-turn.md) remains in force.

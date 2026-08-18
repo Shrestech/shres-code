@@ -2,7 +2,7 @@
 
 Consumer that reprints the J-Space card as the `jspace:card` system-prompt section and mounts the protocol the current pass earns. The card text is derived from the session fold on every assembly, so compaction and resume do not drop it.
 
-When the seat is inactive every J-Space section is empty. When the seat is active and no card is open, `jspace:card` is the availability line. The gate classifies `fast` / `full` / `loop` from the last human message, whether a card is open, and Settings `mode`. `fast` loads no protocol. `full` loads the protocol block plus capacity. `loop` also loads broadcast and opens a card when none exists. `mode: always-open` is always `loop`.
+When the seat is inactive every J-Space section is empty. When the seat is active and no card is open, `jspace:card` is the availability line. The gate classifies `fast` / `full` / `loop` from the last human message, whether a card is open, and Settings `mode`. `fast` loads no protocol. `full` loads the protocol block plus capacity. `loop` also loads broadcast and opens a card when none exists, unless the session already has a native close. `mode: always-open` is always `loop`.
 
 Protocol copy is a first-party rewrite of Tiger3807861189 J-Space Cognition Suite V3.6 (Apache-2.0, DOI 10.5281/zenodo.21971181). It is not their `SKILL.md` and does not implement a Jacobian lens.
 

@@ -98,6 +98,19 @@ describe('jspace-prompt', () => {
       .toContain('Goal:      J-Space is on')
   })
 
+  it('does not auto-open after an explicit close', async () => {
+    const ctx = await harness({ enabled: true, mode: 'always-open' })
+    const agent = liveAgent(ctx, 'ws-prompt-stay-closed')
+    ctx.jspace.open(agent.session, { goal: 'Ship W2', next: 'Write tests' })
+    ctx.jspace.close(agent.session)
+    await ctx.systemPrompt.assemble({ agent, scope: agent, messages: [
+      createUserMessage({ content: [{ type: 'text', text: 'refactor this across every file' }], source: { kind: 'user' } }),
+    ] })
+    expect(ctx.jspace.card(agent.session)).toBeNull()
+    ctx.jspace.open(agent.session, { goal: 'Ship W2', next: 'Write tests' })
+    expect(ctx.jspace.card(agent.session)?.goal).toBe('Ship W2')
+  })
+
   it('does not auto-open when the seat is off', async () => {
     const ctx = await harness({ enabled: false, mode: 'always-open' })
     const agent = liveAgent(ctx, 'ws-prompt-off')
