@@ -172,9 +172,9 @@ describe('shres-tool-subagent-control/list-agents', () => {
       { kind: 'diagnostic', id: SessionId('broken-child'), reason: 'corrupt' },
     ]
     ctx.subagents.listChildren = () => Promise.resolve(entries)
-    const agents = new Map<string, { status: 'running' | 'idle' }>([
-      ['running-child', { status: 'running' }],
-      ['waiting-child', { status: 'idle' }],
+    const agents = new Map<string, { status: 'running' | 'idle'; session: { requestHeader: () => undefined } }>([
+      ['running-child', { status: 'running', session: { requestHeader: () => undefined } }],
+      ['waiting-child', { status: 'idle', session: { requestHeader: () => undefined } }],
     ])
     vi.spyOn(ctx.agents, 'get').mockImplementation(id => agents.get(id) as never)
     const result = await callTool(ctx, 'list_agents', {}, parent)
@@ -294,8 +294,8 @@ describe('shres-tool-subagent-control/list-agents', () => {
     const result = await callTool(ctx, 'list_agents', { scope: 'descendants' }, parent)
     expect(result.isError).toBe(false)
     expect(text(result)).toBe(
-      `${started.childId} [idle] parent=${parent.id} depth=1 — waiting branch\n`
-      + `${grandchild.childId} [running] parent=${started.childId} depth=2 — nested leaf`,
+      `${started.childId} [idle] (mock/mock) parent=${parent.id} depth=1 — waiting branch\n`
+      + `${grandchild.childId} [running] (mock/mock) parent=${started.childId} depth=2 — nested leaf`,
     )
 
     releaseGrandchild.resolve(undefined)

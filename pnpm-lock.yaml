@@ -7526,6 +7526,9 @@ importers:
       '@shres-code/shres-code-agent':
         specifier: workspace:^
         version: link:../../core/agent
+      '@shres-code/shres-code-agent-default-model':
+        specifier: workspace:^
+        version: link:../../core/agent-default-model
       '@shres-code/shres-code-agent-presets':
         specifier: workspace:^
         version: link:../../preset/agent-presets

@@ -33,6 +33,10 @@ type ListAgentsEntry =
     readonly id: SessionId
     readonly label: string
     readonly status: 'running' | 'idle' | 'ready'
+    /** Provider route from the child's logged request header, when it has one. */
+    readonly provider?: string
+    /** Model route from the child's logged request header, when it has one. */
+    readonly model?: string
     readonly parent?: SessionId
     readonly depth?: number
   }
@@ -75,11 +79,14 @@ function project(
   // One-shot children cannot be continued by send_message, so the model
   // never selects them; discovery still traversed them for descendants.
   if (entry.mode !== 'continuable') return undefined
+  const agent = agents.get(entry.id)
+  const logged = agent === undefined ? undefined : agent.session.requestHeader()?.config
   return {
     kind: 'child',
     id: entry.id,
     label: entry.label,
     status: statusOf(agents, entry.id),
+    ...logged === undefined ? {} : { provider: logged.provider, model: logged.model },
     ...at,
   }
 }
@@ -123,6 +130,8 @@ export function apply(ctx: Context): void {
                 id: { type: 'string', required: true },
                 label: { type: 'string', required: true },
                 status: { type: 'string', required: true, enum: ['running', 'idle', 'ready'] },
+                provider: { type: 'string' },
+                model: { type: 'string' },
                 parent: { type: 'string' },
                 depth: { type: 'number' },
               },
@@ -154,8 +163,13 @@ export function apply(ctx: Context): void {
               const at = request.scope === 'descendants'
                 ? ` parent=${String(entry.parent)} depth=${String(entry.depth)}`
                 : ''
+              // Spawn telemetry from the child's logged request header; a
+              // storage-only child that never made a request has none yet.
+              const route = entry.kind === 'child' && entry.provider !== undefined
+                ? ` (${entry.provider}${entry.model === undefined ? '' : `/${entry.model}`})`
+                : ''
               return entry.kind === 'child'
-                ? `${entry.id} [${entry.status}]${at} — ${entry.label}`
+                ? `${entry.id} [${entry.status}]${route}${at} — ${entry.label}`
                 : `${entry.id} [diagnostic: ${entry.reason}]${at}`
             }).join('\n'),
         }]

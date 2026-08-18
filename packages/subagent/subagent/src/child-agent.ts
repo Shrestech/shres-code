@@ -25,6 +25,14 @@ import type {} from '@shres-code/shres-code-user-approval'
 // keeps its model-facing rows on the host plane, where the child already sees
 // them through the tool registry's global layer.
 import type {} from '@shres-code/shres-code-agent-presets'
+// Type-only: make `ctx.get('agentDefaultModel')` resolve to the default-model
+// service when composed — child route inheritance reads the parent's EFFECTIVE
+// model (logged request header, else the live default) instead of the parent's
+// creation-time AgentOptions, so a parent that switched models does not
+// silently misroute every later child onto its original route. Opportunistic
+// (the documented `ctx.get` pattern), never a hard dep; the read is
+// non-installing, so it never attaches selection listeners to the parent.
+import type {} from '@shres-code/shres-code-agent-default-model'
 import { delegationDepthOf } from './depth.ts'
 
 /** Thrown when starting a child would exceed the requested depth cap. */
@@ -57,9 +65,56 @@ export function resolveChildDepth(parent: Agent, maxDepth: number | undefined): 
 }
 
 /**
- * Resolve the child's `AgentOptions`: the parent's provider/model/maxTokens
- * route unless the request overrides it, stamped with the child's own
- * delegation depth.
+ * The parent's effective provider/model route, read without side effects: the
+ * parent's logged request header (what its requests actually run), else the
+ * live default-model selection when that service is composed, else the
+ * parent's creation-time options. A parent that switched models in-process
+ * but has not yet made a request since is read through its last header — the
+ * same approximation any log-derived observer sees.
+ * @param parent - the delegating parent.
+ * @returns the inherited route fields that are known.
+ */
+function inheritedRoute(parent: Agent): { provider?: string; model?: string } {
+  const logged = parent.session.requestHeader()?.config
+  if (logged !== undefined) {
+    return { provider: logged.provider, model: logged.model }
+  }
+  const defaults = parent.ctx.get('agentDefaultModel')
+  if (defaults !== undefined) {
+    const picked = defaults.currentSelection()
+    return { provider: picked.provider, model: picked.model }
+  }
+  return {
+    ...parent.options.provider !== undefined ? { provider: parent.options.provider } : {},
+    ...parent.options.model !== undefined ? { model: parent.options.model } : {},
+  }
+}
+
+/**
+ * The provider/model route a child of this parent would run: the parent's
+ * effective route with any per-child request overrides applied. Option
+ * resolution and the model-facing spawn telemetry both read this, so the
+ * logged route and the run route cannot drift.
+ * @param parent - the delegating parent whose route the child inherits.
+ * @param requested - per-child overrides, if any.
+ * @returns the resolved route fields that are known.
+ */
+export function effectiveChildRoute(
+  parent: Agent,
+  requested: AgentOptions | undefined,
+): { provider?: string; model?: string } {
+  return {
+    ...inheritedRoute(parent),
+    ...requested?.provider !== undefined ? { provider: requested.provider } : {},
+    ...requested?.model !== undefined ? { model: requested.model } : {},
+  }
+}
+
+/**
+ * Resolve the child's `AgentOptions`: the parent's effective provider/model
+ * route (logged header, else live default, else creation options) and the
+ * parent's maxTokens unless the request overrides them, stamped with the
+ * child's own delegation depth.
  * @param parent - the delegating parent whose route the child inherits.
  * @param requested - per-child overrides, if any.
  * @param childDepth - the resolved delegation depth to stamp.
@@ -70,12 +125,11 @@ export function resolveChildAgentOptions(
   requested: AgentOptions | undefined,
   childDepth: number,
 ): AgentOptions {
-  const parentProvider = parent.options.provider
-  const parentModel = parent.options.model
+  const route = effectiveChildRoute(parent, requested)
   const parentMaxTokens = parent.options.maxTokens
   return {
-    ...parentProvider !== undefined ? { provider: parentProvider } : {},
-    ...parentModel !== undefined ? { model: parentModel } : {},
+    ...route.provider !== undefined ? { provider: route.provider } : {},
+    ...route.model !== undefined ? { model: route.model } : {},
     ...parentMaxTokens !== undefined ? { maxTokens: parentMaxTokens } : {},
     ...requested,
     subagentDepth: childDepth,

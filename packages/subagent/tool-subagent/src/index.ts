@@ -15,6 +15,7 @@ import type { AgentOptions } from '@shres-code/shres-code-agent'
 import type { ContentBlock } from '@shres-code/shres-code-llm'
 import type { JsonValue } from '@shres-code/shres-code-session'
 import { assertSubagentMaxDepth, settleRun } from '@shres-code/shres-code-subagent'
+import { effectiveChildRoute } from '@shres-code/shres-code-subagent'
 import type { SubagentProvider, SubagentResult, SubagentRun } from '@shres-code/shres-code-subagent'
 import type { JobOutcome } from '@shres-code/shres-code-jobs'
 import type {} from '@shres-code/shres-code-system-prompt'
@@ -176,10 +177,19 @@ function withPartialText(error: string, output: ContentBlock[]): string {
   return text.length === 0 ? error : `${error}\nPartial output before the run ended:\n${text}`
 }
 
+/** Render `(provider/model)` spawn telemetry, or nothing when the route is unknown. */
+function routeSuffix(provider: string | undefined, model: string | undefined): string {
+  if (provider === undefined && model === undefined) return ''
+  const route = [provider, model].filter(part => part !== undefined).join('/')
+  return ` (${route})`
+}
+
 type ForegroundToolResult = {
   readonly kind: 'foreground'
   readonly runId: SubagentRun['id']
   readonly output: JsonValue[]
+  readonly provider?: string
+  readonly model?: string
 }
 
 /**
@@ -361,6 +371,8 @@ export function apply(ctx: Context, config: Config): void {
               properties: {
                 kind: { type: 'string', required: true, const: 'continuable' },
                 subagentId: { type: 'string', required: true },
+                provider: { type: 'string' },
+                model: { type: 'string' },
               },
             },
             {
@@ -370,6 +382,8 @@ export function apply(ctx: Context, config: Config): void {
                 kind: { type: 'string', required: true, const: 'foreground' },
                 runId: { type: 'string', required: true },
                 output: { type: 'array', required: true, items: { type: 'json' } },
+                provider: { type: 'string' },
+                model: { type: 'string' },
               },
             },
           ],
@@ -379,7 +393,7 @@ export function apply(ctx: Context, config: Config): void {
           text: value.kind === 'background'
             ? `started background subagent task ${value.jobId}`
             : value.kind === 'continuable'
-              ? `started subagent ${value.subagentId}`
+              ? `started subagent ${value.subagentId}${routeSuffix(value.provider, value.model)}`
               : outputValueText(value.output),
         }],
       },
@@ -395,6 +409,14 @@ export function apply(ctx: Context, config: Config): void {
 
         const maxDepth = typeof config.maxDepth === 'number' ? config.maxDepth : undefined
         const label = childLabel(args.description, config.labelPrefix)
+        // Resolved before the start so the logged result reports the same route
+        // the child is created with (per-child overrides, else the parent's
+        // effective model).
+        const route = effectiveChildRoute(parent, config.agentOptions)
+        const routeFields = {
+          ...route.provider !== undefined ? { provider: route.provider } : {},
+          ...route.model !== undefined ? { model: route.model } : {},
+        }
         const request = {
           label,
           prompt: [{ type: 'text', text: args.prompt }] as ContentBlock[],
@@ -416,7 +438,7 @@ export function apply(ctx: Context, config: Config): void {
               request,
               signal: exec.signal,
             })
-            return { kind: 'continuable' as const, subagentId: started.childId }
+            return { kind: 'continuable' as const, subagentId: started.childId, ...routeFields }
           }
           const jobs = ctx.get('jobs')
           if (jobs === undefined) {
@@ -447,7 +469,7 @@ export function apply(ctx: Context, config: Config): void {
           ...request,
           signal: exec.signal,
         })
-        return settleForegroundRun(run)
+        return { ...(await settleForegroundRun(run)), ...routeFields }
       },
     }))
   }

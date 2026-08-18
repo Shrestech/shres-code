@@ -41,6 +41,7 @@
   },
   "peerDependencies": {
     "@shres-code/shres-code-agent": "workspace:^",
+    "@shres-code/shres-code-agent-default-model": "workspace:^",
     "@shres-code/shres-code-agent-presets": "workspace:^",
     "@shres-code/shres-code-brand": "workspace:^",
     "@shres-code/shres-code-invariants": "workspace:^",
@@ -85,6 +86,7 @@
   },
   "devDependencies": {
     "@shres-code/shres-code-agent": "workspace:^",
+    "@shres-code/shres-code-agent-default-model": "workspace:^",
     "@shres-code/shres-code-agent-presets": "workspace:^",
     "@shres-code/shres-code-brand": "workspace:^",
     "@shres-code/shres-code-invariants": "workspace:^",
