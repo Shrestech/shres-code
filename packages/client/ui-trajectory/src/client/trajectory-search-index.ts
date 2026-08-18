@@ -74,6 +74,9 @@ function recordSources(
     cell.shield?.verdict === 'observe' ? 'Observed' : '',
     cell.shield?.rule ?? '',
     cell.shield?.channel ?? '',
+    cell.jspace?.kind === 'open' ? 'Open' : '',
+    cell.jspace?.kind === 'checkpoint' ? 'Checkpoint' : '',
+    cell.jspace?.kind === 'closed' ? 'Closed' : '',
   ]
 }
 

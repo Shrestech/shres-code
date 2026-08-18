@@ -8,6 +8,7 @@ import type {
   TrajectoryConversationViewNode, TrajectoryRequestHeaderState,
   TrajectoryShieldDecision, TrajectorySnapshot,
 } from './trajectory-contract.ts'
+import type { TrajectoryJSpaceBadge } from './trajectory-record.ts'
 
 const EMPTY_LIST: readonly never[] = []
 type AssistantRequest = Extract<RequestView, { purpose: 'assistant' }>
@@ -22,6 +23,7 @@ export const EMPTY_TRAJECTORY_SNAPSHOT: TrajectorySnapshot = {
   partial: null,
   runningCalls: EMPTY_LIST,
   decisions: EMPTY_LIST,
+  jspace: EMPTY_LIST,
 }
 
 function stepKey(turn: number, step: number): string {
@@ -192,6 +194,7 @@ export class TrajectorySnapshotBuilder implements ConversationViewBuilder<
     let partial: TrajectorySnapshot['partial'] = null
     const runningCalls: TrajectorySnapshot['runningCalls'][number][] = []
     const decisions: TrajectoryShieldDecision[] = []
+    const jspace: TrajectoryJSpaceBadge[] = []
 
     for (const contribution of this.contributions) {
       const data = contribution.data
@@ -239,6 +242,10 @@ export class TrajectorySnapshotBuilder implements ConversationViewBuilder<
         decisions.push({ ...data.decision, seq: data.seq })
         continue
       }
+      if (data.kind === 'jspace') {
+        jspace.push(data.badge)
+        continue
+      }
       turnEndings.push({
         turn: data.turn,
         time: data.time,
@@ -259,6 +266,7 @@ export class TrajectorySnapshotBuilder implements ConversationViewBuilder<
       partial,
       runningCalls,
       decisions,
+      jspace,
     }
   }
 

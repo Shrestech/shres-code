@@ -10,6 +10,7 @@ import type { TrajectorySnapshot } from '../src/client/trajectory-contract.ts'
 import { registerTrajectoryMessageDefinitions } from '../src/client/trajectory-message-definitions.ts'
 import { registerTrajectoryRequestHeaderDefinition } from '../src/client/trajectory-request-header-definition.ts'
 import { registerTrajectoryShieldDefinition } from '../src/client/trajectory-shield-definition.ts'
+import { registerTrajectoryJSpaceDefinition } from '../src/client/trajectory-jspace-definition.ts'
 import { trajectoryViewDefinition } from '../src/client/trajectory-snapshot-builder.ts'
 import { registerTrajectoryToolDefinition } from '../src/client/trajectory-tool-definition.ts'
 import { deriveTrajectoryLayout } from '../src/client/layout.ts'
@@ -29,6 +30,7 @@ registerTrajectoryRequestHeaderDefinition(registrationContext)
 registerTrajectoryAssistantDefinition(registrationContext)
 registerTrajectoryToolDefinition(registrationContext)
 registerTrajectoryShieldDefinition(registrationContext)
+registerTrajectoryJSpaceDefinition(registrationContext)
 registerTrajectoryCompactionDefinitions(registrationContext)
 
 class TestEventDefinitions {
@@ -378,5 +380,93 @@ describe('Trajectory conversation Definitions', () => {
     }).flatMap(turn => turn.groups.flatMap(group => group.cells))
     expect(cells.find(cell => cell.callId === 'c1')?.shield?.verdict).toBe('deny')
     expect(cells.find(cell => cell.callId === 'c2')?.shield).toBeUndefined()
+  })
+
+  it('folds jspace/card and jspace/closed into jspace and not eventNodes', () => {
+    const card = {
+      seq: 1,
+      sessionId: 's1',
+      goal: 'Ship it',
+      core: [],
+      checked: [],
+      open: [],
+      next: 'Write the test',
+      goalOpenedSeq: 2,
+    }
+    const current = snapshot(assembler([
+      at(1, 'user/message', {
+        content: [{ type: 'text', text: 'hello' }],
+        source: { kind: 'user' },
+      }, { surfaceOp: 'append' }),
+      at(2, 'jspace/card', card),
+      at(3, 'jspace/card', {
+        ...card,
+        seq: 2,
+        checked: [{ n: 1, check: 'types', by: 'tsc covers src' }],
+      }),
+      at(4, 'jspace/card', {
+        ...card,
+        seq: 3,
+        next: 'Note only',
+        checked: [{ n: 1, check: 'types', by: 'tsc covers src' }],
+      }),
+      at(5, 'jspace/closed', { seq: 4, sessionId: 's1' }),
+    ]))
+
+    expect(current.jspace).toMatchObject([
+      { kind: 'open', seq: 2 },
+      { kind: 'checkpoint', seq: 3 },
+      { kind: 'closed', seq: 5 },
+    ])
+    expect(current.eventNodes.map(node => node.kind)).not.toContain('jspace')
+
+    const definition = DEFINITIONS.find(entry => entry.kind === 'trajectory-jspace')
+    expect(definition?.match({ type: 'turn/start', data: { turn: 1 } } as never)).toBeNull()
+    expect(() => definition?.start(
+      {} as never,
+      { event: { type: 'turn/start', data: { turn: 1 } }, location: { kind: 'session' } } as never,
+      { previous: () => undefined } as never,
+    )).toThrow('trajectory-jspace start requires jspace/card or jspace/closed')
+
+    const cells = deriveTrajectoryLayout({
+      nodes: current.eventNodes,
+      eventLocations: current.eventLocations,
+      partial: null,
+      runningCalls: current.runningCalls,
+      jspace: current.jspace,
+    }).flatMap(turn => turn.groups.flatMap(group => group.cells))
+    const user = cells.find(cell => cell.kind === 'user')
+    expect(user?.jspace?.kind).toBe('closed')
+
+    const data = { get: () => undefined }
+    const step = { turn: 2, step: 3, start: undefined, end: undefined, status: 'open' as const, data }
+    const turn = {
+      turn: 2, start: undefined, end: undefined, status: 'open' as const, steps: [step], data,
+    }
+    const cardEvent = {
+      type: 'jspace/card',
+      seq: 8,
+      data: card,
+    }
+    expect(definition?.start(
+      {} as never,
+      { event: cardEvent, location: { kind: 'step', turn, step } } as never,
+      { previous: () => undefined } as never,
+    )).toMatchObject({ kind: 'open', turn: 2, step: 3 })
+    expect(definition?.start(
+      {} as never,
+      { event: cardEvent, location: { kind: 'turn', turn } } as never,
+      { previous: () => undefined } as never,
+    )).toMatchObject({ kind: 'open', turn: 2 })
+    expect(definition?.buildViewNode?.({
+      key: 'k', kind: 'trajectory-jspace', id: '8', matches: [],
+      start: undefined, state: { kind: 'open', seq: 8, checkedCount: 0 },
+      current: new Map(),
+    })).toBeNull()
+    expect(definition?.buildViewNode?.({
+      key: 'k', kind: 'trajectory-jspace', id: '8', matches: [],
+      start: { event: cardEvent } as never, state: undefined,
+      current: new Map(),
+    })).toBeNull()
   })
 })

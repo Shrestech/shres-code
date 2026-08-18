@@ -1,0 +1,22 @@
+[
+  {
+    "kind": "chunks",
+    "chunks": [
+      { "type": "block-start", "index": 0, "blockType": "tool-call" },
+      { "type": "tool-call-delta", "index": 0, "id": "call_ws_open", "name": "jspace_open", "argumentsDelta": "{\"goal\":\"Finish the headless J-Space snapshot proof\",\"next\":\"Inspect the logged card\"}" },
+      { "type": "block-end", "index": 0, "block": { "type": "tool-call", "id": "call_ws_open", "name": "jspace_open", "arguments": "{\"goal\":\"Finish the headless J-Space snapshot proof\",\"next\":\"Inspect the logged card\"}" } },
+      { "type": "usage", "usage": { "inputTokens": 15, "outputTokens": 8 } },
+      { "type": "finish", "reason": { "kind": "tool-calls" } }
+    ]
+  },
+  {
+    "kind": "chunks",
+    "chunks": [
+      { "type": "block-start", "index": 0, "blockType": "text" },
+      { "type": "text-delta", "index": 0, "text": "J-SPACE READY" },
+      { "type": "block-end", "index": 0, "block": { "type": "text", "text": "J-SPACE READY" } },
+      { "type": "usage", "usage": { "inputTokens": 25, "outputTokens": 2 } },
+      { "type": "finish", "reason": { "kind": "stop" } }
+    ]
+  }
+]

@@ -36,6 +36,9 @@
       "path": "../../guard/shield"
     },
     {
+      "path": "../../jspace/jspace"
+    },
+    {
       "path": "../../runtime-diagnostics/invariants"
     }
   ]

@@ -686,6 +686,12 @@ function shieldBadgeLabel(verdict: 'observe' | 'ask' | 'deny'): string {
   return 'Observed'
 }
 
+function jspaceBadgeLabel(kind: 'open' | 'checkpoint' | 'closed'): string {
+  if (kind === 'open') return 'Open'
+  if (kind === 'checkpoint') return 'Checkpoint'
+  return 'Closed'
+}
+
 function TokenRows({ cell }: { cell: TrajectoryCellProps }) {
   const content = cell.output !== undefined && cell.think !== undefined
     ? Math.max(0, cell.output - cell.think)
@@ -2317,7 +2323,7 @@ export function TrajectoryTable({
                         ? `Collapsed ${record.collapsedSummaryKind} summary, ${record.collapsedSummary}`
                         : isRequestOnly
                           ? `Request ${request ?? ''}, compaction`
-                          : `${request === undefined ? '' : `Request ${request}, `}${KIND_LABEL[record.cell.kind]}, ${listDisplayText || 'no content'}${record.cell.shield === undefined ? '' : `, ${shieldBadgeLabel(record.cell.shield.verdict)}`}`}
+                          : `${request === undefined ? '' : `Request ${request}, `}${KIND_LABEL[record.cell.kind]}, ${listDisplayText || 'no content'}${record.cell.shield === undefined ? '' : `, ${shieldBadgeLabel(record.cell.shield.verdict)}`}${record.cell.jspace === undefined ? '' : `, ${jspaceBadgeLabel(record.cell.jspace.kind)}`}`}
                       aria-selected={!isCollapsedSummary && !isRequestOnly && selectedIndex === record.cell.index}
                       data-kind={record.cell.kind}
                       data-trajectory-row-key={trajectoryVirtualRecordKey(record)}
@@ -2522,6 +2528,14 @@ export function TrajectoryTable({
                                     data-shield-verdict={record.cell.shield.verdict}
                                   >
                                     {shieldBadgeLabel(record.cell.shield.verdict)}
+                                  </span>
+                                )}
+                                {record.cell.jspace !== undefined && (
+                                  <span
+                                    className={`${css.shieldBadge} ${css.jspaceBadge}`}
+                                    data-jspace={record.cell.jspace.kind}
+                                  >
+                                    {jspaceBadgeLabel(record.cell.jspace.kind)}
                                   </span>
                                 )}
                               </span>
@@ -2990,6 +3004,12 @@ export function TrajectoryTable({
                       {statusLabel(selectedState)}
                     </dd>
                   </div>
+                  {selected.cell.jspace !== undefined && (
+                    <div>
+                      <dt>J-Space</dt>
+                      <dd>{jspaceBadgeLabel(selected.cell.jspace.kind)}</dd>
+                    </div>
+                  )}
                   {selected.cell.shield !== undefined && (
                     <>
                       <div>

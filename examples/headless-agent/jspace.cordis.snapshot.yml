@@ -1,0 +1,21 @@
+# Replay counterpart to jspace.cordis.yml. It includes cordis.yml directly because
+# a config patch cannot target an entry behind a nested include, then restates
+# the jspace overlay while replacing the live model with keyless replay.
+- id: base
+  name: '@shres-code/cordis-plugin-include'
+  config:
+    path: ./cordis.yml
+    patches:
+      - id: llm-deepseek
+        name: '@shres-code/shres-code-llm-deepseek'
+        disabled: true
+      - insert:
+          - id: jspace
+            name: '@shres-code/shres-code-jspace'
+            config: { enabled: true, mode: available, requireCoverage: true }
+          - id: jspace-prompt
+            name: '@shres-code/shres-code-jspace-prompt'
+          - id: tool-jspace
+            name: '@shres-code/shres-code-tool-jspace'
+          - id: llm-replay
+            name: '@shres-code/shres-code-llm-replay'

@@ -59,6 +59,8 @@ import * as ToolSkill from '@shres-code/shres-code-tool-skill'
 import * as ToolSessionQuery from '@shres-code/shres-code-tool-session-query'
 import * as ToolTasks from '@shres-code/shres-code-tool-jobs'
 import * as ToolTodo from '@shres-code/shres-code-tool-todo'
+import JspaceService from '@shres-code/shres-code-jspace'
+import * as ToolJSpace from '@shres-code/shres-code-tool-jspace'
 import * as ToolSubagent from '@shres-code/shres-code-tool-subagent'
 import * as ToolWeb from '@shres-code/shres-code-tool-web'
 import VmWorkflowEngine from '@shres-code/shres-code-workflow-worker-thread'
@@ -519,6 +521,20 @@ const TOOL_PACKAGES: ToolPackage[] = [
     },
     note:
       'todo_write is session-owned state; UIs render the latest todo/write event as a checklist. `allowParallelInProgress` is required with no default, so the catalog states its choice: `true`, whose description invites several `in_progress` items. A deployment choosing `false` receives the same tool with a description asking for exactly one active task.',
+  },
+  {
+    pkg: '@shres-code/shres-code-tool-jspace',
+    dir: 'tool-jspace',
+    source: 'packages/jspace/tool-jspace/src/index.ts',
+    requires: ['ctx.tools', 'ctx.jspace', 'owning Agent session'],
+    writes: ['tool/call', 'jspace/card or jspace/closed', 'tool/result'],
+    async mount(ctx) {
+      await ctx.plugin(SessionStore)
+      await ctx.plugin(JspaceService, { enabled: true })
+      await ctx.plugin(ToolJSpace)
+    },
+    note:
+      'Schemas are registered only while Settings `enabled` is true. `jspace_ship` is a register check, not a file writer. Checkpoint `evidence` must name an existing tool-call id and does not prove coverage.',
   },
   {
     pkg: '@shres-code/shres-code-tool-workflow',

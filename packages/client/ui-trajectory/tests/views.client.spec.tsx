@@ -85,6 +85,7 @@ function historySnapshot(
     partial: null,
     runningCalls: [],
     decisions: [],
+    jspace: [],
     ...inspection,
   }
   return {
@@ -1131,6 +1132,50 @@ describe('timeline projection', () => {
 })
 
 describe('TrajectoryView state', () => {
+  it('paints Open / Checkpoint / Closed on existing rows without renaming lanes', () => {
+    const nodes = [
+      {
+        kind: 'user', seq: 1, time: 1_000,
+        content: [{ type: 'text', text: 'hello' }], source: null,
+      },
+      {
+        kind: 'assistant', seq: 2, time: 2_000, turn: 1, step: 1,
+        blocks: [{ kind: 'text', text: 'ok' }],
+      },
+      {
+        kind: 'tool-result', seq: 3, time: 3_000, callId: 'c1',
+        call: { name: 'bash', argsRaw: '{}' },
+        callTime: 2_200, content: [], isError: false, callView: null, resultView: null,
+      },
+    ] as unknown as ConversationSnapshot['nodes']
+    render(createElement(
+      TrajectoryView,
+      {
+        ...standaloneProps(nodes),
+        ...standaloneHistory(historySnapshot(nodes, {
+          jspace: [
+            { kind: 'open', seq: 1 },
+            { kind: 'checkpoint', seq: 2 },
+            { kind: 'closed', seq: 3 },
+          ],
+        })),
+        ...standaloneDuration(),
+      },
+    ))
+    expect(screen.getByRole('row', { name: /USER, hello, Open/ })).toBeTruthy()
+    expect(screen.getByRole('row', { name: /ASSISTANT, ok, Checkpoint/ })).toBeTruthy()
+    expect(screen.getByRole('row', { name: /TOOL, bash \{\}, Closed/ })).toBeTruthy()
+    expect(screen.getByRole('row', { name: /USER, hello, Open/ }).getAttribute('data-kind')).toBe('user')
+    expect(screen.getByRole('row', { name: /ASSISTANT, ok, Checkpoint/ }).getAttribute('data-kind')).toBe('message')
+    expect(screen.getByRole('row', { name: /TOOL, bash \{\}, Closed/ }).getAttribute('data-kind')).toBe('tool')
+    expect(screen.getByText('Input')).toBeTruthy()
+    expect(screen.getByText('Model')).toBeTruthy()
+    expect(screen.getByText('Tools')).toBeTruthy()
+    fireEvent.click(screen.getByRole('row', { name: /USER, hello, Open/ }))
+    expect(screen.getByText('J-Space')).toBeTruthy()
+    expect(screen.getAllByText('Open')).toHaveLength(2)
+  })
+
   it('persists the duration preference through the runtime snapshot-store seam', () => {
     const firstDuration = createTrajectoryDurationStore()
     const commonProps = {

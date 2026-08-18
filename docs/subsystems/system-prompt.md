@@ -6,7 +6,7 @@ Source: [`packages/core/system-prompt/src/index.ts`](../../packages/core/system-
 
 ## Assembly context
 
-`AssembleContext` identifies the scope layer one assembly resolves and may carry the explicit control signal for that request. It is merge-extensible: `shres-agent` adds the optional live `agent` field, and `assembleContextFor(agent, signal)` sets the explicit fields together. A bare assembly has neither scope nor signal.
+`AssembleContext` identifies the scope layer one assembly resolves and may carry the explicit control signal for that request. It is merge-extensible: `shres-agent` adds the optional live `agent` field and, when the loop is assembling a step, the claimed `messages` for that step (those rows are appended as `user/message` only after assemble returns). `assembleContextFor(agent, signal, messages?)` sets the explicit fields together. A bare assembly has neither scope, signal, nor claimed messages.
 
 ```ts type-equiv
 /** Merge-extensible context for one prompt assembly. */

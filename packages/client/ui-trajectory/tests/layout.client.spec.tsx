@@ -336,6 +336,75 @@ describe('deriveTrajectoryLayout', () => {
       .find(cell => cell.callId === 'c1')?.shield?.verdict).toBe('deny')
   })
 
+  it('attaches jspace badges onto existing rows without renaming lanes', () => {
+    const nodes = [
+      { kind: 'user', seq: 1, time: 1_000, content: [{ type: 'text', text: 'hello' }], source: null },
+      {
+        kind: 'assistant', seq: 2, time: 2_000, turn: 1, step: 1,
+        blocks: [{ kind: 'text', text: 'ok' }],
+      },
+    ] as unknown as ConversationSnapshot['nodes']
+    const turns = deriveTrajectoryLayout({
+      nodes,
+      partial: null,
+      runningCalls: [],
+      jspace: [
+        { kind: 'open', seq: 3, turn: 1 },
+        { kind: 'checkpoint', seq: 4, turn: 1 },
+        { kind: 'closed', seq: 5 },
+      ],
+    })
+    const cells = turns[0]?.groups.flatMap(group => group.cells) ?? []
+    const user = cells.find(cell => cell.kind === 'user')
+    const message = cells.find(cell => cell.kind === 'message')
+    expect(user?.jspace).toEqual({ kind: 'checkpoint', seq: 4, turn: 1 })
+    expect(message?.jspace).toEqual({ kind: 'closed', seq: 5 })
+    expect(cells.map(cell => cell.kind)).toEqual(['user', 'message'])
+  })
+
+  it('attaches a stepped jspace badge onto the Step group', () => {
+    const nodes = [
+      { kind: 'user', seq: 1, time: 1_000, content: [{ type: 'text', text: 'hello' }], source: null },
+      {
+        kind: 'steering', seq: 2, time: 2_000,
+        content: [{ type: 'text', text: 'steer' }], source: null,
+      },
+    ] as unknown as ConversationSnapshot['nodes']
+    const data = { get: () => undefined }
+    const step = { turn: 1, step: 1, start: undefined, end: undefined, status: 'open' as const, data }
+    const turn = {
+      turn: 1, start: undefined, end: undefined, status: 'open' as const, steps: [step], data,
+    }
+    const eventLocations = new Map<number, ConversationLocation>([[
+      2,
+      { kind: 'step', turn, step },
+    ]])
+    const turns = deriveTrajectoryLayout({
+      nodes,
+      eventLocations,
+      partial: { turn: 1, step: 1, blocks: [] },
+      runningCalls: [],
+      jspace: [{ kind: 'open', seq: 3, turn: 1, step: 1 }],
+    })
+    const stepped = turns[0]?.groups
+      .find(group => group.title === 'Step 1')
+      ?.cells.find(cell => cell.kind === 'user')
+    expect(stepped?.jspace?.kind).toBe('open')
+
+    const toolTurns = deriveTrajectoryLayout({
+      nodes: [{
+        kind: 'assistant', seq: 4, time: 4_000, turn: 1, step: 2,
+        blocks: [{ kind: 'tool-call', callId: 'c1', name: 'bash', argsRaw: '{}' }],
+      }] as unknown as ConversationSnapshot['nodes'],
+      partial: null,
+      runningCalls: [],
+      jspace: [{ kind: 'checkpoint', seq: 5, turn: 1, step: 2 }],
+    })
+    expect(toolTurns[0]?.groups
+      .find(group => group.title === 'Step 2')
+      ?.cells[0]?.jspace?.kind).toBe('checkpoint')
+  })
+
   it('omits duration when node times are missing instead of rendering NaN', () => {
     const nodes = [
       { kind: 'user', seq: 1, content: [{ type: 'text', text: 'hi' }], source: null },

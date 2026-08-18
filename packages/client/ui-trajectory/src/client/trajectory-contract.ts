@@ -4,6 +4,7 @@ import type {
   RequestPromptChange, RequestView, RunningToolCall, ToolCallBlock,
 } from '@shres-code/shres-code-client-runtime/client'
 import type { ShieldDecision } from '@shres-code/shres-code-shield/types'
+import type { TrajectoryJSpaceBadge } from './trajectory-record.ts'
 
 /** Request-header facts retained by the Trajectory target. */
 export interface TrajectoryRequestHeaderState {
@@ -54,6 +55,10 @@ export type TrajectoryContribution =
     readonly decision: ShieldDecision
     readonly seq: number
   }
+  | {
+    readonly kind: 'jspace'
+    readonly badge: TrajectoryJSpaceBadge
+  }
 
 /** One folded Shield verdict attached to an existing Trajectory row. */
 export interface TrajectoryShieldDecision extends ShieldDecision {
@@ -78,6 +83,8 @@ export interface TrajectorySnapshot {
   readonly partial: PartialAssistant | null
   readonly runningCalls: readonly RunningToolCall[]
   readonly decisions: readonly TrajectoryShieldDecision[]
+  /** Folded J-Space badges attached to existing Trajectory rows only. */
+  readonly jspace: readonly TrajectoryJSpaceBadge[]
 }
 
 declare module '@shres-code/shres-code-client-runtime/client' {

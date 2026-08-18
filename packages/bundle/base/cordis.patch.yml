@@ -312,6 +312,22 @@
     - id: command-goal
       name: '@shres-code/shres-code-command-goal'
 
+    - id: jspace
+      name: '@shres-code/shres-code-jspace'
+      config:
+        enabled: false
+        mode: available
+        requireCoverage: true
+
+    - id: jspace-prompt
+      name: '@shres-code/shres-code-jspace-prompt'
+
+    - id: tool-jspace
+      name: '@shres-code/shres-code-tool-jspace'
+
+    - id: command-jspace
+      name: '@shres-code/shres-code-command-jspace'
+
     - id: plan-mode
       name: '@shres-code/shres-code-plan-mode'
       config:

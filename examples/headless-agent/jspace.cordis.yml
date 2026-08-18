@@ -1,0 +1,14 @@
+# Add the Settings-toggled J-Space seat, prompt reprint, and model tools.
+- id: base
+  name: '@shres-code/cordis-plugin-include'
+  config:
+    path: ./cordis.yml
+    patches:
+      - insert:
+          - id: jspace
+            name: '@shres-code/shres-code-jspace'
+            config: { enabled: true, mode: available, requireCoverage: true }
+          - id: jspace-prompt
+            name: '@shres-code/shres-code-jspace-prompt'
+          - id: tool-jspace
+            name: '@shres-code/shres-code-tool-jspace'

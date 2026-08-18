@@ -1,0 +1,59 @@
+/* J-Space dock: a full-width strip above the composer, after GoalBar. */
+
+.dock {
+  box-sizing: border-box;
+  width: calc(
+    100% -
+    var(--shres-composer-side-clearance) -
+    var(--shres-composer-side-clearance) -
+    var(--shres-composer-dock-inset) -
+    var(--shres-composer-dock-inset) -
+    var(--shres-composer-dock-inset) -
+    var(--shres-composer-dock-inset)
+  );
+  margin: 0 auto;
+}
+
+.bar {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: calc(var(--shres-composer-card-max-width) - 4 * var(--shres-composer-dock-inset));
+  min-height: 36px;
+  margin: 0 auto;
+  padding: 4px 12px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 12px;
+  background: var(--dsw-specific-tip);
+}
+
+.field {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.fieldGrow {
+  flex: 1;
+}
+
+.label {
+  flex: none;
+  font-size: 13px;
+  line-height: 24px;
+  font-weight: 500;
+  color: var(--dsw-alias-label-primary);
+}
+
+.value {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--dsw-alias-label-primary-dimmed);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

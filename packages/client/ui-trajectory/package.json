@@ -58,6 +58,7 @@
     "@shres-code/shres-code-compaction": "workspace:^",
     "@shres-code/shres-code-shield": "workspace:^",
     "@shres-code/shres-code-tools": "workspace:^",
+    "@shres-code/shres-code-jspace": "workspace:^",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
@@ -73,6 +74,7 @@
     "@shres-code/shres-code-invariants": "workspace:^",
     "@shres-code/shres-code-shield": "workspace:^",
     "@shres-code/shres-code-tools": "workspace:^",
+    "@shres-code/shres-code-jspace": "workspace:^",
     "@types/react": "~18.3.1",
     "@types/react-dom": "~18.3.0",
     "@shres-code/cordis": "workspace:^",

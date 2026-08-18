@@ -33,6 +33,18 @@ export interface TrajectorySourceBlock {
   toolName?: string
 }
 
+/** Compact J-Space mutation painted on an existing Trajectory row. */
+export interface TrajectoryJSpaceBadge {
+  /** Card lifecycle shown as Open / Checkpoint / Closed. */
+  kind: 'open' | 'checkpoint' | 'closed'
+  /** Session-event seq that produced this badge. */
+  seq: number
+  /** Enclosing turn when the event carried one. */
+  turn?: number
+  /** Enclosing step when the event carried one. */
+  step?: number
+}
+
 /** Compact Shield verdict painted on a user, context, tool, or subtool row. */
 export interface TrajectoryShieldBadge {
   /** Outcome shown as Blocked / Asked / Observed. */
@@ -99,6 +111,8 @@ export interface TrajectoryCellProps extends HTMLAttributes<HTMLDivElement> {
   startedAt?: number | null
   /** Compact Shield verdict copied onto this existing row. Never creates a row. */
   shield?: TrajectoryShieldBadge
+  /** Compact J-Space badge copied onto this existing row. Never creates a row. */
+  jspace?: TrajectoryJSpaceBadge
   /** Message-only prompt token count. */
   input?: number
   /** Message-only input tokens served from a provider cache. */

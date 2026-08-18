@@ -195,6 +195,9 @@
     - id: ui-settings-shield
       name: '@shres-code/shres-code-client-ui-settings-shield'
 
+    - id: ui-settings-jspace
+      name: '@shres-code/shres-code-client-ui-settings-jspace'
+
     - id: ui-settings-plugin-inventory
       name: '@shres-code/shres-code-client-ui-settings-plugin-inventory'
 
@@ -243,6 +246,9 @@
     # Goal surface: GoalBar in the input dock over the goal session projection.
     - id: ui-goal
       name: '@shres-code/shres-code-client-ui-goal'
+
+    - id: ui-jspace
+      name: '@shres-code/shres-code-client-ui-jspace'
 
     # Per-message feedback: Like/Dislike plus an optional note in the
     # assistant-message action strip, over the messageFeedback Remote.

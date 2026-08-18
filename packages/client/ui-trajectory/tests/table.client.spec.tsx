@@ -757,6 +757,54 @@ describe('TrajectoryTable', () => {
     expect(screen.getByText('Observed')).toBeTruthy()
   })
 
+  it('shows J-Space badges without renaming Input / Model / Tools lanes', () => {
+    const turns: readonly TrajectoryTurnModel[] = [{
+      turn: 1,
+      groups: [{
+        title: 'Message',
+        cells: [
+          {
+            index: 1,
+            kind: 'user',
+            text: 'hello',
+            timeSeconds: 0,
+            opensTurn: true,
+            jspace: { kind: 'open', seq: 2, turn: 1 },
+          },
+          {
+            index: 2,
+            kind: 'message',
+            text: 'ok',
+            timeSeconds: 0.1,
+            jspace: { kind: 'checkpoint', seq: 3, turn: 1 },
+          },
+          {
+            index: 3,
+            kind: 'tool',
+            text: 'bash',
+            callId: 'c1',
+            outputDetail: 'ok',
+            result: 'ok',
+            timeSeconds: 0.2,
+            jspace: { kind: 'closed', seq: 4 },
+          },
+        ],
+      }],
+    }]
+    render(<TrajectoryTable turns={turns} {...FOLD_PROPS} />)
+    expect(screen.getByRole('row', { name: /USER, hello, Open/ })).toBeTruthy()
+    expect(screen.getByRole('row', { name: /ASSISTANT, ok, Checkpoint/ })).toBeTruthy()
+    expect(screen.getByRole('row', { name: /TOOL, bash, Closed/ })).toBeTruthy()
+    expect(screen.getByText('Open')).toBeTruthy()
+    expect(screen.getByText('Checkpoint')).toBeTruthy()
+    expect(screen.getByText('Closed')).toBeTruthy()
+    expect(screen.queryByText('Input')).toBeNull()
+    fireEvent.click(screen.getByRole('row', { name: /ASSISTANT, ok, Checkpoint/ }))
+    expect(screen.getByText('Completed')).toBeTruthy()
+    expect(screen.getByText('J-Space')).toBeTruthy()
+    expect(screen.getAllByText('Checkpoint')).toHaveLength(2)
+  })
+
   it('keeps running and failure semantics distinct from record roles', () => {
     const view = render(<TrajectoryTable turns={TURNS} {...FOLD_PROPS} />)
     expect(view.container.querySelector('tr[data-kind="tool"][data-running="true"]')).toBeTruthy()

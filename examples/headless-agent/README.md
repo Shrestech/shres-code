@@ -28,3 +28,5 @@ The overlay creates the same absolute cwd inside the sandbox, but it does not up
 ## Advanced configuration
 
 [`advanced.cordis.yml`](advanced.cordis.yml) adds Code Mode and the Cordis tools to the test composition.
+
+[`jspace.cordis.yml`](jspace.cordis.yml) adds the Settings-toggled J-Space seat, the `jspace:card` prompt section, and the four J-Space tools.

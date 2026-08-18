@@ -1,0 +1,8 @@
+{
+  "steps": [
+    {
+      "op": "prompt",
+      "text": "Open a J-Space card to finish the snapshot proof, then stop."
+    }
+  ]
+}

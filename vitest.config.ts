@@ -168,6 +168,7 @@ export default defineConfig({
       // them inside the unit process, so real subprocess/Worker tests cover their thin entry glue.
       exclude: [
         'packages/*/*/src/types.ts',
+        'packages/jspace/jspace/src/client.ts',
         'packages/*/*/src/bin.ts',
         'packages/*/*/src/worker.ts',
         // Dynamic Host/Client composition is covered by its focused lifecycle

@@ -31,6 +31,8 @@ const ptyStreamExpected = join(ptyScenarioDir, 'stream-json.expected.jsonl')
 const ptyConfigPath = fileURLToPath(new URL('../pty.cordis.snapshot.yml', import.meta.url))
 const goalScenarioDir = join(snapshotsDir, 'goal-tools')
 const goalConfigPath = fileURLToPath(new URL('../goal.cordis.snapshot.yml', import.meta.url))
+const jspaceScenarioDir = join(snapshotsDir, 'jspace-tools')
+const jspaceConfigPath = fileURLToPath(new URL('../jspace.cordis.snapshot.yml', import.meta.url))
 const retryScenarioDir = join(snapshotsDir, 'provider-retry')
 const retryConfigPath = fileURLToPath(new URL('../retry.cordis.snapshot.yml', import.meta.url))
 const compactionScenarioDir = join(snapshotsDir, 'compaction-recovery')
@@ -697,6 +699,68 @@ describe('headless stream-json snapshots', () => {
 
     expect(result.stderr).toBe('')
     const normalized = normalizeGoalStream(result.stdout, runCwd)
+    if (refreshing) await writeFile(streamExpected, normalized)
+    expect(normalized).toBe(await readFile(streamExpected, 'utf8'))
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+
+  it('replays persisted jspace tools through the one-shot app', async () => {
+    const prompt = await scenarioPrompt(jspaceScenarioDir, 'jspace-tools')
+    const streamExpected = join(jspaceScenarioDir, 'stream-json.expected.jsonl')
+    let runCwd = ''
+    const result = await runLoaderSmoke({
+      label: 'jspace tools headless stream-json snapshot',
+      tempDirPrefix: 'headless-snapshot-jspace-tools-',
+      binScript,
+      libBinScript: binScript,
+      configPath: jspaceConfigPath,
+      binArgs: [jspaceConfigPath, prompt],
+      tsconfigPath,
+      env: {
+        SHRES_SNAPSHOT: 'replay',
+        SHRES_SNAPSHOT_FILE: join(jspaceScenarioDir, 'session.jsonl'),
+        SHRES_SNAPSHOT_OVERRIDE: join(jspaceScenarioDir, 'replay.override.json'),
+        NODE_OPTIONS: [process.env.NODE_OPTIONS, '--disable-warning=ExperimentalWarning'].filter(Boolean).join(' '),
+      },
+      prepare: (cwd) => { runCwd = cwd },
+      inspect: async (cwd) => {
+        const logs = await persistedLogs(cwd)
+        expect(logs).toHaveLength(1)
+        const records = parseJsonl(logs[0]?.content ?? '')
+        const calls = records.filter(record => record.type === 'tool/call')
+          .map(record => (record.data as JsonObject | undefined)?.name)
+        expect(calls).toEqual(['jspace_open'])
+        const cards = records.filter(record => record.type === 'jspace/card')
+        expect(cards).toHaveLength(1)
+        expect(cards[0]?.data).toMatchObject({
+          goal: 'Finish the headless J-Space snapshot proof',
+          next: 'Inspect the logged card',
+          seq: 1,
+          core: [],
+          checked: [],
+          open: [],
+          goalOpenedSeq: cards[0]?.seq,
+        })
+        // The stream expected tokenizes request/header system; the persisted
+        // log is the live jspace:card reprint.
+        const systems = records.flatMap((record) => {
+          if (record.type !== 'request/header') return []
+          const header = (record.data as JsonObject | undefined)?.header as JsonObject | undefined
+          return typeof header?.system === 'string' ? [header.system] : []
+        })
+        expect(systems[0]).not.toContain('Pass: loop')
+        expect(systems[0]).toContain(
+          'J-Space is available. Open a card for multi-stage or multi-file work.',
+        )
+        expect(systems[1]).toContain('Goal:      Finish the headless J-Space snapshot proof')
+        expect(systems[1]).toContain('Core:      (none)')
+        expect(systems[1]).toContain('Checked:   (none)')
+        expect(systems[1]).toContain('Open:      (none)')
+        expect(systems[1]).toContain('Next:      Inspect the logged card')
+      },
+    })
+
+    expect(result.stderr).toBe('')
+    const normalized = normalizeHeadlessStream(result.stdout, runCwd)
     if (refreshing) await writeFile(streamExpected, normalized)
     expect(normalized).toBe(await readFile(streamExpected, 'utf8'))
   }, LOADER_SMOKE_TEST_TIMEOUT_MS)

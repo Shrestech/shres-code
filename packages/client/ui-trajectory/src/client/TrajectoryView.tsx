@@ -263,11 +263,12 @@ export function TrajectoryView({
       requests,
       callSchemas,
       decisions: inspection.decisions,
+      jspace: inspection.jspace,
     })
     return { turns, lastIndex: lastCellIndex(turns) }
   }, [
     nodes, eventLocations, partialTurn, partialStep,
-    runningCalls, requests, callSchemas, inspection.decisions,
+    runningCalls, requests, callSchemas, inspection.decisions, inspection.jspace,
   ])
   const timelinePartialSignature = partialStructureSignature(partial)
   const timelinePartial = useMemo<ConversationSnapshot['partial']>(() => partial === null
@@ -280,16 +281,19 @@ export function TrajectoryView({
   [partialStep, partialTurn, timelinePartialSignature])
   const timelineTurns = useMemo(
     () => appendTrajectoryPartialLayout(
-      finalized.turns, timelinePartial, finalized.lastIndex, inspection.decisions,
+      finalized.turns, timelinePartial, finalized.lastIndex,
+      inspection.decisions, inspection.jspace,
     ),
-    [finalized, timelinePartial, inspection.decisions],
+    [finalized, timelinePartial, inspection.decisions, inspection.jspace],
   )
   const timelineMode: TrajectoryTimelineMode = actualDuration
     ? actualTime ? 'actual' : 'duration'
     : actualTime ? 'time' : 'sequence'
   const partialSearchTurns = useMemo(
-    () => appendTrajectoryPartialLayout([], partial, finalized.lastIndex, inspection.decisions),
-    [finalized.lastIndex, partial, inspection.decisions],
+    () => appendTrajectoryPartialLayout(
+      [], partial, finalized.lastIndex, inspection.decisions, inspection.jspace,
+    ),
+    [finalized.lastIndex, partial, inspection.decisions, inspection.jspace],
   )
   const searchLayouts = useMemo(
     () => [finalized.turns, partialSearchTurns] as const,

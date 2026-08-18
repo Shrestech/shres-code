@@ -9,6 +9,7 @@
 import type { Context, Events } from '@shres-code/cordis'
 import { scopeTarget } from '@shres-code/shres-code-scope'
 import type { Scoped } from '@shres-code/shres-code-scope'
+import type { UserMessage } from '@shres-code/shres-code-session'
 import type { AssembleContext } from '@shres-code/shres-code-system-prompt'
 import type { Agent } from './runtime-types.ts'
 
@@ -169,8 +170,18 @@ export function emitAgentEvent<K extends AgentSubjectEvent>(
  * agent-scoped prompt and tool contributions cannot be silently omitted.
  * @param agent - the agent the assembly is for.
  * @param signal - the current turn's explicit control signal, when assembly belongs to a turn.
+ * @param messages - claimed user messages for this step, when assemble runs in the loop.
  * @returns the context to pass to `assemble()`.
  */
-export function assembleContextFor(agent: Agent, signal?: AbortSignal): AssembleContext {
-  return { agent, scope: agent, ...signal === undefined ? {} : { signal } }
+export function assembleContextFor(
+  agent: Agent,
+  signal?: AbortSignal,
+  messages?: readonly UserMessage[],
+): AssembleContext {
+  return {
+    agent,
+    scope: agent,
+    ...signal === undefined ? {} : { signal },
+    ...messages === undefined ? {} : { messages },
+  }
 }

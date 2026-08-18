@@ -17,6 +17,12 @@ declare module '@shres-code/shres-code-system-prompt' {
   interface AssembleContext {
     /** Agent for this assembly; absent on diagnostics. When present, `scope` must identify the same agent. */
     agent?: Agent
+    /**
+     * Claimed user messages for this step when assemble runs inside the loop
+     * pre-step. Absent on diagnostic `assemble()` calls. The loop appends these
+     * as `user/message` only after assemble returns.
+     */
+    messages?: readonly UserMessage[]
   }
 }
 

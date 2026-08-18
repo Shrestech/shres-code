@@ -470,6 +470,44 @@ Source: [`packages/hooks/hook-protocol/src/types.ts:19`](../packages/hooks/hook-
 
 Source: [`packages/hooks/hook-protocol/src/types.ts:31`](../packages/hooks/hook-protocol/src/types.ts)
 
+### `jspace/*`
+
+<a id="jspacecard--log-only"></a>
+
+#### `jspace/card` — log-only
+
+```ts persistence-catalog
+/**
+ * Whole J-Space card. Log-only. Writers pass `{ ignorable: true }`.
+ * @param seq - monotonic card sequence for this session.
+ * @param sessionId - writing session id.
+ * @param goal - done-means line.
+ * @param core - at most two live items.
+ * @param checked - append-only checked lines.
+ * @param open - unsettled questions.
+ * @param next - single next action.
+ * @param goalOpenedSeq - session event seq that last set `goal`.
+ */
+'jspace/card': JspaceCard
+```
+
+Source: [`packages/jspace/jspace/src/types.ts:112`](../packages/jspace/jspace/src/types.ts)
+
+<a id="jspaceclosed--log-only"></a>
+
+#### `jspace/closed` — log-only
+
+```ts persistence-catalog
+/**
+ * J-Space close tombstone. Log-only. Writers pass `{ ignorable: true }`.
+ * @param seq - monotonic card sequence for this session.
+ * @param sessionId - writing session id.
+ */
+'jspace/closed': JspaceClosed
+```
+
+Source: [`packages/jspace/jspace/src/types.ts:118`](../packages/jspace/jspace/src/types.ts)
+
 ### `llm/*`
 
 <a id="llmretry--log-only"></a>
@@ -678,7 +716,7 @@ Source: [`packages/session/session-title-llm/src/index.ts:43`](../packages/sessi
 'shield/decision': ShieldDecision
 ```
 
-Source: [`packages/guard/shield/src/types.ts:136`](../packages/guard/shield/src/types.ts)
+Source: [`packages/guard/shield/src/types.ts:152`](../packages/guard/shield/src/types.ts)
 
 ### `step/*`
 

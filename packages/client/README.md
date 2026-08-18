@@ -33,6 +33,7 @@ The browser side of the shres web GUI: shell boot, browser-host communication, s
 | [`ui-model-selection/`](ui-model-selection/README.md) | Provides model selection in conversation surfaces. |
 | [`ui-permission/`](ui-permission-presets/README.md) | Configures default permissions and switches the current session's access. |
 | [`ui-plan/`](ui-plan/README.md) | Presents active plan-mode status and its exit control. |
+| [`ui-jspace/`](ui-jspace/README.md) | Presents the session J-Space chip and open-card dock strip. |
 | [`ui-settings-plugins/`](ui-settings-plugins/README.md) | Owns the Plugins settings section, its tab extension point, and configurable host-plane plugin cards. |
 | [`ui-user-questions/`](ui-user-questions/README.md) | Presents interactive questions requested by the agent. |
 | [`ui-agent-preset/`](ui-agent-preset/README.md) | Selects a session's agent preset and authors preset compositions. |
@@ -40,6 +41,7 @@ The browser side of the shres web GUI: shell boot, browser-host communication, s
 | [`ui-settings-general/`](ui-settings-general/README.md) | Provides the general settings section. |
 | [`ui-settings-models/`](ui-settings-models/README.md) | Provides model-provider configuration and DeepSeek onboarding. |
 | [`ui-settings-shield/`](ui-settings-shield/README.md) | Provides the Shield settings page for the paid host seat. |
+| [`ui-settings-jspace/`](ui-settings-jspace/README.md) | Provides the J-Space settings page for the host seat. |
 | [`ui-settings-plugin-inventory/`](ui-settings-plugin-inventory/README.md) | Contributes the read-only Host Loader inventory tab to Plugins settings. |
 
 Each child reference owns its contract and detailed behavior. The [slot system standard](../../.agents/notes/implemented/architecture/2026-07-22-slot-type-chain-implementation.md) and [web client architecture note](../../.agents/notes/implemented/architecture/2026-07-19-gui-web-client-architecture.md) own the cross-package composition and loading decisions.

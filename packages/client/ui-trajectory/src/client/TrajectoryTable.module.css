@@ -843,6 +843,11 @@
   color: var(--dsw-alias-label-secondary);
 }
 
+.jspaceBadge {
+  background: var(--dsw-alias-state-business-tertiary);
+  color: var(--dsw-alias-state-business-primary);
+}
+
 .inlineResult {
   display: flex;
   align-items: center;

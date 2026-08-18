@@ -67,6 +67,8 @@ export const CJK_ALLOWLIST: ReadonlyArray<{ prefix: string; reason: string }> = 
   { prefix: 'packages/core/tools/tests/py-types.spec.ts', reason: 'generated Python types keep CJK identifiers as UTF-8 fixtures' },
   { prefix: 'packages/client/ui-settings-models/tests/components.client.spec.tsx', reason: 'API-key character-class fixture includes CJK sample text' },
   { prefix: '.agents/skills/shres-trim-cot-leakage/', reason: 'detector batteries include CJK authoring-language slips they must find' },
+  { prefix: 'packages/jspace/jspace/tests/fold.spec.ts', reason: 'coverage matcher fixture proves CJK extra terms use substring includes' },
+  { prefix: 'packages/jspace/jspace/tests/jspace.spec.ts', reason: 'checkpoint fixture proves extra CJK coverageTerms match at write time' },
 ]
 
 const CJK = /[\u3400-\u9FFF\uF900-\uFAFF]/u

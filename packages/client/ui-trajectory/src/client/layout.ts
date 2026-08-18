@@ -18,6 +18,7 @@ import type {
   TrajectoryCellProps,
   TrajectoryShieldBadge,
   TrajectorySourceBlock,
+  TrajectoryJSpaceBadge,
 } from './trajectory-record.ts'
 import { formatElapsedSeconds } from './trajectory-record.ts'
 
@@ -44,6 +45,8 @@ export interface TrajectoryLayoutInput {
   callSchemas?: RequestInspectionSnapshot['callSchemas']
   /** Folded `shield/decision` events; attached onto existing rows only. */
   decisions?: readonly TrajectoryShieldMatch[]
+  /** Folded J-Space badges; attached onto existing rows only. */
+  jspace?: readonly TrajectoryJSpaceBadge[]
 }
 
 /** Decision fields used to match an existing user/context/tool cell. */
@@ -159,7 +162,7 @@ function inputCellDetail(node: InputNode): Pick<
 export function deriveTrajectoryLayout(input: TrajectoryLayoutInput): readonly TrajectoryTurnModel[] {
   const {
     nodes, eventLocations, partial, runningCalls, requests = [], callSchemas,
-    decisions = [],
+    decisions = [], jspace = [],
   } = input
   const resultByCall = indexResults(nodes)
   const callById = new Map<string, ToolCallBlock>(resultByCall)
@@ -543,6 +546,7 @@ export function deriveTrajectoryLayout(input: TrajectoryLayoutInput): readonly T
     ...standaloneCompactions.map(entry => toTurnModel(null, entry)),
   ].sort((left, right) => firstCellIndex(left) - firstCellIndex(right))
   attachShieldDecisions(models, decisions)
+  attachJSpaceBadges(models, jspace)
   return models
 }
 
@@ -615,11 +619,62 @@ function attachShieldDecisions(
 }
 
 /**
+ * Match one J-Space badge onto an existing cell.
+ * `turn` (0 folds to 1) plus optional `step` wins. Otherwise the last cell
+ * whose `sourceSeq` is at or before the badge seq.
+ */
+function matchJSpaceCell(
+  models: readonly TrajectoryTurnModel[],
+  badge: TrajectoryJSpaceBadge,
+): TrajectoryCellProps | undefined {
+  if (badge.turn !== undefined) {
+    const wanted = badge.turn === 0 ? 1 : badge.turn
+    const turn = models.find(entry => entry.turn === wanted)
+    if (turn !== undefined) {
+      if (badge.step !== undefined && badge.step > 0) {
+        const stepped = inputCellsInGroup(turn, `Step ${badge.step}`)
+        if (stepped[0] !== undefined) return stepped[0]
+        const tools = turn.groups
+          .filter(group => group.title === `Step ${badge.step}`)
+          .flatMap(group => group.cells)
+        if (tools[0] !== undefined) return tools[0]
+      }
+      const message = inputCellsInGroup(turn, 'Message')
+      const opener = message.find(cell => cell.opensTurn === true) ?? message[0]
+      if (opener !== undefined) return opener
+    }
+  }
+  let best: TrajectoryCellProps | undefined
+  for (const turn of models) {
+    for (const group of turn.groups) {
+      for (const cell of group.cells) {
+        if (cell.sourceSeq === undefined || cell.sourceSeq > badge.seq) continue
+        if (best === undefined || (best.sourceSeq ?? -1) < cell.sourceSeq) best = cell
+      }
+    }
+  }
+  return best
+}
+
+function attachJSpaceBadges(
+  models: readonly TrajectoryTurnModel[],
+  badges: readonly TrajectoryJSpaceBadge[],
+): void {
+  for (const badge of badges) {
+    const cell = matchJSpaceCell(models, badge)
+    if (cell === undefined) continue
+    const previous = cell.jspace
+    if (previous === undefined || badge.seq >= previous.seq) cell.jspace = badge
+  }
+}
+
+/**
  * Append the changing in-flight assistant cells to a stable finalized layout.
  * @param turns - Finalized layout derived with an empty-block partial anchor.
  * @param partial - Current in-flight assistant projection.
  * @param lastIndex - Highest cell index in the finalized layout.
  * @param decisions - Folded Shield verdicts reattached onto streamed tool cells.
+ * @param jspace - Folded J-Space badges reattached onto streamed cells.
  * @returns The original layout without a partial, otherwise a layout sharing every unaffected turn.
  */
 export function appendTrajectoryPartialLayout(
@@ -627,6 +682,7 @@ export function appendTrajectoryPartialLayout(
   partial: ConversationSnapshot['partial'],
   lastIndex: number,
   decisions: readonly TrajectoryShieldMatch[] = [],
+  jspace: readonly TrajectoryJSpaceBadge[] = [],
 ): readonly TrajectoryTurnModel[] {
   if (partial === null) return turns
   const partialTurn = deriveTrajectoryLayout({
@@ -634,6 +690,7 @@ export function appendTrajectoryPartialLayout(
     partial,
     runningCalls: [],
     decisions,
+    jspace,
   }).at(0)
   if (partialTurn === undefined) return turns
   const streamed: TrajectoryTurnModel = {
