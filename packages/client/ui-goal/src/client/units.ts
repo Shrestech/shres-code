@@ -1,11 +1,15 @@
 /**
  * Discrete remaining-work units for the Goal fight strip. Incomplete todos
- * are the only honest army: the strip does not invent zombies from round
- * caps or elapsed time.
+ * are the army when any exist. An absent, empty, or all-completed list
+ * still draws a standing army so Game mode is not a girl in an empty box.
+ * Remaining goal rounds stay unused: the default cap is 256, not unfinished work.
  */
 
 /** Hard cap so the 36px strip stays readable. */
 export const MAX_FIGHT_UNITS = 6
+
+/** Placeholder army while the session has no incomplete todos. */
+export const STANDING_ARMY = 4
 
 /** Sprite family for one remaining unit. */
 export type FightKind = 'zombie' | 'zombie-2' | 'zombie-lunge'
@@ -33,25 +37,35 @@ function fightKindAt(index: number): FightKind {
 
 /**
  * Map the current todo list to at most {@link MAX_FIGHT_UNITS} remaining units.
- * Completed items and an absent list produce an empty army.
+ * Completed items are skipped. An absent, empty, or all-completed list
+ * returns {@link STANDING_ARMY} placeholder units with stable `standing#`
+ * ids so the arena stays populated until a real incomplete item exists.
  * @param todos - latest `todos` projection, or undefined/null when none exists.
- * @returns remaining units in list order.
+ * @returns remaining units in list order, or the standing army.
  */
 export function remainingFightUnits(
   todos: readonly { content: string; status: string }[] | null | undefined,
 ): FightUnit[] {
-  if (!Array.isArray(todos)) return []
   const remaining: FightUnit[] = []
-  const seen = new Map<string, number>()
-  for (const item of todos) {
-    if (item.status === 'completed') continue
-    const n = seen.get(item.content) ?? 0
-    seen.set(item.content, n + 1)
+  if (Array.isArray(todos)) {
+    const seen = new Map<string, number>()
+    for (const item of todos) {
+      if (item.status === 'completed') continue
+      const n = seen.get(item.content) ?? 0
+      seen.set(item.content, n + 1)
+      remaining.push({
+        id: `${item.content}#${String(n)}`,
+        kind: fightKindAt(remaining.length),
+      })
+      if (remaining.length === MAX_FIGHT_UNITS) break
+    }
+  }
+  if (remaining.length > 0) return remaining
+  for (let i = 0; i < STANDING_ARMY; i++) {
     remaining.push({
-      id: `${item.content}#${String(n)}`,
-      kind: fightKindAt(remaining.length),
+      id: `standing#${String(i)}`,
+      kind: fightKindAt(i),
     })
-    if (remaining.length === MAX_FIGHT_UNITS) break
   }
   return remaining
 }

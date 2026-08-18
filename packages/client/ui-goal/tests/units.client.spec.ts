@@ -1,14 +1,18 @@
 // @vitest-environment jsdom
-// remainingFightUnits keeps only incomplete todos and never invents an army.
+// remainingFightUnits maps incomplete todos and stands a placeholder army otherwise.
 
 import { describe, expect, it } from 'vitest'
-import { formatElapsed, MAX_FIGHT_UNITS, remainingFightUnits } from '../src/client/units.ts'
+import { formatElapsed, MAX_FIGHT_UNITS, remainingFightUnits, STANDING_ARMY } from '../src/client/units.ts'
+
+const STANDING_IDS = ['standing#0', 'standing#1', 'standing#2', 'standing#3']
 
 describe('remainingFightUnits', () => {
-  it('returns nothing for an absent, null, or non-list value', () => {
-    expect(remainingFightUnits(undefined)).toEqual([])
-    expect(remainingFightUnits(null)).toEqual([])
-    expect(remainingFightUnits({} as never)).toEqual([])
+  it('draws a standing army when the list is absent, empty, or all completed', () => {
+    for (const todos of [undefined, null, [], [{ content: 'done', status: 'completed' }], {} as never]) {
+      const units = remainingFightUnits(todos)
+      expect(units).toHaveLength(STANDING_ARMY)
+      expect(units.map(u => u.id)).toEqual(STANDING_IDS)
+    }
   })
 
   it('drops completed items, caps the army, and disambiguates duplicate content', () => {
