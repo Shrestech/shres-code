@@ -184,13 +184,6 @@
     - id: tool-subagent-list-agents
       name: '@shres-code/shres-code-tool-subagent-control/list-agents'
 
-    # Named delegation seats (aegis / stride / ward) remounted from the
-    # `agent-seats` settings namespace. Unbound seats stay unmounted, so this
-    # row is a no-op until the user binds one; bound seats appear as their own
-    # model-facing tools with their configured provider/model.
-    - id: agent-seats
-      name: '@shres-code/shres-code-agent-seats'
-
     - id: tool-subagent
       name: '@shres-code/shres-code-tool-subagent'
       config:
