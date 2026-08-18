@@ -328,14 +328,6 @@
     - id: command-jspace
       name: '@shres-code/shres-code-command-jspace'
 
-    # Host-plane, not per-preset: agent-seats registers the `agent-seats`
-    # settings namespace, and a settings namespace tolerates exactly one live
-    # registration — a preset row would throw on the second composed scope
-    # (any concurrent session, or every in-process subagent child, which joins
-    # its parent's preset). Unbound seats stay unmounted.
-    - id: agent-seats
-      name: '@shres-code/shres-code-agent-seats'
-
     - id: plan-mode
       name: '@shres-code/shres-code-plan-mode'
       config:
