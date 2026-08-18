@@ -200,7 +200,7 @@ export function GoalDock({
     <GoalBar
       goal={projection === undefined ? undefined : projection === null ? null : projection.goal}
       units={remainingFightUnits(todos)}
-      createdAt={projection?.createdAt}
+      {...(projection?.createdAt === undefined ? {} : { createdAt: projection.createdAt })}
       gameEnabled={gameEnabled}
       onEdit={onEdit}
       onPause={onPause}

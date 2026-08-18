@@ -70,7 +70,7 @@ describe('GoalFight', () => {
       matches: true,
       addEventListener() {},
       removeEventListener() {},
-    } as MediaQueryList)
+    } as unknown as MediaQueryList)
     const { container, rerender } = render(<GoalFight units={two} frozen={false} createdAt={undefined} />)
     rerender(<GoalFight units={[]} frozen={false} createdAt={undefined} />)
     expect(container.querySelectorAll('[data-unit]')).toHaveLength(0)

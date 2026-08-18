@@ -251,8 +251,15 @@ describe('GoalDock adapter', () => {
     const { container } = render(
       <GoalDock
         useProjection={() => projection}
-        useGameSettings={(select: (s: { status: string; value: { enabled: boolean } }) => unknown) =>
-          select({ status: 'ready', value: { enabled: true } })}
+        useGameSettings={select => select({
+          status: 'ready',
+          value: { enabled: true },
+          base: undefined,
+          user: undefined,
+          revision: 1,
+          writable: true,
+          mode: 'host',
+        })}
         {...actions}
         t={t}
       /> as never,
