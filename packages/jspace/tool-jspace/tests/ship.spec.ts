@@ -79,3 +79,17 @@ describe('shipRefusal', () => {
     expect(shipRefusal({ ...card, goalOpenedSeq: 4 }, afterNewCheckpoint)).toBeUndefined()
   })
 })
+
+describe('shipRefusal robustness (review P2)', () => {
+  it('does not throw on a malformed card event (unreadable checked list)', () => {
+    const malformed = [
+      snapshot(1, []),
+      { type: 'jspace/card' as const, seq: 2, time: 0, ignorable: true as const, data: { broken: true } },
+      { type: 'jspace/card' as const, seq: 3, time: 0, ignorable: true as const, data: { ...card, checked: 'not-an-array' } },
+    ] as unknown as SessionEvent[]
+    expect(() => shipRefusal(card, malformed)).not.toThrow()
+    // No readable growth after seq 1 → refusal, not a crash.
+    expect(shipRefusal({ ...card, goalOpenedSeq: 2 }, malformed))
+      .toBe('jspace ship requires a checkpoint for the current Goal')
+  })
+})

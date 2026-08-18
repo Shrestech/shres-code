@@ -207,6 +207,8 @@ export function apply(ctx: Context): void {
 /**
  * Open a card when this assemble's pass is loop and none exists, so the same
  * request reprints the stock card instead of inviting a doomed `jspace_open`.
+ * An explicit close this session (`/j-space off`) stays closed: the automatic
+ * path must never undo the user's off.
  * @param ctx - seat owner.
  * @param context - current assemble context.
  */
@@ -214,7 +216,9 @@ function openIfLoop(ctx: Context, context: AssembleContext): void {
   const agent = context.agent
   if (agent === undefined) return
   if (!ctx.jspace.status.active) return
-  if (ctx.jspace.card(agent.session) !== null) return
+  const folded = ctx.jspace.fold(agent.session)
+  if (folded.card !== null) return
+  if (folded.closed) return
   if (passFor(ctx, agent.session, context.messages) !== 'loop') return
   ctx.jspace.open(agent.session, {
     goal: JSPACE_ALWAYS_OPEN_GOAL,

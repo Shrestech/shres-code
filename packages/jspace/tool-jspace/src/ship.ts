@@ -22,7 +22,10 @@ function latestCheckpointSeq(events: readonly SessionEvent[]): number | undefine
       continue
     }
     if (event.type !== 'jspace/card') continue
-    const { length } = event.data.checked
+    // A malformed card event is the fold's fault to record, not ship's to
+    // crash on: treat an unreadable checked list as no growth.
+    const checked = event.data?.checked
+    const length = Array.isArray(checked) ? checked.length : 0
     if (length > previous) last = event.seq
     previous = length
   }
