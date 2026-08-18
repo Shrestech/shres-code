@@ -208,6 +208,7 @@ describe('BashTerminalBackend startup rollback', () => {
       graceMs: 10,
       env: {
         TERM: 'dumb', PAGER: 'cat', GIT_PAGER: 'cat', PS1: 'shres> ', BASH_SILENCE_DEPRECATION_WARNING: '1',
+        PROMPT_COMMAND: 'printf "\\033]133;D;%s\\007" "$?"; PS1=\'shres> \'',
         SHRES_SHELL: '1', SHRES_SESSION_ID: 'agent', SHRES_PTY_SESSION_ID: 'pty-1',
       },
     })
@@ -215,7 +216,7 @@ describe('BashTerminalBackend startup rollback', () => {
     expect(initialized).toHaveBeenCalledWith(undefined)
     expect((ctx.sandbox as RecordingSandbox).calls).toEqual([{
       argv: ['/bin/bash', '-i'],
-      policy: { mode: 'workspace-write', sessionId: 'agent', workspaceRoot: '/workspace' },
+      policy: { mode: 'workspace-write', network: 'deny', sessionId: 'agent', workspaceRoot: '/workspace' },
     }])
   })
 
@@ -247,7 +248,7 @@ describe('BashTerminalBackend startup rollback', () => {
     })
     expect((ctx.sandbox as RecordingSandbox).calls).toEqual([{
       argv: ['/bin/bash', '-i'],
-      policy: { mode: 'workspace-write', sessionId: 'agent', workspaceRoot: '/session-workspace' },
+      policy: { mode: 'workspace-write', network: 'deny', sessionId: 'agent', workspaceRoot: '/session-workspace' },
     }])
   })
 
@@ -327,7 +328,7 @@ describe('BashTerminalBackend startup rollback', () => {
         outcome.resolve({ exitCode: null, signal: 'SIGTERM' })
       },
     }
-    queueMicrotask(() => { output.write(Buffer.from('\x1b]133;D;0\x07dsh> ')) })
+    queueMicrotask(() => { output.write(Buffer.from('\x1b]133;D;0\x07shres> ')) })
     const backend = new BashTerminalBackend(
       ctx,
       config(),
