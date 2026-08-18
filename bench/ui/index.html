@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>bench report — jspace a/b</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">shres-code <span>bench</span></div>
+    <div id="experiment-meta" class="experiment-meta" hidden></div>
+    <nav id="nav" aria-label="Report views">
+      <a href="#summary" data-view="summary">Summary</a>
+      <a href="#matrix" data-view="matrix">Matrix</a>
+      <a href="#charts" data-view="charts">Charts</a>
+      <a href="#trials" data-view="trials">Trials</a>
+    </nav>
+  </header>
+  <div id="demo-banner" class="banner" hidden>Synthetic demo data — directional story only, not a measurement.</div>
+  <main id="view" tabindex="-1"></main>
+  <footer>Rendered from bench/ui/data.js (generated, gitignored) · source of truth: bench/runs/&lt;experiment&gt;/&lt;arm&gt;/trials.jsonl</footer>
+  <script src="data.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

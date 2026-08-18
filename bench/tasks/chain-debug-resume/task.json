@@ -1,0 +1,15 @@
+{
+  "taskId": "chain-debug-resume",
+  "stratum": "chain",
+  "description": "Diagnose a stale-memoization bug in one session; a fresh session applies the fix from the recorded analysis.",
+  "phases": [
+    {
+      "instruction": "The test suite in this package fails. Run `node --test`, then diagnose the root cause: which component is wrong, why the observed failure follows from the code, and what the minimal fix is. Record your findings in `DIAGNOSIS.md` in the project root — root cause first, then the evidence (the failing test and the code paths involved). Do not modify anything under `src/` or `test/` in this step; analysis only."
+    },
+    {
+      "instruction": "Fix the bug identified earlier so the full test suite passes (`node --test`). Your earlier analysis is in this workspace. Keep the change minimal and do not modify the test files."
+    }
+  ],
+  "verify": "node verify.mjs",
+  "timeoutMs": 600000
+}

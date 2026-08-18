@@ -1,0 +1,15 @@
+{
+  "taskId": "math-derivation-chain",
+  "stratum": "chain",
+  "description": "Two-session arithmetic pipeline: persist three intermediates, then combine them fresh (re-reading INTERMEDIATE.json is the intended path).",
+  "phases": [
+    {
+      "instruction": "Implement an arithmetic expression evaluator in this package. Create `src/evaluate.js` exporting `evaluate(expression)` — parse and evaluate strings with numeric literals (integers and decimals), the binary operators `+`, `-`, `*`, `/` (usual precedence: `*` and `/` bind tighter), parentheses, unary minus, and arbitrary whitespace between tokens. Examples: `evaluate('2 + 3 * (4 + 5)')` returns `29`; `evaluate('-(2 + 3) * 4')` returns `-20`; `evaluate(' 10 /4 ')` returns `2.5`. Throw an error on malformed input. Cover the grammar with `node:test` tests under `test/`: precedence, parentheses, unary minus, decimals, whitespace, and at least one malformed input.\n\nThen use the evaluator to compute these three expressions and record the results in `INTERMEDIATE.json` in the project root as `{ \"a\": <number>, \"b\": <number>, \"c\": <number> }` with plain JSON numbers:\n\n- a = `2 + 3 * (4 + 5)`\n- b = `(18 - 6) / 4 + 2 * 3`\n- c = `100 / (2 + 3) / 4`\n\n`node --test` must pass."
+    },
+    {
+      "instruction": "Earlier work in this workspace computed three numbers, recorded in `INTERMEDIATE.json` in the project root as `{ \"a\", \"b\", \"c\" }`. Read those values and compute `result = a * b + c / a`. Write the answer to `answer.json` in the project root as `{ \"result\": <number> }` with a plain JSON number. Use the recorded values; do not re-derive them from the original expressions."
+    }
+  ],
+  "verify": "node verify.mjs",
+  "timeoutMs": 600000
+}

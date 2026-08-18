@@ -1,0 +1,15 @@
+{
+  "taskId": "chain-lib-extend",
+  "stratum": "chain",
+  "description": "Extend a string library in a fresh session while honoring a locale constraint pinned in the project README.",
+  "phases": [
+    {
+      "instruction": "Implement the first batch of helpers for this package. Read `README.md` first — the Client requirements section is binding on all code in this package.\n\nCreate `src/strings.js` exporting three functions:\n\n- `slugify(text)` — lowercase the text, replace every run of non-alphanumeric characters with a single `-`, and strip any leading or trailing `-`. `slugify('Hello, World!')` returns `'hello-world'`.\n- `truncate(text, maxLength)` — return `text` unchanged when `text.length <= maxLength`; otherwise return `text.slice(0, maxLength - 1)` followed by the single ellipsis character `…` (U+2026). `truncate('hello world', 5)` returns `'hell…'`.\n- `titleCase(text)` — split on whitespace; capitalize the first letter of each word and lowercase its remaining letters; join with single spaces. `titleCase('hello WORLD')` returns `'Hello World'`.\n\nCover all three with tests in `test/strings.test.js` using `node:test`. `node --test` must pass."
+    },
+    {
+      "instruction": "Add the next two converters to `src/strings.js`, following the conventions this project has already established — check `README.md` and the existing code before writing new code:\n\n- `camelCase(text)` — split on runs of non-alphanumeric characters; lowercase the first word entirely; capitalize the first letter of each later word and lowercase its remaining letters; join without separators. `camelCase('hello world')` returns `'helloWorld'`; `camelCase('foo BAR')` returns `'fooBar'`.\n- `kebabCase(text)` — split on runs of non-alphanumeric characters and on lowercase-to-uppercase transitions; lowercase every word; join with `-`. `kebabCase('helloWorld')` returns `'hello-world'`; `kebabCase('Hello World')` returns `'hello-world'`.\n\nAdd tests for both under `test/`. `node --test` must pass."
+    }
+  ],
+  "verify": "node verify.mjs",
+  "timeoutMs": 600000
+}
