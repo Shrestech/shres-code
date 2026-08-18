@@ -18,7 +18,7 @@ import { SlotRegistry, type SessionId } from '@shres-code/shres-code-client-runt
 import { ConversationEventRegistry } from '@shres-code/shres-code-client-runtime/src/client/conversation/event-registry.ts'
 import type { GoalProjection } from '@shres-code/shres-code-goal/client'
 import { LocaleRuntime } from '@shres-code/shres-code-client-locale/client'
-import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
+import { makeTranslate, stubSettingsScope } from '@shres-code/shres-code-client-test-runtime'
 import { en as commonEn } from '@shres-code/shres-code-client-locale/src/locales/en.ts'
 import type { GoalBarActions } from '../src/client/slots.ts'
 import { apply, inject } from '../src/client/index.ts'
@@ -85,9 +85,11 @@ async function bench(options: {
     name: 'root', children: {
       'conversation.input.dock': { kind: 'list', scope: 'session' },
       'conversation.chat.node': { kind: 'keyed', scope: 'session' },
+      'sidebar.brand.action': { kind: 'list', scope: 'root' },
     },
   } as never, (() => null) as never)
   ctx.provide('locale', new LocaleRuntime(ctx))
+  ctx.provide('settingsScope', { bind: () => stubSettingsScope().scope })
   ctx.provide('sessions', {
     binding: (id: SessionId) => ({
       sessionId: id,
@@ -123,6 +125,10 @@ describe('ui-goal browser plugin', () => {
   it('registers the GoalBar dock, command input Definition, and keyed Chat renderer', async () => {
     const b = await bench()
     await b.fiber.await()
+    const brand = b.ctx.slots.entries('sidebar.brand.action')[0]
+    expect(brand?.options).toMatchObject({ id: 'game-mode', order: 0 })
+    const game = (brand?.inject as () => { setEnabled: (on: boolean) => Promise<void> })()
+    await game.setEnabled(true)
     expect(b.entry()).toMatchObject({ id: 'goal', order: 10, locale: 'goal' })
     expect(b.entry()?.inject).toBeTypeOf('function')
     expect(b.definitions().map(definition => definition.kind)).toEqual(['goal-command-input'])
@@ -203,6 +209,7 @@ describe('ui-goal browser plugin', () => {
     await b.fiber.dispose()
     expect(b.entry()).toBeUndefined()
     expect(b.chatEntry()).toBeUndefined()
+    expect(b.ctx.slots.entries('sidebar.brand.action')).toHaveLength(0)
     expect(b.definitions()).toHaveLength(0)
   })
 })
@@ -230,6 +237,27 @@ describe('GoalDock adapter', () => {
 
     const absent = render(<GoalDock {...dockProps(() => undefined)} />)
     expect(absent.container.firstChild).toBeNull()
+  })
+
+  it('draws the fight arena when Game mode settings are enabled', () => {
+    const projection = makeProjection()
+    const actions: GoalBarActions = {
+      onEdit: () => Promise.resolve({ ok: true, value: undefined }),
+      onPause: () => Promise.resolve({ ok: true, value: undefined }),
+      onResume: () => Promise.resolve({ ok: true, value: undefined }),
+      onClear: () => Promise.resolve({ ok: true, value: undefined }),
+    }
+    const t = makeTranslate(en, commonEn)
+    const { container } = render(
+      <GoalDock
+        useProjection={() => projection}
+        useGameSettings={(select: (s: { status: string; value: { enabled: boolean } }) => unknown) =>
+          select({ status: 'ready', value: { enabled: true } })}
+        {...actions}
+        t={t}
+      /> as never,
+    )
+    expect(container.querySelector('[data-goal-fight]')).toBeTruthy()
   })
 })
 

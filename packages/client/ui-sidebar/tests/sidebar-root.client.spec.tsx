@@ -2,8 +2,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type {
-  SidebarFooterActionOwnerProps, SidebarRootComponentProps, SidebarSectionOwnerProps,
-  SidebarSettingsOwnerProps,
+  SidebarFooterActionOwnerProps, SidebarRootComponentProps,
+  SidebarSectionOwnerProps, SidebarSettingsOwnerProps,
 } from '../src/client/contract/slots.ts'
 import { SidebarRoot } from '../src/client/SidebarRoot.tsx'
 import { en } from '../src/client/locales.ts'
@@ -44,6 +44,9 @@ function mountShell({ collapsed = false, width = 300 }: { collapsed?: boolean; w
         if (key === 'sidebar.footer.action') {
           footerActionOwner = owner
           return <div data-testid="footer-action-seat" data-wide={owner.wide} />
+        }
+        if (key === 'sidebar.brand.action') {
+          return <div data-testid="brand-action-seat" data-wide={owner.wide} />
         }
         regionOwner = owner as SidebarSectionOwnerProps
         return <div data-testid="region" data-wide={owner.wide} />
@@ -91,6 +94,7 @@ describe('SidebarRoot shell', () => {
     // The settings seat rides the same wide flag (ui-settings renders the row).
     expect(b.settingsOwner().wide).toBe(true)
     expect(b.footerActionOwner().wide).toBe(true)
+    expect(screen.getByTestId('brand-action-seat')).toBeTruthy()
     // Expanded: the request is a no-op (no accidental collapse).
     b.regionOwner().expandSidebar()
     expect(b.toggleSidebar).not.toHaveBeenCalled()

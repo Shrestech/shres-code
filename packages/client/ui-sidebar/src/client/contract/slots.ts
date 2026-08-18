@@ -33,6 +33,12 @@ declare module '@shres-code/shres-code-client-ui-slots' {
      * package's 'sidebar' entry; each action receives only the column state.
      */
     'sidebar.footer.action': { kind: 'list'; scope: 'root'; owner: SidebarFooterActionOwnerProps }
+    /**
+     * Optional controls beside the product wordmark (wide logo row only).
+     * Declared by this package's 'sidebar' entry; each action receives the
+     * column state.
+     */
+    'sidebar.brand.action': { kind: 'list'; scope: 'root'; owner: SidebarBrandActionOwnerProps }
   }
 }
 
@@ -62,6 +68,12 @@ export interface SidebarFooterActionOwnerProps {
   wide: boolean
 }
 
+/** Owner share of a control rendered beside the wordmark. */
+export interface SidebarBrandActionOwnerProps {
+  /** Whether the sidebar renders wide content (false = 56px rail). */
+  wide: boolean
+}
+
 /**
  * Registrant-private injected share (arrives via the register inject
  * factory). The shell keeps only its own controls: starting a Session from
@@ -85,5 +97,5 @@ export type SidebarRootInjected = {
  */
 export type SidebarRootComponentProps =
   PropsRuntime<'sidebar'>
-  & PropsRenderSlots<'sidebar.workspaces' | 'sidebar.settings' | 'sidebar.footer.action'>
+  & PropsRenderSlots<'sidebar.workspaces' | 'sidebar.settings' | 'sidebar.footer.action' | 'sidebar.brand.action'>
   & SidebarRootInjected & PropsLocale<'sidebar'>

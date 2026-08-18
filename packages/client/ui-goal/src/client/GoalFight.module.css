@@ -1,0 +1,72 @@
+/* Goal fight arena: 32px tall, packed into the 36px Goal strip. */
+
+.arena {
+  position: relative;
+  flex: none;
+  width: 168px;
+  height: 32px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #1a1c22;
+}
+
+.actor {
+  position: absolute;
+  bottom: 0;
+  pointer-events: none;
+  user-select: none;
+}
+
+.girl {
+  left: 2%;
+  height: 100%;
+  width: auto;
+  z-index: 8;
+  transition: left 420ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.zombie {
+  height: 86%;
+  width: auto;
+  z-index: 2;
+  transition: opacity 420ms ease, transform 420ms ease, filter 420ms ease;
+}
+
+.alive {
+  animation: shambling 1.15s ease-in-out infinite;
+}
+
+.scatter {
+  animation: none;
+  opacity: 0;
+  transform: translateY(-4px) scale(1.08);
+  filter: blur(0.4px) saturate(0.45);
+}
+
+.gone {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.slash {
+  filter: drop-shadow(0 0 6px rgb(37 99 235 / 35%));
+}
+
+.clock {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-caption, #9aa1ad);
+}
+
+@keyframes shambling {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(-2px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .alive { animation: none; }
+  .girl { transition: none; }
+  .scatter { transition: opacity 80ms linear; transform: none; filter: none; }
+}

@@ -54,11 +54,29 @@ describe('GoalBar', () => {
 
   it('active goal: goal glyph, "Ongoing Goal", truncated objective, edit and clear actions', () => {
     const actions = makeActions()
-    render(<GoalBar goal={makeGoal()} {...actions} t={t} />)
+    const { container } = render(<GoalBar goal={makeGoal()} {...actions} t={t} />)
     expect(screen.getByText('Ongoing Goal')).toBeTruthy()
     expect(screen.getByText('Ship the redesign')).toBeTruthy()
+    expect(container.querySelector('[data-goal-fight]')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Clear goal' }))
     expect(actions.onClear).toHaveBeenCalledTimes(1)
+  })
+
+  it('draws incomplete todos as the army and hides the arena from the accessibility tree', () => {
+    const actions = makeActions()
+    const { container } = render(
+      <GoalBar
+        goal={makeGoal()}
+        units={[{ id: 'read#0', kind: 'zombie' }, { id: 'write#0', kind: 'zombie-2' }]}
+        createdAt={1}
+        gameEnabled
+        {...actions}
+        t={t}
+      />,
+    )
+    const arena = container.querySelector('[data-goal-fight]')
+    expect(arena?.getAttribute('aria-hidden')).toBe('true')
+    expect(container.querySelectorAll('[data-unit]')).toHaveLength(2)
   })
 
   it('single-flights rapid clear clicks and hides the committed goal before its projection catches up', async () => {
@@ -112,7 +130,7 @@ describe('GoalBar', () => {
     render(<GoalBar goal={makeGoal()} {...actions} t={t} />)
     fireEvent.click(screen.getByRole('button', { name: 'Edit goal' }))
     fireEvent.change(screen.getByRole('textbox', { name: 'Goal objective' }), { target: { value: 'abandoned draft' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel editing' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel edit' }))
     expect(actions.onEdit).not.toHaveBeenCalled()
     expect(screen.getByText('Ongoing Goal')).toBeTruthy()
 
