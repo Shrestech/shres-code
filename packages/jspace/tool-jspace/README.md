@@ -8,7 +8,7 @@ Model-facing tools over [`ctx.jspace`](../jspace/README.md). The plugin remounts
 |---|---|---|
 | `jspace_open` | `goal`, `next`, optional `core[]` (≤2) | Opens a card, or replaces Goal and Next when a card is already open. Core applies only on the first open. |
 | `jspace_note` | optional `goal`, `departing`, `core`, `open`, `next` | Patches the open card. A Core swap without `departing` fails. |
-| `jspace_checkpoint` | `check`, `by`, optional `evidence` | Appends a Checked line. `by` must name a verifier and coverage. `evidence` must be an existing tool-call id. |
+| `jspace_checkpoint` | `check`, `by`, optional `evidence` | Appends a Checked line. `by` must name a verifier and coverage. `evidence` must be a completed, non-error tool-call id. |
 | `jspace_ship` | optional `path` | Register check only. Rejects if Goal or Next is empty, or if no checkpoint exists for the current Goal. Does not write a file and does not close the card. |
 
 A non-agent caller is rejected. Seat refusals (`JspaceError`) become a plain `Error` with the same message.
@@ -46,7 +46,7 @@ Prefix-stable while the definitions stay visible. Settings off or a remount that
 
 #### What the model sees
 
-Each call retains its arguments. Success returns exactly `Opened J-Space.`, `Updated J-Space.`, `Recorded checkpoint.`, or `Ship check passed.` A second `jspace_open` while a card is open updates Goal and Next and returns `Updated J-Space.` Stable seat failures keep the seat message, including `jspace core swap requires departing and incoming lines`, `jspace checkpoint requires a verifier and coverage claim`, `jspace evidence "<id>" is not a tool call in this session`, and `jspace ship requires a checkpoint for the current Goal`. While a card is open, an identical non-card tool call is refused until a later `jspace/card` write records a diagnosis. A non-agent caller fails with `jspace_<name> requires an owning agent session`. Card snapshots stay in the session log; they are not a second model message.
+Each call retains its arguments. Success returns exactly `Opened J-Space.`, `Updated J-Space.`, `Recorded checkpoint.`, or `Ship check passed.` A second `jspace_open` while a card is open updates Goal and Next and returns `Updated J-Space.` Stable seat failures keep the seat message, including `jspace core swap requires departing and incoming lines`, `jspace checkpoint requires a verifier and coverage claim`, `jspace evidence "<id>" is not a completed, non-error tool call in this session`, and `jspace ship requires a checkpoint for the current Goal`. While a card is open, an identical non-card tool call is refused until a later `jspace/card` write records a diagnosis; the refusal is bounded by the turn, so a new user turn may re-issue a command. A non-agent caller fails with `jspace_<name> requires an owning agent session`. Card snapshots stay in the session log; they are not a second model message.
 
 #### Token effect
 

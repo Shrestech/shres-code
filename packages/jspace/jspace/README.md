@@ -47,5 +47,5 @@ None; this package neither assembles nor sends a provider request.
 ## Known Limitations and Deferred Work
 
 - **`always-open` does not auto-open** — the field is stored; the prompt Consumer opens on the first pre-step with `JSPACE_ALWAYS_OPEN_GOAL` / `JSPACE_ALWAYS_OPEN_NEXT`.
-- **Coverage is a term match** — `checkpoint()` cannot tell whether the verifier ran. `evidence` must name an existing `tool/call` id and still does not prove coverage.
+- **Coverage is a term match** — `checkpoint()` cannot tell whether the verifier ran. `evidence` must name a `tool/call` id with a logged, non-error `tool/result` and still does not prove coverage.
 - **Trusted in-process producers** — a plugin with direct `Session` access can append counterfeit card events. The fold and invariant detect inconsistency; they do not isolate plugins.

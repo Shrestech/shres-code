@@ -339,7 +339,7 @@ describe('jspace tools', () => {
     })
     const denied = await execute(ctx, 'echo', { msg: 'hi' }, agent)
     expect(denied.isError).toBe(true)
-    expect(text(denied)).toContain('repeated tool call')
+    expect(text(denied)).toContain('same arguments within a turn')
     await execute(ctx, 'jspace_note', { next: 'Try another path' }, agent)
     const allowed = await execute(ctx, 'echo', { msg: 'hi' }, agent)
     expect(allowed.isError).toBe(false)

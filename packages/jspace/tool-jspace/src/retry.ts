@@ -15,8 +15,8 @@ const CARD_TOOLS = new Set([
 
 /** Model-visible refuse when the same call repeats with no card write in between. */
 export const REPEAT_DENY =
-  'jspace refuses a repeated tool call with the same arguments while a card is open. '
-  + 'Write a jspace_note naming the diagnosis, then retry with different arguments or a different tool.'
+  'jspace refuses repeating a tool call with the same arguments within a turn while a card is open. '
+  + 'Write a jspace_note naming the diagnosis first; after that note the same call runs again.'
 
 /**
  * Canonical JSON for logged or live tool arguments.
@@ -39,10 +39,12 @@ export function canonicalizeArgs(value: unknown): string {
 }
 
 /**
- * Whether this call matches any prior non-current tool/call with no later card
- * write. The scan covers the whole span since the last card write, not only
- * the immediately previous call: alternating `A, B, A` with identical
- * arguments is the same undiagnosed repeat as `A, A`.
+ * Whether this call matches any prior non-current tool/call in the same turn
+ * with no later card write. The scan covers the whole span since the last
+ * card write or `turn/start`, not only the immediately previous call:
+ * alternating `A, B, A` with identical arguments is the same undiagnosed
+ * repeat as `A, A`. A new user turn bounds the scan, so re-issuing a command
+ * the user asked for again stays legal.
  * @param events - session log (the current `tool/call` may already be appended).
  * @param name - incoming tool name.
  * @param args - incoming parsed arguments.
@@ -61,6 +63,7 @@ export function shouldRefuseRepeat(
     const event = events[index]
     if (event === undefined) continue
     if (event.type === 'jspace/card' || event.type === 'jspace/closed') return false
+    if (event.type === 'turn/start') return false
     if (event.type !== 'tool/call') continue
     const data = event.data as { name?: string; arguments?: unknown; callId?: string }
     if (currentCallId !== undefined && data.callId === currentCallId) continue

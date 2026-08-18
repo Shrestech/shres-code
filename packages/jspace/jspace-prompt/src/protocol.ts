@@ -34,7 +34,7 @@ export const JSPACE_DRIVER_OPEN =
   + 'Record checks with jspace_checkpoint (by must name a verifier). '
   + 'Call jspace_ship before claiming done. Do not call jspace_open to start a second card; '
   + 'it replaces Goal and Next on the open card. '
-  + 'Repeating the same tool call is refused until you write a diagnosis on the card.'
+  + 'Repeating the same tool call within a turn is refused until you write a diagnosis on the card.'
 
 /**
  * Protocol block for this pass, always including the tool-driver lines.

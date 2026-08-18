@@ -18,6 +18,10 @@ function card(): SessionEvent {
   return { type: 'jspace/card', seq: 2, time: 1, data: {} } as SessionEvent
 }
 
+function turn(): SessionEvent {
+  return { type: 'turn/start', seq: 3, time: 2, data: {} } as SessionEvent
+}
+
 describe('shouldRefuseRepeat', () => {
   it('allows the first call and card tools', () => {
     expect(shouldRefuseRepeat([undefined as unknown as SessionEvent], 'bash', { cmd: 'ls' }, 'now')).toBe(false)
@@ -84,6 +88,27 @@ describe('shouldRefuseRepeat', () => {
     )).toBe(true)
     expect(shouldRefuseRepeat(
       [call('bash', '{"cmd":"pwd"}', 'a')],
+      'bash',
+      { cmd: 'ls' },
+      'now',
+    )).toBe(false)
+  })
+
+  it('allows an identical re-issue in a later turn', () => {
+    expect(shouldRefuseRepeat(
+      [call('bash', '{"cmd":"ls"}', 'a'), turn()],
+      'bash',
+      { cmd: 'ls' },
+      'now',
+    )).toBe(false)
+    expect(shouldRefuseRepeat(
+      [turn(), call('bash', '{"cmd":"ls"}', 'a'), call('read', '{"path":"x"}', 'b'), turn()],
+      'bash',
+      { cmd: 'ls' },
+      'now',
+    )).toBe(false)
+    expect(shouldRefuseRepeat(
+      [call('bash', '{"cmd":"ls"}', 'a'), call('read', '{"path":"x"}', 'b'), turn(), call('read', '{"path":"y"}', 'c')],
       'bash',
       { cmd: 'ls' },
       'now',
