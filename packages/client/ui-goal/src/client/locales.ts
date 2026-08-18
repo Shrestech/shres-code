@@ -13,6 +13,9 @@ export const en = {
   'action.resume': 'Resume goal',
   'action.edit': 'Edit goal',
   'action.clear': 'Clear goal',
+  'game.mode': 'Game',
+  'game.on': 'Turn Game mode on',
+  'game.off': 'Turn Game mode off',
 } satisfies Record<string, string>
 
 /** The GoalKey union. */

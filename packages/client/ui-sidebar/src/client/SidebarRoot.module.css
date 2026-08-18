@@ -111,6 +111,13 @@
    (figma flows: the main-screen instance is black; blue is brand
    emphasis only). A button only in behavior (New Session shortcut): the
    pointer cursor is the sole affordance — no hover chrome on the mark. */
+.brandActions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
 .brand {
   flex: 1;
   min-width: 0;

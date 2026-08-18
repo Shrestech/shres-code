@@ -2081,6 +2081,10 @@ importers:
         version: 18.3.1(react@18.3.1)
 
   packages/client/ui-goal:
+    dependencies:
+      '@shres-code/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
     devDependencies:
       '@shres-code/cordis':
         specifier: workspace:^
@@ -2103,6 +2107,12 @@ importers:
       '@shres-code/shres-code-client-ui-primitives':
         specifier: workspace:^
         version: link:../ui-primitives
+      '@shres-code/shres-code-client-ui-settings':
+        specifier: workspace:^
+        version: link:../ui-settings
+      '@shres-code/shres-code-client-ui-sidebar':
+        specifier: workspace:^
+        version: link:../ui-sidebar
       '@shres-code/shres-code-client-ui-slots':
         specifier: workspace:^
         version: link:../ui-slots
@@ -2115,6 +2125,12 @@ importers:
       '@shres-code/shres-code-invariants':
         specifier: workspace:^
         version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-settings':
+        specifier: workspace:^
+        version: link:../../settings/settings
+      '@shres-code/shres-code-tool-todo':
+        specifier: workspace:^
+        version: link:../../todo/tool-todo
       '@testing-library/react':
         specifier: ^16.1.0
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)

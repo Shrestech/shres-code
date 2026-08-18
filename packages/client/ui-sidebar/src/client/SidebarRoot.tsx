@@ -140,6 +140,11 @@ export function SidebarRoot({
             <BrandWordmark size={48} />
           </button>
         )}
+        {wide && (
+          <div className={clsx(css.brandActions, css.wide)}>
+            {renderSlot('sidebar.brand.action', { wide })}
+          </div>
+        )}
         {/* Rail resting state is the product mark; hovering swaps in the panel
             icon (the expand affordance, figma sidebar-hover flow). */}
         <Tooltip label={collapsed ? t('toggle.open') : t('toggle.collapse')} delayMs={500}>

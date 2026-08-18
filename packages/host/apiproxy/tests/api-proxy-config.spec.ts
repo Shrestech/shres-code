@@ -462,6 +462,20 @@ describe('settings domain', () => {
       .toEqual({ seats: { aegis: { provider: 'ollama-cloud', model: 'kimi-k3' } } })
   })
 
+  it('serves the game namespace so the sidebar Game mode switch can persist', async () => {
+    const ctx = await harness()
+    ctx.settings.register(settingsNamespace('game'), z.object({
+      enabled: z.boolean(),
+    }))
+    const api = createApiProxy(ctx, DEFAULTS)
+    expectOk(await api.settings.mutate(request({
+      ns: 'game',
+      ops: [{ op: 'set', path: ['enabled'], value: true }],
+    })))
+    expect(ctx.settings.describe().find(view => String(view.ns) === 'game')?.value)
+      .toEqual({ enabled: true })
+  })
+
   it('serves the jspace namespace so the J-Space settings page can persist the allow switch', async () => {
     const ctx = await harness()
     ctx.settings.register(settingsNamespace('jspace'), z.object({

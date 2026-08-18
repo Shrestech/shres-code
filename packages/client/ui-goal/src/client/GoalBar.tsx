@@ -1,11 +1,13 @@
 /**
  * GoalBar: the goal indicator docked above the message composer (input dock
  * strip). A present goal shows a goal glyph, a phase label, the truncated
- * objective, and icon actions — resume when paused, edit (inline form in the
- * same strip), and clear. Goal creation lives on the `/goal` command, not
- * here: loading (undefined), no goal (null), and complete goals render
- * nothing. Live state arrives as the projected whole snapshot; the verbs are
- * the injected face.
+ * objective, and icon actions — resume when paused, edit (inline form in
+ * the same strip), and clear. When Game mode is on, the fight arena sits
+ * at the left of the strip. Incomplete todos are the army; the clock is
+ * elapsed since create, not an ETA. Goal creation lives on the `/goal`
+ * command, not here: loading (undefined), no goal (null), and complete
+ * goals render nothing. Live state arrives as the projected whole
+ * snapshot; the verbs are the injected face.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -14,14 +16,25 @@ import {
   IconCheckOutline16, IconCloseOutline16, IconEditOutline16, IconGoalOutline16,
   IconPauseOutline16, IconPlayOutline16, IconTrashOutline16, Tooltip,
 } from '@shres-code/shres-code-client-ui-primitives'
-import type { PropsLocale } from '@shres-code/shres-code-client-ui-slots'
-import type { GoalActionResult, GoalBarActions } from './slots.ts'
+import type { InjectFace, PropsLocale } from '@shres-code/shres-code-client-ui-slots'
+// Type-only: the `todos` SessionProjectionMap merge.
+import type {} from '@shres-code/shres-code-tool-todo/client'
+import type { GoalActionResult, GoalBarActions, GoalDockInjected } from './slots.ts'
+import { gameSettingsEnabled } from './game-settings.ts'
 import type { GoalKey } from './locales.ts'
+import { GoalFight } from './GoalFight.tsx'
+import { remainingFightUnits, type FightUnit } from './units.ts'
 import css from './GoalBar.module.css'
 
 export interface GoalBarProps extends GoalBarActions {
   /** Current goal snapshot; undefined = capability absent or loading, null = no goal set. */
   goal: GoalSnapshot | null | undefined
+  /** Remaining incomplete todos drawn as the army; empty shows the girl alone. */
+  units?: readonly FightUnit[]
+  /** Goal create time (epoch ms) for the elapsed clock. */
+  createdAt?: number
+  /** When false the arena is omitted; default off. */
+  gameEnabled?: boolean
 }
 
 /** Strip label keys per visible phase; complete goals render nothing. */
@@ -31,7 +44,9 @@ const PHASE_LABELS = {
   blocked: 'phase.blocked',
 } as const satisfies Record<string, GoalKey>
 
-export function GoalBar({ goal, onEdit, onPause, onResume, onClear, t }: GoalBarProps & PropsLocale<'goal'>) {
+export function GoalBar({
+  goal, units = [], createdAt, gameEnabled = false, onEdit, onPause, onResume, onClear, t,
+}: GoalBarProps & PropsLocale<'goal'>) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
   const [pending, setPending] = useState(false)
@@ -127,6 +142,7 @@ export function GoalBar({ goal, onEdit, onPause, onResume, onClear, t }: GoalBar
   return (
     <div className={css.dock} data-goal-bar>
       <div className={css.bar} title={title}>
+        {gameEnabled && <GoalFight units={units} frozen={goal.phase !== 'active'} createdAt={createdAt} />}
         <span className={css.goalGlyph}><IconGoalOutline16 size={14} /></span>
         <span className={css.label}>{t(PHASE_LABELS[goal.phase])}</span>
         <span className={css.objective}>{goal.objective}</span>
@@ -169,14 +185,23 @@ export function GoalBar({ goal, onEdit, onPause, onResume, onClear, t }: GoalBar
 }
 
 /** Full props of the dock entry: InputZone owner share + session standard kit + injected verbs + the locale seat. */
-export type GoalDockProps = import('@shres-code/shres-code-client-ui-slots').PropsRuntime<'conversation.input.dock'> & GoalBarActions & PropsLocale<'goal'>
+export type GoalDockProps = import('@shres-code/shres-code-client-ui-slots').PropsRuntime<'conversation.input.dock'> & InjectFace<GoalDockInjected> & PropsLocale<'goal'>
 
 /** Dock adapter: reads the host-computed 'goal' projection (whole value; absent or null renders nothing). */
-export function GoalDock({ useProjection, onEdit, onPause, onResume, onClear, t }: GoalDockProps) {
+export function GoalDock({
+  useProjection, useGameSettings, onEdit, onPause, onResume, onClear, t,
+}: GoalDockProps) {
   const projection = useProjection('goal')
+  const todos = useProjection('todos')
+  const gameEnabled = useGameSettings === undefined
+    ? false
+    : gameSettingsEnabled(useGameSettings(current => current))
   return (
     <GoalBar
       goal={projection === undefined ? undefined : projection === null ? null : projection.goal}
+      units={remainingFightUnits(todos)}
+      {...(projection?.createdAt === undefined ? {} : { createdAt: projection.createdAt })}
+      gameEnabled={gameEnabled}
       onEdit={onEdit}
       onPause={onPause}
       onResume={onResume}
