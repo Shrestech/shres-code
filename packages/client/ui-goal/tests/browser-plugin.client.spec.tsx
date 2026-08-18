@@ -250,19 +250,29 @@ describe('GoalDock adapter', () => {
     const t = makeTranslate(en, commonEn)
     const { container } = render(
       <GoalDock
-        useProjection={() => projection}
-        useGameSettings={select => select({
-          status: 'ready',
-          value: { enabled: true },
-          base: undefined,
-          user: undefined,
-          revision: 1,
-          writable: true,
-          mode: 'host',
-        })}
-        {...actions}
-        t={t}
-      /> as never,
+        {...({
+          useProjection: () => projection,
+          useGameSettings: (select: (s: {
+            status: 'ready'
+            value: { enabled: boolean }
+            base: undefined
+            user: undefined
+            revision: number
+            writable: boolean
+            mode: 'host'
+          }) => boolean) => select({
+            status: 'ready',
+            value: { enabled: true },
+            base: undefined,
+            user: undefined,
+            revision: 1,
+            writable: true,
+            mode: 'host',
+          }),
+          ...actions,
+          t,
+        } as unknown as Parameters<typeof GoalDock>[0])}
+      />,
     )
     expect(container.querySelector('[data-goal-fight]')).toBeTruthy()
   })
