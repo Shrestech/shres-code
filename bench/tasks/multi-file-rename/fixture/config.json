@@ -1,0 +1,8 @@
+{
+  "entry": "src/site.js",
+  "modules": {
+    "slug": "src/slugify.js",
+    "post": "src/post.js"
+  },
+  "outputDir": "dist"
+}

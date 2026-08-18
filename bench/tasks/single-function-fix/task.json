@@ -1,0 +1,9 @@
+{
+  "taskId": "single-function-fix",
+  "stratum": "short",
+  "description": "Fix an off-by-one that drops the last partial page of a paginated list.",
+  "instruction": "The test suite in `test/pagination.test.js` fails: `splitIntoPages` in `src/pagination.js` drops a trailing partial page, and returns no page at all when there are fewer items than the page size. Fix `src/pagination.js` with the smallest change that makes `node --test` pass. Do not modify the test file.",
+  "verify": "node verify.mjs",
+  "timeoutMs": 300000,
+  "maxTurns": 12
+}
