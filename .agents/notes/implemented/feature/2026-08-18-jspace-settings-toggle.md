@@ -102,7 +102,7 @@ Render intent is `generic`. Presentation methods are pure functions of `args`. N
 
 ### UI
 
-Settings page (`packages/client/ui-settings-jspace`), `settings.section` id `jspace`, order 13 (after Shield at 12). Lead with the enable switch. Edit `mode` and `requireCoverage` immediately. Below the switch: this-session path, whether a card is open, checkpoint count. Counts come from the `jspace` projection folded from the log, not from `settings.yaml`.
+Settings page (`packages/client/ui-settings-jspace`), `settings.section` id `jspace`, order 13 (after Shield at 12). Lead with the enable switch. Edit `mode` and `requireCoverage` immediately. Below the switch: this-session path, whether a card is open, checkpoint count. Counts come from the `jspace` projection folded from the log, not from `settings.yaml`. The Host API proxy allowlists `jspace` next to `shres-shield` so the page can read and persist the namespace.
 
 Composer chip (`packages/client/ui-jspace`): visible only when Settings `enabled` is true. On opens the card; off writes `jspace/closed`.
 
