@@ -102,7 +102,7 @@ Render intent is `generic`. Presentation methods are pure functions of `args`. N
 
 ### UI
 
-Settings page (`packages/client/ui-settings-jspace`), `settings.section` id `jspace`, order 13 (after Shield at 12). Lead with the enable switch. Edit `mode` and `requireCoverage` immediately. Below the switch: this-session path, whether a card is open, checkpoint count. Counts come from the `jspace` projection folded from the log, not from `settings.yaml`. The Host API proxy allowlists `jspace` next to `shres-shield` so the page can read and persist the namespace.
+Settings page (`packages/client/ui-settings-jspace`), `settings.section` id `jspace`, order 13 (after Shield at 12). Lead with the enable switch. Edit `mode` and `requireCoverage` immediately. Below the switch: this-session path, whether a card is open, checkpoint count. Counts come from the `jspace` projection folded from the log, not from `settings.yaml`. The folded view object is reused while `open` and `checked` are unchanged ([snapshot identity](../bug-fix/2026-08-18-jspace-settings-snapshot-identity.md)). The Host API proxy allowlists `jspace` next to `shres-shield` so the page can read and persist the namespace.
 
 Composer chip (`packages/client/ui-jspace`): visible only when Settings `enabled` is true. On opens the card; off writes `jspace/closed`.
 
@@ -157,7 +157,7 @@ Forked agents copy the logged card; they never share one. Newly spawned agents s
 
 ## Testing
 
-Host package specs cover remount, fold/fault, fork-copy, coverage matching (word-bounded ASCII; CJK extras), checkpoint/ship refusals, command parse, and Loader composition. Prompt specs cover classify, assemble-time open, and section rebuild. Client specs cover Settings apply, chip/dock `sessionId` gating, and Trajectory badges. `examples/headless-agent` keyless snapshot `jspace-tools` is the assembled-application transcript. The settings-chrome dialog golden includes the J-Space nav row.
+Host package specs cover remount, fold/fault, fork-copy, coverage matching (word-bounded ASCII; CJK extras), checkpoint/ship refusals, command parse, and Loader composition. Prompt specs cover classify, assemble-time open, and section rebuild. Client specs cover Settings apply, chip/dock `sessionId` gating, Trajectory badges, and card-view snapshot identity. `examples/headless-agent` keyless snapshot `jspace-tools` is the assembled-application transcript. The settings-chrome dialog golden includes the J-Space nav row. The assembled Settings e2e re-opens the pane after a workspace session exists.
 
 ## Deferred
 

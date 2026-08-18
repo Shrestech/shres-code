@@ -36,8 +36,9 @@ export interface JSpaceSessionRead {
 /**
  * Fold one jspace projection snapshot onto the last-known view.
  * @param raw - `jspace` projection value, or undefined while absent.
- * @param previous - last view kept when the projection is missing.
- * @returns the next view, or `previous` when the snapshot is absent.
+ * @param previous - last view kept when the projection is missing or unchanged.
+ * @returns the next view, or `previous` when the snapshot is absent or when
+ *   `open` and `checked` match (useSyncExternalStore identity).
  */
 export function foldJSpaceCardView(
   raw: unknown,
@@ -47,16 +48,34 @@ export function foldJSpaceCardView(
   if (raw === undefined) return previous
   const card = (raw as { card?: { checked?: readonly unknown[]; sessionId?: string } | null }).card
   if (card === undefined) return previous
-  if (card === null) return { open: false, checked: previous?.checked ?? 0 }
+  if (card === null) return reuseCardView(previous, false, previous?.checked ?? 0)
   if (
     sessionId !== undefined
     && typeof card.sessionId === 'string'
     && card.sessionId.length > 0
     && card.sessionId !== sessionId
   ) {
-    return { open: false, checked: previous?.checked ?? 0 }
+    return reuseCardView(previous, false, previous?.checked ?? 0)
   }
-  return { open: true, checked: card.checked?.length ?? 0 }
+  return reuseCardView(previous, true, card.checked?.length ?? 0)
+}
+
+/**
+ * Return `previous` when `open` and `checked` already match.
+ * @param previous - last view, if any.
+ * @param open - next open flag.
+ * @param checked - next Checked-line count.
+ * @returns `previous` or a new view.
+ */
+function reuseCardView(
+  previous: JSpaceCardView | undefined,
+  open: boolean,
+  checked: number,
+): JSpaceCardView {
+  if (previous !== undefined && previous.open === open && previous.checked === checked) {
+    return previous
+  }
+  return { open, checked }
 }
 
 /**
@@ -99,6 +118,7 @@ export function subscribeJSpaceView(
 
 /**
  * Observable last-known card view for the Settings page.
+ * `getSnapshot` returns the same object until `open` or `checked` changes.
  * @param sessions - list + binding used by the Settings page.
  * @returns a source the renderer binds through `bindSnapshotSelector`.
  */

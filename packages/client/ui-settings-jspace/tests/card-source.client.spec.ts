@@ -73,6 +73,24 @@ describe('foldJSpaceCardView', () => {
       { open: false, checked: 0 },
       'child',
     )).toEqual({ open: false, checked: 0 })
+    expect(foldJSpaceCardView(
+      { card: { sessionId: 'parent', checked: ['a'] } },
+      undefined,
+      'child',
+    )).toEqual({ open: false, checked: 0 })
+  })
+
+  it('returns the previous object when open and checked match', () => {
+    const open = { open: true, checked: 1 }
+    expect(foldJSpaceCardView({ card: { checked: ['x'] } }, open)).toBe(open)
+    const closed = { open: false, checked: 2 }
+    expect(foldJSpaceCardView({ card: null }, closed)).toBe(closed)
+    expect(foldJSpaceCardView(
+      { card: { sessionId: 'parent', checked: ['a'] } },
+      closed,
+      'child',
+    )).toBe(closed)
+    expect(foldJSpaceCardView({ card: { checked: ['a', 'b'] } }, open)).not.toBe(open)
   })
 })
 
@@ -104,6 +122,16 @@ describe('createJSpaceViewSource', () => {
     expect(source.getSnapshot()).toEqual({ open: true, checked: 3 })
     const empty = createJSpaceViewSource(sessions({}))
     expect(empty.getSnapshot()).toBeUndefined()
+  })
+
+  it('returns the same snapshot object while the card is unchanged', () => {
+    const source = createJSpaceViewSource(sessions({
+      current: 's1',
+      raw: { card: { checked: ['a'] } },
+    }))
+    const first = source.getSnapshot()
+    expect(source.getSnapshot()).toBe(first)
+    expect(source.getSnapshot()).toBe(first)
   })
 
   it('notifies on list and face changes and disposes both', () => {

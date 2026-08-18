@@ -97,6 +97,11 @@ describe('web e2e: J-Space settings remount', () => {
     await expect.poll(() => dock.getByText('J-Space is on', { exact: true }).count(), { timeout: 5_000 }).toBe(1)
     await expect.poll(() => dock.getByText('State the first action', { exact: true }).count(), { timeout: 5_000 }).toBe(1)
 
+    const afterSession = await openJspaceSection()
+    await afterSession.getByRole('switch', { name: 'Disable' }).waitFor({ timeout: 10_000 })
+    await afterSession.getByRole('button', { name: 'Close' }).click()
+    await expect.poll(() => page.getByRole('dialog', { name: 'Settings' }).count(), { timeout: 5_000 }).toBe(0)
+
     await scaffold.ctx.settings.mutate(settingsNamespace('jspace'), [
       { op: 'set', path: ['enabled'], value: false },
     ])
