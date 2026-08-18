@@ -7,6 +7,12 @@
     - button "Models":
       - img
       - text: Models
+    - button "Shield":
+      - img
+      - text: Shield
+    - button "J-Space":
+      - img
+      - text: J-Space
     - button "Plugins":
       - img
       - text: Plugins

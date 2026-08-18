@@ -462,6 +462,21 @@ describe('settings domain', () => {
       .toEqual({ seats: { aegis: { provider: 'ollama-cloud', model: 'kimi-k3' } } })
   })
 
+  it('serves the jspace namespace so the J-Space settings page can persist the allow switch', async () => {
+    const ctx = await harness()
+    ctx.settings.register(settingsNamespace('jspace'), z.object({
+      enabled: z.boolean(),
+      mode: z.union(['available', 'always-open'] as const),
+    }))
+    const api = createApiProxy(ctx, DEFAULTS)
+    expectOk(await api.settings.mutate(request({
+      ns: 'jspace',
+      ops: [{ op: 'set', path: ['enabled'], value: true }],
+    })))
+    expect(ctx.settings.describe().find(view => String(view.ns) === 'jspace')?.value)
+      .toEqual({ enabled: true })
+  })
+
   it('serves the shres-shield namespace so the Shield settings page can persist posture and license', async () => {
     const ctx = await harness()
     ctx.settings.register(settingsNamespace('shres-shield'), z.object({
