@@ -17,6 +17,11 @@ export interface JspacePassInput {
   readonly alwaysOpen: boolean
 }
 
+// Term lists are English-only by repo convention (no non-ASCII needles in
+// source); a request the lists do not cover classifies by length only, which
+// under-mounts protocol rather than over-mounting it. The lists are
+// heuristics with no measured basis yet — W0 pass-distribution telemetry is
+// the instrument that calibrates them.
 const LOOP_TERMS =
   /\b(across|multi-?file|persist|resume|refactor|throughout|every file|long-?horizon|multi-?stage|multi-?turn)\b/iu
 const FULL_TERMS =

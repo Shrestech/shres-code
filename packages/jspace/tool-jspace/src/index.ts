@@ -29,8 +29,8 @@ const NOTE_DESCRIPTION =
 
 const CHECKPOINT_DESCRIPTION =
   'Record a Checked line on the open card. `by` must name a verifier and what it covered. '
-  + 'Optional `evidence` is a prior tool-call id that must exist in this session; naming '
-  + 'it does not prove coverage. Rejects if no card is open.'
+  + 'Optional `evidence` is a prior tool-call id that must have completed without error in '
+  + 'this session; naming it does not prove coverage. Rejects if no card is open.'
 
 const SHIP_DESCRIPTION =
   'Check that the open card is ready to ship: Goal and Next are set, and a checkpoint '
@@ -211,7 +211,7 @@ function registerTools(ctx: Context): () => void {
       },
       evidence: {
         type: 'string',
-        description: 'Existing tool-call id. Must exist; it does not prove coverage.',
+        description: 'Completed non-error tool-call id. Naming it does not prove coverage.',
       },
     },
     output: {

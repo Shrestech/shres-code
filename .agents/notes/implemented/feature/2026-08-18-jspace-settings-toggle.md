@@ -93,7 +93,7 @@ Do not load third-party J-Space modules, science references, or Dense Track nota
 |---|---|---|
 | `jspace_open` | `goal`, `next`, optional `core[]` (≤2) | Opens a card, or replaces Goal and Next when a card is already open. Rejects `core.length > 2` on the first open. |
 | `jspace_note` | optional `goal`, `core` swap pair, `open`, `next` | Rejects with no open card; a core swap without a departing line fails. |
-| `jspace_checkpoint` | `check`, `by`, optional `evidence: <callId>` | Rejects with no open card; when `requireCoverage` is true, rejects `by` that matches no coverage term (English word-bounded terms first; extra terms via `coverageTerms`; CJK extras are substring includes). `evidence` must name a `tool/call` id that exists in the session log. It raises the cost of fabrication; it does not prove coverage. |
+| `jspace_checkpoint` | `check`, `by`, optional `evidence: <callId>` | Rejects with no open card; when `requireCoverage` is true, rejects `by` that matches no coverage term (English word-bounded terms first; extra terms via `coverageTerms`; CJK extras are substring includes). `evidence` must name a `tool/call` id with a logged, non-error `tool/result` in the session log. It raises the cost of fabrication; it does not prove coverage. |
 | `jspace_ship` | `path?` | Rejects if Goal is empty, Next is empty, or no `jspace_checkpoint` exists for the current Goal line. Does not close the card. |
 
 Render intent is `generic`. Presentation methods are pure functions of `args`. Native result copy is a compact acknowledgement; the dock and Trajectory read the session events, not the tool result body.

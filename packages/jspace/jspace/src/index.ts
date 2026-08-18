@@ -453,13 +453,34 @@ export default class JspaceService extends Service {
     return card
   }
 
+  /**
+   * Evidence must name a completed call: the `tool/call` exists and a
+   * non-error `tool/result` for it is logged (`isError` rides the
+   * tool-result block). Still not proof of coverage.
+   * @param session - owning session.
+   * @param evidence - claimed tool-call id.
+   */
   private requireEvidence(session: Session, evidence: string): void {
     const id = line(evidence, 'evidence')
-    const found = session.events.some(event =>
+    const ran = session.events.some(event =>
       event.type === 'tool/call' && event.data.callId === id)
-    if (!found) {
+    const succeeded = session.events.some((event) => {
+      if (event.type !== 'tool/result') return false
+      const message = (event.data as {
+        message?: {
+          source?: { kind?: string; callId?: string }
+          content?: ReadonlyArray<{ type?: string; isError?: boolean }>
+        }
+      }).message
+      const block = message?.content?.find(part => part.type === 'tool-result')
+      return message?.source?.kind === 'tool'
+        && message.source.callId === id
+        && block !== undefined
+        && block.isError !== true
+    })
+    if (!ran || !succeeded) {
       throw new JspaceError(
-        `jspace evidence ${JSON.stringify(id)} is not a tool call in this session`,
+        `jspace evidence ${JSON.stringify(id)} is not a completed, non-error tool call in this session`,
         'JSPACE_EVIDENCE',
       )
     }

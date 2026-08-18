@@ -12,7 +12,7 @@ The Settings remount and four tools existed, but a normal multi-step turn still 
 
 `jspace:protocol` always includes tool-driver lines while the seat is active: how to open, or how to note / checkpoint / ship without a second open. `full` and `loop` mount self-monitoring. A long loop also mounts shorthand.
 
-While a native card is open, `tools/pre-execute` refuses a non-card tool whose name and canonical arguments match the last prior `tool/call`, unless a later `jspace/card` or `jspace/closed` write sits between them. The in-flight `callId` is skipped because the loop logs `tool/call` before the waterfall. Card tools never trip the refuse.
+While a native card is open, `tools/pre-execute` refuses a non-card tool whose name and canonical arguments match any prior `tool/call` since the last `jspace/card` or `jspace/closed` write (the immediately previous call or one hidden behind other calls — alternating `A, B, A` is the same undiagnosed repeat). The in-flight `callId` is skipped because the loop logs `tool/call` before the waterfall. Card tools never trip the refuse. The in-flight `callId` is skipped because the loop logs `tool/call` before the waterfall. Card tools never trip the refuse.
 
 The todo plan strip renders nothing while `useProjection('jspace').card` belongs to the live session.
 

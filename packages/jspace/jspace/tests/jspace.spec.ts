@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@shres-code/cordis'
-import { CallId } from '@shres-code/shres-code-llm'
+import { CallId, createToolResultMessage } from '@shres-code/shres-code-llm'
 import SessionStore, { Session, SessionId } from '@shres-code/shres-code-session'
 import JspaceService, { JspaceError } from '../src/index.ts'
 
@@ -135,6 +135,15 @@ describe('JspaceService card log', () => {
       name: 'read',
       arguments: '{}',
     })
+    session.append('tool/result', {
+      turn: 1,
+      step: 1,
+      message: createToolResultMessage({
+        callId: CallId('call-1'),
+        content: [{ type: 'text', text: 'ok' }],
+        isError: false,
+      }),
+    }, { surfaceOp: 'append' })
     const checked = ctx.jspace.checkpoint(session, {
       check: 'read the file',
       by: 'unit tests covering the fold',
@@ -143,11 +152,32 @@ describe('JspaceService card log', () => {
     expect(checked.checked).toEqual([
       { n: 1, check: 'read the file', by: 'unit tests covering the fold', evidence: 'call-1' },
     ])
+    session.append('tool/call', {
+      turn: 1,
+      step: 2,
+      callId: CallId('call-err'),
+      name: 'bash',
+      arguments: '{}',
+    })
+    session.append('tool/result', {
+      turn: 1,
+      step: 2,
+      message: createToolResultMessage({
+        callId: CallId('call-err'),
+        content: [{ type: 'text', text: 'boom' }],
+        isError: true,
+      }),
+    }, { surfaceOp: 'append' })
+    expect(() => ctx.jspace.checkpoint(session, {
+      check: 'ran the command',
+      by: 'unit tests covering the fold',
+      evidence: 'call-err',
+    })).toThrow(/non-error tool call/)
     expect(() => ctx.jspace.checkpoint(session, {
       check: 'again',
       by: 'unit tests',
       evidence: 'missing',
-    })).toThrow(/not a tool call/)
+    })).toThrow(/non-error tool call/)
   })
 
   it('closes the card and copies it onto a fork', async () => {

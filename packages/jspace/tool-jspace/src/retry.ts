@@ -39,7 +39,10 @@ export function canonicalizeArgs(value: unknown): string {
 }
 
 /**
- * Whether this call matches the last non-current tool/call with no later card write.
+ * Whether this call matches any prior non-current tool/call with no later card
+ * write. The scan covers the whole span since the last card write, not only
+ * the immediately previous call: alternating `A, B, A` with identical
+ * arguments is the same undiagnosed repeat as `A, A`.
  * @param events - session log (the current `tool/call` may already be appended).
  * @param name - incoming tool name.
  * @param args - incoming parsed arguments.
@@ -61,8 +64,7 @@ export function shouldRefuseRepeat(
     if (event.type !== 'tool/call') continue
     const data = event.data as { name?: string; arguments?: unknown; callId?: string }
     if (currentCallId !== undefined && data.callId === currentCallId) continue
-    if (data.name !== name) return false
-    return canonicalizeArgs(data.arguments) === incoming
+    if (data.name === name && canonicalizeArgs(data.arguments) === incoming) return true
   }
   return false
 }

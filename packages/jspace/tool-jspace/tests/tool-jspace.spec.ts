@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@shres-code/cordis'
 import Loader from '@shres-code/cordis-plugin-loader'
 import type { Agent } from '@shres-code/shres-code-agent'
-import { CallId } from '@shres-code/shres-code-llm'
+import { CallId, createToolResultMessage } from '@shres-code/shres-code-llm'
 import SessionStore, { SessionId } from '@shres-code/shres-code-session'
 import SystemPrompt from '@shres-code/shres-code-system-prompt'
 import ToolRuntime, { defineTool } from '@shres-code/shres-code-tools'
@@ -93,7 +93,7 @@ async function attachSettings(ctx: Context, enabled: boolean): Promise<(next: bo
   }
 }
 
-function recordEvidence(agent: Agent, callId: string): void {
+function recordEvidence(agent: Agent, callId: string, isError = false): void {
   agent.session.append('turn/start', { turn: 1 })
   agent.session.append('step/start', { turn: 1, step: 1 })
   agent.session.append('tool/call', {
@@ -103,6 +103,15 @@ function recordEvidence(agent: Agent, callId: string): void {
     name: 'read',
     arguments: '{}',
   })
+  agent.session.append('tool/result', {
+    turn: 1,
+    step: 1,
+    message: createToolResultMessage({
+      callId: CallId(callId),
+      content: [{ type: 'text', text: isError ? 'boom' : 'ok' }],
+      isError,
+    }),
+  }, { surfaceOp: 'append' })
 }
 
 describe('tool-jspace registration', () => {
@@ -214,7 +223,7 @@ describe('jspace tools', () => {
       evidence: 'missing',
     }, agent)
     expect(unknown.isError).toBe(true)
-    expect(text(unknown)).toContain('not a tool call')
+    expect(text(unknown)).toContain('non-error tool call')
     expect(ctx.jspace.card(agent.session)?.checked).toEqual([])
 
     recordEvidence(agent, 'call-1')
@@ -228,6 +237,16 @@ describe('jspace tools', () => {
     expect(ctx.jspace.card(agent.session)?.checked).toEqual([
       { n: 1, check: 'read the file', by: 'unit tests covering the fold', evidence: 'call-1' },
     ])
+
+    recordEvidence(agent, 'call-err', true)
+    const errored = await execute(ctx, 'jspace_checkpoint', {
+      check: 'ran the command',
+      by: 'unit tests covering the fold',
+      evidence: 'call-err',
+    }, agent)
+    expect(errored.isError).toBe(true)
+    expect(text(errored)).toContain('non-error tool call')
+    expect(ctx.jspace.card(agent.session)?.checked).toHaveLength(1)
   })
 
   it('ships after a current-Goal checkpoint and fails after a goal change without a new one', async () => {
@@ -306,7 +325,7 @@ describe('jspace tools', () => {
           additionalProperties: false,
           properties: { echoed: { type: 'string', required: true } },
         },
-        render: value => [{ type: 'text', text: String(value.echoed) }],
+        render: (_args, value) => [{ type: 'text', text: String(value.echoed) }],
       },
       execute: args => Promise.resolve({ echoed: String((args as { msg: string }).msg) }),
     }))
@@ -338,7 +357,7 @@ describe('jspace tools', () => {
           additionalProperties: false,
           properties: { echoed: { type: 'string', required: true } },
         },
-        render: value => [{ type: 'text', text: String(value.echoed) }],
+        render: (_args, value) => [{ type: 'text', text: String(value.echoed) }],
       },
       execute: args => Promise.resolve({ echoed: String((args as { msg: string }).msg) }),
     }))
@@ -365,7 +384,7 @@ describe('jspace tools', () => {
           additionalProperties: false,
           properties: { echoed: { type: 'string', required: true } },
         },
-        render: value => [{ type: 'text', text: String(value.echoed) }],
+        render: (_args, value) => [{ type: 'text', text: String(value.echoed) }],
       },
       execute: args => Promise.resolve({ echoed: String((args as { msg: string }).msg) }),
     }))

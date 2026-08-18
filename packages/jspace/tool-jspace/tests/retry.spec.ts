@@ -60,6 +60,36 @@ describe('shouldRefuseRepeat', () => {
     )).toBe(false)
   })
 
+  it('refuses an identical call hidden behind a different tool since the last card write', () => {
+    expect(shouldRefuseRepeat(
+      [call('bash', '{"cmd":"ls"}', 'a'), call('read', '{"path":"x"}', 'b')],
+      'bash',
+      { cmd: 'ls' },
+      'now',
+    )).toBe(true)
+    expect(shouldRefuseRepeat(
+      [call('bash', '{"cmd":"ls"}', 'a'), card(), call('read', '{"path":"x"}', 'b')],
+      'bash',
+      { cmd: 'ls' },
+      'now',
+    )).toBe(false)
+  })
+
+  it('refuses an identical call hidden behind a same-tool run with different arguments', () => {
+    expect(shouldRefuseRepeat(
+      [call('bash', '{"cmd":"ls"}', 'a'), call('bash', '{"cmd":"pwd"}', 'b')],
+      'bash',
+      { cmd: 'ls' },
+      'now',
+    )).toBe(true)
+    expect(shouldRefuseRepeat(
+      [call('bash', '{"cmd":"pwd"}', 'a')],
+      'bash',
+      { cmd: 'ls' },
+      'now',
+    )).toBe(false)
+  })
+
   it('canonicalizes logged strings and live objects the same way', () => {
     expect(canonicalizeArgs('{"cmd":"ls"}')).toBe(canonicalizeArgs({ cmd: 'ls' }))
     expect(canonicalizeArgs('{')).toBe('{')
