@@ -94,6 +94,7 @@
     "@shres-code/shres-code-commands": "workspace:^",
     "@shres-code/shres-code-compaction": "workspace:^",
     "@shres-code/shres-code-goal": "workspace:^",
+    "@shres-code/shres-code-jspace": "workspace:^",
     "@shres-code/shres-code-invariants": "workspace:^",
     "@shres-code/shres-code-llm-retry": "workspace:^",
     "@shres-code/shres-code-permission-presets": "workspace:^",

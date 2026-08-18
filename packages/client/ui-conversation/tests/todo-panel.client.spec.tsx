@@ -104,11 +104,17 @@ describe('TodoPanel', () => {
   })
 })
 
-/** Dock props stub: the adapter reads the 'todos' projection only; the rest of the owner share is unused. */
-function dockProps(store: ReturnType<typeof createSnapshotStore<{ value: readonly TodoItem[] | null | undefined }>>): TodoDockProps {
-  const useProjection = (_key: string, selector?: (v: unknown) => unknown) =>
-    bindSnapshotSelector(store)(s => (selector ?? (v => v))(s.value))
-  return { useProjection, t } as unknown as TodoDockProps
+/** Dock props stub: todos from the store; jspace from an optional static view. */
+function dockProps(
+  store: ReturnType<typeof createSnapshotStore<{ value: readonly TodoItem[] | null | undefined }>>,
+  jspace?: { card: { sessionId: string } | null },
+  sessionId = 's1',
+): TodoDockProps {
+  const useProjection = (key: string, selector?: (v: unknown) => unknown) => {
+    if (key === 'jspace') return (selector ?? (v => v))(jspace)
+    return bindSnapshotSelector(store)(s => (selector ?? (v => v))(s.value))
+  }
+  return { useProjection, t, sessionId } as unknown as TodoDockProps
 }
 
 describe('TodoDock', () => {
@@ -132,5 +138,14 @@ describe('TodoDock', () => {
     todoDockEntry.apply({ slots: { inject, register } } as never)
     expect(inject).toHaveBeenCalledWith('conversation.input.dock', expect.any(Function))
     expect(register).toHaveBeenCalledWith({ name: 'conversation.input.dock', id: 'todo', order: 0, locale: NS }, TodoDock)
+  })
+
+  it('hides the plan strip while a native J-Space card is open', () => {
+    const store = createSnapshotStore<{ value: readonly TodoItem[] | null | undefined }>({ value: LIST })
+    const { unmount } = render(<TodoDock {...dockProps(store, { card: { sessionId: 's1' } }, 's1')} />)
+    expect(screen.queryByTestId('todo-panel')).toBeNull()
+    unmount()
+    render(<TodoDock {...dockProps(store, { card: { sessionId: 'other' } }, 's1')} />)
+    expect(screen.getByTestId('todo-panel')).toBeTruthy()
   })
 })

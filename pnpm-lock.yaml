@@ -1936,6 +1936,9 @@ importers:
       '@shres-code/shres-code-invariants':
         specifier: workspace:^
         version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-jspace':
+        specifier: workspace:^
+        version: link:../../jspace/jspace
       '@shres-code/shres-code-llm-retry':
         specifier: workspace:^
         version: link:../../llm/llm-retry

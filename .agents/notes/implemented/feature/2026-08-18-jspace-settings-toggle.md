@@ -91,7 +91,7 @@ Do not load third-party J-Space modules, science references, or Dense Track nota
 
 | Tool | Args | Failure |
 |---|---|---|
-| `jspace_open` | `goal`, `next`, optional `core[]` (≤2) | Rejects if a card is already open; rejects `core.length > 2`. |
+| `jspace_open` | `goal`, `next`, optional `core[]` (≤2) | Opens a card, or replaces Goal and Next when a card is already open. Rejects `core.length > 2` on the first open. |
 | `jspace_note` | optional `goal`, `core` swap pair, `open`, `next` | Rejects with no open card; a core swap without a departing line fails. |
 | `jspace_checkpoint` | `check`, `by`, optional `evidence: <callId>` | Rejects with no open card; when `requireCoverage` is true, rejects `by` that matches no coverage term (English word-bounded terms first; extra terms via `coverageTerms`; CJK extras are substring includes). `evidence` must name a `tool/call` id that exists in the session log. It raises the cost of fabrication; it does not prove coverage. |
 | `jspace_ship` | `path?` | Rejects if Goal is empty, Next is empty, or no `jspace_checkpoint` exists for the current Goal line. Does not close the card. |
@@ -104,7 +104,7 @@ Render intent is `generic`. Presentation methods are pure functions of `args`. N
 
 Settings page (`packages/client/ui-settings-jspace`), `settings.section` id `jspace`, order 13 (after Shield at 12). Lead with the enable switch. Edit `mode` and `requireCoverage` immediately. Below the switch: this-session path, whether a card is open, checkpoint count. Counts come from the `jspace` projection folded from the log, not from `settings.yaml`. The folded view object is reused while `open` and `checked` are unchanged ([snapshot identity](../bug-fix/2026-08-18-jspace-settings-snapshot-identity.md)). The Host API proxy allowlists `jspace` next to `shres-shield` so the page can read and persist the namespace.
 
-Composer chip (`packages/client/ui-jspace`): visible only when Settings `enabled` is true. On opens the card; off writes `jspace/closed`.
+Composer chip (`packages/client/ui-jspace`): visible only when Settings `enabled` is true. On opens the card; off writes `jspace/closed`. The todo plan strip hides while a native card is open so Goal/Next have one clock.
 
 Dock strip in `conversation.input.dock`. Shows Goal and Next while a native card is open; hidden when closed, when Settings is off, or when the projection `sessionId` is not the live session.
 
@@ -157,11 +157,10 @@ Forked agents copy the logged card; they never share one. Newly spawned agents s
 
 ## Testing
 
-Host package specs cover remount, fold/fault, fork-copy, coverage matching (word-bounded ASCII; CJK extras), checkpoint/ship refusals, command parse, and Loader composition. Prompt specs cover classify, assemble-time open, and section rebuild. Client specs cover Settings apply, chip/dock `sessionId` gating, Trajectory badges, and card-view snapshot identity. `examples/headless-agent` keyless snapshot `jspace-tools` is the assembled-application transcript. The settings-chrome dialog golden includes the J-Space nav row. The assembled Settings e2e re-opens the pane after a workspace session exists.
+Host package specs cover remount, fold/fault, fork-copy, coverage matching (word-bounded ASCII; CJK extras), checkpoint/ship refusals, command parse, and Loader composition. Prompt specs cover classify, assemble-time open, and section rebuild. Client specs cover Settings apply, chip/dock `sessionId` gating, Trajectory badges, and card-view snapshot identity. `examples/headless-agent` keyless snapshot `jspace-tools` is the assembled-application transcript. The settings-chrome dialog golden includes the J-Space nav row. The assembled Settings e2e re-opens the pane after a workspace session exists. The control loop (open-as-note, tool-driver lines, diagnosed retry, todo hide) lives in [J-Space control loop](2026-08-18-jspace-control-loop.md).
 
 ## Deferred
 
 - **W0 measurement** (owner-gated): productivity arm and poisoning chain on the `test_break` rig. The third-party skill's completion and token cost are unmeasured here.
 - **Shield voice registration:** `jspace:card` is not yet in the shield repo's authority-spoof set.
-- **Identical tool-call retry with diagnosis** when a card is open (`tools/pre-execute` consumer).
-- **Unify GoalBar and the todo strip** into this card and change todo’s turn-boundary lifetime. The [todo clearance note](2026-07-28-todo-plan-clears-on-next-turn.md) remains in force.
+- **Unify GoalBar and the todo strip** into this card and change todo’s turn-boundary lifetime. The [todo clearance note](2026-07-28-todo-plan-clears-on-next-turn.md) remains in force. The todo strip already hides while a native card is open.

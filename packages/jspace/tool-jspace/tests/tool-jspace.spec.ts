@@ -5,7 +5,7 @@ import type { Agent } from '@shres-code/shres-code-agent'
 import { CallId } from '@shres-code/shres-code-llm'
 import SessionStore, { SessionId } from '@shres-code/shres-code-session'
 import SystemPrompt from '@shres-code/shres-code-system-prompt'
-import ToolRuntime from '@shres-code/shres-code-tools'
+import ToolRuntime, { defineTool } from '@shres-code/shres-code-tools'
 import type { ToolExecutionResult } from '@shres-code/shres-code-tools'
 import JspaceService, { JspaceError } from '@shres-code/shres-code-jspace'
 import * as tool from '../src/index.ts'
@@ -166,8 +166,9 @@ describe('jspace tools', () => {
     expect(ctx.jspace.card(agent.session)?.core).toEqual(['seat'])
 
     const already = await execute(ctx, 'jspace_open', { goal: 'X', next: 'Y' }, agent)
-    expect(already.isError).toBe(true)
-    expect(text(already)).toContain('already open')
+    expect(already.isError).toBe(false)
+    expect(text(already)).toBe('Updated J-Space.')
+    expect(ctx.jspace.card(agent.session)).toMatchObject({ goal: 'X', next: 'Y', core: ['seat'] })
 
     const appended = await execute(ctx, 'jspace_note', { core: 'tools' }, agent)
     expect(appended.isError).toBe(false)
@@ -291,5 +292,93 @@ describe('jspace tools', () => {
     const unexpected = await execute(ctx, 'jspace_open', { goal: 'A', next: 'B' }, agent)
     expect(unexpected.isError).toBe(true)
     expect(text(unexpected)).toContain('unexpected failure')
+  })
+
+  it('refuses an identical non-card tool call while a card is open', async () => {
+    const { ctx, agent } = await harness()
+    ctx.tools.register(defineTool({
+      name: 'echo',
+      description: 'echo',
+      parameters: { msg: { type: 'string', required: true, description: 'text' } },
+      output: {
+        schema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: { echoed: { type: 'string', required: true } },
+        },
+        render: value => [{ type: 'text', text: String(value.echoed) }],
+      },
+      execute: args => Promise.resolve({ echoed: String((args as { msg: string }).msg) }),
+    }))
+    await execute(ctx, 'jspace_open', { goal: 'A', next: 'B' }, agent)
+    agent.session.append('tool/call', {
+      turn: 1,
+      step: 1,
+      callId: CallId('prev-echo'),
+      name: 'echo',
+      arguments: '{"msg":"hi"}',
+    })
+    const denied = await execute(ctx, 'echo', { msg: 'hi' }, agent)
+    expect(denied.isError).toBe(true)
+    expect(text(denied)).toContain('repeated tool call')
+    await execute(ctx, 'jspace_note', { next: 'Try another path' }, agent)
+    const allowed = await execute(ctx, 'echo', { msg: 'hi' }, agent)
+    expect(allowed.isError).toBe(false)
+  })
+
+  it('does not refuse repeats when the seat is off', async () => {
+    const { ctx, agent } = await harness(false)
+    ctx.tools.register(defineTool({
+      name: 'echo',
+      description: 'echo',
+      parameters: { msg: { type: 'string', required: true, description: 'text' } },
+      output: {
+        schema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: { echoed: { type: 'string', required: true } },
+        },
+        render: value => [{ type: 'text', text: String(value.echoed) }],
+      },
+      execute: args => Promise.resolve({ echoed: String((args as { msg: string }).msg) }),
+    }))
+    agent.session.append('tool/call', {
+      turn: 1,
+      step: 1,
+      callId: CallId('prev-echo'),
+      name: 'echo',
+      arguments: '{"msg":"hi"}',
+    })
+    const allowed = await execute(ctx, 'echo', { msg: 'hi' }, agent)
+    expect(allowed.isError).toBe(false)
+  })
+
+  it('does not refuse repeats when no card is open', async () => {
+    const { ctx, agent } = await harness()
+    ctx.tools.register(defineTool({
+      name: 'echo',
+      description: 'echo',
+      parameters: { msg: { type: 'string', required: true, description: 'text' } },
+      output: {
+        schema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: { echoed: { type: 'string', required: true } },
+        },
+        render: value => [{ type: 'text', text: String(value.echoed) }],
+      },
+      execute: args => Promise.resolve({ echoed: String((args as { msg: string }).msg) }),
+    }))
+    agent.session.append('tool/call', {
+      turn: 1,
+      step: 1,
+      callId: CallId('prev-echo'),
+      name: 'echo',
+      arguments: '{"msg":"hi"}',
+    })
+    const allowed = await execute(ctx, 'echo', { msg: 'hi' }, agent)
+    expect(allowed.isError).toBe(false)
+    const noAgent = await execute(ctx, 'echo', { msg: 'hi' })
+    expect(noAgent.isError).toBe(false)
   })
 })

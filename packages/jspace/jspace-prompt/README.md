@@ -2,7 +2,7 @@
 
 Consumer that reprints the J-Space card as the `jspace:card` system-prompt section and mounts the protocol the current pass earns. The card text is derived from the session fold on every assembly, so compaction and resume do not drop it.
 
-When the seat is inactive every J-Space section is empty. When the seat is active and no card is open, `jspace:card` is the availability line. The gate classifies `fast` / `full` / `loop` from the last human message, whether a card is open, and Settings `mode`. `fast` loads no protocol. `full` loads the protocol block plus capacity. `loop` also loads broadcast and opens a card when none exists, unless the session already has a native close. `mode: always-open` is always `loop`.
+When the seat is inactive every J-Space section is empty. When the seat is active and no card is open, `jspace:card` is the availability line. The gate classifies `fast` / `full` / `loop` from the last human message, whether a card is open, and Settings `mode`. Every active pass includes tool-driver lines in `jspace:protocol`. `fast` adds no further protocol. `full` loads the protocol block, capacity, deep-reasoning, and self-monitoring. `loop` also loads broadcast and directed-focus, and opens a card when none exists, unless the session already has a native close. `mode: always-open` is always `loop`.
 
 Protocol copy is a first-party rewrite of Tiger3807861189 J-Space Cognition Suite V3.6 (Apache-2.0, DOI 10.5281/zenodo.21971181). It is not their `SKILL.md` and does not implement a Jacobian lens.
 
@@ -32,11 +32,11 @@ The availability line is prefix-stable until a card opens or Settings flips. Upd
 
 #### What the model sees
 
-`jspace:protocol` plus `jspace:module:capacity` and `jspace:module:broadcast` when the pass earns them. `fast` leaves those three sections empty.
+`jspace:protocol` always includes the tool-driver lines while the seat is active (how to open or update the card). `jspace:module:capacity` and `jspace:module:broadcast` load when the pass earns them.
 
 #### Token effect
 
-Zero on `fast`. A short fixed protocol block plus one or two short modules on `full` / `loop`. Unused modules stay empty.
+A short driver on `fast`. A longer protocol block plus a few short modules on `full` / `loop`. Unused modules stay empty.
 
 #### KV Cache effect
 
@@ -46,4 +46,4 @@ A pass change replaces the protocol sections and invalidates the prefix from `js
 
 - **Always-open uses a stock Goal/Next** — `J-Space is on` / `State the first action` (`JSPACE_ALWAYS_OPEN_*` from the seat). The model must rewrite those lines through `note`. Bare `/j-space on` uses the same constants.
 - **The gate is a term-and-length heuristic** — it does not ask the model to classify the pass.
-- **At most two extra modules plus untrusted introspection** — the nine-module suite is not concatenated. Markers as a harness retry check is still deferred.
+- **At most the pass-selected modules plus untrusted introspection** — the nine-module suite is not concatenated. Blank identical retries are refused by `tool-jspace`, not by the markers module.

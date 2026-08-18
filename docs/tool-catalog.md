@@ -1817,7 +1817,7 @@ Source: [`packages/jspace/tool-jspace/src/index.ts`](../packages/jspace/tool-jsp
 
 ### `jspace_open`
 
-Open a J-Space card for this session. Use it for multi-stage or multi-file work. Requires a Goal (what done means) and Next (the single next action). Optional Core holds at most two live items. Rejects if a card is already open.
+Open a J-Space card for this session, or replace Goal and Next when a card is already open. Use it for multi-stage or multi-file work. Requires a Goal (what done means) and Next (the single next action). Optional Core holds at most two live items and applies only on the first open.
 
 ```json
 {

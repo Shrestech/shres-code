@@ -33,15 +33,15 @@ describe('selectJspaceModules', () => {
       .toEqual(['introspection'])
   })
 
-  it('loads deep-reasoning and empirics on full', () => {
+  it('loads deep-reasoning and self-monitoring on full', () => {
     expect(selectJspaceModules({ pass: 'full', untrusted: false, longChain: false }))
-      .toEqual(['deep-reasoning', 'empirics'])
+      .toEqual(['deep-reasoning', 'self-monitoring'])
   })
 
-  it('loads directed-focus and markers on loop, or shorthand on a long chain', () => {
+  it('loads directed-focus and self-monitoring on loop, plus shorthand on a long chain', () => {
     expect(selectJspaceModules({ pass: 'loop', untrusted: false, longChain: false }))
-      .toEqual(['directed-focus', 'markers'])
+      .toEqual(['directed-focus', 'self-monitoring'])
     expect(selectJspaceModules({ pass: 'loop', untrusted: false, longChain: true }))
-      .toEqual(['directed-focus', 'shorthand'])
+      .toEqual(['directed-focus', 'self-monitoring', 'shorthand'])
   })
 })

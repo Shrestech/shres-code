@@ -9,6 +9,7 @@ import { defineTool } from '@shres-code/shres-code-tools'
 import type { GenericCallView, ToolRunContext } from '@shres-code/shres-code-tools'
 import { JspaceError } from '@shres-code/shres-code-jspace'
 import type { JspaceStatus } from '@shres-code/shres-code-jspace'
+import { REPEAT_DENY, shouldRefuseRepeat } from './retry.ts'
 import { shipRefusal } from './ship.ts'
 
 /** Cordis plugin name. */
@@ -17,9 +18,10 @@ export const name = 'tool-jspace'
 export const inject = ['tools', 'jspace']
 
 const OPEN_DESCRIPTION =
-  'Open a J-Space card for this session. Use it for multi-stage or multi-file work. '
-  + 'Requires a Goal (what done means) and Next (the single next action). Optional Core '
-  + 'holds at most two live items. Rejects if a card is already open.'
+  'Open a J-Space card for this session, or replace Goal and Next when a card is '
+  + 'already open. Use it for multi-stage or multi-file work. Requires a Goal '
+  + '(what done means) and Next (the single next action). Optional Core holds at '
+  + 'most two live items and applies only on the first open.'
 
 const NOTE_DESCRIPTION =
   'Update the open J-Space card. Changing Core requires both departing (the item '
@@ -84,6 +86,7 @@ const OPENED = {
   additionalProperties: false as const,
   properties: {
     opened: { type: 'boolean' as const, required: true as const },
+    replaced: { type: 'boolean' as const },
   },
 }
 
@@ -132,11 +135,18 @@ function registerTools(ctx: Context): () => void {
     },
     output: {
       schema: OPENED,
-      render: () => [{ type: 'text', text: ACK.opened }],
+      render: (_args, value) => [{
+        type: 'text',
+        text: value.replaced === true ? ACK.updated : ACK.opened,
+      }],
     },
     execute(args, exec) {
       const agent = requireAgent(exec, 'jspace_open')
       return Promise.resolve(runJspace(() => {
+        if (ctx.jspace.card(agent.session) !== null) {
+          ctx.jspace.note(agent.session, { goal: args.goal, next: args.next })
+          return { opened: true, replaced: true }
+        }
         ctx.jspace.open(agent.session, {
           goal: args.goal,
           next: args.next,
@@ -273,4 +283,13 @@ export function apply(ctx: Context): void {
       disposeTools = undefined
     }
   })
+  ctx.effect(() => ctx.on('tools/pre-execute', (exec, next) => {
+    if (!ctx.jspace.status.active) return next()
+    const session = exec.agent?.session
+    if (session === undefined || ctx.jspace.card(session) === null) return next()
+    if (shouldRefuseRepeat(session.events, exec.name, exec.arguments, exec.callId)) {
+      return Promise.resolve({ kind: 'deny' as const, reason: REPEAT_DENY })
+    }
+    return next()
+  }), 'tool-jspace: diagnosed retry')
 }

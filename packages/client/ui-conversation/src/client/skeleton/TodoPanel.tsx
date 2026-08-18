@@ -13,6 +13,9 @@ import type { PropsLocale, PropsRuntime } from '@shres-code/shres-code-client-ui
 // declare) and the payload type. Type-only by construction — the outlet is
 // free of host value imports, so no host Context merge enters this program.
 import type { TodoItem } from '@shres-code/shres-code-tool-todo/client'
+// Type-only: the `jspace` SessionProjectionMap merge so the strip can hide
+// while a native card is the session's working state.
+import type {} from '@shres-code/shres-code-jspace/client'
 import { IconChecklistOutline14, IconChevronDownOutline14, IconChevronUpOutline14 } from '@shres-code/shres-code-client-ui-primitives'
 import { NS } from '../locales.ts'
 import css from './TodoPanel.module.css'
@@ -130,9 +133,15 @@ export function TodoPanel({ todos, t }: TodoPanelProps) {
 /** Full props of a dock entry: InputZone owner share + session standard kit + global seat + the locale seat. */
 export type TodoDockProps = PropsRuntime<'conversation.input.dock'> & PropsLocale<'conversation'>
 
-/** Dock adapter: reads the host-computed 'todos' projection (whole list; absent or null renders nothing). */
-export function TodoDock({ useProjection, t }: TodoDockProps) {
+/**
+ * Dock adapter: host-computed `todos` (empty or absent renders nothing).
+ * Hidden while a native J-Space card is open.
+ */
+export function TodoDock({ useProjection, sessionId, t }: TodoDockProps) {
   const todos = useProjection('todos')
+  const jspace = useProjection('jspace')
+  const card = jspace?.card
+  if (card != null && card.sessionId === sessionId) return null
   return <TodoPanel todos={todos ?? []} t={t} />
 }
 

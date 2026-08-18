@@ -22,14 +22,31 @@ export const JSPACE_CAPACITY_ORDER = 47
 /** Broadcast follows capacity. */
 export const JSPACE_BROADCAST_ORDER = 48
 
+/** How to drive the tools when no card is open. */
+export const JSPACE_DRIVER_CLOSED =
+  'For multi-stage or multi-file work, call jspace_open with a Goal and Next. '
+  + 'Then keep the card current with jspace_note and jspace_checkpoint. '
+  + 'Call jspace_ship before claiming done.'
+
+/** How to drive the tools when a card is already printed. */
+export const JSPACE_DRIVER_OPEN =
+  'A J-Space card is already open. Update it with jspace_note. '
+  + 'Record checks with jspace_checkpoint (by must name a verifier). '
+  + 'Call jspace_ship before claiming done. Do not call jspace_open to start a second card; '
+  + 'it replaces Goal and Next on the open card. '
+  + 'Repeating the same tool call is refused until you write a diagnosis on the card.'
+
 /**
- * Stable protocol block for a non-fast pass.
+ * Protocol block for this pass, always including the tool-driver lines.
  * @param pass - selected pass.
+ * @param cardOpen - true when a native card is already printed.
  * @returns the protocol section text.
  */
-export function formatJspaceProtocol(pass: JspacePass): string {
-  if (pass === 'fast') return ''
+export function formatJspaceProtocol(pass: JspacePass, cardOpen: boolean): string {
+  const driver = cardOpen ? JSPACE_DRIVER_OPEN : JSPACE_DRIVER_CLOSED
+  if (pass === 'fast') return driver
   return [
+    driver,
     'J-Space is the accessible workspace: one or two live ideas, held on purpose,',
     'reprinted from the session card. Automatic fluency stays below it.',
     'Restate the requirement in one inner line before you work.',
@@ -121,8 +138,8 @@ export const JSPACE_MODULE_TEXT: Record<JspaceModuleName, string> = {
 }
 
 /**
- * Choose extra modules. At most two beyond the hub pair, plus introspection
- * on untrusted input for any pass.
+ * Choose extra modules. Full and loop always mount self-monitoring. A long
+ * loop also mounts shorthand. Introspection is extra on untrusted input.
  * @param input - pass and untrusted/long-chain flags.
  * @returns the extra module names to mount.
  */
@@ -131,12 +148,10 @@ export function selectJspaceModules(input: JspaceModuleInput): readonly JspaceMo
   if (input.untrusted) selected.push('introspection')
   if (input.pass === 'fast') return selected
   if (input.pass === 'full') {
-    selected.push('deep-reasoning')
-    if (selected.length < 2) selected.push('empirics')
+    selected.push('deep-reasoning', 'self-monitoring')
     return selected
   }
-  selected.push('directed-focus')
+  selected.push('directed-focus', 'self-monitoring')
   if (input.longChain) selected.push('shorthand')
-  else if (!selected.includes('introspection')) selected.push('markers')
   return selected
 }

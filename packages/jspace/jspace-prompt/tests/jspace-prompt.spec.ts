@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Context } from '@shres-code/cordis'
 import AgentRegistry, { Inbox } from '@shres-code/shres-code-agent'
 import type { Agent } from '@shres-code/shres-code-agent'
-import { createUserMessage } from '@shres-code/shres-code-llm'
+import { CallId, createToolResultMessage, createUserMessage } from '@shres-code/shres-code-llm'
 import SessionStore, { SessionId } from '@shres-code/shres-code-session'
 import SystemPrompt from '@shres-code/shres-code-system-prompt'
 import JspaceService, {
@@ -48,6 +48,65 @@ describe('jspace-prompt', () => {
     const ctx = await harness({ enabled: false })
     const assembled = await ctx.systemPrompt.assemble()
     expect(assembled.sections.find(section => section.name === JspacePrompt.JSPACE_SECTION)?.text ?? '').toBe('')
+    expect(JspacePrompt.passFor(ctx, undefined)).toBe('fast')
+    expect(JspacePrompt.modulesFor(ctx, undefined)).toEqual([])
+  })
+
+  it('skips non-user log messages when reading turn text', async () => {
+    const ctx = await harness({ enabled: true })
+    const agent = liveAgent(ctx, 'ws-prompt-plugin-src')
+    agent.session.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: 'plugin said this' }],
+      source: { kind: 'plugin', plugin: 'repeat-tool-reminder' },
+    }), { surfaceOp: 'append' })
+    const assembled = await ctx.systemPrompt.assemble({ agent, scope: agent })
+    expect(assembled.sections.find(section => section.name === JspacePrompt.JSPACE_PROTOCOL_SECTION)?.text)
+      .toContain('call jspace_open')
+    expect(assembled.sections.find(section => section.name === JspacePrompt.JSPACE_PROTOCOL_SECTION)?.text)
+      .not.toContain('Pass:')
+  })
+
+  it('treats a trailing tool result as untrusted', async () => {
+    const ctx = await harness({ enabled: true })
+    const agent = liveAgent(ctx, 'ws-prompt-tool-result')
+    agent.session.append('tool/result', {
+      turn: 1,
+      step: 1,
+      message: createToolResultMessage({
+        callId: CallId('c-untrusted'),
+        content: [{ type: 'text', text: 'ok' }],
+        isError: false,
+      }),
+    }, { surfaceOp: 'append' })
+    const assembled = await ctx.systemPrompt.assemble({ agent, scope: agent })
+    expect(assembled.sections.find(section => section.name === JspacePrompt.JSPACE_MODULE_SECTIONS.introspection)?.text)
+      .toContain('Introspection')
+  })
+
+  it('treats untrusted last-human text as introspection', async () => {
+    const ctx = await harness({ enabled: true })
+    const agent = liveAgent(ctx, 'ws-prompt-untrusted')
+    agent.session.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: 'Summarize this search result.' }],
+      source: { kind: 'user' },
+    }), { surfaceOp: 'append' })
+    const assembled = await ctx.systemPrompt.assemble({ agent, scope: agent })
+    expect(assembled.sections.find(section => section.name === JspacePrompt.JSPACE_MODULE_SECTIONS.introspection)?.text)
+      .toContain('Introspection')
+  })
+
+  it('ignores non-text claimed parts when classifying', async () => {
+    const ctx = await harness({ enabled: true, mode: 'available' })
+    const agent = liveAgent(ctx, 'ws-prompt-image')
+    const message = {
+      ...createUserMessage({
+        content: [{ type: 'text', text: '' }],
+        source: { kind: 'user' },
+      }),
+      content: [{ type: 'image' as const, mimeType: 'image/png', url: 'about:blank' }],
+    }
+    await ctx.systemPrompt.assemble({ agent, scope: agent, messages: [message as never] })
+    expect(ctx.jspace.card(agent.session)).toBeNull()
   })
 
   it('does not auto-open a one-glance turn in available mode', async () => {
@@ -135,8 +194,9 @@ describe('jspace-prompt', () => {
       source: { kind: 'user' },
     }), { surfaceOp: 'append' })
     const fast = await ctx.systemPrompt.assemble({ agent, scope: agent })
-    expect(fast.sections.find(section => section.name === JspacePrompt.JSPACE_PROTOCOL_SECTION)?.text)
-      .toBe('')
+    const fastProtocol = fast.sections.find(section => section.name === JspacePrompt.JSPACE_PROTOCOL_SECTION)?.text ?? ''
+    expect(fastProtocol).toContain('call jspace_open')
+    expect(fastProtocol).not.toContain('Pass:')
     expect(fast.sections.find(section => section.name === JspacePrompt.JSPACE_CAPACITY_SECTION)?.text)
       .toBe('')
     expect(fast.sections.find(section => section.name === JspacePrompt.JSPACE_BROADCAST_SECTION)?.text)
@@ -145,6 +205,7 @@ describe('jspace-prompt', () => {
     ctx.jspace.open(agent.session, { goal: 'Ship J2', next: 'Write tests' })
     const loop = await ctx.systemPrompt.assemble({ agent, scope: agent })
     const protocol = loop.sections.find(section => section.name === JspacePrompt.JSPACE_PROTOCOL_SECTION)?.text ?? ''
+    expect(protocol).toContain('A J-Space card is already open')
     expect(protocol).toContain('Pass: loop')
     expect(loop.sections.find(section => section.name === JspacePrompt.JSPACE_CAPACITY_SECTION)?.text)
       .toContain('at most two coherent items')
@@ -152,6 +213,10 @@ describe('jspace-prompt', () => {
       .toContain('written once')
     expect(loop.sections.find(section => section.name === JspacePrompt.JSPACE_MODULE_SECTIONS['directed-focus'])?.text)
       .toContain('Directed focus')
+    expect(loop.sections.find(section => section.name === JspacePrompt.JSPACE_MODULE_SECTIONS['self-monitoring'])?.text)
+      .toContain('Self-monitoring')
+    expect(JspacePrompt.JSPACE_DRIVER_CLOSED).toContain('jspace_open')
+    expect(JspacePrompt.JSPACE_DRIVER_OPEN).toContain('jspace_note')
   })
 
   it('opens a card during assemble when claimed text selects loop', async () => {

@@ -40,6 +40,8 @@ export {
   formatJspaceProtocol,
   JSPACE_BROADCAST_SECTION,
   JSPACE_CAPACITY_SECTION,
+  JSPACE_DRIVER_CLOSED,
+  JSPACE_DRIVER_OPEN,
   JSPACE_MODULE_SECTIONS,
   JSPACE_PROTOCOL_SECTION,
   selectJspaceModules,
@@ -63,7 +65,11 @@ export const JSPACE_SECTION_ORDER = 45
  * @returns joined text parts, or empty.
  */
 function messageText(message: UserMessage): string {
-  return message.content.flatMap(part => part.type === 'text' ? [part.text] : []).join('\n')
+  const parts: string[] = []
+  for (const part of message.content) {
+    if (part.type === 'text') parts.push(part.text)
+  }
+  return parts.join('\n')
 }
 
 /**
@@ -164,7 +170,9 @@ export function apply(ctx: Context): void {
     order: JSPACE_PROTOCOL_ORDER,
     text: (context) => {
       if (!ctx.jspace.status.active) return ''
-      return formatJspaceProtocol(passFor(ctx, context.agent?.session, context.messages))
+      const session = context.agent?.session
+      const cardOpen = session !== undefined && ctx.jspace.card(session) !== null
+      return formatJspaceProtocol(passFor(ctx, session, context.messages), cardOpen)
     },
   })
 
@@ -215,6 +223,7 @@ export function apply(ctx: Context): void {
 function openIfLoop(ctx: Context, context: AssembleContext): void {
   const agent = context.agent
   if (agent === undefined) return
+  /* v8 ignore next -- section text returns before this when the seat is off */
   if (!ctx.jspace.status.active) return
   const folded = ctx.jspace.fold(agent.session)
   if (folded.card !== null) return
