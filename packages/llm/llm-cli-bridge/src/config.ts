@@ -199,7 +199,10 @@ export const SHIPPED_ROUTES: Record<ShippedRouteId, CliBridgeRoute> = {
     modelArg: '--model',
     effortStyle: 'thinking-bool',
     efforts: ['off', 'high'],
-    extraArgs: ['--output-format', 'stream-json', '--yolo'],
+    // No autonomy flag: kimi >= 0.36 rejects `--yolo`/`--auto` in `-p` mode
+    // ("Cannot combine --prompt with --yolo"), and one-shot mode already runs
+    // regular tool calls without asking — verified against 0.36.1.
+    extraArgs: ['--output-format', 'stream-json'],
     promptStyle: 'flag',
     promptArg: '-p',
     parseMode: 'stream-json',

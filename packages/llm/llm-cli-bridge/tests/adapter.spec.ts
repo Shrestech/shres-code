@@ -107,7 +107,6 @@ describe('argv and serialize', () => {
     })).toEqual([
       'kimi',
       '--output-format', 'stream-json',
-      '--yolo',
       '--model', 'kimi-code/k3',
       '--thinking',
       '-p', 'q',
