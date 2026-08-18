@@ -397,6 +397,21 @@ describe('parse, serialize, and resolveRoutes', () => {
     expect(() => parseCliOutput(kimi, 'not-json\nstill-not')).toThrow('no answer')
   })
 
+  it('ignores kimi meta stream events so the resume hint cannot win over the reply', () => {
+    const kimi = SHIPPED_ROUTES['kimi-cli']
+    // kimi >= 0.36 stream-json shape: version meta, the assistant reply, then
+    // a session.resume_hint meta whose own `content` used to clobber the text.
+    const stream = [
+      '{"role":"meta","type":"system.version","version":"0.36.1"}',
+      '{"role":"assistant","content":"Hi! What can I do for you?"}',
+      '{"role":"meta","type":"session.resume_hint","session_id":"s1","command":"kimi -r s1","content":"To resume this session: kimi -r s1"}',
+    ].join('\n')
+    expect(parseCliOutput(kimi, stream)).toEqual({ text: 'Hi! What can I do for you?' })
+    // A meta-only stream is no answer at all.
+    expect(() => parseCliOutput(kimi, '{"role":"meta","type":"system.version","version":"0.36.1"}'))
+      .toThrow('no answer')
+  })
+
   it('serializes system, roles, and non-text blocks', () => {
     expect(serializePrompt({
       system: 'sys',

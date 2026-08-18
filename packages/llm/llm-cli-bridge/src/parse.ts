@@ -72,7 +72,15 @@ export function parseCliOutput(route: CliBridgeRoute, stdout: string): ParsedCli
 
   let lastText: string | undefined
   let lastUsage: TokenUsage | undefined
+  // kimi >= 0.36 ends its stream with `role: "meta"` events (system.version,
+  // session.resume_hint) that carry their own `content`; without this gate the
+  // resume hint's content would win over the assistant reply it follows.
+  // Events without a `role` (codex item envelopes, result objects) pass.
   const consider = (value: unknown): void => {
+    if (typeof value === 'object' && value !== null) {
+      const role = (value as { role?: unknown }).role
+      if (typeof role === 'string' && role !== 'assistant') return
+    }
     const text = answerFromObject(value)
     if (text !== undefined) lastText = text
     const usage = usageFromObject(value)
