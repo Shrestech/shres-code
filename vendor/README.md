@@ -49,6 +49,8 @@ Keep this log exhaustive — every divergence from upstream must be listed.
 17. **`@shres-code` rescope**: every vendored manifest `name`, every internal dependency entry among the vendored set, and every module specifier that reaches them use the scoped names in the manifest table's `npm name` column. Directory names, version numbers, and dependency ranges are unchanged, and no upstream runtime identifier is renamed — `Symbol.for('schemastery')` and Schemastery's `vendor:` metadata field keep their upstream values. Re-apply with `pnpm run rescope-vendor --apply` after a sync; the table's two name columns are the mapping, restated for consumers in [docs/rescope.md](../docs/rescope.md).
 18. **Entry `disabled` interpolation in `loader/src/config/entry.ts`**: a `disabled: !!js` expression evaluates against the loader context at every mount decision; the raw node stays in the options, so write-back keeps the `!!js` form. `disabled` is the only interpolated metadata field. Covered by `packages/boot/app-boot/tests/user-patches.spec.ts` and `apps/cli/tests/windows-shell.spec.ts`.
 
+19. **`hmr/src/index.ts` strictness fixes for `exactOptionalPropertyTypes` / `noUncheckedIndexedAccess`**: ten mechanical patches so the vendored source compiles under the repo-root strict flags that upstream does not enable. Watch options clear `cwd`/`ignored` by key omission instead of assigning `undefined` into optional properties; `state.running` resets via `delete`; `process.argv[1]` and the two indexed lookups (`pending[index]`, `nameMap[baseUrl]`) gain non-null assertions at loop/argv-guaranteed sites; the `loadCache` module lookup, `Reload.runtime`, and `fiber.entry` assignments are guarded rather than smuggling `undefined` through required slots. No behavioral change; every site was a compile error under the strict set, not a runtime path.
+
 ## Sync procedure
 
 To update a vendored package from upstream:
@@ -58,3 +60,4 @@ To update a vendored package from upstream:
 3. Re-apply the local modifications listed above (or drop them if upstream made them unnecessary — update the log either way).
 4. Update the version and commit hash in the manifest table.
 5. Run `pnpm install && pnpm run test && pnpm run build` at the repo root.
+

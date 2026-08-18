@@ -7,6 +7,8 @@ import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import type {} from '@shres-code/shres-code-jspace'
+// Type-only: the Context.workspaceRegistry augmentation the scaffold exposes.
+import type {} from '@shres-code/shres-code-workspace'
 import { settingsNamespace } from '@shres-code/shres-code-settings'
 import { launchWebScaffold, watchConsole, type WebScaffold } from './scaffold.ts'
 import { newEnglishPage, saveFailureShot } from './support.ts'

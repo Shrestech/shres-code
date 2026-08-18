@@ -63,6 +63,9 @@
       "path": "../../todo/tool-todo"
     },
     {
+      "path": "../../jspace/jspace"
+    },
+    {
       "path": "../ui-input-trigger"
     },
     {

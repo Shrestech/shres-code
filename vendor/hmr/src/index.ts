@@ -139,11 +139,12 @@ class Hmr extends Service {
     if (this.configs.has(watchFilename)) throw new Error(`config path already registered: ${filename}`)
 
     const { root, depth } = target
+    // exactOptionalPropertyTypes: clear `cwd` / `ignored` by omission, not by
+    // assigning undefined into optional properties.
+    const { cwd: _cwd, ignored: _ignored, ...config } = this.config
     const watcher = watch(root, {
-      ...this.config,
-      cwd: undefined,
+      ...config,
       depth,
-      ignored: undefined,
       ignoreInitial: false,
     })
     const registration = { watcher }
@@ -217,7 +218,7 @@ class Hmr extends Service {
 
     // Collect externals before opening the watcher so every post-ready change
     // is observed by listeners that already have their classification state.
-    const mainUrl = pathToFileURL(resolve(process.argv[1])).href
+    const mainUrl = pathToFileURL(resolve(process.argv[1]!)).href
     const mainJob = this.internal.loadCache.get(mainUrl)
     if (mainJob) {
       this.externals = await loadDependencies(mainJob)
@@ -316,7 +317,7 @@ class Hmr extends Service {
         }
       } while (state.dirty)
     })().finally(() => {
-      state.running = undefined
+      delete state.running
       this.refreshTasks.delete(task)
     })
     state.running = task
@@ -361,7 +362,7 @@ class Hmr extends Service {
     while (pending.length) {
       let index = 0, hasUpdate = false
       while (index < pending.length) {
-        const url = pending[index]
+        const url = pending[index]!
         const children = await this.getLinked(url)
         let isDeclined = true, isAccepted = false
         for (const child of children) {
@@ -412,12 +413,13 @@ class Hmr extends Service {
 
     // Resolve each plugin name to its file URL and check if it needs reload
     for (const baseUrl in nameMap) {
-      for (const name of nameMap[baseUrl]) {
+      for (const name of nameMap[baseUrl]!) {
         try {
           const { url } = await this._resolve(name, baseUrl, {})
           if (this.declined.has(url)) continue
           const job = this.internal.loadCache.get(url)
-          const plugin = this.ctx.loader.unwrapExports(job?.module?.getNamespace())
+          const module = job?.module
+          const plugin = module ? this.ctx.loader.unwrapExports(module.getNamespace()) : undefined
           if (!job || !plugin) continue
           pending.set(job, plugin)
           this.declined.add(url)
@@ -436,10 +438,10 @@ class Hmr extends Service {
       if (!dependencies.some(dep => this.accepted.has(dep))) continue
       dependencies.forEach(dep => this.accepted.add(dep))
 
-      reloads.set(plugin, {
-        filename: job.url,
-        runtime: this.ctx.registry.get(plugin),
-      })
+      const runtime = this.ctx.registry.get(plugin)
+      if (runtime) {
+        reloads.set(plugin, { filename: job.url, runtime })
+      }
     }
 
     /**
@@ -503,8 +505,11 @@ class Hmr extends Service {
       if (!runtime) return
       for (const oldFiber of runtime.fibers) {
         const fiber = oldFiber.parent.registry.plugin(plugin, oldFiber._config, this.getOuterStack)
-        fiber.entry = oldFiber.entry
-        if (fiber.entry) fiber.entry.fiber = fiber
+        const entry = oldFiber.entry
+        if (entry) {
+          fiber.entry = entry
+          entry.fiber = fiber
+        }
       }
     }
 
