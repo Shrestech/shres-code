@@ -208,6 +208,7 @@ describe('BashTerminalBackend startup rollback', () => {
       graceMs: 10,
       env: {
         TERM: 'dumb', PAGER: 'cat', GIT_PAGER: 'cat', PS1: 'shres> ', BASH_SILENCE_DEPRECATION_WARNING: '1',
+        PROMPT_COMMAND: 'printf "\\033]133;D;%s\\007" "$?"; PS1=\'shres> \'',
         SHRES_SHELL: '1', SHRES_SESSION_ID: 'agent', SHRES_PTY_SESSION_ID: 'pty-1',
       },
     })
