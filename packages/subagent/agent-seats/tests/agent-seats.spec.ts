@@ -3,7 +3,8 @@ import { Context } from '@shres-code/cordis'
 import SystemPrompt from '@shres-code/shres-code-system-prompt'
 import ToolRuntime from '@shres-code/shres-code-tools'
 import SubagentRuntime from '@shres-code/shres-code-subagent'
-import { SettingsProvider, type SettingsNamespace } from '@shres-code/shres-code-settings'
+import z from '@shres-code/schemastery'
+import { SettingsProvider, settingsNamespace, type SettingsNamespace } from '@shres-code/shres-code-settings'
 import * as seats from '../src/index.ts'
 import { boundSeats, SEAT_ROSTER } from '../src/roster.ts'
 
@@ -106,6 +107,21 @@ describe('agent-seats remount', () => {
     await fiber.dispose()
     expect(toolNames(ctx)).not.toContain('aegis')
     await ctx.fiber.dispose()
+  })
+
+  it('one settings namespace tolerates one live registration, so seats stay host-plane', async () => {
+    // `SettingsProvider.register` fails loud on a duplicate namespace, and the
+    // duplicate lands on Cordis's async injection fiber, not the plugin load —
+    // racy, not a clean rejection. A per-preset agent-seats row would apply
+    // once per composed scope (a concurrent session, or every in-process
+    // subagent child joining its parent's preset). This pins the constraint
+    // that keeps the plugin in the base bundle, never in an agent preset.
+    const { ctx } = await boot()
+    const service = ctx.get('settings')
+    expect(service).toBeDefined()
+    const probe = settingsNamespace('agent-seats-duplicate-probe')
+    service!.register(probe, z.object({}))
+    expect(() => service!.register(probe, z.object({}))).toThrow(/already registered/)
   })
 
   it('keeps roster labels aligned with the three product seats', () => {
