@@ -275,6 +275,7 @@ describe('GoalDock adapter', () => {
       />,
     )
     expect(container.querySelector('[data-goal-fight]')).toBeTruthy()
+    expect(container.querySelectorAll('[data-unit]')).toHaveLength(4)
   })
 })
 

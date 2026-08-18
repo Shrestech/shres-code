@@ -3,11 +3,12 @@
  * strip). A present goal shows a goal glyph, a phase label, the truncated
  * objective, and icon actions — resume when paused, edit (inline form in
  * the same strip), and clear. When Game mode is on, the fight arena sits
- * at the left of the strip. Incomplete todos are the army; the clock is
- * elapsed since create, not an ETA. Goal creation lives on the `/goal`
- * command, not here: loading (undefined), no goal (null), and complete
- * goals render nothing. Live state arrives as the projected whole
- * snapshot; the verbs are the injected face.
+ * at the left of the strip. Incomplete todos are the army; an empty list
+ * still draws a standing army. The clock is elapsed since create, not an
+ * ETA. Goal creation lives on the `/goal` command, not here: loading
+ * (undefined), no goal (null), and complete goals render nothing. Live
+ * state arrives as the projected whole snapshot; the verbs are the
+ * injected face.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -29,7 +30,7 @@ import css from './GoalBar.module.css'
 export interface GoalBarProps extends GoalBarActions {
   /** Current goal snapshot; undefined = capability absent or loading, null = no goal set. */
   goal: GoalSnapshot | null | undefined
-  /** Remaining incomplete todos drawn as the army; empty shows the girl alone. */
+  /** Remaining fight units (incomplete todos, or the standing army). */
   units?: readonly FightUnit[]
   /** Goal create time (epoch ms) for the elapsed clock. */
   createdAt?: number

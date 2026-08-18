@@ -1,7 +1,9 @@
 /**
  * 36px Goal-strip fight: the fearless girl walks remaining units down.
- * Discrete incomplete todos are zombies; a unit leaving the list is a
- * lunge + slash + scatter. Elapsed time is since goal create, not an ETA.
+ * Discrete incomplete todos are zombies; when that list is empty the
+ * strip draws a standing army so the arena is never girl-only. A unit
+ * leaving the list is a lunge + slash + scatter. Elapsed time is since
+ * goal create, not an ETA.
  */
 
 import { useEffect, useRef, useState } from 'react'
@@ -44,7 +46,7 @@ interface Drawn {
 }
 
 export interface GoalFightProps {
-  /** Remaining discrete units (incomplete todos), already capped. */
+  /** Remaining discrete units (todos or the standing army), already capped. */
   units: readonly FightUnit[]
   /** Pause / block / reduced-motion: skip the lunge and freeze the shuffle. */
   frozen: boolean

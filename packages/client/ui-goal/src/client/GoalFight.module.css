@@ -26,7 +26,7 @@
 }
 
 .zombie {
-  height: 86%;
+  height: 100%;
   width: auto;
   z-index: 2;
   transition: opacity 420ms ease, transform 420ms ease, filter 420ms ease;
