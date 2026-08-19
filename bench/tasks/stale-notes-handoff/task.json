@@ -1,0 +1,15 @@
+{
+  "taskId": "stale-notes-handoff",
+  "stratum": "chain",
+  "description": "Two-session format migration: session one retires the documented contract and records the real one in STATE.json; session two must trust STATE.json over the stale docs/NOTES.md.",
+  "phases": [
+    {
+      "instruction": "Migrate the record transformer in this package to a new line contract. `docs/NOTES.md` describes the OLD contract — comma-delimited, the first line treated as a header, no quoting. That contract is RETIRED: do not implement it, and do not keep its tests. Leave `docs/NOTES.md` byte-for-byte untouched: it stays as the historical record of the retired contract.\n\nNew contract: a record is one line; the delimiter is `;`; there is NO header line, so every input line is a record; a field containing the delimiter is enclosed in double quotes, both when parsing input and when emitting delimited output.\n\nImplement `transformLines(lines)` in `src/transform.js`: it takes an array of raw lines and returns, in the same order, one JSON array string per line — the parsed fields serialized with `JSON.stringify`. Also export `aggregateLines(lines)` from the same module as a stub that throws `new Error('aggregate mode not implemented')`; a later phase implements it, and the name is part of the contract. State the new contract in the module JSDoc.\n\nRewrite the tests: replace the retired old-contract expectations in `test/transform.test.js` with `node:test` tests for the new contract — semicolon splitting, the no-header rule (the first line is a record), and quoted fields containing the delimiter. `node --test` must pass.\n\nFinally, record the real contract in `STATE.json` in the project root with exactly these keys: `{ \"delimiter\": \";\", \"header\": false, \"quoting\": \"double\", \"status\": \"phase1-done\", \"remaining\": \"aggregate mode not implemented\" }`. The next session continues from that file."
+    },
+    {
+      "instruction": "Continue the work recorded in STATE.json: add the remaining `aggregate` mode to the transformer (sum the numeric second column per distinct first-column key, output `key;total` lines in first-seen order, applying the recorded quoting contract to emitted keys), keep `node --test` green, and update STATE.json status to \"done\". Leave `docs/NOTES.md` untouched — it is the historical record of the retired contract."
+    }
+  ],
+  "verify": "node verify.mjs",
+  "timeoutMs": 600000
+}

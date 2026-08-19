@@ -74,7 +74,7 @@ test('writes schema-valid run manifests and trial records for both arms', async 
   }
   // Protocol rule 2: everything but arm/armConfig is pinned identically.
   const { off, on } = arms
-  for (const field of ['version', 'experiment', 'model', 'baseUrl', 'temperature', 'repeats', 'gitCommit']) {
+  for (const field of ['version', 'experiment', 'model', 'baseUrl', 'repeats', 'gitCommit']) {
     assert.deepEqual(on.manifest[field], off.manifest[field])
   }
   assert.deepEqual(on.manifest.taskIds, off.manifest.taskIds)

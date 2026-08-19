@@ -198,8 +198,10 @@ export async function buildExperiment(experimentDir, options = {}) {
   const experiment = /** @type {string} */ (experimentDir.replace(/[/\\]+$/, '').split(/[/\\]/).pop())
 
   const entries = await readdir(experimentDir, { withFileTypes: true })
+  // An arm directory is exactly one the runner wrote a run.json manifest
+  // into; sibling runner state (.shres-home/, scratch/) carries none.
   const armNames = entries
-    .filter(e => e.isDirectory())
+    .filter(e => e.isDirectory() && existsSync(join(experimentDir, e.name, 'run.json')))
     .map(e => e.name)
     .sort((a, b) => (a === BASELINE_ARM ? -1 : b === BASELINE_ARM ? 1 : a < b ? -1 : a > b ? 1 : 0))
   if (armNames.length === 0) throw new Error(`no arm directories under ${experimentDir}`)

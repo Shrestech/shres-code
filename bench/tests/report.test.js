@@ -60,6 +60,7 @@ function manifest(experiment, arm) {
     experiment,
     arm,
     armConfig: { enabled: arm === 'on' },
+    provider: 'deepseek-official',
     model: 'deepseek-chat',
     baseUrl: null,
     temperature: 0,

@@ -18,8 +18,7 @@ bench/tasks/<taskId>/
   "description": "One line shown in the report.",
   "instruction": "The exact prompt handed to the agent.",
   "verify": "node verify.mjs",
-  "timeoutMs": 600000,
-  "maxTurns": 40
+  "timeoutMs": 600000
 }
 ```
 

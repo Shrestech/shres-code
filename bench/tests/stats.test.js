@@ -24,7 +24,10 @@ function makeTrial(overrides = {}) {
     verifier: { command: 'node verify.mjs', exitCode: resolved ? 0 : 1 },
     metrics: {
       inputTokens: 100, outputTokens: 50, durationMs: 1000, turns: 4,
-      toolCalls: 3, identicalRetries: 0, checkpoints: 0, shipPasses: 0,
+      toolCalls: 3, duplicateCallAttempts: 0, identicalRetries: 0,
+      checkpointAttempts: 0, checkpointWrites: 0, checkpoints: 0,
+      shipAttempts: 0, shipPasses: 0, retryDenials: 0, cardOpens: 0,
+      meaningfulGoalWrites: 0, placeholderGoalLeftovers: 0, coreWrites: 0,
       ...metrics,
     },
     sessionFile: null,
@@ -384,7 +387,10 @@ describe('chain trial schema', () => {
       timedOut: false,
       metrics: {
         inputTokens: 100, outputTokens: 50, durationMs: 1000, turns: 4,
-        toolCalls: 3, identicalRetries: 0, checkpoints: 0, shipPasses: 0,
+        toolCalls: 3, duplicateCallAttempts: 0, identicalRetries: 0,
+        checkpointAttempts: 0, checkpointWrites: 0, checkpoints: 0,
+        shipAttempts: 0, shipPasses: 0, retryDenials: 0, cardOpens: 0,
+        meaningfulGoalWrites: 0, placeholderGoalLeftovers: 0, coreWrites: 0,
       },
       startedAt: '2026-08-18T00:00:00.000Z',
       endedAt: '2026-08-18T00:00:01.000Z',
@@ -394,6 +400,23 @@ describe('chain trial schema', () => {
   it('accepts well-formed phases and integrity records', () => {
     validateTrial(makeTrial({ phases: [makePhase(0), makePhase(1)] }))
     validateTrial(makeTrial({ phases: [makePhase(0)], integrity: { violations: ['off-arm-jspace-event:jspace/card-open'] } }))
+  })
+
+  it('accepts legacy metrics but validates truthful metrics when present', () => {
+    const legacy = makeTrial()
+    for (const field of [
+      'duplicateCallAttempts', 'checkpointAttempts', 'checkpointWrites', 'shipAttempts',
+      'retryDenials', 'cardOpens', 'meaningfulGoalWrites', 'placeholderGoalLeftovers', 'coreWrites',
+    ]) delete legacy.metrics[field]
+    validateTrial(legacy)
+    assert.throws(
+      () => validateTrial(makeTrial({ metrics: { retryDenials: -1 } })),
+      /metrics\.retryDenials must be a non-negative number when present/,
+    )
+    assert.throws(
+      () => validateTrial(makeTrial({ metrics: { shipAttempts: 0, shipPasses: 1 } })),
+      /shipPasses cannot exceed shipAttempts/,
+    )
   })
 
   it('rejects out-of-order phase indexes and malformed optional fields', () => {

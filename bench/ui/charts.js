@@ -40,10 +40,13 @@ function num(value, digits = 2) {
 
 /**
  * Round up to a 1/2/5 × 10^n step so axis ticks stay round.
- * @param {number} value - maximum data value; must be > 0.
+ * A non-positive or non-finite maximum (all-zero deltas, empty series) floors
+ * to 1 so scales never emit NaN coordinates.
+ * @param {number} value - maximum data value.
  * @returns {number}
  */
 function niceCeil(value) {
+  if (!Number.isFinite(value) || value <= 0) return 1
   const pow = 10 ** Math.floor(Math.log10(value))
   const unit = value / pow
   const step = unit <= 1 ? 1 : unit <= 2 ? 2 : unit <= 5 ? 5 : 10
@@ -224,15 +227,17 @@ export function groupedBarChart({ categories, series, yLabel, yMax, formatValue 
 
 /**
  * Paired scatter: one point per task, x = off value, y = on value, with a
- * dashed diagonal tie line. Points are colored by which side of the line they
- * fall on; non-finite points are skipped.
+ * dashed diagonal tie line. Points are colored by which arm comes out better;
+ * `higherIsBetter: false` (cost metrics like tokens) treats below the
+ * diagonal as the on-better side. Non-finite points are skipped.
  * @param {object} spec
  * @param {{ id: string, x: number, y: number }[]} spec.points - paired points.
  * @param {string} spec.xLabel - x-axis label.
  * @param {string} spec.yLabel - y-axis label.
+ * @param {boolean} [spec.higherIsBetter] - defaults to true (pass rates).
  * @returns {SVGElement}
  */
-export function pairedScatter({ points, xLabel, yLabel }) {
+export function pairedScatter({ points, xLabel, yLabel, higherIsBetter = true }) {
   const W = 520
   const H = 380
   const m = { t: 24, r: 24, b: 52, l: 58 }
@@ -262,7 +267,9 @@ export function pairedScatter({ points, xLabel, yLabel }) {
   svg.appendChild(el('text', { class: 'axis-label', x: 14, y: m.t + plotH / 2, 'text-anchor': 'middle', fill: 'var(--muted)', transform: `rotate(-90 14 ${m.t + plotH / 2})` }, yLabel))
   for (const p of points) {
     if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) continue
-    const color = p.y > p.x ? 'var(--heat-good)' : p.y < p.x ? 'var(--heat-bad)' : 'var(--muted)'
+    const onWins = higherIsBetter ? p.y > p.x : p.y < p.x
+    const offWins = higherIsBetter ? p.y < p.x : p.y > p.x
+    const color = onWins ? 'var(--heat-good)' : offWins ? 'var(--heat-bad)' : 'var(--muted)'
     const dot = el('circle', {
       class: 'point', cx: num(x(p.x), 1), cy: num(y(p.y), 1), r: 5.5, fill: color, 'fill-opacity': 0.9, stroke: 'var(--bg)', 'stroke-width': 1,
     })

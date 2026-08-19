@@ -376,7 +376,7 @@ export function radarSpec(data) {
  * that has data in both arms.
  * @param {import('../schema/report-data.js').ReportData} data - report payload.
  * @param {'passRate' | 'tokens'} metric - pass rate or mean total tokens.
- * @returns {{ points: { id: string, x: number, y: number }[], xLabel: string, yLabel: string }}
+ * @returns {{ points: { id: string, x: number, y: number }[], xLabel: string, yLabel: string, higherIsBetter: boolean }}
  */
 export function scatterSpec(data, metric) {
   const cells = cellMap(data)
@@ -391,7 +391,8 @@ export function scatterSpec(data, metric) {
     const y = valueOf(on)
     if (Number.isFinite(x) && Number.isFinite(y)) points.push({ id: task.taskId, x, y })
   }
-  return { points, xLabel: `off ${label}`, yLabel: `on ${label}` }
+  // Tokens are a cost: above the diagonal means on spent more, i.e. worse.
+  return { points, xLabel: `off ${label}`, yLabel: `on ${label}`, higherIsBetter: metric !== 'tokens' }
 }
 
 /**

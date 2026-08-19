@@ -4,6 +4,5 @@
   "description": "Rename a core module and update every reference across source, tests, and config.",
   "instruction": "The module `src/slugify.js` has outgrown its name: it will soon host more URL helpers. Rename the file to `src/url-slug.js` and update every reference to the old path across the project — import specifiers in `src/` and `test/`, and the module path in `config.json`. Do not rename any exported symbols. When you are done, `node --test` must pass.",
   "verify": "node verify.mjs",
-  "timeoutMs": 600000,
-  "maxTurns": 40
+  "timeoutMs": 600000
 }

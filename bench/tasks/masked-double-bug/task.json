@@ -1,0 +1,8 @@
+{
+  "taskId": "masked-double-bug",
+  "stratum": "short",
+  "description": "Fix a shop-cart suite whose two compensating rounding bugs mask each other; fixing only one turns green tests red.",
+  "instruction": "The shopping-cart package in this directory has a failing test suite: run `node --test` to see the failure. Find the root cause and make the whole suite pass. Do not modify any file under `test/`. Keep the change minimal.",
+  "verify": "node verify.mjs",
+  "timeoutMs": 300000
+}

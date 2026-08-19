@@ -308,6 +308,21 @@ test('pairedScatter: tie line and sign-colored points', () => {
   assert.ok(byClass(svg, 'axis-label').some(t => t.textContent === 'on pass rate'))
 })
 
+test('pairedScatter: higherIsBetter false flips colors for cost metrics', () => {
+  const svg = pairedScatter({
+    points: [
+      { id: 'costly-on', x: 100, y: 150 },
+      { id: 'thrifty-on', x: 100, y: 80 },
+    ],
+    xLabel: 'off mean tokens',
+    yLabel: 'on mean tokens',
+    higherIsBetter: false,
+  })
+  const points = byClass(svg, 'point')
+  assert.equal(attr(points[0], 'fill'), 'var(--heat-bad)', 'on above the diagonal spent more')
+  assert.equal(attr(points[1], 'fill'), 'var(--heat-good)', 'on below the diagonal spent less')
+})
+
 test('radarChart: rings, spokes, series polygons, max scaling', () => {
   const svg = radarChart({
     axes: ['long', 'short', 'adversarial', 'chain'],
@@ -356,6 +371,16 @@ test('deltaChart: bars centered on zero, colored by sign, with whiskers', () => 
   assert.equal(byClass(svg, 'item-label').length, 3)
   assert.equal(byClass(svg, 'value-label').length, 3)
   assert.match(bars[0].children.find(c => c.tag === 'title').textContent, /95% CI/)
+})
+
+test('deltaChart: all-zero deltas still emit finite coordinates', () => {
+  const svg = deltaChart({ items: [{ id: 'only-task', delta: 0, ci: [0, 0] }] })
+  for (const node of walk(svg)) {
+    for (const name of ['x', 'x1', 'x2', 'cx', 'width', 'points']) {
+      const value = node.attrs?.[name]
+      if (value !== undefined) assert.doesNotMatch(String(value), /NaN/, `${node.tag}[${name}]`)
+    }
+  }
 })
 
 test('sparkline: one polyline per series, shared domain, end dots, tooltips', () => {

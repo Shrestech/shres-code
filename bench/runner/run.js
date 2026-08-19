@@ -4,7 +4,7 @@
  * toggle (protocol rule 1).
  *
  * ```
- * node bench/runner/run.js --experiment w0-2026-08-18 [--arms off,on] [--repeats 3] [--tasks glob] [--dry-run]
+ * node bench/runner/run.js --experiment w0-2026-08-18 [--arms off,on] [--repeats 3] [--tasks globs] [--dry-run]
  * ```
  *
  * Per trial the runner copies the fixture into a fresh scratch dir, writes the
@@ -59,10 +59,11 @@ Options:
   --experiment <name>   experiment directory under bench/runs/ (required)
   --arms <a,b>          arms to run, comma-separated (default: ${listArms().join(',')})
   --repeats <n>         trials per task per arm (default: 3)
-  --tasks <glob>        task-id filter; * and ? wildcards (default: all)
+  --tasks <globs>       task-id filter; * and ? wildcards, comma-separated (default: all)
   --model <id>          model pin for run.json (default: $BENCH_MODEL or deepseek-v4-flash)
-  --temperature <t>     temperature pin for run.json (default: $BENCH_TEMPERATURE or 1)
+  --provider <id>       provider pin, patched into agent-default-model (default: $BENCH_PROVIDER or deepseek-official)
   --base-url <url>      provider base URL pin (default: $DEEPSEEK_BASE_URL or null)
+  --context-window <n>  harness-side context-window pin (ollama-cloud only); forces real compaction when small
   --dry-run             print the plan and exit without writing or executing
   --help                this text
 `
@@ -70,9 +71,18 @@ Options:
 /** Exit code for usage and environment errors (bad flags, missing API key). */
 const EXIT_USAGE = 2
 
-/** Default model/temperature pins, overridable by flag or env; recorded in run.json. */
+/** Default model pin, overridable by flag or env; recorded in run.json. */
 const DEFAULT_MODEL = 'deepseek-v4-flash'
-const DEFAULT_TEMPERATURE = 1
+
+/** Default provider pin; the overlay re-pins `agent-default-model` to it. */
+const DEFAULT_PROVIDER = 'deepseek-official'
+
+/**
+ * Credential environment variable each non-default provider resolves, per the
+ * provider rows in `packages/bundle/base/cordis.patch.yml` (`apiKeyEnv`).
+ * Providers absent here resolve `DEEPSEEK_API_KEY`.
+ */
+const PROVIDER_KEY_ENV = Object.freeze({ 'ollama-cloud': 'OLLAMA_API_KEY' })
 
 /**
  * Provider-failure signature matched against captured output. Heuristic by
@@ -102,7 +112,7 @@ export class UsageError extends Error {
  * @property {boolean} dryRun
  * @property {boolean} help
  * @property {string | undefined} model
- * @property {number | undefined} temperature
+ * @property {string | undefined} provider
  * @property {string | undefined} baseUrl
  */
 
@@ -121,8 +131,9 @@ export function parseArgs(argv) {
     dryRun: false,
     help: false,
     model: undefined,
-    temperature: undefined,
+    provider: undefined,
     baseUrl: undefined,
+    contextWindow: undefined,
   }
   let armsSeen = false
   for (let index = 0; index < argv.length; index += 1) {
@@ -161,15 +172,18 @@ export function parseArgs(argv) {
       case '--model':
         options.model = value()
         break
-      case '--temperature': {
-        const parsed = Number(value())
-        if (!Number.isFinite(parsed)) throw new UsageError('--temperature must be a number')
-        options.temperature = parsed
+      case '--provider':
+        options.provider = value()
         break
-      }
       case '--base-url':
         options.baseUrl = value()
         break
+      case '--context-window': {
+        const parsed = Number(value())
+        if (!Number.isSafeInteger(parsed) || parsed < 1) throw new UsageError('--context-window must be a positive integer')
+        options.contextWindow = parsed
+        break
+      }
       case '--dry-run':
         options.dryRun = true
         break
@@ -186,16 +200,19 @@ export function parseArgs(argv) {
 }
 
 /**
- * Filter task ids by a `*`/`?` glob. Null keeps the whole catalog.
+ * Filter task ids by `*`/`?` globs; a comma separates alternative globs.
+ * Null keeps the whole catalog.
  * @param {string[]} taskIds - catalog ids.
- * @param {string | null} glob - the `--tasks` pattern.
+ * @param {string | null} glob - the `--tasks` pattern(s).
  * @returns {string[]} matching ids, catalog order preserved.
  */
 export function matchTaskIds(taskIds, glob) {
   if (glob === null) return taskIds
-  const source = glob.replace(/[.+^${}()|[\]\\]/g, '\\$&').replaceAll('*', '.*').replaceAll('?', '.')
-  const pattern = new RegExp(`^${source}$`)
-  return taskIds.filter(id => pattern.test(id))
+  const patterns = glob.split(',').map((part) => {
+    const source = part.replace(/[.+^${}()|[\]\\]/g, '\\$&').replaceAll('*', '.*').replaceAll('?', '.')
+    return new RegExp(`^${source}$`)
+  })
+  return taskIds.filter(id => patterns.some(pattern => pattern.test(id)))
 }
 
 /**
@@ -206,8 +223,9 @@ export function matchTaskIds(taskIds, glob) {
  */
 
 /**
- * Build the interleaved execution plan: arms alternate inside every
- * (task, trial) pair, never all-off-then-all-on.
+ * Build the interleaved execution plan. Each (task, trial) pair remains
+ * adjacent, while two-arm experiments use ABBA order across each four-repeat
+ * block so provider drift does not always favor the first arm.
  * @param {{ taskIds: string[], arms: string[], repeats: number }} options
  * @returns {PlanEntry[]} plan in execution order.
  */
@@ -216,7 +234,9 @@ export function buildPlan({ taskIds, arms, repeats }) {
   const plan = []
   for (const taskId of taskIds) {
     for (let trialIndex = 0; trialIndex < repeats; trialIndex += 1) {
-      for (const arm of arms) plan.push({ taskId, trialIndex, arm })
+      const reverse = arms.length === 2 && (trialIndex % 4 === 1 || trialIndex % 4 === 2)
+      const ordered = reverse ? [...arms].reverse() : arms
+      for (const arm of ordered) plan.push({ taskId, trialIndex, arm })
     }
   }
   return plan
@@ -386,16 +406,17 @@ function spawnFailureDetail(outcome, execution, where = '') {
  * @param {{ name: string, jspace: Record<string, unknown> }} options.arm - the arm entry.
  * @param {string} options.armDir - the arm's output directory (sessionFile is relative to it).
  * @param {string} options.sessionLogRoot - per-spawn persistence root; the overlay lands here too.
+ * @param {{ provider: string, model: string, contextWindow?: number }} options.route - the provider/model pinned into the overlay's agent-default-model row, plus an optional context-window pin.
  * @param {string} options.taskText - the prompt for this spawn.
  * @param {string} options.scratchDir - trial scratch dir; becomes the child cwd.
  * @param {number} options.timeoutMs - spawn timeout.
  * @param {NodeJS.ProcessEnv} options.env - child environment.
  * @returns {Promise<{ execution: import('./execute.js').ExecutionResult, metrics: import('../schema/trial.js').TrialMetrics, sessionFile: string | null }>}
  */
-async function executeSpawn({ repoRoot, arm, armDir, sessionLogRoot, taskText, scratchDir, timeoutMs, env }) {
+async function executeSpawn({ repoRoot, arm, armDir, sessionLogRoot, route, taskText, scratchDir, timeoutMs, env }) {
   await mkdir(sessionLogRoot, { recursive: true })
   const overlayPath = join(sessionLogRoot, 'arm-overlay.yml')
-  await writeFile(overlayPath, renderArmOverlay(arm, { sessionLogRoot }))
+  await writeFile(overlayPath, renderArmOverlay(arm, { sessionLogRoot, ...route }))
   const execution = await executeTrial({ repoRoot, overlayPath, taskText, scratchDir, sessionLogRoot, timeoutMs, env })
   const metrics = execution.sessionLogPath === null
     ? emptyMetrics()
@@ -448,17 +469,19 @@ function trialRecordFrame(task, entry, scratchDir, startedAt) {
  * @param {string} options.scratchDir - prepared trial scratch dir (fixture already copied).
  * @param {string} options.sessionLogRoot - per-trial persistence root.
  * @param {string} options.repoRoot - harness repository root.
+ * @param {{ provider: string, model: string, contextWindow?: number }} options.route - the pinned provider/model route, plus an optional context-window pin.
  * @param {NodeJS.ProcessEnv} options.env - child environment.
  * @param {string} options.startedAt - trial start, ISO 8601.
  * @returns {Promise<import('../schema/trial.js').Trial>} the trial record (pre-audit).
  */
-async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, sessionLogRoot, repoRoot, env, startedAt }) {
+async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, sessionLogRoot, repoRoot, route, env, startedAt }) {
   const { base, skippedVerifier } = trialRecordFrame(task, entry, scratchDir, startedAt)
   const { execution, metrics, sessionFile } = await executeSpawn({
     repoRoot,
     arm,
     armDir,
     sessionLogRoot,
+    route,
     taskText: /** @type {string} */ (task.instruction),
     scratchDir,
     timeoutMs: task.timeoutMs,
@@ -505,13 +528,14 @@ async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, ses
  * @param {string} options.scratchDir - prepared trial scratch dir (fixture already copied).
  * @param {string} options.sessionRoot - per-trial session root; phase roots are `phase-<i>` below it.
  * @param {string} options.repoRoot - harness repository root.
+ * @param {{ provider: string, model: string, contextWindow?: number }} options.route - the pinned provider/model route, plus an optional context-window pin.
  * @param {NodeJS.ProcessEnv} options.env - child environment.
  * @param {string} options.startedAt - trial start, ISO 8601.
  * @param {import('../schema/trial.js').PhaseRecord[]} options.phases - shared sink: completed
  *   phase records are pushed here so a mid-chain runner failure keeps the evidence.
  * @returns {Promise<import('../schema/trial.js').Trial>} the trial record (pre-audit).
  */
-async function runChainTrial({ task, entry, arm, armDir, scratchDir, sessionRoot, repoRoot, env, startedAt, phases }) {
+async function runChainTrial({ task, entry, arm, armDir, scratchDir, sessionRoot, repoRoot, route, env, startedAt, phases }) {
   const { base, skippedVerifier } = trialRecordFrame(task, entry, scratchDir, startedAt)
   const definitions = /** @type {TaskPhase[]} */ (task.phases)
   for (let index = 0; index < definitions.length; index += 1) {
@@ -522,6 +546,7 @@ async function runChainTrial({ task, entry, arm, armDir, scratchDir, sessionRoot
       arm,
       armDir,
       sessionLogRoot: join(sessionRoot, `phase-${index}`),
+      route,
       taskText: definition.instruction,
       scratchDir,
       timeoutMs: definition.timeoutMs ?? task.timeoutMs,
@@ -616,13 +641,21 @@ export async function main(argv, io = {}) {
   if (taskIds.length === 0) throw new UsageError(`no tasks match ${options.taskGlob ?? '(empty catalog)'}`)
   const tasks = new Map(catalog.filter(task => taskIds.includes(task.taskId)).map(task => [task.taskId, task]))
   const model = options.model ?? env.BENCH_MODEL ?? DEFAULT_MODEL
-  const temperature = options.temperature ?? (env.BENCH_TEMPERATURE === undefined ? DEFAULT_TEMPERATURE : Number(env.BENCH_TEMPERATURE))
+  const provider = options.provider ?? env.BENCH_PROVIDER ?? DEFAULT_PROVIDER
+  if (options.contextWindow !== undefined && provider !== 'ollama-cloud') {
+    throw new UsageError(`--context-window cannot be pinned for provider "${provider}" (only ollama-cloud is reproducible in the overlay)`)
+  }
+  const route = {
+    provider,
+    model,
+    ...options.contextWindow === undefined ? {} : { contextWindow: options.contextWindow },
+  }
   const baseUrl = options.baseUrl ?? env.DEEPSEEK_BASE_URL ?? null
   const plan = buildPlan({ taskIds, arms: options.arms, repeats: options.repeats })
 
   if (options.dryRun) {
     print(`experiment: ${options.experiment}`)
-    print(`model: ${model}  temperature: ${temperature}  baseUrl: ${baseUrl ?? '(provider default)'}`)
+    print(`provider: ${provider}  model: ${model}  baseUrl: ${baseUrl ?? '(provider default)'}  contextWindow: ${options.contextWindow ?? '(shipped pin)'}`)
     print(`tasks: ${taskIds.join(', ')}`)
     print(`plan: ${plan.length} trials (${taskIds.length} tasks × ${options.repeats} repeats × ${options.arms.length} arms)`)
     for (const entry of plan) {
@@ -633,8 +666,9 @@ export async function main(argv, io = {}) {
     return 0
   }
 
-  if (typeof env.DEEPSEEK_API_KEY !== 'string' || env.DEEPSEEK_API_KEY === '') {
-    throw new UsageError('DEEPSEEK_API_KEY is required for real runs (or use --dry-run)')
+  const keyEnv = PROVIDER_KEY_ENV[provider] ?? 'DEEPSEEK_API_KEY'
+  if (typeof env[keyEnv] !== 'string' || env[keyEnv] === '') {
+    throw new UsageError(`${keyEnv} is required for real runs with provider "${provider}" (or use --dry-run)`)
   }
 
   const experimentDir = join(benchRoot, 'runs', options.experiment)
@@ -650,9 +684,10 @@ export async function main(argv, io = {}) {
       experiment: options.experiment,
       arm: armName,
       armConfig: getArm(armName).jspace,
+      provider,
       model,
       baseUrl,
-      temperature,
+      contextWindow: options.contextWindow ?? null,
       repeats: options.repeats,
       taskIds,
       gitCommit,
@@ -680,7 +715,12 @@ export async function main(argv, io = {}) {
     const scratchDir = join(experimentDir, 'scratch', entry.arm, entry.taskId, String(entry.trialIndex))
     const sessionRoot = join(armDir, 'sessions', entry.taskId, String(entry.trialIndex))
     const trialStartedAt = new Date().toISOString()
-    const trialEnv = { ...env, SHRES_HOME: shresHome }
+    // SHRES_SHIELD=off: trials measure model+jspace capability inside a
+    // throwaway scratch dir, not the paid shield payload. In headless
+    // compositions the shield's `ask` posture fail-closes (no approval
+    // channel), and its tool_args shape heuristics false-positive on ordinary
+    // bench paths, silently denying every tool call (smoke: w0-smoke-ollama).
+    const trialEnv = { ...env, SHRES_HOME: shresHome, SHRES_SHIELD: 'off' }
 
     // Integrity audit, part 1: none of this trial's session roots may
     // pre-exist — a leftover root means leakage from a previous trial.
@@ -710,14 +750,14 @@ export async function main(argv, io = {}) {
         trial = await runSingleSessionTrial({
           task, entry, arm, armDir, scratchDir,
           sessionLogRoot: sessionRoot,
-          repoRoot, env: trialEnv, startedAt: trialStartedAt,
+          repoRoot, route, env: trialEnv, startedAt: trialStartedAt,
         })
       } else {
         chainPhases = []
         trial = await runChainTrial({
           task, entry, arm, armDir, scratchDir,
           sessionRoot,
-          repoRoot, env: trialEnv, startedAt: trialStartedAt,
+          repoRoot, route, env: trialEnv, startedAt: trialStartedAt,
           phases: chainPhases,
         })
       }

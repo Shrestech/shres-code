@@ -21,9 +21,18 @@ export const FAILURE_MODES = Object.freeze([
  * @property {number} durationMs - wall time of the agent run.
  * @property {number} turns - model request count.
  * @property {number} toolCalls - `tool/call` events in the session log.
- * @property {number} identicalRetries - tool calls repeated with identical name+args.
- * @property {number} checkpoints - `jspace_checkpoint` calls accepted (0 in the off arm).
- * @property {number} shipPasses - `jspace_ship` calls accepted (0 in the off arm).
+ * @property {number} [duplicateCallAttempts] - calls after the first with identical name+args; not necessarily denied.
+ * @property {number} identicalRetries - compatibility alias for `duplicateCallAttempts`.
+ * @property {number} [checkpointAttempts] - `jspace_checkpoint` `tool/call` events.
+ * @property {number} [checkpointWrites] - Checked entries added by `jspace/card` snapshots.
+ * @property {number} checkpoints - compatibility alias for `checkpointWrites`.
+ * @property {number} [shipAttempts] - `jspace_ship` `tool/call` events.
+ * @property {number} shipPasses - distinct `jspace_ship` calls with a non-error `tool/result`.
+ * @property {number} [retryDenials] - distinct error results carrying the J-Space identical-retry denial.
+ * @property {number} [cardOpens] - transitions from no open card to a valid `jspace/card`.
+ * @property {number} [meaningfulGoalWrites] - non-placeholder Goal changes recorded by valid card snapshots.
+ * @property {number} [placeholderGoalLeftovers] - open cards still holding the stock placeholder at session end.
+ * @property {number} [coreWrites] - non-empty initial Core writes plus later Core changes.
  */
 
 /**
@@ -60,6 +69,19 @@ export const FAILURE_MODES = Object.freeze([
 /** TrialMetrics field names, shared by trial- and phase-level validation. */
 const METRIC_FIELDS = ['inputTokens', 'outputTokens', 'durationMs', 'turns', 'toolCalls', 'identicalRetries', 'checkpoints', 'shipPasses']
 
+/** Metrics added after the first persisted W0 runs; optional when reading those records. */
+const TRUTHFUL_METRIC_FIELDS = [
+  'duplicateCallAttempts',
+  'checkpointAttempts',
+  'checkpointWrites',
+  'shipAttempts',
+  'retryDenials',
+  'cardOpens',
+  'meaningfulGoalWrites',
+  'placeholderGoalLeftovers',
+  'coreWrites',
+]
+
 /**
  * Validate one metrics record. Throws on the first violation.
  * @param {unknown} value - candidate.
@@ -71,6 +93,20 @@ function validateMetrics(value, name) {
   if (typeof m !== 'object' || m === null) throw new Error(`${name} must be a record`)
   for (const field of METRIC_FIELDS) {
     if (typeof m[field] !== 'number' || m[field] < 0) throw new Error(`${name}.${field} must be a non-negative number`)
+  }
+  for (const field of TRUTHFUL_METRIC_FIELDS) {
+    if (m[field] !== undefined && (typeof m[field] !== 'number' || m[field] < 0)) {
+      throw new Error(`${name}.${field} must be a non-negative number when present`)
+    }
+  }
+  if (m.duplicateCallAttempts !== undefined && m.duplicateCallAttempts !== m.identicalRetries) {
+    throw new Error(`${name}.identicalRetries must equal duplicateCallAttempts when present`)
+  }
+  if (m.checkpointWrites !== undefined && m.checkpointWrites !== m.checkpoints) {
+    throw new Error(`${name}.checkpoints must equal checkpointWrites when present`)
+  }
+  if (m.shipAttempts !== undefined && m.shipPasses > m.shipAttempts) {
+    throw new Error(`${name}.shipPasses cannot exceed shipAttempts`)
   }
 }
 

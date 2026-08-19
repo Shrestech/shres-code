@@ -34,33 +34,75 @@ async function tempDir(prefix) {
 }
 
 describe('metrics.foldSessionLog', () => {
+  const toolResult = (seq, time, callId, text, isError) => ({
+    type: 'tool/result',
+    seq,
+    time,
+    data: {
+      message: {
+        source: { kind: 'tool', callId },
+        content: [{
+          type: 'tool-result',
+          toolCallId: callId,
+          content: [{ type: 'text', text }],
+          isError,
+        }],
+      },
+    },
+  })
   const fixture = [
-    '{"type":"session","version":0,"id":"s1","cwd":"/scratch","createdAt":"2026-08-18T00:00:00Z","delegationDepth":0}',
-    '{"type":"step/start","seq":1,"time":1000,"data":{"turn":0,"step":0}}',
-    '{"type":"assistant/message","seq":2,"time":2000,"data":{"turn":0,"step":0,"message":{"role":"assistant"},"usage":{"inputTokens":100,"outputTokens":50}}}',
-    '{"type":"tool/call","seq":3,"time":2100,"data":{"turn":0,"step":0,"callId":"c1","name":"read_file","arguments":"{\\"a\\":1,\\"b\\":2}"}}',
-    // Same call with different key order: one identical retry.
-    '{"type":"tool/call","seq":4,"time":2200,"data":{"turn":0,"step":0,"callId":"c2","name":"read_file","arguments":"{\\"b\\":2,\\"a\\":1}"}}',
-    '{"type":"tool/call","seq":5,"time":2300,"data":{"turn":0,"step":0,"callId":"c3","name":"jspace_checkpoint","arguments":"{\\"check\\":\\"imports\\"}"}}',
-    '{"type":"tool/call","seq":6,"time":2400,"data":{"turn":0,"step":0,"callId":"c4","name":"jspace_ship","arguments":"{}"}}',
+    { type: 'session', version: 0, id: 's1', cwd: '/scratch', createdAt: '2026-08-18T00:00:00Z', delegationDepth: 0 },
+    { type: 'step/start', seq: 1, time: 1000, data: { turn: 0, step: 0 } },
+    { type: 'assistant/message', seq: 2, time: 2000, data: { usage: { inputTokens: 100, outputTokens: 50 } } },
+    { type: 'tool/call', seq: 3, time: 2100, data: { callId: 'c1', name: 'read_file', arguments: '{"a":1,"b":2}' } },
+    // Same call with different key order: a duplicate attempt that the guard denies.
+    { type: 'tool/call', seq: 4, time: 2200, data: { callId: 'c2', name: 'read_file', arguments: '{"b":2,"a":1}' } },
+    toolResult(
+      5,
+      2250,
+      'c2',
+      'Error: jspace refuses repeating the same failed tool call while Core and Next are unchanged. Use jspace_note before retrying.',
+      true,
+    ),
+    { type: 'jspace/card', seq: 6, time: 2300, data: { goal: 'J-Space is on', core: [], checked: [] } },
+    { type: 'jspace/card', seq: 7, time: 2350, data: { goal: 'Fix the parser', core: ['Keep wire format'], checked: [] } },
+    { type: 'tool/call', seq: 8, time: 2400, data: { callId: 'cp1', name: 'jspace_checkpoint', arguments: '{}' } },
+    { type: 'jspace/card', seq: 9, time: 2450, data: { goal: 'Fix the parser', core: ['Keep wire format'], checked: [{ n: 1 }] } },
+    toolResult(10, 2500, 'cp1', 'Recorded checkpoint.', false),
+    { type: 'tool/call', seq: 11, time: 2550, data: { callId: 'cp2', name: 'jspace_checkpoint', arguments: '{}' } },
+    toolResult(12, 2600, 'cp2', 'Error: jspace checkpoint requires evidence', true),
+    { type: 'tool/call', seq: 13, time: 2650, data: { callId: 'ship1', name: 'jspace_ship', arguments: '{}' } },
+    toolResult(14, 2700, 'ship1', 'Ship check passed.', false),
+    { type: 'tool/call', seq: 15, time: 2750, data: { callId: 'ship2', name: 'jspace_ship', arguments: '{}' } },
+    toolResult(16, 2800, 'ship2', 'Error: jspace ship requires a checkpoint', true),
+    { type: 'jspace/closed', seq: 17, time: 2850, data: { sessionId: 's1' } },
+    { type: 'jspace/card', seq: 18, time: 2900, data: { goal: 'J-Space is on', core: [], checked: [] } },
     // A packed chunk row: ignored by the fold and by the duration span.
-    '{"type":"text-chunks","seq0":7,"time0":2500,"rows":[]}',
-    '{"type":"step/end","seq":10,"time":3000,"data":{"turn":0,"step":0}}',
-    '{"type":"assistant/message","seq":11,"time":4000,"data":{"turn":0,"step":1,"message":{"role":"assistant"},"usage":{"inputTokens":200,"outputTokens":70,"cacheReadTokens":40}}}',
-    '{"type":"step/end","seq":12,"time":5000,"data":{"turn":0,"step":1}}',
-    '',
-  ].join('\n')
+    { type: 'text-chunks', seq0: 19, time0: 2950, rows: [] },
+    { type: 'step/end', seq: 20, time: 3000, data: { turn: 0, step: 0 } },
+    { type: 'assistant/message', seq: 21, time: 4000, data: { usage: { inputTokens: 200, outputTokens: 70, cacheReadTokens: 40 } } },
+    { type: 'step/end', seq: 22, time: 5000, data: { turn: 0, step: 1 } },
+  ].map(event => JSON.stringify(event)).join('\n')
 
-  it('folds turns, tool calls, retries, jspace calls, tokens, and duration', () => {
+  it('separates attempts, durable writes, successful results, denials, and card activity', () => {
     assert.deepEqual(foldSessionLog(fixture), {
       inputTokens: 300,
       outputTokens: 120,
       durationMs: 4000,
       turns: 2,
-      toolCalls: 4,
-      identicalRetries: 1,
+      toolCalls: 6,
+      duplicateCallAttempts: 3,
+      identicalRetries: 3,
+      checkpointAttempts: 2,
+      checkpointWrites: 1,
       checkpoints: 1,
+      shipAttempts: 2,
       shipPasses: 1,
+      retryDenials: 1,
+      cardOpens: 2,
+      meaningfulGoalWrites: 1,
+      placeholderGoalLeftovers: 1,
+      coreWrites: 1,
     })
   })
 
@@ -72,8 +114,25 @@ describe('metrics.foldSessionLog', () => {
     ].join('\n')
     const metrics = foldSessionLog(log)
     assert.equal(metrics.toolCalls, 3)
+    assert.equal(metrics.duplicateCallAttempts, 1)
     assert.equal(metrics.identicalRetries, 1)
+    assert.equal(metrics.retryDenials, 0)
     assert.equal(metrics.durationMs, 2)
+  })
+
+  it('does not count repeated result projections twice', () => {
+    const log = [
+      { type: 'tool/call', seq: 1, time: 1, data: { callId: 'ship', name: 'jspace_ship', arguments: '{}' } },
+      toolResult(2, 2, 'ship', 'Ship check passed.', false),
+      toolResult(3, 3, 'ship', 'Ship check passed.', false),
+      { type: 'tool/call', seq: 4, time: 4, data: { callId: 'retry', name: 'bash', arguments: '{}' } },
+      toolResult(5, 5, 'retry', 'Error: jspace refuses repeating the same failed tool call while Core and Next are unchanged.', true),
+      toolResult(6, 6, 'retry', 'Error: jspace refuses repeating the same failed tool call while Core and Next are unchanged.', true),
+    ].map(event => JSON.stringify(event)).join('\n')
+    const metrics = foldSessionLog(log)
+    assert.equal(metrics.shipAttempts, 1)
+    assert.equal(metrics.shipPasses, 1)
+    assert.equal(metrics.retryDenials, 1)
   })
 
   it('returns zeros for an empty log', () => {
@@ -98,17 +157,40 @@ describe('arms registry', () => {
     assert.throws(() => getArm('always-open'), /unknown arm "always-open".*off, on/)
   })
 
-  it('renders a patch overlay with the jspace config and per-trial log root', () => {
-    const on = renderArmOverlay(ARMS.on, { sessionLogRoot: '/tmp/bench/on/sessions/t/0' })
+  it('renders a patch overlay with the jspace config, pinned route, and per-trial log root', () => {
+    const route = { provider: 'ollama-cloud', model: 'deepseek-v4-flash:cloud' }
+    const on = renderArmOverlay(ARMS.on, { sessionLogRoot: '/tmp/bench/on/sessions/t/0', ...route })
     assert.match(on, /^- id: jspace$/m)
     assert.match(on, /enabled: true/)
     assert.match(on, /mode: "available"/)
     assert.match(on, /requireCoverage: true/)
+    assert.match(on, /^- id: agent-default-model$/m)
+    assert.match(on, /provider: "ollama-cloud"/)
+    assert.match(on, /model: "deepseek-v4-flash:cloud"/)
     assert.match(on, /^- id: session-persistence-jsonl$/m)
     assert.match(on, /root: "\/tmp\/bench\/on\/sessions\/t\/0"/)
     assert.match(on, /compression: none/)
-    const off = renderArmOverlay(ARMS.off, { sessionLogRoot: '/x' })
+    const off = renderArmOverlay(ARMS.off, { sessionLogRoot: '/x', ...route })
     assert.match(off, /enabled: false/)
+  })
+
+  it('pins a harness-side context window for ollama-cloud only', async () => {
+    const route = { provider: 'ollama-cloud', model: 'deepseek-v4-flash:cloud' }
+    const pinned = renderArmOverlay(ARMS.on, { sessionLogRoot: '/x', ...route, contextWindow: 32768 })
+    assert.match(pinned, /^- id: llm-pi-ai$/m)
+    assert.match(pinned, /contextWindow: 32768/)
+    assert.doesNotMatch(pinned, /contextWindow: 1048576/)
+    assert.doesNotMatch(renderArmOverlay(ARMS.on, { sessionLogRoot: '/x', ...route }), /llm-pi-ai/)
+    // The reproduced provider block must not drift from the shipped patch.
+    const shipped = await readFile(new URL('../../packages/bundle/base/cordis.patch.yml', import.meta.url), 'utf8')
+    for (const value of ['baseURL: https://ollama.com/v1', 'apiKeyEnv: OLLAMA_API_KEY', 'deepseek-v4-flash:cloud', 'deepseek-v4-pro:cloud', 'maxTokens: 32768']) {
+      assert.ok(shipped.includes(value), `shipped patch lost "${value}"`)
+      assert.ok(pinned.includes(value), `overlay lost "${value}"`)
+    }
+    assert.throws(
+      () => renderArmOverlay(ARMS.on, { sessionLogRoot: '/x', provider: 'deepseek-official', model: 'deepseek-v4-flash', contextWindow: 32768 }),
+      /--context-window cannot be pinned for provider "deepseek-official"/,
+    )
   })
 })
 
@@ -120,6 +202,12 @@ describe('run.parseArgs', () => {
     assert.equal(options.repeats, 3)
     assert.equal(options.taskGlob, null)
     assert.equal(options.dryRun, false)
+    assert.equal(options.provider, undefined)
+  })
+
+  it('parses --provider', () => {
+    const options = parseArgs(['--experiment', 'w0', '--provider', 'ollama-cloud'])
+    assert.equal(options.provider, 'ollama-cloud')
   })
 
   it('parses every flag', () => {
@@ -129,7 +217,6 @@ describe('run.parseArgs', () => {
       '--repeats', '5',
       '--tasks', 'multi-*',
       '--model', 'deepseek-v4-pro',
-      '--temperature', '0.2',
       '--base-url', 'https://example.test',
       '--dry-run',
     ])
@@ -137,7 +224,6 @@ describe('run.parseArgs', () => {
     assert.equal(options.repeats, 5)
     assert.equal(options.taskGlob, 'multi-*')
     assert.equal(options.model, 'deepseek-v4-pro')
-    assert.equal(options.temperature, 0.2)
     assert.equal(options.baseUrl, 'https://example.test')
     assert.equal(options.dryRun, true)
   })
@@ -155,6 +241,13 @@ describe('run.parseArgs', () => {
   it('treats --help as a flag, not an error', () => {
     assert.equal(parseArgs(['--help']).help, true)
   })
+
+  it('parses --context-window as a positive integer, defaulting to unset', () => {
+    assert.equal(parseArgs(['--experiment', 'w0']).contextWindow, undefined)
+    assert.equal(parseArgs(['--experiment', 'w0', '--context-window', '32768']).contextWindow, 32768)
+    assert.throws(() => parseArgs(['--experiment', 'w0', '--context-window', '0']), /--context-window must be a positive integer/)
+    assert.throws(() => parseArgs(['--experiment', 'w0', '--context-window', 'x']), /--context-window must be a positive integer/)
+  })
 })
 
 describe('run.matchTaskIds', () => {
@@ -168,20 +261,25 @@ describe('run.matchTaskIds', () => {
     assert.deepEqual(matchTaskIds(ids, 'injection-ignor?'), ['injection-ignore'])
     assert.deepEqual(matchTaskIds(ids, 'nomatch'), [])
   })
+
+  it('unions comma-separated globs in catalog order', () => {
+    assert.deepEqual(matchTaskIds(ids, '*-fix,multi-*'), ['multi-file-rename', 'single-function-fix'])
+    assert.deepEqual(matchTaskIds(ids, 'nomatch,multi-*'), ['multi-file-rename'])
+  })
 })
 
 describe('run.buildPlan', () => {
-  it('interleaves arms inside every (task, trial) pair', () => {
-    const plan = buildPlan({ taskIds: ['a', 'b'], arms: ['off', 'on'], repeats: 2 })
+  it('uses ABBA arm order while keeping every task/trial pair adjacent', () => {
+    const plan = buildPlan({ taskIds: ['a'], arms: ['off', 'on'], repeats: 4 })
     assert.deepEqual(plan, [
       { taskId: 'a', trialIndex: 0, arm: 'off' },
       { taskId: 'a', trialIndex: 0, arm: 'on' },
-      { taskId: 'a', trialIndex: 1, arm: 'off' },
       { taskId: 'a', trialIndex: 1, arm: 'on' },
-      { taskId: 'b', trialIndex: 0, arm: 'off' },
-      { taskId: 'b', trialIndex: 0, arm: 'on' },
-      { taskId: 'b', trialIndex: 1, arm: 'off' },
-      { taskId: 'b', trialIndex: 1, arm: 'on' },
+      { taskId: 'a', trialIndex: 1, arm: 'off' },
+      { taskId: 'a', trialIndex: 2, arm: 'on' },
+      { taskId: 'a', trialIndex: 2, arm: 'off' },
+      { taskId: 'a', trialIndex: 3, arm: 'off' },
+      { taskId: 'a', trialIndex: 3, arm: 'on' },
     ])
   })
 })
@@ -345,10 +443,26 @@ describe('run.main --dry-run', () => {
       assert.deepEqual(lines.slice(-4), [
         '  alpha #0 [off]',
         '  alpha #0 [on]',
-        '  alpha #1 [off]',
         '  alpha #1 [on]',
+        '  alpha #1 [off]',
       ])
       assert.deepEqual(await readdir(benchRoot), ['tasks'])
+    } finally {
+      await rm(benchRoot, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects --context-window with a provider the overlay cannot reproduce', async () => {
+    const benchRoot = await tempDir('bench-runner-window-')
+    try {
+      await writeTask(benchRoot, 'alpha')
+      await assert.rejects(
+        main(
+          ['--experiment', 'demo', '--provider', 'deepseek-official', '--context-window', '32768', '--dry-run'],
+          { benchRoot, env: {}, print: () => {} },
+        ),
+        /--context-window cannot be pinned for provider "deepseek-official"/,
+      )
     } finally {
       await rm(benchRoot, { recursive: true, force: true })
     }
