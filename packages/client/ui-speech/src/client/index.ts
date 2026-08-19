@@ -13,7 +13,7 @@ import type {} from '@shres-code/shres-code-client-ui-settings/client'
 import {
   SPEECH_SETTINGS_NAMESPACE,
   type SpeechUserSettings,
-} from '@shres-code/shres-code-speech/settings'
+} from './settings.ts'
 import { MicButton } from './MicButton.tsx'
 import type { MicButtonInjected } from './MicButton.tsx'
 import { SpeakButton } from './SpeakButton.tsx'

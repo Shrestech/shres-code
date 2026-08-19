@@ -9,8 +9,14 @@ import { makeTranslate, stubSettingsScope } from '@shres-code/shres-code-client-
 import { createSnapshotStore } from '@shres-code/shres-code-client-runtime/client'
 import {
   DEFAULT_SPEECH_USER_SETTINGS,
+  DEFAULT_SPEECH_VOICE_ID,
+  SPEECH_SETTINGS_NAMESPACE,
   type SpeechUserSettings,
 } from '@shres-code/shres-code-speech/settings'
+import {
+  DEFAULT_SPEECH_VOICE_ID as CLIENT_DEFAULT_VOICE_ID,
+  SPEECH_SETTINGS_NAMESPACE as CLIENT_SETTINGS_NAMESPACE,
+} from '../src/client/settings.ts'
 import { MicButton } from '../src/client/MicButton.tsx'
 import { SpeakButton, decodeBase64 } from '../src/client/SpeakButton.tsx'
 import { AutoSubmitRow, VoiceRow } from '../src/client/SpeechSettingsRows.tsx'
@@ -46,6 +52,14 @@ function audioResult(base64 = btoa('wav')) {
 describe('decodeBase64', () => {
   it('round-trips ASCII bytes', () => {
     expect([...decodeBase64(btoa('Hi'))]).toEqual([72, 105])
+  })
+})
+
+describe('client-spelled settings constants', () => {
+  it('match the Host section values they duplicate', () => {
+    expect(CLIENT_SETTINGS_NAMESPACE).toBe(SPEECH_SETTINGS_NAMESPACE)
+    expect(CLIENT_DEFAULT_VOICE_ID).toBe(DEFAULT_SPEECH_VOICE_ID)
+    expect(DEFAULT_SPEECH_USER_SETTINGS.voiceId).toBe(CLIENT_DEFAULT_VOICE_ID)
   })
 })
 
