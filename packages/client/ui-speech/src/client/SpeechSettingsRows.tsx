@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@shres-code/shres-code-client-ui-slots'
 import { IconChevronDownOutline14, Menu } from '@shres-code/shres-code-client-ui-primitives'
-import { DEFAULT_SPEECH_VOICE_ID, type SpeechUserSettings } from '@shres-code/shres-code-speech/settings'
+import { DEFAULT_SPEECH_VOICE_ID, type SpeechUserSettings } from './settings.ts'
 import type { SettingsScope, SnapshotStore } from '@shres-code/shres-code-client-runtime/client'
 import type { SpeechClientStatus } from './status.ts'
 import css from './SpeechButton.module.css'
