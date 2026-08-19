@@ -20,31 +20,16 @@ import type {} from '@shres-code/shres-code-system-prompt'
 import { classifyJspacePass, type JspacePass } from './gate.ts'
 import {
   formatJspaceProtocol,
-  JSPACE_BROADCAST_ORDER,
-  JSPACE_BROADCAST_SECTION,
-  JSPACE_BROADCAST_TEXT,
-  JSPACE_CAPACITY_ORDER,
-  JSPACE_CAPACITY_SECTION,
-  JSPACE_CAPACITY_TEXT,
-  JSPACE_FIRST_EXTRA_MODULE_ORDER,
-  JSPACE_MODULE_SECTIONS,
-  JSPACE_MODULE_TEXT,
   JSPACE_PROTOCOL_ORDER,
   JSPACE_PROTOCOL_SECTION,
-  selectJspaceModules,
-  type JspaceModuleName,
 } from './protocol.ts'
 
 export { classifyJspacePass, type JspacePass, type JspacePassInput } from './gate.ts'
 export {
   formatJspaceProtocol,
-  JSPACE_BROADCAST_SECTION,
-  JSPACE_CAPACITY_SECTION,
   JSPACE_DRIVER_CLOSED,
   JSPACE_DRIVER_OPEN,
-  JSPACE_MODULE_SECTIONS,
   JSPACE_PROTOCOL_SECTION,
-  selectJspaceModules,
 } from './protocol.ts'
 
 /** Cordis plugin name. */
@@ -70,6 +55,29 @@ function messageText(message: UserMessage): string {
     if (part.type === 'text') parts.push(part.text)
   }
   return parts.join('\n')
+}
+
+/** Maximum length of a Goal seeded from the triggering human text. */
+export const JSPACE_SEED_GOAL_MAX = 200
+
+/**
+ * Goal seeded from the triggering human text: the first non-empty line,
+ * trimmed and cut within `JSPACE_SEED_GOAL_MAX` at a sentence, then word,
+ * boundary, with an ellipsis when cut. Blank text keeps the stock placeholder
+ * so the card never opens goal-less.
+ * @param text - triggering human text for this assemble.
+ * @returns the Goal line to open with.
+ */
+export function seedGoal(text: string): string {
+  const line = text.split('\n').map(part => part.trim()).find(part => part.length > 0)
+  if (line === undefined) return JSPACE_ALWAYS_OPEN_GOAL
+  if (line.length <= JSPACE_SEED_GOAL_MAX) return line
+  const head = line.slice(0, JSPACE_SEED_GOAL_MAX)
+  const sentence = Math.max(head.lastIndexOf('. '), head.lastIndexOf('! '), head.lastIndexOf('? '))
+  if (sentence > 0) return `${head.slice(0, sentence).replace(/[.!?]+$/u, '')}…`
+  const word = head.lastIndexOf(' ')
+  if (word > 0) return `${head.slice(0, word).trimEnd()}…`
+  return `${head}…`
 }
 
 /**
@@ -114,40 +122,7 @@ export function passFor(
 }
 
 /**
- * True when the latest event is a tool result or the last human text is untrusted.
- * @param session - live session, when any.
- * @returns whether introspection must load.
- */
-function isUntrusted(
-  session: Session | undefined,
-  claimed?: readonly UserMessage[],
-): boolean {
-  if (session?.events.at(-1)?.type === 'tool/result') return true
-  return /\b(untrusted|retrieved|search result|tool output)\b/iu.test(turnText(session, claimed))
-}
-
-/**
- * Extra modules this assembly mounts.
- * @param ctx - seat owner.
- * @param session - live session, when any.
- * @returns selected extra module names.
- */
-export function modulesFor(
-  ctx: Context,
-  session: Session | undefined,
-  claimed?: readonly UserMessage[],
-): readonly JspaceModuleName[] {
-  if (!ctx.jspace.status.active) return []
-  const text = turnText(session, claimed)
-  return selectJspaceModules({
-    pass: passFor(ctx, session, claimed),
-    untrusted: isUntrusted(session, claimed),
-    longChain: text.length > 400,
-  })
-}
-
-/**
- * Register the card section, protocol sections, and loop/always-open pre-step.
+ * Register the card section, operational protocol, and loop/always-open open.
  * @param ctx - Cordis context with jspace and systemPrompt.
  */
 export function apply(ctx: Context): void {
@@ -176,46 +151,15 @@ export function apply(ctx: Context): void {
     },
   })
 
-  ctx.systemPrompt.section({
-    name: JSPACE_CAPACITY_SECTION,
-    order: JSPACE_CAPACITY_ORDER,
-    text: (context) => {
-      if (!ctx.jspace.status.active) return ''
-      const pass = passFor(ctx, context.agent?.session, context.messages)
-      return pass === 'fast' ? '' : JSPACE_CAPACITY_TEXT
-    },
-  })
-
-  ctx.systemPrompt.section({
-    name: JSPACE_BROADCAST_SECTION,
-    order: JSPACE_BROADCAST_ORDER,
-    text: (context) => {
-      if (!ctx.jspace.status.active) return ''
-      return passFor(ctx, context.agent?.session, context.messages) === 'loop'
-        ? JSPACE_BROADCAST_TEXT
-        : ''
-    },
-  })
-
-  const extraNames = Object.keys(JSPACE_MODULE_SECTIONS) as JspaceModuleName[]
-  extraNames.forEach((moduleName, index) => {
-    ctx.systemPrompt.section({
-      name: JSPACE_MODULE_SECTIONS[moduleName],
-      order: JSPACE_FIRST_EXTRA_MODULE_ORDER + index,
-      text: (context) => {
-        if (!ctx.jspace.status.active) return ''
-        return modulesFor(ctx, context.agent?.session, context.messages).includes(moduleName)
-          ? JSPACE_MODULE_TEXT[moduleName]
-          : ''
-      },
-    })
-  })
 }
 
 /**
  * Open a card when this assemble's pass is loop and none exists, so the same
- * request reprints the stock card instead of inviting a doomed `jspace_open`.
- * An explicit close this session (`/j-space off`) stays closed: the automatic
+ * request reprints the card instead of inviting a doomed `jspace_open`. Goal is
+ * seeded from the triggering human text (`seedGoal`, stock placeholder when
+ * that text is blank) and Next stays the stock line; the open lands in the log
+ * as `jspace/card`, so compaction and resume rebuild the seeded card. An
+ * explicit close this session (`/j-space off`) stays closed: the automatic
  * path must never undo the user's off.
  * @param ctx - seat owner.
  * @param context - current assemble context.
@@ -230,7 +174,7 @@ function openIfLoop(ctx: Context, context: AssembleContext): void {
   if (folded.closed) return
   if (passFor(ctx, agent.session, context.messages) !== 'loop') return
   ctx.jspace.open(agent.session, {
-    goal: JSPACE_ALWAYS_OPEN_GOAL,
+    goal: seedGoal(turnText(agent.session, context.messages)),
     next: JSPACE_ALWAYS_OPEN_NEXT,
   })
 }

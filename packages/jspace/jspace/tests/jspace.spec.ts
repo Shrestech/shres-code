@@ -35,7 +35,21 @@ describe('JspaceService remount', () => {
       checkpoints: 0,
     })
     ctx.jspace.open(session, { goal: 'A', next: 'B' })
-    ctx.jspace.checkpoint(session, { check: 'x', by: 'unit tests' })
+    session.append('tool/call', {
+      turn: 1, step: 1, callId: CallId('snapshot-check'), name: 'read', arguments: '{}',
+    })
+    session.append('tool/result', {
+      turn: 1,
+      step: 1,
+      message: createToolResultMessage({
+        callId: CallId('snapshot-check'),
+        content: [{ type: 'text', text: 'ok' }],
+        isError: false,
+      }),
+    }, { surfaceOp: 'append' })
+    ctx.jspace.checkpoint(session, {
+      check: 'x', by: 'unit tests', evidence: 'snapshot-check',
+    })
     expect(ctx.jspace.snapshot(session)).toMatchObject({ open: true, closed: false, checkpoints: 1 })
     ctx.jspace.close(session)
     expect(ctx.jspace.snapshot(session)).toMatchObject({ open: false, closed: true, checkpoints: 0 })
@@ -105,17 +119,15 @@ describe('JspaceService card log', () => {
     })).toThrow(/at most two/)
   })
 
-  it('swaps core only when the departing line is named', async () => {
+  it('replaces Core as a whole list and enforces its two-item capacity', async () => {
     const { ctx, session } = await harness()
     ctx.jspace.open(session, { goal: 'A', next: 'B', core: ['old', 'keep'] })
-    const { ctx: grow, session: emptyCore } = await harness()
-    grow.jspace.open(emptyCore, { goal: 'A', next: 'B' })
-    expect(grow.jspace.note(emptyCore, { core: 'first' }).core).toEqual(['first'])
-    expect(() => ctx.jspace.note(session, { core: 'new' })).toThrow(/departing/)
-    expect(() => ctx.jspace.note(session, { departing: 'missing', core: 'new' })).toThrow(/does not hold/)
-    const next = ctx.jspace.note(session, { departing: 'old', core: 'new', next: 'C' })
-    expect(next.core).toEqual(['new', 'keep'])
+    const next = ctx.jspace.note(session, { core: ['new', 'constraint'], next: 'C' })
+    expect(next.core).toEqual(['new', 'constraint'])
     expect(next.next).toBe('C')
+    expect(ctx.jspace.note(session, { core: [] }).core).toEqual([])
+    expect(() => ctx.jspace.note(session, { core: ['one', 'two', 'three'] }))
+      .toThrow(/at most two/)
   })
 
   it('refuses a checkpoint without a coverage term and accepts one with evidence', async () => {
@@ -126,6 +138,10 @@ describe('JspaceService card log', () => {
       check: 'done',
       by: 'the community reviewed the latest notes',
     })).toThrow(/coverage/)
+    expect(() => ctx.jspace.checkpoint(session, {
+      check: 'done',
+      by: 'unit tests covering the fold',
+    })).toThrow(/evidence/)
     session.append('turn/start', { turn: 1 })
     session.append('step/start', { turn: 1, step: 1 })
     session.append('tool/call', {
@@ -172,12 +188,12 @@ describe('JspaceService card log', () => {
       check: 'ran the command',
       by: 'unit tests covering the fold',
       evidence: 'call-err',
-    })).toThrow(/non-error tool call/)
+    })).toThrow(/successful non-J-Space tool call/)
     expect(() => ctx.jspace.checkpoint(session, {
       check: 'again',
       by: 'unit tests',
       evidence: 'missing',
-    })).toThrow(/non-error tool call/)
+    })).toThrow(/successful non-J-Space tool call/)
   })
 
   it('closes the card and copies it onto a fork', async () => {
@@ -239,9 +255,25 @@ describe('JspaceService card log', () => {
   it('matches extra coverage terms', async () => {
     const { ctx, session } = await harness({ enabled: true, coverageTerms: ['覆盖'] })
     ctx.jspace.open(session, { goal: 'A', next: 'B' })
-    const checked = ctx.jspace.checkpoint(session, { check: '解析', by: '覆盖全部' })
+    session.append('tool/call', {
+      turn: 1, step: 1, callId: CallId('call-extra'), name: 'read', arguments: '{}',
+    })
+    session.append('tool/result', {
+      turn: 1,
+      step: 1,
+      message: createToolResultMessage({
+        callId: CallId('call-extra'),
+        content: [{ type: 'text', text: 'ok' }],
+        isError: false,
+      }),
+    }, { surfaceOp: 'append' })
+    const checked = ctx.jspace.checkpoint(session, {
+      check: '解析', by: '覆盖全部', evidence: 'call-extra',
+    })
     expect(checked.checked).toHaveLength(1)
-    const second = ctx.jspace.checkpoint(session, { check: 'again', by: 'unit tests' })
+    const second = ctx.jspace.checkpoint(session, {
+      check: 'again', by: 'unit tests', evidence: 'call-extra',
+    })
     expect(second.checked.map(line => line.n)).toEqual([1, 2])
   })
 

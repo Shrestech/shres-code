@@ -25,7 +25,7 @@ Product strings, package ids, `ctx` keys, events, tools, and Settings copy use *
 1. `ctx.jspace` service verbs and the session-event writer.
 2. Model tools `jspace_open`, `jspace_note`, `jspace_checkpoint`, `jspace_ship`.
 3. A `systemPrompt.section` named `jspace:card` whose text is the folded card, or the one-line availability notice when no card is open.
-4. A classify-and-rebuild path on assemble so the card cannot be lost the way a skill is. `always-open` and a `loop` pass open a stock card during assemble.
+4. A classify-and-rebuild path on assemble so the card cannot be lost the way a skill is. `always-open` and a `loop` pass open a card during assemble, seeding Goal from the triggering human text when present.
 5. `/j-space on|off` for the current session chip (off closes the card; it does not write Settings `enabled`).
 
 Remount follows the Shield `sync()` chain: dispose the previous fiber, read the current settings document, apply or stay inactive. `installSettingsSection` owns the namespace. Unknown config keys fail at load.
@@ -37,8 +37,8 @@ Settings namespace `jspace` (user scope, `settings.yaml`):
 | Field | Type | Default | Meaning |
 |---|---|---|---|
 | `enabled` | boolean | `false` | Master allow. Off unloads every consumer. |
-| `mode` | `'available' \| 'always-open'` | `'available'` | `available` mounts tools and waits for `jspace_open` or the chip. `always-open` opens a stock card on the first assemble of a session that has none. |
-| `requireCoverage` | boolean | `true` | `jspace_checkpoint` refuses a `by` string that matches no coverage term. |
+| `mode` | `'available' \| 'always-open'` | `'available'` | `available` mounts tools and auto-opens only when the pass is `loop`; `always-open` opens on the first assemble. Automatic opens seed Goal from triggering human text when present. |
+| `requireCoverage` | boolean | `true` | `jspace_checkpoint` requires a coverage term and a successful non-J-Space evidence call for the current Goal. |
 | `coverageTerms` | string[] | `[]` | Extra literal terms merged with the built-in English list. |
 
 Default `enabled: false` because this is an allow switch, not a security screen. Shield defaults on because screening must run; a working card must not tax every chat until the user opts in.
@@ -51,7 +51,7 @@ One card per agent session. The session log is the only durable authority. Write
 
 ```
 Goal:      one sentence. What done means. When `ctx.goals` has a current non-complete goal, this line is that objective; the J-Space service does not grow a second goal store.
-Core:      at most two live items. A third item requires an explicit swap that writes the departing line first.
+Core:      at most two live items: the current intermediate, then an optional pinned constraint. A note replaces the whole list.
 Checked:   numbered, append-only. Each line names the verifier and what it covered. Named `Checked`, not `Verified`: the tool cannot prove the verifier ran, and the model trusts its own card — the line must not assert more than the mechanism guarantees.
 Open:      unsettled questions, each with what would settle it.
 Next:      the single next action. Never empty while the card is open.
@@ -83,7 +83,7 @@ When `enabled` and no card is open, the section is one fixed line: the tools exi
 
 `classifyJspacePass` is a pure function of the last human text, whether a native card is open, and Settings `mode`. `cardOpen` or `always-open` is `loop`. Otherwise long or persist-shaped text is `loop`, bounded multi-step text is `full`, else `fast`. Classification is reconstructable from the log; it does not write an extra event.
 
-The loop passes claimed user messages into `assembleContextFor(agent, signal, messages)` so the prompt Consumer can classify (and `always-open` / `loop` can open a stock card) during assemble, before `user/message` is appended. Diagnostic `assemble()` calls omit `messages`. This is the one `agent-loop` change; new J-Space behavior otherwise stays on `systemPrompt.section`, `ctx.tools`, `ctx.commands`, and session append.
+The loop passes claimed user messages into `assembleContextFor(agent, signal, messages)` so the prompt Consumer can classify and seed an automatic open during assemble, before `user/message` is appended. Diagnostic `assemble()` calls omit `messages`. This is the one `agent-loop` change; new J-Space behavior otherwise stays on `systemPrompt.section`, `ctx.tools`, `ctx.commands`, and session append.
 
 Do not load third-party J-Space modules, science references, or Dense Track notation into the prompt.
 
@@ -91,10 +91,10 @@ Do not load third-party J-Space modules, science references, or Dense Track nota
 
 | Tool | Args | Failure |
 |---|---|---|
-| `jspace_open` | `goal`, `next`, optional `core[]` (≤2) | Opens a card, or replaces Goal and Next when a card is already open. Rejects `core.length > 2` on the first open. |
-| `jspace_note` | optional `goal`, `core` swap pair, `open`, `next` | Rejects with no open card; a core swap without a departing line fails. |
-| `jspace_checkpoint` | `check`, `by`, optional `evidence: <callId>` | Rejects with no open card; when `requireCoverage` is true, rejects `by` that matches no coverage term (English word-bounded terms first; extra terms via `coverageTerms`; CJK extras are substring includes). `evidence` must name a `tool/call` id with a logged, non-error `tool/result` in the session log. It raises the cost of fabrication; it does not prove coverage. |
-| `jspace_ship` | `path?` | Rejects if Goal is empty, Next is empty, or no `jspace_checkpoint` exists for the current Goal line. Does not close the card. |
+| `jspace_open` | `goal`, `next`, optional `core[]` (≤2) | Opens a card, or replaces Goal, Next, and supplied Core when a card is already open. Rejects `core.length > 2`. |
+| `jspace_note` | optional `goal`, replacement `core[]`, `open`, `next` | Rejects with no open card or Core longer than two lines. |
+| `jspace_checkpoint` | `check`, `by`, `evidence: <callId>` when coverage is required | Rejects with no open card, a missing coverage term, or evidence that is not a successful non-J-Space tool call after the current Goal opened. Evidence raises the cost of fabrication; it does not prove semantic coverage. |
+| `jspace_ship` | `path?` | Rejects if Goal is placeholder/empty, Next is empty, or no evidence-backed checkpoint exists for the current Goal. Success closes the card; it does not write a file. |
 
 Render intent is `generic`. Presentation methods are pure functions of `args`. Native result copy is a compact acknowledgement; the dock and Trajectory read the session events, not the tool result body.
 
@@ -147,7 +147,7 @@ Every `shres-base` profile loads the J-Space seat. Tools, prompt section, comman
 
 Reprinting the card on every step costs tokens and breaks the KV prefix when the card changes — including the always-on availability line, which is a permanent prompt change the moment `enabled` flips. `mode: available` keeps one-step chats on the one-line notice.
 
-Coverage refusal only checks that `by` matches configured terms; it cannot tell whether the verifier ran — and `evidence: <callId>` proves an event happened, not that it covered the claim. The line is named `Checked`. The Settings page and the tool README state that limit.
+Coverage checking requires a matching `by` claim and a successful non-J-Space evidence call for the current Goal. The call proves an operation completed, not that it covered the claim, so the line remains named `Checked`.
 
 Two clocks for “what are we doing” (todo strip vs J-Space card) remain until a later unification. The dock stays hidden unless a native card is open, and todo clearance is unchanged.
 

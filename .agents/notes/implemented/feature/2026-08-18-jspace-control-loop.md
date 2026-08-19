@@ -10,9 +10,9 @@ The Settings remount and four tools existed, but a normal multi-step turn still 
 
 `jspace_open` on an already-open card updates Goal and Next through `note` and returns `Updated J-Space.` Service `open()` still throws, so `/j-space on` stays a no-op when a card exists. Assemble still auto-opens a stock card on `loop`; the model can then overwrite those lines.
 
-`jspace:protocol` always includes tool-driver lines while the seat is active: how to open, or how to note / checkpoint / ship without a second open. `full` and `loop` mount self-monitoring. A long loop also mounts shorthand.
+`jspace:protocol` names only how to open, update Core/Next, cite a successful check call, diagnose a failed repeat, and ship. The operational-ledger decision supersedes the protocol modules while preserving the same prompt extension point.
 
-While a native card is open, `tools/pre-execute` refuses a non-card tool whose name and canonical arguments match any prior `tool/call` since the last `jspace/card`, `jspace/closed`, or `turn/start` (the immediately previous call or one hidden behind other calls — alternating `A, B, A` is the same undiagnosed repeat; a new user turn may legitimately re-issue a command). The in-flight `callId` is skipped because the loop logs `tool/call` before the waterfall. Card tools never trip the refuse.
+While a native card is open, `tools/pre-execute` refuses a non-card tool only when the same call failed earlier in the turn and Goal, Core, Open, and Next have not changed. The in-flight `callId` is skipped because the loop logs `tool/call` before the waterfall. Card tools never trip the refusal.
 
 The todo plan strip renders nothing while `useProjection('jspace').card` belongs to the live session.
 
@@ -26,8 +26,8 @@ The todo plan strip renders nothing while `useProjection('jspace').card` belongs
 
 ## Consequences
 
-A stock auto-open no longer blocks stating the real Goal. The model is told the tools on every enabled request, including `fast`. Blank identical retries fail until the card moves. The todo strip yields to an open native card. GoalBar unification and W0 measurement stay deferred.
+A stock auto-open no longer blocks stating the real Goal. The model is told the tools on every enabled request, including `fast`. Failed identical retries wait until the working fields move. The todo strip yields to an open native card. GoalBar unification and W0 measurement stay deferred.
 
 ## Related
 
-The remount and card inventory live in [J-Space as a Settings-toggled harness card](2026-08-18-jspace-settings-toggle.md).
+The remount and card inventory live in [J-Space as a Settings-toggled harness card](2026-08-18-jspace-settings-toggle.md). The current Core, checkpoint, ship, and prompt behavior is owned by [J-Space operational ledger](2026-08-19-jspace-operational-ledger.md).

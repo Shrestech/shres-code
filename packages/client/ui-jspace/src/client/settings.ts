@@ -9,7 +9,7 @@ export interface JSpaceSettings {
   enabled?: boolean
   /** `available` waits for open; `always-open` is reserved for the prompt Consumer. */
   mode?: 'available' | 'always-open'
-  /** Refuse a checkpoint whose `by` names no coverage term. */
+  /** Require a coverage term and successful evidence call. */
   requireCoverage?: boolean
   /** Extra coverage terms, escaped as literals. */
   coverageTerms?: string[]

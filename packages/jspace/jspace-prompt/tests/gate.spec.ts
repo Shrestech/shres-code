@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { classifyJspacePass } from '../src/gate.ts'
-import { selectJspaceModules } from '../src/protocol.ts'
 
 describe('classifyJspacePass', () => {
   it('stays fast for a one-glance question', () => {
@@ -24,24 +23,5 @@ describe('classifyJspacePass', () => {
       cardOpen: false,
       alwaysOpen: false,
     })).toBe('loop')
-  })
-})
-
-describe('selectJspaceModules', () => {
-  it('loads introspection on untrusted input even for fast', () => {
-    expect(selectJspaceModules({ pass: 'fast', untrusted: true, longChain: false }))
-      .toEqual(['introspection'])
-  })
-
-  it('loads deep-reasoning and self-monitoring on full', () => {
-    expect(selectJspaceModules({ pass: 'full', untrusted: false, longChain: false }))
-      .toEqual(['deep-reasoning', 'self-monitoring'])
-  })
-
-  it('loads directed-focus and self-monitoring on loop, plus shorthand on a long chain', () => {
-    expect(selectJspaceModules({ pass: 'loop', untrusted: false, longChain: false }))
-      .toEqual(['directed-focus', 'self-monitoring'])
-    expect(selectJspaceModules({ pass: 'loop', untrusted: false, longChain: true }))
-      .toEqual(['directed-focus', 'self-monitoring', 'shorthand'])
   })
 })

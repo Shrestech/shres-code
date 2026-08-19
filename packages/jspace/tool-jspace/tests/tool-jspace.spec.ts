@@ -7,7 +7,11 @@ import SessionStore, { SessionId } from '@shres-code/shres-code-session'
 import SystemPrompt from '@shres-code/shres-code-system-prompt'
 import ToolRuntime, { defineTool } from '@shres-code/shres-code-tools'
 import type { ToolExecutionResult } from '@shres-code/shres-code-tools'
-import JspaceService, { JspaceError } from '@shres-code/shres-code-jspace'
+import JspaceService, {
+  JSPACE_ALWAYS_OPEN_GOAL,
+  JSPACE_ALWAYS_OPEN_NEXT,
+  JspaceError,
+} from '@shres-code/shres-code-jspace'
 import * as tool from '../src/index.ts'
 
 const TOOL_NAMES = [
@@ -154,6 +158,7 @@ describe('tool-jspace registration', () => {
     expect(ctx.tools.get('jspace_checkpoint')?.presentCall?.({
       check: 'done',
       by: 'unit tests covering the fold',
+      evidence: 'call-1',
     })).toEqual({ card: 'generic', title: 'Record checkpoint', kind: 'other', rawInput: 'done' })
     expect(ctx.tools.get('jspace_ship')?.presentCall?.({}))
       .toEqual({ card: 'generic', title: 'Ship J-Space', kind: 'other' })
@@ -163,7 +168,7 @@ describe('tool-jspace registration', () => {
 })
 
 describe('jspace tools', () => {
-  it('opens, notes, and rejects a swap without departing', async () => {
+  it('opens and replaces the whole Core list', async () => {
     const { ctx, agent } = await harness()
     const opened = await execute(ctx, 'jspace_open', {
       goal: 'Ship W3',
@@ -174,29 +179,24 @@ describe('jspace tools', () => {
     expect(text(opened)).toBe('Opened J-Space.')
     expect(ctx.jspace.card(agent.session)?.core).toEqual(['seat'])
 
-    const already = await execute(ctx, 'jspace_open', { goal: 'X', next: 'Y' }, agent)
+    const already = await execute(ctx, 'jspace_open', {
+      goal: 'X', next: 'Y', core: ['prompt', 'tests'],
+    }, agent)
     expect(already.isError).toBe(false)
     expect(text(already)).toBe('Updated J-Space.')
-    expect(ctx.jspace.card(agent.session)).toMatchObject({ goal: 'X', next: 'Y', core: ['seat'] })
-
-    const appended = await execute(ctx, 'jspace_note', { core: 'tools' }, agent)
-    expect(appended.isError).toBe(false)
-    expect(ctx.jspace.card(agent.session)?.core).toEqual(['seat', 'tools'])
-    const swap = await execute(ctx, 'jspace_note', { core: 'third' }, agent)
-    expect(swap.isError).toBe(true)
-    expect(text(swap)).toContain('departing')
-    expect(ctx.jspace.card(agent.session)?.core).toEqual(['seat', 'tools'])
+    expect(ctx.jspace.card(agent.session)).toMatchObject({
+      goal: 'X', next: 'Y', core: ['prompt', 'tests'],
+    })
 
     const noted = await execute(ctx, 'jspace_note', {
-      departing: 'seat',
-      core: 'prompt',
+      core: ['result', 'constraint'],
       next: 'Checkpoint',
       open: [{ question: 'Ship path?', settles: 'A register check' }],
     }, agent)
     expect(noted.isError).toBe(false)
     expect(text(noted)).toBe('Updated J-Space.')
     expect(ctx.jspace.card(agent.session)).toMatchObject({
-      core: ['prompt', 'tools'],
+      core: ['result', 'constraint'],
       next: 'Checkpoint',
       open: [{ question: 'Ship path?', settles: 'A register check' }],
     })
@@ -208,10 +208,18 @@ describe('jspace tools', () => {
     const failed = await execute(ctx, 'jspace_checkpoint', {
       check: 'done',
       by: 'I looked',
+      evidence: 'missing',
     }, agent)
     expect(failed.isError).toBe(true)
     expect(text(failed)).toContain('verifier and coverage')
     expect(ctx.jspace.card(agent.session)?.checked).toEqual([])
+
+    const noEvidence = await execute(ctx, 'jspace_checkpoint', {
+      check: 'done',
+      by: 'unit tests covering the fold',
+    }, agent)
+    expect(noEvidence.isError).toBe(true)
+    expect(text(noEvidence)).toContain('evidence')
   })
 
   it('rejects unknown evidence and accepts a known tool-call id', async () => {
@@ -223,7 +231,7 @@ describe('jspace tools', () => {
       evidence: 'missing',
     }, agent)
     expect(unknown.isError).toBe(true)
-    expect(text(unknown)).toContain('non-error tool call')
+    expect(text(unknown)).toContain('successful non-J-Space tool call')
     expect(ctx.jspace.card(agent.session)?.checked).toEqual([])
 
     recordEvidence(agent, 'call-1')
@@ -245,7 +253,7 @@ describe('jspace tools', () => {
       evidence: 'call-err',
     }, agent)
     expect(errored.isError).toBe(true)
-    expect(text(errored)).toContain('non-error tool call')
+    expect(text(errored)).toContain('successful non-J-Space tool call')
     expect(ctx.jspace.card(agent.session)?.checked).toHaveLength(1)
   })
 
@@ -260,25 +268,29 @@ describe('jspace tools', () => {
     expect(early.isError).toBe(true)
     expect(text(early)).toContain('checkpoint for the current Goal')
 
+    recordEvidence(agent, 'call-ship-1')
     await execute(ctx, 'jspace_checkpoint', {
       check: 'done',
       by: 'unit tests covering the fold',
+      evidence: 'call-ship-1',
     }, agent)
     const shipped = await execute(ctx, 'jspace_ship', { path: 'notes.md' }, agent)
     expect(shipped.isError).toBe(false)
     if (shipped.isError) throw new Error('expected ship success')
     expect(shipped.value).toEqual({ shipped: true, path: 'notes.md' })
     expect(text(shipped)).toBe('Ship check passed.')
-    expect(ctx.jspace.card(agent.session)).not.toBeNull()
+    expect(ctx.jspace.card(agent.session)).toBeNull()
 
-    await execute(ctx, 'jspace_note', { goal: 'B-goal' }, agent)
+    await execute(ctx, 'jspace_open', { goal: 'B-goal', next: 'Check again' }, agent)
     const stale = await execute(ctx, 'jspace_ship', {}, agent)
     expect(stale.isError).toBe(true)
     expect(text(stale)).toContain('checkpoint for the current Goal')
 
+    recordEvidence(agent, 'call-ship-2')
     await execute(ctx, 'jspace_checkpoint', {
       check: 'again',
       by: 'unit tests covering the fold',
+      evidence: 'call-ship-2',
     }, agent)
     const again = await execute(ctx, 'jspace_ship', {}, agent)
     expect(again.isError).toBe(false)
@@ -337,12 +349,74 @@ describe('jspace tools', () => {
       name: 'echo',
       arguments: '{"msg":"hi"}',
     })
+    agent.session.append('tool/result', {
+      turn: 1,
+      step: 1,
+      message: createToolResultMessage({
+        callId: CallId('prev-echo'),
+        content: [{ type: 'text', text: 'failed' }],
+        isError: true,
+      }),
+    }, { surfaceOp: 'append' })
     const denied = await execute(ctx, 'echo', { msg: 'hi' }, agent)
     expect(denied.isError).toBe(true)
-    expect(text(denied)).toContain('same arguments within a turn')
+    expect(text(denied)).toContain('same failed tool call')
     await execute(ctx, 'jspace_note', { next: 'Try another path' }, agent)
     const allowed = await execute(ctx, 'echo', { msg: 'hi' }, agent)
     expect(allowed.isError).toBe(false)
+  })
+
+  it('denies non-card tools while the open card holds the placeholder Goal', async () => {
+    const { ctx, agent } = await harness()
+    ctx.tools.register(defineTool({
+      name: 'echo',
+      description: 'echo',
+      parameters: { msg: { type: 'string', required: true, description: 'text' } },
+      output: {
+        schema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: { echoed: { type: 'string', required: true } },
+        },
+        render: (_args, value) => [{ type: 'text', text: value.echoed }],
+      },
+      execute: args => Promise.resolve({ echoed: args.msg }),
+    }))
+    ctx.jspace.open(agent.session, { goal: JSPACE_ALWAYS_OPEN_GOAL, next: JSPACE_ALWAYS_OPEN_NEXT })
+    const denied = await execute(ctx, 'echo', { msg: 'hi' }, agent)
+    expect(denied.isError).toBe(true)
+    expect(text(denied)).toContain('placeholder Goal')
+    const noted = await execute(ctx, 'jspace_note', { goal: 'Ship W3' }, agent)
+    expect(noted.isError).toBe(false)
+    const allowed = await execute(ctx, 'echo', { msg: 'hi' }, agent)
+    expect(allowed.isError).toBe(false)
+  })
+
+  it('refuses to ship the placeholder Goal, then ships after a real Goal and checkpoint', async () => {
+    const { ctx, agent } = await harness()
+    ctx.jspace.open(agent.session, { goal: JSPACE_ALWAYS_OPEN_GOAL, next: JSPACE_ALWAYS_OPEN_NEXT })
+    recordEvidence(agent, 'call-placeholder')
+    const early = await execute(ctx, 'jspace_checkpoint', {
+      check: 'done',
+      by: 'unit tests covering the fold',
+      evidence: 'call-placeholder',
+    }, agent)
+    expect(early.isError).toBe(false)
+    const refused = await execute(ctx, 'jspace_ship', {}, agent)
+    expect(refused.isError).toBe(true)
+    expect(text(refused)).toContain('placeholder Goal')
+    await execute(ctx, 'jspace_note', { goal: 'Ship W3' }, agent)
+    const stale = await execute(ctx, 'jspace_ship', {}, agent)
+    expect(stale.isError).toBe(true)
+    expect(text(stale)).toContain('checkpoint for the current Goal')
+    recordEvidence(agent, 'call-real-goal')
+    await execute(ctx, 'jspace_checkpoint', {
+      check: 'again',
+      by: 'unit tests covering the fold',
+      evidence: 'call-real-goal',
+    }, agent)
+    const shipped = await execute(ctx, 'jspace_ship', {}, agent)
+    expect(shipped.isError).toBe(false)
   })
 
   it('does not refuse repeats when the seat is off', async () => {

@@ -534,7 +534,7 @@ const TOOL_PACKAGES: ToolPackage[] = [
       await ctx.plugin(ToolJSpace)
     },
     note:
-      'Schemas are registered only while Settings `enabled` is true. `jspace_ship` is a register check, not a file writer. Checkpoint `evidence` must name a completed, non-error tool-call id and does not prove coverage.',
+      'Schemas are registered only while Settings `enabled` is true. `jspace_ship` closes the card after its register check and is not a file writer. Checkpoint `evidence` must name a successful non-J-Space tool call for the current Goal and does not prove semantic coverage.',
   },
   {
     pkg: '@shres-code/shres-code-tool-workflow',

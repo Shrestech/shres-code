@@ -855,6 +855,60 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'jspace',
+    summary: 'J-Space seat (`ctx.jspace`).',
+    description: 'J-Space seat (`ctx.jspace`).',
+    methods: [
+      {
+        signature: 'watch(listener: (status: JspaceStatus) => void): () => void',
+        description: 'Subscribe to remount status.',
+        parameters: [{ name: 'listener', description: 'called with the new status.' }],
+        returns: 'disposer.',
+      },
+      {
+        signature: 'fold(session: Session): JspaceFold',
+        description: 'Fold one session\'s J-Space events.',
+        parameters: [{ name: 'session', description: 'session whose log to fold.' }],
+        returns: 'native projection plus inherited parent card.',
+      },
+      {
+        signature: 'card(session: Session): JspaceCard | null',
+        description: 'Current native open card, or `null`.',
+        parameters: [{ name: 'session', description: 'owning session.' }],
+        returns: 'the card.',
+      },
+      {
+        signature: 'snapshot(session: Session): JspaceSnapshot',
+        description: 'Settings-console snapshot for one session.',
+        parameters: [{ name: 'session', description: 'session whose log to fold.' }],
+        returns: 'open/closed and checkpoint counts. Does not throw when inactive.',
+      },
+      {
+        signature: 'open(session: Session, input: OpenJspaceInput): JspaceCard',
+        description: 'Open a card.',
+        parameters: [{ name: 'session', description: 'owning session.' }, { name: 'input', description: 'goal, next, optional core.' }],
+        returns: 'the recorded card.',
+      },
+      {
+        signature: 'note(session: Session, input: NoteJspaceInput): JspaceCard',
+        description: 'Patch an open card.',
+        parameters: [{ name: 'session', description: 'owning session.' }, { name: 'input', description: 'fields to replace.' }],
+        returns: 'the recorded card.',
+      },
+      {
+        signature: 'checkpoint(session: Session, input: CheckpointJspaceInput): JspaceCard',
+        description: 'Append a Checked line.',
+        parameters: [{ name: 'session', description: 'owning session.' }, { name: 'input', description: 'check, by, optional evidence.' }],
+        returns: 'the recorded card.',
+      },
+      {
+        signature: 'close(session: Session): void',
+        description: 'Close the card.',
+        parameters: [{ name: 'session', description: 'owning session.' }],
+      },
+    ],
+  },
+  {
     key: 'llm',
     summary: 'The abstract `llm` service: an adapter registry plus a streaming model-call API, interceptable via the `llm/stream` waterfall.',
     description: 'The abstract `llm` service: an adapter registry plus a streaming model-call API, interceptable via the `llm/stream` waterfall.',
@@ -1561,6 +1615,34 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'shield',
+    summary: 'Published Shield status and a read-only snapshot RPC.',
+    description: 'Published Shield status and a read-only snapshot RPC. `active` is the brand-mark switch: blue girl and green shield only while the paid engine is screening. The seat owns this service name; the paid plugin must not replace it.',
+    methods: [
+      {
+        signature: 'readonly status: ShieldStatus',
+        description: 'Current screening status.',
+        parameters: [],
+      },
+      {
+        signature: 'bindPayload(payload: unknown): void',
+        description: 'Remember the live paid instance so snapshot can read its stats.',
+        parameters: [{ name: 'payload', description: 'value returned by the paid `apply`, or `undefined` after dispose.' }],
+      },
+      {
+        signature: 'bindPersistedReader(reader: ((cwd?: string | null) => unknown) | undefined): void',
+        description: 'Remember a module-level stats reader used when screening is off.',
+        parameters: [{ name: 'reader', description: '`stats.snapshot` from the resolved payload module, or `undefined`.' }],
+      },
+      {
+        signature: '@Remote(\'snapshot\') snapshot(sessionId?: string): ShieldSnapshot',
+        description: 'Per-repo counters for the current session cwd. Disable remounts the payload off but still returns last persisted counts with `status.reason === \'disabled\'`.',
+        parameters: [{ name: 'sessionId', description: 'live session whose `header.cwd` keys the stats; omitted uses the most recently created live session that has a cwd.' }],
+        returns: 'a JSON copy, never a live alias of seat or engine state.',
+      },
+    ],
+  },
+  {
     key: 'skills',
     summary: 'Layered registry of skill providers, the host+per-scope shape the tools registry established.',
     description: 'Layered registry of skill providers, the host+per-scope shape the tools registry established. A registration files into the layer of its calling context\'s scope (scopeOf): host rows and repository plugins land in the global layer, while a plugin mounted by an agent preset\'s standing composition lands in that preset\'s layer. A read merges the global layer with the viewing scope\'s chain — the nearest layer\'s entry wins a duplicate name outright, and the rank order decides duplicates only within one layer. It exposes sorted invocation-neutral summaries and loads full skill bodies on demand.',
@@ -2102,7 +2184,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
   {
     key: 'web',
     summary: 'The web access service.',
-    description: 'The web access service. Registered as `ctx.web` (one instance per context).\n\nSelection semantics (resolved at execution time, never order-dependent):\n\n- A configured id that is registered and `available()` → that provider.\n- A configured id not registered → `WEB_PROVIDER_CONFIGURED_MISSING`.\n- A configured id registered but unavailable → `WEB_PROVIDER_CONFIGURED_UNAVAILABLE`.\n- No id configured, exactly one registered usable provider → that provider.\n- No id configured, multiple usable providers → `WEB_PROVIDER_AMBIGUOUS`.\n- No id configured, no usable provider → `WEB_PROVIDER_UNAVAILABLE`.',
+    description: 'The web access service. Registered as `ctx.web` (one instance per context).\n\nSelection semantics (resolved at execution time, never order-dependent):\n\n- A singular configured id that is registered and `available()` → that provider.\n- A singular configured id not registered → `WEB_PROVIDER_CONFIGURED_MISSING`.\n- A singular configured id registered but unavailable → `WEB_PROVIDER_CONFIGURED_UNAVAILABLE`.\n- An ordered fallback list → first listed id that is registered and usable.\n- A fallback list whose members are all missing or unusable → `WEB_PROVIDER_UNAVAILABLE`.\n- No pin, exactly one registered usable provider → that provider.\n- No pin, multiple usable providers → `WEB_PROVIDER_AMBIGUOUS`.\n- No pin, no usable provider → `WEB_PROVIDER_UNAVAILABLE`.',
     methods: [
       {
         signature: 'registerSearchProvider(provider: WebSearchProvider): () => void',
@@ -2814,6 +2896,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface CancelOptions {\n    keepInbox?: boolean | undefined;\n}',
   },
   {
+    name: 'CheckpointJspaceInput',
+    declaration: 'export interface CheckpointJspaceInput {\n    readonly check: string;\n    readonly by: string;\n    readonly evidence?: string;\n}',
+  },
+  {
     name: 'ClientResponse',
     declaration: 'export interface ClientResponse {\n    type: \'client-response\';\n    rpcId: RpcId;\n    result: RpcResult<unknown>;\n}',
   },
@@ -3322,6 +3408,34 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type JsonValue = null | boolean | number | string | JsonValue[] | {\n    [key: string]: JsonValue;\n};',
   },
   {
+    name: 'JspaceCard',
+    declaration: 'export interface JspaceCard {\n    readonly seq: number;\n    readonly sessionId: string;\n    readonly goal: string;\n    readonly core: readonly string[];\n    readonly checked: readonly JspaceCheckedLine[];\n    readonly open: readonly JspaceOpenLine[];\n    readonly next: string;\n    readonly goalOpenedSeq: number;\n}',
+  },
+  {
+    name: 'JspaceCheckedLine',
+    declaration: 'export interface JspaceCheckedLine {\n    readonly n: number;\n    readonly check: string;\n    readonly by: string;\n    readonly evidence?: string;\n}',
+  },
+  {
+    name: 'JspaceFold',
+    declaration: 'export interface JspaceFold extends JspaceProjection {\n    readonly inherited: JspaceCard | null;\n}',
+  },
+  {
+    name: 'JspaceOpenLine',
+    declaration: 'export interface JspaceOpenLine {\n    readonly question: string;\n    readonly settles?: string;\n}',
+  },
+  {
+    name: 'JspaceProjection',
+    declaration: 'export interface JspaceProjection {\n    readonly card: JspaceCard | null;\n    readonly closed: boolean;\n    readonly fault?: string;\n}',
+  },
+  {
+    name: 'JspaceSnapshot',
+    declaration: 'export interface JspaceSnapshot {\n    readonly cwd: string | null;\n    readonly open: boolean;\n    readonly closed: boolean;\n    readonly checkpoints: number;\n    readonly fault?: string;\n}',
+  },
+  {
+    name: 'JspaceStatus',
+    declaration: 'export interface JspaceStatus {\n    readonly active: boolean;\n    readonly reason: \'active\' | \'disabled\';\n}',
+  },
+  {
     name: 'KnobState',
     declaration: 'export interface KnobState {\n    preset: string | null;\n    sandbox: SandboxMode | null;\n    approval: ApprovalPolicy | null;\n}',
   },
@@ -3355,7 +3469,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'LlmConfigurableProvider',
-    declaration: 'export interface LlmConfigurableProvider {\n    provider: string;\n    displayName: string;\n    settingsNs: string;\n    settingsPath: readonly string[];\n    declared?: boolean;\n}',
+    declaration: 'export interface LlmConfigurableProvider {\n    provider: string;\n    displayName: string;\n    settingsNs: string;\n    settingsPath: readonly string[];\n    declared?: boolean;\n    kind?: \'delegated\';\n    binary?: string;\n    binaryFound?: boolean;\n}',
   },
   {
     name: 'LlmDiscoveredModel',
@@ -3383,7 +3497,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'LlmProviderInfo',
-    declaration: 'export interface LlmProviderInfo {\n    id: string;\n    name: string;\n}',
+    declaration: 'export interface LlmProviderInfo {\n    id: string;\n    name: string;\n    kind?: \'delegated\';\n}',
   },
   {
     name: 'LlmReasoningEffortInfo',
@@ -3554,12 +3668,20 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type ModelPurpose = \'compaction\' | \'session-title\';',
   },
   {
+    name: 'NoteJspaceInput',
+    declaration: 'export interface NoteJspaceInput {\n    readonly goal?: string;\n    readonly core?: readonly string[];\n    readonly open?: readonly JspaceOpenLine[];\n    readonly next?: string;\n}',
+  },
+  {
     name: 'ObjectJsonSchema',
     declaration: 'export type ObjectJsonSchema = JsonSchemaNode & {\n    type: \'object\';\n};',
   },
   {
     name: 'OneShotSubagentDescriptorData',
     declaration: 'export interface OneShotSubagentDescriptorData extends SubagentDescriptorBase {\n    readonly mode: \'one-shot\';\n    readonly label?: string;\n}',
+  },
+  {
+    name: 'OpenJspaceInput',
+    declaration: 'export interface OpenJspaceInput {\n    readonly goal: string;\n    readonly next: string;\n    readonly core?: readonly string[];\n}',
   },
   {
     name: 'PermissionSelect',
@@ -3720,14 +3842,6 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ResumeAgentOptions',
     declaration: 'export interface ResumeAgentOptions {\n    readonly resumeSessionId: SessionId;\n    readonly agentOptions?: AgentOptions;\n    readonly signal?: AbortSignal;\n    readonly setup?: AgentSetup;\n}',
-  },
-  {
-    name: 'ShresEnvironment',
-    declaration: 'export type ShresEnvironment = Readonly<Record<ShresEnvironmentKey, string>>;',
-  },
-  {
-    name: 'ShresEnvironmentKey',
-    declaration: 'export type ShresEnvironmentKey = `${typeof SHRES_ENV_PREFIX}${string}`;',
   },
   {
     name: 'RpcError',
@@ -4120,6 +4234,50 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ShellSandboxInfo',
     declaration: 'export interface ShellSandboxInfo {\n    mode: SandboxMode;\n    denied: boolean;\n    enforcement?: SandboxEnforcement;\n    runnerFailed?: boolean;\n}',
+  },
+  {
+    name: 'ShieldCounterSplit',
+    declaration: 'export interface ShieldCounterSplit {\n    screened: number;\n    observed: number;\n    asked: number;\n    askedGranted: number;\n    askedDenied: number;\n    blocked: number;\n}',
+  },
+  {
+    name: 'ShieldDefinitions',
+    declaration: 'export interface ShieldDefinitions {\n    version: string;\n    updatedAt: number | null;\n    stale: boolean;\n}',
+  },
+  {
+    name: 'ShieldFindingSummary',
+    declaration: 'export interface ShieldFindingSummary {\n    at: number;\n    verdict: \'observe\' | \'ask\' | \'deny\';\n    rule: string;\n    channel: string;\n    sha16: string;\n    host?: string;\n    callId?: string;\n}',
+  },
+  {
+    name: 'ShieldInactiveReason',
+    declaration: 'export type ShieldInactiveReason = \'panic\' | \'unlicensed\' | \'engine-missing\' | \'disabled\';',
+  },
+  {
+    name: 'ShieldReason',
+    declaration: 'export type ShieldReason = \'active\' | ShieldInactiveReason;',
+  },
+  {
+    name: 'ShieldRepoStats',
+    declaration: 'export interface ShieldRepoStats extends ShieldCounterSplit {\n    cwd: string | null;\n    byChannel: Readonly<Record<string, ShieldCounterSplit>>;\n    byRule: Readonly<Record<string, ShieldRuleHistogram>>;\n    otherRules: ShieldRuleHistogram;\n    recent: readonly ShieldFindingSummary[];\n}',
+  },
+  {
+    name: 'ShieldRuleHistogram',
+    declaration: 'export interface ShieldRuleHistogram {\n    observed: number;\n    asked: number;\n    blocked: number;\n}',
+  },
+  {
+    name: 'ShieldSnapshot',
+    declaration: 'export interface ShieldSnapshot {\n    status: ShieldStatus;\n    stats: ShieldRepoStats;\n    definitions?: ShieldDefinitions;\n}',
+  },
+  {
+    name: 'ShieldStatus',
+    declaration: 'export interface ShieldStatus {\n    active: boolean;\n    reason: ShieldReason;\n}',
+  },
+  {
+    name: 'ShresEnvironment',
+    declaration: 'export type ShresEnvironment = Readonly<Record<ShresEnvironmentKey, string>>;',
+  },
+  {
+    name: 'ShresEnvironmentKey',
+    declaration: 'export type ShresEnvironmentKey = `${typeof SHRES_ENV_PREFIX}${string}`;',
   },
   {
     name: 'SkillCandidate',

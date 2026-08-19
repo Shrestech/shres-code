@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Context } from '@shres-code/cordis'
 import AgentRegistry, { Inbox } from '@shres-code/shres-code-agent'
 import type { Agent } from '@shres-code/shres-code-agent'
-import { CallId, createToolResultMessage, createUserMessage } from '@shres-code/shres-code-llm'
+import { createUserMessage } from '@shres-code/shres-code-llm'
 import SessionStore, { SessionId } from '@shres-code/shres-code-session'
 import SystemPrompt from '@shres-code/shres-code-system-prompt'
 import JspaceService, {
@@ -49,7 +49,6 @@ describe('jspace-prompt', () => {
     const assembled = await ctx.systemPrompt.assemble()
     expect(assembled.sections.find(section => section.name === JspacePrompt.JSPACE_SECTION)?.text ?? '').toBe('')
     expect(JspacePrompt.passFor(ctx, undefined)).toBe('fast')
-    expect(JspacePrompt.modulesFor(ctx, undefined)).toEqual([])
   })
 
   it('skips non-user log messages when reading turn text', async () => {
@@ -64,35 +63,6 @@ describe('jspace-prompt', () => {
       .toContain('call jspace_open')
     expect(assembled.sections.find(section => section.name === JspacePrompt.JSPACE_PROTOCOL_SECTION)?.text)
       .not.toContain('Pass:')
-  })
-
-  it('treats a trailing tool result as untrusted', async () => {
-    const ctx = await harness({ enabled: true })
-    const agent = liveAgent(ctx, 'ws-prompt-tool-result')
-    agent.session.append('tool/result', {
-      turn: 1,
-      step: 1,
-      message: createToolResultMessage({
-        callId: CallId('c-untrusted'),
-        content: [{ type: 'text', text: 'ok' }],
-        isError: false,
-      }),
-    }, { surfaceOp: 'append' })
-    const assembled = await ctx.systemPrompt.assemble({ agent, scope: agent })
-    expect(assembled.sections.find(section => section.name === JspacePrompt.JSPACE_MODULE_SECTIONS.introspection)?.text)
-      .toContain('Introspection')
-  })
-
-  it('treats untrusted last-human text as introspection', async () => {
-    const ctx = await harness({ enabled: true })
-    const agent = liveAgent(ctx, 'ws-prompt-untrusted')
-    agent.session.append('user/message', createUserMessage({
-      content: [{ type: 'text', text: 'Summarize this search result.' }],
-      source: { kind: 'user' },
-    }), { surfaceOp: 'append' })
-    const assembled = await ctx.systemPrompt.assemble({ agent, scope: agent })
-    expect(assembled.sections.find(section => section.name === JspacePrompt.JSPACE_MODULE_SECTIONS.introspection)?.text)
-      .toContain('Introspection')
   })
 
   it('ignores non-text claimed parts when classifying', async () => {
@@ -142,19 +112,28 @@ describe('jspace-prompt', () => {
       .toBe(JSPACE_AVAILABLE_LINE)
   })
 
-  it('opens a card during assemble when mode is always-open', async () => {
+  it('opens a card during assemble when mode is always-open, seeding Goal from the turn text', async () => {
     const ctx = await harness({ enabled: true, mode: 'always-open' })
     const agent = liveAgent(ctx, 'ws-prompt-always')
     const first = await ctx.systemPrompt.assemble({ agent, scope: agent, messages: [
       createUserMessage({ content: [{ type: 'text', text: 'go' }], source: { kind: 'user' } }),
     ] })
-    expect(ctx.jspace.card(agent.session)?.goal).toBe(JSPACE_ALWAYS_OPEN_GOAL)
+    expect(ctx.jspace.card(agent.session)?.goal).toBe('go')
     expect(first.sections.find(section => section.name === JspacePrompt.JSPACE_SECTION)?.text)
-      .toContain('Goal:      J-Space is on')
+      .toContain('Goal:      go')
     const second = await ctx.systemPrompt.assemble({ agent, scope: agent })
     expect(ctx.jspace.card(agent.session)?.seq).toBe(1)
     expect(second.sections.find(section => section.name === JspacePrompt.JSPACE_SECTION)?.text)
-      .toContain('Goal:      J-Space is on')
+      .toContain('Goal:      go')
+  })
+
+  it('falls back to the stock Goal when always-open assembles with no human text', async () => {
+    const ctx = await harness({ enabled: true, mode: 'always-open' })
+    const agent = liveAgent(ctx, 'ws-prompt-always-blank')
+    const assembled = await ctx.systemPrompt.assemble({ agent, scope: agent })
+    expect(ctx.jspace.card(agent.session)?.goal).toBe(JSPACE_ALWAYS_OPEN_GOAL)
+    expect(assembled.sections.find(section => section.name === JspacePrompt.JSPACE_SECTION)?.text)
+      .toContain(`Goal:      ${JSPACE_ALWAYS_OPEN_GOAL}`)
   })
 
   it('does not auto-open after an explicit close', async () => {
@@ -186,7 +165,7 @@ describe('jspace-prompt', () => {
       .toBe(JSPACE_AVAILABLE_LINE)
   })
 
-  it('omits protocol modules on a fast pass and loads them on loop', async () => {
+  it('uses a short open driver on fast and operational card rules on loop', async () => {
     const ctx = await harness({ enabled: true, mode: 'available' })
     const agent = liveAgent(ctx, 'ws-prompt-fast')
     agent.session.append('user/message', createUserMessage({
@@ -196,25 +175,17 @@ describe('jspace-prompt', () => {
     const fast = await ctx.systemPrompt.assemble({ agent, scope: agent })
     const fastProtocol = fast.sections.find(section => section.name === JspacePrompt.JSPACE_PROTOCOL_SECTION)?.text ?? ''
     expect(fastProtocol).toContain('call jspace_open')
-    expect(fastProtocol).not.toContain('Pass:')
-    expect(fast.sections.find(section => section.name === JspacePrompt.JSPACE_CAPACITY_SECTION)?.text)
-      .toBe('')
-    expect(fast.sections.find(section => section.name === JspacePrompt.JSPACE_BROADCAST_SECTION)?.text)
-      .toBe('')
+    expect(fastProtocol).toContain('Skip the card for one-step work')
+    expect(fastProtocol).not.toContain('accessible workspace')
 
     ctx.jspace.open(agent.session, { goal: 'Ship J2', next: 'Write tests' })
     const loop = await ctx.systemPrompt.assemble({ agent, scope: agent })
     const protocol = loop.sections.find(section => section.name === JspacePrompt.JSPACE_PROTOCOL_SECTION)?.text ?? ''
-    expect(protocol).toContain('A J-Space card is already open')
-    expect(protocol).toContain('Pass: loop')
-    expect(loop.sections.find(section => section.name === JspacePrompt.JSPACE_CAPACITY_SECTION)?.text)
-      .toContain('at most two coherent items')
-    expect(loop.sections.find(section => section.name === JspacePrompt.JSPACE_BROADCAST_SECTION)?.text)
-      .toContain('written once')
-    expect(loop.sections.find(section => section.name === JspacePrompt.JSPACE_MODULE_SECTIONS['directed-focus'])?.text)
-      .toContain('Directed focus')
-    expect(loop.sections.find(section => section.name === JspacePrompt.JSPACE_MODULE_SECTIONS['self-monitoring'])?.text)
-      .toContain('Self-monitoring')
+    expect(protocol).toContain('durable external state')
+    expect(protocol).toContain('current intermediate')
+    expect(protocol).toContain('successful tool-call id')
+    expect(protocol).toContain('successful ship closes the card')
+    expect(protocol).not.toContain('Pass:')
     expect(JspacePrompt.JSPACE_DRIVER_CLOSED).toContain('jspace_open')
     expect(JspacePrompt.JSPACE_DRIVER_OPEN).toContain('jspace_note')
   })
@@ -227,10 +198,45 @@ describe('jspace-prompt', () => {
       source: { kind: 'user' },
     })
     const assembled = await ctx.systemPrompt.assemble({ agent, scope: agent, messages: [message] })
-    expect(ctx.jspace.card(agent.session)?.goal).toBe(JSPACE_ALWAYS_OPEN_GOAL)
+    expect(ctx.jspace.card(agent.session)?.goal)
+      .toBe('Audit this repository across every file and persist the findings.')
     expect(assembled.sections.find(section => section.name === JspacePrompt.JSPACE_SECTION)?.text)
-      .toContain('Goal:      J-Space is on')
+      .toContain('Goal:      Audit this repository across every file and persist the findings.')
     expect(assembled.sections.find(section => section.name === JspacePrompt.JSPACE_PROTOCOL_SECTION)?.text)
-      .toContain('Pass: loop')
+      .toContain('durable external state')
+  })
+})
+
+describe('seedGoal', () => {
+  it('keeps the first non-empty line, trimmed', () => {
+    expect(JspacePrompt.seedGoal('\n  \n  Ship the feature  \nlater line')).toBe('Ship the feature')
+    expect(JspacePrompt.seedGoal('one')).toBe('one')
+  })
+
+  it('falls back to the stock placeholder on blank text', () => {
+    expect(JspacePrompt.seedGoal('')).toBe(JSPACE_ALWAYS_OPEN_GOAL)
+    expect(JspacePrompt.seedGoal(' \n\t\n ')).toBe(JSPACE_ALWAYS_OPEN_GOAL)
+  })
+
+  it('leaves a line at the limit untouched', () => {
+    const exact = 'x'.repeat(JspacePrompt.JSPACE_SEED_GOAL_MAX)
+    expect(JspacePrompt.seedGoal(exact)).toBe(exact)
+  })
+
+  it('cuts at a sentence boundary and marks the cut', () => {
+    expect(JspacePrompt.seedGoal(`${'a'.repeat(150)}. ${'b'.repeat(150)}`))
+      .toBe(`${'a'.repeat(150)}…`)
+    expect(JspacePrompt.seedGoal(`${'q'.repeat(150)}! ${'r'.repeat(150)}`))
+      .toBe(`${'q'.repeat(150)}…`)
+  })
+
+  it('cuts at a word boundary when no sentence ends in range', () => {
+    expect(JspacePrompt.seedGoal(`${'a'.repeat(150)} ${'b'.repeat(150)}`))
+      .toBe(`${'a'.repeat(150)}…`)
+  })
+
+  it('hard-cuts a single long word and marks the cut', () => {
+    const line = 'a'.repeat(JspacePrompt.JSPACE_SEED_GOAL_MAX + 50)
+    expect(JspacePrompt.seedGoal(line)).toBe(`${'a'.repeat(JspacePrompt.JSPACE_SEED_GOAL_MAX)}…`)
   })
 })

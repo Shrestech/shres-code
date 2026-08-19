@@ -13,7 +13,7 @@ export interface JSpaceSettings {
   enabled?: boolean
   /** `available` waits for open; `always-open` opens on the first pre-step. */
   mode?: 'available' | 'always-open'
-  /** Refuse a checkpoint whose `by` names no coverage term. Default true. */
+  /** Require a coverage term and successful evidence call. Default true. */
   requireCoverage?: boolean
 }
 

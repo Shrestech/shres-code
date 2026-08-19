@@ -37,6 +37,7 @@ export interface JSpaceSessionRead {
  * Fold one jspace projection snapshot onto the last-known view.
  * @param raw - `jspace` projection value, or undefined while absent.
  * @param previous - last view kept when the projection is missing or unchanged.
+ * @param sessionId - selected session id used to reject a foreign card.
  * @returns the next view, or `previous` when the snapshot is absent or when
  *   `open` and `checked` match (useSyncExternalStore identity).
  */

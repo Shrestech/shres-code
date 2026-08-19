@@ -9,7 +9,7 @@ import { defineTool } from '@shres-code/shres-code-tools'
 import type { GenericCallView, ToolRunContext } from '@shres-code/shres-code-tools'
 import { JspaceError } from '@shres-code/shres-code-jspace'
 import type { JspaceStatus } from '@shres-code/shres-code-jspace'
-import { REPEAT_DENY, shouldRefuseRepeat } from './retry.ts'
+import { REPEAT_DENY, PLACEHOLDER_DENY, shouldRefusePlaceholder, shouldRefuseRepeat } from './retry.ts'
 import { shipRefusal } from './ship.ts'
 
 /** Cordis plugin name. */
@@ -20,21 +20,21 @@ export const inject = ['tools', 'jspace']
 const OPEN_DESCRIPTION =
   'Open a J-Space card for this session, or replace Goal and Next when a card is '
   + 'already open. Use it for multi-stage or multi-file work. Requires a Goal '
-  + '(what done means) and Next (the single next action). Optional Core holds at '
-  + 'most two live items and applies only on the first open.'
+  + '(what done means) and Next (the single next action). Optional Core replaces '
+  + 'the current intermediate and pinned constraint, at most two.'
 
 const NOTE_DESCRIPTION =
-  'Update the open J-Space card. Changing Core requires both departing (the item '
-  + 'leaving) and core (the item entering). Rejects if no card is open.'
+  'Update the open J-Space card. Core replaces the whole live list: the current '
+  + 'intermediate and at most one pinned constraint. Rejects if no card is open.'
 
 const CHECKPOINT_DESCRIPTION =
-  'Record a Checked line on the open card. `by` must name a verifier and what it covered. '
-  + 'Optional `evidence` is a prior tool-call id that must have completed without error in '
-  + 'this session; naming it does not prove coverage. Rejects if no card is open.'
+  'Record a Checked line on the open card. `by` names the verifier and coverage; '
+  + '`evidence` is the successful non-J-Space tool-call id that performed the check. '
+  + 'The call id raises fabrication cost but does not prove semantic coverage. Rejects if no card is open.'
 
 const SHIP_DESCRIPTION =
-  'Check that the open card is ready to ship: Goal and Next are set, and a checkpoint '
-  + 'exists for the current Goal. Does not write files and does not close the card. '
+  'Check that the open card is ready to ship: Goal and Next are set, and an evidence-backed '
+  + 'checkpoint exists for the current Goal. A successful check closes the card. Does not write files. '
   + 'Optional `path` is recorded in the result only.'
 
 const ACK = {
@@ -144,7 +144,11 @@ function registerTools(ctx: Context): () => void {
       const agent = requireAgent(exec, 'jspace_open')
       return Promise.resolve(runJspace(() => {
         if (ctx.jspace.card(agent.session) !== null) {
-          ctx.jspace.note(agent.session, { goal: args.goal, next: args.next })
+          ctx.jspace.note(agent.session, {
+            goal: args.goal,
+            next: args.next,
+            ...args.core === undefined ? {} : { core: args.core },
+          })
           return { opened: true, replaced: true }
         }
         ctx.jspace.open(agent.session, {
@@ -163,8 +167,11 @@ function registerTools(ctx: Context): () => void {
     description: NOTE_DESCRIPTION,
     parameters: {
       goal: { type: 'string', description: 'Replacement Goal line.' },
-      departing: { type: 'string', description: 'Core item leaving; required when `core` is set.' },
-      core: { type: 'string', description: 'Core item entering; required when `departing` is set.' },
+      core: {
+        type: 'array',
+        description: 'Replacement live list: current intermediate, then optional pinned constraint; at most two.',
+        items: { type: 'string' },
+      },
       open: {
         type: 'array',
         description: 'Replacement unsettled questions.',
@@ -188,7 +195,6 @@ function registerTools(ctx: Context): () => void {
       return Promise.resolve(runJspace(() => {
         ctx.jspace.note(agent.session, {
           ...args.goal === undefined ? {} : { goal: args.goal },
-          ...args.departing === undefined ? {} : { departing: args.departing },
           ...args.core === undefined ? {} : { core: args.core },
           ...args.open === undefined ? {} : { open: args.open },
           ...args.next === undefined ? {} : { next: args.next },
@@ -211,7 +217,7 @@ function registerTools(ctx: Context): () => void {
       },
       evidence: {
         type: 'string',
-        description: 'Completed non-error tool-call id. Naming it does not prove coverage.',
+        description: 'Successful non-J-Space tool-call id that performed the check. Does not prove semantic coverage.',
       },
     },
     output: {
@@ -248,6 +254,7 @@ function registerTools(ctx: Context): () => void {
         const session = agent.session
         const refusal = shipRefusal(ctx.jspace.card(session), session.events)
         if (refusal !== undefined) throw new Error(refusal)
+        ctx.jspace.close(session)
         return args.path === undefined ? { shipped: true } : { shipped: true, path: args.path }
       }))
     },
@@ -286,10 +293,21 @@ export function apply(ctx: Context): void {
   ctx.effect(() => ctx.on('tools/pre-execute', (exec, next) => {
     if (!ctx.jspace.status.active) return next()
     const session = exec.agent?.session
-    if (session === undefined || ctx.jspace.card(session) === null) return next()
-    if (shouldRefuseRepeat(session.events, exec.name, exec.arguments, exec.callId)) {
+    if (session === undefined) return next()
+    const card = ctx.jspace.card(session)
+    if (card === null) return next()
+    if (shouldRefusePlaceholder(card, exec.name)) {
+      return Promise.resolve({ kind: 'deny' as const, reason: PLACEHOLDER_DENY })
+    }
+    if (shouldRefuseRepeat(
+      session.events,
+      exec.name,
+      exec.arguments,
+      exec.callId,
+      session.surface.nodes,
+    )) {
       return Promise.resolve({ kind: 'deny' as const, reason: REPEAT_DENY })
     }
     return next()
-  }), 'tool-jspace: diagnosed retry')
+  }), 'tool-jspace: placeholder gate and diagnosed retry')
 }

@@ -17,8 +17,8 @@ Default-off host seat for the J-Space card. This package remounts from the `jspa
 |---|---|---|
 | `enabled` | `false` | Master allow. False keeps the seat loaded and `status.active === false`. Mutations throw `JSPACE_DISABLED` and write nothing. |
 | `mode` | `available` | `available` waits for `open()`. `always-open` is reserved for the prompt Consumer. |
-| `requireCoverage` | `true` | `checkpoint()` refuses a `by` string that matches no coverage term. |
-| `coverageTerms` | `[]` | Extra literal terms merged with the built-in English list. |
+| `requireCoverage` | `true` | `checkpoint()` requires a coverage term and a successful non-J-Space evidence call for the current Goal. |
+| `coverageTerms` | `[]` | Extra literal terms merged with the built-in English list used for the `by` coverage claim. |
 
 `installSettingsSection` owns the namespace. Unknown keys fail at load. The seat remounts when the document changes.
 
@@ -28,7 +28,7 @@ Default-off host seat for the J-Space card. This package remounts from the `jspa
 
 `watch(listener)` fires on remount so later consumers can dispose tools and the prompt section.
 
-`JSPACE_ALWAYS_OPEN_GOAL` (`J-Space is on`) and `JSPACE_ALWAYS_OPEN_NEXT` (`State the first action`) are the stock lines for `always-open` and bare `/j-space on`.
+`JSPACE_ALWAYS_OPEN_GOAL` (`J-Space is on`) and `JSPACE_ALWAYS_OPEN_NEXT` (`State the first action`) are the stock lines opened by bare `/j-space on`; the prompt Consumer's loop auto-open uses them only as the blank-text Goal fallback and the stock Next.
 
 ## Durable record
 
@@ -46,6 +46,6 @@ None; this package neither assembles nor sends a provider request.
 
 ## Known Limitations and Deferred Work
 
-- **`always-open` does not auto-open** — the field is stored; the prompt Consumer opens on the first pre-step with `JSPACE_ALWAYS_OPEN_GOAL` / `JSPACE_ALWAYS_OPEN_NEXT`.
-- **Coverage is a term match** — `checkpoint()` cannot tell whether the verifier ran. `evidence` must name a `tool/call` id with a logged, non-error `tool/result` and still does not prove coverage.
+- **Automatic open belongs to the prompt Consumer** — the seat stores `mode`; the prompt Consumer opens during assembly, seeds Goal from triggering human text with `JSPACE_ALWAYS_OPEN_GOAL` as the blank fallback, and uses `JSPACE_ALWAYS_OPEN_NEXT` as Next.
+- **Evidence is not semantic verification** — `checkpoint()` requires a successful non-J-Space call for the current Goal when coverage is required; it cannot prove that call covered the claim.
 - **Trusted in-process producers** — a plugin with direct `Session` access can append counterfeit card events. The fold and invariant detect inconsistency; they do not isolate plugins.

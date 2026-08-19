@@ -1,49 +1,54 @@
 # @shres-code/shres-code-jspace-prompt
 
-Consumer that reprints the J-Space card as the `jspace:card` system-prompt section and mounts the protocol the current pass earns. The card text is derived from the session fold on every assembly, so compaction and resume do not drop it.
+Consumer that reprints the logged J-Space card as `jspace:card` and adds one operational `jspace:protocol` section. The card is derived from the session fold on every assembly, so compaction and resume do not drop it.
 
-When the seat is inactive every J-Space section is empty. When the seat is active and no card is open, `jspace:card` is the availability line. The gate classifies `fast` / `full` / `loop` from the last human message, whether a card is open, and Settings `mode`. Every active pass includes tool-driver lines in `jspace:protocol`. `fast` adds no further protocol. `full` loads the protocol block, capacity, deep-reasoning, and self-monitoring. `loop` also loads broadcast and directed-focus, and opens a card when none exists, unless the session already has a native close. `mode: always-open` is always `loop`.
+When the seat is inactive both sections are empty. When active with no open card, `jspace:card` is the availability line and `jspace:protocol` tells the model to open a card only when an intermediate or constraint must survive another tool, file, or compaction. An open card receives four operational rules: Core holds the current intermediate and at most one pinned constraint; update Core or Next before dependent work; cite the successful check call in `jspace_checkpoint`; a successful `jspace_ship` closes the card.
 
-Protocol copy is a first-party rewrite of Tiger3807861189 J-Space Cognition Suite V3.6 (Apache-2.0, DOI 10.5281/zenodo.21971181). It is not their `SKILL.md` and does not implement a Jacobian lens.
+The gate still classifies `fast` / `full` / `loop` from the latest human message, whether a card is open, and Settings `mode`. `loop` auto-opens a card unless the session already has a native close. Automatic opens seed Goal from the first non-empty line of the triggering human text, cut within 200 characters; blank text uses `J-Space is on`. Next starts as `State the first action`.
+
+The card is an external session ledger, not Anthropic's activation J-space or a Jacobian lens. Protocol copy names only card operations and harness enforcement.
 
 ## Model Experience
 
-### J-Space card section
+### Card and operational protocol
 
 #### What the model sees
 
-The five-line card from the fold, or the availability line while enabled and no card is open.
+The model sees the folded five-line card when one is open, or the stable availability line and open driver otherwise.
 
-##### Availability line
+##### Closed card
 
 ```markdown
 J-Space is available. Open a card for multi-stage or multi-file work.
+
+For work whose intermediate or constraint must survive another tool, file, or compaction, call jspace_open with Goal, Next, and up to two Core items. Skip the card for one-step work.
+```
+
+##### Open card
+
+```markdown
+Goal:      Ship the parser change
+Core:      The parser rejects empty records; Preserve the wire format
+Checked:   (none)
+Open:      (none)
+Next:      Run the parser tests
+
+The J-Space card is durable external state. Keep Core to the current intermediate and at most one pinned constraint.
+Before a later operation depends on changed state, update Core or Next with jspace_note.
+After a check completes, call jspace_checkpoint with what it checked and the successful tool-call id as evidence.
+A repeated failed tool call is refused until Core or Next changes. Call jspace_ship after the current Goal has an evidence-backed checkpoint; a successful ship closes the card.
 ```
 
 #### Token effect
 
-Zero when the seat is off. One stable line when on and no card is open. The five-line card when a card is open.
+Zero while the seat is off. Active fast requests pay the availability line and short open driver. An open card pays the five card lines and four operational lines; the removed module blocks add no tokens.
 
 #### KV Cache effect
 
-The availability line is prefix-stable until a card opens or Settings flips. Updating the card replaces the section and invalidates the prefix from this order onward.
-
-### J-Space protocol sections
-
-#### What the model sees
-
-`jspace:protocol` always includes the tool-driver lines while the seat is active (how to open or update the card). `jspace:module:capacity` and `jspace:module:broadcast` load when the pass earns them.
-
-#### Token effect
-
-A short driver on `fast`. A longer protocol block plus a few short modules on `full` / `loop`. Unused modules stay empty.
-
-#### KV Cache effect
-
-A pass change replaces the protocol sections and invalidates the prefix from `jspace:protocol` onward.
+The availability copy is stable until the card opens. A pass change can extend the closed-card driver by one line. Every card mutation changes `jspace:card` at order 45; successful ship closes it and returns later requests to the stable closed-card copy.
 
 ## Known Limitations and Deferred Work
 
-- **Always-open uses a stock Goal/Next** — `J-Space is on` / `State the first action` (`JSPACE_ALWAYS_OPEN_*` from the seat). The model must rewrite those lines through `note`. Bare `/j-space on` uses the same constants.
-- **The gate is a term-and-length heuristic** — it does not ask the model to classify the pass.
-- **At most the pass-selected modules plus untrusted introspection** — the nine-module suite is not concatenated. Blank identical retries are refused by `tool-jspace`, not by the markers module.
+- **The gate is a term-and-length heuristic** — it does not know whether an arbitrary task needs external state.
+- **Automatic Next is generic** — the model must replace `State the first action` when the first concrete operation differs.
+- **No cross-session carry** — forks copy cards, but independent headless chain phases start with separate sessions.

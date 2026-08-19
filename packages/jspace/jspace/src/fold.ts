@@ -309,10 +309,10 @@ export const DEFAULT_COVERAGE_TERMS = [
 export const JSPACE_AVAILABLE_LINE
   = 'J-Space is available. Open a card for multi-stage or multi-file work.'
 
-/** Stock Goal for `always-open` and bare `/j-space on`. */
+/** Stock Goal for bare `/j-space on` and the blank-text fallback when a loop pass auto-opens. */
 export const JSPACE_ALWAYS_OPEN_GOAL = 'J-Space is on'
 
-/** Stock Next for `always-open` and bare `/j-space on`. */
+/** Stock Next for bare `/j-space on` and every automatic open. */
 export const JSPACE_ALWAYS_OPEN_NEXT = 'State the first action'
 
 /**

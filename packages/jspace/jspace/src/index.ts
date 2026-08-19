@@ -88,10 +88,8 @@ export interface OpenJspaceInput {
 export interface NoteJspaceInput {
   /** Replace the goal line. */
   readonly goal?: string
-  /** Departing core item, required when `core` is set. */
-  readonly departing?: string
-  /** Incoming core item, required when `departing` is set. */
-  readonly core?: string
+  /** Replace the live intermediate and pinned-constraint list, at most two. */
+  readonly core?: readonly string[]
   /** Replace the open-question list. */
   readonly open?: readonly JspaceOpenLine[]
   /** Replace Next. */
@@ -303,40 +301,11 @@ export default class JspaceService extends Service {
   note(session: Session, input: NoteJspaceInput): JspaceCard {
     this.requireActive()
     const current = this.requireCard(session)
-    let core = [...current.core]
-    if (input.core !== undefined || input.departing !== undefined) {
-      const incoming = input.core === undefined ? undefined : line(input.core, 'core')
-      if (input.departing === undefined) {
-        if (incoming === undefined) {
-          throw new JspaceError(
-            'jspace core swap requires departing and incoming lines',
-            'JSPACE_SWAP',
-          )
-        }
-        if (core.length >= 2) {
-          throw new JspaceError(
-            'jspace core swap requires departing and incoming lines',
-            'JSPACE_SWAP',
-          )
-        }
-        core = [...core, incoming]
-      } else {
-        if (incoming === undefined) {
-          throw new JspaceError(
-            'jspace core swap requires departing and incoming lines',
-            'JSPACE_SWAP',
-          )
-        }
-        const departing = line(input.departing, 'departing')
-        const index = core.indexOf(departing)
-        if (index < 0) {
-          throw new JspaceError(
-            `jspace core does not hold ${JSON.stringify(departing)}`,
-            'JSPACE_SWAP',
-          )
-        }
-        core = core.map((item, i) => i === index ? incoming : item)
-      }
+    const core = input.core === undefined
+      ? current.core
+      : input.core.map((item, index) => line(item, `core[${String(index)}]`))
+    if (core.length > 2) {
+      throw new JspaceError('jspace core may hold at most two items', 'JSPACE_CORE')
     }
     const goal = input.goal === undefined ? current.goal : line(input.goal, 'goal')
     const next = input.next === undefined ? current.next : line(input.next, 'next')
@@ -376,8 +345,14 @@ export default class JspaceService extends Service {
         'JSPACE_COVERAGE',
       )
     }
+    if (this.config.requireCoverage !== false && input.evidence === undefined) {
+      throw new JspaceError(
+        'jspace checkpoint requires a successful non-J-Space tool-call id as evidence',
+        'JSPACE_EVIDENCE',
+      )
+    }
     if (input.evidence !== undefined) {
-      this.requireEvidence(session, input.evidence)
+      this.requireEvidence(session, current, input.evidence)
     }
     const n = current.checked.reduce((max, item) => Math.max(max, item.n), 0) + 1
     const checked: JspaceCheckedLine = input.evidence === undefined
@@ -460,10 +435,13 @@ export default class JspaceService extends Service {
    * @param session - owning session.
    * @param evidence - claimed tool-call id.
    */
-  private requireEvidence(session: Session, evidence: string): void {
+  private requireEvidence(session: Session, current: JspaceCard, evidence: string): void {
     const id = line(evidence, 'evidence')
-    const ran = session.events.some(event =>
+    const call = session.events.find((event): event is SessionEvent<'tool/call'> =>
       event.type === 'tool/call' && event.data.callId === id)
+    const ran = call !== undefined
+      && call.seq >= current.goalOpenedSeq
+      && !call.data.name.startsWith('jspace_')
     const succeeded = session.events.some((event) => {
       if (event.type !== 'tool/result') return false
       const message = (event.data as {
@@ -480,7 +458,7 @@ export default class JspaceService extends Service {
     })
     if (!ran || !succeeded) {
       throw new JspaceError(
-        `jspace evidence ${JSON.stringify(id)} is not a completed, non-error tool call in this session`,
+        `jspace evidence ${JSON.stringify(id)} is not a successful non-J-Space tool call for the current Goal`,
         'JSPACE_EVIDENCE',
       )
     }
