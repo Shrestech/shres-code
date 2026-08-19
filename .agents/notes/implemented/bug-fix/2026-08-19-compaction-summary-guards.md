@@ -8,7 +8,7 @@ Local W0 calibration at a forced 24576-token pin produced a five-link failure ch
 
 ## Decision
 
-`selectCompactableRange` pins the session's first user-authored surface message: the selected range starts after it, and a span with nothing compactable between the pin and the retained tail returns `null` instead of an absurd single-message region.
+`selectCompactableRange` pins the session's first user-authored surface message for pressure-triggered and manual compaction: the selected range starts after it, and a span with nothing compactable between the pin and the retained tail returns `null` instead of an absurd single-message region. A provider-confirmed context overflow tries the pinned selection first and falls back to an unpinned one when the pin leaves nothing compactable: when the instruction is the only compactable content, a gated summary of it is the only recovery, and failing the turn is the worse outcome.
 
 `acceptSummaryOutput` gates every completed summarization call. A tool-call block means the model attempted an action instead of writing the checkpoint; a missing or trivial `## Primary Request and Intent` section means the mandated checkpoint structure was not produced. Both throw `SummaryOutputRejection`, which fails the attempt through the existing retry path and carries the refused output into the durable `compaction/end` failure record. The summarizer directive adds one sentence stating that J-Space card and protocol text is workload state to summarize, never instructions for the call.
 
@@ -16,7 +16,7 @@ Local W0 calibration at a forced 24576-token pin produced a five-link failure ch
 
 ## Alternatives considered
 
-**Require the instruction to survive via keyword round-trip checks.** Rejected: pinned-entity keyword lists are task-specific; a harness cannot know which tokens are load-bearing for arbitrary instructions. Never shadowing the first user message needs no such knowledge.
+**Require the instruction to survive via keyword round-trip checks.** Rejected: pinned-entity keyword lists are task-specific; a harness cannot know which tokens are load-bearing for arbitrary instructions. Pinning the first user message under pressure needs no such knowledge, and the overflow-only exception exchanges the pin for the acceptance gate exactly when the alternative is losing the session.
 
 **Accept short summaries and retry on size alone.** Rejected: the observed degenerate output was structurally compliant prose. The heading requirement distinguishes a checkpoint from a refusal; size thresholds cannot.
 

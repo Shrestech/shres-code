@@ -89,20 +89,25 @@ interface TransactionFailure {
 
 /**
  * Resolve the next head-anchored range while retaining a priced recent tail
- * and never splitting an assistant tool-call/result pair. The session's first
- * user-authored surface message is pinned — it opens the request chain every
- * later turn builds on, so the selected range always starts after it; when
- * nothing compactable remains between that pin and the retained tail, the
- * result is `null`.
+ * and never splitting an assistant tool-call/result pair. When
+ * `pinFirstUserMessage` is true, the session's first user-authored surface
+ * message is pinned — it opens the request chain every later turn builds on,
+ * so the selected range always starts after it. Pressure and manual
+ * compaction always pin; a provider-confirmed context overflow pins first
+ * and falls back to an unpinned selection when the pin leaves nothing
+ * compactable. When nothing compactable remains between the pin (when armed)
+ * and the retained tail, the result is `null`.
  * @param session - session supplying authoritative current surface positions.
  * @param measurement - unified pressure and surface measurement from the conversation meter.
  * @param retainTokens - minimum recent tail budget retained verbatim.
+ * @param pinFirstUserMessage - whether the first user-authored surface message is exempt from shadowing.
  * @returns the inclusive positional seq range to compact, or `null`.
  */
 export function selectCompactableRange(
   session: Session,
   measurement: TokenMeasurement,
   retainTokens: number,
+  pinFirstUserMessage: boolean,
 ): { start: number; end: number } | null {
   const pricedNodes = measurement.nodes
   if (pricedNodes.length === 0) return null
@@ -130,7 +135,9 @@ export function selectCompactableRange(
   }
   if (keepFromIdx === 0) return null
 
-  const pinIdx = firstUserSourceIndex(session, surfaceNodes, keepFromIdx)
+  const pinIdx = pinFirstUserMessage
+    ? firstUserSourceIndex(session, surfaceNodes, keepFromIdx)
+    : undefined
   let startIdx = pinIdx === undefined ? 0 : pinIdx + 1
   // The retained tail starts on a balanced boundary, so this scan terminates.
   while (startIdx < keepFromIdx) {

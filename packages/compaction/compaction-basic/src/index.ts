@@ -285,7 +285,12 @@ export class BasicCompactionEngine extends CompactionEngine {
         prune.pruneSession(agent.session)
         measurement = meter.measure(agent.session)
       }
-      const range = selectCompactableRange(agent.session, measurement, 0)
+      // Overflow is existential: keep the first user message when any pinned
+      // range exists, but fall back to an unpinned selection when it is the
+      // only compactable content — a gated summary of the instruction beats
+      // failing the turn with no recovery path.
+      const range = selectCompactableRange(agent.session, measurement, 0, true)
+        ?? selectCompactableRange(agent.session, measurement, 0, false)
       if (range === null) return null
       return this.compactRegion(range.start, range.end, agent, signal)
     }
@@ -313,7 +318,7 @@ export class BasicCompactionEngine extends CompactionEngine {
 
     let result: CompactionResult | null = null
     for (let attempt = 0; attempt <= spec.compactionRetries; attempt += 1) {
-      const range = selectCompactableRange(agent.session, measurement, spec.retainTokens)
+      const range = selectCompactableRange(agent.session, measurement, spec.retainTokens, true)
       if (range === null) {
         /* v8 ignore else -- concrete replacement preserves a compactable checkpoint; subclass hooks cannot mutate it. */
         if (result === null) return null
@@ -380,6 +385,7 @@ export class BasicCompactionEngine extends CompactionEngine {
             agent.session,
             this.ctx.tokenMeter.measure(agent.session),
             0,
+            true,
           )
           if (range === null) return null
           return await compactSurfaceRegion(

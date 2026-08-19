@@ -751,7 +751,7 @@ describe('pressure measurement and retention', () => {
     expect(() => selectCompactableRange(session, {
       ...priced,
       nodes: priced.nodes.slice(1),
-    }, 1)).toThrow(/does not match/)
+    }, 1, true)).toThrow(/does not match/)
   })
 
   it('keeps the first user instruction outside every selected compaction range', async () => {
@@ -759,7 +759,7 @@ describe('pressure measurement and retention', () => {
     const compact = service({ auto: false }, ctx)
     const session = conversation(3)
     const before = [...session.surface.nodes]
-    const range = selectCompactableRange(session, ctx.tokenMeter.measure(session), 0)
+    const range = selectCompactableRange(session, ctx.tokenMeter.measure(session), 0, true)
 
     expect(range).toEqual({ start: before[1], end: before.at(-2) })
     const result = await compact.compactRegion(
@@ -774,6 +774,16 @@ describe('pressure measurement and retention', () => {
     expect(summarizedText(compact.calls[0]!.input)).not.toContain('fixture user 1')
     const first = session.deriveMessages()[0]?.content[0]
     expect(first?.type === 'text' ? first.text : '').toContain('fixture user 1')
+  })
+
+  it('lets a context-overflow selection shadow the first user instruction', () => {
+    const ctx = createContext()
+    const session = conversation(1)
+    const first = session.surface.nodes[0]
+
+    expect(selectCompactableRange(session, ctx.tokenMeter.measure(session), 0, true)).toBeNull()
+    expect(selectCompactableRange(session, ctx.tokenMeter.measure(session), 0, false))
+      .toEqual({ start: first, end: expect.any(Number) })
   })
 
   it('declines when rounding a cut would consume the only tool pair', () => {
@@ -807,7 +817,7 @@ describe('pressure measurement and retention', () => {
     session.append('step/end', { turn: 1, step: 1 })
 
     const priced = ctx.tokenMeter.measure(session)
-    expect(selectCompactableRange(session, priced, 1)).toBeNull()
+    expect(selectCompactableRange(session, priced, 1, true)).toBeNull()
   })
 })
 
