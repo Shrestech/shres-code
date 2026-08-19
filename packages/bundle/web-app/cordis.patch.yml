@@ -255,6 +255,9 @@
     - id: ui-message-feedback
       name: '@shres-code/shres-code-client-ui-message-feedback'
 
+    - id: ui-speech
+      name: '@shres-code/shres-code-client-ui-speech'
+
     # Model selection: the /model popupSelect + composer seat over session.models.
     - id: ui-model-selection
       name: '@shres-code/shres-code-client-ui-model-selection'

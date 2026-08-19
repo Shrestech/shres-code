@@ -870,3 +870,27 @@ export const IconArchiveOutline20 = ({ size = 20, className }: IconProps) => (
     <path d="M12.7962 12.5661V11.0832H7.20548V12.5661L12.7962 12.5661Z" fill="currentColor" />
   </svg>
 )
+
+/** ic_ds_mic_outline_16 — harness-only extract for the composer speech control. */
+export const IconMicOutline16 = ({ size = 16, className }: IconProps) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path
+      fillRule="evenodd"
+      clipRule="evenodd"
+      d="M8 1.35C6.757 1.35 5.75 2.357 5.75 3.6V7.4C5.75 8.643 6.757 9.65 8 9.65C9.243 9.65 10.25 8.643 10.25 7.4V3.6C10.25 2.357 9.243 1.35 8 1.35ZM4.4 3.6C4.4 1.612 6.012 0 8 0C9.988 0 11.6 1.612 11.6 3.6V7.4C11.6 9.388 9.988 11 8 11C6.012 11 4.4 9.388 4.4 7.4V3.6ZM2.7 6.8C3.073 6.8 3.375 7.102 3.375 7.475C3.375 10.029 5.446 12.1 8 12.1C10.554 12.1 12.625 10.029 12.625 7.475C12.625 7.102 12.927 6.8 13.3 6.8C13.673 6.8 13.975 7.102 13.975 7.475C13.975 10.775 11.3 13.45 8 13.45C4.7 13.45 2.025 10.775 2.025 7.475C2.025 7.102 2.327 6.8 2.7 6.8ZM7.325 13.45V15.325H8.675V13.45H7.325Z"
+      fill="currentColor"
+    />
+  </svg>
+)
+
+/** ic_ds_speaker_outline_16 — harness-only extract for assistant read-aloud. */
+export const IconSpeakerOutline16 = ({ size = 16, className }: IconProps) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path
+      fillRule="evenodd"
+      clipRule="evenodd"
+      d="M9.25 2.12C9.25 1.54 8.62 1.18 8.12 1.47L3.84 3.95H1.75C1.06 3.95 0.5 4.51 0.5 5.2V10.8C0.5 11.49 1.06 12.05 1.75 12.05H3.84L8.12 14.53C8.62 14.82 9.25 14.46 9.25 13.88V2.12ZM4.36 5.22L7.9 3.17V12.83L4.36 10.78H1.85V5.22H4.36ZM11.22 5.05C11.48 4.79 11.91 4.79 12.17 5.05C13.05 5.93 13.55 7.14 13.55 8.4C13.55 9.66 13.05 10.87 12.17 11.75C11.91 12.01 11.48 12.01 11.22 11.75C10.96 11.49 10.96 11.06 11.22 10.8C11.84 10.18 12.2 9.33 12.2 8.4C12.2 7.47 11.84 6.62 11.22 6C10.96 5.74 10.96 5.31 11.22 5.05Z"
+      fill="currentColor"
+    />
+  </svg>
+)

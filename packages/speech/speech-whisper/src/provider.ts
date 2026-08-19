@@ -1,0 +1,188 @@
+/**
+ * Local Whisper tiny.en STT backend for `ctx.speech`.
+ * @module @shres-code/shres-code-speech-whisper/provider
+ */
+
+import { existsSync, readdirSync } from 'node:fs'
+import { SpeechError, speechMediaTypeToken } from '@shres-code/shres-code-speech'
+import type {
+  SpeechSttProvider,
+  SpeechTranscribeRequest,
+  SpeechTranscribeResult,
+} from '@shres-code/shres-code-speech'
+import { decodePcm16Wav } from './wav.ts'
+
+/** Stable STT id this provider registers under. */
+export const WHISPER_STT_PROVIDER_ID = 'whisper-tiny-en'
+
+/** Default Hugging Face model id. */
+export const WHISPER_DEFAULT_MODEL_ID = 'Xenova/whisper-tiny.en'
+
+/** Result of one local ASR call. */
+export interface WhisperAsrResult {
+  readonly text?: string
+}
+
+/** Minimal ASR face; tests inject a fake. */
+export interface WhisperEngine {
+  (audio: { raw: Float32Array; sampling_rate: number }): Promise<WhisperAsrResult>
+}
+
+/** Options for {@link WhisperLoader}. */
+export interface WhisperLoadRequest {
+  readonly modelId: string
+  readonly cacheDir: string
+}
+
+/**
+ * Load one ASR engine. Production uses {@link loadWhisperJs}; tests inject
+ * a fake so CI never downloads weights.
+ */
+export type WhisperLoader = (request: WhisperLoadRequest, signal?: AbortSignal) => Promise<WhisperEngine>
+
+/** Connection facts the plugin projects per call. */
+export interface WhisperSttOptions {
+  readonly enabled: boolean
+  readonly allowDownload: boolean
+  readonly modelId: string
+  readonly cacheDir: string
+  readonly load: WhisperLoader
+}
+
+/* v8 ignore start -- default loader talks to Hugging Face; unit tests inject a fake engine. */
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw new SpeechError('Whisper load was cancelled', 'SPEECH_CANCELLED')
+  }
+}
+
+function raceAbort<T>(work: Promise<T>, signal?: AbortSignal): Promise<T> {
+  throwIfAborted(signal)
+  if (signal === undefined) return work
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = (): void => {
+      signal.removeEventListener('abort', onAbort)
+      reject(new SpeechError('Whisper load was cancelled', 'SPEECH_CANCELLED'))
+    }
+    signal.addEventListener('abort', onAbort, { once: true })
+    work.then(
+      (value) => {
+        signal.removeEventListener('abort', onAbort)
+        resolve(value)
+      },
+      (error) => {
+        signal.removeEventListener('abort', onAbort)
+        reject(error)
+      },
+    )
+  })
+}
+
+/**
+ * Default loader: `@huggingface/transformers` automatic-speech-recognition.
+ * @param request - model and cache.
+ * @param signal - optional cancellation around the download.
+ * @returns the loaded pipeline.
+ */
+export async function loadWhisperJs(
+  request: WhisperLoadRequest,
+  signal?: AbortSignal,
+): Promise<WhisperEngine> {
+  throwIfAborted(signal)
+  try {
+    const mod = await import('@huggingface/transformers') as {
+      pipeline: (task: string, model: string, options: object) => Promise<WhisperEngine>
+    }
+    return await raceAbort(mod.pipeline('automatic-speech-recognition', request.modelId, {
+      cache_dir: request.cacheDir,
+    }), signal)
+  } catch (error) {
+    if (error instanceof SpeechError) throw error
+    throw new SpeechError('failed to load local Whisper tiny.en', 'SPEECH_PROVIDER_ERROR', { cause: error })
+  }
+}
+/* v8 ignore stop */
+
+/**
+ * True when `cacheDir` already contains at least one file.
+ * @param cacheDir - provider cache root.
+ * @returns whether the directory looks warm.
+ */
+export function cacheIsWarm(cacheDir: string): boolean {
+  if (!existsSync(cacheDir)) return false
+  try {
+    return readdirSync(cacheDir).length > 0
+  } catch {
+    // readdirSync throws when cacheDir exists but is not a readable directory.
+    return false
+  }
+}
+
+/** Local Whisper tiny.en STT provider. */
+export class WhisperSttProvider implements SpeechSttProvider {
+  readonly id = WHISPER_STT_PROVIDER_ID
+  private engine: WhisperEngine | undefined
+  private loading: Promise<WhisperEngine> | undefined
+
+  /**
+   * @param options - thunk returning the currently authoritative connection facts.
+   */
+  constructor(private readonly options: () => WhisperSttOptions) {}
+
+  /**
+   * Cheap local usability check: enabled, and either a download is allowed or
+   * the cache is already warm. Must not load weights.
+   * @returns whether a transcribe would be attempted.
+   */
+  available(): boolean {
+    const options = this.options()
+    return options.enabled && (options.allowDownload || cacheIsWarm(options.cacheDir))
+  }
+
+  /**
+   * Transcribe PCM16 WAV audio.
+   * @param request - bytes; media type must be WAV.
+   * @param signal - optional cancellation around load.
+   * @returns the transcript.
+   */
+  async transcribe(request: SpeechTranscribeRequest, signal?: AbortSignal): Promise<SpeechTranscribeResult> {
+    if (!this.available()) {
+      throw new SpeechError('local Whisper tiny.en is unavailable', 'SPEECH_PROVIDER_UNAVAILABLE')
+    }
+    const token = speechMediaTypeToken(request.mediaType)
+    if (token !== 'audio/wav' && token !== 'audio/x-wav') {
+      throw new SpeechError(
+        'Whisper tiny.en accepts PCM16 WAV; decode the recording in the browser first',
+        'SPEECH_UNSUPPORTED_MEDIA',
+      )
+    }
+    const wav = decodePcm16Wav(request.audio)
+    const options = this.options()
+    const engine = await this.ensureEngine(options, signal)
+    let result: WhisperAsrResult
+    try {
+      result = await engine({ raw: wav.samples, sampling_rate: wav.sampleRate })
+    } catch (error) {
+      throw new SpeechError('Whisper transcribe failed', 'SPEECH_PROVIDER_ERROR', { cause: error })
+    }
+    const text = result.text?.trim() ?? ''
+    return { text }
+  }
+
+  private ensureEngine(options: WhisperSttOptions, signal?: AbortSignal): Promise<WhisperEngine> {
+    if (this.engine !== undefined) return Promise.resolve(this.engine)
+    if (this.loading !== undefined) return this.loading
+    this.loading = options.load({
+      modelId: options.modelId,
+      cacheDir: options.cacheDir,
+    }, signal).then((engine) => {
+      this.engine = engine
+      this.loading = undefined
+      return engine
+    }, (error) => {
+      this.loading = undefined
+      throw error
+    })
+    return this.loading
+  }
+}

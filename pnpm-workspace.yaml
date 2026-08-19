@@ -53,6 +53,10 @@ allowBuilds:
   # The Python runtime deploy includes the reviewed workspace postinstall that
   # restores the executable bit on node-pty's macOS spawn helper.
   '@shres-code/shres-code-subprocess-local@file:packages/subprocess/subprocess-local': true
+  # Local Kokoro TTS and Whisper STT run ONNX through @huggingface/transformers.
+  onnxruntime-node: true
+  # transformers lists sharp for image pipelines; speech never decodes images.
+  sharp: false
 
 minimumReleaseAgeExclude:
   # Fresh pi-ai releases carry the model catalog updates that are the whole
