@@ -2,7 +2,7 @@
  * Mic, speaker, playback, and settings-row gestures.
  */
 // @vitest-environment jsdom
-import { useSyncExternalStore } from 'react'
+import { createElement, useSyncExternalStore, type ComponentType } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { makeTranslate, stubSettingsScope } from '@shres-code/shres-code-client-test-runtime'
@@ -23,6 +23,10 @@ import { en } from '../src/client/locales.ts'
 afterEach(cleanup)
 
 const t = makeTranslate(en)
+
+function renderLoose(component: ComponentType<never>, props: object) {
+  return render(createElement(component, props as never))
+}
 
 function hookOf<T>(source: { getSnapshot(): T; subscribe(fn: () => void): () => void }) {
   return <S,>(select: (value: T) => S): S =>
@@ -121,19 +125,15 @@ describe('SpeakButton', () => {
     const playback = createSpeechPlayback()
     const synthesize = options.synthesize ?? vi.fn(() => Promise.resolve(audioResult()))
     const speech = { status: vi.fn(), synthesize, transcribe: vi.fn() } as unknown as SpeechRemote
-    const ui = render(
-      <SpeakButton
-        {...({
-          messageId: 'm1',
-          text: options.text ?? 'Hello',
-          useSpeechSettings: hookOf(host.scope),
-          useSpeechStatus: hookOf(status),
-          speech,
-          playback,
-          t,
-        } as never)}
-      />,
-    )
+    const ui = renderLoose(SpeakButton, {
+      messageId: 'm1',
+      text: options.text ?? 'Hello',
+      useSpeechSettings: hookOf(host.scope),
+      useSpeechStatus: hookOf(status),
+      speech,
+      playback,
+      t,
+    })
     return { ...ui, synthesize, playback, status }
   }
 
@@ -260,19 +260,15 @@ describe('MicButton', () => {
     }))
     const speech = { status: vi.fn(), synthesize: vi.fn(), transcribe } as unknown as SpeechRemote
     const inputActions = { setDraft: vi.fn(), submit: vi.fn() }
-    const ui = render(
-      <MicButton
-        {...({
-          session: {},
-          input: {},
-          inputActions,
-          useSpeechSettings: hookOf(host.scope),
-          useSpeechStatus: hookOf(status),
-          speech,
-          t,
-        } as never)}
-      />,
-    )
+    const ui = renderLoose(MicButton, {
+      session: {},
+      input: {},
+      inputActions,
+      useSpeechSettings: hookOf(host.scope),
+      useSpeechStatus: hookOf(status),
+      speech,
+      t,
+    })
     return { ...ui, transcribe, inputActions }
   }
 
@@ -486,19 +482,15 @@ describe('MicButton', () => {
       configurable: true,
       value: { getUserMedia: vi.fn(async () => ({ getTracks: () => [{ stop: vi.fn() }] })) },
     })
-    const ui = render(
-      <MicButton
-        {...({
-          session: {},
-          input: {},
-          inputActions,
-          useSpeechSettings: hookOf(host.scope),
-          useSpeechStatus: hookOf(status),
-          speech,
-          t,
-        } as never)}
-      />,
-    )
+    const ui = renderLoose(MicButton, {
+      session: {},
+      input: {},
+      inputActions,
+      useSpeechSettings: hookOf(host.scope),
+      useSpeechStatus: hookOf(status),
+      speech,
+      t,
+    })
     fireEvent.click(ui.getByLabelText(en['mic.idle']))
     await waitFor(() => { expect(ui.getByLabelText(en['mic.recording'])).toBeTruthy() })
     fireEvent.click(ui.getByLabelText(en['mic.recording']))
@@ -547,19 +539,15 @@ describe('MicButton', () => {
       value: { ok: false as const, error: { code: 'SPEECH_UNSUPPORTED_MEDIA', message: 'bad' } },
     }))
     const speech = { status: vi.fn(), synthesize: vi.fn(), transcribe } as unknown as SpeechRemote
-    const ui = render(
-      <MicButton
-        {...({
-          session: {},
-          input: {},
-          inputActions: { setDraft: vi.fn(), submit: vi.fn() },
-          useSpeechSettings: hookOf(host.scope),
-          useSpeechStatus: hookOf(status),
-          speech,
-          t,
-        } as never)}
-      />,
-    )
+    const ui = renderLoose(MicButton, {
+      session: {},
+      input: {},
+      inputActions: { setDraft: vi.fn(), submit: vi.fn() },
+      useSpeechSettings: hookOf(host.scope),
+      useSpeechStatus: hookOf(status),
+      speech,
+      t,
+    })
     fireEvent.click(ui.getByLabelText(en['mic.idle']))
     await waitFor(() => { expect(ui.getByLabelText(en['mic.recording'])).toBeTruthy() })
     fireEvent.click(ui.getByLabelText(en['mic.recording']))
@@ -618,14 +606,14 @@ describe('settings rows', () => {
       setField,
       t,
     }
-    const voice = render(<VoiceRow {...(rowProps as never)} />)
+    const voice = renderLoose(VoiceRow, rowProps)
     fireEvent.click(voice.getByRole('button', { name: 'Heart' }))
     fireEvent.keyDown(document, { key: 'Escape' })
     fireEvent.click(voice.getByRole('button', { name: 'Heart' }))
     fireEvent.click(voice.getByRole('menuitem', { name: 'Michael (am_michael)' }))
     expect(setField).toHaveBeenCalledWith('voiceId', 'am_michael')
     cleanup()
-    const auto = render(<AutoSubmitRow {...(rowProps as never)} />)
+    const auto = renderLoose(AutoSubmitRow, rowProps)
     fireEvent.click(auto.getByRole('button', { name: en['settings.autoSubmit.off'] }))
     expect(setField).toHaveBeenCalledWith('autoSubmitVoice', true)
     cleanup()
@@ -635,7 +623,7 @@ describe('settings rows', () => {
       writable: true,
     })
     cleanup()
-    const unset = render(<VoiceRow {...(rowProps as never)} />)
+    const unset = renderLoose(VoiceRow, rowProps)
     expect(unset.getByRole('button', { name: 'Heart' })).toBeTruthy()
     cleanup()
     host.publish({
@@ -643,12 +631,12 @@ describe('settings rows', () => {
       value: { ...DEFAULT_SPEECH_USER_SETTINGS, voiceId: 'unknown', autoSubmitVoice: true },
       writable: true,
     })
-    const unknown = render(<VoiceRow {...(rowProps as never)} />)
+    const unknown = renderLoose(VoiceRow, rowProps)
     const picker = unknown.getByRole('button', { name: 'unknown' })
     fireEvent.click(picker)
     fireEvent.click(picker)
     cleanup()
-    const on = render(<AutoSubmitRow {...(rowProps as never)} />)
+    const on = renderLoose(AutoSubmitRow, rowProps)
     expect(on.getByRole('button', { name: en['settings.autoSubmit.on'] })).toBeTruthy()
   })
 })
