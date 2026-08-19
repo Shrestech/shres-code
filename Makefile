@@ -18,16 +18,16 @@ build: ## Build lib + web dist (required once before start, and after pulls)
 	pnpm run build
 
 start: ## Start the web app in the background
-	@mkdir -p $(RUN_DIR)
-	@if [ -f $(PID_FILE) ] && kill -0 $$(cat $(PID_FILE)) 2>/dev/null; then \
+	@mkdir -p $(RUN_DIR); \
+	if [ -f $(PID_FILE) ] && kill -0 $$(cat $(PID_FILE)) 2>/dev/null; then \
 		echo "already running, pid $$(cat $(PID_FILE)) — $(URL) (make logs to follow)"; \
 		exit 0; \
-	fi
-	@rm -f $(PID_FILE)
-	@echo "starting shres web -> $(URL)"
-	@nohup pnpm shres web > $(LOG_FILE) 2>&1 & \
-		echo $$! > $(PID_FILE)
-	@i=0; \
+	fi; \
+	rm -f $(PID_FILE); \
+	echo "starting shres web -> $(URL)"; \
+	nohup pnpm shres web > $(LOG_FILE) 2>&1 & \
+	echo $$! > $(PID_FILE); \
+	i=0; \
 	while [ $$i -lt $(START_TIMEOUT) ]; do \
 		if curl -sf -o /dev/null $(URL) && kill -0 $$(cat $(PID_FILE)) 2>/dev/null; then \
 			sleep 1; \
