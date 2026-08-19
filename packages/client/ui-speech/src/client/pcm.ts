@@ -15,7 +15,10 @@ export function audioBufferToWav(buffer: AudioBuffer): Uint8Array {
   const samples = new Float32Array(frames)
   for (let i = 0; i < frames; i += 1) {
     let mix = 0
-    for (let c = 0; c < channels; c += 1) mix += buffer.getChannelData(c)[i]
+    for (let c = 0; c < channels; c += 1) {
+      const sample = buffer.getChannelData(c)[i]
+      mix += sample === undefined ? 0 : sample
+    }
     samples[i] = mix / channels
   }
   const dataSize = frames * 2

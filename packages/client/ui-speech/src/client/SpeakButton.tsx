@@ -87,7 +87,7 @@ export function SpeakButton({
     setPhase('pending')
     try {
       const result = await speech.synthesize({
-        text,
+        text: text ?? '',
         ...voiceId === undefined ? {} : { voiceId },
       })
       if (generation.current !== token || ac.signal.aborted) return

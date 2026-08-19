@@ -68,7 +68,9 @@ export function createSpeechPlayback(): SpeechPlayback & { dispose(): void } {
     stop,
     async play(nextOwner, bytes, mediaType) {
       stop()
-      const blob = new Blob([bytes], { type: mediaType })
+      const copy = new Uint8Array(bytes.byteLength)
+      copy.set(bytes)
+      const blob = new Blob([copy.buffer], { type: mediaType })
       url = URL.createObjectURL(blob)
       const audio = new Audio(url)
       current = audio
