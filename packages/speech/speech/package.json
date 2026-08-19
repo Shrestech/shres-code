@@ -60,7 +60,8 @@
     "@shres-code/cordis": "workspace:^"
   },
   "dependencies": {
-    "@shres-code/schemastery": "workspace:^"
+    "@shres-code/schemastery": "workspace:^",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@shres-code/shres-code-invariants": "workspace:^",
