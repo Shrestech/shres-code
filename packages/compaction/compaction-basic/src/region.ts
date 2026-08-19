@@ -17,11 +17,11 @@ import {
 import type { CompactionResult } from '@shres-code/shres-code-compaction'
 import type { CommandId } from '@shres-code/shres-code-commands/brand'
 import { createUserMessage, errorChain } from '@shres-code/shres-code-llm'
-import type { Message, UserMessage } from '@shres-code/shres-code-llm'
+import type { ContentBlock, Message, UserMessage } from '@shres-code/shres-code-llm'
 import type { TokenMeasurement, TokenMeter } from '@shres-code/shres-code-token-meter'
 import type { Session, SessionEvent } from '@shres-code/shres-code-session'
 import type { Agent } from '@shres-code/shres-code-agent'
-import { frameSummary } from './summarizer.ts'
+import { frameSummary, SummaryOutputRejection } from './summarizer.ts'
 import type { SummarizationInput, SummaryResult } from './summarizer.ts'
 
 interface RegionDependencies {
@@ -89,7 +89,11 @@ interface TransactionFailure {
 
 /**
  * Resolve the next head-anchored range while retaining a priced recent tail
- * and never splitting an assistant tool-call/result pair.
+ * and never splitting an assistant tool-call/result pair. The session's first
+ * user-authored surface message is pinned — it opens the request chain every
+ * later turn builds on, so the selected range always starts after it; when
+ * nothing compactable remains between that pin and the retained tail, the
+ * result is `null`.
  * @param session - session supplying authoritative current surface positions.
  * @param measurement - unified pressure and surface measurement from the conversation meter.
  * @param retainTokens - minimum recent tail budget retained verbatim.
@@ -126,11 +130,45 @@ export function selectCompactableRange(
   }
   if (keepFromIdx === 0) return null
 
+  const pinIdx = firstUserSourceIndex(session, surfaceNodes, keepFromIdx)
+  let startIdx = pinIdx === undefined ? 0 : pinIdx + 1
+  // The retained tail starts on a balanced boundary, so this scan terminates.
+  while (startIdx < keepFromIdx) {
+    // oxlint-disable-next-line typescript/no-non-null-assertion
+    if (toolPairingBalancedBefore(session, surfaceNodes[startIdx]!)) break
+    startIdx += 1
+  }
+  if (startIdx >= keepFromIdx) return null
+
   // oxlint-disable-next-line typescript/no-non-null-assertion
-  const first = surfaceNodes[0]!
+  const first = surfaceNodes[startIdx]!
   // oxlint-disable-next-line typescript/no-non-null-assertion
   const cutoff = surfaceNodes[keepFromIdx - 1]!
   return { start: first, end: cutoff }
+}
+
+/**
+ * First surface position below `bound` whose derived message is user-authored.
+ * That message opens the conversation's request chain, so it is the retention
+ * pin {@link selectCompactableRange} never shadows; compaction checkpoints and
+ * plugin context carry non-`user` source kinds and never qualify.
+ * @param session - session projecting surface events to messages.
+ * @param surfaceNodes - current surface-node seqs, in order.
+ * @param bound - exclusive upper position to scan.
+ * @returns the pinned position, or `undefined` when no user message precedes the bound.
+ */
+function firstUserSourceIndex(
+  session: Session,
+  surfaceNodes: readonly number[],
+  bound: number,
+): number | undefined {
+  for (let index = 0; index < bound; index += 1) {
+    // Surface seqs are validated contiguous log references.
+    // oxlint-disable-next-line typescript/no-non-null-assertion
+    const message = session.deriveEventMessage(session.events[surfaceNodes[index]!]!)
+    if (message?.source.kind === 'user') return index
+  }
+  return undefined
 }
 
 /**
@@ -220,7 +258,11 @@ export async function compactSurfaceRegion(
     if (!closing) {
       closing = true
       try {
-        session.append('compaction/end', { ...lifecycle, error: errorChain(error) })
+        session.append('compaction/end', {
+          ...lifecycle,
+          error: errorChain(error),
+          ...failureRawOutput(error),
+        })
         closed = true
       } catch (closeError: unknown) {
         failure = { error: closeError, stage: 'commit' }
@@ -274,6 +316,18 @@ function throwManualFailure(failure: TransactionFailure): never {
     'manual compaction could not produce a smaller summary',
     { cause: failure.error },
   )
+}
+
+/**
+ * Summarizer output refused by summary acceptance, for the durable
+ * `compaction/end` failure record — the only trace of a rejected attempt,
+ * which never produces a `compaction/summary` event.
+ * @param error - the failure being recorded.
+ * @returns the `rawOutput` field when the error carries refused output.
+ */
+function failureRawOutput(error: unknown): { rawOutput?: ContentBlock[] } {
+  if (!(error instanceof SummaryOutputRejection)) return {}
+  return { rawOutput: [...error.rejectedOutput] }
 }
 
 /**
@@ -372,9 +426,12 @@ async function summarizeCompaction(
   })
   const framedSummaryTokenCount = dependencies.meter.estimateMessage(checkpointMessage)
   if (framedSummaryTokenCount >= prepared.shadowedTokenCount) {
-    throw new Error(
-      `summary is not smaller than the shadowed content (${framedSummaryTokenCount} estimated framed tokens >= ${prepared.shadowedTokenCount})`,
-    )
+    const message = `summary is not smaller than the shadowed content (${framedSummaryTokenCount} estimated framed tokens >= ${prepared.shadowedTokenCount})`
+    // Carrying the refused output keeps it on the durable failure record; an
+    // output-less summarizer failure stays a plain Error.
+    throw summaryResult.rawOutput === undefined
+      ? new Error(message)
+      : new SummaryOutputRejection(message, summaryResult.rawOutput)
   }
   return {
     ...prepared,
@@ -441,6 +498,9 @@ function commitCompactionBody(
     usage,
     checkpointMessage,
   } = summarized
+  // The recorded range is the numeric interval bounding the shadowed seqs
+  // (contractually non-empty); the positional span stays on surfaceOp below.
+  const shadowedRange = normalizedSeqRange(shadowedSeqs)
   const callProvenance = summarized.llmStreamCall === true
     ? { rawOutput: summarized.rawOutput, llmStreamCall: true as const }
     : summarized.rawOutput === undefined ? {} : { rawOutput: summarized.rawOutput }
@@ -451,7 +511,7 @@ function commitCompactionBody(
       : { sourceCommandId: startEvent.data.sourceCommandId },
     summary,
     ...callProvenance,
-    shadowedRange: { start, end },
+    shadowedRange,
     shadowedSeqs: [...shadowedSeqs],
     shadowedTokenCount,
     provider,
@@ -471,10 +531,25 @@ function commitCompactionBody(
     startSeq: startEvent.seq,
     summarySeq: summaryEvent.seq,
     summary,
-    shadowedRange: { start, end },
+    shadowedRange,
     shadowedSeqs: [...shadowedSeqs],
     shadowedTokenCount,
   }
+}
+
+/** Numeric min/max interval for a contractually non-empty seq collection. */
+function normalizedSeqRange(seqs: readonly number[]): { start: number; end: number } {
+  // The selected surface span is validated non-empty before summarization.
+  // oxlint-disable-next-line typescript/no-non-null-assertion
+  let start = seqs[0]!
+  let end = start
+  for (let index = 1; index < seqs.length; index += 1) {
+    // oxlint-disable-next-line typescript/no-non-null-assertion
+    const seq = seqs[index]!
+    if (seq < start) start = seq
+    if (seq > end) end = seq
+  }
+  return { start, end }
 }
 
 /** Attach the successfully appended close event to a pending result. */

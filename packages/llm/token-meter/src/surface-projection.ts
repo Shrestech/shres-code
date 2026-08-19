@@ -68,10 +68,19 @@ export function foldSurfaceProjection(
   event: SessionEvent,
 ): SurfaceTokensFold {
   if (event.type === 'compaction/summary' || event.type === 'compaction/prune') {
-    const { shadowedRange, shadowedTokenCount } = event.data
+    const { shadowedSeqs, shadowedTokenCount } = event.data
+    // Both shadow-price events contractually carry a non-empty shadowedSeqs.
+    // Arm from its first and last entries — the replaced range's surface
+    // positions — which stay correct even when a prior replacement landed a
+    // fresh high-seq node at an older position (shadowedRange is the normalized
+    // min/max interval on compaction/summary, not the positional span).
+    // oxlint-disable-next-line typescript/no-non-null-assertion
+    const start = shadowedSeqs[0]!
+    // oxlint-disable-next-line typescript/no-non-null-assertion
+    const end = shadowedSeqs.at(-1)!
     return {
       deltaTokens: 0,
-      claim: { start: shadowedRange.start, end: shadowedRange.end, tokens: shadowedTokenCount },
+      claim: { start, end, tokens: shadowedTokenCount },
     }
   }
   if (!isSurfaceEvent(event)) return { deltaTokens: 0, claim: undefined }

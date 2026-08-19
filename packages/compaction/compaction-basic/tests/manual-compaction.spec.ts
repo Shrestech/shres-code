@@ -124,10 +124,15 @@ async function loopHarness(): Promise<LoopHarness> {
   return { ctx, agent, compact, adapter, log }
 }
 
-/** Drive one real turn so the closed history holds a compactable older span. */
+/** Drive two real turns so the first instruction stays pinned outside a compactable older span. */
 async function seedHistory(harness: LoopHarness): Promise<void> {
   harness.agent.followup(createUserMessage({
     content: [{ type: 'text', text: PROMPT }],
+    source: { kind: 'user' },
+  }))
+  await harness.agent.whenIdle()
+  harness.agent.followup(createUserMessage({
+    content: [{ type: 'text', text: `${PROMPT} follow the original instruction and record the current result` }],
     source: { kind: 'user' },
   }))
   await harness.agent.whenIdle()
@@ -253,7 +258,7 @@ describe('compactNow through the real loop', () => {
     await new Promise<void>((resolve) => { setTimeout(resolve, 5) })
 
     expect(agent.status).toBe('idle')
-    expect(adapter.requests).toHaveLength(1)
+    expect(adapter.requests).toHaveLength(2)
     expect(log).toEqual(['compaction/start:null'])
 
     gate.resolve()
@@ -270,13 +275,13 @@ describe('compactNow through the real loop', () => {
     expect(summary).toBeLessThan(end)
     expect(end).toBeLessThan(flush)
     expect(flush).toBeLessThan(nextTurn)
-    expect(adapter.requests).toHaveLength(2)
-    const second = (adapter.requests[1] ?? []).map(message => message.content
+    expect(adapter.requests).toHaveLength(3)
+    const resumed = (adapter.requests[2] ?? []).map(message => message.content
       .map(block => block.type === 'text' ? block.text : '')
       .join(''))
-    expect(second[0]).toContain('checkpoint')
-    expect(second.at(-1)).toBe('after compaction')
-    expect(second.some(text => text.includes(PROMPT))).toBe(false)
+    expect(resumed[0]).toContain(PROMPT)
+    expect(resumed.some(text => text.includes('checkpoint'))).toBe(true)
+    expect(resumed.at(-1)).toBe('after compaction')
   })
 
   it('keeps context injected during summarization pending for the next step', async () => {
@@ -309,7 +314,8 @@ describe('compactNow through the real loop', () => {
     }))
     await agent.whenIdle()
     const messages = derivedText(agent.session)
-    expect(messages[0]).toContain('checkpoint')
+    expect(messages[0]).toContain(PROMPT)
+    expect(messages.some(text => text.includes('checkpoint'))).toBe(true)
     expect(messages.filter(text => text.includes('INJECTED CONTEXT'))).toHaveLength(1)
   })
 
@@ -331,7 +337,8 @@ describe('compactNow through the real loop', () => {
 
     expect(attempts).toEqual(['compaction/start', 'compaction/summary'])
     expect(result).not.toBeNull()
-    expect(derivedText(agent.session)[0]).toContain('checkpoint')
+    expect(derivedText(agent.session)[0]).toContain(PROMPT)
+    expect(derivedText(agent.session).some(text => text.includes('checkpoint'))).toBe(true)
     expect(agent.session.events.filter(event => event.type === 'user/message'
       && event.data.source.kind === 'plugin' && event.data.source.plugin === 'listener')).toHaveLength(0)
     const types = compactEvents(agent.session).map(event => event.type)
@@ -351,7 +358,7 @@ describe('compactNow through the real loop', () => {
     expect(compact.calls).toHaveLength(0)
 
     await agent.whenIdle()
-    expect(adapter.requests).toHaveLength(2)
+    expect(adapter.requests).toHaveLength(3)
     expect(agent.session.events.some(event => event.type === 'compaction/start')).toBe(false)
   })
 
@@ -374,7 +381,7 @@ describe('compactNow through the real loop', () => {
       source: { kind: 'user' },
     }))
     await agent.whenIdle()
-    expect(adapter.requests).toHaveLength(2)
+    expect(adapter.requests).toHaveLength(3)
   })
 })
 
@@ -490,13 +497,13 @@ describe('compactNow transaction and failure classification', () => {
     let released = 0
     const agent = fakeAgent(session, () => () => { released += 1 })
     compact.duringSummary = () => {
-      const [head] = session.surface.nodes
+      const selected = session.surface.nodes[1]
       session.append('user/message', createUserMessage({
         content: [{ type: 'text', text: 'competing replacement' }],
         source: { kind: 'plugin', plugin: 'rival' },
       }), {
-        surfaceOp: { op: 'replace', start: head!, end: head! },
-        sourceEventSeqs: [head!],
+        surfaceOp: { op: 'replace', start: selected!, end: selected! },
+        sourceEventSeqs: [selected!],
       })
     }
 
@@ -523,7 +530,7 @@ describe('compactNow transaction and failure classification', () => {
 
     const error = await rejection(compact.compactNow(agent, SIGNAL))
     expect(error.code).toBe('changed')
-    expect(causeOf(error).message).toContain('span changed during summarization')
+    expect(causeOf(error).message).toContain('selected span')
   })
 
   it('revalidates the selected span after the summarizer continuation settles', async () => {
@@ -533,7 +540,7 @@ describe('compactNow transaction and failure classification', () => {
     compact.gate = gate.promise
     let released = 0
     const agent = fakeAgent(session, () => () => { released += 1 })
-    const head = session.surface.nodes[0]!
+    const selected = session.surface.nodes[1]!
     const generation = session.surface.replaceGeneration
 
     const running = compact.compactNow(agent, SIGNAL)
@@ -547,8 +554,8 @@ describe('compactNow transaction and failure classification', () => {
           content: [{ type: 'text', text: 'late competing replacement' }],
           source: { kind: 'plugin', plugin: 'rival' },
         }), {
-          surfaceOp: { op: 'replace', start: head, end: head },
-          sourceEventSeqs: [head],
+          surfaceOp: { op: 'replace', start: selected, end: selected },
+          sourceEventSeqs: [selected],
         })
       })
     })
@@ -559,7 +566,7 @@ describe('compactNow transaction and failure classification', () => {
     expect(released).toBe(1)
     expect(flushes()).toBe(1)
     expect(session.surface.replaceGeneration).toBe(generation + 1)
-    expect(session.surface.nodes).not.toContain(head)
+    expect(session.surface.nodes).not.toContain(selected)
     expect(compactEvents(session).map(event => event.type)).toEqual(['compaction/start', 'compaction/end'])
     expect(session.events.some(event => event.type === 'user/message'
       && isCompactCheckpointSource(event.data.source))).toBe(false)
@@ -622,7 +629,7 @@ describe('compactNow transaction and failure classification', () => {
         return {
           ...measurement,
           nodes: measurement.nodes.map((node, index) =>
-            index === 0 ? { ...node, tokens: node.tokens + 1 } : node),
+            index === 1 ? { ...node, tokens: node.tokens + 1 } : node),
         }
       })
     }
@@ -671,7 +678,7 @@ describe('compactNow transaction and failure classification', () => {
   it('compacts a session with no durable turn boundary without creating one', async () => {
     const { compact } = detachedService()
     const session = Session.create(SessionId('turnless'))
-    for (const text of [PROMPT, 'recent tail']) {
+    for (const text of [PROMPT, PROMPT, 'recent tail']) {
       session.append('user/message', createUserMessage({
         content: [{ type: 'text', text }],
         source: { kind: 'user' },

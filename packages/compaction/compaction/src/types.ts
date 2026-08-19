@@ -34,6 +34,12 @@ declare module '@shres-code/shres-code-session/types' {
       compactionId: CompactionId
       sourceCommandId?: CommandId
       summary: ContentBlock[]
+      /**
+       * Numeric interval bounding the shadowed seqs: `start` is the smallest
+       * and `end` the largest of `shadowedSeqs`, so `start <= end` holds even
+       * when a prior replacement inverted the surface positions' seq order
+       * (see {@link CompactionResult.shadowedRange}).
+       */
       shadowedRange: { start: number; end: number }
       shadowedSeqs: number[]
       shadowedTokenCount: number
@@ -66,9 +72,29 @@ declare module '@shres-code/shres-code-session/types' {
     )
     /**
      * Marks the end of a compaction — log-only, releases the lock. Its owner
-     * matches `compaction/start`; `error` records an unsuccessful attempt.
+     * matches `compaction/start`.
      */
-    'compaction/end': { compactionId: CompactionId; sourceCommandId?: CommandId; turn: number | null; error?: string }
+    'compaction/end': {
+      compactionId: CompactionId
+      sourceCommandId?: CommandId
+      turn: number | null
+    } & (
+      | {
+        /** Successful close after one `compaction/summary`. */
+        error?: never
+        rawOutput?: never
+      }
+      | {
+        /** Error chain of an unsuccessful attempt. */
+        error: string
+        /**
+         * Complete summarizer output refused by summary acceptance — the only
+         * durable trace of a rejected checkpoint attempt, which never produces
+         * a `compaction/summary` event.
+         */
+        rawOutput?: ContentBlock[]
+      }
+    )
     /**
      * Shadow price of one model-free prune replacement — log-only, no
      * surfaceOp. The shared shadow-price protocol: a surface `replace` event
@@ -79,7 +105,7 @@ declare module '@shres-code/shres-code-session/types' {
      * be appended synchronously right after this event.
      */
     'compaction/prune': {
-      /** The replaced range's first and last surface-node seqs (a surface-position span, like {@link CompactionResult.shadowedRange}). */
+      /** The replaced range's first and last surface-node seqs, in surface order. */
       shadowedRange: { start: number; end: number }
       /** The seqs of all shadowed surface nodes, in surface order. */
       shadowedSeqs: number[]
@@ -104,11 +130,12 @@ export interface CompactionResult {
   /** The summary content blocks produced by the backend. */
   summary: ContentBlock[]
   /**
-   * The surface-boundary pair that was shadowed: the seqs of the first
-   * (`start`) and last (`end`) surface nodes of the replaced range. A
-   * surface-POSITION span, not a numeric seq interval — after a prior replace
-   * lands a fresh high-seq summary node at an older range's position, `start`
-   * can be GREATER than `end`. {@link CompactionResult.shadowedSeqs} is the
+   * Numeric interval bounding the shadowed seqs: `start` is the smallest and
+   * `end` the largest seq in {@link CompactionResult.shadowedSeqs}, so
+   * `start <= end` holds even after a prior replacement landed a fresh
+   * high-seq summary node at an older range's surface position. The
+   * replacement's surface-POSITION span — which can be seq-inverted — lives on
+   * the checkpoint `user/message`'s `surfaceOp`; `shadowedSeqs` remains the
    * authoritative set of shadowed nodes, in surface order.
    */
   shadowedRange: { start: number; end: number }

@@ -22,7 +22,7 @@ All three operations are **abstract** — the backend owns trigger policy, reten
 | `compactNow(agent, signal)` | Explicitly compact one useful balanced older span even below automatic pressure. It synchronously reserves idle turn admission before yielding, writes nothing when no useful span exists, records a standalone `compaction/* { turn: null }` attempt before summarization, and awaits its durability checkpoint before release. Expected operational failures use `ManualCompactionError`; cancellation rethrows the exact abort reason. |
 | `compactRegion(start, end, agent, signal?)` | Forcibly summarize surface nodes `[start, end]` (inclusive seqs) from `agent.session` into a single replacement node whose source comes from `compactCheckpointSource(compactionId)`. **Throws** if a compaction is already in progress, if `start`/`end` aren't surface nodes, or if `start` is positioned after `end` on the surface. The range is a SURFACE-POSITION span, not a numeric seq interval — after a prior replace lands a fresh high-seq summary node at the shadowed range's position, surface order no longer tracks seq order. |
 
-`CompactionResult` keeps the raw summary and bookkeeping-event seqs available to callers alongside the shadowed range and token accounting; its drift-checked shape lives in the [compaction data-structure reference](../../../docs/subsystems/compaction.md#compactionresult).
+`CompactionResult` keeps the raw summary and bookkeeping-event seqs available to callers alongside token accounting. `shadowedSeqs` preserves surface order; `shadowedRange` is the normalized numeric min/max interval, while the replacement `user/message.surfaceOp` keeps the positional first/last endpoints. Its drift-checked shape lives in the [compaction data-structure reference](../../../docs/subsystems/compaction.md#compactionresult).
 
 `compactIfNeeded` and `compactNow` take a required `signal`; `compactRegion`'s is optional. A backend that summarizes via `ctx.llm.stream()` **must** forward it into the call's `GenerateOptions.signal`, so an abort or fiber dispose tears down the in-flight summarization. Automatic and explicit-region brackets recover their numeric owner from the currently open turn. Manual brackets require no open turn and stamp `turn: null`.
 
@@ -40,7 +40,7 @@ The private per-session cache is keyed by `session.surface.replaceGeneration` an
 
 1. appends `compaction/start` (log-only) — acquires the lock,
 2. summarizes the range,
-3. appends `compaction/summary` (log-only) with the summary, range, shadowed seqs, token count, and provider/model call envelope,
+3. appends `compaction/summary` (log-only) with the summary, normalized numeric range, surface-ordered shadowed seqs, token count, and provider/model call envelope,
 4. appends a single `user/message` with `source: compactCheckpointSource(compactionId, sourceCommandId?)` and `surfaceOp: { op: 'replace', start, end }` carrying the summary — **the only surface mutation in this operation**,
 5. appends `compaction/end` (log-only) — releases the lock.
 
@@ -55,6 +55,8 @@ The marker pair names lock acquisition and release, not an exclusive event conta
 Compaction is serialized by one log-recorded lock shared by all entry points. Tail inspection independently finds the latest unmatched `compaction/start` and the newest `session/end-seed`. An unmatched start after that boundary is live and reports `busy`; an older unmatched start is stale evidence from a prior process lifecycle and does not block. The same end-seed transition clears the invariant companion's replay trace. A live bracket cannot cross a `turn/start` or `turn/end`; during adoption, repair boundaries in the inherited prefix remain replayable when the later end-seed proves their open bracket stale.
 
 The lock is the durable bracket, not a `WeakSet`, wrapper mutex, or client-side anchor. `compaction/start` is appended synchronously before summarization yields. Every later failure makes exactly one `compaction/end { error }` attempt; if that close append itself fails, the unmatched start remains the intentional busy signal and no flush is attempted. A successfully closed manual attempt is flushed even when it reports `changed` or `summary`, preserving the recorded attempt before turn admission is released.
+
+When a completed summarizer output is rejected before `compaction/summary`, the failed `compaction/end` also records that `rawOutput`. Failures before a complete output carry only `error`.
 
 ## Events
 

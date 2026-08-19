@@ -107,8 +107,15 @@ class OverflowRecoveryAdapter extends LlmAdapter {
       .join('') ?? ''
     if (trailing.includes('acting as a compaction engine')) {
       this.summaryRequests.push(options)
+      const summary = [
+        '## Primary Request and Intent',
+        '- Continue the seeded task while preserving its original instruction.',
+        '',
+        '## Current Work',
+        '- Resume from the compacted historical exchanges.',
+      ].join('\n')
       yield { type: 'block-start', index: 0, blockType: 'text' }
-      yield { type: 'block-end', index: 0, block: { type: 'text', text: 'RECOVERY CHECKPOINT' } }
+      yield { type: 'block-end', index: 0, block: { type: 'text', text: summary } }
       yield { type: 'finish', reason: { kind: 'stop' } }
       return
     }
@@ -348,8 +355,8 @@ describe('context-overflow recovery across the real loop and compaction-basic', 
         expect(instruction).toContain('numeric values, function signatures, and syntax fragments.')
         expect(JSON.stringify(adapter.conversationRequests[0]!.messages)).toContain('OLD HISTORY SENTINEL')
         const retry = JSON.stringify(adapter.conversationRequests[1]!.messages)
-        expect(retry).toContain('RECOVERY CHECKPOINT')
-        expect(retry).not.toContain('OLD HISTORY SENTINEL')
+        expect(retry).toContain('Resume from the compacted historical exchanges.')
+        expect(retry).toContain('OLD HISTORY SENTINEL')
 
         const events = [...agent.session.events]
         const stepStart = events.find(event =>

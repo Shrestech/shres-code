@@ -184,8 +184,22 @@ function validateCompactionEvent(
     if (open.summarized) fail('compaction/summary repeated within one compaction')
     const seqs = event.data.shadowedSeqs
     if (seqs.length === 0) fail('compaction/summary shadowedSeqs must be non-empty')
-    if (seqs[0] !== event.data.shadowedRange.start || seqs.at(-1) !== event.data.shadowedRange.end) {
-      fail('compaction/summary shadowedRange must match the first and last shadowedSeqs')
+    const range = event.data.shadowedRange
+    if (range.start > range.end) {
+      fail('compaction/summary shadowedRange start must not exceed end')
+    }
+    // shadowedSeqs was established non-empty above.
+    // oxlint-disable-next-line typescript/no-non-null-assertion
+    let min = seqs[0]!
+    let max = min
+    for (let index = 1; index < seqs.length; index += 1) {
+      // oxlint-disable-next-line typescript/no-non-null-assertion
+      const seq = seqs[index]!
+      if (seq < min) min = seq
+      if (seq > max) max = seq
+    }
+    if (min !== range.start || max !== range.end) {
+      fail('compaction/summary shadowedRange must be the min and max of shadowedSeqs')
     }
     if (!Number.isSafeInteger(event.data.shadowedTokenCount) || event.data.shadowedTokenCount < 0) {
       fail('compaction/summary shadowedTokenCount must be a non-negative safe integer')
@@ -211,6 +225,9 @@ function validateCompactionEvent(
     fail(`compaction/end owner ${String(event.data.turn)} does not match compaction/start owner ${String(open.turn)}`)
   }
   validateOwner(open.turn, trace.openTurn, event.type, fail)
+  if (event.data.rawOutput !== undefined && event.data.error === undefined) {
+    fail('successful compaction/end must not carry rawOutput')
+  }
   if (event.data.error === undefined && !open.summarized) {
     fail('successful compaction/end requires one compaction/summary')
   }

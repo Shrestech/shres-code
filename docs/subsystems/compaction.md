@@ -11,8 +11,8 @@ Compaction extends [`SessionEventMap`](session.md) with three event types via de
 | Event | Payload | Role |
 |---|---|---|
 | `compaction/start` | `{ turn }` | acquires the log-recorded lock; a number identifies the open automatic turn, while `null` identifies a standalone manual attempt |
-| `compaction/summary` | `{ summary, rawOutput?, llmStreamCall?, shadowedRange, shadowedSeqs, shadowedTokenCount, provider, model, maxTokens?, usage? }` | the safe summary projection, optional complete provider output and usage, an `llmStreamCall: true` marker when producing the result consumed exactly one call through this context's `ctx.llm.stream()` (which requires complete `rawOutput`), the shadowed surface-boundary pair (`start`/`end` seqs — a position span, not a numeric interval), the shadowed seqs in surface order, the estimated token count, and the summarize call's envelope (`provider`, `model`, plus its generation cap when one applied) — logged so the one-shot request is reconstructable from log + code (the reconstructability Agent Note); unmarked `rawOutput` does not identify the call path |
-| `compaction/end` | `{ turn, error? }` | releases the lock with the same numeric-or-null owner (`error` records an unsuccessful attempt) |
+| `compaction/summary` | `{ summary, rawOutput?, llmStreamCall?, shadowedRange, shadowedSeqs, shadowedTokenCount, provider, model, maxTokens?, usage? }` | the safe summary projection, optional complete provider output and usage, an `llmStreamCall: true` marker when producing the result consumed exactly one call through this context's `ctx.llm.stream()` (which requires complete `rawOutput`), the numeric min/max interval bounding the shadowed seqs, the shadowed seqs in surface order, the estimated token count, and the summarize call's envelope (`provider`, `model`, plus its generation cap when one applied) — logged so the one-shot request is reconstructable from log + code (the reconstructability Agent Note); unmarked `rawOutput` does not identify the call path |
+| `compaction/end` | `{ turn, error?, rawOutput? }` | releases the lock with the same numeric-or-null owner; a rejected completed summary may retain its raw output |
 
 The lock brackets the **whole** operation: `compaction/start` is appended first, then summarization, the `compaction/summary` record, and the `user/message` replacement all land, and only then `compaction/end`. Releasing the lock last turns a crash mid-operation into a detectable orphaned lock (a `compaction/start` with no matching `compaction/end`) rather than a `compaction/end` that falsely claims compaction finished.
 
@@ -40,11 +40,12 @@ interface CompactionResult {
   /** The summary content blocks produced by the backend. */
   summary: ContentBlock[]
   /**
-   * The surface-boundary pair that was shadowed: the seqs of the first
-   * (`start`) and last (`end`) surface nodes of the replaced range. A
-   * surface-POSITION span, not a numeric seq interval — after a prior replace
-   * lands a fresh high-seq summary node at an older range's position, `start`
-   * can be GREATER than `end`. {@link CompactionResult.shadowedSeqs} is the
+   * Numeric interval bounding the shadowed seqs: `start` is the smallest and
+   * `end` the largest seq in {@link CompactionResult.shadowedSeqs}, so
+   * `start <= end` holds even after a prior replacement landed a fresh
+   * high-seq summary node at an older range's surface position. The
+   * replacement's surface-POSITION span — which can be seq-inverted — lives on
+   * the checkpoint `user/message`'s `surfaceOp`; `shadowedSeqs` remains the
    * authoritative set of shadowed nodes, in surface order.
    */
   shadowedRange: { start: number; end: number }

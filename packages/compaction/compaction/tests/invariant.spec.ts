@@ -47,7 +47,24 @@ describe('compaction invariants', () => {
     const failed = ctx.sessions.create()
     startTurn(failed, 2)
     failed.append('compaction/start', { compactionId: TEST_COMPACTION_ID, turn: 2 })
-    failed.append('compaction/end', { compactionId: TEST_COMPACTION_ID, turn: 2, error: 'provider failed' })
+    failed.append('compaction/end', {
+      compactionId: TEST_COMPACTION_ID,
+      turn: 2,
+      error: 'provider failed',
+      rawOutput: [{ type: 'text', text: 'refused provider output' }],
+    })
+  })
+
+  it('accepts normalized summary bounds for seq-inverted surface order', async () => {
+    const ctx = await setup()
+    const session = ctx.sessions.create()
+    startTurn(session)
+    session.append('compaction/start', { compactionId: TEST_COMPACTION_ID, turn: 1 })
+    session.append('compaction/summary', summary({
+      shadowedRange: { start: 4, end: 9 },
+      shadowedSeqs: [9, 4],
+    }))
+    session.append('compaction/end', { compactionId: TEST_COMPACTION_ID, turn: 1 })
   })
 
   it('accepts standalone successful and failed compaction lifecycles between turns', async () => {
@@ -341,7 +358,11 @@ describe('compaction invariants', () => {
     ['wrong endpoints', (session: ReturnType<Context['sessions']['create']>) => {
       session.append('compaction/start', { compactionId: TEST_COMPACTION_ID, turn: 1 })
       session.append('compaction/summary', summary({ shadowedRange: { start: 1, end: 4 } }))
-    }, /shadowedRange must match/],
+    }, /shadowedRange must be the min and max/],
+    ['reversed normalized bounds', (session: ReturnType<Context['sessions']['create']>) => {
+      session.append('compaction/start', { compactionId: TEST_COMPACTION_ID, turn: 1 })
+      session.append('compaction/summary', summary({ shadowedRange: { start: 4, end: 2 } }))
+    }, /start must not exceed end/],
     ['invalid token count', (session: ReturnType<Context['sessions']['create']>) => {
       session.append('compaction/start', { compactionId: TEST_COMPACTION_ID, turn: 1 })
       session.append('compaction/summary', summary({ shadowedTokenCount: -1 }))
@@ -378,6 +399,15 @@ describe('compaction invariants', () => {
         error: 'failed',
       })
     }, /compaction\/end sourceCommandId must be a non-empty string/],
+    ['successful end with failed raw output', (session: ReturnType<Context['sessions']['create']>) => {
+      session.append('compaction/start', { compactionId: TEST_COMPACTION_ID, turn: 1 })
+      session.append('compaction/summary', summary())
+      session.append('compaction/end', {
+        compactionId: TEST_COMPACTION_ID,
+        turn: 1,
+        rawOutput: [{ type: 'text', text: 'not a failed attempt' }],
+      } as never)
+    }, /successful compaction\/end must not carry rawOutput/],
     ['success without summary', (session: ReturnType<Context['sessions']['create']>) => {
       session.append('compaction/start', { compactionId: TEST_COMPACTION_ID, turn: 1 })
       session.append('compaction/end', { compactionId: TEST_COMPACTION_ID, turn: 1 })
