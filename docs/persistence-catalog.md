@@ -287,12 +287,34 @@ Source: [`packages/interaction/commands/src/types.ts:88`](../packages/interactio
 ```ts persistence-catalog
 /**
  * Marks the end of a compaction — log-only, releases the lock. Its owner
- * matches `compaction/start`; `error` records an unsuccessful attempt.
+ * matches `compaction/start`.
  */
-'compaction/end': { compactionId: CompactionId; sourceCommandId?: CommandId; turn: number | null; error?: string }
+'compaction/end': {
+  compactionId: CompactionId
+  sourceCommandId?: CommandId
+  turn: number | null
+} & (
+  | {
+    /** Successful close after one `compaction/summary`. */
+    error?: never
+    rawOutput?: never
+  }
+  | {
+    /** Error chain of an unsuccessful attempt. */
+    error: string
+    /**
+     * Complete summarizer output refused by summary acceptance — the only
+     * durable trace of a rejected checkpoint attempt, which never produces
+     * a `compaction/summary` event.
+     */
+    rawOutput?: ContentBlock[]
+  }
+)
 ```
 
-Source: [`packages/compaction/compaction/src/types.ts:71`](../packages/compaction/compaction/src/types.ts)
+Types: [ContentBlock](subsystems/core.md)
+
+Source: [`packages/compaction/compaction/src/types.ts:77`](../packages/compaction/compaction/src/types.ts)
 
 <a id="compactionprune--log-only"></a>
 
@@ -309,7 +331,7 @@ Source: [`packages/compaction/compaction/src/types.ts:71`](../packages/compactio
  * be appended synchronously right after this event.
  */
 'compaction/prune': {
-  /** The replaced range's first and last surface-node seqs (a surface-position span, like {@link CompactionResult.shadowedRange}). */
+  /** The replaced range's first and last surface-node seqs, in surface order. */
   shadowedRange: { start: number; end: number }
   /** The seqs of all shadowed surface nodes, in surface order. */
   shadowedSeqs: number[]
@@ -318,7 +340,7 @@ Source: [`packages/compaction/compaction/src/types.ts:71`](../packages/compactio
 }
 ```
 
-Source: [`packages/compaction/compaction/src/types.ts:81`](../packages/compaction/compaction/src/types.ts)
+Source: [`packages/compaction/compaction/src/types.ts:107`](../packages/compaction/compaction/src/types.ts)
 
 <a id="compactionstart--log-only"></a>
 
@@ -353,6 +375,12 @@ Source: [`packages/compaction/compaction/src/types.ts:23`](../packages/compactio
   compactionId: CompactionId
   sourceCommandId?: CommandId
   summary: ContentBlock[]
+  /**
+   * Numeric interval bounding the shadowed seqs: `start` is the smallest
+   * and `end` the largest of `shadowedSeqs`, so `start <= end` holds even
+   * when a prior replacement inverted the surface positions' seq order
+   * (see {@link CompactionResult.shadowedRange}).
+   */
   shadowedRange: { start: number; end: number }
   shadowedSeqs: number[]
   shadowedTokenCount: number

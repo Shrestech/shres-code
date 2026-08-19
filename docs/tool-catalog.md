@@ -37,7 +37,7 @@ This table connects model-visible tool names to the plugin package and service s
 | `@shres-code/shres-code-tool-subagent-report` | `report` | `ctx.subagents`, `ctx.systemPrompt`, `a live continuable in-process child Agent` | `tool/call`, `tool/result`, `a user-role message in the direct parent session` | - | Registered per continuable in-process child rather than globally, so this schema is visible only inside such a child and survives its global `toolFilter`. The same contribution installs the child-scoped `tool:report` prompt section, which this catalog does not render. The parent-facing `send_message` tool is installed independently. |
 | `@shres-code/shres-code-tool-jobs` | `job_kill`, `job_list`, `job_output` | `ctx.tools`, `ctx.jobs`, `ctx.systemPrompt` | `tool/call`, `tool/result`, `user/message via agent.inject() for background completion notices` | - | The kind-agnostic background-job controller: background bash commands, PTY sends, and subagents are read, listed, and killed through the same three tools. Loading the plugin attaches the controller that arms producers' `ctx.jobs.start()`. |
 | `@shres-code/shres-code-tool-todo` | `todo_write` | `ctx.tools`, `owning Agent session` | `tool/call`, `todo/write`, `tool/result` | - | todo_write is session-owned state; UIs render the latest todo/write event as a checklist. `allowParallelInProgress` is required with no default, so the catalog states its choice: `true`, whose description invites several `in_progress` items. A deployment choosing `false` receives the same tool with a description asking for exactly one active task. |
-| `@shres-code/shres-code-tool-jspace` | `jspace_checkpoint`, `jspace_note`, `jspace_open`, `jspace_ship` | `ctx.tools`, `ctx.jspace`, `owning Agent session` | `tool/call`, `jspace/card or jspace/closed`, `tool/result` | - | Schemas are registered only while Settings `enabled` is true. `jspace_ship` is a register check, not a file writer. Checkpoint `evidence` must name a completed, non-error tool-call id and does not prove coverage. |
+| `@shres-code/shres-code-tool-jspace` | `jspace_checkpoint`, `jspace_note`, `jspace_open`, `jspace_ship` | `ctx.tools`, `ctx.jspace`, `owning Agent session` | `tool/call`, `jspace/card or jspace/closed`, `tool/result` | - | Schemas are registered only while Settings `enabled` is true. `jspace_ship` closes the card after its register check and is not a file writer. Checkpoint `evidence` must name a successful non-J-Space tool call for the current Goal and does not prove semantic coverage. |
 | `@shres-code/shres-code-tool-workflow` | `workflow` | `ctx.tools`, `ctx.workflowEngine`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents the script children)` | `tool/call`, `tool/result` | - | - |
 | `@shres-code/shres-code-tool-web` | `web_fetch`, `web_search` | `ctx.tools`, `ctx.web`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | web_search and web_fetch keep provider selection behind ctx.web so model-visible schemas stay stable across backend swaps. |
 
@@ -1736,7 +1736,7 @@ todo_write is session-owned state; UIs render the latest todo/write event as a c
 
 ### `jspace_checkpoint`
 
-Record a Checked line on the open card. `by` must name a verifier and what it covered. Optional `evidence` is a prior tool-call id that must have completed without error in this session; naming it does not prove coverage. Rejects if no card is open.
+Record a Checked line on the open card. `by` names the verifier and coverage; `evidence` is the successful non-J-Space tool-call id that performed the check. The call id raises fabrication cost but does not prove semantic coverage. Rejects if no card is open.
 
 ```json
 {
@@ -1752,7 +1752,7 @@ Record a Checked line on the open card. `by` must name a verifier and what it co
     },
     "evidence": {
       "type": "string",
-      "description": "Completed non-error tool-call id. Naming it does not prove coverage."
+      "description": "Successful non-J-Space tool-call id that performed the check. Does not prove semantic coverage."
     }
   },
   "required": [
@@ -1766,7 +1766,7 @@ Source: [`packages/jspace/tool-jspace/src/index.ts`](../packages/jspace/tool-jsp
 
 ### `jspace_note`
 
-Update the open J-Space card. Changing Core requires both departing (the item leaving) and core (the item entering). Rejects if no card is open.
+Update the open J-Space card. Core replaces the whole live list: the current intermediate and at most one pinned constraint. Rejects if no card is open.
 
 ```json
 {
@@ -1776,13 +1776,12 @@ Update the open J-Space card. Changing Core requires both departing (the item le
       "type": "string",
       "description": "Replacement Goal line."
     },
-    "departing": {
-      "type": "string",
-      "description": "Core item leaving; required when `core` is set."
-    },
     "core": {
-      "type": "string",
-      "description": "Core item entering; required when `departing` is set."
+      "type": "array",
+      "description": "Replacement live list: current intermediate, then optional pinned constraint; at most two.",
+      "items": {
+        "type": "string"
+      }
     },
     "open": {
       "type": "array",
@@ -1817,7 +1816,7 @@ Source: [`packages/jspace/tool-jspace/src/index.ts`](../packages/jspace/tool-jsp
 
 ### `jspace_open`
 
-Open a J-Space card for this session, or replace Goal and Next when a card is already open. Use it for multi-stage or multi-file work. Requires a Goal (what done means) and Next (the single next action). Optional Core holds at most two live items and applies only on the first open.
+Open a J-Space card for this session, or replace Goal and Next when a card is already open. Use it for multi-stage or multi-file work. Requires a Goal (what done means) and Next (the single next action). Optional Core replaces the current intermediate and pinned constraint, at most two.
 
 ```json
 {
@@ -1850,7 +1849,7 @@ Source: [`packages/jspace/tool-jspace/src/index.ts`](../packages/jspace/tool-jsp
 
 ### `jspace_ship`
 
-Check that the open card is ready to ship: Goal and Next are set, and a checkpoint exists for the current Goal. Does not write files and does not close the card. Optional `path` is recorded in the result only.
+Check that the open card is ready to ship: Goal and Next are set, and an evidence-backed checkpoint exists for the current Goal. A successful check closes the card. Does not write files. Optional `path` is recorded in the result only.
 
 ```json
 {
@@ -1866,7 +1865,7 @@ Check that the open card is ready to ship: Goal and Next are set, and a checkpoi
 
 Source: [`packages/jspace/tool-jspace/src/index.ts`](../packages/jspace/tool-jspace/src/index.ts)
 
-Schemas are registered only while Settings `enabled` is true. `jspace_ship` is a register check, not a file writer. Checkpoint `evidence` must name a completed, non-error tool-call id and does not prove coverage.
+Schemas are registered only while Settings `enabled` is true. `jspace_ship` closes the card after its register check and is not a file writer. Checkpoint `evidence` must name a successful non-J-Space tool call for the current Goal and does not prove semantic coverage.
 
 <a id="shres-codeshres-code-tool-workflow"></a>
 

@@ -97,6 +97,22 @@ const GROUP_ORDER = [
 
 const SERVICE_ROLES: ServiceRole[] = [
   {
+    key: 'jspace',
+    pkg: 'jspace',
+    title: 'Durable J-Space ledger',
+    mode: 'core',
+    consumers: ['jspace-prompt', 'tool-jspace', 'command-jspace'],
+    note: 'Owns Settings activation and the event-sourced card; prompt, tool, command, and client packages consume its folded state.',
+  },
+  {
+    key: 'shield',
+    pkg: 'shield',
+    title: 'Shres Shield host seat',
+    mode: 'core',
+    consumers: ['ui-settings-shield'],
+    note: 'Owns optional external screening-engine activation and serves last-known status to configuration surfaces.',
+  },
+  {
     key: 'attachments',
     pkg: 'attachment',
     title: 'Durable binary attachment storage',

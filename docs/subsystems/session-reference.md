@@ -102,5 +102,5 @@ async prepare( agent: Agent, content: ContentBlock[], references: SessionReferen
 
 Types: [Agent](core.md) · [ContentBlock](llm-streaming.md)
 
-Source: [`packages/context/session-reference/src/index.ts:70`](../../packages/context/session-reference/src/index.ts)
+Source: [`packages/context/session-reference/src/index.ts:64`](../../packages/context/session-reference/src/index.ts)
 <!-- END GENERATED cordis-surface -->
