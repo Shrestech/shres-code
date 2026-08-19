@@ -1346,6 +1346,91 @@
       "source": "packages/web/web/src/types.ts"
     },
     {
+      "doc": "docs/subsystems/speech.md",
+      "symbol": "SpeechUserSettings",
+      "source": "packages/speech/speech/src/settings.ts"
+    },
+    {
+      "doc": "docs/subsystems/speech.md",
+      "symbol": "SpeechVoice",
+      "source": "packages/speech/speech/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/speech.md",
+      "symbol": "SpeechSynthesizeRequest",
+      "source": "packages/speech/speech/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/speech.md",
+      "symbol": "SpeechSynthesizeResult",
+      "source": "packages/speech/speech/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/speech.md",
+      "symbol": "SpeechTranscribeRequest",
+      "source": "packages/speech/speech/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/speech.md",
+      "symbol": "SpeechTranscribeResult",
+      "source": "packages/speech/speech/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/speech.md",
+      "symbol": "SpeechTtsProvider",
+      "source": "packages/speech/speech/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/speech.md",
+      "symbol": "SpeechSttProvider",
+      "source": "packages/speech/speech/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/speech.md",
+      "symbol": "SpeechCapabilityStatus",
+      "source": "packages/speech/speech/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/speech.md",
+      "symbol": "SpeechStatus",
+      "source": "packages/speech/speech/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/speech.md",
+      "symbol": "SpeechSynthesizeAudioValue",
+      "source": "packages/speech/speech/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/speech.md",
+      "symbol": "SpeechSynthesizeEmptyValue",
+      "source": "packages/speech/speech/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/speech.md",
+      "symbol": "SpeechWireFailure",
+      "source": "packages/speech/speech/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/speech.md",
+      "symbol": "SpeechSynthesizeWireRequest",
+      "source": "packages/speech/speech/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/speech.md",
+      "symbol": "SpeechSynthesizeWireResult",
+      "source": "packages/speech/speech/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/speech.md",
+      "symbol": "SpeechTranscribeWireRequest",
+      "source": "packages/speech/speech/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/speech.md",
+      "symbol": "SpeechTranscribeWireResult",
+      "source": "packages/speech/speech/src/types.ts"
+    },
+    {
       "doc": "docs/subsystems/spill.md",
       "symbol": "SaveTextSpill",
       "source": "packages/spill/spill/src/types.ts"

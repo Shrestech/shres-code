@@ -258,6 +258,7 @@ const subsystemGroups = [
     ['lsp.md', 'LSP navigation'],
     ['code-runtime.md', 'Code runtime'],
     ['web.md', 'Web access'],
+    ['speech.md', 'Speech I/O'],
     ['skills.md', 'Skills'],
     ['workflow.md', 'Workflows'],
     ['subagent.md', 'Subagents'],

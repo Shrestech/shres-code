@@ -338,6 +338,8 @@ export interface TurnTailOwnerProps {
 export interface AssistantActionOwnerProps {
   /** Stable identity carried from the `assistant/message` event. */
   messageId: MessageId
+  /** Visible assistant prose for presentation actions such as read-aloud. */
+  text?: string
 }
 
 /** Hook constrained to business data published on the current Chat Node's Turn. */

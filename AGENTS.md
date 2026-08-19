@@ -23,6 +23,7 @@ packages/    @shres-code/shres-code-<pkg> workspaces at packages/<group>/<pkg>/
   lsp/         language-server capability
   skill/       skill provider registry + local impl + catalog/loader tool
   web/         web capability: Service Definition + search/fetch providers + tool Consumer
+  speech/      local Kokoro TTS, Whisper STT, Web mic/speaker
   compaction/     compaction capability + basic provider
   context/     request-context plugins
   subagent/    subagent capability: Service Definition + providers + delegation Consumers

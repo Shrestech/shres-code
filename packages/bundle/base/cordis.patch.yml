@@ -504,6 +504,22 @@
         fetch: false
         searchTimeoutMs: 60000
 
+    - id: speech
+      name: '@shres-code/shres-code-speech'
+      config:
+        maxAudioBytes: 10485760
+        maxTextChars: 15000
+        ttsProviders:
+          - kokoro-tts
+        sttProviders:
+          - whisper-tiny-en
+
+    - id: speech-kokoro
+      name: '@shres-code/shres-code-speech-kokoro'
+
+    - id: speech-whisper
+      name: '@shres-code/shres-code-speech-whisper'
+
     # ── rows every mode mounts, whose values each overlay may state ──────────────
 
     # The tool registry. Presentation mode is a deployment choice; omitting it here

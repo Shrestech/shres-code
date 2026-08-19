@@ -117,6 +117,7 @@ New behavior attaches to a documented extension point. Changing the loop itself 
 | Intercept a request, tool, or turn | use its `agent/*` or `tools/*` event; `agent/turn-stopping` stops a turn |
 | Add model-facing context | call `agent.inject()`; it lands in the next admitted request |
 | Add UI or editor integration | drive `ctx.agents` and render from `session/event` |
+| Add speech I/O (mic, read-aloud) | register on `ctx.speech` (local Kokoro TTS, Whisper tiny.en STT); the Web client records and plays; do not add audio content blocks |
 | Add a Web Client Chat node | register a `ConversationNodeDefinition` + keyed renderer |
 | Add durable session state | extend `SessionEventMap`; render and replay from the log |
 | Generate session titles | register the sole `ctx.sessionTitle` provider |

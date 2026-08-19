@@ -121,6 +121,7 @@ Every product feature maps to a listener on a documented extension point — the
 | Memory | section provider + tool |
 | Scheduled tasks (cron) | a plugin registers model-callable scheduling tools; timer fires → `followup(…, {source: {kind: 'cron', …}})` when idle / `inject()` notification when busy |
 | UI (GUI; CLI emits JSONL) | listen `session/event` (assistant chunks, boundaries, tool activity); input → `followup()` |
+| Speech I/O (mic, read-aloud) | `ctx.speech` local Kokoro TTS + Whisper tiny.en + a Web client on `conversation.input.right` / `conversation.chat.assistant-actions`; transcripts are ordinary prompt text |
 | Web Client Chat business node | register a `ConversationNodeDefinition` and `conversation.chat.node` keyed renderer |
 | SessionTelemetryBackend / replayable trace | `session/event` → JSONL; replay = `sessions.create(id, { seed })` |
 | Model adapters | `LlmAdapter` subclass via `registerAdapter` (`shres-llm-deepseek`, `shres-llm-pi-ai`) |
