@@ -10,7 +10,7 @@ import type {
   SpeechTranscribeRequest,
   SpeechTranscribeResult,
 } from '@shres-code/shres-code-speech'
-import { decodePcm16Wav } from './wav.ts'
+import { decodePcm16Wav, prepareWhisperSamples, stripWhisperTranscript } from './wav.ts'
 
 /** Stable STT id this provider registers under. */
 export const WHISPER_STT_PROVIDER_ID = 'whisper-tiny-en'
@@ -23,9 +23,9 @@ export interface WhisperAsrResult {
   readonly text?: string
 }
 
-/** Minimal ASR face; tests inject a fake. */
+/** Minimal ASR face; tests inject a fake. Transformers 3.8 takes a Float32Array, not a `{ raw }` object. */
 export interface WhisperEngine {
-  (audio: { raw: Float32Array; sampling_rate: number }): Promise<WhisperAsrResult>
+  (audio: Float32Array): Promise<WhisperAsrResult>
 }
 
 /** Options for {@link WhisperLoader}. */
@@ -157,16 +157,17 @@ export class WhisperSttProvider implements SpeechSttProvider {
       )
     }
     const wav = decodePcm16Wav(request.audio)
+    const samples = prepareWhisperSamples(wav.samples, wav.sampleRate)
+    if (samples.length === 0) return { text: '' }
     const options = this.options()
     const engine = await this.ensureEngine(options, signal)
     let result: WhisperAsrResult
     try {
-      result = await engine({ raw: wav.samples, sampling_rate: wav.sampleRate })
+      result = await engine(samples)
     } catch (error) {
       throw new SpeechError('Whisper transcribe failed', 'SPEECH_PROVIDER_ERROR', { cause: error })
     }
-    const text = result.text?.trim() ?? ''
-    return { text }
+    return { text: stripWhisperTranscript(result.text ?? '') }
   }
 
   private ensureEngine(options: WhisperSttOptions, signal?: AbortSignal): Promise<WhisperEngine> {

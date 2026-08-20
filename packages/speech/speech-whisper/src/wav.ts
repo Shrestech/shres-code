@@ -5,10 +5,94 @@
 
 import { SpeechError } from '@shres-code/shres-code-speech'
 
+/** Whisper tiny.en feature-extractor rate. Transformers 3.8 does not resample a Float32Array. */
+export const WHISPER_SAMPLE_RATE = 16_000
+
+/** Pad to at least one second so a short mic tap is not classified as no-speech. */
+export const WHISPER_MIN_SAMPLES = WHISPER_SAMPLE_RATE
+
+/** Peak below this is treated as silence. */
+export const WHISPER_SILENCE_PEAK = 1e-4
+
+/** Target peak after gain so a quiet mic still crosses Whisper's no-speech gate. */
+export const WHISPER_TARGET_PEAK = 0.8
+
+const BLANK_TRANSCRIPT = /^(?:\[(?:BLANK_AUDIO|silence|inaudible)\]|blank audio)$/iu
+
 /** Samples plus the WAV sample rate. */
 export interface PcmWav {
   readonly samples: Float32Array
   readonly sampleRate: number
+}
+
+/**
+ * Linearly resample PCM to `toRate`. Identity when the rates already match.
+ * @param samples - mono float samples.
+ * @param fromRate - source sample rate in Hz.
+ * @param toRate - target sample rate in Hz.
+ * @returns samples at `toRate`.
+ */
+export function resampleLinear(samples: Float32Array, fromRate: number, toRate: number): Float32Array {
+  if (fromRate <= 0 || toRate <= 0 || !Number.isFinite(fromRate) || !Number.isFinite(toRate)) {
+    throw new SpeechError('WAV sample rate is not a positive finite Hz value', 'SPEECH_UNSUPPORTED_MEDIA')
+  }
+  if (samples.length === 0 || fromRate === toRate) return samples
+  const ratio = fromRate / toRate
+  const out = new Float32Array(Math.max(1, Math.round(samples.length / ratio)))
+  const last = samples.length - 1
+  for (let i = 0; i < out.length; i++) {
+    const src = i * ratio
+    const i0 = Math.min(Math.floor(src), last)
+    const i1 = Math.min(i0 + 1, last)
+    const frac = src - i0
+    const a = samples[i0] ?? 0
+    const b = samples[i1] ?? 0
+    out[i] = a + (b - a) * frac
+  }
+  return out
+}
+
+/**
+ * Peak of absolute samples.
+ * @param samples - mono float PCM.
+ * @returns max |sample|.
+ */
+export function peakAmplitude(samples: Float32Array): number {
+  let peak = 0
+  for (const sample of samples) {
+    const magnitude = Math.abs(sample)
+    if (magnitude > peak) peak = magnitude
+  }
+  return peak
+}
+
+/**
+ * Resample to 16 kHz, raise a quiet clip to {@link WHISPER_TARGET_PEAK}, and
+ * pad to {@link WHISPER_MIN_SAMPLES}. Empty when the source is silence.
+ * @param samples - mono float PCM at `fromRate`.
+ * @param fromRate - source sample rate in Hz.
+ * @returns 16 kHz samples, or an empty buffer when there is no speech energy.
+ */
+export function prepareWhisperSamples(samples: Float32Array, fromRate: number): Float32Array {
+  const resampled = resampleLinear(samples, fromRate, WHISPER_SAMPLE_RATE)
+  const peak = peakAmplitude(resampled)
+  if (resampled.length === 0 || peak < WHISPER_SILENCE_PEAK) return new Float32Array(0)
+  const gain = peak < WHISPER_TARGET_PEAK ? WHISPER_TARGET_PEAK / peak : 1
+  const length = Math.max(resampled.length, WHISPER_MIN_SAMPLES)
+  const out = new Float32Array(length)
+  if (gain === 1 && resampled.length === length) return resampled
+  for (let i = 0; i < resampled.length; i++) out[i] = (resampled[i] ?? 0) * gain
+  return out
+}
+
+/**
+ * Drop Whisper's no-speech tokens so they never reach the composer.
+ * @param text - raw pipeline transcript.
+ * @returns trimmed speech, or empty when the model reported silence.
+ */
+export function stripWhisperTranscript(text: string): string {
+  const trimmed = text.trim()
+  return BLANK_TRANSCRIPT.test(trimmed) ? '' : trimmed
 }
 
 /**

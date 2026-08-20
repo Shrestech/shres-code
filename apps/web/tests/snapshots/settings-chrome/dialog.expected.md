@@ -49,3 +49,9 @@
   - button "Queue":
     - text: Queue
     - img
+  - text: Read-aloud voice Kokoro voice used for read-aloud. Twenty-eight US and UK voices.
+  - button "Heart":
+    - text: Heart
+    - img
+  - text: Send after dictation Submit the transcribed draft immediately instead of leaving it in the composer.
+  - button "Off"
