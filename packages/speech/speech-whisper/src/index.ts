@@ -27,7 +27,17 @@ export {
 export type {
   WhisperAsrResult, WhisperEngine, WhisperLoadRequest, WhisperLoader, WhisperSttOptions,
 } from './provider.ts'
-export { decodePcm16Wav } from './wav.ts'
+export {
+  decodePcm16Wav,
+  peakAmplitude,
+  prepareWhisperSamples,
+  resampleLinear,
+  stripWhisperTranscript,
+  WHISPER_MIN_SAMPLES,
+  WHISPER_SAMPLE_RATE,
+  WHISPER_SILENCE_PEAK,
+  WHISPER_TARGET_PEAK,
+} from './wav.ts'
 export type { PcmWav } from './wav.ts'
 
 /** Cordis plugin name used by loader diagnostics. */

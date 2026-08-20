@@ -569,6 +569,58 @@ describe('MicButton', () => {
     vi.unstubAllGlobals()
   })
 
+  it('does not put an empty transcript in the draft', async () => {
+    class FakeRecorder {
+      mimeType = 'audio/webm'
+      ondataavailable: ((event: { data: Blob }) => void) | null = null
+      onstop: (() => void) | null = null
+      start = vi.fn()
+      stop = vi.fn(() => { this.onstop?.() })
+    }
+    class FakeAudioContext {
+      decodeAudioData = vi.fn(async () => ({
+        numberOfChannels: 1,
+        length: 1,
+        sampleRate: 16_000,
+        getChannelData: () => new Float32Array([0.2]),
+      }))
+      close = vi.fn(async () => undefined)
+    }
+    vi.stubGlobal('MediaRecorder', FakeRecorder)
+    vi.stubGlobal('AudioContext', FakeAudioContext)
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getUserMedia: vi.fn(async () => ({ getTracks: () => [{ stop: vi.fn() }] })) },
+    })
+    const host = stubSettingsScope<SpeechUserSettings>()
+    host.publish({ status: 'ready', value: DEFAULT_SPEECH_USER_SETTINGS, writable: true })
+    const status = createSnapshotStore<SpeechClientStatus>({
+      ...INITIAL_SPEECH_CLIENT_STATUS,
+      sttReady: true,
+    })
+    const setDraft = vi.fn()
+    const transcribe = vi.fn(() => Promise.resolve({
+      ok: true as const,
+      value: { ok: true as const, value: { text: '' } },
+    }))
+    const speech = { status: vi.fn(), synthesize: vi.fn(), transcribe } as unknown as SpeechRemote
+    const ui = renderLoose(MicButton, {
+      session: {},
+      input: {},
+      inputActions: { setDraft, submit: vi.fn() },
+      useSpeechSettings: hookOf(host.scope),
+      useSpeechStatus: hookOf(status),
+      speech,
+      t,
+    })
+    fireEvent.click(ui.getByLabelText(en['mic.idle']))
+    await waitFor(() => { expect(ui.getByLabelText(en['mic.recording'])).toBeTruthy() })
+    fireEvent.click(ui.getByLabelText(en['mic.recording']))
+    await waitFor(() => { expect(ui.getByLabelText(en['mic.idle'])).toBeTruthy() })
+    expect(setDraft).not.toHaveBeenCalled()
+    vi.unstubAllGlobals()
+  })
+
   it('stops an open recorder on unmount', async () => {
     class FakeRecorder {
       state = 'recording'

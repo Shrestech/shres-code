@@ -25,7 +25,7 @@ export type MicButtonProps =
   & PropsLocale<'speech'>
 
 type MicPhase = 'idle' | 'recording' | 'transcribing'
-type MicError = 'permission' | 'failed'
+type MicError = 'permission' | 'failed' | 'blank'
 
 /**
  * Composer microphone: record, decode to WAV, transcribe, fill the draft.
@@ -64,7 +64,10 @@ export function MicButton({
     setPhase('transcribing')
     let context: AudioContext | undefined
     try {
-      context = new AudioContext()
+      context = new AudioContext({ sampleRate: 16_000 })
+      if (typeof context.resume === 'function' && context.state === 'suspended') {
+        await context.resume()
+      }
       const decoded = await context.decodeAudioData(await blob.arrayBuffer())
       const wav = audioBufferToWav(decoded)
       const result = await speech.transcribe({
@@ -80,7 +83,11 @@ export function MicButton({
         setError('failed')
         return
       }
-      const text = inner.value.text
+      const text = inner.value.text.trim()
+      if (text === '') {
+        setError('blank')
+        return
+      }
       inputActions?.setDraft(text)
       if (settings !== undefined && settings.autoSubmitVoice && inputActions !== undefined) {
         inputActions.submit()
@@ -136,7 +143,7 @@ export function MicButton({
     }
     try {
       recorder.current = media
-      media.start()
+      media.start(100)
       setPhase('recording')
     } catch {
       releaseStream()
@@ -155,7 +162,9 @@ export function MicButton({
       ? t('mic.permission')
       : error === 'failed'
         ? t('mic.failed')
-        : label
+        : error === 'blank'
+          ? t('mic.blank')
+          : label
 
   return (
     <Tooltip label={tooltip} side="top">

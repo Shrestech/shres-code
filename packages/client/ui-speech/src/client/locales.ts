@@ -8,6 +8,7 @@ export const en = {
   'mic.unavailable': 'Speech-to-text is unavailable',
   'mic.permission': 'Microphone permission denied',
   'mic.failed': 'Could not transcribe this recording',
+  'mic.blank': 'No speech detected. Speak closer to the mic and try again.',
   'speak.play': 'Read aloud',
   'speak.stop': 'Stop reading',
   'speak.loading': 'Preparing audio',

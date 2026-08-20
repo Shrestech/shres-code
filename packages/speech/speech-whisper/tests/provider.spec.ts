@@ -7,8 +7,14 @@ import { mkdtemp, writeFile, rm } from 'node:fs/promises'
 import {
   cacheIsWarm,
   decodePcm16Wav,
+  prepareWhisperSamples,
+  resampleLinear,
   resolveOptions,
+  stripWhisperTranscript,
+  WHISPER_MIN_SAMPLES,
+  WHISPER_SAMPLE_RATE,
   WHISPER_STT_PROVIDER_ID,
+  WHISPER_TARGET_PEAK,
   WhisperSttProvider,
 } from '../src/index.ts'
 import * as plugin from '../src/index.ts'
@@ -176,6 +182,54 @@ describe('cacheIsWarm', () => {
   })
 })
 
+describe('resampleLinear', () => {
+  it('returns the same buffer when the rates match', () => {
+    const pcm = new Float32Array([0, 0.5, -0.5])
+    expect(resampleLinear(pcm, 16_000, WHISPER_SAMPLE_RATE)).toBe(pcm)
+  })
+
+  it('returns an empty buffer unchanged', () => {
+    const pcm = new Float32Array(0)
+    expect(resampleLinear(pcm, 8_000, WHISPER_SAMPLE_RATE)).toBe(pcm)
+  })
+
+  it('doubles length from 8 kHz to 16 kHz', () => {
+    const pcm = new Float32Array([0, 1])
+    const out = resampleLinear(pcm, 8_000, WHISPER_SAMPLE_RATE)
+    expect(out).toHaveLength(4)
+    expect(out[0]).toBeCloseTo(0)
+    expect(out[out.length - 1]).toBeCloseTo(1)
+  })
+
+  it('rejects a non-positive sample rate', () => {
+    expect(() => resampleLinear(new Float32Array([0]), 0, WHISPER_SAMPLE_RATE)).toThrow(
+      expect.objectContaining({ code: 'SPEECH_UNSUPPORTED_MEDIA' }),
+    )
+    expect(() => resampleLinear(new Float32Array([0]), 16_000, Number.NaN)).toThrow(
+      expect.objectContaining({ code: 'SPEECH_UNSUPPORTED_MEDIA' }),
+    )
+  })
+})
+
+describe('prepareWhisperSamples', () => {
+  it('returns empty for a silent buffer', () => {
+    expect(prepareWhisperSamples(new Float32Array(32), 16_000)).toHaveLength(0)
+  })
+
+  it('raises a quiet clip and pads to one second', () => {
+    const out = prepareWhisperSamples(new Float32Array([0.1, -0.1]), 16_000)
+    expect(out).toHaveLength(WHISPER_MIN_SAMPLES)
+    expect(Math.max(...out)).toBeCloseTo(WHISPER_TARGET_PEAK)
+  })
+})
+
+describe('stripWhisperTranscript', () => {
+  it('drops the no-speech token', () => {
+    expect(stripWhisperTranscript(' [BLANK_AUDIO] ')).toBe('')
+    expect(stripWhisperTranscript('hello')).toBe('hello')
+  })
+})
+
 describe('WhisperSttProvider', () => {
   it('is unavailable when downloads are forbidden and the cache is cold', () => {
     const provider = new WhisperSttProvider(() => resolveOptions({
@@ -197,6 +251,38 @@ describe('WhisperSttProvider', () => {
     await expect(provider.transcribe({ audio: wav, mediaType: 'audio/wav' })).resolves.toEqual({
       text: 'hello pnpm',
     })
+  })
+
+  it('returns empty text without loading when the WAV is silent', async () => {
+    let loads = 0
+    const load: WhisperLoader = () => {
+      loads += 1
+      return Promise.resolve(async () => ({ text: 'nope' }))
+    }
+    const provider = new WhisperSttProvider(() => resolveOptions({ allowDownload: true }, load))
+    const silence = encodePcm16Wav(new Float32Array(32), 16_000)
+    await expect(provider.transcribe({ audio: silence, mediaType: 'audio/wav' })).resolves.toEqual({ text: '' })
+    expect(loads).toBe(0)
+  })
+
+  it('strips [BLANK_AUDIO] from the engine transcript', async () => {
+    const load: WhisperLoader = () => Promise.resolve(async () => ({ text: ' [BLANK_AUDIO] ' }))
+    const provider = new WhisperSttProvider(() => resolveOptions({ allowDownload: true }, load))
+    await expect(provider.transcribe({ audio: wav, mediaType: 'audio/wav' })).resolves.toEqual({ text: '' })
+  })
+
+  it('passes a 16 kHz Float32Array to the engine, not a raw/sampling_rate object', async () => {
+    const seen: unknown[] = []
+    const load: WhisperLoader = () => Promise.resolve(async (audio) => {
+      seen.push(audio)
+      return { text: 'ok' }
+    })
+    const provider = new WhisperSttProvider(() => resolveOptions({ allowDownload: true }, load))
+    const high = encodePcm16Wav(new Float32Array([0.5, 1, 0.5, 1]), 48_000)
+    await provider.transcribe({ audio: high, mediaType: 'audio/wav' })
+    expect(seen).toHaveLength(1)
+    expect(seen[0]).toBeInstanceOf(Float32Array)
+    expect((seen[0] as Float32Array).length).toBeGreaterThan(0)
   })
 
   it('rejects webm', async () => {

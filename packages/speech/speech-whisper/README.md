@@ -4,7 +4,7 @@ A local [Whisper tiny.en](https://huggingface.co/Xenova/whisper-tiny.en) STT pro
 
 Weights download once into the harness model cache (`~/.shres/models/speech/whisper` unless `cacheDir` is set). Later transcribes are offline. Tests inject a fake engine so CI never downloads the ONNX file.
 
-The provider accepts **PCM16 WAV** only. The Web client decodes `MediaRecorder` output with Web Audio and sends WAV on the Remote.
+The provider accepts **PCM16 WAV** only. The Web client decodes `MediaRecorder` output with Web Audio and sends WAV on the Remote. `@huggingface/transformers` 3.8's Whisper pipeline takes a `Float32Array` at 16 kHz; a `{ raw, sampling_rate }` object is rejected. The provider resamples to 16 kHz, raises a quiet clip, pads to one second, and drops the model's `[BLANK_AUDIO]` no-speech token so it never reaches the composer.
 
 ## Config
 
