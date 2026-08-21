@@ -485,6 +485,11 @@ describe('parse, serialize, and resolveRoutes', () => {
     expect(grok?.efforts).toEqual(['low', 'medium', 'high', 'xhigh'])
   })
 
+  it('keeps an explicit empty models list as a clearing override', () => {
+    const routes = resolveRoutes(Config({ routes: { 'grok-cli': { enabled: true, models: [] } } }).routes)
+    expect(routes.get('grok-cli')?.models).toEqual([])
+  })
+
   it('rejects empty model ids, missing promptArg, missing effortArg, and unknown effortStyle', () => {
     expect(() => buildCliArgv(SHIPPED_ROUTES['grok-cli'], { model: '', prompt: 'q' }))
       .toThrow(LlmError)
