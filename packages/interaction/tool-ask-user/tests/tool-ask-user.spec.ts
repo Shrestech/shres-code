@@ -13,6 +13,7 @@ interface OptionSchemaShape {
   properties: {
     questions: {
       items: {
+        required?: string[]
         properties: {
           options: {
             items: {
@@ -66,6 +67,7 @@ describe('ask_user_question tool', () => {
       options: { type: 'array' },
       multi_select: { type: 'boolean' },
     })
+    expect(parameters.properties.questions.items.required).toEqual(['question'])
     expect(parameters.properties.questions.items.properties.options.items.properties).toMatchObject({
       label: { type: 'string' },
       description: { type: 'string' },
@@ -303,6 +305,58 @@ describe('ask_user_question tool', () => {
       isError: true,
       error: { info: { name: 'UserQuestionError', code: 'EMPTY_QUESTIONS' } },
     })
+  })
+
+  it('assigns positional ids to questions the model sent without one', async () => {
+    const ctx = await setup()
+    const seen: AskUserQuestionRequest[] = []
+    ctx.userQuestions.registerProvider({
+      async ask(request) {
+        seen.push(request)
+        return { answers: [{ id: 'q1', selected: ['Babylon.js'] }, { id: 'q2', selected: ['Chapter 1'] }] }
+      },
+    })
+
+    const result = await ctx.tools.execute({
+      signal: testToolSignal,
+      callId: CallId('ask-generated-ids'),
+      name: 'ask_user_question',
+      arguments: {
+        questions: [
+          { question: 'Which engine?', options: [{ label: 'Babylon.js' }, { label: 'Godot 4' }] },
+          { question: 'First milestone?', options: [{ label: 'Chapter 1 vertical slice' }, { label: 'Engine skeleton' }] },
+        ],
+      },
+    })
+
+    expect(result).toMatchObject({ isError: false })
+    expect(seen[0]?.questions.map(question => question.id)).toEqual(['q1', 'q2'])
+  })
+
+  it('assigns omitted ids that skip a provided id', async () => {
+    const ctx = await setup()
+    const seen: AskUserQuestionRequest[] = []
+    ctx.userQuestions.registerProvider({
+      async ask(request) {
+        seen.push(request)
+        return { answers: [{ id: 'engine', selected: ['Babylon.js'] }, { id: 'q2', selected: ['ok'] }] }
+      },
+    })
+
+    await ctx.tools.execute({
+      signal: testToolSignal,
+      callId: CallId('ask-id-collision'),
+      name: 'ask_user_question',
+      arguments: {
+        questions: [
+          { question: 'Engine?', options: [{ label: 'Babylon.js' }] },
+          { id: 'q2', question: 'Ship now?', options: [{ label: 'ok' }] },
+          { question: 'Art source?', options: [{ label: 'Mixamo' }] },
+        ],
+      },
+    })
+
+    expect(seen[0]?.questions.map(question => question.id)).toEqual(['q1', 'q2', 'q3'])
   })
 
   it('unregisters the tool when its plugin fiber is disposed', async () => {

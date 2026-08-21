@@ -8,13 +8,55 @@
 
 import type { Context } from '@shres-code/cordis'
 import { defineTool } from '@shres-code/shres-code-tools'
+import type { AskUserQuestionItem } from '@shres-code/shres-code-user-questions'
 import '@shres-code/shres-code-user-questions'
 
 export const name = 'tool-ask-user'
 export const inject = ['tools', 'userQuestions']
 
 const description = 'Ask the user a concise question when you need confirmation, a choice, or missing information before proceeding. '
-  + 'Send one or more questions, each with a stable id that will be echoed in the answer.'
+  + 'Send one or more questions; include a stable id per question so its answer can be correlated — an omitted id is assigned as q1, q2, … by position.'
+
+/** One parsed `questions[]` entry, as the tool schema defines it. */
+interface ParsedQuestion {
+  /** Optional stable id echoed in the answer. */
+  id?: string
+  /** The question to display. */
+  question: string
+  /** Optional short heading. */
+  header?: string
+  /** Optional choices. */
+  options?: { label: string; description?: string }[]
+  /** Whether more than one option may be selected. */
+  multi_select?: boolean
+}
+
+/**
+ * Resolve parsed questions to service questions: provided ids pass through,
+ * and each omitted id takes the first free `q<n>` so generated ids never
+ * collide with a provided one and every answer stays correlated.
+ * @param questions - parsed tool arguments.
+ * @returns service questions with a definite id each.
+ */
+function resolveServiceQuestions(questions: readonly ParsedQuestion[]): AskUserQuestionItem[] {
+  const taken = new Set<string>(questions.flatMap(question => (question.id === undefined ? [] : [question.id])))
+  const nextId = (): string => {
+    for (let n = 1; ; n += 1) {
+      const candidate = `q${String(n)}`
+      if (!taken.has(candidate)) {
+        taken.add(candidate)
+        return candidate
+      }
+    }
+  }
+  return questions.map(question => ({
+    id: question.id ?? nextId(),
+    question: question.question,
+    ...question.header !== undefined ? { header: question.header } : {},
+    ...question.options !== undefined ? { options: question.options } : {},
+    ...question.multi_select !== undefined ? { multiSelect: question.multi_select } : {},
+  }))
+}
 
 export function apply(ctx: Context): void {
   ctx.tools.register(defineTool({
@@ -29,7 +71,7 @@ export function apply(ctx: Context): void {
           type: 'object',
           additionalProperties: true,
           properties: {
-            id: { type: 'string', required: true, description: 'Stable id for this question; echoed in the answer.' },
+            id: { type: 'string', description: 'Stable id for this question, echoed in the answer. Omitted ids are assigned in order (q1, q2, …).' },
             question: { type: 'string', required: true, description: 'The specific question to ask the user.' },
             header: {
               type: 'string',
@@ -79,13 +121,7 @@ export function apply(ctx: Context): void {
     },
     async execute(args, exec) {
       const result = await ctx.userQuestions.ask({
-        questions: args.questions.map(question => ({
-          id: question.id,
-          question: question.question,
-          ...question.header !== undefined ? { header: question.header } : {},
-          ...question.options !== undefined ? { options: question.options } : {},
-          ...question.multi_select !== undefined ? { multiSelect: question.multi_select } : {},
-        })),
+        questions: resolveServiceQuestions(args.questions),
         ...exec.agent !== undefined ? { agent: exec.agent } : {},
         signal: exec.signal,
       })

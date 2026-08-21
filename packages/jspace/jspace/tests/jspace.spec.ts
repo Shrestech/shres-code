@@ -125,7 +125,7 @@ describe('JspaceService card log', () => {
     expect(() => ctx.jspace.checkpoint(session, {
       check: 'done',
       by: 'the community reviewed the latest notes',
-    })).toThrow(/coverage/)
+    })).toThrow(/coverage claim: state in `by` who verified and what they covered/)
     session.append('turn/start', { turn: 1 })
     session.append('step/start', { turn: 1, step: 1 })
     session.append('tool/call', {
@@ -178,6 +178,21 @@ describe('JspaceService card log', () => {
       by: 'unit tests',
       evidence: 'missing',
     })).toThrow(/non-error tool call/)
+  })
+
+  it('accepts prose verifier-and-coverage claims without keyword scaffolding', async () => {
+    const { ctx, session } = await harness()
+    ctx.jspace.open(session, { goal: 'A', next: 'B' })
+    const first = ctx.jspace.checkpoint(session, {
+      check: 'defect status verified against source',
+      by: 'direct source reads: git show d7eabfb diff; correlation.py lines 400-680; grep redeem across src',
+    })
+    expect(first.checked[0]?.by).toContain('direct source reads')
+    const second = ctx.jspace.checkpoint(session, {
+      check: 'gate chain verified',
+      by: 'ox-alpha direct file reads + bash git-history scan covering roe.py and targets.py',
+    })
+    expect(second.checked).toHaveLength(2)
   })
 
   it('closes the card and copies it onto a fork', async () => {

@@ -372,7 +372,9 @@ export default class JspaceService extends Service {
     const by = line(input.by, 'by')
     if (this.config.requireCoverage !== false && !matchesCoverageTerms(by, this.config.coverageTerms)) {
       throw new JspaceError(
-        'jspace checkpoint requires a verifier and coverage claim',
+        'jspace checkpoint requires a verifier and coverage claim: '
+        + 'state in `by` who verified and what they covered, '
+        + 'for example "vitest run of fold.spec.ts green; direct read of index.ts lines 360-392"',
         'JSPACE_COVERAGE',
       )
     }
