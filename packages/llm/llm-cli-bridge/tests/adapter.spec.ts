@@ -13,7 +13,7 @@ import type { SettingsNamespace } from '@shres-code/shres-code-settings'
 import type { SubprocessHandle, SubprocessOutcome, SubprocessSpawnSpec } from '@shres-code/shres-code-subprocess'
 import { CliLlmAdapter } from '../src/adapter.ts'
 import { buildCliArgv, effortFlags } from '../src/argv.ts'
-import { resolveRoutes, SHIPPED_ROUTES } from '../src/config.ts'
+import { Config, resolveRoutes, SHIPPED_ROUTES } from '../src/config.ts'
 import {
   answerFromObject,
   isCliErrorPayload,
@@ -471,6 +471,23 @@ describe('parse, serialize, and resolveRoutes', () => {
     expect(() => resolveRoutes({ extra: { displayName: 'X' } })).toThrow('displayName and binary')
     expect(() => resolveRoutes({ 'grok-cli': { efforts: [''] } })).toThrow('effort ids')
     expect(() => resolveRoutes({ 'grok-cli': { models: [{ id: '' }] } })).toThrow('model ids')
+  })
+
+  it('preserves shipped route defaults when settings override only enabled', () => {
+    // The settings layer coerces a partial route (just `enabled`) through the
+    // Config schema before resolveRoutes merges it. Array/dict fields must stay
+    // absent so the shipped base models/efforts/env survive the merge.
+    const section = Config({ routes: { 'grok-cli': { enabled: true } } })
+    const routes = resolveRoutes(section.routes)
+    const grok = routes.get('grok-cli')
+    expect(grok?.enabled).toBe(true)
+    expect(grok?.models.map(model => model.id)).toEqual(['grok-4.6', 'grok-4.5'])
+    expect(grok?.efforts).toEqual(['low', 'medium', 'high', 'xhigh'])
+  })
+
+  it('keeps an explicit empty models list as a clearing override', () => {
+    const routes = resolveRoutes(Config({ routes: { 'grok-cli': { enabled: true, models: [] } } }).routes)
+    expect(routes.get('grok-cli')?.models).toEqual([])
   })
 
   it('rejects empty model ids, missing promptArg, missing effortArg, and unknown effortStyle', () => {

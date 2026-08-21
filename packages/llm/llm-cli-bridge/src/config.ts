@@ -92,17 +92,18 @@ const routeSchema = z.object({
   modelArg: z.string(),
   effortArg: z.string(),
   effortStyle: z.union(['flag', 'thinking-bool', 'codex-config']),
-  efforts: z.array(z.string()),
-  extraArgs: z.array(z.string()),
+  efforts: z.array(z.string()).default(undefined as unknown as string[]),
+  extraArgs: z.array(z.string()).default(undefined as unknown as string[]),
   promptStyle: z.union(['flag', 'trailing']),
   promptArg: z.string(),
   parseMode: z.union(['json', 'stream-json']),
-  env: z.dict(z.string().role('secret')),
+  env: z.dict(z.string().role('secret')).default(undefined as unknown as Record<string, string>),
   apiKeyEnv: z.string().role('credential-ref'),
   allowDelegatedTools: z.boolean(),
   contextWindow: z.number().step(1).min(1),
   defaultMaxTokens: z.number().step(1).min(1),
-  models: z.array(z.object({ id: z.string().required(), name: z.string() })),
+  models: z.array(z.object({ id: z.string().required(), name: z.string() }))
+    .default(undefined as unknown as { id: string; name: string }[]),
   enabled: z.boolean().default(true),
 })
 
