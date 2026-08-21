@@ -47,7 +47,7 @@ This table connects model-visible tool names to the plugin package and service s
 
 ### `ask_user_question`
 
-Ask the user a concise question when you need confirmation, a choice, or missing information before proceeding. Send one or more questions, each with a stable id that will be echoed in the answer.
+Ask the user a concise question when you need confirmation, a choice, or missing information before proceeding. Send one or more questions; include a stable id per question so its answer can be correlated — an omitted id is assigned as q1, q2, … by position.
 
 ```json
 {
@@ -62,7 +62,7 @@ Ask the user a concise question when you need confirmation, a choice, or missing
         "properties": {
           "id": {
             "type": "string",
-            "description": "Stable id for this question; echoed in the answer."
+            "description": "Stable id for this question, echoed in the answer. Omitted ids are assigned in order (q1, q2, …)."
           },
           "question": {
             "type": "string",
@@ -99,7 +99,6 @@ Ask the user a concise question when you need confirmation, a choice, or missing
           }
         },
         "required": [
-          "id",
           "question"
         ]
       }

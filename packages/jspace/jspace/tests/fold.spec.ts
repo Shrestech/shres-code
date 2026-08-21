@@ -193,3 +193,19 @@ describe('formatJspaceCard', () => {
     expect(formatJspaceCard(card({ checked: [], open: [] })).split('\n')[2]).toBe('Checked:   (none)')
   })
 })
+
+describe('matchesCoverageTerms', () => {
+  it('accepts verification-method claims written as natural prose', () => {
+    expect(matchesCoverageTerms('covering roe.py, targets.py, and runner.py')).toBe(true)
+    expect(matchesCoverageTerms('direct source reads: git show d7eabfb diff; grep redeem across src')).toBe(true)
+    expect(matchesCoverageTerms('bash git-history scan over the last 200 commits')).toBe(true)
+    expect(matchesCoverageTerms('hygiene check via git ls-files')).toBe(true)
+    expect(matchesCoverageTerms('Verifier: ox-alpha. Coverage: full unit suite.')).toBe(true)
+  })
+
+  it('keeps vague social claims and word-internal matches out', () => {
+    expect(matchesCoverageTerms('I looked')).toBe(false)
+    expect(matchesCoverageTerms('the community reviewed the latest notes')).toBe(false)
+    expect(matchesCoverageTerms('test_http_app_target.py')).toBe(false)
+  })
+})

@@ -292,17 +292,37 @@ export function formatJspaceCard(card: JspaceCard): string {
   ].join('\n')
 }
 
-/** Default English coverage terms. Extra terms come from Config. */
+/**
+ * Default English coverage terms: verification-method words a `by` claim uses.
+ * Whole-word matching keeps compounds like `test_http_app_target.py` from
+ * matching `test`.
+ */
 export const DEFAULT_COVERAGE_TERMS = [
   'coverage',
+  'covered',
+  'covering',
   'verifier',
+  'verify',
+  'verifies',
+  'verified',
   'test',
+  'tested',
   'tests',
   'unit',
   'checked',
+  'check',
+  'checks',
   'cases',
   'suite',
   'including',
+  'scan',
+  'scanned',
+  'grep',
+  'grepped',
+  'read',
+  'reads',
+  'diff',
+  'diffed',
 ] as const
 
 /** One-line availability notice while enabled and no card is open. */
