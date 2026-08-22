@@ -151,6 +151,7 @@ describe('Web session model selection', () => {
         maxImagesPerMessage: 2,
         maxMessageImageBytes: 4,
         maxImagePixels: 4,
+        maxImageDimension: 4,
         mediaTypes: ['image/png'],
       },
       validateImage,
