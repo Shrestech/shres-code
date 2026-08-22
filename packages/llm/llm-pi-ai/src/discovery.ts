@@ -13,6 +13,13 @@
  * metadata the surface offers for adoption. `settings.yaml` remains the only
  * thing that decides what a route serves.
  *
+ * Both paths also carry declared input modalities when the source discloses
+ * them — the installed catalog always does; a listing endpoint does only
+ * through OpenRouter's `architecture.input_modalities` — so a surface can show
+ * and adopt the detection instead of asking the user to declare `input` by
+ * hand. Endpoints without that block disclose nothing, and the entry inherits
+ * the route's `defaultInput` as before.
+ *
  * Only OpenAI-compatible protocols are interrogated. Their listing is the one
  * shape a gateway, a self-hosted server, and the official endpoints all agree
  * on, which is the case this action exists for; every other protocol reports
@@ -25,7 +32,8 @@
 import { INVALID_CREDENTIAL_CODE, LlmError, normalizeApiKey } from '@shres-code/shres-code-llm'
 import type { LlmDiscoveredModel, LlmModelDiscoveryRequest } from '@shres-code/shres-code-llm'
 import { attributionHeaders } from '@shres-code/shres-code-llm'
-import { catalogModels } from './catalog.ts'
+import { MODALITIES, catalogModels } from './catalog.ts'
+import type { PiAiModality } from './catalog.ts'
 
 /**
  * Protocols whose model listing this module can read: the two that speak
@@ -59,6 +67,8 @@ interface ListingEntry {
   context_length?: unknown
   max_tokens?: unknown
   max_output_tokens?: unknown
+  /** OpenRouter's per-model architecture block; absent elsewhere. */
+  architecture?: unknown
 }
 
 /** A positive integer field of a listing entry, or `undefined` when absent or unusable. */
@@ -75,6 +85,24 @@ function label(...candidates: readonly unknown[]): string | undefined {
     if (typeof candidate === 'string' && candidate.length > 0) return candidate
   }
   return undefined
+}
+
+/**
+ * The declared input modalities of a listing entry's OpenRouter-style
+ * `architecture.input_modalities`, narrowed to the harness vocabulary: values
+ * outside it (video, file, audio) describe requests this harness never
+ * constructs, so they are dropped rather than carried. Absent block, a
+ * non-array value, and an all-unknown list all state no answer — `undefined` —
+ * so adoption inherits the route's catalog or `defaultInput` fallback instead
+ * of a claim the endpoint never made.
+ * @param entry - one raw listing row.
+ * @returns the declared modalities, or `undefined` when the row discloses none.
+ */
+function listingInput(entry: ListingEntry): readonly PiAiModality[] | undefined {
+  const modalities = (entry.architecture as { input_modalities?: unknown } | null)?.input_modalities
+  if (!Array.isArray(modalities)) return undefined
+  const known = modalities.filter((m): m is PiAiModality => (MODALITIES as readonly unknown[]).includes(m))
+  return known.length === 0 ? undefined : known
 }
 
 /**
@@ -146,16 +174,19 @@ function readListing(body: unknown): LlmDiscoveredModel[] {
   const models: LlmDiscoveredModel[] = []
   for (const raw of data) {
     const entry = raw as ListingEntry | null
-    const id = label(entry?.id)
+    if (entry === null) continue
+    const id = label(entry.id)
     if (id === undefined) continue
-    const name = label(entry?.name, entry?.display_name)
-    const contextWindow = capacity(entry?.context_window, entry?.context_length)
-    const maxTokens = capacity(entry?.max_output_tokens, entry?.max_tokens)
+    const name = label(entry.name, entry.display_name)
+    const contextWindow = capacity(entry.context_window, entry.context_length)
+    const maxTokens = capacity(entry.max_output_tokens, entry.max_tokens)
+    const input = listingInput(entry)
     models.push({
       id,
       ...name === undefined ? {} : { name },
       ...contextWindow === undefined ? {} : { contextWindow },
       ...maxTokens === undefined ? {} : { maxTokens },
+      ...input === undefined ? {} : { input },
     })
   }
   return models
@@ -206,6 +237,7 @@ export async function discoverModels(
         name: model.name,
         contextWindow: model.contextWindow,
         maxTokens: model.maxTokens,
+        input: model.input,
       }))
     }
   }

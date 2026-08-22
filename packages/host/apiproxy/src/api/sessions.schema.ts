@@ -171,6 +171,10 @@ export const modelCatalogModelSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
   reasoning: modelReasoningSchema.optional(),
+  // Plain strings, not an enum: the modality map is merge-extensible, so a
+  // newer host may declare modalities an older client has never heard of.
+  // Never empty: absence is the only unknown, so an empty claim is refused.
+  inputModalities: z.array(z.string()).min(1).optional(),
 }) satisfies z.ZodType<Wire<ModelCatalogModel>>
 
 /** One successfully loaded provider group. */

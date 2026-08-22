@@ -34,6 +34,7 @@ class CatalogAdapter extends LlmAdapter {
     private readonly models: readonly LlmModelInfo[] | Error,
     private readonly reasoning?: LlmModelReasoningInfo,
     private readonly exactError?: Error,
+    private readonly modalities?: LlmResolvedModelInfo['inputModalities'],
   ) {
     super()
   }
@@ -55,6 +56,7 @@ class CatalogAdapter extends LlmAdapter {
       id: model,
       name: model,
       ...this.reasoning === undefined ? {} : { reasoning: this.reasoning },
+      ...this.modalities === undefined ? {} : { inputModalities: [...this.modalities] },
     })
   }
 
@@ -90,7 +92,10 @@ async function harness(logged?: {
   ctx.llm.registerAdapter(['deepseek-official'], new CatalogAdapter('DeepSeek', [
     { provider: 'deepseek-official', id: 'deepseek-chat', name: 'DeepSeek Chat' },
     { provider: 'deepseek-official', id: 'deepseek-reasoner', name: 'DeepSeek Reasoner', description: 'Reasoning model' },
-  ], REASONING))
+  ], REASONING, undefined, ['text', 'image']))
+  ctx.llm.registerAdapter(['plain'], new CatalogAdapter('Plain', [
+    { provider: 'plain', id: 'plain-text', name: 'Plain Text' },
+  ]))
   ctx.llm.registerAdapter(['broken'], new CatalogAdapter('Broken Provider', new Error('catalog offline')))
   ctx.llm.registerAdapter(['metadata-broken'], new CatalogAdapter('Metadata Broken', [
     { provider: 'metadata-broken', id: 'listed', name: 'Listed' },
@@ -286,14 +291,21 @@ describe('Web session model selection', () => {
       id: 'deepseek-official',
       name: 'DeepSeek',
       models: [
-        { id: 'deepseek-chat', name: 'DeepSeek Chat', reasoning: REASONING },
+        { id: 'deepseek-chat', name: 'DeepSeek Chat', reasoning: REASONING, inputModalities: ['text', 'image'] },
         {
           id: 'deepseek-reasoner',
           name: 'DeepSeek Reasoner',
           description: 'Reasoning model',
           reasoning: REASONING,
+          inputModalities: ['text', 'image'],
         },
       ],
+    }, {
+      id: 'plain',
+      name: 'Plain',
+      // A route that declares no modalities projects no key at all: unknown
+      // stays distinguishable from a text-only declaration downstream.
+      models: [{ id: 'plain-text', name: 'Plain Text' }],
     }])
     expect(catalog.failures).toEqual([
       { id: 'broken', name: 'Broken Provider', message: 'catalog offline' },
@@ -304,6 +316,26 @@ describe('Web session model selection', () => {
         message: 'adapter returned invalid or duplicate model metadata for provider "duplicate"',
       },
     ])
+    await ctx.fiber.dispose()
+  })
+
+  it('projects a delegated route as group kind with modality keys absent', async () => {
+    const { ctx, sessionId } = await harness()
+    ctx.llm.registerAdapter(['grok-cli'], new class extends CatalogAdapter {
+      override providerInfo(provider: string): LlmProviderInfo {
+        return { id: provider, name: 'Grok', kind: 'delegated' }
+      }
+    }('Grok', [{ provider: 'grok-cli', id: 'grok-4', name: 'Grok 4' }]))
+    const api = createApiProxy(ctx, { defaultModelSelection: () => ({ provider: 'deepseek-official', model: 'deepseek-chat' }), cwd: '/tmp' })
+
+    const catalog = expectValue(await api.sessions.models(request({ sessionId })))
+    // A delegated CLI reports no modalities: absence, not a text-only claim.
+    expect(catalog.groups.find(group => group.id === 'grok-cli')).toEqual({
+      id: 'grok-cli',
+      name: 'Grok',
+      kind: 'delegated',
+      models: [{ id: 'grok-4', name: 'Grok 4' }],
+    })
     await ctx.fiber.dispose()
   })
 

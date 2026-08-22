@@ -531,7 +531,8 @@ export class LlmRuntime extends Service {
    * candidate metadata a surface may offer for adoption.
    * @param settingsNs - namespace whose registered discovery serves this draft.
    * @param request - the endpoint, protocol, and one-shot credential to use.
-   * @returns the advertised models, deduplicated in endpoint order.
+   * @returns the advertised models, deduplicated in endpoint order, detached
+   *   from adapter-owned state.
    */
   async discoverModels(
     settingsNs: string,
@@ -552,11 +553,13 @@ export class LlmRuntime extends Service {
     for (const model of discovered) {
       if (typeof model.id !== 'string' || model.id.length === 0 || seen.has(model.id)) continue
       seen.add(model.id)
+      const input = this.detachedModalities(model.input)
       models.push({
         id: model.id,
         ...model.name === undefined ? {} : { name: model.name },
         ...model.contextWindow === undefined ? {} : { contextWindow: model.contextWindow },
         ...model.maxTokens === undefined ? {} : { maxTokens: model.maxTokens },
+        ...input === undefined ? {} : { input },
       })
     }
     return models

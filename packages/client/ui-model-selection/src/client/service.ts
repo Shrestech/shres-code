@@ -16,7 +16,7 @@ import { Service } from '@shres-code/cordis'
 import type { Context } from '@shres-code/cordis'
 import type { ConnectionHandle, SessionId } from '@shres-code/shres-code-api-remotes/client'
 import type { SessionRuntime } from '@shres-code/shres-code-client-runtime/client'
-import { ModelDirectory } from './directory.ts'
+import { ModelDirectory, acceptsImageInput } from './directory.ts'
 
 declare module '@shres-code/cordis' {
   interface Context {
@@ -84,13 +84,17 @@ export class ModelDirectoryResolver extends Service {
     // the block is pushed: the Host says whether an adapter serves the
     // session's route, and only a definite `false` makes the input inert.
     // `null` — before the first load, or after one failed — must not, or a
-    // slow or unreachable Host would lock a working composer.
+    // slow or unreachable Host would lock a working composer. The image-input
+    // fact rides the same push so intake can refuse early on a model that
+    // declares no image input; it follows the same tri-state leniency.
     const conversation = this.ctx.get('conversation')
     if (conversation !== undefined) {
       const publish = (): void => {
-        conversation.blocks.set(sessionId, directory.store.getSnapshot().routable === false
+        const snapshot = directory.store.getSnapshot()
+        conversation.blocks.set(sessionId, snapshot.routable === false
           ? { reason: this.blockReason() }
           : undefined)
+        conversation.imageInput.set(sessionId, acceptsImageInput(snapshot))
       }
       publish()
       actx.effect(() => {
@@ -98,8 +102,9 @@ export class ModelDirectoryResolver extends Service {
         return () => {
           stop()
           conversation.blocks.set(sessionId, undefined)
+          conversation.imageInput.set(sessionId, undefined)
         }
-      }, 'ui-model-selection: composer block')
+      }, 'ui-model-selection: composer block and image input')
     }
     actx.effect(() => () => {
       directory.dispose()
