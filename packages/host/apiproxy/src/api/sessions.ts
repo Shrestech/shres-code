@@ -126,6 +126,13 @@ export interface ModelCatalogModel {
   description?: string
   /** Exact-route reasoning metadata when the adapter exposes it. */
   reasoning?: ModelReasoning
+  /**
+   * Declared input modalities when the route states them (settings entry,
+   * installed catalog, or route default). Absent means unknown — selectors
+   * show no capability claim, and host preflights keep their own lenient or
+   * strict reading of absence.
+   */
+  inputModalities?: string[]
 }
 
 /** One provider and the models it advertised successfully. */

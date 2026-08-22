@@ -814,3 +814,15 @@ select.input {
   font-size: 13px;
   overflow-wrap: anywhere;
 }
+
+/* Detected capability beside a fetched candidate id; mirrors the row tag tone. */
+.candidateMeta {
+  flex: none;
+  padding: 1px 6px;
+  border: 1px solid var(--dsw-alias-border-l3);
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--dsw-alias-label-secondary);
+}

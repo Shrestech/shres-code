@@ -95,4 +95,9 @@ export interface DiscoveredModelView {
   contextWindow?: number
   /** Maximum output tokens, when disclosed. */
   maxTokens?: number
+  /**
+   * Input modalities the catalog or listing declares, when disclosed. Absent
+   * states no answer; adoption inherits the route's catalog/default fallback.
+   */
+  input?: readonly string[]
 }

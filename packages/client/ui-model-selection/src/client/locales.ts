@@ -29,6 +29,7 @@ export const en = {
   'empty.efforts': 'This model provides no reasoning effort levels.',
   'delegated.tag': 'Delegated',
   'delegated.hint': 'This route runs an external CLI. That CLI may call its own tools without Shres Code approval.',
+  'modality.vision': 'vision',
 } satisfies Record<string, string>
 
 /** The ModelKey union. */

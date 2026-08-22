@@ -33,6 +33,23 @@ export interface ModelDirectoryState {
   error: string | null
 }
 
+/**
+ * Whether the directory's current selection declares image input. Tri-state
+ * on purpose: `undefined` is "no declaration to read" — nothing loaded yet,
+ * the current model absent from the advisory groups, or the route never
+ * stated its modalities — and only a stated list without 'image' answers
+ * `false`, the same lenient reading the Host's own admission gives absence.
+ * @param state - the directory's current selection and loaded groups.
+ * @returns the declared capability, or `undefined` when none is known.
+ */
+export function acceptsImageInput(state: Pick<ModelDirectoryState, 'current' | 'groups'>): boolean | undefined {
+  const { current, groups } = state
+  if (current === null) return undefined
+  const modalities = groups.find(group => group.id === current.provider)
+    ?.models.find(model => model.id === current.model)?.inputModalities
+  return modalities === undefined ? undefined : modalities.includes('image')
+}
+
 /** One session's shared directory controller; disposed with the session scope. */
 export class ModelDirectory {
   /** The shared snapshot both entries render from (uSES-safe store). */

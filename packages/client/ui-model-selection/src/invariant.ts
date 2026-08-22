@@ -16,8 +16,10 @@ export const inject = ['invariants']
 
 /**
  * No runtime invariant: a single command contribution registration whose disposal is
- * proven by the HMR-safety spec — it emits no cordis events and owns no
- * cross-plugin mutable state.
+ * proven by the HMR-safety spec — it emits no cordis events. The per-session facts
+ * it pushes into ui-conversation's composer registries (blocks, image-input
+ * capability) live in that package's maps, and the browser-plugin spec's
+ * scope-teardown assertions prove both are cleared.
  */
 const install: InvariantInstaller = () => {}
 

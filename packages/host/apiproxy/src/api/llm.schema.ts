@@ -45,6 +45,9 @@ export const discoveredModelViewSchema = z.object({
   name: z.string().min(1).optional(),
   contextWindow: z.number().int().positive().optional(),
   maxTokens: z.number().int().positive().optional(),
+  // Plain strings: the modality vocabulary is merge-extensible host-side.
+  // Never empty: absence states no answer, so an empty claim is refused.
+  input: z.array(z.string()).min(1).optional(),
 }) satisfies z.ZodType<Wire<DiscoveredModelView>>
 
 /** llm.discoverModels request payload. */
