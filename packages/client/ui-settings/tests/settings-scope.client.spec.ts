@@ -402,6 +402,33 @@ describe('SettingsScopeBinder.bind', () => {
     expect(describeCall).toHaveBeenCalledTimes(3)
   })
 
+  it('shares one controller so a write is visible to every bind of the namespace', async () => {
+    const describeCall = vi.fn().mockResolvedValue(described({ preference: 'light' }, 1))
+    const mutate = vi.fn().mockResolvedValue(ok(view({ preference: 'dark' }, 2)))
+    const ctx = new Context()
+    ctx.provide('connection', {
+      api: { settings: { describe: describeCall, mutate } },
+      isLoopback: true,
+    } as never)
+    new TestRemote(ctx)
+    await ctx.plugin(SettingsScopeBinder).await()
+    let writer!: SettingsScope<UiTestSettings>
+    let reader!: SettingsScope<UiTestSettings>
+    const fiber = ctx.plugin({
+      inject: ['connection', 'remote', 'settingsScope'],
+      apply: (plugin: Context) => {
+        writer = plugin.settingsScope.bind<UiTestSettings>({ namespace: 'ui-test' })
+        reader = plugin.settingsScope.bind<UiTestSettings>({ namespace: 'ui-test' })
+      },
+    })
+    await fiber.await()
+    await vi.waitFor(() => { expect(writer.getSnapshot().status).toBe('ready') })
+    await writer.set('preference', 'dark')
+    expect(reader).toBe(writer)
+    expect(reader.getSnapshot()).toMatchObject({ value: { preference: 'dark' }, revision: 2 })
+    await fiber.dispose()
+  })
+
   it('binds a remote browser in memory mode without starting a settings read', async () => {
     const describeCall = vi.fn()
     const ctx = new Context()

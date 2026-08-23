@@ -75,7 +75,6 @@ const ABSENT_MENU_LAUNCHER = {
   getSnapshot: (): string | null => null,
   subscribe: () => () => {},
 }
-
 const CHAT_NODE_INJECT: ChatNodeTurnDataInjected = {
   hooks: {
     turnData: ({ useSession }, nodeKey) => function useTurnData(key) {
@@ -134,6 +133,14 @@ export function apply(ctx: Context): void {
   const submissionPolicy = new ComposerSubmissionPolicy(
     ctx.settingsScope.bind<ConversationSettings>({ namespace: CONVERSATION_SETTINGS_NAMESPACE }),
   )
+  const talkScope = ctx.settingsScope.bind<{ talkMode?: boolean }>({ namespace: 'speech' })
+  const talkModeSource = {
+    getSnapshot: (): boolean => {
+      const snap = talkScope.getSnapshot()
+      return snap.status === 'ready' && snap.value?.talkMode === true
+    },
+    subscribe: (listener: () => void) => talkScope.subscribe(listener),
+  }
 
   ctx.slots.inject('settings.general.item', () => ctx.slots.register({
     name: 'settings.general.item',
@@ -217,7 +224,10 @@ export function apply(ctx: Context): void {
       'conversation.hero.agentPreset': { kind: 'single', scope: 'root' },
     },
     inject: (sessionId: SessionId | undefined): ConversationInjected => ({
-      hooks: { composerBlock: sessionId === undefined ? ABSENT_BLOCK : composerBlocks.storeFor(sessionId) },
+      hooks: {
+        composerBlock: sessionId === undefined ? ABSENT_BLOCK : composerBlocks.storeFor(sessionId),
+        talkMode: talkModeSource,
+      },
       selectWorkspace: async (workspaceId) => {
         const nextId = await workspaces.connectWorkspace(workspaceId)
         if (sessionId !== undefined && nextId !== sessionId) {

@@ -224,7 +224,14 @@ declare module '@shres-code/cordis' {
  * cross-plugin collaboration through cordis services
  * (`packages/client/tsdown.client.ts`).
  */
+interface CachedScope {
+  readonly controller: SettingsScopeController<unknown>
+  refs: number
+}
+
 export class SettingsScopeBinder extends Service {
+  private readonly cache = new Map<string, CachedScope>()
+
   /**
    * @param ctx - the providing plugin's context.
    */
@@ -239,17 +246,29 @@ export class SettingsScopeBinder extends Service {
    * Listeners exist before the initial background read starts, so activation
    * never blocks on the settings transport. The caller injects `connection`
    * for the transport and `remote` for the forwarded settings invalidation.
+   * Repeated binds of the same namespace share one controller so a write is
+   * visible to every reader without waiting for `settings/document-updated`.
    * @param spec - domain-owned namespace contract.
    * @returns the bound scope consumed by the domain's services and rows.
    */
   bind<T>(spec: SettingsScopeSpec<T>): SettingsScope<T> {
     const ctx = this.ctx
     const connection = ctx.get('connection') as ConnectionHandle
-    const controller = new SettingsScopeController<T>(
-      connection.api,
-      spec,
-      connection.isLoopback ? 'host' : 'memory',
-    )
+    let entry = this.cache.get(spec.namespace)
+    if (entry === undefined) {
+      entry = {
+        controller: new SettingsScopeController<T>(
+          connection.api,
+          spec,
+          connection.isLoopback ? 'host' : 'memory',
+        ),
+        refs: 0,
+      }
+      this.cache.set(spec.namespace, entry)
+    }
+    const shared = entry
+    shared.refs += 1
+    const controller = shared.controller as SettingsScopeController<T>
     ctx.effect(() => {
       const refresh = (namespace?: string): void => {
         if (namespace !== undefined && namespace !== spec.namespace) return
@@ -262,7 +281,11 @@ export class SettingsScopeBinder extends Service {
       void controller.load()
       return async () => {
         for (const dispose of disposers) dispose()
-        await controller.dispose()
+        shared.refs -= 1
+        if (shared.refs === 0) {
+          this.cache.delete(spec.namespace)
+          await controller.dispose()
+        }
       }
     }, `ui-settings: ${spec.namespace} settings scope`)
     return controller

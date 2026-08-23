@@ -12,7 +12,7 @@ Speech is a host capability seam (`ctx.speech`) with TTS and STT behind one prov
 
 **Seam, not loop.** `synthesize` and `transcribe` resolve providers with the same pin / ordered-fallback / single-usable auto-select rules as `ctx.web`. Duplicate ids throw `SPEECH_DUPLICATE_PROVIDER`. Caps `maxAudioBytes` and `maxTextChars` are required Config. Markdown is converted to a speakable script on the host before TTS so code fences become `Code block.` and tables become `Table omitted.` instead of being read token-by-token.
 
-**Text in, text out.** A transcription lands in the existing composer draft (`inputActions.setDraft`). Read-aloud consumes the same visible assistant text the copy action already concatenates. No `audio` content block, no `SESSION_FORMAT_VERSION` bump, no ACP audio capability, no prompt section that tells the model the user is listening.
+**Text in, text out.** Dictate lands in the existing composer draft (`inputActions.setDraft`). Talk mode is a composer takeover that still sends ordinary prompt text, but only after a spoken yes/no confirm — see [Talk mode](2026-08-20-talk-mode-voice-confirm.md). Read-aloud consumes the same visible assistant text the copy action already concatenates. No `audio` content block, no `SESSION_FORMAT_VERSION` bump, no ACP audio capability, no prompt section that tells the model the user is listening.
 
 **Local neural engines, no billed API.** TTS is Kokoro-82M via `kokoro-js` on the Node CPU (28 English voices, default `af_heart`). STT is Whisper tiny.en via `@huggingface/transformers`. Weights cache under the harness home. Unary Typert Remotes carry canonical-base64 WAV. `status()` lets the client disable mic and speaker when a cache is cold and downloads are forbidden.
 
