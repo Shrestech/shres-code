@@ -29,6 +29,9 @@ const GROUPS = [{
     {
       id: 'deepseek-v4-flash',
       name: 'DeepSeek-V4-Flash',
+      // Text-only declaration: the pushed image-input fact for the initial
+      // current is a definite refusal.
+      inputModalities: ['text'],
       reasoning: {
         efforts: [
           { id: 'off', name: 'Off' },
@@ -41,6 +44,7 @@ const GROUPS = [{
     {
       id: 'deepseek-v4-pro',
       name: 'DeepSeek-V4-Pro',
+      inputModalities: ['text', 'image'],
       reasoning: {
         efforts: [
           { id: 'off', name: 'Off' },
@@ -81,9 +85,16 @@ async function bench() {
   // block follows this, never catalog membership.
   let routable = true
   const blocks = new Map<SessionId, { reason: string } | undefined>()
+  const imageInput = new Map<SessionId, boolean>()
   ctx.provide('conversation', {
     blocks: {
       set: (id: SessionId, block: { reason: string } | undefined) => { blocks.set(id, block) },
+    },
+    imageInput: {
+      set: (id: SessionId, accepts: boolean | undefined) => {
+        if (accepts === undefined) imageInput.delete(id)
+        else imageInput.set(id, accepts)
+      },
     },
   })
   let contribution: CommandDecoration | undefined
@@ -131,6 +142,7 @@ async function bench() {
     address: (id: SessionId) => { addressed.add(id) },
     setRoutable: (next: boolean) => { routable = next },
     blockOf: (key: string) => blocks.get(sid(key)),
+    imageInputOf: (key: string) => imageInput.get(sid(key)),
   }
 }
 
@@ -153,6 +165,8 @@ describe('ui-model-selection dual entry', () => {
     expect(options.map((o: SelectOption) => o.label)).toEqual(['DeepSeek-V4-Flash', 'DeepSeek-V4-Pro'])
     expect(options[0]).toMatchObject({ active: true, detail: 'DeepSeek' })
     expect(options[1]?.active).toBeUndefined()
+    // A declared image modality joins the provider group in the detail.
+    expect(options[1]).toMatchObject({ detail: 'DeepSeek · vision' })
   })
 
   it('a seat selection is the current the popup marks active next — one shared state', async () => {
@@ -276,7 +290,34 @@ describe('ui-model-selection dual entry', () => {
     expect(b.blockOf('s1')).toBeUndefined()
   })
 
-  it('clears its block when the session scope goes', async () => {
+  it('pushes the image-input capability the current model declares, tri-state like the Host reads it', async () => {
+    const b = await bench()
+    b.mint('s1')
+    const face = b.seat().inject!(sid('s1'))
+
+    // Before the first load nothing is declared, and undeclared must stay
+    // admissible — the same reading the Host's own admission gives absence.
+    expect(b.imageInputOf('s1')).toBeUndefined()
+
+    face.load()
+    await Promise.resolve()
+    await Promise.resolve()
+    // The initial current declares text only: a definite refusal fact.
+    expect(b.imageInputOf('s1')).toBe(false)
+
+    // Switching to the vision-declared model flips the pushed fact.
+    await face.select({ provider: 'deepseek-official', model: 'deepseek-v4-pro' })
+    expect(b.imageInputOf('s1')).toBe(true)
+
+    // A current the groups do not describe declares nothing — admissible.
+    b.setHostCurrent({ provider: 'deepseek-official', model: 'unlisted' })
+    b.ctx.remote.$dispatch('llm/adapters-updated', [])
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(b.imageInputOf('s1')).toBeUndefined()
+  })
+
+  it('clears its block and image-input fact when the session scope goes', async () => {
     const b = await bench()
     const scope = b.mint('s1')
     b.setRoutable(false)
@@ -285,9 +326,12 @@ describe('ui-model-selection dual entry', () => {
     await Promise.resolve()
     await Promise.resolve()
     expect(b.blockOf('s1')).toBeDefined()
+    // The loaded current declares text only, so a refusal fact was pushed.
+    expect(b.imageInputOf('s1')).toBe(false)
 
     await scope.fiber.dispose()
     expect(b.blockOf('s1')).toBeUndefined()
+    expect(b.imageInputOf('s1')).toBeUndefined()
   })
 
   it('an unknown session fails loud at the seat inject', async () => {

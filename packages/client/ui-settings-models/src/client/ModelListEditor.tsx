@@ -44,6 +44,40 @@ function numberOf(model: ModelDraft, key: string): number | undefined {
   return typeof value === 'number' ? value : undefined
 }
 
+/** A row's declared input modalities, or `undefined` when unset or not a string list. */
+function inputOf(model: ModelDraft): readonly string[] | undefined {
+  const value = model['input']
+  return Array.isArray(value) && value.every(item => typeof item === 'string') ? value : undefined
+}
+
+/**
+ * The input control's value for one row. `auto` is the absent key — and a
+ * stored empty list, which the schema reads as no answer — so the row
+ * inherits the installed catalog's declaration or the route's `defaultInput`.
+ * A stored list the control cannot spell (a future modality, a hand-written
+ * combination) stays `custom` so choosing nothing rewrites nothing.
+ */
+function inputChoiceOf(model: ModelDraft): 'auto' | 'text' | 'text+image' | 'custom' {
+  const input = inputOf(model)
+  if (input === undefined || input.length === 0) return 'auto'
+  if (input.length === 1 && input[0] === 'text') return 'text'
+  if (input.length === 2 && input.includes('text') && input.includes('image')) return 'text+image'
+  return 'custom'
+}
+
+/**
+ * The extra choice a stored list the select cannot spell gets, or `null` for
+ * a known one. The list is re-read from the draft rather than reconstructed
+ * from the choice, so what is kept stays visible exactly as stored.
+ * @param model - the row's draft.
+ * @returns the custom option element, or `null` when the row needs none.
+ */
+function customInputOption(model: ModelDraft): ReactNode {
+  const input = inputOf(model)
+  if (input === undefined || inputChoiceOf(model) !== 'custom') return null
+  return <option value="custom">{input.join(' + ')}</option>
+}
+
 /** What an interrogation needs, taken from the live form. */
 export interface ProbeTarget {
   /** Settings namespace whose adapter family answers. */
@@ -150,6 +184,10 @@ function adopt(candidate: DiscoveredModelView): ModelDraft {
     ...candidate.name === undefined ? {} : { name: candidate.name },
     ...candidate.contextWindow === undefined ? {} : { contextWindow: candidate.contextWindow },
     ...candidate.maxTokens === undefined ? {} : { maxTokens: candidate.maxTokens },
+    // The detected modalities are adopted with the row, so a vision-capable
+    // model is claimed as one without a hand-written settings.yaml edit. An
+    // endpoint that disclosed nothing keeps the key absent and inherits.
+    ...candidate.input === undefined ? {} : { input: [...candidate.input] },
   }
 }
 
@@ -210,7 +248,15 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
     })
   }
 
-  const patch = (index: number, next: Record<string, string | number | undefined>): void => {
+  /** Write one row's input declaration; `auto` drops the key so inheritance resumes. */
+  const editInput = (index: number, choice: string): void => {
+    if (choice === 'auto') patch(index, { input: undefined })
+    else if (choice === 'text') patch(index, { input: ['text'] })
+    else if (choice === 'text+image') patch(index, { input: ['text', 'image'] })
+    // 'custom' is the row's own unrecognized stored list; picking it changes nothing.
+  }
+
+  const patch = (index: number, next: Record<string, string | number | readonly string[] | undefined>): void => {
     onChange(models.map((model, at) => {
       if (at !== index) return model
       // Rebuilt rather than spread over: an emptied optional field has to leave
@@ -417,6 +463,21 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
                     onChange={(event) => { editCapacity(index, 'maxTokens', event.target.value) }}
                   />
                 </label>
+                <label className={styles['modelField']}>
+                  <span className={styles['modelFieldLabel']}>{t('modelInput')}</span>
+                  <select
+                    className={`${styles['input']} ${styles['selectInput']}`}
+                    value={inputChoiceOf(model)}
+                    aria-label={`${t('modelInput')} ${index + 1}`}
+                    disabled={disabled}
+                    onChange={(event) => { editInput(index, event.target.value) }}
+                  >
+                    <option value="auto">{t('modelInputAuto')}</option>
+                    <option value="text">{t('modelInputText')}</option>
+                    <option value="text+image">{t('modelInputVision')}</option>
+                    {customInputOption(model)}
+                  </select>
+                </label>
               </div>
             )
             : null}
@@ -458,6 +519,13 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
                     capacities the endpoint reported are adopted with it and
                     editable in the row that appears. */}
                 <span className={styles['candidateId']}>{candidate.id}</span>
+                {candidate.input === undefined
+                  ? null
+                  : (
+                    <span className={styles['candidateMeta']}>
+                      {candidate.input.includes('image') ? t('candidateVision') : candidate.input.join(' + ')}
+                    </span>
+                  )}
               </label>
             </li>
           ))}

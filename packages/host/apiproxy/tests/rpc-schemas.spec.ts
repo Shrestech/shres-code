@@ -221,6 +221,7 @@ describe('sessions domain schemas', () => {
             ],
             defaultEffort: 'off',
           },
+          inputModalities: ['text', 'image'],
         }],
       }],
       failures: [{ id: 'broken', name: 'Broken', message: 'offline' }],
@@ -251,6 +252,16 @@ describe('sessions domain schemas', () => {
         id: 'deepseek-official',
         name: 'DeepSeek',
         models: [{ id: 'm', name: 'M', reasoning: { efforts: [] } }],
+      }],
+      failures: [],
+    })).toThrow()
+    // A declared modality list is never empty either: absence is the unknown.
+    expect(() => sessionModelsValueSchema.parse({
+      current: { provider: 'deepseek-official', model: 'm' },
+      groups: [{
+        id: 'deepseek-official',
+        name: 'DeepSeek',
+        models: [{ id: 'm', name: 'M', inputModalities: [] }],
       }],
       failures: [],
     })).toThrow()

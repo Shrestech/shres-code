@@ -313,7 +313,19 @@ export function ModelSelect(
                             onClick={() => { choose({ provider: group.id, model: model.id }) }}
                           >
                             <span className={css.optionCopy}>
-                              <span className={css.modelName}>{model.name}</span>
+                              <span className={css.nameRow}>
+                                <span className={css.modelName}>{model.name}</span>
+                                {/* 'text' is the floor every route carries; only
+                                    additional declared modalities earn a tag. The
+                                    map is merge-extensible, so an unrecognized
+                                    value renders as its own label. */}
+                                {(model.inputModalities ?? []).filter(modality => modality !== 'text')
+                                  .map(modality => (
+                                    <span className={css.modality} key={modality}>
+                                      {modality === 'image' ? t('modality.vision') : modality}
+                                    </span>
+                                  ))}
+                              </span>
                               {model.description !== undefined && (
                                 <span className={css.description}>{model.description}</span>
                               )}

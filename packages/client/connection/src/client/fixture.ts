@@ -324,7 +324,7 @@ function fixtureModelGroups(): ModelProviderGroup[] {
     {
       id: 'openai',
       name: 'OpenAI',
-      models: [{ id: 'gpt-5', name: 'GPT-5', reasoning: OPENAI_REASONING }],
+      models: [{ id: 'gpt-5', name: 'GPT-5', reasoning: OPENAI_REASONING, inputModalities: ['text', 'image'] }],
     },
   ]
 }
@@ -1077,6 +1077,7 @@ function projectionValuesOf(log: readonly SessionEvent[]): Record<string, unknow
     maxImagesPerMessage: 20,
     maxMessageImageBytes: 100 * 1024 * 1024,
     maxImagePixels: 40_000_000,
+    maxImageDimension: 8192,
     mediaTypes: ['image/png', 'image/jpeg', 'image/webp', 'image/gif'],
   }
   return values
@@ -2959,7 +2960,11 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
       // catalog it already serves — enough for a surface to exercise adopting
       // candidates without a reachable provider.
       discoverModels: request => ok(request, {
-        models: fixtureModelGroups().flatMap(group => group.models.map(model => ({ id: model.id, name: model.name }))),
+        models: fixtureModelGroups().flatMap(group => group.models.map(model => ({
+          id: model.id,
+          name: model.name,
+          ...model.inputModalities === undefined ? {} : { input: model.inputModalities },
+        }))),
       }),
     },
     respond(message: ClientResponse): Promise<RpcReceipt> {

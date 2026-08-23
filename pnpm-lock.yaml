@@ -5806,9 +5806,21 @@ importers:
       '@shres-code/shres-code-anonymous-user-id':
         specifier: workspace:^
         version: link:../../identity/anonymous-user-id
+      '@shres-code/shres-code-atomic-write':
+        specifier: workspace:^
+        version: link:../../util/atomic-write
+      '@shres-code/shres-code-attachment':
+        specifier: workspace:^
+        version: link:../../attachment/attachment
+      '@shres-code/shres-code-brand':
+        specifier: workspace:^
+        version: link:../../util/brand
       '@shres-code/shres-code-credentials':
         specifier: workspace:^
         version: link:../../credentials/credentials
+      '@shres-code/shres-code-home-paths':
+        specifier: workspace:^
+        version: link:../../util/home-paths
       '@shres-code/shres-code-invariants':
         specifier: workspace:^
         version: link:../../runtime-diagnostics/invariants

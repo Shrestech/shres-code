@@ -29,6 +29,7 @@ import type { LlmCallConfig, LlmCallConfigAdapterDefaults } from './call-config.
 import { HarnessError, INVALID_CREDENTIAL_CODE } from './error.ts'
 import { normalizeLlmFailure } from './adapter-failure.ts'
 import { normalizeApiKey } from './api-key.ts'
+import { contentHasImage, projectImagesForTextModel } from './content.ts'
 
 export * from './attribution.ts'
 export * from './brand.ts'
@@ -531,7 +532,8 @@ export class LlmRuntime extends Service {
    * candidate metadata a surface may offer for adoption.
    * @param settingsNs - namespace whose registered discovery serves this draft.
    * @param request - the endpoint, protocol, and one-shot credential to use.
-   * @returns the advertised models, deduplicated in endpoint order.
+   * @returns the advertised models, deduplicated in endpoint order, detached
+   *   from adapter-owned state.
    */
   async discoverModels(
     settingsNs: string,
@@ -552,11 +554,13 @@ export class LlmRuntime extends Service {
     for (const model of discovered) {
       if (typeof model.id !== 'string' || model.id.length === 0 || seen.has(model.id)) continue
       seen.add(model.id)
+      const input = this.detachedModalities(model.input)
       models.push({
         id: model.id,
         ...model.name === undefined ? {} : { name: model.name },
         ...model.contextWindow === undefined ? {} : { contextWindow: model.contextWindow },
         ...model.maxTokens === undefined ? {} : { maxTokens: model.maxTokens },
+        ...input === undefined ? {} : { input },
       })
     }
     return models
@@ -739,7 +743,7 @@ export class LlmRuntime extends Service {
     registration: AdapterRegistration,
     config: LlmCallConfig,
     signal?: AbortSignal,
-  ): Promise<{ config: LlmCallConfig; context?: LlmModelContext }> {
+  ): Promise<{ config: LlmCallConfig; context?: LlmModelContext; info: LlmResolvedModelInfo }> {
     const info = await this.resolveModelInfoFor(registration, config.model, signal)
     const defaulted = config.maxTokens === undefined && info.defaultMaxTokens !== undefined
       ? { ...config, maxTokens: info.defaultMaxTokens }
@@ -768,6 +772,7 @@ export class LlmRuntime extends Service {
     }
     return {
       config: resolvedConfig,
+      info,
       ...info.context === undefined ? {} : { context: info.context },
     }
   }
@@ -812,7 +817,11 @@ export class LlmRuntime extends Service {
           )
         }
         dispatched = true
-        return this.streamWithRegistration(options, { registration, config: resolvedConfig })
+        return this.streamWithRegistration(options, {
+          registration,
+          config: resolvedConfig,
+          info: resolved.info,
+        })
       },
     })
   }
@@ -846,14 +855,21 @@ export class LlmRuntime extends Service {
    */
   private async * adapterStream(
     options: GenerateOptions,
-    prepared?: { registration: AdapterRegistration; config: LlmCallConfig },
+    prepared?: { registration: AdapterRegistration; config: LlmCallConfig; info: LlmResolvedModelInfo },
   ): AsyncGenerator<StreamChunk> {
     let iterator: AsyncIterator<StreamChunk>
     try {
       const registration = prepared?.registration ?? this.registration(options.provider)
-      const resolvedConfig = prepared === undefined
-        ? (await this.resolveCallFor(registration, options, options.signal)).config
-        : prepared.config
+      let resolvedConfig: LlmCallConfig
+      let modelInfo: LlmResolvedModelInfo
+      if (prepared === undefined) {
+        const resolved = await this.resolveCallFor(registration, options, options.signal)
+        resolvedConfig = resolved.config
+        modelInfo = resolved.info
+      } else {
+        resolvedConfig = prepared.config
+        modelInfo = prepared.info
+      }
       if (prepared !== undefined && !callConfigEquals(options, resolvedConfig)) {
         throw new LlmError(
           'prepared LLM call config changed before adapter dispatch',
@@ -865,8 +881,15 @@ export class LlmRuntime extends Service {
         : Object.isFrozen(options)
           ? deepFreeze({ ...options, ...resolvedConfig })
           : { ...options, ...resolvedConfig }
+      const projectedOptions = modelInfo.inputModalities !== undefined
+        && !modelInfo.inputModalities.includes('image')
+        && resolvedOptions.messages.some(message => contentHasImage(message.content))
+        ? Object.isFrozen(resolvedOptions)
+          ? deepFreeze({ ...resolvedOptions, messages: projectImagesForTextModel(resolvedOptions.messages) as Message[] })
+          : { ...resolvedOptions, messages: projectImagesForTextModel(resolvedOptions.messages) as Message[] }
+        : resolvedOptions
       const adapter = registration.adapter
-      const stream = adapter.stream(this.forAdapter(resolvedOptions, adapter))
+      const stream = adapter.stream(this.forAdapter(projectedOptions, adapter))
       iterator = stream[Symbol.asyncIterator]()
     } catch (error: unknown) {
       yield adapterFailureChunk(error, options.signal)
@@ -920,7 +943,7 @@ export class LlmRuntime extends Service {
 
   private streamWithRegistration(
     options: GenerateOptions,
-    prepared?: { registration: AdapterRegistration; config: LlmCallConfig },
+    prepared?: { registration: AdapterRegistration; config: LlmCallConfig; info: LlmResolvedModelInfo },
   ): AsyncIterable<StreamChunk> {
     return this.ctx.waterfall(
       this,

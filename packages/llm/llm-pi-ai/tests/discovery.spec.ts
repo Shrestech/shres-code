@@ -92,6 +92,18 @@ describe('catalog-route model discovery', () => {
     await expect(ctx.llm.discoverModels('llm-pi-ai', { provider: 'deepseek' })).resolves.not.toHaveLength(0)
   })
 
+  it('carries the catalog\'s declared input modalities', async () => {
+    const ctx = await harness()
+
+    const models = await ctx.llm.discoverModels('llm-pi-ai', { provider: 'moonshotai' })
+
+    // The installed registry declares kimi-k3 vision-capable and
+    // kimi-k2-0711-preview text-only; both declarations ride the reply so the
+    // surface can show and adopt them without a hand-written `input`.
+    expect(models.find(model => model.id === 'kimi-k3')?.input).toEqual(['text', 'image'])
+    expect(models.find(model => model.id === 'kimi-k2-0711-preview')?.input).toEqual(['text'])
+  })
+
   it('says where a route the catalog does not describe must get its models', async () => {
     const ctx = await harness()
     await expect(ctx.llm.discoverModels('llm-pi-ai', { provider: 'acme-gateway' }))
@@ -207,6 +219,34 @@ describe('draft-provider model discovery', () => {
 
     expect(await ctx.llm.discoverModels('llm-pi-ai', { baseURL: server.url }))
       .toEqual([{ id: 'good' }, { id: 'zero-capacity' }])
+  })
+
+  it('reads OpenRouter\'s declared input modalities and drops values the harness never sends', async () => {
+    const server = await listingServer({
+      body: JSON.stringify({
+        data: [
+          { id: 'seeing', architecture: { input_modalities: ['text', 'image'] } },
+          // Video describes a request this harness never constructs; the known
+          // subset is what remains of the declaration.
+          { id: 'watching', architecture: { input_modalities: ['text', 'video'] } },
+          { id: 'plain' },
+          { id: 'odd-shape', architecture: { input_modalities: 'image' } },
+          // An all-unknown list states no answer the harness can act on, so
+          // the entry inherits the route fallback rather than a bogus claim.
+          { id: 'hearing-only', architecture: { input_modalities: ['audio'] } },
+        ],
+      }),
+    })
+    const ctx = await harness()
+
+    expect(await ctx.llm.discoverModels('llm-pi-ai', { baseURL: server.url }))
+      .toEqual([
+        { id: 'seeing', input: ['text', 'image'] },
+        { id: 'watching', input: ['text'] },
+        { id: 'plain' },
+        { id: 'odd-shape' },
+        { id: 'hearing-only' },
+      ])
   })
 
   it('points at the credential for a rejected one, and only then', async () => {

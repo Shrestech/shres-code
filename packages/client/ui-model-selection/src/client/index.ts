@@ -49,10 +49,13 @@ function optionsOf(directory: SessionModels, t: TranslateNS<'model'>): SelectOpt
   const rows: SelectOption[] = []
   for (const group of directory.groups) {
     for (const model of group.models) {
+      // The only modality with a named affordance today; unknown values stay
+      // out of the detail line rather than guessing a label.
+      const vision = model.inputModalities?.includes('image') === true ? ` · ${t('modality.vision')}` : ''
       rows.push({
         id: rowId(group.id, model.id),
         label: model.name,
-        detail: model.description !== undefined ? `${group.name} · ${model.description}` : group.name,
+        detail: (model.description !== undefined ? `${group.name} · ${model.description}` : group.name) + vision,
         ...(directory.current.provider === group.id && directory.current.model === model.id
           ? { active: true } : {}),
       })
