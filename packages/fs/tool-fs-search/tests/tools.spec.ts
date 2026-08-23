@@ -12,8 +12,11 @@
 
 import { describe, expect, it } from 'vitest'
 import { Context } from '@shres-code/cordis'
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join, sep } from 'node:path'
 import { resolveShresHome } from '@shres-code/shres-code-home-paths'
+import SandboxPolicyService from '@shres-code/shres-code-sandbox-policy'
 import { createUserMessage, CallId } from '@shres-code/shres-code-llm'
 import SystemPrompt, { renderPrompt } from '@shres-code/shres-code-system-prompt'
 import ToolRuntime, { TOOL_ABORTED_BEFORE_DISPATCH, type ToolExecution, type ToolExecutionToken } from '@shres-code/shres-code-tools'
@@ -390,6 +393,79 @@ describe('command construction (plain argv)', () => {
   })
 })
 
+describe('search-root fence (canonicalized)', () => {
+  const execIn = (cwd: string): ToolExecution => ({
+    agent: { session: { id: 's-fence', header: { cwd }, events: [] } },
+    signal: testToolSignal,
+  } as unknown as ToolExecution) // partial session mock: fenceSearchPath reads only header.cwd; the policy fold reads id/events
+
+  it('denies a symlink alias of a credentials document by its RESOLVED name', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'shres-search-fence-'))
+    try {
+      await writeFile(join(dir, 'store.credentials.yaml'), 'token: x\n')
+      await symlink(join(dir, 'store.credentials.yaml'), join(dir, 'alias.yaml'))
+      const ctx = new Context()
+      // The requested spelling survives by name; the alias is caught only
+      // after canonicalization resolves it to the credentials basename.
+      expect(() => fenceSearchPath(ctx, execIn(dir), 'grep', 'store.credentials.yaml')).toThrow(/credentials/)
+      expect(() => fenceSearchPath(ctx, execIn(dir), 'grep', 'alias.yaml')).toThrow(/credentials/)
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('denies a workspace symlink pointing OUT under a confined policy', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'shres-search-fence-'))
+    try {
+      const workspace = join(dir, 'workspace')
+      const outside = join(dir, 'outside')
+      await mkdir(workspace)
+      await mkdir(outside)
+      await writeFile(join(outside, 'secret.txt'), 'secret\n')
+      await symlink(outside, join(workspace, 'link'))
+      const ctx = new Context()
+      await ctx.plugin(SandboxPolicyService, { mode: 'workspace-write', workspaceRoot: workspace })
+      // Lexically `link` sits inside the workspace; the canonicalized target
+      // does not, so containment must compare real paths.
+      expect(() => fenceSearchPath(ctx, execIn(workspace), 'grep', 'link'))
+        .toThrow(/outside the workspace/)
+      expect(() => fenceSearchPath(ctx, execIn(workspace), 'grep', '.')).not.toThrow()
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('canonicalizes a MISSING root through its deepest existing ancestor', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'shres-search-fence-'))
+    try {
+      const ctx = new Context()
+      // No policy: a not-yet-created root under the workdir is allowed (rg
+      // will fail it as SEARCH_FAILED); the walk-up must not misread it as a
+      // credentials document or an outside path.
+      expect(() => fenceSearchPath(ctx, execIn(dir), 'glob', 'missing/child')).not.toThrow()
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('an AGENTLESS confined call is contained by the configured workspace root', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'shres-search-fence-'))
+    try {
+      const root = join(dir, 'root')
+      const outside = join(dir, 'outside')
+      await mkdir(root)
+      await mkdir(outside)
+      const ctx = new Context()
+      await ctx.plugin(SandboxPolicyService, { mode: 'workspace-write', workspaceRoot: root })
+      const exec = { signal: testToolSignal } as ToolExecution
+      expect(() => fenceSearchPath(ctx, exec, 'grep', outside)).toThrow(/outside the workspace/)
+      expect(() => fenceSearchPath(ctx, exec, 'grep', root)).not.toThrow()
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+})
+
 describe('workdir derivation and signal forwarding', () => {
   it('forwards the session cwd as the spawn cwd', async () => {
     const { ctx, subprocess } = await setup()
@@ -416,8 +492,10 @@ describe('workdir derivation and signal forwarding', () => {
     await call(ctx, 'grep', { pattern: 'needle' })
     const spec = subprocess.spawns[0]
     // --no-config keeps a host RIPGREP_CONFIG_PATH from injecting a
-    // preprocessor into this unconfined spawn.
-    expect(spec?.argv).toEqual([rgPath, '--no-config', '--json', '--regexp=needle'])
+    // preprocessor into this unconfined spawn; the credentials exclusion
+    // rides before the tool's own argv so a `--` terminator cannot demote it
+    // to a search path.
+    expect(spec?.argv).toEqual([rgPath, '--no-config', '--iglob=!*.credentials.yaml', '--json', '--regexp=needle'])
     expect(spec?.stdio.stdin).toBe('ignore')
     // stdout gets the tool's parse budget; stderr is a diagnostic excerpt;
     // both are the seam's diagnostic-tail shape (no spill files requested).
@@ -760,7 +838,7 @@ describe('glob results', () => {
     subprocess.handler = () => runResult('sub/a.ts\n')
     const result = await call(ctx, 'glob', { pattern: '*.ts', path: 'sub' })
     expect(result.isError).toBe(false)
-    expect(subprocess.spawns[0]?.argv).toEqual([rgPath, '--no-config', '--files', '--glob=*.ts', '--sort=modified', '--no-ignore', '--hidden',
+    expect(subprocess.spawns[0]?.argv).toEqual([rgPath, '--no-config', '--iglob=!*.credentials.yaml', '--files', '--glob=*.ts', '--sort=modified', '--no-ignore', '--hidden',
       '--glob=!**/.git', '--glob=!**/.git/**',
       '--glob=!**/.svn', '--glob=!**/.svn/**',
       '--glob=!**/.hg', '--glob=!**/.hg/**',

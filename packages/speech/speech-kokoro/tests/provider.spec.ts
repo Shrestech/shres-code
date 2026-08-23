@@ -10,10 +10,11 @@ import {
   encodePcm16Wav,
   KOKORO_TTS_PROVIDER_ID,
   KokoroTtsProvider,
+  loadKokoroJs,
   resolveOptions,
 } from '../src/index.ts'
 import * as plugin from '../src/index.ts'
-import type { KokoroEngine, KokoroLoader } from '../src/provider.ts'
+import type { KokoroEngine, KokoroLoader, KokoroLoadRequest } from '../src/provider.ts'
 
 const pcm = new Float32Array([0, 0.5, -0.5, 1])
 
@@ -223,6 +224,45 @@ describe('KokoroTtsProvider', () => {
     await expect(provider.synthesize({ text: 'one' })).rejects.toThrow('cold')
     await expect(provider.synthesize({ text: 'two' })).resolves.toMatchObject({ mediaType: 'audio/wav' })
     expect(loads).toBe(2)
+  })
+
+  it('forwards allowDownload to the loader request', async () => {
+    const seen: boolean[] = []
+    const load: KokoroLoader = (request) => {
+      seen.push(request.allowDownload)
+      return Promise.resolve(fakeEngine())
+    }
+    const dir = await mkdtemp(join(tmpdir(), 'shres-kokoro-warm-'))
+    try {
+      await writeFile(join(dir, 'marker'), 'x')
+      const off = new KokoroTtsProvider(() => resolveOptions({ allowDownload: false, cacheDir: dir }, load))
+      await off.synthesize({ text: 'Hello' })
+      const on = new KokoroTtsProvider(() => resolveOptions({ allowDownload: true, cacheDir: dir }, load))
+      await on.synthesize({ text: 'Hello' })
+      expect(seen).toEqual([false, true])
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('loadKokoroJs', () => {
+  it('releases the env lock when the transformers import rejects', async () => {
+    const request: KokoroLoadRequest = {
+      modelId: 'test/model',
+      dtype: 'q8',
+      device: 'cpu',
+      cacheDir: join(tmpdir(), 'shres-missing-kokoro-cache'),
+      allowDownload: false,
+      importTransformers: () => Promise.reject(new Error('transformers missing')),
+    }
+    await expect(loadKokoroJs(request)).rejects.toThrow(
+      expect.objectContaining({ code: 'SPEECH_PROVIDER_ERROR' }),
+    )
+    // A held lock would hang this second attempt; it must reject the same way.
+    await expect(loadKokoroJs(request)).rejects.toThrow(
+      expect.objectContaining({ code: 'SPEECH_PROVIDER_ERROR' }),
+    )
   })
 })
 

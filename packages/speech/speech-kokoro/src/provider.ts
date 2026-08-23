@@ -45,12 +45,24 @@ export interface KokoroEngine {
   generate(text: string, options: { voice: string }): Promise<KokoroAudio>
 }
 
+/** The `@huggingface/transformers` module face whose `env` a load pins. */
+export interface TransformersModule {
+  env: {
+    cacheDir: string
+    allowRemoteModels: boolean
+  }
+}
+
 /** Options for {@link KokoroLoader}. */
 export interface KokoroLoadRequest {
   readonly modelId: string
   readonly dtype: KokoroDtype
   readonly device: KokoroDevice
   readonly cacheDir: string
+  /** When false, the load must resolve from the local cache without downloading. */
+  readonly allowDownload: boolean
+  /** Transformers import; tests inject a fake so CI never loads the native runtime. */
+  readonly importTransformers?: () => Promise<TransformersModule>
 }
 
 /**
@@ -99,28 +111,45 @@ function raceAbort<T>(work: Promise<T>, signal?: AbortSignal): Promise<T> {
   })
 }
 
-let cacheDirLock: Promise<void> = Promise.resolve()
+async function importTransformers(): Promise<TransformersModule> {
+  return await import('@huggingface/transformers')
+}
 
-async function withTransformersCacheDir<T>(cacheDir: string, work: () => Promise<T>): Promise<T> {
-  const previousLock = cacheDirLock
+let envLock: Promise<void> = Promise.resolve()
+
+async function withTransformersEnv<T>(
+  importModule: () => Promise<TransformersModule>,
+  cacheDir: string,
+  allowDownload: boolean,
+  work: () => Promise<T>,
+): Promise<T> {
+  const previousLock = envLock
   let release!: () => void
-  cacheDirLock = new Promise((resolve) => { release = resolve })
+  envLock = new Promise((resolve) => { release = resolve })
   await previousLock
-  const transformers = await import('@huggingface/transformers') as { env: { cacheDir: string } }
-  const previousDir = transformers.env.cacheDir
-  transformers.env.cacheDir = cacheDir
   try {
-    return await work()
+    const transformers = await importModule()
+    const previousDir = transformers.env.cacheDir
+    const previousAllowRemote = transformers.env.allowRemoteModels
+    transformers.env.cacheDir = cacheDir
+    if (!allowDownload) transformers.env.allowRemoteModels = false
+    try {
+      return await work()
+    } finally {
+      transformers.env.cacheDir = previousDir
+      transformers.env.allowRemoteModels = previousAllowRemote
+    }
   } finally {
-    transformers.env.cacheDir = previousDir
     release()
   }
 }
 
 /**
  * Default loader: dynamic-import `kokoro-js` and pin the transformers cache
- * directory to `cacheDir` for the duration of the load.
- * @param request - model, dtype, device, cache.
+ * directory to `cacheDir` for the duration of the load. When the request
+ * forbids download, the load runs with `env.allowRemoteModels` off, so a cold
+ * cache fails instead of fetching.
+ * @param request - model, dtype, device, cache, download policy.
  * @param signal - optional cancellation around the download.
  * @returns the loaded engine.
  */
@@ -130,15 +159,20 @@ export async function loadKokoroJs(
 ): Promise<KokoroEngine> {
   throwIfAborted(signal)
   try {
-    return await withTransformersCacheDir(request.cacheDir, async () => {
-      const mod = await import('kokoro-js') as {
-        KokoroTTS: { from_pretrained: (id: string, options: object) => Promise<KokoroEngine> }
-      }
-      return await raceAbort(mod.KokoroTTS.from_pretrained(request.modelId, {
-        dtype: request.dtype,
-        device: request.device,
-      }), signal)
-    })
+    return await withTransformersEnv(
+      request.importTransformers ?? importTransformers,
+      request.cacheDir,
+      request.allowDownload,
+      async () => {
+        const mod = await import('kokoro-js') as {
+          KokoroTTS: { from_pretrained: (id: string, options: object) => Promise<KokoroEngine> }
+        }
+        return await raceAbort(mod.KokoroTTS.from_pretrained(request.modelId, {
+          dtype: request.dtype,
+          device: request.device,
+        }), signal)
+      },
+    )
   } catch (error) {
     if (error instanceof SpeechError) throw error
     throw new SpeechError('failed to load local Kokoro TTS', 'SPEECH_PROVIDER_ERROR', { cause: error })
@@ -222,6 +256,7 @@ export class KokoroTtsProvider implements SpeechTtsProvider {
       dtype: options.dtype,
       device: options.device,
       cacheDir: options.cacheDir,
+      allowDownload: options.allowDownload,
     }, signal).then((engine) => {
       this.engine = engine
       this.loading = undefined

@@ -114,6 +114,40 @@ describe('createSpeechPlayback', () => {
     playback.dispose()
     vi.unstubAllGlobals()
   })
+
+  it('keeps the replacement when an interrupted play rejects late', async () => {
+    let rejectFirst!: (error: Error) => void
+    const plays: Array<() => Promise<void>> = []
+    const created: FakeAudio[] = []
+    class FakeAudio {
+      src = ''
+      onended: (() => void) | null = null
+      onerror: (() => void) | null = null
+      pause = vi.fn()
+      removeAttribute = vi.fn()
+      play = vi.fn(() => (plays.shift() ?? (() => Promise.resolve()))())
+      constructor() { created.push(this) }
+    }
+    vi.stubGlobal('Audio', FakeAudio)
+    vi.stubGlobal('URL', {
+      createObjectURL: () => 'blob:speech',
+      revokeObjectURL: vi.fn(),
+    })
+    const playback = createSpeechPlayback()
+    const a = Symbol('a')
+    const b = Symbol('b')
+    plays.push(() => new Promise<void>((_, rej) => { rejectFirst = rej }))
+    const first = playback.play(a, new Uint8Array([1]), 'audio/wav')
+    plays.push(() => Promise.resolve())
+    const second = playback.play(b, new Uint8Array([2]), 'audio/wav')
+    rejectFirst(new Error('interrupted'))
+    await expect(first).rejects.toThrow(/rejected/u)
+    await second
+    expect(playback.currentOwner()).toBe(b)
+    expect(created.at(-1)?.pause).not.toHaveBeenCalled()
+    playback.dispose()
+    vi.unstubAllGlobals()
+  })
 })
 
 describe('SpeakButton', () => {
@@ -257,7 +291,11 @@ describe('SpeakButton', () => {
 })
 
 describe('MicButton', () => {
-  function mount(options: { sttReady?: boolean; autoSubmit?: boolean } = {}) {
+  function mount(options: {
+    sttReady?: boolean
+    autoSubmit?: boolean
+    transcribe?: SpeechRemote['transcribe']
+  } = {}) {
     const host = stubSettingsScope<SpeechUserSettings>()
     host.publish({
       status: 'ready',
@@ -268,7 +306,7 @@ describe('MicButton', () => {
       ...INITIAL_SPEECH_CLIENT_STATUS,
       sttReady: options.sttReady ?? true,
     })
-    const transcribe = vi.fn(() => Promise.resolve({
+    const transcribe = options.transcribe ?? vi.fn(() => Promise.resolve({
       ok: true as const,
       value: { ok: true as const, value: { text: 'hello from mic' } },
     }))
@@ -652,6 +690,97 @@ describe('MicButton', () => {
     fireEvent.click(ui.getByLabelText(en['mic.idle']))
     await waitFor(() => { expect(ui.getByLabelText(en['mic.recording'])).toBeTruthy() })
     ui.unmount()
+    vi.unstubAllGlobals()
+  })
+
+  it('disables re-entry while the permission prompt is pending', async () => {
+    let resolvePrompt!: (stream: MediaStream) => void
+    const getUserMedia = vi.fn(() => new Promise<MediaStream>((resolve) => { resolvePrompt = resolve }))
+    class FakeRecorder {
+      mimeType = 'audio/webm'
+      ondataavailable: ((event: { data: Blob }) => void) | null = null
+      onstop: (() => void) | null = null
+      start = vi.fn()
+      stop = vi.fn(() => { this.onstop?.() })
+    }
+    vi.stubGlobal('MediaRecorder', FakeRecorder)
+    Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia } })
+    const ui = mount()
+    fireEvent.click(ui.getByLabelText(en['mic.idle']))
+    await waitFor(() => { expect(ui.getByLabelText(en['mic.idle']).hasAttribute('disabled')).toBe(true) })
+    fireEvent.click(ui.getByLabelText(en['mic.idle']))
+    await act(async () => {
+      resolvePrompt({ getTracks: () => [{ stop: vi.fn() }] } as unknown as MediaStream)
+    })
+    await waitFor(() => { expect(ui.getByLabelText(en['mic.recording'])).toBeTruthy() })
+    expect(getUserMedia).toHaveBeenCalledTimes(1)
+    ui.unmount()
+    vi.unstubAllGlobals()
+  })
+
+  it('stops the resolved stream when unmounted while the prompt is pending', async () => {
+    let resolvePrompt!: (stream: MediaStream) => void
+    const stopTrack = vi.fn()
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getUserMedia: vi.fn(() => new Promise<MediaStream>((resolve) => { resolvePrompt = resolve })) },
+    })
+    const recorderConstructor = vi.fn()
+    vi.stubGlobal('MediaRecorder', recorderConstructor)
+    const ui = mount()
+    fireEvent.click(ui.getByLabelText(en['mic.idle']))
+    await waitFor(() => { expect(ui.getByLabelText(en['mic.idle']).hasAttribute('disabled')).toBe(true) })
+    ui.unmount()
+    await act(async () => {
+      resolvePrompt({ getTracks: () => [{ stop: stopTrack }] } as unknown as MediaStream)
+    })
+    expect(stopTrack).toHaveBeenCalledTimes(1)
+    expect(recorderConstructor).not.toHaveBeenCalled()
+    vi.unstubAllGlobals()
+  })
+
+  it('drops the transcript when unmounted before transcribe resolves', async () => {
+    let release!: (value: {
+      ok: true
+      value: { ok: true; value: { text: string } }
+    }) => void
+    const transcribe = vi.fn(() => new Promise<{
+      ok: true
+      value: { ok: true; value: { text: string } }
+    }>((resolve) => { release = resolve }))
+    class FakeRecorder {
+      mimeType = 'audio/webm'
+      ondataavailable: ((event: { data: Blob }) => void) | null = null
+      onstop: (() => void) | null = null
+      start = vi.fn()
+      stop = vi.fn(() => { this.onstop?.() })
+    }
+    class FakeAudioContext {
+      decodeAudioData = vi.fn(async () => ({
+        numberOfChannels: 1,
+        length: 1,
+        sampleRate: 16_000,
+        getChannelData: () => new Float32Array([0]),
+      }))
+      close = vi.fn(async () => undefined)
+    }
+    vi.stubGlobal('MediaRecorder', FakeRecorder)
+    vi.stubGlobal('AudioContext', FakeAudioContext)
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getUserMedia: vi.fn(async () => ({ getTracks: () => [{ stop: vi.fn() }] })) },
+    })
+    const ui = mount({ transcribe })
+    fireEvent.click(ui.getByLabelText(en['mic.idle']))
+    await waitFor(() => { expect(ui.getByLabelText(en['mic.recording'])).toBeTruthy() })
+    fireEvent.click(ui.getByLabelText(en['mic.recording']))
+    await waitFor(() => { expect(transcribe).toHaveBeenCalled() })
+    ui.unmount()
+    await act(async () => {
+      release({ ok: true, value: { ok: true, value: { text: 'late words' } } })
+    })
+    expect(ui.inputActions.setDraft).not.toHaveBeenCalled()
+    expect(ui.inputActions.submit).not.toHaveBeenCalled()
     vi.unstubAllGlobals()
   })
 })

@@ -32,6 +32,8 @@ export interface WhisperEngine {
 export interface WhisperLoadRequest {
   readonly modelId: string
   readonly cacheDir: string
+  /** When false, the pipeline loads local cache files only and never downloads. */
+  readonly allowDownload: boolean
 }
 
 /**
@@ -80,7 +82,9 @@ function raceAbort<T>(work: Promise<T>, signal?: AbortSignal): Promise<T> {
 
 /**
  * Default loader: `@huggingface/transformers` automatic-speech-recognition.
- * @param request - model and cache.
+ * When the request forbids download, the pipeline runs `local_files_only`, so
+ * a cold cache fails instead of fetching.
+ * @param request - model, cache, download policy.
  * @param signal - optional cancellation around the download.
  * @returns the loaded pipeline.
  */
@@ -95,6 +99,7 @@ export async function loadWhisperJs(
     }
     return await raceAbort(mod.pipeline('automatic-speech-recognition', request.modelId, {
       cache_dir: request.cacheDir,
+      local_files_only: !request.allowDownload,
     }), signal)
   } catch (error) {
     if (error instanceof SpeechError) throw error
@@ -176,6 +181,7 @@ export class WhisperSttProvider implements SpeechSttProvider {
     this.loading = options.load({
       modelId: options.modelId,
       cacheDir: options.cacheDir,
+      allowDownload: options.allowDownload,
     }, signal).then((engine) => {
       this.engine = engine
       this.loading = undefined

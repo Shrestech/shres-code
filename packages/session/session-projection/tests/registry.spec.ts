@@ -3,11 +3,12 @@
  * lazy cell build (registration after events, session after registration),
  * the Object.is no-change gate (same reference ⇒ zero change-feed work),
  * snapshot consistency (asOfSeq = last event seq; values from the watermark
- * cache), duplicate-key rejection, stateVersion validation, and effect-tied
+ * cache), per-registration and per-listener drive containment, duplicate-key
+ * rejection, stateVersion validation, and effect-tied
  * removal of registrations and change listeners (HMR safety).
  */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@shres-code/cordis'
 import { z } from 'zod'
 import SessionStore from '@shres-code/shres-code-session'
@@ -125,6 +126,71 @@ describe('SessionProjectionRegistry drive', () => {
     const snapshot = ctx.sessionProjections.snapshot(session)
     expect(snapshot.values['test/count']).toBe(1)
     expect(snapshot.values['test/marks']).toEqual({ marks: [] })
+  })
+
+  it('contains a throwing unit fold: siblings still fold and the offender keeps its pre-event state', async () => {
+    const { ctx, session } = await harness()
+    const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
+    ctx.sessionProjections.register({
+      ...marksUnit(),
+      apply: (state: MarksState, event: SessionEvent) => {
+        if (event.seq === 1) throw new Error('boom')
+        return event.type === 'test/mark' ? event.data : state
+      },
+    })
+    ctx.sessionProjections.register(countUnit())
+    mark(session, ['a'])
+    mark(session, ['b']) // seq 1: the offender's apply throws
+    mark(session, ['c'])
+    // The sibling — registered AFTER the thrower — folded every event.
+    expect(ctx.sessionProjections.snapshot(session).values['test/count']).toBe(3)
+    // The offender's hole is isolated to the throwing event: its cell kept
+    // the pre-event state there, and later events still fold on top of it.
+    expect(ctx.sessionProjections.snapshot(session).values['test/marks']).toEqual({ marks: ['c'] })
+    expect(warn).toHaveBeenCalledTimes(1)
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('"test/marks"'))
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('seq 1'))
+  })
+
+  it('contains a rejecting view: the cell keeps its pre-event state and the drive continues', async () => {
+    const { ctx, session } = await harness()
+    const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
+    ctx.sessionProjections.register({
+      ...marksUnit(),
+      view: (state: MarksState) => {
+        if (state?.marks.includes('bad') === true) throw new Error('boom')
+        return state ?? { marks: [] }
+      },
+    })
+    ctx.sessionProjections.register(countUnit())
+    // The drive validates the view only when a notification is due.
+    ctx.sessionProjections.onChanged(() => {})
+    mark(session, ['ok'])
+    mark(session, ['bad']) // the view rejects for this state
+    mark(session, ['fine'])
+    expect(ctx.sessionProjections.snapshot(session).values['test/marks']).toEqual({ marks: ['fine'] })
+    expect(ctx.sessionProjections.snapshot(session).values['test/count']).toBe(3)
+    expect(warn).toHaveBeenCalledTimes(1)
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('"test/marks"'))
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('seq 1'))
+  })
+
+  it('contains a throwing change listener: later listeners still receive the notification', async () => {
+    const { ctx, session } = await harness()
+    const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
+    ctx.sessionProjections.register(marksUnit())
+    ctx.sessionProjections.onChanged(() => {
+      throw new Error('boom')
+    })
+    const seen: string[] = []
+    ctx.sessionProjections.onChanged((_session, key) => {
+      seen.push(key)
+    })
+    const event = mark(session, ['a'])
+    expect(seen).toEqual(['test/marks'])
+    expect(warn).toHaveBeenCalledTimes(1)
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('"test/marks"'))
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining(`seq ${event.seq}`))
   })
 
   it('shares one unit between registrants of the same key', async () => {

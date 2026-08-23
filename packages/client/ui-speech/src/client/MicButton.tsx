@@ -38,7 +38,9 @@ export function MicButton({
   const settings = useSpeechSettings(s => s.value as SpeechUserSettings | undefined)
   const sttReady = useSpeechStatus(s => s.sttReady)
   const [phase, setPhase] = useState<MicPhase>('idle')
+  const [starting, setStarting] = useState(false)
   const [error, setError] = useState<MicError | undefined>()
+  const mounted = useRef(true)
   const recorder = useRef<MediaRecorder | null>(null)
   const stream = useRef<MediaStream | null>(null)
   const chunks = useRef<Blob[]>([])
@@ -51,13 +53,17 @@ export function MicButton({
     recorder.current = null
   }, [])
 
-  useEffect(() => () => {
-    if (recorder.current !== null && recorder.current.state !== 'inactive') {
-      recorder.current.ondataavailable = null
-      recorder.current.onstop = null
-      recorder.current.stop()
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+      if (recorder.current !== null && recorder.current.state !== 'inactive') {
+        recorder.current.ondataavailable = null
+        recorder.current.onstop = null
+        recorder.current.stop()
+      }
+      releaseStream()
     }
-    releaseStream()
   }, [releaseStream])
 
   const finish = useCallback(async (blob: Blob) => {
@@ -74,6 +80,9 @@ export function MicButton({
         audioBase64: bytesToBase64(wav),
         mediaType: 'audio/wav',
       })
+      // A session switch unmounts the mic mid-transcribe; the departed
+      // session's composer must not receive the draft or the submit.
+      if (!mounted.current) return
       if (!result.ok) {
         setError('failed')
         return
@@ -111,16 +120,27 @@ export function MicButton({
       recorder.current?.stop()
       return
     }
+    /* v8 ignore next -- the disabled button gates re-entry: React flushes `starting` between discrete clicks. */
+    if (starting) return
     if (navigator.mediaDevices === undefined) {
       setError('failed')
       return
     }
     setError(undefined)
+    setStarting(true)
     let mediaStream: MediaStream
     try {
       mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true })
     } catch {
+      setStarting(false)
       setError('permission')
+      return
+    }
+    setStarting(false)
+    // Unmounted while the permission prompt was open: stop the resolved
+    // tracks here — the unmount cleanup already ran and never saw this stream.
+    if (!mounted.current) {
+      for (const track of mediaStream.getTracks()) track.stop()
       return
     }
     stream.current = mediaStream
@@ -149,7 +169,7 @@ export function MicButton({
       releaseStream()
       setError('failed')
     }
-  }, [finish, phase, releaseStream])
+  }, [finish, phase, releaseStream, starting])
 
   const label = phase === 'recording'
     ? t('mic.recording')
@@ -174,7 +194,7 @@ export function MicButton({
         aria-label={label}
         aria-pressed={phase === 'recording' || undefined}
         data-active={phase === 'recording' || undefined}
-        disabled={!sttReady || phase === 'transcribing' || inputActions === undefined}
+        disabled={!sttReady || starting || phase === 'transcribing' || inputActions === undefined}
         onClick={() => { void toggle() }}
       >
         <IconMicOutline16 />

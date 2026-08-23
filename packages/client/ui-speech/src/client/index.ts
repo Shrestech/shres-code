@@ -86,10 +86,14 @@ export function apply(ctx: ClientContext): void {
   const refreshStatus = (): Promise<void> => speech.status().then((result) => {
     if (result.ok) statusStore.set(projectSpeechStatus(result.value))
   }, () => {
-    // Transport failure; keep the last snapshot so a cold first probe does
-    // not disable a later successful refresh.
+    // Transport failure; keep the last snapshot — the connection/reset
+    // re-probe is the recovery path.
   })
   void refreshStatus()
+  ctx.effect(
+    () => ctx.on('connection/reset', () => { void refreshStatus() }),
+    'ui-speech: status re-probe',
+  )
 
   const settingsInject = (): SpeechSettingsInjected => ({
     hooks: { speechSettings: scope, speechStatus: statusStore },

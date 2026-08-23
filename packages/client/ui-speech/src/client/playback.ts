@@ -14,7 +14,9 @@ export interface SpeechPlayback {
    */
   stop(): void
   /**
-   * Replace the current element and mark `owner` as playing.
+   * Replace the current element and mark `owner` as playing. The promise
+   * rejects when the element's `play()` rejects; a play interrupted by a
+   * newer one rejects without stopping the replacement.
    * @param owner - the SpeakButton that started this play.
    * @param bytes - decoded audio body.
    * @param mediaType - WAV or MPEG.
@@ -76,12 +78,17 @@ export function createSpeechPlayback(): SpeechPlayback & { dispose(): void } {
       current = audio
       owner = nextOwner
       notify()
-      audio.onended = () => { stop() }
-      audio.onerror = () => { stop() }
+      // A later play() replaces `current` while this element's play() is
+      // still pending; only the current element may tear down shared state.
+      const stopIfCurrent = (): void => {
+        if (current === audio) stop()
+      }
+      audio.onended = stopIfCurrent
+      audio.onerror = stopIfCurrent
       try {
         await audio.play()
       } catch {
-        stop()
+        stopIfCurrent()
         throw new Error('speech playback was rejected')
       }
     },
