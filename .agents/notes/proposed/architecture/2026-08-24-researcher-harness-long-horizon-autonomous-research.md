@@ -47,6 +47,8 @@ Consumer tools: `experiment_log_run`, `experiment_log_metrics`, `experiment_quer
 
 Cards gain project scope: branded `JspaceCardId` keyed by `WorkspaceId`, states `open → shipped → archived`, durable authority in a `ctx.storageDomain` form, full-history query (`list({state, since, goalSubstring})`). The session log remains the record of what each session saw; the project store is the cross-session truth. `ship` becomes a durable state transition. A new archive tool `project_recall` reads history back into context. Copy-on-fork gives children a native snapshot under the same `JspaceCardId`.
 
+Duration is emergent, never declared: opening a card fixes only which store its events live in (session log or workspace store), and the terminal transitions (`ship`, archive) are explicit acts — no timer expires a card. A two-day program and a three-month program are the same card.
+
 Concurrent-writer policy, fixed up front: per-workspace last-wins, with a conflict line surfaced on the card when a session other than the last writer reads it. History is preserved by the store, so last-wins loses nothing permanently.
 
 Card-carried program bindings make the card the complete durable unit a new session needs — working memory and program configuration travel together. `jspace_open` accepts them at creation; `jspace_note` swaps them with the same departing/incoming discipline as Core. Three bindings:
