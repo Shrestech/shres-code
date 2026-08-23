@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@shres-code/cordis'
+import { CallId } from '@shres-code/shres-code-llm'
 import SessionStore from '@shres-code/shres-code-session'
 import type { Session } from '@shres-code/shres-code-session'
 import TrackerService, {
@@ -112,7 +113,8 @@ describe('TrackerService.logRun', () => {
   it('resolves the request, delegates to the provider, and logs a landed run event', async () => {
     const { tracker, session } = await mount()
     const request = validRequest({ metrics: [{ name: 'loss', value: 0.5 }] })
-    const result = await tracker.logRun(session, request)
+    const callId = CallId('call-1')
+    const result = await tracker.logRun(session, request, callId)
 
     expect(result).toEqual({ kind: 'landed', runId: result.runId })
     expect(tracker.posts).toHaveLength(1)
@@ -123,6 +125,7 @@ describe('TrackerService.logRun', () => {
     const event = session.events.find(entry => entry.type === 'tracker/run')
     expect(event?.data).toMatchObject({
       runId: result.runId,
+      callId,
       experiment: 'study',
       decisionRule: 'val_bpb < 1.0',
       gitSha: 'abc123',
@@ -132,7 +135,7 @@ describe('TrackerService.logRun', () => {
   it('logs a spooled run event and returns the reason when the provider spools', async () => {
     const { tracker, session } = await mount()
     tracker.outcome = 'spooled'
-    const result = await tracker.logRun(session, validRequest())
+    const result = await tracker.logRun(session, validRequest(), CallId('call-2'))
     expect(result).toEqual({ kind: 'spooled', runId: result.runId, reason: 'spooled' })
     const event = session.events.find(entry => entry.type === 'tracker/run')
     expect(event?.data).toMatchObject({ runId: result.runId })
@@ -140,7 +143,7 @@ describe('TrackerService.logRun', () => {
 
   it('rejects an invalid request before calling the provider or writing an event', async () => {
     const { tracker, session } = await mount()
-    await expect(tracker.logRun(session, validRequest({ gitSha: '' }))).rejects.toThrow(TrackerError)
+    await expect(tracker.logRun(session, validRequest({ gitSha: '' }), CallId('call-3'))).rejects.toThrow(TrackerError)
     expect(tracker.posts).toHaveLength(0)
     expect(session.events.some(entry => entry.type === 'tracker/run')).toBe(false)
   })

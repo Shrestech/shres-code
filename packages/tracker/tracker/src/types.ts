@@ -8,6 +8,7 @@
  */
 
 import type { Branded } from '@shres-code/shres-code-brand'
+import type { CallId } from '@shres-code/shres-code-llm'
 
 /**
  * An opaque experiment-run id. Branded so a run id cannot be passed where
@@ -107,6 +108,8 @@ export type TrackerRunResult =
 /** Durable payload of the log-only `tracker/run` event. */
 export interface TrackerRunEvent {
   readonly runId: TrackerRunId
+  /** The tool-call id of the `experiment_log_run` call that produced the run. */
+  readonly callId: CallId
   readonly experiment: string
   readonly decisionRule: string
   readonly gitSha: string
@@ -124,6 +127,7 @@ declare module '@shres-code/shres-code-session/types' {
      * One run logged (or spooled) through `ctx.tracker`. Log-only. Writers pass
      * `{ ignorable: true }`.
      * @param runId - the run's id; identical to its spool entry id when spooled.
+     * @param callId - the tool-call id of the `experiment_log_run` call that produced the run.
      * @param experiment - the experiment this run belongs to.
      * @param decisionRule - the run's decision rule.
      * @param gitSha - the git commit the run reproduced.

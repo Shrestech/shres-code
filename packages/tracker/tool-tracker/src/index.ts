@@ -166,7 +166,7 @@ export function apply(ctx: Context): void {
         ...args.metrics !== undefined ? { metrics: args.metrics } : {},
         ...args.artifacts !== undefined ? { artifacts: args.artifacts } : {},
       }
-      return projectResult(await ctx.tracker.logRun(session, request))
+      return projectResult(await ctx.tracker.logRun(session, request, exec.callId))
     },
     presentCall: args => presentRunCall(args),
   }))

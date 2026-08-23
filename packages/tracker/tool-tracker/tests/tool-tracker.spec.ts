@@ -132,6 +132,7 @@ describe('experiment_log_run', () => {
     const event = agent.session.events.findLast(e => e.type === 'tracker/run')
     expect(event?.data).toMatchObject({
       runId: result.value.runId,
+      callId: expect.any(String),
       experiment: 'study',
       decisionRule: 'val_bpb < 1.0',
       gitSha: 'abc123',

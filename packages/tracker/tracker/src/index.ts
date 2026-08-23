@@ -11,6 +11,7 @@
  */
 
 import { Context, Service } from '@shres-code/cordis'
+import type { CallId } from '@shres-code/shres-code-llm'
 import type { Session } from '@shres-code/shres-code-session'
 import type {
   LogRunRequest,
@@ -95,14 +96,16 @@ export abstract class TrackerService extends Service {
    * the log reflects the post outcome exactly as the caller received it.
    * @param session - owning session; the run event is appended to its log.
    * @param request - the caller's run request (validated and defaulted here).
+   * @param callId - the tool-call id of the `experiment_log_run` call that produced the run.
    * @returns the post outcome with the allocated run id.
    */
-  async logRun(session: Session, request: LogRunRequest): Promise<TrackerRunResult> {
+  async logRun(session: Session, request: LogRunRequest, callId: CallId): Promise<TrackerRunResult> {
     const spec = resolveLogRun(request)
     const runId = newTrackerRunId()
     const result = await this.postRun(runId, spec)
     session.append('tracker/run', {
       runId,
+      callId,
       experiment: spec.experiment,
       decisionRule: spec.decisionRule,
       gitSha: spec.gitSha,
