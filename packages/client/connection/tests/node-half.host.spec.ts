@@ -10,6 +10,14 @@ import type { ApiProxy } from '@shres-code/shres-code-host-apiproxy/api'
 import type { AttachmentStore } from '@shres-code/shres-code-attachment'
 import { RpcId, type ClientRequest } from '@shres-code/shres-code-host-apiproxy/api'
 import type { WebServer, WebRoute, WebUpgradeRoute } from '@shres-code/shres-code-host-webserver'
+import {
+  DEFAULT_MAX_IMAGE_BYTES,
+  DEFAULT_MAX_IMAGE_DIMENSION,
+  DEFAULT_MAX_IMAGE_PIXELS,
+  DEFAULT_MAX_IMAGES_PER_MESSAGE,
+  DEFAULT_MAX_MESSAGE_IMAGE_BYTES,
+} from '@shres-code/shres-code-attachment-local'
+import { DEFAULT_MAX_REQUEST_BODY_BYTES } from '../src/http-bridge.ts'
 import { API_PATH, apply, HOST_EVENTS_PATH, inject, MUX_EVENTS_PATH, type HostConnectionHandle } from '../src/index.ts'
 
 /** Structural webServer fake recording both route registries. */
@@ -90,6 +98,46 @@ async function mounted(config?: { trustedHosts?: string[] }): Promise<{
 }
 
 describe('connection node half', () => {
+  it('carries the shipped image batch, so both downlinks register once apiProxy arrives', async () => {
+    // The capacity assertion guards the same injection block that registers
+    // the two event-stream upgrade routes, and apiProxy typically arrives
+    // after this plugin applies. A shipped aggregate image limit the shipped
+    // carrier cap cannot hold therefore leaves /api serving while both
+    // WebSocket downlinks silently never register, which strands every client
+    // in a reconnect loop with no event stream. Both defaults are read from
+    // their owning packages: hardcoding either here would let them drift apart
+    // again without failing.
+    const ctx = new Context()
+    const routes: WebRoute[] = []
+    const upgrades: WebUpgradeRoute[] = []
+    ctx.provide('webServer', fakeHttpServer(routes, upgrades) as WebServer)
+    ctx.provide('attachments', {
+      imageLimits: {
+        maxImageBytes: DEFAULT_MAX_IMAGE_BYTES,
+        maxImagesPerMessage: DEFAULT_MAX_IMAGES_PER_MESSAGE,
+        maxMessageImageBytes: DEFAULT_MAX_MESSAGE_IMAGE_BYTES,
+        maxImagePixels: DEFAULT_MAX_IMAGE_PIXELS,
+        maxImageDimension: DEFAULT_MAX_IMAGE_DIMENSION,
+        mediaTypes: ['image/png'],
+      },
+    } as unknown as AttachmentStore)
+    const fiber = ctx.plugin({ inject: [...inject], apply })
+    await fiber.await()
+    expect(routes.map(route => route.path)).toEqual([API_PATH])
+
+    ctx.provide('apiProxy', {} as unknown as ApiProxy)
+    await fiber.await()
+    expect(upgrades.map(route => route.path)).toEqual([MUX_EVENTS_PATH, HOST_EVENTS_PATH])
+    await fiber.dispose()
+  })
+
+  it('sizes the default carrier cap for the default aggregate image batch', () => {
+    // The browser sends a batch as base64 inside one JSON body, so the cap
+    // must hold the expanded bytes plus envelope headroom.
+    expect(DEFAULT_MAX_REQUEST_BODY_BYTES)
+      .toBeGreaterThanOrEqual(Math.ceil(DEFAULT_MAX_MESSAGE_IMAGE_BYTES * 4 / 3))
+  })
+
   it('fails loud when the carrier cap cannot hold the configured image batch', () => {
     const ctx = new Context()
     const routes: WebRoute[] = []
