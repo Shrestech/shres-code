@@ -51,6 +51,8 @@ Duration is emergent, never declared: opening a card fixes only which store its 
 
 Concurrent-writer policy, fixed up front: per-workspace last-wins, with a conflict line surfaced on the card when a session other than the last writer reads it. History is preserved by the store, so last-wins loses nothing permanently.
 
+Stage 2 opens with the session-card correctness fixes the [forensics corpus](../feature/2026-08-24-jspace-live-session-forensics.md) escalated; the [uplift F-list](../feature/2026-08-18-jspace-deployment-review-and-uplift-claude.md) owns each item. Goal-epoch reset (F1-3): a second `jspace_open`/`create_goal` epoch must not inherit the previous Goal's Core and Checked — the D1 reopen is the regression fixture. Stale-Next surfacing (F1-4). Stock-card derivation for forked children (F1-8). A completion nudge. The `evidence`-is-a-call-id driver line. The researcher program multiplies each defect: project cards live across goal epochs, the debate protocol forks child sessions that inherit stock cards, and the evidence-backed ship gate taxes every checkpoint at the corpus's ~31% refusal rate. Project scope builds on the corrected session card, not beside it.
+
 Card-carried program bindings make the card the complete durable unit a new session needs — working memory and program configuration travel together. `jspace_open` accepts them at creation; `jspace_note` swaps them with the same departing/incoming discipline as Core. Three bindings:
 
 - `tracker`: `{ provider, lane?, credentialRef? }` — which mounted tracker provider and lane this program posts to. Values name mounted providers; the card never loads plugins. `provider: 'git-spool'` is the rented-pod posture: git run-records plus local spool, no tracker posts, no token.
@@ -138,7 +140,7 @@ The `storage-domain` family already exists with json and sqlite backends; depend
 Each stage ships per-file 100% tests with invariant companions, a real-composition test booting a `cordis.yml` through the Loader with external services mocked, a keyless snapshot through a runnable example, README and catalog regeneration, and its own implemented Agent Note.
 
 1. **Tracker seam** — proves a model-logged run with `decision_rule` + `git_sha` round-trips to the tracker and the git record rebuilds the index; proves spool-then-sync on outage.
-2. **J-Space v2 project scope** — proves two sessions share one card, `ship` is durable, archive queries return history, and evidence-exists denial is enforced through the executor.
+2. **J-Space v2 project scope** — opens with the forensics-escalated session-card fixes (goal-epoch reset with the D1 fixture, stale-Next surfacing, stock-card derivation, completion nudge, `evidence` driver line); then proves two sessions share one card, `ship` is durable, archive queries return history, and evidence-exists denial is enforced through the executor.
 3. **Decision ledger** — proves every decision cites resolvable run ids and git shas.
 4. **Budget seam + guards** — proves an exhausted budget mid-goal stops the turn, pauses the goal with a code, and the model saw the remaining-budget message in the log.
 5. **Debate protocol + researcher preset** — proves a hypothesis survives reviewer challenge before a run launches and a verdict lands in the ledger after; keyless snapshot of one full micro-cycle (hypothesis → debate → mocked run → verdict → ledger → ship digest).
