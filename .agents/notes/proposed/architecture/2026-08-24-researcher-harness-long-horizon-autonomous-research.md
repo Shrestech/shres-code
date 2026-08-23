@@ -4,7 +4,7 @@ Status: proposed
 
 ## Problem
 
-shres-code sessions live minutes to hours. Research programs — gorakh v1/v2 training, evaluation sweeps, replication studies — run days to months. Today the harness cannot host that work: it has no client for the experiment infrastructure those programs already use, its task memory is session-scoped ([jspace](../../../packages/jspace/README.md) holds one card per session, `ship` writes no durable state, closed cards are recoverable only by raw log replay), it has no budget or compute awareness in the loop, and its checkpoints are self-reported — a single model grades its own evidence with a keyword vocabulary.
+shres-code sessions live minutes to hours. Research programs — gorakh v1/v2 training, evaluation sweeps, replication studies — run days to months. Today the harness cannot host that work: it has no client for the experiment infrastructure those programs already use, its task memory is session-scoped ([jspace](../../../../packages/jspace/README.md) holds one card per session, `ship` writes no durable state, closed cards are recoverable only by raw log replay), it has no budget or compute awareness in the loop, and its checkpoints are self-reported — a single model grades its own evidence with a keyword vocabulary.
 
 The human is also the bottleneck. Approvals gate escalations, steering is synchronous, and nothing runs overnight unattended. The requirement this note answers: agents run experiments with no human in the loop inside declared limits, and contested claims are challenged *inside the harness* — the architect and reviewer seats debate the researcher before compute is spent and after evidence lands — so the human attends a periodic ship gate, not the loop.
 
@@ -27,7 +27,7 @@ No run is done without all three legs. The tracker is derived and rebuildable, s
 
 ## Proposal
 
-A researcher composition built entirely from plugins — four capability seams, two guard consumers, one preset, one debate protocol. No change to `packages/core/agent-loop`; everything attaches at documented events, per [plugins-not-loop-changes](../../../docs/architecture.md) and the [capability-seam definition](../../../docs/glossary.md#capability-seam) (Service Definition / Provider / Consumer, complete, never one role).
+A researcher composition built entirely from plugins — four capability seams, two guard consumers, one preset, one debate protocol. No change to `packages/core/agent-loop`; everything attaches at documented events, per [plugins-not-loop-changes](../../../../docs/architecture.md) and the [capability-seam definition](../../../../docs/glossary.md#capability-seam) (Service Definition / Provider / Consumer, complete, never one role).
 
 ### The researcher cycle
 
