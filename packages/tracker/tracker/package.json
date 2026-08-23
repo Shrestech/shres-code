@@ -1,0 +1,46 @@
+{
+  "name": "@shres-code/shres-code-tracker",
+  "description": "Abstract experiment tracking capability seam (ctx.tracker) for the Shres Code — run/metrics/query vocabulary, the required-field logRun validation contract, the provider-post failure taxonomy, and the log-only tracker/run + tracker/metrics session events",
+  "version": "0.1.0-rc.5",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
+    "directory": "packages/tracker/tracker"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./invariant": {
+      "types": "./lib/types/invariant.d.ts",
+      "default": "./lib/invariant.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/invariant.js",
+    "lib/types/**/*.d.ts"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "@shres-code/shres-code-brand": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
+  },
+  "devDependencies": {
+    "@shres-code/shres-code-brand": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
+  }
+}
