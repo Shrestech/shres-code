@@ -27,7 +27,7 @@ No run is done without all three legs. The tracker is derived and rebuildable, s
 
 ## Proposal
 
-A researcher mode composed entirely from plugins — four capability seams, two guard consumers, one preset, one debate protocol. No change to `packages/core/agent-loop`; everything attaches at documented events, per [plugins-not-loop-changes](../../../docs/architecture.md) and the [capability-seam definition](../../../docs/glossary.md#capability-seam) (Service Definition / Provider / Consumer, complete, never one role).
+A researcher composition built entirely from plugins — four capability seams, two guard consumers, one preset, one debate protocol. No change to `packages/core/agent-loop`; everything attaches at documented events, per [plugins-not-loop-changes](../../../docs/architecture.md) and the [capability-seam definition](../../../docs/glossary.md#capability-seam) (Service Definition / Provider / Consumer, complete, never one role).
 
 ### The researcher cycle
 
@@ -58,6 +58,8 @@ Card-carried program bindings make the card the complete durable unit a new sess
 - `promotion`: the policy that elevates a run to a release candidate — required ledger decision (`accepted`), minimum seed count, tracker provenance (with the tested git-only fallback), and whether the human ship gate is mandatory.
 
 Bindings hold references, never secrets: `credentialRef` resolves through `ctx.credentials`; tokens never appear on a card, which is model-visible. The card declares policy; guards and the ship gate enforce it, so a model reading its own card cannot relax its promotion bar.
+
+Two precedence laws keep bindings from duplicating existing configuration planes. **Config declares inventory; the card selects**: which lanes exist and their endpoints live in deployment config, the program's pick lives on the card, and a card naming an unmounted provider fails loud at first use — the card is a request resolved against mounted capability, per resolve(request):Spec. **Deployment floors bound card policy**: guards reject a promotion binding looser than deployment config (a card may be stricter, never weaker), the same separation that keeps plan-mode guidance from relaxing sandbox enforcement. Bindings carry selection and policy values only; behavior toggles belong to presets or plan mode, never to bindings.
 
 Checkpoint verification splits its dimensions. **Evidence-exists** stays mechanical — the `evidence` callId must resolve to a completed non-error tool call in the log, enforced through the executor so denial is real. **Evidence-covers-goal** becomes a reviewer verdict (see the debate protocol) recorded on the check line; `jspace_ship` refuses a Goal with zero evidence-backed checks for the current Goal epoch (the existing `goalOpenedSeq` anchor, extended).
 
