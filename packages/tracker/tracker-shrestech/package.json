@@ -32,6 +32,7 @@
   ],
   "license": "MIT",
   "peerDependencies": {
+    "@shres-code/shres-code-credentials": "workspace:^",
     "@shres-code/shres-code-home-paths": "workspace:^",
     "@shres-code/shres-code-invariants": "workspace:^",
     "@shres-code/shres-code-tracker": "workspace:^",
@@ -41,6 +42,7 @@
     "@shres-code/schemastery": "workspace:^"
   },
   "devDependencies": {
+    "@shres-code/shres-code-credentials": "workspace:^",
     "@shres-code/shres-code-home-paths": "workspace:^",
     "@shres-code/shres-code-invariants": "workspace:^",
     "@shres-code/shres-code-tracker": "workspace:^",

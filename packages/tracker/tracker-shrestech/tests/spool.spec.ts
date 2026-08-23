@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { TrackerSpool, toSpoolEntry } from '@shres-code/shres-code-tracker-shrestech'
+import { TrackerSpool, toMetricSpoolEntry, toSpoolEntry } from '@shres-code/shres-code-tracker-shrestech'
 import type { LogRunSpec, TrackerRunId } from '@shres-code/shres-code-tracker'
 
 const spec: LogRunSpec = {
@@ -69,6 +69,28 @@ describe('TrackerSpool.replay', () => {
   it('returns an empty list and leaves the spool empty on an empty file', async () => {
     const spool = new TrackerSpool(await scratch())
     await expect(spool.replay()).resolves.toEqual([])
+  })
+})
+
+describe('TrackerSpool metric spool', () => {
+  it('appends a metric entry and reads it back', async () => {
+    const path = await scratch()
+    const spool = new TrackerSpool(path)
+    const entry = toMetricSpoolEntry(runId(1), [{ name: 'loss', value: 0.5 }], '2026-08-24T00:00:00.000Z')
+    await spool.enqueueMetrics(entry)
+    await expect(spool.peekMetrics()).resolves.toEqual([entry])
+    await rm(path, { force: true })
+  })
+
+  it('replays drained metric appends deduplicated by run id', async () => {
+    const spool = new TrackerSpool(await scratch())
+    const older = toMetricSpoolEntry(runId(1), [{ name: 'loss', value: 0.5 }], '2026-08-24T00:00:00.000Z')
+    const newer = toMetricSpoolEntry(runId(1), [{ name: 'loss', value: 0.9 }], '2026-08-24T00:01:00.000Z')
+    await spool.enqueueMetrics(older)
+    await spool.enqueueMetrics(newer)
+    await expect(spool.replayMetrics()).resolves.toEqual([newer])
+    // Replay drained the metric spool.
+    await expect(spool.replayMetrics()).resolves.toEqual([])
   })
 })
 

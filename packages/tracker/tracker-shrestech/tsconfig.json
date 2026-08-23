@@ -21,6 +21,9 @@
       "path": "../tracker"
     },
     {
+      "path": "../../credentials/credentials"
+    },
+    {
       "path": "../../util/home-paths"
     },
     {
