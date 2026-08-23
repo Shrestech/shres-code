@@ -6,7 +6,7 @@ The model-facing **Consumer** for the experiment tracking seam (`ctx.tracker`). 
 
 | Tool | Semantics |
 |---|---|
-| `experiment_log_run` | Log one run with its required `experiment`, `hypothesis`, `decisionRule`, `dataVersion`, and `gitSha` (plus optional `metrics`/`artifacts`). Requires an owning agent session (the run is logged to it). Returns the run id and land/spool status. |
+| `experiment_log_run` | Log one run with its required `experiment`, `hypothesis`, `decisionRule`, `dataVersion`, and `gitSha` (plus optional `metrics`/`artifacts`). Requires an owning agent session (the run is logged to it). Returns the run id and land/spool status. The run's `tracker/run` event carries this call's tool-call id. |
 | `experiment_log_metrics` | Append a batched `metrics` list to one run by `runId`. Requires an owning agent session. |
 | `experiment_query` | Query runs by `experiment`, `gitSha`, and `since`, returning run ids and their land/spool status. |
 
@@ -20,9 +20,8 @@ Decided up front: **generic**. All three tools present via `presentCall` returni
 
 ## Model Experience
 
-Tool results retain bounded run data — the run id, the filter fields, and the exact spool reason — while schemas and descriptions carry the required `decision_rule`/`data_version`/`git_sha` ritual. The seam's `tracker/run` and `tracker/metrics` events (written by the service) keep every logged run reconstructable from the session log.
+Tool results retain bounded run data — the run id, the filter fields, and the exact spool reason — while schemas and descriptions carry the required `decision_rule`/`data_version`/`git_sha` ritual. The seam's `tracker/run` and `tracker/metrics` events (written by the service) keep every logged run reconstructable from the session log, and the `tracker/run` event's tool-call id ties each run to the exact call that produced it.
 
 ## Known Limitations and Deferred Work
 
-- **`experiment_query` reads only the provider's stage-1 spool view** — it cannot see landed runs until the tracker-derived index lands with stage 2.
 - **No concurrency-safety opt-in** — the tools make no `isConcurrencySafe` claim; sequential execution is the safe default until run-logging is proven idempotent.
