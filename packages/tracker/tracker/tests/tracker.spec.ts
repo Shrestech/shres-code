@@ -12,6 +12,7 @@ import type {
   LogRunRequest,
   LogRunSpec,
   MetricPoint,
+  RunFilter,
   TrackerRunId,
 } from '@shres-code/shres-code-tracker'
 
@@ -33,7 +34,7 @@ class StubTracker extends TrackerService {
     this.metricPosts.push({ runId, metrics })
   }
 
-  async queryRuns(): ReturnType<TrackerService['queryRuns']> {
+  async queryRuns(_filter: RunFilter): ReturnType<TrackerService['queryRuns']> {
     return []
   }
 }

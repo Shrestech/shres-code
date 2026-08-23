@@ -84,7 +84,7 @@ describe('buildSyncPayload', () => {
   })
 
   it('fails loud on a metric entry whose run id is blank', () => {
-    const bad = { ...toMetricSpoolEntry(runId, [{ name: 'loss', value: 1 }]), runId: ' ' }
+    const bad = { ...toMetricSpoolEntry(runId, [{ name: 'loss', value: 1 }]), runId: ' ' as TrackerRunId }
     expect(() => buildSyncPayload([], [bad])).toThrow(/blank run field/)
   })
 })
@@ -105,7 +105,7 @@ describe('postRunRequest', () => {
   })
 
   it('returns unreachable on a network failure', async () => {
-    await expect(postRunRequest(fetchReturning(Promise.reject(new TypeError('down'))), BASE, TOKEN, runId, spec))
+    await expect(postRunRequest(fetchReturning(new TypeError('down')), BASE, TOKEN, runId, spec))
       .resolves.toBe('unreachable')
   })
 
@@ -133,7 +133,7 @@ describe('postSyncRequest', () => {
   })
 
   it('returns unreachable on a network failure', async () => {
-    await expect(postSyncRequest(fetchReturning(Promise.reject(new Error('down'))), BASE, TOKEN, validSync))
+    await expect(postSyncRequest(fetchReturning(new Error('down')), BASE, TOKEN, validSync))
       .resolves.toEqual({ kind: 'failure', reason: 'unreachable' })
   })
 

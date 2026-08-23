@@ -11,7 +11,7 @@ import type { LogRunSpec, TrackerFailureReason, TrackerRunId } from '@shres-code
 
 /** A provider whose transport lands a post without HTTP (spool/no-spool seam test). */
 class LandingShrestechTracker extends ShrestechTrackerService {
-  protected async attemptPost(_runId: TrackerRunId, _spec: LogRunSpec, _token: string): Promise<'landed' | TrackerFailureReason> {
+  protected override async attemptPost(_runId: TrackerRunId, _spec: LogRunSpec, _token: string): Promise<'landed' | TrackerFailureReason> {
     return 'landed'
   }
 }

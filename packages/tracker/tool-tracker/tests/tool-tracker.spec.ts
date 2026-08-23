@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@shres-code/cordis'
+import { CallId } from '@shres-code/shres-code-llm'
 import ToolRuntime from '@shres-code/shres-code-tools'
 import SystemPrompt from '@shres-code/shres-code-system-prompt'
 import TrackerService from '@shres-code/shres-code-tracker'
@@ -14,6 +15,7 @@ import type {
 import { Session, SessionId } from '@shres-code/shres-code-session'
 
 import * as tool from '../src/index.ts'
+import type { LogMetricsOutput, LogRunOutput, QueryOutput } from '../src/index.ts'
 
 /** A scripted tracker provider: controllable land/spool outcome and query results. */
 class StubTracker extends TrackerService {
@@ -57,11 +59,16 @@ function callTool(ctx: Context, name: string, args: unknown, over: { agent?: Fak
   const agent = 'agent' in over ? over.agent : agentWithSession()
   return ctx.tools.execute({
     signal: testSignal,
-    callId: `call-${++callCounter}`,
+    callId: CallId(`call-${++callCounter}`),
     name,
     arguments: args,
-    ...agent ? { agent } : {},
+    ...agent ? { agent: agent as never } : {},
   })
+}
+
+/** Cast a tool result's JSON value to its canonical output type for assertions. */
+function valueOf<T>(value: unknown): T {
+  return value as T
 }
 
 function text(result: { content: { type: string; text?: string }[] }): string {
@@ -125,13 +132,13 @@ describe('experiment_log_run', () => {
     const result = await callTool(ctx, 'experiment_log_run', runArgs, { agent })
     expect(result.isError).toBe(false)
     if (result.isError) throw new Error('expected experiment_log_run success')
-    expect(result.value.status).toBe('landed')
-    expect(typeof result.value.runId).toBe('string')
+    expect(valueOf<LogRunOutput>(result.value).status).toBe('landed')
+    expect(typeof valueOf<LogRunOutput>(result.value).runId).toBe('string')
     expect(text(result)).toContain('Logged experiment run')
 
     const event = agent.session.events.findLast(e => e.type === 'tracker/run')
     expect(event?.data).toMatchObject({
-      runId: result.value.runId,
+      runId: valueOf<LogRunOutput>(result.value).runId,
       callId: expect.any(String),
       experiment: 'study',
       decisionRule: 'val_bpb < 1.0',
@@ -145,8 +152,8 @@ describe('experiment_log_run', () => {
     const result = await callTool(ctx, 'experiment_log_run', runArgsMinimal)
     expect(result.isError).toBe(false)
     if (result.isError) throw new Error('expected experiment_log_run success')
-    expect(result.value.status).toBe('spooled')
-    expect(result.value.reason).toBe('unreachable')
+    expect(valueOf<LogRunOutput>(result.value).status).toBe('spooled')
+    expect(valueOf<LogRunOutput>(result.value).reason).toBe('unreachable')
     expect(text(result)).toContain('reason: unreachable')
   })
 
@@ -180,7 +187,7 @@ describe('experiment_log_metrics', () => {
     const result = await callTool(ctx, 'experiment_log_metrics', { runId: 'run-1', metrics }, { agent })
     expect(result.isError).toBe(false)
     if (result.isError) throw new Error('expected experiment_log_metrics success')
-    expect(result.value).toEqual({ runId: 'run-1', metricsCount: 2 })
+    expect(valueOf<LogMetricsOutput>(result.value)).toEqual({ runId: 'run-1', metricsCount: 2 })
     expect(text(result)).toContain('Appended 2 metric points to run run-1')
 
     const event = agent.session.events.findLast(e => e.type === 'tracker/metrics')
@@ -208,8 +215,8 @@ describe('experiment_query', () => {
     const result = await callTool(ctx, 'experiment_query', { experiment: 'study' })
     expect(result.isError).toBe(false)
     if (result.isError) throw new Error('expected experiment_query success')
-    expect(result.value.runs).toHaveLength(2)
-    expect(result.value.runs[1]?.reason).toBe('spooled')
+    expect(valueOf<QueryOutput>(result.value).runs).toHaveLength(2)
+    expect(valueOf<QueryOutput>(result.value).runs[1]?.reason).toBe('spooled')
     expect(text(result)).toContain('(not landed: spooled)')
   })
 
@@ -233,7 +240,7 @@ describe('experiment_query', () => {
     const result = await callTool(ctx, 'experiment_query', { gitSha: 'abc123', since: '2026-01-01T00:00:00.000Z' })
     expect(result.isError).toBe(false)
     if (result.isError) throw new Error('expected experiment_query success')
-    expect(result.value.runs).toHaveLength(1)
+    expect(valueOf<QueryOutput>(result.value).runs).toHaveLength(1)
   })
 })
 
