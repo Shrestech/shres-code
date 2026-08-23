@@ -16,7 +16,8 @@ export const inject = ['invariants']
 
 /**
  * No runtime invariant: the registry's own contracts (duplicate-key and
- * stateVersion rejection, effect-tied removal, the Object.is change gate) are
+ * stateVersion rejection, effect-tied removal, the Object.is change gate,
+ * per-callback drive containment) are
  * enforced synchronously inside the service and proven by its spec, the
  * drive relation (every committed `session/event` passes every unit) would
  * require re-running the drive to check — duplicating the implementation

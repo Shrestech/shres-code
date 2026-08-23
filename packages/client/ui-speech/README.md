@@ -4,7 +4,7 @@ Web controls over `ctx.speech`: a composer microphone, an assistant read-aloud b
 
 The host converts audio locally (Kokoro TTS, Whisper tiny.en STT). This package records, decodes MediaRecorder output to PCM16 WAV, plays returned WAV, and writes the transcript through `inputActions.setDraft`.
 
-`status()` drives disablement: the mic and speaker stay unavailable until the selected provider is usable, and the voice picker lists whatever catalog that probe returns.
+`status()` drives disablement: the mic and speaker stay unavailable until the selected provider is usable, and the voice picker lists whatever catalog that probe returns. The probe runs at startup and again on every `connection/reset`, so a transport failure recovers when the connection does.
 
 ## Model Experience
 

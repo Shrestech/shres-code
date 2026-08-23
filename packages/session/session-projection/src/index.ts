@@ -157,6 +157,11 @@ interface Registration {
  * service subscribes to `session/event` once; every committed event passes
  * every registered unit's `apply` (eager drive), and a changed state
  * reference notifies the change feed with the schema-validated view.
+ * Exceptions are contained where they are thrown: a throwing `apply` (or a
+ * `view`/`schema` rejection) skips that event for that unit alone — its
+ * cell keeps the pre-event state — and a throwing change listener never
+ * starves the listeners after it; each contained failure warns through
+ * `ctx.logger` with the unit key and event seq.
  * Cells build lazily — a unit registered after events flowed, or a session
  * older than the registry, folds `init` over the in-memory log on first
  * touch (event or read). Registration is an effect (disposer rides the
@@ -401,7 +406,13 @@ export class SessionProjectionRegistry extends Service {
     return cell
   }
 
-  /** Eager drive: pass one committed event through every registered unit; notify on changed references. */
+  /**
+   * Eager drive: pass one committed event through every registered unit;
+   * notify on changed references. Containment is per registration and per
+   * listener: a throwing `apply` (or a rejecting `view`/`schema`) skips this
+   * event for that unit alone — its cell keeps the pre-event state — and a
+   * throwing listener never starves the listeners after it.
+   */
   private drive(session: Session, event: SessionEvent): void {
     for (const registration of this.registrations.values()) {
       let cell = registration.cells.get(session)
@@ -411,16 +422,37 @@ export class SessionProjectionRegistry extends Service {
         cell = this.buildCell(registration.def, session.events.slice(0, event.seq))
         registration.cells.set(session, cell)
       }
-      const next = registration.def.apply(cell.state, event)
-      const changed = !Object.is(next, cell.state)
-      cell.state = next
-      cell.observedSeq = event.seq
-      if (changed && this.listeners.size > 0) {
-        const value = registration.def.schema.parse(registration.def.view(next))
+      const current = cell
+      this.contain(registration.def.key, event.seq, 'fold', () => {
+        const next = registration.def.apply(current.state, event)
+        const changed = !Object.is(next, current.state)
+        const notify = changed && this.listeners.size > 0
+        // Validate before committing: a rejecting view leaves the cell at its
+        // pre-event state, so the hole stays at this one event.
+        const value = notify ? registration.def.schema.parse(registration.def.view(next)) : undefined
+        current.state = next
+        current.observedSeq = event.seq
+        if (!notify) return
         for (const listener of this.listeners) {
-          listener(session, registration.def.key as Extract<keyof SessionProjectionMap, string>, value, event.seq)
+          this.contain(registration.def.key, event.seq, 'change listener', () => {
+            listener(session, registration.def.key as Extract<keyof SessionProjectionMap, string>, value, event.seq)
+          })
         }
-      }
+      })
+    }
+  }
+
+  /**
+   * Run one drive step with its exception contained: the drive runs inside
+   * cordis `session/event` dispatch (stop-on-throw), so a throwing unit or
+   * change-feed listener must skip only itself — later registrations still
+   * fold the event and later listeners are still called.
+   */
+  private contain(key: string, seq: number, what: 'fold' | 'change listener', step: () => void): void {
+    try {
+      step()
+    } catch (error) {
+      this.ctx.logger.warn(`session projection ${JSON.stringify(key)} ${what} failed at event seq ${seq}: ${String(error)}`)
     }
   }
 }

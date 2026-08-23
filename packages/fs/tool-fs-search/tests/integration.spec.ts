@@ -159,6 +159,21 @@ describe('search tools over the real subprocess service + the packaged rg', () =
     })
   })
 
+  describe('credential fence', () => {
+    it('a directory search never emits credentials content or paths, and the file root is rejected', async () => {
+      await writeFile(join(dir, 'app.credentials.yaml'), 'token: hunter2-secret\n')
+      // The exclusion glob rides every spawn: the content is unreachable by
+      // grep and the path invisible to glob even though the file sits in the
+      // searched tree.
+      expect(text(await call('grep', { pattern: 'hunter2-secret' }, agent()))).toBe('No matches found')
+      expect(text(await call('glob', { pattern: '**/*' }, agent()))).not.toContain('credentials')
+      // An explicit credentials-file root is the fence's rejection instead.
+      const root = await call('grep', { pattern: 'hunter2', path: 'app.credentials.yaml' }, agent())
+      expect(root.isError).toBe(true)
+      expect(root.error).toMatchObject({ info: { name: 'SearchError', code: 'SEARCH_FAILED' } })
+    })
+  })
+
   describe('per-session cwd', () => {
     it('resolves the search in the SESSION workspace, not the process cwd', async () => {
       const sessionDir = await mkdtemp(join(tmpdir(), 'shres-search-session-'))

@@ -351,6 +351,25 @@ describe('WhisperSttProvider', () => {
     await provider.transcribe({ audio: wav, mediaType: 'audio/x-wav' })
     expect(loads).toBe(1)
   })
+
+  it('forwards allowDownload to the loader request', async () => {
+    const seen: boolean[] = []
+    const load: WhisperLoader = (request) => {
+      seen.push(request.allowDownload)
+      return Promise.resolve(async () => ({ text: 'ok' }))
+    }
+    const dir = await mkdtemp(join(tmpdir(), 'shres-whisper-warm-'))
+    try {
+      await writeFile(join(dir, 'marker'), 'x')
+      const off = new WhisperSttProvider(() => resolveOptions({ allowDownload: false, cacheDir: dir }, load))
+      await off.transcribe({ audio: wav, mediaType: 'audio/wav' })
+      const on = new WhisperSttProvider(() => resolveOptions({ allowDownload: true, cacheDir: dir }, load))
+      await on.transcribe({ audio: wav, mediaType: 'audio/wav' })
+      expect(seen).toEqual([false, true])
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('speech-whisper plugin', () => {

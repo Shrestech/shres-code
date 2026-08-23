@@ -120,16 +120,32 @@ describe('ui-speech browser apply', () => {
     await fiber.dispose()
   })
 
-  it('keeps the initial snapshot when status() rejects', async () => {
-    const remote = speechRemote({
-      status: () => Promise.reject(new Error('transport')),
-    })
-    const b = await bench(remote)
+  it('keeps the last snapshot when status() rejects and re-probes on connection/reset', async () => {
+    let reject = true
+    const status = vi.fn((): ReturnType<SpeechRemote['status']> => reject
+      ? Promise.reject(new Error('transport'))
+      : Promise.resolve({
+        ok: true as const,
+        value: {
+          tts: { kind: 'ready' as const, providerId: 'kokoro-tts' },
+          stt: { kind: 'ready' as const, providerId: 'whisper-tiny-en' },
+          voices: [],
+        },
+      }))
+    const b = await bench(speechRemote({ status }))
     const fiber = b.ctx.plugin({ inject: [...inject], apply })
     await fiber.await()
     await Promise.resolve()
     expect(settingsInject(b.slots).hooks.speechStatus.getSnapshot().ttsReady).toBe(false)
+    reject = false
+    b.ctx.emit('connection/reset')
+    await vi.waitFor(() => {
+      expect(settingsInject(b.slots).hooks.speechStatus.getSnapshot().ttsReady).toBe(true)
+    })
     await fiber.dispose()
+    const probes = status.mock.calls.length
+    b.ctx.emit('connection/reset')
+    expect(status.mock.calls.length).toBe(probes)
   })
 
   it('writes settings fields through the bound scope', async () => {
