@@ -25,6 +25,11 @@ export interface SpeechUserSettings {
   autoSubmitVoice: boolean
   /** Language tag forwarded to TTS and STT. */
   language: string
+  /**
+   * When true, the composer is replaced by the talk surface. Transcripts
+   * require explicit confirm before they reach the coding agent.
+   */
+  talkMode: boolean
 }
 
 /** Schema defaults used as the composition entry when no user layer exists. */
@@ -33,6 +38,7 @@ export const DEFAULT_SPEECH_USER_SETTINGS: SpeechUserSettings = {
   voiceId: DEFAULT_SPEECH_VOICE_ID,
   autoSubmitVoice: false,
   language: DEFAULT_SPEECH_LANGUAGE,
+  talkMode: false,
 }
 
 /** Durable speech schema; also the wire envelope the browser scope validates against. */
@@ -41,4 +47,5 @@ export const SpeechUserSettingsSchema: z<SpeechUserSettings> = z.object({
   voiceId: z.string().default(DEFAULT_SPEECH_VOICE_ID),
   autoSubmitVoice: z.boolean().default(false),
   language: z.string().default(DEFAULT_SPEECH_LANGUAGE),
+  talkMode: z.boolean().default(false),
 })

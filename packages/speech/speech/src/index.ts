@@ -49,6 +49,16 @@ export {
   SpeechUserSettingsSchema,
 } from './settings.ts'
 export type { SpeechUserSettings } from './settings.ts'
+export {
+  languagePrimary,
+  modelForLanguage,
+  spokenConfirmEnabled,
+  SPEECH_LANGUAGES,
+  WHISPER_EN_MODEL_ID,
+  WHISPER_MULTI_MODEL_ID,
+  whisperLanguageName,
+} from './languages.ts'
+export type { SpeechLanguageOption } from './languages.ts'
 export { SPEECH_TRUNCATION_CLAUSE, toSpeechScript } from './script.ts'
 export {
   isSpeechInputMediaType,

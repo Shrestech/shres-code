@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@shres-code/shres-code-client-ui-slots'
-import { IconMicOutline16, Tooltip } from '@shres-code/shres-code-client-ui-primitives'
+import { Button, IconMicOutline16, Modal, Tooltip } from '@shres-code/shres-code-client-ui-primitives'
 import type {} from '@shres-code/shres-code-client-ui-conversation/client'
 import type { SpeechUserSettings } from './settings.ts'
 import type { SettingsScope, SnapshotStore } from '@shres-code/shres-code-client-runtime/client'
@@ -16,6 +16,8 @@ export interface MicButtonInjected {
     speechStatus: SnapshotStore<SpeechClientStatus>
   }
   speech: SpeechRemote
+  /** Persist Talk mode from the hands-free offer dialog. */
+  setTalkMode: (enabled: boolean) => void
 }
 
 /** Full mic-button props. */
@@ -33,12 +35,13 @@ type MicError = 'permission' | 'failed' | 'blank'
  * @returns the mic control.
  */
 export function MicButton({
-  inputActions, useSpeechSettings, useSpeechStatus, speech, t,
+  inputActions, useSpeechSettings, useSpeechStatus, speech, setTalkMode, t,
 }: MicButtonProps) {
-  const settings = useSpeechSettings(s => s.value as SpeechUserSettings | undefined)
+  const settings = useSpeechSettings(s => s.value)
   const sttReady = useSpeechStatus(s => s.sttReady)
   const [phase, setPhase] = useState<MicPhase>('idle')
   const [error, setError] = useState<MicError | undefined>()
+  const [offerOpen, setOfferOpen] = useState(false)
   const recorder = useRef<MediaRecorder | null>(null)
   const stream = useRef<MediaStream | null>(null)
   const chunks = useRef<Blob[]>([])
@@ -73,6 +76,7 @@ export function MicButton({
       const result = await speech.transcribe({
         audioBase64: bytesToBase64(wav),
         mediaType: 'audio/wav',
+        ...settings?.language === undefined ? {} : { language: settings.language },
       })
       if (!result.ok) {
         setError('failed')
@@ -104,7 +108,7 @@ export function MicButton({
       }
       setPhase('idle')
     }
-  }, [inputActions, settings?.autoSubmitVoice, speech])
+  }, [inputActions, settings?.autoSubmitVoice, settings?.language, speech])
 
   const toggle = useCallback(async () => {
     if (phase === 'recording') {
@@ -151,6 +155,15 @@ export function MicButton({
     }
   }, [finish, phase, releaseStream])
 
+  const onMicClick = (): void => {
+    if (phase === 'recording') {
+      void toggle()
+      return
+    }
+    if (phase === 'transcribing') return
+    setOfferOpen(true)
+  }
+
   const label = phase === 'recording'
     ? t('mic.recording')
     : phase === 'transcribing'
@@ -167,18 +180,56 @@ export function MicButton({
           : label
 
   return (
-    <Tooltip label={tooltip} side="top">
-      <button
-        type="button"
-        className={css.action}
-        aria-label={label}
-        aria-pressed={phase === 'recording' || undefined}
-        data-active={phase === 'recording' || undefined}
-        disabled={!sttReady || phase === 'transcribing' || inputActions === undefined}
-        onClick={() => { void toggle() }}
-      >
-        <IconMicOutline16 />
-      </button>
-    </Tooltip>
+    <>
+      <Tooltip label={tooltip} side="top">
+        <button
+          type="button"
+          className={css.action}
+          aria-label={label}
+          aria-pressed={phase === 'recording' || undefined}
+          data-active={phase === 'recording' || undefined}
+          disabled={phase === 'transcribing' || inputActions === undefined}
+          onClick={onMicClick}
+        >
+          <IconMicOutline16 />
+        </button>
+      </Tooltip>
+      <Modal
+        open={offerOpen}
+        onClose={() => { setOfferOpen(false) }}
+        title={t('talk.offer.title')}
+        closeLabel={t('talk.offer.close')}
+        description={t('talk.offer.body')}
+        footer={(
+          <>
+            <Button
+              variant="outline"
+              onClick={() => { setOfferOpen(false) }}
+            >
+              {t('talk.offer.dismiss')}
+            </Button>
+            <Button
+              variant="outline"
+              disabled={!sttReady}
+              onClick={() => {
+                setOfferOpen(false)
+                void toggle()
+              }}
+            >
+              {t('talk.offer.dictate')}
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => {
+                setOfferOpen(false)
+                setTalkMode(true)
+              }}
+            >
+              {t('talk.offer.enable')}
+            </Button>
+          </>
+        )}
+      />
+    </>
   )
 }

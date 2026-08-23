@@ -47,6 +47,7 @@ async function bench(remote: SpeechRemote = speechRemote()) {
     children: {
       'conversation.input.right': { kind: 'list', scope: 'session' },
       'conversation.chat.assistant-actions': { kind: 'list', scope: 'session' },
+      'conversation.composer': { kind: 'chain', scope: 'session' },
       'settings.general.item': { kind: 'list', scope: 'root' },
     },
   } as never, () => null)
@@ -80,9 +81,11 @@ describe('ui-speech browser apply', () => {
     await fiber.await()
     expect(b.slots.entries('conversation.input.right').map(entry => entry.options.id)).toEqual(['mic'])
     expect(b.slots.entries('conversation.chat.assistant-actions').map(entry => entry.options.id)).toEqual(['speak'])
+    expect(b.slots.entries('conversation.composer')[0]?.options.priority).toBe(2)
     expect(b.slots.entries('settings.general.item').map(entry => entry.options.id)).toEqual([
       'speech-voice',
       'auto-submit-voice',
+      'speech-language',
     ])
     await fiber.dispose()
     expect(b.slots.entries('conversation.input.right')).toHaveLength(0)

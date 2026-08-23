@@ -1,4 +1,4 @@
-// Keyless assembled-browser coverage for Game mode (#19/#20): the sidebar
+// Keyless assembled-browser coverage for Game mode (#19/#20): the composer
 // switch writes the `game` settings namespace, the fight arena appears on
 // an active goal, and an empty todo list still draws the standing army.
 // Zero model calls.
@@ -32,13 +32,12 @@ describe('web e2e: Game mode fight bar', () => {
 
   it('toggles Game mode, opens a goal, and draws the standing army', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-goal-fight'))
+    await connectFreshWorkspace(page, scaffold.workspaceCwd)
     const gameWrap = page.locator('[data-game-mode]')
     await gameWrap.waitFor({ timeout: 10_000 })
     expect(await gameWrap.getAttribute('data-game-mode')).toBe('off')
     const turnOn = page.getByRole('switch', { name: 'Turn Game mode on' })
     await expect.poll(() => turnOn.isEnabled(), { timeout: 10_000 }).toBe(true)
-
-    await connectFreshWorkspace(page, scaffold.workspaceCwd)
     const input = page.getByPlaceholder('Describe what you want to build')
     await input.waitFor({ timeout: 10_000 })
     await input.fill('/goal hold the pass against an empty army')

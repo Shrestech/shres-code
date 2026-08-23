@@ -423,7 +423,11 @@ export interface ConversationInjected {
    * plugin raised one; the reason is the blocker's own localized copy, which
    * the root renders as the inert composer's placeholder.
    */
-  hooks: { composerBlock: ObservableSnapshot<ComposerBlock | undefined> }
+  hooks: {
+    composerBlock: ObservableSnapshot<ComposerBlock | undefined>
+    /** Talk mode from the speech settings document; false while the scope is loading. */
+    talkMode: ObservableSnapshot<boolean>
+  }
 }
 
 /** Business callbacks injected into the strict Session body seat. */
@@ -561,6 +565,11 @@ export interface ComposerChainProps {
   interactions: readonly PendingInteraction[]
   /** Current conversation facts for feature-owned takeover selectors. */
   session: ConversationSnapshot | undefined
+  /**
+   * When true, the talk surface may elect in place of the typing composer.
+   * Approval and question takeovers still win because they register first.
+   */
+  talkMode?: boolean
 }
 
 /**

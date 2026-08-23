@@ -14,6 +14,7 @@ import {
   type SpeechUserSettings,
 } from '@shres-code/shres-code-speech/settings'
 import {
+  DEFAULT_SPEECH_LANGUAGE as CLIENT_DEFAULT_LANGUAGE,
   DEFAULT_SPEECH_VOICE_ID as CLIENT_DEFAULT_VOICE_ID,
   SPEECH_SETTINGS_NAMESPACE as CLIENT_SETTINGS_NAMESPACE,
 } from '../src/client/settings.ts'
@@ -59,7 +60,9 @@ describe('client-spelled settings constants', () => {
   it('match the Host section values they duplicate', () => {
     expect(CLIENT_SETTINGS_NAMESPACE).toBe(SPEECH_SETTINGS_NAMESPACE)
     expect(CLIENT_DEFAULT_VOICE_ID).toBe(DEFAULT_SPEECH_VOICE_ID)
+    expect(CLIENT_DEFAULT_LANGUAGE).toBe(DEFAULT_SPEECH_USER_SETTINGS.language)
     expect(DEFAULT_SPEECH_USER_SETTINGS.voiceId).toBe(CLIENT_DEFAULT_VOICE_ID)
+    expect(DEFAULT_SPEECH_USER_SETTINGS.talkMode).toBe(false)
   })
 })
 
@@ -274,6 +277,7 @@ describe('MicButton', () => {
     }))
     const speech = { status: vi.fn(), synthesize: vi.fn(), transcribe } as unknown as SpeechRemote
     const inputActions = { setDraft: vi.fn(), submit: vi.fn() }
+    const setTalkMode = vi.fn()
     const ui = renderLoose(MicButton, {
       session: {},
       input: {},
@@ -281,14 +285,26 @@ describe('MicButton', () => {
       useSpeechSettings: hookOf(host.scope),
       useSpeechStatus: hookOf(status),
       speech,
+      setTalkMode,
       t,
     })
-    return { ...ui, transcribe, inputActions }
+    return { ...ui, transcribe, inputActions, setTalkMode }
   }
 
-  it('stays disabled when STT is unavailable', () => {
+  function beginDictate(ui: {
+    getByLabelText: (text: string) => HTMLElement
+    getByRole: (role: string, options?: { name?: string }) => HTMLElement
+  }) {
+    fireEvent.click(ui.getByLabelText(en['mic.idle']))
+    fireEvent.click(ui.getByRole('button', { name: en['talk.offer.dictate'] }))
+  }
+
+  it('opens the Talk offer when STT is unavailable, and blocks Dictate this once', () => {
     const ui = mount({ sttReady: false })
-    expect(ui.getByLabelText(en['mic.idle']).hasAttribute('disabled')).toBe(true)
+    expect(ui.getByLabelText(en['mic.idle']).hasAttribute('disabled')).toBe(false)
+    fireEvent.click(ui.getByLabelText(en['mic.idle']))
+    expect(ui.getByRole('dialog', { name: en['talk.offer.title'] })).toBeTruthy()
+    expect(ui.getByRole('button', { name: en['talk.offer.dictate'] })).toHaveProperty('disabled', true)
   })
 
   it('records, transcribes, and fills the draft', async () => {
@@ -322,7 +338,7 @@ describe('MicButton', () => {
       value: { getUserMedia: vi.fn(async () => ({ getTracks: () => [{ stop: stopTrack }] })) },
     })
     const ui = mount()
-    fireEvent.click(ui.getByLabelText(en['mic.idle']))
+    beginDictate(ui)
     await waitFor(() => { expect(ui.getByLabelText(en['mic.recording'])).toBeTruthy() })
     fireEvent.click(ui.getByLabelText(en['mic.recording']))
     await waitFor(() => { expect(ui.inputActions.setDraft).toHaveBeenCalledWith('hello from mic') })
@@ -357,7 +373,7 @@ describe('MicButton', () => {
       value: { getUserMedia: vi.fn(async () => ({ getTracks: () => [{ stop: vi.fn() }] })) },
     })
     const ui = mount({ autoSubmit: true })
-    fireEvent.click(ui.getByLabelText(en['mic.idle']))
+    beginDictate(ui)
     await waitFor(() => { expect(recorders).toHaveLength(1) })
     fireEvent.click(ui.getByLabelText(en['mic.recording']))
     await waitFor(() => { expect(ui.inputActions.submit).toHaveBeenCalled() })
@@ -370,7 +386,7 @@ describe('MicButton', () => {
       value: { getUserMedia: vi.fn(async () => { throw new Error('denied') }) },
     })
     const ui = mount()
-    fireEvent.click(ui.getByLabelText(en['mic.idle']))
+    beginDictate(ui)
     await waitFor(() => { expect(ui.getByLabelText(en['mic.idle'])).toBeTruthy() })
     vi.unstubAllGlobals()
   })
@@ -392,7 +408,7 @@ describe('MicButton', () => {
       value: { getUserMedia: vi.fn(async () => ({ getTracks: () => [{ stop: vi.fn() }] })) },
     })
     const ui = mount()
-    fireEvent.click(ui.getByLabelText(en['mic.idle']))
+    beginDictate(ui)
     await waitFor(() => { expect(ui.getByLabelText(en['mic.recording'])).toBeTruthy() })
     fireEvent.click(ui.getByLabelText(en['mic.recording']))
     await waitFor(() => { expect(ui.getByLabelText(en['mic.idle'])).toBeTruthy() })
@@ -402,7 +418,7 @@ describe('MicButton', () => {
   it('fails when MediaRecorder or getUserMedia is missing', async () => {
     Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: undefined })
     const missing = mount()
-    fireEvent.click(missing.getByLabelText(en['mic.idle']))
+    beginDictate(missing)
     await waitFor(() => { expect(missing.getByLabelText(en['mic.idle'])).toBeTruthy() })
     cleanup()
     Object.defineProperty(navigator, 'mediaDevices', {
@@ -413,7 +429,7 @@ describe('MicButton', () => {
       throw new Error('no recorder')
     })
     const failed = mount()
-    fireEvent.click(failed.getByLabelText(en['mic.idle']))
+    beginDictate(failed)
     await waitFor(() => { expect(failed.getByLabelText(en['mic.idle'])).toBeTruthy() })
     vi.unstubAllGlobals()
   })
@@ -432,7 +448,7 @@ describe('MicButton', () => {
     })
     vi.stubGlobal('MediaRecorder', StartFailRecorder)
     const startFail = mount()
-    fireEvent.click(startFail.getByLabelText(en['mic.idle']))
+    beginDictate(startFail)
     await waitFor(() => { expect(startFail.getByLabelText(en['mic.idle'])).toBeTruthy() })
     cleanup()
 
@@ -453,7 +469,7 @@ describe('MicButton', () => {
     vi.stubGlobal('MediaRecorder', FakeRecorder)
     vi.stubGlobal('AudioContext', FakeAudioContext)
     const decodeFail = mount()
-    fireEvent.click(decodeFail.getByLabelText(en['mic.idle']))
+    beginDictate(decodeFail)
     await waitFor(() => { expect(decodeFail.getByLabelText(en['mic.recording'])).toBeTruthy() })
     fireEvent.click(decodeFail.getByLabelText(en['mic.recording']))
     await waitFor(() => { expect(decodeFail.getByLabelText(en['mic.idle'])).toBeTruthy() })
@@ -503,9 +519,10 @@ describe('MicButton', () => {
       useSpeechSettings: hookOf(host.scope),
       useSpeechStatus: hookOf(status),
       speech,
+      setTalkMode: vi.fn(),
       t,
     })
-    fireEvent.click(ui.getByLabelText(en['mic.idle']))
+    beginDictate(ui)
     await waitFor(() => { expect(ui.getByLabelText(en['mic.recording'])).toBeTruthy() })
     fireEvent.click(ui.getByLabelText(en['mic.recording']))
     await waitFor(() => { expect(ui.getByLabelText(en['mic.transcribing'])).toBeTruthy() })
@@ -560,9 +577,10 @@ describe('MicButton', () => {
       useSpeechSettings: hookOf(host.scope),
       useSpeechStatus: hookOf(status),
       speech,
+      setTalkMode: vi.fn(),
       t,
     })
-    fireEvent.click(ui.getByLabelText(en['mic.idle']))
+    beginDictate(ui)
     await waitFor(() => { expect(ui.getByLabelText(en['mic.recording'])).toBeTruthy() })
     fireEvent.click(ui.getByLabelText(en['mic.recording']))
     await waitFor(() => { expect(ui.getByLabelText(en['mic.idle'])).toBeTruthy() })
@@ -611,9 +629,10 @@ describe('MicButton', () => {
       useSpeechSettings: hookOf(host.scope),
       useSpeechStatus: hookOf(status),
       speech,
+      setTalkMode: vi.fn(),
       t,
     })
-    fireEvent.click(ui.getByLabelText(en['mic.idle']))
+    beginDictate(ui)
     await waitFor(() => { expect(ui.getByLabelText(en['mic.recording'])).toBeTruthy() })
     fireEvent.click(ui.getByLabelText(en['mic.recording']))
     await waitFor(() => { expect(ui.getByLabelText(en['mic.idle'])).toBeTruthy() })
@@ -649,7 +668,7 @@ describe('MicButton', () => {
       value: { getUserMedia: vi.fn(async () => ({ getTracks: () => [{ stop: vi.fn() }] })) },
     })
     const ui = mount()
-    fireEvent.click(ui.getByLabelText(en['mic.idle']))
+    beginDictate(ui)
     await waitFor(() => { expect(ui.getByLabelText(en['mic.recording'])).toBeTruthy() })
     ui.unmount()
     vi.unstubAllGlobals()

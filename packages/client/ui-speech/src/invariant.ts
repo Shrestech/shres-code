@@ -16,7 +16,7 @@ export const inject = ['invariants']
 
 /**
  * No runtime invariant: host speech conversion is audited by shres-speech,
- * while the mic and speaker are slot effects exercised by this package.
+ * while the mic, speaker, and Talk composer are slot effects exercised here.
  */
 const install: InvariantInstaller = () => {}
 

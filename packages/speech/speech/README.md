@@ -8,8 +8,8 @@ This package owns the Service Definition role of the speech capability, plus the
 |---|---|
 | `@shres-code/shres-code-speech` (this) | Service Definition: the service, provider registries, selection policy, speakable-script conversion, request/result vocabulary, the `SpeechError` taxonomy, and the `speech` Remote |
 | `@shres-code/shres-code-speech-kokoro` | TTS provider: local Kokoro-82M (`kokoro-js`, CPU) |
-| `@shres-code/shres-code-speech-whisper` | STT provider: local Whisper tiny.en |
-| `@shres-code/shres-code-client-ui-speech` | Consumer: Web mic, speaker, and General Settings rows over the Remote |
+| `@shres-code/shres-code-speech-whisper` | STT provider: local Whisper tiny.en (English) or multilingual tiny |
+| `@shres-code/shres-code-client-ui-speech` | Consumer: Web mic, speaker, Talk mode, and General Settings rows over the Remote |
 
 Providers register **capabilities**, not tools. This seam does not register a model-facing tool and does not add audio content blocks to the session log. A transcription becomes ordinary composer text; playback consumes ordinary assistant text.
 
@@ -21,7 +21,7 @@ Providers register **capabilities**, not tools. This seam does not register a mo
 | `synthesize(request, signal?)` | Convert markdown to a speakable script, resolve the TTS provider, and run one synthesis. An empty script returns zero-length audio without calling the provider. Throws `SpeechError` when the capability cannot run. |
 | `transcribe(request, signal?)` | Resolve the STT provider and run one transcription. Enforces `maxAudioBytes`. Throws `SpeechError` when the capability cannot run or the payload is empty, oversized, or the wrong media type. |
 | `status()` | Probe selection without I/O (aside from `listVoices` when TTS is ready). |
-| `settings()` | Current `speech` user-settings section (`readAloud`, `voiceId`, `autoSubmitVoice`, `language`). |
+| `settings()` | Current `speech` user-settings section (`readAloud`, `voiceId`, `autoSubmitVoice`, `language`, `talkMode`). |
 
 Remote methods `status`, `synthesize`, and `transcribe` carry JSON: audio is canonical base64, matching the image-upload check. Business failures return `{ ok: false, error: { code, message } }` rather than throwing across the wire.
 
@@ -46,7 +46,7 @@ A provider's `available()` is a cheap local check (credential presence, parseabl
 
 `maxAudioBytes` and `maxTextChars` are required positive safe integers and fail at load. Provider pins are optional.
 
-The `speech` user-settings namespace (`readAloud` default false, `voiceId` default `af_heart`, `autoSubmitVoice` default false, `language` default `en`) is live: a changed section reaches the next synthesize or transcribe. `readAloud` is reserved for auto-play of a live-closing turn, which is not shipped. Shipped providers are local ONNX (Kokoro TTS, Whisper tiny.en STT); they do not call a paid speech API.
+The `speech` user-settings namespace (`readAloud` default false, `voiceId` default `af_heart`, `autoSubmitVoice` default false, `language` default `en`, `talkMode` default false) is live: a changed section reaches the next synthesize or transcribe. `talkMode` is consumed by the Web Talk composer (spoken yes/no before `session.prompt`). `readAloud` is reserved for auto-play of a live-closing turn, which is not shipped. Shipped providers are local ONNX (Kokoro TTS, Whisper tiny.en or multilingual tiny STT); they do not call a paid speech API.
 
 ## Speakable script
 

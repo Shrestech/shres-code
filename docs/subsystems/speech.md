@@ -17,6 +17,11 @@ interface SpeechUserSettings {
   autoSubmitVoice: boolean
   /** Language tag forwarded to TTS and STT. */
   language: string
+  /**
+   * When true, the composer is replaced by the talk surface. Transcripts
+   * require explicit confirm before they reach the coding agent.
+   */
+  talkMode: boolean
 }
 ```
 

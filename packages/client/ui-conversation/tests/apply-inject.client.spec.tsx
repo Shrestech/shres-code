@@ -50,7 +50,12 @@ async function bench() {
   runtime.provide('connection', { api: { settings: {} }, isLoopback: false })
   // The plugin injects both; these specs exercise no settings path.
   runtime.provide('remote', { $on: () => () => {} })
-  runtime.provide('settingsScope', { bind: () => stubSettingsScope().scope } as never)
+  const speechHost = stubSettingsScope<{ talkMode?: boolean }>()
+  runtime.provide('settingsScope', {
+    bind: (request?: { namespace?: string }) => (
+      request?.namespace === 'speech' ? speechHost.scope : stubSettingsScope().scope
+    ),
+  } as never)
   const sessionFake = sessionFakeFor()
   await runtime.sessions.add({
     id: ROOT,
@@ -124,7 +129,7 @@ async function bench() {
   return {
     runtime, feature, slots: runtime.slots, entryOf,
     conversationApi, conversationHeaderApi, residentApi, composerApi, chatViewApi, inputApi,
-    sessionFake, layoutFake,
+    sessionFake, layoutFake, speechHost,
   }
 }
 
@@ -237,6 +242,15 @@ describe('conversation slot inject API', () => {
     await vi.waitFor(() => {
       expect(b.runtime.workspaces.calls).toContainEqual({ method: 'openPath', args: ['/proj/src/a.ts'] })
     })
+    await b.runtime.dispose()
+  })
+
+  it('projects speech.talkMode onto the resident talkMode hook', async () => {
+    const b = await bench()
+    const resident = b.residentApi(ROOT)
+    expect(resident.hooks.talkMode.getSnapshot()).toBe(false)
+    b.speechHost.publish({ status: 'ready', value: { talkMode: true }, writable: true })
+    expect(resident.hooks.talkMode.getSnapshot()).toBe(true)
     await b.runtime.dispose()
   })
 

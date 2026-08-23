@@ -15,6 +15,8 @@ export interface SpeechUserSettings {
   autoSubmitVoice?: boolean
   /** Language tag forwarded to TTS and STT. */
   language?: string
+  /** When true, the talk surface replaces typing and requires confirm-to-send. */
+  talkMode?: boolean
 }
 
 /** Settings namespace the Host speech section registers. */
@@ -22,3 +24,6 @@ export const SPEECH_SETTINGS_NAMESPACE = 'speech'
 
 /** Voice id the Host section defaults to. */
 export const DEFAULT_SPEECH_VOICE_ID = 'af_heart'
+
+/** BCP-47 tag the Host section defaults to. */
+export const DEFAULT_SPEECH_LANGUAGE = 'en'

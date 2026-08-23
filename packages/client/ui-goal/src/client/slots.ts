@@ -42,7 +42,7 @@ export interface GoalDockInjected extends GoalBarActions {
   }
 }
 
-/** Injected face of the sidebar Game mode switch. */
+/** Injected face of the composer-row Game mode switch. */
 export interface GameModeToggleInjected {
   /** Settings scope for the `game` namespace. */
   hooks: {
