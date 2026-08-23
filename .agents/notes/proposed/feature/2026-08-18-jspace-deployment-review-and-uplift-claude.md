@@ -89,6 +89,8 @@ One real session with the seat enabled, run on `deepseek-v4-pro:cloud` in the sh
 
 Reading: protocol mounting alone does not produce card maintenance on this model. This is direct evidence for F1-3 (goal-bound checkpoints), F1-4 (stale-Next surfacing), a new F1 item — a completion nudge (`ship` reminder or auto-✗ when a turn ends with an open card and a done-claim) — and it validates the W0 concern that the seat's cost is currently paid for little behavioral function. One session, one model; W0 remains the instrument.
 
+A later live corpus (2026-08-23/24, after the control loop) is recorded in [J-Space live-session forensics](2026-08-24-jspace-live-session-forensics.md). Ship now happens; close still does not; reopen can inherit the previous Goal's Core and Checked; stock fork cards and CLI-bridge tool-skip are named there rather than duplicated as a second F-list.
+
 ## Alignment (2026-08-18, post-review)
 
 Two things landed after this review was written and are now accounted for:
