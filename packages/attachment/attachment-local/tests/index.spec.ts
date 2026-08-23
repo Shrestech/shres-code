@@ -21,7 +21,7 @@ describe('local attachment service', () => {
     const service = new LocalAttachmentStore(new Context(), {})
     expect(DEFAULT_MAX_IMAGE_BYTES).toBe(20 * 1024 * 1024)
     expect(DEFAULT_MAX_IMAGES_PER_MESSAGE).toBe(20)
-    expect(DEFAULT_MAX_MESSAGE_IMAGE_BYTES).toBe(200 * 1024 * 1024)
+    expect(DEFAULT_MAX_MESSAGE_IMAGE_BYTES).toBe(100 * 1024 * 1024)
     expect(DEFAULT_MAX_IMAGE_PIXELS).toBe(64_000_000)
     expect(DEFAULT_MAX_IMAGE_DIMENSION).toBe(8192)
     expect(service.imageLimits).toEqual({
