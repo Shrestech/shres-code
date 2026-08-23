@@ -49,6 +49,14 @@ Cards gain project scope: branded `JspaceCardId` keyed by `WorkspaceId`, states 
 
 Concurrent-writer policy, fixed up front: per-workspace last-wins, with a conflict line surfaced on the card when a session other than the last writer reads it. History is preserved by the store, so last-wins loses nothing permanently.
 
+Card-carried program bindings make the card the complete durable unit a new session needs — working memory and program configuration travel together. `jspace_open` accepts them at creation; `jspace_note` swaps them with the same departing/incoming discipline as Core. Three bindings:
+
+- `tracker`: `{ provider, lane?, credentialRef? }` — which mounted tracker provider and lane this program posts to. Values name mounted providers; the card never loads plugins. `provider: 'git-spool'` is the rented-pod posture: git run-records plus local spool, no tracker posts, no token.
+- `artifacts`: `{ store: 'modelstore', namespace, uriPrefix }` — where run artifacts are pushed; every `artifacts[]` entry a run logs must carry the prefix, so `modelstore://` URIs are consistent program-wide.
+- `promotion`: the policy that elevates a run to a release candidate — required ledger decision (`accepted`), minimum seed count, tracker provenance (with the tested git-only fallback), and whether the human ship gate is mandatory.
+
+Bindings hold references, never secrets: `credentialRef` resolves through `ctx.credentials`; tokens never appear on a card, which is model-visible. The card declares policy; guards and the ship gate enforce it, so a model reading its own card cannot relax its promotion bar.
+
 Checkpoint verification splits its dimensions. **Evidence-exists** stays mechanical — the `evidence` callId must resolve to a completed non-error tool call in the log, enforced through the executor so denial is real. **Evidence-covers-goal** becomes a reviewer verdict (see the debate protocol) recorded on the check line; `jspace_ship` refuses a Goal with zero evidence-backed checks for the current Goal epoch (the existing `goalOpenedSeq` anchor, extended).
 
 ### Seam 3 — decision ledger (`packages/ledger/`)
