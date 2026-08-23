@@ -307,6 +307,7 @@ export default class JspaceService extends Service {
     if (input.core !== undefined || input.departing !== undefined) {
       const incoming = input.core === undefined ? undefined : line(input.core, 'core')
       if (input.departing === undefined) {
+        /* v8 ignore next -- unreachable: entering this branch requires core, which defines incoming */
         if (incoming === undefined) {
           throw new JspaceError(
             'jspace core swap requires departing and incoming lines',
@@ -356,6 +357,44 @@ export default class JspaceService extends Service {
       open,
       next,
       goalOpenedSeq: goal === current.goal ? current.goalOpenedSeq : eventSeq,
+    })
+  }
+
+  /**
+   * Open a new Goal epoch on an open card, or update Goal and Next in place
+   * when the Goal is unchanged. A Goal identity change resets Core and Checked
+   * so ship cannot pass on the previous epoch's evidence, and moves the epoch
+   * anchor so a fresh checkpoint is required. A same-Goal call is the
+   * control-loop update path: Core, Checked, and Open are kept and the anchor
+   * is unchanged. Open questions carry over untouched on a new epoch. The
+   * optional `core` input applies only on the first open and is ignored here.
+   * @param session - owning session.
+   * @param input - goal, next, optional core.
+   * @returns the recorded card.
+   */
+  openGoal(session: Session, input: OpenJspaceInput): JspaceCard {
+    this.requireActive()
+    const current = this.requireCard(session)
+    const goal = line(input.goal, 'goal')
+    const next = line(input.next, 'next')
+    if (goal === current.goal) {
+      return this.writeCard(session, {
+        ...current,
+        seq: this.nextSeq(session),
+        sessionId: session.id,
+        goal,
+        next,
+      })
+    }
+    return this.writeCard(session, {
+      seq: this.nextSeq(session),
+      sessionId: session.id,
+      goal,
+      core: [],
+      checked: [],
+      open: current.open,
+      next,
+      goalOpenedSeq: session.seq,
     })
   }
 

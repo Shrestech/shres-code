@@ -174,10 +174,10 @@ describe('jspace tools', () => {
     expect(text(opened)).toBe('Opened J-Space.')
     expect(ctx.jspace.card(agent.session)?.core).toEqual(['seat'])
 
-    const already = await execute(ctx, 'jspace_open', { goal: 'X', next: 'Y' }, agent)
+    const already = await execute(ctx, 'jspace_open', { goal: 'Ship W3', next: 'Y' }, agent)
     expect(already.isError).toBe(false)
     expect(text(already)).toBe('Updated J-Space.')
-    expect(ctx.jspace.card(agent.session)).toMatchObject({ goal: 'X', next: 'Y', core: ['seat'] })
+    expect(ctx.jspace.card(agent.session)).toMatchObject({ goal: 'Ship W3', next: 'Y', core: ['seat'] })
 
     const appended = await execute(ctx, 'jspace_note', { core: 'tools' }, agent)
     expect(appended.isError).toBe(false)
@@ -284,6 +284,49 @@ describe('jspace tools', () => {
     expect(again.isError).toBe(false)
     if (again.isError) throw new Error('expected ship success')
     expect(again.value).toEqual({ shipped: true })
+  })
+
+  it('resets Core and Checked on a different-Goal open and re-gates ship', async () => {
+    const { ctx, agent } = await harness()
+    await execute(ctx, 'jspace_open', {
+      goal: 'G1',
+      next: 'B',
+      core: ['one', 'two'],
+    }, agent)
+    await execute(ctx, 'jspace_checkpoint', {
+      check: 'c1',
+      by: 'unit tests covering the fold',
+    }, agent)
+    await execute(ctx, 'jspace_checkpoint', {
+      check: 'c2',
+      by: 'unit tests covering the fold',
+    }, agent)
+    const g1 = await execute(ctx, 'jspace_ship', {}, agent)
+    expect(g1.isError).toBe(false)
+
+    await execute(ctx, 'jspace_open', { goal: 'D1', next: 'Start' }, agent)
+    const card = ctx.jspace.card(agent.session)
+    expect(card?.core).toEqual([])
+    expect(card?.checked).toEqual([])
+
+    const stale = await execute(ctx, 'jspace_ship', {}, agent)
+    expect(stale.isError).toBe(true)
+    expect(text(stale)).toContain('checkpoint for the current Goal')
+
+    await execute(ctx, 'jspace_checkpoint', {
+      check: 'd1',
+      by: 'unit tests covering the fold',
+    }, agent)
+    const pass = await execute(ctx, 'jspace_ship', {}, agent)
+    expect(pass.isError).toBe(false)
+
+    await execute(ctx, 'jspace_open', { goal: 'D1', next: 'Next step' }, agent)
+    expect(ctx.jspace.card(agent.session)).toMatchObject({
+      goal: 'D1',
+      next: 'Next step',
+      checked: [{ n: 1, check: 'd1', by: 'unit tests covering the fold' }],
+    })
+    expect(ctx.jspace.card(agent.session)?.core).toEqual([])
   })
 
   it('rejects a non-agent caller and remaps seat errors', async () => {

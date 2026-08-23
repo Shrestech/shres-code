@@ -144,7 +144,7 @@ function registerTools(ctx: Context): () => void {
       const agent = requireAgent(exec, 'jspace_open')
       return Promise.resolve(runJspace(() => {
         if (ctx.jspace.card(agent.session) !== null) {
-          ctx.jspace.note(agent.session, { goal: args.goal, next: args.next })
+          ctx.jspace.openGoal(agent.session, { goal: args.goal, next: args.next })
           return { opened: true, replaced: true }
         }
         ctx.jspace.open(agent.session, {

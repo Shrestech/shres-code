@@ -113,6 +113,7 @@ describe('JspaceService card log', () => {
     expect(grow.jspace.note(emptyCore, { core: 'first' }).core).toEqual(['first'])
     expect(() => ctx.jspace.note(session, { core: 'new' })).toThrow(/departing/)
     expect(() => ctx.jspace.note(session, { departing: 'missing', core: 'new' })).toThrow(/does not hold/)
+    expect(() => ctx.jspace.note(session, { departing: 'old' })).toThrow(/departing/)
     const next = ctx.jspace.note(session, { departing: 'old', core: 'new', next: 'C' })
     expect(next.core).toEqual(['new', 'keep'])
     expect(next.next).toBe('C')
@@ -242,6 +243,49 @@ describe('JspaceService card log', () => {
       open: [{ question: 'Q2', settles: 'S' }],
     }).open).toEqual([{ question: 'Q2', settles: 'S' }])
     expect(ctx.jspace.note(session, { next: 'later' }).next).toBe('later')
+  })
+
+  it('openGoal resets Core and Checked on a Goal epoch change and carries Open', async () => {
+    const { ctx, session } = await harness()
+    const opened = ctx.jspace.open(session, { goal: 'G1', next: 'B', core: ['one', 'two'] })
+    ctx.jspace.checkpoint(session, { check: 'c1', by: 'unit tests' })
+    ctx.jspace.checkpoint(session, { check: 'c2', by: 'unit tests' })
+    const noted = ctx.jspace.note(session, { open: [{ question: 'Q' }] })
+    const epoch = ctx.jspace.openGoal(session, { goal: 'D1', next: 'Start' })
+    expect(epoch.goal).toBe('D1')
+    expect(epoch.next).toBe('Start')
+    expect(epoch.core).toEqual([])
+    expect(epoch.checked).toEqual([])
+    expect(epoch.open).toEqual([{ question: 'Q' }])
+    expect(epoch.goalOpenedSeq).toBeGreaterThan(noted.goalOpenedSeq)
+    expect(ctx.jspace.card(session)?.checked).toEqual([])
+    const replay = new Context()
+    await replay.plugin(SessionStore)
+    await replay.plugin(JspaceService, { enabled: true })
+    const copy = replay.sessions.create(SessionId('ws-reopen-replay'), { seed: session.events })
+    expect(replay.jspace.card(copy)?.checked).toEqual([])
+    expect(replay.jspace.card(copy)?.core).toEqual([])
+    void opened
+  })
+
+  it('openGoal with the same Goal updates Goal and Next in place without resetting', async () => {
+    const { ctx, session } = await harness()
+    const opened = ctx.jspace.open(session, { goal: 'A', next: 'B', core: ['keep'] })
+    ctx.jspace.checkpoint(session, { check: 'c1', by: 'unit tests' })
+    const same = ctx.jspace.openGoal(session, { goal: 'A', next: 'C' })
+    expect(same.goal).toBe('A')
+    expect(same.next).toBe('C')
+    expect(same.core).toEqual(['keep'])
+    expect(same.checked).toHaveLength(1)
+    expect(same.goalOpenedSeq).toBe(opened.goalOpenedSeq)
+  })
+
+  it('openGoal requires an active seat and an open card', async () => {
+    const disabled = await harness({ enabled: false })
+    expect(() => disabled.ctx.jspace.openGoal(disabled.session, { goal: 'A', next: 'B' }))
+      .toThrow(/disabled/)
+    const { ctx, session } = await harness()
+    expect(() => ctx.jspace.openGoal(session, { goal: 'A', next: 'B' })).toThrow(/not open/)
   })
 
   it('accepts a checkpoint without coverage when requireCoverage is false', async () => {
