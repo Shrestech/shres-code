@@ -24,7 +24,9 @@ Default-off host seat for the J-Space card. This package remounts from the `jspa
 
 ## Service
 
-`ctx.jspace` accepts a live `Session`. `open`, `note`, `checkpoint`, and `close` append `{ ignorable: true }` events. `card(session)` and `fold(session)` replay the log. A fork with an inherited parent card receives a native copy (`seq` 1, child `sessionId`) while the seat is active.
+`ctx.jspace` accepts a live `Session`. `open`, `openGoal`, `note`, `checkpoint`, and `close` append `{ ignorable: true }` events. `card(session)` and `fold(session)` replay the log. A fork with an inherited parent card receives a native copy (`seq` 1, child `sessionId`) while the seat is active.
+
+`open` refuses while a card is open (`JSPACE_ALREADY_OPEN`). `openGoal` opens a new Goal epoch on an open card: a Goal identity change resets Core and Checked and moves the `goalOpenedSeq` anchor so ship requires a checkpoint under the new Goal; a same-Goal call updates Goal and Next in place and keeps Core, Checked, and Open. `note` goal updates refine the Goal within the epoch and never reset Core or Checked. Open questions carry over unchanged across an epoch change.
 
 `watch(listener)` fires on remount so later consumers can dispose tools and the prompt section.
 
