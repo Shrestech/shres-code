@@ -438,7 +438,13 @@ describe('SpeechRuntime environment and config', () => {
 
   it('exposes default user settings', async () => {
     const { speech } = await mountSpeech()
-    expect(speech.settings()).toMatchObject({ readAloud: false, voiceId: 'af_heart', autoSubmitVoice: false })
+    expect(speech.settings()).toEqual({
+      readAloud: false,
+      voiceId: 'af_heart',
+      autoSubmitVoice: false,
+      language: 'en',
+      talkMode: false,
+    })
   })
 
   it('picks up a live speech settings section', async () => {

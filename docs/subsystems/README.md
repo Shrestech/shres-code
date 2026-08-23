@@ -37,7 +37,7 @@ One page per subsystem of the Shres Code: what it is, the data structures it mov
 | [compaction.md](compaction.md) | the compaction seam: the `compaction/*` session events, `CompactionResult`, the `CompactionEngine` interface |
 | [subagent.md](subagent.md) | the subagent seam: the named-provider registry, `SubagentStartRequest`/`Result`/`Run`, the start-time-vs-runtime capability split |
 | [web.md](web.md) | the web access seam: `WebSearchRequest`/`Result`, `WebFetchRequest`/`Result`, `WebFetchBody`, provider availability, `WebError` |
-| [speech.md](speech.md) | the speech I/O seam: `SpeechSynthesizeRequest`/`Result`, `SpeechTranscribeRequest`/`Result`, provider selection, Web mic and speaker |
+| [speech.md](speech.md) | the speech I/O seam: `SpeechSynthesizeRequest`/`Result`, `SpeechTranscribeRequest`/`Result`, provider selection, Web mic, speaker, and Talk mode |
 | [spill.md](spill.md) | the spill storage seam: `SaveTextSpill`, `SpillOwner`/`SpillSource`, `SpillRef`, the branded `SpillLocator` |
 | [workflow.md](workflow.md) | the workflow seam: `WorkflowStartRequest`, `WorkflowMeta`, `WorkflowRun`/`Result`, the `workflow/*` event payloads, `WorkflowError` fatality |
 | [jobs.md](jobs.md) | the background-job runtime: branded `JobId`s, the producer contract, consumer views, and `ctx.jobs` service behavior |

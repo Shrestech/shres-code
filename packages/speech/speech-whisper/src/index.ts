@@ -1,18 +1,20 @@
 /**
- * Register a local Whisper tiny.en STT provider on `ctx.speech`. Weights
- * load on first transcribe into the harness model cache; no API key is
- * required. The client must send PCM16 WAV (it decodes MediaRecorder output
- * with Web Audio before the Remote call).
+ * Register a local Whisper STT provider on `ctx.speech`. English uses tiny.en;
+ * other languages use multilingual tiny. Weights load on first transcribe
+ * into the harness model cache; no API key is required. The client must send
+ * PCM16 WAV (it decodes MediaRecorder output with Web Audio before the Remote
+ * call).
  * @module @shres-code/shres-code-speech-whisper
  */
 
+import { join } from 'node:path'
 import type { Context } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
 import { shresHomePath } from '@shres-code/shres-code-home-paths'
+import { modelForLanguage } from '@shres-code/shres-code-speech'
 import type {} from '@shres-code/shres-code-speech'
 import {
   loadWhisperJs,
-  WHISPER_DEFAULT_MODEL_ID,
   WhisperSttProvider,
 } from './provider.ts'
 import type { WhisperLoader, WhisperSttOptions } from './provider.ts'
@@ -25,7 +27,7 @@ export {
   WhisperSttProvider,
 } from './provider.ts'
 export type {
-  WhisperAsrResult, WhisperEngine, WhisperLoadRequest, WhisperLoader, WhisperSttOptions,
+  WhisperAsrResult, WhisperEngine, WhisperEngineOptions, WhisperLoadRequest, WhisperLoader, WhisperSttOptions,
 } from './provider.ts'
 export {
   decodePcm16Wav,
@@ -48,7 +50,7 @@ export const inject = ['speech']
 
 /** Plugin config (all optional — `apply` fills defaults). */
 export interface Config {
-  /** Hugging Face model id. */
+  /** Hugging Face model id. When omitted, English uses tiny.en and others use multilingual tiny. */
   modelId?: string
   /** Cache directory for downloaded weights. */
   cacheDir?: string
@@ -56,11 +58,13 @@ export interface Config {
   allowDownload?: boolean
   /** When false, the backend is omitted from the pool. Defaults to on. */
   enabled?: boolean
+  /** BCP-47 tag; filled from speech settings at apply time. */
+  language?: string
 }
 
-/** Loader-validated plugin config for local Whisper tiny.en. */
+/** Loader-validated plugin config for local Whisper. */
 export const Config: z<Config> = z.object({
-  modelId: z.string().default(WHISPER_DEFAULT_MODEL_ID),
+  modelId: z.string(),
   cacheDir: z.string(),
   allowDownload: z.boolean().default(true),
   enabled: z.boolean().default(true),
@@ -73,16 +77,22 @@ export const Config: z<Config> = z.object({
  * @returns provider options.
  */
 export function resolveOptions(config: Config, load: WhisperLoader = loadWhisperJs): WhisperSttOptions {
+  const language = config.language ?? 'en'
+  const modelId = config.modelId ?? modelForLanguage(language)
   return {
     enabled: config.enabled !== false,
     allowDownload: config.allowDownload !== false,
-    modelId: config.modelId ?? WHISPER_DEFAULT_MODEL_ID,
-    cacheDir: config.cacheDir ?? shresHomePath('models', 'speech', 'whisper'),
+    modelId,
+    language,
+    cacheDir: config.cacheDir ?? join(shresHomePath('models', 'speech', 'whisper'), modelId.replaceAll('/', '__')),
     load,
   }
 }
 
 /** Register the Whisper STT provider with `ctx.speech`. */
 export function apply(ctx: Context, config: Config): void {
-  ctx.speech.registerSttProvider(new WhisperSttProvider(() => resolveOptions(config)))
+  ctx.speech.registerSttProvider(new WhisperSttProvider(() => {
+    const language = ctx.speech.settings().language
+    return resolveOptions({ ...config, language })
+  }))
 }

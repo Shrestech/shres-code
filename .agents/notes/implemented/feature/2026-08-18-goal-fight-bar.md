@@ -8,7 +8,7 @@ The Goal strip reported phase and objective only. Remaining work (incomplete tod
 
 ## Decision
 
-Game mode is off by default. A switch labeled Game sits in the sidebar logo row beside the wordmark (`sidebar.brand.action`) and writes the `game` settings namespace (`enabled`). The Goal fight arena renders only while that document is ready and `enabled` is true.
+Game mode is off by default. A switch labeled Game sits in the composer tool row beside J-Space (`conversation.input.left`) and writes the `game` settings namespace (`enabled`). The Goal fight arena renders only while that document is ready and `enabled` is true.
 
 An active, paused, or blocked GoalBar then draws a 32px fight arena at the left of the strip. The fearless girl (ponytail, sword, green S-shield) stands on the left. Each incomplete todo is one zombie, capped at six, in list order. When a remaining todo id leaves the list, she steps forward, slashes, and that zombie scatters. Paused and blocked goals, and `prefers-reduced-motion: reduce`, drop missing units immediately and do not shuffle.
 
@@ -30,7 +30,9 @@ Sprites are inlined data URLs in `packages/client/ui-goal/src/client/sprites.ts`
 
 **Keep Game mode as a local React flag with no settings namespace.** Rejected: the switch would reset on reload and could not cross the Host settings wire.
 
-**Put the switch only on a Settings page.** Rejected: the request is the logo row. The `game` namespace is still the durable store so a later Settings page can bind the same document.
+**Put the switch only on a Settings page.** Rejected: the switch has to stay next to the chat. The `game` namespace is still the durable store so Settings can bind the same document.
+
+**Keep the switch in the sidebar logo row.** Rejected: it crowds the wordmark. Game sits beside J-Space in the composer tool row.
 
 ## Consequences
 

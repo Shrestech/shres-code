@@ -14,7 +14,7 @@ export type ConversationRootProps = ConversationSlotProps
 
 export function ConversationRoot({
   sessionId, useSession, useSessions, useWorkspaces, useInput, useComposerBlock,
-  renderSlot, renderSlotChain, selectWorkspace, t,
+  useTalkMode, renderSlot, renderSlotChain, selectWorkspace, t,
 }: ConversationRootProps) {
   const openState = useSession(s => s.openState)
   const composerPhase = useSession(s => s.composerPhase)
@@ -27,6 +27,7 @@ export function ConversationRoot({
   // A plugin this package cannot import (ui-model-selection) says this session cannot
   // send; its reason is already localized by whoever raised it.
   const composerBlock = useComposerBlock(block => block)
+  const talkMode = useTalkMode(on => on)
 
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pendingWorkspaceId, setPendingWorkspaceId] = useState<WorkspaceId | undefined>()
@@ -169,7 +170,7 @@ export function ConversationRoot({
   const phase = settling ? 'settling' : hero ? 'hero' : 'active'
   const composer = renderSlotChain(
     'conversation.composer',
-    { interactions: pending, session },
+    { interactions: pending, session, talkMode },
     { fallback: composerBar, overlay: true },
   )
 

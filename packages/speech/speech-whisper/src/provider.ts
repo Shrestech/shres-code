@@ -10,6 +10,7 @@ import type {
   SpeechTranscribeRequest,
   SpeechTranscribeResult,
 } from '@shres-code/shres-code-speech'
+import { whisperLanguageName } from '@shres-code/shres-code-speech'
 import { decodePcm16Wav, prepareWhisperSamples, stripWhisperTranscript } from './wav.ts'
 
 /** Stable STT id this provider registers under. */
@@ -23,15 +24,23 @@ export interface WhisperAsrResult {
   readonly text?: string
 }
 
+/** Optional ASR generation kwargs. */
+export interface WhisperEngineOptions {
+  /** Transformers Whisper language name for the multilingual checkpoint. */
+  readonly language?: string
+}
+
 /** Minimal ASR face; tests inject a fake. Transformers 3.8 takes a Float32Array, not a `{ raw }` object. */
 export interface WhisperEngine {
-  (audio: Float32Array): Promise<WhisperAsrResult>
+  (audio: Float32Array, options?: WhisperEngineOptions): Promise<WhisperAsrResult>
 }
 
 /** Options for {@link WhisperLoader}. */
 export interface WhisperLoadRequest {
   readonly modelId: string
   readonly cacheDir: string
+  /** When false, the pipeline loads local cache files only and never downloads. */
+  readonly allowDownload: boolean
 }
 
 /**
@@ -47,6 +56,8 @@ export interface WhisperSttOptions {
   readonly modelId: string
   readonly cacheDir: string
   readonly load: WhisperLoader
+  /** BCP-47 tag from speech settings; selects checkpoint and pipeline language. */
+  readonly language: string
 }
 
 /* v8 ignore start -- default loader talks to Hugging Face; unit tests inject a fake engine. */
@@ -80,7 +91,9 @@ function raceAbort<T>(work: Promise<T>, signal?: AbortSignal): Promise<T> {
 
 /**
  * Default loader: `@huggingface/transformers` automatic-speech-recognition.
- * @param request - model and cache.
+ * When the request forbids download, the pipeline runs `local_files_only`, so
+ * a cold cache fails instead of fetching.
+ * @param request - model, cache, download policy.
  * @param signal - optional cancellation around the download.
  * @returns the loaded pipeline.
  */
@@ -95,6 +108,7 @@ export async function loadWhisperJs(
     }
     return await raceAbort(mod.pipeline('automatic-speech-recognition', request.modelId, {
       cache_dir: request.cacheDir,
+      local_files_only: !request.allowDownload,
     }), signal)
   } catch (error) {
     if (error instanceof SpeechError) throw error
@@ -123,6 +137,7 @@ export class WhisperSttProvider implements SpeechSttProvider {
   readonly id = WHISPER_STT_PROVIDER_ID
   private engine: WhisperEngine | undefined
   private loading: Promise<WhisperEngine> | undefined
+  private loadedModel: string | undefined
 
   /**
    * @param options - thunk returning the currently authoritative connection facts.
@@ -163,7 +178,8 @@ export class WhisperSttProvider implements SpeechSttProvider {
     const engine = await this.ensureEngine(options, signal)
     let result: WhisperAsrResult
     try {
-      result = await engine(samples)
+      const language = whisperLanguageName(options.language)
+      result = await engine(samples, language === undefined ? undefined : { language })
     } catch (error) {
       throw new SpeechError('Whisper transcribe failed', 'SPEECH_PROVIDER_ERROR', { cause: error })
     }
@@ -171,17 +187,23 @@ export class WhisperSttProvider implements SpeechSttProvider {
   }
 
   private ensureEngine(options: WhisperSttOptions, signal?: AbortSignal): Promise<WhisperEngine> {
-    if (this.engine !== undefined) return Promise.resolve(this.engine)
-    if (this.loading !== undefined) return this.loading
+    if (this.engine !== undefined && this.loadedModel === options.modelId) {
+      return Promise.resolve(this.engine)
+    }
+    if (this.loading !== undefined && this.loadedModel === options.modelId) return this.loading
+    this.engine = undefined
+    this.loadedModel = options.modelId
     this.loading = options.load({
       modelId: options.modelId,
       cacheDir: options.cacheDir,
+      allowDownload: options.allowDownload,
     }, signal).then((engine) => {
       this.engine = engine
       this.loading = undefined
       return engine
     }, (error) => {
       this.loading = undefined
+      this.loadedModel = undefined
       throw error
     })
     return this.loading

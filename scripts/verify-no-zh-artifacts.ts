@@ -56,7 +56,6 @@ export const CJK_ALLOWLIST: ReadonlyArray<{ prefix: string; reason: string }> = 
   { prefix: 'packages/terminal/tool-terminal/tests/render.spec.ts', reason: 'East-Asian width truncation fixture uses CJK sample text' },
   { prefix: 'packages/terminal/tool-terminal/tests/tools.spec.ts', reason: 'East-Asian width truncation fixture uses CJK sample text' },
   { prefix: 'packages/test-support/llm-mock-server/tests/server.spec.ts', reason: 'UTF-8 request-body fixture uses CJK sample text' },
-  { prefix: 'packages/llm/llm-deepseek/tests/serialize.spec.ts', reason: 'UTF-8 reasoning fixture uses CJK sample text' },
   { prefix: 'packages/llm/llm/tests/api-key.spec.ts', reason: 'API-key character-class fixture includes CJK sample text' },
   { prefix: 'packages/host/directory-picker-native/tests/win32-dialog-bindings.spec.ts', reason: 'Win32 folder-dialog Unicode path fixture' },
   { prefix: 'packages/host/directory-picker-native/tests/win32-dialog-logic.spec.ts', reason: 'Win32 folder-dialog Unicode path fixture' },

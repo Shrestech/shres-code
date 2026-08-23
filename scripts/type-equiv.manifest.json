@@ -887,12 +887,27 @@
     },
     {
       "doc": "docs/subsystems/attachment.md",
+      "symbol": "EncodedImageAttachment",
+      "source": "packages/attachment/attachment/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/attachment.md",
       "symbol": "SaveImageAttachment",
       "source": "packages/attachment/attachment/src/types.ts"
     },
     {
       "doc": "docs/subsystems/attachment.md",
       "symbol": "StoredImageAttachment",
+      "source": "packages/attachment/attachment/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/attachment.md",
+      "symbol": "ImageRequestPolicy",
+      "source": "packages/attachment/attachment/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/attachment.md",
+      "symbol": "RequestImageAttachment",
       "source": "packages/attachment/attachment/src/types.ts"
     },
     {

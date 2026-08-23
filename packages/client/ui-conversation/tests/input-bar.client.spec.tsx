@@ -62,6 +62,7 @@ interface BenchOptions {
     maxImagesPerMessage: number
     maxMessageImageBytes: number
     maxImagePixels: number
+    maxImageDimension: number
     mediaTypes: readonly ('image/png' | 'image/jpeg' | 'image/webp' | 'image/gif')[]
   }
   draft?: string
@@ -263,6 +264,7 @@ describe('image draft rail', () => {
       maxImagesPerMessage: 2,
       maxMessageImageBytes: 2 * 1024 * 1024,
       maxImagePixels: 40_000_000,
+      maxImageDimension: 8192,
       mediaTypes: ['image/png'] as const,
     }
     const png = (bytes: number, name: string) => new File([new ArrayBuffer(bytes)], name, { type: 'image/png' })
@@ -306,6 +308,7 @@ describe('image draft rail', () => {
         maxImagesPerMessage: 1,
         maxMessageImageBytes: 8,
         maxImagePixels: 40_000_000,
+        maxImageDimension: 8192,
         mediaTypes: ['image/png'] as const,
       },
     })
@@ -327,6 +330,7 @@ describe('image draft rail', () => {
         maxImagesPerMessage: 20,
         maxMessageImageBytes: 100 * 1024 * 1024,
         maxImagePixels: 40_000_000,
+        maxImageDimension: 8192,
         mediaTypes: ['image/png'] as const,
       },
     })
@@ -1220,6 +1224,98 @@ describe('insertText (scoped event body)', () => {
     act(() => { shell.setDraft('/fixX') })
     expect(shell.insertText('/fixture-demo ', span)).toBe(false)
     expect(shell.snapshot.draft).toBe('/fixX')
+  })
+})
+
+/**
+ * Dispatch the native `beforeinput` the composer reads the pre-edit selection
+ * from. The DOM event carries no range for a textarea (`getTargetRanges()` is
+ * empty there), so the element's own selection plus `inputType` is the signal.
+ */
+function beforeInput(el: HTMLTextAreaElement, inputType = 'insertText'): void {
+  el.dispatchEvent(new InputEvent('beforeinput', { bubbles: true, cancelable: true, inputType }))
+}
+
+describe('composer edit range from beforeinput', () => {
+  it('typing immediately before a placeholder keeps the occurrence structured', () => {
+    const { shell, textarea } = bench()
+    act(() => {
+      shell.setDraft('see @w1 content')
+      shell.insertReference(
+        { source: 'subagent', ref: 'w1', label: '@w1', clipboardText: '@w1' },
+        { start: 4, end: 7, draftRev: shell.snapshot.draftRev },
+      )
+    })
+    expect(shell.snapshot.draft).toBe('see \uFFFC content')
+    expect(shell.snapshot.occurrences).toHaveLength(1)
+    textarea.setSelectionRange(4, 4)
+    act(() => {
+      beforeInput(textarea)
+      fireEvent.change(textarea, { target: { value: 'see x\uFFFC content' } })
+    })
+    expect(shell.snapshot.draft).toBe('see x\uFFFC content')
+    expect(shell.snapshot.occurrences).toHaveLength(1)
+    expect(shell.snapshot.occurrences[0]?.offset).toBe(5)
+  })
+
+  it('a caret Backspace before a placeholder keeps it structured', () => {
+    const { shell, textarea } = bench()
+    act(() => {
+      shell.setDraft('x@w1')
+      shell.insertReference(
+        { source: 'subagent', ref: 'w1', label: '@w1', clipboardText: '@w1' },
+        { start: 1, end: 4, draftRev: shell.snapshot.draftRev },
+      )
+    })
+    expect(shell.snapshot.draft).toBe('x\uFFFC ')
+    textarea.setSelectionRange(1, 1)
+    act(() => {
+      beforeInput(textarea, 'deleteContentBackward')
+      fireEvent.change(textarea, { target: { value: '\uFFFC ' } })
+    })
+    expect(shell.snapshot.draft).toBe('\uFFFC ')
+    expect(shell.snapshot.occurrences).toHaveLength(1)
+    expect(shell.snapshot.occurrences[0]?.offset).toBe(0)
+  })
+
+  it('a caret Delete before a placeholder keeps it structured', () => {
+    const { shell, textarea } = bench()
+    act(() => {
+      shell.setDraft('x@w1')
+      shell.insertReference(
+        { source: 'subagent', ref: 'w1', label: '@w1', clipboardText: '@w1' },
+        { start: 1, end: 4, draftRev: shell.snapshot.draftRev },
+      )
+    })
+    expect(shell.snapshot.draft).toBe('x\uFFFC ')
+    textarea.setSelectionRange(0, 0)
+    act(() => {
+      beforeInput(textarea, 'deleteContentForward')
+      fireEvent.change(textarea, { target: { value: '\uFFFC ' } })
+    })
+    expect(shell.snapshot.draft).toBe('\uFFFC ')
+    expect(shell.snapshot.occurrences).toHaveLength(1)
+    expect(shell.snapshot.occurrences[0]?.offset).toBe(0)
+  })
+
+  it('a caret word delete before a placeholder keeps it structured', () => {
+    const { shell, textarea } = bench()
+    act(() => {
+      shell.setDraft('word @w1')
+      shell.insertReference(
+        { source: 'subagent', ref: 'w1', label: '@w1', clipboardText: '@w1' },
+        { start: 5, end: 8, draftRev: shell.snapshot.draftRev },
+      )
+    })
+    expect(shell.snapshot.draft).toBe('word \uFFFC ')
+    textarea.setSelectionRange(5, 5)
+    act(() => {
+      beforeInput(textarea, 'deleteWordBackward')
+      fireEvent.change(textarea, { target: { value: '\uFFFC ' } })
+    })
+    expect(shell.snapshot.draft).toBe('\uFFFC ')
+    expect(shell.snapshot.occurrences).toHaveLength(1)
+    expect(shell.snapshot.occurrences[0]?.offset).toBe(0)
   })
 })
 

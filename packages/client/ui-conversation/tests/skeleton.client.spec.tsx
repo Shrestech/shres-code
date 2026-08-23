@@ -96,6 +96,8 @@ function mount(
     summaryOrigin?: 'subagent'
     /** A composer block another plugin raised for this session. */
     composerBlock?: { reason: string }
+    /** Talk mode flag passed onto the composer chain owner. */
+    talkMode?: boolean
     /** Mutable view ledger used by registration-order regressions. */
     viewTabs?: ViewTab[]
   } = {},
@@ -221,8 +223,10 @@ function mount(
     }
     return <div data-testid={`view-${opts?.only ?? key}`} />
   }) as ConversationRootProps['renderSlot']
-  const renderSlotChain = ((_key, _owner, opts) => (
-    options.overlayTakeover === true
+  let chainOwner: unknown
+  const renderSlotChain = ((_key, owner, opts) => {
+    chainOwner = owner
+    return options.overlayTakeover === true
       ? (
         <>
           <div data-chain-overlay-fallback="conversation.composer" style={{ display: 'none' }}>
@@ -232,7 +236,7 @@ function mount(
         </>
       )
       : (opts?.fallback ?? null)
-  )) as ConversationRootProps['renderSlotChain']
+  }) as ConversationRootProps['renderSlotChain']
   const props: ConversationRootProps = {
     sessionId: SID,
     SessionProvider: ({ children }) => children(SID),
@@ -241,6 +245,7 @@ function mount(
     useWorkspaces: bindSnapshotSelector(workspaces),
     useProjection: (() => undefined),
     useComposerBlock: select => select(options.composerBlock),
+    useTalkMode: select => select(options.talkMode === true),
     useInput,
     inputActions,
     renderSlot,
@@ -252,6 +257,7 @@ function mount(
   return {
     view, chat, sink, retargetWorkspace, session, slotCalls, seatOwners, open,
     pickerOwner: () => pickerOwner,
+    chainOwner: () => chainOwner,
     rerender: () => { view.rerender(<ConversationRoot {...props} />) },
   }
 }
@@ -336,6 +342,13 @@ describe('ConversationRoot resident composer', () => {
     expect(seat?.contains(textarea)).toBe(true)
     expect(b.slotCalls).toContain('conversation.session.header.actions')
     expect(b.slotCalls).toContain('conversation.session.header.utilities')
+  })
+
+  it('passes talkMode onto the composer chain owner', () => {
+    const off = mount(conversationSnapshot())
+    expect(off.chainOwner()).toMatchObject({ talkMode: false })
+    const on = mount(conversationSnapshot(), undefined, undefined, { talkMode: true })
+    expect(on.chainOwner()).toMatchObject({ talkMode: true })
   })
 
   it('sticky composer seat wraps the whole overlay chain, not only the fallback stack', () => {
