@@ -22,6 +22,7 @@ import { ConversationController, UnsupportedImageMediaTypeError } from './servic
 import type { IConversation } from './service.ts'
 import { ComposerBlockRegistry } from './input/blocks.ts'
 import type { ComposerBlock } from './input/blocks.ts'
+import { ComposerImageInputRegistry } from './input/image-input.ts'
 import { InputHub } from './input/hub.ts'
 import { ComposerSubmissionPolicy } from './input/submission-policy.ts'
 import { InputBar } from './skeleton/InputBar.tsx'
@@ -74,7 +75,6 @@ const ABSENT_MENU_LAUNCHER = {
   getSnapshot: (): string | null => null,
   subscribe: () => () => {},
 }
-
 const CHAT_NODE_INJECT: ChatNodeTurnDataInjected = {
   hooks: {
     turnData: ({ useSession }, nodeKey) => function useTurnData(key) {
@@ -133,6 +133,14 @@ export function apply(ctx: Context): void {
   const submissionPolicy = new ComposerSubmissionPolicy(
     ctx.settingsScope.bind<ConversationSettings>({ namespace: CONVERSATION_SETTINGS_NAMESPACE }),
   )
+  const talkScope = ctx.settingsScope.bind<{ talkMode?: boolean }>({ namespace: 'speech' })
+  const talkModeSource = {
+    getSnapshot: (): boolean => {
+      const snap = talkScope.getSnapshot()
+      return snap.status === 'ready' && snap.value?.talkMode === true
+    },
+    subscribe: (listener: () => void) => talkScope.subscribe(listener),
+  }
 
   ctx.slots.inject('settings.general.item', () => ctx.slots.register({
     name: 'settings.general.item',
@@ -175,6 +183,12 @@ export function apply(ctx: Context): void {
   // way: this package must not import the plugins that would know.
   const composerBlocks = new ComposerBlockRegistry()
 
+  // The image-input registry rides the same one-way push: ui-model-selection
+  // declares whether the session's current model accepts images, and the
+  // intake below refuses early on a definite "no". Unknown stays admissible,
+  // exactly as the Host's own admission reads an undeclared route.
+  const composerImageInput = new ComposerImageInputRegistry()
+
   // The input machine feeds every session-scope slot
   // component through the standard provide channel — the 'input' hook plus
   // the two public actions. Materialization is the shell creation trigger
@@ -210,7 +224,10 @@ export function apply(ctx: Context): void {
       'conversation.hero.agentPreset': { kind: 'single', scope: 'root' },
     },
     inject: (sessionId: SessionId | undefined): ConversationInjected => ({
-      hooks: { composerBlock: sessionId === undefined ? ABSENT_BLOCK : composerBlocks.storeFor(sessionId) },
+      hooks: {
+        composerBlock: sessionId === undefined ? ABSENT_BLOCK : composerBlocks.storeFor(sessionId),
+        talkMode: talkModeSource,
+      },
       selectWorkspace: async (workspaceId) => {
         const nextId = await workspaces.connectWorkspace(workspaceId)
         if (sessionId !== undefined && nextId !== sessionId) {
@@ -306,6 +323,10 @@ export function apply(ctx: Context): void {
       return {
         keyboard: shell,
         addImages: (files) => {
+          // A definite no-image declaration refuses at intake with the
+          // composer's own copy, before any file is read; the gate precedes
+          // the format check so the refusal names the actual obstacle.
+          if (composerImageInput.accepts(sessionId) === false) return t('image.modelUnsupported')
           try {
             const images = conversation.createDraftImages(files)
             if (!shell.addImages(images.map(image => image.id))) {
@@ -432,7 +453,7 @@ export function apply(ctx: Context): void {
   // registers itself as `conversation` and lives on its own child fiber.
   // Presentation registrants depend directly on their slot declarations;
   // this service remains only where conversation actions are required.
-  ctx.plugin(ConversationController, { input: inputHub, blocks: composerBlocks })
+  ctx.plugin(ConversationController, { input: inputHub, blocks: composerBlocks, imageInput: composerImageInput })
 
   // The plan strip rides the input dock above the queue rows (same posture).
   ctx.plugin(todoDockEntry)

@@ -388,17 +388,29 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'completion after the encoded raster has been fully decoded.',
       },
       {
+        signature: 'async saveImages(inputs: readonly SaveImageAttachment[]): Promise<readonly ImageAttachmentRef[]>',
+        description: 'Validate and durably commit one ordered image batch.',
+        parameters: [{ name: 'inputs', description: 'encoded images in owning-message order.' }],
+        returns: 'durable normalized attachment references in the same order after every member succeeds.',
+      },
+      {
         signature: 'abstract saveImage(input: SaveImageAttachment): Promise<ImageAttachmentRef>',
-        description: 'Validate and durably commit one image before its owning session event is appended.',
+        description: 'Validate and durably commit one image before its owning session event is appended. The returned reference describes the persisted normalized image. When normalization reduces the raster, its `originalDimensions` records the orientation-applied input dimensions.',
         parameters: [{ name: 'input', description: 'encoded bytes, declared media type, and optional display name.' }],
-        returns: 'a durable content-addressed reference.',
+        returns: 'the durable content-addressed normalized image reference.',
       },
       {
         signature: 'abstract readImage(ref: ImageAttachmentRef, signal?: AbortSignal): Promise<StoredImageAttachment>',
         description: 'Read one image and verify that bytes still match the recorded reference.',
         parameters: [{ name: 'ref', description: 'durable reference from the session log.' }, { name: 'signal', description: 'optional cancellation for backend read and verification work.' }],
-        returns: 'the verified bytes and canonical reference.',
+        returns: 'the verified bytes and normalized attachment reference.',
         throws: ['the signal reason when aborted, or a storage error when verification fails.'],
+      },
+      {
+        signature: 'readImageRequest( ref: ImageAttachmentRef, policy: ImageRequestPolicy, signal?: AbortSignal, ): Promise<RequestImageAttachment>',
+        description: 'Generate or read one deterministic model-request version from the stored normalized image.',
+        parameters: [{ name: 'ref', description: 'durable provider-independent normalized attachment reference.' }, { name: 'policy', description: 'exact route pixel and encoded-byte budget.' }, { name: 'signal', description: 'optional cancellation.' }],
+        returns: 'request bytes and the cache/upload identity covering every transform input.',
       },
     ],
   },
@@ -3098,6 +3110,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface EditGoalRequest {\n    readonly objective?: string;\n    readonly maxGoalRounds?: number;\n}',
   },
   {
+    name: 'EncodedImageAttachment',
+    declaration: 'export interface EncodedImageAttachment {\n    mediaType: ImageMediaType;\n    data: string;\n    name?: string;\n}',
+  },
+  {
     name: 'EpochHeader',
     declaration: 'export interface EpochHeader {\n    config: LlmCallConfig;\n    adapterDefaults?: LlmCallConfigAdapterDefaults;\n    system?: string;\n    tools?: ToolSchema[];\n}',
   },
@@ -3211,11 +3227,11 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ImageAttachmentLimits',
-    declaration: 'export interface ImageAttachmentLimits {\n    maxImageBytes: number;\n    maxImagesPerMessage: number;\n    maxMessageImageBytes: number;\n    maxImagePixels: number;\n    mediaTypes: readonly ImageMediaType[];\n}',
+    declaration: 'export interface ImageAttachmentLimits {\n    maxImageBytes: number;\n    maxImagesPerMessage: number;\n    maxMessageImageBytes: number;\n    maxImagePixels: number;\n    maxImageDimension: number;\n    mediaTypes: readonly ImageMediaType[];\n}',
   },
   {
     name: 'ImageAttachmentRef',
-    declaration: 'export interface ImageAttachmentRef {\n    attachmentId: AttachmentId;\n    mediaType: ImageMediaType;\n    bytes: number;\n    width: number;\n    height: number;\n    name?: string;\n}',
+    declaration: 'export interface ImageAttachmentRef {\n    attachmentId: AttachmentId;\n    mediaType: ImageMediaType;\n    bytes: number;\n    width: number;\n    height: number;\n    name?: string;\n    originalDimensions?: {\n        width: number;\n        height: number;\n    };\n}',
   },
   {
     name: 'ImageBlock',
@@ -3224,6 +3240,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ImageMediaType',
     declaration: 'export type ImageMediaType = \'image/png\' | \'image/jpeg\' | \'image/webp\' | \'image/gif\';',
+  },
+  {
+    name: 'ImageRequestPolicy',
+    declaration: 'export interface ImageRequestPolicy {\n    maxPixels: number;\n    maxBytes: number;\n}',
+  },
+  {
+    name: 'ImageVariantId',
+    declaration: 'export type ImageVariantId = Branded<\'ImageVariantId\'>;',
   },
   {
     name: 'Inbox',
@@ -3359,7 +3383,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'LlmDiscoveredModel',
-    declaration: 'export interface LlmDiscoveredModel {\n    id: string;\n    name?: string;\n    contextWindow?: number;\n    maxTokens?: number;\n}',
+    declaration: 'export interface LlmDiscoveredModel {\n    id: string;\n    name?: string;\n    contextWindow?: number;\n    maxTokens?: number;\n    input?: readonly ModelModality[];\n}',
   },
   {
     name: 'LlmFailure',
@@ -3684,6 +3708,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'RequestHeaderReason',
     declaration: 'export type RequestHeaderReason = \'initial\' | \'resume\' | \'change\';',
+  },
+  {
+    name: 'RequestImageAttachment',
+    declaration: 'export interface RequestImageAttachment {\n    variantId: ImageVariantId;\n    attachment: ImageAttachmentRef;\n    data: Uint8Array;\n    mediaType: ImageMediaType;\n    bytes: number;\n    width: number;\n    height: number;\n    depth: \'uchar\';\n    space: \'srgb\';\n    hasAlpha: boolean;\n}',
   },
   {
     name: 'RequestRunOutcome',

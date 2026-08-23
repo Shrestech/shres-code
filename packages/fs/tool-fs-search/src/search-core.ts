@@ -1,9 +1,12 @@
 /**
  * Shared execution plumbing for the `glob` / `grep` search tools: the
- * package-owned `SEARCH_*` error vocabulary, one spawn helper that runs the
- * PACKAGED ripgrep binary (`@vscode/ripgrep`) with a plain argv vector and
- * returns complete raw stdout, the best-effort formatted-result spill handoff,
- * and workdir-relative path display.
+ * package-owned `SEARCH_*` error vocabulary, the model-path fence
+ * ({@link fenceSearchPath}: canonicalized containment under a confined
+ * policy, credential-document roots rejected), one spawn helper that runs the
+ * PACKAGED ripgrep binary (`@vscode/ripgrep`) with a plain argv vector —
+ * every search carrying the credentials-content exclusion — and returns
+ * complete raw stdout, the best-effort formatted-result spill handoff, and
+ * workdir-relative path display.
  *
  * Both tools execute as ordinary foreground spawns through `ctx.subprocess` —
  * never `ctx.shell`, never `ctx.shell.start()`, never a model-visible background
@@ -19,7 +22,8 @@
  * @module @shres-code/shres-code-tool-fs-search/search-core
  */
 
-import { basename, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { realpathSync } from 'node:fs'
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type { Context } from '@shres-code/cordis'
 import { resolveShresHome } from '@shres-code/shres-code-home-paths'
 import { HarnessError } from '@shres-code/shres-code-llm'
@@ -178,6 +182,47 @@ export function resolveRgPath(): Promise<string> {
 /** Basename suffix of a credentials document that search must not open. */
 const CREDENTIALS_BASENAME_SUFFIX = '.credentials.yaml'
 
+/**
+ * Ripgrep exclusion appended to EVERY spawned search, before the tool's own
+ * argv: no directory walk may emit the content of a credentials document —
+ * any `*.credentials.yaml` basename, case-insensitive (`--iglob`), at any
+ * depth (a separator-free glob matches the basename). The exclusion rides
+ * before the model-derived argv because a tool's `--` path terminator would
+ * otherwise read it as a search path, and ripgrep's blacklist globs override
+ * a whitelist regardless of order (an `include` of `*.credentials.yaml` still
+ * matches nothing). An explicit credentials-file search ROOT is instead the
+ * fence's rejection ({@link fenceSearchPath}): ripgrep does not apply globs
+ * to explicitly given file arguments.
+ */
+const CREDENTIALS_SEARCH_EXCLUSION = `--iglob=!*${CREDENTIALS_BASENAME_SUFFIX}`
+
+/**
+ * Canonical spelling of a possibly-MISSING path: the deepest existing ancestor
+ * is symlink-resolved and the missing suffix rejoined — the fs-sandbox fence's
+ * deepest-ancestor stance — so containment and credential comparisons see real
+ * identities even when the search root does not exist. The native realpath
+ * follows the filesystem's component-by-component lookup, matching how the
+ * spawned process opens the path. A root ripgrep cannot open then fails as
+ * `SEARCH_FAILED` instead of being misread as outside the workspace.
+ */
+function canonicalPath(path: string): string {
+  const missing: string[] = []
+  let current = path
+  while (true) {
+    try {
+      return join(realpathSync.native(current), ...missing.reverse())
+    } catch {
+      // realpathSync.native failed: `current` (or a prefix) is missing or
+      // unreadable; walk up and canonicalize the deepest existing ancestor.
+      const parent = dirname(current)
+      /* v8 ignore next -- a filesystem root exists, so the walk resolves before this guard. */
+      if (parent === current) return path
+      missing.push(basename(current))
+      current = parent
+    }
+  }
+}
+
 function isPathInside(target: string, root: string): boolean {
   const rel = relative(root, target)
   return rel === '' || (!rel.startsWith(`..${sep}`) && rel !== '..' && !isAbsolute(rel))
@@ -186,7 +231,11 @@ function isPathInside(target: string, root: string): boolean {
 /**
  * Reject a model-supplied search root that would read a credential document
  * or, under a confined session, walk outside the workspace. Omitted `path`
- * searches the session cwd and is allowed.
+ * searches the session cwd and is allowed. The root is canonicalized BEFORE
+ * the containment check: a lexical prefix check passes a workspace symlink
+ * that points outside, and ripgrep follows an explicit symlink root. The
+ * credential name check sees both the requested and the resolved spelling, so
+ * a symlink alias of a credentials document is denied by name either way.
  * @param ctx - context that may carry `sandboxPolicy`.
  * @param exec - tool execution; supplies the session cwd and workspace.
  * @param toolName - `glob` or `grep`, used in error messages.
@@ -199,18 +248,20 @@ export function fenceSearchPath(
   searchPath: string | undefined,
 ): void {
   const workdir = exec.agent?.session.header.cwd ?? process.cwd()
-  const target = resolve(workdir, searchPath ?? '.')
-  if (basename(target).toLowerCase().endsWith(CREDENTIALS_BASENAME_SUFFIX)) {
+  const spelled = resolve(workdir, searchPath ?? '.')
+  const target = canonicalPath(spelled)
+  const names = [basename(spelled), basename(target)]
+  if (names.some(name => name.toLowerCase().endsWith(CREDENTIALS_BASENAME_SUFFIX))) {
     throw new SearchError(`${toolName} cannot search a credentials document`, 'SEARCH_FAILED')
   }
-  const homeDoc = join(resolveShresHome(), '.credentials.yaml')
+  const homeDoc = canonicalPath(join(resolveShresHome(), '.credentials.yaml'))
   if (target === homeDoc || isPathInside(target, homeDoc)) {
     throw new SearchError(`${toolName} cannot search a credentials document`, 'SEARCH_FAILED')
   }
   const policy = (ctx.get('sandboxPolicy') as SandboxPolicyService | undefined)
     ?.resolve({ ...exec.agent === undefined ? {} : { session: exec.agent.session } })
   if (policy !== undefined && policy.mode !== 'danger-full-access') {
-    if (!isPathInside(target, policy.workspaceRoot) && !isPathInside(target, workdir)) {
+    if (!isPathInside(target, policy.workspaceRoot) && !isPathInside(target, canonicalPath(workdir))) {
       throw new SearchError(
         `${toolName} cannot search outside the workspace under ${policy.mode} mode`,
         'SEARCH_FAILED',
@@ -230,7 +281,10 @@ export function fenceSearchPath(
  * The spawn is unconfined (a plain `ctx.subprocess` call), so `--no-config`
  * is prepended: a host `RIPGREP_CONFIG_PATH` (or `rg.conf` next to the
  * binary) can otherwise inject `--pre` and make ripgrep execute an arbitrary
- * preprocessor for every matched file. The collect dispositions are the
+ * preprocessor for every matched file. Every search also carries
+ * {@link CREDENTIALS_SEARCH_EXCLUSION}: a directory walk never emits
+ * `*.credentials.yaml` content, matching the credential read fence
+ * `read` enforces (`FS_SANDBOX_DENIED`). The collect dispositions are the
  * seam's diagnostic-tail shape (no spill files): the tools never read a raw
  * spill path, and truncated stdout fails as `SEARCH_RAW_OUTPUT_OVERFLOW`.
  *
@@ -271,7 +325,7 @@ export async function runRipgrep(
   let handle: SubprocessHandle
   try {
     handle = ctx.subprocess.spawn({
-      argv: [await resolveRgPath(), '--no-config', ...argv],
+      argv: [await resolveRgPath(), '--no-config', CREDENTIALS_SEARCH_EXCLUSION, ...argv],
       cwd: workdir,
       stdio: {
         stdin: 'ignore',

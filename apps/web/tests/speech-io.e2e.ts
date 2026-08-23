@@ -7,7 +7,6 @@ import { join } from 'node:path'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
-import { SPEECH_SETTINGS_NAMESPACE } from '@shres-code/shres-code-speech'
 import { launchWebScaffold, watchConsole, type WebScaffold } from './scaffold.ts'
 import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
 
@@ -43,6 +42,7 @@ describe('web e2e: speech I/O settings and composer mic', () => {
     expect(await dialog.getByRole('button', { name: 'General' }).getAttribute('aria-current')).toBe('true')
     await dialog.getByText('Read-aloud voice', { exact: true }).waitFor({ timeout: 10_000 })
     await dialog.getByText('Send after dictation', { exact: true }).waitFor({ timeout: 10_000 })
+    await dialog.getByText('Spoken language', { exact: true }).waitFor({ timeout: 10_000 })
     await dialog.getByText('Kokoro voice used for read-aloud', { exact: false }).waitFor({ timeout: 5_000 })
 
     const autoSubmit = dialog.getByText('Send after dictation', { exact: true })
@@ -51,9 +51,9 @@ describe('web e2e: speech I/O settings and composer mic', () => {
     await autoSubmit.waitFor({ timeout: 10_000 })
     await expect.poll(() => autoSubmit.textContent(), { timeout: 5_000 }).toBe('Off')
     expect(await autoSubmit.getAttribute('aria-pressed')).toBe('false')
-    await scaffold.ctx.settings.mutate(SPEECH_SETTINGS_NAMESPACE, [
-      { op: 'set', path: ['autoSubmitVoice'], value: true },
-    ])
+    await autoSubmit.click()
+    await expect.poll(() => autoSubmit.textContent(), { timeout: 5_000 }).toBe('On')
+    expect(await autoSubmit.getAttribute('aria-pressed')).toBe('true')
     await expect.poll(async () => readFile(join(scaffold.harnessHome, 'settings.yaml'), 'utf8'), { timeout: 5_000 })
       .toMatch(/speech:[\s\S]*autoSubmitVoice:\s*true/)
 
@@ -63,9 +63,21 @@ describe('web e2e: speech I/O settings and composer mic', () => {
     await connectFreshWorkspace(page, scaffold.workspaceCwd)
     const mic = page.getByRole('button', { name: 'Dictate', exact: true })
     await mic.waitFor({ timeout: 10_000 })
-    if (status.stt.kind !== 'ready') {
-      expect(await mic.isDisabled()).toBe(true)
-    }
+    expect(await mic.isDisabled()).toBe(false)
+    expect(await page.getByRole('switch', { name: 'Turn Talk mode on' }).count()).toBe(0)
+    await page.getByRole('switch', { name: 'Turn Game mode on' }).waitFor({ timeout: 10_000 })
+
+    await mic.click()
+    const offer = page.getByRole('dialog', { name: 'Hands-free Talk' })
+    await offer.waitFor({ timeout: 10_000 })
+    await expect.poll(() => offer.getByText('Speak an instruction').count(), { timeout: 5_000 }).toBe(1)
+    await offer.getByRole('button', { name: 'Enable Talk mode' }).click()
+    await expect.poll(() => page.getByRole('dialog', { name: 'Hands-free Talk' }).count(), { timeout: 5_000 }).toBe(0)
+    await expect.poll(async () => readFile(join(scaffold.harnessHome, 'settings.yaml'), 'utf8'), { timeout: 8_000 })
+      .toMatch(/talkMode:\s*true/)
+    await page.locator('[data-talk-deck]').waitFor({ timeout: 10_000 })
+    await page.getByRole('button', { name: 'Type instead' }).click()
+    await page.getByRole('button', { name: 'Dictate', exact: true }).waitFor({ timeout: 10_000 })
     expect(tripwire.pageErrors).toEqual([])
   }, 90_000)
 })

@@ -85,7 +85,7 @@ async function bench(options: {
     name: 'root', children: {
       'conversation.input.dock': { kind: 'list', scope: 'session' },
       'conversation.chat.node': { kind: 'keyed', scope: 'session' },
-      'sidebar.brand.action': { kind: 'list', scope: 'root' },
+      'conversation.input.left': { kind: 'list', scope: 'session' },
     },
   } as never, (() => null) as never)
   ctx.provide('locale', new LocaleRuntime(ctx))
@@ -125,8 +125,8 @@ describe('ui-goal browser plugin', () => {
   it('registers the GoalBar dock, command input Definition, and keyed Chat renderer', async () => {
     const b = await bench()
     await b.fiber.await()
-    const brand = b.ctx.slots.entries('sidebar.brand.action')[0]
-    expect(brand?.options).toMatchObject({ id: 'game-mode', order: 0 })
+    const brand = b.ctx.slots.entries('conversation.input.left')[0]
+    expect(brand?.options).toMatchObject({ id: 'game-mode', order: 10 })
     const game = (brand?.inject as () => { setEnabled: (on: boolean) => Promise<void> })()
     await game.setEnabled(true)
     expect(b.entry()).toMatchObject({ id: 'goal', order: 10, locale: 'goal' })
@@ -209,7 +209,7 @@ describe('ui-goal browser plugin', () => {
     await b.fiber.dispose()
     expect(b.entry()).toBeUndefined()
     expect(b.chatEntry()).toBeUndefined()
-    expect(b.ctx.slots.entries('sidebar.brand.action')).toHaveLength(0)
+    expect(b.ctx.slots.entries('conversation.input.left')).toHaveLength(0)
     expect(b.definitions()).toHaveLength(0)
   })
 })

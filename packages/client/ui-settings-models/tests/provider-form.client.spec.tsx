@@ -31,6 +31,7 @@ const PiAiConfig = Schema.object({
       name: Schema.string(),
       contextWindow: Schema.number(),
       maxTokens: Schema.number(),
+      input: Schema.array(Schema.union(['text', 'image'])),
     })),
     reasoning: Schema.union(['off', 'high']),
   })),
@@ -486,6 +487,140 @@ describe('endpoint interrogation', () => {
       { id: 'kept', contextWindow: 111 },
       { id: 'fresh', contextWindow: 4096, name: 'Fresh' },
     ])
+  })
+
+  it('adopts the input modalities the endpoint declared, and says so per candidate', async () => {
+    const discover = vi.fn(() => Promise.resolve(ok({
+      models: [
+        { id: 'deepseek-chat', contextWindow: 128000, input: ['text'] },
+        { id: 'deepseek-vl', contextWindow: 64000, input: ['text', 'image'] },
+        { id: 'deepseek-ocr', contextWindow: 32000 },
+      ],
+    })))
+    const { mutate } = await mountSection({
+      discover,
+      providers: { openai: { baseURL: 'https://proxy.example/v1' } },
+    })
+    openEditor('openai')
+
+    fireEvent.click(screen.getByText(en.fetchModels))
+    await screen.findByText(en.fetchTitle)
+
+    // The dialog names what each candidate declared; one that disclosed
+    // nothing gets no claim. (The ids avoid the word itself, so only the
+    // meta chip can produce it.)
+    const rowOf = (id: string): HTMLElement => {
+      const row = screen.getByText(id).closest('li')
+      if (row === null) throw new Error(`no candidate row for ${id}`)
+      return row
+    }
+    expect(rowOf('deepseek-vl').textContent).toContain(en.candidateVision)
+    expect(rowOf('deepseek-chat').textContent).not.toContain(en.candidateVision)
+    expect(rowOf('deepseek-ocr').textContent).not.toContain(en.candidateVision)
+
+    fireEvent.click(screen.getByText(en.fetchAdopt))
+    fireEvent.click(screen.getByText(en.apply))
+    await waitFor(() => { expect(mutate).toHaveBeenCalled() })
+    // The declaration is adopted with the row, so a vision model is claimed
+    // as one without a hand-written settings.yaml edit; an endpoint that
+    // disclosed nothing keeps the key absent and inherits the route default.
+    expect(firstMutate(mutate).ops[0]?.value).toEqual([
+      { id: 'deepseek-chat', contextWindow: 128000, input: ['text'] },
+      { id: 'deepseek-vl', contextWindow: 64000, input: ['text', 'image'] },
+      { id: 'deepseek-ocr', contextWindow: 32000 },
+    ])
+  })
+
+  it('declares the modalities of a row from its advanced fold', async () => {
+    const { mutate } = await mountSection({
+      providers: { openai: { baseURL: 'https://proxy.example/v1', models: [{ id: 'm' }] } },
+    })
+    openEditor('openai')
+    expandModel(1)
+
+    const control = screen.getByLabelText<HTMLSelectElement>(`${en.modelInput} 1`)
+    expect(control.value).toBe('auto')
+    fireEvent.change(control, { target: { value: 'text+image' } })
+    fireEvent.click(screen.getByText(en.apply))
+    await waitFor(() => { expect(mutate).toHaveBeenCalled() })
+    expect(firstMutate(mutate).ops[0]?.value).toEqual([{ id: 'm', input: ['text', 'image'] }])
+  })
+
+  it('spells a stored text-only declaration and re-declares rows from the fold', async () => {
+    const { mutate } = await mountSection({
+      providers: {
+        openai: { baseURL: 'https://proxy.example/v1', models: [{ id: 'm', input: ['text'] }, { id: 'n' }] },
+      },
+    })
+    openEditor('openai')
+    expandModel(1)
+    expandModel(2)
+
+    const stored = screen.getByLabelText<HTMLSelectElement>(`${en.modelInput} 1`)
+    expect(stored.value).toBe('text')
+    fireEvent.change(stored, { target: { value: 'text+image' } })
+    const bare = screen.getByLabelText<HTMLSelectElement>(`${en.modelInput} 2`)
+    expect(bare.value).toBe('auto')
+    fireEvent.change(bare, { target: { value: 'text' } })
+    fireEvent.click(screen.getByText(en.apply))
+    await waitFor(() => { expect(mutate).toHaveBeenCalled() })
+    expect(firstMutate(mutate).ops[0]?.value).toEqual([
+      { id: 'm', input: ['text', 'image'] },
+      { id: 'n', input: ['text'] },
+    ])
+  })
+
+  it('drops the declaration of a row back to inheritance on the auto choice', async () => {
+    const { mutate } = await mountSection({
+      providers: {
+        openai: { baseURL: 'https://proxy.example/v1', models: [{ id: 'm', input: ['text', 'image'] }] },
+      },
+    })
+    openEditor('openai')
+    expandModel(1)
+
+    const control = screen.getByLabelText<HTMLSelectElement>(`${en.modelInput} 1`)
+    expect(control.value).toBe('text+image')
+    fireEvent.change(control, { target: { value: 'auto' } })
+    fireEvent.click(screen.getByText(en.apply))
+    await waitFor(() => { expect(mutate).toHaveBeenCalled() })
+    // Auto is the absent key: a stored empty list would read as undeclared,
+    // so the honest spelling of inherit is no key at all.
+    expect(firstMutate(mutate).ops[0]?.value).toEqual([{ id: 'm' }])
+  })
+
+  it('keeps an unrecognized stored declaration on a custom choice it does not rewrite', async () => {
+    const { mutate } = await mountSection({
+      providers: {
+        openai: { baseURL: 'https://proxy.example/v1', models: [{ id: 'm', input: ['image'] }] },
+      },
+    })
+    openEditor('openai')
+    expandModel(1)
+
+    const control = screen.getByLabelText<HTMLSelectElement>(`${en.modelInput} 1`)
+    expect(control.value).toBe('custom')
+    // The custom option spells the stored list, so what is kept stays visible.
+    expect(control.selectedOptions[0]?.textContent).toBe('image')
+    // Picking the custom choice itself rewrites nothing.
+    fireEvent.change(control, { target: { value: 'custom' } })
+    fireEvent.change(screen.getByLabelText(`${en.modelName} 1`), { target: { value: 'Named' } })
+    fireEvent.click(screen.getByText(en.apply))
+    await waitFor(() => { expect(mutate).toHaveBeenCalled() })
+    expect(firstMutate(mutate).ops[0]?.value).toEqual([{ id: 'm', name: 'Named', input: ['image'] }])
+  })
+
+  it('reads a stored empty declaration as the inherit choice', async () => {
+    await mountSection({
+      providers: {
+        openai: { baseURL: 'https://proxy.example/v1', models: [{ id: 'm', input: [] }] },
+      },
+    })
+    openEditor('openai')
+    expandModel(1)
+
+    // An empty list is the schema's no-answer, so the row shows inherit.
+    expect(screen.getByLabelText<HTMLSelectElement>(`${en.modelInput} 1`).value).toBe('auto')
   })
 
   it('keeps the rows editable when the provider cannot be interrogated', async () => {

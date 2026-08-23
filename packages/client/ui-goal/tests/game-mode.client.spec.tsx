@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 // Game mode switch and the settings predicate that gates the fight arena.
 
+import { createElement, type ComponentType } from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { makeTranslate, stubSettingsScope } from '@shres-code/shres-code-client-test-runtime'
@@ -9,6 +10,10 @@ import { GameModeToggle } from '../src/client/GameModeToggle.tsx'
 import { gameSettingsEnabled } from '../src/client/game-settings.ts'
 import { en } from '../src/client/locales.ts'
 import type { GameSettings } from '../src/client/game-settings.ts'
+
+function renderLoose(component: ComponentType<never>, props: object) {
+  return render(createElement(component, props as never))
+}
 
 afterEach(cleanup)
 
@@ -24,16 +29,13 @@ function mountToggle(enabled: boolean, writable = true) {
   })
   const useGameSettings = <T,>(select: (snapshot: ReturnType<typeof host.scope.getSnapshot>) => T) =>
     select(host.scope.getSnapshot())
-  render(
-    <GameModeToggle
-      wide
-      useSessions={(() => { throw new Error('unused') }) as never}
-      useWorkspaces={(() => { throw new Error('unused') }) as never}
-      useGameSettings={useGameSettings}
-      setEnabled={setEnabled}
-      t={t}
-    />,
-  )
+  renderLoose(GameModeToggle, {
+    session: {},
+    input: {},
+    useGameSettings,
+    setEnabled,
+    t,
+  })
   return { setEnabled }
 }
 
@@ -47,20 +49,6 @@ describe('gameSettingsEnabled', () => {
 })
 
 describe('GameModeToggle', () => {
-  it('hides on the collapsed rail', () => {
-    const { container } = render(
-      <GameModeToggle
-        wide={false}
-        useSessions={(() => { throw new Error('unused') }) as never}
-        useWorkspaces={(() => { throw new Error('unused') }) as never}
-        useGameSettings={() => ({ status: 'ready', value: { enabled: true } }) as never}
-        setEnabled={vi.fn()}
-        t={t}
-      />,
-    )
-    expect(container.firstChild).toBeNull()
-  })
-
   it('toggles Game mode through setEnabled', () => {
     const { setEnabled } = mountToggle(false)
     expect(screen.getByRole('switch', { name: 'Turn Game mode on' })).toBeTruthy()
@@ -75,16 +63,13 @@ describe('GameModeToggle', () => {
 
   it('disables the switch while settings are loading', () => {
     const setEnabled = vi.fn(() => Promise.resolve())
-    render(
-      <GameModeToggle
-        wide
-        useSessions={(() => { throw new Error('unused') }) as never}
-        useWorkspaces={(() => { throw new Error('unused') }) as never}
-        useGameSettings={() => ({ status: 'loading', value: undefined, writable: false }) as never}
-        setEnabled={setEnabled}
-        t={t}
-      />,
-    )
+    renderLoose(GameModeToggle, {
+      session: {},
+      input: {},
+      useGameSettings: () => ({ status: 'loading', value: undefined, writable: false }),
+      setEnabled,
+      t,
+    })
     expect(screen.getByRole('switch')).toHaveProperty('disabled', true)
   })
 })

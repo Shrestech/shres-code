@@ -55,3 +55,7 @@
     - img
   - text: Send after dictation Submit the transcribed draft immediately instead of leaving it in the composer.
   - button "Off"
+  - text: Spoken language Language for Talk mode and dictation. English also speaks the confirm prompt.
+  - button "English":
+    - text: English
+    - img

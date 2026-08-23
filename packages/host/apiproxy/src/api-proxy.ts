@@ -254,10 +254,11 @@ function referencedImage(events: readonly SessionEvent[], attachmentId: string):
  * that choice write it through `settings.update`, so it has to cross the
  * configuration boundary or the pickers silently fail to persist. `shres-shield`
  * is the Shield Settings page (posture and license). `jspace` is the J-Space
- * Settings page (allow switch, mode, requireCoverage). `game` is the sidebar
- * Game mode switch that shows the Goal fight arena.
+ * Settings page (allow switch, mode, requireCoverage). `game` is the composer
+ * Game mode switch that shows the Goal fight arena. `speech` is General
+ * Settings voice/language/auto-submit plus the composer mic's Talk mode flag.
  */
-const PRODUCT_SETTINGS_NAMESPACES = new Set(['ui-onboarding', 'agent-seats', 'shres-shield', 'jspace', 'game', AGENT_PRESET_SETTINGS_NAMESPACE])
+const PRODUCT_SETTINGS_NAMESPACES = new Set(['ui-onboarding', 'agent-seats', 'shres-shield', 'jspace', 'game', 'speech', AGENT_PRESET_SETTINGS_NAMESPACE])
 
 /** Strict browser-zone profile: UTC or an IANA Area/Location-style identifier. */
 const IANA_TIME_ZONE = /^[A-Za-z][A-Za-z0-9_+.-]*(?:\/[A-Za-z0-9_+.-]+)+$/
@@ -362,6 +363,9 @@ async function buildModelCatalog(ctx: Context): Promise<{
           name: model.name,
           ...model.description === undefined ? {} : { description: model.description },
           ...reasoning === undefined ? {} : { reasoning },
+          ...resolved.inputModalities === undefined
+            ? {}
+            : { inputModalities: [...resolved.inputModalities] },
         }
       }))
       const group: ModelProviderGroup = {

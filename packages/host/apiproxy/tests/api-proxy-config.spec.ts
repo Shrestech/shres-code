@@ -238,7 +238,7 @@ function forwardedSettings(ns: string): HostFrame {
     type: 'host/remote-event',
     event: 'settings/document-updated',
     // The revision is the Host's own counter, so the matcher is the assertion.
-    args: [ns, expect.any(Number)], // oxlint-disable-line typescript/no-unsafe-assignment
+    args: [ns, expect.any(Number)],
   }
 }
 
@@ -474,6 +474,21 @@ describe('settings domain', () => {
     })))
     expect(ctx.settings.describe().find(view => String(view.ns) === 'game')?.value)
       .toEqual({ enabled: true })
+  })
+
+  it('serves the speech namespace so General Settings and Talk mode can persist', async () => {
+    const ctx = await harness()
+    ctx.settings.register(settingsNamespace('speech'), z.object({
+      autoSubmitVoice: z.boolean(),
+      talkMode: z.boolean(),
+    }))
+    const api = createApiProxy(ctx, DEFAULTS)
+    expectOk(await api.settings.mutate(request({
+      ns: 'speech',
+      ops: [{ op: 'set', path: ['talkMode'], value: true }],
+    })))
+    expect(ctx.settings.describe().find(view => String(view.ns) === 'speech')?.value)
+      .toEqual({ talkMode: true })
   })
 
   it('serves the jspace namespace so the J-Space settings page can persist the allow switch', async () => {
@@ -784,7 +799,7 @@ describe('llm.discoverModels', () => {
     ctx.llm.registerModelDiscovery('llm-pi-ai', (probe) => {
       seen.push({ baseURL: probe.baseURL, api: probe.api, apiKey: probe.apiKey })
       return Promise.resolve([
-        { id: 'acme-large', name: 'Acme Large', contextWindow: 65_536, maxTokens: 4096 },
+        { id: 'acme-large', name: 'Acme Large', contextWindow: 65_536, maxTokens: 4096, input: ['text', 'image'] },
         { id: 'acme-small' },
       ])
     })
@@ -797,8 +812,9 @@ describe('llm.discoverModels', () => {
       apiKey: 'probe-key',
     })))
 
+    // A declared modality list crosses the wire; an undeclared row stays absent.
     expect(value.models).toEqual([
-      { id: 'acme-large', name: 'Acme Large', contextWindow: 65_536, maxTokens: 4096 },
+      { id: 'acme-large', name: 'Acme Large', contextWindow: 65_536, maxTokens: 4096, input: ['text', 'image'] },
       { id: 'acme-small' },
     ])
     expect(seen).toEqual([{

@@ -163,6 +163,25 @@
   color: var(--dsw-alias-label-secondary);
 }
 
+.nameRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* Capability tag beside a model name; mirrors the delegated route tag. */
+.modality {
+  flex: none;
+  padding: 1px 6px;
+  border: 1px solid var(--dsw-alias-border-l3);
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--dsw-alias-label-secondary);
+}
+
 .option {
   display: flex;
   align-items: center;

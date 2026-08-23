@@ -171,6 +171,10 @@ export const modelCatalogModelSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
   reasoning: modelReasoningSchema.optional(),
+  // Plain strings, not an enum: the modality map is merge-extensible, so a
+  // newer host may declare modalities an older client has never heard of.
+  // Never empty: absence is the only unknown, so an empty claim is refused.
+  inputModalities: z.array(z.string()).min(1).optional(),
 }) satisfies z.ZodType<Wire<ModelCatalogModel>>
 
 /** One successfully loaded provider group. */
@@ -232,6 +236,7 @@ export const imageLimitsProjectionSchema = z.object({
   maxImagesPerMessage: z.number().int().positive(),
   maxMessageImageBytes: z.number().int().positive(),
   maxImagePixels: z.number().int().positive(),
+  maxImageDimension: z.number().int().positive(),
   mediaTypes: z.array(z.string()),
 }) as unknown as z.ZodType<ImageAttachmentLimits>
 

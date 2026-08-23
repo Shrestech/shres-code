@@ -204,6 +204,33 @@ describe('StatsLine', () => {
     expect(emptyView.container.textContent).toBe('')
   })
 
+  function tokenUsage(cacheReadTokens: number, uncachedInputTokens: number) {
+    return { uncachedInputTokens, outputTokens: 1, cacheReadTokens, cacheWriteTokens: 0 }
+  }
+
+  it.each([
+    { actual: '98.6%', tokenUsageValue: tokenUsage(986, 14), expected: 'Cache hit 99%' },
+    { actual: '99.1%', tokenUsageValue: tokenUsage(991, 9), expected: 'Cache hit 99%' },
+    { actual: '99.49%', tokenUsageValue: tokenUsage(9_949, 51), expected: 'Cache hit 99%' },
+    { actual: '99.5%', tokenUsageValue: tokenUsage(995, 5), expected: 'Cache hit 99.5%' },
+    { actual: '99.94%', tokenUsageValue: tokenUsage(9_994, 6), expected: 'Cache hit 99.9%' },
+    { actual: '99.95%', tokenUsageValue: tokenUsage(9_995, 5), expected: 'Cache hit 99.95%' },
+    { actual: '99.955%', tokenUsageValue: tokenUsage(19_991, 9), expected: 'Cache hit 99.96%' },
+    { actual: '99.985%', tokenUsageValue: tokenUsage(19_997, 3), expected: 'Cache hit 99.99%' },
+    { actual: '99.995%', tokenUsageValue: tokenUsage(19_999, 1), expected: 'Cache hit 99.995%' },
+    { actual: '99.9975%', tokenUsageValue: tokenUsage(39_999, 1), expected: 'Cache hit 99.998%' },
+    {
+      actual: 'the closest non-full ratio available from safe integer cumulative counts',
+      tokenUsageValue: tokenUsage(Number.MAX_SAFE_INTEGER - 1, 1),
+      expected: 'Cache hit 99.99999999999999%',
+    },
+    { actual: '100%', tokenUsageValue: tokenUsage(10_000, 0), expected: 'Cache hit 100%' },
+  ])('formats an actual $actual cache-hit ratio as $expected', ({ tokenUsageValue, expected }) => {
+    const { source } = makeSource({ nodes: [assistant(1, 1)] })
+    const view = render(<StatsLine {...props(source, { tokenUsage: tokenUsageValue })} />)
+    expect(view.container.textContent).toContain(expected)
+  })
+
   it('reveals the full line in a delayed hover tooltip only while the row is clipped', () => {
     vi.useFakeTimers()
     // jsdom lays nothing out; fake a row narrower than its content.

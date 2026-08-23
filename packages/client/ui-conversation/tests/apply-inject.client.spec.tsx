@@ -25,9 +25,10 @@ import type {
   ConversationSessionInjected, DetailsInjected,
 } from '@shres-code/shres-code-client-ui-conversation/client'
 import type { createChatStore } from '../src/client/stores.ts'
+import { en } from '../src/client/locales.ts'
 
 // The service reads its initial locale from the browser; these specs assert
-// the shipped Chinese copy, so they state the browser they assume.
+// the shipped English copy, so they pin the browser's language.
 usePinnedBrowserLanguages('en-US')
 
 const ROOT = 'root-1' as SessionId
@@ -50,7 +51,12 @@ async function bench() {
   runtime.provide('connection', { api: { settings: {} }, isLoopback: false })
   // The plugin injects both; these specs exercise no settings path.
   runtime.provide('remote', { $on: () => () => {} })
-  runtime.provide('settingsScope', { bind: () => stubSettingsScope().scope } as never)
+  const speechHost = stubSettingsScope<{ talkMode?: boolean }>()
+  runtime.provide('settingsScope', {
+    bind: (request?: { namespace?: string }) => (
+      request?.namespace === 'speech' ? speechHost.scope : stubSettingsScope().scope
+    ),
+  } as never)
   const sessionFake = sessionFakeFor()
   await runtime.sessions.add({
     id: ROOT,
@@ -124,7 +130,7 @@ async function bench() {
   return {
     runtime, feature, slots: runtime.slots, entryOf,
     conversationApi, conversationHeaderApi, residentApi, composerApi, chatViewApi, inputApi,
-    sessionFake, layoutFake,
+    sessionFake, layoutFake, speechHost,
   }
 }
 
@@ -217,6 +223,36 @@ describe('conversation slot inject API', () => {
     await b.runtime.dispose()
   })
 
+  it('image intake refuses on a definite no-image declaration, and only then', async () => {
+    const b = await bench()
+    const bar = b.composerApi(ROOT)
+    if (bar.addImages === undefined) throw new Error('addImages face missing')
+    const image = new File([Uint8Array.of(1)], 'x.png', { type: 'image/png' })
+    const notImage = new File([Uint8Array.of(1)], 'x.txt', { type: 'text/plain' })
+
+    // Nothing declared (unknown): intake proceeds to the ordinary format
+    // check, which answers for the non-image here.
+    expect(bar.addImages([notImage])).toBe(en['image.unsupportedType'])
+
+    // A definite no-image declaration refuses with the model copy, before any
+    // file is read — even a batch the format check would reject answers the
+    // actual obstacle.
+    const created = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:draft')
+    b.runtime.ctx.conversation.imageInput.set(ROOT, false)
+    expect(bar.addImages([image])).toBe(en['image.modelUnsupported'])
+    expect(bar.addImages([notImage])).toBe(en['image.modelUnsupported'])
+    expect(created).not.toHaveBeenCalled()
+
+    // Declared capable: back to the ordinary path; a valid image is accepted.
+    b.runtime.ctx.conversation.imageInput.set(ROOT, true)
+    expect(bar.addImages([image])).toBeNull()
+    created.mockRestore()
+    // Cleared back to unknown — what a scope teardown pushes — admissible again.
+    b.runtime.ctx.conversation.imageInput.set(ROOT, undefined)
+    expect(bar.addImages([notImage])).toBe(en['image.unsupportedType'])
+    await b.runtime.dispose()
+  })
+
   it('openDetails (chat view face) writes the selection through the store actions and opens the panel', async () => {
     const b = await bench()
     const { instance, injected } = b.chatViewApi(ROOT)
@@ -237,6 +273,15 @@ describe('conversation slot inject API', () => {
     await vi.waitFor(() => {
       expect(b.runtime.workspaces.calls).toContainEqual({ method: 'openPath', args: ['/proj/src/a.ts'] })
     })
+    await b.runtime.dispose()
+  })
+
+  it('projects speech.talkMode onto the resident talkMode hook', async () => {
+    const b = await bench()
+    const resident = b.residentApi(ROOT)
+    expect(resident.hooks.talkMode.getSnapshot()).toBe(false)
+    b.speechHost.publish({ status: 'ready', value: { talkMode: true }, writable: true })
+    expect(resident.hooks.talkMode.getSnapshot()).toBe(true)
     await b.runtime.dispose()
   })
 

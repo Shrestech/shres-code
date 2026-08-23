@@ -40,9 +40,9 @@ Under **Model catalog**, choose **Fetch available models** to query the base URL
 
 ### Image input
 
-A model you enter by hand is treated as text-only until it says otherwise, because nothing can ask an endpoint which modalities it accepts. Attaching an image to such a model is refused before it is sent, naming the model.
+A fetched candidate whose listing declares modalities brings the declaration with it: **Fetch available models** marks an image-capable one **vision**, and adopting it stores the declaration. A model you enter by hand — or one fetched from a listing that declares nothing, which is most of them — stays undeclared and is treated as text-only. Attaching an image to such a model is refused before it is sent.
 
-A vision model on a custom provider therefore needs one line. The form has no field for it; add `input` to the model in `$SHRES_HOME/settings.yaml`:
+To declare a vision model yourself, open the model row's advanced fold and set **Input** to **Text + image (vision)**. The equivalent in `$SHRES_HOME/settings.yaml` is one `input` line on the model:
 
 ```yaml
 llm-pi-ai:
@@ -91,7 +91,7 @@ Both fields state a claim about your endpoint rather than checking it. A model t
 
 ## Select a model
 
-Configured providers appear in the model picker. Selecting a model also makes it the default for new sessions. A session that has already sent a request retains the model recorded in its own log.
+Configured providers appear in the model picker. Selecting a model also makes it the default for new sessions. A session that has already sent a request retains the model recorded in its own log. A model that declares image input carries a **vision** tag.
 
 If a saved default names a provider that was deleted, the composer displays **Select model** and blocks input until another model is selected.
 
@@ -102,7 +102,7 @@ If a saved default names a provider that was deleted, the composer displays **Se
 - **Local Ollama is missing from the picker** — `GET http://localhost:11434/v1/models` did not answer. Start Ollama and retry; the shipped route still appears on the Models page.
 - **`UNKNOWN_MODEL`** — Select a configured model or add the missing model to the custom provider.
 - **Fetching available models returns 401** — Check the key. Model discovery calls the OpenAI-compatible `GET /models` endpoint; enter models manually for endpoints that do not provide it.
-- **An image is refused before sending** — The model declares no image modality. Give a custom provider's model `input: [text, image]`; DeepSeek's own chat-completions route is text-only and cannot be configured otherwise.
+- **An image is refused before sending** — The model declares no image modality. Set the model row's **Input** to **Text + image (vision)**, or give a custom provider's model `input: [text, image]` in `settings.yaml`; DeepSeek's own chat-completions route is text-only and cannot be configured otherwise.
 - **The provider rejects a request carrying an image** — The model declares images its endpoint does not actually serve. Remove `image` from whichever list granted it — the model's `input`, or the route's `defaultInput` — then start a new session: the attached image stays in the session log, so the same request repeats until the session moves off it.
 
 ## Advanced configuration

@@ -351,7 +351,60 @@ describe('WhisperSttProvider', () => {
     await provider.transcribe({ audio: wav, mediaType: 'audio/x-wav' })
     expect(loads).toBe(1)
   })
+
+  it('forwards allowDownload to the loader request', async () => {
+    const seen: boolean[] = []
+    const load: WhisperLoader = (request) => {
+      seen.push(request.allowDownload)
+      return Promise.resolve(async () => ({ text: 'ok' }))
+    }
+    const dir = await mkdtemp(join(tmpdir(), 'shres-whisper-warm-'))
+    try {
+      await writeFile(join(dir, 'marker'), 'x')
+      const off = new WhisperSttProvider(() => resolveOptions({ allowDownload: false, cacheDir: dir }, load))
+      await off.transcribe({ audio: wav, mediaType: 'audio/wav' })
+      const on = new WhisperSttProvider(() => resolveOptions({ allowDownload: true, cacheDir: dir }, load))
+      await on.transcribe({ audio: wav, mediaType: 'audio/wav' })
+      expect(seen).toEqual([false, true])
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('passes a multilingual language kwarg and reloads when the checkpoint changes', async () => {
+    const seen: Array<{ modelId: string; language?: string }> = []
+    const load: WhisperLoader = request => Promise.resolve(async (_audio, options) => {
+      seen.push({
+        modelId: request.modelId,
+        ...(options?.language === undefined ? {} : { language: options.language }),
+      })
+      return { text: 'ok' }
+    })
+    const current = { language: 'en' }
+    const provider = new WhisperSttProvider(() => resolveOptions({
+      allowDownload: true,
+      language: current.language,
+    }, load))
+    await provider.transcribe({ audio: wav, mediaType: 'audio/wav' })
+    current.language = 'es'
+    await provider.transcribe({ audio: wav, mediaType: 'audio/wav' })
+    expect(seen).toEqual([
+      { modelId: 'Xenova/whisper-tiny.en' },
+      { modelId: 'Xenova/whisper-tiny', language: 'spanish' },
+    ])
+  })
 })
+
+describe('resolveOptions', () => {
+  it('derives the checkpoint from language unless modelId is pinned', () => {
+    expect(resolveOptions({ language: 'en' }).modelId).toBe('Xenova/whisper-tiny.en')
+    expect(resolveOptions({ language: 'ja' }).modelId).toBe('Xenova/whisper-tiny')
+    expect(resolveOptions({ language: 'ja', modelId: 'Xenova/whisper-tiny.en' }).modelId).toBe(
+      'Xenova/whisper-tiny.en',
+    )
+  })
+})
+
 
 describe('speech-whisper plugin', () => {
   it('registers whisper-tiny-en on ctx.speech', async () => {

@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@shres-code/shres-code-client-ui-slots'
 import { IconChevronDownOutline14, Menu } from '@shres-code/shres-code-client-ui-primitives'
-import { DEFAULT_SPEECH_VOICE_ID, type SpeechUserSettings } from './settings.ts'
+import { DEFAULT_SPEECH_LANGUAGE, DEFAULT_SPEECH_VOICE_ID, type SpeechUserSettings } from './settings.ts'
 import type { SettingsScope, SnapshotStore } from '@shres-code/shres-code-client-runtime/client'
 import type { SpeechClientStatus } from './status.ts'
+import { SPEECH_LANGUAGES } from './languages.ts'
 import css from './SpeechButton.module.css'
 
 /** Injected settings-row face. */
@@ -12,7 +13,7 @@ export interface SpeechSettingsInjected {
     speechSettings: SettingsScope<SpeechUserSettings>
     speechStatus: SnapshotStore<SpeechClientStatus>
   }
-  setField: (field: 'voiceId' | 'autoSubmitVoice', value: unknown) => void
+  setField: (field: 'voiceId' | 'autoSubmitVoice' | 'language', value: unknown) => void
 }
 
 /** Full settings-row props. */
@@ -88,6 +89,50 @@ export function AutoSubmitRow({ useSpeechSettings, setField, t }: SpeechSettings
       >
         {on ? t('settings.autoSubmit.on') : t('settings.autoSubmit.off')}
       </button>
+    </div>
+  )
+}
+
+/**
+ * Spoken-language picker for dictation and Talk mode.
+ * @param props - settings scope and locale.
+ * @returns the settings row.
+ */
+export function LanguageRow({ useSpeechSettings, setField, t }: SpeechSettingsRowProps) {
+  const value = useSpeechSettings(s => s.value)
+  const selected = value?.language ?? DEFAULT_SPEECH_LANGUAGE
+  const [open, setOpen] = useState(false)
+  const label = SPEECH_LANGUAGES.find(row => row.id === selected)?.label ?? selected
+  return (
+    <div className={css.row}>
+      <div className={css.rowText}>
+        <div className={css.title}>{t('settings.language.title')}</div>
+        <div className={css.desc}>{t('settings.language.description')}</div>
+      </div>
+      <Menu
+        open={open}
+        onClose={() => { setOpen(false) }}
+        items={SPEECH_LANGUAGES.map(row => ({ id: row.id, label: row.label }))}
+        selectedId={selected}
+        onSelect={(id) => {
+          setOpen(false)
+          setField('language', id)
+        }}
+        align="end"
+        portal
+        anchor={(
+          <button
+            type="button"
+            className={css.selector}
+            aria-haspopup="menu"
+            aria-expanded={open}
+            onClick={() => { setOpen(value => !value) }}
+          >
+            {label}
+            <IconChevronDownOutline14 className={css.chevron} />
+          </button>
+        )}
+      />
     </div>
   )
 }

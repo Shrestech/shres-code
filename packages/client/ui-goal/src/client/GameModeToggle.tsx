@@ -1,26 +1,26 @@
 /**
- * Game mode switch beside the sidebar wordmark. Writes the `game` settings
- * namespace; the Goal fight arena reads the same document.
+ * Game mode switch in the composer tool row, beside J-Space. Writes the
+ * `game` settings namespace; the Goal fight arena reads the same document.
  */
 
 import type { InjectFace, PropsLocale, PropsRuntime } from '@shres-code/shres-code-client-ui-slots'
+import type {} from '@shres-code/shres-code-client-ui-conversation/client'
 import type { GameModeToggleInjected } from './slots.ts'
 import { gameSettingsEnabled } from './game-settings.ts'
 import css from './GameModeToggle.module.css'
 
-/** Full props of the brand-row switch. */
+/** Full props of the composer-row switch. */
 export type GameModeToggleProps =
-  PropsRuntime<'sidebar.brand.action'>
+  PropsRuntime<'conversation.input.left'>
   & InjectFace<GameModeToggleInjected>
   & PropsLocale<'goal'>
 
 /**
  * Render the Game mode switch.
- * @param props - settings hook, column state, and copy.
- * @returns the labeled switch, or null on the collapsed rail.
+ * @param props - settings hook and copy.
+ * @returns the labeled switch.
  */
-export function GameModeToggle({ wide, useGameSettings, setEnabled, t }: GameModeToggleProps) {
-  if (!wide) return null
+export function GameModeToggle({ useGameSettings, setEnabled, t }: GameModeToggleProps) {
   const settings = useGameSettings(current => current)
   const enabled = gameSettingsEnabled(settings)
   const disabled = settings.status !== 'ready' || !settings.writable

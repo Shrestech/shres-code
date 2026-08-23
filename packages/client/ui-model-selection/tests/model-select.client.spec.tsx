@@ -106,6 +106,37 @@ describe('ModelSelect reasoning effort', () => {
     expect(screen.getByTitle(en['delegated.hint'])).toBeTruthy()
   })
 
+  it('tags declared input modalities, and only those', () => {
+    const directory = createSnapshotStore(state({
+      current: { provider: 'provider', model: 'seeing' },
+      groups: [{
+        id: 'provider',
+        name: 'Provider',
+        models: [
+          { id: 'seeing', name: 'Seeing', inputModalities: ['text', 'image'] },
+          { id: 'plain', name: 'Plain', inputModalities: ['text'] },
+          { id: 'undeclared', name: 'Undeclared' },
+          // A modality this build has never heard of renders as its own label
+          // rather than being dropped or mapped to a guess.
+          { id: 'listening', name: 'Listening', inputModalities: ['text', 'audio'] },
+        ],
+      }],
+    }))
+    render(<ModelSelect
+      locked={false}
+      available
+      directory={directory}
+      load={vi.fn()}
+      select={vi.fn().mockResolvedValue(true)}
+      t={t}
+    />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Select model, current Seeing' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /Model/ }))
+    const rows = screen.getAllByRole('menuitemradio').map(item => item.textContent)
+    expect(rows).toEqual(['Seeingvision', 'Plain', 'Undeclared', 'Listeningaudio'])
+  })
+
   it('offers provider default only when the adapter does not configure a model default', () => {
     const directory = createSnapshotStore(state({
       groups: [{

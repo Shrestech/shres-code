@@ -47,6 +47,7 @@ async function bench(remote: SpeechRemote = speechRemote()) {
     children: {
       'conversation.input.right': { kind: 'list', scope: 'session' },
       'conversation.chat.assistant-actions': { kind: 'list', scope: 'session' },
+      'conversation.composer': { kind: 'chain', scope: 'session' },
       'settings.general.item': { kind: 'list', scope: 'root' },
     },
   } as never, () => null)
@@ -80,9 +81,11 @@ describe('ui-speech browser apply', () => {
     await fiber.await()
     expect(b.slots.entries('conversation.input.right').map(entry => entry.options.id)).toEqual(['mic'])
     expect(b.slots.entries('conversation.chat.assistant-actions').map(entry => entry.options.id)).toEqual(['speak'])
+    expect(b.slots.entries('conversation.composer')[0]?.options.priority).toBe(2)
     expect(b.slots.entries('settings.general.item').map(entry => entry.options.id)).toEqual([
       'speech-voice',
       'auto-submit-voice',
+      'speech-language',
     ])
     await fiber.dispose()
     expect(b.slots.entries('conversation.input.right')).toHaveLength(0)
@@ -120,16 +123,32 @@ describe('ui-speech browser apply', () => {
     await fiber.dispose()
   })
 
-  it('keeps the initial snapshot when status() rejects', async () => {
-    const remote = speechRemote({
-      status: () => Promise.reject(new Error('transport')),
-    })
-    const b = await bench(remote)
+  it('keeps the last snapshot when status() rejects and re-probes on connection/reset', async () => {
+    let reject = true
+    const status = vi.fn((): ReturnType<SpeechRemote['status']> => reject
+      ? Promise.reject(new Error('transport'))
+      : Promise.resolve({
+        ok: true as const,
+        value: {
+          tts: { kind: 'ready' as const, providerId: 'kokoro-tts' },
+          stt: { kind: 'ready' as const, providerId: 'whisper-tiny-en' },
+          voices: [],
+        },
+      }))
+    const b = await bench(speechRemote({ status }))
     const fiber = b.ctx.plugin({ inject: [...inject], apply })
     await fiber.await()
     await Promise.resolve()
     expect(settingsInject(b.slots).hooks.speechStatus.getSnapshot().ttsReady).toBe(false)
+    reject = false
+    b.ctx.emit('connection/reset')
+    await vi.waitFor(() => {
+      expect(settingsInject(b.slots).hooks.speechStatus.getSnapshot().ttsReady).toBe(true)
+    })
     await fiber.dispose()
+    const probes = status.mock.calls.length
+    b.ctx.emit('connection/reset')
+    expect(status.mock.calls.length).toBe(probes)
   })
 
   it('writes settings fields through the bound scope', async () => {

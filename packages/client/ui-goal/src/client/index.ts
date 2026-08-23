@@ -1,7 +1,7 @@
 /**
  * Goal surface plugin, browser half: the GoalBar entry in the
- * conversation.input.dock strip and the Game mode switch beside the
- * sidebar wordmark. Projection-mode surface — the live goal arrives
+ * conversation.input.dock strip and the Game mode switch in the composer
+ * tool row beside J-Space. Projection-mode surface — the live goal arrives
  * through `useProjection('goal')`. Game mode arrives through the `game`
  * settings namespace. The inject face carries mutation verbs plus the
  * settings hook. Goal creation stays on the /goal host command.
@@ -16,7 +16,6 @@ import type {} from '@shres-code/shres-code-client-locale/client'
 // Type-only: the `goal` SessionProjectionMap key merge (single source, the domain's pure outlet).
 import type { GoalProjection, GoalRef } from '@shres-code/shres-code-goal/client'
 import type {} from '@shres-code/shres-code-client-ui-settings/client'
-import type {} from '@shres-code/shres-code-client-ui-sidebar/client'
 import type { GoalActionResult, GoalDockInjected, GameModeToggleInjected } from './slots.ts'
 import { GoalDock } from './GoalBar.tsx'
 import { GameModeToggle } from './GameModeToggle.tsx'
@@ -76,10 +75,10 @@ export function apply(ctx: ClientContext): void {
     namespace: GAME_SETTINGS_NAMESPACE,
   })
 
-  ctx.slots.inject('sidebar.brand.action', () => ctx.slots.register({
-    name: 'sidebar.brand.action',
+  ctx.slots.inject('conversation.input.left', () => ctx.slots.register({
+    name: 'conversation.input.left',
     id: 'game-mode',
-    order: 0,
+    order: 10,
     locale: NS,
     inject: (): GameModeToggleInjected => ({
       hooks: { gameSettings: gameScope },
