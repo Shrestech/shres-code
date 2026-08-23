@@ -31,7 +31,8 @@ export const JSPACE_DRIVER_CLOSED =
 /** How to drive the tools when a card is already printed. */
 export const JSPACE_DRIVER_OPEN =
   'A J-Space card is already open. Update it with jspace_note. '
-  + 'Record checks with jspace_checkpoint (by must name a verifier). '
+  + 'Record checks with jspace_checkpoint (by must name a verifier; '
+  + 'the optional evidence must be a call_* tool-call id from this session). '
   + 'Call jspace_ship before claiming done. Do not call jspace_open to start a second card; '
   + 'it replaces Goal and Next on the open card. '
   + 'Repeating the same tool call within a turn is refused until you write a diagnosis on the card.'
