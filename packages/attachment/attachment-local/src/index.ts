@@ -28,8 +28,10 @@ export { readRequestImageFile, requestImageDimensions, requestImageVariantId } f
 export const DEFAULT_MAX_IMAGE_BYTES = 20 * 1024 * 1024
 /** Default maximum images in one prompt. */
 export const DEFAULT_MAX_IMAGES_PER_MESSAGE = 20
-/** Default maximum aggregate image bytes in one prompt. */
-export const DEFAULT_MAX_MESSAGE_IMAGE_BYTES = 200 * 1024 * 1024
+/** Default maximum aggregate image bytes in one prompt. Bounded by the HTTP
+ *  carrier: the browser sends a batch as base64 in one JSON body, so this value
+ *  times 4/3 plus envelope headroom must fit `DEFAULT_MAX_REQUEST_BODY_BYTES`. */
+export const DEFAULT_MAX_MESSAGE_IMAGE_BYTES = 100 * 1024 * 1024
 /** Default maximum intrinsic pixels for one submitted image. */
 export const DEFAULT_MAX_IMAGE_PIXELS = 64_000_000
 /** Default per-side pixel cap for one submitted image. */
@@ -55,7 +57,7 @@ export interface Config {
   maxImageBytes?: number
   /** Maximum image count accepted in one submitted message. Default: 20. */
   maxImagesPerMessage?: number
-  /** Maximum aggregate encoded image bytes accepted in one submitted message. Default: 200 MiB. */
+  /** Maximum aggregate encoded image bytes accepted in one submitted message. Default: 100 MiB. */
   maxMessageImageBytes?: number
   /** Maximum intrinsic width multiplied by height accepted for one submitted image. Default: 64,000,000. */
   maxImagePixels?: number
