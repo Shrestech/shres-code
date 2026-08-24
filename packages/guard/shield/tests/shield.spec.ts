@@ -8,6 +8,8 @@ import { Context, FiberState } from '@shres-code/cordis'
 import SystemPrompt from '@shres-code/shres-code-system-prompt'
 import ToolRuntime from '@shres-code/shres-code-tools'
 import { remoteMethods } from '@shres-code/shres-code-typert-protocol'
+import { SettingsProvider } from '@shres-code/shres-code-settings'
+import type { SettingsNamespace } from '@shres-code/shres-code-settings'
 import * as ShieldSeat from '@shres-code/shres-code-shield'
 import type { ShieldDecision } from '@shres-code/shres-code-shield/types'
 import { Session, SessionId } from '@shres-code/shres-code-session'
@@ -424,3 +426,198 @@ describe('shres-shield host seat', () => {
     expect(event.type).toBe('shield/decision')
   })
 })
+
+describe('shres-shield per-repo gate', () => {
+  it('unmounts the engine when the only live session works in an exempt repo', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', fixtureUrl)
+    const ctx = new Context()
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRuntime)
+    await provideApprovalAndJobs(ctx)
+    ctx.provide('sessions', {
+      get: () => undefined,
+      list: () => [{ header: { cwd: '/exempt/repo' } }],
+    })
+    await ctx.plugin(ShieldSeat, { license: 'paid', repos: { '/exempt/repo': { enabled: false } } })
+    await waitForReason(ctx, 'repo-disabled')
+    expect(applied.count).toBe(0)
+    expect(ctx.shield.status).toEqual({ active: false, reason: 'repo-disabled' })
+    // Persisted counts survive the exemption exactly as a global disable.
+    expect(ctx.shield.snapshot().stats.screened).toBe(4)
+  })
+
+  it('keeps the engine mounted while any live repo stays enabled', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', fixtureUrl)
+    const ctx = new Context()
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRuntime)
+    await provideApprovalAndJobs(ctx)
+    ctx.provide('sessions', {
+      get: () => undefined,
+      list: () => [{ header: { cwd: '/exempt/repo' } }, { header: { cwd: '/screened/repo' } }],
+    })
+    await ctx.plugin(ShieldSeat, {
+      license: 'paid',
+      repos: { '/exempt/repo': { enabled: false } },
+    })
+    await waitForReason(ctx, 'active')
+    expect(applied.count).toBe(1)
+  })
+
+  it('keeps the global switch master over a repo entry', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', fixtureUrl)
+    const ctx = new Context()
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRuntime)
+    await provideApprovalAndJobs(ctx)
+    ctx.provide('sessions', { list: () => [{ header: { cwd: '/exempt/repo' } }] })
+    await ctx.plugin(ShieldSeat, {
+      license: 'paid',
+      enabled: false,
+      repos: { '/exempt/repo': { enabled: false } },
+    })
+    await waitForReason(ctx, 'disabled')
+    expect(applied.count).toBe(0)
+  })
+
+  it('keeps diagnostics above the repo gate', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', '/no/such-shield-module.js')
+    const ctx = await setup({ license: 'paid', repos: { '/exempt/repo': { enabled: false } } }, 'engine-missing')
+    ctx.provide('sessions', { list: () => [{ header: { cwd: '/exempt/repo' } }] })
+    expect(ctx.shield.snapshot().status).toEqual({ active: false, reason: 'engine-missing' })
+  })
+
+  it('unmounts through the snapshot pull when a disabled session appears late', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', fixtureUrl)
+    const ctx = await setup({ license: 'paid', repos: { '/exempt/repo': { enabled: false } } }, 'active')
+    expect(applied.count).toBe(1)
+    // No session/created push fires here; snapshot()'s pull re-evaluation
+    // must flip the mount decision on its own.
+    ctx.provide('sessions', { list: () => [{ header: { cwd: '/exempt/repo' } }] })
+    ctx.shield.snapshot()
+    await waitForReason(ctx, 'repo-disabled')
+    expect(applied.disposed).toBe(1)
+    expect(applied.count).toBe(1)
+  })
+
+  it('remounts through the snapshot pull when the exempt session goes away', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', fixtureUrl)
+    const ctx = new Context()
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRuntime)
+    await provideApprovalAndJobs(ctx)
+    let live = true
+    ctx.provide('sessions', {
+      list: () => live ? [{ header: { cwd: '/exempt/repo' } }] : [],
+    })
+    await ctx.plugin(ShieldSeat, { license: 'paid', repos: { '/exempt/repo': { enabled: false } } })
+    await waitForReason(ctx, 'repo-disabled')
+    expect(applied.count).toBe(0)
+    live = false
+    ctx.shield.snapshot()
+    await waitForReason(ctx, 'active')
+    expect(applied.count).toBe(1)
+  })
+
+  it('reports repo-disabled per repo in the snapshot while the engine screens others', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', fixtureUrl)
+    const ctx = await setup({
+      license: 'paid',
+      repos: { '/exempt/repo': { enabled: false } },
+    }, 'active')
+    expect(ctx.shield.status).toEqual({ active: true, reason: 'active' })
+    // No live sessions: mount status is harness-wide truth, snapshot honest.
+    expect(ctx.shield.snapshot().status).toEqual({ active: true, reason: 'active' })
+    ctx.provide('sessions', {
+      get: (id: SessionId) => id === SessionId('exempt') ? { header: { cwd: '/exempt/repo' } } : undefined,
+      list: () => [{ header: { cwd: '/screened/repo' } }],
+    })
+    // The engine stays mounted for /screened/repo; the exempt session's
+    // snapshot reports its own effective status.
+    expect(ctx.shield.snapshot('exempt').status).toEqual({ active: false, reason: 'repo-disabled' })
+    expect(ctx.shield.snapshot().status).toEqual({ active: true, reason: 'active' })
+  })
+
+  it('does not remount the engine on session events that leave the gate unchanged', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', fixtureUrl)
+    const ctx = await setup({ license: 'paid' }, 'active')
+    expect(applied.count).toBe(1)
+    ctx.emit('session/created', Session.create(SessionId('s-push')))
+    ctx.emit('session/disposed', Session.create(SessionId('s-push')))
+    await new Promise<void>((resolve) => { setTimeout(resolve, 80) })
+    expect(applied.count).toBe(1)
+    expect(applied.disposed).toBe(0)
+    expect(ctx.shield.status).toEqual({ active: true, reason: 'active' })
+  })
+
+  it('remounts through the session-event push when the exempt sessions go away', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', fixtureUrl)
+    const ctx = new Context()
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRuntime)
+    await provideApprovalAndJobs(ctx)
+    let live = true
+    ctx.provide('sessions', {
+      list: () => live ? [{ header: { cwd: '/exempt/repo' } }] : [],
+    })
+    await ctx.plugin(ShieldSeat, { license: 'paid', repos: { '/exempt/repo': { enabled: false } } })
+    await waitForReason(ctx, 'repo-disabled')
+    expect(applied.count).toBe(0)
+    live = false
+    ctx.emit('session/disposed', Session.create(SessionId('s-exempt')))
+    await waitForReason(ctx, 'active')
+    expect(applied.count).toBe(1)
+  })
+
+  it('keeps diagnostics above the global switch when the engine is missing', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', '/no/such-shield-module.js')
+    const ctx = await setup({ license: 'paid', enabled: false }, 'engine-missing')
+    expect(ctx.shield.status).toEqual({ active: false, reason: 'engine-missing' })
+    expect(applied.count).toBe(0)
+  })
+
+  it('refuses a repos write with a relative key through the settings service', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', fixtureUrl)
+    const ctx = new Context()
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRuntime)
+    await provideApprovalAndJobs(ctx)
+    const settingsFiber = ctx.plugin(MemorySettings)
+    await settingsFiber.await()
+    await ctx.plugin(ShieldSeat, { license: 'paid' })
+    await waitForReason(ctx, 'active')
+    await expect(ctx.settings.update(ShieldSeat.SHIELD_SETTINGS_NAMESPACE, {
+      repos: { 'relative/path': { enabled: false } },
+    })).rejects.toThrow(/absolute/)
+    await ctx.fiber.dispose()
+  })
+})
+
+/** The smallest real provider: one in-memory document, always writable. */
+class MemorySettings extends SettingsProvider {
+  doc: Record<string, unknown> = {}
+
+  get writable(): boolean {
+    return true
+  }
+
+  protected load(): Promise<Record<string, unknown>> {
+    return Promise.resolve(structuredClone(this.doc))
+  }
+
+  protected persist(ns: SettingsNamespace, section: Record<string, unknown>): Promise<void> {
+    this.doc = { ...this.doc, [ns]: structuredClone(section) }
+    return Promise.resolve()
+  }
+}

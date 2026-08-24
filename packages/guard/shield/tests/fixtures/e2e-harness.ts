@@ -132,6 +132,7 @@ export function fakeAgent(cwd = '/tmp/shres-shield-e2e-workspace'): Agent {
 export async function mountShield(
   posture: 'observe' | 'ask' | 'enforce',
   approvalMode: ApprovalMode,
+  seatConfig: ShieldSeat.Config = {},
 ): Promise<Harness> {
   const ctx = new Context()
   const asks: RecordedAsk[] = []
@@ -174,7 +175,7 @@ export async function mountShield(
     },
   })
 
-  await ctx.plugin(ShieldSeat, { posture })
+  await ctx.plugin(ShieldSeat, { posture, ...seatConfig })
   await waitForReason(ctx, 'active')
 
   return {

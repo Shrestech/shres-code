@@ -15,6 +15,8 @@ export interface ShieldSettings {
   license?: string
   /** User activate/disable switch. Default true. */
   enabled?: boolean
+  /** Per-repo carve-outs: absolute repo path → exemption. */
+  repos?: Record<string, { enabled: boolean }>
   /** Screening posture forwarded to the paid plugin. */
   posture?: 'observe' | 'ask' | 'enforce'
 }
@@ -63,6 +65,11 @@ function formatFinding(
 
 const RULE_TOP_N = 5
 
+/** Copy the exemption map without one key; removing an entry re-enables the repo. */
+function withoutRepo(repos: NonNullable<ShieldSettings['repos']>, path: string): ShieldSettings['repos'] {
+  return Object.fromEntries(Object.entries(repos).filter(([key]) => key !== path))
+}
+
 function topRules(byRule: ShieldSnapshot['stats']['byRule']): Array<{
   rule: string
   observed: number
@@ -103,6 +110,10 @@ export function ShieldSection({
   const posture = settings.value?.posture ?? 'ask'
   const enabled = settings.value?.enabled !== false
   const licenseStored = typeof settings.value?.license === 'string' && settings.value.license.length > 0
+  const repos = settings.value?.repos ?? {}
+  const repoCwd = consoleState.status === 'ready' ? consoleState.snapshot.stats.cwd : null
+  const repoExempt = repoCwd !== null && repos[repoCwd]?.enabled === false
+  const exemptPaths = Object.keys(repos).sort((a, b) => a.localeCompare(b))
 
   useEffect(() => {
     let current = true
@@ -113,6 +124,12 @@ export function ShieldSection({
     )
     return () => { current = false }
   }, [loadSnapshot, currentSessionId, request])
+
+  // The mark follows the current session's effective status; the global
+  // switch echo stays optimistic until the next snapshot corrects it.
+  useEffect(() => {
+    if (consoleState.status === 'ready') publishShieldMark(consoleState.snapshot.status.active)
+  }, [consoleState])
 
   const bothMissing = settings.status === 'unavailable' && consoleState.status === 'error'
   const formDisabled = settings.status !== 'ready' || !settings.writable || saving
@@ -152,6 +169,55 @@ export function ShieldSection({
                 </button>
               </div>
               <p className={css.hint}>{t('toggleHint')}</p>
+              <div className={css.toggleCard}>
+                <div className={css.toggleCopy}>
+                  <span className={css.toggleName}>{repoCwd ?? t('repoUnknown')}</span>
+                  <span className={css.toggleState}>{repoExempt ? t('repoExempt') : t('repoOn')}</span>
+                </div>
+                <button
+                  type="button"
+                  className={repoExempt ? css.switchOff : css.switchOn}
+                  role="switch"
+                  aria-checked={!repoExempt}
+                  aria-label={repoExempt ? t('repoRestore') : t('repoExemptAction')}
+                  disabled={formDisabled || repoCwd === null}
+                  onClick={() => {
+                    if (repoCwd === null) return
+                    if (repoExempt) {
+                      void scope.set('repos', withoutRepo(repos, repoCwd))
+                    } else {
+                      void scope.set('repos', { ...repos, [repoCwd]: { enabled: false } })
+                    }
+                  }}
+                >
+                  <span className={css.switchThumb} />
+                </button>
+              </div>
+              <p className={css.hint}>{t('repoToggleHint')}</p>
+              {exemptPaths.length > 0 ? (
+                <div className={css.recent}>
+                  <h3 className={css.recentTitle}>{t('repoList')}</h3>
+                  <ul className={css.findings}>
+                    {exemptPaths.map(path => (
+                      <li key={path}>
+                        <span>{path}</span>
+                        <button
+                          type="button"
+                          className={css.retry}
+                          disabled={formDisabled}
+                          onClick={() => {
+                            void scope.set('repos', withoutRepo(repos, path))
+                          }}
+                        >
+                          {t('repoRemove')}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <p className={css.hint}>{t('noRepos')}</p>
+              )}
               <label className={css.field}>
                 <span className={css.label}>{t('posture')}</span>
                 <select

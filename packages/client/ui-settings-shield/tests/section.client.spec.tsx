@@ -175,7 +175,7 @@ describe('ShieldSection', () => {
     mount(snapshot({}), vi.fn(async () => {}), () => Promise.reject(new Error('transport')))
     expect((await screen.findByRole('alert')).textContent).toBe(en.snapshotUnavailable)
     expect(screen.queryByText('transport')).toBeNull()
-    expect(screen.getByRole('switch')).toBeTruthy()
+    expect(screen.getByRole('switch', { name: en.disable })).toBeTruthy()
   })
 
   it('retries a failed snapshot load', async () => {
@@ -334,7 +334,7 @@ describe('ShieldSection', () => {
     )
     expect(await screen.findByText('2')).toBeTruthy()
     expect(screen.getByRole('status').textContent).toBe(en.readOnly)
-    expect((screen.getByRole('switch') as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('switch', { name: en.disable }) as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('ignores an unknown posture value', async () => {
@@ -342,6 +342,62 @@ describe('ShieldSection', () => {
     await readyConsole()
     fireEvent.change(screen.getByLabelText(en.posture), { target: { value: 'nope' } })
     expect(set).not.toHaveBeenCalled()
+  })
+
+  it('exempts the current repo through the repos map', async () => {
+    const { set } = mount(snapshot({}))
+    await readyConsole('/repo')
+    fireEvent.click(screen.getByRole('switch', { name: en.repoExemptAction }))
+    expect(set).toHaveBeenCalledWith('repos', { '/repo': { enabled: false } })
+  })
+
+  it('restores screening by removing the current repo entry', async () => {
+    const { set } = mount(snapshot({ value: { posture: 'ask', repos: { '/repo': { enabled: false } } } }))
+    await readyConsole('/repo')
+    fireEvent.click(screen.getByRole('switch', { name: en.repoRestore }))
+    expect(set).toHaveBeenCalledWith('repos', {})
+  })
+
+  it('lists exempt repos sorted with a remove action', async () => {
+    const { set } = mount(snapshot({
+      value: { posture: 'ask', repos: { '/repo/b': { enabled: false }, '/repo/a': { enabled: false } } },
+    }))
+    await readyConsole('/repo')
+    const rows = screen.getByRole('list')
+    const items = [...rows.querySelectorAll('li')].map(li => li.querySelector('span')?.textContent)
+    expect(items).toEqual(['/repo/a', '/repo/b'])
+    fireEvent.click([...rows.querySelectorAll('button')][1] as HTMLElement)
+    expect(set).toHaveBeenCalledWith('repos', { '/repo/a': { enabled: false } })
+  })
+
+  it('shows the empty exemption state and disables the repo switch without a cwd', async () => {
+    mount(snapshot({}), vi.fn(async () => {}), () => Promise.resolve(consoleSnapshot({
+      stats: emptyStats(null),
+    })))
+    expect(await screen.findByText(en.noRepos)).toBeTruthy()
+    expect(screen.getByText(en.repoUnknown)).toBeTruthy()
+    const toggle = screen.getByRole('switch', { name: en.repoExemptAction }) as HTMLButtonElement
+    expect(toggle.disabled).toBe(true)
+  })
+
+  it('marks the current repo exempt in its own toggle while the master stays on', async () => {
+    mount(snapshot({ value: { enabled: true, posture: 'ask', repos: { '/repo': { enabled: false } } } }))
+    expect(await screen.findByText(en.repoExempt)).toBeTruthy()
+    expect(screen.getByText(en.active)).toBeTruthy()
+  })
+
+  it('publishes the mark from the per-session snapshot status', async () => {
+    mount(
+      snapshot({}),
+      vi.fn(async () => {}),
+      () => Promise.resolve(consoleSnapshot({
+        status: { active: false, reason: 'repo-disabled' },
+        stats: emptyStats('/repo'),
+      })),
+    )
+    await waitFor(() => {
+      expect(document.documentElement.dataset.shresShield).toBe('off')
+    })
   })
 
   it('explains when the host seat is not mounted and the console also fails', async () => {

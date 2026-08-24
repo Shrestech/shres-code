@@ -1,7 +1,16 @@
 import type {} from '@shres-code/shres-code-session/types'
 
-/** Why the paid Shield payload is not screening. */
-export type ShieldInactiveReason = 'panic' | 'unlicensed' | 'engine-missing' | 'disabled'
+/**
+ * Why the paid Shield payload is not screening. `'repo-disabled'` covers the
+ * per-repo carve-out: every live session's repo is exempt (mount gate) or the
+ * requested repo is exempt while the engine screens others (snapshot view).
+ */
+export type ShieldInactiveReason =
+  | 'panic'
+  | 'unlicensed'
+  | 'engine-missing'
+  | 'disabled'
+  | 'repo-disabled'
 
 /** Outcome of the host-seat entitlement + resolve step. */
 export type ShieldReason = 'active' | ShieldInactiveReason
@@ -106,7 +115,11 @@ export interface ShieldDefinitions {
 
 /** Host RPC payload for the current session cwd. */
 export interface ShieldSnapshot {
-  /** Live seat status; `reason` is `'disabled'` when the switch is off. */
+  /**
+   * Effective status for the requested repo: `'disabled'` when the global
+   * switch is off, `'repo-disabled'` when this repo is exempt while the
+   * engine screens others.
+   */
   status: ShieldStatus
   /** Last persisted counts for this repo; disable does not wipe them. */
   stats: ShieldRepoStats

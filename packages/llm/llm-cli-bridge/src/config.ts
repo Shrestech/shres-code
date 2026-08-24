@@ -81,7 +81,12 @@ export interface CliBridgeRoute {
 /** Plugin / settings section: a dict of named routes. */
 export interface Config {
   /** Named CLI routes this adapter registers. */
-  routes?: Record<string, Partial<CliBridgeRoute> & { displayName?: string; binary?: string }>
+  routes?: Record<string, Partial<CliBridgeRoute> & {
+    /** Human-readable route name shown in model pickers. */
+    displayName?: string
+    /** Executable name override resolved for this route. */
+    binary?: string
+  }>
   /** Grace in milliseconds for CLI process-tree termination. */
   disposeGraceMs?: number
 }

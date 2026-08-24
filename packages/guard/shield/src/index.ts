@@ -7,7 +7,6 @@
  * @module @shres-code/shres-code-shield
  */
 
-import { realpathSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { Context } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
@@ -17,6 +16,10 @@ import { Remote, TypertRemoteService } from '@shres-code/shres-code-typert-proto
 // Typert-generated ./typert and ./remote artifacts import Zod at runtime.
 import type {} from 'zod'
 import { resolveShieldEngine } from './resolve.ts'
+import {
+  liveSessionCwds, repoDisabled, repoGateBlocksMount, resolveRepoPath,
+  validateRepoKeys, type ShieldRepos,
+} from './repos.ts'
 import type {
   ShieldCounterSplit, ShieldDefinitions, ShieldEngineSource, ShieldFindingSummary,
   ShieldReason, ShieldRepoStats, ShieldRuleHistogram, ShieldSnapshot, ShieldStatus,
@@ -31,7 +34,10 @@ export {
   PAYLOAD_SPECIFIER, repoRootFromSeat, resolveProfileSpecifier, resolveShieldEngine,
   siblingPluginPath, type ShieldResolveOptions,
 } from './resolve.ts'
-
+export {
+  liveSessionCwds, repoDisabled, repoGateBlocksMount, resolveRepoPath, validateRepoKeys,
+  type ShieldRepoEntry, type ShieldRepos, type SessionCwdSource,
+} from './repos.ts'
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'shres-shield'
 
@@ -59,9 +65,17 @@ export interface Config {
   license?: string
   /**
    * User switch on the Shield settings page. Default true. False unloads the
-   * payload without the panic env. `SHRES_SHIELD=off` still wins.
+   * payload without the panic env. `SHRES_SHIELD=off` still wins. The master
+   * control: a `repos` entry cannot re-enable under it.
    */
   enabled?: boolean
+  /**
+   * Per-repo carve-outs. Keys are absolute repo paths; an entry with
+   * `enabled: false` keeps Shield off for sessions working in that repo while
+   * the global switch stays on. Stored in the host-owned settings document —
+   * a repo under audit never authors its own exemption.
+   */
+  repos?: ShieldRepos
   /** Forwarded to the paid plugin. Default `ask`. */
   posture?: 'observe' | 'ask' | 'enforce'
 }
@@ -69,6 +83,7 @@ export interface Config {
 export const Config: z<Config> = z.object({
   license: z.string().default(DEFAULT_SHIELD_LICENSE),
   enabled: z.boolean().default(true),
+  repos: z.dict(z.object({ enabled: z.boolean() })).default({}),
   posture: z.union(['observe', 'ask', 'enforce'] as const).default('ask'),
 })
 
@@ -232,14 +247,6 @@ function readEngineSnapshot(
   return definitions === undefined ? { stats } : { stats, definitions }
 }
 
-function resolveRepoPath(cwd: string): string {
-  try {
-    return realpathSync(cwd)
-  } catch {
-    return cwd
-  }
-}
-
 /**
  * Published Shield status and a read-only snapshot RPC. `active` is the
  * brand-mark switch: blue girl and green shield only while the paid engine is
@@ -252,6 +259,8 @@ export class ShieldHost extends TypertRemoteService {
   private persisted: ((cwd?: string | null) => unknown) | undefined
   private lastStats: ShieldRepoStats
   private lastDefinitions: ShieldDefinitions | undefined
+  private repoDisabledFor: ((cwd: string) => boolean) | undefined
+  private pullSync: (() => void) | undefined
 
   /**
    * @param ctx - owning context.
@@ -284,8 +293,30 @@ export class ShieldHost extends TypertRemoteService {
   }
 
   /**
+   * Remember the per-repo exemption check used to override snapshot status.
+   * @param disabledFor - `(cwd) => true` when an entry disables that repo.
+   */
+  bindRepoDisabled(disabledFor: ((cwd: string) => boolean) | undefined): void {
+    this.repoDisabledFor = disabledFor
+  }
+
+  /**
+   * Remember the pull re-evaluation run at the top of every snapshot call —
+   * the safety net for session events scope-filtered away from the seat fiber.
+   * @param pull - triggers a seat sync when the repo-gate decision flipped.
+   */
+  bindPullSync(pull: (() => void) | undefined): void {
+    this.pullSync = pull
+  }
+
+  /**
    * Per-repo counters for the current session cwd. Disable remounts the payload
    * off but still returns last persisted counts with `status.reason === 'disabled'`.
+   * A repo exempt through `repos` reports `status.reason === 'repo-disabled'`
+   * while diagnostics keep precedence over the exemption. The call first
+   * re-evaluates the repo gate; because that re-evaluation settles
+   * asynchronously, the snapshot that detected a flip reports the pre-flip
+   * status and the next read reflects the new one.
    * @param sessionId - live session whose `header.cwd` keys the stats; omitted
    *   uses the most recently created live session that has a cwd.
    * @returns a JSON copy, never a live alias of seat or engine state.
@@ -293,6 +324,7 @@ export class ShieldHost extends TypertRemoteService {
   @Remote('snapshot')
   snapshot(sessionId?: string): ShieldSnapshot {
     try {
+      this.pullSync?.()
       const cwd = this.resolveCwd(sessionId)
       const source = this.payload !== undefined
         ? this.payload
@@ -305,7 +337,7 @@ export class ShieldHost extends TypertRemoteService {
         this.lastStats = { ...this.lastStats, cwd }
       }
       return {
-        status: { active: this.status.active, reason: this.status.reason },
+        status: this.snapshotStatus(cwd),
         stats: {
           ...toCounterSplit(this.lastStats),
           cwd: this.lastStats.cwd,
@@ -322,6 +354,20 @@ export class ShieldHost extends TypertRemoteService {
         stats: emptyRepoStats(null),
       }
     }
+  }
+
+  /**
+   * Effective status for one repo: harness-wide status, except a mounted
+   * engine screening an exempt repo reports `'repo-disabled'` for that repo.
+   * Diagnostic reasons (`panic`, `engine-missing`, `unlicensed`) and the
+   * global `'disabled'` pass through unchanged — they outrank the exemption.
+   * @param cwd - resolved repo path for the requested session, or `null`.
+   * @returns the status the pane renders for this repo.
+   */
+  private snapshotStatus(cwd: string | null): ShieldStatus {
+    if (!this.status.active || cwd === null) return { active: this.status.active, reason: this.status.reason }
+    if (this.repoDisabledFor?.(cwd) === true) return { active: false, reason: 'repo-disabled' }
+    return { active: this.status.active, reason: this.status.reason }
   }
 
   private resolveCwd(sessionId?: string): string | null {
@@ -397,12 +443,16 @@ export function apply(ctx: Context, config: Config): void {
   const entry: Config = {
     license: config.license !== undefined && config.license.length > 0 ? config.license : DEFAULT_SHIELD_LICENSE,
     enabled: config.enabled !== false,
+    repos: config.repos ?? {},
     posture: config.posture ?? 'ask',
   }
   let source: () => Config = () => entry
   let instance: { dispose(): Promise<void> } | undefined
   let chain = Promise.resolve()
   let stopped = false
+
+  /** Stored exception map from the authoritative source. */
+  const currentRepos = (): ShieldRepos => source().repos ?? {}
 
   const sync = (): void => {
     chain = chain.then(async () => {
@@ -424,10 +474,6 @@ export function apply(ctx: Context, config: Config): void {
         return
       }
       const current = source()
-      if (current.enabled === false) {
-        setStatus(status, { active: false, reason: 'disabled' })
-        return
-      }
       const license = readLicense(current)
       if (engine === undefined) {
         setStatus(status, { active: false, reason: 'engine-missing' })
@@ -435,6 +481,14 @@ export function apply(ctx: Context, config: Config): void {
       }
       if (!isEntitled(license, engine.source)) {
         setStatus(status, { active: false, reason: 'unlicensed' })
+        return
+      }
+      if (current.enabled === false) {
+        setStatus(status, { active: false, reason: 'disabled' })
+        return
+      }
+      if (repoGateBlocksMount(currentRepos(), liveSessionCwds(ctx.get('sessions')))) {
+        setStatus(status, { active: false, reason: 'repo-disabled' })
         return
       }
       instance = await engine.apply(ctx, { posture: current.posture ?? 'ask' })
@@ -451,9 +505,31 @@ export function apply(ctx: Context, config: Config): void {
     })
   }
 
+  /**
+   * Re-evaluate the repo gate and sync only when the mount decision flips.
+   * Reasons that outrank the gate short-circuit: session events cannot change
+   * them. Both the session-event push and snapshot()'s pull route through
+   * here, so neither remounts the engine when the decision holds.
+   */
+  const syncIfGateFlipped = (): void => {
+    if (status.reason !== 'active' && status.reason !== 'repo-disabled') return
+    const blocked = repoGateBlocksMount(currentRepos(), liveSessionCwds(ctx.get('sessions')))
+    if (blocked !== (status.reason === 'repo-disabled')) sync()
+  }
+
+  // Push: session lifecycle can flip the repo gate (a session in a newly
+  // exempt repo keeps the engine mounted for the others and vice versa).
+  // Scope filtering may hide some sessions from this fiber; snapshot()'s pull
+  // re-evaluation is the safety net.
+  ctx.on('session/created', syncIfGateFlipped)
+  ctx.on('session/disposed', syncIfGateFlipped)
+  host.bindRepoDisabled(cwd => repoDisabled(currentRepos(), cwd))
+  host.bindPullSync(syncIfGateFlipped)
+
   installSettingsSection(ctx, SHIELD_SETTINGS_NAMESPACE, Config, entry, {
     setSource: (current) => { source = current },
     onChange: sync,
+    validate: (value) => { validateRepoKeys(value.repos ?? {}) },
   })
   sync()
   ctx.effect(() => () => {
