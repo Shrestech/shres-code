@@ -10,6 +10,7 @@ The `shres` command is the product launcher for profiles: ordered stacks of plug
 | `shres --profile headless "job"` | Run one fresh persisted session, print the final answer, and exit. |
 | `shres web` | Alias of `--profile web`. |
 | `shres plugin --profile <name> <pnpm args>` | Manage a profile's plugins by forwarding to pnpm in the profile directory. |
+| `shres plugin --profile <name> enable-edition <edition>` | Select a declared profile edition: mark it `autoProvision` and provision its packages through pnpm. |
 | `shres models` / `shres providers` | List, set, discover, and add models using the same `$SHRES_HOME` settings and credentials as Settings → Models. |
 
 The invoking directory is the default workspace root. The `web` and `headless` profiles auto-initialize on first use from shipped templates; any other profile must be created through `shres plugin`.
@@ -38,6 +39,18 @@ The tree composes over an empty root:
 Bundles named in `shres.profile.bundles` resolve from the shres installation first (`@shres-code/shres-code-base`, `@shres-code/shres-code-web-app`, `@shres-code/shres-code-headless`), then from the profile's own `node_modules`, where pnpm installs out-of-tree plugins.
 
 Use `--dump-default-config` and `--dump-config` to inspect the composed tree without booting it.
+
+## Editions
+
+A profile may declare an **edition inventory** under `shres.editions` in its `package.json` — a named set of npm specs and an `autoProvision` flag, e.g.:
+
+```json
+{ "shres": { "editions": { "shield": { "packages": ["@shrestech/shres-shield-plugin"], "autoProvision": false } } } }
+```
+
+Config declares the inventory; **enabling selects** among declared editions. Nothing auto-writes an edition. `enable-edition <edition>` is the explicit selection: it sets that edition's `autoProvision` and provisions its packages through the same pnpm forwarder (then reconciles the bundle layers). An undeclared edition fails loud.
+
+At profile boot, every edition with `autoProvision: true` has each declared package checked against the profile's `node_modules`; a missing package is installed once through the same forwarder, and a pnpm failure fails the boot loudly with the exact pnpm error — a missing paid payload is never silently skipped. The shield seat resolves its paid payload from that same profile directory.
 
 The [CLI behavior reference](reference/README.md) owns exact layer precedence, flags, shutdown behavior, deployment defaults, and source execution.
 

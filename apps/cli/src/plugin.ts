@@ -7,12 +7,19 @@
  * removed or bundle-less dependency leaves it). Reconciling by installed
  * state, not by dependency diff, means `update` activates a package that
  * gained its `shres.bundle` declaration in a newer version.
+ *
+ * Editions are the paid-plugin install path: the profile manifest declares the
+ * inventory (`shres.editions.<name>` with its `packages` and `autoProvision`),
+ * `enable-edition` selects one by setting `autoProvision` and provisioning, and
+ * profile boot re-provisions a selected edition whose package is missing.
  * @module @shres-code/shres-code/plugin
  */
 
 import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import {
   DEFAULT_PROFILE_BUNDLES,
   initProfile,
@@ -23,9 +30,14 @@ import {
   writeProfileManifest,
   type ProfileManifest,
 } from '@shres-code/shres-code-app-boot'
-import { INSTALL_ANCHOR } from './profile-boot.ts'
 
 const NAME = 'shres'
+
+/**
+ * Absolute path of this app's package.json (both anchors: src/ and lib/ sit
+ * one level under apps/cli), the first anchor bundle resolution probes.
+ */
+const INSTALL_ANCHOR = fileURLToPath(new URL('../package.json', import.meta.url))
 
 /**
  * Whether a resolved dependency exports a profile patch, i.e. is a bundle.
@@ -112,22 +124,46 @@ function anchorPathSpec(argument: string, cwd: string): string {
 }
 
 /**
- * Run one `shres plugin` invocation: init if needed, forward to pnpm, reconcile.
- * @param profile - the profile name.
+ * The base package name of an npm spec, dropping any `@<version>` suffix
+ * (kept on the scope for a scoped name).
+ * @param spec - an npm spec such as `@shrestech/shres-shield-plugin` or `pkg@^1`.
+ * @returns the bare package name.
+ */
+function npmSpecBase(spec: string): string {
+  const at = spec.startsWith('@') ? spec.indexOf('@', 1) : spec.indexOf('@')
+  return at === -1 ? spec : spec.slice(0, at)
+}
+
+/**
+ * Whether an npm spec is currently resolvable from the profile directory's
+ * `node_modules` (through the ordinary parent walk to the profiles fallback).
+ * @param profileDir - the profile directory.
+ * @param spec - the npm spec to probe.
+ * @returns true when `require.resolve` finds the package's base name.
+ */
+function isSpecInstalled(profileDir: string, spec: string): boolean {
+  try {
+    createRequire(join(profileDir, 'package.json')).resolve(npmSpecBase(spec))
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Run `pnpm <args>` in a profile directory and reconcile the bundle layer list
+ * on success. Shared by the generic forwarder and the edition ensure path so
+ * both install the same way.
+ * @param profileDir - the profile directory pnpm runs in.
+ * @param before - the profile manifest read before pnpm ran (reconcile base).
  * @param args - pnpm arguments with relative path specs anchored to the invoking directory.
  * @returns the pnpm exit code.
  */
-export function runPlugin(profile: string, args: readonly string[]): number {
-  const dir = resolveProfileDir(profile)
-  if (!existsSync(join(dir, 'package.json'))) {
-    initProfile(dir, PROFILE_TEMPLATES[profile] ?? DEFAULT_PROFILE_BUNDLES)
-    process.stderr.write(`${NAME}: initialized profile ${profile} at ${dir}\n`)
-  }
-  const before = readProfileManifest(NAME, dir)
+function runPnpmInProfile(profileDir: string, before: ProfileManifest, args: readonly string[]): number {
   // Windows resolves pnpm through its .cmd shim, which spawn() refuses
   // without a shell since the CVE-2024-27980 hardening.
   const result = spawnSync('pnpm', args.map(argument => anchorPathSpec(argument, process.cwd())), {
-    cwd: dir,
+    cwd: profileDir,
     stdio: 'inherit',
     shell: process.platform === 'win32',
   })
@@ -141,18 +177,101 @@ export function runPlugin(profile: string, args: readonly string[]): number {
   }
   const exitCode = result.status ?? 1
   if (exitCode === 0) {
-    reconcilePlugins(before, dir)
+    reconcilePlugins(before, profileDir)
   } else {
-    // pnpm's own diagnostics name pnpm-workspace.yaml without saying WHICH
-    // one; the profile owns it, and the commonest failure here is pnpm ≥10
-    // blocking a git dependency's prepare (build) script until allowlisted.
-    process.stderr.write(`${NAME}: pnpm failed in profile directory ${dir}\n`)
-    if (args.some(argument => /^git\+|^github:|\.git(?:#|$)/.test(argument))) {
-      process.stderr.write(
-        `${NAME}: git-hosted plugins build on install via their prepare script, which pnpm blocks until allowed — `
-        + `add the exact key pnpm printed above under allowBuilds in ${join(dir, 'pnpm-workspace.yaml')}, then re-run\n`,
-      )
-    }
+    writePnpmFailure(profileDir, args)
   }
   return exitCode
+}
+
+/**
+ * Describe a failed pnpm run: the profile owns `pnpm-workspace.yaml`, and the
+ * commonest failure here is pnpm ≥10 blocking a git dependency's prepare
+ * (build) script until allowlisted.
+ * @param profileDir - the profile directory pnpm ran in.
+ * @param args - the pnpm arguments that failed.
+ */
+function writePnpmFailure(profileDir: string, args: readonly string[]): void {
+  process.stderr.write(`${NAME}: pnpm failed in profile directory ${profileDir}\n`)
+  if (args.some(argument => /^git\+|^github:|\.git(?:#|$)/.test(argument))) {
+    process.stderr.write(
+      `${NAME}: git-hosted plugins build on install via their prepare script, which pnpm blocks until allowed — `
+      + `add the exact key pnpm printed above under allowBuilds in ${join(profileDir, 'pnpm-workspace.yaml')}, then re-run\n`,
+    )
+  }
+}
+
+/**
+ * Run one `shres plugin` invocation: init if needed, forward to pnpm, reconcile.
+ * @param profile - the profile name.
+ * @param args - pnpm arguments with relative path specs anchored to the invoking directory.
+ * @returns the pnpm exit code.
+ */
+export function runPlugin(profile: string, args: readonly string[]): number {
+  const dir = resolveProfileDir(profile)
+  if (!existsSync(join(dir, 'package.json'))) {
+    initProfile(dir, PROFILE_TEMPLATES[profile] ?? DEFAULT_PROFILE_BUNDLES)
+    process.stderr.write(`${NAME}: initialized profile ${profile} at ${dir}\n`)
+  }
+  const before = readProfileManifest(NAME, dir)
+  return runPnpmInProfile(dir, before, args)
+}
+
+/**
+ * Select a declared edition: set its `autoProvision` and provision its
+ * packages through the same pnpm forwarder, then reconcile. Config declares the
+ * inventory; enabling selects among declared editions — an undeclared edition
+ * fails loud rather than inventing a package set.
+ * @param profile - the profile name.
+ * @param edition - the declared edition name under `shres.editions`.
+ * @returns the pnpm exit code, or 1 when the edition is not declared.
+ */
+export function runEnableEdition(profile: string, edition: string): number {
+  const dir = resolveProfileDir(profile)
+  if (!existsSync(join(dir, 'package.json'))) {
+    initProfile(dir, PROFILE_TEMPLATES[profile] ?? DEFAULT_PROFILE_BUNDLES)
+    process.stderr.write(`${NAME}: initialized profile ${profile} at ${dir}\n`)
+  }
+  const before = readProfileManifest(NAME, dir)
+  const declared = before.shres?.editions?.[edition]
+  if (declared === undefined) {
+    process.stderr.write(
+      `${NAME}: edition ${JSON.stringify(edition)} is not declared in ${join(dir, 'package.json')} shres.editions; `
+      + 'declare the edition (its packages) first — enabling selects among declared editions\n',
+    )
+    return 1
+  }
+  if (!declared.autoProvision) {
+    before.shres = {
+      ...before.shres,
+      editions: { ...before.shres?.editions, [edition]: { ...declared, autoProvision: true } },
+    }
+    writeProfileManifest(dir, before)
+  }
+  if (declared.packages.length === 0) return 0
+  return runPnpmInProfile(dir, before, ['add', ...declared.packages])
+}
+
+/**
+ * Ensure every enabled (autoProvision) edition's packages are installed: a
+ * declared package that is not resolvable from the profile triggers one
+ * `pnpm add` for the missing specs plus reconcile. No-op when no edition is
+ * selected or every package already resolves. pnpm's own failure diagnostics
+ * are written to stderr and reflected in the returned exit code, never silently
+ * skipped (misconfiguration fails loud).
+ * @param profileDir - the profile directory.
+ * @returns 0 when nothing needed installing or every install succeeded;
+ *   non-zero when pnpm failed.
+ */
+export function ensureProfileEditions(profileDir: string): number {
+  const before = readProfileManifest(NAME, profileDir)
+  const editions = before.shres?.editions
+  if (editions === undefined) return 0
+  const specs = [...new Set(
+    Object.values(editions).filter(edition => edition.autoProvision).flatMap(edition => edition.packages),
+  )]
+  if (specs.length === 0) return 0
+  const missing = specs.filter(spec => !isSpecInstalled(profileDir, spec))
+  if (missing.length === 0) return 0
+  return runPnpmInProfile(profileDir, before, ['add', ...missing])
 }
