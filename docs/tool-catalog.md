@@ -40,6 +40,7 @@ This table connects model-visible tool names to the plugin package and service s
 | `@shres-code/shres-code-tool-jspace` | `jspace_checkpoint`, `jspace_note`, `jspace_open`, `jspace_ship` | `ctx.tools`, `ctx.jspace`, `owning Agent session` | `tool/call`, `jspace/card or jspace/closed`, `tool/result` | - | Schemas are registered only while Settings `enabled` is true. `jspace_ship` is a register check, not a file writer. Checkpoint `evidence` must name a completed, non-error tool-call id and does not prove coverage. |
 | `@shres-code/shres-code-tool-workflow` | `workflow` | `ctx.tools`, `ctx.workflowEngine`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents the script children)` | `tool/call`, `tool/result` | - | - |
 | `@shres-code/shres-code-tool-web` | `web_fetch`, `web_search` | `ctx.tools`, `ctx.web`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | web_search and web_fetch keep provider selection behind ctx.web so model-visible schemas stay stable across backend swaps. |
+| `@shres-code/shres-code-tool-tracker` | `experiment_log_metrics`, `experiment_log_run`, `experiment_query` | `ctx.tools`, `ctx.tracker` | `tool/call`, `experiment run and metric records through ctx.tracker`, `tool/result` | - | experiment_log_run, experiment_log_metrics, and experiment_query fold experiment records through the tracker service seam. |
 
 <a id="shres-codeshres-code-tool-ask-user"></a>
 
@@ -982,7 +983,7 @@ Source: [`packages/goal/tool-goal/src/index.ts`](../packages/goal/tool-goal/src/
 
 ### `update_goal`
 
-Update the exact current goal revision. edit, pause, and resume require a direct top-level human request. During an automatic continuation of the current goal, complete and blocked are also allowed. blocked is rejected before the configured minimum round count; the model remains responsible for judging that the same condition persisted across those rounds and must explain it in blocked_reason.
+Update the exact current goal revision. edit, pause, and resume require a direct top-level human request. During an automatic continuation of the current goal, complete and blocked are also allowed; complete is additionally allowed on a disarmed goal from any root-agent turn, so a goal whose continuation will not run still gets closed. blocked is rejected before the configured minimum round count; the model remains responsible for judging that the same condition persisted across those rounds and must explain it in blocked_reason.
 
 ```json
 {
@@ -2009,3 +2010,157 @@ Search the web for current information. Returns an optional summary answer and a
 Source: [`packages/web/tool-web/src/index.ts`](../packages/web/tool-web/src/index.ts)
 
 web_search and web_fetch keep provider selection behind ctx.web so model-visible schemas stay stable across backend swaps.
+
+<a id="shres-codeshres-code-tool-tracker"></a>
+
+## `@shres-code/shres-code-tool-tracker`
+
+### `experiment_log_metrics`
+
+Append a batched list of metric points to one experiment run.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "runId": {
+      "type": "string",
+      "description": "The run id returned by experiment_log_run."
+    },
+    "metrics": {
+      "type": "array",
+      "description": "Metric points to append.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Metric name."
+          },
+          "value": {
+            "type": "number",
+            "description": "Measured value."
+          },
+          "step": {
+            "type": "integer",
+            "description": "Optional step or epoch the point was measured at."
+          }
+        },
+        "required": [
+          "name",
+          "value"
+        ]
+      }
+    }
+  },
+  "required": [
+    "runId",
+    "metrics"
+  ]
+}
+```
+
+Source: [`packages/tracker/tool-tracker/src/index.ts`](../packages/tracker/tool-tracker/src/index.ts)
+
+### `experiment_log_run`
+
+Log one experiment run to the tracker with its required decision_rule, data_version, and git_sha, returning its run id (or why the post was held locally).
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "experiment": {
+      "type": "string",
+      "description": "Experiment or study this run belongs to."
+    },
+    "hypothesis": {
+      "type": "string",
+      "description": "The hypothesis under test."
+    },
+    "decisionRule": {
+      "type": "string",
+      "description": "The decision rule encoded in the API itself — a threshold change is a new experiment."
+    },
+    "dataVersion": {
+      "type": "string",
+      "description": "Data version the run used."
+    },
+    "gitSha": {
+      "type": "string",
+      "description": "Git commit the run reproduced."
+    },
+    "metrics": {
+      "type": "array",
+      "description": "Metrics recorded with the run.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Metric name."
+          },
+          "value": {
+            "type": "number",
+            "description": "Measured value."
+          },
+          "step": {
+            "type": "integer",
+            "description": "Optional step or epoch the point was measured at."
+          }
+        },
+        "required": [
+          "name",
+          "value"
+        ]
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "description": "Artifact modelstore:// URIs the run produced.",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "experiment",
+    "hypothesis",
+    "decisionRule",
+    "dataVersion",
+    "gitSha"
+  ]
+}
+```
+
+Source: [`packages/tracker/tool-tracker/src/index.ts`](../packages/tracker/tool-tracker/src/index.ts)
+
+### `experiment_query`
+
+Query experiment runs by experiment, git sha, and recency, returning run ids and their land/spool status.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "experiment": {
+      "type": "string",
+      "description": "Filter to one experiment."
+    },
+    "gitSha": {
+      "type": "string",
+      "description": "Filter to one git commit."
+    },
+    "since": {
+      "type": "string",
+      "description": "ISO-8601 timestamp; return runs on or after it."
+    }
+  }
+}
+```
+
+Source: [`packages/tracker/tool-tracker/src/index.ts`](../packages/tracker/tool-tracker/src/index.ts)
+
+experiment_log_run, experiment_log_metrics, and experiment_query fold experiment records through the tracker service seam.
