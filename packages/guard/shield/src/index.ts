@@ -1,12 +1,14 @@
 /**
  * Default-on host seat for the paid Shres Shield plugin. Resolves the engine
- * from a sibling checkout or `@shres-shield/plugin`, checks entitlement, and
- * publishes `ctx.shield`. The detection payload never lives in this package.
+ * from a sibling checkout, the active profile's installed payload, or
+ * `@shrestech/shres-shield-plugin`, checks entitlement, and publishes
+ * `ctx.shield`. The detection payload never lives in this package.
  * Integration contract: shres-shield `docs/integration-shres-code.md`.
  * @module @shres-code/shres-code-shield
  */
 
 import { realpathSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { Context } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
 import { SessionId } from '@shres-code/shres-code-session'
@@ -25,7 +27,10 @@ export type {
   ShieldEngineSource, ShieldFindingSummary, ShieldInactiveReason, ShieldReason,
   ShieldRepoStats, ShieldRuleHistogram, ShieldSnapshot, ShieldStatus,
 } from './types.ts'
-export { repoRootFromSeat, resolveShieldEngine, siblingPluginPath } from './resolve.ts'
+export {
+  PAYLOAD_SPECIFIER, repoRootFromSeat, resolveProfileSpecifier, resolveShieldEngine,
+  siblingPluginPath, type ShieldResolveOptions,
+} from './resolve.ts'
 
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'shres-shield'
@@ -44,7 +49,7 @@ export const inject = ['systemPrompt', 'tools', 'approval', 'jobs']
  */
 export const DEFAULT_SHIELD_LICENSE = 'shres-dev'
 
-/** Host-seat config. Engine-owned tunables stay on `@shres-shield/plugin`. */
+/** Host-seat config. Engine-owned tunables stay on `@shrestech/shres-shield-plugin`. */
 export interface Config {
   /**
    * Entitlement string. Defaults to {@link DEFAULT_SHIELD_LICENSE} until a
@@ -350,7 +355,7 @@ function isPanicDisabled(): boolean {
 /**
  * Whether the resolved payload may apply.
  * A non-empty license entitles any source. Sibling and env-module loads are
- * developer-entitled without a key. A package-specifier load is not.
+ * developer-entitled without a key. A package- or profile-resolved load is not.
  * @param license - effective license string.
  * @param source - where `apply` was loaded from.
  * @returns true when the paid `apply` may run.
@@ -407,7 +412,11 @@ export function apply(ctx: Context, config: Config): void {
         instance = undefined
         host.bindPayload(undefined)
       }
-      const engine = await resolveShieldEngine()
+      // The boot include anchors module resolution at the profile directory
+      // (`ctx.baseUrl` = profileDir + '/'), so the paid payload resolves from
+      // the same profile whose `node_modules` edition ensure installs into.
+      const profileDir = ctx.baseUrl === undefined ? undefined : fileURLToPath(ctx.baseUrl)
+      const engine = await resolveShieldEngine(profileDir === undefined ? {} : { profileDir })
       if (stopped) return
       host.bindPersistedReader(engine?.snapshot)
       if (isPanicDisabled()) {

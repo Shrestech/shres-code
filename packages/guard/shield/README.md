@@ -1,6 +1,6 @@
 # shres-shield (host seat)
 
-Default-on Cordis seat for the **paid** Shres Shield plugin. This package resolves `@shres-shield/plugin`, checks entitlement, and publishes `ctx.shield`. Detection logic never lives here. The payload contract lives in the sibling `shres-shield` repository at `docs/integration-shres-code.md`.
+Default-on Cordis seat for the **paid** Shres Shield plugin. This package resolves `@shrestech/shres-shield-plugin`, checks entitlement, and publishes `ctx.shield`. Detection logic never lives here. The payload contract lives in the sibling `shres-shield` repository at `docs/integration-shres-code.md`.
 
 ## Plugin (namespace: `shres-shield`)
 
@@ -19,7 +19,7 @@ Default-on Cordis seat for the **paid** Shres Shield plugin. This package resolv
 `ctx.shield.status.active` is true only when all of the following hold:
 
 - `SHRES_SHIELD` is not `off`
-- `@shres-shield/plugin` resolves, in order: `SHRES_SHIELD_MODULE` (exclusive when set), sibling `../shres-shield/packages/plugin/dist/index.js`, then the package specifier
+- `@shrestech/shres-shield-plugin` resolves, in order: `SHRES_SHIELD_MODULE` (exclusive when set), sibling `../shres-shield/packages/plugin/dist/index.js`, the active profile's installed payload (the profile `node_modules` the seat's boot profile anchors), then the `@shrestech/shres-shield-plugin` package specifier
 - `enabled` is not `false` (Settings → Shield switch; default on)
 - a non-empty `license` / `SHRES_SHIELD_LICENSE` (default `shres-dev` until a paid key exists), or the engine loaded from the sibling checkout or `SHRES_SHIELD_MODULE`
 
@@ -41,7 +41,7 @@ The seat declaration-merges `'shield/decision'` onto `SessionEventMap`. The payl
 
 #### What the model sees
 
-When the paid engine applies, it injects the `shres-shield:doctrine@N` system-prompt section and may replace or annotate tool results. The verbatim doctrine text is owned by `@shres-shield/plugin`. This seat contributes no model-visible text of its own.
+When the paid engine applies, it injects the `shres-shield:doctrine@N` system-prompt section and may replace or annotate tool results. The verbatim doctrine text is owned by `@shrestech/shres-shield-plugin`. This seat contributes no model-visible text of its own.
 
 #### Token effect
 
@@ -53,7 +53,7 @@ Inactive: none. Active: the doctrine section is prefix-stable for a given plugin
 
 ## Known Limitations and Deferred Work
 
-- **License strings are not signature-verified** — a non-empty `license` entitles a package-resolved payload; cryptographic verification is deferred to the paid release of `@shres-shield/plugin`.
+- **License strings are not signature-verified** — a non-empty `license` entitles a package- or profile-resolved payload; cryptographic verification is deferred to the paid release of `@shrestech/shres-shield-plugin`.
 - **Ask posture needs an open-turn `ctx.approval.request`** — the payload adapter maps `'allowed-once'` and fail-closes without an `agent` on the live tool execution; headless compositions stay fail-closed.
 - **The payload is not a workspace dependency** — CI without a sibling checkout or `SHRES_SHIELD_MODULE` loads the seat as `engine-missing` and does not screen.
 - **Definition freshness is optional on the snapshot** — the pane shows `—` until the engine reports `definitions`. Update-now is not this seat.
