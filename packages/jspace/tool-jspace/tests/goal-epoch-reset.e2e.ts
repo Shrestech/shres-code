@@ -69,7 +69,7 @@ function foldedCard(agent: Agent): { goal: string; next: string; core: unknown[]
   const cards = agent.session.events.filter(event => event.type === 'jspace/card')
   const last = cards[cards.length - 1]
   if (last === undefined) throw new Error('no jspace/card event in the session log')
-  const data = last.data as { goal?: unknown; next?: unknown; core?: unknown[]; checked?: unknown[] }
+  const data = last.data
   if (typeof data.goal !== 'string' || typeof data.next !== 'string'
     || !Array.isArray(data.core) || !Array.isArray(data.checked)) {
     throw new Error('jspace/card event does not carry goal/next/core/checked')
