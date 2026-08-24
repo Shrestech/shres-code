@@ -50,6 +50,17 @@ export interface ShresProfileManifest {
   bundles?: string[]
 }
 
+/** One declared edition: a named set of npm specs and whether it auto-provisions. */
+export interface ShresEdition {
+  /** npm package specs installed into the profile when the edition is enabled. */
+  packages: string[]
+  /**
+   * True provisions a missing package automatically at profile boot (fails
+   * loud on a pnpm error). Enable is an explicit act; this flag is the selection.
+   */
+  autoProvision: boolean
+}
+
 /**
  * The profile-launcher slice of the `shres`-owned package.json section. A
  * manifest may declare both roles; other consumers own additional keys.
@@ -59,6 +70,8 @@ export interface ShresManifestSection {
   bundle?: ShresBundleManifest
   /** Profile metadata consumed by the profile launcher. */
   profile?: ShresProfileManifest
+  /** Declared edition inventory; `enable-edition` selects among these. */
+  editions?: Record<string, ShresEdition>
 }
 
 /** The slice of package.json both profiles and bundles use. */

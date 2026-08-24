@@ -11,7 +11,8 @@ import { remoteMethods } from '@shres-code/shres-code-typert-protocol'
 import * as ShieldSeat from '@shres-code/shres-code-shield'
 import type { ShieldDecision } from '@shres-code/shres-code-shield/types'
 import { Session, SessionId } from '@shres-code/shres-code-session'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+import { dirname } from 'node:path'
 import { applied } from './fixtures/fake-shield-plugin.ts'
 
 const fixtureUrl = fileURLToPath(new URL('./fixtures/fake-shield-plugin.ts', import.meta.url))
@@ -130,6 +131,23 @@ describe('shres-shield host seat', () => {
     expect(ctx.shield.status).toEqual({ active: false, reason: 'panic' })
     expect(applied.count).toBe(0)
     expect(ctx.shield.snapshot().stats.screened).toBe(4)
+  })
+
+  it('passes the boot profile directory (ctx.baseUrl) into engine resolution', async () => {
+    // Production boot anchors ctx.baseUrl at the profile directory; the seat
+    // reads it to enable the profile-installed payload leg. The engine here
+    // resolves via env (the fixture), but the baseUrl-defined branch runs.
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', fixtureUrl)
+    const ctx = new Context()
+    ctx.baseUrl = pathToFileURL(dirname(fixtureUrl) + '/').href
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRuntime)
+    await provideApprovalAndJobs(ctx)
+    await ctx.plugin(ShieldSeat, { license: 'paid' })
+    await waitForReason(ctx, 'active')
+    expect(ctx.shield.status.active).toBe(true)
+    expect(applied.count).toBe(1)
   })
 
   it('returns persisted counts on a never-applied disabled seat', async () => {

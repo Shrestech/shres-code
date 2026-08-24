@@ -57,6 +57,13 @@ describe('parseShresArgs', () => {
       .toEqual({ mode: 'plugin', profile: 'tui', args: ['add', '--save-dev', 'x'] })
   })
 
+  it('routes plugin enable-edition as an edition selection', () => {
+    expect(parse(['plugin', '--profile', 'tui', 'enable-edition', 'shield']))
+      .toEqual({ mode: 'enable-edition', profile: 'tui', edition: 'shield' })
+    expect(exitCode(['plugin', '--profile', 'tui', 'enable-edition'])).toBe(1) // missing edition name
+    expect(exitCode(['plugin', '--profile', 'tui', 'enable-edition', 'shield', 'extra'])).toBe(1)
+  })
+
   it('routes models and providers subcommands', () => {
     expect(parse(['models', 'list'])).toEqual({ mode: 'models', command: { kind: 'models-list' } })
     expect(parse(['models', 'set', 'ollama-local', 'llama3.2', '--effort', 'high']))

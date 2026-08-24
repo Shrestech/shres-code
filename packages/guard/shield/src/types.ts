@@ -18,7 +18,7 @@ export interface ShieldStatus {
 }
 
 /** Where `apply` was loaded from. */
-export type ShieldEngineSource = 'env' | 'sibling' | 'package'
+export type ShieldEngineSource = 'env' | 'sibling' | 'profile' | 'package'
 
 /** Minimal `apply` the paid payload must export. */
 export interface ShieldEngineApply {
