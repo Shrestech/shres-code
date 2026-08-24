@@ -65,11 +65,16 @@ function text(result: ToolExecutionResult): string {
  * The folded card state carried by the last `jspace/card` session event.
  * @returns The whole-card snapshot data, or throws if no card event was logged.
  */
-function foldedCard(agent: Agent): Record<string, unknown> {
+function foldedCard(agent: Agent): { goal: string; next: string; core: unknown[]; checked: unknown[] } {
   const cards = agent.session.events.filter(event => event.type === 'jspace/card')
   const last = cards[cards.length - 1]
   if (last === undefined) throw new Error('no jspace/card event in the session log')
-  return last.data as Record<string, unknown>
+  const data = last.data as { goal?: unknown; next?: unknown; core?: unknown[]; checked?: unknown[] }
+  if (typeof data.goal !== 'string' || typeof data.next !== 'string'
+    || !Array.isArray(data.core) || !Array.isArray(data.checked)) {
+    throw new Error('jspace/card event does not carry goal/next/core/checked')
+  }
+  return { goal: data.goal, next: data.next, core: data.core, checked: data.checked }
 }
 
 describe('jspace goal-epoch reset (e2e)', () => {
