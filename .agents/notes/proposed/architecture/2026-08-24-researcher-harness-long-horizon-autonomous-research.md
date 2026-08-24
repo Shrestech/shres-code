@@ -58,6 +58,7 @@ Card-carried program bindings make the card the complete durable unit a new sess
 - `tracker`: `{ provider, lane?, credentialRef? }` — which mounted tracker provider and lane this program posts to. Values name mounted providers; the card never loads plugins. `provider: 'git-spool'` is the rented-pod posture: git run-records plus local spool, no tracker posts, no token.
 - `artifacts`: `{ store: 'modelstore', namespace, uriPrefix }` — where run artifacts are pushed; every `artifacts[]` entry a run logs must carry the prefix, so `modelstore://` URIs are consistent program-wide.
 - `promotion`: the policy that elevates a run to a release candidate — required ledger decision (`accepted`), minimum seed count, tracker provenance (with the tested git-only fallback), and whether the human ship gate is mandatory.
+- `edition`: `{ tier: 'community' | 'paid', entitlementRef? }` — which shield tier this program runs under. The community tier is the npm-published `@shrestech/shres-shield-*` set; the paid tier adds the entitled plugin capabilities. The installed packages determine what composes; the card records which tier the program declared, and guards gate paid-tier behaviors on an entitlement resolved through `ctx.credentials` — never on the card's say-so.
 
 Bindings hold references, never secrets: `credentialRef` resolves through `ctx.credentials`; tokens never appear on a card, which is model-visible. The card declares policy; guards and the ship gate enforce it, so a model reading its own card cannot relax its promotion bar.
 
