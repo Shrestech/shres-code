@@ -263,6 +263,7 @@
         "./packages/attachment/*/src",
         "./packages/spill/*/src",
         "./packages/todo/*/src",
+        "./packages/tracker/*/src",
         "./packages/jspace/*/src",
         "./packages/bundle/*/src",
         "./packages/extensions/*/src",
