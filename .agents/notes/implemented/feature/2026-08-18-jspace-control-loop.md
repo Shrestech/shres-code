@@ -8,7 +8,7 @@ The Settings remount and four tools existed, but a normal multi-step turn still 
 
 ## Decision
 
-`jspace_open` on an already-open card updates Goal and Next through `note` and returns `Updated J-Space.` Service `open()` still throws, so `/j-space on` stays a no-op when a card exists. Assemble still auto-opens a stock card on `loop`; the model can then overwrite those lines.
+`jspace_open` on an already-open card updates Goal and Next through `openGoal` and returns `Updated J-Space.`; a Goal identity change resets Core and Checked (a new epoch), a same-Goal call updates in place, and both keep Open unchanged. Service `open()` still throws, so `/j-space on` stays a no-op when a card exists. Assemble still auto-opens a stock card on `loop`; the model can then overwrite those lines.
 
 `jspace:protocol` always includes tool-driver lines while the seat is active: how to open, or how to note / checkpoint / ship without a second open. `full` and `loop` mount self-monitoring. A long loop also mounts shorthand.
 
@@ -30,4 +30,4 @@ A stock auto-open no longer blocks stating the real Goal. The model is told the 
 
 ## Related
 
-The remount and card inventory live in [J-Space as a Settings-toggled harness card](2026-08-18-jspace-settings-toggle.md).
+The remount and card inventory live in [J-Space as a Settings-toggled harness card](2026-08-18-jspace-settings-toggle.md). The Goal-identity reset on open-on-open is owned by [J-Space goal-epoch reset](../bug-fix/2026-08-24-jspace-goal-epoch-reset.md).
