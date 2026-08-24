@@ -2108,7 +2108,7 @@ export interface ShieldRepoEntry {
 }
 ```
 
-Source: [`packages/guard/shield/src/index.ts:60`](../packages/guard/shield/src/index.ts)
+Source: [`packages/guard/shield/src/index.ts:59`](../packages/guard/shield/src/index.ts)
 
 <a id="shres-codeshres-code-skill"></a>
 
