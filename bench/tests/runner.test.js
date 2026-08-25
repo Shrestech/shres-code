@@ -7,16 +7,19 @@
  * session logs and keys its failure modes off the task text. No API calls.
  */
 
+import { readFileSync } from 'node:fs'
 import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { describe, it } from 'node:test'
+import { fileURLToPath } from 'node:url'
 import assert from 'node:assert/strict'
 
 import { ARMS, getArm, listArms, renderArmOverlay } from '../runner/arms.js'
 import { emptyMetrics, foldSessionLog } from '../runner/metrics.js'
 import { runVerifier } from '../runner/verify.js'
 import { findSessionLog, resolveHarnessLaunch } from '../runner/execute.js'
+import { validateRunManifest } from '../schema/run-manifest.js'
 import { validateTrial } from '../schema/trial.js'
 import {
   buildPlan,
@@ -67,6 +70,22 @@ describe('metrics.foldSessionLog', () => {
     assert.equal(result.noteCapRefusals, 0)
     assert.equal(result.danglingCard, false)
     assert.equal(result.sessionQueryCalls, 0)
+    assert.equal(result.compactionCount, 0)
+    assert.equal(result.pressureFired, false)
+  })
+
+  it('counts compaction/end events and ignores other compaction types', () => {
+    const log = [
+      '{"type":"compaction/start","seq":1,"time":1,"data":{"compactionId":"c1","turn":1}}',
+      '{"type":"compaction/summary","seq":2,"time":2,"data":{"compactionId":"c1"}}',
+      '{"type":"compaction/end","seq":3,"time":3,"data":{"compactionId":"c1","turn":1}}',
+      '{"type":"compaction/prune","seq":4,"time":4,"data":{}}',
+      '{"type":"unknown/future","seq":5,"time":5,"data":{}}',
+      '{"type":"compaction/end","seq":6,"time":6,"data":{"compactionId":"c2","turn":2,"error":"failed"}}',
+    ].join('\n')
+    const metrics = foldSessionLog(log)
+    assert.equal(metrics.compactionCount, 2)
+    assert.equal(metrics.pressureFired, true)
   })
 
   it('groups unparseable arguments by their raw text', () => {
@@ -87,6 +106,8 @@ describe('metrics.foldSessionLog', () => {
     assert.equal(result.turns, 0)
     assert.equal(result.danglingCard, false)
     assert.equal(result.sessionQueryCalls, 0)
+    assert.equal(result.compactionCount, 0)
+    assert.equal(result.pressureFired, false)
   })
 
   it('throws with the line number on corrupt JSON', () => {
@@ -174,7 +195,7 @@ describe('run.parseArgs', () => {
     assert.equal(options.taskGlob, null)
     assert.equal(options.dryRun, false)
     assert.equal(options.apiKeyEnv, 'DEEPSEEK_API_KEY')
-    assert.equal(options.tierPatch, null)
+    assert.deepEqual(options.tierPatches, [])
   })
 
   it('parses every flag', () => {
@@ -197,8 +218,20 @@ describe('run.parseArgs', () => {
     assert.equal(options.temperature, 0.2)
     assert.equal(options.baseUrl, 'https://example.test')
     assert.equal(options.apiKeyEnv, 'ZAI_API_KEY')
-    assert.equal(options.tierPatch, 'bench/tiers/zai.patch.yml')
+    assert.deepEqual(options.tierPatches, ['bench/tiers/zai.patch.yml'])
     assert.equal(options.dryRun, true)
+  })
+
+  it('accepts repeatable --tier-patch in given order', () => {
+    const options = parseArgs([
+      '--experiment', 'w1',
+      '--tier-patch', 'bench/tiers/zai.patch.yml',
+      '--tier-patch', 'bench/pressure/forced-compaction.patch.yml',
+    ])
+    assert.deepEqual(options.tierPatches, [
+      'bench/tiers/zai.patch.yml',
+      'bench/pressure/forced-compaction.patch.yml',
+    ])
   })
 
   it('accepts --api-key-env none for keyless tiers', () => {
@@ -218,6 +251,86 @@ describe('run.parseArgs', () => {
 
   it('treats --help as a flag, not an error', () => {
     assert.equal(parseArgs(['--help']).help, true)
+  })
+})
+
+describe('pressure overlay', () => {
+  it('exists as a YAML list patching compaction-basic', () => {
+    const overlayPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'pressure', 'forced-compaction.patch.yml')
+    const text = readFileSync(overlayPath, 'utf8')
+    assert.match(text, /^- id: compaction-basic$/m)
+    assert.match(text, /^\s+auto: true$/m)
+    assert.match(text, /^\s+thresholdRatio: 0\.015$/m)
+    assert.match(text, /^\s+retainRatio: 0\.003$/m)
+    assert.match(text, /^\s+maxTokens: 8192$/m)
+    assert.match(text, /^\s+compactionRetries: 1$/m)
+    assert.match(text, /^\s+maxOverflowRetries: 1$/m)
+  })
+})
+
+describe('schema compaction fields', () => {
+  /**
+   * @param {Record<string, unknown>} [metrics]
+   * @returns {import('../schema/trial.js').Trial}
+   */
+  function trial(metrics = {}) {
+    return {
+      taskId: 'task-a',
+      trialIndex: 0,
+      arm: 'off',
+      status: 'success',
+      resolved: true,
+      failureMode: null,
+      verifier: { command: 'node verify.mjs', exitCode: 0 },
+      metrics: {
+        inputTokens: 100, outputTokens: 50, durationMs: 1000, turns: 4,
+        toolCalls: 3, identicalRetries: 0, checkpoints: 0, shipPasses: 0,
+        tokensIncludingDescendants: null, costIncludingDescendants: null,
+        danglingCard: null, verifiedCheckpointShare: null,
+        coverageRefusalThenPad: 0, noopNoteRefusals: 0, noteCapRefusals: 0,
+        sessionQueryCalls: null,
+        compactionCount: 1,
+        pressureFired: true,
+        ...metrics,
+      },
+      sessionFile: null,
+      startedAt: '2026-08-18T00:00:00.000Z',
+      endedAt: '2026-08-18T00:00:01.000Z',
+    }
+  }
+
+  it('accepts compactionCount and pressureFired', () => {
+    validateTrial(trial())
+    validateTrial(trial({ compactionCount: 0, pressureFired: false }))
+  })
+
+  it('rejects a wrong-typed compactionCount or pressureFired', () => {
+    assert.throws(() => validateTrial(trial({ compactionCount: '1' })), /compactionCount must be a non-negative number/)
+    assert.throws(() => validateTrial(trial({ pressureFired: 1 })), /pressureFired must be a boolean/)
+  })
+
+  it('accepts an empty tierPatches array and rejects a non-array', () => {
+    const manifest = {
+      version: 1,
+      experiment: 'w0',
+      arm: 'off',
+      armConfig: { enabled: false },
+      model: 'deepseek-chat',
+      baseUrl: null,
+      temperature: 0,
+      repeats: 1,
+      taskIds: ['a'],
+      gitCommit: 'deadbeef',
+      apiKeyEnv: 'DEEPSEEK_API_KEY',
+      tierPatches: [],
+      startedAt: '2026-08-18T00:00:00.000Z',
+      endedAt: '2026-08-18T00:00:01.000Z',
+    }
+    validateRunManifest(manifest)
+    assert.throws(
+      () => validateRunManifest({ ...manifest, tierPatches: null }),
+      /tierPatches must be an array/,
+    )
   })
 })
 
@@ -520,7 +633,35 @@ describe('run.main --dry-run', () => {
         { benchRoot, env: {}, print: line => lines.push(line) },
       )
       assert.equal(code, 0)
-      assert.ok(lines.some(l => l.includes('tierPatch:') && l.includes('test.patch.yml')))
+      assert.ok(lines.some(l => l.includes('tierPatches:') && l.includes('test.patch.yml')))
+    } finally {
+      await rm(benchRoot, { recursive: true, force: true })
+    }
+  })
+
+  it('dry-run prints repeatable --tier-patch files in given order', async () => {
+    const benchRoot = await tempDir('bench-runner-tier-multi-dry-')
+    try {
+      await writeTask(benchRoot, 'alpha')
+      await mkdir(join(benchRoot, 'tiers'), { recursive: true })
+      await mkdir(join(benchRoot, 'pressure'), { recursive: true })
+      const first = join(benchRoot, 'tiers', 'a.patch.yml')
+      const second = join(benchRoot, 'pressure', 'b.patch.yml')
+      await writeFile(first, '- id: first\n  disabled: true\n')
+      await writeFile(second, '- id: second\n  disabled: true\n')
+      /** @type {string[]} */
+      const lines = []
+      const code = await main(
+        [
+          '--experiment', 'demo', '--arms', 'off', '--api-key-env', 'none',
+          '--tier-patch', first, '--tier-patch', second, '--dry-run',
+        ],
+        { benchRoot, env: {}, print: line => lines.push(line) },
+      )
+      assert.equal(code, 0)
+      const summary = lines.find(l => l.includes('tierPatches:'))
+      assert.ok(summary)
+      assert.ok(summary.indexOf('a.patch.yml') < summary.indexOf('b.patch.yml'))
     } finally {
       await rm(benchRoot, { recursive: true, force: true })
     }
@@ -937,7 +1078,7 @@ describe('run.main execution (fake harness)', () => {
     }
   })
 
-  it('run.json records apiKeyEnv and tierPatch', async () => {
+  it('run.json records apiKeyEnv and empty tierPatches', async () => {
     const root = await tempDir('bench-runner-manifest-e2e-')
     try {
       const { benchRoot } = await writeBenchWorld(root, [{
@@ -948,13 +1089,13 @@ describe('run.main execution (fake harness)', () => {
       assert.equal(code, 0)
       const manifest = JSON.parse(await readFile(join(benchRoot, 'runs', 'e2e', 'off', 'run.json'), 'utf8'))
       assert.equal(manifest.apiKeyEnv, 'DEEPSEEK_API_KEY')
-      assert.equal(manifest.tierPatch, null)
+      assert.deepEqual(manifest.tierPatches, [])
     } finally {
       await rm(root, { recursive: true, force: true })
     }
   })
 
-  it('tier patch reaches spawn argv as a second --patch flag', async () => {
+  it('run.json records repeatable --tier-patch files in given order', async () => {
     const root = await tempDir('bench-runner-tier-e2e-')
     try {
       const { benchRoot } = await writeBenchWorld(root, [{
@@ -963,21 +1104,28 @@ describe('run.main execution (fake harness)', () => {
       }])
       const tierDir = join(benchRoot, 'tiers')
       await mkdir(tierDir, { recursive: true })
-      const tierPath = join(tierDir, 'test.patch.yml')
-      await writeFile(tierPath, '- id: llm-deepseek\n  disabled: true\n')
-      /** @type {string[]} */
-      const lines = []
+      await mkdir(join(benchRoot, 'pressure'), { recursive: true })
+      const first = join(tierDir, 'test.patch.yml')
+      const second = join(benchRoot, 'pressure', 'forced.patch.yml')
+      await writeFile(first, '- id: llm-deepseek\n  disabled: true\n')
+      await writeFile(second, '- id: compaction-basic\n  config:\n    auto: true\n')
       const code = await main(
-        ['--experiment', 'tier-e2e', '--repeats', '1', '--arms', 'off', '--tier-patch', tierPath],
-        { benchRoot, env: { DEEPSEEK_API_KEY: 'fake-key' }, print: line => lines.push(line) },
+        [
+          '--experiment', 'tier-e2e', '--repeats', '1', '--arms', 'off',
+          '--tier-patch', first, '--tier-patch', second,
+        ],
+        { benchRoot, env: { DEEPSEEK_API_KEY: 'fake-key' }, print: () => {} },
       )
       assert.equal(code, 0)
       const manifest = JSON.parse(await readFile(join(benchRoot, 'runs', 'tier-e2e', 'off', 'run.json'), 'utf8'))
       assert.equal(manifest.apiKeyEnv, 'DEEPSEEK_API_KEY')
-      assert.ok(manifest.tierPatch !== null)
-      assert.match(manifest.tierPatch.path, /tiers\/test\.patch\.yml/)
-      assert.equal(typeof manifest.tierPatch.sha256, 'string')
-      assert.equal(manifest.tierPatch.sha256.length, 64)
+      assert.equal(manifest.tierPatches.length, 2)
+      assert.match(manifest.tierPatches[0].path, /tiers\/test\.patch\.yml/)
+      assert.match(manifest.tierPatches[1].path, /pressure\/forced\.patch\.yml/)
+      for (const record of manifest.tierPatches) {
+        assert.equal(typeof record.sha256, 'string')
+        assert.equal(record.sha256.length, 64)
+      }
     } finally {
       await rm(root, { recursive: true, force: true })
     }

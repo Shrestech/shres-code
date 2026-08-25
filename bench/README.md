@@ -30,6 +30,8 @@ bench/
   ui/           Static zero-build report (index.html + SVG charts); reads generated data.js
   demo/         Seeded synthetic data so the UI runs without an API key
   tasks/        Task catalog: instruction + fixture + verifier per directory
+  tiers/        Provider-swap experiment overlays (`--tier-patch`)
+  pressure/     Repeatable experiment overlays that force mid-task memory pressure
   tests/        node --test suites
   runs/         Output. runs/<experiment>/<arm>/{run.json, trials.jsonl, results.json}
 ```
@@ -51,7 +53,7 @@ node bench/runner/run.js --experiment w0-2026-08-18 --arms off,on --repeats 3
 
 ## Provider tiers
 
-The runner generalizes beyond DeepSeek: `--api-key-env <VAR|none>` names the credential environment variable (`DEEPSEEK_API_KEY` by default), and `--tier-patch <path>` applies an experiment-level composition overlay to every spawn alongside the per-arm overlay. When the variable is not exported, the runner reads it from the harness credential store (`$SHRES_HOME/.credentials.yaml`, default `~/.shres`) and injects the value into the child environment — required because each trial runs under an experiment-local `SHRES_HOME` that hides the real store; the value never reaches any bench record. The CLI passes both patches as repeated `--patch` flags — the shres launcher accepts repeatable `--patch` and flattens all layers into one `applyEntryPatches` call. `run.json` records the env var name (never the value) in `apiKeyEnv` and the tier patch file path + SHA-256 in `tierPatch`, so a changed tier file is a new experiment.
+The runner generalizes beyond DeepSeek: `--api-key-env <VAR|none>` names the credential environment variable (`DEEPSEEK_API_KEY` by default), and `--tier-patch <path>` is a repeatable experiment-level composition overlay applied to every spawn after the per-arm overlay, in the order given. When the variable is not exported, the runner reads it from the harness credential store (`$SHRES_HOME/.credentials.yaml`, default `~/.shres`) and injects the value into the child environment — required because each trial runs under an experiment-local `SHRES_HOME` that hides the real store; the value never reaches any bench record. The CLI passes the arm overlay and every `--tier-patch` as repeated `--patch` flags — the shres launcher accepts repeatable `--patch` and flattens all layers into one `applyEntryPatches` call. `run.json` records the env var name (never the value) in `apiKeyEnv` and each overlay's path + SHA-256 in `tierPatches`, so a changed overlay file is a new experiment.
 
 Ready tier overlays live in `bench/tiers/`. Each is a pure config patch on the `agent-default-model` entry, selecting one of the routes the base profile's `llm-pi-ai` entry already declares (`zai` with `apiKeyEnv: ZAI_API_KEY`, `ollama-cloud` with `apiKeyEnv: OLLAMA_API_KEY` and `baseURL: https://ollama.com/v1`). No tier file inserts or disables an adapter entry: the profile mounts `llm-pi-ai` itself, so inserting it again fails the load with `duplicate loader entry id`. A `config` key replaces the entry's whole config, so each tier file restates both `provider` and `model`.
 
@@ -81,6 +83,26 @@ Both tiers are capable models, so expect ceiling effects on the short tasks: whe
 
 When `--api-key-env` is not `DEEPSEEK_API_KEY`, the `--base-url` default becomes null (the `DEEPSEEK_BASE_URL` env var fallback applies only for the default DeepSeek case).
 
+## Pressure overlays
+
+The catalog's 10–30-turn tasks never consume enough tokens to hit the shipped compaction threshold (`0.8 ×` a 1M-token window). Long-horizon features (J-Space card, session-query) only show their value under memory pressure — tokens consumed versus context available — so the bench forces that ratio with a composition overlay instead of inventing longer tasks.
+
+`bench/pressure/forced-compaction.patch.yml` patches the shipped `compaction-basic` entry so automatic compaction fires around 10k–20k conversation tokens on the 1M-window models this suite uses. A patch `config` key replaces the entry's whole config, so the file restates every field automatic compaction needs. The overlay is experiment-level and applies identically to every arm; it is not an arm contrast.
+
+`--tier-patch` is repeatable. Combine a provider tier with forced compaction by passing both, arm overlay first, then these in order:
+
+```sh
+node bench/runner/run.js \
+  --experiment w4-2026-08-25-zai-pressure \
+  --arms off,on,sq-only,on-sq,on-sq-verified,on-adaptive \
+  --repeats 5 \
+  --api-key-env ZAI_API_KEY \
+  --tier-patch bench/tiers/zai.patch.yml \
+  --tier-patch bench/pressure/forced-compaction.patch.yml
+```
+
+Each trial records `compactionCount` (`compaction/end` events in the session log) and `pressureFired` (`compactionCount > 0`). A long-horizon verdict only counts on trials where `pressureFired` is true — a pass-rate delta on trials that never compacted is not evidence about memory pressure.
+
 ## Protocol rules (pre-registered)
 
 1. Arms run **interleaved** per task and repeat, never all-off-then-all-on — provider model drift must not confound the toggle.
@@ -88,7 +110,7 @@ When `--api-key-env` is not `DEEPSEEK_API_KEY`, the `--base-url` default becomes
 3. Every aggregate reports uncertainty; a delta without an interval is not a result.
 4. Primary metric is verifier-passed task success; LLM judgment is not used in v1.
 5. The decision rule is stated before running: default-on only if `on` beats `off` on the long-horizon stratum with the interval excluding zero, and the short-stratum token overhead stays acceptable.
-6. Compaction-stress tasks force mid-task compaction through the sanctioned tunable, never a harness patch: `BasicCompactionConfig.thresholdRatio` (a validated config field of the `compaction-basic` plugin, default `0.8`; compaction fires at `floor(contextWindow × ratio)`), lowered via the arm overlay.
+6. Mid-task compaction is forced through the sanctioned `BasicCompactionConfig` fields (`thresholdRatio`, default `0.8`; fires at `floor(contextWindow × ratio)`), never a harness source patch. The repeatable `--tier-patch` overlay `bench/pressure/forced-compaction.patch.yml` is the experiment-level way to lower that threshold identically on every arm.
 
 ## Chain tasks
 
@@ -110,5 +132,7 @@ Per-trial metrics beyond pass/fail, computed from the session JSONL:
 | `noopNoteRefusals` | `number` | Count of `JSPACE_NOTE_NOOP` tool results. |
 | `noteCapRefusals` | `number` | Count of note-cap denial tool results. |
 | `sessionQueryCalls` | `number \| null` | Count of session_search/session_event_search/session_event_read/session_event_trace/session_trace calls; null for arms excluding the session-query consumer. |
+| `compactionCount` | `number` | Count of `compaction/end` events (one closed compaction attempt). |
+| `pressureFired` | `boolean` | `compactionCount > 0`. A long-horizon verdict only counts on trials where this is true. |
 
 Aggregates flow through `report/build.js` into `ui/data.js`. The demo generator exercises every field.

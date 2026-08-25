@@ -221,6 +221,8 @@ function forensicsFields(rng, arm, resolved, checkpoints) {
     noopNoteRefusals: hasJspace ? randInt(rng, 0, 2) : 0,
     noteCapRefusals: hasJspace ? randInt(rng, 0, 1) : 0,
     sessionQueryCalls: hasSq ? randInt(rng, 0, 6) : null,
+    compactionCount: 0,
+    pressureFired: false,
   }
 }
 
@@ -288,9 +290,11 @@ function sumPhaseMetrics(phases) {
     danglingCard: null, verifiedCheckpointShare: null,
     coverageRefusalThenPad: 0, noopNoteRefusals: 0, noteCapRefusals: 0,
     sessionQueryCalls: null,
+    compactionCount: 0,
+    pressureFired: false,
   }
   for (const phase of phases) {
-    for (const field of ['inputTokens', 'outputTokens', 'durationMs', 'turns', 'toolCalls', 'identicalRetries', 'checkpoints', 'shipPasses', 'coverageRefusalThenPad', 'noopNoteRefusals', 'noteCapRefusals']) {
+    for (const field of ['inputTokens', 'outputTokens', 'durationMs', 'turns', 'toolCalls', 'identicalRetries', 'checkpoints', 'shipPasses', 'coverageRefusalThenPad', 'noopNoteRefusals', 'noteCapRefusals', 'compactionCount']) {
       total[field] += phase.metrics[field]
     }
   }
@@ -301,6 +305,7 @@ function sumPhaseMetrics(phases) {
     : null
   const cpShares = phases.map(p => p.metrics.verifiedCheckpointShare).filter(v => v !== null)
   total.verifiedCheckpointShare = cpShares.length > 0 ? cpShares.reduce((a, b) => a + b, 0) / cpShares.length : null
+  total.pressureFired = total.compactionCount > 0
   return total
 }
 
@@ -411,7 +416,7 @@ function buildManifest(experiment, arm, gitCommit, armTrials) {
     taskIds: TASKS.map(t => t.taskId),
     gitCommit,
     apiKeyEnv: 'DEEPSEEK_API_KEY',
-    tierPatch: null,
+    tierPatches: [],
     startedAt: armTrials[0].startedAt,
     endedAt: armTrials[armTrials.length - 1].endedAt,
   }

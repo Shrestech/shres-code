@@ -69,7 +69,7 @@ Options:
                         An unset variable falls back to the harness credential store
                         ($SHRES_HOME/.credentials.yaml, default ~/.shres); the value is injected
                         into the child environment only, never into any bench record.
-  --tier-patch <path>   experiment-level patch overlay for provider swap, applied to every spawn alongside the arm overlay
+  --tier-patch <path>   experiment-level overlay applied after the arm overlay; repeatable, order preserved
   --dry-run             print the plan and exit without writing or executing
   --help                this text
 `
@@ -112,7 +112,7 @@ export class UsageError extends Error {
  * @property {number | undefined} temperature
  * @property {string | undefined} baseUrl
  * @property {string} apiKeyEnv - env var name; `none` for keyless tiers.
- * @property {string | null} tierPatch - path to tier overlay file, or null.
+ * @property {string[]} tierPatches - overlay paths in given order; empty when unused.
  */
 
 /**
@@ -133,7 +133,7 @@ export function parseArgs(argv) {
     temperature: undefined,
     baseUrl: undefined,
     apiKeyEnv: 'DEEPSEEK_API_KEY',
-    tierPatch: null,
+    tierPatches: [],
   }
   let armsSeen = false
   for (let index = 0; index < argv.length; index += 1) {
@@ -185,7 +185,7 @@ export function parseArgs(argv) {
         options.apiKeyEnv = value()
         break
       case '--tier-patch':
-        options.tierPatch = value()
+        options.tierPatches.push(value())
         break
       case '--dry-run':
         options.dryRun = true
@@ -429,7 +429,7 @@ async function executeSpawn({ repoRoot, arm, armDir, sessionLogRoot, taskText, s
 }
 
 /** Fields summed across phases. */
-const SUMMABLE_METRICS = ['inputTokens', 'outputTokens', 'durationMs', 'turns', 'toolCalls', 'identicalRetries', 'checkpoints', 'shipPasses', 'coverageRefusalThenPad', 'noopNoteRefusals', 'noteCapRefusals']
+const SUMMABLE_METRICS = ['inputTokens', 'outputTokens', 'durationMs', 'turns', 'toolCalls', 'identicalRetries', 'checkpoints', 'shipPasses', 'coverageRefusalThenPad', 'noopNoteRefusals', 'noteCapRefusals', 'compactionCount']
 
 /**
  * Sum per-phase metrics into the trial-level row.
@@ -449,6 +449,7 @@ function sumPhaseMetrics(phases) {
   total.sessionQueryCalls = sqValues.length > 0 ? sqValues.reduce((a, b) => a + b, 0) : null
   const cpShares = phases.map(p => p.metrics.verifiedCheckpointShare).filter(v => v !== null)
   total.verifiedCheckpointShare = cpShares.length > 0 ? cpShares.reduce((a, b) => a + b, 0) / cpShares.length : null
+  total.pressureFired = total.compactionCount > 0
   return total
 }
 
@@ -695,17 +696,18 @@ export async function main(argv, io = {}) {
   const apiKeyEnv = options.apiKeyEnv
   const baseUrl = options.baseUrl ?? (apiKeyEnv === 'DEEPSEEK_API_KEY' ? (env.DEEPSEEK_BASE_URL ?? null) : null)
 
-  /** @type {import('../schema/run-manifest.js').TierPatchRecord | null} */
-  let tierPatchRecord = null
-  /** @type {string | null} */
-  let tierPatchAbsPath = null
-  if (options.tierPatch !== null) {
-    tierPatchAbsPath = resolve(options.tierPatch)
-    const tierContent = await readFile(tierPatchAbsPath, 'utf8').catch(() => {
-      throw new UsageError(`--tier-patch file not found: ${options.tierPatch}`)
+  /** @type {import('../schema/run-manifest.js').TierPatchRecord[]} */
+  const tierPatchRecords = []
+  /** @type {string[]} */
+  const extraPatchPaths = []
+  for (const given of options.tierPatches) {
+    const absPath = resolve(given)
+    const tierContent = await readFile(absPath, 'utf8').catch(() => {
+      throw new UsageError(`--tier-patch file not found: ${given}`)
     })
     const sha256 = createHash('sha256').update(tierContent).digest('hex')
-    tierPatchRecord = { path: relative(benchRoot, tierPatchAbsPath).split(sep).join('/'), sha256 }
+    tierPatchRecords.push({ path: relative(benchRoot, absPath).split(sep).join('/'), sha256 })
+    extraPatchPaths.push(absPath)
   }
 
   const plan = buildPlan({ taskIds, arms: options.arms, repeats: options.repeats })
@@ -713,7 +715,10 @@ export async function main(argv, io = {}) {
   if (options.dryRun) {
     print(`experiment: ${options.experiment}`)
     print(`model: ${model}  temperature: ${temperature}  baseUrl: ${baseUrl ?? '(provider default)'}`)
-    print(`apiKeyEnv: ${apiKeyEnv}${tierPatchRecord ? `  tierPatch: ${tierPatchRecord.path} (${tierPatchRecord.sha256.slice(0, 12)}…)` : ''}`)
+    const tierSummary = tierPatchRecords.length === 0
+      ? ''
+      : `  tierPatches: ${tierPatchRecords.map(r => `${r.path} (${r.sha256.slice(0, 12)}…)`).join(', ')}`
+    print(`apiKeyEnv: ${apiKeyEnv}${tierSummary}`)
     print(`tasks: ${taskIds.join(', ')}`)
     print(`plan: ${plan.length} trials (${taskIds.length} tasks × ${options.repeats} repeats × ${options.arms.length} arms)`)
     for (const entry of plan) {
@@ -758,7 +763,7 @@ export async function main(argv, io = {}) {
       taskIds,
       gitCommit,
       apiKeyEnv,
-      tierPatch: tierPatchRecord,
+      tierPatches: tierPatchRecords,
       startedAt,
       endedAt: '',
     }
@@ -784,7 +789,6 @@ export async function main(argv, io = {}) {
     const sessionRoot = join(armDir, 'sessions', entry.taskId, String(entry.trialIndex))
     const trialStartedAt = new Date().toISOString()
     const trialEnv = { ...env, SHRES_HOME: shresHome }
-    const extraPatchPaths = tierPatchAbsPath !== null ? [tierPatchAbsPath] : []
 
     // Integrity audit, part 1: none of this trial's session roots may
     // pre-exist — a leftover root means leakage from a previous trial.

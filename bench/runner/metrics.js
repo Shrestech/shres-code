@@ -16,6 +16,8 @@
  * - coverageRefusalThenPad: checkpoint refusal → immediate retry success count.
  * - noopNoteRefusals / noteCapRefusals: JSPACE_NOTE_NOOP and note-cap counts.
  * - sessionQueryCalls: count of session-query tool calls.
+ * - compactionCount: count of `compaction/end` events (one closed attempt).
+ * - pressureFired: true when compactionCount > 0.
  *
  * @module bench/runner/metrics
  */
@@ -108,6 +110,8 @@ export function foldSessionLog(text, armFlags) {
     noopNoteRefusals: 0,
     noteCapRefusals: 0,
     sessionQueryCalls: hasSq ? 0 : null,
+    compactionCount: 0,
+    pressureFired: false,
   }
   /** @type {Map<string, number>} */
   const callCounts = new Map()
@@ -196,6 +200,9 @@ export function foldSessionLog(text, armFlags) {
       case 'jspace/card-close':
         cardOpen = false
         break
+      case 'compaction/end':
+        metrics.compactionCount += 1
+        break
       default:
         break
     }
@@ -210,6 +217,7 @@ export function foldSessionLog(text, armFlags) {
   if (totalCheckpoints > 0) {
     metrics.verifiedCheckpointShare = verifiedCheckpoints / totalCheckpoints
   }
+  metrics.pressureFired = metrics.compactionCount > 0
 
   return metrics
 }
@@ -236,5 +244,7 @@ export function emptyMetrics() {
     noopNoteRefusals: 0,
     noteCapRefusals: 0,
     sessionQueryCalls: null,
+    compactionCount: 0,
+    pressureFired: false,
   }
 }

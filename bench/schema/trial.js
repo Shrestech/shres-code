@@ -43,6 +43,9 @@ export const FAILURE_MODES = Object.freeze([
  * @property {number | null} sessionQueryCalls - count of session_search / session_event_search
  *   / session_event_read / session_event_trace / session_trace calls; null for arms excluding
  *   the session-query consumer.
+ * @property {number} compactionCount - number of `compaction/end` events in the session log
+ *   (one closed compaction attempt, success or error).
+ * @property {boolean} pressureFired - true when compactionCount > 0.
  */
 
 /**
@@ -77,13 +80,16 @@ export const FAILURE_MODES = Object.freeze([
  */
 
 /** TrialMetrics field names that are always non-negative numbers. */
-const METRIC_FIELDS = ['inputTokens', 'outputTokens', 'durationMs', 'turns', 'toolCalls', 'identicalRetries', 'checkpoints', 'shipPasses', 'coverageRefusalThenPad', 'noopNoteRefusals', 'noteCapRefusals']
+const METRIC_FIELDS = ['inputTokens', 'outputTokens', 'durationMs', 'turns', 'toolCalls', 'identicalRetries', 'checkpoints', 'shipPasses', 'coverageRefusalThenPad', 'noopNoteRefusals', 'noteCapRefusals', 'compactionCount']
 
 /** TrialMetrics field names that are number|null. */
 const NULLABLE_NUMBER_FIELDS = ['tokensIncludingDescendants', 'costIncludingDescendants', 'verifiedCheckpointShare', 'sessionQueryCalls']
 
 /** TrialMetrics field names that are boolean|null. */
 const NULLABLE_BOOLEAN_FIELDS = ['danglingCard']
+
+/** TrialMetrics field names that are required booleans. */
+const BOOLEAN_FIELDS = ['pressureFired']
 
 /**
  * Validate one metrics record. Throws on the first violation.
@@ -106,6 +112,9 @@ function validateMetrics(value, name) {
     if (m[field] !== null && typeof m[field] !== 'boolean') {
       throw new Error(`${name}.${field} must be a boolean or null`)
     }
+  }
+  for (const field of BOOLEAN_FIELDS) {
+    if (typeof m[field] !== 'boolean') throw new Error(`${name}.${field} must be a boolean`)
   }
 }
 
