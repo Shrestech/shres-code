@@ -624,3 +624,258 @@ test('constraint-survival-migration: dropping one late-module constraint fails',
   assert.equal(result.status, 1, result.output)
   assert.match(result.output, /m10-write\.js: jsdoc/)
 })
+
+// ── pressure stratum (deep chain + noise) ──
+
+const LEDGER_CLI = `export function parseArgs(argv) {
+  const flags = {}
+  const positionals = []
+  for (let i = 0; i < argv.length; i++) {
+    const token = argv[i]
+    if (token === '--') {
+      positionals.push(...argv.slice(i + 1))
+      break
+    }
+    if (token.startsWith('--')) {
+      const body = token.slice(2)
+      const eq = body.indexOf('=')
+      if (eq !== -1) {
+        flags[body.slice(0, eq)] = body.slice(eq + 1)
+        continue
+      }
+      const next = argv[i + 1]
+      if (next === undefined || next.startsWith('-')) flags[body] = true
+      else {
+        flags[body] = next
+        i += 1
+      }
+      continue
+    }
+    positionals.push(token)
+  }
+  return { flags, positionals }
+}
+`
+
+const LEDGER_FORMAT = `export function padRight(text, width) {
+  if (text.length >= width) return text.slice(0, width)
+  return text + ' '.repeat(width - text.length)
+}
+export function columnize(rows, widths) {
+  return rows.map(row => row.map((cell, i) => padRight(cell, widths[i])).join(' ')).join('\\n')
+}
+export function formatCents(cents) {
+  const sign = cents < 0 ? '-' : ''
+  const abs = Math.abs(cents)
+  return \`\${sign}$\${Math.floor(abs / 100)}.\${String(abs % 100).padStart(2, '0')}\`
+}
+`
+
+const LEDGER_CORE = `const THRESHOLD = 9
+const PRIMARY = 'ops'
+function toCents(amount) { return Math.round(amount * 100) }
+export function classify(tx) {
+  return { bucket: tx.amount > THRESHOLD ? 'large' : 'small', cents: toCents(tx.amount), category: tx.category }
+}
+export function post(transactions) {
+  const entries = transactions.map((tx, i) => {
+    const { bucket, cents, category } = classify(tx)
+    return { id: tx.id, category, bucket, cents, seq: i }
+  })
+  const byCategory = {}
+  const byBucket = { large: 0, small: 0 }
+  let totalCents = 0
+  for (const entry of entries) {
+    byCategory[entry.category] = (byCategory[entry.category] ?? 0) + entry.cents
+    byBucket[entry.bucket] += entry.cents
+    totalCents += entry.cents
+  }
+  byCategory[PRIMARY] += 100
+  totalCents += 100
+  return { entries, totalCents, byCategory, byBucket }
+}
+`
+
+const LEDGER_REPORT = `import { post } from './ledger.js'
+const PRIMARY = 'ops'
+export function generateReport(transactions) {
+  const posted = post(transactions)
+  const largeCount = posted.entries.filter(e => e.bucket === 'large').length
+  return {
+    rounding: 'half-up',
+    thresholdStat: 'median',
+    primaryCategory: PRIMARY,
+    thresholdCents: 900,
+    largeCount,
+    smallCount: posted.entries.length - largeCount,
+    totalCents: posted.totalCents,
+    byCategory: posted.byCategory,
+    primaryCents: posted.byCategory[PRIMARY],
+    entrySeqStart: posted.entries[0].seq,
+  }
+}
+`
+
+/**
+ * Write a consistent median / half-up / ops / 0-based ledger solution.
+ * @param {string} scratch - scratch dir.
+ * @returns {void}
+ */
+function writeLedgerSolution(scratch) {
+  mkdirSync(path.join(scratch, 'src'), { recursive: true })
+  writeFileSync(path.join(scratch, 'src/cli.js'), LEDGER_CLI)
+  writeFileSync(path.join(scratch, 'src/format.js'), LEDGER_FORMAT)
+  writeFileSync(path.join(scratch, 'src/ledger.js'), LEDGER_CORE)
+  writeFileSync(path.join(scratch, 'src/report.js'), LEDGER_REPORT)
+  const transactions = JSON.parse(readFileSync(path.join(scratch, 'data/transactions.json'), 'utf8'))
+  const posted = { entries: [], byCategory: {}, byBucket: { large: 0, small: 0 }, totalCents: 0 }
+  for (const [i, tx] of transactions.entries()) {
+    const cents = Math.round(tx.amount * 100)
+    const bucket = tx.amount > 9 ? 'large' : 'small'
+    posted.entries.push({ id: tx.id, category: tx.category, bucket, cents, seq: i })
+    posted.byCategory[tx.category] = (posted.byCategory[tx.category] ?? 0) + cents
+    posted.byBucket[bucket] += cents
+    posted.totalCents += cents
+  }
+  posted.byCategory.ops += 100
+  posted.totalCents += 100
+  const largeCount = posted.entries.filter(e => e.bucket === 'large').length
+  const report = {
+    rounding: 'half-up',
+    thresholdStat: 'median',
+    primaryCategory: 'ops',
+    thresholdCents: 900,
+    largeCount,
+    smallCount: posted.entries.length - largeCount,
+    totalCents: posted.totalCents,
+    byCategory: posted.byCategory,
+    primaryCents: posted.byCategory.ops,
+    entrySeqStart: 0,
+  }
+  writeFileSync(path.join(scratch, 'REPORT.json'), JSON.stringify(report, null, 2) + '\n')
+  writeFileSync(path.join(scratch, 'SUMMARY.json'), JSON.stringify({
+    transactionCount: transactions.length,
+    thresholdCents: 900,
+    largeCount,
+    smallCount: posted.entries.length - largeCount,
+    totalCents: posted.totalCents,
+    primaryCategory: 'ops',
+    primaryCents: posted.byCategory.ops,
+    largeShareBps: Math.round(posted.byBucket.large * 10000 / posted.totalCents),
+    entrySeqStart: 0,
+    categoryCount: new Set(transactions.map(tx => tx.category)).size,
+  }, null, 2) + '\n')
+}
+
+test('chain-ledger-deep: fixture fails, consistent solution passes', (t) => {
+  const scratch = copyFixture('chain-ledger-deep')
+  t.after(() => rmSync(scratch, { recursive: true, force: true }))
+
+  assert.equal(runVerifier('chain-ledger-deep', scratch).status, 1)
+
+  writeLedgerSolution(scratch)
+  assert.equal(runVerifier('chain-ledger-deep', scratch).status, 0)
+  assert.equal(runVerifier('chain-ledger-deep', scratch).status, 0)
+})
+
+test('chain-ledger-deep: phase-5 report contradicting phase-1 decision fails', (t) => {
+  const scratch = copyFixture('chain-ledger-deep')
+  t.after(() => rmSync(scratch, { recursive: true, force: true }))
+
+  writeLedgerSolution(scratch)
+  const report = JSON.parse(readFileSync(path.join(scratch, 'REPORT.json'), 'utf8'))
+  // Recomputed as if phase 1 had chosen mean (threshold ~21.38 → 3 large) and the other tied primary.
+  report.thresholdStat = 'mean'
+  report.thresholdCents = 2138
+  report.largeCount = 3
+  report.smallCount = 12
+  report.primaryCategory = 'research'
+  writeFileSync(path.join(scratch, 'REPORT.json'), JSON.stringify(report, null, 2) + '\n')
+
+  const result = runVerifier('chain-ledger-deep', scratch)
+  assert.equal(result.status, 1)
+  assert.match(result.output, /inconsistent/)
+})
+
+const NEEDLE_CATALOG = `const items = new Map()
+export function addItem(item) { items.set(item.sku, item) }
+export function findBySku(sku) { return items.get(sku) }
+`
+
+const NEEDLE_PRICE = `import { TAX_RATE } from './constants.js'
+export function withTax(cents) { return Math.round(cents * (1 + TAX_RATE)) }
+`
+
+const NEEDLE_STOCK = `export function adjust(current, delta) {
+  const next = current + delta
+  if (next < 0) throw new Error('stock cannot be negative')
+  return next
+}
+`
+
+const NEEDLE_DISCOUNT = `export function applyDiscount(cents, bps) {
+  return Math.round(cents * (1 - bps / 10000))
+}
+`
+
+const NEEDLE_ORDER = `import { MAX_QTY } from './constants.js'
+import { applyDiscount } from './discount.js'
+import { withTax } from './price.js'
+export function quote(item, qty, discountBps = 0) {
+  if (!Number.isInteger(qty) || qty < 1) throw new Error('qty must be a positive integer')
+  if (qty > MAX_QTY) throw new Error('qty exceeds MAX_QTY')
+  const subtotal = applyDiscount(item.priceCents * qty, discountBps)
+  return { subtotal, total: withTax(subtotal) }
+}
+`
+
+const NEEDLE_SKU = `export function normalizeSku(raw) {
+  return raw.trim().toUpperCase().replace(/\\s+/g, '-')
+}
+`
+
+/**
+ * Repair the noise-needle project and write REPORT.json from diagnose output.
+ * @param {string} scratch - scratch dir.
+ * @param {{ buildId?: string, cacheKey?: string, authRealm?: string }} [override] - optional wrong needle.
+ * @returns {void}
+ */
+function writeNeedleSolution(scratch, override = {}) {
+  writeFileSync(path.join(scratch, 'src/catalog.js'), NEEDLE_CATALOG)
+  writeFileSync(path.join(scratch, 'src/price.js'), NEEDLE_PRICE)
+  writeFileSync(path.join(scratch, 'src/stock.js'), NEEDLE_STOCK)
+  writeFileSync(path.join(scratch, 'src/discount.js'), NEEDLE_DISCOUNT)
+  writeFileSync(path.join(scratch, 'src/order.js'), NEEDLE_ORDER)
+  writeFileSync(path.join(scratch, 'src/sku.js'), NEEDLE_SKU)
+  const diagnose = spawnSync(process.execPath, [path.join(scratch, 'tools/diagnose.js')], { encoding: 'utf8' })
+  const buildId = diagnose.stdout.match(/\[runtime-config\] build_id = (\S+)/)?.[1]
+  const cacheKey = diagnose.stdout.match(/\[runtime-config\] cache_key = (\S+)/)?.[1]
+  const authRealm = diagnose.stdout.match(/\[runtime-config\] auth_realm = (\S+)/)?.[1]
+  writeFileSync(path.join(scratch, 'REPORT.json'), JSON.stringify({
+    buildId: override.buildId ?? buildId,
+    cacheKey: override.cacheKey ?? cacheKey,
+    authRealm: override.authRealm ?? authRealm,
+    ok: true,
+  }, null, 2) + '\n')
+}
+
+test('noise-needle: fixture fails, repaired project with needles passes', (t) => {
+  const scratch = copyFixture('noise-needle')
+  t.after(() => rmSync(scratch, { recursive: true, force: true }))
+
+  assert.equal(runVerifier('noise-needle', scratch).status, 1)
+
+  writeNeedleSolution(scratch)
+  assert.equal(runVerifier('noise-needle', scratch).status, 0)
+  assert.equal(runVerifier('noise-needle', scratch).status, 0)
+})
+
+test('noise-needle: one wrong REPORT value fails', (t) => {
+  const scratch = copyFixture('noise-needle')
+  t.after(() => rmSync(scratch, { recursive: true, force: true }))
+
+  writeNeedleSolution(scratch, { cacheKey: 'not-the-needle' })
+  const result = runVerifier('noise-needle', scratch)
+  assert.equal(result.status, 1)
+  assert.match(result.output, /cacheKey/)
+})

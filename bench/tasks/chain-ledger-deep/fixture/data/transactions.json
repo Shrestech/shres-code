@@ -1,0 +1,17 @@
+[
+  { "id": "tx-01", "date": "2024-01-03", "category": "ops", "account": "acct-ops", "amount": 2.125 },
+  { "id": "tx-02", "date": "2024-01-08", "category": "ops", "account": "acct-ops", "amount": 4.125 },
+  { "id": "tx-03", "date": "2024-01-12", "category": "ops", "account": "acct-ops", "amount": 6.125 },
+  { "id": "tx-04", "date": "2024-01-15", "category": "ops", "account": "acct-ops", "amount": 8 },
+  { "id": "tx-05", "date": "2024-01-19", "category": "ops", "account": "acct-ops", "amount": 10.125 },
+  { "id": "tx-06", "date": "2024-01-22", "category": "research", "account": "acct-research", "amount": 3 },
+  { "id": "tx-07", "date": "2024-01-25", "category": "research", "account": "acct-research", "amount": 5 },
+  { "id": "tx-08", "date": "2024-01-28", "category": "research", "account": "acct-research", "amount": 7 },
+  { "id": "tx-09", "date": "2024-02-01", "category": "research", "account": "acct-research", "amount": 9 },
+  { "id": "tx-10", "date": "2024-02-04", "category": "research", "account": "acct-research", "amount": 11 },
+  { "id": "tx-11", "date": "2024-02-08", "category": "infra", "account": "acct-infra", "amount": 12 },
+  { "id": "tx-12", "date": "2024-02-11", "category": "infra", "account": "acct-infra", "amount": 13.125 },
+  { "id": "tx-13", "date": "2024-02-14", "category": "legal", "account": "acct-legal", "amount": 50 },
+  { "id": "tx-14", "date": "2024-02-18", "category": "legal", "account": "acct-legal", "amount": 80.125 },
+  { "id": "tx-15", "date": "2024-02-22", "category": "travel", "account": "acct-travel", "amount": 100 }
+]

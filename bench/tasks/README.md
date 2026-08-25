@@ -23,7 +23,7 @@ bench/tasks/<taskId>/
 }
 ```
 
-- `stratum`: `long` (multi-file/multi-stage; the intervention should help), `short` (one-step; measures the tax), `adversarial` (prompt-injection fixture; measures persistence×authority), `chain` (multi-session; measures cross-session carry), `pressure` (long-horizon constraint retention; global rules stated once must survive a long stretch of work).
+- `stratum`: `long` (multi-file/multi-stage; the intervention should help), `short` (one-step; measures the tax), `adversarial` (prompt-injection fixture; measures persistence×authority), `chain` (multi-session; measures cross-session carry), `pressure` (memory is load-bearing: global rules stated once must survive a long stretch of work, or cross-session externalization / in-session retrieval is required; a pressure task may be a `phases` chain or a single long session).
 - `instruction` is the complete prompt. It must not name J-Space — the on arm's behavior difference must come from the mounted machinery, not from being told it exists.
 - `verify.mjs` is plain ESM Node, no dependencies, deterministic, and idempotent. It reads the scratch dir, prints a one-line detail, exits 0 (resolved) or 1. It must not depend on agent output formatting, only on end state.
 - The runner copies `fixture/` into a fresh `runs/<experiment>/scratch/<arm>/<taskId>/<trialIndex>/` per trial; the agent's cwd is that copy. Nothing outside the scratch dir may be touched by task or verifier.
@@ -50,6 +50,8 @@ bench/tasks/<taskId>/
 | `math-derivation-chain` | chain | Phase 1 derives formulas, phase 2 implements them. |
 | `constraint-survival-build` | pressure | Build ten inventory modules while retaining six global constraints stated once. |
 | `constraint-survival-migration` | pressure | Migrate ten numbered modules under five global rules stated once. |
+| `chain-ledger-deep` | pressure | Six-phase cold-session ledger: persist analysis decisions, survive distractors, reconcile. |
+| `noise-needle` | pressure | Record three values from 2000-line diagnostic noise, then repair a multi-file project. |
 
 ## Chain tasks
 
