@@ -440,7 +440,7 @@ const TOOL_PACKAGES: ToolPackage[] = [
       await ctx.plugin(ToolSessionQuery)
     },
     note:
-      'The five read-only tools hide provider cursors and authorize every result from the immutable calling agent session. The package is opt-in; compositions that need enforced deadlines or bounded inline output also mount the generic timeout or spill policies.',
+      'The five read-only tools hide provider cursors and authorize every result from the immutable calling agent session. The ACP and headless example compositions mount the consumer by default; the shipped TUI and Web bundles keep the query index but leave this consumer unmounted. Compositions that need enforced deadlines or bounded inline output also mount the generic timeout or spill policies.',
   },
   {
     pkg: '@shres-code/shres-code-tool-subagent',
@@ -537,7 +537,7 @@ const TOOL_PACKAGES: ToolPackage[] = [
       await ctx.plugin(ToolJSpace)
     },
     note:
-      'Schemas are registered only while Settings `enabled` is true. `jspace_ship` is a register check, not a file writer. Checkpoint `evidence` must name a completed, non-error tool-call id and does not prove coverage.',
+      'Schemas are registered only while Settings `enabled` is true. `jspace_ship` is a register check, not a file writer. Checkpoint `evidence` must name a completed, non-error tool-call id; citing a configured verifier tool is evidence-grade and does not prove coverage.',
   },
   {
     pkg: '@shres-code/shres-code-tool-workflow',

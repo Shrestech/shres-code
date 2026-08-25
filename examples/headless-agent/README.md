@@ -1,6 +1,6 @@
 # headless-agent
 
-This directory owns the replay and real-model test composition for a headless coding agent: DeepSeek V4 + local bash and filesystem tools + subagent delegation + workflows and fresh-agent Ralph iteration + `todo_write` + JSONL persistence. It explicitly mounts the shared agent spine, one root agent, persistence, and checkpoint policy; it is not a second product entry point.
+This directory owns the replay and real-model test composition for a headless coding agent: DeepSeek V4 + local bash and filesystem tools + subagent delegation + workflows and fresh-agent Ralph iteration + `todo_write` + JSONL persistence + model-facing session-query tools. It explicitly mounts the shared agent spine, one root agent, persistence, the derived session-query index, and checkpoint policy; it is not a second product entry point.
 
 ## Run it
 

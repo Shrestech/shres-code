@@ -1,4 +1,5 @@
 # Add Code Mode and Cordis tools to the headless spawn/workflow stack.
+# Session-query tools come from the included base composition.
 - id: base
   name: '@shres-code/cordis-plugin-include'
   config:

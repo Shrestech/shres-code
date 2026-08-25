@@ -279,7 +279,29 @@ describe('registration and schemas', () => {
       .toEqual({ card: 'generic', kind: 'read', title: 'Read event 4', rawInput: { seq: 4 } })
     const assembly = await mounted.ctx.systemPrompt.assemble()
     expect(assembly.sections.find(section => section.name === 'tool:session-query')?.text)
-      .toContain('prior sessions')
+      .toBe(
+        'The full session history is searchable with session_search, session_event_search, '
+        + 'session_event_read, session_event_trace, and session_trace; query prior events before '
+        + 're-deriving facts, decisions, or tool output you have already produced.',
+      )
+    const eventSearch = mounted.ctx.tools.schemas().find(schema => schema.name === 'session_event_search')
+    const sessionSearch = mounted.ctx.tools.schemas().find(schema => schema.name === 'session_search')
+    expect(eventSearch?.parameters).toMatchObject({
+      properties: {
+        seq_from: {
+          description:
+            "Inclusive event sequence lower bound. J-Space's goalOpenedSeq is the natural lower bound for current-goal-epoch scoping.",
+        },
+      },
+    })
+    expect(sessionSearch?.parameters).toMatchObject({
+      properties: {
+        event_seq_from: {
+          description:
+            "Inclusive event sequence lower bound. J-Space's goalOpenedSeq is the natural lower bound for current-goal-epoch scoping.",
+        },
+      },
+    })
 
     await mounted.fiber.dispose()
     expect(mounted.ctx.tools.schemas().map(schema => schema.name)).toEqual([])

@@ -185,6 +185,10 @@ const SCENARIOS: Scenario[] = [
     overridden: true,
     pinsHeader: true,
     headerClass: 'session-query',
+    // The five query tools now live on the base composition, so the assembled
+    // request header matches the default class; only the spill overlay differs.
+    systemPromptSource: 'text-turn',
+    toolSchemasSource: 'text-turn',
     configPath: SESSION_QUERY_CONFIG,
     posixOnly: true,
   },

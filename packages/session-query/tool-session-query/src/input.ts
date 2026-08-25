@@ -54,7 +54,11 @@ const sessionSearchParameters = {
     items: { type: 'string', enum: ['live', 'persisted'] },
     description: 'Require at least one selected source availability.',
   },
-  event_seq_from: { type: 'integer', description: 'Inclusive event sequence lower bound.' },
+  event_seq_from: {
+    type: 'integer',
+    description:
+      'Inclusive event sequence lower bound. J-Space\'s goalOpenedSeq is the natural lower bound for current-goal-epoch scoping.',
+  },
   event_seq_to: { type: 'integer', description: 'Inclusive event sequence upper bound.' },
   event_time_from: { type: 'string', description: 'Inclusive timezone-qualified ISO 8601 event-time lower bound.' },
   event_time_to: { type: 'string', description: 'Inclusive timezone-qualified ISO 8601 event-time upper bound.' },
@@ -69,7 +73,11 @@ const sessionSearchParameters = {
 const eventSearchParameters = {
   session_id: { type: 'string', description: 'Target session id. Omit for the current session.' },
   query: { type: 'string', required: true, description: 'Literal full-text query over the target session.' },
-  seq_from: { type: 'integer', description: 'Inclusive event sequence lower bound.' },
+  seq_from: {
+    type: 'integer',
+    description:
+      'Inclusive event sequence lower bound. J-Space\'s goalOpenedSeq is the natural lower bound for current-goal-epoch scoping.',
+  },
   seq_to: { type: 'integer', description: 'Inclusive event sequence upper bound.' },
   time_from: { type: 'string', description: 'Inclusive timezone-qualified ISO 8601 event-time lower bound.' },
   time_to: { type: 'string', description: 'Inclusive timezone-qualified ISO 8601 event-time upper bound.' },

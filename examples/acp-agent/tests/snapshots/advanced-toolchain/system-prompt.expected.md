@@ -15,6 +15,8 @@ Check the [exit code: N] marker on every bash result; investigate failures befor
 
 Track every background job id you start. You are notified in-session when a job finishes — do not busy-poll or sleep on one; keep working on independent steps and do not duplicate a running job's work. Before giving a final answer, collect every still-relevant job with job_output (set wait: true only when you are genuinely blocked on it), and job_kill jobs that stopped mattering.
 
+The full session history is searchable with session_search, session_event_search, session_event_read, session_event_trace, and session_trace; query prior events before re-deriving facts, decisions, or tool output you have already produced.
+
 Use goal tools for one long-running completion objective in the current session. create_goal may infer goal intent from a direct human request in any language; do not create a goal for routine single-turn work. Call get_goal before update_goal and copy its exact goal_id and revision. After session resume or fork, an active goal is disarmed: when a human asks to continue or resume in any wording or language, use update_goal action resume to rearm it. Mark complete only when the objective is actually achieved; when your finishing turn is not human-driven and the goal is disarmed, complete it anyway rather than leaving an active goal no continuation will settle. Mark blocked only after the same blocking condition persists for at least 3 consecutive goal rounds, and report that concrete condition in blocked_reason; difficulty, uncertainty, or useful remaining work is not blocked.
 
 Use the workflow tool ONLY when the user explicitly asks for a workflow or for large multi-agent orchestration: you write a JavaScript script (the tool description documents the exact format) that fans work out across many subagents with phases and structured results. For one or two delegations, prefer plain subagent calls.
@@ -297,6 +299,77 @@ interface ToolArgsMap {
     /** The message to deliver to the subagent. */
     message: string;
   } & Record<string, JsonValue>;
+  /** Read one full unabridged event and optional neighboring raw-event summaries from an authorized session. */
+  session_event_read: {
+    /** Target session id. Omit for the current session. */
+    session_id?: string;
+    /** Target event sequence number. */
+    seq: number;
+    /** Number of preceding raw events to summarize. Omit for none. */
+    before?: number;
+    /** Number of following raw events to summarize. Omit for none. */
+    after?: number;
+  } & Record<string, JsonValue>;
+  /** Search prior events in one authorized session; the current session excludes the step performing this call. */
+  session_event_search: {
+    /** Target session id. Omit for the current session. */
+    session_id?: string;
+    /** Literal full-text query over the target session. */
+    query: string;
+    /** Inclusive event sequence lower bound. J-Space's goalOpenedSeq is the natural lower bound for current-goal-epoch scoping. */
+    seq_from?: number;
+    /** Inclusive event sequence upper bound. */
+    seq_to?: number;
+    /** Inclusive timezone-qualified ISO 8601 event-time lower bound. */
+    time_from?: string;
+    /** Inclusive timezone-qualified ISO 8601 event-time upper bound. */
+    time_to?: string;
+    /** Event types to include. */
+    event_types?: string[];
+    /** Event surfaces to include. */
+    surfaces?: ("current" | "shadowed" | "log-only")[];
+  } & Record<string, JsonValue>;
+  /** Read every direct replacement and relationship to a cited source event for one event in an authorized session. */
+  session_event_trace: {
+    /** Target session id. Omit for the current session. */
+    session_id?: string;
+    /** Target event sequence number. */
+    seq: number;
+  } & Record<string, JsonValue>;
+  /** Search prior sessions in the caller workspace and return the strongest matching event from each session. */
+  session_search: {
+    /** Literal full-text query over prior session history. */
+    query: string;
+    /** Optional session ids to include. */
+    session_ids?: string[];
+    /** Inclusive timezone-qualified ISO 8601 creation-time lower bound. */
+    created_at_from?: string;
+    /** Inclusive timezone-qualified ISO 8601 creation-time upper bound. */
+    created_at_to?: string;
+    /** Optional direct parent session ids. */
+    parent_session_ids?: string[];
+    /** Include sessions with no parent in the parent filter. */
+    include_root_sessions?: boolean;
+    /** Require at least one selected source availability. */
+    availability?: ("live" | "persisted")[];
+    /** Inclusive event sequence lower bound. J-Space's goalOpenedSeq is the natural lower bound for current-goal-epoch scoping. */
+    event_seq_from?: number;
+    /** Inclusive event sequence upper bound. */
+    event_seq_to?: number;
+    /** Inclusive timezone-qualified ISO 8601 event-time lower bound. */
+    event_time_from?: string;
+    /** Inclusive timezone-qualified ISO 8601 event-time upper bound. */
+    event_time_to?: string;
+    /** Event types to include. */
+    event_types?: string[];
+    /** Event surfaces to include. */
+    event_surfaces?: ("current" | "shadowed" | "log-only")[];
+  } & Record<string, JsonValue>;
+  /** Read the authorized session lineage around one session, including complete visible ancestor and descendant relationships. */
+  session_trace: {
+    /** Target session id. Omit for the current session. */
+    session_id?: string;
+  } & Record<string, JsonValue>;
   /** Load the full instructions for an available skill. Call this with the exact skill name from the session skill catalog before acting on a task that names or clearly matches that skill. */
   skill: {
     /** The exact skill name from the available skills list. */
@@ -536,6 +609,11 @@ interface ToolOutputMap {
   send_message: {
     messageId: string;
   };
+  session_event_read: string;
+  session_event_search: string;
+  session_event_trace: string;
+  session_search: string;
+  session_trace: string;
   skill: {
     name: string;
     provider: string;

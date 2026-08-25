@@ -31,13 +31,13 @@ This table connects model-visible tool names to the plugin package and service s
 | `@shres-code/shres-code-tool-lsp` | `lsp` | `ctx.tools`, `ctx.lsp`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | The lsp tool keeps provider selection and language-server subprocesses behind ctx.lsp, so its model-visible schema stays stable across providers. Requires a registered provider (e.g. `@shres-code/shres-code-lsp-stdio`) at runtime; without one, a query returns the structured `LSP_UNAVAILABLE` error rather than changing the schema. |
 | `@shres-code/shres-code-tool-ralph` | `ralph` | `ctx.tools`, `ctx.workflowEngine`, `ctx.subagents`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents every fresh round)` | `tool/call`, `tool/result`, `workflow and child session events during execution` | - | A fixed foreground workflow starts one fresh structured child per round; the model selects only the immutable objective and an optional round cap. |
 | `@shres-code/shres-code-tool-skill` | `skill` | `ctx.tools`, `ctx.agents`, `ctx.skills` | `tool/call`, `tool/result`, `user/message replacement catalogs via agent.inject()` | - | - |
-| `@shres-code/shres-code-tool-session-query` | `session_event_read`, `session_event_search`, `session_event_trace`, `session_search`, `session_trace` | `ctx.tools`, `ctx.systemPrompt`, `ctx.sessionQuery`, `a calling Agent for workspace authority` | `tool/call`, `tool/result` | - | The five read-only tools hide provider cursors and authorize every result from the immutable calling agent session. The package is opt-in; compositions that need enforced deadlines or bounded inline output also mount the generic timeout or spill policies. |
+| `@shres-code/shres-code-tool-session-query` | `session_event_read`, `session_event_search`, `session_event_trace`, `session_search`, `session_trace` | `ctx.tools`, `ctx.systemPrompt`, `ctx.sessionQuery`, `a calling Agent for workspace authority` | `tool/call`, `tool/result` | - | The five read-only tools hide provider cursors and authorize every result from the immutable calling agent session. The ACP and headless example compositions mount the consumer by default; the shipped TUI and Web bundles keep the query index but leave this consumer unmounted. Compositions that need enforced deadlines or bounded inline output also mount the generic timeout or spill policies. |
 | `@shres-code/shres-code-tool-subagent` | `subagent` | `ctx.tools`, `ctx.subagents`, `ctx.systemPrompt` | `tool/call`, `tool/result`, `child session events through the chosen provider` | `subagent`, `subagent_fork` | The registered tool name is the load-time `toolName` config (default `subagent`); the schema above is that default. The shipped compositions load this package once per subagent backend, so the model additionally sees `subagent_fork` bound to the fork backend. Each instance's description, `run_in_background` parameter, and system-prompt policy follow its own `backgroundMode` and `enableRunInBackground`, so the two shipped schemas are not identical: `subagent` is `continuable` and defaults omitted calls to background with automatic settlement delivery, while `subagent_fork` stays `one-shot` and defaults them to foreground — see `packages/bundle/base/cordis.patch.yml` and `examples/acp-agent/cordis.yml`. |
 | `@shres-code/shres-code-tool-subagent-control` | `interrupt_agent`, `list_agents`, `send_message` | `ctx.tools`, `ctx.subagents`, `ctx.agents and ctx.sessionProjections (list_agents only)` | `tool/call`, `tool/result`, `child session events through ctx.subagents` | - | The globally named control tools over continuable background subagents: provider-bound `tool-subagent` instances register distinct delegation tools, while this package registers `send_message` and `interrupt_agent` once, plus `list_agents` from its separately loaded `/list-agents` plugin (whose catalog rows use the sessionProjections and live Agent registries). |
 | `@shres-code/shres-code-tool-subagent-report` | `report` | `ctx.subagents`, `ctx.systemPrompt`, `a live continuable in-process child Agent` | `tool/call`, `tool/result`, `a user-role message in the direct parent session` | - | Registered per continuable in-process child rather than globally, so this schema is visible only inside such a child and survives its global `toolFilter`. The same contribution installs the child-scoped `tool:report` prompt section, which this catalog does not render. The parent-facing `send_message` tool is installed independently. |
 | `@shres-code/shres-code-tool-jobs` | `job_kill`, `job_list`, `job_output` | `ctx.tools`, `ctx.jobs`, `ctx.systemPrompt` | `tool/call`, `tool/result`, `user/message via agent.inject() for background completion notices` | - | The kind-agnostic background-job controller: background bash commands, PTY sends, and subagents are read, listed, and killed through the same three tools. Loading the plugin attaches the controller that arms producers' `ctx.jobs.start()`. |
 | `@shres-code/shres-code-tool-todo` | `todo_write` | `ctx.tools`, `owning Agent session` | `tool/call`, `todo/write`, `tool/result` | - | todo_write is session-owned state; UIs render the latest todo/write event as a checklist. `allowParallelInProgress` is required with no default, so the catalog states its choice: `true`, whose description invites several `in_progress` items. A deployment choosing `false` receives the same tool with a description asking for exactly one active task. |
-| `@shres-code/shres-code-tool-jspace` | `jspace_checkpoint`, `jspace_note`, `jspace_open`, `jspace_ship` | `ctx.tools`, `ctx.jspace`, `owning Agent session` | `tool/call`, `jspace/card or jspace/closed`, `tool/result` | - | Schemas are registered only while Settings `enabled` is true. `jspace_ship` is a register check, not a file writer. Checkpoint `evidence` must name a completed, non-error tool-call id and does not prove coverage. |
+| `@shres-code/shres-code-tool-jspace` | `jspace_checkpoint`, `jspace_note`, `jspace_open`, `jspace_ship` | `ctx.tools`, `ctx.jspace`, `owning Agent session` | `tool/call`, `jspace/card or jspace/closed`, `tool/result` | - | Schemas are registered only while Settings `enabled` is true. `jspace_ship` is a register check, not a file writer. Checkpoint `evidence` must name a completed, non-error tool-call id; citing a configured verifier tool is evidence-grade and does not prove coverage. |
 | `@shres-code/shres-code-tool-workflow` | `workflow` | `ctx.tools`, `ctx.workflowEngine`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents the script children)` | `tool/call`, `tool/result` | - | - |
 | `@shres-code/shres-code-tool-web` | `web_fetch`, `web_search` | `ctx.tools`, `ctx.web`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | web_search and web_fetch keep provider selection behind ctx.web so model-visible schemas stay stable across backend swaps. |
 | `@shres-code/shres-code-tool-tracker` | `experiment_log_metrics`, `experiment_log_run`, `experiment_query` | `ctx.tools`, `ctx.tracker` | `tool/call`, `experiment run and metric records through ctx.tracker`, `tool/result` | - | experiment_log_run, experiment_log_metrics, and experiment_query fold experiment records through the tracker service seam. |
@@ -1289,7 +1289,7 @@ Search prior events in one authorized session; the current session excludes the 
     },
     "seq_from": {
       "type": "integer",
-      "description": "Inclusive event sequence lower bound."
+      "description": "Inclusive event sequence lower bound. J-Space's goalOpenedSeq is the natural lower bound for current-goal-epoch scoping."
     },
     "seq_to": {
       "type": "integer",
@@ -1407,7 +1407,7 @@ Search prior sessions in the caller workspace and return the strongest matching 
     },
     "event_seq_from": {
       "type": "integer",
-      "description": "Inclusive event sequence lower bound."
+      "description": "Inclusive event sequence lower bound. J-Space's goalOpenedSeq is the natural lower bound for current-goal-epoch scoping."
     },
     "event_seq_to": {
       "type": "integer",
@@ -1467,7 +1467,7 @@ Read the authorized session lineage around one session, including complete visib
 
 Source: [`packages/session-query/tool-session-query/src/index.ts`](../packages/session-query/tool-session-query/src/index.ts)
 
-The five read-only tools hide provider cursors and authorize every result from the immutable calling agent session. The package is opt-in; compositions that need enforced deadlines or bounded inline output also mount the generic timeout or spill policies.
+The five read-only tools hide provider cursors and authorize every result from the immutable calling agent session. The ACP and headless example compositions mount the consumer by default; the shipped TUI and Web bundles keep the query index but leave this consumer unmounted. Compositions that need enforced deadlines or bounded inline output also mount the generic timeout or spill policies.
 
 <a id="shres-codeshres-code-tool-subagent"></a>
 
@@ -1736,7 +1736,7 @@ todo_write is session-owned state; UIs render the latest todo/write event as a c
 
 ### `jspace_checkpoint`
 
-Record a Checked line on the open card. `by` must name a verifier and what it covered. Optional `evidence` is a prior tool-call id that must have completed without error in this session; naming it does not prove coverage. Rejects if no card is open.
+Record a Checked line on the open card. `by` must name a verifier and what it covered. Optional `evidence` is a prior tool-call id that must have completed without error in this session; cite a configured verifier tool's call-id for evidence-grade status. Naming it does not prove coverage. Rejects if no card is open.
 
 ```json
 {
@@ -1766,7 +1766,7 @@ Source: [`packages/jspace/tool-jspace/src/index.ts`](../packages/jspace/tool-jsp
 
 ### `jspace_note`
 
-Update the open J-Space card. Changing Core requires both departing (the item leaving) and core (the item entering). Rejects if no card is open.
+Update the open J-Space card. Changing Core requires both departing (the item leaving) and core (the item entering). Goal changes are rejected; use jspace_open to start a new Goal epoch. Rejects if no card is open.
 
 ```json
 {
@@ -1817,7 +1817,7 @@ Source: [`packages/jspace/tool-jspace/src/index.ts`](../packages/jspace/tool-jsp
 
 ### `jspace_open`
 
-Open a J-Space card for this session, or replace Goal and Next when a card is already open. Use it for multi-stage or multi-file work. Requires a Goal (what done means) and Next (the single next action). Optional Core holds at most two live items and applies only on the first open.
+Open a J-Space card for this session, or replace Goal and Next when a card is already open. A changed Goal starts a new epoch: Core and Checked are cleared and ship needs a fresh checkpoint; open questions carry over. Use it for multi-stage or multi-file work. Requires a Goal (what done means) and Next (the single next action). Optional Core holds at most two live items and applies only on the first open.
 
 ```json
 {
@@ -1866,7 +1866,7 @@ Check that the open card is ready to ship: Goal and Next are set, and a checkpoi
 
 Source: [`packages/jspace/tool-jspace/src/index.ts`](../packages/jspace/tool-jspace/src/index.ts)
 
-Schemas are registered only while Settings `enabled` is true. `jspace_ship` is a register check, not a file writer. Checkpoint `evidence` must name a completed, non-error tool-call id and does not prove coverage.
+Schemas are registered only while Settings `enabled` is true. `jspace_ship` is a register check, not a file writer. Checkpoint `evidence` must name a completed, non-error tool-call id; citing a configured verifier tool is evidence-grade and does not prove coverage.
 
 <a id="shres-codeshres-code-tool-workflow"></a>
 

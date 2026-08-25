@@ -1,4 +1,5 @@
 # Replay counterpart to advanced.cordis.yml; only the live model is replaced.
+# Session-query tools come from the included base composition.
 - id: base
   name: '@shres-code/cordis-plugin-include'
   config:
