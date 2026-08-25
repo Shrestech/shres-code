@@ -26,7 +26,7 @@ Default-off host seat for the J-Space card. This package remounts from the `jspa
 
 `ctx.jspace` accepts a live `Session`. `open`, `openGoal`, `note`, `checkpoint`, and `close` append `{ ignorable: true }` events. `card(session)` and `fold(session)` replay the log. A fork with an inherited parent card receives a native copy (`seq` 1, child `sessionId`) while the seat is active.
 
-`open` refuses while a card is open (`JSPACE_ALREADY_OPEN`). `openGoal` opens a new Goal epoch on an open card: a Goal identity change resets Core and Checked and moves the `goalOpenedSeq` anchor so ship requires a checkpoint under the new Goal; a same-Goal call updates Goal and Next in place and keeps Core, Checked, and Open. `note` goal updates refine the Goal within the epoch and never reset Core or Checked. Open questions carry over unchanged across an epoch change.
+`open` refuses while a card is open (`JSPACE_ALREADY_OPEN`). `openGoal` opens a new Goal epoch on an open card: a Goal identity change resets Core and Checked and moves the `goalOpenedSeq` anchor so ship requires a checkpoint under the new Goal; a same-Goal call updates Goal and Next in place and keeps Core, Checked, and Open. `note` rejects a Goal identity change (`JSPACE_NOTE_GOAL_CHANGE`); Goal epochs open only through `openGoal`. Open questions carry over unchanged across an epoch change.
 
 `watch(listener)` fires on remount so later consumers can dispose tools and the prompt section.
 
@@ -51,3 +51,4 @@ None; this package neither assembles nor sends a provider request.
 - **`always-open` does not auto-open** — the field is stored; the prompt Consumer opens on the first pre-step with `JSPACE_ALWAYS_OPEN_GOAL` / `JSPACE_ALWAYS_OPEN_NEXT`.
 - **Coverage is a term match** — `checkpoint()` cannot tell whether the verifier ran. `evidence` must name a `tool/call` id with a logged, non-error `tool/result` and still does not prove coverage.
 - **Trusted in-process producers** — a plugin with direct `Session` access can append counterfeit card events. The fold and invariant detect inconsistency; they do not isolate plugins.
+- **Copy-on-fork inherits Checked** — copy-on-fork copies the parent's Checked lines into the child card while resetting the epoch anchor, so the child's prompt shows checkpoints it has not earned; ship still refuses until a native checkpoint.

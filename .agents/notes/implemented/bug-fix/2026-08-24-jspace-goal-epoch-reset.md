@@ -13,7 +13,7 @@ A card for Goal G1 shipped with 10 Checked lines and 2 Core lines. The user then
 - A **different Goal** opens a new epoch: Core and Checked reset to empty, the `goalOpenedSeq` anchor moves to the current session event seq (the existing ship-gate anchor, not a new one), and Open questions carry over unchanged. Ship then requires a fresh checkpoint under the new Goal.
 - The **same Goal** is the control-loop update path: Goal and Next update in place, and Core, Checked, Open, and the anchor are all unchanged.
 
-`note` goal updates still refine the Goal within the epoch and never reset Core or Checked (their behavior is unchanged); open-on-open only resets when the Goal identity actually changes. The tool `jspace_open` returns `Updated J-Space.` for both cases; it opens a new card only when none is open.
+`note` rejects a Goal identity change (`JSPACE_NOTE_GOAL_CHANGE`); Goal epochs open only through `openGoal`. The tool `jspace_open` returns `Updated J-Space.` for both cases; it opens a new card only when none is open.
 
 The checkpoint driver line (`JSPACE_DRIVER_OPEN`, mounted by the control loop whenever a card is printed) gains one clarifying clause: the optional `evidence` must be a `call_*` tool-call id from this session. The `jspace_checkpoint` refusal behavior is unchanged and stays strict; this only stops models from sending `"bash-1"` or a file path as evidence.
 

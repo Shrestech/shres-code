@@ -268,6 +268,7 @@ const subsystemGroups = [
     ['permission-presets.md', 'Permission presets'],
     ['sandbox.md', 'Sandboxing'],
     ['plan.md', 'Plan mode'],
+    ['jspace.md', 'J-Space'],
     ['user-questions.md', 'User interaction'],
     ['commands.md', 'Human commands'],
     ['goal.md', 'Goals'],

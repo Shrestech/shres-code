@@ -19,13 +19,16 @@ export const inject = ['tools', 'jspace']
 
 const OPEN_DESCRIPTION =
   'Open a J-Space card for this session, or replace Goal and Next when a card is '
-  + 'already open. Use it for multi-stage or multi-file work. Requires a Goal '
-  + '(what done means) and Next (the single next action). Optional Core holds at '
-  + 'most two live items and applies only on the first open.'
+  + 'already open. A changed Goal starts a new epoch: Core and Checked are cleared '
+  + 'and ship needs a fresh checkpoint; open questions carry over. Use it for '
+  + 'multi-stage or multi-file work. Requires a Goal (what done means) and Next '
+  + '(the single next action). Optional Core holds at most two live items and '
+  + 'applies only on the first open.'
 
 const NOTE_DESCRIPTION =
   'Update the open J-Space card. Changing Core requires both departing (the item '
-  + 'leaving) and core (the item entering). Rejects if no card is open.'
+  + 'leaving) and core (the item entering). Goal changes are rejected; use '
+  + 'jspace_open to start a new Goal epoch. Rejects if no card is open.'
 
 const CHECKPOINT_DESCRIPTION =
   'Record a Checked line on the open card. `by` must name a verifier and what it covered. '

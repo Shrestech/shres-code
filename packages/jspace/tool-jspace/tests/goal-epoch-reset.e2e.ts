@@ -87,6 +87,13 @@ describe('jspace goal-epoch reset (e2e)', () => {
     const shipped = await execute(ctx, 'jspace_ship', {}, agent)
     expect(shipped.isError).toBe(false)
 
+    const rejected = await execute(ctx, 'jspace_note', { goal: 'D1' }, agent)
+    expect(rejected.isError).toBe(true)
+    expect(text(rejected)).toContain('jspace_open')
+    const before = foldedCard(agent)
+    expect(before.goal).toBe('G1')
+    expect(before.checked).toHaveLength(1)
+
     // A different Goal resets Core and Checked on the folded card in the log.
     await execute(ctx, 'jspace_open', { goal: 'D1', next: 'Start' }, agent)
     const reset = foldedCard(agent)

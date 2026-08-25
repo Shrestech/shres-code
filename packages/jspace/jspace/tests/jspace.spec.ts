@@ -225,20 +225,28 @@ describe('JspaceService card log', () => {
     expect(disabled.jspace.fold(child).inherited?.goal).toBe('A')
   })
 
-  it('updates goalOpenedSeq when the goal line changes and rejects empty fields', async () => {
+  it('rejects a Goal identity change and allows same-goal note', async () => {
     const { ctx, session } = await harness()
     expect(() => ctx.jspace.note(session, { next: 'x' })).toThrow(/not open/)
     expect(() => ctx.jspace.checkpoint(session, { check: 'a', by: 'unit tests' })).toThrow(/not open/)
     expect(() => ctx.jspace.close(session)).toThrow(/not open/)
-    const opened = ctx.jspace.open(session, { goal: 'A', next: 'B' })
+    ctx.jspace.open(session, { goal: 'A', next: 'B' })
     expect(() => ctx.jspace.note(session, { goal: '   ' })).toThrow(JspaceError)
     expect(() => ctx.jspace.note(session, { next: 'Goal: injected' })).toThrow(/card label/)
     expect(() => ctx.jspace.note(session, { next: 'two\nlines' })).toThrow(/single line/)
     ctx.jspace.close(session)
-    ctx.jspace.open(session, { goal: 'A', next: 'B' })
-    const noted = ctx.jspace.note(session, { goal: 'B-goal', open: [{ question: 'Q' }] })
-    expect(noted.goalOpenedSeq).toBeGreaterThan(opened.goalOpenedSeq)
-    expect(noted.open).toEqual([{ question: 'Q' }])
+    const afterReopen = ctx.jspace.open(session, { goal: 'A', next: 'B' })
+    expect(() => ctx.jspace.note(session, { goal: 'B-goal', open: [{ question: 'Q' }] })).toThrow(JspaceError)
+    try {
+      ctx.jspace.note(session, { goal: 'B-goal', open: [{ question: 'Q' }] })
+    } catch (error) {
+      expect(error).toBeInstanceOf(JspaceError)
+      expect((error as JspaceError).code).toBe('JSPACE_NOTE_GOAL_CHANGE')
+      expect((error as JspaceError).message).toContain('jspace_open')
+    }
+    const sameGoal = ctx.jspace.note(session, { goal: 'A', open: [{ question: 'Q' }] })
+    expect(sameGoal.goalOpenedSeq).toBe(afterReopen.goalOpenedSeq)
+    expect(sameGoal.open).toEqual([{ question: 'Q' }])
     expect(ctx.jspace.note(session, {
       open: [{ question: 'Q2', settles: 'S' }],
     }).open).toEqual([{ question: 'Q2', settles: 'S' }])

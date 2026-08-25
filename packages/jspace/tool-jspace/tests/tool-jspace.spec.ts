@@ -271,7 +271,12 @@ describe('jspace tools', () => {
     expect(text(shipped)).toBe('Ship check passed.')
     expect(ctx.jspace.card(agent.session)).not.toBeNull()
 
-    await execute(ctx, 'jspace_note', { goal: 'B-goal' }, agent)
+    const rejected = await execute(ctx, 'jspace_note', { goal: 'B-goal' }, agent)
+    expect(rejected.isError).toBe(true)
+    expect(text(rejected)).toContain('jspace_open')
+    expect(ctx.jspace.card(agent.session)?.goal).toBe('A')
+
+    await execute(ctx, 'jspace_open', { goal: 'B-goal', next: 'Continue' }, agent)
     const stale = await execute(ctx, 'jspace_ship', {}, agent)
     expect(stale.isError).toBe(true)
     expect(text(stale)).toContain('checkpoint for the current Goal')

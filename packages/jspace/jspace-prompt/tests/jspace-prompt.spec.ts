@@ -218,6 +218,7 @@ describe('jspace-prompt', () => {
     expect(JspacePrompt.JSPACE_DRIVER_CLOSED).toContain('jspace_open')
     expect(JspacePrompt.JSPACE_DRIVER_OPEN).toContain('jspace_note')
     expect(JspacePrompt.JSPACE_DRIVER_OPEN).toContain('evidence must be a call_* tool-call id')
+    expect(JspacePrompt.JSPACE_DRIVER_OPEN).toContain('a changed Goal clears Core and Checked')
   })
 
   it('opens a card during assemble when claimed text selects loop', async () => {

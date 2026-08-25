@@ -295,7 +295,8 @@ export default class JspaceService extends Service {
   }
 
   /**
-   * Patch an open card.
+   * Patch an open card. Rejects a Goal identity change (`JSPACE_NOTE_GOAL_CHANGE`);
+   * Goal epochs open only through `openGoal`.
    * @param session - owning session.
    * @param input - fields to replace.
    * @returns the recorded card.
@@ -340,6 +341,12 @@ export default class JspaceService extends Service {
       }
     }
     const goal = input.goal === undefined ? current.goal : line(input.goal, 'goal')
+    if (input.goal !== undefined && goal !== current.goal) {
+      throw new JspaceError(
+        'note cannot change the Goal; call jspace_open to open a new Goal epoch (resets Core and Checked).',
+        'JSPACE_NOTE_GOAL_CHANGE',
+      )
+    }
     const next = input.next === undefined ? current.next : line(input.next, 'next')
     const open = input.open === undefined
       ? current.open
@@ -347,7 +354,6 @@ export default class JspaceService extends Service {
         question: line(item.question, `open[${String(i)}].question`),
         ...item.settles === undefined ? {} : { settles: line(item.settles, `open[${String(i)}].settles`) },
       }))
-    const eventSeq = session.seq
     return this.writeCard(session, {
       seq: this.nextSeq(session),
       sessionId: session.id,
@@ -356,7 +362,7 @@ export default class JspaceService extends Service {
       checked: current.checked,
       open,
       next,
-      goalOpenedSeq: goal === current.goal ? current.goalOpenedSeq : eventSeq,
+      goalOpenedSeq: current.goalOpenedSeq,
     })
   }
 
