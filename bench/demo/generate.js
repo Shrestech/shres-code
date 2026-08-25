@@ -62,7 +62,7 @@ const ARM_CONFIGS = Object.freeze({
   'sq-only': { enabled: false },
   'on-sq': { enabled: true, mode: 'available' },
   'on-sq-verified': { enabled: true, mode: 'available', verifierTools: ['bash'], requireVerifiedEvidence: true },
-  'on-adaptive': { enabled: true, mode: 'available', engageAfterTurns: 10 },
+  'on-adaptive': { enabled: true, mode: 'available', engageAfterSteps: 10 },
 })
 const REPEATS = 5
 const MODEL = 'deepseek-chat'

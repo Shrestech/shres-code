@@ -232,11 +232,12 @@ describe('jspace-prompt', () => {
     expect(JspacePrompt.JSPACE_DRIVER_OPEN).toContain('a changed Goal clears Core and Checked')
   })
 
-  it('renders nothing until the session reaches engageAfterTurns', async () => {
-    const ctx = await harness({ enabled: true, mode: 'always-open', engageAfterTurns: 2 })
+  it('renders nothing until the session reaches engageAfterSteps', async () => {
+    const ctx = await harness({ enabled: true, mode: 'always-open', engageAfterSteps: 2 })
     const agent = liveAgent(ctx, 'ws-prompt-engage')
     agent.session.append('turn/start', { turn: 1 })
-    agent.session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+    agent.session.append('step/start', { turn: 1, step: 1 })
+    agent.session.append('step/end', { turn: 1, step: 1 })
     const early = await ctx.systemPrompt.assemble({ agent, scope: agent })
     for (const name of [
       JspacePrompt.JSPACE_SECTION,
@@ -250,8 +251,8 @@ describe('jspace-prompt', () => {
     expect(JspacePrompt.passFor(ctx, agent.session)).toBe('fast')
     expect(JspacePrompt.modulesFor(ctx, agent.session)).toEqual([])
 
-    agent.session.append('turn/start', { turn: 2 })
-    agent.session.append('turn/end', { turn: 2, reason: { kind: 'completed' } })
+    agent.session.append('step/start', { turn: 1, step: 2 })
+    agent.session.append('step/end', { turn: 1, step: 2 })
     const engaged = await ctx.systemPrompt.assemble({ agent, scope: agent })
     expect(engaged.sections.find(section => section.name === JspacePrompt.JSPACE_SECTION)?.text)
       .toContain(JSPACE_ALWAYS_OPEN_GOAL)
@@ -260,7 +261,7 @@ describe('jspace-prompt', () => {
   })
 
   it('keeps rendering an open card below the engagement threshold', async () => {
-    const ctx = await harness({ enabled: true, engageAfterTurns: 50 })
+    const ctx = await harness({ enabled: true, engageAfterSteps: 50 })
     const agent = liveAgent(ctx, 'ws-prompt-engage-open')
     ctx.jspace.open(agent.session, { goal: 'Finish the migration', next: 'Read the router' })
     const assembled = await ctx.systemPrompt.assemble({ agent, scope: agent })

@@ -10,19 +10,19 @@ The cost is structural, not incidental. `jspace-prompt` rendered its card, drive
 
 ## Decision
 
-The seat computes one per-session predicate, `ctx.jspace.engaged(session)`, and both Consumers read it. An active seat engages a session when either its card is already open or the session has closed at least `engageAfterTurns` turns. `jspace-prompt` returns empty text from every section while unengaged, including the automatic `loop` card open, so nothing latches engagement on the session's behalf. `tool-jspace` drops the four schemas from `assembly.tools` and denies a call that arrives anyway.
+The seat computes one per-session predicate, `ctx.jspace.engaged(session)`, and both Consumers read it. An active seat engages a session when either its card is already open or the session log contains at least `engageAfterSteps` `step/end` events. `jspace-prompt` returns empty text from every section while unengaged, including the automatic `loop` card open, so nothing latches engagement on the session's behalf. `tool-jspace` drops the four schemas from `assembly.tools` and denies a call that arrives anyway.
 
-The open-card clause is resume safety, not an optimization: a card the model is already driving must never lose its driver or its tools because a fork reset the turn count or a deployment raised the threshold mid-session.
+The open-card clause is resume safety, not an optimization: a card the model is already driving must never lose its driver or its tools because a fork reset the step count or a deployment raised the threshold mid-session.
 
-Both inputs are folds of the session log — the `turn/end` count and the `jspace/card` / `jspace/closed` fold — so engagement introduces no session event and the assembled request stays reconstructable from the log alone. `turn/end` lands once per closed turn whatever the end reason, so it counts the turns the model has lived through rather than the turns it succeeded at.
+Both inputs are folds of the session log — the `step/end` count and the `jspace/card` / `jspace/closed` fold — so engagement introduces no session event and the assembled request stays reconstructable from the log alone. `step/end` lands once per closed model request/response, so it counts the steps the model has already lived through. A headless single-prompt session is one in-flight turn for its whole life; experiment `w4-2026-08-25-zai-adaptive` showed a 12-step trial still sitting at zero closed `turn/end` events, so a turn threshold never fired. Chain-task phases are separate cold sessions, each also one turn.
 
-`engageAfterTurns` is a validated `Config` field on the seat, an integer at or above zero, defaulting to `0`. Zero engages from the first request, which is byte-for-byte the previous behavior; no shipped composition changes. Pre-release, the default may flip once the new `on-adaptive` bench arm (`on-sq` plus `engageAfterTurns: 10`) measures the trade against the same ladder.
+`engageAfterSteps` is a validated `Config` field on the seat, an integer at or above zero, defaulting to `0`. Zero engages from the first request, which is byte-for-byte the previous behavior; no shipped composition changes. Pre-release, the default may flip once the new `on-adaptive` bench arm (`on-sq` plus `engageAfterSteps: 10`) measures the trade against the same ladder.
 
 ### Tool gating is a real roster filter, not only a refusal
 
 `ctx.tools` has no per-request roster hook, and the four registrations must stay mounted so an engaged session in the same process can execute them. The per-session decision therefore lands on the assembly that carries the session: `tool-jspace` joins the `system-prompt/assemble` waterfall, awaits `next()`, and removes the four names from `assembly.tools` when the session is unengaged. That assembly is what `agent-loop` hands to the provider, so the model genuinely never sees the schemas — no `agent-loop` change, and the listener is an ordinary documented extension point.
 
-Prompt filtering alone is not enforcement, so the existing `tools/pre-execute` hook also denies a card tool from an unengaged session with `J-Space engages after <n> completed turns in this session; do the work directly until then.` The executor is where the denial is proved.
+Prompt filtering alone is not enforcement, so the existing `tools/pre-execute` hook also denies a card tool from an unengaged session with `J-Space engages after <n> completed steps in this session; do the work directly until then.` The executor is where the denial is proved.
 
 ### Always-paid prompt mass
 
@@ -34,7 +34,9 @@ The four tool descriptions and the two tool-driver lines dropped from 1,845 to 1
 
 **Refusal only, leaving the schemas visible.** Rejected as the primary mechanism: the schemas are most of the measured cost, so keeping them defeats the change. The refusal remains as the enforcement point behind the filter.
 
-**Engage on a token or context-window threshold instead of a turn count.** Rejected for now: turn count is a direct fold of the log with no dependency on provider accounting, and the pilot's overhead tracked task length, which turns already proxy. A usage-based threshold can replace it once the adaptive arm shows the turn count mistargets.
+**Count closed `turn/end` events.** Rejected: every headless single-prompt session is one in-flight turn, so the count stays 0 for the whole session. Experiment `w4-2026-08-25-zai-adaptive` measured that a 12-step long task never crossed the threshold, and each chain-task phase is a separate cold session that also never closes a second turn.
+
+**Engage on a token or context-window threshold instead of a step count.** Rejected for now: step count is a direct fold of the log with no dependency on provider accounting, and the pilot's overhead tracked task length, which steps already proxy. A usage-based threshold can replace it once the adaptive arm shows the step count mistargets.
 
 **Default the threshold to a non-zero value in this change.** Rejected: the pilot measured cost, not benefit, on a catalog too easy to separate the arms. Flipping the default is a decision the `on-adaptive` arm is built to inform.
 
@@ -42,6 +44,6 @@ The four tool descriptions and the two tool-driver lines dropped from 1,845 to 1
 
 ## Consequences
 
-A deployment that sets `engageAfterTurns` pays nothing for J-Space on short sessions and gets the full card once a session runs long, at the price of one prefix invalidation on the request that crosses the threshold — four prompt sections and four tool schemas appear at once. A session that resumes with an open card keeps everything regardless of the threshold. `tool-jspace` gains type-only dependencies on `shres-code-system-prompt` and `shres-code-agent` for the assembly waterfall and its `agent` field.
+A deployment that sets `engageAfterSteps` pays nothing for J-Space on short sessions and gets the full card once a session runs long, at the price of one prefix invalidation on the request that crosses the threshold — four prompt sections and four tool schemas appear at once. A session that resumes with an open card keeps everything regardless of the threshold. `tool-jspace` gains type-only dependencies on `shres-code-system-prompt` and `shres-code-agent` for the assembly waterfall and its `agent` field.
 
 The pilot's correctness column stays unanswered: no arm separated on pass rate, so nothing here claims the card fails to help — only that it currently charges every session as if it always does. No ACP or headless snapshot fixture pins the trimmed descriptions or the engagement refusal; recording one needs `DEEPSEEK_API_KEY`, which was unavailable, and the existing `jspace-tools` headless fixture carries neither the system prompt nor the tool schemas.

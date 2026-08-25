@@ -75,48 +75,53 @@ describe('JspaceService remount', () => {
     expect(seen).toEqual(['active'])
     expect(ctx.jspace.status.active).toBe(true)
     // A stored document that carries no threshold engages from the first request.
-    expect(ctx.jspace.engageAfterTurns).toBe(0)
+    expect(ctx.jspace.engageAfterSteps).toBe(0)
     stop()
   })
 })
 
 describe('JspaceService engagement', () => {
-  function closeTurns(session: Session, count: number): void {
-    for (let turn = 1; turn <= count; turn += 1) {
-      session.append('turn/start', { turn })
-      session.append('turn/end', { turn, reason: { kind: 'completed' } })
+  function closeSteps(session: Session, count: number): void {
+    const completed = session.events.filter(event => event.type === 'step/end').length
+    if (!session.events.some(event => event.type === 'turn/start')) {
+      session.append('turn/start', { turn: 1 })
+    }
+    for (let offset = 0; offset < count; offset += 1) {
+      const step = completed + offset + 1
+      session.append('step/start', { turn: 1, step })
+      session.append('step/end', { turn: 1, step })
     }
   }
 
   it('never engages while the seat is disabled', async () => {
-    const { ctx, session } = await harness({ enabled: false, engageAfterTurns: 0 })
+    const { ctx, session } = await harness({ enabled: false, engageAfterSteps: 0 })
     expect(ctx.jspace.engaged(session)).toBe(false)
     expect(ctx.jspace.engaged()).toBe(false)
   })
 
-  it('engages every active request when engageAfterTurns is 0', async () => {
+  it('engages every active request when engageAfterSteps is 0', async () => {
     const { ctx, session } = await harness({ enabled: true })
-    expect(ctx.jspace.engageAfterTurns).toBe(0)
+    expect(ctx.jspace.engageAfterSteps).toBe(0)
     expect(ctx.jspace.engaged(session)).toBe(true)
     expect(ctx.jspace.engaged()).toBe(true)
   })
 
-  it('waits for the configured completed-turn count', async () => {
-    const { ctx, session } = await harness({ enabled: true, engageAfterTurns: 3 })
+  it('waits for the configured completed-step count', async () => {
+    const { ctx, session } = await harness({ enabled: true, engageAfterSteps: 3 })
     expect(ctx.jspace.engaged(session)).toBe(false)
-    closeTurns(session, 2)
+    closeSteps(session, 2)
     expect(ctx.jspace.engaged(session)).toBe(false)
-    closeTurns(session, 1)
+    closeSteps(session, 1)
     expect(ctx.jspace.engaged(session)).toBe(true)
   })
 
   it('leaves a session-less assembly unengaged under a threshold', async () => {
-    const { ctx } = await harness({ enabled: true, engageAfterTurns: 3 })
+    const { ctx } = await harness({ enabled: true, engageAfterSteps: 3 })
     expect(ctx.jspace.engaged()).toBe(false)
   })
 
   it('engages a session whose card is already open below the threshold', async () => {
-    const { ctx, session } = await harness({ enabled: true, engageAfterTurns: 10 })
+    const { ctx, session } = await harness({ enabled: true, engageAfterSteps: 10 })
     ctx.jspace.open(session, { goal: 'g', next: 'n' })
     expect(ctx.jspace.engaged(session)).toBe(true)
   })

@@ -472,18 +472,19 @@ describe('jspace tools', () => {
   })
 
   it('withholds the schemas and refuses a call until the session engages', async () => {
-    const { ctx, agent } = await harness(true, { engageAfterTurns: 2 })
+    const { ctx, agent } = await harness(true, { engageAfterSteps: 2 })
     expect(toolNames(ctx)).toEqual([...TOOL_NAMES])
     expect(assembledNames(await ctx.systemPrompt.assemble({ agent }))).toEqual([])
 
     const denied = await execute(ctx, 'jspace_open', { goal: 'A', next: 'B' }, agent)
     expect(denied.isError).toBe(true)
-    expect(text(denied)).toContain('J-Space engages after 2 completed turns in this session')
+    expect(text(denied)).toContain('J-Space engages after 2 completed steps in this session')
     expect(ctx.jspace.card(agent.session)).toBeNull()
 
-    for (const turn of [1, 2]) {
-      agent.session.append('turn/start', { turn })
-      agent.session.append('turn/end', { turn, reason: { kind: 'completed' } })
+    agent.session.append('turn/start', { turn: 1 })
+    for (const step of [1, 2]) {
+      agent.session.append('step/start', { turn: 1, step })
+      agent.session.append('step/end', { turn: 1, step })
     }
     expect(assembledNames(await ctx.systemPrompt.assemble({ agent }))).toEqual(SORTED_TOOL_NAMES)
     const opened = await execute(ctx, 'jspace_open', { goal: 'A', next: 'B' }, agent)

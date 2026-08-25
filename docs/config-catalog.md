@@ -941,10 +941,10 @@ export interface Config {
    */
   requireVerifiedEvidence?: boolean
   /**
-   * Completed turns a session must reach before Consumers engage. Default 0
-   * engages from the first request. An open card engages at any turn count.
+   * Completed model steps a session must reach before Consumers engage. Default 0
+   * engages from the first request. An open card engages at any step count.
    */
-  engageAfterTurns?: number
+  engageAfterSteps?: number
 }
 ```
 

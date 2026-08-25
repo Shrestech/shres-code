@@ -20,7 +20,7 @@
  * | `sq-only` | Session-query tool mounted, jspace disabled. |
  * | `on-sq` | J-Space available + session-query tool. |
  * | `on-sq-verified` | on-sq + verifierTools naming `bash` + requireVerifiedEvidence. |
- * | `on-adaptive` | on-sq with `engageAfterTurns: 10`: J-Space costs nothing until turn 10. |
+ * | `on-adaptive` | on-sq with `engageAfterSteps: 10`: J-Space costs nothing until step 10. |
  *
  * @module bench/runner/arms
  */
@@ -85,7 +85,7 @@ export const ARMS = Object.freeze({
   }),
   // `expectsJspace` only licenses jspace events; the integrity audit checks
   // absence for arms that exclude jspace and never asserts presence. A short
-  // task that never reaches turn 10 therefore logs no jspace event and no
+  // task that never reaches step 10 therefore logs no jspace event and no
   // violation, which is exactly the behavior this arm measures.
   'on-adaptive': Object.freeze({
     name: 'on-adaptive',
@@ -93,7 +93,7 @@ export const ARMS = Object.freeze({
       enabled: true,
       mode: 'available',
       requireCoverage: true,
-      engageAfterTurns: 10,
+      engageAfterSteps: 10,
     }),
     sessionQuery: true,
     expectsSessionQuery: true,

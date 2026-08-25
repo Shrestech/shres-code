@@ -355,7 +355,7 @@ export function apply(ctx: Context, config: Config = {}): void {
     if (JSPACE_TOOL_NAMES.has(exec.name) && !ctx.jspace.engaged(session)) {
       return Promise.resolve({
         kind: 'deny' as const,
-        reason: notEngagedDeny(ctx.jspace.engageAfterTurns),
+        reason: notEngagedDeny(ctx.jspace.engageAfterSteps),
       })
     }
     if (session === undefined || ctx.jspace.card(session) === null) return next()

@@ -124,8 +124,8 @@ describe('arms registry', () => {
     assert.equal(ARMS['on-sq-verified'].jspace.requireVerifiedEvidence, true)
     assert.deepEqual(ARMS['on-sq-verified'].jspace.verifierTools, ['bash'])
     assert.equal(ARMS['on-adaptive'].jspace.enabled, true)
-    assert.equal(ARMS['on-adaptive'].jspace.engageAfterTurns, 10)
-    assert.equal(ARMS.on.jspace.engageAfterTurns, undefined)
+    assert.equal(ARMS['on-adaptive'].jspace.engageAfterSteps, 10)
+    assert.equal(ARMS.on.jspace.engageAfterSteps, undefined)
     assert.equal(getArm('off'), ARMS.off)
   })
 
@@ -147,7 +147,7 @@ describe('arms registry', () => {
     assert.equal(ARMS['sq-only'].expectsSessionQuery, true)
     assert.equal(ARMS['on-sq'].expectsJspace, true)
     assert.equal(ARMS['on-sq'].expectsSessionQuery, true)
-    // Permission, not a requirement: a trial that never reaches turn 10 logs
+    // Permission, not a requirement: a trial that never reaches step 10 logs
     // no jspace event and the audit records no violation.
     assert.equal(ARMS['on-adaptive'].expectsJspace, true)
     assert.equal(ARMS['on-adaptive'].expectsSessionQuery, true)
@@ -157,7 +157,7 @@ describe('arms registry', () => {
     const overlay = renderArmOverlay(ARMS['on-adaptive'], {
       sessionLogRoot: '/tmp/bench/on-adaptive/sessions/t/0',
     })
-    assert.match(overlay, /engageAfterTurns: 10/)
+    assert.match(overlay, /engageAfterSteps: 10/)
     assert.match(overlay, /- id: tool-session-query$/m)
   })
 

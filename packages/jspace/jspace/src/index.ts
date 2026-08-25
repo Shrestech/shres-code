@@ -74,10 +74,10 @@ export interface Config {
    */
   requireVerifiedEvidence?: boolean
   /**
-   * Completed turns a session must reach before Consumers engage. Default 0
-   * engages from the first request. An open card engages at any turn count.
+   * Completed model steps a session must reach before Consumers engage. Default 0
+   * engages from the first request. An open card engages at any step count.
    */
-  engageAfterTurns?: number
+  engageAfterSteps?: number
 }
 
 export const Config: z<Config> = z.object({
@@ -87,7 +87,7 @@ export const Config: z<Config> = z.object({
   coverageTerms: z.array(z.string()).default([]),
   verifierTools: z.array(z.string()).default([]),
   requireVerifiedEvidence: z.boolean().default(false),
-  engageAfterTurns: z.number().step(1).min(0).default(0),
+  engageAfterSteps: z.number().step(1).min(0).default(0),
 })
 
 declare module '@shres-code/cordis' {
@@ -212,16 +212,16 @@ function line(value: string, field: string): string {
 }
 
 /**
- * Completed turns in one session log. `turn/end` lands once per turn the loop
- * closed, whatever the end reason, so it counts turns the model has already
- * lived through; the in-flight turn is not yet counted.
+ * Completed model steps in one session log. `step/end` lands once per model
+ * request/response the loop closed, so it counts steps the model has already
+ * lived through; the in-flight step is not yet counted.
  * @param events - session log.
- * @returns the number of closed turns.
+ * @returns the number of closed steps.
  */
-function countCompletedTurns(events: readonly SessionEvent[]): number {
+function countCompletedSteps(events: readonly SessionEvent[]): number {
   let count = 0
   for (const event of events) {
-    if (event.type === 'turn/end') count += 1
+    if (event.type === 'step/end') count += 1
   }
   return count
 }
@@ -306,32 +306,32 @@ export default class JspaceService extends Service {
   }
 
   /**
-   * Completed turns a session must close before Consumers engage. The one home
-   * of the threshold: {@link JspaceService.engaged} and the tool Consumer's
-   * refusal both read it.
+   * Completed model steps a session must close before Consumers engage. The one
+   * home of the threshold: {@link JspaceService.engaged} and the tool
+   * Consumer's refusal both read it.
    * @returns the configured threshold; `0` engages from the first request.
    */
-  get engageAfterTurns(): number {
-    return this.config.engageAfterTurns ?? 0
+  get engageAfterSteps(): number {
+    return this.config.engageAfterSteps ?? 0
   }
 
   /**
    * Whether the prompt and tool Consumers belong on this session's next
    * request. An active seat engages when a card is already open — an open card
    * must never lose its driver or its tools — or when the session has closed
-   * at least {@link JspaceService.engageAfterTurns} turns. A caller with no
-   * session (a scope-only assembly) carries no horizon, so a non-zero
+   * at least {@link JspaceService.engageAfterSteps} model steps. A caller with
+   * no session (a scope-only assembly) carries no horizon, so a non-zero
    * threshold leaves it unengaged.
    * @param session - session whose log decides engagement, when one exists.
    * @returns true when Consumers mount for this request.
    */
   engaged(session?: Session): boolean {
     if (!this.current.active) return false
-    const after = this.engageAfterTurns
+    const after = this.engageAfterSteps
     if (after === 0) return true
     if (session === undefined) return false
     if (this.card(session) !== null) return true
-    return countCompletedTurns(session.events) >= after
+    return countCompletedSteps(session.events) >= after
   }
 
   /**

@@ -38,11 +38,11 @@ export function noteCapDeny(maxNotesPerTurn: number): string {
  * Model-visible refuse when a card tool is called before the session reaches
  * the engagement threshold. Names the threshold so the model knows the tool is
  * withheld for now rather than broken.
- * @param engageAfterTurns - configured completed-turn threshold.
+ * @param engageAfterSteps - configured completed-step threshold.
  * @returns one-sentence denial.
  */
-export function notEngagedDeny(engageAfterTurns: number): string {
-  return `J-Space engages after ${String(engageAfterTurns)} completed turns in this session; do the work directly until then.`
+export function notEngagedDeny(engageAfterSteps: number): string {
+  return `J-Space engages after ${String(engageAfterSteps)} completed steps in this session; do the work directly until then.`
 }
 
 /**

@@ -2,7 +2,7 @@
 
 Consumer that reprints the J-Space card as the `jspace:card` system-prompt section and mounts the protocol the current pass earns. The card text is derived from the session fold on every assembly, so compaction and resume do not drop it.
 
-Every J-Space section is empty while the seat is not [engaged](../jspace/README.md#engagement) for the assembling session — the seat is off, or the session has not reached `engageAfterTurns` and has no open card. An unengaged request also skips the automatic `loop` card open, so nothing latches engagement on the session's behalf. When the seat is engaged and no card is open, `jspace:card` is the availability line. An open card is reprint-capped and wrapped in the shared untrusted-content frame: session-authored working memory, not instructions. The gate classifies `fast` / `full` / `loop` from the last human message, whether a card is open, and Settings `mode`. Every active pass includes tool-driver lines in `jspace:protocol`. `fast` adds no further protocol. `full` loads the protocol block, capacity, deep-reasoning, and self-monitoring. `loop` also loads broadcast and directed-focus, and opens a card when none exists, unless the session already has a native close. `mode: always-open` is always `loop`.
+Every J-Space section is empty while the seat is not [engaged](../jspace/README.md#engagement) for the assembling session — the seat is off, or the session has not reached `engageAfterSteps` and has no open card. An unengaged request also skips the automatic `loop` card open, so nothing latches engagement on the session's behalf. When the seat is engaged and no card is open, `jspace:card` is the availability line. An open card is reprint-capped and wrapped in the shared untrusted-content frame: session-authored working memory, not instructions. The gate classifies `fast` / `full` / `loop` from the last human message, whether a card is open, and Settings `mode`. Every active pass includes tool-driver lines in `jspace:protocol`. `fast` adds no further protocol. `full` loads the protocol block, capacity, deep-reasoning, and self-monitoring. `loop` also loads broadcast and directed-focus, and opens a card when none exists, unless the session already has a native close. `mode: always-open` is always `loop`.
 
 Protocol copy is a first-party rewrite of Tiger3807861189 J-Space Cognition Suite V3.6 (Apache-2.0, DOI 10.5281/zenodo.21971181). It is not their `SKILL.md` and does not implement a Jacobian lens.
 
@@ -54,13 +54,13 @@ Zero while the seat is unengaged for this session. One stable line when engaged 
 
 #### KV Cache effect
 
-The availability line is prefix-stable until a card opens or Settings flips. Updating the card or the reprint caps replaces the section and invalidates the prefix from this order onward. Crossing `engageAfterTurns` fills four empty sections at once and invalidates the prefix from order 45 for that one request.
+The availability line is prefix-stable until a card opens or Settings flips. Updating the card or the reprint caps replaces the section and invalidates the prefix from this order onward. Crossing `engageAfterSteps` fills four empty sections at once and invalidates the prefix from order 45 for that one request.
 
 ### J-Space protocol sections
 
 #### What the model sees
 
-`jspace:protocol` always includes the tool-driver lines while the seat is engaged (how to open or update the card). The closed-card driver asks for a Goal covering the work that remains, because under a non-zero `engageAfterTurns` the section first appears partway through the session. `jspace:module:capacity` and `jspace:module:broadcast` load when the pass earns them.
+`jspace:protocol` always includes the tool-driver lines while the seat is engaged (how to open or update the card). The closed-card driver asks for a Goal covering the work that remains, because under a non-zero `engageAfterSteps` the section first appears partway through the session. `jspace:module:capacity` and `jspace:module:broadcast` load when the pass earns them.
 
 #### Token effect
 

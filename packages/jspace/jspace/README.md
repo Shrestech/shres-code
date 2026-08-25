@@ -13,7 +13,7 @@ Default-off host seat for the J-Space card. This package remounts from the `jspa
     requireCoverage: true
     verifierTools: []
     requireVerifiedEvidence: false
-    engageAfterTurns: 0
+    engageAfterSteps: 0
 ```
 
 | Field | Default | Meaning |
@@ -24,15 +24,15 @@ Default-off host seat for the J-Space card. This package remounts from the `jspa
 | `coverageTerms` | `[]` | Extra literal terms merged with the built-in English list. |
 | `verifierTools` | `[]` | Tool names whose completed non-error calls mark a cited `evidence` call-id evidence-grade (`verified: true` on the Checked line). Empty leaves classification dormant. |
 | `requireVerifiedEvidence` | `false` | When true, `jspace_ship` refuses unless the current Goal epoch has an evidence-grade checkpoint. |
-| `engageAfterTurns` | `0` | Completed turns a session must close before Consumers engage. `0` engages from the first request. |
+| `engageAfterSteps` | `0` | Completed model steps (`step/end` events) a session must close before Consumers engage. `0` engages from the first request. |
 
 `installSettingsSection` owns the namespace. Unknown keys fail at load. The seat remounts when the document changes.
 
 ## Engagement
 
-`engaged(session)` is the single predicate both Consumers read, so the prompt sections and the four tool schemas appear and disappear together. An active seat engages a session when its card is already open — an open card must never lose its driver or its tools across a resume, a fork, or a threshold change — or when the session has closed at least `engageAfterTurns` turns. `engageAfterTurns` reads through `ctx.jspace.engageAfterTurns`, which resolves a document that omits the field to `0`. A caller with no session, such as a scope-only assembly, carries no horizon and stays unengaged under a non-zero threshold.
+`engaged(session)` is the single predicate both Consumers read, so the prompt sections and the four tool schemas appear and disappear together. An active seat engages a session when its card is already open — an open card must never lose its driver or its tools across a resume, a fork, or a threshold change — or when the session log contains at least `engageAfterSteps` `step/end` events. `engageAfterSteps` reads through `ctx.jspace.engageAfterSteps`, which resolves a document that omits the field to `0`. A caller with no session, such as a scope-only assembly, carries no horizon and stays unengaged under a non-zero threshold.
 
-Both inputs are folds of the session log — `turn/end` count and card status — so engagement adds no session event and keeps the model-visible prompt reconstructable from the log alone. The [adaptive-engagement note](../../../.agents/notes/implemented/feature/2026-08-25-jspace-adaptive-engagement.md) owns the measurement behind the default.
+Both inputs are folds of the session log — `step/end` count and card status — so engagement adds no session event and keeps the model-visible prompt reconstructable from the log alone. The [adaptive-engagement note](../../../.agents/notes/implemented/feature/2026-08-25-jspace-adaptive-engagement.md) owns the measurement behind the default.
 
 ## Service
 

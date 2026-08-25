@@ -14,7 +14,7 @@ Source: [`packages/jspace/jspace/src/index.ts`](../../packages/jspace/jspace/src
 | [shres-command-jspace](../../packages/jspace/command-jspace/README.md) | Human `/j-space on\|off`; session-local card control |
 | [shres-client-ui-jspace](../../packages/client/ui-jspace/README.md) | Composer chip and open-card dock; Trajectory badges; Settings section lives in [shres-client-ui-settings-jspace](../../packages/client/ui-settings-jspace/README.md) |
 
-Both Consumers read one per-session predicate, `ctx.jspace.engaged(session)`: the prompt sections render and the four tool schemas reach the request only for an engaged session. [The seat README](../../packages/jspace/jspace/README.md#engagement) owns the rule and the `engageAfterTurns` threshold.
+Both Consumers read one per-session predicate, `ctx.jspace.engaged(session)`: the prompt sections render and the four tool schemas reach the request only for an engaged session. [The seat README](../../packages/jspace/jspace/README.md#engagement) owns the rule and the `engageAfterSteps` threshold.
 
 ## Card fields
 
