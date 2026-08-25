@@ -363,7 +363,7 @@ test('buildExperiment: chain strata and chain trials flow through unchanged', as
       metrics: { inputTokens: 170, outputTokens: 40, durationMs: 10_000, turns: 4, toolCalls: 6, identicalRetries: 0, checkpoints: 0, shipPasses: 0 },
       sessionFile: chainPhases[1].sessionFile,
       phases: chainPhases,
-      integrity: { violations: ['off-arm-jspace-event:jspace/card-open'] },
+      integrity: { violations: ['off-arm-jspace-event:jspace/card'] },
     })])
     await writeArm(dir, 'on', [trial({
       taskId: 'chain-task',
@@ -397,7 +397,7 @@ test('buildExperiment: chain strata and chain trials flow through unchanged', as
     // Embedded trials keep phases and integrity intact.
     const embedded = report.trials.find(t => t.arm === 'off')
     assert.equal(embedded.phases.length, 2)
-    assert.deepEqual(embedded.integrity, { violations: ['off-arm-jspace-event:jspace/card-open'] })
+    assert.deepEqual(embedded.integrity, { violations: ['off-arm-jspace-event:jspace/card'] })
 
     // Aggregates stay trial-level: one cell per arm, sums from trial.metrics.
     assert.equal(report.cells.length, 2)

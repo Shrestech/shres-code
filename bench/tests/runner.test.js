@@ -88,6 +88,13 @@ describe('metrics.foldSessionLog', () => {
     assert.equal(metrics.pressureFired, true)
   })
 
+  it('tracks danglingCard from jspace/card and jspace/closed events', () => {
+    const open = '{"type":"jspace/card","seq":1,"time":1,"data":{}}'
+    const closed = '{"type":"jspace/closed","seq":2,"time":2,"data":{}}'
+    assert.equal(foldSessionLog(open + '\n').danglingCard, true)
+    assert.equal(foldSessionLog(open + '\n' + closed + '\n').danglingCard, false)
+  })
+
   it('groups unparseable arguments by their raw text', () => {
     const log = [
       '{"type":"tool/call","seq":1,"time":1,"data":{"name":"bash","arguments":"not json {"}}',
@@ -807,7 +814,7 @@ describe('execute.resolveHarnessLaunch', () => {
  * text to spawn-log.txt in the scratch dir (proving the carried workspace),
  * and fabricates a one-turn session log. Failure steering via the task text:
  * PROVIDER_FAIL exits 1 with a provider signature after logging; HARNESS_DIE
- * exits 2 without logging; JSPACE_LEAK logs a jspace/card-open event; HANG
+ * exits 2 without logging; JSPACE_LEAK logs a jspace/card event; HANG
  * never finishes (the runner's timeout kills it).
  */
 const FAKE_BIN = `import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises'
@@ -832,7 +839,7 @@ if (taskText.includes('HANG')) {
     JSON.stringify({ type: 'assistant/message', seq: 2, time: 2000, data: { turn: 0, step: 0, usage: { inputTokens: 100, outputTokens: 20 } } }),
   ]
   if (taskText.includes('JSPACE_LEAK')) {
-    lines.push(JSON.stringify({ type: 'jspace/card-open', seq: 3, time: 3000, data: {} }))
+    lines.push(JSON.stringify({ type: 'jspace/card', seq: 3, time: 3000, data: {} }))
   }
   const dir = join(root, 'workspace', 's1')
   await mkdir(dir, { recursive: true })
@@ -1098,7 +1105,7 @@ describe('run.main execution (fake harness)', () => {
       const [offTrial] = offTrials
       validateTrial(offTrial)
       assert.equal(offTrial.status, 'success', 'violations never abort the trial')
-      assert.deepEqual(offTrial.integrity, { violations: ['off-arm-jspace-event:jspace/card-open'] })
+      assert.deepEqual(offTrial.integrity, { violations: ['off-arm-jspace-event:jspace/card'] })
 
       const [onTrial] = await readTrials(benchRoot, 'e2e', 'on')
       assert.ok(!('integrity' in onTrial), 'the on arm may log jspace events')

@@ -405,7 +405,7 @@ describe('chain trial schema', () => {
 
   it('accepts well-formed phases and integrity records', () => {
     validateTrial(makeTrial({ phases: [makePhase(0), makePhase(1)] }))
-    validateTrial(makeTrial({ phases: [makePhase(0)], integrity: { violations: ['off-arm-jspace-event:jspace/card-open'] } }))
+    validateTrial(makeTrial({ phases: [makePhase(0)], integrity: { violations: ['off-arm-jspace-event:jspace/card'] } }))
   })
 
   it('rejects out-of-order phase indexes and malformed optional fields', () => {

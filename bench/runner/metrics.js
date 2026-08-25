@@ -194,10 +194,10 @@ export function foldSessionLog(text, armFlags) {
         }
         break
       }
-      case 'jspace/card-open':
+      case 'jspace/card':
         cardOpen = true
         break
-      case 'jspace/card-close':
+      case 'jspace/closed':
         cardOpen = false
         break
       case 'compaction/end':
