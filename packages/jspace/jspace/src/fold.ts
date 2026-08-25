@@ -112,7 +112,17 @@ function decodeChecked(value: unknown): JspaceCheckedLine {
   if (evidence !== undefined && (typeof evidence !== 'string' || evidence.trim().length === 0)) {
     throw new Error('jspace checked.evidence must be a non-empty string when present')
   }
-  return evidence === undefined ? { n, check, by } : { n, check, by, evidence }
+  const verified = value['verified']
+  if (verified !== undefined && verified !== true) {
+    throw new Error('jspace checked.verified must be true when present')
+  }
+  return {
+    n,
+    check,
+    by,
+    ...evidence === undefined ? {} : { evidence },
+    ...verified === true ? { verified: true as const } : {},
+  }
 }
 
 /**

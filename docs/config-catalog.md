@@ -930,6 +930,16 @@ export interface Config {
   requireCoverage?: boolean
   /** Extra coverage terms, escaped as literals. */
   coverageTerms?: string[]
+  /**
+   * Tool names whose completed non-error calls count as verifier citations.
+   * Empty (the default) leaves evidence-grade classification dormant.
+   */
+  verifierTools?: string[]
+  /**
+   * When true, `jspace_ship` refuses unless the current Goal epoch has an
+   * evidence-grade checkpoint. Default false.
+   */
+  requireVerifiedEvidence?: boolean
 }
 ```
 

@@ -16,7 +16,7 @@ Source: [`packages/jspace/jspace/src/index.ts`](../../packages/jspace/jspace/src
 
 ## Card fields
 
-`jspace/card` carries a whole-card snapshot. `goalOpenedSeq` is the session event seq of the mutation that last set `goal`; `jspace_ship` requires a checkpoint recorded at or after that anchor for the current Goal epoch.
+`jspace/card` carries a whole-card snapshot. `goalOpenedSeq` is the session event seq of the mutation that last set `goal`; `jspace_ship` requires a checkpoint recorded at or after that anchor for the current Goal epoch. When seat `requireVerifiedEvidence` is true, that checkpoint must be evidence-grade (`verified: true`).
 
 ```ts type-equiv
 /** Whole-card snapshot carried by `jspace/card`. */
@@ -40,11 +40,31 @@ interface JspaceCard {
 }
 ```
 
+```ts type-equiv
+/** One append-only Checked line. `verified` is set only for evidence-grade lines. */
+interface JspaceCheckedLine {
+  /** Positive number, never reused on this card. */
+  readonly n: number
+  /** What was claimed checked. */
+  readonly check: string
+  /** Named verifier and coverage claim. */
+  readonly by: string
+  /** Optional session `callId` that exists in the log. */
+  readonly evidence?: string
+  /**
+   * Present when `evidence` resolved to a completed non-error call of a
+   * configured verifier tool. Reconstructable from this payload; writers omit
+   * the field when the line is not evidence-grade.
+   */
+  readonly verified?: true
+}
+```
+
 Event declarations and fold semantics are in the [persistence log event catalog](../persistence-catalog.md#jspacecard--log-only).
 
 ## Lifecycle and epochs
 
-`open` refuses while a native card is already open (`JSPACE_ALREADY_OPEN`). The `jspace_open` tool routes an open card to `openGoal`: a changed Goal — exact trimmed-string identity — resets Core and Checked, moves `goalOpenedSeq` to the current session seq, and carries Open forward; a same-Goal call updates Goal and Next in place and keeps Core, Checked, Open, and the anchor. `note` patches Core (swap requires `departing` and incoming `core`), Open, and Next, and rejects a Goal identity change with `JSPACE_NOTE_GOAL_CHANGE`; Goal epochs open only through `openGoal`. `checkpoint` appends a Checked line; when `requireCoverage` is true, `by` must match a configured coverage term, and optional `evidence` must name a completed, non-error `tool/call` in the session log. `jspace_ship` is a register check only — non-empty Goal and Next plus a checkpoint at or after `goalOpenedSeq` — and never closes the card. `close` appends a `jspace/closed` tombstone.
+`open` refuses while a native card is already open (`JSPACE_ALREADY_OPEN`). The `jspace_open` tool routes an open card to `openGoal`: a changed Goal — exact trimmed-string identity — resets Core and Checked, moves `goalOpenedSeq` to the current session seq, and carries Open forward; a same-Goal call updates Goal and Next in place and keeps Core, Checked, Open, and the anchor. `note` patches Core (swap requires `departing` and incoming `core`), Open, and Next, and rejects a Goal identity change with `JSPACE_NOTE_GOAL_CHANGE`; Goal epochs open only through `openGoal`. `checkpoint` appends a Checked line; when `requireCoverage` is true, `by` must match a configured coverage term, and optional `evidence` must name a completed, non-error `tool/call` in the session log. When that call's tool name is in `verifierTools`, the line carries `verified: true`. `jspace_ship` is a register check only — non-empty Goal and Next plus a checkpoint at or after `goalOpenedSeq` — and never closes the card. When `requireVerifiedEvidence` is true it also requires an evidence-grade checkpoint in the current Goal epoch. `close` appends a `jspace/closed` tombstone.
 
 While a card is open, `tool-jspace` refuses an identical non-card tool retry within the same turn until a later `jspace/card` write records a diagnosis.
 

@@ -11,6 +11,8 @@ Default-off host seat for the J-Space card. This package remounts from the `jspa
     enabled: false
     mode: available
     requireCoverage: true
+    verifierTools: []
+    requireVerifiedEvidence: false
 ```
 
 | Field | Default | Meaning |
@@ -19,6 +21,8 @@ Default-off host seat for the J-Space card. This package remounts from the `jspa
 | `mode` | `available` | `available` waits for `open()`. `always-open` is reserved for the prompt Consumer. |
 | `requireCoverage` | `true` | `checkpoint()` refuses a `by` string that matches no coverage term. |
 | `coverageTerms` | `[]` | Extra literal terms merged with the built-in English list. |
+| `verifierTools` | `[]` | Tool names whose completed non-error calls mark a cited `evidence` call-id evidence-grade (`verified: true` on the Checked line). Empty leaves classification dormant. |
+| `requireVerifiedEvidence` | `false` | When true, `jspace_ship` refuses unless the current Goal epoch has an evidence-grade checkpoint. |
 
 `installSettingsSection` owns the namespace. Unknown keys fail at load. The seat remounts when the document changes.
 
@@ -26,7 +30,7 @@ Default-off host seat for the J-Space card. This package remounts from the `jspa
 
 `ctx.jspace` accepts a live `Session`. `open`, `openGoal`, `note`, `checkpoint`, and `close` append `{ ignorable: true }` events. `card(session)` and `fold(session)` replay the log. A fork with an inherited parent card receives a native copy (`seq` 1, child `sessionId`) while the seat is active.
 
-`open` refuses while a card is open (`JSPACE_ALREADY_OPEN`). `openGoal` opens a new Goal epoch on an open card: a Goal identity change resets Core and Checked and moves the `goalOpenedSeq` anchor so ship requires a checkpoint under the new Goal; a same-Goal call updates Goal and Next in place and keeps Core, Checked, and Open. `note` rejects a Goal identity change (`JSPACE_NOTE_GOAL_CHANGE`); Goal epochs open only through `openGoal`. Open questions carry over unchanged across an epoch change.
+`open` refuses while a card is open (`JSPACE_ALREADY_OPEN`). `openGoal` opens a new Goal epoch on an open card: a Goal identity change resets Core and Checked and moves the `goalOpenedSeq` anchor so ship requires a checkpoint under the new Goal; a same-Goal call updates Goal and Next in place and keeps Core, Checked, and Open. `note` rejects a Goal identity change (`JSPACE_NOTE_GOAL_CHANGE`); Goal epochs open only through `openGoal`. Open questions carry over unchanged across an epoch change. `checkpoint()` still applies `requireCoverage` to `by`. When `evidence` names a completed non-error `tool/call` whose `name` is in `verifierTools`, the Checked line carries `verified: true`.
 
 `watch(listener)` fires on remount so later consumers can dispose tools and the prompt section.
 
@@ -49,6 +53,7 @@ None; this package neither assembles nor sends a provider request.
 ## Known Limitations and Deferred Work
 
 - **`always-open` does not auto-open** — the field is stored; the prompt Consumer opens on the first pre-step with `JSPACE_ALWAYS_OPEN_GOAL` / `JSPACE_ALWAYS_OPEN_NEXT`.
-- **Coverage is a term match** — `checkpoint()` cannot tell whether the verifier ran. `evidence` must name a `tool/call` id with a logged, non-error `tool/result` and still does not prove coverage.
+- **Coverage is a term match** — `requireCoverage` still only matches `by` against configured terms. `evidence` must name a `tool/call` id with a logged, non-error `tool/result`. Evidence-grade status (`verified: true`) is a separate class: the cited call's tool name must be in `verifierTools`.
+- **Workspace fingerprint is deferred** — evidence-grade classification does not yet record or compare a git status/diff hash, so a re-cited verifier result still counts after the workspace changes. The [evidence-grade note](../../../.agents/notes/implemented/feature/2026-08-25-jspace-evidence-grade-checkpoints.md) owns the deferral.
 - **Trusted in-process producers** — a plugin with direct `Session` access can append counterfeit card events. The fold and invariant detect inconsistency; they do not isolate plugins.
 - **Copy-on-fork inherits Checked** — copy-on-fork copies the parent's Checked lines into the child card while resetting the epoch anchor, so the child's prompt shows checkpoints it has not earned; ship still refuses until a native checkpoint.

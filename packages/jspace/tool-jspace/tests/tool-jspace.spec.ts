@@ -9,6 +9,7 @@ import ToolRuntime, { defineTool } from '@shres-code/shres-code-tools'
 import type { ToolExecutionResult } from '@shres-code/shres-code-tools'
 import JspaceService, { JspaceError } from '@shres-code/shres-code-jspace'
 import * as tool from '../src/index.ts'
+import { SHIP_REQUIRES_VERIFIED_EVIDENCE } from '../src/ship.ts'
 
 const TOOL_NAMES = [
   'jspace_open',
@@ -30,12 +31,15 @@ function stubAgent(ctx: Context, id: string): Agent {
   return { id: session.id, session } as unknown as Agent
 }
 
-async function harness(enabled = true): Promise<Harness> {
+async function harness(
+  enabled = true,
+  jspace: ConstructorParameters<typeof JspaceService>[1] = {},
+): Promise<Harness> {
   const ctx = new Context()
   await ctx.plugin(SessionStore)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
-  await ctx.plugin(JspaceService, { enabled })
+  await ctx.plugin(JspaceService, { enabled, ...jspace })
   const fiber = await ctx.plugin(tool)
   return { ctx, agent: stubAgent(ctx, `ws-tool-${Math.random()}`), fiber }
 }
@@ -69,6 +73,8 @@ async function attachSettings(ctx: Context, enabled: boolean): Promise<(next: bo
     mode: 'available' as const,
     requireCoverage: true,
     coverageTerms: [] as string[],
+    verifierTools: [] as string[],
+    requireVerifiedEvidence: false,
   }
   const watchers = new Set<() => void>()
   await ctx.plugin({
@@ -93,14 +99,14 @@ async function attachSettings(ctx: Context, enabled: boolean): Promise<(next: bo
   }
 }
 
-function recordEvidence(agent: Agent, callId: string, isError = false): void {
+function recordEvidence(agent: Agent, callId: string, isError = false, name = 'read'): void {
   agent.session.append('turn/start', { turn: 1 })
   agent.session.append('step/start', { turn: 1, step: 1 })
   agent.session.append('tool/call', {
     turn: 1,
     step: 1,
     callId: CallId(callId),
-    name: 'read',
+    name,
     arguments: '{}',
   })
   agent.session.append('tool/result', {
@@ -237,6 +243,7 @@ describe('jspace tools', () => {
     expect(ctx.jspace.card(agent.session)?.checked).toEqual([
       { n: 1, check: 'read the file', by: 'unit tests covering the fold', evidence: 'call-1' },
     ])
+    expect(ctx.jspace.card(agent.session)?.checked[0]?.verified).toBeUndefined()
 
     recordEvidence(agent, 'call-err', true)
     const errored = await execute(ctx, 'jspace_checkpoint', {
@@ -247,6 +254,66 @@ describe('jspace tools', () => {
     expect(errored.isError).toBe(true)
     expect(text(errored)).toContain('non-error tool call')
     expect(ctx.jspace.card(agent.session)?.checked).toHaveLength(1)
+  })
+
+  it('marks a verifier citation evidence-grade and refuses ship until one exists when required', async () => {
+    const { ctx, agent } = await harness(true, {
+      verifierTools: ['bash'],
+      requireVerifiedEvidence: true,
+    })
+    await execute(ctx, 'jspace_open', { goal: 'A', next: 'B' }, agent)
+    const keyword = await execute(ctx, 'jspace_checkpoint', {
+      check: 'done',
+      by: 'unit tests covering the fold',
+    }, agent)
+    expect(keyword.isError).toBe(false)
+    const refused = await execute(ctx, 'jspace_ship', {}, agent)
+    expect(refused.isError).toBe(true)
+    expect(text(refused)).toContain(SHIP_REQUIRES_VERIFIED_EVIDENCE)
+
+    recordEvidence(agent, 'call-read')
+    const nonVerifier = await execute(ctx, 'jspace_checkpoint', {
+      check: 'read the file',
+      by: 'unit tests covering the fold',
+      evidence: 'call-read',
+    }, agent)
+    expect(nonVerifier.isError).toBe(false)
+    expect(ctx.jspace.card(agent.session)?.checked[1]?.verified).toBeUndefined()
+    expect((await execute(ctx, 'jspace_ship', {}, agent)).isError).toBe(true)
+
+    recordEvidence(agent, 'call-err', true, 'bash')
+    const errored = await execute(ctx, 'jspace_checkpoint', {
+      check: 'failed run',
+      by: 'unit tests covering the fold',
+      evidence: 'call-err',
+    }, agent)
+    expect(errored.isError).toBe(true)
+    expect(text(errored)).toContain('non-error tool call')
+
+    recordEvidence(agent, 'call-bash', false, 'bash')
+    const verified = await execute(ctx, 'jspace_checkpoint', {
+      check: 'tests ran',
+      by: 'unit tests covering the fold',
+      evidence: 'call-bash',
+    }, agent)
+    expect(verified.isError).toBe(false)
+    expect(ctx.jspace.card(agent.session)?.checked.some(line => line.verified === true)).toBe(true)
+    const shipped = await execute(ctx, 'jspace_ship', {}, agent)
+    expect(shipped.isError).toBe(false)
+  })
+
+  it('leaves evidence-grade dormant when verifierTools is empty and requireVerifiedEvidence is off', async () => {
+    const { ctx, agent } = await harness()
+    await execute(ctx, 'jspace_open', { goal: 'A', next: 'B' }, agent)
+    recordEvidence(agent, 'call-bash', false, 'bash')
+    await execute(ctx, 'jspace_checkpoint', {
+      check: 'tests ran',
+      by: 'unit tests covering the fold',
+      evidence: 'call-bash',
+    }, agent)
+    expect(ctx.jspace.card(agent.session)?.checked[0]?.verified).toBeUndefined()
+    const shipped = await execute(ctx, 'jspace_ship', {}, agent)
+    expect(shipped.isError).toBe(false)
   })
 
   it('ships after a current-Goal checkpoint and fails after a goal change without a new one', async () => {

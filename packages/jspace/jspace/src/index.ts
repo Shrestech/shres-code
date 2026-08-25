@@ -59,6 +59,16 @@ export interface Config {
   requireCoverage?: boolean
   /** Extra coverage terms, escaped as literals. */
   coverageTerms?: string[]
+  /**
+   * Tool names whose completed non-error calls count as verifier citations.
+   * Empty (the default) leaves evidence-grade classification dormant.
+   */
+  verifierTools?: string[]
+  /**
+   * When true, `jspace_ship` refuses unless the current Goal epoch has an
+   * evidence-grade checkpoint. Default false.
+   */
+  requireVerifiedEvidence?: boolean
 }
 
 export const Config: z<Config> = z.object({
@@ -66,6 +76,8 @@ export const Config: z<Config> = z.object({
   mode: z.union(['available', 'always-open'] as const).default('available'),
   requireCoverage: z.boolean().default(true),
   coverageTerms: z.array(z.string()).default([]),
+  verifierTools: z.array(z.string()).default([]),
+  requireVerifiedEvidence: z.boolean().default(false),
 })
 
 declare module '@shres-code/cordis' {
@@ -135,6 +147,7 @@ const jspaceProjectionSchema: ZodType<JspaceProjection> = zod.object({
       check: zod.string().min(1),
       by: zod.string().min(1),
       evidence: zod.string().min(1).optional(),
+      verified: zod.literal(true).optional(),
     })),
     open: zod.array(zod.object({
       question: zod.string().min(1),
@@ -423,13 +436,19 @@ export default class JspaceService extends Service {
         'JSPACE_COVERAGE',
       )
     }
-    if (input.evidence !== undefined) {
-      this.requireEvidence(session, input.evidence)
-    }
+    const evidence = input.evidence === undefined
+      ? undefined
+      : this.resolveEvidence(session, input.evidence)
     const n = current.checked.reduce((max, item) => Math.max(max, item.n), 0) + 1
-    const checked: JspaceCheckedLine = input.evidence === undefined
+    const checked: JspaceCheckedLine = evidence === undefined
       ? { n, check, by }
-      : { n, check, by, evidence: line(input.evidence, 'evidence') }
+      : {
+        n,
+        check,
+        by,
+        evidence: evidence.id,
+        ...evidence.verified ? { verified: true as const } : {},
+      }
     return this.writeCard(session, {
       ...current,
       seq: this.nextSeq(session),
@@ -503,13 +522,18 @@ export default class JspaceService extends Service {
   /**
    * Evidence must name a completed call: the `tool/call` exists and a
    * non-error `tool/result` for it is logged (`isError` rides the
-   * tool-result block). Still not proof of coverage.
+   * tool-result block). A configured verifier tool name marks the line
+   * evidence-grade; keyword coverage is still the floor.
    * @param session - owning session.
    * @param evidence - claimed tool-call id.
+   * @returns the trimmed id and whether the call is evidence-grade.
    */
-  private requireEvidence(session: Session, evidence: string): void {
+  private resolveEvidence(
+    session: Session,
+    evidence: string,
+  ): { readonly id: string; readonly verified: boolean } {
     const id = line(evidence, 'evidence')
-    const ran = session.events.some(event =>
+    const call = session.events.find(event =>
       event.type === 'tool/call' && event.data.callId === id)
     const succeeded = session.events.some((event) => {
       if (event.type !== 'tool/result') return false
@@ -525,12 +549,14 @@ export default class JspaceService extends Service {
         && block !== undefined
         && block.isError !== true
     })
-    if (!ran || !succeeded) {
+    if (call === undefined || !succeeded) {
       throw new JspaceError(
         `jspace evidence ${JSON.stringify(id)} is not a completed, non-error tool call in this session`,
         'JSPACE_EVIDENCE',
       )
     }
+    const verifiers = this.config.verifierTools ?? []
+    return { id, verified: verifiers.includes(call.data.name) }
   }
 
   private copyOnFork(session: Session): void {

@@ -33,7 +33,8 @@ const NOTE_DESCRIPTION =
 const CHECKPOINT_DESCRIPTION =
   'Record a Checked line on the open card. `by` must name a verifier and what it covered. '
   + 'Optional `evidence` is a prior tool-call id that must have completed without error in '
-  + 'this session; naming it does not prove coverage. Rejects if no card is open.'
+  + 'this session; cite a configured verifier tool\'s call-id for evidence-grade status. '
+  + 'Naming it does not prove coverage. Rejects if no card is open.'
 
 const SHIP_DESCRIPTION =
   'Check that the open card is ready to ship: Goal and Next are set, and a checkpoint '
@@ -249,7 +250,9 @@ function registerTools(ctx: Context): () => void {
       const agent = requireAgent(exec, 'jspace_ship')
       return Promise.resolve(runJspace(() => {
         const session = agent.session
-        const refusal = shipRefusal(ctx.jspace.card(session), session.events)
+        const refusal = shipRefusal(ctx.jspace.card(session), session.events, {
+          requireVerifiedEvidence: ctx.jspace.config.requireVerifiedEvidence === true,
+        })
         if (refusal !== undefined) throw new Error(refusal)
         return args.path === undefined ? { shipped: true } : { shipped: true, path: args.path }
       }))

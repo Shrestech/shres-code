@@ -57,7 +57,14 @@ describe('JspaceService remount', () => {
       apply: (c: Context) => {
         c.provide('settings', {
           register: () => ({
-            get: () => ({ enabled: true, mode: 'available' as const, requireCoverage: true, coverageTerms: [] }),
+            get: () => ({
+              enabled: true,
+              mode: 'available' as const,
+              requireCoverage: true,
+              coverageTerms: [],
+              verifierTools: [],
+              requireVerifiedEvidence: false,
+            }),
             watch: () => () => {},
             update: async () => {},
             replace: async () => {},
@@ -153,6 +160,7 @@ describe('JspaceService card log', () => {
     expect(checked.checked).toEqual([
       { n: 1, check: 'read the file', by: 'unit tests covering the fold', evidence: 'call-1' },
     ])
+    expect(checked.checked[0]?.verified).toBeUndefined()
     session.append('tool/call', {
       turn: 1,
       step: 2,
@@ -294,6 +302,106 @@ describe('JspaceService card log', () => {
       .toThrow(/disabled/)
     const { ctx, session } = await harness()
     expect(() => ctx.jspace.openGoal(session, { goal: 'A', next: 'B' })).toThrow(/not open/)
+  })
+
+  it('marks a verifier citation evidence-grade and leaves ordinary evidence unmarked', async () => {
+    const { ctx, session } = await harness({
+      enabled: true,
+      verifierTools: ['bash'],
+    })
+    ctx.jspace.open(session, { goal: 'A', next: 'B' })
+    session.append('turn/start', { turn: 1 })
+    session.append('step/start', { turn: 1, step: 1 })
+    session.append('tool/call', {
+      turn: 1,
+      step: 1,
+      callId: CallId('call-bash'),
+      name: 'bash',
+      arguments: '{}',
+    })
+    session.append('tool/result', {
+      turn: 1,
+      step: 1,
+      message: createToolResultMessage({
+        callId: CallId('call-bash'),
+        content: [{ type: 'text', text: 'ok' }],
+        isError: false,
+      }),
+    }, { surfaceOp: 'append' })
+    session.append('tool/call', {
+      turn: 1,
+      step: 2,
+      callId: CallId('call-read'),
+      name: 'read',
+      arguments: '{}',
+    })
+    session.append('tool/result', {
+      turn: 1,
+      step: 2,
+      message: createToolResultMessage({
+        callId: CallId('call-read'),
+        content: [{ type: 'text', text: 'ok' }],
+        isError: false,
+      }),
+    }, { surfaceOp: 'append' })
+    const verified = ctx.jspace.checkpoint(session, {
+      check: 'tests ran',
+      by: 'unit tests covering the fold',
+      evidence: 'call-bash',
+    })
+    expect(verified.checked[0]).toEqual({
+      n: 1,
+      check: 'tests ran',
+      by: 'unit tests covering the fold',
+      evidence: 'call-bash',
+      verified: true,
+    })
+    const ordinary = ctx.jspace.checkpoint(session, {
+      check: 'read the file',
+      by: 'unit tests covering the fold',
+      evidence: 'call-read',
+    })
+    expect(ordinary.checked[1]).toEqual({
+      n: 2,
+      check: 'read the file',
+      by: 'unit tests covering the fold',
+      evidence: 'call-read',
+    })
+    expect(() => ctx.jspace.checkpoint(session, {
+      check: 'missing',
+      by: 'unit tests covering the fold',
+      evidence: 'call-absent',
+    })).toThrow(/non-error tool call/)
+  })
+
+  it('does not mark evidence-grade when verifierTools is empty', async () => {
+    const { ctx, session } = await harness({ enabled: true })
+    ctx.jspace.open(session, { goal: 'A', next: 'B' })
+    session.append('turn/start', { turn: 1 })
+    session.append('step/start', { turn: 1, step: 1 })
+    session.append('tool/call', {
+      turn: 1,
+      step: 1,
+      callId: CallId('call-bash'),
+      name: 'bash',
+      arguments: '{}',
+    })
+    session.append('tool/result', {
+      turn: 1,
+      step: 1,
+      message: createToolResultMessage({
+        callId: CallId('call-bash'),
+        content: [{ type: 'text', text: 'ok' }],
+        isError: false,
+      }),
+    }, { surfaceOp: 'append' })
+    const checked = ctx.jspace.checkpoint(session, {
+      check: 'tests ran',
+      by: 'unit tests covering the fold',
+      evidence: 'call-bash',
+    })
+    expect(checked.checked[0]?.verified).toBeUndefined()
+    expect(checked.checked[0]?.evidence).toBe('call-bash')
   })
 
   it('accepts a checkpoint without coverage when requireCoverage is false', async () => {

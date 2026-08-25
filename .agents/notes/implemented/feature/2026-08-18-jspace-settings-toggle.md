@@ -40,6 +40,8 @@ Settings namespace `jspace` (user scope, `settings.yaml`):
 | `mode` | `'available' \| 'always-open'` | `'available'` | `available` mounts tools and waits for `jspace_open` or the chip. `always-open` opens a stock card on the first assemble of a session that has none. |
 | `requireCoverage` | boolean | `true` | `jspace_checkpoint` refuses a `by` string that matches no coverage term. |
 | `coverageTerms` | string[] | `[]` | Extra literal terms merged with the built-in English list. |
+| `verifierTools` | string[] | `[]` | Tool names whose completed non-error calls mark a cited `evidence` call-id evidence-grade. Empty leaves classification dormant. |
+| `requireVerifiedEvidence` | boolean | `false` | When true, `jspace_ship` refuses unless the current Goal epoch has an evidence-grade checkpoint. |
 
 Default `enabled: false` because this is an allow switch, not a security screen. Shield defaults on because screening must run; a working card must not tax every chat until the user opts in.
 
@@ -52,7 +54,7 @@ One card per agent session. The session log is the only durable authority. Write
 ```
 Goal:      one sentence. What done means. When `ctx.goals` has a current non-complete goal, this line is that objective; the J-Space service does not grow a second goal store.
 Core:      at most two live items. A third item requires an explicit swap that writes the departing line first.
-Checked:   numbered, append-only. Each line names the verifier and what it covered. Named `Checked`, not `Verified`: the tool cannot prove the verifier ran, and the model trusts its own card — the line must not assert more than the mechanism guarantees.
+Checked:   numbered, append-only. Each line names the verifier and what it covered. Named `Checked`, not `Verified` on the card: keyword `by` matching remains the floor, and `verified: true` is recorded only when `evidence` cites a completed non-error call of a configured verifier tool ([evidence-grade checkpoints](2026-08-25-jspace-evidence-grade-checkpoints.md)).
 Open:      unsettled questions, each with what would settle it.
 Next:      the single next action. Never empty while the card is open.
 ```

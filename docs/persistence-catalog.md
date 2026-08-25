@@ -483,7 +483,7 @@ Source: [`packages/hooks/hook-protocol/src/types.ts:31`](../packages/hooks/hook-
  * @param sessionId - writing session id.
  * @param goal - done-means line.
  * @param core - at most two live items.
- * @param checked - append-only checked lines.
+ * @param checked - append-only checked lines; a line may carry `verified`.
  * @param open - unsettled questions.
  * @param next - single next action.
  * @param goalOpenedSeq - session event seq that last set `goal`.
@@ -491,7 +491,7 @@ Source: [`packages/hooks/hook-protocol/src/types.ts:31`](../packages/hooks/hook-
 'jspace/card': JspaceCard
 ```
 
-Source: [`packages/jspace/jspace/src/types.ts:112`](../packages/jspace/jspace/src/types.ts)
+Source: [`packages/jspace/jspace/src/types.ts:118`](../packages/jspace/jspace/src/types.ts)
 
 <a id="jspaceclosed--log-only"></a>
 
@@ -506,7 +506,7 @@ Source: [`packages/jspace/jspace/src/types.ts:112`](../packages/jspace/jspace/sr
 'jspace/closed': JspaceClosed
 ```
 
-Source: [`packages/jspace/jspace/src/types.ts:118`](../packages/jspace/jspace/src/types.ts)
+Source: [`packages/jspace/jspace/src/types.ts:124`](../packages/jspace/jspace/src/types.ts)
 
 ### `llm/*`
 
@@ -716,7 +716,7 @@ Source: [`packages/session/session-title-llm/src/index.ts:43`](../packages/sessi
 'shield/decision': ShieldDecision
 ```
 
-Source: [`packages/guard/shield/src/types.ts:152`](../packages/guard/shield/src/types.ts)
+Source: [`packages/guard/shield/src/types.ts:165`](../packages/guard/shield/src/types.ts)
 
 ### `step/*`
 
@@ -927,6 +927,43 @@ Source: [`packages/workflow/tool-workflow/src/types.ts:62`](../packages/workflow
 ```
 
 Source: [`packages/workflow/tool-workflow/src/types.ts:47`](../packages/workflow/tool-workflow/src/types.ts)
+
+### `tracker/*`
+
+<a id="trackermetrics--log-only"></a>
+
+#### `tracker/metrics` — log-only
+
+```ts persistence-catalog
+/**
+ * One batched metric append for a run. Log-only. Writers pass
+ * `{ ignorable: true }`.
+ * @param runId - the run the metrics belong to.
+ * @param metrics - the appended metric points.
+ */
+'tracker/metrics': TrackerMetricsEvent
+```
+
+Source: [`packages/tracker/tracker/src/types.ts:142`](../packages/tracker/tracker/src/types.ts)
+
+<a id="trackerrun--log-only"></a>
+
+#### `tracker/run` — log-only
+
+```ts persistence-catalog
+/**
+ * One run logged (or spooled) through `ctx.tracker`. Log-only. Writers pass
+ * `{ ignorable: true }`.
+ * @param runId - the run's id; identical to its spool entry id when spooled.
+ * @param callId - the tool-call id of the `experiment_log_run` call that produced the run.
+ * @param experiment - the experiment this run belongs to.
+ * @param decisionRule - the run's decision rule.
+ * @param gitSha - the git commit the run reproduced.
+ */
+'tracker/run': TrackerRunEvent
+```
+
+Source: [`packages/tracker/tracker/src/types.ts:135`](../packages/tracker/tracker/src/types.ts)
 
 ### `turn/*`
 

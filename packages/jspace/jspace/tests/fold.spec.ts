@@ -107,11 +107,19 @@ describe('foldJspace', () => {
     expect(folded.fault).toMatch(/must be/)
   })
 
-  it('decodes optional evidence and settles', () => {
-    expect(decodeJspaceCard(card({
-      checked: [{ n: 1, check: 'a', by: 'unit tests', evidence: 'c1' }],
+  it('decodes optional evidence, verified, and settles', () => {
+    const decoded = decodeJspaceCard(card({
+      checked: [{ n: 1, check: 'a', by: 'unit tests', evidence: 'c1', verified: true }],
       open: [{ question: 'q', settles: 's' }],
-    })).open[0]?.settles).toBe('s')
+    }))
+    expect(decoded.checked[0]).toEqual({
+      n: 1,
+      check: 'a',
+      by: 'unit tests',
+      evidence: 'c1',
+      verified: true,
+    })
+    expect(decoded.open[0]?.settles).toBe('s')
   })
 
   it('rejects a reused checked number at decode', () => {
@@ -130,6 +138,7 @@ describe('foldJspace', () => {
     [{ ...card(), checked: 'x' }, /checked must be an array/],
     [{ ...card(), checked: [null] }, /checked line must be a record/],
     [{ ...card(), checked: [{ n: 1, check: 'a', by: 'b', evidence: '' }] }, /evidence/],
+    [{ ...card(), checked: [{ n: 1, check: 'a', by: 'b', verified: false }] as never }, /verified/],
     [{ ...card(), open: 'x' }, /open must be an array/],
     [{ ...card(), open: [null] }, /open line must be a record/],
     [{ ...card(), open: [{ question: 'q', settles: '' }] }, /settles/],

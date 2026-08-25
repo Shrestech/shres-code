@@ -5,7 +5,7 @@
  * @module @shres-code/shres-code-jspace/types
  */
 
-/** One append-only Checked line. The tool cannot prove the verifier ran. */
+/** One append-only Checked line. `verified` is set only for evidence-grade lines. */
 export interface JspaceCheckedLine {
   /** Positive number, never reused on this card. */
   readonly n: number
@@ -13,8 +13,14 @@ export interface JspaceCheckedLine {
   readonly check: string
   /** Named verifier and coverage claim. */
   readonly by: string
-  /** Optional session `callId` that exists in the log. Cost-raiser only. */
+  /** Optional session `callId` that exists in the log. */
   readonly evidence?: string
+  /**
+   * Present when `evidence` resolved to a completed non-error call of a
+   * configured verifier tool. Reconstructable from this payload; writers omit
+   * the field when the line is not evidence-grade.
+   */
+  readonly verified?: true
 }
 
 /** One unsettled question. */
@@ -104,7 +110,7 @@ declare module '@shres-code/shres-code-session/types' {
      * @param sessionId - writing session id.
      * @param goal - done-means line.
      * @param core - at most two live items.
-     * @param checked - append-only checked lines.
+     * @param checked - append-only checked lines; a line may carry `verified`.
      * @param open - unsettled questions.
      * @param next - single next action.
      * @param goalOpenedSeq - session event seq that last set `goal`.
