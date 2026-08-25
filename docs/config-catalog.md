@@ -940,6 +940,11 @@ export interface Config {
    * evidence-grade checkpoint. Default false.
    */
   requireVerifiedEvidence?: boolean
+  /**
+   * Completed turns a session must reach before Consumers engage. Default 0
+   * engages from the first request. An open card engages at any turn count.
+   */
+  engageAfterTurns?: number
 }
 ```
 
@@ -2923,7 +2928,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/jspace/tool-jspace/src/index.ts:30`](../packages/jspace/tool-jspace/src/index.ts)
+Source: [`packages/jspace/tool-jspace/src/index.ts:38`](../packages/jspace/tool-jspace/src/index.ts)
 
 <a id="shres-codeshres-code-tool-lsp"></a>
 

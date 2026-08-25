@@ -22,20 +22,23 @@ export const JSPACE_CAPACITY_ORDER = 47
 /** Broadcast follows capacity. */
 export const JSPACE_BROADCAST_ORDER = 48
 
-/** How to drive the tools when no card is open. */
+/**
+ * How to drive the tools when no card is open. The section can first appear
+ * partway through a session, so the Goal it asks for covers the work that
+ * remains rather than the whole session.
+ */
 export const JSPACE_DRIVER_CLOSED =
-  'For multi-stage or multi-file work, call jspace_open with a Goal and Next. '
-  + 'Then keep the card current with jspace_note and jspace_checkpoint. '
-  + 'Call jspace_ship before claiming done.'
+  'For multi-stage or multi-file work, call jspace_open with a Goal and Next for the work '
+  + 'that remains. Keep it current with jspace_note and jspace_checkpoint; '
+  + 'call jspace_ship before claiming done.'
 
 /** How to drive the tools when a card is already printed. */
 export const JSPACE_DRIVER_OPEN =
-  'A J-Space card is already open. Update it with jspace_note. '
-  + 'Record checks with jspace_checkpoint (by must name a verifier; '
-  + 'the optional evidence must be a call_* tool-call id from this session). '
-  + 'Call jspace_ship before claiming done. Do not call jspace_open to start a second card; '
-  + 'it replaces Goal and Next on the open card, and a changed Goal clears Core and Checked. '
-  + 'Repeating the same tool call within a turn is refused until you write a diagnosis on the card.'
+  'A J-Space card is open. Update it with jspace_note. Record checks with jspace_checkpoint '
+  + '(by names the verifier; the optional evidence must be a call_* tool-call id from this '
+  + 'session). Call jspace_ship before claiming done. jspace_open does not start a second card: '
+  + 'it replaces Goal and Next, and a changed Goal clears Core and Checked. '
+  + 'An identical tool call repeated within a turn is refused until you write a diagnosis on the card.'
 
 /**
  * Protocol block for this pass, always including the tool-driver lines.

@@ -212,7 +212,7 @@ describe('jspace-prompt', () => {
     ctx.jspace.open(agent.session, { goal: 'Ship J2', next: 'Write tests' })
     const loop = await ctx.systemPrompt.assemble({ agent, scope: agent })
     const protocol = loop.sections.find(section => section.name === JspacePrompt.JSPACE_PROTOCOL_SECTION)?.text ?? ''
-    expect(protocol).toContain('A J-Space card is already open')
+    expect(protocol).toContain('A J-Space card is open')
     expect(protocol).toContain('Pass: loop')
     expect(loop.sections.find(section => section.name === JspacePrompt.JSPACE_CAPACITY_SECTION)?.text)
       .toBe(JSPACE_CAPACITY_TEXT)
@@ -230,6 +230,42 @@ describe('jspace-prompt', () => {
     expect(JspacePrompt.JSPACE_DRIVER_OPEN).toContain('jspace_note')
     expect(JspacePrompt.JSPACE_DRIVER_OPEN).toContain('evidence must be a call_* tool-call id')
     expect(JspacePrompt.JSPACE_DRIVER_OPEN).toContain('a changed Goal clears Core and Checked')
+  })
+
+  it('renders nothing until the session reaches engageAfterTurns', async () => {
+    const ctx = await harness({ enabled: true, mode: 'always-open', engageAfterTurns: 2 })
+    const agent = liveAgent(ctx, 'ws-prompt-engage')
+    agent.session.append('turn/start', { turn: 1 })
+    agent.session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+    const early = await ctx.systemPrompt.assemble({ agent, scope: agent })
+    for (const name of [
+      JspacePrompt.JSPACE_SECTION,
+      JspacePrompt.JSPACE_PROTOCOL_SECTION,
+      JspacePrompt.JSPACE_CAPACITY_SECTION,
+      JspacePrompt.JSPACE_BROADCAST_SECTION,
+    ]) {
+      expect(early.sections.find(section => section.name === name)?.text).toBe('')
+    }
+    expect(ctx.jspace.card(agent.session)).toBeNull()
+    expect(JspacePrompt.passFor(ctx, agent.session)).toBe('fast')
+    expect(JspacePrompt.modulesFor(ctx, agent.session)).toEqual([])
+
+    agent.session.append('turn/start', { turn: 2 })
+    agent.session.append('turn/end', { turn: 2, reason: { kind: 'completed' } })
+    const engaged = await ctx.systemPrompt.assemble({ agent, scope: agent })
+    expect(engaged.sections.find(section => section.name === JspacePrompt.JSPACE_SECTION)?.text)
+      .toContain(JSPACE_ALWAYS_OPEN_GOAL)
+    expect(engaged.sections.find(section => section.name === JspacePrompt.JSPACE_PROTOCOL_SECTION)?.text)
+      .toContain('Pass: loop')
+  })
+
+  it('keeps rendering an open card below the engagement threshold', async () => {
+    const ctx = await harness({ enabled: true, engageAfterTurns: 50 })
+    const agent = liveAgent(ctx, 'ws-prompt-engage-open')
+    ctx.jspace.open(agent.session, { goal: 'Finish the migration', next: 'Read the router' })
+    const assembled = await ctx.systemPrompt.assemble({ agent, scope: agent })
+    expect(assembled.sections.find(section => section.name === JspacePrompt.JSPACE_SECTION)?.text)
+      .toContain('Finish the migration')
   })
 
   it('opens a card during assemble when claimed text selects loop', async () => {

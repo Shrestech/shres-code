@@ -1736,7 +1736,7 @@ todo_write is session-owned state; UIs render the latest todo/write event as a c
 
 ### `jspace_checkpoint`
 
-Record a Checked line on the open card. `by` must name a verifier and what it covered. Optional `evidence` is a prior tool-call id that must have completed without error in this session; cite a configured verifier tool's call-id for evidence-grade status. Naming it does not prove coverage. Rejects if no card is open.
+Record a Checked line on the open card. `by` names the verifier and what it covered. Prefer citing `evidence`, a completed non-error tool-call id from this session, over prose; a configured verifier tool makes the line evidence-grade. Citing does not prove coverage. Rejects if no card is open.
 
 ```json
 {
@@ -1766,7 +1766,7 @@ Source: [`packages/jspace/tool-jspace/src/index.ts`](../packages/jspace/tool-jsp
 
 ### `jspace_note`
 
-Update the open J-Space card. Changing Core requires both departing (the item leaving) and core (the item entering). Goal changes are rejected; use jspace_open to start a new Goal epoch. Rejects a no-op that leaves the card unchanged, and rejects if no card is open.
+Update the open J-Space card. Goal changes are rejected; use jspace_open to start a new Goal epoch. Rejects a no-op that leaves the card unchanged, and rejects if no card is open.
 
 ```json
 {
@@ -1817,7 +1817,7 @@ Source: [`packages/jspace/tool-jspace/src/index.ts`](../packages/jspace/tool-jsp
 
 ### `jspace_open`
 
-Open a J-Space card for this session, or replace Goal and Next when a card is already open. A changed Goal starts a new epoch: Core and Checked are cleared and ship needs a fresh checkpoint; open questions carry over. Use it for multi-stage or multi-file work. Requires a Goal (what done means) and Next (the single next action). Optional Core holds at most two live items and applies only on the first open.
+Open a J-Space card for multi-stage or multi-file work, or replace Goal and Next on an open card. A changed Goal starts a new epoch: Core and Checked are cleared and ship needs a fresh checkpoint; open questions carry over.
 
 ```json
 {
@@ -1833,7 +1833,7 @@ Open a J-Space card for this session, or replace Goal and Next when a card is al
     },
     "core": {
       "type": "array",
-      "description": "Optional live items, at most two.",
+      "description": "Optional live items, at most two; applied only on the first open.",
       "items": {
         "type": "string"
       }
@@ -1850,7 +1850,7 @@ Source: [`packages/jspace/tool-jspace/src/index.ts`](../packages/jspace/tool-jsp
 
 ### `jspace_ship`
 
-Check that the open card is ready to ship: Goal and Next are set, and a checkpoint exists for the current Goal. Does not write files and does not close the card. Optional `path` is recorded in the result only.
+Check that the open card is ready to ship: Goal and Next are set, and a checkpoint exists for the current Goal. Writes no files and does not close the card.
 
 ```json
 {

@@ -73,6 +73,11 @@ export interface Config {
    * evidence-grade checkpoint. Default false.
    */
   requireVerifiedEvidence?: boolean
+  /**
+   * Completed turns a session must reach before Consumers engage. Default 0
+   * engages from the first request. An open card engages at any turn count.
+   */
+  engageAfterTurns?: number
 }
 
 export const Config: z<Config> = z.object({
@@ -82,6 +87,7 @@ export const Config: z<Config> = z.object({
   coverageTerms: z.array(z.string()).default([]),
   verifierTools: z.array(z.string()).default([]),
   requireVerifiedEvidence: z.boolean().default(false),
+  engageAfterTurns: z.number().step(1).min(0).default(0),
 })
 
 declare module '@shres-code/cordis' {
@@ -206,6 +212,21 @@ function line(value: string, field: string): string {
 }
 
 /**
+ * Completed turns in one session log. `turn/end` lands once per turn the loop
+ * closed, whatever the end reason, so it counts turns the model has already
+ * lived through; the in-flight turn is not yet counted.
+ * @param events - session log.
+ * @returns the number of closed turns.
+ */
+function countCompletedTurns(events: readonly SessionEvent[]): number {
+  let count = 0
+  for (const event of events) {
+    if (event.type === 'turn/end') count += 1
+  }
+  return count
+}
+
+/**
  * Element-wise identity for Core strings.
  * @param left - current Core.
  * @param right - proposed Core.
@@ -282,6 +303,35 @@ export default class JspaceService extends Service {
    */
   get config(): Config {
     return this.override === undefined ? this.entry : this.override()
+  }
+
+  /**
+   * Completed turns a session must close before Consumers engage. The one home
+   * of the threshold: {@link JspaceService.engaged} and the tool Consumer's
+   * refusal both read it.
+   * @returns the configured threshold; `0` engages from the first request.
+   */
+  get engageAfterTurns(): number {
+    return this.config.engageAfterTurns ?? 0
+  }
+
+  /**
+   * Whether the prompt and tool Consumers belong on this session's next
+   * request. An active seat engages when a card is already open — an open card
+   * must never lose its driver or its tools — or when the session has closed
+   * at least {@link JspaceService.engageAfterTurns} turns. A caller with no
+   * session (a scope-only assembly) carries no horizon, so a non-zero
+   * threshold leaves it unengaged.
+   * @param session - session whose log decides engagement, when one exists.
+   * @returns true when Consumers mount for this request.
+   */
+  engaged(session?: Session): boolean {
+    if (!this.current.active) return false
+    const after = this.engageAfterTurns
+    if (after === 0) return true
+    if (session === undefined) return false
+    if (this.card(session) !== null) return true
+    return countCompletedTurns(session.events) >= after
   }
 
   /**

@@ -5,6 +5,7 @@ import type { Agent } from '@shres-code/shres-code-agent'
 import { CallId, createToolResultMessage } from '@shres-code/shres-code-llm'
 import SessionStore, { SessionId } from '@shres-code/shres-code-session'
 import SystemPrompt from '@shres-code/shres-code-system-prompt'
+import type { PromptAssembly } from '@shres-code/shres-code-system-prompt'
 import ToolRuntime, { defineTool } from '@shres-code/shres-code-tools'
 import type { ToolExecutionResult } from '@shres-code/shres-code-tools'
 import JspaceService, { JspaceError } from '@shres-code/shres-code-jspace'
@@ -48,6 +49,15 @@ async function harness(
 function toolNames(ctx: Context): string[] {
   return ctx.tools.schemas().map(schema => schema.name).filter(name => TOOL_NAMES.includes(name as typeof TOOL_NAMES[number]))
 }
+
+function assembledNames(assembly: PromptAssembly): string[] {
+  return assembly.tools
+    .map(schema => schema.name)
+    .filter(name => TOOL_NAMES.includes(name as typeof TOOL_NAMES[number]))
+    .sort()
+}
+
+const SORTED_TOOL_NAMES = [...TOOL_NAMES].sort()
 
 async function execute(
   ctx: Context,
@@ -459,6 +469,30 @@ describe('jspace tools', () => {
     await execute(ctx, 'jspace_note', { next: 'Try another path' }, agent)
     const allowed = await execute(ctx, 'echo', { msg: 'hi' }, agent)
     expect(allowed.isError).toBe(false)
+  })
+
+  it('withholds the schemas and refuses a call until the session engages', async () => {
+    const { ctx, agent } = await harness(true, { engageAfterTurns: 2 })
+    expect(toolNames(ctx)).toEqual([...TOOL_NAMES])
+    expect(assembledNames(await ctx.systemPrompt.assemble({ agent }))).toEqual([])
+
+    const denied = await execute(ctx, 'jspace_open', { goal: 'A', next: 'B' }, agent)
+    expect(denied.isError).toBe(true)
+    expect(text(denied)).toContain('J-Space engages after 2 completed turns in this session')
+    expect(ctx.jspace.card(agent.session)).toBeNull()
+
+    for (const turn of [1, 2]) {
+      agent.session.append('turn/start', { turn })
+      agent.session.append('turn/end', { turn, reason: { kind: 'completed' } })
+    }
+    expect(assembledNames(await ctx.systemPrompt.assemble({ agent }))).toEqual(SORTED_TOOL_NAMES)
+    const opened = await execute(ctx, 'jspace_open', { goal: 'A', next: 'B' }, agent)
+    expect(opened.isError).toBe(false)
+  })
+
+  it('assembles the schemas from the first request under the default threshold', async () => {
+    const { ctx, agent } = await harness()
+    expect(assembledNames(await ctx.systemPrompt.assemble({ agent }))).toEqual(SORTED_TOOL_NAMES)
   })
 
   it('does not refuse repeats when the seat is off', async () => {

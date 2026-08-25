@@ -13,6 +13,7 @@ Default-off host seat for the J-Space card. This package remounts from the `jspa
     requireCoverage: true
     verifierTools: []
     requireVerifiedEvidence: false
+    engageAfterTurns: 0
 ```
 
 | Field | Default | Meaning |
@@ -23,8 +24,15 @@ Default-off host seat for the J-Space card. This package remounts from the `jspa
 | `coverageTerms` | `[]` | Extra literal terms merged with the built-in English list. |
 | `verifierTools` | `[]` | Tool names whose completed non-error calls mark a cited `evidence` call-id evidence-grade (`verified: true` on the Checked line). Empty leaves classification dormant. |
 | `requireVerifiedEvidence` | `false` | When true, `jspace_ship` refuses unless the current Goal epoch has an evidence-grade checkpoint. |
+| `engageAfterTurns` | `0` | Completed turns a session must close before Consumers engage. `0` engages from the first request. |
 
 `installSettingsSection` owns the namespace. Unknown keys fail at load. The seat remounts when the document changes.
+
+## Engagement
+
+`engaged(session)` is the single predicate both Consumers read, so the prompt sections and the four tool schemas appear and disappear together. An active seat engages a session when its card is already open — an open card must never lose its driver or its tools across a resume, a fork, or a threshold change — or when the session has closed at least `engageAfterTurns` turns. `engageAfterTurns` reads through `ctx.jspace.engageAfterTurns`, which resolves a document that omits the field to `0`. A caller with no session, such as a scope-only assembly, carries no horizon and stays unengaged under a non-zero threshold.
+
+Both inputs are folds of the session log — `turn/end` count and card status — so engagement adds no session event and keeps the model-visible prompt reconstructable from the log alone. The [adaptive-engagement note](../../../.agents/notes/implemented/feature/2026-08-25-jspace-adaptive-engagement.md) owns the measurement behind the default.
 
 ## Service
 
@@ -32,7 +40,7 @@ Default-off host seat for the J-Space card. This package remounts from the `jspa
 
 `open` refuses while a card is open (`JSPACE_ALREADY_OPEN`). `openGoal` opens a new Goal epoch on an open card: a Goal identity change resets Core and Checked and moves the `goalOpenedSeq` anchor so ship requires a checkpoint under the new Goal; a same-Goal call updates Goal and Next in place and keeps Core, Checked, and Open. `note` rejects a Goal identity change (`JSPACE_NOTE_GOAL_CHANGE`); Goal epochs open only through `openGoal`. `note` also rejects a patch whose Goal, Next, Core, and Open match the current card (`JSPACE_NOTE_NOOP`). Line validation refuses a Core, Checked, or Open string whose trimmed text `JSON.parse`s to an array (`JSPACE_LINE_PACKED`); a line that merely starts with `[` or that parses to a JSON object or string is accepted. Open questions carry over unchanged across an epoch change. `checkpoint()` still applies `requireCoverage` to `by`. When `evidence` names a completed non-error `tool/call` whose `name` is in `verifierTools`, the Checked line carries `verified: true`.
 
-`watch(listener)` fires on remount so later consumers can dispose tools and the prompt section.
+`watch(listener)` fires on remount so later consumers can dispose tools and the prompt section. `watch` carries the seat-wide toggle; per-session engagement is a read of `engaged(session)` at request time.
 
 `JSPACE_ALWAYS_OPEN_GOAL` (`J-Space is on`) and `JSPACE_ALWAYS_OPEN_NEXT` (`State the first action`) are the stock lines for `always-open` and bare `/j-space on`.
 

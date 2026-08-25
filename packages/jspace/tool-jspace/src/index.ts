@@ -1,6 +1,8 @@
 /**
  * Model-facing J-Space tools. Registrations remount from
- * `ctx.jspace.watch()` so the catalog is empty while the seat is inactive.
+ * `ctx.jspace.watch()` so the catalog is empty while the seat is inactive, and
+ * a session the seat has not engaged yet neither sees the four schemas in its
+ * assembled request nor gets a call through the executor.
  * @module @shres-code/shres-code-tool-jspace
  */
 
@@ -10,16 +12,22 @@ import { defineTool } from '@shres-code/shres-code-tools'
 import type { GenericCallView, ToolRunContext } from '@shres-code/shres-code-tools'
 import { JspaceError } from '@shres-code/shres-code-jspace'
 import type { JspaceStatus } from '@shres-code/shres-code-jspace'
+// Type-only: resolves the `system-prompt/assemble` waterfall the engagement
+// roster gate joins, and the `agent` field `shres-agent` merges into its context.
+import type {} from '@shres-code/shres-code-system-prompt'
+import type {} from '@shres-code/shres-code-agent'
 import {
   DEFAULT_MAX_NOTES_PER_TURN,
+  JSPACE_TOOL_NAMES,
   noteCapDeny,
+  notEngagedDeny,
   REPEAT_DENY,
   shouldRefuseNoteCap,
   shouldRefuseRepeat,
 } from './retry.ts'
 import { shipRefusal } from './ship.ts'
 
-export { DEFAULT_MAX_NOTES_PER_TURN } from './retry.ts'
+export { DEFAULT_MAX_NOTES_PER_TURN, JSPACE_TOOL_NAMES } from './retry.ts'
 
 /** Cordis plugin name. */
 export const name = 'tool-jspace'
@@ -59,29 +67,24 @@ function resolveConfig(config: Config): ResolvedConfig {
 }
 
 const OPEN_DESCRIPTION =
-  'Open a J-Space card for this session, or replace Goal and Next when a card is '
-  + 'already open. A changed Goal starts a new epoch: Core and Checked are cleared '
-  + 'and ship needs a fresh checkpoint; open questions carry over. Use it for '
-  + 'multi-stage or multi-file work. Requires a Goal (what done means) and Next '
-  + '(the single next action). Optional Core holds at most two live items and '
-  + 'applies only on the first open.'
+  'Open a J-Space card for multi-stage or multi-file work, or replace Goal and Next '
+  + 'on an open card. A changed Goal starts a new epoch: Core and Checked are cleared '
+  + 'and ship needs a fresh checkpoint; open questions carry over.'
 
 const NOTE_DESCRIPTION =
-  'Update the open J-Space card. Changing Core requires both departing (the item '
-  + 'leaving) and core (the item entering). Goal changes are rejected; use '
-  + 'jspace_open to start a new Goal epoch. Rejects a no-op that leaves the card '
-  + 'unchanged, and rejects if no card is open.'
+  'Update the open J-Space card. Goal changes are rejected; use jspace_open to start '
+  + 'a new Goal epoch. Rejects a no-op that leaves the card unchanged, and rejects if '
+  + 'no card is open.'
 
 const CHECKPOINT_DESCRIPTION =
-  'Record a Checked line on the open card. `by` must name a verifier and what it covered. '
-  + 'Optional `evidence` is a prior tool-call id that must have completed without error in '
-  + 'this session; cite a configured verifier tool\'s call-id for evidence-grade status. '
-  + 'Naming it does not prove coverage. Rejects if no card is open.'
+  'Record a Checked line on the open card. `by` names the verifier and what it covered. '
+  + 'Prefer citing `evidence`, a completed non-error tool-call id from this session, over '
+  + 'prose; a configured verifier tool makes the line evidence-grade. Citing does not '
+  + 'prove coverage. Rejects if no card is open.'
 
 const SHIP_DESCRIPTION =
   'Check that the open card is ready to ship: Goal and Next are set, and a checkpoint '
-  + 'exists for the current Goal. Does not write files and does not close the card. '
-  + 'Optional `path` is recorded in the result only.'
+  + 'exists for the current Goal. Writes no files and does not close the card.'
 
 const ACK = {
   opened: 'Opened J-Space.',
@@ -175,7 +178,7 @@ function registerTools(ctx: Context): () => void {
       next: { type: 'string', required: true, description: 'The single next action.' },
       core: {
         type: 'array',
-        description: 'Optional live items, at most two.',
+        description: 'Optional live items, at most two; applied only on the first open.',
         items: { type: 'string' },
       },
     },
@@ -311,7 +314,8 @@ function registerTools(ctx: Context): () => void {
 }
 
 /**
- * Remount the four tools while the seat is active.
+ * Remount the four tools while the seat is active, withhold their schemas from
+ * a session the seat has not engaged, and refuse a call that arrives anyway.
  * @param ctx - context with tools and jspace.
  * @param config - per-turn note cap; defaults to 8.
  */
@@ -333,9 +337,27 @@ export function apply(ctx: Context, config: Config = {}): void {
       disposeTools = undefined
     }
   })
+  // The registrations stay mounted so an engaged session can execute them, so
+  // the per-session roster decision lands on the assembly that carries the
+  // session. Filtering after `next()` keeps the removal authoritative over a
+  // listener that re-added the schemas earlier in the chain.
+  ctx.effect(() => ctx.on('system-prompt/assemble', async (_assembly, context, next) => {
+    const assembled = await next()
+    if (ctx.jspace.engaged(context.agent?.session)) return assembled
+    return {
+      ...assembled,
+      tools: assembled.tools.filter(schema => !JSPACE_TOOL_NAMES.has(schema.name)),
+    }
+  }), 'tool-jspace: engagement roster')
   ctx.effect(() => ctx.on('tools/pre-execute', (exec, next) => {
     if (!ctx.jspace.status.active) return next()
     const session = exec.agent?.session
+    if (JSPACE_TOOL_NAMES.has(exec.name) && !ctx.jspace.engaged(session)) {
+      return Promise.resolve({
+        kind: 'deny' as const,
+        reason: notEngagedDeny(ctx.jspace.engageAfterTurns),
+      })
+    }
     if (session === undefined || ctx.jspace.card(session) === null) return next()
     if (shouldRefuseNoteCap(session.events, exec.name, resolved.maxNotesPerTurn, exec.callId)) {
       return Promise.resolve({ kind: 'deny' as const, reason: noteCapDeny(resolved.maxNotesPerTurn) })

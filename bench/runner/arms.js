@@ -11,7 +11,7 @@
  * other arms need no disable rows because the tool is absent from the
  * profile.
  *
- * The five-arm ladder covers every decision-relevant contrast:
+ * The six-arm ladder covers every decision-relevant contrast:
  *
  * | Arm | Configuration |
  * |---|---|
@@ -20,6 +20,7 @@
  * | `sq-only` | Session-query tool mounted, jspace disabled. |
  * | `on-sq` | J-Space available + session-query tool. |
  * | `on-sq-verified` | on-sq + verifierTools naming `bash` + requireVerifiedEvidence. |
+ * | `on-adaptive` | on-sq with `engageAfterTurns: 10`: J-Space costs nothing until turn 10. |
  *
  * @module bench/runner/arms
  */
@@ -32,7 +33,7 @@ import { join } from 'node:path'
  * @property {Record<string, unknown>} jspace - jspace plugin config for the --patch overlay.
  * @property {boolean} sessionQuery - whether the overlay mounts the model-facing session-query tool.
  * @property {boolean} expectsSessionQuery - whether session-query tools are expected in logs.
- * @property {boolean} expectsJspace - whether jspace events are expected in logs.
+ * @property {boolean} expectsJspace - whether jspace events are permitted in logs.
  */
 
 /**
@@ -77,6 +78,22 @@ export const ARMS = Object.freeze({
       requireCoverage: true,
       verifierTools: ['bash'],
       requireVerifiedEvidence: true,
+    }),
+    sessionQuery: true,
+    expectsSessionQuery: true,
+    expectsJspace: true,
+  }),
+  // `expectsJspace` only licenses jspace events; the integrity audit checks
+  // absence for arms that exclude jspace and never asserts presence. A short
+  // task that never reaches turn 10 therefore logs no jspace event and no
+  // violation, which is exactly the behavior this arm measures.
+  'on-adaptive': Object.freeze({
+    name: 'on-adaptive',
+    jspace: Object.freeze({
+      enabled: true,
+      mode: 'available',
+      requireCoverage: true,
+      engageAfterTurns: 10,
     }),
     sessionQuery: true,
     expectsSessionQuery: true,

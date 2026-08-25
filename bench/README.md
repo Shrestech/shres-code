@@ -6,7 +6,7 @@ Conventions follow the established evaluation harnesses rather than inventing ne
 
 ## Arms
 
-The five-arm ladder covers every decision-relevant contrast. Each arm is a `--patch` overlay applied to the shipped headless composition, which mounts `jspace` with `enabled: false` and does not mount the model-facing session-query tool at all.
+The six-arm ladder covers every decision-relevant contrast. Each arm is a `--patch` overlay applied to the shipped headless composition, which mounts `jspace` with `enabled: false` and does not mount the model-facing session-query tool at all.
 
 | Arm | J-Space | Session-Query | Notes |
 |---|---|---|---|
@@ -15,6 +15,7 @@ The five-arm ladder covers every decision-relevant contrast. Each arm is a `--pa
 | `sq-only` | disabled | mounted | Session-query only; measures retrieval in isolation. |
 | `on-sq` | available | mounted | Shipped default composition plus the session-query tool. |
 | `on-sq-verified` | available | mounted | `on-sq` plus `verifierTools: ['bash']` and `requireVerifiedEvidence: true`. |
+| `on-adaptive` | available from turn 10 | mounted | `on-sq` plus `engageAfterTurns: 10`; isolates the always-on prompt and schema cost from the card's long-horizon benefit. |
 
 Arms register in `runner/arms.js`. Every overlay carries a `jspace` config patch and the per-trial persistence redirect; session-query arms additionally patch the shipped `session-query-sqlite` service to open a per-trial index at startup (it ships with `openAt: never` and an in-memory path) and append an `- insert:` layer mounting `tool-session-query`. Arms without session-query need no disable rows, because the tool is absent from the profile.
 
@@ -59,7 +60,7 @@ Ready tier overlays live in `bench/tiers/`. Each is a pure config patch on the `
 ```sh
 node bench/runner/run.js \
   --experiment w4-2026-08-25-zai \
-  --arms off,on,sq-only,on-sq,on-sq-verified \
+  --arms off,on,sq-only,on-sq,on-sq-verified,on-adaptive \
   --repeats 5 \
   --api-key-env ZAI_API_KEY \
   --tier-patch bench/tiers/zai.patch.yml
@@ -70,7 +71,7 @@ node bench/runner/run.js \
 ```sh
 node bench/runner/run.js \
   --experiment w4-2026-08-25-ollama \
-  --arms off,on,sq-only,on-sq,on-sq-verified \
+  --arms off,on,sq-only,on-sq,on-sq-verified,on-adaptive \
   --repeats 5 \
   --api-key-env OLLAMA_API_KEY \
   --tier-patch bench/tiers/ollama-deepseek.patch.yml
@@ -93,7 +94,7 @@ When `--api-key-env` is not `DEEPSEEK_API_KEY`, the `--base-url` default becomes
 
 A task with `phases` (at least 2) in task.json runs as a chain: one scratch dir whose workspace carries across phases, but a separate headless spawn per phase with a fresh per-phase session root (`runs/<experiment>/<arm>/sessions/<taskId>/<trialIndex>/phase-<i>`) — the session boundary is the experiment. The verifier runs once, after the final phase, against the carried workspace; a phase ending in PROVIDER_ERROR or HARNESS_ERROR aborts the chain and excludes the trial from the pass rate. Trial-level metrics are per-phase sums. Carry is **cold-only** today: `resumedFrom` stays null because the harness has no headless/SDK session resume or fork yet; card carry across sessions is a proposed uplift.
 
-Every trial (chains and single-session) passes an arm-integrity audit: no session root of the trial may pre-exist; arms not expecting jspace (`off`, `sq-only`) must contain zero `jspace/` events in their session logs; arms not expecting session-query (`off`, `on`) must contain zero session-query `tool/call` events. Violations are recorded on `trial.integrity.violations`; the trial still counts and the experiment never aborts.
+Every trial (chains and single-session) passes an arm-integrity audit: no session root of the trial may pre-exist; arms not expecting jspace (`off`, `sq-only`) must contain zero `jspace/` events in their session logs; arms not expecting session-query (`off`, `on`) must contain zero session-query `tool/call` events. The audit only checks absence, so an arm that permits jspace records no violation when a trial logs no jspace event — the expected outcome for an `on-adaptive` trial that finishes before turn 10. Violations are recorded on `trial.integrity.violations`; the trial still counts and the experiment never aborts.
 
 ## Forensics metrics
 

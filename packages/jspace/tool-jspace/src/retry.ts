@@ -5,8 +5,12 @@
 
 import type { SessionEvent } from '@shres-code/shres-code-session'
 
-/** Card tools write diagnosis; they never trip the repeat refuse. */
-const CARD_TOOLS = new Set([
+/**
+ * The four model-facing card tools. They write the diagnosis the repeat
+ * refusal asks for, so they never trip it themselves, and they are the names
+ * the engagement gate withholds before a session reaches its threshold.
+ */
+export const JSPACE_TOOL_NAMES: ReadonlySet<string> = new Set([
   'jspace_open',
   'jspace_note',
   'jspace_checkpoint',
@@ -28,6 +32,17 @@ export const REPEAT_DENY =
  */
 export function noteCapDeny(maxNotesPerTurn: number): string {
   return `jspace_note is limited to ${String(maxNotesPerTurn)} calls this turn; write a checkpoint or do the work instead.`
+}
+
+/**
+ * Model-visible refuse when a card tool is called before the session reaches
+ * the engagement threshold. Names the threshold so the model knows the tool is
+ * withheld for now rather than broken.
+ * @param engageAfterTurns - configured completed-turn threshold.
+ * @returns one-sentence denial.
+ */
+export function notEngagedDeny(engageAfterTurns: number): string {
+  return `J-Space engages after ${String(engageAfterTurns)} completed turns in this session; do the work directly until then.`
 }
 
 /**
@@ -69,7 +84,7 @@ export function shouldRefuseRepeat(
   args: unknown,
   currentCallId?: string,
 ): boolean {
-  if (CARD_TOOLS.has(name)) return false
+  if (JSPACE_TOOL_NAMES.has(name)) return false
   const incoming = canonicalizeArgs(args)
   for (let index = events.length - 1; index >= 0; index -= 1) {
     const event = events[index]

@@ -14,6 +14,8 @@ Source: [`packages/jspace/jspace/src/index.ts`](../../packages/jspace/jspace/src
 | [shres-command-jspace](../../packages/jspace/command-jspace/README.md) | Human `/j-space on\|off`; session-local card control |
 | [shres-client-ui-jspace](../../packages/client/ui-jspace/README.md) | Composer chip and open-card dock; Trajectory badges; Settings section lives in [shres-client-ui-settings-jspace](../../packages/client/ui-settings-jspace/README.md) |
 
+Both Consumers read one per-session predicate, `ctx.jspace.engaged(session)`: the prompt sections render and the four tool schemas reach the request only for an engaged session. [The seat README](../../packages/jspace/jspace/README.md#engagement) owns the rule and the `engageAfterTurns` threshold.
+
 ## Card fields
 
 `jspace/card` carries a whole-card snapshot. `goalOpenedSeq` is the session event seq of the mutation that last set `goal`; `jspace_ship` requires a checkpoint recorded at or after that anchor for the current Goal epoch. When seat `requireVerifiedEvidence` is true, that checkpoint must be evidence-grade (`verified: true`).

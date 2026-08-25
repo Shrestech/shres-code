@@ -35,8 +35,10 @@
     "@shres-code/schemastery": "workspace:^"
   },
   "peerDependencies": {
+    "@shres-code/shres-code-agent": "workspace:^",
     "@shres-code/shres-code-invariants": "workspace:^",
     "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-system-prompt": "workspace:^",
     "@shres-code/shres-code-tools": "workspace:^",
     "@shres-code/shres-code-jspace": "workspace:^",
     "@shres-code/cordis": "workspace:^"

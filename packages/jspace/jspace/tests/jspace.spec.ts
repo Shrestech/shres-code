@@ -74,7 +74,51 @@ describe('JspaceService remount', () => {
     })
     expect(seen).toEqual(['active'])
     expect(ctx.jspace.status.active).toBe(true)
+    // A stored document that carries no threshold engages from the first request.
+    expect(ctx.jspace.engageAfterTurns).toBe(0)
     stop()
+  })
+})
+
+describe('JspaceService engagement', () => {
+  function closeTurns(session: Session, count: number): void {
+    for (let turn = 1; turn <= count; turn += 1) {
+      session.append('turn/start', { turn })
+      session.append('turn/end', { turn, reason: { kind: 'completed' } })
+    }
+  }
+
+  it('never engages while the seat is disabled', async () => {
+    const { ctx, session } = await harness({ enabled: false, engageAfterTurns: 0 })
+    expect(ctx.jspace.engaged(session)).toBe(false)
+    expect(ctx.jspace.engaged()).toBe(false)
+  })
+
+  it('engages every active request when engageAfterTurns is 0', async () => {
+    const { ctx, session } = await harness({ enabled: true })
+    expect(ctx.jspace.engageAfterTurns).toBe(0)
+    expect(ctx.jspace.engaged(session)).toBe(true)
+    expect(ctx.jspace.engaged()).toBe(true)
+  })
+
+  it('waits for the configured completed-turn count', async () => {
+    const { ctx, session } = await harness({ enabled: true, engageAfterTurns: 3 })
+    expect(ctx.jspace.engaged(session)).toBe(false)
+    closeTurns(session, 2)
+    expect(ctx.jspace.engaged(session)).toBe(false)
+    closeTurns(session, 1)
+    expect(ctx.jspace.engaged(session)).toBe(true)
+  })
+
+  it('leaves a session-less assembly unengaged under a threshold', async () => {
+    const { ctx } = await harness({ enabled: true, engageAfterTurns: 3 })
+    expect(ctx.jspace.engaged()).toBe(false)
+  })
+
+  it('engages a session whose card is already open below the threshold', async () => {
+    const { ctx, session } = await harness({ enabled: true, engageAfterTurns: 10 })
+    ctx.jspace.open(session, { goal: 'g', next: 'n' })
+    expect(ctx.jspace.engaged(session)).toBe(true)
   })
 })
 

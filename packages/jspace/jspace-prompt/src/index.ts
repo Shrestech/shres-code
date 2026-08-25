@@ -167,14 +167,14 @@ function turnText(session: Session | undefined, claimed: readonly UserMessage[] 
  * @param ctx - seat owner.
  * @param session - live session, when any.
  * @param claimed - claimed step messages, when assemble runs in the loop.
- * @returns the selected pass, or `fast` when the seat is off.
+ * @returns the selected pass, or `fast` while the seat is unengaged for this session.
  */
 export function passFor(
   ctx: Context,
   session: Session | undefined,
   claimed?: readonly UserMessage[],
 ): JspacePass {
-  if (!ctx.jspace.status.active) return 'fast'
+  if (!ctx.jspace.engaged(session)) return 'fast'
   const cardOpen = session !== undefined && ctx.jspace.card(session) !== null
   const alwaysOpen = ctx.jspace.config.mode === 'always-open'
   return classifyJspacePass({ text: turnText(session, claimed), cardOpen, alwaysOpen })
@@ -206,7 +206,7 @@ export function modulesFor(
   session: Session | undefined,
   claimed?: readonly UserMessage[],
 ): readonly JspaceModuleName[] {
-  if (!ctx.jspace.status.active) return []
+  if (!ctx.jspace.engaged(session)) return []
   const text = turnText(session, claimed)
   return selectJspaceModules({
     pass: passFor(ctx, session, claimed),
@@ -217,6 +217,8 @@ export function modulesFor(
 
 /**
  * Register the card section, protocol sections, and loop/always-open pre-step.
+ * Every section is empty while `ctx.jspace.engaged()` is false for the
+ * assembling session, so an unengaged request pays nothing.
  * @param ctx - Cordis context with jspace and systemPrompt.
  * @param config - reprint caps; omitted fields use the schema defaults.
  */
@@ -226,9 +228,9 @@ export function apply(ctx: Context, config: Config = {}): void {
     name: JSPACE_SECTION,
     order: JSPACE_SECTION_ORDER,
     text: (context) => {
-      if (!ctx.jspace.status.active) return ''
-      openIfLoop(ctx, context)
       const session = context.agent?.session
+      if (!ctx.jspace.engaged(session)) return ''
+      openIfLoop(ctx, context)
       if (session === undefined) return JSPACE_AVAILABLE_LINE
       const folded = ctx.jspace.fold(session)
       if (folded.card === null) return JSPACE_AVAILABLE_LINE
@@ -240,8 +242,8 @@ export function apply(ctx: Context, config: Config = {}): void {
     name: JSPACE_PROTOCOL_SECTION,
     order: JSPACE_PROTOCOL_ORDER,
     text: (context) => {
-      if (!ctx.jspace.status.active) return ''
       const session = context.agent?.session
+      if (!ctx.jspace.engaged(session)) return ''
       const cardOpen = session !== undefined && ctx.jspace.card(session) !== null
       return formatJspaceProtocol(passFor(ctx, session, context.messages), cardOpen)
     },
@@ -251,7 +253,6 @@ export function apply(ctx: Context, config: Config = {}): void {
     name: JSPACE_CAPACITY_SECTION,
     order: JSPACE_CAPACITY_ORDER,
     text: (context) => {
-      if (!ctx.jspace.status.active) return ''
       const pass = passFor(ctx, context.agent?.session, context.messages)
       return pass === 'fast' ? '' : JSPACE_CAPACITY_TEXT
     },
@@ -261,7 +262,6 @@ export function apply(ctx: Context, config: Config = {}): void {
     name: JSPACE_BROADCAST_SECTION,
     order: JSPACE_BROADCAST_ORDER,
     text: (context) => {
-      if (!ctx.jspace.status.active) return ''
       return passFor(ctx, context.agent?.session, context.messages) === 'loop'
         ? JSPACE_BROADCAST_TEXT
         : ''
@@ -274,7 +274,6 @@ export function apply(ctx: Context, config: Config = {}): void {
       name: JSPACE_MODULE_SECTIONS[moduleName],
       order: JSPACE_FIRST_EXTRA_MODULE_ORDER + index,
       text: (context) => {
-        if (!ctx.jspace.status.active) return ''
         return modulesFor(ctx, context.agent?.session, context.messages).includes(moduleName)
           ? JSPACE_MODULE_TEXT[moduleName]
           : ''
@@ -294,8 +293,8 @@ export function apply(ctx: Context, config: Config = {}): void {
 function openIfLoop(ctx: Context, context: AssembleContext): void {
   const agent = context.agent
   if (agent === undefined) return
-  /* v8 ignore next -- section text returns before this when the seat is off */
-  if (!ctx.jspace.status.active) return
+  /* v8 ignore next -- section text returns before this when the seat is unengaged */
+  if (!ctx.jspace.engaged(agent.session)) return
   const folded = ctx.jspace.fold(agent.session)
   if (folded.card !== null) return
   if (folded.closed) return

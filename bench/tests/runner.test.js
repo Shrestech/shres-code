@@ -95,13 +95,16 @@ describe('metrics.foldSessionLog', () => {
 })
 
 describe('arms registry', () => {
-  it('registers all five arms in ladder order', () => {
-    assert.deepEqual(listArms(), ['off', 'on', 'sq-only', 'on-sq', 'on-sq-verified'])
+  it('registers all six arms in ladder order', () => {
+    assert.deepEqual(listArms(), ['off', 'on', 'sq-only', 'on-sq', 'on-sq-verified', 'on-adaptive'])
     assert.equal(ARMS.off.jspace.enabled, false)
     assert.equal(ARMS.on.jspace.enabled, true)
     assert.equal(ARMS.on.jspace.mode, 'available')
     assert.equal(ARMS['on-sq-verified'].jspace.requireVerifiedEvidence, true)
     assert.deepEqual(ARMS['on-sq-verified'].jspace.verifierTools, ['bash'])
+    assert.equal(ARMS['on-adaptive'].jspace.enabled, true)
+    assert.equal(ARMS['on-adaptive'].jspace.engageAfterTurns, 10)
+    assert.equal(ARMS.on.jspace.engageAfterTurns, undefined)
     assert.equal(getArm('off'), ARMS.off)
   })
 
@@ -111,6 +114,7 @@ describe('arms registry', () => {
     assert.equal(ARMS['sq-only'].sessionQuery, true)
     assert.equal(ARMS['on-sq'].sessionQuery, true)
     assert.equal(ARMS['on-sq-verified'].sessionQuery, true)
+    assert.equal(ARMS['on-adaptive'].sessionQuery, true)
   })
 
   it('expectsJspace and expectsSessionQuery match arm semantics', () => {
@@ -122,6 +126,18 @@ describe('arms registry', () => {
     assert.equal(ARMS['sq-only'].expectsSessionQuery, true)
     assert.equal(ARMS['on-sq'].expectsJspace, true)
     assert.equal(ARMS['on-sq'].expectsSessionQuery, true)
+    // Permission, not a requirement: a trial that never reaches turn 10 logs
+    // no jspace event and the audit records no violation.
+    assert.equal(ARMS['on-adaptive'].expectsJspace, true)
+    assert.equal(ARMS['on-adaptive'].expectsSessionQuery, true)
+  })
+
+  it('renders the engagement threshold into the on-adaptive overlay', () => {
+    const overlay = renderArmOverlay(ARMS['on-adaptive'], {
+      sessionLogRoot: '/tmp/bench/on-adaptive/sessions/t/0',
+    })
+    assert.match(overlay, /engageAfterTurns: 10/)
+    assert.match(overlay, /- id: tool-session-query$/m)
   })
 
   it('fails loud on unknown arms, naming the valid set', () => {
