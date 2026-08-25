@@ -417,6 +417,9 @@ test('chain-env-propagate: fixture fails, config loader passes', (t) => {
 
   assert.equal(runVerifier('chain-env-propagate', scratch).status, 1)
 
+  // The fixture ships no src/ (creating the loader is the task); the agent's
+  // write tools create parent directories, so the simulated solution must too.
+  mkdirSync(path.join(scratch, 'src'), { recursive: true })
   writeFileSync(path.join(scratch, 'src/config.js'), `/**
  * Load configuration from environment.
  * @returns {object}
