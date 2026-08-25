@@ -136,3 +136,11 @@ Per-trial metrics beyond pass/fail, computed from the session JSONL:
 | `pressureFired` | `boolean` | `compactionCount > 0`. A long-horizon verdict only counts on trials where this is true. |
 
 Aggregates flow through `report/build.js` into `ui/data.js`. The demo generator exercises every field.
+
+## Report
+
+`node bench/report/build.js [--experiment <name>|latest]` rebuilds per-arm `results.json` and `bench/ui/data.js` from `trials.jsonl`. `latest` (the default) picks the `runs/` directory with the newest modification time.
+
+The payload's `comparisons` array holds one `off` vs treatment record for every non-baseline arm present in the experiment (`off` vs `on`, `off` vs `on-adaptive`, and so on). Each record carries the McNemar grade, accuracy delta, and per-task paired rows; there is no singular `comparison` field. Arm summaries include forensics and compaction aggregates (`meanDanglingCard`, `meanVerifiedCheckpointShare`, `meanSessionQueryCalls`, `totalNoopNoteRefusals`, `totalCompactionCount`, `pressureFiredRate`). The `pressure` stratum is a first-class catalog value alongside `long`, `short`, `adversarial`, and `chain`.
+
+Serve the static report with `node bench/report/serve.js`. The UI contract lives in `bench/ui/CONTRACT.md`.

@@ -24,7 +24,7 @@ Eight forensics metric fields were added to TrialMetrics: `tokensIncludingDescen
 
 The task catalog expanded from 7 to 15 tasks: 5 long, 3 short, 2 adversarial, 5 chain.
 
-The demo generator and report builder handle all five arms and all new metrics.
+The demo generator emits all registered arms and forensics fields. The report projects them as `comparisons[]` (one `off` vs treatment record per non-baseline arm) in [bench report multi-arm comparisons](2026-08-25-bench-report-multi-arm-comparisons.md).
 
 ## Alternatives considered
 

@@ -150,6 +150,7 @@ code, pre, td.num, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Con
 .badge-demo { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 55%, var(--border)); background: color-mix(in srgb, var(--warn) 12%, var(--surface)); }
 .badge-warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 55%, var(--border)); background: color-mix(in srgb, var(--warn) 12%, var(--surface)); text-transform: none; letter-spacing: 0.01em; }
 .badge-chain { color: var(--info); border-color: color-mix(in srgb, var(--info) 55%, var(--border)); background: color-mix(in srgb, var(--info) 10%, var(--surface)); }
+.badge-pressure { color: var(--arm-x3); border-color: color-mix(in srgb, var(--arm-x3) 55%, var(--border)); background: color-mix(in srgb, var(--arm-x3) 10%, var(--surface)); }
 
 .chip {
   display: inline-block;
@@ -198,8 +199,12 @@ main h3 { margin: var(--space-5) 0 10px; font-size: var(--font-sm); text-transfo
   border-radius: var(--radius-lg);
   overflow: hidden;
   box-shadow: var(--shadow-2);
-  margin-bottom: var(--space-5);
+  margin-bottom: var(--space-4);
 }
+.hero + .hero { margin-top: calc(-1 * var(--space-2)); }
+.table-wrap { overflow-x: auto; }
+table.headline { min-width: 1080px; }
+tr.stratum[data-stratum="pressure"] th { color: var(--arm-x3); }
 .hero > section {
   background: linear-gradient(180deg, var(--surface-2), var(--surface));
   padding: 18px 20px;

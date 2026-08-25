@@ -237,23 +237,27 @@ test('buildExperiment: results.json per arm and a valid ReportData payload', asy
     assert.equal(alphaOn.passRate, 1)
     assert.equal(alphaOn.meanCheckpoints, 2)
 
-    // Pairs: off vs on per task with McNemar counts and bootstrap interval.
-    assert.equal(report.pairs.length, 2)
-    const alphaPair = report.pairs.find(p => p.taskId === 'alpha')
+    // Comparisons: one off-vs-on pairing with McNemar counts and bootstrap interval.
+    assert.equal(report.comparisons.length, 1)
+    assert.equal(report.comparisons[0].treatment, 'on')
+    const pairs = report.comparisons[0].pairs
+    assert.equal(pairs.length, 2)
+    const alphaPair = pairs.find(p => p.taskId === 'alpha')
     assert.equal(alphaPair.delta, 0.5)
     assert.equal(alphaPair.winner, 'on')
+    assert.equal(alphaPair.treatment, 'on')
     assert.equal(alphaPair.wins, 1)
     assert.equal(alphaPair.losses, 0)
     assert.equal(alphaPair.ties, 1)
     assert.ok(Array.isArray(alphaPair.deltaCi95) && alphaPair.deltaCi95.length === 2)
-    const betaPair = report.pairs.find(p => p.taskId === 'beta')
+    const betaPair = pairs.find(p => p.taskId === 'beta')
     assert.equal(betaPair.delta, 1)
     assert.equal(betaPair.wins, 2)
 
     // Comparison: 3 wins, 0 losses overall -> p = 2 * 0.5^3 = 0.25, grade tie.
-    assert.equal(report.comparison.mcnemarP, 0.25)
-    assert.equal(report.comparison.deltaAccuracy, 0.75)
-    assert.equal(report.comparison.grade, 'tie')
+    assert.equal(report.comparisons[0].mcnemarP, 0.25)
+    assert.equal(report.comparisons[0].deltaAccuracy, 0.75)
+    assert.equal(report.comparisons[0].grade, 'tie')
 
     // results.json rebuilt per arm.
     const offResults = JSON.parse(await readFile(join(experimentDir, 'off', 'results.json'), 'utf8'))
@@ -273,7 +277,7 @@ test('buildExperiment: results.json per arm and a valid ReportData payload', asy
     validateReportData(roundTripped)
     assert.equal(roundTripped.experiment, 'exp1')
     assert.equal(roundTripped.cells.length, 4)
-    assert.equal(roundTripped.comparison.mcnemarP, 0.25)
+    assert.equal(roundTripped.comparisons[0].mcnemarP, 0.25)
   } finally {
     await rm(root, { recursive: true, force: true })
   }
@@ -383,8 +387,9 @@ test('buildExperiment: chain strata and chain trials flow through unchanged', as
     // Aggregates stay trial-level: one cell per arm, sums from trial.metrics.
     assert.equal(report.cells.length, 2)
     assert.equal(report.arms[0].totalInputTokens, 170)
-    assert.equal(report.pairs.length, 1)
-    assert.equal(report.pairs[0].taskId, 'chain-task')
+    assert.equal(report.comparisons.length, 1)
+    assert.equal(report.comparisons[0].pairs.length, 1)
+    assert.equal(report.comparisons[0].pairs[0].taskId, 'chain-task')
   } finally {
     await rm(root, { recursive: true, force: true })
   }
@@ -400,10 +405,108 @@ test('validateReportData: rejects a malformed embedded chain trial', () => {
     cells: [],
     pairs: [],
     arms: [],
-    comparison: { grade: 'tie', deltaAccuracy: 0, mcnemarP: null },
+    comparisons: [],
     trials: [trial({ phases: [{ phaseIndex: 7 }] })],
   }
   assert.throws(() => validateReportData(report), /report\.trials\[0\]: trial\.phases\[0\]/)
+})
+
+test('validateReportData: rejects a non-array comparisons field and a baseline treatment', () => {
+  const base = {
+    version: 1,
+    demo: false,
+    generatedAt: FIXED_NOW,
+    experiment: 'exp1',
+    tasks: [],
+    cells: [],
+    arms: [],
+  }
+  assert.throws(
+    () => validateReportData({ ...base, comparisons: { grade: 'tie', deltaAccuracy: 0, mcnemarP: null } }),
+    /report\.comparisons must be an array/,
+  )
+  assert.throws(
+    () => validateReportData({
+      ...base,
+      comparisons: [{ treatment: 'off', grade: 'tie', deltaAccuracy: 0, mcnemarP: null, pairs: [] }],
+    }),
+    /report\.comparisons\[0\]\.treatment must not be the baseline arm "off"/,
+  )
+  assert.throws(
+    () => validateReportData({
+      ...base,
+      comparisons: [{ treatment: 'on', grade: 'maybe', deltaAccuracy: 0, mcnemarP: null, pairs: [] }],
+    }),
+    /report\.comparisons\[0\]\.grade must be improvement\|regression\|tradeoff\|tie/,
+  )
+})
+
+test('buildExperiment: pressure stratum and one comparison per treatment arm', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'bench-report-multi-'))
+  try {
+    const dir = join(root, 'exp1')
+    await writeArm(dir, 'off', [
+      trial({ taskId: 'press', trialIndex: 0, arm: 'off', resolved: false, failureMode: 'VERIFY_FAILED', verifier: { command: 'node verify.mjs', exitCode: 1 } }),
+      trial({ taskId: 'press', trialIndex: 1, arm: 'off', resolved: false, failureMode: 'VERIFY_FAILED', verifier: { command: 'node verify.mjs', exitCode: 1 } }),
+    ])
+    await writeArm(dir, 'on', [
+      trial({
+        taskId: 'press', trialIndex: 0, arm: 'on', resolved: true,
+        metrics: { danglingCard: false, verifiedCheckpointShare: 1, noopNoteRefusals: 1, sessionQueryCalls: null, compactionCount: 2, pressureFired: true },
+      }),
+      trial({
+        taskId: 'press', trialIndex: 1, arm: 'on', resolved: true,
+        metrics: { danglingCard: true, verifiedCheckpointShare: 0.5, noopNoteRefusals: 0, sessionQueryCalls: null, compactionCount: 1, pressureFired: true },
+      }),
+    ])
+    await writeArm(dir, 'on-adaptive', [
+      trial({
+        taskId: 'press', trialIndex: 0, arm: 'on-adaptive', resolved: true,
+        metrics: { danglingCard: false, verifiedCheckpointShare: 0.8, sessionQueryCalls: 3, compactionCount: 2, pressureFired: true },
+      }),
+      trial({
+        taskId: 'press', trialIndex: 1, arm: 'on-adaptive', resolved: false, failureMode: 'VERIFY_FAILED', verifier: { command: 'node verify.mjs', exitCode: 1 },
+        metrics: { danglingCard: false, verifiedCheckpointShare: null, sessionQueryCalls: 1, compactionCount: 0, pressureFired: false },
+      }),
+    ])
+
+    const tasksDir = join(root, 'tasks')
+    await mkdir(join(tasksDir, 'press'), { recursive: true })
+    await writeFile(join(tasksDir, 'press', 'task.json'), JSON.stringify({
+      taskId: 'press',
+      stratum: 'pressure',
+      description: 'Pressure task from the catalog.',
+      instruction: 'Survive.',
+      verify: 'node verify.mjs',
+      timeoutMs: 600_000,
+      maxTurns: 80,
+    }) + '\n')
+
+    const report = await buildExperiment(dir, { tasksDir, uiDataPath: join(root, 'ui', 'data.js'), generatedAt: FIXED_NOW })
+    validateReportData(report)
+
+    assert.deepEqual(
+      report.tasks.find(t => t.taskId === 'press'),
+      { taskId: 'press', stratum: 'pressure', description: 'Pressure task from the catalog.' },
+    )
+    assert.deepEqual(report.comparisons.map(c => c.treatment), ['on', 'on-adaptive'])
+    assert.equal(report.comparisons[0].pairs[0].winner, 'on')
+    assert.equal(report.comparisons[1].treatment, 'on-adaptive')
+    assert.equal(report.comparisons[1].pairs[0].treatment, 'on-adaptive')
+
+    const onArm = report.arms.find(a => a.arm === 'on')
+    assert.equal(onArm.meanDanglingCard, 0.5)
+    assert.equal(onArm.meanVerifiedCheckpointShare, 0.75)
+    assert.equal(onArm.totalNoopNoteRefusals, 1)
+    assert.equal(onArm.totalCompactionCount, 3)
+    assert.equal(onArm.pressureFiredRate, 1)
+    const adaptive = report.arms.find(a => a.arm === 'on-adaptive')
+    assert.equal(adaptive.meanSessionQueryCalls, 2)
+    assert.equal(adaptive.totalCompactionCount, 2)
+    assert.equal(adaptive.pressureFiredRate, 0.5)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
 })
 
 test('resolveRequest: traversal guard and index.html fallback', () => {

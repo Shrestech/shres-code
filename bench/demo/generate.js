@@ -1,6 +1,6 @@
 /**
  * Synthetic experiment generator: writes a complete, schema-valid experiment
- * (`run.json` + `trials.jsonl` for all five arms) under
+ * (`run.json` + `trials.jsonl` for all six arms) under
  * `bench/runs/<experiment>/` so the report and UI run without an API key.
  * Every byte emitted is a pure function of `--seed`.
  *
@@ -10,7 +10,9 @@
  * ~15% input-token tax; the adversarial arms resist injections better with
  * jspace on. Chain tasks pass at par across arms (cold carry). The sq-only arm
  * shows modest gains from session-query alone. The on-sq-verified arm matches
- * on-sq pass rate with fewer coverage-refusal-then-pad sequences.
+ * on-sq pass rate with fewer coverage-refusal-then-pad sequences. The
+ * on-adaptive arm matches on-sq on long and pressure tasks (turns ≥ 10) and
+ * stays dormant on short tasks. Pressure-stratum tasks fire compaction.
  *
  * @module bench/demo/generate
  */
@@ -25,7 +27,7 @@ import { validateTrial } from '../schema/trial.js'
 /**
  * @typedef {object} DemoTask
  * @property {string} taskId
- * @property {'long' | 'short' | 'adversarial' | 'chain'} stratum
+ * @property {'long' | 'short' | 'adversarial' | 'chain' | 'pressure'} stratum
  * @property {string} failDetail - verifier detail on unresolved trials.
  * @property {number} [phases] - chain phase count; absent on single-session tasks.
  */
@@ -47,15 +49,20 @@ export const TASKS = Object.freeze([
   { taskId: 'chain-env-propagate', stratum: 'chain', phases: 2, failDetail: 'env validation missing' },
   { taskId: 'chain-api-versioning', stratum: 'chain', phases: 2, failDetail: 'v2 endpoint missing' },
   { taskId: 'math-derivation-chain', stratum: 'chain', phases: 2, failDetail: 'derived formula not applied' },
+  { taskId: 'constraint-survival-build', stratum: 'pressure', failDetail: 'inventory module or house rule still fails' },
+  { taskId: 'constraint-survival-migration', stratum: 'pressure', failDetail: 'migrated module still fails catalog-w0 rules' },
+  { taskId: 'noise-needle', stratum: 'pressure', failDetail: 'runtime-config values missing or tests fail' },
+  { taskId: 'chain-ledger-deep', stratum: 'pressure', phases: 6, failDetail: 'ledger reconciliation mismatch' },
 ])
 
-export const DEMO_ARMS = Object.freeze(['off', 'on', 'sq-only', 'on-sq', 'on-sq-verified'])
+export const DEMO_ARMS = Object.freeze(['off', 'on', 'sq-only', 'on-sq', 'on-sq-verified', 'on-adaptive'])
 const ARM_CONFIGS = Object.freeze({
   off: { enabled: false },
   on: { enabled: true, mode: 'available' },
   'sq-only': { enabled: false },
   'on-sq': { enabled: true, mode: 'available' },
   'on-sq-verified': { enabled: true, mode: 'available', verifierTools: ['bash'], requireVerifiedEvidence: true },
+  'on-adaptive': { enabled: true, mode: 'available', engageAfterTurns: 10 },
 })
 const REPEATS = 5
 const MODEL = 'deepseek-chat'
@@ -64,9 +71,9 @@ const BASE_TIME = Date.parse('2026-08-17T09:00:00.000Z')
 const MARKER_FILE = 'demo'
 
 /** Arms with jspace enabled. */
-const JSPACE_ARMS = new Set(['on', 'on-sq', 'on-sq-verified'])
+const JSPACE_ARMS = new Set(['on', 'on-sq', 'on-sq-verified', 'on-adaptive'])
 /** Arms with session-query mounted. */
-const SQ_ARMS = new Set(['sq-only', 'on-sq', 'on-sq-verified'])
+const SQ_ARMS = new Set(['sq-only', 'on-sq', 'on-sq-verified', 'on-adaptive'])
 
 const ERROR_SLOTS = new Set([
   'off:cross-module-refactor:1',
@@ -76,21 +83,25 @@ const ERROR_SLOTS = new Set([
 ])
 
 const RESOLVED_COUNTS = {
-  'multi-file-rename': { off: 2, on: 4, 'sq-only': 3, 'on-sq': 4, 'on-sq-verified': 4 },
-  'cross-module-refactor': { off: 2, on: 4, 'sq-only': 3, 'on-sq': 4, 'on-sq-verified': 4 },
-  'config-migration': { off: 2, on: 3, 'sq-only': 2, 'on-sq': 4, 'on-sq-verified': 4 },
-  'chain-data-pipeline': { off: 2, on: 3, 'sq-only': 3, 'on-sq': 4, 'on-sq-verified': 4 },
-  'compaction-stress-constraints': { off: 2, on: 3, 'sq-only': 2, 'on-sq': 4, 'on-sq-verified': 4 },
-  'single-function-fix': { off: 4, on: 4, 'sq-only': 4, 'on-sq': 4, 'on-sq-verified': 4 },
-  'typo-guard': { off: 4, on: 4, 'sq-only': 4, 'on-sq': 4, 'on-sq-verified': 4 },
-  'log-line-cleanup': { off: 4, on: 4, 'sq-only': 4, 'on-sq': 4, 'on-sq-verified': 4 },
-  'injection-ignore': { off: 3, on: 5, 'sq-only': 3, 'on-sq': 5, 'on-sq-verified': 5 },
-  'doc-poison': { off: 2, on: 3, 'sq-only': 2, 'on-sq': 4, 'on-sq-verified': 4 },
-  'chain-debug-resume': { off: 3, on: 3, 'sq-only': 3, 'on-sq': 3, 'on-sq-verified': 3 },
-  'chain-lib-extend': { off: 3, on: 3, 'sq-only': 3, 'on-sq': 3, 'on-sq-verified': 3 },
-  'chain-env-propagate': { off: 3, on: 3, 'sq-only': 3, 'on-sq': 3, 'on-sq-verified': 3 },
-  'chain-api-versioning': { off: 3, on: 3, 'sq-only': 3, 'on-sq': 3, 'on-sq-verified': 3 },
-  'math-derivation-chain': { off: 3, on: 3, 'sq-only': 3, 'on-sq': 3, 'on-sq-verified': 3 },
+  'multi-file-rename': { off: 2, on: 4, 'sq-only': 3, 'on-sq': 4, 'on-sq-verified': 4, 'on-adaptive': 4 },
+  'cross-module-refactor': { off: 2, on: 4, 'sq-only': 3, 'on-sq': 4, 'on-sq-verified': 4, 'on-adaptive': 4 },
+  'config-migration': { off: 2, on: 3, 'sq-only': 2, 'on-sq': 4, 'on-sq-verified': 4, 'on-adaptive': 4 },
+  'chain-data-pipeline': { off: 2, on: 3, 'sq-only': 3, 'on-sq': 4, 'on-sq-verified': 4, 'on-adaptive': 4 },
+  'compaction-stress-constraints': { off: 2, on: 3, 'sq-only': 2, 'on-sq': 4, 'on-sq-verified': 4, 'on-adaptive': 4 },
+  'single-function-fix': { off: 4, on: 4, 'sq-only': 4, 'on-sq': 4, 'on-sq-verified': 4, 'on-adaptive': 4 },
+  'typo-guard': { off: 4, on: 4, 'sq-only': 4, 'on-sq': 4, 'on-sq-verified': 4, 'on-adaptive': 4 },
+  'log-line-cleanup': { off: 4, on: 4, 'sq-only': 4, 'on-sq': 4, 'on-sq-verified': 4, 'on-adaptive': 4 },
+  'injection-ignore': { off: 3, on: 5, 'sq-only': 3, 'on-sq': 5, 'on-sq-verified': 5, 'on-adaptive': 5 },
+  'doc-poison': { off: 2, on: 3, 'sq-only': 2, 'on-sq': 4, 'on-sq-verified': 4, 'on-adaptive': 4 },
+  'chain-debug-resume': { off: 3, on: 3, 'sq-only': 3, 'on-sq': 3, 'on-sq-verified': 3, 'on-adaptive': 3 },
+  'chain-lib-extend': { off: 3, on: 3, 'sq-only': 3, 'on-sq': 3, 'on-sq-verified': 3, 'on-adaptive': 3 },
+  'chain-env-propagate': { off: 3, on: 3, 'sq-only': 3, 'on-sq': 3, 'on-sq-verified': 3, 'on-adaptive': 3 },
+  'chain-api-versioning': { off: 3, on: 3, 'sq-only': 3, 'on-sq': 3, 'on-sq-verified': 3, 'on-adaptive': 3 },
+  'math-derivation-chain': { off: 3, on: 3, 'sq-only': 3, 'on-sq': 3, 'on-sq-verified': 3, 'on-adaptive': 3 },
+  'constraint-survival-build': { off: 1, on: 3, 'sq-only': 2, 'on-sq': 4, 'on-sq-verified': 4, 'on-adaptive': 4 },
+  'constraint-survival-migration': { off: 1, on: 3, 'sq-only': 2, 'on-sq': 4, 'on-sq-verified': 4, 'on-adaptive': 4 },
+  'noise-needle': { off: 1, on: 3, 'sq-only': 2, 'on-sq': 4, 'on-sq-verified': 4, 'on-adaptive': 4 },
+  'chain-ledger-deep': { off: 2, on: 3, 'sq-only': 2, 'on-sq': 4, 'on-sq-verified': 4, 'on-adaptive': 4 },
 }
 
 const PROFILES = {
@@ -98,6 +109,7 @@ const PROFILES = {
   short: { turns: [3, 7], inPerTurn: [1500, 2400], outPerTurn: [120, 260], msPerTurn: [9000, 16000] },
   adversarial: { turns: [6, 12], inPerTurn: [2200, 3400], outPerTurn: [180, 340], msPerTurn: [11000, 20000] },
   chain: { turns: [6, 10], inPerTurn: [2400, 3600], outPerTurn: [180, 340], msPerTurn: [12000, 20000] },
+  pressure: { turns: [16, 28], inPerTurn: [2600, 4000], outPerTurn: [200, 380], msPerTurn: [13000, 24000] },
 }
 
 /**
@@ -205,24 +217,28 @@ function drawBase(rng, stratum) {
  * @param {string} arm
  * @param {boolean} resolved
  * @param {number} checkpoints
+ * @param {string} [stratum]
+ * @param {number} [turns]
  * @returns {object} forensics metric fields.
  */
-function forensicsFields(rng, arm, resolved, checkpoints) {
-  const hasJspace = JSPACE_ARMS.has(arm)
+function forensicsFields(rng, arm, resolved, checkpoints, stratum, turns) {
+  const adaptiveDormant = arm === 'on-adaptive' && (turns ?? 0) < 10 && stratum !== 'pressure' && stratum !== 'long' && stratum !== 'chain'
+  const hasJspace = JSPACE_ARMS.has(arm) && !adaptiveDormant
   const hasSq = SQ_ARMS.has(arm)
+  const compactionCount = stratum === 'pressure' ? randInt(rng, 1, 3) : (rng() < 0.12 ? 1 : 0)
   return {
     tokensIncludingDescendants: null,
     costIncludingDescendants: null,
     danglingCard: hasJspace ? (!resolved && rng() < 0.3) : null,
-    verifiedCheckpointShare: checkpoints > 0
+    verifiedCheckpointShare: hasJspace && checkpoints > 0
       ? (arm === 'on-sq-verified' ? (resolved ? 1.0 : randInt(rng, 5, 8) / 10) : randInt(rng, 0, 3) / 10)
       : null,
     coverageRefusalThenPad: hasJspace ? (arm === 'on-sq-verified' ? randInt(rng, 0, 1) : randInt(rng, 0, 3)) : 0,
     noopNoteRefusals: hasJspace ? randInt(rng, 0, 2) : 0,
     noteCapRefusals: hasJspace ? randInt(rng, 0, 1) : 0,
     sessionQueryCalls: hasSq ? randInt(rng, 0, 6) : null,
-    compactionCount: 0,
-    pressureFired: false,
+    compactionCount,
+    pressureFired: compactionCount > 0,
   }
 }
 
@@ -238,11 +254,12 @@ function realizeArm(rng, base, stratum, arm, resolved, errored) {
       identicalRetries: 0,
       checkpoints: 0,
       shipPasses: 0,
-      ...forensicsFields(rng, arm, false, 0),
+      ...forensicsFields(rng, arm, false, 0, stratum, turns),
     }
   }
   const jitter = () => 0.95 + rng() * 0.1
-  const hasJspace = JSPACE_ARMS.has(arm)
+  const adaptiveDormant = arm === 'on-adaptive' && base.turns < 10 && stratum !== 'pressure' && stratum !== 'long'
+  const hasJspace = JSPACE_ARMS.has(arm) && !adaptiveDormant
   let inputTokens = Math.round(base.turns * base.inPerTurn * jitter()) + randInt(rng, 0, 200)
   if (hasJspace && stratum === 'short') inputTokens = Math.round(inputTokens * 1.15)
   if (SQ_ARMS.has(arm) && stratum === 'short') inputTokens = Math.round(inputTokens * 1.03)
@@ -257,7 +274,7 @@ function realizeArm(rng, base, stratum, arm, resolved, errored) {
   const shipPasses = hasJspace && resolved ? 1 : 0
   return {
     inputTokens, outputTokens, durationMs, turns: base.turns, toolCalls, identicalRetries, checkpoints, shipPasses,
-    ...forensicsFields(rng, arm, resolved, checkpoints),
+    ...forensicsFields(rng, arm, resolved, checkpoints, stratum, base.turns),
   }
 }
 
@@ -278,7 +295,7 @@ function realizeChainPhase(rng, base, arm, phaseIndex, resolved) {
   const checkpoints = hasJspace ? randInt(rng, 1, 2) : 0
   return {
     inputTokens, outputTokens, durationMs, turns, toolCalls, identicalRetries, checkpoints, shipPasses: 0,
-    ...forensicsFields(rng, arm, resolved, checkpoints),
+    ...forensicsFields(rng, arm, resolved, checkpoints, 'chain', turns),
   }
 }
 

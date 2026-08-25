@@ -12,6 +12,7 @@ import {
   barsSpec,
   buildHash,
   chainTasks,
+  comparisonList,
   deltaSpec,
   filterTrials,
   formatInt,
@@ -22,7 +23,7 @@ import {
   formatSignedPct,
   formatTokens,
   heatColor,
-  heroStats,
+  heroList,
   integrityViolations,
   matrixRows,
   phasesOf,
@@ -30,6 +31,7 @@ import {
   radarSpec,
   scatterSpec,
   sparkSeries,
+  strataOf,
   summaryRows,
   trialList,
 } from './model.js'
@@ -117,29 +119,67 @@ function ciBar(point, ci) {
 }
 
 /**
- * Render the Summary route: the hero comparison banner, stat cards with
- * sparklines, and the per-arm headline table with inline CI bars.
- * @param {HTMLElement} root - container to fill.
+ * One comparison hero banner.
  * @param {import('../schema/report-data.js').ReportData} data - report payload.
- * @returns {void}
+ * @param {ReturnType<typeof heroList>[number]} hero - derived hero stats.
+ * @param {ReturnType<typeof summaryRows>} rows - arm rows with totals.
+ * @returns {HTMLElement}
  */
-export function renderSummary(root, data) {
-  const rows = summaryRows(data)
-  const hero = heroStats(data)
-  const colors = armColorMap(data)
-  const totalTrials = data.arms.reduce((n, a) => n + a.trials, 0)
-  const sparks = sparkSeries(data)
-  const withColors = (/** @type {{ name: string, values: number[] }[]} */ series) => series.map(s => ({ ...s, color: colors.get(s.name) ?? 'var(--muted)' }))
+function comparisonHero(data, hero, rows) {
   const off = rows.find(r => r.arm === 'off')
-  const on = rows.find(r => r.arm === 'on')
-
+  const treatment = rows.find(r => r.arm === hero.treatment)
   const ciText = hero.deltaCi95
     ? `95% CI ${formatSignedPct(hero.deltaCi95[0])} … ${formatSignedPct(hero.deltaCi95[1])} · paired bootstrap`
     : '95% CI unavailable without embedded trials'
   const overheadPct = hero.tokenOverheadRatio === null ? null : (hero.tokenOverheadRatio - 1) * 100
   const overheadSub = hero.tokenOverheadRatio === null
     ? 'token totals unavailable'
-    : `on/off token spend ${overheadPct >= 0 ? '+' : ''}${overheadPct.toFixed(1)}% (${formatTokens(off?.totalTokens ?? NaN)} → ${formatTokens(on?.totalTokens ?? NaN)})`
+    : `${hero.treatment}/off token spend ${overheadPct >= 0 ? '+' : ''}${overheadPct.toFixed(1)}% (${formatTokens(off?.totalTokens ?? NaN)} → ${formatTokens(treatment?.totalTokens ?? NaN)})`
+  return h('div', { class: 'hero' },
+    heroTile('Comparison verdict',
+      gradeChip(hero.grade, `Δ accuracy ${formatSignedPct(hero.deltaAccuracy)} · McNemar ${formatP(hero.mcnemarP)}`),
+      `${data.experiment} · ${hero.treatment} vs off across ${data.tasks.length} tasks`),
+    heroTile('Δ accuracy',
+      h('span', { class: hero.deltaAccuracy > 0 ? 'pos' : hero.deltaAccuracy < 0 ? 'neg' : '', text: formatSignedPct(hero.deltaAccuracy) }),
+      ciText),
+    heroTile('McNemar',
+      formatP(hero.mcnemarP),
+      `wins ${hero.wins} · losses ${hero.losses} · ties ${hero.ties}`),
+    heroTile('Token overhead',
+      formatRatio(hero.tokenOverheadRatio),
+      overheadSub))
+}
+
+/**
+ * Format a nullable mean or rate for the arms table.
+ * @param {number | null | undefined} v - value.
+ * @param {'pct' | 'fixed' | 'int'} kind - display kind.
+ * @returns {string}
+ */
+function formatNullable(v, kind) {
+  if (v === null || v === undefined || !Number.isFinite(v)) return '—'
+  if (kind === 'pct') return formatPct(v)
+  if (kind === 'int') return formatInt(v)
+  return v.toFixed(1)
+}
+
+/**
+ * Render the Summary route: one hero comparison banner per treatment arm,
+ * stat cards with sparklines, and the per-arm headline table with inline CI
+ * bars plus forensics and compaction columns.
+ * @param {HTMLElement} root - container to fill.
+ * @param {import('../schema/report-data.js').ReportData} data - report payload.
+ * @returns {void}
+ */
+export function renderSummary(root, data) {
+  const rows = summaryRows(data)
+  const heroes = heroList(data)
+  const colors = armColorMap(data)
+  const totalTrials = data.arms.reduce((n, a) => n + a.trials, 0)
+  const sparks = sparkSeries(data)
+  const withColors = (/** @type {{ name: string, values: number[] }[]} */ series) => series.map(s => ({ ...s, color: colors.get(s.name) ?? 'var(--muted)' }))
+  const off = rows.find(r => r.arm === 'off')
+  const firstTreatment = rows.find(r => r.arm !== 'off')
 
   const accuracySpark = sparks.accuracy.some(s => s.values.length > 0)
     ? sparkline({ series: withColors(sparks.accuracy), yMin: 0, yMax: 1, formatValue: v => formatPct(v, 0) })
@@ -150,48 +190,49 @@ export function renderSummary(root, data) {
 
   root.append(
     h('h2', { text: 'Summary' }),
-    h('div', { class: 'hero' },
-      heroTile('Comparison verdict',
-        gradeChip(hero.grade, `Δ accuracy ${formatSignedPct(hero.deltaAccuracy)} · McNemar ${formatP(hero.mcnemarP)}`),
-        `${data.experiment} · on vs off across ${data.tasks.length} tasks`),
-      heroTile('Δ accuracy',
-        h('span', { class: hero.deltaAccuracy > 0 ? 'pos' : hero.deltaAccuracy < 0 ? 'neg' : '', text: formatSignedPct(hero.deltaAccuracy) }),
-        ciText),
-      heroTile('McNemar',
-        formatP(hero.mcnemarP),
-        `wins ${hero.wins} · losses ${hero.losses} · ties ${hero.ties}`),
-      heroTile('Token overhead',
-        formatRatio(hero.tokenOverheadRatio),
-        overheadSub)),
+    ...heroes.map(hero => comparisonHero(data, hero, rows)),
     h('div', { class: 'cards' },
       card('Experiment', data.experiment, `${data.tasks.length} tasks · ${totalTrials} trials · ${data.arms.length} arms`),
       card('Generated', data.generatedAt.replace('T', ' ').slice(0, 19)),
-      card('Accuracy trend', off && on ? `${formatPct(off.accuracy)} → ${formatPct(on.accuracy)}` : '—', accuracySpark, 'cumulative pass rate per arm, trials in start order'),
-      card('Tokens per trial', off && on ? `${formatTokens(off.totalTokens)} → ${formatTokens(on.totalTokens)}` : '—', tokenSpark, 'total input+output per arm; line = per-trial spend')),
+      card('Accuracy trend', off && firstTreatment ? `${formatPct(off.accuracy)} → ${formatPct(firstTreatment.accuracy)}` : '—', accuracySpark, 'cumulative pass rate per arm, trials in start order'),
+      card('Tokens per trial', off && firstTreatment ? `${formatTokens(off.totalTokens)} → ${formatTokens(firstTreatment.totalTokens)}` : '—', tokenSpark, 'total input+output per arm; line = per-trial spend')),
     h('h3', { text: 'Arms' }),
-    h('table', { class: 'headline' },
-      h('thead', {},
-        h('tr', {},
-          h('th', { scope: 'col', text: 'Arm' }),
-          h('th', { scope: 'col', class: 'num', text: 'Accuracy ± stderr' }),
-          h('th', { scope: 'col', class: 'num', text: 'Wilson 95% CI' }),
-          h('th', { scope: 'col', class: 'num', text: 'Total tokens' }),
-          h('th', { scope: 'col', class: 'num', text: 'Mean turns' }),
-          h('th', { scope: 'col', class: 'num', text: 'Duration' }),
-          h('th', { scope: 'col', class: 'num', text: 'Δ vs off' }))),
-      h('tbody', {},
-        rows.map(a => h('tr', {},
-          h('th', { scope: 'row' }, h('span', { class: 'dot', style: `background:${colors.get(a.arm)}` }), a.arm),
-          h('td', { class: 'num', text: `${formatPct(a.accuracy)} ± ${formatPct(a.stderr)}` }),
-          h('td', { class: 'num' },
-            h('div', { class: 'ci-cell' },
-              h('span', { class: 'ci-text', text: `${formatPct(a.ci95[0])} – ${formatPct(a.ci95[1])}` }),
-              ciBar(a.accuracy, a.ci95))),
-          h('td', { class: 'num', title: `${formatInt(a.totalInputTokens)} in · ${formatInt(a.totalOutputTokens)} out`, text: formatTokens(a.totalTokens) }),
-          h('td', { class: 'num', text: a.meanTurns.toFixed(1) }),
-          h('td', { class: 'num', text: formatMs(a.totalDurationMs) }),
-          h('td', { class: `num ${a.deltaVsOff === null ? 'mut' : a.deltaVsOff > 0 ? 'pos' : a.deltaVsOff < 0 ? 'neg' : 'mut'}`, text: formatSignedPct(a.deltaVsOff) }))))),
-    h('p', { class: 'note', text: 'Accuracy = resolved / success-status trials; infrastructure-error trials are excluded. Intervals are Wilson 95%.' }))
+    h('div', { class: 'table-wrap' },
+      h('table', { class: 'headline' },
+        h('thead', {},
+          h('tr', {},
+            h('th', { scope: 'col', text: 'Arm' }),
+            h('th', { scope: 'col', class: 'num', text: 'Accuracy ± stderr' }),
+            h('th', { scope: 'col', class: 'num', text: 'Wilson 95% CI' }),
+            h('th', { scope: 'col', class: 'num', text: 'Total tokens' }),
+            h('th', { scope: 'col', class: 'num', text: 'Mean turns' }),
+            h('th', { scope: 'col', class: 'num', text: 'Duration' }),
+            h('th', { scope: 'col', class: 'num', text: 'Δ vs off' }),
+            h('th', { scope: 'col', class: 'num', text: 'Dangling' }),
+            h('th', { scope: 'col', class: 'num', text: 'Verified CP' }),
+            h('th', { scope: 'col', class: 'num', text: 'SQ calls' }),
+            h('th', { scope: 'col', class: 'num', text: 'Noop notes' }),
+            h('th', { scope: 'col', class: 'num', text: 'Compactions' }),
+            h('th', { scope: 'col', class: 'num', text: 'Pressure' }))),
+        h('tbody', {},
+          rows.map(a => h('tr', {},
+            h('th', { scope: 'row' }, h('span', { class: 'dot', style: `background:${colors.get(a.arm)}` }), a.arm),
+            h('td', { class: 'num', text: `${formatPct(a.accuracy)} ± ${formatPct(a.stderr)}` }),
+            h('td', { class: 'num' },
+              h('div', { class: 'ci-cell' },
+                h('span', { class: 'ci-text', text: `${formatPct(a.ci95[0])} – ${formatPct(a.ci95[1])}` }),
+                ciBar(a.accuracy, a.ci95))),
+            h('td', { class: 'num', title: `${formatInt(a.totalInputTokens)} in · ${formatInt(a.totalOutputTokens)} out`, text: formatTokens(a.totalTokens) }),
+            h('td', { class: 'num', text: Number.isFinite(a.meanTurns) ? a.meanTurns.toFixed(1) : '—' }),
+            h('td', { class: 'num', text: formatMs(a.totalDurationMs) }),
+            h('td', { class: `num ${a.deltaVsOff === null ? 'mut' : a.deltaVsOff > 0 ? 'pos' : a.deltaVsOff < 0 ? 'neg' : 'mut'}`, text: formatSignedPct(a.deltaVsOff) }),
+            h('td', { class: 'num', text: formatNullable(a.meanDanglingCard, 'pct') }),
+            h('td', { class: 'num', text: formatNullable(a.meanVerifiedCheckpointShare, 'pct') }),
+            h('td', { class: 'num', text: formatNullable(a.meanSessionQueryCalls, 'fixed') }),
+            h('td', { class: 'num', text: formatNullable(a.totalNoopNoteRefusals, 'int') }),
+            h('td', { class: 'num', text: formatNullable(a.totalCompactionCount, 'int') }),
+            h('td', { class: 'num', text: formatNullable(a.pressureFiredRate, 'pct') })))))),
+    h('p', { class: 'note', text: 'Accuracy = resolved / success-status trials; infrastructure-error trials are excluded. Intervals are Wilson 95%. Forensics columns are means or totals over those same trials; a dash means the arm excludes the metric.' }))
 }
 
 /**
@@ -246,7 +287,7 @@ export function renderMatrix(root, data, ctx) {
           arms.map(arm => h('th', { scope: 'col' }, h('span', { class: 'dot', style: `background:${colors.get(arm)}` }), arm)))),
       h('tbody', {},
         strata.flatMap(({ stratum, rows, subtotal }) => [
-          h('tr', { class: 'stratum' }, h('th', { colspan: String(arms.length + 1), scope: 'colgroup', text: `${stratum} — ${rows.length} task${rows.length > 1 ? 's' : ''}` })),
+          h('tr', { class: 'stratum', dataset: { stratum } }, h('th', { colspan: String(arms.length + 1), scope: 'colgroup', text: `${stratum} — ${rows.length} task${rows.length > 1 ? 's' : ''}` })),
           ...rows.map(({ task, entries, best }) => h('tr', {},
             h('th', { scope: 'row' },
               h('div', { class: 'taskhead' },
@@ -255,6 +296,9 @@ export function renderMatrix(root, data, ctx) {
                   h('span', { class: 'id', text: task.taskId }),
                   task.stratum === 'chain'
                     ? h('span', { class: 'badge badge-chain', title: 'multi-session task: each trial runs as a chain of resumed phases', text: '⟲ chain' })
+                    : null,
+                  task.stratum === 'pressure'
+                    ? h('span', { class: 'badge badge-pressure', title: 'memory-pressure task: global rules or recorded values must survive a long stretch of work', text: 'pressure' })
                     : null))),
             entries.map(entry => cellFor(task, entry, best === entry.arm)))),
           h('tr', { class: 'subtotal' },
@@ -342,23 +386,26 @@ export function renderCharts(root, data, ctx, params) {
     groupedBarChart({ ...withColors(barsSpec(data)), yLabel: 'pass rate', yMax: 1, formatValue: v => formatPct(v, 0) }),
     true))
 
-  const rate = scatterSpec(data, 'passRate')
-  const tokens = scatterSpec(data, 'tokens')
-  if (rate.points.length > 0) {
-    sections.push(chartSection('Paired pass rate', 'One point per task; above the diagonal means on beats off.', pairedScatter(rate)))
-  }
-  if (tokens.points.length > 0) {
-    sections.push(chartSection('Paired mean tokens', 'Same pairing, mean input+output tokens per task.', pairedScatter(tokens)))
+  for (const comparison of comparisonList(data)) {
+    const rate = scatterSpec(data, 'passRate', comparison.treatment)
+    const tokens = scatterSpec(data, 'tokens', comparison.treatment)
+    if (rate.points.length > 0) {
+      sections.push(chartSection(`Paired pass rate · ${comparison.treatment}`, `One point per task; above the diagonal means ${comparison.treatment} beats off.`, pairedScatter(rate)))
+    }
+    if (tokens.points.length > 0) {
+      sections.push(chartSection(`Paired mean tokens · ${comparison.treatment}`, `Same pairing, mean input+output tokens per task.`, pairedScatter(tokens)))
+    }
   }
   const radar = radarSpec(data)
   if (radar.axes.length > 0) {
-    sections.push(chartSection('Pass rate by stratum', 'Tasks pooled per stratum.', radarChart(withColors(radar))))
+    sections.push(chartSection('Pass rate by stratum', 'Tasks pooled per stratum, including pressure.', radarChart(withColors(radar))))
   }
-  if (data.pairs.length > 0) {
+  for (const comparison of comparisonList(data)) {
+    if (comparison.pairs.length === 0) continue
     sections.push(chartSection(
-      'Per-task pass-rate delta',
-      'Delta = on − off; whiskers: paired bootstrap 95% interval.',
-      deltaChart(deltaSpec(data)),
+      `Per-task pass-rate delta · ${comparison.treatment}`,
+      `Delta = ${comparison.treatment} − off; whiskers: paired bootstrap 95% interval.`,
+      deltaChart(deltaSpec(data, comparison)),
       true))
   }
   if (chainTasks(data).length > 0) {
@@ -434,6 +481,7 @@ export function renderTrials(root, data, ctx, params) {
     arm: params.get('arm') ?? '',
     task: params.get('task') ?? '',
     outcome: params.get('outcome') ?? '',
+    stratum: params.get('stratum') ?? '',
   }
   const sort = params.get('sort') ?? ''
   const dir = params.get('dir') ?? ''
@@ -442,14 +490,15 @@ export function renderTrials(root, data, ctx, params) {
       name,
       onchange: (/** @type {Event} */ e) => ctx.navigate(buildHash('trials', { ...filters, sort, dir, [name]: /** @type {HTMLSelectElement} */ (e.target).value }), { replace: true }),
     },
-    options.map(([value, text]) => h('option', { value, ...(value === filters[/** @type {'arm' | 'task' | 'outcome'} */ (name)] ? { selected: '' } : {}), text }))))
+    options.map(([value, text]) => h('option', { value, ...(value === filters[/** @type {'arm' | 'task' | 'outcome' | 'stratum'} */ (name)] ? { selected: '' } : {}), text }))))
 
   root.append(h('div', { class: 'filterbar' },
     select('arm', 'Arm', [['', 'all arms'], ...data.arms.map(a => /** @type {[string, string]} */ ([a.arm, a.arm]))]),
     select('task', 'Task', [['', 'all tasks'], ...data.tasks.map(t => /** @type {[string, string]} */ ([t.taskId, t.taskId]))]),
+    select('stratum', 'Stratum', [['', 'all strata'], ...strataOf(data.tasks).map(s => /** @type {[string, string]} */ ([s, s]))]),
     select('outcome', 'Outcome', [['', 'all outcomes'], ['resolved', 'resolved'], ['failed', 'failed'], ['error', 'error']])))
 
-  const rows = filterTrials(trials, { ...filters, sort, dir })
+  const rows = filterTrials(trials, { ...filters, tasks: data.tasks, sort, dir })
   const bar = root.querySelector('.filterbar')
   bar?.append(h('span', { class: 'count', text: `${rows.length} of ${trials.length} trials` }))
 
@@ -488,7 +537,9 @@ export function renderTrials(root, data, ctx, params) {
           detailItem('session file', t.sessionFile ? h('code', { text: t.sessionFile }) : '—'),
           detailItem('tokens', `${formatInt(t.metrics.inputTokens)} in · ${formatInt(t.metrics.outputTokens)} out`),
           detailItem('loop', `${formatMs(t.metrics.durationMs)} · ${t.metrics.turns} turns · ${t.metrics.toolCalls} tool calls · ${t.metrics.identicalRetries} identical retries`),
-          detailItem('jspace', `${t.metrics.checkpoints} checkpoints · ${t.metrics.shipPasses} ship passes`),
+          detailItem('jspace', `${t.metrics.checkpoints} checkpoints · ${t.metrics.shipPasses} ship passes · dangling ${t.metrics.danglingCard === null ? '—' : t.metrics.danglingCard ? 'yes' : 'no'}`),
+          detailItem('forensics', `verified ${t.metrics.verifiedCheckpointShare === null ? '—' : formatPct(t.metrics.verifiedCheckpointShare)} · noop notes ${t.metrics.noopNoteRefusals} · SQ ${t.metrics.sessionQueryCalls === null ? '—' : t.metrics.sessionQueryCalls}`),
+          detailItem('compaction', `${t.metrics.compactionCount} compact · pressure ${t.metrics.pressureFired ? 'yes' : 'no'}`),
           violations.length > 0
             ? detailItem('integrity', violations.map(v => h('div', { class: 'neg', text: `⚠ ${v}` })))
             : null),

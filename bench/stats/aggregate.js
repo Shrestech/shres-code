@@ -57,6 +57,8 @@ export function summarizeCell(taskId, arm, trials) {
   cell.totalNoteCapRefusals = sum(ok.map(t => t.metrics.noteCapRefusals))
   const sqValues = ok.map(t => t.metrics.sessionQueryCalls).filter(v => v !== null)
   cell.meanSessionQueryCalls = sqValues.length > 0 ? mean(sqValues) : null
+  cell.meanCompactionCount = mean(ok.map(t => t.metrics.compactionCount))
+  cell.pressureFiredRate = ok.length === 0 ? NaN : ok.filter(t => t.metrics.pressureFired).length / ok.length
   return /** @type {import('../schema/report-data.js').ReportCell} */ (cell)
 }
 
@@ -91,6 +93,9 @@ export function summarizeArm(arm, trials) {
   const ok = trials.filter(t => t.status === 'success')
   const resolved = ok.filter(t => t.resolved).length
   const accuracy = ok.length === 0 ? NaN : resolved / ok.length
+  const danglingValues = ok.map(t => t.metrics.danglingCard).filter(v => v !== null)
+  const verifiedValues = ok.map(t => t.metrics.verifiedCheckpointShare).filter(v => v !== null)
+  const sqValues = ok.map(t => t.metrics.sessionQueryCalls).filter(v => v !== null)
   return {
     arm,
     accuracy,
@@ -102,6 +107,16 @@ export function summarizeArm(arm, trials) {
     meanTurns: mean(ok.map(t => t.metrics.turns)),
     totalIdenticalRetries: sum(ok.map(t => t.metrics.identicalRetries)),
     trials: ok.length,
+    meanDanglingCard: danglingValues.length > 0
+      ? danglingValues.filter(v => v === true).length / danglingValues.length
+      : null,
+    meanVerifiedCheckpointShare: verifiedValues.length > 0 ? mean(verifiedValues) : null,
+    totalCoverageRefusalThenPad: sum(ok.map(t => t.metrics.coverageRefusalThenPad)),
+    totalNoopNoteRefusals: sum(ok.map(t => t.metrics.noopNoteRefusals)),
+    totalNoteCapRefusals: sum(ok.map(t => t.metrics.noteCapRefusals)),
+    meanSessionQueryCalls: sqValues.length > 0 ? mean(sqValues) : null,
+    totalCompactionCount: sum(ok.map(t => t.metrics.compactionCount)),
+    pressureFiredRate: ok.length === 0 ? NaN : ok.filter(t => t.metrics.pressureFired).length / ok.length,
   }
 }
 
