@@ -194,6 +194,21 @@ test('loadArm: validates manifest and every trials.jsonl line', async () => {
   }
 })
 
+test('buildExperiment: skips experiment subdirectories without a run.json (scratch, .shres-home)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'bench-report-scratch-'))
+  try {
+    const experimentDir = await fakeRunsTree(root)
+    const tasksDir = await fakeTasksCatalog(root)
+    await mkdir(join(experimentDir, 'scratch', 'off'), { recursive: true })
+    await mkdir(join(experimentDir, '.shres-home'), { recursive: true })
+
+    const report = await buildExperiment(experimentDir, { tasksDir, uiDataPath: join(root, 'ui', 'data.js'), generatedAt: FIXED_NOW })
+    assert.deepEqual(report.arms.map(a => a.arm), ['off', 'on'])
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('buildExperiment: results.json per arm and a valid ReportData payload', async () => {
   const root = await mkdtemp(join(tmpdir(), 'bench-report-build-'))
   try {
