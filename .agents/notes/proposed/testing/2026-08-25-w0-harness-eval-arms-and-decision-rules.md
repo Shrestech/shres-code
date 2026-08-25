@@ -1,0 +1,67 @@
+# Agent Note: W0 harness evaluation — arm ladder, metrics, and decision rules for the 2026-08-25 uplift
+
+Status: proposed
+
+## Problem
+
+The [long-horizon harness uplift](../feature/2026-08-25-long-horizon-harness-uplift.md) shipped its buildable workstreams (session-query mounted and driven, evidence-grade checkpoints, bounded card reprint, untrusted framing, note-spam refusals) with their net effect on task outcomes unmeasured — the exact W4 gap the plan names. The measurement instrument exists: `bench/` is a pre-registered paired A/B suite (interleaved arms, pinned manifest, Wilson/bootstrap intervals, McNemar, verifier-passed success as the primary metric, no LLM judging) but it knows only two arms (`off`, `on` for the J-Space toggle), carries seven tasks across four strata, and `runs/` holds only synthetic demo data — no real experiment has ever run. The new interventions have no arms, the ritual-compliance dysfunctions the [session forensics](../feature/2026-08-24-jspace-live-session-forensics.md) documented have no metrics, and the question "what do we measure against" has no recorded answer.
+
+## What we measure against
+
+The comparison target is ourselves, not a leaderboard: every claim is a paired delta between arms on identical tasks, the same pinned model, temperature, harness commit, and task set, with arms interleaved per task and repeat so provider drift cannot confound the toggle (bench protocol rules 1–3). The control arm is the same harness with the intervention off, so each delta isolates one feature's earned value at its token cost. External suites (Terminal-Bench, SWE-bench-lite) answer a different question — absolute agent capability — and become interesting only after the internal deltas justify the harness configuration they would run under.
+
+## Proposal
+
+### Arm ladder
+
+Register in `bench/runner/arms.js`, keeping the paired design and skipping the full factorial; the ladder covers every decision-relevant contrast:
+
+| Arm | Configuration |
+|---|---|
+| `off` | Control: jspace disabled, no session-query consumer (exists). |
+| `on` | J-Space `available` (exists). |
+| `sq-only` | Session-query tools + driver, jspace disabled — isolates the read path, the contrast the PRO-LONG evidence predicts carries most value. |
+| `on-sq` | J-Space + session-query — the shipped default composition. |
+| `on-sq-verified` | `on-sq` plus `verifierTools` naming the bench harness's shell tool and `requireVerifiedEvidence: true` — prices the evidence gate. |
+
+Primary contrasts: `off↔sq-only` (read path alone), `on↔on-sq` (read path given the card), `on-sq↔on-sq-verified` (gate benefit vs friction), `off↔on` (the original W0 question). Arms today are settings overlays; `sq-only`/`on-sq` differ by composition, so `arms.js` needs a per-arm cordis overlay in addition to the settings overlay — that runner extension is part of this work.
+
+### Task catalog
+
+Grow `bench/tasks/` from 7 to roughly 20, keeping the stratum design: more `long` and `chain` history-dependent tasks (where the literature locates the gains, e.g. multi-phase fixes whose later phases need facts from earlier tool output), retain `short` as the expected-no-gain control stratum, extend `adversarial` with a card-injection task (instructions smuggled into jspace_note content; the verifier checks the smuggled action did not execute — this measures the untrusted frame), and keep compaction-stress via the sanctioned `thresholdRatio` overlay.
+
+### Metrics
+
+Extend `bench/runner/metrics.js` to compute per trial, from the session logs the runner already owns: total tokens and cost including descendant sessions; dangling-card rate (card open at session end); verified-checkpoint share; coverage-refusal-then-pad sequences (the `by`-padding proxy); `JSPACE_NOTE_NOOP` and note-cap refusal counts; session-query call count and whether a queried fact was subsequently re-derived by re-running the producing tool. Trial success stays verifier-passed only.
+
+### Statistics and decision rules
+
+Existing stats stand (Wilson/bootstrap, McNemar, mandatory intervals). With a small catalog, run `--repeats 5` minimum per task×arm. Pre-registered rules, extending bench README rule 5: session-query stays default-mounted only if `on-sq` beats `on` (or `sq-only` beats `off`) on the long+chain strata with the interval excluding zero and short-stratum token overhead under 15%; `requireVerifiedEvidence` graduates from default-off to recommended-on only if `on-sq-verified` pass rate is not lower and the padding proxy drops; the reprint bound and note refusals need only non-regression on the long stratum. A second model tier repeats the matrix if a second provider is configured, testing the capability-floor prediction; otherwise record the stratification as not run.
+
+### Execution on lab5
+
+Real runs need `DEEPSEEK_API_KEY` and a built harness; the lab5 VM hosts them: clone at the pinned develop commit, `pnpm install && pnpm run build`, export the key from the VM's environment (never copied into the repo), `node bench/runner/run.js --experiment w4-<date> --arms off,on,sq-only,on-sq,on-sq-verified --repeats 5`, then copy `runs/<experiment>/` back and rebuild the report (`node bench/report/build.js`). Results land as a new implemented note recording the verdict per decision rule, and the uplift plan's W4 section is settled by that note.
+
+## Alternatives considered
+
+**Run an external benchmark first.** Rejected: leaderboard suites measure absolute capability under one fixed configuration and cannot attribute a delta to a single harness feature; the paired internal design answers the actual question at a fraction of the spend.
+
+**Full 2^4 factorial over the new toggles.** Rejected: 16 arms multiply cost without adding decision-relevant contrasts; the ladder covers every rule the decision needs, and an interaction suspicion can add one arm later under a new experiment id.
+
+**LLM-as-judge success scoring.** Rejected: bench protocol rule 4 already forbids it in v1, and the forensics record shows judge/keyword gates are gaming surfaces; verifier-passed success only.
+
+**Measure on live user sessions instead of the bench.** Rejected as the primary instrument: live sessions lack controls, pairing, and repeatability; the forensics pass mines them for dysfunction discovery, not effect size.
+
+## Acceptance criteria
+
+- The five arms register with settings and composition overlays; the off-arm integrity audit extends to assert the absence of session-query tool events in arms that exclude the consumer.
+- The catalog holds ≥15 tasks with every stratum populated, including one card-injection adversarial task whose verifier fails when the smuggled instruction executed.
+- `trials.jsonl` records the new per-trial metrics; `report/build.js` aggregates them per arm×stratum.
+- One full interleaved experiment (all five arms, ≥5 repeats) completes on lab5, and an implemented results note records the verdict against every pre-registered decision rule.
+
+## Risks
+
+- **Wide intervals from a small catalog:** 7→20 tasks and 5 repeats still yield modest power; the paired tests recover some, and the decision rules demand intervals excluding zero rather than point estimates, so an underpowered result reads "not yet", not "no effect".
+- **API spend:** five arms × ~20 tasks × 5 repeats is real money on lab5's key; run the ladder incrementally (`off,on,on-sq` first) if budget bites, keeping interleaving within whatever subset runs together.
+- **Runner extension risk:** per-arm composition overlays touch the runner's spawn path; the bench stays a standalone zero-dependency tool, so the overlay must be file-based, not a workspace import.
+- **Transfer caveat:** bench tasks are synthetic; a clean win here still warrants the live-session dysfunction re-scan (dangling-card rate on fresh real sessions) before declaring the uplift delivered.
