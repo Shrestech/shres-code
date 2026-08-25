@@ -105,12 +105,12 @@ describe('arms registry', () => {
     assert.equal(getArm('off'), ARMS.off)
   })
 
-  it('arms that exclude session-query have disabledEntries', () => {
-    assert.ok(ARMS.off.disabledEntries.length > 0)
-    assert.ok(ARMS.on.disabledEntries.length > 0)
-    assert.equal(ARMS['sq-only'].disabledEntries.length, 0)
-    assert.equal(ARMS['on-sq'].disabledEntries.length, 0)
-    assert.equal(ARMS['on-sq-verified'].disabledEntries.length, 0)
+  it('session-query mounting matches arm semantics', () => {
+    assert.equal(ARMS.off.sessionQuery, false)
+    assert.equal(ARMS.on.sessionQuery, false)
+    assert.equal(ARMS['sq-only'].sessionQuery, true)
+    assert.equal(ARMS['on-sq'].sessionQuery, true)
+    assert.equal(ARMS['on-sq-verified'].sessionQuery, true)
   })
 
   it('expectsJspace and expectsSessionQuery match arm semantics', () => {
@@ -128,7 +128,7 @@ describe('arms registry', () => {
     assert.throws(() => getArm('always-open'), /unknown arm "always-open"/)
   })
 
-  it('renders a patch overlay with jspace config, log root, and disabled entries', () => {
+  it('renders a patch overlay with jspace config, log root, and session-query mount', () => {
     const onSq = renderArmOverlay(ARMS['on-sq'], { sessionLogRoot: '/tmp/bench/on-sq/sessions/t/0' })
     assert.match(onSq, /^- id: jspace$/m)
     assert.match(onSq, /enabled: true/)
@@ -136,13 +136,16 @@ describe('arms registry', () => {
     assert.match(onSq, /requireCoverage: true/)
     assert.match(onSq, /^- id: session-persistence-jsonl$/m)
     assert.match(onSq, /compression: none/)
-    assert.ok(!onSq.includes('disabled: true'), 'on-sq does not disable any entries')
+    assert.match(onSq, /^- id: session-query-sqlite$/m)
+    assert.match(onSq, /openAt: startup/)
+    assert.match(onSq, /session-query\.db/)
+    assert.match(onSq, /^- insert:$/m)
+    assert.match(onSq, /tool-session-query/)
 
     const off = renderArmOverlay(ARMS.off, { sessionLogRoot: '/x' })
     assert.match(off, /enabled: false/)
-    assert.match(off, /^- id: session-query-sqlite$/m)
-    assert.match(off, /disabled: true/)
-    assert.match(off, /^- id: tool-session-query$/m)
+    assert.ok(!off.includes('session-query'), 'off arm leaves session-query untouched')
+    assert.ok(!off.includes('insert'), 'off arm inserts nothing')
   })
 })
 

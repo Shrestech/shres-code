@@ -1,36 +1,36 @@
 /**
  * Arm registry: the measured interventions. An arm is a name plus the exact
- * jspace plugin config it applies and an optional set of plugin entries to
- * disable in the composition overlay.
+ * jspace plugin config it applies and whether the overlay mounts the
+ * model-facing session-query tool.
  *
- * The shipped compositions now mount session-query by default (commit
- * 82aa91854e), so a clean jspace-off control requires disabling those entries
- * via the `--patch` overlay — a jspace settings overlay alone no longer
- * produces a clean control. Each arm declares `disabledEntries`: plugin ids
- * whose `disabled: true` rows the runner appends to the per-trial patch
- * overlay, leveraging the cordis Loader's entry-level disable mechanism.
+ * The runner spawns the bundle profile (`shres --profile headless`), where
+ * `jspace` ships mounted with `enabled: false` and `tool-session-query` is
+ * not mounted at all; the shipped `session-query-sqlite` service stays for
+ * internal reads with `openAt: never`. Session-query arms therefore insert
+ * `tool-session-query` and open the per-trial SQLite index at startup; the
+ * other arms need no disable rows because the tool is absent from the
+ * profile.
  *
  * The five-arm ladder covers every decision-relevant contrast:
  *
  * | Arm | Configuration |
  * |---|---|
- * | `off` | Control: jspace disabled, session-query excluded. |
- * | `on` | J-Space available, session-query excluded. |
- * | `sq-only` | Session-query mounted + driver, jspace disabled. |
- * | `on-sq` | J-Space available + session-query (shipped default). |
+ * | `off` | Control: jspace disabled, no session-query tool. |
+ * | `on` | J-Space available, no session-query tool. |
+ * | `sq-only` | Session-query tool mounted, jspace disabled. |
+ * | `on-sq` | J-Space available + session-query tool. |
  * | `on-sq-verified` | on-sq + verifierTools naming `bash` + requireVerifiedEvidence. |
  *
  * @module bench/runner/arms
  */
 
-/** Session-query plugin ids in the shipped headless composition. */
-const SESSION_QUERY_IDS = Object.freeze(['session-query-sqlite', 'tool-session-query'])
+import { join } from 'node:path'
 
 /**
  * @typedef {object} ArmEntry
  * @property {string} name - arm identifier.
  * @property {Record<string, unknown>} jspace - jspace plugin config for the --patch overlay.
- * @property {readonly string[]} disabledEntries - plugin ids to set `disabled: true` in the overlay.
+ * @property {boolean} sessionQuery - whether the overlay mounts the model-facing session-query tool.
  * @property {boolean} expectsSessionQuery - whether session-query tools are expected in logs.
  * @property {boolean} expectsJspace - whether jspace events are expected in logs.
  */
@@ -44,28 +44,28 @@ export const ARMS = Object.freeze({
   off: Object.freeze({
     name: 'off',
     jspace: Object.freeze({ enabled: false, mode: 'available', requireCoverage: true }),
-    disabledEntries: Object.freeze([...SESSION_QUERY_IDS]),
+    sessionQuery: false,
     expectsSessionQuery: false,
     expectsJspace: false,
   }),
   on: Object.freeze({
     name: 'on',
     jspace: Object.freeze({ enabled: true, mode: 'available', requireCoverage: true }),
-    disabledEntries: Object.freeze([...SESSION_QUERY_IDS]),
+    sessionQuery: false,
     expectsSessionQuery: false,
     expectsJspace: true,
   }),
   'sq-only': Object.freeze({
     name: 'sq-only',
     jspace: Object.freeze({ enabled: false, mode: 'available', requireCoverage: true }),
-    disabledEntries: Object.freeze([]),
+    sessionQuery: true,
     expectsSessionQuery: true,
     expectsJspace: false,
   }),
   'on-sq': Object.freeze({
     name: 'on-sq',
     jspace: Object.freeze({ enabled: true, mode: 'available', requireCoverage: true }),
-    disabledEntries: Object.freeze([]),
+    sessionQuery: true,
     expectsSessionQuery: true,
     expectsJspace: true,
   }),
@@ -78,7 +78,7 @@ export const ARMS = Object.freeze({
       verifierTools: ['bash'],
       requireVerifiedEvidence: true,
     }),
-    disabledEntries: Object.freeze([]),
+    sessionQuery: true,
     expectsSessionQuery: true,
     expectsJspace: true,
   }),
@@ -107,8 +107,10 @@ export function getArm(name) {
  * Render the `--patch` overlay for one trial. Besides the jspace toggle, the
  * overlay redirects session persistence into a per-trial root with
  * `compression: none` so the runner can locate and line-read the log without
- * the zstd codec. Arms that exclude session-query append `disabled: true`
- * entries for those plugin ids. Strings are JSON-quoted, which is valid YAML.
+ * the zstd codec. Session-query arms additionally open the per-trial SQLite
+ * index at startup and insert the model-facing `tool-session-query` entry,
+ * which the bundle profile does not mount. Strings are JSON-quoted, which is
+ * valid YAML.
  * @param {ArmEntry} arm - arm entry from {@link getArm}.
  * @param {{ sessionLogRoot: string }} options - absolute per-trial persistence root.
  * @returns {string} the overlay YAML document.
@@ -126,8 +128,15 @@ ${jspaceRows}
     root: ${JSON.stringify(sessionLogRoot)}
     compression: none
 `
-  for (const id of arm.disabledEntries) {
-    overlay += `- id: ${id}\n  disabled: true\n`
+  if (arm.sessionQuery) {
+    overlay += `- id: session-query-sqlite
+  config:
+    path: ${JSON.stringify(join(sessionLogRoot, 'session-query.db'))}
+    openAt: startup
+- insert:
+    - id: tool-session-query
+      name: "@shres-code/shres-code-tool-session-query"
+`
   }
   return overlay
 }

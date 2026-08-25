@@ -6,17 +6,17 @@ Conventions follow the established evaluation harnesses rather than inventing ne
 
 ## Arms
 
-The five-arm ladder covers every decision-relevant contrast. Each arm is a `--patch` overlay applied to the shipped headless composition: the jspace settings toggle plus `disabled: true` entries that exclude plugin ids from the composition when the arm does not want them.
+The five-arm ladder covers every decision-relevant contrast. Each arm is a `--patch` overlay applied to the shipped headless composition, which mounts `jspace` with `enabled: false` and does not mount the model-facing session-query tool at all.
 
 | Arm | J-Space | Session-Query | Notes |
 |---|---|---|---|
-| `off` | disabled | excluded | Clean control: no jspace events, no session-query tool calls. |
-| `on` | available | excluded | J-Space only; measures the jspace card in isolation. |
+| `off` | disabled | absent | Clean control: no jspace events, no session-query tool calls. |
+| `on` | available | absent | J-Space only; measures the jspace card in isolation. |
 | `sq-only` | disabled | mounted | Session-query only; measures retrieval in isolation. |
-| `on-sq` | available | mounted | Shipped default: both jspace and session-query. |
+| `on-sq` | available | mounted | Shipped default composition plus the session-query tool. |
 | `on-sq-verified` | available | mounted | `on-sq` plus `verifierTools: ['bash']` and `requireVerifiedEvidence: true`. |
 
-Arms register in `runner/arms.js`. The overlay mechanism appends `disabled: true` rows for plugin ids like `session-query-sqlite` and `tool-session-query` to the per-trial patch YAML, leveraging the Cordis Loader's entry-level disable.
+Arms register in `runner/arms.js`. Every overlay carries a `jspace` config patch and the per-trial persistence redirect; session-query arms additionally patch the shipped `session-query-sqlite` service to open a per-trial index at startup (it ships with `openAt: never` and an in-memory path) and append an `- insert:` layer mounting `tool-session-query`. Arms without session-query need no disable rows, because the tool is absent from the profile.
 
 ## Layout
 
@@ -52,9 +52,9 @@ node bench/runner/run.js --experiment w0-2026-08-18 --arms off,on --repeats 3
 
 The runner generalizes beyond DeepSeek: `--api-key-env <VAR|none>` names the credential environment variable (`DEEPSEEK_API_KEY` by default), and `--tier-patch <path>` applies an experiment-level composition overlay to every spawn alongside the per-arm overlay. When the variable is not exported, the runner reads it from the harness credential store (`$SHRES_HOME/.credentials.yaml`, default `~/.shres`) and injects the value into the child environment — required because each trial runs under an experiment-local `SHRES_HOME` that hides the real store; the value never reaches any bench record. The CLI passes both patches as repeated `--patch` flags — the shres launcher accepts repeatable `--patch` and flattens all layers into one `applyEntryPatches` call. `run.json` records the env var name (never the value) in `apiKeyEnv` and the tier patch file path + SHA-256 in `tierPatch`, so a changed tier file is a new experiment.
 
-Ready tier overlays live in `bench/tiers/`. Each disables the shipped `llm-deepseek` entry and inserts `llm-pi-ai` with a hand-declared provider route, mirroring the documented adapter swap in the headless composition.
+Ready tier overlays live in `bench/tiers/`. Each is a pure config patch on the `agent-default-model` entry, selecting one of the routes the base profile's `llm-pi-ai` entry already declares (`zai` with `apiKeyEnv: ZAI_API_KEY`, `ollama-cloud` with `apiKeyEnv: OLLAMA_API_KEY` and `baseURL: https://ollama.com/v1`). No tier file inserts or disables an adapter entry: the profile mounts `llm-pi-ai` itself, so inserting it again fails the load with `duplicate loader entry id`. A `config` key replaces the entry's whole config, so each tier file restates both `provider` and `model`.
 
-**Z.ai tier** (GLM-5.3 via the OpenAI-compatible endpoint):
+**Z.ai tier** (GLM-5.2 via the shipped `zai` route):
 
 ```sh
 node bench/runner/run.js \
