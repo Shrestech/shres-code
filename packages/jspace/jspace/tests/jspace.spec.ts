@@ -233,6 +233,84 @@ describe('JspaceService card log', () => {
     expect(disabled.jspace.fold(child).inherited?.goal).toBe('A')
   })
 
+  it('refuses a JSON-array packed into one Core, Checked, or Open line', async () => {
+    const { ctx, session } = await harness()
+    const packed = '["Zombie-goal root cause: a", "Fix (scoped): b"]'
+    expect(() => ctx.jspace.open(session, { goal: 'A', next: 'B', core: [packed] })).toThrow(JspaceError)
+    try {
+      ctx.jspace.open(session, { goal: 'A', next: 'B', core: [packed] })
+    } catch (error) {
+      expect(error).toBeInstanceOf(JspaceError)
+      expect((error as JspaceError).code).toBe('JSPACE_LINE_PACKED')
+      expect((error as JspaceError).message).toBe(
+        'jspace line must be one item per slot; Core holds at most 2 live items',
+      )
+    }
+    ctx.jspace.open(session, { goal: 'A', next: 'B' })
+    expect(() => ctx.jspace.note(session, { core: packed })).toThrow(/one item per slot/)
+    expect(() => ctx.jspace.note(session, { open: [{ question: packed }] })).toThrow(/one item per slot/)
+    expect(() => ctx.jspace.checkpoint(session, { check: packed, by: 'unit tests' })).toThrow(/one item per slot/)
+    try {
+      ctx.jspace.note(session, { open: [{ question: packed }] })
+    } catch (error) {
+      expect((error as JspaceError).code).toBe('JSPACE_LINE_PACKED')
+    }
+    try {
+      ctx.jspace.checkpoint(session, { check: packed, by: 'unit tests' })
+    } catch (error) {
+      expect((error as JspaceError).code).toBe('JSPACE_LINE_PACKED')
+    }
+  })
+
+  it('accepts a Core line that merely starts with [ and is not JSON', async () => {
+    const { ctx, session } = await harness()
+    const opened = ctx.jspace.open(session, {
+      goal: 'A',
+      next: 'B',
+      core: ['[shield] fix the gate'],
+    })
+    expect(opened.core).toEqual(['[shield] fix the gate'])
+    const noted = ctx.jspace.note(session, { core: '[guard] keep the hinge' })
+    expect(noted.core).toEqual(['[shield] fix the gate', '[guard] keep the hinge'])
+    expect(ctx.jspace.note(session, { open: [{ question: '[open] who owns the latch?' }] }).open)
+      .toEqual([{ question: '[open] who owns the latch?' }])
+    expect(ctx.jspace.checkpoint(session, {
+      check: '[checked] latch holds',
+      by: 'unit tests',
+    }).checked[0]?.check).toBe('[checked] latch holds')
+  })
+
+  it('accepts a line that parses as a JSON object or string', async () => {
+    const { ctx, session } = await harness()
+    ctx.jspace.open(session, { goal: 'A', next: 'B', core: ['{"kind":"hint"}'] })
+    expect(ctx.jspace.card(session)?.core).toEqual(['{"kind":"hint"}'])
+    expect(ctx.jspace.note(session, { next: '"quoted next"' }).next).toBe('"quoted next"')
+  })
+
+  it('refuses a note that leaves Goal, Next, Core, and Open unchanged', async () => {
+    const { ctx, session } = await harness()
+    ctx.jspace.open(session, { goal: 'A', next: 'B', core: ['keep'] })
+    ctx.jspace.note(session, { open: [{ question: 'Q', settles: 'S' }] })
+    expect(() => ctx.jspace.note(session, {})).toThrow(JspaceError)
+    try {
+      ctx.jspace.note(session, { next: 'B', goal: 'A' })
+    } catch (error) {
+      expect(error).toBeInstanceOf(JspaceError)
+      expect((error as JspaceError).code).toBe('JSPACE_NOTE_NOOP')
+      expect((error as JspaceError).message).toBe(
+        'the card already says this; proceed with the work or write a checkpoint',
+      )
+    }
+    expect(() => ctx.jspace.note(session, {
+      departing: 'keep',
+      core: 'keep',
+      open: [{ question: 'Q', settles: 'S' }],
+    })).toThrow(/already says this/)
+    const bounced = ctx.jspace.note(session, { next: 'C' })
+    expect(bounced.next).toBe('C')
+    expect(ctx.jspace.note(session, { next: 'B' }).next).toBe('B')
+  })
+
   it('rejects a Goal identity change and allows same-goal note', async () => {
     const { ctx, session } = await harness()
     expect(() => ctx.jspace.note(session, { next: 'x' })).toThrow(/not open/)

@@ -5707,6 +5707,10 @@ importers:
         version: link:../../util/untrusted-frame
 
   packages/jspace/tool-jspace:
+    dependencies:
+      '@shres-code/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
     devDependencies:
       '@shres-code/cordis':
         specifier: workspace:^

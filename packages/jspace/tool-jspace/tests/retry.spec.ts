@@ -3,7 +3,15 @@
 import { describe, expect, it } from 'vitest'
 import { CallId } from '@shres-code/shres-code-llm'
 import type { SessionEvent } from '@shres-code/shres-code-session'
-import { REPEAT_DENY, canonicalizeArgs, shouldRefuseRepeat } from '../src/retry.ts'
+import {
+  DEFAULT_MAX_NOTES_PER_TURN,
+  REPEAT_DENY,
+  canonicalizeArgs,
+  countNotesThisTurn,
+  noteCapDeny,
+  shouldRefuseNoteCap,
+  shouldRefuseRepeat,
+} from '../src/retry.ts'
 
 function call(name: string, args: string, callId = 'c1'): SessionEvent {
   return {
@@ -122,5 +130,50 @@ describe('shouldRefuseRepeat', () => {
     circular.self = circular
     expect(canonicalizeArgs(circular)).toBe('')
     expect(REPEAT_DENY).toContain('jspace_note')
+  })
+})
+
+describe('shouldRefuseNoteCap', () => {
+  it('counts jspace_note calls since the last turn/start and skips the in-flight id', () => {
+    expect(countNotesThisTurn([])).toBe(0)
+    expect(countNotesThisTurn([undefined as unknown as SessionEvent])).toBe(0)
+    expect(countNotesThisTurn([
+      call('jspace_note', '{"next":"a"}', 'n1'),
+      call('bash', '{"cmd":"ls"}', 'b1'),
+      call('jspace_note', '{"next":"b"}', 'n2'),
+    ], 'now')).toBe(2)
+    expect(countNotesThisTurn([
+      call('jspace_note', '{"next":"a"}', 'n1'),
+      call('jspace_note', '{"next":"b"}', 'now'),
+    ], 'now')).toBe(1)
+    expect(countNotesThisTurn([
+      call('jspace_note', '{"next":"old"}', 'prev'),
+      turn(),
+      call('jspace_note', '{"next":"a"}', 'n1'),
+    ])).toBe(1)
+  })
+
+  it('refuses the next jspace_note once the turn budget is spent', () => {
+    const notes = [
+      call('jspace_note', '{"next":"1"}', 'n1'),
+      call('jspace_note', '{"next":"2"}', 'n2'),
+    ]
+    expect(shouldRefuseNoteCap(notes, 'jspace_note', 2, 'now')).toBe(true)
+    expect(shouldRefuseNoteCap(notes, 'jspace_note', 3, 'now')).toBe(false)
+    expect(shouldRefuseNoteCap(notes, 'bash', 1, 'now')).toBe(false)
+    expect(shouldRefuseNoteCap([
+      call('jspace_note', '{"next":"1"}', 'n1'),
+      card(),
+      call('jspace_note', '{"next":"2"}', 'n2'),
+    ], 'jspace_note', 2, 'now')).toBe(true)
+    expect(shouldRefuseNoteCap([
+      call('jspace_note', '{"next":"1"}', 'n1'),
+      call('jspace_note', '{"next":"2"}', 'n2'),
+      turn(),
+    ], 'jspace_note', 2, 'now')).toBe(false)
+    expect(DEFAULT_MAX_NOTES_PER_TURN).toBe(8)
+    expect(noteCapDeny(8)).toBe(
+      'jspace_note is limited to 8 calls this turn; write a checkpoint or do the work instead.',
+    )
   })
 })

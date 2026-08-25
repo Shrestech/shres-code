@@ -2906,6 +2906,25 @@ export type CompletionDelivery = 'quiet' | 'wakeup'
 
 Source: [`packages/jobs/tool-jobs/src/index.ts:32`](../packages/jobs/tool-jobs/src/index.ts)
 
+<a id="shres-codeshres-code-tool-jspace"></a>
+
+## `@shres-code/shres-code-tool-jspace`
+
+Requires: `tools` · `jspace`
+
+```ts config-catalog
+/** Per-turn `jspace_note` budget. Raising `maxNotesPerTurn` is a deployment choice. */
+export interface Config {
+  /**
+   * Maximum `jspace_note` calls accepted in one user turn. Defaults to 8.
+   * Zero and negative are rejected.
+   */
+  maxNotesPerTurn?: number
+}
+```
+
+Source: [`packages/jspace/tool-jspace/src/index.ts:30`](../packages/jspace/tool-jspace/src/index.ts)
+
 <a id="shres-codeshres-code-tool-lsp"></a>
 
 ## `@shres-code/shres-code-tool-lsp`
@@ -3586,7 +3605,6 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@shres-code/shres-code-tool-ask-user` — requires `tools` · `userQuestions` ([`packages/interaction/tool-ask-user/src/index.ts`](../packages/interaction/tool-ask-user/src/index.ts))
 - `@shres-code/shres-code-tool-call-timeout-policy` — requires `tools` ([`packages/guard/timeout-policy/src/index.ts`](../packages/guard/timeout-policy/src/index.ts))
 - `@shres-code/shres-code-tool-cordis` — requires `tools` · `systemPrompt` · `dynamicCordisRunner` · `cordisInspect` ([`packages/extensions/tool-cordis/src/index.ts`](../packages/extensions/tool-cordis/src/index.ts))
-- `@shres-code/shres-code-tool-jspace` — requires `tools` · `jspace` ([`packages/jspace/tool-jspace/src/index.ts`](../packages/jspace/tool-jspace/src/index.ts))
 - `@shres-code/shres-code-tool-subagent-control` — requires `tools` · `subagents` ([`packages/subagent/tool-subagent-control/src/index.ts`](../packages/subagent/tool-subagent-control/src/index.ts))
 - `@shres-code/shres-code-tool-tracker` — requires `tools` · `tracker` ([`packages/tracker/tool-tracker/src/index.ts`](../packages/tracker/tool-tracker/src/index.ts))
 - `@shres-code/shres-code-user-questions` ([`packages/interaction/user-questions/src/index.ts`](../packages/interaction/user-questions/src/index.ts))

@@ -34,13 +34,14 @@ function stubAgent(ctx: Context, id: string): Agent {
 async function harness(
   enabled = true,
   jspace: ConstructorParameters<typeof JspaceService>[1] = {},
+  toolConfig: tool.Config = {},
 ): Promise<Harness> {
   const ctx = new Context()
   await ctx.plugin(SessionStore)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
   await ctx.plugin(JspaceService, { enabled, ...jspace })
-  const fiber = await ctx.plugin(tool)
+  const fiber = await ctx.plugin(tool, toolConfig)
   return { ctx, agent: stubAgent(ctx, `ws-tool-${Math.random()}`), fiber }
 }
 
@@ -514,5 +515,66 @@ describe('jspace tools', () => {
     expect(allowed.isError).toBe(false)
     const noAgent = await execute(ctx, 'echo', { msg: 'hi' })
     expect(noAgent.isError).toBe(false)
+  })
+
+  it('refuses a packed JSON-array line and a no-op note', async () => {
+    const { ctx, agent } = await harness()
+    await execute(ctx, 'jspace_open', { goal: 'A', next: 'B' }, agent)
+    const packed = await execute(ctx, 'jspace_note', {
+      core: '["Zombie-goal root cause: a", "Fix (scoped): b"]',
+    }, agent)
+    expect(packed.isError).toBe(true)
+    expect(text(packed)).toContain('one item per slot')
+    const bracket = await execute(ctx, 'jspace_note', { core: '[shield] fix the gate' }, agent)
+    expect(bracket.isError).toBe(false)
+    expect(ctx.jspace.card(agent.session)?.core).toEqual(['[shield] fix the gate'])
+    const noop = await execute(ctx, 'jspace_note', { next: 'B' }, agent)
+    expect(noop.isError).toBe(true)
+    expect(text(noop)).toContain('the card already says this')
+  })
+
+  it('refuses a ninth jspace_note in the same turn and resets after turn/start', async () => {
+    const { ctx, agent } = await harness()
+    await execute(ctx, 'jspace_open', { goal: 'A', next: 'B' }, agent)
+    for (let index = 0; index < 8; index += 1) {
+      agent.session.append('tool/call', {
+        turn: 1,
+        step: index + 1,
+        callId: CallId(`note-${String(index)}`),
+        name: 'jspace_note',
+        arguments: JSON.stringify({ next: `step-${String(index)}` }),
+      })
+    }
+    const denied = await execute(ctx, 'jspace_note', { next: 'after-cap' }, agent)
+    expect(denied.isError).toBe(true)
+    expect(text(denied)).toContain('limited to 8 calls this turn')
+    expect(ctx.jspace.card(agent.session)?.next).toBe('B')
+    agent.session.append('turn/start', { turn: 2 })
+    const allowed = await execute(ctx, 'jspace_note', { next: 'after-cap' }, agent)
+    expect(allowed.isError).toBe(false)
+    expect(ctx.jspace.card(agent.session)?.next).toBe('after-cap')
+  })
+
+  it('honors a deployment maxNotesPerTurn and rejects a non-positive cap', async () => {
+    const tight = await harness(true, {}, { maxNotesPerTurn: 1 })
+    await execute(tight.ctx, 'jspace_open', { goal: 'A', next: 'B' }, tight.agent)
+    tight.agent.session.append('tool/call', {
+      turn: 1,
+      step: 1,
+      callId: CallId('note-0'),
+      name: 'jspace_note',
+      arguments: '{"next":"first"}',
+    })
+    const denied = await execute(tight.ctx, 'jspace_note', { next: 'second' }, tight.agent)
+    expect(denied.isError).toBe(true)
+    expect(text(denied)).toContain('limited to 1 calls this turn')
+    expect(() => new tool.Config({ maxNotesPerTurn: 0 })).toThrow()
+    expect(() => new tool.Config({ maxNotesPerTurn: -1 })).toThrow()
+    expect(() => { tool.apply(new Context(), { maxNotesPerTurn: 0 }) })
+      .toThrow('maxNotesPerTurn must be a positive safe integer')
+    expect(() => { tool.apply(new Context(), { maxNotesPerTurn: -2 }) })
+      .toThrow('maxNotesPerTurn must be a positive safe integer')
+    expect(new tool.Config({})).toEqual({ maxNotesPerTurn: tool.DEFAULT_MAX_NOTES_PER_TURN })
+    expect(tight.ctx.tools.get('jspace_note')?.description).toContain('no-op')
   })
 })

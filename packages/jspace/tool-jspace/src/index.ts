@@ -5,17 +5,58 @@
  */
 
 import type { Context } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
 import { defineTool } from '@shres-code/shres-code-tools'
 import type { GenericCallView, ToolRunContext } from '@shres-code/shres-code-tools'
 import { JspaceError } from '@shres-code/shres-code-jspace'
 import type { JspaceStatus } from '@shres-code/shres-code-jspace'
-import { REPEAT_DENY, shouldRefuseRepeat } from './retry.ts'
+import {
+  DEFAULT_MAX_NOTES_PER_TURN,
+  noteCapDeny,
+  REPEAT_DENY,
+  shouldRefuseNoteCap,
+  shouldRefuseRepeat,
+} from './retry.ts'
 import { shipRefusal } from './ship.ts'
+
+export { DEFAULT_MAX_NOTES_PER_TURN } from './retry.ts'
 
 /** Cordis plugin name. */
 export const name = 'tool-jspace'
 /** Requires the tool registry and the J-Space seat. */
 export const inject = ['tools', 'jspace']
+
+/** Per-turn `jspace_note` budget. Raising `maxNotesPerTurn` is a deployment choice. */
+export interface Config {
+  /**
+   * Maximum `jspace_note` calls accepted in one user turn. Defaults to 8.
+   * Zero and negative are rejected.
+   */
+  maxNotesPerTurn?: number
+}
+
+/** Schemastery config for Loader defaults and generated configuration docs. */
+export const Config: z<Config> = z.object({
+  maxNotesPerTurn: z.number().step(1).min(1).default(DEFAULT_MAX_NOTES_PER_TURN),
+})
+
+/** Fully materialized note-cap. */
+interface ResolvedConfig {
+  readonly maxNotesPerTurn: number
+}
+
+/**
+ * Validate config even when apply is called directly outside Loader normalization.
+ * @param config - raw plugin config.
+ * @returns a positive per-turn note cap.
+ */
+function resolveConfig(config: Config): ResolvedConfig {
+  const maxNotesPerTurn = config.maxNotesPerTurn ?? DEFAULT_MAX_NOTES_PER_TURN
+  if (!Number.isSafeInteger(maxNotesPerTurn) || maxNotesPerTurn < 1) {
+    throw new TypeError('tool-jspace: maxNotesPerTurn must be a positive safe integer')
+  }
+  return { maxNotesPerTurn }
+}
 
 const OPEN_DESCRIPTION =
   'Open a J-Space card for this session, or replace Goal and Next when a card is '
@@ -28,7 +69,8 @@ const OPEN_DESCRIPTION =
 const NOTE_DESCRIPTION =
   'Update the open J-Space card. Changing Core requires both departing (the item '
   + 'leaving) and core (the item entering). Goal changes are rejected; use '
-  + 'jspace_open to start a new Goal epoch. Rejects if no card is open.'
+  + 'jspace_open to start a new Goal epoch. Rejects a no-op that leaves the card '
+  + 'unchanged, and rejects if no card is open.'
 
 const CHECKPOINT_DESCRIPTION =
   'Record a Checked line on the open card. `by` must name a verifier and what it covered. '
@@ -271,8 +313,10 @@ function registerTools(ctx: Context): () => void {
 /**
  * Remount the four tools while the seat is active.
  * @param ctx - context with tools and jspace.
+ * @param config - per-turn note cap; defaults to 8.
  */
-export function apply(ctx: Context): void {
+export function apply(ctx: Context, config: Config = {}): void {
+  const resolved = resolveConfig(config)
   let disposeTools: (() => void) | undefined
   const remount = (status: JspaceStatus): void => {
     disposeTools?.()
@@ -293,6 +337,9 @@ export function apply(ctx: Context): void {
     if (!ctx.jspace.status.active) return next()
     const session = exec.agent?.session
     if (session === undefined || ctx.jspace.card(session) === null) return next()
+    if (shouldRefuseNoteCap(session.events, exec.name, resolved.maxNotesPerTurn, exec.callId)) {
+      return Promise.resolve({ kind: 'deny' as const, reason: noteCapDeny(resolved.maxNotesPerTurn) })
+    }
     if (shouldRefuseRepeat(session.events, exec.name, exec.arguments, exec.callId)) {
       return Promise.resolve({ kind: 'deny' as const, reason: REPEAT_DENY })
     }

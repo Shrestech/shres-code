@@ -1766,7 +1766,7 @@ Source: [`packages/jspace/tool-jspace/src/index.ts`](../packages/jspace/tool-jsp
 
 ### `jspace_note`
 
-Update the open J-Space card. Changing Core requires both departing (the item leaving) and core (the item entering). Goal changes are rejected; use jspace_open to start a new Goal epoch. Rejects if no card is open.
+Update the open J-Space card. Changing Core requires both departing (the item leaving) and core (the item entering). Goal changes are rejected; use jspace_open to start a new Goal epoch. Rejects a no-op that leaves the card unchanged, and rejects if no card is open.
 
 ```json
 {

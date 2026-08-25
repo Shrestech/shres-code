@@ -165,7 +165,22 @@ const jspaceProjectionSchema: ZodType<JspaceProjection> = zod.object({
 }) as ZodType<JspaceProjection>
 
 /**
- * Trim and reject a blank line.
+ * Whether trimmed line text is a JSON array packed into one slot.
+ * Objects and strings that happen to parse as JSON are ordinary prose.
+ * @param trimmed - already-trimmed line.
+ * @returns true when `JSON.parse` yields an array.
+ */
+function isPackedJsonArray(trimmed: string): boolean {
+  try {
+    return Array.isArray(JSON.parse(trimmed))
+  } catch {
+    // JSON.parse rejects non-JSON text; that text is a normal card line.
+    return false
+  }
+}
+
+/**
+ * Trim and reject a blank, multi-line, labeled, or JSON-array-packed line.
  * @param value - raw string.
  * @param field - field name.
  * @returns trimmed value.
@@ -181,7 +196,38 @@ function line(value: string, field: string): string {
   if (/^(Goal|Core|Checked|Open|Next|Pass):/iu.test(trimmed)) {
     throw new JspaceError(`jspace ${field} cannot start with a card label`, 'JSPACE_EMPTY')
   }
+  if (isPackedJsonArray(trimmed)) {
+    throw new JspaceError(
+      'jspace line must be one item per slot; Core holds at most 2 live items',
+      'JSPACE_LINE_PACKED',
+    )
+  }
   return trimmed
+}
+
+/**
+ * Element-wise identity for Core strings.
+ * @param left - current Core.
+ * @param right - proposed Core.
+ * @returns true when both lists match in order.
+ */
+function sameCore(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((item, index) => item === right[index])
+}
+
+/**
+ * Element-wise identity for Open lines.
+ * @param left - current Open.
+ * @param right - proposed Open.
+ * @returns true when questions and optional settles match in order.
+ */
+function sameOpen(left: readonly JspaceOpenLine[], right: readonly JspaceOpenLine[]): boolean {
+  return left.length === right.length && left.every((item, index) => {
+    const other = right[index]
+    return other !== undefined
+      && item.question === other.question
+      && item.settles === other.settles
+  })
 }
 
 /**
@@ -313,7 +359,8 @@ export default class JspaceService extends Service {
 
   /**
    * Patch an open card. Rejects a Goal identity change (`JSPACE_NOTE_GOAL_CHANGE`);
-   * Goal epochs open only through `openGoal`.
+   * Goal epochs open only through `openGoal`. Rejects a patch whose Goal, Next,
+   * Core, and Open match the current card (`JSPACE_NOTE_NOOP`).
    * @param session - owning session.
    * @param input - fields to replace.
    * @returns the recorded card.
@@ -371,6 +418,17 @@ export default class JspaceService extends Service {
         question: line(item.question, `open[${String(i)}].question`),
         ...item.settles === undefined ? {} : { settles: line(item.settles, `open[${String(i)}].settles`) },
       }))
+    if (
+      goal === current.goal
+      && next === current.next
+      && sameCore(current.core, core)
+      && sameOpen(current.open, open)
+    ) {
+      throw new JspaceError(
+        'the card already says this; proceed with the work or write a checkpoint',
+        'JSPACE_NOTE_NOOP',
+      )
+    }
     return this.writeCard(session, {
       seq: this.nextSeq(session),
       sessionId: session.id,
