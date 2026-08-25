@@ -25,6 +25,7 @@ import {
   main,
   matchTaskIds,
   parseArgs,
+  readStoredCredential,
   UsageError,
 } from '../runner/run.js'
 
@@ -433,18 +434,39 @@ describe('run.main --dry-run', () => {
 
   it('refuses a real run without the named API key', async () => {
     const benchRoot = await tempDir('bench-runner-nokey-')
+    // SHRES_HOME pins the credential-store fallback to an empty temp dir so
+    // the machine's real ~/.shres store cannot satisfy the gate under test.
+    const emptyHome = await tempDir('bench-runner-nokey-home-')
     try {
       await writeTask(benchRoot, 'alpha')
       await assert.rejects(
-        () => main(['--experiment', 'demo'], { benchRoot, env: {}, print: () => {} }),
+        () => main(['--experiment', 'demo'], { benchRoot, env: { SHRES_HOME: emptyHome }, print: () => {} }),
         error => error instanceof UsageError && /DEEPSEEK_API_KEY/.test(error.message),
       )
       await assert.rejects(
-        () => main(['--experiment', 'demo2', '--api-key-env', 'ZAI_API_KEY'], { benchRoot, env: {}, print: () => {} }),
+        () => main(['--experiment', 'demo2', '--api-key-env', 'ZAI_API_KEY'], { benchRoot, env: { SHRES_HOME: emptyHome }, print: () => {} }),
         error => error instanceof UsageError && /ZAI_API_KEY/.test(error.message),
       )
     } finally {
       await rm(benchRoot, { recursive: true, force: true })
+      await rm(emptyHome, { recursive: true, force: true })
+    }
+  })
+
+  it('reads a missing API key from the harness credential store', async () => {
+    const home = await tempDir('bench-runner-credstore-')
+    try {
+      await writeFile(join(home, '.credentials.yaml'), [
+        'OTHER_KEY: plain-value',
+        "ZAI_API_KEY: 'quoted-value'",
+        'EMPTY_KEY:   ',
+      ].join('\n'))
+      assert.equal(await readStoredCredential({ SHRES_HOME: home }, 'OTHER_KEY'), 'plain-value')
+      assert.equal(await readStoredCredential({ SHRES_HOME: home }, 'ZAI_API_KEY'), 'quoted-value')
+      assert.equal(await readStoredCredential({ SHRES_HOME: home }, 'ABSENT_KEY'), null)
+      assert.equal(await readStoredCredential({ SHRES_HOME: join(home, 'nowhere') }, 'ZAI_API_KEY'), null)
+    } finally {
+      await rm(home, { recursive: true, force: true })
     }
   })
 

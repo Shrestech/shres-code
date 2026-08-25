@@ -42,6 +42,7 @@ import { appendFile, cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs
 import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { execFile } from 'node:child_process'
+import { homedir } from 'node:os'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
@@ -64,7 +65,10 @@ Options:
   --model <id>          model pin for run.json (default: $BENCH_MODEL or deepseek-v4-flash)
   --temperature <t>     temperature pin for run.json (default: $BENCH_TEMPERATURE or 1)
   --base-url <url>      provider base URL pin (default: $DEEPSEEK_BASE_URL when --api-key-env is DEEPSEEK_API_KEY, null otherwise)
-  --api-key-env <VAR>   env var name for the API key; 'none' for keyless tiers (default: DEEPSEEK_API_KEY)
+  --api-key-env <VAR>   env var name for the API key; 'none' for keyless tiers (default: DEEPSEEK_API_KEY).
+                        An unset variable falls back to the harness credential store
+                        ($SHRES_HOME/.credentials.yaml, default ~/.shres); the value is injected
+                        into the child environment only, never into any bench record.
   --tier-patch <path>   experiment-level patch overlay for provider swap, applied to every spawn alongside the arm overlay
   --dry-run             print the plan and exit without writing or executing
   --help                this text
@@ -639,6 +643,33 @@ async function findIntegrityViolationEvents(sessionLogPath) {
  */
 
 /**
+ * Read a credential from the harness credential store when the variable is
+ * absent from the environment. The store is the flat `KEY: value` YAML the
+ * harness keeps at `$SHRES_HOME/.credentials.yaml` (default `~/.shres`). The
+ * runner overrides SHRES_HOME per experiment for session isolation, so the
+ * spawned harness cannot read the real store itself; the caller injects the
+ * resolved value into the child environment and never writes it to any bench
+ * record.
+ * @param {NodeJS.ProcessEnv} env - runner environment (pre-override SHRES_HOME).
+ * @param {string} name - credential variable name.
+ * @returns {Promise<string | null>} the stored value, or null when absent.
+ */
+export async function readStoredCredential(env, name) {
+  const home = env.SHRES_HOME ?? join(homedir(), '.shres')
+  const text = await readFile(join(home, '.credentials.yaml'), 'utf8').catch(() => null)
+  if (text === null) return null
+  for (const line of text.split('\n')) {
+    const match = /^([A-Za-z_][A-Za-z0-9_]*):\s*(.+?)\s*$/.exec(line)
+    if (match === null || match[1] !== name) continue
+    const raw = /** @type {string} */ (match[2])
+    const unquoted = /^(['"])(.*)\1$/.exec(raw)
+    const value = unquoted === null ? raw : /** @type {string} */ (unquoted[2])
+    return value === '' ? null : value
+  }
+  return null
+}
+
+/**
  * Run the experiment (or, with --dry-run, print the plan).
  * @param {string[]} argv - arguments after `node run.js`.
  * @param {RunnerIo} [io] - injectable environment.
@@ -646,7 +677,7 @@ async function findIntegrityViolationEvents(sessionLogPath) {
  */
 export async function main(argv, io = {}) {
   const options = parseArgs(argv)
-  const env = io.env ?? process.env
+  let env = io.env ?? process.env
   const print = io.print ?? (line => console.log(line))
   if (options.help) {
     print(USAGE)
@@ -694,9 +725,17 @@ export async function main(argv, io = {}) {
   }
 
   if (apiKeyEnv !== 'none') {
-    if (typeof env[apiKeyEnv] !== 'string' || env[apiKeyEnv] === '') {
-      throw new UsageError(`${apiKeyEnv} is required for real runs (or use --dry-run, or --api-key-env none for keyless tiers)`)
+    const fromEnv = env[apiKeyEnv]
+    const key = typeof fromEnv === 'string' && fromEnv !== ''
+      ? fromEnv
+      : await readStoredCredential(env, apiKeyEnv)
+    if (key === null) {
+      throw new UsageError(
+        `${apiKeyEnv} is required for real runs: export it or add it to the harness credential store `
+        + `($SHRES_HOME/.credentials.yaml, default ~/.shres); or use --dry-run, or --api-key-env none for keyless tiers`,
+      )
     }
+    if (fromEnv !== key) env = { ...env, [apiKeyEnv]: key }
   }
 
   const experimentDir = join(benchRoot, 'runs', options.experiment)

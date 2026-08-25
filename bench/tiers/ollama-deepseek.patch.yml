@@ -1,9 +1,10 @@
-# Tier overlay: local Ollama serving a DeepSeek model (OpenAI-compatible).
-# Disables llm-deepseek and inserts llm-pi-ai with a keyless ollama route.
-# Applied as --tier-patch alongside the per-arm overlay.
+# Tier overlay: Ollama Cloud serving DeepSeek-V4-Flash (OpenAI-compatible).
+# Disables llm-deepseek and inserts llm-pi-ai with a credentialed ollama route.
+# Applied as --tier-patch alongside the per-arm overlay; run with
+# --api-key-env OLLAMA_API_KEY (key from https://ollama.com/settings/keys).
 #
-# The model id below must match the model pulled on the runner machine
-# (e.g. `ollama pull deepseek-r1:32b`). Update it before running.
+# The dated :0731-cloud tag pins the model for reproducible experiments;
+# :cloud floats to Ollama's current default.
 - id: llm-deepseek
   disabled: true
 - insert:
@@ -12,7 +13,8 @@
       config:
         providers:
           ollama:
-            baseURL: http://127.0.0.1:11434/v1
+            apiKeyEnv: OLLAMA_API_KEY
+            baseURL: https://ollama.com/v1
             models:
-              - id: deepseek-r1:32b
-                contextWindow: 128000
+              - id: deepseek-v4-flash:0731-cloud
+                contextWindow: 1048576

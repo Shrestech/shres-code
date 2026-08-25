@@ -50,7 +50,7 @@ node bench/runner/run.js --experiment w0-2026-08-18 --arms off,on --repeats 3
 
 ## Provider tiers
 
-The runner generalizes beyond DeepSeek: `--api-key-env <VAR|none>` names the credential environment variable (`DEEPSEEK_API_KEY` by default), and `--tier-patch <path>` applies an experiment-level composition overlay to every spawn alongside the per-arm overlay. The CLI passes both patches as repeated `--patch` flags — the shres launcher accepts repeatable `--patch` and flattens all layers into one `applyEntryPatches` call. `run.json` records the env var name (never the value) in `apiKeyEnv` and the tier patch file path + SHA-256 in `tierPatch`, so a changed tier file is a new experiment.
+The runner generalizes beyond DeepSeek: `--api-key-env <VAR|none>` names the credential environment variable (`DEEPSEEK_API_KEY` by default), and `--tier-patch <path>` applies an experiment-level composition overlay to every spawn alongside the per-arm overlay. When the variable is not exported, the runner reads it from the harness credential store (`$SHRES_HOME/.credentials.yaml`, default `~/.shres`) and injects the value into the child environment — required because each trial runs under an experiment-local `SHRES_HOME` that hides the real store; the value never reaches any bench record. The CLI passes both patches as repeated `--patch` flags — the shres launcher accepts repeatable `--patch` and flattens all layers into one `applyEntryPatches` call. `run.json` records the env var name (never the value) in `apiKeyEnv` and the tier patch file path + SHA-256 in `tierPatch`, so a changed tier file is a new experiment.
 
 Ready tier overlays live in `bench/tiers/`. Each disables the shipped `llm-deepseek` entry and inserts `llm-pi-ai` with a hand-declared provider route, mirroring the documented adapter swap in the headless composition.
 
@@ -65,16 +65,18 @@ node bench/runner/run.js \
   --tier-patch bench/tiers/zai.patch.yml
 ```
 
-**Ollama tier** (local DeepSeek model, keyless):
+**Ollama Cloud tier** (DeepSeek-V4-Flash, hosted, key from https://ollama.com/settings/keys):
 
 ```sh
 node bench/runner/run.js \
   --experiment w4-2026-08-25-ollama \
-  --arms off,on \
+  --arms off,on,sq-only,on-sq,on-sq-verified \
   --repeats 5 \
-  --api-key-env none \
+  --api-key-env OLLAMA_API_KEY \
   --tier-patch bench/tiers/ollama-deepseek.patch.yml
 ```
+
+Both tiers are capable models, so expect ceiling effects on the short tasks: when pass rates saturate across arms, the discriminating signal moves to the long/chain and adversarial tasks and to the efficiency and forensics columns (tokens, turns, `danglingCard`, `verifiedCheckpointShare`). V4-Flash's high output speed also means more turns fit inside a task's time budget than on a slower tier — never compare wall time or turn counts across experiments, only across arms within one.
 
 When `--api-key-env` is not `DEEPSEEK_API_KEY`, the `--base-url` default becomes null (the `DEEPSEEK_BASE_URL` env var fallback applies only for the default DeepSeek case).
 
