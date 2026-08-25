@@ -410,6 +410,8 @@ function buildManifest(experiment, arm, gitCommit, armTrials) {
     repeats: REPEATS,
     taskIds: TASKS.map(t => t.taskId),
     gitCommit,
+    apiKeyEnv: 'DEEPSEEK_API_KEY',
+    tierPatch: null,
     startedAt: armTrials[0].startedAt,
     endedAt: armTrials[armTrials.length - 1].endedAt,
   }

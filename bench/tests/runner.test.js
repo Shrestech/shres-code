@@ -153,6 +153,8 @@ describe('run.parseArgs', () => {
     assert.equal(options.repeats, 3)
     assert.equal(options.taskGlob, null)
     assert.equal(options.dryRun, false)
+    assert.equal(options.apiKeyEnv, 'DEEPSEEK_API_KEY')
+    assert.equal(options.tierPatch, null)
   })
 
   it('parses every flag', () => {
@@ -164,6 +166,8 @@ describe('run.parseArgs', () => {
       '--model', 'deepseek-v4-pro',
       '--temperature', '0.2',
       '--base-url', 'https://example.test',
+      '--api-key-env', 'ZAI_API_KEY',
+      '--tier-patch', 'bench/tiers/zai.patch.yml',
       '--dry-run',
     ])
     assert.deepEqual(options.arms, ['on', 'off'])
@@ -172,7 +176,14 @@ describe('run.parseArgs', () => {
     assert.equal(options.model, 'deepseek-v4-pro')
     assert.equal(options.temperature, 0.2)
     assert.equal(options.baseUrl, 'https://example.test')
+    assert.equal(options.apiKeyEnv, 'ZAI_API_KEY')
+    assert.equal(options.tierPatch, 'bench/tiers/zai.patch.yml')
     assert.equal(options.dryRun, true)
+  })
+
+  it('accepts --api-key-env none for keyless tiers', () => {
+    const options = parseArgs(['--experiment', 'w2', '--api-key-env', 'none'])
+    assert.equal(options.apiKeyEnv, 'none')
   })
 
   it('rejects malformed invocations', () => {
@@ -420,13 +431,70 @@ describe('run.main --dry-run', () => {
     }
   })
 
-  it('refuses a real run without DEEPSEEK_API_KEY', async () => {
+  it('refuses a real run without the named API key', async () => {
     const benchRoot = await tempDir('bench-runner-nokey-')
     try {
       await writeTask(benchRoot, 'alpha')
       await assert.rejects(
         () => main(['--experiment', 'demo'], { benchRoot, env: {}, print: () => {} }),
         error => error instanceof UsageError && /DEEPSEEK_API_KEY/.test(error.message),
+      )
+      await assert.rejects(
+        () => main(['--experiment', 'demo2', '--api-key-env', 'ZAI_API_KEY'], { benchRoot, env: {}, print: () => {} }),
+        error => error instanceof UsageError && /ZAI_API_KEY/.test(error.message),
+      )
+    } finally {
+      await rm(benchRoot, { recursive: true, force: true })
+    }
+  })
+
+  it('accepts --api-key-env none without requiring any key', async () => {
+    const benchRoot = await tempDir('bench-runner-nokey-none-')
+    try {
+      await writeTask(benchRoot, 'alpha')
+      /** @type {string[]} */
+      const lines = []
+      const code = await main(
+        ['--experiment', 'demo', '--arms', 'off', '--api-key-env', 'none', '--dry-run'],
+        { benchRoot, env: {}, print: line => lines.push(line) },
+      )
+      assert.equal(code, 0)
+      assert.ok(lines.some(l => l.includes('apiKeyEnv: none')))
+    } finally {
+      await rm(benchRoot, { recursive: true, force: true })
+    }
+  })
+
+  it('dry-run prints tier patch info', async () => {
+    const benchRoot = await tempDir('bench-runner-tier-dry-')
+    try {
+      await writeTask(benchRoot, 'alpha')
+      const tierPath = join(benchRoot, 'tiers', 'test.patch.yml')
+      await mkdir(join(benchRoot, 'tiers'), { recursive: true })
+      await writeFile(tierPath, '- id: llm-deepseek\n  disabled: true\n')
+      /** @type {string[]} */
+      const lines = []
+      const code = await main(
+        ['--experiment', 'demo', '--arms', 'off', '--api-key-env', 'none', '--tier-patch', tierPath, '--dry-run'],
+        { benchRoot, env: {}, print: line => lines.push(line) },
+      )
+      assert.equal(code, 0)
+      assert.ok(lines.some(l => l.includes('tierPatch:') && l.includes('test.patch.yml')))
+    } finally {
+      await rm(benchRoot, { recursive: true, force: true })
+    }
+  })
+
+  it('refuses --tier-patch when file does not exist', async () => {
+    const benchRoot = await tempDir('bench-runner-tier-missing-')
+    try {
+      await writeTask(benchRoot, 'alpha')
+      await assert.rejects(
+        () => main(
+          ['--experiment', 'demo', '--arms', 'off', '--api-key-env', 'none', '--tier-patch', '/nonexistent/patch.yml', '--dry-run'],
+          { benchRoot, env: {}, print: () => {} },
+        ),
+        error => error instanceof UsageError && /tier-patch file not found/.test(error.message),
       )
     } finally {
       await rm(benchRoot, { recursive: true, force: true })
@@ -535,6 +603,7 @@ const FAKE_BIN = `import { appendFile, mkdir, readFile, writeFile } from 'node:f
 import { join } from 'node:path'
 
 const args = process.argv.slice(2)
+// Read the first --patch (arm overlay) to find the session root.
 const overlay = await readFile(args[args.indexOf('--patch') + 1], 'utf8')
 const root = JSON.parse(overlay.match(/root: ("(?:[^"\\\\]|\\\\.)*")/)[1])
 const taskText = args[args.length - 1]
@@ -827,6 +896,52 @@ describe('run.main execution (fake harness)', () => {
     }
   })
 
+  it('run.json records apiKeyEnv and tierPatch', async () => {
+    const root = await tempDir('bench-runner-manifest-e2e-')
+    try {
+      const { benchRoot } = await writeBenchWorld(root, [{
+        taskId: 'manifest-check',
+        definition: { instruction: 'just checking manifests' },
+      }])
+      const { code } = await runWorld(benchRoot, ['--experiment', 'e2e', '--repeats', '1', '--arms', 'off'], 'off')
+      assert.equal(code, 0)
+      const manifest = JSON.parse(await readFile(join(benchRoot, 'runs', 'e2e', 'off', 'run.json'), 'utf8'))
+      assert.equal(manifest.apiKeyEnv, 'DEEPSEEK_API_KEY')
+      assert.equal(manifest.tierPatch, null)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('tier patch reaches spawn argv as a second --patch flag', async () => {
+    const root = await tempDir('bench-runner-tier-e2e-')
+    try {
+      const { benchRoot } = await writeBenchWorld(root, [{
+        taskId: 'tier-task',
+        definition: { instruction: 'test tier patch propagation' },
+      }])
+      const tierDir = join(benchRoot, 'tiers')
+      await mkdir(tierDir, { recursive: true })
+      const tierPath = join(tierDir, 'test.patch.yml')
+      await writeFile(tierPath, '- id: llm-deepseek\n  disabled: true\n')
+      /** @type {string[]} */
+      const lines = []
+      const code = await main(
+        ['--experiment', 'tier-e2e', '--repeats', '1', '--arms', 'off', '--tier-patch', tierPath],
+        { benchRoot, env: { DEEPSEEK_API_KEY: 'fake-key' }, print: line => lines.push(line) },
+      )
+      assert.equal(code, 0)
+      const manifest = JSON.parse(await readFile(join(benchRoot, 'runs', 'tier-e2e', 'off', 'run.json'), 'utf8'))
+      assert.equal(manifest.apiKeyEnv, 'DEEPSEEK_API_KEY')
+      assert.ok(manifest.tierPatch !== null)
+      assert.match(manifest.tierPatch.path, /tiers\/test\.patch\.yml/)
+      assert.equal(typeof manifest.tierPatch.sha256, 'string')
+      assert.equal(manifest.tierPatch.sha256.length, 64)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('flags a preexisting chain session root as leakage', async () => {
     const root = await tempDir('bench-runner-preexisting-e2e-')
     try {
@@ -846,6 +961,39 @@ describe('run.main execution (fake harness)', () => {
       assert.deepEqual(trial.integrity, { violations: ['session-root-preexisting:sessions/pre-chain/0/phase-1'] })
     } finally {
       await rm(root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('run.main --base-url defaulting', () => {
+  it('falls back to DEEPSEEK_BASE_URL only when apiKeyEnv is DEEPSEEK_API_KEY', async () => {
+    const benchRoot = await tempDir('bench-runner-baseurl-')
+    try {
+      const dir = join(benchRoot, 'tasks', 'alpha')
+      await mkdir(join(dir, 'fixture'), { recursive: true })
+      await writeFile(join(dir, 'task.json'), JSON.stringify({
+        taskId: 'alpha', stratum: 'short', description: 'a',
+        instruction: 'do it', verify: 'node verify.mjs', timeoutMs: 1000,
+      }))
+      /** @type {string[]} */
+      let lines = []
+
+      // Default apiKeyEnv (DEEPSEEK_API_KEY): picks up DEEPSEEK_BASE_URL
+      await main(
+        ['--experiment', 'e1', '--arms', 'off', '--dry-run'],
+        { benchRoot, env: { DEEPSEEK_BASE_URL: 'https://deepseek.example' }, print: line => lines.push(line) },
+      )
+      assert.ok(lines.some(l => l.includes('baseUrl: https://deepseek.example')))
+
+      // Non-default apiKeyEnv: base URL defaults to null
+      lines = []
+      await main(
+        ['--experiment', 'e2', '--arms', 'off', '--api-key-env', 'ZAI_API_KEY', '--dry-run'],
+        { benchRoot, env: { DEEPSEEK_BASE_URL: 'https://deepseek.example' }, print: line => lines.push(line) },
+      )
+      assert.ok(lines.some(l => l.includes('baseUrl: (provider default)')))
+    } finally {
+      await rm(benchRoot, { recursive: true, force: true })
     }
   })
 })

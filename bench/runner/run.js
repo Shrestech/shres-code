@@ -39,6 +39,7 @@
  */
 
 import { appendFile, cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { execFile } from 'node:child_process'
 import { dirname, join, relative, resolve, sep } from 'node:path'
@@ -62,7 +63,9 @@ Options:
   --tasks <glob>        task-id filter; * and ? wildcards (default: all)
   --model <id>          model pin for run.json (default: $BENCH_MODEL or deepseek-v4-flash)
   --temperature <t>     temperature pin for run.json (default: $BENCH_TEMPERATURE or 1)
-  --base-url <url>      provider base URL pin (default: $DEEPSEEK_BASE_URL or null)
+  --base-url <url>      provider base URL pin (default: $DEEPSEEK_BASE_URL when --api-key-env is DEEPSEEK_API_KEY, null otherwise)
+  --api-key-env <VAR>   env var name for the API key; 'none' for keyless tiers (default: DEEPSEEK_API_KEY)
+  --tier-patch <path>   experiment-level patch overlay for provider swap, applied to every spawn alongside the arm overlay
   --dry-run             print the plan and exit without writing or executing
   --help                this text
 `
@@ -104,6 +107,8 @@ export class UsageError extends Error {
  * @property {string | undefined} model
  * @property {number | undefined} temperature
  * @property {string | undefined} baseUrl
+ * @property {string} apiKeyEnv - env var name; `none` for keyless tiers.
+ * @property {string | null} tierPatch - path to tier overlay file, or null.
  */
 
 /**
@@ -123,6 +128,8 @@ export function parseArgs(argv) {
     model: undefined,
     temperature: undefined,
     baseUrl: undefined,
+    apiKeyEnv: 'DEEPSEEK_API_KEY',
+    tierPatch: null,
   }
   let armsSeen = false
   for (let index = 0; index < argv.length; index += 1) {
@@ -169,6 +176,12 @@ export function parseArgs(argv) {
       }
       case '--base-url':
         options.baseUrl = value()
+        break
+      case '--api-key-env':
+        options.apiKeyEnv = value()
+        break
+      case '--tier-patch':
+        options.tierPatch = value()
         break
       case '--dry-run':
         options.dryRun = true
@@ -390,13 +403,14 @@ function spawnFailureDetail(outcome, execution, where = '') {
  * @param {string} options.scratchDir - trial scratch dir; becomes the child cwd.
  * @param {number} options.timeoutMs - spawn timeout.
  * @param {NodeJS.ProcessEnv} options.env - child environment.
+ * @param {string[]} [options.extraPatchPaths] - additional patch overlays (e.g. tier patch).
  * @returns {Promise<{ execution: import('./execute.js').ExecutionResult, metrics: import('../schema/trial.js').TrialMetrics, sessionFile: string | null }>}
  */
-async function executeSpawn({ repoRoot, arm, armDir, sessionLogRoot, taskText, scratchDir, timeoutMs, env }) {
+async function executeSpawn({ repoRoot, arm, armDir, sessionLogRoot, taskText, scratchDir, timeoutMs, env, extraPatchPaths = [] }) {
   await mkdir(sessionLogRoot, { recursive: true })
   const overlayPath = join(sessionLogRoot, 'arm-overlay.yml')
   await writeFile(overlayPath, renderArmOverlay(arm, { sessionLogRoot }))
-  const execution = await executeTrial({ repoRoot, overlayPath, taskText, scratchDir, sessionLogRoot, timeoutMs, env })
+  const execution = await executeTrial({ repoRoot, overlayPath, extraPatchPaths, taskText, scratchDir, sessionLogRoot, timeoutMs, env })
   const metrics = execution.sessionLogPath === null
     ? emptyMetrics()
     : foldSessionLog(await readFile(execution.sessionLogPath, 'utf8'), {
@@ -462,9 +476,10 @@ function trialRecordFrame(task, entry, scratchDir, startedAt) {
  * @param {string} options.repoRoot - harness repository root.
  * @param {NodeJS.ProcessEnv} options.env - child environment.
  * @param {string} options.startedAt - trial start, ISO 8601.
+ * @param {string[]} [options.extraPatchPaths] - additional patch overlays (e.g. tier patch).
  * @returns {Promise<import('../schema/trial.js').Trial>} the trial record (pre-audit).
  */
-async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, sessionLogRoot, repoRoot, env, startedAt }) {
+async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, sessionLogRoot, repoRoot, env, startedAt, extraPatchPaths = [] }) {
   const { base, skippedVerifier } = trialRecordFrame(task, entry, scratchDir, startedAt)
   const { execution, metrics, sessionFile } = await executeSpawn({
     repoRoot,
@@ -475,6 +490,7 @@ async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, ses
     scratchDir,
     timeoutMs: task.timeoutMs,
     env,
+    extraPatchPaths,
   })
   const outcome = classifySpawn(execution)
   const endedAt = new Date().toISOString()
@@ -521,9 +537,10 @@ async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, ses
  * @param {string} options.startedAt - trial start, ISO 8601.
  * @param {import('../schema/trial.js').PhaseRecord[]} options.phases - shared sink: completed
  *   phase records are pushed here so a mid-chain runner failure keeps the evidence.
+ * @param {string[]} [options.extraPatchPaths] - additional patch overlays (e.g. tier patch).
  * @returns {Promise<import('../schema/trial.js').Trial>} the trial record (pre-audit).
  */
-async function runChainTrial({ task, entry, arm, armDir, scratchDir, sessionRoot, repoRoot, env, startedAt, phases }) {
+async function runChainTrial({ task, entry, arm, armDir, scratchDir, sessionRoot, repoRoot, env, startedAt, phases, extraPatchPaths = [] }) {
   const { base, skippedVerifier } = trialRecordFrame(task, entry, scratchDir, startedAt)
   const definitions = /** @type {TaskPhase[]} */ (task.phases)
   for (let index = 0; index < definitions.length; index += 1) {
@@ -538,6 +555,7 @@ async function runChainTrial({ task, entry, arm, armDir, scratchDir, sessionRoot
       scratchDir,
       timeoutMs: definition.timeoutMs ?? task.timeoutMs,
       env,
+      extraPatchPaths,
     })
     phases.push({
       phaseIndex: index,
@@ -643,12 +661,28 @@ export async function main(argv, io = {}) {
   const tasks = new Map(catalog.filter(task => taskIds.includes(task.taskId)).map(task => [task.taskId, task]))
   const model = options.model ?? env.BENCH_MODEL ?? DEFAULT_MODEL
   const temperature = options.temperature ?? (env.BENCH_TEMPERATURE === undefined ? DEFAULT_TEMPERATURE : Number(env.BENCH_TEMPERATURE))
-  const baseUrl = options.baseUrl ?? env.DEEPSEEK_BASE_URL ?? null
+  const apiKeyEnv = options.apiKeyEnv
+  const baseUrl = options.baseUrl ?? (apiKeyEnv === 'DEEPSEEK_API_KEY' ? (env.DEEPSEEK_BASE_URL ?? null) : null)
+
+  /** @type {import('../schema/run-manifest.js').TierPatchRecord | null} */
+  let tierPatchRecord = null
+  /** @type {string | null} */
+  let tierPatchAbsPath = null
+  if (options.tierPatch !== null) {
+    tierPatchAbsPath = resolve(options.tierPatch)
+    const tierContent = await readFile(tierPatchAbsPath, 'utf8').catch(() => {
+      throw new UsageError(`--tier-patch file not found: ${options.tierPatch}`)
+    })
+    const sha256 = createHash('sha256').update(tierContent).digest('hex')
+    tierPatchRecord = { path: relative(benchRoot, tierPatchAbsPath).split(sep).join('/'), sha256 }
+  }
+
   const plan = buildPlan({ taskIds, arms: options.arms, repeats: options.repeats })
 
   if (options.dryRun) {
     print(`experiment: ${options.experiment}`)
     print(`model: ${model}  temperature: ${temperature}  baseUrl: ${baseUrl ?? '(provider default)'}`)
+    print(`apiKeyEnv: ${apiKeyEnv}${tierPatchRecord ? `  tierPatch: ${tierPatchRecord.path} (${tierPatchRecord.sha256.slice(0, 12)}…)` : ''}`)
     print(`tasks: ${taskIds.join(', ')}`)
     print(`plan: ${plan.length} trials (${taskIds.length} tasks × ${options.repeats} repeats × ${options.arms.length} arms)`)
     for (const entry of plan) {
@@ -659,8 +693,10 @@ export async function main(argv, io = {}) {
     return 0
   }
 
-  if (typeof env.DEEPSEEK_API_KEY !== 'string' || env.DEEPSEEK_API_KEY === '') {
-    throw new UsageError('DEEPSEEK_API_KEY is required for real runs (or use --dry-run)')
+  if (apiKeyEnv !== 'none') {
+    if (typeof env[apiKeyEnv] !== 'string' || env[apiKeyEnv] === '') {
+      throw new UsageError(`${apiKeyEnv} is required for real runs (or use --dry-run, or --api-key-env none for keyless tiers)`)
+    }
   }
 
   const experimentDir = join(benchRoot, 'runs', options.experiment)
@@ -682,6 +718,8 @@ export async function main(argv, io = {}) {
       repeats: options.repeats,
       taskIds,
       gitCommit,
+      apiKeyEnv,
+      tierPatch: tierPatchRecord,
       startedAt,
       endedAt: '',
     }
@@ -707,6 +745,7 @@ export async function main(argv, io = {}) {
     const sessionRoot = join(armDir, 'sessions', entry.taskId, String(entry.trialIndex))
     const trialStartedAt = new Date().toISOString()
     const trialEnv = { ...env, SHRES_HOME: shresHome }
+    const extraPatchPaths = tierPatchAbsPath !== null ? [tierPatchAbsPath] : []
 
     // Integrity audit, part 1: none of this trial's session roots may
     // pre-exist — a leftover root means leakage from a previous trial.
@@ -737,6 +776,7 @@ export async function main(argv, io = {}) {
           task, entry, arm, armDir, scratchDir,
           sessionLogRoot: sessionRoot,
           repoRoot, env: trialEnv, startedAt: trialStartedAt,
+          extraPatchPaths,
         })
       } else {
         chainPhases = []
@@ -745,6 +785,7 @@ export async function main(argv, io = {}) {
           sessionRoot,
           repoRoot, env: trialEnv, startedAt: trialStartedAt,
           phases: chainPhases,
+          extraPatchPaths,
         })
       }
     } catch (error) {

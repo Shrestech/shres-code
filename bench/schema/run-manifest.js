@@ -7,6 +7,12 @@
  */
 
 /**
+ * @typedef {object} TierPatchRecord
+ * @property {string} path - relative path of the tier patch file from the bench root.
+ * @property {string} sha256 - hex SHA-256 of the file contents at experiment start.
+ */
+
+/**
  * @typedef {object} RunManifest
  * @property {1} version - manifest format version.
  * @property {string} experiment - experiment directory name, e.g. `w0-2026-08-18`.
@@ -18,6 +24,8 @@
  * @property {number} repeats - planned trials per task.
  * @property {string[]} taskIds - the pinned task set, in catalog order.
  * @property {string} gitCommit - harness commit the runs executed against.
+ * @property {string} apiKeyEnv - environment variable name for the API key (`none` for keyless tiers).
+ * @property {TierPatchRecord | null} tierPatch - tier overlay file record; null when no tier patch is used.
  * @property {string} startedAt - ISO 8601.
  * @property {string} endedAt - ISO 8601, empty string while running.
  */
@@ -40,4 +48,11 @@ export function validateRunManifest(value) {
   if (!Number.isSafeInteger(m.repeats) || /** @type {number} */ (m.repeats) < 1) throw new Error('manifest.repeats must be a positive integer')
   if (!Array.isArray(m.taskIds) || m.taskIds.some(id => typeof id !== 'string')) throw new Error('manifest.taskIds must be a string array')
   if (m.baseUrl !== null && typeof m.baseUrl !== 'string') throw new Error('manifest.baseUrl must be string|null')
+  if (typeof m.apiKeyEnv !== 'string') throw new Error('manifest.apiKeyEnv must be a string')
+  if (m.tierPatch !== null) {
+    const tp = /** @type {Record<string, unknown>} */ (m.tierPatch)
+    if (typeof tp !== 'object' || Array.isArray(tp)) throw new Error('manifest.tierPatch must be a record or null')
+    if (typeof tp.path !== 'string' || tp.path.length === 0) throw new Error('manifest.tierPatch.path must be a non-empty string')
+    if (typeof tp.sha256 !== 'string' || tp.sha256.length === 0) throw new Error('manifest.tierPatch.sha256 must be a non-empty string')
+  }
 }

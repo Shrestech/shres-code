@@ -76,6 +76,8 @@ function manifest(experiment, arm) {
     repeats: 3,
     taskIds: ['alpha', 'beta'],
     gitCommit: 'deadbeef',
+    apiKeyEnv: 'DEEPSEEK_API_KEY',
+    tierPatch: null,
     startedAt: '2026-08-18T00:00:00.000Z',
     endedAt: '2026-08-18T01:00:00.000Z',
   }

@@ -42,11 +42,41 @@ node bench/report/serve.js             # open the report at http://127.0.0.1:747
 node --test bench/tests/*.test.js        # unit tests
 ```
 
-Real runs need `DEEPSEEK_API_KEY` and a built harness:
+Real runs need an API key (or `--api-key-env none` for keyless tiers) and a built harness:
 
 ```sh
 node bench/runner/run.js --experiment w0-2026-08-18 --arms off,on --repeats 3
 ```
+
+## Provider tiers
+
+The runner generalizes beyond DeepSeek: `--api-key-env <VAR|none>` names the credential environment variable (`DEEPSEEK_API_KEY` by default), and `--tier-patch <path>` applies an experiment-level composition overlay to every spawn alongside the per-arm overlay. The CLI passes both patches as repeated `--patch` flags — the shres launcher accepts repeatable `--patch` and flattens all layers into one `applyEntryPatches` call. `run.json` records the env var name (never the value) in `apiKeyEnv` and the tier patch file path + SHA-256 in `tierPatch`, so a changed tier file is a new experiment.
+
+Ready tier overlays live in `bench/tiers/`. Each disables the shipped `llm-deepseek` entry and inserts `llm-pi-ai` with a hand-declared provider route, mirroring the documented adapter swap in the headless composition.
+
+**Z.ai tier** (GLM-5.3 via the OpenAI-compatible endpoint):
+
+```sh
+node bench/runner/run.js \
+  --experiment w4-2026-08-25-zai \
+  --arms off,on,sq-only,on-sq,on-sq-verified \
+  --repeats 5 \
+  --api-key-env ZAI_API_KEY \
+  --tier-patch bench/tiers/zai.patch.yml
+```
+
+**Ollama tier** (local DeepSeek model, keyless):
+
+```sh
+node bench/runner/run.js \
+  --experiment w4-2026-08-25-ollama \
+  --arms off,on \
+  --repeats 5 \
+  --api-key-env none \
+  --tier-patch bench/tiers/ollama-deepseek.patch.yml
+```
+
+When `--api-key-env` is not `DEEPSEEK_API_KEY`, the `--base-url` default becomes null (the `DEEPSEEK_BASE_URL` env var fallback applies only for the default DeepSeek case).
 
 ## Protocol rules (pre-registered)
 

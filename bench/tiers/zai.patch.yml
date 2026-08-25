@@ -1,0 +1,16 @@
+# Tier overlay: Z.ai GLM via llm-pi-ai (OpenAI-compatible endpoint).
+# Disables llm-deepseek and inserts llm-pi-ai with a hand-declared zai route.
+# Applied as --tier-patch alongside the per-arm overlay.
+- id: llm-deepseek
+  disabled: true
+- insert:
+    - id: llm
+      name: '@shres-code/shres-code-llm-pi-ai'
+      config:
+        providers:
+          zai:
+            apiKeyEnv: ZAI_API_KEY
+            baseURL: https://api.z.ai/api/paas/v4/
+            models:
+              - id: glm-5.3
+                contextWindow: 200000

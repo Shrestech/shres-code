@@ -1,0 +1,18 @@
+# Tier overlay: local Ollama serving a DeepSeek model (OpenAI-compatible).
+# Disables llm-deepseek and inserts llm-pi-ai with a keyless ollama route.
+# Applied as --tier-patch alongside the per-arm overlay.
+#
+# The model id below must match the model pulled on the runner machine
+# (e.g. `ollama pull deepseek-r1:32b`). Update it before running.
+- id: llm-deepseek
+  disabled: true
+- insert:
+    - id: llm
+      name: '@shres-code/shres-code-llm-pi-ai'
+      config:
+        providers:
+          ollama:
+            baseURL: http://127.0.0.1:11434/v1
+            models:
+              - id: deepseek-r1:32b
+                contextWindow: 128000

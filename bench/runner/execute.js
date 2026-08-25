@@ -131,16 +131,18 @@ export async function findSessionLog(sessionLogRoot, scratchDir) {
  * @param {object} options
  * @param {string} options.repoRoot - harness repository root.
  * @param {string} options.overlayPath - absolute path of the arm `--patch` overlay.
+ * @param {string[]} [options.extraPatchPaths] - additional `--patch` overlays (e.g. tier patch), applied after the arm overlay.
  * @param {string} options.taskText - the task instruction, passed as the app argument.
  * @param {string} options.scratchDir - trial scratch dir; becomes the child cwd.
  * @param {string} options.sessionLogRoot - per-trial persistence root baked into the overlay.
  * @param {number} options.timeoutMs - task timeout from task.json.
- * @param {NodeJS.ProcessEnv} options.env - child environment (carries DEEPSEEK_API_KEY, SHRES_HOME).
+ * @param {NodeJS.ProcessEnv} options.env - child environment (carries API key, SHRES_HOME).
  * @returns {Promise<ExecutionResult>} the execution record.
  */
-export async function executeTrial({ repoRoot, overlayPath, taskText, scratchDir, sessionLogRoot, timeoutMs, env }) {
+export async function executeTrial({ repoRoot, overlayPath, extraPatchPaths = [], taskText, scratchDir, sessionLogRoot, timeoutMs, env }) {
   const launch = resolveHarnessLaunch(repoRoot)
-  const argv = [...launch.argsPrefix, '--profile', 'headless', '--patch', overlayPath, taskText]
+  const patchArgs = ['--patch', overlayPath, ...extraPatchPaths.flatMap(p => ['--patch', p])]
+  const argv = [...launch.argsPrefix, '--profile', 'headless', ...patchArgs, taskText]
   const startedAt = Date.now()
 
   const child = spawn(launch.command, argv, { cwd: scratchDir, env, stdio: ['ignore', 'pipe', 'pipe'] })
