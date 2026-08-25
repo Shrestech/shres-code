@@ -4,7 +4,7 @@
  * toggle (protocol rule 1).
  *
  * ```
- * node bench/runner/run.js --experiment w0-2026-08-18 [--arms off,on] [--repeats 3] [--tasks glob] [--dry-run]
+ * node bench/runner/run.js --experiment w0-2026-08-18 [--arms off,on] [--repeats 3] [--tasks glob[,glob]] [--dry-run]
  * ```
  *
  * Per trial the runner copies the fixture into a fresh scratch dir, writes the
@@ -61,7 +61,7 @@ Options:
   --experiment <name>   experiment directory under bench/runs/ (required)
   --arms <a,b>          arms to run, comma-separated (default: ${listArms().join(',')})
   --repeats <n>         trials per task per arm (default: 3)
-  --tasks <glob>        task-id filter; * and ? wildcards (default: all)
+  --tasks <glob[,glob]> task-id filter; comma-separated * / ? globs; match is union (default: all)
   --model <id>          model pin for run.json (default: $BENCH_MODEL or deepseek-v4-flash)
   --temperature <t>     temperature pin for run.json (default: $BENCH_TEMPERATURE or 1)
   --base-url <url>      provider base URL pin (default: $DEEPSEEK_BASE_URL when --api-key-env is DEEPSEEK_API_KEY, null otherwise)
@@ -203,16 +203,26 @@ export function parseArgs(argv) {
 }
 
 /**
- * Filter task ids by a `*`/`?` glob. Null keeps the whole catalog.
+ * Compile one `*`/`?` glob into an anchored regular expression.
+ * @param {string} glob - a single pattern; leading/trailing space is trimmed.
+ * @returns {RegExp} matcher for a whole task id.
+ */
+function compileTaskGlob(glob) {
+  const source = glob.trim().replace(/[.+^${}()|[\]\\]/g, '\\$&').replaceAll('*', '.*').replaceAll('?', '.')
+  return new RegExp(`^${source}$`)
+}
+
+/**
+ * Filter task ids by a comma-separated list of `*`/`?` globs. An id matches
+ * when any glob matches. Null keeps the whole catalog.
  * @param {string[]} taskIds - catalog ids.
- * @param {string | null} glob - the `--tasks` pattern.
+ * @param {string | null} glob - the `--tasks` pattern, or a comma-separated list.
  * @returns {string[]} matching ids, catalog order preserved.
  */
 export function matchTaskIds(taskIds, glob) {
   if (glob === null) return taskIds
-  const source = glob.replace(/[.+^${}()|[\]\\]/g, '\\$&').replaceAll('*', '.*').replaceAll('?', '.')
-  const pattern = new RegExp(`^${source}$`)
-  return taskIds.filter(id => pattern.test(id))
+  const patterns = glob.split(',').map(compileTaskGlob)
+  return taskIds.filter(id => patterns.some(pattern => pattern.test(id)))
 }
 
 /**

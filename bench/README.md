@@ -49,6 +49,7 @@ Real runs need an API key (or `--api-key-env none` for keyless tiers) and a buil
 
 ```sh
 node bench/runner/run.js --experiment w0-2026-08-18 --arms off,on --repeats 3
+node bench/runner/run.js --experiment w5-pressure --tasks 'constraint-survival-*,chain-ledger-deep' --arms off,on --repeats 1
 ```
 
 ## Provider tiers

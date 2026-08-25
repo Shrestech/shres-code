@@ -345,6 +345,18 @@ describe('run.matchTaskIds', () => {
     assert.deepEqual(matchTaskIds(ids, 'injection-ignor?'), ['injection-ignore'])
     assert.deepEqual(matchTaskIds(ids, 'nomatch'), [])
   })
+
+  it('treats a comma-separated list as the union of globs', () => {
+    assert.deepEqual(
+      matchTaskIds(ids, 'multi-*,*-fix'),
+      ['multi-file-rename', 'single-function-fix'],
+    )
+    assert.deepEqual(
+      matchTaskIds(ids, ' injection-ignor? , multi-* '),
+      ['multi-file-rename', 'injection-ignore'],
+    )
+    assert.deepEqual(matchTaskIds(ids, 'nomatch,also-missing'), [])
+  })
 })
 
 describe('run.buildPlan', () => {
@@ -662,6 +674,23 @@ describe('run.main --dry-run', () => {
       const summary = lines.find(l => l.includes('tierPatches:'))
       assert.ok(summary)
       assert.ok(summary.indexOf('a.patch.yml') < summary.indexOf('b.patch.yml'))
+    } finally {
+      await rm(benchRoot, { recursive: true, force: true })
+    }
+  })
+
+  it('refuses a comma-separated --tasks list that matches nothing', async () => {
+    const benchRoot = await tempDir('bench-runner-notasks-')
+    try {
+      await writeTask(benchRoot, 'alpha')
+      await writeTask(benchRoot, 'beta')
+      await assert.rejects(
+        () => main(
+          ['--experiment', 'demo', '--tasks', 'nomatch,also-missing', '--dry-run'],
+          { benchRoot, env: {}, print: () => {} },
+        ),
+        error => error instanceof UsageError && /no tasks match/.test(error.message),
+      )
     } finally {
       await rm(benchRoot, { recursive: true, force: true })
     }
