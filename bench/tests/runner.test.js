@@ -123,8 +123,11 @@ describe('metrics.foldSessionLog', () => {
 })
 
 describe('arms registry', () => {
-  it('registers all six arms in ladder order', () => {
-    assert.deepEqual(listArms(), ['off', 'on', 'sq-only', 'on-sq', 'on-sq-verified', 'on-adaptive'])
+  it('registers all seven arms in ladder order', () => {
+    assert.deepEqual(
+      listArms(),
+      ['off', 'on', 'sq-only', 'on-sq', 'on-sq-verified', 'on-adaptive', 'on-core'],
+    )
     assert.equal(ARMS.off.jspace.enabled, false)
     assert.equal(ARMS.on.jspace.enabled, true)
     assert.equal(ARMS.on.jspace.mode, 'available')
@@ -133,6 +136,10 @@ describe('arms registry', () => {
     assert.equal(ARMS['on-adaptive'].jspace.enabled, true)
     assert.equal(ARMS['on-adaptive'].jspace.engageAfterSteps, 10)
     assert.equal(ARMS.on.jspace.engageAfterSteps, undefined)
+    assert.deepEqual(ARMS['on-core'].jspace, ARMS.on.jspace)
+    assert.equal(ARMS['on-core'].toolJspace.requireCoreOnOpen, true)
+    assert.equal(ARMS['on-core'].toolJspace.requireCoreForShip, true)
+    assert.equal(ARMS.on.toolJspace, undefined)
     assert.equal(getArm('off'), ARMS.off)
   })
 
@@ -143,6 +150,7 @@ describe('arms registry', () => {
     assert.equal(ARMS['on-sq'].sessionQuery, true)
     assert.equal(ARMS['on-sq-verified'].sessionQuery, true)
     assert.equal(ARMS['on-adaptive'].sessionQuery, true)
+    assert.equal(ARMS['on-core'].sessionQuery, false)
   })
 
   it('expectsJspace and expectsSessionQuery match arm semantics', () => {
@@ -158,6 +166,22 @@ describe('arms registry', () => {
     // no jspace event and the audit records no violation.
     assert.equal(ARMS['on-adaptive'].expectsJspace, true)
     assert.equal(ARMS['on-adaptive'].expectsSessionQuery, true)
+    assert.equal(ARMS['on-core'].expectsJspace, true)
+    assert.equal(ARMS['on-core'].expectsSessionQuery, false)
+  })
+
+  it('renders the constraint-capture requirements into the on-core overlay', () => {
+    const overlay = renderArmOverlay(ARMS['on-core'], {
+      sessionLogRoot: '/tmp/bench/on-core/sessions/t/0',
+    })
+    assert.match(overlay, /^- id: tool-jspace$/m)
+    assert.match(overlay, /requireCoreOnOpen: true/)
+    assert.match(overlay, /requireCoreForShip: true/)
+    assert.doesNotMatch(overlay, /tool-session-query/)
+    assert.doesNotMatch(
+      renderArmOverlay(ARMS.on, { sessionLogRoot: '/x' }),
+      /^- id: tool-jspace$/m,
+    )
   })
 
   it('renders the engagement threshold into the on-adaptive overlay', () => {

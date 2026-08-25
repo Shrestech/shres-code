@@ -25,6 +25,7 @@ import {
   shouldRefuseNoteCap,
   shouldRefuseRepeat,
 } from './retry.ts'
+import { openRefusal } from './open.ts'
 import { shipRefusal } from './ship.ts'
 
 export { DEFAULT_MAX_NOTES_PER_TURN, JSPACE_TOOL_NAMES } from './retry.ts'
@@ -34,41 +35,57 @@ export const name = 'tool-jspace'
 /** Requires the tool registry and the J-Space seat. */
 export const inject = ['tools', 'jspace']
 
-/** Per-turn `jspace_note` budget. Raising `maxNotesPerTurn` is a deployment choice. */
+/** Per-turn `jspace_note` budget and the opt-in constraint-capture pressure. */
 export interface Config {
   /**
    * Maximum `jspace_note` calls accepted in one user turn. Defaults to 8.
    * Zero and negative are rejected.
    */
   maxNotesPerTurn?: number
+  /**
+   * When true, a `jspace_open` that would create the card is refused unless it
+   * carries at least one `core` item. Default false.
+   */
+  requireCoreOnOpen?: boolean
+  /** When true, `jspace_ship` is refused while the card's Core is empty. Default false. */
+  requireCoreForShip?: boolean
 }
 
 /** Schemastery config for Loader defaults and generated configuration docs. */
 export const Config: z<Config> = z.object({
   maxNotesPerTurn: z.number().step(1).min(1).default(DEFAULT_MAX_NOTES_PER_TURN),
+  requireCoreOnOpen: z.boolean().default(false),
+  requireCoreForShip: z.boolean().default(false),
 })
 
-/** Fully materialized note-cap. */
+/** Fully materialized note-cap and constraint-capture requirements. */
 interface ResolvedConfig {
   readonly maxNotesPerTurn: number
+  readonly requireCoreOnOpen: boolean
+  readonly requireCoreForShip: boolean
 }
 
 /**
  * Validate config even when apply is called directly outside Loader normalization.
  * @param config - raw plugin config.
- * @returns a positive per-turn note cap.
+ * @returns a positive per-turn note cap and both constraint-capture requirements.
  */
 function resolveConfig(config: Config): ResolvedConfig {
   const maxNotesPerTurn = config.maxNotesPerTurn ?? DEFAULT_MAX_NOTES_PER_TURN
   if (!Number.isSafeInteger(maxNotesPerTurn) || maxNotesPerTurn < 1) {
     throw new TypeError('tool-jspace: maxNotesPerTurn must be a positive safe integer')
   }
-  return { maxNotesPerTurn }
+  return {
+    maxNotesPerTurn,
+    requireCoreOnOpen: config.requireCoreOnOpen ?? false,
+    requireCoreForShip: config.requireCoreForShip ?? false,
+  }
 }
 
 const OPEN_DESCRIPTION =
   'Open a J-Space card for multi-stage or multi-file work, or replace Goal and Next '
-  + 'on an open card. A changed Goal starts a new epoch: Core and Checked are cleared '
+  + 'on an open card. Put the task\'s once-stated constraints on `core` so they survive '
+  + 'compaction. A changed Goal starts a new epoch: Core and Checked are cleared '
   + 'and ship needs a fresh checkpoint; open questions carry over.'
 
 const NOTE_DESCRIPTION =
@@ -167,9 +184,10 @@ const SHIPPED = {
 /**
  * Register the four tools on one fiber so remount can dispose them together.
  * @param ctx - context with tools and jspace.
+ * @param config - resolved note cap and constraint-capture requirements.
  * @returns disposer for every registration.
  */
-function registerTools(ctx: Context): () => void {
+function registerTools(ctx: Context, config: ResolvedConfig): () => void {
   const disposeOpen = ctx.tools.register(defineTool({
     name: 'jspace_open',
     description: OPEN_DESCRIPTION,
@@ -178,7 +196,8 @@ function registerTools(ctx: Context): () => void {
       next: { type: 'string', required: true, description: 'The single next action.' },
       core: {
         type: 'array',
-        description: 'Optional live items, at most two; applied only on the first open.',
+        description: 'Standing rules and invariants this work must honor, stated once in the '
+          + 'task and easy to lose: at most two lines, applied only on the first open.',
         items: { type: 'string' },
       },
     },
@@ -192,7 +211,10 @@ function registerTools(ctx: Context): () => void {
     execute(args, exec) {
       const agent = requireAgent(exec, 'jspace_open')
       return Promise.resolve(runJspace(() => {
-        if (ctx.jspace.card(agent.session) !== null) {
+        const cardOpen = ctx.jspace.card(agent.session) !== null
+        const refusal = openRefusal(cardOpen, args.core, config.requireCoreOnOpen)
+        if (refusal !== undefined) throw new Error(refusal)
+        if (cardOpen) {
           ctx.jspace.openGoal(agent.session, { goal: args.goal, next: args.next })
           return { opened: true, replaced: true }
         }
@@ -213,7 +235,11 @@ function registerTools(ctx: Context): () => void {
     parameters: {
       goal: { type: 'string', description: 'Replacement Goal line.' },
       departing: { type: 'string', description: 'Core item leaving; required when `core` is set.' },
-      core: { type: 'string', description: 'Core item entering; required when `departing` is set.' },
+      core: {
+        type: 'string',
+        description: 'Core item entering — a constraint the work must honor. '
+          + 'Required when `departing` is set.',
+      },
       open: {
         type: 'array',
         description: 'Replacement unsettled questions.',
@@ -297,6 +323,7 @@ function registerTools(ctx: Context): () => void {
         const session = agent.session
         const refusal = shipRefusal(ctx.jspace.card(session), session.events, {
           requireVerifiedEvidence: ctx.jspace.config.requireVerifiedEvidence === true,
+          requireCore: config.requireCoreForShip,
         })
         if (refusal !== undefined) throw new Error(refusal)
         return args.path === undefined ? { shipped: true } : { shipped: true, path: args.path }
@@ -317,7 +344,7 @@ function registerTools(ctx: Context): () => void {
  * Remount the four tools while the seat is active, withhold their schemas from
  * a session the seat has not engaged, and refuse a call that arrives anyway.
  * @param ctx - context with tools and jspace.
- * @param config - per-turn note cap; defaults to 8.
+ * @param config - per-turn note cap (defaults to 8) and constraint-capture requirements (default off).
  */
 export function apply(ctx: Context, config: Config = {}): void {
   const resolved = resolveConfig(config)
@@ -326,7 +353,7 @@ export function apply(ctx: Context, config: Config = {}): void {
     disposeTools?.()
     disposeTools = undefined
     if (!status.active) return
-    disposeTools = registerTools(ctx)
+    disposeTools = registerTools(ctx, resolved)
   }
   remount(ctx.jspace.status)
   ctx.effect(() => {

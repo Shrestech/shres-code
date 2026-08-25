@@ -10,10 +10,19 @@ import type { JspaceCard } from '@shres-code/shres-code-jspace'
 export const SHIP_REQUIRES_VERIFIED_EVIDENCE
   = 'jspace ship requires an evidence-grade checkpoint that cites a completed non-error verifier tool call'
 
+/** Model-visible refusal when `requireCoreForShip` finds an empty Core. */
+export const SHIP_REQUIRES_CORE
+  = 'jspace ship on a card whose Core is empty certifies nothing: the card carries no constraint '
+  + 'the work was held to. Write the once-stated constraints and standing rules this work honored '
+  + 'onto Core with jspace_note, or, when the task states none, the acceptance criterion it is '
+  + 'measured against.'
+
 /** Options for the register-only ship check. */
 export interface ShipRefusalOptions {
   /** When true, require a `verified` checkpoint in the current Goal epoch. */
   readonly requireVerifiedEvidence?: boolean
+  /** When true, require at least one Core line on the card. */
+  readonly requireCore?: boolean
 }
 
 /**
@@ -65,7 +74,7 @@ function lineIsVerified(line: unknown): boolean {
  * Why `jspace_ship` must refuse, or `undefined` when the register check passes.
  * @param card - current folded card.
  * @param events - session log used to find a checkpoint for the current Goal.
- * @param options - optional evidence-grade requirement from seat config.
+ * @param options - evidence-grade requirement from seat config and constraint-capture requirement from plugin config.
  * @returns the refusal message.
  */
 export function shipRefusal(
@@ -76,6 +85,7 @@ export function shipRefusal(
   if (card === null) return 'jspace card is not open'
   if (card.goal.length === 0) return 'jspace ship requires a non-empty Goal'
   if (card.next.length === 0) return 'jspace ship requires a non-empty Next'
+  if (options?.requireCore === true && card.core.length === 0) return SHIP_REQUIRES_CORE
   const checkpointSeq = latestCheckpointSeq(events)
   if (checkpointSeq === undefined || checkpointSeq < card.goalOpenedSeq) {
     return 'jspace ship requires a checkpoint for the current Goal'

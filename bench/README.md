@@ -6,7 +6,7 @@ Conventions follow the established evaluation harnesses rather than inventing ne
 
 ## Arms
 
-The six-arm ladder covers every decision-relevant contrast. Each arm is a `--patch` overlay applied to the shipped headless composition, which mounts `jspace` with `enabled: false` and does not mount the model-facing session-query tool at all.
+The seven-arm ladder covers every decision-relevant contrast. Each arm is a `--patch` overlay applied to the shipped headless composition, which mounts `jspace` with `enabled: false` and does not mount the model-facing session-query tool at all.
 
 | Arm | J-Space | Session-Query | Notes |
 |---|---|---|---|
@@ -16,8 +16,9 @@ The six-arm ladder covers every decision-relevant contrast. Each arm is a `--pat
 | `on-sq` | available | mounted | Shipped default composition plus the session-query tool. |
 | `on-sq-verified` | available | mounted | `on-sq` plus `verifierTools: ['bash']` and `requireVerifiedEvidence: true`. |
 | `on-adaptive` | available from step 10 | mounted | `on-sq` plus `engageAfterSteps: 10`; isolates the always-on prompt and schema cost from the card's long-horizon benefit. |
+| `on-core` | available | absent | `on` plus `tool-jspace` `requireCoreOnOpen: true` and `requireCoreForShip: true`; prices the constraint-capture gates against `on`, the arm whose sessions left Core empty. |
 
-Arms register in `runner/arms.js`. Every overlay carries a `jspace` config patch and the per-trial persistence redirect; session-query arms additionally patch the shipped `session-query-sqlite` service to open a per-trial index at startup (it ships with `openAt: never` and an in-memory path) and append an `- insert:` layer mounting `tool-session-query`. Arms without session-query need no disable rows, because the tool is absent from the profile.
+Arms register in `runner/arms.js`. Every overlay carries a `jspace` config patch and the per-trial persistence redirect; an arm with a `toolJspace` config adds a `tool-jspace` patch; session-query arms additionally patch the shipped `session-query-sqlite` service to open a per-trial index at startup (it ships with `openAt: never` and an in-memory path) and append an `- insert:` layer mounting `tool-session-query`. Arms without session-query need no disable rows, because the tool is absent from the profile.
 
 ## Layout
 

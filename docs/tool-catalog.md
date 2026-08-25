@@ -1782,7 +1782,7 @@ Update the open J-Space card. Goal changes are rejected; use jspace_open to star
     },
     "core": {
       "type": "string",
-      "description": "Core item entering; required when `departing` is set."
+      "description": "Core item entering — a constraint the work must honor. Required when `departing` is set."
     },
     "open": {
       "type": "array",
@@ -1817,7 +1817,7 @@ Source: [`packages/jspace/tool-jspace/src/index.ts`](../packages/jspace/tool-jsp
 
 ### `jspace_open`
 
-Open a J-Space card for multi-stage or multi-file work, or replace Goal and Next on an open card. A changed Goal starts a new epoch: Core and Checked are cleared and ship needs a fresh checkpoint; open questions carry over.
+Open a J-Space card for multi-stage or multi-file work, or replace Goal and Next on an open card. Put the task's once-stated constraints on `core` so they survive compaction. A changed Goal starts a new epoch: Core and Checked are cleared and ship needs a fresh checkpoint; open questions carry over.
 
 ```json
 {
@@ -1833,7 +1833,7 @@ Open a J-Space card for multi-stage or multi-file work, or replace Goal and Next
     },
     "core": {
       "type": "array",
-      "description": "Optional live items, at most two; applied only on the first open.",
+      "description": "Standing rules and invariants this work must honor, stated once in the task and easy to lose: at most two lines, applied only on the first open.",
       "items": {
         "type": "string"
       }

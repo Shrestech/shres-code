@@ -10,7 +10,8 @@ import ToolRuntime, { defineTool } from '@shres-code/shres-code-tools'
 import type { ToolExecutionResult } from '@shres-code/shres-code-tools'
 import JspaceService, { JspaceError } from '@shres-code/shres-code-jspace'
 import * as tool from '../src/index.ts'
-import { SHIP_REQUIRES_VERIFIED_EVIDENCE } from '../src/ship.ts'
+import { OPEN_REQUIRES_CORE } from '../src/open.ts'
+import { SHIP_REQUIRES_CORE, SHIP_REQUIRES_VERIFIED_EVIDENCE } from '../src/ship.ts'
 
 const TOOL_NAMES = [
   'jspace_open',
@@ -609,7 +610,67 @@ describe('jspace tools', () => {
       .toThrow('maxNotesPerTurn must be a positive safe integer')
     expect(() => { tool.apply(new Context(), { maxNotesPerTurn: -2 }) })
       .toThrow('maxNotesPerTurn must be a positive safe integer')
-    expect(new tool.Config({})).toEqual({ maxNotesPerTurn: tool.DEFAULT_MAX_NOTES_PER_TURN })
+    expect(new tool.Config({})).toEqual({
+      maxNotesPerTurn: tool.DEFAULT_MAX_NOTES_PER_TURN,
+      requireCoreOnOpen: false,
+      requireCoreForShip: false,
+    })
     expect(tight.ctx.tools.get('jspace_note')?.description).toContain('no-op')
+  })
+})
+
+describe('constraint capture', () => {
+  it('leaves an empty Core acceptable on the shipped defaults', async () => {
+    const { ctx, agent } = await harness()
+    const opened = await execute(ctx, 'jspace_open', { goal: 'A', next: 'B' }, agent)
+    expect(opened.isError).toBe(false)
+    await execute(ctx, 'jspace_checkpoint', {
+      check: 'ran',
+      by: 'unit tests covering the fold',
+    }, agent)
+    const shipped = await execute(ctx, 'jspace_ship', {}, agent)
+    expect(shipped.isError).toBe(false)
+    expect(ctx.jspace.card(agent.session)?.core).toEqual([])
+  })
+
+  it('refuses a coreless open under requireCoreOnOpen and accepts one that carries Core', async () => {
+    const { ctx, agent } = await harness(true, {}, { requireCoreOnOpen: true })
+    const bare = await execute(ctx, 'jspace_open', { goal: 'A', next: 'B' }, agent)
+    expect(bare.isError).toBe(true)
+    expect(text(bare)).toContain(OPEN_REQUIRES_CORE)
+    const empty = await execute(ctx, 'jspace_open', { goal: 'A', next: 'B', core: [] }, agent)
+    expect(empty.isError).toBe(true)
+    expect(ctx.jspace.card(agent.session)).toBeNull()
+
+    const opened = await execute(ctx, 'jspace_open', {
+      goal: 'A',
+      next: 'B',
+      core: ['SKUs stay uppercase; quantities are integers'],
+    }, agent)
+    expect(opened.isError).toBe(false)
+    expect(ctx.jspace.card(agent.session)?.core)
+      .toEqual(['SKUs stay uppercase; quantities are integers'])
+
+    // The seat ignores `core` when the call replaces Goal and Next, so gating
+    // that path would refuse a call the model cannot satisfy.
+    const replaced = await execute(ctx, 'jspace_open', { goal: 'C', next: 'D' }, agent)
+    expect(replaced.isError).toBe(false)
+  })
+
+  it('refuses ship on an empty Core under requireCoreForShip until a note writes one', async () => {
+    const { ctx, agent } = await harness(true, {}, { requireCoreForShip: true })
+    await execute(ctx, 'jspace_open', { goal: 'A', next: 'B' }, agent)
+    await execute(ctx, 'jspace_checkpoint', {
+      check: 'ran',
+      by: 'unit tests covering the fold',
+    }, agent)
+    const refused = await execute(ctx, 'jspace_ship', {}, agent)
+    expect(refused.isError).toBe(true)
+    expect(text(refused)).toContain(SHIP_REQUIRES_CORE)
+
+    const noted = await execute(ctx, 'jspace_note', { core: 'Bin ids are opaque' }, agent)
+    expect(noted.isError).toBe(false)
+    const shipped = await execute(ctx, 'jspace_ship', {}, agent)
+    expect(shipped.isError).toBe(false)
   })
 })

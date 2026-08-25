@@ -2918,17 +2918,24 @@ Source: [`packages/jobs/tool-jobs/src/index.ts:32`](../packages/jobs/tool-jobs/s
 Requires: `tools` · `jspace`
 
 ```ts config-catalog
-/** Per-turn `jspace_note` budget. Raising `maxNotesPerTurn` is a deployment choice. */
+/** Per-turn `jspace_note` budget and the opt-in constraint-capture pressure. */
 export interface Config {
   /**
    * Maximum `jspace_note` calls accepted in one user turn. Defaults to 8.
    * Zero and negative are rejected.
    */
   maxNotesPerTurn?: number
+  /**
+   * When true, a `jspace_open` that would create the card is refused unless it
+   * carries at least one `core` item. Default false.
+   */
+  requireCoreOnOpen?: boolean
+  /** When true, `jspace_ship` is refused while the card's Core is empty. Default false. */
+  requireCoreForShip?: boolean
 }
 ```
 
-Source: [`packages/jspace/tool-jspace/src/index.ts:38`](../packages/jspace/tool-jspace/src/index.ts)
+Source: [`packages/jspace/tool-jspace/src/index.ts:39`](../packages/jspace/tool-jspace/src/index.ts)
 
 <a id="shres-codeshres-code-tool-lsp"></a>
 

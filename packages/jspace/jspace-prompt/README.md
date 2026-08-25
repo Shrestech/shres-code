@@ -60,7 +60,7 @@ The availability line is prefix-stable until a card opens or Settings flips. Upd
 
 #### What the model sees
 
-`jspace:protocol` always includes the tool-driver lines while the seat is engaged (how to open or update the card). The closed-card driver asks for a Goal covering the work that remains, because under a non-zero `engageAfterSteps` the section first appears partway through the session. `jspace:module:capacity` and `jspace:module:broadcast` load when the pass earns them.
+`jspace:protocol` always includes the tool-driver lines while the seat is engaged (how to open or update the card). The closed-card driver asks for a Goal covering the work that remains, because under a non-zero `engageAfterSteps` the section first appears partway through the session, and for the constraints the task stated once on Core, the field that survives compaction whole. The open-card driver repeats that a changed Goal clears Core, so the constraints are restated. `jspace:module:capacity` and `jspace:module:broadcast` load when the pass earns them.
 
 #### Token effect
 

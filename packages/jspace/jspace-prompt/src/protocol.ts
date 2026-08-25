@@ -29,7 +29,8 @@ export const JSPACE_BROADCAST_ORDER = 48
  */
 export const JSPACE_DRIVER_CLOSED =
   'For multi-stage or multi-file work, call jspace_open with a Goal and Next for the work '
-  + 'that remains. Keep it current with jspace_note and jspace_checkpoint; '
+  + 'that remains, and the constraints the task stated once on Core, where they survive '
+  + 'compaction. Keep it current with jspace_note and jspace_checkpoint; '
   + 'call jspace_ship before claiming done.'
 
 /** How to drive the tools when a card is already printed. */
@@ -37,7 +38,8 @@ export const JSPACE_DRIVER_OPEN =
   'A J-Space card is open. Update it with jspace_note. Record checks with jspace_checkpoint '
   + '(by names the verifier; the optional evidence must be a call_* tool-call id from this '
   + 'session). Call jspace_ship before claiming done. jspace_open does not start a second card: '
-  + 'it replaces Goal and Next, and a changed Goal clears Core and Checked. '
+  + 'it replaces Goal and Next, and a changed Goal clears Core and Checked, so restate the '
+  + 'standing constraints there. '
   + 'An identical tool call repeated within a turn is refused until you write a diagnosis on the card.'
 
 /**
