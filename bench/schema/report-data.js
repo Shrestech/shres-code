@@ -24,6 +24,12 @@ import { validateTrial } from './trial.js'
  * @property {number} meanToolCalls
  * @property {number} meanIdenticalRetries
  * @property {number} meanCheckpoints
+ * @property {number | null} meanDanglingCard - fraction of trials with a dangling card; null for jspace-off.
+ * @property {number | null} meanVerifiedCheckpointShare - mean of per-trial verifiedCheckpointShare; null when no trial has checkpoints.
+ * @property {number} totalCoverageRefusalThenPad
+ * @property {number} totalNoopNoteRefusals
+ * @property {number} totalNoteCapRefusals
+ * @property {number | null} meanSessionQueryCalls - null for arms excluding session-query.
  */
 
 /**

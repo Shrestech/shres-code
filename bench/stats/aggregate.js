@@ -45,6 +45,18 @@ export function summarizeCell(taskId, arm, trials) {
   for (const [metric, field] of CELL_MEAN_FIELDS) {
     cell[field] = mean(ok.map(t => t.metrics[metric]))
   }
+  // Forensics aggregates
+  const danglingValues = ok.map(t => t.metrics.danglingCard).filter(v => v !== null)
+  cell.meanDanglingCard = danglingValues.length > 0
+    ? danglingValues.filter(v => v === true).length / danglingValues.length
+    : null
+  const verifiedValues = ok.map(t => t.metrics.verifiedCheckpointShare).filter(v => v !== null)
+  cell.meanVerifiedCheckpointShare = verifiedValues.length > 0 ? mean(verifiedValues) : null
+  cell.totalCoverageRefusalThenPad = sum(ok.map(t => t.metrics.coverageRefusalThenPad))
+  cell.totalNoopNoteRefusals = sum(ok.map(t => t.metrics.noopNoteRefusals))
+  cell.totalNoteCapRefusals = sum(ok.map(t => t.metrics.noteCapRefusals))
+  const sqValues = ok.map(t => t.metrics.sessionQueryCalls).filter(v => v !== null)
+  cell.meanSessionQueryCalls = sqValues.length > 0 ? mean(sqValues) : null
   return /** @type {import('../schema/report-data.js').ReportCell} */ (cell)
 }
 

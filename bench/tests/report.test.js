@@ -23,6 +23,7 @@ const FIXED_NOW = '2026-08-18T00:00:00.000Z'
  * @returns {import('../schema/trial.js').Trial}
  */
 function trial(overrides) {
+  const { metrics: metricsOverride, ...rest } = overrides ?? {}
   return {
     taskId: 'alpha',
     trialIndex: 0,
@@ -40,11 +41,20 @@ function trial(overrides) {
       identicalRetries: 0,
       checkpoints: 0,
       shipPasses: 0,
+      tokensIncludingDescendants: null,
+      costIncludingDescendants: null,
+      danglingCard: null,
+      verifiedCheckpointShare: null,
+      coverageRefusalThenPad: 0,
+      noopNoteRefusals: 0,
+      noteCapRefusals: 0,
+      sessionQueryCalls: null,
+      ...metricsOverride,
     },
     sessionFile: null,
     startedAt: '2026-08-18T00:00:00.000Z',
     endedAt: '2026-08-18T00:01:00.000Z',
-    ...overrides,
+    ...rest,
   }
 }
 
@@ -313,7 +323,11 @@ test('buildExperiment: chain strata and chain trials flow through unchanged', as
       resumedFrom: null,
       exitCode: 0,
       timedOut: false,
-      metrics: { inputTokens, outputTokens: 20, durationMs: 5000, turns: 2, toolCalls: 3, identicalRetries: 0, checkpoints: 0, shipPasses: 0 },
+      metrics: {
+        inputTokens, outputTokens: 20, durationMs: 5000, turns: 2, toolCalls: 3, identicalRetries: 0, checkpoints: 0, shipPasses: 0,
+        tokensIncludingDescendants: null, costIncludingDescendants: null, danglingCard: null, verifiedCheckpointShare: null,
+        coverageRefusalThenPad: 0, noopNoteRefusals: 0, noteCapRefusals: 0, sessionQueryCalls: null,
+      },
       startedAt: '2026-08-18T00:00:00.000Z',
       endedAt: '2026-08-18T00:00:05.000Z',
     })

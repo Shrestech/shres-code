@@ -399,13 +399,19 @@ async function executeSpawn({ repoRoot, arm, armDir, sessionLogRoot, taskText, s
   const execution = await executeTrial({ repoRoot, overlayPath, taskText, scratchDir, sessionLogRoot, timeoutMs, env })
   const metrics = execution.sessionLogPath === null
     ? emptyMetrics()
-    : foldSessionLog(await readFile(execution.sessionLogPath, 'utf8'))
+    : foldSessionLog(await readFile(execution.sessionLogPath, 'utf8'), {
+        expectsSessionQuery: arm.expectsSessionQuery ?? true,
+        expectsJspace: arm.expectsJspace ?? true,
+      })
   metrics.durationMs = execution.durationMs
   const sessionFile = execution.sessionLogPath === null
     ? null
     : relative(armDir, execution.sessionLogPath).split(sep).join('/')
   return { execution, metrics, sessionFile }
 }
+
+/** Fields summed across phases. */
+const SUMMABLE_METRICS = ['inputTokens', 'outputTokens', 'durationMs', 'turns', 'toolCalls', 'identicalRetries', 'checkpoints', 'shipPasses', 'coverageRefusalThenPad', 'noopNoteRefusals', 'noteCapRefusals']
 
 /**
  * Sum per-phase metrics into the trial-level row.
@@ -415,10 +421,16 @@ async function executeSpawn({ repoRoot, arm, armDir, sessionLogRoot, taskText, s
 function sumPhaseMetrics(phases) {
   const total = emptyMetrics()
   for (const phase of phases) {
-    for (const field of /** @type {(keyof import('../schema/trial.js').TrialMetrics)[]} */ (Object.keys(total))) {
+    for (const field of SUMMABLE_METRICS) {
       total[field] += phase.metrics[field]
     }
   }
+  const last = phases[phases.length - 1].metrics
+  total.danglingCard = last.danglingCard
+  const sqValues = phases.map(p => p.metrics.sessionQueryCalls).filter(v => v !== null)
+  total.sessionQueryCalls = sqValues.length > 0 ? sqValues.reduce((a, b) => a + b, 0) : null
+  const cpShares = phases.map(p => p.metrics.verifiedCheckpointShare).filter(v => v !== null)
+  total.verifiedCheckpointShare = cpShares.length > 0 ? cpShares.reduce((a, b) => a + b, 0) / cpShares.length : null
   return total
 }
 
@@ -567,24 +579,38 @@ async function runChainTrial({ task, entry, arm, armDir, scratchDir, sessionRoot
   }
 }
 
+/** Session-query tool names checked by the integrity audit. */
+const SESSION_QUERY_TOOL_NAMES = new Set([
+  'session_search', 'session_event_search', 'session_event_read',
+  'session_event_trace', 'session_trace',
+])
+
 /**
- * Scan one session log for jspace events — off-arm proof of overlay leakage.
+ * Scan one session log for jspace events and session-query tool calls.
  * The metrics fold has already read this file, so its lines parse.
  * @param {string} sessionLogPath - absolute session.jsonl path.
- * @returns {Promise<string[]>} distinct `jspace/` event types in first-seen order.
+ * @returns {Promise<{ jspaceTypes: string[], sessionQueryTools: string[] }>}
+ *   distinct `jspace/` event types and session-query tool names in first-seen order.
  */
-async function findJspaceEventTypes(sessionLogPath) {
+async function findIntegrityViolationEvents(sessionLogPath) {
   const text = await readFile(sessionLogPath, 'utf8')
   /** @type {string[]} */
-  const types = []
+  const jspaceTypes = []
+  /** @type {string[]} */
+  const sessionQueryTools = []
   for (const line of text.split('\n')) {
     if (line.trim() === '') continue
-    const event = /** @type {{ type?: unknown }} */ (JSON.parse(line))
-    if (typeof event.type === 'string' && event.type.startsWith('jspace/') && !types.includes(event.type)) {
-      types.push(event.type)
+    const event = /** @type {{ type?: unknown, data?: Record<string, unknown> }} */ (JSON.parse(line))
+    if (typeof event.type === 'string' && event.type.startsWith('jspace/') && !jspaceTypes.includes(event.type)) {
+      jspaceTypes.push(event.type)
+    }
+    if (event.type === 'tool/call' && event.data && typeof event.data.name === 'string') {
+      if (SESSION_QUERY_TOOL_NAMES.has(event.data.name) && !sessionQueryTools.includes(event.data.name)) {
+        sessionQueryTools.push(event.data.name)
+      }
     }
   }
-  return types
+  return { jspaceTypes, sessionQueryTools }
 }
 
 /**
@@ -743,14 +769,24 @@ export async function main(argv, io = {}) {
       }
     }
 
-    // Integrity audit, part 2: the off arm must log zero jspace events.
-    if (arm.name === 'off') {
-      const sessionFiles = (trial.phases ?? [{ sessionFile: trial.sessionFile }])
-        .map(record => record.sessionFile)
-        .filter(file => file !== null)
+    // Integrity audit, part 2: arms that exclude jspace must log zero jspace
+    // events; arms that exclude session-query must log zero session-query
+    // tool/call events.
+    const sessionFiles = (trial.phases ?? [{ sessionFile: trial.sessionFile }])
+      .map(record => record.sessionFile)
+      .filter(file => file !== null)
+    if (!arm.expectsJspace || !arm.expectsSessionQuery) {
       for (const file of sessionFiles) {
-        for (const type of await findJspaceEventTypes(join(armDir, file))) {
-          violations.push(`off-arm-jspace-event:${type}`)
+        const { jspaceTypes, sessionQueryTools } = await findIntegrityViolationEvents(join(armDir, file))
+        if (!arm.expectsJspace) {
+          for (const type of jspaceTypes) {
+            violations.push(`off-arm-jspace-event:${type}`)
+          }
+        }
+        if (!arm.expectsSessionQuery) {
+          for (const name of sessionQueryTools) {
+            violations.push(`excluded-session-query-tool:${name}`)
+          }
         }
       }
     }

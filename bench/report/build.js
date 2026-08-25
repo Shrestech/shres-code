@@ -39,7 +39,7 @@ const UI_DATA_PATH = fileURLToPath(new URL('../ui/data.js', import.meta.url))
 
 /** Arms always compare against this baseline. */
 const BASELINE_ARM = 'off'
-/** The synthetic experiment arm pair this comparison supports. */
+/** The default treatment arm for the comparison grade. */
 const TREATMENT_ARM = 'on'
 
 /**

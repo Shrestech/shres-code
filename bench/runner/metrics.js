@@ -10,6 +10,13 @@
  * step, so it is the model-request count. Packed chunk rows and unknown event
  * types are ignored, so the fold does not care about `packChunks`.
  *
+ * Forensics metrics (added for the W0 arm-ladder evaluation):
+ * - danglingCard: whether a jspace card was open at session end.
+ * - verifiedCheckpointShare: fraction of checkpoints with verified: true.
+ * - coverageRefusalThenPad: checkpoint refusal → immediate retry success count.
+ * - noopNoteRefusals / noteCapRefusals: JSPACE_NOTE_NOOP and note-cap counts.
+ * - sessionQueryCalls: count of session-query tool calls.
+ *
  * @module bench/runner/metrics
  */
 
@@ -20,6 +27,19 @@
 /** Tool names whose calls count as accepted J-Space checkpoint/ship usage. */
 const CHECKPOINT_TOOL = 'jspace_checkpoint'
 const SHIP_TOOL = 'jspace_ship'
+
+/** Session-query tool names. */
+const SESSION_QUERY_TOOLS = new Set([
+  'session_search',
+  'session_event_search',
+  'session_event_read',
+  'session_event_trace',
+  'session_trace',
+])
+
+/** Refusal indicators in tool/result data for coverage and note diagnostics. */
+const NOOP_NOTE_MARKER = 'JSPACE_NOTE_NOOP'
+const NOTE_CAP_MARKER = 'note cap'
 
 /**
  * Stable string form for retry comparison: object keys sort recursively so
@@ -61,10 +81,15 @@ function toolCallKey(name, rawArguments) {
  * their line number — a log the runner managed to locate should be complete,
  * and silent truncation would corrupt the comparison.
  * @param {string} text - raw JSONL file contents.
+ * @param {{ expectsSessionQuery: boolean, expectsJspace: boolean }} [armFlags] -
+ *   arm-level flags that decide whether nullable fields report a value or null.
  * @returns {TrialMetrics} the folded metrics; `durationMs` spans first to last
  * timestamped record (0 on an empty log).
  */
-export function foldSessionLog(text) {
+export function foldSessionLog(text, armFlags) {
+  const hasJspace = armFlags?.expectsJspace ?? true
+  const hasSq = armFlags?.expectsSessionQuery ?? true
+
   /** @type {TrialMetrics} */
   const metrics = {
     inputTokens: 0,
@@ -75,11 +100,25 @@ export function foldSessionLog(text) {
     identicalRetries: 0,
     checkpoints: 0,
     shipPasses: 0,
+    tokensIncludingDescendants: null,
+    costIncludingDescendants: null,
+    danglingCard: hasJspace ? false : null,
+    verifiedCheckpointShare: null,
+    coverageRefusalThenPad: 0,
+    noopNoteRefusals: 0,
+    noteCapRefusals: 0,
+    sessionQueryCalls: hasSq ? 0 : null,
   }
   /** @type {Map<string, number>} */
   const callCounts = new Map()
   let minTime = Number.POSITIVE_INFINITY
   let maxTime = 0
+
+  let totalCheckpoints = 0
+  let verifiedCheckpoints = 0
+  let lastCheckpointWasRefusal = false
+  let lastCheckpointTurn = -1
+  let cardOpen = false
 
   const lines = text.split('\n')
   for (let index = 0; index < lines.length; index += 1) {
@@ -106,8 +145,39 @@ export function foldSessionLog(text) {
         const name = typeof data.name === 'string' ? data.name : ''
         if (name === CHECKPOINT_TOOL) metrics.checkpoints += 1
         if (name === SHIP_TOOL) metrics.shipPasses += 1
+        if (hasSq && SESSION_QUERY_TOOLS.has(name)) {
+          metrics.sessionQueryCalls = (metrics.sessionQueryCalls ?? 0) + 1
+        }
         const key = toolCallKey(name, data.arguments)
         callCounts.set(key, (callCounts.get(key) ?? 0) + 1)
+        const turn = typeof data.turn === 'number' ? data.turn : -1
+        if (name === CHECKPOINT_TOOL && lastCheckpointWasRefusal && turn === lastCheckpointTurn) {
+          metrics.coverageRefusalThenPad += 1
+        }
+        lastCheckpointWasRefusal = false
+        break
+      }
+      case 'tool/result': {
+        const resultName = typeof data.name === 'string' ? data.name : ''
+        const resultText = typeof data.result === 'string' ? data.result : ''
+        if (resultName === CHECKPOINT_TOOL) {
+          totalCheckpoints += 1
+          if (resultText.includes('verified') && resultText.includes('true')) {
+            verifiedCheckpoints += 1
+          }
+          if (resultText.includes('coverage') && (resultText.includes('refused') || resultText.includes('refusal') || resultText.includes('REFUSED'))) {
+            lastCheckpointWasRefusal = true
+            lastCheckpointTurn = typeof data.turn === 'number' ? data.turn : -1
+          } else {
+            lastCheckpointWasRefusal = false
+          }
+        }
+        if (resultText.includes(NOOP_NOTE_MARKER)) {
+          metrics.noopNoteRefusals += 1
+        }
+        if (resultText.includes(NOTE_CAP_MARKER)) {
+          metrics.noteCapRefusals += 1
+        }
         break
       }
       case 'assistant/message': {
@@ -120,6 +190,12 @@ export function foldSessionLog(text) {
         }
         break
       }
+      case 'jspace/card-open':
+        cardOpen = true
+        break
+      case 'jspace/card-close':
+        cardOpen = false
+        break
       default:
         break
     }
@@ -129,12 +205,18 @@ export function foldSessionLog(text) {
     if (count > 1) metrics.identicalRetries += count - 1
   }
   metrics.durationMs = minTime === Number.POSITIVE_INFINITY ? 0 : maxTime - minTime
+
+  if (hasJspace) metrics.danglingCard = cardOpen
+  if (totalCheckpoints > 0) {
+    metrics.verifiedCheckpointShare = verifiedCheckpoints / totalCheckpoints
+  }
+
   return metrics
 }
 
 /**
  * Zeroed metrics for trials whose session log never materialized.
- * @returns {TrialMetrics} all-zero metrics.
+ * @returns {TrialMetrics} all-zero metrics with nulls for arm-dependent fields.
  */
 export function emptyMetrics() {
   return {
@@ -146,5 +228,13 @@ export function emptyMetrics() {
     identicalRetries: 0,
     checkpoints: 0,
     shipPasses: 0,
+    tokensIncludingDescendants: null,
+    costIncludingDescendants: null,
+    danglingCard: null,
+    verifiedCheckpointShare: null,
+    coverageRefusalThenPad: 0,
+    noopNoteRefusals: 0,
+    noteCapRefusals: 0,
+    sessionQueryCalls: null,
   }
 }

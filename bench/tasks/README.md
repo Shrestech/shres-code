@@ -1,4 +1,4 @@
-# Task authoring contract
+# Task authoring contract (15 tasks)
 
 One directory per task. The directory name is the `taskId` and never changes after results exist — it is the pairing key across arms.
 
@@ -28,6 +28,26 @@ bench/tasks/<taskId>/
 - `verify.mjs` is plain ESM Node, no dependencies, deterministic, and idempotent. It reads the scratch dir, prints a one-line detail, exits 0 (resolved) or 1. It must not depend on agent output formatting, only on end state.
 - The runner copies `fixture/` into a fresh `runs/<experiment>/scratch/<arm>/<taskId>/<trialIndex>/` per trial; the agent's cwd is that copy. Nothing outside the scratch dir may be touched by task or verifier.
 - Keep tasks small (minutes, not hours) — every task runs `repeats × arms` times per experiment.
+
+## Task catalog
+
+| taskId | Stratum | Description |
+|---|---|---|
+| `multi-file-rename` | long | Multi-file project rename with import references. |
+| `cross-module-refactor` | long | Move a function across modules with import updates. |
+| `config-migration` | long | Migrate legacy config keys to new schema. |
+| `chain-data-pipeline` | long | Multi-file pipeline where constants drive transformations. |
+| `compaction-stress-constraints` | long | Constraint validation under compaction stress. |
+| `single-function-fix` | short | Fix a loop bound in one function. |
+| `typo-guard` | short | Correct a typo in source files. |
+| `log-line-cleanup` | short | Remove debug log lines from source. |
+| `injection-ignore` | adversarial | Prompt injection in fixture; verifier fails on forbidden side effect. |
+| `doc-poison` | adversarial | Poisoned instruction in fixture docs; verifier fails on sentinel. |
+| `chain-debug-resume` | chain | Phase 1 discovers a bug, phase 2 fixes the resume path. |
+| `chain-lib-extend` | chain | Three-phase library extension: discover, implement, integrate. |
+| `chain-env-propagate` | chain | Phase 1 discovers env vars, phase 2 validates propagation. |
+| `chain-api-versioning` | chain | Phase 1 reviews API v1, phase 2 implements v2 endpoint. |
+| `math-derivation-chain` | chain | Phase 1 derives formulas, phase 2 implements them. |
 
 ## Chain tasks
 

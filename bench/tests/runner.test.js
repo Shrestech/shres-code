@@ -52,16 +52,20 @@ describe('metrics.foldSessionLog', () => {
   ].join('\n')
 
   it('folds turns, tool calls, retries, jspace calls, tokens, and duration', () => {
-    assert.deepEqual(foldSessionLog(fixture), {
-      inputTokens: 300,
-      outputTokens: 120,
-      durationMs: 4000,
-      turns: 2,
-      toolCalls: 4,
-      identicalRetries: 1,
-      checkpoints: 1,
-      shipPasses: 1,
-    })
+    const result = foldSessionLog(fixture)
+    assert.equal(result.inputTokens, 300)
+    assert.equal(result.outputTokens, 120)
+    assert.equal(result.durationMs, 4000)
+    assert.equal(result.turns, 2)
+    assert.equal(result.toolCalls, 4)
+    assert.equal(result.identicalRetries, 1)
+    assert.equal(result.checkpoints, 1)
+    assert.equal(result.shipPasses, 1)
+    assert.equal(result.coverageRefusalThenPad, 0)
+    assert.equal(result.noopNoteRefusals, 0)
+    assert.equal(result.noteCapRefusals, 0)
+    assert.equal(result.danglingCard, false)
+    assert.equal(result.sessionQueryCalls, 0)
   })
 
   it('groups unparseable arguments by their raw text', () => {
@@ -77,7 +81,11 @@ describe('metrics.foldSessionLog', () => {
   })
 
   it('returns zeros for an empty log', () => {
-    assert.deepEqual(foldSessionLog('\n'), emptyMetrics())
+    const result = foldSessionLog('\n')
+    assert.equal(result.inputTokens, 0)
+    assert.equal(result.turns, 0)
+    assert.equal(result.danglingCard, false)
+    assert.equal(result.sessionQueryCalls, 0)
   })
 
   it('throws with the line number on corrupt JSON', () => {
@@ -86,29 +94,54 @@ describe('metrics.foldSessionLog', () => {
 })
 
 describe('arms registry', () => {
-  it('registers off first, then on, with the toggle as the only difference', () => {
-    assert.deepEqual(listArms(), ['off', 'on'])
+  it('registers all five arms in ladder order', () => {
+    assert.deepEqual(listArms(), ['off', 'on', 'sq-only', 'on-sq', 'on-sq-verified'])
     assert.equal(ARMS.off.jspace.enabled, false)
     assert.equal(ARMS.on.jspace.enabled, true)
     assert.equal(ARMS.on.jspace.mode, 'available')
+    assert.equal(ARMS['on-sq-verified'].jspace.requireVerifiedEvidence, true)
+    assert.deepEqual(ARMS['on-sq-verified'].jspace.verifierTools, ['bash'])
     assert.equal(getArm('off'), ARMS.off)
   })
 
-  it('fails loud on unknown arms, naming the valid set', () => {
-    assert.throws(() => getArm('always-open'), /unknown arm "always-open".*off, on/)
+  it('arms that exclude session-query have disabledEntries', () => {
+    assert.ok(ARMS.off.disabledEntries.length > 0)
+    assert.ok(ARMS.on.disabledEntries.length > 0)
+    assert.equal(ARMS['sq-only'].disabledEntries.length, 0)
+    assert.equal(ARMS['on-sq'].disabledEntries.length, 0)
+    assert.equal(ARMS['on-sq-verified'].disabledEntries.length, 0)
   })
 
-  it('renders a patch overlay with the jspace config and per-trial log root', () => {
-    const on = renderArmOverlay(ARMS.on, { sessionLogRoot: '/tmp/bench/on/sessions/t/0' })
-    assert.match(on, /^- id: jspace$/m)
-    assert.match(on, /enabled: true/)
-    assert.match(on, /mode: "available"/)
-    assert.match(on, /requireCoverage: true/)
-    assert.match(on, /^- id: session-persistence-jsonl$/m)
-    assert.match(on, /root: "\/tmp\/bench\/on\/sessions\/t\/0"/)
-    assert.match(on, /compression: none/)
+  it('expectsJspace and expectsSessionQuery match arm semantics', () => {
+    assert.equal(ARMS.off.expectsJspace, false)
+    assert.equal(ARMS.off.expectsSessionQuery, false)
+    assert.equal(ARMS.on.expectsJspace, true)
+    assert.equal(ARMS.on.expectsSessionQuery, false)
+    assert.equal(ARMS['sq-only'].expectsJspace, false)
+    assert.equal(ARMS['sq-only'].expectsSessionQuery, true)
+    assert.equal(ARMS['on-sq'].expectsJspace, true)
+    assert.equal(ARMS['on-sq'].expectsSessionQuery, true)
+  })
+
+  it('fails loud on unknown arms, naming the valid set', () => {
+    assert.throws(() => getArm('always-open'), /unknown arm "always-open"/)
+  })
+
+  it('renders a patch overlay with jspace config, log root, and disabled entries', () => {
+    const onSq = renderArmOverlay(ARMS['on-sq'], { sessionLogRoot: '/tmp/bench/on-sq/sessions/t/0' })
+    assert.match(onSq, /^- id: jspace$/m)
+    assert.match(onSq, /enabled: true/)
+    assert.match(onSq, /mode: "available"/)
+    assert.match(onSq, /requireCoverage: true/)
+    assert.match(onSq, /^- id: session-persistence-jsonl$/m)
+    assert.match(onSq, /compression: none/)
+    assert.ok(!onSq.includes('disabled: true'), 'on-sq does not disable any entries')
+
     const off = renderArmOverlay(ARMS.off, { sessionLogRoot: '/x' })
     assert.match(off, /enabled: false/)
+    assert.match(off, /^- id: session-query-sqlite$/m)
+    assert.match(off, /disabled: true/)
+    assert.match(off, /^- id: tool-session-query$/m)
   })
 })
 
@@ -116,7 +149,7 @@ describe('run.parseArgs', () => {
   it('applies defaults', () => {
     const options = parseArgs(['--experiment', 'w0'])
     assert.equal(options.experiment, 'w0')
-    assert.deepEqual(options.arms, ['off', 'on'])
+    assert.deepEqual(options.arms, listArms())
     assert.equal(options.repeats, 3)
     assert.equal(options.taskGlob, null)
     assert.equal(options.dryRun, false)
@@ -336,7 +369,7 @@ describe('run.main --dry-run', () => {
       /** @type {string[]} */
       const lines = []
       const code = await main(
-        ['--experiment', 'demo', '--repeats', '2', '--tasks', 'a*', '--dry-run'],
+        ['--experiment', 'demo', '--repeats', '2', '--tasks', 'a*', '--arms', 'off,on', '--dry-run'],
         { benchRoot, env: {}, print: line => lines.push(line) },
       )
       assert.equal(code, 0)
@@ -371,7 +404,7 @@ describe('run.main --dry-run', () => {
       /** @type {string[]} */
       const lines = []
       const code = await main(
-        ['--experiment', 'demo', '--repeats', '1', '--dry-run'],
+        ['--experiment', 'demo', '--repeats', '1', '--arms', 'off,on', '--dry-run'],
         { benchRoot, env: {}, print: line => lines.push(line) },
       )
       assert.equal(code, 0)

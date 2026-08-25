@@ -25,6 +25,10 @@ function makeTrial(overrides = {}) {
     metrics: {
       inputTokens: 100, outputTokens: 50, durationMs: 1000, turns: 4,
       toolCalls: 3, identicalRetries: 0, checkpoints: 0, shipPasses: 0,
+      tokensIncludingDescendants: null, costIncludingDescendants: null,
+      danglingCard: null, verifiedCheckpointShare: null,
+      coverageRefusalThenPad: 0, noopNoteRefusals: 0, noteCapRefusals: 0,
+      sessionQueryCalls: null,
       ...metrics,
     },
     sessionFile: null,
@@ -385,6 +389,10 @@ describe('chain trial schema', () => {
       metrics: {
         inputTokens: 100, outputTokens: 50, durationMs: 1000, turns: 4,
         toolCalls: 3, identicalRetries: 0, checkpoints: 0, shipPasses: 0,
+        tokensIncludingDescendants: null, costIncludingDescendants: null,
+        danglingCard: null, verifiedCheckpointShare: null,
+        coverageRefusalThenPad: 0, noopNoteRefusals: 0, noteCapRefusals: 0,
+        sessionQueryCalls: null,
       },
       startedAt: '2026-08-18T00:00:00.000Z',
       endedAt: '2026-08-18T00:00:01.000Z',

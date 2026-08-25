@@ -1,29 +1,86 @@
 /**
  * Arm registry: the measured interventions. An arm is a name plus the exact
- * jspace plugin config it applies; everything else in the harness composition
- * stays identical so the toggle is the only difference between arms.
+ * jspace plugin config it applies and an optional set of plugin entries to
+ * disable in the composition overlay.
  *
- * The shipped `shres-base` bundle already mounts the `jspace` row with
- * `enabled: false`, so both arms are expressed as an explicit `--patch`
- * overlay that replaces that row's complete config (patch rows replace, never
- * deep-merge). Pinning the off arm too keeps `run.json`'s `armConfig` honest
- * when shipped defaults drift.
+ * The shipped compositions now mount session-query by default (commit
+ * 82aa91854e), so a clean jspace-off control requires disabling those entries
+ * via the `--patch` overlay — a jspace settings overlay alone no longer
+ * produces a clean control. Each arm declares `disabledEntries`: plugin ids
+ * whose `disabled: true` rows the runner appends to the per-trial patch
+ * overlay, leveraging the cordis Loader's entry-level disable mechanism.
+ *
+ * The five-arm ladder covers every decision-relevant contrast:
+ *
+ * | Arm | Configuration |
+ * |---|---|
+ * | `off` | Control: jspace disabled, session-query excluded. |
+ * | `on` | J-Space available, session-query excluded. |
+ * | `sq-only` | Session-query mounted + driver, jspace disabled. |
+ * | `on-sq` | J-Space available + session-query (shipped default). |
+ * | `on-sq-verified` | on-sq + verifierTools naming `bash` + requireVerifiedEvidence. |
  *
  * @module bench/runner/arms
+ */
+
+/** Session-query plugin ids in the shipped headless composition. */
+const SESSION_QUERY_IDS = Object.freeze(['session-query-sqlite', 'tool-session-query'])
+
+/**
+ * @typedef {object} ArmEntry
+ * @property {string} name - arm identifier.
+ * @property {Record<string, unknown>} jspace - jspace plugin config for the --patch overlay.
+ * @property {readonly string[]} disabledEntries - plugin ids to set `disabled: true` in the overlay.
+ * @property {boolean} expectsSessionQuery - whether session-query tools are expected in logs.
+ * @property {boolean} expectsJspace - whether jspace events are expected in logs.
  */
 
 /**
  * Registered arms, in run order. `off` is the baseline every comparison is
  * against and always runs first in the interleave.
+ * @type {Readonly<Record<string, Readonly<ArmEntry>>>}
  */
 export const ARMS = Object.freeze({
   off: Object.freeze({
     name: 'off',
     jspace: Object.freeze({ enabled: false, mode: 'available', requireCoverage: true }),
+    disabledEntries: Object.freeze([...SESSION_QUERY_IDS]),
+    expectsSessionQuery: false,
+    expectsJspace: false,
   }),
   on: Object.freeze({
     name: 'on',
     jspace: Object.freeze({ enabled: true, mode: 'available', requireCoverage: true }),
+    disabledEntries: Object.freeze([...SESSION_QUERY_IDS]),
+    expectsSessionQuery: false,
+    expectsJspace: true,
+  }),
+  'sq-only': Object.freeze({
+    name: 'sq-only',
+    jspace: Object.freeze({ enabled: false, mode: 'available', requireCoverage: true }),
+    disabledEntries: Object.freeze([]),
+    expectsSessionQuery: true,
+    expectsJspace: false,
+  }),
+  'on-sq': Object.freeze({
+    name: 'on-sq',
+    jspace: Object.freeze({ enabled: true, mode: 'available', requireCoverage: true }),
+    disabledEntries: Object.freeze([]),
+    expectsSessionQuery: true,
+    expectsJspace: true,
+  }),
+  'on-sq-verified': Object.freeze({
+    name: 'on-sq-verified',
+    jspace: Object.freeze({
+      enabled: true,
+      mode: 'available',
+      requireCoverage: true,
+      verifierTools: ['bash'],
+      requireVerifiedEvidence: true,
+    }),
+    disabledEntries: Object.freeze([]),
+    expectsSessionQuery: true,
+    expectsJspace: true,
   }),
 })
 
@@ -38,7 +95,7 @@ export function listArms() {
 /**
  * Look up one arm by name. Unknown names fail loud with the valid set.
  * @param {string} name - arm name from `--arms`.
- * @returns {{ name: string, jspace: Record<string, unknown> }} the arm entry.
+ * @returns {ArmEntry} the arm entry.
  */
 export function getArm(name) {
   const arm = ARMS[name]
@@ -50,8 +107,9 @@ export function getArm(name) {
  * Render the `--patch` overlay for one trial. Besides the jspace toggle, the
  * overlay redirects session persistence into a per-trial root with
  * `compression: none` so the runner can locate and line-read the log without
- * the zstd codec. Strings are JSON-quoted, which is valid YAML.
- * @param {{ name: string, jspace: Record<string, unknown> }} arm - arm entry from {@link getArm}.
+ * the zstd codec. Arms that exclude session-query append `disabled: true`
+ * entries for those plugin ids. Strings are JSON-quoted, which is valid YAML.
+ * @param {ArmEntry} arm - arm entry from {@link getArm}.
  * @param {{ sessionLogRoot: string }} options - absolute per-trial persistence root.
  * @returns {string} the overlay YAML document.
  */
@@ -59,7 +117,7 @@ export function renderArmOverlay(arm, { sessionLogRoot }) {
   const jspaceRows = Object.entries(arm.jspace)
     .map(([key, value]) => `    ${key}: ${JSON.stringify(value)}`)
     .join('\n')
-  return `# Generated by bench/runner for arm "${arm.name}". Applied as \`shres --patch\`.
+  let overlay = `# Generated by bench/runner for arm "${arm.name}". Applied as \`shres --patch\`.
 - id: jspace
   config:
 ${jspaceRows}
@@ -68,4 +126,8 @@ ${jspaceRows}
     root: ${JSON.stringify(sessionLogRoot)}
     compression: none
 `
+  for (const id of arm.disabledEntries) {
+    overlay += `- id: ${id}\n  disabled: true\n`
+  }
+  return overlay
 }
