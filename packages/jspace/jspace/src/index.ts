@@ -35,13 +35,17 @@ export {
   decodeJspaceClosed,
   foldJspace,
   formatJspaceCard,
+  formatJspaceCheckedElision,
+  formatJspaceOpenElision,
+  DEFAULT_CHECKED_REPRINT_LIMIT,
+  DEFAULT_OPEN_REPRINT_LIMIT,
   DEFAULT_COVERAGE_TERMS,
   matchesCoverageTerms,
   JSPACE_ALWAYS_OPEN_GOAL,
   JSPACE_ALWAYS_OPEN_NEXT,
   JSPACE_AVAILABLE_LINE,
 } from './fold.ts'
-export type { JspaceFold } from './fold.ts'
+export type { JspaceCardReprint, JspaceFold } from './fold.ts'
 
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'jspace'
@@ -533,7 +537,7 @@ export default class JspaceService extends Service {
     evidence: string,
   ): { readonly id: string; readonly verified: boolean } {
     const id = line(evidence, 'evidence')
-    const call = session.events.find(event =>
+    const call = session.events.find((event): event is SessionEvent<'tool/call'> =>
       event.type === 'tool/call' && event.data.callId === id)
     const succeeded = session.events.some((event) => {
       if (event.type !== 'tool/result') return false
