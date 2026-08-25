@@ -44,7 +44,7 @@ Default-off host seat for the J-Space card. This package remounts from the `jspa
 
 ## Model Experience
 
-None, as this seat stores logged card state; the prompt Consumer owns request text.
+None, as this seat stores logged card state; the prompt Consumer owns request text, including reprint caps and the untrusted card frame.
 
 #### KV Cache effect
 

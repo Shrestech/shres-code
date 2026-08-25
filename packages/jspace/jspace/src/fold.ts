@@ -279,27 +279,71 @@ export function foldJspace(
   }
 }
 
+/** Last Checked lines reprinted when the prompt Consumer omits an override. */
+export const DEFAULT_CHECKED_REPRINT_LIMIT = 5
+
+/** Last Open questions reprinted when the prompt Consumer omits an override. */
+export const DEFAULT_OPEN_REPRINT_LIMIT = 5
+
 /**
- * Render the five-line card the prompt Consumer reprints. Labels are
- * harness-authored framing and must not come from event content.
- * @param card - native open card.
- * @returns the section body.
+ * Reprint caps applied only when rendering. The durable card snapshot is
+ * unchanged. Callers supply positive integers; the prompt Consumer's Config
+ * schema rejects zero and negative values at load.
  */
-export function formatJspaceCard(card: JspaceCard): string {
+export interface JspaceCardReprint {
+  /** Last Checked lines to print. */
+  readonly checkedReprintLimit: number
+  /** Last Open questions to print. */
+  readonly openReprintLimit: number
+}
+
+/**
+ * One elision line placed immediately before a truncated Checked section.
+ * @param elided - count of earlier Checked lines omitted from the reprint.
+ * @returns the elision line.
+ */
+export function formatJspaceCheckedElision(elided: number): string {
+  return `(${String(elided)} earlier Checked lines elided; they remain in the session log and are searchable with the session-query tools)`
+}
+
+/**
+ * One elision line placed immediately before a truncated Open section.
+ * @param elided - count of earlier Open questions omitted from the reprint.
+ * @returns the elision line.
+ */
+export function formatJspaceOpenElision(elided: number): string {
+  return `(${String(elided)} earlier Open questions elided; they remain in the session log and are searchable with the session-query tools)`
+}
+
+/**
+ * Render the card the prompt Consumer reprints. Labels are harness-authored
+ * framing and must not come from event content. Checked and Open print the
+ * last N / last M items; earlier items stay on the durable snapshot.
+ * @param card - native open card.
+ * @param reprint - last-N / last-M reprint caps.
+ * @returns the section body, with one elision line per truncated section.
+ */
+export function formatJspaceCard(card: JspaceCard, reprint: JspaceCardReprint): string {
   const core = card.core.length === 0 ? '(none)' : card.core.join('; ')
-  const checked = card.checked.length === 0
+  const checkedShown = card.checked.slice(-reprint.checkedReprintLimit)
+  const checkedElided = card.checked.length - checkedShown.length
+  const checked = checkedShown.length === 0
     ? '(none)'
-    : card.checked.map(line => `✓${String(line.n)} ${line.check} — ${line.by}`).join('; ')
-  const open = card.open.length === 0
+    : checkedShown.map(line => `✓${String(line.n)} ${line.check} — ${line.by}`).join('; ')
+  const openShown = card.open.slice(-reprint.openReprintLimit)
+  const openElided = card.open.length - openShown.length
+  const open = openShown.length === 0
     ? '(none)'
-    : card.open.map(line => line.settles === undefined ? line.question : `${line.question} [${line.settles}]`).join('; ')
-  return [
+    : openShown.map(line => line.settles === undefined ? line.question : `${line.question} [${line.settles}]`).join('; ')
+  const lines = [
     `Goal:      ${card.goal}`,
     `Core:      ${core}`,
-    `Checked:   ${checked}`,
-    `Open:      ${open}`,
-    `Next:      ${card.next}`,
-  ].join('\n')
+  ]
+  if (checkedElided > 0) lines.push(formatJspaceCheckedElision(checkedElided))
+  lines.push(`Checked:   ${checked}`)
+  if (openElided > 0) lines.push(formatJspaceOpenElision(openElided))
+  lines.push(`Open:      ${open}`, `Next:      ${card.next}`)
+  return lines.join('\n')
 }
 
 /**

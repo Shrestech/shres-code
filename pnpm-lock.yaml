@@ -5670,6 +5670,10 @@ importers:
         version: link:../../settings/settings
 
   packages/jspace/jspace-prompt:
+    dependencies:
+      '@shres-code/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
     devDependencies:
       '@shres-code/cordis':
         specifier: workspace:^
@@ -5698,6 +5702,9 @@ importers:
       '@shres-code/shres-code-system-prompt':
         specifier: workspace:^
         version: link:../../core/system-prompt
+      '@shres-code/shres-code-untrusted-frame':
+        specifier: workspace:^
+        version: link:../../util/untrusted-frame
 
   packages/jspace/tool-jspace:
     devDependencies:

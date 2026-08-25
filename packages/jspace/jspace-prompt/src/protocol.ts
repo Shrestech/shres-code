@@ -62,7 +62,9 @@ export function formatJspaceProtocol(pass: JspacePass, cardOpen: boolean): strin
 export const JSPACE_CAPACITY_TEXT = [
   'Capacity: the stage holds at most two coherent items (the card Core).',
   'A third item requires an explicit swap that writes the departing line first.',
-  'Everything else is automatic or sits on Open / Checked, not on the stage.',
+  'Everything else is automatic or sits on Open / Checked, not on the stage; '
+  + 'earlier Open and Checked lines past the reprint cap remain in the session log '
+  + 'and are searchable with the session-query tools.',
 ].join('\n')
 
 /** Broadcast module: shared names are written once. */

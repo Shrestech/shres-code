@@ -24,7 +24,7 @@ Product strings, package ids, `ctx` keys, events, tools, and Settings copy use *
 
 1. `ctx.jspace` service verbs and the session-event writer.
 2. Model tools `jspace_open`, `jspace_note`, `jspace_checkpoint`, `jspace_ship`.
-3. A `systemPrompt.section` named `jspace:card` whose text is the folded card, or the one-line availability notice when no card is open.
+3. A `systemPrompt.section` named `jspace:card` whose text is the folded card reprint-capped and wrapped as untrusted session-authored working memory ([reprint bounds and framing](2026-08-25-jspace-card-reprint-bounds-and-framing.md)), or the one-line availability notice when no card is open.
 4. A classify-and-rebuild path on assemble so the card cannot be lost the way a skill is. `always-open` and a `loop` pass open a stock card during assemble.
 5. `/j-space on|off` for the current session chip (off closes the card; it does not write Settings `enabled`).
 
@@ -72,9 +72,9 @@ Model-visible text is reconstructed from these events. A new model-visible input
 The card is a persistence surface for the attack classes the `test_break` rig demonstrated (memorygraft, legitimacy accumulation):
 
 - **Card writes are content-channel data.** The four tools register through `ctx.tools`, so their args are screened as `tool_args` at `tools/pre-execute` by Shield when it is active. An injection that wants to persist must survive that screen at write time.
-- **The re-delivery path is not re-screened.** The `jspace:card` section enters the system prompt, which Shield's `agent/pre-step` does not screen (it screens the claimed message batch). This is accepted and bounded: writes were screened at entry, the rebuild is schema-checked, and the section is voice-marked.
-- **Voice registration.** `jspace:card` still needs to join Shield's authority-spoof set in the shield repo. Forged card-shaped lines arriving in tool results must not impersonate the card. That landing is deferred; write-time screening and schema rebuild ship without it.
-- **Doctrine inversion, stated once.** Shield's doctrine teaches the model that tool results are data; this feature promotes tool-call output into system-prompt authority. The inversion is bounded by write-time screening and voice marking.
+- **The re-delivery path is framed, not Shield-screened.** The `jspace:card` section enters the system prompt, which Shield's `agent/pre-step` does not screen (it screens the claimed message batch). An open card is wrapped in the shared untrusted-content frame as session-authored working memory, not instructions. Shield screening of that rebuild stays deferred: `ctx.shield` publishes status and snapshot only, and the paid engine has no function that jspace-prompt can pass section text through ([reprint bounds and framing](2026-08-25-jspace-card-reprint-bounds-and-framing.md)).
+- **Voice registration.** `jspace:card` still needs to join Shield's authority-spoof set in the shield repo. Forged card-shaped lines arriving in tool results must not impersonate the card. That landing is deferred; write-time screening, schema rebuild, and the untrusted frame ship without it.
+- **Doctrine inversion, stated once.** Shield's doctrine teaches the model that tool results are data; this feature promotes tool-call output into system-prompt authority. The inversion is bounded by write-time screening, schema rebuild, and the untrusted frame.
 - **What the card multiplies.** A poisoned card does not raise the attack ceiling (TEXT-only, grants no capability). It multiplies persistence × authority: one bend, then the system prompt re-asserts the poisoned goal as established fact on every turn, compaction-proof.
 
 ### Prompt section and pass gate
@@ -164,5 +164,5 @@ Host package specs cover remount, fold/fault, fork-copy, coverage matching (word
 ## Deferred
 
 - **W0 measurement** (owner-gated): productivity arm and poisoning chain on the `test_break` rig. The third-party skill's completion and token cost are unmeasured here.
-- **Shield voice registration:** `jspace:card` is not yet in the shield repo's authority-spoof set.
+- **Shield rebuild screening and voice registration:** `ctx.shield` exposes status and snapshot only. The paid engine screens `user_message`, `tool_args`, and `tool_result` through waterfall hooks and does not expose a callable screen for system-prompt section text, so the card rebuild is not routed through Shield. `jspace:card` is also not yet in the shield repo's authority-spoof set. The untrusted frame and write-time `tool_args` screening are the shipped bounds ([reprint bounds and framing](2026-08-25-jspace-card-reprint-bounds-and-framing.md)).
 - **Unify GoalBar and the todo strip** into this card and change todo’s turn-boundary lifetime. The [todo clearance note](2026-07-28-todo-plan-clears-on-next-turn.md) remains in force. The todo strip already hides while a native card is open.

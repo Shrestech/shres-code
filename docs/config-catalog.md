@@ -943,7 +943,25 @@ export interface Config {
 }
 ```
 
-Source: [`packages/jspace/jspace/src/index.ts:53`](../packages/jspace/jspace/src/index.ts)
+Source: [`packages/jspace/jspace/src/index.ts:57`](../packages/jspace/jspace/src/index.ts)
+
+<a id="shres-codeshres-code-jspace-prompt"></a>
+
+## `@shres-code/shres-code-jspace-prompt`
+
+Requires: `jspace` · `systemPrompt`
+
+```ts config-catalog
+/** Deployment-owned reprint caps for the assembled card. */
+export interface Config {
+  /** Last Checked lines reprinted on the card. Defaults to 5. Zero and negative are rejected. */
+  checkedReprintLimit?: number
+  /** Last Open questions reprinted on the card. Defaults to 5. Zero and negative are rejected. */
+  openReprintLimit?: number
+}
+```
+
+Source: [`packages/jspace/jspace-prompt/src/index.ts:67`](../packages/jspace/jspace-prompt/src/index.ts)
 
 <a id="shres-codeshres-code-llm-cli-bridge"></a>
 
@@ -3552,7 +3570,6 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@shres-code/shres-code-host-directory-picker-auto` — requires `webServer` · `loader` ([`packages/host/directory-picker-auto/src/index.ts`](../packages/host/directory-picker-auto/src/index.ts))
 - `@shres-code/shres-code-host-directory-picker-native` ([`packages/host/directory-picker-native/src/index.ts`](../packages/host/directory-picker-native/src/index.ts))
 - `@shres-code/shres-code-host-plugin-inventory` — requires `loader` ([`packages/host/plugin-inventory/src/index.ts`](../packages/host/plugin-inventory/src/index.ts))
-- `@shres-code/shres-code-jspace-prompt` — requires `jspace` · `systemPrompt` ([`packages/jspace/jspace-prompt/src/index.ts`](../packages/jspace/jspace-prompt/src/index.ts))
 - `@shres-code/shres-code-llm` ([`packages/llm/llm/src/index.ts`](../packages/llm/llm/src/index.ts))
 - `@shres-code/shres-code-lsp` ([`packages/lsp/lsp/src/index.ts`](../packages/lsp/lsp/src/index.ts))
 - `@shres-code/shres-code-schedule` — requires `agents` · `sessions` · `tools` · `sessionPersistence` ([`packages/schedule/schedule/src/index.ts`](../packages/schedule/schedule/src/index.ts))

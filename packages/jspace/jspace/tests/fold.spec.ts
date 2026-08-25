@@ -5,7 +5,11 @@ import {
   decodeJspaceClosed,
   foldJspace,
   formatJspaceCard,
+  formatJspaceCheckedElision,
+  formatJspaceOpenElision,
   matchesCoverageTerms,
+  DEFAULT_CHECKED_REPRINT_LIMIT,
+  DEFAULT_OPEN_REPRINT_LIMIT,
   JSPACE_ALWAYS_OPEN_GOAL,
   JSPACE_ALWAYS_OPEN_NEXT,
   JSPACE_AVAILABLE_LINE,
@@ -177,13 +181,18 @@ describe('foldJspace', () => {
   })
 })
 
+const reprint = {
+  checkedReprintLimit: DEFAULT_CHECKED_REPRINT_LIMIT,
+  openReprintLimit: DEFAULT_OPEN_REPRINT_LIMIT,
+}
+
 describe('formatJspaceCard', () => {
   it('emits harness-authored labels, not content-supplied ones', () => {
     const text = formatJspaceCard(card({
       core: ['seat', 'fold'],
       checked: [{ n: 1, check: 'replay', by: 'unit tests' }],
       open: [{ question: 'UI?', settles: 'W5' }],
-    }))
+    }), reprint)
     expect(text).toBe([
       'Goal:      Ship the feature',
       'Core:      seat; fold',
@@ -198,8 +207,47 @@ describe('formatJspaceCard', () => {
     expect(matchesCoverageTerms('unit tests')).toBe(true)
     expect(matchesCoverageTerms('the community reviewed the latest notes')).toBe(false)
     expect(matchesCoverageTerms('覆盖全部', ['覆盖'])).toBe(true)
-    expect(formatJspaceCard(card({ core: [], checked: [], open: [{ question: 'alone' }] }))).toContain('Core:      (none)')
-    expect(formatJspaceCard(card({ checked: [], open: [] })).split('\n')[2]).toBe('Checked:   (none)')
+    expect(formatJspaceCard(card({ core: [], checked: [], open: [{ question: 'alone' }] }), reprint)).toContain('Core:      (none)')
+    expect(formatJspaceCard(card({ checked: [], open: [] }), reprint).split('\n')[2]).toBe('Checked:   (none)')
+  })
+
+  it('prints the last N Checked and last M Open lines and prepends elision counts', () => {
+    const checked = [1, 2, 3, 4, 5, 6, 7].map(n => ({
+      n,
+      check: `c${String(n)}`,
+      by: 'unit tests',
+    }))
+    const open = [1, 2, 3, 4].map(n => ({ question: `q${String(n)}` }))
+    const text = formatJspaceCard(card({ checked, open }), {
+      checkedReprintLimit: 3,
+      openReprintLimit: 2,
+    })
+    expect(text).toBe([
+      'Goal:      Ship the feature',
+      'Core:      seat',
+      formatJspaceCheckedElision(4),
+      'Checked:   ✓5 c5 — unit tests; ✓6 c6 — unit tests; ✓7 c7 — unit tests',
+      formatJspaceOpenElision(2),
+      'Open:      q3; q4',
+      'Next:      Write the fold',
+    ].join('\n'))
+  })
+
+  it('omits the elision line when a section has exactly the reprint limit', () => {
+    const checked = [1, 2, 3, 4, 5].map(n => ({
+      n,
+      check: `c${String(n)}`,
+      by: 'unit tests',
+    }))
+    const text = formatJspaceCard(card({ checked, open: [] }), reprint)
+    expect(text).toBe([
+      'Goal:      Ship the feature',
+      'Core:      seat',
+      'Checked:   ✓1 c1 — unit tests; ✓2 c2 — unit tests; ✓3 c3 — unit tests; ✓4 c4 — unit tests; ✓5 c5 — unit tests',
+      'Open:      (none)',
+      'Next:      Write the fold',
+    ].join('\n'))
+    expect(text).not.toContain('elided')
   })
 })
 
