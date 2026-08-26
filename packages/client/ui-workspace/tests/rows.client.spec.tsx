@@ -294,7 +294,7 @@ describe('workspace browser rows', () => {
       // Card body: full title + cwd + absolute creation time.
       expect(screen.getAllByText('Project')).toHaveLength(2)
       expect(screen.getByText('/projects/project')).toBeTruthy()
-      expect(screen.getByText(/^Created  \d+y\d+mo\d+d /)).toBeTruthy()
+      expect(screen.getByText(/^Created \d+-\d+-\d+ /)).toBeTruthy()
       await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Copy: /projects/project' })) })
       expect(writeText).toHaveBeenCalledWith('/projects/project')
       expect(screen.getByRole('status').textContent).toBe('Copied')

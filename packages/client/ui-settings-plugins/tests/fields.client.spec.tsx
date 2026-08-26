@@ -6,7 +6,7 @@
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { SecretField, ValueField } from '../src/client/fields.tsx'
+import { SecretField, SwitchField, ValueField } from '../src/client/fields.tsx'
 
 afterEach(cleanup)
 
@@ -152,5 +152,35 @@ describe('SecretField', () => {
     )
 
     expect(screen.getByLabelText('API key')).toHaveProperty('disabled', true)
+  })
+})
+
+describe('SwitchField', () => {
+  it('stages both the on-to-off and off-to-on drafts', () => {
+    const onEdit = vi.fn()
+    const { rerender } = render(
+      <SwitchField
+        id="plugin-switch"
+        label="Grok"
+        hint="Use Grok search."
+        text="true"
+        disabled={false}
+        onEdit={onEdit}
+      />,
+    )
+    fireEvent.click(screen.getByRole('switch', { name: 'Grok' }))
+    expect(onEdit).toHaveBeenCalledWith('false')
+    rerender(
+      <SwitchField
+        id="plugin-switch"
+        label="Grok"
+        hint="Use Grok search."
+        text="false"
+        disabled={false}
+        onEdit={onEdit}
+      />,
+    )
+    fireEvent.click(screen.getByRole('switch', { name: 'Grok' }))
+    expect(onEdit).toHaveBeenCalledWith('true')
   })
 })

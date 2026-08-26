@@ -221,6 +221,11 @@ describe('prepareWhisperSamples', () => {
     expect(out).toHaveLength(WHISPER_MIN_SAMPLES)
     expect(Math.max(...out)).toBeCloseTo(WHISPER_TARGET_PEAK)
   })
+
+  it('returns a loud full-second clip unchanged', () => {
+    const pcm = new Float32Array(WHISPER_MIN_SAMPLES).fill(0.9)
+    expect(prepareWhisperSamples(pcm, 16_000)).toBe(pcm)
+  })
 })
 
 describe('stripWhisperTranscript', () => {

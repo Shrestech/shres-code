@@ -668,7 +668,7 @@ describe('coverage edges', () => {
     const options = listPickerOptions({ reachable: true, models: [{ id: 'bare' }] })
     expect(options[0]).toMatchObject({ kind: 'ollama-local', name: 'bare' })
     const io = FirstRunSetup.defaultIo()
-    expect(io.isTTY).toBe(process.stdin.isTTY === true && process.stderr.isTTY === true)
+    expect(io.isTTY).toBe(process.stdin.isTTY &&  process.stderr.isTTY)
     expect(await isDefaultUsable(new Context(), { reachable: false, models: [] })).toBe(false)
     const noLlm = new Context()
     await noLlm.plugin(AgentDefaultModelConfig, { provider: 'openai', model: 'gpt-4.1' })

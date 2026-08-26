@@ -45,7 +45,7 @@ describe('TodoPanel', () => {
     render(<TodoPanel todos={LIST} t={t} />)
     expect(screen.getByTestId('todo-panel')).toBeTruthy()
     expect(screen.getByText('To-dos')).toBeTruthy()
-    expect(screen.getByText('1 Completed · 1 Running · 1 pending')).toBeTruthy()
+    expect(screen.getByText(/1 completed.*1 in progress.*1 pending/)).toBeTruthy()
     expect(screen.getByRole('button', { expanded: false })).toBeTruthy()
     expect(screen.queryByRole('list')).toBeNull()
   })
@@ -55,8 +55,8 @@ describe('TodoPanel', () => {
       { content: 'Write components', status: 'in_progress' },
       { content: 'Add tests', status: 'pending' },
     ]} t={t} />)
-    expect(screen.getByText('1 Running · 1 pending')).toBeTruthy()
-    expect(screen.queryByText(/Completed/)).toBeNull()
+    expect(screen.getByText(/1 in progress.*1 pending/)).toBeTruthy()
+    expect(screen.queryByText(/completed/)).toBeNull()
   })
 
   it('expands to show one row per item with its status glyph', () => {
@@ -77,7 +77,7 @@ describe('TodoPanel', () => {
     fireEvent.click(header)
     expect(screen.queryByRole('list')).toBeNull()
     // Collapsed header is title + progress only (no in-progress content hint).
-    expect(screen.getByText('1 Completed · 1 Running · 1 pending')).toBeTruthy()
+    expect(screen.getByText(/1 completed.*1 in progress.*1 pending/)).toBeTruthy()
     expect(screen.queryByText('Write components')).toBeNull()
     fireEvent.click(screen.getByRole('button', { expanded: false }))
     expect(screen.getAllByRole('listitem')).toHaveLength(3)
@@ -92,14 +92,14 @@ describe('TodoPanel', () => {
     expect(statuses.filter(s => s === 'in_progress')).toHaveLength(3)
     expect(screen.getByText('Run the background build')).toBeTruthy()
     expect(screen.getByText('Read source')).toBeTruthy()
-    expect(screen.getByText('1 Completed · 3 Running · 1 pending')).toBeTruthy()
+    expect(screen.getByText(/1 completed.*3 in progress.*1 pending/)).toBeTruthy()
   })
 
   it('an all-completed list collapses the summary to the done count alone', () => {
     render(<TodoPanel todos={[{ content: 'All done', status: 'completed' }]} t={t} />)
     expect(screen.getByRole('button', { expanded: false })).toBeTruthy()
     expect(screen.queryByText('All done')).toBeNull()
-    expect(screen.getByText('1 Completed')).toBeTruthy()
+    expect(screen.getByText('1 completed')).toBeTruthy()
     expect(screen.queryByText(/Running|pending/)).toBeNull()
   })
 })
@@ -124,7 +124,7 @@ describe('TodoDock', () => {
     // Capability absent (no baseline/frame yet) renders nothing.
     expect(screen.queryByTestId('todo-panel')).toBeNull()
     act(() => { store.set({ value: LIST }) })
-    expect(screen.getByText('1 Completed · 1 Running · 1 pending')).toBeTruthy()
+    expect(screen.getByText(/1 completed.*1 in progress.*1 pending/)).toBeTruthy()
     // The pre-first-write whole value (null) retires the strip (the panel owns no data).
     act(() => { store.set({ value: null }) })
     expect(screen.queryByTestId('todo-panel')).toBeNull()

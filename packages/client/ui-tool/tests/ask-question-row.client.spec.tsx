@@ -48,7 +48,7 @@ describe('AskQuestionRow', () => {
   it('running call reads waiting (args-independent: the composer takeover shows the questions)', () => {
     const view = render(<AskQuestionRow {...rowProps(runningCall(ARGS))} />)
     expect(screen.getByText('Ask question')).toBeTruthy()
-    expect(screen.getByText('Waiting for answer')).toBeTruthy()
+    expect(screen.getByText('waiting')).toBeTruthy()
     expect(view.container.querySelector('[data-state="running"]')).not.toBeNull()
   })
 

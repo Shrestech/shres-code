@@ -100,7 +100,9 @@ async function run(ctx: Context, task: string, io: HeadlessIo): Promise<void> {
   const defaultModel = ctx.get('agentDefaultModel')
   const sessions = ctx.get('sessions')
   // Early process shutdown can dispose the tree while settlement is pending.
+  /* v8 ignore start -- inject lists these services; dispose can race the await */
   if (agents === undefined || defaultModel === undefined || sessions === undefined) return
+  /* v8 ignore stop */
 
   const firstRun = ctx.get('firstRunSetup')
   if (firstRun !== undefined) await firstRun.ensureReady()

@@ -70,9 +70,9 @@ async function startServer(): Promise<{ server: Server; port: number; state: Ser
   const state: ServerState = { runs: [], syncBatches: [], failRuns: false }
   const server = createServer((req, res) => {
     let body = ''
-    req.on('data', (chunk) => { body += chunk })
+    req.on('data', (chunk: Buffer | string) => { body += String(chunk) })
     req.on('end', () => {
-      const parsed = body === '' ? {} : JSON.parse(body)
+      const parsed = (body === '' ? {} : JSON.parse(body)) as unknown
       if (req.url === '/api/runs' && req.method === 'POST') {
         state.runs.push(parsed)
         if (state.failRuns) {
@@ -138,7 +138,7 @@ describe('tracker-shrestech real-fetch transport (e2e)', () => {
   })
 
   afterEach(async () => {
-    await new Promise<void>(resolve => server.close(() => resolve()))
+    await new Promise<void>(resolve => server.close(() =>{  resolve() }))
     await rm(dir, { recursive: true, force: true })
   })
 

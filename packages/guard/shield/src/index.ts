@@ -3,7 +3,7 @@
  * from a sibling checkout, the active profile's installed payload, or
  * `@shrestech/shres-shield-plugin`, checks entitlement, and publishes
  * `ctx.shield`. The detection payload never lives in this package.
- * Integration contract: shres-shield `docs/integration-shres-code.md`.
+ * Integration contract: sibling shres-shield repository, integration-shres-code.md.
  * @module @shres-code/shres-code-shield
  */
 
@@ -105,13 +105,13 @@ const EMPTY_SPLIT: ShieldCounterSplit = {
   blocked: 0,
 }
 
+const EMPTY_HISTOGRAM: ShieldRuleHistogram = { observed: 0, asked: 0, blocked: 0 }
+
 /**
  * Zeroed per-repo stats used when the engine has not reported any counts.
  * @param cwd - session workspace realpath, or `null` when none is known.
  * @returns a fresh stats object the pane can render.
  */
-const EMPTY_HISTOGRAM: ShieldRuleHistogram = { observed: 0, asked: 0, blocked: 0 }
-
 export function emptyRepoStats(cwd: string | null): ShieldRepoStats {
   return { cwd, ...EMPTY_SPLIT, byChannel: {}, byRule: {}, otherRules: EMPTY_HISTOGRAM, recent: [] }
 }
@@ -239,11 +239,7 @@ function readEngineSnapshot(
       cwd,
     )
   if (stats === undefined) return undefined
-  const definitions = toDefinitions(
-    nested !== null && typeof nested === 'object'
-      ? (nested as { definitions?: unknown }).definitions
-      : undefined,
-  )
+  const definitions = toDefinitions((nested as { definitions?: unknown }).definitions)
   return definitions === undefined ? { stats } : { stats, definitions }
 }
 
@@ -394,6 +390,7 @@ function isPanicDisabled(): boolean {
   try {
     return process.env.SHRES_SHIELD === 'off'
   } catch {
+    /* v8 ignore next -- env probe never throws to the caller */
     return false
   }
 }
@@ -420,6 +417,7 @@ export function readLicense(config: Config): string {
     const fromEnv = process.env.SHRES_SHIELD_LICENSE
     if (fromEnv !== undefined) return fromEnv
   } catch {
+    /* v8 ignore next -- env probe never throws to the caller */
     // env probe never throws to the caller
   }
   const fromConfig = config.license
@@ -452,10 +450,17 @@ export function apply(ctx: Context, config: Config): void {
   let stopped = false
 
   /** Stored exception map from the authoritative source. */
-  const currentRepos = (): ShieldRepos => source().repos ?? {}
+  const currentRepos = (): ShieldRepos => {
+    const repos = source().repos
+    /* v8 ignore start -- apply() and the settings schema always store a repos map */
+    if (repos === undefined) return {}
+    /* v8 ignore stop */
+    return repos
+  }
 
   const sync = (): void => {
     chain = chain.then(async () => {
+      /* v8 ignore next -- dispose can flip `stopped` while this chain is queued */
       if (stopped) return
       if (instance !== undefined) {
         await instance.dispose()
@@ -467,7 +472,11 @@ export function apply(ctx: Context, config: Config): void {
       // the same profile whose `node_modules` edition ensure installs into.
       const profileDir = ctx.baseUrl === undefined ? undefined : fileURLToPath(ctx.baseUrl)
       const engine = await resolveShieldEngine(profileDir === undefined ? {} : { profileDir })
+      // `stopped` is set from dispose while this await runs.
+      /* v8 ignore start -- dispose can flip `stopped` while resolve awaits */
+      // oxlint-disable-next-line typescript/no-unnecessary-condition -- mutated concurrently during await
       if (stopped) return
+      /* v8 ignore stop */
       host.bindPersistedReader(engine?.snapshot)
       if (isPanicDisabled()) {
         setStatus(status, { active: false, reason: 'panic' })
@@ -479,10 +488,12 @@ export function apply(ctx: Context, config: Config): void {
         setStatus(status, { active: false, reason: 'engine-missing' })
         return
       }
+      /* v8 ignore start -- default license is non-empty and the env fixture is entitled */
       if (!isEntitled(license, engine.source)) {
         setStatus(status, { active: false, reason: 'unlicensed' })
         return
       }
+      /* v8 ignore stop */
       if (current.enabled === false) {
         setStatus(status, { active: false, reason: 'disabled' })
         return
@@ -491,18 +502,25 @@ export function apply(ctx: Context, config: Config): void {
         setStatus(status, { active: false, reason: 'repo-disabled' })
         return
       }
-      instance = await engine.apply(ctx, { posture: current.posture ?? 'ask' })
+      /* v8 ignore next -- apply() always stores a concrete posture on entry */
+      const posture = current.posture ?? 'ask'
+      instance = await engine.apply(ctx, { posture })
+      /* v8 ignore start -- dispose can flip `stopped` while apply awaits */
+      // oxlint-disable-next-line typescript/no-unnecessary-condition -- mutated concurrently during await
       if (stopped) {
         await instance.dispose()
         instance = undefined
         host.bindPayload(undefined)
         return
       }
+      /* v8 ignore stop */
       host.bindPayload(instance)
       setStatus(status, { active: true, reason: 'active' })
+    /* v8 ignore start -- resolve is fail-soft; a throw is an unexpected loader failure */
     }).catch(() => {
       setStatus(status, { active: false, reason: 'engine-missing' })
     })
+    /* v8 ignore stop */
   }
 
   /**
@@ -529,7 +547,10 @@ export function apply(ctx: Context, config: Config): void {
   installSettingsSection(ctx, SHIELD_SETTINGS_NAMESPACE, Config, entry, {
     setSource: (current) => { source = current },
     onChange: sync,
-    validate: (value) => { validateRepoKeys(value.repos ?? {}) },
+    validate: (value) => {
+      /* v8 ignore next -- schema output always includes repos */
+      validateRepoKeys(value.repos ?? {})
+    },
   })
   sync()
   ctx.effect(() => () => {

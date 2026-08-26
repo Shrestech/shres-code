@@ -150,7 +150,7 @@ describe('charter discrimination and nested bash', () => {
     expect(text(result)).toMatch(/still passed after the failProbe/)
     expect(ctx.jspace.card(agent.session)).toBeNull()
     expect(agent.session.events.some(event => event.type === 'jspace/charter-probe'
-      && event.data.demonstrated === false)).toBe(true)
+      && !event.data.demonstrated)).toBe(true)
   }, 30_000)
 
   it('refuses a missing failProbe when discrimination is required', async () => {

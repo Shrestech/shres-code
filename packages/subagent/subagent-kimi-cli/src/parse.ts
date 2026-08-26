@@ -21,14 +21,14 @@ export function parseKimiStreamJson(stdout: string): string {
   const tryParse = (chunk: string): void => {
     if (chunk.length === 0) return
     try {
-      const answer = answerFromObject(JSON.parse(chunk))
+      const answer = answerFromObject(JSON.parse(chunk) as unknown)
       if (answer !== undefined) last = answer
     } catch {
       // A non-JSON line is commentary; only a successful object can win.
     }
   }
   try {
-    const parsed = JSON.parse(trimmed)
+    const parsed = JSON.parse(trimmed) as unknown
     const answer = answerFromObject(parsed)
     if (answer !== undefined) return answer
   } catch {

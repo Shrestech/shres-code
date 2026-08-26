@@ -51,7 +51,7 @@ function latestCheckpointSeq(
       continue
     }
     if (event.type !== 'jspace/card') continue
-    const checked = event.data?.checked
+    const checked = event.data.checked
     // Skip an unreadable payload so the last well-formed length stays the baseline.
     if (!Array.isArray(checked)) continue
     const length = checked.length

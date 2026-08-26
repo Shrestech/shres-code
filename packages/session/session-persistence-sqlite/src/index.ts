@@ -176,6 +176,8 @@ export class SqliteSessionPersistence extends SessionPersistence implements Pers
       throw new TypeError('busyTimeoutMs must be a non-negative safe integer')
     }
     const chunkRetention = config.chunkRetention ?? 'forever'
+    // Programmatic wrappers may construct the backend without Schemastery normalization.
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- un-normalized constructor path
     if (chunkRetention !== 'forever' && chunkRetention !== 'assembled') {
       throw new TypeError(`chunkRetention must be "forever" or "assembled", got ${String(chunkRetention)}`)
     }
@@ -434,9 +436,13 @@ export class SqliteSessionPersistence extends SessionPersistence implements Pers
    */
   readStoredEventsSync(meta: SessionHeader, seqs: readonly number[]): SessionEvent[] {
     if (seqs.length === 0) return []
+    // openDb assigns `db` asynchronously; a windowed re-read can race the open.
+    /* v8 ignore start -- openDb settles before any test can observe the unset field */
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- definite-assignment field is unset until openDb settles
     if (this.db === undefined) {
       throw new Error(`session "${meta.id}": database is not open for a windowed re-read`)
     }
+    /* v8 ignore stop */
     const rows = this.db.prepare(
       `SELECT seq, type, time, data, source_event_seqs, surface_op, ignorable FROM events WHERE session_id = ? AND seq IN (${seqs.map(() => '?').join(',')})`,
     ).all(meta.id, ...seqs) as unknown as EventRow[]

@@ -50,6 +50,7 @@ afterEach(() => {
   applied.disposed = 0
   applied.approvalProbe = 'absent'
   applied.jobsProbe = 'absent'
+  applied.throwOnApply = false
 })
 
 /** Wait until the async resolve/apply effect has published a terminal reason. */
@@ -326,19 +327,84 @@ describe('shres-shield host seat', () => {
           blocked: 0,
           cwd: 1,
           byChannel: { bad: 'no', tool_args: { screened: 1, observed: 0, asked: 0, blocked: 0 } },
+          byRule: {
+            bad: 'no',
+            empty: { observed: 'x', asked: 0, blocked: 0 },
+            'sig.ok': { observed: 1, asked: 0, blocked: 2 },
+          },
+          otherRules: { observed: 0, asked: 1, blocked: 0 },
           recent: [
             null,
+            { at: 'no', rule: 'x', channel: 'y', sha16: 'z', verdict: 'observe' },
             { at: 1, rule: 'x', channel: 'y', sha16: 'z', verdict: 'nope' },
             { at: 2, rule: 'ok', channel: 'user_message', sha16: '0123456789abcdef', verdict: 'observe' },
           ],
-          definitions: { version: 'v', updatedAt: 'no', stale: false },
+          definitions: { version: 'v1', stale: false, updatedAt: 'no' },
         }),
       },
     })
     const next = ctx.shield.snapshot()
     expect(next.stats.screened).toBe(1)
     expect(next.stats.recent).toHaveLength(1)
+    expect(next.stats.byRule['sig.ok']).toEqual({ observed: 1, asked: 0, blocked: 2 })
+    expect(next.stats.otherRules).toEqual({ observed: 0, asked: 1, blocked: 0 })
     expect(next.definitions).toBeUndefined()
+  })
+
+  it('drops a definition stamp whose version or stale field is the wrong type', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', '/no/such-shield-module.js')
+    const ctx = await setup({ license: 'paid' }, 'engine-missing')
+    ctx.shield.bindPayload({
+      stats: {
+        snapshot: () => ({
+          stats: {
+            screened: 1,
+            observed: 0,
+            asked: 0,
+            blocked: 0,
+          },
+          definitions: { version: 1, stale: false, updatedAt: 0 },
+        }),
+      },
+    })
+    expect(ctx.shield.snapshot().definitions).toBeUndefined()
+    ctx.shield.bindPayload({
+      stats: {
+        snapshot: () => ({
+          stats: {
+            screened: 2,
+            observed: 0,
+            asked: 0,
+            blocked: 0,
+          },
+          definitions: { version: 'v1', stale: 'no', updatedAt: 0 },
+        }),
+      },
+    })
+    expect(ctx.shield.snapshot().definitions).toBeUndefined()
+    expect(ctx.shield.snapshot().stats.screened).toBe(2)
+  })
+
+  it('drops a definition stamp whose updatedAt is not a number or null', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', '/no/such-shield-module.js')
+    const ctx = await setup({ license: 'paid' }, 'engine-missing')
+    ctx.shield.bindPayload({
+      stats: {
+        snapshot: () => ({
+          stats: {
+            screened: 1,
+            observed: 0,
+            asked: 0,
+            blocked: 0,
+          },
+          definitions: { version: 'v1', stale: false, updatedAt: false },
+        }),
+      },
+    })
+    expect(ctx.shield.snapshot().definitions).toBeUndefined()
+    expect(ctx.shield.snapshot().stats.screened).toBe(1)
   })
 
   it('accepts wrapped engine stats, call ids, and a null definition stamp', async () => {
@@ -393,6 +459,37 @@ describe('shres-shield host seat', () => {
     })
     expect(ctx.shield.snapshot('empty').stats.cwd).toBe('/listed')
     expect(ctx.shield.snapshot('missing').stats.cwd).toBe('/listed')
+  })
+
+  it('resolves cwd from list when get is absent', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', '/no/such-shield-module.js')
+    const ctx = await setup({ license: 'paid' }, 'engine-missing')
+    ctx.provide('sessions', {
+      list: () => [{ header: { cwd: '/list-only' } }],
+    })
+    expect(ctx.shield.snapshot('no-get').stats.cwd).toBe('/list-only')
+  })
+
+  it('uses an empty session list when the store has no list method', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', '/no/such-shield-module.js')
+    const ctx = await setup({ license: 'paid' }, 'engine-missing')
+    ctx.provide('sessions', {
+      get: () => undefined,
+    })
+    expect(ctx.shield.snapshot().stats.cwd).toBe(null)
+  })
+
+  it('keeps the last resolved cwd when listed sessions have none', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', '/no/such-shield-module.js')
+    const ctx = await setup({ license: 'paid' }, 'engine-missing')
+    let rows: Array<{ header: { cwd?: string } }> = [{ header: { cwd: '/list-only' } }]
+    ctx.provide('sessions', { list: () => rows })
+    expect(ctx.shield.snapshot().stats.cwd).toBe('/list-only')
+    rows = [{ header: {} }]
+    expect(ctx.shield.snapshot().stats.cwd).toBe('/list-only')
   })
 
   it('returns zeroed stats when SessionId resolution throws', async () => {
@@ -600,7 +697,39 @@ describe('shres-shield per-repo gate', () => {
     await expect(ctx.settings.update(ShieldSeat.SHIELD_SETTINGS_NAMESPACE, {
       repos: { 'relative/path': { enabled: false } },
     })).rejects.toThrow(/absolute/)
+    await ctx.settings.update(ShieldSeat.SHIELD_SETTINGS_NAMESPACE, { enabled: true })
     await ctx.fiber.dispose()
+  })
+
+  it('defaults omitted apply fields and an empty license string', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', fixtureUrl)
+    const ctx = new Context()
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRuntime)
+    await provideApprovalAndJobs(ctx)
+    ShieldSeat.apply(ctx, { license: '' })
+    await waitForReason(ctx, 'active')
+    expect(applied.config).toEqual({ posture: 'ask' })
+    await ctx.fiber.dispose()
+  })
+
+  it('treats a throwing payload apply as a missing engine', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', fixtureUrl)
+    applied.throwOnApply = true
+    const ctx = await setup({ license: 'paid' }, 'engine-missing')
+    expect(applied.count).toBe(0)
+    expect(ctx.shield.status).toEqual({ active: false, reason: 'engine-missing' })
+    await ctx.fiber.dispose()
+  })
+
+  it('disposes a seat that never mounted an engine instance', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', '/no/such-shield-module.js')
+    const ctx = await setup({ license: 'paid' }, 'engine-missing')
+    await ctx.fiber.dispose()
+    expect(applied.disposed).toBe(0)
   })
 })
 

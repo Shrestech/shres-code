@@ -19,7 +19,7 @@ function call(name: string, args: string, callId = 'c1'): SessionEvent {
     seq: 1,
     time: 0,
     data: { turn: 1, step: 1, callId: CallId(callId), name, arguments: args },
-  } as SessionEvent
+  }
 }
 
 function card(): SessionEvent {

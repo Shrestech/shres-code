@@ -135,9 +135,9 @@ describe('windowed in-memory session log', () => {
 
   it('fails loud on a non-integer or negative window', () => {
     const session = Session.create(SessionId('bad-window'))
-    expect(() => session.attachMemoryArchive({ read: () => [] }, -1))
+    expect(() => { session.attachMemoryArchive({ read: () => [] }, -1) })
       .toThrow(/inMemoryLogWindow must be a non-negative integer/)
-    expect(() => session.attachMemoryArchive({ read: () => [] }, 1.5))
+    expect(() => { session.attachMemoryArchive({ read: () => [] }, 1.5) })
       .toThrow(/inMemoryLogWindow must be a non-negative integer/)
   })
 
@@ -159,7 +159,7 @@ describe('windowed in-memory session log', () => {
     session.attachMemoryArchive(mapArchive(store), 0)
     delete (session as unknown as { archive?: SessionEventArchive }).archive
     session.markDurableThrough(session.seq - 1)
-    expect(() => session.releaseFlushedOutsideSurface())
+    expect(() => { session.releaseFlushedOutsideSurface() })
       .toThrow(/no durable event archive is attached/)
   })
 
@@ -191,7 +191,7 @@ describe('windowed in-memory session log', () => {
 
   it('rejects a durable mark past the live log', () => {
     const session = Session.create(SessionId('bad-durable'))
-    expect(() => session.markDurableThrough(0)).toThrow(/outside session/)
+    expect(() => { session.markDurableThrough(0) }).toThrow(/outside session/)
     session.append('turn/start', { turn: 1 })
     session.markDurableThrough(0)
     expect(session.residentSeqs()).toEqual([0])

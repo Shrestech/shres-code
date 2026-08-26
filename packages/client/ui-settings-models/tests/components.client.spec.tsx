@@ -269,7 +269,9 @@ describe('ModelsSection', () => {
     scripted.face.settings.describe.mockImplementation(() => Promise.resolve(ok({
       writable: true, hasDocument: false, namespaces,
     })))
+    // oxlint-disable-next-line typescript/no-misused-promises -- mockImplementation is typed void; the live mutate returns this Promise
     scripted.mutate.mockImplementation(() => Promise.resolve(ok(namespaces[3])))
+
     const { controller } = await mountFace(scripted)
     expect(screen.getByText('Grok Build CLI (delegated)')).toBeTruthy()
     expect(screen.getByText(en.delegatedTag)).toBeTruthy()
@@ -402,7 +404,7 @@ describe('ModelsSection', () => {
       onClose={vi.fn()}
     />)
     await waitFor(() => {
-      expect((screen.getByLabelText(en.keyInput) as HTMLInputElement).placeholder).toBe(en.keyEnvLocked)
+      expect((screen.getByLabelText(en.keyInput)).placeholder).toBe(en.keyEnvLocked)
     })
     expect(screen.getByLabelText(en.cliBinary)).toBeTruthy()
     cleanup()

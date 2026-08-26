@@ -186,6 +186,8 @@ export function TalkDeck({
   }, [playback])
 
   const openMic = useCallback(async (onStop: (blob: Blob) => void): Promise<boolean> => {
+    // Some browsers omit mediaDevices; the DOM lib types it as always present.
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- mediaDevices is missing in some browsers
     if (navigator.mediaDevices === undefined) {
       setError(t('mic.failed'))
       return false

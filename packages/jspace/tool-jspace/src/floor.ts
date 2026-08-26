@@ -406,8 +406,7 @@ export function evaluateCharterFloor(
   entry: CharterCheckInput,
   options: CharterFloorOptions,
 ): CharterFloorResult {
-  const id = String(entry.id ?? options.id)
-  const label = `${id}`
+  const label = entry.id ?? options.id
   const constraint = entry.constraint
   if (entry.reads.length < 1) {
     return refuse('JSPACE_CHARTER_NO_READS', `charter entry "${label}" (${constraint}) names no workspace read: put a path from \`reads\` in the command, or use a listed test runner.`)

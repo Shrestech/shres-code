@@ -117,10 +117,10 @@ describe('WebBlock search card', () => {
 
   it('shows the truncated indicator only when the list was capped by the tool', () => {
     const on = render(<WebBlock kind="search" sources={sources(1)} truncated />)
-    expect(on.getByText('source listtruncated')).toBeTruthy()
+    expect(on.getByText('Source list truncated')).toBeTruthy()
     cleanup()
     const off = render(<WebBlock kind="search" sources={sources(1)} truncated={false} />)
-    expect(off.queryByText('source listtruncated')).toBeNull()
+    expect(off.queryByText('Source list truncated')).toBeNull()
   })
 
   it('renders every source in one <ol> with no expand control', () => {

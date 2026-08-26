@@ -38,13 +38,13 @@ describe('PartialAccumulator', () => {
     acc.push(chunk({ type: 'block-start', index: 0, blockType: 'reasoning' }))
     acc.push(chunk({ type: 'reasoning-delta', index: 0, text: 'rea' }))
     acc.push(chunk({ type: 'reasoning-delta', index: 0, text: 'son' }))
-    expect(acc.toPartial().blocks).toEqual([{ kind: 'reasoning', text: 'reasoning' }])
+    expect(acc.toPartial().blocks).toEqual([{ kind: 'reasoning', text: 'reason' }])
   })
 
   it('continues from a materialized history prefix', () => {
     const acc = new PartialAccumulator(1, 0, [{ kind: 'text', text: 'existing' }])
     acc.push(chunk({ type: 'text-delta', index: 0, text: 'delta' }))
-    expect(acc.toPartial().blocks).toEqual([{ kind: 'text', text: 'existing plus delta' }])
+    expect(acc.toPartial().blocks).toEqual([{ kind: 'text', text: 'existingdelta' }])
   })
 
   it('folds tool-call deltas: first id pins callId, late name overrides, argsRaw concatenates', () => {

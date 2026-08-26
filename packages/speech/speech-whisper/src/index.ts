@@ -93,6 +93,6 @@ export function resolveOptions(config: Config, load: WhisperLoader = loadWhisper
 export function apply(ctx: Context, config: Config): void {
   ctx.speech.registerSttProvider(new WhisperSttProvider(() => {
     const language = ctx.speech.settings().language
-    return resolveOptions({ ...config, language })
+    return resolveOptions(Object.assign({}, config, { language }))
   }))
 }

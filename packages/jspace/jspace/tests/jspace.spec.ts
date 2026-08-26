@@ -364,7 +364,7 @@ describe('JspaceService card log', () => {
     const { ctx, session } = await harness()
     expect(() => ctx.jspace.note(session, { next: 'x' })).toThrow(/not open/)
     expect(() => ctx.jspace.checkpoint(session, { check: 'a', by: 'unit tests' })).toThrow(/not open/)
-    expect(() => ctx.jspace.close(session)).toThrow(/not open/)
+    expect(() => { ctx.jspace.close(session) }).toThrow(/not open/)
     ctx.jspace.open(session, { goal: 'A', next: 'B' })
     expect(() => ctx.jspace.note(session, { goal: '   ' })).toThrow(JspaceError)
     expect(() => ctx.jspace.note(session, { next: 'Goal: injected' })).toThrow(/card label/)

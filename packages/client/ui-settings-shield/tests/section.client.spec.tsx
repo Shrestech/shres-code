@@ -128,12 +128,16 @@ describe('ShieldSection', () => {
           byRule: {
             'deny-keylogger': { observed: 0, asked: 0, blocked: 3 },
             'ask-rm-rf': { observed: 0, asked: 2, blocked: 0 },
+            'aaa-tied': { observed: 1, asked: 1, blocked: 1 },
+            'zzz-tied': { observed: 1, asked: 1, blocked: 1 },
           },
         },
       })),
     )
     expect(await screen.findByText('deny-keylogger · blocked 3 · asked 0 · observed 0')).toBeTruthy()
     expect(screen.getByText('ask-rm-rf · blocked 0 · asked 2 · observed 0')).toBeTruthy()
+    expect(screen.getByText('aaa-tied · blocked 1 · asked 1 · observed 1')).toBeTruthy()
+    expect(screen.getByText('zzz-tied · blocked 1 · asked 1 · observed 1')).toBeTruthy()
     expect(screen.getByText(en.patterns)).toBeTruthy()
   })
 
@@ -197,7 +201,7 @@ describe('ShieldSection', () => {
           subscribe: () => () => {},
           set: vi.fn(async () => {}),
           unset: vi.fn(async () => {}),
-        } as unknown as SettingsScope<ShieldSettings>}
+        }}
         useSnapshot={select => select(snapshot({}))}
         t={key => en[key]}
         loadSnapshot={() => deferred.promise}
@@ -271,7 +275,7 @@ describe('ShieldSection', () => {
       })),
     )
     expect(await screen.findByText(/Asked · tool_args · sig.ask · /)).toBeTruthy()
-    expect((screen.getByLabelText(en.license) as HTMLInputElement).placeholder).toBe(en.licenseStored)
+    expect((screen.getByLabelText(en.license)).placeholder).toBe(en.licenseStored)
   })
 
   it('shows applying while a license write is in flight', async () => {
@@ -296,7 +300,7 @@ describe('ShieldSection', () => {
           subscribe: () => () => {},
           set: vi.fn(async () => {}),
           unset: vi.fn(async () => {}),
-        } as unknown as SettingsScope<ShieldSettings>}
+        }}
         useSnapshot={select => select(snapshot({}))}
         t={key => en[key]}
         loadSnapshot={() => deferred.promise}
@@ -334,7 +338,7 @@ describe('ShieldSection', () => {
     )
     expect(await screen.findByText('2')).toBeTruthy()
     expect(screen.getByRole('status').textContent).toBe(en.readOnly)
-    expect((screen.getByRole('switch', { name: en.disable }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('switch', { name: en.disable })).disabled).toBe(true)
   })
 
   it('ignores an unknown posture value', async () => {

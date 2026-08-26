@@ -258,7 +258,7 @@
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: var(--dsw-alias-label-primary-inverted, #fff);
+  background: var(--dsw-alias-label-primary-inverted);
 }
 
 .rowSwitchOn .rowSwitchThumb {

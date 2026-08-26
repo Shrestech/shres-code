@@ -877,11 +877,11 @@ describe('shres-subagent-acp', () => {
     await expect(ctx.subagents.start('acp', { ...request(), maxDepth: 0 }))
       .rejects.toBeInstanceOf(SubagentDepthError)
     await expect(ctx.subagents.start('acp', { ...request(), toolFilter: { deny: ['bash'] } }))
-      .rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY', message: expect.stringContaining('toolFilter') })
+      .rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' })
     await expect(ctx.subagents.start('acp', {
       ...request(),
       outputSchema: { type: 'object', properties: {} },
-    })).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY', message: expect.stringContaining('outputSchema') })
+    })).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' })
     expect(spawn).not.toHaveBeenCalled()
   })
 

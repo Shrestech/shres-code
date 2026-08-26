@@ -14,7 +14,6 @@ afterEach(cleanup)
 
 // Mirrors the real lookup chain (conversation namespace, then common).
 const t = makeTranslate(en, commonEn) as ContextMeterProps['t']
-const tEn = makeTranslate(en, commonEn) as ContextMeterProps['t']
 
 const BREAKDOWN = { systemTokens: 120, toolsTokens: 21_500, messageTokens: 477_000 }
 
@@ -42,7 +41,7 @@ describe('ContextMeter', () => {
       contextPressure: { pressureTokens: 32_000, contextWindow: 128_000 },
       contextBreakdown: BREAKDOWN,
     })
-    const trigger = view.getByRole('button', { name: 'of context used 25%' })
+    const trigger = view.getByRole('button', { name: '25% of context used' })
     expect(view.container.querySelector('[role="dialog"]')).toBeNull()
     fireEvent.click(trigger)
     const panel = view.container.querySelector('[role="dialog"]')!
@@ -59,20 +58,15 @@ describe('ContextMeter', () => {
     expect(view.container.querySelector('[role="dialog"]')).toBeNull()
   })
 
-  it('lets each locale own the headline word order around the reading', () => {
+  it('lets the locale template own the headline word order around the reading', () => {
     const values = {
       contextPressure: { pressureTokens: 32_000, contextWindow: 128_000 },
       contextBreakdown: BREAKDOWN,
     }
-    const zhView = meter(values)
-    fireEvent.click(zhView.getByRole('button', { name: 'of context used 25%' }))
-    // The reading follows the label in Chinese and leads it in English; both
-    // headers read as one sentence rather than a concatenated fragment.
-    expect(zhView.container.querySelector('[role="dialog"]')!.textContent)
-      .toMatch(/^of context used25%/)
-    const enView = meter(values, tEn)
-    fireEvent.click(enView.getByRole('button', { name: '25% of context used' }))
-    expect(enView.container.querySelector('[role="dialog"]')!.textContent)
+    const view = meter(values)
+    fireEvent.click(view.getByRole('button', { name: '25% of context used' }))
+    // `{percent}` leads the English template, so the header reads as one sentence.
+    expect(view.container.querySelector('[role="dialog"]')!.textContent)
       .toMatch(/^25%of context used/)
   })
 
@@ -81,7 +75,7 @@ describe('ContextMeter', () => {
       contextPressure: { pressureTokens: 0, contextWindow: 128_000 },
       contextBreakdown: BREAKDOWN,
     })
-    fireEvent.click(view.getByRole('button', { name: 'of context used 0%' }))
+    fireEvent.click(view.getByRole('button', { name: '0% of context used' }))
     const panel = view.container.querySelector('[role="dialog"]')!
     // `.segment` carries a min-width, so a zero-width part would still paint a
     // filled sliver over an empty context.
@@ -96,14 +90,14 @@ describe('ContextMeter', () => {
       contextPressure: { pressureTokens: 32_000, projectedTokens: 3_000, contextWindow: 128_000 },
       contextBreakdown: BREAKDOWN,
     })
-    const trigger = view.getByRole('button', { name: 'of context used 2%' })
+    const trigger = view.getByRole('button', { name: '2% of context used' })
     fireEvent.click(trigger)
     expect(view.container.querySelector('[role="dialog"]')!.textContent).toContain('~3K / 128K')
   })
 
   it('omits the composition rows while the contextBreakdown projection is absent', () => {
     const view = meter({ contextPressure: { pressureTokens: 32_000, contextWindow: 128_000 } })
-    fireEvent.click(view.getByRole('button', { name: 'of context used 25%' }))
+    fireEvent.click(view.getByRole('button', { name: '25% of context used' }))
     const panel = view.container.querySelector('[role="dialog"]')!
     expect(panel.textContent).toContain('~32K / 128K')
     expect(panel.textContent).not.toContain('System prompt')
@@ -118,7 +112,7 @@ describe('ContextMeter', () => {
       contextBreakdown: BREAKDOWN,
     }
     const view = render(<ContextMeter useProjection={(key: string) => values[key]} t={t} />)
-    fireEvent.click(view.getByRole('button', { name: 'of context used 25%' }))
+    fireEvent.click(view.getByRole('button', { name: '25% of context used' }))
     expect(view.container.querySelector('[role="dialog"]')).not.toBeNull()
 
     values = { contextPressure: { pressureTokens: 32_000 }, contextBreakdown: BREAKDOWN }
@@ -130,7 +124,7 @@ describe('ContextMeter', () => {
       contextBreakdown: BREAKDOWN,
     }
     view.rerender(<ContextMeter useProjection={(key: string) => values[key]} t={t} />)
-    expect(view.getByRole('button', { name: 'of context used 25%' }).getAttribute('aria-expanded')).toBe('false')
+    expect(view.getByRole('button', { name: '25% of context used' }).getAttribute('aria-expanded')).toBe('false')
     expect(view.container.querySelector('[role="dialog"]')).toBeNull()
   })
 
@@ -139,7 +133,7 @@ describe('ContextMeter', () => {
       contextPressure: { pressureTokens: 32_000, contextWindow: 128_000 },
       contextBreakdown: BREAKDOWN,
     })
-    const trigger = view.getByRole('button', { name: 'of context used 25%' })
+    const trigger = view.getByRole('button', { name: '25% of context used' })
     const openPanel = () => {
       fireEvent.click(trigger)
       return view.container.querySelector('[role="dialog"]')!

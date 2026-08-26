@@ -106,6 +106,7 @@ export async function disposeGrokChild(child: SubprocessHandle): Promise<void> {
  * @param spec - Workspace, environment, process service, and diagnostic policy.
  * @returns the published run after spawn.
  */
+// oxlint-disable-next-line typescript/require-await -- callers await the handle; spawn is synchronous
 export async function startGrokCliRun(
   request: SubagentStartRequest,
   spec: GrokCliRunSpec,

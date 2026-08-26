@@ -577,7 +577,7 @@ describe('ChatView', () => {
     })
     const cancelledDisclosure = view.container.querySelector('details') as HTMLDetailsElement
     expect(cancelledDisclosure.dataset.active).toBeUndefined()
-    expect(within(cancelledDisclosure).getByRole('status').textContent).toContain('Retrycancelled')
+    expect(within(cancelledDisclosure).getByRole('status').textContent).toContain('retry cancelled')
   })
 
   it('renders terminal turn failures inline with their durable message and optional code', () => {
@@ -665,7 +665,7 @@ describe('ChatView', () => {
     })
     const view = render(<h.ChatView {...h.props} />)
     // The exact turn/end includes trailing tool activity after the final text.
-    expect(view.getAllByText(/duration 19s/)).toHaveLength(1)
+    expect(view.getAllByText(/Ran for 19s/)).toHaveLength(1)
   })
 
   it('the settled footer appends first-step ttft and turn decode throughput', () => {
@@ -686,8 +686,8 @@ describe('ChatView', () => {
     })
     const view = render(<h.ChatView {...h.props} />)
     // First-step ttft (1.2s) plus 100 tokens over 5s of decode.
-    expect(view.getAllByText(/duration 19s/)).toHaveLength(1)
-    expect(view.getAllByText(/ token 1\.2s/)).toHaveLength(1)
+    expect(view.getAllByText(/Ran for 19s/)).toHaveLength(1)
+    expect(view.getAllByText(/TTFT 1\.2s/)).toHaveLength(1)
     expect(view.getAllByText(/20 tok\/s/)).toHaveLength(1)
   })
 
@@ -704,7 +704,7 @@ describe('ChatView', () => {
       running: true,
     })
     const view = render(<h.ChatView {...h.props} />)
-    expect(view.queryByText(/ token|tok\/s/)).toBeNull()
+    expect(view.queryByText(/TTFT|tok\/s/)).toBeNull()
   })
 
   it('user and assistant message containers scope the hover-revealed time chrome', () => {
@@ -935,7 +935,7 @@ describe('ChatView', () => {
     const view = render(<h.ChatView {...h.props} />)
     // Freshly mounted (as after a reload) yet already past the 15s gate.
     const status = view.getByRole('status')
-    expect(status.textContent).toMatch(/^Deep diving\.\.\.2m0\ds$/)
+    expect(status.textContent).toMatch(/^Deep diving\.\.\.2m 0\ds$/)
     expect(status.querySelector('[aria-hidden="true"]')).not.toBeNull()
     act(() => {
       h.set({ queue: [{
@@ -947,7 +947,7 @@ describe('ChatView', () => {
         text: 'also',
       }] })
     })
-    expect(status.textContent).toMatch(/^Deep diving\.\.\.2m0\ds$/)
+    expect(status.textContent).toMatch(/^Deep diving\.\.\.2m 0\ds$/)
   })
 
   it('hands each ordered root call to the keyed business-node slot', () => {
@@ -1236,7 +1236,7 @@ describe('ChatView', () => {
       openError: { code: 'internal', message: 'boom' } as never,
     })
     const view = render(<h.ChatView {...h.props} />)
-    expect(view.getByText(/historyFailed to load：boom/)).toBeTruthy()
+    expect(view.getByText(/Failed to load history: boom/)).toBeTruthy()
     const loading = makeHarness({ openState: 'loading' })
     const lv = render(<loading.ChatView {...loading.props} />)
     expect(lv.getByText('Loading history…')).toBeTruthy()
@@ -1290,7 +1290,7 @@ describe('ChatView', () => {
       nodes: [command({ seq: 8, commandId: 'cmd-4' as CommandNode['commandId'], name: null, args: null, outcome: { kind: 'success' } })],
     })
     const ov = render(<orphan.ChatView {...orphan.props} />)
-    expect(ov.getByText('Commands')).toBeTruthy()
+    expect(ov.getByText('Command')).toBeTruthy()
     expect(ov.getByText('Completed')).toBeTruthy()
   })
 

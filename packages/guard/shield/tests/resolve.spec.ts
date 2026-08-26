@@ -54,9 +54,10 @@ afterEach(() => {
   else process.env.SHRES_SHIELD_MODULE = savedModule
 })
 
-/** A scratch directory whose `../shres-shield` sibling path cannot exist. */
+/** A scratch repo whose `../shres-shield` sibling cannot collide with tmpdir leftovers. */
 function neutralSiblingRoot(): string {
-  const root = resolve(tmpdir(), `shres-shield-resolve-${Math.random().toString(36).slice(2)}`)
+  const parent = resolve(tmpdir(), `shres-shield-neutral-${Math.random().toString(36).slice(2)}`)
+  const root = join(parent, 'repo')
   mkdirSync(root, { recursive: true })
   return root
 }
@@ -74,7 +75,7 @@ function makeProfileDir(moduleSource: string = FULL_MODULE): { dir: string; clea
   writeFileSync(join(pkgDir, 'index.js'), moduleSource)
   return {
     dir,
-    cleanup: () => rmSync(dir, { recursive: true, force: true }),
+    cleanup: () =>{  rmSync(dir, { recursive: true, force: true }) },
   }
 }
 
@@ -218,6 +219,21 @@ describe('shield payload resolve', () => {
       expect(engine).toBeUndefined()
     } finally {
       profile.cleanup()
+    }
+  })
+
+  it('falls through past a malformed sibling when no profile is given', async () => {
+    const parent = resolve(tmpdir(), `shres-shield-bad-sibling-only-${Math.random().toString(36).slice(2)}`)
+    const repo = join(parent, 'repo')
+    const dist = join(parent, 'shres-shield', 'packages', 'plugin', 'dist')
+    mkdirSync(dist, { recursive: true })
+    writeFileSync(join(dist, 'index.js'), INVALID_APPLY_MODULE)
+    writeFileSync(join(dist, 'package.json'), '{"type":"module"}\n')
+    try {
+      const engine = await resolveShieldEngine({ repoRoot: repo })
+      expect(engine).toBeUndefined()
+    } finally {
+      rmSync(parent, { recursive: true, force: true })
     }
   })
 })

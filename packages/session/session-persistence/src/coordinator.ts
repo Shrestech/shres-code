@@ -95,6 +95,12 @@ export class SessionPersistencePrunedError extends Error {
   }
 }
 
+/**
+ * Explain why a stored session header's format version cannot be opened.
+ * @param id - session identity shown in the refusal.
+ * @param version - the header's format version.
+ * @returns a user-facing refusal naming the stored version and this harness's supported version.
+ */
 export function sessionFormatVersionRefusal(id: string, version: number): string {
   return version > SESSION_FORMAT_VERSION
     ? `session "${id}" uses log format v${version}, but this harness reads only v${SESSION_FORMAT_VERSION}: the log was written by a newer harness — upgrade the harness to open it`
@@ -1408,8 +1414,9 @@ export class PersistenceCoordinator<TornMarker = unknown> {
    */
   private bindMemoryWindow(session: Session): void {
     if (this.inMemoryLogWindow === undefined) return
+    // oxlint-disable-next-line typescript/unbound-method -- existence check before attach; the read path calls through the backend
     const reader = this.backend.readStoredEventsSync
-    if (reader === undefined) {
+    if (typeof reader !== 'function') {
       throw new Error(
         `inMemoryLogWindow is set but ${this.backend.name} cannot re-read stored events synchronously`,
       )

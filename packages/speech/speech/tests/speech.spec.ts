@@ -287,10 +287,9 @@ describe('SpeechRuntime remotes', () => {
     const { speech } = await mountSpeech()
     speech.registerSttProvider(sttProvider('xai-stt', true))
     const result = await speech.transcribeRemote({ audioBase64: 'abc', mediaType: 'audio/webm' })
-    expect(result).toEqual({
-      ok: false,
-      error: expect.objectContaining({ code: 'SPEECH_INVALID_BASE64' }),
-    })
+    expect(result.ok).toBe(false)
+    if (result.ok) throw new Error('expected transcribeRemote to fail')
+    expect(result.error.code).toBe('SPEECH_INVALID_BASE64')
   })
 
   it('transcribeRemote forwards language when provided and omits it otherwise', async () => {
@@ -325,10 +324,10 @@ describe('SpeechRuntime remotes', () => {
 
   it('synthesizeRemote returns a business failure when TTS is missing', async () => {
     const { speech } = await mountSpeech()
-    await expect(speech.synthesizeRemote({ text: 'Hello' })).resolves.toEqual({
-      ok: false,
-      error: expect.objectContaining({ code: 'SPEECH_PROVIDER_UNAVAILABLE' }),
-    })
+    const synth = await speech.synthesizeRemote({ text: 'Hello' })
+    expect(synth.ok).toBe(false)
+    if (synth.ok) throw new Error('expected synthesizeRemote to fail')
+    expect(synth.error.code).toBe('SPEECH_PROVIDER_UNAVAILABLE')
   })
 
   it('transcribeRemote rejects an unsupported media type', async () => {
@@ -338,10 +337,9 @@ describe('SpeechRuntime remotes', () => {
       audioBase64: Buffer.from(mpeg).toString('base64'),
       mediaType: 'image/png',
     })
-    expect(result).toEqual({
-      ok: false,
-      error: expect.objectContaining({ code: 'SPEECH_UNSUPPORTED_MEDIA' }),
-    })
+    expect(result.ok).toBe(false)
+    if (result.ok) throw new Error('expected transcribeRemote to fail')
+    expect(result.error.code).toBe('SPEECH_UNSUPPORTED_MEDIA')
   })
 })
 

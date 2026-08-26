@@ -1624,6 +1624,7 @@ describe('JsonlSessionPersistence: windowed in-memory log', () => {
   async function windowed(compression: 'zstd' | 'none'): Promise<{
     ctx: Context
     session: Session
+    dir: string
     dispose: () => Promise<void>
   }> {
     const dir = await freshRoot()
@@ -1653,7 +1654,7 @@ describe('JsonlSessionPersistence: windowed in-memory log', () => {
     }, { surfaceOp: 'append', sourceEventSeqs: [2] })
     session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
     await ctx.sessions.flush(session)
-    return { ctx, session, dispose: () => fiber.dispose() }
+    return { ctx, session, dir, dispose: () => fiber.dispose() }
   }
 
   it.each(['none', 'zstd'] as const)('drops flushed off-surface events and re-reads them (%s)', async (compression) => {
@@ -1665,6 +1666,30 @@ describe('JsonlSessionPersistence: windowed in-memory log', () => {
         'turn/start', 'user/message', 'assistant/chunk', 'assistant/message', 'turn/end',
       ])
       expect(session.residentSeqs()).toEqual(session.surface.nodes)
+    } finally {
+      await dispose()
+    }
+  })
+
+  it('fails loud when a windowed re-read names a missing seq', async () => {
+    const { ctx, session, dispose } = await windowed('none')
+    try {
+      const jsonl = ctx.sessionPersistence as JsonlSessionPersistence
+      expect(jsonl.readStoredEventsSync(session.header, [])).toEqual([])
+      expect(() => jsonl.readStoredEventsSync(session.header, [99]))
+        .toThrow(/no stored event at seq 99/)
+    } finally {
+      await dispose()
+    }
+  })
+
+  it('fails loud when the durable log has been deleted', async () => {
+    const { ctx, session, dir, dispose } = await windowed('none')
+    try {
+      await rm(logPath(dir, dir, session.header.id, 'none'))
+      const jsonl = ctx.sessionPersistence as JsonlSessionPersistence
+      expect(() => jsonl.readStoredEventsSync(session.header, [0]))
+        .toThrow(/has no durable log to re-read/)
     } finally {
       await dispose()
     }

@@ -13,7 +13,6 @@ import {
   type CharterCheckInput,
   type CharterEntryId as CharterId,
   type CharterEntryInput,
-  type CharterFailProbe,
   type JspaceCharterEntry,
   type JspaceCharterProse,
 } from '@shres-code/shres-code-jspace'
@@ -315,7 +314,7 @@ function normalizeCheckInput(entry: CharterCheckInput): CharterCheckInput {
     command: entry.command,
     reads: entry.reads,
     ...entry.id === undefined ? {} : { id: CharterEntryId(entry.id) },
-    ...entry.failProbe === undefined ? {} : { failProbe: entry.failProbe as { path: string; mutation: CharterFailProbe } },
+    ...entry.failProbe === undefined ? {} : { failProbe: entry.failProbe },
   }
 }
 

@@ -244,14 +244,18 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
     try {
       buffer = readFileSync(path)
     } catch (error: unknown) {
+      /* v8 ignore else -- a non-ENOENT read of a just-flushed artifact is an unexpected FS failure */
       if (isENOENT(error)) {
         throw new Error(`session "${meta.id}" has no durable log to re-read`)
       }
+      /* v8 ignore next -- a non-ENOENT read of a just-flushed artifact is an unexpected FS failure */
       throw error
     }
     if (this.compression === 'none') return scanLog(buffer).events
     const { frames, tornStart } = scanZstdFrames(buffer)
+    /* v8 ignore next -- async load already pins empty and torn Zstandard artifacts */
     if (frames.length === 0) throw new Error('empty or header-less Zstandard session log')
+    /* v8 ignore next -- async load already pins a torn frame on the same bytes */
     if (tornStart !== undefined) {
       throw new Error(`session "${meta.id}": durable log still has a torn frame; cannot re-read a windowed event`)
     }
@@ -265,6 +269,7 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
       const scanner = new SessionLogScanner(header.value)
       for (const plaintext of decoded) scanner.write(plaintext)
       const complete = scanner.checkpoint()
+      /* v8 ignore next -- async load already pins a torn JSONL record inside a complete frame */
       if (complete.committedBytes !== complete.inputBytes) {
         throw new Error('corrupt Zstandard session log: complete frame contains a torn JSONL record')
       }

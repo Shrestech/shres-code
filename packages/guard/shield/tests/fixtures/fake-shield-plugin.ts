@@ -11,6 +11,7 @@ export const applied: {
   disposed: number
   approvalProbe: ServiceProbe
   jobsProbe: ServiceProbe
+  throwOnApply: boolean
   stats: {
     cwd: string | null
     screened: number
@@ -28,6 +29,7 @@ export const applied: {
   disposed: 0,
   approvalProbe: 'absent',
   jobsProbe: 'absent',
+  throwOnApply: false,
   stats: {
     cwd: '/tmp/shield-fixture',
     screened: 4,
@@ -83,6 +85,7 @@ export async function apply(ctx: unknown, config: unknown): Promise<{
   dispose(): Promise<void>
   stats: typeof stats
 }> {
+  if (applied.throwOnApply) throw new Error('payload apply failed')
   applied.count += 1
   applied.config = config
   applied.approvalProbe = probe(ctx, 'approval')

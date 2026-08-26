@@ -62,7 +62,7 @@ export async function discriminateCharterCheck(
   if (options.mode === 'off') {
     return withStatus(entry, 'unverified', 'discrimination-off')
   }
-  const fs = ctx.get('fs') as FileSystem | undefined
+  const fs: FileSystem | undefined = ctx.get('fs')
   if (fs === undefined) {
     if (options.mode === 'required') throw new Error(CHARTER_FS_REQUIRED)
     return withStatus(entry, 'unverified', 'probe-infeasible')

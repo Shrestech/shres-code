@@ -177,7 +177,7 @@ describe('foldJspace', () => {
 
   it('ignores unrelated events', () => {
     const folded = foldJspace([
-      { type: 'turn/start', seq: 0, time: 0, data: { turn: 1 } } as SessionEvent,
+      { type: 'turn/start', seq: 0, time: 0, data: { turn: 1 } },
     ], owner)
     expect(folded.card).toBeNull()
   })

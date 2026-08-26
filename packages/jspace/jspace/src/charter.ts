@@ -195,10 +195,14 @@ export function decodeJspaceCharter(value: unknown): readonly JspaceCharterEntry
  */
 export function formatCharterEntrySummary(entry: JspaceCharterEntry): string {
   const text = entry.constraint.length > 40 ? entry.constraint.slice(0, 40) : entry.constraint
-  if (entry.kind === 'prose') return `${entry.id} prose ${text}`
-  if (entry.kind === 'check') {
-    if (entry.discrimination === 'demonstrated') return `${entry.id} ✓ ${text}`
-    return `${entry.id} ? ${text} [unverified]`
+  switch (entry.kind) {
+    case 'prose':
+      return `${entry.id} prose ${text}`
+    case 'check':
+      return entry.discrimination === 'demonstrated'
+        ? `${entry.id} ✓ ${text}`
+        : `${entry.id} ? ${text} [unverified]`
+    default:
+      return assertNever(entry, 'formatCharterEntrySummary')
   }
-  return assertNever(entry, 'formatCharterEntrySummary')
 }

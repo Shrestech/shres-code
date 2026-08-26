@@ -175,7 +175,7 @@ export async function mountShield(
     },
   })
 
-  await ctx.plugin(ShieldSeat, { posture, ...seatConfig })
+  await ctx.plugin(ShieldSeat, Object.assign({ posture }, seatConfig))
   await waitForReason(ctx, 'active')
 
   return {

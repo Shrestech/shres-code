@@ -328,7 +328,7 @@ describe('FirstRunOnboardingDialog', () => {
     fireEvent.change(screen.getByRole('combobox', { name: en.onboardingPickProvider }), {
       target: { value: 'no-such-route' },
     })
-    expect((screen.getByRole('combobox') as HTMLSelectElement).value).toBe('deepseek-official')
+    expect((screen.getByRole('combobox')).value).toBe('deepseek-official')
   })
 
   it('lets Configure later dismiss a local-Ollama-only card', async () => {
@@ -352,6 +352,7 @@ describe('FirstRunOnboardingDialog', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: en.onboardingUseOllama }))
     await waitFor(() => { expect(h.complete).toHaveBeenCalledOnce() })
+    // oxlint-disable-next-line typescript/unbound-method -- vitest spy on the settings mutate stub
     expect(h.props.api.settings.mutate).toHaveBeenCalledWith({
       ns: 'llm-pi-ai',
       ops: [{ op: 'set', path: ['providers', 'ollama-local', 'models'], value: [{ id: 'qwen2.5' }] }],

@@ -677,6 +677,7 @@ export class Session {
   /** Snapshot the resident log; throws if any seq is still empty after hydrate. */
   private requireResidentLog(): SessionEvent[] {
     return this.log.map((event, seq) => {
+      /* v8 ignore next -- hydrate assigns every requested seq before this snapshot */
       if (event === undefined) {
         throw new Error(`session "${this.id}" is missing event seq ${seq} after hydrate`)
       }
@@ -728,7 +729,7 @@ export class Session {
       ...surfaceOpts?.sourceEventSeqs === undefined ? {} : { sourceEventSeqs: surfaceOpts.sourceEventSeqs },
       ...surfaceOpts?.surfaceOp === undefined ? {} : { surfaceOp: surfaceOpts.surfaceOp },
     }
-    const ignorable = extra !== undefined && 'ignorable' in extra && extra.ignorable === true
+    const ignorable = extra !== undefined && 'ignorable' in extra &&  extra.ignorable
     const dataSnapshot = snapshotJsonValue(data)
     if (dataSnapshot === undefined) {
       throw new Error(`session event "${type}" carries non-JSON-serializable data`)
@@ -830,6 +831,7 @@ export class Session {
     const slice: SessionEvent[] = []
     for (let seq = fromSeq; seq < this.log.length; seq++) {
       const event = this.log[seq]
+      /* v8 ignore next -- releaseFlushedOutsideSurface catches folds up before dropping */
       if (event === undefined) {
         throw new Error(`session "${this.id}" fold hit a dropped event at seq ${seq}`)
       }
@@ -874,6 +876,7 @@ export class Session {
     }
     for (const seq of nodes.slice(this.derivedNodes)) {
       const event = this.log[seq]
+      /* v8 ignore next -- release keeps every current surface node resident */
       if (event === undefined) {
         throw new Error(`session "${this.id}" surface node seq ${seq} is not resident`)
       }

@@ -66,11 +66,6 @@ function callTool(ctx: Context, name: string, args: unknown, over: { agent?: Fak
   })
 }
 
-/** Cast a tool result's JSON value to its canonical output type for assertions. */
-function valueOf<T>(value: unknown): T {
-  return value as T
-}
-
 function text(result: { content: { type: string; text?: string }[] }): string {
   return result.content.filter(b => b.type === 'text').map(b => b.text).join('')
 }
@@ -132,18 +127,17 @@ describe('experiment_log_run', () => {
     const result = await callTool(ctx, 'experiment_log_run', runArgs, { agent })
     expect(result.isError).toBe(false)
     if (result.isError) throw new Error('expected experiment_log_run success')
-    expect(valueOf<LogRunOutput>(result.value).status).toBe('landed')
-    expect(typeof valueOf<LogRunOutput>(result.value).runId).toBe('string')
+    const output = result.value as unknown as LogRunOutput
+    expect(output.status).toBe('landed')
+    expect(typeof output.runId).toBe('string')
     expect(text(result)).toContain('Logged experiment run')
 
     const event = agent.session.events.findLast(e => e.type === 'tracker/run')
-    expect(event?.data).toMatchObject({
-      runId: valueOf<LogRunOutput>(result.value).runId,
-      callId: expect.any(String),
-      experiment: 'study',
-      decisionRule: 'val_bpb < 1.0',
-      gitSha: 'abc123',
-    })
+    expect(event?.data.runId).toBe(output.runId)
+    expect(typeof event?.data.callId).toBe('string')
+    expect(event?.data.experiment).toBe('study')
+    expect(event?.data.decisionRule).toBe('val_bpb < 1.0')
+    expect(event?.data.gitSha).toBe('abc123')
   })
 
   it('surfaces the failure taxonomy verbatim when the run is spooled', async () => {
@@ -152,8 +146,9 @@ describe('experiment_log_run', () => {
     const result = await callTool(ctx, 'experiment_log_run', runArgsMinimal)
     expect(result.isError).toBe(false)
     if (result.isError) throw new Error('expected experiment_log_run success')
-    expect(valueOf<LogRunOutput>(result.value).status).toBe('spooled')
-    expect(valueOf<LogRunOutput>(result.value).reason).toBe('unreachable')
+    const output = result.value as unknown as LogRunOutput
+    expect(output.status).toBe('spooled')
+    expect(output.reason).toBe('unreachable')
     expect(text(result)).toContain('reason: unreachable')
   })
 
@@ -187,7 +182,7 @@ describe('experiment_log_metrics', () => {
     const result = await callTool(ctx, 'experiment_log_metrics', { runId: 'run-1', metrics }, { agent })
     expect(result.isError).toBe(false)
     if (result.isError) throw new Error('expected experiment_log_metrics success')
-    expect(valueOf<LogMetricsOutput>(result.value)).toEqual({ runId: 'run-1', metricsCount: 2 })
+    expect(result.value as unknown as LogMetricsOutput).toEqual({ runId: 'run-1', metricsCount: 2 })
     expect(text(result)).toContain('Appended 2 metric points to run run-1')
 
     const event = agent.session.events.findLast(e => e.type === 'tracker/metrics')
@@ -215,8 +210,9 @@ describe('experiment_query', () => {
     const result = await callTool(ctx, 'experiment_query', { experiment: 'study' })
     expect(result.isError).toBe(false)
     if (result.isError) throw new Error('expected experiment_query success')
-    expect(valueOf<QueryOutput>(result.value).runs).toHaveLength(2)
-    expect(valueOf<QueryOutput>(result.value).runs[1]?.reason).toBe('spooled')
+    const query = result.value as unknown as QueryOutput
+    expect(query.runs).toHaveLength(2)
+    expect(query.runs[1]?.reason).toBe('spooled')
     expect(text(result)).toContain('(not landed: spooled)')
   })
 
@@ -240,7 +236,7 @@ describe('experiment_query', () => {
     const result = await callTool(ctx, 'experiment_query', { gitSha: 'abc123', since: '2026-01-01T00:00:00.000Z' })
     expect(result.isError).toBe(false)
     if (result.isError) throw new Error('expected experiment_query success')
-    expect(valueOf<QueryOutput>(result.value).runs).toHaveLength(1)
+    expect((result.value as unknown as QueryOutput).runs).toHaveLength(1)
   })
 })
 

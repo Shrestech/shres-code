@@ -1074,4 +1074,127 @@ describe('SqliteSessionPersistence: busy_timeout and retention', () => {
     expect(session.residentSeqs()).toEqual(session.surface.nodes)
     await b.dispose()
   })
+
+  it('fails loud when a windowed re-read names a missing seq', async () => {
+    const live = await backend(':memory:')
+    const id = SessionId('missing-window-seq')
+    const session = live.ctx.sessions.create(id)
+    session.append('turn/start', { turn: 1 })
+    await live.ctx.sessions.flush(session)
+    const sqlite = live.ctx.sessionPersistence as unknown as SqliteSessionPersistence
+    expect(sqlite.readStoredEventsSync(session.header, [])).toEqual([])
+    expect(() => sqlite.readStoredEventsSync(session.header, [99]))
+      .toThrow(/no stored event at seq 99/)
+    await live.dispose()
+  })
+
+  it('fails loud when assembled chunk JSON is corrupt', async () => {
+    const path = await freshDbPath()
+    const live = await backend(path, { chunkRetention: 'assembled', writeBatchMaxDelayMs: 1 })
+    const session = live.ctx.sessions.create(SessionId('bad-chunk-json'))
+    session.append('turn/start', { turn: 1 })
+    session.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: 'hi' }], source: { kind: 'user' },
+    }), { surfaceOp: 'append' })
+    session.append('assistant/chunk', {
+      turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'hello' },
+    })
+    await live.ctx.sessions.flush(session)
+    const corrupt = openDatabase(path, 'wal')
+    corrupt.prepare(
+      'UPDATE events SET data = \'not-json\' WHERE session_id = ? AND type = \'assistant/chunk\'',
+    ).run(session.id)
+    corrupt.close()
+    session.append('assistant/message', {
+      turn: 1, step: 1,
+      message: createMessage({
+        role: 'assistant',
+        content: [{ type: 'text', text: 'hello' }],
+        source: { kind: 'model', provider: 'mock', model: 'mock' },
+      }),
+    }, { surfaceOp: 'append', sourceEventSeqs: [2] })
+    await expect(live.ctx.sessions.flush(session)).rejects.toThrow(/not valid JSON/)
+    await live.dispose()
+  })
+
+  it('fails loud when an assembled chunk payload is not an assistant/chunk', async () => {
+    const path = await freshDbPath()
+    const live = await backend(path, { chunkRetention: 'assembled', writeBatchMaxDelayMs: 1 })
+    const session = live.ctx.sessions.create(SessionId('bad-chunk-payload'))
+    session.append('turn/start', { turn: 1 })
+    session.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: 'hi' }], source: { kind: 'user' },
+    }), { surfaceOp: 'append' })
+    session.append('assistant/chunk', {
+      turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'hello' },
+    })
+    await live.ctx.sessions.flush(session)
+    const invalid = openDatabase(path, 'wal')
+    invalid.prepare(
+      'UPDATE events SET data = \'{"pruned":false}\' WHERE session_id = ? AND type = \'assistant/chunk\'',
+    ).run(session.id)
+    invalid.close()
+    session.append('assistant/message', {
+      turn: 1, step: 1,
+      message: createMessage({
+        role: 'assistant',
+        content: [{ type: 'text', text: 'hello' }],
+        source: { kind: 'model', provider: 'mock', model: 'mock' },
+      }),
+    }, { surfaceOp: 'append', sourceEventSeqs: [2] })
+    await expect(live.ctx.sessions.flush(session)).rejects.toThrow(/not an assistant\/chunk/)
+    await live.dispose()
+  })
+
+  it('skips a chunk that is already a reconstructable tombstone', async () => {
+    const path = await freshDbPath()
+    const live = await backend(path, { chunkRetention: 'assembled', writeBatchMaxDelayMs: 1 })
+    const session = live.ctx.sessions.create(SessionId('already-tombstoned'))
+    chunkedTurn(session)
+    await live.ctx.sessions.flush(session)
+    session.append('assistant/message', {
+      turn: 1, step: 2,
+      message: createMessage({
+        role: 'assistant',
+        content: [{ type: 'text', text: 'again' }],
+        source: { kind: 'model', provider: 'mock', model: 'mock' },
+      }),
+    }, { surfaceOp: 'append', sourceEventSeqs: [2] })
+    await live.ctx.sessions.flush(session)
+    await live.dispose()
+  })
+
+  it('tombstones assembled chunks in a mixed flush and skips a message with no sources', async () => {
+    const path = await freshDbPath()
+    const live = await backend(path, { chunkRetention: 'assembled', writeBatchMaxDelayMs: 60_000 })
+    const session = live.ctx.sessions.create(SessionId('mixed-tombstone'))
+    chunkedTurn(session)
+    session.append('assistant/message', {
+      turn: 1, step: 2,
+      message: createMessage({
+        role: 'assistant',
+        content: [{ type: 'text', text: 'no-sources' }],
+        source: { kind: 'model', provider: 'mock', model: 'mock' },
+      }),
+    }, { surfaceOp: 'append' })
+    await live.ctx.sessions.flush(session)
+    await live.dispose()
+  })
+
+  it('skips tombstone when a cited source is not a stored chunk', async () => {
+    const path = await freshDbPath()
+    const live = await backend(path, { chunkRetention: 'assembled', writeBatchMaxDelayMs: 1 })
+    const session = live.ctx.sessions.create(SessionId('missing-chunk-source'))
+    chunkedTurn(session)
+    session.append('assistant/message', {
+      turn: 1, step: 2,
+      message: createMessage({
+        role: 'assistant',
+        content: [{ type: 'text', text: 'cite-user' }],
+        source: { kind: 'model', provider: 'mock', model: 'mock' },
+      }),
+    }, { surfaceOp: 'append', sourceEventSeqs: [1] })
+    await live.ctx.sessions.flush(session)
+    await live.dispose()
+  })
 })

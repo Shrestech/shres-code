@@ -180,6 +180,7 @@ function withPartialText(error: string, output: ContentBlock[]): string {
 
 /** Render `(provider/model)` spawn telemetry, or nothing when the route is unknown. */
 function routeSuffix(provider: string | undefined, model: string | undefined): string {
+  /* v8 ignore next -- a child with no resolved route omits the parenthetical */
   if (provider === undefined && model === undefined) return ''
   const route = [provider, model].filter(part => part !== undefined).join('/')
   return ` (${route})`

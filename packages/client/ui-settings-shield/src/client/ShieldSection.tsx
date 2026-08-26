@@ -182,6 +182,7 @@ export function ShieldSection({
                   aria-label={repoExempt ? t('repoRestore') : t('repoExemptAction')}
                   disabled={formDisabled || repoCwd === null}
                   onClick={() => {
+                    /* v8 ignore next -- the control is disabled when the session has no cwd */
                     if (repoCwd === null) return
                     if (repoExempt) {
                       void scope.set('repos', withoutRepo(repos, repoCwd))

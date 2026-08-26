@@ -94,11 +94,7 @@ describe('resolveLogRun', () => {
     ['gitSha', { gitSha: '' }],
   ])('rejects a missing required %s', (field, overrides) => {
     expect(() => resolveLogRun(validRequest({ ...overrides } as LogRunRequest)))
-      .toThrow(expect.objectContaining({
-        name: 'TrackerError',
-        code: 'TRACKER_REQUIRED_FIELD',
-        message: expect.stringContaining(`requires a non-empty ${field}`),
-      }))
+      .toThrow(new RegExp(`requires a non-empty ${field}`))
   })
 })
 

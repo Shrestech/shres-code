@@ -106,11 +106,11 @@ describe('QueueDock', () => {
     const single = snapshotWith([row('i-1', 'one')])
     const source = liveSession(single)
     const view = render(<QueueDock {...kitFor(single)} useSession={source.useSession} />)
-    expect(view.queryByRole('button', { name: '1  queued messages' })).toBeNull()
+    expect(view.queryByRole('button', { name: '1 queued messages' })).toBeNull()
     expect(view.getByText('one')).toBeTruthy()
 
     act(() => { source.push(snapshotWith([row('i-1', 'one'), row('i-2', 'two')])) })
-    const header = view.getByRole('button', { name: '2  queued messages' })
+    const header = view.getByRole('button', { name: '2 queued messages' })
     expect(header.getAttribute('aria-expanded')).toBe('false')
     expect(document.getElementById(header.getAttribute('aria-controls')!)).toBeTruthy()
     expect(view.queryByText('one')).toBeNull()
@@ -137,7 +137,7 @@ describe('QueueDock', () => {
       source.push(snapshotWith([row('i-edit', 'before'), row('i-2', 'second')]))
     })
 
-    const header = view.getByRole('button', { name: '2  queued messages' })
+    const header = view.getByRole('button', { name: '2 queued messages' })
     expect(header).toHaveProperty('disabled', true)
     expect(header.getAttribute('aria-expanded')).toBe('true')
     expect(view.getByRole('textbox', { name: 'Edit queued message' })).toHaveProperty('value', 'draft')
@@ -163,7 +163,7 @@ describe('QueueDock', () => {
       source.push(snapshotWith([row('i-remove', 'remove me'), row('i-2', 'second')]))
     })
 
-    const header = view.getByRole('button', { name: '2  queued messages' })
+    const header = view.getByRole('button', { name: '2 queued messages' })
     expect(header).toHaveProperty('disabled', true)
     expect(header.getAttribute('aria-expanded')).toBe('true')
     expect(view.getByText('remove me')).toBeTruthy()
@@ -184,7 +184,7 @@ describe('QueueDock', () => {
     const first = snapshotWith([row('i-1', 'one'), row('i-2', 'two')])
     const source = liveSession(first)
     const view = render(<QueueDock {...kitFor(first)} useSession={source.useSession} />)
-    fireEvent.click(view.getByRole('button', { name: '2  queued messages' }))
+    fireEvent.click(view.getByRole('button', { name: '2 queued messages' }))
     expect(view.getByText('one')).toBeTruthy()
 
     act(() => { source.push(snapshotWith([])) })
@@ -193,7 +193,7 @@ describe('QueueDock', () => {
       source.push(snapshotWith([row('i-3', 'three'), row('i-4', 'four')]))
     })
 
-    const header = view.getByRole('button', { name: '2  queued messages' })
+    const header = view.getByRole('button', { name: '2 queued messages' })
     expect(header.getAttribute('aria-expanded')).toBe('false')
     expect(view.queryByText('three')).toBeNull()
   })
@@ -205,7 +205,7 @@ describe('QueueDock', () => {
     ])
     const source = liveSession(snap)
     const { container, getByRole } = render(<QueueDock {...kitFor(snap)} useSession={source.useSession} />)
-    fireEvent.click(getByRole('button', { name: '2  queued messages' }))
+    fireEvent.click(getByRole('button', { name: '2 queued messages' }))
     expect([...container.querySelectorAll('li')].map(item => item.textContent))
       .toEqual(['first queued messages', 'image [image]'])
     expect(container.querySelectorAll('button')).toHaveLength(7)
@@ -287,7 +287,7 @@ describe('QueueDock', () => {
       <QueueDock {...kitFor(snap, { updateQueue })} useSession={source.useSession} />,
     )
 
-    fireEvent.click(getByRole('button', { name: '2  queued messages' }))
+    fireEvent.click(getByRole('button', { name: '2 queued messages' }))
     fireEvent.click(getAllByLabelText('Remove queued message')[0]!)
     await waitFor(() => {
       expect(updateQueue).toHaveBeenCalledWith(iid('i-1'), { kind: 'remove' })

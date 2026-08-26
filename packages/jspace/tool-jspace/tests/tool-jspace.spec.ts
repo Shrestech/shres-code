@@ -35,9 +35,19 @@ function stubAgent(ctx: Context, id: string): Agent {
   return { id: session.id, session } as unknown as Agent
 }
 
+interface SeatConfig {
+  enabled?: boolean
+  mode?: 'available' | 'always-open'
+  requireCoverage?: boolean
+  coverageTerms?: string[]
+  verifierTools?: string[]
+  requireVerifiedEvidence?: boolean
+  engageAfterSteps?: number
+}
+
 async function harness(
   enabled = true,
-  jspace: ConstructorParameters<typeof JspaceService>[1] = {},
+  jspace: SeatConfig = {},
   toolConfig: tool.Config = {},
 ): Promise<Harness> {
   const ctx = new Context()
@@ -495,9 +505,9 @@ describe('jspace tools', () => {
           additionalProperties: false,
           properties: { echoed: { type: 'string', required: true } },
         },
-        render: (_args, value) => [{ type: 'text', text: String(value.echoed) }],
+        render: (_args, value) => [{ type: 'text', text: value.echoed }],
       },
-      execute: args => Promise.resolve({ echoed: String((args as { msg: string }).msg) }),
+      execute: args => Promise.resolve({ echoed: args.msg }),
     }))
     await execute(ctx, 'jspace_open', { goal: 'A', next: 'B' }, agent)
     agent.session.append('tool/call', {
@@ -552,9 +562,9 @@ describe('jspace tools', () => {
           additionalProperties: false,
           properties: { echoed: { type: 'string', required: true } },
         },
-        render: (_args, value) => [{ type: 'text', text: String(value.echoed) }],
+        render: (_args, value) => [{ type: 'text', text: value.echoed }],
       },
-      execute: args => Promise.resolve({ echoed: String((args as { msg: string }).msg) }),
+      execute: args => Promise.resolve({ echoed: args.msg }),
     }))
     agent.session.append('tool/call', {
       turn: 1,
@@ -579,9 +589,9 @@ describe('jspace tools', () => {
           additionalProperties: false,
           properties: { echoed: { type: 'string', required: true } },
         },
-        render: (_args, value) => [{ type: 'text', text: String(value.echoed) }],
+        render: (_args, value) => [{ type: 'text', text: value.echoed }],
       },
-      execute: args => Promise.resolve({ echoed: String((args as { msg: string }).msg) }),
+      execute: args => Promise.resolve({ echoed: args.msg }),
     }))
     agent.session.append('tool/call', {
       turn: 1,

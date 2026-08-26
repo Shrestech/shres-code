@@ -43,7 +43,7 @@ function stageProfile(manifest: Record<string, unknown>): Stage {
   mkdirSync(dir, { recursive: true })
   writeFileSync(join(dir, 'package.json'), JSON.stringify(manifest, undefined, 2) + '\n')
   process.env.SHRES_HOME = home
-  return { home, dir, cleanup: () => rmSync(home, { recursive: true, force: true }) }
+  return { home, dir, cleanup: () =>{  rmSync(home, { recursive: true, force: true }) } }
 }
 
 const edition = (packages: string[], autoProvision: boolean) => ({ packages, autoProvision })

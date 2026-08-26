@@ -274,13 +274,13 @@ describe('image draft rail', () => {
     // Count: three at once over a two-image limit → the whole batch refused.
     const overCount = bench({ addImages: vi.fn(() => null), imageLimits: limits })
     drop([png(8, 'a.png'), png(8, 'b.png'), png(8, 'c.png')])
-    expect(overCount.view.getByRole('alert').textContent).toContain('A message can include up to 2  images')
+    expect(overCount.view.getByRole('alert').textContent).toContain('A message can include up to 2 images')
     expect(overCount.props.addImages).not.toHaveBeenCalled()
     cleanup()
     // Per-file bytes.
     const overFile = bench({ addImages: vi.fn(() => null), imageLimits: limits })
     drop([png(1024 * 1024 + 1, 'big.png')])
-    expect(overFile.view.getByRole('alert').textContent).toContain('each Imagemust not exceed  1MB')
+    expect(overFile.view.getByRole('alert').textContent).toContain('Each image must be smaller than 1MB')
     expect(overFile.props.addImages).not.toHaveBeenCalled()
     cleanup()
     // Aggregate bytes across the existing rail plus the new batch.
@@ -288,7 +288,7 @@ describe('image draft rail', () => {
     const attachment = { kind: 'image' as const, id: 'draft-1' as DraftAttachmentId, file: held, previewUrl: 'blob:held' }
     const overTotal = bench({ addImages: vi.fn(() => null), imageLimits: limits, attachments: [attachment] })
     drop([png(1024 * 1024, 'more.png')])
-    expect(overTotal.view.getByRole('alert').textContent).toContain('Images exceed  2MB')
+    expect(overTotal.view.getByRole('alert').textContent).toContain('Images exceed 2MB')
     expect(overTotal.props.addImages).not.toHaveBeenCalled()
     cleanup()
     // Within every limit: the batch passes through to addImages.
@@ -376,7 +376,7 @@ describe('image draft rail', () => {
     expect((view.getByRole('button', { name: 'Send message' }) as HTMLButtonElement).disabled).toBe(false)
     fireEvent.keyDown(textarea, { key: 'Enter' })
     expect(sink).toHaveBeenCalledWith('', ['draft-1'], 'queue')
-    fireEvent.click(view.getByRole('button', { name: 'RemoveImage pixel.png' }))
+    fireEvent.click(view.getByRole('button', { name: 'Remove image pixel.png' }))
     expect(removeImage).toHaveBeenCalledWith('draft-1')
   })
 
@@ -1187,7 +1187,7 @@ describe('decorations', () => {
       shell.setDraft('see @w1 content')
       shell.insertReference(
         { source: 'subagent', ref: 'w1', label: '@w1', clipboardText: '@w1' },
-        { start: 3, end: 6, draftRev: shell.snapshot.draftRev },
+        { start: 4, end: 7, draftRev: shell.snapshot.draftRev },
       )
     })
     const chip = view.container.querySelector('[data-decoration="chip"]')

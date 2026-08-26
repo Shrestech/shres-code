@@ -266,13 +266,14 @@ function assertRunWire(value: string): void {
  * @param points - the metric points to validate.
  * @throws {@link TrackerError} naming the first malformed point.
  */
-function validateMetricPoints(points: readonly MetricPoint[]): void {
+function validateMetricPoints(points: readonly unknown[]): void {
   for (const point of points) {
     if (typeof point !== 'object' || point === null) throw metricShapeError()
-    if (!assertNonBlank(point.name) || typeof point.value !== 'number' || !Number.isFinite(point.value)) {
+    const record = point as { name?: unknown; value?: unknown; step?: unknown }
+    if (!assertNonBlank(record.name) || typeof record.value !== 'number' || !Number.isFinite(record.value)) {
       throw metricShapeError()
     }
-    if (point.step !== undefined && (typeof point.step !== 'number' || !Number.isFinite(point.step))) {
+    if (record.step !== undefined && (typeof record.step !== 'number' || !Number.isFinite(record.step))) {
       throw metricShapeError()
     }
   }

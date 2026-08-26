@@ -11,11 +11,9 @@ import type { CallId } from '@shres-code/shres-code-llm/brand'
 import { CallId as brandCallId } from '@shres-code/shres-code-llm/brand'
 import type { ToolExecutionResult, ToolRunContext } from '@shres-code/shres-code-tools'
 import type {
-  CharterEntryId,
   JspaceCharterCheck,
   JspaceCharterEntry,
 } from '@shres-code/shres-code-jspace'
-import { assertNever } from '@shres-code/shres-code-jspace'
 import { isGlobPattern, resolveInsideCwd } from './floor.ts'
 
 /** Max stdout+stderr preview stored on `jspace/charter-run`. */
@@ -75,7 +73,6 @@ export async function runCharter(
   let last: CharterRunOutcome | undefined
   for (const entry of entries) {
     if (entry.kind === 'prose') continue
-    if (entry.kind !== 'check') return assertNever(entry, 'runCharter')
     const outcome = await runCharterCheck(ctx, exec, entry, phase, config)
     if (!outcome.passed) throw new Error(formatCharterFailure(phase, outcome))
     last = outcome
@@ -110,7 +107,7 @@ export async function runCharterCheck(
   const callId = brandCallId(`${String(exec.callId)}:charter:${entry.id}`)
   const result = await ctx.tools.execute({
     callId,
-    rootCallId: exec.rootCallId ?? exec.callId,
+    rootCallId: exec.rootCallId,
     name: 'bash',
     arguments: {
       command: entry.command,
@@ -310,7 +307,7 @@ function logCharterRun(exec: ToolRunContext, outcome: CharterRunOutcome, phase: 
   const session = exec.agent?.session
   if (session === undefined) return
   session.append('jspace/charter-run', {
-    entryId: outcome.entry.id as CharterEntryId,
+    entryId: outcome.entry.id,
     callId: outcome.callId,
     parentCallId: exec.callId,
     phase,

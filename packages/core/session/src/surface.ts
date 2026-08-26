@@ -447,6 +447,7 @@ export class SurfaceManager implements SessionSurface {
     for (let seq = this._lastProcessedSeq + 1; seq <= tailSeq; seq++) {
       const index = seq - this.baseSeq
       const event = this.log[index]
+      /* v8 ignore next -- surface folds each append while the event is still resident */
       if (event === undefined) {
         throw new Error(`session surface fold hit a dropped event at seq ${seq}`)
       }

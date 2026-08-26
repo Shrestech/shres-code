@@ -27,7 +27,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'nod
 import type { Context } from '@shres-code/cordis'
 import { resolveShresHome } from '@shres-code/shres-code-home-paths'
 import { HarnessError } from '@shres-code/shres-code-llm'
-import type { SandboxPolicyService } from '@shres-code/shres-code-sandbox-policy'
+import type {} from '@shres-code/shres-code-sandbox-policy'
 import { ItemRetainer, TextRetainer } from '@shres-code/shres-code-output-retention'
 import type { RetainedItems } from '@shres-code/shres-code-output-retention'
 import type { SubprocessHandle, SubprocessOutcome, SubprocessOutputRead, SubprocessSpawnSpec } from '@shres-code/shres-code-subprocess'
@@ -258,7 +258,7 @@ export function fenceSearchPath(
   if (target === homeDoc || isPathInside(target, homeDoc)) {
     throw new SearchError(`${toolName} cannot search a credentials document`, 'SEARCH_FAILED')
   }
-  const policy = (ctx.get('sandboxPolicy') as SandboxPolicyService | undefined)
+  const policy = ctx.get('sandboxPolicy')
     ?.resolve({ ...exec.agent === undefined ? {} : { session: exec.agent.session } })
   if (policy !== undefined && policy.mode !== 'danger-full-access') {
     if (!isPathInside(target, policy.workspaceRoot) && !isPathInside(target, canonicalPath(workdir))) {
