@@ -190,7 +190,7 @@ All config-validated fields on the subagent service `Config` (no hardcoded tunab
 |---|---|---|
 | Receiver backlog cap | `maxPendingMail: number \| 'unlimited'` — acceptance beyond cap rejects `MAILBOX_FULL` (loud, never silent drop) | 32 |
 | Sender-in-flight cap | `maxSentPendingPerTarget` — one sender cannot fill one mailbox alone | 16 |
-| Turn budget coupling | every mail-driven turn consumes the receiver's `maxStepsPerTurn` budget ([`packages/guard/step-budget`](../../../../packages/guard/step-budget), commit `3b2bc1b157`) | inherited |
+| Turn budget coupling | every mail-driven turn consumes the receiver's `maxStepsPerTurn` budget ([`packages/guard/step-budget`](../../../../packages/guard/step-budget/src/index.ts), commit `3b2bc1b157`) | inherited |
 | Loop prevention (spawn recursion) | existing monotone `delegationDepth` floor + absolute `maxDepth` | unchanged |
 | Loop prevention (message ping-pong) | no auto-relay: a delivered message never implicitly sends another message; the only implicit sends remain settlement notices (one per epoch, already capped). If auto-triage relays ever arrive, add a hop-count/TTL envelope field decremented per relay | n/a today |
 | Interrupt authority | deliberately NOT widened to siblings — stop rights stay with the human address or live ancestry | unchanged |

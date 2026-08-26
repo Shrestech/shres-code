@@ -105,7 +105,7 @@ Scheduler rules that follow:
 
 1. The scheduler **never widens approval or sandbox policy**. No new outcome variant, no deferred-answer mailbox in v1, no bypass path. Landlock/Seatbelt/ACL resolution is per-call from session cwd and is untouched by attendance.
 2. The `scheduleNext` unit gains `effectiveApproval: 'ask' | 'never'` so the Agents View can render "will fail closed if fired" *before* it fires (Part 2 consumes this).
-3. A cold-resumed turn that exhausts its work hits the already-shipped guards: `maxStepsPerTurn` ([`packages/guard/step-budget`](../../../../packages/guard/step-budget) `agent/pre-step` plugin), repeat-tool veto, optional tool timeout (commit `3b2bc1b157`). Add one scheduler-owned ceiling: `maxTurnTokens` per dispatched turn, implemented as an **`agent/pre-step` plugin** in the host-scheduler package (same extension point as step-budget; "Plugins, not loop changes"). There is no loop budget hook. Default generous, config-declarable. Rationale: the process that would have been watching is not; the cost bound must be declarable, not assumed.
+3. A cold-resumed turn that exhausts its work hits the already-shipped guards: `maxStepsPerTurn` ([`packages/guard/step-budget`](../../../../packages/guard/step-budget/src/index.ts) `agent/pre-step` plugin), repeat-tool veto, optional tool timeout (commit `3b2bc1b157`). Add one scheduler-owned ceiling: `maxTurnTokens` per dispatched turn, implemented as an **`agent/pre-step` plugin** in the host-scheduler package (same extension point as step-budget; "Plugins, not loop changes"). There is no loop budget hook. Default generous, config-declarable. Rationale: the process that would have been watching is not; the cost bound must be declarable, not assumed.
 4. Misconfiguration fails loud at the resolvable point: a cordis.yml that enables the scheduler without mounting persistence is a composition error (static `inject` of `sessionPersistence` on the scheduler plugin), not a silent no-op. Persistence is **required** for the scheduler plugin (it cannot dispatch cold work without it). That is a different posture from Part 3's listing optionality.
 
 **(e) Config (all validated, default-off):**
@@ -342,7 +342,7 @@ Repeat queries after an invalidation re-read the live watermark (O(1)) or a cold
 
 **Using the identity ladder's `cachedSnapshot` for `scheduleNext` / `tokenUsage`.** Rejected — those units accumulate; a possibly-stale checkpoint under-counts due work and spend. `coldSnapshot()` is the cold-read API.
 
-**A loop-owned `maxTurnTokens` hook.** Rejected — "Plugins, not loop changes." The extension point is `agent/pre-step`, same as [`packages/guard/step-budget`](../../../../packages/guard/step-budget).
+**A loop-owned `maxTurnTokens` hook.** Rejected — "Plugins, not loop changes." The extension point is `agent/pre-step`, same as [`packages/guard/step-budget`](../../../../packages/guard/step-budget/src/index.ts).
 
 **Hard-`inject` persistence on the accounting package while calling it optional.** Rejected — follow `list-children.ts` runtime `ctx.get()` optionality. (The scheduler plugin, by contrast, **does** require persistence: it cannot dispatch cold work without it.)
 
@@ -377,7 +377,7 @@ Repeat queries after an invalidation re-read the live watermark (O(1)) or a cold
 | [`packages/session/session-projection-cache/src/index.ts`](../../../../packages/session/session-projection-cache/src/index.ts) | `coldSnapshot()` consumed, not extended |
 | new `packages/subagent/accounting` | `usageIncludingDescendants`, `costOf`, PriceTable Config, tree-budget implementation |
 | [`packages/subagent/subagent/src/index.ts`](../../../../packages/subagent/subagent/src/index.ts) | `SubagentTreeBudget` seam, `maxTreeTokensPerRoot`, `TREE_BUDGET_EXHAUSTED` |
-| [`packages/host/apiproxy`](../../../../packages/host/apiproxy) | `subagents.forest` RPC |
+| [`packages/host/apiproxy/src/api/subagents.ts`](../../../../packages/host/apiproxy/src/api/subagents.ts) | `subagents.forest` RPC |
 | new `packages/client/ui-agents-view` | forest UI; depth/node constants |
 | [`bench/runner/session-layout.js`](../../../../bench/runner/session-layout.js), [`metrics.js`](../../../../bench/runner/metrics.js) | descendant walk; `usageOf` for root and descendants |
 | [`docs/subsystems/schedule.md`](../../../../docs/subsystems/schedule.md), [subagent.md](../../../../docs/subsystems/subagent.md) | scheduler subsection; accounting cross-links |
