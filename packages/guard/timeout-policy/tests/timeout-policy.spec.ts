@@ -193,6 +193,83 @@ describe('timeout-policy TOOL_TIMEOUT replacement (deadline wins)', () => {
   })
 })
 
+describe('timeout-policy defaultTimeoutMs', () => {
+  /** Mount the registry + the enforcer carrying a blanket fallback. */
+  async function setupWithDefault(defaultTimeoutMs: number) {
+    const ctx = new Context()
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRuntime)
+    await ctx.plugin(timeoutPolicy, { defaultTimeoutMs })
+    return ctx
+  }
+
+  it('arms the fallback for a tool that declares no budget', async () => {
+    vi.useFakeTimers()
+    try {
+      const ctx = await setupWithDefault(250)
+      ctx.tools.register(defineContentToolFixture({
+        name: 'undeclared', description: 'stops when aborted', parameters: {},
+        execute(_args, exec): Promise<{ type: 'text'; text: string }[]> {
+          const done = [{ type: 'text' as const, text: 'stopped cooperatively' }]
+          if (exec.signal.aborted) return Promise.resolve(done)
+          return new Promise((resolve) => { exec.signal.addEventListener('abort', () => { resolve(done) }) })
+        },
+      }))
+      const pending = ctx.tools.execute({ signal: testToolSignal, callId: CallId('c1'), name: 'undeclared', arguments: {} })
+      await vi.advanceTimersByTimeAsync(300)
+      await expect(pending).resolves.toEqual({
+        content: [{ type: 'text', text: 'Error: tool call timed out after 250ms' }],
+        isError: true,
+        error: {
+          message: 'tool call timed out after 250ms',
+          info: { name: 'ToolTimeoutError', code: 'TOOL_TIMEOUT' },
+        },
+      })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("lets a tool's own declaration win over the fallback, in both directions", async () => {
+    vi.useFakeTimers()
+    try {
+      const ctx = await setupWithDefault(10)
+      // Declares 100ms against a 10ms fallback: the declaration raises it.
+      ctx.tools.register(cooperativeTool)
+      const pending = ctx.tools.execute({ signal: testToolSignal, callId: CallId('c1'), name: 'slow', arguments: {} })
+      await vi.advanceTimersByTimeAsync(50)
+      // Still running at 50ms, so the 10ms fallback did not apply.
+      await vi.advanceTimersByTimeAsync(60)
+      await expect(pending).resolves.toMatchObject({
+        error: { message: 'tool call timed out after 100ms' },
+      })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('leaves an undeclared tool untouched when no fallback is configured', async () => {
+    const ctx = await setup()
+    let seenSignal: AbortSignal | undefined
+    ctx.tools.register(defineContentToolFixture({ name: 'probe', description: 'd', parameters: {},
+      async execute(_a, exec) { seenSignal = exec.signal; return [{ type: 'text' as const, text: 'ok' }] } }))
+    const upstream = new AbortController().signal
+    await ctx.tools.execute({ callId: CallId('c1'), name: 'probe', arguments: {}, signal: upstream })
+    expect(seenSignal).toBe(upstream)
+  })
+
+  it('fails loud on a non-positive or fractional fallback', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRuntime)
+    await expect(ctx.plugin(timeoutPolicy, { defaultTimeoutMs: 0 })).rejects.toThrow(/integer >= 1/)
+    const ctx2 = new Context()
+    await ctx2.plugin(SystemPrompt)
+    await ctx2.plugin(ToolRuntime)
+    await expect(ctx2.plugin(timeoutPolicy, { defaultTimeoutMs: 1.5 })).rejects.toThrow(/integer >= 1/)
+  })
+})
+
 describe('timeout-policy contract', () => {
   it('exposes the owned code constant', () => {
     expect(TOOL_TIMEOUT).toBe('TOOL_TIMEOUT')

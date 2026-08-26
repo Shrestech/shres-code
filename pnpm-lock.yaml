@@ -653,6 +653,9 @@ importers:
       '@shres-code/shres-code-spill-policy':
         specifier: workspace:*
         version: link:../packages/spill/spill-policy
+      '@shres-code/shres-code-step-budget':
+        specifier: workspace:*
+        version: link:../packages/guard/step-budget
       '@shres-code/shres-code-subagent':
         specifier: workspace:*
         version: link:../packages/subagent/subagent
@@ -4989,7 +4992,42 @@ importers:
         specifier: workspace:^
         version: link:../../typert/protocol
 
+  packages/guard/step-budget:
+    dependencies:
+      '@shres-code/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/shres-code-agent':
+        specifier: workspace:^
+        version: link:../../core/agent
+      '@shres-code/shres-code-agent-loop':
+        specifier: workspace:^
+        version: link:../../core/agent-loop
+      '@shres-code/shres-code-agent-loop-testkit':
+        specifier: workspace:^
+        version: link:../../test-support/agent-loop-testkit
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-llm':
+        specifier: workspace:^
+        version: link:../../llm/llm
+      '@shres-code/shres-code-session':
+        specifier: workspace:^
+        version: link:../../core/session
+      '@shres-code/shres-code-tools':
+        specifier: workspace:^
+        version: link:../../core/tools
+
   packages/guard/timeout-policy:
+    dependencies:
+      '@shres-code/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
     devDependencies:
       '@shres-code/cordis':
         specifier: workspace:^

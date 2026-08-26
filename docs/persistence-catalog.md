@@ -742,6 +742,29 @@ Source: [`packages/core/session/src/types.ts:256`](../packages/core/session/src/
 
 Source: [`packages/core/session/src/types.ts:254`](../packages/core/session/src/types.ts)
 
+### `step-budget/*`
+
+<a id="step-budgetexhausted--log-only"></a>
+
+#### `step-budget/exhausted` — log-only
+
+```ts persistence-catalog
+/**
+ * The step budget refused to enter another model step, ending the turn.
+ * Log-only, appended immediately before the loop's `turn/end`
+ * (`{ kind: 'blocked' }`) for the same `turn`. Writers pass
+ * `{ ignorable: true }`, so a build without this guard still reads the log.
+ * The model-facing explanation travels separately as the guard's injected
+ * notice, not in this payload.
+ * @param turn - turn the guard ended.
+ * @param step - step the guard refused to enter.
+ * @param limit - configured `maxStepsPerTurn` in force.
+ */
+'step-budget/exhausted': StepBudgetExhausted
+```
+
+Source: [`packages/guard/step-budget/src/types.ts:29`](../packages/guard/step-budget/src/types.ts)
+
 ### `subagent/*`
 
 <a id="subagentdescriptor--log-only"></a>

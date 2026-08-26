@@ -72,6 +72,7 @@
     "@shres-code/shres-code-skill-filesystem": "workspace:*",
     "@shres-code/shres-code-spill-local": "workspace:*",
     "@shres-code/shres-code-spill-policy": "workspace:*",
+    "@shres-code/shres-code-step-budget": "workspace:*",
     "@shres-code/shres-code-subagent": "workspace:*",
     "@shres-code/shres-code-subagent-acp": "workspace:*",
     "@shres-code/shres-code-subagent-claude-code": "workspace:*",

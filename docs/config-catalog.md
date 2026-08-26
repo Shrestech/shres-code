@@ -1702,10 +1702,18 @@ export interface Config {
    * always compares the FULL canonical string).
    */
   argumentsPreviewChars?: number
+  /**
+   * Consecutive-repeat count at which the call is REFUSED instead of merely
+   * reminded (default `0` — off, the shipped advisory-only behavior). From
+   * this run length on, every further identical call is refused with a
+   * structured {@link REPEAT_TOOL_VETO} result and the tool never runs. Fails
+   * loud at load unless it is `0` or an integer >= 2.
+   */
+  vetoThreshold?: number
 }
 ```
 
-Source: [`packages/guard/repeat-tool-reminder/src/index.ts:28`](../packages/guard/repeat-tool-reminder/src/index.ts)
+Source: [`packages/guard/repeat-tool-reminder/src/index.ts:36`](../packages/guard/repeat-tool-reminder/src/index.ts)
 
 <a id="shres-codeshres-code-sandbox-local"></a>
 
@@ -2321,6 +2329,30 @@ export interface Config {
 
 Source: [`packages/spill/spill-policy/src/index.ts:60`](../packages/spill/spill-policy/src/index.ts)
 
+<a id="shres-codeshres-code-step-budget"></a>
+
+## `@shres-code/shres-code-step-budget`
+
+```ts config-catalog
+/**
+ * Plugin config, validated by the same-named schemastery schema plus the
+ * load-time check in `apply` (misconfiguration fails loud: a non-integer or
+ * negative `maxStepsPerTurn` throws at plugin load, never a silent fall-back).
+ */
+export interface Config {
+  /**
+   * Most model steps one turn may enter. `0` — the default — means unlimited
+   * and registers no listener, so an unconfigured deployment behaves exactly
+   * as it did before this guard existed. A step is one model request plus the
+   * tool calls it makes, so the budget bounds a runaway tool loop; it does not
+   * bound tokens, wall time, or how many turns a session runs.
+   */
+  maxStepsPerTurn?: number
+}
+```
+
+Source: [`packages/guard/step-budget/src/index.ts:29`](../packages/guard/step-budget/src/index.ts)
+
 <a id="shres-codeshres-code-storage-domain"></a>
 
 ## `@shres-code/shres-code-storage-domain`
@@ -2803,6 +2835,32 @@ export interface Config {
 ```
 
 Source: [`packages/shell/tool-bash-persistent/src/index.ts:400`](../packages/shell/tool-bash-persistent/src/index.ts)
+
+<a id="shres-codeshres-code-tool-call-timeout-policy"></a>
+
+## `@shres-code/shres-code-tool-call-timeout-policy`
+
+Requires: `tools`
+
+```ts config-catalog
+/**
+ * Plugin config, validated by the same-named schemastery schema plus the
+ * load-time check in `apply` (misconfiguration fails loud: a non-integer or
+ * non-positive `defaultTimeoutMs` throws at plugin load, never a silent
+ * fall-back).
+ */
+export interface Config {
+  /**
+   * Deadline armed for a tool whose `ToolDefinition` declares no `timeoutMs`.
+   * Absent by default, which leaves undeclared tools with no deadline. A
+   * tool's own declaration always wins, in either direction: this is a floor
+   * for the unstated, never a ceiling over the stated.
+   */
+  defaultTimeoutMs?: number
+}
+```
+
+Source: [`packages/guard/timeout-policy/src/index.ts:42`](../packages/guard/timeout-policy/src/index.ts)
 
 <a id="shres-codeshres-code-tool-fs"></a>
 
@@ -3615,7 +3673,6 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@shres-code/shres-code-subprocess-local` ([`packages/subprocess/subprocess-local/src/index.ts`](../packages/subprocess/subprocess-local/src/index.ts))
 - `@shres-code/shres-code-terminal` ([`packages/terminal/terminal/src/index.ts`](../packages/terminal/terminal/src/index.ts))
 - `@shres-code/shres-code-tool-ask-user` — requires `tools` · `userQuestions` ([`packages/interaction/tool-ask-user/src/index.ts`](../packages/interaction/tool-ask-user/src/index.ts))
-- `@shres-code/shres-code-tool-call-timeout-policy` — requires `tools` ([`packages/guard/timeout-policy/src/index.ts`](../packages/guard/timeout-policy/src/index.ts))
 - `@shres-code/shres-code-tool-cordis` — requires `tools` · `systemPrompt` · `dynamicCordisRunner` · `cordisInspect` ([`packages/extensions/tool-cordis/src/index.ts`](../packages/extensions/tool-cordis/src/index.ts))
 - `@shres-code/shres-code-tool-subagent-control` — requires `tools` · `subagents` ([`packages/subagent/tool-subagent-control/src/index.ts`](../packages/subagent/tool-subagent-control/src/index.ts))
 - `@shres-code/shres-code-tool-tracker` — requires `tools` · `tracker` ([`packages/tracker/tool-tracker/src/index.ts`](../packages/tracker/tool-tracker/src/index.ts))

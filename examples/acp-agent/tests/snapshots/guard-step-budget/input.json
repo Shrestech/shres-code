@@ -1,0 +1,8 @@
+{
+  "steps": [
+    { "op": "initialize" },
+    { "op": "newSession" },
+    { "op": "prompt", "text": "Write the todo list 'watch the kettle boil' over and over without changing it." },
+    { "op": "prompt", "text": "Stop repeating and reply DONE." }
+  ]
+}
