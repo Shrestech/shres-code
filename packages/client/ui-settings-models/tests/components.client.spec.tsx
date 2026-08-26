@@ -404,7 +404,7 @@ describe('ModelsSection', () => {
       onClose={vi.fn()}
     />)
     await waitFor(() => {
-      expect((screen.getByLabelText(en.keyInput)).placeholder).toBe(en.keyEnvLocked)
+      expect(screen.getByLabelText<HTMLInputElement>(en.keyInput).placeholder).toBe(en.keyEnvLocked)
     })
     expect(screen.getByLabelText(en.cliBinary)).toBeTruthy()
     cleanup()

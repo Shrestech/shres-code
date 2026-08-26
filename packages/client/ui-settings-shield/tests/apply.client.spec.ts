@@ -8,9 +8,15 @@ import { SlotRegistry } from '@shres-code/shres-code-client-runtime/client'
 import { LocaleRuntime } from '@shres-code/shres-code-client-locale/client'
 import { stubSettingsScope, usePinnedBrowserLanguages } from '@shres-code/shres-code-client-test-runtime'
 import { resolveSlotLabel } from '@shres-code/shres-code-client-ui-slots'
+import type { ShieldSnapshot } from '@shres-code/shres-code-api-remotes/client'
 import { apply, inject, SHIELD_SETTINGS_NAMESPACE } from '../src/client/index.ts'
 import { apply as nodeApply } from '../src/index.ts'
-import { ShieldSection, type ShieldSectionInjected, type ShieldSettings } from '../src/client/ShieldSection.tsx'
+import { ShieldSection, type ShieldSettings } from '../src/client/ShieldSection.tsx'
+
+/** Wire result of `remote.shield.snapshot` — success and engine-missing both occur in these tests. */
+type ShieldSnapshotResult =
+  | { readonly ok: true; readonly value: ShieldSnapshot }
+  | { readonly ok: false; readonly error: { readonly code: string; readonly message: string } }
 
 usePinnedBrowserLanguages('en-US')
 
@@ -24,10 +30,10 @@ async function bench() {
       'settings.section': { kind: 'list', scope: 'root' },
     },
   } as never, () => null)
-  const snapshot = vi.fn(async () => ({
-    ok: true as const,
+  const snapshot = vi.fn(async (_sessionId?: string): Promise<ShieldSnapshotResult> => ({
+    ok: true,
     value: {
-      status: { active: true, reason: 'active' as const },
+      status: { active: true, reason: 'active' },
       stats: {
         cwd: null,
         screened: 0,
@@ -67,16 +73,16 @@ describe('ui-settings-shield browser apply', () => {
     await fiber.await()
     expect(b.slots.entries('settings.section')[0]?.component).toBe(ShieldSection)
     expect(resolveSlotLabel(b.slots.entries('settings.section')[0]!.options.label)).toBeTruthy()
-    const injected = (
-      b.slots.entries('settings.section')[0] as { inject?: () => ShieldSectionInjected }
-    ).inject?.()
-    expect(injected).toBeDefined()
-    await expect(injected!.loadSnapshot()).resolves.toMatchObject({ status: { active: true } })
+    const loadSnapshot = b.slots.entries('settings.section')[0]?.inject?.().loadSnapshot
+    if (typeof loadSnapshot !== 'function') {
+      expect.fail('settings.section inject is missing loadSnapshot')
+    }
+    await expect(loadSnapshot()).resolves.toMatchObject({ status: { active: true } })
     b.snapshot.mockResolvedValueOnce({
-      ok: false as const,
+      ok: false,
       error: { code: 'unavailable', message: 'down' },
     })
-    await expect(injected!.loadSnapshot()).rejects.toThrow(/shield.snapshot failed/)
+    await expect(loadSnapshot()).rejects.toThrow(/shield.snapshot failed/)
     expect(document.documentElement.dataset.shresShield).toBeUndefined()
     b.host.publish({
       status: 'ready',

@@ -275,7 +275,7 @@ describe('ShieldSection', () => {
       })),
     )
     expect(await screen.findByText(/Asked · tool_args · sig.ask · /)).toBeTruthy()
-    expect((screen.getByLabelText(en.license)).placeholder).toBe(en.licenseStored)
+    expect(screen.getByLabelText<HTMLInputElement>(en.license).placeholder).toBe(en.licenseStored)
   })
 
   it('shows applying while a license write is in flight', async () => {
@@ -338,7 +338,7 @@ describe('ShieldSection', () => {
     )
     expect(await screen.findByText('2')).toBeTruthy()
     expect(screen.getByRole('status').textContent).toBe(en.readOnly)
-    expect((screen.getByRole('switch', { name: en.disable })).disabled).toBe(true)
+    expect(screen.getByRole<HTMLButtonElement>('switch', { name: en.disable }).disabled).toBe(true)
   })
 
   it('ignores an unknown posture value', async () => {

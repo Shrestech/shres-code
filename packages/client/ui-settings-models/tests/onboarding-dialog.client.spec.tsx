@@ -328,7 +328,7 @@ describe('FirstRunOnboardingDialog', () => {
     fireEvent.change(screen.getByRole('combobox', { name: en.onboardingPickProvider }), {
       target: { value: 'no-such-route' },
     })
-    expect((screen.getByRole('combobox')).value).toBe('deepseek-official')
+    expect(screen.getByRole<HTMLSelectElement>('combobox').value).toBe('deepseek-official')
   })
 
   it('lets Configure later dismiss a local-Ollama-only card', async () => {
