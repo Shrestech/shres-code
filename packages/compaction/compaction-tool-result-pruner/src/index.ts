@@ -13,7 +13,7 @@ import type { Session, SessionEvent, ToolResultMessage } from '@shres-code/shres
 import type {} from '@shres-code/shres-code-compaction'
 // Type-only: the `ctx.tokenMeter` Context merge for the declared injection.
 import type {} from '@shres-code/shres-code-token-meter'
-import { codePointLength, DEFAULTS, PRUNE_MARKER, resolveConfig } from './config.ts'
+import { codePointLength, DEFAULTS, pruneMarker, resolveConfig } from './config.ts'
 import type {
   PrunedEntry,
   PruneResult,
@@ -21,7 +21,14 @@ import type {
   ToolResultPruneConfig,
 } from './types.ts'
 
-export { codePointLength, DEFAULTS, PRUNE_MARKER, resolveConfig } from './config.ts'
+export {
+  codePointLength,
+  DEFAULTS,
+  MAX_PRUNE_MARKER_CHARS,
+  PRUNE_READ_CUE,
+  pruneMarker,
+  resolveConfig,
+} from './config.ts'
 export type {
   PrunedEntry,
   PruneResult,
@@ -77,13 +84,18 @@ export class ToolResultPruner extends Service {
    * Replace an over-budget text middle while retaining rich-block order.
    * Text slicing is by Unicode code point, not UTF-16 code unit, so a retained
    * boundary cannot split a surrogate pair. Grapheme clusters may still split.
+   * The omitted middle stays in the session log at `originalSeq`; the marker
+   * names `session_event_read this session, seq <originalSeq>` so the model
+   * can re-fetch it.
    * @param blocks - original tool-result content.
+   * @param originalSeq - log seq of the full original `tool/result`.
    * @returns pruned content, or `null` when the text is within budget.
    */
-  pruneContent(blocks: readonly ContentBlock[]): ContentBlock[] | null {
+  pruneContent(blocks: readonly ContentBlock[], originalSeq: number): ContentBlock[] | null {
     const totalChars = this.measureContent(blocks)
     if (totalChars <= this.config.thresholdChars) return null
 
+    const markerText = pruneMarker(originalSeq)
     const removedStart = this.config.headChars
     const removedEnd = totalChars - this.config.tailChars
     const pruned: ContentBlock[] = []
@@ -102,7 +114,7 @@ export class ToolResultPruner extends Service {
       const headEnd = Math.min(points.length, Math.max(0, removedStart - blockStart))
       const tailStart = Math.min(points.length, Math.max(0, removedEnd - blockStart))
       const intersectsRemoved = blockStart < removedEnd && blockEnd > removedStart
-      const marker = intersectsRemoved && !markerInserted ? PRUNE_MARKER : ''
+      const marker = intersectsRemoved && !markerInserted ? markerText : ''
       if (marker.length > 0) markerInserted = true
       const text = points.slice(0, headEnd).join('')
         + marker
@@ -124,9 +136,10 @@ export class ToolResultPruner extends Service {
   /**
    * Prune every over-budget tool result from one stable current-surface snapshot.
    * Each replacement preserves the complete event data except for `content`,
-   * cites the shadowed node so replay can recover the replacement input, and is
-   * immediately preceded by a `compaction/prune` shadow-price event pricing the
-   * shadowed node through the injected token meter, so pure consumers can
+   * cites the shadowed node so replay can recover the replacement input, names
+   * `session_event_read this session, seq N` in the omitted-middle marker, and
+   * is immediately preceded by a `compaction/prune` shadow-price event pricing
+   * the shadowed node through the injected token meter, so pure consumers can
    * subtract it without per-node state.
    * @param session - session whose current surface is rewritten.
    * @returns landed replacements and aggregate Unicode-code-point savings.
@@ -145,7 +158,7 @@ export class ToolResultPruner extends Service {
     let charsRemoved = 0
     for (const { seq, event } of candidates) {
       const result = event.data.message.content[0]
-      const content = this.pruneContent(result.content)
+      const content = this.pruneContent(result.content, seq)
       if (content === null) continue
       const charsBefore = this.measureContent(result.content)
       const charsAfter = this.measureContent(content)

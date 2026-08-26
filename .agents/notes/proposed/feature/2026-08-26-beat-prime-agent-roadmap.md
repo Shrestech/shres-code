@@ -114,6 +114,7 @@ WP1.1 extracts shared plumbing. The WP3.3 OOLONG-lite **pilot** runs immediately
 
 ### WP1.5 Read defaults and result-retention tuning
 
+- **Status:** landed. See [read defaults and result-retention](../../implemented/feature/2026-08-26-read-defaults-and-result-retention.md).
 - **Owner:** this roadmap (median fix); the landing PR carries the implemented note.
 - **Touch points:** [`packages/fs/tool-fs/src/read.ts`](../../../../packages/fs/tool-fs/src/read.ts) (`READ_LIMIT` 2000, already the `readLimit` config default); [`packages/compaction/compaction-tool-result-pruner/src/index.ts`](../../../../packages/compaction/compaction-tool-result-pruner/src/index.ts) (`thresholdChars` default + head/tail budgets); their config schemas and tests.
 - **Work:** audit `READ_LIMIT` and the pruner's head/tail budgets for data-heavy flows; make the budgets validated Config fields at the seam where they are not (defaults unchanged); document the middle-loss behavior; when the pruner replaces a result, the replacement text must name the exact re-fetch command/log anchor (pruned middles stay in the log — the model should be told how to re-fetch them).

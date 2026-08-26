@@ -115,7 +115,7 @@ A successful read is exactly `<path><displayPath></path>`, newline, `<type>file<
 
 #### Token effect
 
-Read output is capped by `readLimit`, `readMaxLineLength`, and `readMaxBytes`; the retained call and result are resent until compaction.
+Read output is capped by `readLimit`, `readMaxLineLength`, and `readMaxBytes`; the retained call and result are resent until compaction. When the optional tool-result pruner later rewrites an oversized result, the surface keeps a head, an omission marker naming `session_event_read this session, seq N`, and a tail; the omitted middle stays in the session log at that seq. Page a data-heavy file with `offset`/`limit` rather than depending on one call to remain whole on later requests.
 
 #### KV Cache effect
 
@@ -171,3 +171,4 @@ Append-only; newly visible content follows the reusable request prefix and does 
 - **Extension-declared media type** — the extension selects the declared type and the attachment store's magic-byte validation stays authoritative; a correctly formatted image under a wrong extension is refused with the rename remedy rather than sniffed.
 - **No inline image preview on the tool-result card** — UI surfaces render the image result generically (the durable reference, not pixels); inline rendering is deferred to the UI packages.
 - **No timeout surface** — `read`/`write`/`edit` take no timeout argument and declare no `timeout-policy` budget; cancellation rides `exec.signal` only ([provider rationale](../README.md#no-timeouts-on-file-io)).
+- **A pruned `read` result loses its middle on the surface** — the original window remains in the session log; re-fetch it with `session_event_read this session, seq N` using the seq named in the prune marker. Paging with `offset`/`limit` is the way to cover a file the line cap cannot hold in one call.

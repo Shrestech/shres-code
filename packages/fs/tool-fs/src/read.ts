@@ -14,7 +14,12 @@ import { buildWindow, formatReadOutput, langFromPath, readMetaFromMeta } from '.
 import { resolveRegularReadTarget } from './read-target.ts'
 import type { FsSandboxController } from './sandbox.ts'
 
-/** Default and maximum number of lines returned by one `read` call (the `readLimit` config). */
+/**
+ * Default and maximum number of lines returned by one `read` call (the `readLimit` config).
+ * Data-heavy files page with `offset`/`limit`. A later tool-result prune keeps only a
+ * configured head and tail on the surface; the omitted middle remains in the session log
+ * and is named in that result's prune marker.
+ */
 export const READ_LIMIT = 2000
 
 /**

@@ -2129,14 +2129,14 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'total Unicode code points across text blocks.',
       },
       {
-        signature: 'pruneContent(blocks: readonly ContentBlock[]): ContentBlock[] | null',
-        description: 'Replace an over-budget text middle while retaining rich-block order. Text slicing is by Unicode code point, not UTF-16 code unit, so a retained boundary cannot split a surrogate pair. Grapheme clusters may still split.',
-        parameters: [{ name: 'blocks', description: 'original tool-result content.' }],
+        signature: 'pruneContent(blocks: readonly ContentBlock[], originalSeq: number): ContentBlock[] | null',
+        description: 'Replace an over-budget text middle while retaining rich-block order. Text slicing is by Unicode code point, not UTF-16 code unit, so a retained boundary cannot split a surrogate pair. Grapheme clusters may still split. The omitted middle stays in the session log at `originalSeq`; the marker names `session_event_read this session, seq <originalSeq>` so the model can re-fetch it.',
+        parameters: [{ name: 'blocks', description: 'original tool-result content.' }, { name: 'originalSeq', description: 'log seq of the full original `tool/result`.' }],
         returns: 'pruned content, or `null` when the text is within budget.',
       },
       {
         signature: 'pruneSession(session: Session): PruneResult',
-        description: 'Prune every over-budget tool result from one stable current-surface snapshot. Each replacement preserves the complete event data except for `content`, cites the shadowed node so replay can recover the replacement input, and is immediately preceded by a `compaction/prune` shadow-price event pricing the shadowed node through the injected token meter, so pure consumers can subtract it without per-node state.',
+        description: 'Prune every over-budget tool result from one stable current-surface snapshot. Each replacement preserves the complete event data except for `content`, cites the shadowed node so replay can recover the replacement input, names `session_event_read this session, seq N` in the omitted-middle marker, and is immediately preceded by a `compaction/prune` shadow-price event pricing the shadowed node through the injected token meter, so pure consumers can subtract it without per-node state.',
         parameters: [{ name: 'session', description: 'session whose current surface is rewritten.' }],
         returns: 'landed replacements and aggregate Unicode-code-point savings.',
         throws: ['when the session rejects a replacement; replacements committed earlier in the pass remain durable.'],

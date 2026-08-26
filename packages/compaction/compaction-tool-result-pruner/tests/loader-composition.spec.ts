@@ -27,7 +27,7 @@ describe('compaction-tool-result-pruner real Loader composition', () => {
       "- name: '@shres-code/shres-code-token-meter'",
       "- name: '@shres-code/shres-code-compaction-tool-result-pruner'",
       '  config:',
-      '    thresholdChars: 100',
+      '    thresholdChars: 400',
       '    headChars: 20',
       '    tailChars: 10',
       '',
@@ -53,7 +53,7 @@ describe('compaction-tool-result-pruner real Loader composition', () => {
 
     expect(context.get('toolResultPruner')).toBeInstanceOf(ToolResultPruner)
     expect(context.toolResultPruner.config).toEqual({
-      thresholdChars: 100,
+      thresholdChars: 400,
       headChars: 20,
       tailChars: 10,
     })

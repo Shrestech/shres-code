@@ -210,17 +210,22 @@ measureContent(blocks: readonly ContentBlock[]): number
  * Replace an over-budget text middle while retaining rich-block order.
  * Text slicing is by Unicode code point, not UTF-16 code unit, so a retained
  * boundary cannot split a surrogate pair. Grapheme clusters may still split.
+ * The omitted middle stays in the session log at `originalSeq`; the marker
+ * names `session_event_read this session, seq <originalSeq>` so the model
+ * can re-fetch it.
  * @param blocks - original tool-result content.
+ * @param originalSeq - log seq of the full original `tool/result`.
  * @returns pruned content, or `null` when the text is within budget.
  */
-pruneContent(blocks: readonly ContentBlock[]): ContentBlock[] | null
+pruneContent(blocks: readonly ContentBlock[], originalSeq: number): ContentBlock[] | null
 
 /**
  * Prune every over-budget tool result from one stable current-surface snapshot.
  * Each replacement preserves the complete event data except for `content`,
- * cites the shadowed node so replay can recover the replacement input, and is
- * immediately preceded by a `compaction/prune` shadow-price event pricing the
- * shadowed node through the injected token meter, so pure consumers can
+ * cites the shadowed node so replay can recover the replacement input, names
+ * `session_event_read this session, seq N` in the omitted-middle marker, and
+ * is immediately preceded by a `compaction/prune` shadow-price event pricing
+ * the shadowed node through the injected token meter, so pure consumers can
  * subtract it without per-node state.
  * @param session - session whose current surface is rewritten.
  * @returns landed replacements and aggregate Unicode-code-point savings.
@@ -232,5 +237,5 @@ pruneSession(session: Session): PruneResult
 
 Types: [ContentBlock](llm-streaming.md) · [Session](session.md)
 
-Source: [`packages/compaction/compaction-tool-result-pruner/src/index.ts:44`](../../packages/compaction/compaction-tool-result-pruner/src/index.ts)
+Source: [`packages/compaction/compaction-tool-result-pruner/src/index.ts:51`](../../packages/compaction/compaction-tool-result-pruner/src/index.ts)
 <!-- END GENERATED cordis-surface -->

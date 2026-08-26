@@ -61,7 +61,7 @@ describe('real Loader composition', () => {
       "- name: '@shres-code/shres-code-token-meter'",
       "- name: '@shres-code/shres-code-compaction-tool-result-pruner'",
       '  config:',
-      '    thresholdChars: 100',
+      '    thresholdChars: 400',
       '    headChars: 20',
       '    tailChars: 10',
       "- name: '@shres-code/shres-code-compaction-basic'",

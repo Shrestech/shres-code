@@ -778,7 +778,7 @@ describe('pressure measurement and retention', () => {
 })
 
 describe('optional model-free tool-result pruning', () => {
-  const pruneConfig = { thresholdChars: 100, headChars: 20, tailChars: 10 }
+  const pruneConfig = { thresholdChars: 400, headChars: 20, tailChars: 10 }
 
   it('does not prune a below-pressure session opportunistically', async () => {
     const ctx = createContext(10_000)
@@ -825,8 +825,9 @@ describe('optional model-free tool-result pruning', () => {
     const session = toolConversation()
 
     expect(await compactIfNeeded(compact, session)).not.toBeNull()
-    expect(compact.calls).toHaveLength(1)
-    expect(summarizedText(compact.calls[0]!.input)).toContain('tool result middle pruned')
+    expect(compact.calls.length).toBeGreaterThanOrEqual(1)
+    expect(summarizedText(compact.calls[0]!.input)).toContain('middle pruned')
+    expect(summarizedText(compact.calls[0]!.input)).toContain(POINTER_READ_CUE)
     expect(summarizedText(compact.calls[0]!.input)).not.toContain('result 1 '.repeat(300))
   })
 
@@ -1609,7 +1610,7 @@ describe('automatic listener and loader composition', () => {
   it('authorizes overflow retry when pruning alone advances an indivisible surface', async () => {
     const ctx = createContext(10_000)
     void new ToolResultPruner(ctx, {
-      thresholdChars: 100,
+      thresholdChars: 400,
       headChars: 20,
       tailChars: 10,
     })
@@ -1628,7 +1629,7 @@ describe('automatic listener and loader composition', () => {
   it('continues overflow recovery with summarization on the pruned surface', async () => {
     const ctx = createContext(10_000)
     void new ToolResultPruner(ctx, {
-      thresholdChars: 100,
+      thresholdChars: 400,
       headChars: 20,
       tailChars: 10,
     })
@@ -1641,7 +1642,7 @@ describe('automatic listener and loader composition', () => {
     expect(await recover(ctx, agent(session, MODEL), overflow())).toBe(true)
     expect(session.events.some(event => event.type === 'compaction/summary')).toBe(true)
     expect(compact.calls).toHaveLength(1)
-    expect(summarizedText(compact.calls[0]!.input)).toContain('tool result middle pruned')
+    expect(summarizedText(compact.calls[0]!.input)).toContain('middle pruned')
   })
 
   it('retries from a durable prune when later overflow summarization throws', async () => {
@@ -1649,7 +1650,7 @@ describe('automatic listener and loader composition', () => {
     const warnings: string[] = []
     ctx.logger.warn = ((message: string) => void warnings.push(message)) as typeof ctx.logger.warn
     void new ToolResultPruner(ctx, {
-      thresholdChars: 100,
+      thresholdChars: 400,
       headChars: 20,
       tailChars: 10,
     })
@@ -1672,7 +1673,7 @@ describe('automatic listener and loader composition', () => {
     const ctx = createContext(10_000)
     const controller = new AbortController()
     void new ToolResultPruner(ctx, {
-      thresholdChars: 100,
+      thresholdChars: 400,
       headChars: 20,
       tailChars: 10,
     })

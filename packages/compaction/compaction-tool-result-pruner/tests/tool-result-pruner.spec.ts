@@ -13,14 +13,18 @@ import TokenMeter from '@shres-code/shres-code-token-meter'
 import ToolResultPruner, {
   codePointLength,
   DEFAULTS,
-  PRUNE_MARKER,
+  MAX_PRUNE_MARKER_CHARS,
+  PRUNE_READ_CUE,
+  pruneMarker,
   resolveConfig,
 } from '@shres-code/shres-code-compaction-tool-result-pruner'
 import type { ToolResultPruneConfig } from '@shres-code/shres-code-compaction-tool-result-pruner'
 
 const MODEL = 'test-model'
+const PLANTED_SEQ = 12
+
 const SMALL: ToolResultPruneConfig = {
-  thresholdChars: 50,
+  thresholdChars: MAX_PRUNE_MARKER_CHARS + 20,
   headChars: 4,
   tailChars: 3,
 }
@@ -74,13 +78,15 @@ function appendToolStep(
 
 describe('tool-result pruning configuration', () => {
   it('resolves detached immutable defaults and partial overrides', () => {
-    const raw = { thresholdChars: 100, headChars: 20, tailChars: 10 }
+    const raw = { thresholdChars: 400, headChars: 20, tailChars: 10 }
     const resolved = resolveConfig(raw)
     raw.headChars = 1
-    expect(resolved).toEqual({ thresholdChars: 100, headChars: 20, tailChars: 10 })
+    expect(resolved).toEqual({ thresholdChars: 400, headChars: 20, tailChars: 10 })
     expect(Object.isFrozen(resolved)).toBe(true)
     expect(DEFAULTS).toEqual({ thresholdChars: 8192, headChars: 4096, tailChars: 1024 })
     expect(Object.isFrozen(DEFAULTS)).toBe(true)
+    expect(PRUNE_READ_CUE).toBe('session_event_read this session, seq')
+    expect(MAX_PRUNE_MARKER_CHARS).toBe(codePointLength(pruneMarker(Number.MAX_SAFE_INTEGER)))
   })
 
   it('rejects stale keys, invalid scalars, and an output budget above threshold', () => {
@@ -89,6 +95,7 @@ describe('tool-result pruning configuration', () => {
       [{ headChars: -1 }, /headChars .* non-negative integer/],
       [{ tailChars: 1.5 }, /tailChars .* non-negative integer/],
       [{ thresholdChars: 50, headChars: 20, tailChars: 20 }, /headChars \+ marker \+ tailChars/],
+      [{ thresholdChars: MAX_PRUNE_MARKER_CHARS - 1, headChars: 0, tailChars: 0 }, /headChars \+ marker \+ tailChars/],
       [{ threshold: 10 }, /unknown key "threshold"/],
     ] as Array<[unknown, RegExp]>
     for (const [config, pattern] of bad) {
@@ -105,20 +112,23 @@ describe('ToolResultPruner content transform', () => {
       { type: 'reasoning', text: 'not measured' },
     ] satisfies ContentBlock[]
     expect(prune.measureContent(blocks)).toBe(3)
-    expect(prune.pruneContent(blocks)).toBeNull()
+    expect(prune.pruneContent(blocks, PLANTED_SEQ)).toBeNull()
     expect(codePointLength('a😀b')).toBe(3)
   })
 
   it('keeps configured head and tail without splitting surrogate pairs', () => {
     const prune = service()
-    const result = prune.pruneContent([{ type: 'text', text: '😀'.repeat(60) }])
+    const overflow = SMALL.thresholdChars! + 40
+    const result = prune.pruneContent([{ type: 'text', text: '😀'.repeat(overflow) }], PLANTED_SEQ)
+    const marker = pruneMarker(PLANTED_SEQ)
     expect(result).toEqual([{
       type: 'text',
-      text: `${'😀'.repeat(4)}${PRUNE_MARKER}${'😀'.repeat(3)}`,
+      text: `${'😀'.repeat(4)}${marker}${'😀'.repeat(3)}`,
     }])
-    expect(prune.measureContent(result!)).toBeLessThanOrEqual(50)
+    expect(prune.measureContent(result!)).toBeLessThanOrEqual(SMALL.thresholdChars!)
     expect(result![0]).toMatchObject({ type: 'text' })
     expect((result![0] as { text: string }).text).not.toContain('\uFFFD')
+    expect((result![0] as { text: string }).text).toContain(`${PRUNE_READ_CUE} ${String(PLANTED_SEQ)}`)
   })
 
   it('preserves non-text blocks and their relative ordering across removed text', () => {
@@ -130,31 +140,43 @@ describe('ToolResultPruner content transform', () => {
       name: 'nested',
       arguments: '{}',
     }
+    const chunk = Math.ceil((SMALL.thresholdChars! + 40) / 3)
     const result = prune.pruneContent([
-      { type: 'text', text: 'A'.repeat(40) },
+      { type: 'text', text: 'A'.repeat(chunk) },
       reasoning,
-      { type: 'text', text: 'B'.repeat(30) },
+      { type: 'text', text: 'B'.repeat(chunk) },
       call,
-      { type: 'text', text: 'C'.repeat(30) },
-    ])
+      { type: 'text', text: 'C'.repeat(chunk) },
+    ], PLANTED_SEQ)
     expect(result).toEqual([
-      { type: 'text', text: `AAAA${PRUNE_MARKER}` },
+      { type: 'text', text: `AAAA${pruneMarker(PLANTED_SEQ)}` },
       reasoning,
       call,
       { type: 'text', text: 'CCC' },
     ])
-    expect(prune.measureContent(result!)).toBeLessThanOrEqual(50)
+    expect(prune.measureContent(result!)).toBeLessThanOrEqual(SMALL.thresholdChars!)
   })
 
   it('supports zero-sized head and tail while still shrinking', () => {
     const prune = service({
-      thresholdChars: codePointLength(PRUNE_MARKER),
+      thresholdChars: MAX_PRUNE_MARKER_CHARS,
       headChars: 0,
       tailChars: 0,
     })
-    const result = prune.pruneContent([{ type: 'text', text: 'x'.repeat(100) }])
-    expect(result).toEqual([{ type: 'text', text: PRUNE_MARKER }])
-    expect(prune.measureContent(result!)).toBe(prune.config.thresholdChars)
+    const result = prune.pruneContent(
+      [{ type: 'text', text: 'x'.repeat(MAX_PRUNE_MARKER_CHARS + 40) }],
+      PLANTED_SEQ,
+    )
+    expect(result).toEqual([{ type: 'text', text: pruneMarker(PLANTED_SEQ) }])
+    expect(prune.measureContent(result!)).toBeLessThanOrEqual(prune.config.thresholdChars)
+  })
+
+  it('rejects a non-integer originalSeq before emitting a marker', () => {
+    const prune = service()
+    expect(() => prune.pruneContent([{ type: 'text', text: 'x'.repeat(SMALL.thresholdChars! + 40) }], -1))
+      .toThrow(/originalSeq .* non-negative safe integer/)
+    expect(() => prune.pruneContent([{ type: 'text', text: 'x'.repeat(SMALL.thresholdChars! + 40) }], 1.5))
+      .toThrow(/originalSeq .* non-negative safe integer/)
   })
 })
 
@@ -163,7 +185,7 @@ describe('ToolResultPruner session transaction', () => {
     const session = Session.create(SessionId('preserve'))
     const originalSeq = appendToolStep(session, 1, 'one', [{
       type: 'text',
-      text: 'x'.repeat(100),
+      text: 'x'.repeat(SMALL.thresholdChars! + 80),
     }], {
       isError: true,
       error: { name: 'ExitError', code: 'EXIT_1' },
@@ -178,8 +200,12 @@ describe('ToolResultPruner session transaction', () => {
     expect(result.pruned).toHaveLength(1)
     expect(result.charsRemoved).toBeGreaterThan(0)
     const entry = result.pruned[0]!
-    expect(entry).toMatchObject({ originalSeq, callId: CallId('one'), charsBefore: 100 })
-    expect(entry.charsAfter).toBeLessThanOrEqual(50)
+    expect(entry).toMatchObject({
+      originalSeq,
+      callId: CallId('one'),
+      charsBefore: SMALL.thresholdChars! + 80,
+    })
+    expect(entry.charsAfter).toBeLessThanOrEqual(SMALL.thresholdChars!)
 
     const original = session.events[originalSeq]!
     const replacement = session.events[entry.replacementSeq]! as SurfaceEvent
@@ -189,7 +215,7 @@ describe('ToolResultPruner session transaction', () => {
         message: {
           content: [{
             type: 'tool-result',
-            content: [{ type: 'text', text: 'x'.repeat(100) }],
+            content: [{ type: 'text', text: 'x'.repeat(SMALL.thresholdChars! + 80) }],
           }],
         },
       },
@@ -211,6 +237,8 @@ describe('ToolResultPruner session transaction', () => {
       sourceEventSeqs: [originalSeq],
     })
     expect(session.surface.nodes).not.toContain(originalSeq)
+    expect(JSON.stringify(replacement.data)).toContain(`${PRUNE_READ_CUE} ${String(originalSeq)}`)
+    expect(JSON.stringify(replacement.data)).toContain('remains in the session log')
 
     // Shadow-price protocol: the metering event sits directly before the
     // replacement and prices the shadowed node with the shared estimator.
@@ -227,9 +255,10 @@ describe('ToolResultPruner session transaction', () => {
 
   it('prunes multiple results, skips short ones, and converges in one pass', () => {
     const session = Session.create(SessionId('multiple'))
-    appendToolStep(session, 1, 'a', [{ type: 'text', text: 'A'.repeat(100) }])
+    const overflow = SMALL.thresholdChars! + 80
+    appendToolStep(session, 1, 'a', [{ type: 'text', text: 'A'.repeat(overflow) }])
     appendToolStep(session, 2, 'b', [{ type: 'text', text: 'short' }])
-    appendToolStep(session, 3, 'c', [{ type: 'text', text: 'C'.repeat(80) }])
+    appendToolStep(session, 3, 'c', [{ type: 'text', text: 'C'.repeat(overflow) }])
     session.append('turn/start', {
       turn: 4,
     })
@@ -245,7 +274,7 @@ describe('ToolResultPruner session transaction', () => {
 
   it('replays to the identical pruned model messages', () => {
     const session = Session.create(SessionId('replay'))
-    appendToolStep(session, 1, 'a', [{ type: 'text', text: 'A'.repeat(100) }])
+    appendToolStep(session, 1, 'a', [{ type: 'text', text: 'A'.repeat(SMALL.thresholdChars! + 80) }])
     session.append('turn/start', {
       turn: 2,
     })
@@ -263,7 +292,7 @@ describe('ToolResultPruner session transaction', () => {
     await ctx.plugin(TokenMeter)
     const prune = new ToolResultPruner(ctx, SMALL)
     const session = ctx.sessions.create(SessionId('invariants'))
-    appendToolStep(session, 1, 'a', [{ type: 'text', text: 'A'.repeat(100) }])
+    appendToolStep(session, 1, 'a', [{ type: 'text', text: 'A'.repeat(SMALL.thresholdChars! + 80) }])
     expect(() => prune.pruneSession(session)).toThrow(/outside any open turn/)
     session.append('turn/start', {
       turn: 2,
