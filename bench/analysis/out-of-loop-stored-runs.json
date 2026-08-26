@@ -1,0 +1,245 @@
+[
+  {
+    "experiment": "demo",
+    "arm": "off",
+    "trials": 0,
+    "mainlineRequests": 0,
+    "runCodeCalls": 0,
+    "delegatedSessions": 0,
+    "outOfLoopExperiments": 0
+  },
+  {
+    "experiment": "demo",
+    "arm": "on",
+    "trials": 0,
+    "mainlineRequests": 0,
+    "runCodeCalls": 0,
+    "delegatedSessions": 0,
+    "outOfLoopExperiments": 0
+  },
+  {
+    "experiment": "demo",
+    "arm": "on-adaptive",
+    "trials": 0,
+    "mainlineRequests": 0,
+    "runCodeCalls": 0,
+    "delegatedSessions": 0,
+    "outOfLoopExperiments": 0
+  },
+  {
+    "experiment": "demo",
+    "arm": "on-sq",
+    "trials": 0,
+    "mainlineRequests": 0,
+    "runCodeCalls": 0,
+    "delegatedSessions": 0,
+    "outOfLoopExperiments": 0
+  },
+  {
+    "experiment": "demo",
+    "arm": "on-sq-verified",
+    "trials": 0,
+    "mainlineRequests": 0,
+    "runCodeCalls": 0,
+    "delegatedSessions": 0,
+    "outOfLoopExperiments": 0
+  },
+  {
+    "experiment": "demo",
+    "arm": "sq-only",
+    "trials": 0,
+    "mainlineRequests": 0,
+    "runCodeCalls": 0,
+    "delegatedSessions": 0,
+    "outOfLoopExperiments": 0
+  },
+  {
+    "experiment": "sq-adopt-2026-08-26",
+    "arm": "sq-driver",
+    "trials": 8,
+    "mainlineRequests": 47,
+    "runCodeCalls": 0,
+    "delegatedSessions": 0,
+    "outOfLoopExperiments": 0
+  },
+  {
+    "experiment": "sq-adopt-2026-08-26",
+    "arm": "sq-only",
+    "trials": 8,
+    "mainlineRequests": 55,
+    "runCodeCalls": 0,
+    "delegatedSessions": 0,
+    "outOfLoopExperiments": 0
+  },
+  {
+    "experiment": "w4-2026-08-25-zai-adaptive",
+    "arm": "off",
+    "trials": 15,
+    "mainlineRequests": 120,
+    "runCodeCalls": 0,
+    "delegatedSessions": 0,
+    "outOfLoopExperiments": 0
+  },
+  {
+    "experiment": "w4-2026-08-25-zai-adaptive",
+    "arm": "on",
+    "trials": 15,
+    "mainlineRequests": 162,
+    "runCodeCalls": 0,
+    "delegatedSessions": 0,
+    "outOfLoopExperiments": 0
+  },
+  {
+    "experiment": "w4-2026-08-25-zai-adaptive",
+    "arm": "on-adaptive",
+    "trials": 15,
+    "mainlineRequests": 134,
+    "runCodeCalls": 0,
+    "delegatedSessions": 0,
+    "outOfLoopExperiments": 0
+  },
+  {
+    "experiment": "w4-2026-08-25-zai-pilot",
+    "arm": "off",
+    "trials": 14,
+    "mainlineRequests": 119,
+    "runCodeCalls": 0,
+    "delegatedSessions": 0,
+    "outOfLoopExperiments": 0
+  },
+  {
+    "experiment": "w4-2026-08-25-zai-pilot",
+    "arm": "on",
+    "trials": 14,
+    "mainlineRequests": 156,
+    "runCodeCalls": 0,
+    "delegatedSessions": 0,
+    "outOfLoopExperiments": 0
+  },
+  {
+    "experiment": "w4-2026-08-25-zai-pilot",
+    "arm": "on-sq",
+    "trials": 14,
+    "mainlineRequests": 155,
+    "runCodeCalls": 0,
+    "delegatedSessions": 0,
+    "outOfLoopExperiments": 0
+  },
+  {
+    "experiment": "w5-pressure-2026-08-26",
+    "arm": "off",
+    "trials": 4,
+    "mainlineRequests": 68,
+    "runCodeCalls": 0,
+    "delegatedSessions": 0,
+    "outOfLoopExperiments": 0
+  },
+  {
+    "experiment": "w5-pressure-2026-08-26",
+    "arm": "on",
+    "trials": 4,
+    "mainlineRequests": 80,
+    "runCodeCalls": 0,
+    "delegatedSessions": 0,
+    "outOfLoopExperiments": 0
+  },
+  {
+    "experiment": "w5-pressure-2026-08-26",
+    "arm": "on-adaptive",
+    "trials": 4,
+    "mainlineRequests": 71,
+    "runCodeCalls": 0,
+    "delegatedSessions": 0,
+    "outOfLoopExperiments": 0
+  },
+  {
+    "experiment": "w6-compaction-2026-08-26",
+    "arm": "off",
+    "trials": 8,
+    "mainlineRequests": 161,
+    "runCodeCalls": 0,
+    "delegatedSessions": 0,
+    "outOfLoopExperiments": 0
+  },
+  {
+    "experiment": "w6-compaction-2026-08-26",
+    "arm": "on",
+    "trials": 8,
+    "mainlineRequests": 298,
+    "runCodeCalls": 0,
+    "delegatedSessions": 0,
+    "outOfLoopExperiments": 0
+  },
+  {
+    "experiment": "w6-compaction-2026-08-26",
+    "arm": "on-adaptive",
+    "trials": 8,
+    "mainlineRequests": 172,
+    "runCodeCalls": 0,
+    "delegatedSessions": 0,
+    "outOfLoopExperiments": 0
+  },
+  {
+    "experiment": "w7-build-confirm-2026-08-26",
+    "arm": "off",
+    "trials": 8,
+    "mainlineRequests": 99,
+    "runCodeCalls": 0,
+    "delegatedSessions": 0,
+    "outOfLoopExperiments": 0
+  },
+  {
+    "experiment": "w7-build-confirm-2026-08-26",
+    "arm": "on",
+    "trials": 8,
+    "mainlineRequests": 161,
+    "runCodeCalls": 0,
+    "delegatedSessions": 0,
+    "outOfLoopExperiments": 0
+  },
+  {
+    "experiment": "w7-build-confirm-2026-08-26",
+    "arm": "on-adaptive",
+    "trials": 8,
+    "mainlineRequests": 109,
+    "runCodeCalls": 0,
+    "delegatedSessions": 0,
+    "outOfLoopExperiments": 0
+  },
+  {
+    "experiment": "w8-core-2026-08-26",
+    "arm": "off",
+    "trials": 16,
+    "mainlineRequests": 224,
+    "runCodeCalls": 0,
+    "delegatedSessions": 0,
+    "outOfLoopExperiments": 0
+  },
+  {
+    "experiment": "w8-core-2026-08-26",
+    "arm": "on-core",
+    "trials": 16,
+    "mainlineRequests": 402,
+    "runCodeCalls": 0,
+    "delegatedSessions": 0,
+    "outOfLoopExperiments": 0
+  },
+  {
+    "experiment": "w9-canary-2026-08-26",
+    "arm": "off",
+    "trials": 2,
+    "mainlineRequests": 26,
+    "runCodeCalls": 0,
+    "delegatedSessions": 0,
+    "outOfLoopExperiments": 0
+  },
+  {
+    "experiment": "w9-canary-2026-08-26",
+    "arm": "on-charter",
+    "trials": 2,
+    "mainlineRequests": 31,
+    "runCodeCalls": 0,
+    "delegatedSessions": 0,
+    "outOfLoopExperiments": 0
+  }
+]

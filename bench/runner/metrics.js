@@ -23,6 +23,10 @@
  * - unverifiedShare: last-card checks with discrimination `unverified`, over registered checks.
  * - echoOkRejectRate: floor registration refusals (JSPACE_CHARTER_CONSTANT / JSPACE_CHARTER_NO_READ)
  *   over `jspace_open` / `jspace_charter_amend` results. The event name is `jspace/charter-amend`.
+ * - outOfLoopExperiments: `run_code` tool calls in this session — programmatic computation
+ *   outside the conversational tool loop. Subagent delegation (a separate experiment class)
+ *   is counted from descendant-session headers in `descendants.js`, not from tool names,
+ *   because the delegation tool name is configurable.
  *
  * @module bench/runner/metrics
  */
@@ -34,6 +38,9 @@
 /** Tool names whose calls count as accepted J-Space checkpoint/ship usage. */
 const CHECKPOINT_TOOL = 'jspace_checkpoint'
 const SHIP_TOOL = 'jspace_ship'
+
+/** Code-mode programmatic-computation tool (RUN_CODE_NAME in `shres-tools`). */
+const RUN_CODE_TOOL = 'run_code'
 
 /** Session-query tool names. */
 const SESSION_QUERY_TOOLS = new Set([
@@ -157,6 +164,7 @@ export function foldSessionLog(text, armFlags) {
     identicalRetries: 0,
     checkpoints: 0,
     shipPasses: 0,
+    outOfLoopExperiments: 0,
     tokensIncludingDescendants: null,
     costIncludingDescendants: null,
     descendantSessions: 0,
@@ -216,6 +224,7 @@ export function foldSessionLog(text, armFlags) {
         if (typeof data.callId === 'string') callNames.set(data.callId, name)
         if (name === CHECKPOINT_TOOL) metrics.checkpoints += 1
         if (name === SHIP_TOOL) metrics.shipPasses += 1
+        if (name === RUN_CODE_TOOL) metrics.outOfLoopExperiments += 1
         if (hasSq && SESSION_QUERY_TOOLS.has(name)) {
           metrics.sessionQueryCalls = (metrics.sessionQueryCalls ?? 0) + 1
         }
@@ -331,6 +340,7 @@ export function emptyMetrics() {
     identicalRetries: 0,
     checkpoints: 0,
     shipPasses: 0,
+    outOfLoopExperiments: 0,
     tokensIncludingDescendants: null,
     costIncludingDescendants: null,
     descendantSessions: 0,
