@@ -238,6 +238,7 @@ function forwardedSettings(ns: string): HostFrame {
     type: 'host/remote-event',
     event: 'settings/document-updated',
     // The revision is the Host's own counter, so the matcher is the assertion.
+    // oxlint-disable-next-line typescript/no-unsafe-assignment -- vitest asymmetric matcher for the revision integer
     args: [ns, expect.any(Number)],
   }
 }
@@ -248,7 +249,7 @@ describe('settings domain', () => {
     const api = createApiProxy(ctx, DEFAULTS)
     const error = expectErr(await api.settings.describe(request({})))
     expect(error.code).toBe('internal')
-    expect(error.message).toContain('shres-settings-file')
+    expect(error.message).toContain('shres-code-settings-file')
   })
 
   it('describes layered redacted namespaces with their secret slots', async () => {
@@ -410,7 +411,7 @@ describe('settings domain', () => {
       ns: 'web-search-attached-cli',
       ops: [{ op: 'set', path: ['ollama'], value: true }],
     })))
-    expect(attachedCli.value).toEqual({ ollama: true })
+    expect(attachedCli.value).toEqual({ ollama: true, preference: [] })
 
     for (const response of [
       await api.settings.update(request({ ns: 'some-other-plugin', patch: { secretPath: '/etc/shadow' } })),
@@ -675,7 +676,7 @@ describe('credentials domain', () => {
     const api = createApiProxy(ctx, DEFAULTS)
     const error = expectErr(await api.credentials.describe(request({ refs: ['A'] })))
     expect(error.code).toBe('internal')
-    expect(error.message).toContain('shres-credentials-local')
+    expect(error.message).toContain('shres-code-credentials-local')
   })
 
   it('describes value-free views and flips state through set/unset with frames', async () => {
