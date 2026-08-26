@@ -303,8 +303,10 @@ export function tokenizeBash(command: string): string[] | undefined {
 
 /**
  * Unquoted scan of `>` / `>>` redirects.
+ * Redirects whose target is exactly `/dev/null` are permitted; every other
+ * unquoted redirect target is treated as mutating.
  * @param command - already comment-stripped.
- * @returns true when an unquoted redirect is present.
+ * @returns true when an unquoted non-`/dev/null` redirect is present.
  */
 export function hasUnquotedRedirect(command: string): boolean {
   let quote: "'" | '"' | undefined
@@ -332,7 +334,19 @@ export function hasUnquotedRedirect(command: string): boolean {
       quote = ch
       continue
     }
-    if (ch === '>') return true
+    if (ch !== '>') continue
+    let cursor = i + 1
+    if (command[cursor] === '>') cursor += 1
+    while (command[cursor] === ' ' || command[cursor] === '\t') cursor += 1
+    let target = ''
+    while (cursor < command.length) {
+      const next = command[cursor]
+      if (next === undefined || next === ' ' || next === '\t' || next === '\n') break
+      target += next
+      cursor += 1
+    }
+    if (target !== '/dev/null') return true
+    i = cursor - 1
   }
   return false
 }

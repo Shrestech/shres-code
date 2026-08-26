@@ -7,7 +7,7 @@
 
 import { unlink } from 'node:fs/promises'
 import type { Context } from '@shres-code/cordis'
-import type { FileSystem } from '@shres-code/shres-code-fs'
+import type { FileSystem, FsTarget } from '@shres-code/shres-code-fs'
 import type { ToolRunContext } from '@shres-code/shres-code-tools'
 import type {
   CharterCheckInput,
@@ -26,6 +26,15 @@ export const CHARTER_FS_REQUIRED
 /** Probe-infeasible copy when a glob-only check matches no files after mutation. */
 const CHARTER_NO_SUBJECT_REFUSE
   = 'matched no files in `reads`. The workspace has no subject for this check.'
+
+/**
+ * Model-visible refuse when the resolved failProbe target escapes session cwd.
+ * @param probePath - workspace-relative failProbe.path (the symlink the model named).
+ * @returns refusal text naming that path.
+ */
+export function charterProbeSymlinkRefuse(probePath: string): string {
+  return `charter failProbe.path ${JSON.stringify(probePath)} resolves outside the session cwd (symlink). Discrimination will not write it.`
+}
 
 /** Discrimination mode from tool-jspace Config. */
 export type CharterDiscriminationMode = 'off' | 'best-effort' | 'required'
@@ -67,6 +76,11 @@ export async function discriminateCharterCheck(
   const cwd = exec.agent?.session.header.cwd ?? process.cwd()
   const probePath = entry.failProbe.path
   const target = await fs.resolve(probePath, { cwd, signal: exec.signal })
+  const escaped = await probeEscapesCwd(fs, target, cwd, probePath, exec)
+  if (escaped !== undefined) {
+    if (options.mode === 'required') throw new Error(escaped)
+    return withStatus(entry, 'unverified', 'probe-infeasible')
+  }
   const existed = (await fs.stat(target, exec.signal)) !== undefined
   let original: string | undefined
   if (existed) original = await fs.readText(target, exec.signal)
@@ -123,7 +137,7 @@ export async function discriminateCharterCheck(
     }, { ignorable: true })
     if (refuse !== undefined) throw new Error(refuse)
   } finally {
-    await restoreProbe(fs, target, existed, original, exec)
+    await restoreProbe(fs, target, existed, original, cwd, probePath, exec)
   }
   if (demonstrated) return withStatus(entry, 'demonstrated')
   return withStatus(entry, 'unverified', unverifiedReason ?? 'probe-infeasible')
@@ -155,10 +169,13 @@ export function applyFailProbe(
 
 /**
  * Restore the probe snapshot. Restore failure is harness I/O, not a charter refusal.
+ * Skips unlink/rewrite when the resolved target has escaped session cwd.
  * @param fs - filesystem.
  * @param target - resolved probe file.
  * @param existed - whether the file existed before the probe.
  * @param original - prior text when it existed.
+ * @param cwd - session cwd.
+ * @param probePath - workspace-relative failProbe.path (named in refusals).
  * @param exec - parent execution (signal).
  */
 async function restoreProbe(
@@ -166,13 +183,37 @@ async function restoreProbe(
   target: Parameters<FileSystem['writeText']>[0],
   existed: boolean,
   original: string | undefined,
+  cwd: string,
+  probePath: string,
   exec: ToolRunContext,
 ): Promise<void> {
+  if (await probeEscapesCwd(fs, target, cwd, probePath, exec) !== undefined) return
   if (existed) {
     await fs.writeText(target, original ?? '', undefined, exec.signal)
     return
   }
   await unlink(fs.processPath(target))
+}
+
+/**
+ * Whether the resolved probe target sits outside session cwd after realpath.
+ * @param fs - filesystem.
+ * @param target - resolved failProbe path.
+ * @param cwd - session cwd.
+ * @param probePath - workspace-relative path to name in the refusal.
+ * @param exec - parent execution (signal).
+ * @returns refusal text naming the symlink, or `undefined` when contained.
+ */
+async function probeEscapesCwd(
+  fs: FileSystem,
+  target: FsTarget,
+  cwd: string,
+  probePath: string,
+  exec: ToolRunContext,
+): Promise<string | undefined> {
+  const cwdTarget = await fs.resolve('.', { cwd, signal: exec.signal })
+  if (fs.contains(cwdTarget, target)) return undefined
+  return charterProbeSymlinkRefuse(probePath)
 }
 
 /**

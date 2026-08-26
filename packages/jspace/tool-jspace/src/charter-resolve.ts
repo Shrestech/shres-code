@@ -41,7 +41,7 @@ export interface CharterResolveConfig extends CharterRunConfig {
   readonly requireExecutableCharter: boolean
 }
 
-/** Model-visible refuse when `requireCharter` finds an empty list on first open. */
+/** Model-visible refuse when `requireCharter` finds an empty list at first registration. */
 export const OPEN_REQUIRES_CHARTER
   = 'jspace_open requires a charter. Pass kind=accept-proposal to confirm the harness proposal, or send kind=check entries.'
 
@@ -52,6 +52,21 @@ export const OPEN_REQUIRES_EXECUTABLE_CHARTER
 /** Model-visible refuse when checkpoint finds no charter under `requireCharter`. */
 export const CHECKPOINT_REQUIRES_CHARTER
   = 'no charter is registered; call jspace_open with a charter or jspace_charter_amend.'
+
+/** Model-visible refuse when `jspace_open` carries a charter onto a non-empty card charter. */
+export const CHARTER_ALREADY_REGISTERED
+  = 'a charter is already registered on this card; call jspace_charter_amend to drop, replace, or add entries. jspace_open does not replace a non-empty charter.'
+
+/**
+ * Model-visible refuse when the resulting list would exceed `maxCharterEntries`.
+ * @param count - resulting entry count.
+ * @param cap - configured cap.
+ * @returns refusal text, or `undefined` when within cap.
+ */
+export function refuseCharterCap(count: number, cap: number): string | undefined {
+  if (count <= cap) return undefined
+  return `jspace charter would have ${count} entries; maxCharterEntries is ${cap}. Drop or replace entries, or raise the cap.`
+}
 
 /**
  * Latest `jspace/charter-proposal` entries in this session.
@@ -200,18 +215,15 @@ export function hasExecutableCharter(
 }
 
 /**
- * Refuse a first open that does not meet charter requirements.
- * @param cardOpen - true when a card already exists (charter is not applied).
+ * Refuse a first charter registration that does not meet charter requirements.
  * @param entries - resolved folded list.
  * @param config - requirements.
  * @returns refusal message, or `undefined`.
  */
 export function charterOpenRefusal(
-  cardOpen: boolean,
   entries: readonly JspaceCharterEntry[],
   config: Pick<CharterResolveConfig, 'requireCharter' | 'requireExecutableCharter' | 'charterDiscrimination'>,
 ): string | undefined {
-  if (cardOpen) return undefined
   if (config.requireCharter && entries.length === 0) return OPEN_REQUIRES_CHARTER
   if (config.requireExecutableCharter && !hasExecutableCharter(entries, config.charterDiscrimination)) {
     return OPEN_REQUIRES_EXECUTABLE_CHARTER

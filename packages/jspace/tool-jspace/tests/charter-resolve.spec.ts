@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { CharterEntryId } from '@shres-code/shres-code-jspace'
 import {
   assignCharterIds,
+  charterOpenRefusal,
   expandCharterItems,
   planCharterAmend,
+  refuseCharterCap,
 } from '../src/charter-resolve.ts'
 import { applyFailProbe } from '../src/charter-probe.ts'
 
@@ -70,6 +72,23 @@ describe('planCharterAmend', () => {
 
   it('refuses dropping an unknown id', () => {
     expect(() => planCharterAmend([], ['e1'], undefined, undefined)).toThrow(/is not on the card/)
+  })
+})
+
+describe('refuseCharterCap', () => {
+  it('names the cap when the resulting list would exceed it', () => {
+    expect(refuseCharterCap(12, 12)).toBeUndefined()
+    expect(refuseCharterCap(13, 12)).toMatch(/maxCharterEntries is 12/)
+  })
+})
+
+describe('charterOpenRefusal', () => {
+  it('refuses an empty list when requireCharter is set', () => {
+    expect(charterOpenRefusal([], {
+      requireCharter: true,
+      requireExecutableCharter: false,
+      charterDiscrimination: 'off',
+    })).toMatch(/requires a charter/)
   })
 })
 

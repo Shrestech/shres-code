@@ -42,7 +42,7 @@ export const JSPACE_DRIVER_OPEN =
   + 'standing constraints there. '
   + 'An identical tool call repeated within a turn is refused until you write a diagnosis on the card.'
 
-/** Extra closed-card driver sentence when a harness charter proposal is in the log. */
+/** Driver sentence when a harness charter proposal exists and no charter is registered yet. */
 export const JSPACE_DRIVER_CHARTER
   = 'Pass the charter on `jspace_open` (accept the proposal or amend it). Ship re-runs every check and names the first failure.'
 
@@ -50,7 +50,7 @@ export const JSPACE_DRIVER_CHARTER
  * Protocol block for this pass, always including the tool-driver lines.
  * @param pass - selected pass.
  * @param cardOpen - true when a native card is already printed.
- * @param charterProposal - when true and the card is closed, append {@link JSPACE_DRIVER_CHARTER}.
+ * @param charterProposal - when true, append {@link JSPACE_DRIVER_CHARTER} (a proposal exists and the card charter is still empty).
  * @returns the protocol section text.
  */
 export function formatJspaceProtocol(
@@ -59,8 +59,8 @@ export function formatJspaceProtocol(
   charterProposal = false,
 ): string {
   let driver = cardOpen ? JSPACE_DRIVER_OPEN : JSPACE_DRIVER_CLOSED
-  if (!cardOpen && charterProposal) {
-    driver = `${JSPACE_DRIVER_CLOSED} ${JSPACE_DRIVER_CHARTER}`
+  if (charterProposal) {
+    driver = `${driver} ${JSPACE_DRIVER_CHARTER}`
   }
   if (pass === 'fast') return driver
   return [

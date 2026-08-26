@@ -71,10 +71,15 @@ describe('evaluateCharterFloor', () => {
     if (!result.ok) expect(result.code).toBe('JSPACE_CHARTER_READS_ESCAPE')
   })
 
-  it('rejects mutating redirects when read-only', () => {
-    const result = check('cat src/m01-sku.js >/dev/null')
+  it('rejects a write redirect when read-only', () => {
+    const result = check('cat src/m01-sku.js > /tmp/out')
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.code).toBe('JSPACE_CHARTER_MUTATING')
+  })
+
+  it('permits unquoted redirects whose target is exactly /dev/null', () => {
+    expect(check('grep AUDIT-TAG src/m01-sku.js >/dev/null').ok).toBe(true)
+    expect(check('grep AUDIT-TAG src/m01-sku.js 2>/dev/null').ok).toBe(true)
   })
 
   it('rejects failProbe.path that is not in reads', () => {

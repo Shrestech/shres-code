@@ -307,10 +307,11 @@ export function apply(ctx: Context, config: Config = {}): void {
     text: (context) => {
       const session = context.agent?.session
       if (!ctx.jspace.engaged(session)) return ''
-      const cardOpen = session !== undefined && ctx.jspace.card(session) !== null
+      const card = session === undefined ? null : ctx.jspace.card(session)
+      const cardOpen = card !== null
       const charterProposal = session !== undefined
         && latestProposal(session) !== undefined
-        && !cardOpen
+        && (card === null || card.charter.length === 0)
       return formatJspaceProtocol(passFor(ctx, session, context.messages), cardOpen, charterProposal)
     },
   })

@@ -119,6 +119,6 @@ export const OPEN_CHARTER_PARAM = {
     'Standing constraints this work must honor. Prefer kind=check (a bash command the harness will '
     + 'run at every checkpoint and at ship). Each check names the constraint text it enforces. '
     + 'kind=accept-proposal copies ids from the harness proposal in this turn. '
-    + 'Applied only on the first open.',
+    + 'Registers on first open, or on an open card whose charter is still empty.',
   items: OPEN_CHARTER_ITEMS,
 }

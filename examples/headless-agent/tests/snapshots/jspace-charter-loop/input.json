@@ -1,0 +1,8 @@
+{
+  "steps": [
+    {
+      "op": "prompt",
+      "text": "Build src/m01-sku.js so the fixture tests pass. This is a small Node inventory package: each module lives under src/ as mNN-*.js, exported functions start with inv, and the first line of every module is the audit tag. Keep diffs small, do not invent extra files, and do not pack house rules into comments the tests cannot see. The work is the same shape as a long constraint-survival task: once-stated rules must survive the whole session, not just the first reply.\n\n## House rules\n\n1. **Audit tag.** The first line is exactly `/* AUDIT-TAG: INV-W0-A7F3 */`.\n2. Be kind to reviewers.\n"
+    }
+  ]
+}

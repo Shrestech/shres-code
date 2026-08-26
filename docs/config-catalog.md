@@ -3001,7 +3001,7 @@ Source: [`packages/jobs/tool-jobs/src/index.ts:32`](../packages/jobs/tool-jobs/s
 
 ## `@shres-code/shres-code-tool-jspace`
 
-Requires: `tools` · `jspace`
+Requires: `tools` · `jspace` · `systemPrompt`
 
 ```ts config-catalog
 /** Per-turn `jspace_note` budget, constraint-capture pressure, and charter gates. */
@@ -3019,8 +3019,8 @@ export interface Config {
   /** When true, `jspace_ship` is refused while the card's Core is empty. Default false. */
   requireCoreForShip?: boolean
   /**
-   * When true, a first `jspace_open` is refused unless the resolved charter has
-   * length ≥ 1, and `jspace_checkpoint` / `jspace_ship` refuse an empty charter.
+   * When true, first charter registration is refused unless the resolved charter
+   * has length ≥ 1, and `jspace_checkpoint` / `jspace_ship` refuse an empty charter.
    * Default false.
    */
   requireCharter?: boolean
@@ -3029,7 +3029,7 @@ export interface Config {
    * Implies `requireCharter`. Default false.
    */
   requireExecutableCharter?: boolean
-  /** When true, extract a charter proposal from the first human user message. Default false. */
+  /** When true, extract a charter proposal from the first human user message during prompt assembly. Default false. */
   charterSeed?: boolean
   /**
    * Discrimination bar at registration. `'required'` implies `requireExecutableCharter`.
@@ -3038,7 +3038,7 @@ export interface Config {
   charterDiscrimination?: CharterDiscriminationMode
   /** Nested bash `timeoutMs` for each charter check. Default 30000. */
   charterCheckTimeoutMs?: number
-  /** Cap on seeded proposal entries. Default 12. */
+  /** Cap on seeded proposal entries and on the registered charter list. Default 12. */
   maxCharterEntries?: number
   /** When true, refuse write-token charter commands. Default true. */
   charterChecksMustBeReadOnly?: boolean
@@ -3048,7 +3048,7 @@ export interface Config {
 export type CharterDiscriminationMode = 'off' | 'best-effort' | 'required'
 ```
 
-Source: [`packages/jspace/tool-jspace/src/index.ts:61`](../packages/jspace/tool-jspace/src/index.ts)
+Source: [`packages/jspace/tool-jspace/src/index.ts:64`](../packages/jspace/tool-jspace/src/index.ts)
 
 <a id="shres-codeshres-code-tool-lsp"></a>
 

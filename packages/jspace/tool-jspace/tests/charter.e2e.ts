@@ -3,7 +3,7 @@
  * Real tool-bash + fs-local. Mock only the model (there is none).
  */
 import { existsSync } from 'node:fs'
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -21,8 +21,8 @@ import ToolRuntime from '@shres-code/shres-code-tools'
 import type { ToolExecutionResult } from '@shres-code/shres-code-tools'
 import JspaceService, { CharterEntryId } from '@shres-code/shres-code-jspace'
 import * as tool from '../src/index.ts'
-import { OPEN_REQUIRES_CHARTER, OPEN_REQUIRES_EXECUTABLE_CHARTER } from '../src/charter-resolve.ts'
-import { CHARTER_FS_REQUIRED } from '../src/charter-probe.ts'
+import { CHARTER_ALREADY_REGISTERED, OPEN_REQUIRES_CHARTER, OPEN_REQUIRES_EXECUTABLE_CHARTER } from '../src/charter-resolve.ts'
+import { CHARTER_FS_REQUIRED, charterProbeSymlinkRefuse } from '../src/charter-probe.ts'
 
 const testToolSignal = new AbortController().signal
 
@@ -265,6 +265,113 @@ describe('charter discrimination and nested bash', () => {
     expect(result.isError).toBe(true)
     expect(text(result)).toContain(OPEN_REQUIRES_EXECUTABLE_CHARTER)
   })
+
+  it('registers a charter on an auto-opened empty card', async () => {
+    const { ctx, agent, tmpDir } = await bashHarness()
+    ctx.jspace.open(agent.session, { goal: 'J-Space is on', next: 'State the first action' })
+    expect(ctx.jspace.card(agent.session)?.charter).toEqual([])
+    await writeFile(join(tmpDir, 'src/m01-sku.js'), 'export function invSku() {}\n')
+    const opened = await execute(ctx, 'jspace_open', {
+      goal: 'Ship charter',
+      next: 'Write modules',
+      charter: [AUDIT_CHECK],
+    }, agent)
+    expect(opened.isError).toBe(false)
+    expect(text(opened)).toBe('Updated J-Space.')
+    expect(ctx.jspace.card(agent.session)?.charter).toHaveLength(1)
+    expect(ctx.jspace.card(agent.session)?.goal).toBe('Ship charter')
+  }, 30_000)
+
+  it('refuses jspace_open carrying charter onto a non-empty charter', async () => {
+    const { ctx, agent } = await bashHarness({
+      requireCharter: true,
+      requireExecutableCharter: false,
+      charterDiscrimination: 'off',
+    })
+    await execute(ctx, 'jspace_open', {
+      goal: 'Ship charter',
+      next: 'Write',
+      charter: [{ kind: 'prose', constraint: 'Be kind to reviewers.' }],
+    }, agent)
+    const again = await execute(ctx, 'jspace_open', {
+      goal: 'Ship charter',
+      next: 'Write more',
+      charter: [{ kind: 'prose', constraint: 'Keep diffs small.' }],
+    }, agent)
+    expect(again.isError).toBe(true)
+    expect(text(again)).toContain(CHARTER_ALREADY_REGISTERED)
+    expect(ctx.jspace.card(agent.session)?.charter).toHaveLength(1)
+  })
+
+  it('refuses registration when the resulting list exceeds maxCharterEntries', async () => {
+    const { ctx, agent } = await bashHarness({
+      requireCharter: true,
+      requireExecutableCharter: false,
+      charterDiscrimination: 'off',
+      maxCharterEntries: 2,
+    })
+    const result = await execute(ctx, 'jspace_open', {
+      goal: 'Ship charter',
+      next: 'Write',
+      charter: [
+        { kind: 'prose', constraint: 'one' },
+        { kind: 'prose', constraint: 'two' },
+        { kind: 'prose', constraint: 'three' },
+      ],
+    }, agent)
+    expect(result.isError).toBe(true)
+    expect(text(result)).toMatch(/maxCharterEntries is 2/)
+    expect(ctx.jspace.card(agent.session)).toBeNull()
+  })
+
+  it('refuses amend when the resulting list exceeds maxCharterEntries', async () => {
+    const { ctx, agent } = await bashHarness({
+      requireCharter: true,
+      requireExecutableCharter: false,
+      charterDiscrimination: 'off',
+      maxCharterEntries: 2,
+    })
+    await execute(ctx, 'jspace_open', {
+      goal: 'Ship charter',
+      next: 'Write',
+      charter: [
+        { kind: 'prose', constraint: 'one' },
+        { kind: 'prose', constraint: 'two' },
+      ],
+    }, agent)
+    const amended = await execute(ctx, 'jspace_charter_amend', {
+      add: [{ kind: 'prose', constraint: 'three' }],
+    }, agent)
+    expect(amended.isError).toBe(true)
+    expect(text(amended)).toMatch(/maxCharterEntries is 2/)
+    expect(ctx.jspace.card(agent.session)?.charter).toHaveLength(2)
+  })
+
+  it('refuses a failProbe whose resolved path escapes cwd through a symlink', async () => {
+    const { ctx, agent, tmpDir } = await bashHarness()
+    const outside = join(tmpDir, '..', `charter-outside-${Math.random()}`)
+    await writeFile(outside, 'secret\n')
+    await writeFile(join(tmpDir, 'src/m01-sku.js'), '/* AUDIT-TAG: INV-W0-A7F3 */\nexport function invSku() {}\n')
+    await symlink(outside, join(tmpDir, 'src/m-probe.js'))
+    const result = await execute(ctx, 'jspace_open', {
+      goal: 'Ship charter',
+      next: 'Write modules',
+      charter: [{
+        kind: 'check',
+        constraint: 'first line is the audit tag',
+        command: 'grep AUDIT-TAG src/m*.js',
+        reads: ['src/m*.js'],
+        failProbe: {
+          path: 'src/m-probe.js',
+          mutation: { kind: 'insert', content: '// no tag\n' },
+        },
+      }],
+    }, agent)
+    expect(result.isError).toBe(true)
+    expect(text(result)).toContain(charterProbeSymlinkRefuse('src/m-probe.js'))
+    expect(await readFile(outside, 'utf8')).toBe('secret\n')
+    await rm(outside, { force: true })
+  }, 30_000)
 })
 
 describe('charter checkpoint, ship, and amend', () => {

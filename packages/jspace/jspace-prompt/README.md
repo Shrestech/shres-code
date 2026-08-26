@@ -83,7 +83,7 @@ The section appears on the first request that carries the user task and disappea
 
 #### What the model sees
 
-`jspace:protocol` always includes the tool-driver lines while the seat is engaged (how to open or update the card). The closed-card driver asks for a Goal covering the work that remains, because under a non-zero `engageAfterSteps` the section first appears partway through the session, and for the constraints the task stated once on Core, the field that survives compaction whole. When a `jspace/charter-proposal` exists and the card is still closed, it appends `JSPACE_DRIVER_CHARTER` (`Pass the charter on jspace_open (accept the proposal or amend it). Ship re-runs every check and names the first failure.`). The open-card driver repeats that a changed Goal clears Core, so the constraints are restated. `jspace:module:capacity` and `jspace:module:broadcast` load when the pass earns them.
+`jspace:protocol` always includes the tool-driver lines while the seat is engaged (how to open or update the card). The closed-card driver asks for a Goal covering the work that remains, because under a non-zero `engageAfterSteps` the section first appears partway through the session, and for the constraints the task stated once on Core, the field that survives compaction whole. When a `jspace/charter-proposal` exists and the card charter is still empty — closed card, or open card after loop auto-open — it appends `JSPACE_DRIVER_CHARTER` (`Pass the charter on jspace_open (accept the proposal or amend it). Ship re-runs every check and names the first failure.`). The open-card driver repeats that a changed Goal clears Core, so the constraints are restated. `jspace:module:capacity` and `jspace:module:broadcast` load when the pass earns them.
 
 #### Token effect
 

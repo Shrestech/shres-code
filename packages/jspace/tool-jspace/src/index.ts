@@ -32,6 +32,7 @@ import { openRefusal } from './open.ts'
 import { shipRefusal } from './ship.ts'
 import {
   assignCharterIds,
+  CHARTER_ALREADY_REGISTERED,
   charterOpenRefusal,
   CHECKPOINT_REQUIRES_CHARTER,
   expandCharterItems,
@@ -40,6 +41,7 @@ import {
   latestCharterProposal,
   OPEN_REQUIRES_EXECUTABLE_CHARTER,
   planCharterAmend,
+  refuseCharterCap,
   type CharterResolveConfig,
   type CharterToolItem,
 } from './charter-resolve.ts'
@@ -73,8 +75,8 @@ export interface Config {
   /** When true, `jspace_ship` is refused while the card's Core is empty. Default false. */
   requireCoreForShip?: boolean
   /**
-   * When true, a first `jspace_open` is refused unless the resolved charter has
-   * length ≥ 1, and `jspace_checkpoint` / `jspace_ship` refuse an empty charter.
+   * When true, first charter registration is refused unless the resolved charter
+   * has length ≥ 1, and `jspace_checkpoint` / `jspace_ship` refuse an empty charter.
    * Default false.
    */
   requireCharter?: boolean
@@ -92,7 +94,7 @@ export interface Config {
   charterDiscrimination?: CharterDiscriminationMode
   /** Nested bash `timeoutMs` for each charter check. Default 30000. */
   charterCheckTimeoutMs?: number
-  /** Cap on seeded proposal entries. Default 12. */
+  /** Cap on seeded proposal entries and on the registered charter list. Default 12. */
   maxCharterEntries?: number
   /** When true, refuse write-token charter commands. Default true. */
   charterChecksMustBeReadOnly?: boolean
@@ -165,9 +167,12 @@ function resolveConfig(config: Config): ResolvedConfig {
 const OPEN_DESCRIPTION =
   'Open a J-Space card for multi-stage or multi-file work, or replace Goal and Next '
   + 'on an open card. Put once-stated constraints on `charter` (prefer kind=check) so the '
-  + 'harness re-runs them at every checkpoint and at ship. `core` still holds at most two '
-  + 'live working-memory items. A changed Goal starts a new epoch: Core and Checked are '
-  + 'cleared and ship needs a fresh checkpoint; the charter and open questions carry over.'
+  + 'harness re-runs them at every checkpoint and at ship. First charter registration is '
+  + 'the first `jspace_open` that carries `charter` while the card charter is empty, including '
+  + 'after loop auto-open. A later `jspace_open` that carries `charter` onto a non-empty charter '
+  + 'is refused; use `jspace_charter_amend`. `core` still holds at most two live working-memory '
+  + 'items. A changed Goal starts a new epoch: Core and Checked are cleared and ship needs a '
+  + 'fresh checkpoint; the charter and open questions carry over.'
 
 const NOTE_DESCRIPTION =
   'Update the open J-Space card. Goal changes are rejected; use jspace_open to start '
@@ -233,6 +238,26 @@ function runJspace<T>(fn: () => T): T {
     if (error instanceof JspaceError) throw new Error(error.message)
     throw error
   }
+}
+
+/**
+ * Expand, cap, assign ids, then floor + discriminate.
+ * @param ctx - context with tools and fs.
+ * @param exec - parent jspace_open execution.
+ * @param items - raw charter argument.
+ * @param config - resolved charter config.
+ * @returns folded entries.
+ */
+async function resolveIncomingCharter(
+  ctx: Context,
+  exec: ToolRunContext,
+  items: readonly CharterToolItem[] | undefined,
+  config: ResolvedConfig,
+): Promise<JspaceCharterEntry[]> {
+  const expanded = expandCharterItems(items, latestCharterProposal(exec))
+  const cap = refuseCharterCap(expanded.length, config.maxCharterEntries)
+  if (cap !== undefined) throw new Error(cap)
+  return foldCharterEntries(ctx, exec, assignCharterIds(expanded), config)
 }
 
 const OPENED = {
@@ -306,21 +331,31 @@ function registerTools(ctx: Context, config: ResolvedConfig): () => void {
     },
     async execute(args, exec) {
       const agent = requireAgent(exec, 'jspace_open')
-      const cardOpen = ctx.jspace.card(agent.session) !== null
+      const card = ctx.jspace.card(agent.session)
+      const cardOpen = card !== null
       const coreRefusal = openRefusal(cardOpen, args.core, config.requireCoreOnOpen)
       if (coreRefusal !== undefined) throw new Error(coreRefusal)
-      if (cardOpen) {
+      const charterArg = args.charter as readonly CharterToolItem[] | undefined
+      const registering = charterArg !== undefined
+      if (cardOpen && registering && card.charter.length > 0) {
+        throw new Error(CHARTER_ALREADY_REGISTERED)
+      }
+      if (cardOpen && !registering) {
         return runJspace(() => {
           ctx.jspace.openGoal(agent.session, { goal: args.goal, next: args.next })
           return { opened: true, replaced: true }
         })
       }
-      const proposal = latestCharterProposal(exec)
-      const expanded = expandCharterItems(args.charter as readonly CharterToolItem[] | undefined, proposal)
-      const assigned = assignCharterIds(expanded)
-      const folded = await foldCharterEntries(ctx, exec, assigned, config)
-      const charterRefusal = charterOpenRefusal(false, folded, config)
+      const folded = await resolveIncomingCharter(ctx, exec, charterArg, config)
+      const charterRefusal = charterOpenRefusal(folded, config)
       if (charterRefusal !== undefined) throw new Error(charterRefusal)
+      if (cardOpen) {
+        return runJspace(() => {
+          ctx.jspace.openGoal(agent.session, { goal: args.goal, next: args.next })
+          if (folded.length > 0) ctx.jspace.amendCharter(agent.session, folded)
+          return { opened: true, replaced: true }
+        })
+      }
       return runJspace(() => {
         ctx.jspace.open(agent.session, {
           goal: args.goal,
@@ -500,6 +535,8 @@ function registerTools(ctx: Context, config: ResolvedConfig): () => void {
         args.replace as Parameters<typeof planCharterAmend>[2],
         args.add as readonly CharterToolItem[] | undefined,
       )
+      const cap = refuseCharterCap(plan.kept.length + plan.added.length, config.maxCharterEntries)
+      if (cap !== undefined) throw new Error(cap)
       const foldedNew = await foldCharterEntries(ctx, exec, plan.added, config)
       const next: JspaceCharterEntry[] = [...plan.kept, ...foldedNew]
       if (config.requireExecutableCharter && !hasExecutableCharter(next, config.charterDiscrimination)) {

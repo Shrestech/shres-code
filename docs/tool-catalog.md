@@ -2122,7 +2122,7 @@ Source: [`packages/jspace/tool-jspace/src/index.ts`](../packages/jspace/tool-jsp
 
 ### `jspace_open`
 
-Open a J-Space card for multi-stage or multi-file work, or replace Goal and Next on an open card. Put once-stated constraints on `charter` (prefer kind=check) so the harness re-runs them at every checkpoint and at ship. `core` still holds at most two live working-memory items. A changed Goal starts a new epoch: Core and Checked are cleared and ship needs a fresh checkpoint; the charter and open questions carry over.
+Open a J-Space card for multi-stage or multi-file work, or replace Goal and Next on an open card. Put once-stated constraints on `charter` (prefer kind=check) so the harness re-runs them at every checkpoint and at ship. First charter registration is the first `jspace_open` that carries `charter` while the card charter is empty, including after loop auto-open. A later `jspace_open` that carries `charter` onto a non-empty charter is refused; use `jspace_charter_amend`. `core` still holds at most two live working-memory items. A changed Goal starts a new epoch: Core and Checked are cleared and ship needs a fresh checkpoint; the charter and open questions carry over.
 
 ```json
 {
@@ -2145,7 +2145,7 @@ Open a J-Space card for multi-stage or multi-file work, or replace Goal and Next
     },
     "charter": {
       "type": "array",
-      "description": "Standing constraints this work must honor. Prefer kind=check (a bash command the harness will run at every checkpoint and at ship). Each check names the constraint text it enforces. kind=accept-proposal copies ids from the harness proposal in this turn. Applied only on the first open.",
+      "description": "Standing constraints this work must honor. Prefer kind=check (a bash command the harness will run at every checkpoint and at ship). Each check names the constraint text it enforces. kind=accept-proposal copies ids from the harness proposal in this turn. Registers on first open, or on an open card whose charter is still empty.",
       "items": {
         "oneOf": [
           {

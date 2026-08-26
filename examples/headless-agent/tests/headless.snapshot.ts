@@ -35,6 +35,7 @@ const jspaceScenarioDir = join(snapshotsDir, 'jspace-tools')
 const jspaceConfigPath = fileURLToPath(new URL('../jspace.cordis.snapshot.yml', import.meta.url))
 const jspaceCharterScenarioDir = join(snapshotsDir, 'jspace-charter')
 const jspaceCharterPassScenarioDir = join(snapshotsDir, 'jspace-charter-pass')
+const jspaceCharterLoopScenarioDir = join(snapshotsDir, 'jspace-charter-loop')
 const jspaceCharterConfigPath = fileURLToPath(new URL('../jspace-charter.cordis.snapshot.yml', import.meta.url))
 const houseRulesHelper = fileURLToPath(new URL(
   '../../../bench/tasks/constraint-survival-build/fixture/tools/check-house-rules.mjs',
@@ -441,6 +442,12 @@ describe('headless stream-json snapshots', () => {
         const summaryRecord = records[summary]
         const summaryData = summaryRecord?.data as JsonObject | undefined
         expect(summaryData?.shadowedSeqs).toEqual(expect.arrayContaining([expect.any(Number)]))
+        const summaryText = JSON.stringify(summaryData?.summary)
+        expect(summaryText).toContain('## Recoverable originals')
+        expect(summaryText).toContain('session_event_read this session, seq')
+        const replacementRecord = records[replacement]
+        const replacementData = replacementRecord?.data as JsonObject | undefined
+        expect(JSON.stringify(replacementData?.content)).toContain('session_event_read this session, seq')
         const final = [...records].reverse().find(record => record.type === 'assistant/message')
         expect(JSON.stringify(final)).toContain('COMPACTION RECOVERED')
 
@@ -931,6 +938,66 @@ describe('headless stream-json snapshots', () => {
         const ship = toolResultFor(records, 'call_ws_ship')
         expect(ship?.isError).toBe(false)
         expect(ship?.text).toContain('Ship check passed.')
+      },
+    })
+
+    expect(result.stderr).toBe('')
+    const normalized = normalizeCharterStream(result.stdout, runCwd)
+    if (refreshing) await writeFile(streamExpected, normalized)
+    expect(normalized).toBe(await readFile(streamExpected, 'utf8'))
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+
+  it('replays a jspace-charter registration after loop auto-open through the one-shot app', async () => {
+    const prompt = await scenarioPrompt(jspaceCharterLoopScenarioDir, 'jspace-charter-loop')
+    expect(prompt.length).toBeGreaterThan(400)
+    const streamExpected = join(jspaceCharterLoopScenarioDir, 'stream-json.expected.jsonl')
+    let runCwd = ''
+    const result = await runLoaderSmoke({
+      label: 'jspace charter loop auto-open headless stream-json snapshot',
+      tempDirPrefix: 'headless-snapshot-jspace-charter-loop-',
+      binScript,
+      libBinScript: binScript,
+      configPath: jspaceCharterConfigPath,
+      binArgs: [jspaceCharterConfigPath, prompt],
+      tsconfigPath,
+      env: {
+        SHRES_SNAPSHOT: 'replay',
+        SHRES_SNAPSHOT_FILE: join(jspaceCharterLoopScenarioDir, 'session.jsonl'),
+        SHRES_SNAPSHOT_OVERRIDE: join(jspaceCharterLoopScenarioDir, 'replay.override.json'),
+        NODE_OPTIONS: [process.env.NODE_OPTIONS, '--disable-warning=ExperimentalWarning'].filter(Boolean).join(' '),
+      },
+      prepare: async (cwd) => {
+        runCwd = cwd
+        await prepareCharterWorkspace(cwd, [
+          '/* AUDIT-TAG: INV-W0-A7F3 */',
+          'export function invSku() {',
+          "  return 'SKU-1'",
+          '}',
+          '',
+        ].join('\n'))
+      },
+      inspect: async (cwd) => {
+        const logs = await persistedLogs(cwd)
+        expect(logs).toHaveLength(1)
+        const records = parseJsonl(logs[0]?.content ?? '')
+        const cards = records.filter(record => record.type === 'jspace/card')
+        expect(cards.length).toBeGreaterThanOrEqual(2)
+        const firstCard = cards[0]?.data as JsonObject | undefined
+        expect(firstCard?.goal).toBe('J-Space is on')
+        expect(firstCard?.charter).toEqual([])
+        const lastCard = cards[cards.length - 1]?.data as JsonObject | undefined
+        expect(((lastCard?.charter as unknown[]) ?? []).length).toBeGreaterThanOrEqual(1)
+        const systems = requestSystems(records)
+        expect(systems[0]).toContain('Pass: loop')
+        expect(systems[0]).toContain('Pass the charter on `jspace_open`')
+        expect(systems[0]).toContain('J-Space charter (harness proposal)')
+        const calls = records.filter(record => record.type === 'tool/call')
+          .map(record => (record.data as JsonObject | undefined)?.name)
+        expect(calls).toEqual(['jspace_open', 'jspace_checkpoint', 'jspace_ship'])
+        const open = toolResultFor(records, 'call_ws_open')
+        expect(open?.isError).toBe(false)
+        const ship = toolResultFor(records, 'call_ws_ship')
+        expect(ship?.isError).toBe(false)
       },
     })
 

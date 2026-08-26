@@ -445,4 +445,27 @@ describe('jspace-prompt', () => {
     expect(after.sections.find(section => section.name === JspacePrompt.JSPACE_CHARTER_SEED_SECTION)?.text ?? '')
       .toBe('')
   })
+
+  it('keeps the charter driver after loop auto-open while the charter is empty', async () => {
+    const ctx = await harness({ enabled: true })
+    const agent = liveAgent(ctx, 'ws-prompt-loop-charter')
+    agent.session.append('jspace/charter-proposal', {
+      entries: [{ kind: 'prose', id: CharterEntryId('e1'), constraint: 'Be kind to reviewers.' }],
+      sourceSeq: 0,
+      truncated: false,
+    }, { ignorable: true })
+    const long = `Build src/m01-sku.js.\n${'Keep the house rules in mind. '.repeat(20)}`
+    expect(long.length).toBeGreaterThan(400)
+    const assembled = await ctx.systemPrompt.assemble({
+      agent,
+      scope: agent,
+      messages: [createUserMessage({ content: [{ type: 'text', text: long }], source: { kind: 'user' } })],
+    })
+    expect(ctx.jspace.card(agent.session)?.goal).toBe(JSPACE_ALWAYS_OPEN_GOAL)
+    expect(ctx.jspace.card(agent.session)?.charter).toEqual([])
+    const protocol = assembled.sections.find(section => section.name === JspacePrompt.JSPACE_PROTOCOL_SECTION)?.text ?? ''
+    expect(protocol).toContain('A J-Space card is open')
+    expect(protocol).toContain(JspacePrompt.JSPACE_DRIVER_CHARTER)
+    expect(protocol).toContain('Pass: loop')
+  })
 })
