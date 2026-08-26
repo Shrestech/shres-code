@@ -1,0 +1,67 @@
+{
+  "comment": "Paired resolved outcomes (taskId+trialIndex) from w7-build-confirm-2026-08-26 and w8-core-2026-08-26. Primary ψ pools the two pool:true contrasts. Regenerated with `node bench/analysis/w9-power.js --from-runs`.",
+  "contrasts": [
+    {
+      "id": "w7-off-on",
+      "label": "w7 off↔on",
+      "experiment": "w7-build-confirm-2026-08-26",
+      "baseline": "off",
+      "treatment": "on",
+      "pool": true,
+      "pairs": [
+        { "taskId": "constraint-survival-build", "trialIndex": 0, "off": false, "on": false },
+        { "taskId": "constraint-survival-build", "trialIndex": 1, "off": true, "on": true },
+        { "taskId": "constraint-survival-build", "trialIndex": 2, "off": false, "on": true },
+        { "taskId": "constraint-survival-build", "trialIndex": 3, "off": true, "on": false },
+        { "taskId": "constraint-survival-build", "trialIndex": 4, "off": false, "on": false },
+        { "taskId": "constraint-survival-build", "trialIndex": 5, "off": true, "on": true },
+        { "taskId": "constraint-survival-build", "trialIndex": 6, "off": true, "on": false },
+        { "taskId": "constraint-survival-build", "trialIndex": 7, "off": true, "on": false }
+      ]
+    },
+    {
+      "id": "w7-off-on-adaptive",
+      "label": "w7 off↔on-adaptive",
+      "experiment": "w7-build-confirm-2026-08-26",
+      "baseline": "off",
+      "treatment": "on-adaptive",
+      "pool": false,
+      "pairs": [
+        { "taskId": "constraint-survival-build", "trialIndex": 0, "off": false, "on": true },
+        { "taskId": "constraint-survival-build", "trialIndex": 1, "off": true, "on": true },
+        { "taskId": "constraint-survival-build", "trialIndex": 2, "off": false, "on": false },
+        { "taskId": "constraint-survival-build", "trialIndex": 3, "off": true, "on": false },
+        { "taskId": "constraint-survival-build", "trialIndex": 4, "off": false, "on": true },
+        { "taskId": "constraint-survival-build", "trialIndex": 5, "off": true, "on": false },
+        { "taskId": "constraint-survival-build", "trialIndex": 6, "off": true, "on": false },
+        { "taskId": "constraint-survival-build", "trialIndex": 7, "off": true, "on": false }
+      ]
+    },
+    {
+      "id": "w8-off-on-core",
+      "label": "w8 off↔on-core",
+      "experiment": "w8-core-2026-08-26",
+      "baseline": "off",
+      "treatment": "on-core",
+      "pool": true,
+      "pairs": [
+        { "taskId": "constraint-survival-build", "trialIndex": 0, "off": false, "on": false },
+        { "taskId": "constraint-survival-build", "trialIndex": 1, "off": true, "on": false },
+        { "taskId": "constraint-survival-build", "trialIndex": 2, "off": false, "on": true },
+        { "taskId": "constraint-survival-build", "trialIndex": 3, "off": false, "on": true },
+        { "taskId": "constraint-survival-build", "trialIndex": 4, "off": true, "on": true },
+        { "taskId": "constraint-survival-build", "trialIndex": 5, "off": true, "on": false },
+        { "taskId": "constraint-survival-build", "trialIndex": 6, "off": false, "on": false },
+        { "taskId": "constraint-survival-build", "trialIndex": 7, "off": true, "on": false },
+        { "taskId": "constraint-survival-build", "trialIndex": 8, "off": true, "on": true },
+        { "taskId": "constraint-survival-build", "trialIndex": 9, "off": true, "on": false },
+        { "taskId": "constraint-survival-build", "trialIndex": 10, "off": false, "on": false },
+        { "taskId": "constraint-survival-build", "trialIndex": 11, "off": false, "on": false },
+        { "taskId": "constraint-survival-build", "trialIndex": 12, "off": true, "on": true },
+        { "taskId": "constraint-survival-build", "trialIndex": 13, "off": false, "on": false },
+        { "taskId": "constraint-survival-build", "trialIndex": 14, "off": false, "on": true },
+        { "taskId": "constraint-survival-build", "trialIndex": 15, "off": false, "on": false }
+      ]
+    }
+  ]
+}
