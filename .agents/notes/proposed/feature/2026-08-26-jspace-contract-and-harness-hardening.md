@@ -14,27 +14,29 @@ Nothing in the long-horizon path depends on model initiative; every promise is a
 
 ### Phase 1 — the J-Space contract
 
-1. **Typed charter.** `jspace_open` takes constraints as typed entries: an executable check (a command the executor can run — lint, grep, test invocation) or prose, executable preferred. A charter with no checkable entry is refused on constraint-bearing work, extending `requireCoreOnOpen` from presence to substance.
-2. **Checkpoints run the charter.** `jspace_checkpoint` executes the charter's checks and records results as verified Checked lines citing the executed calls; a failing check refuses the checkpoint with the named violation. A checkpoint can no longer certify a criterion the charter does not contain, which structurally removes the w7 false-assurance mode.
-3. **Ship gates on charter passing.** `jspace_ship` re-runs every charter check and refuses on the first failure, naming it. `requireCoreForShip` today gates on Core being non-empty; this gates on the checks passing.
-4. **Compaction leaves pointers.** Compaction summaries carry sequence references into the lossless session log, kept visible with the pinned card. Session-query's measured adoption is zero when offered as a tool; a visible reference the model can dereference converts retrieval from initiative into instruction-following, and is the integration point between the write path and the read path.
-5. **Close hygiene.** The [close-hygiene proposal](2026-08-25-jspace-close-hygiene-and-goal-card-binding.md) stands: cards close at goal end, and dangling cards become a live invariant rather than a bench-only metric.
+1. **Typed charter.** `jspace_open` takes constraints as typed entries: an executable check (a command the executor can run — lint, grep, test invocation) or prose, executable preferred. Each executable entry names the constraint text it enforces. Enablement is composition-level config (an arm, preset, or deployment turns the charter requirement on), never a runtime heuristic classifying which work is "constraint-bearing" — a heuristic classifier would be uncalibrated in exactly the way the coverage-term gates were.
+2. **Check substance, not check presence.** A gate on check existence can be placeholder-satisfied one level up (`echo ok` under gate pressure), the same ritual w7 measured in prose. The floor is mechanical: the executor rejects constant-success entries (commands with no workspace read). The real bar is discrimination — a check is credited only when it has been shown to fail on a violation, the runtime analog of the repo rule that a changed acceptance path must reject an invalid case; the cheap form is the harness running the check once against a seeded mutation when the charter registers, and the honest fallback where discrimination is infeasible is that the constraint↔check mapping stays unverified and the w9 arm measures net effect including gaming. This is the hardest open design item in the note, not a solved one.
+3. **Charter seeding.** The harness proposes charter entries extracted from the first user message (the once-stated rules are literally there in every w6–w8 task), and the model confirms or amends rather than authoring from a blank slate. The measured root cause of empty Core is initiative; seeding removes the initiative step from capture itself.
+4. **Checkpoints run the charter.** `jspace_checkpoint` executes the charter's checks and records results as verified Checked lines citing the executed calls; a failing check refuses the checkpoint with the named violation. Charter execution is a design item, not plumbing: checks route through the standard executor seam with the same policy, approval, and timeout treatment as model-issued calls (precedent: codeRuntime bindings and workflow scripts), count against the turn's budgets, and never take a privileged path.
+5. **Ship gates on charter passing.** `jspace_ship` re-runs every charter check and refuses on the first failure, naming it. `requireCoreForShip` today gates on Core being non-empty; this gates on the checks passing. Checks are current-state assertions: a re-run at ship hits the workspace as it is then, hours after open. A check the workspace has legitimately outgrown is amended through a logged charter-amendment call, never bypassed; a workspace-fingerprint companion (deferred previously) is the complement that would make staleness detectable rather than discovered.
+6. **Compaction leaves pointers.** Compaction summaries carry sequence references into the lossless session log. The pointers live on the compaction summary surface, not the card, so the always-reprinted section does not grow with history. Session-query's measured adoption is zero when offered as a tool; a visible reference the model can dereference converts retrieval from initiative into instruction-following, and is the integration point between the write path and the read path. If the adoption experiment (phase 2) still returns zero, the recorded fallback is harness-side auto-dereferencing — injecting the matched events at the elision point — not a further-improved driver line.
+7. **Close hygiene.** The [close-hygiene proposal](2026-08-25-jspace-close-hygiene-and-goal-card-binding.md) stands: cards close at goal end, and dangling cards become a live invariant rather than a bench-only metric.
 
 ### Phase 2 — measurement gates for phase 1
 
-Each phase-1 item ships with its arm; no item graduates to a shipped default without its paired contrast passing the pre-registered rules in the W0 eval note. The w8 run (off vs `on-core`, n=16, forced compaction) decides whether prose capture alone moves pass rate and is the input to item 1's design. A w9 charter-checks arm at n≥16 on `constraint-survival-build` plus one task whose constraints its own test suite cannot see is the decisive run for items 1–3. A session-query adoption experiment — a task whose needed fact exists only in a prior session's event log, run with and without a driver line naming the tool at the moment of need — decides item 4's mechanism. A live-session dysfunction re-scan follows any default change.
+Each phase-1 item ships behind its arm; no item graduates to a shipped default without its paired contrast passing the pre-registered rules in the W0 eval note, extended with a token-neutrality rule: a charter arm must hold short-stratum input overhead under the existing 15% cap and long-stratum overhead under the report's 1.25× tradeoff bound, because the card's measured 1.6–2.9× cost is the liability the contract must retire, not grow. Arm sizes come from a power analysis before w9, not a fixed n: with McNemar on paired trials, detecting the w7-scale delta (~0.25) at α = 0.05 and power 0.8 needs the discordant-pair count the analysis yields, and an underpowered run reads "not yet", never "no effect". The w8 run (off vs `on-core`, n=16, forced compaction) decides whether prose capture alone moves pass rate and is the input to item 1's design. A w9 charter-checks arm on `constraint-survival-build` plus one task whose constraints its own test suite cannot see is the decisive run for items 1–5. A session-query adoption experiment — a task whose needed fact exists only in a prior session's event log, run with and without a driver line naming the tool at the moment of need — decides item 6's mechanism against its auto-dereference fallback. A live-session dysfunction re-scan follows any default change.
 
 ### Phase 3 — harness runtime hardening (independent of jspace)
 
 From the runtime survey of persistence, memory, tool calling, and subagents:
 
-6. **Max-turns budget** in the agent loop with a structured stop reason, and escalation of the repeat-tool guard from advisory reminder to veto past a threshold. No turn limit exists today anywhere in the loop or guards.
-7. **Registry-wide default tool timeout**, overridable per tool. The timeout guard arms only for tools that declare `timeoutMs`; the workhorse tools declare none.
-8. **Windowed in-memory session log.** A live session retains every event in memory for its lifetime regardless of compaction; flushed events outside the model surface should drop from RAM and re-read from the durable log on demand.
-9. **SQLite `busy_timeout` and durable-log retention.** The persistence backend sets no busy timeout and has no pruning or rotation story; streaming chunks persist 1:1 forever.
-10. **Subagent enforcement gaps.** A global concurrent-subagent cap, and honoring or loudly rejecting `maxDepth`/`toolFilter`/`outputSchema` on out-of-process providers that silently ignore them today.
+8. **Max-turns budget** as a guard plugin cancelling from an existing lifecycle extension point (the agent-loop README records the gap and prescribes exactly this), with a structured stop reason, plus escalation of the repeat-tool guard from advisory reminder to veto past a threshold.
+9. **Registry-wide default tool timeout**, overridable per tool, engaging the fs package's recorded refusal of file-IO deadlines ("a deadline would kill work the OS will still finish"): the default must honor a definition-level opt-out so that recorded rationale stands, and the fs tools keep it unless that decision is separately revisited.
+10. **Windowed in-memory session log.** A live session retains every event in memory for its lifetime regardless of compaction; flushed events outside the model surface should drop from RAM and re-read from the durable log on demand.
+11. **SQLite `busy_timeout` and durable-log retention.** The persistence backend sets no busy timeout and has no pruning or rotation story; streaming chunks persist 1:1 forever.
+12. **Subagent enforcement gaps.** A global concurrent-subagent cap, and honoring or loudly rejecting `maxDepth`/`toolFilter`/`outputSchema` on out-of-process providers that silently ignore them today.
 
-Items 6 and 7 are small, unblocked, and ship first; items 1–3 build on the w8 verdict.
+Items 8 and 9 are small, unblocked, and ship first; items 1–5 build on the w8 verdict.
 
 ## Alternatives considered
 
@@ -42,17 +44,21 @@ Items 6 and 7 are small, unblocked, and ship first; items 1–3 build on the w8 
 
 **Strengthen prompt guidance instead of gates.** Rejected: w7 measured ritual compliance with the existing guidance (stock Goal, empty Core, tests-green Checked), and w8's early trials show even captured, reprinted prose being violated. Guidance was the control arm; it lost.
 
+**Runtime heuristic for constraint-bearing work.** Rejected: enablement is composition config; a heuristic classifier recreates the uncalibrated-gate problem the charter exists to remove.
+
 **Retire jspace outright and keep only the log and query tools.** Premature: the enforced-charter version has never been tested, and the w8/w9 arms are the cheap way to test it. If w9 fails, retirement is the recorded fallback and the read path stands alone.
 
 ## Acceptance criteria
 
-- Charter entries are typed; an executable entry is run by the executor at checkpoint and ship; refusals name the failing entry.
-- Compaction summaries carry seq pointers; a bench task exists whose resolution requires dereferencing one.
-- The w9 arm and the session-query adoption experiment run at n≥16 with verdicts recorded against pre-registered rules.
-- Max-turns and default tool timeout land as validated config with loud stop reasons.
+- Charter entries are typed and name the constraint they enforce; an executable entry is run by the executor at checkpoint and ship through the standard executor seam; refusals name the failing entry; constant-success entries are rejected, and credited checks carry a discrimination demonstration or an explicit unverified marker.
+- Compaction summaries carry seq pointers on the summary surface; a bench task exists whose resolution requires dereferencing one.
+- The w9 arm and the session-query adoption experiment run at power-analysis-derived n with verdicts recorded against pre-registered rules, including the token-neutrality bounds.
+- Max-turns and default tool timeout land as validated config with loud stop reasons, the timeout default honoring definition-level opt-outs.
 
 ## Risks
 
+- **Placeholder satisfaction moves up a level**: a gated model can write hollow checks; the discrimination bar and the w9 measurement are the mitigations, and if gaming wins there, the recorded fallback is retirement, not a stricter ritual.
 - **Executable checks are a sandbox surface**: charter commands run with tool authority; they must route through the same executor policy as model tool calls, never a privileged path.
 - **Gate friction on honest work**: over-strict refusals teach gaming; every refusal must be satisfiable and name the exact fix.
-- **Small-n verdicts**: w7's reversal of w6 shows n=2 hints are noise; no default flips without the pre-registered thresholds.
+- **Charter staleness**: checks fixed at open run against a workspace that evolved; the amendment path and fingerprint companion bound the hazard.
+- **Small-n verdicts**: w7's reversal of w6 shows n=2 hints are noise; no default flips without the pre-registered thresholds at powered n.
