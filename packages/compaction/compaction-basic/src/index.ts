@@ -80,6 +80,7 @@ const maxTokensSchema = z.number().step(1).min(1)
 const compactionRetriesSchema = z.number().step(1).min(0)
 const maxOverflowRetriesSchema = z.number().step(1).min(0)
 const maxPointersSchema = z.number().step(1).min(0).max(MAX_MAX_POINTERS)
+const pinSeqsSchema = z.array(z.number().step(1).min(0))
 
 const modelPolicy: z<ModelCompactPolicyConfig> = z.object({
   provider: z.string().required(),
@@ -117,6 +118,7 @@ export class BasicCompactionEngine extends CompactionEngine {
     modelPolicies: z.array(modelPolicy),
     auto: z.boolean(),
     maxPointers: maxPointersSchema,
+    pinSeqs: pinSeqsSchema,
   })
 
   /** Resolved and validated compaction configuration. */
@@ -288,7 +290,7 @@ export class BasicCompactionEngine extends CompactionEngine {
         prune.pruneSession(agent.session)
         measurement = meter.measure(agent.session)
       }
-      const range = selectCompactableRange(agent.session, measurement, 0)
+      const range = selectCompactableRange(agent.session, measurement, 0, this.config.pinSeqs)
       if (range === null) return null
       return this.compactRegion(range.start, range.end, agent, signal)
     }
@@ -316,7 +318,12 @@ export class BasicCompactionEngine extends CompactionEngine {
 
     let result: CompactionResult | null = null
     for (let attempt = 0; attempt <= spec.compactionRetries; attempt += 1) {
-      const range = selectCompactableRange(agent.session, measurement, spec.retainTokens)
+      const range = selectCompactableRange(
+        agent.session,
+        measurement,
+        spec.retainTokens,
+        this.config.pinSeqs,
+      )
       if (range === null) {
         /* v8 ignore else -- concrete replacement preserves a compactable checkpoint; subclass hooks cannot mutate it. */
         if (result === null) return null
@@ -383,6 +390,7 @@ export class BasicCompactionEngine extends CompactionEngine {
             agent.session,
             this.ctx.tokenMeter.measure(agent.session),
             0,
+            this.config.pinSeqs,
           )
           if (range === null) return null
           return await compactSurfaceRegion(

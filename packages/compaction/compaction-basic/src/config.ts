@@ -46,6 +46,7 @@ const BASIC_COMPACT_CONFIG_KEYS: ReadonlySet<string> = new Set([
   'modelPolicies',
   'auto',
   'maxPointers',
+  'pinSeqs',
 ])
 
 /** Complete exact-target override key set. */
@@ -80,6 +81,7 @@ export function resolveConfig(config: BasicCompactionConfig = {}): ResolvedConfi
   if (config.maxPointers !== undefined) {
     assertMaxPointers('BasicCompactionConfig.maxPointers', config.maxPointers)
   }
+  const pinSeqs = resolvePinSeqs(config.pinSeqs)
 
   const thresholdRatio = config.thresholdRatio ?? DEFAULT_THRESHOLD_RATIO
   const retention = resolveRetention(config, { retainRatio: DEFAULT_RETAIN_RATIO })
@@ -104,6 +106,7 @@ export function resolveConfig(config: BasicCompactionConfig = {}): ResolvedConfi
     modelPolicies,
     auto: config.auto ?? true,
     maxPointers: config.maxPointers ?? DEFAULT_MAX_POINTERS,
+    pinSeqs,
   })
 }
 
@@ -312,6 +315,27 @@ function assertNonNegativeInteger(name: string, value: unknown): asserts value i
   if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
     throw new Error(`${name} (${String(value)}) must be a non-negative integer`)
   }
+}
+
+/** Unique non-negative safe integers; empty when omitted. */
+function resolvePinSeqs(configured: unknown): number[] {
+  if (configured === undefined) return []
+  if (!Array.isArray(configured)) {
+    throw new Error('BasicCompactionConfig: pinSeqs must be an array of non-negative safe integers')
+  }
+  const seen = new Set<number>()
+  return configured.map((value, index) => {
+    if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
+      throw new Error(
+        `BasicCompactionConfig: pinSeqs[${index}] (${String(value)}) must be a non-negative safe integer`,
+      )
+    }
+    if (seen.has(value)) {
+      throw new Error(`BasicCompactionConfig: duplicate pinSeqs entry ${value}`)
+    }
+    seen.add(value)
+    return value
+  })
 }
 
 function assertMaxPointers(name: string, value: unknown): asserts value is number {

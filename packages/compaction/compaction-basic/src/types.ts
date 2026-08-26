@@ -47,6 +47,11 @@ export interface BasicCompactionConfig extends CompactionPolicyConfig {
    * the current session. `0` emits no pointers. Defaults to `8`; maximum `64`.
    */
   maxPointers?: number
+  /**
+   * Durable surface seqs the compactor must never shadow. Auto and manual
+   * range selection skip these seqs; they stay on the surface. Defaults to `[]`.
+   */
+  pinSeqs?: number[]
 }
 
 /** Exactly one validated retention form. */
@@ -69,6 +74,7 @@ export type ResolvedConfig = ResolvedPolicyFields & ResolvedRetention & {
   readonly modelPolicies: readonly Readonly<ModelCompactPolicyConfig>[]
   readonly auto: boolean
   readonly maxPointers: number
+  readonly pinSeqs: readonly number[]
 }
 
 /** Fully merged policy for one routed conversation target, before capacity scaling. */
