@@ -31,6 +31,7 @@ Owner: [bench-strategy note](2026-08-26-beat-prime-agent-bench-strategy.md) P0�
 
 ### WP0.1 Descendant-inclusive accounting + live `maxTotalTokens`
 
+- **Status:** landed. See [bench-descendant-accounting-and-budget-cap](../../implemented/testing/2026-08-26-bench-descendant-accounting-and-budget-cap.md).
 - **Touch points:** [`bench/runner/session-layout.js`](../../../../bench/runner/session-layout.js) (`encodeSegment` / `projectKey` already copied); [`bench/runner/metrics.js`](../../../../bench/runner/metrics.js) (today reads only `assistant/message` usage at lines 258–265); [`bench/schema/trial.js`](../../../../bench/schema/trial.js) (`BUDGET_EXCEEDED` exists; `tokensIncludingDescendants` is null; comment at line 31 calls the walk "fragile and untested in v1").
 - **Work:** header-keyed BFS over `parentSession` on closed trial files; `foldUsage` uses token-meter `usageOf` for **root and descendants**; live cap terminates the trial as `BUDGET_EXCEEDED`; `success(B)` below the cap is post-hoc filtering.
 - **Bench arm:** none (code only). Unblocks later subagent arms.
@@ -47,6 +48,7 @@ Owner: [bench-strategy note](2026-08-26-beat-prime-agent-bench-strategy.md) P0�
 
 ### WP0.3 `outOfLoopExperiments` forensics
 
+- **Status:** landed. See [bench-out-of-loop-metric](../../implemented/testing/2026-08-26-bench-out-of-loop-metric.md).
 - **Touch points:** [`bench/runner/metrics.js`](../../../../bench/runner/metrics.js); stored runs `w6`–`w8`, `sq-adopt`.
 - **Work:** recompute over stored runs; zero API spend.
 - **Bench arm:** none (forensics).
@@ -76,8 +78,9 @@ WP1.1 extracts shared plumbing. The WP3.3 OOLONG-lite **pilot** runs immediately
 
 ### WP3.3 OOLONG-lite pilot (arbiter)
 
+- **Status:** built, pilot not run.
 - **Owner:** [bench-strategy note](2026-08-26-beat-prime-agent-bench-strategy.md) P2. Depends on WP0.1 (subagent arms unpriceable without it) and WP0.2 (honesty gate). Sequenced immediately after WP1.1 so WP2.1 cannot start first; WP1.1 does not block the pilot.
-- **Touch points:** new `oolong-aggregate` / `oolong-pairs` tasks (pinned corpus/verifier/seed spec in the bench note).
+- **Touch points:** new `oolong-aggregate` / `oolong-pairs` / `oolong-aggregate-cued` tasks (pinned corpus/verifier/seed spec in the bench note); `stuffed` / `read` / `code` arms in [`bench/runner/arms.js`](../../../../bench/runner/arms.js).
 - **Work:** generator + pilot run. Three contrast arms, corpus otherwise identical: `stuffed` (corpus inline, no read tools); `read` (corpus on disk + session-query, no kernel required); `code` (existing stateless `run_code` mounted, corpus on disk, model computes over it programmatically).
 - **Pre-register:** `code` vs `read` is the **kernel-necessity** contrast (PRO-LONG's +11.1 pp step was code-over-log, which neither `stuffed` nor `read` exercises); `read` vs `stuffed` is the **retrieval** contrast. The powered `shipped` / `shipped-minus` run remains the Wave 3 continuation of this WP.
 - **Task-prompt-cue sensitivity:** one task family whose instruction explicitly names the compute/read capability at the moment of need (the [sq-adopt](../../implemented/testing/2026-08-26-session-query-adoption-experiment.md) lesson: task-level cue ≫ system-prompt line). Purpose: make a tie interpretable ("didn't help" vs "never reached").
@@ -114,6 +117,7 @@ WP1.1 extracts shared plumbing. The WP3.3 OOLONG-lite **pilot** runs immediately
 
 ### WP1.5 Read defaults and result-retention tuning
 
+- **Status:** landed. See [#46](https://github.com/parthmstech/shres-code/pull/46).
 - **Owner:** this roadmap (median fix); the landing PR carries the implemented note.
 - **Touch points:** [`packages/fs/tool-fs/src/read.ts`](../../../../packages/fs/tool-fs/src/read.ts) (`READ_LIMIT` 2000, already the `readLimit` config default); [`packages/compaction/compaction-tool-result-pruner/src/index.ts`](../../../../packages/compaction/compaction-tool-result-pruner/src/index.ts) (`thresholdChars` default + head/tail budgets); their config schemas and tests.
 - **Work:** audit `READ_LIMIT` and the pruner's head/tail budgets for data-heavy flows; make the budgets validated Config fields at the seam where they are not (defaults unchanged); document the middle-loss behavior; when the pruner replaces a result, the replacement text must name the exact re-fetch command/log anchor (pruned middles stay in the log — the model should be told how to re-fetch them).
