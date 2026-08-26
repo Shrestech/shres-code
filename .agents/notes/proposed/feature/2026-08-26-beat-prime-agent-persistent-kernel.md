@@ -15,7 +15,7 @@ Two house facts shape every choice below:
 
 Build an **opt-in, default-off, per-session persistent execution kernel** as a new sibling capability seam `ctx.codeKernel` (Service Definition `shres-code-kernel`, Provider `shres-code-kernel-worker-thread`, Consumers in `shres-tools` plus a caps/log policy). Keep typed tools intact: collapsing them into one REPL tool is rejected ([MAPPING technique inventory item 11](../../../../MAPPING-prime-agent-2026-08-26.md); prior-session verdict stands). Satisfy model-visible ⟺ logged. Measure on the existing W0 bench with a pre-registered paired arm, including a conservative `kern-driver` contrast.
 
-The recommended sequencing is [WP1.1](2026-08-26-beat-prime-agent-roadmap.md) (extract worker-shared plumbing) then [WP2.1](2026-08-26-beat-prime-agent-roadmap.md) (minimal kernel slice, default-off, driver bench arm).
+The recommended sequencing is [WP1.1](2026-08-26-beat-prime-agent-roadmap.md) (extract worker-shared plumbing), then the [WP3.3](2026-08-26-beat-prime-agent-roadmap.md) OOLONG-lite **pilot**, then [WP2.1](2026-08-26-beat-prime-agent-roadmap.md) (minimal kernel slice, default-off, driver bench arm) **only if the `code` arm shows need or `read` plateaus**. Building the kernel before that verdict inverts the [bench-strategy](2026-08-26-beat-prime-agent-bench-strategy.md#which-harness-features-each-chosen-benchmark-exercises) pre-registration that kernel priority follows the `read` result.
 
 ## Lifecycle
 
@@ -75,7 +75,7 @@ return { n: stats.count }                            // only print/return reache
 
 `state.get/set/has/list/del` are thin async bindings bridged to the host owner; `peek(name, opts)` returns the bounded head/tail repr (reuse `shres-output-retention`) inside the run's logs.
 
-Python binding names (`state` on a persistent globals dict) are a **forward-looking portability target**. Only the TypeScript worker has a published CodeRuntime backend ([`packages/code-runtime/code-runtime/src/index.ts:69-70`](../../../../packages/code-runtime/code-runtime/src/index.ts)). A Python kernel backend is not in-tree.
+Python binding names (`state` on a persistent globals dict) are a **forward-looking portability target**. Only the TypeScript worker has a published CodeRuntime backend ([`packages/code-runtime/code-runtime/src/index.ts:69-70`](../../../../packages/code-runtime/code-runtime/src/index.ts)). A Python kernel backend is not in-tree. [Roadmap WP2.5](2026-08-26-beat-prime-agent-roadmap.md) schedules a Python worker backend over the subprocess/E2B seam behind the WP3.3 pilot verdict; engineer-days are estimated at design time. Python SDK types already exist at [`packages/core/tools/src/py-types.ts`](../../../../packages/core/tools/src/py-types.ts).
 
 Whether `state` is a provider-injected binding or a consumer-owned global, and whether it joins `RESERVED_BINDING_GLOBALS` ([`index.ts:40-43`](../../../../packages/code-runtime/code-runtime/src/index.ts)), is an [open decision](#open-decisions).
 
@@ -212,6 +212,7 @@ Pinned here so implementation PRs cannot silently pick:
 8. **`kernel_list` permission preset.** Which shipped preset includes it; default deny outside an explicit grant.
 9. **Bench task set.** History-dependent aggregation that is not a file-on-disk sufficient statistic ([MAPPING prior-session lesson 8](../../../../MAPPING-prime-agent-2026-08-26.md)); exact task ids are unpicked.
 10. **Snapshot fixture target.** Which real example (headless profile) hosts the keyless kernel snapshot.
+11. **Approval granularity for nested dispatch.** One approved `run_code` program issuing N nested actions must not produce N approval prompts in ask-mode, nor silently batch-grant every nested call. Either extreme regresses versus typed tools. Presets and allow-rules are the enterprise common case; this decision must pin the interactive default. Open decisions 4 (torn-batch fold) and 6 (orphan/refcount after slot-drop) must resolve before any kernel default-on.
 
 ## Test and bench plan
 
@@ -253,7 +254,7 @@ Engineer-days, focused:
 | Bench arm overlay + runner glue + powered run + analysis | 1.5–2.5 |
 | **Total** | **~16–20** |
 
-Minimal credible slice (service+provider+consumer, inline-only small slots, no artifact store, unit tests + snapshot, bench arm): **~7–9 days**. Recommended sequencing: shared extraction PR → minimal slice behind default-off → bench → decide before building artifact-store scale features.
+Minimal credible slice (service+provider+consumer, inline-only small slots, no artifact store, unit tests + snapshot, bench arm): **~7–9 days**. Recommended sequencing: shared extraction PR → WP3.3 pilot verdict → minimal slice behind default-off **only if `code` shows need or `read` plateaus** → bench → decide before building artifact-store scale features. Open decisions 4, 6, and 11 must resolve before any default-on.
 
 ## Alternatives considered
 

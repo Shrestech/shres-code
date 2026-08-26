@@ -15,7 +15,7 @@ Prime Agent reports 30%→95.5% Best@1 on ARC-AGI-3 and long-context point estim
 
 ## Proposal
 
-A 30-day measurement campaign that (a) prices descendant spend and enforces `maxTotalTokens` as `BUDGET_EXCEEDED`, (b) runs w9 under a fresh experiment id with the pre-registered typo-guard canary, (c) ports an OOLONG-lite aggregation pair as the highest claim-strength-per-dollar external analog, and (d) only then spends on score-at-budget curves. Sequencing is [roadmap wave 0 then WP3.3 / WP3.4](2026-08-26-beat-prime-agent-roadmap.md).
+A 30-day measurement campaign that (a) prices descendant spend and enforces `maxTotalTokens` as `BUDGET_EXCEEDED`, (b) runs w9 under a fresh experiment id with the pre-registered typo-guard canary, (c) ports an OOLONG-lite aggregation pair as the highest claim-strength-per-dollar external analog, and (d) only then spends on score-at-budget curves. Sequencing is [roadmap wave 0, then the WP3.3 **pilot** in Wave 1 immediately after WP1.1 (before any kernel build), then the powered WP3.3 continuation / WP3.4](2026-08-26-beat-prime-agent-roadmap.md).
 
 Cost figures below use measured per-trial token counts from `bench/runs/w7-build-confirm-2026-08-26`, `w8-core-2026-08-26`, and `sq-adopt-2026-08-26` on Z.ai GLM-5.2. Assume $0.20–$1.00/M input and $1–$3/M output for GLM-class providers.
 
@@ -32,13 +32,14 @@ Every later section uses these names and no others:
 | `off` | Control: claimed feature disabled (jspace off, no kernel, no refine, …). |
 | `on-charter` | W0/w9 treatment: executor-enforced charter. |
 | `stuffed` | Whole corpus in the prompt, no read tools (Pi-mono role). |
-| `read` | Corpus on disk + session-query path (no kernel required). |
+| `read` | Corpus on disk + session-query path (no kernel required). Retrieval contrast vs `stuffed`. |
+| `code` | Corpus on disk + mounted stateless `run_code`; the model computes over it programmatically. Kernel-necessity contrast vs `read`. PRO-LONG's +11.1 pp step was code-over-log; neither `stuffed` nor `read` exercises that. |
 | `shipped` | Full shres composition under test (the treatment that would ship). |
 | `shipped-minus` | `shipped` with the claimed feature disabled (evidence-gated attribution). |
 
 Internal feature beat (already supported): 2 arms, baseline `off` vs treatment, exact McNemar, n=62 pattern from `bench/analysis/w9-power.js`, plus the existing token-overhead grade (`TOKEN_OVERHEAD_MAX = 1.25`).
 
-External-referenced beat: 3 arms from `{stuffed, read, shipped, shipped-minus}` chosen per experiment. The OOLONG-lite **pilot** (P2) is `stuffed` / `read` / `shipped`. The **powered** run (P4) is `stuffed` / `shipped` / `shipped-minus`. `read` is the session-query path; it is not a synonym of `shipped`.
+External-referenced beat: 3 arms from `{stuffed, read, code, shipped, shipped-minus}` chosen per experiment. The OOLONG-lite **pilot** (P2, Wave 1 immediately after WP1.1) is `stuffed` / `read` / `code`. Pre-register: `code` vs `read` is the kernel-necessity contrast; `read` vs `stuffed` is the retrieval contrast. The **powered** run (P4, Wave 3) is `stuffed` / `shipped` / `shipped-minus`. `read` is the session-query path; `code` is the existing stateless `run_code` path; neither is a synonym of `shipped`. One pilot task family carries an explicit **task-prompt cue** naming the compute/read capability at the moment of need (sq-adopt: task-level cue ≫ system-prompt line), so a tie is interpretable as "didn't help" vs "never reached."
 
 ## Budget-cap semantics (decision)
 
@@ -110,7 +111,7 @@ Primary metric stays binary verifier-passed success (protocol rule 4 unchanged).
 - **Aggregate-question types.** `count` (rows matching a predicate), `sum` (of `value` under a predicate), `unique-count` (distinct `name` or `id`), `conditional-count`. The pairs task asks for co-occurrence counts of (`category_a`, `category_b`) pairs.
 - **Verifier tolerance.** Exact match for counts, ids, and pair tables. Integer sums exact (no floats in v1).
 - **Seeded regeneration.** `mulberry32` seed in the task config; regeneration rewrites names/ids from the alphabet while preserving the numeric aggregates the verifier checks. A fixture rebuilt from the same seed is byte-identical.
-- **Stuffed-arm × forced-compaction overlay.** The `stuffed` arm does **not** use the forced-compaction overlay: compaction would destroy the "whole corpus in the prompt" condition. `read` and `shipped` arms **may** use forced-compaction so session-query/kernel have to earn the answer. Mixing stuffed+forced-compaction is a protocol error; the runner must refuse that overlay combination.
+- **Stuffed-arm × forced-compaction overlay.** The `stuffed` arm does **not** use the forced-compaction overlay: compaction would destroy the "whole corpus in the prompt" condition. `read`, `code`, and `shipped` arms **may** use forced-compaction so session-query/`run_code`/kernel have to earn the answer. Mixing stuffed+forced-compaction is a protocol error; the runner must refuse that overlay combination.
 
 Corpus size ~300–600 items. Instruction asks for aggregate facts computable only by scanning everything.
 
@@ -118,7 +119,7 @@ Corpus size ~300–600 items. Instruction asks for aggregate facts computable on
 
 ### Hit now, cheaply or keylessly
 
-1. **OOLONG-lite aggregation pair (`oolong-aggregate`, `oolong-pairs`).** Seeded generator writes the corpus into `fixture/`; `verify.mjs` checks exact values. Pilot arms: `stuffed` vs `read` vs `shipped`. This is the Table-1 analog at ~$5–15 per powered run and feeds the roadmap question "does programmatic read need a kernel?" ([persistent-kernel note](2026-08-26-beat-prime-agent-persistent-kernel.md)).
+1. **OOLONG-lite aggregation pair (`oolong-aggregate`, `oolong-pairs`).** Seeded generator writes the corpus into `fixture/`; `verify.mjs` checks exact values. Pilot arms: `stuffed` vs `read` vs `code`, plus one task-prompt-cue sensitivity family. This is the Table-1 analog at ~$5–15 per powered run and feeds the roadmap question "does programmatic read need a kernel?" ([persistent-kernel note](2026-08-26-beat-prime-agent-persistent-kernel.md); [roadmap WP3.3](2026-08-26-beat-prime-agent-roadmap.md) is sequenced in Wave 1 before WP2.1).
 2. **Out-of-loop experiment counting from logs ($0 marginal).** New forensics metric `outOfLoopExperiments` in `runner/metrics.js`: count tool calls/subagent spawns outside the mainline attempt sequence, computed from session JSONL we already store. Recompute over w6–w8 and sq-adopt runs immediately; no new API spend. Publishes "our harness produces N process traces per 100 mainline attempts" as the comparable process quantity. (The Prime "Fig 6" / "100 training runs" framing is **second-hand**.)
 3. **EmulatorBench-lite** (**assumption** about their protocol). One deterministic fake stateful service in `fixture/` (a small protocol the agent drives through bash), verifier scores final machine state. Exercises cross-session persistence; medium term.
 4. **Score-at-budget sweep on the existing pressure catalog.** Reuses `constraint-survival-*`, `noise-needle`, `chain-ledger-deep`; only needs the budget cap + curve builder.
@@ -133,7 +134,8 @@ Every adopted benchmark must discriminate between competing roadmap items, not j
 
 | Benchmark | Features exercised | Roadmap item it arbitrates |
 |---|---|---|
-| OOLONG-lite (`read` arm) | session-query Consumer, compaction seq pointers, future kernel-over-log Consumer | [Adoption shortlist items 1 and 5](../../../../MAPPING-prime-agent-2026-08-26.md): is grep/read enough, or does the +11.1 pp step (PRO-LONG Table 2 Python-over-log) require a kernel? If `read` wins big, kernel drops priority; if `read` plateaus at search-snippet depth, kernel rises |
+| OOLONG-lite (`read` vs `stuffed`) | session-query Consumer, compaction seq pointers | [Adoption shortlist items 1 and 5](../../../../MAPPING-prime-agent-2026-08-26.md): retrieval contrast. If `read` wins big, kernel drops priority; if `read` plateaus at search-snippet depth, kernel rises |
+| OOLONG-lite (`code` vs `read`) | mounted stateless `run_code` over on-disk corpus | Kernel-necessity contrast: does the +11.1 pp step (PRO-LONG Table 2 Python-over-log) require a persistent kernel, or does existing `run_code` already get it? A `code` win bounds the kernel **floor** (see [roadmap WP1.7](2026-08-26-beat-prime-agent-roadmap.md)), not its ceiling. If `code` ties or loses to `read`, do not build WP2.1 |
 | Score-at-budget sweep on pressure catalog | forced compaction, windowed log, charter checks | w9 charter decision; compaction-pointer value; autonomous continuation ([MAPPING shortlist item 6](../../../../MAPPING-prime-agent-2026-08-26.md)) as the next lever once curves flatten |
 | Experiment-count metric | guard plugins, maxStepsPerTurn, repeat veto, subagent seats/caps | Whether autonomy features ([shortlist item 6](../../../../MAPPING-prime-agent-2026-08-26.md), [technique inventory item 13](../../../../MAPPING-prime-agent-2026-08-26.md) concurrent-subagent cap) raise productive out-of-loop experiments rather than tool storms |
 | EmulatorBench-lite / chain tasks | durable sessions, resume/fork (currently missing — cold carry only), heartbeats ([technique inventory item 16](../../../../MAPPING-prime-agent-2026-08-26.md)) | Multi-session persistence work; `resumedFrom` stops being null |
@@ -152,7 +154,7 @@ Spend assumes Z.ai GLM-5.2 tier pricing of $0.20–$1.00/M input, $1–$3/M outp
 |---|---|---|---|---|---|
 | P0 | 1–3 | Descendant-inclusive accounting: walk persistence root for depth>0 sessions via `parentSession` headers ([`session-layout.js`](../../../../bench/runner/session-layout.js) already copies `encodeSegment`/`projectKey`); fill `tokensIncludingDescendants`/`costIncludingDescendants`; add `maxTotalTokens` live cap + `BUDGET_EXCEEDED` enforcement. Address the schema's "fragile and untested in v1" comment ([`trial.js:31`](../../../../bench/schema/trial.js)) by keying the walk on durable headers of closed files, once per completed trial | Schema un-null'd; unit tests; demo data updated | 0 (code only) | $0 |
 | P1 | 2–6 | **Run w9 as pre-registered** (`off` vs `on-charter`, 31×2 pressure tasks, **typo-guard canary**). Fresh experiment id (do not reuse `w9-charter-2026-08-26` or `w9-canary-2026-08-26`). Canary is the pre-registered short-stratum typo-guard task, not a pressure smoke | Implemented results note; retire-or-graduate verdict | 124 + 10 | $5–$28 |
-| P2 | 3–8 | OOLONG-lite generator + `oolong-aggregate`/`oolong-pairs` tasks + pilot (arms `stuffed`, `read`, `shipped`; 3 tasks × 2 repeats) | Pilot note with Wilson CIs; go/no-go for powered run | ~18 | $2–$8 |
+| P2 | 3–8 | OOLONG-lite generator + `oolong-aggregate`/`oolong-pairs` tasks + Wave-1 pilot (arms `stuffed`, `read`, `code`; 3 tasks × 2 repeats; plus one task-prompt-cue sensitivity family). Go/no-go for WP2.1 | Pilot note with Wilson CIs; kernel-necessity verdict; go/no-go for powered run | ~18 | $2–$8 |
 | P3 | 5–9 | `outOfLoopExperiments` forensics metric; recompute across all stored runs; report lane | Curve table over w6–w8/sq-adopt; $0 API | 0 | $0 |
 | P4 | 9–16 | Powered external-referenced run: `stuffed` vs `shipped` vs `shipped-minus` on OOLONG-lite + `noise-needle` + `chain-ledger-deep`, n=31 pairs, budget grid active | First externally-referenced claim with intervals | ~186 | $18–$55 |
 | P5 | 12–20 | Score-at-budget sweep + spend-at-equal-score builder in report/UI; rerun pressure catalog under budget caps (2 arms × 2 tasks × 5 budgets × 3 reps) | Score-at-spend curves in ui/data.js | ~60 | $6–$18 |
@@ -186,6 +188,10 @@ What remains unclaimable until ARC-AGI-3 access: any absolute comparison to thei
 
 **Force-compaction overlay on the stuffed arm.** Rejected: it destroys the stuffed condition.
 
+**Pilot arms `stuffed` / `read` / `shipped` without a `code` arm.** Rejected by the 2026-08-26 red/green review: PRO-LONG's +11.1 pp step was code-over-log, which neither `stuffed` nor `read` exercises. The kernel-necessity contrast is `code` vs `read`; `shipped` stays the powered-run attribution arm.
+
+**Building the kernel before the OOLONG-lite pilot.** Rejected: this note already pre-registers that if `read` wins big, kernel drops priority. The [roadmap](2026-08-26-beat-prime-agent-roadmap.md) places the pilot in Wave 1 immediately after WP1.1.
+
 **Compare `run.json` `model` strings as the pin.** Rejected: that field records `deepseek-v4-flash` even on zai-tier runs; the pin is `tierPatches` sha256.
 
 **Provision a 5% `PROVIDER_ERROR` rerun buffer from w7/w8.** Rejected: both runs contain zero `PROVIDER_ERROR`.
@@ -194,7 +200,7 @@ What remains unclaimable until ARC-AGI-3 access: any absolute comparison to thei
 
 - P0: `tokensIncludingDescendants` is a number on a planted descendant fixture; a live `maxTotalTokens` abort records `BUDGET_EXCEEDED`; the schema comment's "fragile and untested" walk is replaced by a header-keyed BFS with tests.
 - P1: a fresh w9 experiment id completes 124 interleaved pressure trials plus a typo-guard canary; the implemented results note records retire-or-graduate against the pre-registered rule; underpowered ⇒ "not yet."
-- P2: OOLONG-lite tasks exist with the pinned corpus/verifier/seed spec; stuffed arm refuses a forced-compaction overlay; pilot Wilson CIs published.
+- P2: OOLONG-lite tasks exist with the pinned corpus/verifier/seed spec; stuffed arm refuses a forced-compaction overlay; pilot arms are `stuffed` / `read` / `code` plus one task-prompt-cue family; Wilson CIs published; kernel go/no-go recorded before WP2.1.
 - P3: `outOfLoopExperiments` recomputed over stored w6–w8/sq-adopt runs at $0 API.
 - P4/P5: externally-referenced claim cites +31.8 pp as the target; intervals mandatory; `bootstrapDeltaCi` used for pass-rate deltas; new continuous paired-delta CI used for token deltas.
 - `pnpm run test:coverage` on any new bench JS that lands in packages (bench itself is the standalone runner); `pnpm run doc-sync` if docs change.
