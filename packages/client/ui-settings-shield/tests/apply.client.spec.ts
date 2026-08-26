@@ -8,14 +8,18 @@ import { SlotRegistry } from '@shres-code/shres-code-client-runtime/client'
 import { LocaleRuntime } from '@shres-code/shres-code-client-locale/client'
 import { stubSettingsScope, usePinnedBrowserLanguages } from '@shres-code/shres-code-client-test-runtime'
 import { resolveSlotLabel } from '@shres-code/shres-code-client-ui-slots'
-import type { ShieldSnapshot } from '@shres-code/shres-code-api-remotes/client'
-import { apply, inject, SHIELD_SETTINGS_NAMESPACE } from '../src/client/index.ts'
+import type { ShieldPayloadUpdate, ShieldSnapshot } from '@shres-code/shres-code-api-remotes/client'
+import { apply, inject, SHIELD_SETTINGS_NAMESPACE, type ShieldSectionInjected } from '../src/client/index.ts'
 import { apply as nodeApply } from '../src/index.ts'
 import { ShieldSection, type ShieldSettings } from '../src/client/ShieldSection.tsx'
 
 /** Wire result of `remote.shield.snapshot` — success and engine-missing both occur in these tests. */
 type ShieldSnapshotResult =
   | { readonly ok: true; readonly value: ShieldSnapshot }
+  | { readonly ok: false; readonly error: { readonly code: string; readonly message: string } }
+
+type ShieldUpdateResult =
+  | { readonly ok: true; readonly value: ShieldPayloadUpdate }
   | { readonly ok: false; readonly error: { readonly code: string; readonly message: string } }
 
 usePinnedBrowserLanguages('en-US')
@@ -49,12 +53,25 @@ async function bench() {
       },
     },
   }))
-  ctx.provide('remote', { shield: { snapshot } })
-  ctx.provide('remote.shield', { snapshot })
+  const idleUpdate = async (): Promise<ShieldUpdateResult> => ({
+    ok: true,
+    value: {
+      specifier: '@shrestech/shres-shield-plugin',
+      source: 'none',
+      installed: null,
+      latest: null,
+      available: false,
+      applied: false,
+    },
+  })
+  const checkUpdate = vi.fn(idleUpdate)
+  const applyUpdate = vi.fn(idleUpdate)
+  ctx.provide('remote', { shield: { snapshot, checkUpdate, applyUpdate } })
+  ctx.provide('remote.shield', { snapshot, checkUpdate, applyUpdate })
   ctx.provide('locale', new LocaleRuntime(ctx))
   const host = stubSettingsScope<ShieldSettings>()
   ctx.provide('settingsScope', { bind: vi.fn(() => host.scope) })
-  return { ctx, slots, host, snapshot }
+  return { ctx, slots, host, snapshot, checkUpdate, applyUpdate }
 }
 
 describe('ui-settings-shield browser apply', () => {
@@ -77,12 +94,26 @@ describe('ui-settings-shield browser apply', () => {
     if (typeof loadSnapshot !== 'function') {
       expect.fail('settings.section inject is missing loadSnapshot')
     }
-    await expect(loadSnapshot()).resolves.toMatchObject({ status: { active: true } })
+    const load = loadSnapshot as ShieldSectionInjected['loadSnapshot']
+    await expect(load()).resolves.toMatchObject({ status: { active: true } })
     b.snapshot.mockResolvedValueOnce({
       ok: false,
       error: { code: 'unavailable', message: 'down' },
     })
-    await expect(loadSnapshot()).rejects.toThrow(/shield.snapshot failed/)
+    await expect(load()).rejects.toThrow(/shield.snapshot failed/)
+    const sectionInject = b.slots.entries('settings.section')[0]?.inject?.() as ShieldSectionInjected | undefined
+    await expect(sectionInject?.checkUpdate()).resolves.toMatchObject({ available: false })
+    b.checkUpdate.mockResolvedValueOnce({
+      ok: false,
+      error: { code: 'unavailable', message: 'down' },
+    })
+    await expect(sectionInject?.checkUpdate()).rejects.toThrow(/shield.checkUpdate failed/)
+    await expect(sectionInject?.applyUpdate()).resolves.toMatchObject({ available: false })
+    b.applyUpdate.mockResolvedValueOnce({
+      ok: false,
+      error: { code: 'unavailable', message: 'down' },
+    })
+    await expect(sectionInject?.applyUpdate()).rejects.toThrow(/shield.applyUpdate failed/)
     expect(document.documentElement.dataset.shresShield).toBeUndefined()
     b.host.publish({
       status: 'ready',

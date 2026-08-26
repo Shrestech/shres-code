@@ -585,7 +585,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'Shield screening seat',
     mode: 'core',
     consumers: ['ui-settings-shield'],
-    note: 'Host seat for the paid screening engine: entitlement, engine resolve, published status, and a read-only snapshot RPC. The detection payload is not a workspace package.',
+    note: 'Host seat for the paid screening engine: entitlement, engine resolve, published status, snapshot RPC, and npm check/install remotes. The detection payload is not a workspace package.',
   },
   {
     key: 'speech',

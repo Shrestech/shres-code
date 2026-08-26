@@ -1652,8 +1652,8 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
   },
   {
     key: 'shield',
-    summary: 'Published Shield status and a read-only snapshot RPC.',
-    description: 'Published Shield status and a read-only snapshot RPC. `active` is the brand-mark switch: blue girl and green shield only while the paid engine is screening. The seat owns this service name; the paid plugin must not replace it.',
+    summary: 'Published Shield status, snapshot RPC, and npm check/install remotes.',
+    description: 'Published Shield status, snapshot RPC, and npm check/install remotes. `active` is the brand-mark switch: blue girl and green shield only while the paid engine is screening. The seat owns this service name; the paid plugin must not replace it.',
     methods: [
       {
         signature: 'readonly status: ShieldStatus',
@@ -1681,10 +1681,37 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'pull', description: 'triggers a seat sync when the repo-gate decision flipped.' }],
       },
       {
+        signature: 'bindResolved(info: ShieldPayloadInfo | undefined): void',
+        description: 'Remember the resolved payload identity so snapshot and update RPCs can report source and version without re-importing.',
+        parameters: [{ name: 'info', description: 'identity plus the import entry used for version lookup.' }],
+      },
+      {
+        signature: 'bindProfileDir(dir: string | undefined): void',
+        description: 'Remember the boot profile directory `pnpm add` installs into.',
+        parameters: [{ name: 'dir', description: 'absolute profile directory, or `undefined` when the seat is not booted from a profile.' }],
+      },
+      {
+        signature: 'bindRemount(remount: (() => Promise<void>) | undefined): void',
+        description: 'Remember the remount used after a successful npm install.',
+        parameters: [{ name: 'remount', description: 'queues a seat sync and returns the in-flight chain.' }],
+      },
+      {
         signature: '@Remote(\'snapshot\') snapshot(sessionId?: string): ShieldSnapshot',
         description: 'Per-repo counters for the current session cwd. Disable remounts the payload off but still returns last persisted counts with `status.reason === \'disabled\'`. A repo exempt through `repos` reports `status.reason === \'repo-disabled\'` while diagnostics keep precedence over the exemption. The call first re-evaluates the repo gate; because that re-evaluation settles asynchronously, the snapshot that detected a flip reports the pre-flip status and the next read reflects the new one.',
         parameters: [{ name: 'sessionId', description: 'live session whose `header.cwd` keys the stats; omitted uses the most recently created live session that has a cwd.' }],
         returns: 'a JSON copy, never a live alias of seat or engine state.',
+      },
+      {
+        signature: '@Remote(\'checkUpdate\') async checkUpdate(): Promise<ShieldPayloadUpdate>',
+        description: 'Compare the resolved payload version with npm `latest`. Does not install. An env-module override still reports `latest` but sets `available: false` and `blocked: \'env-override\'` because that exclusive leg would ignore a profile install.',
+        parameters: [],
+        returns: 'a JSON copy of the check result.',
+      },
+      {
+        signature: '@Remote(\'applyUpdate\') async applyUpdate(): Promise<ShieldPayloadUpdate>',
+        description: 'Re-query npm `latest` and, when an update is available, `pnpm add` that exact version into the boot profile, then remount so the profile leg loads it. Refuses env-module override, a missing profile directory, and a non-semver registry version.',
+        parameters: [],
+        returns: 'the post-install check, with `applied: true` on success.',
       },
     ],
   },
@@ -4440,12 +4467,24 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ShieldDefinitions {\n    version: string;\n    updatedAt: number | null;\n    stale: boolean;\n}',
   },
   {
+    name: 'ShieldEngineSource',
+    declaration: 'export type ShieldEngineSource = \'env\' | \'sibling\' | \'profile\' | \'package\';',
+  },
+  {
     name: 'ShieldFindingSummary',
     declaration: 'export interface ShieldFindingSummary {\n    at: number;\n    verdict: \'observe\' | \'ask\' | \'deny\';\n    rule: string;\n    channel: string;\n    sha16: string;\n    host?: string;\n    callId?: string;\n}',
   },
   {
     name: 'ShieldInactiveReason',
     declaration: 'export type ShieldInactiveReason = \'panic\' | \'unlicensed\' | \'engine-missing\' | \'disabled\' | \'repo-disabled\';',
+  },
+  {
+    name: 'ShieldPayloadInfo',
+    declaration: 'export interface ShieldPayloadInfo {\n    source: ShieldEngineSource;\n    version: string | null;\n}',
+  },
+  {
+    name: 'ShieldPayloadUpdate',
+    declaration: 'export interface ShieldPayloadUpdate {\n    specifier: string;\n    source: ShieldEngineSource | \'none\';\n    installed: string | null;\n    latest: string | null;\n    available: boolean;\n    applied: boolean;\n    blocked?: ShieldUpdateBlocked;\n    detail?: string;\n}',
   },
   {
     name: 'ShieldReason',
@@ -4461,11 +4500,15 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ShieldSnapshot',
-    declaration: 'export interface ShieldSnapshot {\n    status: ShieldStatus;\n    stats: ShieldRepoStats;\n    definitions?: ShieldDefinitions;\n}',
+    declaration: 'export interface ShieldSnapshot {\n    status: ShieldStatus;\n    stats: ShieldRepoStats;\n    definitions?: ShieldDefinitions;\n    payload?: ShieldPayloadInfo;\n}',
   },
   {
     name: 'ShieldStatus',
     declaration: 'export interface ShieldStatus {\n    active: boolean;\n    reason: ShieldReason;\n}',
+  },
+  {
+    name: 'ShieldUpdateBlocked',
+    declaration: 'export type ShieldUpdateBlocked = \'env-override\' | \'no-profile\' | \'registry\' | \'pnpm\';',
   },
   {
     name: 'ShresEnvironment',

@@ -2129,6 +2129,16 @@
       "doc": "docs/subsystems/guard.md",
       "symbol": "ShieldSnapshot",
       "source": "packages/guard/shield/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/guard.md",
+      "symbol": "ShieldPayloadInfo",
+      "source": "packages/guard/shield/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/guard.md",
+      "symbol": "ShieldPayloadUpdate",
+      "source": "packages/guard/shield/src/types.ts"
     }
   ]
 }

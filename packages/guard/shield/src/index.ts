@@ -1,9 +1,11 @@
 /**
  * Default-on host seat for the paid Shres Shield plugin. Resolves the engine
- * from a sibling checkout, the active profile's installed payload, or
+ * from the active profile's installed payload, a sibling checkout, or
  * `@shrestech/shres-shield-plugin`, checks entitlement, and publishes
- * `ctx.shield`. The detection payload never lives in this package.
- * Integration contract: sibling shres-shield repository, integration-shres-code.md.
+ * `ctx.shield`. The detection payload never lives in this package. Settings
+ * Check / Update talk to the public npm registry and `pnpm add` in the
+ * profile. Integration contract: sibling shres-shield repository,
+ * integration-shres-code.md.
  * @module @shres-code/shres-code-shield
  */
 
@@ -15,25 +17,35 @@ import { installSettingsSection, settingsNamespace } from '@shres-code/shres-cod
 import { Remote, TypertRemoteService } from '@shres-code/shres-code-typert-protocol'
 // Typert-generated ./typert and ./remote artifacts import Zod at runtime.
 import type {} from 'zod'
-import { resolveShieldEngine } from './resolve.ts'
+import { PAYLOAD_SPECIFIER, resolveShieldEngine } from './resolve.ts'
 import {
   liveSessionCwds, repoDisabled, repoGateBlocksMount, resolveRepoPath,
   validateRepoKeys, type ShieldRepos,
 } from './repos.ts'
+import {
+  installPayload, queryNpmLatest, readPayloadVersion,
+} from './update.ts'
 import type {
   ShieldCounterSplit, ShieldDefinitions, ShieldEngineSource, ShieldFindingSummary,
-  ShieldReason, ShieldRepoStats, ShieldRuleHistogram, ShieldSnapshot, ShieldStatus,
+  ShieldPayloadInfo, ShieldPayloadUpdate, ShieldReason, ShieldRepoStats,
+  ShieldRuleHistogram, ShieldSnapshot, ShieldStatus,
 } from './types.ts'
 
 export type {
   ShieldCounterSplit, ShieldDecision, ShieldDefinitions, ShieldEngine, ShieldEngineApply,
-  ShieldEngineSource, ShieldFindingSummary, ShieldInactiveReason, ShieldReason,
-  ShieldRepoStats, ShieldRuleHistogram, ShieldSnapshot, ShieldStatus,
+  ShieldEngineSource, ShieldFindingSummary, ShieldInactiveReason, ShieldPayloadInfo,
+  ShieldPayloadUpdate, ShieldReason, ShieldRepoStats, ShieldRuleHistogram,
+  ShieldSnapshot, ShieldStatus, ShieldUpdateBlocked,
 } from './types.ts'
 export {
   PAYLOAD_SPECIFIER, repoRootFromSeat, resolveProfileSpecifier, resolveShieldEngine,
   siblingPluginPath, type ShieldResolveOptions,
 } from './resolve.ts'
+export {
+  defaultSpawn, installPayload, isNpmVersion, NPM_PAYLOAD_PACKUMENT, pnpmEnv,
+  queryNpmLatest, readPayloadVersion, restoreDefaultSpawn, shieldSpawn, spawnBinary,
+  type ShieldSpawner, type ShieldSpawnResult,
+} from './update.ts'
 export {
   liveSessionCwds, repoDisabled, repoGateBlocksMount, resolveRepoPath, validateRepoKeys,
   type ShieldRepoEntry, type ShieldRepos, type SessionCwdSource,
@@ -244,9 +256,10 @@ function readEngineSnapshot(
 }
 
 /**
- * Published Shield status and a read-only snapshot RPC. `active` is the
- * brand-mark switch: blue girl and green shield only while the paid engine is
- * screening. The seat owns this service name; the paid plugin must not replace it.
+ * Published Shield status, snapshot RPC, and npm check/install remotes.
+ * `active` is the brand-mark switch: blue girl and green shield only while
+ * the paid engine is screening. The seat owns this service name; the paid
+ * plugin must not replace it.
  */
 export class ShieldHost extends TypertRemoteService {
   /** Current screening status. */
@@ -257,6 +270,10 @@ export class ShieldHost extends TypertRemoteService {
   private lastDefinitions: ShieldDefinitions | undefined
   private repoDisabledFor: ((cwd: string) => boolean) | undefined
   private pullSync: (() => void) | undefined
+  private resolved: ShieldPayloadInfo | undefined
+  private profileDir: string | undefined
+  private remount: (() => Promise<void>) | undefined
+  private updateChain = Promise.resolve()
 
   /**
    * @param ctx - owning context.
@@ -306,6 +323,32 @@ export class ShieldHost extends TypertRemoteService {
   }
 
   /**
+   * Remember the resolved payload identity so snapshot and update RPCs can
+   * report source and version without re-importing.
+   * @param info - identity plus the import entry used for version lookup.
+   */
+  bindResolved(info: ShieldPayloadInfo | undefined): void {
+    this.resolved = info
+  }
+
+  /**
+   * Remember the boot profile directory `pnpm add` installs into.
+   * @param dir - absolute profile directory, or `undefined` when the seat
+   *   is not booted from a profile.
+   */
+  bindProfileDir(dir: string | undefined): void {
+    this.profileDir = dir
+  }
+
+  /**
+   * Remember the remount used after a successful npm install.
+   * @param remount - queues a seat sync and returns the in-flight chain.
+   */
+  bindRemount(remount: (() => Promise<void>) | undefined): void {
+    this.remount = remount
+  }
+
+  /**
    * Per-repo counters for the current session cwd. Disable remounts the payload
    * off but still returns last persisted counts with `status.reason === 'disabled'`.
    * A repo exempt through `repos` reports `status.reason === 'repo-disabled'`
@@ -343,12 +386,96 @@ export class ShieldHost extends TypertRemoteService {
           recent: [...this.lastStats.recent],
         },
         ...(this.lastDefinitions === undefined ? {} : { definitions: { ...this.lastDefinitions } }),
+        ...(this.resolved === undefined ? {} : { payload: { ...this.resolved } }),
       }
     } catch {
       return {
         status: { active: this.status.active, reason: this.status.reason },
         stats: emptyRepoStats(null),
       }
+    }
+  }
+
+  /**
+   * Compare the resolved payload version with npm `latest`. Does not install.
+   * An env-module override still reports `latest` but sets `available: false`
+   * and `blocked: 'env-override'` because that exclusive leg would ignore a
+   * profile install.
+   * @returns a JSON copy of the check result.
+   */
+  @Remote('checkUpdate')
+  async checkUpdate(): Promise<ShieldPayloadUpdate> {
+    return this.runUpdate(false)
+  }
+
+  /**
+   * Re-query npm `latest` and, when an update is available, `pnpm add` that
+   * exact version into the boot profile, then remount so the profile leg
+   * loads it. Refuses env-module override, a missing profile directory, and
+   * a non-semver registry version.
+   * @returns the post-install check, with `applied: true` on success.
+   */
+  @Remote('applyUpdate')
+  async applyUpdate(): Promise<ShieldPayloadUpdate> {
+    const run = this.updateChain.then(() => this.runUpdate(true))
+    this.updateChain = run.then(() => undefined, () => undefined)
+    return run
+  }
+
+  private async runUpdate(install: boolean): Promise<ShieldPayloadUpdate> {
+    const source = this.resolved?.source ?? 'none'
+    const installed = this.resolved?.version ?? null
+    const base = (): ShieldPayloadUpdate => ({
+      specifier: PAYLOAD_SPECIFIER,
+      source,
+      installed,
+      latest: null,
+      available: false,
+      applied: false,
+    })
+
+    if (envModuleSet()) {
+      const queried = await queryNpmLatest()
+      return {
+        ...base(),
+        latest: queried.latest,
+        blocked: 'env-override',
+        ...queried.detail === undefined ? {} : { detail: queried.detail },
+      }
+    }
+
+    const queried = await queryNpmLatest()
+    if (queried.blocked !== undefined) {
+      return {
+        ...base(),
+        blocked: 'registry',
+        /* v8 ignore next -- queryNpmLatest always sets detail when it blocks */
+        ...queried.detail === undefined ? {} : { detail: queried.detail },
+      }
+    }
+    const latest = queried.latest
+    const available = latest !== null && latest !== installed
+    const checked: ShieldPayloadUpdate = { ...base(), latest, available }
+
+    if (!install) return checked
+    if (this.profileDir === undefined) {
+      return { ...checked, available: false, blocked: 'no-profile' }
+    }
+    if (latest === null || !available) return checked
+    const installedNow = await installPayload(this.profileDir, latest)
+    if (!installedNow.ok) {
+      return { ...checked, available: false, blocked: 'pnpm', detail: installedNow.detail }
+    }
+    /* v8 ignore next -- apply() binds remount before any RPC can run */
+    if (this.remount !== undefined) await this.remount()
+    const after = this.resolved
+    return {
+      specifier: PAYLOAD_SPECIFIER,
+      source: after?.source ?? 'profile',
+      installed: after?.version ?? latest,
+      latest,
+      available: false,
+      applied: true,
     }
   }
 
@@ -389,6 +516,16 @@ export class ShieldHost extends TypertRemoteService {
 function isPanicDisabled(): boolean {
   try {
     return process.env.SHRES_SHIELD === 'off'
+  } catch {
+    /* v8 ignore next -- env probe never throws to the caller */
+    return false
+  }
+}
+
+function envModuleSet(): boolean {
+  try {
+    const value = process.env.SHRES_SHIELD_MODULE
+    return value !== undefined && value.length > 0
   } catch {
     /* v8 ignore next -- env probe never throws to the caller */
     return false
@@ -471,7 +608,12 @@ export function apply(ctx: Context, config: Config): void {
       // (`ctx.baseUrl` = profileDir + '/'), so the paid payload resolves from
       // the same profile whose `node_modules` edition ensure installs into.
       const profileDir = ctx.baseUrl === undefined ? undefined : fileURLToPath(ctx.baseUrl)
+      host.bindProfileDir(profileDir)
       const engine = await resolveShieldEngine(profileDir === undefined ? {} : { profileDir })
+      host.bindResolved(engine === undefined ? undefined : {
+        source: engine.source,
+        version: readPayloadVersion(engine.entry),
+      })
       // `stopped` is set from dispose while this await runs.
       /* v8 ignore start -- dispose can flip `stopped` while resolve awaits */
       // oxlint-disable-next-line typescript/no-unnecessary-condition -- mutated concurrently during await
@@ -543,6 +685,10 @@ export function apply(ctx: Context, config: Config): void {
   ctx.on('session/disposed', syncIfGateFlipped)
   host.bindRepoDisabled(cwd => repoDisabled(currentRepos(), cwd))
   host.bindPullSync(syncIfGateFlipped)
+  host.bindRemount(() => {
+    sync()
+    return chain
+  })
 
   installSettingsSection(ctx, SHIELD_SETTINGS_NAMESPACE, Config, entry, {
     setSource: (current) => { source = current },

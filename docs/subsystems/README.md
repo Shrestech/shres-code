@@ -44,7 +44,7 @@ One page per subsystem of the Shres Code: what it is, the data structures it mov
 | [permission-presets.md](permission-presets.md) | the permission-preset layer: `PresetSpec`/`PresetOption`, the derived `custom` state, the log-only `permission/preset` event |
 | [plan.md](plan.md) | plan mode: the log-only `plan/mode` state, pending-selection flush, `PlanModeConfig`, the `exit_plan_mode` review arc |
 | [jspace.md](jspace.md) | J-Space: the settings-toggled five-line card, Goal epochs, checkpoint and ship register checks, prompt and tool consumers |
-| [guard.md](guard.md) | host-seat Shield screening: entitlement, engine resolve, published status, and the read-only snapshot RPC |
+| [guard.md](guard.md) | host-seat Shield screening: entitlement, engine resolve, published status, snapshot RPC, and npm check/install remotes |
 | [tracker.md](tracker.md) | experiment-tracking seam: run identity, metrics points, log/query requests, and provider-post failure taxonomy |
 | [invariants.md](invariants.md) | the runtime-invariant registry: selection `Config`, `InvariantInstaller`/`InvariantFailure`, the empty-companion contract |
 | [web-server.md](web-server.md) | the HTTP carrier: `WebRouteKind`/`WebRoute`, match order, the claimable fallback seat, index taps |

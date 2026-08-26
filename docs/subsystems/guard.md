@@ -17,6 +17,53 @@ interface ShieldSnapshot {
   stats: ShieldRepoStats
   /** Definition stamp when the engine reports one. */
   definitions?: ShieldDefinitions
+  /** Resolved payload identity when an engine file loaded. */
+  payload?: ShieldPayloadInfo
+}
+```
+
+```ts type-equiv
+/**
+ * Currently resolved paid payload identity. Omitted from the snapshot when
+ * nothing resolved.
+ */
+interface ShieldPayloadInfo {
+  /** Resolution leg that supplied `apply`. */
+  source: ShieldEngineSource
+  /**
+   * `version` from the resolved `@shrestech/shres-shield-plugin` package.json,
+   * or `null` when that file is missing or not that package (env fixtures,
+   * a bare specifier with no on-disk package).
+   */
+  version: string | null
+}
+```
+
+```ts type-equiv
+/**
+ * Result of `checkUpdate` / `applyUpdate`. `applied` is true only after a
+ * successful profile install and remount.
+ */
+interface ShieldPayloadUpdate {
+  /** Always `@shrestech/shres-shield-plugin`. */
+  specifier: string
+  /** Current resolution leg, or `'none'` when the engine is missing. */
+  source: ShieldEngineSource | 'none'
+  /** Installed payload version, or `null` when it cannot be read. */
+  installed: string | null
+  /** `dist-tags.latest` from the npm registry, or `null` on a registry miss. */
+  latest: string | null
+  /**
+   * True when `latest` is a semver string different from `installed` and
+   * nothing blocks an install. Env override and missing profile force false.
+   */
+  available: boolean
+  /** True only after `applyUpdate` installed `latest` into the profile. */
+  applied: boolean
+  /** Present when the check or install cannot proceed. */
+  blocked?: ShieldUpdateBlocked
+  /** Registry, pnpm, or validation diagnostic; omitted on success. */
+  detail?: string
 }
 ```
 
@@ -32,7 +79,7 @@ Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnp
 
 ### `ctx.shield` — `ShieldHost`
 
-Published Shield status and a read-only snapshot RPC. `active` is the brand-mark switch: blue girl and green shield only while the paid engine is screening. The seat owns this service name; the paid plugin must not replace it.
+Published Shield status, snapshot RPC, and npm check/install remotes. `active` is the brand-mark switch: blue girl and green shield only while the paid engine is screening. The seat owns this service name; the paid plugin must not replace it.
 
 ```ts cordis-catalog
 /**
@@ -61,6 +108,26 @@ bindRepoDisabled(disabledFor: ((cwd: string) => boolean) | undefined): void
 bindPullSync(pull: (() => void) | undefined): void
 
 /**
+ * Remember the resolved payload identity so snapshot and update RPCs can
+ * report source and version without re-importing.
+ * @param info - identity plus the import entry used for version lookup.
+ */
+bindResolved(info: ShieldPayloadInfo | undefined): void
+
+/**
+ * Remember the boot profile directory `pnpm add` installs into.
+ * @param dir - absolute profile directory, or `undefined` when the seat
+ *   is not booted from a profile.
+ */
+bindProfileDir(dir: string | undefined): void
+
+/**
+ * Remember the remount used after a successful npm install.
+ * @param remount - queues a seat sync and returns the in-flight chain.
+ */
+bindRemount(remount: (() => Promise<void>) | undefined): void
+
+/**
  * Per-repo counters for the current session cwd. Disable remounts the payload
  * off but still returns last persisted counts with `status.reason === 'disabled'`.
  * A repo exempt through `repos` reports `status.reason === 'repo-disabled'`
@@ -73,7 +140,25 @@ bindPullSync(pull: (() => void) | undefined): void
  * @returns a JSON copy, never a live alias of seat or engine state.
  */
 @Remote('snapshot') snapshot(sessionId?: string): ShieldSnapshot
+
+/**
+ * Compare the resolved payload version with npm `latest`. Does not install.
+ * An env-module override still reports `latest` but sets `available: false`
+ * and `blocked: 'env-override'` because that exclusive leg would ignore a
+ * profile install.
+ * @returns a JSON copy of the check result.
+ */
+@Remote('checkUpdate') async checkUpdate(): Promise<ShieldPayloadUpdate>
+
+/**
+ * Re-query npm `latest` and, when an update is available, `pnpm add` that
+ * exact version into the boot profile, then remount so the profile leg
+ * loads it. Refuses env-module override, a missing profile directory, and
+ * a non-semver registry version.
+ * @returns the post-install check, with `applied: true` on success.
+ */
+@Remote('applyUpdate') async applyUpdate(): Promise<ShieldPayloadUpdate>
 ```
 
-Source: [`packages/guard/shield/src/index.ts:251`](../../packages/guard/shield/src/index.ts)
+Source: [`packages/guard/shield/src/index.ts:264`](../../packages/guard/shield/src/index.ts)
 <!-- END GENERATED cordis-surface -->
