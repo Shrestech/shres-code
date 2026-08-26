@@ -70,7 +70,7 @@ function makeProfileDir(moduleSource: string = FULL_MODULE): { dir: string; clea
   writeFileSync(join(dir, 'package.json'), '{"name":"profile-test","private":true,"dependencies":{}}\n')
   writeFileSync(
     join(pkgDir, 'package.json'),
-    '{"name":"@shrestech/shres-shield-plugin","type":"module","main":"index.js"}\n',
+    '{"name":"@shrestech/shres-shield-plugin","version":"0.2.0","type":"module","main":"index.js"}\n',
   )
   writeFileSync(join(pkgDir, 'index.js'), moduleSource)
   return {
@@ -108,6 +108,24 @@ describe('shield payload resolve', () => {
       expect(resolveProfileSpecifier(profile.dir)).toBeUndefined()
     } finally {
       profile.cleanup()
+    }
+  })
+
+  it('prefers a profile payload over a well-formed sibling checkout', async () => {
+    const parent = resolve(tmpdir(), `shres-shield-profile-wins-${Math.random().toString(36).slice(2)}`)
+    const repo = join(parent, 'repo')
+    const dist = join(parent, 'shres-shield', 'packages', 'plugin', 'dist')
+    mkdirSync(dist, { recursive: true })
+    writeFileSync(join(dist, 'index.js'), APPLY_ONLY_MODULE)
+    writeFileSync(join(dist, 'package.json'), '{"type":"module"}\n')
+    const profile = makeProfileDir()
+    try {
+      const engine = await resolveShieldEngine({ profileDir: profile.dir, repoRoot: repo })
+      expect(engine?.source).toBe('profile')
+      expect(engine?.entry).toContain(join('node_modules', '@shrestech', 'shres-shield-plugin'))
+    } finally {
+      profile.cleanup()
+      rmSync(parent, { recursive: true, force: true })
     }
   })
 
@@ -151,6 +169,7 @@ describe('shield payload resolve', () => {
     try {
       const engine = await resolveShieldEngine({ repoRoot: repo })
       expect(engine?.source).toBe('sibling')
+      expect(engine?.entry).toBe(join(dist, 'index.js'))
       expect(engine?.snapshot).toBeUndefined()
     } finally {
       rmSync(parent, { recursive: true, force: true })

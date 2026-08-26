@@ -50,11 +50,15 @@ function asSnapshot(mod: unknown): ((cwd?: string | null) => unknown) | undefine
   return typeof snapshot === 'function' ? snapshot as (cwd?: string | null) => unknown : undefined
 }
 
-function toEngine(source: ShieldEngine['source'], mod: unknown): ShieldEngine | undefined {
+function toEngine(
+  source: ShieldEngine['source'],
+  mod: unknown,
+  entry: string,
+): ShieldEngine | undefined {
   const apply = asApply(mod)
   if (apply === undefined) return undefined
   const snapshot = asSnapshot(mod)
-  return snapshot === undefined ? { source, apply } : { source, apply, snapshot }
+  return snapshot === undefined ? { source, apply, entry } : { source, apply, snapshot, entry }
 }
 
 async function importSpecifier(specifier: string): Promise<unknown> {
@@ -104,11 +108,13 @@ export function resolveProfileSpecifier(
 }
 
 /**
- * Resolve the paid plugin in the documented order: env override, sibling
- * checkout, the active profile's installed payload, then the
- * `@shrestech/shres-shield-plugin` package specifier. Every leg stays
- * fail-through (`undefined` when nothing resolves); the seat owns the
- * fail-soft contract when every leg misses.
+ * Resolve the paid plugin in the documented order: env override (exclusive),
+ * the active profile's installed payload, sibling checkout, then the
+ * `@shrestech/shres-shield-plugin` package specifier. Profile precedes sibling
+ * so a Settings → Update install takes effect on a machine that also has a
+ * local `../shres-shield` checkout. Every leg stays fail-through (`undefined`
+ * when nothing resolves); the seat owns the fail-soft contract when every
+ * leg misses.
  * @param options - resolution anchors; `profileDir` enables the profile-installed leg.
  * @returns the loaded `apply`, or `undefined` when nothing resolved.
  */
@@ -117,22 +123,22 @@ export async function resolveShieldEngine(
 ): Promise<ShieldEngine | undefined> {
   const fromEnv = process.env.SHRES_SHIELD_MODULE
   if (fromEnv !== undefined && fromEnv.length > 0) {
-    return toEngine('env', await importSpecifier(fromEnv))
-  }
-
-  const sibling = siblingPluginPath(options.repoRoot)
-  if (existsSync(sibling)) {
-    const engine = toEngine('sibling', await importSpecifier(sibling))
-    if (engine !== undefined) return engine
+    return toEngine('env', await importSpecifier(fromEnv), fromEnv)
   }
 
   if (options.profileDir !== undefined) {
     const profileSpec = resolveProfileSpecifier(options.profileDir)
     if (profileSpec !== undefined) {
-      const engine = toEngine('profile', await importSpecifier(profileSpec))
+      const engine = toEngine('profile', await importSpecifier(profileSpec), profileSpec)
       if (engine !== undefined) return engine
     }
   }
 
-  return toEngine('package', await importSpecifier(PAYLOAD_SPECIFIER))
+  const sibling = siblingPluginPath(options.repoRoot)
+  if (existsSync(sibling)) {
+    const engine = toEngine('sibling', await importSpecifier(sibling), sibling)
+    if (engine !== undefined) return engine
+  }
+
+  return toEngine('package', await importSpecifier(PAYLOAD_SPECIFIER), PAYLOAD_SPECIFIER)
 }

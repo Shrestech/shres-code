@@ -153,6 +153,14 @@
   opacity: 0.45;
 }
 
+.payload {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid var(--dsw-alias-border-l2);
+  padding-top: 12px;
+}
+
 .console {
   display: flex;
   flex-direction: column;

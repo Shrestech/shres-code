@@ -1,0 +1,4 @@
+- region "Plugin updates":
+  - heading "Plugin updates" [level=3]
+  - paragraph: Check npm for a newer @shrestech/shres-shield-plugin, then Update installs it into this profile and remounts Shield.
+  - button "Check for updates"

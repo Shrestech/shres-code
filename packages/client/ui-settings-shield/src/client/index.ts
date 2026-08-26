@@ -4,7 +4,7 @@
  * Export discipline: packages/client/AGENTS.md.
  */
 
-import type {} from '@shres-code/shres-code-api-remotes/client'
+import type { ShieldPayloadUpdate } from '@shres-code/shres-code-api-remotes/client'
 import type { ClientContext } from '@shres-code/shres-code-client-runtime/client'
 import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
 import type {} from '@shres-code/shres-code-client-ui-settings/client'
@@ -48,7 +48,23 @@ export function apply(ctx: ClientContext): void {
     }
     return result.value
   }
-  const injected = (): ShieldSectionInjected => ({ scope, useSnapshot, t, loadSnapshot })
+  const loadUpdate = async (
+    method: 'checkUpdate' | 'applyUpdate',
+  ): Promise<ShieldPayloadUpdate> => {
+    const result = await ctx.remote.shield[method]()
+    if (!result.ok) {
+      throw new Error(`shield.${method} failed: ${result.error.code}: ${result.error.message}`)
+    }
+    return result.value
+  }
+  const injected = (): ShieldSectionInjected => ({
+    scope,
+    useSnapshot,
+    t,
+    loadSnapshot,
+    checkUpdate: () => loadUpdate('checkUpdate'),
+    applyUpdate: () => loadUpdate('applyUpdate'),
+  })
   ctx.effect(() => {
     const sync = (): void => {
       const snap = scope.getSnapshot()

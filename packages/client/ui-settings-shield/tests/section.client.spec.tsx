@@ -2,7 +2,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ShieldSection, type ShieldSettings } from '../src/client/ShieldSection.tsx'
-import type { ShieldSnapshot } from '@shres-code/shres-code-api-remotes/client'
+import type { ShieldPayloadUpdate, ShieldSnapshot } from '@shres-code/shres-code-api-remotes/client'
 import type { SettingsScope, SettingsScopeSnapshot } from '@shres-code/shres-code-client-runtime/client'
 import { en } from '../src/client/locales.ts'
 
@@ -53,11 +53,24 @@ async function readyConsole(cwd = '/repo'): Promise<void> {
   expect(await screen.findByText((_, node) => node?.textContent === repoLabel(cwd))).toBeTruthy()
 }
 
+function idleUpdate(): ShieldPayloadUpdate {
+  return {
+    specifier: '@shrestech/shres-shield-plugin',
+    source: 'none',
+    installed: null,
+    latest: null,
+    available: false,
+    applied: false,
+  }
+}
+
 function mount(
   snap: SettingsScopeSnapshot<ShieldSettings>,
   set = vi.fn(async () => {}),
   loadSnapshot: (sessionId?: string) => Promise<ShieldSnapshot> = () => Promise.resolve(consoleSnapshot()),
   currentSessionId: string | null = 's-test',
+  checkUpdate: () => Promise<ShieldPayloadUpdate> = async () => idleUpdate(),
+  applyUpdate: () => Promise<ShieldPayloadUpdate> = async () => idleUpdate(),
 ) {
   const scope = {
     getSnapshot: () => snap,
@@ -71,6 +84,8 @@ function mount(
       useSnapshot={select => select(snap)}
       t={key => en[key]}
       loadSnapshot={loadSnapshot}
+      checkUpdate={checkUpdate}
+      applyUpdate={applyUpdate}
       useSessions={select => select({ current: currentSessionId ?? undefined } as never)}
       useWorkspaces={() => undefined as never}
       close={vi.fn()}
@@ -205,6 +220,8 @@ describe('ShieldSection', () => {
         useSnapshot={select => select(snapshot({}))}
         t={key => en[key]}
         loadSnapshot={() => deferred.promise}
+        checkUpdate={async () => idleUpdate()}
+        applyUpdate={async () => idleUpdate()}
         useSessions={select => select({ current: 's-test' } as never)}
         useWorkspaces={() => undefined as never}
         close={vi.fn()}
@@ -304,6 +321,8 @@ describe('ShieldSection', () => {
         useSnapshot={select => select(snapshot({}))}
         t={key => en[key]}
         loadSnapshot={() => deferred.promise}
+        checkUpdate={async () => idleUpdate()}
+        applyUpdate={async () => idleUpdate()}
         useSessions={select => select({ current: 's-test' } as never)}
         useWorkspaces={() => undefined as never}
         close={vi.fn()}
@@ -402,6 +421,146 @@ describe('ShieldSection', () => {
     await waitFor(() => {
       expect(document.documentElement.dataset.shresShield).toBe('off')
     })
+  })
+
+  it('checks npm and offers Update when a newer release is available', async () => {
+    const checkUpdate = vi.fn(async (): Promise<ShieldPayloadUpdate> => ({
+      specifier: '@shrestech/shres-shield-plugin',
+      source: 'profile',
+      installed: '0.1.0',
+      latest: '0.2.0',
+      available: true,
+      applied: false,
+    }))
+    const applyUpdate = vi.fn(async (): Promise<ShieldPayloadUpdate> => ({
+      specifier: '@shrestech/shres-shield-plugin',
+      source: 'profile',
+      installed: '0.2.0',
+      latest: '0.2.0',
+      available: false,
+      applied: true,
+    }))
+    mount(snapshot({}), vi.fn(async () => {}), undefined, 's-test', checkUpdate, applyUpdate)
+    await readyConsole()
+    fireEvent.click(screen.getByRole('button', { name: en.payloadCheck }))
+    expect(await screen.findByText(en.payloadAvailable)).toBeTruthy()
+    expect(screen.getByText((_, node) => node?.textContent === `${en.payloadInstalled} · 0.1.0 · ${en.payloadLatest} · 0.2.0`)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: en.payloadUpdate }))
+    expect(await screen.findByText(en.payloadUpdated)).toBeTruthy()
+    expect(applyUpdate).toHaveBeenCalledTimes(1)
+  })
+
+  it('renders an em-dash when installed or latest is empty', async () => {
+    mount(
+      snapshot({}),
+      vi.fn(async () => {}),
+      undefined,
+      's-test',
+      async () => ({ ...idleUpdate(), installed: '', latest: '', blocked: 'registry' }),
+    )
+    await readyConsole()
+    fireEvent.click(screen.getByRole('button', { name: en.payloadCheck }))
+    expect(await screen.findByText((_, node) => node?.textContent === `${en.payloadInstalled} · ${en.payloadUnknown} · ${en.payloadLatest} · ${en.payloadUnknown}`)).toBeTruthy()
+  })
+
+  it('shows already-current after a check that finds no newer release', async () => {
+    mount(
+      snapshot({}),
+      vi.fn(async () => {}),
+      undefined,
+      's-test',
+      async () => ({
+        specifier: '@shrestech/shres-shield-plugin',
+        source: 'profile',
+        installed: '0.2.0',
+        latest: '0.2.0',
+        available: false,
+        applied: false,
+      }),
+    )
+    await readyConsole()
+    fireEvent.click(screen.getByRole('button', { name: en.payloadCheck }))
+    expect(await screen.findByText(en.payloadCurrent)).toBeTruthy()
+    expect(screen.getByText((_, node) => node?.textContent === `${en.payloadInstalled} · 0.2.0 · ${en.payloadLatest} · 0.2.0`)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: en.payloadUpdate })).toBeNull()
+  })
+
+  it('maps every blocked reason onto pane copy', async () => {
+    const reasons = [
+      ['env-override', en.payloadBlockedEnv],
+      ['no-profile', en.payloadBlockedProfile],
+      ['registry', en.payloadBlockedRegistry],
+      ['pnpm', en.payloadBlockedPnpm],
+    ] as const
+    for (const [blocked, copy] of reasons) {
+      cleanup()
+      mount(
+        snapshot({}),
+        vi.fn(async () => {}),
+        undefined,
+        's-test',
+        async () => ({ ...idleUpdate(), blocked }),
+      )
+      await readyConsole()
+      fireEvent.click(screen.getByRole('button', { name: en.payloadCheck }))
+      expect(await screen.findByText(copy)).toBeTruthy()
+    }
+  })
+
+  it('treats a thrown check as a registry miss and a thrown apply as a pnpm miss', async () => {
+    const checkUpdate = vi.fn()
+      .mockRejectedValueOnce(new Error('transport'))
+      .mockResolvedValueOnce({
+        ...idleUpdate(),
+        available: true,
+        installed: '0.1.0',
+        latest: '0.2.0',
+        source: 'profile',
+      })
+    const applyUpdate = vi.fn(async () => {
+      throw new Error('pnpm')
+    })
+    mount(snapshot({}), vi.fn(async () => {}), undefined, 's-test', checkUpdate, applyUpdate)
+    await readyConsole()
+    fireEvent.click(screen.getByRole('button', { name: en.payloadCheck }))
+    expect(await screen.findByText(en.payloadBlockedRegistry)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: en.payloadCheck }))
+    expect(await screen.findByText(en.payloadAvailable)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: en.payloadUpdate }))
+    expect(await screen.findByText(en.payloadBlockedPnpm)).toBeTruthy()
+  })
+
+  it('shows checking and updating labels while the RPCs are in flight', async () => {
+    const checkDeferred = Promise.withResolvers<ShieldPayloadUpdate>()
+    const applyDeferred = Promise.withResolvers<ShieldPayloadUpdate>()
+    const checkUpdate = vi.fn(() => checkDeferred.promise)
+    const applyUpdate = vi.fn(() => applyDeferred.promise)
+    mount(snapshot({}), vi.fn(async () => {}), undefined, 's-test', checkUpdate, applyUpdate)
+    await readyConsole()
+    fireEvent.click(screen.getByRole('button', { name: en.payloadCheck }))
+    expect(await screen.findByRole('button', { name: en.payloadChecking })).toBeTruthy()
+    await act(async () => {
+      checkDeferred.resolve({
+        ...idleUpdate(),
+        available: true,
+        installed: '0.1.0',
+        latest: '0.2.0',
+        source: 'profile',
+      })
+    })
+    expect(await screen.findByRole('button', { name: en.payloadUpdate })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: en.payloadUpdate }))
+    expect(await screen.findByRole('button', { name: en.payloadUpdating })).toBeTruthy()
+    await act(async () => {
+      applyDeferred.resolve({
+        ...idleUpdate(),
+        applied: true,
+        installed: '0.2.0',
+        latest: '0.2.0',
+        source: 'profile',
+      })
+    })
+    expect(await screen.findByText(en.payloadUpdated)).toBeTruthy()
   })
 
   it('explains when the host seat is not mounted and the console also fails', async () => {

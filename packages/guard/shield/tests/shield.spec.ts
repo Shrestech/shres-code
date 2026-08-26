@@ -3,7 +3,7 @@
  * package-source, env-module entitle, and dispose of the paid apply.
  */
 
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context, FiberState } from '@shres-code/cordis'
 import SystemPrompt from '@shres-code/shres-code-system-prompt'
 import ToolRuntime from '@shres-code/shres-code-tools'
@@ -14,7 +14,9 @@ import * as ShieldSeat from '@shres-code/shres-code-shield'
 import type { ShieldDecision } from '@shres-code/shres-code-shield/types'
 import { Session, SessionId } from '@shres-code/shres-code-session'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { dirname } from 'node:path'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join, resolve } from 'node:path'
 import { applied } from './fixtures/fake-shield-plugin.ts'
 
 const fixtureUrl = fileURLToPath(new URL('./fixtures/fake-shield-plugin.ts', import.meta.url))
@@ -45,6 +47,8 @@ afterEach(() => {
   else process.env.SHRES_SHIELD_LICENSE = saved.SHRES_SHIELD_LICENSE
   if (saved.SHRES_SHIELD_MODULE === undefined) delete process.env.SHRES_SHIELD_MODULE
   else process.env.SHRES_SHIELD_MODULE = saved.SHRES_SHIELD_MODULE
+  ShieldSeat.restoreDefaultSpawn()
+  vi.unstubAllGlobals()
   applied.count = 0
   applied.config = undefined
   applied.disposed = 0
@@ -218,6 +222,8 @@ describe('shres-shield host seat', () => {
     })
     expect(remoteMethods(ctx.shield)).toEqual([
       { method: 'snapshot', invocation: { kind: 'direct' } },
+      { method: 'checkUpdate', invocation: { kind: 'direct' } },
+      { method: 'applyUpdate', invocation: { kind: 'direct' } },
     ])
     expect(ctx.shield.snapshot()).toEqual({
       status: { active: false, reason: 'engine-missing' },
@@ -731,7 +737,239 @@ describe('shres-shield per-repo gate', () => {
     await ctx.fiber.dispose()
     expect(applied.disposed).toBe(0)
   })
+
+  it('blocks checkUpdate and applyUpdate when SHRES_SHIELD_MODULE is set', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', fixtureUrl)
+    vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ version: '0.9.0' }), { status: 200 }))
+    const ctx = await setup({ license: 'paid' }, 'active')
+    try {
+      const checked = await ctx.shield.checkUpdate()
+      expect(checked).toMatchObject({
+        specifier: '@shrestech/shres-shield-plugin',
+        source: 'env',
+        available: false,
+        applied: false,
+        blocked: 'env-override',
+        latest: '0.9.0',
+      })
+      expect(ctx.shield.snapshot().payload).toEqual({ source: 'env', version: null })
+      await expect(ctx.shield.applyUpdate()).resolves.toMatchObject({ blocked: 'env-override', applied: false })
+      vi.stubGlobal('fetch', async () => {
+        throw new Error('offline')
+      })
+      await expect(ctx.shield.checkUpdate()).resolves.toMatchObject({
+        blocked: 'env-override',
+        detail: 'offline',
+        latest: null,
+      })
+    } finally {
+      vi.unstubAllGlobals()
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('reports a registry miss on checkUpdate', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', undefined)
+    vi.stubGlobal('fetch', async () => {
+      throw new Error('offline')
+    })
+    const ctx = await setup({ license: 'paid' })
+    await new Promise<void>((resolve) => { setTimeout(resolve, 80) })
+    try {
+      await expect(ctx.shield.checkUpdate()).resolves.toMatchObject({
+        blocked: 'registry',
+        detail: 'offline',
+        available: false,
+      })
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('refuses applyUpdate without a boot profile directory', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', undefined)
+    vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ version: '0.9.0' }), { status: 200 }))
+    const ctx = await setup({ license: 'paid' })
+    await new Promise<void>((resolve) => { setTimeout(resolve, 80) })
+    try {
+      const result = await ctx.shield.applyUpdate()
+      expect(result.blocked).toBe('no-profile')
+      expect(result.applied).toBe(false)
+      expect(result.latest).toBe('0.9.0')
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('installs latest into the profile and remounts on applyUpdate', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', undefined)
+    const profile = makeUpdateProfile('0.1.0')
+    vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ version: '0.2.0' }), { status: 200 }))
+    ShieldSeat.shieldSpawn.current = async () => {
+      writeFileSync(
+        join(profile.dir, 'node_modules', '@shrestech', 'shres-shield-plugin', 'package.json'),
+        '{"name":"@shrestech/shres-shield-plugin","version":"0.2.0","type":"module","main":"index.js"}\n',
+      )
+      return { status: 0, stderr: '' }
+    }
+    const ctx = new Context()
+    ctx.baseUrl = pathToFileURL(profile.dir + '/').href
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRuntime)
+    await provideApprovalAndJobs(ctx)
+    await ctx.plugin(ShieldSeat, { license: 'paid' })
+    await waitForReason(ctx, 'active')
+    try {
+      expect(ctx.shield.snapshot().payload).toEqual({ source: 'profile', version: '0.1.0' })
+      const current = await ctx.shield.checkUpdate()
+      expect(current).toMatchObject({
+        source: 'profile',
+        installed: '0.1.0',
+        latest: '0.2.0',
+        available: true,
+        applied: false,
+      })
+      const appliedUpdate = await ctx.shield.applyUpdate()
+      expect(appliedUpdate).toMatchObject({
+        applied: true,
+        latest: '0.2.0',
+        installed: '0.2.0',
+        available: false,
+        source: 'profile',
+      })
+      await expect(ctx.shield.applyUpdate()).resolves.toMatchObject({
+        applied: false,
+        available: false,
+        installed: '0.2.0',
+      })
+    } finally {
+      ShieldSeat.restoreDefaultSpawn()
+      vi.unstubAllGlobals()
+      await ctx.fiber.dispose()
+      profile.cleanup()
+    }
+  })
+
+  it('maps a pnpm failure onto blocked pnpm and skips remount', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', undefined)
+    const profile = makeUpdateProfile('0.1.0')
+    vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ version: '0.2.0' }), { status: 200 }))
+    ShieldSeat.shieldSpawn.current = async () => ({ status: 1, stderr: 'EACCES' })
+    const ctx = new Context()
+    ctx.baseUrl = pathToFileURL(profile.dir + '/').href
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRuntime)
+    await provideApprovalAndJobs(ctx)
+    await ctx.plugin(ShieldSeat, { license: 'paid' })
+    await waitForReason(ctx, 'active')
+    const before = applied.count
+    try {
+      await expect(ctx.shield.applyUpdate()).resolves.toMatchObject({
+        blocked: 'pnpm',
+        detail: 'EACCES',
+        applied: false,
+      })
+      expect(applied.count).toBe(before)
+    } finally {
+      ShieldSeat.restoreDefaultSpawn()
+      vi.unstubAllGlobals()
+      await ctx.fiber.dispose()
+      profile.cleanup()
+    }
+  })
+
+  it('swallows a remount rejection on the update chain and falls back when resolved is cleared', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', undefined)
+    const profile = makeUpdateProfile('0.1.0')
+    vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ version: '0.2.0' }), { status: 200 }))
+    ShieldSeat.shieldSpawn.current = async () => ({ status: 0, stderr: '' })
+    const ctx = new Context()
+    ctx.baseUrl = pathToFileURL(profile.dir + '/').href
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRuntime)
+    await provideApprovalAndJobs(ctx)
+    await ctx.plugin(ShieldSeat, { license: 'paid' })
+    await waitForReason(ctx, 'active')
+    let throws = true
+    ctx.shield.bindRemount(async () => {
+      ctx.shield.bindResolved(undefined)
+      if (throws) {
+        throws = false
+        throw new Error('remount')
+      }
+    })
+    try {
+      await expect(ctx.shield.applyUpdate()).rejects.toThrow(/remount/)
+      const again = ctx.shield.applyUpdate()
+      await expect(again).resolves.toMatchObject({
+        applied: true,
+        source: 'profile',
+        installed: '0.2.0',
+      })
+    } finally {
+      ShieldSeat.restoreDefaultSpawn()
+      vi.unstubAllGlobals()
+      await ctx.fiber.dispose()
+      profile.cleanup()
+    }
+  })
+
+  it('returns already-current without spawning when installed equals latest', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', undefined)
+    const profile = makeUpdateProfile('0.2.0')
+    vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ version: '0.2.0' }), { status: 200 }))
+    let spawned = 0
+    ShieldSeat.shieldSpawn.current = async () => {
+      spawned += 1
+      return { status: 0, stderr: '' }
+    }
+    const ctx = new Context()
+    ctx.baseUrl = pathToFileURL(profile.dir + '/').href
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRuntime)
+    await provideApprovalAndJobs(ctx)
+    await ctx.plugin(ShieldSeat, { license: 'paid' })
+    await waitForReason(ctx, 'active')
+    try {
+      await expect(ctx.shield.applyUpdate()).resolves.toMatchObject({
+        available: false,
+        applied: false,
+        installed: '0.2.0',
+        latest: '0.2.0',
+      })
+      expect(spawned).toBe(0)
+    } finally {
+      ShieldSeat.restoreDefaultSpawn()
+      vi.unstubAllGlobals()
+      await ctx.fiber.dispose()
+      profile.cleanup()
+    }
+  })
 })
+
+const UPDATE_MODULE = `
+export async function apply() { return { dispose: async () => {} } }
+`
+
+function makeUpdateProfile(version: string): { dir: string; cleanup(): void } {
+  const dir = resolve(tmpdir(), `shres-shield-host-update-${Math.random().toString(36).slice(2)}`)
+  const pkgDir = join(dir, 'node_modules', '@shrestech', 'shres-shield-plugin')
+  mkdirSync(pkgDir, { recursive: true })
+  writeFileSync(join(dir, 'package.json'), '{"name":"profile-test","private":true,"dependencies":{}}\n')
+  writeFileSync(
+    join(pkgDir, 'package.json'),
+    `{"name":"@shrestech/shres-shield-plugin","version":${JSON.stringify(version)},"type":"module","main":"index.js"}\n`,
+  )
+  writeFileSync(join(pkgDir, 'index.js'), UPDATE_MODULE)
+  return { dir, cleanup: () => { rmSync(dir, { recursive: true, force: true }) } }
+}
 
 /** The smallest real provider: one in-memory document, always writable. */
 class MemorySettings extends SettingsProvider {

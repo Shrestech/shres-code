@@ -1,6 +1,6 @@
 {
   "name": "@shres-code/shres-code-client-ui-settings-shield",
-  "description": "Shield settings page: posture, license, and paid-plugin status for the default-on Shres Shield seat",
+  "description": "Shield settings page: posture, license, paid-plugin status, and npm check/update for the default-on Shres Shield seat",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
