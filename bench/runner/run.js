@@ -80,6 +80,10 @@ Options:
   --concurrency <n>     max trials in flight (default: 1; 1 is sequential)
   --max-total-tokens <n>  live token cap per trial: observed root+descendant usage
                         above the cap terminates the trial as BUDGET_EXCEEDED
+  --resume               continue an interrupted experiment: reuse its manifest and
+                        skip (task, trial, arm) triples already recorded with a
+                        delivered verdict (status success); retried provider-error
+                        trials run again. Pin mismatches refuse loud.
   --dry-run             print the plan and exit without writing or executing
   --help                this text
 `
@@ -129,6 +133,8 @@ export class UsageError extends Error {
  * @property {number} concurrency - max trials in flight; 1 is sequential.
  * @property {number} [maxTotalTokens] - live per-trial token cap; a spawn whose observed
  *   root+descendant usage exceeds it is terminated and recorded `BUDGET_EXCEEDED`.
+ * @property {boolean} [resume] - continue an interrupted experiment instead of refusing
+ *   its existing manifests; delivered-verdict trials are skipped, error trials rerun.
  */
 
 /**
@@ -152,6 +158,7 @@ export function parseArgs(argv) {
     tierPatches: [],
     concurrency: 1,
     maxTotalTokens: undefined,
+    resume: false,
   }
   let armsSeen = false
   for (let index = 0; index < argv.length; index += 1) {
@@ -217,6 +224,9 @@ export function parseArgs(argv) {
         options.maxTotalTokens = parsed
         break
       }
+      case '--resume':
+        options.resume = true
+        break
       case '--dry-run':
         options.dryRun = true
         break
@@ -902,8 +912,41 @@ export async function main(argv, io = {}) {
   const startedAt = new Date().toISOString()
 
   const armDirs = new Map()
+  /** @type {Map<string, Set<string>>} arm -> delivered `(taskId, trialIndex)` keys to skip on resume. */
+  const delivered = new Map()
   for (const armName of options.arms) {
     const armDir = join(experimentDir, armName)
+    if (options.resume) {
+      const manifestPath = join(armDir, 'run.json')
+      let existing
+      try {
+        existing = JSON.parse(await readFile(manifestPath, 'utf8'))
+      } catch {
+        throw new UsageError(`--resume: experiment "${options.experiment}" has no manifest for arm "${armName}"; nothing to resume`)
+      }
+      const mismatches = resumePinMismatches(existing, {
+        model, baseUrl, temperature, taskIds, tierPatches: tierPatchRecords, maxTotalTokens: options.maxTotalTokens ?? null, apiKeyEnv,
+      })
+      if (mismatches.length > 0) {
+        throw new UsageError(
+          `--resume: experiment "${options.experiment}" arm "${armName}" pins differ (${mismatches.join(', ')}); a changed run is a new experiment name`,
+        )
+      }
+      const done = new Set()
+      try {
+        for (const line of (await readFile(join(armDir, 'trials.jsonl'), 'utf8')).split('\n')) {
+          if (line.trim() === '') continue
+          const trial = JSON.parse(line)
+          if (trial.status === 'success') done.add(`${trial.taskId}\u0000${trial.trialIndex}`)
+        }
+      } catch {
+        // No trials yet: the manifest alone is resumable.
+      }
+      delivered.set(armName, done)
+      print(`[${options.experiment}] resume ${armName}: skipping ${done.size} delivered trials, rerunning error trials`)
+      armDirs.set(armName, armDir)
+      continue
+    }
     const manifest = {
       version: 1,
       experiment: options.experiment,
@@ -927,10 +970,32 @@ export async function main(argv, io = {}) {
       await writeFile(join(armDir, 'run.json'), `${JSON.stringify(manifest, null, 2)}\n`, { flag: 'wx' })
     } catch {
       throw new UsageError(
-        `experiment "${options.experiment}" already has a manifest for arm "${armName}"; a changed run is a new experiment name`,
+        `experiment "${options.experiment}" already has a manifest for arm "${armName}"; a changed run is a new experiment name (or pass --resume to continue it)`,
       )
     }
     armDirs.set(armName, armDir)
+  }
+
+  /**
+   * Compare a stored manifest's pre-registration pins against the invocation's.
+   * `gitCommit` and `startedAt` deliberately excluded: resuming after a pull is
+   * allowed only when the tier patches pin the same harness composition; a
+   * changed commit with identical overlays is the same measured condition.
+   * @param {Record<string, unknown>} stored - the existing manifest.
+   * @param {object} pins - the invocation's pins.
+   * @returns {string[]} field names that differ.
+   */
+  function resumePinMismatches(stored, pins) {
+    /** @type {string[]} */
+    const diffs = []
+    if (stored.model !== pins.model) diffs.push('model')
+    if (stored.baseUrl !== pins.baseUrl) diffs.push('baseUrl')
+    if (stored.temperature !== pins.temperature) diffs.push('temperature')
+    if (JSON.stringify(stored.taskIds) !== JSON.stringify(pins.taskIds)) diffs.push('taskIds')
+    if (JSON.stringify(stored.tierPatches) !== JSON.stringify(pins.tierPatches)) diffs.push('tierPatches')
+    if ((stored.maxTotalTokens ?? null) !== pins.maxTotalTokens) diffs.push('maxTotalTokens')
+    if (stored.apiKeyEnv !== pins.apiKeyEnv) diffs.push('apiKeyEnv')
+    return diffs
   }
 
   let finished = 0
@@ -944,6 +1009,8 @@ export async function main(argv, io = {}) {
    */
   const runPlanEntry = async entry => {
     if (signal?.aborted) return
+    const done = delivered.get(entry.arm)
+    if (done !== undefined && done.has(`${entry.taskId}\u0000${entry.trialIndex}`)) return
     const task = /** @type {TaskDefinition} */ (tasks.get(entry.taskId))
     const arm = getArm(entry.arm)
     const armDir = /** @type {string} */ (armDirs.get(entry.arm))
@@ -965,7 +1032,13 @@ export async function main(argv, io = {}) {
       : task.phases.map((_, index) => join(sessionRoot, `phase-${index}`))
     for (const root of phaseRoots) {
       if (existsSync(root)) {
-        violations.push(`session-root-preexisting:${relative(armDir, root).split(sep).join('/')}`)
+        if (options.resume) {
+          // A rerun of an interrupted error trial reuses its slot; the stale
+          // roots belong to the failed attempt and are cleared, not flagged.
+          await rm(root, { recursive: true, force: true })
+        } else {
+          violations.push(`session-root-preexisting:${relative(armDir, root).split(sep).join('/')}`)
+        }
       }
     }
 
