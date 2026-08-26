@@ -479,6 +479,7 @@ async function executeSpawn({ repoRoot, arm, armDir, sessionLogRoot, taskText, s
       metrics.tokensIncludingDescendants = descendants.tokensIncludingDescendants
       metrics.descendantSessions = descendants.descendantSessions
     }
+    metrics.outOfLoopExperiments += descendants.delegatedSessions + descendants.descendantRunCodeCalls
   }
   const sessionFile = execution.sessionLogPath === null
     ? null
@@ -487,7 +488,7 @@ async function executeSpawn({ repoRoot, arm, armDir, sessionLogRoot, taskText, s
 }
 
 /** Fields summed across phases. */
-const SUMMABLE_METRICS = ['inputTokens', 'outputTokens', 'durationMs', 'turns', 'toolCalls', 'identicalRetries', 'checkpoints', 'shipPasses', 'coverageRefusalThenPad', 'noopNoteRefusals', 'noteCapRefusals', 'compactionCount', 'tokensIncludingDescendants', 'descendantSessions']
+const SUMMABLE_METRICS = ['inputTokens', 'outputTokens', 'durationMs', 'turns', 'toolCalls', 'identicalRetries', 'checkpoints', 'shipPasses', 'coverageRefusalThenPad', 'noopNoteRefusals', 'noteCapRefusals', 'compactionCount', 'tokensIncludingDescendants', 'descendantSessions', 'outOfLoopExperiments']
 
 /**
  * Sum per-phase metrics into the trial-level row.

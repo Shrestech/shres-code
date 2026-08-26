@@ -42,7 +42,7 @@ function trial(overrides) {
       checkpoints: 0,
       shipPasses: 0,
       tokensIncludingDescendants: null,
-      costIncludingDescendants: null,
+      costIncludingDescendants: null, descendantSessions: 0, outOfLoopExperiments: 0,
       danglingCard: null,
       verifiedCheckpointShare: null,
       coverageRefusalThenPad: 0,
@@ -380,7 +380,7 @@ test('buildExperiment: chain strata and chain trials flow through unchanged', as
       timedOut: false,
       metrics: {
         inputTokens, outputTokens: 20, durationMs: 5000, turns: 2, toolCalls: 3, identicalRetries: 0, checkpoints: 0, shipPasses: 0,
-        tokensIncludingDescendants: null, costIncludingDescendants: null, danglingCard: null, verifiedCheckpointShare: null,
+        tokensIncludingDescendants: null, costIncludingDescendants: null, descendantSessions: 0, outOfLoopExperiments: 0, danglingCard: null, verifiedCheckpointShare: null,
         coverageRefusalThenPad: 0, noopNoteRefusals: 0, noteCapRefusals: 0, sessionQueryCalls: null,
         compactionCount: 0, pressureFired: false,
       },
