@@ -111,7 +111,7 @@ Scheduler rules that follow:
 **(e) Config (all validated, default-off):**
 
 ```ts
-interface Config {
+interface HostSchedulerConfig {
   /** Master switch. Default false: no scanning, no timers, no resumes. */
   readonly enabled: boolean
   /** Simultaneously cold-resumed sessions. Default 2. */
@@ -221,21 +221,25 @@ True mailbox depth is **deferred to [WP2.2](2026-08-26-beat-prime-agent-roadmap.
 **Inject posture (decision):** follow [`list-children.ts:209-213`](../../../../packages/subagent/subagent/src/list-children.ts). Static `inject` lists `subagents` and `sessionProjections`. `sessionPersistence` and `sessionProjectionCache` are obtained via runtime `ctx.get()` and are optional: an absent cache means every cold candidate takes the authoritative `inspect` rung; an absent persistence means only live sessions contribute (same as listing). Do not list persistence as a hard `inject` while calling it optional in prose.
 
 ```ts
-interface TreeUsage {
-  readonly root: SessionId
-  /** Provider-reported buckets summed over the root session itself. */
-  readonly rootUsage: TokenUsageProjection | null     // null: no usage ever reported
-  /** Same buckets summed over every healthy session-backed descendant. */
-  readonly descendantUsage: TokenUsageProjection
-  /** Number of descendant sessions contributing; excludes diagnostics. */
+interface BeatPrimeTreeUsage {
+  readonly root: string
+  readonly rootUsage: BeatPrimeTokenUsageProjection | null
+  readonly descendantUsage: BeatPrimeTokenUsageProjection
   readonly countedSessions: number
-  /** Per-descendant failures, mirroring SubagentListEntry diagnostics. */
-  readonly diagnostics: readonly { id: SessionId; reason: 'corrupt' | 'unavailable' }[]
+  readonly diagnostics: readonly { id: string; reason: 'corrupt' | 'unavailable' }[]
 }
 
-// ctx.subagentAccounting
-usageIncludingDescendants(root: SessionId, signal?: AbortSignal): Promise<TreeUsage>
-costOf(usage: TreeUsage, prices: PriceTable): UsdBreakdown | undefined
+interface BeatPrimeTokenUsageProjection {
+  readonly uncachedInputTokens: number
+  readonly outputTokens: number
+  readonly cacheReadTokens: number
+  readonly cacheWriteTokens: number
+}
+
+interface BeatPrimeSubagentAccounting {
+  usageIncludingDescendants(root: string, signal?: AbortSignal): Promise<BeatPrimeTreeUsage>
+  costOf(usage: BeatPrimeTreeUsage, prices: PriceTable): { usd: number } | undefined
+}
 ```
 
 Mechanics: one `listDescendants(root)` call, then per node read its **`tokenUsage` projection value**:
@@ -288,17 +292,13 @@ The only correct chokepoint is where occupancy is already acquired synchronously
 Dependency-direction problem: accounting consumes `subagents` (for `listDescendants`), so subagent cannot import accounting. Solution — define the seam where it is consumed:
 
 ```ts
-// packages/subagent/subagent — new abstract seam, optionally implemented:
-interface SubagentTreeBudget {
-  /** Tokens already spent by this root's tree, provider-reported. */
-  spentIncludingDescendants(root: SessionId): number | undefined   // undefined: unknown ⇒ admit
+interface BeatPrimeSubagentTreeBudget {
+  spentIncludingDescendants(root: string): number | undefined
 }
 
-// SubagentRuntime.Config gains:
-/** Refuse new children once the root's tree exceeds this many billed tokens.
- *  Requires a mounted SubagentTreeBudget implementation; a configured cap
- *  without one is a load-time composition error (fail loud). Default 'unlimited'. */
-readonly maxTreeTokensPerRoot?: number | 'unlimited'
+interface BeatPrimeSubagentRuntimeConfigGains {
+  readonly maxTreeTokensPerRoot?: number | 'unlimited'
+}
 ```
 
 Refusal is a typed `SubagentError('TREE_BUDGET_EXHAUSTED')` carrying `{ root, spent, cap }`; the delegation tool layer maps it to an `isError` tool result exactly as it maps `CONCURRENCY_CAP`. `undefined` (no usage yet, no accounting mounted at runtime despite valid composition) admits — budget enforcement is best-effort at admission granularity, and the doc says so; the hard stop for runaway remains Part 1's turn ceilings and the bench's `BUDGET_EXCEEDED` failure mode.

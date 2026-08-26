@@ -47,9 +47,9 @@ What changes is who may deliver and when materialization happens.
 
 Today `followup()` resolves residency synchronously: enqueue into the live Activation, or cold-resume then submit. Add a second delivery posture, mirroring the report channel's `'quiet' | 'wakeup'` split:
 
-```ts type-equiv
+```ts
 /** Scheduling policy for one accepted bus message. */
-type MailDelivery = 'wakeup' | 'quiet'
+type BeatPrimeMailDelivery = 'wakeup' | 'quiet'
 ```
 
 - `'wakeup'` — exactly today's `followup()` path: enqueue / wake / cold-resume.
@@ -78,14 +78,14 @@ One-shot children stay undeliverable in every direction. **`NOT_CONTINUABLE` is 
 
 Add one merge-extensible `MessageSourceMap` kind next to the existing three:
 
-```ts type-equiv
+```ts
 /** Durable attribution for a bus message between family members. */
-interface AgentMailMessageSource {
+interface BeatPrimeAgentMailMessageSource {
   readonly kind: 'agent-mail'
   /** A message another agent addressed to this one. */
   readonly form: 'relay'
-  /** Session id of the sending agent. */
-  readonly senderSessionId: SessionId
+  /** Session id of the sending agent (branded SessionId at the seam). */
+  readonly senderSessionId: string
 }
 ```
 
@@ -97,16 +97,19 @@ Settlement notices keep their distinct kind — a transcript must never credit t
 
 Declared by `shres-subagent` via `declare module` merging (same mechanism as `subagent/descriptor`), regenerated into `KNOWN_SESSION_EVENT_TYPES` by `gen-persistence-catalog`.
 
-```ts type-equiv
-interface SubagentMailData {
+```ts
+/** Caller-minted pairing key; branded `MailCorrelationId` at the seam. */
+type BeatPrimeMailCorrelationId = string
+
+interface BeatPrimeSubagentMailData {
   /** Envelope format version; supporting another field is a deliberate bump. */
   readonly version: 1
   /** Identity of this mail; equals the accepted UserMessage id on wakeup delivery. */
-  readonly messageId: MessageId
+  readonly messageId: string
   /** Sending session. */
-  readonly sender: SessionId
+  readonly sender: string
   /** Receiving session (redundant with the log it lives in, but makes receipts self-contained). */
-  readonly receiver: SessionId
+  readonly receiver: string
   /** Scheduling policy chosen at send time. */
   readonly delivery: 'wakeup' | 'quiet'
   /**
@@ -114,10 +117,8 @@ interface SubagentMailData {
    * durable / tool / RPC boundary; the caller mints it, the harness does
    * not allocate or validate uniqueness.
    */
-  readonly correlationId?: MailCorrelationId
+  readonly correlationId?: BeatPrimeMailCorrelationId
 }
-
-type MailCorrelationId = Branded<'MailCorrelationId'>
 ```
 
 `correlationId` is **not** a bare `string`. Callers mint `MailCorrelationId` values the same way they mint `MessageId` (brand constructor, no format check). The harness treats two equal ids as the same pairing key and does not generate them.

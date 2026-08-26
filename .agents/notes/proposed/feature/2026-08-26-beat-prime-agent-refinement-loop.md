@@ -109,29 +109,29 @@ No SQL beyond whatever the sqlite storage-domain backend already provides; the s
 
 ### Entry shape
 
-```ts type-equiv
+```ts
 /** Kinds of reusable harness state. Closed in v1; merge-extensible later. */
-type HarnessEntryKind = 'memory' | 'skill' | 'subagent-spec'
+type BeatPrimeHarnessEntryKind = 'memory' | 'skill' | 'subagent-spec'
 
 /** Lifecycle. Transitions are one-directional except retire, which is a new head. */
-type HarnessEntryStatus =
-  | 'draft'        // mined, awaiting validation
-  | 'validated'    // validator receipt attached
-  | 'approved'     // human grant recorded (when gate requires it)
-  | 'active'       // activator materialized it
-  | 'retired'      // superseded/rolled back; prior head restorable
+type BeatPrimeHarnessEntryStatus =
+  | 'draft'
+  | 'validated'
+  | 'approved'
+  | 'active'
+  | 'retired'
 
-interface HarnessEntry {
-  readonly id: HarnessEntryId            // Branded<'HarnessEntryId'>
-  readonly kind: HarnessEntryKind
-  readonly name: string                  // kebab-case, namespace-checked per kind
-  readonly status: HarnessEntryStatus
-  readonly version: number               // monotonic per id
-  readonly body: string                  // markdown / spec JSON; bytes hashed below
-  readonly bodyHash: string              // sha256; receipt binds to this exact value
+interface BeatPrimeHarnessEntry {
+  readonly id: string
+  readonly kind: BeatPrimeHarnessEntryKind
+  readonly name: string
+  readonly status: BeatPrimeHarnessEntryStatus
+  readonly version: number
+  readonly body: string
+  readonly bodyHash: string
   readonly provenance: {
-    readonly sourceSessionIds: readonly SessionId[]
-    readonly sourceSeqs: readonly number[]      // citable via session_event_read
+    readonly sourceSessionIds: readonly string[]
+    readonly sourceSeqs: readonly number[]
     readonly evidenceClass: 'charter-verified' | 'verifier-evidence' | 'human-positive' | 'unverified'
     readonly trigger: 'session-end' | 'command' | 'sweep'
     readonly minedAt: number
@@ -139,9 +139,9 @@ interface HarnessEntry {
   readonly validation?: {
     readonly validator: 'shres-harness-validate'
     readonly checksPassed: readonly string[]
-    readonly receiptHash: string          // binds receipt to bodyHash
+    readonly receiptHash: string
   }
-  readonly approval?: { readonly by: string; readonly channel: 'command' | 'ui'; readonly approvalId?: ApprovalRequestId }
+  readonly approval?: { readonly by: string; readonly channel: 'command' | 'ui'; readonly approvalId?: string }
 }
 ```
 

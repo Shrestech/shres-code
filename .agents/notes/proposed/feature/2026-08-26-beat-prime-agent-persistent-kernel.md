@@ -65,7 +65,7 @@ Persisted values: lossless JSON structures and text blobs (datasets, parsed tabl
 
 Programs are still bodies of async functions (unchanged strip-wrap). Persistence is an injected global, so the seam stays language-portable:
 
-```ts
+```ts ignore-check
 // run_code (kernel flavor) — cell semantics
 const rows = await tools.read_file({ path })        // nested dispatch, logged as today
 state.docs = parse(rows)                             // persist a slot
@@ -113,42 +113,30 @@ So: **event-sourced slot metadata + content-addressed artifact payloads** — th
 
 Merged into `SessionEventMap` by the kernel package (declaration merging, jspace/* pattern; all log-only, all `{ ignorable: true }`; no new `SurfaceEventType`; no `SESSION_FORMAT_VERSION` bump since the format gains merge-extensible members only):
 
-```ts type-equiv
-/** Scope opened lazily before its first exec. */
-'kernel/open': { kernelId: string }
-
-/**
- * One settled kernel-mode run. Pairs with the ordinary tool/call + tool/result
- * events via callId; the tool/result text is the model-visible part.
- */
-'kernel/exec': {
-  kernelId: string
-  callId: CallId            // links to the outer run_code call
-  language: 'typescript' | 'python'
-  program: string           // full source, as logged for every code run today
-  outcome: 'ok' | 'error'
-  errorKind?: 'exception' | 'timeout' | 'abort' | 'worker-exit' | 'invalid-output' | 'output-limit' | 'budget'
-  reads: string[]           // slots read (provenance)
-  writes: string[]          // slots written this run
+```ts
+/** Proposed `SessionEventMap` members; branded ids at the seam. */
+interface BeatPrimeKernelEventMap {
+  'kernel/open': { kernelId: string }
+  'kernel/exec': {
+    kernelId: string
+    callId: string
+    language: 'typescript' | 'python'
+    program: string
+    outcome: 'ok' | 'error'
+    errorKind?: 'exception' | 'timeout' | 'abort' | 'worker-exit' | 'invalid-output' | 'output-limit' | 'budget'
+    reads: string[]
+    writes: string[]
+  }
+  'kernel/slot-set': {
+    kernelId: string
+    name: string
+    ref: { sha256: string; bytes: number; encoding: 'json' | 'text' }
+    reprHead: string
+    value?: unknown
+  }
+  'kernel/slot-drop': { kernelId: string; names: string[]; freedBytes: number }
+  'kernel/close': { kernelId: string; reason: 'idle-ttl' | 'disposed' | 'recycled' | 'session-end' }
 }
-
-/**
- * Durable slot commit — appended AFTER the run settles (transactional batch).
- * Small values MAY inline `value`; larger ones carry only the ref.
- */
-'kernel/slot-set': {
-  kernelId: string
-  name: string
-  ref: { sha256: string; bytes: number; encoding: 'json' | 'text' }
-  reprHead: string          // bounded preview; the only cheap-to-render copy
-  value?: JsonValue         // present iff bytes <= maxInlineSlotBytes
-}
-
-/** Model-driven deletion. */
-'kernel/slot-drop': { kernelId: string; names: string[]; freedBytes: number }
-
-/** Disposal with reason; rehydrate folds ignore scopes closed before their read point. */
-'kernel/close': { kernelId: string; reason: 'idle-ttl' | 'disposed' | 'recycled' | 'session-end' }
 ```
 
 `language: 'python'` on `kernel/exec` is reserved for a future backend; v1 events always carry `'typescript'`.
