@@ -133,6 +133,7 @@ WP1.1 extracts shared plumbing. The WP3.3 OOLONG-lite **pilot** runs immediately
 
 ### WP1.7 Default-mount stateless `run_code` in the advanced analysis profile
 
+- **Status:** landed. See [run-code compute-don't-read](../../implemented/feature/2026-08-26-run-code-compute-dont-read.md). This measures adoption of stateless code-mode compute; it bounds the kernel's **floor**, not its ceiling.
 - **Owner:** this roadmap (median fix); the landing PR carries the implemented note.
 - **Touch points:** [`examples/headless-agent/advanced.cordis.yml`](../../../../examples/headless-agent/advanced.cordis.yml) and/or the analysis-profile patch (NOT the base bundle — the default-off constitution holds for the bench); [`packages/core/tools/src/code-mode.ts`](../../../../packages/core/tools/src/code-mode.ts) (`RUN_CODE_NAME`, `SDK_SECTION_ORDER`, language flavor texts). Template: [`examples/acp-agent/code-mode.cordis.yml`](../../../../examples/acp-agent/code-mode.cordis.yml).
 - **Work:** mount code-mode in the advanced analysis profile; add a compute-don't-read guidance line to the SDK section for that profile: when a task needs reading many files or computing over data, prefer one `run_code` program that loads and computes over a corpus instead of N `read` calls.
