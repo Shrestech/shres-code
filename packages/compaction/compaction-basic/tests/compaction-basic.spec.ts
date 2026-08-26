@@ -5,11 +5,17 @@ import BasicCompactionEngine from '@shres-code/shres-code-compaction-basic'
 import type { BasicCompactionConfig } from '@shres-code/shres-code-compaction-basic'
 import { selectCompactableRange } from '@shres-code/shres-code-compaction-basic/src/region.ts'
 import type { SummarizationInput, SummaryResult } from '@shres-code/shres-code-compaction-basic/src/summarizer.ts'
+import {
+  POINTER_READ_CUE,
+  POINTER_SECTION_HEADING,
+} from '@shres-code/shres-code-compaction-basic/src/pointers.ts'
 import { CompactionId, toolPairingBalancedAfter, toolPairingBalancedBefore } from '@shres-code/shres-code-compaction'
 import {
   resolveCompactSpec,
   resolveConfig,
   resolveTargetPolicy,
+  DEFAULT_MAX_POINTERS,
+  MAX_MAX_POINTERS,
 } from '@shres-code/shres-code-compaction-basic/src/config.ts'
 import type { CompactionResult } from '@shres-code/shres-code-compaction'
 import LlmRuntime, { createUserMessage, CallId, CONTEXT_WINDOW_EXCEEDED_CODE, createToolResultMessage, LlmAdapter , createMessage } from '@shres-code/shres-code-llm'
@@ -298,6 +304,7 @@ describe('compact configuration and defaults', () => {
       maxOverflowRetries: 1,
       modelPolicies: [],
       auto: true,
+      maxPointers: DEFAULT_MAX_POINTERS,
     })
     expect(Object.isFrozen(resolved)).toBe(true)
   })
@@ -415,6 +422,9 @@ describe('compact configuration and defaults', () => {
       [{ maxTokens: 0 }, /maxTokens/],
       [{ compactionRetries: -1 }, /compactionRetries/],
       [{ maxOverflowRetries: -1 }, /maxOverflowRetries/],
+      [{ maxPointers: -1 }, /maxPointers/],
+      [{ maxPointers: MAX_MAX_POINTERS + 1 }, /maxPointers/],
+      [{ maxPointers: 1.5 }, /maxPointers/],
       [{ auto: 'yes' }, /auto must be a boolean/],
       [{ summarizationProvider: 1 }, /summarizationProvider must be a string/],
       [{ summarizationModel: 1 }, /summarizationModel must be a string/],
@@ -457,6 +467,7 @@ describe('compact configuration and defaults', () => {
         /modelPolicies\[0\]: retainRatio \(0.9\).*thresholdRatio \(0.8\)/,
       ],
       [{ modelPolicies: [{ provider: MODEL, model: MODEL }, { provider: MODEL, model: MODEL }] }, /duplicate model policy/],
+      [{ modelPolicies: [{ provider: MODEL, model: MODEL, maxPointers: 1 }] }, /unknown key "maxPointers"/],
       [{ models: { [MODEL]: { retainTokens: 10 } } }, /BasicCompactionConfig: unknown key "models"/],
       [{ thresholdRato: 0.5 }, /BasicCompactionConfig: unknown key "thresholdRato"/],
     ] as Array<[unknown, RegExp]>
@@ -870,13 +881,35 @@ describe('compaction region transaction', () => {
       usage: compact.usage,
     })
     expect(summary?.data).not.toHaveProperty('llmStreamCall')
+    const pointerText = summary?.type === 'compaction/summary'
+      ? summary.data.summary.filter(block => block.type === 'text').map(block => block.text).join('')
+      : ''
+    expect(pointerText).toContain(POINTER_SECTION_HEADING)
+    expect(pointerText).toContain(POINTER_READ_CUE)
+    expect(summary?.type === 'compaction/summary' ? summary.data.rawOutput : undefined)
+      .toEqual(compact.rawOutput)
     const head = session.deriveMessages()[0]!
     expect(head.content[0]?.type).toBe('text')
     expect(head.content[0]?.type === 'text' ? head.content[0].text : '').toContain('<compacted-summary>')
+    expect(head.content.some(block => block.type === 'text' && block.text.includes(POINTER_SECTION_HEADING)))
+      .toBe(true)
     expect(head.content.at(-1)).toEqual({ type: 'text', text: '</compacted-summary>' })
 
     const replay = Session.create(SessionId('replay'), [...session.events])
     expect(replay.deriveMessages()).toEqual(session.deriveMessages())
+  })
+
+  it('omits pointer lines when maxPointers is 0', async () => {
+    const compact = service({ auto: false, maxPointers: 0 })
+    const session = conversation(3)
+    const before = [...session.surface.nodes]
+    await compact.compactRegion(before[0]!, before[3]!, agent(session, MODEL), SIGNAL)
+    const summary = session.events.findLast(event => event.type === 'compaction/summary')
+    const text = summary?.type === 'compaction/summary'
+      ? summary.data.summary.filter(block => block.type === 'text').map(block => block.text).join('')
+      : ''
+    expect(text).toBe('small checkpoint')
+    expect(text).not.toContain(POINTER_SECTION_HEADING)
   })
 
   it('replays the latest routed header so the summarizer reuses the cache', async () => {
@@ -1325,12 +1358,15 @@ describe('default one-shot summarizer', () => {
     const session = conversation(3, 'large history '.repeat(500))
     const nodes = session.surface.nodes
     await compact.compactRegion(nodes[0]!, nodes[3]!, agent(session, MODEL), SIGNAL)
-    expect(session.events.findLast(event => event.type === 'compaction/summary')?.data).toMatchObject({
-      summary: [{ type: 'text', text: 'routed summary' }],
+    const recorded = session.events.findLast(event => event.type === 'compaction/summary')?.data
+    expect(recorded).toMatchObject({
       llmStreamCall: true,
       provider: 'routed-summary-provider',
       model: 'routed-summary-model',
     })
+    expect(recorded?.summary[0]).toEqual({ type: 'text', text: 'routed summary' })
+    expect(recorded?.summary.some(block => block.type === 'text' && block.text.includes(POINTER_READ_CUE)))
+      .toBe(true)
     expect(routedAdapter.lastOptions?.provider).toBe('routed-summary-provider')
     expect(routedAdapter.lastOptions?.model).toBe('routed-summary-model')
   })

@@ -23,9 +23,12 @@ import type { Session, SessionEvent } from '@shres-code/shres-code-session'
 import type { Agent } from '@shres-code/shres-code-agent'
 import { frameSummary } from './summarizer.ts'
 import type { SummarizationInput, SummaryResult } from './summarizer.ts'
+import { attachElisionPointersWithinBudget } from './pointers.ts'
 
 interface RegionDependencies {
   readonly meter: TokenMeter
+  /** Maximum code-assembled seq-pointer lines appended to the summary. */
+  readonly maxPointers: number
   summarize(input: SummarizationInput, agent: Agent, signal?: AbortSignal): Promise<SummaryResult>
 }
 
@@ -366,8 +369,19 @@ async function summarizeCompaction(
   signal?: AbortSignal,
 ): Promise<SummarizedCompaction> {
   const summaryResult = await dependencies.summarize(prepared.input, agent, signal)
+  const summary = attachElisionPointersWithinBudget(
+    summaryResult.summary,
+    agent.session,
+    prepared.shadowedSeqs,
+    dependencies.maxPointers,
+    blocks => dependencies.meter.estimateMessage(createUserMessage({
+      content: frameSummary(blocks),
+      source: compactCheckpointSource(compactionId, sourceCommandId),
+    })),
+    prepared.shadowedTokenCount,
+  )
   const checkpointMessage = createUserMessage({
-    content: frameSummary(summaryResult.summary),
+    content: frameSummary(summary),
     source: compactCheckpointSource(compactionId, sourceCommandId),
   })
   const framedSummaryTokenCount = dependencies.meter.estimateMessage(checkpointMessage)
@@ -379,6 +393,7 @@ async function summarizeCompaction(
   return {
     ...prepared,
     ...summaryResult,
+    summary,
     checkpointMessage,
   }
 }

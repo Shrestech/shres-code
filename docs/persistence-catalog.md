@@ -292,7 +292,7 @@ Source: [`packages/interaction/commands/src/types.ts:88`](../packages/interactio
 'compaction/end': { compactionId: CompactionId; sourceCommandId?: CommandId; turn: number | null; error?: string }
 ```
 
-Source: [`packages/compaction/compaction/src/types.ts:71`](../packages/compaction/compaction/src/types.ts)
+Source: [`packages/compaction/compaction/src/types.ts:73`](../packages/compaction/compaction/src/types.ts)
 
 <a id="compactionprune--log-only"></a>
 
@@ -318,7 +318,7 @@ Source: [`packages/compaction/compaction/src/types.ts:71`](../packages/compactio
 }
 ```
 
-Source: [`packages/compaction/compaction/src/types.ts:81`](../packages/compaction/compaction/src/types.ts)
+Source: [`packages/compaction/compaction/src/types.ts:83`](../packages/compaction/compaction/src/types.ts)
 
 <a id="compactionstart--log-only"></a>
 
@@ -347,7 +347,9 @@ Source: [`packages/compaction/compaction/src/types.ts:23`](../packages/compactio
  * shadows the compacted range. That adjacency is contractual — the
  * shadowed pricing fields are the replacement's shadow price, so a
  * consumer may pair a replacement with the metering event directly
- * before it (`compaction/prune` documents the shared protocol).
+ * before it (`compaction/prune` documents the shared protocol). When the
+ * basic backend appends seq-pointer lines, they are extra text blocks in
+ * `summary` and therefore on that replacement message.
  */
 'compaction/summary': {
   compactionId: CompactionId
@@ -387,7 +389,7 @@ Source: [`packages/compaction/compaction/src/types.ts:23`](../packages/compactio
 
 Types: [ContentBlock](subsystems/core.md) · [TokenUsage](subsystems/llm-streaming.md)
 
-Source: [`packages/compaction/compaction/src/types.ts:33`](../packages/compaction/compaction/src/types.ts)
+Source: [`packages/compaction/compaction/src/types.ts:35`](../packages/compaction/compaction/src/types.ts)
 
 ### `feedback/*`
 
@@ -492,7 +494,7 @@ Source: [`packages/hooks/hook-protocol/src/types.ts:31`](../packages/hooks/hook-
 'jspace/card': JspaceCard
 ```
 
-Source: [`packages/jspace/jspace/src/types.ts:206`](../packages/jspace/jspace/src/types.ts)
+Source: [`packages/jspace/jspace/src/types.ts:203`](../packages/jspace/jspace/src/types.ts)
 
 <a id="jspacecharter-amend--log-only"></a>
 
@@ -513,7 +515,7 @@ Source: [`packages/jspace/jspace/src/types.ts:206`](../packages/jspace/jspace/sr
 }
 ```
 
-Source: [`packages/jspace/jspace/src/types.ts:278`](../packages/jspace/jspace/src/types.ts)
+Source: [`packages/jspace/jspace/src/types.ts:275`](../packages/jspace/jspace/src/types.ts)
 
 <a id="jspacecharter-probe--log-only"></a>
 
@@ -542,7 +544,7 @@ Source: [`packages/jspace/jspace/src/types.ts:278`](../packages/jspace/jspace/sr
 
 Types: [CallId](subsystems/core.md)
 
-Source: [`packages/jspace/jspace/src/types.ts:263`](../packages/jspace/jspace/src/types.ts)
+Source: [`packages/jspace/jspace/src/types.ts:260`](../packages/jspace/jspace/src/types.ts)
 
 <a id="jspacecharter-proposal--log-only"></a>
 
@@ -563,7 +565,7 @@ Source: [`packages/jspace/jspace/src/types.ts:263`](../packages/jspace/jspace/sr
 }
 ```
 
-Source: [`packages/jspace/jspace/src/types.ts:220`](../packages/jspace/jspace/src/types.ts)
+Source: [`packages/jspace/jspace/src/types.ts:217`](../packages/jspace/jspace/src/types.ts)
 
 <a id="jspacecharter-run--log-only"></a>
 
@@ -602,7 +604,7 @@ Source: [`packages/jspace/jspace/src/types.ts:220`](../packages/jspace/jspace/sr
 
 Types: [CallId](subsystems/core.md)
 
-Source: [`packages/jspace/jspace/src/types.ts:240`](../packages/jspace/jspace/src/types.ts)
+Source: [`packages/jspace/jspace/src/types.ts:237`](../packages/jspace/jspace/src/types.ts)
 
 <a id="jspaceclosed--log-only"></a>
 
@@ -617,7 +619,7 @@ Source: [`packages/jspace/jspace/src/types.ts:240`](../packages/jspace/jspace/sr
 'jspace/closed': JspaceClosed
 ```
 
-Source: [`packages/jspace/jspace/src/types.ts:212`](../packages/jspace/jspace/src/types.ts)
+Source: [`packages/jspace/jspace/src/types.ts:209`](../packages/jspace/jspace/src/types.ts)
 
 ### `llm/*`
 

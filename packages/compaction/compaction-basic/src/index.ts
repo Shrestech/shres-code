@@ -21,6 +21,7 @@ import {
   resolveConfig,
   resolveTargetPolicy,
   TargetPressureConfigError,
+  MAX_MAX_POINTERS,
 } from './config.ts'
 import {
   assertNoActiveCompaction,
@@ -78,6 +79,7 @@ const summarizationModelSchema = z.string()
 const maxTokensSchema = z.number().step(1).min(1)
 const compactionRetriesSchema = z.number().step(1).min(0)
 const maxOverflowRetriesSchema = z.number().step(1).min(0)
+const maxPointersSchema = z.number().step(1).min(0).max(MAX_MAX_POINTERS)
 
 const modelPolicy: z<ModelCompactPolicyConfig> = z.object({
   provider: z.string().required(),
@@ -114,6 +116,7 @@ export class BasicCompactionEngine extends CompactionEngine {
     maxOverflowRetries: maxOverflowRetriesSchema,
     modelPolicies: z.array(modelPolicy),
     auto: z.boolean(),
+    maxPointers: maxPointersSchema,
   })
 
   /** Resolved and validated compaction configuration. */
@@ -420,10 +423,15 @@ export class BasicCompactionEngine extends CompactionEngine {
   }
 
   /** Bind the effective token meter and dynamically dispatched summarizer hook. */
-  private regionDependencies(): { meter: TokenMeter; summarize: RegionSummarize } {
+  private regionDependencies(): {
+    meter: TokenMeter
+    summarize: RegionSummarize
+    maxPointers: number
+  } {
     return {
       meter: this.ctx.tokenMeter,
       summarize: (input, owner, abort) => this.summarize(input, owner, abort),
+      maxPointers: this.config.maxPointers,
     }
   }
 }

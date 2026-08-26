@@ -516,6 +516,13 @@ export interface BasicCompactionConfig extends CompactionPolicyConfig {
   modelPolicies?: ModelCompactPolicyConfig[]
   /** Enable automatic step-boundary pressure and overflow-recovery listeners. Defaults to `true`. */
   auto?: boolean
+  /**
+   * Maximum code-assembled seq-pointer lines appended to each summary.
+   * Each line names a salient shadowed event (tool result, user message, or
+   * assistant message) and how to reread it with `session_event_read` against
+   * the current session. `0` emits no pointers. Defaults to `8`; maximum `64`.
+   */
+  maxPointers?: number
 }
 
 /** Policy fields shared by the default policy and exact model overrides. */

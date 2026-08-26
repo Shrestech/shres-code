@@ -28,7 +28,9 @@ declare module '@shres-code/shres-code-session/types' {
      * shadows the compacted range. That adjacency is contractual — the
      * shadowed pricing fields are the replacement's shadow price, so a
      * consumer may pair a replacement with the metering event directly
-     * before it (`compaction/prune` documents the shared protocol).
+     * before it (`compaction/prune` documents the shared protocol). When the
+     * basic backend appends seq-pointer lines, they are extra text blocks in
+     * `summary` and therefore on that replacement message.
      */
     'compaction/summary': {
       compactionId: CompactionId

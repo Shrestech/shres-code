@@ -16,6 +16,12 @@ import type {
   ResolvedTargetPolicy,
 } from './types.ts'
 
+/** Default number of seq-pointer lines appended to a compaction summary. */
+export const DEFAULT_MAX_POINTERS = 8
+
+/** Inclusive upper bound for {@link BasicCompactionConfig.maxPointers}. */
+export const MAX_MAX_POINTERS = 64
+
 /** Default request-pressure fraction for every routed model. */
 const DEFAULT_THRESHOLD_RATIO = 0.8
 
@@ -39,6 +45,7 @@ const BASIC_COMPACT_CONFIG_KEYS: ReadonlySet<string> = new Set([
   ...POLICY_CONFIG_KEYS,
   'modelPolicies',
   'auto',
+  'maxPointers',
 ])
 
 /** Complete exact-target override key set. */
@@ -70,6 +77,9 @@ export function resolveConfig(config: BasicCompactionConfig = {}): ResolvedConfi
   if (config.auto !== undefined && typeof config.auto !== 'boolean') {
     throw new Error('BasicCompactionConfig: auto must be a boolean')
   }
+  if (config.maxPointers !== undefined) {
+    assertMaxPointers('BasicCompactionConfig.maxPointers', config.maxPointers)
+  }
 
   const thresholdRatio = config.thresholdRatio ?? DEFAULT_THRESHOLD_RATIO
   const retention = resolveRetention(config, { retainRatio: DEFAULT_RETAIN_RATIO })
@@ -93,6 +103,7 @@ export function resolveConfig(config: BasicCompactionConfig = {}): ResolvedConfi
     maxOverflowRetries: config.maxOverflowRetries ?? 1,
     modelPolicies,
     auto: config.auto ?? true,
+    maxPointers: config.maxPointers ?? DEFAULT_MAX_POINTERS,
   })
 }
 
@@ -300,6 +311,13 @@ function assertPositiveInteger(name: string, value: unknown): asserts value is n
 function assertNonNegativeInteger(name: string, value: unknown): asserts value is number {
   if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
     throw new Error(`${name} (${String(value)}) must be a non-negative integer`)
+  }
+}
+
+function assertMaxPointers(name: string, value: unknown): asserts value is number {
+  assertNonNegativeInteger(name, value)
+  if (value > MAX_MAX_POINTERS) {
+    throw new Error(`${name} (${String(value)}) must be at most ${MAX_MAX_POINTERS}`)
   }
 }
 
