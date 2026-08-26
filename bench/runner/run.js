@@ -229,7 +229,53 @@ export function parseArgs(argv) {
   if (options.experiment.includes('/') || options.experiment.includes('\\')) {
     throw new UsageError('--experiment must be a plain directory name')
   }
+  assertStuffedCompactionGuard(options)
   return options
+}
+
+/**
+ * True when a `--tier-patch` path is the forced-compaction pressure overlay.
+ * @param {string} patchPath - path as given on the command line.
+ * @returns {boolean} whether the basename is `forced-compaction.patch.yml`.
+ */
+export function isForcedCompactionPatch(patchPath) {
+  const normalized = patchPath.replaceAll('\\', '/')
+  const slash = normalized.lastIndexOf('/')
+  const basename = slash === -1 ? normalized : normalized.slice(slash + 1)
+  return basename === 'forced-compaction.patch.yml'
+}
+
+/**
+ * Protocol rule: a stuffed arm's condition is the whole corpus in the prompt.
+ * Forced compaction would destroy that condition. Fail at argv validation.
+ * @param {Pick<RunnerOptions, 'arms' | 'tierPatches'>} options - parsed flags.
+ * @returns {void}
+ */
+export function assertStuffedCompactionGuard(options) {
+  const stuffedArms = options.arms.filter(name => getArm(name).stuffed === true)
+  if (stuffedArms.length === 0) return
+  const compaction = options.tierPatches.filter(isForcedCompactionPatch)
+  if (compaction.length === 0) return
+  throw new UsageError(
+    `stuffed arm (${stuffedArms.join(', ')}) cannot combine with the forced-compaction overlay `
+    + `(${compaction.join(', ')}): compaction would destroy the whole-corpus-in-the-prompt condition `
+    + `(protocol rule)`,
+  )
+}
+
+/**
+ * Choose the model-visible instruction for one (task, arm). `armInstructions[arm]`
+ * wins when present (cued family); stuffed arms fall back to `stuffedInstruction`;
+ * otherwise the default `instruction`.
+ * @param {TaskDefinition} task - loaded task.
+ * @param {{ name: string, stuffed?: boolean }} arm - arm entry.
+ * @returns {string} the prompt for this spawn.
+ */
+export function resolveTaskInstruction(task, arm) {
+  const byArm = task.armInstructions?.[arm.name]
+  if (typeof byArm === 'string') return byArm
+  if (arm.stuffed === true && typeof task.stuffedInstruction === 'string') return task.stuffedInstruction
+  return /** @type {string} */ (task.instruction)
 }
 
 /**
@@ -299,6 +345,8 @@ export function looksLikeProviderError(stdout, stderr) {
  * @typedef {object} TaskDefinition
  * @property {string} taskId
  * @property {string | null} instruction - single-session prompt; null on chain tasks.
+ * @property {string | null} stuffedInstruction - stuffed-arm prompt with the corpus inlined; null when absent.
+ * @property {Record<string, string> | null} armInstructions - per-arm prompt override (cued family); null when absent.
  * @property {TaskPhase[] | null} phases - chain phases (at least 2); null on single-session
  *   tasks. Exactly one of `instruction`/`phases` is non-null.
  * @property {string} verify
@@ -361,6 +409,32 @@ export async function loadTaskCatalog(tasksRoot) {
       }
       instruction = definition.instruction
     }
+    /** @type {string | null} */
+    let stuffedInstruction = null
+    if (definition.stuffedInstruction !== undefined) {
+      if (typeof definition.stuffedInstruction !== 'string' || definition.stuffedInstruction.trim() === '') {
+        throw new Error(`task ${entry.name}: task.json stuffedInstruction must be a non-empty string`)
+      }
+      stuffedInstruction = definition.stuffedInstruction
+    }
+    /** @type {Record<string, string> | null} */
+    let armInstructions = null
+    if (definition.armInstructions !== undefined) {
+      if (
+        typeof definition.armInstructions !== 'object'
+        || definition.armInstructions === null
+        || Array.isArray(definition.armInstructions)
+      ) {
+        throw new Error(`task ${entry.name}: task.json armInstructions must be a record of non-empty strings`)
+      }
+      armInstructions = {}
+      for (const [name, text] of Object.entries(/** @type {Record<string, unknown>} */ (definition.armInstructions))) {
+        if (typeof text !== 'string' || text.trim() === '') {
+          throw new Error(`task ${entry.name}: task.json armInstructions.${name} must be a non-empty string`)
+        }
+        armInstructions[name] = text
+      }
+    }
     if (typeof definition.verify !== 'string' || definition.verify.trim() === '') {
       throw new Error(`task ${entry.name}: task.json verify must be a non-empty string`)
     }
@@ -383,6 +457,8 @@ export async function loadTaskCatalog(tasksRoot) {
     tasks.push({
       taskId: entry.name,
       instruction,
+      stuffedInstruction,
+      armInstructions,
       phases,
       verify: definition.verify,
       setup,
@@ -554,7 +630,7 @@ async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, ses
     arm,
     armDir,
     sessionLogRoot,
-    taskText: /** @type {string} */ (task.instruction),
+    taskText: resolveTaskInstruction(task, arm),
     scratchDir,
     timeoutMs: task.timeoutMs,
     env,

@@ -6,7 +6,7 @@ Conventions follow the established evaluation harnesses rather than inventing ne
 
 ## Arms
 
-The nine-arm ladder covers every decision-relevant contrast. `sq-driver` exists for the session-query adoption experiment. `on-charter` is the w9 treatment: executor-enforced charter checks, graded against `off`. Each arm is a `--patch` overlay applied to the shipped headless composition, which mounts `jspace` with `enabled: false` and does not mount the model-facing session-query tool at all.
+The nine-arm ladder covers every jspace/session-query contrast. `sq-driver` exists for the session-query adoption experiment. `on-charter` is the w9 treatment: executor-enforced charter checks, graded against `off`. OOLONG-lite adds `stuffed`, `read`, and `code` (see below). Each arm is a `--patch` overlay applied to the shipped headless composition, which mounts `jspace` with `enabled: false` and does not mount the model-facing session-query tool at all.
 
 | Arm | J-Space | Session-Query | Notes |
 |---|---|---|---|
@@ -19,8 +19,11 @@ The nine-arm ladder covers every decision-relevant contrast. `sq-driver` exists 
 | `on-adaptive` | available from step 10 | mounted | `on-sq` plus `engageAfterSteps: 10`; isolates the always-on prompt and schema cost from the card's long-horizon benefit. |
 | `on-core` | available | absent | `on` plus `tool-jspace` `requireCoreOnOpen: true` and `requireCoreForShip: true`; prices the constraint-capture gates against `on`, the arm whose sessions left Core empty. |
 | `on-charter` | available | absent | `on` plus `tool-jspace` `requireCharter`, `requireExecutableCharter`, `charterSeed`, `charterDiscrimination: 'required'`, `charterCheckTimeoutMs: 30000`, `maxCharterEntries: 12`, `charterChecksMustBeReadOnly: true`. Seat stays `available` (`requireCharter` refuses `always-open`). |
+| `stuffed` | disabled | absent | OOLONG-lite: corpus inlined in the instruction (`stuffedInstruction`); refuses a forced-compaction overlay. |
+| `read` | disabled | mounted | OOLONG-lite: corpus on disk + session-query (same mount as `sq-only`). |
+| `code` | disabled | mounted | OOLONG-lite: `read` plus `tools.mode: both` (headless already inserts `code-runtime`; re-inserting it is a duplicate-id load failure). |
 
-Arms register in `runner/arms.js`. Every overlay carries a `jspace` config patch and the per-trial persistence redirect; an arm with a `toolJspace` config adds a `tool-jspace` patch; session-query arms additionally patch the shipped `session-query-sqlite` service to open a per-trial index at startup (it ships with `openAt: never` and an in-memory path) and append an `- insert:` layer mounting `tool-session-query`. Arms without session-query need no disable rows, because the tool is absent from the profile.
+Arms register in `runner/arms.js`. Every overlay carries a `jspace` config patch and the per-trial persistence redirect; an arm with a `toolJspace` config adds a `tool-jspace` patch; session-query arms additionally patch the shipped `session-query-sqlite` service to open a per-trial index at startup (it ships with `openAt: never` and an in-memory path) and append an `- insert:` layer mounting `tool-session-query`. The `code` arm patches `tools.mode` to `both`. Arms without session-query need no disable rows, because the tool is absent from the profile.
 
 ## Layout
 
@@ -96,7 +99,7 @@ When `--api-key-env` is not `DEEPSEEK_API_KEY`, the `--base-url` default becomes
 
 The catalog's 10–30-turn tasks never consume enough tokens to hit the shipped compaction threshold (`0.8 ×` a 1M-token window). Long-horizon features (J-Space card, session-query) only show their value under memory pressure — tokens consumed versus context available — so the bench forces that ratio with a composition overlay instead of inventing longer tasks.
 
-`bench/pressure/forced-compaction.patch.yml` patches the shipped `compaction-basic` entry so automatic compaction fires around 10k–20k conversation tokens on the 1M-window models this suite uses. A patch `config` key replaces the entry's whole config, so the file restates every field automatic compaction needs. The overlay is experiment-level and applies identically to every arm; it is not an arm contrast.
+`bench/pressure/forced-compaction.patch.yml` patches the shipped `compaction-basic` entry so automatic compaction fires around 10k–20k conversation tokens on the 1M-window models this suite uses. A patch `config` key replaces the entry's whole config, so the file restates every field automatic compaction needs. The overlay is experiment-level and applies identically to every selected arm; it is not an arm contrast. Combining it with any arm that carries `stuffed: true` (the `stuffed` arm) is a protocol error: compaction would destroy the whole-corpus-in-the-prompt condition. The runner refuses that combination at argv validation. `read` and `code` may use the overlay. Because `listArms()` includes `stuffed`, a pressure run must pass `--arms` without `stuffed`.
 
 `--tier-patch` is repeatable. Combine a provider tier with forced compaction by passing both, arm overlay first, then these in order:
 
@@ -119,19 +122,37 @@ Each trial records `compactionCount` (`compaction/end` events in the session log
 3. Every aggregate reports uncertainty; a delta without an interval is not a result.
 4. Primary metric is verifier-passed task success; LLM judgment is not used in v1.
 5. The decision rule is stated before running: default-on only if `on` beats `off` on the long-horizon stratum with the interval excluding zero, and the short-stratum token overhead stays acceptable.
-6. Mid-task compaction is forced through the sanctioned `BasicCompactionConfig` fields (`thresholdRatio`, default `0.8`; fires at `floor(contextWindow × ratio)`), never a harness source patch. The repeatable `--tier-patch` overlay `bench/pressure/forced-compaction.patch.yml` is the experiment-level way to lower that threshold identically on every arm.
+6. Mid-task compaction is forced through the sanctioned `BasicCompactionConfig` fields (`thresholdRatio`, default `0.8`; fires at `floor(contextWindow × ratio)`), never a harness source patch. The repeatable `--tier-patch` overlay `bench/pressure/forced-compaction.patch.yml` is the experiment-level way to lower that threshold identically on every selected arm except `stuffed`, which the runner refuses in combination with that overlay.
 
 ## Chain tasks
 
 A task with `phases` (at least 2) in task.json runs as a chain: one scratch dir whose workspace carries across phases, but a separate headless spawn per phase with a fresh per-phase session root (`runs/<experiment>/<arm>/sessions/<taskId>/<trialIndex>/phase-<i>`) — the session boundary is the experiment. The verifier runs once, after the final phase, against the carried workspace; a phase ending in PROVIDER_ERROR or HARNESS_ERROR aborts the chain and excludes the trial from the pass rate. Trial-level metrics are per-phase sums. Carry is **cold-only** today: `resumedFrom` stays null because the harness has no headless/SDK session resume or fork yet; card carry across sessions is a proposed uplift.
 
-Every trial (chains and single-session) passes an arm-integrity audit: no session root of the trial may pre-exist; arms not expecting jspace (`off`, `sq-only`, `sq-driver`) must contain zero `jspace/` events in their session logs; arms not expecting session-query (`off`, `on`) must contain zero session-query `tool/call` events. The audit only checks absence, so an arm that permits jspace records no violation when a trial logs no jspace event — the expected outcome for an `on-adaptive` trial that finishes before step 10. Violations are recorded on `trial.integrity.violations`; the trial still counts and the experiment never aborts.
+Every trial (chains and single-session) passes an arm-integrity audit: no session root of the trial may pre-exist; arms not expecting jspace (`off`, `sq-only`, `sq-driver`, `stuffed`, `read`, `code`) must contain zero `jspace/` events in their session logs; arms not expecting session-query (`off`, `on`, `stuffed`) must contain zero session-query `tool/call` events. The audit only checks absence, so an arm that permits jspace records no violation when a trial logs no jspace event — the expected outcome for an `on-adaptive` trial that finishes before step 10. Violations are recorded on `trial.integrity.violations`; the trial still counts and the experiment never aborts.
 
 A task whose `task.json` names `setup` runs that command after the fixture copy and before the spawn, with argv `<scratch-dir> <session-log-root>`. `session-query-adoption` uses this to plant a prior-session JSONL into the trial persistence root (header `cwd` rewritten to the scratch dir so session-query workspace authority admits it). The trial locator skips `bench-prior-*` session ids so the planted log is never folded as the trial transcript. Adoption (whether session-query ran) is `metrics.sessionQueryCalls`; the verifier scores only whether the shipped workspace used the recorded fact.
 
 The adoption experiment is `--arms sq-only,sq-driver --tasks session-query-adoption`.
 
 `compaction-pointer-follow` measures pointer dereference: run it with `bench/pressure/forced-compaction.patch.yml` plus a patch setting `compaction-basic` `maxPointers` above the overlay's pinned `0` so summaries carry seq pointers.
+
+## OOLONG-lite (WP3.3)
+
+Long-stratum aggregation over a seeded 400-row JSONL corpus (`{ id, name, value, category }`). Names and ids are synthetic so they are not recallable words. Same seed (`task.json` `seed`, `mulberry32`) rewrites identical names, ids, values, and `expectedAnswers`. Regeneration is `node bench/tasks/oolong-aggregate/generate.mjs`; trials copy the committed fixtures and do not regenerate. The generator, seed contract, and the three task directories are documented in [`tasks/oolong-aggregate/README.md`](tasks/oolong-aggregate/README.md).
+
+| taskId | Stratum | What it asks |
+|---|---|---|
+| `oolong-aggregate` | long | Four exact integers: count(category C ∧ value > N), sum(value \| category D), distinct names, count(value ∈ [X, Y]). |
+| `oolong-pairs` | long | Exact 3×3 count matrix of (value-range bucket × category) over three planted buckets and three planted category columns. |
+| `oolong-aggregate-cued` | long | Byte-identical corpus and questions to `oolong-aggregate`; the instruction's final line names the capability at the moment of need, adapted per arm (`armInstructions`). |
+
+Pilot arms: `--arms stuffed,read,code --tasks 'oolong-*'`. Pre-registered contrasts:
+
+- `code` vs `read` is the **kernel-necessity** contrast (does mounted stateless `run_code` already get the programmatic-over-corpus step, or is a persistent kernel required?).
+- `read` vs `stuffed` is the **retrieval** contrast (session-query over an on-disk corpus vs the whole corpus inlined in the prompt).
+- The cued family makes a tie interpretable: "didn't help" vs "never reached" (the cue names `session_search` on `read` and `run_code` on `code`).
+
+The stuffed arm inlines the corpus through `task.json` `stuffedInstruction` (the runner selects it when the arm carries `stuffed: true`). The verifier reads `answers.json` from the scratch dir and exact-matches integers against `expectedAnswers` in `task.json`, which the agent cannot see.
 
 ## Forensics metrics
 

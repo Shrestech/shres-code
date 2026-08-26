@@ -11,7 +11,7 @@
  * other arms need no disable rows because the tool is absent from the
  * profile.
  *
- * The nine-arm ladder covers every decision-relevant contrast:
+ * The nine-arm ladder covers every jspace/session-query contrast:
  *
  * | Arm | Configuration |
  * |---|---|
@@ -24,6 +24,18 @@
  * | `on-adaptive` | on-sq with `engageAfterSteps: 10`: J-Space costs nothing until step 10. |
  * | `on-core` | on + `requireCoreOnOpen` and `requireCoreForShip`: the card must carry constraints. |
  * | `on-charter` | on + tool-jspace executable charter required, seeded, and discrimination-gated. |
+ *
+ * OOLONG-lite (WP3.3) adds three corpus-contrast arms. `code` vs `read` is the
+ * kernel-necessity contrast; `read` vs `stuffed` is the retrieval contrast.
+ * `stuffed` refuses a forced-compaction overlay (the runner fails argv
+ * validation): compaction would destroy the whole-corpus-in-the-prompt
+ * condition.
+ *
+ * | Arm | Configuration |
+ * |---|---|
+ * | `stuffed` | Corpus inlined in the instruction; jspace off; session-query absent. |
+ * | `read` | Corpus on disk; session-query mounted; jspace off. |
+ * | `code` | `read` plus `tools.mode: both` (headless already inserts `code-runtime`). |
  *
  * @module bench/runner/arms
  */
@@ -39,6 +51,8 @@ import { join } from 'node:path'
  * @property {boolean} expectsSessionQuery - whether session-query tools are expected in logs.
  * @property {boolean} expectsJspace - whether jspace events are permitted in logs.
  * @property {boolean} [driverLine] - whether the overlay appends the session-query driver line to the headless persona.
+ * @property {boolean} [stuffed] - whether the runner must use `stuffedInstruction` / the stuffed arm template; refuses forced-compaction.
+ * @property {boolean} [codeMode] - whether the overlay patches `tools.mode` to `both` (stateless `run_code`).
  */
 
 /** Headless profile persona restated when a driver-line overlay replaces `system-prompt` config. */
@@ -153,6 +167,29 @@ export const ARMS = Object.freeze({
     expectsSessionQuery: false,
     expectsJspace: true,
   }),
+  stuffed: Object.freeze({
+    name: 'stuffed',
+    jspace: Object.freeze({ enabled: false, mode: 'available', requireCoverage: true }),
+    sessionQuery: false,
+    expectsSessionQuery: false,
+    expectsJspace: false,
+    stuffed: true,
+  }),
+  read: Object.freeze({
+    name: 'read',
+    jspace: Object.freeze({ enabled: false, mode: 'available', requireCoverage: true }),
+    sessionQuery: true,
+    expectsSessionQuery: true,
+    expectsJspace: false,
+  }),
+  code: Object.freeze({
+    name: 'code',
+    jspace: Object.freeze({ enabled: false, mode: 'available', requireCoverage: true }),
+    sessionQuery: true,
+    expectsSessionQuery: true,
+    expectsJspace: false,
+    codeMode: true,
+  }),
 })
 
 /**
@@ -231,6 +268,15 @@ ${configRows(arm.toolJspace)}
 - insert:
     - id: tool-session-query
       name: "@shres-code/shres-code-tool-session-query"
+`
+  }
+  // The headless profile already inserts `code-runtime`. Re-inserting it fails
+  // load with `duplicate loader entry id`. `tools.mode: both` is the arm's
+  // intervention: native tools stay on the wire and `run_code` is added.
+  if (arm.codeMode) {
+    overlay += `- id: tools
+  config:
+    mode: "both"
 `
   }
   return overlay
