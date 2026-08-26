@@ -148,7 +148,7 @@ describe('windowed in-memory session log', () => {
     session.attachMemoryArchive(mapArchive(store), 0)
     session.markDurableThrough(session.seq - 1)
     session.releaseFlushedOutsideSurface()
-    ;(session as unknown as { archive?: SessionEventArchive }).archive = undefined
+    delete (session as unknown as { archive?: SessionEventArchive }).archive
     expect(() => session.events).toThrow(/has no durable archive to re-read/)
   })
 
@@ -157,7 +157,7 @@ describe('windowed in-memory session log', () => {
     populate(session)
     const store = new Map(session.events.map(event => [event.seq, event]))
     session.attachMemoryArchive(mapArchive(store), 0)
-    ;(session as unknown as { archive?: SessionEventArchive }).archive = undefined
+    delete (session as unknown as { archive?: SessionEventArchive }).archive
     session.markDurableThrough(session.seq - 1)
     expect(() => session.releaseFlushedOutsideSurface())
       .toThrow(/no durable event archive is attached/)
