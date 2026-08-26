@@ -234,6 +234,7 @@ function forensicsFields(rng, arm, resolved, checkpoints, stratum, turns) {
     tokensIncludingDescendants: null,
     costIncludingDescendants: null,
     descendantSessions: 0,
+    outOfLoopExperiments: 0,
     danglingCard: hasJspace ? (!resolved && rng() < 0.3) : null,
     verifiedCheckpointShare: hasJspace && checkpoints > 0
       ? (arm === 'on-sq-verified' ? (resolved ? 1.0 : randInt(rng, 5, 8) / 10) : randInt(rng, 0, 3) / 10)
@@ -308,7 +309,7 @@ function sumPhaseMetrics(phases) {
   const total = {
     inputTokens: 0, outputTokens: 0, durationMs: 0, turns: 0, toolCalls: 0,
     identicalRetries: 0, checkpoints: 0, shipPasses: 0,
-    tokensIncludingDescendants: null, costIncludingDescendants: null, descendantSessions: 0,
+    tokensIncludingDescendants: null, costIncludingDescendants: null, descendantSessions: 0, outOfLoopExperiments: 0,
     danglingCard: null, verifiedCheckpointShare: null,
     coverageRefusalThenPad: 0, noopNoteRefusals: 0, noteCapRefusals: 0,
     sessionQueryCalls: null,
