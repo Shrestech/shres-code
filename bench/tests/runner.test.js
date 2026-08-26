@@ -26,13 +26,16 @@ import { validateTrial } from '../schema/trial.js'
 import { createSerialQueue, mapPool } from '../runner/pool.js'
 import { pairOutcomes } from '../stats/paired.js'
 import {
+  assertStuffedCompactionGuard,
   buildPlan,
+  isForcedCompactionPatch,
   loadTaskCatalog,
   looksLikeProviderError,
   main,
   matchTaskIds,
   parseArgs,
   readStoredCredential,
+  resolveTaskInstruction,
   UsageError,
 } from '../runner/run.js'
 
@@ -226,10 +229,10 @@ describe('metrics.foldSessionLog', () => {
 })
 
 describe('arms registry', () => {
-  it('registers all nine arms in ladder order', () => {
+  it('registers the jspace ladder and the OOLONG-lite arms in order', () => {
     assert.deepEqual(
       listArms(),
-      ['off', 'on', 'sq-only', 'sq-driver', 'on-sq', 'on-sq-verified', 'on-adaptive', 'on-core', 'on-charter'],
+      ['off', 'on', 'sq-only', 'sq-driver', 'on-sq', 'on-sq-verified', 'on-adaptive', 'on-core', 'on-charter', 'stuffed', 'read', 'code'],
     )
     assert.equal(ARMS.off.jspace.enabled, false)
     assert.equal(ARMS.on.jspace.enabled, true)
@@ -266,6 +269,9 @@ describe('arms registry', () => {
     assert.equal(ARMS['on-adaptive'].sessionQuery, true)
     assert.equal(ARMS['on-core'].sessionQuery, false)
     assert.equal(ARMS['on-charter'].sessionQuery, false)
+    assert.equal(ARMS.stuffed.sessionQuery, false)
+    assert.equal(ARMS.read.sessionQuery, true)
+    assert.equal(ARMS.code.sessionQuery, true)
   })
 
   it('expectsJspace and expectsSessionQuery match arm semantics', () => {
@@ -289,6 +295,15 @@ describe('arms registry', () => {
     assert.equal(ARMS['on-core'].expectsSessionQuery, false)
     assert.equal(ARMS['on-charter'].expectsJspace, true)
     assert.equal(ARMS['on-charter'].expectsSessionQuery, false)
+    assert.equal(ARMS.stuffed.expectsJspace, false)
+    assert.equal(ARMS.stuffed.expectsSessionQuery, false)
+    assert.equal(ARMS.stuffed.stuffed, true)
+    assert.equal(ARMS.read.expectsJspace, false)
+    assert.equal(ARMS.read.expectsSessionQuery, true)
+    assert.equal(ARMS.code.expectsJspace, false)
+    assert.equal(ARMS.code.expectsSessionQuery, true)
+    assert.equal(ARMS.code.codeMode, true)
+    assert.equal(ARMS.read.codeMode, undefined)
   })
 
   it('renders the constraint-capture requirements into the on-core overlay', () => {
@@ -369,6 +384,31 @@ describe('arms registry', () => {
     assert.ok(!off.includes('session-query'), 'off arm leaves session-query untouched')
     assert.ok(!off.includes('insert'), 'off arm inserts nothing')
   })
+
+  it('renders stuffed without session-query or code-mode', () => {
+    const overlay = renderArmOverlay(ARMS.stuffed, { sessionLogRoot: '/tmp/bench/stuffed/sessions/t/0' })
+    assert.match(overlay, /enabled: false/)
+    assert.doesNotMatch(overlay, /tool-session-query/)
+    assert.doesNotMatch(overlay, /^- id: tools$/m)
+    assert.doesNotMatch(overlay, /mode: "both"/)
+  })
+
+  it('renders read like sq-only: session-query mounted, jspace off', () => {
+    const overlay = renderArmOverlay(ARMS.read, { sessionLogRoot: '/tmp/bench/read/sessions/t/0' })
+    assert.match(overlay, /enabled: false/)
+    assert.match(overlay, /- id: tool-session-query$/m)
+    assert.match(overlay, /openAt: startup/)
+    assert.doesNotMatch(overlay, /^- id: tools$/m)
+  })
+
+  it('renders code as read plus tools.mode both, without re-inserting code-runtime', () => {
+    const overlay = renderArmOverlay(ARMS.code, { sessionLogRoot: '/tmp/bench/code/sessions/t/0' })
+    assert.match(overlay, /enabled: false/)
+    assert.match(overlay, /- id: tool-session-query$/m)
+    assert.match(overlay, /^- id: tools$/m)
+    assert.match(overlay, /mode: "both"/)
+    assert.doesNotMatch(overlay, /code-runtime/)
+  })
 })
 
 describe('run.parseArgs', () => {
@@ -413,6 +453,7 @@ describe('run.parseArgs', () => {
   it('accepts repeatable --tier-patch in given order', () => {
     const options = parseArgs([
       '--experiment', 'w1',
+      '--arms', 'off,on',
       '--tier-patch', 'bench/tiers/zai.patch.yml',
       '--tier-patch', 'bench/pressure/forced-compaction.patch.yml',
     ])
@@ -420,6 +461,42 @@ describe('run.parseArgs', () => {
       'bench/tiers/zai.patch.yml',
       'bench/pressure/forced-compaction.patch.yml',
     ])
+  })
+
+  it('refuses stuffed together with the forced-compaction overlay', () => {
+    assert.throws(
+      () => parseArgs([
+        '--experiment', 'x',
+        '--arms', 'stuffed',
+        '--tier-patch', 'bench/pressure/forced-compaction.patch.yml',
+      ]),
+      /stuffed arm \(stuffed\) cannot combine with the forced-compaction overlay.*whole-corpus-in-the-prompt/,
+    )
+    assert.throws(
+      () => parseArgs([
+        '--experiment', 'x',
+        '--arms', 'read,stuffed,code',
+        '--tier-patch', 'bench/tiers/zai.patch.yml',
+        '--tier-patch', 'bench/pressure/forced-compaction.patch.yml',
+      ]),
+      /stuffed arm \(stuffed\).*forced-compaction/,
+    )
+    assert.throws(
+      () => parseArgs([
+        '--experiment', 'x',
+        '--tier-patch', 'bench/pressure/forced-compaction.patch.yml',
+      ]),
+      /stuffed arm/,
+    )
+    const ok = parseArgs([
+      '--experiment', 'x',
+      '--arms', 'read,code',
+      '--tier-patch', 'bench/pressure/forced-compaction.patch.yml',
+    ])
+    assert.deepEqual(ok.arms, ['read', 'code'])
+    assert.equal(isForcedCompactionPatch('bench/pressure/forced-compaction.patch.yml'), true)
+    assert.equal(isForcedCompactionPatch('bench/tiers/zai.patch.yml'), false)
+    assert.doesNotThrow(() => assertStuffedCompactionGuard({ arms: ['off'], tierPatches: ['bench/pressure/forced-compaction.patch.yml'] }))
   })
 
   it('accepts --api-key-env none for keyless tiers', () => {
@@ -594,6 +671,8 @@ describe('run.loadTaskCatalog', () => {
       assert.equal(task.taskId, 'alpha')
       assert.equal(task.timeoutMs, 1000)
       assert.equal(task.setup, null)
+      assert.equal(task.stuffedInstruction, null)
+      assert.equal(task.armInstructions, null)
 
       const badDir = join(root, 'bad')
       await mkdir(badDir, { recursive: true })
@@ -607,6 +686,50 @@ describe('run.loadTaskCatalog', () => {
     } finally {
       await rm(root, { recursive: true, force: true })
     }
+  })
+
+  it('loads stuffedInstruction and armInstructions and resolveTaskInstruction selects them', async () => {
+    const root = await tempDir('bench-runner-stuffed-')
+    try {
+      const taskDir = join(root, 'oolong')
+      await mkdir(join(taskDir, 'fixture'), { recursive: true })
+      await writeFile(join(taskDir, 'task.json'), JSON.stringify({
+        taskId: 'oolong',
+        stratum: 'long',
+        description: 'd',
+        instruction: 'on disk',
+        stuffedInstruction: 'inline corpus',
+        armInstructions: { read: 'read cue', code: 'code cue', stuffed: 'stuffed cue' },
+        verify: 'node verify.mjs',
+        timeoutMs: 1000,
+      }))
+      const [task] = await loadTaskCatalog(root)
+      assert.equal(task.instruction, 'on disk')
+      assert.equal(task.stuffedInstruction, 'inline corpus')
+      assert.deepEqual(task.armInstructions, { read: 'read cue', code: 'code cue', stuffed: 'stuffed cue' })
+      assert.equal(resolveTaskInstruction(task, ARMS.stuffed), 'stuffed cue')
+      assert.equal(resolveTaskInstruction(task, ARMS.read), 'read cue')
+      assert.equal(resolveTaskInstruction(task, ARMS.code), 'code cue')
+      assert.equal(resolveTaskInstruction(task, ARMS.off), 'on disk')
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('resolveTaskInstruction uses stuffedInstruction when armInstructions omit the stuffed arm', async () => {
+    const task = {
+      taskId: 'x',
+      instruction: 'on disk',
+      stuffedInstruction: 'inline',
+      armInstructions: null,
+      phases: null,
+      verify: 'node verify.mjs',
+      setup: null,
+      timeoutMs: 1,
+      dir: '/tmp',
+    }
+    assert.equal(resolveTaskInstruction(task, ARMS.stuffed), 'inline')
+    assert.equal(resolveTaskInstruction(task, ARMS.read), 'on disk')
   })
 
   it('parses a chain task: phases with per-phase timeout overrides, no top-level instruction', async () => {

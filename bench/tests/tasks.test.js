@@ -30,6 +30,11 @@ test('the shipped catalog loads under the chain-aware loader', async () => {
   assert.ok(adoption, 'session-query-adoption is in the catalog')
   assert.equal(adoption.setup, 'node setup.mjs')
   assert.equal(adoption.phases, null)
+  const aggregate = tasks.find(task => task.taskId === 'oolong-aggregate')
+  assert.ok(aggregate, 'oolong-aggregate is in the catalog')
+  assert.ok(typeof aggregate.stuffedInstruction === 'string' && aggregate.stuffedInstruction.includes('r000'))
+  const cued = tasks.find(task => task.taskId === 'oolong-aggregate-cued')
+  assert.ok(cued?.armInstructions?.code?.includes('run_code'))
 })
 
 /**

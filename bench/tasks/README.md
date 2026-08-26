@@ -1,4 +1,4 @@
-# Task authoring contract (22 tasks)
+# Task authoring contract (25 tasks)
 
 One directory per task. The directory name is the `taskId` and never changes after results exist — it is the pairing key across arms.
 
@@ -25,7 +25,7 @@ bench/tasks/<taskId>/
 ```
 
 - `stratum`: `long` (multi-file/multi-stage; the intervention should help), `short` (one-step; measures the tax), `adversarial` (prompt-injection fixture; measures persistence×authority), `chain` (multi-session; measures cross-session carry), `pressure` (memory is load-bearing: global rules stated once must survive a long stretch of work, or cross-session externalization / in-session retrieval is required; a pressure task may be a `phases` chain or a single long session).
-- `instruction` is the complete prompt. It must not name J-Space — the on arm's behavior difference must come from the mounted machinery, not from being told it exists. Session-query naming belongs on the `sq-driver` arm overlay, not in the task prompt.
+- `instruction` is the complete prompt. It must not name J-Space — the on arm's behavior difference must come from the mounted machinery, not from being told it exists. Session-query naming belongs on the `sq-driver` arm overlay, not in the task prompt, except the OOLONG-lite cued family (`oolong-aggregate-cued`), whose final line names the capability at the moment of need and is selected per arm via `armInstructions` / `stuffedInstruction`.
 - `setup` is optional. When present it is `node setup.mjs` (same argv convention as `verify`, plus the persistence root): the runner invokes it after copying `fixture/` and before the harness spawn. Use it to plant files the agent must not see in the workspace — a prior session log into `session-log-root` — never to leak the oracle into `scratch`.
 - `verify.mjs` is plain ESM Node, no dependencies, deterministic, and idempotent. It reads the scratch dir, prints a one-line detail, exits 0 (resolved) or 1. It must not depend on agent output formatting, only on end state.
 - The runner copies `fixture/` into a fresh `runs/<experiment>/scratch/<arm>/<taskId>/<trialIndex>/` per trial; the agent's cwd is that copy. Nothing outside the scratch dir may be touched by task or verifier.
@@ -57,6 +57,9 @@ bench/tasks/<taskId>/
 | `chain-ledger-deep` | pressure | Six-phase cold-session ledger: persist analysis decisions, survive distractors, reconcile. |
 | `noise-needle` | pressure | Record three values from 2000-line diagnostic noise, then repair a multi-file project. |
 | `session-query-adoption` | pressure | Apply a fact that exists only in a pre-seeded prior session log. |
+| `oolong-aggregate` | long | Four exact-integer aggregates over a 400-row seeded JSONL corpus. |
+| `oolong-pairs` | long | Exact 3×3 range-bucket × category count matrix over the same corpus. |
+| `oolong-aggregate-cued` | long | Same corpus and questions as `oolong-aggregate`, with an arm-adaptive capability cue. |
 
 ## Chain tasks
 
