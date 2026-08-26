@@ -4,16 +4,19 @@
  * toggle (protocol rule 1).
  *
  * ```
- * node bench/runner/run.js --experiment w0-2026-08-18 [--arms off,on] [--repeats 3] [--tasks glob[,glob]] [--dry-run]
+ * node bench/runner/run.js --experiment w0-2026-08-18 [--arms off,on] [--repeats 3] [--concurrency 1] [--tasks glob[,glob]] [--dry-run]
  * ```
  *
  * Per trial the runner copies the fixture into a fresh scratch dir, runs an
  * optional task `setup` (used to plant a prior session into the persistence
  * root), writes the arm's `--patch` overlay, spawns the headless profile,
  * folds the session log into metrics, runs the verifier, and appends one
- * validated Trial to `trials.jsonl`. `run.json` is written
+ * validated Trial to `trials.jsonl`. `--concurrency <n>` (default 1) runs up
+ * to n plan entries at once; 1 is sequential. Concurrent completions share
+ * one in-process writer so each JSONL line is whole. `run.json` is written
  * before the first trial (endedAt empty) and completed at the end, so a crash
- * keeps every finished trial.
+ * keeps every finished trial. SIGINT/SIGTERM abort in-flight children, skip
+ * `endedAt`, and leave already-appended lines intact.
  *
  * Chain tasks (`phases` in task.json) run one scratch dir but one spawn per
  * phase, each with a fresh session root (`sessions/<taskId>/<trial>/phase-<i>`):
@@ -50,6 +53,7 @@ import { promisify } from 'node:util'
 import { getArm, listArms, renderArmOverlay } from './arms.js'
 import { executeTrial } from './execute.js'
 import { emptyMetrics, foldSessionLog } from './metrics.js'
+import { createSerialQueue, mapPool } from './pool.js'
 import { runSetup } from './setup.js'
 import { runVerifier } from './verify.js'
 import { validateRunManifest } from '../schema/run-manifest.js'
@@ -72,12 +76,16 @@ Options:
                         ($SHRES_HOME/.credentials.yaml, default ~/.shres); the value is injected
                         into the child environment only, never into any bench record.
   --tier-patch <path>   experiment-level overlay applied after the arm overlay; repeatable, order preserved
+  --concurrency <n>     max trials in flight (default: 1; 1 is sequential)
   --dry-run             print the plan and exit without writing or executing
   --help                this text
 `
 
 /** Exit code for usage and environment errors (bad flags, missing API key). */
 const EXIT_USAGE = 2
+
+/** Exit code when SIGINT/SIGTERM abort the run after in-flight trials drain. */
+const EXIT_ABORTED = 130
 
 /** Default model/temperature pins, overridable by flag or env; recorded in run.json. */
 const DEFAULT_MODEL = 'deepseek-v4-flash'
@@ -115,6 +123,7 @@ export class UsageError extends Error {
  * @property {string | undefined} baseUrl
  * @property {string} apiKeyEnv - env var name; `none` for keyless tiers.
  * @property {string[]} tierPatches - overlay paths in given order; empty when unused.
+ * @property {number} concurrency - max trials in flight; 1 is sequential.
  */
 
 /**
@@ -136,6 +145,7 @@ export function parseArgs(argv) {
     baseUrl: undefined,
     apiKeyEnv: 'DEEPSEEK_API_KEY',
     tierPatches: [],
+    concurrency: 1,
   }
   let armsSeen = false
   for (let index = 0; index < argv.length; index += 1) {
@@ -189,6 +199,12 @@ export function parseArgs(argv) {
       case '--tier-patch':
         options.tierPatches.push(value())
         break
+      case '--concurrency': {
+        const parsed = Number(value())
+        if (!Number.isSafeInteger(parsed) || parsed < 1) throw new UsageError('--concurrency must be an integer >= 1')
+        options.concurrency = parsed
+        break
+      }
       case '--dry-run':
         options.dryRun = true
         break
@@ -430,13 +446,14 @@ function spawnFailureDetail(outcome, execution, where = '') {
  * @param {number} options.timeoutMs - spawn timeout.
  * @param {NodeJS.ProcessEnv} options.env - child environment.
  * @param {string[]} [options.extraPatchPaths] - additional patch overlays (e.g. tier patch).
+ * @param {AbortSignal} [options.signal]
  * @returns {Promise<{ execution: import('./execute.js').ExecutionResult, metrics: import('../schema/trial.js').TrialMetrics, sessionFile: string | null }>}
  */
-async function executeSpawn({ repoRoot, arm, armDir, sessionLogRoot, taskText, scratchDir, timeoutMs, env, extraPatchPaths = [] }) {
+async function executeSpawn({ repoRoot, arm, armDir, sessionLogRoot, taskText, scratchDir, timeoutMs, env, extraPatchPaths = [], signal }) {
   await mkdir(sessionLogRoot, { recursive: true })
   const overlayPath = join(sessionLogRoot, 'arm-overlay.yml')
   await writeFile(overlayPath, renderArmOverlay(arm, { sessionLogRoot }))
-  const execution = await executeTrial({ repoRoot, overlayPath, extraPatchPaths, taskText, scratchDir, sessionLogRoot, timeoutMs, env })
+  const execution = await executeTrial({ repoRoot, overlayPath, extraPatchPaths, taskText, scratchDir, sessionLogRoot, timeoutMs, env, signal })
   const metrics = execution.sessionLogPath === null
     ? emptyMetrics()
     : foldSessionLog(await readFile(execution.sessionLogPath, 'utf8'), {
@@ -504,12 +521,13 @@ function trialRecordFrame(task, entry, scratchDir, startedAt) {
  * @param {NodeJS.ProcessEnv} options.env - child environment.
  * @param {string} options.startedAt - trial start, ISO 8601.
  * @param {string[]} [options.extraPatchPaths] - additional patch overlays (e.g. tier patch).
+ * @param {AbortSignal} [options.signal]
  * @returns {Promise<import('../schema/trial.js').Trial>} the trial record (pre-audit).
  */
-async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, sessionLogRoot, repoRoot, env, startedAt, extraPatchPaths = [] }) {
+async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, sessionLogRoot, repoRoot, env, startedAt, extraPatchPaths = [], signal }) {
   const { base, skippedVerifier } = trialRecordFrame(task, entry, scratchDir, startedAt)
   if (task.setup !== null) {
-    await runSetup({ taskDir: task.dir, setup: task.setup, scratchDir, sessionLogRoot })
+    await runSetup({ taskDir: task.dir, setup: task.setup, scratchDir, sessionLogRoot, signal })
   }
   const { execution, metrics, sessionFile } = await executeSpawn({
     repoRoot,
@@ -521,6 +539,7 @@ async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, ses
     timeoutMs: task.timeoutMs,
     env,
     extraPatchPaths,
+    signal,
   })
   const outcome = classifySpawn(execution)
   const endedAt = new Date().toISOString()
@@ -537,7 +556,7 @@ async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, ses
     }
   }
   // A nonzero exit with a log is an incomplete turn: a valid attempt.
-  const verifier = await runVerifier({ taskDir: task.dir, verify: task.verify, scratchDir })
+  const verifier = await runVerifier({ taskDir: task.dir, verify: task.verify, scratchDir, signal })
   return {
     ...base,
     status: 'success',
@@ -568,9 +587,10 @@ async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, ses
  * @param {import('../schema/trial.js').PhaseRecord[]} options.phases - shared sink: completed
  *   phase records are pushed here so a mid-chain runner failure keeps the evidence.
  * @param {string[]} [options.extraPatchPaths] - additional patch overlays (e.g. tier patch).
+ * @param {AbortSignal} [options.signal]
  * @returns {Promise<import('../schema/trial.js').Trial>} the trial record (pre-audit).
  */
-async function runChainTrial({ task, entry, arm, armDir, scratchDir, sessionRoot, repoRoot, env, startedAt, phases, extraPatchPaths = [] }) {
+async function runChainTrial({ task, entry, arm, armDir, scratchDir, sessionRoot, repoRoot, env, startedAt, phases, extraPatchPaths = [], signal }) {
   const { base, skippedVerifier } = trialRecordFrame(task, entry, scratchDir, startedAt)
   const definitions = /** @type {TaskPhase[]} */ (task.phases)
   for (let index = 0; index < definitions.length; index += 1) {
@@ -578,7 +598,7 @@ async function runChainTrial({ task, entry, arm, armDir, scratchDir, sessionRoot
     const phaseStartedAt = new Date().toISOString()
     const sessionLogRoot = join(sessionRoot, `phase-${index}`)
     if (task.setup !== null) {
-      await runSetup({ taskDir: task.dir, setup: task.setup, scratchDir, sessionLogRoot })
+      await runSetup({ taskDir: task.dir, setup: task.setup, scratchDir, sessionLogRoot, signal })
     }
     const { execution, metrics, sessionFile } = await executeSpawn({
       repoRoot,
@@ -590,6 +610,7 @@ async function runChainTrial({ task, entry, arm, armDir, scratchDir, sessionRoot
       timeoutMs: definition.timeoutMs ?? task.timeoutMs,
       env,
       extraPatchPaths,
+      signal,
     })
     phases.push({
       phaseIndex: index,
@@ -616,7 +637,7 @@ async function runChainTrial({ task, entry, arm, armDir, scratchDir, sessionRoot
       }
     }
   }
-  const verifier = await runVerifier({ taskDir: task.dir, verify: task.verify, scratchDir })
+  const verifier = await runVerifier({ taskDir: task.dir, verify: task.verify, scratchDir, signal })
   const anyPhaseTimedOut = phases.some(phase => phase.timedOut)
   return {
     ...base,
@@ -670,6 +691,7 @@ async function findIntegrityViolationEvents(sessionLogPath) {
  * @property {string} [benchRoot] - absolute bench directory (default: this repo's bench/).
  * @property {NodeJS.ProcessEnv} [env] - environment (default: process.env).
  * @property {(line: string) => void} [print] - plan/progress sink (default: console.log).
+ * @property {AbortSignal} [signal] - abort in-flight trials; omit for an uninterruptible run.
  */
 
 /**
@@ -709,6 +731,7 @@ export async function main(argv, io = {}) {
   const options = parseArgs(argv)
   let env = io.env ?? process.env
   const print = io.print ?? (line => console.log(line))
+  const signal = io.signal
   if (options.help) {
     print(USAGE)
     return 0
@@ -750,6 +773,7 @@ export async function main(argv, io = {}) {
     print(`apiKeyEnv: ${apiKeyEnv}${tierSummary}`)
     print(`tasks: ${taskIds.join(', ')}`)
     print(`plan: ${plan.length} trials (${taskIds.length} tasks × ${options.repeats} repeats × ${options.arms.length} arms)`)
+    if (options.concurrency > 1) print(`concurrency: ${options.concurrency}`)
     for (const entry of plan) {
       const task = /** @type {TaskDefinition} */ (tasks.get(entry.taskId))
       const suffix = task.phases === null ? '' : ` (${task.phases.length} phases)`
@@ -810,7 +834,15 @@ export async function main(argv, io = {}) {
 
   let finished = 0
   let failed = 0
-  for (const entry of plan) {
+  const recordQueue = createSerialQueue()
+
+  /**
+   * One interleaved plan entry: isolated scratch + session root, then a
+   * serialized append of one complete trials.jsonl line.
+   * @param {PlanEntry} entry
+   */
+  const runPlanEntry = async entry => {
+    if (signal?.aborted) return
     const task = /** @type {TaskDefinition} */ (tasks.get(entry.taskId))
     const arm = getArm(entry.arm)
     const armDir = /** @type {string} */ (armDirs.get(entry.arm))
@@ -818,6 +850,10 @@ export async function main(argv, io = {}) {
     const sessionRoot = join(armDir, 'sessions', entry.taskId, String(entry.trialIndex))
     const trialStartedAt = new Date().toISOString()
     const trialEnv = { ...env, SHRES_HOME: shresHome }
+
+    if (options.concurrency > 1) {
+      print(`[${options.experiment}] ${entry.taskId} #${entry.trialIndex} [${entry.arm}] running`)
+    }
 
     // Integrity audit, part 1: none of this trial's session roots may
     // pre-exist — a leftover root means leakage from a previous trial.
@@ -833,7 +869,8 @@ export async function main(argv, io = {}) {
     }
 
     // The scratch dir is created once per trial; a chain's workspace carries
-    // across its phases while sessions do not.
+    // across its phases while sessions do not. Paths include arm/task/trial
+    // so concurrent workers never share a directory.
     await rm(scratchDir, { recursive: true, force: true })
     await mkdir(scratchDir, { recursive: true })
     await cp(join(task.dir, 'fixture'), scratchDir, { recursive: true })
@@ -849,6 +886,7 @@ export async function main(argv, io = {}) {
           sessionLogRoot: sessionRoot,
           repoRoot, env: trialEnv, startedAt: trialStartedAt,
           extraPatchPaths,
+          signal,
         })
       } else {
         chainPhases = []
@@ -858,9 +896,11 @@ export async function main(argv, io = {}) {
           repoRoot, env: trialEnv, startedAt: trialStartedAt,
           phases: chainPhases,
           extraPatchPaths,
+          signal,
         })
       }
     } catch (error) {
+      if (signal?.aborted) return
       const partial = chainPhases !== undefined && chainPhases.length > 0 ? chainPhases : undefined
       trial = {
         taskId: entry.taskId,
@@ -881,6 +921,8 @@ export async function main(argv, io = {}) {
         endedAt: new Date().toISOString(),
       }
     }
+
+    if (signal?.aborted) return
 
     // Integrity audit, part 2: arms that exclude jspace must log zero jspace
     // events; arms that exclude session-query must log zero session-query
@@ -906,13 +948,22 @@ export async function main(argv, io = {}) {
     if (violations.length > 0) trial.integrity = { violations }
 
     validateTrial(trial)
-    await appendFile(join(armDir, 'trials.jsonl'), `${JSON.stringify(trial)}\n`)
-    if (trial.status === 'error') failed += 1
-    else finished += 1
-    print(
-      `[${options.experiment}] ${entry.taskId} #${entry.trialIndex} [${entry.arm}] `
-      + `${trial.status}${trial.resolved ? ' resolved' : ''}${trial.failureMode ? ` ${trial.failureMode}` : ''}`,
-    )
+    const line = `${JSON.stringify(trial)}\n`
+    await recordQueue.enqueue(async () => {
+      await appendFile(join(armDir, 'trials.jsonl'), line)
+      if (trial.status === 'error') failed += 1
+      else finished += 1
+      print(
+        `[${options.experiment}] ${entry.taskId} #${entry.trialIndex} [${entry.arm}] `
+        + `${trial.status}${trial.resolved ? ' resolved' : ''}${trial.failureMode ? ` ${trial.failureMode}` : ''}`,
+      )
+    })
+  }
+
+  await mapPool(plan, options.concurrency, runPlanEntry, { signal })
+  if (signal?.aborted) {
+    print(`[${options.experiment}] aborted: ${finished} completed, ${failed} infrastructure errors`)
+    return EXIT_ABORTED
   }
 
   const endedAt = new Date().toISOString()
@@ -932,11 +983,24 @@ const invokedAsScript = process.argv[1] !== undefined
   && import.meta.url === pathToFileURL(resolve(process.argv[1])).href
 
 if (invokedAsScript) {
-  main(process.argv.slice(2)).then(
+  const abort = new AbortController()
+  const onSignal = () => {
+    if (abort.signal.aborted) process.exit(EXIT_ABORTED)
+    abort.abort()
+  }
+  process.on('SIGINT', onSignal)
+  process.on('SIGTERM', onSignal)
+  const detachSignals = () => {
+    process.off('SIGINT', onSignal)
+    process.off('SIGTERM', onSignal)
+  }
+  main(process.argv.slice(2), { signal: abort.signal }).then(
     code => {
+      detachSignals()
       process.exitCode = code
     },
     error => {
+      detachSignals()
       if (error instanceof UsageError) {
         console.error(error.message)
         process.exitCode = EXIT_USAGE

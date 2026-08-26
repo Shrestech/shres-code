@@ -9,6 +9,7 @@
 
 import { spawn } from 'node:child_process'
 import { resolve } from 'node:path'
+import { killOnAbort } from './execute.js'
 
 /** Setup is local filesystem work; thirty seconds is generous. */
 export const SETUP_TIMEOUT_MS = 30_000
@@ -43,9 +44,11 @@ function setupArgv(setup, taskDir) {
  * @param {string} options.scratchDir - trial scratch dir (becomes header cwd).
  * @param {string} options.sessionLogRoot - per-spawn persistence root.
  * @param {number} [options.timeoutMs]
+ * @param {AbortSignal} [options.signal] - abort kills the setup process and waits for exit.
  * @returns {Promise<void>}
  */
-export async function runSetup({ taskDir, setup, scratchDir, sessionLogRoot, timeoutMs = SETUP_TIMEOUT_MS }) {
+export async function runSetup({ taskDir, setup, scratchDir, sessionLogRoot, timeoutMs = SETUP_TIMEOUT_MS, signal }) {
+  if (signal?.aborted) throw new Error('setup aborted')
   const argv = [...setupArgv(setup, taskDir), scratchDir, sessionLogRoot]
   const child = spawn(argv[0], argv.slice(1), { cwd: scratchDir, stdio: ['ignore', 'pipe', 'pipe'] })
 
@@ -58,26 +61,29 @@ export async function runSetup({ taskDir, setup, scratchDir, sessionLogRoot, tim
 
   const outcome = await new Promise(resolvePromise => {
     let settled = false
-    const timer = setTimeout(() => {
+    /** @type {ReturnType<typeof setTimeout>} */
+    let timer
+    const detachAbort = killOnAbort(child, signal)
+    const settle = result => {
       if (settled) return
       settled = true
+      clearTimeout(timer)
+      detachAbort()
+      resolvePromise(result)
+    }
+    timer = setTimeout(() => {
       child.kill('SIGTERM')
-      resolvePromise({ exitCode: EXIT_TIMEOUT, detail: `setup timed out after ${timeoutMs}ms` })
+      settle({ exitCode: EXIT_TIMEOUT, detail: `setup timed out after ${timeoutMs}ms` })
     }, timeoutMs)
     child.on('error', error => {
-      if (settled) return
-      settled = true
-      clearTimeout(timer)
-      resolvePromise({ exitCode: EXIT_SPAWN_FAILURE, detail: `setup failed to start: ${error.message}` })
+      settle({ exitCode: EXIT_SPAWN_FAILURE, detail: `setup failed to start: ${error.message}` })
     })
     child.on('close', code => {
-      if (settled) return
-      settled = true
-      clearTimeout(timer)
-      resolvePromise({ exitCode: code ?? EXIT_SPAWN_FAILURE, detail: undefined })
+      settle({ exitCode: code ?? EXIT_SPAWN_FAILURE, detail: undefined })
     })
   })
 
+  if (signal?.aborted) throw new Error('setup aborted')
   if (outcome.exitCode === 0) return
   const lastLine = output
     .split('\n')

@@ -9,6 +9,7 @@
 
 import { spawn } from 'node:child_process'
 import { resolve } from 'node:path'
+import { killOnAbort } from './execute.js'
 
 /** Verifier runs are local and fast; two minutes is generous headroom. */
 export const VERIFY_TIMEOUT_MS = 120_000
@@ -49,10 +50,10 @@ function verifyArgv(verify, taskDir) {
 /**
  * Run the verifier in the scratch directory. Never rejects for an ordinary
  * nonzero exit; spawn failures and timeouts fold into conventional exit codes.
- * @param {{ taskDir: string, verify: string, scratchDir: string, timeoutMs?: number }} options
+ * @param {{ taskDir: string, verify: string, scratchDir: string, timeoutMs?: number, signal?: AbortSignal }} options
  * @returns {Promise<VerifierOutcome>} the verifier outcome.
  */
-export async function runVerifier({ taskDir, verify, scratchDir, timeoutMs = VERIFY_TIMEOUT_MS }) {
+export async function runVerifier({ taskDir, verify, scratchDir, timeoutMs = VERIFY_TIMEOUT_MS, signal }) {
   const command = `${verify} ${scratchDir}`
   const argv = [...verifyArgv(verify, taskDir), scratchDir]
   const child = spawn(argv[0], argv.slice(1), { cwd: scratchDir, stdio: ['ignore', 'pipe', 'pipe'] })
@@ -66,23 +67,25 @@ export async function runVerifier({ taskDir, verify, scratchDir, timeoutMs = VER
 
   const outcome = await new Promise(resolvePromise => {
     let settled = false
-    const timer = setTimeout(() => {
+    /** @type {ReturnType<typeof setTimeout>} */
+    let timer
+    const detachAbort = killOnAbort(child, signal)
+    const settle = result => {
       if (settled) return
       settled = true
+      clearTimeout(timer)
+      detachAbort()
+      resolvePromise(result)
+    }
+    timer = setTimeout(() => {
       child.kill('SIGTERM')
-      resolvePromise({ exitCode: EXIT_TIMEOUT, detail: `verifier timed out after ${timeoutMs}ms` })
+      settle({ exitCode: EXIT_TIMEOUT, detail: `verifier timed out after ${timeoutMs}ms` })
     }, timeoutMs)
     child.on('error', error => {
-      if (settled) return
-      settled = true
-      clearTimeout(timer)
-      resolvePromise({ exitCode: EXIT_SPAWN_FAILURE, detail: `verifier failed to start: ${error.message}` })
+      settle({ exitCode: EXIT_SPAWN_FAILURE, detail: `verifier failed to start: ${error.message}` })
     })
     child.on('close', code => {
-      if (settled) return
-      settled = true
-      clearTimeout(timer)
-      resolvePromise({ exitCode: code ?? EXIT_SPAWN_FAILURE, detail: undefined })
+      settle({ exitCode: code ?? EXIT_SPAWN_FAILURE, detail: undefined })
     })
   })
 

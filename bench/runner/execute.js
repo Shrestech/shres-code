@@ -22,7 +22,35 @@ import { isSeededPriorSession } from './session-layout.js'
 const MAX_CAPTURE_BYTES = 8 << 20
 
 /** Grace period between SIGTERM and SIGKILL when a run exceeds its timeout. */
-const KILL_GRACE_MS = 5_000
+export const KILL_GRACE_MS = 5_000
+
+/**
+ * SIGTERM a child on abort, then SIGKILL after `graceMs`. The disposer
+ * removes the listener and cancels the SIGKILL timer; call it when the
+ * child has closed so a late abort cannot SIGKILL an already-reaped pid,
+ * and so dispose waits for exit (kill → await `close`) rather than
+ * returning while the child is still dying.
+ *
+ * @param {import('node:child_process').ChildProcess} child
+ * @param {AbortSignal | undefined} signal
+ * @param {number} [graceMs]
+ * @returns {() => void} disposer.
+ */
+export function killOnAbort(child, signal, graceMs = KILL_GRACE_MS) {
+  if (signal === undefined) return () => {}
+  /** @type {ReturnType<typeof setTimeout> | null} */
+  let killTimer = null
+  const onAbort = () => {
+    child.kill('SIGTERM')
+    if (killTimer === null) killTimer = setTimeout(() => child.kill('SIGKILL'), graceMs)
+  }
+  if (signal.aborted) onAbort()
+  else signal.addEventListener('abort', onAbort)
+  return () => {
+    signal.removeEventListener('abort', onAbort)
+    if (killTimer !== null) clearTimeout(killTimer)
+  }
+}
 
 /**
  * @typedef {object} HarnessLaunch
@@ -147,13 +175,18 @@ export async function findSessionLog(sessionLogRoot, scratchDir) {
  * @param {string} options.sessionLogRoot - per-trial persistence root baked into the overlay.
  * @param {number} options.timeoutMs - task timeout from task.json.
  * @param {NodeJS.ProcessEnv} options.env - child environment (carries API key, SHRES_HOME).
+ * @param {AbortSignal} [options.signal] - abort kills the child (SIGTERM, then SIGKILL) and waits for exit.
  * @returns {Promise<ExecutionResult>} the execution record.
  */
-export async function executeTrial({ repoRoot, overlayPath, extraPatchPaths = [], taskText, scratchDir, sessionLogRoot, timeoutMs, env }) {
+export async function executeTrial({ repoRoot, overlayPath, extraPatchPaths = [], taskText, scratchDir, sessionLogRoot, timeoutMs, env, signal }) {
   const launch = resolveHarnessLaunch(repoRoot)
   const patchArgs = ['--patch', overlayPath, ...extraPatchPaths.flatMap(p => ['--patch', p])]
   const argv = [...launch.argsPrefix, '--profile', 'headless', ...patchArgs, taskText]
   const startedAt = Date.now()
+
+  if (signal?.aborted) {
+    return { exitCode: null, timedOut: false, stdout: '', stderr: '', durationMs: 0, sessionLogPath: null }
+  }
 
   const child = spawn(launch.command, argv, { cwd: scratchDir, env, stdio: ['ignore', 'pipe', 'pipe'] })
   let stdout = ''
@@ -170,24 +203,27 @@ export async function executeTrial({ repoRoot, overlayPath, extraPatchPaths = []
     let timeoutFired = false
     /** @type {ReturnType<typeof setTimeout> | null} */
     let killTimer = null
+    const detachAbort = killOnAbort(child, signal)
     const timer = setTimeout(() => {
       if (settled) return
       timeoutFired = true
       child.kill('SIGTERM')
       killTimer = setTimeout(() => child.kill('SIGKILL'), KILL_GRACE_MS)
     }, timeoutMs)
-    child.on('error', error => {
-      clearTimeout(timer)
-      if (killTimer) clearTimeout(killTimer)
-      settled = true
-      rejectPromise(error)
-    })
-    child.on('close', code => {
+    const finish = (result, error) => {
       if (settled) return
       settled = true
       clearTimeout(timer)
       if (killTimer) clearTimeout(killTimer)
-      resolvePromise({ exitCode: code, timedOut: timeoutFired })
+      detachAbort()
+      if (error !== undefined) rejectPromise(error)
+      else resolvePromise(result)
+    }
+    child.on('error', error => {
+      finish(undefined, error)
+    })
+    child.on('close', code => {
+      finish({ exitCode: code, timedOut: timeoutFired })
     })
   })
 

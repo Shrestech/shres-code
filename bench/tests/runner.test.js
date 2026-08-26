@@ -7,7 +7,7 @@
  * session logs and keys its failure modes off the task text. No API calls.
  */
 
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -23,6 +23,8 @@ import { findSessionLog, resolveHarnessLaunch } from '../runner/execute.js'
 import { encodeSegment, isSeededPriorSession, projectKey, SEEDED_PRIOR_SESSION_PREFIX } from '../runner/session-layout.js'
 import { validateRunManifest } from '../schema/run-manifest.js'
 import { validateTrial } from '../schema/trial.js'
+import { createSerialQueue, mapPool } from '../runner/pool.js'
+import { pairOutcomes } from '../stats/paired.js'
 import {
   buildPlan,
   loadTaskCatalog,
@@ -256,6 +258,7 @@ describe('run.parseArgs', () => {
     assert.equal(options.dryRun, false)
     assert.equal(options.apiKeyEnv, 'DEEPSEEK_API_KEY')
     assert.deepEqual(options.tierPatches, [])
+    assert.equal(options.concurrency, 1)
   })
 
   it('parses every flag', () => {
@@ -269,6 +272,7 @@ describe('run.parseArgs', () => {
       '--base-url', 'https://example.test',
       '--api-key-env', 'ZAI_API_KEY',
       '--tier-patch', 'bench/tiers/zai.patch.yml',
+      '--concurrency', '4',
       '--dry-run',
     ])
     assert.deepEqual(options.arms, ['on', 'off'])
@@ -279,6 +283,7 @@ describe('run.parseArgs', () => {
     assert.equal(options.baseUrl, 'https://example.test')
     assert.equal(options.apiKeyEnv, 'ZAI_API_KEY')
     assert.deepEqual(options.tierPatches, ['bench/tiers/zai.patch.yml'])
+    assert.equal(options.concurrency, 4)
     assert.equal(options.dryRun, true)
   })
 
@@ -304,6 +309,11 @@ describe('run.parseArgs', () => {
     assert.throws(() => parseArgs(['--experiment', 'x', '--bogus']), /unknown argument "--bogus"/)
     assert.throws(() => parseArgs(['--experiment', 'x', '--repeats', '0']), /positive integer/)
     assert.throws(() => parseArgs(['--experiment', 'x', '--repeats', 'abc']), /positive integer/)
+    assert.throws(() => parseArgs(['--experiment', 'x', '--concurrency', '0']), /integer >= 1/)
+    assert.throws(() => parseArgs(['--experiment', 'x', '--concurrency', '-1']), /integer >= 1/)
+    assert.throws(() => parseArgs(['--experiment', 'x', '--concurrency', '1.5']), /integer >= 1/)
+    assert.throws(() => parseArgs(['--experiment', 'x', '--concurrency', 'abc']), /integer >= 1/)
+    assert.throws(() => parseArgs(['--experiment', 'x', '--concurrency']), /needs a value/)
     assert.throws(() => parseArgs(['--experiment', 'x', '--arms', 'on,nope']), /unknown arm "nope"/)
     assert.throws(() => parseArgs(['--experiment']), /needs a value/)
     assert.throws(() => parseArgs(['--experiment', 'a/b']), /plain directory name/)
@@ -999,7 +1009,7 @@ describe('execute.resolveHarnessLaunch', () => {
  * exits 2 without logging; JSPACE_LEAK logs a jspace/card event; HANG
  * never finishes (the runner's timeout kills it).
  */
-const FAKE_BIN = `import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises'
+const FAKE_BIN = `import { appendFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 const args = process.argv.slice(2)
@@ -1015,6 +1025,19 @@ if (taskText.includes('HANG')) {
 } else if (taskText.includes('HARNESS_DIE')) {
   process.exit(2)
 } else {
+  if (taskText.includes('GATE') && process.env.BENCH_TEST_GATE_DIR) {
+    const gateDir = process.env.BENCH_TEST_GATE_DIR
+    const gateN = Number(process.env.BENCH_TEST_GATE_N ?? '3')
+    const id = String(process.pid)
+    await writeFile(join(gateDir, 'start-' + id), '')
+    const seen = (await readdir(gateDir)).filter(name => name.startsWith('start-')).length
+    await writeFile(join(gateDir, 'seen-' + id), String(seen))
+    const t0 = Date.now()
+    while ((await readdir(gateDir)).filter(name => name.startsWith('start-')).length < gateN) {
+      if (Date.now() - t0 > 8000) break
+      await new Promise(r => setTimeout(r, 15))
+    }
+  }
   const lines = [
     JSON.stringify({ type: 'session', version: 0, id: 's1', cwd: process.cwd(), delegationDepth: 0 }),
     JSON.stringify({ type: 'step/end', seq: 1, time: 1000, data: { turn: 0, step: 0 } }),
@@ -1093,10 +1116,15 @@ async function writeBenchWorld(root, tasks) {
  * @param {string} arm - the arm to read.
  * @returns {Promise<{ code: number, lines: string[], trials: object[] }>} exit code, progress lines, trials.
  */
-async function runWorld(benchRoot, argv, arm) {
+async function runWorld(benchRoot, argv, arm, io = {}) {
   /** @type {string[]} */
   const lines = []
-  const code = await main(argv, { benchRoot, env: { DEEPSEEK_API_KEY: 'fake-key' }, print: line => lines.push(line) })
+  const code = await main(argv, {
+    benchRoot,
+    env: { DEEPSEEK_API_KEY: 'fake-key', ...io.env },
+    print: line => lines.push(line),
+    signal: io.signal,
+  })
   return { code, lines, trials: await readTrials(benchRoot, argv[1], arm) }
 }
 
@@ -1433,6 +1461,231 @@ await writeFile(join(dir, 'session.jsonl'), header + '\\n{"type":"step/end","seq
       assert.equal(trial.status, 'error')
       assert.equal(trial.failureMode, 'HARNESS_ERROR')
       assert.match(trial.verifier.detail, /setup failed \(exit 1\): fail: cannot plant/)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('runner pool', () => {
+  it('concurrency 1 starts and finishes in list order', async () => {
+    /** @type {number[]} */
+    const started = []
+    /** @type {number[]} */
+    const finished = []
+    await mapPool([1, 2, 3], 1, async n => {
+      started.push(n)
+      finished.push(n)
+    })
+    assert.deepEqual(started, [1, 2, 3])
+    assert.deepEqual(finished, [1, 2, 3])
+  })
+
+  it('keeps at most n in flight and starts in list order', async () => {
+    /** @type {string[]} */
+    const events = []
+    let current = 0
+    let max = 0
+    await mapPool(['a', 'b', 'c', 'd'], 3, async id => {
+      current += 1
+      max = Math.max(max, current)
+      events.push(`s${id}`)
+      await new Promise(resolve => setTimeout(resolve, 40))
+      current -= 1
+      events.push(`e${id}`)
+    })
+    assert.equal(max, 3)
+    assert.deepEqual(events.slice(0, 3), ['sa', 'sb', 'sc'])
+    assert.ok(events.includes('ed'))
+  })
+
+  it('stops launching after abort and waits for in-flight workers', async () => {
+    const abort = new AbortController()
+    /** @type {number[]} */
+    const started = []
+    let released = 0
+    await mapPool([1, 2, 3, 4, 5], 2, async n => {
+      started.push(n)
+      if (n === 2) abort.abort()
+      await new Promise(resolve => setTimeout(resolve, 20))
+      released += 1
+    }, { signal: abort.signal })
+    assert.deepEqual(started, [1, 2])
+    assert.equal(released, 2)
+  })
+
+  it('serializes overlapping writes into whole lines', async () => {
+    const root = await tempDir('bench-runner-serial-')
+    try {
+      const path = join(root, 'out.jsonl')
+      const queue = createSerialQueue()
+      await Promise.all([0, 1, 2].map(index => queue.enqueue(async () => {
+        await writeFile(path, `{${index}`, { flag: 'a' })
+        await new Promise(resolve => setTimeout(resolve, 15))
+        await writeFile(path, `}\n`, { flag: 'a' })
+      })))
+      const text = await readFile(path, 'utf8')
+      assert.equal(text, '{0}\n{1}\n{2}\n')
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('run.main concurrency (fake harness)', () => {
+  /**
+   * @param {import('../schema/trial.js').Trial} trial
+   */
+  function trialKey(trial) {
+    return {
+      taskId: trial.taskId,
+      trialIndex: trial.trialIndex,
+      arm: trial.arm,
+      status: trial.status,
+      resolved: trial.resolved,
+      sessionFile: trial.sessionFile,
+      failureMode: trial.failureMode,
+    }
+  }
+
+  it('concurrency 1 matches the default sequential run', async () => {
+    const root = await tempDir('bench-runner-conc1-')
+    try {
+      const { benchRoot } = await writeBenchWorld(root, [
+        { taskId: 'plain-a', definition: { instruction: 'do a' } },
+        { taskId: 'plain-b', definition: { instruction: 'do b' } },
+      ])
+      const flags = ['--repeats', '1', '--arms', 'off,on']
+      const sequential = await runWorld(benchRoot, ['--experiment', 'seq', ...flags], 'off')
+      const conc1 = await runWorld(benchRoot, ['--experiment', 'c1', ...flags, '--concurrency', '1'], 'off')
+      assert.equal(sequential.code, 0)
+      assert.equal(conc1.code, 0)
+      assert.deepEqual(sequential.trials.map(trialKey), conc1.trials.map(trialKey))
+      assert.deepEqual(
+        (await readTrials(benchRoot, 'seq', 'on')).map(trialKey),
+        (await readTrials(benchRoot, 'c1', 'on')).map(trialKey),
+      )
+      const strip = line => line.replace(/^\[(seq|c1)\] /, '')
+      assert.deepEqual(sequential.lines.map(strip), conc1.lines.map(strip))
+      const taskIds = [...new Set(sequential.trials.map(t => t.taskId))]
+      assert.deepEqual(
+        sequential.trials.map(t => ({ taskId: t.taskId, trialIndex: t.trialIndex, arm: t.arm })),
+        buildPlan({ taskIds, arms: ['off'], repeats: 1 }),
+      )
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('concurrency 3 runs three trials at once and writes a complete trials.jsonl', async () => {
+    const root = await tempDir('bench-runner-conc3-')
+    try {
+      const gateDir = join(root, 'gate')
+      await mkdir(gateDir, { recursive: true })
+      const { benchRoot } = await writeBenchWorld(root, [
+        { taskId: 'gate-a', definition: { instruction: 'GATE a', timeoutMs: 15000 } },
+        { taskId: 'gate-b', definition: { instruction: 'GATE b', timeoutMs: 15000 } },
+        { taskId: 'gate-c', definition: { instruction: 'GATE c', timeoutMs: 15000 } },
+      ])
+      const { code, lines, trials } = await runWorld(
+        benchRoot,
+        ['--experiment', 'e2e', '--repeats', '1', '--arms', 'off', '--concurrency', '3'],
+        'off',
+        { env: { BENCH_TEST_GATE_DIR: gateDir, BENCH_TEST_GATE_N: '3' } },
+      )
+      assert.equal(code, 0)
+      assert.equal(trials.length, 3)
+      for (const trial of trials) validateTrial(trial)
+      const text = await readFile(join(benchRoot, 'runs', 'e2e', 'off', 'trials.jsonl'), 'utf8')
+      assert.equal(text.endsWith('\n'), true)
+      for (const line of text.trim().split('\n')) JSON.parse(line)
+      const seen = (await readdir(gateDir))
+        .filter(name => name.startsWith('seen-'))
+        .map(name => Number(readFileSync(join(gateDir, name), 'utf8')))
+      assert.equal(Math.max(...seen), 3)
+      assert.ok(lines.every(line => /gate-[abc] #\d+ \[off\]/.test(line) || line.includes('done:')))
+      assert.ok(lines.some(line => line.includes('running')))
+      const onKeys = trials.map(t => `${t.taskId}:${t.trialIndex}`)
+      const paired = pairOutcomes(trials, trials)
+      assert.equal(paired.ties, 3)
+      assert.equal(paired.pairs.length, 3)
+      assert.deepEqual([...onKeys].sort(), ['gate-a:0', 'gate-b:0', 'gate-c:0'])
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('out-of-order trials.jsonl still pairs on taskId+trialIndex', async () => {
+    const root = await tempDir('bench-runner-ooo-')
+    try {
+      const { benchRoot } = await writeBenchWorld(root, [
+        { taskId: 'pair-a', definition: { instruction: 'pair a' } },
+        { taskId: 'pair-b', definition: { instruction: 'pair b' } },
+        { taskId: 'pair-c', definition: { instruction: 'pair c' } },
+      ])
+      await runWorld(
+        benchRoot,
+        ['--experiment', 'e2e', '--repeats', '1', '--arms', 'off,on', '--concurrency', '3'],
+        'off',
+      )
+      const off = await readTrials(benchRoot, 'e2e', 'off')
+      const on = await readTrials(benchRoot, 'e2e', 'on')
+      const fileOrder = pairOutcomes(off, on)
+      const sorted = pairOutcomes(
+        [...off].sort((a, b) => a.taskId.localeCompare(b.taskId) || a.trialIndex - b.trialIndex),
+        [...on].sort((a, b) => a.taskId.localeCompare(b.taskId) || a.trialIndex - b.trialIndex),
+      )
+      assert.equal(fileOrder.wins, sorted.wins)
+      assert.equal(fileOrder.losses, sorted.losses)
+      assert.equal(fileOrder.ties, sorted.ties)
+      assert.equal(fileOrder.ties, 3)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('abort drains in-flight trials and leaves trials.jsonl well-formed', async () => {
+    const root = await tempDir('bench-runner-abort-')
+    try {
+      const { benchRoot } = await writeBenchWorld(root, [
+        { taskId: 'hang-a', definition: { instruction: 'will HANG', timeoutMs: 30000 } },
+        { taskId: 'hang-b', definition: { instruction: 'also HANG', timeoutMs: 30000 } },
+      ])
+      const abort = new AbortController()
+      /** @type {string[]} */
+      const lines = []
+      /** @type {((value?: void) => void) | undefined} */
+      let sawRunning
+      const started = new Promise(resolve => { sawRunning = resolve })
+      const running = main(
+        ['--experiment', 'e2e', '--repeats', '1', '--arms', 'off', '--concurrency', '2'],
+        {
+          benchRoot,
+          env: { DEEPSEEK_API_KEY: 'fake-key' },
+          print: line => {
+            lines.push(line)
+            if (line.includes('running')) sawRunning?.()
+          },
+          signal: abort.signal,
+        },
+      )
+      await Promise.race([
+        started,
+        new Promise((_, reject) => setTimeout(() => reject(new Error('no running progress line')), 8000)),
+      ])
+      abort.abort()
+      const code = await running
+      assert.equal(code, 130)
+      const manifest = JSON.parse(await readFile(join(benchRoot, 'runs', 'e2e', 'off', 'run.json'), 'utf8'))
+      assert.equal(manifest.endedAt, '')
+      const trialsPath = join(benchRoot, 'runs', 'e2e', 'off', 'trials.jsonl')
+      if (existsSync(trialsPath)) {
+        const text = await readFile(trialsPath, 'utf8')
+        for (const line of text.split('\n').filter(l => l.trim() !== '')) {
+          validateTrial(JSON.parse(line))
+        }
+      }
+      assert.ok(lines.some(line => line.includes('aborted:')))
     } finally {
       await rm(root, { recursive: true, force: true })
     }

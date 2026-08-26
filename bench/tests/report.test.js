@@ -316,6 +316,38 @@ test('buildExperiment: demo marker file flags the synthetic experiment', async (
   }
 })
 
+test('loadArm: reversed trials.jsonl grades identically after sort', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'bench-report-ooo-'))
+  try {
+    const experimentDir = await fakeRunsTree(root)
+    const tasksDir = await fakeTasksCatalog(root)
+    const forward = await buildExperiment(experimentDir, {
+      tasksDir,
+      uiDataPath: join(root, 'ui-fwd', 'data.js'),
+      generatedAt: FIXED_NOW,
+    })
+
+    for (const arm of ['off', 'on']) {
+      const path = join(experimentDir, arm, 'trials.jsonl')
+      const lines = (await readFile(path, 'utf8')).trim().split('\n').reverse()
+      await writeFile(path, `${lines.join('\n')}\n`)
+    }
+    const reversed = await buildExperiment(experimentDir, {
+      tasksDir,
+      uiDataPath: join(root, 'ui-rev', 'data.js'),
+      generatedAt: FIXED_NOW,
+    })
+
+    assert.deepEqual(reversed.comparisons, forward.comparisons)
+    assert.deepEqual(
+      reversed.trials.map(t => [t.arm, t.taskId, t.trialIndex]),
+      forward.trials.map(t => [t.arm, t.taskId, t.trialIndex]),
+    )
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('buildExperiment: fails loud on a corrupt trials.jsonl', async () => {
   const root = await mkdtemp(join(tmpdir(), 'bench-report-corrupt-'))
   try {

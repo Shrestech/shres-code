@@ -52,7 +52,10 @@ Real runs need an API key (or `--api-key-env none` for keyless tiers) and a buil
 ```sh
 node bench/runner/run.js --experiment w0-2026-08-18 --arms off,on --repeats 3
 node bench/runner/run.js --experiment w5-pressure --tasks 'constraint-survival-*,chain-ledger-deep' --arms off,on --repeats 1
+node bench/runner/run.js --experiment w9-charter --arms off,on --repeats 31 --concurrency 4
 ```
+
+`--concurrency <n>` (default `1`) runs up to n trials at once from the interleaved plan. Each trial already owns a unique scratch dir (`runs/<experiment>/scratch/<arm>/<taskId>/<trialIndex>`) and session-log root (`runs/<experiment>/<arm>/sessions/<taskId>/<trialIndex>`), so concurrent workers do not collide. `trials.jsonl` may append out of completion order; the report pairs on `taskId+trialIndex`, not file order. `1` is sequential and is the historical runner. SIGINT/SIGTERM abort in-flight harness processes and leave every already-appended line intact (`run.json` `endedAt` stays empty).
 
 ## Provider tiers
 
@@ -108,7 +111,7 @@ Each trial records `compactionCount` (`compaction/end` events in the session log
 
 ## Protocol rules (pre-registered)
 
-1. Arms run **interleaved** per task and repeat, never all-off-then-all-on — provider model drift must not confound the toggle.
+1. Arms run **interleaved** per task and repeat, never all-off-then-all-on — provider model drift must not confound the toggle. `--concurrency` does not reorder that list.
 2. Model, temperature, base URL, harness commit, and task set are pinned in `run.json`; a changed task set is a new experiment.
 3. Every aggregate reports uncertainty; a delta without an interval is not a result.
 4. Primary metric is verifier-passed task success; LLM judgment is not used in v1.

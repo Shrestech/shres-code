@@ -106,6 +106,8 @@ export async function resolveExperimentDir(runsDir, experiment) {
 /**
  * Load and validate one arm directory: run.json plus every trials.jsonl line.
  * A missing trials.jsonl reads as zero trials so an interrupted run still builds.
+ * Trials sort by taskId then trialIndex so an out-of-order concurrent append
+ * grades identically to a sequential write; pairing keys, not file order.
  * @param {string} armDir - runs/<experiment>/<arm> directory.
  * @returns {Promise<{ manifest: import('../schema/run-manifest.js').RunManifest, trials: import('../schema/trial.js').Trial[] }>}
  */
@@ -134,6 +136,7 @@ export async function loadArm(armDir) {
       trials.push(record)
     }
   }
+  trials.sort((a, b) => a.taskId.localeCompare(b.taskId) || a.trialIndex - b.trialIndex)
   return { manifest, trials }
 }
 
