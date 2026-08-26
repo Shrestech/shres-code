@@ -24,13 +24,16 @@ export const FAILURE_MODES = Object.freeze([
  * @property {number} identicalRetries - tool calls repeated with identical name+args.
  * @property {number} checkpoints - `jspace_checkpoint` calls accepted (0 in the off arm).
  * @property {number} shipPasses - `jspace_ship` calls accepted (0 in the off arm).
- * @property {number | null} tokensIncludingDescendants - sum of input+output tokens over
- *   descendant sessions; null when descendant sessions are not observable from the runner's
- *   session roots (the runner locates only the top-level `delegationDepth: 0` session; child
- *   sessions under the same persistence root are not guaranteed discoverable without a
- *   recursive walk and depth>0 header check, which is fragile and untested in v1).
- * @property {number | null} costIncludingDescendants - estimated cost over descendant
- *   sessions; null for the same reason as tokensIncludingDescendants.
+ * @property {number | null} tokensIncludingDescendants - input+output tokens summed over the
+ *   root session and every descendant session, keyed by header `parentSession` links under the
+ *   trial's persistence root (seeded `bench-prior-*` fixtures excluded). Null only when the root
+ *   header cannot be read. The numerator matches `inputTokens`/`outputTokens`: `assistant/message`
+ *   provider-reported usage only.
+ * @property {number} descendantSessions - count of descendant sessions in the closure (excludes
+ *   the root; includes descendants whose logs carry no usage events).
+ * @property {number | null} costIncludingDescendants - estimated cost over the same closure;
+ *   always null until the bench carries a price table (none exists in-tree, and stale prices
+ *   are wrong prices), so token fields remain the cost currency.
  * @property {boolean | null} danglingCard - card open at session end (last jspace state not
  *   closed); null for jspace-off arms.
  * @property {number | null} verifiedCheckpointShare - fraction of checkpoint lines carrying
@@ -65,6 +68,7 @@ export const FAILURE_MODES = Object.freeze([
  * @property {string | null} resumedFrom - prior phase's session id when card-carry resume exists; always null under cold carry.
  * @property {number | null} exitCode - harness process exit code; null when killed by a signal.
  * @property {boolean} timedOut - the phase exceeded its timeout and was killed.
+ * @property {boolean} budgetExceeded - the live token cap terminated this phase's spawn.
  * @property {TrialMetrics} metrics - this phase's metrics.
  * @property {string} startedAt - ISO 8601.
  * @property {string} endedAt - ISO 8601.

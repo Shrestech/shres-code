@@ -56,7 +56,9 @@ node bench/runner/run.js --experiment w5-pressure --tasks 'constraint-survival-*
 node bench/runner/run.js --experiment w9-charter --arms off,on --repeats 31 --concurrency 4
 ```
 
-`--concurrency <n>` (default `1`) runs up to n trials at once from the interleaved plan. Each trial already owns a unique scratch dir (`runs/<experiment>/scratch/<arm>/<taskId>/<trialIndex>`) and session-log root (`runs/<experiment>/<arm>/sessions/<taskId>/<trialIndex>`), so concurrent workers do not collide. `trials.jsonl` may append out of completion order; the report pairs on `taskId+trialIndex`, not file order. `1` is sequential and is the historical runner. SIGINT/SIGTERM abort in-flight harness processes and leave every already-appended line intact (`run.json` `endedAt` stays empty).
+`--concurrency <n>` (default `1`) runs up to n trials at once from the interleaved plan.
+
+`--max-total-tokens <n>` sets a live per-trial token cap: the runner watches every session log under the trial's session-log root (root plus descendants, incremental byte-offset polling) and, when observed usage exceeds the cap, terminates the harness child and records `BUDGET_EXCEEDED` on the trial when the verifier does not resolve it. The cap is pinned in `run.json` (`maxTotalTokens`) so the pre-registration is checkable; `success(B)` curves at budgets below the cap remain post-hoc filtering over `tokensIncludingDescendants`. Each trial already owns a unique scratch dir (`runs/<experiment>/scratch/<arm>/<taskId>/<trialIndex>`) and session-log root (`runs/<experiment>/<arm>/sessions/<taskId>/<trialIndex>`), so concurrent workers do not collide. `trials.jsonl` may append out of completion order; the report pairs on `taskId+trialIndex`, not file order. `1` is sequential and is the historical runner. SIGINT/SIGTERM abort in-flight harness processes and leave every already-appended line intact (`run.json` `endedAt` stays empty).
 
 ## Provider tiers
 
@@ -137,8 +139,9 @@ Per-trial metrics beyond pass/fail, computed from the session JSONL:
 
 | Field | Type | Description |
 |---|---|---|
-| `tokensIncludingDescendants` | `number \| null` | Sum of input+output tokens over descendant sessions; null because descendant sessions are not observable from the runner's top-level session roots in v1. |
-| `costIncludingDescendants` | `number \| null` | Estimated cost over descendant sessions; null for the same reason. |
+| `tokensIncludingDescendants` | `number \| null` | Input+output tokens summed over the root session and its descendant closure, keyed by header `parentSession` links under the trial's session-log root (seeded `bench-prior-*` fixtures excluded). The numerator matches `inputTokens`/`outputTokens` (`assistant/message` provider-reported usage only), so root and tree numbers stay comparable. Null only when the root header cannot be read. |
+| `descendantSessions` | `number` | Count of descendant sessions in that closure (excludes the root; includes descendants whose logs carry no usage events). |
+| `costIncludingDescendants` | `number \| null` | Always null until the bench carries a price table; none exists in-tree (stale prices are wrong prices), so token fields remain the cost currency. |
 | `danglingCard` | `boolean \| null` | Card open at session end; null for jspace-off arms. |
 | `verifiedCheckpointShare` | `number \| null` | Fraction of checkpoint tool results carrying `verified: true`; null when no checkpoints exist. |
 | `coverageRefusalThenPad` | `number` | Count of checkpoint-refusal → immediate retry-success sequences within the same turn. |

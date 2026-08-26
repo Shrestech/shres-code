@@ -53,6 +53,7 @@ import { promisify } from 'node:util'
 import { getArm, listArms, renderArmOverlay } from './arms.js'
 import { executeTrial } from './execute.js'
 import { emptyMetrics, foldSessionLog } from './metrics.js'
+import { descendantUsage } from './descendants.js'
 import { createSerialQueue, mapPool } from './pool.js'
 import { runSetup } from './setup.js'
 import { runVerifier } from './verify.js'
@@ -77,6 +78,8 @@ Options:
                         into the child environment only, never into any bench record.
   --tier-patch <path>   experiment-level overlay applied after the arm overlay; repeatable, order preserved
   --concurrency <n>     max trials in flight (default: 1; 1 is sequential)
+  --max-total-tokens <n>  live token cap per trial: observed root+descendant usage
+                        above the cap terminates the trial as BUDGET_EXCEEDED
   --dry-run             print the plan and exit without writing or executing
   --help                this text
 `
@@ -124,6 +127,8 @@ export class UsageError extends Error {
  * @property {string} apiKeyEnv - env var name; `none` for keyless tiers.
  * @property {string[]} tierPatches - overlay paths in given order; empty when unused.
  * @property {number} concurrency - max trials in flight; 1 is sequential.
+ * @property {number} [maxTotalTokens] - live per-trial token cap; a spawn whose observed
+ *   root+descendant usage exceeds it is terminated and recorded `BUDGET_EXCEEDED`.
  */
 
 /**
@@ -146,6 +151,7 @@ export function parseArgs(argv) {
     apiKeyEnv: 'DEEPSEEK_API_KEY',
     tierPatches: [],
     concurrency: 1,
+    maxTotalTokens: undefined,
   }
   let armsSeen = false
   for (let index = 0; index < argv.length; index += 1) {
@@ -203,6 +209,12 @@ export function parseArgs(argv) {
         const parsed = Number(value())
         if (!Number.isSafeInteger(parsed) || parsed < 1) throw new UsageError('--concurrency must be an integer >= 1')
         options.concurrency = parsed
+        break
+      }
+      case '--max-total-tokens': {
+        const parsed = Number(value())
+        if (!Number.isSafeInteger(parsed) || parsed < 1) throw new UsageError('--max-total-tokens must be a positive integer')
+        options.maxTotalTokens = parsed
         break
       }
       case '--dry-run':
@@ -449,11 +461,11 @@ function spawnFailureDetail(outcome, execution, where = '') {
  * @param {AbortSignal} [options.signal]
  * @returns {Promise<{ execution: import('./execute.js').ExecutionResult, metrics: import('../schema/trial.js').TrialMetrics, sessionFile: string | null }>}
  */
-async function executeSpawn({ repoRoot, arm, armDir, sessionLogRoot, taskText, scratchDir, timeoutMs, env, extraPatchPaths = [], signal }) {
+async function executeSpawn({ repoRoot, arm, armDir, sessionLogRoot, taskText, scratchDir, timeoutMs, env, extraPatchPaths = [], signal, maxTotalTokens }) {
   await mkdir(sessionLogRoot, { recursive: true })
   const overlayPath = join(sessionLogRoot, 'arm-overlay.yml')
   await writeFile(overlayPath, renderArmOverlay(arm, { sessionLogRoot }))
-  const execution = await executeTrial({ repoRoot, overlayPath, extraPatchPaths, taskText, scratchDir, sessionLogRoot, timeoutMs, env, signal })
+  const execution = await executeTrial({ repoRoot, overlayPath, extraPatchPaths, taskText, scratchDir, sessionLogRoot, timeoutMs, env, signal, maxTotalTokens })
   const metrics = execution.sessionLogPath === null
     ? emptyMetrics()
     : foldSessionLog(await readFile(execution.sessionLogPath, 'utf8'), {
@@ -461,6 +473,13 @@ async function executeSpawn({ repoRoot, arm, armDir, sessionLogRoot, taskText, s
         expectsJspace: arm.expectsJspace ?? true,
       })
   metrics.durationMs = execution.durationMs
+  if (execution.sessionLogPath !== null) {
+    const descendants = await descendantUsage(sessionLogRoot, execution.sessionLogPath)
+    if (descendants.tokensIncludingDescendants !== null) {
+      metrics.tokensIncludingDescendants = descendants.tokensIncludingDescendants
+      metrics.descendantSessions = descendants.descendantSessions
+    }
+  }
   const sessionFile = execution.sessionLogPath === null
     ? null
     : relative(armDir, execution.sessionLogPath).split(sep).join('/')
@@ -468,7 +487,7 @@ async function executeSpawn({ repoRoot, arm, armDir, sessionLogRoot, taskText, s
 }
 
 /** Fields summed across phases. */
-const SUMMABLE_METRICS = ['inputTokens', 'outputTokens', 'durationMs', 'turns', 'toolCalls', 'identicalRetries', 'checkpoints', 'shipPasses', 'coverageRefusalThenPad', 'noopNoteRefusals', 'noteCapRefusals', 'compactionCount']
+const SUMMABLE_METRICS = ['inputTokens', 'outputTokens', 'durationMs', 'turns', 'toolCalls', 'identicalRetries', 'checkpoints', 'shipPasses', 'coverageRefusalThenPad', 'noopNoteRefusals', 'noteCapRefusals', 'compactionCount', 'tokensIncludingDescendants', 'descendantSessions']
 
 /**
  * Sum per-phase metrics into the trial-level row.
@@ -524,7 +543,7 @@ function trialRecordFrame(task, entry, scratchDir, startedAt) {
  * @param {AbortSignal} [options.signal]
  * @returns {Promise<import('../schema/trial.js').Trial>} the trial record (pre-audit).
  */
-async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, sessionLogRoot, repoRoot, env, startedAt, extraPatchPaths = [], signal }) {
+async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, sessionLogRoot, repoRoot, env, startedAt, extraPatchPaths = [], signal, maxTotalTokens }) {
   const { base, skippedVerifier } = trialRecordFrame(task, entry, scratchDir, startedAt)
   if (task.setup !== null) {
     await runSetup({ taskDir: task.dir, setup: task.setup, scratchDir, sessionLogRoot, signal })
@@ -540,6 +559,7 @@ async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, ses
     env,
     extraPatchPaths,
     signal,
+    maxTotalTokens,
   })
   const outcome = classifySpawn(execution)
   const endedAt = new Date().toISOString()
@@ -561,7 +581,7 @@ async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, ses
     ...base,
     status: 'success',
     resolved: verifier.resolved,
-    failureMode: verifier.resolved ? null : outcome === 'timeout' ? 'AGENT_TIMEOUT' : verifier.failureMode,
+    failureMode: verifier.resolved ? null : execution.budgetExceeded ? 'BUDGET_EXCEEDED' : outcome === 'timeout' ? 'AGENT_TIMEOUT' : verifier.failureMode,
     verifier,
     metrics,
     sessionFile,
@@ -590,7 +610,7 @@ async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, ses
  * @param {AbortSignal} [options.signal]
  * @returns {Promise<import('../schema/trial.js').Trial>} the trial record (pre-audit).
  */
-async function runChainTrial({ task, entry, arm, armDir, scratchDir, sessionRoot, repoRoot, env, startedAt, phases, extraPatchPaths = [], signal }) {
+async function runChainTrial({ task, entry, arm, armDir, scratchDir, sessionRoot, repoRoot, env, startedAt, phases, extraPatchPaths = [], signal, maxTotalTokens }) {
   const { base, skippedVerifier } = trialRecordFrame(task, entry, scratchDir, startedAt)
   const definitions = /** @type {TaskPhase[]} */ (task.phases)
   for (let index = 0; index < definitions.length; index += 1) {
@@ -611,6 +631,7 @@ async function runChainTrial({ task, entry, arm, armDir, scratchDir, sessionRoot
       env,
       extraPatchPaths,
       signal,
+      maxTotalTokens,
     })
     phases.push({
       phaseIndex: index,
@@ -618,6 +639,7 @@ async function runChainTrial({ task, entry, arm, armDir, scratchDir, sessionRoot
       resumedFrom: null,
       exitCode: execution.exitCode,
       timedOut: execution.timedOut,
+      budgetExceeded: execution.budgetExceeded,
       metrics,
       startedAt: phaseStartedAt,
       endedAt: new Date().toISOString(),
@@ -639,11 +661,12 @@ async function runChainTrial({ task, entry, arm, armDir, scratchDir, sessionRoot
   }
   const verifier = await runVerifier({ taskDir: task.dir, verify: task.verify, scratchDir, signal })
   const anyPhaseTimedOut = phases.some(phase => phase.timedOut)
+  const anyPhaseBudgetExceeded = phases.some(phase => phase.budgetExceeded)
   return {
     ...base,
     status: 'success',
     resolved: verifier.resolved,
-    failureMode: verifier.resolved ? null : anyPhaseTimedOut ? 'AGENT_TIMEOUT' : verifier.failureMode,
+    failureMode: verifier.resolved ? null : anyPhaseBudgetExceeded ? 'BUDGET_EXCEEDED' : anyPhaseTimedOut ? 'AGENT_TIMEOUT' : verifier.failureMode,
     verifier,
     metrics: sumPhaseMetrics(phases),
     sessionFile: /** @type {string | null} */ (phases.at(-1).sessionFile),
@@ -817,6 +840,7 @@ export async function main(argv, io = {}) {
       gitCommit,
       apiKeyEnv,
       tierPatches: tierPatchRecords,
+      maxTotalTokens: options.maxTotalTokens ?? null,
       startedAt,
       endedAt: '',
     }
@@ -887,6 +911,7 @@ export async function main(argv, io = {}) {
           repoRoot, env: trialEnv, startedAt: trialStartedAt,
           extraPatchPaths,
           signal,
+          maxTotalTokens: options.maxTotalTokens,
         })
       } else {
         chainPhases = []
@@ -896,6 +921,7 @@ export async function main(argv, io = {}) {
           repoRoot, env: trialEnv, startedAt: trialStartedAt,
           phases: chainPhases,
           extraPatchPaths,
+          maxTotalTokens: options.maxTotalTokens,
           signal,
         })
       }
