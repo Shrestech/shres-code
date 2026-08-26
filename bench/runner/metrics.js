@@ -18,6 +18,11 @@
  * - sessionQueryCalls: count of session-query tool calls.
  * - compactionCount: count of `compaction/end` events (one closed attempt).
  * - pressureFired: true when compactionCount > 0.
+ * - charterRunFailNamed: a `jspace/charter-run` with phase checkpoint|ship and passed false.
+ * - emptyCharterRate: 1 when the last `jspace/card` charter is empty or no card opened.
+ * - unverifiedShare: last-card checks with discrimination `unverified`, over registered checks.
+ * - echoOkRejectRate: floor registration refusals (JSPACE_CHARTER_CONSTANT / JSPACE_CHARTER_NO_READ)
+ *   over `jspace_open` / `jspace_charter_amend` results. The event name is `jspace/charter-amend`.
  *
  * @module bench/runner/metrics
  */
@@ -39,9 +44,59 @@ const SESSION_QUERY_TOOLS = new Set([
   'session_trace',
 ])
 
+/** Tools that register charter entries (floor refusals land on their results). */
+const CHARTER_REGISTRATION_TOOLS = new Set(['jspace_open', 'jspace_charter_amend'])
+
+/** Floor echo-ok refusals: named codes plus the model-visible copy the throw uses. */
+const ECHO_OK_REFUSE = /JSPACE_CHARTER_CONSTANT|JSPACE_CHARTER_NO_READ|is a constant-success command|names no workspace read/
+
 /** Refusal indicators in tool/result data for coverage and note diagnostics. */
 const NOOP_NOTE_MARKER = 'JSPACE_NOTE_NOOP'
 const NOTE_CAP_MARKER = 'note cap'
+
+/**
+ * Flatten tool/result text from the durable `message` payload or the older
+ * bench-synthetic `result` string.
+ * @param {Record<string, unknown>} data - tool/result data.
+ * @returns {string} concatenated text blocks.
+ */
+function extractToolResultText(data) {
+  if (typeof data.result === 'string') return data.result
+  return collectText(data.message)
+}
+
+/**
+ * Walk a tool-result message (or nested content) for text blocks.
+ * @param {unknown} value - message, content array, or text node.
+ * @returns {string} joined text.
+ */
+function collectText(value) {
+  if (typeof value === 'string') return value
+  if (Array.isArray(value)) return value.map(collectText).join('\n')
+  if (typeof value === 'object' && value !== null) {
+    const record = /** @type {Record<string, unknown>} */ (value)
+    if (typeof record.text === 'string') return record.text
+    if (record.content !== undefined) return collectText(record.content)
+  }
+  return ''
+}
+
+/**
+ * Call id on a tool/result: durable `message.source.callId`, else `callId`.
+ * @param {Record<string, unknown>} data - tool/result data.
+ * @returns {string} call id or empty.
+ */
+function resultCallId(data) {
+  const message = data.message
+  if (typeof message === 'object' && message !== null) {
+    const source = /** @type {Record<string, unknown>} */ (message).source
+    if (typeof source === 'object' && source !== null) {
+      const callId = /** @type {Record<string, unknown>} */ (source).callId
+      if (typeof callId === 'string') return callId
+    }
+  }
+  return typeof data.callId === 'string' ? data.callId : ''
+}
 
 /**
  * Stable string form for retry comparison: object keys sort recursively so
@@ -112,9 +167,15 @@ export function foldSessionLog(text, armFlags) {
     sessionQueryCalls: hasSq ? 0 : null,
     compactionCount: 0,
     pressureFired: false,
+    charterRunFailNamed: hasJspace ? false : null,
+    emptyCharterRate: hasJspace ? 1 : null,
+    unverifiedShare: null,
+    echoOkRejectRate: null,
   }
   /** @type {Map<string, number>} */
   const callCounts = new Map()
+  /** @type {Map<string, string>} */
+  const callNames = new Map()
   let minTime = Number.POSITIVE_INFINITY
   let maxTime = 0
 
@@ -123,6 +184,10 @@ export function foldSessionLog(text, armFlags) {
   let lastCheckpointWasRefusal = false
   let lastCheckpointTurn = -1
   let cardOpen = false
+  /** @type {unknown[] | undefined} */
+  let lastCharter
+  let registrationAttempts = 0
+  let echoOkRejects = 0
 
   const lines = text.split('\n')
   for (let index = 0; index < lines.length; index += 1) {
@@ -147,6 +212,7 @@ export function foldSessionLog(text, armFlags) {
       case 'tool/call': {
         metrics.toolCalls += 1
         const name = typeof data.name === 'string' ? data.name : ''
+        if (typeof data.callId === 'string') callNames.set(data.callId, name)
         if (name === CHECKPOINT_TOOL) metrics.checkpoints += 1
         if (name === SHIP_TOOL) metrics.shipPasses += 1
         if (hasSq && SESSION_QUERY_TOOLS.has(name)) {
@@ -162,8 +228,13 @@ export function foldSessionLog(text, armFlags) {
         break
       }
       case 'tool/result': {
-        const resultName = typeof data.name === 'string' ? data.name : ''
+        const resultName = typeof data.name === 'string' ? data.name : (callNames.get(resultCallId(data)) ?? '')
         const resultText = typeof data.result === 'string' ? data.result : ''
+        if (hasJspace && CHARTER_REGISTRATION_TOOLS.has(resultName)) {
+          const charterText = resultText.length > 0 ? resultText : extractToolResultText(data)
+          registrationAttempts += 1
+          if (ECHO_OK_REFUSE.test(charterText)) echoOkRejects += 1
+        }
         if (resultName === CHECKPOINT_TOOL) {
           totalCheckpoints += 1
           if (resultText.includes('verified') && resultText.includes('true')) {
@@ -196,10 +267,18 @@ export function foldSessionLog(text, armFlags) {
       }
       case 'jspace/card':
         cardOpen = true
+        lastCharter = Array.isArray(data.charter) ? data.charter : []
         break
       case 'jspace/closed':
         cardOpen = false
         break
+      case 'jspace/charter-run': {
+        const phase = data.phase
+        if (hasJspace && (phase === 'checkpoint' || phase === 'ship') && data.passed === false) {
+          metrics.charterRunFailNamed = true
+        }
+        break
+      }
       case 'compaction/end':
         metrics.compactionCount += 1
         break
@@ -214,6 +293,21 @@ export function foldSessionLog(text, armFlags) {
   metrics.durationMs = minTime === Number.POSITIVE_INFINITY ? 0 : maxTime - minTime
 
   if (hasJspace) metrics.danglingCard = cardOpen
+  if (hasJspace) {
+    metrics.emptyCharterRate = lastCharter === undefined || lastCharter.length === 0 ? 1 : 0
+    if (lastCharter !== undefined) {
+      const checks = lastCharter.filter(entry =>
+        typeof entry === 'object' && entry !== null && /** @type {Record<string, unknown>} */ (entry).kind === 'check')
+      if (checks.length > 0) {
+        const unverified = checks.filter(entry =>
+          /** @type {Record<string, unknown>} */ (entry).discrimination === 'unverified').length
+        metrics.unverifiedShare = unverified / checks.length
+      }
+    }
+    if (registrationAttempts > 0) {
+      metrics.echoOkRejectRate = echoOkRejects / registrationAttempts
+    }
+  }
   if (totalCheckpoints > 0) {
     metrics.verifiedCheckpointShare = verifiedCheckpoints / totalCheckpoints
   }
@@ -246,5 +340,9 @@ export function emptyMetrics() {
     sessionQueryCalls: null,
     compactionCount: 0,
     pressureFired: false,
+    charterRunFailNamed: null,
+    emptyCharterRate: null,
+    unverifiedShare: null,
+    echoOkRejectRate: null,
   }
 }

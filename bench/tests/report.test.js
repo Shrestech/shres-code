@@ -551,6 +551,70 @@ test('buildExperiment: pressure stratum and one comparison per treatment arm', a
     assert.equal(adaptive.meanSessionQueryCalls, 2)
     assert.equal(adaptive.totalCompactionCount, 2)
     assert.equal(adaptive.pressureFiredRate, 0.5)
+    assert.equal(onArm.meanCharterRunFailNamed, null)
+    assert.equal(onArm.meanEmptyCharterRate, null)
+    assert.equal(onArm.meanUnverifiedShare, null)
+    assert.equal(onArm.meanEchoOkRejectRate, null)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('buildExperiment: charter forensics aggregates', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'bench-report-charter-'))
+  try {
+    const dir = join(root, 'exp-charter')
+    await writeArm(dir, 'off', [
+      trial({ taskId: 'press', trialIndex: 0, arm: 'off', resolved: false, failureMode: 'VERIFY_FAILED', verifier: { command: 'node verify.mjs', exitCode: 1 } }),
+    ])
+    await writeArm(dir, 'on-charter', [
+      trial({
+        taskId: 'press', trialIndex: 0, arm: 'on-charter', resolved: true,
+        metrics: {
+          danglingCard: false,
+          charterRunFailNamed: true,
+          emptyCharterRate: 0,
+          unverifiedShare: 0.25,
+          echoOkRejectRate: 0.5,
+        },
+      }),
+      trial({
+        taskId: 'press', trialIndex: 1, arm: 'on-charter', resolved: true,
+        metrics: {
+          danglingCard: false,
+          charterRunFailNamed: false,
+          emptyCharterRate: 1,
+          unverifiedShare: 0.75,
+          echoOkRejectRate: 0,
+        },
+      }),
+    ])
+    const tasksDir = join(root, 'tasks')
+    await mkdir(join(tasksDir, 'press'), { recursive: true })
+    await writeFile(join(tasksDir, 'press', 'task.json'), JSON.stringify({
+      taskId: 'press',
+      stratum: 'pressure',
+      description: 'Charter pressure task.',
+      instruction: 'Survive.',
+      verify: 'node verify.mjs',
+      timeoutMs: 600_000,
+      maxTurns: 80,
+    }) + '\n')
+
+    const report = await buildExperiment(dir, { tasksDir, uiDataPath: join(root, 'ui', 'data.js'), generatedAt: FIXED_NOW })
+    const arm = report.arms.find(a => a.arm === 'on-charter')
+    assert.equal(arm.meanCharterRunFailNamed, 0.5)
+    assert.equal(arm.meanEmptyCharterRate, 0.5)
+    assert.equal(arm.meanUnverifiedShare, 0.5)
+    assert.equal(arm.meanEchoOkRejectRate, 0.25)
+    const cell = report.cells.find(c => c.arm === 'on-charter' && c.taskId === 'press')
+    assert.equal(cell.meanCharterRunFailNamed, 0.5)
+    assert.equal(cell.meanEmptyCharterRate, 0.5)
+    assert.equal(cell.meanUnverifiedShare, 0.5)
+    assert.equal(cell.meanEchoOkRejectRate, 0.25)
+    const offArm = report.arms.find(a => a.arm === 'off')
+    assert.equal(offArm.meanCharterRunFailNamed, null)
+    assert.equal(offArm.meanEmptyCharterRate, null)
   } finally {
     await rm(root, { recursive: true, force: true })
   }

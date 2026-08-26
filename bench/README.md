@@ -6,7 +6,7 @@ Conventions follow the established evaluation harnesses rather than inventing ne
 
 ## Arms
 
-The eight-arm ladder covers every decision-relevant contrast. `sq-driver` exists for the session-query adoption experiment. Each arm is a `--patch` overlay applied to the shipped headless composition, which mounts `jspace` with `enabled: false` and does not mount the model-facing session-query tool at all.
+The nine-arm ladder covers every decision-relevant contrast. `sq-driver` exists for the session-query adoption experiment. `on-charter` is the w9 treatment: executor-enforced charter checks, graded against `off`. Each arm is a `--patch` overlay applied to the shipped headless composition, which mounts `jspace` with `enabled: false` and does not mount the model-facing session-query tool at all.
 
 | Arm | J-Space | Session-Query | Notes |
 |---|---|---|---|
@@ -18,6 +18,7 @@ The eight-arm ladder covers every decision-relevant contrast. `sq-driver` exists
 | `on-sq-verified` | available | mounted | `on-sq` plus `verifierTools: ['bash']` and `requireVerifiedEvidence: true`. |
 | `on-adaptive` | available from step 10 | mounted | `on-sq` plus `engageAfterSteps: 10`; isolates the always-on prompt and schema cost from the card's long-horizon benefit. |
 | `on-core` | available | absent | `on` plus `tool-jspace` `requireCoreOnOpen: true` and `requireCoreForShip: true`; prices the constraint-capture gates against `on`, the arm whose sessions left Core empty. |
+| `on-charter` | available | absent | `on` plus `tool-jspace` `requireCharter`, `requireExecutableCharter`, `charterSeed`, `charterDiscrimination: 'required'`, `charterCheckTimeoutMs: 30000`, `maxCharterEntries: 12`, `charterChecksMustBeReadOnly: true`. Seat stays `available` (`requireCharter` refuses `always-open`). |
 
 Arms register in `runner/arms.js`. Every overlay carries a `jspace` config patch and the per-trial persistence redirect; an arm with a `toolJspace` config adds a `tool-jspace` patch; session-query arms additionally patch the shipped `session-query-sqlite` service to open a per-trial index at startup (it ships with `openAt: never` and an in-memory path) and append an `- insert:` layer mounting `tool-session-query`. Arms without session-query need no disable rows, because the tool is absent from the profile.
 
@@ -144,6 +145,10 @@ Per-trial metrics beyond pass/fail, computed from the session JSONL:
 | `sessionQueryCalls` | `number \| null` | Count of session_search/session_event_search/session_event_read/session_event_trace/session_trace calls; null for arms excluding the session-query consumer. |
 | `compactionCount` | `number` | Count of `compaction/end` events (one closed compaction attempt). |
 | `pressureFired` | `boolean` | `compactionCount > 0`. A long-horizon verdict only counts on trials where this is true. |
+| `charterRunFailNamed` | `boolean \| null` | A `jspace/charter-run` with phase `checkpoint` or `ship` and `passed: false` (the refusal names `entryId`); null for jspace-off. Probe-phase runs do not count. |
+| `emptyCharterRate` | `number \| null` | 1 when the last `jspace/card` charter is empty or no card opened; 0 when the last card carries at least one entry; null for jspace-off. |
+| `unverifiedShare` | `number \| null` | Last-card `kind: 'check'` entries with `discrimination: 'unverified'`, divided by registered checks; null when no checks. |
+| `echoOkRejectRate` | `number \| null` | Floor registration refusals (`JSPACE_CHARTER_CONSTANT` / `JSPACE_CHARTER_NO_READ`, or their model-visible copy) over `jspace_open` / `jspace_charter_amend` results; null when no registration attempt. The amend event is `jspace/charter-amend`. |
 
 Aggregates flow through `report/build.js` into `ui/data.js`. The demo generator exercises every field.
 
@@ -151,6 +156,6 @@ Aggregates flow through `report/build.js` into `ui/data.js`. The demo generator 
 
 `node bench/report/build.js [--experiment <name>|latest]` rebuilds per-arm `results.json` and `bench/ui/data.js` from `trials.jsonl`. `latest` (the default) picks the `runs/` directory with the newest modification time.
 
-The payload's `comparisons` array holds one `off` vs treatment record for every non-baseline arm present in the experiment (`off` vs `on`, `off` vs `on-adaptive`, and so on). Each record carries the McNemar grade, accuracy delta, and per-task paired rows; there is no singular `comparison` field. Arm summaries include forensics and compaction aggregates (`meanDanglingCard`, `meanVerifiedCheckpointShare`, `meanSessionQueryCalls`, `totalNoopNoteRefusals`, `totalCompactionCount`, `pressureFiredRate`). The `pressure` stratum is a first-class catalog value alongside `long`, `short`, `adversarial`, and `chain`.
+The payload's `comparisons` array holds one `off` vs treatment record for every non-baseline arm present in the experiment (`off` vs `on`, `off` vs `on-adaptive`, and so on). Each record carries the McNemar grade, accuracy delta, and per-task paired rows; there is no singular `comparison` field. Arm summaries include forensics and compaction aggregates (`meanDanglingCard`, `meanVerifiedCheckpointShare`, `meanSessionQueryCalls`, `totalNoopNoteRefusals`, `totalCompactionCount`, `pressureFiredRate`, `meanCharterRunFailNamed`, `meanEmptyCharterRate`, `meanUnverifiedShare`, `meanEchoOkRejectRate`). The `pressure` stratum is a first-class catalog value alongside `long`, `short`, `adversarial`, and `chain`.
 
 Serve the static report with `node bench/report/serve.js`. The UI contract lives in `bench/ui/CONTRACT.md`.

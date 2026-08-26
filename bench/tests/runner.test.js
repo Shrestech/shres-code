@@ -119,6 +119,10 @@ describe('metrics.foldSessionLog', () => {
     assert.equal(result.sessionQueryCalls, 0)
     assert.equal(result.compactionCount, 0)
     assert.equal(result.pressureFired, false)
+    assert.equal(result.charterRunFailNamed, false)
+    assert.equal(result.emptyCharterRate, 1)
+    assert.equal(result.unverifiedShare, null)
+    assert.equal(result.echoOkRejectRate, null)
   })
 
   it('counts session-query tool calls for adoption forensics', () => {
@@ -131,16 +135,101 @@ describe('metrics.foldSessionLog', () => {
     assert.equal(foldSessionLog(log, { expectsSessionQuery: false, expectsJspace: false }).sessionQueryCalls, null)
   })
 
+  it('sets charterRunFailNamed from a failed checkpoint or ship charter-run', () => {
+    const fail = '{"type":"jspace/charter-run","seq":1,"time":1,"data":{"entryId":"e1","phase":"checkpoint","passed":false}}'
+    const shipFail = '{"type":"jspace/charter-run","seq":2,"time":2,"data":{"entryId":"e1","phase":"ship","passed":false}}'
+    const probeFail = '{"type":"jspace/charter-run","seq":3,"time":3,"data":{"entryId":"e1","phase":"probe","passed":false}}'
+    const pass = '{"type":"jspace/charter-run","seq":4,"time":4,"data":{"entryId":"e1","phase":"checkpoint","passed":true}}'
+    assert.equal(foldSessionLog(fail + '\n').charterRunFailNamed, true)
+    assert.equal(foldSessionLog(shipFail + '\n').charterRunFailNamed, true)
+    assert.equal(foldSessionLog(probeFail + '\n').charterRunFailNamed, false)
+    assert.equal(foldSessionLog(pass + '\n').charterRunFailNamed, false)
+    assert.equal(
+      foldSessionLog(fail + '\n', { expectsSessionQuery: false, expectsJspace: false }).charterRunFailNamed,
+      null,
+    )
+  })
+
+  it('sets emptyCharterRate from the last jspace/card charter', () => {
+    const empty = '{"type":"jspace/card","seq":1,"time":1,"data":{"charter":[]}}'
+    const filled = '{"type":"jspace/card","seq":2,"time":2,"data":{"charter":[{"kind":"check","id":"e1","discrimination":"demonstrated"}]}}'
+    const closed = '{"type":"jspace/closed","seq":3,"time":3,"data":{}}'
+    assert.equal(foldSessionLog('\n').emptyCharterRate, 1)
+    assert.equal(foldSessionLog(empty + '\n').emptyCharterRate, 1)
+    assert.equal(foldSessionLog(filled + '\n').emptyCharterRate, 0)
+    assert.equal(foldSessionLog(empty + '\n' + filled + '\n').emptyCharterRate, 0)
+    assert.equal(foldSessionLog(filled + '\n' + empty + '\n').emptyCharterRate, 1)
+    assert.equal(foldSessionLog(filled + '\n' + closed + '\n').emptyCharterRate, 0)
+    assert.equal(
+      foldSessionLog(empty + '\n', { expectsSessionQuery: false, expectsJspace: false }).emptyCharterRate,
+      null,
+    )
+  })
+
+  it('sets unverifiedShare from last-card check discrimination', () => {
+    const mixed = JSON.stringify({
+      type: 'jspace/card',
+      seq: 1,
+      time: 1,
+      data: {
+        charter: [
+          { kind: 'check', id: 'e1', discrimination: 'demonstrated' },
+          { kind: 'check', id: 'e2', discrimination: 'unverified' },
+          { kind: 'prose', id: 'e3', constraint: 'be kind' },
+        ],
+      },
+    })
+    const allDemo = '{"type":"jspace/card","seq":1,"time":1,"data":{"charter":[{"kind":"check","id":"e1","discrimination":"demonstrated"}]}}'
+    const proseOnly = '{"type":"jspace/card","seq":1,"time":1,"data":{"charter":[{"kind":"prose","id":"e1"}]}}'
+    assert.equal(foldSessionLog(mixed + '\n').unverifiedShare, 0.5)
+    assert.equal(foldSessionLog(allDemo + '\n').unverifiedShare, 0)
+    assert.equal(foldSessionLog(proseOnly + '\n').unverifiedShare, null)
+    assert.equal(foldSessionLog('\n').unverifiedShare, null)
+  })
+
+  it('sets echoOkRejectRate from floor refusals on open and charter_amend', () => {
+    const openCall = '{"type":"tool/call","seq":1,"time":1,"data":{"callId":"c1","name":"jspace_open","arguments":"{}"}}'
+    const openRefuse = '{"type":"tool/result","seq":2,"time":2,"data":{"name":"jspace_open","result":"Error: charter entry \\"e1\\" (qty) is a constant-success command. Write a command that reads a path from `reads`."}}'
+    const amendCall = '{"type":"tool/call","seq":3,"time":3,"data":{"callId":"c2","name":"jspace_charter_amend","arguments":"{}"}}'
+    const amendOk = '{"type":"tool/result","seq":4,"time":4,"data":{"name":"jspace_charter_amend","result":"Amended."}}'
+    const noRead = '{"type":"tool/result","seq":5,"time":5,"data":{"name":"jspace_open","result":"JSPACE_CHARTER_NO_READ: charter entry \\"e1\\" names no workspace read"}}'
+    const durable = JSON.stringify({
+      type: 'tool/result',
+      seq: 6,
+      time: 6,
+      data: {
+        message: {
+          source: { kind: 'tool', callId: 'c1' },
+          content: [{
+            type: 'tool-result',
+            toolCallId: 'c1',
+            isError: true,
+            content: [{ type: 'text', text: 'Error: charter entry "e1" (qty) is a constant-success command.' }],
+          }],
+        },
+      },
+    })
+    assert.equal(foldSessionLog([openCall, openRefuse].join('\n')).echoOkRejectRate, 1)
+    assert.equal(foldSessionLog([openCall, openRefuse, amendCall, amendOk].join('\n')).echoOkRejectRate, 0.5)
+    assert.equal(foldSessionLog([openCall, noRead].join('\n')).echoOkRejectRate, 1)
+    assert.equal(foldSessionLog([openCall, durable].join('\n')).echoOkRejectRate, 1)
+    assert.equal(foldSessionLog(openCall + '\n').echoOkRejectRate, null)
+    assert.equal(
+      foldSessionLog([openCall, openRefuse].join('\n'), { expectsSessionQuery: false, expectsJspace: false }).echoOkRejectRate,
+      null,
+    )
+  })
+
   it('throws with the line number on corrupt JSON', () => {
     assert.throws(() => foldSessionLog('{"type":"session"}\nnot json\n'), /line 2/)
   })
 })
 
 describe('arms registry', () => {
-  it('registers all eight arms in ladder order', () => {
+  it('registers all nine arms in ladder order', () => {
     assert.deepEqual(
       listArms(),
-      ['off', 'on', 'sq-only', 'sq-driver', 'on-sq', 'on-sq-verified', 'on-adaptive', 'on-core'],
+      ['off', 'on', 'sq-only', 'sq-driver', 'on-sq', 'on-sq-verified', 'on-adaptive', 'on-core', 'on-charter'],
     )
     assert.equal(ARMS.off.jspace.enabled, false)
     assert.equal(ARMS.on.jspace.enabled, true)
@@ -153,6 +242,16 @@ describe('arms registry', () => {
     assert.deepEqual(ARMS['on-core'].jspace, ARMS.on.jspace)
     assert.equal(ARMS['on-core'].toolJspace.requireCoreOnOpen, true)
     assert.equal(ARMS['on-core'].toolJspace.requireCoreForShip, true)
+    assert.deepEqual(ARMS['on-charter'].jspace, ARMS.on.jspace)
+    assert.deepEqual(ARMS['on-charter'].toolJspace, {
+      requireCharter: true,
+      requireExecutableCharter: true,
+      charterSeed: true,
+      charterDiscrimination: 'required',
+      charterCheckTimeoutMs: 30_000,
+      maxCharterEntries: 12,
+      charterChecksMustBeReadOnly: true,
+    })
     assert.equal(ARMS.on.toolJspace, undefined)
     assert.equal(getArm('off'), ARMS.off)
   })
@@ -166,6 +265,7 @@ describe('arms registry', () => {
     assert.equal(ARMS['on-sq-verified'].sessionQuery, true)
     assert.equal(ARMS['on-adaptive'].sessionQuery, true)
     assert.equal(ARMS['on-core'].sessionQuery, false)
+    assert.equal(ARMS['on-charter'].sessionQuery, false)
   })
 
   it('expectsJspace and expectsSessionQuery match arm semantics', () => {
@@ -187,6 +287,8 @@ describe('arms registry', () => {
     assert.equal(ARMS['on-adaptive'].expectsSessionQuery, true)
     assert.equal(ARMS['on-core'].expectsJspace, true)
     assert.equal(ARMS['on-core'].expectsSessionQuery, false)
+    assert.equal(ARMS['on-charter'].expectsJspace, true)
+    assert.equal(ARMS['on-charter'].expectsSessionQuery, false)
   })
 
   it('renders the constraint-capture requirements into the on-core overlay', () => {
@@ -201,6 +303,27 @@ describe('arms registry', () => {
       renderArmOverlay(ARMS.on, { sessionLogRoot: '/x' }),
       /^- id: tool-jspace$/m,
     )
+  })
+
+  it('renders the executor-enforced charter requirements into the on-charter overlay', () => {
+    const overlay = renderArmOverlay(ARMS['on-charter'], {
+      sessionLogRoot: '/tmp/bench/on-charter/sessions/t/0',
+    })
+    assert.match(overlay, /^- id: jspace$/m)
+    assert.match(overlay, /enabled: true/)
+    assert.match(overlay, /mode: "available"/)
+    assert.match(overlay, /requireCoverage: true/)
+    assert.match(overlay, /^- id: tool-jspace$/m)
+    assert.match(overlay, /requireCharter: true/)
+    assert.match(overlay, /requireExecutableCharter: true/)
+    assert.match(overlay, /charterSeed: true/)
+    assert.match(overlay, /charterDiscrimination: "required"/)
+    assert.match(overlay, /charterCheckTimeoutMs: 30000/)
+    assert.match(overlay, /maxCharterEntries: 12/)
+    assert.match(overlay, /charterChecksMustBeReadOnly: true/)
+    assert.doesNotMatch(overlay, /tool-session-query/)
+    assert.doesNotMatch(overlay, /session-query/)
+    assert.doesNotMatch(overlay, /requireCoreOnOpen/)
   })
 
   it('renders the engagement threshold into the on-adaptive overlay', () => {

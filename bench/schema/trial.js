@@ -46,6 +46,15 @@ export const FAILURE_MODES = Object.freeze([
  * @property {number} compactionCount - number of `compaction/end` events in the session log
  *   (one closed compaction attempt, success or error).
  * @property {boolean} pressureFired - true when compactionCount > 0.
+ * @property {boolean | null} charterRunFailNamed - a `jspace/charter-run` with phase
+ *   checkpoint or ship and `passed: false` (the refusal names `entryId`); null for jspace-off.
+ * @property {number | null} emptyCharterRate - 1 when the last `jspace/card` charter is empty
+ *   or no card opened; 0 when the last card carries at least one entry; null for jspace-off.
+ * @property {number | null} unverifiedShare - last-card `kind: 'check'` entries with
+ *   `discrimination: 'unverified'`, divided by registered checks; null when no checks.
+ * @property {number | null} echoOkRejectRate - floor registration refusals
+ *   (`JSPACE_CHARTER_CONSTANT` / `JSPACE_CHARTER_NO_READ`, or their model-visible copy)
+ *   over `jspace_open` / `jspace_charter_amend` results; null when no registration attempt.
  */
 
 /**

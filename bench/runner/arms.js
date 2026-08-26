@@ -11,7 +11,7 @@
  * other arms need no disable rows because the tool is absent from the
  * profile.
  *
- * The eight-arm ladder covers every decision-relevant contrast:
+ * The nine-arm ladder covers every decision-relevant contrast:
  *
  * | Arm | Configuration |
  * |---|---|
@@ -23,6 +23,7 @@
  * | `on-sq-verified` | on-sq + verifierTools naming `bash` + requireVerifiedEvidence. |
  * | `on-adaptive` | on-sq with `engageAfterSteps: 10`: J-Space costs nothing until step 10. |
  * | `on-core` | on + `requireCoreOnOpen` and `requireCoreForShip`: the card must carry constraints. |
+ * | `on-charter` | on + tool-jspace executable charter required, seeded, and discrimination-gated. |
  *
  * @module bench/runner/arms
  */
@@ -130,6 +131,24 @@ export const ARMS = Object.freeze({
     name: 'on-core',
     jspace: Object.freeze({ enabled: true, mode: 'available', requireCoverage: true }),
     toolJspace: Object.freeze({ requireCoreOnOpen: true, requireCoreForShip: true }),
+    sessionQuery: false,
+    expectsSessionQuery: false,
+    expectsJspace: true,
+  }),
+  // Contrast against `off` (w9). Seat stays `available` because tool-jspace
+  // `requireCharter` refuses `always-open`. Keys match tool-jspace Config.
+  'on-charter': Object.freeze({
+    name: 'on-charter',
+    jspace: Object.freeze({ enabled: true, mode: 'available', requireCoverage: true }),
+    toolJspace: Object.freeze({
+      requireCharter: true,
+      requireExecutableCharter: true,
+      charterSeed: true,
+      charterDiscrimination: 'required',
+      charterCheckTimeoutMs: 30_000,
+      maxCharterEntries: 12,
+      charterChecksMustBeReadOnly: true,
+    }),
     sessionQuery: false,
     expectsSessionQuery: false,
     expectsJspace: true,

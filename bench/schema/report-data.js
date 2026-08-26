@@ -35,6 +35,10 @@ export const REPORT_STRATA = Object.freeze(['long', 'short', 'adversarial', 'cha
  * @property {number | null} meanSessionQueryCalls - null for arms excluding session-query.
  * @property {number} meanCompactionCount
  * @property {number} pressureFiredRate - fraction of success trials with pressureFired.
+ * @property {number | null} meanCharterRunFailNamed - fraction of trials with a named checkpoint/ship charter failure; null for jspace-off.
+ * @property {number | null} meanEmptyCharterRate - mean of per-trial emptyCharterRate; null for jspace-off.
+ * @property {number | null} meanUnverifiedShare - mean of per-trial unverifiedShare; null when no trial registered checks.
+ * @property {number | null} meanEchoOkRejectRate - mean of per-trial echoOkRejectRate; null when no trial attempted registration.
  */
 
 /**
@@ -70,6 +74,10 @@ export const REPORT_STRATA = Object.freeze(['long', 'short', 'adversarial', 'cha
  * @property {number | null} meanSessionQueryCalls - null for arms excluding session-query.
  * @property {number} totalCompactionCount
  * @property {number} pressureFiredRate - fraction of success trials with pressureFired.
+ * @property {number | null} meanCharterRunFailNamed - fraction of trials with a named checkpoint/ship charter failure; null for jspace-off.
+ * @property {number | null} meanEmptyCharterRate - mean of per-trial emptyCharterRate; null for jspace-off.
+ * @property {number | null} meanUnverifiedShare - mean of per-trial unverifiedShare; null when no trial registered checks.
+ * @property {number | null} meanEchoOkRejectRate - mean of per-trial echoOkRejectRate; null when no trial attempted registration.
  */
 
 /**

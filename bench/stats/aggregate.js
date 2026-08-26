@@ -59,6 +59,16 @@ export function summarizeCell(taskId, arm, trials) {
   cell.meanSessionQueryCalls = sqValues.length > 0 ? mean(sqValues) : null
   cell.meanCompactionCount = mean(ok.map(t => t.metrics.compactionCount))
   cell.pressureFiredRate = ok.length === 0 ? NaN : ok.filter(t => t.metrics.pressureFired).length / ok.length
+  const namedFails = ok.map(t => t.metrics.charterRunFailNamed).filter(v => v !== null && v !== undefined)
+  cell.meanCharterRunFailNamed = namedFails.length > 0
+    ? namedFails.filter(v => v === true).length / namedFails.length
+    : null
+  const emptyCharterValues = ok.map(t => t.metrics.emptyCharterRate).filter(v => typeof v === 'number')
+  cell.meanEmptyCharterRate = emptyCharterValues.length > 0 ? mean(emptyCharterValues) : null
+  const unverifiedValues = ok.map(t => t.metrics.unverifiedShare).filter(v => v !== null && v !== undefined)
+  cell.meanUnverifiedShare = unverifiedValues.length > 0 ? mean(unverifiedValues) : null
+  const echoOkValues = ok.map(t => t.metrics.echoOkRejectRate).filter(v => v !== null && v !== undefined)
+  cell.meanEchoOkRejectRate = echoOkValues.length > 0 ? mean(echoOkValues) : null
   return /** @type {import('../schema/report-data.js').ReportCell} */ (cell)
 }
 
@@ -96,6 +106,10 @@ export function summarizeArm(arm, trials) {
   const danglingValues = ok.map(t => t.metrics.danglingCard).filter(v => v !== null)
   const verifiedValues = ok.map(t => t.metrics.verifiedCheckpointShare).filter(v => v !== null)
   const sqValues = ok.map(t => t.metrics.sessionQueryCalls).filter(v => v !== null)
+  const namedFails = ok.map(t => t.metrics.charterRunFailNamed).filter(v => v !== null && v !== undefined)
+  const emptyCharterValues = ok.map(t => t.metrics.emptyCharterRate).filter(v => typeof v === 'number')
+  const unverifiedValues = ok.map(t => t.metrics.unverifiedShare).filter(v => v !== null && v !== undefined)
+  const echoOkValues = ok.map(t => t.metrics.echoOkRejectRate).filter(v => v !== null && v !== undefined)
   return {
     arm,
     accuracy,
@@ -117,6 +131,12 @@ export function summarizeArm(arm, trials) {
     meanSessionQueryCalls: sqValues.length > 0 ? mean(sqValues) : null,
     totalCompactionCount: sum(ok.map(t => t.metrics.compactionCount)),
     pressureFiredRate: ok.length === 0 ? NaN : ok.filter(t => t.metrics.pressureFired).length / ok.length,
+    meanCharterRunFailNamed: namedFails.length > 0
+      ? namedFails.filter(v => v === true).length / namedFails.length
+      : null,
+    meanEmptyCharterRate: emptyCharterValues.length > 0 ? mean(emptyCharterValues) : null,
+    meanUnverifiedShare: unverifiedValues.length > 0 ? mean(unverifiedValues) : null,
+    meanEchoOkRejectRate: echoOkValues.length > 0 ? mean(echoOkValues) : null,
   }
 }
 
