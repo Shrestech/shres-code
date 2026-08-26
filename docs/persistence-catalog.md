@@ -829,7 +829,7 @@ Source: [`packages/session/session-title-llm/src/index.ts:43`](../packages/sessi
 'shield/decision': ShieldDecision
 ```
 
-Source: [`packages/guard/shield/src/types.ts:165`](../packages/guard/shield/src/types.ts)
+Source: [`packages/guard/shield/src/types.ts:220`](../packages/guard/shield/src/types.ts)
 
 ### `step/*`
 
