@@ -1,4 +1,7 @@
-# Add Code Mode and Cordis tools to the headless spawn/workflow stack.
+# Add Code Mode (`tools.mode: both` + `code-runtime`) and Cordis tools to the
+# headless spawn/workflow stack. This is the analysis profile: stateless
+# `run_code` is mounted here, not in the base bundle. SDK guidance prefers one
+# program that loads and computes over a corpus instead of N `read` calls.
 # Session-query tools come from the included base composition.
 - id: base
   name: '@shres-code/cordis-plugin-include'

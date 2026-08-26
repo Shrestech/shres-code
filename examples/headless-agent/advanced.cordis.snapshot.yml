@@ -1,4 +1,5 @@
-# Replay counterpart to advanced.cordis.yml. It includes the base `cordis.yml`
+# Replay counterpart to advanced.cordis.yml (analysis profile: Code Mode mounted,
+# not the base bundle). It includes the base `cordis.yml`
 # (including the model-facing session-query tools) directly — a config patch
 # cannot target an entry behind a nested include — and
 # restates advanced.cordis.yml's overlay (the agent and persistence configs plus the

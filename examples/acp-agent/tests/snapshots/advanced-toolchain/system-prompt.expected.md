@@ -139,6 +139,7 @@ Use subagent in the background by default. Start independent delegations togethe
 - A FAILED tool call rejects with `ToolCallError`, whose `toolName` identifies the failed tool and whose `message` is human-readable — `try/catch` it to handle and continue.
 - Independent read-only calls MAY overlap under `Promise.all` (safe calls run concurrently; mutating calls run alone, in submission order). Sequence dependent work with `await`.
 - Emit results with `return` and/or `console.log(...)`. ONLY what you print or return comes back to you — intermediate tool results never enter the conversation, so extract just what you need.
+- When a task needs reading many files or computing over data, prefer one `run_code` program that loads and computes over a corpus instead of N `read` calls.
 
 The available tools:
 
@@ -583,6 +584,8 @@ interface ToolOutputMap {
     id: string;
     label: string;
     status: "running" | "idle" | "ready";
+    provider?: string;
+    model?: string;
     parent?: string;
     depth?: number;
   } | {
@@ -617,6 +620,7 @@ interface ToolOutputMap {
   skill: {
     name: string;
     provider: string;
+    source: string;
     resourceBase?: {
       kind: "directory";
       path: string;
@@ -635,10 +639,14 @@ interface ToolOutputMap {
   } | {
     kind: "continuable";
     subagentId: string;
+    provider?: string;
+    model?: string;
   } | {
     kind: "foreground";
     runId: string;
     output: JsonValue[];
+    provider?: string;
+    model?: string;
   };
   subagent_fork: {
     kind: "background";
@@ -646,10 +654,14 @@ interface ToolOutputMap {
   } | {
     kind: "continuable";
     subagentId: string;
+    provider?: string;
+    model?: string;
   } | {
     kind: "foreground";
     runId: string;
     output: JsonValue[];
+    provider?: string;
+    model?: string;
   };
   todo_write: {
     todos: ({
