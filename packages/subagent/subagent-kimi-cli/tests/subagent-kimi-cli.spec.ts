@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { Agent } from '@shres-code/shres-code-agent'
 import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 import type { ContentBlock } from '@shres-code/shres-code-llm'
-import SubagentRuntime from '@shres-code/shres-code-subagent'
+import SubagentRuntime, { SubagentDepthError } from '@shres-code/shres-code-subagent'
 import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
 import type {
   SubprocessHandle,
@@ -25,6 +25,7 @@ import { parseKimiStreamJson } from '../src/parse.ts'
 
 const fakeParent = {
   id: 'parent',
+  options: {},
   session: { header: { cwd: process.cwd() } },
 } as unknown as Agent
 
@@ -188,7 +189,7 @@ describe('startKimiCliRun', () => {
 })
 
 describe('Kimi CLI provider registration', () => {
-  it('registers kimi-cli with no start capabilities and validates config', async () => {
+  it('registers kimi-cli with parent-side depth and validates config', async () => {
     const ctx = new Context()
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(LocalSubprocessRuntime)
@@ -199,7 +200,7 @@ describe('Kimi CLI provider registration', () => {
       name: 'kimi-cli',
       capabilities: {
         outputSchema: false,
-        depthLimit: false,
+        depthLimit: true,
         toolFilter: false,
         persona: false,
       },
@@ -215,6 +216,24 @@ describe('Kimi CLI provider registration', () => {
       .rejects.toThrow(`disposeGraceMs must be no greater than ${MAX_TIMER_DELAY_MS}`)
     await expect(ctx.plugin(kimi, { executable: '' }))
       .rejects.toThrow('executable must not be empty')
+    await ctx.fiber.dispose()
+  })
+
+  it('honors maxDepth from the parent and rejects toolFilter and outputSchema before spawn', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SubagentRuntime)
+    await ctx.plugin(LocalSubprocessRuntime)
+    const spawn = vi.spyOn(ctx.subprocess, 'spawn')
+    await ctx.plugin(kimi, {})
+    await expect(ctx.subagents.start('kimi-cli', { ...request(), maxDepth: 0 }))
+      .rejects.toBeInstanceOf(SubagentDepthError)
+    await expect(ctx.subagents.start('kimi-cli', { ...request(), toolFilter: { deny: ['bash'] } }))
+      .rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' })
+    await expect(ctx.subagents.start('kimi-cli', {
+      ...request(),
+      outputSchema: { type: 'object', properties: {} },
+    })).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' })
+    expect(spawn).not.toHaveBeenCalled()
     await ctx.fiber.dispose()
   })
 

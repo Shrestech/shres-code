@@ -16,7 +16,7 @@ The declaration satisfies the scheduler's safety contract structurally: a child 
 
 Coordinating sibling workspace effects is the model's responsibility, the stance the product already takes for background, continuable, and workflow children. Peer harnesses agree: Claude Code's Task tool is unconditionally concurrency-safe (cap 10), oh-my-pi's task tool defaults to its overlapping `shared` class, opencode's task tool runs unbounded under its SDK, and Codex sidesteps the question by making delegation an asynchronous spawn/wait mailbox.
 
-Capacity stays where the scheduler note put it: `maxParallelToolCalls` caps one step's unsettled tool calls — and therefore concurrently running foreground children — while background and continuable calls settle at start and free their pool slot, so children they leave running are not capped by it. LLM providers own their own capacity controls.
+Capacity stays where the scheduler note put it: `maxParallelToolCalls` caps one step's unsettled tool calls — and therefore concurrently running foreground children — while background and continuable calls settle at start and free their pool slot, so children they leave running are not capped by it. Live one-shot runs and first-epoch continuable Activations are separately capped by `SubagentRuntime.maxConcurrentSubagents` (default `'unlimited'`). LLM providers own their own capacity controls.
 
 ## Testing
 
@@ -36,7 +36,7 @@ The authored `subagent-parallel` snapshot pins the assembled-app transcript: one
 
 ## Consequences
 
-Sibling children can race on shared workspace or external resources; the model owns that coordination, as it already does for every other overlapping child. Concurrent children also compete for LLM provider quota; `maxParallelToolCalls` caps only unsettled calls, not children a background or continuable call left running.
+Sibling children can race on shared workspace or external resources; the model owns that coordination, as it already does for every other overlapping child. Concurrent children also compete for LLM provider quota; `maxParallelToolCalls` caps only unsettled calls, not children a background or continuable call left running. Those live children count against `maxConcurrentSubagents` when that config is a positive integer.
 
 Two one-shot background delegations in one message acquire their model-visible job ids (`subagent-<n>`) in dispatch-race order. The ids are logged, so replay stays valid, but a snapshot scenario that distinguishes its background children would inherit the same determinism constraint as twin child sessions.
 

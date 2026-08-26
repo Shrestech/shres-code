@@ -1,9 +1,11 @@
 /**
  * Out-of-process ACP subagent backend. Each child has its own process, session, model, and
- * tools, so it shares no Cordis context and advertises no parent-enforced start capabilities;
- * the ONE thing it reads off `request.parent` is the session's workspace cwd (see
- * {@link resolveCwd}). This plugin uses named exports only; a default would hide its
- * loader metadata (see `docs/postmortem/0001-acp-default-export-drops-inject.md`).
+ * tools, so it shares no Cordis context. Parent-side `maxDepth` is enforced
+ * before spawn; `toolFilter`, `persona`, and `outputSchema` are rejected
+ * loud. The ONE other thing it reads off `request.parent` is the session's
+ * workspace cwd (see {@link resolveCwd}). This plugin uses named exports only;
+ * a default would hide its loader metadata (see
+ * `docs/postmortem/0001-acp-default-export-drops-inject.md`).
  * @module @shres-code/shres-code-subagent-acp
  */
 
@@ -11,11 +13,13 @@ import { accessSync, constants, statSync } from 'node:fs'
 import { isAbsolute, resolve } from 'node:path'
 import type { Context } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
-import type {
-  ResolvedSubagentStartRequest,
-  SubagentCapabilities,
-  SubagentProvider,
-  SubagentStartRequest,
+import {
+  assertStartCapabilities,
+  REMOTE_START_CAPABILITIES,
+  type ResolvedSubagentStartRequest,
+  type SubagentCapabilities,
+  type SubagentProvider,
+  type SubagentStartRequest,
 } from '@shres-code/shres-code-subagent'
 import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
 import { type AcpRunSpec, DEFAULT_DISPOSE_EOF_GRACE_MS, DEFAULT_DISPOSE_GRACE_MS, type PermissionPolicy, startAcpRun } from './run.ts'
@@ -139,18 +143,18 @@ function resolveCwd(configured: string | undefined, request: SubagentStartReques
 }
 
 /**
- * The ACP provider. Advertises NO start-time capabilities: an out-of-process
- * child cannot honor `outputSchema`/`maxDepth`/`toolFilter` (the service rejects
- * a request needing any of them before `start` runs).
+ * The ACP provider. `depthLimit` is parent-enforced before spawn; tool filter,
+ * persona, and structured output are rejected rather than ignored.
  */
 class AcpProvider implements SubagentProvider {
-  readonly capabilities: SubagentCapabilities = { outputSchema: false, depthLimit: false, toolFilter: false, persona: false }
+  readonly capabilities: SubagentCapabilities = REMOTE_START_CAPABILITIES
   // Context contract: an out-of-process ACP child starts fresh — no parent conversation crosses the process boundary.
   readonly inheritsParentContext = false
 
   constructor(readonly name: string, private readonly ctx: Context, private readonly config: ResolvedConfig) {}
 
   start(request: ResolvedSubagentStartRequest) {
+    assertStartCapabilities(this.name, request, this.capabilities)
     const spec: AcpRunSpec = {
       command: this.config.command,
       args: this.config.args,

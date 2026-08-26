@@ -32,17 +32,19 @@
  */
 
 import { Context, Service } from '@shres-code/cordis'
+import z from '@shres-code/schemastery'
 import { scopeTarget } from '@shres-code/shres-code-scope'
 import type { Scoped } from '@shres-code/shres-code-scope'
 import { assertObjectJsonSchema } from '@shres-code/shres-code-tools'
 import type { ContentBlock, MessageId } from '@shres-code/shres-code-llm'
 import type { Agent } from '@shres-code/shres-code-agent'
 import type { SessionId } from '@shres-code/shres-code-session'
+import { resolveChildDepth } from './child-agent.ts'
+import { assertStartCapabilities } from './start-capabilities.ts'
 import type {
   ContinuableCreateRequest,
   ContinuableCreateSpec,
   ResolvedSubagentStartRequest,
-  SubagentCapabilities,
   SubagentProvider,
   SubagentRun,
   SubagentRunEndInfo,
@@ -98,6 +100,7 @@ export type {
 } from './descriptor.ts'
 export { seedDescriptorTurn } from './descriptor-seed.ts'
 export { SubagentError } from './error.ts'
+export { assertStartCapabilities } from './start-capabilities.ts'
 export { settleRun } from './run-settlement.ts'
 export { assertSubagentMaxDepth, delegationDepthOf } from './depth.ts'
 export {
@@ -168,8 +171,75 @@ declare module '@shres-code/cordis' {
   }
 }
 
+/**
+ * Plugin config for {@link SubagentRuntime}. All fields optional — `static Config`
+ * supplies the defaults. A non-integer, non-positive, or non-`'unlimited'`
+ * `maxConcurrentSubagents` throws at plugin load.
+ */
+export interface Config {
+  /**
+   * Maximum concurrently live spawned subagents on this service instance.
+   * `'unlimited'` (the default) admits every spawn. A positive safe integer
+   * refuses a new {@link SubagentRuntime.start} or
+   * {@link SubagentRuntime.startContinuable} with `CONCURRENCY_CAP` once that
+   * many published one-shot runs or first-epoch continuable Activations still
+   * occupy a slot. Follow-up and cold resume do not occupy. Occupancy is not
+   * a queue: the refused call never waits.
+   */
+  maxConcurrentSubagents?: number | 'unlimited'
+}
+
+/**
+ * Resolve the spawn cap to an occupied-slot ceiling, or `undefined` for
+ * unlimited. The schema already defaults `'unlimited'` and rejects `0`; this
+ * re-check fails loud for a direct constructor call that bypassed schemastery.
+ * @param value - schema-defaulted or constructor-supplied cap.
+ * @returns the positive ceiling, or `undefined` when unlimited.
+ * @throws when the value is not a positive safe integer or `'unlimited'`.
+ */
+function resolveConcurrencyCap(value: number | 'unlimited' | undefined): number | undefined {
+  if (value === undefined || value === 'unlimited') return undefined
+  if (!Number.isSafeInteger(value) || value < 1) {
+    throw new Error(
+      `subagent: invalid maxConcurrentSubagents ${String(value)} — must be a positive safe integer or 'unlimited'`,
+    )
+  }
+  return value
+}
+
+/**
+ * Hold a one-shot run's spawn slot until `dispose()` settles. Release is
+ * idempotent so a second dispose cannot drive occupancy negative, and the
+ * returned `dispose` promise is memoized so callers that compare identity
+ * still see one teardown.
+ * @param run - the published holder-owned run.
+ * @param release - once-only occupancy releaser from {@link SubagentRuntime.occupySpawn}.
+ * @returns the same run with `dispose` wrapped.
+ */
+function holdSpawnSlot(run: SubagentRun, release: () => void): SubagentRun {
+  const original = run.dispose.bind(run)
+  let disposal: Promise<void> | undefined
+  return {
+    id: run.id,
+    localAgent: run.localAgent,
+    result: run.result,
+    dispose(): Promise<void> {
+      if (disposal !== undefined) return disposal
+      disposal = original().finally(release)
+      return disposal
+    },
+  }
+}
+
 /** Named provider registry with one-shot runs, durable discovery, and continuable-child operations. */
 export class SubagentRuntime extends Service {
+  static Config: z<Config> = z.object({
+    maxConcurrentSubagents: z.union([
+      z.const('unlimited' as const),
+      z.number().step(1).min(1).max(Number.MAX_SAFE_INTEGER),
+    ]).default('unlimited'),
+  })
+
   private providers = new Map<string, SubagentProvider>()
   private continuations: SubagentContinuationManager | undefined
   /** Deployment contributions composed into unpublished continuable children. */
@@ -180,14 +250,23 @@ export class SubagentRuntime extends Service {
    * composes into the carrier.
    */
   private readonly emitLifecycle: LifecycleEmitter
+  /**
+   * Occupied-slot ceiling, or `undefined` when {@link Config.maxConcurrentSubagents}
+   * is `'unlimited'`.
+   */
+  private readonly concurrencyLimit: number | undefined
+  /** Currently occupied spawn slots (published one-shot runs plus first-epoch Activations). */
+  private liveSpawns = 0
 
-  constructor(ctx: Context) {
+  constructor(ctx: Context, config: Config) {
     super(ctx, 'subagents')
+    this.concurrencyLimit = resolveConcurrencyCap(config.maxConcurrentSubagents)
     this.emitLifecycle = createLifecycleEmitter(this.ctx, parent => scopeTarget(this, parent))
     ctx.inject(['agents'], (childCtx: Context) => {
       const manager = new SubagentContinuationManager(childCtx, {
         prepareContinuable: (name, request) => this.prepareContinuable(name, request),
         observeActivation: (provider, childId, parent) => this.observeActivation(provider, childId, parent),
+        occupySpawn: () => this.occupySpawn(),
       }, this.setupRegistry)
       this.continuations = manager
       childCtx.effect(() => () => {
@@ -403,8 +482,10 @@ export class SubagentRuntime extends Service {
   }
 
   /**
-   * Establish a published child on the named provider. Capability and semantic
-   * checks run before delegation. Provider ownership lasts until its promise
+   * Establish a published child on the named provider. Capability, depth, schema,
+   * and concurrency-cap checks run before delegation. Occupancy is acquired
+   * synchronously before `provider.start()` and released on start rejection or
+   * when the holder `dispose()`s. Provider ownership lasts until its promise
    * fulfills; a rejection therefore has no run for the caller to dispose and
    * emits no run lifecycle events. Post-publication turn and infrastructure
    * failures settle through the returned run.
@@ -414,16 +495,24 @@ export class SubagentRuntime extends Service {
    */
   async start(name: string, request: SubagentStartRequest): Promise<SubagentRun> {
     const provider = this.expectProvider(name)
-    this.assertCapabilities(provider, request)
+    assertStartCapabilities(provider.name, request, provider.capabilities)
     assertSubagentMaxDepth(request.maxDepth)
     if (request.outputSchema !== undefined) assertObjectJsonSchema(request.outputSchema)
+    if (request.maxDepth !== undefined) resolveChildDepth(request.parent, request.maxDepth)
     const descriptor = snapshotSubagentDescriptor({
       mode: 'one-shot',
       provider: name,
       ...request.label !== undefined ? { label: request.label } : {},
     })
     const resolved: ResolvedSubagentStartRequest = { ...request, descriptor }
-    return observeRun(this.emitLifecycle, name, request.parent, await provider.start(resolved))
+    const release = this.occupySpawn()
+    try {
+      const run = await provider.start(resolved)
+      return observeRun(this.emitLifecycle, name, request.parent, holdSpawnSlot(run, release))
+    } catch (error: unknown) {
+      release()
+      throw error
+    }
   }
 
   /**
@@ -478,21 +567,27 @@ export class SubagentRuntime extends Service {
     return createActivationObserver(this.emitLifecycle, provider, childId, parent)
   }
 
-  /** Reject the first requested capability that the provider lacks. */
-  private assertCapabilities(provider: SubagentProvider, request: SubagentStartRequest): void {
-    const needs: { when: boolean; cap: keyof SubagentCapabilities }[] = [
-      { when: request.outputSchema !== undefined, cap: 'outputSchema' },
-      { when: request.maxDepth !== undefined, cap: 'depthLimit' },
-      { when: request.toolFilter !== undefined, cap: 'toolFilter' },
-      { when: request.persona !== undefined, cap: 'persona' },
-    ]
-    for (const { when, cap } of needs) {
-      if (when && !provider.capabilities[cap]) {
-        throw new SubagentError(
-          `subagent provider "${provider.name}" does not support the "${cap}" capability`,
-          'UNSUPPORTED_CAPABILITY',
-        )
-      }
+  /**
+   * Reserve one spawn slot or throw `CONCURRENCY_CAP`. The returned releaser is
+   * idempotent so dispose-plus-rollback cannot drive occupancy negative.
+   * Increment is synchronous: two concurrent `start()` calls at `cap - 1` cannot
+   * both pass.
+   * @returns a once-only occupancy releaser.
+   * @throws {SubagentError} `CONCURRENCY_CAP` naming the cap and the live count.
+   */
+  private occupySpawn(): () => void {
+    if (this.concurrencyLimit !== undefined && this.liveSpawns >= this.concurrencyLimit) {
+      throw new SubagentError(
+        `subagent concurrency cap reached (cap ${this.concurrencyLimit}, live ${this.liveSpawns})`,
+        'CONCURRENCY_CAP',
+      )
+    }
+    this.liveSpawns += 1
+    let released = false
+    return () => {
+      if (released) return
+      released = true
+      this.liveSpawns -= 1
     }
   }
 }

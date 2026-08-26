@@ -11,7 +11,7 @@ import z from '@shres-code/schemastery'
 import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
 import {
   assertPositiveFinite,
-  NO_START_CAPABILITIES,
+  assertStartCapabilities,
   resolveChildCwd,
   type ResolvedSubagentStartRequest,
   type SubagentCapabilities,
@@ -47,11 +47,23 @@ export const Config: z<Config> = z.object({
 type ResolvedConfig = Required<Config>
 /* jscpd:ignore-end */
 
+/**
+ * Claude Code honors parent-side `maxDepth` and SDK `outputFormat` structured
+ * output. Tool filter and persona have no shared vocabulary with the harness
+ * and are rejected rather than mapped.
+ */
+const CLAUDE_START_CAPABILITIES: SubagentCapabilities = Object.freeze({
+  outputSchema: true,
+  depthLimit: true,
+  toolFilter: false,
+  persona: false,
+})
+
 /* jscpd:ignore-start -- Cordis registration and shared-seam plumbing mirror
  * the Codex sibling; each product's lifecycle remains package-private. */
 class ClaudeCodeProvider implements SubagentProvider {
   readonly name = 'claude-code'
-  readonly capabilities: SubagentCapabilities = NO_START_CAPABILITIES
+  readonly capabilities: SubagentCapabilities = CLAUDE_START_CAPABILITIES
   readonly inheritsParentContext = false
 
   constructor(
@@ -60,6 +72,7 @@ class ClaudeCodeProvider implements SubagentProvider {
   ) {}
 
   async start(request: ResolvedSubagentStartRequest) {
+    assertStartCapabilities(this.name, request, this.capabilities)
     const parentCwd = request.parent.session.header.cwd
     if (parentCwd === undefined) {
       throw new Error(

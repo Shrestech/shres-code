@@ -11,8 +11,10 @@ import { describe, expect, it, vi } from 'vitest'
 import { SessionId } from '@shres-code/shres-code-session'
 import {
   assertPositiveFinite,
+  assertStartCapabilities,
   assertUsableCwd,
   NO_START_CAPABILITIES,
+  REMOTE_START_CAPABILITIES,
   resolveChildCwd,
   settleRunResult,
   subprocessRunHandle,
@@ -20,9 +22,38 @@ import {
 } from '../src/index.ts'
 
 describe('NO_START_CAPABILITIES', () => {
-  it('advertises nothing and is frozen (shared by every out-of-process backend)', () => {
+  it('advertises nothing and is frozen (test fixture for a fully incapable provider)', () => {
     expect(NO_START_CAPABILITIES).toEqual({ outputSchema: false, depthLimit: false, toolFilter: false, persona: false })
     expect(Object.isFrozen(NO_START_CAPABILITIES)).toBe(true)
+  })
+})
+
+describe('REMOTE_START_CAPABILITIES', () => {
+  it('advertises parent-side depth only and is frozen', () => {
+    expect(REMOTE_START_CAPABILITIES).toEqual({
+      outputSchema: false,
+      depthLimit: true,
+      toolFilter: false,
+      persona: false,
+    })
+    expect(Object.isFrozen(REMOTE_START_CAPABILITIES)).toBe(true)
+  })
+})
+
+describe('assertStartCapabilities', () => {
+  it('allows maxDepth on a remote provider and rejects the others', () => {
+    expect(() => {
+      assertStartCapabilities('acp', { maxDepth: 3 }, REMOTE_START_CAPABILITIES)
+    }).not.toThrow()
+    expect(() => {
+      assertStartCapabilities('acp', { toolFilter: { deny: ['bash'] } }, REMOTE_START_CAPABILITIES)
+    }).toThrow(/does not support toolFilter/)
+    expect(() => {
+      assertStartCapabilities('acp', { outputSchema: { type: 'object', properties: {} } }, REMOTE_START_CAPABILITIES)
+    }).toThrow(/does not support outputSchema/)
+    expect(() => {
+      assertStartCapabilities('acp', { persona: 'reviewer' }, REMOTE_START_CAPABILITIES)
+    }).toThrow(/does not support persona/)
   })
 })
 

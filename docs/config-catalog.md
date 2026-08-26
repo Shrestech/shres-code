@@ -2465,6 +2465,32 @@ export type JournalMode = 'wal' | 'delete' | 'truncate' | 'persist'
 
 Source: [`packages/storage/storage-sqlite/src/index.ts:24`](../packages/storage/storage-sqlite/src/index.ts)
 
+<a id="shres-codeshres-code-subagent"></a>
+
+## `@shres-code/shres-code-subagent`
+
+```ts config-catalog
+/**
+ * Plugin config for {@link SubagentRuntime}. All fields optional — `static Config`
+ * supplies the defaults. A non-integer, non-positive, or non-`'unlimited'`
+ * `maxConcurrentSubagents` throws at plugin load.
+ */
+export interface Config {
+  /**
+   * Maximum concurrently live spawned subagents on this service instance.
+   * `'unlimited'` (the default) admits every spawn. A positive safe integer
+   * refuses a new {@link SubagentRuntime.start} or
+   * {@link SubagentRuntime.startContinuable} with `CONCURRENCY_CAP` once that
+   * many published one-shot runs or first-epoch continuable Activations still
+   * occupy a slot. Follow-up and cold resume do not occupy. Occupancy is not
+   * a queue: the refused call never waits.
+   */
+  maxConcurrentSubagents?: number | 'unlimited'
+}
+```
+
+Source: [`packages/subagent/subagent/src/index.ts:179`](../packages/subagent/subagent/src/index.ts)
+
 <a id="shres-codeshres-code-subagent-acp"></a>
 
 ## `@shres-code/shres-code-subagent-acp`
@@ -2516,7 +2542,7 @@ export interface Config {
 export type PermissionPolicy = 'allow' | 'reject'
 ```
 
-Source: [`packages/subagent/subagent-acp/src/index.ts:27`](../packages/subagent/subagent-acp/src/index.ts)
+Source: [`packages/subagent/subagent-acp/src/index.ts:31`](../packages/subagent/subagent-acp/src/index.ts)
 
 <a id="shres-codeshres-code-subagent-claude-code"></a>
 
@@ -2558,7 +2584,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/subagent/subagent-codex/src/index.ts:30`](../packages/subagent/subagent-codex/src/index.ts)
+Source: [`packages/subagent/subagent-codex/src/index.ts:31`](../packages/subagent/subagent-codex/src/index.ts)
 
 <a id="shres-codeshres-code-subagent-fork-in-process"></a>
 
@@ -2598,7 +2624,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/subagent/subagent-grok-cli/src/index.ts:34`](../packages/subagent/subagent-grok-cli/src/index.ts)
+Source: [`packages/subagent/subagent-grok-cli/src/index.ts:35`](../packages/subagent/subagent-grok-cli/src/index.ts)
 
 <a id="shres-codeshres-code-subagent-kimi-cli"></a>
 
@@ -2622,7 +2648,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/subagent/subagent-kimi-cli/src/index.ts:34`](../packages/subagent/subagent-kimi-cli/src/index.ts)
+Source: [`packages/subagent/subagent-kimi-cli/src/index.ts:35`](../packages/subagent/subagent-kimi-cli/src/index.ts)
 
 <a id="shres-codeshres-code-subagent-shres-sdk"></a>
 
@@ -2675,7 +2701,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/subagent/subagent-shres-sdk/src/index.ts:29`](../packages/subagent/subagent-shres-sdk/src/index.ts)
+Source: [`packages/subagent/subagent-shres-sdk/src/index.ts:30`](../packages/subagent/subagent-shres-sdk/src/index.ts)
 
 <a id="shres-codeshres-code-subagent-spawn-in-process"></a>
 
@@ -3212,10 +3238,11 @@ export interface Config {
    * Maximum child depth: a non-negative safe integer (default `3`; `0` forbids
    * delegation entirely), or `'provider-managed'` to send no cap. A numeric cap
    * requires the provider's `depthLimit` capability (mount fails loud
-   * otherwise). The provider checks the calling agent's current depth at every
-   * start; the tool remains model-visible so runtime policy owns rejection.
-   * `'provider-managed'` is for an out-of-process provider whose recursion
-   * budget belongs to the child runtime or its own deployment.
+   * otherwise). Out-of-process providers advertise `depthLimit` and enforce
+   * that cap on the parent before spawn; `'provider-managed'` omits it when the
+   * child harness or product owns recursion. The service checks the calling
+   * agent's current depth at every start; the tool remains model-visible so
+   * runtime policy owns rejection.
    */
   maxDepth?: number | 'provider-managed'
   /**
@@ -3724,7 +3751,6 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@shres-code/shres-code-session-stats` — requires `sessionProjections` ([`packages/session/session-stats/src/index.ts`](../packages/session/session-stats/src/index.ts))
 - `@shres-code/shres-code-skill-badge` — requires `skills` ([`packages/skill/skill-badge/src/index.ts`](../packages/skill/skill-badge/src/index.ts))
 - `@shres-code/shres-code-storage` ([`packages/storage/storage/src/index.ts`](../packages/storage/storage/src/index.ts))
-- `@shres-code/shres-code-subagent` ([`packages/subagent/subagent/src/index.ts`](../packages/subagent/subagent/src/index.ts))
 - `@shres-code/shres-code-subprocess-local` ([`packages/subprocess/subprocess-local/src/index.ts`](../packages/subprocess/subprocess-local/src/index.ts))
 - `@shres-code/shres-code-terminal` ([`packages/terminal/terminal/src/index.ts`](../packages/terminal/terminal/src/index.ts))
 - `@shres-code/shres-code-tool-ask-user` — requires `tools` · `userQuestions` ([`packages/interaction/tool-ask-user/src/index.ts`](../packages/interaction/tool-ask-user/src/index.ts))

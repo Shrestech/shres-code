@@ -9,7 +9,9 @@ import SubagentRuntime, {
   snapshotSubagentDescriptor,
   SUBAGENT_DESCRIPTOR_VERSION,
   SubagentError,
+  SubagentDepthError,
   assertSubagentMaxDepth,
+  type Config,
   type ResolvedSubagentStartRequest,
   type SubagentCapabilities,
   type SubagentProvider,
@@ -21,7 +23,11 @@ import SubagentRuntime, {
 import { SessionId, type SessionEvent } from '@shres-code/shres-code-session'
 
 function fakeParent(id = 'parent-1'): Agent {
-  return { id: SessionId(id) } as unknown as Agent
+  return {
+    id: SessionId(id),
+    options: {},
+    session: { header: {} },
+  } as unknown as Agent
 }
 
 const ALL_CAPS: SubagentCapabilities = { outputSchema: true, depthLimit: true, toolFilter: true, persona: true }
@@ -62,9 +68,9 @@ class StubProvider implements SubagentProvider {
   }
 }
 
-async function service(): Promise<{ ctx: Context; subagents: SubagentRuntime }> {
+async function service(config?: Config): Promise<{ ctx: Context; subagents: SubagentRuntime }> {
   const ctx = new Context()
-  await ctx.plugin(SubagentRuntime)
+  await ctx.plugin(SubagentRuntime, config)
   return { ctx, subagents: ctx.subagents }
 }
 
@@ -184,6 +190,15 @@ describe('SubagentRuntime', () => {
       .rejects.toThrow()
     expect(provider.startCount).toBe(0)
     expect(() => { assertSubagentMaxDepth(undefined) }).not.toThrow()
+  })
+
+  it('enforces maxDepth from the parent before provider startup', async () => {
+    const { subagents } = await service()
+    const provider = new StubProvider('strong')
+    subagents.registerProvider(provider)
+    await expect(subagents.start('strong', baseRequest({ maxDepth: 0 })))
+      .rejects.toBeInstanceOf(SubagentDepthError)
+    expect(provider.startCount).toBe(0)
   })
 
   it('publishes lifecycle only after async provider start and keeps parent scope', async () => {
@@ -317,6 +332,98 @@ describe('SubagentRuntime', () => {
     expect(error).toBeInstanceOf(HarnessError)
     expect(error.name).toBe('SubagentError')
     expect(error.code).toBe('NO_PROVIDER')
+  })
+
+  describe('maxConcurrentSubagents', () => {
+    it('defaults to unlimited so many overlapping starts succeed', async () => {
+      const { subagents } = await service()
+      subagents.registerProvider(new StubProvider('open'))
+      const runs = await Promise.all(Array.from({ length: 8 }, () => subagents.start('open', baseRequest())))
+      expect(runs).toHaveLength(8)
+      await Promise.all(runs.map(run => run.dispose()))
+    })
+
+    it('admits starts below the cap and refuses at the cap with cap and live count', async () => {
+      const { subagents } = await service({ maxConcurrentSubagents: 2 })
+      subagents.registerProvider(new StubProvider('capped'))
+      const first = await subagents.start('capped', baseRequest())
+      const second = await subagents.start('capped', baseRequest())
+      await expect(subagents.start('capped', baseRequest())).rejects.toMatchObject({
+        code: 'CONCURRENCY_CAP',
+        message: 'subagent concurrency cap reached (cap 2, live 2)',
+      })
+      const disposal = first.dispose()
+      expect(first.dispose()).toBe(disposal)
+      await disposal
+      const third = await subagents.start('capped', baseRequest())
+      await Promise.all([second.dispose(), third.dispose()])
+    })
+
+    it('refuses a second start while the first is still in provider startup', async () => {
+      const { subagents } = await service({ maxConcurrentSubagents: 1 })
+      const ready = Promise.withResolvers<SubagentRun>()
+      subagents.registerProvider({
+        name: 'slow',
+        capabilities: ALL_CAPS,
+        inheritsParentContext: false,
+        start: () => ready.promise,
+      })
+      const first = subagents.start('slow', baseRequest())
+      await expect(subagents.start('slow', baseRequest())).rejects.toMatchObject({
+        code: 'CONCURRENCY_CAP',
+        message: 'subagent concurrency cap reached (cap 1, live 1)',
+      })
+      ready.resolve({
+        id: SessionId('child'),
+        localAgent: undefined,
+        result: Promise.resolve({ output: [], stopReason: 'completed' }),
+        async dispose() {},
+      })
+      await (await first).dispose()
+    })
+
+    it('releases the slot when provider startup rejects', async () => {
+      const { subagents } = await service({ maxConcurrentSubagents: 1 })
+      let fail = true
+      subagents.registerProvider({
+        name: 'flaky',
+        capabilities: ALL_CAPS,
+        inheritsParentContext: false,
+        start: async () => {
+          if (fail) {
+            fail = false
+            throw new Error('setup rolled back')
+          }
+          return {
+            id: SessionId('child'),
+            localAgent: undefined,
+            result: Promise.resolve({ output: [], stopReason: 'completed' as const }),
+            async dispose() {},
+          }
+        },
+      })
+      await expect(subagents.start('flaky', baseRequest())).rejects.toThrow('setup rolled back')
+      const run = await subagents.start('flaky', baseRequest())
+      await run.dispose()
+    })
+
+    it("treats explicit 'unlimited' the same as the default", async () => {
+      const { subagents } = await service({ maxConcurrentSubagents: 'unlimited' })
+      subagents.registerProvider(new StubProvider('open'))
+      const runs = await Promise.all(Array.from({ length: 5 }, () => subagents.start('open', baseRequest())))
+      await Promise.all(runs.map(run => run.dispose()))
+    })
+
+    it('rejects a non-positive or non-integer cap at load', async () => {
+      await expect(new Context().plugin(SubagentRuntime, { maxConcurrentSubagents: 0 }))
+        .rejects.toThrow()
+      await expect(new Context().plugin(SubagentRuntime, { maxConcurrentSubagents: -1 }))
+        .rejects.toThrow()
+      await expect(new Context().plugin(SubagentRuntime, { maxConcurrentSubagents: 1.5 }))
+        .rejects.toThrow()
+      expect(() => new SubagentRuntime(new Context(), { maxConcurrentSubagents: 0 }))
+        .toThrow(/invalid maxConcurrentSubagents/)
+    })
   })
 })
 

@@ -2,8 +2,9 @@
  * Out-of-process SDK subagent backend. Each child is a complete DeepSeek
  * Harness runtime in its own process — own `cordis.yml`-decided composition,
  * session, model route, and tools — driven over stdio JSON-RPC through the
- * TypeScript SDK client, so it shares no Cordis context and advertises no
- * parent-enforced start capabilities; the ONE thing it reads off
+ * TypeScript SDK client, so it shares no Cordis context. Parent-side
+ * `maxDepth` is enforced before spawn; `toolFilter`, `persona`, and
+ * `outputSchema` are rejected loud. The ONE other thing it reads off
  * `request.parent` is the session's workspace cwd. This plugin uses named
  * exports only; a default would hide its loader metadata (see
  * `docs/postmortem/0001-acp-default-export-drops-inject.md`).
@@ -13,7 +14,7 @@
 import type { Context } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
 import type { SubagentCapabilities, SubagentProvider, SubagentStartRequest } from '@shres-code/shres-code-subagent'
-import { assertPositiveFinite, NO_START_CAPABILITIES, resolveChildCwd, validateConfiguredCwd } from '@shres-code/shres-code-subagent'
+import { assertPositiveFinite, assertStartCapabilities, REMOTE_START_CAPABILITIES, resolveChildCwd, validateConfiguredCwd } from '@shres-code/shres-code-subagent'
 import {
   DEFAULT_DISPOSE_EOF_GRACE_MS,
   DEFAULT_DISPOSE_GRACE_MS,
@@ -86,18 +87,18 @@ export const Config: z<Config> = z.object({
 type ResolvedConfig = Required<Omit<Config, 'cwd' | 'maxTokens'>> & Pick<Config, 'cwd' | 'maxTokens'>
 
 /**
- * The SDK provider. Advertises NO start-time capabilities: an out-of-process
- * child cannot honor `outputSchema`/`maxDepth`/`toolFilter`/`persona` (the
- * service rejects a request needing any of them before `start` runs).
+ * The SDK provider. Parent-side `maxDepth` is enforced before spawn;
+ * `toolFilter`, `persona`, and `outputSchema` are rejected rather than ignored.
  */
 class SdkSubagentProvider implements SubagentProvider {
-  readonly capabilities: SubagentCapabilities = NO_START_CAPABILITIES
+  readonly capabilities: SubagentCapabilities = REMOTE_START_CAPABILITIES
   // Context contract: an out-of-process SDK child starts fresh — no parent conversation crosses the process boundary.
   readonly inheritsParentContext = false
 
   constructor(readonly name: string, private readonly ctx: Context, private readonly config: ResolvedConfig) {}
 
   start(request: SubagentStartRequest) {
+    assertStartCapabilities(this.name, request, this.capabilities)
     const spec: SdkRunSpec = {
       command: this.config.command,
       args: this.config.args,
