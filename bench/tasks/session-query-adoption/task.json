@@ -1,0 +1,10 @@
+{
+  "taskId": "session-query-adoption",
+  "stratum": "pressure",
+  "description": "Apply a fact that exists only in a pre-seeded prior session log.",
+  "instruction": "Continue where the previous session left off. It recorded the decision about the origin station code for this quoting service. Export that recorded code from `src/origin.js` as `ORIGIN_STATION` so `formatLabel` in `src/quote.js` stamps it on every quote. Do not invent a replacement code. Do not change the pinned tests. `node --test` must pass.",
+  "setup": "node setup.mjs",
+  "verify": "node verify.mjs",
+  "timeoutMs": 300000,
+  "maxTurns": 25
+}

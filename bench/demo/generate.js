@@ -53,6 +53,7 @@ export const TASKS = Object.freeze([
   { taskId: 'constraint-survival-migration', stratum: 'pressure', failDetail: 'migrated module still fails catalog-w0 rules' },
   { taskId: 'noise-needle', stratum: 'pressure', failDetail: 'runtime-config values missing or tests fail' },
   { taskId: 'chain-ledger-deep', stratum: 'pressure', phases: 6, failDetail: 'ledger reconciliation mismatch' },
+  { taskId: 'session-query-adoption', stratum: 'pressure', failDetail: 'origin station does not match the prior-session record' },
 ])
 
 export const DEMO_ARMS = Object.freeze(['off', 'on', 'sq-only', 'on-sq', 'on-sq-verified', 'on-adaptive'])
@@ -102,6 +103,7 @@ const RESOLVED_COUNTS = {
   'constraint-survival-migration': { off: 1, on: 3, 'sq-only': 2, 'on-sq': 4, 'on-sq-verified': 4, 'on-adaptive': 4 },
   'noise-needle': { off: 1, on: 3, 'sq-only': 2, 'on-sq': 4, 'on-sq-verified': 4, 'on-adaptive': 4 },
   'chain-ledger-deep': { off: 2, on: 3, 'sq-only': 2, 'on-sq': 4, 'on-sq-verified': 4, 'on-adaptive': 4 },
+  'session-query-adoption': { off: 0, on: 0, 'sq-only': 1, 'on-sq': 1, 'on-sq-verified': 1, 'on-adaptive': 1 },
 }
 
 const PROFILES = {

@@ -11,13 +11,14 @@
  * other arms need no disable rows because the tool is absent from the
  * profile.
  *
- * The seven-arm ladder covers every decision-relevant contrast:
+ * The eight-arm ladder covers every decision-relevant contrast:
  *
  * | Arm | Configuration |
  * |---|---|
  * | `off` | Control: jspace disabled, no session-query tool. |
  * | `on` | J-Space available, no session-query tool. |
  * | `sq-only` | Session-query tool mounted, jspace disabled. |
+ * | `sq-driver` | sq-only plus one system-prompt driver line naming the session-query tools. |
  * | `on-sq` | J-Space available + session-query tool. |
  * | `on-sq-verified` | on-sq + verifierTools naming `bash` + requireVerifiedEvidence. |
  * | `on-adaptive` | on-sq with `engageAfterSteps: 10`: J-Space costs nothing until step 10. |
@@ -36,7 +37,18 @@ import { join } from 'node:path'
  * @property {boolean} sessionQuery - whether the overlay mounts the model-facing session-query tool.
  * @property {boolean} expectsSessionQuery - whether session-query tools are expected in logs.
  * @property {boolean} expectsJspace - whether jspace events are permitted in logs.
+ * @property {boolean} [driverLine] - whether the overlay appends the session-query driver line to the headless persona.
  */
+
+/** Headless profile persona restated when a driver-line overlay replaces `system-prompt` config. */
+export const HEADLESS_PERSONA = 'You are a coding agent powered by the {{model}} model. Your working directory is {{cwd}}.'
+
+/**
+ * Extra system-prompt paragraph for `sq-driver`: names the session-query tools
+ * at the moment a prior-session fact is needed. The stock tool guidance does
+ * not mention a prior session.
+ */
+export const SESSION_QUERY_DRIVER_LINE = 'The previous session in this workspace recorded a decision this task needs. Look it up with session_search or session_event_search, then session_event_read the matching event; do not guess the recorded value.'
 
 /**
  * Registered arms, in run order. `off` is the baseline every comparison is
@@ -64,6 +76,16 @@ export const ARMS = Object.freeze({
     sessionQuery: true,
     expectsSessionQuery: true,
     expectsJspace: false,
+  }),
+  // Identical to `sq-only` plus one persona paragraph naming the session-query
+  // tools. The session-query-adoption task is the contrast this arm exists for.
+  'sq-driver': Object.freeze({
+    name: 'sq-driver',
+    jspace: Object.freeze({ enabled: false, mode: 'available', requireCoverage: true }),
+    sessionQuery: true,
+    expectsSessionQuery: true,
+    expectsJspace: false,
+    driverLine: true,
   }),
   'on-sq': Object.freeze({
     name: 'on-sq',
@@ -153,7 +175,9 @@ function configRows(config) {
  * `tool-jspace` entry, which owns the constraint-capture requirements.
  * Session-query arms additionally open the per-trial SQLite index at startup
  * and insert the model-facing `tool-session-query` entry, which the bundle
- * profile does not mount.
+ * profile does not mount. A `driverLine` arm restates the headless persona
+ * plus one paragraph naming the session-query tools (`system-prompt` config
+ * replace is wholesale).
  * @param {ArmEntry} arm - arm entry from {@link getArm}.
  * @param {{ sessionLogRoot: string }} options - absolute per-trial persistence root.
  * @returns {string} the overlay YAML document.
@@ -172,6 +196,12 @@ ${configRows(arm.jspace)}
     overlay += `- id: tool-jspace
   config:
 ${configRows(arm.toolJspace)}
+`
+  }
+  if (arm.driverLine) {
+    overlay += `- id: system-prompt
+  config:
+    persona: ${JSON.stringify(`${HEADLESS_PERSONA}\n\n${SESSION_QUERY_DRIVER_LINE}`)}
 `
   }
   if (arm.sessionQuery) {

@@ -7,10 +7,11 @@
  * node bench/runner/run.js --experiment w0-2026-08-18 [--arms off,on] [--repeats 3] [--tasks glob[,glob]] [--dry-run]
  * ```
  *
- * Per trial the runner copies the fixture into a fresh scratch dir, writes the
- * arm's `--patch` overlay (jspace toggle + per-trial session-log root), spawns
- * the headless profile, folds the session log into metrics, runs the verifier,
- * and appends one validated Trial to `trials.jsonl`. `run.json` is written
+ * Per trial the runner copies the fixture into a fresh scratch dir, runs an
+ * optional task `setup` (used to plant a prior session into the persistence
+ * root), writes the arm's `--patch` overlay, spawns the headless profile,
+ * folds the session log into metrics, runs the verifier, and appends one
+ * validated Trial to `trials.jsonl`. `run.json` is written
  * before the first trial (endedAt empty) and completed at the end, so a crash
  * keeps every finished trial.
  *
@@ -49,6 +50,7 @@ import { promisify } from 'node:util'
 import { getArm, listArms, renderArmOverlay } from './arms.js'
 import { executeTrial } from './execute.js'
 import { emptyMetrics, foldSessionLog } from './metrics.js'
+import { runSetup } from './setup.js'
 import { runVerifier } from './verify.js'
 import { validateRunManifest } from '../schema/run-manifest.js'
 import { validateTrial } from '../schema/trial.js'
@@ -272,6 +274,7 @@ export function looksLikeProviderError(stdout, stderr) {
  * @property {TaskPhase[] | null} phases - chain phases (at least 2); null on single-session
  *   tasks. Exactly one of `instruction`/`phases` is non-null.
  * @property {string} verify
+ * @property {string | null} setup - optional pre-spawn command (`node setup.mjs`); null when absent.
  * @property {number} timeoutMs - per-spawn timeout; the per-phase default on chains.
  * @property {string} dir - absolute task directory.
  */
@@ -333,6 +336,14 @@ export async function loadTaskCatalog(tasksRoot) {
     if (typeof definition.verify !== 'string' || definition.verify.trim() === '') {
       throw new Error(`task ${entry.name}: task.json verify must be a non-empty string`)
     }
+    /** @type {string | null} */
+    let setup = null
+    if (definition.setup !== undefined) {
+      if (typeof definition.setup !== 'string' || definition.setup.trim() === '') {
+        throw new Error(`task ${entry.name}: task.json setup must be a non-empty string`)
+      }
+      setup = definition.setup
+    }
     if (!Number.isSafeInteger(definition.timeoutMs) || /** @type {number} */ (definition.timeoutMs) < 1) {
       throw new Error(`task ${entry.name}: task.json timeoutMs must be a positive integer`)
     }
@@ -346,6 +357,7 @@ export async function loadTaskCatalog(tasksRoot) {
       instruction,
       phases,
       verify: definition.verify,
+      setup,
       timeoutMs: /** @type {number} */ (definition.timeoutMs),
       dir,
     })
@@ -496,6 +508,9 @@ function trialRecordFrame(task, entry, scratchDir, startedAt) {
  */
 async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, sessionLogRoot, repoRoot, env, startedAt, extraPatchPaths = [] }) {
   const { base, skippedVerifier } = trialRecordFrame(task, entry, scratchDir, startedAt)
+  if (task.setup !== null) {
+    await runSetup({ taskDir: task.dir, setup: task.setup, scratchDir, sessionLogRoot })
+  }
   const { execution, metrics, sessionFile } = await executeSpawn({
     repoRoot,
     arm,
@@ -561,11 +576,15 @@ async function runChainTrial({ task, entry, arm, armDir, scratchDir, sessionRoot
   for (let index = 0; index < definitions.length; index += 1) {
     const definition = definitions[index]
     const phaseStartedAt = new Date().toISOString()
+    const sessionLogRoot = join(sessionRoot, `phase-${index}`)
+    if (task.setup !== null) {
+      await runSetup({ taskDir: task.dir, setup: task.setup, scratchDir, sessionLogRoot })
+    }
     const { execution, metrics, sessionFile } = await executeSpawn({
       repoRoot,
       arm,
       armDir,
-      sessionLogRoot: join(sessionRoot, `phase-${index}`),
+      sessionLogRoot,
       taskText: definition.instruction,
       scratchDir,
       timeoutMs: definition.timeoutMs ?? task.timeoutMs,

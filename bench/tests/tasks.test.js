@@ -8,12 +8,14 @@
  */
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { loadTaskCatalog } from '../runner/run.js'
+import { sessionLogPath } from '../runner/session-layout.js'
+import { ORIGIN_STATION, plantPriorSession, PRIOR_SESSION_ID } from '../tasks/session-query-adoption/setup.mjs'
 
 const tasksDir = fileURLToPath(new URL('../tasks/', import.meta.url))
 
@@ -24,6 +26,10 @@ test('the shipped catalog loads under the chain-aware loader', async () => {
     // Exactly one shape: single-session instruction xor chain phases.
     assert.ok((task.instruction === null) !== (task.phases === null), `${task.taskId}: exactly one of instruction/phases`)
   }
+  const adoption = tasks.find(task => task.taskId === 'session-query-adoption')
+  assert.ok(adoption, 'session-query-adoption is in the catalog')
+  assert.equal(adoption.setup, 'node setup.mjs')
+  assert.equal(adoption.phases, null)
 })
 
 /**
@@ -878,4 +884,84 @@ test('noise-needle: one wrong REPORT value fails', (t) => {
   const result = runVerifier('noise-needle', scratch)
   assert.equal(result.status, 1)
   assert.match(result.output, /cacheKey/)
+})
+
+// ── session-query-adoption ───────────────────────────────────────────
+
+test('session-query-adoption: fixture and prompt omit the recorded fact', () => {
+  const taskDir = path.join(tasksDir, 'session-query-adoption')
+  const instruction = JSON.parse(readFileSync(path.join(taskDir, 'task.json'), 'utf8')).instruction
+  assert.ok(!instruction.includes(ORIGIN_STATION), 'prompt must not state the fact')
+  assert.ok(!instruction.includes('session_search'), 'prompt must not name the tool')
+  for (const rel of ['fixture/src/origin.js', 'fixture/src/quote.js', 'fixture/test/quote.test.js', 'fixture/package.json']) {
+    const text = readFileSync(path.join(taskDir, rel), 'utf8')
+    assert.ok(!text.includes(ORIGIN_STATION), `${rel} must not contain the recorded fact`)
+  }
+  const prior = readFileSync(path.join(taskDir, 'prior-session.jsonl'), 'utf8')
+  assert.ok(prior.includes(ORIGIN_STATION), 'the prior log is the only home of the fact')
+  assert.match(prior, new RegExp(`"id":"${PRIOR_SESSION_ID}"`))
+})
+
+test('session-query-adoption: fixture fails, recorded origin station passes', (t) => {
+  const scratch = copyFixture('session-query-adoption')
+  t.after(() => rmSync(scratch, { recursive: true, force: true }))
+
+  assert.equal(runVerifier('session-query-adoption', scratch).status, 1)
+
+  writeFileSync(path.join(scratch, 'src/origin.js'), `export const ORIGIN_STATION = ${JSON.stringify(ORIGIN_STATION)}\n`)
+  assert.equal(runVerifier('session-query-adoption', scratch).status, 0)
+  assert.equal(runVerifier('session-query-adoption', scratch).status, 0)
+})
+
+test('session-query-adoption: a guessed station code that satisfies the tests still fails', (t) => {
+  const scratch = copyFixture('session-query-adoption')
+  t.after(() => rmSync(scratch, { recursive: true, force: true }))
+
+  writeFileSync(path.join(scratch, 'src/origin.js'), 'export const ORIGIN_STATION = \'STATION-1\'\n')
+  const result = runVerifier('session-query-adoption', scratch)
+  assert.equal(result.status, 1)
+  assert.match(result.output, /ORIGIN_STATION must be the recorded prior-session code/)
+})
+
+test('session-query-adoption: weakening the pinned tests fails', (t) => {
+  const scratch = copyFixture('session-query-adoption')
+  t.after(() => rmSync(scratch, { recursive: true, force: true }))
+
+  writeFileSync(path.join(scratch, 'src/origin.js'), `export const ORIGIN_STATION = ${JSON.stringify(ORIGIN_STATION)}\n`)
+  writeFileSync(path.join(scratch, 'test/quote.test.js'), 'import { test } from \'node:test\'\ntest(\'noop\', () => {})\n')
+  const result = runVerifier('session-query-adoption', scratch)
+  assert.equal(result.status, 1)
+  assert.match(result.output, /test\/quote\.test\.js was modified/)
+})
+
+test('session-query-adoption: setup plants the prior session at the JSONL identity path', async (t) => {
+  const scratch = copyFixture('session-query-adoption')
+  const sessionRoot = mkdtempSync(path.join(os.tmpdir(), 'bench-prior-root-'))
+  t.after(() => {
+    rmSync(scratch, { recursive: true, force: true })
+    rmSync(sessionRoot, { recursive: true, force: true })
+  })
+
+  const dest = await plantPriorSession(scratch, sessionRoot)
+  const cwd = realpathSync(scratch)
+  assert.equal(dest, sessionLogPath(sessionRoot, cwd, PRIOR_SESSION_ID))
+  const header = JSON.parse(readFileSync(dest, 'utf8').split('\n', 1)[0])
+  assert.equal(header.id, PRIOR_SESSION_ID)
+  assert.equal(header.cwd, cwd)
+  assert.ok(!header.cwd.includes('__BENCH_SCRATCH_CWD__'))
+  const body = readFileSync(dest, 'utf8')
+  assert.ok(body.includes(ORIGIN_STATION))
+  assert.equal(
+    readFileSync(path.join(scratch, 'src/origin.js'), 'utf8').includes(ORIGIN_STATION),
+    false,
+    'setup must not leak the fact into the scratch workspace',
+  )
+
+  const cli = spawnSync(
+    process.execPath,
+    [path.join(tasksDir, 'session-query-adoption', 'setup.mjs'), scratch, sessionRoot],
+    { encoding: 'utf8' },
+  )
+  assert.equal(cli.status, 0, cli.stderr)
+  assert.match(cli.stdout, /ok: planted/)
 })

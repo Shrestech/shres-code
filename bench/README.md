@@ -6,13 +6,14 @@ Conventions follow the established evaluation harnesses rather than inventing ne
 
 ## Arms
 
-The seven-arm ladder covers every decision-relevant contrast. Each arm is a `--patch` overlay applied to the shipped headless composition, which mounts `jspace` with `enabled: false` and does not mount the model-facing session-query tool at all.
+The eight-arm ladder covers every decision-relevant contrast. `sq-driver` exists for the session-query adoption experiment. Each arm is a `--patch` overlay applied to the shipped headless composition, which mounts `jspace` with `enabled: false` and does not mount the model-facing session-query tool at all.
 
 | Arm | J-Space | Session-Query | Notes |
 |---|---|---|---|
 | `off` | disabled | absent | Clean control: no jspace events, no session-query tool calls. |
 | `on` | available | absent | J-Space only; measures the jspace card in isolation. |
 | `sq-only` | disabled | mounted | Session-query only; measures retrieval in isolation. |
+| `sq-driver` | disabled | mounted | `sq-only` plus one system-prompt driver line naming the session-query tools; the adoption-experiment contrast. |
 | `on-sq` | available | mounted | Shipped default composition plus the session-query tool. |
 | `on-sq-verified` | available | mounted | `on-sq` plus `verifierTools: ['bash']` and `requireVerifiedEvidence: true`. |
 | `on-adaptive` | available from step 10 | mounted | `on-sq` plus `engageAfterSteps: 10`; isolates the always-on prompt and schema cost from the card's long-horizon benefit. |
@@ -118,7 +119,11 @@ Each trial records `compactionCount` (`compaction/end` events in the session log
 
 A task with `phases` (at least 2) in task.json runs as a chain: one scratch dir whose workspace carries across phases, but a separate headless spawn per phase with a fresh per-phase session root (`runs/<experiment>/<arm>/sessions/<taskId>/<trialIndex>/phase-<i>`) — the session boundary is the experiment. The verifier runs once, after the final phase, against the carried workspace; a phase ending in PROVIDER_ERROR or HARNESS_ERROR aborts the chain and excludes the trial from the pass rate. Trial-level metrics are per-phase sums. Carry is **cold-only** today: `resumedFrom` stays null because the harness has no headless/SDK session resume or fork yet; card carry across sessions is a proposed uplift.
 
-Every trial (chains and single-session) passes an arm-integrity audit: no session root of the trial may pre-exist; arms not expecting jspace (`off`, `sq-only`) must contain zero `jspace/` events in their session logs; arms not expecting session-query (`off`, `on`) must contain zero session-query `tool/call` events. The audit only checks absence, so an arm that permits jspace records no violation when a trial logs no jspace event — the expected outcome for an `on-adaptive` trial that finishes before step 10. Violations are recorded on `trial.integrity.violations`; the trial still counts and the experiment never aborts.
+Every trial (chains and single-session) passes an arm-integrity audit: no session root of the trial may pre-exist; arms not expecting jspace (`off`, `sq-only`, `sq-driver`) must contain zero `jspace/` events in their session logs; arms not expecting session-query (`off`, `on`) must contain zero session-query `tool/call` events. The audit only checks absence, so an arm that permits jspace records no violation when a trial logs no jspace event — the expected outcome for an `on-adaptive` trial that finishes before step 10. Violations are recorded on `trial.integrity.violations`; the trial still counts and the experiment never aborts.
+
+A task whose `task.json` names `setup` runs that command after the fixture copy and before the spawn, with argv `<scratch-dir> <session-log-root>`. `session-query-adoption` uses this to plant a prior-session JSONL into the trial persistence root (header `cwd` rewritten to the scratch dir so session-query workspace authority admits it). The trial locator skips `bench-prior-*` session ids so the planted log is never folded as the trial transcript. Adoption (whether session-query ran) is `metrics.sessionQueryCalls`; the verifier scores only whether the shipped workspace used the recorded fact.
+
+The adoption experiment is `--arms sq-only,sq-driver --tasks session-query-adoption`.
 
 ## Forensics metrics
 

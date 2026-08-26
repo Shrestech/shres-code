@@ -16,6 +16,7 @@ import { open, readdir } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { isSeededPriorSession } from './session-layout.js'
 
 /** Captured stdout/stderr are capped so a stuck loop cannot exhaust memory. */
 const MAX_CAPTURE_BYTES = 8 << 20
@@ -80,7 +81,9 @@ async function readFirstLine(path) {
  * Locate the trial's top-level session log under its per-trial persistence
  * root. Child sessions (subagents) share the root, so candidates filter on the
  * header's `delegationDepth: 0` and prefer the header whose cwd is the scratch
- * dir; ties break by sorted path for determinism.
+ * dir. Seeded prior-session fixtures (`bench-prior-*`) are never the trial
+ * transcript, even when they share cwd. Remaining ties prefer newer
+ * `createdAt`, then sorted path.
  * @param {string} sessionLogRoot - per-trial persistence root from the arm overlay.
  * @param {string} scratchDir - the trial's scratch cwd.
  * @returns {Promise<string | null>} absolute session.jsonl path, or null when absent.
@@ -105,12 +108,11 @@ export async function findSessionLog(sessionLogRoot, scratchDir) {
     }
   }
   await walk(sessionLogRoot)
-  candidates.sort()
 
-  /** @type {string | null} */
-  let fallback = null
+  /** @type {{ path: string, cwdMatch: boolean, createdAt: number }[]} */
+  const eligible = []
   for (const path of candidates) {
-    /** @type {{ type?: unknown, delegationDepth?: unknown, cwd?: unknown }} */
+    /** @type {{ type?: unknown, delegationDepth?: unknown, cwd?: unknown, id?: unknown, createdAt?: unknown }} */
     let header
     try {
       header = JSON.parse(await readFirstLine(path))
@@ -119,10 +121,18 @@ export async function findSessionLog(sessionLogRoot, scratchDir) {
       continue
     }
     if (header.type !== 'session' || header.delegationDepth !== 0) continue
-    if (header.cwd === scratchDir) return path
-    fallback ??= path
+    if (isSeededPriorSession(header.id)) continue
+    eligible.push({
+      path,
+      cwdMatch: header.cwd === scratchDir,
+      createdAt: typeof header.createdAt === 'number' && Number.isFinite(header.createdAt) ? header.createdAt : 0,
+    })
   }
-  return fallback
+  const cwdHits = eligible.filter(entry => entry.cwdMatch)
+  const pool = cwdHits.length > 0 ? cwdHits : eligible
+  if (pool.length === 0) return null
+  pool.sort((a, b) => b.createdAt - a.createdAt || a.path.localeCompare(b.path))
+  return pool[0].path
 }
 
 /**

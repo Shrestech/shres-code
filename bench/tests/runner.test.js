@@ -15,10 +15,12 @@ import { describe, it } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import assert from 'node:assert/strict'
 
-import { ARMS, getArm, listArms, renderArmOverlay } from '../runner/arms.js'
+import { ARMS, getArm, listArms, renderArmOverlay, SESSION_QUERY_DRIVER_LINE } from '../runner/arms.js'
 import { emptyMetrics, foldSessionLog } from '../runner/metrics.js'
+import { runSetup } from '../runner/setup.js'
 import { runVerifier } from '../runner/verify.js'
 import { findSessionLog, resolveHarnessLaunch } from '../runner/execute.js'
+import { encodeSegment, isSeededPriorSession, projectKey, SEEDED_PRIOR_SESSION_PREFIX } from '../runner/session-layout.js'
 import { validateRunManifest } from '../schema/run-manifest.js'
 import { validateTrial } from '../schema/trial.js'
 import {
@@ -117,16 +119,26 @@ describe('metrics.foldSessionLog', () => {
     assert.equal(result.pressureFired, false)
   })
 
+  it('counts session-query tool calls for adoption forensics', () => {
+    const log = [
+      '{"type":"tool/call","seq":1,"time":1,"data":{"name":"session_search","arguments":"{\\"query\\":\\"origin\\"}"}}',
+      '{"type":"tool/call","seq":2,"time":2,"data":{"name":"session_event_read","arguments":"{}"}}',
+      '{"type":"tool/call","seq":3,"time":3,"data":{"name":"read_file","arguments":"{}"}}',
+    ].join('\n')
+    assert.equal(foldSessionLog(log).sessionQueryCalls, 2)
+    assert.equal(foldSessionLog(log, { expectsSessionQuery: false, expectsJspace: false }).sessionQueryCalls, null)
+  })
+
   it('throws with the line number on corrupt JSON', () => {
     assert.throws(() => foldSessionLog('{"type":"session"}\nnot json\n'), /line 2/)
   })
 })
 
 describe('arms registry', () => {
-  it('registers all seven arms in ladder order', () => {
+  it('registers all eight arms in ladder order', () => {
     assert.deepEqual(
       listArms(),
-      ['off', 'on', 'sq-only', 'on-sq', 'on-sq-verified', 'on-adaptive', 'on-core'],
+      ['off', 'on', 'sq-only', 'sq-driver', 'on-sq', 'on-sq-verified', 'on-adaptive', 'on-core'],
     )
     assert.equal(ARMS.off.jspace.enabled, false)
     assert.equal(ARMS.on.jspace.enabled, true)
@@ -147,6 +159,7 @@ describe('arms registry', () => {
     assert.equal(ARMS.off.sessionQuery, false)
     assert.equal(ARMS.on.sessionQuery, false)
     assert.equal(ARMS['sq-only'].sessionQuery, true)
+    assert.equal(ARMS['sq-driver'].sessionQuery, true)
     assert.equal(ARMS['on-sq'].sessionQuery, true)
     assert.equal(ARMS['on-sq-verified'].sessionQuery, true)
     assert.equal(ARMS['on-adaptive'].sessionQuery, true)
@@ -160,6 +173,10 @@ describe('arms registry', () => {
     assert.equal(ARMS.on.expectsSessionQuery, false)
     assert.equal(ARMS['sq-only'].expectsJspace, false)
     assert.equal(ARMS['sq-only'].expectsSessionQuery, true)
+    assert.equal(ARMS['sq-driver'].expectsJspace, false)
+    assert.equal(ARMS['sq-driver'].expectsSessionQuery, true)
+    assert.equal(ARMS['sq-driver'].driverLine, true)
+    assert.equal(ARMS['sq-only'].driverLine, undefined)
     assert.equal(ARMS['on-sq'].expectsJspace, true)
     assert.equal(ARMS['on-sq'].expectsSessionQuery, true)
     // Permission, not a requirement: a trial that never reaches step 10 logs
@@ -190,6 +207,18 @@ describe('arms registry', () => {
     })
     assert.match(overlay, /engageAfterSteps: 10/)
     assert.match(overlay, /- id: tool-session-query$/m)
+  })
+
+  it('renders the session-query driver line only on sq-driver', () => {
+    const driver = renderArmOverlay(ARMS['sq-driver'], { sessionLogRoot: '/tmp/bench/sq-driver/sessions/t/0' })
+    assert.match(driver, /^- id: system-prompt$/m)
+    assert.match(driver, /session_search/)
+    assert.ok(driver.includes(JSON.stringify(SESSION_QUERY_DRIVER_LINE).slice(1, -1)))
+    assert.match(driver, /- id: tool-session-query$/m)
+    const baseline = renderArmOverlay(ARMS['sq-only'], { sessionLogRoot: '/x' })
+    assert.doesNotMatch(baseline, /^- id: system-prompt$/m)
+    assert.ok(!baseline.includes('session_search or session_event_search'))
+    assert.match(driver, /You are a coding agent powered by the \{\{model\}\} model/)
   })
 
   it('fails loud on unknown arms, naming the valid set', () => {
@@ -431,6 +460,7 @@ describe('run.loadTaskCatalog', () => {
       const [task] = await loadTaskCatalog(root)
       assert.equal(task.taskId, 'alpha')
       assert.equal(task.timeoutMs, 1000)
+      assert.equal(task.setup, null)
 
       const badDir = join(root, 'bad')
       await mkdir(badDir, { recursive: true })
@@ -471,6 +501,36 @@ describe('run.loadTaskCatalog', () => {
         { instruction: 'phase three', timeoutMs: null },
       ])
       assert.equal(task.timeoutMs, 1000)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('parses optional setup and rejects an empty setup string', async () => {
+    const root = await tempDir('bench-runner-setup-catalog-')
+    try {
+      const taskDir = join(root, 'plant')
+      await mkdir(join(taskDir, 'fixture'), { recursive: true })
+      await writeFile(join(taskDir, 'task.json'), JSON.stringify({
+        taskId: 'plant',
+        stratum: 'pressure',
+        description: 'plant',
+        instruction: 'continue',
+        setup: 'node setup.mjs',
+        verify: 'node verify.mjs',
+        timeoutMs: 1000,
+      }))
+      const [task] = await loadTaskCatalog(root)
+      assert.equal(task.setup, 'node setup.mjs')
+
+      await writeFile(join(taskDir, 'task.json'), JSON.stringify({
+        taskId: 'plant',
+        instruction: 'continue',
+        setup: '   ',
+        verify: 'node verify.mjs',
+        timeoutMs: 1000,
+      }))
+      await assert.rejects(() => loadTaskCatalog(root), /setup must be a non-empty string/)
     } finally {
       await rm(root, { recursive: true, force: true })
     }
@@ -786,11 +846,85 @@ describe('verify.runVerifier', () => {
   })
 })
 
+describe('setup.runSetup', () => {
+  it('runs node setup.mjs with scratch dir and session-log root', async () => {
+    const root = await tempDir('bench-runner-setup-ok-')
+    try {
+      const scratchDir = join(root, 'scratch')
+      const sessionLogRoot = join(root, 'sessions')
+      await mkdir(scratchDir, { recursive: true })
+      await mkdir(sessionLogRoot, { recursive: true })
+      await writeFile(join(root, 'setup.mjs'), `
+import { writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
+await writeFile(join(process.argv[3], 'planted.txt'), process.argv[2])
+console.log('ok')
+`)
+      await runSetup({ taskDir: root, setup: 'node setup.mjs', scratchDir, sessionLogRoot })
+      assert.equal(await readFile(join(sessionLogRoot, 'planted.txt'), 'utf8'), scratchDir)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects a nonzero setup as infrastructure failure', async () => {
+    const root = await tempDir('bench-runner-setup-fail-')
+    try {
+      const scratchDir = join(root, 'scratch')
+      await mkdir(scratchDir, { recursive: true })
+      await writeFile(join(root, 'setup.mjs'), 'console.log("fail: boom")\nprocess.exit(1)\n')
+      await assert.rejects(
+        () => runSetup({
+          taskDir: root,
+          setup: 'node setup.mjs',
+          scratchDir,
+          sessionLogRoot: join(root, 'sessions'),
+        }),
+        /setup failed \(exit 1\): fail: boom/,
+      )
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('session-layout', () => {
+  it('matches the JSONL persistence encodeSegment and projectKey vectors', () => {
+    assert.equal(encodeSegment('..'), '~002E~002E')
+    assert.equal(encodeSegment('.'), '~002E')
+    assert.equal(encodeSegment('a/b'), 'a~002Fb')
+    assert.equal(encodeSegment('plain-ID_1.2'), 'plain-ID_1.2')
+    assert.equal(encodeSegment('bench-prior-session-query-adoption'), 'bench-prior-session-query-adoption')
+    assert.equal(projectKey('/Users/qyj/work/shres-code'), '--Users-qyj-work-shres-code--')
+    assert.equal(projectKey('/'), '--root--')
+  })
+
+  it('reserves the bench-prior- session-id prefix', () => {
+    assert.equal(SEEDED_PRIOR_SESSION_PREFIX, 'bench-prior-')
+    assert.equal(isSeededPriorSession('bench-prior-session-query-adoption'), true)
+    assert.equal(isSeededPriorSession('bench-prior'), false)
+    assert.equal(isSeededPriorSession('session-abc'), false)
+    assert.equal(isSeededPriorSession(1), false)
+  })
+})
+
 describe('execute.findSessionLog', () => {
-  /** @param {string} path @param {number} delegationDepth @param {string} cwd */
-  async function writeLog(path, delegationDepth, cwd) {
+  /**
+   * @param {string} path
+   * @param {number} delegationDepth
+   * @param {string} cwd
+   * @param {{ id?: string, createdAt?: number }} [extra]
+   */
+  async function writeLog(path, delegationDepth, cwd, extra = {}) {
     await mkdir(join(path, '..'), { recursive: true })
-    const header = JSON.stringify({ type: 'session', version: 0, id: 's', cwd, delegationDepth })
+    const header = JSON.stringify({
+      type: 'session',
+      version: 0,
+      id: extra.id ?? 's',
+      cwd,
+      delegationDepth,
+      ...(extra.createdAt !== undefined ? { createdAt: extra.createdAt } : {}),
+    })
     await writeFile(path, `${header}\n{"type":"step/end","seq":1,"time":1,"data":{"turn":0,"step":0}}\n`)
   }
 
@@ -814,6 +948,30 @@ describe('execute.findSessionLog', () => {
       await writeLog(top, 0, '/somewhere-else')
       assert.equal(await findSessionLog(root, '/scratch'), top)
       assert.equal(await findSessionLog(join(root, 'missing'), '/scratch'), null)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('skips seeded prior-session fixtures even when cwd matches', async () => {
+    const root = await tempDir('bench-runner-prior-logs-')
+    try {
+      const prior = join(root, '--scratch--', 'bench-prior-x', 'session.jsonl')
+      const trial = join(root, '--scratch--', 'live', 'session.jsonl')
+      await writeLog(prior, 0, '/scratch', { id: 'bench-prior-x', createdAt: 9_999 })
+      await writeLog(trial, 0, '/scratch', { id: 's1', createdAt: 1 })
+      assert.equal(await findSessionLog(root, '/scratch'), trial)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('returns null when only a seeded prior log exists', async () => {
+    const root = await tempDir('bench-runner-prior-only-')
+    try {
+      const prior = join(root, '--scratch--', 'bench-prior-x', 'session.jsonl')
+      await writeLog(prior, 0, '/scratch', { id: 'bench-prior-x' })
+      assert.equal(await findSessionLog(root, '/scratch'), null)
     } finally {
       await rm(root, { recursive: true, force: true })
     }
@@ -891,8 +1049,9 @@ export async function load(url, context, nextLoad) {
  * stand-in that registers the .ts hook, the fake bin) with bench/ inside it,
  * plus the given tasks in bench/tasks.
  * @param {string} root - temp root.
- * @param {{ taskId: string, definition: Record<string, unknown>, passes?: boolean }[]} tasks -
- *   task definitions; `passes` decides the verifier's exit code.
+ * @param {{ taskId: string, definition: Record<string, unknown>, passes?: boolean, setupSource?: string }[]} tasks -
+ *   task definitions; `passes` decides the verifier's exit code; `setupSource`
+ *   writes `setup.mjs` when the definition names a setup command.
  * @returns {Promise<{ benchRoot: string, repoRoot: string }>} paths; benchRoot feeds main().
  */
 async function writeBenchWorld(root, tasks) {
@@ -908,7 +1067,7 @@ async function writeBenchWorld(root, tasks) {
   await writeFile(join(repoRoot, 'node_modules', 'tsx', 'hooks.mjs'), FAKE_TSX_HOOKS)
   await mkdir(join(repoRoot, 'apps', 'cli', 'src'), { recursive: true })
   await writeFile(join(repoRoot, 'apps', 'cli', 'src', 'bin.ts'), FAKE_BIN)
-  for (const { taskId, definition, passes = true } of tasks) {
+  for (const { taskId, definition, passes = true, setupSource } of tasks) {
     const dir = join(benchRoot, 'tasks', taskId)
     await mkdir(join(dir, 'fixture'), { recursive: true })
     await writeFile(join(dir, 'fixture', 'seed.txt'), `${taskId} fixture\n`)
@@ -921,6 +1080,7 @@ async function writeBenchWorld(root, tasks) {
       ...definition,
     }))
     await writeFile(join(dir, 'verify.mjs'), `process.exit(${passes ? 0 : 1})\n`)
+    if (setupSource !== undefined) await writeFile(join(dir, 'setup.mjs'), setupSource)
   }
   return { benchRoot, repoRoot }
 }
@@ -1208,6 +1368,71 @@ describe('run.main execution (fake harness)', () => {
       validateTrial(trial)
       assert.equal(trial.status, 'success')
       assert.deepEqual(trial.integrity, { violations: ['session-root-preexisting:sessions/pre-chain/0/phase-1'] })
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('plants a prior session during setup without mistaking it for the trial log', async () => {
+    const root = await tempDir('bench-runner-setup-plant-')
+    try {
+      const { benchRoot } = await writeBenchWorld(root, [{
+        taskId: 'plant-prior',
+        definition: { instruction: 'continue the prior work', setup: 'node setup.mjs' },
+        setupSource: `import { mkdir, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
+const scratch = process.argv[2]
+const sessionRoot = process.argv[3]
+const dir = join(sessionRoot, '--planted--', 'bench-prior-plant')
+await mkdir(dir, { recursive: true })
+const header = JSON.stringify({
+  type: 'session', version: 0, id: 'bench-prior-plant',
+  cwd: scratch, delegationDepth: 0, createdAt: 99,
+})
+await writeFile(join(dir, 'session.jsonl'), header + '\\n{"type":"step/end","seq":0,"time":1,"data":{"turn":0,"step":0}}\\n')
+`,
+      }])
+      const { code, trials } = await runWorld(
+        benchRoot,
+        ['--experiment', 'e2e', '--repeats', '1', '--arms', 'off'],
+        'off',
+      )
+      assert.equal(code, 0)
+      const [trial] = trials
+      validateTrial(trial)
+      assert.equal(trial.status, 'success')
+      assert.match(trial.sessionFile, /workspace\/s1\/session\.jsonl$/)
+      assert.ok(!('integrity' in trial), 'setup after the pre-exist check is not leakage')
+      const prior = join(
+        benchRoot, 'runs', 'e2e', 'off', 'sessions', 'plant-prior', '0',
+        '--planted--', 'bench-prior-plant', 'session.jsonl',
+      )
+      const planted = JSON.parse((await readFile(prior, 'utf8')).split('\n', 1)[0])
+      assert.equal(planted.id, 'bench-prior-plant')
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('records a failed setup as HARNESS_ERROR', async () => {
+    const root = await tempDir('bench-runner-setup-err-')
+    try {
+      const { benchRoot } = await writeBenchWorld(root, [{
+        taskId: 'broken-setup',
+        definition: { instruction: 'never spawned', setup: 'node setup.mjs' },
+        setupSource: 'console.log("fail: cannot plant")\nprocess.exit(1)\n',
+      }])
+      const { code, trials } = await runWorld(
+        benchRoot,
+        ['--experiment', 'e2e', '--repeats', '1', '--arms', 'off'],
+        'off',
+      )
+      assert.equal(code, 1, 'every trial errored')
+      const [trial] = trials
+      validateTrial(trial)
+      assert.equal(trial.status, 'error')
+      assert.equal(trial.failureMode, 'HARNESS_ERROR')
+      assert.match(trial.verifier.detail, /setup failed \(exit 1\): fail: cannot plant/)
     } finally {
       await rm(root, { recursive: true, force: true })
     }
