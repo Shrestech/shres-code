@@ -305,6 +305,7 @@ describe('compact configuration and defaults', () => {
       modelPolicies: [],
       auto: true,
       maxPointers: DEFAULT_MAX_POINTERS,
+      pinSeqs: [],
     })
     expect(Object.isFrozen(resolved)).toBe(true)
   })
@@ -468,6 +469,10 @@ describe('compact configuration and defaults', () => {
       ],
       [{ modelPolicies: [{ provider: MODEL, model: MODEL }, { provider: MODEL, model: MODEL }] }, /duplicate model policy/],
       [{ modelPolicies: [{ provider: MODEL, model: MODEL, maxPointers: 1 }] }, /unknown key "maxPointers"/],
+      [{ pinSeqs: 1 }, /pinSeqs must be an array/],
+      [{ pinSeqs: [-1] }, /pinSeqs\[0\].*non-negative safe integer/],
+      [{ pinSeqs: [1.5] }, /pinSeqs\[0\].*non-negative safe integer/],
+      [{ pinSeqs: [1, 1] }, /duplicate pinSeqs entry 1/],
       [{ models: { [MODEL]: { retainTokens: 10 } } }, /BasicCompactionConfig: unknown key "models"/],
       [{ thresholdRato: 0.5 }, /BasicCompactionConfig: unknown key "thresholdRato"/],
     ] as Array<[unknown, RegExp]>
@@ -1284,6 +1289,8 @@ describe('default one-shot summarizer', () => {
     const last = messages.at(-1)?.content[0]
     const lastText = last?.type === 'text' ? last.text : ''
     expect(lastText).toContain('Write concise English engineering prose.')
+    expect(lastText).toContain('## Constraints')
+    expect(lastText).toContain('copy the original sentence verbatim')
     expect(lastText).toContain('numeric values, function signatures, and syntax fragments.')
     expect(lastText).toContain('## Primary Request and Intent')
   })
@@ -1912,5 +1919,128 @@ describe('automatic listener and loader composition', () => {
     await preStep(ctx, agent(session, MODEL))
     expect(session.events.some(event => event.type === 'compaction/start')).toBe(false)
     expect(await recover(ctx, agent(session, MODEL), overflow())).toBe(false)
+  })
+})
+
+const CONSTRAINT_RULES = [
+  'Rule 1: qty() of apples is 3.',
+  'Rule 2: never substitute pears.',
+  'Rule 3: report units in kilograms.',
+  'Rule 4: refuse orders over 12.',
+  'Rule 5: keep the house discount at 15%.',
+  'Rule 6: quote the SKU exactly as given.',
+] as const
+
+function assembledPrompt(session: Session): string {
+  return session.deriveMessages()
+    .flatMap(message => message.content)
+    .map(block => block.type === 'text' ? block.text : '')
+    .join('\n')
+}
+
+describe('constraint retention and pin list', () => {
+  it('keeps six constraint sentences across three compact cycles', async () => {
+    class ConstraintRetainingEngine extends TestCompactionEngine {
+      override async summarize(
+        input: SummarizationInput,
+        agent: Agent,
+        signal?: AbortSignal,
+      ): Promise<{
+        summary: ContentBlock[]
+        rawOutput?: ContentBlock[]
+        provider: string
+        model: string
+        maxTokens?: number
+        usage?: TokenUsage
+      }> {
+        const result = await super.summarize(input, agent, signal)
+        const rules = [...summarizedText(input).matchAll(/^Rule \d+: .+$/gm)].map(match => match[0])
+        return {
+          ...result,
+          summary: [{ type: 'text', text: `## Constraints\n${rules.join('\n')}` }],
+        }
+      }
+    }
+
+    const ctx = createContext()
+    const compact = new ConstraintRetainingEngine(ctx, { auto: false })
+    const session = conversation(4, `${CONSTRAINT_RULES.join('\n')}\n${'padding '.repeat(40)}`)
+    for (let cycle = 0; cycle < 3; cycle += 1) {
+      if (cycle > 0) {
+        const turn = cycle + 4
+        session.append('user/message', createUserMessage({
+          content: [{ type: 'text', text: `later padding ${turn} ${'x'.repeat(200)}` }],
+          source: { kind: 'user' },
+        }), { surfaceOp: 'append' })
+        session.append('step/start', { turn, step: 1 })
+        session.append('assistant/message', {
+          turn,
+          step: 1,
+          message: createMessage({
+            role: 'assistant',
+            content: [{ type: 'text', text: `later assistant ${turn} ${'y'.repeat(200)}` }],
+            source: { kind: 'model', provider: MODEL, model: MODEL },
+          }),
+        }, { surfaceOp: 'append' })
+        session.append('step/end', { turn, step: 1 })
+        session.append('turn/end', { turn, reason: { kind: 'completed' } })
+        session.append('turn/start', { turn: turn + 1 })
+      }
+      expect(
+        await compactIfNeeded(compact, session, 'context-overflow'),
+        `cycle ${cycle}`,
+      ).not.toBeNull()
+    }
+    const prompt = assembledPrompt(session)
+    for (const rule of CONSTRAINT_RULES) expect(prompt).toContain(rule)
+  })
+
+  it('never shadows a pinned surface seq', async () => {
+    const session = conversation(6)
+    const firstUser = session.events.find(event => event.type === 'user/message')
+    if (firstUser === undefined) throw new Error('expected a user/message to pin')
+    const compact = service({
+      auto: false,
+      pinSeqs: [firstUser.seq],
+    })
+    expect(await compactIfNeeded(compact, session, 'context-overflow')).not.toBeNull()
+    expect(session.surface.nodes).toContain(firstUser.seq)
+    expect(session.events[firstUser.seq]).toMatchObject({ type: 'user/message' })
+    expect(session.surface.replaceGeneration).toBeGreaterThan(0)
+  })
+
+  it('declines when every compactable seq is pinned', () => {
+    const session = conversation(4)
+    const priced = createContext().tokenMeter.measure(session)
+    expect(selectCompactableRange(session, priced, 40, [...session.surface.nodes])).toBeNull()
+  })
+
+  it('advances the compact start past an unpaired tool result after leading pins', () => {
+    const session = toolConversation()
+    const assistant = session.events.find(event => event.type === 'assistant/message')
+    const user = session.events.find(event => event.type === 'user/message')
+    if (assistant === undefined || user === undefined) {
+      throw new Error('expected a leading user and tool-call assistant to pin')
+    }
+    const priced = createContext().tokenMeter.measure(session)
+    const range = selectCompactableRange(session, priced, 1, [user.seq, assistant.seq])
+    expect(range).not.toBeNull()
+    expect(range!.start).not.toBe(user.seq)
+    expect(range!.start).not.toBe(assistant.seq)
+  })
+
+  it('compacts the unpinned prefix before a mid-surface pin', () => {
+    const session = conversation(6)
+    const surface = [...session.surface.nodes]
+    const pin = surface[2]
+    if (pin === undefined) throw new Error('expected a mid-surface seq to pin')
+    const priced = createContext().tokenMeter.measure(session)
+    const range = selectCompactableRange(session, priced, 40, [pin])
+    expect(range).not.toBeNull()
+    expect(range!.end).toBe(surface[1])
+    expect(session.surface.nodes.slice(
+      session.surface.nodes.indexOf(range!.start),
+      session.surface.nodes.indexOf(range!.end) + 1,
+    )).not.toContain(pin)
   })
 })

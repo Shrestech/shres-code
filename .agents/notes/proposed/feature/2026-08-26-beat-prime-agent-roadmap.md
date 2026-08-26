@@ -123,6 +123,7 @@ WP1.1 extracts shared plumbing. The WP3.3 OOLONG-lite **pilot** runs immediately
 
 ### WP1.6 Compaction-retention tuning for the 33-fires regime
 
+- **Status:** landed. See [compaction-constraint-retention](../../implemented/feature/2026-08-26-compaction-constraint-retention.md).
 - **Owner:** this roadmap (median fix); the landing PR carries the implemented note and a pre-registered measurement note.
 - **Touch points:** [`packages/compaction/compaction-basic/src/config.ts`](../../../../packages/compaction/compaction-basic/src/config.ts) (`thresholdRatio` 0.8, `retainRatio` 0.16, summary `maxTokens` 8192); summarizer prompt structure.
 - **Work:** make reset behavior constraint-preserving: the summarization directive must instruct verbatim retention of constraint-style statements (rules stated once in the user's instruction) — the w6–w8 modal failure was a `qty()` constraint dying in a reset. Config-first. Add a config field for an optional pin list: durable seq anchors the compactor must never shadow (log-only anchor events already exist; link them). Compaction-basic fires ~33×/trial under pressure at the current defaults; tune for constraint-survival.

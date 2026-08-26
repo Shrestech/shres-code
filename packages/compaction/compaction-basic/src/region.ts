@@ -96,12 +96,14 @@ interface TransactionFailure {
  * @param session - session supplying authoritative current surface positions.
  * @param measurement - unified pressure and surface measurement from the conversation meter.
  * @param retainTokens - minimum recent tail budget retained verbatim.
+ * @param pinSeqs - surface seqs that must remain unshadowed.
  * @returns the inclusive positional seq range to compact, or `null`.
  */
 export function selectCompactableRange(
   session: Session,
   measurement: TokenMeasurement,
   retainTokens: number,
+  pinSeqs: readonly number[] = [],
 ): { start: number; end: number } | null {
   const pricedNodes = measurement.nodes
   if (pricedNodes.length === 0) return null
@@ -129,8 +131,29 @@ export function selectCompactableRange(
   }
   if (keepFromIdx === 0) return null
 
+  const pinned = new Set(pinSeqs)
+  let startIdx = 0
+  while (startIdx < keepFromIdx) {
+    // oxlint-disable-next-line typescript/no-non-null-assertion
+    if (!pinned.has(surfaceNodes[startIdx]!)) break
+    startIdx += 1
+  }
+  for (let index = startIdx; index < keepFromIdx; index += 1) {
+    // oxlint-disable-next-line typescript/no-non-null-assertion
+    if (pinned.has(surfaceNodes[index]!)) {
+      keepFromIdx = index
+      break
+    }
+  }
+  while (startIdx < keepFromIdx) {
+    // oxlint-disable-next-line typescript/no-non-null-assertion
+    if (toolPairingBalancedBefore(session, surfaceNodes[startIdx]!)) break
+    startIdx += 1
+  }
+  if (startIdx >= keepFromIdx) return null
+
   // oxlint-disable-next-line typescript/no-non-null-assertion
-  const first = surfaceNodes[0]!
+  const first = surfaceNodes[startIdx]!
   // oxlint-disable-next-line typescript/no-non-null-assertion
   const cutoff = surfaceNodes[keepFromIdx - 1]!
   return { start: first, end: cutoff }

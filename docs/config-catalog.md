@@ -523,6 +523,11 @@ export interface BasicCompactionConfig extends CompactionPolicyConfig {
    * the current session. `0` emits no pointers. Defaults to `8`; maximum `64`.
    */
   maxPointers?: number
+  /**
+   * Durable surface seqs the compactor must never shadow. Auto and manual
+   * range selection skip these seqs; they stay on the surface. Defaults to `[]`.
+   */
+  pinSeqs?: number[]
 }
 
 /** Policy fields shared by the default policy and exact model overrides. */
