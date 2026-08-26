@@ -1,4 +1,4 @@
-# Task authoring contract (18 tasks)
+# Task authoring contract (21 tasks)
 
 One directory per task. The directory name is the `taskId` and never changes after results exist — it is the pairing key across arms.
 
@@ -51,6 +51,7 @@ bench/tasks/<taskId>/
 | `chain-api-versioning` | chain | Phase 1 reviews API v1, phase 2 implements v2 endpoint. |
 | `math-derivation-chain` | chain | Phase 1 derives formulas, phase 2 implements them. |
 | `constraint-survival-build` | pressure | Build ten inventory modules while retaining six global constraints stated once. |
+| `constraint-survival-fare` | pressure | Build eight transit-fare modules while retaining six global constraints stated once. |
 | `constraint-survival-migration` | pressure | Migrate ten numbered modules under five global rules stated once. |
 | `chain-ledger-deep` | pressure | Six-phase cold-session ledger: persist analysis decisions, survive distractors, reconcile. |
 | `noise-needle` | pressure | Record three values from 2000-line diagnostic noise, then repair a multi-file project. |
