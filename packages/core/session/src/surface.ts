@@ -287,7 +287,7 @@ function isDeepEqualJson(a: unknown, b: unknown): boolean {
 function assertToolResultRewrite(
   event: SessionEvent,
   shadowedSeqs: readonly number[],
-  events: readonly SessionEvent[],
+  events: readonly (SessionEvent | undefined)[],
   baseSeq: number,
 ): void {
   if (event.type !== 'tool/result') return
@@ -322,7 +322,7 @@ function planSurfaceEvent(
   state: SurfaceFoldState,
   event: SessionEvent,
   expectedSeq: number,
-  events: readonly SessionEvent[],
+  events: readonly (SessionEvent | undefined)[],
   baseSeq: number,
 ): SurfacePlan | undefined {
   if (event.seq !== expectedSeq) {
@@ -351,7 +351,7 @@ function applySurfaceEvent(
   state: SurfaceFoldState,
   event: SessionEvent,
   expectedSeq: number,
-  events: readonly SessionEvent[],
+  events: readonly (SessionEvent | undefined)[],
   baseSeq: number,
 ): SurfaceFoldReplacement | undefined {
   const plan = planSurfaceEvent(state, event, expectedSeq, events, baseSeq)
@@ -404,11 +404,12 @@ export class SurfaceManager implements SessionSurface {
   private _pendingPlan: { event: SessionEvent; expectedSeq: number; plan: SurfacePlan | undefined } | undefined
 
   /**
-   * @param log - Contiguous complete log or loaded event window.
+   * @param log - Contiguous complete log or loaded event window. Slots may be
+   *   empty only in a prefix the fold has already processed.
    * @param baseSeq - Absolute sequence of the window's first event.
    */
   constructor(
-    private log: readonly SessionEvent[],
+    private log: readonly (SessionEvent | undefined)[],
     private readonly baseSeq = 0,
   ) {
     this._lastProcessedSeq = baseSeq - 1
@@ -445,8 +446,10 @@ export class SurfaceManager implements SessionSurface {
     const tailSeq = this.baseSeq + this.log.length - 1
     for (let seq = this._lastProcessedSeq + 1; seq <= tailSeq; seq++) {
       const index = seq - this.baseSeq
-      // oxlint-disable-next-line typescript/no-non-null-assertion -- bounded by the loop condition
-      const event = this.log[index]!
+      const event = this.log[index]
+      if (event === undefined) {
+        throw new Error(`session surface fold hit a dropped event at seq ${seq}`)
+      }
       const pending = this._pendingPlan
       if (pending?.event === event && pending.expectedSeq === seq) {
         applySurfacePlan(this._state, pending.plan)

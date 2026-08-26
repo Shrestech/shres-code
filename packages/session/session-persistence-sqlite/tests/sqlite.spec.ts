@@ -8,7 +8,8 @@ import { dirname, join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import SessionStore, { SessionId } from '@shres-code/shres-code-session'
 import type { Session, SessionEvent, SurfaceEvent, SurfaceEventType } from '@shres-code/shres-code-session'
-import SqliteSessionPersistence, { SCHEMA_VERSION } from '@shres-code/shres-code-session-persistence-sqlite'
+import SqliteSessionPersistence, { DEFAULT_BUSY_TIMEOUT_MS, SCHEMA_VERSION } from '@shres-code/shres-code-session-persistence-sqlite'
+import { SessionPersistencePrunedError } from '@shres-code/shres-code-session-persistence'
 import {
   openDatabase,
   rowToEvent,
@@ -41,11 +42,34 @@ async function freshDbPath(): Promise<string> {
 }
 
 /** A context with the session store + SQLite backend, plus a teardown. */
-async function backend(path = ':memory:'): Promise<{ ctx: Context; dispose: () => Promise<void> }> {
+async function backend(
+  path = ':memory:',
+  config: Omit<ConstructorParameters<typeof SqliteSessionPersistence>[1], 'path'> = {},
+): Promise<{ ctx: Context; dispose: () => Promise<void> }> {
   const ctx = new Context()
   await ctx.plugin(SessionStore)
-  const fiber = await ctx.plugin(SqliteSessionPersistence, { path })
+  const fiber = await ctx.plugin(SqliteSessionPersistence, { path, ...config })
   return { ctx, dispose: () => fiber.dispose() }
+}
+
+/** One turn that includes a log-only chunk behind the assistant message. */
+function chunkedTurn(session: Session): void {
+  session.append('turn/start', { turn: 1 })
+  session.append('user/message', createUserMessage({
+    content: [{ type: 'text', text: 'hi' }], source: { kind: 'user' },
+  }), { surfaceOp: 'append' })
+  session.append('assistant/chunk', {
+    turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'hello' },
+  })
+  session.append('assistant/message', {
+    turn: 1, step: 1,
+    message: createMessage({
+      role: 'assistant',
+      content: [{ type: 'text', text: 'hello' }],
+      source: { kind: 'model', provider: 'mock', model: 'mock' },
+    }),
+  }, { surfaceOp: 'append', sourceEventSeqs: [2] })
+  session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
 }
 
 // Run the same backend-agnostic contract as JSONL to pin identical semantics.
@@ -945,5 +969,109 @@ describe('surface field round-trip', () => {
     expect((loaded.events[1]! as SurfaceEvent).surfaceOp).toBe('append')
     expect((loaded.events[1]! as SurfaceEvent).sourceEventSeqs).toBeUndefined()
     await fiber.dispose()
+  })
+})
+
+describe('SqliteSessionPersistence: busy_timeout and retention', () => {
+  function busyTimeout(db: DatabaseSync): number {
+    const row = db.prepare('PRAGMA busy_timeout').get() as Record<string, number>
+    const value = Object.values(row)[0]
+    if (value === undefined) throw new Error('PRAGMA busy_timeout returned no columns')
+    return value
+  }
+
+  it('sets the default busy_timeout pragma', () => {
+    const db = openDatabase(':memory:', 'wal')
+    expect(busyTimeout(db)).toBe(DEFAULT_BUSY_TIMEOUT_MS)
+    db.close()
+  })
+
+  it('sets a configured busy_timeout of 0', () => {
+    const db = openDatabase(':memory:', 'wal', 0)
+    expect(busyTimeout(db)).toBe(0)
+    db.close()
+  })
+
+  it('accepts busyTimeoutMs 0 at plugin load', async () => {
+    const b = await backend(':memory:', { busyTimeoutMs: 0 })
+    expect(await b.ctx.sessionPersistence.list()).toEqual([])
+    await b.dispose()
+  })
+
+  it.each([-1, 1.5])('rejects busyTimeoutMs %s without schema normalization', async (busyTimeoutMs) => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    expect(() => new SqliteSessionPersistence(ctx, {
+      path: ':memory:',
+      busyTimeoutMs,
+    })).toThrow(/busyTimeoutMs must be a non-negative safe integer/)
+    await ctx.fiber.dispose()
+  })
+
+  it('rejects a negative inMemoryLogWindow at plugin load', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await expect(ctx.plugin(SqliteSessionPersistence, {
+      path: ':memory:',
+      inMemoryLogWindow: -1,
+    })).rejects.toThrow()
+    await ctx.fiber.dispose()
+  })
+
+  it('rejects an unknown chunkRetention without schema normalization', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    expect(() => new SqliteSessionPersistence(ctx, {
+      path: ':memory:',
+      chunkRetention: 'rotate' as never,
+    })).toThrow(/chunkRetention must be "forever" or "assembled"/)
+    await ctx.fiber.dispose()
+  })
+
+  it('keeps streaming chunks reconstructable under the forever default', async () => {
+    const b = await backend()
+    const session = b.ctx.sessions.create(SessionId('chunks-forever'))
+    chunkedTurn(session)
+    await b.ctx.sessions.flush(session)
+    const loaded = await b.ctx.sessionPersistence.load(SessionId('chunks-forever'))
+    expect(loaded.events.map(event => event.type)).toContain('assistant/chunk')
+    expect(loaded.events.find(event => event.type === 'assistant/chunk')?.data).toMatchObject({
+      chunk: { type: 'text-delta', text: 'hello' },
+    })
+    await b.dispose()
+  })
+
+  it('tombstones assembled chunks and refuses a later full-log read', async () => {
+    const path = await freshDbPath()
+    const id = SessionId('chunks-assembled')
+    const live = await backend(path, { chunkRetention: 'assembled', writeBatchMaxDelayMs: 1 })
+    const session = live.ctx.sessions.create(id)
+    chunkedTurn(session)
+    await live.ctx.sessions.flush(session)
+    const inspected = await live.ctx.sessionPersistence.inspect(id)
+    expect(inspected.events.find(event => event.type === 'assistant/chunk')?.data).toMatchObject({
+      chunk: { type: 'text-delta', text: 'hello' },
+    })
+    await live.dispose()
+
+    const cold = await backend(path, { chunkRetention: 'assembled' })
+    await expect(cold.ctx.sessionPersistence.load(id)).rejects.toBeInstanceOf(SessionPersistencePrunedError)
+    await expect(cold.ctx.sessionPersistence.inspect(id)).rejects.toThrow(/chunkRetention=assembled/)
+    await expect(cold.ctx.sessionPersistence.readFrom(id, 0)).rejects.toBeInstanceOf(SessionPersistencePrunedError)
+    await cold.dispose()
+  })
+
+  it('drops flushed off-surface events from RAM and re-reads them', async () => {
+    const b = await backend(':memory:', { inMemoryLogWindow: 0, writeBatchMaxDelayMs: 1 })
+    const session = b.ctx.sessions.create(SessionId('windowed-sqlite'))
+    chunkedTurn(session)
+    await b.ctx.sessions.flush(session)
+    expect(session.residentSeqs()).toEqual(session.surface.nodes)
+    expect(session.deriveMessages().map(message => message.role)).toEqual(['user', 'assistant'])
+    expect(session.events.map(event => event.type)).toEqual([
+      'turn/start', 'user/message', 'assistant/chunk', 'assistant/message', 'turn/end',
+    ])
+    expect(session.residentSeqs()).toEqual(session.surface.nodes)
+    await b.dispose()
   })
 })

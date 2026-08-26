@@ -48,6 +48,7 @@ export {
   PersistenceCoordinator,
   SessionFormatUnsupportedError,
   SessionPersistenceCorruptionError,
+  SessionPersistencePrunedError,
   sessionFormatVersionRefusal,
 } from './coordinator.ts'
 export type {

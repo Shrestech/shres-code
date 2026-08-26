@@ -489,6 +489,33 @@ describe('PersistenceCoordinator session preparations', () => {
     })).toThrow(/writeBatchMaxDelayMs must be an integer between/)
   })
 
+  it.each([-1, 1.5])('rejects invalid in-memory log window %s', (window) => {
+    const ctx = new Context()
+    const backend = new ControlledBackend()
+
+    expect(() => new PersistenceCoordinator(ctx, backend, {
+      preparedSessionCacheSize: DEFAULT_PREPARED_SESSION_CACHE_SIZE,
+      writeBatchMaxDelayMs: DEFAULT_WRITE_BATCH_MAX_DELAY_MS,
+      inMemoryLogWindow: window,
+    })).toThrow(/inMemoryLogWindow must be a non-negative safe integer/)
+  })
+
+  it('fails loud when a window is set without a sync durable reader', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const backend = new ControlledBackend()
+    const fiber = await ctx.plugin(Object.assign((inner: Context) => {
+      new PersistenceCoordinator(inner, backend, {
+        preparedSessionCacheSize: DEFAULT_PREPARED_SESSION_CACHE_SIZE,
+        writeBatchMaxDelayMs: DEFAULT_WRITE_BATCH_MAX_DELAY_MS,
+        inMemoryLogWindow: 0,
+      })
+    }, { inject: ['sessions'] }))
+    expect(() => ctx.sessions.create(SessionId('no-sync-reader')))
+      .toThrow(/cannot re-read stored events synchronously/)
+    await fiber.dispose()
+  })
+
   it('retries invalidated prepare and load reservations', async () => {
     const ctx = new Context()
     await ctx.plugin(SessionStore)

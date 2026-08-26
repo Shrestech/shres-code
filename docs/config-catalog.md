@@ -1835,6 +1835,12 @@ export interface Config {
   preparedSessionCacheSize?: number
   /** Fixed live-event coalescing window; not a backend completion deadline. */
   writeBatchMaxDelayMs?: number
+  /**
+   * Trailing-seq count kept in RAM besides the live model surface after a
+   * flush. Absent retains every event. `0` keeps only current surface nodes
+   * plus unflushed events.
+   */
+  inMemoryLogWindow?: number
 }
 
 /** Physical encoding selected for JSONL session artifacts. */
@@ -1873,6 +1879,25 @@ export interface Config {
   preparedSessionCacheSize?: number
   /** Fixed live-event coalescing window; not a backend completion deadline. */
   writeBatchMaxDelayMs?: number
+  /**
+   * Trailing-seq count kept in RAM besides the live model surface after a
+   * flush. Absent retains every event. `0` keeps only current surface nodes
+   * plus unflushed events.
+   */
+  inMemoryLogWindow?: number
+  /**
+   * Milliseconds SQLite waits on a locked database before failing. `0` fails
+   * immediately. Default `5000`.
+   */
+  busyTimeoutMs?: number
+  /**
+   * Whether stored `assistant/chunk` rows stay forever (`forever`, the default)
+   * or are tombstoned after their assembling `assistant/message` is stored
+   * (`assembled`). Assembled retention makes a later full-log read throw
+   * {@link SessionPersistencePrunedError} rather than silently reconstructing
+   * a different log.
+   */
+  chunkRetention?: ChunkRetention
 }
 
 /**
@@ -1884,9 +1909,12 @@ export interface Config {
  * backend promises.
  */
 export type JournalMode = 'wal' | 'delete' | 'truncate' | 'persist'
+
+/** How long assembled `assistant/chunk` rows remain reconstructable. */
+export type ChunkRetention = 'forever' | 'assembled'
 ```
 
-Source: [`packages/session/session-persistence-sqlite/src/index.ts:70`](../packages/session/session-persistence-sqlite/src/index.ts)
+Source: [`packages/session/session-persistence-sqlite/src/index.ts:90`](../packages/session/session-persistence-sqlite/src/index.ts)
 
 <a id="shres-codeshres-code-session-projection-cache"></a>
 

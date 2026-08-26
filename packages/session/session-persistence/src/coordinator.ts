@@ -74,6 +74,27 @@ export class SessionFormatUnsupportedError extends Error {
  * @param version - the stored format version.
  * @returns the stable refusal text, without a raw-log path suffix.
  */
+/**
+ * A later full-log read cannot reconstruct `assistant/chunk` events that
+ * opt-in assembled retention tombstoned. Distinct from corruption: the rows
+ * are intact, and the refusal is the documented cost of that policy.
+ */
+export class SessionPersistencePrunedError extends Error {
+  /**
+   * @param sessionId - the session whose stored log is no longer reconstructable.
+   * @param seqs - seq numbers of tombstoned `assistant/chunk` events.
+   */
+  constructor(
+    readonly sessionId: SessionId,
+    readonly seqs: readonly number[],
+  ) {
+    super(
+      `session "${sessionId}" cannot be reconstructed: chunkRetention=assembled pruned assistant/chunk seqs ${seqs.join(', ')}`,
+    )
+    this.name = 'SessionPersistencePrunedError'
+  }
+}
+
 export function sessionFormatVersionRefusal(id: string, version: number): string {
   return version > SESSION_FORMAT_VERSION
     ? `session "${id}" uses log format v${version}, but this harness reads only v${SESSION_FORMAT_VERSION}: the log was written by a newer harness — upgrade the harness to open it`
@@ -86,6 +107,12 @@ export interface PersistenceCoordinatorOptions {
   readonly preparedSessionCacheSize: number
   /** Maximum intentional batching wait after an idle live queue receives work. */
   readonly writeBatchMaxDelayMs: number
+  /**
+   * Trailing-seq count kept in RAM besides the live model surface after a
+   * flush. Absent means retain every event. `0` keeps only current surface
+   * nodes plus unflushed events. Requires {@link PersistenceBackend.readStoredEventsSync}.
+   */
+  readonly inMemoryLogWindow?: number
 }
 
 /**
@@ -212,6 +239,17 @@ export interface PersistenceBackend<TornMarker = unknown> {
    * backend omits it.
    */
   close?(): Promise<void>
+
+  /**
+   * Optional sync suffix/point read used by a live session's RAM window to
+   * reconstruct events it dropped after a flush. A backend that cannot
+   * address events by seq omits it; configuring `inMemoryLogWindow` then
+   * fails loud at attach.
+   * @param meta - header of the session whose events are requested.
+   * @param seqs - absolute seq numbers to return, in that order.
+   * @returns one stored event per requested seq.
+   */
+  readStoredEventsSync?(meta: SessionHeader, seqs: readonly number[]): SessionEvent[]
 }
 
 /** Per-session write state held by the coordinator's in-memory bookkeeping. */
@@ -601,6 +639,8 @@ export class PersistenceCoordinator<TornMarker = unknown> {
   private chains = new Map<SessionId, Promise<unknown>>()
   /** Resolved fixed write-batching window shared by per-session controllers. */
   private readonly writeBatchMaxDelayMs: number
+  /** Trailing-seq RAM window; absent means the live session retains every event. */
+  private readonly inMemoryLogWindow: number | undefined
 
   constructor(
     private ctx: Context,
@@ -619,7 +659,12 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       || options.writeBatchMaxDelayMs > MAX_WRITE_BATCH_DELAY_MS) {
       throw new TypeError(`writeBatchMaxDelayMs must be an integer between 1 and ${MAX_WRITE_BATCH_DELAY_MS}`)
     }
+    if (options.inMemoryLogWindow !== undefined
+      && (!Number.isSafeInteger(options.inMemoryLogWindow) || options.inMemoryLogWindow < 0)) {
+      throw new TypeError('inMemoryLogWindow must be a non-negative safe integer')
+    }
     this.writeBatchMaxDelayMs = options.writeBatchMaxDelayMs
+    this.inMemoryLogWindow = options.inMemoryLogWindow
     this.preparations = new SessionPreparations(options.preparedSessionCacheSize)
     this.installWritePath()
   }
@@ -707,6 +752,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
     state.materialized = true
     state.cursor += events.length
     this.preparations.invalidate(id)
+    this.releaseOwnerMemory(state)
   }
 
   /**
@@ -1171,6 +1217,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       return restored
     }
     const seed = session.events.map(e => structuredClone(e))
+    this.bindMemoryWindow(session)
     const live: LiveSessionState = {
       init: Promise.resolve(),
       writes: this.createWriteBehind(session, () => live.init),
@@ -1195,6 +1242,8 @@ export class PersistenceCoordinator<TornMarker = unknown> {
     const suffix = session.events.slice(state.cursor).map(event => structuredClone(event))
     this.preparations.attach(reservation)
     state.owner = session
+    this.bindMemoryWindow(session)
+    this.releaseOwnerMemory(state)
     const live: LiveSessionState = {
       init: Promise.resolve(),
       writes: this.createWriteBehind(session, () => live.init),
@@ -1259,6 +1308,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
         // events never emit session/event, so the buffer never sees them.
         const suffix = seed.slice(tracked.cursor)
         if (suffix.length > 0) await this.appendCore(id, suffix)
+        else this.releaseOwnerMemory(tracked)
         return
       }
       const owner = this.live.get(tracked.owner)
@@ -1312,14 +1362,16 @@ export class PersistenceCoordinator<TornMarker = unknown> {
     }
     // Truncate-only repair (no closers): the open turn is NOT closed here.
     if (tornMarker !== undefined) await this.backend.commitRepair(meta, tornMarker, [])
-    this.states.set(session.header.id, {
+    const adopted: SessionState = {
       meta: { ...meta },
       cursor: storedEvents.length,
       materialized: true,
       owner: session,
-    })
+    }
+    this.states.set(session.header.id, adopted)
     const suffix = seed.slice(storedEvents.length)
     if (suffix.length > 0) await this.appendCore(session.header.id, suffix)
+    else this.releaseOwnerMemory(adopted)
   }
 
   private async flush(session: Session): Promise<void> {
@@ -1348,6 +1400,34 @@ export class PersistenceCoordinator<TornMarker = unknown> {
         this.ctx.logger.warn(`${this.backend.name}: background write for session "${session.id}" failed (buffered events retained): ${String(error)}`)
       },
     })
+  }
+
+  /**
+   * Attach the durable re-read hook and RAM window to a live session.
+   * @param session - the session whose flushed off-surface events may leave RAM.
+   */
+  private bindMemoryWindow(session: Session): void {
+    if (this.inMemoryLogWindow === undefined) return
+    const reader = this.backend.readStoredEventsSync
+    if (reader === undefined) {
+      throw new Error(
+        `inMemoryLogWindow is set but ${this.backend.name} cannot re-read stored events synchronously`,
+      )
+    }
+    session.attachMemoryArchive({
+      read: seqs => reader.call(this.backend, session.header, seqs),
+    }, this.inMemoryLogWindow)
+  }
+
+  /**
+   * Mark the owner's flushed prefix durable and drop off-surface events.
+   * @param state - per-id persistence state whose cursor is the stored length.
+   */
+  private releaseOwnerMemory(state: SessionState): void {
+    const owner = state.owner
+    if (owner === undefined || state.cursor <= 0) return
+    owner.markDurableThrough(state.cursor - 1)
+    owner.releaseFlushedOutsideSurface()
   }
 
   /** Append one controller-owned prefix after filtering events initialization already stored. */

@@ -13,7 +13,7 @@ Durable session persistence, semantic checkpoint policy, and the shipped storage
 | [`session-persistence-jsonl/`](session-persistence-jsonl/README.md) | Persists sessions in JSONL files | registers on `ctx.sessionPersistence` |
 | [`session-persistence-sqlite/`](session-persistence-sqlite/README.md) | Persists sessions in SQLite | registers on `ctx.sessionPersistence` |
 
-The [session-persistence decision](../../.agents/notes/implemented/architecture/2026-06-14-session-persistence.md) records the persistence design.
+The [session-persistence decision](../../.agents/notes/implemented/architecture/2026-06-14-session-persistence.md) records the persistence design. Live RAM retention and SQLite lock/chunk policy are the [windowed-log decision](../../.agents/notes/implemented/feature/2026-08-26-windowed-session-log-and-sqlite-retention.md).
 
 ## Projection
 

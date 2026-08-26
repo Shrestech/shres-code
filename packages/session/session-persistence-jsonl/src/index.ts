@@ -8,7 +8,7 @@
 
 import { Context } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
-import { readdirSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { open, mkdir, readFile, readdir, realpath, link, rm, stat, truncate } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { performance } from 'node:perf_hooks'
@@ -80,6 +80,12 @@ export interface Config {
   preparedSessionCacheSize?: number
   /** Fixed live-event coalescing window; not a backend completion deadline. */
   writeBatchMaxDelayMs?: number
+  /**
+   * Trailing-seq count kept in RAM besides the live model surface after a
+   * flush. Absent retains every event. `0` keeps only current surface nodes
+   * plus unflushed events.
+   */
+  inMemoryLogWindow?: number
 }
 
 /** Opaque coordinator token for replacing bytes recovered from a torn frame. */
@@ -130,6 +136,7 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
     preparedSessionCacheSize: z.number().step(1).min(1).default(DEFAULT_PREPARED_SESSION_CACHE_SIZE),
     writeBatchMaxDelayMs: z.number().step(1).min(1).max(MAX_WRITE_BATCH_DELAY_MS)
       .default(DEFAULT_WRITE_BATCH_MAX_DELAY_MS),
+    inMemoryLogWindow: z.number().step(1).min(0),
   })
 
   /**
@@ -160,6 +167,7 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
     this.coordinator = new PersistenceCoordinator<JsonlTornMarker>(this.ctx, this, {
       preparedSessionCacheSize,
       writeBatchMaxDelayMs,
+      ...config.inMemoryLogWindow === undefined ? {} : { inMemoryLogWindow: config.inMemoryLogWindow },
     })
   }
 
@@ -204,6 +212,67 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
 
   /* jscpd:ignore-end */
   // --- PersistenceBackend hooks (the file-bytes storage primitives) ---
+
+  /**
+   * Re-read stored events by seq for a live session's RAM window.
+   * @param meta - header of the session whose events are requested.
+   * @param seqs - absolute seq numbers to return, in that order.
+   * @returns one stored event per requested seq.
+   */
+  readStoredEventsSync(meta: SessionHeader, seqs: readonly number[]): SessionEvent[] {
+    if (seqs.length === 0) return []
+    const events = this.readStoredLogSync(meta)
+    const bySeq = new Map(events.map(event => [event.seq, event]))
+    return seqs.map((seq) => {
+      const event = bySeq.get(seq)
+      if (event === undefined) {
+        throw new Error(`session "${meta.id}" has no stored event at seq ${seq}`)
+      }
+      return event
+    })
+  }
+
+  /**
+   * Scan the session's current artifact synchronously. Used only after a
+   * successful flush, when the file must already contain the requested prefix.
+   * @param meta - header used to resolve the artifact path.
+   * @returns the contiguous stored event prefix.
+   */
+  private readStoredLogSync(meta: SessionHeader): SessionEvent[] {
+    const path = logPath(this.root, meta.cwd, meta.id, this.compression)
+    let buffer: Buffer
+    try {
+      buffer = readFileSync(path)
+    } catch (error: unknown) {
+      if (isENOENT(error)) {
+        throw new Error(`session "${meta.id}" has no durable log to re-read`)
+      }
+      throw error
+    }
+    if (this.compression === 'none') return scanLog(buffer).events
+    const { frames, tornStart } = scanZstdFrames(buffer)
+    if (frames.length === 0) throw new Error('empty or header-less Zstandard session log')
+    if (tornStart !== undefined) {
+      throw new Error(`session "${meta.id}": durable log still has a torn frame; cannot re-read a windowed event`)
+    }
+    const decoder = createZstdFrameDecoder()
+    try {
+      const decoded = decoder.decode(buffer, frames)
+      const header = decoded.next()
+      /* v8 ignore next -- a non-empty structural frame list yields its first frame or throws. */
+      if (header.done) throw new Error('empty or header-less Zstandard session log')
+      assertZstdHeaderFrame(header.value)
+      const scanner = new SessionLogScanner(header.value)
+      for (const plaintext of decoded) scanner.write(plaintext)
+      const complete = scanner.checkpoint()
+      if (complete.committedBytes !== complete.inputBytes) {
+        throw new Error('corrupt Zstandard session log: complete frame contains a torn JSONL record')
+      }
+      return scanner.finish().events
+    } finally {
+      decoder.close()
+    }
+  }
 
   /** Read a stored prefix by id across all project directories when cwd is unknown. */
   async loadStored(id: SessionId, signal?: AbortSignal): Promise<StoredPrefix<JsonlTornMarker> | undefined> {

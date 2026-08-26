@@ -139,6 +139,20 @@ export type PrepareSessionOptions =
   | (CreateSessionOptions & { readonly seedSource?: undefined })
   | RestoredSessionOptions
 
+/**
+ * Sync reader for events a live session has dropped from RAM after they
+ * reached the durable log. Persistence attaches one when
+ * `inMemoryLogWindow` is configured; without it the session never drops.
+ */
+export interface SessionEventArchive {
+  /**
+   * Return one event per requested seq, in that order.
+   * @param seqs - absolute seq numbers to re-read from durable storage.
+   * @returns the stored events; each `event.seq` must equal the corresponding request.
+   */
+  read(seqs: readonly number[]): SessionEvent[]
+}
+
 /** Why an active agent driver was cancelled. */
 export type AgentCancelCause =
   | { readonly kind: 'user' }

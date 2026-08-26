@@ -14,7 +14,7 @@ import type { Scoped } from '@shres-code/shres-code-scope'
 import type { Message } from '@shres-code/shres-code-llm'
 import { SESSION_FORMAT_VERSION, SessionId } from './types.ts'
 import type { TypertLookup } from '@shres-code/shres-code-typert-protocol'
-import type { CreateSessionOptions, EpochHeader, LogEventIntent, PrepareSessionOptions, RequestContext, SessionEvent, SessionEventMap, SessionEventType, SessionHeader, SurfaceIntent, SurfaceEventType } from './types.ts'
+import type { CreateSessionOptions, EpochHeader, LogEventIntent, PrepareSessionOptions, RequestContext, SessionEvent, SessionEventArchive, SessionEventMap, SessionEventType, SessionHeader, SurfaceIntent, SurfaceEventType } from './types.ts'
 import { snapshotJsonValue } from './json.ts'
 import { deriveEventMessage, SurfaceManager } from './surface.ts'
 import type { SessionSurface } from './surface.ts'
@@ -423,9 +423,21 @@ const attachments = new WeakMap<Session, SessionEntry>()
  * @typert object
  */
 export class Session {
-  private log: SessionEvent[] = []
+  private log: (SessionEvent | undefined)[] = []
   /** Single incremental owner of surface acceptance and projection state. */
   private readonly surfaceManager = new SurfaceManager(this.log)
+  /** Durable reader used to refill slots dropped after a flush. */
+  private archive: SessionEventArchive | undefined
+  /**
+   * Inclusive last seq known durable. `-1` means nothing has been marked
+   * flushed. Only seqs at or below this value may leave RAM.
+   */
+  private durableThrough = -1
+  /**
+   * Trailing seqs to keep even when they are off the model surface.
+   * `undefined` retains every event (the unconfigured default).
+   */
+  private memoryWindow: number | undefined
 
   /** The ordered surface over this session's event log. */
   get surface(): SessionSurface {
@@ -552,18 +564,124 @@ export class Session {
 
   /**
    * An immutable snapshot of the append-only event log. The snapshot is reused
-   * until the next append; a previously returned array does not grow later.
-   * Events and their nested data are deep-frozen at acceptance, so neither a
-   * cast nor ordinary JavaScript can rewrite durable history.
+   * until the next append when every event is resident; a previously returned
+   * array does not grow later. Events and their nested data are deep-frozen at
+   * acceptance, so neither a cast nor ordinary JavaScript can rewrite durable
+   * history. After `inMemoryLogWindow` drops flushed off-surface events, this
+   * getter re-reads the missing seqs from the attached archive and does not
+   * cache that reconstructed snapshot on the session.
    */
   get events(): readonly SessionEvent[] {
-    this.eventsSnapshot ??= Object.freeze([...this.log])
-    return this.eventsSnapshot
+    if (this.eventsSnapshot !== undefined) return this.eventsSnapshot
+    this.hydrateHoles()
+    const snapshot = Object.freeze(this.requireResidentLog())
+    if (this.memoryWindow === undefined) this.eventsSnapshot = snapshot
+    else this.releaseFlushedOutsideSurface()
+    return snapshot
   }
 
   /** The next event's sequence number — always the log length (the `seq = log.length` contiguity contract). */
   get seq(): number {
     return this.log.length
+  }
+
+  /**
+   * Seq numbers currently held in RAM, in order. Off-surface flushed events
+   * that have been released are absent until {@link events} re-reads them.
+   * @returns a fresh array of resident seqs.
+   */
+  residentSeqs(): number[] {
+    const seqs: number[] = []
+    for (const [seq, event] of this.log.entries()) {
+      if (event !== undefined) seqs.push(seq)
+    }
+    return seqs
+  }
+
+  /**
+   * Attach the durable reader and the RAM window used after a flush. A window
+   * of `0` keeps only current surface nodes plus unflushed events; a positive
+   * value also keeps that many trailing seqs. Persistence attaches this when
+   * `inMemoryLogWindow` is configured; without it the session never drops.
+   * @param archive - sync reader for dropped seqs.
+   * @param window - non-negative trailing-seq count besides the live surface.
+   * @throws when `window` is not a non-negative safe integer.
+   */
+  attachMemoryArchive(archive: SessionEventArchive, window: number): void {
+    if (!Number.isSafeInteger(window) || window < 0) {
+      throw new Error(`inMemoryLogWindow must be a non-negative integer, got ${String(window)}`)
+    }
+    this.archive = archive
+    this.memoryWindow = window
+  }
+
+  /**
+   * Record that every event through `seq` inclusive is durable. Only those
+   * seqs may later leave RAM.
+   * @param seq - inclusive last durable seq, or `-1` when the log is empty.
+   * @throws when `seq` is not an integer in `[-1, this.seq)`.
+   */
+  markDurableThrough(seq: number): void {
+    if (!Number.isSafeInteger(seq) || seq < -1 || seq >= this.log.length) {
+      throw new Error(`durable seq ${String(seq)} is outside session "${this.id}" (length ${this.log.length})`)
+    }
+    if (seq > this.durableThrough) this.durableThrough = seq
+  }
+
+  /**
+   * Drop flushed events that are not on the model surface and not inside the
+   * configured trailing window. No-op when no window is attached. Catches
+   * incremental header and context folds up first so a later fold cannot miss
+   * a dropped `request/header` or `request/context`.
+   * @throws when a window is attached but no archive can re-read dropped seqs.
+   */
+  releaseFlushedOutsideSurface(): void {
+    if (this.memoryWindow === undefined) return
+    if (this.archive === undefined) {
+      throw new Error(`session "${this.id}": inMemoryLogWindow is set but no durable event archive is attached`)
+    }
+    this.requestHeader()
+    this.requestContext()
+    const surface = new Set(this.surface.nodes)
+    const tailStart = this.log.length - this.memoryWindow
+    for (let seq = 0; seq <= this.durableThrough && seq < this.log.length; seq++) {
+      if (this.log[seq] === undefined || surface.has(seq) || seq >= tailStart) continue
+      this.log[seq] = undefined
+    }
+    this.eventsSnapshot = undefined
+  }
+
+  /** Fill every empty slot from the attached archive. */
+  private hydrateHoles(): void {
+    const missing: number[] = []
+    for (const [seq, event] of this.log.entries()) {
+      if (event === undefined) missing.push(seq)
+    }
+    if (missing.length === 0) return
+    if (this.archive === undefined) {
+      throw new Error(`session "${this.id}" dropped ${missing.length} event(s) from memory and has no durable archive to re-read`)
+    }
+    const restored = this.archive.read(missing)
+    if (restored.length !== missing.length) {
+      throw new Error(`session "${this.id}": archive returned ${restored.length} event(s) for ${missing.length} requested seq(s)`)
+    }
+    for (const [index, event] of restored.entries()) {
+      const expected = missing[index]
+      if (expected === undefined || event.seq !== expected) {
+        throw new Error(`session "${this.id}": archive returned seq ${event.seq} where ${String(expected)} was requested`)
+      }
+      this.log[expected] = event
+    }
+  }
+
+  /** Snapshot the resident log; throws if any seq is still empty after hydrate. */
+  private requireResidentLog(): SessionEvent[] {
+    return this.log.map((event, seq) => {
+      if (event === undefined) {
+        throw new Error(`session "${this.id}" is missing event seq ${seq} after hydrate`)
+      }
+      return event
+    })
   }
 
   /**
@@ -674,7 +792,10 @@ export class Session {
       // consumer mutating it in place (instead of building a replacement)
       // would desync every later comparison against the log, so mutation
       // throws instead.
-      this.headerFold = deepFreeze(foldRequestHeader(this.log.slice(this.headerFoldSeq), this.headerFold))
+      this.headerFold = deepFreeze(foldRequestHeader(
+        this.residentSlice(this.headerFoldSeq),
+        this.headerFold,
+      ))
       this.headerFoldSeq = this.log.length
     }
     return this.headerFold
@@ -691,12 +812,30 @@ export class Session {
    */
   requestContext(): RequestContext | undefined {
     if (this.contextFoldSeq < this.log.length) {
-      for (const event of this.log.slice(this.contextFoldSeq)) {
+      for (const event of this.residentSlice(this.contextFoldSeq)) {
         if (event.type === 'request/context') this.contextFold = deepFreeze({ ...event.data })
       }
       this.contextFoldSeq = this.log.length
     }
     return this.contextFold
+  }
+
+  /**
+   * Defined events from `fromSeq` to the log end. A hole in this tail means a
+   * fold ran after a release without catching up first — fail loud.
+   * @param fromSeq - first seq to include.
+   * @returns the resident suffix.
+   */
+  private residentSlice(fromSeq: number): SessionEvent[] {
+    const slice: SessionEvent[] = []
+    for (let seq = fromSeq; seq < this.log.length; seq++) {
+      const event = this.log[seq]
+      if (event === undefined) {
+        throw new Error(`session "${this.id}" fold hit a dropped event at seq ${seq}`)
+      }
+      slice.push(event)
+    }
+    return slice
   }
 
   /** The derived-message cache: frozen projections, extended per unseen node. */
@@ -734,10 +873,11 @@ export class Session {
       this.derivedGeneration = generation
     }
     for (const seq of nodes.slice(this.derivedNodes)) {
-      // Surface sequences are built from this.log — seq is always a valid
-      // index by construction. The non-null assertion expresses that invariant.
-      // oxlint-disable-next-line typescript/no-non-null-assertion
-      const msg = this.deriveEventMessage(this.log[seq]!)
+      const event = this.log[seq]
+      if (event === undefined) {
+        throw new Error(`session "${this.id}" surface node seq ${seq} is not resident`)
+      }
+      const msg = this.deriveEventMessage(event)
       // A surface node is one of the five message-producing types, but an
       // empty-content assistant/message (a max-tokens step that hosts only
       // usage) derives to null and must not enter the transcript.

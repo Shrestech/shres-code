@@ -1619,3 +1619,54 @@ describe('JsonlSessionPersistence: edge cases', () => {
   })
 
 })
+
+describe('JsonlSessionPersistence: windowed in-memory log', () => {
+  async function windowed(compression: 'zstd' | 'none'): Promise<{
+    ctx: Context
+    session: Session
+    dispose: () => Promise<void>
+  }> {
+    const dir = await freshRoot()
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const fiber = await ctx.plugin(JsonlSessionPersistence, {
+      root: dir,
+      compression,
+      writeBatchMaxDelayMs: 1,
+      inMemoryLogWindow: 0,
+    })
+    const session = ctx.sessions.create(SessionId(`windowed-${compression}`), { meta: { cwd: dir } })
+    session.append('turn/start', { turn: 1 })
+    session.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: 'hi' }], source: { kind: 'user' },
+    }), { surfaceOp: 'append' })
+    session.append('assistant/chunk', {
+      turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'hello' },
+    })
+    session.append('assistant/message', {
+      turn: 1, step: 1,
+      message: createMessage({
+        role: 'assistant',
+        content: [{ type: 'text', text: 'hello' }],
+        source: { kind: 'model', provider: 'mock', model: 'mock' },
+      }),
+    }, { surfaceOp: 'append', sourceEventSeqs: [2] })
+    session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+    await ctx.sessions.flush(session)
+    return { ctx, session, dispose: () => fiber.dispose() }
+  }
+
+  it.each(['none', 'zstd'] as const)('drops flushed off-surface events and re-reads them (%s)', async (compression) => {
+    const { session, dispose } = await windowed(compression)
+    try {
+      expect(session.residentSeqs()).toEqual(session.surface.nodes)
+      expect(session.deriveMessages().map(message => message.role)).toEqual(['user', 'assistant'])
+      expect(session.events.map(event => event.type)).toEqual([
+        'turn/start', 'user/message', 'assistant/chunk', 'assistant/message', 'turn/end',
+      ])
+      expect(session.residentSeqs()).toEqual(session.surface.nodes)
+    } finally {
+      await dispose()
+    }
+  })
+})
