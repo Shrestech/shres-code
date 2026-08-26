@@ -1,0 +1,42 @@
+[
+  {
+    "kind": "chunks",
+    "chunks": [
+      { "type": "block-start", "index": 0, "blockType": "tool-call" },
+      { "type": "tool-call-delta", "index": 0, "id": "call_ws_open", "name": "jspace_open", "argumentsDelta": "{\"goal\":\"Finish the charter snapshot proof\",\"next\":\"Record a checkpoint\",\"charter\":[{\"kind\":\"accept-proposal\"}]}" },
+      { "type": "block-end", "index": 0, "block": { "type": "tool-call", "id": "call_ws_open", "name": "jspace_open", "arguments": "{\"goal\":\"Finish the charter snapshot proof\",\"next\":\"Record a checkpoint\",\"charter\":[{\"kind\":\"accept-proposal\"}]}" } },
+      { "type": "usage", "usage": { "inputTokens": 15, "outputTokens": 8 } },
+      { "type": "finish", "reason": { "kind": "tool-calls" } }
+    ]
+  },
+  {
+    "kind": "chunks",
+    "chunks": [
+      { "type": "block-start", "index": 0, "blockType": "tool-call" },
+      { "type": "tool-call-delta", "index": 0, "id": "call_ws_check", "name": "jspace_checkpoint", "argumentsDelta": "{}" },
+      { "type": "block-end", "index": 0, "block": { "type": "tool-call", "id": "call_ws_check", "name": "jspace_checkpoint", "arguments": "{}" } },
+      { "type": "usage", "usage": { "inputTokens": 20, "outputTokens": 4 } },
+      { "type": "finish", "reason": { "kind": "tool-calls" } }
+    ]
+  },
+  {
+    "kind": "chunks",
+    "chunks": [
+      { "type": "block-start", "index": 0, "blockType": "tool-call" },
+      { "type": "tool-call-delta", "index": 0, "id": "call_ws_ship", "name": "jspace_ship", "argumentsDelta": "{}" },
+      { "type": "block-end", "index": 0, "block": { "type": "tool-call", "id": "call_ws_ship", "name": "jspace_ship", "arguments": "{}" } },
+      { "type": "usage", "usage": { "inputTokens": 22, "outputTokens": 3 } },
+      { "type": "finish", "reason": { "kind": "tool-calls" } }
+    ]
+  },
+  {
+    "kind": "chunks",
+    "chunks": [
+      { "type": "block-start", "index": 0, "blockType": "text" },
+      { "type": "text-delta", "index": 0, "text": "CHARTER PASS" },
+      { "type": "block-end", "index": 0, "block": { "type": "text", "text": "CHARTER PASS" } },
+      { "type": "usage", "usage": { "inputTokens": 25, "outputTokens": 2 } },
+      { "type": "finish", "reason": { "kind": "stop" } }
+    ]
+  }
+]

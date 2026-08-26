@@ -15,6 +15,7 @@ import {
   JSPACE_AVAILABLE_LINE,
 } from '../src/fold.ts'
 import type { JspaceCard } from '../src/types.ts'
+import { CharterEntryId } from '../src/index.ts'
 
 const owner = 'sess-a'
 
@@ -28,6 +29,7 @@ function card(overrides: Partial<JspaceCard> = {}): JspaceCard {
     open: [],
     next: 'Write the fold',
     goalOpenedSeq: 1,
+    charter: [],
     ...overrides,
   }
 }
@@ -179,6 +181,12 @@ describe('foldJspace', () => {
     ], owner)
     expect(folded.card).toBeNull()
   })
+
+  it('defaults a missing charter field to an empty list', () => {
+    const payload = { ...card() } as Record<string, unknown>
+    delete payload['charter']
+    expect(decodeJspaceCard(payload).charter).toEqual([])
+  })
 })
 
 const reprint = {
@@ -248,6 +256,35 @@ describe('formatJspaceCard', () => {
       'Next:      Write the fold',
     ].join('\n'))
     expect(text).not.toContain('elided')
+  })
+
+  it('prints a Charter line after Core and omits commands', () => {
+    const text = formatJspaceCard(card({
+      charter: [
+        {
+          kind: 'check',
+          id: CharterEntryId('e1'),
+          constraint: 'qty via qty()',
+          command: 'node tools/check-house-rules.mjs qty src/m*.js',
+          reads: ['src/m*.js'],
+          discrimination: 'demonstrated',
+        },
+        {
+          kind: 'prose',
+          id: CharterEntryId('e3'),
+          constraint: 'export prefix',
+        },
+      ],
+    }), reprint)
+    expect(text).toBe([
+      'Goal:      Ship the feature',
+      'Core:      seat',
+      'Charter:    e1 ✓ qty via qty(); e3 prose export prefix',
+      'Checked:   (none)',
+      'Open:      (none)',
+      'Next:      Write the fold',
+    ].join('\n'))
+    expect(text).not.toContain('node tools')
   })
 })
 

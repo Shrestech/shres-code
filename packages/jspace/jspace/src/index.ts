@@ -20,8 +20,10 @@ import {
   matchesCoverageTerms,
 } from './fold.ts'
 import type { JspaceFold } from './fold.ts'
+import { decodeJspaceCharter } from './charter.ts'
 import type {
   JspaceCard,
+  JspaceCharterEntry,
   JspaceCheckedLine,
   JspaceOpenLine,
   JspaceProjection,
@@ -30,6 +32,16 @@ import type {
 } from './types.ts'
 
 export type * from './types.ts'
+export {
+  CharterEntryId,
+  decodeJspaceCharter,
+  decodeJspaceCharterEntry,
+  formatCharterEntrySummary,
+  nextCharterEntryId,
+  assertNever,
+} from './charter.ts'
+export { extractCharterProposal } from './charter-seed.ts'
+export type { CharterProposalExtract } from './charter-seed.ts'
 export {
   decodeJspaceCard,
   decodeJspaceClosed,
@@ -104,6 +116,8 @@ export interface OpenJspaceInput {
   readonly next: string
   /** Optional live items, at most two. */
   readonly core?: readonly string[]
+  /** Optional charter, applied only on the first open. */
+  readonly charter?: readonly JspaceCharterEntry[]
 }
 
 /** Patch an open card. */
@@ -165,6 +179,29 @@ const jspaceProjectionSchema: ZodType<JspaceProjection> = zod.object({
     })),
     next: zod.string().min(1),
     goalOpenedSeq: zod.number().int().nonnegative(),
+    charter: zod.array(zod.object({
+      kind: zod.enum(['check', 'prose']),
+      id: zod.string().min(1),
+      constraint: zod.string().min(1),
+      command: zod.string().min(1).optional(),
+      reads: zod.array(zod.string()).optional(),
+      discrimination: zod.enum(['demonstrated', 'unverified']).optional(),
+      unverifiedReason: zod.enum([
+        'discrimination-off',
+        'policy-denied',
+        'probe-timeout',
+        'probe-infeasible',
+      ]).optional(),
+      failProbe: zod.object({
+        path: zod.string().min(1),
+        mutation: zod.object({
+          kind: zod.enum(['insert', 'prepend', 'replace']),
+          content: zod.string().optional(),
+          from: zod.string().optional(),
+          to: zod.string().optional(),
+        }),
+      }).optional(),
+    })).default([]),
   }).nullable(),
   closed: zod.boolean(),
   fault: zod.string().optional(),
@@ -199,7 +236,7 @@ function line(value: string, field: string): string {
   if (trimmed.includes('\n') || trimmed.includes('\r')) {
     throw new JspaceError(`jspace ${field} must be a single line`, 'JSPACE_EMPTY')
   }
-  if (/^(Goal|Core|Checked|Open|Next|Pass):/iu.test(trimmed)) {
+  if (/^(Goal|Core|Checked|Open|Next|Pass|Charter):/iu.test(trimmed)) {
     throw new JspaceError(`jspace ${field} cannot start with a card label`, 'JSPACE_EMPTY')
   }
   if (isPackedJsonArray(trimmed)) {
@@ -403,8 +440,37 @@ export default class JspaceService extends Service {
       open: [],
       next: line(input.next, 'next'),
       goalOpenedSeq: session.seq,
+      charter: [...(input.charter ?? [])],
     }
     return this.writeCard(session, card)
+  }
+
+  /**
+   * Charter list on the current native card, or empty when none is open.
+   * @param session - owning session.
+   * @returns the folded charter.
+   */
+  charter(session: Session): readonly JspaceCharterEntry[] {
+    return this.card(session)?.charter ?? []
+  }
+
+  /**
+   * Replace the charter list on an open card. The tool Consumer runs floor and
+   * discrimination before calling this.
+   * @param session - owning session.
+   * @param next - replacement list.
+   * @returns the recorded card.
+   */
+  amendCharter(session: Session, next: readonly JspaceCharterEntry[]): JspaceCard {
+    this.requireActive()
+    const current = this.requireCard(session)
+    const charter = decodeJspaceCharter(next)
+    return this.writeCard(session, {
+      ...current,
+      seq: this.nextSeq(session),
+      sessionId: session.id,
+      charter,
+    })
   }
 
   /**
@@ -488,6 +554,7 @@ export default class JspaceService extends Service {
       open,
       next,
       goalOpenedSeq: current.goalOpenedSeq,
+      charter: current.charter,
     })
   }
 
@@ -495,10 +562,11 @@ export default class JspaceService extends Service {
    * Open a new Goal epoch on an open card, or update Goal and Next in place
    * when the Goal is unchanged. A Goal identity change resets Core and Checked
    * so ship cannot pass on the previous epoch's evidence, and moves the epoch
-   * anchor so a fresh checkpoint is required. A same-Goal call is the
-   * control-loop update path: Core, Checked, and Open are kept and the anchor
-   * is unchanged. Open questions carry over untouched on a new epoch. The
-   * optional `core` input applies only on the first open and is ignored here.
+   * anchor so a fresh checkpoint is required. The charter is kept: house rules
+   * outlive a Goal rewrite. A same-Goal call is the control-loop update path:
+   * Core, Checked, Open, and charter are kept and the anchor is unchanged. Open
+   * questions carry over untouched on a new epoch. The optional `core` and
+   * `charter` inputs apply only on the first open and are ignored here.
    * @param session - owning session.
    * @param input - goal, next, optional core.
    * @returns the recorded card.
@@ -526,6 +594,7 @@ export default class JspaceService extends Service {
       open: current.open,
       next,
       goalOpenedSeq: session.seq,
+      charter: current.charter,
     })
   }
 
@@ -645,6 +714,11 @@ export default class JspaceService extends Service {
     evidence: string,
   ): { readonly id: string; readonly verified: boolean } {
     const id = line(evidence, 'evidence')
+    const charterRun = session.events.find((event): event is SessionEvent<'jspace/charter-run'> =>
+      event.type === 'jspace/charter-run' && event.data.callId === id && event.data.passed)
+    if (charterRun !== undefined) {
+      return { id, verified: true }
+    }
     const call = session.events.find((event): event is SessionEvent<'tool/call'> =>
       event.type === 'tool/call' && event.data.callId === id)
     const succeeded = session.events.some((event) => {

@@ -12,6 +12,7 @@ const card: JspaceCard = {
   open: [],
   next: 'Write tests',
   goalOpenedSeq: 1,
+  charter: [],
 }
 
 function snapshot(
@@ -33,6 +34,7 @@ function snapshot(
       open: [],
       next: 'Write tests',
       goalOpenedSeq,
+      charter: [],
     },
   }
 }

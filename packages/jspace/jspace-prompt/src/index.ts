@@ -19,6 +19,7 @@ import {
   JSPACE_ALWAYS_OPEN_NEXT,
   JSPACE_AVAILABLE_LINE,
 } from '@shres-code/shres-code-jspace'
+import type { CharterEntryInput } from '@shres-code/shres-code-jspace'
 import type {} from '@shres-code/shres-code-system-prompt'
 import {
   frameUntrusted,
@@ -47,6 +48,7 @@ export {
   formatJspaceProtocol,
   JSPACE_BROADCAST_SECTION,
   JSPACE_CAPACITY_SECTION,
+  JSPACE_DRIVER_CHARTER,
   JSPACE_DRIVER_CLOSED,
   JSPACE_DRIVER_OPEN,
   JSPACE_MODULE_SECTIONS,
@@ -126,6 +128,41 @@ export const JSPACE_SECTION = 'jspace:card'
 /** Prompt order: before plan policy (50). */
 export const JSPACE_SECTION_ORDER = 45
 
+/** Harness charter proposal reprint, immediately before `jspace:card`. */
+export const JSPACE_CHARTER_SEED_SECTION = 'jspace:charter-seed'
+
+/** Prompt order: immediately before `jspace:card` (45). */
+export const JSPACE_CHARTER_SEED_ORDER = 44
+
+/** Pinned preamble for {@link JSPACE_CHARTER_SEED_SECTION}. */
+export const JSPACE_CHARTER_SEED_PREAMBLE = [
+  'J-Space charter (harness proposal). Confirm or amend on jspace_open; do not author a blank list.',
+  'Each check is a bash command the harness will run at every checkpoint and at ship. Exit 0 passes.',
+  'kind=accept-proposal with no ids accepts this whole list. Replace any entry by sending kind=check with a different command.',
+  'Prose entries reprint; they do not pass ship. Prefer a check per rule.',
+].join('\n')
+
+/**
+ * Render the model-facing charter proposal block.
+ * @param entries - proposed entries with ids assigned.
+ * @returns section body.
+ */
+export function formatCharterSeedSection(entries: readonly CharterEntryInput[]): string {
+  const lines = [JSPACE_CHARTER_SEED_PREAMBLE, '']
+  for (const entry of entries) {
+    lines.push(`- id=${String(entry.id ?? '')} kind=${entry.kind}`)
+    lines.push(`  constraint: ${entry.constraint}`)
+    if (entry.kind === 'check') {
+      lines.push(`  command: ${entry.command}`)
+      lines.push(`  reads: ${entry.reads.join(', ')}`)
+      if (entry.failProbe !== undefined) {
+        lines.push(`  failProbe: ${entry.failProbe.mutation.kind} ${entry.failProbe.path}`)
+      }
+    }
+  }
+  return lines.join('\n')
+}
+
 /**
  * Latest human user text from the session log.
  * @param session - session whose events to scan.
@@ -160,6 +197,19 @@ function turnText(session: Session | undefined, claimed: readonly UserMessage[] 
     return messageText(event.data)
   }
   return ''
+}
+
+/**
+ * Latest harness charter proposal entries in this session, if any.
+ * @param session - live session.
+ * @returns proposed entries, or `undefined`.
+ */
+function latestProposal(session: Session): readonly CharterEntryInput[] | undefined {
+  for (let index = session.events.length - 1; index >= 0; index -= 1) {
+    const event = session.events[index]
+    if (event?.type === 'jspace/charter-proposal') return event.data.entries
+  }
+  return undefined
 }
 
 /**
@@ -225,6 +275,19 @@ export function modulesFor(
 export function apply(ctx: Context, config: Config = {}): void {
   const reprint = resolveConfig(config)
   ctx.systemPrompt.section({
+    name: JSPACE_CHARTER_SEED_SECTION,
+    order: JSPACE_CHARTER_SEED_ORDER,
+    text: (context) => {
+      const session = context.agent?.session
+      if (!ctx.jspace.engaged(session) || session === undefined) return ''
+      const proposal = latestProposal(session)
+      if (proposal === undefined) return ''
+      const card = ctx.jspace.card(session)
+      if (card !== null && card.charter.length > 0) return ''
+      return formatCharterSeedSection(proposal)
+    },
+  })
+  ctx.systemPrompt.section({
     name: JSPACE_SECTION,
     order: JSPACE_SECTION_ORDER,
     text: (context) => {
@@ -245,7 +308,10 @@ export function apply(ctx: Context, config: Config = {}): void {
       const session = context.agent?.session
       if (!ctx.jspace.engaged(session)) return ''
       const cardOpen = session !== undefined && ctx.jspace.card(session) !== null
-      return formatJspaceProtocol(passFor(ctx, session, context.messages), cardOpen)
+      const charterProposal = session !== undefined
+        && latestProposal(session) !== undefined
+        && !cardOpen
+      return formatJspaceProtocol(passFor(ctx, session, context.messages), cardOpen, charterProposal)
     },
   })
 

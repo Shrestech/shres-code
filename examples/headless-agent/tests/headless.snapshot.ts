@@ -33,6 +33,13 @@ const goalScenarioDir = join(snapshotsDir, 'goal-tools')
 const goalConfigPath = fileURLToPath(new URL('../goal.cordis.snapshot.yml', import.meta.url))
 const jspaceScenarioDir = join(snapshotsDir, 'jspace-tools')
 const jspaceConfigPath = fileURLToPath(new URL('../jspace.cordis.snapshot.yml', import.meta.url))
+const jspaceCharterScenarioDir = join(snapshotsDir, 'jspace-charter')
+const jspaceCharterPassScenarioDir = join(snapshotsDir, 'jspace-charter-pass')
+const jspaceCharterConfigPath = fileURLToPath(new URL('../jspace-charter.cordis.snapshot.yml', import.meta.url))
+const houseRulesHelper = fileURLToPath(new URL(
+  '../../../bench/tasks/constraint-survival-build/fixture/tools/check-house-rules.mjs',
+  import.meta.url,
+))
 const retryScenarioDir = join(snapshotsDir, 'provider-retry')
 const retryConfigPath = fileURLToPath(new URL('../retry.cordis.snapshot.yml', import.meta.url))
 const compactionScenarioDir = join(snapshotsDir, 'compaction-recovery')
@@ -180,6 +187,25 @@ function normalizeGoalStream(rawStdout: string, cwd: string): string {
     .join('\n') + '\n'
 }
 
+/** Zero charter `readsFingerprint.mtimeMs` so keyless replay is not host-clock-bound. */
+function normalizeCharterFingerprints(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(normalizeCharterFingerprints)
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [
+      key,
+      key === 'mtimeMs' && typeof item === 'number' ? 0 : normalizeCharterFingerprints(item),
+    ]))
+  }
+  return value
+}
+
+/** Normalize charter fingerprints after the shared scrubbers. */
+function normalizeCharterStream(rawStdout: string, cwd: string): string {
+  return parseJsonl(normalizeHeadlessStream(rawStdout, cwd))
+    .map(record => JSON.stringify(normalizeCharterFingerprints(record)))
+    .join('\n') + '\n'
+}
+
 async function scenarioPrompt(dir: string, label: string): Promise<string> {
   const input = JSON.parse(await readFile(join(dir, 'input.json'), 'utf8')) as {
     steps?: { op?: unknown; text?: unknown }[]
@@ -187,6 +213,48 @@ async function scenarioPrompt(dir: string, label: string): Promise<string> {
   const prompt = input.steps?.find(step => step.op === 'prompt')?.text
   if (typeof prompt !== 'string') throw new Error(`${label} input has no prompt step`)
   return prompt
+}
+
+/** Copy the house-rule helper and write one `src/m*.js` module into the snapshot cwd. */
+async function prepareCharterWorkspace(cwd: string, source: string): Promise<void> {
+  await mkdir(join(cwd, 'tools'), { recursive: true })
+  await mkdir(join(cwd, 'src'), { recursive: true })
+  await copyFile(houseRulesHelper, join(cwd, 'tools', 'check-house-rules.mjs'))
+  await writeFile(join(cwd, 'src', 'm01-sku.js'), source)
+}
+
+/** Assembled system strings from persisted `request/header` events, in order. */
+function requestSystems(records: JsonObject[]): string[] {
+  return records.flatMap((record) => {
+    if (record.type !== 'request/header') return []
+    const header = (record.data as JsonObject | undefined)?.header as JsonObject | undefined
+    return typeof header?.system === 'string' ? [header.system] : []
+  })
+}
+
+/** Text and error bit of the `tool/result` whose source call-id matches. */
+function toolResultFor(
+  records: JsonObject[],
+  callId: string,
+): { isError: boolean; text: string } | undefined {
+  for (const record of records) {
+    if (record.type !== 'tool/result') continue
+    const data = record.data as JsonObject | undefined
+    const message = data?.message as JsonObject | undefined
+    const source = message?.source as JsonObject | undefined
+    if (source?.callId !== callId) continue
+    const outer = (message?.content as JsonObject[] | undefined) ?? []
+    const toolResult = outer.find(block => block.type === 'tool-result')
+    const inner = (toolResult?.content as JsonObject[] | undefined) ?? outer
+    const texts = inner
+      .filter(block => block.type === 'text' && typeof block.text === 'string')
+      .map(block => block.text as string)
+    return {
+      isError: toolResult?.isError === true || (toolResult === undefined && outer[0]?.isError === true),
+      text: texts.join(''),
+    }
+  }
+  return undefined
 }
 
 async function readPersistedLog(file: string): Promise<string> {
@@ -762,6 +830,112 @@ describe('headless stream-json snapshots', () => {
 
     expect(result.stderr).toBe('')
     const normalized = normalizeHeadlessStream(result.stdout, runCwd)
+    if (refreshing) await writeFile(streamExpected, normalized)
+    expect(normalized).toBe(await readFile(streamExpected, 'utf8'))
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+
+  it('replays a failing jspace-charter checkpoint through the one-shot app', async () => {
+    const prompt = await scenarioPrompt(jspaceCharterScenarioDir, 'jspace-charter')
+    const streamExpected = join(jspaceCharterScenarioDir, 'stream-json.expected.jsonl')
+    let runCwd = ''
+    const result = await runLoaderSmoke({
+      label: 'jspace charter fail headless stream-json snapshot',
+      tempDirPrefix: 'headless-snapshot-jspace-charter-',
+      binScript,
+      libBinScript: binScript,
+      configPath: jspaceCharterConfigPath,
+      binArgs: [jspaceCharterConfigPath, prompt],
+      tsconfigPath,
+      env: {
+        SHRES_SNAPSHOT: 'replay',
+        SHRES_SNAPSHOT_FILE: join(jspaceCharterScenarioDir, 'session.jsonl'),
+        SHRES_SNAPSHOT_OVERRIDE: join(jspaceCharterScenarioDir, 'replay.override.json'),
+        NODE_OPTIONS: [process.env.NODE_OPTIONS, '--disable-warning=ExperimentalWarning'].filter(Boolean).join(' '),
+      },
+      prepare: async (cwd) => {
+        runCwd = cwd
+        await prepareCharterWorkspace(cwd, [
+          'export function invSku() {',
+          "  return 'SKU-1'",
+          '}',
+          '',
+        ].join('\n'))
+      },
+      inspect: async (cwd) => {
+        const logs = await persistedLogs(cwd)
+        expect(logs).toHaveLength(1)
+        const records = parseJsonl(logs[0]?.content ?? '')
+        expect(records.some(record => record.type === 'jspace/charter-proposal')).toBe(true)
+        expect(records.some(record => record.type === 'jspace/charter-probe')).toBe(true)
+        const cards = records.filter(record => record.type === 'jspace/card')
+        expect(cards.length).toBeGreaterThanOrEqual(1)
+        const charter = (cards[0]?.data as JsonObject | undefined)?.charter as unknown[] | undefined
+        expect((charter ?? []).length).toBeGreaterThanOrEqual(1)
+        const systems = requestSystems(records)
+        expect(systems[0]).toContain('J-Space charter (harness proposal)')
+        expect(systems.slice(1).join('\n')).not.toContain('J-Space charter (harness proposal)')
+        const checkpoint = toolResultFor(records, 'call_ws_check')
+        expect(checkpoint?.isError).toBe(true)
+        expect(checkpoint?.text).toMatch(/e1/)
+        expect(checkpoint?.text).toContain('fix:')
+      },
+    })
+
+    expect(result.stderr).toBe('')
+    const normalized = normalizeCharterStream(result.stdout, runCwd)
+    if (refreshing) await writeFile(streamExpected, normalized)
+    expect(normalized).toBe(await readFile(streamExpected, 'utf8'))
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+
+  it('replays a passing jspace-charter ship through the one-shot app', async () => {
+    const prompt = await scenarioPrompt(jspaceCharterPassScenarioDir, 'jspace-charter-pass')
+    const streamExpected = join(jspaceCharterPassScenarioDir, 'stream-json.expected.jsonl')
+    let runCwd = ''
+    const result = await runLoaderSmoke({
+      label: 'jspace charter pass headless stream-json snapshot',
+      tempDirPrefix: 'headless-snapshot-jspace-charter-pass-',
+      binScript,
+      libBinScript: binScript,
+      configPath: jspaceCharterConfigPath,
+      binArgs: [jspaceCharterConfigPath, prompt],
+      tsconfigPath,
+      env: {
+        SHRES_SNAPSHOT: 'replay',
+        SHRES_SNAPSHOT_FILE: join(jspaceCharterPassScenarioDir, 'session.jsonl'),
+        SHRES_SNAPSHOT_OVERRIDE: join(jspaceCharterPassScenarioDir, 'replay.override.json'),
+        NODE_OPTIONS: [process.env.NODE_OPTIONS, '--disable-warning=ExperimentalWarning'].filter(Boolean).join(' '),
+      },
+      prepare: async (cwd) => {
+        runCwd = cwd
+        await prepareCharterWorkspace(cwd, [
+          '/* AUDIT-TAG: INV-W0-A7F3 */',
+          'export function invSku() {',
+          "  return 'SKU-1'",
+          '}',
+          '',
+        ].join('\n'))
+      },
+      inspect: async (cwd) => {
+        const logs = await persistedLogs(cwd)
+        expect(logs).toHaveLength(1)
+        const records = parseJsonl(logs[0]?.content ?? '')
+        expect(records.some(record => record.type === 'jspace/charter-proposal')).toBe(true)
+        expect(records.some(record => record.type === 'jspace/charter-probe')).toBe(true)
+        const cards = records.filter(record => record.type === 'jspace/card')
+        const last = cards[cards.length - 1]?.data as JsonObject | undefined
+        const checked = last?.checked as JsonObject[] | undefined
+        expect(checked?.some(line => line.verified === true)).toBe(true)
+        const calls = records.filter(record => record.type === 'tool/call')
+          .map(record => (record.data as JsonObject | undefined)?.name)
+        expect(calls).toEqual(['jspace_open', 'jspace_checkpoint', 'jspace_ship'])
+        const ship = toolResultFor(records, 'call_ws_ship')
+        expect(ship?.isError).toBe(false)
+        expect(ship?.text).toContain('Ship check passed.')
+      },
+    })
+
+    expect(result.stderr).toBe('')
+    const normalized = normalizeCharterStream(result.stdout, runCwd)
     if (refreshing) await writeFile(streamExpected, normalized)
     expect(normalized).toBe(await readFile(streamExpected, 'utf8'))
   }, LOADER_SMOKE_TEST_TIMEOUT_MS)

@@ -12,6 +12,8 @@ Nothing in the long-horizon path depends on model initiative; every promise is a
 
 ## Proposal
 
+Items 1–5 shipped in the [executor-enforced charter](../../implemented/feature/2026-08-26-jspace-executor-enforced-charter.md) note. This proposal remains open for items 6–12 and for graduating charter enablement to a shipped default via the w9 McNemar contrast.
+
 ### Phase 1 — the J-Space contract
 
 1. **Typed charter.** `jspace_open` takes constraints as typed entries: an executable check (a command the executor can run — lint, grep, test invocation) or prose, executable preferred. Each executable entry names the constraint text it enforces. Enablement is composition-level config (an arm, preset, or deployment turns the charter requirement on), never a runtime heuristic classifying which work is "constraint-bearing" — a heuristic classifier would be uncalibrated in exactly the way the coverage-term gates were.

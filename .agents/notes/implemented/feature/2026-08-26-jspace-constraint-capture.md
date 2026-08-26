@@ -50,6 +50,8 @@ Bench arm `on-core` registers as `on` plus both requirements. It contrasts again
 
 A deployment enabling both fields cannot ship a card that carries no constraint, at the cost of at least one extra tool call whenever the model opens a card without one and whenever a Goal change empties Core. Both refusals are presence checks: a placeholder Core line satisfies them, and nothing compares Core against the task statement.
 
+Core remains the two-item working-memory stage. Typed standing checks live on a separate [charter](2026-08-26-jspace-executor-enforced-charter.md) list on the same card; this note's presence gates do not run those checks.
+
 The [close-hygiene and goal-card-binding proposal](../../proposed/feature/2026-08-25-jspace-close-hygiene-and-goal-card-binding.md) stays open and unbuilt; this change delivers none of its five items. Its dangling-card root and this note's empty-Core root are separate failures of the same card.
 
 No ACP or headless snapshot fixture pins the changed descriptions or either refusal. The `jspace-tools` headless fixture normalizes the system prompt and tool schemas to placeholders, and recording a fixture that carries them needs an API key that was unavailable; the tool-jspace unit suite and the `constraint-capture.e2e.ts` keyless end-to-end pin the text instead.

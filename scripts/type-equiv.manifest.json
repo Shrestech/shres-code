@@ -981,6 +981,46 @@
       "source": "packages/jspace/jspace/src/types.ts"
     },
     {
+      "doc": "docs/subsystems/jspace.md",
+      "symbol": "CharterDiscrimination",
+      "source": "packages/jspace/jspace/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/jspace.md",
+      "symbol": "CharterUnverifiedReason",
+      "source": "packages/jspace/jspace/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/jspace.md",
+      "symbol": "CharterFailProbe",
+      "source": "packages/jspace/jspace/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/jspace.md",
+      "symbol": "CharterCheckInput",
+      "source": "packages/jspace/jspace/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/jspace.md",
+      "symbol": "CharterProseInput",
+      "source": "packages/jspace/jspace/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/jspace.md",
+      "symbol": "JspaceCharterCheck",
+      "source": "packages/jspace/jspace/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/jspace.md",
+      "symbol": "JspaceCharterProse",
+      "source": "packages/jspace/jspace/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/jspace.md",
+      "symbol": "JspaceCharterEntry",
+      "source": "packages/jspace/jspace/src/types.ts"
+    },
+    {
       "doc": "docs/subsystems/terminal.md",
       "symbol": "TerminalWaitReason",
       "source": "packages/terminal/terminal/src/types.ts"

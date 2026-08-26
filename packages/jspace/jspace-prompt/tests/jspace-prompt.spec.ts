@@ -6,6 +6,7 @@ import { CallId, createToolResultMessage, createUserMessage } from '@shres-code/
 import SessionStore, { SessionId } from '@shres-code/shres-code-session'
 import SystemPrompt from '@shres-code/shres-code-system-prompt'
 import JspaceService, {
+  CharterEntryId,
   formatJspaceCheckedElision,
   formatJspaceOpenElision,
   JSPACE_ALWAYS_OPEN_GOAL,
@@ -398,5 +399,50 @@ describe('jspace-prompt', () => {
     const text = assembled.sections.find(section => section.name === JspacePrompt.JSPACE_SECTION)?.text ?? ''
     expect(text).toContain('Handle \\u003cscript> tags')
     expect(text).not.toContain('Handle <script> tags')
+  })
+
+  it('reprints the pinned charter seed section until the card carries a charter', async () => {
+    const ctx = await harness({ enabled: true })
+    const agent = liveAgent(ctx, 'ws-prompt-seed')
+    agent.session.append('jspace/charter-proposal', {
+      entries: [{
+        kind: 'check',
+        id: CharterEntryId('e1'),
+        constraint: 'first line is the audit tag',
+        command: 'node tools/check-house-rules.mjs audit-tag src/m*.js',
+        reads: ['src/m*.js'],
+        failProbe: { path: 'src/m-probe.js', mutation: { kind: 'insert', content: '// no tag\n' } },
+      }, {
+        kind: 'prose',
+        id: CharterEntryId('e2'),
+        constraint: 'Be kind to reviewers.',
+      }],
+      sourceSeq: 0,
+      truncated: false,
+    }, { ignorable: true })
+    const before = await ctx.systemPrompt.assemble({ agent, scope: agent })
+    const seed = before.sections.find(section => section.name === JspacePrompt.JSPACE_CHARTER_SEED_SECTION)?.text ?? ''
+    expect(seed).toBe(JspacePrompt.formatCharterSeedSection([
+      {
+        kind: 'check',
+        id: CharterEntryId('e1'),
+        constraint: 'first line is the audit tag',
+        command: 'node tools/check-house-rules.mjs audit-tag src/m*.js',
+        reads: ['src/m*.js'],
+        failProbe: { path: 'src/m-probe.js', mutation: { kind: 'insert', content: '// no tag\n' } },
+      },
+      { kind: 'prose', id: CharterEntryId('e2'), constraint: 'Be kind to reviewers.' },
+    ]))
+    expect(seed.startsWith(JspacePrompt.JSPACE_CHARTER_SEED_PREAMBLE)).toBe(true)
+    expect(before.sections.find(section => section.name === JspacePrompt.JSPACE_PROTOCOL_SECTION)?.text)
+      .toContain(JspacePrompt.JSPACE_DRIVER_CHARTER)
+    ctx.jspace.open(agent.session, {
+      goal: 'Ship W3',
+      next: 'Write tests',
+      charter: [{ kind: 'prose', id: CharterEntryId('e2'), constraint: 'Be kind to reviewers.' }],
+    })
+    const after = await ctx.systemPrompt.assemble({ agent, scope: agent })
+    expect(after.sections.find(section => section.name === JspacePrompt.JSPACE_CHARTER_SEED_SECTION)?.text ?? '')
+      .toBe('')
   })
 })

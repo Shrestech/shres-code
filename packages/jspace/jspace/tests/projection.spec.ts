@@ -42,6 +42,7 @@ describe('jspace projection unit', () => {
         open: [],
         next: 'B',
         goalOpenedSeq: 1,
+        charter: [],
       },
       closed: false,
     }

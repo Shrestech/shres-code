@@ -90,7 +90,7 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 }[T]
 ```
 
-Sources: [`packages/core/session/src/types.ts:336`](../packages/core/session/src/types.ts) · [`packages/core/session/src/types.ts:343`](../packages/core/session/src/types.ts) · [`packages/core/session/src/types.ts:372`](../packages/core/session/src/types.ts) · [`packages/core/session/src/types.ts:416`](../packages/core/session/src/types.ts)
+Sources: [`packages/core/session/src/types.ts:350`](../packages/core/session/src/types.ts) · [`packages/core/session/src/types.ts:357`](../packages/core/session/src/types.ts) · [`packages/core/session/src/types.ts:386`](../packages/core/session/src/types.ts) · [`packages/core/session/src/types.ts:430`](../packages/core/session/src/types.ts)
 
 ## Events
 
@@ -215,7 +215,7 @@ Source: [`packages/interaction/user-approval/src/index.ts:67`](../packages/inter
 
 Types: [StreamChunk](subsystems/llm-streaming.md)
 
-Source: [`packages/core/session/src/types.ts:266`](../packages/core/session/src/types.ts)
+Source: [`packages/core/session/src/types.ts:280`](../packages/core/session/src/types.ts)
 
 <a id="assistantmessage--surface"></a>
 
@@ -233,7 +233,7 @@ Source: [`packages/core/session/src/types.ts:266`](../packages/core/session/src/
 
 Types: [TokenUsage](subsystems/llm-streaming.md)
 
-Source: [`packages/core/session/src/types.ts:273`](../packages/core/session/src/types.ts)
+Source: [`packages/core/session/src/types.ts:287`](../packages/core/session/src/types.ts)
 
 ### `command/*`
 
@@ -487,11 +487,122 @@ Source: [`packages/hooks/hook-protocol/src/types.ts:31`](../packages/hooks/hook-
  * @param open - unsettled questions.
  * @param next - single next action.
  * @param goalOpenedSeq - session event seq that last set `goal`.
+ * @param charter - standing constraints; empty when none are registered.
  */
 'jspace/card': JspaceCard
 ```
 
-Source: [`packages/jspace/jspace/src/types.ts:118`](../packages/jspace/jspace/src/types.ts)
+Source: [`packages/jspace/jspace/src/types.ts:206`](../packages/jspace/jspace/src/types.ts)
+
+<a id="jspacecharter-amend--log-only"></a>
+
+#### `jspace/charter-amend` — log-only
+
+```ts persistence-catalog
+/**
+ * Charter list replaced via jspace_charter_amend. Log-only. Writers pass
+ * `{ ignorable: true }`. The following `jspace/card` snapshot is authoritative.
+ * @param dropped - ids removed.
+ * @param added - ids added.
+ * @param replaced - ids replaced.
+ */
+'jspace/charter-amend': {
+  dropped: readonly CharterEntryId[]
+  added: readonly CharterEntryId[]
+  replaced: readonly CharterEntryId[]
+}
+```
+
+Source: [`packages/jspace/jspace/src/types.ts:278`](../packages/jspace/jspace/src/types.ts)
+
+<a id="jspacecharter-probe--log-only"></a>
+
+#### `jspace/charter-probe` — log-only
+
+```ts persistence-catalog
+/**
+ * Discrimination probe: mutation applied, command outcome, restore done.
+ * Log-only. Writers pass `{ ignorable: true }`.
+ * @param entryId - charter entry id.
+ * @param callId - nested CallId of the probe bash.
+ * @param path - failProbe.path.
+ * @param mutationKind - insert, prepend, or replace.
+ * @param demonstrated - true when the command failed after mutation.
+ * @param unverifiedReason - set when not demonstrated.
+ */
+'jspace/charter-probe': {
+  entryId: CharterEntryId
+  callId: CallId
+  path: string
+  mutationKind: CharterFailProbe['kind']
+  demonstrated: boolean
+  unverifiedReason?: CharterUnverifiedReason
+}
+```
+
+Types: [CallId](subsystems/core.md)
+
+Source: [`packages/jspace/jspace/src/types.ts:263`](../packages/jspace/jspace/src/types.ts)
+
+<a id="jspacecharter-proposal--log-only"></a>
+
+#### `jspace/charter-proposal` — log-only
+
+```ts persistence-catalog
+/**
+ * Harness-authored charter proposal extracted from the first human user
+ * message. Log-only. Writers pass `{ ignorable: true }`.
+ * @param entries - proposed inputs (check or prose), with ids assigned.
+ * @param sourceSeq - session seq of the `user/message` that was parsed.
+ * @param truncated - true when items were dropped at `maxCharterEntries`.
+ */
+'jspace/charter-proposal': {
+  entries: readonly CharterEntryInput[]
+  sourceSeq: number
+  truncated: boolean
+}
+```
+
+Source: [`packages/jspace/jspace/src/types.ts:220`](../packages/jspace/jspace/src/types.ts)
+
+<a id="jspacecharter-run--log-only"></a>
+
+#### `jspace/charter-run` — log-only
+
+```ts persistence-catalog
+/**
+ * One nested bash execution of a registered check (checkpoint, ship, or
+ * registration probe). Log-only. Writers pass `{ ignorable: true }`.
+ * @param entryId - branded charter entry id.
+ * @param callId - nested CallId (`<parent>:charter:<entryId>`).
+ * @param parentCallId - the jspace_* call that dispatched this run.
+ * @param phase - why it ran.
+ * @param command - command actually dispatched.
+ * @param passed - true only for foreground exit 0.
+ * @param exitCode - bash exit, when the tool returned foreground output.
+ * @param deniedReason - tools/pre-execute deny text, when denied.
+ * @param timedOut - bash timedOut bit.
+ * @param outputPreview - bounded stdout+stderr (max 2KiB).
+ * @param readsFingerprint - optional stat snapshot of expanded reads.
+ */
+'jspace/charter-run': {
+  entryId: CharterEntryId
+  callId: CallId
+  parentCallId: CallId
+  phase: 'checkpoint' | 'ship' | 'probe'
+  command: string
+  passed: boolean
+  exitCode?: number | null
+  deniedReason?: string
+  timedOut?: boolean
+  outputPreview: string
+  readsFingerprint?: readonly { path: string; mtimeMs: number; size: number }[]
+}
+```
+
+Types: [CallId](subsystems/core.md)
+
+Source: [`packages/jspace/jspace/src/types.ts:240`](../packages/jspace/jspace/src/types.ts)
 
 <a id="jspaceclosed--log-only"></a>
 
@@ -506,7 +617,7 @@ Source: [`packages/jspace/jspace/src/types.ts:118`](../packages/jspace/jspace/sr
 'jspace/closed': JspaceClosed
 ```
 
-Source: [`packages/jspace/jspace/src/types.ts:124`](../packages/jspace/jspace/src/types.ts)
+Source: [`packages/jspace/jspace/src/types.ts:212`](../packages/jspace/jspace/src/types.ts)
 
 ### `llm/*`
 
@@ -581,7 +692,7 @@ Source: [`packages/plan/plan-mode/src/index.ts:53`](../packages/plan/plan-mode/s
 'request/context': RequestContext
 ```
 
-Source: [`packages/core/session/src/types.ts:309`](../packages/core/session/src/types.ts)
+Source: [`packages/core/session/src/types.ts:323`](../packages/core/session/src/types.ts)
 
 <a id="requestheader--log-only"></a>
 
@@ -595,7 +706,7 @@ Source: [`packages/core/session/src/types.ts:309`](../packages/core/session/src/
 'request/header': { header: EpochHeader; reason: RequestHeaderReason }
 ```
 
-Source: [`packages/core/session/src/types.ts:304`](../packages/core/session/src/types.ts)
+Source: [`packages/core/session/src/types.ts:318`](../packages/core/session/src/types.ts)
 
 ### `sandbox/*`
 
@@ -670,7 +781,7 @@ Source: [`packages/schedule/schedule/src/types.ts:219`](../packages/schedule/sch
 'session/end-seed': Record<string, never>
 ```
 
-Source: [`packages/core/session/src/types.ts:332`](../packages/core/session/src/types.ts)
+Source: [`packages/core/session/src/types.ts:346`](../packages/core/session/src/types.ts)
 
 <a id="sessiontitle--log-only"></a>
 
@@ -729,7 +840,7 @@ Source: [`packages/guard/shield/src/types.ts:165`](../packages/guard/shield/src/
 'step/end': { turn: number; step: number }
 ```
 
-Source: [`packages/core/session/src/types.ts:256`](../packages/core/session/src/types.ts)
+Source: [`packages/core/session/src/types.ts:270`](../packages/core/session/src/types.ts)
 
 <a id="stepstart--log-only"></a>
 
@@ -740,7 +851,7 @@ Source: [`packages/core/session/src/types.ts:256`](../packages/core/session/src/
 'step/start': { turn: number; step: number }
 ```
 
-Source: [`packages/core/session/src/types.ts:254`](../packages/core/session/src/types.ts)
+Source: [`packages/core/session/src/types.ts:268`](../packages/core/session/src/types.ts)
 
 ### `step-budget/*`
 
@@ -797,7 +908,7 @@ Source: [`packages/subagent/subagent/src/descriptor.ts:37`](../packages/subagent
 
 Types: [TodoItem](subsystems/session.md)
 
-Source: [`packages/core/session/src/types.ts:299`](../packages/core/session/src/types.ts)
+Source: [`packages/core/session/src/types.ts:313`](../packages/core/session/src/types.ts)
 
 ### `tool/*`
 
@@ -816,7 +927,7 @@ Source: [`packages/core/session/src/types.ts:299`](../packages/core/session/src/
 
 Types: [CallId](subsystems/core.md)
 
-Source: [`packages/core/session/src/types.ts:279`](../packages/core/session/src/types.ts)
+Source: [`packages/core/session/src/types.ts:293`](../packages/core/session/src/types.ts)
 
 <a id="toolcode-dispatch--log-only"></a>
 
@@ -891,7 +1002,7 @@ Source: [`packages/core/tools/src/types.ts:40`](../packages/core/tools/src/types
 }
 ```
 
-Source: [`packages/core/session/src/types.ts:291`](../packages/core/session/src/types.ts)
+Source: [`packages/core/session/src/types.ts:305`](../packages/core/session/src/types.ts)
 
 ### `tool-workflow/*`
 
@@ -1008,7 +1119,7 @@ Source: [`packages/tracker/tracker/src/types.ts:135`](../packages/tracker/tracke
 
 Types: [TurnEndReason](subsystems/session.md)
 
-Source: [`packages/core/session/src/types.ts:252`](../packages/core/session/src/types.ts)
+Source: [`packages/core/session/src/types.ts:266`](../packages/core/session/src/types.ts)
 
 <a id="turnstart--log-only"></a>
 
@@ -1024,7 +1135,7 @@ Source: [`packages/core/session/src/types.ts:252`](../packages/core/session/src/
 'turn/start': { turn: number }
 ```
 
-Source: [`packages/core/session/src/types.ts:243`](../packages/core/session/src/types.ts)
+Source: [`packages/core/session/src/types.ts:257`](../packages/core/session/src/types.ts)
 
 ### `user/*`
 
@@ -1043,7 +1154,7 @@ Source: [`packages/core/session/src/types.ts:243`](../packages/core/session/src/
 'user/message': UserMessage
 ```
 
-Source: [`packages/core/session/src/types.ts:264`](../packages/core/session/src/types.ts)
+Source: [`packages/core/session/src/types.ts:278`](../packages/core/session/src/types.ts)
 
 ### `web/*`
 

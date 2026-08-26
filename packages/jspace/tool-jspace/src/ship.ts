@@ -10,6 +10,10 @@ import type { JspaceCard } from '@shres-code/shres-code-jspace'
 export const SHIP_REQUIRES_VERIFIED_EVIDENCE
   = 'jspace ship requires an evidence-grade checkpoint that cites a completed non-error verifier tool call'
 
+/** Model-visible refusal when `requireCharter` finds an empty charter at ship. */
+export const SHIP_REQUIRES_CHARTER
+  = 'jspace ship requires a registered charter. Call jspace_open with a charter or jspace_charter_amend before shipping.'
+
 /** Model-visible refusal when `requireCoreForShip` finds an empty Core. */
 export const SHIP_REQUIRES_CORE
   = 'jspace ship on a card whose Core is empty certifies nothing: the card carries no constraint '
@@ -23,6 +27,8 @@ export interface ShipRefusalOptions {
   readonly requireVerifiedEvidence?: boolean
   /** When true, require at least one Core line on the card. */
   readonly requireCore?: boolean
+  /** When true, require a non-empty charter on the card. */
+  readonly requireCharter?: boolean
 }
 
 /**
@@ -86,6 +92,7 @@ export function shipRefusal(
   if (card.goal.length === 0) return 'jspace ship requires a non-empty Goal'
   if (card.next.length === 0) return 'jspace ship requires a non-empty Next'
   if (options?.requireCore === true && card.core.length === 0) return SHIP_REQUIRES_CORE
+  if (options?.requireCharter === true && card.charter.length === 0) return SHIP_REQUIRES_CHARTER
   const checkpointSeq = latestCheckpointSeq(events)
   if (checkpointSeq === undefined || checkpointSeq < card.goalOpenedSeq) {
     return 'jspace ship requires a checkpoint for the current Goal'

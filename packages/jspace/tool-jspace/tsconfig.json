@@ -30,6 +30,12 @@
       "path": "../../core/tools"
     },
     {
+      "path": "../../fs/fs"
+    },
+    {
+      "path": "../../llm/llm"
+    },
+    {
       "path": "../jspace"
     },
     {

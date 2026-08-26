@@ -5694,9 +5694,15 @@ importers:
       '@shres-code/cordis':
         specifier: workspace:^
         version: link:../../../vendor/cordis
+      '@shres-code/shres-code-brand':
+        specifier: workspace:^
+        version: link:../../util/brand
       '@shres-code/shres-code-invariants':
         specifier: workspace:^
         version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-llm':
+        specifier: workspace:^
+        version: link:../../llm/llm
       '@shres-code/shres-code-session':
         specifier: workspace:^
         version: link:../../core/session
@@ -5762,6 +5768,15 @@ importers:
       '@shres-code/shres-code-agent':
         specifier: workspace:^
         version: link:../../core/agent
+      '@shres-code/shres-code-bash-local':
+        specifier: workspace:^
+        version: link:../../shell/bash-local
+      '@shres-code/shres-code-fs':
+        specifier: workspace:^
+        version: link:../../fs/fs
+      '@shres-code/shres-code-fs-local':
+        specifier: workspace:^
+        version: link:../../fs/fs-local
       '@shres-code/shres-code-invariants':
         specifier: workspace:^
         version: link:../../runtime-diagnostics/invariants
@@ -5774,9 +5789,18 @@ importers:
       '@shres-code/shres-code-session':
         specifier: workspace:^
         version: link:../../core/session
+      '@shres-code/shres-code-shell-env':
+        specifier: workspace:^
+        version: link:../../shell/shell-env
+      '@shres-code/shres-code-subprocess-local':
+        specifier: workspace:^
+        version: link:../../subprocess/subprocess-local
       '@shres-code/shres-code-system-prompt':
         specifier: workspace:^
         version: link:../../core/system-prompt
+      '@shres-code/shres-code-tool-bash':
+        specifier: workspace:^
+        version: link:../../shell/tool-bash
       '@shres-code/shres-code-tools':
         specifier: workspace:^
         version: link:../../core/tools

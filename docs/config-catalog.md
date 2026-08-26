@@ -948,7 +948,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/jspace/jspace/src/index.ts:57`](../packages/jspace/jspace/src/index.ts)
+Source: [`packages/jspace/jspace/src/index.ts:69`](../packages/jspace/jspace/src/index.ts)
 
 <a id="shres-codeshres-code-jspace-prompt"></a>
 
@@ -966,7 +966,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/jspace/jspace-prompt/src/index.ts:67`](../packages/jspace/jspace-prompt/src/index.ts)
+Source: [`packages/jspace/jspace-prompt/src/index.ts:69`](../packages/jspace/jspace-prompt/src/index.ts)
 
 <a id="shres-codeshres-code-llm-cli-bridge"></a>
 
@@ -3004,7 +3004,7 @@ Source: [`packages/jobs/tool-jobs/src/index.ts:32`](../packages/jobs/tool-jobs/s
 Requires: `tools` · `jspace`
 
 ```ts config-catalog
-/** Per-turn `jspace_note` budget and the opt-in constraint-capture pressure. */
+/** Per-turn `jspace_note` budget, constraint-capture pressure, and charter gates. */
 export interface Config {
   /**
    * Maximum `jspace_note` calls accepted in one user turn. Defaults to 8.
@@ -3018,10 +3018,37 @@ export interface Config {
   requireCoreOnOpen?: boolean
   /** When true, `jspace_ship` is refused while the card's Core is empty. Default false. */
   requireCoreForShip?: boolean
+  /**
+   * When true, a first `jspace_open` is refused unless the resolved charter has
+   * length ≥ 1, and `jspace_checkpoint` / `jspace_ship` refuse an empty charter.
+   * Default false.
+   */
+  requireCharter?: boolean
+  /**
+   * When true, the charter must contain at least one `kind: 'check'`.
+   * Implies `requireCharter`. Default false.
+   */
+  requireExecutableCharter?: boolean
+  /** When true, extract a charter proposal from the first human user message. Default false. */
+  charterSeed?: boolean
+  /**
+   * Discrimination bar at registration. `'required'` implies `requireExecutableCharter`.
+   * Default `'off'`.
+   */
+  charterDiscrimination?: CharterDiscriminationMode
+  /** Nested bash `timeoutMs` for each charter check. Default 30000. */
+  charterCheckTimeoutMs?: number
+  /** Cap on seeded proposal entries. Default 12. */
+  maxCharterEntries?: number
+  /** When true, refuse write-token charter commands. Default true. */
+  charterChecksMustBeReadOnly?: boolean
 }
+
+/** Discrimination mode from tool-jspace Config. */
+export type CharterDiscriminationMode = 'off' | 'best-effort' | 'required'
 ```
 
-Source: [`packages/jspace/tool-jspace/src/index.ts:39`](../packages/jspace/tool-jspace/src/index.ts)
+Source: [`packages/jspace/tool-jspace/src/index.ts:61`](../packages/jspace/tool-jspace/src/index.ts)
 
 <a id="shres-codeshres-code-tool-lsp"></a>
 

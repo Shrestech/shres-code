@@ -37,7 +37,7 @@ This table connects model-visible tool names to the plugin package and service s
 | `@shres-code/shres-code-tool-subagent-report` | `report` | `ctx.subagents`, `ctx.systemPrompt`, `a live continuable in-process child Agent` | `tool/call`, `tool/result`, `a user-role message in the direct parent session` | - | Registered per continuable in-process child rather than globally, so this schema is visible only inside such a child and survives its global `toolFilter`. The same contribution installs the child-scoped `tool:report` prompt section, which this catalog does not render. The parent-facing `send_message` tool is installed independently. |
 | `@shres-code/shres-code-tool-jobs` | `job_kill`, `job_list`, `job_output` | `ctx.tools`, `ctx.jobs`, `ctx.systemPrompt` | `tool/call`, `tool/result`, `user/message via agent.inject() for background completion notices` | - | The kind-agnostic background-job controller: background bash commands, PTY sends, and subagents are read, listed, and killed through the same three tools. Loading the plugin attaches the controller that arms producers' `ctx.jobs.start()`. |
 | `@shres-code/shres-code-tool-todo` | `todo_write` | `ctx.tools`, `owning Agent session` | `tool/call`, `todo/write`, `tool/result` | - | todo_write is session-owned state; UIs render the latest todo/write event as a checklist. `allowParallelInProgress` is required with no default, so the catalog states its choice: `true`, whose description invites several `in_progress` items. A deployment choosing `false` receives the same tool with a description asking for exactly one active task. |
-| `@shres-code/shres-code-tool-jspace` | `jspace_checkpoint`, `jspace_note`, `jspace_open`, `jspace_ship` | `ctx.tools`, `ctx.jspace`, `owning Agent session` | `tool/call`, `jspace/card or jspace/closed`, `tool/result` | - | Schemas are registered only while Settings `enabled` is true. `jspace_ship` is a register check, not a file writer. Checkpoint `evidence` must name a completed, non-error tool-call id; citing a configured verifier tool is evidence-grade and does not prove coverage. |
+| `@shres-code/shres-code-tool-jspace` | `jspace_charter_amend`, `jspace_checkpoint`, `jspace_note`, `jspace_open`, `jspace_ship` | `ctx.tools`, `ctx.jspace`, `owning Agent session` | `tool/call`, `jspace/card or jspace/closed`, `tool/result` | - | Schemas are registered only while Settings `enabled` is true. `jspace_ship` is a register check, not a file writer. Checkpoint `evidence` must name a completed, non-error tool-call id; citing a configured verifier tool is evidence-grade and does not prove coverage. |
 | `@shres-code/shres-code-tool-workflow` | `workflow` | `ctx.tools`, `ctx.workflowEngine`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents the script children)` | `tool/call`, `tool/result` | - | - |
 | `@shres-code/shres-code-tool-web` | `web_fetch`, `web_search` | `ctx.tools`, `ctx.web`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | web_search and web_fetch keep provider selection behind ctx.web so model-visible schemas stay stable across backend swaps. |
 | `@shres-code/shres-code-tool-tracker` | `experiment_log_metrics`, `experiment_log_run`, `experiment_query` | `ctx.tools`, `ctx.tracker` | `tool/call`, `experiment run and metric records through ctx.tracker`, `tool/result` | - | experiment_log_run, experiment_log_metrics, and experiment_query fold experiment records through the tracker service seam. |
@@ -1734,9 +1734,318 @@ todo_write is session-owned state; UIs render the latest todo/write event as a c
 
 ## `@shres-code/shres-code-tool-jspace`
 
+### `jspace_charter_amend`
+
+Replace charter entries on the open card. Drop by id, replace an id with a new check or prose entry, or add entries. The harness re-runs floor and discrimination on added and replaced checks. There is no skip-checks argument.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "drop": {
+      "type": "array",
+      "description": "Entry ids to remove.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "add": {
+      "type": "array",
+      "description": "Entries to append after drops and replaces.",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "check"
+              },
+              "id": {
+                "type": "string",
+                "description": "Kebab-case id. Omit to receive a harness-assigned id."
+              },
+              "constraint": {
+                "type": "string",
+                "description": "The rule this command enforces, in the task's words."
+              },
+              "command": {
+                "type": "string",
+                "description": "Foreground bash. Exit 0 = pass. Must read the paths in `reads`."
+              },
+              "reads": {
+                "type": "array",
+                "description": "Workspace-relative files or globs the command reads. At least one.",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "failProbe": {
+                "type": "object",
+                "description": "A content mutation that must make `command` fail. Required when this deployment demands demonstrated discrimination.",
+                "additionalProperties": false,
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "description": "Workspace-relative path; must be in `reads` or match a `reads` glob."
+                  },
+                  "mutation": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "insert"
+                          },
+                          "content": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "content"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "prepend"
+                          },
+                          "content": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "content"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "replace"
+                          },
+                          "from": {
+                            "type": "string"
+                          },
+                          "to": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "from",
+                          "to"
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "path",
+                  "mutation"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "constraint",
+              "command",
+              "reads"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "prose"
+              },
+              "id": {
+                "type": "string"
+              },
+              "constraint": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "constraint"
+            ]
+          }
+        ]
+      }
+    },
+    "replace": {
+      "type": "array",
+      "description": "Replace an existing id with a new check or prose entry.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Existing entry id to replace."
+          },
+          "entry": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "check"
+                  },
+                  "id": {
+                    "type": "string",
+                    "description": "Kebab-case id. Omit to receive a harness-assigned id."
+                  },
+                  "constraint": {
+                    "type": "string",
+                    "description": "The rule this command enforces, in the task's words."
+                  },
+                  "command": {
+                    "type": "string",
+                    "description": "Foreground bash. Exit 0 = pass. Must read the paths in `reads`."
+                  },
+                  "reads": {
+                    "type": "array",
+                    "description": "Workspace-relative files or globs the command reads. At least one.",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "failProbe": {
+                    "type": "object",
+                    "description": "A content mutation that must make `command` fail. Required when this deployment demands demonstrated discrimination.",
+                    "additionalProperties": false,
+                    "properties": {
+                      "path": {
+                        "type": "string",
+                        "description": "Workspace-relative path; must be in `reads` or match a `reads` glob."
+                      },
+                      "mutation": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "const": "insert"
+                              },
+                              "content": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "content"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "const": "prepend"
+                              },
+                              "content": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "content"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "const": "replace"
+                              },
+                              "from": {
+                                "type": "string"
+                              },
+                              "to": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "from",
+                              "to"
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "path",
+                      "mutation"
+                    ]
+                  }
+                },
+                "required": [
+                  "kind",
+                  "constraint",
+                  "command",
+                  "reads"
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "prose"
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "constraint": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "constraint"
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "entry"
+        ]
+      }
+    }
+  }
+}
+```
+
+Source: [`packages/jspace/tool-jspace/src/index.ts`](../packages/jspace/tool-jspace/src/index.ts)
+
 ### `jspace_checkpoint`
 
-Record a Checked line on the open card. `by` names the verifier and what it covered. Prefer citing `evidence`, a completed non-error tool-call id from this session, over prose; a configured verifier tool makes the line evidence-grade. Citing does not prove coverage. Rejects if no card is open.
+Record a Checked line on the open card. When a charter is registered, the harness runs every kind=check first and refuses on the first failure. `check` and `by` are optional then (the harness synthesizes them); if you send them they are appended after a passing charter run. Prefer citing `evidence` over prose. Rejects if no card is open.
 
 ```json
 {
@@ -1744,21 +2053,17 @@ Record a Checked line on the open card. `by` names the verifier and what it cove
   "properties": {
     "check": {
       "type": "string",
-      "description": "What was claimed checked."
+      "description": "What was claimed checked. Optional when a charter is registered."
     },
     "by": {
       "type": "string",
-      "description": "Verifier and coverage claim. Must name both."
+      "description": "Verifier and coverage claim. Optional when a charter is registered."
     },
     "evidence": {
       "type": "string",
       "description": "Completed non-error tool-call id. Naming it does not prove coverage."
     }
-  },
-  "required": [
-    "check",
-    "by"
-  ]
+  }
 }
 ```
 
@@ -1766,7 +2071,7 @@ Source: [`packages/jspace/tool-jspace/src/index.ts`](../packages/jspace/tool-jsp
 
 ### `jspace_note`
 
-Update the open J-Space card. Goal changes are rejected; use jspace_open to start a new Goal epoch. Rejects a no-op that leaves the card unchanged, and rejects if no card is open.
+Update the open J-Space card. Goal changes are rejected; use jspace_open to start a new Goal epoch. Rejects a no-op that leaves the card unchanged, and rejects if no card is open. Charter changes use jspace_charter_amend, not this tool.
 
 ```json
 {
@@ -1782,7 +2087,7 @@ Update the open J-Space card. Goal changes are rejected; use jspace_open to star
     },
     "core": {
       "type": "string",
-      "description": "Core item entering — a constraint the work must honor. Required when `departing` is set."
+      "description": "Core item entering — a live working-memory item. Required when `departing` is set."
     },
     "open": {
       "type": "array",
@@ -1817,7 +2122,7 @@ Source: [`packages/jspace/tool-jspace/src/index.ts`](../packages/jspace/tool-jsp
 
 ### `jspace_open`
 
-Open a J-Space card for multi-stage or multi-file work, or replace Goal and Next on an open card. Put the task's once-stated constraints on `core` so they survive compaction. A changed Goal starts a new epoch: Core and Checked are cleared and ship needs a fresh checkpoint; open questions carry over.
+Open a J-Space card for multi-stage or multi-file work, or replace Goal and Next on an open card. Put once-stated constraints on `charter` (prefer kind=check) so the harness re-runs them at every checkpoint and at ship. `core` still holds at most two live working-memory items. A changed Goal starts a new epoch: Core and Checked are cleared and ship needs a fresh checkpoint; the charter and open questions carry over.
 
 ```json
 {
@@ -1833,9 +2138,166 @@ Open a J-Space card for multi-stage or multi-file work, or replace Goal and Next
     },
     "core": {
       "type": "array",
-      "description": "Standing rules and invariants this work must honor, stated once in the task and easy to lose: at most two lines, applied only on the first open.",
+      "description": "At most two live working-memory items, applied only on the first open.",
       "items": {
         "type": "string"
+      }
+    },
+    "charter": {
+      "type": "array",
+      "description": "Standing constraints this work must honor. Prefer kind=check (a bash command the harness will run at every checkpoint and at ship). Each check names the constraint text it enforces. kind=accept-proposal copies ids from the harness proposal in this turn. Applied only on the first open.",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "check"
+              },
+              "id": {
+                "type": "string",
+                "description": "Kebab-case id. Omit to receive a harness-assigned id."
+              },
+              "constraint": {
+                "type": "string",
+                "description": "The rule this command enforces, in the task's words."
+              },
+              "command": {
+                "type": "string",
+                "description": "Foreground bash. Exit 0 = pass. Must read the paths in `reads`."
+              },
+              "reads": {
+                "type": "array",
+                "description": "Workspace-relative files or globs the command reads. At least one.",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "failProbe": {
+                "type": "object",
+                "description": "A content mutation that must make `command` fail. Required when this deployment demands demonstrated discrimination.",
+                "additionalProperties": false,
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "description": "Workspace-relative path; must be in `reads` or match a `reads` glob."
+                  },
+                  "mutation": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "insert"
+                          },
+                          "content": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "content"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "prepend"
+                          },
+                          "content": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "content"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "replace"
+                          },
+                          "from": {
+                            "type": "string"
+                          },
+                          "to": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "from",
+                          "to"
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "path",
+                  "mutation"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "constraint",
+              "command",
+              "reads"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "prose"
+              },
+              "id": {
+                "type": "string"
+              },
+              "constraint": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "constraint"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "accept-proposal"
+              },
+              "ids": {
+                "type": "array",
+                "description": "Proposal ids to accept. Omit to accept every proposed entry.",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          }
+        ]
       }
     }
   },
@@ -1850,7 +2312,7 @@ Source: [`packages/jspace/tool-jspace/src/index.ts`](../packages/jspace/tool-jsp
 
 ### `jspace_ship`
 
-Check that the open card is ready to ship: Goal and Next are set, and a checkpoint exists for the current Goal. Writes no files and does not close the card.
+Check that the open card is ready to ship: Goal and Next are set, and a checkpoint exists for the current Goal. Re-runs every charter check against the current workspace. Writes no files and does not close the card.
 
 ```json
 {

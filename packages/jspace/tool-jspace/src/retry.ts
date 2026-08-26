@@ -6,7 +6,7 @@
 import type { SessionEvent } from '@shres-code/shres-code-session'
 
 /**
- * The four model-facing card tools. They write the diagnosis the repeat
+ * The five model-facing card tools. They write the diagnosis the repeat
  * refusal asks for, so they never trip it themselves, and they are the names
  * the engagement gate withholds before a session reaches its threshold.
  */
@@ -15,6 +15,7 @@ export const JSPACE_TOOL_NAMES: ReadonlySet<string> = new Set([
   'jspace_note',
   'jspace_checkpoint',
   'jspace_ship',
+  'jspace_charter_amend',
 ])
 
 /** Default `jspace_note` calls accepted in one user turn. Raising it is a deployment choice. */

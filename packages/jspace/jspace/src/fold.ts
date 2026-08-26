@@ -11,6 +11,7 @@
  */
 
 import type { SessionEvent } from '@shres-code/shres-code-session'
+import { decodeJspaceCharter, formatCharterEntrySummary } from './charter.ts'
 import type {
   JspaceCard,
   JspaceCheckedLine,
@@ -164,7 +165,8 @@ export function decodeJspaceCard(value: unknown): JspaceCard {
   const open = value['open'].map(decodeOpen)
   const next = requiredLine(value['next'], 'next')
   const goalOpenedSeq = sessionEventSeq(value['goalOpenedSeq'], 'goalOpenedSeq')
-  return { seq, sessionId, goal, core, checked, open, next, goalOpenedSeq }
+  const charter = decodeJspaceCharter(value['charter'])
+  return { seq, sessionId, goal, core, checked, open, next, goalOpenedSeq, charter }
 }
 
 /**
@@ -339,6 +341,9 @@ export function formatJspaceCard(card: JspaceCard, reprint: JspaceCardReprint): 
     `Goal:      ${card.goal}`,
     `Core:      ${core}`,
   ]
+  if (card.charter.length > 0) {
+    lines.push(`Charter:    ${card.charter.map(formatCharterEntrySummary).join('; ')}`)
+  }
   if (checkedElided > 0) lines.push(formatJspaceCheckedElision(checkedElided))
   lines.push(`Checked:   ${checked}`)
   if (openElided > 0) lines.push(formatJspaceOpenElision(openElided))

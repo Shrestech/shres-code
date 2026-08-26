@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Context } from '@shres-code/cordis'
 import { CallId, createToolResultMessage } from '@shres-code/shres-code-llm'
 import SessionStore, { Session, SessionId } from '@shres-code/shres-code-session'
-import JspaceService, { JspaceError } from '../src/index.ts'
+import JspaceService, { CharterEntryId, JspaceError } from '../src/index.ts'
 
 async function harness(config: ConstructorParameters<typeof JspaceService>[1] = { enabled: true }) {
   const ctx = new Context()
@@ -368,6 +368,7 @@ describe('JspaceService card log', () => {
     ctx.jspace.open(session, { goal: 'A', next: 'B' })
     expect(() => ctx.jspace.note(session, { goal: '   ' })).toThrow(JspaceError)
     expect(() => ctx.jspace.note(session, { next: 'Goal: injected' })).toThrow(/card label/)
+    expect(() => ctx.jspace.note(session, { next: 'Charter: injected' })).toThrow(/card label/)
     expect(() => ctx.jspace.note(session, { next: 'two\nlines' })).toThrow(/single line/)
     ctx.jspace.close(session)
     const afterReopen = ctx.jspace.open(session, { goal: 'A', next: 'B' })
@@ -390,7 +391,12 @@ describe('JspaceService card log', () => {
 
   it('openGoal resets Core and Checked on a Goal epoch change and carries Open', async () => {
     const { ctx, session } = await harness()
-    const opened = ctx.jspace.open(session, { goal: 'G1', next: 'B', core: ['one', 'two'] })
+    const opened = ctx.jspace.open(session, {
+      goal: 'G1',
+      next: 'B',
+      core: ['one', 'two'],
+      charter: [{ kind: 'prose', id: CharterEntryId('e1'), constraint: 'Be kind to reviewers.' }],
+    })
     ctx.jspace.checkpoint(session, { check: 'c1', by: 'unit tests' })
     ctx.jspace.checkpoint(session, { check: 'c2', by: 'unit tests' })
     const noted = ctx.jspace.note(session, { open: [{ question: 'Q' }] })
@@ -400,6 +406,7 @@ describe('JspaceService card log', () => {
     expect(epoch.core).toEqual([])
     expect(epoch.checked).toEqual([])
     expect(epoch.open).toEqual([{ question: 'Q' }])
+    expect(epoch.charter).toEqual([{ kind: 'prose', id: 'e1', constraint: 'Be kind to reviewers.' }])
     expect(epoch.goalOpenedSeq).toBeGreaterThan(noted.goalOpenedSeq)
     expect(ctx.jspace.card(session)?.checked).toEqual([])
     const replay = new Context()
@@ -565,6 +572,7 @@ describe('JspaceService card log', () => {
           open: [],
           next: 'stay',
           goalOpenedSeq: 1,
+          charter: [],
         },
       }],
     })

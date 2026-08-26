@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@shres-code/cordis'
 import Loader from '@shres-code/cordis-plugin-loader'
 import type { Agent } from '@shres-code/shres-code-agent'
-import { CallId, createToolResultMessage } from '@shres-code/shres-code-llm'
+import { agentEvents } from '@shres-code/shres-code-agent'
+import { CallId, createToolResultMessage, createUserMessage } from '@shres-code/shres-code-llm'
 import SessionStore, { SessionId } from '@shres-code/shres-code-session'
 import SystemPrompt from '@shres-code/shres-code-system-prompt'
 import type { PromptAssembly } from '@shres-code/shres-code-system-prompt'
@@ -18,6 +19,7 @@ const TOOL_NAMES = [
   'jspace_note',
   'jspace_checkpoint',
   'jspace_ship',
+  'jspace_charter_amend',
 ] as const
 
 const testToolSignal = new AbortController().signal
@@ -136,12 +138,12 @@ describe('tool-jspace registration', () => {
   it('has the namespace-plugin export shape', () => {
     expect('default' in tool).toBe(false)
     expect(tool.name).toBe('tool-jspace')
-    expect(tool.inject).toEqual(['tools', 'jspace'])
+    expect(tool.inject).toEqual(['tools', 'jspace', 'systemPrompt'])
     const loader = Object.create(Loader.prototype) as Loader
     expect(loader.unwrapExports(tool)).toBe(tool)
   })
 
-  it('lists the four tools only while the seat is active', async () => {
+  it('lists the five tools only while the seat is active', async () => {
     const off = await harness(false)
     expect(toolNames(off.ctx)).toEqual([])
     const on = await harness(true)
@@ -177,6 +179,39 @@ describe('tool-jspace registration', () => {
       .toEqual({ card: 'generic', title: 'Ship J-Space', kind: 'other' })
     expect(ctx.tools.get('jspace_ship')?.presentCall?.({ path: 'notes.md' }))
       .toEqual({ card: 'generic', title: 'Ship J-Space', kind: 'other', rawInput: 'notes.md' })
+    expect(ctx.tools.get('jspace_charter_amend')?.presentCall?.({}))
+      .toEqual({ card: 'generic', title: 'Amend charter', kind: 'other' })
+  })
+
+  it('seeds a charter proposal from the first human user message', async () => {
+    const { ctx, agent } = await harness(true, {}, { charterSeed: true })
+    const messages = [createUserMessage({
+      content: [{ type: 'text', text: '## House rules\n\n1. Be kind to reviewers.\n' }],
+      source: { kind: 'user' },
+    })]
+    agent.session.append('user/message', messages[0]!, { surfaceOp: 'append' })
+    await agentEvents(ctx, agent).waterfall(
+      'agent/pre-step',
+      { messages, turn: 1, step: 1, signal: testToolSignal },
+      () => Promise.resolve({ kind: 'enter' as const, messages }),
+    )
+    const proposal = agent.session.events.find(event => event.type === 'jspace/charter-proposal')
+    expect(proposal?.data.entries).toEqual([
+      { kind: 'prose', id: 'e1', constraint: 'Be kind to reviewers.' },
+    ])
+  })
+
+  it('seeds a charter proposal during assemble so the first request can reprint it', async () => {
+    const { ctx, agent } = await harness(true, {}, { charterSeed: true })
+    const messages = [createUserMessage({
+      content: [{ type: 'text', text: '## House rules\n\n1. Be kind to reviewers.\n' }],
+      source: { kind: 'user' },
+    })]
+    await ctx.systemPrompt.assemble({ agent, scope: agent, messages })
+    const proposal = agent.session.events.find(event => event.type === 'jspace/charter-proposal')
+    expect(proposal?.data.entries).toEqual([
+      { kind: 'prose', id: 'e1', constraint: 'Be kind to reviewers.' },
+    ])
   })
 })
 
@@ -230,6 +265,14 @@ describe('jspace tools', () => {
     expect(failed.isError).toBe(true)
     expect(text(failed)).toContain('verifier and coverage')
     expect(ctx.jspace.card(agent.session)?.checked).toEqual([])
+  })
+
+  it('still requires check and by when no charter is registered', async () => {
+    const { ctx, agent } = await harness()
+    await execute(ctx, 'jspace_open', { goal: 'A', next: 'B' }, agent)
+    const failed = await execute(ctx, 'jspace_checkpoint', {}, agent)
+    expect(failed.isError).toBe(true)
+    expect(text(failed)).toMatch(/requires `check` and `by`/)
   })
 
   it('rejects unknown evidence and accepts a known tool-call id', async () => {
@@ -614,6 +657,13 @@ describe('jspace tools', () => {
       maxNotesPerTurn: tool.DEFAULT_MAX_NOTES_PER_TURN,
       requireCoreOnOpen: false,
       requireCoreForShip: false,
+      requireCharter: false,
+      requireExecutableCharter: false,
+      charterSeed: false,
+      charterDiscrimination: 'off',
+      charterCheckTimeoutMs: 30_000,
+      maxCharterEntries: 12,
+      charterChecksMustBeReadOnly: true,
     })
     expect(tight.ctx.tools.get('jspace_note')?.description).toContain('no-op')
   })
