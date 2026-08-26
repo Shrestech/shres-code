@@ -19,7 +19,7 @@ Groups hold `packages/<group>/<pkg>/`; names stay `@shres-code/shres-code-<pkg>`
 | [`e2b/`](e2b/README.md) | E2B providers | POC |
 | [`subprocess/`](subprocess/README.md) | Subprocess capability family: Service Definition + local process-tree provider | Product — stable API |
 | [`shell/`](shell/README.md) | Bash capability family: executor seam, local impl, model-facing tool | Product — stable API |
-| [`terminal/`](terminal/README.md) | Persistent PTY capability family: owner-scoped sessions, local implementation, and model-facing tools | Product — stable API |
+| [`terminal/`](terminal/README.md) | Persistent PTY sessions, local implementation, and model-facing tools | Product — stable API |
 | [`code-runtime/`](code-runtime/README.md) | Code-execution capability family: Service Definition + worker-thread provider + Code Mode Consumer | Product — stable API |
 | [`sandbox/`](sandbox/README.md) | Process-confinement seam; bwrap/Landlock/Seatbelt backends | Product — stable API |
 | [`fs/`](fs/README.md) | Filesystem capability family: seam, local impl, model-facing file tools, bash-backed discovery tools | Product — stable API |
@@ -35,16 +35,16 @@ Groups hold `packages/<group>/<pkg>/`; names stay `@shres-code/shres-code-<pkg>`
 | [`attachment/`](attachment/README.md) | Durable attachment identity, validation, local content-addressed storage | Product — stable API |
 | [`spill/`](spill/README.md) | Spill capability family: storage seam, local impl, tool-result spill policy | Product — stable API |
 | [`todo/`](todo/README.md) | The model-facing `todo_write` tool | Product — stable API |
-| [`tracker/`](tracker/README.md) | Experiment tracking capability family: seam, offline-first shrestech-tracker provider, and the model-facing experiment tools | Product — stable API |
+| [`tracker/`](tracker/README.md) | Experiment tracking seam, shrestech-tracker provider, and experiment tools | Product — stable API |
 | [`jspace/`](jspace/README.md) | Settings-toggled logged working card | Product — stable API |
 | [`plan/`](plan/README.md) | Plan collaboration state with a direct entry command and reviewed exit | Product — stable API |
 | [`preset/`](preset/README.md) | Per-session agent composition from preset `cordis.yml` files | Product — stable API |
-| [`guard/`](guard/README.md) | Loop-hygiene guards: advisory repeat-call reminders, the `tools/execute` deadline enforcer, and the paid Shres Shield seat | Product — stable API |
+| [`guard/`](guard/README.md) | Loop-hygiene guards: repeat-call reminders, tool-execute deadlines, and the Shield seat | Product — stable API |
 | [`bundle/`](bundle/README.md) | Installable `shres --profile` patch layers | Product — stable API |
 | [`extensions/`](extensions/README.md) | Agent runtime self-modification: live plugin/service inspection and model-written plugin mount/unmount ([design](../.agents/notes/implemented/feature/2026-07-08-self-referential-cordis-toolset.md)) | Product — stable API |
 | [`hooks/`](hooks/README.md) | Hook bridges + the shared Claude Code / Codex wire-protocol library | Product — stable API |
 | [`session/`](session/README.md) | Durable session data plane: persistence seam + JSONL/SQLite backends, projection seam, log-backed titles, session reporting | Product — stable API |
-| [`session-query/`](session-query/README.md) | Session retrieval family: logical corpus, bounded reads, lineage, event relationships, semantic filtering, and SQLite full-text search | Product — stable API |
+| [`session-query/`](session-query/README.md) | Session retrieval: bounded reads, lineage, semantic filtering, and SQLite full-text search | Product — stable API |
 | [`settings/`](settings/README.md) | User-settings seam + file-backed provider | Product — stable API |
 | [`credentials/`](credentials/README.md) | Credential-reference seam + env-over-`.env` provider | Product — stable API |
 | [`storage/`](storage/README.md) | Non-session storage hub + backends + domain form | Product — stable API |

@@ -1057,6 +1057,11 @@
     },
     {
       "doc": "docs/subsystems/sandbox.md",
+      "symbol": "SandboxNetwork",
+      "source": "packages/sandbox/sandbox/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/sandbox.md",
       "symbol": "ConfinedSandboxMode",
       "source": "packages/sandbox/sandbox/src/index.ts"
     },
@@ -2079,6 +2084,51 @@
       "doc": "docs/subsystems/feedback.md",
       "symbol": "MessageFeedbackDeleteResult",
       "source": "packages/feedback/message-feedback/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/tracker.md",
+      "symbol": "TrackerRunId",
+      "source": "packages/tracker/tracker/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/tracker.md",
+      "symbol": "TrackerFailureReason",
+      "source": "packages/tracker/tracker/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/tracker.md",
+      "symbol": "MetricPoint",
+      "source": "packages/tracker/tracker/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/tracker.md",
+      "symbol": "LogRunRequest",
+      "source": "packages/tracker/tracker/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/tracker.md",
+      "symbol": "LogRunSpec",
+      "source": "packages/tracker/tracker/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/tracker.md",
+      "symbol": "TrackerRunResult",
+      "source": "packages/tracker/tracker/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/tracker.md",
+      "symbol": "RunFilter",
+      "source": "packages/tracker/tracker/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/tracker.md",
+      "symbol": "TrackerRunSummary",
+      "source": "packages/tracker/tracker/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/guard.md",
+      "symbol": "ShieldSnapshot",
+      "source": "packages/guard/shield/src/types.ts"
     }
   ]
 }

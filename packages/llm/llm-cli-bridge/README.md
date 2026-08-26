@@ -25,15 +25,17 @@ The optional `llm-cli-bridge` settings section overlays the composition entry. E
 
 ## Model Experience
 
-### What the model sees
+### Delegated CLI prompt
+
+#### What the model sees
 
 The external CLI sees one serialized prompt (system text, then `user` / `assistant` / `tool` sections). It does not see harness tool schemas unless `allowDelegatedTools` is true, in which case it still runs **its own** tools, not the harness catalog.
 
-### Token effect
+#### Token effect
 
 The child CLI pays for its own context. When the CLI reports usage, the adapter emits a `usage` chunk; otherwise the stream has none.
 
-### KV Cache effect
+#### KV Cache effect
 
 Independent of harness HTTP request cache. There is no provider replay state.
 

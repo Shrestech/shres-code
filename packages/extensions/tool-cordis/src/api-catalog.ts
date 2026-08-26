@@ -867,6 +867,84 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'jspace',
+    summary: 'J-Space seat (`ctx.jspace`).',
+    description: 'J-Space seat (`ctx.jspace`).',
+    methods: [
+      {
+        signature: 'engaged(session?: Session): boolean',
+        description: 'Whether the prompt and tool Consumers belong on this session\'s next request. An active seat engages when a card is already open — an open card must never lose its driver or its tools — or when the session has closed at least JspaceService.engageAfterSteps model steps. A caller with no session (a scope-only assembly) carries no horizon, so a non-zero threshold leaves it unengaged.',
+        parameters: [{ name: 'session', description: 'session whose log decides engagement, when one exists.' }],
+        returns: 'true when Consumers mount for this request.',
+      },
+      {
+        signature: 'watch(listener: (status: JspaceStatus) => void): () => void',
+        description: 'Subscribe to remount status.',
+        parameters: [{ name: 'listener', description: 'called with the new status.' }],
+        returns: 'disposer.',
+      },
+      {
+        signature: 'fold(session: Session): JspaceFold',
+        description: 'Fold one session\'s J-Space events.',
+        parameters: [{ name: 'session', description: 'session whose log to fold.' }],
+        returns: 'native projection plus inherited parent card.',
+      },
+      {
+        signature: 'card(session: Session): JspaceCard | null',
+        description: 'Current native open card, or `null`.',
+        parameters: [{ name: 'session', description: 'owning session.' }],
+        returns: 'the card.',
+      },
+      {
+        signature: 'snapshot(session: Session): JspaceSnapshot',
+        description: 'Settings-console snapshot for one session.',
+        parameters: [{ name: 'session', description: 'session whose log to fold.' }],
+        returns: 'open/closed and checkpoint counts. Does not throw when inactive.',
+      },
+      {
+        signature: 'open(session: Session, input: OpenJspaceInput): JspaceCard',
+        description: 'Open a card.',
+        parameters: [{ name: 'session', description: 'owning session.' }, { name: 'input', description: 'goal, next, optional core.' }],
+        returns: 'the recorded card.',
+      },
+      {
+        signature: 'charter(session: Session): readonly JspaceCharterEntry[]',
+        description: 'Charter list on the current native card, or empty when none is open.',
+        parameters: [{ name: 'session', description: 'owning session.' }],
+        returns: 'the folded charter.',
+      },
+      {
+        signature: 'amendCharter(session: Session, next: readonly JspaceCharterEntry[]): JspaceCard',
+        description: 'Replace the charter list on an open card. The tool Consumer runs floor and discrimination before calling this.',
+        parameters: [{ name: 'session', description: 'owning session.' }, { name: 'next', description: 'replacement list.' }],
+        returns: 'the recorded card.',
+      },
+      {
+        signature: 'note(session: Session, input: NoteJspaceInput): JspaceCard',
+        description: 'Patch an open card. Rejects a Goal identity change (`JSPACE_NOTE_GOAL_CHANGE`); Goal epochs open only through `openGoal`. Rejects a patch whose Goal, Next, Core, and Open match the current card (`JSPACE_NOTE_NOOP`).',
+        parameters: [{ name: 'session', description: 'owning session.' }, { name: 'input', description: 'fields to replace.' }],
+        returns: 'the recorded card.',
+      },
+      {
+        signature: 'openGoal(session: Session, input: OpenJspaceInput): JspaceCard',
+        description: 'Open a new Goal epoch on an open card, or update Goal and Next in place when the Goal is unchanged. A Goal identity change resets Core and Checked so ship cannot pass on the previous epoch\'s evidence, and moves the epoch anchor so a fresh checkpoint is required. The charter is kept: house rules outlive a Goal rewrite. A same-Goal call is the control-loop update path: Core, Checked, Open, and charter are kept and the anchor is unchanged. Open questions carry over untouched on a new epoch. The optional `core` and `charter` inputs apply only on the first open and are ignored here.',
+        parameters: [{ name: 'session', description: 'owning session.' }, { name: 'input', description: 'goal, next, optional core.' }],
+        returns: 'the recorded card.',
+      },
+      {
+        signature: 'checkpoint(session: Session, input: CheckpointJspaceInput): JspaceCard',
+        description: 'Append a Checked line.',
+        parameters: [{ name: 'session', description: 'owning session.' }, { name: 'input', description: 'check, by, optional evidence.' }],
+        returns: 'the recorded card.',
+      },
+      {
+        signature: 'close(session: Session): void',
+        description: 'Close the card.',
+        parameters: [{ name: 'session', description: 'owning session.' }],
+      },
+    ],
+  },
+  {
     key: 'llm',
     summary: 'The abstract `llm` service: an adapter registry plus a streaming model-call API, interceptable via the `llm/stream` waterfall.',
     description: 'The abstract `llm` service: an adapter registry plus a streaming model-call API, interceptable via the `llm/stream` waterfall.',
@@ -905,7 +983,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         signature: 'async discoverModels( settingsNs: string, request: LlmModelDiscoveryRequest, ): Promise<LlmDiscoveredModel[]>',
         description: 'Interrogate one provider endpoint for the models it advertises. The request describes a draft, not a stored route, so nothing here reads or writes settings or credentials — the caller owns both, and the reply is candidate metadata a surface may offer for adoption.',
         parameters: [{ name: 'settingsNs', description: 'namespace whose registered discovery serves this draft.' }, { name: 'request', description: 'the endpoint, protocol, and one-shot credential to use.' }],
-        returns: 'the advertised models, deduplicated in endpoint order.',
+        returns: 'the advertised models, deduplicated in endpoint order, detached from adapter-owned state.',
       },
       {
         signature: 'providerRetryPolicy(provider: string): ResolvedRetryPolicy',
@@ -1192,7 +1270,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
   {
     key: 'sessionProjections',
     summary: '`ctx.sessionProjections`: the projection unit table and its drive.',
-    description: '`ctx.sessionProjections`: the projection unit table and its drive. The service subscribes to `session/event` once; every committed event passes every registered unit\'s `apply` (eager drive), and a changed state reference notifies the change feed with the schema-validated view. Cells build lazily — a unit registered after events flowed, or a session older than the registry, folds `init` over the in-memory log on first touch (event or read). Registration is an effect (disposer rides the calling fiber): an unloaded domain plugin\'s key disappears from snapshots and clients read it as capability absence. Domain plugins register under `ctx.inject([\'sessionProjections\'], …)` so headless assemblies without the registry stay unaffected. Registrants sharing a key share one unit and are counted: the same tool package mounted in N agent presets registers N times, and the key survives until the last one unloads.',
+    description: '`ctx.sessionProjections`: the projection unit table and its drive. The service subscribes to `session/event` once; every committed event passes every registered unit\'s `apply` (eager drive), and a changed state reference notifies the change feed with the schema-validated view. Exceptions are contained where they are thrown: a throwing `apply` (or a `view`/`schema` rejection) skips that event for that unit alone — its cell keeps the pre-event state — and a throwing change listener never starves the listeners after it; each contained failure warns through `ctx.logger` with the unit key and event seq. Cells build lazily — a unit registered after events flowed, or a session older than the registry, folds `init` over the in-memory log on first touch (event or read). Registration is an effect (disposer rides the calling fiber): an unloaded domain plugin\'s key disappears from snapshots and clients read it as capability absence. Domain plugins register under `ctx.inject([\'sessionProjections\'], …)` so headless assemblies without the registry stay unaffected. Registrants sharing a key share one unit and are counted: the same tool package mounted in N agent presets registers N times, and the key survives until the last one unloads.',
     methods: [
       {
         signature: 'register<K extends keyof SessionProjectionMap, S>(definition: ProjectionDefinition<K, S>): () => void',
@@ -1573,6 +1651,44 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'shield',
+    summary: 'Published Shield status and a read-only snapshot RPC.',
+    description: 'Published Shield status and a read-only snapshot RPC. `active` is the brand-mark switch: blue girl and green shield only while the paid engine is screening. The seat owns this service name; the paid plugin must not replace it.',
+    methods: [
+      {
+        signature: 'readonly status: ShieldStatus',
+        description: 'Current screening status.',
+        parameters: [],
+      },
+      {
+        signature: 'bindPayload(payload: unknown): void',
+        description: 'Remember the live paid instance so snapshot can read its stats.',
+        parameters: [{ name: 'payload', description: 'value returned by the paid `apply`, or `undefined` after dispose.' }],
+      },
+      {
+        signature: 'bindPersistedReader(reader: ((cwd?: string | null) => unknown) | undefined): void',
+        description: 'Remember a module-level stats reader used when screening is off.',
+        parameters: [{ name: 'reader', description: '`stats.snapshot` from the resolved payload module, or `undefined`.' }],
+      },
+      {
+        signature: 'bindRepoDisabled(disabledFor: ((cwd: string) => boolean) | undefined): void',
+        description: 'Remember the per-repo exemption check used to override snapshot status.',
+        parameters: [{ name: 'disabledFor', description: '`(cwd) => true` when an entry disables that repo.' }],
+      },
+      {
+        signature: 'bindPullSync(pull: (() => void) | undefined): void',
+        description: 'Remember the pull re-evaluation run at the top of every snapshot call — the safety net for session events scope-filtered away from the seat fiber.',
+        parameters: [{ name: 'pull', description: 'triggers a seat sync when the repo-gate decision flipped.' }],
+      },
+      {
+        signature: '@Remote(\'snapshot\') snapshot(sessionId?: string): ShieldSnapshot',
+        description: 'Per-repo counters for the current session cwd. Disable remounts the payload off but still returns last persisted counts with `status.reason === \'disabled\'`. A repo exempt through `repos` reports `status.reason === \'repo-disabled\'` while diagnostics keep precedence over the exemption. The call first re-evaluates the repo gate; because that re-evaluation settles asynchronously, the snapshot that detected a flip reports the pre-flip status and the next read reflects the new one.',
+        parameters: [{ name: 'sessionId', description: 'live session whose `header.cwd` keys the stats; omitted uses the most recently created live session that has a cwd.' }],
+        returns: 'a JSON copy, never a live alias of seat or engine state.',
+      },
+    ],
+  },
+  {
     key: 'skills',
     summary: 'Layered registry of skill providers, the host+per-scope shape the tools registry established.',
     description: 'Layered registry of skill providers, the host+per-scope shape the tools registry established. A registration files into the layer of its calling context\'s scope (scopeOf): host rows and repository plugins land in the global layer, while a plugin mounted by an agent preset\'s standing composition lands in that preset\'s layer. A read merges the global layer with the viewing scope\'s chain — the nearest layer\'s entry wins a duplicate name outright, and the rank order decides duplicates only within one layer. It exposes sorted invocation-neutral summaries and loads full skill bodies on demand.',
@@ -1606,6 +1722,61 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Load and validate the winning candidate, passing its opaque discovery locator back to the provider. Cancellation is rechecked after selection, including cache hits, and raced against loading so an uncooperative provider cannot hang the caller.',
         parameters: [{ name: 'name', description: 'kebab-case skill name.' }, { name: 'options', description: 'view options; `scope` selects the viewing agent\'s layers, `cwd` selects workspace-sensitive skills, and `signal` cancels work.' }],
         returns: 'the full skill, including body content, or `undefined`.',
+      },
+    ],
+  },
+  {
+    key: 'speech',
+    summary: 'The speech I/O service.',
+    description: 'The speech I/O service. Registered as `ctx.speech` (one instance per context).\n\nSelection semantics (resolved at execution time, never order-dependent):\n\n- A singular configured id that is registered and `available()` → that provider.\n- A singular configured id not registered → `SPEECH_PROVIDER_CONFIGURED_MISSING`.\n- A singular configured id registered but unavailable → `SPEECH_PROVIDER_CONFIGURED_UNAVAILABLE`.\n- An ordered fallback list → first listed id that is registered and usable.\n- A fallback list whose members are all missing or unusable → `SPEECH_PROVIDER_UNAVAILABLE`.\n- No pin, exactly one registered usable provider → that provider.\n- No pin, multiple usable providers → `SPEECH_PROVIDER_AMBIGUOUS`.\n- No pin, no usable provider → `SPEECH_PROVIDER_UNAVAILABLE`.',
+    methods: [
+      {
+        signature: 'settings(): SpeechUserSettings',
+        description: 'Current resolved user-settings section (read-aloud, voice, language).',
+        parameters: [],
+        returns: 'the live section, including schema defaults.',
+      },
+      {
+        signature: 'registerTtsProvider(provider: SpeechTtsProvider): () => void',
+        description: 'Register a TTS provider. Throws SpeechError `SPEECH_DUPLICATE_PROVIDER` if its id is already registered for TTS. Returns a disposer; disposed with the calling fiber.',
+        parameters: [{ name: 'provider', description: 'the provider; its `id` is the registry key.' }],
+        returns: 'the disposer that unregisters the provider.',
+      },
+      {
+        signature: 'registerSttProvider(provider: SpeechSttProvider): () => void',
+        description: 'Register an STT provider. Throws SpeechError `SPEECH_DUPLICATE_PROVIDER` if its id is already registered for STT. Returns a disposer; disposed with the calling fiber.',
+        parameters: [{ name: 'provider', description: 'the provider; its `id` is the registry key.' }],
+        returns: 'the disposer that unregisters the provider.',
+      },
+      {
+        signature: 'async synthesize( request: SpeechSynthesizeRequest, signal?: AbortSignal, ): Promise<SpeechSynthesizeResult>',
+        description: 'Convert markdown to a speakable script and synthesize it through the selected TTS provider. An empty script returns zero-length audio with the requested (or default) voice id; callers that must skip playback inspect `audio.byteLength`.',
+        parameters: [{ name: 'request', description: 'markdown text plus optional voice and language.' }, { name: 'signal', description: 'optional cancellation signal forwarded to the provider.' }],
+        returns: 'synthesized audio (WAV from the local Kokoro provider).',
+      },
+      {
+        signature: 'async transcribe( request: SpeechTranscribeRequest, signal?: AbortSignal, ): Promise<SpeechTranscribeResult>',
+        description: 'Transcribe recorded audio through the selected STT provider.',
+        parameters: [{ name: 'request', description: 'bytes and a closed media type.' }, { name: 'signal', description: 'optional cancellation signal forwarded to the provider.' }],
+        returns: 'the transcript.',
+      },
+      {
+        signature: '@Remote(\'status\') async status(): Promise<SpeechStatus>',
+        description: 'Probe TTS and STT selection plus the TTS voice catalog, without running a synthesis or transcription.',
+        parameters: [],
+        returns: 'capability status and voices (empty when TTS is unavailable).',
+      },
+      {
+        signature: '@Remote(\'synthesize\') async synthesizeRemote(request: SpeechSynthesizeWireRequest): Promise<SpeechSynthesizeWireResult>',
+        description: 'Remote synthesize: markdown in, canonical-base64 MPEG out (or `empty`).',
+        parameters: [{ name: 'request', description: 'wire payload.' }],
+        returns: 'a tagged business result; transport failures stay on the carrier.',
+      },
+      {
+        signature: '@Remote(\'transcribe\') async transcribeRemote(request: SpeechTranscribeWireRequest): Promise<SpeechTranscribeWireResult>',
+        description: 'Remote transcribe: canonical-base64 audio in, transcript out.',
+        parameters: [{ name: 'request', description: 'wire payload.' }],
+        returns: 'a tagged business result; transport failures stay on the carrier.',
       },
     ],
   },
@@ -1750,7 +1921,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'async start(name: string, request: SubagentStartRequest): Promise<SubagentRun>',
-        description: 'Establish a published child on the named provider. Capability and semantic checks run before delegation. Provider ownership lasts until its promise fulfills; a rejection therefore has no run for the caller to dispose and emits no run lifecycle events. Post-publication turn and infrastructure failures settle through the returned run.',
+        description: 'Establish a published child on the named provider. Capability, depth, schema, and concurrency-cap checks run before delegation. Occupancy is acquired synchronously before `provider.start()` and released on start rejection or when the holder `dispose()`s. Provider ownership lasts until its promise fulfills; a rejection therefore has no run for the caller to dispose and emits no run lifecycle events. Post-publication turn and infrastructure failures settle through the returned run.',
         parameters: [{ name: 'name', description: 'the provider to use.' }, { name: 'request', description: 'child label, prompt, parent, signal, and optional capabilities.' }],
         returns: 'the published holder-owned run.',
       },
@@ -2028,6 +2199,41 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'tracker',
+    summary: 'The abstract experiment tracking service.',
+    description: 'The abstract experiment tracking service. Registered as `ctx.tracker` (one provider per context; loading a second throws cordis\' standard duplicate-service behavior). A provider subclasses this, implements the three abstract persistence hooks, and loads the subclass as a plugin.\n\nImplementations must honor these semantics:\n\n- postRun persists the run or holds it in the durable local spool, returning a TrackerRunResult that carries the failure taxonomy when the post did not land. It never returns a bare id for a failed post.\n- postMetrics persists a batched metric append for a run.\n- queryRuns reads the provider\'s authoritative run store.',
+    methods: [
+      {
+        signature: 'abstract postRun(runId: TrackerRunId, spec: LogRunSpec): Promise<TrackerRunResult>',
+        description: 'Persist (or spool) a run. Implemented by the provider; returns the post outcome with the run\'s failure reason when it did not land.',
+        parameters: [{ name: 'runId', description: 'the id the seam allocated for this run.' }, { name: 'spec', description: 'a resolved spec from {@link resolveLogRun}, never a raw request.' }],
+        returns: 'the post outcome (landed, or spooled with a {@link TrackerFailureReason}).',
+      },
+      {
+        signature: 'abstract postMetrics(runId: TrackerRunId, metrics: readonly MetricPoint[]): Promise<void>',
+        description: 'Persist a batched metric append for a run.',
+        parameters: [{ name: 'runId', description: 'the run the metrics belong to.' }, { name: 'metrics', description: 'the metric points to persist.' }],
+      },
+      {
+        signature: 'abstract queryRuns(filter: RunFilter): Promise<TrackerRunSummary[]>',
+        description: 'Query runs from the provider\'s authoritative store.',
+        parameters: [{ name: 'filter', description: 'optional filters; absent fields are not applied.' }],
+        returns: 'the matching run summaries.',
+      },
+      {
+        signature: 'async logRun(session: Session, request: LogRunRequest, callId: CallId): Promise<TrackerRunResult>',
+        description: 'Log a run. Resolves and validates the request, allocates the run id, delegates to the provider, and writes the log-only `tracker/run` event to the owning session. The event is written after the provider returns, so the log reflects the post outcome exactly as the caller received it.',
+        parameters: [{ name: 'session', description: 'owning session; the run event is appended to its log.' }, { name: 'request', description: 'the caller\'s run request (validated and defaulted here).' }, { name: 'callId', description: 'the tool-call id of the `experiment_log_run` call that produced the run.' }],
+        returns: 'the post outcome with the allocated run id.',
+      },
+      {
+        signature: 'async logMetrics(session: Session, runId: TrackerRunId, metrics: readonly MetricPoint[]): Promise<void>',
+        description: 'Append metrics to a run\'s durable record and write the log-only `tracker/metrics` event.',
+        parameters: [{ name: 'session', description: 'the owning session; the append is logged to it.' }, { name: 'runId', description: 'the run the metrics belong to.' }, { name: 'metrics', description: 'the metric points to append.' }],
+      },
+    ],
+  },
+  {
     key: 'typert',
     summary: 'Registry of generated schemas, package reflection, invocations, and Remote dependency providers.',
     description: 'Registry of generated schemas, package reflection, invocations, and Remote dependency providers.',
@@ -2114,7 +2320,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
   {
     key: 'web',
     summary: 'The web access service.',
-    description: 'The web access service. Registered as `ctx.web` (one instance per context).\n\nSelection semantics (resolved at execution time, never order-dependent):\n\n- A configured id that is registered and `available()` → that provider.\n- A configured id not registered → `WEB_PROVIDER_CONFIGURED_MISSING`.\n- A configured id registered but unavailable → `WEB_PROVIDER_CONFIGURED_UNAVAILABLE`.\n- No id configured, exactly one registered usable provider → that provider.\n- No id configured, multiple usable providers → `WEB_PROVIDER_AMBIGUOUS`.\n- No id configured, no usable provider → `WEB_PROVIDER_UNAVAILABLE`.',
+    description: 'The web access service. Registered as `ctx.web` (one instance per context).\n\nSelection semantics (resolved at execution time, never order-dependent):\n\n- A singular configured id that is registered and `available()` → that provider.\n- A singular configured id not registered → `WEB_PROVIDER_CONFIGURED_MISSING`.\n- A singular configured id registered but unavailable → `WEB_PROVIDER_CONFIGURED_UNAVAILABLE`.\n- An ordered fallback list → first listed id that is registered and usable.\n- A fallback list whose members are all missing or unusable → `WEB_PROVIDER_UNAVAILABLE`.\n- No pin, exactly one registered usable provider → that provider.\n- No pin, multiple usable providers → `WEB_PROVIDER_AMBIGUOUS`.\n- No pin, no usable provider → `WEB_PROVIDER_UNAVAILABLE`.',
     methods: [
       {
         signature: 'registerSearchProvider(provider: WebSearchProvider): () => void',
@@ -2826,6 +3032,30 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface CancelOptions {\n    keepInbox?: boolean | undefined;\n}',
   },
   {
+    name: 'CharterCheckInput',
+    declaration: 'export interface CharterCheckInput {\n    readonly kind: \'check\';\n    readonly id?: CharterEntryId;\n    readonly constraint: string;\n    readonly command: string;\n    readonly reads: readonly string[];\n    readonly failProbe?: {\n        readonly path: string;\n        readonly mutation: CharterFailProbe;\n    };\n}',
+  },
+  {
+    name: 'CharterDiscrimination',
+    declaration: 'export type CharterDiscrimination = \'demonstrated\' | \'unverified\';',
+  },
+  {
+    name: 'CharterEntryId',
+    declaration: 'export type CharterEntryId = Branded<\'CharterEntryId\'>;',
+  },
+  {
+    name: 'CharterFailProbe',
+    declaration: 'export type CharterFailProbe = {\n    readonly kind: \'insert\';\n    readonly content: string;\n} | {\n    readonly kind: \'prepend\';\n    readonly content: string;\n} | {\n    readonly kind: \'replace\';\n    readonly from: string;\n    readonly to: string;\n};',
+  },
+  {
+    name: 'CharterUnverifiedReason',
+    declaration: 'export type CharterUnverifiedReason = \'discrimination-off\' | \'policy-denied\' | \'probe-timeout\' | \'probe-infeasible\';',
+  },
+  {
+    name: 'CheckpointJspaceInput',
+    declaration: 'export interface CheckpointJspaceInput {\n    readonly check: string;\n    readonly by: string;\n    readonly evidence?: string;\n}',
+  },
+  {
     name: 'ClientResponse',
     declaration: 'export interface ClientResponse {\n    type: \'client-response\';\n    rpcId: RpcId;\n    result: RpcResult<unknown>;\n}',
   },
@@ -3110,10 +3340,6 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface EditGoalRequest {\n    readonly objective?: string;\n    readonly maxGoalRounds?: number;\n}',
   },
   {
-    name: 'EncodedImageAttachment',
-    declaration: 'export interface EncodedImageAttachment {\n    mediaType: ImageMediaType;\n    data: string;\n    name?: string;\n}',
-  },
-  {
     name: 'EpochHeader',
     declaration: 'export interface EpochHeader {\n    config: LlmCallConfig;\n    adapterDefaults?: LlmCallConfigAdapterDefaults;\n    system?: string;\n    tools?: ToolSchema[];\n}',
   },
@@ -3346,6 +3572,46 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type JsonValue = null | boolean | number | string | JsonValue[] | {\n    [key: string]: JsonValue;\n};',
   },
   {
+    name: 'JspaceCard',
+    declaration: 'export interface JspaceCard {\n    readonly seq: number;\n    readonly sessionId: string;\n    readonly goal: string;\n    readonly core: readonly string[];\n    readonly checked: readonly JspaceCheckedLine[];\n    readonly open: readonly JspaceOpenLine[];\n    readonly next: string;\n    readonly goalOpenedSeq: number;\n    readonly charter: readonly JspaceCharterEntry[];\n}',
+  },
+  {
+    name: 'JspaceCharterCheck',
+    declaration: 'export interface JspaceCharterCheck extends CharterCheckInput {\n    readonly kind: \'check\';\n    readonly id: CharterEntryId;\n    readonly discrimination: CharterDiscrimination;\n    readonly unverifiedReason?: CharterUnverifiedReason;\n}',
+  },
+  {
+    name: 'JspaceCharterEntry',
+    declaration: 'export type JspaceCharterEntry = JspaceCharterCheck | JspaceCharterProse;',
+  },
+  {
+    name: 'JspaceCharterProse',
+    declaration: 'export interface JspaceCharterProse {\n    readonly kind: \'prose\';\n    readonly id: CharterEntryId;\n    readonly constraint: string;\n}',
+  },
+  {
+    name: 'JspaceCheckedLine',
+    declaration: 'export interface JspaceCheckedLine {\n    readonly n: number;\n    readonly check: string;\n    readonly by: string;\n    readonly evidence?: string;\n    readonly verified?: true;\n}',
+  },
+  {
+    name: 'JspaceFold',
+    declaration: 'export interface JspaceFold extends JspaceProjection {\n    readonly inherited: JspaceCard | null;\n}',
+  },
+  {
+    name: 'JspaceOpenLine',
+    declaration: 'export interface JspaceOpenLine {\n    readonly question: string;\n    readonly settles?: string;\n}',
+  },
+  {
+    name: 'JspaceProjection',
+    declaration: 'export interface JspaceProjection {\n    readonly card: JspaceCard | null;\n    readonly closed: boolean;\n    readonly fault?: string;\n}',
+  },
+  {
+    name: 'JspaceSnapshot',
+    declaration: 'export interface JspaceSnapshot {\n    readonly cwd: string | null;\n    readonly open: boolean;\n    readonly closed: boolean;\n    readonly checkpoints: number;\n    readonly fault?: string;\n}',
+  },
+  {
+    name: 'JspaceStatus',
+    declaration: 'export interface JspaceStatus {\n    readonly active: boolean;\n    readonly reason: \'active\' | \'disabled\';\n}',
+  },
+  {
     name: 'KnobState',
     declaration: 'export interface KnobState {\n    preset: string | null;\n    sandbox: SandboxMode | null;\n    approval: ApprovalPolicy | null;\n}',
   },
@@ -3379,7 +3645,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'LlmConfigurableProvider',
-    declaration: 'export interface LlmConfigurableProvider {\n    provider: string;\n    displayName: string;\n    settingsNs: string;\n    settingsPath: readonly string[];\n    declared?: boolean;\n}',
+    declaration: 'export interface LlmConfigurableProvider {\n    provider: string;\n    displayName: string;\n    settingsNs: string;\n    settingsPath: readonly string[];\n    declared?: boolean;\n    kind?: \'delegated\';\n    binary?: string;\n    binaryFound?: boolean;\n}',
   },
   {
     name: 'LlmDiscoveredModel',
@@ -3407,7 +3673,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'LlmProviderInfo',
-    declaration: 'export interface LlmProviderInfo {\n    id: string;\n    name: string;\n}',
+    declaration: 'export interface LlmProviderInfo {\n    id: string;\n    name: string;\n    kind?: \'delegated\';\n}',
   },
   {
     name: 'LlmReasoningEffortInfo',
@@ -3424,6 +3690,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'LocalOllamaStatus',
     declaration: 'export interface LocalOllamaStatus {\n    reachable: boolean;\n    models: readonly LlmDiscoveredModel[];\n}',
+  },
+  {
+    name: 'LogRunRequest',
+    declaration: 'export interface LogRunRequest {\n    readonly experiment: string;\n    readonly hypothesis: string;\n    readonly decisionRule: string;\n    readonly dataVersion: string;\n    readonly gitSha: string;\n    readonly metrics?: readonly MetricPoint[];\n    readonly artifacts?: readonly string[];\n}',
+  },
+  {
+    name: 'LogRunSpec',
+    declaration: 'export interface LogRunSpec {\n    readonly experiment: string;\n    readonly hypothesis: string;\n    readonly decisionRule: string;\n    readonly dataVersion: string;\n    readonly gitSha: string;\n    readonly metrics: readonly MetricPoint[];\n    readonly artifacts: readonly string[];\n}',
   },
   {
     name: 'LspHover',
@@ -3562,6 +3836,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface MessageSourceMap {\n    user: {\n        kind: \'user\';\n    };\n    plugin: {\n        kind: \'plugin\';\n        plugin: string;\n    } & ContextFormed;\n    model: ModelMessageSource;\n    tool: ToolMessageSource;\n}',
   },
   {
+    name: 'MetricPoint',
+    declaration: 'export interface MetricPoint {\n    readonly name: string;\n    readonly value: number;\n    readonly step?: number;\n}',
+  },
+  {
     name: 'ModelMessageSource',
     declaration: 'export interface ModelMessageSource extends AssistantProvenance {\n    kind: \'model\';\n}',
   },
@@ -3578,12 +3856,20 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type ModelPurpose = \'compaction\' | \'session-title\';',
   },
   {
+    name: 'NoteJspaceInput',
+    declaration: 'export interface NoteJspaceInput {\n    readonly goal?: string;\n    readonly departing?: string;\n    readonly core?: string;\n    readonly open?: readonly JspaceOpenLine[];\n    readonly next?: string;\n}',
+  },
+  {
     name: 'ObjectJsonSchema',
     declaration: 'export type ObjectJsonSchema = JsonSchemaNode & {\n    type: \'object\';\n};',
   },
   {
     name: 'OneShotSubagentDescriptorData',
     declaration: 'export interface OneShotSubagentDescriptorData extends SubagentDescriptorBase {\n    readonly mode: \'one-shot\';\n    readonly label?: string;\n}',
+  },
+  {
+    name: 'OpenJspaceInput',
+    declaration: 'export interface OpenJspaceInput {\n    readonly goal: string;\n    readonly next: string;\n    readonly core?: readonly string[];\n    readonly charter?: readonly JspaceCharterEntry[];\n}',
   },
   {
     name: 'PermissionSelect',
@@ -3750,14 +4036,6 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ResumeAgentOptions {\n    readonly resumeSessionId: SessionId;\n    readonly agentOptions?: AgentOptions;\n    readonly signal?: AbortSignal;\n    readonly setup?: AgentSetup;\n}',
   },
   {
-    name: 'ShresEnvironment',
-    declaration: 'export type ShresEnvironment = Readonly<Record<ShresEnvironmentKey, string>>;',
-  },
-  {
-    name: 'ShresEnvironmentKey',
-    declaration: 'export type ShresEnvironmentKey = `${typeof SHRES_ENV_PREFIX}${string}`;',
-  },
-  {
     name: 'RpcError',
     declaration: 'export type RpcError = {\n    [C in RpcErrorCode]: {\n        code: C;\n        message: string;\n        details: RpcErrorDetailsMap[C];\n    };\n}[RpcErrorCode];',
   },
@@ -3780,6 +4058,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'RpcResult',
     declaration: 'export type RpcResult<T> = {\n    ok: true;\n    value: T;\n} | {\n    ok: false;\n    error: RpcError;\n};',
+  },
+  {
+    name: 'RunFilter',
+    declaration: 'export interface RunFilter {\n    readonly experiment?: string;\n    readonly gitSha?: string;\n    readonly since?: string;\n}',
   },
   {
     name: 'RunnerFailureRule',
@@ -4150,6 +4432,50 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ShellSandboxInfo {\n    mode: SandboxMode;\n    denied: boolean;\n    enforcement?: SandboxEnforcement;\n    runnerFailed?: boolean;\n}',
   },
   {
+    name: 'ShieldCounterSplit',
+    declaration: 'export interface ShieldCounterSplit {\n    screened: number;\n    observed: number;\n    asked: number;\n    askedGranted: number;\n    askedDenied: number;\n    blocked: number;\n}',
+  },
+  {
+    name: 'ShieldDefinitions',
+    declaration: 'export interface ShieldDefinitions {\n    version: string;\n    updatedAt: number | null;\n    stale: boolean;\n}',
+  },
+  {
+    name: 'ShieldFindingSummary',
+    declaration: 'export interface ShieldFindingSummary {\n    at: number;\n    verdict: \'observe\' | \'ask\' | \'deny\';\n    rule: string;\n    channel: string;\n    sha16: string;\n    host?: string;\n    callId?: string;\n}',
+  },
+  {
+    name: 'ShieldInactiveReason',
+    declaration: 'export type ShieldInactiveReason = \'panic\' | \'unlicensed\' | \'engine-missing\' | \'disabled\' | \'repo-disabled\';',
+  },
+  {
+    name: 'ShieldReason',
+    declaration: 'export type ShieldReason = \'active\' | ShieldInactiveReason;',
+  },
+  {
+    name: 'ShieldRepoStats',
+    declaration: 'export interface ShieldRepoStats extends ShieldCounterSplit {\n    cwd: string | null;\n    byChannel: Readonly<Record<string, ShieldCounterSplit>>;\n    byRule: Readonly<Record<string, ShieldRuleHistogram>>;\n    otherRules: ShieldRuleHistogram;\n    recent: readonly ShieldFindingSummary[];\n}',
+  },
+  {
+    name: 'ShieldRuleHistogram',
+    declaration: 'export interface ShieldRuleHistogram {\n    observed: number;\n    asked: number;\n    blocked: number;\n}',
+  },
+  {
+    name: 'ShieldSnapshot',
+    declaration: 'export interface ShieldSnapshot {\n    status: ShieldStatus;\n    stats: ShieldRepoStats;\n    definitions?: ShieldDefinitions;\n}',
+  },
+  {
+    name: 'ShieldStatus',
+    declaration: 'export interface ShieldStatus {\n    active: boolean;\n    reason: ShieldReason;\n}',
+  },
+  {
+    name: 'ShresEnvironment',
+    declaration: 'export type ShresEnvironment = Readonly<Record<ShresEnvironmentKey, string>>;',
+  },
+  {
+    name: 'ShresEnvironmentKey',
+    declaration: 'export type ShresEnvironmentKey = `${typeof SHRES_ENV_PREFIX}${string}`;',
+  },
+  {
     name: 'SkillCandidate',
     declaration: 'export interface SkillCandidate extends SkillSummary {\n    readonly rank: number;\n    readonly locator: unknown;\n    readonly path?: string;\n    readonly metadata?: Readonly<Record<string, unknown>>;\n}',
   },
@@ -4200,6 +4526,78 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'SkillViewOptions',
     declaration: 'export interface SkillViewOptions extends SkillLookupOptions {\n    readonly scope?: ScopeKey | undefined;\n}',
+  },
+  {
+    name: 'SpeechCapabilityStatus',
+    declaration: 'export type SpeechCapabilityStatus = {\n    readonly kind: \'ready\';\n    readonly providerId: string;\n} | {\n    readonly kind: \'unavailable\';\n    readonly code: string;\n    readonly message: string;\n};',
+  },
+  {
+    name: 'SpeechInputMediaType',
+    declaration: 'export type SpeechInputMediaType = typeof SPEECH_INPUT_MEDIA_TYPES[number];',
+  },
+  {
+    name: 'SpeechOutputMediaType',
+    declaration: 'export type SpeechOutputMediaType = \'audio/wav\' | \'audio/mpeg\';',
+  },
+  {
+    name: 'SpeechStatus',
+    declaration: 'export interface SpeechStatus {\n    readonly tts: SpeechCapabilityStatus;\n    readonly stt: SpeechCapabilityStatus;\n    readonly voices: readonly SpeechVoice[];\n}',
+  },
+  {
+    name: 'SpeechSttProvider',
+    declaration: 'export interface SpeechSttProvider {\n    readonly id: string;\n    available(): boolean;\n    transcribe(request: SpeechTranscribeRequest, signal?: AbortSignal): Promise<SpeechTranscribeResult>;\n}',
+  },
+  {
+    name: 'SpeechSynthesizeAudioValue',
+    declaration: 'export interface SpeechSynthesizeAudioValue {\n    readonly kind: \'audio\';\n    readonly audioBase64: string;\n    readonly mediaType: SpeechOutputMediaType;\n    readonly voiceId: string;\n}',
+  },
+  {
+    name: 'SpeechSynthesizeEmptyValue',
+    declaration: 'export interface SpeechSynthesizeEmptyValue {\n    readonly kind: \'empty\';\n}',
+  },
+  {
+    name: 'SpeechSynthesizeRequest',
+    declaration: 'export interface SpeechSynthesizeRequest {\n    readonly text: string;\n    readonly voiceId?: string;\n    readonly language?: string;\n}',
+  },
+  {
+    name: 'SpeechSynthesizeResult',
+    declaration: 'export interface SpeechSynthesizeResult {\n    readonly audio: Uint8Array;\n    readonly mediaType: SpeechOutputMediaType;\n    readonly voiceId: string;\n}',
+  },
+  {
+    name: 'SpeechSynthesizeWireRequest',
+    declaration: 'export interface SpeechSynthesizeWireRequest {\n    readonly text: string;\n    readonly voiceId?: string;\n    readonly language?: string;\n}',
+  },
+  {
+    name: 'SpeechSynthesizeWireResult',
+    declaration: 'export type SpeechSynthesizeWireResult = {\n    readonly ok: true;\n    readonly value: SpeechSynthesizeAudioValue | SpeechSynthesizeEmptyValue;\n} | {\n    readonly ok: false;\n    readonly error: SpeechWireFailure;\n};',
+  },
+  {
+    name: 'SpeechTranscribeRequest',
+    declaration: 'export interface SpeechTranscribeRequest {\n    readonly audio: Uint8Array;\n    readonly mediaType: SpeechInputMediaType;\n    readonly language?: string;\n}',
+  },
+  {
+    name: 'SpeechTranscribeResult',
+    declaration: 'export interface SpeechTranscribeResult {\n    readonly text: string;\n}',
+  },
+  {
+    name: 'SpeechTranscribeWireRequest',
+    declaration: 'export interface SpeechTranscribeWireRequest {\n    readonly audioBase64: string;\n    readonly mediaType: string;\n    readonly language?: string;\n}',
+  },
+  {
+    name: 'SpeechTranscribeWireResult',
+    declaration: 'export type SpeechTranscribeWireResult = {\n    readonly ok: true;\n    readonly value: SpeechTranscribeResult;\n} | {\n    readonly ok: false;\n    readonly error: SpeechWireFailure;\n};',
+  },
+  {
+    name: 'SpeechTtsProvider',
+    declaration: 'export interface SpeechTtsProvider {\n    readonly id: string;\n    available(): boolean;\n    listVoices(): Promise<readonly SpeechVoice[]>;\n    synthesize(request: SpeechSynthesizeRequest, signal?: AbortSignal): Promise<SpeechSynthesizeResult>;\n}',
+  },
+  {
+    name: 'SpeechVoice',
+    declaration: 'export interface SpeechVoice {\n    readonly id: string;\n    readonly name: string;\n    readonly language?: string;\n}',
+  },
+  {
+    name: 'SpeechWireFailure',
+    declaration: 'export interface SpeechWireFailure {\n    readonly code: string;\n    readonly message: string;\n}',
   },
   {
     name: 'SpillLocator',
@@ -4287,7 +4685,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SubagentRuntime',
-    declaration: 'export class SubagentRuntime extends Service {\n    constructor(ctx: Context);\n    async startContinuable(spec: ContinuableStartSpec): Promise<ContinuableStart>;\n    async followup(parent: Agent, childId: SessionId, content: ContentBlock[], options: SubagentFollowupOptions): Promise<MessageId>;\n    interrupt(targetSessionId: SessionId, authority: SubagentInterruptAuthority): void;\n    async reportFrom(child: Agent, content: ContentBlock[], options: SubagentReportOptions): Promise<MessageId>;\n    registerContinuableSetup(contribution: ContinuableSetupContribution): () => void;\n    async drainContinuableDescendants(parents: readonly Agent[]): Promise<void>;\n    listChildren(parentSessionId: SessionId, signal?: AbortSignal): Promise<SubagentListEntry[]>;\n    listDescendants(rootSessionId: SessionId, signal?: AbortSignal): Promise<SubagentDescendantListEntry[]>;\n    registerProvider(provider: SubagentProvider): () => void;\n    getProvider(name: string): SubagentProvider | undefined;\n    list(): string[];\n    async start(name: string, request: SubagentStartRequest): Promise<SubagentRun>;\n}',
+    declaration: 'export class SubagentRuntime extends Service {\n    static Config: z<Config>;\n    constructor(ctx: Context, config: Config);\n    async startContinuable(spec: ContinuableStartSpec): Promise<ContinuableStart>;\n    async followup(parent: Agent, childId: SessionId, content: ContentBlock[], options: SubagentFollowupOptions): Promise<MessageId>;\n    interrupt(targetSessionId: SessionId, authority: SubagentInterruptAuthority): void;\n    async reportFrom(child: Agent, content: ContentBlock[], options: SubagentReportOptions): Promise<MessageId>;\n    registerContinuableSetup(contribution: ContinuableSetupContribution): () => void;\n    async drainContinuableDescendants(parents: readonly Agent[]): Promise<void>;\n    listChildren(parentSessionId: SessionId, signal?: AbortSignal): Promise<SubagentListEntry[]>;\n    listDescendants(rootSessionId: SessionId, signal?: AbortSignal): Promise<SubagentDescendantListEntry[]>;\n    registerProvider(provider: SubagentProvider): () => void;\n    getProvider(name: string): SubagentProvider | undefined;\n    list(): string[];\n    async start(name: string, request: SubagentStartRequest): Promise<SubagentRun>;\n}',
   },
   {
     name: 'SubagentStartRequest',
@@ -4592,6 +4990,22 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ToolSchema',
     declaration: 'export interface ToolSchema {\n    name: string;\n    description: string;\n    parameters: Record<string, unknown>;\n}',
+  },
+  {
+    name: 'TrackerFailureReason',
+    declaration: 'export type TrackerFailureReason = \'auth\' | \'unreachable\' | \'quarantined-row\' | \'spooled\';',
+  },
+  {
+    name: 'TrackerRunId',
+    declaration: 'export type TrackerRunId = Branded<\'TrackerRunId\'>;',
+  },
+  {
+    name: 'TrackerRunResult',
+    declaration: 'export type TrackerRunResult = {\n    readonly kind: \'landed\';\n    readonly runId: TrackerRunId;\n} | {\n    readonly kind: \'spooled\';\n    readonly runId: TrackerRunId;\n    readonly reason: TrackerFailureReason;\n};',
+  },
+  {
+    name: 'TrackerRunSummary',
+    declaration: 'export interface TrackerRunSummary {\n    readonly runId: TrackerRunId;\n    readonly experiment: string;\n    readonly decisionRule: string;\n    readonly dataVersion: string;\n    readonly gitSha: string;\n    readonly reason?: TrackerFailureReason;\n}',
   },
   {
     name: 'TurnEndCancelCause',

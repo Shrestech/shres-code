@@ -12,3 +12,5 @@ Behavioral guard plugins watch the agent loop for unproductive patterns and enfo
 Reminders travel as `additionalContexts` on the `tools/post-execute` decision and are appended as logged plugin-sourced `user/message` events ([tools](../../docs/subsystems/tools.md)); the timeout split across `shres-timeout`, capability termination, and this policy layer is recorded in the [timeout-library Agent Note](../../.agents/notes/implemented/architecture/2026-07-06-timeout-deadline-library.md).
 
 Every enforcing behavior in this family is off unless a deployment configures it: the repeat veto (`vetoThreshold`), the step budget (`maxStepsPerTurn`), and the blanket tool deadline (`defaultTimeoutMs`) all ship neutral, because each one truncates honest work when its ceiling is wrong ([harness-hardening Agent Note](../../.agents/notes/implemented/feature/2026-08-26-step-budget-and-default-tool-timeout.md)).
+
+The Shield snapshot vocabulary is [docs/subsystems/guard.md](../../docs/subsystems/guard.md).

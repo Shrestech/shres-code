@@ -9,3 +9,5 @@ This family provides provider-neutral experiment run, metric, and query operatio
 | [`tool-tracker/`](tool-tracker/README.md) | Exposes experiment run logging, metric append, and query to the model | registers on `ctx.tools` |
 
 The offline posture is a mode, not an error path: with no credential reference, or with the tracker unreachable, a run is held in a durable local spool carrying the failure-taxonomy reason until it syncs. The `tracker/run` event carries the tool-call id of the `experiment_log_run` call that produced it, so every logged run is traceable to its originating call.
+
+The subsystem reference is [docs/subsystems/tracker.md](../../docs/subsystems/tracker.md).

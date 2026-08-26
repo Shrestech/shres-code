@@ -172,3 +172,127 @@ Writers pass `{ ignorable: true }` on card and close events. The native fold is 
 ## Relation to goals
 
 The [goal subsystem](goal.md) and J-Space use separate session stores with no automatic sync. The dock reads both projections and omits its Goal line only when the live GoalBar objective equals the card Goal by exact string match ([ui-jspace](../../packages/client/ui-jspace/README.md)).
+
+<!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
+
+<a id="cordis-surface"></a>
+
+## Cordis API
+
+Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — this section is byte-identical in both language sides of the page. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+
+<a id="ctxjspace--jspaceservice"></a>
+
+### `ctx.jspace` — `JspaceService`
+
+J-Space seat (`ctx.jspace`).
+
+```ts cordis-catalog
+/**
+ * Whether the prompt and tool Consumers belong on this session's next
+ * request. An active seat engages when a card is already open — an open card
+ * must never lose its driver or its tools — or when the session has closed
+ * at least {@link JspaceService.engageAfterSteps} model steps. A caller with
+ * no session (a scope-only assembly) carries no horizon, so a non-zero
+ * threshold leaves it unengaged.
+ * @param session - session whose log decides engagement, when one exists.
+ * @returns true when Consumers mount for this request.
+ */
+engaged(session?: Session): boolean
+
+/**
+ * Subscribe to remount status.
+ * @param listener - called with the new status.
+ * @returns disposer.
+ */
+watch(listener: (status: JspaceStatus) => void): () => void
+
+/**
+ * Fold one session's J-Space events.
+ * @param session - session whose log to fold.
+ * @returns native projection plus inherited parent card.
+ */
+fold(session: Session): JspaceFold
+
+/**
+ * Current native open card, or `null`.
+ * @param session - owning session.
+ * @returns the card.
+ */
+card(session: Session): JspaceCard | null
+
+/**
+ * Settings-console snapshot for one session.
+ * @param session - session whose log to fold.
+ * @returns open/closed and checkpoint counts. Does not throw when inactive.
+ */
+snapshot(session: Session): JspaceSnapshot
+
+/**
+ * Open a card.
+ * @param session - owning session.
+ * @param input - goal, next, optional core.
+ * @returns the recorded card.
+ */
+open(session: Session, input: OpenJspaceInput): JspaceCard
+
+/**
+ * Charter list on the current native card, or empty when none is open.
+ * @param session - owning session.
+ * @returns the folded charter.
+ */
+charter(session: Session): readonly JspaceCharterEntry[]
+
+/**
+ * Replace the charter list on an open card. The tool Consumer runs floor and
+ * discrimination before calling this.
+ * @param session - owning session.
+ * @param next - replacement list.
+ * @returns the recorded card.
+ */
+amendCharter(session: Session, next: readonly JspaceCharterEntry[]): JspaceCard
+
+/**
+ * Patch an open card. Rejects a Goal identity change (`JSPACE_NOTE_GOAL_CHANGE`);
+ * Goal epochs open only through `openGoal`. Rejects a patch whose Goal, Next,
+ * Core, and Open match the current card (`JSPACE_NOTE_NOOP`).
+ * @param session - owning session.
+ * @param input - fields to replace.
+ * @returns the recorded card.
+ */
+note(session: Session, input: NoteJspaceInput): JspaceCard
+
+/**
+ * Open a new Goal epoch on an open card, or update Goal and Next in place
+ * when the Goal is unchanged. A Goal identity change resets Core and Checked
+ * so ship cannot pass on the previous epoch's evidence, and moves the epoch
+ * anchor so a fresh checkpoint is required. The charter is kept: house rules
+ * outlive a Goal rewrite. A same-Goal call is the control-loop update path:
+ * Core, Checked, Open, and charter are kept and the anchor is unchanged. Open
+ * questions carry over untouched on a new epoch. The optional `core` and
+ * `charter` inputs apply only on the first open and are ignored here.
+ * @param session - owning session.
+ * @param input - goal, next, optional core.
+ * @returns the recorded card.
+ */
+openGoal(session: Session, input: OpenJspaceInput): JspaceCard
+
+/**
+ * Append a Checked line.
+ * @param session - owning session.
+ * @param input - check, by, optional evidence.
+ * @returns the recorded card.
+ */
+checkpoint(session: Session, input: CheckpointJspaceInput): JspaceCard
+
+/**
+ * Close the card.
+ * @param session - owning session.
+ */
+close(session: Session): void
+```
+
+Types: [Session](session.md)
+
+Source: [`packages/jspace/jspace/src/index.ts:294`](../../packages/jspace/jspace/src/index.ts)
+<!-- END GENERATED cordis-surface -->

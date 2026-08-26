@@ -100,11 +100,9 @@ This is an automatically generated checkpoint condensing an earlier span of the 
 - full output of bash at seq 15 — session_event_read this session, seq 15
 ```
 
-Each line names a shadowed tool result, user message, prior checkpoint, or (when those are absent) assistant message. `session_id` is omitted so `session_event_read` targets the current session. At most `maxPointers` lines are emitted; they do not grow the J-Space card.
-
 #### Token effect
 
-Model-free pruning can avoid the auxiliary call entirely; otherwise it reduces that call's transcript before the summary replaces an older range. The replacement reduces future input history rather than appending a second copy. Seq-pointer lines add a small, `maxPointers`-capped number of tokens on that replacement. If they would make the framed checkpoint not shrink, they are dropped from the least-salient end until it does. A summary remains until a later compaction replaces it, while an indivisible non-tool unit can still exceed the budget.
+Model-free pruning can avoid the auxiliary call entirely; otherwise it reduces that call's transcript before the summary replaces an older range. The replacement reduces future input history rather than appending a second copy. Seq-pointer lines name a shadowed tool result, user message, prior checkpoint, or (when those are absent) assistant message; `session_id` is omitted so `session_event_read` targets the current session. They add a small, `maxPointers`-capped number of tokens on that replacement and do not grow the J-Space card. If they would make the framed checkpoint not shrink, they are dropped from the least-salient end until it does. A summary remains until a later compaction replaces it, while an indivisible non-tool unit can still exceed the budget.
 
 #### KV Cache effect
 

@@ -98,6 +98,10 @@ export function validateArchiveArtifacts(artifacts: ReadonlyMap<string, Buffer>)
       errors.push(`${path}: expected {kind}/yyyy-mm-dd-topic.md (English-only archive)`)
       continue
     }
+    if (path.endsWith('.zh.md')) {
+      errors.push(`${path}: leftover Chinese artifact (English-only archive)`)
+      continue
+    }
     if (!(AGENT_NOTE_CLASSES as readonly string[]).includes(match[1])) {
       errors.push(`${path}: unknown Agent Note kind ${JSON.stringify(match[1])}`)
       continue

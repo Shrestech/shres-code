@@ -43,3 +43,16 @@ Outcome mapping matches the seam's `TrackerFailureReason` taxonomy: a network fa
 ## Query semantics
 
 `queryRuns` merges landed runs from the index (no `reason`) with pending runs from the run spool (with their `reason`), filtering by `experiment`, `gitSha`, and `since` (against `landedAt` for landed runs and `enqueuedAt` for spooled runs).
+
+## Model Experience
+
+Indirectly, through `shres-tool-tracker`, which owns every model-facing schema, prompt, and result.
+
+#### KV Cache effect
+
+No direct invalidation; the named consumer owns any request-prefix changes.
+
+## Known Limitations and Deferred Work
+
+- **Spool-only without credentials** — absent `credentialRef` never posts live; runs stay in the local spool until a credential is configured.
+- **Unexpected HTTP status fails loud** — only `unreachable` and `auth` map onto the spool taxonomy; any other status throws rather than being swallowed.

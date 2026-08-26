@@ -77,7 +77,7 @@ Prefix-stable while the tool definition and visibility are unchanged. Shadowing,
 
 #### What the model sees
 
-A successful call uses the result template and the provider-managed, directory, URL, or opaque resource guidance below.
+A successful call uses the result template and the provider-managed, directory, URL, or opaque resource guidance below. An untrusted source (`project-*` or any label outside `bundled` / `user-*` / `runtime` / `custom`) places the [`shres-untrusted-frame`](../../util/untrusted-frame/README.md) header inside this block, above `<skill_instructions>`, and wraps the body so every `<` is escaped. The catalog stays summary-only and is not framed.
 
 ##### Skill result template
 
@@ -92,8 +92,6 @@ A successful call uses the result template and the provider-managed, directory, 
 </skill_instructions>
 </skill_content>
 ```
-
-An untrusted source (`project-*` or any label outside `bundled` / `user-*` / `runtime` / `custom`) places the [`shres-untrusted-frame`](../../util/untrusted-frame/README.md) header inside this block, above `<skill_instructions>`, and wraps the body so every `<` is escaped. The catalog stays summary-only and is not framed.
 
 ##### Provider-managed resource guidance
 

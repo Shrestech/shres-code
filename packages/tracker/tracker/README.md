@@ -10,7 +10,7 @@ This package owns the Service Definition role of the experiment tracking capabil
 | `@shres-code/shres-code-tracker-shrestech` | Provider: durable local spool (stage 1), live shrestech-tracker HTTP (stage 2) |
 | `@shres-code/shres-code-tool-tracker` | Consumer: the model-facing `experiment_log_run` / `experiment_log_metrics` / `experiment_query` tools |
 
-The seam follows the [capability seam](docs/glossary.md#capability-seam) definition: a Service Definition / Service Provider / Consumer trio, complete, never one role.
+The seam follows the [capability seam](../../../docs/glossary.md#capability-seam) definition: a Service Definition / Service Provider / Consumer trio, complete, never one role.
 
 ## Service API (`ctx.tracker`)
 

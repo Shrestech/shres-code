@@ -20,7 +20,33 @@ Decided up front: **generic**. All three tools present via `presentCall` returni
 
 ## Model Experience
 
-Tool results retain bounded run data — the run id, the filter fields, and the exact spool reason — while schemas and descriptions carry the required `decision_rule`/`data_version`/`git_sha` ritual. The seam's `tracker/run` and `tracker/metrics` events (written by the service) keep every logged run reconstructable from the session log, and the `tracker/run` event's tool-call id ties each run to the exact call that produced it.
+### Tool schema
+
+#### What the model sees
+
+The model sees the generated [`experiment_log_run`, `experiment_log_metrics`, and `experiment_query` schemas](../../../docs/tool-catalog.md#shres-codeshres-code-tool-tracker).
+
+#### Token effect
+
+Fixed schema cost on every request where the tools are visible.
+
+#### KV Cache effect
+
+Prefix-stable while the definitions and visibility are unchanged. Plugin lifecycle or scoped restrictions may invalidate reuse from this schema.
+
+### Tool-call history and result
+
+#### What the model sees
+
+Success returns exactly `Logged experiment run <runId>.`, `Run <runId> did not land at the tracker; held in the local spool (reason: <reason>).`, `Appended <n> metric point(s) to run <runId>.`, `No experiment runs found.`, or a list headed `Experiment runs:` of `- <runId> <experiment> <decisionRule> @ <gitSha>` lines with optional `(not landed: <reason>)`. `experiment_log_run` and `experiment_log_metrics` reject a caller without an owning agent session.
+
+#### Token effect
+
+Call arguments remain until compaction. Result text is small and scales with the query hit list.
+
+#### KV Cache effect
+
+Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
 
 ## Known Limitations and Deferred Work
 

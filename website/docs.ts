@@ -254,6 +254,7 @@ const subsystemGroups = [
     ['subprocess.md', 'Subprocesses'],
     ['terminal.md', 'PTY sessions'],
     ['jobs.md', 'Background jobs'],
+    ['tracker.md', 'Experiment tracking'],
     ['filesystem.md', 'Filesystem'],
     ['lsp.md', 'LSP navigation'],
     ['code-runtime.md', 'Code runtime'],
@@ -269,6 +270,7 @@ const subsystemGroups = [
     ['sandbox.md', 'Sandboxing'],
     ['plan.md', 'Plan mode'],
     ['jspace.md', 'J-Space'],
+    ['guard.md', 'Guards'],
     ['user-questions.md', 'User interaction'],
     ['commands.md', 'Human commands'],
     ['goal.md', 'Goals'],
@@ -449,7 +451,7 @@ export const docsPages: DocsPage[] = [
  */
 export function orderedPages(locale: DocsLocale, collection: DocsSidebar): DocsPage[] {
   return docsPages
-    .filter(page => page.locale === locale && page.sidebar === collection)
+    .filter(page => page.sidebar === collection)
     .sort((left, right) => (
       sectionSpec(locale, left.section).index - sectionSpec(locale, right.section).index
       || left.order - right.order

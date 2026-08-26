@@ -60,16 +60,16 @@ The availability line is prefix-stable until a card opens or Settings flips. Upd
 
 #### What the model sees
 
-`jspace:charter-seed` while a `jspace/charter-proposal` exists and the folded card has an empty charter. The pinned preamble:
+`jspace:charter-seed` while a `jspace/charter-proposal` exists and the folded card has an empty charter. The section is empty after the card carries a charter. Template commands in the proposal are new model-visible input; the reconstructable source is the `jspace/charter-proposal` event.
 
-```
+##### Charter-seed preamble
+
+```markdown
 J-Space charter (harness proposal). Confirm or amend on jspace_open; do not author a blank list.
 Each check is a bash command the harness will run at every checkpoint and at ship. Exit 0 passes.
 kind=accept-proposal with no ids accepts this whole list. Replace any entry by sending kind=check with a different command.
 Prose entries reprint; they do not pass ship. Prefer a check per rule.
 ```
-
-The section is empty after the card carries a charter. Template commands in the proposal are new model-visible input; the reconstructable source is the `jspace/charter-proposal` event.
 
 #### Token effect
 
