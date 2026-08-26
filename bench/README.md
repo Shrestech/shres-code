@@ -129,6 +129,8 @@ A task whose `task.json` names `setup` runs that command after the fixture copy 
 
 The adoption experiment is `--arms sq-only,sq-driver --tasks session-query-adoption`.
 
+`compaction-pointer-follow` measures pointer dereference: run it with `bench/pressure/forced-compaction.patch.yml` plus a patch setting `compaction-basic` `maxPointers` above the overlay's pinned `0` so summaries carry seq pointers.
+
 ## Forensics metrics
 
 Per-trial metrics beyond pass/fail, computed from the session JSONL:
