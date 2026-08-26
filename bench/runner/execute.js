@@ -17,12 +17,16 @@ import { createRequire } from 'node:module'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { isSeededPriorSession } from './session-layout.js'
+import { UsageWatcher } from './usage-watcher.js'
 
 /** Captured stdout/stderr are capped so a stuck loop cannot exhaust memory. */
 const MAX_CAPTURE_BYTES = 8 << 20
 
 /** Grace period between SIGTERM and SIGKILL when a run exceeds its timeout. */
 export const KILL_GRACE_MS = 5_000
+
+/** Budget-watch poll interval: how often the live usage watcher absorbs appended bytes. */
+export const BUDGET_POLL_MS = 5_000
 
 /**
  * SIGTERM a child on abort, then SIGKILL after `graceMs`. The disposer
@@ -87,6 +91,7 @@ export function resolveHarnessLaunch(repoRoot) {
  * @property {string} stderr - captured stderr (capped).
  * @property {number} durationMs - wall time from spawn to exit.
  * @property {string | null} sessionLogPath - absolute top-level session log, when found.
+ * @property {boolean} budgetExceeded - the live token cap observed the trial over `maxTotalTokens` and terminated it.
  */
 
 /**
@@ -164,6 +169,46 @@ export async function findSessionLog(sessionLogRoot, scratchDir) {
 }
 
 /**
+ * Poll the trial's persistence root for provider-reported usage and fire
+ * `onExceeded` once the running root+descendant total passes `maxTotalTokens`.
+ * The poll loop is advisory: a watch error is swallowed (the cap must never
+ * fail a run that merely has an unreadable moment) and polling stops as soon
+ * as `isSettled` reports the child exited.
+ * @param {import('node:child_process').ChildProcess} child - the spawned harness.
+ * @param {string} sessionLogRoot - per-trial persistence root.
+ * @param {number | undefined} maxTotalTokens - cap; undefined disables the watch.
+ * @param {() => void} onExceeded - called once when the cap is observed exceeded.
+ * @param {() => boolean} isSettled - whether the spawn already finished.
+ * @param {(graceMs: number) => void} armKillTimer - arm the SIGKILL grace timer on the caller's handle.
+ * @returns {() => void} stopper; call when the child closes.
+ */
+function startBudgetWatch(child, sessionLogRoot, maxTotalTokens, onExceeded, isSettled, armKillTimer) {
+  if (maxTotalTokens === undefined) return () => {}
+  const watcher = new UsageWatcher(sessionLogRoot)
+  /** @type {ReturnType<typeof setTimeout> | null} */
+  let timer = null
+  const poll = async () => {
+    if (isSettled()) return
+    try {
+      const totals = await watcher.poll()
+      if (totals.inputTokens + totals.outputTokens > maxTotalTokens) {
+        onExceeded()
+        child.kill('SIGTERM')
+        armKillTimer(KILL_GRACE_MS)
+        return
+      }
+    } catch {
+      // An unreadable instant during append is retried on the next tick.
+    }
+    if (!isSettled()) timer = setTimeout(poll, BUDGET_POLL_MS)
+  }
+  timer = setTimeout(poll, BUDGET_POLL_MS)
+  return () => {
+    if (timer !== null) clearTimeout(timer)
+  }
+}
+
+/**
  * Run one headless trial to completion or timeout. Never rejects for an
  * ordinary nonzero exit; only spawn-level failures (node missing) throw.
  * @param {object} options
@@ -175,17 +220,19 @@ export async function findSessionLog(sessionLogRoot, scratchDir) {
  * @param {string} options.sessionLogRoot - per-trial persistence root baked into the overlay.
  * @param {number} options.timeoutMs - task timeout from task.json.
  * @param {NodeJS.ProcessEnv} options.env - child environment (carries API key, SHRES_HOME).
+ * @param {number} [options.maxTotalTokens] - live cap on observed root+descendant usage; exceeding it
+ *   terminates the child and marks the result `budgetExceeded`. Undefined disables the watch.
  * @param {AbortSignal} [options.signal] - abort kills the child (SIGTERM, then SIGKILL) and waits for exit.
  * @returns {Promise<ExecutionResult>} the execution record.
  */
-export async function executeTrial({ repoRoot, overlayPath, extraPatchPaths = [], taskText, scratchDir, sessionLogRoot, timeoutMs, env, signal }) {
+export async function executeTrial({ repoRoot, overlayPath, extraPatchPaths = [], taskText, scratchDir, sessionLogRoot, timeoutMs, env, signal, maxTotalTokens }) {
   const launch = resolveHarnessLaunch(repoRoot)
   const patchArgs = ['--patch', overlayPath, ...extraPatchPaths.flatMap(p => ['--patch', p])]
   const argv = [...launch.argsPrefix, '--profile', 'headless', ...patchArgs, taskText]
   const startedAt = Date.now()
 
   if (signal?.aborted) {
-    return { exitCode: null, timedOut: false, stdout: '', stderr: '', durationMs: 0, sessionLogPath: null }
+    return { exitCode: null, timedOut: false, budgetExceeded: false, stdout: '', stderr: '', durationMs: 0, sessionLogPath: null }
   }
 
   const child = spawn(launch.command, argv, { cwd: scratchDir, env, stdio: ['ignore', 'pipe', 'pipe'] })
@@ -198,6 +245,7 @@ export async function executeTrial({ repoRoot, overlayPath, extraPatchPaths = []
     if (stderr.length < MAX_CAPTURE_BYTES) stderr += chunk.toString()
   })
 
+  let budgetExceeded = false
   const { exitCode, timedOut } = await new Promise((resolvePromise, rejectPromise) => {
     let settled = false
     let timeoutFired = false
@@ -210,12 +258,18 @@ export async function executeTrial({ repoRoot, overlayPath, extraPatchPaths = []
       child.kill('SIGTERM')
       killTimer = setTimeout(() => child.kill('SIGKILL'), KILL_GRACE_MS)
     }, timeoutMs)
+    const stopBudgetWatch = startBudgetWatch(child, sessionLogRoot, maxTotalTokens, () => {
+      budgetExceeded = true
+    }, () => settled, graceMs => {
+      if (killTimer === null) killTimer = setTimeout(() => child.kill('SIGKILL'), graceMs)
+    })
     const finish = (result, error) => {
       if (settled) return
       settled = true
       clearTimeout(timer)
       if (killTimer) clearTimeout(killTimer)
       detachAbort()
+      stopBudgetWatch()
       if (error !== undefined) rejectPromise(error)
       else resolvePromise(result)
     }
@@ -230,6 +284,7 @@ export async function executeTrial({ repoRoot, overlayPath, extraPatchPaths = []
   return {
     exitCode,
     timedOut,
+    budgetExceeded,
     stdout,
     stderr,
     durationMs: Date.now() - startedAt,
