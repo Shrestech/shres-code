@@ -1179,6 +1179,13 @@ export interface PiAiProviderProfile {
   /** Endpoint for this route's models; defaults to the installed catalog's endpoint. */
   baseURL?: string
   /**
+   * Known alternate endpoints of this route (platform, coding, regional). The
+   * active endpoint is still the plain `baseURL` override; variants only feed
+   * pickers and placeholders, so a hand-written `baseURL` remains
+   * authoritative.
+   */
+  endpoints?: PiAiEndpointVariant[] | null
+  /**
    * This route's model catalog. Omission serves the installed catalog for the
    * route unchanged; an explicit list replaces it, each entry defaulting its
    * unset fields from the installed model of the same id.
@@ -1243,6 +1250,23 @@ export interface PiAiProviderProfile {
   retryPolicy?: RetryPolicyConfig
   /** When false, this route is omitted from the live adapter registry. Defaults to on. */
   enabled?: boolean
+}
+
+/**
+ * One known alternate endpoint of a provider route: a named deployment of the
+ * same API family that takes a different credential class. Declaring variants
+ * lets the settings card offer an explicit endpoint choice instead of asking
+ * the user to discover and hand-type a base URL.
+ */
+export interface PiAiEndpointVariant {
+  /** Stable variant id used as the settings value. */
+  id: string
+  /** Human label for pickers. */
+  label: string
+  /** Endpoint base URL this variant switches the route to. */
+  baseURL: string
+  /** One-line hint of what the variant serves and which credential it wants. */
+  hint?: string
 }
 
 /** One configured model entry: an id plus the catalog fields it overrides. */
@@ -1337,7 +1361,7 @@ type WithheldThinkingFormat = 'chat-template' | 'qwen-chat-template'
 
 Depends on: `Api` (`@earendil-works/pi-ai`) · `CacheRetention` (`@earendil-works/pi-ai`) · `Model` (`@earendil-works/pi-ai`) · `ModelThinkingLevel` (`@earendil-works/pi-ai`) · `OpenAICompletionsCompat` (`@earendil-works/pi-ai`) · [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts) · `ThinkingBudgets` (`@earendil-works/pi-ai`) · `Transport` (`@earendil-works/pi-ai`)
 
-Source: [`packages/llm/llm-pi-ai/src/config.ts:174`](../packages/llm/llm-pi-ai/src/config.ts)
+Source: [`packages/llm/llm-pi-ai/src/config.ts:198`](../packages/llm/llm-pi-ai/src/config.ts)
 
 <a id="shres-codeshres-code-llm-replay"></a>
 

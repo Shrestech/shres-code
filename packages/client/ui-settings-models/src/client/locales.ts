@@ -45,6 +45,7 @@ export const en = {
   customized: 'Customized settings',
   baseUrl: 'Base URL',
   baseUrlDefault: 'Provider default',
+  endpoint: 'Endpoint',
   models: 'Models',
   modelsInherited: 'Using the adapter defaults',
   modelsCustomized: 'Customized model catalog',
