@@ -20,6 +20,8 @@ import {
 } from './protocol.ts'
 
 export { DESIGN_DEFENSE_DENY_PREFIX, designDefenseDeny, missingDebateTools } from './epoch.ts'
+export { renderDigest } from './digest.ts'
+export type { DigestBudget, DigestCard, DigestDecision, DigestInput } from './digest.ts'
 export type { CompletedDebateCall } from './epoch.ts'
 export {
   RESEARCH_PROTOCOL_SECTION_NAME,
@@ -78,16 +80,27 @@ function resolveConfig(config: Config): ResolvedConfig {
       throw new TypeError('research-protocol: debateTools and gatedTools must hold non-empty tool names')
     }
   }
-  const requireDesignDefense: string = config.requireDesignDefense ?? 'per-epoch'
-  if (requireDesignDefense !== 'per-epoch' && requireDesignDefense !== 'off') {
-    throw new TypeError("research-protocol: requireDesignDefense must be 'per-epoch' or 'off'")
-  }
+  const requireDesignDefense = validateDefenseMode(config.requireDesignDefense as string)
   return {
     enabled: config.enabled === true,
     requireDesignDefense,
     debateTools,
     gatedTools,
   }
+}
+
+/**
+ * Validate one defense-mode value straight from raw config.
+ * @param value - the raw value.
+ * @returns the validated mode.
+ */
+function validateDefenseMode(value: string): 'per-epoch' | 'off' {
+  // Direct apply callers bypass Loader schema defaulting; an omitted mode is
+  // a misconfiguration, not a silent default.
+  if (value !== 'per-epoch' && value !== 'off') {
+    throw new TypeError("research-protocol: requireDesignDefense must be 'per-epoch' or 'off'")
+  }
+  return value
 }
 
 /**
@@ -122,6 +135,7 @@ export function apply(ctx: Context, config: Config = {}): void {
       current = resolveConfig(source())
     },
   })
+  current = resolveConfig(source())
   ctx.systemPrompt.section({
     name: RESEARCH_PROTOCOL_SECTION_NAME,
     order: RESEARCH_PROTOCOL_SECTION_ORDER,

@@ -1,0 +1,8 @@
+{
+  "steps": [
+    {
+      "op": "prompt",
+      "text": "Run one researcher micro cycle: open a card, hold the design defense with both seats, log one run with a machine rule, verify it mechanically, record the decision, checkpoint with evidence, and ship."
+    }
+  ]
+}

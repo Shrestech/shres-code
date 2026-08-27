@@ -33,6 +33,8 @@ const goalScenarioDir = join(snapshotsDir, 'goal-tools')
 const goalConfigPath = fileURLToPath(new URL('../goal.cordis.snapshot.yml', import.meta.url))
 const jspaceScenarioDir = join(snapshotsDir, 'jspace-tools')
 const jspaceConfigPath = fileURLToPath(new URL('../jspace.cordis.snapshot.yml', import.meta.url))
+const researcherScenarioDir = join(snapshotsDir, 'researcher-micro-cycle')
+const researcherConfigPath = fileURLToPath(new URL('../researcher.cordis.snapshot.yml', import.meta.url))
 const jspaceCharterScenarioDir = join(snapshotsDir, 'jspace-charter')
 const jspaceCharterPassScenarioDir = join(snapshotsDir, 'jspace-charter-pass')
 const jspaceCharterLoopScenarioDir = join(snapshotsDir, 'jspace-charter-loop')
@@ -832,6 +834,68 @@ describe('headless stream-json snapshots', () => {
         expect(systems[1]).toContain('Checked:   (none)')
         expect(systems[1]).toContain('Open:      (none)')
         expect(systems[1]).toContain('Next:      Inspect the logged card')
+      },
+    })
+
+    expect(result.stderr).toBe('')
+    const normalized = normalizeHeadlessStream(result.stdout, runCwd)
+    if (refreshing) await writeFile(streamExpected, normalized)
+    expect(normalized).toBe(await readFile(streamExpected, 'utf8'))
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+
+  it('replays a researcher micro cycle through the one-shot app', async () => {
+    const prompt = await scenarioPrompt(researcherScenarioDir, 'researcher-micro-cycle')
+    const streamExpected = join(researcherScenarioDir, 'stream-json.expected.jsonl')
+    let runCwd = ''
+    const result = await runLoaderSmoke({
+      label: 'researcher micro cycle headless stream-json snapshot',
+      tempDirPrefix: 'headless-snapshot-researcher-',
+      binScript,
+      libBinScript: binScript,
+      configPath: researcherConfigPath,
+      binArgs: [researcherConfigPath, prompt],
+      tsconfigPath,
+      env: {
+        SHRES_SNAPSHOT: 'replay',
+        SHRES_SNAPSHOT_FILE: join(researcherScenarioDir, 'session.jsonl'),
+        SHRES_SNAPSHOT_OVERRIDE: join(researcherScenarioDir, 'replay.override.json'),
+        NODE_OPTIONS: [process.env.NODE_OPTIONS, '--disable-warning=ExperimentalWarning'].filter(Boolean).join(' '),
+      },
+      prepare: (cwd) => { runCwd = cwd },
+      inspect: async (cwd) => {
+        const logs = await persistedLogs(cwd)
+        expect(logs).toHaveLength(1)
+        const records = parseJsonl(logs[0]?.content ?? '')
+        const calls = records.filter(record => record.type === 'tool/call')
+          .map(record => (record.data as JsonObject | undefined)?.name)
+        expect(calls).toEqual([
+          'jspace_open',
+          'aegis',
+          'ward',
+          'experiment_log_run',
+          'experiment_verify_decision_rule',
+          'ledger_record_decision',
+          'jspace_checkpoint',
+          'jspace_ship',
+        ])
+        const runEvents = records.filter(record => record.type === 'tracker/run')
+        expect(runEvents).toHaveLength(1)
+        expect(runEvents[0]?.data).toMatchObject({ experiment: 'micro-cycle', decisionRule: 'val_bpb < 1.0' })
+        const ledgerEvents = records.filter(record => record.type === 'ledger/decision')
+        expect(ledgerEvents).toHaveLength(1)
+        expect(ledgerEvents[0]?.data).toMatchObject({ decision: 'accepted', hypothesis: 'The stub debate satisfies the design-defense gate' })
+        const cards = records.filter(record => record.type === 'jspace/card')
+        expect(cards).toHaveLength(2)
+        const checked = (cards[1]?.data as JsonObject | undefined)?.checked as ReadonlyArray<JsonObject> | undefined
+        expect(checked).toHaveLength(1)
+        expect(checked?.[0]).toMatchObject({ verified: true })
+        const systems = records.flatMap((record) => {
+          if (record.type !== 'request/header') return []
+          const header = (record.data as JsonObject | undefined)?.header as JsonObject | undefined
+          return typeof header?.system === 'string' ? [header.system] : []
+        })
+        expect(systems[0]).toContain('research:protocol')
+        expect(systems[0]).toContain('experiment_verify_decision_rule')
       },
     })
 

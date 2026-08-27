@@ -293,6 +293,7 @@
     { "path": "./packages/ledger/ledger" },
     { "path": "./packages/ledger/tool-ledger" },
     { "path": "./packages/research/protocol" },
+    { "path": "./packages/test-support/research-stubs" },
     { "path": "./packages/jspace/jspace" },
     { "path": "./packages/jspace/jspace-prompt" },
     { "path": "./packages/jspace/tool-jspace" },

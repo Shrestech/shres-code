@@ -37,9 +37,6 @@
     tracker: true
     ledger: true
   config:
-    - id: tracker
-      name: '@shres-code/shres-code-tracker'
-
     - id: tracker-shrestech
       name: '@shres-code/shres-code-tracker-shrestech'
       config:

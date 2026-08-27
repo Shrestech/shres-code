@@ -30,11 +30,11 @@ The gate proves a debate happened; the probe-downgrade rule for unresolved chall
 
 ## Consequences
 
-A researcher session can now run the full micro-cycle — hypothesis on the card, seat debate enforced before any run is logged, runs with machine rules verified mechanically, decisions in the ledger with resolvable evidence, all under a user-owned toggle — with every model-visible surface reconstructable from the log and both new stores durable outside the session. The remaining researcher-harness stages (jspace v2 project scope, budget seam, autonomy guards, the keyless micro-cycle snapshot) build on this surface.
+A researcher session can now run the full micro-cycle — hypothesis on the card, seat debate enforced before any run is logged, runs with machine rules verified mechanically, decisions in the ledger with resolvable evidence, all under a user-owned toggle — with every model-visible surface reconstructable from the log and both new stores durable outside the session. The keyless `researcher-micro-cycle` headless snapshot replays one complete cycle (card → stub seat debate → spooled run with a machine rule → `experiment_verify_decision_rule` interpolating the minted run id through a `{{fromRequest}}` placeholder → ledger decision → evidence-grade checkpoint citing the log-run call → passing ship under `requireVerifiedEvidence`). The remaining researcher-harness stages (jspace v2 project scope, budget seam, autonomy guards) build on this surface.
 
 ## Testing
 
-Per-file 100% coverage on `packages/ledger/*`, `packages/research/protocol/src`, and the touched tracker trees; the protocol package adds a real-Loader composition test, a settings-flip test through `FileSettingsProvider`, and gate tests that cover epoch re-arm, custom seat names, and the invariant's spurious-deny rejection. Catalogs (`gen-tool-catalog`, `gen-doc-graphs`, `gen-cordis-catalog`) and `verify-type-equiv` are regenerated and green.
+Per-file 100% coverage on `packages/ledger/*`, `packages/research/protocol/src`, and the touched tracker trees; the protocol package adds a real-Loader composition test, a settings-flip test through `FileSettingsProvider`, and gate tests that cover epoch re-arm, custom seat names, and the invariant's spurious-deny rejection. Catalogs (`gen-tool-catalog`, `gen-doc-graphs`, `gen-cordis-catalog`) and `verify-type-equiv` are regenerated and green. `packages/test-support/research-stubs` provides the keyless aegis/ward seats; `pnpm run test:snapshot -t researcher` replays the cycle with no API key.
 
 ## Related
 

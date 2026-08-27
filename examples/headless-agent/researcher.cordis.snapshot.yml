@@ -1,0 +1,45 @@
+# Replay counterpart for the researcher micro-cycle scenario. It includes
+# cordis.yml directly because a config patch cannot target an entry behind a
+# nested include, then adds the researcher surface — protocol, project stores,
+# J-Space with evidence-grade ship, and the stub debate seats — while replacing
+# the live model with keyless replay.
+- id: base
+  name: '@shres-code/cordis-plugin-include'
+  config:
+    path: ./cordis.yml
+    patches:
+      - id: llm-deepseek
+        name: '@shres-code/shres-code-llm-deepseek'
+        disabled: true
+      - insert:
+          - id: jspace
+            name: '@shres-code/shres-code-jspace'
+            config:
+              enabled: true
+              mode: available
+              requireCoverage: true
+              verifierTools: [experiment_verify_decision_rule, experiment_log_run]
+              requireVerifiedEvidence: true
+          - id: jspace-prompt
+            name: '@shres-code/shres-code-jspace-prompt'
+          - id: tool-jspace
+            name: '@shres-code/shres-code-tool-jspace'
+          - id: research-protocol
+            name: '@shres-code/shres-code-research-protocol'
+            config: { enabled: true }
+          - id: tracker-shrestech
+            name: '@shres-code/shres-code-tracker-shrestech'
+            config:
+              baseUrl: 'https://tracker.invalid'
+              lane: researcher
+          - id: tool-tracker
+            name: '@shres-code/shres-code-tool-tracker'
+          - id: ledger
+            name: '@shres-code/shres-code-ledger'
+            config: { storagePath: 'research-ledger.jsonl' }
+          - id: tool-ledger
+            name: '@shres-code/shres-code-tool-ledger'
+          - id: research-stubs
+            name: '@shres-code/shres-code-research-stubs'
+          - id: llm-replay
+            name: '@shres-code/shres-code-llm-replay'
