@@ -25,3 +25,5 @@ Request/spec split follows `shres-shell`: the seam resolves once via `resolveLog
 ## Consequences
 
 Stage 1 now proves the live round trip: a run with a credential reference posts over real HTTP, a non-landing run is held durably with its taxonomy reason, `sync` drains runs and metrics together and re-enqueues only what did not land, and `queryRuns` answers from the derived index without a network call. The git run-record remains the binding truth; the landed index is derived and rebuildable. Per-file 100% coverage gates every src file; the spool drain/append, the transport mapping, and the index are covered through mocked fetch and temp-directory round-trips, plus an env-gated e2e test is available when `TRACKER_BASE_URL` is set.
+
+The surface grew in the [researcher MVI](2026-08-28-researcher-mvi-ledger-verifier-protocol.md): runs carry an optional machine-readable `machineRule`, the service gained `getRun`/`getMetrics` retrieval hooks, and `verifyDecisionRule` re-executes the rule mechanically — the shrestech provider implements the retrieval from its spool and landed index.

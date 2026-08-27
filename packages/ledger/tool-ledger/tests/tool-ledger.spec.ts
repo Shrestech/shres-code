@@ -7,7 +7,7 @@ import { CallId } from '@shres-code/shres-code-llm'
 import ToolRuntime from '@shres-code/shres-code-tools'
 import SystemPrompt from '@shres-code/shres-code-system-prompt'
 import TrackerService from '@shres-code/shres-code-tracker'
-import type { LogRunSpec, MetricPoint, RunFilter, TrackerRunId, TrackerRunRecord, TrackerRunResult, TrackerRunSummary } from '@shres-code/shres-code-tracker'
+import type { LogRunSpec, MetricPoint, RunFilter, TrackerDecisionRuleVerdict, TrackerRunId, TrackerRunRecord, TrackerRunResult, TrackerRunSummary } from '@shres-code/shres-code-tracker'
 import FileLedgerService from '@shres-code/shres-code-ledger'
 import { Session, SessionId } from '@shres-code/shres-code-session'
 
@@ -36,6 +36,12 @@ class StubTracker extends TrackerService {
 
   override async getMetrics(_runId: TrackerRunId): Promise<MetricPoint[]> {
     return []
+  }
+
+  override async verifyDecisionRule(runId: TrackerRunId): Promise<TrackerDecisionRuleVerdict> {
+    return this.knownRuns.includes(runId)
+      ? { status: 'satisfied', rule: { metric: 'val_bpb', op: '<', threshold: 1 }, actual: 0.5 }
+      : { status: 'refused', reason: 'run-not-found', detail: runId }
   }
 }
 

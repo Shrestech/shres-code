@@ -3730,7 +3730,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'LedgerFailureReason',
-    declaration: 'export type LedgerFailureReason = \'required-field\' | \'missing-run\' | \'deferred-cites-runs\' | \'invalid-artifact-uri\' | \'unresolved-run\' | \'corrupt-store\';',
+    declaration: 'export type LedgerFailureReason = \'required-field\' | \'missing-run\' | \'deferred-cites-runs\' | \'unresolved-run\' | \'unverified-run\' | \'corrupt-store\';',
   },
   {
     name: 'LedgerFilter',

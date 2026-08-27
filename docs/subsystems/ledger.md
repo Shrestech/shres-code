@@ -20,7 +20,7 @@ type LedgerEntryId = Branded<'LedgerEntryId'>
 type Decision = 'accepted' | 'rejected' | 'deferred'
 ```
 
-`record` accepts a `LedgerRequest` and resolves it through `resolveRecord(request): LedgerSpec`. That step rejects blank `hypothesis`/`rationale`, requires at least one `evidence.runIds` entry for `accepted` and `rejected` (every cited run id must resolve through the mounted tracker service), requires zero run ids for `deferred`, and defaults `evidence.artifactUris` to an empty list. Providers never re-default.
+`record` accepts a `LedgerRequest` and resolves it through `resolveRecord(request): LedgerSpec`. That step rejects blank `hypothesis`/`rationale`, requires at least one `evidence.runIds` entry for `accepted` and `rejected`, requires zero run ids for `deferred`, and defaults `evidence.artifactUris` to an empty list. Providers never re-default. `record` then re-executes every cited run's machine rule through `ctx.tracker.verifyDecisionRule` — an `accepted` or `rejected` decision fails with `unverified-run` unless every cited run verifies `satisfied`, making the mechanical-verdict rule an invariant of the ledger store itself; `deferred` cites no evidence and is verified at acceptance time.
 
 ```ts type-equiv
 /**
@@ -110,8 +110,8 @@ type LedgerFailureReason =
   | 'required-field'
   | 'missing-run'
   | 'deferred-cites-runs'
-  | 'invalid-artifact-uri'
   | 'unresolved-run'
+  | 'unverified-run'
   | 'corrupt-store'
 ```
 
@@ -197,5 +197,5 @@ async query(filter: LedgerFilter): Promise<LedgerEntry[]>
 
 Types: [CallId](llm-streaming.md) · [Session](session.md)
 
-Source: [`packages/ledger/ledger/src/index.ts:65`](../../packages/ledger/ledger/src/index.ts)
+Source: [`packages/ledger/ledger/src/index.ts:67`](../../packages/ledger/ledger/src/index.ts)
 <!-- END GENERATED cordis-surface -->

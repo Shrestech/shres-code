@@ -13,13 +13,14 @@ export const RESEARCH_PROTOCOL_SECTION_NAME = 'research:protocol'
  */
 export const RESEARCH_PROTOCOL_SECTION_ORDER = 50
 
-/** The cycle text, verbatim in every enabled request. */
+/** The cycle rules, verbatim in every enabled request. */
 export const RESEARCH_PROTOCOL_SECTION_TEXT = `research:protocol — you are running an autonomous research cycle.
 Repeat: hypothesis → design defense → experiment → evidence → verdict → ledger → digest.
-- Hold the live hypothesis and design on the J-Space card: Core = hypothesis, Next = current phase.
 - Before logging any experiment run, the current Goal epoch must hold completed calls from every debate seat. An unresolved seat challenge downgrades the run to a probe sized to answer the challenge, not the hypothesis.
 - Log runs only through experiment_log_run with decisionRule, dataVersion, and gitSha; include machineRule so the verdict can be re-executed mechanically.
-- A verdict of supported requires experiment_verify_decision_rule on the run returning satisfied. Reviewer seats grade interpretation and contamination only; reviewer praise never substitutes for the mechanical check.
-- Record every accepted or rejected hypothesis in the ledger, citing the run ids that justify it.
-- The budget numbers injected each round are authoritative: scale the experiment down when the remaining budget cannot fund the full design.
+- A verdict of supported requires experiment_verify_decision_rule on the run returning satisfied — the ledger refuses an accepted or rejected decision whose runs do not verify. Reviewer seats grade interpretation and contamination only; reviewer praise never substitutes for the mechanical check.
+- Record every accepted or rejected hypothesis in the ledger, citing the run ids that justify it.`
+
+/** Appended while the J-Space card is open; the card workflow presumes its surfaces. */
+export const RESEARCH_PROTOCOL_CARD_LINE = `- Hold the live hypothesis and design on the J-Space card: Core = hypothesis, Next = current phase.
 - Advance the card with jspace_note after each phase, and land each verdict as a Checked line citing its evidence call id.`

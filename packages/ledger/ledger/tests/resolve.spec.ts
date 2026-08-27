@@ -78,10 +78,6 @@ describe('resolveRecord', () => {
       .toThrow(new RegExp('must not cite run ids'))
   })
 
-  it('rejects an artifact uri that does not start with modelstore:// as invalid-artifact-uri', () => {
-    expect(() => resolveRecord(validRequest({ evidence: { runIds: [runId('run-1')], artifactUris: ['https://x'] } })))
-      .toThrow(new RegExp('must start with modelstore://'))
-  })
 })
 
 describe('LedgerError', () => {

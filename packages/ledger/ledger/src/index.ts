@@ -119,6 +119,19 @@ export abstract class LedgerService extends Service {
     for (const runId of spec.evidence.runIds) {
       if (!known.has(runId)) return { kind: 'failed', entryId, reason: 'unresolved-run' }
     }
+    // Amendment 1 lives here: an accepted or rejected decision is an
+    // invariant of the ledger store itself — every cited run's machine rule
+    // must re-execute to satisfied, regardless of prompt text, jspace
+    // posture, or deployment config. Deferred decisions cite no evidence
+    // and are verified at acceptance time.
+    if (spec.decision !== 'deferred') {
+      for (const runId of spec.evidence.runIds) {
+        const verdict = await this.ctx.tracker.verifyDecisionRule(runId)
+        if (verdict.status !== 'satisfied') {
+          return { kind: 'failed', entryId, reason: 'unverified-run' }
+        }
+      }
+    }
     try {
       await this.persistRecord(entryId, spec)
     } catch (error) {

@@ -14,6 +14,7 @@ import type {} from '@shres-code/shres-code-tools'
 import type {} from '@shres-code/shres-code-jspace'
 import { designDefenseDeny, missingDebateTools } from './epoch.ts'
 import {
+  RESEARCH_PROTOCOL_CARD_LINE,
   RESEARCH_PROTOCOL_SECTION_NAME,
   RESEARCH_PROTOCOL_SECTION_ORDER,
   RESEARCH_PROTOCOL_SECTION_TEXT,
@@ -24,6 +25,7 @@ export { renderDigest } from './digest.ts'
 export type { DigestBudget, DigestCard, DigestDecision, DigestInput } from './digest.ts'
 export type { CompletedDebateCall } from './epoch.ts'
 export {
+  RESEARCH_PROTOCOL_CARD_LINE,
   RESEARCH_PROTOCOL_SECTION_NAME,
   RESEARCH_PROTOCOL_SECTION_ORDER,
   RESEARCH_PROTOCOL_SECTION_TEXT,
@@ -139,7 +141,16 @@ export function apply(ctx: Context, config: Config = {}): void {
   ctx.systemPrompt.section({
     name: RESEARCH_PROTOCOL_SECTION_NAME,
     order: RESEARCH_PROTOCOL_SECTION_ORDER,
-    text: () => (current.enabled ? RESEARCH_PROTOCOL_SECTION_TEXT : ''),
+    text: (context) => {
+      if (!current.enabled) return ''
+      const session = context.agent?.session
+      const jspace = ctx.get('jspace')
+      const cardOpen = jspace !== undefined && jspace.status.active
+        && session !== undefined && jspace.card(session) !== null
+      const lines = [RESEARCH_PROTOCOL_SECTION_TEXT]
+      if (cardOpen) lines.push(RESEARCH_PROTOCOL_CARD_LINE)
+      return lines.join('\n')
+    },
   })
   ctx.effect(() => ctx.on('tools/pre-execute', (exec, next) => {
     if (!current.enabled) return next()

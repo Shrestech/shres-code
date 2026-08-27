@@ -884,6 +884,10 @@ describe('headless stream-json snapshots', () => {
         const ledgerEvents = records.filter(record => record.type === 'ledger/decision')
         expect(ledgerEvents).toHaveLength(1)
         expect(ledgerEvents[0]?.data).toMatchObject({ decision: 'accepted', hypothesis: 'The stub debate satisfies the design-defense gate' })
+        const verifyResults = records.filter(record => record.type === 'tool/result')
+          .map(record => JSON.stringify(record.data))
+          .filter(text => text.includes('experiment_verify_decision_rule') || text.includes('Decision rule'))
+        expect(verifyResults.some(text => text.includes('Decision rule satisfied'))).toBe(true)
         const cards = records.filter(record => record.type === 'jspace/card')
         expect(cards).toHaveLength(2)
         const checked = (cards[1]?.data as JsonObject | undefined)?.checked as ReadonlyArray<JsonObject> | undefined

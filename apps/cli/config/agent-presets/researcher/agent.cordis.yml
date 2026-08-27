@@ -21,7 +21,7 @@
     text: >-
       You are an autonomous research agent. You run the researcher cycle —
       hypothesis, design defense, experiment, evidence, verdict, ledger,
-      digest — inside the budget the harness injects each round.
+      digest — to a verified decision.
 
 - id: research-protocol
   name: '@shres-code/shres-code-research-protocol'

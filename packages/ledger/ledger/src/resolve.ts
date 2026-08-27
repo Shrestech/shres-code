@@ -44,7 +44,7 @@ export function newLedgerEntryId(): LedgerEntryId {
  * `required-field`), reject an `accepted`/`rejected` decision that cites no
  * run id (`missing-run`), reject a `deferred` decision that cites any run id
  * (`deferred-cites-runs`), reject an artifact uri that does not start with
- * `modelstore://` (`invalid-artifact-uri`), and default `evidence.artifactUris`
+ * and default `evidence.artifactUris`
  * to an empty list. String values are stored exactly as supplied once proven
  * non-blank.
  * @param request - the caller's decision request.
@@ -67,11 +67,6 @@ export function resolveRecord(request: LedgerRequest): LedgerSpec {
     throw new LedgerError('ledger record accepted/rejected decision requires at least one run id', 'missing-run')
   }
   const artifactUris = request.evidence.artifactUris ?? []
-  for (const uri of artifactUris) {
-    if (!uri.startsWith('modelstore://')) {
-      throw new LedgerError(`ledger record artifact uri must start with modelstore://, got ${uri}`, 'invalid-artifact-uri')
-    }
-  }
   return {
     hypothesis: request.hypothesis,
     decision: request.decision,

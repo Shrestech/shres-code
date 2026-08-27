@@ -994,7 +994,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/ledger/ledger/src/index.ts:147`](../packages/ledger/ledger/src/index.ts)
+Source: [`packages/ledger/ledger/src/index.ts:162`](../packages/ledger/ledger/src/index.ts)
 
 <a id="shres-codeshres-code-llm-cli-bridge"></a>
 
@@ -1787,7 +1787,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/research/protocol/src/index.ts:40`](../packages/research/protocol/src/index.ts)
+Source: [`packages/research/protocol/src/index.ts:44`](../packages/research/protocol/src/index.ts)
 
 <a id="shres-codeshres-code-sandbox-local"></a>
 
@@ -3817,6 +3817,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@shres-code/shres-code-host-plugin-inventory` — requires `loader` ([`packages/host/plugin-inventory/src/index.ts`](../packages/host/plugin-inventory/src/index.ts))
 - `@shres-code/shres-code-llm` ([`packages/llm/llm/src/index.ts`](../packages/llm/llm/src/index.ts))
 - `@shres-code/shres-code-lsp` ([`packages/lsp/lsp/src/index.ts`](../packages/lsp/lsp/src/index.ts))
+- `@shres-code/shres-code-research-stubs` — requires `tools` ([`packages/test-support/research-stubs/src/index.ts`](../packages/test-support/research-stubs/src/index.ts))
 - `@shres-code/shres-code-schedule` — requires `agents` · `sessions` · `tools` · `sessionPersistence` ([`packages/schedule/schedule/src/index.ts`](../packages/schedule/schedule/src/index.ts))
 - `@shres-code/shres-code-session` ([`packages/core/session/src/index.ts`](../packages/core/session/src/index.ts))
 - `@shres-code/shres-code-session-checkpoint-policy` — requires `llm` · `sessionPersistence` · `sessions` · `tools` ([`packages/session/session-checkpoint-policy/src/index.ts`](../packages/session/session-checkpoint-policy/src/index.ts))

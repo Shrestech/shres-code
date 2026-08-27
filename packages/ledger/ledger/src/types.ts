@@ -100,8 +100,8 @@ export type LedgerFailureReason =
   | 'required-field'
   | 'missing-run'
   | 'deferred-cites-runs'
-  | 'invalid-artifact-uri'
   | 'unresolved-run'
+  | 'unverified-run'
   | 'corrupt-store'
 
 /**

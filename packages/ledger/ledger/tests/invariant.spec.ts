@@ -7,7 +7,7 @@ import { CallId } from '@shres-code/shres-code-llm'
 import SessionStore from '@shres-code/shres-code-session'
 import type { Session } from '@shres-code/shres-code-session'
 import TrackerService from '@shres-code/shres-code-tracker'
-import type { LogRunSpec, MetricPoint, RunFilter, TrackerRunId, TrackerRunResult, TrackerRunSummary, TrackerRunRecord } from '@shres-code/shres-code-tracker'
+import type { LogRunSpec, MetricPoint, RunFilter, TrackerRunId, TrackerRunResult, TrackerRunSummary, TrackerRunRecord, TrackerDecisionRuleVerdict } from '@shres-code/shres-code-tracker'
 import FileLedgerService from '@shres-code/shres-code-ledger'
 import type { LedgerEntryId, LedgerRequest } from '@shres-code/shres-code-ledger'
 import * as LedgerInvariantCompanion from '@shres-code/shres-code-ledger/invariant'
@@ -34,6 +34,12 @@ class StubTracker extends TrackerService {
 
   override async getMetrics(_runId: TrackerRunId): Promise<MetricPoint[]> {
     return []
+  }
+
+  override async verifyDecisionRule(runId: TrackerRunId): Promise<TrackerDecisionRuleVerdict> {
+    return this.knownRuns.includes(runId)
+      ? { status: 'satisfied', rule: { metric: 'val_bpb', op: '<', threshold: 1 }, actual: 0.5 }
+      : { status: 'refused', reason: 'run-not-found', detail: runId }
   }
 }
 
