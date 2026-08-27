@@ -217,6 +217,9 @@ flowchart LR
   svc_tracker["ctx.tracker<br/>Experiment tracking seam"]
   pkg_tracker_shrestech["tracker-shrestech"]
   pkg_tool_tracker["tool-tracker"]
+  pkg_ledger["ledger"]
+  svc_ledger["ctx.ledger<br/>Decision ledger seam"]
+  pkg_tool_ledger["tool-ledger"]
   pkg_acp --> svc_approval
   pkg_agent --> svc_agents
   pkg_agent_default_model --> svc_agentDefaultModel
@@ -253,6 +256,7 @@ flowchart LR
   pkg_jobs --> svc_jobs
   pkg_jobs_local --> svc_jobs
   pkg_jspace --> svc_jspace
+  pkg_ledger --> svc_ledger
   pkg_llm --> svc_llm
   pkg_llm_cli_bridge --> svc_llm
   pkg_llm_deepseek --> svc_llm
@@ -367,6 +371,7 @@ flowchart LR
   svc_jspace --> pkg_tool_jspace
   svc_jspace --> pkg_ui_jspace
   svc_jspace --> pkg_ui_settings_jspace
+  svc_ledger --> pkg_tool_ledger
   svc_llm --> pkg_agent_loop
   svc_llm --> pkg_compaction_basic
   svc_lsp --> pkg_tool_lsp
@@ -521,5 +526,6 @@ flowchart LR
 | `ctx.shield` | `core` | [`shield`](../packages/guard/shield) | - | `ui-settings-shield` | - | Host seat for the paid screening engine: entitlement, engine resolve, published status, snapshot RPC, and npm check/install remotes. The detection payload is not a workspace package. |
 | `ctx.speech` | `seam` | [`speech`](../packages/speech/speech) | [`speech-kokoro`](../packages/speech/speech-kokoro), [`speech-whisper`](../packages/speech/speech-whisper) | `ui-speech` | - | TTS and STT provider registry with selection independent of registration order; local Kokoro and Whisper providers implement the seam, and the Web client consumes status plus synthesize/transcribe remotes. |
 | `ctx.tracker` | `seam` | [`tracker`](../packages/tracker/tracker) | [`tracker-shrestech`](../packages/tracker/tracker-shrestech) | [`tool-tracker`](../packages/tracker/tool-tracker) | - | Run, metrics, and query vocabulary with provider-post failure taxonomy; the shrestech backend persists, and the model tools log through ctx.tracker onto the session. |
+| `ctx.ledger` | `seam` | [`ledger`](../packages/ledger/ledger) | - | [`tool-ledger`](../packages/ledger/tool-ledger) | - | Accepted, rejected, and deferred hypothesis decisions whose cited run ids must resolve through ctx.tracker; the JSONL store is durable and queryable, and every record lands as an ignorable ledger/decision event. |
 
 Maintenance mode: hybrid: services are discovered from Cordis declarations; interface/implementation/consumer roles are classified in `scripts/gen-doc-graphs.ts` with a completeness guard.

@@ -605,6 +605,15 @@ const SERVICE_ROLES: ServiceRole[] = [
     consumers: ['tool-tracker'],
     note: 'Run, metrics, and query vocabulary with provider-post failure taxonomy; the shrestech backend persists, and the model tools log through ctx.tracker onto the session.',
   },
+  {
+    key: 'ledger',
+    pkg: 'ledger',
+    title: 'Decision ledger seam',
+    mode: 'seam',
+    implementations: [],
+    consumers: ['tool-ledger'],
+    note: 'Accepted, rejected, and deferred hypothesis decisions whose cited run ids must resolve through ctx.tracker; the JSONL store is durable and queryable, and every record lands as an ignorable ledger/decision event.',
+  },
 ]
 
 function generatedHeader(title: string): string[] {

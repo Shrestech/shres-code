@@ -40,7 +40,8 @@ This table connects model-visible tool names to the plugin package and service s
 | `@shres-code/shres-code-tool-jspace` | `jspace_charter_amend`, `jspace_checkpoint`, `jspace_note`, `jspace_open`, `jspace_ship` | `ctx.tools`, `ctx.jspace`, `owning Agent session` | `tool/call`, `jspace/card or jspace/closed`, `tool/result` | - | Schemas are registered only while Settings `enabled` is true. `jspace_ship` is a register check, not a file writer. Checkpoint `evidence` must name a completed, non-error tool-call id; citing a configured verifier tool is evidence-grade and does not prove coverage. |
 | `@shres-code/shres-code-tool-workflow` | `workflow` | `ctx.tools`, `ctx.workflowEngine`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents the script children)` | `tool/call`, `tool/result` | - | - |
 | `@shres-code/shres-code-tool-web` | `web_fetch`, `web_search` | `ctx.tools`, `ctx.web`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | web_search and web_fetch keep provider selection behind ctx.web so model-visible schemas stay stable across backend swaps. |
-| `@shres-code/shres-code-tool-tracker` | `experiment_log_metrics`, `experiment_log_run`, `experiment_query` | `ctx.tools`, `ctx.tracker` | `tool/call`, `experiment run and metric records through ctx.tracker`, `tool/result` | - | experiment_log_run, experiment_log_metrics, and experiment_query fold experiment records through the tracker service seam. |
+| `@shres-code/shres-code-tool-tracker` | `experiment_log_metrics`, `experiment_log_run`, `experiment_query`, `experiment_verify_decision_rule` | `ctx.tools`, `ctx.tracker` | `tool/call`, `experiment run and metric records through ctx.tracker`, `tool/result` | - | experiment_log_run, experiment_log_metrics, and experiment_query fold experiment records through the tracker service seam. |
+| `@shres-code/shres-code-tool-ledger` | `ledger_query`, `ledger_record_decision` | `ctx.tools`, `ctx.ledger`, `ctx.tracker` | `tool/call`, `ledger/decision`, `tool/result` | - | ledger_record_decision and ledger_query record decisions whose cited run ids must resolve through ctx.tracker. |
 
 <a id="shres-codeshres-code-tool-ask-user"></a>
 
@@ -2553,6 +2554,37 @@ Log one experiment run to the tracker with its required decision_rule, data_vers
       "type": "string",
       "description": "Git commit the run reproduced."
     },
+    "machineRule": {
+      "type": "object",
+      "description": "Machine-readable decision rule; experiment_verify_decision_rule re-executes it against the run's logged metrics.",
+      "additionalProperties": false,
+      "properties": {
+        "metric": {
+          "type": "string",
+          "description": "Metric name the rule reads."
+        },
+        "op": {
+          "type": "string",
+          "description": "Comparison applied to the metric's latest value.",
+          "enum": [
+            ">",
+            ">=",
+            "<",
+            "<=",
+            "=="
+          ]
+        },
+        "threshold": {
+          "type": "number",
+          "description": "Threshold the latest value is compared against."
+        }
+      },
+      "required": [
+        "metric",
+        "op",
+        "threshold"
+      ]
+    },
     "metrics": {
       "type": "array",
       "description": "Metrics recorded with the run.",
@@ -2625,4 +2657,126 @@ Query experiment runs by experiment, git sha, and recency, returning run ids and
 
 Source: [`packages/tracker/tool-tracker/src/index.ts`](../packages/tracker/tool-tracker/src/index.ts)
 
+### `experiment_verify_decision_rule`
+
+Mechanically re-execute one run's machine decision rule against its logged metrics, returning whether the rule is satisfied, unsatisfied, or refused with the reason. Never an LLM judgment.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "runId": {
+      "type": "string",
+      "description": "The run id returned by experiment_log_run."
+    }
+  },
+  "required": [
+    "runId"
+  ]
+}
+```
+
+Source: [`packages/tracker/tool-tracker/src/index.ts`](../packages/tracker/tool-tracker/src/index.ts)
+
 experiment_log_run, experiment_log_metrics, and experiment_query fold experiment records through the tracker service seam.
+
+<a id="shres-codeshres-code-tool-ledger"></a>
+
+## `@shres-code/shres-code-tool-ledger`
+
+### `ledger_query`
+
+Query recorded research decisions by decision, hypothesis substring, and recency, returning their entry ids and evidence.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "decision": {
+      "type": "string",
+      "description": "Filter to one decision.",
+      "enum": [
+        "accepted",
+        "rejected",
+        "deferred"
+      ]
+    },
+    "hypothesisSubstring": {
+      "type": "string",
+      "description": "Match decisions whose hypothesis contains this substring."
+    },
+    "since": {
+      "type": "integer",
+      "description": "Epoch milliseconds; return decisions recorded on or after it."
+    }
+  }
+}
+```
+
+Source: [`packages/ledger/tool-ledger/src/index.ts`](../packages/ledger/tool-ledger/src/index.ts)
+
+### `ledger_record_decision`
+
+Record one research decision to the ledger with its hypothesis, decision, evidence, and rationale, returning its entry id (or why the record was rejected).
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "hypothesis": {
+      "type": "string",
+      "description": "The hypothesis the decision addresses."
+    },
+    "decision": {
+      "type": "string",
+      "description": "The decision reached.",
+      "enum": [
+        "accepted",
+        "rejected",
+        "deferred"
+      ]
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "runIds": {
+          "type": "array",
+          "description": "Experiment run ids cited as evidence.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "gitSha": {
+          "type": "string",
+          "description": "Git commit the evidence reproduced."
+        },
+        "artifactUris": {
+          "type": "array",
+          "description": "Artifact modelstore:// URIs cited as evidence.",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "runIds"
+      ]
+    },
+    "rationale": {
+      "type": "string",
+      "description": "Why the decision was reached."
+    }
+  },
+  "required": [
+    "hypothesis",
+    "decision",
+    "evidence",
+    "rationale"
+  ]
+}
+```
+
+Source: [`packages/ledger/tool-ledger/src/index.ts`](../packages/ledger/tool-ledger/src/index.ts)
+
+ledger_record_decision and ledger_query record decisions whose cited run ids must resolve through ctx.tracker.

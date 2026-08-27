@@ -980,6 +980,22 @@ export interface Config {
 
 Source: [`packages/jspace/jspace-prompt/src/index.ts:69`](../packages/jspace/jspace-prompt/src/index.ts)
 
+<a id="shres-codeshres-code-ledger"></a>
+
+## `@shres-code/shres-code-ledger`
+
+Requires: `tracker`
+
+```ts config-catalog
+/** Provider plugin config. */
+export interface Config {
+  /** Absolute path of the append-only JSONL store file. */
+  storagePath: string
+}
+```
+
+Source: [`packages/ledger/ledger/src/index.ts:162`](../packages/ledger/ledger/src/index.ts)
+
 <a id="shres-codeshres-code-llm-cli-bridge"></a>
 
 ## `@shres-code/shres-code-llm-cli-bridge`
@@ -1750,6 +1766,28 @@ export interface Config {
 ```
 
 Source: [`packages/guard/repeat-tool-reminder/src/index.ts:36`](../packages/guard/repeat-tool-reminder/src/index.ts)
+
+<a id="shres-codeshres-code-research-protocol"></a>
+
+## `@shres-code/shres-code-research-protocol`
+
+Requires: `systemPrompt`
+
+```ts config-catalog
+/** Plugin config; also the settings schema for the `autoresearch` namespace. */
+export interface Config {
+  /** Master allow. Off mounts an empty section and a passthrough gate. Default false. */
+  enabled?: boolean
+  /** `per-epoch` refuses gated tools until every debate tool has a completed call this epoch. Default `per-epoch`. */
+  requireDesignDefense?: 'per-epoch' | 'off'
+  /** Seat tools whose completed calls satisfy the design defense. Default aegis and ward. */
+  debateTools?: string[]
+  /** Model-facing tools the gate holds back until the design defense exists. */
+  gatedTools?: string[]
+}
+```
+
+Source: [`packages/research/protocol/src/index.ts:44`](../packages/research/protocol/src/index.ts)
 
 <a id="shres-codeshres-code-sandbox-local"></a>
 
@@ -3463,7 +3501,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/tracker/tracker-shrestech/src/index.ts:53`](../packages/tracker/tracker-shrestech/src/index.ts)
+Source: [`packages/tracker/tracker-shrestech/src/index.ts:54`](../packages/tracker/tracker-shrestech/src/index.ts)
 
 <a id="shres-codeshres-code-typert-loader"></a>
 
@@ -3779,6 +3817,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@shres-code/shres-code-host-plugin-inventory` — requires `loader` ([`packages/host/plugin-inventory/src/index.ts`](../packages/host/plugin-inventory/src/index.ts))
 - `@shres-code/shres-code-llm` ([`packages/llm/llm/src/index.ts`](../packages/llm/llm/src/index.ts))
 - `@shres-code/shres-code-lsp` ([`packages/lsp/lsp/src/index.ts`](../packages/lsp/lsp/src/index.ts))
+- `@shres-code/shres-code-research-stubs` — requires `tools` ([`packages/test-support/research-stubs/src/index.ts`](../packages/test-support/research-stubs/src/index.ts))
 - `@shres-code/shres-code-schedule` — requires `agents` · `sessions` · `tools` · `sessionPersistence` ([`packages/schedule/schedule/src/index.ts`](../packages/schedule/schedule/src/index.ts))
 - `@shres-code/shres-code-session` ([`packages/core/session/src/index.ts`](../packages/core/session/src/index.ts))
 - `@shres-code/shres-code-session-checkpoint-policy` — requires `llm` · `sessionPersistence` · `sessions` · `tools` ([`packages/session/session-checkpoint-policy/src/index.ts`](../packages/session/session-checkpoint-policy/src/index.ts))
@@ -3791,6 +3830,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@shres-code/shres-code-terminal` ([`packages/terminal/terminal/src/index.ts`](../packages/terminal/terminal/src/index.ts))
 - `@shres-code/shres-code-tool-ask-user` — requires `tools` · `userQuestions` ([`packages/interaction/tool-ask-user/src/index.ts`](../packages/interaction/tool-ask-user/src/index.ts))
 - `@shres-code/shres-code-tool-cordis` — requires `tools` · `systemPrompt` · `dynamicCordisRunner` · `cordisInspect` ([`packages/extensions/tool-cordis/src/index.ts`](../packages/extensions/tool-cordis/src/index.ts))
+- `@shres-code/shres-code-tool-ledger` — requires `tools` · `ledger` ([`packages/ledger/tool-ledger/src/index.ts`](../packages/ledger/tool-ledger/src/index.ts))
 - `@shres-code/shres-code-tool-subagent-control` — requires `tools` · `subagents` ([`packages/subagent/tool-subagent-control/src/index.ts`](../packages/subagent/tool-subagent-control/src/index.ts))
 - `@shres-code/shres-code-tool-tracker` — requires `tools` · `tracker` ([`packages/tracker/tool-tracker/src/index.ts`](../packages/tracker/tool-tracker/src/index.ts))
 - `@shres-code/shres-code-user-questions` ([`packages/interaction/user-questions/src/index.ts`](../packages/interaction/user-questions/src/index.ts))

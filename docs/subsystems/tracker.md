@@ -53,6 +53,8 @@ interface LogRunRequest {
   readonly hypothesis: string
   /** The decision rule encoded in the API itself — a threshold change is a new experiment. */
   readonly decisionRule: string
+  /** Optional machine-readable decision rule; validated by {@link resolveLogRun} when present. */
+  readonly machineRule?: MachineRule
   /** Data version the run used. */
   readonly dataVersion: string
   /** Git commit the run reproduced. */
@@ -61,6 +63,24 @@ interface LogRunRequest {
   readonly metrics?: readonly MetricPoint[]
   /** Artifact `modelstore://` URIs the run produced. */
   readonly artifacts?: readonly string[]
+}
+```
+
+`MachineRule` is the machine-readable half of a decision rule. A run that logs one can have its verdict re-executed mechanically by `verifyDecisionRule`; a run without one can never produce a mechanical `satisfied`.
+
+```ts type-equiv
+/**
+ * A machine-readable decision rule. When present on a run, {@link
+ * verifyDecisionRule} re-executes it mechanically against the run's logged
+ * metrics — never an LLM's judgment — so a "supported" verdict is reproducible.
+ */
+interface MachineRule {
+  /** The metric name the rule reads (for example `val_bpb`). */
+  readonly metric: string
+  /** The comparison operator applied to the metric's latest value. */
+  readonly op: '>' | '>=' | '<' | '<=' | '=='
+  /** The threshold the metric's latest value is compared against. */
+  readonly threshold: number
 }
 ```
 
@@ -74,6 +94,7 @@ interface LogRunSpec {
   readonly experiment: string
   readonly hypothesis: string
   readonly decisionRule: string
+  readonly machineRule?: MachineRule
   readonly dataVersion: string
   readonly gitSha: string
   readonly metrics: readonly MetricPoint[]
@@ -115,6 +136,43 @@ interface TrackerRunSummary {
   /** Why the run has not landed, when it has not. */
   readonly reason?: TrackerFailureReason
 }
+```
+
+```ts type-equiv
+/**
+ * One run resolved by id for {@link verifyDecisionRule}: the run's stored
+ * fields plus its optional {@link MachineRule}. `reason` is present only for
+ * spooled runs.
+ */
+interface TrackerRunRecord {
+  readonly runId: TrackerRunId
+  readonly experiment: string
+  readonly decisionRule: string
+  readonly dataVersion: string
+  readonly gitSha: string
+  /** The run's machine-readable decision rule, when it logged one. */
+  readonly machineRule?: MachineRule
+  /** Why the run has not landed, when it has not. */
+  readonly reason?: TrackerFailureReason
+}
+```
+
+```ts type-equiv
+/**
+ * The outcome of {@link verifyDecisionRule}: a mechanical re-execution of the
+ * run's {@link MachineRule} against its logged metrics. `satisfied` and
+ * `unsatisfied` carry the rule and the observed metric value; `refused` names
+ * why no verdict could be produced (the fail-loud path — never a default or
+ * guess).
+ */
+type TrackerDecisionRuleVerdict =
+  | { readonly status: 'satisfied'; readonly rule: MachineRule; readonly actual: number }
+  | { readonly status: 'unsatisfied'; readonly rule: MachineRule; readonly actual: number }
+  | {
+    readonly status: 'refused'
+    readonly reason: 'run-not-found' | 'no-machine-rule' | 'metrics-missing' | 'metric-not-in-run'
+    readonly detail: string
+  }
 ```
 
 `logRun`/`logMetrics` write the log-only, `ignorable` events `tracker/run` and `tracker/metrics`. A spooled run still carries its id in the event.
@@ -164,6 +222,21 @@ abstract postMetrics(runId: TrackerRunId, metrics: readonly MetricPoint[]): Prom
 abstract queryRuns(filter: RunFilter): Promise<TrackerRunSummary[]>
 
 /**
+ * Resolve one run by id from the provider's authoritative store (the landed
+ * index and the spool), including its optional {@link MachineRule}.
+ * @param runId - the run to resolve.
+ * @returns the run record, or `undefined` when no run with that id is stored.
+ */
+abstract getRun(runId: TrackerRunId): Promise<TrackerRunRecord | undefined>
+
+/**
+ * Retrieve every logged metric point for one run, in append order.
+ * @param runId - the run whose metrics to read.
+ * @returns the run's logged metric points; empty when none are logged.
+ */
+abstract getMetrics(runId: TrackerRunId): Promise<MetricPoint[]>
+
+/**
  * Log a run. Resolves and validates the request, allocates the run id,
  * delegates to the provider, and writes the log-only `tracker/run` event to
  * the owning session. The event is written after the provider returns, so
@@ -183,9 +256,22 @@ async logRun(session: Session, request: LogRunRequest, callId: CallId): Promise<
  * @param metrics - the metric points to append.
  */
 async logMetrics(session: Session, runId: TrackerRunId, metrics: readonly MetricPoint[]): Promise<void>
+
+/**
+ * Mechanically re-execute a run's {@link MachineRule} against its logged
+ * metrics. No LLM and no heuristics: the run is resolved by id, its rule is
+ * compared against the latest append of the named metric, and the verdict is
+ * a pure function of those stored values. A run with no machine rule, no
+ * metrics, or without the named metric is refused with its reason — never
+ * defaulted or guessed.
+ * @param runId - the run whose decision rule to verify.
+ * @returns the mechanical verdict: satisfied/unsatisfied with the rule and
+ * observed value, or refused with the reason no verdict could be produced.
+ */
+async verifyDecisionRule(runId: TrackerRunId): Promise<TrackerDecisionRuleVerdict>
 ```
 
 Types: [CallId](llm-streaming.md) · [Session](session.md)
 
-Source: [`packages/tracker/tracker/src/index.ts:64`](../../packages/tracker/tracker/src/index.ts)
+Source: [`packages/tracker/tracker/src/index.ts:70`](../../packages/tracker/tracker/src/index.ts)
 <!-- END GENERATED cordis-surface -->
