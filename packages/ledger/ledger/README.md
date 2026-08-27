@@ -58,5 +58,8 @@ No direct invalidation; the named consumer owns any request-prefix changes.
 
 ## Known Limitations and Deferred Work
 
+- **Single-writer, load-once index** — the store loads its JSONL into memory at mount; a second session or process over the same `storagePath` never sees the other writer's entries until restart, and there is no cross-writer coordination. Relative `storagePath` values resolve under the harness home.
+
+
 - **No live decision store** — the seam's `persistRecord` contract is defined here, and the file-backed provider is the only implementation; a remote decision store is deferred.
 - **`ledger/decision` carries no git sha or artifact uris** — the event payload is the minimal `{ entryId, hypothesis, decision, runIds, callId }`; the full evidence is reconstructable from the store entry.

@@ -1,6 +1,6 @@
 {
   "name": "@shres-code/shres-code-ledger",
-  "description": "Abstract decision-ledger capability seam (ctx.ledger) for the Shres Code — the decision record/query vocabulary, the required-field validation and spec step, the validation failure taxonomy, the durable JSONL store, and the log-only ledger/decision session event",
+  "description": "Abstract decision-ledger capability seam (ctx.ledger) for the Shres Code \u2014 the decision record/query vocabulary, the required-field validation and spec step, the validation failure taxonomy, the durable JSONL store, and the log-only ledger/decision session event",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
@@ -37,7 +37,8 @@
     "@shres-code/shres-code-llm": "workspace:^",
     "@shres-code/shres-code-session": "workspace:^",
     "@shres-code/shres-code-tracker": "workspace:^",
-    "@shres-code/cordis": "workspace:^"
+    "@shres-code/cordis": "workspace:^",
+    "@shres-code/shres-code-home-paths": "workspace:^"
   },
   "dependencies": {
     "@shres-code/schemastery": "workspace:^"
@@ -48,6 +49,7 @@
     "@shres-code/shres-code-llm": "workspace:^",
     "@shres-code/shres-code-session": "workspace:^",
     "@shres-code/shres-code-tracker": "workspace:^",
-    "@shres-code/cordis": "workspace:^"
+    "@shres-code/cordis": "workspace:^",
+    "@shres-code/shres-code-home-paths": "workspace:^"
   }
 }

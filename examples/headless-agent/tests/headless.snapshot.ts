@@ -889,6 +889,16 @@ describe('headless stream-json snapshots', () => {
         const checked = (cards[1]?.data as JsonObject | undefined)?.checked as ReadonlyArray<JsonObject> | undefined
         expect(checked).toHaveLength(1)
         expect(checked?.[0]).toMatchObject({ verified: true })
+        if (process.env.SHRES_SNAPSHOT !== undefined) {
+          for (const record of records) {
+            if (record.type === 'tool/call' || record.type === 'tool/result') {
+              const data = JSON.stringify(record.data)
+              if (data.includes('experiment_verify') || data.includes('run-')) {
+                console.log('RESEARCHER-DEBUG', record.type, record.seq, data.slice(0, 400))
+              }
+            }
+          }
+        }
         const systems = records.flatMap((record) => {
           if (record.type !== 'request/header') return []
           const header = (record.data as JsonObject | undefined)?.header as JsonObject | undefined

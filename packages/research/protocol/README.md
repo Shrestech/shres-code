@@ -50,4 +50,7 @@ The refusal is per-call tool output and invalidates nothing.
 ## Known Limitations and Deferred Work
 
 - The gate proves a debate happened, not that its challenges were resolved; the probe-downgrade rule is prompt text, not enforcement.
+- Seat matching is by tool name: any completed non-error call named `aegis` or `ward` satisfies the gate, whatever produced it.
+- A gated call carrying no owning session passes the gate; the gated tools themselves then reject the sessionless caller.
+- `renderDigest` is exported for the digest-delivery stage; no harness surface consumes it yet.
 - Seat-model diversity (a reviewer sharing the executor's model) is a composition concern and is not checked here.

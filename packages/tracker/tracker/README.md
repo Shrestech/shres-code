@@ -44,4 +44,4 @@ No direct invalidation; the named consumer owns any request-prefix changes.
 
 ## Known Limitations and Deferred Work
 
-- **Mechanical verdicts read the mounted provider** — `verifyDecisionRule` resolves the run and its metrics through `getRun`/`getMetrics`; a provider whose derived stores lag the authoritative tracker can refuse with `metrics-missing` even though the run landed.
+- **Mechanical verdicts read the mounted provider** — `verifyDecisionRule` resolves the run and its metrics through `getRun`/`getMetrics`; after a sync drains the metric spool, landed metrics live server-side and `verifyDecisionRule` refuses with `metrics-missing` — the derived stores deliberately do not mirror server state.

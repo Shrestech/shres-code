@@ -49,7 +49,7 @@
     - id: ledger
       name: '@shres-code/shres-code-ledger'
       config:
-        storagePath: 'research-ledger.jsonl'
+        storagePath: 'research-ledger.jsonl'  # relative resolves under the harness home (ledger/)
 
     - id: tool-ledger
       name: '@shres-code/shres-code-tool-ledger'

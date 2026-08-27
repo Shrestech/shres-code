@@ -2554,6 +2554,37 @@ Log one experiment run to the tracker with its required decision_rule, data_vers
       "type": "string",
       "description": "Git commit the run reproduced."
     },
+    "machineRule": {
+      "type": "object",
+      "description": "Machine-readable decision rule; experiment_verify_decision_rule re-executes it against the run's logged metrics.",
+      "additionalProperties": false,
+      "properties": {
+        "metric": {
+          "type": "string",
+          "description": "Metric name the rule reads."
+        },
+        "op": {
+          "type": "string",
+          "description": "Comparison applied to the metric's latest value.",
+          "enum": [
+            ">",
+            ">=",
+            "<",
+            "<=",
+            "=="
+          ]
+        },
+        "threshold": {
+          "type": "number",
+          "description": "Threshold the latest value is compared against."
+        }
+      },
+      "required": [
+        "metric",
+        "op",
+        "threshold"
+      ]
+    },
     "metrics": {
       "type": "array",
       "description": "Metrics recorded with the run.",

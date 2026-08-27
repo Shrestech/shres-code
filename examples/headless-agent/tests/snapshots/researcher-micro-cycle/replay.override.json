@@ -1,92 +1,358 @@
 [
-  {
-    "kind": "chunks",
-    "chunks": [
-      { "type": "block-start", "index": 0, "blockType": "tool-call" },
-      { "type": "tool-call-delta", "index": 0, "id": "call_ws_open", "name": "jspace_open", "argumentsDelta": "{\"goal\":\"Prove the researcher micro cycle\",\"next\":\"Hold the design defense\"}" },
-      { "type": "block-end", "index": 0, "block": { "type": "tool-call", "id": "call_ws_open", "name": "jspace_open", "arguments": "{\"goal\":\"Prove the researcher micro cycle\",\"next\":\"Hold the design defense\"}" } },
-      { "type": "usage", "usage": { "inputTokens": 40, "outputTokens": 12 } },
-      { "type": "finish", "reason": { "kind": "tool-calls" } }
-    ]
-  },
-  {
-    "kind": "chunks",
-    "chunks": [
-      { "type": "block-start", "index": 0, "blockType": "tool-call" },
-      { "type": "tool-call-delta", "index": 0, "id": "call_aegis", "name": "aegis", "argumentsDelta": "{}" },
-      { "type": "block-end", "index": 0, "block": { "type": "tool-call", "id": "call_aegis", "name": "aegis", "arguments": "{}" } },
-      { "type": "usage", "usage": { "inputTokens": 120, "outputTokens": 30 } },
-      { "type": "finish", "reason": { "kind": "tool-calls" } }
-    ]
-  },
-  {
-    "kind": "chunks",
-    "chunks": [
-      { "type": "block-start", "index": 0, "blockType": "tool-call" },
-      { "type": "tool-call-delta", "index": 0, "id": "call_ward", "name": "ward", "argumentsDelta": "{}" },
-      { "type": "block-end", "index": 0, "block": { "type": "tool-call", "id": "call_ward", "name": "ward", "arguments": "{}" } },
-      { "type": "usage", "usage": { "inputTokens": 160, "outputTokens": 24 } },
-      { "type": "finish", "reason": { "kind": "tool-calls" } }
-    ]
-  },
-  {
-    "kind": "chunks",
-    "chunks": [
-      { "type": "block-start", "index": 0, "blockType": "tool-call" },
-      { "type": "tool-call-delta", "index": 0, "id": "call_exp_log", "name": "experiment_log_run", "argumentsDelta": "{\"experiment\":\"micro-cycle\",\"hypothesis\":\"The stub debate satisfies the design-defense gate\",\"decisionRule\":\"val_bpb < 1.0\",\"dataVersion\":\"v3\",\"gitSha\":\"0000000000000000000000000000000000000000\",\"machineRule\":{\"metric\":\"val_bpb\",\"op\":\"<\",\"threshold\":1.0},\"metrics\":[{\"name\":\"val_bpb\",\"value\":0.8}]}" },
-      { "type": "block-end", "index": 0, "block": { "type": "tool-call", "id": "call_exp_log", "name": "experiment_log_run", "arguments": "{\"experiment\":\"micro-cycle\",\"hypothesis\":\"The stub debate satisfies the design-defense gate\",\"decisionRule\":\"val_bpb < 1.0\",\"dataVersion\":\"v3\",\"gitSha\":\"0000000000000000000000000000000000000000\",\"machineRule\":{\"metric\":\"val_bpb\",\"op\":\"<\",\"threshold\":1.0},\"metrics\":[{\"name\":\"val_bpb\",\"value\":0.8}]}" } },
-      { "type": "usage", "usage": { "inputTokens": 320, "outputTokens": 60 } },
-      { "type": "finish", "reason": { "kind": "tool-calls" } }
-    ]
-  },
-  {
-    "kind": "chunks",
-    "chunks": [
-      { "type": "block-start", "index": 0, "blockType": "tool-call" },
-      { "type": "tool-call-delta", "index": 0, "id": "call_verify", "name": "experiment_verify_decision_rule", "argumentsDelta": "{\"runId\":\"{{fromRequest:(run-[0-9a-f-]{36})}}\"}" },
-      { "type": "block-end", "index": 0, "block": { "type": "tool-call", "id": "call_verify", "name": "experiment_verify_decision_rule", "arguments": "{\"runId\":\"{{fromRequest:(run-[0-9a-f-]{36})}}\"}" } },
-      { "type": "usage", "usage": { "inputTokens": 380, "outputTokens": 16 } },
-      { "type": "finish", "reason": { "kind": "tool-calls" } }
-    ]
-  },
-  {
-    "kind": "chunks",
-    "chunks": [
-      { "type": "block-start", "index": 0, "blockType": "tool-call" },
-      { "type": "tool-call-delta", "index": 0, "id": "call_ledger", "name": "ledger_record_decision", "argumentsDelta": "{\"hypothesis\":\"The stub debate satisfies the design-defense gate\",\"decision\":\"accepted\",\"evidence\":{\"runIds\":[\"{{fromRequest:(run-[0-9a-f-]{36})}}\"],\"gitSha\":\"0000000000000000000000000000000000000000\"},\"rationale\":\"The machine rule was re-executed mechanically and satisfied.\"}" },
-      { "type": "block-end", "index": 0, "block": { "type": "tool-call", "id": "call_ledger", "name": "ledger_record_decision", "arguments": "{\"hypothesis\":\"The stub debate satisfies the design-defense gate\",\"decision\":\"accepted\",\"evidence\":{\"runIds\":[\"{{fromRequest:(run-[0-9a-f-]{36})}}\"],\"gitSha\":\"0000000000000000000000000000000000000000\"},\"rationale\":\"The machine rule was re-executed mechanically and satisfied.\"}" } },
-      { "type": "usage", "usage": { "inputTokens": 420, "outputTokens": 48 } },
-      { "type": "finish", "reason": { "kind": "tool-calls" } }
-    ]
-  },
-  {
-    "kind": "chunks",
-    "chunks": [
-      { "type": "block-start", "index": 0, "blockType": "tool-call" },
-      { "type": "tool-call-delta", "index": 0, "id": "call_checkpoint", "name": "jspace_checkpoint", "argumentsDelta": "{\"check\":\"Micro cycle completed: run logged, mechanically verified, decision recorded\",\"by\":\"experiment_verify_decision_rule covered the logged run's machine rule and the ledger entry cites it\",\"evidence\":\"call_exp_log\"}" },
-      { "type": "block-end", "index": 0, "block": { "type": "tool-call", "id": "call_checkpoint", "name": "jspace_checkpoint", "arguments": "{\"check\":\"Micro cycle completed: run logged, mechanically verified, decision recorded\",\"by\":\"experiment_verify_decision_rule covered the logged run's machine rule and the ledger entry cites it\",\"evidence\":\"call_exp_log\"}" } },
-      { "type": "usage", "usage": { "inputTokens": 470, "outputTokens": 40 } },
-      { "type": "finish", "reason": { "kind": "tool-calls" } }
-    ]
-  },
-  {
-    "kind": "chunks",
-    "chunks": [
-      { "type": "block-start", "index": 0, "blockType": "tool-call" },
-      { "type": "tool-call-delta", "index": 0, "id": "call_ship", "name": "jspace_ship", "argumentsDelta": "{}" },
-      { "type": "block-end", "index": 0, "block": { "type": "tool-call", "id": "call_ship", "name": "jspace_ship", "arguments": "{}" } },
-      { "type": "usage", "usage": { "inputTokens": 520, "outputTokens": 10 } },
-      { "type": "finish", "reason": { "kind": "tool-calls" } }
-    ]
-  },
-  {
-    "kind": "chunks",
-    "chunks": [
-      { "type": "block-start", "index": 0, "blockType": "text" },
-      { "type": "text-delta", "index": 0, "text": "RESEARCHER MICRO CYCLE COMPLETE" },
-      { "type": "block-end", "index": 0, "block": { "type": "text", "text": "RESEARCHER MICRO CYCLE COMPLETE" } },
-      { "type": "usage", "usage": { "inputTokens": 540, "outputTokens": 4 } },
-      { "type": "finish", "reason": { "kind": "stop" } }
-    ]
-  }
+{
+"kind": "chunks",
+"chunks": [
+{
+"type": "block-start",
+"index": 0,
+"blockType": "tool-call"
+},
+{
+"type": "tool-call-delta",
+"index": 0,
+"id": "call_ws_open",
+"name": "jspace_open",
+"argumentsDelta": "{\"goal\":\"Prove the researcher micro cycle\",\"next\":\"Hold the design defense\"}"
+},
+{
+"type": "block-end",
+"index": 0,
+"block": {
+"type": "tool-call",
+"id": "call_ws_open",
+"name": "jspace_open",
+"arguments": "{\"goal\":\"Prove the researcher micro cycle\",\"next\":\"Hold the design defense\"}"
+}
+},
+{
+"type": "usage",
+"usage": {
+"inputTokens": 40,
+"outputTokens": 12
+}
+},
+{
+"type": "finish",
+"reason": {
+"kind": "tool-calls"
+}
+}
+]
+},
+{
+"kind": "chunks",
+"chunks": [
+{
+"type": "block-start",
+"index": 0,
+"blockType": "tool-call"
+},
+{
+"type": "tool-call-delta",
+"index": 0,
+"id": "call_aegis",
+"name": "aegis",
+"argumentsDelta": "{}"
+},
+{
+"type": "block-end",
+"index": 0,
+"block": {
+"type": "tool-call",
+"id": "call_aegis",
+"name": "aegis",
+"arguments": "{}"
+}
+},
+{
+"type": "usage",
+"usage": {
+"inputTokens": 120,
+"outputTokens": 30
+}
+},
+{
+"type": "finish",
+"reason": {
+"kind": "tool-calls"
+}
+}
+]
+},
+{
+"kind": "chunks",
+"chunks": [
+{
+"type": "block-start",
+"index": 0,
+"blockType": "tool-call"
+},
+{
+"type": "tool-call-delta",
+"index": 0,
+"id": "call_ward",
+"name": "ward",
+"argumentsDelta": "{}"
+},
+{
+"type": "block-end",
+"index": 0,
+"block": {
+"type": "tool-call",
+"id": "call_ward",
+"name": "ward",
+"arguments": "{}"
+}
+},
+{
+"type": "usage",
+"usage": {
+"inputTokens": 160,
+"outputTokens": 24
+}
+},
+{
+"type": "finish",
+"reason": {
+"kind": "tool-calls"
+}
+}
+]
+},
+{
+"kind": "chunks",
+"chunks": [
+{
+"type": "block-start",
+"index": 0,
+"blockType": "tool-call"
+},
+{
+"type": "tool-call-delta",
+"index": 0,
+"id": "call_exp_log",
+"name": "experiment_log_run",
+"argumentsDelta": "{\"experiment\":\"micro-cycle\",\"hypothesis\":\"The stub debate satisfies the design-defense gate\",\"decisionRule\":\"val_bpb < 1.0\",\"dataVersion\":\"v3\",\"gitSha\":\"0000000000000000000000000000000000000000\",\"machineRule\":{\"metric\":\"val_bpb\",\"op\":\"<\",\"threshold\":1.0},\"metrics\":[{\"name\":\"val_bpb\",\"value\":0.8}]}"
+},
+{
+"type": "block-end",
+"index": 0,
+"block": {
+"type": "tool-call",
+"id": "call_exp_log",
+"name": "experiment_log_run",
+"arguments": "{\"experiment\":\"micro-cycle\",\"hypothesis\":\"The stub debate satisfies the design-defense gate\",\"decisionRule\":\"val_bpb < 1.0\",\"dataVersion\":\"v3\",\"gitSha\":\"0000000000000000000000000000000000000000\",\"machineRule\":{\"metric\":\"val_bpb\",\"op\":\"<\",\"threshold\":1.0},\"metrics\":[{\"name\":\"val_bpb\",\"value\":0.8}]}"
+}
+},
+{
+"type": "usage",
+"usage": {
+"inputTokens": 320,
+"outputTokens": 60
+}
+},
+{
+"type": "finish",
+"reason": {
+"kind": "tool-calls"
+}
+}
+]
+},
+{
+"kind": "chunks",
+"chunks": [
+{
+"type": "block-start",
+"index": 0,
+"blockType": "tool-call"
+},
+{
+"type": "tool-call-delta",
+"index": 0,
+"id": "call_verify",
+"name": "experiment_verify_decision_rule",
+"argumentsDelta": "{\"runId\":\"{{fromRequest:(run-[0-9a-f-]{36})}}\"}"
+},
+{
+"type": "block-end",
+"index": 0,
+"block": {
+"type": "tool-call",
+"id": "call_verify",
+"name": "experiment_verify_decision_rule",
+"arguments": "{\"runId\":\"{{fromRequest:(run-[0-9a-f-]{36})}}\"}"
+}
+},
+{
+"type": "usage",
+"usage": {
+"inputTokens": 380,
+"outputTokens": 16
+}
+},
+{
+"type": "finish",
+"reason": {
+"kind": "tool-calls"
+}
+}
+]
+},
+{
+"kind": "chunks",
+"chunks": [
+{
+"type": "block-start",
+"index": 0,
+"blockType": "tool-call"
+},
+{
+"type": "tool-call-delta",
+"index": 0,
+"id": "call_ledger",
+"name": "ledger_record_decision",
+"argumentsDelta": "{\"hypothesis\":\"The stub debate satisfies the design-defense gate\",\"decision\":\"accepted\",\"evidence\":{\"runIds\":[\"{{fromRequest:(run-[0-9a-f-]{36})}}\"],\"gitSha\":\"0000000000000000000000000000000000000000\"},\"rationale\":\"The machine rule was re-executed mechanically and satisfied.\"}"
+},
+{
+"type": "block-end",
+"index": 0,
+"block": {
+"type": "tool-call",
+"id": "call_ledger",
+"name": "ledger_record_decision",
+"arguments": "{\"hypothesis\":\"The stub debate satisfies the design-defense gate\",\"decision\":\"accepted\",\"evidence\":{\"runIds\":[\"{{fromRequest:(run-[0-9a-f-]{36})}}\"],\"gitSha\":\"0000000000000000000000000000000000000000\"},\"rationale\":\"The machine rule was re-executed mechanically and satisfied.\"}"
+}
+},
+{
+"type": "usage",
+"usage": {
+"inputTokens": 420,
+"outputTokens": 48
+}
+},
+{
+"type": "finish",
+"reason": {
+"kind": "tool-calls"
+}
+}
+]
+},
+{
+"kind": "chunks",
+"chunks": [
+{
+"type": "block-start",
+"index": 0,
+"blockType": "tool-call"
+},
+{
+"type": "tool-call-delta",
+"index": 0,
+"id": "call_checkpoint",
+"name": "jspace_checkpoint",
+"argumentsDelta": "{\"check\":\"Micro cycle completed: run logged, mechanically verified, decision recorded\",\"by\":\"experiment_verify_decision_rule re-executed the logged machine rule (satisfied); the ledger entry cites the same run and covered the mechanical-verdict gate\",\"evidence\":\"call_verify\"}"
+},
+{
+"type": "block-end",
+"index": 0,
+"block": {
+"type": "tool-call",
+"id": "call_checkpoint",
+"name": "jspace_checkpoint",
+"arguments": "{\"check\":\"Micro cycle completed: run logged, mechanically verified, decision recorded\",\"by\":\"experiment_verify_decision_rule re-executed the logged machine rule (satisfied); the ledger entry cites the same run and covered the mechanical-verdict gate\",\"evidence\":\"call_verify\"}"
+}
+},
+{
+"type": "usage",
+"usage": {
+"inputTokens": 470,
+"outputTokens": 40
+}
+},
+{
+"type": "finish",
+"reason": {
+"kind": "tool-calls"
+}
+}
+]
+},
+{
+"kind": "chunks",
+"chunks": [
+{
+"type": "block-start",
+"index": 0,
+"blockType": "tool-call"
+},
+{
+"type": "tool-call-delta",
+"index": 0,
+"id": "call_ship",
+"name": "jspace_ship",
+"argumentsDelta": "{}"
+},
+{
+"type": "block-end",
+"index": 0,
+"block": {
+"type": "tool-call",
+"id": "call_ship",
+"name": "jspace_ship",
+"arguments": "{}"
+}
+},
+{
+"type": "usage",
+"usage": {
+"inputTokens": 520,
+"outputTokens": 10
+}
+},
+{
+"type": "finish",
+"reason": {
+"kind": "tool-calls"
+}
+}
+]
+},
+{
+"kind": "chunks",
+"chunks": [
+{
+"type": "block-start",
+"index": 0,
+"blockType": "text"
+},
+{
+"type": "text-delta",
+"index": 0,
+"text": "RESEARCHER MICRO CYCLE COMPLETE"
+},
+{
+"type": "block-end",
+"index": 0,
+"block": {
+"type": "text",
+"text": "RESEARCHER MICRO CYCLE COMPLETE"
+}
+},
+{
+"type": "usage",
+"usage": {
+"inputTokens": 540,
+"outputTokens": 4
+}
+},
+{
+"type": "finish",
+"reason": {
+"kind": "stop"
+}
+}
+]
+}
 ]

@@ -172,6 +172,16 @@ export function apply(ctx: Context): void {
       decisionRule: { type: 'string', required: true, description: 'The decision rule encoded in the API itself — a threshold change is a new experiment.' },
       dataVersion: { type: 'string', required: true, description: 'Data version the run used.' },
       gitSha: { type: 'string', required: true, description: 'Git commit the run reproduced.' },
+      machineRule: {
+        type: 'object',
+        description: 'Machine-readable decision rule; experiment_verify_decision_rule re-executes it against the run\'s logged metrics.',
+        additionalProperties: false,
+        properties: {
+          metric: { type: 'string', required: true, description: 'Metric name the rule reads.' },
+          op: { type: 'string', required: true, enum: ['>', '>=', '<', '<=', '=='], description: 'Comparison applied to the metric\'s latest value.' },
+          threshold: { type: 'number', required: true, description: 'Threshold the latest value is compared against.' },
+        },
+      },
       metrics: {
         type: 'array',
         description: 'Metrics recorded with the run.',
@@ -207,6 +217,7 @@ export function apply(ctx: Context): void {
         decisionRule: args.decisionRule,
         dataVersion: args.dataVersion,
         gitSha: args.gitSha,
+        ...args.machineRule !== undefined ? { machineRule: args.machineRule } : {},
         ...args.metrics !== undefined ? { metrics: args.metrics } : {},
         ...args.artifacts !== undefined ? { artifacts: args.artifacts } : {},
       }

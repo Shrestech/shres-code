@@ -115,7 +115,7 @@ describe('shres-tool-tracker registration', () => {
     const run = ctx.tools.get('experiment_log_run')!
     const props = (run.parameters as { properties?: Record<string, unknown> }).properties ?? {}
     expect(Object.keys(props).sort()).toEqual([
-      'artifacts', 'dataVersion', 'decisionRule', 'experiment', 'gitSha', 'hypothesis', 'metrics',
+      'artifacts', 'dataVersion', 'decisionRule', 'experiment', 'gitSha', 'hypothesis', 'machineRule', 'metrics',
     ])
   })
 

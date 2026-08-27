@@ -27,6 +27,9 @@
       "path": "../../util/brand"
     },
     {
+      "path": "../../util/home-paths"
+    },
+    {
       "path": "../../tracker/tracker"
     },
     {

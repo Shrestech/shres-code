@@ -18,7 +18,7 @@
               enabled: true
               mode: available
               requireCoverage: true
-              verifierTools: [experiment_verify_decision_rule, experiment_log_run]
+              verifierTools: [experiment_verify_decision_rule]
               requireVerifiedEvidence: true
           - id: jspace-prompt
             name: '@shres-code/shres-code-jspace-prompt'

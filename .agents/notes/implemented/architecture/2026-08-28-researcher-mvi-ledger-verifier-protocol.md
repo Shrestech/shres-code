@@ -18,7 +18,7 @@ Three pieces ship behind the researcher preset, each attached at documented exte
 
 ## Enforcement split
 
-The gate proves a debate happened; the probe-downgrade rule for unresolved challenges stays prompt text. The mechanical verdict check is enforced where the log can prove it: `experiment_verify_decision_rule` is a `verifierTools` candidate, so a deployment setting `requireVerifiedEvidence: true` makes `jspace_ship` refuse an epoch with no machine-checked run. Reviewer seats grade interpretation and contamination only, recorded on the card, never as gate authority.
+The gate proves a debate happened; the probe-downgrade rule for unresolved challenges stays prompt text. The mechanical verdict check is enforced where the log can prove it, with one honest boundary: `experiment_verify_decision_rule` is a `verifierTools` candidate, so a deployment setting `requireVerifiedEvidence: true` makes `jspace_ship` refuse an epoch with no completed verifier call — but evidence-grade means the verifier RAN, not that it returned `satisfied` (jspace grades the call, not the result payload). A deployment that needs satisfied-ness itself pins it at the snapshot/analysis layer until a result-aware evidence class exists. The snapshot pins the full chain: the run carries a machine rule, the verify call returns `satisfied`, and the checkpoint cites the verify call. Reviewer seats grade interpretation and contamination only, recorded on the card, never as gate authority.
 
 ## Alternatives considered
 
@@ -34,7 +34,7 @@ A researcher session can now run the full micro-cycle — hypothesis on the card
 
 ## Testing
 
-Per-file 100% coverage on `packages/ledger/*`, `packages/research/protocol/src`, and the touched tracker trees; the protocol package adds a real-Loader composition test, a settings-flip test through `FileSettingsProvider`, and gate tests that cover epoch re-arm, custom seat names, and the invariant's spurious-deny rejection. Catalogs (`gen-tool-catalog`, `gen-doc-graphs`, `gen-cordis-catalog`) and `verify-type-equiv` are regenerated and green. `packages/test-support/research-stubs` provides the keyless aegis/ward seats; `pnpm run test:snapshot -t researcher` replays the cycle with no API key.
+Per-file 100% coverage on `packages/ledger/*`, `packages/research/protocol/src`, and the touched tracker trees; the protocol package adds a real-Loader composition test, a settings-flip test through `FileSettingsProvider`, and gate tests that cover epoch re-arm, custom seat names, and the invariant's spurious-deny rejection. Catalogs (`gen-tool-catalog`, `gen-doc-graphs`, `gen-cordis-catalog`) and `verify-type-equiv` are regenerated and green. `packages/test-support/research-stubs` provides the keyless aegis/ward seats; `pnpm run test:snapshot -t researcher` replays the cycle with no API key. The `experiment_log_run` schema carries `machineRule` so the model — not only direct service callers — can log mechanically checkable runs; a review pass caught the original omission (schema dropped the field, the snapshot pinned the resulting refusal as success, and listing the plain log-run tool as a verifier laundered the gate) and folded the fixes in: pass-through schema, verifier-only verifierTools in the snapshot, and this corrected claim.
 
 ## Related
 

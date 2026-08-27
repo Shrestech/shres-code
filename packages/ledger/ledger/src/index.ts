@@ -13,6 +13,8 @@
 
 import { Context, Service } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
+import { isAbsolute, join } from 'node:path'
+import { shresHomePath } from '@shres-code/shres-code-home-paths'
 import type { CallId } from '@shres-code/shres-code-llm'
 import type { Session } from '@shres-code/shres-code-session'
 import { LedgerError, newLedgerEntryId, resolveRecord } from './resolve.ts'
@@ -174,7 +176,13 @@ export class FileLedgerService extends LedgerService {
     if (config.storagePath.trim().length === 0) {
       throw new Error('ledger: storagePath must be a non-empty string')
     }
-    this.store = new LedgerStore(config.storagePath)
+    // A relative path resolves against the harness home, matching the
+    // tracker spool default; the raw process cwd depends on which process
+    // mounted the service and is never a stable base.
+    const storagePath = isAbsolute(config.storagePath)
+      ? config.storagePath
+      : join(shresHomePath('ledger'), config.storagePath)
+    this.store = new LedgerStore(storagePath)
   }
 
   /**

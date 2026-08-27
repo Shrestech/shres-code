@@ -197,16 +197,20 @@ export class ShrestechTrackerService extends TrackerService {
   }
 
   /**
-   * Merge the run's pending metric appends by metric name, later appends
+   * Merge the run's inline metrics (logged with the run, held in its spool
+   * entry) with its pending metric appends by metric name, later appends
    * overriding earlier values. Metrics already drained to the tracker live
    * server-side and are not answered from here.
    * @param runId - the run the metrics belong to.
    * @returns the merged metric points, latest value per name.
    */
   override async getMetrics(runId: TrackerRunId): Promise<MetricPoint[]> {
-    const entries = (await this.metricSpool.peekMetrics()).filter(entry => entry.runId === runId)
+    const [runEntries, metricEntries] = await Promise.all([this.spool.peek(), this.metricSpool.peekMetrics()])
     const byName = new Map<string, MetricPoint>()
-    for (const entry of entries) {
+    const runEntry = runEntries.find(entry => entry.runId === runId)
+    for (const point of runEntry?.metrics ?? []) byName.set(point.name, point)
+    for (const entry of metricEntries) {
+      if (entry.runId !== runId) continue
       for (const point of entry.metrics) byName.set(point.name, point)
     }
     return [...byName.values()]
