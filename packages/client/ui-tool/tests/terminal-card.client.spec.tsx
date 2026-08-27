@@ -502,7 +502,7 @@ describe('DetailsPanel Output section', () => {
     const view = mount(snapshot({
       nodes: [settled({ resultView: resultTerminal({ output: `${long.join('\n')}\n` }) })],
     }), target)
-    fireEvent.click(view.getByRole('button', { name: 'Show remaining 4 linesOutput' }))
+    fireEvent.click(view.getByRole('button', { name: 'Expand the remaining 4 output lines' }))
     expect(view.getByRole('button', { name: 'Collapse output' })).toBeTruthy()
     // A second call, selected without unmounting the panel, starts collapsed.
     cleanup()
@@ -511,7 +511,7 @@ describe('DetailsPanel Output section', () => {
         callId: 'c2', resultView: resultTerminal({ output: `${long.join('\n')}\n` }),
       })],
     }), { turnSeq: 10, callId: 'c2', toolName: 'bash' })
-    expect(second.getByRole('button', { name: 'Show remaining 4 linesOutput' })).toBeTruthy()
+    expect(second.getByRole('button', { name: 'Expand the remaining 4 output lines' })).toBeTruthy()
   })
 
   it('renders the presenter description above the card', () => {
@@ -539,7 +539,7 @@ describe('DetailsPanel Output section', () => {
     expect(view.getByText(/"command"/)).toBeTruthy()
     expect(view.getByText('ls -la')).toBeTruthy()
     // The panel takes the primitive's own default cap (16), not the row's.
-    expect(view.getByText(`… remaining ${20 - 16} lines`)).toBeTruthy()
+    expect(view.getByText('… 4 more lines')).toBeTruthy()
     expect(view.getByText('row-0')).toBeTruthy()
   })
 

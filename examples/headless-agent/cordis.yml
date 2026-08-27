@@ -69,6 +69,20 @@
 - id: checkpoint-policy
   name: '@shres-code/shres-code-session-checkpoint-policy'
 
+# The ACP app mounts the derived index internally; this leaf registers both
+# the SQLite service and the model-facing consumer. Search stays enabled
+# (`openAt` defaults to `startup`) so history tools can query the live log.
+- id: session-query-sqlite
+  name: '@shres-code/shres-code-session-query-sqlite'
+  config:
+    path: './.sessions/session-query.db'
+
+- id: tool-session-query
+  name: '@shres-code/shres-code-tool-session-query'
+
+- id: timeout-policy
+  name: '@shres-code/shres-code-tool-call-timeout-policy'
+
 # Summarize an older range when derived history approaches the context window.
 - id: token-meter
   name: '@shres-code/shres-code-token-meter'

@@ -19,6 +19,9 @@ import type { SessionEvent, SessionId, SessionHeader, SurfaceOp } from '@shres-c
  */
 export const SCHEMA_VERSION = 15
 
+/** Default SQLite `busy_timeout` in milliseconds. `0` restores immediate lock failure. */
+export const DEFAULT_BUSY_TIMEOUT_MS = 5000
+
 /** SQLite application id protecting unrelated databases from persistence writes. */
 export const SESSION_PERSISTENCE_SQLITE_APPLICATION_ID = 0x44534850
 
@@ -76,12 +79,17 @@ export type JournalMode = 'wal' | 'delete' | 'truncate' | 'persist'
  * being migrated in place.
  * @param path - the SQLite database file to open (created when absent).
  * @param journalMode - validated journal pragma.
+ * @param busyTimeoutMs - `PRAGMA busy_timeout` in milliseconds; `0` fails immediately.
  * @returns the open handle with pragmas applied and all three tables ensured.
  */
-export function openDatabase(path: string, journalMode: JournalMode): DatabaseSync {
+export function openDatabase(
+  path: string,
+  journalMode: JournalMode,
+  busyTimeoutMs = DEFAULT_BUSY_TIMEOUT_MS,
+): DatabaseSync {
   const db = new DatabaseSync(path)
   try {
-    configureDatabase(db, path, journalMode)
+    configureDatabase(db, path, journalMode, busyTimeoutMs)
     return db
   } catch (error: unknown) {
     db.close()
@@ -89,7 +97,12 @@ export function openDatabase(path: string, journalMode: JournalMode): DatabaseSy
   }
 }
 
-function configureDatabase(db: DatabaseSync, path: string, journalMode: JournalMode): void {
+function configureDatabase(
+  db: DatabaseSync,
+  path: string,
+  journalMode: JournalMode,
+  busyTimeoutMs: number,
+): void {
   db.exec('PRAGMA foreign_keys = ON')
   let began = false
   try {
@@ -169,6 +182,8 @@ function configureDatabase(db: DatabaseSync, path: string, journalMode: JournalM
   // The validated union is safe to interpolate into a non-bindable PRAGMA.
   // Apply it only after ownership validation and initialization commit.
   db.exec(`PRAGMA journal_mode = ${journalMode.toUpperCase()}`)
+  // `busyTimeoutMs` is a validated non-negative safe integer.
+  db.exec(`PRAGMA busy_timeout = ${busyTimeoutMs}`)
 }
 
 /**

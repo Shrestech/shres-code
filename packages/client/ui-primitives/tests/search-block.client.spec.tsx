@@ -111,11 +111,11 @@ describe('SearchBlock height cap', () => {
     const view = render(<SearchBlock kind="paths" truncated={false} total={10} paths={paths} maxLines={4} />)
     // maxLines 4: head = ceil(4/2) = 2, tail = 2, 6 hidden.
     expect(lines(view.container)).toEqual(['p1', 'p2', 'p9', 'p10'])
-    const toggle = view.getByRole('button', { name: 'Show remaining 6 linesResult' })
+    const toggle = view.getByRole('button', { name: 'Show remaining 6 lines' })
     expect(toggle.textContent).toBe('… remaining 6 lines')
     fireEvent.click(toggle)
     expect(lines(view.container)).toHaveLength(10)
-    const collapse = view.getByRole('button', { name: 'Show lessResult' })
+    const collapse = view.getByRole('button', { name: 'Show less' })
     expect(collapse.textContent).toBe('Show less')
     fireEvent.click(collapse)
     expect(lines(view.container)).toEqual(['p1', 'p2', 'p9', 'p10'])
@@ -128,14 +128,14 @@ describe('SearchBlock height cap', () => {
     // Head takes the header then the first match; tail takes the last two matches.
     expect(lines(view.container)).toEqual(['1: hit 1', '9: hit 9', '10: hit 10'])
     expect(fileHeaders(view.container)).toEqual(['a.ts10'])
-    expect(view.getByRole('button', { name: 'Show remaining 7 linesResult' })).toBeTruthy()
+    expect(view.getByRole('button', { name: 'Show remaining 7 lines' })).toBeTruthy()
   })
 
   it('renders the head slice alone when the cap leaves no tail', () => {
     const view = render(<SearchBlock kind="paths" truncated={false} total={5}
       paths={['a', 'b', 'c', 'd', 'e']} maxLines={1} />)
     expect(lines(view.container)).toEqual(['a'])
-    expect(view.getByRole('button', { name: 'Show remaining 4 linesResult' })).toBeTruthy()
+    expect(view.getByRole('button', { name: 'Show remaining 4 lines' })).toBeTruthy()
   })
 
   it('restores the owning file header above a tail slice that begins mid-file', () => {
@@ -153,14 +153,14 @@ describe('SearchBlock height cap', () => {
     ])
     // Visible rows hold at maxLines (2 headers + 6 matches = 8), so the hidden
     // count stays exact: 22 − 8 = 14.
-    expect(view.getByRole('button', { name: 'Show remaining 14 linesResult' })).toBeTruthy()
+    expect(view.getByRole('button', { name: 'Show remaining 14 lines' })).toBeTruthy()
   })
 
   it('caps at the documented default when maxLines is absent', () => {
     const paths = Array.from({ length: DEFAULT_SEARCH_MAX_LINES + 1 }, (_v, i) => `p${i}`)
     const view = render(<SearchBlock kind="paths" truncated={false} total={paths.length} paths={paths} />)
     expect(lines(view.container)).toHaveLength(DEFAULT_SEARCH_MAX_LINES)
-    expect(view.getByRole('button', { name: 'Show remaining 1 linesResult' })).toBeTruthy()
+    expect(view.getByRole('button', { name: 'Show remaining 1 lines' })).toBeTruthy()
   })
 })
 

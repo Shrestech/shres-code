@@ -308,6 +308,118 @@ describe('chain semantics', () => {
   })
 })
 
+/** Every tool result the agent logged, as `<isError>:<joined text>`. */
+function results(agent: Agent): string[] {
+  return [...agent.session.events]
+    .filter((e): e is SessionEvent<'tool/result'> => e.type === 'tool/result')
+    .map((e) => {
+      const block = e.data.message.content[0]
+      const text = (block.content ?? []).map(part => part.type === 'text' ? part.text : '').join('')
+      return `${String(block.isError === true)}:${text}`
+    })
+}
+
+describe('veto escalation', () => {
+  it('is off by default: a long run of identical calls all execute', async () => {
+    const ctx = await harness({ thresholds: [2] })
+    ctx.llm.registerAdapter(['mock'], new MockAdapter([
+      ...Array.from({ length: 4 }, (_, i) => toolCallResponse(`c${i}`, 'probe', { q: 1 })),
+      textResponse('done'),
+    ]))
+    const agent = ctx.agentLoop.create(SessionId('a1'), { provider: 'mock', model: 'mock' })
+    agent.followup(createUserMessage({ content: [{ type: 'text', text: 'go' }], source: { kind: 'user' } }))
+    await waitForIdle(ctx, agent)
+
+    expect(results(agent)).toEqual(['false:ok', 'false:ok', 'false:ok', 'false:ok'])
+  })
+
+  it('refuses from the threshold on, with a structured REPEAT_TOOL_VETO error', async () => {
+    const ctx = await harness({ thresholds: [2], vetoThreshold: 3 })
+    ctx.llm.registerAdapter(['mock'], new MockAdapter([
+      ...Array.from({ length: 4 }, (_, i) => toolCallResponse(`c${i}`, 'probe', { q: 1 })),
+      textResponse('done'),
+    ]))
+    const agent = ctx.agentLoop.create(SessionId('a1'), { provider: 'mock', model: 'mock' })
+    agent.followup(createUserMessage({ content: [{ type: 'text', text: 'go' }], source: { kind: 'user' } }))
+    await waitForIdle(ctx, agent)
+
+    const found = results(agent)
+    expect(found.slice(0, 2)).toEqual(['false:ok', 'false:ok'])
+    // Refused once the run reaches 3, and every identical attempt after it.
+    expect(found[2]).toBe(
+      'true:Error: refused: probe has now been called 3 times in a row with identical arguments '
+      + 'and is not making progress. This exact call will keep being refused. Re-read the last '
+      + 'result from probe, then call it with different arguments, use a different tool, or '
+      + 'finish with what you already know.',
+    )
+    expect(found[3]).toContain('called 4 times in a row')
+    const errors = [...agent.session.events]
+      .filter((e): e is SessionEvent<'tool/result'> => e.type === 'tool/result')
+      .map(e => e.data.error?.code)
+    expect(errors).toEqual([undefined, undefined, 'REPEAT_TOOL_VETO', 'REPEAT_TOOL_VETO'])
+  })
+
+  it('never runs the vetoed tool', async () => {
+    let executed = 0
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(AgentLoop, { agents: [] })
+    await ctx.plugin(RepeatToolGuard, { vetoThreshold: 2 })
+    ctx.tools.register(defineContentToolFixture({
+      name: 'probe',
+      description: 'p',
+      parameters: {},
+      async execute() { executed += 1; return [{ type: 'text', text: 'ok' }] },
+    }))
+    ctx.llm.registerAdapter(['mock'], new MockAdapter([
+      toolCallResponse('c1', 'probe', { q: 1 }),
+      toolCallResponse('c2', 'probe', { q: 1 }),
+      toolCallResponse('c3', 'probe', { q: 1 }),
+      textResponse('done'),
+    ]))
+    const agent = ctx.agentLoop.create(SessionId('a1'), { provider: 'mock', model: 'mock' })
+    agent.followup(createUserMessage({ content: [{ type: 'text', text: 'go' }], source: { kind: 'user' } }))
+    await waitForIdle(ctx, agent)
+
+    expect(executed).toBe(1)
+  })
+
+  it('releases the veto when the model changes the call', async () => {
+    const ctx = await harness({ vetoThreshold: 2 })
+    ctx.llm.registerAdapter(['mock'], new MockAdapter([
+      toolCallResponse('c1', 'probe', { q: 1 }),
+      toolCallResponse('c2', 'probe', { q: 1 }), // refused
+      toolCallResponse('c3', 'other', {}),       // different call: chain resets
+      toolCallResponse('c4', 'probe', { q: 1 }), // count 1 again
+      textResponse('done'),
+    ]))
+    const agent = ctx.agentLoop.create(SessionId('a1'), { provider: 'mock', model: 'mock' })
+    agent.followup(createUserMessage({ content: [{ type: 'text', text: 'go' }], source: { kind: 'user' } }))
+    await waitForIdle(ctx, agent)
+
+    expect(results(agent).map(result => result.startsWith('true:'))).toEqual([false, true, false, false])
+  })
+
+  it('leaves untracked tools and agent-less direct calls alone', async () => {
+    const ctx = await harness({ vetoThreshold: 2, exclude: ['other'] })
+    const direct = await ctx.tools.execute({ signal: testToolSignal, callId: CallId('d1'), name: 'probe', arguments: { q: 1 } })
+    const direct2 = await ctx.tools.execute({ signal: testToolSignal, callId: CallId('d2'), name: 'probe', arguments: { q: 1 } })
+    expect([direct.isError, direct2.isError]).toEqual([false, false])
+
+    ctx.llm.registerAdapter(['mock'], new MockAdapter([
+      toolCallResponse('c1', 'other', {}),
+      toolCallResponse('c2', 'other', {}),
+      toolCallResponse('c3', 'other', {}),
+      textResponse('done'),
+    ]))
+    const agent = ctx.agentLoop.create(SessionId('a1'), { provider: 'mock', model: 'mock' })
+    agent.followup(createUserMessage({ content: [{ type: 'text', text: 'go' }], source: { kind: 'user' } }))
+    await waitForIdle(ctx, agent)
+
+    expect(results(agent).every(result => result.startsWith('false:'))).toBe(true)
+  })
+})
+
 describe('fold onto the downstream decision', () => {
   it('folds the reminder onto a downstream block and keeps its feedback', async () => {
     const ctx = await harness({ thresholds: [2] })
@@ -399,5 +511,14 @@ describe('config validation fails loud', () => {
     await expect(ctx.plugin(RepeatToolGuard, { argumentsPreviewChars: 0 })).rejects.toThrow(/argumentsPreviewChars/)
     const ctx2 = await spine()
     await expect(ctx2.plugin(RepeatToolGuard, { argumentsPreviewChars: 12.5 })).rejects.toThrow(/argumentsPreviewChars/)
+  })
+
+  it('rejects a vetoThreshold below 2 or fractional, but accepts 0 as off', async () => {
+    const ctx = await spine()
+    await expect(ctx.plugin(RepeatToolGuard, { vetoThreshold: 1 })).rejects.toThrow(/vetoThreshold/)
+    const ctx2 = await spine()
+    await expect(ctx2.plugin(RepeatToolGuard, { vetoThreshold: 3.5 })).rejects.toThrow(/vetoThreshold/)
+    const ctx3 = await spine()
+    await expect(ctx3.plugin(RepeatToolGuard, { vetoThreshold: 0 })).resolves.toBeDefined()
   })
 })

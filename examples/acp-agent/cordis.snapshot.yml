@@ -1,4 +1,5 @@
-# Keyless replay includes the live `cordis.yml`, disables the key-requiring
+# Keyless replay includes the live `cordis.yml` (including the model-facing
+# session-query tools and timeout policy), disables the key-requiring
 # DeepSeek adapter, and inserts `llm-replay` to serve recorded JSONL without a key
 # or network; every other app entry remains shared. It also restates the acp-agent
 # config to re-pin `deepseek-v4-flash`: `cordis.yml` ships `deepseek-v4-pro`, but the

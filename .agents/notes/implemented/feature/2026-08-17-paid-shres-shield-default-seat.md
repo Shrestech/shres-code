@@ -8,15 +8,15 @@ Shres Shield is the product's prompt-injection defense and a paid plugin. Shippi
 
 ## Decision
 
-`@shres-shield/plugin` stays in the shres-shield repository. Shres Code ships only `@shres-code/shres-code-shield`, a function plugin on `shres-base` (`id: shres-shield`) that resolves the payload, checks entitlement, and publishes `ctx.shield.status`.
+`@shrestech/shres-shield-plugin` stays in the shres-shield repository. Shres Code ships only `@shres-code/shres-code-shield`, a function plugin on `shres-base` (`id: shres-shield`) that resolves the payload, checks entitlement, and publishes `ctx.shield.status`.
 
-Resolve order: `SHRES_SHIELD_MODULE` (exclusive when set), then sibling `../shres-shield/packages/plugin/dist/index.js`, then the `@shres-shield/plugin` specifier. Entitlement: a non-empty `license` / `SHRES_SHIELD_LICENSE`, or a sibling/env-module load. `SHRES_SHIELD=off` is the panic switch and beats every other control. An unentitled or missing payload keeps the row loaded and `active: false`; the loop is unchanged.
+Resolve order: `SHRES_SHIELD_MODULE` (exclusive when set), then the active profile's installed payload, then sibling `../shres-shield/packages/plugin/dist/index.js`, then the `@shrestech/shres-shield-plugin` specifier (see [edition provision](2026-08-24-shield-edition-provision.md) for the profile leg; [npm update](2026-08-26-shield-npm-payload-update.md) for why profile precedes sibling). Entitlement: a non-empty `license` / `SHRES_SHIELD_LICENSE`, or a sibling/env-module load. `SHRES_SHIELD=off` is the panic switch and beats every other control. An unentitled or missing payload keeps the row loaded and `active: false`; the loop is unchanged.
 
 The seat calls `apply(ctx, { posture })` itself and registers `dispose` through `ctx.effect()`. The payload is never a Loader `name` — its `apply` is async and returns an instance, which Cordis would not treat as a disposer.
 
 The seat `inject` is `['systemPrompt', 'tools', 'approval', 'jobs']`. Cordis array inject is required-only; there is no optional flag. Product `shres-base` always mounts `user-approval` and `jobs-local` as siblings of this row. A composition that omits `approval` or `jobs` leaves the seat fiber pending: `apply` never runs, `ctx.shield` is never published, and the engine never screens. Listing the names is required so the payload adapter's `ctx.approval` / `ctx.jobs` property probes succeed when those sibling services exist (an uninjected property read throws and is treated as headless).
 
-While `ctx.shield.status.active` is true, the product mark uses girl `#2563eb` and shield `#16a34a`. Inactive uses `currentColor` with no green overlay. The web primitives default `shieldActive` to true because the shipped composition is default-on; a later client binding can pass `ctx.shield.status.active`. Settings **Shield** (`@shres-code/shres-code-client-ui-settings-shield`, order 12) writes the `shres-shield` namespace (`enabled`, `posture`, `license`); the seat remounts on change. The page's activate switch sits beside the Shield mark. The same page binds `ctx.remote.shield.snapshot()` for this-repo counters and recent findings. License defaults to `shres-dev` until a paid key exists. The API proxy allowlists that namespace next to `agent-seats`. `ctx.shield.snapshot()` is the Host Remote for those counts. `'shield/decision'` is the ignorable session event Trajectory badges fold.
+While `ctx.shield.status.active` is true, the product mark uses girl `#2563eb` and shield `#16a34a`. Inactive uses `currentColor` with no green overlay. The web primitives default `shieldActive` to true because the shipped composition is default-on; a later client binding can pass `ctx.shield.status.active`. Settings **Shield** (`@shres-code/shres-code-client-ui-settings-shield`, order 12) writes the `shres-shield` namespace (`enabled`, `posture`, `license`, `repos`); the seat remounts on change. The page's activate switch sits beside the Shield mark. The same page binds `ctx.remote.shield.snapshot()` for this-repo counters and recent findings. License defaults to `shres-dev` until a paid key exists. The API proxy allowlists that namespace next to `agent-seats`. `ctx.shield.snapshot()` is the Host Remote for those counts. `'shield/decision'` is the ignorable session event Trajectory badges fold. The mark follows the current session's snapshot status, and `repos` carries the per-repo exemption ([per-repo exemption note](2026-08-24-shield-per-repo-exemption.md)).
 
 The reproducible checkout, entitlement table, and Cordis mapping live in shres-shield `docs/integration-shres-code.md`.
 
@@ -24,13 +24,13 @@ The reproducible checkout, entitlement table, and Cordis mapping live in shres-s
 
 **Vendor `@shres-shield/*` into this repository.** Rejected: the engine is the paid product. A workspace copy would ship it with every harness install and fork the release train.
 
-**List `@shres-shield/plugin` as a `file:` or workspace member.** Rejected: CI has no sibling checkout, and `workspace:*` inside that package does not resolve from this workspace. Dynamic resolve plus a documented sibling layout keeps `pnpm install` self-contained.
+**List `@shrestech/shres-shield-plugin` as a `file:` or workspace member.** Rejected: CI has no sibling checkout, and `workspace:*` inside that package does not resolve from this workspace. Dynamic resolve plus a documented sibling layout keeps `pnpm install` self-contained.
 
 **Mount the payload as a bare `cordis.yml` name.** Rejected: Cordis `apply` must return a disposer or void. The payload's `apply` is async and returns `{ shield, dispose }`.
 
-**Require a license even for a sibling checkout.** Rejected: developers cloning both repos as siblings must get a working default-on seat without a customer key. Package-specifier loads still require `SHRES_SHIELD_LICENSE`.
+**Require a license even for a sibling checkout.** Rejected: developers cloning both repos as siblings must get a working default-on seat without a customer key. Package- and profile-resolved loads still require `SHRES_SHIELD_LICENSE`.
 
-**Cryptographic license verification in this seat.** Rejected for this change: the paid release of `@shres-shield/plugin` owns key verification. This seat only distinguishes empty from non-empty and records the gap.
+**Cryptographic license verification in this seat.** Rejected for this change: the paid release of `@shrestech/shres-shield-plugin` owns key verification. This seat only distinguishes empty from non-empty and records the gap.
 
 **Skip `approval` and `jobs` in `inject` and probe with `ctx.get`.** Rejected: the payload adapter property-reads `ctx.approval` / `ctx.jobs` (try/caught). Sibling services are invisible on the ancestor walk without `inject` ([postmortem 0001](../../../../docs/postmortem/0001-acp-default-export-drops-inject.md)). Tools already consume approval opportunistically via `ctx.get` ([approval seam](2026-07-06-approval-seam.md)); the adapter does not. Cordis has no optional-inject form.
 

@@ -15,15 +15,15 @@ The Cordis framework and its foundation libraries are source-vendored into this 
 
 | Package | Upstream name | Upstream | License |
 | --- | --- | --- | --- |
-| `@shres-code/cosmokit` | `cosmokit` | [github.com/parthmstech/cosmokit](https://github.com/parthmstech/cosmokit) | MIT |
-| `@shres-code/schemastery` | `schemastery` | [github.com/parthmstech/schemastery](https://github.com/parthmstech/schemastery) | MIT |
+| `@shres-code/cosmokit` | `cosmokit` | [github.com/shigma/cosmokit](https://github.com/shigma/cosmokit) | MIT |
+| `@shres-code/schemastery` | `schemastery` | [github.com/shigma/schemastery](https://github.com/shigma/schemastery) | MIT |
 | `@shres-code/cordis` | `cordis` | [github.com/cordiverse/cordis](https://github.com/cordiverse/cordis) | MIT |
 | `@shres-code/cordis-plugin-loader` | `@cordisjs/plugin-loader` | [github.com/cordiverse/cordis](https://github.com/cordiverse/cordis) | MIT |
-| `@shres-code/cordis-plugin-include` | `@cordisjs/plugin-include` | [github.com/parthmstech/cordis](https://github.com/parthmstech/cordis) | MIT |
-| `@shres-code/cordis-plugin-group` | `@cordisjs/plugin-group` | [github.com/parthmstech/cordis](https://github.com/parthmstech/cordis) | MIT |
-| `@shres-code/cordis-plugin-timer` | `@cordisjs/plugin-timer` | [github.com/parthmstech/cordis](https://github.com/parthmstech/cordis) | MIT |
-| `@shres-code/cordis-plugin-hmr` | `@cordisjs/plugin-hmr` | [github.com/parthmstech/cordis](https://github.com/parthmstech/cordis) | MIT |
-| `@shres-code/cordis-plugin-logger-console` | `@cordisjs/plugin-logger-console` | [github.com/parthmstech/cordis](https://github.com/parthmstech/cordis) | MIT |
+| `@shres-code/cordis-plugin-include` | `@cordisjs/plugin-include` | [github.com/cordiverse/cordis](https://github.com/cordiverse/cordis) | MIT |
+| `@shres-code/cordis-plugin-group` | `@cordisjs/plugin-group` | [github.com/cordiverse/cordis](https://github.com/cordiverse/cordis) | MIT |
+| `@shres-code/cordis-plugin-timer` | `@cordisjs/plugin-timer` | [github.com/cordiverse/cordis](https://github.com/cordiverse/cordis) | MIT |
+| `@shres-code/cordis-plugin-hmr` | `@cordisjs/plugin-hmr` | [github.com/cordiverse/cordis](https://github.com/cordiverse/cordis) | MIT |
+| `@shres-code/cordis-plugin-logger-console` | `@cordisjs/plugin-logger-console` | [github.com/cordiverse/cordis](https://github.com/cordiverse/cordis) | MIT |
 
 ## Runtime npm dependencies
 

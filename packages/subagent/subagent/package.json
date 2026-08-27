@@ -37,6 +37,7 @@
   ],
   "license": "MIT",
   "dependencies": {
+    "@shres-code/schemastery": "workspace:^",
     "zod": "^4.4.3"
   },
   "peerDependencies": {

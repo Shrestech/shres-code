@@ -18,9 +18,9 @@ Each `start` spawns a new child, runs exactly one ACP session (`initialize` → 
 
 The client advertises NO optional capabilities (no `fs`, no `terminal`): the child self-serves file/terminal access in its own process. `session/update` notifications are consumed — the backend accumulates `agent_message_chunk` text as the result output and ignores the rest (thoughts, tool-call cards), so only the child's final answer surfaces. `session/request_permission` is auto-answered by a configured policy (`reject` declines every prompt, `allow` approves via the first allow-shaped option) — no prompt is surfaced to a human. Proxying `fs`/`terminal` back to the parent (a shared-workspace mode) remains future work, as the seam Agent Note noted.
 
-### No start-time capabilities
+### Parent-side depth; no remote tool filter or structured output
 
-The provider's `capabilities` are all `false`. An out-of-process child cannot honor the parent's `maxDepth` (it has no access to `parent.options.subagentDepth`) or `toolFilter` (it owns its own tool registry), and the first cut does not implement `outputSchema`. The service rejects a request needing any of them before `start` runs. The backend injects only `subagents` (not `ctx.agents`); the ONE thing it reads off `request.parent` is the session header's cwd (see the workspace resolution below) — no conversation context, depth, or tool state crosses the process boundary.
+The provider advertises `depthLimit` and rejects `toolFilter`, `persona`, and `outputSchema`. An out-of-process child cannot apply the parent's tool filter (it owns its own tool registry) or persona, and the first cut does not implement `outputSchema`. The service rejects a request needing those before spawn. Parent-side `maxDepth` is `resolveChildDepth` on the delegating agent before `provider.start()`. The backend injects only `subagents` (not `ctx.agents`); the ONE other thing it reads off `request.parent` is the session header's cwd (see the workspace resolution below) — no conversation context or tool state crosses the process boundary.
 
 ### Workspace cwd resolution
 

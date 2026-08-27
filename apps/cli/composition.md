@@ -108,6 +108,14 @@ flowchart LR
   cfg --> plugin_shres_base_goal_round_driver
   plugin_shres_base_command_goal["command-goal<br/>@shres-code/shres-code-command-goal"]
   cfg --> plugin_shres_base_command_goal
+  plugin_shres_base_jspace["jspace<br/>@shres-code/shres-code-jspace"]
+  cfg --> plugin_shres_base_jspace
+  plugin_shres_base_jspace_prompt["jspace-prompt<br/>@shres-code/shres-code-jspace-prompt"]
+  cfg --> plugin_shres_base_jspace_prompt
+  plugin_shres_base_tool_jspace["tool-jspace<br/>@shres-code/shres-code-tool-jspace"]
+  cfg --> plugin_shres_base_tool_jspace
+  plugin_shres_base_command_jspace["command-jspace<br/>@shres-code/shres-code-command-jspace"]
+  cfg --> plugin_shres_base_command_jspace
   plugin_shres_base_plan_mode["plan-mode<br/>@shres-code/shres-code-plan-mode"]
   cfg --> plugin_shres_base_plan_mode
   plugin_shres_base_token_meter["token-meter<br/>@shres-code/shres-code-token-meter"]
@@ -128,6 +136,8 @@ flowchart LR
   cfg --> plugin_shres_base_tool_subagent_list_agents
   plugin_shres_base_tool_subagent["tool-subagent<br/>@shres-code/shres-code-tool-subagent"]
   cfg --> plugin_shres_base_tool_subagent
+  plugin_shres_base_agent_seats["agent-seats<br/>@shres-code/shres-code-agent-seats"]
+  cfg --> plugin_shres_base_agent_seats
   plugin_shres_base_tool_subagent_fork["tool-subagent-fork<br/>@shres-code/shres-code-tool-subagent"]
   cfg --> plugin_shres_base_tool_subagent_fork
   plugin_shres_base_tool_subagent_report["tool-subagent-report<br/>@shres-code/shres-code-tool-subagent-report"]
@@ -136,6 +146,8 @@ flowchart LR
   cfg --> plugin_shres_base_workflow_worker_thread
   plugin_shres_base_tool_workflow["tool-workflow<br/>@shres-code/shres-code-tool-workflow"]
   cfg --> plugin_shres_base_tool_workflow
+  plugin_shres_base_shres_shield["shres-shield<br/>@shres-code/shres-code-shield"]
+  cfg --> plugin_shres_base_shres_shield
   plugin_shres_base_timeout_policy["timeout-policy<br/>@shres-code/shres-code-tool-call-timeout-policy"]
   cfg --> plugin_shres_base_timeout_policy
   plugin_shres_base_spill_local["spill-local<br/>@shres-code/shres-code-spill-local"]
@@ -164,6 +176,12 @@ flowchart LR
   cfg --> plugin_shres_base_web_search_deepseek
   plugin_shres_base_tool_web["tool-web<br/>@shres-code/shres-code-tool-web"]
   cfg --> plugin_shres_base_tool_web
+  plugin_shres_base_speech["speech<br/>@shres-code/shres-code-speech"]
+  cfg --> plugin_shres_base_speech
+  plugin_shres_base_speech_kokoro["speech-kokoro<br/>@shres-code/shres-code-speech-kokoro"]
+  cfg --> plugin_shres_base_speech_kokoro
+  plugin_shres_base_speech_whisper["speech-whisper<br/>@shres-code/shres-code-speech-whisper"]
+  cfg --> plugin_shres_base_speech_whisper
   plugin_shres_base_tools["tools<br/>@shres-code/shres-code-tools"]
   cfg --> plugin_shres_base_tools
   plugin_shres_base_system_prompt["system-prompt<br/>@shres-code/shres-code-system-prompt"]
@@ -172,6 +190,8 @@ flowchart LR
   cfg --> plugin_shres_base_agent_loop
   plugin_shres_base_fs_sandbox["fs-sandbox<br/>@shres-code/shres-code-fs-sandbox"]
   cfg --> plugin_shres_base_fs_sandbox
+  plugin_shres_base_llm_cli_bridge["llm-cli-bridge<br/>@shres-code/shres-code-llm-cli-bridge"]
+  cfg --> plugin_shres_base_llm_cli_bridge
   plugin_shres_base_llm_deepseek["llm-deepseek<br/>@shres-code/shres-code-llm-deepseek"]
   cfg --> plugin_shres_base_llm_deepseek
 ```
@@ -228,6 +248,10 @@ flowchart LR
 | `goal` | `@shres-code/shres-code-goal` |
 | `goal-round-driver` | `@shres-code/shres-code-goal-round-driver` |
 | `command-goal` | `@shres-code/shres-code-command-goal` |
+| `jspace` | `@shres-code/shres-code-jspace` |
+| `jspace-prompt` | `@shres-code/shres-code-jspace-prompt` |
+| `tool-jspace` | `@shres-code/shres-code-tool-jspace` |
+| `command-jspace` | `@shres-code/shres-code-command-jspace` |
 | `plan-mode` | `@shres-code/shres-code-plan-mode` |
 | `token-meter` | `@shres-code/shres-code-token-meter` |
 | `compaction-basic` | `@shres-code/shres-code-compaction-basic` |
@@ -238,10 +262,12 @@ flowchart LR
 | `tool-subagent-control` | `@shres-code/shres-code-tool-subagent-control` |
 | `tool-subagent-list-agents` | `@shres-code/shres-code-tool-subagent-control/list-agents` |
 | `tool-subagent` | `@shres-code/shres-code-tool-subagent` |
+| `agent-seats` | `@shres-code/shres-code-agent-seats` |
 | `tool-subagent-fork` | `@shres-code/shres-code-tool-subagent` |
 | `tool-subagent-report` | `@shres-code/shres-code-tool-subagent-report` |
 | `workflow-worker-thread` | `@shres-code/shres-code-workflow-worker-thread` |
 | `tool-workflow` | `@shres-code/shres-code-tool-workflow` |
+| `shres-shield` | `@shres-code/shres-code-shield` |
 | `timeout-policy` | `@shres-code/shres-code-tool-call-timeout-policy` |
 | `spill-local` | `@shres-code/shres-code-spill-local` |
 | `spill-policy` | `@shres-code/shres-code-spill-policy` |
@@ -256,10 +282,14 @@ flowchart LR
 | `web-search-attached-cli` | `@shres-code/shres-code-web-search-attached-cli` |
 | `web-search-deepseek` | `@shres-code/shres-code-web-search-deepseek` |
 | `tool-web` | `@shres-code/shres-code-tool-web` |
+| `speech` | `@shres-code/shres-code-speech` |
+| `speech-kokoro` | `@shres-code/shres-code-speech-kokoro` |
+| `speech-whisper` | `@shres-code/shres-code-speech-whisper` |
 | `tools` | `@shres-code/shres-code-tools` |
 | `system-prompt` | `@shres-code/shres-code-system-prompt` |
 | `agent-loop` | `@shres-code/shres-code-agent-loop` |
 | `fs-sandbox` | `@shres-code/shres-code-fs-sandbox` |
+| `llm-cli-bridge` | `@shres-code/shres-code-llm-cli-bridge` |
 | `llm-deepseek` | `@shres-code/shres-code-llm-deepseek` |
 
 Source config: [`packages/bundle/base/cordis.patch.yml`](../../packages/bundle/base/cordis.patch.yml).

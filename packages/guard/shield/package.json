@@ -1,6 +1,6 @@
 {
   "name": "@shres-code/shres-code-shield",
-  "description": "Default-on host seat for the paid Shres Shield plugin: entitlement, engine resolve, ctx.shield status, and snapshot RPC",
+  "description": "Default-on host seat for the paid Shres Shield plugin: entitlement, engine resolve, ctx.shield status, snapshot RPC, and npm payload update",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"

@@ -16,8 +16,8 @@ const icons = Object.fromEntries(
 const iconNames = Object.keys(icons)
 
 describe('ic_ds_ icon set', () => {
-  it('exports the full icon set (46 deepsuite + 20 figma extracts + four product glyphs outside those sets)', () => {
-    expect(iconNames.length).toBe(70)
+  it('exports the full icon set (46 deepsuite + 20 figma extracts + six product glyphs outside those sets)', () => {
+    expect(iconNames.length).toBe(72)
   })
 
   it.each(iconNames)('%s renders an svg with currentColor fills and no hardcoded palette', (name) => {
@@ -82,6 +82,10 @@ describe('HoppingRoo', () => {
     const svg = container.querySelector('[data-hopping-roo="ward"]')!
     expect(svg.getAttribute('data-state')).toBe('ongoing')
     expect((svg as SVGElement).style.color.replace(/\s/g, '')).toMatch(/#3b7dd8|rgb\(59,125,216\)/)
+    const idle = render(<primitives.HoppingRoo hopping={false} />)
+    const idleSvg = idle.container.querySelector('[data-hopping-roo="generic"]')!
+    expect(idleSvg.getAttribute('data-state')).toBeNull()
+    expect(idleSvg.getAttribute('class') ?? '').not.toMatch(/undefined/)
   })
 })
 

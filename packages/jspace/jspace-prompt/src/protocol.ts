@@ -22,28 +22,46 @@ export const JSPACE_CAPACITY_ORDER = 47
 /** Broadcast follows capacity. */
 export const JSPACE_BROADCAST_ORDER = 48
 
-/** How to drive the tools when no card is open. */
+/**
+ * How to drive the tools when no card is open. The section can first appear
+ * partway through a session, so the Goal it asks for covers the work that
+ * remains rather than the whole session.
+ */
 export const JSPACE_DRIVER_CLOSED =
-  'For multi-stage or multi-file work, call jspace_open with a Goal and Next. '
-  + 'Then keep the card current with jspace_note and jspace_checkpoint. '
-  + 'Call jspace_ship before claiming done.'
+  'For multi-stage or multi-file work, call jspace_open with a Goal and Next for the work '
+  + 'that remains, and the constraints the task stated once on Core, where they survive '
+  + 'compaction. Keep it current with jspace_note and jspace_checkpoint; '
+  + 'call jspace_ship before claiming done.'
 
 /** How to drive the tools when a card is already printed. */
 export const JSPACE_DRIVER_OPEN =
-  'A J-Space card is already open. Update it with jspace_note. '
-  + 'Record checks with jspace_checkpoint (by must name a verifier). '
-  + 'Call jspace_ship before claiming done. Do not call jspace_open to start a second card; '
-  + 'it replaces Goal and Next on the open card. '
-  + 'Repeating the same tool call within a turn is refused until you write a diagnosis on the card.'
+  'A J-Space card is open. Update it with jspace_note. Record checks with jspace_checkpoint '
+  + '(by names the verifier; the optional evidence must be a call_* tool-call id from this '
+  + 'session). Call jspace_ship before claiming done. jspace_open does not start a second card: '
+  + 'it replaces Goal and Next, and a changed Goal clears Core and Checked, so restate the '
+  + 'standing constraints there. '
+  + 'An identical tool call repeated within a turn is refused until you write a diagnosis on the card.'
+
+/** Driver sentence when a harness charter proposal exists and no charter is registered yet. */
+export const JSPACE_DRIVER_CHARTER
+  = 'Pass the charter on `jspace_open` (accept the proposal or amend it). Ship re-runs every check and names the first failure.'
 
 /**
  * Protocol block for this pass, always including the tool-driver lines.
  * @param pass - selected pass.
  * @param cardOpen - true when a native card is already printed.
+ * @param charterProposal - when true, append {@link JSPACE_DRIVER_CHARTER} (a proposal exists and the card charter is still empty).
  * @returns the protocol section text.
  */
-export function formatJspaceProtocol(pass: JspacePass, cardOpen: boolean): string {
-  const driver = cardOpen ? JSPACE_DRIVER_OPEN : JSPACE_DRIVER_CLOSED
+export function formatJspaceProtocol(
+  pass: JspacePass,
+  cardOpen: boolean,
+  charterProposal = false,
+): string {
+  let driver = cardOpen ? JSPACE_DRIVER_OPEN : JSPACE_DRIVER_CLOSED
+  if (charterProposal) {
+    driver = `${driver} ${JSPACE_DRIVER_CHARTER}`
+  }
   if (pass === 'fast') return driver
   return [
     driver,
@@ -61,7 +79,9 @@ export function formatJspaceProtocol(pass: JspacePass, cardOpen: boolean): strin
 export const JSPACE_CAPACITY_TEXT = [
   'Capacity: the stage holds at most two coherent items (the card Core).',
   'A third item requires an explicit swap that writes the departing line first.',
-  'Everything else is automatic or sits on Open / Checked, not on the stage.',
+  'Everything else is automatic or sits on Open / Checked, not on the stage; '
+  + 'earlier Open and Checked lines past the reprint cap remain in the session log '
+  + 'and are searchable with the session-query tools.',
 ].join('\n')
 
 /** Broadcast module: shared names are written once. */

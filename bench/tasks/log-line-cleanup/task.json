@@ -1,0 +1,9 @@
+{
+  "taskId": "log-line-cleanup",
+  "stratum": "short",
+  "description": "Remove all console.log debug statements from src/ while keeping tests green.",
+  "instruction": "Remove every `console.log` call from files under `src/`. These are leftover debug statements. The production code should not log to the console. When you are done, `node --test` must pass and no `console.log` may remain in any file under `src/`. Do not modify test files.",
+  "verify": "node verify.mjs",
+  "timeoutMs": 300000,
+  "maxTurns": 12
+}

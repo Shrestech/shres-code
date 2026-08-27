@@ -20,7 +20,7 @@ import {
 import type { Agent } from '@shres-code/shres-code-agent'
 import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 import type { ContentBlock } from '@shres-code/shres-code-llm'
-import SubagentRuntime from '@shres-code/shres-code-subagent'
+import SubagentRuntime, { SubagentDepthError } from '@shres-code/shres-code-subagent'
 import type {
   SubprocessHandle,
   SubprocessOutcome,
@@ -59,6 +59,7 @@ vi.mock('@anthropic-ai/claude-agent-sdk', async importOriginal => ({
 
 const fakeParent = {
   id: 'parent',
+  options: {},
   session: { header: { cwd: process.cwd() } },
 } as unknown as Agent
 
@@ -302,8 +303,8 @@ describe('task admission and package contracts', () => {
     expect(ctx.subagents.getProvider('claude-code')).toMatchObject({
       name: 'claude-code',
       capabilities: {
-        outputSchema: false,
-        depthLimit: false,
+        outputSchema: true,
+        depthLimit: true,
         toolFilter: false,
         persona: false,
       },
@@ -322,6 +323,45 @@ describe('task admission and package contracts', () => {
     })).rejects.toThrow(
       `disposeGraceMs must be no greater than ${MAX_TIMER_DELAY_MS}`,
     )
+    await ctx.fiber.dispose()
+  })
+
+  it('honors maxDepth from the parent and rejects toolFilter before spawn', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SubagentRuntime)
+    await ctx.plugin(LocalSubprocessRuntime)
+    const spawn = vi.spyOn(ctx.subprocess, 'spawn')
+    const resolveExecutable = vi.spyOn(ctx.subprocess, 'resolveExecutable')
+      .mockResolvedValue('/native/claude')
+    await ctx.plugin(claudeCode, {})
+    await expect(ctx.subagents.start('claude-code', { ...request(), maxDepth: 0 }))
+      .rejects.toBeInstanceOf(SubagentDepthError)
+    await expect(ctx.subagents.start('claude-code', { ...request(), toolFilter: { deny: ['bash'] } }))
+      .rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' })
+    expect(spawn).not.toHaveBeenCalled()
+    expect(resolveExecutable).not.toHaveBeenCalled()
+    await ctx.fiber.dispose()
+  })
+
+  it('forwards outputSchema as SDK outputFormat and surfaces structured_output', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SubagentRuntime)
+    await ctx.plugin(LocalSubprocessRuntime)
+    const schema = { type: 'object' as const, properties: { answer: { type: 'string' as const } } }
+    const structured = success('plain') as SDKResultMessage & { structured_output: unknown }
+    structured.structured_output = { answer: 'ok' }
+    const { child, options } = fakeRun([structured])
+    vi.spyOn(ctx.subprocess, 'spawn').mockImplementation(() => child.handle)
+    vi.spyOn(ctx.subprocess, 'resolveExecutable').mockResolvedValue('/native/claude')
+    await ctx.plugin(claudeCode, {})
+    const run = await ctx.subagents.start('claude-code', { ...request(), outputSchema: schema })
+    expect(options[0]?.outputFormat).toEqual({ type: 'json_schema', schema })
+    await expect(run.result).resolves.toEqual({
+      output: [{ type: 'text', text: 'plain' }],
+      structured: { answer: 'ok' },
+      stopReason: 'completed',
+    })
+    await run.dispose()
     await ctx.fiber.dispose()
   })
 
@@ -614,6 +654,19 @@ describe('query options and result mapping', () => {
     await expect(consumeClaudeQuery(
       queryFrom([{ type: 'system', subtype: 'init' } as SDKMessage]),
     )).rejects.toThrow('ended without a result')
+  })
+
+  it('requires structured_output when a schema is requested and copies it onto the result', async () => {
+    const schema = { type: 'object' as const, properties: { answer: { type: 'string' as const } } }
+    await expect(consumeClaudeQuery(queryFrom([success('plain')]), schema))
+      .rejects.toThrow('without structured output')
+    const structured = success('plain') as SDKResultMessage & { structured_output: unknown }
+    structured.structured_output = { answer: 'ok' }
+    await expect(consumeClaudeQuery(queryFrom([structured]), schema)).resolves.toEqual({
+      output: [{ type: 'text', text: 'plain' }],
+      structured: { answer: 'ok' },
+      stopReason: 'completed',
+    })
   })
 })
 

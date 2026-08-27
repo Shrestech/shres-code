@@ -217,6 +217,19 @@ describe('headless runner', () => {
     await ctx.fiber.dispose()
   })
 
+  it('runs first-run setup when that service is composed', async () => {
+    const test = await bench({
+      afterPrompt(session, message) { appendTurn(session, 1, message, 'after setup', true) },
+    })
+    let called = false
+    test.ctx.provide('firstRunSetup', {
+      ensureReady: async () => { called = true },
+    })
+    expect(await test.run()).toMatchObject({ code: 0, out: 'after setup\n' })
+    expect(called).toBe(true)
+    await test.ctx.fiber.dispose()
+  })
+
   it('abandons a run when the tree is disposed during Loader settlement', async () => {
     const ctx = new Context()
     let exited = false

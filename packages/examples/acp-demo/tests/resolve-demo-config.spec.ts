@@ -66,6 +66,7 @@ describe('resolveDemoConfig', () => {
       cwd: tmp(),
       home: tmp(),
       installAnchor: anchor,
+      execPath: anchor,
     })).toBe(resolve(leaf))
   })
 

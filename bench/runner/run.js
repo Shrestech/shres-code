@@ -4,15 +4,19 @@
  * toggle (protocol rule 1).
  *
  * ```
- * node bench/runner/run.js --experiment w0-2026-08-18 [--arms off,on] [--repeats 3] [--tasks glob] [--dry-run]
+ * node bench/runner/run.js --experiment w0-2026-08-18 [--arms off,on] [--repeats 3] [--concurrency 1] [--tasks glob[,glob]] [--dry-run]
  * ```
  *
- * Per trial the runner copies the fixture into a fresh scratch dir, writes the
- * arm's `--patch` overlay (jspace toggle + per-trial session-log root), spawns
- * the headless profile, folds the session log into metrics, runs the verifier,
- * and appends one validated Trial to `trials.jsonl`. `run.json` is written
+ * Per trial the runner copies the fixture into a fresh scratch dir, runs an
+ * optional task `setup` (used to plant a prior session into the persistence
+ * root), writes the arm's `--patch` overlay, spawns the headless profile,
+ * folds the session log into metrics, runs the verifier, and appends one
+ * validated Trial to `trials.jsonl`. `--concurrency <n>` (default 1) runs up
+ * to n plan entries at once; 1 is sequential. Concurrent completions share
+ * one in-process writer so each JSONL line is whole. `run.json` is written
  * before the first trial (endedAt empty) and completed at the end, so a crash
- * keeps every finished trial.
+ * keeps every finished trial. SIGINT/SIGTERM abort in-flight children, skip
+ * `endedAt`, and leave already-appended lines intact.
  *
  * Chain tasks (`phases` in task.json) run one scratch dir but one spawn per
  * phase, each with a fresh session root (`sessions/<taskId>/<trial>/phase-<i>`):
@@ -39,14 +43,19 @@
  */
 
 import { appendFile, cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { execFile } from 'node:child_process'
+import { homedir } from 'node:os'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 import { getArm, listArms, renderArmOverlay } from './arms.js'
 import { executeTrial } from './execute.js'
 import { emptyMetrics, foldSessionLog } from './metrics.js'
+import { descendantUsage } from './descendants.js'
+import { createSerialQueue, mapPool } from './pool.js'
+import { runSetup } from './setup.js'
 import { runVerifier } from './verify.js'
 import { validateRunManifest } from '../schema/run-manifest.js'
 import { validateTrial } from '../schema/trial.js'
@@ -59,16 +68,31 @@ Options:
   --experiment <name>   experiment directory under bench/runs/ (required)
   --arms <a,b>          arms to run, comma-separated (default: ${listArms().join(',')})
   --repeats <n>         trials per task per arm (default: 3)
-  --tasks <glob>        task-id filter; * and ? wildcards (default: all)
+  --tasks <glob[,glob]> task-id filter; comma-separated * / ? globs; match is union (default: all)
   --model <id>          model pin for run.json (default: $BENCH_MODEL or deepseek-v4-flash)
   --temperature <t>     temperature pin for run.json (default: $BENCH_TEMPERATURE or 1)
-  --base-url <url>      provider base URL pin (default: $DEEPSEEK_BASE_URL or null)
+  --base-url <url>      provider base URL pin (default: $DEEPSEEK_BASE_URL when --api-key-env is DEEPSEEK_API_KEY, null otherwise)
+  --api-key-env <VAR>   env var name for the API key; 'none' for keyless tiers (default: DEEPSEEK_API_KEY).
+                        An unset variable falls back to the harness credential store
+                        ($SHRES_HOME/.credentials.yaml, default ~/.shres); the value is injected
+                        into the child environment only, never into any bench record.
+  --tier-patch <path>   experiment-level overlay applied after the arm overlay; repeatable, order preserved
+  --concurrency <n>     max trials in flight (default: 1; 1 is sequential)
+  --max-total-tokens <n>  live token cap per trial: observed root+descendant usage
+                        above the cap terminates the trial as BUDGET_EXCEEDED
+  --resume               continue an interrupted experiment: reuse its manifest and
+                        skip (task, trial, arm) triples already recorded with a
+                        delivered verdict (status success); retried provider-error
+                        trials run again. Pin mismatches refuse loud.
   --dry-run             print the plan and exit without writing or executing
   --help                this text
 `
 
 /** Exit code for usage and environment errors (bad flags, missing API key). */
 const EXIT_USAGE = 2
+
+/** Exit code when SIGINT/SIGTERM abort the run after in-flight trials drain. */
+const EXIT_ABORTED = 130
 
 /** Default model/temperature pins, overridable by flag or env; recorded in run.json. */
 const DEFAULT_MODEL = 'deepseek-v4-flash'
@@ -104,6 +128,13 @@ export class UsageError extends Error {
  * @property {string | undefined} model
  * @property {number | undefined} temperature
  * @property {string | undefined} baseUrl
+ * @property {string} apiKeyEnv - env var name; `none` for keyless tiers.
+ * @property {string[]} tierPatches - overlay paths in given order; empty when unused.
+ * @property {number} concurrency - max trials in flight; 1 is sequential.
+ * @property {number} [maxTotalTokens] - live per-trial token cap; a spawn whose observed
+ *   root+descendant usage exceeds it is terminated and recorded `BUDGET_EXCEEDED`.
+ * @property {boolean} [resume] - continue an interrupted experiment instead of refusing
+ *   its existing manifests; delivered-verdict trials are skipped, error trials rerun.
  */
 
 /**
@@ -123,6 +154,11 @@ export function parseArgs(argv) {
     model: undefined,
     temperature: undefined,
     baseUrl: undefined,
+    apiKeyEnv: 'DEEPSEEK_API_KEY',
+    tierPatches: [],
+    concurrency: 1,
+    maxTotalTokens: undefined,
+    resume: false,
   }
   let armsSeen = false
   for (let index = 0; index < argv.length; index += 1) {
@@ -170,6 +206,27 @@ export function parseArgs(argv) {
       case '--base-url':
         options.baseUrl = value()
         break
+      case '--api-key-env':
+        options.apiKeyEnv = value()
+        break
+      case '--tier-patch':
+        options.tierPatches.push(value())
+        break
+      case '--concurrency': {
+        const parsed = Number(value())
+        if (!Number.isSafeInteger(parsed) || parsed < 1) throw new UsageError('--concurrency must be an integer >= 1')
+        options.concurrency = parsed
+        break
+      }
+      case '--max-total-tokens': {
+        const parsed = Number(value())
+        if (!Number.isSafeInteger(parsed) || parsed < 1) throw new UsageError('--max-total-tokens must be a positive integer')
+        options.maxTotalTokens = parsed
+        break
+      }
+      case '--resume':
+        options.resume = true
+        break
       case '--dry-run':
         options.dryRun = true
         break
@@ -182,20 +239,76 @@ export function parseArgs(argv) {
   if (options.experiment.includes('/') || options.experiment.includes('\\')) {
     throw new UsageError('--experiment must be a plain directory name')
   }
+  assertStuffedCompactionGuard(options)
   return options
 }
 
 /**
- * Filter task ids by a `*`/`?` glob. Null keeps the whole catalog.
+ * True when a `--tier-patch` path is the forced-compaction pressure overlay.
+ * @param {string} patchPath - path as given on the command line.
+ * @returns {boolean} whether the basename is `forced-compaction.patch.yml`.
+ */
+export function isForcedCompactionPatch(patchPath) {
+  const normalized = patchPath.replaceAll('\\', '/')
+  const slash = normalized.lastIndexOf('/')
+  const basename = slash === -1 ? normalized : normalized.slice(slash + 1)
+  return basename === 'forced-compaction.patch.yml'
+}
+
+/**
+ * Protocol rule: a stuffed arm's condition is the whole corpus in the prompt.
+ * Forced compaction would destroy that condition. Fail at argv validation.
+ * @param {Pick<RunnerOptions, 'arms' | 'tierPatches'>} options - parsed flags.
+ * @returns {void}
+ */
+export function assertStuffedCompactionGuard(options) {
+  const stuffedArms = options.arms.filter(name => getArm(name).stuffed === true)
+  if (stuffedArms.length === 0) return
+  const compaction = options.tierPatches.filter(isForcedCompactionPatch)
+  if (compaction.length === 0) return
+  throw new UsageError(
+    `stuffed arm (${stuffedArms.join(', ')}) cannot combine with the forced-compaction overlay `
+    + `(${compaction.join(', ')}): compaction would destroy the whole-corpus-in-the-prompt condition `
+    + `(protocol rule)`,
+  )
+}
+
+/**
+ * Choose the model-visible instruction for one (task, arm). `armInstructions[arm]`
+ * wins when present (cued family); stuffed arms fall back to `stuffedInstruction`;
+ * otherwise the default `instruction`.
+ * @param {TaskDefinition} task - loaded task.
+ * @param {{ name: string, stuffed?: boolean }} arm - arm entry.
+ * @returns {string} the prompt for this spawn.
+ */
+export function resolveTaskInstruction(task, arm) {
+  const byArm = task.armInstructions?.[arm.name]
+  if (typeof byArm === 'string') return byArm
+  if (arm.stuffed === true && typeof task.stuffedInstruction === 'string') return task.stuffedInstruction
+  return /** @type {string} */ (task.instruction)
+}
+
+/**
+ * Compile one `*`/`?` glob into an anchored regular expression.
+ * @param {string} glob - a single pattern; leading/trailing space is trimmed.
+ * @returns {RegExp} matcher for a whole task id.
+ */
+function compileTaskGlob(glob) {
+  const source = glob.trim().replace(/[.+^${}()|[\]\\]/g, '\\$&').replaceAll('*', '.*').replaceAll('?', '.')
+  return new RegExp(`^${source}$`)
+}
+
+/**
+ * Filter task ids by a comma-separated list of `*`/`?` globs. An id matches
+ * when any glob matches. Null keeps the whole catalog.
  * @param {string[]} taskIds - catalog ids.
- * @param {string | null} glob - the `--tasks` pattern.
+ * @param {string | null} glob - the `--tasks` pattern, or a comma-separated list.
  * @returns {string[]} matching ids, catalog order preserved.
  */
 export function matchTaskIds(taskIds, glob) {
   if (glob === null) return taskIds
-  const source = glob.replace(/[.+^${}()|[\]\\]/g, '\\$&').replaceAll('*', '.*').replaceAll('?', '.')
-  const pattern = new RegExp(`^${source}$`)
-  return taskIds.filter(id => pattern.test(id))
+  const patterns = glob.split(',').map(compileTaskGlob)
+  return taskIds.filter(id => patterns.some(pattern => pattern.test(id)))
 }
 
 /**
@@ -242,9 +355,12 @@ export function looksLikeProviderError(stdout, stderr) {
  * @typedef {object} TaskDefinition
  * @property {string} taskId
  * @property {string | null} instruction - single-session prompt; null on chain tasks.
+ * @property {string | null} stuffedInstruction - stuffed-arm prompt with the corpus inlined; null when absent.
+ * @property {Record<string, string> | null} armInstructions - per-arm prompt override (cued family); null when absent.
  * @property {TaskPhase[] | null} phases - chain phases (at least 2); null on single-session
  *   tasks. Exactly one of `instruction`/`phases` is non-null.
  * @property {string} verify
+ * @property {string | null} setup - optional pre-spawn command (`node setup.mjs`); null when absent.
  * @property {number} timeoutMs - per-spawn timeout; the per-phase default on chains.
  * @property {string} dir - absolute task directory.
  */
@@ -303,8 +419,42 @@ export async function loadTaskCatalog(tasksRoot) {
       }
       instruction = definition.instruction
     }
+    /** @type {string | null} */
+    let stuffedInstruction = null
+    if (definition.stuffedInstruction !== undefined) {
+      if (typeof definition.stuffedInstruction !== 'string' || definition.stuffedInstruction.trim() === '') {
+        throw new Error(`task ${entry.name}: task.json stuffedInstruction must be a non-empty string`)
+      }
+      stuffedInstruction = definition.stuffedInstruction
+    }
+    /** @type {Record<string, string> | null} */
+    let armInstructions = null
+    if (definition.armInstructions !== undefined) {
+      if (
+        typeof definition.armInstructions !== 'object'
+        || definition.armInstructions === null
+        || Array.isArray(definition.armInstructions)
+      ) {
+        throw new Error(`task ${entry.name}: task.json armInstructions must be a record of non-empty strings`)
+      }
+      armInstructions = {}
+      for (const [name, text] of Object.entries(/** @type {Record<string, unknown>} */ (definition.armInstructions))) {
+        if (typeof text !== 'string' || text.trim() === '') {
+          throw new Error(`task ${entry.name}: task.json armInstructions.${name} must be a non-empty string`)
+        }
+        armInstructions[name] = text
+      }
+    }
     if (typeof definition.verify !== 'string' || definition.verify.trim() === '') {
       throw new Error(`task ${entry.name}: task.json verify must be a non-empty string`)
+    }
+    /** @type {string | null} */
+    let setup = null
+    if (definition.setup !== undefined) {
+      if (typeof definition.setup !== 'string' || definition.setup.trim() === '') {
+        throw new Error(`task ${entry.name}: task.json setup must be a non-empty string`)
+      }
+      setup = definition.setup
     }
     if (!Number.isSafeInteger(definition.timeoutMs) || /** @type {number} */ (definition.timeoutMs) < 1) {
       throw new Error(`task ${entry.name}: task.json timeoutMs must be a positive integer`)
@@ -317,8 +467,11 @@ export async function loadTaskCatalog(tasksRoot) {
     tasks.push({
       taskId: entry.name,
       instruction,
+      stuffedInstruction,
+      armInstructions,
       phases,
       verify: definition.verify,
+      setup,
       timeoutMs: /** @type {number} */ (definition.timeoutMs),
       dir,
     })
@@ -390,22 +543,38 @@ function spawnFailureDetail(outcome, execution, where = '') {
  * @param {string} options.scratchDir - trial scratch dir; becomes the child cwd.
  * @param {number} options.timeoutMs - spawn timeout.
  * @param {NodeJS.ProcessEnv} options.env - child environment.
+ * @param {string[]} [options.extraPatchPaths] - additional patch overlays (e.g. tier patch).
+ * @param {AbortSignal} [options.signal]
  * @returns {Promise<{ execution: import('./execute.js').ExecutionResult, metrics: import('../schema/trial.js').TrialMetrics, sessionFile: string | null }>}
  */
-async function executeSpawn({ repoRoot, arm, armDir, sessionLogRoot, taskText, scratchDir, timeoutMs, env }) {
+async function executeSpawn({ repoRoot, arm, armDir, sessionLogRoot, taskText, scratchDir, timeoutMs, env, extraPatchPaths = [], signal, maxTotalTokens }) {
   await mkdir(sessionLogRoot, { recursive: true })
   const overlayPath = join(sessionLogRoot, 'arm-overlay.yml')
   await writeFile(overlayPath, renderArmOverlay(arm, { sessionLogRoot }))
-  const execution = await executeTrial({ repoRoot, overlayPath, taskText, scratchDir, sessionLogRoot, timeoutMs, env })
+  const execution = await executeTrial({ repoRoot, overlayPath, extraPatchPaths, taskText, scratchDir, sessionLogRoot, timeoutMs, env, signal, maxTotalTokens })
   const metrics = execution.sessionLogPath === null
     ? emptyMetrics()
-    : foldSessionLog(await readFile(execution.sessionLogPath, 'utf8'))
+    : foldSessionLog(await readFile(execution.sessionLogPath, 'utf8'), {
+        expectsSessionQuery: arm.expectsSessionQuery ?? true,
+        expectsJspace: arm.expectsJspace ?? true,
+      })
   metrics.durationMs = execution.durationMs
+  if (execution.sessionLogPath !== null) {
+    const descendants = await descendantUsage(sessionLogRoot, execution.sessionLogPath)
+    if (descendants.tokensIncludingDescendants !== null) {
+      metrics.tokensIncludingDescendants = descendants.tokensIncludingDescendants
+      metrics.descendantSessions = descendants.descendantSessions
+    }
+    metrics.outOfLoopExperiments += descendants.delegatedSessions + descendants.descendantRunCodeCalls
+  }
   const sessionFile = execution.sessionLogPath === null
     ? null
     : relative(armDir, execution.sessionLogPath).split(sep).join('/')
   return { execution, metrics, sessionFile }
 }
+
+/** Fields summed across phases. */
+const SUMMABLE_METRICS = ['inputTokens', 'outputTokens', 'durationMs', 'turns', 'toolCalls', 'identicalRetries', 'checkpoints', 'shipPasses', 'coverageRefusalThenPad', 'noopNoteRefusals', 'noteCapRefusals', 'compactionCount', 'tokensIncludingDescendants', 'descendantSessions', 'outOfLoopExperiments']
 
 /**
  * Sum per-phase metrics into the trial-level row.
@@ -415,10 +584,17 @@ async function executeSpawn({ repoRoot, arm, armDir, sessionLogRoot, taskText, s
 function sumPhaseMetrics(phases) {
   const total = emptyMetrics()
   for (const phase of phases) {
-    for (const field of /** @type {(keyof import('../schema/trial.js').TrialMetrics)[]} */ (Object.keys(total))) {
+    for (const field of SUMMABLE_METRICS) {
       total[field] += phase.metrics[field]
     }
   }
+  const last = phases[phases.length - 1].metrics
+  total.danglingCard = last.danglingCard
+  const sqValues = phases.map(p => p.metrics.sessionQueryCalls).filter(v => v !== null)
+  total.sessionQueryCalls = sqValues.length > 0 ? sqValues.reduce((a, b) => a + b, 0) : null
+  const cpShares = phases.map(p => p.metrics.verifiedCheckpointShare).filter(v => v !== null)
+  total.verifiedCheckpointShare = cpShares.length > 0 ? cpShares.reduce((a, b) => a + b, 0) / cpShares.length : null
+  total.pressureFired = total.compactionCount > 0
   return total
 }
 
@@ -450,19 +626,27 @@ function trialRecordFrame(task, entry, scratchDir, startedAt) {
  * @param {string} options.repoRoot - harness repository root.
  * @param {NodeJS.ProcessEnv} options.env - child environment.
  * @param {string} options.startedAt - trial start, ISO 8601.
+ * @param {string[]} [options.extraPatchPaths] - additional patch overlays (e.g. tier patch).
+ * @param {AbortSignal} [options.signal]
  * @returns {Promise<import('../schema/trial.js').Trial>} the trial record (pre-audit).
  */
-async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, sessionLogRoot, repoRoot, env, startedAt }) {
+async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, sessionLogRoot, repoRoot, env, startedAt, extraPatchPaths = [], signal, maxTotalTokens }) {
   const { base, skippedVerifier } = trialRecordFrame(task, entry, scratchDir, startedAt)
+  if (task.setup !== null) {
+    await runSetup({ taskDir: task.dir, setup: task.setup, scratchDir, sessionLogRoot, signal })
+  }
   const { execution, metrics, sessionFile } = await executeSpawn({
     repoRoot,
     arm,
     armDir,
     sessionLogRoot,
-    taskText: /** @type {string} */ (task.instruction),
+    taskText: resolveTaskInstruction(task, arm),
     scratchDir,
     timeoutMs: task.timeoutMs,
     env,
+    extraPatchPaths,
+    signal,
+    maxTotalTokens,
   })
   const outcome = classifySpawn(execution)
   const endedAt = new Date().toISOString()
@@ -479,12 +663,12 @@ async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, ses
     }
   }
   // A nonzero exit with a log is an incomplete turn: a valid attempt.
-  const verifier = await runVerifier({ taskDir: task.dir, verify: task.verify, scratchDir })
+  const verifier = await runVerifier({ taskDir: task.dir, verify: task.verify, scratchDir, signal })
   return {
     ...base,
     status: 'success',
     resolved: verifier.resolved,
-    failureMode: verifier.resolved ? null : outcome === 'timeout' ? 'AGENT_TIMEOUT' : verifier.failureMode,
+    failureMode: verifier.resolved ? null : execution.budgetExceeded ? 'BUDGET_EXCEEDED' : outcome === 'timeout' ? 'AGENT_TIMEOUT' : verifier.failureMode,
     verifier,
     metrics,
     sessionFile,
@@ -509,23 +693,32 @@ async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, ses
  * @param {string} options.startedAt - trial start, ISO 8601.
  * @param {import('../schema/trial.js').PhaseRecord[]} options.phases - shared sink: completed
  *   phase records are pushed here so a mid-chain runner failure keeps the evidence.
+ * @param {string[]} [options.extraPatchPaths] - additional patch overlays (e.g. tier patch).
+ * @param {AbortSignal} [options.signal]
  * @returns {Promise<import('../schema/trial.js').Trial>} the trial record (pre-audit).
  */
-async function runChainTrial({ task, entry, arm, armDir, scratchDir, sessionRoot, repoRoot, env, startedAt, phases }) {
+async function runChainTrial({ task, entry, arm, armDir, scratchDir, sessionRoot, repoRoot, env, startedAt, phases, extraPatchPaths = [], signal, maxTotalTokens }) {
   const { base, skippedVerifier } = trialRecordFrame(task, entry, scratchDir, startedAt)
   const definitions = /** @type {TaskPhase[]} */ (task.phases)
   for (let index = 0; index < definitions.length; index += 1) {
     const definition = definitions[index]
     const phaseStartedAt = new Date().toISOString()
+    const sessionLogRoot = join(sessionRoot, `phase-${index}`)
+    if (task.setup !== null) {
+      await runSetup({ taskDir: task.dir, setup: task.setup, scratchDir, sessionLogRoot, signal })
+    }
     const { execution, metrics, sessionFile } = await executeSpawn({
       repoRoot,
       arm,
       armDir,
-      sessionLogRoot: join(sessionRoot, `phase-${index}`),
+      sessionLogRoot,
       taskText: definition.instruction,
       scratchDir,
       timeoutMs: definition.timeoutMs ?? task.timeoutMs,
       env,
+      extraPatchPaths,
+      signal,
+      maxTotalTokens,
     })
     phases.push({
       phaseIndex: index,
@@ -533,6 +726,7 @@ async function runChainTrial({ task, entry, arm, armDir, scratchDir, sessionRoot
       resumedFrom: null,
       exitCode: execution.exitCode,
       timedOut: execution.timedOut,
+      budgetExceeded: execution.budgetExceeded,
       metrics,
       startedAt: phaseStartedAt,
       endedAt: new Date().toISOString(),
@@ -552,13 +746,14 @@ async function runChainTrial({ task, entry, arm, armDir, scratchDir, sessionRoot
       }
     }
   }
-  const verifier = await runVerifier({ taskDir: task.dir, verify: task.verify, scratchDir })
+  const verifier = await runVerifier({ taskDir: task.dir, verify: task.verify, scratchDir, signal })
   const anyPhaseTimedOut = phases.some(phase => phase.timedOut)
+  const anyPhaseBudgetExceeded = phases.some(phase => phase.budgetExceeded)
   return {
     ...base,
     status: 'success',
     resolved: verifier.resolved,
-    failureMode: verifier.resolved ? null : anyPhaseTimedOut ? 'AGENT_TIMEOUT' : verifier.failureMode,
+    failureMode: verifier.resolved ? null : anyPhaseBudgetExceeded ? 'BUDGET_EXCEEDED' : anyPhaseTimedOut ? 'AGENT_TIMEOUT' : verifier.failureMode,
     verifier,
     metrics: sumPhaseMetrics(phases),
     sessionFile: /** @type {string | null} */ (phases.at(-1).sessionFile),
@@ -567,24 +762,38 @@ async function runChainTrial({ task, entry, arm, armDir, scratchDir, sessionRoot
   }
 }
 
+/** Session-query tool names checked by the integrity audit. */
+const SESSION_QUERY_TOOL_NAMES = new Set([
+  'session_search', 'session_event_search', 'session_event_read',
+  'session_event_trace', 'session_trace',
+])
+
 /**
- * Scan one session log for jspace events — off-arm proof of overlay leakage.
+ * Scan one session log for jspace events and session-query tool calls.
  * The metrics fold has already read this file, so its lines parse.
  * @param {string} sessionLogPath - absolute session.jsonl path.
- * @returns {Promise<string[]>} distinct `jspace/` event types in first-seen order.
+ * @returns {Promise<{ jspaceTypes: string[], sessionQueryTools: string[] }>}
+ *   distinct `jspace/` event types and session-query tool names in first-seen order.
  */
-async function findJspaceEventTypes(sessionLogPath) {
+async function findIntegrityViolationEvents(sessionLogPath) {
   const text = await readFile(sessionLogPath, 'utf8')
   /** @type {string[]} */
-  const types = []
+  const jspaceTypes = []
+  /** @type {string[]} */
+  const sessionQueryTools = []
   for (const line of text.split('\n')) {
     if (line.trim() === '') continue
-    const event = /** @type {{ type?: unknown }} */ (JSON.parse(line))
-    if (typeof event.type === 'string' && event.type.startsWith('jspace/') && !types.includes(event.type)) {
-      types.push(event.type)
+    const event = /** @type {{ type?: unknown, data?: Record<string, unknown> }} */ (JSON.parse(line))
+    if (typeof event.type === 'string' && event.type.startsWith('jspace/') && !jspaceTypes.includes(event.type)) {
+      jspaceTypes.push(event.type)
+    }
+    if (event.type === 'tool/call' && event.data && typeof event.data.name === 'string') {
+      if (SESSION_QUERY_TOOL_NAMES.has(event.data.name) && !sessionQueryTools.includes(event.data.name)) {
+        sessionQueryTools.push(event.data.name)
+      }
     }
   }
-  return types
+  return { jspaceTypes, sessionQueryTools }
 }
 
 /**
@@ -592,7 +801,35 @@ async function findJspaceEventTypes(sessionLogPath) {
  * @property {string} [benchRoot] - absolute bench directory (default: this repo's bench/).
  * @property {NodeJS.ProcessEnv} [env] - environment (default: process.env).
  * @property {(line: string) => void} [print] - plan/progress sink (default: console.log).
+ * @property {AbortSignal} [signal] - abort in-flight trials; omit for an uninterruptible run.
  */
+
+/**
+ * Read a credential from the harness credential store when the variable is
+ * absent from the environment. The store is the flat `KEY: value` YAML the
+ * harness keeps at `$SHRES_HOME/.credentials.yaml` (default `~/.shres`). The
+ * runner overrides SHRES_HOME per experiment for session isolation, so the
+ * spawned harness cannot read the real store itself; the caller injects the
+ * resolved value into the child environment and never writes it to any bench
+ * record.
+ * @param {NodeJS.ProcessEnv} env - runner environment (pre-override SHRES_HOME).
+ * @param {string} name - credential variable name.
+ * @returns {Promise<string | null>} the stored value, or null when absent.
+ */
+export async function readStoredCredential(env, name) {
+  const home = env.SHRES_HOME ?? join(homedir(), '.shres')
+  const text = await readFile(join(home, '.credentials.yaml'), 'utf8').catch(() => null)
+  if (text === null) return null
+  for (const line of text.split('\n')) {
+    const match = /^([A-Za-z_][A-Za-z0-9_]*):\s*(.+?)\s*$/.exec(line)
+    if (match === null || match[1] !== name) continue
+    const raw = /** @type {string} */ (match[2])
+    const unquoted = /^(['"])(.*)\1$/.exec(raw)
+    const value = unquoted === null ? raw : /** @type {string} */ (unquoted[2])
+    return value === '' ? null : value
+  }
+  return null
+}
 
 /**
  * Run the experiment (or, with --dry-run, print the plan).
@@ -602,8 +839,9 @@ async function findJspaceEventTypes(sessionLogPath) {
  */
 export async function main(argv, io = {}) {
   const options = parseArgs(argv)
-  const env = io.env ?? process.env
+  let env = io.env ?? process.env
   const print = io.print ?? (line => console.log(line))
+  const signal = io.signal
   if (options.help) {
     print(USAGE)
     return 0
@@ -617,14 +855,35 @@ export async function main(argv, io = {}) {
   const tasks = new Map(catalog.filter(task => taskIds.includes(task.taskId)).map(task => [task.taskId, task]))
   const model = options.model ?? env.BENCH_MODEL ?? DEFAULT_MODEL
   const temperature = options.temperature ?? (env.BENCH_TEMPERATURE === undefined ? DEFAULT_TEMPERATURE : Number(env.BENCH_TEMPERATURE))
-  const baseUrl = options.baseUrl ?? env.DEEPSEEK_BASE_URL ?? null
+  const apiKeyEnv = options.apiKeyEnv
+  const baseUrl = options.baseUrl ?? (apiKeyEnv === 'DEEPSEEK_API_KEY' ? (env.DEEPSEEK_BASE_URL ?? null) : null)
+
+  /** @type {import('../schema/run-manifest.js').TierPatchRecord[]} */
+  const tierPatchRecords = []
+  /** @type {string[]} */
+  const extraPatchPaths = []
+  for (const given of options.tierPatches) {
+    const absPath = resolve(given)
+    const tierContent = await readFile(absPath, 'utf8').catch(() => {
+      throw new UsageError(`--tier-patch file not found: ${given}`)
+    })
+    const sha256 = createHash('sha256').update(tierContent).digest('hex')
+    tierPatchRecords.push({ path: relative(benchRoot, absPath).split(sep).join('/'), sha256 })
+    extraPatchPaths.push(absPath)
+  }
+
   const plan = buildPlan({ taskIds, arms: options.arms, repeats: options.repeats })
 
   if (options.dryRun) {
     print(`experiment: ${options.experiment}`)
     print(`model: ${model}  temperature: ${temperature}  baseUrl: ${baseUrl ?? '(provider default)'}`)
+    const tierSummary = tierPatchRecords.length === 0
+      ? ''
+      : `  tierPatches: ${tierPatchRecords.map(r => `${r.path} (${r.sha256.slice(0, 12)}…)`).join(', ')}`
+    print(`apiKeyEnv: ${apiKeyEnv}${tierSummary}`)
     print(`tasks: ${taskIds.join(', ')}`)
     print(`plan: ${plan.length} trials (${taskIds.length} tasks × ${options.repeats} repeats × ${options.arms.length} arms)`)
+    if (options.concurrency > 1) print(`concurrency: ${options.concurrency}`)
     for (const entry of plan) {
       const task = /** @type {TaskDefinition} */ (tasks.get(entry.taskId))
       const suffix = task.phases === null ? '' : ` (${task.phases.length} phases)`
@@ -633,8 +892,18 @@ export async function main(argv, io = {}) {
     return 0
   }
 
-  if (typeof env.DEEPSEEK_API_KEY !== 'string' || env.DEEPSEEK_API_KEY === '') {
-    throw new UsageError('DEEPSEEK_API_KEY is required for real runs (or use --dry-run)')
+  if (apiKeyEnv !== 'none') {
+    const fromEnv = env[apiKeyEnv]
+    const key = typeof fromEnv === 'string' && fromEnv !== ''
+      ? fromEnv
+      : await readStoredCredential(env, apiKeyEnv)
+    if (key === null) {
+      throw new UsageError(
+        `${apiKeyEnv} is required for real runs: export it or add it to the harness credential store `
+        + `($SHRES_HOME/.credentials.yaml, default ~/.shres); or use --dry-run, or --api-key-env none for keyless tiers`,
+      )
+    }
+    if (fromEnv !== key) env = { ...env, [apiKeyEnv]: key }
   }
 
   const experimentDir = join(benchRoot, 'runs', options.experiment)
@@ -643,8 +912,41 @@ export async function main(argv, io = {}) {
   const startedAt = new Date().toISOString()
 
   const armDirs = new Map()
+  /** @type {Map<string, Set<string>>} arm -> delivered `(taskId, trialIndex)` keys to skip on resume. */
+  const delivered = new Map()
   for (const armName of options.arms) {
     const armDir = join(experimentDir, armName)
+    if (options.resume) {
+      const manifestPath = join(armDir, 'run.json')
+      let existing
+      try {
+        existing = JSON.parse(await readFile(manifestPath, 'utf8'))
+      } catch {
+        throw new UsageError(`--resume: experiment "${options.experiment}" has no manifest for arm "${armName}"; nothing to resume`)
+      }
+      const mismatches = resumePinMismatches(existing, {
+        model, baseUrl, temperature, taskIds, tierPatches: tierPatchRecords, maxTotalTokens: options.maxTotalTokens ?? null, apiKeyEnv,
+      })
+      if (mismatches.length > 0) {
+        throw new UsageError(
+          `--resume: experiment "${options.experiment}" arm "${armName}" pins differ (${mismatches.join(', ')}); a changed run is a new experiment name`,
+        )
+      }
+      const done = new Set()
+      try {
+        for (const line of (await readFile(join(armDir, 'trials.jsonl'), 'utf8')).split('\n')) {
+          if (line.trim() === '') continue
+          const trial = JSON.parse(line)
+          if (trial.status === 'success') done.add(`${trial.taskId}\u0000${trial.trialIndex}`)
+        }
+      } catch {
+        // No trials yet: the manifest alone is resumable.
+      }
+      delivered.set(armName, done)
+      print(`[${options.experiment}] resume ${armName}: skipping ${done.size} delivered trials, rerunning error trials`)
+      armDirs.set(armName, armDir)
+      continue
+    }
     const manifest = {
       version: 1,
       experiment: options.experiment,
@@ -656,6 +958,9 @@ export async function main(argv, io = {}) {
       repeats: options.repeats,
       taskIds,
       gitCommit,
+      apiKeyEnv,
+      tierPatches: tierPatchRecords,
+      maxTotalTokens: options.maxTotalTokens ?? null,
       startedAt,
       endedAt: '',
     }
@@ -665,15 +970,47 @@ export async function main(argv, io = {}) {
       await writeFile(join(armDir, 'run.json'), `${JSON.stringify(manifest, null, 2)}\n`, { flag: 'wx' })
     } catch {
       throw new UsageError(
-        `experiment "${options.experiment}" already has a manifest for arm "${armName}"; a changed run is a new experiment name`,
+        `experiment "${options.experiment}" already has a manifest for arm "${armName}"; a changed run is a new experiment name (or pass --resume to continue it)`,
       )
     }
     armDirs.set(armName, armDir)
   }
 
+  /**
+   * Compare a stored manifest's pre-registration pins against the invocation's.
+   * `gitCommit` and `startedAt` deliberately excluded: resuming after a pull is
+   * allowed only when the tier patches pin the same harness composition; a
+   * changed commit with identical overlays is the same measured condition.
+   * @param {Record<string, unknown>} stored - the existing manifest.
+   * @param {object} pins - the invocation's pins.
+   * @returns {string[]} field names that differ.
+   */
+  function resumePinMismatches(stored, pins) {
+    /** @type {string[]} */
+    const diffs = []
+    if (stored.model !== pins.model) diffs.push('model')
+    if (stored.baseUrl !== pins.baseUrl) diffs.push('baseUrl')
+    if (stored.temperature !== pins.temperature) diffs.push('temperature')
+    if (JSON.stringify(stored.taskIds) !== JSON.stringify(pins.taskIds)) diffs.push('taskIds')
+    if (JSON.stringify(stored.tierPatches) !== JSON.stringify(pins.tierPatches)) diffs.push('tierPatches')
+    if ((stored.maxTotalTokens ?? null) !== pins.maxTotalTokens) diffs.push('maxTotalTokens')
+    if (stored.apiKeyEnv !== pins.apiKeyEnv) diffs.push('apiKeyEnv')
+    return diffs
+  }
+
   let finished = 0
   let failed = 0
-  for (const entry of plan) {
+  const recordQueue = createSerialQueue()
+
+  /**
+   * One interleaved plan entry: isolated scratch + session root, then a
+   * serialized append of one complete trials.jsonl line.
+   * @param {PlanEntry} entry
+   */
+  const runPlanEntry = async entry => {
+    if (signal?.aborted) return
+    const done = delivered.get(entry.arm)
+    if (done !== undefined && done.has(`${entry.taskId}\u0000${entry.trialIndex}`)) return
     const task = /** @type {TaskDefinition} */ (tasks.get(entry.taskId))
     const arm = getArm(entry.arm)
     const armDir = /** @type {string} */ (armDirs.get(entry.arm))
@@ -681,6 +1018,10 @@ export async function main(argv, io = {}) {
     const sessionRoot = join(armDir, 'sessions', entry.taskId, String(entry.trialIndex))
     const trialStartedAt = new Date().toISOString()
     const trialEnv = { ...env, SHRES_HOME: shresHome }
+
+    if (options.concurrency > 1) {
+      print(`[${options.experiment}] ${entry.taskId} #${entry.trialIndex} [${entry.arm}] running`)
+    }
 
     // Integrity audit, part 1: none of this trial's session roots may
     // pre-exist — a leftover root means leakage from a previous trial.
@@ -691,12 +1032,19 @@ export async function main(argv, io = {}) {
       : task.phases.map((_, index) => join(sessionRoot, `phase-${index}`))
     for (const root of phaseRoots) {
       if (existsSync(root)) {
-        violations.push(`session-root-preexisting:${relative(armDir, root).split(sep).join('/')}`)
+        if (options.resume) {
+          // A rerun of an interrupted error trial reuses its slot; the stale
+          // roots belong to the failed attempt and are cleared, not flagged.
+          await rm(root, { recursive: true, force: true })
+        } else {
+          violations.push(`session-root-preexisting:${relative(armDir, root).split(sep).join('/')}`)
+        }
       }
     }
 
     // The scratch dir is created once per trial; a chain's workspace carries
-    // across its phases while sessions do not.
+    // across its phases while sessions do not. Paths include arm/task/trial
+    // so concurrent workers never share a directory.
     await rm(scratchDir, { recursive: true, force: true })
     await mkdir(scratchDir, { recursive: true })
     await cp(join(task.dir, 'fixture'), scratchDir, { recursive: true })
@@ -711,6 +1059,9 @@ export async function main(argv, io = {}) {
           task, entry, arm, armDir, scratchDir,
           sessionLogRoot: sessionRoot,
           repoRoot, env: trialEnv, startedAt: trialStartedAt,
+          extraPatchPaths,
+          signal,
+          maxTotalTokens: options.maxTotalTokens,
         })
       } else {
         chainPhases = []
@@ -719,9 +1070,13 @@ export async function main(argv, io = {}) {
           sessionRoot,
           repoRoot, env: trialEnv, startedAt: trialStartedAt,
           phases: chainPhases,
+          extraPatchPaths,
+          maxTotalTokens: options.maxTotalTokens,
+          signal,
         })
       }
     } catch (error) {
+      if (signal?.aborted) return
       const partial = chainPhases !== undefined && chainPhases.length > 0 ? chainPhases : undefined
       trial = {
         taskId: entry.taskId,
@@ -743,27 +1098,48 @@ export async function main(argv, io = {}) {
       }
     }
 
-    // Integrity audit, part 2: the off arm must log zero jspace events.
-    if (arm.name === 'off') {
-      const sessionFiles = (trial.phases ?? [{ sessionFile: trial.sessionFile }])
-        .map(record => record.sessionFile)
-        .filter(file => file !== null)
+    if (signal?.aborted) return
+
+    // Integrity audit, part 2: arms that exclude jspace must log zero jspace
+    // events; arms that exclude session-query must log zero session-query
+    // tool/call events.
+    const sessionFiles = (trial.phases ?? [{ sessionFile: trial.sessionFile }])
+      .map(record => record.sessionFile)
+      .filter(file => file !== null)
+    if (!arm.expectsJspace || !arm.expectsSessionQuery) {
       for (const file of sessionFiles) {
-        for (const type of await findJspaceEventTypes(join(armDir, file))) {
-          violations.push(`off-arm-jspace-event:${type}`)
+        const { jspaceTypes, sessionQueryTools } = await findIntegrityViolationEvents(join(armDir, file))
+        if (!arm.expectsJspace) {
+          for (const type of jspaceTypes) {
+            violations.push(`off-arm-jspace-event:${type}`)
+          }
+        }
+        if (!arm.expectsSessionQuery) {
+          for (const name of sessionQueryTools) {
+            violations.push(`excluded-session-query-tool:${name}`)
+          }
         }
       }
     }
     if (violations.length > 0) trial.integrity = { violations }
 
     validateTrial(trial)
-    await appendFile(join(armDir, 'trials.jsonl'), `${JSON.stringify(trial)}\n`)
-    if (trial.status === 'error') failed += 1
-    else finished += 1
-    print(
-      `[${options.experiment}] ${entry.taskId} #${entry.trialIndex} [${entry.arm}] `
-      + `${trial.status}${trial.resolved ? ' resolved' : ''}${trial.failureMode ? ` ${trial.failureMode}` : ''}`,
-    )
+    const line = `${JSON.stringify(trial)}\n`
+    await recordQueue.enqueue(async () => {
+      await appendFile(join(armDir, 'trials.jsonl'), line)
+      if (trial.status === 'error') failed += 1
+      else finished += 1
+      print(
+        `[${options.experiment}] ${entry.taskId} #${entry.trialIndex} [${entry.arm}] `
+        + `${trial.status}${trial.resolved ? ' resolved' : ''}${trial.failureMode ? ` ${trial.failureMode}` : ''}`,
+      )
+    })
+  }
+
+  await mapPool(plan, options.concurrency, runPlanEntry, { signal })
+  if (signal?.aborted) {
+    print(`[${options.experiment}] aborted: ${finished} completed, ${failed} infrastructure errors`)
+    return EXIT_ABORTED
   }
 
   const endedAt = new Date().toISOString()
@@ -783,11 +1159,24 @@ const invokedAsScript = process.argv[1] !== undefined
   && import.meta.url === pathToFileURL(resolve(process.argv[1])).href
 
 if (invokedAsScript) {
-  main(process.argv.slice(2)).then(
+  const abort = new AbortController()
+  const onSignal = () => {
+    if (abort.signal.aborted) process.exit(EXIT_ABORTED)
+    abort.abort()
+  }
+  process.on('SIGINT', onSignal)
+  process.on('SIGTERM', onSignal)
+  const detachSignals = () => {
+    process.off('SIGINT', onSignal)
+    process.off('SIGTERM', onSignal)
+  }
+  main(process.argv.slice(2), { signal: abort.signal }).then(
     code => {
+      detachSignals()
       process.exitCode = code
     },
     error => {
+      detachSignals()
       if (error instanceof UsageError) {
         console.error(error.message)
         process.exitCode = EXIT_USAGE

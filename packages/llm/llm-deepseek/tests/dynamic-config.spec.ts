@@ -172,6 +172,19 @@ describe('request-level dynamic configuration', () => {
     expect(result.finish.failure.message).not.toContain('ByteString')
   })
 
+  it('registers the adapter when the section is enabled after a disabled boot', async () => {
+    const dir = await home()
+    const { ctx } = await boot(dir, { enabled: false })
+    expect(ctx.llm.listProviders().some(provider => provider.id === 'deepseek-official')).toBe(false)
+    await ctx.settings.update(NS, {
+      enabled: false,
+      retryPolicy: { mode: 'always', backoff: { initialDelayMs: 25, maxDelayMs: 100, jitterRatio: 0.2 } },
+    })
+    expect(ctx.llm.listProviders().some(provider => provider.id === 'deepseek-official')).toBe(false)
+    await ctx.settings.update(NS, { enabled: true })
+    expect(ctx.llm.listProviders().some(provider => provider.id === 'deepseek-official')).toBe(true)
+  })
+
   it('advertises a live settings catalog without re-registration', async () => {
     const dir = await home()
     const { ctx } = await boot(dir, { baseURL: 'http://127.0.0.1:1' })

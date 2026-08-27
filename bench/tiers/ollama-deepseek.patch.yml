@@ -1,0 +1,11 @@
+# Tier overlay: DeepSeek-V4-Flash over the base profile's shipped
+# `ollama-cloud` route (llm-pi-ai, `apiKeyEnv: OLLAMA_API_KEY`,
+# https://ollama.com/v1, contextWindow pinned in the bundle).
+# Applied as --tier-patch alongside the per-arm overlay; run with
+# --api-key-env OLLAMA_API_KEY (key from https://ollama.com/settings/keys).
+# The :cloud tag floats to Ollama's current default; run.json's model pin
+# records what an experiment ran.
+- id: agent-default-model
+  config:
+    provider: ollama-cloud
+    model: deepseek-v4-flash:cloud

@@ -8,7 +8,7 @@ The [shipped-roster decision](2026-07-31-even-out-shipped-tool-rosters.md) made 
 
 ## Decision
 
-The shipped TUI, Web, and headless surfaces do not mount `@shres-code/shres-code-tool-session-query`, and no shipped agent preset carries it. The consumer stays opt-in exactly as the model-facing-session-query-tools note describes: the ACP example's [`session-query.cordis.yml`](../../../../examples/acp-agent/session-query.cordis.yml) and its snapshot counterpart remain the mounted reference, and a custom composition can mount the package with the timeout and spill policies.
+The shipped TUI and Web surfaces do not mount `@shres-code/shres-code-tool-session-query`, and no shipped agent preset carries it. The ACP and headless example compositions now mount the consumer by default ([example-default decision](2026-08-25-session-query-mounted-by-default.md)). The ACP example's [`session-query.cordis.yml`](../../../../examples/acp-agent/session-query.cordis.yml) overlay adds only spill storage on top of that base; a custom composition can still mount the package with the timeout and spill policies.
 
 The `ctx.sessionQuery` service itself stays mounted. `session-query-sqlite` remains a base row — the TUI's `session-reference` consumes it for `/resume` — with its full-text index off by default (`openAt: never`; the [content-search opt-in decision](../architecture/2026-08-13-session-content-search-opt-in.md)), and the Web overlay keeps its in-memory values for deployments that enable content search. Only the model-facing consumer is removed.
 
@@ -20,4 +20,4 @@ The `ctx.sessionQuery` service itself stays mounted. `session-query-sqlite` rema
 
 ## Consequences
 
-Both surfaces return to the same twenty unconditional tools (plus `glob`/`grep` under ripgrep), and the five session-search schemas and their prompt section leave the default request. The shipped-composition tests on both surfaces pin the smaller catalog, so re-adding session search as a default touches the same tests. Users who want session search mount the consumer from a personal overlay or the ACP example, adding the dependency where they do.
+Both product surfaces keep the same twenty unconditional tools (plus `glob`/`grep` under ripgrep), and the five session-search schemas and their prompt section stay off those default requests. The shipped-composition tests on both surfaces pin the smaller catalog, so adding session search to the shared base still touches the same tests. Users who want session search on TUI or Web mount the consumer from a personal overlay, adding the dependency where they do.

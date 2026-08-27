@@ -1,12 +1,15 @@
 /**
  * Default-on host seat for the paid Shres Shield plugin. Resolves the engine
- * from a sibling checkout or `@shres-shield/plugin`, checks entitlement, and
- * publishes `ctx.shield`. The detection payload never lives in this package.
- * Integration contract: shres-shield `docs/integration-shres-code.md`.
+ * from the active profile's installed payload, a sibling checkout, or
+ * `@shrestech/shres-shield-plugin`, checks entitlement, and publishes
+ * `ctx.shield`. The detection payload never lives in this package. Settings
+ * Check / Update talk to the public npm registry and `pnpm add` in the
+ * profile. Integration contract: sibling shres-shield repository,
+ * integration-shres-code.md.
  * @module @shres-code/shres-code-shield
  */
 
-import { realpathSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { Context } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
 import { SessionId } from '@shres-code/shres-code-session'
@@ -14,19 +17,39 @@ import { installSettingsSection, settingsNamespace } from '@shres-code/shres-cod
 import { Remote, TypertRemoteService } from '@shres-code/shres-code-typert-protocol'
 // Typert-generated ./typert and ./remote artifacts import Zod at runtime.
 import type {} from 'zod'
-import { resolveShieldEngine } from './resolve.ts'
+import { PAYLOAD_SPECIFIER, resolveShieldEngine } from './resolve.ts'
+import {
+  liveSessionCwds, repoDisabled, repoGateBlocksMount, resolveRepoPath,
+  validateRepoKeys, type ShieldRepos,
+} from './repos.ts'
+import {
+  installPayload, queryNpmLatest, readPayloadVersion,
+} from './update.ts'
 import type {
   ShieldCounterSplit, ShieldDefinitions, ShieldEngineSource, ShieldFindingSummary,
-  ShieldReason, ShieldRepoStats, ShieldRuleHistogram, ShieldSnapshot, ShieldStatus,
+  ShieldPayloadInfo, ShieldPayloadUpdate, ShieldReason, ShieldRepoStats,
+  ShieldRuleHistogram, ShieldSnapshot, ShieldStatus,
 } from './types.ts'
 
 export type {
   ShieldCounterSplit, ShieldDecision, ShieldDefinitions, ShieldEngine, ShieldEngineApply,
-  ShieldEngineSource, ShieldFindingSummary, ShieldInactiveReason, ShieldReason,
-  ShieldRepoStats, ShieldRuleHistogram, ShieldSnapshot, ShieldStatus,
+  ShieldEngineSource, ShieldFindingSummary, ShieldInactiveReason, ShieldPayloadInfo,
+  ShieldPayloadUpdate, ShieldReason, ShieldRepoStats, ShieldRuleHistogram,
+  ShieldSnapshot, ShieldStatus, ShieldUpdateBlocked,
 } from './types.ts'
-export { repoRootFromSeat, resolveShieldEngine, siblingPluginPath } from './resolve.ts'
-
+export {
+  PAYLOAD_SPECIFIER, repoRootFromSeat, resolveProfileSpecifier, resolveShieldEngine,
+  siblingPluginPath, type ShieldResolveOptions,
+} from './resolve.ts'
+export {
+  defaultSpawn, installPayload, isNpmVersion, NPM_PAYLOAD_PACKUMENT, pnpmEnv,
+  queryNpmLatest, readPayloadVersion, restoreDefaultSpawn, shieldSpawn, spawnBinary,
+  type ShieldSpawner, type ShieldSpawnResult,
+} from './update.ts'
+export {
+  liveSessionCwds, repoDisabled, repoGateBlocksMount, resolveRepoPath, validateRepoKeys,
+  type ShieldRepoEntry, type ShieldRepos, type SessionCwdSource,
+} from './repos.ts'
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'shres-shield'
 
@@ -44,7 +67,7 @@ export const inject = ['systemPrompt', 'tools', 'approval', 'jobs']
  */
 export const DEFAULT_SHIELD_LICENSE = 'shres-dev'
 
-/** Host-seat config. Engine-owned tunables stay on `@shres-shield/plugin`. */
+/** Host-seat config. Engine-owned tunables stay on `@shrestech/shres-shield-plugin`. */
 export interface Config {
   /**
    * Entitlement string. Defaults to {@link DEFAULT_SHIELD_LICENSE} until a
@@ -54,9 +77,17 @@ export interface Config {
   license?: string
   /**
    * User switch on the Shield settings page. Default true. False unloads the
-   * payload without the panic env. `SHRES_SHIELD=off` still wins.
+   * payload without the panic env. `SHRES_SHIELD=off` still wins. The master
+   * control: a `repos` entry cannot re-enable under it.
    */
   enabled?: boolean
+  /**
+   * Per-repo carve-outs. Keys are absolute repo paths; an entry with
+   * `enabled: false` keeps Shield off for sessions working in that repo while
+   * the global switch stays on. Stored in the host-owned settings document —
+   * a repo under audit never authors its own exemption.
+   */
+  repos?: ShieldRepos
   /** Forwarded to the paid plugin. Default `ask`. */
   posture?: 'observe' | 'ask' | 'enforce'
 }
@@ -64,6 +95,7 @@ export interface Config {
 export const Config: z<Config> = z.object({
   license: z.string().default(DEFAULT_SHIELD_LICENSE),
   enabled: z.boolean().default(true),
+  repos: z.dict(z.object({ enabled: z.boolean() })).default({}),
   posture: z.union(['observe', 'ask', 'enforce'] as const).default('ask'),
 })
 
@@ -85,13 +117,13 @@ const EMPTY_SPLIT: ShieldCounterSplit = {
   blocked: 0,
 }
 
+const EMPTY_HISTOGRAM: ShieldRuleHistogram = { observed: 0, asked: 0, blocked: 0 }
+
 /**
  * Zeroed per-repo stats used when the engine has not reported any counts.
  * @param cwd - session workspace realpath, or `null` when none is known.
  * @returns a fresh stats object the pane can render.
  */
-const EMPTY_HISTOGRAM: ShieldRuleHistogram = { observed: 0, asked: 0, blocked: 0 }
-
 export function emptyRepoStats(cwd: string | null): ShieldRepoStats {
   return { cwd, ...EMPTY_SPLIT, byChannel: {}, byRule: {}, otherRules: EMPTY_HISTOGRAM, recent: [] }
 }
@@ -219,26 +251,15 @@ function readEngineSnapshot(
       cwd,
     )
   if (stats === undefined) return undefined
-  const definitions = toDefinitions(
-    nested !== null && typeof nested === 'object'
-      ? (nested as { definitions?: unknown }).definitions
-      : undefined,
-  )
+  const definitions = toDefinitions((nested as { definitions?: unknown }).definitions)
   return definitions === undefined ? { stats } : { stats, definitions }
 }
 
-function resolveRepoPath(cwd: string): string {
-  try {
-    return realpathSync(cwd)
-  } catch {
-    return cwd
-  }
-}
-
 /**
- * Published Shield status and a read-only snapshot RPC. `active` is the
- * brand-mark switch: blue girl and green shield only while the paid engine is
- * screening. The seat owns this service name; the paid plugin must not replace it.
+ * Published Shield status, snapshot RPC, and npm check/install remotes.
+ * `active` is the brand-mark switch: blue girl and green shield only while
+ * the paid engine is screening. The seat owns this service name; the paid
+ * plugin must not replace it.
  */
 export class ShieldHost extends TypertRemoteService {
   /** Current screening status. */
@@ -247,6 +268,12 @@ export class ShieldHost extends TypertRemoteService {
   private persisted: ((cwd?: string | null) => unknown) | undefined
   private lastStats: ShieldRepoStats
   private lastDefinitions: ShieldDefinitions | undefined
+  private repoDisabledFor: ((cwd: string) => boolean) | undefined
+  private pullSync: (() => void) | undefined
+  private resolved: ShieldPayloadInfo | undefined
+  private profileDir: string | undefined
+  private remount: (() => Promise<void>) | undefined
+  private updateChain = Promise.resolve()
 
   /**
    * @param ctx - owning context.
@@ -279,8 +306,56 @@ export class ShieldHost extends TypertRemoteService {
   }
 
   /**
+   * Remember the per-repo exemption check used to override snapshot status.
+   * @param disabledFor - `(cwd) => true` when an entry disables that repo.
+   */
+  bindRepoDisabled(disabledFor: ((cwd: string) => boolean) | undefined): void {
+    this.repoDisabledFor = disabledFor
+  }
+
+  /**
+   * Remember the pull re-evaluation run at the top of every snapshot call —
+   * the safety net for session events scope-filtered away from the seat fiber.
+   * @param pull - triggers a seat sync when the repo-gate decision flipped.
+   */
+  bindPullSync(pull: (() => void) | undefined): void {
+    this.pullSync = pull
+  }
+
+  /**
+   * Remember the resolved payload identity so snapshot and update RPCs can
+   * report source and version without re-importing.
+   * @param info - identity plus the import entry used for version lookup.
+   */
+  bindResolved(info: ShieldPayloadInfo | undefined): void {
+    this.resolved = info
+  }
+
+  /**
+   * Remember the boot profile directory `pnpm add` installs into.
+   * @param dir - absolute profile directory, or `undefined` when the seat
+   *   is not booted from a profile.
+   */
+  bindProfileDir(dir: string | undefined): void {
+    this.profileDir = dir
+  }
+
+  /**
+   * Remember the remount used after a successful npm install.
+   * @param remount - queues a seat sync and returns the in-flight chain.
+   */
+  bindRemount(remount: (() => Promise<void>) | undefined): void {
+    this.remount = remount
+  }
+
+  /**
    * Per-repo counters for the current session cwd. Disable remounts the payload
    * off but still returns last persisted counts with `status.reason === 'disabled'`.
+   * A repo exempt through `repos` reports `status.reason === 'repo-disabled'`
+   * while diagnostics keep precedence over the exemption. The call first
+   * re-evaluates the repo gate; because that re-evaluation settles
+   * asynchronously, the snapshot that detected a flip reports the pre-flip
+   * status and the next read reflects the new one.
    * @param sessionId - live session whose `header.cwd` keys the stats; omitted
    *   uses the most recently created live session that has a cwd.
    * @returns a JSON copy, never a live alias of seat or engine state.
@@ -288,6 +363,7 @@ export class ShieldHost extends TypertRemoteService {
   @Remote('snapshot')
   snapshot(sessionId?: string): ShieldSnapshot {
     try {
+      this.pullSync?.()
       const cwd = this.resolveCwd(sessionId)
       const source = this.payload !== undefined
         ? this.payload
@@ -300,7 +376,7 @@ export class ShieldHost extends TypertRemoteService {
         this.lastStats = { ...this.lastStats, cwd }
       }
       return {
-        status: { active: this.status.active, reason: this.status.reason },
+        status: this.snapshotStatus(cwd),
         stats: {
           ...toCounterSplit(this.lastStats),
           cwd: this.lastStats.cwd,
@@ -310,6 +386,7 @@ export class ShieldHost extends TypertRemoteService {
           recent: [...this.lastStats.recent],
         },
         ...(this.lastDefinitions === undefined ? {} : { definitions: { ...this.lastDefinitions } }),
+        ...(this.resolved === undefined ? {} : { payload: { ...this.resolved } }),
       }
     } catch {
       return {
@@ -317,6 +394,103 @@ export class ShieldHost extends TypertRemoteService {
         stats: emptyRepoStats(null),
       }
     }
+  }
+
+  /**
+   * Compare the resolved payload version with npm `latest`. Does not install.
+   * An env-module override still reports `latest` but sets `available: false`
+   * and `blocked: 'env-override'` because that exclusive leg would ignore a
+   * profile install.
+   * @returns a JSON copy of the check result.
+   */
+  @Remote('checkUpdate')
+  async checkUpdate(): Promise<ShieldPayloadUpdate> {
+    return this.runUpdate(false)
+  }
+
+  /**
+   * Re-query npm `latest` and, when an update is available, `pnpm add` that
+   * exact version into the boot profile, then remount so the profile leg
+   * loads it. Refuses env-module override, a missing profile directory, and
+   * a non-semver registry version.
+   * @returns the post-install check, with `applied: true` on success.
+   */
+  @Remote('applyUpdate')
+  async applyUpdate(): Promise<ShieldPayloadUpdate> {
+    const run = this.updateChain.then(() => this.runUpdate(true))
+    this.updateChain = run.then(() => undefined, () => undefined)
+    return run
+  }
+
+  private async runUpdate(install: boolean): Promise<ShieldPayloadUpdate> {
+    const source = this.resolved?.source ?? 'none'
+    const installed = this.resolved?.version ?? null
+    const base = (): ShieldPayloadUpdate => ({
+      specifier: PAYLOAD_SPECIFIER,
+      source,
+      installed,
+      latest: null,
+      available: false,
+      applied: false,
+    })
+
+    if (envModuleSet()) {
+      const queried = await queryNpmLatest()
+      return {
+        ...base(),
+        latest: queried.latest,
+        blocked: 'env-override',
+        ...queried.detail === undefined ? {} : { detail: queried.detail },
+      }
+    }
+
+    const queried = await queryNpmLatest()
+    if (queried.blocked !== undefined) {
+      return {
+        ...base(),
+        blocked: 'registry',
+        /* v8 ignore next -- queryNpmLatest always sets detail when it blocks */
+        ...queried.detail === undefined ? {} : { detail: queried.detail },
+      }
+    }
+    const latest = queried.latest
+    const available = latest !== null && latest !== installed
+    const checked: ShieldPayloadUpdate = { ...base(), latest, available }
+
+    if (!install) return checked
+    if (this.profileDir === undefined) {
+      return { ...checked, available: false, blocked: 'no-profile' }
+    }
+    if (latest === null || !available) return checked
+    const installedNow = await installPayload(this.profileDir, latest)
+    if (!installedNow.ok) {
+      return { ...checked, available: false, blocked: 'pnpm', detail: installedNow.detail }
+    }
+    /* v8 ignore next -- apply() binds remount before any RPC can run */
+    if (this.remount !== undefined) await this.remount()
+    const after = this.resolved
+    return {
+      specifier: PAYLOAD_SPECIFIER,
+      source: after?.source ?? 'profile',
+      installed: after?.version ?? latest,
+      latest,
+      available: false,
+      applied: true,
+    }
+  }
+
+  /**
+   * Effective status for one repo: harness-wide status, except a mounted
+   * engine screening an exempt repo reports `'repo-disabled'` for that repo.
+   * Diagnostic reasons (`panic`, `engine-missing`, `unlicensed`) and the
+   * global `'disabled'` pass through unchanged — they outrank the exemption.
+   * @param cwd - resolved repo path for the requested session, or `null`.
+   * @returns the status the pane renders for this repo.
+   */
+  private snapshotStatus(cwd: string | null): ShieldStatus {
+    if (!this.status.active || cwd === null) return { active: this.status.active, reason: this.status.reason }
+    if (this.repoDisabledFor?.(cwd) === true) return { active: false, reason: 'repo-disabled' }
+    return { active: this.status.active, reason: this.status.reason }
   }
 
   private resolveCwd(sessionId?: string): string | null {
@@ -343,6 +517,17 @@ function isPanicDisabled(): boolean {
   try {
     return process.env.SHRES_SHIELD === 'off'
   } catch {
+    /* v8 ignore next -- env probe never throws to the caller */
+    return false
+  }
+}
+
+function envModuleSet(): boolean {
+  try {
+    const value = process.env.SHRES_SHIELD_MODULE
+    return value !== undefined && value.length > 0
+  } catch {
+    /* v8 ignore next -- env probe never throws to the caller */
     return false
   }
 }
@@ -350,7 +535,7 @@ function isPanicDisabled(): boolean {
 /**
  * Whether the resolved payload may apply.
  * A non-empty license entitles any source. Sibling and env-module loads are
- * developer-entitled without a key. A package-specifier load is not.
+ * developer-entitled without a key. A package- or profile-resolved load is not.
  * @param license - effective license string.
  * @param source - where `apply` was loaded from.
  * @returns true when the paid `apply` may run.
@@ -369,6 +554,7 @@ export function readLicense(config: Config): string {
     const fromEnv = process.env.SHRES_SHIELD_LICENSE
     if (fromEnv !== undefined) return fromEnv
   } catch {
+    /* v8 ignore next -- env probe never throws to the caller */
     // env probe never throws to the caller
   }
   const fromConfig = config.license
@@ -392,6 +578,7 @@ export function apply(ctx: Context, config: Config): void {
   const entry: Config = {
     license: config.license !== undefined && config.license.length > 0 ? config.license : DEFAULT_SHIELD_LICENSE,
     enabled: config.enabled !== false,
+    repos: config.repos ?? {},
     posture: config.posture ?? 'ask',
   }
   let source: () => Config = () => entry
@@ -399,52 +586,117 @@ export function apply(ctx: Context, config: Config): void {
   let chain = Promise.resolve()
   let stopped = false
 
+  /** Stored exception map from the authoritative source. */
+  const currentRepos = (): ShieldRepos => {
+    const repos = source().repos
+    /* v8 ignore start -- apply() and the settings schema always store a repos map */
+    if (repos === undefined) return {}
+    /* v8 ignore stop */
+    return repos
+  }
+
   const sync = (): void => {
     chain = chain.then(async () => {
+      /* v8 ignore next -- dispose can flip `stopped` while this chain is queued */
       if (stopped) return
       if (instance !== undefined) {
         await instance.dispose()
         instance = undefined
         host.bindPayload(undefined)
       }
-      const engine = await resolveShieldEngine()
+      // The boot include anchors module resolution at the profile directory
+      // (`ctx.baseUrl` = profileDir + '/'), so the paid payload resolves from
+      // the same profile whose `node_modules` edition ensure installs into.
+      const profileDir = ctx.baseUrl === undefined ? undefined : fileURLToPath(ctx.baseUrl)
+      host.bindProfileDir(profileDir)
+      const engine = await resolveShieldEngine(profileDir === undefined ? {} : { profileDir })
+      host.bindResolved(engine === undefined ? undefined : {
+        source: engine.source,
+        version: readPayloadVersion(engine.entry),
+      })
+      // `stopped` is set from dispose while this await runs.
+      /* v8 ignore start -- dispose can flip `stopped` while resolve awaits */
+      // oxlint-disable-next-line typescript/no-unnecessary-condition -- mutated concurrently during await
       if (stopped) return
+      /* v8 ignore stop */
       host.bindPersistedReader(engine?.snapshot)
       if (isPanicDisabled()) {
         setStatus(status, { active: false, reason: 'panic' })
         return
       }
       const current = source()
-      if (current.enabled === false) {
-        setStatus(status, { active: false, reason: 'disabled' })
-        return
-      }
       const license = readLicense(current)
       if (engine === undefined) {
         setStatus(status, { active: false, reason: 'engine-missing' })
         return
       }
+      /* v8 ignore start -- default license is non-empty and the env fixture is entitled */
       if (!isEntitled(license, engine.source)) {
         setStatus(status, { active: false, reason: 'unlicensed' })
         return
       }
-      instance = await engine.apply(ctx, { posture: current.posture ?? 'ask' })
+      /* v8 ignore stop */
+      if (current.enabled === false) {
+        setStatus(status, { active: false, reason: 'disabled' })
+        return
+      }
+      if (repoGateBlocksMount(currentRepos(), liveSessionCwds(ctx.get('sessions')))) {
+        setStatus(status, { active: false, reason: 'repo-disabled' })
+        return
+      }
+      /* v8 ignore next -- apply() always stores a concrete posture on entry */
+      const posture = current.posture ?? 'ask'
+      instance = await engine.apply(ctx, { posture })
+      /* v8 ignore start -- dispose can flip `stopped` while apply awaits */
+      // oxlint-disable-next-line typescript/no-unnecessary-condition -- mutated concurrently during await
       if (stopped) {
         await instance.dispose()
         instance = undefined
         host.bindPayload(undefined)
         return
       }
+      /* v8 ignore stop */
       host.bindPayload(instance)
       setStatus(status, { active: true, reason: 'active' })
+    /* v8 ignore start -- resolve is fail-soft; a throw is an unexpected loader failure */
     }).catch(() => {
       setStatus(status, { active: false, reason: 'engine-missing' })
     })
+    /* v8 ignore stop */
   }
+
+  /**
+   * Re-evaluate the repo gate and sync only when the mount decision flips.
+   * Reasons that outrank the gate short-circuit: session events cannot change
+   * them. Both the session-event push and snapshot()'s pull route through
+   * here, so neither remounts the engine when the decision holds.
+   */
+  const syncIfGateFlipped = (): void => {
+    if (status.reason !== 'active' && status.reason !== 'repo-disabled') return
+    const blocked = repoGateBlocksMount(currentRepos(), liveSessionCwds(ctx.get('sessions')))
+    if (blocked !== (status.reason === 'repo-disabled')) sync()
+  }
+
+  // Push: session lifecycle can flip the repo gate (a session in a newly
+  // exempt repo keeps the engine mounted for the others and vice versa).
+  // Scope filtering may hide some sessions from this fiber; snapshot()'s pull
+  // re-evaluation is the safety net.
+  ctx.on('session/created', syncIfGateFlipped)
+  ctx.on('session/disposed', syncIfGateFlipped)
+  host.bindRepoDisabled(cwd => repoDisabled(currentRepos(), cwd))
+  host.bindPullSync(syncIfGateFlipped)
+  host.bindRemount(() => {
+    sync()
+    return chain
+  })
 
   installSettingsSection(ctx, SHIELD_SETTINGS_NAMESPACE, Config, entry, {
     setSource: (current) => { source = current },
     onChange: sync,
+    validate: (value) => {
+      /* v8 ignore next -- schema output always includes repos */
+      validateRepoKeys(value.repos ?? {})
+    },
   })
   sync()
   ctx.effect(() => () => {

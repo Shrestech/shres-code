@@ -40,7 +40,10 @@ function renderLoose(component: ComponentType<never>, props: object) {
 
 function hookOf<T>(source: { getSnapshot(): T; subscribe(fn: () => void): () => void }) {
   return <S,>(select: (value: T) => S): S =>
-    useSyncExternalStore(source.subscribe, () => select(source.getSnapshot()))
+    useSyncExternalStore(
+      listener => source.subscribe(listener),
+      () => select(source.getSnapshot()),
+    )
 }
 
 function transcriptResult(text: string) {

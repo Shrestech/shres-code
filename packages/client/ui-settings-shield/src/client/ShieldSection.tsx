@@ -1,7 +1,7 @@
 /** Shield settings section: posture and license over the `shres-shield` namespace. */
 
 import { useEffect, useState, type ReactNode } from 'react'
-import type { ShieldFindingSummary, ShieldSnapshot } from '@shres-code/shres-code-api-remotes/client'
+import type { ShieldFindingSummary, ShieldPayloadUpdate, ShieldSnapshot } from '@shres-code/shres-code-api-remotes/client'
 import type { SettingsScope, SettingsScopeSnapshot } from '@shres-code/shres-code-client-runtime/client'
 import type { PropsRuntime } from '@shres-code/shres-code-client-ui-slots'
 import { FishLogo } from '@shres-code/shres-code-client-ui-primitives'
@@ -15,6 +15,8 @@ export interface ShieldSettings {
   license?: string
   /** User activate/disable switch. Default true. */
   enabled?: boolean
+  /** Per-repo carve-outs: absolute repo path → exemption. */
+  repos?: Record<string, { enabled: boolean }>
   /** Screening posture forwarded to the paid plugin. */
   posture?: 'observe' | 'ask' | 'enforce'
 }
@@ -31,6 +33,10 @@ export interface ShieldSectionInjected {
   t: (key: keyof typeof en) => string
   /** Read-only per-repo console payload. Not a settings field. */
   loadSnapshot: (sessionId?: string) => Promise<ShieldSnapshot>
+  /** Compare the resolved payload with npm `latest`. */
+  checkUpdate: () => Promise<ShieldPayloadUpdate>
+  /** Install npm `latest` into the boot profile and remount. */
+  applyUpdate: () => Promise<ShieldPayloadUpdate>
 }
 
 /** Full component props. */
@@ -41,6 +47,12 @@ type ConsoleState =
   | { readonly status: 'loading' }
   | { readonly status: 'error' }
   | { readonly status: 'ready'; readonly snapshot: ShieldSnapshot }
+
+type UpdateState =
+  | { readonly status: 'idle' }
+  | { readonly status: 'checking' }
+  | { readonly status: 'updating'; readonly report: ShieldPayloadUpdate }
+  | { readonly status: 'result'; readonly report: ShieldPayloadUpdate }
 
 function verdictLabel(
   verdict: ShieldFindingSummary['verdict'],
@@ -62,6 +74,11 @@ function formatFinding(
 }
 
 const RULE_TOP_N = 5
+
+/** Copy the exemption map without one key; removing an entry re-enables the repo. */
+function withoutRepo(repos: NonNullable<ShieldSettings['repos']>, path: string): ShieldSettings['repos'] {
+  return Object.fromEntries(Object.entries(repos).filter(([key]) => key !== path))
+}
 
 function topRules(byRule: ShieldSnapshot['stats']['byRule']): Array<{
   rule: string
@@ -86,13 +103,34 @@ function definitionsStamp(snapshot: ShieldSnapshot): string {
   return `${definitions.version} · ${new Date(definitions.updatedAt).toISOString()}`
 }
 
+function blockedCopy(
+  blocked: NonNullable<ShieldPayloadUpdate['blocked']>,
+  t: ShieldSectionInjected['t'],
+): string {
+  if (blocked === 'env-override') return t('payloadBlockedEnv')
+  if (blocked === 'no-profile') return t('payloadBlockedProfile')
+  if (blocked === 'registry') return t('payloadBlockedRegistry')
+  return t('payloadBlockedPnpm')
+}
+
+function updateStatusCopy(report: ShieldPayloadUpdate, t: ShieldSectionInjected['t']): string {
+  if (report.applied) return t('payloadUpdated')
+  if (report.blocked !== undefined) return blockedCopy(report.blocked, t)
+  if (report.available) return t('payloadAvailable')
+  return t('payloadCurrent')
+}
+
+function versionLabel(value: string | null, t: ShieldSectionInjected['t']): string {
+  return value === null || value.length === 0 ? t('payloadUnknown') : value
+}
+
 /**
  * Render the Shield settings page.
  * @param props - scope, snapshot hook, copy, and console loader.
  * @returns the section.
  */
 export function ShieldSection({
-  scope, useSnapshot, t, loadSnapshot, useSessions,
+  scope, useSnapshot, t, loadSnapshot, checkUpdate, applyUpdate, useSessions,
 }: ShieldSectionProps): ReactNode {
   const settings = useSnapshot(current => current)
   const currentSessionId = useSessions(state => state.current)
@@ -100,9 +138,14 @@ export function ShieldSection({
   const [saving, setSaving] = useState(false)
   const [request, setRequest] = useState(0)
   const [consoleState, setConsoleState] = useState<ConsoleState>({ status: 'loading' })
+  const [updateState, setUpdateState] = useState<UpdateState>({ status: 'idle' })
   const posture = settings.value?.posture ?? 'ask'
   const enabled = settings.value?.enabled !== false
   const licenseStored = typeof settings.value?.license === 'string' && settings.value.license.length > 0
+  const repos = settings.value?.repos ?? {}
+  const repoCwd = consoleState.status === 'ready' ? consoleState.snapshot.stats.cwd : null
+  const repoExempt = repoCwd !== null && repos[repoCwd]?.enabled === false
+  const exemptPaths = Object.keys(repos).sort((a, b) => a.localeCompare(b))
 
   useEffect(() => {
     let current = true
@@ -113,6 +156,12 @@ export function ShieldSection({
     )
     return () => { current = false }
   }, [loadSnapshot, currentSessionId, request])
+
+  // The mark follows the current session's effective status; the global
+  // switch echo stays optimistic until the next snapshot corrects it.
+  useEffect(() => {
+    if (consoleState.status === 'ready') publishShieldMark(consoleState.snapshot.status.active)
+  }, [consoleState])
 
   const bothMissing = settings.status === 'unavailable' && consoleState.status === 'error'
   const formDisabled = settings.status !== 'ready' || !settings.writable || saving
@@ -152,6 +201,56 @@ export function ShieldSection({
                 </button>
               </div>
               <p className={css.hint}>{t('toggleHint')}</p>
+              <div className={css.toggleCard}>
+                <div className={css.toggleCopy}>
+                  <span className={css.toggleName}>{repoCwd ?? t('repoUnknown')}</span>
+                  <span className={css.toggleState}>{repoExempt ? t('repoExempt') : t('repoOn')}</span>
+                </div>
+                <button
+                  type="button"
+                  className={repoExempt ? css.switchOff : css.switchOn}
+                  role="switch"
+                  aria-checked={!repoExempt}
+                  aria-label={repoExempt ? t('repoRestore') : t('repoExemptAction')}
+                  disabled={formDisabled || repoCwd === null}
+                  onClick={() => {
+                    /* v8 ignore next -- the control is disabled when the session has no cwd */
+                    if (repoCwd === null) return
+                    if (repoExempt) {
+                      void scope.set('repos', withoutRepo(repos, repoCwd))
+                    } else {
+                      void scope.set('repos', { ...repos, [repoCwd]: { enabled: false } })
+                    }
+                  }}
+                >
+                  <span className={css.switchThumb} />
+                </button>
+              </div>
+              <p className={css.hint}>{t('repoToggleHint')}</p>
+              {exemptPaths.length > 0 ? (
+                <div className={css.recent}>
+                  <h3 className={css.recentTitle}>{t('repoList')}</h3>
+                  <ul className={css.findings}>
+                    {exemptPaths.map(path => (
+                      <li key={path}>
+                        <span>{path}</span>
+                        <button
+                          type="button"
+                          className={css.retry}
+                          disabled={formDisabled}
+                          onClick={() => {
+                            void scope.set('repos', withoutRepo(repos, path))
+                          }}
+                        >
+                          {t('repoRemove')}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <p className={css.hint}>{t('noRepos')}</p>
+              )}
               <label className={css.field}>
                 <span className={css.label}>{t('posture')}</span>
                 <select
@@ -206,6 +305,87 @@ export function ShieldSection({
                 </button>
               </div>
               <p className={css.notice}>{t('panic')}</p>
+              <section className={css.payload} aria-label={t('payload')}>
+                <h3 className={css.recentTitle}>{t('payload')}</h3>
+                <p className={css.hint}>{t('payloadHint')}</p>
+                {updateState.status === 'result' || updateState.status === 'updating' ? (
+                  <>
+                    <p className={css.definitions} role="status">
+                      {updateStatusCopy(updateState.report, t)}
+                    </p>
+                    <p className={css.hint}>
+                      {t('payloadInstalled')}
+                      {' · '}
+                      {versionLabel(updateState.report.installed, t)}
+                      {' · '}
+                      {t('payloadLatest')}
+                      {' · '}
+                      {versionLabel(updateState.report.latest, t)}
+                    </p>
+                  </>
+                ) : null}
+                <div className={css.actions}>
+                  <button
+                    type="button"
+                    className={css.retry}
+                    disabled={updateState.status === 'checking' || updateState.status === 'updating'}
+                    onClick={() => {
+                      setUpdateState({ status: 'checking' })
+                      void checkUpdate().then(
+                        (report) => { setUpdateState({ status: 'result', report }) },
+                        () => {
+                          setUpdateState({
+                            status: 'result',
+                            report: {
+                              specifier: '@shrestech/shres-shield-plugin',
+                              source: 'none',
+                              installed: null,
+                              latest: null,
+                              available: false,
+                              applied: false,
+                              blocked: 'registry',
+                            },
+                          })
+                        },
+                      )
+                    }}
+                  >
+                    {updateState.status === 'checking' ? t('payloadChecking') : t('payloadCheck')}
+                  </button>
+                  {updateState.status === 'result' && updateState.report.available ? (
+                    <button
+                      type="button"
+                      className={css.apply}
+                      onClick={() => {
+                        setUpdateState({ status: 'updating', report: updateState.report })
+                        void applyUpdate().then(
+                          (report) => {
+                            setUpdateState({ status: 'result', report })
+                            setRequest(value => value + 1)
+                          },
+                          () => {
+                            setUpdateState({
+                              status: 'result',
+                              report: {
+                                ...updateState.report,
+                                applied: false,
+                                blocked: 'pnpm',
+                              },
+                            })
+                          },
+                        )
+                      }}
+                    >
+                      {t('payloadUpdate')}
+                    </button>
+                  ) : null}
+                  {updateState.status === 'updating' ? (
+                    <button type="button" className={css.apply} disabled>
+                      {t('payloadUpdating')}
+                    </button>
+                  ) : null}
+                </div>
+              </section>
             </>
           ) : null}
           <section

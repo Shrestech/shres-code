@@ -36,7 +36,7 @@ describe('Grok CLI provider public Loader composition', () => {
         name: 'grok-cli',
         capabilities: {
           outputSchema: false,
-          depthLimit: false,
+          depthLimit: true,
           toolFilter: false,
           persona: false,
         },

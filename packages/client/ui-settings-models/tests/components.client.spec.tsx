@@ -269,7 +269,9 @@ describe('ModelsSection', () => {
     scripted.face.settings.describe.mockImplementation(() => Promise.resolve(ok({
       writable: true, hasDocument: false, namespaces,
     })))
+    // oxlint-disable-next-line typescript/no-misused-promises -- mockImplementation is typed void; the live mutate returns this Promise
     scripted.mutate.mockImplementation(() => Promise.resolve(ok(namespaces[3])))
+
     const { controller } = await mountFace(scripted)
     expect(screen.getByText('Grok Build CLI (delegated)')).toBeTruthy()
     expect(screen.getByText(en.delegatedTag)).toBeTruthy()
@@ -402,7 +404,7 @@ describe('ModelsSection', () => {
       onClose={vi.fn()}
     />)
     await waitFor(() => {
-      expect((screen.getByLabelText(en.keyInput) as HTMLInputElement).placeholder).toBe(en.keyEnvLocked)
+      expect(screen.getByLabelText<HTMLInputElement>(en.keyInput).placeholder).toBe(en.keyEnvLocked)
     })
     expect(screen.getByLabelText(en.cliBinary)).toBeTruthy()
     cleanup()
@@ -1569,5 +1571,120 @@ describe('apiKeyFailure', () => {
     // heuristic leaves them alone rather than guessing at a paste error.
     expect(apiKeyFailure('"')).toBeUndefined()
     expect(apiKeyFailure('"a')).toBeUndefined()
+  })
+})
+
+
+describe('endpoint variant picker', () => {
+  it('renders declared variants and writes the chosen baseURL', async () => {
+    const mutate = vi.fn((_payload: unknown) => Promise.resolve(ok({})))
+    const set = vi.fn(() => Promise.resolve(ok({})))
+    const namespace = {
+      ns: 'llm-pi-ai',
+      schema: Schema.object({
+        providers: Schema.dict(Schema.object({
+          apiKeyEnv: Schema.string(),
+          displayName: Schema.string(),
+          api: Schema.string(),
+          baseURL: Schema.string(),
+          endpoints: Schema.array(Schema.object({
+            id: Schema.string(),
+            label: Schema.string(),
+            baseURL: Schema.string(),
+            hint: Schema.string(),
+          })),
+          models: Schema.array(Schema.object({ id: Schema.string() })),
+        })),
+      }),
+      value: {
+        providers: {
+          moonshotai: {
+            apiKeyEnv: 'MOONSHOT_API_KEY',
+            endpoints: [
+              { id: 'platform', label: 'Moonshot Platform', baseURL: 'https://api.moonshot.ai/v1' },
+              { id: 'coding', label: 'Kimi Code', baseURL: 'https://api.kimi.com/coding/v1', hint: 'Kimi Code subscription credentials.' },
+            ],
+          },
+        },
+      },
+      applies: 'live',
+      secrets: [],
+      revision: 0,
+    } as unknown as SettingsNamespaceView
+    const api = {
+      settings: { mutate },
+      credentials: {
+        describe: vi.fn(() => Promise.resolve(ok({
+          credentials: { MOONSHOT_API_KEY: { configured: false, writable: true } },
+        }))),
+        set,
+      },
+      llm: { providers: vi.fn(), models: vi.fn() },
+    }
+    render(<ProviderEditor
+      provider="moonshotai"
+      displayName="Moonshot"
+      namespace={namespace}
+      settingsPath={['providers', 'moonshotai']}
+      api={api as never}
+      t={t}
+      readOnly={false}
+      onClose={vi.fn()}
+    />)
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Kimi Code' })).toBeTruthy()
+    })
+    // Declared variants render; picking one stages the plain baseURL override,
+    // and Apply lands it through the ordinary settings-mutate path.
+    fireEvent.click(screen.getByRole('button', { name: 'Kimi Code' }))
+    fireEvent.click(screen.getByRole('button', { name: en.apply }))
+    const firstOp = await vi.waitFor(() => {
+      const call = mutate.mock.calls[0]?.[0] as { ops: Array<{ op: string; path: string[]; value?: unknown }> } | undefined
+      if (call === undefined) throw new Error('no settings write was recorded')
+      const op = call.ops[0]
+      if (op === undefined) throw new Error('no op in the settings write')
+      return op
+    })
+    expect(firstOp).toMatchObject({ path: ['providers', 'moonshotai', 'baseURL'], value: 'https://api.kimi.com/coding/v1' })
+  })
+
+  it('renders no picker when the route declares fewer than two variants', async () => {
+    const namespace = {
+      ns: 'llm-pi-ai',
+      schema: Schema.object({
+        providers: Schema.dict(Schema.object({
+          baseURL: Schema.string(),
+          endpoints: Schema.array(Schema.object({
+            id: Schema.string(), label: Schema.string(), baseURL: Schema.string(), hint: Schema.string(),
+          })),
+        })),
+      }),
+      value: { providers: { openai: { endpoints: [{ id: 'only', label: 'Only', baseURL: 'https://one.example/v1' }] } } },
+      applies: 'live',
+      secrets: [],
+      revision: 0,
+    } as unknown as SettingsNamespaceView
+    const api = {
+      settings: { mutate: vi.fn(() => Promise.resolve(ok({}))) },
+      credentials: {
+        describe: vi.fn(() => Promise.resolve(ok({ credentials: {} }))),
+        set: vi.fn(() => Promise.resolve(ok({}))),
+      },
+      llm: { providers: vi.fn(), models: vi.fn() },
+    }
+    render(<ProviderEditor
+      provider="openai"
+      displayName="OpenAI"
+      namespace={namespace}
+      settingsPath={['providers', 'openai']}
+      api={api as never}
+      t={t}
+      readOnly={false}
+      onClose={vi.fn()}
+    />)
+    await waitFor(() => {
+      expect(screen.getByLabelText(en.keyInput)).toBeTruthy()
+    })
+    expect(screen.queryByRole('button', { name: 'Only' })).toBeNull()
   })
 })

@@ -59,6 +59,10 @@ flowchart LR
   cfg --> plugin_acp_tool_ralph
   plugin_acp_tool_todo["tool-todo<br/>@shres-code/shres-code-tool-todo"]
   cfg --> plugin_acp_tool_todo
+  plugin_acp_tool_session_query["tool-session-query<br/>@shres-code/shres-code-tool-session-query"]
+  cfg --> plugin_acp_tool_session_query
+  plugin_acp_timeout_policy["timeout-policy<br/>@shres-code/shres-code-tool-call-timeout-policy"]
+  cfg --> plugin_acp_timeout_policy
   plugin_acp_repeat_tool_reminder["repeat-tool-reminder<br/>@shres-code/shres-code-repeat-tool-reminder"]
   cfg --> plugin_acp_repeat_tool_reminder
   plugin_acp_fs_sandbox["fs-sandbox<br/>@shres-code/shres-code-fs-sandbox"]
@@ -97,6 +101,8 @@ flowchart LR
 | `tool-workflow` | `@shres-code/shres-code-tool-workflow` |
 | `tool-ralph` | `@shres-code/shres-code-tool-ralph` |
 | `tool-todo` | `@shres-code/shres-code-tool-todo` |
+| `tool-session-query` | `@shres-code/shres-code-tool-session-query` |
+| `timeout-policy` | `@shres-code/shres-code-tool-call-timeout-policy` |
 | `repeat-tool-reminder` | `@shres-code/shres-code-repeat-tool-reminder` |
 | `fs-sandbox` | `@shres-code/shres-code-fs-sandbox` |
 | `fs-observation-policy` | `@shres-code/shres-code-fs-observation-policy` |

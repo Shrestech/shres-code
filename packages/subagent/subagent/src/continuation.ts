@@ -182,6 +182,14 @@ interface ContinuationHost {
    * @returns the observer whose edges this epoch publishes.
    */
   observeActivation(provider: string, childId: SessionId, parent: Agent): ActivationObserver
+  /**
+   * Reserve one concurrent-spawn slot or throw `CONCURRENCY_CAP`. The returned
+   * releaser is idempotent; call it when this start's Activation settles or
+   * when materialization rolls back. Follow-up and cold resume must not call
+   * this — they are not spawns.
+   * @returns a once-only occupancy releaser.
+   */
+  occupySpawn(): () => void
 }
 
 /**
@@ -238,6 +246,12 @@ interface Activation {
   announced: boolean
   /** Renewed whenever a settlement watcher must re-observe quiescence. */
   poke: PromiseWithResolvers<void>
+  /**
+   * Once-only occupancy releaser for a first-epoch spawn, or absent on a cold
+   * resume. Called from unpublished rollback and from disposal; the releaser
+   * itself is idempotent.
+   */
+  releaseSlot?: () => void
 }
 
 /** Inputs shared by fresh and resumed Activation materialization. */
@@ -259,6 +273,11 @@ interface MaterializeInputs {
   agentOptions: AgentOptions
   composition: { persona?: string | undefined; toolFilter?: ToolRestriction | undefined }
   signal: AbortSignal
+  /**
+   * Occupancy releaser for a first-epoch spawn. Absent on cold resume, which
+   * is not a spawn and does not occupy a slot.
+   */
+  releaseSlot?: () => void
 }
 
 /**
@@ -429,35 +448,42 @@ export class SubagentContinuationManager {
     // parent's future, not to this child.
     const delegatedPolicies = captureDelegatedPolicyOverrides(parent)
 
-    const prepared = await this.host.prepareContinuable(spec.provider, {
-      sessionId: childId,
-      parent,
-      signal: spec.signal,
-    })
-    spec.signal.throwIfAborted()
-    this.assertAdmitting(parent)
-
-    const lineageSeedLength = prepared.seed?.length ?? 0
-    const seed = seedDescriptorTurn(childId, prepared.seed, descriptor)
-    const messageId = await this.locks.run(childId, async () => {
-      const activation = await this.materialize({
-        childId,
-        provider: spec.provider,
+    const releaseSlot = this.host.occupySpawn()
+    try {
+      const prepared = await this.host.prepareContinuable(spec.provider, {
+        sessionId: childId,
         parent,
-        create: { seed, meta: childSessionMeta(parent, childDepth, lineageSeedLength), delegatedPolicies },
-        agentOptions: resolveChildAgentOptions(parent, request.agentOptions, childDepth),
-        composition: { persona: request.persona, toolFilter: request.toolFilter },
         signal: spec.signal,
       })
-      return this.submitMaterialized(
-        activation,
-        request.prompt,
-        { kind: 'user' },
-        parent,
-        spec.signal,
-      )
-    })
-    return { childId, messageId }
+      spec.signal.throwIfAborted()
+      this.assertAdmitting(parent)
+
+      const lineageSeedLength = prepared.seed?.length ?? 0
+      const seed = seedDescriptorTurn(childId, prepared.seed, descriptor)
+      const messageId = await this.locks.run(childId, async () => {
+        const activation = await this.materialize({
+          childId,
+          provider: spec.provider,
+          parent,
+          create: { seed, meta: childSessionMeta(parent, childDepth, lineageSeedLength), delegatedPolicies },
+          agentOptions: resolveChildAgentOptions(parent, request.agentOptions, childDepth),
+          composition: { persona: request.persona, toolFilter: request.toolFilter },
+          signal: spec.signal,
+          releaseSlot,
+        })
+        return this.submitMaterialized(
+          activation,
+          request.prompt,
+          { kind: 'user' },
+          parent,
+          spec.signal,
+        )
+      })
+      return { childId, messageId }
+    } catch (error: unknown) {
+      releaseSlot()
+      throw error
+    }
   }
 
   /**
@@ -1041,6 +1067,7 @@ export class SubagentContinuationManager {
       accepted: new Set(),
       announced: false,
       poke: Promise.withResolvers<void>(),
+      ...inputs.releaseSlot !== undefined ? { releaseSlot: inputs.releaseSlot } : {},
     }
     // After transfer, any failure must dispose the created handle, remove the
     // Activation, and roll back parent ownership before rejecting.
@@ -1091,6 +1118,7 @@ export class SubagentContinuationManager {
       } finally {
         this.activations.delete(activation.childId)
         this.releaseOwnership(activation.childId)
+        activation.releaseSlot?.()
       }
     })())
   }
@@ -1380,6 +1408,7 @@ export class SubagentContinuationManager {
     // Emit once the disposal outcome is known, so a rejecting scoped cleanup
     // cannot be reported as a successful epoch.
     activation.observer.settle(failure)
+    activation.releaseSlot?.()
     if (failure !== undefined) throw failure
   }
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Context } from '@shres-code/cordis'
 import { CallId, createToolResultMessage } from '@shres-code/shres-code-llm'
 import SessionStore, { Session, SessionId } from '@shres-code/shres-code-session'
-import JspaceService, { JspaceError } from '../src/index.ts'
+import JspaceService, { CharterEntryId, JspaceError } from '../src/index.ts'
 
 async function harness(config: ConstructorParameters<typeof JspaceService>[1] = { enabled: true }) {
   const ctx = new Context()
@@ -57,7 +57,14 @@ describe('JspaceService remount', () => {
       apply: (c: Context) => {
         c.provide('settings', {
           register: () => ({
-            get: () => ({ enabled: true, mode: 'available' as const, requireCoverage: true, coverageTerms: [] }),
+            get: () => ({
+              enabled: true,
+              mode: 'available' as const,
+              requireCoverage: true,
+              coverageTerms: [],
+              verifierTools: [],
+              requireVerifiedEvidence: false,
+            }),
             watch: () => () => {},
             update: async () => {},
             replace: async () => {},
@@ -67,7 +74,56 @@ describe('JspaceService remount', () => {
     })
     expect(seen).toEqual(['active'])
     expect(ctx.jspace.status.active).toBe(true)
+    // A stored document that carries no threshold engages from the first request.
+    expect(ctx.jspace.engageAfterSteps).toBe(0)
     stop()
+  })
+})
+
+describe('JspaceService engagement', () => {
+  function closeSteps(session: Session, count: number): void {
+    const completed = session.events.filter(event => event.type === 'step/end').length
+    if (!session.events.some(event => event.type === 'turn/start')) {
+      session.append('turn/start', { turn: 1 })
+    }
+    for (let offset = 0; offset < count; offset += 1) {
+      const step = completed + offset + 1
+      session.append('step/start', { turn: 1, step })
+      session.append('step/end', { turn: 1, step })
+    }
+  }
+
+  it('never engages while the seat is disabled', async () => {
+    const { ctx, session } = await harness({ enabled: false, engageAfterSteps: 0 })
+    expect(ctx.jspace.engaged(session)).toBe(false)
+    expect(ctx.jspace.engaged()).toBe(false)
+  })
+
+  it('engages every active request when engageAfterSteps is 0', async () => {
+    const { ctx, session } = await harness({ enabled: true })
+    expect(ctx.jspace.engageAfterSteps).toBe(0)
+    expect(ctx.jspace.engaged(session)).toBe(true)
+    expect(ctx.jspace.engaged()).toBe(true)
+  })
+
+  it('waits for the configured completed-step count', async () => {
+    const { ctx, session } = await harness({ enabled: true, engageAfterSteps: 3 })
+    expect(ctx.jspace.engaged(session)).toBe(false)
+    closeSteps(session, 2)
+    expect(ctx.jspace.engaged(session)).toBe(false)
+    closeSteps(session, 1)
+    expect(ctx.jspace.engaged(session)).toBe(true)
+  })
+
+  it('leaves a session-less assembly unengaged under a threshold', async () => {
+    const { ctx } = await harness({ enabled: true, engageAfterSteps: 3 })
+    expect(ctx.jspace.engaged()).toBe(false)
+  })
+
+  it('engages a session whose card is already open below the threshold', async () => {
+    const { ctx, session } = await harness({ enabled: true, engageAfterSteps: 10 })
+    ctx.jspace.open(session, { goal: 'g', next: 'n' })
+    expect(ctx.jspace.engaged(session)).toBe(true)
   })
 })
 
@@ -113,6 +169,7 @@ describe('JspaceService card log', () => {
     expect(grow.jspace.note(emptyCore, { core: 'first' }).core).toEqual(['first'])
     expect(() => ctx.jspace.note(session, { core: 'new' })).toThrow(/departing/)
     expect(() => ctx.jspace.note(session, { departing: 'missing', core: 'new' })).toThrow(/does not hold/)
+    expect(() => ctx.jspace.note(session, { departing: 'old' })).toThrow(/departing/)
     const next = ctx.jspace.note(session, { departing: 'old', core: 'new', next: 'C' })
     expect(next.core).toEqual(['new', 'keep'])
     expect(next.next).toBe('C')
@@ -152,6 +209,7 @@ describe('JspaceService card log', () => {
     expect(checked.checked).toEqual([
       { n: 1, check: 'read the file', by: 'unit tests covering the fold', evidence: 'call-1' },
     ])
+    expect(checked.checked[0]?.verified).toBeUndefined()
     session.append('tool/call', {
       turn: 1,
       step: 2,
@@ -224,24 +282,260 @@ describe('JspaceService card log', () => {
     expect(disabled.jspace.fold(child).inherited?.goal).toBe('A')
   })
 
-  it('updates goalOpenedSeq when the goal line changes and rejects empty fields', async () => {
+  it('refuses a JSON-array packed into one Core, Checked, or Open line', async () => {
+    const { ctx, session } = await harness()
+    const packed = '["Zombie-goal root cause: a", "Fix (scoped): b"]'
+    expect(() => ctx.jspace.open(session, { goal: 'A', next: 'B', core: [packed] })).toThrow(JspaceError)
+    try {
+      ctx.jspace.open(session, { goal: 'A', next: 'B', core: [packed] })
+    } catch (error) {
+      expect(error).toBeInstanceOf(JspaceError)
+      expect((error as JspaceError).code).toBe('JSPACE_LINE_PACKED')
+      expect((error as JspaceError).message).toBe(
+        'jspace line must be one item per slot; Core holds at most 2 live items',
+      )
+    }
+    ctx.jspace.open(session, { goal: 'A', next: 'B' })
+    expect(() => ctx.jspace.note(session, { core: packed })).toThrow(/one item per slot/)
+    expect(() => ctx.jspace.note(session, { open: [{ question: packed }] })).toThrow(/one item per slot/)
+    expect(() => ctx.jspace.checkpoint(session, { check: packed, by: 'unit tests' })).toThrow(/one item per slot/)
+    try {
+      ctx.jspace.note(session, { open: [{ question: packed }] })
+    } catch (error) {
+      expect((error as JspaceError).code).toBe('JSPACE_LINE_PACKED')
+    }
+    try {
+      ctx.jspace.checkpoint(session, { check: packed, by: 'unit tests' })
+    } catch (error) {
+      expect((error as JspaceError).code).toBe('JSPACE_LINE_PACKED')
+    }
+  })
+
+  it('accepts a Core line that merely starts with [ and is not JSON', async () => {
+    const { ctx, session } = await harness()
+    const opened = ctx.jspace.open(session, {
+      goal: 'A',
+      next: 'B',
+      core: ['[shield] fix the gate'],
+    })
+    expect(opened.core).toEqual(['[shield] fix the gate'])
+    const noted = ctx.jspace.note(session, { core: '[guard] keep the hinge' })
+    expect(noted.core).toEqual(['[shield] fix the gate', '[guard] keep the hinge'])
+    expect(ctx.jspace.note(session, { open: [{ question: '[open] who owns the latch?' }] }).open)
+      .toEqual([{ question: '[open] who owns the latch?' }])
+    expect(ctx.jspace.checkpoint(session, {
+      check: '[checked] latch holds',
+      by: 'unit tests',
+    }).checked[0]?.check).toBe('[checked] latch holds')
+  })
+
+  it('accepts a line that parses as a JSON object or string', async () => {
+    const { ctx, session } = await harness()
+    ctx.jspace.open(session, { goal: 'A', next: 'B', core: ['{"kind":"hint"}'] })
+    expect(ctx.jspace.card(session)?.core).toEqual(['{"kind":"hint"}'])
+    expect(ctx.jspace.note(session, { next: '"quoted next"' }).next).toBe('"quoted next"')
+  })
+
+  it('refuses a note that leaves Goal, Next, Core, and Open unchanged', async () => {
+    const { ctx, session } = await harness()
+    ctx.jspace.open(session, { goal: 'A', next: 'B', core: ['keep'] })
+    ctx.jspace.note(session, { open: [{ question: 'Q', settles: 'S' }] })
+    expect(() => ctx.jspace.note(session, {})).toThrow(JspaceError)
+    try {
+      ctx.jspace.note(session, { next: 'B', goal: 'A' })
+    } catch (error) {
+      expect(error).toBeInstanceOf(JspaceError)
+      expect((error as JspaceError).code).toBe('JSPACE_NOTE_NOOP')
+      expect((error as JspaceError).message).toBe(
+        'the card already says this; proceed with the work or write a checkpoint',
+      )
+    }
+    expect(() => ctx.jspace.note(session, {
+      departing: 'keep',
+      core: 'keep',
+      open: [{ question: 'Q', settles: 'S' }],
+    })).toThrow(/already says this/)
+    const bounced = ctx.jspace.note(session, { next: 'C' })
+    expect(bounced.next).toBe('C')
+    expect(ctx.jspace.note(session, { next: 'B' }).next).toBe('B')
+  })
+
+  it('rejects a Goal identity change and allows same-goal note', async () => {
     const { ctx, session } = await harness()
     expect(() => ctx.jspace.note(session, { next: 'x' })).toThrow(/not open/)
     expect(() => ctx.jspace.checkpoint(session, { check: 'a', by: 'unit tests' })).toThrow(/not open/)
-    expect(() => ctx.jspace.close(session)).toThrow(/not open/)
-    const opened = ctx.jspace.open(session, { goal: 'A', next: 'B' })
+    expect(() => { ctx.jspace.close(session) }).toThrow(/not open/)
+    ctx.jspace.open(session, { goal: 'A', next: 'B' })
     expect(() => ctx.jspace.note(session, { goal: '   ' })).toThrow(JspaceError)
     expect(() => ctx.jspace.note(session, { next: 'Goal: injected' })).toThrow(/card label/)
+    expect(() => ctx.jspace.note(session, { next: 'Charter: injected' })).toThrow(/card label/)
     expect(() => ctx.jspace.note(session, { next: 'two\nlines' })).toThrow(/single line/)
     ctx.jspace.close(session)
-    ctx.jspace.open(session, { goal: 'A', next: 'B' })
-    const noted = ctx.jspace.note(session, { goal: 'B-goal', open: [{ question: 'Q' }] })
-    expect(noted.goalOpenedSeq).toBeGreaterThan(opened.goalOpenedSeq)
-    expect(noted.open).toEqual([{ question: 'Q' }])
+    const afterReopen = ctx.jspace.open(session, { goal: 'A', next: 'B' })
+    expect(() => ctx.jspace.note(session, { goal: 'B-goal', open: [{ question: 'Q' }] })).toThrow(JspaceError)
+    try {
+      ctx.jspace.note(session, { goal: 'B-goal', open: [{ question: 'Q' }] })
+    } catch (error) {
+      expect(error).toBeInstanceOf(JspaceError)
+      expect((error as JspaceError).code).toBe('JSPACE_NOTE_GOAL_CHANGE')
+      expect((error as JspaceError).message).toContain('jspace_open')
+    }
+    const sameGoal = ctx.jspace.note(session, { goal: 'A', open: [{ question: 'Q' }] })
+    expect(sameGoal.goalOpenedSeq).toBe(afterReopen.goalOpenedSeq)
+    expect(sameGoal.open).toEqual([{ question: 'Q' }])
     expect(ctx.jspace.note(session, {
       open: [{ question: 'Q2', settles: 'S' }],
     }).open).toEqual([{ question: 'Q2', settles: 'S' }])
     expect(ctx.jspace.note(session, { next: 'later' }).next).toBe('later')
+  })
+
+  it('openGoal resets Core and Checked on a Goal epoch change and carries Open', async () => {
+    const { ctx, session } = await harness()
+    const opened = ctx.jspace.open(session, {
+      goal: 'G1',
+      next: 'B',
+      core: ['one', 'two'],
+      charter: [{ kind: 'prose', id: CharterEntryId('e1'), constraint: 'Be kind to reviewers.' }],
+    })
+    ctx.jspace.checkpoint(session, { check: 'c1', by: 'unit tests' })
+    ctx.jspace.checkpoint(session, { check: 'c2', by: 'unit tests' })
+    const noted = ctx.jspace.note(session, { open: [{ question: 'Q' }] })
+    const epoch = ctx.jspace.openGoal(session, { goal: 'D1', next: 'Start' })
+    expect(epoch.goal).toBe('D1')
+    expect(epoch.next).toBe('Start')
+    expect(epoch.core).toEqual([])
+    expect(epoch.checked).toEqual([])
+    expect(epoch.open).toEqual([{ question: 'Q' }])
+    expect(epoch.charter).toEqual([{ kind: 'prose', id: 'e1', constraint: 'Be kind to reviewers.' }])
+    expect(epoch.goalOpenedSeq).toBeGreaterThan(noted.goalOpenedSeq)
+    expect(ctx.jspace.card(session)?.checked).toEqual([])
+    const replay = new Context()
+    await replay.plugin(SessionStore)
+    await replay.plugin(JspaceService, { enabled: true })
+    const copy = replay.sessions.create(SessionId('ws-reopen-replay'), { seed: session.events })
+    expect(replay.jspace.card(copy)?.checked).toEqual([])
+    expect(replay.jspace.card(copy)?.core).toEqual([])
+    void opened
+  })
+
+  it('openGoal with the same Goal updates Goal and Next in place without resetting', async () => {
+    const { ctx, session } = await harness()
+    const opened = ctx.jspace.open(session, { goal: 'A', next: 'B', core: ['keep'] })
+    ctx.jspace.checkpoint(session, { check: 'c1', by: 'unit tests' })
+    const same = ctx.jspace.openGoal(session, { goal: 'A', next: 'C' })
+    expect(same.goal).toBe('A')
+    expect(same.next).toBe('C')
+    expect(same.core).toEqual(['keep'])
+    expect(same.checked).toHaveLength(1)
+    expect(same.goalOpenedSeq).toBe(opened.goalOpenedSeq)
+  })
+
+  it('openGoal requires an active seat and an open card', async () => {
+    const disabled = await harness({ enabled: false })
+    expect(() => disabled.ctx.jspace.openGoal(disabled.session, { goal: 'A', next: 'B' }))
+      .toThrow(/disabled/)
+    const { ctx, session } = await harness()
+    expect(() => ctx.jspace.openGoal(session, { goal: 'A', next: 'B' })).toThrow(/not open/)
+  })
+
+  it('marks a verifier citation evidence-grade and leaves ordinary evidence unmarked', async () => {
+    const { ctx, session } = await harness({
+      enabled: true,
+      verifierTools: ['bash'],
+    })
+    ctx.jspace.open(session, { goal: 'A', next: 'B' })
+    session.append('turn/start', { turn: 1 })
+    session.append('step/start', { turn: 1, step: 1 })
+    session.append('tool/call', {
+      turn: 1,
+      step: 1,
+      callId: CallId('call-bash'),
+      name: 'bash',
+      arguments: '{}',
+    })
+    session.append('tool/result', {
+      turn: 1,
+      step: 1,
+      message: createToolResultMessage({
+        callId: CallId('call-bash'),
+        content: [{ type: 'text', text: 'ok' }],
+        isError: false,
+      }),
+    }, { surfaceOp: 'append' })
+    session.append('tool/call', {
+      turn: 1,
+      step: 2,
+      callId: CallId('call-read'),
+      name: 'read',
+      arguments: '{}',
+    })
+    session.append('tool/result', {
+      turn: 1,
+      step: 2,
+      message: createToolResultMessage({
+        callId: CallId('call-read'),
+        content: [{ type: 'text', text: 'ok' }],
+        isError: false,
+      }),
+    }, { surfaceOp: 'append' })
+    const verified = ctx.jspace.checkpoint(session, {
+      check: 'tests ran',
+      by: 'unit tests covering the fold',
+      evidence: 'call-bash',
+    })
+    expect(verified.checked[0]).toEqual({
+      n: 1,
+      check: 'tests ran',
+      by: 'unit tests covering the fold',
+      evidence: 'call-bash',
+      verified: true,
+    })
+    const ordinary = ctx.jspace.checkpoint(session, {
+      check: 'read the file',
+      by: 'unit tests covering the fold',
+      evidence: 'call-read',
+    })
+    expect(ordinary.checked[1]).toEqual({
+      n: 2,
+      check: 'read the file',
+      by: 'unit tests covering the fold',
+      evidence: 'call-read',
+    })
+    expect(() => ctx.jspace.checkpoint(session, {
+      check: 'missing',
+      by: 'unit tests covering the fold',
+      evidence: 'call-absent',
+    })).toThrow(/non-error tool call/)
+  })
+
+  it('does not mark evidence-grade when verifierTools is empty', async () => {
+    const { ctx, session } = await harness({ enabled: true })
+    ctx.jspace.open(session, { goal: 'A', next: 'B' })
+    session.append('turn/start', { turn: 1 })
+    session.append('step/start', { turn: 1, step: 1 })
+    session.append('tool/call', {
+      turn: 1,
+      step: 1,
+      callId: CallId('call-bash'),
+      name: 'bash',
+      arguments: '{}',
+    })
+    session.append('tool/result', {
+      turn: 1,
+      step: 1,
+      message: createToolResultMessage({
+        callId: CallId('call-bash'),
+        content: [{ type: 'text', text: 'ok' }],
+        isError: false,
+      }),
+    }, { surfaceOp: 'append' })
+    const checked = ctx.jspace.checkpoint(session, {
+      check: 'tests ran',
+      by: 'unit tests covering the fold',
+      evidence: 'call-bash',
+    })
+    expect(checked.checked[0]?.verified).toBeUndefined()
+    expect(checked.checked[0]?.evidence).toBe('call-bash')
   })
 
   it('accepts a checkpoint without coverage when requireCoverage is false', async () => {
@@ -278,6 +572,7 @@ describe('JspaceService card log', () => {
           open: [],
           next: 'stay',
           goalOpenedSeq: 1,
+          charter: [],
         },
       }],
     })

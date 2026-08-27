@@ -244,7 +244,7 @@ export function pairedScatter({ points, xLabel, yLabel }) {
 
   const svg = svgRoot(W, H, `Paired scatter of ${yLabel} against ${xLabel}`, 'paired-scatter')
   svg.appendChild(legendG([
-    { name: 'on better', color: 'var(--heat-good)' },
+    { name: 'treatment better', color: 'var(--heat-good)' },
     { name: 'off better', color: 'var(--heat-bad)' },
     { name: 'tie', color: 'var(--muted)' },
   ], m.l, 4))
@@ -339,7 +339,7 @@ export function deltaChart({ items, xLabel }) {
 
   const svg = svgRoot(W, H, `Delta chart${xLabel ? ` of ${xLabel}` : ''}`, 'delta')
   svg.appendChild(legendG([
-    { name: 'on better', color: 'var(--heat-good)' },
+    { name: 'treatment better', color: 'var(--heat-good)' },
     { name: 'off better', color: 'var(--heat-bad)' },
   ], m.l, 2))
   for (const v of [-half, 0, half]) {

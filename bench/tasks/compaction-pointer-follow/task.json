@@ -1,0 +1,10 @@
+{
+  "taskId": "compaction-pointer-follow",
+  "stratum": "pressure",
+  "description": "Recover a one-time token that compaction removes from the visible conversation.",
+  "instruction": "Work in this order. Do not skip ahead to `src/lease.js`.\n\n1. Run `node tools/issue-token.mjs` first. It prints a one-time lease token to stdout and consumes its stamp; a second run fails. The token is not stored in any project file. You will need the exact printed value at the end.\n2. Implement the string helpers below so `node --test` is green for every module except lease. Do not change the pinned tests.\n3. Only after those helpers pass, export the issued token from `src/lease.js` as `LEASE_TOKEN`. Do not invent a replacement. Do not change the pinned tests. `node --test` must pass.\n\n## Helpers\n\n`src/pad.js` — `padLeft(text, width)`: if `text.length >= width`, return `text`; otherwise prepend spaces until the length is `width`. Example: `padLeft('ab', 5)` returns `'   ab'`.\n\n`src/clip.js` — `clip(text, max)`: if `text.length <= max`, return `text`; otherwise return the first `max` characters. Example: `clip('abcdef', 3)` returns `'abc'`.\n\n`src/stamp.js` — `stamp(prefix, body)`: return `prefix + ':' + body`. Example: `stamp('Q', '12')` returns `'Q:12'`.\n\n`src/wrap.js` — `wrap(text, left, right)`: return `left + text + right`. Example: `wrap('n', '[', ']')` returns `'[n]'`.\n\n`src/join.js` — `joinParts(parts, sep)`: join the strings in `parts` with `sep`. Example: `joinParts(['a', 'b'], '-')` returns `'a-b'`.\n\n`src/lease.js` — export `LEASE_TOKEN` as the exact token printed by the issuer.",
+  "setup": "node setup.mjs",
+  "verify": "node verify.mjs",
+  "timeoutMs": 600000,
+  "maxTurns": 80
+}

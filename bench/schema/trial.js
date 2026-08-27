@@ -24,6 +24,40 @@ export const FAILURE_MODES = Object.freeze([
  * @property {number} identicalRetries - tool calls repeated with identical name+args.
  * @property {number} checkpoints - `jspace_checkpoint` calls accepted (0 in the off arm).
  * @property {number} shipPasses - `jspace_ship` calls accepted (0 in the off arm).
+ * @property {number | null} tokensIncludingDescendants - input+output tokens summed over the
+ *   root session and every descendant session, keyed by header `parentSession` links under the
+ *   trial's persistence root (seeded `bench-prior-*` fixtures excluded). Null only when the root
+ *   header cannot be read. The numerator matches `inputTokens`/`outputTokens`: `assistant/message`
+ *   provider-reported usage only.
+ * @property {number} descendantSessions - count of descendant sessions in the closure (excludes
+ *   the root; includes descendants whose logs carry no usage events).
+ * @property {number | null} costIncludingDescendants - estimated cost over the same closure;
+ *   always null until the bench carries a price table (none exists in-tree, and stale prices
+ *   are wrong prices), so token fields remain the cost currency.
+ * @property {boolean | null} danglingCard - card open at session end (last jspace state not
+ *   closed); null for jspace-off arms.
+ * @property {number | null} verifiedCheckpointShare - fraction of checkpoint lines carrying
+ *   `verified: true`; null when no checkpoints exist in the log.
+ * @property {number} coverageRefusalThenPad - count of sequences where a jspace_checkpoint
+ *   tool/result is a coverage refusal and the next jspace_checkpoint call succeeds within
+ *   the same turn (the by-padding proxy).
+ * @property {number} noopNoteRefusals - count of JSPACE_NOTE_NOOP tool results.
+ * @property {number} noteCapRefusals - count of note-cap denial tool results.
+ * @property {number | null} sessionQueryCalls - count of session_search / session_event_search
+ *   / session_event_read / session_event_trace / session_trace calls; null for arms excluding
+ *   the session-query consumer.
+ * @property {number} compactionCount - number of `compaction/end` events in the session log
+ *   (one closed compaction attempt, success or error).
+ * @property {boolean} pressureFired - true when compactionCount > 0.
+ * @property {boolean | null} charterRunFailNamed - a `jspace/charter-run` with phase
+ *   checkpoint or ship and `passed: false` (the refusal names `entryId`); null for jspace-off.
+ * @property {number | null} emptyCharterRate - 1 when the last `jspace/card` charter is empty
+ *   or no card opened; 0 when the last card carries at least one entry; null for jspace-off.
+ * @property {number | null} unverifiedShare - last-card `kind: 'check'` entries with
+ *   `discrimination: 'unverified'`, divided by registered checks; null when no checks.
+ * @property {number | null} echoOkRejectRate - floor registration refusals
+ *   (`JSPACE_CHARTER_CONSTANT` / `JSPACE_CHARTER_NO_READ`, or their model-visible copy)
+ *   over `jspace_open` / `jspace_charter_amend` results; null when no registration attempt.
  */
 
 /**
@@ -34,6 +68,7 @@ export const FAILURE_MODES = Object.freeze([
  * @property {string | null} resumedFrom - prior phase's session id when card-carry resume exists; always null under cold carry.
  * @property {number | null} exitCode - harness process exit code; null when killed by a signal.
  * @property {boolean} timedOut - the phase exceeded its timeout and was killed.
+ * @property {boolean} budgetExceeded - the live token cap terminated this phase's spawn.
  * @property {TrialMetrics} metrics - this phase's metrics.
  * @property {string} startedAt - ISO 8601.
  * @property {string} endedAt - ISO 8601.
@@ -57,8 +92,17 @@ export const FAILURE_MODES = Object.freeze([
  * @property {{ violations: string[] }} [integrity] - arm-integrity audit findings; omitted when clean.
  */
 
-/** TrialMetrics field names, shared by trial- and phase-level validation. */
-const METRIC_FIELDS = ['inputTokens', 'outputTokens', 'durationMs', 'turns', 'toolCalls', 'identicalRetries', 'checkpoints', 'shipPasses']
+/** TrialMetrics field names that are always non-negative numbers. */
+const METRIC_FIELDS = ['inputTokens', 'outputTokens', 'durationMs', 'turns', 'toolCalls', 'identicalRetries', 'checkpoints', 'shipPasses', 'descendantSessions', 'outOfLoopExperiments', 'coverageRefusalThenPad', 'noopNoteRefusals', 'noteCapRefusals', 'compactionCount']
+
+/** TrialMetrics field names that are number|null. */
+const NULLABLE_NUMBER_FIELDS = ['tokensIncludingDescendants', 'costIncludingDescendants', 'verifiedCheckpointShare', 'sessionQueryCalls']
+
+/** TrialMetrics field names that are boolean|null. */
+const NULLABLE_BOOLEAN_FIELDS = ['danglingCard']
+
+/** TrialMetrics field names that are required booleans. */
+const BOOLEAN_FIELDS = ['pressureFired']
 
 /**
  * Validate one metrics record. Throws on the first violation.
@@ -71,6 +115,19 @@ function validateMetrics(value, name) {
   if (typeof m !== 'object' || m === null) throw new Error(`${name} must be a record`)
   for (const field of METRIC_FIELDS) {
     if (typeof m[field] !== 'number' || m[field] < 0) throw new Error(`${name}.${field} must be a non-negative number`)
+  }
+  for (const field of NULLABLE_NUMBER_FIELDS) {
+    if (m[field] !== null && (typeof m[field] !== 'number' || !Number.isFinite(/** @type {number} */ (m[field])))) {
+      throw new Error(`${name}.${field} must be a finite number or null`)
+    }
+  }
+  for (const field of NULLABLE_BOOLEAN_FIELDS) {
+    if (m[field] !== null && typeof m[field] !== 'boolean') {
+      throw new Error(`${name}.${field} must be a boolean or null`)
+    }
+  }
+  for (const field of BOOLEAN_FIELDS) {
+    if (typeof m[field] !== 'boolean') throw new Error(`${name}.${field} must be a boolean`)
   }
 }
 

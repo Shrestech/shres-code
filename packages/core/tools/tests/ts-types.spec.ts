@@ -146,6 +146,7 @@ describe('renderToolsSdk', () => {
     expect(text).toContain('rejects with `ToolCallError`')
     expect(text).toContain('MAY overlap under `Promise.all`')
     expect(text).toContain('lossless JSON')
+    expect(text).toContain('prefer one `run_code` program that loads and computes over a corpus')
   })
 
   it('names both required call arguments, not just the program', () => {

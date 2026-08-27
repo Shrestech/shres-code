@@ -14,6 +14,7 @@ const card: JspaceCard = {
   open: [],
   next: 'write a test',
   goalOpenedSeq: 1,
+  charter: [],
 }
 
 async function setup(): Promise<Context> {

@@ -300,6 +300,63 @@ describe('goal tool execution authority', () => {
     expect(malformed.error?.info?.code).toBe('GOAL_TOOL_AUTHORITY_REQUIRED')
   })
 
+  it('completes a disarmed goal from a notification-sourced turn', async () => {
+    const { ctx, root } = await harness()
+    const humanTurn = openTurn(root, { kind: 'user' })
+    const created = ctx.goals.create(root.agent, { objective: 'close without a human turn' })
+    closeTurn(root, humanTurn)
+    ctx.goals.disarm(root.agent)
+    openTurn(root, {
+      kind: 'plugin', plugin: 'background-job', form: 'notice', summary: 'job finished',
+    }, 'job finished')
+    const done = await execute(ctx, 'update_goal', {
+      goal_id: created.id, revision: created.revision, action: 'complete',
+    }, root.agent)
+    expect(resultGoal(done)).toMatchObject({ phase: 'complete' })
+    // Bookkeeping-only completion wraps up no round, exactly like a direct-human one.
+    expect(done.concludesTurn).toBeUndefined()
+  })
+
+  it('still rejects blocked on a disarmed goal from a notification-sourced turn', async () => {
+    const { ctx, root } = await harness()
+    const humanTurn = openTurn(root, { kind: 'user' })
+    const created = ctx.goals.create(root.agent, { objective: 'cannot self-report blocked' })
+    closeTurn(root, humanTurn)
+    ctx.goals.disarm(root.agent)
+    openTurn(root, {
+      kind: 'plugin', plugin: 'background-job', form: 'notice', summary: 'job finished',
+    }, 'job finished')
+    const result = await execute(ctx, 'update_goal', {
+      goal_id: created.id, revision: created.revision, action: 'blocked', blocked_reason: 'stuck',
+    }, root.agent)
+    expect(result.error?.info?.code).toBe('GOAL_TOOL_AUTHORITY_REQUIRED')
+  })
+
+  it('rejects a seeded subagent completing the root goal from a notification turn', async () => {
+    const { ctx, root } = await harness()
+    const humanTurn = openTurn(root, { kind: 'user' })
+    const created = ctx.goals.create(root.agent, { objective: 'parent owns the goal' })
+    closeTurn(root, humanTurn)
+    ctx.goals.disarm(root.agent)
+    const subId = SessionId('goal-tool-sub-seed')
+    const subSession = Session.create(subId, root.session.events, {
+      version: SESSION_FORMAT_VERSION,
+      id: subId,
+      createdAt: Date.now(),
+      parentSession: root.session.id,
+      seedLength: root.session.seq,
+    })
+    const sub = stubAgent(subId, subSession)
+    ctx.agents.enter(sub.agent, root.agent)
+    openTurn(sub, {
+      kind: 'plugin', plugin: 'subagent-notice', form: 'notice', summary: 'notice',
+    }, 'notice')
+    const result = await execute(ctx, 'update_goal', {
+      goal_id: created.id, revision: created.revision, action: 'complete',
+    }, sub.agent)
+    expect(result.error?.info?.code).toBe('GOAL_TOOL_AUTHORITY_REQUIRED')
+  })
+
   it('accepts direct human steering in a goal-sourced root turn', async () => {
     const { ctx, root } = await harness()
     const humanTurn = openTurn(root, { kind: 'user' })

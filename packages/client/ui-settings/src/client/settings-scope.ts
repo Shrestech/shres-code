@@ -217,6 +217,12 @@ declare module '@shres-code/cordis' {
   }
 }
 
+/** Shared in-memory controller plus the live bind count for one namespace. */
+interface CachedScope {
+  readonly controller: SettingsScopeController<unknown>
+  refs: number
+}
+
 /**
  * The settings domain's base service. Features that own a preference reach the
  * settings transport through this service rather than a shared function: the
@@ -224,11 +230,6 @@ declare module '@shres-code/cordis' {
  * cross-plugin collaboration through cordis services
  * (`packages/client/tsdown.client.ts`).
  */
-interface CachedScope {
-  readonly controller: SettingsScopeController<unknown>
-  refs: number
-}
-
 export class SettingsScopeBinder extends Service {
   private readonly cache = new Map<string, CachedScope>()
 

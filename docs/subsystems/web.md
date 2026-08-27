@@ -145,12 +145,14 @@ The web access service. Registered as `ctx.web` (one instance per context).
 
 Selection semantics (resolved at execution time, never order-dependent):
 
-- A configured id that is registered and `available()` → that provider.
-- A configured id not registered → `WEB_PROVIDER_CONFIGURED_MISSING`.
-- A configured id registered but unavailable → `WEB_PROVIDER_CONFIGURED_UNAVAILABLE`.
-- No id configured, exactly one registered usable provider → that provider.
-- No id configured, multiple usable providers → `WEB_PROVIDER_AMBIGUOUS`.
-- No id configured, no usable provider → `WEB_PROVIDER_UNAVAILABLE`.
+- A singular configured id that is registered and `available()` → that provider.
+- A singular configured id not registered → `WEB_PROVIDER_CONFIGURED_MISSING`.
+- A singular configured id registered but unavailable → `WEB_PROVIDER_CONFIGURED_UNAVAILABLE`.
+- An ordered fallback list → first listed id that is registered and usable.
+- A fallback list whose members are all missing or unusable → `WEB_PROVIDER_UNAVAILABLE`.
+- No pin, exactly one registered usable provider → that provider.
+- No pin, multiple usable providers → `WEB_PROVIDER_AMBIGUOUS`.
+- No pin, no usable provider → `WEB_PROVIDER_UNAVAILABLE`.
 
 ```ts cordis-catalog
 /**
@@ -193,5 +195,5 @@ async search(request: WebSearchRequest, signal?: AbortSignal): Promise<WebSearch
 async fetch(request: WebFetchRequest, signal?: AbortSignal): Promise<WebFetchResult>
 ```
 
-Source: [`packages/web/web/src/index.ts:74`](../../packages/web/web/src/index.ts)
+Source: [`packages/web/web/src/index.ts:85`](../../packages/web/web/src/index.ts)
 <!-- END GENERATED cordis-surface -->

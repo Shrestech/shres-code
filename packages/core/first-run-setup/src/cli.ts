@@ -199,7 +199,7 @@ function attach(stdin: NodeJS.ReadableStream): LineSource {
  */
 export async function readSecret(io: CliIo): Promise<string> {
   const stdin = io.stdin as NodeJS.ReadStream
-  if (typeof stdin.setRawMode === 'function' && stdin.isTTY === true) {
+  if (typeof stdin.setRawMode === 'function' &&  stdin.isTTY) {
     return readHiddenLine(stdin, io.stdout)
   }
   return readLine(io.stdin)
@@ -241,7 +241,7 @@ function readHiddenLine(stdin: NodeJS.ReadStream, stdout: NodeJS.WritableStream)
     }
     const cleanup = (): void => {
       stdin.off('data', onData)
-      stdin.setRawMode(previous === true)
+      stdin.setRawMode(previous)
       if (source !== undefined) source.paused = false
     }
     stdin.on('data', onData)

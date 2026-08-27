@@ -739,6 +739,7 @@ const SDK_INSTRUCTIONS = `## Writing code for run_code
 - A FAILED tool call raises \`ToolCallError\`, whose \`toolName\` identifies the failed tool and whose message is human-readable — wrap in \`try/except\` to handle and continue.
 - Independent read-only calls MAY overlap under \`asyncio.gather\` (safe calls run concurrently; mutating calls run alone, in submission order). Sequence dependent work with \`await\`.
 - Emit the run's answer with \`print(...)\` and/or a top-level \`return <value>\`; the returned value must be lossless JSON. ONLY what you print and the returned value come back — intermediate tool results never enter the conversation, so extract just what you need.
+- When a task needs reading many files or computing over data, prefer one \`run_code\` program that loads and computes over a corpus instead of N \`read\` calls.
 
 The available tools:`
 

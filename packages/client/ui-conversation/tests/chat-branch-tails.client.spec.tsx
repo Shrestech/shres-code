@@ -304,7 +304,7 @@ describe('MessageItem arms', () => {
     )
     fireEvent.click(view.getByRole('button', { name: /^Context injection\s*AGENTS\.md, sub\/AGENTS\.md$/ }))
     const files = [...view.container.querySelectorAll('[data-context-files] li')].map(node => node.textContent)
-    expect(files).toEqual(['AGENTS.mdloaded', 'sub/AGENTS.mdRemoved'])
+    expect(files).toEqual(['AGENTS.mdloaded', 'sub/AGENTS.mdremoved'])
     // The `<system-reminder>` framing is part of what the model read, so the
     // body keeps it verbatim rather than presenting a cleaned-up excerpt.
     expect(view.container.querySelector('[data-context-text]')?.textContent)
@@ -477,7 +477,7 @@ describe('MessageItem arms', () => {
     )
     fireEvent.click(view.getByRole('button', { name: /^Context injection\s*plugin$/ }))
     expect(view.container.querySelector('[data-context-fields] dd')?.textContent)
-      .toMatch(/… truncated，of \d+ characters$/)
+      .toMatch(/… truncated, \d+ characters total$/)
   })
 
   it('an empty replacement catalog stays a catalog: it retires every earlier name', () => {
@@ -531,7 +531,7 @@ describe('MessageItem arms', () => {
     )
     fireEvent.click(view.getByRole('button', { name: /^Context injection\s*skill-catalog$/ }))
     expect(view.container.querySelectorAll('[data-context-entries] li')).toHaveLength(200)
-    expect(view.container.querySelector('[data-context-entries-truncated]')?.textContent).toBe('…plus 5  items')
+    expect(view.container.querySelector('[data-context-entries-truncated]')?.textContent).toBe('… 5 more')
   })
 
   it('a catalog keeps a content block this version does not know', () => {
@@ -692,7 +692,7 @@ describe('MessageItem arms', () => {
       />,
     )
     fireEvent.click(view.getByRole('button', { name: /^Context injection\s*subagent-report$/ }))
-    expect(view.container.querySelector('[data-context-relay-sender]')?.textContent).toBe('fromSessions child-7')
+    expect(view.container.querySelector('[data-context-relay-sender]')?.textContent).toBe('From session child-7')
     expect(view.container.querySelector('[data-context-text]')?.textContent).toBe('child report body')
   })
 
@@ -720,7 +720,7 @@ describe('MessageItem arms', () => {
     )
     fireEvent.click(view.getByRole('button', { name: /^Session recall\s*refactor loader, fix CI$/ }))
     const rows = [...view.container.querySelectorAll('[data-context-recalls] li')].map(node => node.textContent)
-    expect(rows).toEqual(['refactor loaderkeep 18  items · omitted 42  itemstruncated', 'fix CIkeep 3  items · omitted 0  items'])
+    expect(rows).toEqual(['refactor loader18 kept · 42 omittedtruncated', 'fix CI3 kept · 0 omitted'])
     expect(view.container.querySelector('[data-context-text]')?.textContent).toBe('recalled material')
   })
 
@@ -728,7 +728,7 @@ describe('MessageItem arms', () => {
     const unknownView = render(
       <MessageItem t={t} node={{ kind: 'unknown', seq: 4, type: 'surface/next', data: { x: 1 } } as never} />,
     )
-    expect(unknownView.getByText(/unknown surface event：surface\/next/)).toBeTruthy()
+    expect(unknownView.getByText(/Unknown surface event: surface\/next/)).toBeTruthy()
   })
 
   it('a compaction marker discloses its summary and never shows the framed checkpoint', () => {
@@ -795,8 +795,8 @@ describe('MessageItem arms', () => {
     expect(details?.open).toBe(false)
     expect(details?.dataset.active).toBe('true')
     expect(view.getByRole('status').textContent).toBe('Retrying model request (1/2) · 3s')
-    expect(view.getByText('Retry delay: ').parentElement?.textContent).toBe('Retry delay: 2500ms')
-    expect(view.getByText('Failure reason: ').parentElement?.textContent).toBe('Failure reason: connection reset')
+    expect(view.getByText(/Retry delay:/).parentElement?.textContent).toBe('Retry delay: 2500ms')
+    expect(view.getByText(/Failure reason:/).parentElement?.textContent).toBe('Failure reason: connection reset')
 
     act(() => { vi.advanceTimersByTime(1_100) })
     expect(view.getByRole('status').textContent).toBe('Retrying model request (1/2) · 2s')
@@ -904,7 +904,7 @@ describe('formatMessageClock', () => {
   })
 
   it('prefixes month and day across days in the same year', () => {
-    expect(formatMessageClock(new Date(2026, 0, 1, 14, 24).getTime(), t, now)).toBe('1mo1d 14:24')
+    expect(formatMessageClock(new Date(2026, 0, 1, 14, 24).getTime(), t, now)).toBe('1/1 14:24')
   })
 
   it('prefixes year, month, and day across years', () => {
@@ -942,7 +942,7 @@ describe('useCalendarDay boundary refresh', () => {
     act(() => {
       vi.advanceTimersByTime(msUntilNextLocalMidnight(dayStart) + 1)
     })
-    expect(screen.getByText('7mo29d 14:24')).toBeTruthy()
+    expect(screen.getByText('7/29 14:24')).toBeTruthy()
   })
 })
 

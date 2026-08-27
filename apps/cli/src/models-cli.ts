@@ -143,7 +143,7 @@ export function processIo(): ModelsCliIo {
     stdin: process.stdin,
     stdout: process.stdout,
     stderr: process.stderr,
-    isTTY: process.stdin.isTTY === true && process.stderr.isTTY === true,
+    isTTY:  process.stdin.isTTY &&  process.stderr.isTTY,
     exit: (code) => { process.exitCode = code },
   }
 }

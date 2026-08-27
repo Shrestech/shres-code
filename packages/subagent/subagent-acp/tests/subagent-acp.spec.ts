@@ -1,11 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@shres-code/cordis'
 import Loader from '@shres-code/cordis-plugin-loader'
 import { chmodSync, existsSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import SubagentRuntime from '@shres-code/shres-code-subagent'
+import SubagentRuntime, { SubagentDepthError } from '@shres-code/shres-code-subagent'
 import type { Agent } from '@shres-code/shres-code-agent'
 import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
 import type { SubprocessOutcome } from '@shres-code/shres-code-subprocess'
@@ -25,8 +25,12 @@ import { spawnSubprocess } from '@shres-code/shres-code-subprocess-local/src/spa
 
 const mockServer = fileURLToPath(new URL('./mock-acp-server.ts', import.meta.url))
 
-/** A parent Agent stub. The ACP backend reads exactly one thing off it: the session header's cwd (the workspace its child inherits). */
-const fakeParent = { id: 'parent', session: { header: { cwd: process.cwd() } } } as unknown as Agent
+/** A parent Agent stub. The ACP backend reads the session header's cwd; parent-side depth uses options. */
+const fakeParent = {
+  id: 'parent',
+  options: {},
+  session: { header: { cwd: process.cwd() } },
+} as unknown as Agent
 
 function request(text = 'p', signal = new AbortController().signal) {
   return { prompt: [{ type: 'text' as const, text }], parent: fakeParent, signal }
@@ -860,10 +864,25 @@ describe('shres-subagent-acp', () => {
     }
   })
 
-  it('advertises no start-time capabilities (out-of-process child)', async () => {
+  it('advertises parent-side depth and rejects toolFilter and outputSchema', async () => {
     const ctx = await setup()
     const provider = ctx.subagents.getProvider('acp')!
-    expect(provider.capabilities).toEqual({ outputSchema: false, depthLimit: false, toolFilter: false, persona: false })
+    expect(provider.capabilities).toEqual({
+      outputSchema: false,
+      depthLimit: true,
+      toolFilter: false,
+      persona: false,
+    })
+    const spawn = vi.spyOn(ctx.subprocess, 'spawn')
+    await expect(ctx.subagents.start('acp', { ...request(), maxDepth: 0 }))
+      .rejects.toBeInstanceOf(SubagentDepthError)
+    await expect(ctx.subagents.start('acp', { ...request(), toolFilter: { deny: ['bash'] } }))
+      .rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' })
+    await expect(ctx.subagents.start('acp', {
+      ...request(),
+      outputSchema: { type: 'object', properties: {} },
+    })).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' })
+    expect(spawn).not.toHaveBeenCalled()
   })
 
   it('unregisters the provider when its fiber is disposed (HMR safety)', async () => {

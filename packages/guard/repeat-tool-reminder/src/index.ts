@@ -1,8 +1,9 @@
 /**
- * Advisory per-agent repeat-call detector. It enriches post-execute decisions
- * with logged model context without vetoing or rewriting calls. Configuration
- * and chain semantics live in the package README; rationale lives in the
- * repeat-tool-reminder Agent Note.
+ * Per-agent repeat-call detector. It enriches post-execute decisions with
+ * logged model context, and — only when a deployment opts in with
+ * `vetoThreshold` — refuses the call itself past that run length.
+ * Configuration and chain semantics live in the package README; rationale
+ * lives in the repeat-tool-reminder Agent Note.
  * @module @shres-code/shres-code-repeat-tool-reminder
  */
 
@@ -12,9 +13,16 @@ import type { Agent, PreStepDecision } from '@shres-code/shres-code-agent'
 import { createUserMessage } from '@shres-code/shres-code-llm'
 import type { MessageSource } from '@shres-code/shres-code-llm'
 import type { UserMessage } from '@shres-code/shres-code-session'
-import type { PostToolDecision, ToolExecution } from '@shres-code/shres-code-tools'
+import type { PostToolDecision, ToolExecution, ToolExecutionResult } from '@shres-code/shres-code-tools'
 
 export const name = 'repeat-tool-reminder'
+
+/**
+ * The code this plugin stamps on a vetoed call's structured error, so a
+ * retry, metrics, or transcript consumer can route on the refusal instead of
+ * matching its prose.
+ */
+export const REPEAT_TOOL_VETO = 'REPEAT_TOOL_VETO'
 
 /**
  * Plugin config, validated by the same-named schemastery schema plus the
@@ -40,6 +48,14 @@ export interface Config {
    * always compares the FULL canonical string).
    */
   argumentsPreviewChars?: number
+  /**
+   * Consecutive-repeat count at which the call is REFUSED instead of merely
+   * reminded (default `0` — off, the shipped advisory-only behavior). From
+   * this run length on, every further identical call is refused with a
+   * structured {@link REPEAT_TOOL_VETO} result and the tool never runs. Fails
+   * loud at load unless it is `0` or an integer >= 2.
+   */
+  vetoThreshold?: number
 }
 
 export const Config: z<Config> = z.object({
@@ -47,6 +63,7 @@ export const Config: z<Config> = z.object({
   include: z.array(z.string()).default([]),
   exclude: z.array(z.string()).default([]),
   argumentsPreviewChars: z.number().default(500),
+  vetoThreshold: z.number().default(0),
 })
 
 /**
@@ -65,6 +82,29 @@ const GENTLE_REMINDER =
   + 'Carefully analyze the previous result before calling again: if the task is '
   + 'not complete, try a different approach or different arguments instead of '
   + 'repeating the call.'
+
+/**
+ * The structured result substituted for a vetoed call. `content` is the
+ * model-facing refusal: it names the violation, states that repeating will not
+ * help, and lists the ways out.
+ * @param toolName - the repeated tool.
+ * @param count - the run length this attempt reaches.
+ * @returns the `isError` {@link ToolExecutionResult} carrying {@link REPEAT_TOOL_VETO}.
+ */
+function vetoResult(toolName: string, count: number): ToolExecutionResult {
+  const message = `refused: ${toolName} has now been called ${count} times in a row with identical arguments`
+  return {
+    content: [{
+      type: 'text',
+      text: `Error: ${message} and is not making progress. `
+        + 'This exact call will keep being refused. Re-read the last result from '
+        + `${toolName}, then call it with different arguments, use a different tool, `
+        + 'or finish with what you already know.',
+    }],
+    isError: true,
+    error: { message, info: { name: 'RepeatToolVetoError', code: REPEAT_TOOL_VETO } },
+  }
+}
 
 /** The detailed later-threshold reminder naming the tool, the run length, and the canonical arguments. */
 function detailedReminder(toolName: string, count: number, canonicalArguments: string): string {
@@ -121,6 +161,21 @@ function previewArguments(canonical: string, cap: number): string {
 }
 
 /**
+ * Validate `vetoThreshold` per the fail-loud contract and resolve the
+ * off sentinel away.
+ * @param value - the schema-defaulted config value.
+ * @returns the run length at which calls are refused, or `undefined` when the veto is off.
+ * @throws when the value is neither `0` nor an integer >= 2.
+ */
+function resolveVetoThreshold(value: number): number | undefined {
+  if (value === 0) return undefined
+  if (!Number.isInteger(value) || value < 2) {
+    throw new Error(`repeat-tool-reminder: invalid vetoThreshold ${value} — must be 0 (off) or an integer >= 2`)
+  }
+  return value
+}
+
+/**
  * Validate `thresholds` per the fail-loud contract and return them sorted
  * ascending (the escalation rule reads `thresholds[0]` as the gentle tier, so
  * order is normalized here, once).
@@ -169,6 +224,7 @@ export function apply(ctx: Context, config: Config): void {
   if (!Number.isInteger(argumentsPreviewChars) || argumentsPreviewChars < 1) {
     throw new Error(`repeat-tool-reminder: invalid argumentsPreviewChars ${argumentsPreviewChars} — must be an integer >= 1`)
   }
+  const vetoThreshold = resolveVetoThreshold(config.vetoThreshold as number)
 
   const chains = new WeakMap<Agent, Chain>()
 
@@ -178,31 +234,58 @@ export function apply(ctx: Context, config: Config): void {
     return !excludePatterns.some(pattern => pattern.test(toolName))
   }
 
+  /** The chain identity of one tracked call, or `undefined` when the call is transparent to the chain. */
+  function chainKey(exec: ToolExecution): string | undefined {
+    // A direct `ctx.tools.execute()` caller has no model to remind and no id
+    // to key on; only agent-loop calls participate.
+    if (!exec.agent) return undefined
+    if (!tracked(exec.name)) return undefined
+    return JSON.stringify([exec.name, canonicalize(exec.arguments)])
+  }
+
+  /** The run length this attempt reaches, without advancing the chain. */
+  function projectedCount(agent: Agent, key: string): number {
+    const chain = chains.get(agent)
+    return chain !== undefined && chain.key === key ? chain.count + 1 : 1
+  }
+
   /**
    * Advance the calling agent's chain for one attempt and return the reminder
    * to deliver, if this attempt's run length hits a configured threshold.
    * Counting happens here — in post-execute — because denied calls also flow
    * through this waterfall (`ToolRuntime.execute` routes a deny through the
    * same pipeline), and a model hammering a denied call is exactly the loop
-   * worth breaking.
+   * worth breaking. A call this plugin vetoed reaches post-execute too, so a
+   * refused run keeps counting and stays refused.
    */
   function observe(exec: ToolExecution): UserMessage | undefined {
-    // A direct `ctx.tools.execute()` caller has no model to remind and no id
-    // to key on; only agent-loop calls participate.
-    if (!exec.agent) return undefined
-    if (!tracked(exec.name)) return undefined
-    const canonical = canonicalize(exec.arguments)
-    const key = JSON.stringify([exec.name, canonical])
-    const chain = chains.get(exec.agent)
-    const count = chain !== undefined && chain.key === key ? chain.count + 1 : 1
+    const key = chainKey(exec)
+    if (key === undefined || !exec.agent) return undefined
+    const count = projectedCount(exec.agent, key)
     chains.set(exec.agent, { key, count })
     if (!thresholdSet.has(count)) return undefined
     const text = count === thresholds[0]
       ? GENTLE_REMINDER
-      : detailedReminder(exec.name, count, previewArguments(canonical, argumentsPreviewChars))
+      : detailedReminder(exec.name, count, previewArguments(canonicalize(exec.arguments), argumentsPreviewChars))
     return createUserMessage({
       content: [{ type: 'text', text }],
       source: { ...PLUGIN_SOURCE, form: 'notice', summary: `${exec.name} × ${count}` },
+    })
+  }
+
+  // The opt-in escalation. It sits on `tools/execute` rather than the
+  // `tools/pre-execute` deny gate because a refusal the model can route on
+  // needs a structured error `code`, which a deny reason string cannot carry;
+  // short-circuiting the dispatch waterfall keeps the tool from running at
+  // all. The chain is READ here and still advanced in post-execute, which the
+  // refused call also reaches.
+  if (vetoThreshold !== undefined) {
+    ctx.on('tools/execute', (exec, next): Promise<ToolExecutionResult> => {
+      const key = chainKey(exec)
+      if (key === undefined || !exec.agent) return next()
+      const count = projectedCount(exec.agent, key)
+      if (count < vetoThreshold) return next()
+      return Promise.resolve(vetoResult(exec.name, count))
     })
   }
 

@@ -25,7 +25,7 @@ afterEach(async () => {
 })
 
 describe('tool-jspace real Loader composition through cordis.yml', () => {
-  it('registers the four tools when the seat is enabled and opens a card', async () => {
+  it('registers the five tools when the seat is enabled and opens a card', async () => {
     root = await mkdtemp(join(tmpdir(), 'shres-tool-jspace-loader-'))
     await writeFile(join(root, 'cordis.yml'), [
       "- name: '@shres-code/shres-code-session'",
@@ -68,6 +68,7 @@ describe('tool-jspace real Loader composition through cordis.yml', () => {
       'jspace_note',
       'jspace_checkpoint',
       'jspace_ship',
+      'jspace_charter_amend',
     ]))
 
     const session = ctx.sessions.create(SessionId('ws-tool-loader'))

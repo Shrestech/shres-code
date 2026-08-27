@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { SessionEvent } from '@shres-code/shres-code-session'
 import type { JspaceCard } from '@shres-code/shres-code-jspace'
-import { shipRefusal } from '../src/ship.ts'
+import { SHIP_REQUIRES_CORE, SHIP_REQUIRES_VERIFIED_EVIDENCE, shipRefusal } from '../src/ship.ts'
 
 const card: JspaceCard = {
   seq: 1,
@@ -12,6 +12,7 @@ const card: JspaceCard = {
   open: [],
   next: 'Write tests',
   goalOpenedSeq: 1,
+  charter: [],
 }
 
 function snapshot(
@@ -33,6 +34,7 @@ function snapshot(
       open: [],
       next: 'Write tests',
       goalOpenedSeq,
+      charter: [],
     },
   }
 }
@@ -77,6 +79,53 @@ describe('shipRefusal', () => {
       snapshot(5, checked, 4),
     ]
     expect(shipRefusal({ ...card, goalOpenedSeq: 4 }, afterNewCheckpoint)).toBeUndefined()
+  })
+
+  it('refuses an empty Core only when requireCore is set', () => {
+    const events = [
+      snapshot(1, []),
+      snapshot(2, [{ n: 1, check: 'done', by: 'unit tests covering the fold' }]),
+    ]
+    expect(shipRefusal(card, events)).toBeUndefined()
+    expect(shipRefusal(card, events, { requireCore: true })).toBe(SHIP_REQUIRES_CORE)
+    expect(shipRefusal({ ...card, core: ['quantities are integers'] }, events, {
+      requireCore: true,
+    })).toBeUndefined()
+    expect(shipRefusal({ ...card, next: '' }, events, { requireCore: true }))
+      .toBe('jspace ship requires a non-empty Next')
+  })
+
+  it('refuses when requireVerifiedEvidence is set and no verified line is in the epoch', () => {
+    const keyword = snapshot(2, [{ n: 1, check: 'done', by: 'unit tests covering the fold' }])
+    expect(shipRefusal({ ...card, goalOpenedSeq: 1 }, [snapshot(1, []), keyword], {
+      requireVerifiedEvidence: true,
+    })).toBe(SHIP_REQUIRES_VERIFIED_EVIDENCE)
+
+    const verified = snapshot(3, [{
+      n: 1,
+      check: 'done',
+      by: 'unit tests covering the fold',
+      evidence: 'call-1',
+      verified: true,
+    }])
+    expect(shipRefusal({ ...card, goalOpenedSeq: 1 }, [snapshot(1, []), verified], {
+      requireVerifiedEvidence: true,
+    })).toBeUndefined()
+
+    const staleVerified = [
+      snapshot(1, []),
+      snapshot(2, [{
+        n: 1,
+        check: 'old',
+        by: 'unit tests covering the fold',
+        evidence: 'call-1',
+        verified: true,
+      }]),
+      snapshot(3, [], 3),
+    ]
+    expect(shipRefusal({ ...card, goalOpenedSeq: 3 }, staleVerified, {
+      requireVerifiedEvidence: true,
+    })).toBe('jspace ship requires a checkpoint for the current Goal')
   })
 })
 

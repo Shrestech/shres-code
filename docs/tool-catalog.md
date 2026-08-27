@@ -31,15 +31,16 @@ This table connects model-visible tool names to the plugin package and service s
 | `@shres-code/shres-code-tool-lsp` | `lsp` | `ctx.tools`, `ctx.lsp`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | The lsp tool keeps provider selection and language-server subprocesses behind ctx.lsp, so its model-visible schema stays stable across providers. Requires a registered provider (e.g. `@shres-code/shres-code-lsp-stdio`) at runtime; without one, a query returns the structured `LSP_UNAVAILABLE` error rather than changing the schema. |
 | `@shres-code/shres-code-tool-ralph` | `ralph` | `ctx.tools`, `ctx.workflowEngine`, `ctx.subagents`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents every fresh round)` | `tool/call`, `tool/result`, `workflow and child session events during execution` | - | A fixed foreground workflow starts one fresh structured child per round; the model selects only the immutable objective and an optional round cap. |
 | `@shres-code/shres-code-tool-skill` | `skill` | `ctx.tools`, `ctx.agents`, `ctx.skills` | `tool/call`, `tool/result`, `user/message replacement catalogs via agent.inject()` | - | - |
-| `@shres-code/shres-code-tool-session-query` | `session_event_read`, `session_event_search`, `session_event_trace`, `session_search`, `session_trace` | `ctx.tools`, `ctx.systemPrompt`, `ctx.sessionQuery`, `a calling Agent for workspace authority` | `tool/call`, `tool/result` | - | The five read-only tools hide provider cursors and authorize every result from the immutable calling agent session. The package is opt-in; compositions that need enforced deadlines or bounded inline output also mount the generic timeout or spill policies. |
+| `@shres-code/shres-code-tool-session-query` | `session_event_read`, `session_event_search`, `session_event_trace`, `session_search`, `session_trace` | `ctx.tools`, `ctx.systemPrompt`, `ctx.sessionQuery`, `a calling Agent for workspace authority` | `tool/call`, `tool/result` | - | The five read-only tools hide provider cursors and authorize every result from the immutable calling agent session. The ACP and headless example compositions mount the consumer by default; the shipped TUI and Web bundles keep the query index but leave this consumer unmounted. Compositions that need enforced deadlines or bounded inline output also mount the generic timeout or spill policies. |
 | `@shres-code/shres-code-tool-subagent` | `subagent` | `ctx.tools`, `ctx.subagents`, `ctx.systemPrompt` | `tool/call`, `tool/result`, `child session events through the chosen provider` | `subagent`, `subagent_fork` | The registered tool name is the load-time `toolName` config (default `subagent`); the schema above is that default. The shipped compositions load this package once per subagent backend, so the model additionally sees `subagent_fork` bound to the fork backend. Each instance's description, `run_in_background` parameter, and system-prompt policy follow its own `backgroundMode` and `enableRunInBackground`, so the two shipped schemas are not identical: `subagent` is `continuable` and defaults omitted calls to background with automatic settlement delivery, while `subagent_fork` stays `one-shot` and defaults them to foreground — see `packages/bundle/base/cordis.patch.yml` and `examples/acp-agent/cordis.yml`. |
 | `@shres-code/shres-code-tool-subagent-control` | `interrupt_agent`, `list_agents`, `send_message` | `ctx.tools`, `ctx.subagents`, `ctx.agents and ctx.sessionProjections (list_agents only)` | `tool/call`, `tool/result`, `child session events through ctx.subagents` | - | The globally named control tools over continuable background subagents: provider-bound `tool-subagent` instances register distinct delegation tools, while this package registers `send_message` and `interrupt_agent` once, plus `list_agents` from its separately loaded `/list-agents` plugin (whose catalog rows use the sessionProjections and live Agent registries). |
 | `@shres-code/shres-code-tool-subagent-report` | `report` | `ctx.subagents`, `ctx.systemPrompt`, `a live continuable in-process child Agent` | `tool/call`, `tool/result`, `a user-role message in the direct parent session` | - | Registered per continuable in-process child rather than globally, so this schema is visible only inside such a child and survives its global `toolFilter`. The same contribution installs the child-scoped `tool:report` prompt section, which this catalog does not render. The parent-facing `send_message` tool is installed independently. |
 | `@shres-code/shres-code-tool-jobs` | `job_kill`, `job_list`, `job_output` | `ctx.tools`, `ctx.jobs`, `ctx.systemPrompt` | `tool/call`, `tool/result`, `user/message via agent.inject() for background completion notices` | - | The kind-agnostic background-job controller: background bash commands, PTY sends, and subagents are read, listed, and killed through the same three tools. Loading the plugin attaches the controller that arms producers' `ctx.jobs.start()`. |
 | `@shres-code/shres-code-tool-todo` | `todo_write` | `ctx.tools`, `owning Agent session` | `tool/call`, `todo/write`, `tool/result` | - | todo_write is session-owned state; UIs render the latest todo/write event as a checklist. `allowParallelInProgress` is required with no default, so the catalog states its choice: `true`, whose description invites several `in_progress` items. A deployment choosing `false` receives the same tool with a description asking for exactly one active task. |
-| `@shres-code/shres-code-tool-jspace` | `jspace_checkpoint`, `jspace_note`, `jspace_open`, `jspace_ship` | `ctx.tools`, `ctx.jspace`, `owning Agent session` | `tool/call`, `jspace/card or jspace/closed`, `tool/result` | - | Schemas are registered only while Settings `enabled` is true. `jspace_ship` is a register check, not a file writer. Checkpoint `evidence` must name a completed, non-error tool-call id and does not prove coverage. |
+| `@shres-code/shres-code-tool-jspace` | `jspace_charter_amend`, `jspace_checkpoint`, `jspace_note`, `jspace_open`, `jspace_ship` | `ctx.tools`, `ctx.jspace`, `owning Agent session` | `tool/call`, `jspace/card or jspace/closed`, `tool/result` | - | Schemas are registered only while Settings `enabled` is true. `jspace_ship` is a register check, not a file writer. Checkpoint `evidence` must name a completed, non-error tool-call id; citing a configured verifier tool is evidence-grade and does not prove coverage. |
 | `@shres-code/shres-code-tool-workflow` | `workflow` | `ctx.tools`, `ctx.workflowEngine`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents the script children)` | `tool/call`, `tool/result` | - | - |
 | `@shres-code/shres-code-tool-web` | `web_fetch`, `web_search` | `ctx.tools`, `ctx.web`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | web_search and web_fetch keep provider selection behind ctx.web so model-visible schemas stay stable across backend swaps. |
+| `@shres-code/shres-code-tool-tracker` | `experiment_log_metrics`, `experiment_log_run`, `experiment_query` | `ctx.tools`, `ctx.tracker` | `tool/call`, `experiment run and metric records through ctx.tracker`, `tool/result` | - | experiment_log_run, experiment_log_metrics, and experiment_query fold experiment records through the tracker service seam. |
 
 <a id="shres-codeshres-code-tool-ask-user"></a>
 
@@ -982,7 +983,7 @@ Source: [`packages/goal/tool-goal/src/index.ts`](../packages/goal/tool-goal/src/
 
 ### `update_goal`
 
-Update the exact current goal revision. edit, pause, and resume require a direct top-level human request. During an automatic continuation of the current goal, complete and blocked are also allowed. blocked is rejected before the configured minimum round count; the model remains responsible for judging that the same condition persisted across those rounds and must explain it in blocked_reason.
+Update the exact current goal revision. edit, pause, and resume require a direct top-level human request. During an automatic continuation of the current goal, complete and blocked are also allowed; complete is additionally allowed on a disarmed goal from any root-agent turn, so a goal whose continuation will not run still gets closed. blocked is rejected before the configured minimum round count; the model remains responsible for judging that the same condition persisted across those rounds and must explain it in blocked_reason.
 
 ```json
 {
@@ -1288,7 +1289,7 @@ Search prior events in one authorized session; the current session excludes the 
     },
     "seq_from": {
       "type": "integer",
-      "description": "Inclusive event sequence lower bound."
+      "description": "Inclusive event sequence lower bound. J-Space's goalOpenedSeq is the natural lower bound for current-goal-epoch scoping."
     },
     "seq_to": {
       "type": "integer",
@@ -1406,7 +1407,7 @@ Search prior sessions in the caller workspace and return the strongest matching 
     },
     "event_seq_from": {
       "type": "integer",
-      "description": "Inclusive event sequence lower bound."
+      "description": "Inclusive event sequence lower bound. J-Space's goalOpenedSeq is the natural lower bound for current-goal-epoch scoping."
     },
     "event_seq_to": {
       "type": "integer",
@@ -1466,7 +1467,7 @@ Read the authorized session lineage around one session, including complete visib
 
 Source: [`packages/session-query/tool-session-query/src/index.ts`](../packages/session-query/tool-session-query/src/index.ts)
 
-The five read-only tools hide provider cursors and authorize every result from the immutable calling agent session. The package is opt-in; compositions that need enforced deadlines or bounded inline output also mount the generic timeout or spill policies.
+The five read-only tools hide provider cursors and authorize every result from the immutable calling agent session. The ACP and headless example compositions mount the consumer by default; the shipped TUI and Web bundles keep the query index but leave this consumer unmounted. Compositions that need enforced deadlines or bounded inline output also mount the generic timeout or spill policies.
 
 <a id="shres-codeshres-code-tool-subagent"></a>
 
@@ -1733,9 +1734,318 @@ todo_write is session-owned state; UIs render the latest todo/write event as a c
 
 ## `@shres-code/shres-code-tool-jspace`
 
+### `jspace_charter_amend`
+
+Replace charter entries on the open card. Drop by id, replace an id with a new check or prose entry, or add entries. The harness re-runs floor and discrimination on added and replaced checks. There is no skip-checks argument.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "drop": {
+      "type": "array",
+      "description": "Entry ids to remove.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "add": {
+      "type": "array",
+      "description": "Entries to append after drops and replaces.",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "check"
+              },
+              "id": {
+                "type": "string",
+                "description": "Kebab-case id. Omit to receive a harness-assigned id."
+              },
+              "constraint": {
+                "type": "string",
+                "description": "The rule this command enforces, in the task's words."
+              },
+              "command": {
+                "type": "string",
+                "description": "Foreground bash. Exit 0 = pass. Must read the paths in `reads`."
+              },
+              "reads": {
+                "type": "array",
+                "description": "Workspace-relative files or globs the command reads. At least one.",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "failProbe": {
+                "type": "object",
+                "description": "A content mutation that must make `command` fail. Required when this deployment demands demonstrated discrimination.",
+                "additionalProperties": false,
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "description": "Workspace-relative path; must be in `reads` or match a `reads` glob."
+                  },
+                  "mutation": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "insert"
+                          },
+                          "content": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "content"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "prepend"
+                          },
+                          "content": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "content"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "replace"
+                          },
+                          "from": {
+                            "type": "string"
+                          },
+                          "to": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "from",
+                          "to"
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "path",
+                  "mutation"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "constraint",
+              "command",
+              "reads"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "prose"
+              },
+              "id": {
+                "type": "string"
+              },
+              "constraint": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "constraint"
+            ]
+          }
+        ]
+      }
+    },
+    "replace": {
+      "type": "array",
+      "description": "Replace an existing id with a new check or prose entry.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Existing entry id to replace."
+          },
+          "entry": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "check"
+                  },
+                  "id": {
+                    "type": "string",
+                    "description": "Kebab-case id. Omit to receive a harness-assigned id."
+                  },
+                  "constraint": {
+                    "type": "string",
+                    "description": "The rule this command enforces, in the task's words."
+                  },
+                  "command": {
+                    "type": "string",
+                    "description": "Foreground bash. Exit 0 = pass. Must read the paths in `reads`."
+                  },
+                  "reads": {
+                    "type": "array",
+                    "description": "Workspace-relative files or globs the command reads. At least one.",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "failProbe": {
+                    "type": "object",
+                    "description": "A content mutation that must make `command` fail. Required when this deployment demands demonstrated discrimination.",
+                    "additionalProperties": false,
+                    "properties": {
+                      "path": {
+                        "type": "string",
+                        "description": "Workspace-relative path; must be in `reads` or match a `reads` glob."
+                      },
+                      "mutation": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "const": "insert"
+                              },
+                              "content": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "content"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "const": "prepend"
+                              },
+                              "content": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "content"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "const": "replace"
+                              },
+                              "from": {
+                                "type": "string"
+                              },
+                              "to": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "from",
+                              "to"
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "path",
+                      "mutation"
+                    ]
+                  }
+                },
+                "required": [
+                  "kind",
+                  "constraint",
+                  "command",
+                  "reads"
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "prose"
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "constraint": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "constraint"
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "entry"
+        ]
+      }
+    }
+  }
+}
+```
+
+Source: [`packages/jspace/tool-jspace/src/index.ts`](../packages/jspace/tool-jspace/src/index.ts)
+
 ### `jspace_checkpoint`
 
-Record a Checked line on the open card. `by` must name a verifier and what it covered. Optional `evidence` is a prior tool-call id that must have completed without error in this session; naming it does not prove coverage. Rejects if no card is open.
+Record a Checked line on the open card. When a charter is registered, the harness runs every kind=check first and refuses on the first failure. `check` and `by` are optional then (the harness synthesizes them); if you send them they are appended after a passing charter run. Prefer citing `evidence` over prose. Rejects if no card is open.
 
 ```json
 {
@@ -1743,21 +2053,17 @@ Record a Checked line on the open card. `by` must name a verifier and what it co
   "properties": {
     "check": {
       "type": "string",
-      "description": "What was claimed checked."
+      "description": "What was claimed checked. Optional when a charter is registered."
     },
     "by": {
       "type": "string",
-      "description": "Verifier and coverage claim. Must name both."
+      "description": "Verifier and coverage claim. Optional when a charter is registered."
     },
     "evidence": {
       "type": "string",
       "description": "Completed non-error tool-call id. Naming it does not prove coverage."
     }
-  },
-  "required": [
-    "check",
-    "by"
-  ]
+  }
 }
 ```
 
@@ -1765,7 +2071,7 @@ Source: [`packages/jspace/tool-jspace/src/index.ts`](../packages/jspace/tool-jsp
 
 ### `jspace_note`
 
-Update the open J-Space card. Changing Core requires both departing (the item leaving) and core (the item entering). Rejects if no card is open.
+Update the open J-Space card. Goal changes are rejected; use jspace_open to start a new Goal epoch. Rejects a no-op that leaves the card unchanged, and rejects if no card is open. Charter changes use jspace_charter_amend, not this tool.
 
 ```json
 {
@@ -1781,7 +2087,7 @@ Update the open J-Space card. Changing Core requires both departing (the item le
     },
     "core": {
       "type": "string",
-      "description": "Core item entering; required when `departing` is set."
+      "description": "Core item entering — a live working-memory item. Required when `departing` is set."
     },
     "open": {
       "type": "array",
@@ -1816,7 +2122,7 @@ Source: [`packages/jspace/tool-jspace/src/index.ts`](../packages/jspace/tool-jsp
 
 ### `jspace_open`
 
-Open a J-Space card for this session, or replace Goal and Next when a card is already open. Use it for multi-stage or multi-file work. Requires a Goal (what done means) and Next (the single next action). Optional Core holds at most two live items and applies only on the first open.
+Open a J-Space card for multi-stage or multi-file work, or replace Goal and Next on an open card. Put once-stated constraints on `charter` (prefer kind=check) so the harness re-runs them at every checkpoint and at ship. First charter registration is the first `jspace_open` that carries `charter` while the card charter is empty, including after loop auto-open. A later `jspace_open` that carries `charter` onto a non-empty charter is refused; use `jspace_charter_amend`. `core` still holds at most two live working-memory items. A changed Goal starts a new epoch: Core and Checked are cleared and ship needs a fresh checkpoint; the charter and open questions carry over.
 
 ```json
 {
@@ -1832,9 +2138,166 @@ Open a J-Space card for this session, or replace Goal and Next when a card is al
     },
     "core": {
       "type": "array",
-      "description": "Optional live items, at most two.",
+      "description": "At most two live working-memory items, applied only on the first open.",
       "items": {
         "type": "string"
+      }
+    },
+    "charter": {
+      "type": "array",
+      "description": "Standing constraints this work must honor. Prefer kind=check (a bash command the harness will run at every checkpoint and at ship). Each check names the constraint text it enforces. kind=accept-proposal copies ids from the harness proposal in this turn. Registers on first open, or on an open card whose charter is still empty.",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "check"
+              },
+              "id": {
+                "type": "string",
+                "description": "Kebab-case id. Omit to receive a harness-assigned id."
+              },
+              "constraint": {
+                "type": "string",
+                "description": "The rule this command enforces, in the task's words."
+              },
+              "command": {
+                "type": "string",
+                "description": "Foreground bash. Exit 0 = pass. Must read the paths in `reads`."
+              },
+              "reads": {
+                "type": "array",
+                "description": "Workspace-relative files or globs the command reads. At least one.",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "failProbe": {
+                "type": "object",
+                "description": "A content mutation that must make `command` fail. Required when this deployment demands demonstrated discrimination.",
+                "additionalProperties": false,
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "description": "Workspace-relative path; must be in `reads` or match a `reads` glob."
+                  },
+                  "mutation": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "insert"
+                          },
+                          "content": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "content"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "prepend"
+                          },
+                          "content": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "content"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "replace"
+                          },
+                          "from": {
+                            "type": "string"
+                          },
+                          "to": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "from",
+                          "to"
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "path",
+                  "mutation"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "constraint",
+              "command",
+              "reads"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "prose"
+              },
+              "id": {
+                "type": "string"
+              },
+              "constraint": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "constraint"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "accept-proposal"
+              },
+              "ids": {
+                "type": "array",
+                "description": "Proposal ids to accept. Omit to accept every proposed entry.",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          }
+        ]
       }
     }
   },
@@ -1849,7 +2312,7 @@ Source: [`packages/jspace/tool-jspace/src/index.ts`](../packages/jspace/tool-jsp
 
 ### `jspace_ship`
 
-Check that the open card is ready to ship: Goal and Next are set, and a checkpoint exists for the current Goal. Does not write files and does not close the card. Optional `path` is recorded in the result only.
+Check that the open card is ready to ship: Goal and Next are set, and a checkpoint exists for the current Goal. Re-runs every charter check against the current workspace. Writes no files and does not close the card.
 
 ```json
 {
@@ -1865,7 +2328,7 @@ Check that the open card is ready to ship: Goal and Next are set, and a checkpoi
 
 Source: [`packages/jspace/tool-jspace/src/index.ts`](../packages/jspace/tool-jspace/src/index.ts)
 
-Schemas are registered only while Settings `enabled` is true. `jspace_ship` is a register check, not a file writer. Checkpoint `evidence` must name a completed, non-error tool-call id and does not prove coverage.
+Schemas are registered only while Settings `enabled` is true. `jspace_ship` is a register check, not a file writer. Checkpoint `evidence` must name a completed, non-error tool-call id; citing a configured verifier tool is evidence-grade and does not prove coverage.
 
 <a id="shres-codeshres-code-tool-workflow"></a>
 
@@ -2009,3 +2472,157 @@ Search the web for current information. Returns an optional summary answer and a
 Source: [`packages/web/tool-web/src/index.ts`](../packages/web/tool-web/src/index.ts)
 
 web_search and web_fetch keep provider selection behind ctx.web so model-visible schemas stay stable across backend swaps.
+
+<a id="shres-codeshres-code-tool-tracker"></a>
+
+## `@shres-code/shres-code-tool-tracker`
+
+### `experiment_log_metrics`
+
+Append a batched list of metric points to one experiment run.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "runId": {
+      "type": "string",
+      "description": "The run id returned by experiment_log_run."
+    },
+    "metrics": {
+      "type": "array",
+      "description": "Metric points to append.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Metric name."
+          },
+          "value": {
+            "type": "number",
+            "description": "Measured value."
+          },
+          "step": {
+            "type": "integer",
+            "description": "Optional step or epoch the point was measured at."
+          }
+        },
+        "required": [
+          "name",
+          "value"
+        ]
+      }
+    }
+  },
+  "required": [
+    "runId",
+    "metrics"
+  ]
+}
+```
+
+Source: [`packages/tracker/tool-tracker/src/index.ts`](../packages/tracker/tool-tracker/src/index.ts)
+
+### `experiment_log_run`
+
+Log one experiment run to the tracker with its required decision_rule, data_version, and git_sha, returning its run id (or why the post was held locally).
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "experiment": {
+      "type": "string",
+      "description": "Experiment or study this run belongs to."
+    },
+    "hypothesis": {
+      "type": "string",
+      "description": "The hypothesis under test."
+    },
+    "decisionRule": {
+      "type": "string",
+      "description": "The decision rule encoded in the API itself — a threshold change is a new experiment."
+    },
+    "dataVersion": {
+      "type": "string",
+      "description": "Data version the run used."
+    },
+    "gitSha": {
+      "type": "string",
+      "description": "Git commit the run reproduced."
+    },
+    "metrics": {
+      "type": "array",
+      "description": "Metrics recorded with the run.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Metric name."
+          },
+          "value": {
+            "type": "number",
+            "description": "Measured value."
+          },
+          "step": {
+            "type": "integer",
+            "description": "Optional step or epoch the point was measured at."
+          }
+        },
+        "required": [
+          "name",
+          "value"
+        ]
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "description": "Artifact modelstore:// URIs the run produced.",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "experiment",
+    "hypothesis",
+    "decisionRule",
+    "dataVersion",
+    "gitSha"
+  ]
+}
+```
+
+Source: [`packages/tracker/tool-tracker/src/index.ts`](../packages/tracker/tool-tracker/src/index.ts)
+
+### `experiment_query`
+
+Query experiment runs by experiment, git sha, and recency, returning run ids and their land/spool status.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "experiment": {
+      "type": "string",
+      "description": "Filter to one experiment."
+    },
+    "gitSha": {
+      "type": "string",
+      "description": "Filter to one git commit."
+    },
+    "since": {
+      "type": "string",
+      "description": "ISO-8601 timestamp; return runs on or after it."
+    }
+  }
+}
+```
+
+Source: [`packages/tracker/tool-tracker/src/index.ts`](../packages/tracker/tool-tracker/src/index.ts)
+
+experiment_log_run, experiment_log_metrics, and experiment_query fold experiment records through the tracker service seam.

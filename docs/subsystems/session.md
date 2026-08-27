@@ -425,13 +425,47 @@ declare class Session {
   static fromRestore(id: SessionId, seed: readonly SessionEvent[], header: SessionHeader): Session;
   /**
    * An immutable snapshot of the append-only event log. The snapshot is reused
-   * until the next append; a previously returned array does not grow later.
-   * Events and their nested data are deep-frozen at acceptance, so neither a
-   * cast nor ordinary JavaScript can rewrite durable history.
+   * until the next append when every event is resident; a previously returned
+   * array does not grow later. Events and their nested data are deep-frozen at
+   * acceptance, so neither a cast nor ordinary JavaScript can rewrite durable
+   * history. After `inMemoryLogWindow` drops flushed off-surface events, this
+   * getter re-reads the missing seqs from the attached archive and does not
+   * cache that reconstructed snapshot on the session.
    */
   get events(): readonly SessionEvent[];
   /** The next event's sequence number — always the log length (the `seq = log.length` contiguity contract). */
   get seq(): number;
+  /**
+   * Seq numbers currently held in RAM, in order. Off-surface flushed events
+   * that have been released are absent until {@link events} re-reads them.
+   * @returns a fresh array of resident seqs.
+   */
+  residentSeqs(): number[];
+  /**
+   * Attach the durable reader and the RAM window used after a flush. A window
+   * of `0` keeps only current surface nodes plus unflushed events; a positive
+   * value also keeps that many trailing seqs. Persistence attaches this when
+   * `inMemoryLogWindow` is configured; without it the session never drops.
+   * @param archive - sync reader for dropped seqs.
+   * @param window - non-negative trailing-seq count besides the live surface.
+   * @throws when `window` is not a non-negative safe integer.
+   */
+  attachMemoryArchive(archive: SessionEventArchive, window: number): void;
+  /**
+   * Record that every event through `seq` inclusive is durable. Only those
+   * seqs may later leave RAM.
+   * @param seq - inclusive last durable seq, or `-1` when the log is empty.
+   * @throws when `seq` is not an integer in `[-1, this.seq)`.
+   */
+  markDurableThrough(seq: number): void;
+  /**
+   * Drop flushed events that are not on the model surface and not inside the
+   * configured trailing window. No-op when no window is attached. Catches
+   * incremental header and context folds up first so a later fold cannot miss
+   * a dropped `request/header` or `request/context`.
+   * @throws when a window is attached but no archive can re-read dropped seqs.
+   */
+  releaseFlushedOutsideSurface(): void;
   /**
    * Append one typed event to the log and synchronously notify observers via
    * the store-owned, module-private publication hooks. The hot path never blocks
@@ -442,14 +476,12 @@ declare class Session {
    *
    * @param type - The event type (key of {@link SessionEventMap}).
    * @param data - The event payload; must be JSON-serializable.
-   * @param opts - Surface metadata: `surfaceOp` controls how the event enters
-   *   the ordered surface; `sourceEventSeqs` lists the seq numbers of earlier
-   *   events this one derives from. REQUIRED for
-   *   {@link SurfaceEventType} events (every message-producing event must
-   *   declare how it joins the surface, the sole source of derived model
-   *   history) and
-   *   rejected by the compiler for non-surface types like `turn/start` or
-   *   `assistant/chunk`.
+   * @param opts - For {@link SurfaceEventType}, required {@link SurfaceIntent}
+   *   (`surfaceOp` plus optional `sourceEventSeqs`). For every other type, an
+   *   optional {@link LogEventIntent}: pass `{ ignorable: true }` so a reader
+   *   that does not know `type` may skip the event. The compiler rejects a
+   *   surface intent on a log-only type and rejects `ignorable` on a surface
+   *   type.
    * @returns the logged event — its assigned `seq`/`time` plus the SNAPSHOT of
    *   `data` that entered the log, so reading `event.data` back sees the logged
    *   value, never the caller's still-mutable input.
@@ -470,7 +502,7 @@ declare class Session {
   append<T extends SessionEventType>(
     type: T,
     data: SessionEventMap[T],
-    ...opts: T extends SurfaceEventType ? [opts: SurfaceIntent] : []
+    ...opts: T extends SurfaceEventType ? [opts: SurfaceIntent] : [opts?: LogEventIntent]
   ): SessionEvent<T>;
   /**
    * The {@link EpochHeader} in force after the log's last header event — the
@@ -744,7 +776,7 @@ fork(source: SessionForkSource, boundary?: number, childSessionId?: SessionId): 
 
 Types: [CreateSessionOptions](persistence.md) · [PrepareSessionOptions](persistence.md) · [SessionId](core.md)
 
-Source: [`packages/core/session/src/index.ts:792`](../../packages/core/session/src/index.ts)
+Source: [`packages/core/session/src/index.ts:936`](../../packages/core/session/src/index.ts)
 
 <a id="session-events"></a>
 

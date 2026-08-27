@@ -20,8 +20,10 @@ import {
   matchesCoverageTerms,
 } from './fold.ts'
 import type { JspaceFold } from './fold.ts'
+import { decodeJspaceCharter } from './charter.ts'
 import type {
   JspaceCard,
+  JspaceCharterEntry,
   JspaceCheckedLine,
   JspaceOpenLine,
   JspaceProjection,
@@ -31,17 +33,31 @@ import type {
 
 export type * from './types.ts'
 export {
+  CharterEntryId,
+  decodeJspaceCharter,
+  decodeJspaceCharterEntry,
+  formatCharterEntrySummary,
+  nextCharterEntryId,
+  assertNever,
+} from './charter.ts'
+export { extractCharterProposal } from './charter-seed.ts'
+export type { CharterProposalExtract } from './charter-seed.ts'
+export {
   decodeJspaceCard,
   decodeJspaceClosed,
   foldJspace,
   formatJspaceCard,
+  formatJspaceCheckedElision,
+  formatJspaceOpenElision,
+  DEFAULT_CHECKED_REPRINT_LIMIT,
+  DEFAULT_OPEN_REPRINT_LIMIT,
   DEFAULT_COVERAGE_TERMS,
   matchesCoverageTerms,
   JSPACE_ALWAYS_OPEN_GOAL,
   JSPACE_ALWAYS_OPEN_NEXT,
   JSPACE_AVAILABLE_LINE,
 } from './fold.ts'
-export type { JspaceFold } from './fold.ts'
+export type { JspaceCardReprint, JspaceFold } from './fold.ts'
 
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'jspace'
@@ -59,6 +75,21 @@ export interface Config {
   requireCoverage?: boolean
   /** Extra coverage terms, escaped as literals. */
   coverageTerms?: string[]
+  /**
+   * Tool names whose completed non-error calls count as verifier citations.
+   * Empty (the default) leaves evidence-grade classification dormant.
+   */
+  verifierTools?: string[]
+  /**
+   * When true, `jspace_ship` refuses unless the current Goal epoch has an
+   * evidence-grade checkpoint. Default false.
+   */
+  requireVerifiedEvidence?: boolean
+  /**
+   * Completed model steps a session must reach before Consumers engage. Default 0
+   * engages from the first request. An open card engages at any step count.
+   */
+  engageAfterSteps?: number
 }
 
 export const Config: z<Config> = z.object({
@@ -66,6 +97,9 @@ export const Config: z<Config> = z.object({
   mode: z.union(['available', 'always-open'] as const).default('available'),
   requireCoverage: z.boolean().default(true),
   coverageTerms: z.array(z.string()).default([]),
+  verifierTools: z.array(z.string()).default([]),
+  requireVerifiedEvidence: z.boolean().default(false),
+  engageAfterSteps: z.number().step(1).min(0).default(0),
 })
 
 declare module '@shres-code/cordis' {
@@ -82,6 +116,8 @@ export interface OpenJspaceInput {
   readonly next: string
   /** Optional live items, at most two. */
   readonly core?: readonly string[]
+  /** Optional charter, applied only on the first open. */
+  readonly charter?: readonly JspaceCharterEntry[]
 }
 
 /** Patch an open card. */
@@ -135,6 +171,7 @@ const jspaceProjectionSchema: ZodType<JspaceProjection> = zod.object({
       check: zod.string().min(1),
       by: zod.string().min(1),
       evidence: zod.string().min(1).optional(),
+      verified: zod.literal(true).optional(),
     })),
     open: zod.array(zod.object({
       question: zod.string().min(1),
@@ -142,13 +179,51 @@ const jspaceProjectionSchema: ZodType<JspaceProjection> = zod.object({
     })),
     next: zod.string().min(1),
     goalOpenedSeq: zod.number().int().nonnegative(),
+    charter: zod.array(zod.object({
+      kind: zod.enum(['check', 'prose']),
+      id: zod.string().min(1),
+      constraint: zod.string().min(1),
+      command: zod.string().min(1).optional(),
+      reads: zod.array(zod.string()).optional(),
+      discrimination: zod.enum(['demonstrated', 'unverified']).optional(),
+      unverifiedReason: zod.enum([
+        'discrimination-off',
+        'policy-denied',
+        'probe-timeout',
+        'probe-infeasible',
+      ]).optional(),
+      failProbe: zod.object({
+        path: zod.string().min(1),
+        mutation: zod.object({
+          kind: zod.enum(['insert', 'prepend', 'replace']),
+          content: zod.string().optional(),
+          from: zod.string().optional(),
+          to: zod.string().optional(),
+        }),
+      }).optional(),
+    })).default([]),
   }).nullable(),
   closed: zod.boolean(),
   fault: zod.string().optional(),
 }) as ZodType<JspaceProjection>
 
 /**
- * Trim and reject a blank line.
+ * Whether trimmed line text is a JSON array packed into one slot.
+ * Objects and strings that happen to parse as JSON are ordinary prose.
+ * @param trimmed - already-trimmed line.
+ * @returns true when `JSON.parse` yields an array.
+ */
+function isPackedJsonArray(trimmed: string): boolean {
+  try {
+    return Array.isArray(JSON.parse(trimmed))
+  } catch {
+    // JSON.parse rejects non-JSON text; that text is a normal card line.
+    return false
+  }
+}
+
+/**
+ * Trim and reject a blank, multi-line, labeled, or JSON-array-packed line.
  * @param value - raw string.
  * @param field - field name.
  * @returns trimmed value.
@@ -161,10 +236,56 @@ function line(value: string, field: string): string {
   if (trimmed.includes('\n') || trimmed.includes('\r')) {
     throw new JspaceError(`jspace ${field} must be a single line`, 'JSPACE_EMPTY')
   }
-  if (/^(Goal|Core|Checked|Open|Next|Pass):/iu.test(trimmed)) {
+  if (/^(Goal|Core|Checked|Open|Next|Pass|Charter):/iu.test(trimmed)) {
     throw new JspaceError(`jspace ${field} cannot start with a card label`, 'JSPACE_EMPTY')
   }
+  if (isPackedJsonArray(trimmed)) {
+    throw new JspaceError(
+      'jspace line must be one item per slot; Core holds at most 2 live items',
+      'JSPACE_LINE_PACKED',
+    )
+  }
   return trimmed
+}
+
+/**
+ * Completed model steps in one session log. `step/end` lands once per model
+ * request/response the loop closed, so it counts steps the model has already
+ * lived through; the in-flight step is not yet counted.
+ * @param events - session log.
+ * @returns the number of closed steps.
+ */
+function countCompletedSteps(events: readonly SessionEvent[]): number {
+  let count = 0
+  for (const event of events) {
+    if (event.type === 'step/end') count += 1
+  }
+  return count
+}
+
+/**
+ * Element-wise identity for Core strings.
+ * @param left - current Core.
+ * @param right - proposed Core.
+ * @returns true when both lists match in order.
+ */
+function sameCore(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((item, index) => item === right[index])
+}
+
+/**
+ * Element-wise identity for Open lines.
+ * @param left - current Open.
+ * @param right - proposed Open.
+ * @returns true when questions and optional settles match in order.
+ */
+function sameOpen(left: readonly JspaceOpenLine[], right: readonly JspaceOpenLine[]): boolean {
+  return left.length === right.length && left.every((item, index) => {
+    const other = right[index]
+    return other !== undefined
+      && item.question === other.question
+      && item.settles === other.settles
+  })
 }
 
 /**
@@ -219,6 +340,35 @@ export default class JspaceService extends Service {
    */
   get config(): Config {
     return this.override === undefined ? this.entry : this.override()
+  }
+
+  /**
+   * Completed model steps a session must close before Consumers engage. The one
+   * home of the threshold: {@link JspaceService.engaged} and the tool
+   * Consumer's refusal both read it.
+   * @returns the configured threshold; `0` engages from the first request.
+   */
+  get engageAfterSteps(): number {
+    return this.config.engageAfterSteps ?? 0
+  }
+
+  /**
+   * Whether the prompt and tool Consumers belong on this session's next
+   * request. An active seat engages when a card is already open — an open card
+   * must never lose its driver or its tools — or when the session has closed
+   * at least {@link JspaceService.engageAfterSteps} model steps. A caller with
+   * no session (a scope-only assembly) carries no horizon, so a non-zero
+   * threshold leaves it unengaged.
+   * @param session - session whose log decides engagement, when one exists.
+   * @returns true when Consumers mount for this request.
+   */
+  engaged(session?: Session): boolean {
+    if (!this.current.active) return false
+    const after = this.engageAfterSteps
+    if (after === 0) return true
+    if (session === undefined) return false
+    if (this.card(session) !== null) return true
+    return countCompletedSteps(session.events) >= after
   }
 
   /**
@@ -290,12 +440,43 @@ export default class JspaceService extends Service {
       open: [],
       next: line(input.next, 'next'),
       goalOpenedSeq: session.seq,
+      charter: [...(input.charter ?? [])],
     }
     return this.writeCard(session, card)
   }
 
   /**
-   * Patch an open card.
+   * Charter list on the current native card, or empty when none is open.
+   * @param session - owning session.
+   * @returns the folded charter.
+   */
+  charter(session: Session): readonly JspaceCharterEntry[] {
+    return this.card(session)?.charter ?? []
+  }
+
+  /**
+   * Replace the charter list on an open card. The tool Consumer runs floor and
+   * discrimination before calling this.
+   * @param session - owning session.
+   * @param next - replacement list.
+   * @returns the recorded card.
+   */
+  amendCharter(session: Session, next: readonly JspaceCharterEntry[]): JspaceCard {
+    this.requireActive()
+    const current = this.requireCard(session)
+    const charter = decodeJspaceCharter(next)
+    return this.writeCard(session, {
+      ...current,
+      seq: this.nextSeq(session),
+      sessionId: session.id,
+      charter,
+    })
+  }
+
+  /**
+   * Patch an open card. Rejects a Goal identity change (`JSPACE_NOTE_GOAL_CHANGE`);
+   * Goal epochs open only through `openGoal`. Rejects a patch whose Goal, Next,
+   * Core, and Open match the current card (`JSPACE_NOTE_NOOP`).
    * @param session - owning session.
    * @param input - fields to replace.
    * @returns the recorded card.
@@ -307,6 +488,7 @@ export default class JspaceService extends Service {
     if (input.core !== undefined || input.departing !== undefined) {
       const incoming = input.core === undefined ? undefined : line(input.core, 'core')
       if (input.departing === undefined) {
+        /* v8 ignore next -- unreachable: entering this branch requires core, which defines incoming */
         if (incoming === undefined) {
           throw new JspaceError(
             'jspace core swap requires departing and incoming lines',
@@ -339,6 +521,12 @@ export default class JspaceService extends Service {
       }
     }
     const goal = input.goal === undefined ? current.goal : line(input.goal, 'goal')
+    if (input.goal !== undefined && goal !== current.goal) {
+      throw new JspaceError(
+        'note cannot change the Goal; call jspace_open to open a new Goal epoch (resets Core and Checked).',
+        'JSPACE_NOTE_GOAL_CHANGE',
+      )
+    }
     const next = input.next === undefined ? current.next : line(input.next, 'next')
     const open = input.open === undefined
       ? current.open
@@ -346,7 +534,17 @@ export default class JspaceService extends Service {
         question: line(item.question, `open[${String(i)}].question`),
         ...item.settles === undefined ? {} : { settles: line(item.settles, `open[${String(i)}].settles`) },
       }))
-    const eventSeq = session.seq
+    if (
+      goal === current.goal
+      && next === current.next
+      && sameCore(current.core, core)
+      && sameOpen(current.open, open)
+    ) {
+      throw new JspaceError(
+        'the card already says this; proceed with the work or write a checkpoint',
+        'JSPACE_NOTE_NOOP',
+      )
+    }
     return this.writeCard(session, {
       seq: this.nextSeq(session),
       sessionId: session.id,
@@ -355,7 +553,48 @@ export default class JspaceService extends Service {
       checked: current.checked,
       open,
       next,
-      goalOpenedSeq: goal === current.goal ? current.goalOpenedSeq : eventSeq,
+      goalOpenedSeq: current.goalOpenedSeq,
+      charter: current.charter,
+    })
+  }
+
+  /**
+   * Open a new Goal epoch on an open card, or update Goal and Next in place
+   * when the Goal is unchanged. A Goal identity change resets Core and Checked
+   * so ship cannot pass on the previous epoch's evidence, and moves the epoch
+   * anchor so a fresh checkpoint is required. The charter is kept: house rules
+   * outlive a Goal rewrite. A same-Goal call is the control-loop update path:
+   * Core, Checked, Open, and charter are kept and the anchor is unchanged. Open
+   * questions carry over untouched on a new epoch. The optional `core` and
+   * `charter` inputs apply only on the first open and are ignored here.
+   * @param session - owning session.
+   * @param input - goal, next, optional core.
+   * @returns the recorded card.
+   */
+  openGoal(session: Session, input: OpenJspaceInput): JspaceCard {
+    this.requireActive()
+    const current = this.requireCard(session)
+    const goal = line(input.goal, 'goal')
+    const next = line(input.next, 'next')
+    if (goal === current.goal) {
+      return this.writeCard(session, {
+        ...current,
+        seq: this.nextSeq(session),
+        sessionId: session.id,
+        goal,
+        next,
+      })
+    }
+    return this.writeCard(session, {
+      seq: this.nextSeq(session),
+      sessionId: session.id,
+      goal,
+      core: [],
+      checked: [],
+      open: current.open,
+      next,
+      goalOpenedSeq: session.seq,
+      charter: current.charter,
     })
   }
 
@@ -378,13 +617,19 @@ export default class JspaceService extends Service {
         'JSPACE_COVERAGE',
       )
     }
-    if (input.evidence !== undefined) {
-      this.requireEvidence(session, input.evidence)
-    }
+    const evidence = input.evidence === undefined
+      ? undefined
+      : this.resolveEvidence(session, input.evidence)
     const n = current.checked.reduce((max, item) => Math.max(max, item.n), 0) + 1
-    const checked: JspaceCheckedLine = input.evidence === undefined
+    const checked: JspaceCheckedLine = evidence === undefined
       ? { n, check, by }
-      : { n, check, by, evidence: line(input.evidence, 'evidence') }
+      : {
+        n,
+        check,
+        by,
+        evidence: evidence.id,
+        ...evidence.verified ? { verified: true as const } : {},
+      }
     return this.writeCard(session, {
       ...current,
       seq: this.nextSeq(session),
@@ -458,13 +703,23 @@ export default class JspaceService extends Service {
   /**
    * Evidence must name a completed call: the `tool/call` exists and a
    * non-error `tool/result` for it is logged (`isError` rides the
-   * tool-result block). Still not proof of coverage.
+   * tool-result block). A configured verifier tool name marks the line
+   * evidence-grade; keyword coverage is still the floor.
    * @param session - owning session.
    * @param evidence - claimed tool-call id.
+   * @returns the trimmed id and whether the call is evidence-grade.
    */
-  private requireEvidence(session: Session, evidence: string): void {
+  private resolveEvidence(
+    session: Session,
+    evidence: string,
+  ): { readonly id: string; readonly verified: boolean } {
     const id = line(evidence, 'evidence')
-    const ran = session.events.some(event =>
+    const charterRun = session.events.find((event): event is SessionEvent<'jspace/charter-run'> =>
+      event.type === 'jspace/charter-run' && event.data.callId === id && event.data.passed)
+    if (charterRun !== undefined) {
+      return { id, verified: true }
+    }
+    const call = session.events.find((event): event is SessionEvent<'tool/call'> =>
       event.type === 'tool/call' && event.data.callId === id)
     const succeeded = session.events.some((event) => {
       if (event.type !== 'tool/result') return false
@@ -480,12 +735,14 @@ export default class JspaceService extends Service {
         && block !== undefined
         && block.isError !== true
     })
-    if (!ran || !succeeded) {
+    if (call === undefined || !succeeded) {
       throw new JspaceError(
         `jspace evidence ${JSON.stringify(id)} is not a completed, non-error tool call in this session`,
         'JSPACE_EVIDENCE',
       )
     }
+    const verifiers = this.config.verifierTools ?? []
+    return { id, verified: verifiers.includes(call.data.name) }
   }
 
   private copyOnFork(session: Session): void {

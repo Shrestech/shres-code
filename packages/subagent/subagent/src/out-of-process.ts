@@ -17,14 +17,28 @@ import type { ContentBlock } from '@shres-code/shres-code-llm'
 import type { SubagentCapabilities, SubagentResult, SubagentRun, SubagentStopReason } from './types.ts'
 
 /**
- * The capability advertisement of an out-of-process backend: NONE. A child in
- * another process cannot honor parent-enforced start features
- * (`outputSchema`/`maxDepth`/`toolFilter`/`persona`), so the service rejects a
- * request needing any of them before `start` runs — never accepted-then-ignored.
+ * Fully incapable start-time advertisement. Used by tests of a provider that
+ * honors none of the optional one-shot fields. Production out-of-process
+ * backends use {@link REMOTE_START_CAPABILITIES} (or a stricter subset) instead.
  */
 export const NO_START_CAPABILITIES: SubagentCapabilities = Object.freeze({
   outputSchema: false,
   depthLimit: false,
+  toolFilter: false,
+  persona: false,
+})
+
+/**
+ * Start-time advertisement for an out-of-process backend that cannot filter
+ * tools, set a persona, or capture structured output. `depthLimit` is true
+ * because the service enforces `maxDepth` from the parent's durable
+ * delegation depth before `provider.start()` — the child process is not
+ * required. A request that still needs an unadvertised option is rejected
+ * with `UNSUPPORTED_CAPABILITY` rather than accepted-then-ignored.
+ */
+export const REMOTE_START_CAPABILITIES: SubagentCapabilities = Object.freeze({
+  outputSchema: false,
+  depthLimit: true,
   toolFilter: false,
   persona: false,
 })

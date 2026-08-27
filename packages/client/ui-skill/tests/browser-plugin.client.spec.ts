@@ -124,13 +124,6 @@ describe('apply', () => {
     expect(entry?.component).toBe(SkillToolRow)
     expect(presentation.dictionaries).toEqual([{
       namespace: 'skill', dictionaries: {
-        zh: {
-          'row.running': 'Loading skill',
-          'row.failed': 'Skill load failed',
-          'row.stopped': 'Skill load stopped',
-          'row.instructions': 'Instructions',
-          'menu.userOnly': 'user-only',
-        },
         en: {
           'row.running': 'Loading skill',
           'row.failed': 'Skill load failed',

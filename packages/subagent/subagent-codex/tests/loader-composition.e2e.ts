@@ -36,7 +36,7 @@ describe('Codex provider public Loader composition', () => {
         name: 'codex',
         capabilities: {
           outputSchema: false,
-          depthLimit: false,
+          depthLimit: true,
           toolFilter: false,
           persona: false,
         },

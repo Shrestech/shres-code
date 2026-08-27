@@ -5,7 +5,7 @@
 
 import { describe, expect, it, vi } from 'vitest'
 import { stubSettingsScope, type StubSettingsScope } from '@shres-code/shres-code-client-test-runtime'
-import { CardForm, numberField, textField } from '../src/client/card-form.ts'
+import { CardForm, booleanField, numberField, textField } from '../src/client/card-form.ts'
 import { AgentLoopCardController, type AgentLoopSettings } from '../src/client/agent-loop-card-controller.ts'
 import { BashCardController, type BashSettings } from '../src/client/bash-card-controller.ts'
 import {
@@ -573,5 +573,33 @@ describe('WebSearchCardController', () => {
 
     expect(host.set.mock.calls).toEqual([['baseURL', 'https://other.test'], ['maxUses', 3]])
     expect(credentials.set).not.toHaveBeenCalled()
+  })
+
+  it('routes method-field reset and discard through the methods scope', () => {
+    const host = stubSettingsScope<WebSearchSettings>()
+    const methods = stubSettingsScope<WebSearchMethods>()
+    const credentials = credentialsApi(true)
+    const controller = new WebSearchCardController(host.scope, credentials.api, methods.scope)
+    host.publish({ status: 'ready', writable: true, value: {}, user: {} })
+    methods.publish({ status: 'ready', writable: true, value: { grok: true, claude: true, codex: true, kimi: true, ollama: true }, user: {} })
+    const face = controller.inject()
+    face.edit('codex', 'false')
+    face.resetField('codex')
+    face.edit('baseURL', 'https://other.test')
+    face.resetField('baseURL')
+    face.edit('kimi', 'false')
+    face.discard()
+    expect(face.hooks.webSearchCard.getSnapshot().codex.text).toBe('true')
+  })
+})
+
+describe('booleanField', () => {
+  it('parses only the two switch drafts and treats any other text as invalid', () => {
+    const field = booleanField('enabled')
+    expect(field.format(false)).toBe('false')
+    expect(field.format(true)).toBe('true')
+    expect(field.parse('true')).toEqual({ kind: 'set', value: true })
+    expect(field.parse('false')).toEqual({ kind: 'set', value: false })
+    expect(field.parse('maybe')).toBeUndefined()
   })
 })

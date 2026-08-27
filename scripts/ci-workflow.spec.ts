@@ -399,11 +399,25 @@ describe('Git hooks', () => {
       if (!isRecord(hook) || !Array.isArray(hook.jobs)) {
         throw new TypeError(`lefthook must define ${hookName} jobs`)
       }
-      const pairing: unknown = hook.jobs.find(
-        (job: unknown) => isRecord(job) && job.name === 'translation pairing (staged records)',
-      )
-
-      expect(pairing).toMatchObject({ exclude: ['.agents/notes/archived/**'] })
+      let archived: Record<string, unknown> | undefined
+      for (const job of hook.jobs) {
+        if (isRecord(job) && job.name === 'archived agent notes') {
+          archived = job
+          break
+        }
+      }
+      if (archived === undefined) {
+        throw new TypeError(`lefthook ${hookName} must define the archived agent notes job`)
+      }
+      expect(archived.glob).toBe('.agents/notes/archived/**')
+      let pairing: unknown
+      for (const job of hook.jobs) {
+        if (isRecord(job) && String(job.name).includes('translation pairing')) {
+          pairing = job
+          break
+        }
+      }
+      expect(pairing).toBeUndefined()
     }
   })
 })

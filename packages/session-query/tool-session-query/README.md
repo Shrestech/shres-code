@@ -1,6 +1,6 @@
 # @shres-code/shres-code-tool-session-query
 
-Workspace-authorized model tools over `ctx.sessionQuery`. The opt-in package depends only on the unified interface and registers `session_search`, `session_event_search`, `session_trace`, `session_event_trace`, and `session_event_read`; shipped host compositions do not mount it by default.
+Workspace-authorized model tools over `ctx.sessionQuery`. The package depends only on the unified interface and registers `session_search`, `session_event_search`, `session_trace`, `session_event_trace`, and `session_event_read`. The ACP and headless example compositions mount it by default; the shipped TUI and Web bundles keep the `ctx.sessionQuery` index but leave this consumer unmounted.
 
 ## Configuration
 
@@ -9,7 +9,7 @@ Workspace-authorized model tools over `ctx.sessionQuery`. The opt-in package dep
 | `maxSearchResults` | `100` | Maximum authorized non-self hits collected across internal provider pages |
 | `searchTimeoutMs` | `30000` | Cooperative deadline attached to both full-text search tools |
 
-The caller comes exclusively from `ToolExecution.exec.agent`. Cross-session access requires exact equality between the target and caller session `cwd` values; a caller without `cwd` can inspect only itself. Search never exposes provider cursors, offsets, page sizes, or a model-controlled limit. Because one search consumes generation-bound provider cursors internally, both search tools execute exclusively with sibling tool calls; the three exact trace/read tools opt into parallel execution. Every exact executor passes its unchanged execution signal through authorization and the service trace/read, so cancellation waits for cooperative persistence cleanup and retains the signal's exact reason. Timestamps at the tool boundary require an explicit `Z` or numeric offset and become inclusive epoch-millisecond filters.
+The caller comes exclusively from `ToolExecution.exec.agent`. Cross-session access requires exact equality between the target and caller session `cwd` values; a caller without `cwd` can inspect only itself. Search never exposes provider cursors, offsets, page sizes, or a model-controlled limit. Because one search consumes generation-bound provider cursors internally, both search tools execute exclusively with sibling tool calls; the three exact trace/read tools opt into parallel execution. Every exact executor passes its unchanged execution signal through authorization and the service trace/read, so cancellation waits for cooperative persistence cleanup and retains the signal's exact reason. Timestamps at the tool boundary require an explicit `Z` or numeric offset and become inclusive epoch-millisecond filters. Sequence-range filters (`event_seq_from`/`event_seq_to` on `session_search`, `seq_from`/`seq_to` on `session_event_search`) are inclusive; J-Space's `goalOpenedSeq` is the natural lower bound when scoping a search to the current Goal epoch.
 
 `session_search` always omits the caller session. Requested parent ids are deduplicated and checked against caller-workspace authority before FTS; only authorized ids reach the provider, while missing and cross-workspace guesses behave identically and the root marker remains independently ORed. A current-session `session_event_search` stops immediately before the step that invoked it, so the active assistant output and logged tool call cannot match themselves. Direct targets are authorized before trace, event, or title reads. Lineage output replaces unauthorized ancestor and descendant boundaries with markers that contain no hidden session id.
 
@@ -28,7 +28,7 @@ The model receives one fixed prior-history guidance section.
 ##### Prior-history guidance
 
 ```markdown
-Use session_search to find relevant work from prior sessions, or session_event_search to search earlier events in one session. Search results are cursor-free and workspace-scoped. Follow a useful hit with session_trace, session_event_trace, or session_event_read when you need lineage, relationships, or exact data.
+The full session history is searchable with session_search, session_event_search, session_event_read, session_event_trace, and session_trace; query prior events before re-deriving facts, decisions, or tool output you have already produced.
 ```
 
 #### Token effect

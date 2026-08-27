@@ -34,15 +34,18 @@ function el(tag, cls, text) {
  * @returns {void}
  */
 function fillMeta(meta, data) {
-  const cmp = data.comparison
-  const chip = el('span', `chip grade-${cmp.grade}`, cmp.grade)
-  chip.title = 'comparison grade: on vs off'
+  const comparisons = Array.isArray(data.comparisons) ? data.comparisons : []
+  const chips = comparisons.map((cmp) => {
+    const chip = el('span', `chip grade-${cmp.grade}`, cmp.grade)
+    chip.title = `comparison grade: ${cmp.treatment} vs off`
+    return chip
+  })
   meta.replaceChildren(.../** @type {HTMLElement[]} */ ([
     el('span', 'experiment-name', data.experiment),
     el('span', 'sep', '·'),
     el('span', 'generated', `generated ${data.generatedAt.replace('T', ' ').slice(0, 19)}`),
     data.demo ? el('span', 'badge badge-demo', 'demo') : null,
-    chip,
+    ...chips,
   ].filter(Boolean)))
   meta.hidden = false
 }

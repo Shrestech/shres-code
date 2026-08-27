@@ -28,7 +28,8 @@ const SUMMARY_CLOSE_TAG = '</compacted-summary>'
  * front of it makes the auxiliary call a genuine prefix of the last routed
  * request, so the provider's KV cache is reused instead of invalidated.
  */
-const COMPACTION_INSTRUCTION = [
+/** Compaction instruction appended as the final user message of the summarizer request. */
+export const COMPACTION_INSTRUCTION = [
   'You are now acting as a compaction engine for this AI coding assistant. Condense the conversation ABOVE into a structured checkpoint that lets another model resume the work with no loss of essential context.',
   '',
   'Output EXACTLY the Markdown structure below: keep every section, in order. Use terse bullets, not prose paragraphs. Write "(none)" for an empty section — never drop a section.',
@@ -54,15 +55,19 @@ const COMPACTION_INSTRUCTION = [
   '## Next Step',
   '- [the single next action, directly in line with the most recent request, or "(none)"]',
   '',
+  '## Constraints',
+  '- [every quantity, prohibition, required format, house rule, or other constraint stated once in the user\'s instruction — copy the original sentence verbatim; never paraphrase, number-shift, or drop it]',
+  '',
   '## Critical Context',
-  '- [decisions and their rationale, constraints, user preferences, open questions, data needed to continue]',
+  '- [decisions and their rationale, user preferences, open questions, data needed to continue]',
   '',
   'Rules:',
   '- Write concise English engineering prose. Preserve exact file paths, commands, error strings, identifiers, numeric values, function signatures, and syntax fragments.',
   '- Capture user feedback and explicit instructions faithfully, especially corrections.',
+  '- Constraint-style statements (rules stated once: quantities, caps, prohibitions, required formats) must appear verbatim under ## Constraints. They must survive every later checkpoint, including when a prior compacted-summary is merged.',
   '- Do NOT mention this summarization request or that the context was compacted.',
   '- Output only the checkpoint text: do not call any tool or take any other action.',
-  `- If the conversation already contains a ${SUMMARY_OPEN_TAG} block, it is a PRIOR checkpoint. Do not copy it forward verbatim: preserve still-true facts, drop stale ones, and merge newer information into a single consolidated summary under the same structure.`,
+  `- If the conversation already contains a ${SUMMARY_OPEN_TAG} block, it is a PRIOR checkpoint. Do not copy it forward verbatim: preserve still-true facts, drop stale ones, merge newer information into a single consolidated summary under the same structure, and keep every constraint sentence verbatim.`,
 ].join('\n')
 
 /** Framing that makes the replacement user message established context. */

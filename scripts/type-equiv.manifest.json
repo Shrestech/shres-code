@@ -971,6 +971,56 @@
       "source": "packages/jobs/jobs/src/types.ts"
     },
     {
+      "doc": "docs/subsystems/jspace.md",
+      "symbol": "JspaceCard",
+      "source": "packages/jspace/jspace/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/jspace.md",
+      "symbol": "JspaceCheckedLine",
+      "source": "packages/jspace/jspace/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/jspace.md",
+      "symbol": "CharterDiscrimination",
+      "source": "packages/jspace/jspace/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/jspace.md",
+      "symbol": "CharterUnverifiedReason",
+      "source": "packages/jspace/jspace/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/jspace.md",
+      "symbol": "CharterFailProbe",
+      "source": "packages/jspace/jspace/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/jspace.md",
+      "symbol": "CharterCheckInput",
+      "source": "packages/jspace/jspace/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/jspace.md",
+      "symbol": "CharterProseInput",
+      "source": "packages/jspace/jspace/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/jspace.md",
+      "symbol": "JspaceCharterCheck",
+      "source": "packages/jspace/jspace/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/jspace.md",
+      "symbol": "JspaceCharterProse",
+      "source": "packages/jspace/jspace/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/jspace.md",
+      "symbol": "JspaceCharterEntry",
+      "source": "packages/jspace/jspace/src/types.ts"
+    },
+    {
       "doc": "docs/subsystems/terminal.md",
       "symbol": "TerminalWaitReason",
       "source": "packages/terminal/terminal/src/types.ts"
@@ -1003,6 +1053,11 @@
     {
       "doc": "docs/subsystems/sandbox.md",
       "symbol": "SandboxMode",
+      "source": "packages/sandbox/sandbox/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/sandbox.md",
+      "symbol": "SandboxNetwork",
       "source": "packages/sandbox/sandbox/src/index.ts"
     },
     {
@@ -2029,6 +2084,61 @@
       "doc": "docs/subsystems/feedback.md",
       "symbol": "MessageFeedbackDeleteResult",
       "source": "packages/feedback/message-feedback/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/tracker.md",
+      "symbol": "TrackerRunId",
+      "source": "packages/tracker/tracker/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/tracker.md",
+      "symbol": "TrackerFailureReason",
+      "source": "packages/tracker/tracker/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/tracker.md",
+      "symbol": "MetricPoint",
+      "source": "packages/tracker/tracker/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/tracker.md",
+      "symbol": "LogRunRequest",
+      "source": "packages/tracker/tracker/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/tracker.md",
+      "symbol": "LogRunSpec",
+      "source": "packages/tracker/tracker/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/tracker.md",
+      "symbol": "TrackerRunResult",
+      "source": "packages/tracker/tracker/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/tracker.md",
+      "symbol": "RunFilter",
+      "source": "packages/tracker/tracker/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/tracker.md",
+      "symbol": "TrackerRunSummary",
+      "source": "packages/tracker/tracker/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/guard.md",
+      "symbol": "ShieldSnapshot",
+      "source": "packages/guard/shield/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/guard.md",
+      "symbol": "ShieldPayloadInfo",
+      "source": "packages/guard/shield/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/guard.md",
+      "symbol": "ShieldPayloadUpdate",
+      "source": "packages/guard/shield/src/types.ts"
     }
   ]
 }

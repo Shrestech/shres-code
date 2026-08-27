@@ -16,12 +16,45 @@ import { open, readdir } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { isSeededPriorSession } from './session-layout.js'
+import { UsageWatcher } from './usage-watcher.js'
 
 /** Captured stdout/stderr are capped so a stuck loop cannot exhaust memory. */
 const MAX_CAPTURE_BYTES = 8 << 20
 
 /** Grace period between SIGTERM and SIGKILL when a run exceeds its timeout. */
-const KILL_GRACE_MS = 5_000
+export const KILL_GRACE_MS = 5_000
+
+/** Budget-watch poll interval: how often the live usage watcher absorbs appended bytes. */
+export const BUDGET_POLL_MS = 5_000
+
+/**
+ * SIGTERM a child on abort, then SIGKILL after `graceMs`. The disposer
+ * removes the listener and cancels the SIGKILL timer; call it when the
+ * child has closed so a late abort cannot SIGKILL an already-reaped pid,
+ * and so dispose waits for exit (kill → await `close`) rather than
+ * returning while the child is still dying.
+ *
+ * @param {import('node:child_process').ChildProcess} child
+ * @param {AbortSignal | undefined} signal
+ * @param {number} [graceMs]
+ * @returns {() => void} disposer.
+ */
+export function killOnAbort(child, signal, graceMs = KILL_GRACE_MS) {
+  if (signal === undefined) return () => {}
+  /** @type {ReturnType<typeof setTimeout> | null} */
+  let killTimer = null
+  const onAbort = () => {
+    child.kill('SIGTERM')
+    if (killTimer === null) killTimer = setTimeout(() => child.kill('SIGKILL'), graceMs)
+  }
+  if (signal.aborted) onAbort()
+  else signal.addEventListener('abort', onAbort)
+  return () => {
+    signal.removeEventListener('abort', onAbort)
+    if (killTimer !== null) clearTimeout(killTimer)
+  }
+}
 
 /**
  * @typedef {object} HarnessLaunch
@@ -58,6 +91,7 @@ export function resolveHarnessLaunch(repoRoot) {
  * @property {string} stderr - captured stderr (capped).
  * @property {number} durationMs - wall time from spawn to exit.
  * @property {string | null} sessionLogPath - absolute top-level session log, when found.
+ * @property {boolean} budgetExceeded - the live token cap observed the trial over `maxTotalTokens` and terminated it.
  */
 
 /**
@@ -80,7 +114,9 @@ async function readFirstLine(path) {
  * Locate the trial's top-level session log under its per-trial persistence
  * root. Child sessions (subagents) share the root, so candidates filter on the
  * header's `delegationDepth: 0` and prefer the header whose cwd is the scratch
- * dir; ties break by sorted path for determinism.
+ * dir. Seeded prior-session fixtures (`bench-prior-*`) are never the trial
+ * transcript, even when they share cwd. Remaining ties prefer newer
+ * `createdAt`, then sorted path.
  * @param {string} sessionLogRoot - per-trial persistence root from the arm overlay.
  * @param {string} scratchDir - the trial's scratch cwd.
  * @returns {Promise<string | null>} absolute session.jsonl path, or null when absent.
@@ -105,12 +141,11 @@ export async function findSessionLog(sessionLogRoot, scratchDir) {
     }
   }
   await walk(sessionLogRoot)
-  candidates.sort()
 
-  /** @type {string | null} */
-  let fallback = null
+  /** @type {{ path: string, cwdMatch: boolean, createdAt: number }[]} */
+  const eligible = []
   for (const path of candidates) {
-    /** @type {{ type?: unknown, delegationDepth?: unknown, cwd?: unknown }} */
+    /** @type {{ type?: unknown, delegationDepth?: unknown, cwd?: unknown, id?: unknown, createdAt?: unknown }} */
     let header
     try {
       header = JSON.parse(await readFirstLine(path))
@@ -119,10 +154,58 @@ export async function findSessionLog(sessionLogRoot, scratchDir) {
       continue
     }
     if (header.type !== 'session' || header.delegationDepth !== 0) continue
-    if (header.cwd === scratchDir) return path
-    fallback ??= path
+    if (isSeededPriorSession(header.id)) continue
+    eligible.push({
+      path,
+      cwdMatch: header.cwd === scratchDir,
+      createdAt: typeof header.createdAt === 'number' && Number.isFinite(header.createdAt) ? header.createdAt : 0,
+    })
   }
-  return fallback
+  const cwdHits = eligible.filter(entry => entry.cwdMatch)
+  const pool = cwdHits.length > 0 ? cwdHits : eligible
+  if (pool.length === 0) return null
+  pool.sort((a, b) => b.createdAt - a.createdAt || a.path.localeCompare(b.path))
+  return pool[0].path
+}
+
+/**
+ * Poll the trial's persistence root for provider-reported usage and fire
+ * `onExceeded` once the running root+descendant total passes `maxTotalTokens`.
+ * The poll loop is advisory: a watch error is swallowed (the cap must never
+ * fail a run that merely has an unreadable moment) and polling stops as soon
+ * as `isSettled` reports the child exited.
+ * @param {import('node:child_process').ChildProcess} child - the spawned harness.
+ * @param {string} sessionLogRoot - per-trial persistence root.
+ * @param {number | undefined} maxTotalTokens - cap; undefined disables the watch.
+ * @param {() => void} onExceeded - called once when the cap is observed exceeded.
+ * @param {() => boolean} isSettled - whether the spawn already finished.
+ * @param {(graceMs: number) => void} armKillTimer - arm the SIGKILL grace timer on the caller's handle.
+ * @returns {() => void} stopper; call when the child closes.
+ */
+function startBudgetWatch(child, sessionLogRoot, maxTotalTokens, onExceeded, isSettled, armKillTimer) {
+  if (maxTotalTokens === undefined) return () => {}
+  const watcher = new UsageWatcher(sessionLogRoot)
+  /** @type {ReturnType<typeof setTimeout> | null} */
+  let timer = null
+  const poll = async () => {
+    if (isSettled()) return
+    try {
+      const totals = await watcher.poll()
+      if (totals.inputTokens + totals.outputTokens > maxTotalTokens) {
+        onExceeded()
+        child.kill('SIGTERM')
+        armKillTimer(KILL_GRACE_MS)
+        return
+      }
+    } catch {
+      // An unreadable instant during append is retried on the next tick.
+    }
+    if (!isSettled()) timer = setTimeout(poll, BUDGET_POLL_MS)
+  }
+  timer = setTimeout(poll, BUDGET_POLL_MS)
+  return () => {
+    if (timer !== null) clearTimeout(timer)
+  }
 }
 
 /**
@@ -131,17 +214,26 @@ export async function findSessionLog(sessionLogRoot, scratchDir) {
  * @param {object} options
  * @param {string} options.repoRoot - harness repository root.
  * @param {string} options.overlayPath - absolute path of the arm `--patch` overlay.
+ * @param {string[]} [options.extraPatchPaths] - additional `--patch` overlays (e.g. tier patch), applied after the arm overlay.
  * @param {string} options.taskText - the task instruction, passed as the app argument.
  * @param {string} options.scratchDir - trial scratch dir; becomes the child cwd.
  * @param {string} options.sessionLogRoot - per-trial persistence root baked into the overlay.
  * @param {number} options.timeoutMs - task timeout from task.json.
- * @param {NodeJS.ProcessEnv} options.env - child environment (carries DEEPSEEK_API_KEY, SHRES_HOME).
+ * @param {NodeJS.ProcessEnv} options.env - child environment (carries API key, SHRES_HOME).
+ * @param {number} [options.maxTotalTokens] - live cap on observed root+descendant usage; exceeding it
+ *   terminates the child and marks the result `budgetExceeded`. Undefined disables the watch.
+ * @param {AbortSignal} [options.signal] - abort kills the child (SIGTERM, then SIGKILL) and waits for exit.
  * @returns {Promise<ExecutionResult>} the execution record.
  */
-export async function executeTrial({ repoRoot, overlayPath, taskText, scratchDir, sessionLogRoot, timeoutMs, env }) {
+export async function executeTrial({ repoRoot, overlayPath, extraPatchPaths = [], taskText, scratchDir, sessionLogRoot, timeoutMs, env, signal, maxTotalTokens }) {
   const launch = resolveHarnessLaunch(repoRoot)
-  const argv = [...launch.argsPrefix, '--profile', 'headless', '--patch', overlayPath, taskText]
+  const patchArgs = ['--patch', overlayPath, ...extraPatchPaths.flatMap(p => ['--patch', p])]
+  const argv = [...launch.argsPrefix, '--profile', 'headless', ...patchArgs, taskText]
   const startedAt = Date.now()
+
+  if (signal?.aborted) {
+    return { exitCode: null, timedOut: false, budgetExceeded: false, stdout: '', stderr: '', durationMs: 0, sessionLogPath: null }
+  }
 
   const child = spawn(launch.command, argv, { cwd: scratchDir, env, stdio: ['ignore', 'pipe', 'pipe'] })
   let stdout = ''
@@ -153,35 +245,46 @@ export async function executeTrial({ repoRoot, overlayPath, taskText, scratchDir
     if (stderr.length < MAX_CAPTURE_BYTES) stderr += chunk.toString()
   })
 
+  let budgetExceeded = false
   const { exitCode, timedOut } = await new Promise((resolvePromise, rejectPromise) => {
     let settled = false
     let timeoutFired = false
     /** @type {ReturnType<typeof setTimeout> | null} */
     let killTimer = null
+    const detachAbort = killOnAbort(child, signal)
     const timer = setTimeout(() => {
       if (settled) return
       timeoutFired = true
       child.kill('SIGTERM')
       killTimer = setTimeout(() => child.kill('SIGKILL'), KILL_GRACE_MS)
     }, timeoutMs)
-    child.on('error', error => {
-      clearTimeout(timer)
-      if (killTimer) clearTimeout(killTimer)
-      settled = true
-      rejectPromise(error)
+    const stopBudgetWatch = startBudgetWatch(child, sessionLogRoot, maxTotalTokens, () => {
+      budgetExceeded = true
+    }, () => settled, graceMs => {
+      if (killTimer === null) killTimer = setTimeout(() => child.kill('SIGKILL'), graceMs)
     })
-    child.on('close', code => {
+    const finish = (result, error) => {
       if (settled) return
       settled = true
       clearTimeout(timer)
       if (killTimer) clearTimeout(killTimer)
-      resolvePromise({ exitCode: code, timedOut: timeoutFired })
+      detachAbort()
+      stopBudgetWatch()
+      if (error !== undefined) rejectPromise(error)
+      else resolvePromise(result)
+    }
+    child.on('error', error => {
+      finish(undefined, error)
+    })
+    child.on('close', code => {
+      finish({ exitCode: code, timedOut: timeoutFired })
     })
   })
 
   return {
     exitCode,
     timedOut,
+    budgetExceeded,
     stdout,
     stderr,
     durationMs: Date.now() - startedAt,

@@ -69,6 +69,7 @@ describe('real Loader composition', () => {
       '    thresholdRatio: 0.5',
       '    retainRatio: 0.125',
       '    auto: false',
+      '    maxPointers: 4',
     ])
 
     const unloaded = [...loaded.loader.entries()]
@@ -81,6 +82,7 @@ describe('real Loader composition', () => {
       thresholdRatio: 0.5,
       retainRatio: 0.125,
       auto: false,
+      maxPointers: 4,
     })
   })
 

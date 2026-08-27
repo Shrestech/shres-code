@@ -18,7 +18,7 @@
 /** Report routes in nav order. */
 export const VIEWS = Object.freeze(['summary', 'matrix', 'charts', 'trials'])
 
-const STRATUM_ORDER = ['long', 'short', 'adversarial', 'chain']
+const STRATUM_ORDER = ['long', 'short', 'adversarial', 'chain', 'pressure']
 
 // Numeric mirrors of the --heat-* anchors in styles.css; interpolating a
 // gradient needs channels, which CSS custom properties cannot provide in JS.
@@ -117,8 +117,8 @@ function pairOutcomes(offTrials, onTrials) {
 }
 
 /**
- * Distinct strata in report order: long, short, adversarial, chain, then any
- * extras.
+ * Distinct strata in report order: long, short, adversarial, chain, pressure,
+ * then any extras.
  * @param {{ stratum: string }[]} tasks - report task catalog.
  * @returns {string[]}
  */
@@ -196,27 +196,42 @@ export function summaryRows(data) {
 }
 
 /**
- * Hero-banner statistics for the off/on comparison: the payload's grade and
- * McNemar p, plus a paired bootstrap interval on the accuracy delta and the
- * discordance counts recomputed from embedded trials. Without trials the
- * interval is null and the counts fall back to summing data.pairs.
+ * Comparison records on the payload, empty when absent.
  * @param {import('../schema/report-data.js').ReportData} data - report payload.
- * @returns {{ grade: string, deltaAccuracy: number, deltaCi95: [number, number] | null, mcnemarP: number | null, tokenOverheadRatio: number | null, wins: number, losses: number, ties: number }}
+ * @returns {import('../schema/report-data.js').ReportComparison[]}
  */
-export function heroStats(data) {
-  const cmp = data.comparison
+export function comparisonList(data) {
+  return Array.isArray(data.comparisons) ? data.comparisons : []
+}
+
+/**
+ * Hero-banner statistics for one off-vs-treatment comparison: the record's
+ * grade and McNemar p, plus a paired bootstrap interval on the accuracy
+ * delta and the discordance counts recomputed from embedded trials. Without
+ * trials the interval is null and the counts fall back to summing the
+ * comparison's pairs. When `comparison` is omitted the first comparison is
+ * used.
+ * @param {import('../schema/report-data.js').ReportData} data - report payload.
+ * @param {import('../schema/report-data.js').ReportComparison} [comparison] - pairing to render.
+ * @returns {{ treatment: string, grade: string, deltaAccuracy: number, deltaCi95: [number, number] | null, mcnemarP: number | null, tokenOverheadRatio: number | null, wins: number, losses: number, ties: number }}
+ */
+export function heroStats(data, comparison) {
+  const cmp = comparison ?? comparisonList(data)[0] ?? {
+    treatment: 'on', grade: 'tie', deltaAccuracy: 0, mcnemarP: null, pairs: [],
+  }
   const off = data.arms.find(a => a.arm === 'off')
-  const on = data.arms.find(a => a.arm === 'on')
+  const treatment = data.arms.find(a => a.arm === cmp.treatment)
   const offTokens = off ? off.totalInputTokens + off.totalOutputTokens : 0
-  const onTokens = on ? on.totalInputTokens + on.totalOutputTokens : 0
-  const tokenOverheadRatio = off && on && offTokens > 0 ? onTokens / offTokens : null
+  const treatmentTokens = treatment ? treatment.totalInputTokens + treatment.totalOutputTokens : 0
+  const tokenOverheadRatio = off && treatment && offTokens > 0 ? treatmentTokens / offTokens : null
   const trials = trialList(data)
   const offTrials = trials.filter(t => t.arm === 'off')
-  const onTrials = trials.filter(t => t.arm === 'on')
-  if (offTrials.length > 0 && onTrials.length > 0) {
-    const { pairs, wins, losses, ties } = pairOutcomes(offTrials, onTrials)
+  const treatmentTrials = trials.filter(t => t.arm === cmp.treatment)
+  if (offTrials.length > 0 && treatmentTrials.length > 0) {
+    const { pairs, wins, losses, ties } = pairOutcomes(offTrials, treatmentTrials)
     const ci = bootstrapDeltaCi(pairs)
     return {
+      treatment: cmp.treatment,
       grade: cmp.grade,
       deltaAccuracy: cmp.deltaAccuracy,
       deltaCi95: Number.isFinite(ci[0]) && Number.isFinite(ci[1]) ? ci : null,
@@ -228,15 +243,25 @@ export function heroStats(data) {
     }
   }
   return {
+    treatment: cmp.treatment,
     grade: cmp.grade,
     deltaAccuracy: cmp.deltaAccuracy,
     deltaCi95: null,
     mcnemarP: cmp.mcnemarP,
     tokenOverheadRatio,
-    wins: data.pairs.reduce((n, p) => n + p.wins, 0),
-    losses: data.pairs.reduce((n, p) => n + p.losses, 0),
-    ties: data.pairs.reduce((n, p) => n + p.ties, 0),
+    wins: cmp.pairs.reduce((n, p) => n + p.wins, 0),
+    losses: cmp.pairs.reduce((n, p) => n + p.losses, 0),
+    ties: cmp.pairs.reduce((n, p) => n + p.ties, 0),
   }
+}
+
+/**
+ * Hero statistics for every comparison in report order.
+ * @param {import('../schema/report-data.js').ReportData} data - report payload.
+ * @returns {ReturnType<typeof heroStats>[]}
+ */
+export function heroList(data) {
+  return comparisonList(data).map(c => heroStats(data, c))
 }
 
 /**
@@ -372,37 +397,42 @@ export function radarSpec(data) {
 }
 
 /**
- * Paired-scatter spec for one metric, off on x and on on y, one point per task
- * that has data in both arms.
+ * Paired-scatter spec for one metric, off on x and a treatment arm on y, one
+ * point per task that has data in both arms.
  * @param {import('../schema/report-data.js').ReportData} data - report payload.
  * @param {'passRate' | 'tokens'} metric - pass rate or mean total tokens.
+ * @param {string} [treatment] - intervention arm; defaults to the first comparison or `on`.
  * @returns {{ points: { id: string, x: number, y: number }[], xLabel: string, yLabel: string }}
  */
-export function scatterSpec(data, metric) {
+export function scatterSpec(data, metric, treatment) {
+  const vs = treatment ?? comparisonList(data)[0]?.treatment ?? 'on'
   const cells = cellMap(data)
   const label = metric === 'tokens' ? 'mean tokens' : 'pass rate'
   const valueOf = (/** @type {import('../schema/report-data.js').ReportCell} */ c) => (metric === 'tokens' ? c.meanInputTokens + c.meanOutputTokens : c.passRate)
   const points = []
   for (const task of data.tasks) {
     const off = cells.get(cellKey(task.taskId, 'off'))
-    const on = cells.get(cellKey(task.taskId, 'on'))
-    if (!off || !on || off.trials === 0 || on.trials === 0) continue
+    const other = cells.get(cellKey(task.taskId, vs))
+    if (!off || !other || off.trials === 0 || other.trials === 0) continue
     const x = valueOf(off)
-    const y = valueOf(on)
+    const y = valueOf(other)
     if (Number.isFinite(x) && Number.isFinite(y)) points.push({ id: task.taskId, x, y })
   }
-  return { points, xLabel: `off ${label}`, yLabel: `on ${label}` }
+  return { points, xLabel: `off ${label}`, yLabel: `${vs} ${label}` }
 }
 
 /**
- * Delta-chart spec from the paired comparisons.
+ * Delta-chart spec from one comparison's paired rows.
  * @param {import('../schema/report-data.js').ReportData} data - report payload.
+ * @param {import('../schema/report-data.js').ReportComparison} [comparison] - pairing; defaults to the first comparison.
  * @returns {{ items: { id: string, delta: number, ci: [number, number] }[], xLabel: string }}
  */
-export function deltaSpec(data) {
+export function deltaSpec(data, comparison) {
+  const cmp = comparison ?? comparisonList(data)[0]
+  const treatment = cmp?.treatment ?? 'on'
   return {
-    items: data.pairs.map(p => ({ id: p.taskId, delta: p.delta, ci: p.deltaCi95 })),
-    xLabel: 'pass-rate delta (on − off)',
+    items: (cmp?.pairs ?? []).map(p => ({ id: p.taskId, delta: p.delta, ci: p.deltaCi95 })),
+    xLabel: `pass-rate delta (${treatment} − off)`,
   }
 }
 
@@ -512,15 +542,19 @@ function defaultTrialOrder(a, b) {
  * TRIAL_SORTS key and `dir` is 'asc' | 'desc'; without a known sort key the
  * default order applies.
  * @param {import('../schema/trial.js').Trial[]} trials - all trials.
- * @param {{ arm?: string, task?: string, outcome?: string, sort?: string, dir?: string }} filters - filter and sort state.
+ * @param {{ arm?: string, task?: string, outcome?: string, stratum?: string, tasks?: { taskId: string, stratum: string }[], sort?: string, dir?: string }} filters - filter and sort state.
  * @returns {import('../schema/trial.js').Trial[]}
  */
-export function filterTrials(trials, { arm, task, outcome, sort, dir } = {}) {
+export function filterTrials(trials, { arm, task, outcome, stratum, tasks, sort, dir } = {}) {
   const cmp = sort && Object.hasOwn(TRIAL_SORTS, sort) ? TRIAL_SORTS[/** @type {keyof typeof TRIAL_SORTS} */ (sort)] : null
   const sign = dir === 'desc' ? -1 : 1
+  const inStratum = stratum && Array.isArray(tasks)
+    ? new Set(tasks.filter(t => t.stratum === stratum).map(t => t.taskId))
+    : null
   return trials
     .filter(t => (!arm || t.arm === arm)
       && (!task || t.taskId === task)
+      && (!inStratum || inStratum.has(t.taskId))
       && (!outcome
         || (outcome === 'resolved' && t.status === 'success' && t.resolved)
         || (outcome === 'failed' && t.status === 'success' && !t.resolved)

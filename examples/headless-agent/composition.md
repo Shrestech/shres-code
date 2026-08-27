@@ -24,6 +24,12 @@ flowchart LR
   cfg --> plugin_headless_persistence
   plugin_headless_checkpoint_policy["checkpoint-policy<br/>@shres-code/shres-code-session-checkpoint-policy"]
   cfg --> plugin_headless_checkpoint_policy
+  plugin_headless_session_query_sqlite["session-query-sqlite<br/>@shres-code/shres-code-session-query-sqlite"]
+  cfg --> plugin_headless_session_query_sqlite
+  plugin_headless_tool_session_query["tool-session-query<br/>@shres-code/shres-code-tool-session-query"]
+  cfg --> plugin_headless_tool_session_query
+  plugin_headless_timeout_policy["timeout-policy<br/>@shres-code/shres-code-tool-call-timeout-policy"]
+  cfg --> plugin_headless_timeout_policy
   plugin_headless_token_meter["token-meter<br/>@shres-code/shres-code-token-meter"]
   cfg --> plugin_headless_token_meter
   plugin_headless_compaction_basic["compaction-basic<br/>@shres-code/shres-code-compaction-basic"]
@@ -70,6 +76,9 @@ flowchart LR
 | `agent-spine` | `@shres-code/shres-code-agent-spine-demo` |
 | `persistence` | `@shres-code/shres-code-session-persistence-jsonl` |
 | `checkpoint-policy` | `@shres-code/shres-code-session-checkpoint-policy` |
+| `session-query-sqlite` | `@shres-code/shres-code-session-query-sqlite` |
+| `tool-session-query` | `@shres-code/shres-code-tool-session-query` |
+| `timeout-policy` | `@shres-code/shres-code-tool-call-timeout-policy` |
 | `token-meter` | `@shres-code/shres-code-token-meter` |
 | `compaction-basic` | `@shres-code/shres-code-compaction-basic` |
 | `session-projection` | `@shres-code/shres-code-session-projection` |

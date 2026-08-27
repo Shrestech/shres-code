@@ -1,0 +1,7 @@
+{
+  "prefixes": ["AB", "CD", "EF"],
+  "labels": {
+    "ok": "accepted",
+    "bad": "rejected"
+  }
+}

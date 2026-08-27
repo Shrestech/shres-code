@@ -1,0 +1,7 @@
+[
+  { "id": "acct-ops", "label": "Operations", "category": "ops" },
+  { "id": "acct-research", "label": "Research", "category": "research" },
+  { "id": "acct-infra", "label": "Infrastructure", "category": "infra" },
+  { "id": "acct-legal", "label": "Legal", "category": "legal" },
+  { "id": "acct-travel", "label": "Travel", "category": "travel" }
+]

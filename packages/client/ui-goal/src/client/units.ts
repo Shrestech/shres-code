@@ -36,6 +36,16 @@ function fightKindAt(index: number): FightKind {
 }
 
 /**
+ * Tests pass a non-array object as `never`; only a real array is a todo list.
+ * @param value - projected todos, or a hostile stand-in.
+ */
+function isTodoList(
+  value: unknown,
+): value is readonly { content: string; status: string }[] {
+  return Array.isArray(value)
+}
+
+/**
  * Map the current todo list to at most {@link MAX_FIGHT_UNITS} remaining units.
  * Completed items are skipped. An absent, empty, or all-completed list
  * returns {@link STANDING_ARMY} placeholder units with stable `standing#`
@@ -47,7 +57,7 @@ export function remainingFightUnits(
   todos: readonly { content: string; status: string }[] | null | undefined,
 ): FightUnit[] {
   const remaining: FightUnit[] = []
-  if (Array.isArray(todos)) {
+  if (isTodoList(todos)) {
     const seen = new Map<string, number>()
     for (const item of todos) {
       if (item.status === 'completed') continue

@@ -57,7 +57,10 @@ afterEach(() => {
 })
 
 /** Boot the full continuable stack: loop, persistence, providers, and subagents. */
-async function setupWith(adapter: LlmAdapter, options: { persistence?: boolean } = {}) {
+async function setupWith(adapter: LlmAdapter, options: {
+  persistence?: boolean
+  maxConcurrentSubagents?: number | 'unlimited'
+} = {}) {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
   let disposePersistence: (() => Promise<void>) | undefined
@@ -69,7 +72,9 @@ async function setupWith(adapter: LlmAdapter, options: { persistence?: boolean }
     disposePersistence = () => persistenceFiber.dispose()
   }
   await ctx.plugin(AgentLoop, { agents: [] })
-  await ctx.plugin(SubagentRuntime)
+  await ctx.plugin(SubagentRuntime, options.maxConcurrentSubagents === undefined
+    ? undefined
+    : { maxConcurrentSubagents: options.maxConcurrentSubagents })
   await ctx.plugin(SubagentSpawn, { providerName: 'spawn' })
   await ctx.plugin(SubagentFork, { providerName: 'fork' })
   ctx.llm.registerAdapter(['mock'], adapter)
@@ -77,7 +82,10 @@ async function setupWith(adapter: LlmAdapter, options: { persistence?: boolean }
   return { ctx, parent, disposePersistence, root }
 }
 
-async function setup(script: Script, options: { persistence?: boolean } = {}) {
+async function setup(script: Script, options: {
+  persistence?: boolean
+  maxConcurrentSubagents?: number | 'unlimited'
+} = {}) {
   const adapter = new MockAdapter(script)
   const booted = await setupWith(adapter, options)
   return { ...booted, adapter }
@@ -253,6 +261,51 @@ describe('SubagentRuntime.startContinuable', () => {
     await vi.waitFor(() => {
       expect(ctx.agents.list().map(agent => agent.id)).toEqual([SessionId('parent')])
     })
+  })
+
+  it('refuses a second startContinuable at the concurrency cap and frees the slot on settlement', async () => {
+    const hold = Promise.withResolvers<undefined>()
+    const adapter = new GatedAdapter([
+      { chunks: textResponse('first'), gate: hold.promise },
+      { chunks: textResponse('second') },
+    ])
+    const { ctx, parent } = await setupWith(adapter, { maxConcurrentSubagents: 1 })
+    parkParent(ctx, parent)
+    const first = await ctx.subagents.startContinuable(startSpec(parent))
+    await expect(ctx.subagents.startContinuable({
+      ...startSpec(parent),
+      label: 'second child',
+    })).rejects.toMatchObject({
+      code: 'CONCURRENCY_CAP',
+      message: 'subagent concurrency cap reached (cap 1, live 1)',
+    })
+    hold.resolve(undefined)
+    await waitNoActivation(ctx, first.childId)
+    const second = await ctx.subagents.startContinuable({
+      ...startSpec(parent),
+      label: 'after release',
+    })
+    await waitNoActivation(ctx, second.childId)
+  })
+
+  it('releases the concurrency slot when startContinuable rolls back', async () => {
+    const { ctx, parent } = await setup([textResponse('unused'), textResponse('recovered')], {
+      maxConcurrentSubagents: 1,
+    })
+    const controller = new AbortController()
+    ctx.on('agent/created', ({ agent: child }) => {
+      if (child !== parent) controller.abort('caller gave up')
+    })
+    await expect(ctx.subagents.startContinuable(startSpec(parent, 'spawn', controller.signal)))
+      .rejects.toThrow()
+    await vi.waitFor(() => {
+      expect(ctx.agents.list().map(agent => agent.id)).toEqual([SessionId('parent')])
+    })
+    const started = await ctx.subagents.startContinuable({
+      ...startSpec(parent),
+      label: 'after rollback',
+    })
+    await waitNoActivation(ctx, started.childId)
   })
 
   it('rolls the child back when the signal aborts between publication and acceptance', async () => {

@@ -194,6 +194,8 @@ export function GoalDock({
 }: GoalDockProps) {
   const projection = useProjection('goal')
   const todos = useProjection('todos')
+  // Tests and some assemblies omit the Game settings hook; InjectFace types it as required.
+  // oxlint-disable-next-line typescript/no-unnecessary-condition -- hook is absent when Game mode is not mounted
   const gameEnabled = useGameSettings === undefined
     ? false
     : gameSettingsEnabled(useGameSettings(current => current))

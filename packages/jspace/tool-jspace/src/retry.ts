@@ -5,18 +5,46 @@
 
 import type { SessionEvent } from '@shres-code/shres-code-session'
 
-/** Card tools write diagnosis; they never trip the repeat refuse. */
-const CARD_TOOLS = new Set([
+/**
+ * The five model-facing card tools. They write the diagnosis the repeat
+ * refusal asks for, so they never trip it themselves, and they are the names
+ * the engagement gate withholds before a session reaches its threshold.
+ */
+export const JSPACE_TOOL_NAMES: ReadonlySet<string> = new Set([
   'jspace_open',
   'jspace_note',
   'jspace_checkpoint',
   'jspace_ship',
+  'jspace_charter_amend',
 ])
+
+/** Default `jspace_note` calls accepted in one user turn. Raising it is a deployment choice. */
+export const DEFAULT_MAX_NOTES_PER_TURN = 8
 
 /** Model-visible refuse when the same call repeats with no card write in between. */
 export const REPEAT_DENY =
   'jspace refuses repeating a tool call with the same arguments within a turn while a card is open. '
   + 'Write a jspace_note naming the diagnosis first; after that note the same call runs again.'
+
+/**
+ * Model-visible refuse when this turn already spent its `jspace_note` budget.
+ * @param maxNotesPerTurn - configured cap.
+ * @returns one-sentence denial.
+ */
+export function noteCapDeny(maxNotesPerTurn: number): string {
+  return `jspace_note is limited to ${String(maxNotesPerTurn)} calls this turn; write a checkpoint or do the work instead.`
+}
+
+/**
+ * Model-visible refuse when a card tool is called before the session reaches
+ * the engagement threshold. Names the threshold so the model knows the tool is
+ * withheld for now rather than broken.
+ * @param engageAfterSteps - configured completed-step threshold.
+ * @returns one-sentence denial.
+ */
+export function notEngagedDeny(engageAfterSteps: number): string {
+  return `J-Space engages after ${String(engageAfterSteps)} completed steps in this session; do the work directly until then.`
+}
 
 /**
  * Canonical JSON for logged or live tool arguments.
@@ -57,7 +85,7 @@ export function shouldRefuseRepeat(
   args: unknown,
   currentCallId?: string,
 ): boolean {
-  if (CARD_TOOLS.has(name)) return false
+  if (JSPACE_TOOL_NAMES.has(name)) return false
   const incoming = canonicalizeArgs(args)
   for (let index = events.length - 1; index >= 0; index -= 1) {
     const event = events[index]
@@ -70,4 +98,46 @@ export function shouldRefuseRepeat(
     if (data.name === name && canonicalizeArgs(data.arguments) === incoming) return true
   }
   return false
+}
+
+/**
+ * Count `jspace_note` tool/call events in the current turn, excluding the
+ * in-flight call. A new `turn/start` resets the count; card writes do not.
+ * @param events - session log (the current `tool/call` may already be appended).
+ * @param currentCallId - call id of the in-flight execution, when logged.
+ * @returns notes already issued this turn.
+ */
+export function countNotesThisTurn(
+  events: readonly SessionEvent[],
+  currentCallId?: string,
+): number {
+  let count = 0
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index]
+    if (event === undefined) continue
+    if (event.type === 'turn/start') return count
+    if (event.type !== 'tool/call') continue
+    const data = event.data as { name?: string; callId?: string }
+    if (currentCallId !== undefined && data.callId === currentCallId) continue
+    if (data.name === 'jspace_note') count += 1
+  }
+  return count
+}
+
+/**
+ * Whether this `jspace_note` has already spent the per-turn budget.
+ * @param events - session log.
+ * @param name - incoming tool name.
+ * @param maxNotesPerTurn - configured cap.
+ * @param currentCallId - call id of the in-flight execution, when logged.
+ * @returns true when the harness must deny.
+ */
+export function shouldRefuseNoteCap(
+  events: readonly SessionEvent[],
+  name: string,
+  maxNotesPerTurn: number,
+  currentCallId?: string,
+): boolean {
+  if (name !== 'jspace_note') return false
+  return countNotesThisTurn(events, currentCallId) >= maxNotesPerTurn
 }

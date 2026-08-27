@@ -1,7 +1,16 @@
 import type {} from '@shres-code/shres-code-session/types'
 
-/** Why the paid Shield payload is not screening. */
-export type ShieldInactiveReason = 'panic' | 'unlicensed' | 'engine-missing' | 'disabled'
+/**
+ * Why the paid Shield payload is not screening. `'repo-disabled'` covers the
+ * per-repo carve-out: every live session's repo is exempt (mount gate) or the
+ * requested repo is exempt while the engine screens others (snapshot view).
+ */
+export type ShieldInactiveReason =
+  | 'panic'
+  | 'unlicensed'
+  | 'engine-missing'
+  | 'disabled'
+  | 'repo-disabled'
 
 /** Outcome of the host-seat entitlement + resolve step. */
 export type ShieldReason = 'active' | ShieldInactiveReason
@@ -18,7 +27,7 @@ export interface ShieldStatus {
 }
 
 /** Where `apply` was loaded from. */
-export type ShieldEngineSource = 'env' | 'sibling' | 'package'
+export type ShieldEngineSource = 'env' | 'sibling' | 'profile' | 'package'
 
 /** Minimal `apply` the paid payload must export. */
 export interface ShieldEngineApply {
@@ -32,6 +41,11 @@ export interface ShieldEngineApply {
 export interface ShieldEngine {
   readonly source: ShieldEngineSource
   readonly apply: ShieldEngineApply
+  /**
+   * Absolute path or package specifier that `import()` loaded. Version
+   * lookup walks from an absolute path; a bare specifier yields `null`.
+   */
+  readonly entry: string
   /**
    * Module-level stats reader used when screening is off. `apply` is not
    * invoked; the engine must not register seams for this read.
@@ -104,14 +118,68 @@ export interface ShieldDefinitions {
   stale: boolean
 }
 
+/** Why a npm check or install did not proceed. */
+export type ShieldUpdateBlocked =
+  | 'env-override'
+  | 'no-profile'
+  | 'registry'
+  | 'pnpm'
+
+/**
+ * Currently resolved paid payload identity. Omitted from the snapshot when
+ * nothing resolved.
+ */
+export interface ShieldPayloadInfo {
+  /** Resolution leg that supplied `apply`. */
+  source: ShieldEngineSource
+  /**
+   * `version` from the resolved `@shrestech/shres-shield-plugin` package.json,
+   * or `null` when that file is missing or not that package (env fixtures,
+   * a bare specifier with no on-disk package).
+   */
+  version: string | null
+}
+
+/**
+ * Result of `checkUpdate` / `applyUpdate`. `applied` is true only after a
+ * successful profile install and remount.
+ */
+export interface ShieldPayloadUpdate {
+  /** Always `@shrestech/shres-shield-plugin`. */
+  specifier: string
+  /** Current resolution leg, or `'none'` when the engine is missing. */
+  source: ShieldEngineSource | 'none'
+  /** Installed payload version, or `null` when it cannot be read. */
+  installed: string | null
+  /** `dist-tags.latest` from the npm registry, or `null` on a registry miss. */
+  latest: string | null
+  /**
+   * True when `latest` is a semver string different from `installed` and
+   * nothing blocks an install. Env override and missing profile force false.
+   */
+  available: boolean
+  /** True only after `applyUpdate` installed `latest` into the profile. */
+  applied: boolean
+  /** Present when the check or install cannot proceed. */
+  blocked?: ShieldUpdateBlocked
+  /** Registry, pnpm, or validation diagnostic; omitted on success. */
+  detail?: string
+}
+
 /** Host RPC payload for the current session cwd. */
 export interface ShieldSnapshot {
-  /** Live seat status; `reason` is `'disabled'` when the switch is off. */
+  /**
+   * Effective status for the requested repo: `'disabled'` when the global
+   * switch is off, `'repo-disabled'` when this repo is exempt while the
+   * engine screens others.
+   */
   status: ShieldStatus
   /** Last persisted counts for this repo; disable does not wipe them. */
   stats: ShieldRepoStats
   /** Definition stamp when the engine reports one. */
   definitions?: ShieldDefinitions
+  /** Resolved payload identity when an engine file loaded. */
+  payload?: ShieldPayloadInfo
 }
 
 /**

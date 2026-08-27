@@ -37,7 +37,11 @@
     "@shres-code/shres-code-session": "workspace:^",
     "@shres-code/shres-code-system-prompt": "workspace:^",
     "@shres-code/shres-code-jspace": "workspace:^",
+    "@shres-code/shres-code-untrusted-frame": "workspace:^",
     "@shres-code/cordis": "workspace:^"
+  },
+  "dependencies": {
+    "@shres-code/schemastery": "workspace:^"
   },
   "devDependencies": {
     "@shres-code/cordis-plugin-include": "workspace:^",
@@ -48,6 +52,7 @@
     "@shres-code/shres-code-session": "workspace:^",
     "@shres-code/shres-code-system-prompt": "workspace:^",
     "@shres-code/shres-code-jspace": "workspace:^",
+    "@shres-code/shres-code-untrusted-frame": "workspace:^",
     "@shres-code/cordis": "workspace:^"
   }
 }

@@ -141,6 +141,7 @@ export class TokenMeter extends Service {
       baseline,
       surfaceDeltaTokens,
       totalTokens: Math.max(0, baseline.tokens + surfaceDeltaTokens),
+      headerTokens: estimateHeader(header),
       surfaceTokens: state.surfaceTokens,
       nodes: state.surface,
     }))

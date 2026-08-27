@@ -8,8 +8,48 @@
  */
 
 import { globSync, readFileSync } from 'node:fs'
-import { dirname, join, resolve, sep } from 'node:path'
+import { basename, dirname, join, resolve, sep } from 'node:path'
 import ts from 'typescript'
+
+/** Oxlint contract probes write this prefix into package `src`, then delete the file. */
+const EPHEMERAL_SOURCE_BASENAME = /^oxlint-contract-/
+
+/**
+ * Rel paths the catalog must not treat as product source.
+ * @param rel - repo-relative, `/`-normalized path from glob.
+ * @returns true when the basename is an oxlint-contract probe.
+ */
+function isEphemeralSourceRel(rel: string): boolean {
+  return EPHEMERAL_SOURCE_BASENAME.test(basename(rel))
+}
+
+/**
+ * Read a scanned file. A path that disappears between glob and read is skipped
+ * (oxlint-contract probes, and any other ephemeral file in `src`).
+ * @param abs - absolute path from {@link resolve}.
+ * @returns file text, or `undefined` when the path is gone.
+ */
+function readIfPresent(abs: string): string | undefined {
+  try {
+    return readFileSync(abs, 'utf8')
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined
+    throw error
+  }
+}
+
+/**
+ * Glob source files, dropping oxlint-contract probes and sorting stably.
+ * @param scanRoot - repository root the patterns resolve against.
+ * @param patterns - glob(s) selecting TypeScript/TSX files.
+ * @returns repo-relative `/`-normalized paths, sorted.
+ */
+function listedRels(scanRoot: string, patterns: readonly string[]): string[] {
+  return [...new Set(globSync(patterns as string[], { cwd: scanRoot })
+    .map(path => path.split(sep).join('/')))]
+    .filter(rel => !isEphemeralSourceRel(rel))
+    .sort()
+}
 
 /** The module whose `SlotMap` / standard-kit interfaces every slot owner merges into. */
 const SLOTS_MODULE = '@shres-code/shres-code-client-ui-slots'
@@ -93,11 +133,10 @@ export interface ScannedFile {
 export function scanSlotFiles(scanRoot: string, patterns: readonly string[]): ScannedFile[] {
   const out: ScannedFile[] = []
   const names = new Map<string, string>()
-  const rels = [...new Set(globSync(patterns as string[], { cwd: scanRoot })
-    .map(path => path.split(sep).join('/')))].sort()
-  for (const rel of rels) {
+  for (const rel of listedRels(scanRoot, patterns)) {
     const abs = resolve(scanRoot, rel)
-    const text = readFileSync(abs, 'utf8')
+    const text = readIfPresent(abs)
+    if (text === undefined) continue
     if (!MERGE_HEAD.test(text) && !REGISTER_HEAD.test(text)) continue
     out.push({
       rel,
@@ -120,11 +159,11 @@ export function scanSlotFiles(scanRoot: string, patterns: readonly string[]): Sc
 export function indexExportedTypes(scanRoot: string, patterns: readonly string[]): Map<string, TypeDeclaration> {
   const index = new Map<string, TypeDeclaration>()
   const ambiguous = new Set<string>()
-  const rels = [...new Set(globSync(patterns as string[], { cwd: scanRoot })
-    .map(path => path.split(sep).join('/')))].sort()
-  for (const rel of rels) {
+  for (const rel of listedRels(scanRoot, patterns)) {
     const abs = resolve(scanRoot, rel)
-    const sf = ts.createSourceFile(abs, readFileSync(abs, 'utf8'), ts.ScriptTarget.Latest, true, scriptKindOf(rel))
+    const text = readIfPresent(abs)
+    if (text === undefined) continue
+    const sf = ts.createSourceFile(abs, text, ts.ScriptTarget.Latest, true, scriptKindOf(rel))
     for (const statement of sf.statements) {
       if (!ts.isInterfaceDeclaration(statement) && !ts.isTypeAliasDeclaration(statement)) continue
       if (!statement.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword)) continue

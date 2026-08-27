@@ -12,7 +12,7 @@ import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import SubagentRuntime from '@shres-code/shres-code-subagent'
+import SubagentRuntime, { SubagentDepthError } from '@shres-code/shres-code-subagent'
 import type { Agent } from '@shres-code/shres-code-agent'
 import * as sdk from '../src/index.ts'
 import {
@@ -27,7 +27,11 @@ import {
 const fakeRuntime = fileURLToPath(new URL('../../../sdk/client/tests/fake-runtime.ts', import.meta.url))
 
 /** A parent Agent stub. The SDK backend reads exactly one thing off it: the session header's cwd (the workspace its child inherits). */
-const fakeParent = { id: 'parent', session: { header: { cwd: process.cwd() } } } as unknown as Agent
+const fakeParent = {
+  id: 'parent',
+  options: {},
+  session: { header: { cwd: process.cwd() } },
+} as unknown as Agent
 
 function request(text = 'p', signal = new AbortController().signal) {
   return { label: text, prompt: [{ type: 'text' as const, text }], parent: fakeParent, signal }
@@ -374,12 +378,31 @@ describe('shres-subagent-shres-sdk provider', () => {
     expect(ctx.subagents.getProvider('sdk-hmr')?.inheritsParentContext).toBe(false)
     expect(ctx.subagents.getProvider('sdk-hmr')?.capabilities).toEqual({
       outputSchema: false,
-      depthLimit: false,
+      depthLimit: true,
       toolFilter: false,
       persona: false,
     })
     await fiber.dispose()
     expect(ctx.subagents.getProvider('sdk-hmr')).toBeUndefined()
+    await ctx.fiber.dispose()
+  })
+
+  it('honors maxDepth from the parent and rejects toolFilter and outputSchema', async () => {
+    const ctx = await setup()
+    await expect(ctx.subagents.start('shres-sdk', { ...request(), maxDepth: 0 }))
+      .rejects.toBeInstanceOf(SubagentDepthError)
+    await expect(ctx.subagents.start('shres-sdk', { ...request(), toolFilter: { deny: ['bash'] } }))
+      .rejects.toMatchObject({
+        code: 'UNSUPPORTED_CAPABILITY',
+        message: 'subagent provider "shres-sdk" does not support toolFilter',
+      })
+    await expect(ctx.subagents.start('shres-sdk', {
+      ...request(),
+      outputSchema: { type: 'object', properties: {} },
+    })).rejects.toMatchObject({
+      code: 'UNSUPPORTED_CAPABILITY',
+      message: 'subagent provider "shres-sdk" does not support outputSchema',
+    })
     await ctx.fiber.dispose()
   })
 

@@ -169,12 +169,24 @@ describe('shres-tool-subagent-control/list-agents', () => {
         activity: 'running',
         hasChildren: true,
       },
+      {
+        kind: 'child',
+        id: SessionId('routed-child'),
+        label: 'named route',
+        mode: 'continuable',
+        activity: 'inactive',
+        hasChildren: false,
+      },
       { kind: 'diagnostic', id: SessionId('broken-child'), reason: 'corrupt' },
     ]
     ctx.subagents.listChildren = () => Promise.resolve(entries)
-    const agents = new Map<string, { status: 'running' | 'idle'; session: { requestHeader: () => undefined } }>([
+    const agents = new Map<string, { status: 'running' | 'idle'; session: { requestHeader: () => unknown } }>([
       ['running-child', { status: 'running', session: { requestHeader: () => undefined } }],
       ['waiting-child', { status: 'idle', session: { requestHeader: () => undefined } }],
+      ['routed-child', {
+        status: 'idle',
+        session: { requestHeader: () => ({ config: { provider: 'spawn' } }) },
+      }],
     ])
     vi.spyOn(ctx.agents, 'get').mockImplementation(id => agents.get(id) as never)
     const result = await callTool(ctx, 'list_agents', {}, parent)
@@ -185,6 +197,7 @@ describe('shres-tool-subagent-control/list-agents', () => {
       `${started.childId} [ready] — real child\n`
       + 'running-child [running] — still working\n'
       + 'waiting-child [idle] — waiting on descendants\n'
+      + 'routed-child [idle] (spawn) — named route\n'
       + 'broken-child [diagnostic: corrupt]',
     )
   })

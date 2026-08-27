@@ -45,14 +45,18 @@
     "zod": "^4.4.3"
   },
   "peerDependencies": {
+    "@shres-code/shres-code-brand": "workspace:^",
     "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
     "@shres-code/shres-code-session": "workspace:^",
     "@shres-code/shres-code-session-projection": "workspace:^",
     "@shres-code/shres-code-settings": "workspace:^",
     "@shres-code/cordis": "workspace:^"
   },
   "devDependencies": {
+    "@shres-code/shres-code-brand": "workspace:^",
     "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
     "@shres-code/shres-code-session": "workspace:^",
     "@shres-code/shres-code-session-projection": "workspace:^",
     "@shres-code/shres-code-settings": "workspace:^",

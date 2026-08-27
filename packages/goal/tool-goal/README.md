@@ -22,6 +22,8 @@ Execution requires the exact live `exec.agent`, its inherited `AgentRegistry` in
 
 Complete and blocked also accept the exact current goal round: a goal-sourced `user/message` whose id, revision, and round equal the folded current goal. A goal-round blocked call is mechanically rejected until `blockedAfterConsecutiveRounds`; the model judges whether the same condition actually persisted and must describe it in `blocked_reason`. Direct human authority may stop a goal immediately.
 
+`complete` additionally admits a disarmed goal on a runtime root from any turn. The grant is bookkeeping-only: `goal-round-driver` reserves rounds exclusively while `activation === 'armed'`, so completing a disarmed goal cuts short no continuation. Without it, an agent whose finishing turn is not human-driven — a background-notification or plugin-sourced turn — can never close the goal it just finished, leaving an active-but-idle goal the runtime refuses to settle. `blocked` never takes this grant: its persisted-rounds threshold is untestable without admitted rounds. A subagent session seeded with a parent's goal events is not a runtime root and cannot close the parent's goal.
+
 ## Config
 
 ```yaml
@@ -44,7 +46,7 @@ A fixed goal policy says when semantic human intent warrants creation, requires 
 ##### Goal policy
 
 ```markdown
-Use goal tools for one long-running completion objective in the current session. create_goal may infer goal intent from a direct human request in any language; do not create a goal for routine single-turn work. Call get_goal before update_goal and copy its exact goal_id and revision. After session resume or fork, an active goal is disarmed: when a human asks to continue or resume in any wording or language, use update_goal action resume to rearm it. Mark complete only when the objective is actually achieved. Mark blocked only after the same blocking condition persists for at least 3 consecutive goal rounds, and report that concrete condition in blocked_reason; difficulty, uncertainty, or useful remaining work is not blocked.
+Use goal tools for one long-running completion objective in the current session. create_goal may infer goal intent from a direct human request in any language; do not create a goal for routine single-turn work. Call get_goal before update_goal and copy its exact goal_id and revision. After session resume or fork, an active goal is disarmed: when a human asks to continue or resume in any wording or language, use update_goal action resume to rearm it. Mark complete only when the objective is actually achieved; when your finishing turn is not human-driven and the goal is disarmed, complete it anyway rather than leaving an active goal no continuation will settle. Mark blocked only after the same blocking condition persists for at least 3 consecutive goal rounds, and report that concrete condition in blocked_reason; difficulty, uncertainty, or useful remaining work is not blocked.
 ```
 
 #### Token effect

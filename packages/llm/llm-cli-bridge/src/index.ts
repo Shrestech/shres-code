@@ -120,11 +120,11 @@ function sessionWorkspaceCwd(ctx: Context, sessionId: GenerateOptions['sessionId
   if (sessionId === undefined) {
     throw new Error('llm-cli-bridge: stream() requires a session with a workspace')
   }
-  const sessions = ctx.get('sessions')
+  const sessions = ctx.get('sessions') as { get(id: SessionId): { header: { cwd?: string } } | undefined } | undefined
   if (sessions === undefined) {
     throw new Error('llm-cli-bridge: stream() requires ctx.sessions')
   }
-  const cwd = sessions.get(sessionId as SessionId)?.header.cwd
+  const cwd = sessions.get(sessionId)?.header.cwd
   if (cwd === undefined || cwd.length === 0) {
     throw new Error(
       'llm-cli-bridge: no working directory for the child — start from a session that has one',
@@ -227,7 +227,7 @@ export function apply(ctx: Context, config: Config): void {
   ensureRegistrationFacts()
 
   installSettingsSection(ctx, NS, Config, config as never, {
-    setSource: (source) => { current = () => source() as Config },
+    setSource: (source) => { current = () => source() },
     onChange: () => {
       ensureDirectory()
       ensureRegistrationFacts()

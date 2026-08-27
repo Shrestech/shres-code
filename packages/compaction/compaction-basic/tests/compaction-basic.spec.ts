@@ -5,11 +5,17 @@ import BasicCompactionEngine from '@shres-code/shres-code-compaction-basic'
 import type { BasicCompactionConfig } from '@shres-code/shres-code-compaction-basic'
 import { selectCompactableRange } from '@shres-code/shres-code-compaction-basic/src/region.ts'
 import type { SummarizationInput, SummaryResult } from '@shres-code/shres-code-compaction-basic/src/summarizer.ts'
+import {
+  POINTER_READ_CUE,
+  POINTER_SECTION_HEADING,
+} from '@shres-code/shres-code-compaction-basic/src/pointers.ts'
 import { CompactionId, toolPairingBalancedAfter, toolPairingBalancedBefore } from '@shres-code/shres-code-compaction'
 import {
   resolveCompactSpec,
   resolveConfig,
   resolveTargetPolicy,
+  DEFAULT_MAX_POINTERS,
+  MAX_MAX_POINTERS,
 } from '@shres-code/shres-code-compaction-basic/src/config.ts'
 import type { CompactionResult } from '@shres-code/shres-code-compaction'
 import LlmRuntime, { createUserMessage, CallId, CONTEXT_WINDOW_EXCEEDED_CODE, createToolResultMessage, LlmAdapter , createMessage } from '@shres-code/shres-code-llm'
@@ -298,6 +304,8 @@ describe('compact configuration and defaults', () => {
       maxOverflowRetries: 1,
       modelPolicies: [],
       auto: true,
+      maxPointers: DEFAULT_MAX_POINTERS,
+      pinSeqs: [],
     })
     expect(Object.isFrozen(resolved)).toBe(true)
   })
@@ -415,6 +423,9 @@ describe('compact configuration and defaults', () => {
       [{ maxTokens: 0 }, /maxTokens/],
       [{ compactionRetries: -1 }, /compactionRetries/],
       [{ maxOverflowRetries: -1 }, /maxOverflowRetries/],
+      [{ maxPointers: -1 }, /maxPointers/],
+      [{ maxPointers: MAX_MAX_POINTERS + 1 }, /maxPointers/],
+      [{ maxPointers: 1.5 }, /maxPointers/],
       [{ auto: 'yes' }, /auto must be a boolean/],
       [{ summarizationProvider: 1 }, /summarizationProvider must be a string/],
       [{ summarizationModel: 1 }, /summarizationModel must be a string/],
@@ -457,6 +468,11 @@ describe('compact configuration and defaults', () => {
         /modelPolicies\[0\]: retainRatio \(0.9\).*thresholdRatio \(0.8\)/,
       ],
       [{ modelPolicies: [{ provider: MODEL, model: MODEL }, { provider: MODEL, model: MODEL }] }, /duplicate model policy/],
+      [{ modelPolicies: [{ provider: MODEL, model: MODEL, maxPointers: 1 }] }, /unknown key "maxPointers"/],
+      [{ pinSeqs: 1 }, /pinSeqs must be an array/],
+      [{ pinSeqs: [-1] }, /pinSeqs\[0\].*non-negative safe integer/],
+      [{ pinSeqs: [1.5] }, /pinSeqs\[0\].*non-negative safe integer/],
+      [{ pinSeqs: [1, 1] }, /duplicate pinSeqs entry 1/],
       [{ models: { [MODEL]: { retainTokens: 10 } } }, /BasicCompactionConfig: unknown key "models"/],
       [{ thresholdRato: 0.5 }, /BasicCompactionConfig: unknown key "thresholdRato"/],
     ] as Array<[unknown, RegExp]>
@@ -674,6 +690,43 @@ describe('pressure measurement and retention', () => {
     expect(await compactIfNeeded(compact, retained)).toBeNull()
   })
 
+  it('does not trigger when only non-compactable header furniture exceeds the threshold', async () => {
+    // The doom-loop regression: a threshold configured below the request
+    // furniture (system prompt + tool schemas) used to fire on every step
+    // with nothing removable. Pressure must price the surface against the
+    // window minus furniture, so furniture alone never qualifies.
+    const compact = service({ auto: false, thresholdRatio: 0.05, retainRatio: 0.003 })
+    const session = conversation(4)
+    session.append('request/header', {
+      header: {
+        config: { provider: MODEL, model: MODEL },
+        system: 'x'.repeat(80_000),
+        tools: [{ name: 'read', description: 'd'.repeat(2_000), parameters: {} }],
+      },
+      reason: 'initial',
+    })
+    // Threshold 0.05 x 1000 = 50; furniture alone is ~20k tokens, surface ~hundreds.
+    // Old behavior: totalTokens (furniture + surface) >> 50 => compaction every step.
+    // New behavior: surface (hundreds) < budget(max(1, 50 - 20k)) = 1 => decline.
+    expect(await compactIfNeeded(compact, session)).toBeNull()
+  })
+
+  it('still triggers when the compactable surface genuinely exceeds the furniture-adjusted budget', async () => {
+    const compact = service({ auto: false, thresholdRatio: 0.9, retainRatio: 0.05 })
+    const session = conversation(6)
+    session.append('request/header', {
+      header: {
+        config: { provider: MODEL, model: MODEL },
+        system: 'x'.repeat(400),
+        tools: [{ name: 'read', description: 'd'.repeat(400), parameters: {} }],
+      },
+      reason: 'initial',
+    })
+    // Threshold 0.9 x 1000 = 900; furniture ~200 tokens => surface budget ~700.
+    // Six turns of 280-token messages put the surface far over that budget.
+    expect(await compactIfNeeded(compact, session)).not.toBeNull()
+  })
+
   it('uses one unified measurement for each pressure-and-retention decision', async () => {
     const ctx = createContext()
     const compact = service(compactConfig, ctx)
@@ -698,7 +751,7 @@ describe('pressure measurement and retention', () => {
     }))
 
     await expect(compactIfNeeded(compact, conversation(4)))
-      .rejects.toThrow(/still above threshold after 1 compaction attempts/)
+      .rejects.toThrow(/still above surface budget after 1 compaction attempts/)
   })
 
   it('rounds a retention cut head-ward to preserve tool-call/result pairing', async () => {
@@ -870,13 +923,35 @@ describe('compaction region transaction', () => {
       usage: compact.usage,
     })
     expect(summary?.data).not.toHaveProperty('llmStreamCall')
+    const pointerText = summary?.type === 'compaction/summary'
+      ? summary.data.summary.filter(block => block.type === 'text').map(block => block.text).join('')
+      : ''
+    expect(pointerText).toContain(POINTER_SECTION_HEADING)
+    expect(pointerText).toContain(POINTER_READ_CUE)
+    expect(summary?.type === 'compaction/summary' ? summary.data.rawOutput : undefined)
+      .toEqual(compact.rawOutput)
     const head = session.deriveMessages()[0]!
     expect(head.content[0]?.type).toBe('text')
     expect(head.content[0]?.type === 'text' ? head.content[0].text : '').toContain('<compacted-summary>')
+    expect(head.content.some(block => block.type === 'text' && block.text.includes(POINTER_SECTION_HEADING)))
+      .toBe(true)
     expect(head.content.at(-1)).toEqual({ type: 'text', text: '</compacted-summary>' })
 
     const replay = Session.create(SessionId('replay'), [...session.events])
     expect(replay.deriveMessages()).toEqual(session.deriveMessages())
+  })
+
+  it('omits pointer lines when maxPointers is 0', async () => {
+    const compact = service({ auto: false, maxPointers: 0 })
+    const session = conversation(3)
+    const before = [...session.surface.nodes]
+    await compact.compactRegion(before[0]!, before[3]!, agent(session, MODEL), SIGNAL)
+    const summary = session.events.findLast(event => event.type === 'compaction/summary')
+    const text = summary?.type === 'compaction/summary'
+      ? summary.data.summary.filter(block => block.type === 'text').map(block => block.text).join('')
+      : ''
+    expect(text).toBe('small checkpoint')
+    expect(text).not.toContain(POINTER_SECTION_HEADING)
   })
 
   it('replays the latest routed header so the summarizer reuses the cache', async () => {
@@ -1251,6 +1326,8 @@ describe('default one-shot summarizer', () => {
     const last = messages.at(-1)?.content[0]
     const lastText = last?.type === 'text' ? last.text : ''
     expect(lastText).toContain('Write concise English engineering prose.')
+    expect(lastText).toContain('## Constraints')
+    expect(lastText).toContain('copy the original sentence verbatim')
     expect(lastText).toContain('numeric values, function signatures, and syntax fragments.')
     expect(lastText).toContain('## Primary Request and Intent')
   })
@@ -1325,12 +1402,15 @@ describe('default one-shot summarizer', () => {
     const session = conversation(3, 'large history '.repeat(500))
     const nodes = session.surface.nodes
     await compact.compactRegion(nodes[0]!, nodes[3]!, agent(session, MODEL), SIGNAL)
-    expect(session.events.findLast(event => event.type === 'compaction/summary')?.data).toMatchObject({
-      summary: [{ type: 'text', text: 'routed summary' }],
+    const recorded = session.events.findLast(event => event.type === 'compaction/summary')?.data
+    expect(recorded).toMatchObject({
       llmStreamCall: true,
       provider: 'routed-summary-provider',
       model: 'routed-summary-model',
     })
+    expect(recorded?.summary[0]).toEqual({ type: 'text', text: 'routed summary' })
+    expect(recorded?.summary.some(block => block.type === 'text' && block.text.includes(POINTER_READ_CUE)))
+      .toBe(true)
     expect(routedAdapter.lastOptions?.provider).toBe('routed-summary-provider')
     expect(routedAdapter.lastOptions?.model).toBe('routed-summary-model')
   })
@@ -1876,5 +1956,128 @@ describe('automatic listener and loader composition', () => {
     await preStep(ctx, agent(session, MODEL))
     expect(session.events.some(event => event.type === 'compaction/start')).toBe(false)
     expect(await recover(ctx, agent(session, MODEL), overflow())).toBe(false)
+  })
+})
+
+const CONSTRAINT_RULES = [
+  'Rule 1: qty() of apples is 3.',
+  'Rule 2: never substitute pears.',
+  'Rule 3: report units in kilograms.',
+  'Rule 4: refuse orders over 12.',
+  'Rule 5: keep the house discount at 15%.',
+  'Rule 6: quote the SKU exactly as given.',
+] as const
+
+function assembledPrompt(session: Session): string {
+  return session.deriveMessages()
+    .flatMap(message => message.content)
+    .map(block => block.type === 'text' ? block.text : '')
+    .join('\n')
+}
+
+describe('constraint retention and pin list', () => {
+  it('keeps six constraint sentences across three compact cycles', async () => {
+    class ConstraintRetainingEngine extends TestCompactionEngine {
+      override async summarize(
+        input: SummarizationInput,
+        agent: Agent,
+        signal?: AbortSignal,
+      ): Promise<{
+        summary: ContentBlock[]
+        rawOutput?: ContentBlock[]
+        provider: string
+        model: string
+        maxTokens?: number
+        usage?: TokenUsage
+      }> {
+        const result = await super.summarize(input, agent, signal)
+        const rules = [...summarizedText(input).matchAll(/^Rule \d+: .+$/gm)].map(match => match[0])
+        return {
+          ...result,
+          summary: [{ type: 'text', text: `## Constraints\n${rules.join('\n')}` }],
+        }
+      }
+    }
+
+    const ctx = createContext()
+    const compact = new ConstraintRetainingEngine(ctx, { auto: false })
+    const session = conversation(4, `${CONSTRAINT_RULES.join('\n')}\n${'padding '.repeat(40)}`)
+    for (let cycle = 0; cycle < 3; cycle += 1) {
+      if (cycle > 0) {
+        const turn = cycle + 4
+        session.append('user/message', createUserMessage({
+          content: [{ type: 'text', text: `later padding ${turn} ${'x'.repeat(200)}` }],
+          source: { kind: 'user' },
+        }), { surfaceOp: 'append' })
+        session.append('step/start', { turn, step: 1 })
+        session.append('assistant/message', {
+          turn,
+          step: 1,
+          message: createMessage({
+            role: 'assistant',
+            content: [{ type: 'text', text: `later assistant ${turn} ${'y'.repeat(200)}` }],
+            source: { kind: 'model', provider: MODEL, model: MODEL },
+          }),
+        }, { surfaceOp: 'append' })
+        session.append('step/end', { turn, step: 1 })
+        session.append('turn/end', { turn, reason: { kind: 'completed' } })
+        session.append('turn/start', { turn: turn + 1 })
+      }
+      expect(
+        await compactIfNeeded(compact, session, 'context-overflow'),
+        `cycle ${cycle}`,
+      ).not.toBeNull()
+    }
+    const prompt = assembledPrompt(session)
+    for (const rule of CONSTRAINT_RULES) expect(prompt).toContain(rule)
+  })
+
+  it('never shadows a pinned surface seq', async () => {
+    const session = conversation(6)
+    const firstUser = session.events.find(event => event.type === 'user/message')
+    if (firstUser === undefined) throw new Error('expected a user/message to pin')
+    const compact = service({
+      auto: false,
+      pinSeqs: [firstUser.seq],
+    })
+    expect(await compactIfNeeded(compact, session, 'context-overflow')).not.toBeNull()
+    expect(session.surface.nodes).toContain(firstUser.seq)
+    expect(session.events[firstUser.seq]).toMatchObject({ type: 'user/message' })
+    expect(session.surface.replaceGeneration).toBeGreaterThan(0)
+  })
+
+  it('declines when every compactable seq is pinned', () => {
+    const session = conversation(4)
+    const priced = createContext().tokenMeter.measure(session)
+    expect(selectCompactableRange(session, priced, 40, [...session.surface.nodes])).toBeNull()
+  })
+
+  it('advances the compact start past an unpaired tool result after leading pins', () => {
+    const session = toolConversation()
+    const assistant = session.events.find(event => event.type === 'assistant/message')
+    const user = session.events.find(event => event.type === 'user/message')
+    if (assistant === undefined || user === undefined) {
+      throw new Error('expected a leading user and tool-call assistant to pin')
+    }
+    const priced = createContext().tokenMeter.measure(session)
+    const range = selectCompactableRange(session, priced, 1, [user.seq, assistant.seq])
+    expect(range).not.toBeNull()
+    expect(range!.start).not.toBe(user.seq)
+    expect(range!.start).not.toBe(assistant.seq)
+  })
+
+  it('compacts the unpinned prefix before a mid-surface pin', () => {
+    const session = conversation(6)
+    const surface = [...session.surface.nodes]
+    const pin = surface[2]
+    if (pin === undefined) throw new Error('expected a mid-surface seq to pin')
+    const priced = createContext().tokenMeter.measure(session)
+    const range = selectCompactableRange(session, priced, 40, [pin])
+    expect(range).not.toBeNull()
+    expect(range!.end).toBe(surface[1])
+    expect(session.surface.nodes.slice(
+      session.surface.nodes.indexOf(range!.start),
+      session.surface.nodes.indexOf(range!.end) + 1,
+    )).not.toContain(pin)
   })
 })

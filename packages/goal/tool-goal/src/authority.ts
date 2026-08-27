@@ -20,6 +20,7 @@ export interface GoalToolExecution {
 export type GoalToolAuthority =
   | { readonly kind: 'direct-human' }
   | { readonly kind: 'goal-round'; readonly goal: GoalView }
+  | { readonly kind: 'disarmed'; readonly goal: GoalView }
 
 /** Throw one structured tool-policy failure. */
 function reject(message: string, code = 'GOAL_TOOL_AUTHORITY_REQUIRED'): never {
@@ -68,9 +69,14 @@ export function goalToolExecution(ctx: Context, exec: ToolRunContext): GoalToolE
  * producers must supply their own source rather than inheriting this authority.
  */
 function hasDirectHumanInput(ctx: Context, execution: GoalToolExecution): boolean {
-  if (!ctx.agents.roots().includes(execution.agent)) return false
+  if (!isRuntimeRoot(ctx, execution)) return false
   return execution.events.some(event =>
     event.type === 'user/message' && event.data.source.kind === 'user')
+}
+
+/** Whether the executing agent is a runtime root, not a scoped subagent. */
+function isRuntimeRoot(ctx: Context, execution: GoalToolExecution): boolean {
+  return ctx.agents.roots().includes(execution.agent)
 }
 
 /** Whether this turn is the current goal's exact admitted round. */
@@ -93,16 +99,38 @@ export function requireDirectHuman(ctx: Context, execution: GoalToolExecution): 
 }
 
 /**
- * Resolve completion authority from either direct human input or the exact goal round.
+ * Resolve completion authority from direct human input, the exact goal round,
+ * or — for `complete` only — a disarmed goal on a runtime root.
+ *
+ * The disarmed grant is bookkeeping-only: `goal-round-driver` reserves rounds
+ * exclusively while `activation === 'armed'`, so completing a disarmed goal
+ * cuts short no continuation. It exists so an agent whose finishing turn was
+ * not human-driven (a background-notification or plugin-sourced turn) can
+ * still close the goal instead of leaving an active-but-idle goal the runtime
+ * refuses to settle from that turn. The roots check keeps a subagent session
+ * seeded with a parent's goal events from closing the parent's goal.
+ * `blocked` never takes this grant: its persisted-rounds threshold is
+ * untestable without admitted rounds.
+ *
  * @param ctx - Context carrying live agents and goal state.
  * @param execution - Authenticated current tool execution.
- * @returns The direct-human or exact-goal-round authority grant.
+ * @param action - terminal action the caller is reporting.
+ * @returns The direct-human, exact-goal-round, or disarmed-goal authority grant.
  */
-export function completionAuthority(ctx: Context, execution: GoalToolExecution): GoalToolAuthority {
+export function completionAuthority(
+  ctx: Context,
+  execution: GoalToolExecution,
+  action: 'complete' | 'blocked',
+): GoalToolAuthority {
   if (hasDirectHumanInput(ctx, execution)) return { kind: 'direct-human' }
   const goal = ctx.goals.get(execution.agent)
   if (goal !== undefined && isMatchingGoalRound(execution, goal)) {
     return { kind: 'goal-round', goal }
   }
-  return reject('complete and blocked require a direct human turn or the current goal round')
+  if (action === 'complete' && goal !== undefined && goal.activation === 'disarmed'
+    && isRuntimeRoot(ctx, execution)) {
+    return { kind: 'disarmed', goal }
+  }
+  return reject('complete and blocked require a direct human turn or the current goal round; '
+    + 'complete additionally admits a disarmed goal on a runtime root')
 }

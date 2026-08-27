@@ -167,8 +167,7 @@ describe('directory-picker-browse client half', () => {
     await b.ctx.plugin({ inject: [...inject], apply }).await()
     const entry = b.slots.entries(HOLES[0])[0]!
     const injected = (entry.inject as () => { t: (key: string) => string })()
-    // zh is the shipped default locale.
-    expect(injected.t('browser.title')).toBe('Choose workspace')
+    expect(injected.t('browser.title')).toBe('Select Workspace Directory')
     expect(injected.t('browser.newFolder')).toBe('New folder')
     expect(injected.t('browser.showHidden')).toBe('Show hidden files')
   })

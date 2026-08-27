@@ -426,7 +426,7 @@ describe('worktree-local Lefthook installer', { timeout: 15_000 }, () => {
     const result = await runInstaller(fixture, fixture.main)
 
     expect(result.status).toBe(1)
-    expect(result.stderr).toContain('dormant repository extension extensions.dshunknown')
+    expect(result.stderr).toContain('dormant repository extension extensions.shresunknown')
     expect(git(fixture, fixture.main, [
       'config', '--file', commonConfig, '--get', 'core.repositoryFormatVersion',
     ])).toBe('0')
@@ -627,7 +627,7 @@ describe('worktree-local Lefthook installer', { timeout: 15_000 }, () => {
   })
 
   for (const includeKey of ['include.path', 'includeIf.onbranch:conditional.path']) {
-    for (const key of ['core.worktree', 'core.bare', 'extensions.dshunknown']) {
+    for (const key of ['core.worktree', 'core.bare', 'extensions.shresunknown']) {
       it(`ignores ${key} loaded through ${includeKey}`, async () => {
         const fixture = createFixture()
         const commonConfig = join(commonDirectory(fixture), 'config')

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@shres-code/cordis'
+import { AttachmentId } from '@shres-code/shres-code-attachment'
 import LlmRuntime, {
   errorChain,
   GenerateOptions,
@@ -595,6 +596,52 @@ describe('LlmRuntime', () => {
       provider: 'route', id: 'model', name: 'Model',
       inputModalities: ['text', 'image'],
     })
+  })
+
+  it('projects images off text-only models for frozen and mutable requests', async () => {
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    const adapter = new class extends RecordingAdapter {
+      override resolveModel(): Promise<LlmResolvedModelInfo> {
+        return Promise.resolve({
+          provider: 'route', id: 'model', name: 'Model',
+          inputModalities: ['text'],
+        })
+      }
+    }(SCRIPT)
+    ctx.llm.registerAdapter(['route'], adapter)
+    const messages = [createMessage({
+      role: 'user',
+      content: [
+        { type: 'text', text: 'see' },
+        {
+          type: 'image',
+          attachment: {
+            attachmentId: AttachmentId(`sha256:${'a'.repeat(64)}`),
+            mediaType: 'image/png',
+            bytes: 3,
+            width: 1,
+            height: 1,
+          },
+        },
+      ],
+      source: { kind: 'user' },
+    })]
+
+    for await (const _chunk of ctx.llm.stream(Object.freeze({
+      provider: 'route',
+      model: 'model',
+      messages,
+    }))) { /* drain */ }
+    expect(adapter.lastOptions?.messages[0]?.content.some(block => block.type === 'image')).toBe(false)
+    expect(Object.isFrozen(adapter.lastOptions)).toBe(true)
+
+    for await (const _chunk of ctx.llm.stream({
+      provider: 'route',
+      model: 'model',
+      messages,
+    })) { /* drain */ }
+    expect(adapter.lastOptions?.messages[0]?.content.some(block => block.type === 'image')).toBe(false)
   })
 
   it('resolves detached model context independently of advisory catalog membership', async () => {

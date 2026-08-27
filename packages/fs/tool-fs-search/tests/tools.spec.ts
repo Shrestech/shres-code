@@ -368,7 +368,7 @@ describe('command construction (plain argv)', () => {
       agent: { session: { header: { cwd: process.cwd() } } },
       signal: testToolSignal,
     } as ToolExecution
-    expect(() => fenceSearchPath(ctx, exec, 'grep', join(resolveShresHome(), '.credentials.yaml')))
+    expect(() =>{  fenceSearchPath(ctx, exec, 'grep', join(resolveShresHome(), '.credentials.yaml')) })
       .toThrow(/credentials/)
   })
 
@@ -407,8 +407,8 @@ describe('search-root fence (canonicalized)', () => {
       const ctx = new Context()
       // The requested spelling survives by name; the alias is caught only
       // after canonicalization resolves it to the credentials basename.
-      expect(() => fenceSearchPath(ctx, execIn(dir), 'grep', 'store.credentials.yaml')).toThrow(/credentials/)
-      expect(() => fenceSearchPath(ctx, execIn(dir), 'grep', 'alias.yaml')).toThrow(/credentials/)
+      expect(() =>{  fenceSearchPath(ctx, execIn(dir), 'grep', 'store.credentials.yaml') }).toThrow(/credentials/)
+      expect(() =>{  fenceSearchPath(ctx, execIn(dir), 'grep', 'alias.yaml') }).toThrow(/credentials/)
     } finally {
       await rm(dir, { recursive: true, force: true })
     }
@@ -427,9 +427,9 @@ describe('search-root fence (canonicalized)', () => {
       await ctx.plugin(SandboxPolicyService, { mode: 'workspace-write', workspaceRoot: workspace })
       // Lexically `link` sits inside the workspace; the canonicalized target
       // does not, so containment must compare real paths.
-      expect(() => fenceSearchPath(ctx, execIn(workspace), 'grep', 'link'))
+      expect(() =>{  fenceSearchPath(ctx, execIn(workspace), 'grep', 'link') })
         .toThrow(/outside the workspace/)
-      expect(() => fenceSearchPath(ctx, execIn(workspace), 'grep', '.')).not.toThrow()
+      expect(() =>{  fenceSearchPath(ctx, execIn(workspace), 'grep', '.') }).not.toThrow()
     } finally {
       await rm(dir, { recursive: true, force: true })
     }
@@ -442,7 +442,7 @@ describe('search-root fence (canonicalized)', () => {
       // No policy: a not-yet-created root under the workdir is allowed (rg
       // will fail it as SEARCH_FAILED); the walk-up must not misread it as a
       // credentials document or an outside path.
-      expect(() => fenceSearchPath(ctx, execIn(dir), 'glob', 'missing/child')).not.toThrow()
+      expect(() =>{  fenceSearchPath(ctx, execIn(dir), 'glob', 'missing/child') }).not.toThrow()
     } finally {
       await rm(dir, { recursive: true, force: true })
     }
@@ -458,8 +458,33 @@ describe('search-root fence (canonicalized)', () => {
       const ctx = new Context()
       await ctx.plugin(SandboxPolicyService, { mode: 'workspace-write', workspaceRoot: root })
       const exec = { signal: testToolSignal } as ToolExecution
-      expect(() => fenceSearchPath(ctx, exec, 'grep', outside)).toThrow(/outside the workspace/)
-      expect(() => fenceSearchPath(ctx, exec, 'grep', root)).not.toThrow()
+      expect(() =>{  fenceSearchPath(ctx, exec, 'grep', outside) }).toThrow(/outside the workspace/)
+      expect(() =>{  fenceSearchPath(ctx, exec, 'grep', root) }).not.toThrow()
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('denies a nested path under the home credentials document', () => {
+    const ctx = new Context()
+    const exec = {
+      agent: { session: { header: { cwd: process.cwd() } } },
+      signal: testToolSignal,
+    } as ToolExecution
+    expect(() => {
+      fenceSearchPath(ctx, exec, 'grep', join(resolveShresHome(), '.credentials.yaml', 'nested'))
+    }).toThrow(/credentials/)
+  })
+
+  it('denies the exact parent of a confined workspace root', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'shres-search-fence-parent-'))
+    try {
+      const root = join(dir, 'root')
+      await mkdir(root)
+      const ctx = new Context()
+      await ctx.plugin(SandboxPolicyService, { mode: 'workspace-write', workspaceRoot: root })
+      const exec = { signal: testToolSignal } as ToolExecution
+      expect(() =>{  fenceSearchPath(ctx, exec, 'grep', dir) }).toThrow(/outside the workspace/)
     } finally {
       await rm(dir, { recursive: true, force: true })
     }

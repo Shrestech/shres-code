@@ -108,6 +108,7 @@ export class HarnessSdkJsonRpcServer {
    * @param params - SDK handshake parameters.
    * @returns server identity for the handshake.
    */
+  // oxlint-disable-next-line typescript/require-await -- initialize is a protocol method typed as Promise
   async initialize(params: InitializeParams): Promise<InitializeResult> {
     if (params.maxTokens !== undefined
       && (!Number.isSafeInteger(params.maxTokens) || params.maxTokens <= 0)) {
