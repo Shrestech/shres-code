@@ -49,6 +49,17 @@ function arrayOfStrings(value: unknown): string[] {
   return value.filter((entry): entry is string => typeof entry === 'string' && entry.length > 0)
 }
 
+/** Read a route's declared endpoint variants from its stored settings section. */
+function arrayOfObjects(section: unknown, field: string): Array<Record<string, unknown>> {
+  if (section === null || typeof section !== 'object') return []
+  const list = (section as Record<string, unknown>)[field]
+  if (!Array.isArray(list)) return []
+  return list.filter((entry): entry is Record<string, unknown> =>
+    typeof entry === 'object' && entry !== null
+    && typeof (entry as Record<string, unknown>).id === 'string'
+    && typeof (entry as Record<string, unknown>).baseURL === 'string')
+}
+
 /** Props of {@link ProviderEditor}. */
 export interface ProviderEditorProps {
   /** Provider route id. */
@@ -260,6 +271,7 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
   // an edited-but-unsaved endpoint, and a key typed but not yet stored.
   const probeApi = stringAt(draft, 'api') ?? stringAt(fallback, 'api')
   const probeBaseURL = stringAt(draft, 'baseURL') ?? stringAt(fallback, 'baseURL')
+  const endpointVariants = arrayOfObjects(fallback, 'endpoints')
   const probe = {
     settingsNs: namespace.ns,
     // Naming the route lets an adapter that already describes it answer from
@@ -418,6 +430,38 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
           />
           {shownKeyFailure === undefined ? null : <p className={styles['error']}>{t(shownKeyFailure)}</p>}
         </div>
+        {props.credentialOnly === true || endpointVariants.length < 2 ? null : (
+          <div className={styles['field']}>
+            <span className={styles['fieldLabel']}>{t('endpoint')}</span>
+            {/* Variants a route declares render as an explicit choice; picking
+                one writes the plain baseURL override, and a hand-typed URL in
+                CustomSettings stays authoritative over whichever chip glows. */}
+            <div className={styles['endpointVariants']}>
+              {endpointVariants.map((variant) => {
+                const variantURL = variant.baseURL
+                const active = probeBaseURL === variantURL
+                return (
+                  <button
+                    key={String(variant.id)}
+                    type="button"
+                    className={active ? `${styles['endpointChip']} ${styles['endpointChipActive']}` : styles['endpointChip']}
+                    title={typeof variant.hint === 'string' ? variant.hint : undefined}
+                    aria-pressed={active}
+                    disabled={disabled}
+                    onClick={() => { setField('baseURL', variantURL as string) }}
+                  >
+                    {typeof variant.label === 'string' ? variant.label : String(variant.id)}
+                  </button>
+                )
+              })}
+            </div>
+            {typeof endpointVariants.find(variant => variant.baseURL === probeBaseURL)?.hint === 'string' ? (
+              <p className={styles['hint']}>
+                {String(endpointVariants.find(variant => variant.baseURL === probeBaseURL)?.hint)}
+              </p>
+            ) : null}
+          </div>
+        )}
         {props.credentialOnly === true ? null : <details className={styles['customized']}>
           <summary className={styles['customizedSummary']}>{t('customized')}</summary>
           <div className={styles['customizedBody']}>

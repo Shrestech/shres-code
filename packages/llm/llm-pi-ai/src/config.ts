@@ -61,6 +61,23 @@ export type {
   PiAiThinkingFormat,
 } from './catalog.ts'
 
+/**
+ * One known alternate endpoint of a provider route: a named deployment of the
+ * same API family that takes a different credential class. Declaring variants
+ * lets the settings card offer an explicit endpoint choice instead of asking
+ * the user to discover and hand-type a base URL.
+ */
+export interface PiAiEndpointVariant {
+  /** Stable variant id used as the settings value. */
+  id: string
+  /** Human label for pickers. */
+  label: string
+  /** Endpoint base URL this variant switches the route to. */
+  baseURL: string
+  /** One-line hint of what the variant serves and which credential it wants. */
+  hint?: string
+}
+
 /** Configuration for one pi-ai provider route; the `providers` dict key IS the route. */
 export interface PiAiProviderProfile {
   /** Credential reference (environment-variable name) resolved per request through `ctx.credentials`. */
@@ -75,6 +92,13 @@ export interface PiAiProviderProfile {
   api?: string
   /** Endpoint for this route's models; defaults to the installed catalog's endpoint. */
   baseURL?: string
+  /**
+   * Known alternate endpoints of this route (platform, coding, regional). The
+   * active endpoint is still the plain `baseURL` override; variants only feed
+   * pickers and placeholders, so a hand-written `baseURL` remains
+   * authoritative.
+   */
+  endpoints?: PiAiEndpointVariant[] | null
   /**
    * This route's model catalog. Omission serves the installed catalog for the
    * route unchanged; an explicit list replaces it, each entry defaulting its
@@ -223,6 +247,13 @@ const modelFields = {
   compat: compatProfile,
 }
 
+const endpointVariant: z<PiAiEndpointVariant> = z.object({
+  id: z.string().required(),
+  label: z.string().required(),
+  baseURL: z.string().required(),
+  hint: z.string(),
+})
+
 const modelProfile: z<PiAiModelProfile> = z.object({
   id: z.string().required(),
   ...modelFields,
@@ -236,6 +267,7 @@ const profile = z.object({
   displayName: z.string(),
   api: z.union(supportedProtocols()),
   baseURL: z.string(),
+  endpoints: z.array(endpointVariant),
   models: z.array(modelProfile),
   modelOverrides: z.dict(modelOverride),
   compat: compatProfile,

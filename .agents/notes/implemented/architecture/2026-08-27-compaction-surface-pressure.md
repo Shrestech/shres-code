@@ -10,7 +10,7 @@ Automatic pressure compaction compared `tokenMeter.totalTokens` against `thresho
 
 `TokenMeasurement` gains `headerTokens` — the heuristic furniture estimate under the effective header (`estimateHeader`, the same function the baseline already uses). `compaction-basic`'s pressure check now prices only what compaction can act on:
 
-```ts
+```ts ignore-check
 const surfaceBudget = () => spec.thresholdTokens - measurement.headerTokens
 if (surfaceBudget() <= spec.retainTokens) return null        // config cannot express pressure here
 if (measurement.surfaceTokens < surfaceBudget()) return null // not yet under pressure
