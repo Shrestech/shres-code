@@ -690,6 +690,43 @@ describe('pressure measurement and retention', () => {
     expect(await compactIfNeeded(compact, retained)).toBeNull()
   })
 
+  it('does not trigger when only non-compactable header furniture exceeds the threshold', async () => {
+    // The doom-loop regression: a threshold configured below the request
+    // furniture (system prompt + tool schemas) used to fire on every step
+    // with nothing removable. Pressure must price the surface against the
+    // window minus furniture, so furniture alone never qualifies.
+    const compact = service({ auto: false, thresholdRatio: 0.05, retainRatio: 0.003 })
+    const session = conversation(4)
+    session.append('request/header', {
+      header: {
+        config: { provider: MODEL, model: MODEL },
+        system: 'x'.repeat(80_000),
+        tools: [{ name: 'read', description: 'd'.repeat(2_000), parameters: {} }],
+      },
+      reason: 'initial',
+    })
+    // Threshold 0.05 x 1000 = 50; furniture alone is ~20k tokens, surface ~hundreds.
+    // Old behavior: totalTokens (furniture + surface) >> 50 => compaction every step.
+    // New behavior: surface (hundreds) < budget(max(1, 50 - 20k)) = 1 => decline.
+    expect(await compactIfNeeded(compact, session)).toBeNull()
+  })
+
+  it('still triggers when the compactable surface genuinely exceeds the furniture-adjusted budget', async () => {
+    const compact = service({ auto: false, thresholdRatio: 0.9, retainRatio: 0.05 })
+    const session = conversation(6)
+    session.append('request/header', {
+      header: {
+        config: { provider: MODEL, model: MODEL },
+        system: 'x'.repeat(400),
+        tools: [{ name: 'read', description: 'd'.repeat(400), parameters: {} }],
+      },
+      reason: 'initial',
+    })
+    // Threshold 0.9 x 1000 = 900; furniture ~200 tokens => surface budget ~700.
+    // Six turns of 280-token messages put the surface far over that budget.
+    expect(await compactIfNeeded(compact, session)).not.toBeNull()
+  })
+
   it('uses one unified measurement for each pressure-and-retention decision', async () => {
     const ctx = createContext()
     const compact = service(compactConfig, ctx)
@@ -714,7 +751,7 @@ describe('pressure measurement and retention', () => {
     }))
 
     await expect(compactIfNeeded(compact, conversation(4)))
-      .rejects.toThrow(/still above threshold after 1 compaction attempts/)
+      .rejects.toThrow(/still above surface budget after 1 compaction attempts/)
   })
 
   it('rounds a retention cut head-ward to preserve tool-call/result pairing', async () => {

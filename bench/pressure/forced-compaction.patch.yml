@@ -4,8 +4,8 @@
 # shipped tasks never reach the default 0.8 × context-window threshold
 # (≈800k tokens on the 1M DeepSeek / Ollama Cloud windows).
 #
-# thresholdRatio 0.015 fires at floor(window × 0.015): ≈15k tokens on 1M
-# windows, ≈3k on a 200k window. retainRatio must stay below that ratio
+# thresholdRatio 0.015 prices the COMPACTABLE SURFACE against the window minus the request furniture (system+tools); see the compaction-basic surface-budget fix
+# windows. retainRatio must stay below that ratio
 # (the plugin default 0.16 would fail load). A config patch replaces the
 # whole entry config, so every field automatic compaction needs is restated.
 # Applies identically to every arm; combine with a provider tier via a
