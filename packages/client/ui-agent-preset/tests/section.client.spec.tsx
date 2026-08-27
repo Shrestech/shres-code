@@ -461,7 +461,7 @@ describe('a long card description', () => {
     disconnect(): void {}
   }
 
-  const LONG = 'Always use SimplifiedChinesefriendly general assistant，with persistent bash  and fileEdit。'.repeat(8)
+  const LONG = 'Always use a Chinese-friendly general assistant, with persistent bash and file edit. '.repeat(8)
 
   /** Force the clamp to report an overflow: jsdom lays nothing out, so both heights are 0. */
   function clamp(overflowing: boolean): void {
@@ -479,9 +479,9 @@ describe('a long card description', () => {
     clamp(true)
     vi.useFakeTimers()
     try {
-      renderSection({ rows: [{ id: 'zh', trust: 'user', isDefault: false, name: 'Chineseassistant', description: LONG }] })
+      renderSection({ rows: [{ id: 'zh', trust: 'user', isDefault: false, name: 'Chinese assistant', description: LONG }] })
 
-      fireEvent.mouseEnter(within(rowFor('zh')).getByText(LONG))
+      fireEvent.mouseEnter(within(rowFor('zh')).getByText(/Always use a Chinese-friendly general assistant/))
       act(() => { vi.advanceTimersByTime(400) })
 
       expect(screen.getByRole('tooltip').textContent).toBe(LONG)
@@ -494,9 +494,9 @@ describe('a long card description', () => {
     clamp(false)
     vi.useFakeTimers()
     try {
-      renderSection({ rows: [{ id: 'zh', trust: 'user', isDefault: false, name: 'Chineseassistant', description: 'short description。' }] })
+      renderSection({ rows: [{ id: 'zh', trust: 'user', isDefault: false, name: 'Chinese assistant', description: 'short description.' }] })
 
-      fireEvent.mouseEnter(within(rowFor('zh')).getByText('short description。'))
+      fireEvent.mouseEnter(within(rowFor('zh')).getByText('short description.'))
       act(() => { vi.advanceTimersByTime(400) })
 
       // A bubble repeating what is already fully on the card is noise.
@@ -514,6 +514,6 @@ describe('a long card description', () => {
       renderSection({ rows: [{ id: 'zh', trust: 'user', isDefault: false, description: LONG }] })
     }).not.toThrow()
     // The first measurement does not depend on the observer.
-    expect(within(rowFor('zh')).getByText(LONG).getAttribute('title')).toBe('')
+    expect(within(rowFor('zh')).getByText(/Always use a Chinese-friendly general assistant/).getAttribute('title')).toBe('')
   })
 })

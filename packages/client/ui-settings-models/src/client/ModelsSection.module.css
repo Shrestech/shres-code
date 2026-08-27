@@ -258,7 +258,7 @@
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: var(--dsw-alias-label-primary-inverted, #fff);
+  background: var(--dsw-alias-label-primary-inverted);
 }
 
 .rowSwitchOn .rowSwitchThumb {
@@ -825,4 +825,32 @@ select.input {
   line-height: 16px;
   font-weight: 500;
   color: var(--dsw-alias-label-secondary);
+}
+
+.endpointVariants {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.endpointChip {
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  padding: 4px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.endpointChipActive {
+  background: var(--dsw-alias-interactive-bg-hover-accent);
+  border-color: var(--dsw-alias-border-l3);
+  color: var(--dsw-alias-label-primary);
+}
+
+.hint {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--dsw-alias-label-tertiary);
 }

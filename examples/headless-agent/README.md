@@ -1,6 +1,6 @@
 # headless-agent
 
-This directory owns the replay and real-model test composition for a headless coding agent: DeepSeek V4 + local bash and filesystem tools + subagent delegation + workflows and fresh-agent Ralph iteration + `todo_write` + JSONL persistence. It explicitly mounts the shared agent spine, one root agent, persistence, and checkpoint policy; it is not a second product entry point.
+This directory owns the replay and real-model test composition for a headless coding agent: DeepSeek V4 + local bash and filesystem tools + subagent delegation + workflows and fresh-agent Ralph iteration + `todo_write` + JSONL persistence + model-facing session-query tools. It explicitly mounts the shared agent spine, one root agent, persistence, the derived session-query index, and checkpoint policy; it is not a second product entry point.
 
 ## Run it
 
@@ -29,4 +29,4 @@ The overlay creates the same absolute cwd inside the sandbox, but it does not up
 
 [`advanced.cordis.yml`](advanced.cordis.yml) adds Code Mode and the Cordis tools to the test composition.
 
-[`jspace.cordis.yml`](jspace.cordis.yml) adds the Settings-toggled J-Space seat, the `jspace:card` prompt section, and the four J-Space tools.
+[`jspace.cordis.yml`](jspace.cordis.yml) adds the Settings-toggled J-Space seat, the `jspace:card` prompt section, and the five J-Space tools. [`jspace-charter.cordis.snapshot.yml`](jspace-charter.cordis.snapshot.yml) is the keyless replay overlay that turns on executor-enforced charter gates for the `jspace-charter` / `jspace-charter-pass` / `jspace-charter-loop` snapshots.

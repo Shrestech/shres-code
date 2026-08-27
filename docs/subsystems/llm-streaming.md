@@ -379,6 +379,11 @@ interface LlmProviderInfo {
   id: string
   /** Human-readable provider name for selectors and diagnostics. */
   name: string
+  /**
+   * When `delegated`, the route runs an external CLI whose own tools
+   * bypass harness approval. Absent means an ordinary HTTP adapter.
+   */
+  kind?: 'delegated'
 }
 ```
 
@@ -412,6 +417,18 @@ interface LlmConfigurableProvider {
    * from outside.
    */
   declared?: boolean
+  /**
+   * When `delegated`, the route runs an external CLI whose own tools
+   * bypass harness approval. Selectors must show that fact.
+   */
+  kind?: 'delegated'
+  /**
+   * Command the host will spawn for a delegated CLI route. Configuration
+   * surfaces probe PATH with this name.
+   */
+  binary?: string
+  /** Whether {@link binary} is an executable file or a command on PATH. */
+  binaryFound?: boolean
 }
 ```
 
@@ -802,7 +819,8 @@ registerModelDiscovery( settingsNs: string, discover: (request: LlmModelDiscover
  * candidate metadata a surface may offer for adoption.
  * @param settingsNs - namespace whose registered discovery serves this draft.
  * @param request - the endpoint, protocol, and one-shot credential to use.
- * @returns the advertised models, deduplicated in endpoint order.
+ * @returns the advertised models, deduplicated in endpoint order, detached
+ *   from adapter-owned state.
  */
 async discoverModels( settingsNs: string, request: LlmModelDiscoveryRequest, ): Promise<LlmDiscoveredModel[]>
 
@@ -868,7 +886,7 @@ async prepareCall(config: LlmCallConfig, signal?: AbortSignal): Promise<Prepared
 stream(options: GenerateOptions): AsyncIterable<StreamChunk>
 ```
 
-Source: [`packages/llm/llm/src/index.ts:284`](../../packages/llm/llm/src/index.ts)
+Source: [`packages/llm/llm/src/index.ts:285`](../../packages/llm/llm/src/index.ts)
 
 <a id="llm-events"></a>
 
@@ -917,5 +935,5 @@ Waterfall around every streaming model call (retry, replay, routing). Bound to t
 'llm/stream'(this: LlmRuntime, options: GenerateOptions, next: () => AsyncIterable<StreamChunk>): AsyncIterable<StreamChunk>
 ```
 
-Source: [`packages/llm/llm/src/index.ts:64`](../../packages/llm/llm/src/index.ts)
+Source: [`packages/llm/llm/src/index.ts:65`](../../packages/llm/llm/src/index.ts)
 <!-- END GENERATED cordis-surface -->

@@ -17,8 +17,6 @@
                   args: ['./lsp-server.mjs']
                   extensionToLanguage:
                     '.ts': typescript
-          - id: timeout-policy
-            name: '@shres-code/shres-code-tool-call-timeout-policy'
           - id: tool-lsp
             name: '@shres-code/shres-code-tool-lsp'
             config:

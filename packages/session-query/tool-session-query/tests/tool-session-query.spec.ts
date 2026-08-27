@@ -279,7 +279,29 @@ describe('registration and schemas', () => {
       .toEqual({ card: 'generic', kind: 'read', title: 'Read event 4', rawInput: { seq: 4 } })
     const assembly = await mounted.ctx.systemPrompt.assemble()
     expect(assembly.sections.find(section => section.name === 'tool:session-query')?.text)
-      .toContain('prior sessions')
+      .toBe(
+        'The full session history is searchable with session_search, session_event_search, '
+        + 'session_event_read, session_event_trace, and session_trace; query prior events before '
+        + 're-deriving facts, decisions, or tool output you have already produced.',
+      )
+    const eventSearch = mounted.ctx.tools.schemas().find(schema => schema.name === 'session_event_search')
+    const sessionSearch = mounted.ctx.tools.schemas().find(schema => schema.name === 'session_search')
+    expect(eventSearch?.parameters).toMatchObject({
+      properties: {
+        seq_from: {
+          description:
+            "Inclusive event sequence lower bound. J-Space's goalOpenedSeq is the natural lower bound for current-goal-epoch scoping.",
+        },
+      },
+    })
+    expect(sessionSearch?.parameters).toMatchObject({
+      properties: {
+        event_seq_from: {
+          description:
+            "Inclusive event sequence lower bound. J-Space's goalOpenedSeq is the natural lower bound for current-goal-epoch scoping.",
+        },
+      },
+    })
 
     await mounted.fiber.dispose()
     expect(mounted.ctx.tools.schemas().map(schema => schema.name)).toEqual([])
@@ -1444,7 +1466,8 @@ describe('search paging, prior-history bounds, titles, and cancellation', () => 
     },
   ])('fails generic when inspecting $name is unsafe', async ({ secrets, diagnostic, failure }) => {
     const mounted = await mount()
-    // oxlint-disable-next-line typescript/prefer-promise-reject-errors -- hostile unknown rejection is the scenario
+    // Hostile fixtures return unknown; wrapping with instanceof Error is the case under test.
+    // oxlint-disable-next-line typescript/prefer-promise-reject-errors
     FakeQuery.sessionSearch = () => Promise.reject(failure())
     const warn = vi.spyOn(mounted.ctx.logger, 'warn').mockImplementation(() => undefined)
 

@@ -202,6 +202,36 @@ export type PresetTrust = 'system' | 'user'
 
 Source: [`packages/preset/agent-presets/src/preset.ts:52`](../packages/preset/agent-presets/src/preset.ts)
 
+<a id="shres-codeshres-code-agent-seats"></a>
+
+## `@shres-code/shres-code-agent-seats`
+
+Requires: `tools` · `subagents` · `systemPrompt`
+
+```ts config-catalog
+/** Plugin config and `agent-seats` settings schema. Seats default unbound. */
+export interface Config extends AgentSeatsSettings {}
+
+/** User and composition document for the `agent-seats` settings section. */
+export interface AgentSeatsSettings {
+  /** Per-seat bindings; an omitted or empty seat stays unmounted. */
+  seats?: Partial<Record<SeatId, SeatBinding>>
+}
+
+/** One named seat the conductor can delegate to. */
+export type SeatId = (typeof SEAT_IDS)[number]
+
+/** Stored provider/model pair for one seat. Omitted fields leave the seat unbound. */
+export interface SeatBinding {
+  /** Live `ctx.llm` route id. */
+  provider?: string
+  /** Provider-owned model id on that route. */
+  model?: string
+}
+```
+
+Source: [`packages/subagent/agent-seats/src/index.ts:34`](../packages/subagent/agent-seats/src/index.ts)
+
 <a id="shres-codeshres-code-agent-spine-demo"></a>
 
 ## `@shres-code/shres-code-agent-spine-demo`
@@ -346,7 +376,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/attachment/attachment-local/src/index.ts:51`](../packages/attachment/attachment-local/src/index.ts)
+Source: [`packages/attachment/attachment-local/src/index.ts:53`](../packages/attachment/attachment-local/src/index.ts)
 
 <a id="shres-codeshres-code-bash-local"></a>
 
@@ -486,6 +516,18 @@ export interface BasicCompactionConfig extends CompactionPolicyConfig {
   modelPolicies?: ModelCompactPolicyConfig[]
   /** Enable automatic step-boundary pressure and overflow-recovery listeners. Defaults to `true`. */
   auto?: boolean
+  /**
+   * Maximum code-assembled seq-pointer lines appended to each summary.
+   * Each line names a salient shadowed event (tool result, user message, or
+   * assistant message) and how to reread it with `session_event_read` against
+   * the current session. `0` emits no pointers. Defaults to `8`; maximum `64`.
+   */
+  maxPointers?: number
+  /**
+   * Durable surface seqs the compactor must never shadow. Auto and manual
+   * range selection skip these seqs; they stay on the surface. Defaults to `[]`.
+   */
+  pinSeqs?: number[]
 }
 
 /** Policy fields shared by the default policy and exact model overrides. */
@@ -559,7 +601,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/extensions/cordis-host-runner/src/index.ts:94`](../packages/extensions/cordis-host-runner/src/index.ts)
+Source: [`packages/extensions/cordis-host-runner/src/index.ts:95`](../packages/extensions/cordis-host-runner/src/index.ts)
 
 <a id="shres-codeshres-code-credentials-local"></a>
 
@@ -883,6 +925,143 @@ export interface Config {
 
 Source: [`packages/jobs/jobs-local/src/index.ts:31`](../packages/jobs/jobs-local/src/index.ts)
 
+<a id="shres-codeshres-code-jspace"></a>
+
+## `@shres-code/shres-code-jspace`
+
+Requires: `sessions`
+
+```ts config-catalog
+/** Host-seat config. */
+export interface Config {
+  /** Master allow. Default false. */
+  enabled?: boolean
+  /** `available` waits for open; `always-open` is reserved for the prompt Consumer. */
+  mode?: 'available' | 'always-open'
+  /** Refuse a checkpoint whose `by` names no coverage term. Default true. */
+  requireCoverage?: boolean
+  /** Extra coverage terms, escaped as literals. */
+  coverageTerms?: string[]
+  /**
+   * Tool names whose completed non-error calls count as verifier citations.
+   * Empty (the default) leaves evidence-grade classification dormant.
+   */
+  verifierTools?: string[]
+  /**
+   * When true, `jspace_ship` refuses unless the current Goal epoch has an
+   * evidence-grade checkpoint. Default false.
+   */
+  requireVerifiedEvidence?: boolean
+  /**
+   * Completed model steps a session must reach before Consumers engage. Default 0
+   * engages from the first request. An open card engages at any step count.
+   */
+  engageAfterSteps?: number
+}
+```
+
+Source: [`packages/jspace/jspace/src/index.ts:69`](../packages/jspace/jspace/src/index.ts)
+
+<a id="shres-codeshres-code-jspace-prompt"></a>
+
+## `@shres-code/shres-code-jspace-prompt`
+
+Requires: `jspace` · `systemPrompt`
+
+```ts config-catalog
+/** Deployment-owned reprint caps for the assembled card. */
+export interface Config {
+  /** Last Checked lines reprinted on the card. Defaults to 5. Zero and negative are rejected. */
+  checkedReprintLimit?: number
+  /** Last Open questions reprinted on the card. Defaults to 5. Zero and negative are rejected. */
+  openReprintLimit?: number
+}
+```
+
+Source: [`packages/jspace/jspace-prompt/src/index.ts:69`](../packages/jspace/jspace-prompt/src/index.ts)
+
+<a id="shres-codeshres-code-llm-cli-bridge"></a>
+
+## `@shres-code/shres-code-llm-cli-bridge`
+
+Requires: `llm`
+
+```ts config-catalog
+/** Plugin / settings section: a dict of named routes. */
+export interface Config {
+  /** Named CLI routes this adapter registers. */
+  routes?: Record<string, Partial<CliBridgeRoute> & {
+    /** Human-readable route name shown in model pickers. */
+    displayName?: string
+    /** Executable name override resolved for this route. */
+    binary?: string
+  }>
+  /** Grace in milliseconds for CLI process-tree termination. */
+  disposeGraceMs?: number
+}
+
+/** One CLI route the adapter can register. */
+export interface CliBridgeRoute {
+  /** Human-readable route name for selectors. */
+  displayName: string
+  /** Executable name or absolute path. */
+  binary: string
+  /** Flag that receives `GenerateOptions.model` (for example `--model`). */
+  modelArg: string
+  /**
+   * Flag that receives `GenerateOptions.reasoningEffort` when
+   * {@link effortStyle} is `flag`.
+   */
+  effortArg?: string
+  /** How this CLI spells reasoning effort on argv. */
+  effortStyle: EffortStyle
+  /** Efforts this CLI accepts, in display order. */
+  efforts: string[]
+  /** Extra argv inserted before the prompt (output format, yolo, …). */
+  extraArgs: string[]
+  /** Where the serialized prompt is placed. */
+  promptStyle: 'flag' | 'trailing'
+  /** Prompt flag when {@link promptStyle} is `flag` (for example `-p`). */
+  promptArg?: string
+  /** How to parse collected stdout. */
+  parseMode: 'json' | 'stream-json'
+  /** Explicit child env layered after the subprocess scrub. */
+  env: Record<string, string>
+  /**
+   * Credential reference (and child env var name) resolved through the
+   * credentials seam. The secret is never stored in this section.
+   */
+  apiKeyEnv?: string
+  /**
+   * When true, a non-empty `GenerateOptions.tools` is allowed because the
+   * CLI will run its own tools. When false, that request throws
+   * `UNSUPPORTED_OPTION`.
+   */
+  allowDelegatedTools: boolean
+  /** Conservative combined context capacity. */
+  contextWindow: number
+  /** Conservative per-request output cap. */
+  defaultMaxTokens: number
+  /** Advisory models shown by discovery consumers. */
+  models: CliBridgeModel[]
+  /** When false, this route is omitted from the live adapter registry. Defaults to on. */
+  enabled?: boolean
+}
+
+/** How a route turns `GenerateOptions.reasoningEffort` into argv. */
+export type EffortStyle = 'flag' | 'thinking-bool' | 'codex-config'
+
+/** One advisory model listed for a CLI route. */
+export interface CliBridgeModel {
+  /** Model id passed to {@link import('@shres-code/shres-code-llm').GenerateOptions.model}. */
+  id: string
+  /** Selector label; defaults to {@link id}. */
+  name?: string
+}
+```
+
+Source: [`packages/llm/llm-cli-bridge/src/config.ts:82`](../packages/llm/llm-cli-bridge/src/config.ts)
+
 <a id="shres-codeshres-code-llm-deepseek"></a>
 
 ## `@shres-code/shres-code-llm-deepseek`
@@ -1000,6 +1179,13 @@ export interface PiAiProviderProfile {
   /** Endpoint for this route's models; defaults to the installed catalog's endpoint. */
   baseURL?: string
   /**
+   * Known alternate endpoints of this route (platform, coding, regional). The
+   * active endpoint is still the plain `baseURL` override; variants only feed
+   * pickers and placeholders, so a hand-written `baseURL` remains
+   * authoritative.
+   */
+  endpoints?: PiAiEndpointVariant[] | null
+  /**
    * This route's model catalog. Omission serves the installed catalog for the
    * route unchanged; an explicit list replaces it, each entry defaulting its
    * unset fields from the installed model of the same id.
@@ -1062,6 +1248,25 @@ export interface PiAiProviderProfile {
   streamIdleTimeoutMs?: number
   /** Provider-owned model-request retry policy; omission uses normal defaults. */
   retryPolicy?: RetryPolicyConfig
+  /** When false, this route is omitted from the live adapter registry. Defaults to on. */
+  enabled?: boolean
+}
+
+/**
+ * One known alternate endpoint of a provider route: a named deployment of the
+ * same API family that takes a different credential class. Declaring variants
+ * lets the settings card offer an explicit endpoint choice instead of asking
+ * the user to discover and hand-type a base URL.
+ */
+export interface PiAiEndpointVariant {
+  /** Stable variant id used as the settings value. */
+  id: string
+  /** Human label for pickers. */
+  label: string
+  /** Endpoint base URL this variant switches the route to. */
+  baseURL: string
+  /** One-line hint of what the variant serves and which credential it wants. */
+  hint?: string
 }
 
 /** One configured model entry: an id plus the catalog fields it overrides. */
@@ -1156,7 +1361,7 @@ type WithheldThinkingFormat = 'chat-template' | 'qwen-chat-template'
 
 Depends on: `Api` (`@earendil-works/pi-ai`) · `CacheRetention` (`@earendil-works/pi-ai`) · `Model` (`@earendil-works/pi-ai`) · `ModelThinkingLevel` (`@earendil-works/pi-ai`) · `OpenAICompletionsCompat` (`@earendil-works/pi-ai`) · [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts) · `ThinkingBudgets` (`@earendil-works/pi-ai`) · `Transport` (`@earendil-works/pi-ai`)
 
-Source: [`packages/llm/llm-pi-ai/src/config.ts:172`](../packages/llm/llm-pi-ai/src/config.ts)
+Source: [`packages/llm/llm-pi-ai/src/config.ts:198`](../packages/llm/llm-pi-ai/src/config.ts)
 
 <a id="shres-codeshres-code-llm-replay"></a>
 
@@ -1533,10 +1738,18 @@ export interface Config {
    * always compares the FULL canonical string).
    */
   argumentsPreviewChars?: number
+  /**
+   * Consecutive-repeat count at which the call is REFUSED instead of merely
+   * reminded (default `0` — off, the shipped advisory-only behavior). From
+   * this run length on, every further identical call is refused with a
+   * structured {@link REPEAT_TOOL_VETO} result and the tool never runs. Fails
+   * loud at load unless it is `0` or an integer >= 2.
+   */
+  vetoThreshold?: number
 }
 ```
 
-Source: [`packages/guard/repeat-tool-reminder/src/index.ts:28`](../packages/guard/repeat-tool-reminder/src/index.ts)
+Source: [`packages/guard/repeat-tool-reminder/src/index.ts:36`](../packages/guard/repeat-tool-reminder/src/index.ts)
 
 <a id="shres-codeshres-code-sandbox-local"></a>
 
@@ -1658,6 +1871,12 @@ export interface Config {
   preparedSessionCacheSize?: number
   /** Fixed live-event coalescing window; not a backend completion deadline. */
   writeBatchMaxDelayMs?: number
+  /**
+   * Trailing-seq count kept in RAM besides the live model surface after a
+   * flush. Absent retains every event. `0` keeps only current surface nodes
+   * plus unflushed events.
+   */
+  inMemoryLogWindow?: number
 }
 
 /** Physical encoding selected for JSONL session artifacts. */
@@ -1696,6 +1915,25 @@ export interface Config {
   preparedSessionCacheSize?: number
   /** Fixed live-event coalescing window; not a backend completion deadline. */
   writeBatchMaxDelayMs?: number
+  /**
+   * Trailing-seq count kept in RAM besides the live model surface after a
+   * flush. Absent retains every event. `0` keeps only current surface nodes
+   * plus unflushed events.
+   */
+  inMemoryLogWindow?: number
+  /**
+   * Milliseconds SQLite waits on a locked database before failing. `0` fails
+   * immediately. Default `5000`.
+   */
+  busyTimeoutMs?: number
+  /**
+   * Whether stored `assistant/chunk` rows stay forever (`forever`, the default)
+   * or are tombstoned after their assembling `assistant/message` is stored
+   * (`assembled`). Assembled retention makes a later full-log read throw
+   * {@link SessionPersistencePrunedError} rather than silently reconstructing
+   * a different log.
+   */
+  chunkRetention?: ChunkRetention
 }
 
 /**
@@ -1707,9 +1945,12 @@ export interface Config {
  * backend promises.
  */
 export type JournalMode = 'wal' | 'delete' | 'truncate' | 'persist'
+
+/** How long assembled `assistant/chunk` rows remain reconstructable. */
+export type ChunkRetention = 'forever' | 'assembled'
 ```
 
-Source: [`packages/session/session-persistence-sqlite/src/index.ts:70`](../packages/session/session-persistence-sqlite/src/index.ts)
+Source: [`packages/session/session-persistence-sqlite/src/index.ts:90`](../packages/session/session-persistence-sqlite/src/index.ts)
 
 <a id="shres-codeshres-code-session-projection-cache"></a>
 
@@ -1930,6 +2171,50 @@ export interface Config {
 
 Source: [`packages/shell/shell-env/src/index.ts:29`](../packages/shell/shell-env/src/index.ts)
 
+<a id="shres-codeshres-code-shield"></a>
+
+## `@shres-code/shres-code-shield`
+
+Requires: `systemPrompt` · `tools` · `approval` · `jobs`
+
+```ts config-catalog
+/** Host-seat config. Engine-owned tunables stay on `@shrestech/shres-shield-plugin`. */
+export interface Config {
+  /**
+   * Entitlement string. Defaults to {@link DEFAULT_SHIELD_LICENSE} until a
+   * paid key exists. `SHRES_SHIELD_LICENSE` overrides this field. A sibling
+   * `../shres-shield` checkout is also entitled without a key.
+   */
+  license?: string
+  /**
+   * User switch on the Shield settings page. Default true. False unloads the
+   * payload without the panic env. `SHRES_SHIELD=off` still wins. The master
+   * control: a `repos` entry cannot re-enable under it.
+   */
+  enabled?: boolean
+  /**
+   * Per-repo carve-outs. Keys are absolute repo paths; an entry with
+   * `enabled: false` keeps Shield off for sessions working in that repo while
+   * the global switch stays on. Stored in the host-owned settings document —
+   * a repo under audit never authors its own exemption.
+   */
+  repos?: ShieldRepos
+  /** Forwarded to the paid plugin. Default `ask`. */
+  posture?: 'observe' | 'ask' | 'enforce'
+}
+
+/** Repo path → entry exception map stored in the settings namespace. */
+export type ShieldRepos = Record<string, ShieldRepoEntry>
+
+/** One `repos` map entry. `enabled: true` is legal but inert under carve-out-only precedence. */
+export interface ShieldRepoEntry {
+  /** False keeps Shield off for this repo while the global switch stays on. */
+  enabled: boolean
+}
+```
+
+Source: [`packages/guard/shield/src/index.ts:71`](../packages/guard/shield/src/index.ts)
+
 <a id="shres-codeshres-code-skill"></a>
 
 ## `@shres-code/shres-code-skill`
@@ -1942,7 +2227,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/skill/skill/src/index.ts:279`](../packages/skill/skill/src/index.ts)
+Source: [`packages/skill/skill/src/index.ts:315`](../packages/skill/skill/src/index.ts)
 
 <a id="shres-codeshres-code-skill-filesystem"></a>
 
@@ -1982,6 +2267,94 @@ export interface Config {
 
 Source: [`packages/skill/skill-filesystem/src/index.ts:49`](../packages/skill/skill-filesystem/src/index.ts)
 
+<a id="shres-codeshres-code-speech"></a>
+
+## `@shres-code/shres-code-speech`
+
+```ts config-catalog
+/**
+ * Config for the speech seam. `ttsProvider` / `sttProvider` pin which provider
+ * wins for each capability; both are optional (a single registered usable
+ * provider auto-selects). `ttsProviders` / `sttProviders` are ordered
+ * fallbacks used only when the singular pin is omitted. Operational overrides
+ * such as environment variables must feed these same fields rather than
+ * introduce a hidden priority chain. `maxAudioBytes` and `maxTextChars` are
+ * required deployment limits.
+ */
+export interface SpeechRuntimeConfig {
+  /** Inclusive recorded-audio byte cap enforced on transcribe. */
+  readonly maxAudioBytes: number
+  /** Inclusive speakable-script character cap enforced on synthesize. */
+  readonly maxTextChars: number
+  /** Exclusive TTS provider id. Wins over {@link ttsProviders}. */
+  readonly ttsProvider?: string
+  /** Ordered TTS ids; the first registered and `available()` provider runs. */
+  readonly ttsProviders?: string[]
+  /** Exclusive STT provider id. Wins over {@link sttProviders}. */
+  readonly sttProvider?: string
+  /** Ordered STT ids; the first registered and `available()` provider runs. */
+  readonly sttProviders?: string[]
+}
+```
+
+Source: [`packages/speech/speech/src/index.ts:116`](../packages/speech/speech/src/index.ts)
+
+<a id="shres-codeshres-code-speech-kokoro"></a>
+
+## `@shres-code/shres-code-speech-kokoro`
+
+Requires: `speech`
+
+```ts config-catalog
+/** Plugin config (all optional — `apply` fills defaults). */
+export interface Config {
+  /** Hugging Face model id. */
+  modelId?: string
+  /** Weight quantization. Defaults to `q8`. */
+  dtype?: KokoroDtype
+  /** ONNX device. Defaults to `cpu`. */
+  device?: KokoroDevice
+  /** Cache directory for downloaded weights. */
+  cacheDir?: string
+  /** When false, refuse to download and require a warm cache. Defaults to true. */
+  allowDownload?: boolean
+  /** When false, the backend is omitted from the pool. Defaults to on. */
+  enabled?: boolean
+}
+
+/** One `kokoro-js` dtype. */
+export type KokoroDtype = typeof KOKORO_DTYPES[number]
+
+/** One ONNX device id this provider will run. */
+export type KokoroDevice = typeof KOKORO_DEVICES[number]
+```
+
+Source: [`packages/speech/speech-kokoro/src/index.ts:38`](../packages/speech/speech-kokoro/src/index.ts)
+
+<a id="shres-codeshres-code-speech-whisper"></a>
+
+## `@shres-code/shres-code-speech-whisper`
+
+Requires: `speech`
+
+```ts config-catalog
+/** Plugin config (all optional — `apply` fills defaults). */
+export interface Config {
+  /** Hugging Face model id. When omitted, English uses tiny.en and others use multilingual tiny. */
+  modelId?: string
+  /** Cache directory for downloaded weights. */
+  cacheDir?: string
+  /** When false, refuse to download and require a warm cache. Defaults to true. */
+  allowDownload?: boolean
+  /** When false, the backend is omitted from the pool. Defaults to on. */
+  enabled?: boolean
+  /** BCP-47 tag; filled from speech settings at apply time. */
+  language?: string
+}
+```
+
+Source: [`packages/speech/speech-whisper/src/index.ts:52`](../packages/speech/speech-whisper/src/index.ts)
+
 <a id="shres-codeshres-code-spill-local"></a>
 
 ## `@shres-code/shres-code-spill-local`
@@ -2019,6 +2392,30 @@ export interface Config {
 ```
 
 Source: [`packages/spill/spill-policy/src/index.ts:60`](../packages/spill/spill-policy/src/index.ts)
+
+<a id="shres-codeshres-code-step-budget"></a>
+
+## `@shres-code/shres-code-step-budget`
+
+```ts config-catalog
+/**
+ * Plugin config, validated by the same-named schemastery schema plus the
+ * load-time check in `apply` (misconfiguration fails loud: a non-integer or
+ * negative `maxStepsPerTurn` throws at plugin load, never a silent fall-back).
+ */
+export interface Config {
+  /**
+   * Most model steps one turn may enter. `0` — the default — means unlimited
+   * and registers no listener, so an unconfigured deployment behaves exactly
+   * as it did before this guard existed. A step is one model request plus the
+   * tool calls it makes, so the budget bounds a runaway tool loop; it does not
+   * bound tokens, wall time, or how many turns a session runs.
+   */
+  maxStepsPerTurn?: number
+}
+```
+
+Source: [`packages/guard/step-budget/src/index.ts:29`](../packages/guard/step-budget/src/index.ts)
 
 <a id="shres-codeshres-code-storage-domain"></a>
 
@@ -2104,6 +2501,32 @@ export type JournalMode = 'wal' | 'delete' | 'truncate' | 'persist'
 
 Source: [`packages/storage/storage-sqlite/src/index.ts:24`](../packages/storage/storage-sqlite/src/index.ts)
 
+<a id="shres-codeshres-code-subagent"></a>
+
+## `@shres-code/shres-code-subagent`
+
+```ts config-catalog
+/**
+ * Plugin config for {@link SubagentRuntime}. All fields optional — `static Config`
+ * supplies the defaults. A non-integer, non-positive, or non-`'unlimited'`
+ * `maxConcurrentSubagents` throws at plugin load.
+ */
+export interface Config {
+  /**
+   * Maximum concurrently live spawned subagents on this service instance.
+   * `'unlimited'` (the default) admits every spawn. A positive safe integer
+   * refuses a new {@link SubagentRuntime.start} or
+   * {@link SubagentRuntime.startContinuable} with `CONCURRENCY_CAP` once that
+   * many published one-shot runs or first-epoch continuable Activations still
+   * occupy a slot. Follow-up and cold resume do not occupy. Occupancy is not
+   * a queue: the refused call never waits.
+   */
+  maxConcurrentSubagents?: number | 'unlimited'
+}
+```
+
+Source: [`packages/subagent/subagent/src/index.ts:179`](../packages/subagent/subagent/src/index.ts)
+
 <a id="shres-codeshres-code-subagent-acp"></a>
 
 ## `@shres-code/shres-code-subagent-acp`
@@ -2155,7 +2578,7 @@ export interface Config {
 export type PermissionPolicy = 'allow' | 'reject'
 ```
 
-Source: [`packages/subagent/subagent-acp/src/index.ts:27`](../packages/subagent/subagent-acp/src/index.ts)
+Source: [`packages/subagent/subagent-acp/src/index.ts:31`](../packages/subagent/subagent-acp/src/index.ts)
 
 <a id="shres-codeshres-code-subagent-claude-code"></a>
 
@@ -2197,7 +2620,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/subagent/subagent-codex/src/index.ts:30`](../packages/subagent/subagent-codex/src/index.ts)
+Source: [`packages/subagent/subagent-codex/src/index.ts:31`](../packages/subagent/subagent-codex/src/index.ts)
 
 <a id="shres-codeshres-code-subagent-fork-in-process"></a>
 
@@ -2214,6 +2637,54 @@ export interface Config {
 ```
 
 Source: [`packages/subagent/subagent-fork-in-process/src/index.ts:31`](../packages/subagent/subagent-fork-in-process/src/index.ts)
+
+<a id="shres-codeshres-code-subagent-grok-cli"></a>
+
+## `@shres-code/shres-code-subagent-grok-cli`
+
+Requires: `subagents` · `subprocess`
+
+```ts config-catalog
+/** Deployment-owned environment, process-release bound, and executable override. */
+export interface Config {
+  /**
+   * Explicit environment entries layered over the subprocess seam's
+   * credential-scrubbed parent environment. An API key reaches the child
+   * only when named here.
+   */
+  env?: Record<string, string>
+  /** Grace in milliseconds for Grok Build process-tree termination. */
+  disposeGraceMs?: number
+  /** Absolute path or PATH name of the `grok` binary; default `grok`. */
+  executable?: string
+}
+```
+
+Source: [`packages/subagent/subagent-grok-cli/src/index.ts:35`](../packages/subagent/subagent-grok-cli/src/index.ts)
+
+<a id="shres-codeshres-code-subagent-kimi-cli"></a>
+
+## `@shres-code/shres-code-subagent-kimi-cli`
+
+Requires: `subagents` · `subprocess`
+
+```ts config-catalog
+/** Deployment-owned environment, process-release bound, and executable override. */
+export interface Config {
+  /**
+   * Explicit environment entries layered over the subprocess seam's
+   * credential-scrubbed parent environment. An API key reaches the child
+   * only when named here.
+   */
+  env?: Record<string, string>
+  /** Grace in milliseconds for Kimi CLI process-tree termination. */
+  disposeGraceMs?: number
+  /** Absolute path or PATH name of the `kimi` binary; default `kimi`. */
+  executable?: string
+}
+```
+
+Source: [`packages/subagent/subagent-kimi-cli/src/index.ts:35`](../packages/subagent/subagent-kimi-cli/src/index.ts)
 
 <a id="shres-codeshres-code-subagent-shres-sdk"></a>
 
@@ -2266,7 +2737,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/subagent/subagent-shres-sdk/src/index.ts:29`](../packages/subagent/subagent-shres-sdk/src/index.ts)
+Source: [`packages/subagent/subagent-shres-sdk/src/index.ts:30`](../packages/subagent/subagent-shres-sdk/src/index.ts)
 
 <a id="shres-codeshres-code-subagent-spawn-in-process"></a>
 
@@ -2455,6 +2926,32 @@ export interface Config {
 
 Source: [`packages/shell/tool-bash-persistent/src/index.ts:400`](../packages/shell/tool-bash-persistent/src/index.ts)
 
+<a id="shres-codeshres-code-tool-call-timeout-policy"></a>
+
+## `@shres-code/shres-code-tool-call-timeout-policy`
+
+Requires: `tools`
+
+```ts config-catalog
+/**
+ * Plugin config, validated by the same-named schemastery schema plus the
+ * load-time check in `apply` (misconfiguration fails loud: a non-integer or
+ * non-positive `defaultTimeoutMs` throws at plugin load, never a silent
+ * fall-back).
+ */
+export interface Config {
+  /**
+   * Deadline armed for a tool whose `ToolDefinition` declares no `timeoutMs`.
+   * Absent by default, which leaves undeclared tools with no deadline. A
+   * tool's own declaration always wins, in either direction: this is a floor
+   * for the unstated, never a ceiling over the stated.
+   */
+  defaultTimeoutMs?: number
+}
+```
+
+Source: [`packages/guard/timeout-policy/src/index.ts:42`](../packages/guard/timeout-policy/src/index.ts)
+
 <a id="shres-codeshres-code-tool-fs"></a>
 
 ## `@shres-code/shres-code-tool-fs`
@@ -2510,7 +3007,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/fs/tool-fs-search/src/index.ts:73`](../packages/fs/tool-fs-search/src/index.ts)
+Source: [`packages/fs/tool-fs-search/src/index.ts:74`](../packages/fs/tool-fs-search/src/index.ts)
 
 <a id="shres-codeshres-code-tool-goal"></a>
 
@@ -2561,6 +3058,59 @@ export type CompletionDelivery = 'quiet' | 'wakeup'
 ```
 
 Source: [`packages/jobs/tool-jobs/src/index.ts:32`](../packages/jobs/tool-jobs/src/index.ts)
+
+<a id="shres-codeshres-code-tool-jspace"></a>
+
+## `@shres-code/shres-code-tool-jspace`
+
+Requires: `tools` · `jspace` · `systemPrompt`
+
+```ts config-catalog
+/** Per-turn `jspace_note` budget, constraint-capture pressure, and charter gates. */
+export interface Config {
+  /**
+   * Maximum `jspace_note` calls accepted in one user turn. Defaults to 8.
+   * Zero and negative are rejected.
+   */
+  maxNotesPerTurn?: number
+  /**
+   * When true, a `jspace_open` that would create the card is refused unless it
+   * carries at least one `core` item. Default false.
+   */
+  requireCoreOnOpen?: boolean
+  /** When true, `jspace_ship` is refused while the card's Core is empty. Default false. */
+  requireCoreForShip?: boolean
+  /**
+   * When true, first charter registration is refused unless the resolved charter
+   * has length ≥ 1, and `jspace_checkpoint` / `jspace_ship` refuse an empty charter.
+   * Default false.
+   */
+  requireCharter?: boolean
+  /**
+   * When true, the charter must contain at least one `kind: 'check'`.
+   * Implies `requireCharter`. Default false.
+   */
+  requireExecutableCharter?: boolean
+  /** When true, extract a charter proposal from the first human user message during prompt assembly. Default false. */
+  charterSeed?: boolean
+  /**
+   * Discrimination bar at registration. `'required'` implies `requireExecutableCharter`.
+   * Default `'off'`.
+   */
+  charterDiscrimination?: CharterDiscriminationMode
+  /** Nested bash `timeoutMs` for each charter check. Default 30000. */
+  charterCheckTimeoutMs?: number
+  /** Cap on seeded proposal entries and on the registered charter list. Default 12. */
+  maxCharterEntries?: number
+  /** When true, refuse write-token charter commands. Default true. */
+  charterChecksMustBeReadOnly?: boolean
+}
+
+/** Discrimination mode from tool-jspace Config. */
+export type CharterDiscriminationMode = 'off' | 'best-effort' | 'required'
+```
+
+Source: [`packages/jspace/tool-jspace/src/index.ts:64`](../packages/jspace/tool-jspace/src/index.ts)
 
 <a id="shres-codeshres-code-tool-lsp"></a>
 
@@ -2670,7 +3220,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/fs/tool-str-replace-editor/src/index.ts:497`](../packages/fs/tool-str-replace-editor/src/index.ts)
+Source: [`packages/fs/tool-str-replace-editor/src/index.ts:514`](../packages/fs/tool-str-replace-editor/src/index.ts)
 
 <a id="shres-codeshres-code-tool-subagent"></a>
 
@@ -2724,18 +3274,29 @@ export interface Config {
    * Maximum child depth: a non-negative safe integer (default `3`; `0` forbids
    * delegation entirely), or `'provider-managed'` to send no cap. A numeric cap
    * requires the provider's `depthLimit` capability (mount fails loud
-   * otherwise). The provider checks the calling agent's current depth at every
-   * start; the tool remains model-visible so runtime policy owns rejection.
-   * `'provider-managed'` is for an out-of-process provider whose recursion
-   * budget belongs to the child runtime or its own deployment.
+   * otherwise). Out-of-process providers advertise `depthLimit` and enforce
+   * that cap on the parent before spawn; `'provider-managed'` omits it when the
+   * child harness or product owns recursion. The service checks the calling
+   * agent's current depth at every start; the tool remains model-visible so
+   * runtime policy owns rejection.
    */
   maxDepth?: number | 'provider-managed'
+  /**
+   * Override the provider-derived tool description. The background-policy
+   * appendix is still appended. Omission keeps the inherit/fresh wording.
+   */
+  description?: string
+  /**
+   * Prefix written onto the persisted child label (`"<prefix>: <description>"`).
+   * Omission stores the model's `description` argument unchanged.
+   */
+  labelPrefix?: string
 }
 ```
 
 Depends on: [`AgentOptions`](subsystems/core.md)
 
-Source: [`packages/subagent/tool-subagent/src/index.ts:29`](../packages/subagent/tool-subagent/src/index.ts)
+Source: [`packages/subagent/tool-subagent/src/index.ts:30`](../packages/subagent/tool-subagent/src/index.ts)
 
 <a id="shres-codeshres-code-tool-subagent-report"></a>
 
@@ -2879,6 +3440,31 @@ export type ToolPresentationMode = 'native' | 'code' | 'both'
 
 Source: [`packages/core/tools/src/index.ts:654`](../packages/core/tools/src/index.ts)
 
+<a id="shres-codeshres-code-tracker-shrestech"></a>
+
+## `@shres-code/shres-code-tracker-shrestech`
+
+```ts config-catalog
+/** Provider plugin config. */
+export interface Config {
+  /** Tracker base URL, for example `https://tracker.example.com`. */
+  baseUrl: string
+  /** Per-lane scope; lanes carry distinct bearer credentials. */
+  lane: string
+  /**
+   * Reference to a credential in `ctx.credentials`. Absent = spool-only mode:
+   * runs are held locally and never posted, and that is not an error.
+   */
+  credentialRef?: string
+  /** Spool file path. Defaults to `$SHRES_HOME/tracker/<lane>.spool.jsonl`. */
+  spoolPath?: string
+  /** Landed-run index file path. Defaults beside the spool (`.landed.jsonl`). */
+  indexPath?: string
+}
+```
+
+Source: [`packages/tracker/tracker-shrestech/src/index.ts:53`](../packages/tracker/tracker-shrestech/src/index.ts)
+
 <a id="shres-codeshres-code-typert-loader"></a>
 
 ## `@shres-code/shres-code-typert-loader`
@@ -2924,7 +3510,7 @@ export interface Config {
 export type ApprovalPolicy = 'ask' | 'never'
 ```
 
-Source: [`packages/interaction/user-approval/src/index.ts:177`](../packages/interaction/user-approval/src/index.ts)
+Source: [`packages/interaction/user-approval/src/index.ts:205`](../packages/interaction/user-approval/src/index.ts)
 
 <a id="shres-codeshres-code-web"></a>
 
@@ -2934,18 +3520,24 @@ Source: [`packages/interaction/user-approval/src/index.ts:177`](../packages/inte
 /**
  * Config for the web seam. `searchProvider` / `fetchProvider` pin which provider
  * wins for each capability; both are optional (a single registered usable
- * provider auto-selects). Operational overrides such as environment variables
- * must feed these same fields rather than introduce a hidden priority chain.
+ * provider auto-selects). `searchProviders` / `fetchProviders` are ordered
+ * fallbacks used only when the singular pin is omitted. Operational overrides
+ * such as environment variables must feed these same fields rather than
+ * introduce a hidden priority chain.
  */
 export interface WebRuntimeConfig {
-  /** Explicit search provider id. Omitted = auto-select when exactly one usable. */
+  /** Exclusive search provider id. Wins over {@link searchProviders}. */
   readonly searchProvider?: string
-  /** Explicit fetch provider id. Omitted = auto-select when exactly one usable. */
+  /** Ordered search ids; the first registered and `available()` provider runs. */
+  readonly searchProviders?: string[]
+  /** Exclusive fetch provider id. Wins over {@link fetchProviders}. */
   readonly fetchProvider?: string
+  /** Ordered fetch ids; the first registered and `available()` provider runs. */
+  readonly fetchProviders?: string[]
 }
 ```
 
-Source: [`packages/web/web/src/index.ts:55`](../packages/web/web/src/index.ts)
+Source: [`packages/web/web/src/index.ts:59`](../packages/web/web/src/index.ts)
 
 <a id="shres-codeshres-code-web-app"></a>
 
@@ -2998,6 +3590,30 @@ export interface Config {
 
 Source: [`packages/web/web-fetch-http/src/index.ts:34`](../packages/web/web-fetch-http/src/index.ts)
 
+<a id="shres-codeshres-code-web-search-attached-cli"></a>
+
+## `@shres-code/shres-code-web-search-attached-cli`
+
+Requires: `web`
+
+```ts config-catalog
+/** Plugin config. */
+export interface Config {
+  /** When false, Grok is omitted from the search pool. Defaults to on. */
+  grok?: boolean
+  /** When false, Claude is omitted from the search pool. Defaults to on. */
+  claude?: boolean
+  /** When false, Codex is omitted from the search pool. Defaults to on. */
+  codex?: boolean
+  /** When false, Kimi is omitted from the search pool. Defaults to on. */
+  kimi?: boolean
+  /** When false, Ollama Cloud is omitted from the search pool. Defaults to on. */
+  ollama?: boolean
+}
+```
+
+Source: [`packages/web/web-search-attached-cli/src/index.ts:49`](../packages/web/web-search-attached-cli/src/index.ts)
+
 <a id="shres-codeshres-code-web-search-deepseek"></a>
 
 ## `@shres-code/shres-code-web-search-deepseek`
@@ -3021,6 +3637,8 @@ export interface Config {
   maxTokens?: number
   /** Maximum `web_search` server-tool uses per request. Defaults to 5. */
   maxUses?: number
+  /** When false, this provider is omitted from the search pool. Defaults to on. */
+  enabled?: boolean
 }
 ```
 
@@ -3124,6 +3742,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@shres-code/shres-code-client-ui-goal` ([`packages/client/ui-goal/src/index.ts`](../packages/client/ui-goal/src/index.ts))
 - `@shres-code/shres-code-client-ui-input-trigger` ([`packages/client/ui-input-trigger/src/index.ts`](../packages/client/ui-input-trigger/src/index.ts))
 - `@shres-code/shres-code-client-ui-jobs` ([`packages/client/ui-jobs/src/index.ts`](../packages/client/ui-jobs/src/index.ts))
+- `@shres-code/shres-code-client-ui-jspace` ([`packages/client/ui-jspace/src/index.ts`](../packages/client/ui-jspace/src/index.ts))
 - `@shres-code/shres-code-client-ui-layout` ([`packages/client/ui-layout/src/index.ts`](../packages/client/ui-layout/src/index.ts))
 - `@shres-code/shres-code-client-ui-message-feedback` ([`packages/client/ui-message-feedback/src/index.ts`](../packages/client/ui-message-feedback/src/index.ts))
 - `@shres-code/shres-code-client-ui-model-selection` ([`packages/client/ui-model-selection/src/index.ts`](../packages/client/ui-model-selection/src/index.ts))
@@ -3131,11 +3750,14 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@shres-code/shres-code-client-ui-plan` ([`packages/client/ui-plan/src/index.ts`](../packages/client/ui-plan/src/index.ts))
 - `@shres-code/shres-code-client-ui-settings` ([`packages/client/ui-settings/src/index.ts`](../packages/client/ui-settings/src/index.ts))
 - `@shres-code/shres-code-client-ui-settings-general` ([`packages/client/ui-settings-general/src/index.ts`](../packages/client/ui-settings-general/src/index.ts))
+- `@shres-code/shres-code-client-ui-settings-jspace` ([`packages/client/ui-settings-jspace/src/index.ts`](../packages/client/ui-settings-jspace/src/index.ts))
 - `@shres-code/shres-code-client-ui-settings-models` ([`packages/client/ui-settings-models/src/index.ts`](../packages/client/ui-settings-models/src/index.ts))
 - `@shres-code/shres-code-client-ui-settings-plugin-inventory` ([`packages/client/ui-settings-plugin-inventory/src/index.ts`](../packages/client/ui-settings-plugin-inventory/src/index.ts))
 - `@shres-code/shres-code-client-ui-settings-plugins` ([`packages/client/ui-settings-plugins/src/index.ts`](../packages/client/ui-settings-plugins/src/index.ts))
+- `@shres-code/shres-code-client-ui-settings-shield` ([`packages/client/ui-settings-shield/src/index.ts`](../packages/client/ui-settings-shield/src/index.ts))
 - `@shres-code/shres-code-client-ui-sidebar` ([`packages/client/ui-sidebar/src/index.ts`](../packages/client/ui-sidebar/src/index.ts))
 - `@shres-code/shres-code-client-ui-skill` ([`packages/client/ui-skill/src/index.ts`](../packages/client/ui-skill/src/index.ts))
+- `@shres-code/shres-code-client-ui-speech` ([`packages/client/ui-speech/src/index.ts`](../packages/client/ui-speech/src/index.ts))
 - `@shres-code/shres-code-client-ui-subagent` ([`packages/client/ui-subagent/src/index.ts`](../packages/client/ui-subagent/src/index.ts))
 - `@shres-code/shres-code-client-ui-theme` ([`packages/client/ui-theme/src/index.ts`](../packages/client/ui-theme/src/index.ts))
 - `@shres-code/shres-code-client-ui-tool` ([`packages/client/ui-tool/src/index.ts`](../packages/client/ui-tool/src/index.ts))
@@ -3146,6 +3768,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@shres-code/shres-code-command-compact` — requires `commands` · `compaction` ([`packages/compaction/command-compact/src/index.ts`](../packages/compaction/command-compact/src/index.ts))
 - `@shres-code/shres-code-command-feedback` — requires `commands` ([`packages/feedback/command-feedback/src/index.ts`](../packages/feedback/command-feedback/src/index.ts))
 - `@shres-code/shres-code-command-goal` — requires `commands` · `goals` ([`packages/goal/command-goal/src/index.ts`](../packages/goal/command-goal/src/index.ts))
+- `@shres-code/shres-code-command-jspace` — requires `commands` · `jspace` ([`packages/jspace/command-jspace/src/index.ts`](../packages/jspace/command-jspace/src/index.ts))
 - `@shres-code/shres-code-commands` ([`packages/interaction/commands/src/index.ts`](../packages/interaction/commands/src/index.ts))
 - `@shres-code/shres-code-cordis-client-runner` ([`packages/extensions/cordis-client-runner/src/index.ts`](../packages/extensions/cordis-client-runner/src/index.ts))
 - `@shres-code/shres-code-fs-e2b` — requires `e2b` ([`packages/e2b/fs-e2b/src/index.ts`](../packages/e2b/fs-e2b/src/index.ts))
@@ -3164,13 +3787,12 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@shres-code/shres-code-session-stats` — requires `sessionProjections` ([`packages/session/session-stats/src/index.ts`](../packages/session/session-stats/src/index.ts))
 - `@shres-code/shres-code-skill-badge` — requires `skills` ([`packages/skill/skill-badge/src/index.ts`](../packages/skill/skill-badge/src/index.ts))
 - `@shres-code/shres-code-storage` ([`packages/storage/storage/src/index.ts`](../packages/storage/storage/src/index.ts))
-- `@shres-code/shres-code-subagent` ([`packages/subagent/subagent/src/index.ts`](../packages/subagent/subagent/src/index.ts))
 - `@shres-code/shres-code-subprocess-local` ([`packages/subprocess/subprocess-local/src/index.ts`](../packages/subprocess/subprocess-local/src/index.ts))
 - `@shres-code/shres-code-terminal` ([`packages/terminal/terminal/src/index.ts`](../packages/terminal/terminal/src/index.ts))
 - `@shres-code/shres-code-tool-ask-user` — requires `tools` · `userQuestions` ([`packages/interaction/tool-ask-user/src/index.ts`](../packages/interaction/tool-ask-user/src/index.ts))
-- `@shres-code/shres-code-tool-call-timeout-policy` — requires `tools` ([`packages/guard/timeout-policy/src/index.ts`](../packages/guard/timeout-policy/src/index.ts))
 - `@shres-code/shres-code-tool-cordis` — requires `tools` · `systemPrompt` · `dynamicCordisRunner` · `cordisInspect` ([`packages/extensions/tool-cordis/src/index.ts`](../packages/extensions/tool-cordis/src/index.ts))
 - `@shres-code/shres-code-tool-subagent-control` — requires `tools` · `subagents` ([`packages/subagent/tool-subagent-control/src/index.ts`](../packages/subagent/tool-subagent-control/src/index.ts))
+- `@shres-code/shres-code-tool-tracker` — requires `tools` · `tracker` ([`packages/tracker/tool-tracker/src/index.ts`](../packages/tracker/tool-tracker/src/index.ts))
 - `@shres-code/shres-code-user-questions` ([`packages/interaction/user-questions/src/index.ts`](../packages/interaction/user-questions/src/index.ts))
 - `@shres-code/shres-code-workspace` — requires `storageDomain` · `sessionPersistence` ([`packages/workspace/workspace/src/index.ts`](../packages/workspace/workspace/src/index.ts))
 
@@ -3192,6 +3814,7 @@ Abstract service classes — a deployment loads a concrete implementation packag
 - `@shres-code/shres-code-shell` — abstract `ShellExecutor` ([`packages/shell/shell/src/index.ts`](../packages/shell/shell/src/index.ts))
 - `@shres-code/shres-code-spill` — abstract `SpillStore` ([`packages/spill/spill/src/index.ts`](../packages/spill/spill/src/index.ts))
 - `@shres-code/shres-code-subprocess` — abstract `SubprocessRuntime` ([`packages/subprocess/subprocess/src/index.ts`](../packages/subprocess/subprocess/src/index.ts))
+- `@shres-code/shres-code-tracker` — abstract `TrackerService` ([`packages/tracker/tracker/src/index.ts`](../packages/tracker/tracker/src/index.ts))
 - `@shres-code/shres-code-workflow` — abstract `WorkflowEngine` ([`packages/workflow/workflow/src/index.ts`](../packages/workflow/workflow/src/index.ts))
 
 ## Library packages (no plugin entry)
@@ -3232,3 +3855,4 @@ Imported as libraries by other packages; a `cordis.yml` cannot load them.
 - `@shres-code/shres-code-typert-generator` ([`packages/typert/generator/src/index.ts`](../packages/typert/generator/src/index.ts))
 - `@shres-code/shres-code-typert-protocol` ([`packages/typert/protocol/src/index.ts`](../packages/typert/protocol/src/index.ts))
 - `@shres-code/shres-code-typert-registry` ([`packages/typert/registry/src/index.ts`](../packages/typert/registry/src/index.ts))
+- `@shres-code/shres-code-untrusted-frame` ([`packages/util/untrusted-frame/src/index.ts`](../packages/util/untrusted-frame/src/index.ts))

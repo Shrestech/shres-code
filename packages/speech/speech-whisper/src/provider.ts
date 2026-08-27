@@ -81,9 +81,11 @@ function raceAbort<T>(work: Promise<T>, signal?: AbortSignal): Promise<T> {
         signal.removeEventListener('abort', onAbort)
         resolve(value)
       },
-      (error) => {
+      (error: unknown) => {
         signal.removeEventListener('abort', onAbort)
-        reject(error)
+        /* v8 ignore start -- engine abort rejects with Error */
+        reject(error instanceof Error ? error : new Error(String(error)))
+        /* v8 ignore stop */
       },
     )
   })
@@ -201,10 +203,12 @@ export class WhisperSttProvider implements SpeechSttProvider {
       this.engine = engine
       this.loading = undefined
       return engine
-    }, (error) => {
+    }, (error: unknown) => {
       this.loading = undefined
       this.loadedModel = undefined
-      throw error
+      /* v8 ignore start -- engine loader rejects with Error */
+      throw error instanceof Error ? error : new Error(String(error))
+      /* v8 ignore stop */
     })
     return this.loading
   }

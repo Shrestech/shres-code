@@ -33,6 +33,7 @@ function card(over: Partial<JspaceCard> = {}): JspaceCard {
     open: [],
     next: 'Write the dock',
     goalOpenedSeq: 1,
+    charter: [],
     ...over,
   }
 }
@@ -71,7 +72,7 @@ function goalProjection(objective: string, phase: GoalProjection['goal']['phase'
 function setup(
   settings: SettingsScopeSnapshot<JSpaceSettings>,
   jspace: JspaceProjection | undefined,
-  goal: GoalProjection | null | undefined = undefined,
+  goal?: GoalProjection | null,
 ) {
   const settingsStore = createSnapshotStore(settings)
   const useJspaceSettings = bindSnapshotSelector(settingsStore)

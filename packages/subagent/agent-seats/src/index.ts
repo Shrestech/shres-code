@@ -87,7 +87,7 @@ export function apply(ctx: Context, config: Config): void {
     disposeTools = () => { void fiber.dispose() }
   }
 
-  installSettingsSection(ctx, AGENT_SEATS_SETTINGS_NAMESPACE, Config, { ...EMPTY_SEATS, ...config }, {
+  installSettingsSection(ctx, AGENT_SEATS_SETTINGS_NAMESPACE, Config, Object.assign({}, EMPTY_SEATS, config), {
     setSource: (current) => { source = current },
     onChange: remount,
   })

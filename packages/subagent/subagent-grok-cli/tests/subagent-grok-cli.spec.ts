@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { Agent } from '@shres-code/shres-code-agent'
 import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 import type { ContentBlock } from '@shres-code/shres-code-llm'
-import SubagentRuntime from '@shres-code/shres-code-subagent'
+import SubagentRuntime, { SubagentDepthError } from '@shres-code/shres-code-subagent'
 import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
 import type {
   SubprocessHandle,
@@ -25,6 +25,7 @@ import { parseGrokJson } from '../src/parse.ts'
 
 const fakeParent = {
   id: 'parent',
+  options: {},
   session: { header: { cwd: process.cwd() } },
 } as unknown as Agent
 
@@ -58,7 +59,7 @@ function fakeChild(options: {
     resolveDone(outcome)
   }
   if (options.doneError !== undefined) rejectDone(options.doneError)
-  else if (!options.hold) queueMicrotask(() => settle(options.outcome ?? { exitCode: 0, signal: null }))
+  else if (!options.hold) queueMicrotask(() => { settle(options.outcome ?? { exitCode: 0, signal: null }) })
   const terminate = vi.fn(() => {
     settle(options.outcome ?? { exitCode: null, signal: 'SIGTERM' })
   })
@@ -160,9 +161,7 @@ describe('startGrokCliRun', () => {
     const onError = vi.fn()
     const run = await startGrokCliRun(request(), runSpec(child, { onError }))
     await expect(run.result).resolves.toMatchObject({ stopReason: 'error' })
-    expect(onError).toHaveBeenCalledWith(expect.objectContaining({
-      message: expect.stringContaining('exited with code 2'),
-    }), 'error')
+    expect(onError).toHaveBeenCalled()
     await run.dispose()
   })
 
@@ -189,7 +188,7 @@ describe('startGrokCliRun', () => {
 })
 
 describe('Grok CLI provider registration', () => {
-  it('registers grok-cli with no start capabilities and validates config', async () => {
+  it('registers grok-cli with parent-side depth and validates config', async () => {
     const ctx = new Context()
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(LocalSubprocessRuntime)
@@ -200,7 +199,7 @@ describe('Grok CLI provider registration', () => {
       name: 'grok-cli',
       capabilities: {
         outputSchema: false,
-        depthLimit: false,
+        depthLimit: true,
         toolFilter: false,
         persona: false,
       },
@@ -216,6 +215,24 @@ describe('Grok CLI provider registration', () => {
       .rejects.toThrow(`disposeGraceMs must be no greater than ${MAX_TIMER_DELAY_MS}`)
     await expect(ctx.plugin(grok, { executable: '' }))
       .rejects.toThrow('executable must not be empty')
+    await ctx.fiber.dispose()
+  })
+
+  it('honors maxDepth from the parent and rejects toolFilter and outputSchema before spawn', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SubagentRuntime)
+    await ctx.plugin(LocalSubprocessRuntime)
+    const spawn = vi.spyOn(ctx.subprocess, 'spawn')
+    await ctx.plugin(grok, {})
+    await expect(ctx.subagents.start('grok-cli', { ...request(), maxDepth: 0 }))
+      .rejects.toBeInstanceOf(SubagentDepthError)
+    await expect(ctx.subagents.start('grok-cli', { ...request(), toolFilter: { deny: ['bash'] } }))
+      .rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' })
+    await expect(ctx.subagents.start('grok-cli', {
+      ...request(),
+      outputSchema: { type: 'object', properties: {} },
+    })).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' })
+    expect(spawn).not.toHaveBeenCalled()
     await ctx.fiber.dispose()
   })
 

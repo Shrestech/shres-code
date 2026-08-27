@@ -59,6 +59,7 @@ The design ships as a new backend `shres-compact-recallable` on the existing `ct
 - **Tool-result pruning** (the in-flight pruning service): its replacement nodes carry `sourceEventSeqs`; the same registry fold lists pruned results as recallable. Follow-up scope; neither blocks the other.
 - **Provider-usage token accounting** (the in-flight move of compaction pressure onto provider-reported usage): supplies the guard's accounting; the implementation stacks after it.
 - **"Query sessions" backlog item**: the cross-session generalization; this Agent Note scopes to the live session with tool names and rendering chosen so that work extends rather than collides.
+- **Summary seq pointers on `compaction-basic`**: [item 6 of the contract plan](2026-08-26-jspace-contract-and-harness-hardening.md) shipped code-assembled `session_event_read` cues on the existing single-summary backend ([seq-pointers note](../../implemented/feature/2026-08-26-compaction-summary-seq-pointers.md)). That is a narrower mechanism than this note: it does not split frozen index stubs from a mutable state checkpoint, does not add `history_read` / `history_search`, and does not introduce `shres-compact-recallable`. Those remain the open design here.
 - **Training**: when to recall is a learned behavior. The deterministic footers and keyword anchors give training a stable target, and recall usage is fully visible in the session log for trajectory export; benchmark and RL design proceed with the post-training side.
 
 ### Follow-ups

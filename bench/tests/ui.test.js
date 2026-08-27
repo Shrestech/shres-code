@@ -204,7 +204,7 @@ function fixture() {
     trial({ taskId: 'bug-chain', trialIndex: 1, arm: 'on', resolved: true, phases: [ph(0, 'bug-chain', 1), ph(1, 'bug-chain', 1)], sessionFile: 'sessions/bug-chain/t1/p1.jsonl' }),
   ]
   const pairs = tasks.map((t, i) => ({
-    taskId: t.taskId, delta: 0.5 - i * 0.2, deltaCi95: [-0.2, 0.9], mcnemarP: 0.5,
+    taskId: t.taskId, treatment: 'on', delta: 0.5 - i * 0.2, deltaCi95: [-0.2, 0.9], mcnemarP: 0.5,
     wins: 1, losses: 0, ties: 1, winner: 'on',
   }))
   return {
@@ -214,12 +214,11 @@ function fixture() {
     experiment: 'testexp',
     tasks,
     cells,
-    pairs,
     arms: [
       { arm: 'off', accuracy: 0.5, stderr: 0.13, ci95: [0.28, 0.72], totalInputTokens: 30000, totalOutputTokens: 4000, totalDurationMs: 600000, meanTurns: 6, totalIdenticalRetries: 4, trials: 9 },
       { arm: 'on', accuracy: 0.75, stderr: 0.11, ci95: [0.53, 0.89], totalInputTokens: 33000, totalOutputTokens: 4200, totalDurationMs: 640000, meanTurns: 6.2, totalIdenticalRetries: 1, trials: 10 },
     ],
-    comparison: { grade: 'improvement', deltaAccuracy: 0.25, mcnemarP: 0.031 },
+    comparisons: [{ treatment: 'on', grade: 'improvement', deltaAccuracy: 0.25, mcnemarP: 0.031, pairs }],
     trials,
   }
 }
@@ -431,9 +430,10 @@ test('model.armColorMap pins off/on and cycles four extras', () => {
   assert.equal(map.get('v'), 'var(--arm-x1)', 'fifth extra wraps the cycle')
 })
 
-test('model.strataOf orders long, short, adversarial, chain, then extras', () => {
+test('model.strataOf orders long, short, adversarial, chain, pressure, then extras', () => {
   const order = model.strataOf(fixture().tasks)
   assert.deepEqual(order, ['long', 'short', 'adversarial', 'chain'])
+  assert.deepEqual(model.strataOf([{ stratum: 'pressure' }, { stratum: 'long' }]), ['long', 'pressure'])
   assert.deepEqual(model.strataOf([{ stratum: 'chain' }, { stratum: 'xtra' }, { stratum: 'short' }]), ['short', 'chain', 'xtra'])
 })
 
@@ -487,6 +487,7 @@ test('model.summaryRows derives totals and delta vs off', () => {
 
 test('model.heroStats recomputes the delta CI from trials and the token ratio from arms', () => {
   const hero = model.heroStats(fixture())
+  assert.equal(hero.treatment, 'on')
   assert.equal(hero.grade, 'improvement')
   assert.equal(hero.deltaAccuracy, 0.25)
   assert.equal(hero.mcnemarP, 0.031)
@@ -579,6 +580,9 @@ test('renderSummary: hero banner, sparklines, CI bars, arms table', () => {
   assert.equal(byClass(root, 'ci-track').length, 2, 'one inline CI bar per arm')
   assert.equal(attr(byClass(root, 'ci-track')[0], 'role'), 'img')
   assert.equal(byTag(root, 'table').length, 1)
+  assert.ok(text.includes('Dangling'), 'forensics column')
+  assert.ok(text.includes('Compactions'), 'compaction column')
+  assert.ok(text.includes('Pressure'), 'pressure-fired column')
 })
 
 test('renderMatrix: stratum headers, subtotal rows, chain badges, best-arm cells, navigation', () => {

@@ -47,22 +47,22 @@ describe('attachment rejection copy', () => {
     expect(attachmentErrorText(t, 'IMAGE_TOO_MANY_PIXELS')).toBe('Image resolution is too high; compress it and try again')
     expect(attachmentErrorText(t, 'INVALID_IMAGE')).toBe('Only PNG, JPG, WebP, and GIF images are supported')
     expect(attachmentErrorText(t, 'IMAGE_TYPE_MISMATCH')).toBe('Only PNG, JPG, WebP, and GIF images are supported')
-    expect(attachmentErrorText(t, 'TOO_MANY_IMAGES', limits)).toBe('A message can include up to 20  images')
-    expect(attachmentErrorText(t, 'IMAGE_TOO_LARGE', limits)).toBe('each Imagemust not exceed  5MB')
-    expect(attachmentErrorText(t, 'IMAGES_TOO_LARGE', limits)).toBe('Images exceed  100MB，please remove some images')
+    expect(attachmentErrorText(t, 'TOO_MANY_IMAGES', limits)).toBe('A message can include up to 20 images')
+    expect(attachmentErrorText(t, 'IMAGE_TOO_LARGE', limits)).toBe('Each image must be smaller than 5MB')
+    expect(attachmentErrorText(t, 'IMAGES_TOO_LARGE', limits)).toBe('Images exceed 100MB in total; remove some and try again')
     expect(attachmentErrorText(enT, 'TOO_MANY_IMAGES', limits)).toBe('A message can include up to 20 images')
   })
 
   it('folds unknown reasons and limit reasons without projected limits into the send-failed line', () => {
-    expect(attachmentErrorText(t, 'INVALID_IMAGE_BASE64')).toBe('Sending images failed (INVALID_IMAGE_BASE64)，please re-add the images and try again')
-    expect(attachmentErrorText(t, 'TOO_MANY_IMAGES')).toBe('Sending images failed (TOO_MANY_IMAGES)，please re-add the images and try again')
-    expect(attachmentErrorText(t, 'IMAGE_TOO_LARGE')).toBe('Sending images failed (IMAGE_TOO_LARGE)，please re-add the images and try again')
-    expect(attachmentErrorText(t, 'IMAGES_TOO_LARGE')).toBe('Sending images failed (IMAGES_TOO_LARGE)，please re-add the images and try again')
+    expect(attachmentErrorText(t, 'INVALID_IMAGE_BASE64')).toBe('Sending images failed (INVALID_IMAGE_BASE64); re-add them and try again')
+    expect(attachmentErrorText(t, 'TOO_MANY_IMAGES')).toBe('Sending images failed (TOO_MANY_IMAGES); re-add them and try again')
+    expect(attachmentErrorText(t, 'IMAGE_TOO_LARGE')).toBe('Sending images failed (IMAGE_TOO_LARGE); re-add them and try again')
+    expect(attachmentErrorText(t, 'IMAGES_TOO_LARGE')).toBe('Sending images failed (IMAGES_TOO_LARGE); re-add them and try again')
   })
 })
 
 describe('assistant images through the label bridge', () => {
-  it('resolves zh dictionary strings and opens the lightbox on a single click', async () => {
+  it('resolves dictionary strings and opens the lightbox on a single click', async () => {
     const view = render(
       <AssistantMarkdown
         t={t}

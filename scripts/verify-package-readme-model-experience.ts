@@ -169,6 +169,8 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/speech/speech': { kind: 'none', reason: 'The seam converts audio and text; session.prompt owns any model-visible transcript.' },
   'packages/speech/speech-kokoro': { kind: 'none', reason: 'Local Kokoro TTS converts text to audio; session.prompt owns any model-visible transcript.' },
   'packages/speech/speech-whisper': { kind: 'none', reason: 'Local Whisper tiny.en converts audio to text; session.prompt owns any model-visible transcript.' },
+  'packages/tracker/tracker': { kind: 'indirect', reason: 'The service seam delegates model rendering to shres-tool-tracker.' },
+  'packages/tracker/tracker-shrestech': { kind: 'indirect', reason: 'The provider backend delegates model rendering to shres-tool-tracker.' },
   'packages/web/web': { kind: 'indirect', reason: 'The provider registry delegates model rendering to shres-tool-web.' },
   'packages/web/web-fetch-http': { kind: 'indirect', reason: 'The provider backend delegates model rendering to shres-tool-web.' },
   'packages/web/web-search-exa': { kind: 'indirect', reason: 'The provider backend delegates model rendering to shres-tool-web.' },

@@ -18,7 +18,7 @@ Each query sets `persistSession: false` and disables `AskUserQuestion`. It suppl
 
 ## Capabilities and context
 
-The provider advertises no optional start-time capabilities and reports `inheritsParentContext: false`. Claude Code receives the standalone text task and the parent Session cwd, but not the parent conversation, persona, tool filter, depth policy, or structured-output contract. Every run has an independent SDK query, cancellation controller, CLI process, and non-persisted product session.
+The provider advertises `depthLimit` and `outputSchema`, and reports `inheritsParentContext: false`. Claude Code receives the standalone text task, the parent Session cwd, and an optional object JSON schema forwarded as SDK `outputFormat`; it does not receive the parent conversation, persona, or harness tool filter. Every run has an independent SDK query, cancellation controller, CLI process, and non-persisted product session.
 
 ## Configuration
 
@@ -92,5 +92,5 @@ Append-only: the new tool result follows the reusable parent request prefix.
 - **The SDK platform CLI remains in the install closure** — production ignores it in favor of the host `claude`, but the current SDK optional dependency is still installed and supplies the keyless compatibility fixture. Removing that payload belongs to the separate product installation-closure follow-up.
 - **No human interaction path** — `AskUserQuestion` is disabled and other interactive callbacks are absent, so tasks requiring new approval or input fail instead of suspending.
 - **Final text only** — reasoning, intermediate messages, tool traffic, usage, stderr, and workspace diffs remain product-local.
-- **No optional shared capabilities** — output schemas, child personas, tool filtering, and harness depth enforcement are rejected by the shared service for this provider.
+- **No harness tool filter or persona** — those options are rejected. Parent-side `maxDepth` is enforced before spawn. `outputSchema` is forwarded as SDK `outputFormat`; a successful result without `structured_output` fails the run.
 - **No wall-clock timeout or side-effect rollback** — the caller cancels long work, and files or external systems changed before cancellation are not restored.

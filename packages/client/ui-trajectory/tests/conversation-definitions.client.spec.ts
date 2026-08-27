@@ -392,6 +392,7 @@ describe('Trajectory conversation Definitions', () => {
       open: [],
       next: 'Write the test',
       goalOpenedSeq: 2,
+      charter: [],
     }
     const current = snapshot(assembler([
       at(1, 'user/message', {

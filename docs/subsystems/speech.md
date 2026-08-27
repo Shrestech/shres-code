@@ -178,4 +178,95 @@ type SpeechTranscribeWireResult =
 The local Kokoro provider emits WAV. The Web client decodes MediaRecorder output to PCM16 WAV before `transcribe`. Unary Remotes carry canonical-base64 audio.
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
-<!-- END GENERATED cordis-surface (gen-cordis-catalog.ts) -->
+
+<a id="cordis-surface"></a>
+
+## Cordis API
+
+Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — this section is byte-identical in both language sides of the page. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+
+<a id="ctxspeech--speechruntime"></a>
+
+### `ctx.speech` — `SpeechRuntime`
+
+The speech I/O service. Registered as `ctx.speech` (one instance per context).
+
+Selection semantics (resolved at execution time, never order-dependent):
+
+- A singular configured id that is registered and `available()` → that provider.
+- A singular configured id not registered → `SPEECH_PROVIDER_CONFIGURED_MISSING`.
+- A singular configured id registered but unavailable → `SPEECH_PROVIDER_CONFIGURED_UNAVAILABLE`.
+- An ordered fallback list → first listed id that is registered and usable.
+- A fallback list whose members are all missing or unusable → `SPEECH_PROVIDER_UNAVAILABLE`.
+- No pin, exactly one registered usable provider → that provider.
+- No pin, multiple usable providers → `SPEECH_PROVIDER_AMBIGUOUS`.
+- No pin, no usable provider → `SPEECH_PROVIDER_UNAVAILABLE`.
+
+```ts cordis-catalog
+/**
+ * Current resolved user-settings section (read-aloud, voice, language).
+ * @returns the live section, including schema defaults.
+ */
+settings(): SpeechUserSettings
+
+/**
+ * Register a TTS provider. Throws {@link SpeechError}
+ * `SPEECH_DUPLICATE_PROVIDER` if its id is already registered for TTS.
+ * Returns a disposer; disposed with the calling fiber.
+ * @param provider - the provider; its `id` is the registry key.
+ * @returns the disposer that unregisters the provider.
+ */
+registerTtsProvider(provider: SpeechTtsProvider): () => void
+
+/**
+ * Register an STT provider. Throws {@link SpeechError}
+ * `SPEECH_DUPLICATE_PROVIDER` if its id is already registered for STT.
+ * Returns a disposer; disposed with the calling fiber.
+ * @param provider - the provider; its `id` is the registry key.
+ * @returns the disposer that unregisters the provider.
+ */
+registerSttProvider(provider: SpeechSttProvider): () => void
+
+/**
+ * Convert markdown to a speakable script and synthesize it through the
+ * selected TTS provider. An empty script returns zero-length audio with
+ * the requested (or default) voice id; callers that must skip playback
+ * inspect `audio.byteLength`.
+ * @param request - markdown text plus optional voice and language.
+ * @param signal - optional cancellation signal forwarded to the provider.
+ * @returns synthesized audio (WAV from the local Kokoro provider).
+ */
+async synthesize( request: SpeechSynthesizeRequest, signal?: AbortSignal, ): Promise<SpeechSynthesizeResult>
+
+/**
+ * Transcribe recorded audio through the selected STT provider.
+ * @param request - bytes and a closed media type.
+ * @param signal - optional cancellation signal forwarded to the provider.
+ * @returns the transcript.
+ */
+async transcribe( request: SpeechTranscribeRequest, signal?: AbortSignal, ): Promise<SpeechTranscribeResult>
+
+/**
+ * Probe TTS and STT selection plus the TTS voice catalog, without running a
+ * synthesis or transcription.
+ * @returns capability status and voices (empty when TTS is unavailable).
+ */
+@Remote('status') async status(): Promise<SpeechStatus>
+
+/**
+ * Remote synthesize: markdown in, canonical-base64 MPEG out (or `empty`).
+ * @param request - wire payload.
+ * @returns a tagged business result; transport failures stay on the carrier.
+ */
+@Remote('synthesize') async synthesizeRemote(request: SpeechSynthesizeWireRequest): Promise<SpeechSynthesizeWireResult>
+
+/**
+ * Remote transcribe: canonical-base64 audio in, transcript out.
+ * @param request - wire payload.
+ * @returns a tagged business result; transport failures stay on the carrier.
+ */
+@Remote('transcribe') async transcribeRemote(request: SpeechTranscribeWireRequest): Promise<SpeechTranscribeWireResult>
+```
+
+Source: [`packages/speech/speech/src/index.ts:146`](../../packages/speech/speech/src/index.ts)
+<!-- END GENERATED cordis-surface -->

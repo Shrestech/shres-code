@@ -8,7 +8,7 @@ NOTICE: Protocol and card design is derived from Tiger3807861189 J-Space Cogniti
 |---|---|---|
 | [`jspace/`](jspace/README.md) | Seat, settings namespace, remount, fold, session events | `ctx.jspace` |
 | [`jspace-prompt/`](jspace-prompt/README.md) | Reprints the card as `jspace:card` | — |
-| [`tool-jspace/`](tool-jspace/README.md) | Four model tools; remounts from `status.active` | — |
+| [`tool-jspace/`](tool-jspace/README.md) | Five model tools; remounts from `status.active` | — |
 | [`command-jspace/`](command-jspace/README.md) | `/j-space on\|off`; session-local | — |
 
 Design: [J-Space as a Settings-toggled harness card](../../.agents/notes/implemented/feature/2026-08-18-jspace-settings-toggle.md).

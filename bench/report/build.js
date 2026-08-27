@@ -2,9 +2,9 @@
 /**
  * Report builder: scans bench/runs/<experiment>/<arm>/, validates every
  * record against bench/schema, rebuilds per-arm results.json (arm summary
- * + per-task cells) from the trial source of truth, computes off-vs-on
- * pairs and the comparison grade via bench/stats, validates the final
- * ReportData payload, and writes bench/ui/data.js as
+ * + per-task cells) from the trial source of truth, computes off-vs-each-
+ * treatment pairs and comparison grades via bench/stats, validates the
+ * final ReportData payload, and writes bench/ui/data.js as
  * `globalThis.BENCH_REPORT = <json>;`.
  *
  * Usage: node bench/report/build.js [--experiment <name> | latest]
@@ -28,7 +28,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { validateTrial } from '../schema/trial.js'
 import { validateRunManifest } from '../schema/run-manifest.js'
-import { validateReportData } from '../schema/report-data.js'
+import { REPORT_STRATA, validateReportData } from '../schema/report-data.js'
 import { summarizeArm, summarizeCells } from '../stats/aggregate.js'
 import { bootstrapDeltaCi } from '../stats/intervals.js'
 import { gradeComparison, mcnemarExactP, pairOutcomes } from '../stats/paired.js'
@@ -39,8 +39,6 @@ const UI_DATA_PATH = fileURLToPath(new URL('../ui/data.js', import.meta.url))
 
 /** Arms always compare against this baseline. */
 const BASELINE_ARM = 'off'
-/** The synthetic experiment arm pair this comparison supports. */
-const TREATMENT_ARM = 'on'
 
 /**
  * Per-arm rebuilt aggregate, written to runs/<experiment>/<arm>/results.json.
@@ -108,6 +106,8 @@ export async function resolveExperimentDir(runsDir, experiment) {
 /**
  * Load and validate one arm directory: run.json plus every trials.jsonl line.
  * A missing trials.jsonl reads as zero trials so an interrupted run still builds.
+ * Trials sort by taskId then trialIndex so an out-of-order concurrent append
+ * grades identically to a sequential write; pairing keys, not file order.
  * @param {string} armDir - runs/<experiment>/<arm> directory.
  * @returns {Promise<{ manifest: import('../schema/run-manifest.js').RunManifest, trials: import('../schema/trial.js').Trial[] }>}
  */
@@ -136,6 +136,7 @@ export async function loadArm(armDir) {
       trials.push(record)
     }
   }
+  trials.sort((a, b) => a.taskId.localeCompare(b.taskId) || a.trialIndex - b.trialIndex)
   return { manifest, trials }
 }
 
@@ -144,12 +145,12 @@ export async function loadArm(armDir) {
  * fall back to the taskId as description and the 'long' stratum.
  * @param {string} tasksDir - task catalog root.
  * @param {string} taskId - task directory name.
- * @returns {Promise<{ taskId: string, stratum: 'long' | 'short' | 'adversarial' | 'chain', description: string }>}
+ * @returns {Promise<{ taskId: string, stratum: 'long' | 'short' | 'adversarial' | 'chain' | 'pressure', description: string }>}
  */
 export async function loadTaskInfo(tasksDir, taskId) {
   try {
     const raw = JSON.parse(await readFile(join(tasksDir, taskId, 'task.json'), 'utf8'))
-    const stratum = ['long', 'short', 'adversarial', 'chain'].includes(raw.stratum) ? raw.stratum : 'long'
+    const stratum = REPORT_STRATA.includes(raw.stratum) ? raw.stratum : 'long'
     const description = typeof raw.description === 'string' && raw.description.length > 0
       ? raw.description
       : taskId
@@ -160,26 +161,65 @@ export async function loadTaskInfo(tasksDir, taskId) {
 }
 
 /**
- * Build the per-task paired comparison between the baseline and treatment arm.
+ * Build the per-task paired comparison between the baseline and one treatment arm.
  * @param {string} taskId - task to compare.
  * @param {import('../schema/trial.js').Trial[]} offTrials - baseline trials for the task.
- * @param {import('../schema/trial.js').Trial[]} onTrials - treatment trials for the task.
+ * @param {import('../schema/trial.js').Trial[]} treatmentTrials - treatment trials for the task.
  * @param {number} offPass - baseline pass rate for the task.
- * @param {number} onPass - treatment pass rate for the task.
+ * @param {number} treatmentPass - treatment pass rate for the task.
+ * @param {string} treatment - treatment arm name.
  * @returns {import('../schema/report-data.js').ReportPair}
  */
-export function buildPair(taskId, offTrials, onTrials, offPass, onPass) {
-  const { pairs, wins, losses, ties } = pairOutcomes(offTrials, onTrials)
-  const delta = onPass - offPass
+export function buildPair(taskId, offTrials, treatmentTrials, offPass, treatmentPass, treatment) {
+  const { pairs, wins, losses, ties } = pairOutcomes(offTrials, treatmentTrials)
+  const delta = treatmentPass - offPass
   return {
     taskId,
+    treatment,
     delta,
     deltaCi95: bootstrapDeltaCi(pairs),
     mcnemarP: mcnemarExactP(wins, losses),
     wins,
     losses,
     ties,
-    winner: delta > 0 ? 'on' : delta < 0 ? 'off' : 'tie',
+    winner: delta > 0 ? treatment : delta < 0 ? 'off' : 'tie',
+  }
+}
+
+/**
+ * Grade one `off` vs treatment pairing over the experiment.
+ * @param {string} treatment - treatment arm name.
+ * @param {{ trials: import('../schema/trial.js').Trial[] }} offArm - baseline arm load.
+ * @param {{ trials: import('../schema/trial.js').Trial[] }} treatmentArm - treatment arm load.
+ * @param {import('../schema/report-data.js').ReportArmSummary} offSummary
+ * @param {import('../schema/report-data.js').ReportArmSummary} treatmentSummary
+ * @param {string[]} taskIds - catalog order.
+ * @param {import('../schema/report-data.js').ReportCell[]} cells
+ * @returns {import('../schema/report-data.js').ReportComparison}
+ */
+export function buildComparison(treatment, offArm, treatmentArm, offSummary, treatmentSummary, taskIds, cells) {
+  const offTokens = offSummary.totalInputTokens + offSummary.totalOutputTokens
+  const treatmentTokens = treatmentSummary.totalInputTokens + treatmentSummary.totalOutputTokens
+  const tokenOverheadRatio = offTokens > 0 ? treatmentTokens / offTokens : Number.POSITIVE_INFINITY
+  /** @type {import('../schema/report-data.js').ReportPair[]} */
+  const pairs = []
+  for (const taskId of taskIds) {
+    const offTrials = offArm.trials.filter(t => t.taskId === taskId)
+    const treatmentTrials = treatmentArm.trials.filter(t => t.taskId === taskId)
+    if (offTrials.length === 0 && treatmentTrials.length === 0) continue
+    const offCell = cells.find(c => c.arm === BASELINE_ARM && c.taskId === taskId)
+    const treatmentCell = cells.find(c => c.arm === treatment && c.taskId === taskId)
+    pairs.push(buildPair(taskId, offTrials, treatmentTrials, offCell?.passRate ?? 0, treatmentCell?.passRate ?? 0, treatment))
+  }
+  const overall = pairOutcomes(offArm.trials, treatmentArm.trials)
+  const deltaAccuracy = treatmentSummary.accuracy - offSummary.accuracy
+  const mcnemarP = mcnemarExactP(overall.wins, overall.losses)
+  return {
+    treatment,
+    grade: gradeComparison({ mcnemarP, deltaAccuracy, tokenOverheadRatio }),
+    deltaAccuracy,
+    mcnemarP,
+    pairs,
   }
 }
 
@@ -199,7 +239,7 @@ export async function buildExperiment(experimentDir, options = {}) {
 
   const entries = await readdir(experimentDir, { withFileTypes: true })
   const armNames = entries
-    .filter(e => e.isDirectory())
+    .filter(e => e.isDirectory() && existsSync(join(experimentDir, e.name, 'run.json')))
     .map(e => e.name)
     .sort((a, b) => (a === BASELINE_ARM ? -1 : b === BASELINE_ARM ? 1 : a < b ? -1 : a > b ? 1 : 0))
   if (armNames.length === 0) throw new Error(`no arm directories under ${experimentDir}`)
@@ -241,35 +281,15 @@ export async function buildExperiment(experimentDir, options = {}) {
   }
 
   const off = arms.get(BASELINE_ARM)
-  const on = arms.get(TREATMENT_ARM)
-  /** @type {import('../schema/report-data.js').ReportPair[]} */
-  const pairs = []
-  /** @type {import('../schema/report-data.js').ReportData['comparison']} */
-  let comparison = { grade: 'tie', deltaAccuracy: 0, mcnemarP: null }
-  if (off && on) {
+  /** @type {import('../schema/report-data.js').ReportComparison[]} */
+  const comparisons = []
+  if (off) {
     const offSummary = armSummaries[armNames.indexOf(BASELINE_ARM)]
-    const onSummary = armSummaries[armNames.indexOf(TREATMENT_ARM)]
-    const offTokens = offSummary.totalInputTokens + offSummary.totalOutputTokens
-    const onTokens = onSummary.totalInputTokens + onSummary.totalOutputTokens
-    const tokenOverheadRatio = offTokens > 0 ? onTokens / offTokens : Number.POSITIVE_INFINITY
-    for (const taskId of taskIds) {
-      const offTrials = off.trials.filter(t => t.taskId === taskId)
-      const onTrials = on.trials.filter(t => t.taskId === taskId)
-      if (offTrials.length === 0 && onTrials.length === 0) continue
-      const offCell = cells.find(c => c.arm === BASELINE_ARM && c.taskId === taskId)
-      const onCell = cells.find(c => c.arm === TREATMENT_ARM && c.taskId === taskId)
-      pairs.push(buildPair(taskId, offTrials, onTrials, offCell?.passRate ?? 0, onCell?.passRate ?? 0))
-    }
-    const overall = pairOutcomes(off.trials, on.trials)
-    const deltaAccuracy = onSummary.accuracy - offSummary.accuracy
-    comparison = {
-      grade: gradeComparison({
-        mcnemarP: mcnemarExactP(overall.wins, overall.losses),
-        deltaAccuracy,
-        tokenOverheadRatio,
-      }),
-      deltaAccuracy,
-      mcnemarP: mcnemarExactP(overall.wins, overall.losses),
+    for (const treatment of armNames.filter(name => name !== BASELINE_ARM)) {
+      const treatmentArm = arms.get(treatment)
+      const treatmentSummary = armSummaries[armNames.indexOf(treatment)]
+      if (!treatmentArm || !offSummary || !treatmentSummary) continue
+      comparisons.push(buildComparison(treatment, off, treatmentArm, offSummary, treatmentSummary, taskIds, cells))
     }
   }
 
@@ -284,9 +304,8 @@ export async function buildExperiment(experimentDir, options = {}) {
     experiment,
     tasks,
     cells,
-    pairs,
     arms: armSummaries,
-    comparison,
+    comparisons,
     trials: allTrials,
   }
   validateReportData(report)

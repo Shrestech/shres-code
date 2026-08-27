@@ -390,10 +390,18 @@ describe('WebSearchCard', () => {
     fireEvent.click(screen.getByText(en.webSearchTitle))
 
     fireEvent.click(screen.getByRole('switch', { name: en.webSearchGrok }))
+    fireEvent.click(screen.getByRole('switch', { name: en.webSearchClaude }))
+    fireEvent.click(screen.getByRole('switch', { name: en.webSearchCodex }))
+    fireEvent.click(screen.getByRole('switch', { name: en.webSearchKimi }))
+    fireEvent.click(screen.getByRole('switch', { name: en.webSearchOllama }))
     fireEvent.click(screen.getByRole('switch', { name: en.webSearchDeepSeek }))
 
     expect(actions.edit.mock.calls).toEqual([
       ['grok', 'false'],
+      ['claude', 'false'],
+      ['codex', 'false'],
+      ['kimi', 'false'],
+      ['ollama', 'false'],
       ['enabled', 'false'],
     ])
   })

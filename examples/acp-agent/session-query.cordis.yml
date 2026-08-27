@@ -1,12 +1,7 @@
-# Explicit session-query tool opt-in for the dedicated spill scenario. The
-# nested filesystem overlay supplies private spill storage and its byte limit.
+# Spill-backed session-query scenario. The five model-facing query tools and
+# the timeout policy live on the base composition; this overlay only adds
+# private spill storage through the filesystem overlay.
 - id: base
   name: '@shres-code/cordis-plugin-include'
   config:
     path: ./fs.cordis.yml
-    patches:
-      - insert:
-          - id: tool-session-query
-            name: '@shres-code/shres-code-tool-session-query'
-          - id: timeout-policy
-            name: '@shres-code/shres-code-tool-call-timeout-policy'

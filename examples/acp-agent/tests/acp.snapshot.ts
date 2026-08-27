@@ -45,6 +45,7 @@ const DEPTH_TWO_CONFIG = fileURLToPath(new URL('../depth-two.cordis.yml', import
 const CHILD_QUESTION_CONFIG = fileURLToPath(new URL('../child-question.cordis.yml', import.meta.url))
 const SESSION_SANDBOX_ROOT_CONFIG = fileURLToPath(new URL('../session-sandbox-root.cordis.yml', import.meta.url))
 const RETRY_CONFIG = fileURLToPath(new URL('../retry.cordis.yml', import.meta.url))
+const GUARD_BUDGET_CONFIG = fileURLToPath(new URL('../guard-budget.cordis.yml', import.meta.url))
 const SESSION_TITLE_CONFIG = fileURLToPath(new URL('../session-title.cordis.yml', import.meta.url))
 const SUBAGENT_REPORT_QUIET_CONFIG = fileURLToPath(
   new URL('../subagent-report-quiet.cordis.yml', import.meta.url),
@@ -185,6 +186,10 @@ const SCENARIOS: Scenario[] = [
     overridden: true,
     pinsHeader: true,
     headerClass: 'session-query',
+    // The five query tools now live on the base composition, so the assembled
+    // request header matches the default class; only the spill overlay differs.
+    systemPromptSource: 'text-turn',
+    toolSchemasSource: 'text-turn',
     configPath: SESSION_QUERY_CONFIG,
     posixOnly: true,
   },
@@ -360,6 +365,13 @@ const SCENARIOS: Scenario[] = [
   // the fixture scripts five identical todo_write calls and pins BOTH reminder
   // tiers (gentle at 3, detailed at 5) as injected user/message in transcript and log.
   { name: 'repeat-tool-reminder', hasModelTurn: true, recorded: false },
+  // Keyless, authored (like repeat-tool-reminder): the two enforcing guards the
+  // base composition ships off. The overlay turns the reminder's veto on at 4
+  // and caps the turn at 5 steps; the script repeats one todo_write until both
+  // fire, pinning the advisory tier at 3, the structured refusal at 4 and 5
+  // (the tool never runs), the durable `step-budget/exhausted` stop, the
+  // `blocked` turn end, and the stop notice arriving in the next turn.
+  { name: 'guard-step-budget', hasModelTurn: true, recorded: false, configPath: GUARD_BUDGET_CONFIG },
   // Authored replay: a root AGENTS.md pins the session prefix, then a read in
   // nested/ discovers its narrower AGENTS.md as a raw, metadata-bearing
   // injected user/message. Both portable AGENTS.md fixtures are symlinks to a sibling

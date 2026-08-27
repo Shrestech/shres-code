@@ -127,6 +127,15 @@
             apiKeyEnv: XAI_API_KEY
           moonshotai:
             apiKeyEnv: MOONSHOT_API_KEY
+            endpoints:
+              - id: platform
+                label: Moonshot Platform
+                baseURL: https://api.moonshot.ai/v1
+                hint: Platform API keys (sk-...) from platform.moonshot.ai; serves the full Kimi model family.
+              - id: coding
+                label: Kimi Code
+                baseURL: https://api.kimi.com/coding/v1
+                hint: Kimi Code subscription credentials; serves the kimi-k2.7-code coding models.
           openrouter:
             apiKeyEnv: OPENROUTER_API_KEY
           groq:

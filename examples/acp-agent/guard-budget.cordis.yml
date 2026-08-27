@@ -1,0 +1,21 @@
+# Guard-escalation overlay: the two enforcing budgets that ship off. The base
+# composition mounts repeat-tool-reminder advisory-only and no step budget, so a
+# scenario that needs a refusal and a budget stop has to turn both on. Neither
+# changes the tool roster or the persona, so this overlay shares the default
+# header class. Config patches replace whole plugin configs, so the reminder
+# patch restates the tier it keeps alongside its veto threshold.
+- id: base
+  name: '@shres-code/cordis-plugin-include'
+  config:
+    path: ./cordis.yml
+    patches:
+      - id: repeat-tool-reminder
+        name: '@shres-code/shres-code-repeat-tool-reminder'
+        config:
+          thresholds: [3]
+          vetoThreshold: 4
+      - insert:
+          - id: step-budget
+            name: '@shres-code/shres-code-step-budget'
+            config:
+              maxStepsPerTurn: 5

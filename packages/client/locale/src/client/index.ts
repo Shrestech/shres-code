@@ -174,9 +174,12 @@ export class LocaleRuntime {
   setLocale(id: string): void {
     const match = this.snapshot.locales.find(l => l.id === id)
     if (match === undefined) throw new Error(`locale "${id}" is not registered`)
+    /* v8 ignore start -- LocaleId is the singleton `en`; setLocale always hits the same-locale return */
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- same-locale guard until another locale ships
     if (this.snapshot.active === match.id) return
     this.publish(match.id, true)
     void this.host?.set(LOCALE_PREFERENCE_FIELD, match.id)
+    /* v8 ignore stop */
   }
 
   /**
@@ -188,8 +191,11 @@ export class LocaleRuntime {
     const section = host.getSnapshot().value
     if (section === undefined) return
     const target = normalizeLocalePreference(section.preference) ?? this.provisional
+    /* v8 ignore start -- LocaleId is the singleton `en`; adopt always hits the same-locale return */
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- same-locale guard until another locale ships
     if (this.snapshot.active === target) return
     this.publish(target, true)
+    /* v8 ignore stop */
   }
 
   /**
@@ -299,6 +305,7 @@ export class LocaleRuntime {
       locales: this.snapshot.locales,
       revision: this.snapshot.revision + 1,
     })
+    /* v8 ignore next -- LocaleId is the singleton `en`; publish(true) is the setLocale/adopt arm above */
     if (localeChanged) this.ctx.emit('locale/change', this.snapshot)
     for (const fn of [...this.listeners]) {
       try {

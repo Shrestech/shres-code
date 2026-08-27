@@ -230,7 +230,7 @@ describe('host-half activation approval', () => {
     ctx.on('approval/request', async () => {
       asked.push('asked')
       await gate.promise
-      return 'allowed-once' as ApprovalOutcome
+      return 'allowed-once'
     })
     const { pluginId, packageId } = defineHost(runner)
     const first = runner.run(AGENT_A, pluginId, packageId, 'run')

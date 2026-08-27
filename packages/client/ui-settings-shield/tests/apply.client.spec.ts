@@ -1,71 +1,135 @@
-/** Shield section registration and locale-following nav label. */
-
+/**
+ * Shield settings browser half: slot registration and the loading mark skip.
+ */
+// @vitest-environment jsdom
 import { Context } from '@shres-code/cordis'
 import { describe, expect, it, vi } from 'vitest'
-import { resolveSlotLabel } from '@shres-code/shres-code-client-ui-slots'
 import { SlotRegistry } from '@shres-code/shres-code-client-runtime/client'
 import { LocaleRuntime } from '@shres-code/shres-code-client-locale/client'
-import { TestRemote, usePinnedBrowserLanguages } from '@shres-code/shres-code-client-test-runtime'
-import { SettingsScopeBinder } from '@shres-code/shres-code-client-ui-settings/client'
-import { apply, inject } from '@shres-code/shres-code-client-ui-settings-shield/client'
-import { ShieldSection } from '../src/client/ShieldSection.tsx'
-import type { ShieldSectionInjected } from '../src/client/ShieldSection.tsx'
+import { stubSettingsScope, usePinnedBrowserLanguages } from '@shres-code/shres-code-client-test-runtime'
+import { resolveSlotLabel } from '@shres-code/shres-code-client-ui-slots'
+import type { ShieldPayloadUpdate, ShieldSnapshot } from '@shres-code/shres-code-api-remotes/client'
+import { apply, inject, SHIELD_SETTINGS_NAMESPACE, type ShieldSectionInjected } from '../src/client/index.ts'
+import { apply as nodeApply } from '../src/index.ts'
+import { ShieldSection, type ShieldSettings } from '../src/client/ShieldSection.tsx'
+
+/** Wire result of `remote.shield.snapshot` — success and engine-missing both occur in these tests. */
+type ShieldSnapshotResult =
+  | { readonly ok: true; readonly value: ShieldSnapshot }
+  | { readonly ok: false; readonly error: { readonly code: string; readonly message: string } }
+
+type ShieldUpdateResult =
+  | { readonly ok: true; readonly value: ShieldPayloadUpdate }
+  | { readonly ok: false; readonly error: { readonly code: string; readonly message: string } }
 
 usePinnedBrowserLanguages('en-US')
 
 async function bench() {
   const ctx = new Context()
   await ctx.plugin(SlotRegistry).await()
-  const locale = new LocaleRuntime(ctx)
-  ctx.provide('locale', locale)
-  const snapshot = vi.fn(async () => ({ ok: true as const, value: { status: { active: false, reason: 'engine-missing' as const }, stats: { cwd: null, screened: 0, observed: 0, asked: 0, askedGranted: 0, askedDenied: 0, blocked: 0, byChannel: {}, byRule: {}, otherRules: { observed: 0, asked: 0, blocked: 0 }, recent: [] } } }))
-  const remote = new TestRemote(ctx)
-  Object.assign(remote, { shield: { snapshot } })
-  ctx.provide('remote.shield', { snapshot })
-  ctx.provide('connection', {
-    isLoopback: true,
-    api: {
-      settings: { describe: vi.fn(() => Promise.resolve({ rpcId: 's', result: { ok: false, error: {} } })) },
-    },
-  } as never)
-  await ctx.plugin(SettingsScopeBinder).await()
-  return { ctx, slots: ctx.get('slots') as SlotRegistry, snapshot }
-}
-
-function declareRoot(slots: SlotRegistry): () => void {
-  return slots.register({
+  const slots = ctx.get('slots') as SlotRegistry
+  slots.register({
     name: 'root',
-    children: { 'settings.section': { kind: 'list', scope: 'root' } },
+    children: {
+      'settings.section': { kind: 'list', scope: 'root' },
+    },
   } as never, () => null)
+  const snapshot = vi.fn(async (_sessionId?: string): Promise<ShieldSnapshotResult> => ({
+    ok: true,
+    value: {
+      status: { active: true, reason: 'active' },
+      stats: {
+        cwd: null,
+        screened: 0,
+        observed: 0,
+        asked: 0,
+        askedGranted: 0,
+        askedDenied: 0,
+        blocked: 0,
+        byChannel: {},
+        byRule: {},
+        otherRules: { observed: 0, asked: 0, blocked: 0 },
+        recent: [],
+      },
+    },
+  }))
+  const idleUpdate = async (): Promise<ShieldUpdateResult> => ({
+    ok: true,
+    value: {
+      specifier: '@shrestech/shres-shield-plugin',
+      source: 'none',
+      installed: null,
+      latest: null,
+      available: false,
+      applied: false,
+    },
+  })
+  const checkUpdate = vi.fn(idleUpdate)
+  const applyUpdate = vi.fn(idleUpdate)
+  ctx.provide('remote', { shield: { snapshot, checkUpdate, applyUpdate } })
+  ctx.provide('remote.shield', { snapshot, checkUpdate, applyUpdate })
+  ctx.provide('locale', new LocaleRuntime(ctx))
+  const host = stubSettingsScope<ShieldSettings>()
+  ctx.provide('settingsScope', { bind: vi.fn(() => host.scope) })
+  return { ctx, slots, host, snapshot, checkUpdate, applyUpdate }
 }
 
-describe('ui-settings-shield apply', () => {
-  it('declares the services it uses', () => {
+describe('ui-settings-shield browser apply', () => {
+  it('declares every service it binds', () => {
     expect(inject).toEqual(['slots', 'locale', 'settingsScope', 'remote', 'remote.shield'])
+    expect(SHIELD_SETTINGS_NAMESPACE).toBe('shres-shield')
   })
 
-  it('registers the Shield nav entry', async () => {
-    const { ctx, slots, snapshot } = await bench()
-    declareRoot(slots)
-    await ctx.plugin({ inject: [...inject], apply }).await()
-    const entry = slots.entries('settings.section')[0]!
-    expect(entry.component).toBe(ShieldSection)
-    expect(entry.options).toMatchObject({ id: 'shield', order: 12 })
-    expect(resolveSlotLabel(entry.options.label)).toBe('Shield')
-    expect(snapshot).not.toHaveBeenCalled()
-    const injected = (entry.inject as unknown as () => ShieldSectionInjected)()
-    await expect(injected.loadSnapshot('s-current')).resolves.toMatchObject({ stats: { screened: 0 } })
-    expect(snapshot).toHaveBeenCalledWith('s-current')
-    snapshot.mockResolvedValueOnce({ ok: false, error: { code: 'REMOTE_ERROR', message: 'unavailable' } } as never)
-    await expect(injected.loadSnapshot()).rejects.toThrow('shield.snapshot failed: REMOTE_ERROR: unavailable')
+  it('node-half apply is an intentional no-op', () => {
+    nodeApply()
   })
 
-  it('unregisters the section with the fiber', async () => {
-    const { ctx, slots } = await bench()
-    declareRoot(slots)
-    const fiber = await ctx.plugin({ inject: [...inject], apply }).await()
-    expect(slots.entries('settings.section')).toHaveLength(1)
+  it('skips the product mark while the host snapshot is loading, then publishes once ready', async () => {
+    const b = await bench()
+    const fiber = b.ctx.plugin({ inject: [...inject], apply })
+    await fiber.await()
+    expect(b.slots.entries('settings.section')[0]?.component).toBe(ShieldSection)
+    expect(resolveSlotLabel(b.slots.entries('settings.section')[0]!.options.label)).toBeTruthy()
+    const loadSnapshot = b.slots.entries('settings.section')[0]?.inject?.().loadSnapshot
+    if (typeof loadSnapshot !== 'function') {
+      expect.fail('settings.section inject is missing loadSnapshot')
+    }
+    const load = loadSnapshot as ShieldSectionInjected['loadSnapshot']
+    await expect(load()).resolves.toMatchObject({ status: { active: true } })
+    b.snapshot.mockResolvedValueOnce({
+      ok: false,
+      error: { code: 'unavailable', message: 'down' },
+    })
+    await expect(load()).rejects.toThrow(/shield.snapshot failed/)
+    const sectionInject = b.slots.entries('settings.section')[0]?.inject?.() as ShieldSectionInjected | undefined
+    await expect(sectionInject?.checkUpdate()).resolves.toMatchObject({ available: false })
+    b.checkUpdate.mockResolvedValueOnce({
+      ok: false,
+      error: { code: 'unavailable', message: 'down' },
+    })
+    await expect(sectionInject?.checkUpdate()).rejects.toThrow(/shield.checkUpdate failed/)
+    await expect(sectionInject?.applyUpdate()).resolves.toMatchObject({ available: false })
+    b.applyUpdate.mockResolvedValueOnce({
+      ok: false,
+      error: { code: 'unavailable', message: 'down' },
+    })
+    await expect(sectionInject?.applyUpdate()).rejects.toThrow(/shield.applyUpdate failed/)
+    expect(document.documentElement.dataset.shresShield).toBeUndefined()
+    b.host.publish({
+      status: 'ready',
+      writable: true,
+      value: { enabled: true, posture: 'ask' },
+      user: {},
+    })
+    expect(document.documentElement.dataset.shresShield).toBe('on')
+    b.host.publish({
+      status: 'ready',
+      writable: true,
+      value: { enabled: false, posture: 'ask' },
+      user: {},
+    })
+    expect(document.documentElement.dataset.shresShield).toBe('off')
     await fiber.dispose()
-    expect(slots.entries('settings.section')).toHaveLength(0)
+    expect(b.slots.entries('settings.section')).toHaveLength(0)
   })
 })

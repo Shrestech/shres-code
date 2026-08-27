@@ -40,7 +40,7 @@ function fakeAgent(id = 'parent-1'): Agent {
     // no ctx services and no logged request header in the default stub.
     ctx: { get: () => undefined },
     options: {},
-    session: { requestHeader: () => undefined },
+    session: { header: {}, requestHeader: () => undefined },
   } as unknown as Agent
 }
 
@@ -1270,10 +1270,18 @@ describe('depth budget configuration', () => {
   })
 
   it('forwards an explicit tool filter unchanged instead of encoding the depth policy into it', async () => {
-    const { ctx, requests } = await captureSetup({ toolFilter: { deny: ['dangerous'] }, maxDepth: 0 })
+    const { ctx, requests } = await captureSetup({ toolFilter: { deny: ['dangerous'] }, maxDepth: 5 })
     await callSubagent(ctx, { description: 'd', prompt: 'p' })
-    expect(requests[0]?.maxDepth).toBe(0)
+    expect(requests[0]?.maxDepth).toBe(5)
     expect(requests[0]?.toolFilter).toEqual({ deny: ['dangerous'] })
+  })
+
+  it('refuses maxDepth 0 on a top-level parent before the provider starts', async () => {
+    const { ctx, requests } = await captureSetup({ maxDepth: 0 })
+    const result = await callSubagent(ctx, { description: 'd', prompt: 'p' })
+    expect(result.isError).toBe(true)
+    expect(text(result)).toContain('depth')
+    expect(requests).toEqual([])
   })
 
   it('rejects a numeric maxDepth on a provider without the depthLimit capability at mount', async () => {

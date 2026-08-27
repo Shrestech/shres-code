@@ -1,0 +1,47 @@
+# Keyless counterpart to guard-budget.cordis.yml: disable the key-requiring
+# DeepSeek adapter, insert `llm-replay`, and turn on the two guard settings under
+# test. Patches reach only the entries of the file they include, so this overlay
+# includes `cordis.yml` directly and restates the app patch (raw JSONL
+# persistence and the recorded model) rather than nesting inside
+# `cordis.snapshot.yml`. Config patches replace whole plugin configs, so the
+# reminder patch restates the tier it keeps alongside its veto threshold.
+- id: base
+  name: '@shres-code/cordis-plugin-include'
+  config:
+    path: ./cordis.yml
+    patches:
+      - id: llm-deepseek
+        name: '@shres-code/shres-code-llm-deepseek'
+        disabled: true
+      - id: acp-agent
+        name: '@shres-code/shres-code-acp-demo'
+        config:
+          provider: deepseek-official
+          model: deepseek-v4-flash
+          persistenceRoot: !!js process.env.SHRES_SNAPSHOT_SESSIONS_ROOT ?? './.sessions'
+          persistenceCompression: none
+          workspaceContext:
+            maxBytes: 65536
+          persona: |
+            You are a coding assistant powered by the {{model}} model. Your working directory is {{cwd}}. Your bash tool runs under a file sandbox — a `[sandbox: file access denied …]` result is policy, not a command bug.
+
+            Verify your work by running the code or tests. Keep answers brief and factual.
+      - id: repeat-tool-reminder
+        name: '@shres-code/shres-code-repeat-tool-reminder'
+        config:
+          thresholds: [3]
+          vetoThreshold: 4
+      - insert:
+          - id: llm-replay
+            name: '@shres-code/shres-code-llm-replay'
+            config:
+              providers:
+                - id: deepseek-official
+                  name: DeepSeek
+                  models:
+                    - id: deepseek-v4-flash
+                    - id: deepseek-v4-pro
+          - id: step-budget
+            name: '@shres-code/shres-code-step-budget'
+            config:
+              maxStepsPerTurn: 5

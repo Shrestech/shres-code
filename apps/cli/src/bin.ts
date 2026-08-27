@@ -42,6 +42,11 @@ switch (invocation.mode) {
     process.exit(runPlugin(invocation.profile, invocation.args))
     break
   }
+  case 'enable-edition': {
+    const { runEnableEdition } = await import('./plugin.ts')
+    process.exit(runEnableEdition(invocation.profile, invocation.edition))
+    break
+  }
   case 'dump-config': {
     const { runDumpConfig } = await import('./dump-config.ts')
     runDumpConfig(invocation.profile, invocation.defaultOnly, invocation.patches)

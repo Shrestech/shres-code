@@ -83,7 +83,7 @@ describe('QuestionComposer', () => {
     const scrollRegion = detail.closest('[data-question-scroll]')
     expect(scrollRegion).toBeTruthy()
     expect(scrollRegion?.contains(screen.getByRole('radio', { name: /Delivery-focused/ }))).toBe(true)
-    expect(scrollRegion?.contains(screen.getByText('Next question').closest('button'))).toBe(false)
+    expect(scrollRegion?.contains(screen.getByRole('button', { name: 'Next question' }))).toBe(false)
     fireEvent.keyDown(screen.getByRole('radio', { name: /Delivery-focused/ }), { key: 'Enter' })
     expect(respond).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('radio', { name: /Delivery-focused/ }))
@@ -147,7 +147,7 @@ describe('QuestionComposer', () => {
     const { carrier, respond } = wait()
     render(<QuestionComposer matched={carrier} interactions={[carrier]} {...kit} />)
 
-    expect((screen.getByText('Next question').closest('button') as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByText('Next', { exact: true }).closest('button') as HTMLButtonElement).disabled).toBe(true)
     fireEvent.click(screen.getByRole('radio', { name: 'Research-focused' }))
     expect(screen.getByText('2 / 3')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Skip this question' }))

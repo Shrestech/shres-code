@@ -30,6 +30,7 @@ function card(over: Partial<JspaceCard> = {}): JspaceCard {
     open: [],
     next: 'Write the dock',
     goalOpenedSeq: 1,
+    charter: [],
     ...over,
   }
 }

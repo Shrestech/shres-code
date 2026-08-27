@@ -57,6 +57,8 @@ import Lsp from '@shres-code/shres-code-lsp'
 import * as ToolLsp from '@shres-code/shres-code-tool-lsp'
 import * as ToolSkill from '@shres-code/shres-code-tool-skill'
 import * as ToolSessionQuery from '@shres-code/shres-code-tool-session-query'
+import { ShrestechTrackerService } from '@shres-code/shres-code-tracker-shrestech'
+import * as ToolTracker from '@shres-code/shres-code-tool-tracker'
 import * as ToolTasks from '@shres-code/shres-code-tool-jobs'
 import * as ToolTodo from '@shres-code/shres-code-tool-todo'
 import JspaceService from '@shres-code/shres-code-jspace'
@@ -438,7 +440,7 @@ const TOOL_PACKAGES: ToolPackage[] = [
       await ctx.plugin(ToolSessionQuery)
     },
     note:
-      'The five read-only tools hide provider cursors and authorize every result from the immutable calling agent session. The package is opt-in; compositions that need enforced deadlines or bounded inline output also mount the generic timeout or spill policies.',
+      'The five read-only tools hide provider cursors and authorize every result from the immutable calling agent session. The ACP and headless example compositions mount the consumer by default; the shipped TUI and Web bundles keep the query index but leave this consumer unmounted. Compositions that need enforced deadlines or bounded inline output also mount the generic timeout or spill policies.',
   },
   {
     pkg: '@shres-code/shres-code-tool-subagent',
@@ -535,7 +537,7 @@ const TOOL_PACKAGES: ToolPackage[] = [
       await ctx.plugin(ToolJSpace)
     },
     note:
-      'Schemas are registered only while Settings `enabled` is true. `jspace_ship` is a register check, not a file writer. Checkpoint `evidence` must name a completed, non-error tool-call id and does not prove coverage.',
+      'Schemas are registered only while Settings `enabled` is true. `jspace_ship` is a register check, not a file writer. Checkpoint `evidence` must name a completed, non-error tool-call id; citing a configured verifier tool is evidence-grade and does not prove coverage.',
   },
   {
     pkg: '@shres-code/shres-code-tool-workflow',
@@ -569,6 +571,25 @@ const TOOL_PACKAGES: ToolPackage[] = [
     },
     note:
       'web_search and web_fetch keep provider selection behind ctx.web so model-visible schemas stay stable across backend swaps.',
+  },
+  {
+    pkg: '@shres-code/shres-code-tool-tracker',
+    dir: 'tool-tracker',
+    source: 'packages/tracker/tool-tracker/src/index.ts',
+    requires: ['ctx.tools', 'ctx.tracker'],
+    writes: ['tool/call', 'experiment run and metric records through ctx.tracker', 'tool/result'],
+    async mount(ctx) {
+      // Spool-only provider: no credential, unreachable base URL — the spool
+      // writes nothing until a run is logged, and catalog generation never
+      // logs one. Only the tool schemas are extracted.
+      await ctx.plugin(ShrestechTrackerService, {
+        baseUrl: 'https://tracker.invalid',
+        lane: 'catalog',
+      })
+      await ctx.plugin(ToolTracker)
+    },
+    note:
+      'experiment_log_run, experiment_log_metrics, and experiment_query fold experiment records through the tracker service seam.',
   },
 ]
 

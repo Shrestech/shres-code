@@ -10,7 +10,8 @@ import z from '@shres-code/schemastery'
 import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
 import {
   assertPositiveFinite,
-  NO_START_CAPABILITIES,
+  assertStartCapabilities,
+  REMOTE_START_CAPABILITIES,
   resolveChildCwd,
   type ResolvedSubagentStartRequest,
   type SubagentCapabilities,
@@ -60,7 +61,7 @@ type ResolvedConfig = {
 /* jscpd:ignore-start -- Cordis registration mirrors the Kimi sibling. */
 class GrokCliProvider implements SubagentProvider {
   readonly name = 'grok-cli'
-  readonly capabilities: SubagentCapabilities = NO_START_CAPABILITIES
+  readonly capabilities: SubagentCapabilities = REMOTE_START_CAPABILITIES
   readonly inheritsParentContext = false
 
   constructor(
@@ -69,6 +70,7 @@ class GrokCliProvider implements SubagentProvider {
   ) {}
 
   async start(request: ResolvedSubagentStartRequest) {
+    assertStartCapabilities(this.name, request, this.capabilities)
     const parentCwd = request.parent.session.header.cwd
     if (parentCwd === undefined) {
       throw new Error(

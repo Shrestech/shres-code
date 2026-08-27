@@ -54,10 +54,10 @@ describe('ui-settings-models apply', () => {
     expect(entry.component).toBe(ModelsSection)
     expect(entry.options).toMatchObject({ id: 'models', order: 10 })
     // The nav label is a locale-following thunk; owners resolve at read time.
-    expect(resolveSlotLabel(entry.options.label)).toBe('Model')
+    expect(resolveSlotLabel(entry.options.label)).toBe('Models')
     const injected = (entry.inject as unknown as () => import('../src/client/ModelsSection.tsx').ModelsSectionInjected)()
-    expect(injected.t('nav')).toBe('Model')
-    expect(injected.t('deleteTitle')).toBe('Delete {provider}？')
+    expect(injected.t('nav')).toBe('Models')
+    expect(injected.t('deleteTitle')).toBe('Delete {provider}?')
     expect(typeof injected.controller.load).toBe('function')
     expect(typeof injected.useSnapshot).toBe('function')
     expect(injected.api).toBeDefined()

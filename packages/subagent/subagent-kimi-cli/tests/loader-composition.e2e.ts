@@ -36,7 +36,7 @@ describe('Kimi CLI provider public Loader composition', () => {
         name: 'kimi-cli',
         capabilities: {
           outputSchema: false,
-          depthLimit: false,
+          depthLimit: true,
           toolFilter: false,
           persona: false,
         },

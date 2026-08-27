@@ -1,0 +1,15 @@
+{
+  "taskId": "chain-env-propagate",
+  "stratum": "chain",
+  "description": "Build a config loader from .env.example in two phases: basic loading then typed validation.",
+  "phases": [
+    {
+      "instruction": "Read `.env.example` in the project root. Create `src/config.js` that exports a `loadConfig()` function. It must read each variable listed in `.env.example` from `process.env`, falling back to the default value shown after the `=` sign in the example file. Return a plain object whose keys are the variable names and whose values are the resolved strings. Write tests in `test/config.test.js` using `node:test` that verify defaults are used when env vars are unset, and that env vars override defaults. `node --test` must pass."
+    },
+    {
+      "instruction": "Extend `src/config.js` with validation. In `.env.example`, each variable has an inline comment indicating its type and whether it is required: `# type:number,required` or `# type:string,optional`. Update `loadConfig()` so that (a) numeric values are parsed to numbers, (b) required variables with no value and no default throw an Error, and (c) optional variables with no value resolve to `null`. Add tests covering all validation paths. `node --test` must pass."
+    }
+  ],
+  "verify": "node verify.mjs",
+  "timeoutMs": 600000
+}

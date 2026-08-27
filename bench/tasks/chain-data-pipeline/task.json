@@ -1,0 +1,9 @@
+{
+  "taskId": "chain-data-pipeline",
+  "stratum": "long",
+  "description": "Build a multi-file data pipeline where constants from one file determine transformations in three others.",
+  "instruction": "This project has a data pipeline across four source files. `src/constants.js` defines the transformation parameters (scale factor, offset, precision). The three pipeline stages — `src/normalize.js`, `src/transform.js`, and `src/format.js` — each need to import and apply these constants correctly.\n\nYour job: read the constants in `src/constants.js`, then implement the three pipeline modules so that:\n1. `normalize(values)` divides each value by `SCALE_FACTOR` from constants.\n2. `transform(values)` adds `OFFSET` to each value from constants.\n3. `format(values)` rounds each value to `PRECISION` decimal places from constants and returns strings.\n\nThe pipeline entry point `src/pipeline.js` chains them: normalize → transform → format. The test suite verifies the full pipeline output. `node --test` must pass.",
+  "verify": "node verify.mjs",
+  "timeoutMs": 600000,
+  "maxTurns": 40
+}

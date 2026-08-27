@@ -1,9 +1,9 @@
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@shres-code/cordis'
-import { FsVersion } from '@shres-code/shres-code-fs'
+import { FsError, FsVersion } from '@shres-code/shres-code-fs'
 import { CallId } from '@shres-code/shres-code-llm'
 import { Session, SessionId } from '@shres-code/shres-code-session'
 import AgentRegistry, { Inbox } from '@shres-code/shres-code-agent'
@@ -566,6 +566,29 @@ describe('tool-str-replace-editor', () => {
     })
     expect(insert.isError).toBe(true)
     expect(text(insert)).toContain('backend write failed')
+  })
+
+  it('maps a sandbox denial from view, str_replace, and insert through the policy marker', async () => {
+    const { ctx, root, owner } = await setup({}, { sandboxMode: 'workspace-write' })
+    const path = join(root, 'denied.txt')
+    await writeFile(path, 'hello\nworld\n')
+    vi.spyOn(ctx.fs, 'readText').mockRejectedValue(new FsError('denied', 'FS_SANDBOX_DENIED'))
+    const view = await call(ctx, owner, { command: 'view', path })
+    expect(view.error).toMatchObject({ info: { code: 'FS_SANDBOX_DENIED' } })
+    const replaced = await call(ctx, owner, {
+      command: 'str_replace',
+      path,
+      old_str: 'hello',
+      new_str: 'hi',
+    })
+    expect(replaced.error).toMatchObject({ info: { code: 'FS_SANDBOX_DENIED' } })
+    const insert = await call(ctx, owner, {
+      command: 'insert',
+      path,
+      insert_line: 1,
+      new_str: 'mid',
+    })
+    expect(insert.error).toMatchObject({ info: { code: 'FS_SANDBOX_DENIED' } })
   })
 
   it('rejects invalid plugin config', () => {

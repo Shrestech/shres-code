@@ -1,0 +1,15 @@
+{
+  "taskId": "chain-api-versioning",
+  "stratum": "chain",
+  "description": "Add API versioning to a route handler in two phases: v2 prefix with v1 compat shim, then a v2-only endpoint.",
+  "phases": [
+    {
+      "instruction": "The file `src/router.js` exports a `handleRequest(method, path)` function that dispatches simple in-memory routes. Add versioning: all existing routes should move under `/v2/` (e.g., `/users` becomes `/v2/users`). Add a compatibility layer so that requests to `/v1/users` (the old paths) return `{ redirect: '/v2/users' }`. Write a log of migrated routes to `migration-log.json` in the project root — an array of `{ from, to }` objects. Add tests in `test/router.test.js`. `node --test` must pass."
+    },
+    {
+      "instruction": "Add a new v2-only endpoint: `GET /v2/migration-status` that reads `migration-log.json` from the project root and returns `{ migrated: <number of routes migrated> }`. Also ensure `/v1/migration-status` returns `{ error: 'not available in v1' }` (not a redirect). Add tests. `node --test` must pass."
+    }
+  ],
+  "verify": "node verify.mjs",
+  "timeoutMs": 600000
+}

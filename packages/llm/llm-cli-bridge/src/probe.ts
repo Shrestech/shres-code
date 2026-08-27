@@ -50,6 +50,7 @@ export function executableOnPath(
     return names.some(name => canExecute(name))
   }
   for (const dir of (pathValue ?? '').split(delimiter)) {
+    /* v8 ignore next -- PATH entries are non-empty on hosts that have a PATH */
     if (dir === '') continue
     for (const name of names) {
       if (canExecute(join(dir, name))) return true

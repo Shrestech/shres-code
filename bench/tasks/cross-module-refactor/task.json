@@ -1,0 +1,9 @@
+{
+  "taskId": "cross-module-refactor",
+  "stratum": "long",
+  "description": "Extract duplicated validation logic from three modules into a shared helper.",
+  "instruction": "Three source files (`src/users.js`, `src/orders.js`, `src/products.js`) each contain their own copy of the same email-validation and ID-validation logic. Extract the shared validation functions into a new `src/validate.js` module and update all three callers to import from it. The extracted module must export `isValidEmail(str)` and `isValidId(str)`. Do not change any behavior — `node --test` must pass.",
+  "verify": "node verify.mjs",
+  "timeoutMs": 600000,
+  "maxTurns": 40
+}

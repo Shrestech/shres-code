@@ -1,0 +1,9 @@
+{
+  "taskId": "typo-guard",
+  "stratum": "short",
+  "description": "Fix three typos in string constants that cause test failures.",
+  "instruction": "The test suite (`node --test`) fails because `src/labels.js` has three misspelled string constants. Fix the typos so the tests pass. Do not modify the test file.",
+  "verify": "node verify.mjs",
+  "timeoutMs": 300000,
+  "maxTurns": 12
+}

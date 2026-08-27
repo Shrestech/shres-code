@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { Agent } from '@shres-code/shres-code-agent'
 import type { InvariantInstaller } from '@shres-code/shres-code-invariants'
 import type { ContentBlock } from '@shres-code/shres-code-llm'
-import SubagentRuntime from '@shres-code/shres-code-subagent'
+import SubagentRuntime, { SubagentDepthError } from '@shres-code/shres-code-subagent'
 import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
 import type {
   SubprocessHandle,
@@ -28,6 +28,7 @@ type JsonObject = Record<string, unknown>
 
 const fakeParent = {
   id: 'parent',
+  options: {},
   session: { header: { cwd: process.cwd() } },
 } as unknown as Agent
 
@@ -295,7 +296,7 @@ describe('task admission and package contracts', () => {
       name: 'codex',
       capabilities: {
         outputSchema: false,
-        depthLimit: false,
+        depthLimit: true,
         toolFilter: false,
         persona: false,
       },
@@ -311,6 +312,24 @@ describe('task admission and package contracts', () => {
     }
     await expect(ctx.plugin(codex, { disposeGraceMs: MAX_TIMER_DELAY_MS + 1 }))
       .rejects.toThrow(`disposeGraceMs must be no greater than ${MAX_TIMER_DELAY_MS}`)
+    await ctx.fiber.dispose()
+  })
+
+  it('honors maxDepth from the parent and rejects toolFilter and outputSchema before spawn', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SubagentRuntime)
+    await ctx.plugin(LocalSubprocessRuntime)
+    const spawn = vi.spyOn(ctx.subprocess, 'spawn')
+    await ctx.plugin(codex, {})
+    await expect(ctx.subagents.start('codex', { ...request(), maxDepth: 0 }))
+      .rejects.toBeInstanceOf(SubagentDepthError)
+    await expect(ctx.subagents.start('codex', { ...request(), toolFilter: { deny: ['bash'] } }))
+      .rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' })
+    await expect(ctx.subagents.start('codex', {
+      ...request(),
+      outputSchema: { type: 'object', properties: {} },
+    })).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' })
+    expect(spawn).not.toHaveBeenCalled()
     await ctx.fiber.dispose()
   })
 

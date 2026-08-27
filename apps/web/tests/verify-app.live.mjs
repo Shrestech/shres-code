@@ -208,6 +208,7 @@ try {
     ok('Definitions stamp', /Definitions/i.test(shield))
     ok('Recent findings', /Recent/i.test(shield))
     ok('Panic copy mentions SHRES_SHIELD', /SHRES_SHIELD/.test(shield))
+    ok('Check for updates', /Check for updates/i.test(shield))
     ok('Shield page has no Roos', !/\bRoos\b/.test(shield))
 
     const beforeMark = await markState(page)

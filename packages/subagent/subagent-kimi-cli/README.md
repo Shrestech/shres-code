@@ -12,7 +12,7 @@ The published `run.result` waits for process exit. Exit 0 plus a stream-json eve
 
 ## Capabilities and context
 
-The provider advertises no optional start-time capabilities and reports `inheritsParentContext: false`. Kimi receives the standalone text task and the parent Session cwd, but not the parent conversation, persona, tool filter, or depth policy.
+The provider advertises `depthLimit` (parent-side `maxDepth` before spawn) and reports `inheritsParentContext: false`. Kimi receives the standalone text task and the parent Session cwd, but not the parent conversation, persona, tool filter, or structured-output contract.
 
 ## Configuration
 
@@ -77,4 +77,5 @@ Append-only: the new tool result follows the reusable parent request prefix.
 - **Host-managed product installation** — a missing `kimi` is a startup error; this plugin does not install or log in.
 - **Kimi's own tools bypass harness approval** — `--yolo` is required for unattended one-shot runs.
 - **Final text only** — reasoning, tool traffic, and workspace diffs remain product-local.
+- **No remote tool filter, persona, or structured output** — those options are rejected. Parent-side `maxDepth` is enforced before spawn; recursion inside Kimi is not.
 - **Older `kimi --print` binaries** — override `executable` and do not expect the shipped `-p` argv unless that binary accepts it.

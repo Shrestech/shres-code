@@ -40,7 +40,7 @@ export function MicButton({
   const settings = useSpeechSettings(s => s.value)
   const sttReady = useSpeechStatus(s => s.sttReady)
   const [phase, setPhase] = useState<MicPhase>('idle')
-  const [starting, setStarting] = useState(false)
+  const [starting, setStarting] = useState<boolean>(false)
   const [error, setError] = useState<MicError | undefined>()
   const [offerOpen, setOfferOpen] = useState(false)
   const mounted = useRef(true)
@@ -101,8 +101,8 @@ export function MicButton({
         setError('blank')
         return
       }
-      inputActions?.setDraft(text)
-      if (settings !== undefined && settings.autoSubmitVoice && inputActions !== undefined) {
+      inputActions.setDraft(text)
+      if (settings !== undefined && settings.autoSubmitVoice) {
         inputActions.submit()
       }
     } catch {
@@ -126,6 +126,8 @@ export function MicButton({
     }
     /* v8 ignore next -- the disabled button gates re-entry: React flushes `starting` between discrete clicks. */
     if (starting) return
+    // Some browsers omit mediaDevices; the DOM lib types it as always present.
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- mediaDevices is missing in some browsers
     if (navigator.mediaDevices === undefined) {
       setError('failed')
       return
@@ -208,7 +210,7 @@ export function MicButton({
           aria-label={label}
           aria-pressed={phase === 'recording' || undefined}
           data-active={phase === 'recording' || undefined}
-          disabled={starting || phase === 'transcribing' || inputActions === undefined}
+          disabled={starting || phase === 'transcribing'}
           onClick={onMicClick}
         >
           <IconMicOutline16 />

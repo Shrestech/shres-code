@@ -42,6 +42,7 @@ export {
   resolveProfileDir,
   writeProfileManifest,
   type ShresBundleManifest,
+  type ShresEdition,
   type ShresManifestSection,
   type ShresProfileManifest,
   type Profile,

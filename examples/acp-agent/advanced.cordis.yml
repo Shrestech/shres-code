@@ -1,5 +1,6 @@
 # Add Code Mode and Cordis tools to the base spawn/workflow stack, exercising
-# all four boundaries in one ACP snapshot.
+# all four boundaries in one ACP snapshot. Session-query tools come from the
+# included base composition.
 - id: base
   name: '@shres-code/cordis-plugin-include'
   config:

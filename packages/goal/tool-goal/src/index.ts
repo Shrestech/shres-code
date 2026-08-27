@@ -116,7 +116,9 @@ function guidance(blockedAfter: number): string {
     + 'create a goal for routine single-turn work. Call get_goal before update_goal and copy its '
     + 'exact goal_id and revision. After session resume or fork, an active goal is disarmed: when '
     + 'a human asks to continue or resume in any wording or language, use update_goal action '
-    + 'resume to rearm it. Mark complete only when the objective is actually achieved. Mark '
+    + 'resume to rearm it. Mark complete only when the objective is actually achieved; when your '
+    + 'finishing turn is not human-driven and the goal is disarmed, complete it anyway rather '
+    + 'than leaving an active goal no continuation will settle. Mark '
     + `blocked only after the same blocking condition persists for at least ${blockedAfter} `
     + 'consecutive goal rounds, and report that concrete condition in blocked_reason; difficulty, uncertainty, '
     + 'or useful remaining work is not blocked.'
@@ -235,7 +237,9 @@ export function apply(ctx: Context, config: Config): void {
     name: 'update_goal',
     description: 'Update the exact current goal revision. edit, pause, and resume require a direct '
       + 'top-level human request. During an automatic continuation of the current goal, complete '
-      + 'and blocked are also allowed. blocked is rejected before the configured minimum round count; the model remains '
+      + 'and blocked are also allowed; complete is additionally allowed on a disarmed goal from '
+      + 'any root-agent turn, so a goal whose continuation will not run still gets closed. '
+      + 'blocked is rejected before the configured minimum round count; the model remains '
       + 'responsible for judging that the same condition persisted across those rounds and must explain it in blocked_reason.',
     parameters: {
       goal_id: { type: 'string', required: true, description: 'Exact id returned by get_goal.' },
@@ -282,7 +286,7 @@ export function apply(ctx: Context, config: Config): void {
           : ctx.goals.resume(execution.agent, ref)
         return Promise.resolve(goalValue(goal))
       }
-      const authority = completionAuthority(ctx, execution)
+      const authority = completionAuthority(ctx, execution, args.action)
       if (hasText(args.objective) || hasRoundCap(args.max_goal_rounds)) {
         throw new HarnessError(
           'objective and max_goal_rounds are valid only with action edit',

@@ -14,7 +14,7 @@ The root `shres` script only runs `node --import tsx/esm apps/cli/src/bin.ts`. `
 
 Missing Typert host artifacts fail profile boot through module-resolution errors without a build instruction. Once those host artifacts exist, missing frontend and client-plugin artifacts fail at startup with diagnostics that direct the user to `pnpm run build`. The launcher does not validate artifact freshness: existing stale frontend or client-plugin bundles are accepted and can run older browser code until the next build. After package Node halves have been built once, `pnpm run dev:web` rebuilds only packages that declare `shres.client`; it keeps client-plugin bundles current and activates their hot-reload path, but does not rebuild the frontend shell.
 
-This decision owns build scheduling only. The [tsx ESM source-launch decision](../architecture/2026-07-29-shres-source-launch-tsx-esm.md) owns TypeScript transformation and workspace resolution, the [source-run decision](2026-08-10-source-run-without-managed-installer.md) owns repository scripts as the supported checkout entry points, and the [personal-config decision](../feature/2026-07-20-shres-cli-personal-config.md) owns the machine-level configuration layer.
+This decision owns build scheduling only. The [tsx ESM source-launch decision](../architecture/2026-07-29-dsh-source-launch-tsx-esm.md) owns TypeScript transformation and workspace resolution, the [source-run decision](2026-08-10-source-run-without-managed-installer.md) owns repository scripts as the supported checkout entry points, and the [personal-config decision](../feature/2026-07-20-dsh-cli-personal-config.md) owns the machine-level configuration layer.
 
 ## Alternatives considered
 

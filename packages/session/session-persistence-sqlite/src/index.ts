@@ -15,17 +15,37 @@ import { mkdir, open } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import {
   DEFAULT_PREPARED_SESSION_CACHE_SIZE, DEFAULT_WRITE_BATCH_MAX_DELAY_MS, MAX_WRITE_BATCH_DELAY_MS,
-  SessionPersistence, SessionPersistenceRevision, PersistenceCoordinator,
+  SessionPersistence, SessionPersistencePrunedError, SessionPersistenceRevision, PersistenceCoordinator,
   type PersistenceBackend, type SessionLocation, type SessionPersistenceSnapshot,
   type SessionInspection, type SessionPersistenceRevision as PersistenceRevision,
   type StoredPrefix, type StoredSuffix,
 } from '@shres-code/shres-code-session-persistence'
 import type { SessionEvent, SurfaceEventType, SessionId, SessionHeader, SessionPreparation } from '@shres-code/shres-code-session'
 import {
-  type JournalMode, openDatabase, rowToMeta, scanRows, type EventRow, type SessionRow,
+  DEFAULT_BUSY_TIMEOUT_MS, type JournalMode, openDatabase, rowToEvent, rowToMeta, scanRows,
+  type EventRow, type SessionRow,
 } from './schema.ts'
 
-export { SCHEMA_VERSION } from './schema.ts'
+export { DEFAULT_BUSY_TIMEOUT_MS, SCHEMA_VERSION } from './schema.ts'
+
+/** How long assembled `assistant/chunk` rows remain reconstructable. */
+export type ChunkRetention = 'forever' | 'assembled'
+
+/** Whether a reconstructed event is an assembled-retention tombstone. */
+function isPrunedChunk(event: SessionEvent): boolean {
+  if (event.type !== 'assistant/chunk') return false
+  return (event.data as { pruned?: unknown }).pruned === true
+}
+
+/**
+ * Refuse a stored prefix that assembled retention has made incomplete.
+ * @param id - session whose events were just scanned.
+ * @param events - reconstructed events, including any tombstones.
+ */
+function assertUnpruned(id: SessionId, events: readonly SessionEvent[]): void {
+  const seqs = events.filter(isPrunedChunk).map(event => event.seq)
+  if (seqs.length > 0) throw new SessionPersistencePrunedError(id, seqs)
+}
 
 /**
  * Serialize an event's optional envelope fields for SQL binding. The surface
@@ -89,6 +109,25 @@ export interface Config {
   preparedSessionCacheSize?: number
   /** Fixed live-event coalescing window; not a backend completion deadline. */
   writeBatchMaxDelayMs?: number
+  /**
+   * Trailing-seq count kept in RAM besides the live model surface after a
+   * flush. Absent retains every event. `0` keeps only current surface nodes
+   * plus unflushed events.
+   */
+  inMemoryLogWindow?: number
+  /**
+   * Milliseconds SQLite waits on a locked database before failing. `0` fails
+   * immediately. Default `5000`.
+   */
+  busyTimeoutMs?: number
+  /**
+   * Whether stored `assistant/chunk` rows stay forever (`forever`, the default)
+   * or are tombstoned after their assembling `assistant/message` is stored
+   * (`assembled`). Assembled retention makes a later full-log read throw
+   * {@link SessionPersistencePrunedError} rather than silently reconstructing
+   * a different log.
+   */
+  chunkRetention?: ChunkRetention
 }
 
 /**
@@ -107,6 +146,9 @@ export class SqliteSessionPersistence extends SessionPersistence implements Pers
     preparedSessionCacheSize: z.number().step(1).min(1).default(DEFAULT_PREPARED_SESSION_CACHE_SIZE),
     writeBatchMaxDelayMs: z.number().step(1).min(1).max(MAX_WRITE_BATCH_DELAY_MS)
       .default(DEFAULT_WRITE_BATCH_MAX_DELAY_MS),
+    inMemoryLogWindow: z.number().step(1).min(0),
+    busyTimeoutMs: z.number().step(1).min(0).default(DEFAULT_BUSY_TIMEOUT_MS),
+    chunkRetention: z.union([z.const('forever'), z.const('assembled')]).default('forever'),
   })
 
   /**
@@ -120,6 +162,7 @@ export class SqliteSessionPersistence extends SessionPersistence implements Pers
   private storeIdentity!: string
   private ready: Promise<void>
   private coordinator: PersistenceCoordinator<number>
+  private readonly chunkRetention: ChunkRetention
 
   constructor(ctx: Context, public config: Config) {
     super(ctx)
@@ -128,22 +171,34 @@ export class SqliteSessionPersistence extends SessionPersistence implements Pers
       ?? DEFAULT_PREPARED_SESSION_CACHE_SIZE
     const writeBatchMaxDelayMs = config.writeBatchMaxDelayMs
       ?? DEFAULT_WRITE_BATCH_MAX_DELAY_MS
+    const busyTimeoutMs = config.busyTimeoutMs ?? DEFAULT_BUSY_TIMEOUT_MS
+    if (!Number.isSafeInteger(busyTimeoutMs) || busyTimeoutMs < 0) {
+      throw new TypeError('busyTimeoutMs must be a non-negative safe integer')
+    }
+    const chunkRetention = config.chunkRetention ?? 'forever'
+    // Programmatic wrappers may construct the backend without Schemastery normalization.
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- un-normalized constructor path
+    if (chunkRetention !== 'forever' && chunkRetention !== 'assembled') {
+      throw new TypeError(`chunkRetention must be "forever" or "assembled", got ${String(chunkRetention)}`)
+    }
+    this.chunkRetention = chunkRetention
     // Open asynchronously so directory creation does not block plugin apply;
     // every storage hook awaits the same readiness promise.
-    this.ready = this.openDb(config.path, (config as Required<Config>).journalMode)
+    this.ready = this.openDb(config.path, (config as Required<Config>).journalMode, busyTimeoutMs)
     this.coordinator = new PersistenceCoordinator<number>(this.ctx, this, {
       preparedSessionCacheSize,
       writeBatchMaxDelayMs,
+      ...config.inMemoryLogWindow === undefined ? {} : { inMemoryLogWindow: config.inMemoryLogWindow },
     })
   }
 
-  private async openDb(path: string, journalMode: JournalMode): Promise<void> {
+  private async openDb(path: string, journalMode: JournalMode, busyTimeoutMs: number): Promise<void> {
     const actual = path === ':memory:' ? path : resolve(path)
     if (actual !== ':memory:') {
       await mkdir(dirname(actual), { recursive: true, mode: 0o700 })
       await createDatabaseFile(actual)
     }
-    this.db = openDatabase(actual, journalMode)
+    this.db = openDatabase(actual, journalMode, busyTimeoutMs)
     try {
       const row = this.db.prepare(
         'SELECT store_id FROM persistence_state WHERE singleton = 1',
@@ -234,6 +289,7 @@ export class SqliteSessionPersistence extends SessionPersistence implements Pers
       .all(id, fromSeq) as unknown as EventRow[]
     signal?.throwIfAborted()
     const { preserved } = scanRows(eventRows, fromSeq)
+    assertUnpruned(id, preserved)
     return { meta, events: preserved }
   }
 
@@ -267,6 +323,7 @@ export class SqliteSessionPersistence extends SessionPersistence implements Pers
     if (snapshot === undefined) return undefined
     const { row, eventRows } = snapshot
     const { preserved, tornFrom } = scanRows(eventRows)
+    assertUnpruned(id, preserved)
     return {
       meta: rowToMeta(row),
       events: preserved,
@@ -293,6 +350,7 @@ export class SqliteSessionPersistence extends SessionPersistence implements Pers
         const [surfaceSeqs, surfaceOp, ignorable] = envelopeBindings(event)
         insertEvent.run(meta.id, event.seq, event.type, event.time, JSON.stringify(event.data), surfaceSeqs, surfaceOp, ignorable)
       }
+      if (this.chunkRetention === 'assembled') this.tombstoneAssembledChunks(meta.id, events)
       this.db.prepare('UPDATE sessions SET revision = revision + 1 WHERE id = ?').run(meta.id)
       this.db.exec('COMMIT')
     } catch (error) {
@@ -368,6 +426,75 @@ export class SqliteSessionPersistence extends SessionPersistence implements Pers
   async close(): Promise<void> {
     await this.ready
     this.db.close()
+  }
+
+  /**
+   * Re-read stored events by seq for a live session's RAM window.
+   * @param meta - header of the session whose events are requested.
+   * @param seqs - absolute seq numbers to return, in that order.
+   * @returns one stored event per requested seq.
+   */
+  readStoredEventsSync(meta: SessionHeader, seqs: readonly number[]): SessionEvent[] {
+    if (seqs.length === 0) return []
+    // openDb assigns `db` asynchronously; a windowed re-read can race the open.
+    /* v8 ignore start -- openDb settles before any test can observe the unset field */
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- definite-assignment field is unset until openDb settles
+    if (this.db === undefined) {
+      throw new Error(`session "${meta.id}": database is not open for a windowed re-read`)
+    }
+    /* v8 ignore stop */
+    const rows = this.db.prepare(
+      `SELECT seq, type, time, data, source_event_seqs, surface_op, ignorable FROM events WHERE session_id = ? AND seq IN (${seqs.map(() => '?').join(',')})`,
+    ).all(meta.id, ...seqs) as unknown as EventRow[]
+    const bySeq = new Map(rows.map(row => [row.seq, rowToEvent(row)]))
+    const events = seqs.map((seq) => {
+      const event = bySeq.get(seq)
+      if (event === undefined) {
+        throw new Error(`session "${meta.id}" has no stored event at seq ${seq}`)
+      }
+      return event
+    })
+    assertUnpruned(meta.id, events)
+    return events
+  }
+
+  /**
+   * Replace assembled `assistant/chunk` rows with reconstructable tombstones.
+   * @param sessionId - session whose just-appended messages may retire chunks.
+   * @param events - the batch that just became durable.
+   */
+  private tombstoneAssembledChunks(sessionId: SessionId, events: readonly SessionEvent[]): void {
+    const select = this.db.prepare(
+      'SELECT seq, data FROM events WHERE session_id = ? AND seq = ? AND type = ?',
+    )
+    const update = this.db.prepare(
+      'UPDATE events SET data = ? WHERE session_id = ? AND seq = ? AND type = ?',
+    )
+    for (const event of events) {
+      if (event.type !== 'assistant/message') continue
+      const sources = (event as SessionEvent<SurfaceEventType>).sourceEventSeqs
+      if (sources === undefined) continue
+      for (const seq of sources) {
+        const row = select.get(sessionId, seq, 'assistant/chunk') as { seq: number; data: string } | undefined
+        if (row === undefined) continue
+        let parsed: { turn?: unknown; step?: unknown; pruned?: unknown }
+        try {
+          parsed = JSON.parse(row.data) as { turn?: unknown; step?: unknown; pruned?: unknown }
+        } catch {
+          throw new Error(`session "${sessionId}": cannot prune chunk at seq ${seq}: stored data is not valid JSON`)
+        }
+        if (parsed.pruned === true) continue
+        if (typeof parsed.turn !== 'number' || typeof parsed.step !== 'number') {
+          throw new Error(`session "${sessionId}": cannot prune chunk at seq ${seq}: stored payload is not an assistant/chunk`)
+        }
+        update.run(JSON.stringify({
+          turn: parsed.turn,
+          step: parsed.step,
+          chunk: { type: 'text-delta', index: 0, text: '' },
+          pruned: true,
+        }), sessionId, seq, 'assistant/chunk')
+      }
+    }
   }
 
   // --- row helpers ---

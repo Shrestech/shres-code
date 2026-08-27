@@ -86,7 +86,8 @@ function project(
     id: entry.id,
     label: entry.label,
     status: statusOf(agents, entry.id),
-    ...logged === undefined ? {} : { provider: logged.provider, model: logged.model },
+    ...logged?.provider !== undefined ? { provider: logged.provider } : {},
+    ...logged?.model !== undefined ? { model: logged.model } : {},
     ...at,
   }
 }

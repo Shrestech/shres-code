@@ -295,7 +295,7 @@ describe('TerminalBlock height cap', () => {
     const view = render(<TerminalBlock command="ls" output={body(10)} maxLines={4} />)
     // maxLines 4: head = ceil(4/2) = 2, tail = 4 - 2 = 2, 6 hidden.
     expect(outputLines(view.container)).toEqual(['line 1', 'line 2', 'line 9', 'line 10'])
-    const toggle = view.getByRole('button', { name: 'Show remaining 6 linesOutput' })
+    const toggle = view.getByRole('button', { name: 'Show remaining 6 lines' })
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
     expect(toggle.textContent).toBe('… remaining 6 lines')
 
@@ -312,13 +312,13 @@ describe('TerminalBlock height cap', () => {
   it('renders the head slice alone when the cap leaves no tail', () => {
     const view = render(<TerminalBlock command="ls" output={body(5)} maxLines={1} />)
     expect(outputLines(view.container)).toEqual(['line 1'])
-    expect(view.getByRole('button', { name: 'Show remaining 4 linesOutput' })).toBeTruthy()
+    expect(view.getByRole('button', { name: 'Show remaining 4 lines' })).toBeTruthy()
   })
 
   it('caps at the documented default when maxLines is absent', () => {
     const view = render(<TerminalBlock command="ls" output={body(DEFAULT_TERMINAL_MAX_LINES + 1)} />)
     expect(outputLines(view.container)).toHaveLength(DEFAULT_TERMINAL_MAX_LINES)
-    expect(view.getByRole('button', { name: 'Show remaining 1 linesOutput' })).toBeTruthy()
+    expect(view.getByRole('button', { name: 'Show remaining 1 lines' })).toBeTruthy()
   })
 })
 

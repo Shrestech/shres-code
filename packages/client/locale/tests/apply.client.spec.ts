@@ -139,7 +139,7 @@ describe('locale apply', () => {
     b.setHostPreference(undefined)
     b.ctx.remote.$dispatch('settings/document-updated', [LOCALE_SETTINGS_NAMESPACE, 0])
     await vi.waitFor(() => { expect(locale.getLocale().active).toBe('en') })
-    expect(b.describe).toHaveBeenCalledTimes(3)
+    expect(b.describe).toHaveBeenCalledTimes(2)
   })
 
   it('recovers after an HMR collapse of the declaring entry (stale disposer must not block)', async () => {

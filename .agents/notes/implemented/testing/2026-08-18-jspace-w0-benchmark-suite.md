@@ -4,7 +4,7 @@ Status: implemented
 
 ## Problem
 
-The J-Space seat shipped with its value unmeasured: [W0](../../implemented/feature/2026-08-18-jspace-settings-toggle.md) stayed deferred, and both deployment reviews ([Claude](../feature/2026-08-18-jspace-deployment-review-and-uplift-claude.md), [Kimi](../feature/2026-08-18-jspace-deployment-review-and-uplift-kimi.md)) name the missing measurement as the highest-leverage gap and the gate for any capability uplift or default-on decision. No instrument existed to produce it. Writing one from scratch risked diverging from how recognized evaluation harnesses model runs, statistics, and reports — the [Scaffold Effect](https://arxiv.org/html/2607.22585v1) shows harness-level differences swamp the effect being measured, so the instrument's own conventions had to be defensible.
+The J-Space seat shipped with its value unmeasured: [W0](../../implemented/feature/2026-08-18-jspace-settings-toggle.md) stayed deferred, and both deployment reviews ([Claude](../../proposed/feature/2026-08-18-jspace-deployment-review-and-uplift-claude.md), [Kimi](../../proposed/feature/2026-08-18-jspace-deployment-review-and-uplift-kimi.md)) name the missing measurement as the highest-leverage gap and the gate for any capability uplift or default-on decision. No instrument existed to produce it. Writing one from scratch risked diverging from how recognized evaluation harnesses model runs, statistics, and reports — the [Scaffold Effect](https://arxiv.org/html/2607.22585v1) shows harness-level differences swamp the effect being measured, so the instrument's own conventions had to be defensible.
 
 ## Decision
 
@@ -40,4 +40,4 @@ W0 is runnable: `node bench/runner/run.js --experiment <name> --arms off,on --re
 ## Related
 
 - [J-Space as a Settings-toggled harness card](../../implemented/feature/2026-08-18-jspace-settings-toggle.md) — the seat under measurement; owns the W0 deferred item this instruments.
-- Deployment reviews: [Claude](../feature/2026-08-18-jspace-deployment-review-and-uplift-claude.md), [Kimi](../feature/2026-08-18-jspace-deployment-review-and-uplift-kimi.md) — both gate capability uplift on this measurement.
+- Deployment reviews: [Claude](../../proposed/feature/2026-08-18-jspace-deployment-review-and-uplift-claude.md), [Kimi](../../proposed/feature/2026-08-18-jspace-deployment-review-and-uplift-kimi.md) — both gate capability uplift on this measurement.

@@ -191,11 +191,19 @@ test('emits valid chain trials with cold per-phase records', async () => {
   }
 })
 
-test('keeps the built report at the honest tie grade', async () => {
+test('builds a multi-arm report with pressure tasks and on-adaptive', async () => {
   const { dir } = await generateAndRead()
   const uiDataPath = path.join(dir, 'ui-data-out.js')
   const report = await buildExperiment(dir, { uiDataPath, generatedAt: '2026-08-18T00:00:00.000Z' })
-  assert.equal(report.comparison.grade, 'tie')
+  assert.deepEqual(report.comparisons.map(c => c.treatment), ['on', 'on-adaptive', 'on-sq', 'on-sq-verified', 'sq-only'])
+  const onCmp = report.comparisons.find(c => c.treatment === 'on')
+  assert.equal(onCmp.grade, 'improvement')
+  assert.ok(onCmp.deltaAccuracy > 0)
+  assert.ok(report.tasks.filter(t => t.stratum === 'pressure').length >= 4)
+  const adaptive = report.arms.find(a => a.arm === 'on-adaptive')
+  assert.ok(adaptive.meanSessionQueryCalls !== null && adaptive.meanSessionQueryCalls > 0)
+  assert.ok(report.arms.every(a => Number.isFinite(a.totalCompactionCount)))
+  assert.ok(report.arms.some(a => a.pressureFiredRate > 0))
 })
 
 test('is deterministic from the seed', async () => {

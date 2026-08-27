@@ -13,8 +13,9 @@ import type { TypertClientRemote } from '@shres-code/shres-code-typert-protocol'
 export type { TypertClientRemote as ClientRemote } from '@shres-code/shres-code-typert-protocol'
 export type { PluginInventorySnapshot } from '@shres-code/shres-code-host-plugin-inventory/types'
 export type {
-  ShieldCounterSplit, ShieldDefinitions, ShieldFindingSummary, ShieldReason,
-  ShieldRepoStats, ShieldRuleHistogram, ShieldSnapshot, ShieldStatus,
+  ShieldCounterSplit, ShieldDefinitions, ShieldFindingSummary, ShieldPayloadInfo,
+  ShieldPayloadUpdate, ShieldReason, ShieldRepoStats, ShieldRuleHistogram,
+  ShieldSnapshot, ShieldStatus, ShieldUpdateBlocked,
 } from '@shres-code/shres-code-shield/types'
 export type {} from '@shres-code/shres-code-commands/remote'
 export type {} from '@shres-code/shres-code-goal/remote'

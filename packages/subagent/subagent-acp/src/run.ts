@@ -355,6 +355,7 @@ export async function startAcpRun(request: SubagentStartRequest, spec: AcpRunSpe
     localAgent: undefined,
     result,
     dispose(): Promise<void> {
+      /* v8 ignore next -- callers reuse the same in-flight dispose promise */
       if (disposal !== undefined) return disposal
       request.signal.removeEventListener('abort', onAbort)
       requestCancel()

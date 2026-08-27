@@ -105,23 +105,34 @@ export function successfulResult(message: SDKResultMessage): string {
 
 /**
  * Consume the complete SDK stream and require one strict success plus normal
- * iterator completion.
+ * iterator completion. When `outputSchema` is set, a successful result must
+ * also carry `structured_output`.
  * @param query - published official SDK query.
+ * @param outputSchema - requested object schema, or absent when unstructured.
  * @returns the completed shared result.
  */
 export async function consumeClaudeQuery(
   query: AsyncIterable<SDKMessage>,
+  outputSchema?: Record<string, unknown>,
 ): Promise<SubagentResult> {
   let answer: string | undefined
+  let structured: unknown
   for await (const message of query) {
     if (message.type !== 'result') continue
     answer = successfulResult(message)
+    if (outputSchema !== undefined) {
+      if (!('structured_output' in message) || message.structured_output === undefined) {
+        throw new Error('subagent-claude-code: Claude Code finished without structured output')
+      }
+      structured = message.structured_output
+    }
   }
   if (answer === undefined) {
     throw new Error('subagent-claude-code: Claude Code ended without a result')
   }
   return {
     output: [{ type: 'text', text: answer }],
+    ...structured !== undefined ? { structured } : {},
     stopReason: 'completed',
   }
 }
@@ -172,12 +183,14 @@ export async function disposeClaudeCodeChild(
  * @param spec - Workspace, environment, process service, and disposal policy.
  * @param controller - per-run cancellation owner.
  * @param capture - receives the real managed child synchronously from the SDK hook.
+ * @param outputSchema - object schema forwarded as SDK `outputFormat`, when requested.
  * @returns options that inherit native settings while disabling persistence and user questions.
  */
 export function claudeQueryOptions(
   spec: ClaudeCodeRunSpec,
   controller: AbortController,
   capture: (child: SubprocessHandle) => void,
+  outputSchema?: Record<string, unknown>,
 ): Options {
   return {
     abortController: controller,
@@ -186,6 +199,9 @@ export function claudeQueryOptions(
     env: { ...scrubbedParentEnv(), ...spec.env },
     persistSession: false,
     disallowedTools: ['AskUserQuestion'],
+    ...outputSchema !== undefined
+      ? { outputFormat: { type: 'json_schema' as const, schema: outputSchema } }
+      : {},
     spawnClaudeCodeProcess: (options: SpawnOptions) => {
       const child = spec.spawn(claudeSpawnSpec(options, spec.disposeGraceMs))
       capture(child)
@@ -217,6 +233,7 @@ export async function startClaudeCodeRun(
   }
   const onAbort = (): void => { requestCancel() }
   request.signal.addEventListener('abort', onAbort, { once: true })
+  const outputSchema = request.outputSchema as Record<string, unknown> | undefined
 
   let child: SubprocessHandle | undefined
   let query: Query | undefined
@@ -225,7 +242,7 @@ export async function startClaudeCodeRun(
       prompt,
       options: claudeQueryOptions(spec, controller, (captured) => {
         child = captured
-      }),
+      }, outputSchema),
     })
     if (child === undefined || child.pid <= 0) {
       throw new Error(
@@ -268,7 +285,7 @@ export async function startClaudeCodeRun(
   const publishedQuery = query
   const publishedChild = child
   const result = settleRunResult({
-    attempt: () => consumeClaudeQuery(publishedQuery),
+    attempt: () => consumeClaudeQuery(publishedQuery, outputSchema),
     collectOutput: () => [],
     cancelled: () => controller.signal.aborted,
     onError: spec.onError,

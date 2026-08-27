@@ -4,8 +4,13 @@ Behavioral guard plugins watch the agent loop for unproductive patterns and enfo
 
 | Package | Role | ctx key |
 |---|---|---|
-| [`repeat-tool-reminder/`](repeat-tool-reminder/README.md) | Advisory reminders for repeated tool calls | listens on tool and agent events |
+| [`repeat-tool-reminder/`](repeat-tool-reminder/README.md) | Reminders for repeated tool calls, with an opt-in refusal past a run length | listens on tool and agent events |
+| [`step-budget/`](step-budget/README.md) | Ends a turn that proposes more model steps than its budget allows | registers an `agent/pre-step` listener |
 | [`timeout-policy/`](timeout-policy/README.md) | Arms per-call tool deadlines as deployment policy | registers a `tools/execute` listener |
 | [`shield/`](shield/README.md) | Default-on seat for the paid Shres Shield plugin | `ctx.shield` |
 
 Reminders travel as `additionalContexts` on the `tools/post-execute` decision and are appended as logged plugin-sourced `user/message` events ([tools](../../docs/subsystems/tools.md)); the timeout split across `shres-timeout`, capability termination, and this policy layer is recorded in the [timeout-library Agent Note](../../.agents/notes/implemented/architecture/2026-07-06-timeout-deadline-library.md).
+
+Every enforcing behavior in this family is off unless a deployment configures it: the repeat veto (`vetoThreshold`), the step budget (`maxStepsPerTurn`), and the blanket tool deadline (`defaultTimeoutMs`) all ship neutral, because each one truncates honest work when its ceiling is wrong ([harness-hardening Agent Note](../../.agents/notes/implemented/feature/2026-08-26-step-budget-and-default-tool-timeout.md)).
+
+The Shield snapshot vocabulary is [docs/subsystems/guard.md](../../docs/subsystems/guard.md).

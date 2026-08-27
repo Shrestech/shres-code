@@ -36,6 +36,7 @@ const SHIPPED_PRESET_ROOT = fileURLToPath(new URL('../config/agent-presets/', im
 
 import { SHRES_LAUNCH_ENVIRONMENT_KEY, type LaunchEnvironmentSnapshot } from '@shres-code/shres-code-launch-environment'
 import { provideCmdline } from '@shres-code/shres-code-cmdline'
+import { ensureProfileEditions } from './plugin.ts'
 import { createProcessShutdown, type ProcessShutdown } from './process-shutdown.ts'
 
 const NAME = 'shres'
@@ -206,6 +207,17 @@ function suppressShutdownError(ctx: Context, signal: AbortSignal, error: unknown
  */
 export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Context; shutdown: ProcessShutdown }> {
   const composed = composeProfile(options.profile, options.patchFiles)
+  // Provision enabled (autoProvision) editions before the tree mounts so the
+  // seat resolves a paid payload it declared. pnpm failure fails loud: the
+  // exact error is already on stderr, and boot must not proceed with a
+  // silently skipped missing payload.
+  const ensureCode = ensureProfileEditions(composed.profile.dir)
+  if (ensureCode !== 0) {
+    throw new Error(
+      `${NAME}: profile ${options.profile} auto-provision failed (pnpm exited ${ensureCode}); `
+      + 'the exact pnpm error is printed above — provisioning is never silently skipped',
+    )
+  }
   const app: { current?: Context } = {}
   const shutdown = createProcessShutdown(async () => { await app.current?.fiber.dispose() })
   const signalShutdown = new AbortController()

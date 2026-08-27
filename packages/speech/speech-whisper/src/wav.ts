@@ -45,8 +45,10 @@ export function resampleLinear(samples: Float32Array, fromRate: number, toRate: 
     const i0 = Math.min(Math.floor(src), last)
     const i1 = Math.min(i0 + 1, last)
     const frac = src - i0
+    /* v8 ignore start -- Float32Array slots are never empty */
     const a = samples[i0] ?? 0
     const b = samples[i1] ?? 0
+    /* v8 ignore stop */
     out[i] = a + (b - a) * frac
   }
   return out
@@ -81,7 +83,10 @@ export function prepareWhisperSamples(samples: Float32Array, fromRate: number): 
   const length = Math.max(resampled.length, WHISPER_MIN_SAMPLES)
   const out = new Float32Array(length)
   if (gain === 1 && resampled.length === length) return resampled
-  for (let i = 0; i < resampled.length; i++) out[i] = (resampled[i] ?? 0) * gain
+  for (let i = 0; i < resampled.length; i++) {
+    /* v8 ignore next -- Float32Array slots are never empty */
+    out[i] = (resampled[i] ?? 0) * gain
+  }
   return out
 }
 

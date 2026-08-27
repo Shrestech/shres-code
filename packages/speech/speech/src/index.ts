@@ -298,6 +298,7 @@ export class SpeechRuntime extends TypertRemoteService {
     let voices: readonly SpeechVoice[] = []
     if (tts.kind === 'ready') {
       const provider = this.ttsProviders.get(tts.providerId)
+      /* v8 ignore next -- resolveTts only returns ready for a still-registered id */
       if (provider !== undefined) voices = await provider.listVoices()
     }
     return { tts, stt, voices }

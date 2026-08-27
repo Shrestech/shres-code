@@ -26,6 +26,7 @@ The JSONL durable session-persistence backend — a concrete `SessionPersistence
 | `compression` | `'zstd' \| 'none'` | Defaults to `'zstd'`; `'none'` retains newline-delimited UTF-8 text. |
 | `preparedSessionCacheSize` | positive integer (default `5`) | Maximum unpublished Sessions retained after cold history inspection for reuse by resume. |
 | `writeBatchMaxDelayMs` | positive integer (default `200`) | Fixed coalescing window after an idle live-event queue receives work. Later events do not reset it; flush and teardown bypass it. It does not bound event-loop, serialized-operation, or backend latency. At most Node's `2_147_483_647` ms timer limit. |
+| `inMemoryLogWindow` | non-negative integer (absent by default) | Trailing-seq count kept in RAM besides the live model surface after a flush. Absent retains every event. `0` keeps only current surface nodes plus unflushed events; the backend re-reads dropped seqs from the artifact. |
 
 `locate(meta)` returns `{ kind: 'jsonl', path }` for the fixed transcript inside the resolved project/session directories. It performs no filesystem I/O: the target can be returned before the directory or file exists, and an existing file contains only the last flushed prefix.
 

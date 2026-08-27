@@ -571,6 +571,40 @@ const SERVICE_ROLES: ServiceRole[] = [
     consumers: ['tool-cordis'],
     note: 'Registers host inspect providers, mirrors the client provider manifest, and routes client queries through the dynamic Cordis transport.',
   },
+  {
+    key: 'jspace',
+    pkg: 'jspace',
+    title: 'J-Space card seat',
+    mode: 'core',
+    consumers: ['tool-jspace', 'jspace-prompt', 'ui-jspace', 'ui-settings-jspace'],
+    note: 'Publishes ctx.jspace, folds logged card events, and remounts prompt plus tool consumers from seat status.',
+  },
+  {
+    key: 'shield',
+    pkg: 'shield',
+    title: 'Shield screening seat',
+    mode: 'core',
+    consumers: ['ui-settings-shield'],
+    note: 'Host seat for the paid screening engine: entitlement, engine resolve, published status, snapshot RPC, and npm check/install remotes. The detection payload is not a workspace package.',
+  },
+  {
+    key: 'speech',
+    pkg: 'speech',
+    title: 'Speech I/O seam',
+    mode: 'seam',
+    implementations: ['speech-kokoro', 'speech-whisper'],
+    consumers: ['ui-speech'],
+    note: 'TTS and STT provider registry with selection independent of registration order; local Kokoro and Whisper providers implement the seam, and the Web client consumes status plus synthesize/transcribe remotes.',
+  },
+  {
+    key: 'tracker',
+    pkg: 'tracker',
+    title: 'Experiment tracking seam',
+    mode: 'seam',
+    implementations: ['tracker-shrestech'],
+    consumers: ['tool-tracker'],
+    note: 'Run, metrics, and query vocabulary with provider-post failure taxonomy; the shrestech backend persists, and the model tools log through ctx.tracker onto the session.',
+  },
 ]
 
 function generatedHeader(title: string): string[] {

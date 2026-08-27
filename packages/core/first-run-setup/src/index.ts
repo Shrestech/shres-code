@@ -193,7 +193,7 @@ export function processIo(): CliIo {
     stdout: process.stderr,
     stderr: process.stderr,
     /* v8 ignore next -- TTY detection is process-owned; tests assert both sides of the conjunction via the explicit CliIo. */
-    isTTY: process.stdin.isTTY === true && process.stderr.isTTY === true,
+    isTTY:  process.stdin.isTTY &&  process.stderr.isTTY,
   }
 }
 

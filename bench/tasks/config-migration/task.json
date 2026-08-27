@@ -1,0 +1,9 @@
+{
+  "taskId": "config-migration",
+  "stratum": "long",
+  "description": "Migrate a flat config.json to nested structure and update all code that reads it.",
+  "instruction": "This project has a flat `config.json` with keys like `db_host`, `db_port`, `cache_ttl`, and `app_name`. Migrate it to a nested structure: database settings go under a `\"database\"` key, cache settings under `\"cache\"`, and app settings under `\"app\"`. Then update every source file under `src/` that reads from the config to use the new nested paths. When you are done, `node --test` must pass.",
+  "verify": "node verify.mjs",
+  "timeoutMs": 600000,
+  "maxTurns": 40
+}

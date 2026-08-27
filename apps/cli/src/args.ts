@@ -47,6 +47,14 @@ interface PluginInvocation {
   args: string[]
 }
 
+/** Select a declared profile edition: set its autoProvision and provision its packages. */
+interface EnableEditionInvocation {
+  mode: 'enable-edition'
+  profile: string
+  /** The declared edition name under the profile manifest's `shres.editions`. */
+  edition: string
+}
+
 /** Manage models or providers against `$SHRES_HOME` settings and credentials. */
 interface ModelsInvocation {
   mode: 'models'
@@ -54,7 +62,7 @@ interface ModelsInvocation {
 }
 
 /** The resolved `shres` invocation. Help, version, and errors exit inside {@link parseShresArgs}. */
-export type ShresInvocation = ProfileInvocation | DumpConfigInvocation | PluginInvocation | ModelsInvocation
+export type ShresInvocation = ProfileInvocation | DumpConfigInvocation | PluginInvocation | EnableEditionInvocation | ModelsInvocation
 
 /** Launcher flags shared by the default command and the `web` alias. */
 interface BootOptions {
@@ -189,7 +197,15 @@ export function parseShresArgs(argv: readonly string[], version: string): ShresI
       rejectParentOptions('plugin')
       if (options.profile === '') program.error('error: --profile needs a name')
       if (args.length === 0) program.error('error: plugin needs pnpm arguments to forward (e.g. add <package>)')
-      resolved = { mode: 'plugin', profile: options.profile, args }
+      if (args[0] === 'enable-edition') {
+        const edition = args[1]
+        if (args.length !== 2 || edition === undefined || edition === '') {
+          program.error('error: plugin enable-edition needs an edition name (shres plugin --profile <name> enable-edition <edition>)')
+        }
+        resolved = { mode: 'enable-edition', profile: options.profile, edition }
+      } else {
+        resolved = { mode: 'plugin', profile: options.profile, args }
+      }
     })
 
   const models = program.command('models').description('list or set the default model using the same store as Settings → Models')

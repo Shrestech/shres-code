@@ -31,6 +31,9 @@
     "lib/types/**/*.d.ts"
   ],
   "license": "MIT",
+  "dependencies": {
+    "@shres-code/schemastery": "workspace:^"
+  },
   "peerDependencies": {
     "@shres-code/shres-code-invariants": "workspace:^",
     "@shres-code/shres-code-llm": "workspace:^",

@@ -513,6 +513,7 @@ describe('per-call sandbox policy resolution', () => {
       mode: 'read-only',
       workspaceRoot: resolvePath(realpathSync.native(sessionCwd)),
       sessionId: 'policy-session',
+      network: 'deny',
     })
   })
 
@@ -522,6 +523,7 @@ describe('per-call sandbox policy resolution', () => {
     expect(bash.requests[0]?.sandboxPolicy).toEqual({
       mode: 'read-only',
       workspaceRoot: resolvePath(realpathSync.native(process.cwd())),
+      network: 'deny',
     })
 
     // The base FakeBash advertises no sandboxMode, so the tool must not stamp

@@ -5,12 +5,17 @@ import {
   decodeJspaceClosed,
   foldJspace,
   formatJspaceCard,
+  formatJspaceCheckedElision,
+  formatJspaceOpenElision,
   matchesCoverageTerms,
+  DEFAULT_CHECKED_REPRINT_LIMIT,
+  DEFAULT_OPEN_REPRINT_LIMIT,
   JSPACE_ALWAYS_OPEN_GOAL,
   JSPACE_ALWAYS_OPEN_NEXT,
   JSPACE_AVAILABLE_LINE,
 } from '../src/fold.ts'
 import type { JspaceCard } from '../src/types.ts'
+import { CharterEntryId } from '../src/index.ts'
 
 const owner = 'sess-a'
 
@@ -24,6 +29,7 @@ function card(overrides: Partial<JspaceCard> = {}): JspaceCard {
     open: [],
     next: 'Write the fold',
     goalOpenedSeq: 1,
+    charter: [],
     ...overrides,
   }
 }
@@ -107,11 +113,19 @@ describe('foldJspace', () => {
     expect(folded.fault).toMatch(/must be/)
   })
 
-  it('decodes optional evidence and settles', () => {
-    expect(decodeJspaceCard(card({
-      checked: [{ n: 1, check: 'a', by: 'unit tests', evidence: 'c1' }],
+  it('decodes optional evidence, verified, and settles', () => {
+    const decoded = decodeJspaceCard(card({
+      checked: [{ n: 1, check: 'a', by: 'unit tests', evidence: 'c1', verified: true }],
       open: [{ question: 'q', settles: 's' }],
-    })).open[0]?.settles).toBe('s')
+    }))
+    expect(decoded.checked[0]).toEqual({
+      n: 1,
+      check: 'a',
+      by: 'unit tests',
+      evidence: 'c1',
+      verified: true,
+    })
+    expect(decoded.open[0]?.settles).toBe('s')
   })
 
   it('rejects a reused checked number at decode', () => {
@@ -130,6 +144,7 @@ describe('foldJspace', () => {
     [{ ...card(), checked: 'x' }, /checked must be an array/],
     [{ ...card(), checked: [null] }, /checked line must be a record/],
     [{ ...card(), checked: [{ n: 1, check: 'a', by: 'b', evidence: '' }] }, /evidence/],
+    [{ ...card(), checked: [{ n: 1, check: 'a', by: 'b', verified: false }] as never }, /verified/],
     [{ ...card(), open: 'x' }, /open must be an array/],
     [{ ...card(), open: [null] }, /open line must be a record/],
     [{ ...card(), open: [{ question: 'q', settles: '' }] }, /settles/],
@@ -162,11 +177,22 @@ describe('foldJspace', () => {
 
   it('ignores unrelated events', () => {
     const folded = foldJspace([
-      { type: 'turn/start', seq: 0, time: 0, data: { turn: 1 } } as SessionEvent,
+      { type: 'turn/start', seq: 0, time: 0, data: { turn: 1 } },
     ], owner)
     expect(folded.card).toBeNull()
   })
+
+  it('defaults a missing charter field to an empty list', () => {
+    const payload = { ...card() } as Record<string, unknown>
+    delete payload['charter']
+    expect(decodeJspaceCard(payload).charter).toEqual([])
+  })
 })
+
+const reprint = {
+  checkedReprintLimit: DEFAULT_CHECKED_REPRINT_LIMIT,
+  openReprintLimit: DEFAULT_OPEN_REPRINT_LIMIT,
+}
 
 describe('formatJspaceCard', () => {
   it('emits harness-authored labels, not content-supplied ones', () => {
@@ -174,7 +200,7 @@ describe('formatJspaceCard', () => {
       core: ['seat', 'fold'],
       checked: [{ n: 1, check: 'replay', by: 'unit tests' }],
       open: [{ question: 'UI?', settles: 'W5' }],
-    }))
+    }), reprint)
     expect(text).toBe([
       'Goal:      Ship the feature',
       'Core:      seat; fold',
@@ -189,8 +215,76 @@ describe('formatJspaceCard', () => {
     expect(matchesCoverageTerms('unit tests')).toBe(true)
     expect(matchesCoverageTerms('the community reviewed the latest notes')).toBe(false)
     expect(matchesCoverageTerms('覆盖全部', ['覆盖'])).toBe(true)
-    expect(formatJspaceCard(card({ core: [], checked: [], open: [{ question: 'alone' }] }))).toContain('Core:      (none)')
-    expect(formatJspaceCard(card({ checked: [], open: [] })).split('\n')[2]).toBe('Checked:   (none)')
+    expect(formatJspaceCard(card({ core: [], checked: [], open: [{ question: 'alone' }] }), reprint)).toContain('Core:      (none)')
+    expect(formatJspaceCard(card({ checked: [], open: [] }), reprint).split('\n')[2]).toBe('Checked:   (none)')
+  })
+
+  it('prints the last N Checked and last M Open lines and prepends elision counts', () => {
+    const checked = [1, 2, 3, 4, 5, 6, 7].map(n => ({
+      n,
+      check: `c${String(n)}`,
+      by: 'unit tests',
+    }))
+    const open = [1, 2, 3, 4].map(n => ({ question: `q${String(n)}` }))
+    const text = formatJspaceCard(card({ checked, open }), {
+      checkedReprintLimit: 3,
+      openReprintLimit: 2,
+    })
+    expect(text).toBe([
+      'Goal:      Ship the feature',
+      'Core:      seat',
+      formatJspaceCheckedElision(4),
+      'Checked:   ✓5 c5 — unit tests; ✓6 c6 — unit tests; ✓7 c7 — unit tests',
+      formatJspaceOpenElision(2),
+      'Open:      q3; q4',
+      'Next:      Write the fold',
+    ].join('\n'))
+  })
+
+  it('omits the elision line when a section has exactly the reprint limit', () => {
+    const checked = [1, 2, 3, 4, 5].map(n => ({
+      n,
+      check: `c${String(n)}`,
+      by: 'unit tests',
+    }))
+    const text = formatJspaceCard(card({ checked, open: [] }), reprint)
+    expect(text).toBe([
+      'Goal:      Ship the feature',
+      'Core:      seat',
+      'Checked:   ✓1 c1 — unit tests; ✓2 c2 — unit tests; ✓3 c3 — unit tests; ✓4 c4 — unit tests; ✓5 c5 — unit tests',
+      'Open:      (none)',
+      'Next:      Write the fold',
+    ].join('\n'))
+    expect(text).not.toContain('elided')
+  })
+
+  it('prints a Charter line after Core and omits commands', () => {
+    const text = formatJspaceCard(card({
+      charter: [
+        {
+          kind: 'check',
+          id: CharterEntryId('e1'),
+          constraint: 'qty via qty()',
+          command: 'node tools/check-house-rules.mjs qty src/m*.js',
+          reads: ['src/m*.js'],
+          discrimination: 'demonstrated',
+        },
+        {
+          kind: 'prose',
+          id: CharterEntryId('e3'),
+          constraint: 'export prefix',
+        },
+      ],
+    }), reprint)
+    expect(text).toBe([
+      'Goal:      Ship the feature',
+      'Core:      seat',
+      'Charter:    e1 ✓ qty via qty(); e3 prose export prefix',
+      'Checked:   (none)',
+      'Open:      (none)',
+      'Next:      Write the fold',
+    ].join('\n'))
+    expect(text).not.toContain('node tools')
   })
 })
 

@@ -23,6 +23,7 @@ const FIXED_NOW = '2026-08-18T00:00:00.000Z'
  * @returns {import('../schema/trial.js').Trial}
  */
 function trial(overrides) {
+  const { metrics: metricsOverride, ...rest } = overrides ?? {}
   return {
     taskId: 'alpha',
     trialIndex: 0,
@@ -40,11 +41,22 @@ function trial(overrides) {
       identicalRetries: 0,
       checkpoints: 0,
       shipPasses: 0,
+      tokensIncludingDescendants: null,
+      costIncludingDescendants: null, descendantSessions: 0, outOfLoopExperiments: 0,
+      danglingCard: null,
+      verifiedCheckpointShare: null,
+      coverageRefusalThenPad: 0,
+      noopNoteRefusals: 0,
+      noteCapRefusals: 0,
+      sessionQueryCalls: null,
+      compactionCount: 0,
+      pressureFired: false,
+      ...metricsOverride,
     },
     sessionFile: null,
     startedAt: '2026-08-18T00:00:00.000Z',
     endedAt: '2026-08-18T00:01:00.000Z',
-    ...overrides,
+    ...rest,
   }
 }
 
@@ -66,6 +78,8 @@ function manifest(experiment, arm) {
     repeats: 3,
     taskIds: ['alpha', 'beta'],
     gitCommit: 'deadbeef',
+    apiKeyEnv: 'DEEPSEEK_API_KEY',
+    tierPatches: [],
     startedAt: '2026-08-18T00:00:00.000Z',
     endedAt: '2026-08-18T01:00:00.000Z',
   }
@@ -180,6 +194,21 @@ test('loadArm: validates manifest and every trials.jsonl line', async () => {
   }
 })
 
+test('buildExperiment: skips experiment subdirectories without a run.json (scratch, .shres-home)', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'bench-report-scratch-'))
+  try {
+    const experimentDir = await fakeRunsTree(root)
+    const tasksDir = await fakeTasksCatalog(root)
+    await mkdir(join(experimentDir, 'scratch', 'off'), { recursive: true })
+    await mkdir(join(experimentDir, '.shres-home'), { recursive: true })
+
+    const report = await buildExperiment(experimentDir, { tasksDir, uiDataPath: join(root, 'ui', 'data.js'), generatedAt: FIXED_NOW })
+    assert.deepEqual(report.arms.map(a => a.arm), ['off', 'on'])
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('buildExperiment: results.json per arm and a valid ReportData payload', async () => {
   const root = await mkdtemp(join(tmpdir(), 'bench-report-build-'))
   try {
@@ -223,23 +252,27 @@ test('buildExperiment: results.json per arm and a valid ReportData payload', asy
     assert.equal(alphaOn.passRate, 1)
     assert.equal(alphaOn.meanCheckpoints, 2)
 
-    // Pairs: off vs on per task with McNemar counts and bootstrap interval.
-    assert.equal(report.pairs.length, 2)
-    const alphaPair = report.pairs.find(p => p.taskId === 'alpha')
+    // Comparisons: one off-vs-on pairing with McNemar counts and bootstrap interval.
+    assert.equal(report.comparisons.length, 1)
+    assert.equal(report.comparisons[0].treatment, 'on')
+    const pairs = report.comparisons[0].pairs
+    assert.equal(pairs.length, 2)
+    const alphaPair = pairs.find(p => p.taskId === 'alpha')
     assert.equal(alphaPair.delta, 0.5)
     assert.equal(alphaPair.winner, 'on')
+    assert.equal(alphaPair.treatment, 'on')
     assert.equal(alphaPair.wins, 1)
     assert.equal(alphaPair.losses, 0)
     assert.equal(alphaPair.ties, 1)
     assert.ok(Array.isArray(alphaPair.deltaCi95) && alphaPair.deltaCi95.length === 2)
-    const betaPair = report.pairs.find(p => p.taskId === 'beta')
+    const betaPair = pairs.find(p => p.taskId === 'beta')
     assert.equal(betaPair.delta, 1)
     assert.equal(betaPair.wins, 2)
 
     // Comparison: 3 wins, 0 losses overall -> p = 2 * 0.5^3 = 0.25, grade tie.
-    assert.equal(report.comparison.mcnemarP, 0.25)
-    assert.equal(report.comparison.deltaAccuracy, 0.75)
-    assert.equal(report.comparison.grade, 'tie')
+    assert.equal(report.comparisons[0].mcnemarP, 0.25)
+    assert.equal(report.comparisons[0].deltaAccuracy, 0.75)
+    assert.equal(report.comparisons[0].grade, 'tie')
 
     // results.json rebuilt per arm.
     const offResults = JSON.parse(await readFile(join(experimentDir, 'off', 'results.json'), 'utf8'))
@@ -259,7 +292,7 @@ test('buildExperiment: results.json per arm and a valid ReportData payload', asy
     validateReportData(roundTripped)
     assert.equal(roundTripped.experiment, 'exp1')
     assert.equal(roundTripped.cells.length, 4)
-    assert.equal(roundTripped.comparison.mcnemarP, 0.25)
+    assert.equal(roundTripped.comparisons[0].mcnemarP, 0.25)
   } finally {
     await rm(root, { recursive: true, force: true })
   }
@@ -278,6 +311,38 @@ test('buildExperiment: demo marker file flags the synthetic experiment', async (
     await writeFile(join(experimentDir, 'demo'), 'synthetic data\n')
     report = await buildExperiment(experimentDir, { tasksDir, uiDataPath, generatedAt: FIXED_NOW })
     assert.equal(report.demo, true)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('loadArm: reversed trials.jsonl grades identically after sort', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'bench-report-ooo-'))
+  try {
+    const experimentDir = await fakeRunsTree(root)
+    const tasksDir = await fakeTasksCatalog(root)
+    const forward = await buildExperiment(experimentDir, {
+      tasksDir,
+      uiDataPath: join(root, 'ui-fwd', 'data.js'),
+      generatedAt: FIXED_NOW,
+    })
+
+    for (const arm of ['off', 'on']) {
+      const path = join(experimentDir, arm, 'trials.jsonl')
+      const lines = (await readFile(path, 'utf8')).trim().split('\n').reverse()
+      await writeFile(path, `${lines.join('\n')}\n`)
+    }
+    const reversed = await buildExperiment(experimentDir, {
+      tasksDir,
+      uiDataPath: join(root, 'ui-rev', 'data.js'),
+      generatedAt: FIXED_NOW,
+    })
+
+    assert.deepEqual(reversed.comparisons, forward.comparisons)
+    assert.deepEqual(
+      reversed.trials.map(t => [t.arm, t.taskId, t.trialIndex]),
+      forward.trials.map(t => [t.arm, t.taskId, t.trialIndex]),
+    )
   } finally {
     await rm(root, { recursive: true, force: true })
   }
@@ -313,7 +378,12 @@ test('buildExperiment: chain strata and chain trials flow through unchanged', as
       resumedFrom: null,
       exitCode: 0,
       timedOut: false,
-      metrics: { inputTokens, outputTokens: 20, durationMs: 5000, turns: 2, toolCalls: 3, identicalRetries: 0, checkpoints: 0, shipPasses: 0 },
+      metrics: {
+        inputTokens, outputTokens: 20, durationMs: 5000, turns: 2, toolCalls: 3, identicalRetries: 0, checkpoints: 0, shipPasses: 0,
+        tokensIncludingDescendants: null, costIncludingDescendants: null, descendantSessions: 0, outOfLoopExperiments: 0, danglingCard: null, verifiedCheckpointShare: null,
+        coverageRefusalThenPad: 0, noopNoteRefusals: 0, noteCapRefusals: 0, sessionQueryCalls: null,
+        compactionCount: 0, pressureFired: false,
+      },
       startedAt: '2026-08-18T00:00:00.000Z',
       endedAt: '2026-08-18T00:00:05.000Z',
     })
@@ -325,7 +395,7 @@ test('buildExperiment: chain strata and chain trials flow through unchanged', as
       metrics: { inputTokens: 170, outputTokens: 40, durationMs: 10_000, turns: 4, toolCalls: 6, identicalRetries: 0, checkpoints: 0, shipPasses: 0 },
       sessionFile: chainPhases[1].sessionFile,
       phases: chainPhases,
-      integrity: { violations: ['off-arm-jspace-event:jspace/card-open'] },
+      integrity: { violations: ['off-arm-jspace-event:jspace/card'] },
     })])
     await writeArm(dir, 'on', [trial({
       taskId: 'chain-task',
@@ -359,13 +429,14 @@ test('buildExperiment: chain strata and chain trials flow through unchanged', as
     // Embedded trials keep phases and integrity intact.
     const embedded = report.trials.find(t => t.arm === 'off')
     assert.equal(embedded.phases.length, 2)
-    assert.deepEqual(embedded.integrity, { violations: ['off-arm-jspace-event:jspace/card-open'] })
+    assert.deepEqual(embedded.integrity, { violations: ['off-arm-jspace-event:jspace/card'] })
 
     // Aggregates stay trial-level: one cell per arm, sums from trial.metrics.
     assert.equal(report.cells.length, 2)
     assert.equal(report.arms[0].totalInputTokens, 170)
-    assert.equal(report.pairs.length, 1)
-    assert.equal(report.pairs[0].taskId, 'chain-task')
+    assert.equal(report.comparisons.length, 1)
+    assert.equal(report.comparisons[0].pairs.length, 1)
+    assert.equal(report.comparisons[0].pairs[0].taskId, 'chain-task')
   } finally {
     await rm(root, { recursive: true, force: true })
   }
@@ -381,10 +452,172 @@ test('validateReportData: rejects a malformed embedded chain trial', () => {
     cells: [],
     pairs: [],
     arms: [],
-    comparison: { grade: 'tie', deltaAccuracy: 0, mcnemarP: null },
+    comparisons: [],
     trials: [trial({ phases: [{ phaseIndex: 7 }] })],
   }
   assert.throws(() => validateReportData(report), /report\.trials\[0\]: trial\.phases\[0\]/)
+})
+
+test('validateReportData: rejects a non-array comparisons field and a baseline treatment', () => {
+  const base = {
+    version: 1,
+    demo: false,
+    generatedAt: FIXED_NOW,
+    experiment: 'exp1',
+    tasks: [],
+    cells: [],
+    arms: [],
+  }
+  assert.throws(
+    () => validateReportData({ ...base, comparisons: { grade: 'tie', deltaAccuracy: 0, mcnemarP: null } }),
+    /report\.comparisons must be an array/,
+  )
+  assert.throws(
+    () => validateReportData({
+      ...base,
+      comparisons: [{ treatment: 'off', grade: 'tie', deltaAccuracy: 0, mcnemarP: null, pairs: [] }],
+    }),
+    /report\.comparisons\[0\]\.treatment must not be the baseline arm "off"/,
+  )
+  assert.throws(
+    () => validateReportData({
+      ...base,
+      comparisons: [{ treatment: 'on', grade: 'maybe', deltaAccuracy: 0, mcnemarP: null, pairs: [] }],
+    }),
+    /report\.comparisons\[0\]\.grade must be improvement\|regression\|tradeoff\|tie/,
+  )
+})
+
+test('buildExperiment: pressure stratum and one comparison per treatment arm', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'bench-report-multi-'))
+  try {
+    const dir = join(root, 'exp1')
+    await writeArm(dir, 'off', [
+      trial({ taskId: 'press', trialIndex: 0, arm: 'off', resolved: false, failureMode: 'VERIFY_FAILED', verifier: { command: 'node verify.mjs', exitCode: 1 } }),
+      trial({ taskId: 'press', trialIndex: 1, arm: 'off', resolved: false, failureMode: 'VERIFY_FAILED', verifier: { command: 'node verify.mjs', exitCode: 1 } }),
+    ])
+    await writeArm(dir, 'on', [
+      trial({
+        taskId: 'press', trialIndex: 0, arm: 'on', resolved: true,
+        metrics: { danglingCard: false, verifiedCheckpointShare: 1, noopNoteRefusals: 1, sessionQueryCalls: null, compactionCount: 2, pressureFired: true },
+      }),
+      trial({
+        taskId: 'press', trialIndex: 1, arm: 'on', resolved: true,
+        metrics: { danglingCard: true, verifiedCheckpointShare: 0.5, noopNoteRefusals: 0, sessionQueryCalls: null, compactionCount: 1, pressureFired: true },
+      }),
+    ])
+    await writeArm(dir, 'on-adaptive', [
+      trial({
+        taskId: 'press', trialIndex: 0, arm: 'on-adaptive', resolved: true,
+        metrics: { danglingCard: false, verifiedCheckpointShare: 0.8, sessionQueryCalls: 3, compactionCount: 2, pressureFired: true },
+      }),
+      trial({
+        taskId: 'press', trialIndex: 1, arm: 'on-adaptive', resolved: false, failureMode: 'VERIFY_FAILED', verifier: { command: 'node verify.mjs', exitCode: 1 },
+        metrics: { danglingCard: false, verifiedCheckpointShare: null, sessionQueryCalls: 1, compactionCount: 0, pressureFired: false },
+      }),
+    ])
+
+    const tasksDir = join(root, 'tasks')
+    await mkdir(join(tasksDir, 'press'), { recursive: true })
+    await writeFile(join(tasksDir, 'press', 'task.json'), JSON.stringify({
+      taskId: 'press',
+      stratum: 'pressure',
+      description: 'Pressure task from the catalog.',
+      instruction: 'Survive.',
+      verify: 'node verify.mjs',
+      timeoutMs: 600_000,
+      maxTurns: 80,
+    }) + '\n')
+
+    const report = await buildExperiment(dir, { tasksDir, uiDataPath: join(root, 'ui', 'data.js'), generatedAt: FIXED_NOW })
+    validateReportData(report)
+
+    assert.deepEqual(
+      report.tasks.find(t => t.taskId === 'press'),
+      { taskId: 'press', stratum: 'pressure', description: 'Pressure task from the catalog.' },
+    )
+    assert.deepEqual(report.comparisons.map(c => c.treatment), ['on', 'on-adaptive'])
+    assert.equal(report.comparisons[0].pairs[0].winner, 'on')
+    assert.equal(report.comparisons[1].treatment, 'on-adaptive')
+    assert.equal(report.comparisons[1].pairs[0].treatment, 'on-adaptive')
+
+    const onArm = report.arms.find(a => a.arm === 'on')
+    assert.equal(onArm.meanDanglingCard, 0.5)
+    assert.equal(onArm.meanVerifiedCheckpointShare, 0.75)
+    assert.equal(onArm.totalNoopNoteRefusals, 1)
+    assert.equal(onArm.totalCompactionCount, 3)
+    assert.equal(onArm.pressureFiredRate, 1)
+    const adaptive = report.arms.find(a => a.arm === 'on-adaptive')
+    assert.equal(adaptive.meanSessionQueryCalls, 2)
+    assert.equal(adaptive.totalCompactionCount, 2)
+    assert.equal(adaptive.pressureFiredRate, 0.5)
+    assert.equal(onArm.meanCharterRunFailNamed, null)
+    assert.equal(onArm.meanEmptyCharterRate, null)
+    assert.equal(onArm.meanUnverifiedShare, null)
+    assert.equal(onArm.meanEchoOkRejectRate, null)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('buildExperiment: charter forensics aggregates', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'bench-report-charter-'))
+  try {
+    const dir = join(root, 'exp-charter')
+    await writeArm(dir, 'off', [
+      trial({ taskId: 'press', trialIndex: 0, arm: 'off', resolved: false, failureMode: 'VERIFY_FAILED', verifier: { command: 'node verify.mjs', exitCode: 1 } }),
+    ])
+    await writeArm(dir, 'on-charter', [
+      trial({
+        taskId: 'press', trialIndex: 0, arm: 'on-charter', resolved: true,
+        metrics: {
+          danglingCard: false,
+          charterRunFailNamed: true,
+          emptyCharterRate: 0,
+          unverifiedShare: 0.25,
+          echoOkRejectRate: 0.5,
+        },
+      }),
+      trial({
+        taskId: 'press', trialIndex: 1, arm: 'on-charter', resolved: true,
+        metrics: {
+          danglingCard: false,
+          charterRunFailNamed: false,
+          emptyCharterRate: 1,
+          unverifiedShare: 0.75,
+          echoOkRejectRate: 0,
+        },
+      }),
+    ])
+    const tasksDir = join(root, 'tasks')
+    await mkdir(join(tasksDir, 'press'), { recursive: true })
+    await writeFile(join(tasksDir, 'press', 'task.json'), JSON.stringify({
+      taskId: 'press',
+      stratum: 'pressure',
+      description: 'Charter pressure task.',
+      instruction: 'Survive.',
+      verify: 'node verify.mjs',
+      timeoutMs: 600_000,
+      maxTurns: 80,
+    }) + '\n')
+
+    const report = await buildExperiment(dir, { tasksDir, uiDataPath: join(root, 'ui', 'data.js'), generatedAt: FIXED_NOW })
+    const arm = report.arms.find(a => a.arm === 'on-charter')
+    assert.equal(arm.meanCharterRunFailNamed, 0.5)
+    assert.equal(arm.meanEmptyCharterRate, 0.5)
+    assert.equal(arm.meanUnverifiedShare, 0.5)
+    assert.equal(arm.meanEchoOkRejectRate, 0.25)
+    const cell = report.cells.find(c => c.arm === 'on-charter' && c.taskId === 'press')
+    assert.equal(cell.meanCharterRunFailNamed, 0.5)
+    assert.equal(cell.meanEmptyCharterRate, 0.5)
+    assert.equal(cell.meanUnverifiedShare, 0.5)
+    assert.equal(cell.meanEchoOkRejectRate, 0.25)
+    const offArm = report.arms.find(a => a.arm === 'off')
+    assert.equal(offArm.meanCharterRunFailNamed, null)
+    assert.equal(offArm.meanEmptyCharterRate, null)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
 })
 
 test('resolveRequest: traversal guard and index.html fallback', () => {

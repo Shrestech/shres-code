@@ -7,7 +7,7 @@ describe('TerminalSanitizer', () => {
     expect(sanitizer.push('red\x1b[3')).toEqual({ text: 'red', prompt: false })
     expect(sanitizer.push('1m text\x1b[0m\r\n')).toEqual({ text: ' text\n', prompt: false })
     expect(sanitizer.push('\x1b]133;')).toEqual({ text: '', prompt: false })
-    expect(sanitizer.push('D;0\x07dsh> ')).toEqual({ text: 'shres> ', prompt: true, promptTail: 'shres> ' })
+    expect(sanitizer.push('D;0\x07shres> ')).toEqual({ text: 'shres> ', prompt: true, promptTail: 'shres> ' })
   })
 
   it('drops unrelated OSC, short escapes, BEL, and incomplete trailing escape', () => {

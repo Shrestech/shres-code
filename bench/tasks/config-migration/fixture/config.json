@@ -1,0 +1,9 @@
+{
+  "db_host": "localhost",
+  "db_port": 5432,
+  "db_name": "appdb",
+  "cache_ttl": 3600,
+  "cache_max_size": 1000,
+  "app_name": "my-service",
+  "app_port": 8080
+}
