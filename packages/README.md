@@ -36,6 +36,7 @@ Groups hold `packages/<group>/<pkg>/`; names stay `@shres-code/shres-code-<pkg>`
 | [`spill/`](spill/README.md) | Spill capability family: storage seam, local impl, tool-result spill policy | Product — stable API |
 | [`todo/`](todo/README.md) | The model-facing `todo_write` tool | Product — stable API |
 | [`tracker/`](tracker/README.md) | Experiment tracking seam, shrestech-tracker provider, and experiment tools | Product — stable API |
+| [`research/`](research/README.md) | Autoresearch toggle + researcher protocol | Product — stable API |
 | [`jspace/`](jspace/README.md) | Settings-toggled logged working card | Product — stable API |
 | [`plan/`](plan/README.md) | Plan collaboration state with a direct entry command and reviewed exit | Product — stable API |
 | [`preset/`](preset/README.md) | Per-session agent composition from preset `cordis.yml` files | Product — stable API |

@@ -9,18 +9,23 @@ import type {
   MetricPoint,
   RunFilter,
   TrackerRunId,
+  TrackerRunRecord,
   TrackerRunResult,
   TrackerRunSummary,
 } from '@shres-code/shres-code-tracker'
 import { Session, SessionId } from '@shres-code/shres-code-session'
 
 import * as tool from '../src/index.ts'
-import type { LogMetricsOutput, LogRunOutput, QueryOutput } from '../src/index.ts'
+import type { LogMetricsOutput, LogRunOutput, QueryOutput, VerifyOutput } from '../src/index.ts'
 
 /** A scripted tracker provider: controllable land/spool outcome and query results. */
 class StubTracker extends TrackerService {
   spooled = false
   queryResults: TrackerRunSummary[] = []
+  /** Runs returned by {@link getRun}, keyed by run id. */
+  runs = new Map<TrackerRunId, TrackerRunRecord>()
+  /** Metrics returned by {@link getMetrics}, keyed by run id. */
+  metrics = new Map<TrackerRunId, MetricPoint[]>()
 
   async postRun(runId: TrackerRunId, _spec: LogRunSpec): Promise<TrackerRunResult> {
     return this.spooled
@@ -32,6 +37,14 @@ class StubTracker extends TrackerService {
 
   async queryRuns(_filter: RunFilter): Promise<TrackerRunSummary[]> {
     return this.queryResults
+  }
+
+  async getRun(runId: TrackerRunId): Promise<TrackerRunRecord | undefined> {
+    return this.runs.get(runId)
+  }
+
+  async getMetrics(runId: TrackerRunId): Promise<MetricPoint[]> {
+    return this.metrics.get(runId) ?? []
   }
 }
 
@@ -90,10 +103,15 @@ const runArgsMinimal = {
 }
 
 describe('shres-tool-tracker registration', () => {
-  it('registers the three experiment tools with their schemas', async () => {
+  it('registers the four experiment tools with their schemas', async () => {
     const { ctx } = await setup()
     const names = ctx.tools.schemas().map(s => s.name).sort()
-    expect(names).toEqual(['experiment_log_metrics', 'experiment_log_run', 'experiment_query'])
+    expect(names).toEqual([
+      'experiment_log_metrics',
+      'experiment_log_run',
+      'experiment_query',
+      'experiment_verify_decision_rule',
+    ])
     const run = ctx.tools.get('experiment_log_run')!
     const props = (run.parameters as { properties?: Record<string, unknown> }).properties ?? {}
     expect(Object.keys(props).sort()).toEqual([
@@ -240,6 +258,63 @@ describe('experiment_query', () => {
   })
 })
 
+describe('experiment_verify_decision_rule', () => {
+  /** Seed a run with a machine rule and one metric point. */
+  function seedRun(tracker: StubTracker, runId: string, value: number) {
+    const id = runId as TrackerRunId
+    tracker.runs.set(id, {
+      runId: id,
+      experiment: 'study',
+      decisionRule: 'val_bpb < 1.0',
+      dataVersion: 'v3',
+      gitSha: 'abc123',
+      machineRule: { metric: 'val_bpb', op: '<', threshold: 1.0 },
+    })
+    tracker.metrics.set(id, [{ name: 'val_bpb', value }])
+  }
+
+  it('returns a satisfied verdict and renders the rule and actual value', async () => {
+    const { ctx, tracker } = await setup()
+    seedRun(tracker, 'run-1', 0.5)
+    const result = await callTool(ctx, 'experiment_verify_decision_rule', { runId: 'run-1' })
+    expect(result.isError).toBe(false)
+    if (result.isError) throw new Error('expected experiment_verify_decision_rule success')
+    const output = result.value as unknown as VerifyOutput
+    if (output.status === 'refused') throw new Error('expected a decided verdict')
+    expect(output.status).toBe('satisfied')
+    expect(output.rule).toEqual({ metric: 'val_bpb', op: '<', threshold: 1.0 })
+    expect(output.actual).toBe(0.5)
+    expect(text(result)).toContain('Decision rule satisfied: val_bpb < 1 (actual 0.5)')
+  })
+
+  it('returns an unsatisfied verdict when the rule is not met', async () => {
+    const { ctx, tracker } = await setup()
+    seedRun(tracker, 'run-1', 1.5)
+    const result = await callTool(ctx, 'experiment_verify_decision_rule', { runId: 'run-1' })
+    expect(result.isError).toBe(false)
+    if (result.isError) throw new Error('expected experiment_verify_decision_rule success')
+    expect((result.value as unknown as VerifyOutput).status).toBe('unsatisfied')
+    expect(text(result)).toContain('Decision rule unsatisfied')
+  })
+
+  it('renders a refusal with its reason verbatim', async () => {
+    const { ctx } = await setup()
+    const result = await callTool(ctx, 'experiment_verify_decision_rule', { runId: 'run-missing' })
+    expect(result.isError).toBe(false)
+    if (result.isError) throw new Error('expected experiment_verify_decision_rule success')
+    const output = result.value as unknown as VerifyOutput
+    if (output.status !== 'refused') throw new Error('expected a refused verdict')
+    expect(output.reason).toBe('run-not-found')
+    expect(text(result)).toContain('Decision rule verification refused (run-not-found)')
+  })
+
+  it('presents the call as a generic card', async () => {
+    const { ctx } = await setup()
+    const view = ctx.tools.get('experiment_verify_decision_rule')!.presentCall?.({ runId: 'run-1' })
+    expect(view?.card).toBe('generic')
+  })
+})
+
 describe('output formatters', () => {
   it('formats landed and spooled run outputs', () => {
     expect(tool.formatRunOutput({ runId: 'r', status: 'landed' })).toContain('Logged experiment run')
@@ -250,5 +325,14 @@ describe('output formatters', () => {
 
   it('formats a single metric point with singular grammar', () => {
     expect(tool.formatMetricsOutput({ runId: 'r', metricsCount: 1 })).toContain('1 metric point')
+  })
+
+  it('formats satisfied, unsatisfied, and refused verification outputs', () => {
+    expect(tool.formatVerifyOutput({ status: 'satisfied', rule: { metric: 'val_bpb', op: '<', threshold: 1 }, actual: 0.5 }))
+      .toContain('Decision rule satisfied: val_bpb < 1 (actual 0.5)')
+    expect(tool.formatVerifyOutput({ status: 'unsatisfied', rule: { metric: 'val_bpb', op: '<', threshold: 1 }, actual: 1.5 }))
+      .toContain('Decision rule unsatisfied')
+    expect(tool.formatVerifyOutput({ status: 'refused', reason: 'no-machine-rule', detail: 'run r logged no machine rule' }))
+      .toContain('Decision rule verification refused (no-machine-rule)')
   })
 })

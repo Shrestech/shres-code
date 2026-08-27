@@ -945,6 +945,42 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'ledger',
+    summary: 'The abstract decision-ledger service.',
+    description: 'The abstract decision-ledger service. Registered as `ctx.ledger` (one provider per context; loading a second throws cordis\' standard duplicate-service behavior). A provider subclasses this, implements the three abstract persistence hooks, and loads the subclass as a plugin.\n\nImplementations must honor these semantics:\n\n- persistRecord persists a resolved decision spec under its entry id.\n- queryEntries reads the provider\'s authoritative entry store.\n- hasEntry reports whether an entry id is present in the store.',
+    methods: [
+      {
+        signature: 'abstract persistRecord(entryId: LedgerEntryId, spec: LedgerSpec): Promise<void>',
+        description: 'Persist a resolved decision spec under its entry id. Implemented by the provider.',
+        parameters: [{ name: 'entryId', description: 'the id the seam allocated for this record.' }, { name: 'spec', description: 'a resolved spec from {@link resolveRecord}, never a raw request.' }],
+      },
+      {
+        signature: 'abstract queryEntries(filter: LedgerFilter): Promise<LedgerEntry[]>',
+        description: 'Query entries from the provider\'s authoritative store.',
+        parameters: [{ name: 'filter', description: 'optional filters; absent fields are not applied.' }],
+        returns: 'the matching entries.',
+      },
+      {
+        signature: 'abstract hasEntry(entryId: LedgerEntryId): boolean',
+        description: 'Whether the provider\'s store holds an entry with the given id. Synchronous so the invariant companion can check a `ledger/decision` event against the store without awaiting a query.',
+        parameters: [{ name: 'entryId', description: 'the entry id to look up.' }],
+        returns: 'whether the entry is present.',
+      },
+      {
+        signature: 'async record(session: Session, request: LedgerRequest, callId: CallId): Promise<LedgerRecordResult>',
+        description: 'Record a decision. Resolves and validates the request, allocates the entry id, resolves every cited run id against the mounted tracker service, and delegates to the provider. A validation or store failure returns a failed result carrying the LedgerFailureReason; the log-only `ledger/decision` event is written only after the provider returns, so the log reflects the record outcome exactly as the caller received it.',
+        parameters: [{ name: 'session', description: 'owning session; the decision event is appended to its log.' }, { name: 'request', description: 'the caller\'s decision request (validated and defaulted here).' }, { name: 'callId', description: 'the tool-call id of the `ledger_record_decision` call that produced the record.' }],
+        returns: 'the record outcome with the allocated entry id.',
+      },
+      {
+        signature: 'async query(filter: LedgerFilter): Promise<LedgerEntry[]>',
+        description: 'Query entries from the provider\'s authoritative store.',
+        parameters: [{ name: 'filter', description: 'optional filters; absent fields are not applied.' }],
+        returns: 'the matching entries.',
+      },
+    ],
+  },
+  {
     key: 'llm',
     summary: 'The abstract `llm` service: an adapter registry plus a streaming model-call API, interceptable via the `llm/stream` waterfall.',
     description: 'The abstract `llm` service: an adapter registry plus a streaming model-call API, interceptable via the `llm/stream` waterfall.',
@@ -2248,6 +2284,18 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the matching run summaries.',
       },
       {
+        signature: 'abstract getRun(runId: TrackerRunId): Promise<TrackerRunRecord | undefined>',
+        description: 'Resolve one run by id from the provider\'s authoritative store (the landed index and the spool), including its optional MachineRule.',
+        parameters: [{ name: 'runId', description: 'the run to resolve.' }],
+        returns: 'the run record, or `undefined` when no run with that id is stored.',
+      },
+      {
+        signature: 'abstract getMetrics(runId: TrackerRunId): Promise<MetricPoint[]>',
+        description: 'Retrieve every logged metric point for one run, in append order.',
+        parameters: [{ name: 'runId', description: 'the run whose metrics to read.' }],
+        returns: 'the run\'s logged metric points; empty when none are logged.',
+      },
+      {
         signature: 'async logRun(session: Session, request: LogRunRequest, callId: CallId): Promise<TrackerRunResult>',
         description: 'Log a run. Resolves and validates the request, allocates the run id, delegates to the provider, and writes the log-only `tracker/run` event to the owning session. The event is written after the provider returns, so the log reflects the post outcome exactly as the caller received it.',
         parameters: [{ name: 'session', description: 'owning session; the run event is appended to its log.' }, { name: 'request', description: 'the caller\'s run request (validated and defaulted here).' }, { name: 'callId', description: 'the tool-call id of the `experiment_log_run` call that produced the run.' }],
@@ -2257,6 +2305,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         signature: 'async logMetrics(session: Session, runId: TrackerRunId, metrics: readonly MetricPoint[]): Promise<void>',
         description: 'Append metrics to a run\'s durable record and write the log-only `tracker/metrics` event.',
         parameters: [{ name: 'session', description: 'the owning session; the append is logged to it.' }, { name: 'runId', description: 'the run the metrics belong to.' }, { name: 'metrics', description: 'the metric points to append.' }],
+      },
+      {
+        signature: 'async verifyDecisionRule(runId: TrackerRunId): Promise<TrackerDecisionRuleVerdict>',
+        description: 'Mechanically re-execute a run\'s MachineRule against its logged metrics. No LLM and no heuristics: the run is resolved by id, its rule is compared against the latest append of the named metric, and the verdict is a pure function of those stored values. A run with no machine rule, no metrics, or without the named metric is refused with its reason — never defaulted or guessed.',
+        parameters: [{ name: 'runId', description: 'the run whose decision rule to verify.' }],
+        returns: 'the mechanical verdict: satisfied/unsatisfied with the rule and observed value, or refused with the reason no verdict could be produced.',
       },
     ],
   },
@@ -3271,6 +3325,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type CredentialRef = Branded<\'CredentialRef\'>;',
   },
   {
+    name: 'Decision',
+    declaration: 'export type Decision = \'accepted\' | \'rejected\' | \'deferred\';',
+  },
+  {
     name: 'DiffCallView',
     declaration: 'export interface DiffCallView {\n    card: \'diff\';\n    title: string;\n    diffs: FileDiff[];\n    locations?: FileLocation[];\n}',
   },
@@ -3659,6 +3717,38 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface KvUnitDescriptor {\n    readonly name: string;\n    readonly version: number;\n    readonly tables: readonly string[];\n    readonly hasGlobal: boolean;\n}',
   },
   {
+    name: 'LedgerEntry',
+    declaration: 'export interface LedgerEntry {\n    readonly entryId: LedgerEntryId;\n    readonly hypothesis: string;\n    readonly decision: Decision;\n    readonly evidence: LedgerEvidence;\n    readonly rationale: string;\n    readonly recordedAt: number;\n}',
+  },
+  {
+    name: 'LedgerEntryId',
+    declaration: 'export type LedgerEntryId = Branded<\'LedgerEntryId\'>;',
+  },
+  {
+    name: 'LedgerEvidence',
+    declaration: 'export interface LedgerEvidence {\n    readonly runIds: readonly TrackerRunId[];\n    readonly gitSha?: string;\n    readonly artifactUris: readonly string[];\n}',
+  },
+  {
+    name: 'LedgerFailureReason',
+    declaration: 'export type LedgerFailureReason = \'required-field\' | \'missing-run\' | \'deferred-cites-runs\' | \'invalid-artifact-uri\' | \'unresolved-run\' | \'corrupt-store\';',
+  },
+  {
+    name: 'LedgerFilter',
+    declaration: 'export interface LedgerFilter {\n    readonly decision?: Decision;\n    readonly hypothesisSubstring?: string;\n    readonly since?: number;\n}',
+  },
+  {
+    name: 'LedgerRecordResult',
+    declaration: 'export type LedgerRecordResult = {\n    readonly kind: \'recorded\';\n    readonly entryId: LedgerEntryId;\n} | {\n    readonly kind: \'failed\';\n    readonly entryId: LedgerEntryId;\n    readonly reason: LedgerFailureReason;\n};',
+  },
+  {
+    name: 'LedgerRequest',
+    declaration: 'export interface LedgerRequest {\n    readonly hypothesis: string;\n    readonly decision: Decision;\n    readonly evidence: {\n        readonly runIds: readonly TrackerRunId[];\n        readonly gitSha?: string;\n        readonly artifactUris?: readonly string[];\n    };\n    readonly rationale: string;\n}',
+  },
+  {
+    name: 'LedgerSpec',
+    declaration: 'export interface LedgerSpec {\n    readonly hypothesis: string;\n    readonly decision: Decision;\n    readonly evidence: LedgerEvidence;\n    readonly rationale: string;\n}',
+  },
+  {
     name: 'LlmAdapter',
     declaration: 'export abstract class LlmAdapter {\n    providerInfo(provider: string): LlmProviderInfo;\n    providerRetryPolicy(_provider: string): ResolvedRetryPolicy | undefined;\n    listModels(_provider: string): Promise<readonly LlmModelInfo[]>;\n    resolveModel(provider: string, model: string, _signal?: AbortSignal): Promise<LlmResolvedModelInfo>;\n    abstract stream(options: GenerateOptions): AsyncIterable<StreamChunk>;\n}',
   },
@@ -3720,11 +3810,11 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'LogRunRequest',
-    declaration: 'export interface LogRunRequest {\n    readonly experiment: string;\n    readonly hypothesis: string;\n    readonly decisionRule: string;\n    readonly dataVersion: string;\n    readonly gitSha: string;\n    readonly metrics?: readonly MetricPoint[];\n    readonly artifacts?: readonly string[];\n}',
+    declaration: 'export interface LogRunRequest {\n    readonly experiment: string;\n    readonly hypothesis: string;\n    readonly decisionRule: string;\n    readonly machineRule?: MachineRule;\n    readonly dataVersion: string;\n    readonly gitSha: string;\n    readonly metrics?: readonly MetricPoint[];\n    readonly artifacts?: readonly string[];\n}',
   },
   {
     name: 'LogRunSpec',
-    declaration: 'export interface LogRunSpec {\n    readonly experiment: string;\n    readonly hypothesis: string;\n    readonly decisionRule: string;\n    readonly dataVersion: string;\n    readonly gitSha: string;\n    readonly metrics: readonly MetricPoint[];\n    readonly artifacts: readonly string[];\n}',
+    declaration: 'export interface LogRunSpec {\n    readonly experiment: string;\n    readonly hypothesis: string;\n    readonly decisionRule: string;\n    readonly machineRule?: MachineRule;\n    readonly dataVersion: string;\n    readonly gitSha: string;\n    readonly metrics: readonly MetricPoint[];\n    readonly artifacts: readonly string[];\n}',
   },
   {
     name: 'LspHover',
@@ -3765,6 +3855,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'LspRange',
     declaration: 'export interface LspRange {\n    readonly start: LspPosition;\n    readonly end: LspPosition;\n}',
+  },
+  {
+    name: 'MachineRule',
+    declaration: 'export interface MachineRule {\n    readonly metric: string;\n    readonly op: \'>\' | \'>=\' | \'<\' | \'<=\' | \'==\';\n    readonly threshold: number;\n}',
   },
   {
     name: 'ManualCompactAgentContext',
@@ -5035,12 +5129,20 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ToolSchema {\n    name: string;\n    description: string;\n    parameters: Record<string, unknown>;\n}',
   },
   {
+    name: 'TrackerDecisionRuleVerdict',
+    declaration: 'export type TrackerDecisionRuleVerdict = {\n    readonly status: \'satisfied\';\n    readonly rule: MachineRule;\n    readonly actual: number;\n} | {\n    readonly status: \'unsatisfied\';\n    readonly rule: MachineRule;\n    readonly actual: number;\n} | {\n    readonly status: \'refused\';\n    readonly reason: \'run-not-found\' | \'no-machine-rule\' | \'metrics-missing\' | \'metric-not-in-run\';\n    readonly detail: string;\n};',
+  },
+  {
     name: 'TrackerFailureReason',
     declaration: 'export type TrackerFailureReason = \'auth\' | \'unreachable\' | \'quarantined-row\' | \'spooled\';',
   },
   {
     name: 'TrackerRunId',
     declaration: 'export type TrackerRunId = Branded<\'TrackerRunId\'>;',
+  },
+  {
+    name: 'TrackerRunRecord',
+    declaration: 'export interface TrackerRunRecord {\n    readonly runId: TrackerRunId;\n    readonly experiment: string;\n    readonly decisionRule: string;\n    readonly dataVersion: string;\n    readonly gitSha: string;\n    readonly machineRule?: MachineRule;\n    readonly reason?: TrackerFailureReason;\n}',
   },
   {
     name: 'TrackerRunResult',

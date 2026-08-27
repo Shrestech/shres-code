@@ -10,7 +10,12 @@
 import type { Context } from '@shres-code/cordis'
 import { defineTool } from '@shres-code/shres-code-tools'
 import type { GenericCallView, ToolRunContext } from '@shres-code/shres-code-tools'
-import type { LogRunRequest, TrackerRunId, TrackerRunResult } from '@shres-code/shres-code-tracker'
+import type {
+  LogRunRequest,
+  TrackerDecisionRuleVerdict,
+  TrackerRunId,
+  TrackerRunResult,
+} from '@shres-code/shres-code-tracker'
 
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'tool-tracker'
@@ -43,6 +48,19 @@ export interface QueryOutput {
     readonly reason?: string
   }>
 }
+
+/** Canonical `experiment_verify_decision_rule` output value. */
+export type VerifyOutput =
+  | {
+    readonly status: 'satisfied' | 'unsatisfied'
+    readonly rule: { readonly metric: string; readonly op: string; readonly threshold: number }
+    readonly actual: number
+  }
+  | {
+    readonly status: 'refused'
+    readonly reason: string
+    readonly detail: string
+  }
 
 /**
  * Require the calling agent so run/metrics mutations have a session log.
@@ -95,6 +113,20 @@ export function formatQueryOutput(value: QueryOutput): string {
 }
 
 /**
+ * Format a decision-rule verification output, surfacing the verdict verbatim:
+ * the rule and observed value for satisfied/unsatisfied, or the refusal reason
+ * and detail for refused.
+ * @param value - the tool's canonical output.
+ * @returns the model-facing text.
+ */
+export function formatVerifyOutput(value: VerifyOutput): string {
+  if (value.status === 'refused') {
+    return `Decision rule verification refused (${value.reason}): ${value.detail}`
+  }
+  return `Decision rule ${value.status}: ${value.rule.metric} ${value.rule.op} ${value.rule.threshold} (actual ${value.actual})`
+}
+
+/**
  * Pending-call presentation for `experiment_log_run`: a generic card.
  * @param args - the raw tool arguments; `experiment` becomes the title.
  * @returns the generic card view.
@@ -112,6 +144,18 @@ function projectResult(result: TrackerRunResult): LogRunOutput {
   return result.kind === 'landed'
     ? { runId: result.runId, status: 'landed' }
     : { runId: result.runId, status: 'spooled', reason: result.reason }
+}
+
+/**
+ * Project a {@link TrackerDecisionRuleVerdict} into a {@link VerifyOutput}.
+ * @param verdict - the seam's mechanical verdict.
+ * @returns the tool's canonical output value.
+ */
+function projectVerdict(verdict: TrackerDecisionRuleVerdict): VerifyOutput {
+  if (verdict.status === 'refused') {
+    return { status: 'refused', reason: verdict.reason, detail: verdict.detail }
+  }
+  return { status: verdict.status, rule: verdict.rule, actual: verdict.actual }
 }
 
 /**
@@ -261,5 +305,39 @@ export function apply(ctx: Context): void {
       }
     },
     presentCall: () => ({ card: 'generic', title: 'Query experiment runs', kind: 'other', rawInput: '' }),
+  }))
+
+  ctx.tools.register(defineTool({
+    name: 'experiment_verify_decision_rule',
+    description: 'Mechanically re-execute one run\'s machine decision rule against its logged metrics, returning whether the rule is satisfied, unsatisfied, or refused with the reason. Never an LLM judgment.',
+    parameters: {
+      runId: { type: 'string', required: true, description: 'The run id returned by experiment_log_run.' },
+    },
+    output: {
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          status: { type: 'string', required: true, enum: ['satisfied', 'unsatisfied', 'refused'] },
+          rule: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              metric: { type: 'string', required: true },
+              op: { type: 'string', required: true },
+              threshold: { type: 'number', required: true },
+            },
+          },
+          actual: { type: 'number' },
+          reason: { type: 'string' },
+          detail: { type: 'string' },
+        },
+      },
+      render: (_args, value) => [{ type: 'text', text: formatVerifyOutput(value as VerifyOutput) }],
+    },
+    async execute(args) {
+      return projectVerdict(await ctx.tracker.verifyDecisionRule(args.runId as TrackerRunId))
+    },
+    presentCall: () => ({ card: 'generic', title: 'Verify decision rule', kind: 'other', rawInput: '' }),
   }))
 }

@@ -36,6 +36,20 @@ export interface MetricPoint {
 }
 
 /**
+ * A machine-readable decision rule. When present on a run, {@link
+ * verifyDecisionRule} re-executes it mechanically against the run's logged
+ * metrics — never an LLM's judgment — so a "supported" verdict is reproducible.
+ */
+export interface MachineRule {
+  /** The metric name the rule reads (for example `val_bpb`). */
+  readonly metric: string
+  /** The comparison operator applied to the metric's latest value. */
+  readonly op: '>' | '>=' | '<' | '<=' | '=='
+  /** The threshold the metric's latest value is compared against. */
+  readonly threshold: number
+}
+
+/**
  * A caller's run REQUEST. `experiment`, `decisionRule`, `dataVersion`, and
  * `gitSha` are required and enforced by {@link
  * resolveLogRun}; `hypothesis` is a required string by type (the tool schema
@@ -50,6 +64,8 @@ export interface LogRunRequest {
   readonly hypothesis: string
   /** The decision rule encoded in the API itself — a threshold change is a new experiment. */
   readonly decisionRule: string
+  /** Optional machine-readable decision rule; validated by {@link resolveLogRun} when present. */
+  readonly machineRule?: MachineRule
   /** Data version the run used. */
   readonly dataVersion: string
   /** Git commit the run reproduced. */
@@ -69,6 +85,7 @@ export interface LogRunSpec {
   readonly experiment: string
   readonly hypothesis: string
   readonly decisionRule: string
+  readonly machineRule?: MachineRule
   readonly dataVersion: string
   readonly gitSha: string
   readonly metrics: readonly MetricPoint[]
@@ -95,6 +112,39 @@ export interface TrackerRunSummary {
   /** Why the run has not landed, when it has not. */
   readonly reason?: TrackerFailureReason
 }
+
+/**
+ * One run resolved by id for {@link verifyDecisionRule}: the run's stored
+ * fields plus its optional {@link MachineRule}. `reason` is present only for
+ * spooled runs.
+ */
+export interface TrackerRunRecord {
+  readonly runId: TrackerRunId
+  readonly experiment: string
+  readonly decisionRule: string
+  readonly dataVersion: string
+  readonly gitSha: string
+  /** The run's machine-readable decision rule, when it logged one. */
+  readonly machineRule?: MachineRule
+  /** Why the run has not landed, when it has not. */
+  readonly reason?: TrackerFailureReason
+}
+
+/**
+ * The outcome of {@link verifyDecisionRule}: a mechanical re-execution of the
+ * run's {@link MachineRule} against its logged metrics. `satisfied` and
+ * `unsatisfied` carry the rule and the observed metric value; `refused` names
+ * why no verdict could be produced (the fail-loud path — never a default or
+ * guess).
+ */
+export type TrackerDecisionRuleVerdict =
+  | { readonly status: 'satisfied'; readonly rule: MachineRule; readonly actual: number }
+  | { readonly status: 'unsatisfied'; readonly rule: MachineRule; readonly actual: number }
+  | {
+    readonly status: 'refused'
+    readonly reason: 'run-not-found' | 'no-machine-rule' | 'metrics-missing' | 'metric-not-in-run'
+    readonly detail: string
+  }
 
 /**
  * A provider post outcome. Every run is assigned an id (offline posture is a

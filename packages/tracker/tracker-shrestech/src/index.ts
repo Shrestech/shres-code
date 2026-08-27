@@ -25,6 +25,7 @@ import type {
   TrackerRunId,
   TrackerRunResult,
   TrackerRunSummary,
+  TrackerRunRecord,
 } from '@shres-code/shres-code-tracker'
 import { TrackerSpool, toMetricSpoolEntry, toSpoolEntry } from './spool.ts'
 import type { TrackerMetricSpoolEntry, TrackerSpoolEntry } from './spool.ts'
@@ -160,6 +161,55 @@ export class ShrestechTrackerService extends TrackerService {
     const landed = records.filter(record => matchesRun(filter, record.gitSha, record.experiment, record.landedAt)).map(toLandedSummary)
     const spooled = entries.filter(entry => matchesRun(filter, entry.gitSha, entry.experiment, entry.enqueuedAt)).map(toSummary)
     return [...landed, ...spooled]
+  }
+
+  /**
+   * Resolve one run by id from the derived landed-run index, then the run
+   * spool, so `verifyDecisionRule` reaches spooled runs too.
+   * @param runId - the run's id.
+   * @returns the run record, or `undefined` when neither store holds it.
+   */
+  override async getRun(runId: TrackerRunId): Promise<TrackerRunRecord | undefined> {
+    const [records, entries] = await Promise.all([this.index.list(), this.spool.peek()])
+    const landed = records.find(record => record.runId === runId)
+    if (landed !== undefined) {
+      return {
+        runId: landed.runId,
+        experiment: landed.experiment,
+        decisionRule: landed.decisionRule,
+        dataVersion: landed.dataVersion,
+        gitSha: landed.gitSha,
+        ...(landed.machineRule !== undefined ? { machineRule: landed.machineRule } : {}),
+      }
+    }
+    const entry = entries.find(candidate => candidate.runId === runId)
+    if (entry === undefined) return undefined
+    const spec = entryToSpec(entry)
+    return {
+      runId: entry.runId,
+      experiment: spec.experiment,
+      decisionRule: spec.decisionRule,
+      dataVersion: spec.dataVersion,
+      gitSha: spec.gitSha,
+      ...(spec.machineRule !== undefined ? { machineRule: spec.machineRule } : {}),
+      reason: entry.reason,
+    }
+  }
+
+  /**
+   * Merge the run's pending metric appends by metric name, later appends
+   * overriding earlier values. Metrics already drained to the tracker live
+   * server-side and are not answered from here.
+   * @param runId - the run the metrics belong to.
+   * @returns the merged metric points, latest value per name.
+   */
+  override async getMetrics(runId: TrackerRunId): Promise<MetricPoint[]> {
+    const entries = (await this.metricSpool.peekMetrics()).filter(entry => entry.runId === runId)
+    const byName = new Map<string, MetricPoint>()
+    for (const entry of entries) {
+      for (const point of entry.metrics) byName.set(point.name, point)
+    }
+    return [...byName.values()]
   }
 
   /**
@@ -324,6 +374,7 @@ function toLandedRecord(runId: TrackerRunId, spec: LogRunSpec): LandedRunRecord 
     decisionRule: spec.decisionRule,
     dataVersion: spec.dataVersion,
     gitSha: spec.gitSha,
+    ...(spec.machineRule !== undefined ? { machineRule: spec.machineRule } : {}),
     landedAt: new Date().toISOString(),
   }
 }
@@ -340,6 +391,7 @@ function entryToSpec(entry: TrackerSpoolEntry): LogRunSpec {
     decisionRule: entry.decisionRule,
     dataVersion: entry.dataVersion,
     gitSha: entry.gitSha,
+    ...(entry.machineRule !== undefined ? { machineRule: entry.machineRule } : {}),
     metrics: entry.metrics,
     artifacts: entry.artifacts,
   }

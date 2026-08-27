@@ -2139,6 +2139,66 @@
       "doc": "docs/subsystems/guard.md",
       "symbol": "ShieldPayloadUpdate",
       "source": "packages/guard/shield/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/ledger.md",
+      "symbol": "LedgerEntryId",
+      "source": "packages/ledger/ledger/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/ledger.md",
+      "symbol": "Decision",
+      "source": "packages/ledger/ledger/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/ledger.md",
+      "symbol": "LedgerRequest",
+      "source": "packages/ledger/ledger/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/ledger.md",
+      "symbol": "LedgerEvidence",
+      "source": "packages/ledger/ledger/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/ledger.md",
+      "symbol": "LedgerSpec",
+      "source": "packages/ledger/ledger/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/ledger.md",
+      "symbol": "LedgerFilter",
+      "source": "packages/ledger/ledger/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/ledger.md",
+      "symbol": "LedgerEntry",
+      "source": "packages/ledger/ledger/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/ledger.md",
+      "symbol": "LedgerFailureReason",
+      "source": "packages/ledger/ledger/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/ledger.md",
+      "symbol": "LedgerRecordResult",
+      "source": "packages/ledger/ledger/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/tracker.md",
+      "symbol": "MachineRule",
+      "source": "packages/tracker/tracker/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/tracker.md",
+      "symbol": "TrackerRunRecord",
+      "source": "packages/tracker/tracker/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/tracker.md",
+      "symbol": "TrackerDecisionRuleVerdict",
+      "source": "packages/tracker/tracker/src/types.ts"
     }
   ]
 }
