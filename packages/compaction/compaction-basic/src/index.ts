@@ -306,7 +306,18 @@ export class BasicCompactionEngine extends CompactionEngine {
       )
     }
     const spec = resolveCompactSpec(policy, context.contextWindow)
-    if (measurement.totalTokens < spec.thresholdTokens) return null
+    // Pressure prices only the compactable surface. The request header
+    // (system prompt + tool schemas) is furniture no compaction can remove, so
+    // its tokens come out of the budget instead of the measured side: a
+    // threshold configured near or below the furniture floor would otherwise
+    // fire on every step with nothing removable, and the same ratio would
+    // apply wildly different real pressure on different window sizes.
+    // A threshold smaller than the furniture plus the retained tail cannot
+    // express pressure for this window and composition: compacting can never
+    // bring the surface under it, so firing would only loop. Decline instead.
+    const surfaceBudget = () => spec.thresholdTokens - measurement.headerTokens
+    if (surfaceBudget() <= spec.retainTokens) return null
+    if (measurement.surfaceTokens < surfaceBudget()) return null
 
     // Once pressure qualifies, land the model-free pass before choosing a
     // summary range, then remeasure through the singleton replay fold.
@@ -314,7 +325,7 @@ export class BasicCompactionEngine extends CompactionEngine {
       prune.pruneSession(agent.session)
       measurement = meter.measure(agent.session)
     }
-    if (measurement.totalTokens < spec.thresholdTokens) return null
+    if (surfaceBudget() <= spec.retainTokens || measurement.surfaceTokens < surfaceBudget()) return null
 
     let result: CompactionResult | null = null
     for (let attempt = 0; attempt <= spec.compactionRetries; attempt += 1) {
@@ -332,12 +343,13 @@ export class BasicCompactionEngine extends CompactionEngine {
       }
       result = await this.compactRegion(range.start, range.end, agent, signal)
       measurement = meter.measure(agent.session)
-      if (measurement.totalTokens < spec.thresholdTokens) return result
+      if (measurement.surfaceTokens < surfaceBudget()) return result
     }
 
     throw new Error(
-      `compaction still above threshold after ${spec.compactionRetries + 1} compaction attempts `
-      + `(${measurement.totalTokens} estimated tokens >= threshold ${spec.thresholdTokens})`,
+      `compaction still above surface budget after ${spec.compactionRetries + 1} compaction attempts `
+        + `(${measurement.surfaceTokens} surface tokens >= budget ${surfaceBudget()} of threshold `
+        + `${spec.thresholdTokens} minus ${measurement.headerTokens} header furniture)`,
     )
   }
 
