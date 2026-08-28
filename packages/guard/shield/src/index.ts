@@ -23,7 +23,7 @@ import {
   validateRepoKeys, type ShieldRepos,
 } from './repos.ts'
 import {
-  installPayload, queryNpmLatest, readPayloadVersion,
+  installPayload, isNpmVersion, queryNpmLatest, readPayloadVersion,
 } from './update.ts'
 import type {
   ShieldCounterSplit, ShieldDefinitions, ShieldEngineSource, ShieldFindingSummary,
@@ -274,6 +274,8 @@ export class ShieldHost extends TypertRemoteService {
   private profileDir: string | undefined
   private remount: (() => Promise<void>) | undefined
   private updateChain = Promise.resolve()
+  /** Latest payload version already warned about (so the notice fires once). */
+  private staleWarnedFor: string | undefined
 
   /**
    * @param ctx - owning context.
@@ -329,6 +331,47 @@ export class ShieldHost extends TypertRemoteService {
    */
   bindResolved(info: ShieldPayloadInfo | undefined): void {
     this.resolved = info
+  }
+
+  /**
+   * One-shot staleness probe (gapfix 2026-08-24): query npm `latest` and, when
+   * it outruns the applied payload version, emit a stderr notice and mark the
+   * host status reason `payload-outdated` WITHOUT deactivating screening.
+   * Skipped for env-module overrides (their contract is explicit pinning) and
+   * when the registry is unreachable. Fires at most once per boot.
+   */
+  async notePayloadStaleness(): Promise<void> {
+    const installed = this.resolved?.version ?? null
+    if (installed === null) return
+    if (isNpmVersion(installed) === false) return
+    const queried = await queryNpmLatest().catch(() => null)
+    if (queried === null || queried.latest === null || queried.blocked !== undefined) return
+    const latest = queried.latest
+    if (isNpmVersion(latest) === false || latest === installed) {
+      // converged (fresh install or remount after applyUpdate): clear advisory
+      this.status.stale = undefined
+      return
+    }
+    const newer = (a: string, b: string): boolean => {
+      const pa = a.split('.').map(Number)
+      const pb = b.split('.').map(Number)
+      for (let i = 0; i < 3; i++) {
+        if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) > (pb[i] ?? 0)
+      }
+      return false
+    }
+    if (!newer(latest, installed)) {
+      this.status.stale = undefined
+      return
+    }
+    this.status.stale = { installed, latest }
+    if (this.staleWarnedFor !== latest) {
+      this.staleWarnedFor = latest
+      process.stderr.write(
+        `[shres-shield] NOTICE: payload ${installed} is behind npm latest ${latest}; `
+        + 'detection-rule coverage may be outdated. Update via Settings > Shield '
+        + '(or `shres plugin --profile <profile> enable-edition shield`).\n')
+    }
   }
 
   /**
@@ -614,6 +657,12 @@ export function apply(ctx: Context, config: Config): void {
         source: engine.source,
         version: readPayloadVersion(engine.entry),
       })
+      // One-shot staleness probe AFTER resolve settles: env-module overrides
+      // are skipped by contract (explicit pinning); profile/package legs get
+      // the notice + payload-outdated status marker when npm is ahead.
+      if (engine !== undefined && engine.source !== 'env') {
+        void host.notePayloadStaleness()
+      }
       // `stopped` is set from dispose while this await runs.
       /* v8 ignore start -- dispose can flip `stopped` while resolve awaits */
       // oxlint-disable-next-line typescript/no-unnecessary-condition -- mutated concurrently during await
