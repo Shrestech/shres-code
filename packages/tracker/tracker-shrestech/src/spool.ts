@@ -17,6 +17,7 @@ import type {
   MetricPoint,
   TrackerFailureReason,
   TrackerRunId,
+  MachineRule,
 } from '@shres-code/shres-code-tracker'
 
 /**
@@ -31,6 +32,7 @@ export interface TrackerSpoolEntry {
   readonly decisionRule: string
   readonly dataVersion: string
   readonly gitSha: string
+  readonly machineRule?: MachineRule
   readonly metrics: readonly MetricPoint[]
   readonly artifacts: readonly string[]
   readonly reason: TrackerFailureReason
@@ -186,6 +188,7 @@ export function toSpoolEntry(
     decisionRule: spec.decisionRule,
     dataVersion: spec.dataVersion,
     gitSha: spec.gitSha,
+    ...(spec.machineRule !== undefined ? { machineRule: spec.machineRule } : {}),
     metrics: spec.metrics,
     artifacts: spec.artifacts,
     reason,

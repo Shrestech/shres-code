@@ -8,7 +8,7 @@
  */
 
 import { randomUUID } from 'node:crypto'
-import type { LogRunRequest, LogRunSpec, TrackerRunId } from './types.ts'
+import type { LogRunRequest, LogRunSpec, MachineRule, TrackerRunId } from './types.ts'
 
 /**
  * Typed error with a stable, machine-routable `code`. Used for the seam's
@@ -35,6 +35,28 @@ const REQUIRED_FIELDS: ReadonlyArray<keyof LogRunRequest> = [
   'dataVersion',
   'gitSha',
 ]
+
+/** The closed set of machine-rule comparison operators. */
+const MACHINE_RULE_OPS: ReadonlyArray<MachineRule['op']> = ['>', '>=', '<', '<=', '==']
+
+/**
+ * Validate an optional {@link MachineRule}: a non-empty `metric`, an `op` in
+ * the closed set, and a finite `threshold`. Throws a named {@link TrackerError}
+ * (code `TRACKER_INVALID_MACHINE_RULE`) on the first violation.
+ * @param rule - the machine rule to validate.
+ * @throws {@link TrackerError} naming the first invalid field.
+ */
+function validateMachineRule(rule: MachineRule): void {
+  if (typeof rule.metric !== 'string' || rule.metric.trim().length === 0) {
+    throw new TrackerError('tracker logRun machineRule requires a non-empty metric', 'TRACKER_INVALID_MACHINE_RULE')
+  }
+  if (!MACHINE_RULE_OPS.includes(rule.op)) {
+    throw new TrackerError(`tracker logRun machineRule op must be one of ${MACHINE_RULE_OPS.join(', ')}`, 'TRACKER_INVALID_MACHINE_RULE')
+  }
+  if (typeof rule.threshold !== 'number' || !Number.isFinite(rule.threshold)) {
+    throw new TrackerError('tracker logRun machineRule threshold must be a finite number', 'TRACKER_INVALID_MACHINE_RULE')
+  }
+}
 
 /**
  * Allocate a fresh branded run id. The seam assigns every run an id before
@@ -65,10 +87,14 @@ export function resolveLogRun(request: LogRunRequest): LogRunSpec {
       )
     }
   }
+  if (request.machineRule !== undefined) {
+    validateMachineRule(request.machineRule)
+  }
   return {
     experiment: request.experiment,
     hypothesis: request.hypothesis,
     decisionRule: request.decisionRule,
+    ...request.machineRule !== undefined ? { machineRule: request.machineRule } : {},
     dataVersion: request.dataVersion,
     gitSha: request.gitSha,
     metrics: request.metrics ?? [],

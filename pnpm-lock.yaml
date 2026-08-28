@@ -548,6 +548,9 @@ importers:
       '@shres-code/shres-code-jspace-prompt':
         specifier: workspace:*
         version: link:../packages/jspace/jspace-prompt
+      '@shres-code/shres-code-ledger':
+        specifier: workspace:*
+        version: link:../packages/ledger/ledger
       '@shres-code/shres-code-llm':
         specifier: workspace:*
         version: link:../packages/llm/llm
@@ -584,6 +587,12 @@ importers:
       '@shres-code/shres-code-repeat-tool-reminder':
         specifier: workspace:*
         version: link:../packages/guard/repeat-tool-reminder
+      '@shres-code/shres-code-research-protocol':
+        specifier: workspace:*
+        version: link:../packages/research/protocol
+      '@shres-code/shres-code-research-stubs':
+        specifier: workspace:*
+        version: link:../packages/test-support/research-stubs
       '@shres-code/shres-code-sandbox':
         specifier: workspace:*
         version: link:../packages/sandbox/sandbox
@@ -734,6 +743,9 @@ importers:
       '@shres-code/shres-code-tool-jspace':
         specifier: workspace:*
         version: link:../packages/jspace/tool-jspace
+      '@shres-code/shres-code-tool-ledger':
+        specifier: workspace:*
+        version: link:../packages/ledger/tool-ledger
       '@shres-code/shres-code-tool-lsp':
         specifier: workspace:*
         version: link:../packages/lsp/tool-lsp
@@ -767,6 +779,9 @@ importers:
       '@shres-code/shres-code-tool-todo':
         specifier: workspace:*
         version: link:../packages/todo/tool-todo
+      '@shres-code/shres-code-tool-tracker':
+        specifier: workspace:*
+        version: link:../packages/tracker/tool-tracker
       '@shres-code/shres-code-tool-web':
         specifier: workspace:*
         version: link:../packages/web/tool-web
@@ -776,6 +791,12 @@ importers:
       '@shres-code/shres-code-tools':
         specifier: workspace:*
         version: link:../packages/core/tools
+      '@shres-code/shres-code-tracker':
+        specifier: workspace:*
+        version: link:../packages/tracker/tracker
+      '@shres-code/shres-code-tracker-shrestech':
+        specifier: workspace:*
+        version: link:../packages/tracker/tracker-shrestech
       '@shres-code/shres-code-user-approval':
         specifier: workspace:*
         version: link:../packages/interaction/user-approval
@@ -5805,6 +5826,58 @@ importers:
         specifier: workspace:^
         version: link:../../core/tools
 
+  packages/ledger/ledger:
+    dependencies:
+      '@shres-code/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/shres-code-brand':
+        specifier: workspace:^
+        version: link:../../util/brand
+      '@shres-code/shres-code-home-paths':
+        specifier: workspace:^
+        version: link:../../util/home-paths
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-llm':
+        specifier: workspace:^
+        version: link:../../llm/llm
+      '@shres-code/shres-code-session':
+        specifier: workspace:^
+        version: link:../../core/session
+      '@shres-code/shres-code-tracker':
+        specifier: workspace:^
+        version: link:../../tracker/tracker
+
+  packages/ledger/tool-ledger:
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-ledger':
+        specifier: workspace:^
+        version: link:../ledger
+      '@shres-code/shres-code-session':
+        specifier: workspace:^
+        version: link:../../core/session
+      '@shres-code/shres-code-system-prompt':
+        specifier: workspace:^
+        version: link:../../core/system-prompt
+      '@shres-code/shres-code-tools':
+        specifier: workspace:^
+        version: link:../../core/tools
+      '@shres-code/shres-code-tracker':
+        specifier: workspace:^
+        version: link:../../tracker/tracker
+
   packages/llm/llm:
     dependencies:
       '@shres-code/schemastery':
@@ -6290,6 +6363,34 @@ importers:
       '@shres-code/shres-code-system-prompt':
         specifier: workspace:^
         version: link:../../core/system-prompt
+
+  packages/research/protocol:
+    dependencies:
+      '@shres-code/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-jspace':
+        specifier: workspace:^
+        version: link:../../jspace/jspace
+      '@shres-code/shres-code-session':
+        specifier: workspace:^
+        version: link:../../core/session
+      '@shres-code/shres-code-settings':
+        specifier: workspace:^
+        version: link:../../settings/settings
+      '@shres-code/shres-code-system-prompt':
+        specifier: workspace:^
+        version: link:../../core/system-prompt
+      '@shres-code/shres-code-tools':
+        specifier: workspace:^
+        version: link:../../core/tools
 
   packages/runtime-diagnostics/invariants:
     dependencies:
@@ -8654,6 +8755,18 @@ importers:
       '@shres-code/shres-code-session':
         specifier: workspace:^
         version: link:../../core/session
+
+  packages/test-support/research-stubs:
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-tools':
+        specifier: workspace:^
+        version: link:../../core/tools
 
   packages/todo/tool-todo:
     dependencies:

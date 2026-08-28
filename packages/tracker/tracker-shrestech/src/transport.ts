@@ -13,8 +13,7 @@ import type {
   LogRunSpec,
   MetricPoint,
   TrackerFailureReason,
-  TrackerRunId,
-} from '@shres-code/shres-code-tracker'
+  TrackerRunId, MachineRule } from '@shres-code/shres-code-tracker'
 import type { TrackerMetricSpoolEntry, TrackerSpoolEntry } from './spool.ts'
 
 /** The subset of {@link TrackerFailureReason} the transport maps responses to. */
@@ -42,6 +41,7 @@ export interface RunWire {
   readonly decisionRule: string
   readonly dataVersion: string
   readonly gitSha: string
+  readonly machineRule?: MachineRule
   readonly metrics: readonly MetricPoint[]
   readonly artifacts: readonly string[]
 }
@@ -233,6 +233,7 @@ function toRunWire(entry: TrackerSpoolEntry): RunWire {
     decisionRule: entry.decisionRule,
     dataVersion: entry.dataVersion,
     gitSha: entry.gitSha,
+    ...(entry.machineRule !== undefined ? { machineRule: entry.machineRule } : {}),
     metrics: entry.metrics,
     artifacts: entry.artifacts,
   }

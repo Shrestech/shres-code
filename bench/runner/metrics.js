@@ -28,8 +28,26 @@
  *   is counted from descendant-session headers in `descendants.js`, not from tool names,
  *   because the delegation tool name is configurable.
  *
+ * Researcher integrity metrics (added for the WP-research experiment surface) are all
+ * log-derived — never model self-reports — and null for arms that do not mount the
+ * researcher surface:
+ * - gateRefusals: tool results matching the design-defense refusal.
+ * - debateCalls: completed aegis+ward call pairs per Goal epoch, summed.
+ * - runsLogged: `experiment_log_run` results that recorded a run (landed or spooled).
+ * - verifySatisfiedRate: satisfied / `experiment_verify_decision_rule` calls.
+ * - unverifiedRunRefusals: ledger results carrying the `unverified-run` refusal.
+ * - ledgerDecisions: `ledger/decision` event counts by decision.
+ * - deferredShare, ledgerAbandoned, unverifiedAcceptRecovery: derived from the above.
+ * - thinDebates: debate pairs whose combined descendant seat-token volume fell under the
+ *   thinDebates floor. The root fold cannot see descendant tokens, so it is computed by
+ *   the async {@link computeThinDebates} over the descendant closure and assigned in the
+ *   runner after {@link foldSessionLog}.
+ *
  * @module bench/runner/metrics
  */
+
+import { readdir, readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 
 /**
  * @typedef {import('../schema/trial.js').TrialMetrics} TrialMetrics
@@ -61,6 +79,29 @@ const ECHO_OK_REFUSE = /JSPACE_CHARTER_CONSTANT|JSPACE_CHARTER_NO_READ|is a cons
 const NOOP_NOTE_MARKER = 'JSPACE_NOTE_NOOP'
 const NOTE_CAP_MARKER = 'note cap'
 
+/** Researcher design-defense refusal prefix (DESIGN_DEFENSE_DENY_PREFIX). */
+const DESIGN_DEFENSE_REFUSAL = /research protocol requires a design defense/
+
+/** Ledger record refusal for a cited run whose machine rule did not re-execute to satisfied. */
+const UNVERIFIED_RUN_REFUSAL = /unverified-run/
+
+/** Debate seats whose completed calls satisfy the research design defense. */
+const DEBATE_TOOLS = ['aegis', 'ward']
+
+/** Model-facing tracker tools the integrity fold watches. */
+const TRACKER_RUN_TOOL = 'experiment_log_run'
+const TRACKER_VERIFY_TOOL = 'experiment_verify_decision_rule'
+
+/** Landed-run result marker from `formatRunOutput`. */
+const RUN_LANDED_MARKER = 'Logged experiment run'
+const RUN_SPOOLED_MARKER = 'held in the local spool'
+
+/** Satisfied verify verdict marker from `formatVerifyOutput`. */
+const VERIFY_SATISFIED_MARKER = 'Decision rule satisfied'
+
+/** thinDebates token floor: a debate pair under it is a minimal (thin) debate. */
+export const THIN_DEBATES_FLOOR = 200
+
 /**
  * Flatten tool/result text from the durable `message` payload or the older
  * bench-synthetic `result` string.
@@ -86,6 +127,28 @@ function collectText(value) {
     if (record.content !== undefined) return collectText(record.content)
   }
   return ''
+}
+
+/**
+ * Whether a tool/result reflects a completed (non-error) call. The durable
+ * message form carries an explicit `isError` on its `tool-result` block; the
+ * plain bench-synthetic `result` string form has no error flag, so a result's
+ * presence is completion. Mirrors the research-protocol gate's evidence walk.
+ * @param {Record<string, unknown>} data - tool/result data.
+ * @returns {boolean} true when the result is not an explicit error.
+ */
+function isNonErrorResult(data) {
+  const message = data.message
+  if (typeof message === 'object' && message !== null) {
+    const source = /** @type {Record<string, unknown>} */ (message).source
+    if (typeof source === 'object' && source !== null && source.kind === 'tool') {
+      const content = Array.isArray(message.content) ? message.content : []
+      const block = content.find(part =>
+        typeof part === 'object' && part !== null && /** @type {Record<string, unknown>} */ (part).type === 'tool-result')
+      return block === undefined || /** @type {Record<string, unknown>} */ (block).isError !== true
+    }
+  }
+  return true
 }
 
 /**
@@ -153,6 +216,7 @@ function toolCallKey(name, rawArguments) {
 export function foldSessionLog(text, armFlags) {
   const hasJspace = armFlags?.expectsJspace ?? true
   const hasSq = armFlags?.expectsSessionQuery ?? true
+  const hasResearcher = armFlags?.expectsResearcher ?? false
 
   /** @type {TrialMetrics} */
   const metrics = {
@@ -180,6 +244,16 @@ export function foldSessionLog(text, armFlags) {
     emptyCharterRate: hasJspace ? 1 : null,
     unverifiedShare: null,
     echoOkRejectRate: null,
+    gateRefusals: null,
+    debateCalls: null,
+    runsLogged: null,
+    verifySatisfiedRate: null,
+    unverifiedRunRefusals: null,
+    ledgerDecisions: null,
+    deferredShare: null,
+    ledgerAbandoned: null,
+    unverifiedAcceptRecovery: null,
+    thinDebates: null,
   }
   /** @type {Map<string, number>} */
   const callCounts = new Map()
@@ -197,6 +271,21 @@ export function foldSessionLog(text, armFlags) {
   let lastCharter
   let registrationAttempts = 0
   let echoOkRejects = 0
+
+  // Researcher integrity state.
+  let gateRefusals = 0
+  let runsLogged = 0
+  let verifyCalls = 0
+  let verifySatisfied = 0
+  let unverifiedRunRefusals = 0
+  let ledgerAccepted = 0
+  let ledgerRejected = 0
+  let ledgerDeferred = 0
+  let currentEpoch = 0
+  /** @type {Map<string, { tool: string, epoch: number }>} */
+  const pendingDebate = new Map()
+  /** @type {Map<number, { aegis: number, ward: number }>} */
+  const debateByEpoch = new Map()
 
   const lines = text.split('\n')
   for (let index = 0; index < lines.length; index += 1) {
@@ -225,8 +314,12 @@ export function foldSessionLog(text, armFlags) {
         if (name === CHECKPOINT_TOOL) metrics.checkpoints += 1
         if (name === SHIP_TOOL) metrics.shipPasses += 1
         if (name === RUN_CODE_TOOL) metrics.outOfLoopExperiments += 1
+        if (name === TRACKER_VERIFY_TOOL) verifyCalls += 1
         if (hasSq && SESSION_QUERY_TOOLS.has(name)) {
           metrics.sessionQueryCalls = (metrics.sessionQueryCalls ?? 0) + 1
+        }
+        if (DEBATE_TOOLS.includes(name) && typeof data.callId === 'string') {
+          pendingDebate.set(data.callId, { tool: name, epoch: currentEpoch })
         }
         const key = toolCallKey(name, data.arguments)
         callCounts.set(key, (callCounts.get(key) ?? 0) + 1)
@@ -263,6 +356,40 @@ export function foldSessionLog(text, armFlags) {
         if (resultText.includes(NOTE_CAP_MARKER)) {
           metrics.noteCapRefusals += 1
         }
+        if (hasResearcher) {
+          const text = resultText.length > 0 ? resultText : extractToolResultText(data)
+          if (DESIGN_DEFENSE_REFUSAL.test(text)) gateRefusals += 1
+          if (UNVERIFIED_RUN_REFUSAL.test(text)) unverifiedRunRefusals += 1
+          // A run is logged whether it landed or was held in the spool: the
+          // spool preserves the machine rule, so both satisfy record-time
+          // verification in the spool-only posture.
+          if (resultName === TRACKER_RUN_TOOL
+            && (text.includes(RUN_LANDED_MARKER) || text.includes(RUN_SPOOLED_MARKER))) runsLogged += 1
+          if (resultName === TRACKER_VERIFY_TOOL && text.includes(VERIFY_SATISFIED_MARKER)) verifySatisfied += 1
+          // Match a debate call by its durable callId first; plain-string bench
+          // logs may omit callId, so fall back to the oldest pending call of the
+          // same tool.
+          const callId = resultCallId(data)
+          let pending = pendingDebate.get(callId)
+          if (pending === undefined && DEBATE_TOOLS.includes(resultName)) {
+            for (const [key, entry] of pendingDebate) {
+              if (entry.tool === resultName) {
+                pendingDebate.delete(key)
+                pending = entry
+                break
+              }
+            }
+          }
+          if (pending !== undefined) {
+            if (pendingDebate.get(callId) !== undefined) pendingDebate.delete(callId)
+            if (isNonErrorResult(data)) {
+              const bucket = debateByEpoch.get(pending.epoch) ?? { aegis: 0, ward: 0 }
+              if (pending.tool === 'aegis') bucket.aegis += 1
+              else if (pending.tool === 'ward') bucket.ward += 1
+              debateByEpoch.set(pending.epoch, bucket)
+            }
+          }
+        }
         break
       }
       case 'assistant/message': {
@@ -278,6 +405,9 @@ export function foldSessionLog(text, armFlags) {
       case 'jspace/card':
         cardOpen = true
         lastCharter = Array.isArray(data.charter) ? data.charter : []
+        if (typeof data.goalOpenedSeq === 'number' && data.goalOpenedSeq > currentEpoch) {
+          currentEpoch = data.goalOpenedSeq
+        }
         break
       case 'jspace/closed':
         cardOpen = false
@@ -287,6 +417,14 @@ export function foldSessionLog(text, armFlags) {
         if (hasJspace && (phase === 'checkpoint' || phase === 'ship') && data.passed === false) {
           metrics.charterRunFailNamed = true
         }
+        break
+      }
+      case 'ledger/decision': {
+        if (!hasResearcher) break
+        const decision = data.decision
+        if (decision === 'accepted') ledgerAccepted += 1
+        else if (decision === 'rejected') ledgerRejected += 1
+        else if (decision === 'deferred') ledgerDeferred += 1
         break
       }
       case 'compaction/end':
@@ -323,6 +461,24 @@ export function foldSessionLog(text, armFlags) {
   }
   metrics.pressureFired = metrics.compactionCount > 0
 
+  if (hasResearcher) {
+    let debateCalls = 0
+    for (const bucket of debateByEpoch.values()) {
+      debateCalls += Math.min(bucket.aegis, bucket.ward)
+    }
+    const ledgerTotal = ledgerAccepted + ledgerRejected + ledgerDeferred
+    metrics.gateRefusals = gateRefusals
+    metrics.debateCalls = debateCalls
+    metrics.runsLogged = runsLogged
+    metrics.verifySatisfiedRate = verifyCalls > 0 ? verifySatisfied / verifyCalls : null
+    metrics.unverifiedRunRefusals = unverifiedRunRefusals
+    metrics.ledgerDecisions = { accepted: ledgerAccepted, rejected: ledgerRejected, deferred: ledgerDeferred }
+    metrics.deferredShare = ledgerTotal > 0 ? ledgerDeferred / ledgerTotal : null
+    metrics.ledgerAbandoned = ledgerTotal === 0
+    metrics.unverifiedAcceptRecovery = unverifiedRunRefusals > 0 && ledgerTotal > 0
+    metrics.thinDebates = 0
+  }
+
   return metrics
 }
 
@@ -356,5 +512,139 @@ export function emptyMetrics() {
     emptyCharterRate: null,
     unverifiedShare: null,
     echoOkRejectRate: null,
+    gateRefusals: null,
+    debateCalls: null,
+    runsLogged: null,
+    verifySatisfiedRate: null,
+    unverifiedRunRefusals: null,
+    ledgerDecisions: null,
+    deferredShare: null,
+    ledgerAbandoned: null,
+    unverifiedAcceptRecovery: null,
+    thinDebates: null,
   }
+}
+
+/**
+ * Parse one session-log text into its ordered debate (aegis/ward) tool calls.
+ * Used by {@link computeThinDebates} to attribute descendant token usage to the
+ * debate seats that spawned it.
+ * @param {string} text - raw JSONL root-session contents.
+ * @returns {{ name: string, time: number }[]} debate tool calls in first-seen order.
+ */
+function debateCallsFromLog(text) {
+  /** @type {{ name: string, time: number }[]} */
+  const calls = []
+  for (const line of text.split('\n')) {
+    if (line.trim() === '') continue
+    /** @type {{ type?: unknown, time?: unknown, data?: unknown }} */
+    let event
+    try {
+      event = JSON.parse(line)
+    } catch {
+      continue
+    }
+    if (event.type !== 'tool/call') continue
+    const data = /** @type {Record<string, unknown>} */ (event.data ?? {})
+    const name = typeof data.name === 'string' ? data.name : ''
+    if (!DEBATE_TOOLS.includes(name)) continue
+    calls.push({ name, time: typeof event.time === 'number' ? event.time : 0 })
+  }
+  return calls
+}
+
+/**
+ * Count debate pairs whose combined descendant seat-token volume falls under
+ * the thinDebates floor. Signal-only: descendant session headers record their
+ * `parentSession` and `createdAt` but not which parent tool call spawned them,
+ * so each descendant is bucketed to the nearest preceding debate tool call by
+ * creation time, and each completed aegis call pairs with the next completed
+ * ward call in the same epoch. The root fold cannot see descendant tokens, so
+ * the runner calls this after {@link foldSessionLog}.
+ * @param {string} sessionLogRoot - per-trial persistence root (descendant logs live here).
+ * @param {string} rootText - the trial's root session-log text.
+ * @returns {Promise<number>} count of thin debate pairs.
+ */
+export async function computeThinDebates(sessionLogRoot, rootText) {
+  const calls = debateCallsFromLog(rootText)
+  if (calls.length === 0) return 0
+
+  // Walk descendant session logs, folding usage and keeping their creation time.
+  /** @type {string[]} */
+  const logs = []
+  /** @param {string} dir */
+  const walk = async dir => {
+    let entries
+    try {
+      entries = await readdir(dir, { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const entry of entries) {
+      const path = join(dir, entry.name)
+      if (entry.isDirectory()) await walk(path)
+      else if (entry.isFile() && entry.name === 'session.jsonl') logs.push(path)
+    }
+  }
+  await walk(sessionLogRoot)
+
+  /** @type {{ tokens: number, createdAt: number, parent: string | null }[]} */
+  const descendants = []
+  for (const path of logs) {
+    const text = await readFile(path, 'utf8')
+    const firstLine = text.split('\n', 1)[0] ?? ''
+    /** @type {{ type?: unknown, id?: unknown, createdAt?: unknown, parentSession?: unknown }} */
+    let header
+    try {
+      header = JSON.parse(firstLine)
+    } catch {
+      continue
+    }
+    if (header.type !== 'session' || typeof header.id !== 'string') continue
+    let input = 0
+    let output = 0
+    for (const line of text.split('\n')) {
+      if (line.trim() === '') continue
+      let event
+      try {
+        event = JSON.parse(line)
+      } catch {
+        continue
+      }
+      if (event.type !== 'assistant/message') continue
+      const usage = /** @type {Record<string, unknown>} */ ((/** @type {Record<string, unknown>} */ (event.data ?? {})).usage ?? {})
+      if (typeof usage.inputTokens === 'number') input += usage.inputTokens
+      if (typeof usage.outputTokens === 'number') output += usage.outputTokens
+    }
+    descendants.push({
+      tokens: input + output,
+      createdAt: typeof header.createdAt === 'number' ? header.createdAt : 0,
+      parent: typeof header.parentSession === 'string' ? header.parentSession : null,
+    })
+  }
+
+  // Attribute each descendant to the nearest preceding debate call.
+  /** @type {number[]} */
+  const callTokens = new Array(calls.length).fill(0)
+  for (const child of descendants) {
+    let best = -1
+    for (let i = 0; i < calls.length; i += 1) {
+      if (calls[i].time <= child.createdAt) best = i
+      else break
+    }
+    if (best >= 0) callTokens[best] += child.tokens
+  }
+
+  // Completed debate pairs: pair each aegis call with the next ward call.
+  let thin = 0
+  let wardIndex = 0
+  for (let i = 0; i < calls.length; i += 1) {
+    if (calls[i].name !== 'aegis') continue
+    while (wardIndex < calls.length && calls[wardIndex].name !== 'ward') wardIndex += 1
+    if (wardIndex >= calls.length) break
+    const combined = callTokens[i] + callTokens[wardIndex]
+    if (combined < THIN_DEBATES_FLOOR) thin += 1
+    wardIndex += 1
+  }
+  return thin
 }

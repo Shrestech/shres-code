@@ -58,6 +58,28 @@ export const FAILURE_MODES = Object.freeze([
  * @property {number | null} echoOkRejectRate - floor registration refusals
  *   (`JSPACE_CHARTER_CONSTANT` / `JSPACE_CHARTER_NO_READ`, or their model-visible copy)
  *   over `jspace_open` / `jspace_charter_amend` results; null when no registration attempt.
+ * @property {number | null} gateRefusals - count of tool results matching the researcher
+ *   design-defense refusal (`research protocol requires a design defense`); null for arms
+ *   that do not mount the researcher surface.
+ * @property {number | null} debateCalls - completed aegis+ward call pairs per Goal epoch,
+ *   summed (min of completed aegis and ward calls per epoch); null for non-researcher arms.
+ * @property {number | null} runsLogged - `experiment_log_run` results that landed at the
+ *   tracker; null for non-researcher arms. Spool-only deployments record zero.
+ * @property {number | null} verifySatisfiedRate - fraction of `experiment_verify_decision_rule`
+ *   calls that returned `satisfied`; null when no verify calls or non-researcher.
+ * @property {number | null} unverifiedRunRefusals - count of ledger tool results carrying
+ *   the `unverified-run` refusal reason; null for non-researcher arms.
+ * @property {{ accepted: number, rejected: number, deferred: number } | null} ledgerDecisions -
+ *   `ledger/decision` session-event counts by decision; null for non-researcher arms.
+ * @property {number | null} deferredShare - fraction of ledger decisions that were `deferred`;
+ *   null when no ledger decisions or non-researcher.
+ * @property {boolean | null} ledgerAbandoned - a researcher trial that recorded zero ledger
+ *   decisions; null for non-researcher arms.
+ * @property {boolean | null} unverifiedAcceptRecovery - a researcher trial that had at least one
+ *   `unverified-run` refusal and still ended with a recorded ledger decision; null for
+ *   non-researcher arms.
+ * @property {number | null} thinDebates - debate pairs whose combined descendant seat-token
+ *   volume fell under the thinDebates floor (200); null for non-researcher arms.
  */
 
 /**
@@ -96,10 +118,10 @@ export const FAILURE_MODES = Object.freeze([
 const METRIC_FIELDS = ['inputTokens', 'outputTokens', 'durationMs', 'turns', 'toolCalls', 'identicalRetries', 'checkpoints', 'shipPasses', 'descendantSessions', 'outOfLoopExperiments', 'coverageRefusalThenPad', 'noopNoteRefusals', 'noteCapRefusals', 'compactionCount']
 
 /** TrialMetrics field names that are number|null. */
-const NULLABLE_NUMBER_FIELDS = ['tokensIncludingDescendants', 'costIncludingDescendants', 'verifiedCheckpointShare', 'sessionQueryCalls']
+const NULLABLE_NUMBER_FIELDS = ['tokensIncludingDescendants', 'costIncludingDescendants', 'verifiedCheckpointShare', 'sessionQueryCalls', 'gateRefusals', 'debateCalls', 'runsLogged', 'verifySatisfiedRate', 'unverifiedRunRefusals', 'deferredShare', 'thinDebates']
 
 /** TrialMetrics field names that are boolean|null. */
-const NULLABLE_BOOLEAN_FIELDS = ['danglingCard']
+const NULLABLE_BOOLEAN_FIELDS = ['danglingCard', 'ledgerAbandoned', 'unverifiedAcceptRecovery']
 
 /** TrialMetrics field names that are required booleans. */
 const BOOLEAN_FIELDS = ['pressureFired']
@@ -128,6 +150,19 @@ function validateMetrics(value, name) {
   }
   for (const field of BOOLEAN_FIELDS) {
     if (typeof m[field] !== 'boolean') throw new Error(`${name}.${field} must be a boolean`)
+  }
+  // ledgerDecisions is a nullable object of three non-negative counts.
+  const ld = m.ledgerDecisions
+  if (ld !== null) {
+    if (typeof ld !== 'object' || ld === null || Array.isArray(ld)) {
+      throw new Error(`${name}.ledgerDecisions must be a record or null`)
+    }
+    for (const field of ['accepted', 'rejected', 'deferred']) {
+      const count = /** @type {Record<string, unknown>} */ (ld)[field]
+      if (typeof count !== 'number' || count < 0) {
+        throw new Error(`${name}.ledgerDecisions.${field} must be a non-negative number`)
+      }
+    }
   }
 }
 

@@ -7,12 +7,20 @@ import { CredentialProvider } from '@shres-code/shres-code-credentials'
 import type { CredentialInfo, CredentialRef, ResolvedCredential } from '@shres-code/shres-code-credentials'
 import ShrestechTrackerService from '@shres-code/shres-code-tracker-shrestech'
 import type { Config } from '@shres-code/shres-code-tracker-shrestech'
-import type { LogRunSpec, TrackerFailureReason, TrackerRunId } from '@shres-code/shres-code-tracker'
+import type { LogRunSpec, MetricPoint, TrackerFailureReason, TrackerRunId, TrackerRunRecord } from '@shres-code/shres-code-tracker'
 
 /** A provider whose transport lands a post without HTTP (spool/no-spool seam test). */
 class LandingShrestechTracker extends ShrestechTrackerService {
   protected override async attemptPost(_runId: TrackerRunId, _spec: LogRunSpec, _token: string): Promise<'landed' | TrackerFailureReason> {
     return 'landed'
+  }
+
+  override async getRun(_runId: TrackerRunId): Promise<TrackerRunRecord | undefined> {
+    return undefined
+  }
+
+  override async getMetrics(_runId: TrackerRunId): Promise<MetricPoint[]> {
+    return []
   }
 }
 
@@ -354,6 +362,44 @@ describe('ShrestechTrackerService.sync', () => {
     const { fetch } = fakeFetch(200, { notLanded: true })
     vi.stubGlobal('fetch', fetch)
     await expect(provider(ctx).sync()).rejects.toThrow(/landedRunIds/)
+    await rm(dir, { recursive: true, force: true })
+  })
+
+  it('resolves a spooled run with its machine rule via getRun', async () => {
+    const { ctx, dir } = await mount(ShrestechTrackerService)
+    const machineRule = { metric: 'val_bpb', op: '<' as const, threshold: 1.0 }
+    await provider(ctx).postRun('run-1' as TrackerRunId, { ...spec, machineRule })
+    const record = await provider(ctx).getRun('run-1' as TrackerRunId)
+    expect(record).toMatchObject({ runId: 'run-1', machineRule, reason: 'spooled' })
+    expect(await provider(ctx).getRun('run-missing' as TrackerRunId)).toBeUndefined()
+    await rm(dir, { recursive: true, force: true })
+  })
+
+  it('persists the machine rule into the landed index and resolves it without a reason', async () => {
+    const { fetch } = fakeFetch(200, { ok: true })
+    vi.stubGlobal('fetch', fetch)
+    const { ctx, dir } = await mount(ShrestechTrackerService, { credentialRef: 'TRACKER_TOKEN' })
+    const machineRule = { metric: 'val_bpb', op: '<' as const, threshold: 1.0 }
+    await provider(ctx).postRun('run-1' as TrackerRunId, { ...spec, machineRule })
+    const record = await provider(ctx).getRun('run-1' as TrackerRunId)
+    expect(record).toMatchObject({ runId: 'run-1', machineRule })
+    expect(record?.reason).toBeUndefined()
+    await rm(dir, { recursive: true, force: true })
+  })
+
+  it('merges pending metric appends by name, latest value winning', async () => {
+    const { ctx, dir } = await mount(ShrestechTrackerService)
+    await provider(ctx).postMetrics('run-1' as TrackerRunId, [
+      { name: 'val_bpb', value: 1.0 },
+      { name: 'loss', value: 2.0 },
+    ])
+    await provider(ctx).postMetrics('run-1' as TrackerRunId, [{ name: 'val_bpb', value: 0.5 }])
+    const metrics = await provider(ctx).getMetrics('run-1' as TrackerRunId)
+    expect(metrics).toEqual([
+      { name: 'val_bpb', value: 0.5 },
+      { name: 'loss', value: 2.0 },
+    ])
+    expect(await provider(ctx).getMetrics('run-other' as TrackerRunId)).toEqual([])
     await rm(dir, { recursive: true, force: true })
   })
 })

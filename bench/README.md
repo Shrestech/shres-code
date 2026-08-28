@@ -22,6 +22,9 @@ The nine-arm ladder covers every jspace/session-query contrast. `sq-driver` exis
 | `stuffed` | disabled | absent | OOLONG-lite: corpus inlined in the instruction (`stuffedInstruction`); refuses a forced-compaction overlay. |
 | `read` | disabled | mounted | OOLONG-lite: corpus on disk + session-query (same mount as `sq-only`). |
 | `code` | disabled | mounted | OOLONG-lite: `read` plus `tools.mode: both` (headless already inserts `code-runtime`; re-inserting it is a duplicate-id load failure). |
+| `research-inert` | disabled | absent | Researcher surface mounted (tracker spool-only + ledger + tools + aegis/ward/stride seats), protocol `enabled: false`. |
+| `research-lite` | disabled | absent | Same surface, protocol `enabled: true, requireDesignDefense: 'off'`. |
+| `research-on` | available | absent | Same surface, `requireDesignDefense: 'per-epoch'`, plus jspace `verifierTools: ['bash','experiment_verify_decision_rule']` and `requireVerifiedEvidence: true` (the on-sq-verified pattern). |
 
 Arms register in `runner/arms.js`. Every overlay carries a `jspace` config patch and the per-trial persistence redirect; an arm with a `toolJspace` config adds a `tool-jspace` patch; session-query arms additionally patch the shipped `session-query-sqlite` service to open a per-trial index at startup (it ships with `openAt: never` and an in-memory path) and append an `- insert:` layer mounting `tool-session-query`. The `code` arm patches `tools.mode` to `both`. Arms without session-query need no disable rows, because the tool is absent from the profile.
 
@@ -155,6 +158,33 @@ Pilot arms: `--arms stuffed,read,code --tasks 'oolong-*'`. Pre-registered contra
 - The cued family makes a tie interpretable: "didn't help" vs "never reached" (the cue names `session_search` on `read` and `run_code` on `code`).
 
 The stuffed arm inlines the corpus through `task.json` `stuffedInstruction` (the runner selects it when the arm carries `stuffed: true`). The verifier reads `answers.json` from the scratch dir and exact-matches integers against `expectedAnswers` in `task.json`, which the agent cannot see.
+
+## Researcher ladder (WP-research)
+
+Three arms measure the research-protocol experiment surface (`research-inert`,
+`research-lite`, `research-on`). Each mounts the same surface — research-protocol,
+tracker-shrestech (spool-only, per-trial spool/index redirect into the trial's
+persistence dir), tool-tracker, ledger (per-trial store), tool-ledger, and the
+aegis/ward/stride tool-subagent seats (fork one-shot / spawn continuable,
+mirroring the base headless rows). The ladder differs in the protocol gate and
+jspace posture; pre-registration lives in
+[`researcher-preregistration.md`](researcher-preregistration.md).
+
+Two arm-neutral microcycle tasks (`research-microcycle-accept`,
+`research-microcycle-reject`) ask the agent to test a hypothesis against a small
+numeric `data.json`, support the verdict with a measurement, and record it in a
+plain `verdict.json`. The verifier recomputes the truth from the pinned dataset
+(SHA-256) and scores verdict correctness plus the recorded measurement — any
+arm's trial that writes a correct verdict is gradable. The reject task frames
+the dataset as high-value to tempt an unsupported accept.
+
+Per-trial integrity metrics are log-derived (grep the session JSONL for event
+names and result text): `gateRefusals`, `debateCalls` (completed aegis+ward
+pairs per Goal epoch), `runsLogged` (landed posts; zero under spool-only),
+`verifySatisfiedRate`, `unverifiedRunRefusals`, `ledgerDecisions`,
+`deferredShare`, `ledgerAbandoned`, `unverifiedAcceptRecovery`, and `thinDebates`
+(debate pairs under the 200-token seat floor). These are null for non-researcher
+arms.
 
 ## Forensics metrics
 
