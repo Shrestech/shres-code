@@ -37,6 +37,20 @@
  * | `read` | Corpus on disk; session-query mounted; jspace off. |
  * | `code` | `read` plus `tools.mode: both` (headless already inserts `code-runtime`). |
  *
+ * The researcher ladder (WP-research) measures the research-protocol experiment
+ * surface: tracker + ledger + tool-tracker/tool-ledger + the three debate seats
+ * (aegis/ward fork one-shot, stride spawn continuable), with the research
+ * protocol gate off (inert), on-but-defense-off (lite), or per-epoch enforced
+ * with jspace verifier evidence (on). The base headless composition mounts none
+ * of the researcher rows, so the overlay inserts them fresh, mirroring how the
+ * session-query arms insert `tool-session-query`.
+ *
+ * | Arm | Configuration |
+ * |---|---|
+ * | `research-inert` | Researcher surface mounted, protocol `enabled: false`; jspace untouched (disabled). |
+ * | `research-lite` | Same + protocol `enabled: true, requireDesignDefense: 'off'`. |
+ * | `research-on` | Same + `requireDesignDefense: 'per-epoch'`, jspace `verifierTools` + `requireVerifiedEvidence`. |
+ *
  * @module bench/runner/arms
  */
 
@@ -53,6 +67,9 @@ import { join } from 'node:path'
  * @property {boolean} [driverLine] - whether the overlay appends the session-query driver line to the headless persona.
  * @property {boolean} [stuffed] - whether the runner must use `stuffedInstruction` / the stuffed arm template; refuses forced-compaction.
  * @property {boolean} [codeMode] - whether the overlay patches `tools.mode` to `both` (stateless `run_code`).
+ * @property {Record<string, unknown> | undefined} [researcher] - research-protocol config; when present the overlay mounts
+ *   the researcher surface (protocol, tracker, ledger, tools, debate seats) and the arm expects researcher metrics.
+ * @property {boolean} [expectsResearcher] - whether researcher metrics are expected (non-null) in trial logs.
  */
 
 /** Headless profile persona restated when a driver-line overlay replaces `system-prompt` config. */
@@ -190,6 +207,48 @@ export const ARMS = Object.freeze({
     expectsJspace: false,
     codeMode: true,
   }),
+  // Researcher ladder. `research-inert` and `research-lite` leave jspace
+  // disabled (the base profile already mounts it off); `research-on` enables
+  // it with verifier evidence so a checkpoint can cite an
+  // `experiment_verify_decision_rule` result. All three mount the same
+  // researcher surface; the protocol gate and jspace posture differ.
+  'research-inert': Object.freeze({
+    name: 'research-inert',
+    jspace: Object.freeze({ enabled: false, mode: 'available', requireCoverage: true }),
+    researcher: Object.freeze({ enabled: false }),
+    sessionQuery: false,
+    expectsSessionQuery: false,
+    expectsJspace: false,
+    expectsResearcher: true,
+  }),
+  'research-lite': Object.freeze({
+    name: 'research-lite',
+    jspace: Object.freeze({ enabled: false, mode: 'available', requireCoverage: true }),
+    researcher: Object.freeze({ enabled: true, requireDesignDefense: 'off' }),
+    sessionQuery: false,
+    expectsSessionQuery: false,
+    expectsJspace: false,
+    expectsResearcher: true,
+  }),
+  // on-sq-verified pattern for the verifier extras: jspace verifierTools names
+  // the tools whose completed calls count as verified checkpoint evidence, and
+  // requireVerifiedEvidence holds checkpoints to that standard. The researcher
+  // protocol's default `requireDesignDefense: 'per-epoch'` is restated.
+  'research-on': Object.freeze({
+    name: 'research-on',
+    jspace: Object.freeze({
+      enabled: true,
+      mode: 'available',
+      requireCoverage: true,
+      verifierTools: ['bash', 'experiment_verify_decision_rule'],
+      requireVerifiedEvidence: true,
+    }),
+    researcher: Object.freeze({ enabled: true, requireDesignDefense: 'per-epoch' }),
+    sessionQuery: false,
+    expectsSessionQuery: false,
+    expectsJspace: true,
+    expectsResearcher: true,
+  }),
 })
 
 /**
@@ -233,7 +292,11 @@ function configRows(config) {
  * and insert the model-facing `tool-session-query` entry, which the bundle
  * profile does not mount. A `driverLine` arm restates the headless persona
  * plus one paragraph naming the session-query tools (`system-prompt` config
- * replace is wholesale).
+ * replace is wholesale). A researcher arm inserts the whole experiment-tracking
+ * surface — research-protocol, tracker (spool-only, per-trial spool/index),
+ * ledger (per-trial store), their tool packages, and the aegis/ward/stride
+ * debate seats — with persistence redirected into the per-trial root exactly
+ * like the session-persistence redirect.
  * @param {ArmEntry} arm - arm entry from {@link getArm}.
  * @param {{ sessionLogRoot: string }} options - absolute per-trial persistence root.
  * @returns {string} the overlay YAML document.
@@ -277,6 +340,51 @@ ${configRows(arm.toolJspace)}
     overlay += `- id: tools
   config:
     mode: "both"
+`
+  }
+  if (arm.researcher) {
+    // research-protocol must be INSERTED, not patched: the base headless
+    // composition does not mount it, and a patch against a missing entry
+    // no-ops silently — the plugin would never load and the gate would
+    // never arm (found by the researcher-smoke real-spawn trial).
+    overlay += `- insert:
+    - id: research-protocol
+      name: "@shres-code/shres-code-research-protocol"
+      config:
+${configRows(arm.researcher).split('\n').map(row => `  ${row}`).join('\n')}
+    - id: tracker-shrestech
+      name: "@shres-code/shres-code-tracker-shrestech"
+      config:
+        baseUrl: "https://tracker.invalid"
+        lane: "bench"
+        spoolPath: ${JSON.stringify(join(sessionLogRoot, 'research-spool.jsonl'))}
+        indexPath: ${JSON.stringify(join(sessionLogRoot, 'research-spool.landed.jsonl'))}
+    - id: tool-tracker
+      name: "@shres-code/shres-code-tool-tracker"
+    - id: ledger
+      name: "@shres-code/shres-code-ledger"
+      config:
+        storagePath: ${JSON.stringify(join(sessionLogRoot, 'research-ledger.jsonl'))}
+    - id: tool-ledger
+      name: "@shres-code/shres-code-tool-ledger"
+    - id: tool-subagent-aegis
+      name: "@shres-code/shres-code-tool-subagent"
+      config:
+        provider: fork
+        toolName: aegis
+        backgroundMode: one-shot
+    - id: tool-subagent-ward
+      name: "@shres-code/shres-code-tool-subagent"
+      config:
+        provider: fork
+        toolName: ward
+        backgroundMode: one-shot
+    - id: tool-subagent-stride
+      name: "@shres-code/shres-code-tool-subagent"
+      config:
+        provider: spawn
+        toolName: stride
+        backgroundMode: continuable
 `
   }
   return overlay

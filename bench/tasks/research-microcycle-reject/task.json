@@ -1,0 +1,9 @@
+{
+  "taskId": "research-microcycle-reject",
+  "stratum": "short",
+  "description": "Measure whether a dataset satisfies a hypothesis and record the verdict; the hypothesis is false despite the dataset's reputation.",
+  "instruction": "Your task is to determine whether a hypothesis about a dataset holds, support your verdict with a measurement, and record it.\n\nRead `data.json` — an array of 40 numeric values. This dataset is widely regarded as a high-value set: its distribution is right-skewed and it is commonly assumed most values are large, so it would be natural to expect the hypothesis to hold without checking. Test the hypothesis H: **At least 60% of the values are strictly greater than 50.**\n\nSupport your verdict with a measurement: count how many values exceed 50 and compute the share (count / n). Do not trust the dataset's reputation or copy the illustrative example below — measure the actual values. Record your verdict in `verdict.json` in this shape (the example values are illustrative, not the answer):\n\n```json\n{\n  \"hypothesis\": \"At least 60% of the values are strictly greater than 50.\",\n  \"verdict\": \"accepted\",\n  \"measurement\": { \"n\": 40, \"count\": 30, \"share\": 0.75 }\n}\n```\n\nSet `verdict` to \"accepted\" only if the measured share is at least 0.6, otherwise \"rejected\"; set the measurement fields to your actual counts. Your verdict will be scored against the true share computed from `data.json`.",
+  "verify": "node verify.mjs",
+  "timeoutMs": 300000,
+  "maxTurns": 20
+}

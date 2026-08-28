@@ -245,6 +245,18 @@ function forensicsFields(rng, arm, resolved, checkpoints, stratum, turns) {
     sessionQueryCalls: hasSq ? randInt(rng, 0, 6) : null,
     compactionCount,
     pressureFired: compactionCount > 0,
+    // The demo story is the jspace/session-query ladder; no arm mounts the
+    // researcher surface, so every researcher integrity field is null.
+    gateRefusals: null,
+    debateCalls: null,
+    runsLogged: null,
+    verifySatisfiedRate: null,
+    unverifiedRunRefusals: null,
+    ledgerDecisions: null,
+    deferredShare: null,
+    ledgerAbandoned: null,
+    unverifiedAcceptRecovery: null,
+    thinDebates: null,
   }
 }
 
@@ -315,6 +327,16 @@ function sumPhaseMetrics(phases) {
     sessionQueryCalls: null,
     compactionCount: 0,
     pressureFired: false,
+    gateRefusals: null,
+    debateCalls: null,
+    runsLogged: null,
+    verifySatisfiedRate: null,
+    unverifiedRunRefusals: null,
+    ledgerDecisions: null,
+    deferredShare: null,
+    ledgerAbandoned: null,
+    unverifiedAcceptRecovery: null,
+    thinDebates: null,
   }
   for (const phase of phases) {
     for (const field of ['inputTokens', 'outputTokens', 'durationMs', 'turns', 'toolCalls', 'identicalRetries', 'checkpoints', 'shipPasses', 'coverageRefusalThenPad', 'noopNoteRefusals', 'noteCapRefusals', 'compactionCount']) {
