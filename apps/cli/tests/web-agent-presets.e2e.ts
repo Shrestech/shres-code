@@ -184,10 +184,10 @@ describe('the shipped Web composition', () => {
     }
   })
 
-  it('supplies both shipped presets, and only those, from the system root', async () => {
+  it('supplies the shipped presets, and only those, from the system root', async () => {
     const listed = await ctx.agentPresets.list()
 
-    expect(listed.map(preset => preset.id).sort()).toEqual(['code', 'cordis', 'minimal', 'standard'])
+    expect(listed.map(preset => preset.id).sort()).toEqual(['code', 'cordis', 'minimal', 'researcher', 'standard'])
     expect(listed.every(preset => preset.trust === 'system')).toBe(true)
     expect(ctx.agentPresets.defaultId).toBe('standard')
   })
@@ -208,6 +208,29 @@ describe('the shipped Web composition', () => {
         'get_goal', 'interrupt_agent', 'job_kill', 'job_list', 'job_output', 'list_agents', 'ralph', 'read', 'read_image', 'send_message', 'skill',
         'subagent', 'subagent_fork', 'todo_write', 'update_goal', 'web_search',
         'workflow', 'write',
+      ])
+    } finally {
+      await handle.dispose()
+    }
+  })
+
+  it('composes the full agent plus the research surface from `researcher`', async () => {
+    const handle = await ctx.agents.create({
+      sessionId: SessionId('preset-researcher'),
+      setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'researcher').then(() => undefined),
+    })
+    try {
+      // Same exact-catalog discipline as `standard`: the researcher preset
+      // once mounted with no file or shell tools at all — every model-facing
+      // row lives on the agent plane, and this preset carried only its
+      // research rows. The catalog is the standard surface plus the tracker,
+      // ledger, and debate-seat tools.
+      expect(toolNames(ctx, handle.agent).filter(name => name !== 'glob' && name !== 'grep')).toEqual([
+        'aegis', 'ask_user_question', 'bash', 'create_goal', 'edit', 'exit_plan_mode',
+        'experiment_log_metrics', 'experiment_log_run', 'experiment_query', 'experiment_verify_decision_rule',
+        'get_goal', 'interrupt_agent', 'job_kill', 'job_list', 'job_output', 'ledger_query', 'ledger_record_decision',
+        'list_agents', 'ralph', 'read', 'read_image', 'send_message', 'skill', 'stride',
+        'subagent', 'subagent_fork', 'todo_write', 'update_goal', 'ward', 'web_search', 'workflow', 'write',
       ])
     } finally {
       await handle.dispose()
