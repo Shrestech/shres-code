@@ -5,9 +5,10 @@
  * activate, against that plugin context) and the entry `disabled` field (at
  * every mount decision, against the loader context). Every other entry
  * metadata field stays static, so an expression there remains truthy data and
- * silently changes composition. Example configs and the shres Web composition
- * resolve named plugins from their owning workspace manifests. Local example
- * packages must also be in the root TypeScript project graph.
+ * silently changes composition. Example configs, the shres Web composition, and
+ * the shipped agent presets resolve named plugins from their owning workspace
+ * manifests. Local example packages must also be in the root TypeScript project
+ * graph.
  */
 
 import { globSync, readFileSync } from 'node:fs'
@@ -268,8 +269,12 @@ function validateAppResolution(): string[] {
     ...Object.fromEntries(globSync('packages/bundle/*/package.json', { cwd: root })
       .flatMap(file => Object.entries(readManifest(file).dependencies ?? {}))),
   }
-  const shipped = new Set(globSync('*.cordis.yml', { cwd: resolve(root, 'apps/cli/config') })
-    .map(file => `apps/cli/config/${file}`))
+  // Agent presets mount per session, but their bare specifiers resolve from the
+  // same app dependency surface as the shipped configs.
+  const shipped = new Set(
+    globSync(['*.cordis.yml', 'agent-presets/*/agent.cordis.yml'], { cwd: resolve(root, 'apps/cli/config') })
+      .map(file => `apps/cli/config/${file}`),
+  )
   const appReferences = pluginReferences.filter(reference => shipped.has(reference.file) || appOverlayFiles.has(reference.file))
   violations.push(...missingPluginDependencies(appReferences, appDependencies, 'apps/cli/package.json or a bundle manifest'))
   // Each bundle's patch rows must resolve from that bundle's own dependencies:

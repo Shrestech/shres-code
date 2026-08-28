@@ -115,6 +115,15 @@ bindPullSync(pull: (() => void) | undefined): void
 bindResolved(info: ShieldPayloadInfo | undefined): void
 
 /**
+ * One-shot staleness probe (gapfix 2026-08-24): query npm `latest` and, when
+ * it outruns the applied payload version, emit a stderr notice and mark the
+ * host status reason `payload-outdated` WITHOUT deactivating screening.
+ * Skipped for env-module overrides (their contract is explicit pinning) and
+ * when the registry is unreachable. Fires at most once per boot.
+ */
+async notePayloadStaleness(): Promise<void>
+
+/**
  * Remember the boot profile directory `pnpm add` installs into.
  * @param dir - absolute profile directory, or `undefined` when the seat
  *   is not booted from a profile.

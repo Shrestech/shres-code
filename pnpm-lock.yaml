@@ -213,6 +213,9 @@ importers:
       '@shres-code/shres-code-launch-environment':
         specifier: workspace:^
         version: link:../../packages/util/launch-environment
+      '@shres-code/shres-code-ledger':
+        specifier: workspace:^
+        version: link:../../packages/ledger/ledger
       '@shres-code/shres-code-llm':
         specifier: workspace:^
         version: link:../../packages/llm/llm
@@ -240,6 +243,9 @@ importers:
       '@shres-code/shres-code-pwsh-sandbox':
         specifier: workspace:^
         version: link:../../packages/shell/pwsh-sandbox
+      '@shres-code/shres-code-research-protocol':
+        specifier: workspace:^
+        version: link:../../packages/research/protocol
       '@shres-code/shres-code-schedule':
         specifier: workspace:^
         version: link:../../packages/schedule/schedule
@@ -300,6 +306,9 @@ importers:
       '@shres-code/shres-code-tool-jobs':
         specifier: workspace:^
         version: link:../../packages/jobs/tool-jobs
+      '@shres-code/shres-code-tool-ledger':
+        specifier: workspace:^
+        version: link:../../packages/ledger/tool-ledger
       '@shres-code/shres-code-tool-pwsh':
         specifier: workspace:^
         version: link:../../packages/shell/tool-pwsh
@@ -321,12 +330,18 @@ importers:
       '@shres-code/shres-code-tool-todo':
         specifier: workspace:^
         version: link:../../packages/todo/tool-todo
+      '@shres-code/shres-code-tool-tracker':
+        specifier: workspace:^
+        version: link:../../packages/tracker/tool-tracker
       '@shres-code/shres-code-tool-web':
         specifier: workspace:^
         version: link:../../packages/web/tool-web
       '@shres-code/shres-code-tool-workflow':
         specifier: workspace:^
         version: link:../../packages/workflow/tool-workflow
+      '@shres-code/shres-code-tracker-shrestech':
+        specifier: workspace:^
+        version: link:../../packages/tracker/tracker-shrestech
       '@shres-code/shres-code-web-app':
         specifier: workspace:^
         version: link:../../packages/bundle/web-app

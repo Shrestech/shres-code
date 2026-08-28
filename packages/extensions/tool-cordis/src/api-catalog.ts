@@ -1722,6 +1722,11 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'info', description: 'identity plus the import entry used for version lookup.' }],
       },
       {
+        signature: 'async notePayloadStaleness(): Promise<void>',
+        description: 'One-shot staleness probe (gapfix 2026-08-24): query npm `latest` and, when it outruns the applied payload version, emit a stderr notice and mark the host status reason `payload-outdated` WITHOUT deactivating screening. Skipped for env-module overrides (their contract is explicit pinning) and when the registry is unreachable. Fires at most once per boot.',
+        parameters: [],
+      },
+      {
         signature: 'bindProfileDir(dir: string | undefined): void',
         description: 'Remember the boot profile directory `pnpm add` installs into.',
         parameters: [{ name: 'dir', description: 'absolute profile directory, or `undefined` when the seat is not booted from a profile.' }],
@@ -4598,7 +4603,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ShieldStatus',
-    declaration: 'export interface ShieldStatus {\n    active: boolean;\n    reason: ShieldReason;\n}',
+    declaration: 'export interface ShieldStatus {\n    active: boolean;\n    stale?: {\n        installed: string | null;\n        latest: string;\n    };\n    reason: ShieldReason;\n}',
   },
   {
     name: 'ShieldUpdateBlocked',
