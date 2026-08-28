@@ -12,6 +12,7 @@
 
 import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
+import type { MachineRule } from '@shres-code/shres-code-tracker'
 import type { TrackerRunId } from '@shres-code/shres-code-tracker'
 
 /** One landed run as recorded in the derived index. */
@@ -21,6 +22,8 @@ export interface LandedRunRecord {
   readonly decisionRule: string
   readonly dataVersion: string
   readonly gitSha: string
+  /** The run's machine-readable decision rule, when it logged one. */
+  readonly machineRule?: MachineRule
   /** ISO-8601 timestamp when the run was confirmed landed. */
   readonly landedAt: string
 }

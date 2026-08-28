@@ -44,5 +44,4 @@ No direct invalidation; the named consumer owns any request-prefix changes.
 
 ## Known Limitations and Deferred Work
 
-- **No live post transport** — the seam's `postRun` contract is defined here, but stage 1 has no HTTP provider; every run is spooled until stage 2 lands the shrestech-tracker transport.
-- **`tracker/run` carries no tool-call id** — the service method has no call context; correlating a run event to its tool call is deferred with stage 2.
+- **Mechanical verdicts read the mounted provider** — `verifyDecisionRule` resolves the run and its metrics through `getRun`/`getMetrics`; after a sync drains the metric spool, landed metrics live server-side and `verifyDecisionRule` refuses with `metrics-missing` — the derived stores deliberately do not mirror server state.

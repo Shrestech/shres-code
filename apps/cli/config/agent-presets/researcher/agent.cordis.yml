@@ -1,0 +1,87 @@
+# The `researcher` agent preset: the autonomous-research composition.
+#
+# Adds the researcher surface on top of the host plane: the research protocol
+# (autoresearch toggle, cycle prompt section, design-defense gate), the
+# experiment-tracking and decision-ledger stores in one shared realm (the
+# ledger resolves cited run ids through the tracker), and the three debate/
+# execution seats as fork-or-spawn tool instances.
+#
+# J-Space stays host-owned: its settings namespace is registered by the base
+# bundle, so this preset must not re-mount the seat. Enable the card through
+# Settings; the design-defense epoch anchor reads it when present and falls
+# back to session start when not.
+#
+# The tracker provider composes spool-only: without a `credentialRef` it never
+# posts and never holds a token; runs land in the durable local spool.
+# Point `baseUrl`/`lane` at a real deployment to post.
+
+- id: persona
+  name: '@shres-code/shres-code-persona'
+  config:
+    text: >-
+      You are an autonomous research agent. You run the researcher cycle —
+      hypothesis, design defense, experiment, evidence, verdict, ledger,
+      digest — to a verified decision.
+
+- id: research-protocol
+  name: '@shres-code/shres-code-research-protocol'
+  config:
+    enabled: true
+
+# One realm for both project stores: the ledger resolves cited run ids
+# through ctx.tracker, so they must share scope.
+- id: research-stores
+  name: cordis:group
+  group: true
+  isolate:
+    tracker: true
+    ledger: true
+  config:
+    - id: tracker-shrestech
+      name: '@shres-code/shres-code-tracker-shrestech'
+      config:
+        baseUrl: 'https://tracker.invalid'
+        lane: 'researcher'
+
+    - id: tool-tracker
+      name: '@shres-code/shres-code-tool-tracker'
+
+    - id: ledger
+      name: '@shres-code/shres-code-ledger'
+      config:
+        storagePath: 'research-ledger.jsonl'  # relative resolves under the harness home (ledger/)
+
+    - id: tool-ledger
+      name: '@shres-code/shres-code-tool-ledger'
+
+- id: tool-goal
+  name: '@shres-code/shres-code-tool-goal'
+
+# The seats: design defense forks the parent session (aegis for feasibility,
+# ward against it — give ward a different model than the parent at the
+# deployment layer via agentOptions.model, so the reviewer does not share the
+# executor's blind spots); experiments run in spawned children.
+- id: seats
+  name: cordis:group
+  group: true
+  config:
+    - id: tool-subagent-aegis
+      name: '@shres-code/shres-code-tool-subagent'
+      config:
+        provider: fork
+        toolName: aegis
+        backgroundMode: continuable
+
+    - id: tool-subagent-ward
+      name: '@shres-code/shres-code-tool-subagent'
+      config:
+        provider: fork
+        toolName: ward
+        backgroundMode: continuable
+
+    - id: tool-subagent-stride
+      name: '@shres-code/shres-code-tool-subagent'
+      config:
+        provider: spawn
+        toolName: stride
+        backgroundMode: continuable

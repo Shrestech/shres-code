@@ -37,6 +37,61 @@ test('the shipped catalog loads under the chain-aware loader', async () => {
   assert.ok(cued?.armInstructions?.code?.includes('run_code'))
 })
 
+test('the researcher microcycle tasks load and their verifiers are discriminating', async () => {
+  const tasks = await loadTaskCatalog(tasksDir)
+  for (const taskId of ['research-microcycle-accept', 'research-microcycle-reject']) {
+    const task = tasks.find(candidate => candidate.taskId === taskId)
+    assert.ok(task, `${taskId} is in the catalog`)
+    assert.equal(task.phases, null, `${taskId} is a single-session task`)
+    assert.equal(typeof task.instruction, 'string', `${taskId} has an instruction`)
+
+    const scratch = copyFixture(taskId)
+    try {
+      // The unmodified fixture has no verdict file: not resolved.
+      const bare = runVerifier(taskId, scratch)
+      assert.notEqual(bare.status, 0, `${taskId}: bare fixture must fail`)
+      assert.match(bare.output, /verdict\.json is missing/)
+
+      // A correct verdict + measurement passes.
+      const truth = taskId === 'research-microcycle-accept'
+        ? { verdict: 'accepted', n: 40, count: 29, share: 0.725 }
+        : { verdict: 'rejected', n: 40, count: 19, share: 0.475 }
+      writeFileSync(path.join(scratch, 'verdict.json'), JSON.stringify({
+        hypothesis: 'At least 60% of the values are strictly greater than 50.',
+        verdict: truth.verdict,
+        measurement: { n: truth.n, count: truth.count, share: truth.share },
+      }))
+      const good = runVerifier(taskId, scratch)
+      assert.equal(good.status, 0, `${taskId}: correct verdict+measurement must pass`)
+
+      // The correct verdict with a wrong measurement is not enough: measurement is required.
+      writeFileSync(path.join(scratch, 'verdict.json'), JSON.stringify({
+        hypothesis: 'At least 60% of the values are strictly greater than 50.',
+        verdict: truth.verdict,
+        measurement: { n: 40, count: 30, share: 0.75 },
+      }))
+      const wrongMeas = runVerifier(taskId, scratch)
+      assert.notEqual(wrongMeas.status, 0, `${taskId}: wrong measurement must fail`)
+      assert.match(wrongMeas.output, /measurement/)
+
+      // Editing data.json to inflate the share corrupts the condition: refused.
+      const dataPath = path.join(scratch, 'data.json')
+      const inflated = JSON.parse(readFileSync(dataPath, 'utf8')).map(value => value > 50 ? value + 1000 : value)
+      writeFileSync(dataPath, JSON.stringify(inflated))
+      writeFileSync(path.join(scratch, 'verdict.json'), JSON.stringify({
+        hypothesis: 'At least 60% of the values are strictly greater than 50.',
+        verdict: truth.verdict,
+        measurement: { n: 40, count: 40, share: 1 },
+      }))
+      const tampered = runVerifier(taskId, scratch)
+      assert.notEqual(tampered.status, 0, `${taskId}: a modified dataset must fail`)
+      assert.match(tampered.output, /was modified/)
+    } finally {
+      rmSync(scratch, { recursive: true, force: true })
+    }
+  }
+})
+
 /**
  * Copy one task's fixture into a fresh temp dir.
  * @param {string} taskId - task directory name under bench/tasks.

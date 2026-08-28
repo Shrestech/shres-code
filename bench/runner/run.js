@@ -52,7 +52,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 import { getArm, listArms, renderArmOverlay } from './arms.js'
 import { executeTrial } from './execute.js'
-import { emptyMetrics, foldSessionLog } from './metrics.js'
+import { computeThinDebates, emptyMetrics, foldSessionLog } from './metrics.js'
 import { descendantUsage } from './descendants.js'
 import { createSerialQueue, mapPool } from './pool.js'
 import { runSetup } from './setup.js'
@@ -557,6 +557,7 @@ async function executeSpawn({ repoRoot, arm, armDir, sessionLogRoot, taskText, s
     : foldSessionLog(await readFile(execution.sessionLogPath, 'utf8'), {
         expectsSessionQuery: arm.expectsSessionQuery ?? true,
         expectsJspace: arm.expectsJspace ?? true,
+        expectsResearcher: arm.expectsResearcher ?? false,
       })
   metrics.durationMs = execution.durationMs
   if (execution.sessionLogPath !== null) {
@@ -566,6 +567,9 @@ async function executeSpawn({ repoRoot, arm, armDir, sessionLogRoot, taskText, s
       metrics.descendantSessions = descendants.descendantSessions
     }
     metrics.outOfLoopExperiments += descendants.delegatedSessions + descendants.descendantRunCodeCalls
+    if (arm.expectsResearcher) {
+      metrics.thinDebates = await computeThinDebates(sessionLogRoot, await readFile(execution.sessionLogPath, 'utf8'))
+    }
   }
   const sessionFile = execution.sessionLogPath === null
     ? null
@@ -577,7 +581,10 @@ async function executeSpawn({ repoRoot, arm, armDir, sessionLogRoot, taskText, s
 const SUMMABLE_METRICS = ['inputTokens', 'outputTokens', 'durationMs', 'turns', 'toolCalls', 'identicalRetries', 'checkpoints', 'shipPasses', 'coverageRefusalThenPad', 'noopNoteRefusals', 'noteCapRefusals', 'compactionCount', 'tokensIncludingDescendants', 'descendantSessions', 'outOfLoopExperiments']
 
 /**
- * Sum per-phase metrics into the trial-level row.
+ * Sum per-phase metrics into the trial-level row. Researcher integrity fields
+ * are nullable per phase; they sum across the phases that actually mounted the
+ * researcher surface (the phase whose `gateRefusals` is non-null), with rates
+ * averaged and derived booleans recomputed from the summed counts.
  * @param {import('../schema/trial.js').PhaseRecord[]} phases - completed phases.
  * @returns {import('../schema/trial.js').TrialMetrics} field-wise sums.
  */
@@ -595,6 +602,26 @@ function sumPhaseMetrics(phases) {
   const cpShares = phases.map(p => p.metrics.verifiedCheckpointShare).filter(v => v !== null)
   total.verifiedCheckpointShare = cpShares.length > 0 ? cpShares.reduce((a, b) => a + b, 0) / cpShares.length : null
   total.pressureFired = total.compactionCount > 0
+  const research = phases.filter(p => p.metrics.gateRefusals !== null)
+  if (research.length > 0) {
+    const sum = field => research.reduce((acc, p) => acc + (/** @type {number} */ (p.metrics[field]) ?? 0), 0)
+    total.gateRefusals = sum('gateRefusals')
+    total.debateCalls = sum('debateCalls')
+    total.runsLogged = sum('runsLogged')
+    total.unverifiedRunRefusals = sum('unverifiedRunRefusals')
+    total.thinDebates = sum('thinDebates')
+    const verifyShares = research.map(p => p.metrics.verifySatisfiedRate).filter(v => v !== null)
+    total.verifySatisfiedRate = verifyShares.length > 0 ? verifyShares.reduce((a, b) => a + b, 0) / verifyShares.length : null
+    const deferredShares = research.map(p => p.metrics.deferredShare).filter(v => v !== null)
+    total.deferredShare = deferredShares.length > 0 ? deferredShares.reduce((a, b) => a + b, 0) / deferredShares.length : null
+    const accepted = research.reduce((a, p) => a + (p.metrics.ledgerDecisions?.accepted ?? 0), 0)
+    const rejected = research.reduce((a, p) => a + (p.metrics.ledgerDecisions?.rejected ?? 0), 0)
+    const deferred = research.reduce((a, p) => a + (p.metrics.ledgerDecisions?.deferred ?? 0), 0)
+    const totalDecisions = accepted + rejected + deferred
+    total.ledgerDecisions = { accepted, rejected, deferred }
+    total.ledgerAbandoned = totalDecisions === 0
+    total.unverifiedAcceptRecovery = (total.unverifiedRunRefusals ?? 0) > 0 && totalDecisions > 0
+  }
   return total
 }
 

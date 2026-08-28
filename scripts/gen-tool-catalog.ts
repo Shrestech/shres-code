@@ -59,6 +59,8 @@ import * as ToolSkill from '@shres-code/shres-code-tool-skill'
 import * as ToolSessionQuery from '@shres-code/shres-code-tool-session-query'
 import { ShrestechTrackerService } from '@shres-code/shres-code-tracker-shrestech'
 import * as ToolTracker from '@shres-code/shres-code-tool-tracker'
+import LedgerService from '@shres-code/shres-code-ledger'
+import * as ToolLedger from '@shres-code/shres-code-tool-ledger'
 import * as ToolTasks from '@shres-code/shres-code-tool-jobs'
 import * as ToolTodo from '@shres-code/shres-code-tool-todo'
 import JspaceService from '@shres-code/shres-code-jspace'
@@ -590,6 +592,26 @@ const TOOL_PACKAGES: ToolPackage[] = [
     },
     note:
       'experiment_log_run, experiment_log_metrics, and experiment_query fold experiment records through the tracker service seam.',
+  },
+  {
+    pkg: '@shres-code/shres-code-tool-ledger',
+    dir: 'tool-ledger',
+    source: 'packages/ledger/tool-ledger/src/index.ts',
+    requires: ['ctx.tools', 'ctx.ledger', 'ctx.tracker'],
+    writes: ['tool/call', 'ledger/decision', 'tool/result'],
+    async mount(ctx) {
+      // The spool-only tracker provider satisfies the ledger's evidence
+      // resolution; neither service writes during catalog generation — only
+      // the tool schemas are extracted.
+      await ctx.plugin(ShrestechTrackerService, {
+        baseUrl: 'https://tracker.invalid',
+        lane: 'catalog',
+      })
+      await ctx.plugin(LedgerService, { storagePath: 'catalog-ledger.jsonl' })
+      await ctx.plugin(ToolLedger)
+    },
+    note:
+      'ledger_record_decision and ledger_query record decisions whose cited run ids must resolve through ctx.tracker.',
   },
 ]
 

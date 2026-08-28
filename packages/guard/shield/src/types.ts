@@ -12,6 +12,7 @@ export type ShieldInactiveReason =
   | 'disabled'
   | 'repo-disabled'
 
+
 /** Outcome of the host-seat entitlement + resolve step. */
 export type ShieldReason = 'active' | ShieldInactiveReason
 
@@ -22,6 +23,15 @@ export type ShieldReason = 'active' | ShieldInactiveReason
 export interface ShieldStatus {
   /** True only when the paid engine applied and is screening. */
   active: boolean
+  /**
+   * Present when npm `latest` outruns the applied payload version: rule
+   * coverage may predate newer attack families. Advisory only — screening
+   * stays active; update via Settings > Shield. One registry probe per boot;
+   * cleared on remount when versions converge. (gapfix incident 2026-08-24:
+   * a profile rode 0.1.1 while 0.2.0 shipped the authority-impersonation
+   * family and nothing said so in headless runs.)
+   */
+  stale?: { installed: string | null; latest: string }
   /** Discriminant for inactivity; `'active'` when screening. */
   reason: ShieldReason
 }

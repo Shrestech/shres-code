@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url'
 import assert from 'node:assert/strict'
 
 import { ARMS, getArm, listArms, renderArmOverlay, SESSION_QUERY_DRIVER_LINE } from '../runner/arms.js'
-import { emptyMetrics, foldSessionLog } from '../runner/metrics.js'
+import { computeThinDebates, emptyMetrics, foldSessionLog } from '../runner/metrics.js'
 import { runSetup } from '../runner/setup.js'
 import { runVerifier } from '../runner/verify.js'
 import { findSessionLog, resolveHarnessLaunch } from '../runner/execute.js'
@@ -226,13 +226,101 @@ describe('metrics.foldSessionLog', () => {
   it('throws with the line number on corrupt JSON', () => {
     assert.throws(() => foldSessionLog('{"type":"session"}\nnot json\n'), /line 2/)
   })
+
+  it('folds researcher integrity metrics from a research session log', () => {
+    const metrics = foldSessionLog([
+      // Design-defense refusal on a gated tool.
+      '{"type":"tool/call","seq":1,"time":1,"data":{"callId":"c0","name":"experiment_log_run","arguments":"{}"}}',
+      '{"type":"tool/result","seq":2,"time":2,"data":{"name":"experiment_log_run","result":"Error: research protocol requires a design defense before logging a run: completed calls missing for: aegis, ward"}}',
+      // A completed debate pair: aegis and ward each with a non-error result.
+      '{"type":"tool/call","seq":3,"time":3,"data":{"callId":"a1","name":"aegis","arguments":"{}"}}',
+      '{"type":"tool/result","seq":4,"time":4,"data":{"name":"aegis","result":"aegis report: the mean is below the bound"}}',
+      '{"type":"tool/call","seq":5,"time":5,"data":{"callId":"w1","name":"ward","arguments":"{}"}}',
+      '{"type":"tool/result","seq":6,"time":6,"data":{"name":"ward","result":"ward report: I agree, reject"}}',
+      // A run lands and a verify call is satisfied.
+      '{"type":"tool/call","seq":7,"time":7,"data":{"callId":"r1","name":"experiment_log_run","arguments":"{}"}}',
+      '{"type":"tool/result","seq":8,"time":8,"data":{"name":"experiment_log_run","result":"Logged experiment run r-123."}}',
+      '{"type":"tool/call","seq":9,"time":9,"data":{"callId":"v1","name":"experiment_verify_decision_rule","arguments":"{}"}}',
+      '{"type":"tool/result","seq":10,"time":10,"data":{"name":"experiment_verify_decision_rule","result":"Decision rule satisfied: share > 0.6 (actual 0.7)"}}',
+      '{"type":"tool/result","seq":11,"time":11,"data":{"name":"ledger_record_decision","result":"Decision L1 was not recorded (reason: unverified-run)."}}',
+      '{"type":"ledger/decision","seq":12,"time":12,"data":{"entryId":"L1","hypothesis":"h","decision":"rejected","runIds":["r-123"]}}',
+      '{"type":"ledger/decision","seq":13,"time":13,"data":{"entryId":"L2","hypothesis":"h","decision":"deferred","runIds":[]}}',
+    ].join('\n'), { expectsResearcher: true, expectsJspace: true })
+    assert.equal(metrics.gateRefusals, 1)
+    assert.equal(metrics.debateCalls, 1)
+    assert.equal(metrics.runsLogged, 1)
+    assert.equal(metrics.verifySatisfiedRate, 1)
+    assert.equal(metrics.unverifiedRunRefusals, 1)
+    assert.deepEqual(metrics.ledgerDecisions, { accepted: 0, rejected: 1, deferred: 1 })
+    assert.equal(metrics.deferredShare, 0.5)
+    assert.equal(metrics.ledgerAbandoned, false)
+    assert.equal(metrics.unverifiedAcceptRecovery, true)
+  })
+
+  it('nulls researcher integrity metrics for arms without the researcher surface', () => {
+    const metrics = foldSessionLog('{"type":"tool/call","seq":1,"time":1,"data":{"name":"aegis","arguments":"{}"}}\n', { expectsResearcher: false })
+    assert.equal(metrics.gateRefusals, null)
+    assert.equal(metrics.debateCalls, null)
+    assert.equal(metrics.runsLogged, null)
+    assert.equal(metrics.verifySatisfiedRate, null)
+    assert.equal(metrics.unverifiedRunRefusals, null)
+    assert.equal(metrics.ledgerDecisions, null)
+    assert.equal(metrics.deferredShare, null)
+    assert.equal(metrics.ledgerAbandoned, null)
+    assert.equal(metrics.unverifiedAcceptRecovery, null)
+    assert.equal(metrics.thinDebates, null)
+  })
+
+  it('counts completed debate pairs per Goal epoch', () => {
+    const metrics = foldSessionLog([
+      // Epoch 0 (before any card): one aegis call, no ward call -> 0 pairs.
+      '{"type":"tool/call","seq":1,"time":1,"data":{"callId":"a1","name":"aegis","arguments":"{}"}}',
+      '{"type":"tool/result","seq":2,"time":2,"data":{"name":"aegis","result":"ok"}}',
+      // Open a goal epoch (goalOpenedSeq 10).
+      '{"type":"jspace/card","seq":10,"time":10,"data":{"goalOpenedSeq":10,"goal":"g"}}',
+      // Epoch 10: two aegis calls, one ward call -> 1 pair.
+      '{"type":"tool/call","seq":11,"time":11,"data":{"callId":"a2","name":"aegis","arguments":"{}"}}',
+      '{"type":"tool/result","seq":12,"time":12,"data":{"name":"aegis","result":"ok"}}',
+      '{"type":"tool/call","seq":13,"time":13,"data":{"callId":"a3","name":"aegis","arguments":"{}"}}',
+      '{"type":"tool/result","seq":14,"time":14,"data":{"name":"aegis","result":"ok"}}',
+      '{"type":"tool/call","seq":15,"time":15,"data":{"callId":"w1","name":"ward","arguments":"{}"}}',
+      '{"type":"tool/result","seq":16,"time":16,"data":{"name":"ward","result":"ok"}}',
+      // An errored aegis result does not count as completed.
+      '{"type":"tool/call","seq":17,"time":17,"data":{"callId":"a4","name":"aegis","arguments":"{}"}}',
+      JSON.stringify({ type: 'tool/result', seq: 18, time: 18, data: { message: { source: { kind: 'tool', callId: 'a4' }, content: [{ type: 'tool-result', toolCallId: 'a4', isError: true, content: [{ type: 'text', text: 'boom' }] }] } } }),
+    ].join('\n'), { expectsResearcher: true, expectsJspace: true })
+    assert.equal(metrics.debateCalls, 1)
+  })
+
+  it('computes thinDebates from descendant seat-token volume', async () => {
+    const root = await tempDir('bench-thin-')
+    try {
+      const rootLog = '{"type":"tool/call","seq":1,"time":100,"data":{"callId":"a1","name":"aegis","arguments":"{}"}}\n{"type":"tool/call","seq":2,"time":200,"data":{"callId":"w1","name":"ward","arguments":"{}"}}\n'
+      // A descendant bucketed to the aegis call (createdAt 150 <= 200) with 120 tokens.
+      const childA = join(root, 'childA')
+      await mkdir(childA, { recursive: true })
+      const childAHeader = JSON.stringify({ type: 'session', id: 'childA', createdAt: 150, parentSession: 'root', origin: 'subagent' })
+      await writeFile(join(childA, 'session.jsonl'), childAHeader + '\n{"type":"assistant/message","time":160,"data":{"usage":{"inputTokens":100,"outputTokens":20}}}\n')
+      // Combined aegis+ward tokens (120) sit under the thinDebates floor -> thin.
+      assert.equal(await computeThinDebates(root, rootLog), 1)
+      // A ward-bucketed descendant (createdAt 250) with 550 tokens pushes the
+      // pair over the floor -> not thin.
+      const childW = join(root, 'childW')
+      await mkdir(childW, { recursive: true })
+      const childWHeader = JSON.stringify({ type: 'session', id: 'childW', createdAt: 250, parentSession: 'root', origin: 'subagent' })
+      await writeFile(join(childW, 'session.jsonl'), childWHeader + '\n{"type":"assistant/message","time":260,"data":{"usage":{"inputTokens":500,"outputTokens":50}}}\n')
+      assert.equal(await computeThinDebates(root, rootLog), 0)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('arms registry', () => {
   it('registers the jspace ladder and the OOLONG-lite arms in order', () => {
     assert.deepEqual(
       listArms(),
-      ['off', 'on', 'sq-only', 'sq-driver', 'on-sq', 'on-sq-verified', 'on-adaptive', 'on-core', 'on-charter', 'stuffed', 'read', 'code'],
+      ['off', 'on', 'sq-only', 'sq-driver', 'on-sq', 'on-sq-verified', 'on-adaptive', 'on-core', 'on-charter', 'stuffed', 'read', 'code', 'research-inert', 'research-lite', 'research-on'],
     )
     assert.equal(ARMS.off.jspace.enabled, false)
     assert.equal(ARMS.on.jspace.enabled, true)
@@ -383,6 +471,40 @@ describe('arms registry', () => {
     assert.match(off, /enabled: false/)
     assert.ok(!off.includes('session-query'), 'off arm leaves session-query untouched')
     assert.ok(!off.includes('insert'), 'off arm inserts nothing')
+  })
+
+  it('renders the researcher surface and per-trial persistence into a research arm overlay', () => {
+    const root = '/tmp/bench/research-on/sessions/t/0'
+    const overlay = renderArmOverlay(ARMS['research-on'], { sessionLogRoot: root })
+    // research-protocol is INSERTED (the base headless composition does not
+    // mount it); a patch row against a missing entry no-ops silently.
+    assert.match(overlay, /^- insert:$/m)
+    assert.match(overlay, /^    - id: research-protocol$/m)
+    assert.match(overlay, /"@shres-code\/shres-code-research-protocol"/)
+    assert.match(overlay, /enabled: true/)
+    assert.match(overlay, /requireDesignDefense: "per-epoch"/)
+    assert.match(overlay, /tracker\.invalid/)
+    assert.match(overlay, /research-spool\.jsonl/)
+    assert.match(overlay, new RegExp(root.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '/research-spool.jsonl'))
+    assert.match(overlay, /^\s*- id: tool-tracker$/m)
+    assert.match(overlay, /^\s*- id: ledger$/m)
+    assert.match(overlay, /research-ledger\.jsonl/)
+    assert.match(overlay, /^\s*- id: tool-ledger$/m)
+    assert.match(overlay, /^\s*- id: tool-subagent-aegis$/m)
+    assert.match(overlay, /toolName: aegis/)
+    assert.match(overlay, /^\s*- id: tool-subagent-ward$/m)
+    assert.match(overlay, /toolName: ward/)
+    assert.match(overlay, /^\s*- id: tool-subagent-stride$/m)
+    assert.match(overlay, /toolName: stride/)
+    assert.match(overlay, /provider: spawn/)
+    // Fork seats are one-shot; the spawn seat is continuable, mirroring the
+    // base headless tool-subagent / tool-subagent-fork rows.
+    assert.match(overlay, /provider: fork\n\s+toolName: aegis\n\s+backgroundMode: one-shot/)
+    assert.match(overlay, /provider: spawn\n\s+toolName: stride\n\s+backgroundMode: continuable/)
+    // research-on carries the on-sq-verified jspace verifier extras.
+    assert.match(overlay, /verifierTools/)
+    assert.match(overlay, /experiment_verify_decision_rule/)
+    assert.match(overlay, /requireVerifiedEvidence: true/)
   })
 
   it('renders stuffed without session-query or code-mode', () => {
@@ -561,6 +683,8 @@ describe('schema compaction fields', () => {
         sessionQueryCalls: null,
         compactionCount: 1,
         pressureFired: true,
+        gateRefusals: null, debateCalls: null, runsLogged: null, verifySatisfiedRate: null, unverifiedRunRefusals: null,
+        ledgerDecisions: null, deferredShare: null, ledgerAbandoned: null, unverifiedAcceptRecovery: null, thinDebates: null,
         ...metrics,
       },
       sessionFile: null,

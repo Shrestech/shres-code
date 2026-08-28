@@ -621,6 +621,27 @@ Source: [`packages/jspace/jspace/src/types.ts:237`](../packages/jspace/jspace/sr
 
 Source: [`packages/jspace/jspace/src/types.ts:209`](../packages/jspace/jspace/src/types.ts)
 
+### `ledger/*`
+
+<a id="ledgerdecision--log-only"></a>
+
+#### `ledger/decision` — log-only
+
+```ts persistence-catalog
+/**
+ * One decision recorded through `ctx.ledger`. Log-only. Writers pass
+ * `{ ignorable: true }`.
+ * @param entryId - the entry's id; identical to its store entry id.
+ * @param hypothesis - the hypothesis the decision addresses.
+ * @param decision - the decision reached.
+ * @param runIds - the experiment run ids cited as evidence.
+ * @param callId - the tool-call id of the `ledger_record_decision` call that produced the record.
+ */
+'ledger/decision': LedgerDecisionEvent
+```
+
+Source: [`packages/ledger/ledger/src/types.ts:137`](../packages/ledger/ledger/src/types.ts)
+
 ### `llm/*`
 
 <a id="llmretry--log-only"></a>
@@ -1080,7 +1101,7 @@ Source: [`packages/workflow/tool-workflow/src/types.ts:47`](../packages/workflow
 'tracker/metrics': TrackerMetricsEvent
 ```
 
-Source: [`packages/tracker/tracker/src/types.ts:142`](../packages/tracker/tracker/src/types.ts)
+Source: [`packages/tracker/tracker/src/types.ts:192`](../packages/tracker/tracker/src/types.ts)
 
 <a id="trackerrun--log-only"></a>
 
@@ -1099,7 +1120,7 @@ Source: [`packages/tracker/tracker/src/types.ts:142`](../packages/tracker/tracke
 'tracker/run': TrackerRunEvent
 ```
 
-Source: [`packages/tracker/tracker/src/types.ts:135`](../packages/tracker/tracker/src/types.ts)
+Source: [`packages/tracker/tracker/src/types.ts:185`](../packages/tracker/tracker/src/types.ts)
 
 ### `turn/*`
 

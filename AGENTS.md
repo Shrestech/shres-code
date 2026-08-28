@@ -32,6 +32,7 @@ packages/    @shres-code/shres-code-<pkg> workspaces at packages/<group>/<pkg>/
   todo/        todo_write tool
   plan/        plan mode as logged state
   preset/      per-session agent composition from preset cordis.yml files
+  research/    autoresearch toggle and researcher protocol
   guard/       loop-hygiene + tool-timeout plugins
   self-modification/  the agent inspects/mounts its own plugins
   hooks/       Claude Code/Codex hook bridges + wire-protocol library
