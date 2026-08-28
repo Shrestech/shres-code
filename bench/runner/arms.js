@@ -351,7 +351,7 @@ ${configRows(arm.toolJspace)}
     - id: research-protocol
       name: "@shres-code/shres-code-research-protocol"
       config:
-${configRows(arm.researcher).split('\n').map(row => `  ${row}`).join('\n')}
+${configRows(arm.researcher).split('\n').map(row => `    ${row}`).join('\n')}
     - id: tracker-shrestech
       name: "@shres-code/shres-code-tracker-shrestech"
       config:

@@ -343,13 +343,13 @@ export class ShieldHost extends TypertRemoteService {
   async notePayloadStaleness(): Promise<void> {
     const installed = this.resolved?.version ?? null
     if (installed === null) return
-    if (isNpmVersion(installed) === false) return
+    if (!isNpmVersion(installed)) return
     const queried = await queryNpmLatest().catch(() => null)
     if (queried === null || queried.latest === null || queried.blocked !== undefined) return
     const latest = queried.latest
-    if (isNpmVersion(latest) === false || latest === installed) {
+    if (!isNpmVersion(latest) || latest === installed) {
       // converged (fresh install or remount after applyUpdate): clear advisory
-      this.status.stale = undefined
+      delete this.status.stale
       return
     }
     const newer = (a: string, b: string): boolean => {
@@ -361,7 +361,7 @@ export class ShieldHost extends TypertRemoteService {
       return false
     }
     if (!newer(latest, installed)) {
-      this.status.stale = undefined
+      delete this.status.stale
       return
     }
     this.status.stale = { installed, latest }
