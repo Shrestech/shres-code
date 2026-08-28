@@ -41,3 +41,4 @@ Per-file 100% coverage on `packages/ledger/*`, `packages/research/protocol/src`,
 - [Researcher harness proposal](../../proposed/architecture/2026-08-24-researcher-harness-long-horizon-autonomous-research.md) — the staged plan this change advances.
 - [J-Space evidence-grade checkpoints](../feature/2026-08-25-jspace-evidence-grade-checkpoints.md) — the executed-verifier class the verdict check plugs into.
 - [Tracker seam stage 1](2026-08-24-researcher-tracker-seam-scaffold.md) — the seam the verifier extends.
+- [Preset plugins resolve from the app dependency surface](../bug-fix/2026-08-28-preset-plugins-app-dependency-surface.md) — the dependency-declaration and gate fix that made this preset mountable outside the snapshot lane.
