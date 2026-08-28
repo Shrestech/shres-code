@@ -33,7 +33,7 @@
  * researcher surface:
  * - gateRefusals: tool results matching the design-defense refusal.
  * - debateCalls: completed aegis+ward call pairs per Goal epoch, summed.
- * - runsLogged: `experiment_log_run` results that landed.
+ * - runsLogged: `experiment_log_run` results that recorded a run (landed or spooled).
  * - verifySatisfiedRate: satisfied / `experiment_verify_decision_rule` calls.
  * - unverifiedRunRefusals: ledger results carrying the `unverified-run` refusal.
  * - ledgerDecisions: `ledger/decision` event counts by decision.
@@ -94,6 +94,7 @@ const TRACKER_VERIFY_TOOL = 'experiment_verify_decision_rule'
 
 /** Landed-run result marker from `formatRunOutput`. */
 const RUN_LANDED_MARKER = 'Logged experiment run'
+const RUN_SPOOLED_MARKER = 'held in the local spool'
 
 /** Satisfied verify verdict marker from `formatVerifyOutput`. */
 const VERIFY_SATISFIED_MARKER = 'Decision rule satisfied'
@@ -359,7 +360,11 @@ export function foldSessionLog(text, armFlags) {
           const text = resultText.length > 0 ? resultText : extractToolResultText(data)
           if (DESIGN_DEFENSE_REFUSAL.test(text)) gateRefusals += 1
           if (UNVERIFIED_RUN_REFUSAL.test(text)) unverifiedRunRefusals += 1
-          if (resultName === TRACKER_RUN_TOOL && text.includes(RUN_LANDED_MARKER)) runsLogged += 1
+          // A run is logged whether it landed or was held in the spool: the
+          // spool preserves the machine rule, so both satisfy record-time
+          // verification in the spool-only posture.
+          if (resultName === TRACKER_RUN_TOOL
+            && (text.includes(RUN_LANDED_MARKER) || text.includes(RUN_SPOOLED_MARKER))) runsLogged += 1
           if (resultName === TRACKER_VERIFY_TOOL && text.includes(VERIFY_SATISFIED_MARKER)) verifySatisfied += 1
           // Match a debate call by its durable callId first; plain-string bench
           // logs may omit callId, so fall back to the oldest pending call of the
