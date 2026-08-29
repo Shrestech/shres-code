@@ -342,6 +342,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'path', description: 'absolute or host-resolvable path.' }],
       },
       {
+        signature: 'readFile(path: string, signal?: AbortSignal): Promise<FileRead>',
+        description: 'Read one Workspace file as bounded text through the Host viewer fence (workspace-confined, byte-capped, binary-flagged).',
+        parameters: [{ name: 'path', description: 'absolute or Host-resolvable file path.' }, { name: 'signal', description: 'aborts the wire request when the caller supersedes it.' }],
+        returns: 'the bounded text read.',
+      },
+      {
         signature: 'rename(workspaceId: WorkspaceId, title: string): Promise<WorkspaceView>',
         description: 'Rename a Workspace.',
         parameters: [{ name: 'workspaceId', description: 'target workspace.' }, { name: 'title', description: 'the new display title.' }],

@@ -414,11 +414,18 @@ export function apply(ctx: Context): void {
         },
         fileMentions: owner => ctx.get('chatFileMentions')?.forClosing(owner),
         openFile: (path) => {
-          const cwd = sessions.list.getSnapshot().byId[sessionId]?.cwd
-          void workspaces.openPath(resolveWorkspacePath(cwd, path)).catch(() => {
-            // Host/OS open failures stay silent in the chat row; the native
-            // app surfaces its own error dialog when the path is unusable.
-          })
+          // Directory gestures (the deliverables row's Show-folder chip) keep
+          // the native hand-off; every file path opens the in-app viewer pane.
+          if (path === '.' || path.endsWith('/')) {
+            const cwd = sessions.list.getSnapshot().byId[sessionId]?.cwd
+            void workspaces.openPath(resolveWorkspacePath(cwd, path)).catch(() => {
+              // Host/OS open failures stay silent in the chat row; the native
+              // app surfaces its own error dialog when the path is unusable.
+            })
+            return
+          }
+          actions.select({ kind: 'file', path })
+          layout.openDetails()
         },
         loadOlder: () => { void scoped.loadOlder() },
         loadImage: attachment => conversation.resolveImage(sessionId, attachment),
@@ -469,8 +476,19 @@ export function apply(ctx: Context): void {
       'conversation.details.tool': { kind: 'single', scope: 'session' },
     },
     store: chatStore,
-    inject: (): DetailsInjected => ({
+    inject: (sessionId: SessionId): DetailsInjected => ({
       closeDetails: () => { layout.closeDetails() },
+      readFile: (path) => {
+        const cwd = sessions.list.getSnapshot().byId[sessionId]?.cwd
+        return workspaces.readFile(resolveWorkspacePath(cwd, path))
+      },
+      openNative: (path) => {
+        const cwd = sessions.list.getSnapshot().byId[sessionId]?.cwd
+        void workspaces.openPath(resolveWorkspacePath(cwd, path)).catch(() => {
+          // The native opener already surfaced its own failure dialog; the
+          // pane keeps showing the file so the gesture is never destructive.
+        })
+      },
     }),
   }, DetailsPanel)
 

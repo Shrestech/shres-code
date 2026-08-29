@@ -291,6 +291,8 @@ describe('DetailsPanel Output section (read)', () => {
         useStore={bindSnapshotSelector(chat)}
         actions={chat.actions}
         closeDetails={vi.fn()}
+        readFile={() => Promise.resolve({ content: '', truncated: false, binary: false, sizeBytes: 0 })}
+        openNative={() => {}}
       />,
     )
   }

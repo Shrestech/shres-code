@@ -23,6 +23,8 @@ File-tool path summaries (`read` / `write` / `edit` args carrying `path` or `fil
 
 Clicking a file path in a tool row opens that path on the host. Non-file tool rows are inert summaries (expand toggles remain where the row already supported them). Remote or non-loopback clients cannot invoke `host.openPath`.
 
+2026-08-30: file paths now open the [in-session file viewer pane](2026-08-30-in-session-file-viewer-pane.md) instead; native open remains for directory gestures and as the pane's "Open in editor" hand-off.
+
 ## Risks
 
 - Desktop Linux hosts without `xdg-open`, and WSL hosts without working Windows interop (`wslpath` plus `powershell.exe`), fail the RPC; the chat row stays silent while the host returns an internal error.

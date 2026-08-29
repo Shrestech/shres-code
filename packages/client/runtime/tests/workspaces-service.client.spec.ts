@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { SessionId, WorkspaceId, WorkspaceView } from '@shres-code/shres-code-api-remotes/client'
 import { SessionRuntime } from '../src/client/sessions/service.ts'
 import { WorkspaceManager } from '../src/client/workspaces/manager.ts'
-import { DirectoryBrowseError, WorkspaceCreateError, WorkspaceRuntime } from '../src/client/workspaces/service.ts'
+import { DirectoryBrowseError, FileReadError, WorkspaceCreateError, WorkspaceRuntime } from '../src/client/workspaces/service.ts'
 import { FakeApiClient, deferred, err, fakeRemote, ok } from './fake-api.client.ts'
 
 const sid = (id: string): SessionId => id as SessionId
@@ -358,6 +358,21 @@ describe('WorkspaceRuntime', () => {
     expect(api.callsOf('host.openPath')).toEqual([{ path: '/w/alpha/a.ts' }])
     api.onOpenPath = () => Promise.resolve(err({ code: 'internal', message: 'boom', details: {} }))
     await expect(workspaces.openPath('/missing')).rejects.toThrow(/path open failed/)
+  })
+
+  it('reads a workspace file through the host, wrapping business failures', async () => {
+    const ctx = new Context()
+    const api = new FakeApiClient()
+    const sessions = new SessionRuntime(ctx, api, fakeRemote())
+    const workspaces = new WorkspaceRuntime(ctx, api, sessions)
+    const read = { content: 'one\ntwo\n', truncated: true, binary: false, sizeBytes: 8 }
+    api.onReadFile = () => Promise.resolve(ok(read))
+    await expect(workspaces.readFile('/w/alpha/a.ts')).resolves.toEqual(read)
+    expect(api.callsOf('host.readFile')).toEqual([{ path: '/w/alpha/a.ts' }])
+    api.onReadFile = () => Promise.resolve(err({ code: 'file-outside-workspace', message: 'denied', details: { path: '/x' } }))
+    const failure = workspaces.readFile('/outside')
+    await expect(failure).rejects.toBeInstanceOf(FileReadError)
+    await expect(failure).rejects.toMatchObject({ rpcError: { code: 'file-outside-workspace' } })
   })
 
   it('deletes a Workspace or preserves it when the Host rejects deletion', async () => {

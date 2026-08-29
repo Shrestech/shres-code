@@ -1,16 +1,19 @@
-// DetailsPanel: close button + the selected call's args and
-// result — args as JSON, the result raw except for a terminal-card call, whose
-// Output section is the command's terminal card. Reads the
-// selection from the shared chat
-// store (conversation writes, this panel reads — the cross-registration
-// share the store seat exists for) and derives the call material from the
-// session snapshot — no data of its own.
+// DetailsPanel: a close button plus, for a call selection, the selected
+// call's args and result — args as JSON, the result raw except for a
+// terminal-card call, whose Output section is the command's terminal card;
+// for a file selection, the file's bounded text with a native-editor
+// hand-off. Reads the selection from the shared chat store (conversation
+// writes, this panel reads — the cross-registration share the store seat
+// exists for), derives the call material from the session snapshot, and
+// fetches file content per selection.
 
-import { Fragment } from 'react'
-import { CodeBlock } from '@shres-code/shres-code-client-ui-primitives'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { CodeBlock, ReadBlock } from '@shres-code/shres-code-client-ui-primitives'
 import { shallowEqual } from '@shres-code/shres-code-client-runtime/client'
 import type { ConversationSnapshot, RunningToolCall, ToolCallBlock, ToolResultNode } from '@shres-code/shres-code-client-runtime/client'
+import type { FileRead } from '@shres-code/shres-code-client-connection/client'
 import type { DetailsSlotProps } from '../contract/slots.ts'
+import type { CallSelectionTarget, FileSelectionTarget, SelectionTarget } from '../contract/views.ts'
 import { findToolCall } from '../chat/tool-node-reader.ts'
 import css from './DetailsPanel.module.css'
 
@@ -63,35 +66,126 @@ function rawResultText(block: ToolCallBlock): string {
   return parts.join('\n')
 }
 
-export function DetailsPanel({ useSession, useSessions, sessionId, useStore, renderSlot, closeDetails, t }: DetailsPanelProps) {
+/** Whether the selection targets a tool call (the persisted pre-file shape included). */
+function isCallSelection(selection: SelectionTarget | null): selection is CallSelectionTarget {
+  return selection !== null && !isFileSelection(selection)
+}
+
+function isFileSelection(selection: SelectionTarget | null): selection is FileSelectionTarget {
+  return selection !== null && 'kind' in selection && selection.kind === 'file'
+}
+
+/** Grammar hint for the file extension; unknown extensions render plain. */
+const FILE_LANGS: Readonly<Record<string, string>> = {
+  ts: 'typescript', tsx: 'tsx', js: 'javascript', jsx: 'jsx', json: 'json', md: 'markdown',
+  css: 'css', html: 'html', yml: 'yaml', yaml: 'yaml', sh: 'shellscript', bash: 'shellscript',
+  py: 'python', rs: 'rust', go: 'go', java: 'java', c: 'c', cpp: 'cpp', rb: 'ruby',
+  swift: 'swift', kt: 'kotlin', toml: 'toml', sql: 'sql',
+}
+
+function langForPath(path: string): string | undefined {
+  const ext = path.split('.').at(-1)?.toLowerCase() ?? ''
+  return FILE_LANGS[ext]
+}
+
+/** Fetch state of one file read for the viewer branch. */
+type FileViewState =
+  | { phase: 'loading' }
+  | { phase: 'ok'; read: FileRead }
+  | { phase: 'failed'; message: string }
+
+export function DetailsPanel({
+  useSession, useSessions, sessionId, useStore, renderSlot, closeDetails, readFile, openNative, t,
+}: DetailsPanelProps) {
   const selection = useStore(s => s.selection)
+  const fileTarget = isFileSelection(selection) ? selection : null
+  const callTarget = isCallSelection(selection) ? selection : null
+  const callId = callTarget?.callId
+
   // Session workspace root: an omitted or relative terminal cwd resolves
   // against it, which the pure presenter cannot see.
   const sessionCwd = useSessions(list => list.byId[sessionId]?.cwd)
-  const callId = selection?.callId
-  // materialFor builds a fresh wrapper; shallowEqual short-circuits on its
-  // stable members (result node reference rides the snapshot's structural sharing).
   const material = useSession(
     s => (callId === undefined ? null : materialFor(s, callId)),
     (a, b) => shallowEqual(a, b))
+
+  // The injected readFile face is fetched through a ref so re-renders never
+  // retrigger the fetch; the selection's file path is the only effect key.
+  const readFileRef = useRef(readFile)
+  useEffect(() => {
+    readFileRef.current = readFile
+  })
+  const [fileState, setFileState] = useState<FileViewState>({ phase: 'loading' })
+  // The pane serves the read's own text with file-relative line numbers; the
+  // ReadBlock's head/tail collapse shapes long files the same way read cards do.
+  const fileLines = useMemo(
+    () => (fileState.phase === 'ok' && !fileState.read.binary
+      ? fileState.read.content.split('\n').map((text, index) => ({ number: index + 1, text }))
+      : []),
+    [fileState],
+  )
+  const filePath = fileTarget?.path
+  useEffect(() => {
+    if (filePath === undefined) return
+    let live = true
+    setFileState({ phase: 'loading' })
+    void readFileRef.current(filePath).then(
+      (read) => { if (live) setFileState({ phase: 'ok', read }) },
+      (error: unknown) => {
+        if (live) setFileState({ phase: 'failed', message: error instanceof Error ? error.message : String(error) })
+      },
+    )
+    return () => { live = false }
+  }, [filePath])
 
   return (
     <div className={css.root}>
       <div className={css.header}>
         <div className={css.title}>
-          {selection === null ? t('details.title') : material?.name ?? selection.toolName ?? t('details.title')}
+          {fileTarget !== null
+            ? fileTarget.path.split('/').filter(Boolean).at(-1) ?? fileTarget.path
+            : callTarget === null ? t('details.title') : material?.name ?? callTarget.toolName ?? t('details.title')}
         </div>
-        <button
-          type="button" className={css.close} aria-label={t('details.close')}
-          onClick={() => { closeDetails() }}
-        >
-          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden>
-            <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-        </button>
+        <div className={css.actions}>
+          {fileTarget !== null && (
+            <button
+              type="button" className={css.nativeBtn}
+              onClick={() => { openNative(fileTarget.path) }}
+            >
+              {t('details.openNative')}
+            </button>
+          )}
+          <button
+            type="button" className={css.close} aria-label={t('details.close')}
+            onClick={() => { closeDetails() }}
+          >
+            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden>
+              <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
       </div>
       <div className={css.body}>
-        {selection === null || callId === undefined
+        {fileTarget !== null ? (
+          fileState.phase === 'loading'
+            ? <div className={css.empty}>{t('details.fileLoading')}</div>
+            : fileState.phase === 'failed'
+              ? <div className={css.empty}>{t('details.fileLoadFailed', { message: fileState.message })}</div>
+              : fileState.read.binary
+                ? <div className={css.empty}>{t('details.fileBinary')}</div>
+                : fileState.read.content === ''
+                  ? <div className={css.empty}>{t('details.fileEmpty')}</div>
+                  : (
+                    <section className={css.section}>
+                      <div className={css.sectionLabel}>{t('details.file')}</div>
+                      {fileState.read.truncated && <div className={css.note}>{t('details.fileTruncated')}</div>}
+                      <ReadBlock
+                        label={fileTarget.path} lines={fileLines} totalLines={fileLines.length}
+                        lang={langForPath(filePath ?? '')} maxLines={64}
+                      />
+                    </section>
+                  )
+        ) : selection === null || callId === undefined
           ? <div className={css.empty}>{t('details.empty')}</div>
           : material === null
             ? <div className={css.empty}>{t('details.notInWindow')}</div>

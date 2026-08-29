@@ -1,7 +1,7 @@
 /** Test-owned workspaces face: the renderer standard-kit observable plus recorded actions. */
 import { createSnapshotStore } from '@shres-code/shres-code-client-runtime/client'
 import type {
-  DirectoryListing, IWorkspaces, SessionId, SnapshotStore, WorkspaceId, WorkspaceListState, WorkspaceView,
+  DirectoryListing, FileRead, IWorkspaces, SessionId, SnapshotStore, WorkspaceId, WorkspaceListState, WorkspaceView,
 } from '@shres-code/shres-code-client-runtime/client'
 import { workspaceListState } from './fixtures.ts'
 import type { Stabilizer } from './fixtures.ts'
@@ -95,6 +95,18 @@ export class TestWorkspaces implements IWorkspaces {
   async openPath(path: string): Promise<void> {
     this.calls.push({ method: 'openPath', args: [path] })
     await (this.stubs.get('openPath')?.(path) as Promise<void> | undefined)
+  }
+
+  /**
+   * Read one workspace file (recorded). The default serves empty text;
+   * stub to shape content or failure.
+   * @param path - host-resolvable file path.
+   */
+  async readFile(path: string, _signal?: AbortSignal): Promise<FileRead> {
+    this.calls.push({ method: 'readFile', args: [path] })
+    const stub = this.stubs.get('readFile')
+    if (stub !== undefined) return await (stub(path) as Promise<FileRead>)
+    return { content: '', truncated: false, binary: false, sizeBytes: 0 }
   }
 
   /**

@@ -16,7 +16,7 @@ import { Context, Service } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
 import type {} from '@shres-code/shres-code-agent-default-model'
 import type { ApiProxy } from './api/index.ts'
-import { createApiProxy, DEFAULT_COLD_BLANK_PROBE_MAX_BYTES } from './api-proxy.ts'
+import { createApiProxy, DEFAULT_COLD_BLANK_PROBE_MAX_BYTES, DEFAULT_FILE_VIEW_MAX_BYTES } from './api-proxy.ts'
 import {
   DEFAULT_SESSION_LOG_COMPRESSION_LEVEL,
   type SessionLogCompressionLevel,
@@ -59,6 +59,12 @@ export interface Config {
    * @default 1024
    */
   coldBlankProbeMaxBytes?: number
+  /**
+   * Maximum bytes the in-app file viewer serves for one `host.readFile`
+   * call; a larger file answers its leading slice with `truncated: true`.
+   * @default 524288
+   */
+  fileViewMaxBytes?: number
 }
 
 /**
@@ -77,6 +83,7 @@ export class ApiProxyService extends Service implements ApiProxy {
     sessionExportCompressionLevel: z.number().step(1).min(0).max(9)
       .default(DEFAULT_SESSION_LOG_COMPRESSION_LEVEL) as z<SessionLogCompressionLevel>,
     coldBlankProbeMaxBytes: z.natural().default(DEFAULT_COLD_BLANK_PROBE_MAX_BYTES),
+    fileViewMaxBytes: z.natural().default(DEFAULT_FILE_VIEW_MAX_BYTES),
   })
 
   readonly sessions: ApiProxy['sessions']
@@ -106,6 +113,9 @@ export class ApiProxyService extends Service implements ApiProxy {
       ...(config.coldBlankProbeMaxBytes === undefined
         ? {}
         : { coldBlankProbeMaxBytes: config.coldBlankProbeMaxBytes }),
+      ...(config.fileViewMaxBytes === undefined
+        ? {}
+        : { fileViewMaxBytes: config.fileViewMaxBytes }),
     })
     this.sessions = api.sessions
     this.subagents = api.subagents

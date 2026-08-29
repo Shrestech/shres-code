@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, realpathSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
@@ -16,7 +16,7 @@ import WorkspaceRegistry from '@shres-code/shres-code-workspace'
 import type { HostFrame, WorkspaceId } from '@shres-code/shres-code-host-apiproxy/api'
 import type { RpcRequest, RpcResponse } from '@shres-code/shres-code-host-apiproxy/api/rpc'
 import { RpcId } from '@shres-code/shres-code-host-apiproxy/api/rpc'
-import { createApiProxy } from '@shres-code/shres-code-host-apiproxy'
+import ApiProxyService, { createApiProxy } from '@shres-code/shres-code-host-apiproxy'
 import { MemoryStorageBackend } from '../../../storage/storage-domain/tests/helpers/memory-backend.ts'
 
 let nextRpc = 1
@@ -64,6 +64,7 @@ async function harness(
   extras: {
     openPath?: (path: string, signal: AbortSignal) => Promise<void>
     canOpenPath?: () => boolean
+    fileViewMaxBytes?: number
   } = {},
 ) {
   const ctx = new Context()
@@ -107,6 +108,7 @@ async function harness(
     cwd: root,
     ...extras.openPath === undefined ? {} : { openPath: extras.openPath },
     ...extras.canOpenPath === undefined ? {} : { canOpenPath: extras.canOpenPath },
+    ...extras.fileViewMaxBytes === undefined ? {} : { fileViewMaxBytes: extras.fileViewMaxBytes },
   })
   return { api, ctx, storageDomain, root }
 }
@@ -566,5 +568,83 @@ describe('Host Workspace increments', () => {
       error: { code: 'session-not-found', details: { sessionId: 'session-ghost' } },
     })
     abort.abort()
+  })
+})
+
+describe('host.readFile', () => {
+  it('reads a file inside the host project cwd with size and shape metadata', async () => {
+    const { api, root } = await harness()
+    writeFileSync(join(root, 'demo.ts'), 'export const n = 1\n')
+    const read = expectOk(await api.host.readFile(request({ path: join(root, 'demo.ts') }), new AbortController().signal))
+    expect(read).toEqual({ content: 'export const n = 1\n', truncated: false, binary: false, sizeBytes: 19 })
+  })
+
+  it('reads inside a registered Workspace other than the host cwd', async () => {
+    const { api, ctx } = await harness()
+    const other = realpathSync.native(mkdtempSync(join(tmpdir(), 'shres-apiproxy-viewer-')))
+    writeFileSync(join(other, 'inside.md'), 'hello\n')
+    await ctx.workspaceRegistry.create(other)
+    const read = expectOk(await api.host.readFile(request({ path: join(other, 'inside.md') }), new AbortController().signal))
+    expect(read.content).toBe('hello\n')
+  })
+
+  it('refuses paths outside every root, including through an inside symlink', async () => {
+    const { api, root } = await harness()
+    const outside = realpathSync.native(mkdtempSync(join(tmpdir(), 'shres-apiproxy-outside-')))
+    const outsideFile = join(outside, 'secret.txt')
+    writeFileSync(outsideFile, 'top secret\n')
+
+    const denied = await api.host.readFile(request({ path: outsideFile }), new AbortController().signal)
+    expect(denied.result).toMatchObject({ ok: false, error: { code: 'file-outside-workspace', details: { path: outsideFile } } })
+
+    // A symlink inside the workspace is judged by its real target, not its
+    // cosmetic inside-the-root spelling.
+    const escaped = join(root, 'backdoor.txt')
+    symlinkSync(outsideFile, escaped)
+    const viaLink = await api.host.readFile(request({ path: escaped }), new AbortController().signal)
+    expect(viaLink.result).toMatchObject({ ok: false, error: { code: 'file-outside-workspace', details: { path: outsideFile } } })
+  })
+
+  it('reports missing files and directories as unreadable', async () => {
+    const { api, root } = await harness()
+    const missing = await api.host.readFile(request({ path: join(root, 'nope.md') }), new AbortController().signal)
+    expect(missing.result).toMatchObject({ ok: false, error: { code: 'file-unreadable' } })
+    const isDir = await api.host.readFile(request({ path: root }), new AbortController().signal)
+    expect(isDir.result).toMatchObject({ ok: false, error: { code: 'file-unreadable' } })
+  })
+
+  it('flags NUL-bearing leading bytes as binary instead of serving text', async () => {
+    const { api, root } = await harness()
+    const blob = join(root, 'blob.bin')
+    writeFileSync(blob, Buffer.from([0x64, 0x00, 0x65, 0x66]), 'binary')
+    const read = expectOk(await api.host.readFile(request({ path: blob }), new AbortController().signal))
+    expect(read).toEqual({ content: '', truncated: false, binary: true, sizeBytes: 4 })
+  })
+
+  it('answers a cancelled request before reading', async () => {
+    const { api, root } = await harness()
+    writeFileSync(join(root, 'demo.ts'), 'export const n = 1\n')
+    const abort = new AbortController()
+    abort.abort()
+    const read = await api.host.readFile(request({ path: join(root, 'demo.ts') }), abort.signal)
+    expect(read.result).toMatchObject({ ok: false, error: { code: 'cancelled' } })
+  })
+
+  it('rejects non-natural caps in Config', () => {
+    for (const value of [-1, 1.5]) {
+      expect(() => ApiProxyService.Config({ fileViewMaxBytes: value } as never)).toThrow()
+    }
+  })
+
+  it('truncates oversized files at the configured cap and keeps the physical size', async () => {
+    const { api, root } = await harness(undefined, undefined, { fileViewMaxBytes: 5 })
+    writeFileSync(join(root, 'big.md'), 'abcdefghij')
+    const read = expectOk(await api.host.readFile(request({ path: join(root, 'big.md') }), new AbortController().signal))
+    expect(read).toEqual({ content: 'abcde', truncated: true, binary: false, sizeBytes: 10 })
+    // Exactly at the cap: fully served, not truncated.
+    writeFileSync(join(root, 'five.md'), '12345')
+    const exact = expectOk(await api.host.readFile(request({ path: join(root, 'five.md') }), new AbortController().signal))
+    expect(exact.truncated).toBe(false)
+    expect(exact.content).toBe('12345')
   })
 })

@@ -239,6 +239,8 @@ describe('DetailsPanel web Output section', () => {
         useStore={bindSnapshotSelector(chat)}
         actions={chat.actions}
         closeDetails={vi.fn()}
+        readFile={() => Promise.resolve({ content: '', truncated: false, binary: false, sizeBytes: 0 })}
+        openNative={() => {}}
         t={t}
       />,
     )
