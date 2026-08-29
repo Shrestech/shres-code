@@ -5492,9 +5492,6 @@ importers:
 
   packages/host/remote-control:
     dependencies:
-      '@shres-code/shres-code-typert-protocol':
-        specifier: workspace:^
-        version: link:../../typert/protocol
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -5514,6 +5511,9 @@ importers:
       '@shres-code/shres-code-invariants':
         specifier: workspace:^
         version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-typert-protocol':
+        specifier: workspace:^
+        version: link:../../typert/protocol
 
   packages/host/webserver:
     dependencies:
