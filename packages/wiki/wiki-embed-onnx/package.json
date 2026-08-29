@@ -38,7 +38,7 @@
     "@shres-code/cordis": "workspace:^"
   },
   "dependencies": {
-    "@huggingface/transformers": "^3.7.2",
+    "@huggingface/transformers": "^4.2.0",
     "@shres-code/schemastery": "workspace:^"
   },
   "devDependencies": {

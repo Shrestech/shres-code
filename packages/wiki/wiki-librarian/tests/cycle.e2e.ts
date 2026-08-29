@@ -5,7 +5,7 @@
 
 import { mkdtemp, readdir, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join, relative, sep } from 'node:path'
+import { join, sep } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@shres-code/cordis'
 import LlmRuntime, { createUserMessage } from '@shres-code/shres-code-llm'
@@ -37,21 +37,20 @@ afterEach(async () => {
  * @returns posix-relative paths of non-empty page or log files.
  */
 async function materialWikiFiles(root: string): Promise<string[]> {
-  let entries: Awaited<ReturnType<typeof readdir>>
+  let entries: string[]
   try {
-    entries = await readdir(root, { recursive: true, withFileTypes: true })
+    entries = await readdir(root, { recursive: true })
   } catch {
     // The wiki directory is created on the first write; an empty cycle leaves none.
     return []
   }
   const found: string[] = []
   for (const entry of entries) {
-    if (!entry.isFile() || !entry.name.endsWith('.md')) continue
-    const abs = join(entry.parentPath, entry.name)
-    const rel = relative(root, abs).split(sep).join('/')
+    if (!entry.endsWith('.md')) continue
+    const rel = entry.split(sep).join('/')
     if (rel === 'index.md') continue
-    const info = await stat(abs)
-    if (info.size > 0) found.push(rel)
+    const info = await stat(join(root, entry))
+    if (info.isFile() && info.size > 0) found.push(rel)
   }
   return found
 }
