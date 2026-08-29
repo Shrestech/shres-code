@@ -42,7 +42,7 @@
     "@shres-code/cordis": "workspace:^"
   },
   "dependencies": {
-    "koffi": "^3.1.0"
+    "koffi": "^3.1.2"
   },
   "devDependencies": {
     "@shres-code/shres-code-invariants": "workspace:^",

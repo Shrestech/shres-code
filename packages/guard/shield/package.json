@@ -53,21 +53,22 @@
     "zod": "^4.4.3"
   },
   "peerDependencies": {
+    "@shres-code/cordis": "workspace:^",
     "@shres-code/shres-code-invariants": "workspace:^",
     "@shres-code/shres-code-session": "workspace:^",
     "@shres-code/shres-code-settings": "workspace:^",
     "@shres-code/shres-code-system-prompt": "workspace:^",
     "@shres-code/shres-code-tools": "workspace:^",
-    "@shres-code/shres-code-typert-protocol": "workspace:^",
-    "@shres-code/cordis": "workspace:^"
+    "@shres-code/shres-code-typert-protocol": "workspace:^"
   },
   "devDependencies": {
+    "@shres-code/cordis": "workspace:^",
     "@shres-code/shres-code-invariants": "workspace:^",
     "@shres-code/shres-code-session": "workspace:^",
     "@shres-code/shres-code-settings": "workspace:^",
     "@shres-code/shres-code-system-prompt": "workspace:^",
     "@shres-code/shres-code-tools": "workspace:^",
     "@shres-code/shres-code-typert-protocol": "workspace:^",
-    "@shres-code/cordis": "workspace:^"
+    "@shrestech/shres-shield-plugin": "0.2.0"
   }
 }

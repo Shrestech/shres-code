@@ -26,13 +26,14 @@ import * as ShieldSeat from '@shres-code/shres-code-shield'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 /**
- * The sibling checkout's built plugin dist, resolved the same way the seat's
- * developer-entitlement path does (`../shres-shield/packages/plugin/dist/index.js`
- * from the shres-code repo root).
+ * The published `@shrestech/shres-shield-plugin` payload's ESM entry, resolved
+ * from the installed devDependency so the e2e suite exercises the real engine
+ * without depending on a local `../shres-shield` checkout.
  */
-export const REAL_PLUGIN_MODULE = ShieldSeat.siblingPluginPath()
+export const REAL_PLUGIN_MODULE = fileURLToPath(import.meta.resolve('@shrestech/shres-shield-plugin'))
 
 /** Model-visible quarantine prefix the post-execute seam writes on a block. */
 export const REVIEW_VOICE = '[shres-shield:REVIEW]'

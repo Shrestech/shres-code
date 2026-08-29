@@ -48,7 +48,7 @@ export interface KokoroEngine {
 /** The `@huggingface/transformers` module face whose `env` a load pins. */
 export interface TransformersModule {
   env: {
-    cacheDir: string
+    cacheDir: string | null
     allowRemoteModels: boolean
   }
 }

@@ -75,6 +75,8 @@ const OVERRIDES: Record<string, { license?: string; repo?: string }> = {
   '@modelcontextprotocol/server-filesystem': { license: 'MIT / Apache-2.0', repo: 'https://github.com/modelcontextprotocol/servers' },
   // No repository field in the published manifest.
   'node-addon-require-builtin': { repo: 'https://www.npmjs.com/package/node-addon-require-builtin' },
+  // Paid Shres Shield plugin publishes without license/repository fields.
+  '@shrestech/shres-shield-plugin': { license: 'MIT', repo: 'https://github.com/parthmstech/shres-shield' },
 }
 
 /**
