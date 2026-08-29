@@ -18,19 +18,19 @@ The seam follows the [capability seam](../../../docs/glossary.md#capability-seam
 
 | Member | Semantics |
 |---|---|
-| `read(path)` | Return one parsed page, or `undefined`. Does not bump `touched`. |
-| `list(filter)` | Temperature-ranked pages. Archive is omitted unless `includeArchive`. |
-| `search(query, options)` | BM25 plus optional cosine mix-in; HOT ranks above COLD. Archive omitted by default. |
-| `similar(path)` | Dedup/link shortlist against one seed page. |
+| `read(session, path)` | Return one parsed page, or `undefined`. Does not bump `touched`. |
+| `list(session, filter)` | Temperature-ranked pages. Archive is omitted unless `includeArchive`. |
+| `search(session, query, options)` | BM25 plus optional cosine mix-in; HOT ranks above COLD. Archive omitted by default. |
+| `similar(session, path)` | Dedup/link shortlist against one seed page. |
 | `writePage(session, request)` | Validate, persist, log `wiki/page`, regenerate `index.md`, demote COLD-past-`demoteDays` pages. |
-| `appendLog(session, request)` | Append to `log/YYYY-MM-DD.md` and log `wiki/page` with `op: 'log'`. |
+| `appendLog(session, request)` | Append one system-timestamped JSONL line (`ts`, `session`, `body`) to `log/DD-MM-YY.jsonl` and log `wiki/page` with `op: 'log'`. |
 | `touch(session, path)` | Read-path access bump. Tools call this; the model never sets `touched`. |
-| `lint()` | Orphans, dead links, missing freshness, index drift. Zero LLM tokens. |
+| `lint(session)` | Orphans, dead links, missing freshness, index drift. Zero LLM tokens. |
 | `reindex(session?)` | Rebuild `index.md` and demote. |
 | `registerEmbeddings(provider)` | Optional mix-in; dispose falls back to BM25. |
 | `status` / `watch` | Seat remount. `enabled: false` sets `active: false`. |
 
-Providers implement `persistPage`, `persistTouch`, `persistLog`, `persistDemote`, `persistIndex`, `loadPages`, `loadIndex`, and `hasPage`. The seam's concrete methods own defaulting, ranking, lint, and event logging so those never vary by provider.
+Store-touching members take the owning session and pass its recorded `cwd` to the provider hooks (`persistPage`, `persistTouch`, `persistLog`, `persistDemote`, `persistIndex`, `loadPages`, `loadIndex`, plus `projectConfigOf`), so each session resolves its own repository's wiki; sessions without a recorded `cwd` fall back to the provider default. `hasPage` spans every materialized store root. The seam's concrete methods own defaulting, ranking, lint, and event logging so those never vary by provider.
 
 ## Request/spec split
 

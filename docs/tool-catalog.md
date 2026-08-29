@@ -2788,7 +2788,7 @@ ledger_record_decision and ledger_query record decisions whose cited run ids mus
 
 ### `wiki_log`
 
-Append a short note to the wiki day log (log/YYYY-MM-DD.md). Use for session traces that should not become knowledge pages.
+Append a short note to the wiki day log (a JSONL day shard). Use for session traces that should not become knowledge pages. The system timestamps every entry and picks the day shard itself, so never include a date or time in the body.
 
 ```json
 {
@@ -2796,7 +2796,7 @@ Append a short note to the wiki day log (log/YYYY-MM-DD.md). Use for session tra
   "properties": {
     "body": {
       "type": "string",
-      "description": "Markdown to append to today's shard."
+      "description": "Text to append. Never include a date or time; the system stamps every entry."
     }
   },
   "required": [

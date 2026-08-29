@@ -73,6 +73,8 @@ describe('tool-wiki', () => {
     const on = await setup(true)
     const names = on.ctx.tools.schemas().map(schema => schema.name).sort()
     expect(names).toEqual(['wiki_log', 'wiki_read', 'wiki_search', 'wiki_write'])
+    const logSchema = on.ctx.tools.schemas().find(schema => schema.name === 'wiki_log')
+    expect(logSchema?.description).toMatch('never include a date or time')
     expect(on.ctx.tools.get('wiki_search')?.presentCall?.({ query: 'q' })).toMatchObject({
       title: 'Search wiki: q', kind: 'search',
     })

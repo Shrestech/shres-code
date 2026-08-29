@@ -22,11 +22,11 @@ class MemoryWiki extends WikiService {
   index = ''
   project: WikiProjectConfig = {}
 
-  override projectConfig(): WikiProjectConfig {
+  override async projectConfigOf(_projectCwd: string | undefined): Promise<WikiProjectConfig> {
     return this.project
   }
 
-  async persistPage(spec: WikiWriteSpec, nowMs: number): Promise<WikiPage> {
+  override async persistPage(_projectCwd: string | undefined, spec: WikiWriteSpec, nowMs: number): Promise<WikiPage> {
     const existing = this.pages.get(spec.path)
     const archived = spec.path.startsWith('archive/')
     const nowIso = new Date(nowMs).toISOString()
@@ -41,7 +41,7 @@ class MemoryWiki extends WikiService {
     return page
   }
 
-  async persistTouch(path: string, nowMs: number): Promise<WikiPage> {
+  override async persistTouch(_projectCwd: string | undefined, path: string, nowMs: number): Promise<WikiPage> {
     const existing = this.pages.get(path)
     if (existing === undefined) throw new WikiError(`missing ${path}`, 'not-found')
     const page: WikiPage = {
@@ -52,7 +52,7 @@ class MemoryWiki extends WikiService {
     return page
   }
 
-  async persistLog(spec: WikiLogSpec, nowMs: number): Promise<string> {
+  override async persistLog(_projectCwd: string | undefined, spec: WikiLogSpec, nowMs: number): Promise<string> {
     const path = logPathOf(nowMs)
     const existing = this.pages.get(path)
     const body = existing === undefined ? spec.body : `${existing.body}\n${spec.body}`
@@ -65,7 +65,7 @@ class MemoryWiki extends WikiService {
     return path
   }
 
-  async persistDemote(path: string, nowMs: number): Promise<void> {
+  override async persistDemote(_projectCwd: string | undefined, path: string, nowMs: number): Promise<void> {
     const existing = this.pages.get(path)
     if (existing === undefined) return
     this.pages.delete(path)
@@ -81,15 +81,15 @@ class MemoryWiki extends WikiService {
     })
   }
 
-  async persistIndex(markdown: string): Promise<void> {
+  override async persistIndex(_projectCwd: string | undefined, markdown: string): Promise<void> {
     this.index = markdown
   }
 
-  async loadPages(includeArchive: boolean): Promise<WikiPage[]> {
+  override async loadPages(_projectCwd: string | undefined, includeArchive: boolean): Promise<WikiPage[]> {
     return [...this.pages.values()].filter(page => includeArchive || !page.path.startsWith('archive/'))
   }
 
-  async loadIndex(): Promise<string> {
+  override async loadIndex(_projectCwd: string | undefined): Promise<string> {
     return this.index
   }
 
@@ -165,7 +165,7 @@ describe('WikiService write/read/list/touch/log', () => {
   it('appends a log shard and refuses a blank body', async () => {
     const { wiki, session } = await mount()
     const result = await wiki.appendLog(session, { body: 'shipped card' }, NOW)
-    expect(result).toEqual({ kind: 'appended', path: 'log/2026-08-29.md' })
+    expect(result).toEqual({ kind: 'appended', path: logPathOf(NOW) })
     expect(session.events.some(event => event.type === 'wiki/page' && event.data.op === 'log')).toBe(true)
     const second = await wiki.appendLog(session, { body: 'again' }, NOW)
     expect(second.kind).toBe('appended')
@@ -203,7 +203,7 @@ describe('WikiService write/read/list/touch/log', () => {
       body: 'archived',
       frontmatter: { created: COLD, updated: COLD, touched: COLD, status: 'archived' },
     })
-    const listed = await wiki.list({}, NOW)
+    const listed = await wiki.list(session, {}, NOW)
     wiki.pages.set('hot-b.md', {
       path: 'hot-b.md',
       title: 'Hot B',
@@ -217,13 +217,13 @@ describe('WikiService write/read/list/touch/log', () => {
       frontmatter: { created: HOT, updated: HOT, touched: HOT, status: 'archived' },
     })
     expect(listed.map(page => page.path)).toEqual(['hot.md', 'cold.md'])
-    expect((await wiki.list({}, NOW)).map(page => page.path)).toEqual(['hot-b.md', 'hot.md', 'cold.md'])
-    expect((await wiki.list({ temperature: 'HOT' }, NOW)).map(page => page.path)).toEqual(['hot-b.md', 'hot.md'])
-    expect((await wiki.list({ substring: 'zzzz' }, NOW))).toEqual([])
-    expect((await wiki.list({ includeArchive: true, substring: 'archive/old' }, NOW)).map(page => page.path))
+    expect((await wiki.list(session, {}, NOW)).map(page => page.path)).toEqual(['hot-b.md', 'hot.md', 'cold.md'])
+    expect((await wiki.list(session, { temperature: 'HOT' }, NOW)).map(page => page.path)).toEqual(['hot-b.md', 'hot.md'])
+    expect((await wiki.list(session, { substring: 'zzzz' }, NOW))).toEqual([])
+    expect((await wiki.list(session, { includeArchive: true, substring: 'archive/old' }, NOW)).map(page => page.path))
       .toEqual(['archive/old.md'])
-    expect(await wiki.read('hot.md')).toMatchObject({ path: 'hot.md' })
-    expect(await wiki.read('nope.md')).toBeUndefined()
+    expect(await wiki.read(session, 'hot.md')).toMatchObject({ path: 'hot.md' })
+    expect(await wiki.read(session, 'nope.md')).toBeUndefined()
   })
 })
 
@@ -243,10 +243,10 @@ describe('WikiService search / similar / embeddings', () => {
       body: 'gradient descent language',
       frontmatter: { created: COLD, updated: COLD, touched: COLD, status: 'archived' },
     })
-    const hits = await wiki.search('language', { limit: 10 }, NOW)
+    const hits = await wiki.search(session, 'language', { limit: 10 }, NOW)
     expect(hits[0]?.path).toBe('hot.md')
     expect(hits.some(hit => hit.path.startsWith('archive/'))).toBe(false)
-    const archived = await wiki.search('language', { includeArchive: true }, NOW)
+    const archived = await wiki.search(session, 'language', { includeArchive: true }, NOW)
     expect(archived.some(hit => hit.path === 'archive/x.md')).toBe(true)
   })
 
@@ -267,11 +267,11 @@ describe('WikiService search / similar / embeddings', () => {
     }
     const stop = wiki.registerEmbeddings(provider)
     expect(wiki.embeddingsProvider()).toBe(provider)
-    const hits = await wiki.search('alpha', {}, NOW)
+    const hits = await wiki.search(session, 'alpha', {}, NOW)
     expect(hits[0]?.path).toBe('a.md')
-    const similar = await wiki.similar('a.md', 5, NOW)
+    const similar = await wiki.similar(session, 'a.md', 5, NOW)
     expect(similar.every(hit => hit.path !== 'a.md')).toBe(true)
-    expect(await wiki.similar('missing.md', 5, NOW)).toEqual([])
+    expect(await wiki.similar(session, 'missing.md', 5, NOW)).toEqual([])
     const replacement: WikiEmbeddings = {
       available: () => true,
       embed: async texts => texts.map(() => [0, 1]),
@@ -282,7 +282,7 @@ describe('WikiService search / similar / embeddings', () => {
     expect(wiki.embeddingsProvider()).toBe(replacement)
     wiki.registerEmbeddings(replacement)()
     expect(wiki.embeddingsProvider()).toBeUndefined()
-    const lexical = await wiki.search('alpha', {}, NOW)
+    const lexical = await wiki.search(session, 'alpha', {}, NOW)
     expect(lexical[0]?.path).toBe('a.md')
   })
 
@@ -295,7 +295,7 @@ describe('WikiService search / similar / embeddings', () => {
         throw new Error('must not load')
       },
     })
-    await expect(wiki.search('alpha', {}, NOW)).resolves.toMatchObject([{ path: 'a.md' }])
+    await expect(wiki.search(session, 'alpha', {}, NOW)).resolves.toMatchObject([{ path: 'a.md' }])
   })
 
   it('skips a cosine mix-in when the query vector is missing', async () => {
@@ -305,9 +305,9 @@ describe('WikiService search / similar / embeddings', () => {
       available: () => true,
       embed: async () => [],
     })
-    const hits = await wiki.search('alpha', {}, NOW)
+    const hits = await wiki.search(session, 'alpha', {}, NOW)
     expect(hits[0]?.path).toBe('a.md')
-    expect((await wiki.search(' ', {}, NOW)).some(hit => hit.path === 'a.md')).toBe(true)
+    expect((await wiki.search(session, ' ', {}, NOW)).some(hit => hit.path === 'a.md')).toBe(true)
   })
 })
 
@@ -321,13 +321,13 @@ describe('WikiService lint / reindex / demotion / settings', () => {
       body: 'see [live](live.md)',
       frontmatter: { created: COLD, updated: COLD, touched: COLD, status: 'active' },
     })
-    const before = await wiki.lint()
+    const before = await wiki.lint(session)
     expect(before.some(issue => issue.code === 'index-missing' && issue.path === 'stale.md')).toBe(true)
     await wiki.reindex(session, NOW)
     expect(wiki.hasPage('stale.md')).toBe(false)
     expect(wiki.hasPage('archive/stale.md')).toBe(true)
     expect(session.events.some(event => event.type === 'wiki/page' && event.data.op === 'archive')).toBe(true)
-    const after = await wiki.lint()
+    const after = await wiki.lint(session)
     expect(after.some(issue => issue.path === 'stale.md')).toBe(false)
   })
 
@@ -337,9 +337,9 @@ describe('WikiService lint / reindex / demotion / settings', () => {
     const stop = wiki.watch((status) => { seen.push(status.reason) })
     expect(seen).toEqual(['active'])
     expect(wiki.settingsLibrarian()).toBeUndefined()
-    expect(wiki.engineConfig.hotDays).toBe(7)
+    expect((await wiki.engineConfig()).hotDays).toBe(7)
     wiki.project = { hotDays: 3, warmDays: 10, demoteDays: 20 }
-    expect(wiki.engineConfig.hotDays).toBe(3)
+    expect((await wiki.engineConfig()).hotDays).toBe(3)
     stop()
     wiki.watch(() => {})()
   })
@@ -352,7 +352,7 @@ describe('WikiService lint / reindex / demotion / settings', () => {
   })
 
   it('ranks WARM between HOT and COLD and demotes without a session log', async () => {
-    const { wiki } = await mount()
+    const { wiki, session } = await mount()
     const warm = new Date(NOW - 8 * 86_400_000).toISOString()
     wiki.pages.set('warm.md', {
       path: 'warm.md',
@@ -372,7 +372,7 @@ describe('WikiService lint / reindex / demotion / settings', () => {
       body: 'see [warm](warm.md)',
       frontmatter: { created: COLD, updated: COLD, touched: COLD, status: 'active' },
     })
-    expect((await wiki.list({}, NOW)).map(page => page.path)).toEqual(['warm.md', 'stale.md'])
+    expect((await wiki.list(session, {}, NOW)).map(page => page.path)).toEqual(['warm.md', 'stale.md'])
     await wiki.reindex(undefined, NOW)
     expect(wiki.hasPage('archive/stale.md')).toBe(true)
     expect(wiki.hasPage('stale.md')).toBe(false)

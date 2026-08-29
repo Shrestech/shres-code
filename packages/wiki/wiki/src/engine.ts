@@ -392,19 +392,24 @@ export function generateIndex(
 }
 
 /**
- * UTC calendar date `YYYY-MM-DD` for a millisecond timestamp.
+ * Local calendar date `DD-MM-YY` for a millisecond timestamp. The shard name
+ * follows the machine's local day, so the file rolls at local midnight.
  * @param nowMs - clock.
- * @returns the UTC date stamp used as a log shard name.
+ * @returns the local date stamp used as a log shard name.
  */
-export function utcDateStamp(nowMs: number): string {
-  return new Date(nowMs).toISOString().slice(0, 10)
+export function localDateStamp(nowMs: number): string {
+  const date = new Date(nowMs)
+  const day = String(date.getDate()).padStart(2, '0')
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const year = String(date.getFullYear() % 100).padStart(2, '0')
+  return `${day}-${month}-${year}`
 }
 
 /**
- * Wiki-relative path of the day-sharded log file.
+ * Wiki-relative path of the day-sharded JSONL log file.
  * @param nowMs - clock.
- * @returns `log/YYYY-MM-DD.md`.
+ * @returns `log/DD-MM-YY.jsonl`.
  */
 export function logPathOf(nowMs: number): string {
-  return `log/${utcDateStamp(nowMs)}.md`
+  return `log/${localDateStamp(nowMs)}.jsonl`
 }

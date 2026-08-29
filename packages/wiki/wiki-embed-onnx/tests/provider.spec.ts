@@ -21,7 +21,7 @@ class MemoryWiki extends WikiService {
   pages = new Map<string, WikiPage>()
   index = ''
 
-  async persistPage(spec: WikiWriteSpec, nowMs: number): Promise<WikiPage> {
+  override async persistPage(_projectCwd: string | undefined, spec: WikiWriteSpec, nowMs: number): Promise<WikiPage> {
     const nowIso = new Date(nowMs).toISOString()
     const frontmatter: WikiFrontmatter = {
       created: nowIso,
@@ -36,7 +36,7 @@ class MemoryWiki extends WikiService {
     return page
   }
 
-  async persistTouch(path: string, nowMs: number): Promise<WikiPage> {
+  override async persistTouch(_projectCwd: string | undefined, path: string, nowMs: number): Promise<WikiPage> {
     const existing = this.pages.get(path)
     if (existing === undefined) throw new Error(path)
     const page: WikiPage = {
@@ -47,7 +47,7 @@ class MemoryWiki extends WikiService {
     return page
   }
 
-  async persistLog(spec: WikiLogSpec, nowMs: number): Promise<string> {
+  override async persistLog(_projectCwd: string | undefined, spec: WikiLogSpec, nowMs: number): Promise<string> {
     const path = `log/${new Date(nowMs).toISOString().slice(0, 10)}.md`
     this.pages.set(path, {
       path,
@@ -63,11 +63,12 @@ class MemoryWiki extends WikiService {
     return path
   }
 
-  async persistDemote(): Promise<void> {}
-  async persistIndex(markdown: string): Promise<void> { this.index = markdown }
-  async loadPages(): Promise<WikiPage[]> { return [...this.pages.values()] }
-  async loadIndex(): Promise<string> { return this.index }
-  hasPage(path: string): boolean { return this.pages.has(path) }
+  override async persistDemote(): Promise<void> {}
+  override async persistIndex(_projectCwd: string | undefined, markdown: string): Promise<void> { this.index = markdown }
+  override async loadPages(): Promise<WikiPage[]> { return [...this.pages.values()] }
+  override async loadIndex(_projectCwd: string | undefined): Promise<string> { return this.index }
+  override hasPage(path: string): boolean { return this.pages.has(path) }
+  override async projectConfigOf(_projectCwd: string | undefined): Promise<Record<string, never>> { return {} }
 }
 
 const loadOk: WikiEmbedLoader = () => Promise.resolve(async (texts) => {

@@ -1,6 +1,6 @@
 # @shres-code/shres-code-wiki-filesystem
 
-Markdown Service Provider for `ctx.wiki`. Pages, the generated `index.md`, day-sharded `log/YYYY-MM-DD.md` files, `archive/`, and project `config.yaml` live at `<projectRoot>/.shres/wiki`. The directory is created on the first write — an enabled seat does not pollute a project that has never stored a page.
+Markdown Service Provider for `ctx.wiki`. Pages, the generated `index.md`, day-sharded `log/DD-MM-YY.jsonl` logs, `archive/`, and project `config.yaml` live at `<projectRoot>/.shres/wiki`, where projectRoot is the `.git`-walk root of the calling session's recorded `cwd` — one wiki per repository (an absolute `root` pins a single store). The directory is created on the first write — an enabled seat does not pollute a project that has never stored a page.
 
 Writes go through `@shres-code/shres-code-atomic-write`. A Chokidar watcher plus `fs/observed` invalidation keep the in-memory page cache coherent with host edits. `index.md` is regenerated after every write and is never a hand-edited source of truth.
 
@@ -21,8 +21,8 @@ Writes go through `@shres-code/shres-code-atomic-write`. A Chokidar watcher plus
 
 | Field | Default | Meaning |
 |---|---|---|
-| `root` | `.shres/wiki` | Wiki directory. Relative values resolve under the `.git`-walk project root of `cwd`. Absolute values are used as-is. Empty string fails at mount. |
-| `cwd` | `process.cwd()` | Origin of the `.git` walk when `root` is relative. |
+| `root` | `.shres/wiki` | Wiki directory. Relative values resolve under the `.git`-walk project root of each calling session's `cwd`. Absolute values pin one store for every session. Empty string fails at mount. |
+| `cwd` | `process.cwd()` | Origin of the `.git` walk when `root` is relative and the session has no recorded `cwd`. |
 | `watch` | `true` | Watch the materialized root for external edits. |
 
 Engine tunables (`enabled`, `hotDays`, `warmDays`, `demoteDays`, `indexMaxLines`, `roles`) are the Service Definition's Config, accepted here so a single plugin row configures the seat.
@@ -36,7 +36,7 @@ Project `config.yaml` overlays engine tunables and the librarian role for this r
   config.yaml      # optional project overlay
   index.md         # generated projection; do not edit
   <page>.md        # knowledge pages
-  log/YYYY-MM-DD.md
+  log/DD-MM-YY.jsonl # append-only lines: {"ts","session","body"}; machine-only
   archive/         # COLD-past-demoteDays pages; never deleted
 ```
 

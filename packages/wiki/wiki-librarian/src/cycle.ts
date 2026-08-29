@@ -133,7 +133,7 @@ export const LIBRARIAN_SYSTEM = [
   'pages is an array of {op, path, body, title?, tags?, contradicts?, superseded_by?} where op is create, update, or merge.',
   'Write durable knowledge only — no task trackers, no working-memory cards, no session chatter.',
   'Keep pages concise. Use contradicts and superseded_by for structural disagreement.',
-  'log is optional markdown to append to the day shard. summary is a one-line notice for the session.',
+  'log is optional plain text appended to the day log; the system timestamps every entry, so never include a date or time. summary is a one-line notice for the session.',
 ].join('\n')
 
 /**
@@ -207,7 +207,7 @@ export async function runLibrarianCycle(
   }
   const route = resolveLibrarianRoute(
     ctx.wiki.settings,
-    ctx.wiki.projectConfig(),
+    await ctx.wiki.projectConfig(session),
     {
       ...config.provider === undefined ? {} : { provider: config.provider },
       ...config.model === undefined ? {} : { model: config.model },
@@ -217,8 +217,8 @@ export async function runLibrarianCycle(
   if (route === undefined) {
     return { kind: 'dormant', detail: 'wiki librarian is unbound', paths: [] }
   }
-  const pages = await ctx.wiki.list({ includeArchive: false })
-  const lint = await ctx.wiki.lint()
+  const pages = await ctx.wiki.list(session, { includeArchive: false })
+  const lint = await ctx.wiki.lint(session)
   const events = session.events.slice(-config.maxLogEvents).map(event => ({
     type: event.type,
     data: event.data,

@@ -15,8 +15,8 @@ import {
   rankHits,
   shouldDemote,
   temperatureOf,
+  localDateStamp,
   tokenize,
-  utcDateStamp,
 } from '../src/engine.ts'
 import type { WikiEngineConfig } from '../src/resolve.ts'
 import type { WikiPage, WikiSearchHit } from '../src/types.ts'
@@ -195,8 +195,9 @@ describe('outboundLinks / lintPages / index', () => {
 })
 
 describe('log shards', () => {
-  it('names the UTC day shard', () => {
-    expect(utcDateStamp(NOW)).toBe('2026-08-29')
-    expect(logPathOf(NOW)).toBe('log/2026-08-29.md')
+  it('names the local day shard', () => {
+    process.env.TZ = 'UTC'
+    expect(localDateStamp(NOW)).toBe('29-08-26')
+    expect(logPathOf(NOW)).toBe('log/29-08-26.jsonl')
   })
 })

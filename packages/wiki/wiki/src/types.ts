@@ -77,15 +77,17 @@ export interface WikiWriteSpec {
   readonly superseded_by?: string
 }
 
-/** Caller's log-append REQUEST. */
+/** Caller's log-append REQUEST. The service owns all date and time fields. */
 export interface WikiLogRequest {
-  /** Markdown to append to today's shard. */
+  /** Text appended to the current day shard. Never include a date or time. */
   readonly body: string
 }
 
 /** Resolved log-append spec. */
 export interface WikiLogSpec {
   readonly body: string
+  /** Owning session id, stamped on the JSONL line by the service. */
+  readonly session?: string
 }
 
 /** Filters for {@link WikiService.list}. Absent fields are not applied. */
