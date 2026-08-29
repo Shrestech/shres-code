@@ -32,7 +32,7 @@ function entry(alias: 'lab' | 'prod'): Parameters<typeof upsertEntry>[1] {
   return {
     id: asRemoteId(alias),
     target: asRemoteTarget('ci@remote.example'),
-    remotePort: asRemotePort('3080'),
+    remotePort: asRemotePort(3080),
     version: REGISTRY_VERSION,
     fingerprint: null,
     createdAt: new Date().toISOString(),
@@ -76,9 +76,9 @@ describe('web e2e: remoteControl registry namespace', () => {
 
     await upsertEntry(registryPath(scaffold), entry('prod'))
     entries = await listRemotes(scaffold)
-    expect(entries.map((remoteEntry) => remoteEntry.id)).toEqual(['lab', 'prod'])
+    expect(entries.map(remoteEntry => remoteEntry.id)).toEqual(['lab', 'prod'])
 
     expect(await removeEntry(registryPath(scaffold), asRemoteId('lab'))).toBe(true)
-    expect((await listRemotes(scaffold)).map((remoteEntry) => remoteEntry.id)).toEqual(['prod'])
+    expect((await listRemotes(scaffold)).map(remoteEntry => remoteEntry.id)).toEqual(['prod'])
   })
 })
