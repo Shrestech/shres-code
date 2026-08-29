@@ -39,7 +39,7 @@
   "dependencies": {
     "@shres-code/shres-code-host-directory-picker": "workspace:^",
     "@shres-code/shres-code-native-command": "workspace:^",
-    "koffi": "^3.1.0"
+    "koffi": "^3.1.2"
   },
   "peerDependencies": {
     "@shres-code/shres-code-invariants": "workspace:^",
