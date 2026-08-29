@@ -29,7 +29,13 @@ async function bench() {
   ctx.provide('connection', {
     isLoopback: true,
     api: {
-      settings: { describe: vi.fn(() => Promise.resolve({ rpcId: 's', result: { ok: false, error: {} } })) },
+      settings: {
+        describe: vi.fn(() => Promise.resolve({ rpcId: 's', result: { ok: false, error: {} } })),
+        mutate: vi.fn(() => Promise.resolve({ rpcId: 'm', result: { ok: true, value: {} } })),
+      },
+      llm: {
+        models: vi.fn(() => Promise.resolve({ rpcId: 'l', result: { ok: true, value: { groups: [] } } })),
+      },
     },
   } as never)
   await ctx.plugin(SettingsScopeBinder).await()
@@ -45,7 +51,7 @@ function declareRoot(slots: SlotRegistry): () => void {
 
 describe('ui-settings-jspace apply', () => {
   it('declares the services it uses', () => {
-    expect(inject).toEqual(['slots', 'locale', 'settingsScope', 'sessions'])
+    expect(inject).toEqual(['slots', 'locale', 'settingsScope', 'sessions', 'connection'])
   })
 
   it('registers the J-Space nav entry', async () => {

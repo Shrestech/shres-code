@@ -24,6 +24,21 @@ export const en = {
   open: 'Open',
   closed: 'Closed',
   checked: 'Checked',
+  wikiTitle: 'LLM Wiki',
+  wikiIntro:
+    'WikiSkill: persistent knowledge wiki improved benchmark scores up to +24 pts; 9B + wiki beat 27B without.',
+  wikiToggleHint:
+    'On mounts the wiki tools. Off unloads them. No directory is created until the first write.',
+  wikiActive: 'Active',
+  wikiInactive: 'Disabled',
+  wikiActivate: 'Enable LLM Wiki',
+  wikiDisable: 'Disable LLM Wiki',
+  wikiLibrarian: 'Librarian',
+  wikiModelHint:
+    'Bind a cheap or local model for librarian consolidation. Unbound, the librarian stays dormant and never uses the session frontier model.',
+  wikiProvider: 'Provider',
+  wikiModel: 'Model',
+  wikiUnbound: 'Unbound',
 }
 
 /** The JSpaceKey union. */

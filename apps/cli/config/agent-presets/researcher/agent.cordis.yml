@@ -249,6 +249,11 @@
     - id: tool-ledger
       name: '@shres-code/shres-code-tool-ledger'
 
+# Wiki stays host-owned: ctx.wiki and the wiki settings namespace are
+# registered by the base bundle, so this preset must not re-mount the seat.
+# Bind a cheap/local (or Ollama Cloud) librarian through Settings → J-Space
+# → LLM Wiki; unbound, the librarian stays dormant.
+
 # The seats: design defense forks the parent session (aegis for feasibility,
 # ward against it — give ward a different model than the parent at the
 # deployment layer via agentOptions.model, so the reviewer does not share the

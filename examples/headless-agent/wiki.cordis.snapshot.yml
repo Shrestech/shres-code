@@ -1,0 +1,19 @@
+# Replay counterpart to a wiki-tools scenario. It includes cordis.yml directly
+# because a config patch cannot target an entry behind a nested include, then
+# restates the wiki overlay while replacing the live model with keyless replay.
+- id: base
+  name: '@shres-code/cordis-plugin-include'
+  config:
+    path: ./cordis.yml
+    patches:
+      - id: llm-deepseek
+        name: '@shres-code/shres-code-llm-deepseek'
+        disabled: true
+      - insert:
+          - id: wiki-filesystem
+            name: '@shres-code/shres-code-wiki-filesystem'
+            config: { watch: false }
+          - id: tool-wiki
+            name: '@shres-code/shres-code-tool-wiki'
+          - id: llm-replay
+            name: '@shres-code/shres-code-llm-replay'

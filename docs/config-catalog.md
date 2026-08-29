@@ -3730,6 +3730,77 @@ export interface Config {
 
 Source: [`packages/web/web-search-perplexity/src/index.ts:32`](../packages/web/web-search-perplexity/src/index.ts)
 
+<a id="shres-codeshres-code-wiki-embed-onnx"></a>
+
+## `@shres-code/shres-code-wiki-embed-onnx`
+
+Requires: `wiki`
+
+```ts config-catalog
+/** Plugin config (all optional — `apply` fills defaults). */
+export interface Config {
+  /** Hugging Face model id. */
+  modelId?: string
+  /** Cache directory for downloaded weights. */
+  cacheDir?: string
+  /** When false, refuse to download and require a warm cache. Defaults to true. */
+  allowDownload?: boolean
+  /** When false, the backend reports unavailable. Defaults to on. */
+  enabled?: boolean
+}
+```
+
+Source: [`packages/wiki/wiki-embed-onnx/src/index.ts:39`](../packages/wiki/wiki-embed-onnx/src/index.ts)
+
+<a id="shres-codeshres-code-wiki-filesystem"></a>
+
+## `@shres-code/shres-code-wiki-filesystem`
+
+```ts config-catalog
+/** Provider plugin config. Extends the seam tunables with the store root and watch. */
+export interface Config extends WikiConfigShape {
+  /**
+   * Wiki directory. Relative values resolve under the `.git`-walk project root
+   * of `cwd` (or `process.cwd()`). Absolute values are used as-is.
+   */
+  root?: string
+  /** Starting directory for the `.git` walk when `root` is relative. */
+  cwd?: string
+  /** Whether the materialized wiki root is watched for external edits. */
+  watch?: boolean
+}
+```
+
+Depends on: [`WikiConfigShape`](../packages/wiki/wiki/src/index.ts)
+
+Source: [`packages/wiki/wiki-filesystem/src/index.ts:34`](../packages/wiki/wiki-filesystem/src/index.ts)
+
+<a id="shres-codeshres-code-wiki-librarian"></a>
+
+## `@shres-code/shres-code-wiki-librarian`
+
+Requires: `wiki` · `llm`
+
+```ts config-catalog
+/** Plugin config. `provider` and `model` must be supplied together. */
+export interface Config {
+  /** Explicit provider route; must be paired with `model`. */
+  provider?: string
+  /** Explicit model id; must be paired with `provider`. */
+  model?: string
+  /** End-to-end auxiliary request deadline in milliseconds. */
+  timeoutMs?: number
+  /** Auxiliary generation output-token cap. */
+  maxOutputTokens?: number
+  /** Maximum UTF-8 bytes in the framed user prompt. */
+  maxInputBytes?: number
+  /** Maximum trailing session events included in the prompt. */
+  maxLogEvents?: number
+}
+```
+
+Source: [`packages/wiki/wiki-librarian/src/resolve.ts:11`](../packages/wiki/wiki-librarian/src/resolve.ts)
+
 <a id="shres-codeshres-code-workflow-worker-thread"></a>
 
 ## `@shres-code/shres-code-workflow-worker-thread`
@@ -3833,6 +3904,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@shres-code/shres-code-tool-ledger` — requires `tools` · `ledger` ([`packages/ledger/tool-ledger/src/index.ts`](../packages/ledger/tool-ledger/src/index.ts))
 - `@shres-code/shres-code-tool-subagent-control` — requires `tools` · `subagents` ([`packages/subagent/tool-subagent-control/src/index.ts`](../packages/subagent/tool-subagent-control/src/index.ts))
 - `@shres-code/shres-code-tool-tracker` — requires `tools` · `tracker` ([`packages/tracker/tool-tracker/src/index.ts`](../packages/tracker/tool-tracker/src/index.ts))
+- `@shres-code/shres-code-tool-wiki` — requires `tools` · `wiki` ([`packages/wiki/tool-wiki/src/index.ts`](../packages/wiki/tool-wiki/src/index.ts))
 - `@shres-code/shres-code-user-questions` ([`packages/interaction/user-questions/src/index.ts`](../packages/interaction/user-questions/src/index.ts))
 - `@shres-code/shres-code-workspace` — requires `storageDomain` · `sessionPersistence` ([`packages/workspace/workspace/src/index.ts`](../packages/workspace/workspace/src/index.ts))
 
@@ -3855,6 +3927,7 @@ Abstract service classes — a deployment loads a concrete implementation packag
 - `@shres-code/shres-code-spill` — abstract `SpillStore` ([`packages/spill/spill/src/index.ts`](../packages/spill/spill/src/index.ts))
 - `@shres-code/shres-code-subprocess` — abstract `SubprocessRuntime` ([`packages/subprocess/subprocess/src/index.ts`](../packages/subprocess/subprocess/src/index.ts))
 - `@shres-code/shres-code-tracker` — abstract `TrackerService` ([`packages/tracker/tracker/src/index.ts`](../packages/tracker/tracker/src/index.ts))
+- `@shres-code/shres-code-wiki` — abstract `WikiService` ([`packages/wiki/wiki/src/index.ts`](../packages/wiki/wiki/src/index.ts))
 - `@shres-code/shres-code-workflow` — abstract `WorkflowEngine` ([`packages/workflow/workflow/src/index.ts`](../packages/workflow/workflow/src/index.ts))
 
 ## Library packages (no plugin entry)

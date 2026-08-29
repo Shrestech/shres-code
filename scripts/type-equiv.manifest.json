@@ -2199,6 +2199,46 @@
       "doc": "docs/subsystems/tracker.md",
       "symbol": "TrackerDecisionRuleVerdict",
       "source": "packages/tracker/tracker/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/wiki.md",
+      "symbol": "WikiFrontmatter",
+      "source": "packages/wiki/wiki/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/wiki.md",
+      "symbol": "WikiPage",
+      "source": "packages/wiki/wiki/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/wiki.md",
+      "symbol": "WikiWriteRequest",
+      "source": "packages/wiki/wiki/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/wiki.md",
+      "symbol": "WikiWriteSpec",
+      "source": "packages/wiki/wiki/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/wiki.md",
+      "symbol": "WikiSearchHit",
+      "source": "packages/wiki/wiki/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/wiki.md",
+      "symbol": "WikiLintIssue",
+      "source": "packages/wiki/wiki/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/wiki.md",
+      "symbol": "WikiPageEvent",
+      "source": "packages/wiki/wiki/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/wiki.md",
+      "symbol": "WikiLibrarianRequestEvent",
+      "source": "packages/wiki/wiki/src/types.ts"
     }
   ]
 }

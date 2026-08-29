@@ -12,6 +12,7 @@
     { "path": "../web-react" },
     { "path": "../ui-settings" },
     { "path": "../locale" },
-    { "path": "../../runtime-diagnostics/invariants" }
+    { "path": "../../runtime-diagnostics/invariants" },
+    { "path": "../../api/remotes/tsconfig.client.json" }
   ]
 }

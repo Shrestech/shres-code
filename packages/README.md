@@ -38,6 +38,7 @@ Groups hold `packages/<group>/<pkg>/`; names stay `@shres-code/shres-code-<pkg>`
 | [`tracker/`](tracker/README.md) | Experiment tracking seam, shrestech-tracker provider, and experiment tools | Product — stable API |
 | [`research/`](research/README.md) | Autoresearch toggle + researcher protocol | Product — stable API |
 | [`jspace/`](jspace/README.md) | Settings-toggled logged working card | Product — stable API |
+| [`wiki/`](wiki/README.md) | Project long-term markdown memory | Product — stable API |
 | [`plan/`](plan/README.md) | Plan collaboration state with a direct entry command and reviewed exit | Product — stable API |
 | [`preset/`](preset/README.md) | Per-session agent composition from preset `cordis.yml` files | Product — stable API |
 | [`guard/`](guard/README.md) | Loop-hygiene guards: repeat-call reminders, tool-execute deadlines, and the Shield seat | Product — stable API |

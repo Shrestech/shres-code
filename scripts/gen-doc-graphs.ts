@@ -614,6 +614,15 @@ const SERVICE_ROLES: ServiceRole[] = [
     consumers: ['tool-ledger'],
     note: 'Accepted, rejected, and deferred hypothesis decisions whose cited run ids must resolve through ctx.tracker; the JSONL store is durable and queryable, and every record lands as an ignorable ledger/decision event.',
   },
+  {
+    key: 'wiki',
+    pkg: 'wiki',
+    title: 'Project wiki seam',
+    mode: 'seam',
+    implementations: ['wiki-filesystem', 'wiki-embed-onnx'],
+    consumers: ['tool-wiki', 'wiki-librarian', 'ui-settings-jspace'],
+    note: 'Long-term markdown memory with temperature/demotion/lint folds; the filesystem provider persists under .shres/wiki, embeddings are optional, and the librarian seat stays dormant until a cheap model is bound.',
+  },
 ]
 
 function generatedHeader(title: string): string[] {

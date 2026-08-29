@@ -220,6 +220,12 @@ flowchart LR
   pkg_ledger["ledger"]
   svc_ledger["ctx.ledger<br/>Decision ledger seam"]
   pkg_tool_ledger["tool-ledger"]
+  pkg_wiki["wiki"]
+  svc_wiki["ctx.wiki<br/>Project wiki seam"]
+  pkg_wiki_filesystem["wiki-filesystem"]
+  pkg_wiki_embed_onnx["wiki-embed-onnx"]
+  pkg_tool_wiki["tool-wiki"]
+  pkg_wiki_librarian["wiki-librarian"]
   pkg_acp --> svc_approval
   pkg_agent --> svc_agents
   pkg_agent_default_model --> svc_agentDefaultModel
@@ -331,6 +337,9 @@ flowchart LR
   pkg_web_search_exa --> svc_web
   pkg_web_search_perplexity --> svc_web
   pkg_webserver --> svc_webServer
+  pkg_wiki --> svc_wiki
+  pkg_wiki_embed_onnx --> svc_wiki
+  pkg_wiki_filesystem --> svc_wiki
   pkg_workflow --> svc_workflowEngine
   pkg_workflow_worker_thread --> svc_workflowEngine
   pkg_workspace --> svc_workspaceRegistry
@@ -457,6 +466,9 @@ flowchart LR
   svc_webServer --> pkg_connection
   svc_webServer --> pkg_hmr
   svc_webServer --> pkg_modules
+  svc_wiki --> pkg_tool_wiki
+  svc_wiki --> pkg_ui_settings_jspace
+  svc_wiki --> pkg_wiki_librarian
   svc_workflowEngine --> pkg_tool_ralph
   svc_workflowEngine --> pkg_tool_workflow
   svc_workspaceRegistry --> pkg_apiproxy
@@ -527,5 +539,6 @@ flowchart LR
 | `ctx.speech` | `seam` | [`speech`](../packages/speech/speech) | [`speech-kokoro`](../packages/speech/speech-kokoro), [`speech-whisper`](../packages/speech/speech-whisper) | `ui-speech` | - | TTS and STT provider registry with selection independent of registration order; local Kokoro and Whisper providers implement the seam, and the Web client consumes status plus synthesize/transcribe remotes. |
 | `ctx.tracker` | `seam` | [`tracker`](../packages/tracker/tracker) | [`tracker-shrestech`](../packages/tracker/tracker-shrestech) | [`tool-tracker`](../packages/tracker/tool-tracker) | - | Run, metrics, and query vocabulary with provider-post failure taxonomy; the shrestech backend persists, and the model tools log through ctx.tracker onto the session. |
 | `ctx.ledger` | `seam` | [`ledger`](../packages/ledger/ledger) | - | [`tool-ledger`](../packages/ledger/tool-ledger) | - | Accepted, rejected, and deferred hypothesis decisions whose cited run ids must resolve through ctx.tracker; the JSONL store is durable and queryable, and every record lands as an ignorable ledger/decision event. |
+| `ctx.wiki` | `seam` | [`wiki`](../packages/wiki/wiki) | [`wiki-filesystem`](../packages/wiki/wiki-filesystem), [`wiki-embed-onnx`](../packages/wiki/wiki-embed-onnx) | [`tool-wiki`](../packages/wiki/tool-wiki), [`wiki-librarian`](../packages/wiki/wiki-librarian), `ui-settings-jspace` | - | Long-term markdown memory with temperature/demotion/lint folds; the filesystem provider persists under .shres/wiki, embeddings are optional, and the librarian seat stays dormant until a cheap model is bound. |
 
 Maintenance mode: hybrid: services are discovered from Cordis declarations; interface/implementation/consumer roles are classified in `scripts/gen-doc-graphs.ts` with a completeness guard.

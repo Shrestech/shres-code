@@ -119,6 +119,7 @@
     "@shres-code/shres-code-tool-todo": "workspace:*",
     "@shres-code/shres-code-tool-tracker": "workspace:*",
     "@shres-code/shres-code-tool-web": "workspace:*",
+    "@shres-code/shres-code-tool-wiki": "workspace:*",
     "@shres-code/shres-code-tool-workflow": "workspace:*",
     "@shres-code/shres-code-tools": "workspace:*",
     "@shres-code/shres-code-tracker": "workspace:*",
@@ -127,6 +128,10 @@
     "@shres-code/shres-code-user-questions": "workspace:*",
     "@shres-code/shres-code-web": "workspace:*",
     "@shres-code/shres-code-web-fetch-http": "workspace:*",
+    "@shres-code/shres-code-wiki": "workspace:*",
+    "@shres-code/shres-code-wiki-embed-onnx": "workspace:*",
+    "@shres-code/shres-code-wiki-filesystem": "workspace:*",
+    "@shres-code/shres-code-wiki-librarian": "workspace:*",
     "@shres-code/shres-code-workflow-worker-thread": "workspace:*"
   }
 }

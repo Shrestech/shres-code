@@ -116,6 +116,14 @@ flowchart LR
   cfg --> plugin_shres_base_tool_jspace
   plugin_shres_base_command_jspace["command-jspace<br/>@shres-code/shres-code-command-jspace"]
   cfg --> plugin_shres_base_command_jspace
+  plugin_shres_base_wiki_filesystem["wiki-filesystem<br/>@shres-code/shres-code-wiki-filesystem"]
+  cfg --> plugin_shres_base_wiki_filesystem
+  plugin_shres_base_tool_wiki["tool-wiki<br/>@shres-code/shres-code-tool-wiki"]
+  cfg --> plugin_shres_base_tool_wiki
+  plugin_shres_base_wiki_embed_onnx["wiki-embed-onnx<br/>@shres-code/shres-code-wiki-embed-onnx"]
+  cfg --> plugin_shres_base_wiki_embed_onnx
+  plugin_shres_base_wiki_librarian["wiki-librarian<br/>@shres-code/shres-code-wiki-librarian"]
+  cfg --> plugin_shres_base_wiki_librarian
   plugin_shres_base_plan_mode["plan-mode<br/>@shres-code/shres-code-plan-mode"]
   cfg --> plugin_shres_base_plan_mode
   plugin_shres_base_token_meter["token-meter<br/>@shres-code/shres-code-token-meter"]
@@ -252,6 +260,10 @@ flowchart LR
 | `jspace-prompt` | `@shres-code/shres-code-jspace-prompt` |
 | `tool-jspace` | `@shres-code/shres-code-tool-jspace` |
 | `command-jspace` | `@shres-code/shres-code-command-jspace` |
+| `wiki-filesystem` | `@shres-code/shres-code-wiki-filesystem` |
+| `tool-wiki` | `@shres-code/shres-code-tool-wiki` |
+| `wiki-embed-onnx` | `@shres-code/shres-code-wiki-embed-onnx` |
+| `wiki-librarian` | `@shres-code/shres-code-wiki-librarian` |
 | `plan-mode` | `@shres-code/shres-code-plan-mode` |
 | `token-meter` | `@shres-code/shres-code-token-meter` |
 | `compaction-basic` | `@shres-code/shres-code-compaction-basic` |

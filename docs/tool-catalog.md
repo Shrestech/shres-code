@@ -42,6 +42,7 @@ This table connects model-visible tool names to the plugin package and service s
 | `@shres-code/shres-code-tool-web` | `web_fetch`, `web_search` | `ctx.tools`, `ctx.web`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | web_search and web_fetch keep provider selection behind ctx.web so model-visible schemas stay stable across backend swaps. |
 | `@shres-code/shres-code-tool-tracker` | `experiment_log_metrics`, `experiment_log_run`, `experiment_query`, `experiment_verify_decision_rule` | `ctx.tools`, `ctx.tracker` | `tool/call`, `experiment run and metric records through ctx.tracker`, `tool/result` | - | experiment_log_run, experiment_log_metrics, and experiment_query fold experiment records through the tracker service seam. |
 | `@shres-code/shres-code-tool-ledger` | `ledger_query`, `ledger_record_decision` | `ctx.tools`, `ctx.ledger`, `ctx.tracker` | `tool/call`, `ledger/decision`, `tool/result` | - | ledger_record_decision and ledger_query record decisions whose cited run ids must resolve through ctx.tracker. |
+| `@shres-code/shres-code-tool-wiki` | `wiki_log`, `wiki_read`, `wiki_search`, `wiki_write` | `ctx.tools`, `ctx.wiki`, `owning Agent session` | `tool/call`, `wiki/page`, `tool/result` | - | Schemas are registered only while Settings `enabled` is true. wiki_read bumps `touched` itself. Wiki content reaches the model only through these tools. |
 
 <a id="shres-codeshres-code-tool-ask-user"></a>
 
@@ -2780,3 +2781,128 @@ Record one research decision to the ledger with its hypothesis, decision, eviden
 Source: [`packages/ledger/tool-ledger/src/index.ts`](../packages/ledger/tool-ledger/src/index.ts)
 
 ledger_record_decision and ledger_query record decisions whose cited run ids must resolve through ctx.tracker.
+
+<a id="shres-codeshres-code-tool-wiki"></a>
+
+## `@shres-code/shres-code-tool-wiki`
+
+### `wiki_log`
+
+Append a short note to the wiki day log (log/YYYY-MM-DD.md). Use for session traces that should not become knowledge pages.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "body": {
+      "type": "string",
+      "description": "Markdown to append to today's shard."
+    }
+  },
+  "required": [
+    "body"
+  ]
+}
+```
+
+Source: [`packages/wiki/tool-wiki/src/index.ts`](../packages/wiki/tool-wiki/src/index.ts)
+
+### `wiki_read`
+
+Read one wiki page by wiki-relative path. The read records access (bumps touched) so temperature stays honest. Missing pages fail.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "path": {
+      "type": "string",
+      "description": "Wiki-relative markdown path, for example notes.md."
+    }
+  },
+  "required": [
+    "path"
+  ]
+}
+```
+
+Source: [`packages/wiki/tool-wiki/src/index.ts`](../packages/wiki/tool-wiki/src/index.ts)
+
+### `wiki_search`
+
+Search the project wiki for durable knowledge pages. Results are temperature-ranked: HOT pages outrank COLD. Archive is omitted unless includeArchive is true. Use this before writing a page to avoid duplicates.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "query": {
+      "type": "string",
+      "description": "Search query."
+    },
+    "limit": {
+      "type": "integer",
+      "description": "Maximum hits to return."
+    },
+    "includeArchive": {
+      "type": "boolean",
+      "description": "When true, include archived pages."
+    }
+  },
+  "required": [
+    "query"
+  ]
+}
+```
+
+Source: [`packages/wiki/tool-wiki/src/index.ts`](../packages/wiki/tool-wiki/src/index.ts)
+
+### `wiki_write`
+
+Create or update a durable wiki knowledge page. Use for long-term facts, not task trackers or working-memory cards. Path is wiki-relative markdown (for example patterns/foo.md).
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "path": {
+      "type": "string",
+      "description": "Wiki-relative markdown path."
+    },
+    "body": {
+      "type": "string",
+      "description": "Markdown body. Frontmatter is filled by the harness."
+    },
+    "title": {
+      "type": "string",
+      "description": "Optional title override."
+    },
+    "tags": {
+      "type": "array",
+      "description": "Optional tags.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "contradicts": {
+      "type": "array",
+      "description": "Wiki-relative paths this page contradicts.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "superseded_by": {
+      "type": "string",
+      "description": "Wiki-relative path of a successor page."
+    }
+  },
+  "required": [
+    "path",
+    "body"
+  ]
+}
+```
+
+Source: [`packages/wiki/tool-wiki/src/index.ts`](../packages/wiki/tool-wiki/src/index.ts)
+
+Schemas are registered only while Settings `enabled` is true. wiki_read bumps `touched` itself. Wiki content reaches the model only through these tools.
