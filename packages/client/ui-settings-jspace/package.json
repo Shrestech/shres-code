@@ -1,6 +1,6 @@
 {
   "name": "@shres-code/shres-code-client-ui-settings-jspace",
-  "description": "J-Space settings page: allow switch, mode, coverage, and last-known card counts",
+  "description": "J-Space settings page: allow switch, mode, coverage, last-known card counts, and the LLM Wiki librarian binding",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
@@ -34,7 +34,8 @@
       "inject": [
         "@shres-code/shres-code-client-runtime",
         "@shres-code/shres-code-client-ui-settings",
-        "@shres-code/shres-code-client-locale"
+        "@shres-code/shres-code-client-locale",
+        "@shres-code/shres-code-api-remotes"
       ],
       "platform": "web"
     }
@@ -46,6 +47,7 @@
   "license": "MIT",
   "peerDependencies": {
     "@shres-code/cordis": "workspace:^",
+    "@shres-code/shres-code-api-remotes": "workspace:^",
     "@shres-code/shres-code-client-runtime": "workspace:^",
     "@shres-code/shres-code-client-ui-slots": "workspace:^",
     "@shres-code/shres-code-client-web-react": "workspace:^",
@@ -53,6 +55,7 @@
     "react": "^18.2.0"
   },
   "devDependencies": {
+    "@shres-code/shres-code-api-remotes": "workspace:^",
     "@shres-code/shres-code-client-locale": "workspace:^",
     "@shres-code/shres-code-client-runtime": "workspace:^",
     "@shres-code/shres-code-client-test-runtime": "workspace:^",

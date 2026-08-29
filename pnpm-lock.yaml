@@ -336,6 +336,9 @@ importers:
       '@shres-code/shres-code-tool-web':
         specifier: workspace:^
         version: link:../../packages/web/tool-web
+      '@shres-code/shres-code-tool-wiki':
+        specifier: workspace:^
+        version: link:../../packages/wiki/tool-wiki
       '@shres-code/shres-code-tool-workflow':
         specifier: workspace:^
         version: link:../../packages/workflow/tool-workflow
@@ -345,6 +348,18 @@ importers:
       '@shres-code/shres-code-web-app':
         specifier: workspace:^
         version: link:../../packages/bundle/web-app
+      '@shres-code/shres-code-wiki':
+        specifier: workspace:^
+        version: link:../../packages/wiki/wiki
+      '@shres-code/shres-code-wiki-embed-onnx':
+        specifier: workspace:^
+        version: link:../../packages/wiki/wiki-embed-onnx
+      '@shres-code/shres-code-wiki-filesystem':
+        specifier: workspace:^
+        version: link:../../packages/wiki/wiki-filesystem
+      '@shres-code/shres-code-wiki-librarian':
+        specifier: workspace:^
+        version: link:../../packages/wiki/wiki-librarian
       '@shres-code/shres-code-workflow-worker-thread':
         specifier: workspace:^
         version: link:../../packages/workflow/workflow-worker-thread
@@ -800,6 +815,9 @@ importers:
       '@shres-code/shres-code-tool-web':
         specifier: workspace:*
         version: link:../packages/web/tool-web
+      '@shres-code/shres-code-tool-wiki':
+        specifier: workspace:*
+        version: link:../packages/wiki/tool-wiki
       '@shres-code/shres-code-tool-workflow':
         specifier: workspace:*
         version: link:../packages/workflow/tool-workflow
@@ -824,6 +842,18 @@ importers:
       '@shres-code/shres-code-web-fetch-http':
         specifier: workspace:*
         version: link:../packages/web/web-fetch-http
+      '@shres-code/shres-code-wiki':
+        specifier: workspace:*
+        version: link:../packages/wiki/wiki
+      '@shres-code/shres-code-wiki-embed-onnx':
+        specifier: workspace:*
+        version: link:../packages/wiki/wiki-embed-onnx
+      '@shres-code/shres-code-wiki-filesystem':
+        specifier: workspace:*
+        version: link:../packages/wiki/wiki-filesystem
+      '@shres-code/shres-code-wiki-librarian':
+        specifier: workspace:*
+        version: link:../packages/wiki/wiki-librarian
       '@shres-code/shres-code-workflow-worker-thread':
         specifier: workspace:*
         version: link:../packages/workflow/workflow-worker-thread
@@ -1310,6 +1340,9 @@ importers:
       '@shres-code/shres-code-tool-web':
         specifier: workspace:^
         version: link:../../web/tool-web
+      '@shres-code/shres-code-tool-wiki':
+        specifier: workspace:^
+        version: link:../../wiki/tool-wiki
       '@shres-code/shres-code-tool-workflow':
         specifier: workspace:^
         version: link:../../workflow/tool-workflow
@@ -1337,6 +1370,18 @@ importers:
       '@shres-code/shres-code-web-search-deepseek':
         specifier: workspace:^
         version: link:../../web/web-search-deepseek
+      '@shres-code/shres-code-wiki':
+        specifier: workspace:^
+        version: link:../../wiki/wiki
+      '@shres-code/shres-code-wiki-embed-onnx':
+        specifier: workspace:^
+        version: link:../../wiki/wiki-embed-onnx
+      '@shres-code/shres-code-wiki-filesystem':
+        specifier: workspace:^
+        version: link:../../wiki/wiki-filesystem
+      '@shres-code/shres-code-wiki-librarian':
+        specifier: workspace:^
+        version: link:../../wiki/wiki-librarian
       '@shres-code/shres-code-workflow-worker-thread':
         specifier: workspace:^
         version: link:../../workflow/workflow-worker-thread
@@ -2715,6 +2760,9 @@ importers:
       '@shres-code/cordis':
         specifier: workspace:^
         version: link:../../../vendor/cordis
+      '@shres-code/shres-code-api-remotes':
+        specifier: workspace:^
+        version: link:../../api/remotes
       '@shres-code/shres-code-client-locale':
         specifier: workspace:^
         version: link:../locale
@@ -9235,6 +9283,160 @@ importers:
       '@shres-code/shres-code-web':
         specifier: workspace:^
         version: link:../web
+
+  packages/wiki/tool-wiki:
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/cordis-plugin-include':
+        specifier: workspace:^
+        version: link:../../../vendor/include
+      '@shres-code/cordis-plugin-loader':
+        specifier: workspace:^
+        version: link:../../../vendor/loader
+      '@shres-code/shres-code-agent':
+        specifier: workspace:^
+        version: link:../../core/agent
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-session':
+        specifier: workspace:^
+        version: link:../../core/session
+      '@shres-code/shres-code-system-prompt':
+        specifier: workspace:^
+        version: link:../../core/system-prompt
+      '@shres-code/shres-code-tools':
+        specifier: workspace:^
+        version: link:../../core/tools
+      '@shres-code/shres-code-wiki':
+        specifier: workspace:^
+        version: link:../wiki
+      '@shres-code/shres-code-wiki-filesystem':
+        specifier: workspace:^
+        version: link:../wiki-filesystem
+
+  packages/wiki/wiki:
+    dependencies:
+      '@shres-code/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-session':
+        specifier: workspace:^
+        version: link:../../core/session
+      '@shres-code/shres-code-settings':
+        specifier: workspace:^
+        version: link:../../settings/settings
+
+  packages/wiki/wiki-embed-onnx:
+    dependencies:
+      '@huggingface/transformers':
+        specifier: ^4.2.0
+        version: 4.2.0
+      '@shres-code/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/shres-code-home-paths':
+        specifier: workspace:^
+        version: link:../../util/home-paths
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-wiki':
+        specifier: workspace:^
+        version: link:../wiki
+
+  packages/wiki/wiki-filesystem:
+    dependencies:
+      '@shres-code/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+      chokidar:
+        specifier: ^4.0.3
+        version: 4.0.3
+      yaml:
+        specifier: ^2.9.0
+        version: 2.9.0
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/shres-code-atomic-write':
+        specifier: workspace:^
+        version: link:../../util/atomic-write
+      '@shres-code/shres-code-fs':
+        specifier: workspace:^
+        version: link:../../fs/fs
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-session':
+        specifier: workspace:^
+        version: link:../../core/session
+      '@shres-code/shres-code-wiki':
+        specifier: workspace:^
+        version: link:../wiki
+
+  packages/wiki/wiki-librarian:
+    dependencies:
+      '@shres-code/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/cordis-plugin-include':
+        specifier: workspace:^
+        version: link:../../../vendor/include
+      '@shres-code/cordis-plugin-loader':
+        specifier: workspace:^
+        version: link:../../../vendor/loader
+      '@shres-code/shres-code-agent':
+        specifier: workspace:^
+        version: link:../../core/agent
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-jobs':
+        specifier: workspace:^
+        version: link:../../jobs/jobs
+      '@shres-code/shres-code-llm':
+        specifier: workspace:^
+        version: link:../../llm/llm
+      '@shres-code/shres-code-llm-deepseek':
+        specifier: workspace:^
+        version: link:../../llm/llm-deepseek
+      '@shres-code/shres-code-session':
+        specifier: workspace:^
+        version: link:../../core/session
+      '@shres-code/shres-code-system-prompt':
+        specifier: workspace:^
+        version: link:../../core/system-prompt
+      '@shres-code/shres-code-timeout':
+        specifier: workspace:^
+        version: link:../../util/timeout
+      '@shres-code/shres-code-tools':
+        specifier: workspace:^
+        version: link:../../core/tools
+      '@shres-code/shres-code-wiki':
+        specifier: workspace:^
+        version: link:../wiki
+      '@shres-code/shres-code-wiki-filesystem':
+        specifier: workspace:^
+        version: link:../wiki-filesystem
 
   packages/workflow/tool-ralph:
     dependencies:

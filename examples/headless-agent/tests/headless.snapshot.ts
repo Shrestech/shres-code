@@ -33,6 +33,8 @@ const goalScenarioDir = join(snapshotsDir, 'goal-tools')
 const goalConfigPath = fileURLToPath(new URL('../goal.cordis.snapshot.yml', import.meta.url))
 const jspaceScenarioDir = join(snapshotsDir, 'jspace-tools')
 const jspaceConfigPath = fileURLToPath(new URL('../jspace.cordis.snapshot.yml', import.meta.url))
+const wikiScenarioDir = join(snapshotsDir, 'wiki-tools')
+const wikiConfigPath = fileURLToPath(new URL('../wiki.cordis.snapshot.yml', import.meta.url))
 const researcherScenarioDir = join(snapshotsDir, 'researcher-micro-cycle')
 const researcherConfigPath = fileURLToPath(new URL('../researcher.cordis.snapshot.yml', import.meta.url))
 const jspaceCharterScenarioDir = join(snapshotsDir, 'jspace-charter')
@@ -834,6 +836,44 @@ describe('headless stream-json snapshots', () => {
         expect(systems[1]).toContain('Checked:   (none)')
         expect(systems[1]).toContain('Open:      (none)')
         expect(systems[1]).toContain('Next:      Inspect the logged card')
+      },
+    })
+
+    expect(result.stderr).toBe('')
+    const normalized = normalizeHeadlessStream(result.stdout, runCwd)
+    if (refreshing) await writeFile(streamExpected, normalized)
+    expect(normalized).toBe(await readFile(streamExpected, 'utf8'))
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+
+  it('replays persisted wiki tools through the one-shot app', async () => {
+    const prompt = await scenarioPrompt(wikiScenarioDir, 'wiki-tools')
+    const streamExpected = join(wikiScenarioDir, 'stream-json.expected.jsonl')
+    let runCwd = ''
+    const result = await runLoaderSmoke({
+      label: 'wiki tools headless stream-json snapshot',
+      tempDirPrefix: 'headless-snapshot-wiki-tools-',
+      binScript,
+      libBinScript: binScript,
+      configPath: wikiConfigPath,
+      binArgs: [wikiConfigPath, prompt],
+      tsconfigPath,
+      env: {
+        SHRES_SNAPSHOT: 'replay',
+        SHRES_SNAPSHOT_FILE: join(wikiScenarioDir, 'session.jsonl'),
+        SHRES_SNAPSHOT_OVERRIDE: join(wikiScenarioDir, 'replay.override.json'),
+        NODE_OPTIONS: [process.env.NODE_OPTIONS, '--disable-warning=ExperimentalWarning'].filter(Boolean).join(' '),
+      },
+      prepare: (cwd) => { runCwd = cwd },
+      inspect: async (cwd) => {
+        const logs = await persistedLogs(cwd)
+        expect(logs).toHaveLength(1)
+        const records = parseJsonl(logs[0]?.content ?? '')
+        const calls = records.filter(record => record.type === 'tool/call')
+          .map(record => (record.data as JsonObject | undefined)?.name)
+        expect(calls).toEqual(['wiki_write'])
+        const pages = records.filter(record => record.type === 'wiki/page')
+        expect(pages.some(event => (event.data as JsonObject | undefined)?.op === 'create')).toBe(true)
+        expect(pages.some(event => (event.data as JsonObject | undefined)?.path === 'snapshot.md')).toBe(true)
       },
     })
 

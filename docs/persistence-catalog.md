@@ -1191,3 +1191,44 @@ Source: [`packages/core/session/src/types.ts:278`](../packages/core/session/src/
 ```
 
 Source: [`packages/web/web-search-deepseek/src/provider.ts:83`](../packages/web/web-search-deepseek/src/provider.ts)
+
+### `wiki/*`
+
+<a id="wikilibrarian-request--log-only"></a>
+
+#### `wiki/librarian-request` — log-only
+
+```ts persistence-catalog
+/**
+ * Pre-dispatch record of one wiki librarian auxiliary model request.
+ * Log-only. Writers pass `{ ignorable: true }`.
+ * @param purpose - why this auxiliary call ran.
+ * @param route - exact provider and model used for the call.
+ * @param system - exact auxiliary system prompt.
+ * @param prompt - exact auxiliary user prompt.
+ * @param maxTokens - exact auxiliary output-token cap.
+ */
+'wiki/librarian-request': WikiLibrarianRequestEvent
+```
+
+Types: [WikiLibrarianRequestEvent](subsystems/wiki.md)
+
+Source: [`packages/wiki/wiki/src/types.ts:251`](../packages/wiki/wiki/src/types.ts)
+
+<a id="wikipage--log-only"></a>
+
+#### `wiki/page` — log-only
+
+```ts persistence-catalog
+/**
+ * One wiki page write, touch, archive, or log append through `ctx.wiki`.
+ * Log-only. Writers pass `{ ignorable: true }`.
+ * @param path - wiki-relative path that was written.
+ * @param op - the operation that produced this event.
+ */
+'wiki/page': WikiPageEvent
+```
+
+Types: [WikiPageEvent](subsystems/wiki.md)
+
+Source: [`packages/wiki/wiki/src/types.ts:241`](../packages/wiki/wiki/src/types.ts)

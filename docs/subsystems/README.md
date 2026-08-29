@@ -47,6 +47,7 @@ One page per subsystem of the Shres Code: what it is, the data structures it mov
 | [guard.md](guard.md) | host-seat Shield screening: entitlement, engine resolve, published status, snapshot RPC, and npm check/install remotes |
 | [tracker.md](tracker.md) | experiment-tracking seam: run identity, metrics points, log/query requests, and provider-post failure taxonomy |
 | [ledger.md](ledger.md) | decision-ledger seam: entry identity, decision request/spec, validation failure taxonomy, and the durable entry record |
+| [wiki.md](wiki.md) | project wiki seam: frontmatter, write request/spec, search hits, lint findings, and log-only wiki events |
 | [invariants.md](invariants.md) | the runtime-invariant registry: selection `Config`, `InvariantInstaller`/`InvariantFailure`, the empty-companion contract |
 | [web-server.md](web-server.md) | the HTTP carrier: `WebRouteKind`/`WebRoute`, match order, the claimable fallback seat, index taps |
 | [storage.md](storage.md) | the storage subsystem: the backend contract (`StorageBackend`), `StorageForms`, `DomainSpec`/`Domain`, `domain/changed` |

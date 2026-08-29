@@ -2472,6 +2472,148 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'wiki',
+    summary: 'The abstract wiki service.',
+    description: 'The abstract wiki service. Registered as `ctx.wiki` (one provider per context). A provider subclasses this, implements the persistence hooks, and loads the subclass as a plugin.\n\nImplementations must honor these semantics:\n\n- persistPage writes a resolved spec under its path, creating directories on first write (lazy materialization).\n- persistTouch updates only `touched` on an existing page.\n- persistLog appends to the day-sharded log.\n- persistDemote moves a COLD-past-`demoteDays` page into `archive/`.\n- persistIndex replaces generated `index.md`.\n- loadPages reads the provider\'s authoritative page store.\n- loadIndex returns generated `index.md` text, or `\'\'` when absent.\n- hasPage reports whether a path is present.',
+    methods: [
+      {
+        signature: 'abstract persistPage(spec: WikiWriteSpec, nowMs: number): Promise<WikiPage>',
+        description: 'Persist a resolved page spec. Implemented by the provider.',
+        parameters: [{ name: 'spec', description: 'a resolved spec from {@link resolveWrite}.' }, { name: 'nowMs', description: 'write clock used for freshness timestamps.' }],
+        returns: 'the stored page.',
+      },
+      {
+        signature: 'abstract persistTouch(path: string, nowMs: number): Promise<WikiPage>',
+        description: 'Update only `touched` on an existing page.',
+        parameters: [{ name: 'path', description: 'wiki-relative path.' }, { name: 'nowMs', description: 'access clock.' }],
+        returns: 'the updated page.',
+      },
+      {
+        signature: 'abstract persistLog(spec: WikiLogSpec, nowMs: number): Promise<string>',
+        description: 'Append a resolved log body to the day shard for `nowMs`.',
+        parameters: [{ name: 'spec', description: 'resolved log spec.' }, { name: 'nowMs', description: 'append clock (selects the shard).' }],
+        returns: 'the shard path that received the append.',
+      },
+      {
+        signature: 'abstract persistDemote(path: string, nowMs: number): Promise<void>',
+        description: 'Move a page into `archive/`. The original path must no longer be listed.',
+        parameters: [{ name: 'path', description: 'active wiki-relative path.' }, { name: 'nowMs', description: 'demotion clock.' }],
+      },
+      {
+        signature: 'abstract persistIndex(markdown: string): Promise<void>',
+        description: 'Replace generated `index.md`.',
+        parameters: [{ name: 'markdown', description: 'generated projection.' }],
+      },
+      {
+        signature: 'abstract loadPages(includeArchive: boolean): Promise<WikiPage[]>',
+        description: 'Load pages from the provider\'s store.',
+        parameters: [{ name: 'includeArchive', description: 'when true, include `archive/` pages.' }],
+        returns: 'the matching pages; empty when the wiki directory does not exist yet.',
+      },
+      {
+        signature: 'abstract loadIndex(): Promise<string>',
+        description: 'Load generated `index.md` text.',
+        parameters: [],
+        returns: 'the file contents, or `\'\'` when the wiki has not been materialized.',
+      },
+      {
+        signature: 'abstract hasPage(path: string): boolean',
+        description: 'Whether the store holds a page at `path`. Synchronous so the invariant companion can check a `wiki/page` event without awaiting a query.',
+        parameters: [{ name: 'path', description: 'wiki-relative path.' }],
+        returns: 'whether the page or log shard is present.',
+      },
+      {
+        signature: 'projectConfig(): WikiProjectConfig',
+        description: 'Project-level `config.yaml` overlay, when the provider keeps one.',
+        parameters: [],
+        returns: 'the parsed project config, or `{}` when absent.',
+      },
+      {
+        signature: 'watch(listener: (status: WikiStatus) => void): () => void',
+        description: 'Subscribe to status remounts.',
+        parameters: [{ name: 'listener', description: 'called with the current status immediately and on change.' }],
+        returns: 'disposer.',
+      },
+      {
+        signature: 'registerEmbeddings(provider: WikiEmbeddings): () => void',
+        description: 'Register an embeddings provider. A later registration replaces the previous one. Dispose removes it so search falls back to BM25.',
+        parameters: [{ name: 'provider', description: 'embeddings implementation.' }],
+        returns: 'disposer that unregisters this provider if it is still current.',
+      },
+      {
+        signature: 'embeddingsProvider(): WikiEmbeddings | undefined',
+        description: 'Currently registered embeddings provider, if any.',
+        parameters: [],
+        returns: 'the provider, or `undefined`.',
+      },
+      {
+        signature: 'settingsLibrarian(): { provider: string; model: string } | undefined',
+        description: 'Bound librarian route from the settings namespace, when both fields are set.',
+        parameters: [],
+        returns: 'the pair, or `undefined` when unbound at the settings layer.',
+      },
+      {
+        signature: 'async read(path: string): Promise<WikiPage | undefined>',
+        description: 'Read one page without bumping `touched`.',
+        parameters: [{ name: 'path', description: 'wiki-relative path.' }],
+        returns: 'the page, or `undefined` when missing or the wiki is not materialized.',
+      },
+      {
+        signature: 'async list(filter: WikiListFilter = {}, nowMs: number = Date.now()): Promise<WikiPage[]>',
+        description: 'List pages, temperature-ranked. Archive is omitted unless requested.',
+        parameters: [{ name: 'filter', description: 'optional filters.' }, { name: 'nowMs', description: 'evaluation clock; defaults to `Date.now()`.' }],
+        returns: 'matching pages HOT first.',
+      },
+      {
+        signature: 'async search( query: string, options: WikiSearchOptions = {}, nowMs: number = Date.now(), signal?: AbortSignal, ): Promise<WikiSearchHit[]>',
+        description: 'Search pages. BM25 always runs; cosine mix-in applies when embeddings are registered and available. Default result set excludes archive. HOT ranks above COLD regardless of score.',
+        parameters: [{ name: 'query', description: 'raw query string.' }, { name: 'options', description: 'limit and archive inclusion.' }, { name: 'nowMs', description: 'evaluation clock.' }, { name: 'signal', description: 'optional cancellation around embeddings.' }],
+        returns: 'ranked hits.',
+      },
+      {
+        signature: 'async similar( path: string, limit: number = 5, nowMs: number = Date.now(), signal?: AbortSignal, ): Promise<WikiSearchHit[]>',
+        description: 'Shortlist pages most similar to `path` (embeddings when available, else BM25 against the page title). Used by the librarian for dedup/link proposals. Archive is excluded.',
+        parameters: [{ name: 'path', description: 'wiki-relative path of the seed page.' }, { name: 'limit', description: 'maximum hits, default 5.' }, { name: 'nowMs', description: 'evaluation clock.' }, { name: 'signal', description: 'optional cancellation around embeddings.' }],
+        returns: 'ranked other pages.',
+      },
+      {
+        signature: 'async writePage( session: Session, request: WikiWriteRequest, nowMs: number = Date.now(), ): Promise<WikiWriteResult>',
+        description: 'Write a page. Resolves the request, persists, logs `wiki/page`, regenerates the index, and mechanically demotes COLD-past-`demoteDays` pages.',
+        parameters: [{ name: 'session', description: 'owning session; the page event is appended to its log.' }, { name: 'request', description: 'the caller\'s write request.' }, { name: 'nowMs', description: 'write clock.' }],
+        returns: 'the write outcome.',
+      },
+      {
+        signature: 'async appendLog( session: Session, request: WikiLogRequest, nowMs: number = Date.now(), ): Promise<WikiLogResult>',
+        description: 'Append to the day-sharded log and write `wiki/page` with `op: \'log\'`.',
+        parameters: [{ name: 'session', description: 'owning session.' }, { name: 'request', description: 'the caller\'s log request.' }, { name: 'nowMs', description: 'append clock.' }],
+        returns: 'the append outcome.',
+      },
+      {
+        signature: 'async touch( session: Session, path: string, nowMs: number = Date.now(), ): Promise<WikiWriteResult>',
+        description: 'Bump `touched` on a page (the read-path access recorder) and log `wiki/page` with `op: \'touch\'`. Missing pages fail with `not-found`.',
+        parameters: [{ name: 'session', description: 'owning session.' }, { name: 'path', description: 'wiki-relative path.' }, { name: 'nowMs', description: 'access clock.' }],
+        returns: 'the updated page, or a failed result.',
+      },
+      {
+        signature: 'async lint(): Promise<WikiLintIssue[]>',
+        description: 'Mechanically lint every page plus the generated index.',
+        parameters: [],
+        returns: 'the issue list.',
+      },
+      {
+        signature: 'async reindex(session?: Session, nowMs: number = Date.now()): Promise<void>',
+        description: 'Rebuild `index.md` and demote COLD-past-`demoteDays` pages into `archive/`. Records a `wiki/page` archive event per demoted page when `session` is given.',
+        parameters: [{ name: 'session', description: 'optional session to log archive events on.' }, { name: 'nowMs', description: 'evaluation clock.' }],
+      },
+      {
+        signature: 'freshness(nowIso: string, existing: WikiFrontmatter | undefined, archived: boolean): WikiFrontmatter',
+        description: 'Fill freshness fields for a newly persisted page. Providers call this when the stored page had no frontmatter yet.',
+        parameters: [{ name: 'nowIso', description: 'ISO-8601 instant.' }, { name: 'existing', description: 'previous frontmatter, when updating.' }, { name: 'archived', description: 'whether the destination is under `archive/`.' }],
+        returns: 'complete frontmatter.',
+      },
+    ],
+  },
+  {
     key: 'workflowEngine',
     summary: 'Workflow Service Definition contract.',
     description: 'Workflow Service Definition contract. Invalid requests throw before publication; a live run is holder-owned, its result never rejects, cancellation and disposal are bounded, and disposal waits for child cleanup within that bound. Lifecycle listener failures are contained, and `workflow/end` fires exactly once as the result settles.',
@@ -3503,7 +3645,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'GenerateOptions',
-    declaration: 'export interface GenerateOptions {\n    provider: string;\n    model: string;\n    reasoningEffort?: ReasoningEffortId;\n    messages: Message[];\n    system?: string;\n    tools?: ToolSchema[];\n    temperature?: number;\n    maxTokens?: number;\n    stop?: string[];\n    signal?: AbortSignal;\n    sessionId?: Branded<\'SessionId\'>;\n    purpose?: \'compaction\' | \'session-title\';\n}',
+    declaration: 'export interface GenerateOptions {\n    provider: string;\n    model: string;\n    reasoningEffort?: ReasoningEffortId;\n    messages: Message[];\n    system?: string;\n    tools?: ToolSchema[];\n    temperature?: number;\n    maxTokens?: number;\n    stop?: string[];\n    signal?: AbortSignal;\n    sessionId?: Branded<\'SessionId\'>;\n    purpose?: \'compaction\' | \'session-title\' | \'wiki-summarize\' | \'wiki-extract\';\n}',
   },
   {
     name: 'GenericCallView',
@@ -5304,6 +5446,86 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'WebUpgradeRoute',
     declaration: 'export interface WebUpgradeRoute {\n    path: string;\n    handler: (req: IncomingMessage, socket: Duplex, head: Buffer) => void | Promise<void>;\n}',
+  },
+  {
+    name: 'WikiEmbeddings',
+    declaration: 'export interface WikiEmbeddings {\n    available(): boolean;\n    embed(texts: readonly string[], signal?: AbortSignal): Promise<readonly (readonly number[])[]>;\n}',
+  },
+  {
+    name: 'WikiFailureReason',
+    declaration: 'export type WikiFailureReason = \'required-field\' | \'invalid-path\' | \'disabled\' | \'not-found\' | \'not-materialized\';',
+  },
+  {
+    name: 'WikiFrontmatter',
+    declaration: 'export interface WikiFrontmatter {\n    readonly created: string;\n    readonly updated: string;\n    readonly touched: string;\n    readonly status: WikiPageStatus;\n    readonly superseded_by?: string;\n    readonly contradicts?: readonly string[];\n    readonly tags?: readonly string[];\n}',
+  },
+  {
+    name: 'WikiLintCode',
+    declaration: 'export type WikiLintCode = \'missing-created\' | \'missing-updated\' | \'missing-touched\' | \'dead-link\' | \'orphan\' | \'index-missing\' | \'index-stale\' | \'archived-in-index\';',
+  },
+  {
+    name: 'WikiLintIssue',
+    declaration: 'export interface WikiLintIssue {\n    readonly code: WikiLintCode;\n    readonly path: string;\n    readonly target?: string;\n    readonly detail: string;\n}',
+  },
+  {
+    name: 'WikiListFilter',
+    declaration: 'export interface WikiListFilter {\n    readonly temperature?: WikiTemperature;\n    readonly includeArchive?: boolean;\n    readonly substring?: string;\n}',
+  },
+  {
+    name: 'WikiLogRequest',
+    declaration: 'export interface WikiLogRequest {\n    readonly body: string;\n}',
+  },
+  {
+    name: 'WikiLogResult',
+    declaration: 'export type WikiLogResult = {\n    readonly kind: \'appended\';\n    readonly path: string;\n} | {\n    readonly kind: \'failed\';\n    readonly reason: WikiFailureReason;\n    readonly detail: string;\n};',
+  },
+  {
+    name: 'WikiLogSpec',
+    declaration: 'export interface WikiLogSpec {\n    readonly body: string;\n}',
+  },
+  {
+    name: 'WikiPage',
+    declaration: 'export interface WikiPage {\n    readonly path: string;\n    readonly title: string;\n    readonly body: string;\n    readonly frontmatter: WikiFrontmatter;\n}',
+  },
+  {
+    name: 'WikiPageStatus',
+    declaration: 'export type WikiPageStatus = \'active\' | \'archived\';',
+  },
+  {
+    name: 'WikiProjectConfig',
+    declaration: 'export interface WikiProjectConfig {\n    readonly enabled?: boolean;\n    readonly hotDays?: number;\n    readonly warmDays?: number;\n    readonly demoteDays?: number;\n    readonly roles?: {\n        readonly librarian?: WikiRoleBinding;\n    };\n}',
+  },
+  {
+    name: 'WikiRoleBinding',
+    declaration: 'export interface WikiRoleBinding {\n    readonly provider?: string;\n    readonly model?: string;\n}',
+  },
+  {
+    name: 'WikiSearchHit',
+    declaration: 'export interface WikiSearchHit {\n    readonly path: string;\n    readonly title: string;\n    readonly temperature: WikiTemperature;\n    readonly score: number;\n    readonly excerpt: string;\n}',
+  },
+  {
+    name: 'WikiSearchOptions',
+    declaration: 'export interface WikiSearchOptions {\n    readonly limit?: number;\n    readonly includeArchive?: boolean;\n}',
+  },
+  {
+    name: 'WikiStatus',
+    declaration: 'export interface WikiStatus {\n    readonly active: boolean;\n    readonly reason: \'active\' | \'disabled\';\n}',
+  },
+  {
+    name: 'WikiTemperature',
+    declaration: 'export type WikiTemperature = \'HOT\' | \'WARM\' | \'COLD\';',
+  },
+  {
+    name: 'WikiWriteRequest',
+    declaration: 'export interface WikiWriteRequest {\n    readonly path: string;\n    readonly body: string;\n    readonly title?: string;\n    readonly tags?: readonly string[];\n    readonly contradicts?: readonly string[];\n    readonly superseded_by?: string;\n}',
+  },
+  {
+    name: 'WikiWriteResult',
+    declaration: 'export type WikiWriteResult = {\n    readonly kind: \'written\';\n    readonly page: WikiPage;\n} | {\n    readonly kind: \'failed\';\n    readonly reason: WikiFailureReason;\n    readonly detail: string;\n};',
+  },
+  {
+    name: 'WikiWriteSpec',
+    declaration: 'export interface WikiWriteSpec {\n    readonly path: string;\n    readonly title: string;\n    readonly body: string;\n    readonly tags: readonly string[];\n    readonly contradicts: readonly string[];\n    readonly superseded_by?: string;\n}',
   },
   {
     name: 'WorkflowAgentEndInfo',

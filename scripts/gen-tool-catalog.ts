@@ -65,6 +65,8 @@ import * as ToolTasks from '@shres-code/shres-code-tool-jobs'
 import * as ToolTodo from '@shres-code/shres-code-tool-todo'
 import JspaceService from '@shres-code/shres-code-jspace'
 import * as ToolJSpace from '@shres-code/shres-code-tool-jspace'
+import FileWikiService from '@shres-code/shres-code-wiki-filesystem'
+import * as ToolWiki from '@shres-code/shres-code-tool-wiki'
 import * as ToolSubagent from '@shres-code/shres-code-tool-subagent'
 import * as ToolWeb from '@shres-code/shres-code-tool-web'
 import VmWorkflowEngine from '@shres-code/shres-code-workflow-worker-thread'
@@ -612,6 +614,20 @@ const TOOL_PACKAGES: ToolPackage[] = [
     },
     note:
       'ledger_record_decision and ledger_query record decisions whose cited run ids must resolve through ctx.tracker.',
+  },
+  {
+    pkg: '@shres-code/shres-code-tool-wiki',
+    dir: 'tool-wiki',
+    source: 'packages/wiki/tool-wiki/src/index.ts',
+    requires: ['ctx.tools', 'ctx.wiki', 'owning Agent session'],
+    writes: ['tool/call', 'wiki/page', 'tool/result'],
+    async mount(ctx) {
+      await ctx.plugin(SessionStore)
+      await ctx.plugin(FileWikiService, { root: '/tmp/shres-wiki-catalog', watch: false })
+      await ctx.plugin(ToolWiki)
+    },
+    note:
+      'Schemas are registered only while Settings `enabled` is true. wiki_read bumps `touched` itself. Wiki content reaches the model only through these tools.',
   },
 ]
 

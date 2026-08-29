@@ -119,6 +119,7 @@ New behavior attaches to a documented extension point. Changing the loop itself 
 | Add UI or editor integration | drive `ctx.agents` and render from `session/event` |
 | Add speech I/O (mic, read-aloud, Talk mode) | register on `ctx.speech` (local Kokoro TTS, Whisper STT); the Web client records and plays; Talk mode confirms by voice before `session.prompt`; do not add audio content blocks |
 | Add a Web Client Chat node | register a `ConversationNodeDefinition` + keyed renderer |
+| Add project long-term memory | register on `ctx.wiki`; tools are the only model-visible path |
 | Add durable session state | extend `SessionEventMap`; render and replay from the log |
 | Generate session titles | register the sole `ctx.sessionTitle` provider |
 | Manage a same-session objective | use `ctx.goals`; continue through `agent/*` |

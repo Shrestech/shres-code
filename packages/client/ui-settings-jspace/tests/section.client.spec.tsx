@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { JSpaceSection, type JSpaceSettings } from '../src/client/JSpaceSection.tsx'
+import { JSpaceSection, writeWikiLibrarian, type JSpaceSettings, type WikiSettings } from '../src/client/JSpaceSection.tsx'
 import type { JSpaceCardView } from '../src/client/card-source.ts'
 import type { SettingsScope, SettingsScopeSnapshot } from '@shres-code/shres-code-client-runtime/client'
 import { en } from '../src/client/locales.ts'
@@ -25,10 +25,42 @@ function sessionLabel(state: string): string {
   return `${en.session} · ${state}`
 }
 
+function wikiSnapshot(partial: Partial<SettingsScopeSnapshot<WikiSettings>> = {}): SettingsScopeSnapshot<WikiSettings> {
+  return {
+    status: 'ready',
+    value: { enabled: true },
+    base: {},
+    user: {},
+    revision: 1,
+    writable: true,
+    mode: 'host',
+    ...partial,
+  }
+}
+
 function mount(
   snap: SettingsScopeSnapshot<JSpaceSettings>,
   set = vi.fn(async () => {}),
   card?: JSpaceCardView,
+  wikiSnap: SettingsScopeSnapshot<WikiSettings> = wikiSnapshot(),
+  wikiSet = vi.fn(async () => {}),
+  api = {
+    settings: { mutate: vi.fn(async () => ({ rpcId: 'm', result: { ok: true, value: {} } })) },
+    llm: {
+      models: vi.fn(async () => ({
+        rpcId: 'l',
+        result: {
+          ok: true as const,
+          value: {
+            groups: [
+              { id: 'ollama-local', name: 'Ollama (local)', models: [{ id: 'qwen', name: 'Qwen' }] },
+              { id: 'ollama-cloud', name: 'Ollama Cloud', models: [{ id: 'flash', name: 'Flash' }] },
+            ],
+          },
+        },
+      })),
+    },
+  },
 ) {
   const scope = {
     getSnapshot: () => snap,
@@ -36,18 +68,27 @@ function mount(
     set,
     unset: vi.fn(async () => {}),
   } as unknown as SettingsScope<JSpaceSettings>
+  const wikiScope = {
+    getSnapshot: () => wikiSnap,
+    subscribe: () => () => {},
+    set: wikiSet,
+    unset: vi.fn(async () => {}),
+  } as unknown as SettingsScope<WikiSettings>
   render(
     <JSpaceSection
       scope={scope}
       useSnapshot={select => select(snap)}
+      wikiScope={wikiScope}
+      useWikiSnapshot={select => select(wikiSnap)}
       useCard={select => select(card)}
+      api={api as never}
       t={key => en[key]}
       useSessions={select => select({ current: 's-test' } as never)}
       useWorkspaces={() => undefined as never}
       close={vi.fn()}
     />,
   )
-  return { set }
+  return { set, wikiSet, api }
 }
 
 describe('JSpaceSection', () => {
@@ -97,14 +138,24 @@ describe('JSpaceSection', () => {
   })
 
   it('shows settings loading without a switch', () => {
-    mount(snapshot({ status: 'loading', value: undefined, writable: false }))
+    mount(
+      snapshot({ status: 'loading', value: undefined, writable: false }),
+      vi.fn(async () => {}),
+      undefined,
+      wikiSnapshot({ status: 'unavailable', value: undefined, writable: false }),
+    )
     expect(screen.getByText(en.loading)).toBeTruthy()
     expect(screen.queryByRole('switch')).toBeNull()
     expect(screen.getByText(en.coverageHonesty)).toBeTruthy()
   })
 
   it('explains when the host seat is not mounted', () => {
-    mount(snapshot({ status: 'unavailable', value: undefined, writable: false }))
+    mount(
+      snapshot({ status: 'unavailable', value: undefined, writable: false }),
+      vi.fn(async () => {}),
+      undefined,
+      wikiSnapshot({ status: 'unavailable', value: undefined, writable: false }),
+    )
     expect(screen.getByRole('status').textContent).toBe(en.unavailable)
     expect(screen.queryByRole('switch')).toBeNull()
   })
@@ -120,5 +171,96 @@ describe('JSpaceSection', () => {
     const { set } = mount(snapshot({ value: { requireCoverage: false } }))
     fireEvent.click(screen.getByRole('switch', { name: en.requireCoverage }))
     expect(set).toHaveBeenCalledWith('requireCoverage', true)
+  })
+
+  it('toggles LLM Wiki and hides model pickers when disabled', () => {
+    const { wikiSet } = mount(
+      snapshot({}),
+      vi.fn(async () => {}),
+      undefined,
+      wikiSnapshot({ value: { enabled: true } }),
+    )
+    expect(screen.getByText(en.wikiIntro)).toBeTruthy()
+    expect(screen.getByLabelText(`${en.wikiLibrarian} ${en.wikiProvider}`)).toBeTruthy()
+    fireEvent.click(screen.getByRole('switch', { name: en.wikiDisable }))
+    expect(wikiSet).toHaveBeenCalledWith('enabled', false)
+    cleanup()
+    const { api } = mount(
+      snapshot({}),
+      vi.fn(async () => {}),
+      undefined,
+      wikiSnapshot({ value: { enabled: false } }),
+    )
+    expect(screen.queryByLabelText(`${en.wikiLibrarian} ${en.wikiProvider}`)).toBeNull()
+    expect(api.llm.models).not.toHaveBeenCalled()
+  })
+
+  it('writes the librarian provider and model', async () => {
+    const { api } = mount(
+      snapshot({}),
+      vi.fn(async () => {}),
+      undefined,
+      wikiSnapshot({
+        value: { enabled: true, roles: { librarian: { provider: 'ollama-local' } } },
+      }),
+    )
+    await screen.findByRole('option', { name: 'Ollama Cloud' })
+    fireEvent.change(screen.getByLabelText(`${en.wikiLibrarian} ${en.wikiProvider}`), {
+      target: { value: 'ollama-cloud' },
+    })
+    expect(api.settings.mutate).toHaveBeenCalledWith({
+      ns: 'wiki',
+      ops: [{ op: 'set', path: ['roles', 'librarian'], value: { provider: 'ollama-cloud' } }],
+    })
+    fireEvent.change(screen.getByLabelText(`${en.wikiLibrarian} ${en.wikiModel}`), {
+      target: { value: '' },
+    })
+    expect(api.settings.mutate).toHaveBeenCalledWith({
+      ns: 'wiki',
+      ops: [{ op: 'set', path: ['roles', 'librarian'], value: { provider: 'ollama-local' } }],
+    })
+    fireEvent.change(screen.getByLabelText(`${en.wikiLibrarian} ${en.wikiModel}`), {
+      target: { value: 'qwen' },
+    })
+    expect(api.settings.mutate).toHaveBeenCalledWith({
+      ns: 'wiki',
+      ops: [{ op: 'set', path: ['roles', 'librarian'], value: { provider: 'ollama-local', model: 'qwen' } }],
+    })
+    fireEvent.change(screen.getByLabelText(`${en.wikiLibrarian} ${en.wikiProvider}`), {
+      target: { value: '' },
+    })
+    expect(api.settings.mutate).toHaveBeenCalledWith({
+      ns: 'wiki',
+      ops: [{ op: 'unset', path: ['roles', 'librarian'] }],
+    })
+    await writeWikiLibrarian(api as never, undefined)
+  })
+
+  it('ignores a failed models catalog lookup', async () => {
+    mount(
+      snapshot({}),
+      vi.fn(async () => {}),
+      undefined,
+      wikiSnapshot({ value: { enabled: true } }),
+      vi.fn(async () => {}),
+      {
+        settings: { mutate: vi.fn(async () => ({ rpcId: 'm', result: { ok: true, value: {} } })) },
+        llm: { models: vi.fn(async () => ({ rpcId: 'l', result: { ok: false as const, error: {} } })) },
+      } as never,
+    )
+    await Promise.resolve()
+    expect(screen.getByLabelText(`${en.wikiLibrarian} ${en.wikiProvider}`)).toBeTruthy()
+  })
+
+  it('keeps a stored model id that is not in the live catalog', () => {
+    mount(
+      snapshot({}),
+      vi.fn(async () => {}),
+      undefined,
+      wikiSnapshot({
+        value: { enabled: true, roles: { librarian: { provider: 'ollama-local', model: 'custom-id' } } },
+      }),
+    )
+    expect(screen.getByDisplayValue('custom-id')).toBeTruthy()
   })
 })

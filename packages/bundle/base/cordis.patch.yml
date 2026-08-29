@@ -105,6 +105,8 @@
             models:
               - id: llama3.2
                 name: Llama 3.2
+          # Wiki librarian binding (Settings → J-Space → LLM Wiki) can use this
+          # route or ollama-local; unbound, the librarian stays dormant.
           ollama-cloud:
             displayName: Ollama Cloud
             api: openai-completions
@@ -336,6 +338,20 @@
 
     - id: command-jspace
       name: '@shres-code/shres-code-command-jspace'
+
+    # Project wiki: enabled by default, directory created on the first write.
+    # The librarian stays dormant until Settings → J-Space → LLM Wiki binds a route.
+    - id: wiki-filesystem
+      name: '@shres-code/shres-code-wiki-filesystem'
+
+    - id: tool-wiki
+      name: '@shres-code/shres-code-tool-wiki'
+
+    - id: wiki-embed-onnx
+      name: '@shres-code/shres-code-wiki-embed-onnx'
+
+    - id: wiki-librarian
+      name: '@shres-code/shres-code-wiki-librarian'
 
     - id: plan-mode
       name: '@shres-code/shres-code-plan-mode'

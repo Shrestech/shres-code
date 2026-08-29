@@ -270,6 +270,7 @@ const subsystemGroups = [
     ['sandbox.md', 'Sandboxing'],
     ['plan.md', 'Plan mode'],
     ['jspace.md', 'J-Space'],
+    ['wiki.md', 'Wiki'],
     ['guard.md', 'Guards'],
     ['user-questions.md', 'User interaction'],
     ['commands.md', 'Human commands'],

@@ -5,22 +5,25 @@
  */
 
 import type { ClientContext } from '@shres-code/shres-code-client-runtime/client'
+import type { ConnectionHandle } from '@shres-code/shres-code-api-remotes/client'
 import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
 import type {} from '@shres-code/shres-code-client-ui-settings/client'
 import type {} from '@shres-code/shres-code-client-locale/client'
+import type {} from '@shres-code/shres-code-api-remotes/client'
 import { createJSpaceViewSource, type JSpaceSessionRead } from './card-source.ts'
 import { JSpaceSection } from './JSpaceSection.tsx'
-import type { JSpaceSectionInjected, JSpaceSettings } from './JSpaceSection.tsx'
+import type { JSpaceSectionInjected, JSpaceSettings, WikiSettings } from './JSpaceSection.tsx'
 import { en, type JSpaceKey } from './locales.ts'
 
 export type {
-  JSpaceSectionInjected, JSpaceSectionProps, JSpaceSettings,
+  JSpaceSectionInjected, JSpaceSectionProps, JSpaceSettings, WikiSettings,
 } from './JSpaceSection.tsx'
 export type { JSpaceCardView } from './card-source.ts'
 export type { JSpaceKey } from './locales.ts'
 
 /** Settings namespace the Host seat registers. Spelled here: client must not import the Host package. */
 export const JSPACE_SETTINGS_NAMESPACE = 'jspace'
+const WIKI_SETTINGS_NAMESPACE = 'wiki'
 
 declare module '@shres-code/shres-code-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -32,7 +35,7 @@ declare module '@shres-code/shres-code-client-ui-slots' {
 const NS = 'settings.jspace'
 
 /** Required services. */
-export const inject = ['slots', 'locale', 'settingsScope', 'sessions']
+export const inject = ['slots', 'locale', 'settingsScope', 'sessions', 'connection']
 
 /**
  * Register the J-Space section once `settings.section` is declared.
@@ -41,14 +44,27 @@ export const inject = ['slots', 'locale', 'settingsScope', 'sessions']
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { en }), 'ui-settings-jspace: copy dictionaries')
   const t = ctx.locale.bind(NS) as JSpaceSectionInjected['t']
+  const connection = ctx.get('connection') as ConnectionHandle
   const scope = ctx.settingsScope.bind<JSpaceSettings>({
     namespace: JSPACE_SETTINGS_NAMESPACE,
   })
+  const wikiScope = ctx.settingsScope.bind<WikiSettings>({
+    namespace: WIKI_SETTINGS_NAMESPACE,
+  })
   const useSnapshot = bindSnapshotSelector(scope)
+  const useWikiSnapshot = bindSnapshotSelector(wikiScope)
   const useCard = bindSnapshotSelector(
     createJSpaceViewSource(ctx.sessions as unknown as JSpaceSessionRead),
   )
-  const injected = (): JSpaceSectionInjected => ({ scope, useSnapshot, useCard, t })
+  const injected = (): JSpaceSectionInjected => ({
+    scope,
+    useSnapshot,
+    wikiScope,
+    useWikiSnapshot,
+    useCard,
+    api: connection.api,
+    t,
+  })
 
   ctx.slots.inject('settings.section', () => ctx.slots.register({
     name: 'settings.section',
