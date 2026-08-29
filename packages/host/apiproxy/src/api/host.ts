@@ -32,6 +32,18 @@ export interface DirectoryListing {
   truncated: boolean
 }
 
+/** host.readFile response value: the bounded text view of one workspace file. */
+export interface FileRead {
+  /** UTF-8 decode of the served byte slice; empty when `binary` is true. */
+  content: string
+  /** The file continued past the served leading slice (the gateway's byte cap). */
+  truncated: boolean
+  /** The served bytes contain NUL — a binary file the viewer must not render as text. */
+  binary: boolean
+  /** Physical file size in bytes at read time. */
+  sizeBytes: number
+}
+
 /** Host-level unary methods. */
 export interface HostApi {
   /**
@@ -93,4 +105,18 @@ export interface HostApi {
     request: RpcRequest<{ path: string }>,
     signal: AbortSignal,
   ): Promise<RpcResponse<{ opened: true }>>
+
+  /**
+   * Read one workspace file as bounded text for the in-app file viewer. The
+   * path must resolve inside a registered Workspace root (or the host project
+   * cwd) — anything else fails with `file-outside-workspace`; a missing or
+   * unreadable target fails with `file-unreadable`. Oversized files answer
+   * their leading slice with `truncated: true`, and binary content is
+   * reported in-band (`binary: true`, empty content) instead of erroring.
+   * Like `openPath`, this is a loopback-pinned privileged method.
+   */
+  readFile(
+    request: RpcRequest<{ path: string }>,
+    signal: AbortSignal,
+  ): Promise<RpcResponse<FileRead>>
 }

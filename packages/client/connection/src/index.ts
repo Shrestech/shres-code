@@ -107,6 +107,10 @@ const PRIVILEGED_METHODS = new Set([
   'agentPreset.remove',
   'host.pickDirectory',
   'host.openPath',
+  // The in-app file viewer's bounded read: file content crossing the wire is
+  // reconnaissance-grade, so it rides the same loopback pin as the openPath
+  // desktop hand-off beside it.
+  'host.readFile',
   'settings.describe',
   'settings.openDocument',
   'settings.update',

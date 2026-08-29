@@ -11,7 +11,7 @@ import type {
   TurnLocation, WorkspaceId,
 } from '@shres-code/shres-code-client-runtime/client'
 import type { MarkdownFileMentions } from '@shres-code/shres-code-client-ui-primitives'
-import type { MessageId } from '@shres-code/shres-code-client-connection/client'
+import type { FileRead, MessageId } from '@shres-code/shres-code-client-connection/client'
 import type {} from '@shres-code/shres-code-client-ui-layout/client'
 import type { ComposerBlock } from '../input/blocks.ts'
 import type {
@@ -20,7 +20,7 @@ import type {
 import type { createChatStore } from '../stores.ts'
 import type { ComposerSubmitGesture, InputSubmitMode } from './composer-submission.ts'
 import type { ChatNode, ChatNodeKind } from './chat-nodes.ts'
-import type { CallId, SelectionTarget, ViewTab } from './views.ts'
+import type { CallId, CallSelectionTarget, ViewTab } from './views.ts'
 
 /** Browser-owned image that has not crossed the durable host boundary. */
 export interface ComposerAttachment {
@@ -685,7 +685,7 @@ export interface ChatScrollPosition {
  */
 export interface ChatViewInjected {
   /** Selection write + details panel opening in one gesture (store action + layout orchestration). */
-  openDetails: (target: SelectionTarget) => void
+  openDetails: (target: CallSelectionTarget) => void
   /**
    * Open a tool-arg filesystem path with the host OS default application
    * (relative paths resolve against the session cwd).
@@ -725,11 +725,25 @@ export type ChatViewSlotProps =
 
 /**
  * Injected share of the details slot: the panel is otherwise a pure reader of
- * the shared chat store, but its close button is a layout orchestration call.
+ * the shared chat store, but its close button is a layout orchestration call
+ * and the file viewer reads through the session-scoped workspaces face.
  */
 export interface DetailsInjected {
   /** Close the details panel (layout geometry stays with ctx.layout). */
   closeDetails: () => void
+  /**
+   * Fetch one file's bounded text for the viewer; relative paths resolve
+   * against the selected session's cwd inside the apply world.
+   * @param path - workspace-relative or absolute file path from the selection.
+   * @returns the bounded text read.
+   */
+  readFile: (path: string) => Promise<FileRead>
+  /**
+   * Native-opener fallback for the file viewer's "Open in editor" gesture and
+   * its binary/oversize recommendations.
+   * @param path - workspace-relative or absolute file path from the selection.
+   */
+  openNative: (path: string) => void
 }
 
 /** Full details-slot props: selection store, Tool output seat, injected close callback, and locale. */

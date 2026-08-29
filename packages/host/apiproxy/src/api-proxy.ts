@@ -4,8 +4,8 @@
  */
 
 import { randomUUID } from 'node:crypto'
-import { mkdir, stat } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { mkdir, open, realpath, stat } from 'node:fs/promises'
+import { dirname, isAbsolute, relative, resolve } from 'node:path'
 import type { Context } from '@shres-code/cordis'
 import { installModelSelection } from '@shres-code/shres-code-agent'
 import type { Agent, ModelSelection, ModelSelectionRef, AgentOptions, AgentStatus } from '@shres-code/shres-code-agent'
@@ -36,7 +36,7 @@ import {
 import type { PresetBearingSession } from '@shres-code/shres-code-agent-presets'
 import type {} from '@shres-code/shres-code-tools'
 import type {
-  ApiProxy, ConfigurableProviderView, CredentialView, GoalRef, HistoryEntry, HostFrame,
+  ApiProxy, ConfigurableProviderView, CredentialView, FileRead, GoalRef, HistoryEntry, HostFrame,
   ModelCatalogFailure, ModelProviderGroup,
   ModelReasoning, MuxFrame, PromptContentPart, QuestionResponsePayload, SessionListMetadata, SessionProjectionsBlock, SessionSearchItem,
   QueuedInboxItem, SessionSummary, SettingsNamespaceView, SubagentAddress, JobView, ToolEventView,
@@ -136,6 +136,8 @@ const SESSION_SEARCH_PROVIDER_CALL_LIMIT = 100
 const COLD_SUMMARY_BATCH_SIZE = 16
 /** Default maximum artifact size eligible for one cold blankness read. */
 export const DEFAULT_COLD_BLANK_PROBE_MAX_BYTES = 1024
+/** One `host.readFile` call serves at most this many bytes (the viewer's truncation point). */
+export const DEFAULT_FILE_VIEW_MAX_BYTES = 512 * 1024
 
 /** Conversation message event types (the pagination counting unit). */
 const MESSAGE_TYPES = new Set(['user/message', 'assistant/message'])
@@ -649,6 +651,24 @@ function directoryError(error: unknown): RpcError {
   return { code: 'internal', message: error instanceof Error ? error.message : String(error), details: {} }
 }
 
+/**
+ * Read a regular file's leading slice without ever buffering past the cap.
+ * @param path - absolute real path of a readable file.
+ * @param cap - maximum number of bytes to serve.
+ * @returns the served bytes, the file's physical size, and whether the file continued past the cap.
+ */
+async function readBounded(path: string, cap: number): Promise<{ bytes: Buffer; sizeBytes: number; truncated: boolean }> {
+  const handle = await open(path, 'r')
+  try {
+    const stats = await handle.stat()
+    const buffer = Buffer.alloc(Math.min(stats.size, cap))
+    const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0)
+    return { bytes: buffer.subarray(0, bytesRead), sizeBytes: stats.size, truncated: stats.size > cap }
+  } finally {
+    await handle.close()
+  }
+}
+
 /** Resolved Agent model and project-directory defaults consumed by the API implementation. */
 export interface ApiProxyDefaults {
   /**
@@ -672,6 +692,8 @@ export interface ApiProxyDefaults {
   openPath?: (path: string, signal: AbortSignal) => Promise<void>
   /** Native text-editor handoff; injectable for settings-document tests. */
   openTextFile?: (path: string, signal: AbortSignal) => Promise<void>
+  /** Maximum bytes one `host.readFile` call serves (the viewer's truncation point). */
+  fileViewMaxBytes?: number
   /** Validated DEFLATE level for session-log ZIP entries; defaults to 6. */
   sessionExportCompressionLevel?: SessionLogCompressionLevel
   /** Maximum artifact size eligible for one cold blankness read. */
@@ -1125,6 +1147,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     ?? DEFAULT_SESSION_LOG_COMPRESSION_LEVEL
   const coldBlankProbeMaxBytes = defaults.coldBlankProbeMaxBytes
     ?? DEFAULT_COLD_BLANK_PROBE_MAX_BYTES
+  const fileViewMaxBytes = defaults.fileViewMaxBytes ?? DEFAULT_FILE_VIEW_MAX_BYTES
   /** The seed model each create/resume declares; re-read so it never goes stale. */
   const agentOptions = (): AgentOptions => {
     const { provider, model } = defaults.defaultModelSelection()
@@ -1937,6 +1960,67 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     if (defaults.canOpenPath !== undefined) return defaults.canOpenPath()
     // An injected opener is by definition usable; otherwise ask the platform.
     return defaults.openPath !== undefined || canOpenNativePath()
+  }
+
+  /**
+   * Read one workspace file as bounded text for the in-app viewer. The
+   * symlink-resolved path must live inside a registered Workspace root or the
+   * host project cwd, so the browser payload cannot select an arbitrary
+   * filesystem target; binary leading bytes answer as `binary: true` with
+   * empty content, and a file past the gateway's byte cap answers its leading
+   * slice with `truncated: true` rather than failing.
+   */
+  async function readFile(
+    request: RpcRequest<unknown>, rawPath: string, signal: AbortSignal,
+  ): Promise<RpcResponse<FileRead>> {
+    if (isAborted(signal)) {
+      return err(request, { code: 'cancelled', message: 'file read was aborted', details: {} })
+    }
+    const resolved = resolve(rawPath)
+    let real: string
+    try {
+      real = await realpath(resolved)
+    } catch {
+      return err(request, {
+        code: 'file-unreadable',
+        message: `file to read does not exist: ${resolved}`,
+        details: { path: resolved },
+      })
+    }
+    const roots = await Promise.all(
+      [defaults.cwd, ...ctx.workspaceRegistry.list().map(workspace => workspace.path)]
+        .map(root => realpath(resolve(root)).catch(() => resolve(root))),
+    )
+    const inside = roots.some((root) => {
+      const rel = relative(root.replace(/[\\/]+$/, ''), real)
+      return rel === '' || (!isAbsolute(rel) && !rel.startsWith('..'))
+    })
+    if (!inside) {
+      return err(request, {
+        code: 'file-outside-workspace',
+        message: `host.readFile is confined to registered workspace roots; ${real} is outside every one`,
+        details: { path: real },
+      })
+    }
+    try {
+      const { bytes, sizeBytes, truncated } = await readBounded(real, fileViewMaxBytes)
+      const binary = bytes.includes(0)
+      return ok(request, {
+        content: binary ? '' : bytes.toString('utf8'),
+        truncated,
+        binary,
+        sizeBytes,
+      })
+    } catch (error: unknown) {
+      if (isAborted(signal)) {
+        return err(request, { code: 'cancelled', message: 'file read was aborted', details: {} })
+      }
+      return err(request, {
+        code: 'file-unreadable',
+        message: `file read failed: ${error instanceof Error ? error.message : String(error)}`,
+        details: { path: real },
+      })
+    }
   }
 
   /** Missing-service report shared by the credentials domain. */
@@ -3025,6 +3109,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
 
       async openPath(request, signal) {
         return openPath(request, request.payload.path, signal)
+      },
+
+      async readFile(request, signal) {
+        return readFile(request, request.payload.path, signal)
       },
     },
 

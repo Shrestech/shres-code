@@ -32,3 +32,5 @@ Two distinct defects sat behind that. The transcript never said what a turn had 
 ## Consequences
 
 Every existing file affordance changed at once: write, edit, read, and the generic single-file card all reach `openFile`, so the link fix and browser preference apply without per-row changes. The assembled Web test covers overflow geometry and a one-click Host handoff without launching a native application. A produced `file://` document cannot `fetch` its own siblings (while `<script src>`, `<img>`, and CSS `@import` work), the one capability HTTP serving had that this does not. Remote clients keep the chips but omit the folder action; the full path remains in each chip's `title`. Markdown still opens in the platform's `.md` application; in-product rendering is separate work.
+
+2026-08-30: a file chip opens the [in-session file viewer pane](2026-08-30-in-session-file-viewer-pane.md), whose "Open in editor" chip keeps this native browser-preference hand-off; the directory gesture (`Show in folder`) still opens natively.

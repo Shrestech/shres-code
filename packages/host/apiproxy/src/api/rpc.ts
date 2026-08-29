@@ -45,6 +45,10 @@ export interface RpcErrorDetailsMap {
   'directory-exists': { path: string }
   'directory-create-failed': { path: string }
   'directory-picker-unavailable': { capability: string }
+  /** host.readFile: the target is missing, a directory, or otherwise unreadable. */
+  'file-unreadable': { path: string }
+  /** host.readFile: the symlink-resolved target is outside every registered Workspace root and the host cwd. */
+  'file-outside-workspace': { path: string }
   'agent-preset-read-only': { agentPreset: string; reason: string }
   'agent-preset-locked': { sessionId: SessionId; agentPreset: string }
   'agent-preset-conflict': { sessionId: SessionId; requestedPreset: string; existingPreset?: string }

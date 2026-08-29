@@ -158,7 +158,7 @@ export function ChatView({
   const openError = useSession(s => s.openError)
   const hasMore = useSession(s => s.hasMore)
   const loadingOlder = useSession(s => s.loadingOlder)
-  const selectedCallId = useStore(s => s.selection?.callId)
+  const selectedCallId = useStore(s => (s.selection !== null && 'callId' in s.selection ? s.selection.callId : undefined))
 
   const pendingSteering = useMemo(
     () => inbox.filter(item => item.placement === 'steering'),

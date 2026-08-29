@@ -72,3 +72,16 @@ export const hostOpenPathRequestSchema = z.object({
 export const hostOpenPathValueSchema = z.object({
   opened: z.literal(true),
 }) satisfies z.ZodType<Wire<ResponseValue<'host.openPath'>>>
+
+/** host.readFile request payload. */
+export const hostReadFileRequestSchema = z.object({
+  path: z.string().min(1),
+}) satisfies z.ZodType<Wire<RequestPayload<'host.readFile'>>>
+
+/** host.readFile response value: the bounded text view of one workspace file. */
+export const hostReadFileValueSchema = z.object({
+  content: z.string(),
+  truncated: z.boolean(),
+  binary: z.boolean(),
+  sizeBytes: z.number().int().nonnegative(),
+}) satisfies z.ZodType<Wire<ResponseValue<'host.readFile'>>>

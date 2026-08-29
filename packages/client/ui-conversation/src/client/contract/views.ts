@@ -3,8 +3,21 @@
 /** Tool call identity as carried on the wire (branded upstream in connection). */
 export type CallId = string
 
-/** Selection target for the details linkage channel (toolcall is the step special case). */
-export interface SelectionTarget { turnSeq: number; stepSeq?: number; callId?: CallId; toolName?: string }
+/**
+ * Call selection: the details panel shows the tool call's material (the step
+ * special case carries a `stepSeq`). `kind` stays optional so the persisted
+ * pre-file selection shape rehydrates as a call target untouched.
+ */
+export interface CallSelectionTarget { turnSeq: number; stepSeq?: number; callId?: CallId; toolName?: string }
+
+/** File selection target: the details panel shows one workspace file's text. */
+export interface FileSelectionTarget { kind: 'file'; path: string }
+
+/**
+ * Selection target for the details linkage channel. Call targets show the
+ * selected tool call; a file target shows the file's text in the viewer.
+ */
+export type SelectionTarget = CallSelectionTarget | FileSelectionTarget
 
 /**
  * One conversation view tab, projected from a 'conversation.view' slot

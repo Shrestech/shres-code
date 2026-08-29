@@ -159,6 +159,9 @@ function fakeApi(overrides: Partial<{ muxFrames: MuxFrame[]; hostFrames: HostFra
       async openPath(request) {
         return { rpcId: request.rpcId, result: { ok: true, value: { opened: true as const } } }
       },
+      async readFile(request) {
+        return { rpcId: request.rpcId, result: { ok: true, value: { content: '', truncated: false, binary: false, sizeBytes: 0 } } }
+      },
     },
     workspace: {
       async list(request) {
@@ -422,6 +425,18 @@ describe('unary round trip (handler ⇄ client, no network)', () => {
     const response = await client(api).host.openPath({ path: '/tmp/a.txt' })
     expect(opened).toBe('/tmp/a.txt')
     expect(response.result).toEqual({ ok: true, value: { opened: true } })
+  })
+
+  it('round-trips host.readFile through the wire form', async () => {
+    const api = fakeApi()
+    let requested: string | undefined
+    api.host.readFile = async (request) => {
+      requested = request.payload.path
+      return { rpcId: request.rpcId, result: { ok: true, value: { content: 'one\ntwo\n', truncated: false, binary: false, sizeBytes: 8 } } }
+    }
+    const response = await client(api).host.readFile({ path: '/tmp/a.txt' })
+    expect(requested).toBe('/tmp/a.txt')
+    expect(response.result).toEqual({ ok: true, value: { content: 'one\ntwo\n', truncated: false, binary: false, sizeBytes: 8 } })
   })
 
   it('round-trips skill.list through the wire form', async () => {

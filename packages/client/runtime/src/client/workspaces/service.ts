@@ -2,7 +2,7 @@
 
 import type { Context } from '@shres-code/cordis'
 import type {
-  DirectoryListing, IApiClient, RpcError,
+  DirectoryListing, FileRead, IApiClient, RpcError,
   SessionId, WorkspaceId, WorkspaceView,
 } from '@shres-code/shres-code-api-remotes/client'
 import type { SnapshotStore } from '../contract/store.ts'
@@ -44,6 +44,14 @@ export class DirectoryBrowseError extends Error {
   constructor(readonly rpcError: RpcError) {
     super(`directory browse failed: ${rpcError.code}: ${rpcError.message}`)
     this.name = 'DirectoryBrowseError'
+  }
+}
+
+/** Structured read failure so the file viewer can branch on Host business codes. */
+export class FileReadError extends Error {
+  constructor(readonly rpcError: RpcError) {
+    super(`file read failed: ${rpcError.code}: ${rpcError.message}`)
+    this.name = 'FileReadError'
   }
 }
 
@@ -247,6 +255,18 @@ export class WorkspaceRuntime implements IWorkspaces {
     if (!response.result.ok) {
       throw new Error(`path open failed: ${response.result.error.message}`)
     }
+  }
+
+  /**
+   * Read one workspace file as bounded text through the Host viewer fence.
+   * @param path - absolute or host-resolvable file path.
+   * @param signal - aborts the wire request when the caller supersedes it.
+   * @returns the bounded text read.
+   */
+  async readFile(path: string, signal?: AbortSignal): Promise<FileRead> {
+    const response = await this.api.host.readFile({ path }, signal)
+    if (!response.result.ok) throw new FileReadError(response.result.error)
+    return response.result.value
   }
 
   /**

@@ -180,7 +180,11 @@ export class FakeApiClient implements IApiClient {
     listDirectory: (payload: unknown) => this.record('host.listDirectory', payload, this.onListDirectory(payload)),
     createDirectory: (payload: unknown) => this.record('host.createDirectory', payload, this.onCreateDirectory(payload)),
     openPath: (payload: unknown) => this.record('host.openPath', payload, this.onOpenPath(payload)),
+    readFile: (payload: unknown) => this.record('host.readFile', payload, this.onReadFile(payload)),
   }
+
+  onReadFile: (payload: unknown) => Promise<RpcResponse<{ content: string; truncated: boolean; binary: boolean; sizeBytes: number }>> =
+    () => Promise.resolve(ok({ content: '', truncated: false, binary: false, sizeBytes: 0 }))
 
   // The archive-set field defaults at the binding below so list stubs keep
   // the pre-archive `{ items }` shape; a stub carrying the field wins.

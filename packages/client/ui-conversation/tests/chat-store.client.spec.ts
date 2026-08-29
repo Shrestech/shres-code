@@ -20,6 +20,9 @@ describe('createChatStore', () => {
 
     store.actions.select({ turnSeq: 3, callId: 'c1', toolName: 'bash' })
     expect(store.store.getSnapshot().selection).toEqual({ turnSeq: 3, callId: 'c1', toolName: 'bash' })
+    // File targets ride the same selection seat for the viewer branch.
+    store.actions.select({ kind: 'file', path: 'src/a.ts' })
+    expect(store.store.getSnapshot().selection).toEqual({ kind: 'file', path: 'src/a.ts' })
     store.actions.select(null)
     expect(store.store.getSnapshot().selection).toBeNull()
 

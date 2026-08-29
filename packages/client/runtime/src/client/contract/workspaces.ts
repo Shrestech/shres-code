@@ -6,7 +6,7 @@
  * the concrete class. Widening this interface is the explicit act of
  * widening what features may do to the workspaces domain.
  */
-import type { DirectoryListing, SessionId, WorkspaceId, WorkspaceView } from '@shres-code/shres-code-api-remotes/client'
+import type { DirectoryListing, FileRead, SessionId, WorkspaceId, WorkspaceView } from '@shres-code/shres-code-api-remotes/client'
 import type { WorkspaceListState } from '../workspaces/service.ts'
 import type { ObservableSnapshot } from './store.ts'
 
@@ -58,6 +58,14 @@ export interface IWorkspaces {
    * @param path - absolute or host-resolvable path.
    */
   openPath(path: string): Promise<void>
+  /**
+   * Read one Workspace file as bounded text through the Host viewer fence
+   * (workspace-confined, byte-capped, binary-flagged).
+   * @param path - absolute or Host-resolvable file path.
+   * @param signal - aborts the wire request when the caller supersedes it.
+   * @returns the bounded text read.
+   */
+  readFile(path: string, signal?: AbortSignal): Promise<FileRead>
   /**
    * Rename a Workspace.
    * @param workspaceId - target workspace.

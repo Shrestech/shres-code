@@ -49,6 +49,30 @@
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
+/* File-viewer header: the native hand-off chip beside the close button. */
+.actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+}
+
+.nativeBtn {
+  padding: 4px 8px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.nativeBtn:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
 .body {
   flex: 1;
   min-height: 0;
@@ -73,6 +97,14 @@
   line-height: 18px;
   font-weight: 500;
   color: var(--dsw-alias-label-secondary);
+}
+
+/* Truncation notice above the file code block. */
+.note {
+  margin-bottom: 8px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
 }
 
 /* figma Code-block (I54:42735;43:41429): r12, pad 16, mono 13/22. */

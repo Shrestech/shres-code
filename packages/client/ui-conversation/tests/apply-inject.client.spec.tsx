@@ -266,12 +266,26 @@ describe('conversation slot inject API', () => {
     await b.runtime.dispose()
   })
 
-  it('openFile (chat view face) resolves against session cwd and calls workspaces.openPath', async () => {
+  it('openFile (chat view face) writes the file selection and opens the viewer pane', async () => {
     const b = await bench()
-    const { injected } = b.chatViewApi(ROOT)
+    const { instance, injected } = b.chatViewApi(ROOT)
     injected.openFile('src/a.ts')
+    expect(instance.store.getSnapshot().selection).toEqual({ kind: 'file', path: 'src/a.ts' })
+    expect(b.layoutFake.openDetails).toHaveBeenCalledTimes(1)
+    // File paths read through the pane, never the native opener.
+    expect(b.runtime.workspaces.calls).toEqual([])
+    await b.runtime.dispose()
+  })
+
+  it('openFile (chat view face) keeps the native hand-off for directory gestures', async () => {
+    const b = await bench()
+    const { instance, injected } = b.chatViewApi(ROOT)
+    injected.openFile('.')
+    // A directory is not a viewer selection: no selection write, native open.
+    expect(instance.store.getSnapshot().selection).toBeNull()
+    expect(b.layoutFake.openDetails).not.toHaveBeenCalled()
     await vi.waitFor(() => {
-      expect(b.runtime.workspaces.calls).toContainEqual({ method: 'openPath', args: ['/proj/src/a.ts'] })
+      expect(b.runtime.workspaces.calls).toContainEqual({ method: 'openPath', args: ['/proj/.'] })
     })
     await b.runtime.dispose()
   })
@@ -381,13 +395,19 @@ describe('conversation slot inject API', () => {
 })
 
 describe('details inject API', () => {
-  it('details injects the one layout callback; selection rides the shared store instead', async () => {
+  it('details injects close and viewer callbacks bound to the session cwd', async () => {
     const b = await bench()
     const entry = b.entryOf('details')
-    const injected = (entry.inject as unknown as () => DetailsInjected)()
-    expect(Object.keys(injected)).toEqual(['closeDetails'])
+    const injected = (entry.inject as unknown as (sessionId: SessionId) => DetailsInjected)(ROOT)
+    expect(Object.keys(injected)).toEqual(['closeDetails', 'readFile', 'openNative'])
     injected.closeDetails()
     expect(b.layoutFake.closeDetails).toHaveBeenCalledTimes(1)
+    await injected.readFile('src/a.ts')
+    expect(b.runtime.workspaces.calls).toContainEqual({ method: 'readFile', args: ['/proj/src/a.ts'] })
+    injected.openNative('src/a.ts')
+    await vi.waitFor(() => {
+      expect(b.runtime.workspaces.calls).toContainEqual({ method: 'openPath', args: ['/proj/src/a.ts'] })
+    })
     // The shared handle: details resolves the SAME instance conversation writes.
     const conv = b.runtime.storeOf('conversation.session', ROOT)
     const details = b.runtime.storeOf('details', ROOT)
