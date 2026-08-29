@@ -4611,8 +4611,8 @@ importers:
         specifier: link:../../../vendor/schemastery
         version: link:../../../vendor/schemastery
       koffi:
-        specifier: ^3.1.2
-        version: 3.1.2
+        specifier: ^3.1.0
+        version: 3.1.1
     devDependencies:
       '@shres-code/cordis':
         specifier: workspace:^
@@ -5376,8 +5376,8 @@ importers:
         specifier: workspace:^
         version: link:../../util/native-command
       koffi:
-        specifier: ^3.1.2
-        version: 3.1.2
+        specifier: ^3.1.0
+        version: 3.1.1
     devDependencies:
       '@shres-code/cordis':
         specifier: workspace:^
@@ -6002,7 +6002,7 @@ importers:
     dependencies:
       '@earendil-works/pi-ai':
         specifier: ^0.82.1
-        version: 0.82.1(@modelcontextprotocol/sdk@1.29.0(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)
+        version: 0.82.1(@modelcontextprotocol/sdk@1.30.0(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)
       '@shres-code/schemastery':
         specifier: link:../../../vendor/schemastery
         version: link:../../../vendor/schemastery
@@ -6228,8 +6228,8 @@ importers:
   packages/mcp/mcp-client:
     dependencies:
       '@modelcontextprotocol/sdk':
-        specifier: ^1.12.0
-        version: 1.29.0(zod@4.4.3)
+        specifier: ^1.30.0
+        version: 1.30.0(zod@4.4.3)
       '@shres-code/schemastery':
         specifier: link:../../../vendor/schemastery
         version: link:../../../vendor/schemastery
@@ -6491,8 +6491,8 @@ importers:
   packages/sandbox/sandbox-windows-acl:
     dependencies:
       koffi:
-        specifier: ^3.1.2
-        version: 3.1.2
+        specifier: ^3.1.0
+        version: 3.1.1
     devDependencies:
       '@shres-code/cordis':
         specifier: workspace:^
@@ -6840,8 +6840,8 @@ importers:
         specifier: link:../../../vendor/schemastery
         version: link:../../../vendor/schemastery
       koffi:
-        specifier: ^3.1.2
-        version: 3.1.2
+        specifier: ^3.1.0
+        version: 3.1.1
     devDependencies:
       '@shres-code/cordis':
         specifier: workspace:^
@@ -7983,7 +7983,7 @@ importers:
     dependencies:
       '@anthropic-ai/claude-agent-sdk':
         specifier: 0.3.220
-        version: 0.3.220(@anthropic-ai/sdk@0.93.0(zod@4.4.3))(@modelcontextprotocol/sdk@1.29.0(zod@4.4.3))(zod@4.4.3)
+        version: 0.3.220(@anthropic-ai/sdk@0.93.0(zod@4.4.3))(@modelcontextprotocol/sdk@1.30.0(zod@4.4.3))(zod@4.4.3)
       '@anthropic-ai/sdk':
         specifier: 0.93.0
         version: 0.93.0(zod@4.4.3)
@@ -10903,9 +10903,9 @@ packages:
       '@modelcontextprotocol/sdk':
         optional: true
 
-  '@hono/node-server@1.19.17':
-    resolution: {integrity: sha512-dSneS5qhiauZWGDCeK4o695Xd9nUNjviSZCMQrj10eetr8Uln1ucn6bbphOM6UynAMMtNIzZNSpL9vnASJwrPQ==}
-    engines: {node: '>=18.14.1'}
+  '@hono/node-server@2.0.12':
+    resolution: {integrity: sha512-eWpQYr67tqJLeaSUl0Q+TquuYfUdTibpOJlUMV2FfUP7+KqCC5TufnwnlXL6mobZBJbGAYRd7ZvEBDCbLInjhg==}
+    engines: {node: '>=20'}
     peerDependencies:
       hono: ^4
 
@@ -11287,78 +11287,78 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
-  '@koromix/koffi-darwin-arm64@3.1.2':
-    resolution: {integrity: sha512-32pU4pNZABIz+l9DNJl51Y+jur4vv+SF4Ip2CSF4OUg1xUyefoLpX0NttDmzGITIrneUEVSEN+dT22524ESKBw==}
+  '@koromix/koffi-darwin-arm64@3.1.1':
+    resolution: {integrity: sha512-+Dl0zQDh1Wb55AWOn9hp7K30qgkODvrvN+ZNkFOh81Q0oFX/rpJQtocgjAuYk2zFAcajSeVDumkcHMPwnKSXzA==}
     cpu: [arm64]
     os: [darwin]
 
-  '@koromix/koffi-darwin-x64@3.1.2':
-    resolution: {integrity: sha512-S+H6LQgUoMj77BqDegwlRaxwLXDfwvSJGuceOqtH0I5V8rzKLmu/hC7NBlxOoAlvKlcV63FtdNiE2E9YSltffg==}
+  '@koromix/koffi-darwin-x64@3.1.1':
+    resolution: {integrity: sha512-cDFAKn1qdZBFLrp7dAc9QUDw3l4xAhTJbOdPWWb0LxssVicUdHcRCLZGrDsmPW2tpH6LGNNeLgqRpAoD2Mo8iA==}
     cpu: [x64]
     os: [darwin]
 
-  '@koromix/koffi-freebsd-arm64@3.1.2':
-    resolution: {integrity: sha512-fD0ow2PBE60nw7K6xcbala6qwXxfcYeU62tduNeIPvx0KoWhU2rMKZiDNe+iI5TQb3rxYYjjP+aF2Sdm9y6EXQ==}
+  '@koromix/koffi-freebsd-arm64@3.1.1':
+    resolution: {integrity: sha512-zaP7FJISI/scQW9Wa5QicY3a09WmtKBWSbmC+5nfCqPzwWe7Hx2so74Er7mPsDfCiMMR0Ya+evKbJQDkfyXicg==}
     cpu: [arm64]
     os: [freebsd]
 
-  '@koromix/koffi-freebsd-ia32@3.1.2':
-    resolution: {integrity: sha512-t8OmL+hoJGDLZDnuLjgLemSYrXX99M7Md+zJX8bMHOtiNbFtkGXn/mV21Pb1ik9JhBXjwK1r4hvBPNlqTMGrHg==}
+  '@koromix/koffi-freebsd-ia32@3.1.1':
+    resolution: {integrity: sha512-7GejVb688TLM8rbjfc0oezJrATxZc0dn801xWEDJekN2DgmRXu7HquGqWQ6z3NeSq7ZxEggz4T3xtlbCysQapA==}
     cpu: [ia32]
     os: [freebsd]
 
-  '@koromix/koffi-freebsd-x64@3.1.2':
-    resolution: {integrity: sha512-axbLgiM4Y2vyDOTqlXCI8vkg9wqjwSRsmoWXSKreA5YFJwnYA6Sc4aHMz+qZgUSfFei52Qrv1RGhDyo4kHvqhA==}
+  '@koromix/koffi-freebsd-x64@3.1.1':
+    resolution: {integrity: sha512-XLiCFP9OFCyOoGTjAimtDKLhzhfo34WcP1ShVWxRzNCWDGjfz8BYjwd69cp/cDSUXZbxamqs4+/6vmkePq9wxA==}
     cpu: [x64]
     os: [freebsd]
 
-  '@koromix/koffi-linux-arm64@3.1.2':
-    resolution: {integrity: sha512-f0hqAIlFcL9wlRGJ/uCfyfspqnGaASk2gLx1UAP3RBgMQl68D1e+fiHNdXa7g9d76ttmpA8/PGNAqc1X4Byy1Q==}
+  '@koromix/koffi-linux-arm64@3.1.1':
+    resolution: {integrity: sha512-HA9xINK7G4dRAkpfnBWD9VfuyIBgW1SuK+KPHjksUwRMOnhgqP8J/JqgrAzdzcDiefGBkqEacIP776OUwz7knQ==}
     cpu: [arm64]
     os: [linux]
 
-  '@koromix/koffi-linux-ia32@3.1.2':
-    resolution: {integrity: sha512-UGLPuqeOV/UArsK6oeB5yI/XjSWkFqFlBTC9rUbezBuHJhSibk1EMv7QC0cvtDMu18bo+ucqXWPzh42oT5yYlw==}
+  '@koromix/koffi-linux-ia32@3.1.1':
+    resolution: {integrity: sha512-jG7IFytmP8K5Qtbx0ro0ZeuX3JjSsLxmYhq+nmXDdrtOAlxIsWGynuiDLS6Jk3vOchVii2m6Y2f/L3GLG2fG5A==}
     cpu: [ia32]
     os: [linux]
 
-  '@koromix/koffi-linux-loong64@3.1.2':
-    resolution: {integrity: sha512-jI0+gM2oDsJ7reOt3XPyO7lyQtZ1CT6NR2uqGQcQVM43cyXBAVYYCUxEH3LHCbgumFaZ+LueIUgbMSwb9pHBxQ==}
+  '@koromix/koffi-linux-loong64@3.1.1':
+    resolution: {integrity: sha512-CIsT1cNnih8FuU52Me/IVlJBpH28SQfoDeYPctJswgJzaARktusF7m4MUbtR1PBDjuquCVM4/vFyNdOzfPonvA==}
     cpu: [loong64]
     os: [linux]
 
-  '@koromix/koffi-linux-riscv64@3.1.2':
-    resolution: {integrity: sha512-yB99adXBRd5T+xXG+f6nnUkC3jCI0iXvPU6RqD9Kx7aZP4Y4NNUWJ5Q4FaP9jb1XmZLY4pGBUiHt8u03Yl7NyA==}
+  '@koromix/koffi-linux-riscv64@3.1.1':
+    resolution: {integrity: sha512-9D6RmqeKsSvs3U6jILJU9PcAjMwKKyn7yLxNBb5k6z9PCoUoGJ3/BrhXAX0qjrLLwEiIpP/hS/40RuXvH8Lc3Q==}
     cpu: [riscv64]
     os: [linux]
 
-  '@koromix/koffi-linux-x64@3.1.2':
-    resolution: {integrity: sha512-Oxvo6F3Edzy/Jm2EtbHWkJ2xRB0mXDAe63k5+USL5uiGE5xZjwEUDOBKIhv2BpCZSOAJrfoojFFogj6+ICKQhw==}
+  '@koromix/koffi-linux-x64@3.1.1':
+    resolution: {integrity: sha512-pyTcX5fePeYbt7TZAwRby69wdlRx3PT+g15ra5IYdat/Pgh3qAKEYeZ+uu7WpPGOy43p/oSRqqZoa2kORzozlA==}
     cpu: [x64]
     os: [linux]
 
-  '@koromix/koffi-openbsd-ia32@3.1.2':
-    resolution: {integrity: sha512-SSWzUhL8Ex84JTsO67+MdWZrdwgOzoOrQ0+ZbB+UsivHoAxmWLHKWZaSafNqyBZtxGY1EgtR8AIPouWE9U+Zfw==}
+  '@koromix/koffi-openbsd-ia32@3.1.1':
+    resolution: {integrity: sha512-iPnPzvG2HOfdzaiG1drdkt86sAqmTPDv9mAf+5gL7mRzkeeQC88EVGboRy7eXwdXn7R+v0ntA3iQxdHrBn6yXw==}
     cpu: [ia32]
     os: [openbsd]
 
-  '@koromix/koffi-openbsd-x64@3.1.2':
-    resolution: {integrity: sha512-0ZuI4St7chq3M0d3VivvKIqacZ7RhgohdR476V3HpJkaNdfIywsJIw+GBvqkQahu+4A2Rpu6yQJpWSrfk/Z+Jw==}
+  '@koromix/koffi-openbsd-x64@3.1.1':
+    resolution: {integrity: sha512-/Xqc3R0SVoMCYjMPZnJ9bULtRo364+dKmnQhfDrI83tSpxUHRw7HRNf12vBeL+hPgKxSBjtMpWfQ/ZIyVyLFag==}
     cpu: [x64]
     os: [openbsd]
 
-  '@koromix/koffi-win32-arm64@3.1.2':
-    resolution: {integrity: sha512-8Wn6phw7y53uI52+aBPAqEfZ5pj/HCjg/YtdthqSWYHy+d0MhyASKlcmuP0B5raxQnnA1Bm9LC8UO3M3RojeBw==}
+  '@koromix/koffi-win32-arm64@3.1.1':
+    resolution: {integrity: sha512-JhqHauEwQvdcWUERxrV5HH/DT9W7hY1A1eU6/o8tB+yck+D3kt5elpRDBt9KjpW6h+vHPy3V0sjDvO0CXyabTA==}
     cpu: [arm64]
     os: [win32]
 
-  '@koromix/koffi-win32-ia32@3.1.2':
-    resolution: {integrity: sha512-FkKaPBMawgHMNnp1FwLldXMNvEa139GXkxPi9JD9xU71Kh/ZmuEYHGSD6JwZDmDr4jekVrBrr+eGZ+j6C2mkXg==}
+  '@koromix/koffi-win32-ia32@3.1.1':
+    resolution: {integrity: sha512-ZRuyYmlGS/rCc966qqs0qREXDW4FRdul7rDF1VgSWHbVmdc196PUgUT+blq/GjZgTwqzeEXtMRgM+cU8krHjvA==}
     cpu: [ia32]
     os: [win32]
 
-  '@koromix/koffi-win32-x64@3.1.2':
-    resolution: {integrity: sha512-FeFC59UU1XX4J3ZaqKrsrEzczzB5qksMJo7/R45vIg8mGNVSLMVE85JRiZpjcp9i5Lbav5Vw47QvwFzBgIfvlw==}
+  '@koromix/koffi-win32-x64@3.1.1':
+    resolution: {integrity: sha512-KqHPmvj6QILhNyI/To8QSihHsijeVGIYYPBOUnXEpcnH2LuLbargY4Hd6dDeTN3Z90uUUxN+1FWz1UnhVzFOiA==}
     cpu: [x64]
     os: [win32]
 
@@ -11379,8 +11379,8 @@ packages:
   '@mixmark-io/domino@2.2.0':
     resolution: {integrity: sha512-Y28PR25bHXUg88kCV7nivXrP2Nj2RueZ3/l/jdx6J9f8J4nsEGcgX0Qe6lt7Pa+J79+kPiJU3LguR6O/6zrLOw==}
 
-  '@modelcontextprotocol/sdk@1.29.0':
-    resolution: {integrity: sha512-zo37mZA9hJWpULgkRpowewez1y6ML5GsXJPY8FI0tBBCd77HEvza4jDqRKOXgHNn867PVGCyTdzqpz0izu5ZjQ==}
+  '@modelcontextprotocol/sdk@1.30.0':
+    resolution: {integrity: sha512-xKd8OIzlqNzcqcNumGAa6g+PW2kjD5vrpcKOnfldAUPP3j7lnqMPwlTXQm8gF+UwH72z0lqaRbjr9hqGz0eITA==}
     engines: {node: '>=18'}
     peerDependencies:
       '@cfworker/json-schema': ^4.1.1
@@ -14048,8 +14048,8 @@ packages:
     engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
 
-  koffi@3.1.2:
-    resolution: {integrity: sha512-wVwuE21TBl8/si6E0hPorKR2PJ2q33mEWVETANrtSp3kFM8fi2FcD/J5wmxu0T4TBcqmMQ4xKuF1X1ayFmphzw==}
+  koffi@3.1.1:
+    resolution: {integrity: sha512-mRX6AMeeKCxSOeOopqAcLAl5jcNvge7NAG8l7rF/8gGJATI0tdHFYjteIdE0mGOtWdsrJOij+PjnP8Q9c1gwgA==}
 
   kokoro-js@1.2.1:
     resolution: {integrity: sha512-oq0HZJWis3t8lERkMJh84WLU86dpYD0EuBPtqYnLlQzyFP1OkyBRDcweAqCfhNOpltyN9j/azp1H6uuC47gShw==}
@@ -15883,10 +15883,10 @@ snapshots:
   '@anthropic-ai/claude-agent-sdk-win32-x64@0.3.220':
     optional: true
 
-  '@anthropic-ai/claude-agent-sdk@0.3.220(@anthropic-ai/sdk@0.93.0(zod@4.4.3))(@modelcontextprotocol/sdk@1.29.0(zod@4.4.3))(zod@4.4.3)':
+  '@anthropic-ai/claude-agent-sdk@0.3.220(@anthropic-ai/sdk@0.93.0(zod@4.4.3))(@modelcontextprotocol/sdk@1.30.0(zod@4.4.3))(zod@4.4.3)':
     dependencies:
       '@anthropic-ai/sdk': 0.93.0(zod@4.4.3)
-      '@modelcontextprotocol/sdk': 1.29.0(zod@4.4.3)
+      '@modelcontextprotocol/sdk': 1.30.0(zod@4.4.3)
       zod: 4.4.3
     optionalDependencies:
       '@anthropic-ai/claude-agent-sdk-darwin-arm64': 0.3.220
@@ -16365,11 +16365,11 @@ snapshots:
     transitivePeerDependencies:
       - '@algolia/client-search'
 
-  '@earendil-works/pi-ai@0.82.1(@modelcontextprotocol/sdk@1.29.0(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)':
+  '@earendil-works/pi-ai@0.82.1(@modelcontextprotocol/sdk@1.30.0(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)':
     dependencies:
       '@anthropic-ai/sdk': 0.91.1(zod@4.4.3)
       '@aws-sdk/client-bedrock-runtime': 3.1048.0
-      '@google/genai': 1.52.0(@modelcontextprotocol/sdk@1.29.0(zod@4.4.3))
+      '@google/genai': 1.52.0(@modelcontextprotocol/sdk@1.30.0(zod@4.4.3))
       '@mistralai/mistralai': 2.2.6(@opentelemetry/api@1.9.0)
       '@opentelemetry/api': 1.9.0
       '@smithy/node-http-handler': 4.7.3
@@ -16685,20 +16685,20 @@ snapshots:
 
   '@exodus/bytes@1.15.1': {}
 
-  '@google/genai@1.52.0(@modelcontextprotocol/sdk@1.29.0(zod@4.4.3))':
+  '@google/genai@1.52.0(@modelcontextprotocol/sdk@1.30.0(zod@4.4.3))':
     dependencies:
       google-auth-library: 10.7.0
       p-retry: 4.6.2
       protobufjs: 7.6.4
       ws: 8.21.0
     optionalDependencies:
-      '@modelcontextprotocol/sdk': 1.29.0(zod@4.4.3)
+      '@modelcontextprotocol/sdk': 1.30.0(zod@4.4.3)
     transitivePeerDependencies:
       - bufferutil
       - supports-color
       - utf-8-validate
 
-  '@hono/node-server@1.19.17(hono@4.12.32)':
+  '@hono/node-server@2.0.12(hono@4.12.32)':
     dependencies:
       hono: 4.12.32
 
@@ -16975,49 +16975,49 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@koromix/koffi-darwin-arm64@3.1.2':
+  '@koromix/koffi-darwin-arm64@3.1.1':
     optional: true
 
-  '@koromix/koffi-darwin-x64@3.1.2':
+  '@koromix/koffi-darwin-x64@3.1.1':
     optional: true
 
-  '@koromix/koffi-freebsd-arm64@3.1.2':
+  '@koromix/koffi-freebsd-arm64@3.1.1':
     optional: true
 
-  '@koromix/koffi-freebsd-ia32@3.1.2':
+  '@koromix/koffi-freebsd-ia32@3.1.1':
     optional: true
 
-  '@koromix/koffi-freebsd-x64@3.1.2':
+  '@koromix/koffi-freebsd-x64@3.1.1':
     optional: true
 
-  '@koromix/koffi-linux-arm64@3.1.2':
+  '@koromix/koffi-linux-arm64@3.1.1':
     optional: true
 
-  '@koromix/koffi-linux-ia32@3.1.2':
+  '@koromix/koffi-linux-ia32@3.1.1':
     optional: true
 
-  '@koromix/koffi-linux-loong64@3.1.2':
+  '@koromix/koffi-linux-loong64@3.1.1':
     optional: true
 
-  '@koromix/koffi-linux-riscv64@3.1.2':
+  '@koromix/koffi-linux-riscv64@3.1.1':
     optional: true
 
-  '@koromix/koffi-linux-x64@3.1.2':
+  '@koromix/koffi-linux-x64@3.1.1':
     optional: true
 
-  '@koromix/koffi-openbsd-ia32@3.1.2':
+  '@koromix/koffi-openbsd-ia32@3.1.1':
     optional: true
 
-  '@koromix/koffi-openbsd-x64@3.1.2':
+  '@koromix/koffi-openbsd-x64@3.1.1':
     optional: true
 
-  '@koromix/koffi-win32-arm64@3.1.2':
+  '@koromix/koffi-win32-arm64@3.1.1':
     optional: true
 
-  '@koromix/koffi-win32-ia32@3.1.2':
+  '@koromix/koffi-win32-ia32@3.1.1':
     optional: true
 
-  '@koromix/koffi-win32-x64@3.1.2':
+  '@koromix/koffi-win32-x64@3.1.1':
     optional: true
 
   '@mermaid-js/mermaid-mindmap@9.3.0':
@@ -17049,9 +17049,9 @@ snapshots:
 
   '@mixmark-io/domino@2.2.0': {}
 
-  '@modelcontextprotocol/sdk@1.29.0(zod@4.4.3)':
+  '@modelcontextprotocol/sdk@1.30.0(zod@4.4.3)':
     dependencies:
-      '@hono/node-server': 1.19.17(hono@4.12.32)
+      '@hono/node-server': 2.0.12(hono@4.12.32)
       ajv: 8.20.0
       ajv-formats: 3.0.1(ajv@8.20.0)
       content-type: 1.0.5
@@ -17073,7 +17073,7 @@ snapshots:
 
   '@modelcontextprotocol/server-everything@2026.7.4':
     dependencies:
-      '@modelcontextprotocol/sdk': 1.29.0(zod@4.4.3)
+      '@modelcontextprotocol/sdk': 1.30.0(zod@4.4.3)
       cors: 2.8.6
       express: 5.2.1
       jszip: 3.10.1
@@ -17084,7 +17084,7 @@ snapshots:
 
   '@modelcontextprotocol/server-filesystem@2026.7.10(zod@4.4.3)':
     dependencies:
-      '@modelcontextprotocol/sdk': 1.29.0(zod@4.4.3)
+      '@modelcontextprotocol/sdk': 1.30.0(zod@4.4.3)
       diff: 8.0.4
       glob: 10.5.0
       minimatch: 10.2.5
@@ -19622,23 +19622,23 @@ snapshots:
       yaml: 2.9.0
       zod: 4.4.3
 
-  koffi@3.1.2:
+  koffi@3.1.1:
     optionalDependencies:
-      '@koromix/koffi-darwin-arm64': 3.1.2
-      '@koromix/koffi-darwin-x64': 3.1.2
-      '@koromix/koffi-freebsd-arm64': 3.1.2
-      '@koromix/koffi-freebsd-ia32': 3.1.2
-      '@koromix/koffi-freebsd-x64': 3.1.2
-      '@koromix/koffi-linux-arm64': 3.1.2
-      '@koromix/koffi-linux-ia32': 3.1.2
-      '@koromix/koffi-linux-loong64': 3.1.2
-      '@koromix/koffi-linux-riscv64': 3.1.2
-      '@koromix/koffi-linux-x64': 3.1.2
-      '@koromix/koffi-openbsd-ia32': 3.1.2
-      '@koromix/koffi-openbsd-x64': 3.1.2
-      '@koromix/koffi-win32-arm64': 3.1.2
-      '@koromix/koffi-win32-ia32': 3.1.2
-      '@koromix/koffi-win32-x64': 3.1.2
+      '@koromix/koffi-darwin-arm64': 3.1.1
+      '@koromix/koffi-darwin-x64': 3.1.1
+      '@koromix/koffi-freebsd-arm64': 3.1.1
+      '@koromix/koffi-freebsd-ia32': 3.1.1
+      '@koromix/koffi-freebsd-x64': 3.1.1
+      '@koromix/koffi-linux-arm64': 3.1.1
+      '@koromix/koffi-linux-ia32': 3.1.1
+      '@koromix/koffi-linux-loong64': 3.1.1
+      '@koromix/koffi-linux-riscv64': 3.1.1
+      '@koromix/koffi-linux-x64': 3.1.1
+      '@koromix/koffi-openbsd-ia32': 3.1.1
+      '@koromix/koffi-openbsd-x64': 3.1.1
+      '@koromix/koffi-win32-arm64': 3.1.1
+      '@koromix/koffi-win32-ia32': 3.1.1
+      '@koromix/koffi-win32-x64': 3.1.1
 
   kokoro-js@1.2.1:
     dependencies:
