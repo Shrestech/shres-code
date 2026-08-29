@@ -29,7 +29,7 @@
   "dependencies": {
     "@shres-code/shres-code-client-ui-slots": "workspace:^",
     "react": "^18.2.0",
-    "use-sync-external-store": "1.2.0"
+    "use-sync-external-store": "1.6.0"
   },
   "peerDependencies": {
     "@shres-code/shres-code-invariants": "workspace:^",
