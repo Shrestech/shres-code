@@ -57,6 +57,11 @@ switch (invocation.mode) {
     process.exit(await runModelsCli(invocation.command))
     break
   }
+  case 'remote': {
+    const { runRemoteCli } = await import('./remote-cli.ts')
+    process.exit(await runRemoteCli(invocation.command))
+    break
+  }
   default:
     invocation satisfies never
     throw new Error(`shres: unhandled invocation mode ${JSON.stringify(invocation)}`)

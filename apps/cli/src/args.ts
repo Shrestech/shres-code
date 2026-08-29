@@ -19,6 +19,7 @@
 import { Command, CommanderError } from 'commander'
 import type { ModelsCliCommand, ProviderTemplate } from './models-cli.ts'
 import { PROVIDER_TEMPLATES } from './models-cli.ts'
+import type { RemoteCliCommand } from '@shres-code/shres-code-host-remote-control'
 
 /** Boot a named profile and hand it the invocation's inner arguments. */
 interface ProfileInvocation {
@@ -61,8 +62,20 @@ interface ModelsInvocation {
   command: ModelsCliCommand
 }
 
+/** Register remote hosts or open hardened SSH tunnels to their daemons. */
+interface RemoteInvocation {
+  mode: 'remote'
+  command: RemoteCliCommand
+}
+
 /** The resolved `shres` invocation. Help, version, and errors exit inside {@link parseShresArgs}. */
-export type ShresInvocation = ProfileInvocation | DumpConfigInvocation | PluginInvocation | EnableEditionInvocation | ModelsInvocation
+export type ShresInvocation =
+  | ProfileInvocation
+  | DumpConfigInvocation
+  | PluginInvocation
+  | EnableEditionInvocation
+  | ModelsInvocation
+  | RemoteInvocation
 
 /** Launcher flags shared by the default command and the `web` alias. */
 interface BootOptions {
@@ -304,6 +317,52 @@ export function parseShresArgs(argv: readonly string[], version: string): ShresI
       rejectParentOptions('providers')
       if (provider === '') program.error('error: providers remove needs a provider')
       resolved = { mode: 'models', command: { kind: 'providers-remove', provider } }
+    })
+
+  const remote = program.command('remote').description('register remote hosts and open hardened SSH tunnels to their daemons')
+  remote
+    .command('add')
+    .description('register a remote host; validate the target and daemon port loud')
+    .argument('<alias>', 'short lowercase alias (letters, digits, dashes)')
+    .argument('<target>', 'user@host ssh target')
+    .option('--port <port>', 'remote daemon loopback port the tunnel forwards to', '3080')
+    .action((alias: string, target: string, options: { port: string }) => {
+      rejectParentOptions('remote')
+      if (alias === '') program.error('error: remote add needs an alias')
+      if (target === '') program.error('error: remote add needs a user@host target')
+      const remotePort = Number(options.port)
+      if (!Number.isInteger(remotePort)) program.error(`error: remote add --port must be an integer, got "${options.port}"`)
+      resolved = { mode: 'remote', command: { kind: 'remote-add', alias, target, remotePort } }
+    })
+  remote
+    .command('list')
+    .description('list registered remotes from the local registry')
+    .action(() => {
+      rejectParentOptions('remote')
+      resolved = { mode: 'remote', command: { kind: 'remote-list' } }
+    })
+  remote
+    .command('remove')
+    .description('remove a registered remote alias')
+    .argument('<alias>', 'short lowercase alias')
+    .action((alias: string) => {
+      rejectParentOptions('remote')
+      if (alias === '') program.error('error: remote remove needs an alias')
+      resolved = { mode: 'remote', command: { kind: 'remote-remove', alias } }
+    })
+  remote
+    .command('connect')
+    .description('open the master + tunnel to a remote daemon and print the tunneled GUI URL')
+    .argument('<alias>', 'short lowercase alias')
+    .option('--local-port <port>', 'local loopback port for the tunnel; default allocates a free one')
+    .option('--allow-version-skew', 'warn instead of refusing when daemon and controller versions differ')
+    .option('--force-fingerprint', 'accept an installation id different from the recorded one')
+    .action((alias: string, options: { localPort?: string; allowVersionSkew?: boolean; forceFingerprint?: boolean }) => {
+      rejectParentOptions('remote')
+      if (alias === '') program.error('error: remote connect needs an alias')
+      const localPort = options.localPort === undefined ? undefined : Number(options.localPort)
+      if (localPort !== undefined && !Number.isInteger(localPort)) program.error(`error: --local-port must be an integer, got "${options.localPort}"`)
+      resolved = { mode: 'remote', command: { kind: 'remote-connect', alias, ...(localPort === undefined ? {} : { localPort }), allowVersionSkew: options.allowVersionSkew === true, forceFingerprint: options.forceFingerprint === true } }
     })
 
   try {
