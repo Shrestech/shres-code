@@ -507,6 +507,21 @@ describe('settings domain', () => {
       .toEqual({ enabled: true })
   })
 
+  it('serves the wiki namespace so the J-Space settings page can persist the wiki switch and librarian binding', async () => {
+    const ctx = await harness()
+    ctx.settings.register(settingsNamespace('wiki'), z.object({
+      enabled: z.boolean(),
+      roles: z.object({ librarian: z.object({ provider: z.string(), model: z.string() }) }),
+    }))
+    const api = createApiProxy(ctx, DEFAULTS)
+    expectOk(await api.settings.mutate(request({
+      ns: 'wiki',
+      ops: [{ op: 'set', path: ['enabled'], value: false }],
+    })))
+    expect(ctx.settings.describe().find(view => String(view.ns) === 'wiki')?.value)
+      .toEqual({ enabled: false, roles: { librarian: {} } })
+  })
+
   it('serves the shres-shield namespace so the Shield settings page can persist posture and license', async () => {
     const ctx = await harness()
     ctx.settings.register(settingsNamespace('shres-shield'), z.object({
