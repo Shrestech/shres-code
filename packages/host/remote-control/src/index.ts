@@ -8,6 +8,9 @@
 
 import RemoteControlGateway from './gateway.ts'
 
+// Typert-generated ./typert and ./remote artifacts import Zod at runtime.
+import type {} from 'zod'
+
 export { RemoteControlError } from './errors.ts'
 export { resolveRegistryPath, resolveRunDir } from './home.ts'
 export { RemoteControlGateway } from './gateway.ts'

@@ -178,7 +178,8 @@ async function probeThroughTunnel(localPort: number): Promise<string | null> {
     })
     const body: unknown = await response.json()
     const value = (body as { result?: { value?: { version?: unknown } } }).result?.value
-    return typeof value === 'object' && typeof value.version === 'string' && value.version.length > 0 ? value.version : null
+    const version: unknown = (value as { version?: unknown } | null | undefined)?.version
+    return typeof version === 'string' && version.length > 0 ? version : null
   } catch {
     // Tunnel absent, refused, or slow: reported as no-answer, ownership of the reason stays with the caller's status output.
     return null
