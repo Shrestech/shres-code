@@ -1594,6 +1594,9 @@ importers:
       '@shres-code/shres-code-host-plugin-inventory':
         specifier: workspace:^
         version: link:../../host/plugin-inventory
+      '@shres-code/shres-code-host-remote-control':
+        specifier: workspace:^
+        version: link:../../host/remote-control
       '@shres-code/shres-code-host-webserver':
         specifier: workspace:^
         version: link:../../host/webserver
@@ -5485,6 +5488,13 @@ importers:
         version: link:../../typert/protocol
 
   packages/host/remote-control:
+    dependencies:
+      '@shres-code/shres-code-typert-protocol':
+        specifier: workspace:^
+        version: link:../../typert/protocol
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@shres-code/cordis':
         specifier: workspace:^

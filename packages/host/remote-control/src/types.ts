@@ -62,3 +62,24 @@ export type RemoteCliCommand =
   | { kind: 'remote-list' }
   | { kind: 'remote-remove'; alias: string }
   | { kind: 'remote-connect'; alias: string; localPort?: number; allowVersionSkew: boolean; forceFingerprint: boolean }
+
+/** One registry entry projected to remote RPC clients. */
+export interface RemoteEntryView {
+  /** Registry alias. */
+  id: RemoteId
+  /** SSH connect target, `user@host`. */
+  target: RemoteTarget
+  /** Daemon port on the remote loopback. */
+  remotePort: number
+  /** Installation identity bound by a verified connect, null until first `connect`. */
+  fingerprint: string | null
+  /** ISO timestamp of the last verified connect, null when never connected. */
+  lastConnectedAt: string | null
+  /** ISO creation timestamp. */
+  createdAt: string
+}
+
+/** Read-only registry snapshot served over the `remoteControl` Remote namespace. */
+export interface RemoteRegistrySnapshot {
+  entries: RemoteEntryView[]
+}

@@ -99,6 +99,11 @@
     - id: api-gateway
       name: '@shres-code/shres-code-host-apiproxy'
 
+    # Read-only remote registry projection for trusted client RPCs; the connect
+    # flow's gesture-token authority mounts in its own PR.
+    - id: remote-control
+      name: '@shres-code/shres-code-host-remote-control'
+
     - id: cordis-host-runner
       name: '@shres-code/shres-code-cordis-host-runner'
 
