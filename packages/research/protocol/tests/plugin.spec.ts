@@ -74,7 +74,7 @@ async function harness(options: HarnessOptions = {}) {
   await ctx.plugin(ToolRuntime)
   if (options.settings === true) {
     settingsRoot = await mkdtemp(join(tmpdir(), 'shres-research-protocol-settings-'))
-    ctx.plugin(FileSettingsProvider, { path: join(settingsRoot, 'settings.yaml'), watch: false })
+    await ctx.plugin(FileSettingsProvider, { path: join(settingsRoot, 'settings.yaml'), watch: false })
   }
   if (options.jspace !== undefined) await ctx.plugin(JspaceService, options.jspace)
   await ctx.plugin(Protocol, options.protocol ?? {})
