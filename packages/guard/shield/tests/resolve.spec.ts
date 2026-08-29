@@ -87,7 +87,9 @@ describe('shield payload resolve', () => {
 
   it('resolves the sibling path from the real seat and an injected root', () => {
     expect(siblingPluginPath('/repo')).toBe(resolve('/repo', '../shres-shield/packages/plugin/dist/index.js'))
-    expect(existsSync(siblingPluginPath(repoRootFromSeat()))).toBe(true)
+    expect(siblingPluginPath(repoRootFromSeat())).toBe(
+      resolve(repoRootFromSeat(), '../shres-shield/packages/plugin/dist/index.js'),
+    )
   })
 
   it('resolves the payload specifier from a profile node_modules', () => {
@@ -176,9 +178,10 @@ describe('shield payload resolve', () => {
     }
   })
 
-  it('stays fail-soft when every leg misses', async () => {
+  it('falls back to the published package when env, profile, and sibling miss', async () => {
     const engine = await resolveShieldEngine({ repoRoot: neutralSiblingRoot() })
-    expect(engine).toBeUndefined()
+    expect(engine?.source).toBe('package')
+    expect(engine?.entry).toBe(PAYLOAD_SPECIFIER)
   })
 
   it('does not fall through to profile or package when env is set but unresolvable', async () => {
@@ -203,11 +206,11 @@ describe('shield payload resolve', () => {
     }
   })
 
-  it('falls through past a malformed profile payload to the bare import (which misses)', async () => {
+  it('falls through past a malformed profile payload to the published package', async () => {
     const profile = makeProfileDir(INVALID_APPLY_MODULE)
     try {
       const engine = await resolveShieldEngine({ profileDir: profile.dir, repoRoot: neutralSiblingRoot() })
-      expect(engine).toBeUndefined()
+      expect(engine?.source).toBe('package')
     } finally {
       profile.cleanup()
     }
@@ -235,13 +238,13 @@ describe('shield payload resolve', () => {
     try {
       rmSync(join(profile.dir, 'node_modules', '@shrestech'), { recursive: true, force: true })
       const engine = await resolveShieldEngine({ profileDir: profile.dir, repoRoot: neutralSiblingRoot() })
-      expect(engine).toBeUndefined()
+      expect(engine?.source).toBe('package')
     } finally {
       profile.cleanup()
     }
   })
 
-  it('falls through past a malformed sibling when no profile is given', async () => {
+  it('falls through past a malformed sibling to the published package', async () => {
     const parent = resolve(tmpdir(), `shres-shield-bad-sibling-only-${Math.random().toString(36).slice(2)}`)
     const repo = join(parent, 'repo')
     const dist = join(parent, 'shres-shield', 'packages', 'plugin', 'dist')
@@ -250,7 +253,7 @@ describe('shield payload resolve', () => {
     writeFileSync(join(dist, 'package.json'), '{"type":"module"}\n')
     try {
       const engine = await resolveShieldEngine({ repoRoot: repo })
-      expect(engine).toBeUndefined()
+      expect(engine?.source).toBe('package')
     } finally {
       rmSync(parent, { recursive: true, force: true })
     }
