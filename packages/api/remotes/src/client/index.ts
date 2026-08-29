@@ -5,6 +5,7 @@ import commandsRemote from '@shres-code/shres-code-commands/remote'
 import goalsRemote from '@shres-code/shres-code-goal/remote'
 import dynamicRemote from '@shres-code/shres-code-cordis-host-runner/remote'
 import pluginInventoryRemote from '@shres-code/shres-code-host-plugin-inventory/remote'
+import remoteControlRemote from '@shres-code/shres-code-host-remote-control/remote'
 import messageFeedbackRemote from '@shres-code/shres-code-message-feedback/remote'
 import speechRemote from '@shres-code/shres-code-speech/remote'
 import shieldRemote from '@shres-code/shres-code-shield/remote'
@@ -20,6 +21,7 @@ export type {
 export type {} from '@shres-code/shres-code-commands/remote'
 export type {} from '@shres-code/shres-code-goal/remote'
 export type {} from '@shres-code/shres-code-host-plugin-inventory/remote'
+export type {} from '@shres-code/shres-code-host-remote-control/remote'
 export type {} from '@shres-code/shres-code-message-feedback/remote'
 export type {} from '@shres-code/shres-code-speech/remote'
 export type {} from '@shres-code/shres-code-shield/remote'
@@ -115,7 +117,7 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
   const disposers: Array<() => Promise<void>> = []
   try {
     for (const contribution of [
-      commandsRemote, goalsRemote, dynamicRemote, pluginInventoryRemote, messageFeedbackRemote,
+      commandsRemote, goalsRemote, dynamicRemote, pluginInventoryRemote, remoteControlRemote, messageFeedbackRemote,
       speechRemote, shieldRemote,
     ]) {
       disposers.push(await ctx.remote.$mount(contribution))
