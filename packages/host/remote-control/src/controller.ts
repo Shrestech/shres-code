@@ -119,7 +119,7 @@ export async function openTunnel(runner: SshRunner, spec: TunnelSpec, entry: Rem
     }
     const spawnedForward = await runner.spawn(tunnelArgv(spec))
     forward.pid = spawnedForward.pid
-    forward.dispose = spawnedForward.dispose
+    forward.dispose = async () => spawnedForward.dispose()
     const throughVersion = await probeThroughTunnel(spec.localPort)
     if (throughVersion === null) {
       throw new RemoteControlError('tunnel-failed', `forward to 127.0.0.1:${String(spec.localPort)} did not answer host.describe; refusing to report connected`)
@@ -131,7 +131,12 @@ export async function openTunnel(runner: SshRunner, spec: TunnelSpec, entry: Rem
     if (entry.fingerprint !== null && entry.fingerprint !== fingerprint && !options.forceFingerprint) {
       throw new RemoteControlError('fingerprint-mismatch', `installation id changed for alias ${spec.id}: expected ${entry.fingerprint}, observed ${fingerprint}; pass --force-fingerprint if the host was reinstalled`)
     }
-    return { pid: forward.pid, version, fingerprint, dispose: oncePair(forward.dispose, master.dispose) }
+    return {
+      pid: forward.pid,
+      version,
+      fingerprint,
+      dispose: async () => { await Promise.allSettled([spawnedForward.dispose(), master.dispose()]) },
+    }
   } catch (error) {
     // Tear-down is failure-isolated: one stuck handle must not leak the other.
     await Promise.allSettled([forward.dispose(), master.dispose()])
@@ -139,10 +144,6 @@ export async function openTunnel(runner: SshRunner, spec: TunnelSpec, entry: Rem
   }
 }
 
-/** Run both disposers; resolves after both settle, swallowing neither's result silently. */
-function oncePair(first: () => Promise<void>, second: () => Promise<void>): () => Promise<void> {
-  return async () => { await Promise.allSettled([first(), second()]) }
-}
 
 /**
  * Wait until the remote daemon answers (bounded), surfacing a typed failure
@@ -177,8 +178,7 @@ async function probeThroughTunnel(localPort: number): Promise<string | null> {
     })
     const body: unknown = await response.json()
     const value = (body as { result?: { value?: { version?: unknown } } }).result?.value
-    const version = typeof value === 'object' && value !== null ? (value as { version?: unknown }).version : undefined
-    return typeof version === 'string' ? version : null
+    return typeof value === 'object' && typeof value.version === 'string' && value.version.length > 0 ? value.version : null
   } catch {
     // Tunnel absent, refused, or slow: reported as no-answer, ownership of the reason stays with the caller's status output.
     return null

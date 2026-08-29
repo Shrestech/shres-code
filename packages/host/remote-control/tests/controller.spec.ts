@@ -66,9 +66,9 @@ async function describeServer(version: string): Promise<{ port: number; close: (
     response.setHeader('content-type', 'application/json')
     response.end(JSON.stringify({ result: { value: { version } } }))
   })
-  await new Promise<void>(resolveListen => server.listen(0, '127.0.0.1', () => resolveListen()))
+  await new Promise<void>(resolveListen => server.listen(0, '127.0.0.1', () =>{  resolveListen() }))
   const address = server.address()
-  if (address === null || typeof address === 'string') { await new Promise<void>(c => server.close(() => c())); throw new Error('no tcp address') }
+  if (address === null || typeof address === 'string') { await new Promise<void>(c => server.close(() =>{  c() })); throw new Error('no tcp address') }
   return { port: address.port, close: async () => { await new Promise(c => server.close(c)) } }
 }
 

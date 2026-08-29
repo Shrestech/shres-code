@@ -13,7 +13,7 @@ export const name = 'host-remote-control-invariant'
 /** Service required before the companion can reserve package ownership. */
 export const inject = ['invariants']
 
-/** No runtime invariant: the gateway projects the registry file directly and owns no long-lived state; durable tunnel/registry relations arrive with the connect-flow PR. */
+/** No runtime invariant: the gateway projects the registry file directly and owns no long-lived state. */
 const install: InvariantInstaller = () => {}
 
 /**

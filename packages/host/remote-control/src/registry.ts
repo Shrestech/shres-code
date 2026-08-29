@@ -111,9 +111,9 @@ function validateEntry(candidate: unknown): RemoteEntry | null {
     if (record.fingerprint !== null && typeof record.fingerprint !== 'string') {
       throw new RemoteControlError('registry-corrupt', 'remote registry fingerprint is neither a string nor null; refusing to downgrade the identity check')
     }
-    const fingerprint = record.fingerprint as string | null
+    const fingerprint = record.fingerprint
     const createdAt = typeof record.createdAt === 'string' ? record.createdAt : null
-    const lastConnectedAt = record.lastConnectedAt === null || typeof record.lastConnectedAt === 'string' ? record.lastConnectedAt as string | null : null
+    const lastConnectedAt = record.lastConnectedAt === null || typeof record.lastConnectedAt === 'string' ? record.lastConnectedAt : null
     if (createdAt === null) return null
     return {
       id: asRemoteId(id),

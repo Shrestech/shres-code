@@ -27,7 +27,7 @@ export class RemoteControlGateway extends TypertRemoteService {
   async list(): Promise<RemoteRegistrySnapshot> {
     const entries = await loadRegistry(resolveRegistryPath())
     return {
-      entries: [...entries.values()].map((entry) => ({
+      entries: [...entries.values()].map(entry => ({
         id: entry.id,
         target: entry.target,
         remotePort: entry.remotePort,
