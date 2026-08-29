@@ -839,6 +839,12 @@ export interface Config {
    * @default 1024
    */
   coldBlankProbeMaxBytes?: number
+  /**
+   * Maximum bytes the in-app file viewer serves for one `host.readFile`
+   * call; a larger file answers its leading slice with `truncated: true`.
+   * @default 524288
+   */
+  fileViewMaxBytes?: number
 }
 ```
 
@@ -3951,6 +3957,7 @@ Imported as libraries by other packages; a `cordis.yml` cannot load them.
 - `@shres-code/shres-code-cmdline` ([`packages/boot/cmdline/src/index.ts`](../packages/boot/cmdline/src/index.ts))
 - `@shres-code/shres-code-home-paths` ([`packages/util/home-paths/src/index.ts`](../packages/util/home-paths/src/index.ts))
 - `@shres-code/shres-code-hook-protocol` ([`packages/hooks/hook-protocol/src/index.ts`](../packages/hooks/hook-protocol/src/index.ts))
+- `@shres-code/shres-code-host-remote-control` ([`packages/host/remote-control/src/index.ts`](../packages/host/remote-control/src/index.ts))
 - `@shres-code/shres-code-launch-environment` ([`packages/util/launch-environment/src/index.ts`](../packages/util/launch-environment/src/index.ts))
 - `@shres-code/shres-code-llm-mock-server` ([`packages/test-support/llm-mock-server/src/index.ts`](../packages/test-support/llm-mock-server/src/index.ts))
 - `@shres-code/shres-code-loader-smoke` ([`packages/test-support/loader-smoke/src/index.ts`](../packages/test-support/loader-smoke/src/index.ts))
