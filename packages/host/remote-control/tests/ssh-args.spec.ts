@@ -36,11 +36,19 @@ describe('tunnel argv contract', () => {
   it('refuses shell-hostile targets at argv construction', () => {
     expect(() => tunnelArgv({ ...spec, target: '-oProxyCommand=evil' as never })).toThrow()
   })
+
+  it('refuses leading-dash users (ssh option smuggling), not just flag-pairs', () => {
+    expect(() => tunnelArgv({ ...spec, target: '-lroot@example.com' as never })).toThrow()
+    expect(() => masterArgv({ ...spec, target: '-F/tmp/other' as never })).toThrow()
+  })
 })
 
 describe('remote commands', () => {
-  it('probes the daemon on the remote loopback with a short timeout', () => {
-    expect(probeCommand(3080)).toBe('curl -sS -m 2 -X POST http://127.0.0.1:3080/api/host.describe 2>&1')
+  it('probes describe with the client-request envelope the real handler dispatches', () => {
+    const command = probeCommand(3080)
+    expect(command).toContain('-X POST http://127.0.0.1:3080/api/host.describe')
+    expect(command).toContain("-H 'Content-Type: application/json'")
+    expect(command).toContain('-d \'{"type":"client-request","rpcId":"remote-connect-probe","method":"host.describe","payload":{}}\'')
   })
 
   it('reads the installation id tolerating both home layouts and absence', () => {
@@ -51,13 +59,15 @@ describe('remote commands', () => {
 })
 
 describe('probe parsing', () => {
-  it('extracts the version from a plain describe body', () => {
-    expect(parseProbeVersion('{"version":"0.1.0-rc.5"}')).toBe('0.1.0-rc.5')
+  it('extracts the version from the real ServerResponse envelope', () => {
+    expect(parseProbeVersion('{"result":{"type":"ok","value":{"version":"0.1.0-rc.5","cwd":"/srv"}}}')).toBe('0.1.0-rc.5')
   })
 
   it('returns null for garbage, stderr noise, and versionless bodies', () => {
     expect(parseProbeVersion('curl: (7) Failed to connect')).toBeNull()
     expect(parseProbeVersion('')).toBeNull()
     expect(parseProbeVersion('{"cwd":"/tmp"}')).toBeNull()
+    expect(parseProbeVersion('{"result":{"value":{"version":42}}}')).toBeNull()
+    expect(parseProbeVersion('{"error":{"message":"refused"}}')).toBeNull()
   })
 })

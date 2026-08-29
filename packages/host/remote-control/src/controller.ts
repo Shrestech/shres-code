@@ -10,6 +10,11 @@ import type { RemoteEntry, TunnelSpec } from './types.ts'
 import { RemoteControlError } from './errors.ts'
 import { installationIdCommand, masterArgv, parseProbeVersion, probeCommand, tunnelArgv } from './ssh-args.ts'
 
+/** Bounded probe loop: attempts before declaring the remote daemon absent. */
+const PROBE_ATTEMPTS = 5
+/** Delay between describe probes; short, since the master window already amortizes connection cost. */
+const PROBE_RETRY_DELAY_MS = 250
+
 /** One completed short ssh execution; nonzero exits and stderr are data. */
 export interface SshResult {
   /** Process exit code. */
@@ -46,8 +51,14 @@ export interface SshRunner {
  * @param remotePort - remote daemon loopback port.
  * @returns the daemon version, or null when the probe found nothing to parse.
  */
-export async function probeDaemonVersion(runner: SshRunner, target: string, remotePort: number): Promise<string | null> {
-  const result = await runner.run(['ssh', target, probeCommand(remotePort)])
+export async function probeDaemonVersion(
+  runner: SshRunner,
+  target: string,
+  remotePort: number,
+  controlPath?: string,
+): Promise<string | null> {
+  const forwardArgs = controlPath === undefined ? [] : ['-o', `ControlPath=${controlPath}`]
+  const result = await runner.run(['ssh', ...forwardArgs, target, probeCommand(remotePort)])
   return parseProbeVersion(result.stdout)
 }
 
@@ -58,15 +69,16 @@ export async function probeDaemonVersion(runner: SshRunner, target: string, remo
  * @param target - validated connect target.
  * @returns the installation id or null.
  */
-export async function readInstallationId(runner: SshRunner, target: string): Promise<string | null> {
-  const result = await runner.run(['ssh', target, installationIdCommand()])
+export async function readInstallationId(runner: SshRunner, target: string, controlPath?: string): Promise<string | null> {
+  const forwardArgs = controlPath === undefined ? [] : ['-o', `ControlPath=${controlPath}`]
+  const result = await runner.run(['ssh', ...forwardArgs, target, installationIdCommand()])
   const id = result.stdout.trim()
   return id.length > 0 ? id : null
 }
 
 /** Knobs controlling how strictly {@link openTunnel} verifies the remote. */
 export interface OpenTunnelOptions {
-  /** Accept a daemon version other than the local one (caller warns instead). */
+  /** Accept a daemon version other than the local one; the caller owes the warning output. */
   allowVersionSkew: boolean
   /** Local controller version compared against the daemon's describe. */
   localVersion: string
@@ -76,13 +88,13 @@ export interface OpenTunnelOptions {
 
 /** Live tunnel handle and the daemon facts observed at open time. */
 export interface LiveTunnel {
-  /** Foreward child pid (informational; `dispose` owns the kill). */
+  /** Forward child pid (informational; `dispose` owns the kill). */
   pid: number
   /** Daemon version observed remotely before the forward opened. */
   version: string
   /** Installation id observed on the remote. */
   fingerprint: string
-  /** Kill the forward and the master window. */
+  /** Kill the forward and the master window; resolves even when one handle already exited. */
   dispose(): Promise<void>
 }
 
@@ -112,19 +124,24 @@ export async function openTunnel(runner: SshRunner, spec: TunnelSpec, entry: Rem
     if (throughVersion === null) {
       throw new RemoteControlError('tunnel-failed', `forward to 127.0.0.1:${String(spec.localPort)} did not answer host.describe; refusing to report connected`)
     }
-    const fingerprint = await readInstallationId(runner, spec.target)
+    const fingerprint = await readInstallationId(runner, spec.target, spec.controlPath)
     if (fingerprint === null) {
       throw new RemoteControlError('fingerprint-mismatch', `remote returned no installation id; cannot bind alias ${spec.id} to an installation`)
     }
     if (entry.fingerprint !== null && entry.fingerprint !== fingerprint && !options.forceFingerprint) {
       throw new RemoteControlError('fingerprint-mismatch', `installation id changed for alias ${spec.id}: expected ${entry.fingerprint}, observed ${fingerprint}; pass --force-fingerprint if the host was reinstalled`)
     }
-    return { pid: forward.pid, version, fingerprint, dispose: forward.dispose }
+    return { pid: forward.pid, version, fingerprint, dispose: oncePair(forward.dispose, master.dispose) }
   } catch (error) {
-    await forward.dispose()
-    await master.dispose()
+    // Tear-down is failure-isolated: one stuck handle must not leak the other.
+    await Promise.allSettled([forward.dispose(), master.dispose()])
     throw error
   }
+}
+
+/** Run both disposers; resolves after both settle, swallowing neither's result silently. */
+function oncePair(first: () => Promise<void>, second: () => Promise<void>): () => Promise<void> {
+  return async () => { await Promise.allSettled([first(), second()]) }
 }
 
 /**
@@ -136,9 +153,10 @@ export async function openTunnel(runner: SshRunner, spec: TunnelSpec, entry: Rem
  * @returns the observed daemon version.
  */
 async function waitForVersion(runner: SshRunner, spec: TunnelSpec): Promise<string> {
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const version = await probeDaemonVersion(runner, spec.target, spec.remotePort)
+  for (let attempt = 0; attempt < PROBE_ATTEMPTS; attempt++) {
+    const version = await probeDaemonVersion(runner, spec.target, spec.remotePort, spec.controlPath)
     if (version !== null) return version
+    await new Promise(resolveDelay => setTimeout(resolveDelay, PROBE_RETRY_DELAY_MS))
   }
   throw new RemoteControlError('probe-failed', `no host.describe answered on 127.0.0.1:${String(spec.remotePort)} on the remote; start the daemon first or pass the right --port`)
 }
@@ -151,9 +169,15 @@ async function waitForVersion(runner: SshRunner, spec: TunnelSpec): Promise<stri
  */
 async function probeThroughTunnel(localPort: number): Promise<string | null> {
   try {
-    const response = await fetch(`http://127.0.0.1:${String(localPort)}/api/host.describe`, { method: 'POST', signal: AbortSignal.timeout(2000) })
+    const response = await fetch(`http://127.0.0.1:${String(localPort)}/api/host.describe`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ type: 'client-request', rpcId: 'remote-connect-verify', method: 'host.describe', payload: {} }),
+      signal: AbortSignal.timeout(2000),
+    })
     const body: unknown = await response.json()
-    const version = (body as { version?: unknown }).version
+    const value = (body as { result?: { value?: { version?: unknown } } }).result?.value
+    const version = typeof value === 'object' && value !== null ? (value as { version?: unknown }).version : undefined
     return typeof version === 'string' ? version : null
   } catch {
     // Tunnel absent, refused, or slow: reported as no-answer, ownership of the reason stays with the caller's status output.

@@ -64,6 +64,13 @@ describe('registry', () => {
     await expect(loadRegistry(path)).rejects.toMatchObject({ code: 'registry-corrupt' })
   })
 
+  it('a malformed entry fails loud instead of being skipped', async () => {
+    const path = await tempRegistry()
+    const { writeFile } = await import('node:fs/promises')
+    await writeFile(path, JSON.stringify({ version: 1, entries: [{ id: 'lab', target: 'bad target', remotePort: 1, version: 1, fingerprint: 5, createdAt: 'x', lastConnectedAt: null }] }))
+    await expect(loadRegistry(path)).rejects.toMatchObject({ code: 'registry-corrupt' })
+  })
+
   it('validates alias, target, and port shapes loudly', async () => {
     const path = await tempRegistry()
     await expect(upsertEntry(path, { ...entry(), id: 'Loud_Upper' as never })).rejects.toMatchObject({ code: 'invalid-alias' })

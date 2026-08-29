@@ -27,27 +27,39 @@ function readCliVersion(): string {
 function nodeSshRunner(): rc.SshRunner {
   return {
     async run(args) {
-      return new Promise((resolveP, rejectP) => {
-        execFile('ssh', args, { timeout: 15_000, maxBuffer: 4 * 1024 * 1024 }, (error, stdout, stderr) => {
-          if (error === null) { resolveP({ exitCode: 0, stdout: String(stdout), stderr: String(stderr) }); return }
-          if (typeof error.code !== 'number') { rejectP(error); return }
-          resolveP({ exitCode: error.code, stdout: String(stdout), stderr: String(stderr) })
+      return new Promise((resolveP) => {
+        execFile('ssh', args, { timeout: EXEC_TIMEOUT_MS, maxBuffer: 4 * 1024 * 1024 }, (error, stdout, stderr) => {
+          // Nonzero exits, timeouts, and missing binaries are all probe data: the controller's typed retry loop decides.
+          const exitCode = error === null ? 0 : typeof error.code === 'number' ? error.code : 255
+          const stderrText = error !== null && typeof error.code !== 'number' ? `${String(stderr)}${error.message}`.trim() : String(stderr)
+          resolveP({ exitCode, stdout: String(stdout), stderr: stderrText })
         })
       })
     },
     spawn(args) {
-      return new Promise((resolveP) => {
+      return new Promise((resolveP, rejectP) => {
         const child = spawn('ssh', args, { stdio: 'ignore' })
-        const disposer = async (): Promise<void> => {
-          child.kill('SIGTERM')
-          setTimeout(() => { if (child.exitCode === null) child.kill('SIGKILL') }, 1000)
-          await new Promise<void>((resolveK) => { child.once('exit', () => resolveK()) })
-        }
-        resolveP({ pid: child.pid ?? 0, dispose: disposer })
+        child.once('error', (spawnError) => { rejectP(new Error(`ssh spawn failed: ${String(spawnError)}`)) })
+        child.once('spawn', () => {
+          const disposer = async (): Promise<void> => {
+            if (child.exitCode !== null || child.signalCode !== null) return
+            child.kill('SIGTERM')
+            const escalate = setTimeout(() => { if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL') }, 1000)
+            await new Promise<void>((resolveK) => {
+              if (child.exitCode !== null || child.signalCode !== null) resolveK()
+              else child.once('exit', () => resolveK())
+            })
+            clearTimeout(escalate)
+          }
+          resolveP({ pid: child.pid ?? 0, dispose: disposer })
+        })
       })
     },
   }
 }
+
+/** Short-ssh execution bound; long enough for a describe probe, short enough to fail usefully. */
+const EXEC_TIMEOUT_MS = 15_000
 
 /**
  * Run one `shres remote` invocation; pure over the registry plus the ssh
@@ -82,7 +94,7 @@ export async function runRemoteCli(command: rc.RemoteCliCommand): Promise<number
       }
       case 'remote-remove': {
         const removed = await rc.removeEntry(rc.resolveRegistryPath(), rc.asRemoteId(command.alias))
-        if (!removed) throw new rc.RemoteControlError('invalid-alias', `remote "${command.alias}" is not registered`)
+        if (!removed) throw new rc.RemoteControlError('unknown-alias', `remote "${command.alias}" is not registered`)
         console.log(`remote "${command.alias}" removed`)
         return 0
       }
@@ -91,7 +103,7 @@ export async function runRemoteCli(command: rc.RemoteCliCommand): Promise<number
         const entries = await rc.loadRegistry(path)
         const id = rc.asRemoteId(command.alias)
         const entry = entries.get(id)
-        if (entry === undefined) throw new rc.RemoteControlError('invalid-alias', `remote "${command.alias}" is not registered; add it first`)
+        if (entry === undefined) throw new rc.RemoteControlError('unknown-alias', `remote "${command.alias}" is not registered; add it first`)
         const localPort = command.localPort ?? await rc.allocateLoopbackPort()
         const spec = { id, target: entry.target, remotePort: entry.remotePort, localPort, controlPath: resolve(rc.resolveRunDir(), `${id}.sock`) }
         const tunnel = await rc.openTunnel(nodeSshRunner(), spec, entry, {
@@ -100,6 +112,9 @@ export async function runRemoteCli(command: rc.RemoteCliCommand): Promise<number
           forceFingerprint: command.forceFingerprint,
         })
         await rc.upsertEntry(path, { ...entry, fingerprint: tunnel.fingerprint, lastConnectedAt: new Date().toISOString() })
+        if (command.allowVersionSkew && tunnel.version !== readCliVersion()) {
+          console.error(`warning: remote daemon ${tunnel.version} differs from this controller ${readCliVersion()}; behavior may drift`)
+        }
         console.log(`connected to "${id}"; Remote GUI: http://127.0.0.1:${String(localPort)} (daemon ${tunnel.version})`)
         return await new Promise<never>(() => process.once('SIGINT', () => { void tunnel.dispose().then(() => process.exit(0)) }))
       }

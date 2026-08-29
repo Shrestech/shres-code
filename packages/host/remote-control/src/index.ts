@@ -7,12 +7,11 @@
  */
 
 import { shresHomePath } from '@shres-code/shres-code-home-paths'
-import { resolve } from 'node:path'
 import { asRemoteId } from './registry.ts'
 import type { RemoteId } from './types.ts'
 
 export { RemoteControlError } from './errors.ts'
-export { loadRegistry, saveRegistry, upsertEntry, removeEntry, asRemoteId, asRemoteTarget, asRemotePort, REGISTRY_VERSION } from './registry.ts'
+export { loadRegistry, upsertEntry, removeEntry, asRemoteId, asRemoteTarget, asRemotePort, REGISTRY_VERSION } from './registry.ts'
 export type { LiveTunnel, OpenTunnelOptions, SshRunner, SshResult } from './controller.ts'
 export { openTunnel, probeDaemonVersion, readInstallationId } from './controller.ts'
 export { allocateLoopbackPort } from './port.ts'
@@ -45,9 +44,4 @@ export function resolveRunDir(configured?: string): string {
  */
 export function parseAlias(alias: string): RemoteId {
   return asRemoteId(alias)
-}
-
-/** PID marker file for one live tunnel, used by `remove`-time liveness checks. */
-export function pidMarkerPath(runDir: string, id: RemoteId): string {
-  return resolve(runDir, `${id}.pid`)
 }

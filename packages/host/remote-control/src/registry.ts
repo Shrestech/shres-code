@@ -82,9 +82,11 @@ export async function loadRegistry(path: string): Promise<Map<RemoteId, RemoteEn
     throw new RemoteControlError('registry-corrupt', `remote registry at ${path} has no entries array`)
   }
   const entries = new Map<RemoteId, RemoteEntry>()
-  for (const candidate of document.entries) {
+  for (const [index, candidate] of document.entries.entries()) {
     const entry = validateEntry(candidate)
-    if (entry === null) continue
+    if (entry === null) {
+      throw new RemoteControlError('registry-corrupt', `remote registry at ${path} entry ${String(index)} is not a valid entry; refusing to guess`)
+    }
     if (entries.has(entry.id)) {
       throw new RemoteControlError('registry-corrupt', `remote registry at ${path} declares alias "${entry.id}" twice`)
     }
@@ -106,7 +108,10 @@ function validateEntry(candidate: unknown): RemoteEntry | null {
   const remotePort = record.remotePort
   if (id === null || target === null || typeof remotePort !== 'number') return null
   try {
-    const fingerprint = record.fingerprint === null || typeof record.fingerprint === 'string' ? record.fingerprint as string | null : null as string | null
+    if (record.fingerprint !== null && typeof record.fingerprint !== 'string') {
+      throw new RemoteControlError('registry-corrupt', 'remote registry fingerprint is neither a string nor null; refusing to downgrade the identity check')
+    }
+    const fingerprint = record.fingerprint as string | null
     const createdAt = typeof record.createdAt === 'string' ? record.createdAt : null
     const lastConnectedAt = record.lastConnectedAt === null || typeof record.lastConnectedAt === 'string' ? record.lastConnectedAt as string | null : null
     if (createdAt === null) return null
@@ -130,10 +135,11 @@ function validateEntry(candidate: unknown): RemoteEntry | null {
  * @param path - registry file path.
  * @param entries - complete next entry set.
  */
-export async function saveRegistry(path: string, entries: Map<RemoteId, RemoteEntry>): Promise<void> {
+/** Serialize one registry document; atomic replace at mode 0600/0700, callers own the lock. */
+async function persistRegistry(path: string, entries: Map<RemoteId, RemoteEntry>): Promise<void> {
   const content = JSON.stringify({ version: REGISTRY_VERSION, entries: [...entries.values()] } satisfies RegistryFile, null, 2) + '\n'
   try {
-    await withFileLock(`${path}.lock`, async () => writeFileAtomic(path, content, { mode: 0o600, dirMode: 0o700 }))
+    await writeFileAtomic(path, content, { mode: 0o600, dirMode: 0o700 })
   } catch (error) {
     if (error instanceof RemoteControlError) throw error
     throw new RemoteControlError('registry-corrupt', `cannot write remote registry at ${path}: ${String(error)}`)
@@ -172,7 +178,7 @@ export async function upsertEntry(path: string, entry: RemoteEntry): Promise<voi
   await withFileLock(`${path}.lock`, async () => {
     const current = await loadRegistry(path)
     current.set(validated.id, validated)
-    await writeFileAtomic(path, JSON.stringify({ version: REGISTRY_VERSION, entries: [...current.values()] } satisfies RegistryFile, null, 2) + '\n', { mode: 0o600, dirMode: 0o700 })
+    await persistRegistry(path, current)
   })
 }
 
@@ -186,7 +192,7 @@ export async function removeEntry(path: string, id: RemoteId): Promise<boolean> 
   return withFileLock(`${path}.lock`, async () => {
     const current = await loadRegistry(path)
     if (!current.delete(id)) return false
-    await writeFileAtomic(path, JSON.stringify({ version: REGISTRY_VERSION, entries: [...current.values()] } satisfies RegistryFile, null, 2) + '\n', { mode: 0o600, dirMode: 0o700 })
+    await persistRegistry(path, current)
     return true
   })
 }

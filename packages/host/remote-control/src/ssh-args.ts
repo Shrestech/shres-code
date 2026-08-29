@@ -58,7 +58,8 @@ export function tunnelArgv(spec: TunnelSpec): string[] {
  * @returns shell command string executed over `ssh` with a 2s curl timeout.
  */
 export function probeCommand(remotePort: number): string {
-  return `curl -sS -m 2 -X POST http://127.0.0.1:${remotePort}/api/host.describe 2>&1`
+  const body = '{"type":"client-request","rpcId":"remote-connect-probe","method":"host.describe","payload":{}}'
+  return `curl -sS -m 2 -X POST http://127.0.0.1:${remotePort}/api/host.describe -H 'Content-Type: application/json' -d '${body}'`
 }
 
 /**
@@ -80,9 +81,9 @@ export function parseProbeVersion(stdout: string): string | null {
   const start = stdout.indexOf('{')
   if (start < 0) return null
   try {
-    const parsed: unknown = JSON.parse(stdout.slice(start))
-    if (typeof parsed !== 'object' || parsed === null) return null
-    const version = (parsed as { version?: unknown }).version
+    const envelope: unknown = JSON.parse(stdout.slice(start))
+    const value = (envelope as { result?: { value?: { version?: unknown } } }).result?.value
+    const version = typeof value === 'object' && value !== null ? (value as { version?: unknown }).version : undefined
     return typeof version === 'string' && version.length > 0 ? version : null
   } catch (error) {
     // Truncated or torn probe output is an expected probe state, not a crash: report it as no-version.
@@ -94,11 +95,11 @@ export function parseProbeVersion(stdout: string): string | null {
 /**
  * Validate the connect target at every argv construction (the registry is a
  * durable file boundary): a target without `user@host`, whitespace, or a
- * leading dash is registry corruption or a caller bug.
+ * leading dash (ssh would parse it as an option — there is no `--` terminator)
  * @param target - validated target.
  * @returns the same target for inline use.
  */
 function validateTarget(target: RemoteTarget): string {
-  if (!/^[A-Za-z0-9._~-]+@[A-Za-z0-9._-]+$/.test(target)) throw new Error(`invalid remote target: ${target}`)
+  if (!/^[A-Za-z0-9][A-Za-z0-9._~-]*@[A-Za-z0-9][A-Za-z0-9._-]*$/.test(target)) throw new Error(`invalid remote target: ${target}`)
   return target
 }
