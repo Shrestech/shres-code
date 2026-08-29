@@ -10,8 +10,12 @@ export type { RemoteEntryView, RemoteRegistrySnapshot } from './types.ts'
 
 /**
  * Serve the remote registry as the `remoteControl` Remote namespace. The
- * projection is read-only: connecting and mutating stay CLI-gated until the
- * connect-flow PR mounts the gesture-token authority.
+ * projection is read-only: mutating and connecting must mount as a separate
+ * token-gated namespace, because this service is served identically by local
+ * and tunneled remotes and cannot enforce the local user's gesture authority.
+ * The Gateway maps business throws to its generic wire failure (message
+ * without a typed code), so callers render the message as-is; `registry-corrupt`
+ * divergence stays loud server-side.
  */
 export class RemoteControlGateway extends TypertRemoteService {
   constructor(ctx: Context) {
