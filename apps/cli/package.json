@@ -61,6 +61,7 @@
     "@shres-code/shres-code-pwsh-sandbox": "workspace:^",
     "@shres-code/shres-code-session-projection": "workspace:^",
     "@shres-code/shres-code-settings": "workspace:^",
+    "@shres-code/shres-code-host-remote-control": "workspace:^",
     "@shres-code/shres-code-settings-file": "workspace:^",
     "@shres-code/shres-code-session-reference": "workspace:^",
     "@shres-code/shres-code-time-context": "workspace:^",

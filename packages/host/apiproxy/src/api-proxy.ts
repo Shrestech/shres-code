@@ -52,6 +52,7 @@ import {
   type SessionLogCompressionLevel,
 } from './session-export.ts'
 import type { SessionRawArtifact } from '@shres-code/shres-code-session-persistence'
+import { hostVersion } from './host-version.ts'
 import {
   SESSION_SEARCH_RESULT_LIMIT,
   SESSION_SEARCH_SNIPPET_MAX_CODE_POINTS,
@@ -2940,10 +2941,9 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
 
     host: {
       describe(request) {
-        // TODO: version should read apps/cli's package.json; placeholder for now.
         const selection = defaults.defaultModelSelection()
         return Promise.resolve(ok(request, {
-          version: '0.0.1',
+          version: hostVersion(),
           // Same source as session.create's fallback: the UI's default project
           // must match where an unspecified-cwd session actually lands.
           cwd: defaults.cwd,

@@ -157,3 +157,25 @@ describe('parseShresArgs', () => {
     expect(exitCode(['--version'])).toBe(0)
   })
 })
+
+describe('parseShresArgs remote family', () => {
+  it('parses add with explicit daemon port', () => {
+    expect(parse(['remote', 'add', 'lab', 'ci@r.example', '--port', '4022']))
+      .toEqual({ mode: 'remote', command: { kind: 'remote-add', alias: 'lab', target: 'ci@r.example', remotePort: 4022 } })
+  })
+
+  it('parses list, remove, and connect flags', () => {
+    expect(parse(['remote', 'list'])).toEqual({ mode: 'remote', command: { kind: 'remote-list' } })
+    expect(parse(['remote', 'remove', 'lab'])).toEqual({ mode: 'remote', command: { kind: 'remote-remove', alias: 'lab' } })
+    expect(parse(['remote', 'connect', 'lab', '--allow-version-skew']))
+      .toEqual({ mode: 'remote', command: { kind: 'remote-connect', alias: 'lab', allowVersionSkew: true, forceFingerprint: false } })
+    expect(parse(['remote', 'connect', 'lab', '--force-fingerprint']))
+      .toEqual({ mode: 'remote', command: { kind: 'remote-connect', alias: 'lab', allowVersionSkew: false, forceFingerprint: true } })
+  })
+
+  it('refuses malformed remote input loudly', () => {
+    expect(exitCode(['remote', 'add', '', 'x@y'])).toBe(1)
+    expect(exitCode(['remote', 'connect', ''])).toBe(1)
+    expect(exitCode(['remote', 'add', 'lab', 'u@h', '--port', 'oops'])).toBe(1)
+  })
+})
