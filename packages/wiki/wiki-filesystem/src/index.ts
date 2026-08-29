@@ -1,8 +1,10 @@
 /**
  * Markdown filesystem provider for the wiki capability seam (`ctx.wiki`).
- * Pages live at `<projectRoot>/.shres/wiki` (or an explicit absolute `root`).
- * The directory is created on the first write; enabled-by-default does not
- * pollute a project that has never written a page.
+ * Each session's wiki lives at `<projectRoot>/.shres/wiki`, where projectRoot
+ * is the `.git`-walk root of the session's recorded `cwd` — one wiki per
+ * repository (an explicit absolute `root` pins a single store). The directory
+ * is created on the first write; enabled-by-default does not pollute a
+ * project that has never written a page.
  *
  * @module @shres-code/shres-code-wiki-filesystem
  */
@@ -34,10 +36,11 @@ export { parsePage, parseProjectConfig, serializePage, WikiMarkdownStore } from 
 export interface Config extends WikiConfigShape {
   /**
    * Wiki directory. Relative values resolve under the `.git`-walk project root
-   * of `cwd` (or `process.cwd()`). Absolute values are used as-is.
+   * of each calling session's `cwd` (or `process.cwd()` when the session has
+   * no recorded `cwd`). Absolute values pin one store for every session.
    */
   root?: string
-  /** Starting directory for the `.git` walk when `root` is relative. */
+  /** Starting directory for the `.git` walk when `root` is relative and the session has no recorded `cwd`. */
   cwd?: string
   /** Whether the materialized wiki root is watched for external edits. */
   watch?: boolean
@@ -69,13 +72,14 @@ export const Config: z<Config> = z.object({
 export class FileWikiService extends WikiService {
   static override Config = Config
 
-  private store: WikiMarkdownStore
+  /** Stores keyed by absolute wiki root; one per resolved repository. */
+  private readonly stores = new Map<string, WikiMarkdownStore>()
+  /** Resolved roots keyed by project cwd (`''` for the deployment default). */
+  private readonly rootsByCwd = new Map<string, string>()
   private readonly configuredRoot: string
-  private readonly cwd: string
+  private readonly defaultCwd: string
   private readonly watchEnabled: boolean
-  private relocated = false
-  private watcher: FSWatcher | undefined
-  private watching = false
+  private readonly watchers = new Map<string, FSWatcher>()
 
   /**
    * @param ctx - Cordis context.
@@ -88,23 +92,30 @@ export class FileWikiService extends WikiService {
       throw new Error('wiki-filesystem: root must be a non-empty string')
     }
     this.configuredRoot = relativeRoot
-    this.cwd = config.cwd ?? process.cwd()
-    const root = isAbsolute(relativeRoot) ? resolve(relativeRoot) : join(this.cwd, relativeRoot)
-    this.store = new WikiMarkdownStore(root)
-    this.relocated = isAbsolute(relativeRoot)
+    this.defaultCwd = config.cwd ?? process.cwd()
+    if (isAbsolute(relativeRoot)) {
+      const root = resolve(relativeRoot)
+      this.stores.set(root, new WikiMarkdownStore(root))
+    }
     this.watchEnabled = config.watch !== false
     ctx.effect(() => () => {
-      void this.closeWatcher()
+      for (const watcher of this.watchers.values()) void watcher.close()
+      this.watchers.clear()
     }, 'wiki-filesystem watcher')
     ctx.on('fs/observed', (target) => {
-      if (target.displayPath.startsWith(this.store.root)) this.store.invalidate()
+      for (const [root, store] of this.stores) {
+        if (target.displayPath.startsWith(root)) {
+          store.invalidate()
+          break
+        }
+      }
     })
   }
 
   /**
    * Resolve a relative wiki root against the `.git`-walk project root of `cwd`.
-   * Absolute `root` values are unchanged. Called by tests and by apply-time
-   * construction when the caller already knows the project root.
+   * Absolute `root` values are unchanged. Called by tests and by store
+   * resolution when the caller already knows the project root.
    * @param root - configured root.
    * @param cwd - walk origin.
    * @returns the absolute wiki directory.
@@ -115,21 +126,58 @@ export class FileWikiService extends WikiService {
     return join(projectRoot, root)
   }
 
-  override projectConfig(): WikiProjectConfig {
-    return this.store.projectConfig()
+  /**
+   * Store for one session's repository. Relative roots resolve per project
+   * cwd and cache, so every session of one repository shares a store.
+   * @param projectCwd - absolute project directory of the calling session, when recorded.
+   * @returns the store rooted at the session's wiki directory.
+   */
+  private async storeFor(projectCwd: string | undefined): Promise<WikiMarkdownStore> {
+    const key = projectCwd ?? ''
+    let root = this.rootsByCwd.get(key)
+    if (root === undefined) {
+      root = await FileWikiService.resolveRoot(this.configuredRoot, projectCwd ?? this.defaultCwd)
+      this.rootsByCwd.set(key, root)
+    }
+    let store = this.stores.get(root)
+    if (store === undefined) {
+      store = new WikiMarkdownStore(root)
+      this.stores.set(root, store)
+    }
+    return store
   }
 
-  private async ensureRoot(): Promise<void> {
-    if (this.relocated) return
-    const next = await FileWikiService.resolveRoot(this.configuredRoot, this.cwd)
-    if (next !== this.store.root) this.store = new WikiMarkdownStore(next)
-    this.relocated = true
+  /**
+   * Provider-selected project overlay for one repository root.
+   * @param projectCwd - absolute project directory of the calling session, when recorded.
+   * @returns the parsed project config, or `{}` when the root has no `config.yaml`.
+   */
+  override async projectConfigOf(projectCwd: string | undefined): Promise<WikiProjectConfig> {
+    const store = await this.storeFor(projectCwd)
+    await store.load()
+    return store.projectConfig()
   }
 
-  override async persistPage(spec: WikiWriteSpec, nowMs: number): Promise<WikiPage> {
-    await this.ensureRoot()
-    await this.store.load()
-    const existing = this.store.list(true).find(page => page.path === spec.path)
+  private ensureWatcher(store: WikiMarkdownStore): void {
+    if (!this.watchEnabled || this.watchers.has(store.root) || !store.materialized()) return
+    const watcher = chokidar.watch(store.root, {
+      persistent: true,
+      ignoreInitial: true,
+      depth: 6,
+      awaitWriteFinish: { stabilityThreshold: 200, pollInterval: 100 },
+    })
+    /* v8 ignore next -- chokidar add/change/unlink all invalidate the page cache */
+    const invalidate = (): void => { store.invalidate() }
+    watcher.on('add', invalidate)
+    watcher.on('change', invalidate)
+    watcher.on('unlink', invalidate)
+    this.watchers.set(store.root, watcher)
+  }
+
+  override async persistPage(projectCwd: string | undefined, spec: WikiWriteSpec, nowMs: number): Promise<WikiPage> {
+    const store = await this.storeFor(projectCwd)
+    await store.load()
+    const existing = store.list(true).find(page => page.path === spec.path)
     const archived = isArchivedPath(spec.path)
     const freshness: WikiFrontmatter = {
       ...this.freshness(new Date(nowMs).toISOString(), existing?.frontmatter, archived),
@@ -137,74 +185,54 @@ export class FileWikiService extends WikiService {
       contradicts: spec.contradicts,
       ...spec.superseded_by === undefined ? {} : { superseded_by: spec.superseded_by },
     }
-    const page = await this.store.writePage(spec, freshness)
-    this.ensureWatcher()
+    const page = await store.writePage(spec, freshness)
+    this.ensureWatcher(store)
     return page
   }
 
-  override async persistTouch(path: string, nowMs: number): Promise<WikiPage> {
-    await this.ensureRoot()
-    await this.store.load()
-    return this.store.touch(path, nowMs)
+  override async persistTouch(projectCwd: string | undefined, path: string, nowMs: number): Promise<WikiPage> {
+    const store = await this.storeFor(projectCwd)
+    await store.load()
+    return store.touch(path, nowMs)
   }
 
-  override async persistLog(spec: WikiLogSpec, nowMs: number): Promise<string> {
-    await this.ensureRoot()
-    await this.store.load()
-    const path = await this.store.appendLog(spec, nowMs)
-    this.ensureWatcher()
+  override async persistLog(projectCwd: string | undefined, spec: WikiLogSpec, nowMs: number): Promise<string> {
+    const store = await this.storeFor(projectCwd)
+    await store.load()
+    const path = await store.appendLog(spec, nowMs)
+    this.ensureWatcher(store)
     return path
   }
 
-  override async persistDemote(path: string, nowMs: number): Promise<void> {
-    await this.ensureRoot()
-    await this.store.load()
-    await this.store.demote(path, nowMs)
+  override async persistDemote(projectCwd: string | undefined, path: string, nowMs: number): Promise<void> {
+    const store = await this.storeFor(projectCwd)
+    await store.load()
+    await store.demote(path, nowMs)
   }
 
-  override async persistIndex(markdown: string): Promise<void> {
-    await this.ensureRoot()
-    await this.store.load()
-    await this.store.writeIndex(markdown)
+  override async persistIndex(projectCwd: string | undefined, markdown: string): Promise<void> {
+    const store = await this.storeFor(projectCwd)
+    await store.load()
+    await store.writeIndex(markdown)
   }
 
-  override async loadPages(includeArchive: boolean): Promise<WikiPage[]> {
-    await this.ensureRoot()
-    await this.store.load()
-    return this.store.list(includeArchive)
+  override async loadPages(projectCwd: string | undefined, includeArchive: boolean): Promise<WikiPage[]> {
+    const store = await this.storeFor(projectCwd)
+    await store.load()
+    return store.list(includeArchive)
   }
 
-  override async loadIndex(): Promise<string> {
-    await this.ensureRoot()
-    await this.store.load()
-    return this.store.index()
+  override async loadIndex(projectCwd: string | undefined): Promise<string> {
+    const store = await this.storeFor(projectCwd)
+    await store.load()
+    return store.index()
   }
 
   override hasPage(path: string): boolean {
-    return this.store.has(path)
-  }
-
-  private ensureWatcher(): void {
-    if (!this.watchEnabled || this.watching || !this.store.materialized()) return
-    this.watching = true
-    this.watcher = chokidar.watch(this.store.root, {
-      persistent: true,
-      ignoreInitial: true,
-      depth: 6,
-      awaitWriteFinish: { stabilityThreshold: 200, pollInterval: 100 },
-    })
-    /* v8 ignore next -- chokidar add/change/unlink all invalidate the page cache */
-    const invalidate = (): void => { this.store.invalidate() }
-    this.watcher.on('add', invalidate)
-    this.watcher.on('change', invalidate)
-    this.watcher.on('unlink', invalidate)
-  }
-
-  private async closeWatcher(): Promise<void> {
-    const watcher = this.watcher
-    this.watcher = undefined
-    this.watching = false
-    if (watcher !== undefined) await watcher.close()
+    for (const store of this.stores.values()) {
+      if (store.has(path)) return true
+    }
+    return false
   }
 }
 

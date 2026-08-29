@@ -162,8 +162,8 @@ function registerTools(ctx: Context): () => void {
       render: (_args, value) => [{ type: 'text', text: formatSearchOutput(value as SearchOutput) }],
     },
     async execute(args, exec) {
-      requireAgent(exec, 'wiki_search')
-      const hits = await ctx.wiki.search(args.query, {
+      const agent = requireAgent(exec, 'wiki_search')
+      const hits = await ctx.wiki.search(agent.session, args.query, {
         ...args.limit === undefined ? {} : { limit: args.limit },
         ...args.includeArchive === undefined ? {} : { includeArchive: args.includeArchive },
       }, Date.now(), exec.signal)
@@ -204,7 +204,7 @@ function registerTools(ctx: Context): () => void {
         path: page.path,
         title: page.title,
         body: page.body,
-        temperature: temperatureOf(page.frontmatter.touched, Date.now(), ctx.wiki.engineConfig),
+        temperature: temperatureOf(page.frontmatter.touched, Date.now(), await ctx.wiki.engineConfig(agent.session)),
         created: page.frontmatter.created,
         updated: page.frontmatter.updated,
         touched: page.frontmatter.touched,
@@ -258,9 +258,9 @@ function registerTools(ctx: Context): () => void {
   const disposeLog = ctx.tools.register(defineTool({
     name: 'wiki_log',
     description:
-      'Append a short note to the wiki day log (log/YYYY-MM-DD.md). Use for session traces that should not become knowledge pages.',
+      'Append a short note to the wiki day log (a JSONL day shard). Use for session traces that should not become knowledge pages. The system timestamps every entry and picks the day shard itself, so never include a date or time in the body.',
     parameters: {
-      body: { type: 'string', required: true, description: 'Markdown to append to today\'s shard.' },
+      body: { type: 'string', required: true, description: 'Text to append. Never include a date or time; the system stamps every entry.' },
     },
     output: {
       schema: {

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { logPathOf } from '@shres-code/shres-code-wiki'
 import { parsePage, parseProjectConfig, serializePage, WikiMarkdownStore } from '../src/store.ts'
 
 const NOW = Date.parse('2026-08-29T12:00:00.000Z')
@@ -97,9 +98,14 @@ describe('WikiMarkdownStore', () => {
     const raw = await readFile(join(root, 'notes.md'), 'utf8')
     expect(raw).toMatch(/status: active/)
     await store.touch('notes.md', NOW + 1000)
-    await store.appendLog({ body: 'hello' }, NOW)
-    expect(store.has('log/2026-08-29.md')).toBe(true)
+    await store.appendLog({ body: 'hello', session: 's1' }, NOW)
+    expect(store.has(logPathOf(NOW))).toBe(true)
     await store.appendLog({ body: 'again' }, NOW)
+    const shardRaw = await readFile(join(root, ...logPathOf(NOW).split('/')), 'utf8')
+    const entries = shardRaw.trimEnd().split('\n').map(line => JSON.parse(line) as { ts: string; session?: string; body: string })
+    expect(entries.map(entry => entry.body)).toEqual(['hello', 'again'])
+    expect(entries[0]?.ts).toBe(new Date(NOW).toISOString())
+    expect(entries[0]?.session).toBe('s1')
     await store.writeIndex('# Wiki index\n')
     await store.writeProjectConfig({ enabled: true, hotDays: 3 })
     expect(store.projectConfig().hotDays).toBe(3)
@@ -123,6 +129,7 @@ describe('WikiMarkdownStore', () => {
     await writeFile(join(root, 'a.md'), '---\ncreated: x\nupdated: x\ntouched: x\nstatus: active\n---\n\n# A\n')
     await writeFile(join(root, 'archive', 'old.md'), '---\ncreated: x\nupdated: x\ntouched: x\nstatus: archived\n---\n\nold\n')
     await writeFile(join(root, 'log', '2026-08-29.md'), 'log body\n')
+    await writeFile(join(root, 'log', '29-08-26.jsonl'), '{"ts":"x","body":"y"}\n')
     await writeFile(join(root, 'skip.txt'), 'not markdown')
     await writeFile(join(root, '_skip.md'), 'not a wiki path')
     await mkdir(join(root, 'empty'), { recursive: true })
@@ -132,6 +139,9 @@ describe('WikiMarkdownStore', () => {
     expect(store.projectConfig().warmDays).toBe(11)
     expect(store.list(false).map(page => page.path)).toEqual(['a.md'])
     expect(store.list(true).some(page => page.path === 'archive/old.md')).toBe(true)
+    expect(store.has('log/29-08-26.jsonl')).toBe(true)
+    expect(store.list(true).some(page => page.path === 'log/2026-08-29.md')).toBe(true)
+    expect(store.list(true).some(page => page.path.endsWith('.jsonl'))).toBe(false)
     await store.load()
     await store.demote('missing.md', NOW)
     await store.demote('archive/old.md', NOW)

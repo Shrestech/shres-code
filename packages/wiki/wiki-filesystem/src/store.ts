@@ -5,7 +5,7 @@
  * @module @shres-code/shres-code-wiki-filesystem/store
  */
 
-import { mkdir, readdir, readFile, rm } from 'node:fs/promises'
+import { appendFile, mkdir, readdir, readFile, rm } from 'node:fs/promises'
 import { join, relative, sep } from 'node:path'
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml'
 import { writeFileAtomic } from '@shres-code/shres-code-atomic-write'
@@ -27,6 +27,8 @@ const DIR_MODE = 0o755
 /** In-memory page plus index cache over one wiki root. */
 export class WikiMarkdownStore {
   private pages = new Map<string, WikiPage>()
+  /** JSONL day-shard paths tracked for `has`; shards are machine-only. */
+  private logs = new Set<string>()
   private indexText = ''
   private project: WikiProjectConfig = {}
   private loaded = false
@@ -46,12 +48,12 @@ export class WikiMarkdownStore {
   }
 
   /**
-   * Whether a page or log shard is in the loaded index.
+   * Whether a page or JSONL log shard is in the loaded index.
    * @param path - wiki-relative path.
    * @returns true when present.
    */
   has(path: string): boolean {
-    return this.pages.has(path)
+    return this.pages.has(path) || this.logs.has(path)
   }
 
   /**
@@ -76,6 +78,7 @@ export class WikiMarkdownStore {
   async load(): Promise<this> {
     if (this.loaded) return this
     this.pages = new Map()
+    this.logs = new Set()
     this.indexText = ''
     this.project = {}
     try {
@@ -83,7 +86,7 @@ export class WikiMarkdownStore {
       this.exists = true
       for (const entry of entries) {
         if (!entry.isFile()) continue
-        if (!entry.name.endsWith('.md') && entry.name !== 'config.yaml') continue
+        if (!entry.name.endsWith('.md') && !entry.name.endsWith('.jsonl') && entry.name !== 'config.yaml') continue
         const parent = entry.parentPath
         const relativePath = posixJoin(relative(this.root, join(parent, entry.name)))
         if (relativePath === 'index.md') {
@@ -94,7 +97,17 @@ export class WikiMarkdownStore {
           this.project = parseProjectConfig(await readFile(join(this.root, 'config.yaml'), 'utf8'))
           continue
         }
-        if (relativePath.startsWith('log/') || isWikiPath(relativePath) || isArchivedPath(relativePath)) {
+        if (relativePath.startsWith('log/')) {
+          // JSONL day shards are append-only streams kept out of the page set;
+          // legacy markdown shards stay loadable as pages.
+          if (relativePath.endsWith('.jsonl')) this.logs.add(relativePath)
+          else {
+            const raw = await readFile(join(this.root, ...relativePath.split('/')), 'utf8')
+            this.pages.set(relativePath, parsePage(relativePath, raw))
+          }
+          continue
+        }
+        if (isWikiPath(relativePath) || isArchivedPath(relativePath)) {
           const raw = await readFile(join(this.root, ...relativePath.split('/')), 'utf8')
           this.pages.set(relativePath, parsePage(relativePath, raw))
         }
@@ -175,30 +188,23 @@ export class WikiMarkdownStore {
   }
 
   /**
-   * Append to the day shard.
-   * @param spec - resolved log spec.
-   * @param nowMs - append clock.
+   * Append one JSONL line to the day shard. The service owns all timestamps:
+   * each line carries the full append instant, the owning session id, and the
+   * caller's text. The write is an append; the shard is never rewritten.
+   * @param spec - resolved log spec (body plus owning session id).
+   * @param nowMs - append clock (selects the shard, stamps the line).
    * @returns the shard path.
    */
   async appendLog(spec: WikiLogSpec, nowMs: number): Promise<string> {
     await this.materialize()
     const path = logPathOf(nowMs)
-    const existing = this.pages.get(path)
-    const header = existing === undefined
-      ? `---\ncreated: ${new Date(nowMs).toISOString()}\nupdated: ${new Date(nowMs).toISOString()}\ntouched: ${new Date(nowMs).toISOString()}\nstatus: active\n---\n\n# ${path}\n\n`
-      : ''
-    const previous = existing?.body ?? ''
-    const body = existing === undefined ? spec.body : `${previous}\n${spec.body}`
-    const nowIso = new Date(nowMs).toISOString()
-    const raw = existing === undefined
-      ? `${header}${spec.body}\n`
-      : serializePage({
-        ...existing,
-        body,
-        frontmatter: { ...existing.frontmatter, updated: nowIso, touched: nowIso },
-      })
-    await this.writeRelative(path, raw)
-    this.pages.set(path, parsePage(path, raw))
+    const line = `${JSON.stringify({
+      ts: new Date(nowMs).toISOString(),
+      ...spec.session === undefined ? {} : { session: spec.session },
+      body: spec.body,
+    })}\n`
+    await appendFile(join(this.root, ...path.split('/')), line, { mode: FILE_MODE })
+    this.logs.add(path)
     return path
   }
 

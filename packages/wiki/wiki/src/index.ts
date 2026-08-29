@@ -65,7 +65,7 @@ export {
   shouldDemote,
   temperatureOf,
   tokenize,
-  utcDateStamp,
+  localDateStamp,
 } from './engine.ts'
 export {
   assertRolePair,
@@ -124,16 +124,21 @@ declare module '@shres-code/cordis' {
  * context). A provider subclasses this, implements the persistence hooks, and
  * loads the subclass as a plugin.
  *
+ * Persist and load hooks receive the calling session's project directory
+ * (session `cwd`): a provider roots relative store locations there, so each
+ * session lands in its own repository's wiki. Sessions without a recorded
+ * `cwd` fall back to the provider's deployment default.
+ *
  * Implementations must honor these semantics:
  * - {@link persistPage} writes a resolved spec under its path, creating
  *   directories on first write (lazy materialization).
  * - {@link persistTouch} updates only `touched` on an existing page.
- * - {@link persistLog} appends to the day-sharded log.
+ * - {@link persistLog} appends one timestamped JSONL line to the day shard.
  * - {@link persistDemote} moves a COLD-past-`demoteDays` page into `archive/`.
  * - {@link persistIndex} replaces generated `index.md`.
  * - {@link loadPages} reads the provider's authoritative page store.
  * - {@link loadIndex} returns generated `index.md` text, or `''` when absent.
- * - {@link hasPage} reports whether a path is present.
+ * - {@link hasPage} reports whether a path is present in any store root.
  */
 export abstract class WikiService extends Service {
   static Config = Config
@@ -168,53 +173,61 @@ export abstract class WikiService extends Service {
 
   /**
    * Persist a resolved page spec. Implemented by the provider.
+   * @param projectCwd - absolute project directory of the calling session, when recorded.
    * @param spec - a resolved spec from {@link resolveWrite}.
    * @param nowMs - write clock used for freshness timestamps.
    * @returns the stored page.
    */
-  abstract persistPage(spec: WikiWriteSpec, nowMs: number): Promise<WikiPage>
+  abstract persistPage(projectCwd: string | undefined, spec: WikiWriteSpec, nowMs: number): Promise<WikiPage>
 
   /**
    * Update only `touched` on an existing page.
+   * @param projectCwd - absolute project directory of the calling session, when recorded.
    * @param path - wiki-relative path.
    * @param nowMs - access clock.
    * @returns the updated page.
    */
-  abstract persistTouch(path: string, nowMs: number): Promise<WikiPage>
+  abstract persistTouch(projectCwd: string | undefined, path: string, nowMs: number): Promise<WikiPage>
 
   /**
-   * Append a resolved log body to the day shard for `nowMs`.
+   * Append one JSONL line (`ts`, `session`, `body`) to the day shard for
+   * `nowMs`. The service owns all timestamps; specs never carry dates.
+   * @param projectCwd - absolute project directory of the calling session, when recorded.
    * @param spec - resolved log spec.
-   * @param nowMs - append clock (selects the shard).
+   * @param nowMs - append clock (selects the shard, stamps the line).
    * @returns the shard path that received the append.
    */
-  abstract persistLog(spec: WikiLogSpec, nowMs: number): Promise<string>
+  abstract persistLog(projectCwd: string | undefined, spec: WikiLogSpec, nowMs: number): Promise<string>
 
   /**
    * Move a page into `archive/`. The original path must no longer be listed.
+   * @param projectCwd - absolute project directory of the calling session, when recorded.
    * @param path - active wiki-relative path.
    * @param nowMs - demotion clock.
    */
-  abstract persistDemote(path: string, nowMs: number): Promise<void>
+  abstract persistDemote(projectCwd: string | undefined, path: string, nowMs: number): Promise<void>
 
   /**
    * Replace generated `index.md`.
+   * @param projectCwd - absolute project directory of the calling session, when recorded.
    * @param markdown - generated projection.
    */
-  abstract persistIndex(markdown: string): Promise<void>
+  abstract persistIndex(projectCwd: string | undefined, markdown: string): Promise<void>
 
   /**
    * Load pages from the provider's store.
+   * @param projectCwd - absolute project directory of the calling session, when recorded.
    * @param includeArchive - when true, include `archive/` pages.
    * @returns the matching pages; empty when the wiki directory does not exist yet.
    */
-  abstract loadPages(includeArchive: boolean): Promise<WikiPage[]>
+  abstract loadPages(projectCwd: string | undefined, includeArchive: boolean): Promise<WikiPage[]>
 
   /**
    * Load generated `index.md` text.
+   * @param projectCwd - absolute project directory of the calling session, when recorded.
    * @returns the file contents, or `''` when the wiki has not been materialized.
    */
-  abstract loadIndex(): Promise<string>
+  abstract loadIndex(projectCwd: string | undefined): Promise<string>
 
   /**
    * Whether the store holds a page at `path`. Synchronous so the invariant
@@ -226,11 +239,20 @@ export abstract class WikiService extends Service {
 
   /**
    * Project-level `config.yaml` overlay, when the provider keeps one.
+   * @param session - owning session; selects the repository overlay. Optional
+   *   callers fall back to the provider's deployment default.
    * @returns the parsed project config, or `{}` when absent.
    */
-  projectConfig(): WikiProjectConfig {
-    return {}
+  async projectConfig(session?: Session): Promise<WikiProjectConfig> {
+    return this.projectConfigOf(session?.header.cwd)
   }
+
+  /**
+   * Provider-selected project overlay for one repository root.
+   * @param projectCwd - absolute project directory of the calling session, when recorded.
+   * @returns the parsed project config, or `{}` when absent.
+   */
+  protected abstract projectConfigOf(projectCwd: string | undefined): Promise<WikiProjectConfig>
 
   /**
    * Current seat status.
@@ -250,11 +272,14 @@ export abstract class WikiService extends Service {
 
   /**
    * Engine tunables from the composition entry (not overlaid by the settings
-   * document; project `config.yaml` may still overlay them in the provider).
+   * document; the session's project `config.yaml` may still overlay them in
+   * the provider).
+   * @param session - owning session; selects the repository overlay. Optional
+   *   callers fall back to the provider's deployment default.
    * @returns the resolved engine config.
    */
-  get engineConfig(): WikiEngineConfig {
-    const project = this.projectConfig()
+  async engineConfig(session?: Session): Promise<WikiEngineConfig> {
+    const project = await this.projectConfigOf(session?.header.cwd)
     return resolveEngine({
       hotDays: project.hotDays ?? this.engine.hotDays,
       warmDays: project.warmDays ?? this.engine.warmDays,
@@ -306,23 +331,25 @@ export abstract class WikiService extends Service {
 
   /**
    * Read one page without bumping `touched`.
+   * @param session - owning session; selects the repository wiki.
    * @param path - wiki-relative path.
    * @returns the page, or `undefined` when missing or the wiki is not materialized.
    */
-  async read(path: string): Promise<WikiPage | undefined> {
-    const pages = await this.loadPages(true)
+  async read(session: Session, path: string): Promise<WikiPage | undefined> {
+    const pages = await this.loadPages(session.header.cwd, true)
     return pages.find(page => page.path === path)
   }
 
   /**
    * List pages, temperature-ranked. Archive is omitted unless requested.
+   * @param session - owning session; selects the repository wiki.
    * @param filter - optional filters.
    * @param nowMs - evaluation clock; defaults to `Date.now()`.
    * @returns matching pages HOT first.
    */
-  async list(filter: WikiListFilter = {}, nowMs: number = Date.now()): Promise<WikiPage[]> {
-    const pages = await this.loadPages(filter.includeArchive === true)
-    const engine = this.engineConfig
+  async list(session: Session, filter: WikiListFilter = {}, nowMs: number = Date.now()): Promise<WikiPage[]> {
+    const pages = await this.loadPages(session.header.cwd, filter.includeArchive === true)
+    const engine = await this.engineConfig(session)
     const substring = filter.substring?.toLowerCase()
     const filtered = pages.filter((page) => {
       if (filter.includeArchive !== true && (isArchivedPath(page.path) || page.frontmatter.status === 'archived')) {
@@ -349,6 +376,7 @@ export abstract class WikiService extends Service {
    * Search pages. BM25 always runs; cosine mix-in applies when embeddings are
    * registered and available. Default result set excludes archive. HOT ranks
    * above COLD regardless of score.
+   * @param session - owning session; selects the repository wiki.
    * @param query - raw query string.
    * @param options - limit and archive inclusion.
    * @param nowMs - evaluation clock.
@@ -356,15 +384,16 @@ export abstract class WikiService extends Service {
    * @returns ranked hits.
    */
   async search(
+    session: Session,
     query: string,
     options: WikiSearchOptions = {},
     nowMs: number = Date.now(),
     signal?: AbortSignal,
   ): Promise<WikiSearchHit[]> {
-    const pages = (await this.loadPages(options.includeArchive === true))
+    const pages = (await this.loadPages(session.header.cwd, options.includeArchive === true))
       .filter(page => options.includeArchive === true
         || (!isArchivedPath(page.path) && page.frontmatter.status !== 'archived'))
-    const engine = this.engineConfig
+    const engine = await this.engineConfig(session)
     const lexical = bm25Scores(pages, query)
     let cosine: Map<string, number> | undefined
     const embeddings = this.embeddings
@@ -408,6 +437,7 @@ export abstract class WikiService extends Service {
    * Shortlist pages most similar to `path` (embeddings when available, else
    * BM25 against the page title). Used by the librarian for dedup/link
    * proposals. Archive is excluded.
+   * @param session - owning session; selects the repository wiki.
    * @param path - wiki-relative path of the seed page.
    * @param limit - maximum hits, default 5.
    * @param nowMs - evaluation clock.
@@ -415,14 +445,15 @@ export abstract class WikiService extends Service {
    * @returns ranked other pages.
    */
   async similar(
+    session: Session,
     path: string,
     limit: number = 5,
     nowMs: number = Date.now(),
     signal?: AbortSignal,
   ): Promise<WikiSearchHit[]> {
-    const seed = await this.read(path)
+    const seed = await this.read(session, path)
     if (seed === undefined) return []
-    const hits = await this.search(`${seed.title} ${seed.body}`, { limit: limit + 1 }, nowMs, signal)
+    const hits = await this.search(session, `${seed.title} ${seed.body}`, { limit: limit + 1 }, nowMs, signal)
     return hits.filter(hit => hit.path !== path).slice(0, limit)
   }
 
@@ -451,8 +482,8 @@ export abstract class WikiService extends Service {
       }
       throw error
     }
-    const existing = await this.read(spec.path)
-    const page = await this.persistPage(spec, nowMs)
+    const existing = await this.read(session, spec.path)
+    const page = await this.persistPage(session.header.cwd, spec, nowMs)
     session.append('wiki/page', {
       path: page.path,
       op: existing === undefined ? 'create' : 'update',
@@ -485,7 +516,7 @@ export abstract class WikiService extends Service {
       /* v8 ignore stop */
       return { kind: 'failed', reason: error.code, detail: error.message }
     }
-    const path = await this.persistLog(spec, nowMs)
+    const path = await this.persistLog(session.header.cwd, { body: spec.body, session: session.id }, nowMs)
     session.append('wiki/page', { path, op: 'log' }, { ignorable: true })
     return { kind: 'appended', path }
   }
@@ -506,22 +537,23 @@ export abstract class WikiService extends Service {
     if (!this.current.active) {
       return { kind: 'failed', reason: 'disabled', detail: 'wiki is disabled' }
     }
-    const existing = await this.read(path)
+    const existing = await this.read(session, path)
     if (existing === undefined) {
       return { kind: 'failed', reason: 'not-found', detail: `wiki page not found: ${path}` }
     }
-    const page = await this.persistTouch(path, nowMs)
+    const page = await this.persistTouch(session.header.cwd, path, nowMs)
     session.append('wiki/page', { path: page.path, op: 'touch' }, { ignorable: true })
     return { kind: 'written', page }
   }
 
   /**
    * Mechanically lint every page plus the generated index.
+   * @param session - owning session; selects the repository wiki.
    * @returns the issue list.
    */
-  async lint(): Promise<WikiLintIssue[]> {
-    const pages = await this.loadPages(true)
-    const index = await this.loadIndex()
+  async lint(session: Session): Promise<WikiLintIssue[]> {
+    const pages = await this.loadPages(session.header.cwd, true)
+    const index = await this.loadIndex(session.header.cwd)
     return lintPages(pages, index)
   }
 
@@ -556,16 +588,17 @@ export abstract class WikiService extends Service {
   }
 
   private async maintain(nowMs: number, session?: Session): Promise<void> {
-    const engine = this.engineConfig
-    const pages = await this.loadPages(true)
+    const projectCwd = session?.header.cwd
+    const engine = await this.engineConfig(session)
+    const pages = await this.loadPages(projectCwd, true)
     for (const page of pages) {
       if (isArchivedPath(page.path) || page.frontmatter.status === 'archived') continue
       if (!shouldDemote(page.frontmatter.touched, nowMs, engine)) continue
-      await this.persistDemote(page.path, nowMs)
+      await this.persistDemote(projectCwd, page.path, nowMs)
       session?.append('wiki/page', { path: archivePathOf(page.path), op: 'archive' }, { ignorable: true })
     }
-    const next = await this.loadPages(true)
-    await this.persistIndex(generateIndex(next, nowMs, engine))
+    const next = await this.loadPages(projectCwd, true)
+    await this.persistIndex(projectCwd, generateIndex(next, nowMs, engine))
   }
 
   private sync(): void {

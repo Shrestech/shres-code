@@ -140,67 +140,77 @@ Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnp
 
 The abstract wiki service. Registered as `ctx.wiki` (one provider per context). A provider subclasses this, implements the persistence hooks, and loads the subclass as a plugin.
 
+Persist and load hooks receive the calling session's project directory (session `cwd`): a provider roots relative store locations there, so each session lands in its own repository's wiki. Sessions without a recorded `cwd` fall back to the provider's deployment default.
+
 Implementations must honor these semantics:
 
 - persistPage writes a resolved spec under its path, creating directories on first write (lazy materialization).
 - persistTouch updates only `touched` on an existing page.
-- persistLog appends to the day-sharded log.
+- persistLog appends one timestamped JSONL line to the day shard.
 - persistDemote moves a COLD-past-`demoteDays` page into `archive/`.
 - persistIndex replaces generated `index.md`.
 - loadPages reads the provider's authoritative page store.
 - loadIndex returns generated `index.md` text, or `''` when absent.
-- hasPage reports whether a path is present.
+- hasPage reports whether a path is present in any store root.
 
 ```ts cordis-catalog
 /**
  * Persist a resolved page spec. Implemented by the provider.
+ * @param projectCwd - absolute project directory of the calling session, when recorded.
  * @param spec - a resolved spec from {@link resolveWrite}.
  * @param nowMs - write clock used for freshness timestamps.
  * @returns the stored page.
  */
-abstract persistPage(spec: WikiWriteSpec, nowMs: number): Promise<WikiPage>
+abstract persistPage(projectCwd: string | undefined, spec: WikiWriteSpec, nowMs: number): Promise<WikiPage>
 
 /**
  * Update only `touched` on an existing page.
+ * @param projectCwd - absolute project directory of the calling session, when recorded.
  * @param path - wiki-relative path.
  * @param nowMs - access clock.
  * @returns the updated page.
  */
-abstract persistTouch(path: string, nowMs: number): Promise<WikiPage>
+abstract persistTouch(projectCwd: string | undefined, path: string, nowMs: number): Promise<WikiPage>
 
 /**
- * Append a resolved log body to the day shard for `nowMs`.
+ * Append one JSONL line (`ts`, `session`, `body`) to the day shard for
+ * `nowMs`. The service owns all timestamps; specs never carry dates.
+ * @param projectCwd - absolute project directory of the calling session, when recorded.
  * @param spec - resolved log spec.
- * @param nowMs - append clock (selects the shard).
+ * @param nowMs - append clock (selects the shard, stamps the line).
  * @returns the shard path that received the append.
  */
-abstract persistLog(spec: WikiLogSpec, nowMs: number): Promise<string>
+abstract persistLog(projectCwd: string | undefined, spec: WikiLogSpec, nowMs: number): Promise<string>
 
 /**
  * Move a page into `archive/`. The original path must no longer be listed.
+ * @param projectCwd - absolute project directory of the calling session, when recorded.
  * @param path - active wiki-relative path.
  * @param nowMs - demotion clock.
  */
-abstract persistDemote(path: string, nowMs: number): Promise<void>
+abstract persistDemote(projectCwd: string | undefined, path: string, nowMs: number): Promise<void>
 
 /**
  * Replace generated `index.md`.
+ * @param projectCwd - absolute project directory of the calling session, when recorded.
  * @param markdown - generated projection.
  */
-abstract persistIndex(markdown: string): Promise<void>
+abstract persistIndex(projectCwd: string | undefined, markdown: string): Promise<void>
 
 /**
  * Load pages from the provider's store.
+ * @param projectCwd - absolute project directory of the calling session, when recorded.
  * @param includeArchive - when true, include `archive/` pages.
  * @returns the matching pages; empty when the wiki directory does not exist yet.
  */
-abstract loadPages(includeArchive: boolean): Promise<WikiPage[]>
+abstract loadPages(projectCwd: string | undefined, includeArchive: boolean): Promise<WikiPage[]>
 
 /**
  * Load generated `index.md` text.
+ * @param projectCwd - absolute project directory of the calling session, when recorded.
  * @returns the file contents, or `''` when the wiki has not been materialized.
  */
-abstract loadIndex(): Promise<string>
+abstract loadIndex(projectCwd: string | undefined): Promise<string>
 
 /**
  * Whether the store holds a page at `path`. Synchronous so the invariant
@@ -212,9 +222,21 @@ abstract hasPage(path: string): boolean
 
 /**
  * Project-level `config.yaml` overlay, when the provider keeps one.
+ * @param session - owning session; selects the repository overlay. Optional
+ *   callers fall back to the provider's deployment default.
  * @returns the parsed project config, or `{}` when absent.
  */
-projectConfig(): WikiProjectConfig
+async projectConfig(session?: Session): Promise<WikiProjectConfig>
+
+/**
+ * Engine tunables from the composition entry (not overlaid by the settings
+ * document; the session's project `config.yaml` may still overlay them in
+ * the provider).
+ * @param session - owning session; selects the repository overlay. Optional
+ *   callers fall back to the provider's deployment default.
+ * @returns the resolved engine config.
+ */
+async engineConfig(session?: Session): Promise<WikiEngineConfig>
 
 /**
  * Subscribe to status remounts.
@@ -245,42 +267,46 @@ settingsLibrarian(): { provider: string; model: string } | undefined
 
 /**
  * Read one page without bumping `touched`.
+ * @param session - owning session; selects the repository wiki.
  * @param path - wiki-relative path.
  * @returns the page, or `undefined` when missing or the wiki is not materialized.
  */
-async read(path: string): Promise<WikiPage | undefined>
+async read(session: Session, path: string): Promise<WikiPage | undefined>
 
 /**
  * List pages, temperature-ranked. Archive is omitted unless requested.
+ * @param session - owning session; selects the repository wiki.
  * @param filter - optional filters.
  * @param nowMs - evaluation clock; defaults to `Date.now()`.
  * @returns matching pages HOT first.
  */
-async list(filter: WikiListFilter = {}, nowMs: number = Date.now()): Promise<WikiPage[]>
+async list(session: Session, filter: WikiListFilter = {}, nowMs: number = Date.now()): Promise<WikiPage[]>
 
 /**
  * Search pages. BM25 always runs; cosine mix-in applies when embeddings are
  * registered and available. Default result set excludes archive. HOT ranks
  * above COLD regardless of score.
+ * @param session - owning session; selects the repository wiki.
  * @param query - raw query string.
  * @param options - limit and archive inclusion.
  * @param nowMs - evaluation clock.
  * @param signal - optional cancellation around embeddings.
  * @returns ranked hits.
  */
-async search( query: string, options: WikiSearchOptions = {}, nowMs: number = Date.now(), signal?: AbortSignal, ): Promise<WikiSearchHit[]>
+async search( session: Session, query: string, options: WikiSearchOptions = {}, nowMs: number = Date.now(), signal?: AbortSignal, ): Promise<WikiSearchHit[]>
 
 /**
  * Shortlist pages most similar to `path` (embeddings when available, else
  * BM25 against the page title). Used by the librarian for dedup/link
  * proposals. Archive is excluded.
+ * @param session - owning session; selects the repository wiki.
  * @param path - wiki-relative path of the seed page.
  * @param limit - maximum hits, default 5.
  * @param nowMs - evaluation clock.
  * @param signal - optional cancellation around embeddings.
  * @returns ranked other pages.
  */
-async similar( path: string, limit: number = 5, nowMs: number = Date.now(), signal?: AbortSignal, ): Promise<WikiSearchHit[]>
+async similar( session: Session, path: string, limit: number = 5, nowMs: number = Date.now(), signal?: AbortSignal, ): Promise<WikiSearchHit[]>
 
 /**
  * Write a page. Resolves the request, persists, logs `wiki/page`, regenerates
@@ -313,9 +339,10 @@ async touch( session: Session, path: string, nowMs: number = Date.now(), ): Prom
 
 /**
  * Mechanically lint every page plus the generated index.
+ * @param session - owning session; selects the repository wiki.
  * @returns the issue list.
  */
-async lint(): Promise<WikiLintIssue[]>
+async lint(session: Session): Promise<WikiLintIssue[]>
 
 /**
  * Rebuild `index.md` and demote COLD-past-`demoteDays` pages into `archive/`.
@@ -338,5 +365,5 @@ freshness(nowIso: string, existing: WikiFrontmatter | undefined, archived: boole
 
 Types: [Session](session.md)
 
-Source: [`packages/wiki/wiki/src/index.ts:138`](../../packages/wiki/wiki/src/index.ts)
+Source: [`packages/wiki/wiki/src/index.ts:143`](../../packages/wiki/wiki/src/index.ts)
 <!-- END GENERATED cordis-surface -->

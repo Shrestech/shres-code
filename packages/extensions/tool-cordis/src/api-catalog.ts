@@ -2474,46 +2474,46 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
   {
     key: 'wiki',
     summary: 'The abstract wiki service.',
-    description: 'The abstract wiki service. Registered as `ctx.wiki` (one provider per context). A provider subclasses this, implements the persistence hooks, and loads the subclass as a plugin.\n\nImplementations must honor these semantics:\n\n- persistPage writes a resolved spec under its path, creating directories on first write (lazy materialization).\n- persistTouch updates only `touched` on an existing page.\n- persistLog appends to the day-sharded log.\n- persistDemote moves a COLD-past-`demoteDays` page into `archive/`.\n- persistIndex replaces generated `index.md`.\n- loadPages reads the provider\'s authoritative page store.\n- loadIndex returns generated `index.md` text, or `\'\'` when absent.\n- hasPage reports whether a path is present.',
+    description: 'The abstract wiki service. Registered as `ctx.wiki` (one provider per context). A provider subclasses this, implements the persistence hooks, and loads the subclass as a plugin.\n\nPersist and load hooks receive the calling session\'s project directory (session `cwd`): a provider roots relative store locations there, so each session lands in its own repository\'s wiki. Sessions without a recorded `cwd` fall back to the provider\'s deployment default.\n\nImplementations must honor these semantics:\n\n- persistPage writes a resolved spec under its path, creating directories on first write (lazy materialization).\n- persistTouch updates only `touched` on an existing page.\n- persistLog appends one timestamped JSONL line to the day shard.\n- persistDemote moves a COLD-past-`demoteDays` page into `archive/`.\n- persistIndex replaces generated `index.md`.\n- loadPages reads the provider\'s authoritative page store.\n- loadIndex returns generated `index.md` text, or `\'\'` when absent.\n- hasPage reports whether a path is present in any store root.',
     methods: [
       {
-        signature: 'abstract persistPage(spec: WikiWriteSpec, nowMs: number): Promise<WikiPage>',
+        signature: 'abstract persistPage(projectCwd: string | undefined, spec: WikiWriteSpec, nowMs: number): Promise<WikiPage>',
         description: 'Persist a resolved page spec. Implemented by the provider.',
-        parameters: [{ name: 'spec', description: 'a resolved spec from {@link resolveWrite}.' }, { name: 'nowMs', description: 'write clock used for freshness timestamps.' }],
+        parameters: [{ name: 'projectCwd', description: 'absolute project directory of the calling session, when recorded.' }, { name: 'spec', description: 'a resolved spec from {@link resolveWrite}.' }, { name: 'nowMs', description: 'write clock used for freshness timestamps.' }],
         returns: 'the stored page.',
       },
       {
-        signature: 'abstract persistTouch(path: string, nowMs: number): Promise<WikiPage>',
+        signature: 'abstract persistTouch(projectCwd: string | undefined, path: string, nowMs: number): Promise<WikiPage>',
         description: 'Update only `touched` on an existing page.',
-        parameters: [{ name: 'path', description: 'wiki-relative path.' }, { name: 'nowMs', description: 'access clock.' }],
+        parameters: [{ name: 'projectCwd', description: 'absolute project directory of the calling session, when recorded.' }, { name: 'path', description: 'wiki-relative path.' }, { name: 'nowMs', description: 'access clock.' }],
         returns: 'the updated page.',
       },
       {
-        signature: 'abstract persistLog(spec: WikiLogSpec, nowMs: number): Promise<string>',
-        description: 'Append a resolved log body to the day shard for `nowMs`.',
-        parameters: [{ name: 'spec', description: 'resolved log spec.' }, { name: 'nowMs', description: 'append clock (selects the shard).' }],
+        signature: 'abstract persistLog(projectCwd: string | undefined, spec: WikiLogSpec, nowMs: number): Promise<string>',
+        description: 'Append one JSONL line (`ts`, `session`, `body`) to the day shard for `nowMs`. The service owns all timestamps; specs never carry dates.',
+        parameters: [{ name: 'projectCwd', description: 'absolute project directory of the calling session, when recorded.' }, { name: 'spec', description: 'resolved log spec.' }, { name: 'nowMs', description: 'append clock (selects the shard, stamps the line).' }],
         returns: 'the shard path that received the append.',
       },
       {
-        signature: 'abstract persistDemote(path: string, nowMs: number): Promise<void>',
+        signature: 'abstract persistDemote(projectCwd: string | undefined, path: string, nowMs: number): Promise<void>',
         description: 'Move a page into `archive/`. The original path must no longer be listed.',
-        parameters: [{ name: 'path', description: 'active wiki-relative path.' }, { name: 'nowMs', description: 'demotion clock.' }],
+        parameters: [{ name: 'projectCwd', description: 'absolute project directory of the calling session, when recorded.' }, { name: 'path', description: 'active wiki-relative path.' }, { name: 'nowMs', description: 'demotion clock.' }],
       },
       {
-        signature: 'abstract persistIndex(markdown: string): Promise<void>',
+        signature: 'abstract persistIndex(projectCwd: string | undefined, markdown: string): Promise<void>',
         description: 'Replace generated `index.md`.',
-        parameters: [{ name: 'markdown', description: 'generated projection.' }],
+        parameters: [{ name: 'projectCwd', description: 'absolute project directory of the calling session, when recorded.' }, { name: 'markdown', description: 'generated projection.' }],
       },
       {
-        signature: 'abstract loadPages(includeArchive: boolean): Promise<WikiPage[]>',
+        signature: 'abstract loadPages(projectCwd: string | undefined, includeArchive: boolean): Promise<WikiPage[]>',
         description: 'Load pages from the provider\'s store.',
-        parameters: [{ name: 'includeArchive', description: 'when true, include `archive/` pages.' }],
+        parameters: [{ name: 'projectCwd', description: 'absolute project directory of the calling session, when recorded.' }, { name: 'includeArchive', description: 'when true, include `archive/` pages.' }],
         returns: 'the matching pages; empty when the wiki directory does not exist yet.',
       },
       {
-        signature: 'abstract loadIndex(): Promise<string>',
+        signature: 'abstract loadIndex(projectCwd: string | undefined): Promise<string>',
         description: 'Load generated `index.md` text.',
-        parameters: [],
+        parameters: [{ name: 'projectCwd', description: 'absolute project directory of the calling session, when recorded.' }],
         returns: 'the file contents, or `\'\'` when the wiki has not been materialized.',
       },
       {
@@ -2523,10 +2523,16 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'whether the page or log shard is present.',
       },
       {
-        signature: 'projectConfig(): WikiProjectConfig',
+        signature: 'async projectConfig(session?: Session): Promise<WikiProjectConfig>',
         description: 'Project-level `config.yaml` overlay, when the provider keeps one.',
-        parameters: [],
+        parameters: [{ name: 'session', description: 'owning session; selects the repository overlay. Optional callers fall back to the provider\'s deployment default.' }],
         returns: 'the parsed project config, or `{}` when absent.',
+      },
+      {
+        signature: 'async engineConfig(session?: Session): Promise<WikiEngineConfig>',
+        description: 'Engine tunables from the composition entry (not overlaid by the settings document; the session\'s project `config.yaml` may still overlay them in the provider).',
+        parameters: [{ name: 'session', description: 'owning session; selects the repository overlay. Optional callers fall back to the provider\'s deployment default.' }],
+        returns: 'the resolved engine config.',
       },
       {
         signature: 'watch(listener: (status: WikiStatus) => void): () => void',
@@ -2553,27 +2559,27 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the pair, or `undefined` when unbound at the settings layer.',
       },
       {
-        signature: 'async read(path: string): Promise<WikiPage | undefined>',
+        signature: 'async read(session: Session, path: string): Promise<WikiPage | undefined>',
         description: 'Read one page without bumping `touched`.',
-        parameters: [{ name: 'path', description: 'wiki-relative path.' }],
+        parameters: [{ name: 'session', description: 'owning session; selects the repository wiki.' }, { name: 'path', description: 'wiki-relative path.' }],
         returns: 'the page, or `undefined` when missing or the wiki is not materialized.',
       },
       {
-        signature: 'async list(filter: WikiListFilter = {}, nowMs: number = Date.now()): Promise<WikiPage[]>',
+        signature: 'async list(session: Session, filter: WikiListFilter = {}, nowMs: number = Date.now()): Promise<WikiPage[]>',
         description: 'List pages, temperature-ranked. Archive is omitted unless requested.',
-        parameters: [{ name: 'filter', description: 'optional filters.' }, { name: 'nowMs', description: 'evaluation clock; defaults to `Date.now()`.' }],
+        parameters: [{ name: 'session', description: 'owning session; selects the repository wiki.' }, { name: 'filter', description: 'optional filters.' }, { name: 'nowMs', description: 'evaluation clock; defaults to `Date.now()`.' }],
         returns: 'matching pages HOT first.',
       },
       {
-        signature: 'async search( query: string, options: WikiSearchOptions = {}, nowMs: number = Date.now(), signal?: AbortSignal, ): Promise<WikiSearchHit[]>',
+        signature: 'async search( session: Session, query: string, options: WikiSearchOptions = {}, nowMs: number = Date.now(), signal?: AbortSignal, ): Promise<WikiSearchHit[]>',
         description: 'Search pages. BM25 always runs; cosine mix-in applies when embeddings are registered and available. Default result set excludes archive. HOT ranks above COLD regardless of score.',
-        parameters: [{ name: 'query', description: 'raw query string.' }, { name: 'options', description: 'limit and archive inclusion.' }, { name: 'nowMs', description: 'evaluation clock.' }, { name: 'signal', description: 'optional cancellation around embeddings.' }],
+        parameters: [{ name: 'session', description: 'owning session; selects the repository wiki.' }, { name: 'query', description: 'raw query string.' }, { name: 'options', description: 'limit and archive inclusion.' }, { name: 'nowMs', description: 'evaluation clock.' }, { name: 'signal', description: 'optional cancellation around embeddings.' }],
         returns: 'ranked hits.',
       },
       {
-        signature: 'async similar( path: string, limit: number = 5, nowMs: number = Date.now(), signal?: AbortSignal, ): Promise<WikiSearchHit[]>',
+        signature: 'async similar( session: Session, path: string, limit: number = 5, nowMs: number = Date.now(), signal?: AbortSignal, ): Promise<WikiSearchHit[]>',
         description: 'Shortlist pages most similar to `path` (embeddings when available, else BM25 against the page title). Used by the librarian for dedup/link proposals. Archive is excluded.',
-        parameters: [{ name: 'path', description: 'wiki-relative path of the seed page.' }, { name: 'limit', description: 'maximum hits, default 5.' }, { name: 'nowMs', description: 'evaluation clock.' }, { name: 'signal', description: 'optional cancellation around embeddings.' }],
+        parameters: [{ name: 'session', description: 'owning session; selects the repository wiki.' }, { name: 'path', description: 'wiki-relative path of the seed page.' }, { name: 'limit', description: 'maximum hits, default 5.' }, { name: 'nowMs', description: 'evaluation clock.' }, { name: 'signal', description: 'optional cancellation around embeddings.' }],
         returns: 'ranked other pages.',
       },
       {
@@ -2595,9 +2601,9 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the updated page, or a failed result.',
       },
       {
-        signature: 'async lint(): Promise<WikiLintIssue[]>',
+        signature: 'async lint(session: Session): Promise<WikiLintIssue[]>',
         description: 'Mechanically lint every page plus the generated index.',
-        parameters: [],
+        parameters: [{ name: 'session', description: 'owning session; selects the repository wiki.' }],
         returns: 'the issue list.',
       },
       {
@@ -5452,6 +5458,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface WikiEmbeddings {\n    available(): boolean;\n    embed(texts: readonly string[], signal?: AbortSignal): Promise<readonly (readonly number[])[]>;\n}',
   },
   {
+    name: 'WikiEngineConfig',
+    declaration: 'export interface WikiEngineConfig {\n    readonly hotDays: number;\n    readonly warmDays: number;\n    readonly demoteDays: number;\n    readonly indexMaxLines: number;\n}',
+  },
+  {
     name: 'WikiFailureReason',
     declaration: 'export type WikiFailureReason = \'required-field\' | \'invalid-path\' | \'disabled\' | \'not-found\' | \'not-materialized\';',
   },
@@ -5481,7 +5491,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'WikiLogSpec',
-    declaration: 'export interface WikiLogSpec {\n    readonly body: string;\n}',
+    declaration: 'export interface WikiLogSpec {\n    readonly body: string;\n    readonly session?: string;\n}',
   },
   {
     name: 'WikiPage',
