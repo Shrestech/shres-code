@@ -34,7 +34,7 @@ function probePort(): Promise<number> {
       const address = server.address()
       // Typed same-process invariant: the loopback listener is always a TCP address.
       if (address === null || typeof address === 'string') { server.close(); reject(new Error('loopback listener without TCP address')) }
-      else server.close(() => resolve(address.port))
+      else server.close(() =>{  resolve(address.port) })
     })
   })
 }
@@ -48,8 +48,8 @@ function probePort(): Promise<number> {
 async function canRebind(port: number): Promise<boolean> {
   return new Promise((resolve) => {
     const server = createServer()
-    server.once('error', () => resolve(false))
-    server.once('listening', () => server.close(() => resolve(true)))
+    server.once('error', () =>{  resolve(false) })
+    server.once('listening', () => server.close(() =>{  resolve(true) }))
     server.listen(port, '127.0.0.1')
   })
 }

@@ -18,9 +18,29 @@
       "types": "./lib/types/index.d.ts",
       "default": "./lib/index.js"
     },
+    "./gateway": {
+      "types": "./lib/types/gateway.d.ts",
+      "default": "./lib/types/gateway.js"
+    },
+    "./home": {
+      "types": "./lib/types/home.d.ts",
+      "default": "./lib/types/home.js"
+    },
     "./invariant": {
       "types": "./lib/types/invariant.d.ts",
       "default": "./lib/invariant.js"
+    },
+    "./types": {
+      "types": "./lib/types/types.d.ts",
+      "default": "./lib/types/types.js"
+    },
+    "./typert": {
+      "types": "./lib/typert.host.d.ts",
+      "default": "./lib/typert.host.js"
+    },
+    "./remote": {
+      "types": "./lib/typert.remote-client.d.ts",
+      "default": "./lib/typert.remote-client.js"
     },
     "./src/*": "./src/*",
     "./package.json": "./package.json"
@@ -28,7 +48,12 @@
   "files": [
     "lib/index.js",
     "lib/invariant.js",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.js",
+    "lib/types/**/*.d.ts",
+    "lib/typert.host.js",
+    "lib/typert.host.d.ts",
+    "lib/typert.remote-client.js",
+    "lib/typert.remote-client.d.ts"
   ],
   "license": "MIT",
   "peerDependencies": {
@@ -36,13 +61,18 @@
     "@shres-code/shres-code-atomic-write": "workspace:^",
     "@shres-code/shres-code-brand": "workspace:^",
     "@shres-code/shres-code-home-paths": "workspace:^",
-    "@shres-code/shres-code-invariants": "workspace:^"
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-typert-protocol": "workspace:^"
   },
   "devDependencies": {
     "@shres-code/cordis": "workspace:^",
     "@shres-code/shres-code-atomic-write": "workspace:^",
     "@shres-code/shres-code-brand": "workspace:^",
     "@shres-code/shres-code-home-paths": "workspace:^",
-    "@shres-code/shres-code-invariants": "workspace:^"
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-typert-protocol": "workspace:^"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
   }
 }

@@ -22,7 +22,6 @@
     },
     {
       "path": "../../credentials/credentials"
-
     },
     {
       "path": "../../extensions/cordis-host-runner"
@@ -38,6 +37,9 @@
     },
     {
       "path": "../../host/plugin-inventory"
+    },
+    {
+      "path": "../../host/remote-control"
     },
     {
       "path": "../../guard/shield"

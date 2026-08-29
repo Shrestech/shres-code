@@ -31,8 +31,8 @@ function nodeSshRunner(): rc.SshRunner {
         execFile('ssh', args, { timeout: EXEC_TIMEOUT_MS, maxBuffer: 4 * 1024 * 1024 }, (error, stdout, stderr) => {
           // Nonzero exits, timeouts, and missing binaries are all probe data: the controller's typed retry loop decides.
           const exitCode = error === null ? 0 : typeof error.code === 'number' ? error.code : 255
-          const stderrText = error !== null && typeof error.code !== 'number' ? `${String(stderr)}${error.message}`.trim() : String(stderr)
-          resolveP({ exitCode, stdout: String(stdout), stderr: stderrText })
+          const stderrText = error !== null && typeof error.code !== 'number' ? `${stderr}${error.message}`.trim() : stderr
+          resolveP({ exitCode, stdout, stderr: stderrText })
         })
       })
     },
@@ -47,7 +47,7 @@ function nodeSshRunner(): rc.SshRunner {
             const escalate = setTimeout(() => { if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL') }, 1000)
             await new Promise<void>((resolveK) => {
               if (child.exitCode !== null || child.signalCode !== null) resolveK()
-              else child.once('exit', () => resolveK())
+              else child.once('exit', () =>{  resolveK() })
             })
             clearTimeout(escalate)
           }

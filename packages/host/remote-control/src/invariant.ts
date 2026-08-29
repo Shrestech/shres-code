@@ -13,8 +13,7 @@ export const name = 'host-remote-control-invariant'
 /** Service required before the companion can reserve package ownership. */
 export const inject = ['invariants']
 
-/** No runtime invariant: PR1 ships pure functions and the CLI.
- * Durable invariants (tunnel/registry relations) arrive with the mounted plugin face. */
+/** No runtime invariant: the gateway projects the registry file directly and owns no long-lived state. */
 const install: InvariantInstaller = () => {}
 
 /**

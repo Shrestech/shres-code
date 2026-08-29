@@ -83,7 +83,7 @@ export function parseProbeVersion(stdout: string): string | null {
   try {
     const envelope: unknown = JSON.parse(stdout.slice(start))
     const value = (envelope as { result?: { value?: { version?: unknown } } }).result?.value
-    const version = typeof value === 'object' && value !== null ? (value as { version?: unknown }).version : undefined
+    const version: unknown = (value as { version?: unknown } | null | undefined)?.version
     return typeof version === 'string' && version.length > 0 ? version : null
   } catch (error) {
     // Truncated or torn probe output is an expected probe state, not a crash: report it as no-version.
