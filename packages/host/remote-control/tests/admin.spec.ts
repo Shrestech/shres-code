@@ -5,8 +5,8 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@shres-code/cordis'
 import { remoteMethods } from '@shres-code/shres-code-typert-protocol'
-import RemoteAdminGateway from '../src/admin-gateway.ts'
-import type { AdminConfig } from '../src/admin-gateway.ts'
+import RemoteAdminGateway from '../src/admin.ts'
+import type { AdminConfig } from '../src/admin.ts'
 import type { SshRunner } from '../src/controller.ts'
 import { asRemoteId, asRemoteTarget, loadRegistry } from '../src/registry.ts'
 import type { TunnelStateView } from '../src/types.ts'
@@ -61,7 +61,7 @@ function fabricatedRunner(options: {
         throw options.spawnFailure
       }
       const forwardIndex = argv.indexOf('-N')
-      const localPort = forwardIndex >= 0 ? Number.parseInt(argv[argv.indexOf('-L') + 1]!.split(':')[0]!, 10) : null
+      const localPort = forwardIndex >= 0 ? Number.parseInt(argv[argv.indexOf('-L') + 1]!.split(':')[0]!, 10) : 0
       return new Promise((resolveSpawn) => {
         const closeServer = async (): Promise<void> => {
           const server = servers.pop()
@@ -382,7 +382,12 @@ describe('RemoteAdminGateway', () => {
     try {
       const ctx = new Context()
       contexts.push(ctx)
-      await ctx.plugin(RemoteAdminGateway, {}, fabricatedRunner({}))
+      class DefaultGateway extends RemoteAdminGateway {
+        constructor(ctx: Context, config?: AdminConfig) {
+          super(ctx, config, fabricatedRunner({}))
+        }
+      }
+      await ctx.plugin(DefaultGateway, {})
       const gateway = ctx.get('remoteAdmin') as RemoteAdminGateway
       await gateway.add({ token: await grant(gateway, 'add', null), alias: 'lab', target: 'ci@remote.example', remotePort: 3080 })
       expect(await loadRegistry(join(root, 'remote', 'remotes.json'))).toHaveLength(1)
