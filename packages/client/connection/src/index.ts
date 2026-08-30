@@ -120,6 +120,21 @@ const PRIVILEGED_METHODS = new Set([
   'credentials.set',
   'credentials.unset',
   'llm.discoverModels',
+  // The remote plane: `remoteControl/list` reads registry targets (`user@host`),
+  // which are reconnaissance-grade exactly like `settings.describe` beside them,
+  // and every `remoteAdmin` method either fires ssh, mutates the durable
+  // registry, or owns the process's tunnels. The gesture gate lives in the
+  // remoteAdmin operations themselves; this pin keeps the whole plane
+  // loopback-same-origin like the rest of the configuration surface.
+  'remoteControl/list',
+  'remoteAdmin/begin',
+  'remoteAdmin/inspect',
+  'remoteAdmin/connect',
+  'remoteAdmin/disconnect',
+  'remoteAdmin/add',
+  'remoteAdmin/edit',
+  'remoteAdmin/remove',
+  'remoteAdmin/status',
 ])
 
 /**
