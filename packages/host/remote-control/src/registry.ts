@@ -8,7 +8,7 @@
 
 import { readFile } from 'node:fs/promises'
 import { writeFileAtomic, withFileLock } from '@shres-code/shres-code-atomic-write'
-import type { RemoteEntry, RemoteId, RemoteTarget } from './types.ts'
+import type { RemoteEntry, RemoteEntryView, RemoteId, RemoteTarget } from './types.ts'
 import { RemoteControlError } from './errors.ts'
 
 /** Current on-disk registry schema version; bumped only with a format break. */
@@ -49,6 +49,22 @@ export function asRemotePort(port: number): number {
     throw new RemoteControlError('invalid-port', `invalid daemon port ${String(port)}: expected 1..65535`)
   }
   return port
+}
+
+/**
+ * Project one durable entry into its wire view (drops the on-disk version).
+ * @param entry - validated registry entry.
+ * @returns the Remote-facing entry projection.
+ */
+export function remoteEntryView(entry: RemoteEntry): RemoteEntryView {
+  return {
+    id: entry.id,
+    target: entry.target,
+    remotePort: entry.remotePort,
+    fingerprint: entry.fingerprint,
+    lastConnectedAt: entry.lastConnectedAt,
+    createdAt: entry.createdAt,
+  }
 }
 
 /**

@@ -13,7 +13,12 @@ export const name = 'host-remote-control-invariant'
 /** Service required before the companion can reserve package ownership. */
 export const inject = ['invariants']
 
-/** No runtime invariant: the gateway projects the registry file directly and owns no long-lived state. */
+/**
+ * No runtime invariant: tunnel records are process-private, published only at
+ * commit points through the tunnel-state event, and the registry file stays
+ * the durable authority — no cross-service relationship to assert at install
+ * time.
+ */
 const install: InvariantInstaller = () => {}
 
 /**

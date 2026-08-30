@@ -119,7 +119,7 @@ export async function openTunnel(runner: SshRunner, spec: TunnelSpec, entry: Rem
   try {
     const version = await waitForVersion(runner, spec)
     if (!options.allowVersionSkew && version !== options.localVersion) {
-      throw new RemoteControlError('version-mismatch', `remote daemon version ${version} does not match this controller ${options.localVersion}; upgrade the remote install or pass --allow-version-skew`)
+      throw new RemoteControlError('version-mismatch', `remote daemon version ${version} does not match this controller ${options.localVersion}; upgrade the remote install or pass --allow-version-skew`, { observed: version })
     }
     const spawnedForward = await runner.spawn(tunnelArgv(spec), options.onForwardExit)
     forward.pid = spawnedForward.pid
@@ -133,7 +133,7 @@ export async function openTunnel(runner: SshRunner, spec: TunnelSpec, entry: Rem
       throw new RemoteControlError('fingerprint-mismatch', `remote returned no installation id; cannot bind alias ${spec.id} to an installation`)
     }
     if (entry.fingerprint !== null && entry.fingerprint !== fingerprint && !options.forceFingerprint) {
-      throw new RemoteControlError('fingerprint-mismatch', `installation id changed for alias ${spec.id}: expected ${entry.fingerprint}, observed ${fingerprint}; pass --force-fingerprint if the host was reinstalled`)
+      throw new RemoteControlError('fingerprint-mismatch', `installation id changed for alias ${spec.id}: expected ${entry.fingerprint}, observed ${fingerprint}; pass --force-fingerprint if the host was reinstalled`, { observed: fingerprint })
     }
     return {
       pid: forward.pid,

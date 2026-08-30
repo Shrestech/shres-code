@@ -17,7 +17,7 @@ export default defineConfig(({ env }) => {
   const client = isBuildFaceClient(env?.SHRES_BUILD_FACE)
   return {
     workspace: ['vendor/*', 'packages/*/*', 'apps/cli'],
-    entry: client ? '' : ['lib/types/{index,invariant,startup}.js'],
+    entry: client ? '' : ['lib/types/{index,invariant,startup,admin}.js'],
     outDir: 'lib',
     format: ['esm'],
     platform: 'node',

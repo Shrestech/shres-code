@@ -113,7 +113,7 @@ export interface TunnelStateView {
  */
 export type ConnectOutcome =
   | { status: 'connected'; localPort: number; version: string; fingerprint: string }
-  | { status: 'version-mismatch'; observed: string; local: string }
+  | { status: 'version-mismatch'; observed: string | null; local: string }
   | { status: 'fingerprint-mismatch'; observed: string | null; trusted: string | null }
   | { status: 'unreachable'; stage: 'probe' | 'tunnel'; message: string }
 
@@ -126,6 +126,80 @@ export type DisconnectOutcome =
 export type RemoveOutcome =
   | { status: 'removed'; removed: boolean }
   | { status: 'connected' }
+
+/** Wire request for `remoteAdmin/begin`: the gesture to authorize. */
+export interface AdminBeginRequest {
+  /** The mutation verb to authorize. */
+  verb: AdminGestureVerb
+  /** The alias the verb targets; null only for `add`, which names a new alias. */
+  alias: string | null
+}
+
+/** Wire grant from `remoteAdmin/begin`: spendable on exactly one matching mutation. */
+export interface GestureGrant {
+  /** 128-bit hex nonce. */
+  token: string
+  /** ISO 8601 deadline after which the grant is dead. */
+  expiresAt: string
+}
+
+/** Wire request for `remoteAdmin/inspect`. */
+export interface AdminInspectRequest {
+  /** Alias to observe. */
+  alias: string
+}
+
+/** Wire request for `remoteAdmin/connect`. */
+export interface AdminConnectRequest {
+  /** Grant from `begin({ verb: 'connect', alias })`. */
+  token: string
+  /** Alias to connect. */
+  alias: string
+  /** Accept a daemon version other than this controller's. */
+  allowVersionSkew: boolean
+  /** Accept an installation id different from the recorded fingerprint. */
+  forceFingerprint: boolean
+}
+
+/** Wire request for `remoteAdmin/disconnect`. */
+export interface AdminDisconnectRequest {
+  /** Grant from `begin({ verb: 'disconnect', alias })`. */
+  token: string
+  /** Alias to disconnect. */
+  alias: string
+}
+
+/** Wire request for `remoteAdmin/add` and `remoteAdmin/edit`. */
+export interface AdminEntryRequest {
+  /** Grant bound to `add` (alias null) or `edit` (this alias). */
+  token: string
+  /** Alias to insert or rewrite. */
+  alias: string
+  /** `user@host` connect target. */
+  target: string
+  /** Remote daemon loopback port. */
+  remotePort: number
+}
+
+/** Wire request for `remoteAdmin/remove`. */
+export interface AdminRemoveRequest {
+  /** Grant from `begin({ verb: 'remove', alias })`. */
+  token: string
+  /** Alias to remove. */
+  alias: string
+}
+
+/** One inserted or rewritten registry entry. */
+export interface AdminEntryResult {
+  /** The entry as it now reads in the registry. */
+  entry: RemoteEntryView
+}
+
+/** Full tunnel-state picture for a fresh page load. */
+export interface AdminStatusResult {
+  /** Every alias this process tracks, in tracking order. */
+  tunnels: TunnelStateView[]
+}
 
 /** One alias's trust-modal facts: remote observations plus what this controller knows. */
 export interface RemoteInspectView {

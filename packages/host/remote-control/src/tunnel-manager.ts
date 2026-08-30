@@ -171,9 +171,9 @@ export class TunnelManager {
    * the closed states are published like any other committed transition.
    */
   async disposeAll(): Promise<void> {
-    const live = [...this.#records.values()].filter((record): record is TunnelRecord & { tunnel: LiveTunnel } => record.tunnel !== null)
-    await Promise.all(live.map(async (record) => {
-      await record.tunnel.dispose()
+    const live = [...this.#records.values()].flatMap(record => record.tunnel === null ? [] : [{ record, tunnel: record.tunnel }])
+    await Promise.all(live.map(async ({ record, tunnel }) => {
+      await tunnel.dispose()
       record.tunnel = null
       record.state = 'closed'
       record.since = this.#now()
