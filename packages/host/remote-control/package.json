@@ -67,6 +67,7 @@
     "@shres-code/shres-code-brand": "workspace:^",
     "@shres-code/shres-code-home-paths": "workspace:^",
     "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/schemastery": "workspace:^",
     "@shres-code/shres-code-typert-protocol": "workspace:^"
   },
   "devDependencies": {
@@ -75,6 +76,7 @@
     "@shres-code/shres-code-brand": "workspace:^",
     "@shres-code/shres-code-home-paths": "workspace:^",
     "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/schemastery": "workspace:^",
     "@shres-code/shres-code-typert-protocol": "workspace:^"
   },
   "dependencies": {
