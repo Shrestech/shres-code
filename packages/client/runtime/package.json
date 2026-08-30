@@ -54,7 +54,7 @@
     "@shres-code/shres-code-session-projection": "workspace:^",
     "@shres-code/shres-code-session-title": "workspace:^",
     "@shres-code/shres-code-tools": "workspace:^",
-    "immer": "^10.1.1",
+    "immer": "^11.1.15",
     "react": "^18.2.0",
     "zustand": "~4.4.7"
   },
