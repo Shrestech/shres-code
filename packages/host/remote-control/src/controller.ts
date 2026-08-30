@@ -32,16 +32,18 @@ export interface SshResult {
 export interface SshRunner {
   /**
    * Run one short ssh exec to completion.
-   * @param args - full argv (including `ssh`).
+   * @param args - ssh arguments; the runner supplies the binary.
    * @returns captured result.
    */
   run(args: readonly string[]): Promise<SshResult>
   /**
    * Spawn one long-lived ssh (master or forward) that outlives the call.
-   * @param args - full argv (including `ssh`).
+   * @param args - ssh arguments; the runner supplies the binary.
+   * @param onExit - optional observation of the child's natural or killed exit,
+   *   delivered at most once; a disposer-initiated exit is observed like any other.
    * @returns child pid and a disposer killing the process tree.
    */
-  spawn(args: readonly string[]): Promise<{ pid: number; dispose(): Promise<void> }>
+  spawn(args: readonly string[], onExit?: (exitCode: number | null) => void): Promise<{ pid: number; dispose(): Promise<void> }>
 }
 
 /**
@@ -58,7 +60,7 @@ export async function probeDaemonVersion(
   controlPath?: string,
 ): Promise<string | null> {
   const forwardArgs = controlPath === undefined ? [] : ['-o', `ControlPath=${controlPath}`]
-  const result = await runner.run(['ssh', ...forwardArgs, target, probeCommand(remotePort)])
+  const result = await runner.run([...forwardArgs, target, probeCommand(remotePort)])
   return parseProbeVersion(result.stdout)
 }
 
@@ -71,7 +73,7 @@ export async function probeDaemonVersion(
  */
 export async function readInstallationId(runner: SshRunner, target: string, controlPath?: string): Promise<string | null> {
   const forwardArgs = controlPath === undefined ? [] : ['-o', `ControlPath=${controlPath}`]
-  const result = await runner.run(['ssh', ...forwardArgs, target, installationIdCommand()])
+  const result = await runner.run([...forwardArgs, target, installationIdCommand()])
   const id = result.stdout.trim()
   return id.length > 0 ? id : null
 }
@@ -84,6 +86,8 @@ export interface OpenTunnelOptions {
   localVersion: string
   /** Accept an installation id different from the recorded fingerprint. */
   forceFingerprint: boolean
+  /** Exit observation wired to the forward child, for the owning tunnel manager. */
+  onForwardExit?: (exitCode: number | null) => void
 }
 
 /** Live tunnel handle and the daemon facts observed at open time. */
@@ -117,7 +121,7 @@ export async function openTunnel(runner: SshRunner, spec: TunnelSpec, entry: Rem
     if (!options.allowVersionSkew && version !== options.localVersion) {
       throw new RemoteControlError('version-mismatch', `remote daemon version ${version} does not match this controller ${options.localVersion}; upgrade the remote install or pass --allow-version-skew`)
     }
-    const spawnedForward = await runner.spawn(tunnelArgv(spec))
+    const spawnedForward = await runner.spawn(tunnelArgv(spec), options.onForwardExit)
     forward.pid = spawnedForward.pid
     forward.dispose = async () => spawnedForward.dispose()
     const throughVersion = await probeThroughTunnel(spec.localPort)

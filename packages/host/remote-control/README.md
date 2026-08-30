@@ -9,10 +9,11 @@ SSH-tunnel controller for VS Code-style remote connect: a durable remote-alias r
 | `RemoteControlGateway` | Remote namespace `remoteControl` (`@Remote('list')`): re-reads the registry file per call — the writer is a separate CLI process, so no cache or event can observe its writes; a missing file is the empty snapshot. The namespace is read-only: mutating/connect operations stay CLI-gated until a separate token-gated namespace mounts, because leaf methods served by a tunneled remote daemon cannot enforce the local user's gesture authority. Wire errors surface as the Gateway's generic failure envelope (message only, no typed code) — wire callers render the message and point at `shres remote list`. |
 | `loadRegistry` / `upsertEntry` / `removeEntry` | durable alias registry at `resolveRegistryPath()` (`$SHRES_HOME/remote/remotes.json`), single-writer via `withFileLock`, atomic replace at 0600/0700, schema version checked loud |
 | `asRemoteId` / `asRemoteTarget` / `asRemotePort` | boundary validation for alias (`[a-z0-9-]`), `user@host`, and 1..65535 |
-| `masterArgv` / `tunnelArgv` | exact ssh argv: ControlMaster (`ControlPersist=600`) and `ssh -N -L` with `ExitOnForwardFailure=yes`, `ServerAliveInterval=15/CountMax=3`; never `-F none` (user ProxyJump/config composes) |
+| `masterArgv` / `tunnelArgv` | exact ssh arguments (the runner owns the binary): ControlMaster (`ControlPersist=600`) and the no-shell forward with `ExitOnForwardFailure=yes`, `ServerAliveInterval=15/CountMax=3`; never `-F none` (user ProxyJump/config composes) |
 | `probeCommand` / `parseProbeVersion` / `installationIdCommand` | remote one-liners and describe parsing; absent installation id returns null, never a guess |
 | `openTunnel` | probe → forward → verify describe **through** the tunnel → fingerprint check; every failure after the master opened disposes it |
-| `SshRunner` | process seam; tests inject fabricated output, the CLI passes a node adapter |
+| `SshRunner` | process seam over ssh arguments; tests inject fabricated output, `nodeSshRunner` adapts Node child processes (another ssh command may be passed for wrappers and fixtures) |
+| `nodeSshRunner` | the Node adapter: short execs piped-and-awaited, long-lived children with a SIGTERM-then-SIGKILL disposer and optional exit observation |
 | `allocateLoopbackPort` | bind-verify-rebind port allocation; a stolen port becomes a loud `ExitOnForwardFailure` failure |
 
 CLI: `shres remote add|list|remove|connect` (see `shres remote --help`); `connect` stays foreground, prints the tunneled GUI URL, and disposes the forward + master on SIGINT.

@@ -16,6 +16,7 @@ export { resolveRegistryPath, resolveRunDir } from './home.ts'
 export { RemoteControlGateway } from './gateway.ts'
 export default RemoteControlGateway
 export { loadRegistry, upsertEntry, removeEntry, asRemoteId, asRemoteTarget, asRemotePort, REGISTRY_VERSION } from './registry.ts'
+export { nodeSshRunner } from './node-runner.ts'
 export type { LiveTunnel, OpenTunnelOptions, SshRunner, SshResult } from './controller.ts'
 export { openTunnel, probeDaemonVersion, readInstallationId } from './controller.ts'
 export { allocateLoopbackPort } from './port.ts'
