@@ -28,7 +28,7 @@ function harness(): {
     sessions: { list: () => [] },
     invariants: {
       register: (_name: string, installer: (c: Context, fail: InvariantFailure) => void) => {
-        installer(ctx as unknown as Context, (message: string) => { failures.push(message) })
+        installer(ctx as unknown as Context, ((message: string) => { failures.push(message) }) as unknown as InvariantFailure)
         return () => { /* no-op */ }
       },
     },
