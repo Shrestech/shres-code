@@ -22,7 +22,7 @@ The optional `llm-grok-session` settings section overlays the composition entry 
 | `displayName` | `Grok (subscription)` | Selector label. |
 | `models` | `grok-4.6`, `grok-4.5` (500k context, `low`/`medium`/`high`/`xhigh`) | Catalog; a new proxy release is a settings entry, not a code change. |
 | `refreshLeewayMs` | `300000` | Refresh when the token is at or within this distance of expiry. |
-| `cliVersion` | `1.0.13` | CLI version the route advertises (`user-agent` and `x-grok-cli-version`); the proxy rejects version-less clients with 426 and floors the reported version, so a proxy floor bump is a settings entry. |
+| `cliVersion` | `1.0.13` | CLI version the route advertises via `x-grok-client-version` (sent with `X-XAI-Token-Auth: xai-grok-cli` and `x-grok-client-identifier: grok-shell`, the header set the proxy's 426 gate requires); a proxy floor bump is a settings entry. |
 
 ## Model Experience
 

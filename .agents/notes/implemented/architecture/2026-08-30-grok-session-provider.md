@@ -27,6 +27,6 @@ Verified live before implementation (2026-08-30, SuperGrok Heavy session, secret
 
 ## Consequences
 
-The route advertises grok-cli/<cliVersion> (user-agent and x-grok-cli-version) on every request: the proxy rejects version-less clients with 426 and floors the reported version, so the adapter self-reports the CLI generation it tracks; cliVersion is a settings entry for proxy floor bumps.
+The route sends the CLI header set the proxy's 426 gate requires on every request: X-XAI-Token-Auth: xai-grok-cli (validate as a CLI session token), x-grok-client-identifier: grok-shell, and x-grok-client-version with the tracked CLI generation. A user-agent approach is inert twice over - the proxy does not read it, and pi-ai's requestHeaders reserves user-agent for harness attribution; cliVersion is a settings entry for proxy floor bumps.
 
 The session document is the CLI's implementation detail, not a published contract: format drift, a proxy path change, or a header requirement introduced by a CLI self-update can break the route at request time, where the error names `grok login` or the failing endpoint. Refresh races are resolved by adoption, so under concurrent use one side's grant is occasionally spent for nothing — the document still ends up valid for both. Usage on this route bills the subscription (the proxy returns cost figures), not the X API; the [`grok-cli` headless-spike](2026-08-16-grok-cli-headless-spike.md) route remains the right choice when the CLI's own agentic behavior is what a task needs.

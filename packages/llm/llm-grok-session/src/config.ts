@@ -55,12 +55,13 @@ export const SHIPPED_MODELS: readonly GrokSessionModelConfig[] = [
 ]
 
 /**
- * CLI generation the advertised version defaults to. The proxy rejects
- * requests whose client reports no version (426 'Your Grok CLI version
- * (none) is outdated') and floors the reported version at its current
- * minimum; this default tracks the CLI generation this package was built
- * against, and a proxy floor bump is a settings cliVersion entry, not a
- * code change.
+ * CLI generation the advertised version defaults to. The proxy requires
+ * the CLI header set (x-grok-client-version with X-XAI-Token-Auth and
+ * x-grok-client-identifier) and floors the reported version at its
+ * current minimum, answering 426 'Your Grok CLI version (none) is
+ * outdated' without them; this default tracks the CLI generation this
+ * package was built against, and a proxy floor bump is a settings
+ * cliVersion entry, not a code change.
  */
 export const DEFAULT_CLI_VERSION = '1.0.13'
 
@@ -166,8 +167,9 @@ export function resolveRoute(config: Config): Omit<PiAiProviderProfile, 'display
     api: 'openai-responses',
     baseURL,
     headers: {
-      'user-agent': 'grok-cli/' + cliVersion,
-      'x-grok-cli-version': cliVersion,
+      'x-xai-token-auth': 'xai-grok-cli',
+      'x-grok-client-version': cliVersion,
+      'x-grok-client-identifier': 'grok-shell',
     },
     models: models.map(model => ({
       id: model.id,

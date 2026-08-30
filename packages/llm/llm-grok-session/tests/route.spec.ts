@@ -3,15 +3,16 @@ import { Config as Section } from '../src/index.ts'
 import { DEFAULT_CLI_VERSION, resolveRoute } from '../src/config.ts'
 
 describe('resolveRoute headers', () => {
-  it('advertises the default CLI version the proxy gates on', () => {
+  it('sends the documented CLI header set the proxy gates on', () => {
     const route = resolveRoute({} as Section)
-    expect(route.headers?.['user-agent']).toBe('grok-cli/' + DEFAULT_CLI_VERSION)
-    expect(route.headers?.['x-grok-cli-version']).toBe(DEFAULT_CLI_VERSION)
+    expect(route.headers?.['x-xai-token-auth']).toBe('xai-grok-cli')
+    expect(route.headers?.['x-grok-client-version']).toBe(DEFAULT_CLI_VERSION)
+    expect(route.headers?.['x-grok-client-identifier']).toBe('grok-shell')
   })
 
   it('advertises a configured cliVersion override', () => {
     const route = resolveRoute({ cliVersion: '9.9.9' } as Section)
-    expect(route.headers?.['user-agent']).toBe('grok-cli/9.9.9')
+    expect(route.headers?.['x-grok-client-version']).toBe('9.9.9')
   })
 
   it('rejects an empty cliVersion', () => {
