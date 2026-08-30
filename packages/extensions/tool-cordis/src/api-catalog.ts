@@ -2926,6 +2926,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     parameters: [{ name: 'options', description: 'the full request. A LOOP-built request carries the process-local {@link markAgentLoopRequest} identity and arrives deep-frozen (mutation throws): its content is a pure function of the session log (the reconstructability Agent Note), so listeners read it, never rewrite it. Hand-built calls do not carry that marker; their messages already obey the immutable creation contract.' }],
   },
   {
+    name: 'remote-control/tunnel-state',
+    mode: 'emit',
+    signature: '\'remote-control/tunnel-state\'(view: TunnelStateView): void',
+    summary: 'Full-state projection of one alias\'s GUI-owned tunnel after each committed transition (connecting, open, closed, error).',
+    description: 'Full-state projection of one alias\'s GUI-owned tunnel after each committed transition (connecting, open, closed, error). The payload is the complete view, so consumers reconcile idempotently with no cursor; a fresh page fills its initial picture from `remoteAdmin/status`.',
+    parameters: [{ name: 'view', description: 'the complete current state of the alias\'s tunnel.' }],
+  },
+  {
     name: 'session-telemetry/record',
     mode: 'waterfall',
     signature: '\'session-telemetry/record\'(record: SessionTelemetryRecord, next: () => SessionTelemetryRecord): SessionTelemetryRecord',
@@ -4254,6 +4262,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface RedactedSecret {\n    path: string[];\n    set: boolean;\n}',
   },
   {
+    name: 'RemoteId',
+    declaration: 'export type RemoteId = Branded<\'RemoteId\'>;',
+  },
+  {
     name: 'ReplayEnvelope',
     declaration: 'export interface ReplayEnvelope {\n    response: unknown;\n    blocks?: readonly unknown[];\n}',
   },
@@ -5304,6 +5316,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'TrackerRunSummary',
     declaration: 'export interface TrackerRunSummary {\n    readonly runId: TrackerRunId;\n    readonly experiment: string;\n    readonly decisionRule: string;\n    readonly dataVersion: string;\n    readonly gitSha: string;\n    readonly reason?: TrackerFailureReason;\n}',
+  },
+  {
+    name: 'TunnelStateView',
+    declaration: 'export interface TunnelStateView {\n    alias: RemoteId;\n    state: \'connecting\' | \'open\' | \'closed\' | \'error\';\n    localPort: number | null;\n    version: string | null;\n    fingerprint: string | null;\n    error: string | null;\n    since: string;\n}',
   },
   {
     name: 'TurnEndCancelCause',

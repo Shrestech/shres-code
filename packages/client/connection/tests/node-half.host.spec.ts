@@ -225,6 +225,12 @@ describe('connection node half', () => {
       // reconnaissance, and copy/remove/openDocument manage the roster and
       // drive the host desktop.
       'agentPreset.read', 'agentPreset.copy', 'agentPreset.openDocument', 'agentPreset.remove',
+      // The remote plane: the registry read is reconnaissance-grade, and the
+      // remoteAdmin surface fires ssh, mutates the durable registry, or owns
+      // the process's tunnels — the gesture gate stays inside the namespace.
+      'remoteControl/list',
+      'remoteAdmin/begin', 'remoteAdmin/inspect', 'remoteAdmin/connect', 'remoteAdmin/disconnect',
+      'remoteAdmin/add', 'remoteAdmin/edit', 'remoteAdmin/remove', 'remoteAdmin/status',
     ]) {
       const denied = fakeResponse()
       await routes[0]!.handler(

@@ -975,26 +975,36 @@ Source: [`packages/jspace/jspace/src/index.ts:69`](../packages/jspace/jspace/src
 Requires: `jspace` · `tools` · `systemPrompt` · `subagents`
 
 ```ts config-catalog
-/** Advisor plugin config and settings schema. */
+/** Advisor plugin config. */
 export interface Config {
   /** Master allow. Default false. */
   enabled?: boolean
-  /** `ctx.subagents` provider that establishes the reviewer child. */
+  /** LLM route provider the reviewer runs on; required when enabled. */
   provider?: string
-  /** Model id on that route; omitted leaves the reviewer unbound. */
+  /** Model id on that route; required when enabled. */
   model?: string
+  /** `ctx.subagents` provider that runs reviewer children. Default 'spawn'. */
+  subagentProvider?: string
   /** Reviewer persona; defaults to the built-in reviewer persona. */
   persona?: string
-  /** Reviewer tool filter; defaults to wiki + session-query tools. */
+  /** Reviewer tool filter; defaults to the wiki read tools. */
   reviewerTools?: string[]
   /** Trailing tool signals the advisory digest retains. Default 12. */
   maxDigestTools?: number
   /** Character cap on the rendered advisory digest. Default 4000. */
   maxDigestChars?: number
-  /** Character cap on recorded advice. Default 1000. */
+  /** Character cap on each error excerpt. Default 200. */
+  maxExcerptChars?: number
+  /** Character cap on each user message in the digest. Default 300. */
+  maxUserMessageChars?: number
+  /** Character cap on the retained user-message history. Default 1500. */
+  maxUserHistoryChars?: number
+  /** Character cap on recorded advice and redirect text. Default 1000. */
   maxAdviceChars?: number
   /** Consecutive errored tool results that count as a burst. Default 2. */
   errorBurst?: number
+  /** Drift-check cadence in completed steps since the last advice. Default 8. */
+  driftEverySteps?: number
   /** Order of the `jspace:advisor` prompt section. Default 56. */
   advisorySectionOrder?: number
   /** Enable proactive reviews. Default true. */
@@ -1002,7 +1012,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/jspace/jspace-advisor/src/index.ts:80`](../packages/jspace/jspace-advisor/src/index.ts)
+Source: [`packages/jspace/jspace-advisor/src/index.ts:90`](../packages/jspace/jspace-advisor/src/index.ts)
 
 <a id="shres-codeshres-code-jspace-prompt"></a>
 

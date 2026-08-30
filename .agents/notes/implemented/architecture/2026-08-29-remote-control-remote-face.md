@@ -55,8 +55,9 @@ register (package-private RPC, wrong product plane), and a session-event feed
 - The gateway's README documents the message-only wire error stance; threading
   typed error codes through the Typert Gateway is a separate, Typert-level PR
   if ever needed.
-- `PRIVILEGED_METHODS` loopback pinning for `remoteControl/list` is decided in
-  the UI PR, where the first consumer lands.
+- `PRIVILEGED_METHODS` loopback-pins `remoteControl/list` alongside the
+  `remoteAdmin` namespace; the pin decision is recorded in the
+  [remoteAdmin note](2026-08-30-remote-admin-namespace.md).
 - Known gap (accepted precedent, same shape as merged plugin-inventory): the
   mount is proven by unit harness plus the Loader smoke face, not a dedicated
   real-composition test of the patch row.

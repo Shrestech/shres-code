@@ -13,7 +13,6 @@ describe('tunnel argv contract', () => {
 
   it('spawns the tunnel with ExitOnForwardFailure, keepalives, and the same master socket', () => {
     expect(tunnelArgv(spec)).toEqual([
-      'ssh',
       '-N',
       '-L', '40123:127.0.0.1:3080',
       '-o', 'ExitOnForwardFailure=yes',
@@ -26,8 +25,7 @@ describe('tunnel argv contract', () => {
 
   it('opens the master with multiplexing and never disables the user ssh config', () => {
     const argv = masterArgv(spec)
-    expect(argv[0]).toBe('ssh')
-    expect(argv).toContain('-M')
+    expect(argv[0]).toBe('-M')
     expect(argv).toContain('ControlPersist=600')
     expect(argv).not.toContain('-F')
     expect(argv.at(-1)).toBe('ci@remote.example')

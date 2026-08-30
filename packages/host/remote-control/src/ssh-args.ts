@@ -1,8 +1,9 @@
 /**
- * Pure ssh argv builders and remote-command strings for the remote-control
- * package — the durable tunnel contract (`shres remote` CLI and any future
- * host face run the same argv), fully unit-tested. Never passes `-F none`:
- * the user's ssh config (ProxyJump, IdentityFile) must keep applying.
+ * Pure ssh argument builders and remote-command strings for the remote-control
+ * package — the durable tunnel contract (`shres remote` CLI and the
+ * `remoteAdmin` gateway run the same arguments; the runner owns the binary),
+ * fully unit-tested. Never passes `-F none`: the user's ssh config
+ * (ProxyJump, IdentityFile) must keep applying.
  * @module @shres-code/shres-code-host-remote-control
  */
 
@@ -16,13 +17,13 @@ const SERVER_ALIVE_INTERVAL_SECONDS = 15
 const SERVER_ALIVE_COUNT_MAX = 3
 
 /**
- * Build the exact ControlMaster argv for one alias target.
+ * Build the exact ControlMaster arguments for one alias target. The runner
+ * supplies the ssh binary itself, so a configured wrapper command composes.
  * @param spec - resolved tunnel specification (only `target`/`controlPath` used).
- * @returns argv for the multiplexing master connection.
+ * @returns arguments for the multiplexing master connection.
  */
 export function masterArgv(spec: Pick<TunnelSpec, 'target' | 'controlPath'>): string[] {
   return [
-    'ssh',
     '-M',
     '-o', `ControlPath=${spec.controlPath}`,
     '-o', 'ControlMaster=auto',
@@ -32,16 +33,16 @@ export function masterArgv(spec: Pick<TunnelSpec, 'target' | 'controlPath'>): st
 }
 
 /**
- * Build the exact no-shell forward argv for one tunnel. `ExitOnForwardFailure`
- * makes a lost remote listener fail the process instead of listening dead;
- * keepalives bound silent NAT/flow stalls. The controller still passes the
- * user's ssh config untouched (no `-F none`), so ProxyJump composes.
+ * Build the exact no-shell forward arguments for one tunnel.
+ * `ExitOnForwardFailure` makes a lost remote listener fail the process instead
+ * of listening dead; keepalives bound silent NAT/flow stalls. The controller
+ * still passes the user's ssh config untouched (no `-F none`), so ProxyJump
+ * composes.
  * @param spec - resolved tunnel specification.
- * @returns argv for the long-lived `ssh -N -L` forward.
+ * @returns arguments for the long-lived `ssh -N -L` forward.
  */
 export function tunnelArgv(spec: TunnelSpec): string[] {
   return [
-    'ssh',
     '-N',
     '-L', `${spec.localPort}:127.0.0.1:${spec.remotePort}`,
     '-o', 'ExitOnForwardFailure=yes',

@@ -50,6 +50,7 @@ One page per subsystem of the Shres Code: what it is, the data structures it mov
 | [wiki.md](wiki.md) | project wiki seam: frontmatter, write request/spec, search hits, lint findings, and log-only wiki events |
 | [invariants.md](invariants.md) | the runtime-invariant registry: selection `Config`, `InvariantInstaller`/`InvariantFailure`, the empty-companion contract |
 | [web-server.md](web-server.md) | the HTTP carrier: `WebRouteKind`/`WebRoute`, match order, the claimable fallback seat, index taps |
+| [remote-control.md](remote-control.md) | the remote-connect seam: durable `RemoteEntry` records, the `TunnelSpec`/`SshRunner` contract, gesture-gated decision outcomes, and the `remote-control/tunnel-state` projection |
 | [storage.md](storage.md) | the storage subsystem: the backend contract (`StorageBackend`), `StorageForms`, `DomainSpec`/`Domain`, `domain/changed` |
 | [workspace.md](workspace.md) | the workspace registry: `Workspace`/`WorkspaceId`, registration and resolution, the session `cwd` relationship |
 | [client-modules.md](client-modules.md) | the web plugin table: `shres.client` declarations, `WebBootGraph` wire composition, the bundle route and index tap |

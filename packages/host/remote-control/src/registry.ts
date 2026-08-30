@@ -6,9 +6,10 @@
  * @module @shres-code/shres-code-host-remote-control
  */
 
-import { readFile } from 'node:fs/promises'
+import { access, mkdir, readFile } from 'node:fs/promises'
+import { dirname } from 'node:path'
 import { writeFileAtomic, withFileLock } from '@shres-code/shres-code-atomic-write'
-import type { RemoteEntry, RemoteId, RemoteTarget } from './types.ts'
+import type { RemoteEntry, RemoteEntryView, RemoteId, RemoteTarget } from './types.ts'
 import { RemoteControlError } from './errors.ts'
 
 /** Current on-disk registry schema version; bumped only with a format break. */
@@ -49,6 +50,22 @@ export function asRemotePort(port: number): number {
     throw new RemoteControlError('invalid-port', `invalid daemon port ${String(port)}: expected 1..65535`)
   }
   return port
+}
+
+/**
+ * Project one durable entry into its wire view (drops the on-disk version).
+ * @param entry - validated registry entry.
+ * @returns the Remote-facing entry projection.
+ */
+export function remoteEntryView(entry: RemoteEntry): RemoteEntryView {
+  return {
+    id: entry.id,
+    target: entry.target,
+    remotePort: entry.remotePort,
+    fingerprint: entry.fingerprint,
+    lastConnectedAt: entry.lastConnectedAt,
+    createdAt: entry.createdAt,
+  }
 }
 
 /**
@@ -175,6 +192,9 @@ function validateEntryStrict(entry: RemoteEntry): RemoteEntry {
  */
 export async function upsertEntry(path: string, entry: RemoteEntry): Promise<void> {
   const validated = validateEntryStrict(entry)
+  // The writer lock contract requires its parent to exist; a fresh home has
+  // no remote/ directory yet, and the first GUI or CLI write creates it.
+  await mkdir(dirname(path), { recursive: true, mode: 0o700 })
   await withFileLock(`${path}.lock`, async () => {
     const current = await loadRegistry(path)
     current.set(validated.id, validated)
@@ -189,6 +209,13 @@ export async function upsertEntry(path: string, entry: RemoteEntry): Promise<voi
  * @returns true when an entry was removed.
  */
 export async function removeEntry(path: string, id: RemoteId): Promise<boolean> {
+  // An absent registry has nothing to remove: creating its directory just to
+  // take the writer lock would materialize state for a no-op.
+  try {
+    await access(dirname(path))
+  } catch {
+    return false
+  }
   return withFileLock(`${path}.lock`, async () => {
     const current = await loadRegistry(path)
     if (!current.delete(id)) return false

@@ -33,6 +33,15 @@ describe('registry', () => {
     expect(loaded.get(asRemoteId('lab'))).toEqual(entry())
   })
 
+  it('creates the registry directory on the first write into a fresh home', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'shres-remote-fresh-'))
+    const path = join(root, 'remote', 'remotes.json')
+    // An absent registry has nothing to remove and must not materialize state.
+    expect(await removeEntry(path, asRemoteId('lab'))).toBe(false)
+    await upsertEntry(path, entry())
+    expect((await loadRegistry(path)).size).toBe(1)
+  })
+
   it('serializes concurrent reads and writes through one lock file', async () => {
     const path = await tempRegistry()
     await Promise.all([

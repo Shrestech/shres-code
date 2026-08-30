@@ -3,7 +3,7 @@
 import { TypertRemoteService, Remote } from '@shres-code/shres-code-typert-protocol'
 import type { Context } from '@shres-code/cordis'
 import { resolveRegistryPath } from './home.ts'
-import { loadRegistry } from './registry.ts'
+import { loadRegistry, remoteEntryView } from './registry.ts'
 import type { RemoteRegistrySnapshot } from './types.ts'
 
 export type { RemoteEntryView, RemoteRegistrySnapshot } from './types.ts'
@@ -30,16 +30,7 @@ export class RemoteControlGateway extends TypertRemoteService {
   @Remote('list')
   async list(): Promise<RemoteRegistrySnapshot> {
     const entries = await loadRegistry(resolveRegistryPath())
-    return {
-      entries: [...entries.values()].map(entry => ({
-        id: entry.id,
-        target: entry.target,
-        remotePort: entry.remotePort,
-        fingerprint: entry.fingerprint,
-        lastConnectedAt: entry.lastConnectedAt,
-        createdAt: entry.createdAt,
-      })),
-    }
+    return { entries: [...entries.values()].map(remoteEntryView) }
   }
 }
 
