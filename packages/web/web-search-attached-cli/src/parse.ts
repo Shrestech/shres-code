@@ -4,6 +4,7 @@
  * @module @shres-code/shres-code-web-search-attached-cli/parse
  */
 
+import { WebError } from '@shres-code/shres-code-web'
 import type { WebSearchResult, WebSearchSource } from '@shres-code/shres-code-web'
 
 /** One collected citation while walking a vendor payload. */
@@ -32,6 +33,45 @@ export function mapVendorSearchPayload(payload: unknown): WebSearchResult {
     })),
     truncated: false,
   }
+}
+
+/** The Z.AI Web Search API response envelope (docs.z.ai/api-reference/tools/web-search). */
+interface ZaiSearchResponse {
+  /** Result rows; `link` is the citeable URL, `content` the summary. */
+  search_result?: unknown
+}
+
+/**
+ * Map the Z.AI Web Search API envelope onto a seam result. The endpoint is
+ * retrieval-only, so there is no generated answer: every row with a citeable
+ * http(s) `link` becomes a source carrying `title`, `content` as the snippet,
+ * and `publish_date` as `publishedAt`. The envelope is fixed by the API
+ * reference, so a 200 body that does not match it is a provider error rather
+ * than an empty result; rows without a citeable link are dropped, and
+ * site-name/icon fields have no seam counterpart.
+ *
+ * @param payload - parsed response body from `POST /api/paas/v4/web_search`.
+ * @returns a seam result; `truncated` is always false (the seam caps sources).
+ */
+export function mapZaiSearchPayload(payload: unknown): WebSearchResult {
+  if (payload === null || typeof payload !== 'object' || !Array.isArray((payload as ZaiSearchResponse).search_result)) {
+    throw new WebError('Z.AI search returned an envelope without a search_result list', 'WEB_PROVIDER_ERROR')
+  }
+  const envelope = payload as ZaiSearchResponse
+  const sources: WebSearchSource[] = []
+  for (const row of envelope.search_result as unknown[]) {
+    if (row === null || typeof row !== 'object') continue
+    const entry = row as Record<string, unknown>
+    const link = entry.link
+    if (typeof link !== 'string' || !isHttpUrl(link)) continue
+    sources.push({
+      url: link,
+      ...typeof entry.title === 'string' && entry.title.length > 0 ? { title: entry.title } : {},
+      ...typeof entry.content === 'string' && entry.content.length > 0 ? { snippet: entry.content } : {},
+      ...typeof entry.publish_date === 'string' && entry.publish_date.length > 0 ? { publishedAt: entry.publish_date } : {},
+    })
+  }
+  return { sources, truncated: false }
 }
 
 /**

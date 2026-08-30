@@ -132,6 +132,7 @@
     "@shres-code/shres-code-web": "workspace:^",
     "@shres-code/shres-code-web-search-attached-cli": "workspace:^",
     "@shres-code/shres-code-web-search-deepseek": "workspace:^",
+    "@shres-code/shres-code-web-search-perplexity": "workspace:^",
     "@shres-code/shres-code-workflow-worker-thread": "workspace:^",
     "@shres-code/shres-code-agent-instructions": "workspace:^"
   },

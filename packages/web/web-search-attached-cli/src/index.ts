@@ -37,7 +37,7 @@ export {
   selectBackend,
 } from './provider.ts'
 export type { AttachedCliBackend, AttachedCliBackendId, AttachedCliSearchOptions } from './provider.ts'
-export { mapVendorSearchPayload } from './parse.ts'
+export { mapVendorSearchPayload, mapZaiSearchPayload } from './parse.ts'
 
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'web-search-attached-cli'
@@ -57,6 +57,8 @@ export interface Config {
   kimi?: boolean
   /** When false, Ollama Cloud is omitted from the search pool. Defaults to on. */
   ollama?: boolean
+  /** When false, Z.AI is omitted from the search pool. Defaults to on. */
+  zai?: boolean
 }
 
 export const Config: z<Config> = z.object({
@@ -65,6 +67,7 @@ export const Config: z<Config> = z.object({
   codex: z.boolean().default(true),
   kimi: z.boolean().default(true),
   ollama: z.boolean().default(true),
+  zai: z.boolean().default(true),
 })
 
 /**
@@ -79,6 +82,7 @@ export function enabledBackends(config: Config): AttachedCliBackendId[] {
     ['codex-cli', config.codex],
     ['kimi-cli', config.kimi],
     ['ollama-cloud', config.ollama],
+    ['zai', config.zai],
   ]
   return flags.filter(([, on]) => on !== false).map(([id]) => id)
 }

@@ -1236,6 +1236,8 @@ export interface Config {
   models?: GrokSessionModelConfig[]
   /** Refresh leeway in milliseconds; defaults to {@link DEFAULT_REFRESH_LEEWAY_MS}. */
   refreshLeewayMs?: number
+  /** CLI version the route advertises; defaults to {@link DEFAULT_CLI_VERSION}. */
+  cliVersion?: string
 }
 
 /** One advisory model entry a deployment may declare. */
@@ -1259,7 +1261,7 @@ export interface GrokSessionModelConfig {
 
 Depends on: [`PiAiModality`](../packages/llm/llm-pi-ai/src/index.ts)
 
-Source: [`packages/llm/llm-grok-session/src/config.ts:76`](../packages/llm/llm-grok-session/src/config.ts)
+Source: [`packages/llm/llm-grok-session/src/config.ts:87`](../packages/llm/llm-grok-session/src/config.ts)
 
 <a id="shres-codeshres-code-llm-pi-ai"></a>
 
@@ -3745,6 +3747,8 @@ export interface Config {
   kimi?: boolean
   /** When false, Ollama Cloud is omitted from the search pool. Defaults to on. */
   ollama?: boolean
+  /** When false, Z.AI is omitted from the search pool. Defaults to on. */
+  zai?: boolean
 }
 ```
 
@@ -3811,10 +3815,12 @@ Source: [`packages/web/web-search-exa/src/index.ts:38`](../packages/web/web-sear
 Requires: `web`
 
 ```ts config-catalog
-/** Plugin config (all optional — `apply` fills env-var and constant defaults). */
+/** Plugin config (all optional — `apply` fills credential and constant defaults). */
 export interface Config {
-  /** Perplexity API key. Falls back to `$PERPLEXITY_API_KEY`. Empty → unavailable. */
+  /** Literal Perplexity API key; prefer {@link apiKeyEnv} so no secret enters configuration files. */
   apiKey?: string
+  /** Credential reference resolved for each refresh; defaults to `PERPLEXITY_API_KEY`. */
+  apiKeyEnv?: string
   /** Endpoint base; `/chat/completions` is appended. Defaults to the public API. */
   baseURL?: string
   /** Search model name. Defaults to `sonar`. */
@@ -3823,10 +3829,12 @@ export interface Config {
   maxTokens?: number
   /** Recency window sent as `search_recency_filter`. Omitted = no filter. */
   searchRecency?: 'day' | 'week' | 'month' | 'year'
+  /** When false, this provider is omitted from the search pool. Defaults to on. */
+  enabled?: boolean
 }
 ```
 
-Source: [`packages/web/web-search-perplexity/src/index.ts:32`](../packages/web/web-search-perplexity/src/index.ts)
+Source: [`packages/web/web-search-perplexity/src/index.ts:43`](../packages/web/web-search-perplexity/src/index.ts)
 
 <a id="shres-codeshres-code-wiki-embed-onnx"></a>
 

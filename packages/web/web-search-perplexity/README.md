@@ -8,18 +8,24 @@ This is an **implementation** package: it registers a provider into `ctx.web`, i
 
 | Key | Default | Meaning |
 |---|---|---|
-| `apiKey` | `$PERPLEXITY_API_KEY` | Perplexity API key. Empty/absent makes the provider unavailable. |
+| `apiKey` | (unset) | Literal Perplexity API key (schema role `secret`). Prefer `apiKeyEnv` so no secret enters configuration files. |
+| `apiKeyEnv` | `PERPLEXITY_API_KEY` | Credential reference (schema role `credential-ref`) resolved through the credentials domain — the web Settings web-search card writes it — with the launching environment as the no-seam fallback. |
 | `baseURL` | `https://api.perplexity.ai` | Endpoint base; `/chat/completions` is appended. An unparseable value makes the provider unavailable. |
 | `model` | `sonar` | Search model name. |
 | `maxTokens` | `1024` | Upper bound on generated answer tokens (`max_tokens`). Must be a positive integer. |
 | `searchRecency` | (unset) | Recency window sent as `search_recency_filter`: `day`, `week`, `month`, or `year`. Unset sends no filter. |
+| `enabled` | `true` | When false, the provider is omitted from the search pool. |
 
 ```yaml
 - id: web-search-perplexity
   name: '@shres-code/shres-code-web-search-perplexity'
-  config:
-    apiKey: !!js process.env.PERPLEXITY_API_KEY
 ```
+
+The resolved section also installs as the `web-search-perplexity` settings namespace, so a settings provider layers user values over the composition entry without re-registration, and configuration surfaces such as the web Settings page render and edit the section.
+
+## Credential resolution and availability
+
+The provider refreshes its key from the credentials domain at boot, before every search, and on a `credentials/updated` commit naming its reference, so a key stored or rotated after boot takes effect without a restart. Availability is **key-presence based**: with no key the provider is unavailable, which keeps it out of the `searchProviders` fallback chain instead of shadowing later providers — unlike the terminal DeepSeek fallback, which stays available to report the missing credential. A search that still finds no key fails as `WEB_PROVIDER_CREDENTIAL_MISSING`; a credential-backend failure fails as `WEB_PROVIDER_ERROR`, never as a missing key.
 
 ## Mapping
 
