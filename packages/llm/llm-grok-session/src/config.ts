@@ -54,6 +54,16 @@ export const SHIPPED_MODELS: readonly GrokSessionModelConfig[] = [
   { id: 'grok-4.5', name: 'Grok 4.5', contextWindow: 500_000 },
 ]
 
+/**
+ * CLI generation the advertised version defaults to. The proxy rejects
+ * requests whose client reports no version (426 'Your Grok CLI version
+ * (none) is outdated') and floors the reported version at its current
+ * minimum; this default tracks the CLI generation this package was built
+ * against, and a proxy floor bump is a settings cliVersion entry, not a
+ * code change.
+ */
+export const DEFAULT_CLI_VERSION = '1.0.13'
+
 /** One advisory model entry a deployment may declare. */
 export interface GrokSessionModelConfig {
   /** Model id the proxy accepts. */
@@ -86,6 +96,8 @@ export interface Config {
   models?: GrokSessionModelConfig[]
   /** Refresh leeway in milliseconds; defaults to {@link DEFAULT_REFRESH_LEEWAY_MS}. */
   refreshLeewayMs?: number
+  /** CLI version the route advertises; defaults to {@link DEFAULT_CLI_VERSION}. */
+  cliVersion?: string
 }
 
 const modelSchema = z.object({
@@ -106,6 +118,7 @@ export const Config: z<Config> = z.object({
   // any model rather than "use the shipped catalog".
   models: z.array(modelSchema).default(undefined as unknown as never),
   refreshLeewayMs: z.number().step(1).min(0),
+  cliVersion: z.string(),
 })
 
 /**
@@ -146,10 +159,16 @@ export function resolveRoute(config: Config): Omit<PiAiProviderProfile, 'display
   if (baseURL.length === 0) throw new Error('llm-grok-session: baseURL must be non-empty when set')
   const models = config.models ?? SHIPPED_MODELS
   if (models.length === 0) throw new Error('llm-grok-session: models must list at least one model')
+  const cliVersion = config.cliVersion ?? DEFAULT_CLI_VERSION
+  if (cliVersion.trim().length === 0) throw new Error('llm-grok-session: cliVersion must be non-empty when set')
   return {
     displayName: config.displayName ?? DEFAULT_DISPLAY_NAME,
     api: 'openai-responses',
     baseURL,
+    headers: {
+      'user-agent': 'grok-cli/' + cliVersion,
+      'x-grok-cli-version': cliVersion,
+    },
     models: models.map(model => ({
       id: model.id,
       ...(model.name === undefined ? {} : { name: model.name }),
