@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@shres-code/cordis'
 import { remoteMethods } from '@shres-code/shres-code-typert-protocol'
+import { RemoteControlError } from '../src/errors.ts'
 import RemoteAdminGateway from '../src/admin.ts'
 import type { AdminConfig } from '../src/admin.ts'
 import type { SshRunner } from '../src/controller.ts'
@@ -222,6 +223,23 @@ describe('RemoteAdminGateway', () => {
     expect(forced).toMatchObject({ status: 'connected', fingerprint: 'install-2' })
   })
 
+  it('answers a silent installation id as a fingerprint mismatch with a null observation', async () => {
+    const runner = fabricatedRunner({ probe: ANSWER_LAB, installId: '', forwardVersion: '0.1.0-rc.5' })
+    const { gateway, registryPath } = await harness(runner)
+    const { upsertEntry, REGISTRY_VERSION } = await import('../src/registry.ts')
+    await upsertEntry(registryPath, {
+      id: asRemoteId('lab'),
+      target: asRemoteTarget('ci@remote.example'),
+      remotePort: 3080,
+      version: REGISTRY_VERSION,
+      fingerprint: 'install-1',
+      createdAt: '2026-08-29T00:00:00.000Z',
+      lastConnectedAt: null,
+    })
+    const outcome = await gateway.connect({ token: await grant(gateway, 'connect', 'lab'), alias: 'lab', allowVersionSkew: false, forceFingerprint: false })
+    expect(outcome).toEqual({ status: 'fingerprint-mismatch', observed: null, trusted: 'install-1' })
+  })
+
   it('answers an unreachable daemon as staged outcome data', async () => {
     const silent = fabricatedRunner({ probeQueue: ['', '', '', '', '', ''], installId: 'install-1', forwardVersion: '0.1.0-rc.5' })
     const { gateway } = await harness(silent)
@@ -249,6 +267,22 @@ describe('RemoteAdminGateway', () => {
     expect(views.at(-1)).toMatchObject({ state: 'error', error: 'ssh spawn failed: exploded' })
   })
 
+  it('refuses a connect for an unregistered alias as a caller error', async () => {
+    const { gateway } = await harness(fabricatedRunner({}))
+    await expect(gateway.connect({ token: await grant(gateway, 'connect', 'ghost'), alias: 'ghost', allowVersionSkew: false, forceFingerprint: false }))
+      .rejects.toThrow(/not registered/)
+  })
+
+  it('keeps typed failures outside the decision set as wire errors', async () => {
+    const runner = fabricatedRunner({})
+    runner.run = async () => { throw new RemoteControlError('gesture-refused', 'probe seam exploded') }
+    const { gateway, views } = await harness(runner)
+    await seedLab(gateway)
+    await expect(gateway.connect({ token: await grant(gateway, 'connect', 'lab'), alias: 'lab', allowVersionSkew: false, forceFingerprint: false }))
+      .rejects.toThrow(/probe seam exploded/)
+    expect(views.at(-1)).toMatchObject({ state: 'error', error: 'probe seam exploded' })
+  })
+
   it('spends each gesture exactly once and refuses missing or out-of-scope tokens', async () => {
     const runner = fabricatedRunner({ probe: ANSWER_LAB, installId: 'install-1', forwardVersion: '0.1.0-rc.5' })
     const { gateway } = await harness(runner)
@@ -261,6 +295,13 @@ describe('RemoteAdminGateway', () => {
       .rejects.toThrow(/gesture token/)
     await expect(gateway.remove({ token: await grant(gateway, 'connect', 'lab'), alias: 'lab' }))
       .rejects.toThrow(/gesture token/)
+
+    // An add grant is scoped to the not-yet-existing alias (null), and its
+    // refusal message names that shape.
+    const addToken = await grant(gateway, 'add', null)
+    await gateway.add({ token: addToken, alias: 'prod', target: 'ci@remote.example', remotePort: 3080 })
+    await expect(gateway.add({ token: addToken, alias: 'prod', target: 'ci@remote.example', remotePort: 3080 }))
+      .rejects.toThrow(/<new alias>/)
   })
 
   it('add, edit, and remove mutate the registry under their own grants', async () => {
@@ -382,12 +423,9 @@ describe('RemoteAdminGateway', () => {
     try {
       const ctx = new Context()
       contexts.push(ctx)
-      class DefaultGateway extends RemoteAdminGateway {
-        constructor(ctx: Context, config?: AdminConfig) {
-          super(ctx, config, fabricatedRunner({}))
-        }
-      }
-      await ctx.plugin(DefaultGateway, {})
+      // No config and no injected runner: the production resolution paths and
+      // the node adapter both come from the gateway itself. `add` writes only.
+      await ctx.plugin(RemoteAdminGateway, {})
       const gateway = ctx.get('remoteAdmin') as RemoteAdminGateway
       await gateway.add({ token: await grant(gateway, 'add', null), alias: 'lab', target: 'ci@remote.example', remotePort: 3080 })
       expect(await loadRegistry(join(root, 'remote', 'remotes.json'))).toHaveLength(1)

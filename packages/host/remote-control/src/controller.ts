@@ -130,7 +130,7 @@ export async function openTunnel(runner: SshRunner, spec: TunnelSpec, entry: Rem
     }
     const fingerprint = await readInstallationId(runner, spec.target, spec.controlPath)
     if (fingerprint === null) {
-      throw new RemoteControlError('fingerprint-mismatch', `remote returned no installation id; cannot bind alias ${spec.id} to an installation`)
+      throw new RemoteControlError('fingerprint-mismatch', `remote returned no installation id; cannot bind alias ${spec.id} to an installation`, { observed: null })
     }
     if (entry.fingerprint !== null && entry.fingerprint !== fingerprint && !options.forceFingerprint) {
       throw new RemoteControlError('fingerprint-mismatch', `installation id changed for alias ${spec.id}: expected ${entry.fingerprint}, observed ${fingerprint}; pass --force-fingerprint if the host was reinstalled`, { observed: fingerprint })

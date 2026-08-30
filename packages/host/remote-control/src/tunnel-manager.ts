@@ -22,14 +22,26 @@ export interface TunnelManagerOptions {
   publish: (view: TunnelStateView) => void
 }
 
+/** The facts and the live handle that exist exactly while a tunnel is open. */
+interface OpenTunnel {
+  /** Live handle owned since the verified open. */
+  tunnel: LiveTunnel
+  /** Local loopback port bound at open. */
+  localPort: number
+  /** Daemon version observed at open time. */
+  version: string
+  /** Installation id observed at open time. */
+  fingerprint: string
+}
+
 /** One alias's live or last-known tunnel, process-private. */
 interface TunnelRecord {
   /** Alias key. */
   id: RemoteId
   /** Resolved forward specification of the latest attempt. */
   spec: TunnelSpec
-  /** Live handle while state is `open`; null while connecting or after exit. */
-  tunnel: LiveTunnel | null
+  /** Present exactly while state is `open`. */
+  open: OpenTunnel | null
   /** Display state after the last committed transition. */
   state: TunnelStateView['state']
   /** ISO timestamp of the last committed transition. */
@@ -60,8 +72,9 @@ export class TunnelManager {
    * @param spec - resolved specification of the attempt.
    */
   connecting(id: RemoteId, spec: TunnelSpec): void {
-    this.#records.set(id, { id, spec, tunnel: null, state: 'connecting', since: this.#now(), localPort: null, version: null, fingerprint: null, error: null })
-    this.#publish(id)
+    const record: TunnelRecord = { id, spec, open: null, state: 'connecting', since: this.#now(), localPort: null, version: null, fingerprint: null, error: null }
+    this.#records.set(id, record)
+    this.#publish(record)
   }
 
   /**
@@ -75,19 +88,20 @@ export class TunnelManager {
    * @param fingerprint - installation id observed at open time.
    */
   async opened(id: RemoteId, spec: TunnelSpec, tunnel: LiveTunnel, version: string, fingerprint: string): Promise<void> {
-    this.#records.set(id, {
+    const record: TunnelRecord = {
       id,
       spec,
-      tunnel,
+      open: { tunnel, localPort: spec.localPort, version, fingerprint },
       state: 'open',
       since: this.#now(),
       localPort: spec.localPort,
       version,
       fingerprint,
       error: null,
-    })
+    }
+    this.#records.set(id, record)
     await writeFileAtomic(join(this.#options.runDir, `${id}.pid`), `${tunnel.pid}\n`, { mode: 0o600, dirMode: 0o700 })
-    this.#publish(id)
+    this.#publish(record)
   }
 
   /**
@@ -98,8 +112,9 @@ export class TunnelManager {
    * @param message - human-readable failure for the alias's row.
    */
   failed(id: RemoteId, spec: TunnelSpec, message: string): void {
-    this.#records.set(id, { id, spec, tunnel: null, state: 'error', since: this.#now(), localPort: null, version: null, fingerprint: null, error: message })
-    this.#publish(id)
+    const record: TunnelRecord = { id, spec, open: null, state: 'error', since: this.#now(), localPort: null, version: null, fingerprint: null, error: message }
+    this.#records.set(id, record)
+    this.#publish(record)
   }
 
   /**
@@ -111,12 +126,13 @@ export class TunnelManager {
    */
   async exited(id: RemoteId, _exitCode: number | null): Promise<void> {
     const record = this.#records.get(id)
-    if (record === undefined || record.tunnel === null || record.state !== 'open') return
-    record.tunnel = null
+    const open = record?.open ?? null
+    if (record === undefined || open === null) return
+    record.open = null
     record.state = 'closed'
     record.since = this.#now()
     await this.#removeMarker(id)
-    this.#publish(id)
+    this.#publish(record)
   }
 
   /**
@@ -127,13 +143,14 @@ export class TunnelManager {
    */
   async disconnect(id: RemoteId): Promise<boolean> {
     const record = this.#records.get(id)
-    if (record === undefined || record.tunnel === null) return false
-    await record.tunnel.dispose()
-    record.tunnel = null
+    const open = record?.open ?? null
+    if (record === undefined || open === null) return false
+    await open.tunnel.dispose()
+    record.open = null
     record.state = 'closed'
     record.since = this.#now()
     await this.#removeMarker(id)
-    this.#publish(id)
+    this.#publish(record)
     return true
   }
 
@@ -143,8 +160,17 @@ export class TunnelManager {
    * @returns true while the alias's handle is live.
    */
   isLive(id: RemoteId): boolean {
-    const record = this.#records.get(id)
-    return record !== undefined && record.tunnel !== null
+    return (this.#records.get(id)?.open ?? null) !== null
+  }
+
+  /**
+   * The connected-outcome facts of the alias's verified-open tunnel.
+   * @param id - alias to query.
+   * @returns the facts, or null when no verified-open tunnel exists.
+   */
+  openOutcome(id: RemoteId): { localPort: number; version: string; fingerprint: string } | null {
+    const open = this.#records.get(id)?.open ?? null
+    return open === null ? null : { localPort: open.localPort, version: open.version, fingerprint: open.fingerprint }
   }
 
   /**
@@ -171,14 +197,14 @@ export class TunnelManager {
    * the closed states are published like any other committed transition.
    */
   async disposeAll(): Promise<void> {
-    const live = [...this.#records.values()].flatMap(record => record.tunnel === null ? [] : [{ record, tunnel: record.tunnel }])
-    await Promise.all(live.map(async ({ record, tunnel }) => {
-      await tunnel.dispose()
-      record.tunnel = null
+    const live = [...this.#records.values()].flatMap(record => record.open === null ? [] : [{ record, open: record.open }])
+    await Promise.all(live.map(async ({ record, open }) => {
+      await open.tunnel.dispose()
+      record.open = null
       record.state = 'closed'
       record.since = this.#now()
       await this.#removeMarker(record.id)
-      this.#publish(record.id)
+      this.#publish(record)
     }))
   }
 
@@ -195,10 +221,9 @@ export class TunnelManager {
     }
   }
 
-  /** Publish the alias's current view through the sink. */
-  #publish(id: RemoteId): void {
-    const record = this.#records.get(id)
-    if (record !== undefined) this.#options.publish(this.#viewOf(record))
+  /** Publish the record's current view through the sink. */
+  #publish(record: TunnelRecord): void {
+    this.#options.publish(this.#viewOf(record))
   }
 
   /** Remove the alias's PID marker; absence is the expected post-exit state. */

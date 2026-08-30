@@ -84,6 +84,15 @@ function nowIso(): string {
 }
 
 /**
+ * Collapse an index-signature fact read to the outcome's nullable string.
+ * @param value - the fact value as the record type stores it.
+ * @returns the fact, or null when the throw site carried none.
+ */
+function fact(value: string | null | undefined): string | null {
+  return value ?? null
+}
+
+/**
  * Serve the mutating remote surface as the `remoteAdmin` Remote namespace.
  * The gesture gate lives HERE, in the operations that spend it: scope
  * validation needs the business verb/alias semantics the apiproxy carrier
@@ -177,8 +186,8 @@ export class RemoteAdminGateway extends TypertRemoteService {
   async connect(request: AdminConnectRequest): Promise<ConnectOutcome> {
     this.requireGesture(request.token, 'connect', request.alias)
     const entry = await this.entry(request.alias)
-    const live = this.tunnels.view(entry.id)
-    if (live !== null && live.state === 'open' && live.localPort !== null && live.version !== null && live.fingerprint !== null) {
+    const live = this.tunnels.openOutcome(entry.id)
+    if (live !== null) {
       // One alias carries one GUI tunnel: another granted connect reports the
       // live one instead of stacking a second forward beside it.
       return { status: 'connected', localPort: live.localPort, version: live.version, fingerprint: live.fingerprint }
@@ -201,9 +210,9 @@ export class RemoteAdminGateway extends TypertRemoteService {
       if (!(error instanceof RemoteControlError)) throw error
       switch (error.code) {
         case 'version-mismatch':
-          return { status: 'version-mismatch', observed: error.facts['observed'] ?? null, local: this.localVersion }
+          return { status: 'version-mismatch', observed: fact(error.facts['observed']), local: this.localVersion }
         case 'fingerprint-mismatch':
-          return { status: 'fingerprint-mismatch', observed: error.facts['observed'] ?? null, trusted: entry.fingerprint }
+          return { status: 'fingerprint-mismatch', observed: fact(error.facts['observed']), trusted: entry.fingerprint }
         case 'probe-failed':
           return { status: 'unreachable', stage: 'probe', message: error.message }
         case 'tunnel-failed':

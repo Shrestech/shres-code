@@ -45,12 +45,16 @@ describe('nodeSshRunner', () => {
 })
 
 // Windows cannot ignore SIGTERM (the signal terminates unconditionally), so
-// the SIGKILL escalation arm only exists on POSIX signals.
+// the SIGKILL escalation arm only exists on POSIX signals. A shell trap is the
+// reliable way to hold a child through SIGTERM.
 describe.skipIf(process.platform === 'win32')('nodeSshRunner escalation', () => {
   it('escalates to SIGKILL when the child ignores SIGTERM', async () => {
     const exits: (number | null)[] = []
-    const ignoresTerm = 'process.on("SIGTERM", () => {}); setInterval(() => {}, 1000)'
-    const handle = await nodeSshRunner(NODE).spawn(['-e', ignoresTerm], (code) => { exits.push(code) })
+    const ignoresTerm = "trap '' TERM; sleep 30"
+    const handle = await nodeSshRunner('/bin/sh').spawn(['-c', ignoresTerm], (code) => { exits.push(code) })
+    // The shell needs a few milliseconds to install the trap; disposing
+    // immediately would TERM it at default disposition and race this test.
+    await new Promise<void>((resolveSettled) => { setTimeout(resolveSettled, 150) })
     await handle.dispose()
     expect(exits).toEqual([null])
   })
