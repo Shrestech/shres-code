@@ -1,9 +1,9 @@
 /**
  * Bounded advisory digest over a parent session: enough for a reviewer to
- * judge whether the main session is going wrong, not so much that the digest
- * becomes the full transcript. Reconstructable from the session log alone —
- * the fold reads only committed events, so model-visible reviewer input is
- * always reconstructable from the parent session.
+ * judge whether the main session still serves the user's goal, not so much
+ * that the digest becomes the full transcript. Reconstructable from the
+ * session log alone — the fold reads only committed events, so model-visible
+ * reviewer input is always reconstructable from the parent session.
  * @module @shres-code/shres-code-jspace-advisor/digest
  */
 
@@ -27,38 +27,62 @@ export const TRUNCATION_MARKER = '…'
  */
 export function boundText(text: string, max: number): string {
   if (text.length <= max) return text
-  return `${text.slice(0, max - 1)}${TRUNCATION_MARKER}`
+  return text.slice(0, max - 1) + TRUNCATION_MARKER
 }
 
-/** Completed `step/end` events in one session log. */
+/** Completed step/end events in one session log. */
 function countSteps(events: readonly SessionEvent[]): number {
   let count = 0
   for (const event of events) {
-    if (event.type === 'step/end') count += 1
+    if (event !== undefined && event.type === 'step/end') count += 1
   }
   return count
 }
 
+/** Text of one source-'user' message, or an empty string when it carries none. */
+function userMessageText(event: SessionEvent<'user/message'>): string {
+  return event.data.content
+    .filter(part => part.type === 'text')
+    .map(part => part.text)
+    .join('\n')
+    .trim()
+}
+
 /**
- * Latest human user text from the session log, bounded.
+ * Fold every human user message, oldest-first, bounded per message and in
+ * total. The first message — the session's goal statement — is always
+ * retained; the total cap drops the oldest droppable entries first and the
+ * caller renders the elided count in the card's elision voice.
  * @param events - session log.
- * @param max - character cap.
- * @returns the bounded text, or empty when none.
+ * @param maxPerMessage - character cap on each message.
+ * @param maxTotal - character cap on the retained history as a whole.
+ * @returns the retained messages plus the count of elided ones.
  */
-function latestUserIntent(events: readonly SessionEvent[], max: number): string {
-  for (let index = events.length - 1; index >= 0; index -= 1) {
-    const event = events[index]
+export function foldUserMessages(
+  events: readonly SessionEvent[],
+  maxPerMessage: number,
+  maxTotal: number,
+): { messages: string[]; elided: number } {
+  const all: string[] = []
+  for (const event of events) {
     if (event === undefined || event.type !== 'user/message') continue
     if (event.data.source.kind !== 'user') continue
-    const text = event.data.content
-      .filter(part => part.type === 'text')
-      .map(part => part.text)
-      .join('\n')
-      .trim()
+    const text = userMessageText(event)
     if (text.length === 0) continue
-    return boundText(text, max)
+    all.push(boundText(text, maxPerMessage))
   }
-  return ''
+  if (all.length <= 1) return { messages: all, elided: 0 }
+  const first = all[0] as string
+  const keep = new Set<number>([0])
+  let used = first.length
+  for (let index = all.length - 1; index >= 1; index -= 1) {
+    const entry = all[index] as string
+    if (used + entry.length > maxTotal) break
+    keep.add(index)
+    used += entry.length
+  }
+  const messages = all.filter((_, index) => keep.has(index))
+  return { messages, elided: all.length - messages.length }
 }
 
 /**
@@ -76,7 +100,7 @@ function recentTools(
 ): readonly JspaceAdvisorToolSignal[] {
   const resultByCall = new Map<string, { ok: boolean; excerpt?: string }>()
   for (const event of events) {
-    if (event.type !== 'tool/result') continue
+    if (event === undefined || event.type !== 'tool/result') continue
     const message = (event.data as {
       message?: {
         source?: { kind?: string; callId?: string }
@@ -118,14 +142,16 @@ export interface AdvisorDigestCaps {
   readonly maxChars: number
   /** Character cap on each error excerpt. */
   readonly maxExcerpt: number
-  /** Character cap on the latest user intent. */
-  readonly maxIntent: number
+  /** Character cap on each user message. */
+  readonly maxUserMessage: number
+  /** Character cap on the retained user-message history. */
+  readonly maxUserHistory: number
 }
 
 /**
  * Fold a bounded advisory digest from one session's committed events.
  * @param session - live session whose log to fold.
- * @param card - the open card, or `null` when none is open.
+ * @param card - the open card, or null when none is open.
  * @param caps - digest caps.
  * @returns the digest.
  */
@@ -135,41 +161,51 @@ export function foldAdvisorDigest(
   caps: AdvisorDigestCaps,
 ): JspaceAdvisorDigest {
   const recent = recentTools(session.events, caps.maxTools, caps.maxExcerpt)
+  const history = foldUserMessages(session.events, caps.maxUserMessage, caps.maxUserHistory)
   const renderedCard = card === null
     ? null
     : formatJspaceCard(card, {
       checkedReprintLimit: DEFAULT_CHECKED_REPRINT_LIMIT,
       openReprintLimit: DEFAULT_OPEN_REPRINT_LIMIT,
     })
-  const digest: JspaceAdvisorDigest = {
+  return {
     card: renderedCard,
+    userMessages: history.messages,
+    elidedUserMessages: history.elided,
     recentTools: recent,
-    userIntent: latestUserIntent(session.events, caps.maxIntent),
     steps: countSteps(session.events),
     seq: session.seq,
     maxTools: caps.maxTools,
     maxChars: caps.maxChars,
   }
-  return digest
 }
 
 /**
- * Render the digest as the reviewer's input text, bounded to `maxChars`.
+ * Render the digest as the reviewer's input text, bounded to maxChars.
+ * Order is truncation priority: the user stream (goal ground truth) and the
+ * card survive first; the trailing tool window renders last so the cap eats
+ * it first.
  * @param digest - folded digest.
  * @returns the bounded render.
  */
 export function renderAdvisorDigest(digest: JspaceAdvisorDigest): string {
   const lines: string[] = []
-  if (digest.card !== null) lines.push(`Card:\n${digest.card}`)
-  if (digest.userIntent.length > 0) lines.push(`Latest user intent: ${digest.userIntent}`)
-  lines.push(`Completed steps: ${String(digest.steps)}`)
+  if (digest.userMessages.length > 0) {
+    const history = digest.userMessages.map((text, index) => 'U' + String(index + 1) + ': ' + text)
+    if (digest.elidedUserMessages > 0) {
+      history.splice(1, 0, '(' + String(digest.elidedUserMessages) + ' earlier user messages elided)')
+    }
+    lines.push('User messages (the goal ground truth):\n' + history.join('\n'))
+  }
+  if (digest.card !== null) lines.push('Session card (the session\'s own claim):\n' + digest.card)
+  lines.push('Completed steps: ' + String(digest.steps))
   if (digest.recentTools.length > 0) {
     const tools = digest.recentTools
       .map(signal => signal.ok
-        ? `ok ${signal.name}`
-        : `FAIL ${signal.name}${signal.errorExcerpt === undefined ? '' : `: ${signal.errorExcerpt}`}`)
+        ? 'ok ' + signal.name
+        : 'FAIL ' + signal.name + (signal.errorExcerpt === undefined ? '' : ': ' + signal.errorExcerpt))
       .join('\n')
-    lines.push(`Recent tool outcomes:\n${tools}`)
+    lines.push('Recent tool outcomes:\n' + tools)
   }
   return boundText(lines.join('\n'), digest.maxChars)
 }

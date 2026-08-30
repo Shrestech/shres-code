@@ -13,8 +13,9 @@ import type { JspaceAdvisorDigest } from '../src/types.ts'
 
 const DIGEST: JspaceAdvisorDigest = {
   card: 'Goal: ship',
+  userMessages: ['hi'],
+  elidedUserMessages: 0,
   recentTools: [],
-  userIntent: 'hi',
   steps: 1,
   seq: 0,
   maxTools: 12,
