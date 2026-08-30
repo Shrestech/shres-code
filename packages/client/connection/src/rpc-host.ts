@@ -66,15 +66,25 @@ export class HostConnectionService extends Service implements HostConnectionHand
    * Compose one shared-channel Fetch handler from its interceptor and fallback.
    * @param channel - shared channel mounted by Connection.
    * @param fallback - handler for endpoints not claimed by the interceptor.
+   * @param loopbackOnly - endpoints pinned to loopback by Connection's own
+   *   policy, fenced with an empty trust list before interceptor dispatch so
+   *   claimed endpoints cannot bypass the pin.
    * @returns Fetch handler that selects exactly one target for each request.
    */
   createSharedFetchHandler(
     channel: '/api',
     fallback: FetchHandler,
+    loopbackOnly?: ReadonlySet<string>,
   ): FetchHandler {
     return {
       fetch: (request) => {
         const endpoint = endpointFromPath(channel, new URL(request.url).pathname)
+        // The pin runs before interceptor dispatch: an interceptor's own
+        // channel-wide authority is broader than the pin, and a check placed
+        // behind the claim would never fire for claimed endpoints.
+        if (endpoint !== undefined && loopbackOnly?.has(endpoint) === true && !isTrustedApiRequest(request, [])) {
+          return Promise.resolve(new Response('forbidden', { status: 403 }))
+        }
         const interceptor = this.interceptors.get(channel)
         if (endpoint === undefined || interceptor === undefined || !interceptor.matches(endpoint)) {
           return fallback.fetch(request)
