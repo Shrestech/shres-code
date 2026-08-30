@@ -1,0 +1,43 @@
+/* Trust modal body: one labeled row per fact, trust copy under the id. */
+.line {
+  color: var(--dsw-alias-label-secondary);
+}
+
+.failure {
+  color: var(--dsw-alias-state-error-primary);
+  font-weight: 500;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 0;
+}
+
+.field + .field {
+  border-top: 1px solid var(--dsw-alias-border-l2);
+}
+
+.fieldLabel {
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+}
+
+.fieldValue {
+  color: var(--dsw-alias-label-primary);
+  font-family: var(--ds-font-family-code);
+  font-size: 13px;
+}
+
+.trustLine {
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 12px;
+}

@@ -47,7 +47,7 @@ The `SshRunner` seam receives ssh arguments without the binary; the extracted `n
 
 ## Consequences
 
-`remoteControl/list` keeps its frozen shape; the new plane lives beside it, and a LAN-served GUI loses the whole remote plane (loopback pin) until a real authentication layer exists. Tunnel lifetime is the webapp process: a restart honestly reports every tunnel closed, PID markers are recorded but never adopted cross-process, and a disconnect racing a still-dialing connect answers `not-connected` while the in-flight open completes. The connected tab is the tunneled origin opened in a new tab (the client PR); a same-tab origin switch was rejected because it needs cross-origin /api and an Origin-fence exemption for a cross-port loopback caller — a security-shape change for a cosmetic win. /api stays POST-only, pinned end-to-end.
+`remoteControl/list` keeps its frozen shape; the new plane lives beside it, and a LAN-served GUI loses the whole remote plane (loopback pin) until a real authentication layer exists. Tunnel lifetime is the webapp process: a restart honestly reports every tunnel closed, PID markers are recorded but never adopted cross-process, and a disconnect racing a still-dialing connect answers `not-connected` while the in-flight open completes. The connected tab is the tunneled origin opened in a new tab ([sidebar Remotes group](../feature/2026-08-30-remote-connect-sidebar.md)); a same-tab origin switch was rejected because it needs cross-origin /api and an Origin-fence exemption for a cross-port loopback caller — a security-shape change for a cosmetic win. /api stays POST-only, pinned end-to-end.
 
 ## Testing
 

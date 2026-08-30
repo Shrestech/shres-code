@@ -1,0 +1,13 @@
+- region "Remotes":
+  - button "Hide remotes" [expanded]:
+    - img
+    - text: Remotes
+  - button "Connect lab": lab ci@lab.remote.example
+  - button "Remote actions for lab":
+    - img
+  - button "Connect prod": prod ci@prod.remote.example
+  - button "Remote actions for prod":
+    - img
+  - button "Add remote…":
+    - img
+    - text: Add remote…

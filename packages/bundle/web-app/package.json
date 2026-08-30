@@ -85,6 +85,7 @@
     "@shres-code/shres-code-client-ui-workflow-run": "workspace:^",
     "@shres-code/shres-code-client-ui-trajectory": "workspace:^",
     "@shres-code/shres-code-client-ui-workspace": "workspace:^",
+    "@shres-code/shres-code-client-ui-remote": "workspace:^",
     "@shres-code/shres-code-cmdline": "workspace:^",
     "@shres-code/shres-code-code-runtime-worker-thread": "workspace:^",
     "@shres-code/shres-code-cordis-client-runner": "workspace:^",
