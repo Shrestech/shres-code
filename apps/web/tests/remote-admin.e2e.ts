@@ -15,23 +15,33 @@ interface RemoteEntryView {
 }
 
 interface RpcBody {
-  result?: { value?: unknown }
-  error?: { message?: string }
+  result?: { ok?: boolean; value?: unknown; error?: { message?: string } }
 }
 
-/** Issue one POST against the real /api carrier and return the envelope. */
-async function rpc(scaffold: WebScaffold, method: string, args: Record<string, unknown>): Promise<RpcBody> {
+/** One client-request envelope per wire contract: rpcId unique per call. */
+let rpcSeq = 0
+
+/** Issue one POST against the real /api carrier and return the response envelope. */
+async function rpc(scaffold: WebScaffold, method: string, request?: Record<string, unknown>): Promise<RpcBody> {
   const response = await fetch(`${scaffold.baseUrl}/api/${method}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ args }),
+    body: JSON.stringify({
+      type: 'client-request',
+      rpcId: `remote-admin-e2e-${String(++rpcSeq)}`,
+      method,
+      // A parameterless descriptor takes an empty args object; methods with a
+      // single `request` parameter wrap it under its wire name.
+      payload: { args: request === undefined ? {} : { request } },
+    }),
   })
   expect(response.ok).toBe(true)
   return await response.json() as RpcBody
 }
 
 function value(body: RpcBody): Record<string, unknown> {
-  return body.result?.value as Record<string, unknown>
+  if (body.result?.ok !== true) throw new Error(`wire failure: ${JSON.stringify(body.result?.error)}`)
+  return body.result.value as Record<string, unknown>
 }
 
 /** Mint one grant for the verb/alias pair through the real wire. */
@@ -42,7 +52,7 @@ async function grant(scaffold: WebScaffold, verb: string, alias: string | null):
 }
 
 async function listIds(scaffold: WebScaffold): Promise<string[]> {
-  const body = value(await rpc(scaffold, 'remoteControl/list', {}))
+  const body = value(await rpc(scaffold, 'remoteControl/list'))
   return ((body['entries'] as RemoteEntryView[]) ?? []).map(entry => entry.id)
 }
 
@@ -60,7 +70,7 @@ describe('web e2e: remoteAdmin gesture-gated namespace', () => {
   it('drives add, edit, and remove through begin grants over the real registry', async () => {
     onTestFailed(() => { void scaffold })
 
-    expect(value(await rpc(scaffold, 'remoteAdmin/status', {}))).toMatchObject({ tunnels: [] })
+    expect(value(await rpc(scaffold, 'remoteAdmin/status'))).toMatchObject({ tunnels: [] })
     expect(await listIds(scaffold)).toEqual([])
 
     const added = value(await rpc(scaffold, 'remoteAdmin/add', {
@@ -92,18 +102,18 @@ describe('web e2e: remoteAdmin gesture-gated namespace', () => {
     const token = await grant(scaffold, 'add', null)
     await rpc(scaffold, 'remoteAdmin/add', { token, alias: 'lab', target: 'ci@remote.example', remotePort: 3080 })
     const reused = await rpc(scaffold, 'remoteAdmin/add', { token, alias: 'prod', target: 'ci@remote.example', remotePort: 3080 })
-    expect(reused.error?.message).toContain('gesture token')
+    expect(reused.result?.error?.message).toContain('gesture token')
 
     const missing = await rpc(scaffold, 'remoteAdmin/remove', { token: 'deadbeef', alias: 'lab' })
-    expect(missing.error?.message).toContain('gesture token')
+    expect(missing.result?.error?.message).toContain('gesture token')
 
     const scoped = await rpc(scaffold, 'remoteAdmin/remove', { token: await grant(scaffold, 'connect', 'lab'), alias: 'lab' })
-    expect(scoped.error?.message).toContain('gesture token')
+    expect(scoped.result?.error?.message).toContain('gesture token')
 
     const aliasedAdd = await rpc(scaffold, 'remoteAdmin/begin', { verb: 'add', alias: 'lab' })
-    expect(aliasedAdd.error?.message).toContain('pass alias null')
+    expect(aliasedAdd.result?.error?.message).toContain('pass alias null')
     const bareVerb = await rpc(scaffold, 'remoteAdmin/begin', { verb: 'connect', alias: null })
-    expect(bareVerb.error?.message).toContain('needs an alias')
+    expect(bareVerb.result?.error?.message).toContain('needs an alias')
 
     // The spent token left no second mutation behind.
     expect(await listIds(scaffold)).toEqual(['lab'])
@@ -135,7 +145,12 @@ describe('web e2e: remote plane pins to loopback', () => {
       const response = await fetch(`${scaffold.baseUrl}/api/${method}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json', origin: scaffold.baseUrl, 'sec-fetch-site': 'same-origin' },
-        body: JSON.stringify({ args: method === 'remoteControl/list' ? {} : method === 'remoteAdmin/begin' ? { verb: 'add', alias: null } : {} }),
+        body: JSON.stringify({
+          type: 'client-request',
+          rpcId: 'remote-admin-e2e-pin',
+          method,
+          payload: { args: { request: method === 'remoteAdmin/begin' ? { verb: 'add', alias: null } : {} } },
+        }),
       })
       expect(response.status, method).toBe(403)
     }
