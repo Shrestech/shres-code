@@ -17,7 +17,7 @@ VS Code-style remote connect rides an SSH-tunnel + loopback carrier: the remote 
 
 ## Rationale
 
-Tunnel trust extends the remote's loopback trust to the local loopback; that is sound only because holding the SSH key already implied a remote shell. Sync and consent live at the controller's own dispatch seam with gesture-minted authority — beyond PR1's scope — and the remote's leaf RPC semantics stay untouched. `host.describe.version` now reports the running package's manifest version (workspace invariant pins it to every app's version), so controller↔daemon skew becomes exact-match-refusable pre-first-tag with an `--allow-version-skew` warn path; a protocol version field waits for multi-origin clients. Reconnect remains the client's existing full-rebuild resync by design; a `since` cursor stays a deliberate future decision, not a resume patch.
+Tunnel trust extends the remote's loopback trust to the local loopback; that is sound only because holding the SSH key already implied a remote shell. Sync and consent run through the [remoteAdmin namespace](2026-08-30-remote-admin-namespace.md) at the controller's own dispatch seam with gesture-minted authority, and the remote's leaf RPC semantics stay untouched. `host.describe.version` now reports the running package's manifest version (workspace invariant pins it to every app's version), so controller↔daemon skew becomes exact-match-refusable pre-first-tag with an `--allow-version-skew` warn path; a protocol version field waits for multi-origin clients. Reconnect remains the client's existing full-rebuild resync by design; a `since` cursor stays a deliberate future decision, not a resume patch.
 
 ## Alternatives considered
 
@@ -25,7 +25,7 @@ See the negative guarantees above; the losing alternatives remain tempting in ex
 
 ## Consequences
 
-The supervision contract (flags, ports, disposal, jobs ownership) is the durable contract future PRs compose: PR2 slots ensure-running between probe and forward; sync gains the gesture-token gate at the controller seam; the plugin face mounts with its composition row and shares this registry.
+The supervision contract (flags, ports, disposal, jobs ownership) is the durable contract future PRs compose: PR2 slots ensure-running between probe and forward, and the [remoteAdmin namespace](2026-08-30-remote-admin-namespace.md) mounts the gesture-gated mutation face beside the read-only projection, sharing this registry.
 
 - tmux/nohup backed persistence: rejected — detached shells cannot survive reboot and could not back a persistence claim; the daemon lifecycle belongs to PR2's ensure-running path.
 - Fixed default ports: rejected — local ports are allocated and stored per remote; daemon ports come from the registry.
