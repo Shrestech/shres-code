@@ -230,7 +230,7 @@ describe('connection node half', () => {
       // the process's tunnels — the gesture gate stays inside the namespace.
       'remoteControl/list',
       'remoteAdmin/begin', 'remoteAdmin/inspect', 'remoteAdmin/connect', 'remoteAdmin/disconnect',
-      'remoteAdmin/add', 'remoteAdmin/edit', 'remoteAdmin/remove', 'remoteAdmin/status',
+      'remoteAdmin/add', 'remoteAdmin/edit', 'remoteAdmin/removeEntry', 'remoteAdmin/status',
     ]) {
       const denied = fakeResponse()
       await routes[0]!.handler(

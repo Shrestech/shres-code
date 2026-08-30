@@ -133,7 +133,7 @@ const PRIVILEGED_METHODS = new Set([
   'remoteAdmin/disconnect',
   'remoteAdmin/add',
   'remoteAdmin/edit',
-  'remoteAdmin/remove',
+  'remoteAdmin/removeEntry',
   'remoteAdmin/status',
 ])
 

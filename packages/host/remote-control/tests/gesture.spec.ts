@@ -19,7 +19,7 @@ describe('GestureLedger', () => {
   it('refuses a token minted for another verb and spends it anyway', () => {
     const ledger = new GestureLedger()
     const { token } = ledger.mint('connect', 'lab', 0)
-    expect(ledger.consume(token, 'remove', 'lab', 1)).toBe(false)
+    expect(ledger.consume(token, 'removeEntry', 'lab', 1)).toBe(false)
     expect(ledger.consume(token, 'connect', 'lab', 1)).toBe(false)
   })
 
@@ -45,10 +45,10 @@ describe('GestureLedger', () => {
     for (let minted = 1; minted < MAX_OUTSTANDING_TOKENS; minted++) {
       ledger.mint('add', null, minted)
     }
-    const overflow = ledger.mint('remove', 'prod', MAX_OUTSTANDING_TOKENS).token
+    const overflow = ledger.mint('removeEntry', 'prod', MAX_OUTSTANDING_TOKENS).token
     expect(overflow).not.toBe(first)
     expect(ledger.consume(first, 'connect', 'lab', 0)).toBe(false)
-    expect(ledger.consume(overflow, 'remove', 'prod', 0)).toBe(true)
+    expect(ledger.consume(overflow, 'removeEntry', 'prod', 0)).toBe(true)
   })
 
   it('keeps the security-invariant window and cap fixed', () => {

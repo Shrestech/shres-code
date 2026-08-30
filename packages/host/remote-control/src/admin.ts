@@ -299,9 +299,9 @@ export class RemoteAdminGateway extends TypertRemoteService {
    * @param request - the granted remove.
    * @returns the removal outcome.
    */
-  @Remote('remove')
-  async remove(request: AdminRemoveRequest): Promise<RemoveOutcome> {
-    this.requireGesture(request.token, 'remove', request.alias)
+  @Remote('removeEntry')
+  async removeEntry(request: AdminRemoveRequest): Promise<RemoveOutcome> {
+    this.requireGesture(request.token, 'removeEntry', request.alias)
     const id = asRemoteId(request.alias)
     if (this.tunnels.isLive(id)) return { status: 'connected' }
     return { status: 'removed', removed: await removeEntry(this.registryPath, id) }

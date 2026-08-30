@@ -140,7 +140,7 @@ async function harness(
 }
 
 /** Mint a grant for one verb/alias pair. */
-async function grant(gateway: RemoteAdminGateway, verb: 'connect' | 'disconnect' | 'add' | 'edit' | 'remove', alias: string | null): Promise<string> {
+async function grant(gateway: RemoteAdminGateway, verb: 'connect' | 'disconnect' | 'add' | 'edit' | 'removeEntry', alias: string | null): Promise<string> {
   return gateway.begin({ verb, alias }).token
 }
 
@@ -157,7 +157,7 @@ describe('RemoteAdminGateway', () => {
     const { gateway } = await harness(fabricatedRunner({}))
     expect(gateway.typertRemote).toMatchObject({ serviceKey: 'remoteAdmin', namespace: 'remoteAdmin' })
     expect(remoteMethods(gateway).map(marker => marker.method)).toEqual([
-      'begin', 'inspect', 'connect', 'disconnect', 'add', 'edit', 'remove', 'status',
+      'begin', 'inspect', 'connect', 'disconnect', 'add', 'edit', 'removeEntry', 'status',
     ])
   })
 
@@ -335,7 +335,7 @@ describe('RemoteAdminGateway', () => {
       .rejects.toThrow(/gesture token/)
     await expect(gateway.connect({ token: 'deadbeef', alias: 'lab', allowVersionSkew: false, forceFingerprint: false }))
       .rejects.toThrow(/gesture token/)
-    await expect(gateway.remove({ token: await grant(gateway, 'connect', 'lab'), alias: 'lab' }))
+    await expect(gateway.removeEntry({ token: await grant(gateway, 'connect', 'lab'), alias: 'lab' }))
       .rejects.toThrow(/gesture token/)
 
     // An add grant is scoped to the not-yet-existing alias (null), and its
@@ -352,7 +352,7 @@ describe('RemoteAdminGateway', () => {
     expect(added.entry).toMatchObject({ id: 'lab', target: 'ci@remote.example', remotePort: 3080, fingerprint: null })
     const edited = await gateway.edit({ token: await grant(gateway, 'edit', 'lab'), alias: 'lab', target: 'build@remote.example', remotePort: 3081 })
     expect(edited.entry).toMatchObject({ id: 'lab', target: 'build@remote.example', remotePort: 3081 })
-    const removed = await gateway.remove({ token: await grant(gateway, 'remove', 'lab'), alias: 'lab' })
+    const removed = await gateway.removeEntry({ token: await grant(gateway, 'removeEntry', 'lab'), alias: 'lab' })
     expect(removed).toEqual({ status: 'removed', removed: true })
     expect(await loadRegistry(registryPath)).toHaveLength(0)
   })
@@ -383,7 +383,7 @@ describe('RemoteAdminGateway', () => {
     await seedLab(gateway)
     await gateway.add({ token: await grant(gateway, 'add', null), alias: 'lab', target: 'ci@remote.example', remotePort: 3080 })
     await gateway.connect({ token: await grant(gateway, 'connect', 'lab'), alias: 'lab', allowVersionSkew: false, forceFingerprint: false })
-    const refused = await gateway.remove({ token: await grant(gateway, 'remove', 'lab'), alias: 'lab' })
+    const refused = await gateway.removeEntry({ token: await grant(gateway, 'removeEntry', 'lab'), alias: 'lab' })
     expect(refused).toEqual({ status: 'connected' })
     expect(await loadRegistry(registryPath)).toHaveLength(1)
   })

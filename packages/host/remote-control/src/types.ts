@@ -87,7 +87,7 @@ export interface RemoteRegistrySnapshot {
 }
 
 /** The verbs a user gesture can authorize; each mutating `remoteAdmin` method consumes exactly one. */
-export type AdminGestureVerb = 'connect' | 'disconnect' | 'add' | 'edit' | 'remove'
+export type AdminGestureVerb = 'connect' | 'disconnect' | 'add' | 'edit' | 'removeEntry'
 
 /** Full-state projection of one alias's GUI-owned tunnel, published on every committed transition. */
 export interface TunnelStateView {
@@ -182,9 +182,9 @@ export interface AdminEntryRequest {
   remotePort: number
 }
 
-/** Wire request for `remoteAdmin/remove`. */
+/** Wire request for `remoteAdmin/removeEntry`. */
 export interface AdminRemoveRequest {
-  /** Grant from `begin({ verb: 'remove', alias })`. */
+  /** Grant from `begin({ verb: 'removeEntry', alias })`. */
   token: string
   /** Alias to remove. */
   alias: string

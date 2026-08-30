@@ -88,8 +88,8 @@ describe('web e2e: remoteAdmin gesture-gated namespace', () => {
     expect(edited).toMatchObject({ entry: { target: 'build@remote.example', remotePort: 3081 } })
     expect(await listIds(scaffold)).toEqual(['lab'])
 
-    const removed = value(await rpc(scaffold, 'remoteAdmin/remove', {
-      token: await grant(scaffold, 'remove', 'lab'),
+    const removed = value(await rpc(scaffold, 'remoteAdmin/removeEntry', {
+      token: await grant(scaffold, 'removeEntry', 'lab'),
       alias: 'lab',
     }))
     expect(removed).toEqual({ status: 'removed', removed: true })
@@ -104,10 +104,10 @@ describe('web e2e: remoteAdmin gesture-gated namespace', () => {
     const reused = await rpc(scaffold, 'remoteAdmin/add', { token, alias: 'prod', target: 'ci@remote.example', remotePort: 3080 })
     expect(reused.result?.error?.message).toContain('gesture token')
 
-    const missing = await rpc(scaffold, 'remoteAdmin/remove', { token: 'deadbeef', alias: 'lab' })
+    const missing = await rpc(scaffold, 'remoteAdmin/removeEntry', { token: 'deadbeef', alias: 'lab' })
     expect(missing.result?.error?.message).toContain('gesture token')
 
-    const scoped = await rpc(scaffold, 'remoteAdmin/remove', { token: await grant(scaffold, 'connect', 'lab'), alias: 'lab' })
+    const scoped = await rpc(scaffold, 'remoteAdmin/removeEntry', { token: await grant(scaffold, 'connect', 'lab'), alias: 'lab' })
     expect(scoped.result?.error?.message).toContain('gesture token')
 
     const aliasedAdd = await rpc(scaffold, 'remoteAdmin/begin', { verb: 'add', alias: 'lab' })
