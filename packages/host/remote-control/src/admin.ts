@@ -14,7 +14,7 @@ import { Service } from '@shres-code/cordis'
 import type { Context } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
 import { TypertRemoteService, Remote } from '@shres-code/shres-code-typert-protocol'
-import { openTunnel, probeDaemonVersion, readInstallationId, type SshRunner } from './controller.ts'
+import { openTunnel, probeDaemonVersion, readInstallationId, type LiveTunnel, type SshRunner } from './controller.ts'
 import { RemoteControlError } from './errors.ts'
 import { GestureLedger } from './gesture.ts'
 import { resolveRegistryPath, resolveRunDir } from './home.ts'
@@ -193,18 +193,31 @@ export class RemoteAdminGateway extends TypertRemoteService {
       return { status: 'connected', localPort: live.localPort, version: live.version, fingerprint: live.fingerprint }
     }
     const spec = await this.spec(entry)
-    this.tunnels.connecting(entry.id, spec)
+    await this.tunnels.connecting(entry.id, spec)
+    // Held until the manager owns the handle: a failure after openTunnel
+    // returned must dispose the live master + forward before the failure is
+    // recorded, or the forward keeps the ControlMaster alive.
+    let tunnel: LiveTunnel | null = null
     try {
-      const tunnel = await openTunnel(this.runner, spec, entry, {
+      tunnel = await openTunnel(this.runner, spec, entry, {
         allowVersionSkew: request.allowVersionSkew,
         localVersion: this.localVersion,
         forceFingerprint: request.forceFingerprint,
-        onForwardExit: (exitCode) => { void this.tunnels.exited(entry.id, exitCode) },
+        onForwardExit: (exitCode) => { void this.tunnels.exited(entry.id, spec, exitCode) },
       })
+      // The alias may have been removed while the chain dialed; committing the
+      // connect would resurrect the removed entry.
+      const current = await loadRegistry(this.registryPath)
+      if (!current.has(entry.id)) {
+        throw new RemoteControlError('removed-while-connecting', `remote "${request.alias}" was removed while connecting`)
+      }
       await upsertEntry(this.registryPath, { ...entry, fingerprint: tunnel.fingerprint, lastConnectedAt: nowIso() })
       await this.tunnels.opened(entry.id, spec, tunnel, tunnel.version, tunnel.fingerprint)
-      return { status: 'connected', localPort: spec.localPort, version: tunnel.version, fingerprint: tunnel.fingerprint }
+      const connected = { localPort: spec.localPort, version: tunnel.version, fingerprint: tunnel.fingerprint }
+      tunnel = null
+      return { status: 'connected', ...connected }
     } catch (error) {
+      if (tunnel !== null) await tunnel.dispose()
       const message = error instanceof Error ? error.message : String(error)
       this.tunnels.failed(entry.id, spec, message)
       if (!(error instanceof RemoteControlError)) throw error
@@ -217,6 +230,8 @@ export class RemoteAdminGateway extends TypertRemoteService {
           return { status: 'unreachable', stage: 'probe', message: error.message }
         case 'tunnel-failed':
           return { status: 'unreachable', stage: 'tunnel', message: error.message }
+        case 'removed-while-connecting':
+          return { status: 'unreachable', stage: 'removed', message: error.message }
         // Caller misuse (unknown alias, bad input) and future codes stay wire
         // errors: the Gateway renders their message, and there is no connect
         // decision to carry.

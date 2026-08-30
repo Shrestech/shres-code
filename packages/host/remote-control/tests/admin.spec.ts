@@ -1,5 +1,5 @@
 import { createServer, type Server } from 'node:http'
-import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -9,7 +9,7 @@ import { RemoteControlError } from '../src/errors.ts'
 import RemoteAdminGateway from '../src/admin.ts'
 import type { AdminConfig } from '../src/admin.ts'
 import type { SshRunner } from '../src/controller.ts'
-import { asRemoteId, asRemoteTarget, loadRegistry } from '../src/registry.ts'
+import { asRemoteId, asRemoteTarget, loadRegistry, removeEntry } from '../src/registry.ts'
 import type { TunnelStateView } from '../src/types.ts'
 
 const contexts: Context[] = []
@@ -43,6 +43,7 @@ function fabricatedRunner(options: {
   installId?: string
   forwardVersion?: string
   spawnFailure?: unknown
+  onInstallId?: () => Promise<void>
 }): SshRunner & { children: FakeChild[] } {
   const children: FakeChild[] = []
   const servers: Server[] = []
@@ -50,6 +51,7 @@ function fabricatedRunner(options: {
     children,
     async run(argv) {
       if (argv.some(arg => arg.includes('anonymous-user-id'))) {
+        if (options.onInstallId !== undefined) await options.onInstallId()
         return { exitCode: 0, stdout: options.installId ?? '', stderr: '' }
       }
       if (options.probeQueue !== undefined) {
@@ -146,6 +148,9 @@ async function grant(gateway: RemoteAdminGateway, verb: 'connect' | 'disconnect'
 async function seedLab(gateway: RemoteAdminGateway): Promise<void> {
   await gateway.add({ token: await grant(gateway, 'add', null), alias: 'lab', target: 'ci@remote.example', remotePort: 3080 })
 }
+
+/** Registry path the install-id removal hook targets (set by the harness). */
+let hookRegistryPath = ''
 
 describe('RemoteAdminGateway', () => {
   it('exposes the eight methods as direct Remote calls', async () => {
@@ -271,6 +276,43 @@ describe('RemoteAdminGateway', () => {
     const { gateway } = await harness(fabricatedRunner({}))
     await expect(gateway.connect({ token: await grant(gateway, 'connect', 'ghost'), alias: 'ghost', allowVersionSkew: false, forceFingerprint: false }))
       .rejects.toThrow(/not registered/)
+  })
+
+  it('disposes the live tunnel when the registry commit fails after openTunnel', async () => {
+    if (process.platform === 'win32') return
+    const runner = fabricatedRunner({ probe: ANSWER_LAB, installId: 'install-1', forwardVersion: '0.1.0-rc.5' })
+    const { gateway, registryPath } = await harness(runner)
+    await seedLab(gateway)
+    // A read-only registry directory turns the post-open commit into a plain
+    // write failure while every earlier read stays healthy.
+    const registryDir = registryPath.slice(0, registryPath.lastIndexOf('/'))
+    await chmod(registryDir, 0o500)
+    try {
+      await expect(gateway.connect({ token: await grant(gateway, 'connect', 'lab'), alias: 'lab', allowVersionSkew: false, forceFingerprint: false }))
+        .rejects.toThrow()
+    } finally {
+      await chmod(registryDir, 0o700)
+    }
+    const forward = runner.children.find(child => child.argv.includes('-N'))
+    expect(forward?.disposed).toBe(true)
+  })
+
+  it('does not resurrect an alias removed while the connect dialed', async () => {
+    const runner = fabricatedRunner({
+      probe: ANSWER_LAB,
+      installId: 'install-1',
+      forwardVersion: '0.1.0-rc.5',
+      onInstallId: async () => { await removeEntry(hookRegistryPath, asRemoteId('lab')) },
+    })
+    const { gateway, registryPath, views } = await harness(runner)
+    hookRegistryPath = registryPath
+    await seedLab(gateway)
+    const outcome = await gateway.connect({ token: await grant(gateway, 'connect', 'lab'), alias: 'lab', allowVersionSkew: false, forceFingerprint: false })
+    expect(outcome).toMatchObject({ status: 'unreachable', stage: 'removed' })
+    expect(await loadRegistry(registryPath)).toHaveLength(0)
+    const forward = runner.children.find(child => child.argv.includes('-N'))
+    expect(forward?.disposed).toBe(true)
+    expect(views.at(-1)).toMatchObject({ state: 'error' })
   })
 
   it('keeps typed failures outside the decision set as wire errors', async () => {

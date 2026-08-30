@@ -71,7 +71,12 @@ export class TunnelManager {
    * @param id - alias being connected.
    * @param spec - resolved specification of the attempt.
    */
-  connecting(id: RemoteId, spec: TunnelSpec): void {
+  async connecting(id: RemoteId, spec: TunnelSpec): Promise<void> {
+    // A dialing attempt displaces an open record just like a second open
+    // would; the orphaned handle must be disposed or its forward keeps the
+    // ControlMaster alive past ControlPersist.
+    const displaced = this.#records.get(id)?.open ?? null
+    if (displaced !== null) await displaced.tunnel.dispose()
     const record: TunnelRecord = { id, spec, open: null, state: 'connecting', since: this.#now(), localPort: null, version: null, fingerprint: null, error: null }
     this.#records.set(id, record)
     this.#publish(record)
@@ -88,6 +93,11 @@ export class TunnelManager {
    * @param fingerprint - installation id observed at open time.
    */
   async opened(id: RemoteId, spec: TunnelSpec, tunnel: LiveTunnel, version: string, fingerprint: string): Promise<void> {
+    // A concurrent granted connect can commit while this attempt dialed; the
+    // displaced handle must be disposed or its forward keeps the ControlMaster
+    // alive past ControlPersist.
+    const displaced = this.#records.get(id)?.open ?? null
+    if (displaced !== null) await displaced.tunnel.dispose()
     const record: TunnelRecord = {
       id,
       spec,
@@ -119,15 +129,18 @@ export class TunnelManager {
 
   /**
    * Observe the forward child's own exit: drop the handle, clear the PID
-   * marker, and publish the closed state. A stale observation (unknown alias,
-   * already replaced by another attempt, or a disposer-driven exit) is a no-op.
+   * marker, and publish the closed state. The attempt identity makes stale
+   * observations no-ops: unknown alias, an alias already dialing again, a
+   * handle displaced by a later open, or a disposer-driven exit after
+   * disconnect already committed the closed state.
    * @param id - alias whose forward exited.
+   * @param spec - the attempt's resolved specification (identity of the exit).
    * @param _exitCode - the child's exit code; the closed state carries no error.
    */
-  async exited(id: RemoteId, _exitCode: number | null): Promise<void> {
+  async exited(id: RemoteId, spec: TunnelSpec, _exitCode: number | null): Promise<void> {
     const record = this.#records.get(id)
     const open = record?.open ?? null
-    if (record === undefined || open === null) return
+    if (record === undefined || open === null || record.spec !== spec) return
     record.open = null
     record.state = 'closed'
     record.since = this.#now()
@@ -145,10 +158,13 @@ export class TunnelManager {
     const record = this.#records.get(id)
     const open = record?.open ?? null
     if (record === undefined || open === null) return false
-    await open.tunnel.dispose()
+    // Clear the record before disposing: the disposer-driven exit observation
+    // must see a committed closed state and no-op, keeping one event per
+    // committed transition.
     record.open = null
     record.state = 'closed'
     record.since = this.#now()
+    await open.tunnel.dispose()
     await this.#removeMarker(id)
     this.#publish(record)
     return true

@@ -52,6 +52,7 @@ export type RemoteControlErrorCode =
   | 'registry-corrupt'
   | 'unknown-alias'
   | 'gesture-refused'
+  | 'removed-while-connecting'
   | 'probe-failed'
   | 'tunnel-failed'
   | 'version-mismatch'
@@ -115,7 +116,7 @@ export type ConnectOutcome =
   | { status: 'connected'; localPort: number; version: string; fingerprint: string }
   | { status: 'version-mismatch'; observed: string | null; local: string }
   | { status: 'fingerprint-mismatch'; observed: string | null; trusted: string | null }
-  | { status: 'unreachable'; stage: 'probe' | 'tunnel'; message: string }
+  | { status: 'unreachable'; stage: 'probe' | 'tunnel' | 'removed'; message: string }
 
 /** Disconnect decision data: a not-connected alias is a display state, not an error. */
 export type DisconnectOutcome =
