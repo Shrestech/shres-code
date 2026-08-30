@@ -51,6 +51,7 @@ export type RemoteControlErrorCode =
   | 'invalid-port'
   | 'registry-corrupt'
   | 'unknown-alias'
+  | 'gesture-refused'
   | 'probe-failed'
   | 'tunnel-failed'
   | 'version-mismatch'
@@ -82,4 +83,76 @@ export interface RemoteEntryView {
 /** Read-only registry snapshot served over the `remoteControl` Remote namespace. */
 export interface RemoteRegistrySnapshot {
   entries: RemoteEntryView[]
+}
+
+/** The verbs a user gesture can authorize; each mutating `remoteAdmin` method consumes exactly one. */
+export type AdminGestureVerb = 'connect' | 'disconnect' | 'add' | 'edit' | 'remove'
+
+/** Full-state projection of one alias's GUI-owned tunnel, published on every committed transition. */
+export interface TunnelStateView {
+  /** Alias the tunnel belongs to. */
+  alias: RemoteId
+  /** Display state after the last committed transition. */
+  state: 'connecting' | 'open' | 'closed' | 'error'
+  /** Allocated local loopback port, null before the forward bound. */
+  localPort: number | null
+  /** Daemon version observed at open time, null before a verified open. */
+  version: string | null
+  /** Installation id observed at open time, null before a verified open. */
+  fingerprint: string | null
+  /** Human-readable failure for state `error`; null otherwise. */
+  error: string | null
+  /** ISO 8601 timestamp of the last committed transition. */
+  since: string
+}
+
+/**
+ * Connect decision data: every expected verification failure is a variant the
+ * trust modal branches on, never a wire error — the Gateway's generic failure
+ * envelope is message-only and could not carry an "allow version skew" decision.
+ */
+export type ConnectOutcome =
+  | { status: 'connected'; localPort: number; version: string; fingerprint: string }
+  | { status: 'version-mismatch'; observed: string; local: string }
+  | { status: 'fingerprint-mismatch'; observed: string | null; trusted: string | null }
+  | { status: 'unreachable'; stage: 'probe' | 'tunnel'; message: string }
+
+/** Disconnect decision data: a not-connected alias is a display state, not an error. */
+export type DisconnectOutcome =
+  | { state: 'closed' }
+  | { state: 'not-connected' }
+
+/** Remove decision data: a live tunnel refuses removal so the UI disconnects first. */
+export type RemoveOutcome =
+  | { status: 'removed'; removed: boolean }
+  | { status: 'connected' }
+
+/** One alias's trust-modal facts: remote observations plus what this controller knows. */
+export interface RemoteInspectView {
+  /** Registry target the probes ran against. */
+  target: RemoteTarget
+  /** Daemon version answered by the describe probe; null means unreachable. */
+  daemonVersion: string | null
+  /** Installation id read from the remote; null when absent. */
+  installationId: string | null
+  /** This controller's own version, the local side of the skew check. */
+  localVersion: string
+  /** True when no fingerprint is on record yet (trust-on-first-use decision). */
+  firstConnect: boolean
+  /** Fingerprint bound by a previous verified connect, null before the first. */
+  trustedFingerprint: string | null
+}
+
+declare module '@shres-code/cordis' {
+  interface Events {
+    /**
+     * Full-state projection of one alias's GUI-owned tunnel after each
+     * committed transition (connecting, open, closed, error). The payload is
+     * the complete view, so consumers reconcile idempotently with no cursor;
+     * a fresh page fills its initial picture from `remoteAdmin/status`.
+     * @param view - the complete current state of the alias's tunnel.
+     * @mode emit
+     */
+    'remote-control/tunnel-state'(view: TunnelStateView): void
+  }
 }
