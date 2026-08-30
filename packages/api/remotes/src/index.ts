@@ -8,6 +8,9 @@ import { API_REMOTE_FORWARDED_EVENTS } from './remote-events.ts'
 // makes the shape assertion below judge real signatures rather than an empty
 // event vocabulary.
 import type {} from '@shres-code/shres-code-host-remote-control/remote'
+// The remote-control event vocabulary (tunnel-state) lives in the package's
+// client-safe types face; the /remote artifact carries only the namespace map.
+import type {} from '@shres-code/shres-code-host-remote-control/types'
 import type {} from '@shres-code/shres-code-commands/types'
 import type {} from '@shres-code/shres-code-cordis-host-runner/types'
 import type {} from '@shres-code/shres-code-credentials/types'
