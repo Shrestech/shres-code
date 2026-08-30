@@ -210,6 +210,7 @@
     { "path": "./packages/llm/llm-deepseek" },
     { "path": "./packages/llm/llm-pi-ai" },
     { "path": "./packages/llm/llm-cli-bridge" },
+    { "path": "./packages/llm/llm-grok-session" },
     { "path": "./packages/shell/bash-local" },
     { "path": "./packages/shell/shell-env" },
     { "path": "./packages/shell/pwsh-local" },

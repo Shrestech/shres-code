@@ -474,6 +474,25 @@ Source: [`packages/hooks/hook-protocol/src/types.ts:31`](../packages/hooks/hook-
 
 ### `jspace/*`
 
+<a id="jspaceadvisor--log-only"></a>
+
+#### `jspace/advisor` — log-only
+
+```ts persistence-catalog
+/**
+ * Reviewer advice surfaced for the main session. Log-only. Writers pass
+ * `{ ignorable: true }`.
+ * @param sessionId - session that authored the advice.
+ * @param childId - the reviewer child that produced it.
+ * @param trigger - why the review ran.
+ * @param advice - bounded reviewer advice text.
+ * @param seq - session event seq the review folded against.
+ */
+'jspace/advisor': JspaceAdvisorAdvice
+```
+
+Source: [`packages/jspace/jspace-advisor/src/types.ts:73`](../packages/jspace/jspace-advisor/src/types.ts)
+
 <a id="jspacecard--log-only"></a>
 
 #### `jspace/card` — log-only
@@ -1213,7 +1232,7 @@ Source: [`packages/web/web-search-deepseek/src/provider.ts:83`](../packages/web/
 
 Types: [WikiLibrarianRequestEvent](subsystems/wiki.md)
 
-Source: [`packages/wiki/wiki/src/types.ts:251`](../packages/wiki/wiki/src/types.ts)
+Source: [`packages/wiki/wiki/src/types.ts:253`](../packages/wiki/wiki/src/types.ts)
 
 <a id="wikipage--log-only"></a>
 
@@ -1231,4 +1250,4 @@ Source: [`packages/wiki/wiki/src/types.ts:251`](../packages/wiki/wiki/src/types.
 
 Types: [WikiPageEvent](subsystems/wiki.md)
 
-Source: [`packages/wiki/wiki/src/types.ts:241`](../packages/wiki/wiki/src/types.ts)
+Source: [`packages/wiki/wiki/src/types.ts:243`](../packages/wiki/wiki/src/types.ts)

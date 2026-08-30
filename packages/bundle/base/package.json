@@ -65,6 +65,7 @@
     "@shres-code/shres-code-llm": "workspace:^",
     "@shres-code/shres-code-llm-deepseek": "workspace:^",
     "@shres-code/shres-code-llm-cli-bridge": "workspace:^",
+    "@shres-code/shres-code-llm-grok-session": "workspace:^",
     "@shres-code/shres-code-llm-pi-ai": "workspace:^",
     "@shres-code/shres-code-llm-retry": "workspace:^",
     "@shres-code/shres-code-permission-presets": "workspace:^",

@@ -88,6 +88,8 @@ describe('shres models / providers', () => {
     expect(result.stdout).toContain('llama3.2')
     expect(result.stdout).toContain('grok-cli')
     expect(result.stdout).toMatch(/delegated/)
+    expect(result.stdout).toContain('grok-session')
+    expect(result.stdout).toContain('grok-4.6')
   })
 
   it('sets a grok-cli model and advertised effort', async () => {
@@ -102,6 +104,20 @@ describe('shres models / providers', () => {
     expect(set.stdout).toContain('Default: grok-cli grok-4 effort=high')
     const listed = await run(home, { kind: 'models-list' })
     expect(listed.stdout).toContain('Default: grok-cli grok-4 effort=high')
+  })
+
+  it('sets a grok-session model and effort without a stored key', async () => {
+    const home = await tempHome()
+    const set = await run(home, {
+      kind: 'models-set',
+      provider: 'grok-session',
+      model: 'grok-4.6',
+      effort: 'xhigh',
+    })
+    expect(set.exit).toBe(0)
+    expect(set.stdout).toContain('Default: grok-session grok-4.6 effort=xhigh')
+    const listed = await run(home, { kind: 'models-list' })
+    expect(listed.stdout).toContain('grok-4.6  (default)')
   })
 
   it('sets the default including reasoning effort', async () => {

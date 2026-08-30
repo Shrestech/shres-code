@@ -968,6 +968,42 @@ export interface Config {
 
 Source: [`packages/jspace/jspace/src/index.ts:69`](../packages/jspace/jspace/src/index.ts)
 
+<a id="shres-codeshres-code-jspace-advisor"></a>
+
+## `@shres-code/shres-code-jspace-advisor`
+
+Requires: `jspace` · `tools` · `systemPrompt` · `subagents`
+
+```ts config-catalog
+/** Advisor plugin config and settings schema. */
+export interface Config {
+  /** Master allow. Default false. */
+  enabled?: boolean
+  /** `ctx.subagents` provider that establishes the reviewer child. */
+  provider?: string
+  /** Model id on that route; omitted leaves the reviewer unbound. */
+  model?: string
+  /** Reviewer persona; defaults to the built-in reviewer persona. */
+  persona?: string
+  /** Reviewer tool filter; defaults to wiki + session-query tools. */
+  reviewerTools?: string[]
+  /** Trailing tool signals the advisory digest retains. Default 12. */
+  maxDigestTools?: number
+  /** Character cap on the rendered advisory digest. Default 4000. */
+  maxDigestChars?: number
+  /** Character cap on recorded advice. Default 1000. */
+  maxAdviceChars?: number
+  /** Consecutive errored tool results that count as a burst. Default 2. */
+  errorBurst?: number
+  /** Order of the `jspace:advisor` prompt section. Default 56. */
+  advisorySectionOrder?: number
+  /** Enable proactive reviews. Default true. */
+  proactive?: boolean
+}
+```
+
+Source: [`packages/jspace/jspace-advisor/src/index.ts:80`](../packages/jspace/jspace-advisor/src/index.ts)
+
 <a id="shres-codeshres-code-jspace-prompt"></a>
 
 ## `@shres-code/shres-code-jspace-prompt`
@@ -1168,6 +1204,52 @@ export interface DeepSeekCatalogModel {
 Depends on: [`ModelModality`](../packages/llm/llm/src/index.ts) · [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts)
 
 Source: [`packages/llm/llm-deepseek/src/index.ts:106`](../packages/llm/llm-deepseek/src/index.ts)
+
+<a id="shres-codeshres-code-llm-grok-session"></a>
+
+## `@shres-code/shres-code-llm-grok-session`
+
+Requires: `llm`
+
+```ts config-catalog
+/** Plugin / settings section configuring the one route. */
+export interface Config {
+  /** When false, the route is omitted from the live adapter registry. Defaults to on. */
+  enabled?: boolean
+  /** Auth document path; defaults to `~/.grok/auth.json`. */
+  authPath?: string
+  /** Endpoint base for the proxy; defaults to {@link DEFAULT_BASE_URL}. */
+  baseURL?: string
+  /** Selector label; defaults to {@link DEFAULT_DISPLAY_NAME}. */
+  displayName?: string
+  /** Model catalog; defaults to {@link SHIPPED_MODELS}. */
+  models?: GrokSessionModelConfig[]
+  /** Refresh leeway in milliseconds; defaults to {@link DEFAULT_REFRESH_LEEWAY_MS}. */
+  refreshLeewayMs?: number
+}
+
+/** One advisory model entry a deployment may declare. */
+export interface GrokSessionModelConfig {
+  /** Model id the proxy accepts. */
+  id: string
+  /** Selector label; defaults to the id. */
+  name?: string
+  /** Maximum combined request and response context in tokens. */
+  contextWindow?: number
+  /** Maximum output tokens; configuring one also makes it the request default. */
+  maxTokens?: number
+  /**
+   * Request modalities this model accepts; absent keeps the text floor. A
+   * deployment serving a vision-capable Grok model declares
+   * `['text', 'image']` here, which is what admits image blocks.
+   */
+  input?: PiAiModality[]
+}
+```
+
+Depends on: [`PiAiModality`](../packages/llm/llm-pi-ai/src/index.ts)
+
+Source: [`packages/llm/llm-grok-session/src/config.ts:76`](../packages/llm/llm-grok-session/src/config.ts)
 
 <a id="shres-codeshres-code-llm-pi-ai"></a>
 
@@ -3767,10 +3849,11 @@ Source: [`packages/wiki/wiki-embed-onnx/src/index.ts:39`](../packages/wiki/wiki-
 export interface Config extends WikiConfigShape {
   /**
    * Wiki directory. Relative values resolve under the `.git`-walk project root
-   * of `cwd` (or `process.cwd()`). Absolute values are used as-is.
+   * of each calling session's `cwd` (or `process.cwd()` when the session has
+   * no recorded `cwd`). Absolute values pin one store for every session.
    */
   root?: string
-  /** Starting directory for the `.git` walk when `root` is relative. */
+  /** Starting directory for the `.git` walk when `root` is relative and the session has no recorded `cwd`. */
   cwd?: string
   /** Whether the materialized wiki root is watched for external edits. */
   watch?: boolean
@@ -3779,7 +3862,7 @@ export interface Config extends WikiConfigShape {
 
 Depends on: [`WikiConfigShape`](../packages/wiki/wiki/src/index.ts)
 
-Source: [`packages/wiki/wiki-filesystem/src/index.ts:34`](../packages/wiki/wiki-filesystem/src/index.ts)
+Source: [`packages/wiki/wiki-filesystem/src/index.ts:36`](../packages/wiki/wiki-filesystem/src/index.ts)
 
 <a id="shres-codeshres-code-wiki-librarian"></a>
 
