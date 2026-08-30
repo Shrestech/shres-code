@@ -27,6 +27,7 @@ import {
 } from './consult.ts'
 import { boundText, foldAdvisorDigest } from './digest.ts'
 import {
+  ADVISOR_CHILD_LABEL,
   buildReviewPrompt,
   classifyDrift,
   classifyTrigger,
@@ -325,6 +326,7 @@ export function apply(ctx: Context, config: Config = {}): void {
         if (refusal !== undefined) throw new Error(refusal)
         const digest = foldAdvisorDigest(session, card, digestCaps(resolved))
         const run = await ctx.subagents.start(resolved.subagentProvider, {
+          label: ADVISOR_CHILD_LABEL,
           prompt: [{ type: 'text', text: buildConsultPrompt(digest, args.question) }],
           parent: agent,
           persona: resolved.persona,
@@ -451,6 +453,7 @@ async function runProactiveReview(
   const digest = foldAdvisorDigest(session, card, digestCaps(resolved))
   try {
     const run = await ctx.subagents.start(resolved.subagentProvider, {
+      label: ADVISOR_CHILD_LABEL,
       prompt: [{ type: 'text', text: buildReviewPrompt(digest, trigger) }],
       parent: agent,
       persona: resolved.persona,

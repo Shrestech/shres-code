@@ -15,11 +15,14 @@ import type { JspaceAdvisorDigest, AdvisorTrigger } from './types.ts'
 
 /** Built-in reviewer persona; overridable via Config. */
 export const DEFAULT_REVIEWER_PERSONA =
-  'You are the jspace advisor, a reviewer model watching a bounded digest of the main session. '
+  'You are the jspace advisor, a reviewer model judging one bounded digest of the main session. '
   + 'The digest carries the user messages (U1, U2, ...) — the ground truth of the user goal, '
   + 'U1 always retained — and the session card, which is only what the session believes its '
   + 'goal is and may be stale or a placeholder. Judge the recent work against the USER goal, '
-  + 'not the card. Gather context with the read-only tools available to you. '
+  + 'not the card. The digest is the main session and is sufficient input for the verdict: '
+  + 'do not read your own session log and do not search for other sessions. '
+  + 'Use a read-only tool only when the digest is genuinely insufficient, at most one call. '
+  + 'Always finish with the structured verdict. '
   + 'When the work serves the goal: verdict on-track, one-line advice. When it drifts: verdict '
   + 'drift, advice naming the drift in one sentence, and redirect giving the exact correction — '
   + 'what to drop and what to do next to serve the goal.'
@@ -34,6 +37,9 @@ export const DEFAULT_REVIEWER_TOOLS = [
   'wiki_search',
   'wiki_read',
 ] as const
+
+/** Display label persisted with every reviewer child in the subagent list. */
+export const ADVISOR_CHILD_LABEL = 'Advisor'
 
 /** Whether a session is a root (not a delegated child). */
 export function isRootSession(session: Session): boolean {
@@ -88,7 +94,8 @@ export function settleReview(result: SubagentResult): ReviewVerdict {
  */
 export function buildReviewPrompt(digest: JspaceAdvisorDigest, trigger: AdvisorTrigger): string {
   return renderAdvisorDigest(digest) + '\n\nTrigger: ' + trigger + '\n'
-    + 'Review the main session against the user goal above. Return a structured verdict.'
+    + 'The digest above is the main session. Review it against the user goal '
+    + 'and return the structured verdict now.'
 }
 
 /** Whether the event is an errored, tool-sourced tool/result. */

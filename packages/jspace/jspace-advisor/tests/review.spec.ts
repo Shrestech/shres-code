@@ -4,6 +4,7 @@ import type { SubagentResult } from '@shres-code/shres-code-subagent'
 import { foldAdvisorDigest } from '../src/digest.ts'
 import {
   buildReviewPrompt,
+  DEFAULT_REVIEWER_PERSONA,
   classifyDrift,
   classifyTrigger,
   isErroredToolResult,
@@ -225,6 +226,15 @@ describe('isErroredToolResult', () => {
   })
 })
 
+describe('DEFAULT_REVIEWER_PERSONA', () => {
+  it('frames the digest as sufficient and forbids session hunting', () => {
+    expect(DEFAULT_REVIEWER_PERSONA).toContain('sufficient input for the verdict')
+    expect(DEFAULT_REVIEWER_PERSONA).toContain('do not read your own session log')
+    expect(DEFAULT_REVIEWER_PERSONA).toContain('do not search for other sessions')
+    expect(DEFAULT_REVIEWER_PERSONA).toContain('Always finish with the structured verdict')
+  })
+})
+
 describe('buildReviewPrompt', () => {
   it('embeds the digest render and the trigger', () => {
     const digest = foldAdvisorDigest(sessionWith([{ type: 'user/message', data: { source: { kind: 'user' }, content: [{ type: 'text', text: 'goal' }] }, seq: 1 }]), null,
@@ -232,5 +242,7 @@ describe('buildReviewPrompt', () => {
     const prompt = buildReviewPrompt(digest, 'drift-check')
     expect(prompt).toContain('U1: goal')
     expect(prompt).toContain('drift-check')
+    expect(prompt).toContain('The digest above is the main session')
+    expect(prompt).toContain('return the structured verdict now')
   })
 })
