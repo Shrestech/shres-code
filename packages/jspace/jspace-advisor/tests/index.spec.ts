@@ -5,7 +5,7 @@ import ToolRuntime from '@shres-code/shres-code-tools'
 import SubagentRuntime from '@shres-code/shres-code-subagent'
 import SessionStore, { SessionId } from '@shres-code/shres-code-session'
 import type { Session, SessionEvent } from '@shres-code/shres-code-session'
-import { CallId } from '@shres-code/shres-code-llm'
+import { CallId, MessageId } from '@shres-code/shres-code-llm'
 import JspaceService, { JSPACE_SETTINGS_NAMESPACE } from '@shres-code/shres-code-jspace'
 import { SettingsProvider, type SettingsNamespace } from '@shres-code/shres-code-settings'
 import * as Advisor from '../src/index.ts'
@@ -48,23 +48,14 @@ class StubAgents extends Service {
 /** Labels observed on reviewer-child start requests, newest last. */
 const startLabels: (string | undefined)[] = []
 
-/** A spawn provider whose children settle a scripted drift verdict. */
-function registerSpawn(ctx: Context, behavior: 'verdict' | 'fail' | 'hang' | 'noredirect'): void {
+/** A spawn provider whose one-shot consult children settle a scripted reply. */
+function registerSpawn(ctx: Context, behavior: 'verdict' | 'noredirect'): void {
   ctx.subagents.registerProvider({
     name: 'spawn',
     capabilities: { outputSchema: true, depthLimit: true, toolFilter: true, persona: true },
     inheritsParentContext: false,
     start: async (request: { label?: string; outputSchema?: { properties?: Record<string, unknown> } }) => {
       startLabels.push(request.label)
-      if (behavior === 'fail') throw new Error('stub start failure')
-      if (behavior === 'hang') {
-        return {
-          id: SessionId('child-hang'),
-          localAgent: undefined,
-          result: new Promise(() => { /* never settles; disposal owns the abort */ }),
-          dispose: async () => { /* scripted child has nothing to release */ },
-        }
-      }
       const structured = 'verdict' in (request.outputSchema?.properties ?? {})
         ? behavior === 'noredirect'
           ? { verdict: 'drift', advice: 'off course' }
@@ -89,7 +80,7 @@ const ENABLED: Advisor.Config = { enabled: true, provider: 'zai', model: 'glm-5.
 
 async function boot(
   advisorConfig: Advisor.Config = ENABLED,
-  options: { spawn?: 'verdict' | 'fail' | 'hang' | 'noredirect'; agents?: boolean; jspaceEnabled?: boolean } = {},
+  options: { spawn?: 'verdict' | 'noredirect'; agents?: boolean; jspaceEnabled?: boolean } = {},
 ): Promise<{ ctx: Context; advisorFiber: { dispose: () => Promise<void> } }> {
   const ctx = new Context()
   await ctx.plugin(MemorySettings)
@@ -136,6 +127,75 @@ function consultExec(session: { id: string }) {
     arguments: { question: 'am I drifting?' },
     agent: { id: session.id, session } as never,
   }
+}
+
+
+/** What the patched continuable service recorded, for assertions. */
+interface ContinuableLog {
+  starts: number
+  followups: number
+  interrupts: number
+  prompts: string[]
+  childId: SessionId
+  setBehavior: (behavior: 'verdict' | 'noredirect' | 'garbage' | 'fail' | 'hang') => void
+}
+
+/**
+ * Patch the real subagent runtime's continuable operations with scripted
+ * advisor children: every start/followup records its prompt and schedules the
+ * child session's reply, so the plugin's verdict wait resolves through the
+ * same global session-event channel production uses.
+ */
+function patchContinuable(ctx: Context): ContinuableLog {
+  const log: ContinuableLog = {
+    starts: 0,
+    followups: 0,
+    interrupts: 0,
+    prompts: [],
+    childId: SessionId('advisor-child-1'),
+    setBehavior: () => {},
+  }
+  let behavior: 'verdict' | 'noredirect' | 'garbage' | 'fail' | 'hang' = 'verdict'
+  let child: Session | undefined
+  log.setBehavior = (next) => { behavior = next }
+  const deliverTurn = (): void => {
+    if (behavior === 'hang' || behavior === 'fail') return
+    const text = behavior === 'garbage'
+      ? 'I could not tell.'
+      : behavior === 'noredirect'
+        ? '{"verdict":"drift","advice":"off course"}'
+        : '{"verdict":"drift","advice":"off course","redirect":"drop X, do Y"}'
+    const target = child ?? ctx.sessions.create(log.childId)
+    child = target
+    setTimeout(() => {
+      target.append('assistant/message', {
+        turn: 1,
+        step: 1,
+        message: { role: 'assistant', content: [{ type: 'text', text }] },
+      } as never, { surfaceOp: 'append' })
+      target.append('turn/end', { turn: 1, reason: { kind: 'completed' } } as never)
+    }, 0)
+  }
+  const runtime = ctx.subagents as unknown as {
+    startContinuable: (spec: { request: { prompt: { text?: string }[] } }) => Promise<{ childId: SessionId; messageId: MessageId }>
+    followup: (parent: unknown, childId: SessionId, content: { text?: string }[]) => Promise<MessageId>
+    interrupt: (target: SessionId, authority: unknown) => void
+  }
+  runtime.startContinuable = async (spec) => {
+    log.starts += 1
+    log.prompts.push(spec.request.prompt.map(part => part.text ?? '').join(''))
+    if (behavior === 'fail') throw new Error('stub start failure')
+    deliverTurn()
+    return { childId: log.childId, messageId: MessageId('m-' + String(log.starts)) }
+  }
+  runtime.followup = async (_parent, _childId, content) => {
+    log.followups += 1
+    log.prompts.push(content.map(part => part.text ?? '').join(''))
+    deliverTurn()
+    return MessageId('m-f' + String(log.followups))
+  }
+  runtime.interrupt = () => { log.interrupts += 1 }
+  return log
 }
 
 describe('resolveConfig', () => {
@@ -191,22 +251,26 @@ describe('advisor apply', () => {
 
   it('runs a drift review on the step cadence and logs the verdict', async () => {
     const { ctx } = await boot()
+    const continuable = patchContinuable(ctx)
     const session = await liveSession(ctx)
     for (let step = 1; step <= 8; step += 1) {
       session.append('step/end', { turn: 1, step })
     }
     await until(() => adviceEvents(session).length === 1)
-    expect(startLabels.at(-1)).toBe('Advisor')
+    expect(continuable.starts).toBe(1)
+    expect(continuable.prompts[0]).toContain('reply with only the verdict JSON now')
     const advice = adviceEvents(session)[0]?.data
     expect(advice?.trigger).toBe('drift-check')
     expect(advice?.triggerSeq).toBe(session.events.findLast(e => e.type === 'step/end')?.seq)
     expect(advice?.verdict).toBe('drift')
     expect(advice?.redirect).toBe('drop X, do Y')
+    expect(advice?.childId).toBe(continuable.childId)
     await ctx.fiber.dispose()
   })
 
-  it('suppresses repeat reviews until the user speaks again', async () => {
+  it('reuses one standing advisor across reviews and sends deltas after the first turn', async () => {
     const { ctx } = await boot()
+    const continuable = patchContinuable(ctx)
     const session = await liveSession(ctx)
     for (let step = 1; step <= 8; step += 1) session.append('step/end', { turn: 1, step })
     await until(() => adviceEvents(session).length === 1)
@@ -219,11 +283,17 @@ describe('advisor apply', () => {
     } as never, { surfaceOp: 'append' })
     for (let step = 1; step <= 8; step += 1) session.append('step/end', { turn: 3, step })
     await until(() => adviceEvents(session).length === 2)
+    expect(continuable.starts).toBe(1)
+    expect(continuable.followups).toBe(1)
+    expect(continuable.prompts[0]).not.toContain('since your last review')
+    expect(continuable.prompts[1]).toContain('since your last review')
+    expect(continuable.prompts[1]).toContain('N1: stay on the goal')
     await ctx.fiber.dispose()
   })
 
   it('renders the verdict and redirect in the prompt section', async () => {
     const { ctx } = await boot()
+    patchContinuable(ctx)
     const session = await liveSession(ctx)
     for (let step = 1; step <= 8; step += 1) session.append('step/end', { turn: 1, step })
     await until(() => adviceEvents(session).length === 1)
@@ -296,22 +366,54 @@ describe('advisor apply', () => {
   })
 
   it('aborts in-flight reviews when the advisor fiber disposes', async () => {
-    const { ctx, advisorFiber } = await boot(ENABLED, { spawn: 'hang' })
+    const { ctx, advisorFiber } = await boot()
+    const continuable = patchContinuable(ctx)
+    continuable.setBehavior('hang')
     const session = await liveSession(ctx)
     for (let step = 1; step <= 8; step += 1) session.append('step/end', { turn: 1, step })
     await new Promise(resolve => setTimeout(resolve, 100))
+    expect(continuable.starts).toBe(1)
     await advisorFiber.dispose()
     await new Promise(resolve => setTimeout(resolve, 50))
+    expect(continuable.interrupts).toBe(1)
     expect(adviceEvents(session)).toHaveLength(0)
     await ctx.fiber.dispose()
   })
 
-  it('swallows a failing reviewer without logging advice', async () => {
-    const { ctx } = await boot(ENABLED, { spawn: 'fail' })
+  it('swallows a failing advisor start without logging advice', async () => {
+    const { ctx } = await boot()
+    const continuable = patchContinuable(ctx)
+    continuable.setBehavior('fail')
     const session = await liveSession(ctx)
     for (let step = 1; step <= 8; step += 1) session.append('step/end', { turn: 1, step })
     await new Promise(resolve => setTimeout(resolve, 150))
+    expect(continuable.starts).toBe(1)
     expect(adviceEvents(session)).toHaveLength(0)
+    await ctx.fiber.dispose()
+  })
+
+  it('cold-restarts the advisor after a verdict-less turn and cools down drift re-fires', async () => {
+    const { ctx } = await boot()
+    const continuable = patchContinuable(ctx)
+    const session = await liveSession(ctx)
+    continuable.setBehavior('garbage')
+    for (let step = 1; step <= 8; step += 1) session.append('step/end', { turn: 1, step })
+    await new Promise(resolve => setTimeout(resolve, 150))
+    expect(continuable.starts).toBe(1)
+    expect(adviceEvents(session)).toHaveLength(0)
+    // The failed turn cools down cadence triggers: more steps do not re-fire.
+    for (let step = 1; step <= 8; step += 1) session.append('step/end', { turn: 2, step })
+    await new Promise(resolve => setTimeout(resolve, 150))
+    expect(continuable.starts).toBe(1)
+    // The user speaking again re-arms the review with a fresh advisor.
+    continuable.setBehavior('verdict')
+    session.append('user/message', {
+      source: { kind: 'user' },
+      content: [{ type: 'text', text: 'try again' }],
+    } as never, { surfaceOp: 'append' })
+    for (let step = 1; step <= 8; step += 1) session.append('step/end', { turn: 3, step })
+    await until(() => adviceEvents(session).length === 1)
+    expect(continuable.starts).toBe(2)
     await ctx.fiber.dispose()
   })
 
@@ -349,7 +451,9 @@ describe('advisor apply', () => {
   })
 
   it('records drift advice without a redirect when the reviewer gives none', async () => {
-    const { ctx } = await boot(ENABLED, { spawn: 'noredirect' })
+    const { ctx } = await boot()
+    const continuable = patchContinuable(ctx)
+    continuable.setBehavior('noredirect')
     const session = await liveSession(ctx)
     for (let step = 1; step <= 8; step += 1) session.append('step/end', { turn: 1, step })
     await until(() => adviceEvents(session).length === 1)

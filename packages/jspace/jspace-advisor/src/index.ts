@@ -2,8 +2,10 @@
  * Background jspace advisor. When the jspace seat is engaged and the session
  * has an open card, mounts `jspace_consult` (an on-demand review) and a
  * proactive reviewer woken on session triggers and a step-cadence drift
- * check. Both channels run fresh one-shot reviewer children; the latest
- * verdict is logged as a log-only jspace/advisor event and reprinted by the
+ * check. The consult channel runs a fresh one-shot child per call; the
+ * proactive channel is one standing continuable child per root session whose
+ * first turn carries the full digest and every later turn only a delta. The
+ * latest verdict is logged as a log-only jspace/advisor event and reprinted by the
  * `jspace:advisor` prompt section, which — re-assembled on every step — is
  * the redirect channel that reaches the main model.
  * @module @shres-code/shres-code-jspace-advisor
@@ -14,10 +16,10 @@ import z from '@shres-code/schemastery'
 import { frameUntrusted, UNTRUSTED_INSTRUCTION_DISCLAIMER } from '@shres-code/shres-code-untrusted-frame'
 import type { JspaceStatus } from '@shres-code/shres-code-jspace'
 import type {} from '@shres-code/shres-code-system-prompt'
-import type {} from '@shres-code/shres-code-agent'
+import type { Agent } from '@shres-code/shres-code-agent'
 import { defineTool } from '@shres-code/shres-code-tools'
 import type { ToolRunContext } from '@shres-code/shres-code-tools'
-import type { Session } from '@shres-code/shres-code-session'
+import type { Session, SessionEvent, SessionId } from '@shres-code/shres-code-session'
 import {
   buildConsultPrompt,
   CONSULT_OUTPUT_JSON_SCHEMA,
@@ -25,18 +27,20 @@ import {
   consultRefusal,
   settleConsult,
 } from './consult.ts'
-import { boundText, foldAdvisorDigest } from './digest.ts'
+import { boundText, foldAdvisorDigest, foldAdvisorDelta } from './digest.ts'
 import {
   ADVISOR_CHILD_LABEL,
+  buildReviewDeltaPrompt,
   buildReviewPrompt,
   classifyDrift,
   classifyTrigger,
   DEFAULT_REVIEWER_PERSONA,
   DEFAULT_REVIEWER_TOOLS,
   isRootSession,
-  REVIEW_OUTPUT_JSON_SCHEMA,
-  settleReview,
+  latestAdvice,
+  parseFinalVerdict,
   suppressReview,
+  type ReviewVerdict,
 } from './review.ts'
 import type { AdvisorTrigger, JspaceAdvisorAdvice } from './types.ts'
 
@@ -68,6 +72,9 @@ export const DEFAULT_ERROR_BURST = 2
 
 /** Default drift-check cadence in completed model steps since the last advice. */
 export const DEFAULT_DRIFT_EVERY_STEPS = 8
+
+/** Default review-turn timeout in milliseconds before the turn is interrupted. */
+export const DEFAULT_REVIEW_TIMEOUT_MS = 180_000
 
 /** Default `ctx.subagents` provider that runs reviewer children. */
 export const DEFAULT_SUBAGENT_PROVIDER = 'spawn'
@@ -116,6 +123,8 @@ export interface Config {
   errorBurst?: number
   /** Drift-check cadence in completed steps since the last advice. Default 8. */
   driftEverySteps?: number
+  /** Review-turn timeout in milliseconds; a stuck child turn is interrupted. Default 180000. */
+  reviewTimeoutMs?: number
   /** Order of the `jspace:advisor` prompt section. Default 56. */
   advisorySectionOrder?: number
   /** Enable proactive reviews. Default true. */
@@ -138,6 +147,7 @@ export const Config: z<Config> = z.object({
   maxAdviceChars: z.number().step(1).min(1).default(DEFAULT_MAX_ADVICE_CHARS),
   errorBurst: z.number().step(1).min(1).default(DEFAULT_ERROR_BURST),
   driftEverySteps: z.number().step(1).min(2).default(DEFAULT_DRIFT_EVERY_STEPS),
+  reviewTimeoutMs: z.number().step(1).min(1000).default(DEFAULT_REVIEW_TIMEOUT_MS),
   advisorySectionOrder: z.number().step(1).default(ADVISOR_SECTION_ORDER),
   proactive: z.boolean().default(true),
 })
@@ -158,6 +168,7 @@ export interface ResolvedConfig {
   readonly maxAdviceChars: number
   readonly errorBurst: number
   readonly driftEverySteps: number
+  readonly reviewTimeoutMs: number
   readonly advisorySectionOrder: number
   readonly proactive: boolean
 }
@@ -210,6 +221,7 @@ export function resolveConfig(config: Config): ResolvedConfig {
     maxAdviceChars: positiveInt(config.maxAdviceChars, DEFAULT_MAX_ADVICE_CHARS, 'maxAdviceChars'),
     errorBurst: positiveInt(config.errorBurst, DEFAULT_ERROR_BURST, 'errorBurst'),
     driftEverySteps: positiveInt(config.driftEverySteps, DEFAULT_DRIFT_EVERY_STEPS, 'driftEverySteps', 2),
+    reviewTimeoutMs: positiveInt(config.reviewTimeoutMs, DEFAULT_REVIEW_TIMEOUT_MS, 'reviewTimeoutMs', 1000),
     advisorySectionOrder: positiveInt(config.advisorySectionOrder, ADVISOR_SECTION_ORDER, 'advisorySectionOrder'),
     proactive: config.proactive ?? true,
   }
@@ -392,8 +404,37 @@ export function apply(ctx: Context, config: Config = {}): void {
   if (resolved.proactive) {
     const flights = new WeakSet<Session>()
     const controllers = new Set<AbortController>()
+    /** Standing-advisor state per root session. */
+    const runs = new WeakMap<Session, AdvisorRun>()
+    /** One verdict waiter per advisor child, keyed by child session id. */
+    const verdictWaiters = new Map<SessionId, (verdict: ReviewVerdict | undefined) => void>()
+
+    /** The session's advisor state, reattached to a prior standing child after a restart. */
+    const ensureRun = (session: Session): AdvisorRun => {
+      const existing = runs.get(session)
+      if (existing !== undefined) return existing
+      // The latest advice names the standing child and the seq it folded through,
+      // so a restarted process resumes the same advisor instead of starting over.
+      const latest = latestAdvice(session.events)
+      const run: AdvisorRun = latest === undefined
+        ? { childId: undefined, lastSeq: -1, failedSeq: undefined }
+        : { childId: latest.data.childId, lastSeq: latest.data.seq, failedSeq: undefined }
+      runs.set(session, run)
+      return run
+    }
+
+    /** Resolve a waiting review when its advisor child's turn ends. */
+    const settleVerdict = (session: Session, event: SessionEvent): void => {
+      if (event.type !== 'turn/end') return
+      const waiter = verdictWaiters.get(session.id)
+      if (waiter === undefined) return
+      verdictWaiters.delete(session.id)
+      waiter(parseFinalVerdict(session))
+    }
+
     ctx.effect(() => {
       const stop = ctx.on('session/event', (session, event) => {
+        settleVerdict(session, event)
         if (event.type !== 'step/end' && event.type !== 'jspace/charter-run'
           && event.type !== 'jspace/card' && event.type !== 'tool/result') return
         if (!armed(resolved, ctx.jspace.status)) return
@@ -409,10 +450,15 @@ export function apply(ctx: Context, config: Config = {}): void {
           ? classifyDrift(session.events, resolved.driftEverySteps)
           : classifyTrigger(event, session.events, resolved.errorBurst)
         if (trigger === undefined) return
+        const run = ensureRun(session)
+        // After a failed turn, cadence triggers (drift, error bursts) cool down
+        // until the user speaks again; epoch and charter triggers always run.
+        if (run.failedSeq !== undefined && !userSpokeSince(session.events, run.failedSeq)
+          && event.type !== 'jspace/card' && event.type !== 'jspace/charter-run') return
         flights.add(session)
         const controller = new AbortController()
         controllers.add(controller)
-        void runProactiveReview(ctx, session, trigger, event.seq, controller.signal, resolved)
+        void runProactiveReview(ctx, session, trigger, event.seq, controller.signal, resolved, run, verdictWaiters)
           .finally(() => {
             flights.delete(session)
             controllers.delete(controller)
@@ -422,22 +468,112 @@ export function apply(ctx: Context, config: Config = {}): void {
         stop()
         for (const controller of controllers) controller.abort()
         controllers.clear()
+        verdictWaiters.clear()
       }
     }, 'jspace-advisor: proactive review')
   }
 }
 
+/** Mutable standing-advisor state for one root session. */
+interface AdvisorRun {
+  /** Durable continuable child session id; undefined forces a fresh advisor. */
+  childId: SessionId | undefined
+  /** Session event seq the last successful review folded through. */
+  lastSeq: number
+  /** Session event seq of the last failed review; cadence triggers cool down past it. */
+  failedSeq: number | undefined
+}
+
+/** Whether a source-'user' message exists beyond `seq`. */
+function userSpokeSince(log: readonly SessionEvent[], seq: number): boolean {
+  for (let index = log.length - 1; index >= 0; index -= 1) {
+    const event = log[index]
+    if (event === undefined || event.seq <= seq) break
+    if (event.type === 'user/message' && event.data.source.kind === 'user') return true
+  }
+  return false
+}
+
 /**
- * Run one proactive review on a fresh one-shot reviewer child: fold the
- * digest, run the reviewer on the configured route, and append the verdict as
- * a log-only jspace/advisor event. The append happens at the settle point —
- * after the run resolves — never inside a session event's publication window.
+ * Await the advisor child's next turn verdict. Resolves undefined on timeout
+ * or caller abort, after interrupting the stuck turn; the waiter is removed
+ * on every settle path.
+ * @param ctx - context carrying the subagent service.
+ * @param agent - the main agent, the interrupt authority for the child.
+ * @param childId - advisor child session id.
+ * @param waiters - plugin-scoped verdict waiters keyed by child id.
+ * @param signal - caller cancellation owning the wait.
+ * @param timeoutMs - turn timeout in milliseconds.
+ * @returns the parsed verdict, or undefined when the turn ends without one.
+ */
+function awaitVerdict(
+  ctx: Context,
+  agent: Agent,
+  childId: SessionId,
+  waiters: Map<SessionId, (verdict: ReviewVerdict | undefined) => void>,
+  signal: AbortSignal,
+  timeoutMs: number,
+): Promise<ReviewVerdict | undefined> {
+  return new Promise((resolve) => {
+    const done = (verdict: ReviewVerdict | undefined): void => {
+      clearTimeout(timer)
+      signal.removeEventListener('abort', onAbort)
+      waiters.delete(childId)
+      resolve(verdict)
+    }
+    const timer = setTimeout(() => {
+      ctx.subagents.interrupt(childId, { kind: 'ancestor', agent })
+      done(undefined)
+    }, timeoutMs)
+    const onAbort = (): void => {
+      ctx.subagents.interrupt(childId, { kind: 'ancestor', agent })
+      done(undefined)
+    }
+    signal.addEventListener('abort', onAbort, { once: true })
+    waiters.set(childId, done)
+  })
+}
+
+/** Append one settled verdict as the log-only jspace/advisor event. */
+function recordVerdict(
+  session: Session,
+  childId: SessionId,
+  trigger: AdvisorTrigger,
+  triggerSeq: number,
+  verdict: ReviewVerdict,
+  resolved: ResolvedConfig,
+): void {
+  session.append('jspace/advisor', {
+    sessionId: session.id,
+    childId,
+    trigger,
+    triggerSeq,
+    verdict: verdict.verdict,
+    advice: boundText(verdict.advice, resolved.maxAdviceChars),
+    ...verdict.redirect === undefined
+      ? {}
+      : { redirect: boundText(verdict.redirect, resolved.maxAdviceChars) },
+    seq: session.seq,
+  }, { ignorable: true })
+}
+
+/**
+ * Run one proactive review turn on the session's standing continuable
+ * advisor: fold the full digest on the first turn or a delta after it,
+ * deliver the turn, await the JSON verdict, and append it as a log-only
+ * jspace/advisor event. The append happens at the settle point — after the
+ * verdict resolves — never inside a session event's publication window. A
+ * failed or verdict-less turn discards the advisor so the next trigger
+ * cold-restarts a fresh one, and cadence triggers cool down until the user
+ * speaks again.
  * @param ctx - context with subagents; the agents service is optional.
  * @param session - the main session.
  * @param trigger - why the review ran.
  * @param triggerSeq - seq of the triggering event.
  * @param signal - cancellation owned by the plugin effect.
  * @param resolved - resolved advisor config.
+ * @param run - the session's mutable advisor state.
+ * @param waiters - plugin-scoped verdict waiters keyed by child id.
  */
 async function runProactiveReview(
   ctx: Context,
@@ -446,42 +582,53 @@ async function runProactiveReview(
   triggerSeq: number,
   signal: AbortSignal,
   resolved: ResolvedConfig,
+  run: AdvisorRun,
+  waiters: Map<SessionId, (verdict: ReviewVerdict | undefined) => void>,
 ): Promise<void> {
   const agent = ctx.get('agents')?.get(session.id)
   if (agent === undefined) return
   const card = ctx.jspace.card(session)
-  const digest = foldAdvisorDigest(session, card, digestCaps(resolved))
+  const caps = digestCaps(resolved)
   try {
-    const run = await ctx.subagents.start(resolved.subagentProvider, {
-      label: ADVISOR_CHILD_LABEL,
-      prompt: [{ type: 'text', text: buildReviewPrompt(digest, trigger) }],
-      parent: agent,
-      persona: resolved.persona,
-      toolFilter: { allow: [...resolved.reviewerTools] },
-      agentOptions: { provider: resolved.provider as string, model: resolved.model as string },
-      outputSchema: REVIEW_OUTPUT_JSON_SCHEMA,
-      signal,
-    })
-    try {
-      const result = await run.result
-      const review = settleReview(result)
-      session.append('jspace/advisor', {
-        sessionId: session.id,
-        childId: run.id,
-        trigger,
-        triggerSeq,
-        verdict: review.verdict,
-        advice: boundText(review.advice, resolved.maxAdviceChars),
-        ...review.redirect === undefined
-          ? {}
-          : { redirect: boundText(review.redirect, resolved.maxAdviceChars) },
-        seq: session.seq,
-      }, { ignorable: true })
-    } finally {
-      await run.dispose()
+    signal.throwIfAborted()
+    let childId = run.childId
+    if (childId === undefined) {
+      const digest = foldAdvisorDigest(session, card, caps)
+      const started = await ctx.subagents.startContinuable({
+        provider: resolved.subagentProvider,
+        label: ADVISOR_CHILD_LABEL,
+        request: {
+          prompt: [{ type: 'text', text: buildReviewPrompt(digest, trigger) }],
+          parent: agent,
+          persona: resolved.persona,
+          toolFilter: { allow: [...resolved.reviewerTools] },
+          agentOptions: { provider: resolved.provider as string, model: resolved.model as string },
+        },
+        signal,
+      })
+      childId = started.childId
+      run.childId = childId
+      const verdict = await awaitVerdict(ctx, agent, childId, waiters, signal, resolved.reviewTimeoutMs)
+      if (verdict === undefined) throw new Error('advisor turn returned no verdict')
+      run.lastSeq = digest.seq
+      recordVerdict(session, childId, trigger, triggerSeq, verdict, resolved)
+    } else {
+      const delta = foldAdvisorDelta(session, card, caps, run.lastSeq)
+      const verdictPromise = awaitVerdict(ctx, agent, childId, waiters, signal, resolved.reviewTimeoutMs)
+      await ctx.subagents.followup(agent, childId, [{ type: 'text', text: buildReviewDeltaPrompt(delta, trigger) }], {
+        source: { kind: 'coordinator', form: 'relay', senderSessionId: session.id },
+        signal,
+      })
+      const verdict = await verdictPromise
+      if (verdict === undefined) throw new Error('advisor turn returned no verdict')
+      run.lastSeq = delta.seq
+      recordVerdict(session, childId, trigger, triggerSeq, verdict, resolved)
     }
+    run.failedSeq = undefined
   } catch (error) {
-    // A failing reviewer must not break the main session.
+    // A failing advisor must not break the main session; the next trigger cold-restarts a fresh child.
+    run.childId = undefined
+    run.failedSeq = session.seq
     ctx.logger.warn('jspace-advisor: proactive review failed: ' + String(error))
   }
 }

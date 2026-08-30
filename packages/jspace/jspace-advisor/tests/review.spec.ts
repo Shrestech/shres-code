@@ -1,15 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import type { Session, SessionEvent } from '@shres-code/shres-code-session'
-import type { SubagentResult } from '@shres-code/shres-code-subagent'
-import { foldAdvisorDigest } from '../src/digest.ts'
+import { foldAdvisorDelta, foldAdvisorDigest } from '../src/digest.ts'
 import {
+  buildReviewDeltaPrompt,
   buildReviewPrompt,
   DEFAULT_REVIEWER_PERSONA,
   classifyDrift,
   classifyTrigger,
   isErroredToolResult,
   isRootSession,
-  settleReview,
+  parseFinalVerdict,
+  parseReviewVerdict,
   suppressReview,
 } from '../src/review.ts'
 
@@ -34,10 +35,6 @@ function erroredResult(callId: string, seq: number, isError = true) {
 
 function toolCall(callId: string, name: string, seq: number) {
   return event('tool/call', { callId, name }, seq)
-}
-
-function result(stopReason: SubagentResult['stopReason'], structured?: unknown, output: unknown[] = []): SubagentResult {
-  return { stopReason, output: output as SubagentResult['output'], ...structured === undefined ? {} : { structured } }
 }
 
 describe('isRootSession', () => {
@@ -148,28 +145,62 @@ describe('suppressReview', () => {
   })
 })
 
-describe('settleReview', () => {
-  it('returns an on-track verdict', () => {
-    const review = settleReview(result('completed', { verdict: 'on-track', advice: 'serving the goal' }))
-    expect(review.verdict).toBe('on-track')
+describe('parseReviewVerdict', () => {
+  it('parses a bare JSON object', () => {
+    const verdict = parseReviewVerdict('{"verdict":"on-track","advice":"serving the goal"}')
+    expect(verdict).toEqual({ verdict: 'on-track', advice: 'serving the goal' })
   })
 
-  it('returns a drift verdict with its redirect', () => {
-    const review = settleReview(result('completed', { verdict: 'drift', advice: 'off course', redirect: 'drop X' }))
-    expect(review.verdict).toBe('drift')
-    expect(review.redirect).toBe('drop X')
+  it('parses a fenced code block', () => {
+    const verdict = parseReviewVerdict('```json\n{"verdict":"drift","advice":"off course","redirect":"drop X"}\n```')
+    expect(verdict).toEqual({ verdict: 'drift', advice: 'off course', redirect: 'drop X' })
   })
 
-  it('throws on a non-completed stop reason', () => {
-    expect(() => settleReview(result('max-tokens'))).toThrow(/token limit/)
+  it('parses an object embedded in stray prose', () => {
+    const verdict = parseReviewVerdict('Here it is: {"verdict":"drift","advice":"off course"} — done.')
+    expect(verdict?.verdict).toBe('drift')
   })
 
-  it('throws when no structured verdict is present', () => {
-    expect(() => settleReview(result('completed'))).toThrow(/no structured verdict/)
+  it('rejects an invalid verdict value', () => {
+    expect(parseReviewVerdict('{"verdict":"meh","advice":"x"}')).toBeUndefined()
   })
 
-  it('throws on an invalid verdict value', () => {
-    expect(() => settleReview(result('completed', { verdict: 'meh', advice: 'x' }))).toThrow(/no structured verdict/)
+  it('rejects a missing advice field', () => {
+    expect(parseReviewVerdict('{"verdict":"on-track"}')).toBeUndefined()
+  })
+
+  it('rejects a non-string redirect', () => {
+    expect(parseReviewVerdict('{"verdict":"drift","advice":"x","redirect":3}')).toBeUndefined()
+  })
+
+  it('rejects prose without a verdict object', () => {
+    expect(parseReviewVerdict('looks fine to me')).toBeUndefined()
+  })
+})
+
+describe('parseFinalVerdict', () => {
+  it('reads the latest parseable assistant reply of the child turn', () => {
+    const session = sessionWith([
+      event('assistant/message', { message: { role: 'assistant', content: [{ type: 'text', text: 're-reading the goal' }] } }, 1),
+      event('tool/call', { callId: 'c1', name: 'wiki_read' }, 2),
+      event('assistant/message', { message: { role: 'assistant', content: [{ type: 'text', text: '{"verdict":"on-track","advice":"ok"}' }] } }, 3),
+    ])
+    expect(parseFinalVerdict(session)).toEqual({ verdict: 'on-track', advice: 'ok' })
+  })
+
+  it('skips reasoning-only assistant messages', () => {
+    const session = sessionWith([
+      event('assistant/message', { message: { role: 'assistant', content: [{ type: 'reasoning', text: 'hmm' }] } }, 1),
+      event('assistant/message', { message: { role: 'assistant', content: [{ type: 'text', text: '{"verdict":"drift","advice":"off"}' }] } }, 2),
+    ])
+    expect(parseFinalVerdict(session)?.verdict).toBe('drift')
+  })
+
+  it('is undefined when no reply parses', () => {
+    const session = sessionWith([
+      event('assistant/message', { message: { role: 'assistant', content: [{ type: 'text', text: 'I could not tell.' }] } }, 1),
+    ])
+    expect(parseFinalVerdict(session)).toBeUndefined()
   })
 })
 
@@ -227,11 +258,11 @@ describe('isErroredToolResult', () => {
 })
 
 describe('DEFAULT_REVIEWER_PERSONA', () => {
-  it('frames the digest as sufficient and forbids session hunting', () => {
-    expect(DEFAULT_REVIEWER_PERSONA).toContain('sufficient input for the verdict')
-    expect(DEFAULT_REVIEWER_PERSONA).toContain('do not read your own session log')
+  it('frames the input as sufficient, forbids session hunting, and fixes the reply protocol', () => {
+    expect(DEFAULT_REVIEWER_PERSONA).toContain('standing reviewer of one main session')
     expect(DEFAULT_REVIEWER_PERSONA).toContain('do not search for other sessions')
-    expect(DEFAULT_REVIEWER_PERSONA).toContain('Always finish with the structured verdict')
+    expect(DEFAULT_REVIEWER_PERSONA).toContain('a single JSON object')
+    expect(DEFAULT_REVIEWER_PERSONA).toContain('Omit redirect when on-track')
   })
 })
 
@@ -243,6 +274,19 @@ describe('buildReviewPrompt', () => {
     expect(prompt).toContain('U1: goal')
     expect(prompt).toContain('drift-check')
     expect(prompt).toContain('The digest above is the main session')
-    expect(prompt).toContain('return the structured verdict now')
+    expect(prompt).toContain('reply with only the verdict JSON now')
+  })
+
+  it('builds the delta prompt from the folded delta and the trigger', () => {
+    const delta = foldAdvisorDelta(sessionWith([
+      { type: 'user/message', data: { source: { kind: 'user' }, content: [{ type: 'text', text: 'goal' }] }, seq: 1 },
+      { type: 'user/message', data: { source: { kind: 'user' }, content: [{ type: 'text', text: 'new ask' }] }, seq: 5 },
+    ]), null,
+    { maxTools: 12, maxChars: 4000, maxExcerpt: 200, maxUserMessage: 300, maxUserHistory: 1500 }, 3)
+    const prompt = buildReviewDeltaPrompt(delta, 'goal-epoch')
+    expect(prompt).toContain('Goal (U1): goal')
+    expect(prompt).toContain('N1: new ask')
+    expect(prompt).toContain('since your last review')
+    expect(prompt).toContain('goal-epoch')
   })
 })
