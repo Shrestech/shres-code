@@ -38,6 +38,9 @@ export const DEFAULT_REVIEWER_TOOLS = [
   'wiki_read',
 ] as const
 
+/** Display label persisted with every reviewer child in the subagent list. */
+export const ADVISOR_CHILD_LABEL = 'Advisor'
+
 /** Whether a session is a root (not a delegated child). */
 export function isRootSession(session: Session): boolean {
   return session.header.parentSession === undefined

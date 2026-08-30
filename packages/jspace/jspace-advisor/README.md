@@ -34,7 +34,7 @@ Default-off jspace feature that puts a reviewer model on the session. The adviso
 
 ## How it works
 
-- Both channels run fresh **one-shot** reviewer children on the configured route (`provider`/`model`) through `subagentProvider`.
+- Both channels run fresh **one-shot** reviewer children on the configured route (`provider`/`model`) through `subagentProvider`; every child carries the display label **Advisor** in the subagent list.
 - **Consult** (`jspace_consult`) folds the digest, asks the reviewer the caller's question, and returns `{advice, recommendation?}` synchronously as the tool result.
 - **Proactive** watches committed session events; on a trigger or the drift cadence it runs a reviewer, awaits the structured verdict `{verdict, advice, redirect?}`, and appends it as a log-only `jspace/advisor` event.
 - The digest anchors on the **user-message stream** (U1, U2, … with U1 always retained) — the card Goal is the agent's own claim and can be a placeholder — and renders the trailing tool window last so the digest cap truncates it first.

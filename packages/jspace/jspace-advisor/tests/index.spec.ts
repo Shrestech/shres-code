@@ -45,13 +45,17 @@ class StubAgents extends Service {
   }
 }
 
+/** Labels observed on reviewer-child start requests, newest last. */
+const startLabels: (string | undefined)[] = []
+
 /** A spawn provider whose children settle a scripted drift verdict. */
 function registerSpawn(ctx: Context, behavior: 'verdict' | 'fail' | 'hang' | 'noredirect'): void {
   ctx.subagents.registerProvider({
     name: 'spawn',
     capabilities: { outputSchema: true, depthLimit: true, toolFilter: true, persona: true },
     inheritsParentContext: false,
-    start: async (request: { outputSchema?: { properties?: Record<string, unknown> } }) => {
+    start: async (request: { label?: string; outputSchema?: { properties?: Record<string, unknown> } }) => {
+      startLabels.push(request.label)
       if (behavior === 'fail') throw new Error('stub start failure')
       if (behavior === 'hang') {
         return {
@@ -181,6 +185,7 @@ describe('advisor apply', () => {
     const result = await ctx.tools.execute(consultExec(session) as never)
     expect(result.isError).toBe(false)
     expect(JSON.stringify(result)).toContain('off course')
+    expect(startLabels.at(-1)).toBe('Advisor')
     await ctx.fiber.dispose()
   })
 
@@ -191,6 +196,7 @@ describe('advisor apply', () => {
       session.append('step/end', { turn: 1, step })
     }
     await until(() => adviceEvents(session).length === 1)
+    expect(startLabels.at(-1)).toBe('Advisor')
     const advice = adviceEvents(session)[0]?.data
     expect(advice?.trigger).toBe('drift-check')
     expect(advice?.triggerSeq).toBe(session.events.findLast(e => e.type === 'step/end')?.seq)
