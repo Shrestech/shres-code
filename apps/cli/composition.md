@@ -180,6 +180,8 @@ flowchart LR
   cfg --> plugin_shres_base_web
   plugin_shres_base_web_search_attached_cli["web-search-attached-cli<br/>@shres-code/shres-code-web-search-attached-cli"]
   cfg --> plugin_shres_base_web_search_attached_cli
+  plugin_shres_base_web_search_perplexity["web-search-perplexity<br/>@shres-code/shres-code-web-search-perplexity"]
+  cfg --> plugin_shres_base_web_search_perplexity
   plugin_shres_base_web_search_deepseek["web-search-deepseek<br/>@shres-code/shres-code-web-search-deepseek"]
   cfg --> plugin_shres_base_web_search_deepseek
   plugin_shres_base_tool_web["tool-web<br/>@shres-code/shres-code-tool-web"]
@@ -294,6 +296,7 @@ flowchart LR
 | `repeat-tool-reminder` | `@shres-code/shres-code-repeat-tool-reminder` |
 | `web` | `@shres-code/shres-code-web` |
 | `web-search-attached-cli` | `@shres-code/shres-code-web-search-attached-cli` |
+| `web-search-perplexity` | `@shres-code/shres-code-web-search-perplexity` |
 | `web-search-deepseek` | `@shres-code/shres-code-web-search-deepseek` |
 | `tool-web` | `@shres-code/shres-code-tool-web` |
 | `speech` | `@shres-code/shres-code-speech` |

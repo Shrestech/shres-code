@@ -503,20 +503,26 @@
     # Every mode enables the stable model-facing web_search tool. An attached
     # CLI (Grok, Claude, Codex, Kimi) owns search through that vendor's hosted
     # web-search tool and the same credential the Models page already stores;
-    # DeepSeek official is the fallback when no listed vendor has a key. Fetch stays
-    # disabled and no fetch provider is mounted: that provider defers SSRF
-    # protection and the model would choose the request target. Search is a full
-    # auxiliary model request with server-side retrieval, so this shipped route
-    # gets 60s while the provider-neutral tool default remains 30s.
+    # Perplexity serves when its key is configured (the Settings web-search
+    # card writes it); DeepSeek official is the fallback when no listed vendor
+    # has a key. Fetch stays disabled and no fetch provider is mounted: that
+    # provider defers SSRF protection and the model would choose the request
+    # target. Search is a full auxiliary model request with server-side
+    # retrieval, so this shipped route gets 60s while the provider-neutral
+    # tool default remains 30s.
     - id: web
       name: '@shres-code/shres-code-web'
       config:
         searchProviders:
           - attached-cli
+          - perplexity
           - deepseek-official
 
     - id: web-search-attached-cli
       name: '@shres-code/shres-code-web-search-attached-cli'
+
+    - id: web-search-perplexity
+      name: '@shres-code/shres-code-web-search-perplexity'
 
     - id: web-search-deepseek
       name: '@shres-code/shres-code-web-search-deepseek'

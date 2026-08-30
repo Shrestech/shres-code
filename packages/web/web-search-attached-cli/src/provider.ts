@@ -11,7 +11,7 @@ import type {
   WebSearchRequest,
   WebSearchResult,
 } from '@shres-code/shres-code-web'
-import { mapVendorSearchPayload } from './parse.ts'
+import { mapVendorSearchPayload, mapZaiSearchPayload } from './parse.ts'
 
 /** Stable id this provider registers under. */
 export const ATTACHED_CLI_PROVIDER_ID = 'attached-cli'
@@ -23,6 +23,7 @@ export const ATTACHED_CLI_BACKENDS = [
   'codex-cli',
   'kimi-cli',
   'ollama-cloud',
+  'zai',
 ] as const
 
 /** One shipped CLI backend id. */
@@ -38,6 +39,7 @@ export const BACKEND_API_KEY_ENV: Record<AttachedCliBackendId, string> = {
   'codex-cli': 'OPENAI_API_KEY',
   'kimi-cli': 'MOONSHOT_API_KEY',
   'ollama-cloud': 'OLLAMA_API_KEY',
+  'zai': 'ZAI_API_KEY',
 }
 
 /** Default HTTP bases for each vendor search call. */
@@ -47,14 +49,15 @@ export const BACKEND_DEFAULT_BASE_URL: Record<AttachedCliBackendId, string> = {
   'codex-cli': 'https://api.openai.com/v1',
   'kimi-cli': 'https://api.moonshot.ai/v1',
   'ollama-cloud': 'https://ollama.com',
+  'zai': 'https://api.z.ai/api/paas/v4',
 }
 
 /**
  * Auxiliary search models. These are vendor Messages/Responses ids, not the
- * CLI aliases (`sonnet`, `k2`) the conversation adapter stores. Ollama search
- * is a dedicated retrieval endpoint and does not send a model.
+ * CLI aliases (`sonnet`, `k2`) the conversation adapter stores. Ollama and
+ * Z.AI search are dedicated retrieval endpoints and do not send a model.
  */
-export const BACKEND_DEFAULT_MODEL: Record<Exclude<AttachedCliBackendId, 'ollama-cloud'>, string> = {
+export const BACKEND_DEFAULT_MODEL: Record<Exclude<AttachedCliBackendId, 'ollama-cloud' | 'zai'>, string> = {
   'grok-cli': 'grok-4.6',
   'claude-cli': 'claude-sonnet-4-5',
   'codex-cli': 'gpt-5.4',
@@ -190,7 +193,9 @@ export class AttachedCliSearchProvider implements WebSearchProvider {
         { cause: error },
       )
     }
-    return mapVendorSearchPayload(payload)
+    // Z.AI's retrieval envelope is fixed and structured, so it validates; the
+    // model-answer vendors share the tolerant walker.
+    return id === 'zai' ? mapZaiSearchPayload(payload) : mapVendorSearchPayload(payload)
   }
 }
 
@@ -252,6 +257,18 @@ export function buildRequest(
           'user-agent': USER_AGENT,
         },
         body: { query },
+      }
+    case 'zai':
+      // The Z.AI Web Search API is retrieval-only (no model turn);
+      // `search-prime` is the engine code its reference documents.
+      return {
+        url: `${base}/web_search`,
+        headers: {
+          authorization: `Bearer ${apiKey}`,
+          'content-type': 'application/json',
+          'user-agent': USER_AGENT,
+        },
+        body: { search_engine: 'search-prime', search_query: query },
       }
     default: {
       const never: never = id

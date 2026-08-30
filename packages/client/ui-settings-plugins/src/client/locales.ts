@@ -14,6 +14,8 @@ export type PluginsSettingsLocaleKey =
   | 'webSearchCodex' | 'webSearchCodexHint'
   | 'webSearchKimi' | 'webSearchKimiHint'
   | 'webSearchOllama' | 'webSearchOllamaHint'
+  | 'webSearchZai' | 'webSearchZaiHint'
+  | 'webSearchPerplexity' | 'webSearchPerplexityHint' | 'webSearchPerplexityApiKey' | 'webSearchPerplexityBaseUrl'
   | 'webSearchDeepSeek' | 'webSearchDeepSeekHint'
   | 'webSearchApiKey' | 'webSearchApiKeyHint' | 'webSearchApiKeySet' | 'webSearchApiKeyUnset'
   | 'webSearchBaseUrl' | 'webSearchBaseUrlHint' | 'webSearchMaxUses' | 'webSearchMaxUsesHint'
@@ -60,6 +62,12 @@ export const en: Record<PluginsSettingsLocaleKey, string> = {
   webSearchKimiHint: 'Moonshot web search, using the same key as the Kimi CLI.',
   webSearchOllama: 'Ollama',
   webSearchOllamaHint: 'Ollama Cloud web search, using the same key as Ollama Cloud chat.',
+  webSearchZai: 'Z.AI',
+  webSearchZaiHint: 'Z.AI web search, using the same key as Z.AI chat.',
+  webSearchPerplexity: 'Perplexity',
+  webSearchPerplexityHint: 'Perplexity web search. Turn this off if you do not have a Perplexity key.',
+  webSearchPerplexityApiKey: 'Perplexity API key',
+  webSearchPerplexityBaseUrl: 'Perplexity endpoint',
   webSearchDeepSeek: 'DeepSeek',
   webSearchDeepSeekHint: 'DeepSeek web search. Turn this off if you do not have a DeepSeek key.',
   webSearchApiKey: 'API key',

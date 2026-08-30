@@ -119,7 +119,7 @@ type WebFetchBody =
 
 A provider's `available(): boolean` is a cheap LOCAL check (credential presence, parseable config) and **must not make network calls**. It is an input to execution-time selection, not a health system: `search()`/`fetch()` read it to pick a usable provider, and a selection failure surfaces as the structured `WebError` the caller routes on — which carries the branchable detail (the missing id or ambiguous candidate set) in its code and message.
 
-Selection never depends on registration, config, or HMR order: a singular pin (`searchProvider`/`fetchProvider`, or the matching env var) is exclusive; `searchProviders`/`fetchProviders` (or `$SHRES_WEB_*_PROVIDERS`) is first-usable-wins and is ignored when a singular pin is set; with neither, the seam auto-selects when exactly one usable provider is registered. Multiple usable providers with no pin and no list is `WEB_PROVIDER_AMBIGUOUS`. The shipped base composition lists `attached-cli` then `deepseek-official`, so an attached CLI vendor owns search.
+Selection never depends on registration, config, or HMR order: a singular pin (`searchProvider`/`fetchProvider`, or the matching env var) is exclusive; `searchProviders`/`fetchProviders` (or `$SHRES_WEB_*_PROVIDERS`) is first-usable-wins and is ignored when a singular pin is set; with neither, the seam auto-selects when exactly one usable provider is registered. Multiple usable providers with no pin and no list is `WEB_PROVIDER_AMBIGUOUS`. The shipped base composition lists `attached-cli`, then `perplexity`, then `deepseek-official`: an attached CLI vendor owns search, Perplexity serves when its key is configured, and DeepSeek remains the always-available terminal entry that reports its own missing key.
 
 ## Errors
 

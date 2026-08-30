@@ -32,8 +32,10 @@
   ],
   "license": "MIT",
   "peerDependencies": {
+    "@shres-code/shres-code-credentials": "workspace:^",
     "@shres-code/shres-code-launch-environment": "workspace:^",
     "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-settings": "workspace:^",
     "@shres-code/shres-code-web": "workspace:^",
     "@shres-code/cordis": "workspace:^"
   },
@@ -41,8 +43,11 @@
     "@shres-code/schemastery": "workspace:^"
   },
   "devDependencies": {
+    "@shres-code/shres-code-credentials": "workspace:^",
+    "@shres-code/shres-code-credentials-local": "workspace:^",
     "@shres-code/shres-code-launch-environment": "workspace:^",
     "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-settings": "workspace:^",
     "@shres-code/shres-code-web": "workspace:^",
     "@shres-code/cordis": "workspace:^"
   }

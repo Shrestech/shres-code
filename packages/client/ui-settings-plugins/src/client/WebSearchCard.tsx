@@ -1,7 +1,8 @@
 /**
- * The web-search card: method switches, then DeepSeek's key, endpoint, and
- * budget when that method is on. The key is written through the credentials
- * domain, never into a settings section.
+ * The web-search card: method switches, then Perplexity's and DeepSeek's
+ * keys and endpoints — plus DeepSeek's budget — when those methods are on.
+ * The keys are written through the credentials domain, never into a settings
+ * section.
  */
 
 import type { InjectFace, PropsLocale, PropsRuntime } from '@shres-code/shres-code-client-ui-slots'
@@ -26,6 +27,7 @@ export function WebSearchCard(props: WebSearchCardProps) {
   const { t } = props
   const state = props.useWebSearchCard(snapshot => snapshot)
   const disabled = !state.writable
+  const perplexityOn = state.perplexity.text !== 'false'
   const deepseekOn = state.deepseek.text !== 'false'
   return (
     <PluginCard
@@ -79,6 +81,22 @@ export function WebSearchCard(props: WebSearchCardProps) {
           onEdit={(text) => { props.edit('ollama', text) }}
         />
         <SwitchField
+          id="plugin-config-web-search-zai"
+          label={t('webSearchZai')}
+          hint={t('webSearchZaiHint')}
+          text={state.zai.text}
+          disabled={disabled}
+          onEdit={(text) => { props.edit('zai', text) }}
+        />
+        <SwitchField
+          id="plugin-config-web-search-perplexity"
+          label={t('webSearchPerplexity')}
+          hint={t('webSearchPerplexityHint')}
+          text={state.perplexity.text}
+          disabled={disabled}
+          onEdit={(text) => { props.edit('perplexityEnabled', text) }}
+        />
+        <SwitchField
           id="plugin-config-web-search-deepseek"
           label={t('webSearchDeepSeek')}
           hint={t('webSearchDeepSeekHint')}
@@ -87,6 +105,38 @@ export function WebSearchCard(props: WebSearchCardProps) {
           onEdit={(text) => { props.edit('enabled', text) }}
         />
       </div>
+      {perplexityOn
+        ? (
+          <>
+            <SecretField
+              id="plugin-config-web-search-perplexity-key"
+              label={t('webSearchPerplexityApiKey')}
+              hint={t('webSearchApiKeyHint')}
+              // The credentials domain accepts a key even when the settings document
+              // itself is read-only; they are separate stores with separate refusals.
+              // Its own writability is what disables this control — a key sourced
+              // from the process environment cannot be written from here.
+              disabled={!state.perplexityApiKeyWritable}
+              text={state.perplexityApiKey.text}
+              configured={state.perplexityApiKeyConfigured}
+              stateLabel={state.perplexityApiKeyConfigured ? t('webSearchApiKeySet') : t('webSearchApiKeyUnset')}
+              onEdit={(text) => { props.edit('perplexityApiKey', text) }}
+            />
+            <ValueField
+              id="plugin-config-web-search-perplexity-endpoint"
+              label={t('webSearchPerplexityBaseUrl')}
+              hint={t('webSearchBaseUrlHint')}
+              overriddenLabel={t('overridden')}
+              resetLabel={t('reset')}
+              invalidLabel={t('invalidNumber')}
+              disabled={disabled}
+              {...state.perplexityBaseURL}
+              onEdit={(text) => { props.edit('perplexityBaseURL', text) }}
+              onReset={() => { props.resetField('perplexityBaseURL') }}
+            />
+          </>
+        )
+        : null}
       {deepseekOn
         ? (
           <>

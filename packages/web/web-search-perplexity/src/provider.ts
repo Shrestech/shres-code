@@ -13,6 +13,7 @@ import type {
   WebSearchResult,
   WebSearchSource,
 } from '@shres-code/shres-code-web'
+import type { CredentialRef } from '@shres-code/shres-code-credentials'
 import type { PerplexityError, PerplexityResponse, PerplexitySearchResult } from './types.ts'
 
 /** Stable id this provider registers under. */
@@ -33,10 +34,22 @@ export type PerplexityRecency = 'day' | 'week' | 'month' | 'year'
 /** Attribution header sent on every request. Bump with the package version. */
 const USER_AGENT = 'shres-code/0.0.1'
 
-/** Resolved provider options (the plugin's `apply` supplies env-var and constant defaults). */
+/** Resolved provider options (the plugin's `apply` supplies credential and constant defaults). */
 export interface PerplexitySearchProviderOptions {
-  /** Perplexity API key. Empty/absent makes the provider unavailable. */
-  apiKey: string
+  /**
+   * The last resolved Perplexity API key: the literal config key, or the
+   * credential cache's snapshot. Absent until a key exists, which keeps the
+   * provider out of the fallback chain instead of shadowing later providers.
+   */
+  apiKey?: string
+  /**
+   * Refresh the credential cache from the credentials seam before one search,
+   * so a key stored after boot (the Settings page writes it) takes effect
+   * without a restart. Sync `available()` reads the last snapshot only.
+   */
+  refreshKey?: () => Promise<void>
+  /** Credential reference named by missing-credential diagnostics. */
+  apiKeyEnv?: CredentialRef
   /** Endpoint base; `/chat/completions` is appended. */
   baseURL: string
   /** Search model name. */
@@ -45,6 +58,8 @@ export interface PerplexitySearchProviderOptions {
   maxTokens: number
   /** Optional recency window sent as `search_recency_filter`; omitted = no filter. */
   searchRecency?: PerplexityRecency
+  /** When false, `available()` is false. */
+  enabled?: boolean
 }
 
 /**
@@ -86,35 +101,52 @@ export function mapPerplexityResponse(response: PerplexityResponse): WebSearchRe
 export class PerplexitySearchProvider implements WebSearchProvider {
   readonly id = PERPLEXITY_PROVIDER_ID
 
-  constructor(private readonly options: PerplexitySearchProviderOptions) {}
+  /**
+   * @param resolveOptions - options for the NEXT search, snapshotted once per
+   * availability check and per operation.
+   */
+  constructor(private readonly resolveOptions: () => PerplexitySearchProviderOptions) {}
 
-  // Availability checks stay beside each provider's distinct config contract;
-  // a shared base class would obscure which fields make this backend usable.
-  /* jscpd:ignore-start */
   available(): boolean {
-    return this.options.apiKey.length > 0
-      && URL.canParse(this.options.baseURL)
-      && isPositiveInteger(this.options.maxTokens)
+    const options = this.resolveOptions()
+    return options.enabled !== false
+      && (options.apiKey?.length ?? 0) > 0
+      && URL.canParse(options.baseURL)
+      && isPositiveInteger(options.maxTokens)
   }
-  /* jscpd:ignore-end */
 
   async search(request: WebSearchRequest, signal?: AbortSignal): Promise<WebSearchResult> {
+    // Refresh mutates the credential cache. Re-read after it so this search's
+    // key is the one just resolved, not the empty pre-refresh copy.
+    await this.refreshKey(signal)
+    const options = this.resolveOptions()
+    throwIfSearchAborted(signal)
+    const apiKey = options.apiKey
+    if (apiKey === undefined || apiKey.length === 0) {
+      const ref = options.apiKeyEnv ?? 'PERPLEXITY_API_KEY'
+      throw new WebError(
+        `Perplexity search has no API key for "${ref}"; store it through the credentials service`
+        + ' (the web Settings page writes it), export it in the launching environment, or set a literal'
+        + ' "apiKey" in the web-search-perplexity config',
+        'WEB_PROVIDER_CREDENTIAL_MISSING',
+      )
+    }
     let response: Response
     try {
-      response = await fetch(`${this.options.baseURL}/chat/completions`, {
+      response = await fetch(`${options.baseURL}/chat/completions`, {
         method: 'POST',
         redirect: 'error',
         headers: {
-          'authorization': `Bearer ${this.options.apiKey}`,
+          'authorization': `Bearer ${apiKey}`,
           'content-type': 'application/json',
           'accept': 'application/json',
           'user-agent': USER_AGENT,
         },
         body: JSON.stringify({
-          model: this.options.model,
-          max_tokens: this.options.maxTokens,
+          model: options.model,
+          max_tokens: options.maxTokens,
           messages: [{ role: 'user', content: request.query }],
-          ...this.options.searchRecency !== undefined ? { search_recency_filter: this.options.searchRecency } : {},
+          ...options.searchRecency !== undefined ? { search_recency_filter: options.searchRecency } : {},
         }),
         ...signal !== undefined ? { signal } : {},
       })
@@ -149,6 +181,34 @@ export class PerplexitySearchProvider implements WebSearchProvider {
       if (isAbortError(error)) throw new WebError('Perplexity search aborted', 'WEB_ABORTED', { cause: error })
       throw new WebError(`Perplexity returned an unprocessable response body: ${String(error)}`, 'WEB_PROVIDER_ERROR', { cause: error })
     }
+  }
+
+  /**
+   * Await the credential refresh as part of the operation's cancellation
+   * contract: an abort-shaped rejection is cancellation, anything else is a
+   * credential-backend failure, never a missing key.
+   * @param signal - abort signal for the surrounding search.
+   */
+  private async refreshKey(signal?: AbortSignal): Promise<void> {
+    const refresh = this.resolveOptions().refreshKey
+    if (refresh === undefined) return
+    try {
+      await refresh()
+    } catch (error: unknown) {
+      if (signal?.aborted === true || isAbortError(error)) {
+        throw new WebError('Perplexity search aborted', 'WEB_ABORTED', {
+          cause: signal?.aborted === true ? signal.reason : error,
+        })
+      }
+      throw new WebError(`Perplexity search credential resolution failed: ${String(error)}`, 'WEB_PROVIDER_ERROR', { cause: error })
+    }
+  }
+}
+
+/** Throw the provider's stable cancellation error when the caller already aborted. */
+function throwIfSearchAborted(signal?: AbortSignal): void {
+  if (signal?.aborted === true) {
+    throw new WebError('Perplexity search aborted', 'WEB_ABORTED', { cause: signal.reason })
   }
 }
 
