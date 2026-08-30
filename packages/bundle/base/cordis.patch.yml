@@ -582,5 +582,14 @@
     - id: llm-cli-bridge
       name: '@shres-code/shres-code-llm-cli-bridge'
 
+    # Grok subscription session: the same credential the Grok Build CLI's
+    # "grok login" stores in ~/.grok/auth.json, served as a bearer token to
+    # cli-chat-proxy.grok.com over the openai-responses wire and refreshed
+    # through auth.x.ai. Dormant until that login exists on the machine; use
+    # bills the CLI subscription (SuperGrok), not the X API. The delegated
+    # grok-cli route above is the spawn-based alternative.
+    - id: llm-grok-session
+      name: '@shres-code/shres-code-llm-grok-session'
+
     - id: llm-deepseek
       name: '@shres-code/shres-code-llm-deepseek'
