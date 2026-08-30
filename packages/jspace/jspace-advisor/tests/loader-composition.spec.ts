@@ -73,8 +73,8 @@ async function loadComposition(): Promise<Context> {
     "- name: '@shres-code/shres-code-jspace-advisor'",
     '  config:',
     '    enabled: true',
-    '    provider: spawn',
-    '    model: reviewer',
+    '    provider: reviewer-route',
+    '    model: reviewer-model',
     '',
   ].join('\n'))
 
@@ -136,5 +136,23 @@ describe('jspace-advisor real composition', () => {
       .map(block => block.text)
       .join('')
     expect(text).toContain('you drifted')
+  }, 30_000)
+
+  it('wires the proactive drift cadence and degrades without an agents service', async () => {
+    const ctx = await loadComposition()
+    const session = ctx.sessions.create(SessionId('ws-advisor-drift'))
+    const agent = { id: session.id, session } as unknown as Agent
+    const opened = await ctx.tools.execute({
+      signal: new AbortController().signal,
+      callId: CallId('open2'),
+      name: 'jspace_open',
+      arguments: { goal: 'Ship W3', next: 'Write tests' },
+      agent,
+    })
+    expect(opened.isError).toBe(false)
+    for (let step = 1; step <= 8; step += 1) {
+      session.append('step/end', { turn: 1, step })
+    }
+    expect(session.events.some(record => record.type === 'jspace/advisor')).toBe(false)
   }, 30_000)
 })

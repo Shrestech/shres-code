@@ -1,6 +1,6 @@
 {
   "name": "@shres-code/shres-code-jspace-advisor",
-  "description": "Background jspace reviewer: a continuable model seat that watches the session and advises the main agent",
+  "description": "Background jspace reviewer: a one-shot reviewer seat that watches the session and redirects the main agent to the user's goal",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"

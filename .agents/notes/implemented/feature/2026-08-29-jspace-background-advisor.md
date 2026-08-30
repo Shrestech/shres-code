@@ -2,6 +2,8 @@
 
 Status: implemented
 
+Superseded for the proactive channel by [the one-shot drift reviewer](./2026-08-30-jspace-advisor-oneshot-drift-reviewer.md); consult remains as described here with the route split applied.
+
 ## Problem
 
 The J-Space card is a working-memory fold of the session log, but nothing looks over the session's shoulder as it runs. The main agent is self-monitoring only through prompt text. The user wanted a dedicated reviewer model — a continuation of the Ward/Aegis/Stride "model seat" concept — that monitors the session in the background, not reading everything but enough for useful, targeted advice, and that can (a) proactively flag when the session appears to be going wrong and (b) be consulted on demand by the main session.
