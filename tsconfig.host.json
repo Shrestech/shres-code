@@ -303,6 +303,7 @@
     { "path": "./packages/jspace/jspace-prompt" },
     { "path": "./packages/jspace/tool-jspace" },
     { "path": "./packages/jspace/command-jspace" },
+    { "path": "./packages/jspace/jspace-advisor" },
     { "path": "./packages/plan/plan-mode" },
     { "path": "./packages/preset/agent-presets" },
     { "path": "./packages/preset/persona" },
