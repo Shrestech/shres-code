@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Context } from '@shres-code/cordis'
 import type { InvariantFailure } from '@shres-code/shres-code-invariants'
-import type { Session, SessionEvent } from '@shres-code/shres-code-session'
+import type { Session } from '@shres-code/shres-code-session'
 import { apply } from '../src/invariant.ts'
 
 /** Minimal session stub carrying only the events the invariant reads. */
@@ -16,12 +16,13 @@ function harness(): {
   dispatch: (session: Session, event: unknown) => void
 } {
   const failures: string[] = []
-  let dispatch: (session: Session, event: unknown) => void = () => { /* no-op */ }
+  let handlerRef: (mode: string, eventName: string, args: unknown[]) => void = () => { /* no-op */ }
+  const dispatch = (session: Session, event: unknown): void => {
+    handlerRef('emit', 'session/event', [session, event])
+  }
   const ctx = {
     on: (_name: string, handler: (mode: string, eventName: string, args: unknown[]) => void) => {
-      dispatch = (session: Session, event: unknown) => {
-        handler('emit', 'session/event', [session, event])
-      }
+      handlerRef = handler
       return () => { /* no-op */ }
     },
     sessions: { list: () => [] },

@@ -131,6 +131,10 @@ describe('jspace-advisor real composition', () => {
       agent,
     })
     expect(result.isError).toBe(false)
-    expect(result.message?.content?.[0]?.text).toContain('you drifted')
+    const text = result.content
+      .filter(block => block.type === 'text')
+      .map(block => block.text)
+      .join('')
+    expect(text).toContain('you drifted')
   }, 30_000)
 })

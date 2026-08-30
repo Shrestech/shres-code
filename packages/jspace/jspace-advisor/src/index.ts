@@ -18,6 +18,7 @@ import type { ToolRunContext } from '@shres-code/shres-code-tools'
 import type { Session } from '@shres-code/shres-code-session'
 import {
   buildConsultPrompt,
+  CONSULT_OUTPUT_JSON_SCHEMA,
   CONSULT_OUTPUT_SCHEMA,
   consultRefusal,
   settleConsult,
@@ -38,8 +39,8 @@ import type { JspaceAdvisorAdvice, AdvisorTrigger } from './types.ts'
 
 /** Cordis plugin name. */
 export const name = 'jspace-advisor'
-/** Requires the jspace seat, tools, system prompt, agents, and subagents. */
-export const inject = ['jspace', 'tools', 'systemPrompt', 'agents', 'subagents']
+/** Requires the jspace seat, tools, system prompt, and subagents. The agents service is optional (proactive path only). */
+export const inject = ['jspace', 'tools', 'systemPrompt', 'subagents']
 
 /** Settings namespace the Models/advisory card writes. */
 export const JSPACE_ADVISOR_SETTINGS_NAMESPACE = settingsNamespace('jspace-advisor')
@@ -104,10 +105,10 @@ export interface Config {
 /** Schemastery config for Loader defaults and generated configuration docs. */
 export const Config: z<Config> = z.object({
   enabled: z.boolean().default(false),
-  provider: z.string().optional(),
-  model: z.string().optional(),
-  persona: z.string().optional(),
-  reviewerTools: z.array(z.string()).optional(),
+  provider: z.string(),
+  model: z.string(),
+  persona: z.string(),
+  reviewerTools: z.array(z.string()).default([...DEFAULT_REVIEWER_TOOLS]),
   maxDigestTools: z.number().step(1).min(1).default(DEFAULT_MAX_DIGEST_TOOLS),
   maxDigestChars: z.number().step(1).min(1).default(DEFAULT_MAX_DIGEST_CHARS),
   maxAdviceChars: z.number().step(1).min(1).default(DEFAULT_MAX_ADVICE_CHARS),
@@ -119,8 +120,8 @@ export const Config: z<Config> = z.object({
 /** Fully materialized advisor config. */
 export interface ResolvedConfig {
   readonly enabled: boolean
-  readonly provider?: string
-  readonly model?: string
+  readonly provider?: string | undefined
+  readonly model?: string | undefined
   readonly persona: string
   readonly reviewerTools: readonly string[]
   readonly maxDigestTools: number
@@ -281,8 +282,8 @@ export function apply(ctx: Context, config: Config = {}): void {
           parent: agent,
           persona: resolved.persona,
           toolFilter: { allow: [...resolved.reviewerTools] },
-          agentOptions: { provider: resolved.provider, model: resolved.model },
-          outputSchema: CONSULT_OUTPUT_SCHEMA,
+          agentOptions: { provider: resolved.provider as string, model: resolved.model as string },
+          outputSchema: CONSULT_OUTPUT_JSON_SCHEMA,
           signal: exec.signal,
         })
         try {
@@ -376,7 +377,7 @@ async function runProactiveReview(
   trigger: AdvisorTrigger,
   resolved: ResolvedConfig,
 ): Promise<void> {
-  const agent = ctx.agents.get(session.id)
+  const agent = ctx.get('agents')?.get(session.id)
   if (agent === undefined) return
   const card = ctx.jspace.card(session)
   const digest = foldAdvisorDigest(session, card, digestCaps(resolved))

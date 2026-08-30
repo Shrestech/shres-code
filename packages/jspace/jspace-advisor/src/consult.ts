@@ -42,8 +42,18 @@ export interface ConsultReply {
   readonly recommendation?: string
 }
 
+/** Tool-side output schema for the consult reply (defineTool compiles the DSL). */
+export const CONSULT_OUTPUT_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    advice: { type: 'string', required: true },
+    recommendation: { type: 'string' },
+  },
+} as const
+
 /** Object-rooted JSON Schema for the structured consult reply, in the enforced subset. */
-export const CONSULT_OUTPUT_SCHEMA: ObjectJsonSchema = {
+export const CONSULT_OUTPUT_JSON_SCHEMA: ObjectJsonSchema = {
   type: 'object',
   additionalProperties: false,
   required: ['advice'],
