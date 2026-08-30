@@ -18,6 +18,9 @@ importers:
       '@agentclientprotocol/sdk':
         specifier: 0.25.1
         version: 0.25.1(zod@4.4.3)
+      '@shres-code/shres-code-jspace-advisor':
+        specifier: workspace:^
+        version: link:packages/jspace/jspace-advisor
       '@shres-code/shres-code-tool-session-query':
         specifier: workspace:^
         version: link:packages/session-query/tool-session-query
