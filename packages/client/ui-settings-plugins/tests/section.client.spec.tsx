@@ -433,6 +433,22 @@ describe('WebSearchCard', () => {
     expect(screen.getByRole('switch', { name: en.webSearchPerplexity }).getAttribute('aria-checked')).toBe('false')
   })
 
+  it('renders each method\'s credential fields under that method\'s switch', () => {
+    renderWebSearch()
+    fireEvent.click(screen.getByText(en.webSearchTitle))
+
+    const perplexity = screen.getByRole('switch', { name: en.webSearchPerplexity })
+    const perplexityKey = screen.getByLabelText(en.webSearchPerplexityApiKey)
+    const perplexityEndpoint = screen.getByLabelText(en.webSearchPerplexityBaseUrl)
+    const deepseek = screen.getByRole('switch', { name: en.webSearchDeepSeek })
+    const deepseekKey = screen.getByLabelText(en.webSearchApiKey)
+    const following = Node.DOCUMENT_POSITION_FOLLOWING
+    expect(perplexity.compareDocumentPosition(perplexityKey) & following).toBe(following)
+    expect(perplexityKey.compareDocumentPosition(perplexityEndpoint) & following).toBe(following)
+    expect(perplexityEndpoint.compareDocumentPosition(deepseek) & following).toBe(following)
+    expect(deepseek.compareDocumentPosition(deepseekKey) & following).toBe(following)
+  })
+
   it('stages the Perplexity key and endpoint through their field aliases', () => {
     const actions = renderWebSearch({
       perplexityApiKeyConfigured: true,

@@ -101,6 +101,18 @@ describe('web e2e: plugin configuration section', () => {
     expect(await perplexitySwitch.getAttribute('aria-checked')).toBe('true')
     expect(await dialog.getByLabel('Perplexity API key', { exact: true }).getAttribute('type')).toBe('password')
     expect(await dialog.getByLabel('Perplexity endpoint', { exact: true }).count()).toBe(1)
+    expect(await dialog.getByLabel('DeepSeek API key', { exact: true }).count()).toBe(1)
+    expect(await dialog.getByLabel('DeepSeek endpoint', { exact: true }).count()).toBe(1)
+    const perplexityBox = await perplexitySwitch.boundingBox()
+    const perplexityKeyBox = await dialog.getByLabel('Perplexity API key', { exact: true }).boundingBox()
+    const deepseekBox = await dialog.getByRole('switch', { name: 'DeepSeek', exact: true }).boundingBox()
+    expect(perplexityBox).not.toBeNull()
+    expect(perplexityKeyBox).not.toBeNull()
+    expect(deepseekBox).not.toBeNull()
+    expect(perplexityBox!.y).toBeLessThan(perplexityKeyBox!.y)
+    expect(perplexityKeyBox!.y).toBeLessThan(deepseekBox!.y)
+    const snapshot = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
+    await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'web-search.expected.md'), snapshot, MODE)
     // No edit was staged: expanding the card changes nothing on disk.
     expect(await settingsDocument()).not.toContain('web-search-perplexity')
     expect(tripwire.pageErrors).toEqual([])
@@ -195,6 +207,6 @@ describe('web e2e: plugin configuration section', () => {
 
   it.skipIf(MODE === 'record')('keeps the fixture inventory closed', async () => {
     expect(tripwire.warnings).toEqual([])
-    await assertFixtureInventory(SNAPSHOT_DIR, ['section.expected.md'])
+    await assertFixtureInventory(SNAPSHOT_DIR, ['section.expected.md', 'web-search.expected.md'])
   })
 })
