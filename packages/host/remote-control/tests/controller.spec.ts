@@ -121,11 +121,19 @@ describe('openTunnel', () => {
     }
   })
 
-  it('fails typed after probe attempts are exhausted', async () => {
+  it('fails typed after probe attempts are exhausted on an installed remote', async () => {
+    const children: FakeChild[] = []
+    const runner = fakeRunner({ installId: 'install-1', probeQueue: ['', '', '', '', '', 'installed'] }, children)
+    await expect(openTunnel(runner, SPEC(), entry(), { allowVersionSkew: false, localVersion: '0.1.0-rc.5', forceFingerprint: false }))
+      .rejects.toMatchObject({ code: 'probe-failed' })
+    expect(children.every(c => c.disposed)).toBe(true)
+  })
+
+  it('fails as no-remote-install when the remote carries no shres install', async () => {
     const children: FakeChild[] = []
     const runner = fakeRunner({ installId: 'install-1', probeQueue: ['', '', '', '', '', ''] }, children)
     await expect(openTunnel(runner, SPEC(), entry(), { allowVersionSkew: false, localVersion: '0.1.0-rc.5', forceFingerprint: false }))
-      .rejects.toMatchObject({ code: 'probe-failed' })
+      .rejects.toMatchObject({ code: 'no-remote-install' })
     expect(children.every(c => c.disposed)).toBe(true)
   })
 

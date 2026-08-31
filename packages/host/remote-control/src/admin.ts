@@ -14,7 +14,7 @@ import { Service } from '@shres-code/cordis'
 import type { Context } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
 import { TypertRemoteService, Remote } from '@shres-code/shres-code-typert-protocol'
-import { openTunnel, probeDaemonVersion, readInstallationId, type LiveTunnel, type SshRunner } from './controller.ts'
+import { openTunnel, probeDaemonVersion, probeRemoteInstalled, readInstallationId, type LiveTunnel, type SshRunner } from './controller.ts'
 import { RemoteControlError } from './errors.ts'
 import { GestureLedger } from './gesture.ts'
 import { resolveRegistryPath, resolveRunDir } from './home.ts'
@@ -22,6 +22,7 @@ import { nodeSshRunner } from './node-runner.ts'
 import { allocateLoopbackPort } from './port.ts'
 import { asRemoteId, asRemotePort, asRemoteTarget, loadRegistry, REGISTRY_VERSION, remoteEntryView, removeEntry, upsertEntry } from './registry.ts'
 import { TunnelManager } from './tunnel-manager.ts'
+import { DEFAULT_REMOTE_DAEMON_PORT } from './types.ts'
 import type { RemoteEntry } from './types.ts'
 import type {
   AdminBeginRequest, AdminConnectRequest, AdminDisconnectRequest, AdminEntryRequest, AdminEntryResult,
@@ -165,9 +166,11 @@ export class RemoteAdminGateway extends TypertRemoteService {
     const entry = await this.entry(request.alias)
     const daemonVersion = await probeDaemonVersion(this.runner, entry.target, entry.remotePort)
     const installationId = await readInstallationId(this.runner, entry.target)
+    const installed = daemonVersion !== null || await probeRemoteInstalled(this.runner, entry.target)
     return {
       target: entry.target,
       daemonVersion,
+      installed,
       installationId,
       localVersion: this.localVersion,
       firstConnect: entry.fingerprint === null,
@@ -226,6 +229,8 @@ export class RemoteAdminGateway extends TypertRemoteService {
           return { status: 'version-mismatch', observed: fact(error.facts['observed']), local: this.localVersion }
         case 'fingerprint-mismatch':
           return { status: 'fingerprint-mismatch', observed: fact(error.facts['observed']), trusted: entry.fingerprint }
+        case 'no-remote-install':
+          return { status: 'unreachable', stage: 'uninstalled', message: error.message }
         case 'probe-failed':
           return { status: 'unreachable', stage: 'probe', message: error.message }
         case 'tunnel-failed':
@@ -264,7 +269,7 @@ export class RemoteAdminGateway extends TypertRemoteService {
     const entry: RemoteEntry = {
       id: asRemoteId(request.alias),
       target: asRemoteTarget(request.target),
-      remotePort: asRemotePort(request.remotePort),
+      remotePort: asRemotePort(request.remotePort ?? DEFAULT_REMOTE_DAEMON_PORT),
       version: REGISTRY_VERSION,
       fingerprint: null,
       createdAt: nowIso(),
@@ -287,7 +292,7 @@ export class RemoteAdminGateway extends TypertRemoteService {
     const entry: RemoteEntry = {
       ...current,
       target: asRemoteTarget(request.target),
-      remotePort: asRemotePort(request.remotePort),
+      remotePort: asRemotePort(request.remotePort ?? DEFAULT_REMOTE_DAEMON_PORT),
     }
     await upsertEntry(this.registryPath, entry)
     return { entry: remoteEntryView(entry) }

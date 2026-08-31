@@ -8,7 +8,7 @@
 
 import type { RemoteEntry, TunnelSpec } from './types.ts'
 import { RemoteControlError } from './errors.ts'
-import { installationIdCommand, masterArgv, parseProbeVersion, probeCommand, tunnelArgv } from './ssh-args.ts'
+import { installationCheckCommand, installationIdCommand, masterArgv, parseProbeVersion, probeCommand, tunnelArgv } from './ssh-args.ts'
 
 /** Bounded probe loop: attempts before declaring the remote daemon absent. */
 const PROBE_ATTEMPTS = 5
@@ -53,6 +53,19 @@ export interface SshRunner {
  * @param remotePort - remote daemon loopback port.
  * @returns the daemon version, or null when the probe found nothing to parse.
  */
+/**
+ * Whether the remote carries any shres install (CLI on PATH or a shres home
+ * directory); one ssh exec, reused by inspect's pre-confirm observation.
+ * @param runner - process seam.
+ * @param target - validated connect target.
+ * @returns true when an install marker was found.
+ */
+export async function probeRemoteInstalled(runner: SshRunner, target: string, controlPath?: string): Promise<boolean> {
+  const forwardArgs = controlPath === undefined ? [] : ['-o', `ControlPath=${controlPath}`]
+  const result = await runner.run([...forwardArgs, target, installationCheckCommand()])
+  return result.stdout.trim() === 'installed'
+}
+
 export async function probeDaemonVersion(
   runner: SshRunner,
   target: string,
@@ -151,8 +164,10 @@ export async function openTunnel(runner: SshRunner, spec: TunnelSpec, entry: Rem
 
 /**
  * Wait until the remote daemon answers (bounded), surfacing a typed failure
- * naming the deepest reached stage. PR2's ensure-running slots in here when
- * the probe stays silent.
+ * naming the deepest reached stage: a remote with no shres install is
+ * reported as such with the install command; a silent daemon on an installed
+ * remote keeps the port-naming probe failure. PR2's ensure-running slots in
+ * here when the probe stays silent on an installed remote.
  * @param runner - process seam.
  * @param spec - tunnel specification (target + remotePort).
  * @returns the observed daemon version.
@@ -163,7 +178,23 @@ async function waitForVersion(runner: SshRunner, spec: TunnelSpec): Promise<stri
     if (version !== null) return version
     await new Promise(resolveDelay => setTimeout(resolveDelay, PROBE_RETRY_DELAY_MS))
   }
-  throw new RemoteControlError('probe-failed', `no host.describe answered on 127.0.0.1:${String(spec.remotePort)} on the remote; start the daemon first or pass the right --port`)
+  if (!await remoteIsInstalled(runner, spec)) {
+    throw new RemoteControlError('no-remote-install',
+      'no shres install found on the remote; install it first (Node.js 22+, then npx @shres-code/shres-code web on the remote) and connect again')
+  }
+  throw new RemoteControlError('probe-failed', `no host.describe answered on 127.0.0.1:${String(spec.remotePort)} on the remote; start the daemon (shres web, default port 3080) or fix the alias's daemon port`)
+}
+
+/**
+ * Whether the remote carries any shres install (CLI on PATH or a shres home
+ * directory); one ssh exec after the probe stayed silent.
+ * @param runner - process seam.
+ * @param spec - tunnel specification (target + controlPath).
+ * @returns true when an install marker was found.
+ */
+async function remoteIsInstalled(runner: SshRunner, spec: TunnelSpec): Promise<boolean> {
+  const result = await runner.run(['-o', `ControlPath=${spec.controlPath}`, spec.target, installationCheckCommand()])
+  return result.stdout.trim() === 'installed'
 }
 
 /**
