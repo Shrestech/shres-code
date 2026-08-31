@@ -46,6 +46,7 @@ export function apply(ctx: ClientContext): void {
       // registers the foot trigger + settings panel, ui-goal registers the
       // Game mode switch beside the wordmark.
       children: {
+        'sidebar.remotes': { kind: 'single', scope: 'root' },
         'sidebar.workspaces': { kind: 'single', scope: 'root' },
         'sidebar.settings': { kind: 'single', scope: 'root' },
         'sidebar.footer.action': { kind: 'list', scope: 'root' },

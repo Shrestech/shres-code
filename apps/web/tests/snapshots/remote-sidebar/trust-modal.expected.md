@@ -1,0 +1,7 @@
+- dialog "Connect to prod":
+  - heading "Connect to prod" [level=2]
+  - button "Close":
+    - img
+  - text: Target ci@prod.remote.example Remote version 0.1.0-rc.5 — matches this app Installation id 0123456789ab… First connection to this remote — connecting trusts the installation id below.
+  - button "Trust and connect"
+  - button "Cancel"

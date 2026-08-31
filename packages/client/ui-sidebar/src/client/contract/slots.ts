@@ -2,10 +2,11 @@
  * Sidebar slot contract: the registrant-side props composition for the
  * layout-owned `sidebar` slot, plus the holes this shell declares. The shell
  * owns column geometry (fold state machine, brand row, New Session);
- * everything between the section header and the list bottom is the
- * `sidebar.workspaces` registrant's (ui-workspace), and the foot is the
- * `sidebar.settings` registrant's (ui-settings), followed by optional footer
- * actions in `sidebar.footer.action`.
+ * `sidebar.remotes` (ui-remote) stacks the remote-host group above the
+ * browsing region, everything below it is the `sidebar.workspaces`
+ * registrant's (ui-workspace), and the foot is the `sidebar.settings`
+ * registrant's (ui-settings), followed by optional footer actions in
+ * `sidebar.footer.action`.
  */
 import type { PropsLocale, PropsRenderSlots, PropsRuntime } from '@shres-code/shres-code-client-ui-slots'
 // Type-only: pulls ui-layout's SlotMap merge (the 'sidebar' entry) into every
@@ -15,6 +16,12 @@ import type { WorkspaceId } from '@shres-code/shres-code-client-runtime/client'
 
 declare module '@shres-code/shres-code-client-ui-slots' {
   interface SlotMap {
+    /**
+     * The remote-host group: one row per registry alias (alias, user@host,
+     * status dot), the connected badge, and the add form. Declared by this
+     * package's 'sidebar' entry; ui-remote registers the group.
+     */
+    'sidebar.remotes': { kind: 'single'; scope: 'root'; owner: SidebarSectionOwnerProps }
     /**
      * The workspace/session browsing region: section header, search, the
      * grouped/flat session list, and every workspace dialog. Declared by this
@@ -97,5 +104,5 @@ export type SidebarRootInjected = {
  */
 export type SidebarRootComponentProps =
   PropsRuntime<'sidebar'>
-  & PropsRenderSlots<'sidebar.workspaces' | 'sidebar.settings' | 'sidebar.footer.action' | 'sidebar.brand.action'>
+  & PropsRenderSlots<'sidebar.remotes' | 'sidebar.workspaces' | 'sidebar.settings' | 'sidebar.footer.action' | 'sidebar.brand.action'>
   & SidebarRootInjected & PropsLocale<'sidebar'>

@@ -235,6 +235,11 @@
     - id: ui-workspace
       name: '@shres-code/shres-code-client-ui-workspace'
 
+    # Sidebar remote-host group: registry rows, trust modal, connected badge
+    # over the remoteControl/remoteAdmin namespaces.
+    - id: ui-remote
+      name: '@shres-code/shres-code-client-ui-remote'
+
     # Input triggers: the '/' | '@' pipeline (ui-input-trigger), the command surface over
     # it (ui-commands), and the two reference sources (ui-skill / ui-subagent).
     - id: ui-input-trigger

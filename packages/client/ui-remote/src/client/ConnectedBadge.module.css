@@ -1,0 +1,45 @@
+/* Connected strip: one pill per open tunnel, elevated fill so it reads as
+   state rather than navigation. */
+.badges {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.badge {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+.label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--dsw-alias-label-primary);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.arrow {
+  flex: none;
+  color: var(--dsw-alias-state-success-primary);
+}
+
+.target {
+  overflow: hidden;
+  color: var(--dsw-alias-label-secondary);
+  text-overflow: ellipsis;
+}
+
+.actions {
+  display: inline-flex;
+  flex: none;
+  gap: 4px;
+}

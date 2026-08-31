@@ -177,6 +177,12 @@ export function SidebarRoot({
       {/* The browsing region fills the column between the controls and the
           foot in both states; its rail icon column rides the same slot. */}
       <div className={css.regionArea}>
+        {/* The remote-hosts group stacks above the browsing region; the rail
+            icon column rides the workspaces slot below it. */}
+        {renderSlot('sidebar.remotes', {
+          wide,
+          expandSidebar: () => { if (collapsed) toggleSidebar() },
+        })}
         {renderSlot('sidebar.workspaces', {
           wide,
           expandSidebar: () => { if (collapsed) toggleSidebar() },

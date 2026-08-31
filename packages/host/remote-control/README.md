@@ -23,20 +23,16 @@ CLI: `shres remote add|list|remove|connect` (see `shres remote --help`); `connec
 
 ## Model Experience
 
-### Request context and condition
+None, as the package registers no tools, injects no prompts, and writes no session events; the model never observes its output unless the user pastes CLI text.
 
-#### What the model sees
+#### KV Cache effect
 
-Zero token effect: the package registers no tools, injects no prompts, and writes no session events; the model never observes its output unless the user pastes CLI text.
-
-#### Model Experience context
-
-The CLI prints the tunneled GUI URL; agents called through the tunnel behave exactly as local sessions — no model-visible surface originates here.
+None; this package neither assembles nor sends a provider request.
 
 ## Known Limitations and Deferred Work
 
 - Tunnel liveness is per-process: `run/<alias>.pid` markers record each open forward, but a restarted daemon reports every tunnel closed and never adopts another process's marker or forward.
 - A disconnect arriving while that alias's connect is still dialing answers `not-connected`; the in-flight open completes and a second disconnect closes it.
-- No daemon ensure-running, auto-install, or degraded-mode lifecycle — PR2 composes over these primitives.
+- No daemon ensure-running, auto-install, or degraded-mode lifecycle — the sidebar Remotes group composes over these primitives.
 - Version comparison is exact-match with an `--allow-version-skew` warn path; a protocol version field is deferred until multi-origin clients exist.
 - ControlMaster sockets live under `$SHRES_HOME/remote/run/`; NFS removes the lock/mtime assumptions the registry relies on — keep `$SHRES_HOME` on local disk.
