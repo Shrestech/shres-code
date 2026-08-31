@@ -193,7 +193,10 @@ export function apply(ctx: ClientContext): void {
     try {
       const grant = await unwrap(ctx.remote.remoteAdmin.begin({ verb: 'add', alias: null }))
       const result = await ctx.remote.remoteAdmin.add({
-        token: grant.token, alias: draft.alias, target: draft.target, remotePort: draft.remotePort,
+        token: grant.token,
+        alias: draft.alias,
+        target: draft.target,
+        ...(draft.remotePort === undefined ? {} : { remotePort: draft.remotePort }),
       })
       if (!result.ok) return { ok: false, message: result.error.message }
       view.setEntries(upsertEntry(view.getSnapshot().entries, result.value.entry))
@@ -210,7 +213,10 @@ export function apply(ctx: ClientContext): void {
     try {
       const grant = await unwrap(ctx.remote.remoteAdmin.begin({ verb: 'edit', alias }))
       const result = await ctx.remote.remoteAdmin.edit({
-        token: grant.token, alias, target: draft.target, remotePort: draft.remotePort,
+        token: grant.token,
+        alias,
+        target: draft.target,
+        ...(draft.remotePort === undefined ? {} : { remotePort: draft.remotePort }),
       })
       if (!result.ok) return { ok: false, message: result.error.message }
       view.setEntries(upsertEntry(view.getSnapshot().entries, result.value.entry))
