@@ -81,6 +81,8 @@ turn/end
 
 `turn/*`, `step/*`, `user/message`, `assistant/*`, and `tool/*` are durable session events; the rest are live extension points across three domains. `agent/pre-step`, `agent/request`, `llm/stream`, and the three `tools/*` events are waterfalls, whose listeners must call `next()` to delegate; `agent/turn-stopping` is serial and has no `next()`.
 
+Only `tool-call` blocks reach the `tools/execute` pipeline. A `server-tool-call` block — a hosted tool the provider executed on the model's behalf (for example a provider-native web search) — is structurally excluded by the loop's `isLocalToolCall` dispatch predicate: it is logged in `assistant/message` content and rendered generically but never looked up, executed, or correlated by tool name.
+
 Input reaches the driver through one inbox. Some messages wake it immediately; injected context waits in the inbox until another message does.
 
 `agent/pre-step` decides what the model sees. Listeners may rewrite the claimed messages or reject them outright; a rejected or empty first claim still closes a durable turn that spent no step, so the log records the attempt. Each step reads the prompt sections and tool schemas that plugins registered.

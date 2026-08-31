@@ -33,7 +33,7 @@ import { joinContextSections, renderContextSections, renderPrompt } from '@shres
 import type { PromptAssembly } from '@shres-code/shres-code-system-prompt'
 import type { Context } from '@shres-code/cordis'
 import { RuntimeContextProjection } from './runtime-context.ts'
-import { executeToolCalls } from './tool-calls.ts'
+import { executeToolCalls, isLocalToolCall } from './tool-calls.ts'
 
 type Phase =
   | { kind: 'idle'; lastTurn: number }
@@ -406,7 +406,7 @@ export class ReactLoopAgent implements Agent {
       )
       if (finish.kind === 'max-tokens') return { kind: 'max-tokens' }
 
-      const toolCalls = message.content.filter(block => block.type === 'tool-call')
+      const toolCalls = message.content.filter(isLocalToolCall)
       if (toolCalls.length === 0) return { kind: 'completed' }
       const { concluded } = await executeToolCalls(
         this.loopCtx, turn, step, toolCalls, signal,

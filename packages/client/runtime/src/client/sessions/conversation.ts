@@ -7,7 +7,7 @@
 
 import type { CommandId } from '@shres-code/shres-code-commands/brand'
 import type { MessageId } from '@shres-code/shres-code-llm/brand'
-import type { ContentBlock } from '@shres-code/shres-code-llm/types'
+import type { ContentBlock, ServerToolCallBlock } from '@shres-code/shres-code-llm/types'
 import type { ImageAttachmentRef } from '@shres-code/shres-code-attachment'
 import type { LlmRetryEventData } from '@shres-code/shres-code-llm-retry/types'
 import type { TodoItem } from '@shres-code/shres-code-session/types'
@@ -46,6 +46,7 @@ export type AssistantBlock =
   | { kind: 'reasoning'; text: string }
   | { kind: 'image'; attachment: ImageAttachmentRef }
   | { kind: 'tool-call'; callId: string; name: string; argsRaw: string }
+  | { kind: 'server-tool-call'; block: ServerToolCallBlock }
   | { kind: 'other'; block: unknown }
 
 /**
@@ -68,6 +69,7 @@ export function toAssistantBlock(block: ContentBlock): AssistantBlock {
     case 'reasoning': return { kind: 'reasoning', text: block.text }
     case 'image': return { kind: 'image', attachment: block.attachment }
     case 'tool-call': return { kind: 'tool-call', callId: String(block.id), name: block.name, argsRaw: block.arguments }
+    case 'server-tool-call': return { kind: 'server-tool-call', block }
     default: return { kind: 'other', block }
   }
 }

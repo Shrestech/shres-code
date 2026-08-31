@@ -12,9 +12,23 @@
  */
 
 import type { Context } from '@shres-code/cordis'
-import { assertNever, createToolResultMessage, type ToolCallBlock } from '@shres-code/shres-code-llm'
+import { assertNever, createToolResultMessage, type ContentBlock, type ToolCallBlock } from '@shres-code/shres-code-llm'
 import type { Session, UserMessage } from '@shres-code/shres-code-session'
 import { TOOL_ABORTED_BEFORE_DISPATCH, TOOL_RUNTIME_SCHEDULER, type ToolExecutionInput, type ToolExecutionMode, type ToolExecutionResult, type ToolRunContext } from '@shres-code/shres-code-tools'
+
+/**
+ * The one dispatch predicate over assistant content: only genuine model
+ * `tool-call` blocks reach the scheduler. A `server-tool-call` block — a
+ * tool the provider backend already executed — is structurally excluded here:
+ * it is logged and rendered but never looked up, executed, or correlated by
+ * name. This narrows `ContentBlock` to `ToolCallBlock`, so no other block
+ * tag can be scheduled by mistake.
+ * @param block - one assistant content block.
+ * @returns true when the block is a locally dispatchable tool call.
+ */
+export function isLocalToolCall(block: ContentBlock): block is ToolCallBlock {
+  return block.type === 'tool-call'
+}
 
 /** One tool call after argument parsing, ready to schedule. */
 interface PlannedCall {

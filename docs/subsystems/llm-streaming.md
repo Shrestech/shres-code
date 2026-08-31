@@ -23,10 +23,11 @@ interface ContentBlockMap {
   'image': ImageBlock
   'tool-call': ToolCallBlock
   'tool-result': ToolResultBlock
+  'server-tool-call': ServerToolCallBlock
 }
 ```
 
-The block interfaces (full fields in source): `TextBlock` (`text`), `ReasoningBlock` (thinking, distinct from visible text), `ImageBlock` (a durable [image attachment](attachment.md)), `ToolCallBlock` (`id: CallId`, `name`, raw-JSON `arguments`), and `ToolResultBlock` (`toolCallId`, nested `content: ContentBlock[]`, `isError?`). `ContentBlock = ContentBlockMap[ContentBlockType]`. A new modality belongs in the merge-extensible map only when its adapter, UI, compaction, and durable replay paths honor it.
+The block interfaces (full fields in source): `TextBlock` (`text`), `ReasoningBlock` (thinking, distinct from visible text), `ImageBlock` (a durable [image attachment](attachment.md)), `ToolCallBlock` (`id: CallId`, `name`, raw-JSON `arguments`), `ToolResultBlock` (`toolCallId`, nested `content: ContentBlock[]`, `isError?`), and `ServerToolCallBlock` (a hosted tool the provider executed on the model's behalf — `kind`, optional `name`/`id`, `status`, bounded `results` of `{ title?, url?, snippet? }`). `ContentBlock = ContentBlockMap[ContentBlockType]`. A new modality belongs in the merge-extensible map only when its adapter, UI, compaction, and durable replay paths honor it.
 
 Source: [`packages/llm/llm/src/message.ts`](../../packages/llm/llm/src/message.ts)
 

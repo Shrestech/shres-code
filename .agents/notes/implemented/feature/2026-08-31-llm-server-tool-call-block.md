@@ -1,0 +1,36 @@
+# Agent Note: server-tool-call content block
+
+Status: implemented
+
+## Problem
+
+A provider can execute a tool on the model's behalf — a hosted or server-side tool such as a provider-native web search (on Grok/Responses: web_search_call output items and server-executed custom_tool_call items). No harness content block represents those invocations today. web_search_call items are dropped inside the pinned npm dependency pi-ai (at earendil-works/pi-ai@^0.82.1, declared in packages/llm/llm-pi-ai/package.json) before the harness sees them — pi-ai's output-item mapper (createSlot) handles only message/reasoning/function_call/custom_tool_call; llm-grok-session routes through that shared PiAiAdapter, so the same gap applies there. A server-executed custom_tool_call surfaces as an ordinary tool-call ContentBlock that the agent loop would dispatch as a local tool — colliding with tool-web's local web_search.
+
+## Decision
+
+Add a first-class server-tool-call content block to the provider-neutral vocabulary in @shres-code/shres-code-llm, with a bounded projection seam, and make the agent loop structurally ignore it.
+
+- **Block contract.** ServerToolCallBlock (type: 'server-tool-call') carries the hosted tool identity (kind, optional name and provider id), a provider-neutral completion status (completed or failed), and an optional results array of mutable { title?, url?, snippet? } entries (mutable so Wire<T> can rewrite arrays to Wire<E>[], matching ToolResultBlock content; runtime immutability is enforced by toServerToolCallBlock's deep freeze plus freezeMessage). Construct it only through toServerToolCallBlock, which trims optional fields, drops empty entries, caps results at MAX_SERVER_TOOL_CALL_RESULTS (10), and freezes the block, the results array, and each result entry.
+- **Loop safety.** The agent loop's dispatch predicate is a named type guard, isLocalToolCall(block), in shres-agent-loop — only type === 'tool-call' reaches executeToolCalls. A server-tool-call block is never looked up, executed, or keyed by tool name (verified by a name-collision test that registers a local tool under the hosted block's name and asserts it never fires).
+- **Log round-trip.** assistant/message content already carries ContentBlocks as lossless JSON; the block round-trips through the durable session log with no session-event addition and no SESSION_FORMAT_VERSION bump (the block is model-visible output carried by an existing event).
+- **Transcript rendering.** toAssistantBlock in shres-client-runtime classifies server-tool-call to a structured AssistantBlock that carries the raw block; the trajectory renderers present it opaquely through the existing JSON fallback. No search-result UI.
+- **Inbound mapping deferred.** The pi-ai conversion module (provider-neutral adapter code) cannot map the raw wire shapes: pi-ai drops web_search_call before the harness sees it (a pinned npm dependency, not a vendored source copy), and disambiguating a server-executed custom_tool_call (for example x_search) from a local call needs grok-session-specific hosted-tool-name knowledge. The later hosted-search PR must map web_search_call and hosted custom_tool_call to this block in the pi-ai stream translation (or the grok-session route) through toServerToolCallBlock.
+
+## Verification
+
+Unit suites cover block construction/validation (trim, bounds, empty-drop, frozen immutability, blank-kind rejection) and JSON round-trip through assistant content; the agent-loop suite proves a hosted-only assistant step logs the block while dispatching nothing, that an adjacent real tool-call still dispatches, and that a local tool registered under the hosted block's name never fires; the client runtime suite proves toAssistantBlock classifies the block. llm and agent-loop typecheck clean.
+
+packages/host/apiproxy compiles clean of the branch-introduced error once the readonly modifier on ServerToolCallBlock.results was dropped: Wire<T> rewrites arrays to mutable Wire<E>[], so a readonly results array made ServerToolCallBlock not assignable to Wire<ServerToolCallBlock>, breaking the z.ZodType<RequestPayload<K>> to z.ZodType<Wire<RequestPayload<K>>> relation in packages/host/apiproxy/src/fetch/handler.ts (the error lived in apiproxy, not api/remotes). tsc -b packages/host/apiproxy now shows only the pre-existing generated */remote subpath requirement (api/remotes imports @shres-code/<owner>/remote modules that the repo's remote type-graph codegen emits; those live in packages I do not touch and require the full build).
+
+## Alternatives considered
+
+- **Map the wire shapes in llm-pi-ai's stream layer now.** Rejected because the producer boundary is inside the pinned dependency pi-ai: it drops web_search_call in createSlot before the harness sees any event, and it flattens custom_tool_call into a generic toolCall, discarding the hosted-tool marker. Mapping therefore requires either a pi-ai change (upstream) or grok-session-specific hosted-tool-name knowledge that no provider-neutral module has. Deferring to the hosted-search PR keeps this change to harness vocabulary and let the producer work proceed in its own seam.
+- **Carry hosted calls as a new session event instead of a content block.** Rejected: the model-visible reconstructed history must stay in assistant message content (the model-visible equals logged invariant), and a parallel log-only hosted-call event would split that invariant and require a new SessionEventMap member with format considerations. Riding the existing assistant/message event round-trips the facts losslessly with no format bump.
+- **Exclude dispatch by tool name (skip when block.name matches a registered local tool) instead of the type-tag predicate.** Rejected: name-keyed exclusion still requires a tool lookup (defeating structural non-execution) and is fragile — a hosted tool can legitimately share a name with a local tool, and the mapping from hosted call to local name is provider-specific. A first-class type tag is structural and needs no registry access.
+
+## Consequences
+
+- The block type, builder, loop non-execution, log round-trip, and transcript classification all ship with tests.
+- Content-block consumers with merge-extensible default arms (token-meter pricing, session-query extraction, the client other fallback) already handle the new member; two closed client switches gained server-tool-call arms.
+- **Adapter-support rule exception.** ContentBlockMap's contract and llm-streaming.md say a new core block must land with adapter, UI, and compaction support. This block deliberately ships no adapter because no producer exists yet — the hosted-search PR is the producer and owns the inbound mapping; the UI already has a generic opaque fallback, and the compaction, session-query, and token-meter paths are merge-extensible and safe. The block is deliberately stable so a later hosted-search presenter can render results without changing the block again.
+- Pi-ai replay (foreignAssistant / replayedAssistant) drops the block from replayed provider history like any other non-representable block, which is acceptable because the block exists for logging and rendering.
