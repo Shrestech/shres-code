@@ -1,0 +1,90 @@
+- dialog "Settings":
+  - navigation:
+    - text: Settings
+    - button "General":
+      - img
+      - text: General
+    - button "Models":
+      - img
+      - text: Models
+    - button "Shield":
+      - img
+      - text: Shield
+    - button "J-Space":
+      - img
+      - text: J-Space
+    - button "Plugins":
+      - img
+      - text: Plugins
+    - button "Agent presets":
+      - img
+      - text: Agent presets
+  - button "Open configuration file"
+  - button "Close":
+    - img
+    - text: Close
+  - heading "Plugins" [level=2]
+  - paragraph: Configure and inspect the plugins installed in this deployment.
+  - tablist "Plugin views":
+    - tab "Plugin configuration" [selected]
+    - tab "Plugin list"
+  - tabpanel "Plugin configuration":
+    - list:
+      - listitem:
+        - 'button "Show settings: Shell"':
+          - text: Shell Limits every command the agent runs.
+          - img
+      - listitem:
+        - 'button "Show settings: Agent loop"':
+          - text: Agent loop How the agent dispatches tool calls.
+          - img
+      - listitem:
+        - 'button "Hide settings: Web search" [expanded]':
+          - text: Web search Turn on the search methods the agent may use.
+          - img
+        - paragraph: Methods
+        - text: Grok
+        - switch "Grok" [checked]
+        - paragraph: xAI web search, using the same key as the Grok CLI.
+        - text: Claude
+        - switch "Claude" [checked]
+        - paragraph: Anthropic web search, using the same key as the Claude CLI.
+        - text: Codex
+        - switch "Codex" [checked]
+        - paragraph: OpenAI web search, using the same key as the Codex CLI.
+        - text: Kimi
+        - switch "Kimi" [checked]
+        - paragraph: Moonshot web search, using the same key as the Kimi CLI.
+        - text: Ollama
+        - switch "Ollama" [checked]
+        - paragraph: Ollama Cloud web search, using the same key as Ollama Cloud chat.
+        - text: Z.AI
+        - switch "Z.AI" [checked]
+        - paragraph: Z.AI web search, using the same key as Z.AI chat.
+        - text: Perplexity
+        - switch "Perplexity" [checked]
+        - paragraph: Perplexity web search. Turn this off if you do not have a Perplexity key.
+        - text: Perplexity API key No key is configured; search is unavailable until one is.
+        - textbox "Perplexity API key"
+        - paragraph: Stored outside the settings file. Leave blank to keep the current key.
+        - text: Perplexity endpoint
+        - textbox "Perplexity endpoint":
+          - /placeholder: ""
+        - paragraph: Leave blank to use the provider default.
+        - text: DeepSeek
+        - switch "DeepSeek" [checked]
+        - paragraph: DeepSeek web search. Turn this off if you do not have a DeepSeek key.
+        - text: DeepSeek API key No key is configured; search is unavailable until one is.
+        - textbox "DeepSeek API key"
+        - paragraph: Stored outside the settings file. Leave blank to keep the current key.
+        - text: DeepSeek endpoint
+        - textbox "DeepSeek endpoint":
+          - /placeholder: ""
+        - paragraph: Leave blank to use the provider default.
+        - text: Max searches per request
+        - textbox "Max searches per request":
+          - /placeholder: ""
+          - text: "5"
+        - paragraph: How many times one request may search before it must answer.
+        - button "Discard" [disabled]
+        - button "Save" [disabled]
