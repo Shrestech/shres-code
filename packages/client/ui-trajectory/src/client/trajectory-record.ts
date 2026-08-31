@@ -27,6 +27,8 @@ export interface AssistantMetricDetail {
 export interface TrajectorySourceBlock {
   type: string
   content: string
+  /** Reasoning segments coalesced from adjacent reasoning blocks; present only on thinking entries. */
+  segments?: readonly string[]
   imageSrc?: string
   imageAlt?: string
   callId?: string

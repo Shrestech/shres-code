@@ -507,6 +507,7 @@ export function TrajectoryView({
           onToggleAssistant={toggleAssistant}
           inspectCallId={inspect?.callId ?? null}
           onInspectApplied={onInspectDone}
+          t={t}
         />
       </div>
     </div>
