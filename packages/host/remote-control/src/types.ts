@@ -12,6 +12,9 @@ export type RemoteId = Branded<'RemoteId'>
 /** `user@host` connect target, validated against shell-hostile characters. */
 export type RemoteTarget = Branded<'RemoteTarget'>
 
+/** Default loopback port of the remote `shres web` daemon (`packages/boot/cmdline` webserver defaults). */
+export const DEFAULT_REMOTE_DAEMON_PORT = 3080
+
 /** One durable remote alias entry persisted in `remote/remotes.json`. */
 export interface RemoteEntry {
   /** Stable alias key; also the ControlMaster socket and PID-marker name. */
@@ -53,6 +56,7 @@ export type RemoteControlErrorCode =
   | 'unknown-alias'
   | 'gesture-refused'
   | 'removed-while-connecting'
+  | 'no-remote-install'
   | 'probe-failed'
   | 'tunnel-failed'
   | 'version-mismatch'
@@ -116,7 +120,7 @@ export type ConnectOutcome =
   | { status: 'connected'; localPort: number; version: string; fingerprint: string }
   | { status: 'version-mismatch'; observed: string | null; local: string }
   | { status: 'fingerprint-mismatch'; observed: string | null; trusted: string | null }
-  | { status: 'unreachable'; stage: 'probe' | 'tunnel' | 'removed'; message: string }
+  | { status: 'unreachable'; stage: 'probe' | 'tunnel' | 'removed' | 'uninstalled'; message: string }
 
 /** Disconnect decision data: a not-connected alias is a display state, not an error. */
 export type DisconnectOutcome =
@@ -178,8 +182,8 @@ export interface AdminEntryRequest {
   alias: string
   /** `user@host` connect target. */
   target: string
-  /** Remote daemon loopback port. */
-  remotePort: number
+  /** Remote daemon loopback port; omitted resolves to {@link DEFAULT_REMOTE_DAEMON_PORT} at the gateway. */
+  remotePort?: number
 }
 
 /** Wire request for `remoteAdmin/removeEntry`. */

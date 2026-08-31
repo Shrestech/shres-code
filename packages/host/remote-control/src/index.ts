@@ -23,4 +23,5 @@ export type { LiveTunnel, OpenTunnelOptions, SshRunner, SshResult } from './cont
 export { openTunnel, probeDaemonVersion, readInstallationId } from './controller.ts'
 export { allocateLoopbackPort } from './port.ts'
 export { installationIdCommand, masterArgv, parseProbeVersion, probeCommand, tunnelArgv } from './ssh-args.ts'
+export { DEFAULT_REMOTE_DAEMON_PORT } from './types.ts'
 export type { RemoteControlErrorCode, RemoteCliCommand, RemoteEntry, RemoteId, RemoteTarget, TunnelSpec } from './types.ts'

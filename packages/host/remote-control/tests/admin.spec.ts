@@ -246,13 +246,23 @@ describe('RemoteAdminGateway', () => {
   })
 
   it('answers an unreachable daemon as staged outcome data', async () => {
-    const silent = fabricatedRunner({ probeQueue: ['', '', '', '', '', ''], installId: 'install-1', forwardVersion: '0.1.0-rc.5' })
+    const silent = fabricatedRunner({ probeQueue: ['', '', '', '', '', 'installed'], installId: 'install-1', forwardVersion: '0.1.0-rc.5' })
     const { gateway } = await harness(silent)
     await seedLab(gateway)
     const probe = await gateway.connect({ token: await grant(gateway, 'connect', 'lab'), alias: 'lab', allowVersionSkew: false, forceFingerprint: false })
     expect(probe).toMatchObject({ status: 'unreachable', stage: 'probe' })
     if (probe.status !== 'unreachable') throw new Error('unreachable arm')
     expect(probe.message).toContain('host.describe')
+  })
+
+  it('answers a remote with no shres install as the uninstalled stage naming the install command', async () => {
+    const bare = fabricatedRunner({ probeQueue: ['', '', '', '', '', ''], installId: 'install-1', forwardVersion: '0.1.0-rc.5' })
+    const { gateway } = await harness(bare)
+    await seedLab(gateway)
+    const outcome = await gateway.connect({ token: await grant(gateway, 'connect', 'lab'), alias: 'lab', allowVersionSkew: false, forceFingerprint: false })
+    expect(outcome).toMatchObject({ status: 'unreachable', stage: 'uninstalled' })
+    if (outcome.status !== 'unreachable') throw new Error('unreachable arm')
+    expect(outcome.message).toContain('npx @shres-code/shres-code web')
   })
 
   it('maps a dead forward to the tunnel stage', async () => {
@@ -344,6 +354,14 @@ describe('RemoteAdminGateway', () => {
     await gateway.add({ token: addToken, alias: 'prod', target: 'ci@remote.example', remotePort: 3080 })
     await expect(gateway.add({ token: addToken, alias: 'prod', target: 'ci@remote.example', remotePort: 3080 }))
       .rejects.toThrow(/<new alias>/)
+  })
+
+  it('add and edit resolve an omitted daemon port to the web default', async () => {
+    const { gateway } = await harness(fabricatedRunner({}))
+    const added = await gateway.add({ token: await grant(gateway, 'add', null), alias: 'lab', target: 'ci@remote.example' })
+    expect(added.entry).toMatchObject({ remotePort: 3080 })
+    const edited = await gateway.edit({ token: await grant(gateway, 'edit', 'lab'), alias: 'lab', target: 'build@remote.example' })
+    expect(edited.entry).toMatchObject({ remotePort: 3080 })
   })
 
   it('add, edit, and remove mutate the registry under their own grants', async () => {

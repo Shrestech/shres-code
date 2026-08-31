@@ -19,7 +19,7 @@ SSH-tunnel controller for VS Code-style remote connect: a durable remote-alias r
 | `allocateLoopbackPort` | bind-verify-rebind port allocation; a stolen port becomes a loud `ExitOnForwardFailure` failure |
 | `TunnelManager` | in-memory liveness authority for the process's own tunnels: one record per alias, `run/<alias>.pid` markers, and a full-state `remote-control/tunnel-state` publication on every committed transition; gateway teardown ends the process's tunnels |
 
-CLI: `shres remote add|list|remove|connect` (see `shres remote --help`); `connect` stays foreground, prints the tunneled GUI URL, and disposes the forward + master on SIGINT.
+CLI: `shres remote add|list|remove|connect` (see `shres remote --help`); `connect` stays foreground, prints the tunneled GUI URL, and disposes the forward + master on SIGINT. `add` and `edit` default the daemon port to the remote `shres web` loopback default 3080 when the request omits it. A silent probe on a remote with no shres install surfaces as the `uninstalled` stage carrying the install command instead of the port-naming probe failure.
 
 ## Model Experience
 

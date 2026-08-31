@@ -28,7 +28,7 @@ export const en = {
   'form.add': 'Add remote…',
   'form.alias': 'Alias',
   'form.target': 'Target (user@host)',
-  'form.port': 'Remote port',
+  'form.port': 'Daemon port (shres web on the remote, default 3080)',
   'form.save': 'Save',
   'form.cancel': 'Cancel',
   'form.editing': 'Editing {alias}',

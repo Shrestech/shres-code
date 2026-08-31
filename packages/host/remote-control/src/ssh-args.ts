@@ -73,6 +73,16 @@ export function installationIdCommand(): string {
 }
 
 /**
+ * Remote command checking whether a shres install exists at all: prints
+ * `installed` when either the CLI binary is on PATH or a `~/.shres` home is
+ * present, and nothing otherwise.
+ * @returns shell command string executed over `ssh`.
+ */
+export function installationCheckCommand(): string {
+  return 'command -v shres >/dev/null 2>&1 && echo installed || { [ -d "${SHRES_HOME:-$HOME/.shres}" ] && echo installed || true; }'
+}
+
+/**
  * Parse a `host.describe` response captured through the probe; failure is
  * data here (remote-down, wrong-port, garbage), so callers receive null.
  * @param stdout - combined probe output.

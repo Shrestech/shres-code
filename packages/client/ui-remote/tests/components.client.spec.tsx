@@ -406,7 +406,8 @@ describe('RemotesSection', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add remote…' }))
     fireEvent.change(screen.getByLabelText('Alias'), { target: { value: 'lab' } })
     fireEvent.change(screen.getByLabelText('Target (user@host)'), { target: { value: 'ci@lab.remote.example' } })
-    fireEvent.change(screen.getByLabelText('Remote port'), { target: { value: '3080' } })
+    const portInput = screen.getByLabelText('Daemon port (shres web on the remote, default 3080)') as HTMLInputElement
+    expect(portInput.value).toBe('3080')
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await vi.waitFor(() =>{  expect(props.addRemote).toHaveBeenCalledWith({ alias: 'lab', target: 'ci@lab.remote.example', remotePort: 3080 }) })
     await vi.waitFor(() =>{  expect(screen.queryByLabelText('Alias')).toBeNull() })
@@ -419,7 +420,8 @@ describe('RemotesSection', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add remote…' }))
     fireEvent.change(screen.getByLabelText('Alias'), { target: { value: 'prod' } })
     fireEvent.change(screen.getByLabelText('Target (user@host)'), { target: { value: 'ci@prod.remote.example' } })
-    fireEvent.change(screen.getByLabelText('Remote port'), { target: { value: '3080' } })
+    const portInput = screen.getByLabelText('Daemon port (shres web on the remote, default 3080)') as HTMLInputElement
+    expect(portInput.value).toBe('3080')
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await vi.waitFor(() =>{  expect(screen.getByText('alias already exists')).toBeTruthy() })
     // Cancel closes the form without another submit.
@@ -453,7 +455,7 @@ describe('RemotesSection', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Remote actions for prod' }))
     fireEvent.click(screen.getByText('Edit'))
     fireEvent.change(screen.getByLabelText('Target (user@host)'), { target: { value: 'ci@prod.remote.example' } })
-    fireEvent.change(screen.getByLabelText('Remote port'), { target: { value: '4080' } })
+    fireEvent.change(screen.getByLabelText('Daemon port (shres web on the remote, default 3080)'), { target: { value: '4080' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await vi.waitFor(() => {
       expect(props.editRemote).toHaveBeenCalledWith('prod', { alias: 'prod', target: 'ci@prod.remote.example', remotePort: 4080 })
