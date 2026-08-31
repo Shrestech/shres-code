@@ -8,7 +8,7 @@ The first jspace-advisor skeleton (see [the original note](./2026-08-29-jspace-b
 
 ## Decision
 
-Both channels now run fresh one-shot reviewer children on one explicit route.
+Both channels now run fresh one-shot reviewer children on one explicit route. Partially superseded: the proactive channel is now one standing continuable child with delta turns — see [the standing-reviewer note](./2026-08-31-jspace-advisor-persistent-reviewer.md); the consult channel and every trigger/digest decision below still stand.
 
 - **Goal anchor is the user-message stream, not the card Goal.** The card Goal is agent-authored and provably placeholder-grade (`always-open` and bare `/j-space on` open Goal "J-Space is on"). The digest carries every source-`user` message oldest-first (first message always retained, per-message and history caps as Config fields), with the card framed as the session's own claim. The trailing tool window renders last so the digest cap truncates it first.
 - **Triggers classify mid-turn**; the dead `userTurnOpen` gate is gone. Charter discrimination probes (phase `probe`) are excluded — a demonstrated probe logs `passed: false` and would otherwise fire a bogus charter-fail. Error bursts count across interleaved `tool/call`s and break only at a successful result.

@@ -38,6 +38,34 @@ export interface JspaceAdvisorAdvice {
   readonly seq: number
 }
 
+/**
+ * Bounded fold of what changed in a parent session since the standing
+ * reviewer's last turn. The reviewer's own conversation already holds the
+ * previous digest and verdicts; a delta turn restates only the goal anchor,
+ * the new user messages, the current card, and the trailing window since the
+ * last review.
+ */
+export interface JspaceAdvisorDelta {
+  /** First source-'user' message, bounded; the goal ground truth anchor. */
+  readonly goal: string
+  /** Source-'user' messages with seq beyond sinceSeq, oldest-first, bounded. */
+  readonly userMessages: readonly string[]
+  /** Rendered open card - the session's own claim - or null when none is open. */
+  readonly card: string | null
+  /** Trailing tool signals with seq beyond sinceSeq, oldest-first, capped by maxTools. */
+  readonly recentTools: readonly JspaceAdvisorToolSignal[]
+  /** Completed step count with seq beyond sinceSeq. */
+  readonly steps: number
+  /** Session event seq the previous review folded through. */
+  readonly sinceSeq: number
+  /** Session event seq this delta folded through. */
+  readonly seq: number
+  /** Item cap applied to recentTools. */
+  readonly maxTools: number
+  /** Character cap applied to the complete render. */
+  readonly maxChars: number
+}
+
 /** One trailing tool signal in the advisory digest. */
 export interface JspaceAdvisorToolSignal {
   /** Tool name. */

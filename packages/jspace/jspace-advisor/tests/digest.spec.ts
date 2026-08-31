@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Session, SessionEvent } from '@shres-code/shres-code-session'
 import type { JspaceCard } from '@shres-code/shres-code-jspace'
-import { boundText, foldAdvisorDigest, foldUserMessages, renderAdvisorDigest, TRUNCATION_MARKER } from '../src/digest.ts'
+import { boundText, foldAdvisorDelta, foldAdvisorDigest, foldUserMessages, renderAdvisorDelta, renderAdvisorDigest, TRUNCATION_MARKER } from '../src/digest.ts'
 
 /** Minimal session stub carrying only the events the fold reads. */
 function sessionWith(events: readonly unknown[], seq = 0): Session {
@@ -192,5 +192,50 @@ describe('renderAdvisorDigest', () => {
     expect(render.length).toBeLessThanOrEqual(30)
     expect(render.endsWith(TRUNCATION_MARKER)).toBe(true)
     expect(render.startsWith('User messages')).toBe(true)
+  })
+})
+
+describe('foldAdvisorDelta', () => {
+  it('folds only user messages and steps beyond sinceSeq while restating the goal', () => {
+    const delta = foldAdvisorDelta(sessionWith([
+      userMsg('goal', 1),
+      { type: 'step/end', seq: 2, data: {} },
+      userMsg('new ask', 5),
+      { type: 'step/end', seq: 6, data: {} },
+      { type: 'step/end', seq: 7, data: {} },
+    ], 7), CARD, CAPS, 3)
+    expect(delta.goal).toBe('goal')
+    expect(delta.userMessages).toEqual(['new ask'])
+    expect(delta.steps).toBe(2)
+    expect(delta.sinceSeq).toBe(3)
+    expect(delta.seq).toBe(7)
+  })
+
+  it('pairs only tool signals that fall inside the delta window', () => {
+    const delta = foldAdvisorDelta(sessionWith([
+      { type: 'tool/call', seq: 1, data: { callId: 'old', name: 'bash' } },
+      { type: 'tool/result', seq: 2, data: { message: { source: { kind: 'tool', callId: 'old' }, content: [{ type: 'tool-result' }] } } },
+      { type: 'tool/call', seq: 5, data: { callId: 'new', name: 'read' } },
+      { type: 'tool/result', seq: 6, data: { message: { source: { kind: 'tool', callId: 'new' }, content: [{ type: 'tool-result' }] } } },
+    ], 6), null, CAPS, 3)
+    expect(delta.recentTools).toEqual([{ name: 'read', ok: true }])
+  })
+
+  it('renders the goal, the delta boundary, and the new messages', () => {
+    const delta = foldAdvisorDelta(sessionWith([
+      userMsg('goal', 1),
+      userMsg('new ask', 4),
+    ], 4), CARD, CAPS, 3)
+    const render = renderAdvisorDelta(delta)
+    expect(render).toContain('Goal (U1): goal')
+    expect(render).toContain('New user messages since event 3:')
+    expect(render).toContain('N1: new ask')
+    expect(render).toContain('Steps completed since the last review: 0')
+    expect(render.indexOf('Goal (U1)')).toBeLessThan(render.indexOf('N1: new ask'))
+  })
+
+  it('states when no new user message arrived', () => {
+    const delta = foldAdvisorDelta(sessionWith([userMsg('goal', 1)], 2), null, CAPS, 1)
+    expect(renderAdvisorDelta(delta)).toContain('New user messages since event 1: (none)')
   })
 })

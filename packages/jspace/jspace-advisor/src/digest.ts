@@ -14,7 +14,7 @@ import {
   formatJspaceCard,
 } from '@shres-code/shres-code-jspace'
 import type { JspaceCard } from '@shres-code/shres-code-jspace'
-import type { JspaceAdvisorDigest, JspaceAdvisorToolSignal } from './types.ts'
+import type { JspaceAdvisorDelta, JspaceAdvisorDigest, JspaceAdvisorToolSignal } from './types.ts'
 
 /** Truncation marker appended when a bounded field is cut. */
 export const TRUNCATION_MARKER = '…'
@@ -180,6 +180,15 @@ export function foldAdvisorDigest(
   }
 }
 
+/** Render trailing tool signals, oldest-first, one per line. */
+function renderToolSignals(signals: readonly JspaceAdvisorToolSignal[]): string {
+  return signals
+    .map(signal => signal.ok
+      ? 'ok ' + signal.name
+      : 'FAIL ' + signal.name + (signal.errorExcerpt === undefined ? '' : ': ' + signal.errorExcerpt))
+    .join('\n')
+}
+
 /**
  * Render the digest as the reviewer's input text, bounded to maxChars.
  * Order is truncation priority: the user stream (goal ground truth) and the
@@ -200,12 +209,87 @@ export function renderAdvisorDigest(digest: JspaceAdvisorDigest): string {
   if (digest.card !== null) lines.push('Session card (the session\'s own claim):\n' + digest.card)
   lines.push('Completed steps: ' + String(digest.steps))
   if (digest.recentTools.length > 0) {
-    const tools = digest.recentTools
-      .map(signal => signal.ok
-        ? 'ok ' + signal.name
-        : 'FAIL ' + signal.name + (signal.errorExcerpt === undefined ? '' : ': ' + signal.errorExcerpt))
-      .join('\n')
-    lines.push('Recent tool outcomes:\n' + tools)
+    lines.push('Recent tool outcomes:\n' + renderToolSignals(digest.recentTools))
   }
   return boundText(lines.join('\n'), digest.maxChars)
+}
+/**
+ * First non-empty source-'user' message text, bounded, or an empty string
+ * when the session carries none.
+ * @param events - session log.
+ * @param max - character cap.
+ * @returns the bounded goal statement.
+ */
+function goalMessage(events: readonly SessionEvent[], max: number): string {
+  for (const event of events) {
+    if (event.type !== 'user/message') continue
+    if (event.data.source.kind !== 'user') continue
+    const text = userMessageText(event)
+    if (text.length === 0) continue
+    return boundText(text, max)
+  }
+  return ''
+}
+
+/**
+ * Fold the bounded delta since the standing reviewer's previous turn. The
+ * tool window pairs only calls and results that both fall inside the delta:
+ * a call from before the last review whose result landed after it carries no
+ * signal.
+ * @param session - live session whose log to fold.
+ * @param card - the open card, or null when none is open.
+ * @param caps - digest caps.
+ * @param sinceSeq - session event seq the previous review folded through.
+ * @returns the delta.
+ */
+export function foldAdvisorDelta(
+  session: Session,
+  card: JspaceCard | null,
+  caps: AdvisorDigestCaps,
+  sinceSeq: number,
+): JspaceAdvisorDelta {
+  const since = session.events.filter(event => event.seq > sinceSeq)
+  const history = foldUserMessages(since, caps.maxUserMessage, caps.maxUserHistory)
+  const renderedCard = card === null
+    ? null
+    : formatJspaceCard(card, {
+      checkedReprintLimit: DEFAULT_CHECKED_REPRINT_LIMIT,
+      openReprintLimit: DEFAULT_OPEN_REPRINT_LIMIT,
+    })
+  return {
+    goal: goalMessage(session.events, caps.maxUserMessage),
+    userMessages: history.messages,
+    card: renderedCard,
+    recentTools: recentTools(since, caps.maxTools, caps.maxExcerpt),
+    steps: countSteps(since),
+    sinceSeq,
+    seq: session.seq,
+    maxTools: caps.maxTools,
+    maxChars: caps.maxChars,
+  }
+}
+
+/**
+ * Render the delta as the reviewer's follow-up input text, bounded to
+ * maxChars with the same truncation priority as the full digest: the goal
+ * anchor, new user messages, and the card survive first and the tool window
+ * renders last.
+ * @param delta - folded delta.
+ * @returns the bounded render.
+ */
+export function renderAdvisorDelta(delta: JspaceAdvisorDelta): string {
+  const lines: string[] = []
+  if (delta.goal.length > 0) lines.push('Goal (U1): ' + delta.goal)
+  if (delta.userMessages.length > 0) {
+    const fresh = delta.userMessages.map((text, index) => 'N' + String(index + 1) + ': ' + text).join('\n')
+    lines.push('New user messages since event ' + String(delta.sinceSeq) + ':\n' + fresh)
+  } else {
+    lines.push('New user messages since event ' + String(delta.sinceSeq) + ': (none)')
+  }
+  if (delta.card !== null) lines.push('Session card (the session\'s own claim):\n' + delta.card)
+  lines.push('Steps completed since the last review: ' + String(delta.steps))
+  if (delta.recentTools.length > 0) {
+    lines.push('Tool outcomes since the last review:\n' + renderToolSignals(delta.recentTools))
+  }
+  return boundText(lines.join('\n'), delta.maxChars)
 }

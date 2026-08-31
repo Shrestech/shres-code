@@ -1,31 +1,32 @@
 /**
  * Proactive review machinery: trigger classification (event triggers plus the
- * step-cadence drift check), reviewer persona and prompt, and the settle
- * mapping for a one-shot reviewer run. All cadence and dedup state derives
- * from the session log so replays and forks reconstruct it.
+ * step-cadence drift check), the standing reviewer's persona and turn prompts
+ * (full digest first, deltas after), and the verdict parser for the JSON
+ * reply protocol. All cadence and dedup state derives from the session log
+ * so replays and forks reconstruct it.
  * @module @shres-code/shres-code-jspace-advisor/review
  */
 
 import type { Session, SessionEvent } from '@shres-code/shres-code-session'
-import type { SubagentResult } from '@shres-code/shres-code-subagent'
-import type { ObjectJsonSchema } from '@shres-code/shres-code-tools'
-import { stopReasonError, withPartialText } from './consult.ts'
-import { renderAdvisorDigest } from './digest.ts'
-import type { JspaceAdvisorDigest, AdvisorTrigger } from './types.ts'
+import { renderAdvisorDigest, renderAdvisorDelta } from './digest.ts'
+import type { JspaceAdvisorDelta, JspaceAdvisorDigest, AdvisorTrigger } from './types.ts'
 
 /** Built-in reviewer persona; overridable via Config. */
 export const DEFAULT_REVIEWER_PERSONA =
-  'You are the jspace advisor, a reviewer model judging one bounded digest of the main session. '
-  + 'The digest carries the user messages (U1, U2, ...) — the ground truth of the user goal, '
-  + 'U1 always retained — and the session card, which is only what the session believes its '
-  + 'goal is and may be stale or a placeholder. Judge the recent work against the USER goal, '
-  + 'not the card. The digest is the main session and is sufficient input for the verdict: '
-  + 'do not read your own session log and do not search for other sessions. '
-  + 'Use a read-only tool only when the digest is genuinely insufficient, at most one call. '
-  + 'Always finish with the structured verdict. '
-  + 'When the work serves the goal: verdict on-track, one-line advice. When it drifts: verdict '
-  + 'drift, advice naming the drift in one sentence, and redirect giving the exact correction — '
-  + 'what to drop and what to do next to serve the goal.'
+  'You are the jspace advisor, the standing reviewer of one main session. '
+  + 'Your conversation holds every earlier digest and verdict; each turn brings either the '
+  + 'full digest or one delta since your last review, and the user messages (U1, U2, ...) are '
+  + 'the ground truth of the user goal - U1 always restated - while the session card is only '
+  + 'what the session believes its goal is and may be stale or a placeholder. Judge the recent '
+  + 'work against the USER goal, not the card. The digest and deltas are the main session and '
+  + 'are sufficient input: do not search for other sessions. '
+  + 'Use a read-only tool only when the input is genuinely insufficient, at most one call. '
+  + 'End every review turn with exactly one reply that is a single JSON object and no other '
+  + 'text: {"verdict":"on-track"|"drift","advice":"<one sentence>","redirect":"<exact correction>"}. '
+  + 'When the work serves the goal: verdict on-track and one-line advice. When it drifts: '
+  + 'verdict drift, advice naming the drift in one sentence, and redirect giving the exact '
+  + 'correction - what to drop and what to do next to serve the goal. Omit redirect when '
+  + 'on-track.'
 
 /**
  * Default reviewer tool filter: durable knowledge reads mounted in every
@@ -38,7 +39,7 @@ export const DEFAULT_REVIEWER_TOOLS = [
   'wiki_read',
 ] as const
 
-/** Display label persisted with every reviewer child in the subagent list. */
+/** Display label persisted with the advisor child in the subagent list. */
 export const ADVISOR_CHILD_LABEL = 'Advisor'
 
 /** Whether a session is a root (not a delegated child). */
@@ -56,38 +57,9 @@ export interface ReviewVerdict {
   readonly redirect?: string
 }
 
-/** Object-rooted JSON Schema for the structured proactive verdict, in the enforced subset. */
-export const REVIEW_OUTPUT_JSON_SCHEMA: ObjectJsonSchema = {
-  type: 'object',
-  additionalProperties: false,
-  required: ['verdict', 'advice'],
-  properties: {
-    verdict: { type: 'string', enum: ['on-track', 'drift'] },
-    advice: { type: 'string' },
-    redirect: { type: 'string' },
-  },
-}
-
 /**
- * Settle a proactive reviewer run into its structured verdict.
- * @param result - the child's terminal result.
- * @returns the structured verdict.
- * @throws {Error} when the run did not complete or returned no verdict.
- */
-export function settleReview(result: SubagentResult): ReviewVerdict {
-  const error = stopReasonError(result)
-  if (error !== undefined) throw new Error(withPartialText(error, result.output))
-  const structured = result.structured as ReviewVerdict | undefined
-  if (structured === undefined || typeof structured.advice !== 'string'
-    || (structured.verdict !== 'on-track' && structured.verdict !== 'drift')) {
-    throw new Error('jspace-advisor reviewer returned no structured verdict')
-  }
-  return structured
-}
-
-/**
- * Build the reviewer prompt for one proactive review: the rendered digest
- * plus the trigger that woke it.
+ * Build the reviewer's first-turn prompt: the rendered full digest plus the
+ * trigger that woke it.
  * @param digest - folded advisory digest.
  * @param trigger - why the review ran.
  * @returns the prompt text.
@@ -95,7 +67,84 @@ export function settleReview(result: SubagentResult): ReviewVerdict {
 export function buildReviewPrompt(digest: JspaceAdvisorDigest, trigger: AdvisorTrigger): string {
   return renderAdvisorDigest(digest) + '\n\nTrigger: ' + trigger + '\n'
     + 'The digest above is the main session. Review it against the user goal '
-    + 'and return the structured verdict now.'
+    + 'and reply with only the verdict JSON now.'
+}
+
+/**
+ * Build a follow-up turn's prompt: the rendered delta since the reviewer's
+ * previous turn plus the trigger that woke it.
+ * @param delta - folded advisory delta.
+ * @param trigger - why the review ran.
+ * @returns the prompt text.
+ */
+export function buildReviewDeltaPrompt(delta: JspaceAdvisorDelta, trigger: AdvisorTrigger): string {
+  return renderAdvisorDelta(delta) + '\n\nTrigger: ' + trigger + '\n'
+    + 'The delta above is what changed in the main session since your last '
+    + 'review. Weigh it against the user goal and your earlier verdicts, then '
+    + 'reply with only the verdict JSON now.'
+}
+
+/**
+ * Parse one reviewer reply under the JSON protocol. Accepts a bare object, a
+ * fenced code block, or an object embedded in stray prose (outermost braces);
+ * anything else that does not carry a valid verdict is a failed review turn.
+ * @param text - the reply text.
+ * @returns the verdict, or undefined when the reply carries none.
+ */
+export function parseReviewVerdict(text: string): ReviewVerdict | undefined {
+  const candidates: string[] = []
+  const trimmed = text.trim()
+  candidates.push(trimmed)
+  const fence = /^```[a-zA-Z]*\s*([\s\S]*?)\s*```$/.exec(trimmed)
+  if (fence?.[1] !== undefined) candidates.push(fence[1])
+  const first = trimmed.indexOf('{')
+  const last = trimmed.lastIndexOf('}')
+  if (first >= 0 && last > first) candidates.push(trimmed.slice(first, last + 1))
+  for (const candidate of candidates) {
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(candidate)
+    } catch {
+      // Not JSON under this candidate; the next candidate may be.
+      continue
+    }
+    if (typeof parsed !== 'object' || parsed === null) continue
+    const value = parsed as { verdict?: unknown; advice?: unknown; redirect?: unknown }
+    if (value.verdict !== 'on-track' && value.verdict !== 'drift') continue
+    if (typeof value.advice !== 'string') continue
+    if (value.redirect !== undefined && typeof value.redirect !== 'string') continue
+    return {
+      verdict: value.verdict,
+      advice: value.advice,
+      ...value.redirect === undefined ? {} : { redirect: value.redirect },
+    }
+  }
+  return undefined
+}
+
+/**
+ * Read the verdict of one completed advisor-child turn: the latest
+ * assistant message whose text parses under the JSON protocol. Turn steps
+ * before the reply (reasoning, tool calls) never parse, so the scan lands on
+ * the reply.
+ * @param session - the advisor child's session after its turn ended.
+ * @returns the verdict, or undefined when the turn carries none.
+ */
+export function parseFinalVerdict(session: Session): ReviewVerdict | undefined {
+  for (let index = session.events.length - 1; index >= 0; index -= 1) {
+    const event = session.events[index]
+    if (event === undefined || event.type !== 'assistant/message') continue
+    const content = (event.data.message as { content?: ReadonlyArray<{ type?: string; text?: string }> }).content
+    const text = (content ?? [])
+      .filter(part => part.type === 'text' && typeof part.text === 'string')
+      .map(part => part.text)
+      .join('')
+      .trim()
+    if (text.length === 0) continue
+    const verdict = parseReviewVerdict(text)
+    if (verdict !== undefined) return verdict
+  }
+  return undefined
 }
 
 /** Whether the event is an errored, tool-sourced tool/result. */
@@ -139,7 +188,7 @@ function countConsecutiveErrors(log: readonly SessionEvent[], seq: number): numb
 
 /**
  * Classify one committed event as a proactive review trigger, or `undefined`.
- * step/end events are not handled here — the drift cadence is
+ * step/end events are not handled here - the drift cadence is
  * {@link classifyDrift}. Charter discrimination probes (phase 'probe') are
  * harness machinery, not session failures, and never trigger.
  * Coalescing (one review per user turn) is applied by the caller.
