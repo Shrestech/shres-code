@@ -1,0 +1,92 @@
+# Agent Note: hosted web search and X search on grok-session
+
+Status: implemented
+
+## Problem
+
+The Grok subscription-session route (llm-grok-session) could only run search through a harness-local
+tool (tool-web's web_search). The Grok subscription proxy, like the Grok Build CLI's own sampler, can
+execute web search and X (Twitter) search on the model's behalf when the request declares them as
+hosted Responses tools (`{ type: "web_search" }`, `{ type: "x_search" }`). Nothing spliced those
+declarations into the outgoing tools array, nothing dropped the colliding local web_search while a
+hosted one ran (so a model could be offered both and the loop would only ever dispatch the local
+copy), and a server-executed x_search invocation surfaced as an ordinary pi-ai tool call that the
+loop would try to dispatch as a local tool named x_search. PR-B (server-tool-call content block)
+laid the result vessel and the loop guard; this PR is the producer that fills it.
+
+## Decision
+
+Serve hosted search per switch on the llm-grok-session settings surface (hostedWebSearch and
+hostedXSearch, both default off), execute it entirely on the provider backend, and record each
+hosted invocation as a server-tool-call block the loop never dispatches.
+
+- **Request side — onPayload splice, no pi-ai fork.** The shared llm-pi-ai adapter gains an optional
+  hostedSearch option (a thunk read live per stream call). It builds pi-ai's onPayload hook that
+  splices the hosted tool entries into the outgoing `tools` array and drops the colliding local
+  function tool named web_search while hosted web search is on (**hosted wins on name collision**).
+  The entry JSON and names mirror the Grok Build CLI's sampler in
+  `crates/codegen/xai-grok-sampling-types` (WebSearchOptions/XSearchOptions `to_tool_entry`), so the
+  harness speaks the same wire a signed-in `grok` CLI does.
+- **Response side — map both inbound shapes through toServerToolCallBlock.** llm-pi-ai's new
+  hosted-tools module projects a `web_search_call` output item and a hosted `custom_tool_call` item
+  (x_search) into the bounded ServerToolCallBlock via the single toServerToolCallBlock seam. The
+  x_search path is wired live: pi-ai surfaces the hosted custom tool call as a tool call named
+  x_search, and the adapter's stream transform promotes it to a server-tool-call block, so the loop's
+  isLocalToolCall predicate excludes it structurally.
+- **Config fails loud.** resolveHostedSearch defaults both switches off and refuses a non-boolean
+  switch at the config boundary; the settings validator calls it so a bad write is refused where it is
+  written. No hardcoded tunables; both switches are settings surface.
+- **web_search_call live-capture gap (documented).** The pinned pi-ai dependency drops web_search_call
+  output items (and the backend's url_citation annotations) in its createSlot and exposes no
+  response-body hook, so the harness cannot observe a server-executed web search's item live without
+  forking pi-ai or a raw-wire read. webSearchCallToServerToolCall is therefore a unit-tested converter
+  seam wired for the real item shape (id/status/action.sources): the model's synthesized answer text
+  still arrives and is logged, and no local web_search is run, but the search action, its query, and
+  structured citations are not recorded or rendered until a pi-ai change surfaces the item.
+
+## Verification
+
+llm-pi-ai and llm-grok-session unit suites run without network against the local proxy stand-in:
+hosted tool entries render the exact wire JSON; the payload splice appends entries and drops the
+local web_search only while hosted web search is on; web_search_call and hosted custom_tool_call map
+to ServerToolCallBlock (bounds, status, id, freeze) and a non-hosted custom tool stays a normal tool
+call; the stream transform promotes x_search to a server-tool-call block end-to-end through grok-
+session and isLocalToolCall rejects it; config switches default off and fail loud on a non-boolean.
+PR-B's agent-loop suite continues to pin that a server-tool-call block is never dispatched.
+llm-pi-ai and llm-grok-session typecheck clean, oxlint reports zero new errors, duplication is at the
+42 baseline, and verify-type-equiv is green. The module/config/cordis catalogs were regenerated. One
+pre-existing base-red test was repaired: llm-pi-ai's adapter.spec helper-absence list still named
+resolveProfiles, which the package root exports and llm-grok-session imports from the root, so that
+entry was removed from the list (with a comment) to make the suite green.
+
+## Alternatives considered
+
+- **Map web_search_call live in the pi-ai stream translation.** Rejected because pi-ai drops
+  web_search_call in createSlot before the harness sees any event and exposes no response-body hook;
+  mapping it live would require forking the pinned pi-ai dependency, which the design rules out. The
+  converter exists and is tested; wiring it is gated on a pi-ai surface change or a raw-wire read.
+- **Fork pnpm-patched pi-ai to surface web_search_call.** Rejected: it adds a maintained fork the repo
+  does not otherwise carry, contradicts the shared-adapter contract, and the harness's own splice and
+  promotion cover the model-visible behavior (results in assistant text, no local dispatch). The
+  loss is only the web search's own log block, which PR-B's generic fallback already renders.
+- **Own the Responses stream in grok-session instead of reusing the shared adapter.** Rejected: it
+  duplicates pi-ai's whole streaming/replay machinery and contradicts this package's documented
+  reuse of the shared adapter; the onPayload splice plus stream promotion keeps one adapter in play.
+- **Expose hosted search as adapter config instead of a per-route settings surface.** Rejected: the
+  per-route switches belong on the grok-session settings surface where the route's other tunables
+  live, and a provider-neutral adapter option accepts them as a thunk.
+
+## Consequences
+
+- Hosted searches run wholly server-side; results ride the assistant text. x_search is recorded as a
+  server-tool-call block and never dispatched. The local tool-web web_search is withdrawn from the
+  request only while hosted web search is on for the grok-session route.
+- A hosted x_search turn degrades its pi-ai replay metadata on the next request (the server-tool-call
+  block is not representable in pi-ai history), matching PR-B's documented replay degradation; the
+  assembled assistant content remains the authoritative record.
+- Replay fidelity and the block's generic fallback rendering are unchanged; no presenter was added
+  because the generic fallback already renders the block and a results presenter is deferred (the
+  block is stable).
+- Default behavior is unchanged: with both switches off (the default) the route behaves exactly as
+  before. The one pre-existing test edit is the adapter.spec helper-absence repair described in
+  Verification; every other pre-existing grok-session and pi-ai test passes unchanged.

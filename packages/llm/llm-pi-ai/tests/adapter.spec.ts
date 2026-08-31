@@ -355,8 +355,9 @@ describe('PiAiAdapter provider routing', () => {
 
 describe('provider profile lifecycle', () => {
   it('keeps adapter helpers off the package root', () => {
+    // resolveProfiles is a public resolver shres-llm-grok-session imports from
+    // the package root, so it is deliberately absent from this internal list.
     for (const helper of [
-      'resolveProfiles',
       'toPiContext',
       'toPiReplayState',
       'toPiAssistant',

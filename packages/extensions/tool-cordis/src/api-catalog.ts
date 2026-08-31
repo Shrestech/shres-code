@@ -3408,7 +3408,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ContentBlockMap',
-    declaration: 'export interface ContentBlockMap {\n    \'text\': TextBlock;\n    \'reasoning\': ReasoningBlock;\n    \'image\': ImageBlock;\n    \'tool-call\': ToolCallBlock;\n    \'tool-result\': ToolResultBlock;\n}',
+    declaration: 'export interface ContentBlockMap {\n    \'text\': TextBlock;\n    \'reasoning\': ReasoningBlock;\n    \'image\': ImageBlock;\n    \'tool-call\': ToolCallBlock;\n    \'tool-result\': ToolResultBlock;\n    \'server-tool-call\': ServerToolCallBlock;\n}',
   },
   {
     name: 'ContentBlockType',
@@ -4449,6 +4449,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ServerResponse',
     declaration: 'export interface ServerResponse {\n    type: \'server-response\';\n    rpcId: RpcId;\n    result: RpcResult<unknown>;\n}',
+  },
+  {
+    name: 'ServerToolCallBlock',
+    declaration: 'export interface ServerToolCallBlock {\n    type: \'server-tool-call\';\n    kind: string;\n    name?: string;\n    id?: CallId;\n    status: \'completed\' | \'failed\';\n    results?: ServerToolResult[];\n}',
+  },
+  {
+    name: 'ServerToolResult',
+    declaration: 'export interface ServerToolResult {\n    title?: string;\n    url?: string;\n    snippet?: string;\n}',
   },
   {
     name: 'SessionAvailability',

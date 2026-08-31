@@ -24,6 +24,8 @@ The optional `llm-grok-session` settings section overlays the composition entry 
 | `models` | `grok-4.6`, `grok-4.5` (500k context, `low`/`medium`/`high`/`xhigh`) | Catalog; a new proxy release is a settings entry, not a code change. |
 | `refreshLeewayMs` | `300000` | Refresh when the token is at or within this distance of expiry. |
 | `cliVersion` | `1.0.13` | CLI version the route advertises via `x-grok-client-version` (sent with `X-XAI-Token-Auth: xai-grok-cli` and `x-grok-client-identifier: grok-shell`, the header set the proxy's 426 gate requires); a proxy floor bump is a settings entry. |
+| `hostedWebSearch` | `false` | Serve web search as a hosted backend tool instead of the local `tool-web` tool. While on, the colliding local `web_search` function tool is dropped from the request for this route (hosted wins). |
+| `hostedXSearch` | `false` | Serve X (Twitter) search as a hosted backend tool. |
 
 ## Model Experience
 
@@ -41,9 +43,28 @@ Usage chunks carry the proxy's reported input/output/reasoning token counts; the
 
 Provider-side. The proxy reports cached input inside its usage when it serves a cache hit; this adapter passes those counts through as `cacheReadTokens` unchanged.
 
+## Hosted search
+
+The route can present web search and X (Twitter) search as hosted backend tools - the provider
+(the Grok proxy) executes the search on the model's behalf - instead of asking a harness tool to
+run it. Both switches default off.
+
+When a switch is on, the matching Responses tool entry is spliced into the outgoing request's
+tools array through the shared adapter's payload hook, mirroring the declarations the Grok Build
+CLI itself sends: {"type": "web_search"} and {"type": "x_search"}. Because the names collide with a
+harness-local tool-web web_search, hosted wins: while hosted web search is on, the local
+web_search function tool is dropped from the request so the model can reach only the backend tool;
+a local tool registered for other names is unaffected. A local function tool also named x_search
+stays in the request while hostedXSearch is on, and its model-invoked calls are promoted to
+server-tool-call and never execute locally. The hosted x_search invocation is promoted
+to a server-tool-call content block in the stream, so the agent loop logs it but never dispatches
+it as a local tool; search results ride the assistant text the model writes.
+
+The provider executes the search; this route never runs a local web_search for it.
 ## Known Limitations and Deferred Work
 
 - **Unofficial wire** — `auth.json`'s format, the proxy's paths, and the CLI's client id are the Grok Build CLI's implementation details, not a published contract; a CLI self-update can change them, and this package pins no client id (the credential's own is echoed at refresh).
 - **Refresh races are resolved by adoption, not prevention** — a sibling that refreshes concurrently wins the document; this adapter adopts its token rather than clobbering it, matching the CLI's own refresher.
 - **Billing follows the subscription** — usage on this route consumes SuperGrok quota and reports the proxy's cost figures; it is not metered by the X API.
 - **No silent first-run onboarding** — `providerUsable` treats the live route as usable, so the Models CLI shows it active without a login; the failure arrives at first use by design (fail loud at the earliest resolvable point).
+- **Hosted `web_search_call` items stay invisible** — the pinned pi-ai dependency drops `web_search_call` output items (and the backend's `url_citation` annotations) before the harness sees them and exposes no response-body hook, so this route records neither the search action, its query, nor structured citations while that holds. The model's synthesized answer text still arrives and is logged; X search does surface and is recorded as a `server-tool-call` block. The conversion seam (`webSearchCallToServerToolCall` in `shres-code-llm-pi-ai`) is tested and ready for a pi-ai surface change or a raw-wire read.

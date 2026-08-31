@@ -2,7 +2,7 @@
 
 Generic multi-provider adapter for the harness LLM seam backed by [`@earendil-works/pi-ai`](https://www.npmjs.com/package/@earendil-works/pi-ai). One plugin instance owns a dict of provider profiles keyed by route; every request selects a profile with `GenerateOptions.provider` and resolves `GenerateOptions.model` against that route's configured catalog. A route naming an installed pi-ai provider inherits its endpoint, wire protocol, and model catalog as defaults and overrides them field by field; a route pi-ai does not ship is declared outright, so an OpenAI-compatible gateway, a self-hosted server, or a provider newer than the installed catalog is configuration rather than a code change.
 
-The package root exposes the Cordis plugin contract, `PiAiAdapter`, `supportedProtocols()`, and `discoverModels`. First-run setup and the Models page **Fetch available models** action share `discoverModels` so OpenAI-compatible `GET /models` parsing stays in one place. Profile resolution, catalog materialization, provider construction, replay conversion, and stream conversion remain package-internal.
+The package root exposes the Cordis plugin contract, `PiAiAdapter`, `supportedProtocols()`, `discoverModels`, and the hosted-search wire helpers (`webSearchToolEntry`, `xSearchToolEntry`, `applyHostedToolsPayload`, `webSearchCallToServerToolCall`, `hostedCustomToolCallToServerToolCall`, `mapHostedToolCalls`). First-run setup and the Models page **Fetch available models** action share `discoverModels` so OpenAI-compatible `GET /models` parsing stays in one place. Profile resolution, catalog materialization, provider construction, replay conversion, and stream conversion remain package-internal.
 
 ## Config
 
@@ -156,6 +156,21 @@ Every request carries the shared attribution header from shres-llm's `attributio
 
 pi-ai installs several provider SDKs and lazy-loads the one selected by the catalog model. The dependency weight is isolated to this opt-in adapter package.
 
+## Hosted search
+
+A route in the `openai-responses` dialect can present search as a hosted backend tool - the
+provider executes the search on the model's behalf. The adapter exposes an optional
+`hostedSearch` option (read live per stream call) carrying the raw tool entries to splice into
+the outgoing `tools` array, the local function-tool names to drop while their hosted counterpart
+is enabled (hosted wins on name collision), and the hosted names to promote from pi-ai's tool
+calls to `server-tool-call` content blocks so the loop never dispatches them. The splice rides
+pi-ai's `onPayload` hook; no pi-ai fork is involved. Entry JSON and tool names mirror the Grok
+Build CLI's sampler (`web_search`, `x_search`).
+
+`webSearchCallToServerToolCall` projects a `web_search_call` output item into the bounded
+server-tool-call block; the pinned pi-ai dependency drops that item before the harness sees it, so
+the converter is the tested seam a future pi-ai surface or raw-wire read feeds. X search surfaces
+as a custom tool call through pi-ai and is promoted to the block live.
 ## Model Experience
 
 ### Provider request through pi-ai

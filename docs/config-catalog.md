@@ -162,7 +162,7 @@ export interface Config {
 
 Depends on: [`AgentOptions`](subsystems/core.md) · [`SessionId`](subsystems/core.md)
 
-Source: [`packages/core/agent-loop/src/index.ts:255`](../packages/core/agent-loop/src/index.ts)
+Source: [`packages/core/agent-loop/src/index.ts:256`](../packages/core/agent-loop/src/index.ts)
 
 <a id="shres-codeshres-code-agent-presets"></a>
 
@@ -1240,6 +1240,14 @@ export interface Config {
   refreshLeewayMs?: number
   /** CLI version the route advertises; defaults to {@link DEFAULT_CLI_VERSION}. */
   cliVersion?: string
+  /**
+   * Serve web search as a hosted backend tool instead of the local `tool-web`
+   * tool for this route. Defaults to off; when on, the colliding local
+   * `web_search` function tool is dropped from the request (hosted wins).
+   */
+  hostedWebSearch?: boolean
+  /** Serve X (Twitter) search as a hosted backend tool. Defaults to off. */
+  hostedXSearch?: boolean
 }
 
 /** One advisory model entry a deployment may declare. */
@@ -3994,6 +4002,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@shres-code/shres-code-client-ui-model-selection` ([`packages/client/ui-model-selection/src/index.ts`](../packages/client/ui-model-selection/src/index.ts))
 - `@shres-code/shres-code-client-ui-permission-presets` ([`packages/client/ui-permission-presets/src/index.ts`](../packages/client/ui-permission-presets/src/index.ts))
 - `@shres-code/shres-code-client-ui-plan` ([`packages/client/ui-plan/src/index.ts`](../packages/client/ui-plan/src/index.ts))
+- `@shres-code/shres-code-client-ui-remote` ([`packages/client/ui-remote/src/index.ts`](../packages/client/ui-remote/src/index.ts))
 - `@shres-code/shres-code-client-ui-settings` ([`packages/client/ui-settings/src/index.ts`](../packages/client/ui-settings/src/index.ts))
 - `@shres-code/shres-code-client-ui-settings-general` ([`packages/client/ui-settings-general/src/index.ts`](../packages/client/ui-settings-general/src/index.ts))
 - `@shres-code/shres-code-client-ui-settings-jspace` ([`packages/client/ui-settings-jspace/src/index.ts`](../packages/client/ui-settings-jspace/src/index.ts))
