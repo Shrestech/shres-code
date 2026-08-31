@@ -56,7 +56,7 @@
     "@shres-code/shres-code-tools": "workspace:^",
     "immer": "^11.1.15",
     "react": "^18.2.0",
-    "zustand": "~4.4.7"
+    "zustand": "5.0.14"
   },
   "peerDependencies": {
     "@shres-code/cordis": "workspace:^",
