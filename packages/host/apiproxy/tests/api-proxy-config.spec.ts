@@ -522,6 +522,22 @@ describe('settings domain', () => {
       .toEqual({ enabled: false, roles: { librarian: {} } })
   })
 
+  it('serves the jspace-advisor namespace so the J-Space settings page can persist the advisor switch and route', async () => {
+    const ctx = await harness()
+    ctx.settings.register(settingsNamespace('jspace-advisor'), z.object({
+      enabled: z.boolean(),
+      provider: z.string(),
+      model: z.string(),
+    }))
+    const api = createApiProxy(ctx, DEFAULTS)
+    expectOk(await api.settings.mutate(request({
+      ns: 'jspace-advisor',
+      ops: [{ op: 'set', path: ['enabled'], value: true }],
+    })))
+    expect(ctx.settings.describe().find(view => String(view.ns) === 'jspace-advisor')?.value)
+      .toEqual({ enabled: true })
+  })
+
   it('serves the shres-shield namespace so the Shield settings page can persist posture and license', async () => {
     const ctx = await harness()
     ctx.settings.register(settingsNamespace('shres-shield'), z.object({

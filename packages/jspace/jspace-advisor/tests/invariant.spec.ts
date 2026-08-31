@@ -137,6 +137,28 @@ describe('jspace-advisor invariant', () => {
     )).toThrow(/unreachable variant/)
   })
 
+  it('accepts a human user message as the user-intent pointer', () => {
+    const { ctx, failures, dispatch } = harness()
+    void apply(ctx)
+    dispatch(sessionWith([{
+      type: 'user/message',
+      seq: 1,
+      data: { source: { kind: 'user' }, content: [{ type: 'text', text: 'hi' }] },
+    }]), advisorEvent('user-intent', 1, 2))
+    expect(failures).toEqual([])
+  })
+
+  it('rejects a machine-sourced user message as user-intent', () => {
+    const { ctx, failures, dispatch } = harness()
+    void apply(ctx)
+    dispatch(sessionWith([{
+      type: 'user/message',
+      seq: 1,
+      data: { source: { kind: 'plugin' }, content: [{ type: 'text', text: 'hi' }] },
+    }]), advisorEvent('user-intent', 1, 2))
+    expect(failures).toHaveLength(1)
+  })
+
   it('accepts a step/end as the drift-check pointer', () => {
     const { ctx, failures, dispatch } = harness()
     void apply(ctx)

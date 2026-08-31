@@ -126,7 +126,10 @@ export function settleConsult(result: SubagentResult): ConsultReply {
  * @returns the prompt text.
  */
 export function buildConsultPrompt(digest: JspaceAdvisorDigest, question: string): string {
-  return `${renderAdvisorDigest(digest)}\n\nThe main session asks: ${question}\n`
-    + 'Advise it. Return a one-sentence verdict in `advice` and an optional concrete '
-    + '`recommendation`. Use wiki_search/wiki_read and the session_search family for context.'
+  return `${renderAdvisorDigest(digest)}\n\nThe named main session asks: ${question}\n`
+    + 'Advise it from the digest. If you must inspect one event, session_event_read that '
+    + 'session_id at a listed seq — omitting session_id reads your own log. Do not search '
+    + 'other sessions. Do not review code here; recommend ward for a deep review. Return a '
+    + 'one-sentence verdict in `advice` and an optional concrete `recommendation`. Spend tokens '
+    + 'only on the answer.'
 }

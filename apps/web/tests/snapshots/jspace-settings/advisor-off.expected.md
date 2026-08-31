@@ -1,0 +1,56 @@
+- dialog "Settings":
+  - navigation:
+    - text: Settings
+    - button "General":
+      - img
+      - text: General
+    - button "Models":
+      - img
+      - text: Models
+    - button "Shield":
+      - img
+      - text: Shield
+    - button "J-Space":
+      - img
+      - text: J-Space
+    - button "Plugins":
+      - img
+      - text: Plugins
+    - button "Agent presets":
+      - img
+      - text: Agent presets
+  - button "Open configuration file"
+  - button "Close":
+    - img
+    - text: Close
+  - heading "J-Space" [level=2]
+  - paragraph: J-Space is an allow switch. On mounts the card tools and prompt section. Off unloads them.
+  - text: J-Space Disabled
+  - switch "Activate"
+  - paragraph: Turn J-Space on or off. Off unloads the tools, prompt section, and session chip.
+  - text: Mode
+  - combobox "Mode":
+    - option "Available" [selected]
+    - option "Always open"
+  - text: Available waits for an open. Always open starts the stock Goal/Next on the first pre-step of a session that has none. Require coverage A checkpoint must name a verifier and a coverage claim.
+  - switch "Require coverage" [checked]
+  - paragraph: A background reviewer that steers the session back to the user goal. Off keeps the plugin loaded and mounts nothing.
+  - text: Advisor Disabled
+  - switch "Enable Advisor"
+  - paragraph: On arms the advisor once a provider and model are bound. Off unloads consult and proactive reviews.
+  - paragraph: "WikiSkill: persistent knowledge wiki improved benchmark scores up to +24 pts; 9B + wiki beat 27B without."
+  - text: LLM Wiki Active
+  - switch "Disable LLM Wiki" [checked]
+  - paragraph: On mounts the wiki tools. Off unloads them. No directory is created until the first write.
+  - paragraph: Bind a cheap or local model for librarian consolidation. Unbound, the librarian stays dormant and never uses the session frontier model.
+  - text: Provider
+  - combobox "Librarian Provider":
+    - option "Unbound" [selected]
+  - text: Model
+  - combobox "Librarian Model" [disabled]:
+    - option "Unbound" [selected]
+  - region "This session":
+    - paragraph: This session · —
+    - term: Checked
+    - definition: —
+    - paragraph: Checkpoints name a verifier; the harness cannot prove it ran.

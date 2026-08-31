@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { JSpaceSection, writeWikiLibrarian, type JSpaceSettings, type WikiSettings } from '../src/client/JSpaceSection.tsx'
+import {
+  JSpaceSection, writeAdvisorRoute, writeWikiLibrarian,
+  type AdvisorSettings, type JSpaceSettings, type WikiSettings,
+} from '../src/client/JSpaceSection.tsx'
 import type { JSpaceCardView } from '../src/client/card-source.ts'
 import type { SettingsScope, SettingsScopeSnapshot } from '@shres-code/shres-code-client-runtime/client'
 import { en } from '../src/client/locales.ts'
@@ -38,6 +41,21 @@ function wikiSnapshot(partial: Partial<SettingsScopeSnapshot<WikiSettings>> = {}
   }
 }
 
+function advisorSnapshot(
+  partial: Partial<SettingsScopeSnapshot<AdvisorSettings>> = {},
+): SettingsScopeSnapshot<AdvisorSettings> {
+  return {
+    status: 'unavailable',
+    value: undefined,
+    base: {},
+    user: {},
+    revision: 1,
+    writable: false,
+    mode: 'host',
+    ...partial,
+  }
+}
+
 function mount(
   snap: SettingsScopeSnapshot<JSpaceSettings>,
   set = vi.fn(async () => {}),
@@ -61,6 +79,8 @@ function mount(
       })),
     },
   },
+  advisorSnap: SettingsScopeSnapshot<AdvisorSettings> = advisorSnapshot(),
+  advisorSet = vi.fn(async () => {}),
 ) {
   const scope = {
     getSnapshot: () => snap,
@@ -74,12 +94,20 @@ function mount(
     set: wikiSet,
     unset: vi.fn(async () => {}),
   } as unknown as SettingsScope<WikiSettings>
+  const advisorScope = {
+    getSnapshot: () => advisorSnap,
+    subscribe: () => () => {},
+    set: advisorSet,
+    unset: vi.fn(async () => {}),
+  } as unknown as SettingsScope<AdvisorSettings>
   render(
     <JSpaceSection
       scope={scope}
       useSnapshot={select => select(snap)}
       wikiScope={wikiScope}
       useWikiSnapshot={select => select(wikiSnap)}
+      advisorScope={advisorScope}
+      useAdvisorSnapshot={select => select(advisorSnap)}
       useCard={select => select(card)}
       api={api as never}
       t={key => en[key]}
@@ -88,7 +116,7 @@ function mount(
       close={vi.fn()}
     />,
   )
-  return { set, wikiSet, api }
+  return { set, wikiSet, advisorSet, api }
 }
 
 describe('JSpaceSection', () => {
@@ -250,6 +278,135 @@ describe('JSpaceSection', () => {
     )
     await Promise.resolve()
     expect(screen.getByLabelText(`${en.wikiLibrarian} ${en.wikiProvider}`)).toBeTruthy()
+  })
+
+  it('toggles Advisor and hides model pickers when disabled', () => {
+    const catalog = {
+      settings: { mutate: vi.fn(async () => ({ rpcId: 'm', result: { ok: true, value: {} } })) },
+      llm: {
+        models: vi.fn(async () => ({
+          rpcId: 'l',
+          result: {
+            ok: true as const,
+            value: {
+              groups: [
+                { id: 'ollama-local', name: 'Ollama (local)', models: [{ id: 'qwen', name: 'Qwen' }] },
+              ],
+            },
+          },
+        })),
+      },
+    }
+    const { advisorSet } = mount(
+      snapshot({}),
+      vi.fn(async () => {}),
+      undefined,
+      wikiSnapshot({ value: { enabled: false } }),
+      vi.fn(async () => {}),
+      catalog as never,
+      advisorSnapshot({ status: 'ready', writable: true, value: { enabled: true } }),
+    )
+    expect(screen.getByText(en.advisorIntro)).toBeTruthy()
+    expect(screen.getByLabelText(`${en.advisorTitle} ${en.advisorProvider}`)).toBeTruthy()
+    fireEvent.click(screen.getByRole('switch', { name: en.advisorDisable }))
+    expect(advisorSet).toHaveBeenCalledWith('enabled', false)
+    cleanup()
+    const idle = {
+      settings: { mutate: vi.fn(async () => ({ rpcId: 'm', result: { ok: true, value: {} } })) },
+      llm: { models: vi.fn(async () => ({ rpcId: 'l', result: { ok: true as const, value: { groups: [] } } })) },
+    }
+    const { api } = mount(
+      snapshot({}),
+      vi.fn(async () => {}),
+      undefined,
+      wikiSnapshot({ value: { enabled: false } }),
+      vi.fn(async () => {}),
+      idle as never,
+      advisorSnapshot({ status: 'ready', writable: true, value: { enabled: false } }),
+    )
+    expect(screen.queryByLabelText(`${en.advisorTitle} ${en.advisorProvider}`)).toBeNull()
+    expect(api.llm.models).not.toHaveBeenCalled()
+  })
+
+  it('writes the advisor provider and model', async () => {
+    const { api } = mount(
+      snapshot({}),
+      vi.fn(async () => {}),
+      undefined,
+      wikiSnapshot({ value: { enabled: false } }),
+      vi.fn(async () => {}),
+      {
+        settings: { mutate: vi.fn(async () => ({ rpcId: 'm', result: { ok: true, value: {} } })) },
+        llm: {
+          models: vi.fn(async () => ({
+            rpcId: 'l',
+            result: {
+              ok: true as const,
+              value: {
+                groups: [
+                  { id: 'ollama-local', name: 'Ollama (local)', models: [{ id: 'qwen', name: 'Qwen' }] },
+                  { id: 'ollama-cloud', name: 'Ollama Cloud', models: [{ id: 'flash', name: 'Flash' }] },
+                ],
+              },
+            },
+          })),
+        },
+      } as never,
+      advisorSnapshot({
+        status: 'ready',
+        writable: true,
+        value: { enabled: true, provider: 'ollama-local' },
+      }),
+    )
+    await screen.findByRole('option', { name: 'Ollama Cloud' })
+    fireEvent.change(screen.getByLabelText(`${en.advisorTitle} ${en.advisorProvider}`), {
+      target: { value: 'ollama-cloud' },
+    })
+    expect(api.settings.mutate).toHaveBeenCalledWith({
+      ns: 'jspace-advisor',
+      ops: [
+        { op: 'set', path: ['provider'], value: 'ollama-cloud' },
+        { op: 'unset', path: ['model'] },
+      ],
+    })
+    fireEvent.change(screen.getByLabelText(`${en.advisorTitle} ${en.advisorModel}`), {
+      target: { value: 'qwen' },
+    })
+    expect(api.settings.mutate).toHaveBeenCalledWith({
+      ns: 'jspace-advisor',
+      ops: [
+        { op: 'set', path: ['provider'], value: 'ollama-local' },
+        { op: 'set', path: ['model'], value: 'qwen' },
+      ],
+    })
+    fireEvent.change(screen.getByLabelText(`${en.advisorTitle} ${en.advisorProvider}`), {
+      target: { value: '' },
+    })
+    expect(api.settings.mutate).toHaveBeenCalledWith({
+      ns: 'jspace-advisor',
+      ops: [{ op: 'unset', path: ['provider'] }, { op: 'unset', path: ['model'] }],
+    })
+    await writeAdvisorRoute(api as never, undefined)
+  })
+
+  it('keeps a stored advisor model id that is not in the live catalog', () => {
+    mount(
+      snapshot({}),
+      vi.fn(async () => {}),
+      undefined,
+      wikiSnapshot({ value: { enabled: false } }),
+      vi.fn(async () => {}),
+      {
+        settings: { mutate: vi.fn(async () => ({ rpcId: 'm', result: { ok: true, value: {} } })) },
+        llm: { models: vi.fn(async () => ({ rpcId: 'l', result: { ok: true as const, value: { groups: [] } } })) },
+      } as never,
+      advisorSnapshot({
+        status: 'ready',
+        writable: true,
+        value: { enabled: true, provider: 'ollama-local', model: 'custom-id' },
+      }),
+    )
+    expect(screen.getByDisplayValue('custom-id')).toBeTruthy()
   })
 
   it('keeps a stored model id that is not in the live catalog', () => {

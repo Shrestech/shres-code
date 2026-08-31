@@ -1,4 +1,4 @@
-/** J-Space settings section: allow switch over the `jspace` namespace, plus the LLM Wiki seat. */
+/** J-Space settings section: allow switch over the `jspace` namespace, plus Advisor and LLM Wiki. */
 
 import { useEffect, useState, type ReactNode } from 'react'
 import type { IApiClient, ModelProviderGroup } from '@shres-code/shres-code-api-remotes/client'
@@ -16,6 +16,16 @@ export interface JSpaceSettings {
   mode?: 'available' | 'always-open'
   /** Refuse a checkpoint whose `by` names no coverage term. Default true. */
   requireCoverage?: boolean
+}
+
+/** Stored advisor settings the Host advisor plugin registers. */
+export interface AdvisorSettings {
+  /** Master allow. Default false. */
+  enabled?: boolean
+  /** LLM route provider the reviewer runs on. */
+  provider?: string
+  /** Model id on that route. */
+  model?: string
 }
 
 /** Stored wiki settings the Host wiki seat registers. */
@@ -43,6 +53,10 @@ export interface JSpaceSectionInjected {
   wikiScope: SettingsScope<WikiSettings>
   /** Wiki settings snapshot hook bound by the renderer. */
   useWikiSnapshot: <T>(select: (snapshot: SettingsScopeSnapshot<WikiSettings>) => T) => T
+  /** Bound `jspace-advisor` settings scope. */
+  advisorScope: SettingsScope<AdvisorSettings>
+  /** Advisor settings snapshot hook bound by the renderer. */
+  useAdvisorSnapshot: <T>(select: (snapshot: SettingsScopeSnapshot<AdvisorSettings>) => T) => T
   /** Last-known card view from the selected session projection. */
   useCard: <T>(select: (view: JSpaceCardView | undefined) => T) => T
   /** Wire face for wiki librarian binding and live model catalog. */
@@ -54,6 +68,35 @@ export interface JSpaceSectionInjected {
 /** Full component props. */
 export type JSpaceSectionProps =
   PropsRuntime<'settings.section'> & JSpaceSectionInjected
+
+/**
+ * Bind or clear the wiki librarian role. Both fields must be set for dispatch.
+ * @param api - settings wire face.
+ * @param next - next binding, or undefined to unbind.
+ * @returns fulfillment after the mutate settles.
+ */
+/**
+ * Bind or clear the advisor LLM route. Turning the provider off unsets both fields.
+ * @param api - settings wire face.
+ * @param next - next binding, or undefined to unbind.
+ * @returns fulfillment after the mutate settles.
+ */
+export async function writeAdvisorRoute(
+  api: Pick<IApiClient, 'settings'>,
+  next: { provider?: string; model?: string } | undefined,
+): Promise<void> {
+  await api.settings.mutate({
+    ns: 'jspace-advisor',
+    ops: next === undefined
+      ? [{ op: 'unset', path: ['provider'] }, { op: 'unset', path: ['model'] }]
+      : next.model === undefined
+        ? [{ op: 'set', path: ['provider'], value: next.provider }, { op: 'unset', path: ['model'] }]
+        : [
+          { op: 'set', path: ['provider'], value: next.provider },
+          { op: 'set', path: ['model'], value: next.model },
+        ],
+  })
+}
 
 /**
  * Bind or clear the wiki librarian role. Both fields must be set for dispatch.
@@ -79,10 +122,11 @@ export async function writeWikiLibrarian(
  * @returns the section.
  */
 export function JSpaceSection({
-  scope, useSnapshot, wikiScope, useWikiSnapshot, useCard, api, t,
+  scope, useSnapshot, wikiScope, useWikiSnapshot, advisorScope, useAdvisorSnapshot, useCard, api, t,
 }: JSpaceSectionProps): ReactNode {
   const settings = useSnapshot(current => current)
   const wiki = useWikiSnapshot(current => current)
+  const advisor = useAdvisorSnapshot(current => current)
   const card = useCard(current => current)
   const enabled = settings.value?.enabled === true
   const mode = settings.value?.mode ?? 'available'
@@ -93,16 +137,22 @@ export function JSpaceSection({
   const wikiReady = wiki.status === 'ready'
   const wikiDisabled = !wiki.writable
   const librarian = wiki.value?.roles?.librarian ?? {}
+  const advisorReady = advisor.status === 'ready'
+  const advisorDisabled = !advisor.writable
+  const advisorEnabled = advisor.value?.enabled === true
+  const advisorProvider = advisor.value?.provider
+  const advisorModel = advisor.value?.model
   const [groups, setGroups] = useState<readonly ModelProviderGroup[]>([])
 
   useEffect(() => {
-    if (!wikiReady || !wikiEnabled) return
+    if ((!wikiReady || !wikiEnabled) && (!advisorReady || !advisorEnabled)) return
     void api.llm.models({}).then((response) => {
       if (response.result.ok) setGroups(response.result.value.groups)
     })
-  }, [api, wikiReady, wikiEnabled])
+  }, [api, wikiReady, wikiEnabled, advisorReady, advisorEnabled])
 
   const models = groups.find(group => group.id === librarian.provider)?.models ?? []
+  const advisorModels = groups.find(group => group.id === advisorProvider)?.models ?? []
 
   return (
     <div className={css.section}>
@@ -168,6 +218,87 @@ export function JSpaceSection({
             </button>
           </div>
         </>
+      ) : null}
+      {advisorReady ? (
+        <div className={css.wikiBlock}>
+          <p className={css.intro}>{t('advisorIntro')}</p>
+          <div className={css.toggleCard}>
+            <div className={css.toggleCopy}>
+              <span className={css.toggleName}>{t('advisorTitle')}</span>
+              <span className={css.toggleState}>{advisorEnabled ? t('advisorActive') : t('advisorInactive')}</span>
+            </div>
+            <button
+              type="button"
+              className={advisorEnabled ? css.switchOn : css.switchOff}
+              role="switch"
+              aria-checked={advisorEnabled}
+              aria-label={advisorEnabled ? t('advisorDisable') : t('advisorActivate')}
+              disabled={advisorDisabled}
+              onClick={() => { void advisorScope.set('enabled', !advisorEnabled) }}
+            >
+              <span className={css.switchThumb} />
+            </button>
+          </div>
+          <p className={css.hint}>{t('advisorToggleHint')}</p>
+          {advisorEnabled ? (
+            <>
+              <p className={css.hint}>{t('advisorModelHint')}</p>
+              <div className={css.wikiFields}>
+                <label className={css.field}>
+                  <span className={css.label}>{t('advisorProvider')}</span>
+                  <select
+                    className={css.select}
+                    value={advisorProvider ?? ''}
+                    aria-label={`${t('advisorTitle')} ${t('advisorProvider')}`}
+                    disabled={advisorDisabled}
+                    onChange={(event) => {
+                      const provider = event.target.value
+                      void writeAdvisorRoute(
+                        api,
+                        provider === '' ? undefined : { provider },
+                      )
+                    }}
+                  >
+                    <option value="">{t('advisorUnbound')}</option>
+                    {groups.map(group => (
+                      <option key={group.id} value={group.id}>{group.name}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className={css.field}>
+                  <span className={css.label}>{t('advisorModel')}</span>
+                  <select
+                    className={css.select}
+                    value={advisorModel ?? ''}
+                    aria-label={`${t('advisorTitle')} ${t('advisorModel')}`}
+                    disabled={advisorDisabled || advisorProvider === undefined}
+                    onChange={(event) => {
+                      const model = event.target.value
+                      /* v8 ignore next -- the model select is disabled until a provider is chosen */
+                      if (advisorProvider === undefined) return
+                      void writeAdvisorRoute(
+                        api,
+                        model === ''
+                          ? { provider: advisorProvider }
+                          : { provider: advisorProvider, model },
+                      )
+                    }}
+                  >
+                    <option value="">{t('advisorUnbound')}</option>
+                    {advisorModels.map(model => (
+                      <option key={model.id} value={model.id}>{model.name}</option>
+                    ))}
+                    {advisorModel !== undefined
+                      && advisorModel.length > 0
+                      && !advisorModels.some(model => model.id === advisorModel)
+                      ? <option value={advisorModel}>{advisorModel}</option>
+                      : null}
+                  </select>
+                </label>
+              </div>
+            </>
+          ) : null}
+        </div>
       ) : null}
       {wikiReady ? (
         <div className={css.wikiBlock}>

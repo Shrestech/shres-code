@@ -68,6 +68,8 @@ export function triggerSatisfiedAt(
       return isErroredToolResult(event)
     case 'drift-check':
       return event.type === 'step/end'
+    case 'user-intent':
+      return event.type === 'user/message' && event.data.source.kind === 'user'
     default:
       return assertNever(trigger)
   }

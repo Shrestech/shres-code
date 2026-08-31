@@ -85,18 +85,48 @@ export function foldUserMessages(
   return { messages, elided: all.length - messages.length }
 }
 
+/** Preferred tool-argument keys, in priority order, for the digest excerpt. */
+const ARG_EXCERPT_KEYS = ['command', 'file_path', 'path', 'target_file', 'url', 'query', 'question'] as const
+
 /**
- * Resolve a tool/result to its owning call name, success bit, and a bounded
- * error excerpt, oldest-first within the trailing window.
+ * Bound a path, command, or JSON argument blob for the trailing tool window.
+ * @param raw - `tool/call` arguments JSON string, or undefined.
+ * @param max - character cap.
+ * @returns the excerpt, or undefined when the call carried no arguments.
+ */
+export function argsExcerpt(raw: string | undefined, max: number): string | undefined {
+  if (raw === undefined || raw.length === 0) return undefined
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return boundText(raw, max)
+  }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return boundText(typeof parsed === 'string' ? parsed : JSON.stringify(parsed), max)
+  }
+  const obj = parsed as Record<string, unknown>
+  for (const key of ARG_EXCERPT_KEYS) {
+    const value = obj[key]
+    if (typeof value === 'string' && value.length > 0) return boundText(value, max)
+  }
+  return boundText(JSON.stringify(obj), max)
+}
+
+/**
+ * Resolve a tool/result to its owning call seq, name, success bit, and
+ * bounded excerpts, oldest-first within the trailing window.
  * @param events - session log.
  * @param maxItems - maximum signal items to retain.
  * @param maxExcerpt - character cap on each error excerpt.
+ * @param maxArgs - character cap on each argument excerpt.
  * @returns the trailing window, oldest-first.
  */
 function recentTools(
   events: readonly SessionEvent[],
   maxItems: number,
   maxExcerpt: number,
+  maxArgs: number,
 ): readonly JspaceAdvisorToolSignal[] {
   const resultByCall = new Map<string, { ok: boolean; excerpt?: string }>()
   for (const event of events) {
@@ -125,9 +155,12 @@ function recentTools(
     if (callId === undefined) continue
     const result = resultByCall.get(callId)
     if (result === undefined) continue
+    const args = argsExcerpt((event.data as { arguments?: string }).arguments, maxArgs)
     out.push({
+      seq: typeof event.seq === 'number' ? event.seq : 0,
       name: (event.data as { name?: string }).name ?? '<unknown>',
       ok: result.ok,
+      ...args === undefined ? {} : { argsExcerpt: args },
       ...result.excerpt === undefined ? {} : { errorExcerpt: result.excerpt },
     })
   }
@@ -146,6 +179,8 @@ export interface AdvisorDigestCaps {
   readonly maxUserMessage: number
   /** Character cap on the retained user-message history. */
   readonly maxUserHistory: number
+  /** Character cap on each tool-argument excerpt. */
+  readonly maxArgs: number
 }
 
 /**
@@ -160,7 +195,7 @@ export function foldAdvisorDigest(
   card: JspaceCard | null,
   caps: AdvisorDigestCaps,
 ): JspaceAdvisorDigest {
-  const recent = recentTools(session.events, caps.maxTools, caps.maxExcerpt)
+  const recent = recentTools(session.events, caps.maxTools, caps.maxExcerpt, caps.maxArgs)
   const history = foldUserMessages(session.events, caps.maxUserMessage, caps.maxUserHistory)
   const renderedCard = card === null
     ? null
@@ -169,6 +204,7 @@ export function foldAdvisorDigest(
       openReprintLimit: DEFAULT_OPEN_REPRINT_LIMIT,
     })
   return {
+    sessionId: session.id,
     card: renderedCard,
     userMessages: history.messages,
     elidedUserMessages: history.elided,
@@ -183,22 +219,27 @@ export function foldAdvisorDigest(
 /** Render trailing tool signals, oldest-first, one per line. */
 function renderToolSignals(signals: readonly JspaceAdvisorToolSignal[]): string {
   return signals
-    .map(signal => signal.ok
-      ? 'ok ' + signal.name
-      : 'FAIL ' + signal.name + (signal.errorExcerpt === undefined ? '' : ': ' + signal.errorExcerpt))
+    .map((signal) => {
+      const args = signal.argsExcerpt === undefined ? '' : ' ' + signal.argsExcerpt
+      const fail = signal.ok ? '' : (signal.errorExcerpt === undefined ? '' : ': ' + signal.errorExcerpt)
+      return (signal.ok ? 'ok ' : 'FAIL ') + signal.name + ' seq=' + String(signal.seq) + args + fail
+    })
     .join('\n')
 }
 
 /**
  * Render the digest as the reviewer's input text, bounded to maxChars.
- * Order is truncation priority: the user stream (goal ground truth) and the
- * card survive first; the trailing tool window renders last so the cap eats
- * it first.
+ * Order is truncation priority: the parent session id and seq range, then the
+ * user stream and the card; the trailing tool window renders last so the cap
+ * eats it first.
  * @param digest - folded digest.
  * @returns the bounded render.
  */
 export function renderAdvisorDigest(digest: JspaceAdvisorDigest): string {
-  const lines: string[] = []
+  const lines: string[] = [
+    'Main session id: ' + digest.sessionId,
+    'Folded through seq: ' + String(digest.seq),
+  ]
   if (digest.userMessages.length > 0) {
     const history = digest.userMessages.map((text, index) => 'U' + String(index + 1) + ': ' + text)
     if (digest.elidedUserMessages > 0) {
@@ -257,10 +298,11 @@ export function foldAdvisorDelta(
       openReprintLimit: DEFAULT_OPEN_REPRINT_LIMIT,
     })
   return {
+    sessionId: session.id,
     goal: goalMessage(session.events, caps.maxUserMessage),
     userMessages: history.messages,
     card: renderedCard,
-    recentTools: recentTools(since, caps.maxTools, caps.maxExcerpt),
+    recentTools: recentTools(since, caps.maxTools, caps.maxExcerpt, caps.maxArgs),
     steps: countSteps(since),
     sinceSeq,
     seq: session.seq,
@@ -278,7 +320,10 @@ export function foldAdvisorDelta(
  * @returns the bounded render.
  */
 export function renderAdvisorDelta(delta: JspaceAdvisorDelta): string {
-  const lines: string[] = []
+  const lines: string[] = [
+    'Main session id: ' + delta.sessionId,
+    'Folded events: ' + String(delta.sinceSeq) + ' → ' + String(delta.seq),
+  ]
   if (delta.goal.length > 0) lines.push('Goal (U1): ' + delta.goal)
   if (delta.userMessages.length > 0) {
     const fresh = delta.userMessages.map((text, index) => 'N' + String(index + 1) + ': ' + text).join('\n')

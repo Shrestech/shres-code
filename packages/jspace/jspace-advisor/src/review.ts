@@ -12,21 +12,22 @@ import { renderAdvisorDigest, renderAdvisorDelta } from './digest.ts'
 import type { JspaceAdvisorDelta, JspaceAdvisorDigest, AdvisorTrigger } from './types.ts'
 
 /** Built-in reviewer persona; overridable via Config. */
-export const DEFAULT_REVIEWER_PERSONA =
-  'You are the jspace advisor, the standing reviewer of one main session. '
-  + 'Your conversation holds every earlier digest and verdict; each turn brings either the '
-  + 'full digest or one delta since your last review, and the user messages (U1, U2, ...) are '
-  + 'the ground truth of the user goal - U1 always restated - while the session card is only '
-  + 'what the session believes its goal is and may be stale or a placeholder. Judge the recent '
-  + 'work against the USER goal, not the card. The digest and deltas are the main session and '
-  + 'are sufficient input: do not search for other sessions. '
-  + 'Use a read-only tool only when the input is genuinely insufficient, at most one call. '
-  + 'End every review turn with exactly one reply that is a single JSON object and no other '
-  + 'text: {"verdict":"on-track"|"drift","advice":"<one sentence>","redirect":"<exact correction>"}. '
-  + 'When the work serves the goal: verdict on-track and one-line advice. When it drifts: '
-  + 'verdict drift, advice naming the drift in one sentence, and redirect giving the exact '
-  + 'correction - what to drop and what to do next to serve the goal. Omit redirect when '
-  + 'on-track.'
+export const DEFAULT_REVIEWER_PERSONA = [
+  'You are the jspace advisor, the standing reviewer of one main session.',
+  'Goal: steer that session so its work serves the USER messages (U1, U2, …; U1 always restated).',
+  'The card is only what the session claims and may be stale. Judge work against the user, not the card.',
+  'You cannot edit files, run a shell, approve tools, or review code yourself.',
+  'Code review is a main-session permission: on a deep review, redirect it to call ward (the Reviewer seat) with a self-contained prompt. Do not ask it to paste diffs here.',
+  'Each turn is a full digest or a delta. Every user message in it is ground truth and must be weighed.',
+  'The digest names the main session id and labels every tool seq. Those seqs belong to that session, not yours.',
+  'Tools: wiki_search/wiki_read for project memory; session_event_read for one unabridged parent event.',
+  'If the digest is insufficient, call session_event_read with that session_id and a seq from the tool window. Omitting session_id reads YOUR log — never do that. At most one tool call per turn. Prefer the digest; tokens are expensive.',
+  'Do not search other sessions. Do not dump code or long quotes into the verdict.',
+  'End every turn with exactly one JSON object and no other text: '
+  + '{"verdict":"on-track"|"drift","advice":"<one sentence>","redirect":"<exact correction>"}.',
+  'On-track: one-line advice, omit redirect. Drift: name the drift, and redirect with what to drop and what to do next '
+  + '(including ward or jspace_consult when that is the correction).',
+].join(' ')
 
 /**
  * Default reviewer tool filter: durable knowledge reads mounted in every
@@ -42,9 +43,37 @@ export const DEFAULT_REVIEWER_TOOLS = [
 /** Display label persisted with the advisor child in the subagent list. */
 export const ADVISOR_CHILD_LABEL = 'Advisor'
 
-/** Whether a session is a root (not a delegated child). */
+/**
+ * Whether a session is a root (not a delegated child).
+ * @param session - session to classify.
+ * @returns true when `parentSession` is absent.
+ */
 export function isRootSession(session: Session): boolean {
   return session.header.parentSession === undefined
+}
+
+/**
+ * Whether the event is a human source-'user' message.
+ * @param event - committed session event.
+ * @returns true for source-kind user messages.
+ */
+export function isHumanUserMessage(event: SessionEvent): boolean {
+  return event.type === 'user/message' && event.data.source.kind === 'user'
+}
+
+/**
+ * Latest human user-message seq after `sinceSeq`, or undefined.
+ * @param log - session log.
+ * @param sinceSeq - exclusive lower bound.
+ * @returns the latest matching seq.
+ */
+export function latestHumanUserSeqAfter(log: readonly SessionEvent[], sinceSeq: number): number | undefined {
+  let found: number | undefined
+  for (const event of log) {
+    if (event.seq <= sinceSeq) continue
+    if (isHumanUserMessage(event)) found = event.seq
+  }
+  return found
 }
 
 /** Structured reviewer verdict for one proactive run. */
@@ -66,7 +95,7 @@ export interface ReviewVerdict {
  */
 export function buildReviewPrompt(digest: JspaceAdvisorDigest, trigger: AdvisorTrigger): string {
   return renderAdvisorDigest(digest) + '\n\nTrigger: ' + trigger + '\n'
-    + 'The digest above is the main session. Review it against the user goal '
+    + 'The digest above is the named main session. Review it against the user goal '
     + 'and reply with only the verdict JSON now.'
 }
 
@@ -79,9 +108,9 @@ export function buildReviewPrompt(digest: JspaceAdvisorDigest, trigger: AdvisorT
  */
 export function buildReviewDeltaPrompt(delta: JspaceAdvisorDelta, trigger: AdvisorTrigger): string {
   return renderAdvisorDelta(delta) + '\n\nTrigger: ' + trigger + '\n'
-    + 'The delta above is what changed in the main session since your last '
-    + 'review. Weigh it against the user goal and your earlier verdicts, then '
-    + 'reply with only the verdict JSON now.'
+    + 'The delta above is what changed in the named main session since your last '
+    + 'review. Weigh every new user message against the user goal and your earlier '
+    + 'verdicts, then reply with only the verdict JSON now.'
 }
 
 /**
@@ -147,7 +176,11 @@ export function parseFinalVerdict(session: Session): ReviewVerdict | undefined {
   return undefined
 }
 
-/** Whether the event is an errored, tool-sourced tool/result. */
+/**
+ * Whether the event is an errored, tool-sourced tool/result.
+ * @param event - the session event.
+ * @returns true when the event is a failed tool-sourced result.
+ */
 export function isErroredToolResult(event: SessionEvent): boolean {
   if (event.type !== 'tool/result') return false
   const message = (event.data as {
@@ -216,10 +249,15 @@ export function classifyTrigger(
   if (isErroredToolResult(event)) {
     return countConsecutiveErrors(log, event.seq) >= errorBurst ? 'error-burst' : undefined
   }
+  if (isHumanUserMessage(event)) return 'user-intent'
   return undefined
 }
 
-/** The latest logged jspace/advisor event, or `undefined`. */
+/**
+ * The latest logged jspace/advisor event, or `undefined`.
+ * @param log - session log.
+ * @returns the latest advice event, if any.
+ */
 export function latestAdvice(log: readonly SessionEvent[]): SessionEvent<'jspace/advisor'> | undefined {
   for (let index = log.length - 1; index >= 0; index -= 1) {
     const event = log[index]

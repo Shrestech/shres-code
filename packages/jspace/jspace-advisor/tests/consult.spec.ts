@@ -12,6 +12,7 @@ import {
 import type { JspaceAdvisorDigest } from '../src/types.ts'
 
 const DIGEST: JspaceAdvisorDigest = {
+  sessionId: 's1',
   card: 'Goal: ship',
   userMessages: ['hi'],
   elidedUserMessages: 0,
@@ -89,7 +90,10 @@ describe('settleConsult', () => {
 describe('buildConsultPrompt', () => {
   it('embeds the digest and question', () => {
     const prompt = buildConsultPrompt(DIGEST, 'am I drifting?')
+    expect(prompt).toContain('Main session id: s1')
     expect(prompt).toContain('Goal: ship')
     expect(prompt).toContain('am I drifting?')
+    expect(prompt).toContain('recommend ward')
+    expect(prompt).not.toContain('session_search family')
   })
 })
