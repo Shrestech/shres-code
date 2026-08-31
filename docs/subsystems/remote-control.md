@@ -47,5 +47,5 @@ Full-state projection of one alias's GUI-owned tunnel after each committed trans
 'remote-control/tunnel-state'(view: TunnelStateView): void
 ```
 
-Source: [`packages/host/remote-control/src/types.ts:231`](../../packages/host/remote-control/src/types.ts)
+Source: [`packages/host/remote-control/src/types.ts:237`](../../packages/host/remote-control/src/types.ts)
 <!-- END GENERATED cordis-surface -->

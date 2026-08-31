@@ -48,6 +48,7 @@ export type {
   SessionListMetadata, SessionProjectionsBlock, SessionSearchItem, SessionsApi, SessionSummary,
 } from './sessions.ts'
 export type { DirectoryEntry, DirectoryListing, FileRead, HostApi } from './host.ts'
+export type { ImageMediaType } from '@shres-code/shres-code-attachment'
 export type {
   SubagentAddress, SubagentCatalog, SubagentInterruptReceipt, SubagentListEntry,
   SubagentPromptReceipt, SubagentsApi,

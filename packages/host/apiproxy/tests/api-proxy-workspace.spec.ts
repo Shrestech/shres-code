@@ -621,6 +621,62 @@ describe('host.readFile', () => {
     expect(read).toEqual({ content: '', truncated: false, binary: true, sizeBytes: 4 })
   })
 
+  it('sniffs a JPEG slice and reports the image media type with base64 data', async () => {
+    const { api, root } = await harness()
+    const jpeg = join(root, 'image-1.jpg')
+    // JPEG magic (FF D8 FF) plus NUL bytes so the slice reads as binary.
+    writeFileSync(jpeg, Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46]), 'binary')
+    const read = expectOk(await api.host.readFile(request({ path: jpeg }), new AbortController().signal))
+    expect(read).toEqual({
+      content: '', truncated: false, binary: true, sizeBytes: 10,
+      imageMediaType: 'image/jpeg',
+      imageData: Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46]).toString('base64'),
+    })
+  })
+
+  it('sniffs PNG, WebP, and both GIF variants by magic bytes, not extension', async () => {
+    const { api, root } = await harness()
+    const cases: ReadonlyArray<readonly [string, number[], string]> = [
+      ['pic.png', [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00], 'image/png'],
+      ['pic.webp', [0x52, 0x49, 0x46, 0x46, 0x00, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50, 0x00], 'image/webp'],
+      ['pic.gif', [0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x00, 0x00], 'image/gif'],
+      ['pic87.gif', [0x47, 0x49, 0x46, 0x38, 0x37, 0x61, 0x00, 0x00], 'image/gif'],
+      // A JPEG slice under a .png name is still sniffed as JPEG: the magic
+      // bytes decide, never the extension.
+      ['mislabeled.png', [0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46], 'image/jpeg'],
+    ]
+    for (const [name, bytes, mediaType] of cases) {
+      const file = join(root, name)
+      writeFileSync(file, Buffer.from(bytes), 'binary')
+      const read = expectOk(await api.host.readFile(request({ path: file }), new AbortController().signal))
+      expect(read.imageMediaType).toBe(mediaType)
+      expect(read.imageData).toBe(Buffer.from(bytes).toString('base64'))
+    }
+  })
+
+  it('leaves a text file under an image extension as text, not an image', async () => {
+    const { api, root } = await harness()
+    const fake = join(root, 'not-an-image.jpg')
+    writeFileSync(fake, 'plain text, no NUL bytes\n')
+    const read = expectOk(await api.host.readFile(request({ path: fake }), new AbortController().signal))
+    expect(read).toEqual({ content: 'plain text, no NUL bytes\n', truncated: false, binary: false, sizeBytes: 25 })
+    expect(read.imageMediaType).toBeUndefined()
+    expect(read.imageData).toBeUndefined()
+  })
+
+  it('carries the image media type but no bytes for a truncated image read', async () => {
+    const { api, root } = await harness(undefined, undefined, { fileViewMaxBytes: 5 })
+    const jpeg = join(root, 'big.jpg')
+    // A JPEG whose leading slice fits the cap but whose physical size exceeds it.
+    writeFileSync(jpeg, Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46]), 'binary')
+    const read = expectOk(await api.host.readFile(request({ path: jpeg }), new AbortController().signal))
+    expect(read).toEqual({
+      content: '', truncated: true, binary: true, sizeBytes: 10,
+      imageMediaType: 'image/jpeg',
+    })
+    expect(read.imageData).toBeUndefined()
+  })
+
   it('answers a cancelled request before reading', async () => {
     const { api, root } = await harness()
     writeFileSync(join(root, 'demo.ts'), 'export const n = 1\n')

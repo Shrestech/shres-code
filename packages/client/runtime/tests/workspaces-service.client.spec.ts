@@ -375,6 +375,19 @@ describe('WorkspaceRuntime', () => {
     await expect(failure).rejects.toMatchObject({ rpcError: { code: 'file-outside-workspace' } })
   })
 
+  it('passes the sniffed image media type and bytes through the readFile face', async () => {
+    const ctx = new Context()
+    const api = new FakeApiClient()
+    const sessions = new SessionRuntime(ctx, api, fakeRemote())
+    const workspaces = new WorkspaceRuntime(ctx, api, sessions)
+    const read = {
+      content: '', truncated: false, binary: true, sizeBytes: 4096,
+      imageMediaType: 'image/jpeg' as const, imageData: 'aGVsbG8=',
+    }
+    api.onReadFile = () => Promise.resolve(ok(read))
+    await expect(workspaces.readFile('/w/alpha/image-1.jpg')).resolves.toEqual(read)
+  })
+
   it('deletes a Workspace or preserves it when the Host rejects deletion', async () => {
     const ctx = new Context()
     const api = new FakeApiClient()

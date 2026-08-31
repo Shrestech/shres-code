@@ -258,10 +258,13 @@ export class WorkspaceRuntime implements IWorkspaces {
   }
 
   /**
-   * Read one workspace file as bounded text through the Host viewer fence.
+   * Read one workspace file through the Host viewer fence. The reply serves
+   * the bounded slice as text or, for a sniffed image binary, base64
+   * `imageData` with its `imageMediaType` (a truncated image carries the type
+   * but no bytes).
    * @param path - absolute or host-resolvable file path.
    * @param signal - aborts the wire request when the caller supersedes it.
-   * @returns the bounded text read.
+   * @returns the bounded read.
    */
   async readFile(path: string, signal?: AbortSignal): Promise<FileRead> {
     const response = await this.api.host.readFile({ path }, signal)
