@@ -1,0 +1,59 @@
+{
+  "name": "@shres-code/shres-code-tool-image-gen",
+  "description": "Default-off model-facing image_gen tool that generates an image through the Grok Build Imagine API (api.x.ai) using the same subscription session credential as grok-session (no XAI_API_KEY, no CLI spawn), saves the result to the attachments service and a workspace file, and reports both saved locations",
+  "version": "0.1.0-rc.5",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
+    "directory": "packages/llm/tool-image-gen"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./invariant": {
+      "types": "./lib/types/invariant.d.ts",
+      "default": "./lib/invariant.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/invariant.js",
+    "lib/client.js",
+    "lib/persist.js",
+    "lib/image-gen.js",
+    "lib/config.js",
+    "lib/types/**/*.d.ts"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "@shres-code/shres-code-attachment": "workspace:^",
+    "@shres-code/shres-code-grok-credential": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-system-prompt": "workspace:^",
+    "@shres-code/shres-code-tools": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
+  },
+  "dependencies": {
+    "@shres-code/schemastery": "workspace:^"
+  },
+  "devDependencies": {
+    "@shres-code/shres-code-attachment": "workspace:^",
+    "@shres-code/shres-code-grok-credential": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-system-prompt": "workspace:^",
+    "@shres-code/shres-code-tools": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
+  }
+}

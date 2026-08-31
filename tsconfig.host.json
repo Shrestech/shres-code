@@ -214,6 +214,7 @@
     { "path": "./packages/llm/llm-cli-bridge" },
     { "path": "./packages/llm/grok-credential" },
     { "path": "./packages/llm/llm-grok-session" },
+    { "path": "./packages/llm/tool-image-gen" },
     { "path": "./packages/shell/bash-local" },
     { "path": "./packages/shell/shell-env" },
     { "path": "./packages/shell/pwsh-local" },
