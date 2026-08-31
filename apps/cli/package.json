@@ -50,6 +50,7 @@
     "@shres-code/shres-code-llm-deepseek": "workspace:^",
     "@shres-code/shres-code-llm-cli-bridge": "workspace:^",
     "@shres-code/shres-code-llm-grok-session": "workspace:^",
+    "@shres-code/shres-code-llm-xai-apikey": "workspace:^",
     "@shres-code/shres-code-llm-pi-ai": "workspace:^",
     "@shres-code/shres-code-mcp-client": "workspace:^",
     "@shres-code/shres-code-home-paths": "workspace:^",

@@ -67,6 +67,7 @@
     "@shres-code/shres-code-grok-credential": "workspace:^",
     "@shres-code/shres-code-llm-cli-bridge": "workspace:^",
     "@shres-code/shres-code-llm-grok-session": "workspace:^",
+    "@shres-code/shres-code-llm-xai-apikey": "workspace:^",
     "@shres-code/shres-code-llm-pi-ai": "workspace:^",
     "@shres-code/shres-code-llm-retry": "workspace:^",
     "@shres-code/shres-code-permission-presets": "workspace:^",

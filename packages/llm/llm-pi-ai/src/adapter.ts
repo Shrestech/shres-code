@@ -103,6 +103,14 @@ export interface PiAiAdapterOptions {
    * `server-tool-call` blocks instead of dispatching locally.
    */
   hostedSearch?: () => PiAiAdapterHostedSearch | undefined
+  /**
+   * Rewrite one outgoing provider request payload before it is sent. pi-ai
+   * hands the hook the request body it built for the model; returning a value
+   * replaces it and returning `undefined` keeps it (which still lets the hook
+   * mutate the body in place). Deployment-owned so a route can splice
+   * provider-specific request fields, such as xAI's `service_tier`.
+   */
+  onPayload?: (payload: unknown, request: { provider: string; model: string }) => unknown
 }
 
 /** Copy profile stream knobs into pi-ai's common option vocabulary. */
@@ -343,11 +351,27 @@ export class PiAiAdapter extends LlmAdapter {
       const context = attachments === undefined
         ? toPiContext(options, undefined, onReplayDegrade)
         : await toPiContext(options, attachments, onReplayDegrade)
-      // Hosted tools ride pi-ai's payload hook: splicing here (rather than
-      // forking pi-ai) keeps the shared adapter on the stock dependency.
-      const onPayload = hosted === undefined
+      // Hosted tools ride pi-ai's payload hook, then the route's own onPayload
+      // hook runs on the (possibly replaced) body: splicing here (rather than
+      // forking pi-ai) keeps the shared adapter on the stock dependency, and
+      // chaining the hosted result into the route hook keeps both effects on
+      // the one payload pi-ai sends. Only a final non-undefined result
+      // replaces the outgoing payload; a hook that mutates in place and
+      // returns undefined keeps its own mutation.
+      const onPayload = hosted === undefined && this.config.onPayload === undefined
         ? undefined
-        : (payload: unknown): unknown => applyHostedToolsPayload(payload, hosted)
+        : (payload: unknown): unknown => {
+          let current = payload
+          if (hosted !== undefined) {
+            const spliced = applyHostedToolsPayload(current, hosted)
+            if (spliced !== undefined) current = spliced
+          }
+          if (this.config.onPayload !== undefined) {
+            const result = this.config.onPayload(current, { provider: options.provider, model: model.id })
+            if (result !== undefined) current = result
+          }
+          return current === payload ? undefined : current
+        }
       const events = snapshot.models.streamSimple(model, context, {
         ...profileOptions(profile, reasoning, apiKey, onPayload),
         ...options.temperature === undefined ? {} : { temperature: options.temperature },
