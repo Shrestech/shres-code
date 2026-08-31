@@ -73,7 +73,9 @@ function ConfirmBody({ modal, connectBusy, t, onConfirm, onCancel }: {
   const installationId = inspect.installationId
     ?? (outcome?.status === 'fingerprint-mismatch' ? outcome.observed : null)
   const versionLine = observedVersion === null
-    ? t('modal.version.absent')
+    ? inspect.installed
+      ? t('modal.version.absent')
+      : t('modal.version.uninstalled')
     : skew
       ? t('modal.version.skew', { observed: observedVersion, local: inspect.localVersion })
       : t('modal.version.match', { version: observedVersion })

@@ -92,8 +92,8 @@ describe('hosted search request splice', () => {
       provider: 'grok-session', model: 'grok-4.6', messages: [],
       tools: [localWebSearchTool, echoTool],
     })) assembler.push(chunk)
-    const tools = (upstream!.bodies[0] as Record<string, unknown>)['tools'] as unknown[]
-    const names = tools.map((tool: Record<string, unknown>) => tool['name'])
+    const tools = (upstream!.bodies[0] as Record<string, unknown>)['tools'] as Record<string, unknown>[]
+    const names = tools.map(tool => tool['name'])
     expect(names).toContain('web_search')
     expect(names).toContain('echo')
   })

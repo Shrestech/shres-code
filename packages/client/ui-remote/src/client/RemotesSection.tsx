@@ -171,12 +171,12 @@ function AddEditForm({ form, addBusy, t, onSubmit, onCancel }: {
 }) {
   const [alias, setAlias] = useState(form.mode === 'edit' ? form.entry.id : '')
   const [target, setTarget] = useState(form.mode === 'edit' ? form.entry.target : '')
-  const [port, setPort] = useState(form.mode === 'edit' ? String(form.entry.remotePort) : '')
+  const [port, setPort] = useState(form.mode === 'edit' ? String(form.entry.remotePort) : '3080')
   const [error, setError] = useState<string | null>(null)
 
   const submit = async (): Promise<void> => {
     setError(null)
-    const outcome = await onSubmit({ alias, target, remotePort: Number(port) })
+    const outcome = await onSubmit({ alias, target, remotePort: port === '' ? undefined : Number(port) })
     if (!outcome.ok) setError(outcome.message)
   }
 

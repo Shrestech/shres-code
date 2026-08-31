@@ -19,6 +19,7 @@
 import { Command, CommanderError } from 'commander'
 import type { ModelsCliCommand, ProviderTemplate } from './models-cli.ts'
 import { PROVIDER_TEMPLATES } from './models-cli.ts'
+import { DEFAULT_REMOTE_DAEMON_PORT } from '@shres-code/shres-code-host-remote-control'
 import type { RemoteCliCommand } from '@shres-code/shres-code-host-remote-control'
 
 /** Boot a named profile and hand it the invocation's inner arguments. */
@@ -325,7 +326,7 @@ export function parseShresArgs(argv: readonly string[], version: string): ShresI
     .description('register a remote host; validate the target and daemon port loud')
     .argument('<alias>', 'short lowercase alias (letters, digits, dashes)')
     .argument('<target>', 'user@host ssh target')
-    .option('--port <port>', 'remote daemon loopback port the tunnel forwards to', '3080')
+    .option('--port <port>', 'remote daemon loopback port the tunnel forwards to', String(DEFAULT_REMOTE_DAEMON_PORT))
     .action((alias: string, target: string, options: { port: string }) => {
       rejectParentOptions('remote')
       if (alias === '') program.error('error: remote add needs an alias')

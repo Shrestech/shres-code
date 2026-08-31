@@ -3229,6 +3229,34 @@ export interface Config {
 
 Source: [`packages/goal/tool-goal/src/index.ts:26`](../packages/goal/tool-goal/src/index.ts)
 
+<a id="shres-codeshres-code-tool-image-gen"></a>
+
+## `@shres-code/shres-code-tool-image-gen`
+
+Requires: `tools` · `systemPrompt` · `grokCredential`
+
+```ts config-catalog
+/** Plugin / cordis.yml section configuring the image_gen tool. */
+export interface Config {
+  /** Register the tool. Defaults to off. */
+  enabled?: boolean
+  /** Imagine model id; defaults to {@link DEFAULT_MODEL}. */
+  model?: string
+  /** Imagine API base including the version prefix; defaults to {@link DEFAULT_BASE_URL}. */
+  baseURL?: string
+  /** Auth document path; defaults to {@link defaultAuthPath}. */
+  authPath?: string
+  /** Token refresh leeway in milliseconds; defaults to {@link DEFAULT_REFRESH_LEEWAY_MS}. */
+  refreshLeewayMs?: number
+  /** Directory generated images are written into; defaults to {@link DEFAULT_OUTPUT_DIRECTORY}. */
+  outputDirectory?: string
+  /** Cooperative tool-call budget (ms); defaults to {@link DEFAULT_TIMEOUT_MS}. */
+  timeoutMs?: number
+}
+```
+
+Source: [`packages/llm/tool-image-gen/src/config.ts:38`](../packages/llm/tool-image-gen/src/config.ts)
+
 <a id="shres-codeshres-code-tool-jobs"></a>
 
 ## `@shres-code/shres-code-tool-jobs`
