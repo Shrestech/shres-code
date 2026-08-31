@@ -37,7 +37,7 @@ The standard harness conversation: system text, ordered messages, harness tool s
 
 #### Token effect
 
-Usage chunks carry the proxy's reported input/output/reasoning token counts; the request default for output tokens follows the model entry's `maxTokens` when one is configured.
+Usage chunks carry the proxy's reported input/output/reasoning token counts; the request default for output tokens follows the model entry's `maxTokens` when one is configured. Both shipped models declare `input: ['text', 'image']`, which admits image blocks (vision); a deployment can narrow a model entry's `input` list through the settings section.
 
 #### KV Cache effect
 

@@ -50,8 +50,8 @@ const SHIPPED_REASONING_EFFORTS = {
  * not caught up with is a settings ``models`` entry, not a code change.
  */
 export const SHIPPED_MODELS: readonly GrokSessionModelConfig[] = [
-  { id: 'grok-4.6', name: 'Grok 4.6', contextWindow: 500_000 },
-  { id: 'grok-4.5', name: 'Grok 4.5', contextWindow: 500_000 },
+  { id: 'grok-4.6', name: 'Grok 4.6', contextWindow: 500_000, input: ['text', 'image'] },
+  { id: 'grok-4.5', name: 'Grok 4.5', contextWindow: 500_000, input: ['text', 'image'] },
 ]
 
 /**
@@ -109,11 +109,16 @@ export interface Config {
   hostedXSearch?: boolean
 }
 
+// Mirrors pi-ai's modality gate (text|image); a pi-ai modality drift fails
+// the profile layer's own Record gate before this copy can go stale silently.
+const inputModalitySchema = z.union([z.const('text' as const), z.const('image' as const)])
+
 const modelSchema = z.object({
   id: z.string().required(),
   name: z.string(),
   contextWindow: z.number().step(1).min(1),
   maxTokens: z.number().step(1).min(1),
+  input: z.array(inputModalitySchema),
 })
 
 /** Runtime schema for {@link Config}. */
