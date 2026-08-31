@@ -176,7 +176,9 @@ function AddEditForm({ form, addBusy, t, onSubmit, onCancel }: {
 
   const submit = async (): Promise<void> => {
     setError(null)
-    const outcome = await onSubmit({ alias, target, remotePort: port === '' ? undefined : Number(port) })
+    const outcome = await onSubmit(
+      port === '' ? { alias, target } : { alias, target, remotePort: Number(port) },
+    )
     if (!outcome.ok) setError(outcome.message)
   }
 
