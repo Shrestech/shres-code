@@ -117,7 +117,8 @@ export function createRemoteViewStore(): RemoteViewStore {
 export interface RemoteDraft {
   alias: string
   target: string
-  remotePort: number
+  /** Omitted when the form field is cleared; the gateway resolves it to the daemon default. */
+  remotePort?: number
 }
 
 /** Result of the add/edit flow: the upserted entry, or the wire failure message. */
