@@ -14,7 +14,7 @@ import { Service } from '@shres-code/cordis'
 import type { Context } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
 import { TypertRemoteService, Remote } from '@shres-code/shres-code-typert-protocol'
-import { openTunnel, probeDaemonVersion, readInstallationId, type LiveTunnel, type SshRunner } from './controller.ts'
+import { openTunnel, probeDaemonVersion, probeRemoteInstalled, readInstallationId, type LiveTunnel, type SshRunner } from './controller.ts'
 import { RemoteControlError } from './errors.ts'
 import { GestureLedger } from './gesture.ts'
 import { resolveRegistryPath, resolveRunDir } from './home.ts'
@@ -166,9 +166,11 @@ export class RemoteAdminGateway extends TypertRemoteService {
     const entry = await this.entry(request.alias)
     const daemonVersion = await probeDaemonVersion(this.runner, entry.target, entry.remotePort)
     const installationId = await readInstallationId(this.runner, entry.target)
+    const installed = daemonVersion !== null || await probeRemoteInstalled(this.runner, entry.target)
     return {
       target: entry.target,
       daemonVersion,
+      installed,
       installationId,
       localVersion: this.localVersion,
       firstConnect: entry.fingerprint === null,

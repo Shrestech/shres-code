@@ -40,6 +40,7 @@ export const en = {
   'modal.version.match': '{version} — matches this app',
   'modal.version.skew': '{observed} — this app runs {local}',
   'modal.version.absent': 'No daemon answered on the remote port.',
+  'modal.version.uninstalled': 'Not installed on the remote. Install it (Node.js 22+, then npx @shres-code/shres-code web) and connect again.',
   'modal.field.fingerprint': 'Installation id',
   'modal.fingerprint.first': 'First connection to this remote — connecting trusts the installation id below.',
   'modal.fingerprint.changed': 'The remote’s installation changed since the last connection.',

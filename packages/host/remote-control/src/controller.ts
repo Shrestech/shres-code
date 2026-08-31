@@ -53,6 +53,19 @@ export interface SshRunner {
  * @param remotePort - remote daemon loopback port.
  * @returns the daemon version, or null when the probe found nothing to parse.
  */
+/**
+ * Whether the remote carries any shres install (CLI on PATH or a shres home
+ * directory); one ssh exec, reused by inspect's pre-confirm observation.
+ * @param runner - process seam.
+ * @param target - validated connect target.
+ * @returns true when an install marker was found.
+ */
+export async function probeRemoteInstalled(runner: SshRunner, target: string, controlPath?: string): Promise<boolean> {
+  const forwardArgs = controlPath === undefined ? [] : ['-o', `ControlPath=${controlPath}`]
+  const result = await runner.run([...forwardArgs, target, installationCheckCommand()])
+  return result.stdout.trim() === 'installed'
+}
+
 export async function probeDaemonVersion(
   runner: SshRunner,
   target: string,
@@ -169,7 +182,7 @@ async function waitForVersion(runner: SshRunner, spec: TunnelSpec): Promise<stri
     throw new RemoteControlError('no-remote-install',
       'no shres install found on the remote; install it first (Node.js 22+, then npx @shres-code/shres-code web on the remote) and connect again')
   }
-  throw new RemoteControlError('probe-failed', `no host.describe answered on 127.0.0.1:${String(spec.remotePort)} on the remote; start the daemon first or pass the right --port`)
+  throw new RemoteControlError('probe-failed', `no host.describe answered on 127.0.0.1:${String(spec.remotePort)} on the remote; start the daemon (shres web, default port 3080) or fix the alias's daemon port`)
 }
 
 /**

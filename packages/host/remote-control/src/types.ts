@@ -212,6 +212,8 @@ export interface RemoteInspectView {
   target: RemoteTarget
   /** Daemon version answered by the describe probe; null means unreachable. */
   daemonVersion: string | null
+  /** Whether the remote carries any shres install; false turns the absent-version line into install guidance. */
+  installed: boolean
   /** Installation id read from the remote; null when absent. */
   installationId: string | null
   /** This controller's own version, the local side of the skew check. */
