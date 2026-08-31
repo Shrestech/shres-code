@@ -21,6 +21,9 @@
       "path": "../../llm/llm"
     },
     {
+      "path": "../../llm/grok-credential"
+    },
+    {
       "path": "../../llm/llm-pi-ai"
     },
     {

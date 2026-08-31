@@ -123,6 +123,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Owns isolated per-session replay folds; pressure consumers share immutable revisioned measurements.',
   },
   {
+    key: 'grokCredential',
+    pkg: 'grok-credential',
+    title: 'Grok Build subscription credential engine',
+    mode: 'core',
+    consumers: ['llm-grok-session'],
+    note: 'Owns one single-flight Grok session-credential manager per credential spec; the llm-grok-session adapter resolves its bearer token through this service.',
+  },
+  {
     key: 'toolResultPruner',
     pkg: 'compaction-tool-result-pruner',
     title: 'Model-free tool-result pruning',

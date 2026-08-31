@@ -24,9 +24,10 @@ import type {
 } from '@shres-code/shres-code-llm'
 import { PiAiAdapter, resolveProfiles } from '@shres-code/shres-code-llm-pi-ai'
 import type { ResolvedPiAiProviderProfile } from '@shres-code/shres-code-llm-pi-ai'
+import { GrokSessionManager } from '@shres-code/shres-code-grok-credential'
 import { deepEqualJson, installSettingsSection, settingsNamespace } from '@shres-code/shres-code-settings'
 import { Config, GROK_SESSION_PROVIDER_ID, resolveCredentialSpec, resolveRoute } from './config.ts'
-import { GrokSessionManager } from './session.ts'
+import type { CredentialSpec } from './config.ts'
 
 export {
   Config,
@@ -40,8 +41,8 @@ export {
   resolveRoute,
 } from './config.ts'
 export type { GrokSessionModelConfig } from './config.ts'
-export { GrokSessionManager, OIDC_ISSUER, selectSessionEntry } from './session.ts'
-export type { GrokSessionEntry, GrokSessionOptions } from './session.ts'
+export { GrokSessionManager, OIDC_ISSUER, selectSessionEntry } from '@shres-code/shres-code-grok-credential'
+export type { GrokSessionEntry, GrokSessionOptions } from '@shres-code/shres-code-grok-credential'
 
 export const name = 'llm-grok-session'
 export const inject = ['llm']
@@ -73,19 +74,24 @@ function registrationFacts(current: () => Config): unknown {
  * The credential hook: a session manager keyed by the credential facts it
  * was built with, rebuilt only when they change. Keying preserves the
  * single-flight refresh across requests while a live section read moves the
- * document or the leeway.
- * @param current - read of the current section value.
- * @returns the manager for the section's credential facts.
+ * document or the leeway. The shared grok-credential service owns the
+ * memoization when the composition mounts it; a local fallback with the same
+ * keying covers compositions that only boot this adapter.
+ * @param ctx - context carrying the optional grok-credential service.
+ * @returns the manager for a resolved credential spec.
  */
-function sessionManagerFor(current: () => Config): () => GrokSessionManager {
-  let manager: GrokSessionManager | undefined
-  let key: string | undefined
-  return () => {
-    const spec = resolveCredentialSpec(current())
-    const nextKey = `${spec.authPath}\u0000${String(spec.refreshLeewayMs)}`
-    if (manager === undefined || key !== nextKey) {
+function createCredentialResolver(ctx: Context): (spec: CredentialSpec) => GrokSessionManager {
+  const local = new Map<string, GrokSessionManager>()
+  return (spec) => {
+    // Re-read the shared service each request so a composition that mounts it
+    // after startup (or unloads it) is honored without a captured reference.
+    const service = ctx.get('grokCredential')
+    if (service !== undefined) return service.managerFor(spec)
+    const key = `${spec.authPath}\u0000${String(spec.refreshLeewayMs)}`
+    let manager = local.get(key)
+    if (manager === undefined) {
       manager = new GrokSessionManager(spec)
-      key = nextKey
+      local.set(key, manager)
     }
     return manager
   }
@@ -98,20 +104,22 @@ function sessionManagerFor(current: () => Config): () => GrokSessionManager {
  * on is read live per request.
  * @param ctx - context carrying attachments and the logger.
  * @param current - read of the current section value.
+ * @param managerFor - the credential-fact resolver for {@link createCredentialResolver}.
  * @param profiles - memoized resolved-profile read.
  * @returns the adapter instance.
  */
 function buildAdapter(
   ctx: Context,
   current: () => Config,
+  managerFor: (spec: CredentialSpec) => GrokSessionManager,
   profiles: () => ReadonlyMap<string, ResolvedPiAiProviderProfile>,
 ): PiAiAdapter {
-  const managerFor = sessionManagerFor(current)
   return new PiAiAdapter({
     profiles,
     resolveApiKey: async () => {
+      const manager = managerFor(resolveCredentialSpec(current()))
       try {
-        return await managerFor().accessToken()
+        return await manager.accessToken()
       } catch (error) {
         if (error instanceof LlmError) throw error
         throw new LlmError(
@@ -157,9 +165,13 @@ export function apply(ctx: Context, config: Config): void {
   // the settings validator refuses at write time below.
   resolveCredentialSpec(current())
 
+  // The credential hook resolves through the shared service when present and
+  // falls back to the local single-flight manager otherwise.
+  const managerFor = createCredentialResolver(ctx)
+
   // One adapter for the plugin's whole life: the registry binds the instance
   // at register time, so every config fact is read live instead.
-  const adapter = buildAdapter(ctx, () => current(), profiles)
+  const adapter = buildAdapter(ctx, () => current(), managerFor, profiles)
 
   const directoryEntry = (): LlmConfigurableProvider => ({
     provider: GROK_SESSION_PROVIDER_ID,

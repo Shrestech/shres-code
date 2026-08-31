@@ -202,6 +202,8 @@ flowchart LR
   cfg --> plugin_shres_base_fs_sandbox
   plugin_shres_base_llm_cli_bridge["llm-cli-bridge<br/>@shres-code/shres-code-llm-cli-bridge"]
   cfg --> plugin_shres_base_llm_cli_bridge
+  plugin_shres_base_grok_credential["grok-credential<br/>@shres-code/shres-code-grok-credential"]
+  cfg --> plugin_shres_base_grok_credential
   plugin_shres_base_llm_grok_session["llm-grok-session<br/>@shres-code/shres-code-llm-grok-session"]
   cfg --> plugin_shres_base_llm_grok_session
   plugin_shres_base_llm_deepseek["llm-deepseek<br/>@shres-code/shres-code-llm-deepseek"]
@@ -307,6 +309,7 @@ flowchart LR
 | `agent-loop` | `@shres-code/shres-code-agent-loop` |
 | `fs-sandbox` | `@shres-code/shres-code-fs-sandbox` |
 | `llm-cli-bridge` | `@shres-code/shres-code-llm-cli-bridge` |
+| `grok-credential` | `@shres-code/shres-code-grok-credential` |
 | `llm-grok-session` | `@shres-code/shres-code-llm-grok-session` |
 | `llm-deepseek` | `@shres-code/shres-code-llm-deepseek` |
 
