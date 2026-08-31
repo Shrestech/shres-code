@@ -6365,6 +6365,34 @@ importers:
         specifier: workspace:^
         version: link:../../session/session-projection
 
+  packages/llm/tool-image-gen:
+    dependencies:
+      '@shres-code/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/shres-code-attachment':
+        specifier: workspace:^
+        version: link:../../attachment/attachment
+      '@shres-code/shres-code-grok-credential':
+        specifier: workspace:^
+        version: link:../grok-credential
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-llm':
+        specifier: workspace:^
+        version: link:../llm
+      '@shres-code/shres-code-system-prompt':
+        specifier: workspace:^
+        version: link:../../core/system-prompt
+      '@shres-code/shres-code-tools':
+        specifier: workspace:^
+        version: link:../../core/tools
+
   packages/lsp/lsp:
     devDependencies:
       '@shres-code/cordis':
