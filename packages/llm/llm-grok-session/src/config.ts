@@ -99,6 +99,14 @@ export interface Config {
   refreshLeewayMs?: number
   /** CLI version the route advertises; defaults to {@link DEFAULT_CLI_VERSION}. */
   cliVersion?: string
+  /**
+   * Serve web search as a hosted backend tool instead of the local `tool-web`
+   * tool for this route. Defaults to off; when on, the colliding local
+   * `web_search` function tool is dropped from the request (hosted wins).
+   */
+  hostedWebSearch?: boolean
+  /** Serve X (Twitter) search as a hosted backend tool. Defaults to off. */
+  hostedXSearch?: boolean
 }
 
 const modelSchema = z.object({
@@ -120,6 +128,8 @@ export const Config: z<Config> = z.object({
   models: z.array(modelSchema).default(undefined as unknown as never),
   refreshLeewayMs: z.number().step(1).min(0),
   cliVersion: z.string(),
+  hostedWebSearch: z.boolean().default(false),
+  hostedXSearch: z.boolean().default(false),
 })
 
 /**
@@ -130,6 +140,39 @@ export interface CredentialSpec {
   authPath: string
   /** Refresh leeway in milliseconds. */
   refreshLeewayMs: number
+}
+
+/**
+ * The hosted-search switches of the section, with every default decided here
+ * rather than inline at use sites.
+ */
+export interface ResolvedHostedSearch {
+  /** Serve web search as a hosted backend tool. */
+  webSearch: boolean
+  /** Serve X (Twitter) search as a hosted backend tool. */
+  xSearch: boolean
+}
+
+/**
+ * Resolve the hosted-search switches of the section, failing loud on a value
+ * the boundary cannot serve. A section comes through composition JSON as well
+ * as the typed settings schema, so a non-boolean switch is refused here rather
+ * than silently treated as off.
+ * @param config - composition or settings section value.
+ * @returns the resolved hosted-search switches.
+ */
+export function resolveHostedSearch(config: Config): ResolvedHostedSearch {
+  const source = config as unknown as Record<string, unknown>
+  for (const field of ['hostedWebSearch', 'hostedXSearch'] as const) {
+    const value = source[field]
+    if (value !== undefined && typeof value !== 'boolean') {
+      throw new Error(`llm-grok-session: ${field} must be a boolean`)
+    }
+  }
+  return {
+    webSearch: config.hostedWebSearch ?? false,
+    xSearch: config.hostedXSearch ?? false,
+  }
 }
 
 /**
