@@ -133,6 +133,16 @@ describe('RemoteRow', () => {
     await vi.waitFor(() => { expect(screen.queryByRole('alertdialog')).toBeNull() })
   })
 
+  it('keeps the kebab inside the row and reports expanded state', () => {
+    render(<RemoteRow {...rowProps()} />)
+    const kebab = screen.getByRole('button', { name: 'Remote actions for prod' })
+    const connect = screen.getByRole('button', { name: 'Connect prod' })
+    expect(connect.parentElement?.contains(kebab)).toBe(true)
+    expect(kebab.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(kebab)
+    expect(kebab.getAttribute('aria-expanded')).toBe('true')
+  })
+
   it('closes the kebab when the menu dismisses', () => {
     render(<RemoteRow {...rowProps()} />)
     fireEvent.click(screen.getByRole('button', { name: 'Remote actions for prod' }))
