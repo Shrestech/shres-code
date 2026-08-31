@@ -1187,6 +1187,9 @@ importers:
       '@shres-code/shres-code-goal-round-driver':
         specifier: workspace:^
         version: link:../../goal/goal-round-driver
+      '@shres-code/shres-code-grok-credential':
+        specifier: workspace:^
+        version: link:../../llm/grok-credential
       '@shres-code/shres-code-jobs-local':
         specifier: workspace:^
         version: link:../../jobs/jobs-local
@@ -6045,6 +6048,18 @@ importers:
         specifier: workspace:^
         version: link:../../tracker/tracker
 
+  packages/llm/grok-credential:
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-llm':
+        specifier: workspace:^
+        version: link:../llm
+
   packages/llm/llm:
     dependencies:
       '@shres-code/schemastery':
@@ -6162,6 +6177,9 @@ importers:
       '@shres-code/shres-code-attachment':
         specifier: workspace:^
         version: link:../../attachment/attachment
+      '@shres-code/shres-code-grok-credential':
+        specifier: workspace:^
+        version: link:../grok-credential
       '@shres-code/shres-code-invariants':
         specifier: workspace:^
         version: link:../../runtime-diagnostics/invariants

@@ -1005,6 +1005,8 @@ export interface Config {
   errorBurst?: number
   /** Drift-check cadence in completed steps since the last advice. Default 8. */
   driftEverySteps?: number
+  /** Review-turn timeout in milliseconds; a stuck child turn is interrupted. Default 180000. */
+  reviewTimeoutMs?: number
   /** Order of the `jspace:advisor` prompt section. Default 56. */
   advisorySectionOrder?: number
   /** Enable proactive reviews. Default true. */
@@ -1012,7 +1014,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/jspace/jspace-advisor/src/index.ts:90`](../packages/jspace/jspace-advisor/src/index.ts)
+Source: [`packages/jspace/jspace-advisor/src/index.ts:97`](../packages/jspace/jspace-advisor/src/index.ts)
 
 <a id="shres-codeshres-code-jspace-prompt"></a>
 
@@ -3990,6 +3992,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@shres-code/shres-code-fs-e2b` — requires `e2b` ([`packages/e2b/fs-e2b/src/index.ts`](../packages/e2b/fs-e2b/src/index.ts))
 - `@shres-code/shres-code-fs-observation-policy` ([`packages/fs/fs-observation-policy/src/index.ts`](../packages/fs/fs-observation-policy/src/index.ts))
 - `@shres-code/shres-code-goal-round-driver` — requires `agents` · `goals` · `sessions` ([`packages/goal/goal-round-driver/src/index.ts`](../packages/goal/goal-round-driver/src/index.ts))
+- `@shres-code/shres-code-grok-credential` ([`packages/llm/grok-credential/src/index.ts`](../packages/llm/grok-credential/src/index.ts))
 - `@shres-code/shres-code-host-directory-picker-auto` — requires `webServer` · `loader` ([`packages/host/directory-picker-auto/src/index.ts`](../packages/host/directory-picker-auto/src/index.ts))
 - `@shres-code/shres-code-host-directory-picker-native` ([`packages/host/directory-picker-native/src/index.ts`](../packages/host/directory-picker-native/src/index.ts))
 - `@shres-code/shres-code-host-plugin-inventory` — requires `loader` ([`packages/host/plugin-inventory/src/index.ts`](../packages/host/plugin-inventory/src/index.ts))

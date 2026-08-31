@@ -5,7 +5,7 @@
  * back in the CLI's own document format. Values never reach diagnostics: an
  * entry key names its issuer and client id, a refresh failure names the
  * issuer's error code, and nothing else about the credential is ever quoted.
- * @module @shres-code/shres-code-llm-grok-session/session
+ * @module @shres-code/shres-code-grok-credential/session
  */
 
 import { chmod, readFile, rename, stat, writeFile } from 'node:fs/promises'

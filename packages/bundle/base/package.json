@@ -64,6 +64,7 @@
     "@shres-code/shres-code-api-gateway": "workspace:^",
     "@shres-code/shres-code-llm": "workspace:^",
     "@shres-code/shres-code-llm-deepseek": "workspace:^",
+    "@shres-code/shres-code-grok-credential": "workspace:^",
     "@shres-code/shres-code-llm-cli-bridge": "workspace:^",
     "@shres-code/shres-code-llm-grok-session": "workspace:^",
     "@shres-code/shres-code-llm-pi-ai": "workspace:^",

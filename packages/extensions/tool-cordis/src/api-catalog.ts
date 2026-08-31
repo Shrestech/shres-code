@@ -793,6 +793,19 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'grokCredential',
+    summary: 'Single-flight Grok Build session-credential service.',
+    description: 'Single-flight Grok Build session-credential service.\n\nGrokCredential.managerFor returns the one GrokSessionManager memoized for a credential spec, preserving one shared in-flight refresh per document. The memoization caches every spec key for the service\'s lifetime (develop\'s single-slot resolver evicted on change); that is safe because each `accessToken()` call re-validates the document and refresh at the moment it runs rather than trusting a stale cached token state.',
+    methods: [
+      {
+        signature: 'managerFor(spec: GrokSessionOptions): GrokSessionManager',
+        description: 'Resolve the credential manager for one spec, sharing the cached instance across callers so concurrent requests refresh the document once.',
+        parameters: [{ name: 'spec', description: 'the credential spec this manager reads and refreshes.' }],
+        returns: 'the manager for the spec\'s credential facts.',
+      },
+    ],
+  },
+  {
     key: 'invariants',
     summary: 'Package-owned invariant registry with global and regex-based selection.',
     description: 'Package-owned invariant registry with global and regex-based selection.',
@@ -3696,6 +3709,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'GoalView',
     declaration: 'export interface GoalView extends GoalSnapshot {\n    readonly roundsStarted: number;\n    readonly createdAt: number;\n    readonly updatedAt: number;\n    readonly activation: GoalActivation;\n}',
+  },
+  {
+    name: 'GrokSessionManager',
+    declaration: 'export class GrokSessionManager {\n    constructor(options: GrokSessionOptions);\n    accessToken(): Promise<string>;\n}',
+  },
+  {
+    name: 'GrokSessionOptions',
+    declaration: 'export interface GrokSessionOptions {\n    authPath: string;\n    refreshLeewayMs: number;\n    fetch?: typeof fetch;\n    now?: () => number;\n}',
   },
   {
     name: 'ImageAttachmentLimits',

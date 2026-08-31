@@ -594,6 +594,9 @@
     # through auth.x.ai. Dormant until that login exists on the machine; use
     # bills the CLI subscription (SuperGrok), not the X API. The delegated
     # grok-cli route above is the spawn-based alternative.
+    - id: grok-credential
+      name: '@shres-code/shres-code-grok-credential'
+
     - id: llm-grok-session
       name: '@shres-code/shres-code-llm-grok-session'
 

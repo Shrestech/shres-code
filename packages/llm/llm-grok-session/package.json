@@ -32,6 +32,7 @@
   ],
   "license": "MIT",
   "peerDependencies": {
+    "@shres-code/shres-code-grok-credential": "workspace:^",
     "@shres-code/shres-code-invariants": "workspace:^",
     "@shres-code/shres-code-llm": "workspace:^",
     "@shres-code/shres-code-llm-pi-ai": "workspace:^",
@@ -42,6 +43,7 @@
     "@shres-code/schemastery": "workspace:^"
   },
   "devDependencies": {
+    "@shres-code/shres-code-grok-credential": "workspace:^",
     "@shres-code/shres-code-attachment": "workspace:^",
     "@shres-code/shres-code-invariants": "workspace:^",
     "@shres-code/shres-code-llm": "workspace:^",
