@@ -62,6 +62,11 @@ const FOLD_PROPS = {
   onToggleTurn: () => {},
   collapsedAssistants: new Set<string>(),
   onToggleAssistant: () => {},
+  t: (key: string, params?: Record<string, unknown>) => {
+    if (key === 'thinking.label') return 'Thinking'
+    if (key === 'thinking.segments') return `${params?.count} segments`
+    return key
+  },
 }
 
 describe('TrajectoryTable', () => {
@@ -167,6 +172,72 @@ describe('TrajectoryTable', () => {
     expect(screen.getByRole('button', { name: 'Thinking' })).toBe(toggle)
     expect(toggle.getAttribute('aria-expanded')).toBe('true')
     expect(toggle.parentElement?.textContent?.length).toBeGreaterThan(thinking.length)
+  })
+
+  it('coalesces adjacent reasoning into one expandable thinking entry in the raw view', () => {
+    const turns: readonly TrajectoryTurnModel[] = [{
+      turn: 1,
+      groups: [{
+        title: 'Step 1',
+        cells: [{
+          index: 1,
+          kind: 'message',
+          text: '',
+          sourceBlocks: [
+            { type: 'thinking', content: 'r1\n\nr2\n\nr3', segments: ['r1', 'r2', 'r3'] },
+            { type: 'tool-call', content: '{}', callId: 'call-1', toolName: 'read' },
+            { type: 'thinking', content: 'r4\n\nr5', segments: ['r4', 'r5'] },
+          ],
+          timeSeconds: 1,
+        }],
+      }],
+    }]
+    render(<TrajectoryTable turns={turns} {...FOLD_PROPS} />)
+
+    fireEvent.click(screen.getByRole('row', { name: /ASSISTANT/ }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Raw' }))
+
+    const toggles = screen.getAllByRole('button', { name: /Thinking/ })
+    expect(toggles).toHaveLength(2)
+    expect(toggles[0]?.getAttribute('aria-expanded')).toBe('false')
+    expect(toggles[0]?.textContent).toContain('3 segments')
+    expect(toggles[1]?.textContent).toContain('2 segments')
+    // Collapsed shows the newest segment's first line as a live preview.
+    expect(screen.getByText('r3')).toBeTruthy()
+    expect(screen.getByText('r5')).toBeTruthy()
+    expect(screen.queryByText('r1')).toBeNull()
+    expect(screen.queryByText('r4')).toBeNull()
+
+    fireEvent.click(toggles[0]!)
+    expect(toggles[0]?.getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByText('r1')).toBeTruthy()
+    expect(screen.getByText('r2')).toBeTruthy()
+    expect(screen.getByText('r3')).toBeTruthy()
+  })
+
+  it('renders a single reasoning block as one thinking entry with its full text', () => {
+    const turns: readonly TrajectoryTurnModel[] = [{
+      turn: 1,
+      groups: [{
+        title: 'Step 1',
+        cells: [{
+          index: 1,
+          kind: 'message',
+          text: '',
+          sourceBlocks: [{
+            type: 'thinking', content: 'solo', segments: ['solo'],
+          }],
+          timeSeconds: 1,
+        }],
+      }],
+    }]
+    render(<TrajectoryTable turns={turns} {...FOLD_PROPS} />)
+
+    fireEvent.click(screen.getByRole('row', { name: /ASSISTANT/ }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Raw' }))
+
+    expect(screen.getByText('solo')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Thinking/ })).toBeNull()
   })
 
   it('keeps raw HTML tags in a Markdown-derived context preview', () => {

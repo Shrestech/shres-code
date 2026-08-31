@@ -866,7 +866,7 @@ function expandAssistant(
         : {}),
     ...(messageText !== '' ? { outputDetail: messageText } : {}),
     ...(thinkingText !== '' ? { thinkingDetail: thinkingText } : {}),
-    sourceBlocks: node.blocks.map(block => assistantSourceBlock(block)),
+    sourceBlocks: assistantSourceBlocks(node.blocks),
     timeSeconds: messageDuration,
     startedAt: recordedStart,
   }
@@ -934,6 +934,34 @@ function promptChangeLabel(change: RequestPromptChange): string {
   if (change.kind === 'system') return 'System Prompt Updated'
   if (change.kind === 'tools') return 'Tools Updated'
   return 'System Prompt and Tools Updated'
+}
+
+/**
+ * Map a message's blocks to source entries, coalescing each maximal run of
+ * adjacent reasoning blocks into one thinking entry with its segments.
+ * @param blocks - Assistant message blocks in source order.
+ * @returns Source entries in the same order, with reasoning runs collapsed.
+ */
+function assistantSourceBlocks(blocks: readonly AssistantBlock[]): TrajectorySourceBlock[] {
+  const out: TrajectorySourceBlock[] = []
+  let run: string[] = []
+  const flush = (): void => {
+    if (run.length === 0) return
+    out.push({ type: 'thinking', segments: run, content: run.join('\n\n') })
+    run = []
+  }
+  for (const block of blocks) {
+    if (block.kind === 'reasoning') {
+      // Empty-text reasoning is a just-opened streaming placeholder; counting it
+      // would transiently inflate the segment count and blank the preview.
+      if (block.text !== '') run.push(block.text)
+      continue
+    }
+    flush()
+    out.push(assistantSourceBlock(block))
+  }
+  flush()
+  return out
 }
 
 function assistantSourceBlock(block: AssistantBlock): TrajectorySourceBlock {

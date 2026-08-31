@@ -1,4 +1,4 @@
-/** `trajectory` namespace dictionaries (view tab label + toolbar strings). */
+/** `trajectory` namespace dictionaries (view tab label, toolbar, and thinking-collapse strings). */
 
 /** Dictionary namespace owned by this plugin. */
 export const NS = 'trajectory'
@@ -19,10 +19,12 @@ export type TrajectoryKey =
   | 'toolbar.collapseCalls'
   | 'toolbar.search'
   | 'toolbar.searchPlaceholder'
+  | 'thinking.label'
+  | 'thinking.segments'
 
 declare module '@shres-code/shres-code-client-ui-slots' {
   interface LocaleNamespaceMap {
-    /** The trajectory view tab label and toolbar strings. */
+    /** The trajectory view tab label, toolbar, and thinking-collapse strings. */
     'trajectory': TrajectoryKey
   }
 }
@@ -43,4 +45,6 @@ export const en: Record<TrajectoryKey, string> = {
   'toolbar.collapseCalls': 'Collapse calls',
   'toolbar.search': 'Search trajectory',
   'toolbar.searchPlaceholder': 'Search',
+  'thinking.label': 'Thinking',
+  'thinking.segments': '{count} segments',
 }

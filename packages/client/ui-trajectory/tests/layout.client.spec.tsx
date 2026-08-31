@@ -271,6 +271,24 @@ describe('deriveTrajectoryLayout', () => {
     expect(streamed[1]?.groups[0]?.cells[0]?.requestOnly).toBeUndefined()
   })
 
+  it('appends a streaming reasoning delta to the trailing thinking group', () => {
+    const partial = {
+      turn: 2,
+      step: 1,
+      blocks: [
+        { kind: 'reasoning' as const, text: 'first' },
+        { kind: 'reasoning' as const, text: 'second' },
+      ],
+    }
+    const streamed = appendTrajectoryPartialLayout([], partial, 0)
+    const message = streamed[0]?.groups.flatMap(group => group.cells)
+      .find(cell => cell.kind === 'message')
+
+    expect(message?.sourceBlocks).toEqual([{
+      type: 'thinking', segments: ['first', 'second'], content: 'first\n\nsecond',
+    }])
+  })
+
   it('replaces a running-call placeholder with the matching streamed tool call', () => {
     const partial = {
       turn: 1,
@@ -652,6 +670,47 @@ describe('deriveTrajectoryLayout', () => {
     expect(message?.text).toBe('')
     expect(message?.previewMarkdown).toBe(thinking)
     expect(message?.thinkingDetail).toBe(thinking)
+  })
+
+  it('coalesces adjacent reasoning blocks into one thinking entry per run', () => {
+    const nodes = [{
+      kind: 'assistant', seq: 1, time: 5_000, turn: 1, step: 0,
+      blocks: [
+        { kind: 'reasoning', text: 'r1' },
+        { kind: 'reasoning', text: 'r2' },
+        { kind: 'reasoning', text: 'r3' },
+        { kind: 'tool-call', callId: 'c1', name: 'bash', argsRaw: '{}' },
+        { kind: 'reasoning', text: 'r4' },
+        { kind: 'reasoning', text: 'r5' },
+      ],
+    }] as unknown as ConversationSnapshot['nodes']
+
+    const turns = deriveTrajectoryLayout({ nodes, partial: null, runningCalls: [] })
+    const message = turns[0]?.groups.flatMap(group => group.cells)
+      .find(cell => cell.kind === 'message')
+
+    const thinking = message?.sourceBlocks?.filter(block => block.type === 'thinking')
+    expect(thinking).toHaveLength(2)
+    expect(thinking?.[0]?.segments).toEqual(['r1', 'r2', 'r3'])
+    expect(thinking?.[0]?.content).toBe('r1\n\nr2\n\nr3')
+    expect(thinking?.[1]?.segments).toEqual(['r4', 'r5'])
+    expect(message?.sourceBlocks?.map(block => block.type))
+      .toEqual(['thinking', 'tool-call', 'thinking'])
+  })
+
+  it('renders a single reasoning block as one thinking entry with no segments', () => {
+    const nodes = [{
+      kind: 'assistant', seq: 1, time: 5_000, turn: 1, step: 0,
+      blocks: [{ kind: 'reasoning', text: 'solo' }],
+    }] as unknown as ConversationSnapshot['nodes']
+
+    const turns = deriveTrajectoryLayout({ nodes, partial: null, runningCalls: [] })
+    const message = turns[0]?.groups.flatMap(group => group.cells)
+      .find(cell => cell.kind === 'message')
+
+    expect(message?.sourceBlocks).toEqual([{
+      type: 'thinking', segments: ['solo'], content: 'solo',
+    }])
   })
 
   it('advances the duration cursor over context and compaction nodes', () => {
