@@ -93,6 +93,49 @@ export interface ToolResultBlock {
 }
 
 /**
+ * One result entry a provider-backend tool produced, held in a bounded,
+ * provider-neutral form that renders without provider-specific translation.
+ */
+export interface ServerToolResult {
+  /** Result heading supplied by the hosted tool, when present. */
+  title?: string
+  /** Provider-returned location of the result, when present. */
+  url?: string
+  /** Short excerpt supplied by the hosted tool, when present. */
+  snippet?: string
+}
+
+/**
+ * A tool call the provider backend executed on the model's behalf — a hosted
+ * or server-side tool (for example a provider-native web search). The block is
+ * recorded for logging and generic rendering; the agent loop must never
+ * dispatch it as a local tool call. Fields hold the hosted tool identity plus
+ * a bounded, provider-neutral summary of what the backend did/found, so a
+ * later hosted-search presenter can render the results without changing this
+ * block. Construct only through {@link toServerToolCallBlock}, which enforces
+ * the bounds.
+ */
+export interface ServerToolCallBlock {
+  type: 'server-tool-call'
+  /** Hosted-tool category reported by the provider (for example `'web_search'`). */
+  kind: string
+  /** Hosted-tool name when the provider reports one distinct from {@link ServerToolCallBlock.kind}. */
+  name?: string
+  /** Provider-issued call id for the hosted invocation, when reported. */
+  id?: CallId
+  /** Provider-neutral completion state of the hosted call. */
+  status: 'completed' | 'failed'
+  /**
+   * Bounded, provider-neutral results the hosted call produced; omitted when
+   * the call returned none. A mutable array like sibling blocks (Wire
+   * rewrites arrays to mutable `Wire<E>[]`, so a readonly array would break
+   * cross-package assignability); runtime immutability is enforced by
+   * `toServerToolCallBlock`'s freeze plus `freezeMessage`'s deep-freeze.
+   */
+  results?: ServerToolResult[]
+}
+
+/**
  * Merge-extensible content blocks keyed by `type`. New core blocks must land
  * with adapter, UI, and compaction support.
  */
@@ -102,6 +145,7 @@ export interface ContentBlockMap {
   'image': ImageBlock
   'tool-call': ToolCallBlock
   'tool-result': ToolResultBlock
+  'server-tool-call': ServerToolCallBlock
 }
 
 /** The block `type` tag vocabulary; widens as plugins add entries to {@link ContentBlockMap}. */

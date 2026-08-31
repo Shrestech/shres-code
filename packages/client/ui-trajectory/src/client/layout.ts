@@ -952,6 +952,7 @@ function assistantSourceBlock(block: AssistantBlock): TrajectorySourceBlock {
       type: 'image',
       content: stringifySourceValue(block.attachment),
     }
+    case 'server-tool-call': return sourceBlock(block.block)
     case 'other': return sourceBlock(block.block)
   }
 }

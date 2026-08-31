@@ -28,4 +28,15 @@ describe('toAssistantBlock', () => {
     ])
     expect(toAssistantBlock(blocks[0] as ContentBlock)).toEqual({ kind: 'text', text: 'body' })
   })
+
+  it('classifies a server-tool-call block carrying its hosted identity', () => {
+    const block = {
+      type: 'server-tool-call' as const,
+      kind: 'web_search',
+      name: 'x_search',
+      status: 'completed' as const,
+      results: [{ title: 'R', url: 'https://r.test', snippet: 'excerpt' }],
+    }
+    expect(toAssistantBlock(block as ContentBlock)).toEqual({ kind: 'server-tool-call', block })
+  })
 })

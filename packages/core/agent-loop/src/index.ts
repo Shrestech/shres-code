@@ -185,6 +185,7 @@ declare module '@shres-code/cordis' {
 }
 
 export { DEFAULT_MAX_PARALLEL_TOOL_CALLS }
+export { isLocalToolCall } from './tool-calls.ts'
 
 /**
  * One launcher-selected session identity for a configured agent. `resume`
