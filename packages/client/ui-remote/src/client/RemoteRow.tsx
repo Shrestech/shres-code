@@ -5,6 +5,7 @@
  * message are component-local state per the three-channel rule.
  */
 import { useState } from 'react'
+import clsx from 'clsx'
 import {
   IconEllipsisOutline16, IconEditOutline16, IconRightUpOutline14, IconTrashOutline16, Menu,
 } from '@shres-code/shres-code-client-ui-primitives'
@@ -75,7 +76,7 @@ export function RemoteRow({ entry, tunnel, busy, t, onConnect, onEdit, onRemove,
   }
 
   return (
-    <div className={css.row}>
+    <div className={clsx(css.row, menuOpen && css.menuOpen)}>
       <button
         type="button"
         className={css.main}
@@ -96,6 +97,7 @@ export function RemoteRow({ entry, tunnel, busy, t, onConnect, onEdit, onRemove,
             type="button"
             className={css.kebab}
             aria-label={t('row.menu.aria', { alias: entry.id })}
+            aria-expanded={menuOpen}
             onClick={() => { setMenuOpen(open => !open) }}
           >
             <IconEllipsisOutline16 size={16} />
