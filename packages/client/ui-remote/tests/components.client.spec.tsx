@@ -171,6 +171,7 @@ describe('TrustModal', () => {
   const baseInspect = {
     target: 'ci@prod.remote.example' as RemoteInspectView['target'],
     daemonVersion: '0.1.0-rc.5',
+    installed: true,
     installationId: 'abcdef1234567890abcdef',
     localVersion: '0.1.0-rc.5',
     firstConnect: true,
