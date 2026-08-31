@@ -1570,6 +1570,62 @@ export type Config = Readonly<Record<string, never>>
 
 Source: [`packages/llm/llm-retry/src/index.ts:24`](../packages/llm/llm-retry/src/index.ts)
 
+<a id="shres-codeshres-code-llm-xai-apikey"></a>
+
+## `@shres-code/shres-code-llm-xai-apikey`
+
+Requires: `llm`
+
+```ts config-catalog
+/** Plugin / settings section configuring the one route. */
+export interface Config {
+  /**
+   * When false (or omitted), the route is omitted from the live adapter
+   * registry. This route ships off by default: it is pay-per-token and
+   * needs an explicit key, so nothing serves until a deployment turns it on.
+   */
+  enabled?: boolean
+  /** Credential reference (env var) resolved per request; defaults to XAI_API_KEY. */
+  apiKeyEnv?: string
+  /** Endpoint base for the X API; defaults to DEFAULT_BASE_URL. */
+  baseURL?: string
+  /** Selector label; defaults to DEFAULT_DISPLAY_NAME. */
+  displayName?: string
+  /** Model catalog; defaults to SHIPPED_MODELS. */
+  models?: XaiModelConfig[]
+}
+
+/** One advisory model entry a deployment may declare. */
+export interface XaiModelConfig {
+  /** Model id the X API accepts. */
+  id: string
+  /** Selector label; defaults to the id. */
+  name?: string
+  /** Maximum combined request and response context in tokens. */
+  contextWindow?: number
+  /** Maximum output tokens; configuring one also makes it the request default. */
+  maxTokens?: number
+  /**
+   * Request modalities this model accepts; absent keeps the text floor. A
+   * deployment serving a vision-capable Grok model declares image here,
+   * which is what admits image blocks.
+   */
+  input?: PiAiModality[]
+  /**
+   * Serve tier for this model. default (the default) omits service_tier
+   * from the request body; priority splices it in and is billed differently.
+   */
+  serviceTier?: ServiceTier
+}
+
+/** One selectable per-model service tier. */
+export type ServiceTier = typeof SERVICE_TIERS[number]
+```
+
+Depends on: [`PiAiModality`](../packages/llm/llm-pi-ai/src/index.ts)
+
+Source: [`packages/llm/llm-xai-apikey/src/config.ts:80`](../packages/llm/llm-xai-apikey/src/config.ts)
+
 <a id="shres-codeshres-code-lsp-stdio"></a>
 
 ## `@shres-code/shres-code-lsp-stdio`

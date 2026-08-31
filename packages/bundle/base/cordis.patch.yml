@@ -600,5 +600,12 @@
     - id: llm-grok-session
       name: '@shres-code/shres-code-llm-grok-session'
 
+    # Pay-per-token xAI API-key route: serves api.x.ai over the openai-responses
+    # wire with a key stored through the credentials seam. Ships off by default
+    # (enabled: false) and is orthogonal to the subscription route above; a
+    # deployment turns it on and stores XAI_API_KEY to serve it.
+    - id: llm-xai-apikey
+      name: '@shres-code/shres-code-llm-xai-apikey'
+
     - id: llm-deepseek
       name: '@shres-code/shres-code-llm-deepseek'

@@ -237,6 +237,9 @@ importers:
       '@shres-code/shres-code-llm-pi-ai':
         specifier: workspace:^
         version: link:../../packages/llm/llm-pi-ai
+      '@shres-code/shres-code-llm-xai-apikey':
+        specifier: workspace:^
+        version: link:../../packages/llm/llm-xai-apikey
       '@shres-code/shres-code-mcp-client':
         specifier: workspace:^
         version: link:../../packages/mcp/mcp-client
@@ -1217,6 +1220,9 @@ importers:
       '@shres-code/shres-code-llm-retry':
         specifier: workspace:^
         version: link:../../llm/llm-retry
+      '@shres-code/shres-code-llm-xai-apikey':
+        specifier: workspace:^
+        version: link:../../llm/llm-xai-apikey
       '@shres-code/shres-code-permission-presets':
         specifier: workspace:^
         version: link:../../interaction/permission-presets
@@ -6336,6 +6342,37 @@ importers:
       '@shres-code/shres-code-tools':
         specifier: workspace:^
         version: link:../../core/tools
+
+  packages/llm/llm-xai-apikey:
+    dependencies:
+      '@shres-code/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/shres-code-attachment':
+        specifier: workspace:^
+        version: link:../../attachment/attachment
+      '@shres-code/shres-code-credentials':
+        specifier: workspace:^
+        version: link:../../credentials/credentials
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-launch-environment':
+        specifier: workspace:^
+        version: link:../../util/launch-environment
+      '@shres-code/shres-code-llm':
+        specifier: workspace:^
+        version: link:../llm
+      '@shres-code/shres-code-llm-pi-ai':
+        specifier: workspace:^
+        version: link:../llm-pi-ai
+      '@shres-code/shres-code-settings':
+        specifier: workspace:^
+        version: link:../../settings/settings
 
   packages/llm/token-meter:
     dependencies:
@@ -22002,7 +22039,7 @@ snapshots:
   vite@8.0.16(@types/node@22.20.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0):
     dependencies:
       lightningcss: 1.33.0
-      picomatch: 4.0.5
+      picomatch: 4.0.7
       postcss: 8.5.25
       rolldown: 1.0.3
       tinyglobby: 0.2.17
@@ -22017,7 +22054,7 @@ snapshots:
   vite@8.0.16(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0):
     dependencies:
       lightningcss: 1.33.0
-      picomatch: 4.0.5
+      picomatch: 4.0.7
       postcss: 8.5.25
       rolldown: 1.0.3
       tinyglobby: 0.2.17
