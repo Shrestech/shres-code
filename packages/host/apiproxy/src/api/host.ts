@@ -4,6 +4,7 @@
  */
 
 import type { RpcRequest, RpcResponse } from './rpc.ts'
+import type { ImageMediaType } from '@shres-code/shres-code-attachment'
 
 /** One directory row of a listing: a child entry or a breadcrumb ancestor. */
 export interface DirectoryEntry {
@@ -32,7 +33,11 @@ export interface DirectoryListing {
   truncated: boolean
 }
 
-/** host.readFile response value: the bounded text view of one workspace file. */
+/**
+ * host.readFile response value: the bounded slice of one workspace file — UTF-8
+ * text, or for a sniffed image binary the base64 `imageData` with its
+ * `imageMediaType` (a truncated image carries the type but no bytes).
+ */
 export interface FileRead {
   /** UTF-8 decode of the served byte slice; empty when `binary` is true. */
   content: string
@@ -42,6 +47,18 @@ export interface FileRead {
   binary: boolean
   /** Physical file size in bytes at read time. */
   sizeBytes: number
+  /**
+   * Sniffed image media type of the served slice's magic bytes, present only
+   * when the slice is a recognized JPEG/PNG/WebP/GIF. Carried even for a
+   * truncated read so the viewer can show the image-specific truncation note
+   * instead of rendering a corrupt half image.
+   */
+  imageMediaType?: ImageMediaType
+  /**
+   * Base64 of the served byte slice, present only when `imageMediaType` is set
+   * and the read is not truncated (the viewer can render it as a data URL).
+   */
+  imageData?: string
 }
 
 /** Host-level unary methods. */

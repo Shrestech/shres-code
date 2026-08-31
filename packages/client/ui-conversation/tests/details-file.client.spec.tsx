@@ -138,6 +138,48 @@ describe('DetailsPanel file viewer', () => {
     expect(await h.view.findByText('Binary file — open it with the editor instead')).toBeTruthy()
   })
 
+  it('an image type without bytes and not truncated falls back to the binary note, never a broken img', async () => {
+    const h = makeHarness()
+    // The host never produces this shape, but the viewer must not build a
+    // broken data URL from an undefined imageData.
+    h.readFile.mockResolvedValue({
+      content: '', truncated: false, binary: true, sizeBytes: 4096,
+      imageMediaType: 'image/jpeg',
+    })
+    act(() => { h.chat.actions.select({ kind: 'file', path: 'odd.jpg' }) })
+    expect(await h.view.findByText('Binary file — open it with the editor instead')).toBeTruthy()
+    expect(h.view.queryByRole('img')).toBeNull()
+  })
+
+  it('image reads render the served bytes as an <img> with the byte size', async () => {
+    const h = makeHarness()
+    const imageData = Buffer.from([0xff, 0xd8, 0xff, 0xe0]).toString('base64')
+    h.readFile.mockResolvedValue({
+      content: '', truncated: false, binary: true, sizeBytes: 4096,
+      imageMediaType: 'image/jpeg', imageData,
+    })
+    act(() => { h.chat.actions.select({ kind: 'file', path: 'images/image-1.jpg' }) })
+    const img = await h.view.findByRole('img')
+    expect(img.getAttribute('src')).toBe('data:image/jpeg;base64,' + imageData)
+    expect(img.getAttribute('alt')).toBe('images/image-1.jpg')
+    // The byte size renders in the meta line; no binary note, no text block.
+    expect(h.view.container.textContent).toContain('4.0 KB')
+    expect(h.view.queryByText('Binary file — open it with the editor instead')).toBeNull()
+  })
+
+  it('truncated image reads show the cap note with size facts and no <img>', async () => {
+    const h = makeHarness()
+    h.readFile.mockResolvedValue({
+      content: '', truncated: true, binary: true, sizeBytes: 2000000,
+      imageMediaType: 'image/jpeg',
+    })
+    act(() => { h.chat.actions.select({ kind: 'file', path: 'big.jpg' }) })
+    expect(await h.view.findByText(/Image exceeds the view cap/)).toBeTruthy()
+    expect(h.view.container.textContent).toContain('2000000 bytes')
+    // A partial JPEG must never render as a corrupt half image.
+    expect(h.view.queryByRole('img')).toBeNull()
+  })
+
   it('truncated reads show the notice above the served slice', async () => {
     const h = makeHarness()
     h.readFile.mockResolvedValue(okRead('abc', { truncated: true, sizeBytes: 900_000 }))

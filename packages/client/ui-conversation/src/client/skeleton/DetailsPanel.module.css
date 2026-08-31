@@ -107,6 +107,24 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
+/* Image read: pane-bounded, object-fit contain so the whole image stays visible. */
+.image {
+  display: block;
+  max-width: 100%;
+  max-height: 60vh;
+  object-fit: contain;
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-base);
+}
+
+/* Image read meta line: byte size and browser-reported dimensions. */
+.imageMeta {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
 /* figma Code-block (I54:42735;43:41429): r12, pad 16, mono 13/22. */
 .code {
   margin: 0;

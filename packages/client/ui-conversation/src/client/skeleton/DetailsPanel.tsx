@@ -88,6 +88,40 @@ function langForPath(path: string): string | undefined {
   return FILE_LANGS[ext]
 }
 
+/** Human-readable byte size for the image read's meta line. */
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+/**
+ * Image read render: the served bytes as a pane-bounded <img> from a data URL,
+ * with the byte size and the browser-reported dimensions once the image loads.
+ */
+function FileImage({ read, path, t }: { read: FileRead; path: string; t: DetailsPanelProps['t'] }) {
+  const [dimensions, setDimensions] = useState<{ width: number; height: number } | null>(null)
+  const src = `data:${read.imageMediaType};base64,${read.imageData}`
+  return (
+    <section className={css.section}>
+      <div className={css.sectionLabel}>{t('details.file')}</div>
+      <img
+        className={css.image}
+        src={src}
+        alt={path}
+        onLoad={(event) => {
+          const img = event.currentTarget
+          setDimensions({ width: img.naturalWidth, height: img.naturalHeight })
+        }}
+      />
+      <div className={css.imageMeta}>
+        {formatBytes(read.sizeBytes)}
+        {dimensions !== null ? ` · ${dimensions.width} × ${dimensions.height}` : ''}
+      </div>
+    </section>
+  )
+}
+
 /** Fetch state of one file read for the viewer branch. */
 type FileViewState =
   | { phase: 'loading' }
@@ -172,7 +206,22 @@ export function DetailsPanel({
             : fileState.phase === 'failed'
               ? <div className={css.empty}>{t('details.fileLoadFailed', { message: fileState.message })}</div>
               : fileState.read.binary
-                ? <div className={css.empty}>{t('details.fileBinary')}</div>
+                ? fileState.read.imageMediaType !== undefined
+                  ? fileState.read.truncated
+                    ? <div className={css.empty}>{t('details.fileImageTruncated', { sizeBytes: fileState.read.sizeBytes })}</div>
+                    : fileState.read.imageData !== undefined
+                      ? (
+                        // Keyed by the selected file: the image's onLoad
+                        // dimensions and the <img> element are per-file state,
+                        // which React would otherwise carry into the next
+                        // selection because the panel does not unmount between
+                        // files.
+                        <Fragment key={fileTarget.path}>
+                          <FileImage read={fileState.read} path={fileTarget.path} t={t} />
+                        </Fragment>
+                      )
+                      : <div className={css.empty}>{t('details.fileBinary')}</div>
+                  : <div className={css.empty}>{t('details.fileBinary')}</div>
                 : fileState.read.content === ''
                   ? <div className={css.empty}>{t('details.fileEmpty')}</div>
                   : (

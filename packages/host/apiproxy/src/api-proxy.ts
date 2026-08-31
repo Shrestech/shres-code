@@ -37,7 +37,7 @@ import type { PresetBearingSession } from '@shres-code/shres-code-agent-presets'
 import type {} from '@shres-code/shres-code-tools'
 import type {
   ApiProxy, ConfigurableProviderView, CredentialView, FileRead, GoalRef, HistoryEntry, HostFrame,
-  ModelCatalogFailure, ModelProviderGroup,
+  ImageMediaType, ModelCatalogFailure, ModelProviderGroup,
   ModelReasoning, MuxFrame, PromptContentPart, QuestionResponsePayload, SessionListMetadata, SessionProjectionsBlock, SessionSearchItem,
   QueuedInboxItem, SessionSummary, SettingsNamespaceView, SubagentAddress, JobView, ToolEventView,
   WorkspaceId, WorkspaceView,
@@ -667,6 +667,29 @@ async function readBounded(path: string, cap: number): Promise<{ bytes: Buffer; 
   } finally {
     await handle.close()
   }
+}
+
+/** Magic-byte matchers for the image media types the viewer can sniff. */
+const IMAGE_MAGIC: ReadonlyArray<readonly [ImageMediaType, (bytes: Buffer) => boolean]> = [
+  ['image/jpeg', bytes => bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff],
+  ['image/png', bytes => bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))],
+  ['image/webp', bytes => bytes.length >= 12 && bytes.subarray(0, 4).toString('ascii') === 'RIFF' && bytes.subarray(8, 12).toString('ascii') === 'WEBP'],
+  ['image/gif', (bytes) => {
+    const head = bytes.subarray(0, 6).toString('ascii')
+    return head === 'GIF87a' || head === 'GIF89a'
+  }],
+]
+
+/**
+ * Sniff a served byte slice's magic bytes for a recognized image media type.
+ * @param bytes - the served leading slice.
+ * @returns the sniffed media type, or undefined when the slice is not a recognized image.
+ */
+function sniffImageMediaType(bytes: Buffer): ImageMediaType | undefined {
+  for (const [type, matches] of IMAGE_MAGIC) {
+    if (matches(bytes)) return type
+  }
+  return undefined
 }
 
 /** Resolved Agent model and project-directory defaults consumed by the API implementation. */
@@ -2005,11 +2028,18 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     try {
       const { bytes, sizeBytes, truncated } = await readBounded(real, fileViewMaxBytes)
       const binary = bytes.includes(0)
+      const imageMediaType = binary ? sniffImageMediaType(bytes) : undefined
       return ok(request, {
         content: binary ? '' : bytes.toString('utf8'),
         truncated,
         binary,
         sizeBytes,
+        ...(imageMediaType === undefined ? {} : {
+          imageMediaType,
+          // A truncated slice is a partial image the viewer must not render;
+          // carrying the bytes would only invite a corrupt half image.
+          ...(truncated ? {} : { imageData: bytes.toString('base64') }),
+        }),
       })
     } catch (error: unknown) {
       if (isAborted(signal)) {
