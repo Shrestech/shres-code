@@ -53,6 +53,7 @@ function timelineBlock(block: AssistantBlock): AssistantBlock {
       name: block.name,
       argsRaw: '',
     }
+    case 'server-tool-call': return block
     case 'other': return { kind: 'other', block: null }
   }
 }
@@ -506,6 +507,7 @@ export function TrajectoryView({
           onToggleAssistant={toggleAssistant}
           inspectCallId={inspect?.callId ?? null}
           onInspectApplied={onInspectDone}
+          t={t}
         />
       </div>
     </div>

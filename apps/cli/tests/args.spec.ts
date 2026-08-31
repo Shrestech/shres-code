@@ -159,6 +159,11 @@ describe('parseShresArgs', () => {
 })
 
 describe('parseShresArgs remote family', () => {
+  it('parses add with the default daemon port', () => {
+    expect(parse(['remote', 'add', 'lab', 'ci@r.example']))
+      .toEqual({ mode: 'remote', command: { kind: 'remote-add', alias: 'lab', target: 'ci@r.example', remotePort: 3080 } })
+  })
+
   it('parses add with explicit daemon port', () => {
     expect(parse(['remote', 'add', 'lab', 'ci@r.example', '--port', '4022']))
       .toEqual({ mode: 'remote', command: { kind: 'remote-add', alias: 'lab', target: 'ci@r.example', remotePort: 4022 } })

@@ -7,6 +7,7 @@ One page per subsystem of the Shres Code: what it is, the data structures it mov
 | [core.md](core.md) | how `packages/core` controls the agent loop: the package-by-package loop description, agent creation and ownership (`AgentHandle`), the `Agent` handle's delivery/cancellation/interception contracts, and the repo-wide type patterns (`…Map → derived-union`, branded ids) |
 | [llm-streaming.md](llm-streaming.md) | the `packages/llm` conversation types — `Message`/`ContentBlock`, the assembled model request, the `StreamChunk` wire protocol and adapter contract, `BlockAssembler`, and the `LlmAdapter` provider contract |
 | [token-meter.md](token-meter.md) | immutable scalar and positional replay measurements with consumed-log revisions |
+| [grok-credential.md](grok-credential.md) | the one Grok Build subscription credential: the single-flight session-credential engine shared by the grok-session adapter and future consumers |
 | [scope.md](scope.md) | scoped registration identity, dispatch carriers, and the owned `Scope` context |
 | [typert.md](typert.md) | Remote invocation descriptors, lookup/Context declarations, Typert registries, and the Host Gateway/Client API boundaries |
 | [goal.md](goal.md) | persisted goal identity, lifecycle snapshots, activation, change records, and round attribution |
@@ -50,6 +51,7 @@ One page per subsystem of the Shres Code: what it is, the data structures it mov
 | [wiki.md](wiki.md) | project wiki seam: frontmatter, write request/spec, search hits, lint findings, and log-only wiki events |
 | [invariants.md](invariants.md) | the runtime-invariant registry: selection `Config`, `InvariantInstaller`/`InvariantFailure`, the empty-companion contract |
 | [web-server.md](web-server.md) | the HTTP carrier: `WebRouteKind`/`WebRoute`, match order, the claimable fallback seat, index taps |
+| [remote-control.md](remote-control.md) | the remote-connect seam: durable `RemoteEntry` records, the `TunnelSpec`/`SshRunner` contract, gesture-gated decision outcomes, and the `remote-control/tunnel-state` projection |
 | [storage.md](storage.md) | the storage subsystem: the backend contract (`StorageBackend`), `StorageForms`, `DomainSpec`/`Domain`, `domain/changed` |
 | [workspace.md](workspace.md) | the workspace registry: `Workspace`/`WorkspaceId`, registration and resolution, the session `cwd` relationship |
 | [client-modules.md](client-modules.md) | the web plugin table: `shres.client` declarations, `WebBootGraph` wire composition, the bundle route and index tap |

@@ -78,10 +78,16 @@ export const hostReadFileRequestSchema = z.object({
   path: z.string().min(1),
 }) satisfies z.ZodType<Wire<RequestPayload<'host.readFile'>>>
 
-/** host.readFile response value: the bounded text view of one workspace file. */
+/**
+ * host.readFile response value: the bounded slice of one workspace file — UTF-8
+ * text, or for a sniffed image binary the base64 `imageData` with its
+ * `imageMediaType` (a truncated image carries the type but no bytes).
+ */
 export const hostReadFileValueSchema = z.object({
   content: z.string(),
   truncated: z.boolean(),
   binary: z.boolean(),
   sizeBytes: z.number().int().nonnegative(),
+  imageMediaType: z.enum(['image/jpeg', 'image/png', 'image/webp', 'image/gif']).optional(),
+  imageData: z.string().optional(),
 }) satisfies z.ZodType<Wire<ResponseValue<'host.readFile'>>>

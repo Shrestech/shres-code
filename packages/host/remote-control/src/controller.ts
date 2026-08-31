@@ -8,7 +8,7 @@
 
 import type { RemoteEntry, TunnelSpec } from './types.ts'
 import { RemoteControlError } from './errors.ts'
-import { installationIdCommand, masterArgv, parseProbeVersion, probeCommand, tunnelArgv } from './ssh-args.ts'
+import { installationCheckCommand, installationIdCommand, masterArgv, parseProbeVersion, probeCommand, tunnelArgv } from './ssh-args.ts'
 
 /** Bounded probe loop: attempts before declaring the remote daemon absent. */
 const PROBE_ATTEMPTS = 5
@@ -32,16 +32,18 @@ export interface SshResult {
 export interface SshRunner {
   /**
    * Run one short ssh exec to completion.
-   * @param args - full argv (including `ssh`).
+   * @param args - ssh arguments; the runner supplies the binary.
    * @returns captured result.
    */
   run(args: readonly string[]): Promise<SshResult>
   /**
    * Spawn one long-lived ssh (master or forward) that outlives the call.
-   * @param args - full argv (including `ssh`).
+   * @param args - ssh arguments; the runner supplies the binary.
+   * @param onExit - optional observation of the child's natural or killed exit,
+   *   delivered at most once; a disposer-initiated exit is observed like any other.
    * @returns child pid and a disposer killing the process tree.
    */
-  spawn(args: readonly string[]): Promise<{ pid: number; dispose(): Promise<void> }>
+  spawn(args: readonly string[], onExit?: (exitCode: number | null) => void): Promise<{ pid: number; dispose(): Promise<void> }>
 }
 
 /**
@@ -51,6 +53,19 @@ export interface SshRunner {
  * @param remotePort - remote daemon loopback port.
  * @returns the daemon version, or null when the probe found nothing to parse.
  */
+/**
+ * Whether the remote carries any shres install (CLI on PATH or a shres home
+ * directory); one ssh exec, reused by inspect's pre-confirm observation.
+ * @param runner - process seam.
+ * @param target - validated connect target.
+ * @returns true when an install marker was found.
+ */
+export async function probeRemoteInstalled(runner: SshRunner, target: string, controlPath?: string): Promise<boolean> {
+  const forwardArgs = controlPath === undefined ? [] : ['-o', `ControlPath=${controlPath}`]
+  const result = await runner.run([...forwardArgs, target, installationCheckCommand()])
+  return result.stdout.trim() === 'installed'
+}
+
 export async function probeDaemonVersion(
   runner: SshRunner,
   target: string,
@@ -58,7 +73,7 @@ export async function probeDaemonVersion(
   controlPath?: string,
 ): Promise<string | null> {
   const forwardArgs = controlPath === undefined ? [] : ['-o', `ControlPath=${controlPath}`]
-  const result = await runner.run(['ssh', ...forwardArgs, target, probeCommand(remotePort)])
+  const result = await runner.run([...forwardArgs, target, probeCommand(remotePort)])
   return parseProbeVersion(result.stdout)
 }
 
@@ -71,7 +86,7 @@ export async function probeDaemonVersion(
  */
 export async function readInstallationId(runner: SshRunner, target: string, controlPath?: string): Promise<string | null> {
   const forwardArgs = controlPath === undefined ? [] : ['-o', `ControlPath=${controlPath}`]
-  const result = await runner.run(['ssh', ...forwardArgs, target, installationIdCommand()])
+  const result = await runner.run([...forwardArgs, target, installationIdCommand()])
   const id = result.stdout.trim()
   return id.length > 0 ? id : null
 }
@@ -84,6 +99,8 @@ export interface OpenTunnelOptions {
   localVersion: string
   /** Accept an installation id different from the recorded fingerprint. */
   forceFingerprint: boolean
+  /** Exit observation wired to the forward child, for the owning tunnel manager. */
+  onForwardExit?: (exitCode: number | null) => void
 }
 
 /** Live tunnel handle and the daemon facts observed at open time. */
@@ -115,9 +132,9 @@ export async function openTunnel(runner: SshRunner, spec: TunnelSpec, entry: Rem
   try {
     const version = await waitForVersion(runner, spec)
     if (!options.allowVersionSkew && version !== options.localVersion) {
-      throw new RemoteControlError('version-mismatch', `remote daemon version ${version} does not match this controller ${options.localVersion}; upgrade the remote install or pass --allow-version-skew`)
+      throw new RemoteControlError('version-mismatch', `remote daemon version ${version} does not match this controller ${options.localVersion}; upgrade the remote install or pass --allow-version-skew`, { observed: version })
     }
-    const spawnedForward = await runner.spawn(tunnelArgv(spec))
+    const spawnedForward = await runner.spawn(tunnelArgv(spec), options.onForwardExit)
     forward.pid = spawnedForward.pid
     forward.dispose = async () => spawnedForward.dispose()
     const throughVersion = await probeThroughTunnel(spec.localPort)
@@ -126,10 +143,10 @@ export async function openTunnel(runner: SshRunner, spec: TunnelSpec, entry: Rem
     }
     const fingerprint = await readInstallationId(runner, spec.target, spec.controlPath)
     if (fingerprint === null) {
-      throw new RemoteControlError('fingerprint-mismatch', `remote returned no installation id; cannot bind alias ${spec.id} to an installation`)
+      throw new RemoteControlError('fingerprint-mismatch', `remote returned no installation id; cannot bind alias ${spec.id} to an installation`, { observed: null })
     }
     if (entry.fingerprint !== null && entry.fingerprint !== fingerprint && !options.forceFingerprint) {
-      throw new RemoteControlError('fingerprint-mismatch', `installation id changed for alias ${spec.id}: expected ${entry.fingerprint}, observed ${fingerprint}; pass --force-fingerprint if the host was reinstalled`)
+      throw new RemoteControlError('fingerprint-mismatch', `installation id changed for alias ${spec.id}: expected ${entry.fingerprint}, observed ${fingerprint}; pass --force-fingerprint if the host was reinstalled`, { observed: fingerprint })
     }
     return {
       pid: forward.pid,
@@ -147,8 +164,10 @@ export async function openTunnel(runner: SshRunner, spec: TunnelSpec, entry: Rem
 
 /**
  * Wait until the remote daemon answers (bounded), surfacing a typed failure
- * naming the deepest reached stage. PR2's ensure-running slots in here when
- * the probe stays silent.
+ * naming the deepest reached stage: a remote with no shres install is
+ * reported as such with the install command; a silent daemon on an installed
+ * remote keeps the port-naming probe failure. PR2's ensure-running slots in
+ * here when the probe stays silent on an installed remote.
  * @param runner - process seam.
  * @param spec - tunnel specification (target + remotePort).
  * @returns the observed daemon version.
@@ -159,7 +178,23 @@ async function waitForVersion(runner: SshRunner, spec: TunnelSpec): Promise<stri
     if (version !== null) return version
     await new Promise(resolveDelay => setTimeout(resolveDelay, PROBE_RETRY_DELAY_MS))
   }
-  throw new RemoteControlError('probe-failed', `no host.describe answered on 127.0.0.1:${String(spec.remotePort)} on the remote; start the daemon first or pass the right --port`)
+  if (!await remoteIsInstalled(runner, spec)) {
+    throw new RemoteControlError('no-remote-install',
+      'no shres install found on the remote; install it first (Node.js 22+, then npx @shres-code/shres-code web on the remote) and connect again')
+  }
+  throw new RemoteControlError('probe-failed', `no host.describe answered on 127.0.0.1:${String(spec.remotePort)} on the remote; start the daemon (shres web, default port 3080) or fix the alias's daemon port`)
+}
+
+/**
+ * Whether the remote carries any shres install (CLI on PATH or a shres home
+ * directory); one ssh exec after the probe stayed silent.
+ * @param runner - process seam.
+ * @param spec - tunnel specification (target + controlPath).
+ * @returns true when an install marker was found.
+ */
+async function remoteIsInstalled(runner: SshRunner, spec: TunnelSpec): Promise<boolean> {
+  const result = await runner.run(['-o', `ControlPath=${spec.controlPath}`, spec.target, installationCheckCommand()])
+  return result.stdout.trim() === 'installed'
 }
 
 /**

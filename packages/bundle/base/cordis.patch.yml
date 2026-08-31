@@ -503,20 +503,26 @@
     # Every mode enables the stable model-facing web_search tool. An attached
     # CLI (Grok, Claude, Codex, Kimi) owns search through that vendor's hosted
     # web-search tool and the same credential the Models page already stores;
-    # DeepSeek official is the fallback when no listed vendor has a key. Fetch stays
-    # disabled and no fetch provider is mounted: that provider defers SSRF
-    # protection and the model would choose the request target. Search is a full
-    # auxiliary model request with server-side retrieval, so this shipped route
-    # gets 60s while the provider-neutral tool default remains 30s.
+    # Perplexity serves when its key is configured (the Settings web-search
+    # card writes it); DeepSeek official is the fallback when no listed vendor
+    # has a key. Fetch stays disabled and no fetch provider is mounted: that
+    # provider defers SSRF protection and the model would choose the request
+    # target. Search is a full auxiliary model request with server-side
+    # retrieval, so this shipped route gets 60s while the provider-neutral
+    # tool default remains 30s.
     - id: web
       name: '@shres-code/shres-code-web'
       config:
         searchProviders:
           - attached-cli
+          - perplexity
           - deepseek-official
 
     - id: web-search-attached-cli
       name: '@shres-code/shres-code-web-search-attached-cli'
+
+    - id: web-search-perplexity
+      name: '@shres-code/shres-code-web-search-perplexity'
 
     - id: web-search-deepseek
       name: '@shres-code/shres-code-web-search-deepseek'
@@ -581,6 +587,25 @@
     # writes through the same agent-default-model section as HTTP routes.
     - id: llm-cli-bridge
       name: '@shres-code/shres-code-llm-cli-bridge'
+
+    # Grok subscription session: the same credential the Grok Build CLI's
+    # "grok login" stores in ~/.grok/auth.json, served as a bearer token to
+    # cli-chat-proxy.grok.com over the openai-responses wire and refreshed
+    # through auth.x.ai. Dormant until that login exists on the machine; use
+    # bills the CLI subscription (SuperGrok), not the X API. The delegated
+    # grok-cli route above is the spawn-based alternative.
+    - id: grok-credential
+      name: '@shres-code/shres-code-grok-credential'
+
+    - id: llm-grok-session
+      name: '@shres-code/shres-code-llm-grok-session'
+
+    # Pay-per-token xAI API-key route: serves api.x.ai over the openai-responses
+    # wire with a key stored through the credentials seam. Ships off by default
+    # (enabled: false) and is orthogonal to the subscription route above; a
+    # deployment turns it on and stores XAI_API_KEY to serve it.
+    - id: llm-xai-apikey
+      name: '@shres-code/shres-code-llm-xai-apikey'
 
     - id: llm-deepseek
       name: '@shres-code/shres-code-llm-deepseek'

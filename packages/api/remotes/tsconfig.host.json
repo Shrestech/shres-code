@@ -26,6 +26,9 @@
       "path": "../../credentials/credentials"
     },
     {
+      "path": "../../host/remote-control"
+    },
+    {
       "path": "../../interaction/commands"
     },
     {

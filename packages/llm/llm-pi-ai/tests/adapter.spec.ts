@@ -355,8 +355,9 @@ describe('PiAiAdapter provider routing', () => {
 
 describe('provider profile lifecycle', () => {
   it('keeps adapter helpers off the package root', () => {
+    // resolveProfiles is a public resolver shres-llm-grok-session imports from
+    // the package root, so it is deliberately absent from this internal list.
     for (const helper of [
-      'resolveProfiles',
       'toPiContext',
       'toPiReplayState',
       'toPiAssistant',
@@ -899,5 +900,50 @@ describe('abort wiring', () => {
     }
     await new Promise(resolve => setTimeout(resolve, 20))
     expect(server.requests).toHaveLength(1)
+  })
+})
+
+describe('hosted-search and route onPayload composition', () => {
+  it('applies both the hosted splice and a route onPayload hook to one request body', async () => {
+    // A minimal Responses text turn so the openai-responses wire completes.
+    const responsesTextTurn = [
+      JSON.stringify({ type: 'response.created', response: { id: 'resp_1' } }),
+      JSON.stringify({ type: 'response.output_item.added', output_index: 0, item: { type: 'message', role: 'assistant' } }),
+      JSON.stringify({ type: 'response.output_text.delta', item_id: 'msg_1', output_index: 0, content_index: 0, delta: 'hello' }),
+      JSON.stringify({ type: 'response.completed', response: { id: 'resp_1', usage: { input_tokens: 3, input_tokens_details: { cached_tokens: 0 }, output_tokens: 1, output_tokens_details: { reasoning_tokens: 0 }, total_tokens: 4 } } }),
+    ]
+    const server = await mockServer([{ events: responsesTextTurn }])
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    const adapter = new PiAiAdapter({
+      profiles: () => resolveProfiles({
+        'xai-apikey': {
+          api: 'openai-responses',
+          baseURL: server.url,
+          models: [{ id: 'grok-4.6' }],
+        },
+      }),
+      resolveApiKey: () => Promise.resolve('test-key'),
+      hostedSearch: () => ({ entries: [{ type: 'web_search' }], dropLocalTools: ['web_search'] }),
+      onPayload: (payload) => {
+        if (payload !== null && typeof payload === 'object') {
+          ;(payload as Record<string, unknown>).service_tier = 'priority'
+        }
+      },
+    })
+    ctx.llm.registerAdapter(['xai-apikey'], adapter)
+    await assemble(ctx, {
+      provider: 'xai-apikey',
+      model: 'grok-4.6',
+      messages: [],
+      tools: [{ name: 'web_search', description: 'local', parameters: { type: 'object', properties: {} } }],
+    })
+    const body = server.requests[0] as Record<string, unknown>
+    const tools = body['tools'] as Record<string, unknown>[]
+    // hosted splice: the hosted web_search entry is present and the local one dropped
+    expect(tools.some(tool => tool['type'] === 'web_search')).toBe(true)
+    expect(tools.some(tool => tool['name'] === 'web_search')).toBe(false)
+    // route onPayload: service_tier spliced on the same body
+    expect(body['service_tier']).toBe('priority')
   })
 })

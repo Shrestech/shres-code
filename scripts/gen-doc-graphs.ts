@@ -110,7 +110,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     pkg: 'llm',
     title: 'LLM adapter registry',
     mode: 'seam',
-    implementations: ['llm-deepseek', 'llm-pi-ai', 'llm-replay', 'llm-cli-bridge'],
+    implementations: ['llm-deepseek', 'llm-pi-ai', 'llm-replay', 'llm-cli-bridge', 'llm-grok-session'],
     consumers: ['agent-loop', 'compaction-basic'],
     note: 'Adapters register provider implementations; the loop and compaction call the provider-neutral stream service.',
   },
@@ -121,6 +121,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'core',
     consumers: ['compaction-basic'],
     note: 'Owns isolated per-session replay folds; pressure consumers share immutable revisioned measurements.',
+  },
+  {
+    key: 'grokCredential',
+    pkg: 'grok-credential',
+    title: 'Grok Build subscription credential engine',
+    mode: 'core',
+    consumers: ['llm-grok-session'],
+    note: 'Owns one single-flight Grok session-credential manager per credential spec; the llm-grok-session adapter resolves its bearer token through this service.',
   },
   {
     key: 'toolResultPruner',
@@ -176,7 +184,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'User-settings seam',
     mode: 'seam',
     implementations: ['settings-file'],
-    consumers: ['llm-deepseek', 'llm-pi-ai', 'llm-cli-bridge', 'apiproxy'],
+    consumers: ['llm-deepseek', 'llm-pi-ai', 'llm-cli-bridge', 'llm-grok-session', 'apiproxy'],
     note: 'Plugins register namespace schemas and resolve layered values; providers store the raw document. The LLM adapters register their entry config as the composition base under the user section; the web gateway serves redacted layered descriptors and writes the user layer.',
   },
   {

@@ -69,6 +69,12 @@
       "path": "../../packages/llm/llm-cli-bridge"
     },
     {
+      "path": "../../packages/llm/llm-grok-session"
+    },
+    {
+      "path": "../../packages/llm/llm-xai-apikey"
+    },
+    {
       "path": "../../packages/llm/llm-pi-ai"
     },
     {

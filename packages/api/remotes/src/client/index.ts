@@ -22,6 +22,13 @@ export type {} from '@shres-code/shres-code-commands/remote'
 export type {} from '@shres-code/shres-code-goal/remote'
 export type {} from '@shres-code/shres-code-host-plugin-inventory/remote'
 export type {} from '@shres-code/shres-code-host-remote-control/remote'
+// The remote namespaces' payload vocabulary rides the same rule as the shield
+// block above: a Client contribution names what it sends and receives through
+// this assembly, never through a Host package import.
+export type {
+  AdminStatusResult, ConnectOutcome, DisconnectOutcome, RemoteEntryView, RemoteId, RemoteInspectView,
+  RemoteRegistrySnapshot, RemoteTarget, RemoveOutcome, TunnelStateView,
+} from '@shres-code/shres-code-host-remote-control/types'
 export type {} from '@shres-code/shres-code-message-feedback/remote'
 export type {} from '@shres-code/shres-code-speech/remote'
 export type {} from '@shres-code/shres-code-shield/remote'
@@ -34,6 +41,7 @@ export type { ApiRemoteForwardedEvent } from '../types.ts'
 export type {} from '@shres-code/shres-code-commands/types'
 export type {} from '@shres-code/shres-code-cordis-host-runner/types'
 export type {} from '@shres-code/shres-code-credentials/types'
+export type {} from '@shres-code/shres-code-host-remote-control/types'
 export type {} from '@shres-code/shres-code-llm/types'
 export type {} from '@shres-code/shres-code-agent-presets/types'
 export type {} from '@shres-code/shres-code-settings/types'

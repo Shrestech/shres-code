@@ -11,6 +11,7 @@ import { BashCardController, type BashSettings } from '../src/client/bash-card-c
 import {
   WebSearchCardController,
   type WebSearchMethods,
+  type WebSearchPerplexitySettings,
   type WebSearchSettings,
 } from '../src/client/web-search-card-controller.ts'
 
@@ -29,7 +30,8 @@ function acceptWrites<T>(host: StubSettingsScope<T>): void {
 }
 
 function credentialsApi(configured: boolean) {
-  const describe = vi.fn(() => Promise.resolve({
+  // The wide return type leaves each test free to answer for any reference.
+  const describe = vi.fn((): Promise<unknown> => Promise.resolve({
     rpcId: 'c-1' as never,
     result: { ok: true as const, value: { credentials: { DEEPSEEK_API_KEY: { configured, writable: true } } } },
   }))
@@ -387,9 +389,10 @@ function webSearchController(
   host = stubSettingsScope<WebSearchSettings>(),
   methods = stubSettingsScope<WebSearchMethods>(),
   credentials = credentialsApi(true),
+  perplexity = stubSettingsScope<WebSearchPerplexitySettings>(),
 ) {
-  const controller = new WebSearchCardController(host.scope, credentials.api, methods.scope)
-  return { host, methods, credentials, controller }
+  const controller = new WebSearchCardController(host.scope, credentials.api, methods.scope, perplexity.scope)
+  return { host, methods, credentials, perplexity, controller }
 }
 
 describe('WebSearchCardController', () => {
@@ -410,7 +413,12 @@ describe('WebSearchCardController', () => {
   it('writes the staged key through the credentials domain, never the settings section', async () => {
     const host = stubSettingsScope<WebSearchSettings>()
     const credentials = credentialsApi(false)
-    const controller = new WebSearchCardController(host.scope, credentials.api, stubSettingsScope<WebSearchMethods>().scope)
+    const controller = new WebSearchCardController(
+      host.scope,
+      credentials.api,
+      stubSettingsScope<WebSearchMethods>().scope,
+      stubSettingsScope<WebSearchPerplexitySettings>().scope,
+    )
     host.publish({ status: 'ready', writable: true, value: {}, user: {} })
     const face = controller.inject()
 
@@ -435,7 +443,12 @@ describe('WebSearchCardController', () => {
   it('keeps the stored key when the draft is left blank', () => {
     const host = stubSettingsScope<WebSearchSettings>()
     const credentials = credentialsApi(true)
-    const controller = new WebSearchCardController(host.scope, credentials.api, stubSettingsScope<WebSearchMethods>().scope)
+    const controller = new WebSearchCardController(
+      host.scope,
+      credentials.api,
+      stubSettingsScope<WebSearchMethods>().scope,
+      stubSettingsScope<WebSearchPerplexitySettings>().scope,
+    )
     host.publish({ status: 'ready', writable: true, value: {}, user: {} })
     const face = controller.inject()
 
@@ -450,7 +463,12 @@ describe('WebSearchCardController', () => {
   it('re-reads when the Host reports the watched reference changed', async () => {
     const host = stubSettingsScope<WebSearchSettings>()
     const credentials = credentialsApi(false)
-    const controller = new WebSearchCardController(host.scope, credentials.api, stubSettingsScope<WebSearchMethods>().scope)
+    const controller = new WebSearchCardController(
+      host.scope,
+      credentials.api,
+      stubSettingsScope<WebSearchMethods>().scope,
+      stubSettingsScope<WebSearchPerplexitySettings>().scope,
+    )
     host.publish({ status: 'ready', writable: true, value: {}, user: {} })
     await vi.waitFor(() => { expect(credentials.describe).toHaveBeenCalled() })
     credentials.describe.mockClear()
@@ -474,7 +492,12 @@ describe('WebSearchCardController', () => {
   it('addresses the reference the section declares rather than the default', async () => {
     const host = stubSettingsScope<WebSearchSettings>()
     const credentials = credentialsApi(false)
-    const controller = new WebSearchCardController(host.scope, credentials.api, stubSettingsScope<WebSearchMethods>().scope)
+    const controller = new WebSearchCardController(
+      host.scope,
+      credentials.api,
+      stubSettingsScope<WebSearchMethods>().scope,
+      stubSettingsScope<WebSearchPerplexitySettings>().scope,
+    )
     host.publish({ status: 'ready', writable: true, value: { apiKeyEnv: 'SEARCH_KEY' }, user: {} })
     const face = controller.inject()
 
@@ -488,7 +511,12 @@ describe('WebSearchCardController', () => {
   it('reports a key the Host did not store as a failed save', async () => {
     const host = stubSettingsScope<WebSearchSettings>()
     const credentials = credentialsApi(false)
-    const controller = new WebSearchCardController(host.scope, credentials.api, stubSettingsScope<WebSearchMethods>().scope)
+    const controller = new WebSearchCardController(
+      host.scope,
+      credentials.api,
+      stubSettingsScope<WebSearchMethods>().scope,
+      stubSettingsScope<WebSearchPerplexitySettings>().scope,
+    )
     host.publish({ status: 'ready', writable: true, value: {}, user: {} })
     const face = controller.inject()
 
@@ -509,6 +537,7 @@ describe('WebSearchCardController', () => {
       host.scope,
       { credentials: { describe, set } } as never,
       methods.scope,
+      stubSettingsScope<WebSearchPerplexitySettings>().scope,
     )
     const face = controller.inject()
     await vi.waitFor(() => { expect(describe).toHaveBeenCalled() })
@@ -536,6 +565,7 @@ describe('WebSearchCardController', () => {
       host.scope,
       { credentials: { describe, set: vi.fn() } } as never,
       methods.scope,
+      stubSettingsScope<WebSearchPerplexitySettings>().scope,
     )
     await vi.waitFor(() => { expect(describe).toHaveBeenCalled() })
 
@@ -547,7 +577,12 @@ describe('WebSearchCardController', () => {
     const methods = stubSettingsScope<WebSearchMethods>()
     acceptWrites(methods)
     const credentials = credentialsApi(true)
-    const controller = new WebSearchCardController(host.scope, credentials.api, methods.scope)
+    const controller = new WebSearchCardController(
+      host.scope,
+      credentials.api,
+      methods.scope,
+      stubSettingsScope<WebSearchPerplexitySettings>().scope,
+    )
     host.publish({ status: 'ready', writable: true, value: {}, user: {} })
     methods.publish({ status: 'ready', writable: true, value: { grok: true, claude: true, codex: true, kimi: true }, user: {} })
     const face = controller.inject()
@@ -562,7 +597,12 @@ describe('WebSearchCardController', () => {
     const host = stubSettingsScope<WebSearchSettings>()
     acceptWrites(host)
     const credentials = credentialsApi(true)
-    const controller = new WebSearchCardController(host.scope, credentials.api, stubSettingsScope<WebSearchMethods>().scope)
+    const controller = new WebSearchCardController(
+      host.scope,
+      credentials.api,
+      stubSettingsScope<WebSearchMethods>().scope,
+      stubSettingsScope<WebSearchPerplexitySettings>().scope,
+    )
     host.publish({ status: 'ready', writable: true, value: {}, base: {}, user: {} })
     const face = controller.inject()
 
@@ -579,7 +619,12 @@ describe('WebSearchCardController', () => {
     const host = stubSettingsScope<WebSearchSettings>()
     const methods = stubSettingsScope<WebSearchMethods>()
     const credentials = credentialsApi(true)
-    const controller = new WebSearchCardController(host.scope, credentials.api, methods.scope)
+    const controller = new WebSearchCardController(
+      host.scope,
+      credentials.api,
+      methods.scope,
+      stubSettingsScope<WebSearchPerplexitySettings>().scope,
+    )
     host.publish({ status: 'ready', writable: true, value: {}, user: {} })
     methods.publish({ status: 'ready', writable: true, value: { grok: true, claude: true, codex: true, kimi: true, ollama: true }, user: {} })
     const face = controller.inject()
@@ -590,6 +635,133 @@ describe('WebSearchCardController', () => {
     face.edit('kimi', 'false')
     face.discard()
     expect(face.hooks.webSearchCard.getSnapshot().codex.text).toBe('true')
+  })
+
+  it('writes the Perplexity switch and endpoint to the perplexity section', async () => {
+    const host = stubSettingsScope<WebSearchSettings>()
+    const perplexity = stubSettingsScope<WebSearchPerplexitySettings>()
+    acceptWrites(perplexity)
+    const credentials = credentialsApi(true)
+    const controller = new WebSearchCardController(
+      host.scope,
+      credentials.api,
+      stubSettingsScope<WebSearchMethods>().scope,
+      perplexity.scope,
+    )
+    host.publish({ status: 'ready', writable: true, value: {}, user: {} })
+    perplexity.publish({ status: 'ready', writable: true, value: {}, base: {}, user: {} })
+    const face = controller.inject()
+
+    face.edit('perplexityEnabled', 'false')
+    face.edit('perplexityBaseURL', 'https://pplx.test')
+    face.save()
+    await vi.waitFor(() => { expect(perplexity.set).toHaveBeenCalledTimes(2) })
+
+    expect(perplexity.set.mock.calls).toEqual([['enabled', false], ['baseURL', 'https://pplx.test']])
+    expect(host.set).not.toHaveBeenCalled()
+    expect(credentials.set).not.toHaveBeenCalled()
+  })
+
+  it('writes the staged Perplexity key to its own reference through the credentials domain', async () => {
+    const host = stubSettingsScope<WebSearchSettings>()
+    const perplexity = stubSettingsScope<WebSearchPerplexitySettings>()
+    const credentials = credentialsApi(false)
+    const controller = new WebSearchCardController(
+      host.scope,
+      credentials.api,
+      stubSettingsScope<WebSearchMethods>().scope,
+      perplexity.scope,
+    )
+    host.publish({ status: 'ready', writable: true, value: {}, user: {} })
+    perplexity.publish({ status: 'ready', writable: true, value: {}, user: {} })
+    const face = controller.inject()
+
+    face.edit('perplexityApiKey', ' pplx-secret ')
+    expect(face.hooks.webSearchCard.getSnapshot().dirty).toBe(true)
+
+    credentials.describe.mockImplementation(() => Promise.resolve({
+      rpcId: 'c-1' as never,
+      result: { ok: true as const, value: { credentials: { PERPLEXITY_API_KEY: { configured: true, writable: true } } } },
+    }))
+    face.save()
+    await vi.waitFor(() => { expect(credentials.set).toHaveBeenCalled() })
+
+    expect(credentials.set).toHaveBeenCalledWith({ ref: 'PERPLEXITY_API_KEY', value: 'pplx-secret' })
+    expect(perplexity.set).not.toHaveBeenCalled()
+    await vi.waitFor(() => {
+      expect(face.hooks.webSearchCard.getSnapshot()).toMatchObject({ dirty: false, perplexityApiKeyConfigured: true })
+    })
+  })
+
+  it('addresses the Perplexity reference its section declares', async () => {
+    const host = stubSettingsScope<WebSearchSettings>()
+    const perplexity = stubSettingsScope<WebSearchPerplexitySettings>()
+    const credentials = credentialsApi(false)
+    const controller = new WebSearchCardController(
+      host.scope,
+      credentials.api,
+      stubSettingsScope<WebSearchMethods>().scope,
+      perplexity.scope,
+    )
+    host.publish({ status: 'ready', writable: true, value: {}, user: {} })
+    perplexity.publish({ status: 'ready', writable: true, value: { apiKeyEnv: 'SONAR_KEY' }, user: {} })
+    const face = controller.inject()
+
+    face.edit('perplexityApiKey', 'pplx-secret')
+    face.save()
+    await vi.waitFor(() => { expect(credentials.set).toHaveBeenCalled() })
+
+    expect(credentials.set).toHaveBeenCalledWith({ ref: 'SONAR_KEY', value: 'pplx-secret' })
+  })
+
+  it('re-reads the Perplexity reference when the Host reports it changed', async () => {
+    const host = stubSettingsScope<WebSearchSettings>()
+    const perplexity = stubSettingsScope<WebSearchPerplexitySettings>()
+    const credentials = credentialsApi(false)
+    const controller = new WebSearchCardController(
+      host.scope,
+      credentials.api,
+      stubSettingsScope<WebSearchMethods>().scope,
+      perplexity.scope,
+    )
+    host.publish({ status: 'ready', writable: true, value: {}, user: {} })
+    perplexity.publish({ status: 'ready', writable: true, value: {}, user: {} })
+    await vi.waitFor(() => { expect(credentials.describe).toHaveBeenCalled() })
+    credentials.describe.mockClear()
+
+    controller.refreshCredential('OTHER_KEY')
+    expect(credentials.describe).not.toHaveBeenCalled()
+
+    credentials.describe.mockImplementation(() => Promise.resolve({
+      rpcId: 'c-1' as never,
+      result: { ok: true as const, value: { credentials: { PERPLEXITY_API_KEY: { configured: true, writable: true } } } },
+    }))
+    controller.refreshCredential('PERPLEXITY_API_KEY')
+
+    await vi.waitFor(() => {
+      expect(controller.inject().hooks.webSearchCard.getSnapshot().perplexityApiKeyConfigured).toBe(true)
+    })
+  })
+
+  it('resets a staged Perplexity endpoint through the perplexity scope', async () => {
+    const host = stubSettingsScope<WebSearchSettings>()
+    const perplexity = stubSettingsScope<WebSearchPerplexitySettings>()
+    acceptWrites(perplexity)
+    const credentials = credentialsApi(true)
+    const controller = new WebSearchCardController(
+      host.scope,
+      credentials.api,
+      stubSettingsScope<WebSearchMethods>().scope,
+      perplexity.scope,
+    )
+    host.publish({ status: 'ready', writable: true, value: {}, user: {} })
+    perplexity.publish({ status: 'ready', writable: true, value: { baseURL: 'https://stored.test' }, base: {}, user: { baseURL: 'https://stored.test' } })
+    const face = controller.inject()
+
+    face.resetField('perplexityBaseURL')
+    face.save()
+    await vi.waitFor(() => { expect(perplexity.unset).toHaveBeenCalledWith('baseURL') })
+    expect(host.set).not.toHaveBeenCalled()
   })
 })
 

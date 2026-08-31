@@ -340,12 +340,18 @@ describe('WebSearchCard', () => {
       codex: field('true'),
       kimi: field('true'),
       ollama: field('true'),
+      zai: field('true'),
       deepseek: field('true'),
       baseURL: field(''),
       maxUses: field('5'),
       apiKey: field(''),
       apiKeyConfigured: false,
       apiKeyWritable: true,
+      perplexity: field('true'),
+      perplexityBaseURL: field(''),
+      perplexityApiKey: field(''),
+      perplexityApiKeyConfigured: false,
+      perplexityApiKeyWritable: true,
       ...state,
     })
     const actions = cardActions()
@@ -394,6 +400,8 @@ describe('WebSearchCard', () => {
     fireEvent.click(screen.getByRole('switch', { name: en.webSearchCodex }))
     fireEvent.click(screen.getByRole('switch', { name: en.webSearchKimi }))
     fireEvent.click(screen.getByRole('switch', { name: en.webSearchOllama }))
+    fireEvent.click(screen.getByRole('switch', { name: en.webSearchZai }))
+    fireEvent.click(screen.getByRole('switch', { name: en.webSearchPerplexity }))
     fireEvent.click(screen.getByRole('switch', { name: en.webSearchDeepSeek }))
 
     expect(actions.edit.mock.calls).toEqual([
@@ -402,6 +410,8 @@ describe('WebSearchCard', () => {
       ['codex', 'false'],
       ['kimi', 'false'],
       ['ollama', 'false'],
+      ['zai', 'false'],
+      ['perplexityEnabled', 'false'],
       ['enabled', 'false'],
     ])
   })
@@ -412,6 +422,59 @@ describe('WebSearchCard', () => {
 
     expect(screen.queryByLabelText(en.webSearchApiKey)).toBeNull()
     expect(screen.getByRole('switch', { name: en.webSearchDeepSeek }).getAttribute('aria-checked')).toBe('false')
+  })
+
+  it('hides Perplexity key fields while that method is off', () => {
+    renderWebSearch({ perplexity: field('false') })
+    fireEvent.click(screen.getByText(en.webSearchTitle))
+
+    expect(screen.queryByLabelText(en.webSearchPerplexityApiKey)).toBeNull()
+    expect(screen.queryByLabelText(en.webSearchPerplexityBaseUrl)).toBeNull()
+    expect(screen.getByRole('switch', { name: en.webSearchPerplexity }).getAttribute('aria-checked')).toBe('false')
+  })
+
+  it('renders each method\'s credential fields under that method\'s switch', () => {
+    renderWebSearch()
+    fireEvent.click(screen.getByText(en.webSearchTitle))
+
+    const perplexity = screen.getByRole('switch', { name: en.webSearchPerplexity })
+    const perplexityKey = screen.getByLabelText(en.webSearchPerplexityApiKey)
+    const perplexityEndpoint = screen.getByLabelText(en.webSearchPerplexityBaseUrl)
+    const deepseek = screen.getByRole('switch', { name: en.webSearchDeepSeek })
+    const deepseekKey = screen.getByLabelText(en.webSearchApiKey)
+    const following = Node.DOCUMENT_POSITION_FOLLOWING
+    expect(perplexity.compareDocumentPosition(perplexityKey) & following).toBe(following)
+    expect(perplexityKey.compareDocumentPosition(perplexityEndpoint) & following).toBe(following)
+    expect(perplexityEndpoint.compareDocumentPosition(deepseek) & following).toBe(following)
+    expect(deepseek.compareDocumentPosition(deepseekKey) & following).toBe(following)
+  })
+
+  it('stages the Perplexity key and endpoint through their field aliases', () => {
+    const actions = renderWebSearch({
+      perplexityApiKeyConfigured: true,
+      perplexityBaseURL: field('https://stored.test', { overridden: true }),
+    })
+    fireEvent.click(screen.getByText(en.webSearchTitle))
+
+    expect(screen.getByLabelText(en.webSearchPerplexityApiKey)).toHaveProperty('type', 'password')
+    fireEvent.change(screen.getByLabelText(en.webSearchPerplexityApiKey), { target: { value: 'pplx-secret' } })
+    fireEvent.change(screen.getByLabelText(en.webSearchPerplexityBaseUrl), { target: { value: 'https://pplx.test' } })
+    // Only the Perplexity endpoint carries an override, so its reset is alone.
+    fireEvent.click(screen.getByRole('button', { name: en.reset }))
+
+    expect(actions.edit.mock.calls).toEqual([
+      ['perplexityApiKey', 'pplx-secret'],
+      ['perplexityBaseURL', 'https://pplx.test'],
+    ])
+    expect(actions.resetField.mock.calls).toEqual([['perplexityBaseURL']])
+  })
+
+  it('disables the Perplexity key control when its reference is not writable', () => {
+    renderWebSearch({ perplexityApiKeyConfigured: true, perplexityApiKeyWritable: false })
+    fireEvent.click(screen.getByText(en.webSearchTitle))
+
+    expect(screen.getByLabelText(en.webSearchPerplexityApiKey)).toHaveProperty('disabled', true)
+    expect(screen.getByLabelText(en.webSearchPerplexityBaseUrl)).toHaveProperty('disabled', false)
   })
 
   it('stages the endpoint, the search budget, and their resets', () => {

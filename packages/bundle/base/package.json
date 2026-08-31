@@ -64,7 +64,10 @@
     "@shres-code/shres-code-api-gateway": "workspace:^",
     "@shres-code/shres-code-llm": "workspace:^",
     "@shres-code/shres-code-llm-deepseek": "workspace:^",
+    "@shres-code/shres-code-grok-credential": "workspace:^",
     "@shres-code/shres-code-llm-cli-bridge": "workspace:^",
+    "@shres-code/shres-code-llm-grok-session": "workspace:^",
+    "@shres-code/shres-code-llm-xai-apikey": "workspace:^",
     "@shres-code/shres-code-llm-pi-ai": "workspace:^",
     "@shres-code/shres-code-llm-retry": "workspace:^",
     "@shres-code/shres-code-permission-presets": "workspace:^",
@@ -131,6 +134,7 @@
     "@shres-code/shres-code-web": "workspace:^",
     "@shres-code/shres-code-web-search-attached-cli": "workspace:^",
     "@shres-code/shres-code-web-search-deepseek": "workspace:^",
+    "@shres-code/shres-code-web-search-perplexity": "workspace:^",
     "@shres-code/shres-code-workflow-worker-thread": "workspace:^",
     "@shres-code/shres-code-agent-instructions": "workspace:^"
   },

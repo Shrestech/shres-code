@@ -99,10 +99,15 @@
     - id: api-gateway
       name: '@shres-code/shres-code-host-apiproxy'
 
-    # Read-only remote registry projection for trusted client RPCs; the connect
-    # flow's gesture-token authority mounts in its own PR.
+    # Read-only remote registry projection for trusted client RPCs.
     - id: remote-control
       name: '@shres-code/shres-code-host-remote-control'
+
+    # The connect flow's gesture-gated mutation namespace and tunnel owner:
+    # begin/connect/disconnect plus registry add/edit/remove, reading the same
+    # registry file the remoteControl row and the `shres remote` CLI write.
+    - id: remote-admin
+      name: '@shres-code/shres-code-host-remote-control/admin'
 
     - id: cordis-host-runner
       name: '@shres-code/shres-code-cordis-host-runner'
@@ -229,6 +234,11 @@
 
     - id: ui-workspace
       name: '@shres-code/shres-code-client-ui-workspace'
+
+    # Sidebar remote-host group: registry rows, trust modal, connected badge
+    # over the remoteControl/remoteAdmin namespaces.
+    - id: ui-remote
+      name: '@shres-code/shres-code-client-ui-remote'
 
     # Input triggers: the '/' | '@' pipeline (ui-input-trigger), the command surface over
     # it (ui-commands), and the two reference sources (ui-skill / ui-subagent).

@@ -6,7 +6,7 @@ The **Plugins** settings section and its **Plugin configuration** tab. The secti
 
 A card renders only when its namespace is both registered by a live Host plugin and served to the browser. A deployment that does not compose the owning plugin — or serves the namespace to no client — renders nothing for it rather than an empty or disabled card, so the configurable tab reflects what this deployment actually runs.
 
-The first batch covers the shell executor (`bash`), the agent loop's tool-call parallelism (`agent-loop`), and web search (`web-search-attached-cli` plus `web-search-deepseek`), whose card exposes one on/off switch per method (Grok, Claude, Codex, Kimi, Ollama, DeepSeek).
+The first batch covers the shell executor (`bash`), the agent loop's tool-call parallelism (`agent-loop`), and web search (`web-search-attached-cli` plus `web-search-deepseek` and `web-search-perplexity`), whose card exposes one on/off switch per method (Grok, Claude, Codex, Kimi, Ollama, Z.AI, Perplexity, DeepSeek). Perplexity's and DeepSeek's key and endpoint fields render immediately under that method's switch while it is on, and DeepSeek's controls are labeled as DeepSeek's; each key is written through the credentials domain to the reference its provider resolves (`PERPLEXITY_API_KEY`, `DEEPSEEK_API_KEY`), never into a settings section.
 
 ## Extension point
 

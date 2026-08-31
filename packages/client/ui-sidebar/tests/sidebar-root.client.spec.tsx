@@ -24,6 +24,7 @@ const neverHook = (() => { throw new Error('shell must not read global hooks') }
 function mountShell({ collapsed = false, width = 300 }: { collapsed?: boolean; width?: number } = {}) {
   const startSession = vi.fn()
   const toggleSidebar = vi.fn()
+  let remotesOwner: SidebarSectionOwnerProps | undefined
   let regionOwner: SidebarSectionOwnerProps | undefined
   let settingsOwner: SidebarSettingsOwnerProps | undefined
   let footerActionOwner: SidebarFooterActionOwnerProps | undefined
@@ -41,6 +42,10 @@ function mountShell({ collapsed = false, width = 300 }: { collapsed?: boolean; w
           settingsOwner = owner
           return <div data-testid="settings-seat" data-wide={owner.wide} />
         }
+        if (key === 'sidebar.remotes') {
+          remotesOwner = owner as SidebarSectionOwnerProps
+          return <div data-testid="remotes-seat" data-wide={owner.wide} />
+        }
         if (key === 'sidebar.footer.action') {
           footerActionOwner = owner
           return <div data-testid="footer-action-seat" data-wide={owner.wide} />
@@ -57,6 +62,10 @@ function mountShell({ collapsed = false, width = 300 }: { collapsed?: boolean; w
   return {
     startSession,
     toggleSidebar,
+    remotesOwner: () => {
+      if (remotesOwner === undefined) throw new Error('remotes owner not rendered')
+      return remotesOwner
+    },
     regionOwner: () => {
       if (regionOwner === undefined) throw new Error('region owner not rendered')
       return regionOwner
@@ -95,9 +104,22 @@ describe('SidebarRoot shell', () => {
     expect(b.settingsOwner().wide).toBe(true)
     expect(b.footerActionOwner().wide).toBe(true)
     expect(screen.getByTestId('brand-action-seat')).toBeTruthy()
+    // The remote-hosts group rides the same section owner share as the region.
+    expect(b.remotesOwner().wide).toBe(true)
     // Expanded: the request is a no-op (no accidental collapse).
     b.regionOwner().expandSidebar()
     expect(b.toggleSidebar).not.toHaveBeenCalled()
+  })
+
+  it('stacks the remotes seat above the browsing region in both sidebar widths', () => {
+    const b = mountShell()
+    const remotes = screen.getByTestId('remotes-seat')
+    const region = screen.getByTestId('region')
+    expect(remotes.compareDocumentPosition(region) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    b.rerender({ collapsed: true })
+    // Both region-area seats stay mounted through the crossfade window.
+    expect(screen.getByTestId('remotes-seat')).toBeTruthy()
+    expect(screen.getByTestId('region')).toBeTruthy()
   })
 
   it('keeps the region mounted through collapse and expands on its request', () => {
@@ -110,9 +132,11 @@ describe('SidebarRoot shell', () => {
     b.rerender({})
     expect(b.regionOwner().wide).toBe(false)
     expect(b.footerActionOwner().wide).toBe(false)
+    expect(b.remotesOwner().wide).toBe(false)
     expect(screen.getByTestId('region')).toBeTruthy()
     b.regionOwner().expandSidebar()
-    expect(b.toggleSidebar).toHaveBeenCalledOnce()
+    b.remotesOwner().expandSidebar()
+    expect(b.toggleSidebar).toHaveBeenCalledTimes(2)
   })
 
   it('renders statically collapsed on a cold start (no crossfade classes)', () => {

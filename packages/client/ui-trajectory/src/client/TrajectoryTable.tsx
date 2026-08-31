@@ -13,9 +13,11 @@ import {
   Tooltip,
 } from '@shres-code/shres-code-client-ui-primitives'
 import { structuredPatch } from 'diff'
+import type { TranslateNS } from '@shres-code/shres-code-client-ui-slots'
 import type {
   AssistantRequestConfig, ConversationPromptSnapshot,
 } from '@shres-code/shres-code-client-runtime/client'
+import type { NS } from './locales.ts'
 import type {
   AssistantMetricDetail, TrajectoryCellKind, TrajectoryCellProps, TrajectorySourceBlock,
 } from './trajectory-record.ts'
@@ -387,6 +389,8 @@ export interface TrajectoryTableProps {
   inspectCallId?: string | null
   /** Acknowledge a consumed (or unresolvable) inspect request. */
   onInspectApplied?: (() => void) | undefined
+  /** Translate a trajectory dictionary key. */
+  t: TranslateNS<typeof NS>
 }
 
 /** Request-inspector fields shared by ordinary generation and compaction. */
@@ -1067,44 +1071,105 @@ function MarkdownFragment({
 function SourceBlocks({
   blocks,
   onOpenCall,
+  t,
 }: {
   blocks: readonly TrajectorySourceBlock[]
   onOpenCall: (callId: string) => void
+  t: TranslateNS<typeof NS>
 }) {
   return (
     <div className={css.sourceBlocks}>
       {blocks.map((block, index) => (
-        <section className={css.sourceBlock} key={index}>
-          {block.callId !== undefined
-            ? (
-              <button
-                type="button"
-                className={css.sourceBlockJumpTarget}
-                aria-label={`Open Block #${index + 1} tool call summary`}
-                title="Open tool call summary"
-                onClick={() => {
-                  if (block.callId !== undefined) onOpenCall(block.callId)
-                }}
-              >
-                <span className={css.sourceBlockLabel}>
-                  {`Block #${index + 1} ${block.type}`}
-                </span>
-                <IconChevronRightOutline14 className={css.sourceBlockJumpIcon} size={12} />
-              </button>
-            )
-            : (
-              <div className={css.sourceBlockHeader}>
-                <span className={css.sourceBlockLabel}>
-                  {`Block #${index + 1} ${block.type}`}
-                </span>
-              </div>
-            )}
-          {block.imageSrc !== undefined
-            ? <PanelImage block={block} />
-            : <pre className={css.sourceBlockContent}>{block.content}</pre>}
-        </section>
+        block.type === 'thinking' && block.segments !== undefined
+          ? <ThinkingSourceBlock block={block} t={t} key={index} />
+          : (
+            <section className={css.sourceBlock} key={index}>
+              {block.callId !== undefined
+                ? (
+                  <button
+                    type="button"
+                    className={css.sourceBlockJumpTarget}
+                    aria-label={`Open Block #${index + 1} tool call summary`}
+                    title="Open tool call summary"
+                    onClick={() => {
+                      if (block.callId !== undefined) onOpenCall(block.callId)
+                    }}
+                  >
+                    <span className={css.sourceBlockLabel}>
+                      {`Block #${index + 1} ${block.type}`}
+                    </span>
+                    <IconChevronRightOutline14 className={css.sourceBlockJumpIcon} size={12} />
+                  </button>
+                )
+                : (
+                  <div className={css.sourceBlockHeader}>
+                    <span className={css.sourceBlockLabel}>
+                      {`Block #${index + 1} ${block.type}`}
+                    </span>
+                  </div>
+                )}
+              {block.imageSrc !== undefined
+                ? <PanelImage block={block} />
+                : <pre className={css.sourceBlockContent}>{block.content}</pre>}
+            </section>
+          )
       ))}
     </div>
+  )
+}
+
+/** First line of a reasoning segment, used as the collapsed live preview. */
+function thinkingPreview(segments: readonly string[]): string {
+  const newest = segments.at(-1) ?? ''
+  return newest.split('\n')[0] ?? ''
+}
+
+/** One coalesced thinking entry: collapsed by default, expandable to every segment. */
+function ThinkingSourceBlock({
+  block,
+  t,
+}: {
+  block: TrajectorySourceBlock
+  t: TranslateNS<typeof NS>
+}) {
+  const segments = block.segments ?? []
+  const [expanded, setExpanded] = useState(false)
+  if (segments.length <= 1) {
+    return (
+      <section className={css.sourceBlock}>
+        <div className={css.sourceBlockHeader}>
+          <span className={css.sourceBlockLabel}>{t('thinking.label')}</span>
+        </div>
+        <pre className={css.sourceBlockContent}>{block.content}</pre>
+      </section>
+    )
+  }
+  const preview = thinkingPreview(segments)
+  return (
+    <section className={css.sourceBlock}>
+      <button
+        type="button"
+        className={css.thinkingToggle}
+        aria-expanded={expanded}
+        onClick={() => { setExpanded(current => !current) }}
+      >
+        <IconChevronRightOutline14 className={css.thinkingChevron} size={12} />
+        <span className={css.sourceBlockLabel}>{t('thinking.label')}</span>
+        <span className={css.thinkingCount}>{t('thinking.segments', { count: segments.length })}</span>
+      </button>
+      {!expanded && preview !== '' && (
+        <div className={css.thinkingPreview}>{preview}</div>
+      )}
+      {expanded && (
+        <div className={css.thinkingSegments}>
+          {segments.map((segment, index) => (
+            <div className={css.thinkingSegment} key={index}>
+              <pre className={css.sourceBlockContent}>{segment}</pre>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   )
 }
 
@@ -1366,6 +1431,7 @@ function MarkdownRecordContent({
   thinkingExpanded,
   onThinkingExpandedChange,
   onOpenCall,
+  t,
 }: {
   record: TableRecord
   rendered: boolean
@@ -1373,9 +1439,10 @@ function MarkdownRecordContent({
   thinkingExpanded: boolean
   onThinkingExpandedChange: (expanded: boolean) => void
   onOpenCall: (callId: string) => void
+  t: TranslateNS<typeof NS>
 }) {
   if (!rendered && record.cell.sourceBlocks && record.cell.sourceBlocks.length > 0) {
-    return <SourceBlocks blocks={record.cell.sourceBlocks} onOpenCall={onOpenCall} />
+    return <SourceBlocks blocks={record.cell.sourceBlocks} onOpenCall={onOpenCall} t={t} />
   }
   if (record.cell.thinkingDetail) {
     if (!rendered) {
@@ -1724,6 +1791,7 @@ export function TrajectoryTable({
   onToggleAssistant,
   inspectCallId = null,
   onInspectApplied,
+  t,
 }: TrajectoryTableProps) {
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null)
   const [selectedRequest, setSelectedRequest] = useState<SelectedRequest | null>(null)
@@ -2913,6 +2981,7 @@ export function TrajectoryTable({
                       thinkingExpanded={thinkingExpanded}
                       onThinkingExpandedChange={setThinkingExpanded}
                       onOpenCall={openCallSummary}
+                      t={t}
                     />
                   </div>
                 )}
@@ -3058,6 +3127,7 @@ export function TrajectoryTable({
                             thinkingExpanded={thinkingExpanded}
                             onThinkingExpandedChange={setThinkingExpanded}
                             onOpenCall={openCallSummary}
+                            t={t}
                           />
                         </OverviewSection>
                       </>
@@ -3104,6 +3174,7 @@ export function TrajectoryTable({
                 thinkingExpanded={thinkingExpanded}
                 onThinkingExpandedChange={setThinkingExpanded}
                 onOpenCall={openCallSummary}
+                t={t}
               />
             )}
             {!promptSelected && selected !== undefined && activeTab === 'raw' && (
@@ -3113,6 +3184,7 @@ export function TrajectoryTable({
                 thinkingExpanded={thinkingExpanded}
                 onThinkingExpandedChange={setThinkingExpanded}
                 onOpenCall={openCallSummary}
+                t={t}
               />
             )}
             {!promptSelected && selected !== undefined && activeTab === 'source' && (

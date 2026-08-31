@@ -51,6 +51,8 @@ import type { AttachmentStore } from '@shres-code/shres-code-attachment'
 import { idleWatchdog, timeoutOf } from '@shres-code/shres-code-timeout'
 import type { ResolvedPiAiProviderProfile } from './config.ts'
 import { toPiContext } from './context.ts'
+import { applyHostedToolsPayload, mapHostedToolCalls } from './hosted-tools.ts'
+import type { HostedToolsSplice } from './hosted-tools.ts'
 import { toStreamChunks } from './stream.ts'
 
 /** One resolution's frozen view: the profiles and the collection built from them. */
@@ -59,6 +61,18 @@ interface PiAiSnapshot {
   profiles: ReadonlyMap<string, ResolvedPiAiProviderProfile>
   /** Providers for exactly those profiles; never mutated once published. */
   models: Models
+}
+
+/**
+ * Hosted-search facts one route supplies the adapter with, resolved per
+ * stream call. `entries` are appended to the outgoing tools array, local
+ * tools in `dropLocalTools` are omitted, and hosted tools in `callNames`
+ * surface as pi-ai tool calls that must be promoted to server-tool-call
+ * blocks so the loop never dispatches them.
+ */
+export interface PiAiAdapterHostedSearch extends HostedToolsSplice {
+  /** Hosted tool names that surface as pi-ai tool calls; promoted to server-tool-call blocks. */
+  callNames?: readonly string[]
 }
 
 /** Constructor options for {@link PiAiAdapter}: the two resolution hooks the plugin owns. */
@@ -81,6 +95,22 @@ export interface PiAiAdapterOptions {
    * conversion because its stored replay state is unusable by this build.
    */
   onReplayDegrade?: (detail: { provider: string; model: string; reason: string }) => void
+  /**
+   * Hosted-search facts, read live per stream call like `profiles`. When the
+   * resolved value names entries, they are spliced into the outgoing payload
+   * and the colliding local tools are dropped; `callNames` names hosted tools
+   * that surface as pi-ai tool calls and therefore must be promoted to
+   * `server-tool-call` blocks instead of dispatching locally.
+   */
+  hostedSearch?: () => PiAiAdapterHostedSearch | undefined
+  /**
+   * Rewrite one outgoing provider request payload before it is sent. pi-ai
+   * hands the hook the request body it built for the model; returning a value
+   * replaces it and returning `undefined` keeps it (which still lets the hook
+   * mutate the body in place). Deployment-owned so a route can splice
+   * provider-specific request fields, such as xAI's `service_tier`.
+   */
+  onPayload?: (payload: unknown, request: { provider: string; model: string }) => unknown
 }
 
 /** Copy profile stream knobs into pi-ai's common option vocabulary. */
@@ -88,6 +118,7 @@ function profileOptions(
   profile: ResolvedPiAiProviderProfile,
   reasoning: ModelThinkingLevel | undefined,
   apiKey: string | undefined,
+  onPayload?: SimpleStreamOptions['onPayload'],
 ): SimpleStreamOptions {
   const enabledReasoning: ThinkingLevel | undefined = reasoning === 'off' ? undefined : reasoning
   return {
@@ -99,6 +130,7 @@ function profileOptions(
     ...profile.timeoutMs === undefined ? {} : { timeoutMs: profile.timeoutMs },
     ...profile.websocketConnectTimeoutMs === undefined ? {} : { websocketConnectTimeoutMs: profile.websocketConnectTimeoutMs },
     // The agent recovery layer owns visible attempts; one adapter call is one SDK attempt.
+    ...onPayload === undefined ? {} : { onPayload },
     maxRetries: 0,
   }
 }
@@ -295,6 +327,7 @@ export class PiAiAdapter extends LlmAdapter {
       options.reasoningEffort ?? profile.reasoning,
     )
     const apiKey = await this.config.resolveApiKey(options.provider, profile)
+    const hosted = this.config.hostedSearch?.()
 
     const consumer = new AbortController()
     const upstream = options.signal === undefined
@@ -318,8 +351,29 @@ export class PiAiAdapter extends LlmAdapter {
       const context = attachments === undefined
         ? toPiContext(options, undefined, onReplayDegrade)
         : await toPiContext(options, attachments, onReplayDegrade)
+      // Hosted tools ride pi-ai's payload hook, then the route's own onPayload
+      // hook runs on the (possibly replaced) body: splicing here (rather than
+      // forking pi-ai) keeps the shared adapter on the stock dependency, and
+      // chaining the hosted result into the route hook keeps both effects on
+      // the one payload pi-ai sends. Only a final non-undefined result
+      // replaces the outgoing payload; a hook that mutates in place and
+      // returns undefined keeps its own mutation.
+      const onPayload = hosted === undefined && this.config.onPayload === undefined
+        ? undefined
+        : (payload: unknown): unknown => {
+          let current = payload
+          if (hosted !== undefined) {
+            const spliced = applyHostedToolsPayload(current, hosted)
+            if (spliced !== undefined) current = spliced
+          }
+          if (this.config.onPayload !== undefined) {
+            const result = this.config.onPayload(current, { provider: options.provider, model: model.id })
+            if (result !== undefined) current = result
+          }
+          return current === payload ? undefined : current
+        }
       const events = snapshot.models.streamSimple(model, context, {
-        ...profileOptions(profile, reasoning, apiKey),
+        ...profileOptions(profile, reasoning, apiKey, onPayload),
         ...options.temperature === undefined ? {} : { temperature: options.temperature },
         ...options.maxTokens === undefined ? {} : { maxTokens: options.maxTokens },
         ...options.sessionId === undefined ? {} : { sessionId: String(options.sessionId) },
@@ -328,7 +382,16 @@ export class PiAiAdapter extends LlmAdapter {
         // Harness-owned and therefore win collisions.
         headers: requestHeaders(profile.headers),
       })
-      const iterator = toStreamChunks(events, model.contextWindow)[Symbol.asyncIterator]()
+      // A hosted tool pi-ai surfaces as an ordinary tool call must be promoted
+      // to a server-tool-call block here, the adapter seam that knows the
+      // route's hosted names, so the loop structurally never dispatches it.
+      const hostedNames = hosted === undefined || hosted.callNames === undefined || hosted.callNames.length === 0
+        ? undefined
+        : new Set(hosted.callNames)
+      const translated = toStreamChunks(events, model.contextWindow)
+      const iterator = hostedNames === undefined
+        ? translated[Symbol.asyncIterator]()
+        : mapHostedToolCalls(translated, hostedNames)[Symbol.asyncIterator]()
       let exhausted = false
       try {
         while (true) {

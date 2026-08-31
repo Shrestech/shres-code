@@ -87,6 +87,7 @@ export const en = {
   'details.fileBinary': 'Binary file — open it with the editor instead',
   'details.fileEmpty': 'Empty file',
   'details.fileTruncated': 'Large file — showing the beginning only',
+  'details.fileImageTruncated': 'Image exceeds the view cap — open it with the system or raise fileViewMaxBytes ({sizeBytes} bytes)',
   'todo.title': 'To-dos',
   'todo.progress.done': '{done} completed',
   'todo.progress.active': '{active} in progress',

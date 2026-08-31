@@ -86,6 +86,41 @@ describe('web e2e: plugin configuration section', () => {
     expect(tripwire.pageErrors).toEqual([])
   }, 60_000)
 
+  it('exposes the Perplexity and Z.AI search methods on the web-search card', async () => {
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-plugin-config-perplexity'))
+    const dialog = await openPlugins()
+    await dialog.getByText('Web search', { exact: true }).click()
+
+    // The shipped bundle mounts web-search-perplexity and the attached-CLI zai
+    // backend, so the card serves both namespaces with no key configured: the
+    // switches render, and Perplexity's key control is a password field whose
+    // endpoint is labeled distinctly from DeepSeek's.
+    const perplexitySwitch = dialog.getByRole('switch', { name: 'Perplexity', exact: true })
+    await perplexitySwitch.waitFor({ timeout: 10_000 })
+    expect(await dialog.getByRole('switch', { name: 'Z.AI', exact: true }).count()).toBe(1)
+    expect(await perplexitySwitch.getAttribute('aria-checked')).toBe('true')
+    expect(await dialog.getByLabel('Perplexity API key', { exact: true }).getAttribute('type')).toBe('password')
+    expect(await dialog.getByLabel('Perplexity endpoint', { exact: true }).count()).toBe(1)
+    expect(await dialog.getByLabel('DeepSeek API key', { exact: true }).count()).toBe(1)
+    expect(await dialog.getByLabel('DeepSeek endpoint', { exact: true }).count()).toBe(1)
+    const perplexityBox = await perplexitySwitch.boundingBox()
+    const perplexityKeyBox = await dialog.getByLabel('Perplexity API key', { exact: true }).boundingBox()
+    const deepseekBox = await dialog.getByRole('switch', { name: 'DeepSeek', exact: true }).boundingBox()
+    expect(perplexityBox).not.toBeNull()
+    expect(perplexityKeyBox).not.toBeNull()
+    expect(deepseekBox).not.toBeNull()
+    expect(perplexityBox!.y).toBeLessThan(perplexityKeyBox!.y)
+    expect(perplexityKeyBox!.y).toBeLessThan(deepseekBox!.y)
+    const snapshot = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
+    await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'web-search.expected.md'), snapshot, MODE)
+    // No edit was staged: expanding the card changes nothing on disk.
+    expect(await settingsDocument()).not.toContain('web-search-perplexity')
+    expect(tripwire.pageErrors).toEqual([])
+
+    // Leave the card collapsed for the scenarios that share this page.
+    await dialog.getByText('Web search', { exact: true }).click()
+  }, 60_000)
+
   it('stages an edit and writes it only when saved', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-plugin-config-write'))
     const dialog = await openPlugins()
@@ -172,6 +207,6 @@ describe('web e2e: plugin configuration section', () => {
 
   it.skipIf(MODE === 'record')('keeps the fixture inventory closed', async () => {
     expect(tripwire.warnings).toEqual([])
-    await assertFixtureInventory(SNAPSHOT_DIR, ['section.expected.md'])
+    await assertFixtureInventory(SNAPSHOT_DIR, ['section.expected.md', 'web-search.expected.md'])
   })
 })

@@ -1418,6 +1418,31 @@
   outline-offset: 2px;
 }
 
+.thinkingCount {
+  margin-left: 4px;
+  color: var(--dsw-alias-label-caption);
+  font: 11px/16px var(--ds-font-family-code);
+}
+
+.thinkingPreview {
+  margin: 2px 0 0;
+  overflow: hidden;
+  color: var(--dsw-alias-label-secondary);
+  font: 12px/19px var(--ds-font-family-code);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.thinkingSegments {
+  margin-top: 4px;
+}
+
+.thinkingSegment + .thinkingSegment {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--dsw-alias-border-l1);
+}
+
 .thinkingQuote .markdownPreview,
 .thinkingQuote .markdownPayload,
 .thinkingQuote .payload {

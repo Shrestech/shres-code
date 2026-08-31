@@ -162,7 +162,7 @@ export interface Config {
 
 Depends on: [`AgentOptions`](subsystems/core.md) · [`SessionId`](subsystems/core.md)
 
-Source: [`packages/core/agent-loop/src/index.ts:255`](../packages/core/agent-loop/src/index.ts)
+Source: [`packages/core/agent-loop/src/index.ts:256`](../packages/core/agent-loop/src/index.ts)
 
 <a id="shres-codeshres-code-agent-presets"></a>
 
@@ -968,6 +968,54 @@ export interface Config {
 
 Source: [`packages/jspace/jspace/src/index.ts:69`](../packages/jspace/jspace/src/index.ts)
 
+<a id="shres-codeshres-code-jspace-advisor"></a>
+
+## `@shres-code/shres-code-jspace-advisor`
+
+Requires: `jspace` · `tools` · `systemPrompt` · `subagents`
+
+```ts config-catalog
+/** Advisor plugin config. */
+export interface Config {
+  /** Master allow. Default false. */
+  enabled?: boolean
+  /** LLM route provider the reviewer runs on; required when enabled. */
+  provider?: string
+  /** Model id on that route; required when enabled. */
+  model?: string
+  /** `ctx.subagents` provider that runs reviewer children. Default 'spawn'. */
+  subagentProvider?: string
+  /** Reviewer persona; defaults to the built-in reviewer persona. */
+  persona?: string
+  /** Reviewer tool filter; defaults to the wiki read tools. */
+  reviewerTools?: string[]
+  /** Trailing tool signals the advisory digest retains. Default 12. */
+  maxDigestTools?: number
+  /** Character cap on the rendered advisory digest. Default 4000. */
+  maxDigestChars?: number
+  /** Character cap on each error excerpt. Default 200. */
+  maxExcerptChars?: number
+  /** Character cap on each user message in the digest. Default 300. */
+  maxUserMessageChars?: number
+  /** Character cap on the retained user-message history. Default 1500. */
+  maxUserHistoryChars?: number
+  /** Character cap on recorded advice and redirect text. Default 1000. */
+  maxAdviceChars?: number
+  /** Consecutive errored tool results that count as a burst. Default 2. */
+  errorBurst?: number
+  /** Drift-check cadence in completed steps since the last advice. Default 8. */
+  driftEverySteps?: number
+  /** Review-turn timeout in milliseconds; a stuck child turn is interrupted. Default 180000. */
+  reviewTimeoutMs?: number
+  /** Order of the `jspace:advisor` prompt section. Default 56. */
+  advisorySectionOrder?: number
+  /** Enable proactive reviews. Default true. */
+  proactive?: boolean
+}
+```
+
+Source: [`packages/jspace/jspace-advisor/src/index.ts:97`](../packages/jspace/jspace-advisor/src/index.ts)
+
 <a id="shres-codeshres-code-jspace-prompt"></a>
 
 ## `@shres-code/shres-code-jspace-prompt`
@@ -1168,6 +1216,62 @@ export interface DeepSeekCatalogModel {
 Depends on: [`ModelModality`](../packages/llm/llm/src/index.ts) · [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts)
 
 Source: [`packages/llm/llm-deepseek/src/index.ts:106`](../packages/llm/llm-deepseek/src/index.ts)
+
+<a id="shres-codeshres-code-llm-grok-session"></a>
+
+## `@shres-code/shres-code-llm-grok-session`
+
+Requires: `llm`
+
+```ts config-catalog
+/** Plugin / settings section configuring the one route. */
+export interface Config {
+  /** When false, the route is omitted from the live adapter registry. Defaults to on. */
+  enabled?: boolean
+  /** Auth document path; defaults to `~/.grok/auth.json`. */
+  authPath?: string
+  /** Endpoint base for the proxy; defaults to {@link DEFAULT_BASE_URL}. */
+  baseURL?: string
+  /** Selector label; defaults to {@link DEFAULT_DISPLAY_NAME}. */
+  displayName?: string
+  /** Model catalog; defaults to {@link SHIPPED_MODELS}. */
+  models?: GrokSessionModelConfig[]
+  /** Refresh leeway in milliseconds; defaults to {@link DEFAULT_REFRESH_LEEWAY_MS}. */
+  refreshLeewayMs?: number
+  /** CLI version the route advertises; defaults to {@link DEFAULT_CLI_VERSION}. */
+  cliVersion?: string
+  /**
+   * Serve web search as a hosted backend tool instead of the local `tool-web`
+   * tool for this route. Defaults to off; when on, the colliding local
+   * `web_search` function tool is dropped from the request (hosted wins).
+   */
+  hostedWebSearch?: boolean
+  /** Serve X (Twitter) search as a hosted backend tool. Defaults to off. */
+  hostedXSearch?: boolean
+}
+
+/** One advisory model entry a deployment may declare. */
+export interface GrokSessionModelConfig {
+  /** Model id the proxy accepts. */
+  id: string
+  /** Selector label; defaults to the id. */
+  name?: string
+  /** Maximum combined request and response context in tokens. */
+  contextWindow?: number
+  /** Maximum output tokens; configuring one also makes it the request default. */
+  maxTokens?: number
+  /**
+   * Request modalities this model accepts; absent keeps the text floor. A
+   * deployment serving a vision-capable Grok model declares
+   * `['text', 'image']` here, which is what admits image blocks.
+   */
+  input?: PiAiModality[]
+}
+```
+
+Depends on: [`PiAiModality`](../packages/llm/llm-pi-ai/src/index.ts)
+
+Source: [`packages/llm/llm-grok-session/src/config.ts:87`](../packages/llm/llm-grok-session/src/config.ts)
 
 <a id="shres-codeshres-code-llm-pi-ai"></a>
 
@@ -1465,6 +1569,62 @@ export type Config = Readonly<Record<string, never>>
 ```
 
 Source: [`packages/llm/llm-retry/src/index.ts:24`](../packages/llm/llm-retry/src/index.ts)
+
+<a id="shres-codeshres-code-llm-xai-apikey"></a>
+
+## `@shres-code/shres-code-llm-xai-apikey`
+
+Requires: `llm`
+
+```ts config-catalog
+/** Plugin / settings section configuring the one route. */
+export interface Config {
+  /**
+   * When false (or omitted), the route is omitted from the live adapter
+   * registry. This route ships off by default: it is pay-per-token and
+   * needs an explicit key, so nothing serves until a deployment turns it on.
+   */
+  enabled?: boolean
+  /** Credential reference (env var) resolved per request; defaults to XAI_API_KEY. */
+  apiKeyEnv?: string
+  /** Endpoint base for the X API; defaults to DEFAULT_BASE_URL. */
+  baseURL?: string
+  /** Selector label; defaults to DEFAULT_DISPLAY_NAME. */
+  displayName?: string
+  /** Model catalog; defaults to SHIPPED_MODELS. */
+  models?: XaiModelConfig[]
+}
+
+/** One advisory model entry a deployment may declare. */
+export interface XaiModelConfig {
+  /** Model id the X API accepts. */
+  id: string
+  /** Selector label; defaults to the id. */
+  name?: string
+  /** Maximum combined request and response context in tokens. */
+  contextWindow?: number
+  /** Maximum output tokens; configuring one also makes it the request default. */
+  maxTokens?: number
+  /**
+   * Request modalities this model accepts; absent keeps the text floor. A
+   * deployment serving a vision-capable Grok model declares image here,
+   * which is what admits image blocks.
+   */
+  input?: PiAiModality[]
+  /**
+   * Serve tier for this model. default (the default) omits service_tier
+   * from the request body; priority splices it in and is billed differently.
+   */
+  serviceTier?: ServiceTier
+}
+
+/** One selectable per-model service tier. */
+export type ServiceTier = typeof SERVICE_TIERS[number]
+```
+
+Depends on: [`PiAiModality`](../packages/llm/llm-pi-ai/src/index.ts)
+
+Source: [`packages/llm/llm-xai-apikey/src/config.ts:80`](../packages/llm/llm-xai-apikey/src/config.ts)
 
 <a id="shres-codeshres-code-lsp-stdio"></a>
 
@@ -3069,6 +3229,34 @@ export interface Config {
 
 Source: [`packages/goal/tool-goal/src/index.ts:26`](../packages/goal/tool-goal/src/index.ts)
 
+<a id="shres-codeshres-code-tool-image-gen"></a>
+
+## `@shres-code/shres-code-tool-image-gen`
+
+Requires: `tools` · `systemPrompt` · `grokCredential`
+
+```ts config-catalog
+/** Plugin / cordis.yml section configuring the image_gen tool. */
+export interface Config {
+  /** Register the tool. Defaults to off. */
+  enabled?: boolean
+  /** Imagine model id; defaults to {@link DEFAULT_MODEL}. */
+  model?: string
+  /** Imagine API base including the version prefix; defaults to {@link DEFAULT_BASE_URL}. */
+  baseURL?: string
+  /** Auth document path; defaults to {@link defaultAuthPath}. */
+  authPath?: string
+  /** Token refresh leeway in milliseconds; defaults to {@link DEFAULT_REFRESH_LEEWAY_MS}. */
+  refreshLeewayMs?: number
+  /** Directory generated images are written into; defaults to {@link DEFAULT_OUTPUT_DIRECTORY}. */
+  outputDirectory?: string
+  /** Cooperative tool-call budget (ms); defaults to {@link DEFAULT_TIMEOUT_MS}. */
+  timeoutMs?: number
+}
+```
+
+Source: [`packages/llm/tool-image-gen/src/config.ts:38`](../packages/llm/tool-image-gen/src/config.ts)
+
 <a id="shres-codeshres-code-tool-jobs"></a>
 
 ## `@shres-code/shres-code-tool-jobs`
@@ -3653,6 +3841,8 @@ export interface Config {
   kimi?: boolean
   /** When false, Ollama Cloud is omitted from the search pool. Defaults to on. */
   ollama?: boolean
+  /** When false, Z.AI is omitted from the search pool. Defaults to on. */
+  zai?: boolean
 }
 ```
 
@@ -3719,10 +3909,12 @@ Source: [`packages/web/web-search-exa/src/index.ts:38`](../packages/web/web-sear
 Requires: `web`
 
 ```ts config-catalog
-/** Plugin config (all optional — `apply` fills env-var and constant defaults). */
+/** Plugin config (all optional — `apply` fills credential and constant defaults). */
 export interface Config {
-  /** Perplexity API key. Falls back to `$PERPLEXITY_API_KEY`. Empty → unavailable. */
+  /** Literal Perplexity API key; prefer {@link apiKeyEnv} so no secret enters configuration files. */
   apiKey?: string
+  /** Credential reference resolved for each refresh; defaults to `PERPLEXITY_API_KEY`. */
+  apiKeyEnv?: string
   /** Endpoint base; `/chat/completions` is appended. Defaults to the public API. */
   baseURL?: string
   /** Search model name. Defaults to `sonar`. */
@@ -3731,10 +3923,12 @@ export interface Config {
   maxTokens?: number
   /** Recency window sent as `search_recency_filter`. Omitted = no filter. */
   searchRecency?: 'day' | 'week' | 'month' | 'year'
+  /** When false, this provider is omitted from the search pool. Defaults to on. */
+  enabled?: boolean
 }
 ```
 
-Source: [`packages/web/web-search-perplexity/src/index.ts:32`](../packages/web/web-search-perplexity/src/index.ts)
+Source: [`packages/web/web-search-perplexity/src/index.ts:43`](../packages/web/web-search-perplexity/src/index.ts)
 
 <a id="shres-codeshres-code-wiki-embed-onnx"></a>
 
@@ -3767,10 +3961,11 @@ Source: [`packages/wiki/wiki-embed-onnx/src/index.ts:39`](../packages/wiki/wiki-
 export interface Config extends WikiConfigShape {
   /**
    * Wiki directory. Relative values resolve under the `.git`-walk project root
-   * of `cwd` (or `process.cwd()`). Absolute values are used as-is.
+   * of each calling session's `cwd` (or `process.cwd()` when the session has
+   * no recorded `cwd`). Absolute values pin one store for every session.
    */
   root?: string
-  /** Starting directory for the `.git` walk when `root` is relative. */
+  /** Starting directory for the `.git` walk when `root` is relative and the session has no recorded `cwd`. */
   cwd?: string
   /** Whether the materialized wiki root is watched for external edits. */
   watch?: boolean
@@ -3779,7 +3974,7 @@ export interface Config extends WikiConfigShape {
 
 Depends on: [`WikiConfigShape`](../packages/wiki/wiki/src/index.ts)
 
-Source: [`packages/wiki/wiki-filesystem/src/index.ts:34`](../packages/wiki/wiki-filesystem/src/index.ts)
+Source: [`packages/wiki/wiki-filesystem/src/index.ts:36`](../packages/wiki/wiki-filesystem/src/index.ts)
 
 <a id="shres-codeshres-code-wiki-librarian"></a>
 
@@ -3863,6 +4058,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@shres-code/shres-code-client-ui-model-selection` ([`packages/client/ui-model-selection/src/index.ts`](../packages/client/ui-model-selection/src/index.ts))
 - `@shres-code/shres-code-client-ui-permission-presets` ([`packages/client/ui-permission-presets/src/index.ts`](../packages/client/ui-permission-presets/src/index.ts))
 - `@shres-code/shres-code-client-ui-plan` ([`packages/client/ui-plan/src/index.ts`](../packages/client/ui-plan/src/index.ts))
+- `@shres-code/shres-code-client-ui-remote` ([`packages/client/ui-remote/src/index.ts`](../packages/client/ui-remote/src/index.ts))
 - `@shres-code/shres-code-client-ui-settings` ([`packages/client/ui-settings/src/index.ts`](../packages/client/ui-settings/src/index.ts))
 - `@shres-code/shres-code-client-ui-settings-general` ([`packages/client/ui-settings-general/src/index.ts`](../packages/client/ui-settings-general/src/index.ts))
 - `@shres-code/shres-code-client-ui-settings-jspace` ([`packages/client/ui-settings-jspace/src/index.ts`](../packages/client/ui-settings-jspace/src/index.ts))
@@ -3889,6 +4085,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@shres-code/shres-code-fs-e2b` — requires `e2b` ([`packages/e2b/fs-e2b/src/index.ts`](../packages/e2b/fs-e2b/src/index.ts))
 - `@shres-code/shres-code-fs-observation-policy` ([`packages/fs/fs-observation-policy/src/index.ts`](../packages/fs/fs-observation-policy/src/index.ts))
 - `@shres-code/shres-code-goal-round-driver` — requires `agents` · `goals` · `sessions` ([`packages/goal/goal-round-driver/src/index.ts`](../packages/goal/goal-round-driver/src/index.ts))
+- `@shres-code/shres-code-grok-credential` ([`packages/llm/grok-credential/src/index.ts`](../packages/llm/grok-credential/src/index.ts))
 - `@shres-code/shres-code-host-directory-picker-auto` — requires `webServer` · `loader` ([`packages/host/directory-picker-auto/src/index.ts`](../packages/host/directory-picker-auto/src/index.ts))
 - `@shres-code/shres-code-host-directory-picker-native` ([`packages/host/directory-picker-native/src/index.ts`](../packages/host/directory-picker-native/src/index.ts))
 - `@shres-code/shres-code-host-plugin-inventory` — requires `loader` ([`packages/host/plugin-inventory/src/index.ts`](../packages/host/plugin-inventory/src/index.ts))

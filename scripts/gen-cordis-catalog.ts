@@ -64,6 +64,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   e2b: 'subprocess.md',
   fs: 'filesystem.md',
   goals: 'goal.md',
+  grokCredential: 'grok-credential.md',
   webServer: 'web-server.md',
   invariants: 'invariants.md',
   llm: 'llm-streaming.md',
@@ -174,6 +175,7 @@ export const EVENT_SCOPE_PAGE: Record<string, string> = {
   'fs': 'filesystem.md',
   'goal': 'goal.md',
   'llm': 'llm-streaming.md',
+  'remote-control': 'remote-control.md',
   'session': 'session.md',
   'settings': 'settings.md',
   'skills': 'skills.md',
@@ -214,6 +216,7 @@ export const EVENT_WALK_EXEMPTIONS: Record<string, string> = {
  */
 export const LINK_MAP: Readonly<Record<string, string>> = {
   Agent: 'core.md',
+  TunnelStateView: 'remote-control.md',
   AgentCancelCause: 'core.md',
   AgentFactory: 'core.md',
   AgentHandle: 'core.md',
@@ -631,6 +634,8 @@ export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
   HostCordisInspectProviderRegistration: 'Host inspect provider registration is owned by packages/extensions/cordis-host-runner/src/inspect-registry.ts',
   DomainImpl: 'domain implementation contract is owned by packages/storage/storage-domain/README.md',
   CommandExecution: 'executor return contract is owned by packages/interaction/commands/src/index.ts',
+  GrokSessionManager: 'Grok Build session-credential engine is owned by packages/llm/grok-credential/README.md',
+  GrokSessionOptions: 'credential spec fields are owned by packages/llm/grok-credential/README.md',
   'z.core.JSONSchema.BaseSchema': 'zod projection output is owned by the zod v4 API',
   'z.core.ToJSONSchemaParams': 'zod projection parameters are owned by the zod v4 API',
   TypertDisposer: 'Typert lifecycle contract is owned by packages/typert/protocol/README.md',

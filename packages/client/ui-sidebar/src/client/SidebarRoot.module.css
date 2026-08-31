@@ -236,6 +236,7 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
+  gap: 8px;
   margin-left: -4px;
   margin-right: calc(-1 * var(--shres-sidebar-inline-padding));
   padding-left: 4px;

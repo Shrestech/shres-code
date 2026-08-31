@@ -67,8 +67,20 @@ import type { ResolvedPiAiProviderProfile } from './config.ts'
 import { discoverModels } from './discovery.ts'
 
 export { PiAiAdapter } from './adapter.ts'
-export type { PiAiAdapterOptions } from './adapter.ts'
-export { Config } from './config.ts'
+export type { PiAiAdapterHostedSearch, PiAiAdapterOptions } from './adapter.ts'
+export {
+  HOSTED_WEB_SEARCH_NAME,
+  HOSTED_X_SEARCH_NAME,
+  LOCAL_WEB_SEARCH_NAME,
+  applyHostedToolsPayload,
+  hostedCustomToolCallToServerToolCall,
+  mapHostedToolCalls,
+  webSearchCallToServerToolCall,
+  webSearchToolEntry,
+  xSearchToolEntry,
+} from './hosted-tools.ts'
+export type { HostedCustomToolCallItem, HostedWebSearchCallItem, HostedToolsSplice, WebSearchCallAction, WebSearchCallSource } from './hosted-tools.ts'
+export { Config, resolveProfiles } from './config.ts'
 export type {
   PiAiCompatProfile,
   PiAiModality,

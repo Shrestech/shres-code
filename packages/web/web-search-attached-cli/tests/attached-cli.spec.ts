@@ -15,6 +15,7 @@ import {
   buildRequest,
   isBackendId,
   mapVendorSearchPayload,
+  mapZaiSearchPayload,
   selectBackend,
   type AttachedCliBackend,
   type AttachedCliBackendId,
@@ -36,9 +37,10 @@ function options(partial: Partial<AttachedCliSearchOptions> & {
   codex?: string | undefined
   kimi?: string | undefined
   ollama?: string | undefined
+  zai?: string | undefined
 }): AttachedCliSearchOptions {
   return {
-    preference: partial.preference ?? ['grok-cli', 'claude-cli', 'codex-cli', 'kimi-cli', 'ollama-cloud'],
+    preference: partial.preference ?? ['grok-cli', 'claude-cli', 'codex-cli', 'kimi-cli', 'ollama-cloud', 'zai'],
     ...partial.currentProvider !== undefined ? { currentProvider: partial.currentProvider } : {},
     backends: {
       'grok-cli': backend('grok-cli', partial.grok),
@@ -46,6 +48,7 @@ function options(partial: Partial<AttachedCliSearchOptions> & {
       'codex-cli': backend('codex-cli', partial.codex),
       'kimi-cli': backend('kimi-cli', partial.kimi),
       'ollama-cloud': backend('ollama-cloud', partial.ollama),
+      'zai': backend('zai', partial.zai),
     },
     ...partial.fetch !== undefined ? { fetch: partial.fetch } : {},
     ...partial.refreshKeys !== undefined ? { refreshKeys: partial.refreshKeys } : {},
@@ -87,6 +90,10 @@ describe('selectBackend', () => {
       grok: 'g',
       ollama: 'ollama-key',
     }))).toBe('ollama-cloud')
+  })
+
+  it('walks preference to Z.AI when only it has a key', () => {
+    expect(selectBackend(options({ zai: 'zai-key' }))).toBe('zai')
   })
 })
 
@@ -224,6 +231,13 @@ describe('buildRequest', () => {
     expect(request.headers.authorization).toBe('Bearer ollama-key')
   })
 
+  it('targets the Z.AI Web Search retrieval endpoint for zai', () => {
+    const request = buildRequest('zai', 'https://api.z.ai/api/paas/v4', 'zai-key', 'glm release notes')
+    expect(request.url).toBe('https://api.z.ai/api/paas/v4/web_search')
+    expect(request.body).toEqual({ search_engine: 'search-prime', search_query: 'glm release notes' })
+    expect(request.headers.authorization).toBe('Bearer zai-key')
+  })
+
   it('strips a trailing slash from the vendor base', () => {
     expect(buildRequest('grok-cli', 'https://api.x.ai/v1/', 'k', 'q').url)
       .toBe('https://api.x.ai/v1/responses')
@@ -238,12 +252,12 @@ describe('buildRequest', () => {
 describe('enabledBackends', () => {
   it('defaults every vendor on and drops a vendor the user turns off', () => {
     expect(enabledBackends({})).toEqual([
-      'grok-cli', 'claude-cli', 'codex-cli', 'kimi-cli', 'ollama-cloud',
+      'grok-cli', 'claude-cli', 'codex-cli', 'kimi-cli', 'ollama-cloud', 'zai',
     ])
     expect(enabledBackends({ grok: false, claude: true, codex: false, kimi: false, ollama: false }))
-      .toEqual(['claude-cli'])
+      .toEqual(['claude-cli', 'zai'])
     expect(enabledBackends({
-      grok: false, claude: false, codex: false, kimi: false, ollama: false,
+      grok: false, claude: false, codex: false, kimi: false, ollama: false, zai: false,
     })).toEqual([])
   })
 })
@@ -254,7 +268,70 @@ describe('backendUsable and isBackendId', () => {
     expect(backendUsable({ ...backend('grok-cli'), hasResolver: true })).toBe(true)
     expect(isBackendId('grok-cli')).toBe(true)
     expect(isBackendId('ollama-cloud')).toBe(true)
+    expect(isBackendId('zai')).toBe(true)
     expect(isBackendId('deepseek-official')).toBe(false)
+  })
+})
+
+describe('mapZaiSearchPayload', () => {
+  it('maps link, title, content, and publish_date onto seam sources', () => {
+    expect(mapZaiSearchPayload({
+      id: 'req-1',
+      created: 1748261757,
+      search_result: [
+        {
+          title: 'Financial Morning Briefing',
+          content: 'Outward direct investment reached $57.54 billion.',
+          link: 'https://www.sohu.com/a/897879632_121123890',
+          media: 'Sohu',
+          icon: 'https://sfile.chatglm.cn/searchImage/sohu_icon_new.jpg',
+          refer: 'ref_1',
+          publish_date: '2025-05-23',
+        },
+        { link: 'https://finance.example/bare' },
+      ],
+    })).toEqual({
+      sources: [
+        {
+          url: 'https://www.sohu.com/a/897879632_121123890',
+          title: 'Financial Morning Briefing',
+          snippet: 'Outward direct investment reached $57.54 billion.',
+          publishedAt: '2025-05-23',
+        },
+        { url: 'https://finance.example/bare' },
+      ],
+      truncated: false,
+    })
+  })
+
+  it('never surfaces icon or other non-link URLs as sources', () => {
+    const result = mapZaiSearchPayload({
+      search_result: [{
+        link: 'https://example.com/doc',
+        icon: 'https://sfile.chatglm.cn/searchImage/icon.jpg',
+      }],
+    })
+    expect(result.sources.map(source => source.url)).toEqual(['https://example.com/doc'])
+  })
+
+  it('drops rows without a citeable link and blank optional fields', () => {
+    const result = mapZaiSearchPayload({
+      search_result: [
+        null,
+        'not a row',
+        { title: 'No link' },
+        { link: 'not-a-url' },
+        { link: 'https://example.com/a', title: '', content: '', publish_date: '' },
+      ],
+    })
+    expect(result.sources).toEqual([{ url: 'https://example.com/a' }])
+  })
+
+  it('fails a 200 body whose envelope carries no search_result list', () => {
+    expect(() => mapZaiSearchPayload('not an envelope'))
+      .toThrow(expect.objectContaining({ code: 'WEB_PROVIDER_ERROR' }))
+    expect(() => mapZaiSearchPayload({ search_result: null }))
+      .toThrow(expect.objectContaining({ code: 'WEB_PROVIDER_ERROR' }))
   })
 })
 
@@ -593,6 +670,46 @@ describe('web-search-attached-cli plugin registration', () => {
     } finally {
       if (previous === undefined) delete process.env.OLLAMA_API_KEY
       else process.env.OLLAMA_API_KEY = previous
+    }
+  })
+
+  it('searches Z.AI with the stored ZAI_API_KEY', async () => {
+    const previous = process.env.ZAI_API_KEY
+    delete process.env.ZAI_API_KEY
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const href = input instanceof Request ? input.url : input instanceof URL ? input.href : input
+      expect(href).toBe('https://api.z.ai/api/paas/v4/web_search')
+      return new Response(JSON.stringify({
+        id: 'req-1',
+        created: 1748261757,
+        search_result: [{
+          title: 'GLM',
+          content: 'Z.AI chat models',
+          link: 'https://z.ai/blog/glm',
+          publish_date: '2026-08-01',
+        }],
+      }), { status: 200 })
+    }))
+    try {
+      const ctx = new Context()
+      await ctx.plugin(WebRuntime, { searchProviders: ['attached-cli', 'deepseek-official'] })
+      await ctx.plugin(class extends MemoryCredentials {
+        constructor(inner: Context) {
+          super(inner, { ZAI_API_KEY: 'zai-stored' })
+        }
+      })
+      await ctx.plugin(attachedCliPlugin, {})
+      await expect(ctx.web.search({ query: 'GLM models' })).resolves.toMatchObject({
+        sources: [{
+          url: 'https://z.ai/blog/glm',
+          title: 'GLM',
+          snippet: 'Z.AI chat models',
+          publishedAt: '2026-08-01',
+        }],
+      })
+    } finally {
+      if (previous === undefined) delete process.env.ZAI_API_KEY
+      else process.env.ZAI_API_KEY = previous
     }
   })
 

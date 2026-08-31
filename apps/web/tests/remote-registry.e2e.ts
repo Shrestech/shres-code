@@ -20,7 +20,7 @@ interface RemoteEntryView {
 }
 
 interface RemoteListBody {
-  result?: { value?: { entries?: RemoteEntryView[] } }
+  result?: { ok?: boolean; value?: { entries?: RemoteEntryView[] }; error?: { message?: string } }
 }
 
 function registryPath(scaffold: WebScaffold): string {
@@ -44,10 +44,16 @@ async function listRemotes(scaffold: WebScaffold): Promise<RemoteEntryView[]> {
   const response = await fetch(`${scaffold.baseUrl}/api/remoteControl/list`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ args: {} }),
+    body: JSON.stringify({
+      type: 'client-request',
+      rpcId: 'remote-registry-e2e-list',
+      method: 'remoteControl/list',
+      payload: { args: {} },
+    }),
   })
   expect(response.ok).toBe(true)
   const body = await response.json() as RemoteListBody
+  expect(body.result?.ok, JSON.stringify(body.result?.error)).toBe(true)
   return body.result?.value?.entries ?? []
 }
 

@@ -11,6 +11,12 @@
 
 import type { API_REMOTE_FORWARDED_EVENTS } from './remote-events.ts'
 
+// Both compiler faces compile this file, so the owner packages' client-safe
+// `Events` merges ride it into the Host forwarding loop and the consumer
+// `$on` key face alike; the root entry's `import type {}` side does not
+// survive declaration emit for the referenced project's consumers.
+export type {} from '@shres-code/shres-code-host-remote-control/types'
+
 /** Type projection of the allowlist; the consumer and the Host read this one. */
 export type ApiRemoteForwardedEvent = typeof API_REMOTE_FORWARDED_EVENTS[number]
 

@@ -343,9 +343,9 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'readFile(path: string, signal?: AbortSignal): Promise<FileRead>',
-        description: 'Read one Workspace file as bounded text through the Host viewer fence (workspace-confined, byte-capped, binary-flagged).',
+        description: 'Read one Workspace file through the Host viewer fence (workspace-confined, byte-capped, binary-flagged). The reply serves the bounded slice as text or, for a sniffed image binary, base64 `imageData` with its `imageMediaType` (a truncated image carries the type but no bytes).',
         parameters: [{ name: 'path', description: 'absolute or Host-resolvable file path.' }, { name: 'signal', description: 'aborts the wire request when the caller supersedes it.' }],
-        returns: 'the bounded text read.',
+        returns: 'the bounded read.',
       },
       {
         signature: 'rename(workspaceId: WorkspaceId, title: string): Promise<WorkspaceView>',
@@ -421,7 +421,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'AssistantBlock',
-    declaration: 'export type AssistantBlock = {\n    kind: \'text\';\n    text: string;\n} | {\n    kind: \'reasoning\';\n    text: string;\n} | {\n    kind: \'image\';\n    attachment: ImageAttachmentRef;\n} | {\n    kind: \'tool-call\';\n    callId: string;\n    name: string;\n    argsRaw: string;\n} | {\n    kind: \'other\';\n    block: unknown;\n};',
+    declaration: 'export type AssistantBlock = {\n    kind: \'text\';\n    text: string;\n} | {\n    kind: \'reasoning\';\n    text: string;\n} | {\n    kind: \'image\';\n    attachment: ImageAttachmentRef;\n} | {\n    kind: \'tool-call\';\n    callId: string;\n    name: string;\n    argsRaw: string;\n} | {\n    kind: \'server-tool-call\';\n    block: ServerToolCallBlock;\n} | {\n    kind: \'other\';\n    block: unknown;\n};',
   },
   {
     name: 'AssistantMessageNode',

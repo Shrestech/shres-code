@@ -482,6 +482,13 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
           apiKeyEnv: options.deepSeekSearch.apiKeyEnv,
           baseURL: options.deepSeekSearch.baseURL,
         },
+      }, {
+        // This scenario drives a DeepSeek double and asserts one exact wire
+        // call. Perplexity sits ahead of DeepSeek in the shipped fallback, so
+        // a recorder host with PERPLEXITY_API_KEY exported would hijack the
+        // lane; pin it off whatever the recorder's environment holds.
+        id: 'web-search-perplexity',
+        config: { enabled: false },
       }],
     ...mode === 'record' || options.deepSeekMissingCredential === true
       ? []

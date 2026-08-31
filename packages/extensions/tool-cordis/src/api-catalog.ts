@@ -793,6 +793,19 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'grokCredential',
+    summary: 'Single-flight Grok Build session-credential service.',
+    description: 'Single-flight Grok Build session-credential service.\n\nGrokCredential.managerFor returns the one GrokSessionManager memoized for a credential spec, preserving one shared in-flight refresh per document. The memoization caches every spec key for the service\'s lifetime (develop\'s single-slot resolver evicted on change); that is safe because each `accessToken()` call re-validates the document and refresh at the moment it runs rather than trusting a stale cached token state.',
+    methods: [
+      {
+        signature: 'managerFor(spec: GrokSessionOptions): GrokSessionManager',
+        description: 'Resolve the credential manager for one spec, sharing the cached instance across callers so concurrent requests refresh the document once.',
+        parameters: [{ name: 'spec', description: 'the credential spec this manager reads and refreshes.' }],
+        returns: 'the manager for the spec\'s credential facts.',
+      },
+    ],
+  },
+  {
     key: 'invariants',
     summary: 'Package-owned invariant registry with global and regex-based selection.',
     description: 'Package-owned invariant registry with global and regex-based selection.',
@@ -2926,6 +2939,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     parameters: [{ name: 'options', description: 'the full request. A LOOP-built request carries the process-local {@link markAgentLoopRequest} identity and arrives deep-frozen (mutation throws): its content is a pure function of the session log (the reconstructability Agent Note), so listeners read it, never rewrite it. Hand-built calls do not carry that marker; their messages already obey the immutable creation contract.' }],
   },
   {
+    name: 'remote-control/tunnel-state',
+    mode: 'emit',
+    signature: '\'remote-control/tunnel-state\'(view: TunnelStateView): void',
+    summary: 'Full-state projection of one alias\'s GUI-owned tunnel after each committed transition (connecting, open, closed, error).',
+    description: 'Full-state projection of one alias\'s GUI-owned tunnel after each committed transition (connecting, open, closed, error). The payload is the complete view, so consumers reconcile idempotently with no cursor; a fresh page fills its initial picture from `remoteAdmin/status`.',
+    parameters: [{ name: 'view', description: 'the complete current state of the alias\'s tunnel.' }],
+  },
+  {
     name: 'session-telemetry/record',
     mode: 'waterfall',
     signature: '\'session-telemetry/record\'(record: SessionTelemetryRecord, next: () => SessionTelemetryRecord): SessionTelemetryRecord',
@@ -3387,7 +3408,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ContentBlockMap',
-    declaration: 'export interface ContentBlockMap {\n    \'text\': TextBlock;\n    \'reasoning\': ReasoningBlock;\n    \'image\': ImageBlock;\n    \'tool-call\': ToolCallBlock;\n    \'tool-result\': ToolResultBlock;\n}',
+    declaration: 'export interface ContentBlockMap {\n    \'text\': TextBlock;\n    \'reasoning\': ReasoningBlock;\n    \'image\': ImageBlock;\n    \'tool-call\': ToolCallBlock;\n    \'tool-result\': ToolResultBlock;\n    \'server-tool-call\': ServerToolCallBlock;\n}',
   },
   {
     name: 'ContentBlockType',
@@ -3688,6 +3709,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'GoalView',
     declaration: 'export interface GoalView extends GoalSnapshot {\n    readonly roundsStarted: number;\n    readonly createdAt: number;\n    readonly updatedAt: number;\n    readonly activation: GoalActivation;\n}',
+  },
+  {
+    name: 'GrokSessionManager',
+    declaration: 'export class GrokSessionManager {\n    constructor(options: GrokSessionOptions);\n    accessToken(): Promise<string>;\n}',
+  },
+  {
+    name: 'GrokSessionOptions',
+    declaration: 'export interface GrokSessionOptions {\n    authPath: string;\n    refreshLeewayMs: number;\n    fetch?: typeof fetch;\n    now?: () => number;\n}',
   },
   {
     name: 'ImageAttachmentLimits',
@@ -4254,6 +4283,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface RedactedSecret {\n    path: string[];\n    set: boolean;\n}',
   },
   {
+    name: 'RemoteId',
+    declaration: 'export type RemoteId = Branded<\'RemoteId\'>;',
+  },
+  {
     name: 'ReplayEnvelope',
     declaration: 'export interface ReplayEnvelope {\n    response: unknown;\n    blocks?: readonly unknown[];\n}',
   },
@@ -4319,7 +4352,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'RpcErrorDetailsMap',
-    declaration: 'export interface RpcErrorDetailsMap {\n    \'bad-request\': {\n        issues: ZodIssue[];\n    };\n    \'cancelled\': {};\n    \'session-not-found\': {\n        sessionId: SessionId;\n    };\n    \'model-unavailable\': {\n        provider: string;\n        model: string;\n    };\n    \'session-conflict\': {\n        sessionId: SessionId;\n        requestedCwd: string;\n        existingCwd?: string;\n    };\n    \'invalid-time-zone\': {\n        value: string;\n    };\n    \'workspace-attach-failed\': {\n        sessionId: SessionId;\n        workspaceId: string;\n    };\n    \'workspace-not-found\': {\n        workspaceId: string;\n    };\n    \'workspace-invalid-path\': {\n        path: string;\n    };\n    \'workspace-name-conflict\': {\n        name: string;\n    };\n    \'workspace-move-invalid\': {\n        workspaceId: string;\n        sessionId: SessionId;\n        beforeSessionId?: SessionId;\n    };\n    \'directory-unreadable\': {\n        path: string;\n    };\n    \'directory-exists\': {\n        path: string;\n    };\n    \'directory-create-failed\': {\n        path: string;\n    };\n    \'directory-picker-unavailable\': {\n        capability: string;\n    };\n    \'agent-preset-read-only\': {\n        agentPreset: string;\n        reason: string;\n    };\n    \'agent-preset-locked\': {\n        sessionId: SessionId;\n        agentPreset: string;\n    };\n    \'agent-preset-conflict\': {\n        sessionId: SessionId;\n        requestedPreset: string;\n        existingPreset?: string;\n    };\n    \'agent-preset-not-found\': {\n        agentPreset: string;\n      /* …truncated — full shape in source */',
+    declaration: 'export interface RpcErrorDetailsMap {\n    \'bad-request\': {\n        issues: ZodIssue[];\n    };\n    \'cancelled\': {};\n    \'session-not-found\': {\n        sessionId: SessionId;\n    };\n    \'model-unavailable\': {\n        provider: string;\n        model: string;\n    };\n    \'session-conflict\': {\n        sessionId: SessionId;\n        requestedCwd: string;\n        existingCwd?: string;\n    };\n    \'invalid-time-zone\': {\n        value: string;\n    };\n    \'workspace-attach-failed\': {\n        sessionId: SessionId;\n        workspaceId: string;\n    };\n    \'workspace-not-found\': {\n        workspaceId: string;\n    };\n    \'workspace-invalid-path\': {\n        path: string;\n    };\n    \'workspace-name-conflict\': {\n        name: string;\n    };\n    \'workspace-move-invalid\': {\n        workspaceId: string;\n        sessionId: SessionId;\n        beforeSessionId?: SessionId;\n    };\n    \'directory-unreadable\': {\n        path: string;\n    };\n    \'directory-exists\': {\n        path: string;\n    };\n    \'directory-create-failed\': {\n        path: string;\n    };\n    \'directory-picker-unavailable\': {\n        capability: string;\n    };\n    \'file-unreadable\': {\n        path: string;\n    };\n    \'file-outside-workspace\': {\n        path: string;\n    };\n    \'agent-preset-read-only\': {\n        agentPreset: string;\n        reason: string;\n    };\n    \'agent-preset-locked\': {\n        sessionId: SessionId;\n        agentPreset: string;\n    };\n    \'agent-preset-conflict\': {\n        sessionId: SessionId;\n        requestedPreset: /* …truncated — full shape in source */',
   },
   {
     name: 'RpcId',
@@ -4416,6 +4449,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ServerResponse',
     declaration: 'export interface ServerResponse {\n    type: \'server-response\';\n    rpcId: RpcId;\n    result: RpcResult<unknown>;\n}',
+  },
+  {
+    name: 'ServerToolCallBlock',
+    declaration: 'export interface ServerToolCallBlock {\n    type: \'server-tool-call\';\n    kind: string;\n    name?: string;\n    id?: CallId;\n    status: \'completed\' | \'failed\';\n    results?: ServerToolResult[];\n}',
+  },
+  {
+    name: 'ServerToolResult',
+    declaration: 'export interface ServerToolResult {\n    title?: string;\n    url?: string;\n    snippet?: string;\n}',
   },
   {
     name: 'SessionAvailability',
@@ -5304,6 +5345,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'TrackerRunSummary',
     declaration: 'export interface TrackerRunSummary {\n    readonly runId: TrackerRunId;\n    readonly experiment: string;\n    readonly decisionRule: string;\n    readonly dataVersion: string;\n    readonly gitSha: string;\n    readonly reason?: TrackerFailureReason;\n}',
+  },
+  {
+    name: 'TunnelStateView',
+    declaration: 'export interface TunnelStateView {\n    alias: RemoteId;\n    state: \'connecting\' | \'open\' | \'closed\' | \'error\';\n    localPort: number | null;\n    version: string | null;\n    fingerprint: string | null;\n    error: string | null;\n    since: string;\n}',
   },
   {
     name: 'TurnEndCancelCause',

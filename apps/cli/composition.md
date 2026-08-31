@@ -180,6 +180,8 @@ flowchart LR
   cfg --> plugin_shres_base_web
   plugin_shres_base_web_search_attached_cli["web-search-attached-cli<br/>@shres-code/shres-code-web-search-attached-cli"]
   cfg --> plugin_shres_base_web_search_attached_cli
+  plugin_shres_base_web_search_perplexity["web-search-perplexity<br/>@shres-code/shres-code-web-search-perplexity"]
+  cfg --> plugin_shres_base_web_search_perplexity
   plugin_shres_base_web_search_deepseek["web-search-deepseek<br/>@shres-code/shres-code-web-search-deepseek"]
   cfg --> plugin_shres_base_web_search_deepseek
   plugin_shres_base_tool_web["tool-web<br/>@shres-code/shres-code-tool-web"]
@@ -200,6 +202,12 @@ flowchart LR
   cfg --> plugin_shres_base_fs_sandbox
   plugin_shres_base_llm_cli_bridge["llm-cli-bridge<br/>@shres-code/shres-code-llm-cli-bridge"]
   cfg --> plugin_shres_base_llm_cli_bridge
+  plugin_shres_base_grok_credential["grok-credential<br/>@shres-code/shres-code-grok-credential"]
+  cfg --> plugin_shres_base_grok_credential
+  plugin_shres_base_llm_grok_session["llm-grok-session<br/>@shres-code/shres-code-llm-grok-session"]
+  cfg --> plugin_shres_base_llm_grok_session
+  plugin_shres_base_llm_xai_apikey["llm-xai-apikey<br/>@shres-code/shres-code-llm-xai-apikey"]
+  cfg --> plugin_shres_base_llm_xai_apikey
   plugin_shres_base_llm_deepseek["llm-deepseek<br/>@shres-code/shres-code-llm-deepseek"]
   cfg --> plugin_shres_base_llm_deepseek
 ```
@@ -292,6 +300,7 @@ flowchart LR
 | `repeat-tool-reminder` | `@shres-code/shres-code-repeat-tool-reminder` |
 | `web` | `@shres-code/shres-code-web` |
 | `web-search-attached-cli` | `@shres-code/shres-code-web-search-attached-cli` |
+| `web-search-perplexity` | `@shres-code/shres-code-web-search-perplexity` |
 | `web-search-deepseek` | `@shres-code/shres-code-web-search-deepseek` |
 | `tool-web` | `@shres-code/shres-code-tool-web` |
 | `speech` | `@shres-code/shres-code-speech` |
@@ -302,6 +311,9 @@ flowchart LR
 | `agent-loop` | `@shres-code/shres-code-agent-loop` |
 | `fs-sandbox` | `@shres-code/shres-code-fs-sandbox` |
 | `llm-cli-bridge` | `@shres-code/shres-code-llm-cli-bridge` |
+| `grok-credential` | `@shres-code/shres-code-grok-credential` |
+| `llm-grok-session` | `@shres-code/shres-code-llm-grok-session` |
+| `llm-xai-apikey` | `@shres-code/shres-code-llm-xai-apikey` |
 | `llm-deepseek` | `@shres-code/shres-code-llm-deepseek` |
 
 Source config: [`packages/bundle/base/cordis.patch.yml`](../../packages/bundle/base/cordis.patch.yml).

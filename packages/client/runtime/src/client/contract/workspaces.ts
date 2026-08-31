@@ -59,11 +59,13 @@ export interface IWorkspaces {
    */
   openPath(path: string): Promise<void>
   /**
-   * Read one Workspace file as bounded text through the Host viewer fence
-   * (workspace-confined, byte-capped, binary-flagged).
+   * Read one Workspace file through the Host viewer fence (workspace-confined,
+   * byte-capped, binary-flagged). The reply serves the bounded slice as text
+   * or, for a sniffed image binary, base64 `imageData` with its
+   * `imageMediaType` (a truncated image carries the type but no bytes).
    * @param path - absolute or Host-resolvable file path.
    * @param signal - aborts the wire request when the caller supersedes it.
-   * @returns the bounded text read.
+   * @returns the bounded read.
    */
   readFile(path: string, signal?: AbortSignal): Promise<FileRead>
   /**

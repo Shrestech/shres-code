@@ -1,7 +1,8 @@
 /**
- * The web-search card: method switches, then DeepSeek's key, endpoint, and
- * budget when that method is on. The key is written through the credentials
- * domain, never into a settings section.
+ * The web-search card: one switch per method. Perplexity's key and endpoint,
+ * and DeepSeek's key, endpoint, and budget, render immediately under that
+ * method's switch while it is on. The keys are written through the
+ * credentials domain, never into a settings section.
  */
 
 import type { InjectFace, PropsLocale, PropsRuntime } from '@shres-code/shres-code-client-ui-slots'
@@ -26,6 +27,7 @@ export function WebSearchCard(props: WebSearchCardProps) {
   const { t } = props
   const state = props.useWebSearchCard(snapshot => snapshot)
   const disabled = !state.writable
+  const perplexityOn = state.perplexity.text !== 'false'
   const deepseekOn = state.deepseek.text !== 'false'
   return (
     <PluginCard
@@ -79,6 +81,54 @@ export function WebSearchCard(props: WebSearchCardProps) {
           onEdit={(text) => { props.edit('ollama', text) }}
         />
         <SwitchField
+          id="plugin-config-web-search-zai"
+          label={t('webSearchZai')}
+          hint={t('webSearchZaiHint')}
+          text={state.zai.text}
+          disabled={disabled}
+          onEdit={(text) => { props.edit('zai', text) }}
+        />
+        <SwitchField
+          id="plugin-config-web-search-perplexity"
+          label={t('webSearchPerplexity')}
+          hint={t('webSearchPerplexityHint')}
+          text={state.perplexity.text}
+          disabled={disabled}
+          onEdit={(text) => { props.edit('perplexityEnabled', text) }}
+        />
+        {perplexityOn
+          ? (
+            <>
+              <SecretField
+                id="plugin-config-web-search-perplexity-key"
+                label={t('webSearchPerplexityApiKey')}
+                hint={t('webSearchApiKeyHint')}
+                // The credentials domain accepts a key even when the settings document
+                // itself is read-only; they are separate stores with separate refusals.
+                // Its own writability is what disables this control — a key sourced
+                // from the process environment cannot be written from here.
+                disabled={!state.perplexityApiKeyWritable}
+                text={state.perplexityApiKey.text}
+                configured={state.perplexityApiKeyConfigured}
+                stateLabel={state.perplexityApiKeyConfigured ? t('webSearchApiKeySet') : t('webSearchApiKeyUnset')}
+                onEdit={(text) => { props.edit('perplexityApiKey', text) }}
+              />
+              <ValueField
+                id="plugin-config-web-search-perplexity-endpoint"
+                label={t('webSearchPerplexityBaseUrl')}
+                hint={t('webSearchBaseUrlHint')}
+                overriddenLabel={t('overridden')}
+                resetLabel={t('reset')}
+                invalidLabel={t('invalidNumber')}
+                disabled={disabled}
+                {...state.perplexityBaseURL}
+                onEdit={(text) => { props.edit('perplexityBaseURL', text) }}
+                onReset={() => { props.resetField('perplexityBaseURL') }}
+              />
+            </>
+          )
+          : null}
+        <SwitchField
           id="plugin-config-web-search-deepseek"
           label={t('webSearchDeepSeek')}
           hint={t('webSearchDeepSeekHint')}
@@ -86,52 +136,52 @@ export function WebSearchCard(props: WebSearchCardProps) {
           disabled={disabled}
           onEdit={(text) => { props.edit('enabled', text) }}
         />
+        {deepseekOn
+          ? (
+            <>
+              <SecretField
+                id="plugin-config-web-search-key"
+                label={t('webSearchApiKey')}
+                hint={t('webSearchApiKeyHint')}
+                // The credentials domain accepts a key even when the settings document
+                // itself is read-only; they are separate stores with separate refusals.
+                // Its own writability is what disables this control — a key sourced
+                // from the process environment cannot be written from here.
+                disabled={!state.apiKeyWritable}
+                text={state.apiKey.text}
+                configured={state.apiKeyConfigured}
+                stateLabel={state.apiKeyConfigured ? t('webSearchApiKeySet') : t('webSearchApiKeyUnset')}
+                onEdit={(text) => { props.edit('apiKey', text) }}
+              />
+              <ValueField
+                id="plugin-config-web-search-endpoint"
+                label={t('webSearchBaseUrl')}
+                hint={t('webSearchBaseUrlHint')}
+                overriddenLabel={t('overridden')}
+                resetLabel={t('reset')}
+                invalidLabel={t('invalidNumber')}
+                disabled={disabled}
+                {...state.baseURL}
+                onEdit={(text) => { props.edit('baseURL', text) }}
+                onReset={() => { props.resetField('baseURL') }}
+              />
+              <ValueField
+                id="plugin-config-web-search-max-uses"
+                label={t('webSearchMaxUses')}
+                hint={t('webSearchMaxUsesHint')}
+                overriddenLabel={t('overridden')}
+                resetLabel={t('reset')}
+                invalidLabel={t('invalidNumber')}
+                numeric
+                disabled={disabled}
+                {...state.maxUses}
+                onEdit={(text) => { props.edit('maxUses', text) }}
+                onReset={() => { props.resetField('maxUses') }}
+              />
+            </>
+          )
+          : null}
       </div>
-      {deepseekOn
-        ? (
-          <>
-            <SecretField
-              id="plugin-config-web-search-key"
-              label={t('webSearchApiKey')}
-              hint={t('webSearchApiKeyHint')}
-              // The credentials domain accepts a key even when the settings document
-              // itself is read-only; they are separate stores with separate refusals.
-              // Its own writability is what disables this control — a key sourced
-              // from the process environment cannot be written from here.
-              disabled={!state.apiKeyWritable}
-              text={state.apiKey.text}
-              configured={state.apiKeyConfigured}
-              stateLabel={state.apiKeyConfigured ? t('webSearchApiKeySet') : t('webSearchApiKeyUnset')}
-              onEdit={(text) => { props.edit('apiKey', text) }}
-            />
-            <ValueField
-              id="plugin-config-web-search-endpoint"
-              label={t('webSearchBaseUrl')}
-              hint={t('webSearchBaseUrlHint')}
-              overriddenLabel={t('overridden')}
-              resetLabel={t('reset')}
-              invalidLabel={t('invalidNumber')}
-              disabled={disabled}
-              {...state.baseURL}
-              onEdit={(text) => { props.edit('baseURL', text) }}
-              onReset={() => { props.resetField('baseURL') }}
-            />
-            <ValueField
-              id="plugin-config-web-search-max-uses"
-              label={t('webSearchMaxUses')}
-              hint={t('webSearchMaxUsesHint')}
-              overriddenLabel={t('overridden')}
-              resetLabel={t('reset')}
-              invalidLabel={t('invalidNumber')}
-              numeric
-              disabled={disabled}
-              {...state.maxUses}
-              onEdit={(text) => { props.edit('maxUses', text) }}
-              onReset={() => { props.resetField('maxUses') }}
-            />
-          </>
-        )
-        : null}
     </PluginCard>
   )
 }
