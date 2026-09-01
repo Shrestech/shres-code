@@ -91,49 +91,49 @@ function withinMs(settlement: Promise<CommandSettlement>, timeoutMs: number): Pr
 }
 
 function commandText(spec: SubprocessSpawnSpec, paths: RemotePaths): string {
-  const encoder = `"$roos_e2b_env_bin" -i "$roos_e2b_node" -e ${quoteE2BShellArg(OUTPUT_ENCODER_SOURCE)}`
+  const encoder = `"$shres_e2b_env_bin" -i "$shres_e2b_node" -e ${quoteE2BShellArg(OUTPUT_ENCODER_SOURCE)}`
   const stdoutRedirect = hasSpill(spec.stdio.stdout)
-    ? `> >("$roos_e2b_tee" --output-error=warn-nopipe >("$roos_e2b_head" -c ${spec.stdio.stdout.spill.maxBytes} > ${quoteE2BShellArg(paths.stdout)}) | ${encoder} 2>/dev/null)`
+    ? `> >("$shres_e2b_tee" --output-error=warn-nopipe >("$shres_e2b_head" -c ${spec.stdio.stdout.spill.maxBytes} > ${quoteE2BShellArg(paths.stdout)}) | ${encoder} 2>/dev/null)`
     : `> >(${encoder} 2>/dev/null)`
   const stderrRedirect = hasSpill(spec.stdio.stderr)
-    ? `2> >("$roos_e2b_tee" --output-error=warn-nopipe >("$roos_e2b_head" -c ${spec.stdio.stderr.spill.maxBytes} > ${quoteE2BShellArg(paths.stderr)}) | ${encoder} >&2 2>/dev/null)`
+    ? `2> >("$shres_e2b_tee" --output-error=warn-nopipe >("$shres_e2b_head" -c ${spec.stdio.stderr.spill.maxBytes} > ${quoteE2BShellArg(paths.stderr)}) | ${encoder} >&2 2>/dev/null)`
     : `2> >(${encoder} >&2 2>/dev/null)`
   const inner = [
     'set +e',
-    'roos_e2b_env_bin=$1',
-    'roos_e2b_node=$2',
-    'roos_e2b_ps=$3',
-    'roos_e2b_tr=$4',
-    'roos_e2b_tee=$5',
-    'roos_e2b_head=$6',
-    'roos_e2b_rm=$7',
+    'shres_e2b_env_bin=$1',
+    'shres_e2b_node=$2',
+    'shres_e2b_ps=$3',
+    'shres_e2b_tr=$4',
+    'shres_e2b_tee=$5',
+    'shres_e2b_head=$6',
+    'shres_e2b_rm=$7',
     'shift 7',
-    'roos_e2b_pgid="$("$roos_e2b_ps" -o pgid= -p "$$" | "$roos_e2b_tr" -d " ")"',
-    `printf '%s\\n' "$roos_e2b_pgid" > ${quoteE2BShellArg(paths.pid)}`,
-    `mapfile -d '' -t roos_e2b_env < ${quoteE2BShellArg(paths.environment)}`,
-    `"$roos_e2b_rm" -f -- ${quoteE2BShellArg(paths.environment)}`,
-    `"$roos_e2b_env_bin" -i -- "\${roos_e2b_env[@]}" "$@" ${stdoutRedirect} ${stderrRedirect}`.trimEnd(),
-    'roos_e2b_status=$?',
-    `printf '%s\\n' "$roos_e2b_status" > ${quoteE2BShellArg(paths.status)}`,
+    'shres_e2b_pgid="$("$shres_e2b_ps" -o pgid= -p "$$" | "$shres_e2b_tr" -d " ")"',
+    `printf '%s\\n' "$shres_e2b_pgid" > ${quoteE2BShellArg(paths.pid)}`,
+    `mapfile -d '' -t shres_e2b_env < ${quoteE2BShellArg(paths.environment)}`,
+    `"$shres_e2b_rm" -f -- ${quoteE2BShellArg(paths.environment)}`,
+    `"$shres_e2b_env_bin" -i -- "\${shres_e2b_env[@]}" "$@" ${stdoutRedirect} ${stderrRedirect}`.trimEnd(),
+    'shres_e2b_status=$?',
+    `printf '%s\\n' "$shres_e2b_status" > ${quoteE2BShellArg(paths.status)}`,
     'wait',
-    'exit "$roos_e2b_status"',
+    'exit "$shres_e2b_status"',
   ].join('\n')
   const argv = spec.argv.map(quoteE2BShellArg).join(' ')
   const bootstrap = [
-    `mapfile -d '' -t roos_e2b_env < ${quoteE2BShellArg(paths.environment)}`,
-    'roos_e2b_env_bin="$(command -v env)"',
-    'roos_e2b_setsid="$(command -v setsid)"',
-    'roos_e2b_bash="$(command -v bash)"',
-    'roos_e2b_node="$(command -v node)"',
-    'roos_e2b_ps="$(command -v ps)"',
-    'roos_e2b_tr="$(command -v tr)"',
-    'roos_e2b_tee="$(command -v tee)"',
-    'roos_e2b_head="$(command -v head)"',
-    'roos_e2b_rm="$(command -v rm)"',
-    'for roos_e2b_tool in "$roos_e2b_env_bin" "$roos_e2b_setsid" "$roos_e2b_bash" "$roos_e2b_node" "$roos_e2b_ps" "$roos_e2b_tr" "$roos_e2b_tee" "$roos_e2b_head" "$roos_e2b_rm"; do',
-    '  [[ "$roos_e2b_tool" == /* && -x "$roos_e2b_tool" ]] || exit 125',
+    `mapfile -d '' -t shres_e2b_env < ${quoteE2BShellArg(paths.environment)}`,
+    'shres_e2b_env_bin="$(command -v env)"',
+    'shres_e2b_setsid="$(command -v setsid)"',
+    'shres_e2b_bash="$(command -v bash)"',
+    'shres_e2b_node="$(command -v node)"',
+    'shres_e2b_ps="$(command -v ps)"',
+    'shres_e2b_tr="$(command -v tr)"',
+    'shres_e2b_tee="$(command -v tee)"',
+    'shres_e2b_head="$(command -v head)"',
+    'shres_e2b_rm="$(command -v rm)"',
+    'for shres_e2b_tool in "$shres_e2b_env_bin" "$shres_e2b_setsid" "$shres_e2b_bash" "$shres_e2b_node" "$shres_e2b_ps" "$shres_e2b_tr" "$shres_e2b_tee" "$shres_e2b_head" "$shres_e2b_rm"; do',
+    '  [[ "$shres_e2b_tool" == /* && -x "$shres_e2b_tool" ]] || exit 125',
     'done',
-    `exec "$roos_e2b_env_bin" -i -- "\${roos_e2b_env[@]}" "$roos_e2b_setsid" --wait -- "$roos_e2b_bash" -c ${quoteE2BShellArg(inner)} shres-e2b "$roos_e2b_env_bin" "$roos_e2b_node" "$roos_e2b_ps" "$roos_e2b_tr" "$roos_e2b_tee" "$roos_e2b_head" "$roos_e2b_rm" ${argv}`,
+    `exec "$shres_e2b_env_bin" -i -- "\${shres_e2b_env[@]}" "$shres_e2b_setsid" --wait -- "$shres_e2b_bash" -c ${quoteE2BShellArg(inner)} shres-e2b "$shres_e2b_env_bin" "$shres_e2b_node" "$shres_e2b_ps" "$shres_e2b_tr" "$shres_e2b_tee" "$shres_e2b_head" "$shres_e2b_rm" ${argv}`,
   ].join('\n')
   return bootstrap
 }
