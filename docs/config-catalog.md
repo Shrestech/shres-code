@@ -2391,8 +2391,8 @@ export interface Config {
    * {@link DEFAULT_SHIELD_LICENSE} until a paid key exists.
    * `SHRES_SHIELD_LICENSE` overrides this field. A sibling
    * `../shres-shield` checkout is also entitled without a key. Unsigned
-   * profile/package loads in non-production enable the payload's unsigned-dev
-   * hatch; production requires a signed `shres1.` token.
+   * loads in non-production enable the payload's unsigned-dev hatch;
+   * production requires a signed `shres1.` token.
    */
   license?: string
   /**

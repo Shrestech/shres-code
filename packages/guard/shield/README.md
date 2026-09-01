@@ -41,7 +41,7 @@ The engine mounts once per harness boot, so the gate is a mount gate: when every
 
 An unentitled or missing payload keeps the seat loaded and `active: false`. The agent loop is unchanged. The product mark stays monochrome.
 
-The seat forwards `license` and `posture` into paid `apply`. Plugin 0.2.0 verifies signed `shres1.` tokens. For a profile- or package-resolved load without a signed token, a non-production seat sets `SHRES_SHIELD_DEV=1` so the payload's unsigned-dev hatch can screen until a paid key exists. `NODE_ENV=production` or `SHRES_SHIELD_PRODUCTION=1` forbids that hatch.
+The seat forwards `license` and `posture` into paid `apply`. Plugin 0.2.0 verifies signed `shres1.` tokens. For any resolve source without a signed token, a non-production seat sets `SHRES_SHIELD_DEV=1` so the payload's unsigned-dev hatch can screen until a paid key exists. `NODE_ENV=production` or `SHRES_SHIELD_PRODUCTION=1` forbids that hatch.
 
 ### `ctx.shield`
 

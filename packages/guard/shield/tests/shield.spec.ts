@@ -233,20 +233,24 @@ describe('shres-shield host seat', () => {
     expect(ShieldSeat.licenseLooksSigned(ShieldSeat.DEFAULT_SHIELD_LICENSE)).toBe(false)
   })
 
-  it('enables the unsigned-dev hatch only for unsigned profile and package loads', () => {
+  it('enables the unsigned-dev hatch for unsigned non-production loads of every source', () => {
     setEnv('SHRES_SHIELD_DEV', undefined)
     setEnv('SHRES_SHIELD_PRODUCTION', undefined)
-    ShieldSeat.ensureUnsignedDevHatch(ShieldSeat.DEFAULT_SHIELD_LICENSE, 'env')
-    expect(process.env.SHRES_SHIELD_DEV).toBeUndefined()
     ShieldSeat.ensureUnsignedDevHatch('shres1.kid.payload.sig', 'profile')
     expect(process.env.SHRES_SHIELD_DEV).toBeUndefined()
+    ShieldSeat.ensureUnsignedDevHatch(ShieldSeat.DEFAULT_SHIELD_LICENSE, 'env')
+    expect(process.env.SHRES_SHIELD_DEV).toBe('1')
+    setEnv('SHRES_SHIELD_DEV', undefined)
+    ShieldSeat.ensureUnsignedDevHatch(ShieldSeat.DEFAULT_SHIELD_LICENSE, 'sibling')
+    expect(process.env.SHRES_SHIELD_DEV).toBe('1')
+    setEnv('SHRES_SHIELD_DEV', undefined)
     ShieldSeat.ensureUnsignedDevHatch(ShieldSeat.DEFAULT_SHIELD_LICENSE, 'profile')
     expect(process.env.SHRES_SHIELD_DEV).toBe('1')
     ShieldSeat.ensureUnsignedDevHatch(ShieldSeat.DEFAULT_SHIELD_LICENSE, 'package')
     expect(process.env.SHRES_SHIELD_DEV).toBe('1')
     setEnv('SHRES_SHIELD_DEV', undefined)
     setEnv('SHRES_SHIELD_PRODUCTION', '1')
-    ShieldSeat.ensureUnsignedDevHatch(ShieldSeat.DEFAULT_SHIELD_LICENSE, 'package')
+    ShieldSeat.ensureUnsignedDevHatch(ShieldSeat.DEFAULT_SHIELD_LICENSE, 'env')
     expect(process.env.SHRES_SHIELD_DEV).toBeUndefined()
   })
 
@@ -1110,13 +1114,13 @@ describe('shres-shield per-repo gate', () => {
     }
   })
 
-  it('does not set the hatch for an env-resolved payload', async () => {
+  it('sets the hatch for an env-resolved payload without a signed token', async () => {
     setEnv('SHRES_SHIELD', undefined)
     setEnv('SHRES_SHIELD_MODULE', fixtureUrl)
     setEnv('SHRES_SHIELD_DEV', undefined)
     setEnv('SHRES_SHIELD_PRODUCTION', undefined)
     const ctx = await setup({ license: ShieldSeat.DEFAULT_SHIELD_LICENSE }, 'active')
-    expect(process.env.SHRES_SHIELD_DEV).toBeUndefined()
+    expect(process.env.SHRES_SHIELD_DEV).toBe('1')
     await ctx.fiber.dispose()
   })
 

@@ -74,8 +74,8 @@ export interface Config {
    * {@link DEFAULT_SHIELD_LICENSE} until a paid key exists.
    * `SHRES_SHIELD_LICENSE` overrides this field. A sibling
    * `../shres-shield` checkout is also entitled without a key. Unsigned
-   * profile/package loads in non-production enable the payload's unsigned-dev
-   * hatch; production requires a signed `shres1.` token.
+   * loads in non-production enable the payload's unsigned-dev hatch;
+   * production requires a signed `shres1.` token.
    */
   license?: string
   /**
@@ -644,15 +644,16 @@ export function productionLockActive(): boolean {
 }
 
 /**
- * Enable the paid plugin's unsigned-dev hatch for profile/package loads that
- * have no signed token. Env and sibling loads are already developer-entitled
- * without it. Production stays fail-closed. Does not overwrite an existing
+ * Enable the paid plugin's unsigned-dev hatch when the license is not a
+ * signed `shres1.` token. Plugin 0.2.0 rejects `shres-dev` unless this
+ * hatch is on, for every resolve source including env and sibling.
+ * Production stays fail-closed. Does not overwrite an existing
  * `SHRES_SHIELD_DEV=1`.
  * @param license - effective license string.
- * @param source - where `apply` was loaded from.
+ * @param source - where `apply` was loaded from (unused; hatch is source-independent).
  */
 export function ensureUnsignedDevHatch(license: string, source: ShieldEngineSource): void {
-  if (source !== 'profile' && source !== 'package') return
+  void source
   if (licenseLooksSigned(license)) return
   if (productionLockActive()) return
   try {
@@ -818,12 +819,15 @@ export function apply(ctx: Context, config: Config): void {
         return
       }
       /* v8 ignore stop */
-      host.bindPayload(instance)
       const entitlement = pluginEntitlement(instance)
       if (entitlement?.active === false) {
+        await instance.dispose()
+        instance = undefined
+        host.bindPayload(undefined)
         setStatus(status, { active: false, reason: hostReasonFromPlugin(entitlement.reason) })
         return
       }
+      host.bindPayload(instance)
       setStatus(status, { active: true, reason: 'active' })
     /* v8 ignore start -- resolve is fail-soft; a throw is an unexpected loader failure */
     }).catch(() => {

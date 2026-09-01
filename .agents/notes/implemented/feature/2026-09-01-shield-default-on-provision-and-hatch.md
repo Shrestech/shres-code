@@ -14,7 +14,7 @@ Activate in Settings only wrote `enabled` and remounted. Stock `web` / `headless
 
 **The seat forwards license and honors plugin entitlement.** Paid `apply` receives `{ posture, license }`. After apply, `entitlement.active === false` keeps the host inactive (`unlicensed`, or `panic` when the payload says panic).
 
-**Unsigned profile/package loads in non-production use the payload hatch.** When the engine source is `profile` or `package` and the license is not a `shres1.` token, the seat sets `SHRES_SHIELD_DEV=1` unless `NODE_ENV=production` or `SHRES_SHIELD_PRODUCTION=1`. Env and sibling loads stay developer-entitled without that assignment. Production remains fail-closed without a signed token.
+**Unsigned loads in non-production use the payload hatch.** When the license is not a `shres1.` token, the seat sets `SHRES_SHIELD_DEV=1` unless `NODE_ENV=production` or `SHRES_SHIELD_PRODUCTION=1`. That includes env (`SHRES_SHIELD_MODULE`) and sibling checkouts: plugin 0.2.0 rejects `shres-dev` on every source unless the hatch is on. Production remains fail-closed without a signed token.
 
 ## Alternatives considered
 
