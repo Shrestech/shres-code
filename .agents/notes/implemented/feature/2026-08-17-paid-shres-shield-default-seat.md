@@ -46,4 +46,4 @@ Every profile loads `shres-shield`. Screening starts only when the payload resol
 
 ## Deferred
 
-No client plugin yet reads `ctx.shield.status.active` over RPC to flip `shieldActive` at runtime. Ask-posture approval still needs an open turn and `exec.agent`; headless stays fail-closed. Signed-token verification lives in the paid plugin; the seat forwards `license` and enables the unsigned-dev hatch for non-production profile/package loads.
+No client plugin yet reads `ctx.shield.status.active` over RPC to flip `shieldActive` at runtime. Ask-posture approval still needs an open turn and `exec.agent`; headless stays fail-closed. Signed-token verification lives in the paid plugin; the seat forwards `license` and enables the unsigned-dev hatch for unsigned non-production loads of every source.

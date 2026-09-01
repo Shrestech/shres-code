@@ -233,24 +233,16 @@ describe('shres-shield host seat', () => {
     expect(ShieldSeat.licenseLooksSigned(ShieldSeat.DEFAULT_SHIELD_LICENSE)).toBe(false)
   })
 
-  it('enables the unsigned-dev hatch for unsigned non-production loads of every source', () => {
+  it('enables the unsigned-dev hatch for unsigned non-production licenses', () => {
     setEnv('SHRES_SHIELD_DEV', undefined)
     setEnv('SHRES_SHIELD_PRODUCTION', undefined)
-    ShieldSeat.ensureUnsignedDevHatch('shres1.kid.payload.sig', 'profile')
+    ShieldSeat.ensureUnsignedDevHatch('shres1.kid.payload.sig')
     expect(process.env.SHRES_SHIELD_DEV).toBeUndefined()
-    ShieldSeat.ensureUnsignedDevHatch(ShieldSeat.DEFAULT_SHIELD_LICENSE, 'env')
-    expect(process.env.SHRES_SHIELD_DEV).toBe('1')
-    setEnv('SHRES_SHIELD_DEV', undefined)
-    ShieldSeat.ensureUnsignedDevHatch(ShieldSeat.DEFAULT_SHIELD_LICENSE, 'sibling')
-    expect(process.env.SHRES_SHIELD_DEV).toBe('1')
-    setEnv('SHRES_SHIELD_DEV', undefined)
-    ShieldSeat.ensureUnsignedDevHatch(ShieldSeat.DEFAULT_SHIELD_LICENSE, 'profile')
-    expect(process.env.SHRES_SHIELD_DEV).toBe('1')
-    ShieldSeat.ensureUnsignedDevHatch(ShieldSeat.DEFAULT_SHIELD_LICENSE, 'package')
+    ShieldSeat.ensureUnsignedDevHatch(ShieldSeat.DEFAULT_SHIELD_LICENSE)
     expect(process.env.SHRES_SHIELD_DEV).toBe('1')
     setEnv('SHRES_SHIELD_DEV', undefined)
     setEnv('SHRES_SHIELD_PRODUCTION', '1')
-    ShieldSeat.ensureUnsignedDevHatch(ShieldSeat.DEFAULT_SHIELD_LICENSE, 'env')
+    ShieldSeat.ensureUnsignedDevHatch(ShieldSeat.DEFAULT_SHIELD_LICENSE)
     expect(process.env.SHRES_SHIELD_DEV).toBeUndefined()
   })
 

@@ -650,10 +650,8 @@ export function productionLockActive(): boolean {
  * Production stays fail-closed. Does not overwrite an existing
  * `SHRES_SHIELD_DEV=1`.
  * @param license - effective license string.
- * @param source - where `apply` was loaded from (unused; hatch is source-independent).
  */
-export function ensureUnsignedDevHatch(license: string, source: ShieldEngineSource): void {
-  void source
+export function ensureUnsignedDevHatch(license: string): void {
   if (licenseLooksSigned(license)) return
   if (productionLockActive()) return
   try {
@@ -809,7 +807,7 @@ export function apply(ctx: Context, config: Config): void {
       }
       /* v8 ignore next -- apply() always stores a concrete posture on entry */
       const posture = current.posture ?? 'ask'
-      ensureUnsignedDevHatch(license, engine.source)
+      ensureUnsignedDevHatch(license)
       instance = await engine.apply(ctx, { posture, license })
       /* v8 ignore start -- dispose can flip `stopped` while apply awaits */
       if (stopped) {

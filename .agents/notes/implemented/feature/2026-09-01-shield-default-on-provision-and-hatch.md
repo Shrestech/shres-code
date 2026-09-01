@@ -22,7 +22,7 @@ Activate in Settings only wrote `enabled` and remounted. Stock `web` / `headless
 
 **Auto-write `shres.editions.shield` onto existing profiles from Update or Enable.** Rejected earlier for Update; still rejected. Templates declare at init. The seat's missing-payload `pnpm add` writes an ordinary dependency.
 
-**Keep `~/.shres/cordis.patch.yml` `!!js` as the hatch.** Rejected: that file is a user plugin layer, not entitlement. The seat owns the hatch for unsigned non-production profile/package loads.
+**Keep `~/.shres/cordis.patch.yml` `!!js` as the hatch.** Rejected: that file is a user plugin layer, not entitlement. The seat owns the hatch for unsigned non-production loads of every source.
 
 **Forward license only, with no hatch.** Rejected: plugin 0.2.0 rejects `shres-dev` by name, so default-on would stay dark until every developer minted a signed token.
 
