@@ -50,7 +50,7 @@
     "@shres-code/shres-code-client-ui-primitives": "workspace:^",
     "@shres-code/shres-code-client-ui-slots": "workspace:^",
     "clsx": "^2.0.0",
-    "react": "^18.2.0"
+    "react": "^19.2.8"
   },
   "peerDependencies": {
     "@shres-code/cordis": "workspace:^",
@@ -67,7 +67,7 @@
     "@shres-code/shres-code-system-prompt": "workspace:^",
     "@shres-code/shres-code-tools": "workspace:^",
     "@shres-code/shres-code-user-questions": "workspace:^",
-    "@types/react": "~18.3.1"
+    "@types/react": "~19.2.18"
   },
   "files": [
     "lib/index.js",
