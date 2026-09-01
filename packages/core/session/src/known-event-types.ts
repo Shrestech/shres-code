@@ -41,6 +41,7 @@ export const KNOWN_SESSION_EVENT_TYPES: ReadonlySet<string> = new Set([
   'jspace/charter-proposal',
   'jspace/charter-run',
   'jspace/closed',
+  'jspace/shipped',
   'ledger/decision',
   'llm/retry',
   'llm/retry-started',
