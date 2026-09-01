@@ -38,8 +38,9 @@ export type {
   ShieldSnapshot, ShieldStatus, ShieldUpdateBlocked,
 } from './types.ts'
 export {
-  PAYLOAD_SPECIFIER, repoRootFromSeat, resolveProfileSpecifier, resolveShieldEngine,
-  siblingPluginPath, type ShieldResolveOptions,
+  PAYLOAD_IMPORT_BUST_PARAM, PAYLOAD_SPECIFIER, fileImportHref, propagateShieldImportBust,
+  repoRootFromSeat, resolveProfileSpecifier, resolveShieldEngine, siblingPluginPath,
+  type ShieldResolveOptions,
 } from './resolve.ts'
 export {
   defaultSpawn, installPayload, isNpmVersion, NPM_PAYLOAD_PACKUMENT, pnpmEnv,

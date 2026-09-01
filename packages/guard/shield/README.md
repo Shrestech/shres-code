@@ -33,7 +33,7 @@ The engine mounts once per harness boot, so the gate is a mount gate: when every
 `ctx.shield.status.active` is true only when all of the following hold:
 
 - `SHRES_SHIELD` is not `off`
-- `@shrestech/shres-shield-plugin` resolves, in order: `SHRES_SHIELD_MODULE` (exclusive when set), the active profile's installed payload (the profile `node_modules` the seat's boot profile anchors), sibling `../shres-shield/packages/plugin/dist/index.js`, then the `@shrestech/shres-shield-plugin` package specifier
+- `@shrestech/shres-shield-plugin` resolves, in order: `SHRES_SHIELD_MODULE` (exclusive when set), the active profile's installed payload (CJS resolve from the profile `node_modules`, or that package's `exports.import` when it has no `main`), sibling `../shres-shield/packages/plugin/dist/index.js`, then the `@shrestech/shres-shield-plugin` package specifier
 - the payload is entitled: a non-empty `license` / `SHRES_SHIELD_LICENSE` (default `shres-dev` until a paid key exists), or the engine loaded from the sibling checkout or `SHRES_SHIELD_MODULE`
 - the paid `apply` did not return `entitlement.active === false`
 - `enabled` is not `false` (Settings → Shield switch; default on)
@@ -49,7 +49,7 @@ The seat forwards `license` and `posture` into paid `apply`. Plugin 0.2.0 verifi
 
 `ctx.shield.snapshot(sessionId?)` is the Host Remote (`shield/snapshot`) for the Settings console. It returns `{ status, stats, definitions?, payload? }` for the current session cwd (`realpath(session.header.cwd)` when a live session is known). Counts live in the engine's per-repo store, not `settings.yaml`. Disable and panic remount the payload off and still read module-level `stats.snapshot()` so last persisted counts remain with `status.reason === 'disabled'` or `'panic'`. The snapshot's `status` is per-repo: while the engine screens other repos, an exempt repo's snapshot reports `'repo-disabled'`; diagnostic and global-off reasons always pass through. `payload` is the resolved engine source and npm version when a file loaded.
 
-`ctx.shield.checkUpdate()` GETs `https://registry.npmjs.org/@shrestech/shres-shield-plugin/latest` and compares that `version` to the resolved package.json. `ctx.shield.applyUpdate()` re-checks, then `pnpm add @shrestech/shres-shield-plugin@<version>` in the boot profile and remounts. `SHRES_SHIELD_MODULE` is exclusive and blocks the install; a missing profile directory also blocks. Settings → Shield **Check for updates** / **Update** are the product path.
+`ctx.shield.checkUpdate()` GETs `https://registry.npmjs.org/@shrestech/shres-shield-plugin/latest` and compares that `version` to the resolved package.json. `ctx.shield.applyUpdate()` re-checks, then `pnpm add @shrestech/shres-shield-plugin@<version>` in the boot profile and remounts. File-leg `import()` uses a content-scoped query so that remount loads the new files without restarting the process. `SHRES_SHIELD_MODULE` is exclusive and blocks the install; a missing profile directory also blocks. Settings → Shield **Check for updates** / **Update** are the product path.
 
 The seat declaration-merges `'shield/decision'` onto `SessionEventMap`. The payload is the W1 decision body (`verdict`, `rule`, `reasonCode`, `channel`, `sha16`, optional `host` / `callId` / `origin` / `turn` / `step`). Writers pass `{ ignorable: true }` so older readers resume. `SESSION_FORMAT_VERSION` stays `0`.
 

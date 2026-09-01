@@ -8,13 +8,13 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import {
-  PAYLOAD_SPECIFIER, resolveProfileSpecifier, resolveShieldEngine, repoRootFromSeat,
-  siblingPluginPath,
+  PAYLOAD_IMPORT_BUST_PARAM, PAYLOAD_SPECIFIER, fileImportHref, propagateShieldImportBust,
+  resolveProfileSpecifier, resolveShieldEngine, repoRootFromSeat, siblingPluginPath,
 } from '@shres-code/shres-code-shield'
 
 const OLD_WRONG_SPECIFIER = '@shres-shield/plugin'
@@ -193,6 +193,21 @@ describe('shield payload resolve', () => {
     } finally {
       profile.cleanup()
     }
+    process.env.SHRES_SHIELD_MODULE = 'not-a-real-shield-package'
+    expect(await resolveShieldEngine({ repoRoot: neutralSiblingRoot() })).toBeUndefined()
+  })
+
+  it('returns undefined when a file-leg import fails with and without the bust query', async () => {
+    const dir = resolve(tmpdir(), `shres-shield-bad-js-${Math.random().toString(36).slice(2)}`)
+    mkdirSync(dir, { recursive: true })
+    const file = join(dir, 'broken.js')
+    writeFileSync(file, 'this is not valid javascript {{{')
+    process.env.SHRES_SHIELD_MODULE = file
+    try {
+      expect(await resolveShieldEngine({ repoRoot: neutralSiblingRoot() })).toBeUndefined()
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 
   it('returns a top-level snapshot when the payload has no stats reader', async () => {
@@ -257,5 +272,272 @@ describe('shield payload resolve', () => {
     } finally {
       rmSync(parent, { recursive: true, force: true })
     }
+  })
+
+  it('resolves an ESM-only profile payload that publishes exports.import and no main', () => {
+    const dir = resolve(tmpdir(), `shres-shield-esm-only-${Math.random().toString(36).slice(2)}`)
+    const pkgDir = join(dir, 'node_modules', '@shrestech', 'shres-shield-plugin')
+    mkdirSync(join(pkgDir, 'dist'), { recursive: true })
+    writeFileSync(join(dir, 'package.json'), '{"name":"profile-test","private":true,"dependencies":{}}\n')
+    writeFileSync(
+      join(pkgDir, 'package.json'),
+      JSON.stringify({
+        name: PAYLOAD_SPECIFIER,
+        version: '0.2.1',
+        type: 'module',
+        exports: { '.': { types: './dist/index.d.ts', import: './dist/index.js' } },
+      }) + '\n',
+    )
+    writeFileSync(join(pkgDir, 'dist', 'index.js'), APPLY_ONLY_MODULE)
+    try {
+      expect(resolveProfileSpecifier(dir)).toBe(join(pkgDir, 'dist', 'index.js'))
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('resolves a profile payload whose exports map is a string', () => {
+    const dir = resolve(tmpdir(), `shres-shield-exports-string-${Math.random().toString(36).slice(2)}`)
+    const pkgDir = join(dir, 'node_modules', '@shrestech', 'shres-shield-plugin')
+    mkdirSync(pkgDir, { recursive: true })
+    writeFileSync(join(dir, 'package.json'), '{"name":"profile-test","private":true}\n')
+    writeFileSync(
+      join(pkgDir, 'package.json'),
+      JSON.stringify({ name: PAYLOAD_SPECIFIER, type: 'module', exports: './index.js' }) + '\n',
+    )
+    writeFileSync(join(pkgDir, 'index.js'), APPLY_ONLY_MODULE)
+    try {
+      const resolved = resolveProfileSpecifier(dir)
+      expect(resolved).toBeTruthy()
+      expect(resolved).toMatch(/index\.js$/)
+      expect(existsSync(resolved as string)).toBe(true)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('resolves a profile payload whose exports["."] is a string', () => {
+    const dir = resolve(tmpdir(), `shres-shield-exports-dot-${Math.random().toString(36).slice(2)}`)
+    const pkgDir = join(dir, 'node_modules', '@shrestech', 'shres-shield-plugin')
+    mkdirSync(pkgDir, { recursive: true })
+    writeFileSync(join(dir, 'package.json'), '{"name":"profile-test","private":true}\n')
+    writeFileSync(
+      join(pkgDir, 'package.json'),
+      JSON.stringify({ name: PAYLOAD_SPECIFIER, type: 'module', exports: { '.': './index.js' } }) + '\n',
+    )
+    writeFileSync(join(pkgDir, 'index.js'), APPLY_ONLY_MODULE)
+    try {
+      const resolved = resolveProfileSpecifier(dir)
+      expect(resolved).toBeTruthy()
+      expect(resolved).toMatch(/index\.js$/)
+      expect(existsSync(resolved as string)).toBe(true)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('falls through to main when exports.import is not a string', () => {
+    const dir = resolve(tmpdir(), `shres-shield-exports-main-${Math.random().toString(36).slice(2)}`)
+    const pkgDir = join(dir, 'node_modules', '@shrestech', 'shres-shield-plugin')
+    mkdirSync(pkgDir, { recursive: true })
+    writeFileSync(join(dir, 'package.json'), '{"name":"profile-test","private":true}\n')
+    writeFileSync(
+      join(pkgDir, 'package.json'),
+      JSON.stringify({
+        name: PAYLOAD_SPECIFIER,
+        type: 'module',
+        exports: { '.': { types: './index.d.ts' } },
+        main: './index.js',
+      }) + '\n',
+    )
+    writeFileSync(join(pkgDir, 'index.js'), APPLY_ONLY_MODULE)
+    try {
+      expect(resolveProfileSpecifier(dir)).toBe(join(pkgDir, 'index.js'))
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('skips an ESM-only profile package whose name, JSON, or entry is unusable', () => {
+    const dir = resolve(tmpdir(), `shres-shield-esm-miss-${Math.random().toString(36).slice(2)}`)
+    const pkgDir = join(dir, 'node_modules', '@shrestech', 'shres-shield-plugin')
+    mkdirSync(pkgDir, { recursive: true })
+    writeFileSync(join(dir, 'package.json'), '{"name":"profile-test","private":true}\n')
+    try {
+      writeFileSync(join(pkgDir, 'package.json'), '{')
+      expect(resolveProfileSpecifier(dir)).toBeUndefined()
+      writeFileSync(join(pkgDir, 'package.json'), 'null\n')
+      expect(resolveProfileSpecifier(dir)).toBeUndefined()
+      writeFileSync(join(pkgDir, 'package.json'), '1\n')
+      expect(resolveProfileSpecifier(dir)).toBeUndefined()
+      writeFileSync(join(pkgDir, 'package.json'), '{"name":"other","exports":"./index.js"}\n')
+      expect(resolveProfileSpecifier(dir)).toBeUndefined()
+      writeFileSync(
+        join(pkgDir, 'package.json'),
+        JSON.stringify({ name: PAYLOAD_SPECIFIER, type: 'module' }) + '\n',
+      )
+      expect(resolveProfileSpecifier(dir)).toBeUndefined()
+      writeFileSync(
+        join(pkgDir, 'package.json'),
+        JSON.stringify({ name: PAYLOAD_SPECIFIER, type: 'module', exports: { '.': { import: './missing.js' } } }) + '\n',
+      )
+      expect(resolveProfileSpecifier(dir)).toBeUndefined()
+      writeFileSync(
+        join(pkgDir, 'package.json'),
+        JSON.stringify({ name: PAYLOAD_SPECIFIER, type: 'module', exports: null }) + '\n',
+      )
+      expect(resolveProfileSpecifier(dir)).toBeUndefined()
+      writeFileSync(
+        join(pkgDir, 'package.json'),
+        JSON.stringify({ name: PAYLOAD_SPECIFIER, type: 'module', exports: { '.': null } }) + '\n',
+      )
+      expect(resolveProfileSpecifier(dir)).toBeUndefined()
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('loads rewritten payload code at the same profile path in the same process', async () => {
+    const oldSource = `
+export async function apply() { return { dispose: async () => {} } }
+export const stats = { snapshot: () => ({ marker: 'old' }) }
+`
+    const newSource = `
+export async function apply() { return { dispose: async () => {} } }
+export const stats = { snapshot: () => ({ marker: 'new' }) }
+`
+    const profile = makeProfileDir(oldSource)
+    try {
+      const first = await resolveShieldEngine({
+        profileDir: profile.dir,
+        repoRoot: neutralSiblingRoot(),
+      })
+      expect(first?.snapshot?.()).toEqual({ marker: 'old' })
+      const entry = resolveProfileSpecifier(profile.dir) as string
+      const beforeHref = fileImportHref(entry)
+      writeFileSync(entry, newSource)
+      // Token is mtime+size; bump mtime so a same-ms rewrite still busts.
+      const later = Date.now() / 1000 + 5
+      utimesSync(entry, later, later)
+      expect(fileImportHref(entry)).not.toBe(beforeHref)
+      const second = await resolveShieldEngine({
+        profileDir: profile.dir,
+        repoRoot: neutralSiblingRoot(),
+      })
+      expect(second?.snapshot?.()).toEqual({ marker: 'new' })
+    } finally {
+      profile.cleanup()
+    }
+  })
+
+  it('reloads a child module when the same profile tree is overwritten', async () => {
+    const dir = resolve(tmpdir(), `shres-shield-multifile-${Math.random().toString(36).slice(2)}`)
+    const pkgDir = join(dir, 'node_modules', '@shrestech', 'shres-shield-plugin')
+    mkdirSync(pkgDir, { recursive: true })
+    writeFileSync(join(dir, 'package.json'), '{"name":"profile-test","private":true,"dependencies":{}}\n')
+    writeFileSync(
+      join(pkgDir, 'package.json'),
+      `{"name":"${PAYLOAD_SPECIFIER}","version":"0.2.0","type":"module","main":"index.js"}\n`,
+    )
+    const writeGraph = (marker: string, stamp: string): void => {
+      writeFileSync(join(pkgDir, 'index.js'), `
+import { marker } from './child.js'
+export async function apply() { return { dispose: async () => {} } }
+export const stats = { snapshot: () => ({ marker }) }
+${stamp}
+`)
+      writeFileSync(join(pkgDir, 'child.js'), `export const marker = ${JSON.stringify(marker)}\n`)
+    }
+    writeGraph('old', '// gen-1')
+    try {
+      const first = await resolveShieldEngine({
+        profileDir: dir,
+        repoRoot: neutralSiblingRoot(),
+      })
+      expect(first?.snapshot?.()).toEqual({ marker: 'old' })
+      writeGraph('new', '// gen-2')
+      const entry = join(pkgDir, 'index.js')
+      const later = Date.now() / 1000 + 5
+      utimesSync(entry, later, later) // same-ms rewrite still changes the bust token
+      const second = await resolveShieldEngine({
+        profileDir: dir,
+        repoRoot: neutralSiblingRoot(),
+      })
+      expect(second?.snapshot?.()).toEqual({ marker: 'new' })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('fileImportHref', () => {
+  it('leaves a bare specifier unchanged and omits the query when the file is missing', () => {
+    expect(fileImportHref(PAYLOAD_SPECIFIER)).toBe(PAYLOAD_SPECIFIER)
+    expect(fileImportHref('file://example.com/foo')).toBe('file://example.com/foo')
+    expect(fileImportHref('./no-such-shield-file.js').startsWith('file:')).toBe(true)
+    expect(fileImportHref('./no-such-shield-file.js')).not.toContain(PAYLOAD_IMPORT_BUST_PARAM)
+    expect(fileImportHref(tmpdir())).not.toContain(PAYLOAD_IMPORT_BUST_PARAM)
+    const missing = resolve(tmpdir(), `shres-shield-missing-${Math.random().toString(36).slice(2)}.js`)
+    const href = fileImportHref(missing)
+    expect(href.startsWith('file:')).toBe(true)
+    expect(href).not.toContain(PAYLOAD_IMPORT_BUST_PARAM)
+  })
+
+  it('appends a bust query for an existing file path and a file: URL', () => {
+    const profile = makeProfileDir()
+    try {
+      const entry = resolveProfileSpecifier(profile.dir) as string
+      const fromPath = fileImportHref(entry)
+      const fromUrl = fileImportHref(pathToFileURL(entry).href)
+      expect(fromPath).toContain(`${PAYLOAD_IMPORT_BUST_PARAM}=`)
+      expect(fromUrl).toContain(`${PAYLOAD_IMPORT_BUST_PARAM}=`)
+    } finally {
+      profile.cleanup()
+    }
+  })
+})
+
+describe('propagateShieldImportBust', () => {
+  const emptyContext = { conditions: [] as string[], importAttributes: {} }
+
+  it('copies the parent bust param onto child file URLs and ignores other parents', () => {
+    const parent = `file:///pkg/index.js?${PAYLOAD_IMPORT_BUST_PARAM}=1.2`
+    const copied = propagateShieldImportBust(
+      './child.js',
+      { ...emptyContext, parentURL: parent },
+      () => ({ url: 'file:///pkg/child.js' }),
+    )
+    expect(copied.url).toBe(`file:///pkg/child.js?${PAYLOAD_IMPORT_BUST_PARAM}=1.2`)
+    const already = propagateShieldImportBust(
+      './child.js',
+      { ...emptyContext, parentURL: parent },
+      () => ({ url: `file:///pkg/child.js?${PAYLOAD_IMPORT_BUST_PARAM}=1.2` }),
+    )
+    expect(already.url).toBe(`file:///pkg/child.js?${PAYLOAD_IMPORT_BUST_PARAM}=1.2`)
+    expect(propagateShieldImportBust(
+      'node:path',
+      { ...emptyContext, parentURL: parent },
+      () => ({ url: 'node:path' }),
+    ).url).toBe('node:path')
+    expect(propagateShieldImportBust(
+      './child.js',
+      { ...emptyContext, parentURL: undefined },
+      () => ({ url: 'file:///pkg/child.js' }),
+    ).url).toBe('file:///pkg/child.js')
+    expect(propagateShieldImportBust(
+      './child.js',
+      { ...emptyContext, parentURL: 'file:///pkg/index.js' },
+      () => ({ url: 'file:///pkg/child.js' }),
+    ).url).toBe('file:///pkg/child.js')
+    expect(propagateShieldImportBust(
+      './child.js',
+      { ...emptyContext, parentURL: `file:///pkg/index.js?${PAYLOAD_IMPORT_BUST_PARAM}=` },
+      () => ({ url: 'file:///pkg/child.js' }),
+    ).url).toBe('file:///pkg/child.js')
+    expect(propagateShieldImportBust(
+      './child.js',
+      { ...emptyContext, parentURL: 'not a url' },
+      () => ({ url: 'file:///pkg/child.js' }),
+    ).url).toBe('file:///pkg/child.js')
   })
 })
