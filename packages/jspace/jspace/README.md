@@ -1,6 +1,6 @@
 # @shres-code/shres-code-jspace
 
-Default-off host seat for the J-Space card. This package remounts from the `jspace` settings namespace, publishes `ctx.jspace`, and writes `jspace/card` / `jspace/closed` session events. Prompt and tool consumers are separate packages that watch `status.active`.
+Default-off host seat for the J-Space card. This package remounts from the `jspace` settings namespace, publishes `ctx.jspace`, and writes `jspace/card` / `jspace/closed` / `jspace/shipped` session events. Prompt and tool consumers are separate packages that watch `status.active`.
 
 ## Plugin (namespace: `jspace`)
 
