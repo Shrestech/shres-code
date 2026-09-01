@@ -109,6 +109,15 @@ export function mapStopReason(message: AssistantMessage, contextWindow?: number)
       const text = message.errorMessage ?? 'pi-ai stream error'
       return { kind: 'error', failure: { message: text, code: classifyPiAiError(text) } }
     }
+    case 'pending':
+      // Partial messages use this; a terminal event with pending is incomplete.
+      return {
+        kind: 'error',
+        failure: {
+          message: message.errorMessage ?? `model "${message.model}" ended before a terminal stop reason`,
+          code: 'PI_AI_ERROR',
+        },
+      }
   }
 }
 
