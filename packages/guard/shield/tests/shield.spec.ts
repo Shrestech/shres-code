@@ -25,28 +25,43 @@ const saved = {
   SHRES_SHIELD: process.env.SHRES_SHIELD,
   SHRES_SHIELD_LICENSE: process.env.SHRES_SHIELD_LICENSE,
   SHRES_SHIELD_MODULE: process.env.SHRES_SHIELD_MODULE,
+  SHRES_SHIELD_DEV: process.env.SHRES_SHIELD_DEV,
+  SHRES_SHIELD_PRODUCTION: process.env.SHRES_SHIELD_PRODUCTION,
 }
 
-function setEnv(
-  name: 'SHRES_SHIELD' | 'SHRES_SHIELD_LICENSE' | 'SHRES_SHIELD_MODULE',
-  value: string | undefined,
-): void {
-  if (value === undefined) {
-    if (name === 'SHRES_SHIELD') delete process.env.SHRES_SHIELD
-    else if (name === 'SHRES_SHIELD_LICENSE') delete process.env.SHRES_SHIELD_LICENSE
-    else delete process.env.SHRES_SHIELD_MODULE
+type ShieldEnvName =
+  | 'SHRES_SHIELD'
+  | 'SHRES_SHIELD_LICENSE'
+  | 'SHRES_SHIELD_MODULE'
+  | 'SHRES_SHIELD_DEV'
+  | 'SHRES_SHIELD_PRODUCTION'
+
+function writeEnv(name: ShieldEnvName, value: string | undefined): void {
+  if (value !== undefined) {
+    process.env[name] = value
     return
   }
-  process.env[name] = value
+  if (name === 'SHRES_SHIELD') delete process.env.SHRES_SHIELD
+  else if (name === 'SHRES_SHIELD_LICENSE') delete process.env.SHRES_SHIELD_LICENSE
+  else if (name === 'SHRES_SHIELD_MODULE') delete process.env.SHRES_SHIELD_MODULE
+  else if (name === 'SHRES_SHIELD_DEV') delete process.env.SHRES_SHIELD_DEV
+  else delete process.env.SHRES_SHIELD_PRODUCTION
+}
+
+function setEnv(name: ShieldEnvName, value: string | undefined): void {
+  writeEnv(name, value)
+}
+
+function restoreEnv(name: ShieldEnvName, previous: string | undefined): void {
+  writeEnv(name, previous)
 }
 
 afterEach(() => {
-  if (saved.SHRES_SHIELD === undefined) delete process.env.SHRES_SHIELD
-  else process.env.SHRES_SHIELD = saved.SHRES_SHIELD
-  if (saved.SHRES_SHIELD_LICENSE === undefined) delete process.env.SHRES_SHIELD_LICENSE
-  else process.env.SHRES_SHIELD_LICENSE = saved.SHRES_SHIELD_LICENSE
-  if (saved.SHRES_SHIELD_MODULE === undefined) delete process.env.SHRES_SHIELD_MODULE
-  else process.env.SHRES_SHIELD_MODULE = saved.SHRES_SHIELD_MODULE
+  restoreEnv('SHRES_SHIELD', saved.SHRES_SHIELD)
+  restoreEnv('SHRES_SHIELD_LICENSE', saved.SHRES_SHIELD_LICENSE)
+  restoreEnv('SHRES_SHIELD_MODULE', saved.SHRES_SHIELD_MODULE)
+  restoreEnv('SHRES_SHIELD_DEV', saved.SHRES_SHIELD_DEV)
+  restoreEnv('SHRES_SHIELD_PRODUCTION', saved.SHRES_SHIELD_PRODUCTION)
   ShieldSeat.restoreDefaultSpawn()
   vi.unstubAllGlobals()
   applied.count = 0
@@ -55,6 +70,7 @@ afterEach(() => {
   applied.approvalProbe = 'absent'
   applied.jobsProbe = 'absent'
   applied.throwOnApply = false
+  applied.entitlement = undefined
 })
 
 /** Wait until the async resolve/apply effect has published a terminal reason. */
@@ -183,7 +199,7 @@ describe('shres-shield host seat', () => {
     const ctx = await setup({ posture: 'observe' }, 'active')
     expect(ctx.shield.status).toEqual({ active: true, reason: 'active' })
     expect(applied.count).toBe(1)
-    expect(applied.config).toEqual({ posture: 'observe' })
+    expect(applied.config).toEqual({ posture: 'observe', license: ShieldSeat.DEFAULT_SHIELD_LICENSE })
   })
 
   it('disposes the paid instance when the seat fiber unloads', async () => {
@@ -210,6 +226,24 @@ describe('shres-shield host seat', () => {
     expect(ShieldSeat.isEntitled('key', 'package')).toBe(true)
     expect(ShieldSeat.isEntitled('', 'sibling')).toBe(true)
     expect(ShieldSeat.isEntitled('', 'env')).toBe(true)
+  })
+
+  it('treats shres1 tokens as signed and shres-dev as unsigned', () => {
+    expect(ShieldSeat.licenseLooksSigned('shres1.kid.payload.sig')).toBe(true)
+    expect(ShieldSeat.licenseLooksSigned(ShieldSeat.DEFAULT_SHIELD_LICENSE)).toBe(false)
+  })
+
+  it('enables the unsigned-dev hatch for unsigned non-production licenses', () => {
+    setEnv('SHRES_SHIELD_DEV', undefined)
+    setEnv('SHRES_SHIELD_PRODUCTION', undefined)
+    ShieldSeat.ensureUnsignedDevHatch('shres1.kid.payload.sig')
+    expect(process.env.SHRES_SHIELD_DEV).toBeUndefined()
+    ShieldSeat.ensureUnsignedDevHatch(ShieldSeat.DEFAULT_SHIELD_LICENSE)
+    expect(process.env.SHRES_SHIELD_DEV).toBe('1')
+    setEnv('SHRES_SHIELD_DEV', undefined)
+    setEnv('SHRES_SHIELD_PRODUCTION', '1')
+    ShieldSeat.ensureUnsignedDevHatch(ShieldSeat.DEFAULT_SHIELD_LICENSE)
+    expect(process.env.SHRES_SHIELD_DEV).toBeUndefined()
   })
 
   it('publishes a direct snapshot remote and empty stats before the engine binds', async () => {
@@ -716,7 +750,7 @@ describe('shres-shield per-repo gate', () => {
     await provideApprovalAndJobs(ctx)
     ShieldSeat.apply(ctx, { license: '' })
     await waitForReason(ctx, 'active')
-    expect(applied.config).toEqual({ posture: 'ask' })
+    expect(applied.config).toEqual({ posture: 'ask', license: ShieldSeat.DEFAULT_SHIELD_LICENSE })
     await ctx.fiber.dispose()
   })
 
@@ -952,6 +986,226 @@ describe('shres-shield per-repo gate', () => {
       profile.cleanup()
     }
   })
+
+  it('skips staleness when the installed version is not semver or npm is older', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', fixtureUrl)
+    const ctx = await setup({ license: 'paid' }, 'active')
+    try {
+      ctx.shield.bindResolved({ source: 'profile', version: 'not-semver' })
+      await ctx.shield.notePayloadStaleness()
+      vi.stubGlobal('fetch', async () => new Response('nope', { status: 500 }))
+      ctx.shield.bindResolved({ source: 'profile', version: '0.2.0' })
+      await ctx.shield.notePayloadStaleness()
+      vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ version: '0.1.0' }), { status: 200 }))
+      await ctx.shield.notePayloadStaleness()
+      expect(ctx.shield.status.stale).toBeUndefined()
+      vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ version: '0.3.0' }), { status: 200 }))
+      await ctx.shield.notePayloadStaleness()
+      await ctx.shield.notePayloadStaleness()
+      expect(ctx.shield.status.stale).toEqual({ installed: '0.2.0', latest: '0.3.0' })
+    } finally {
+      vi.unstubAllGlobals()
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('forwards license into paid apply', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', fixtureUrl)
+    const ctx = await setup({ license: 'paid', posture: 'enforce' }, 'active')
+    expect(applied.config).toEqual({ posture: 'enforce', license: 'paid' })
+    await ctx.fiber.dispose()
+  })
+
+  it('keeps the host inactive when the payload reports unlicensed', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', fixtureUrl)
+    applied.entitlement = { active: false, reason: 'unlicensed' }
+    const ctx = await setup({ license: 'paid' }, 'unlicensed')
+    expect(ctx.shield.status).toEqual({ active: false, reason: 'unlicensed' })
+    expect(applied.count).toBe(1)
+    await ctx.fiber.dispose()
+  })
+
+  it('ignores a payload entitlement that is not an active boolean', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', fixtureUrl)
+    applied.entitlement = { active: 'yes' }
+    const ctx = await setup({ license: 'paid' }, 'active')
+    expect(ctx.shield.status.active).toBe(true)
+    await ctx.fiber.dispose()
+  })
+
+  it('treats active entitlement without a reason string as screening', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', fixtureUrl)
+    applied.entitlement = { active: true }
+    const ctx = await setup({ license: 'paid' }, 'active')
+    expect(ctx.shield.status).toEqual({ active: true, reason: 'active' })
+    await ctx.fiber.dispose()
+  })
+
+  it('treats a null payload entitlement as screening', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', fixtureUrl)
+    applied.entitlement = null
+    const ctx = await setup({ license: 'paid' }, 'active')
+    expect(ctx.shield.status.active).toBe(true)
+    await ctx.fiber.dispose()
+  })
+
+  it('maps payload panic entitlement onto host panic', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', fixtureUrl)
+    applied.entitlement = { active: false, reason: 'panic' }
+    const ctx = await setup({ license: 'paid' }, 'panic')
+    expect(ctx.shield.status).toEqual({ active: false, reason: 'panic' })
+    await ctx.fiber.dispose()
+  })
+
+  it('sets the unsigned-dev hatch for a profile load without a signed token', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', undefined)
+    setEnv('SHRES_SHIELD_DEV', undefined)
+    setEnv('SHRES_SHIELD_PRODUCTION', undefined)
+    const profile = makeUpdateProfile('0.2.0')
+    const ctx = new Context()
+    ctx.baseUrl = pathToFileURL(profile.dir + '/').href
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRuntime)
+    await provideApprovalAndJobs(ctx)
+    await ctx.plugin(ShieldSeat, { license: ShieldSeat.DEFAULT_SHIELD_LICENSE })
+    await waitForReason(ctx, 'active')
+    try {
+      expect(process.env.SHRES_SHIELD_DEV).toBe('1')
+    } finally {
+      await ctx.fiber.dispose()
+      profile.cleanup()
+    }
+  })
+
+  it('does not set the hatch under the production lock', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', undefined)
+    setEnv('SHRES_SHIELD_DEV', undefined)
+    setEnv('SHRES_SHIELD_PRODUCTION', '1')
+    const profile = makeUpdateProfile('0.2.0')
+    const ctx = new Context()
+    ctx.baseUrl = pathToFileURL(profile.dir + '/').href
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRuntime)
+    await provideApprovalAndJobs(ctx)
+    await ctx.plugin(ShieldSeat, { license: ShieldSeat.DEFAULT_SHIELD_LICENSE })
+    await waitForReason(ctx, 'active')
+    try {
+      expect(process.env.SHRES_SHIELD_DEV).toBeUndefined()
+    } finally {
+      await ctx.fiber.dispose()
+      profile.cleanup()
+    }
+  })
+
+  it('sets the hatch for an env-resolved payload without a signed token', async () => {
+    setEnv('SHRES_SHIELD', undefined)
+    setEnv('SHRES_SHIELD_MODULE', fixtureUrl)
+    setEnv('SHRES_SHIELD_DEV', undefined)
+    setEnv('SHRES_SHIELD_PRODUCTION', undefined)
+    const ctx = await setup({ license: ShieldSeat.DEFAULT_SHIELD_LICENSE }, 'active')
+    expect(process.env.SHRES_SHIELD_DEV).toBe('1')
+    await ctx.fiber.dispose()
+  })
+
+  it('provisions npm latest into an empty profile and re-resolves', async () => {
+    const profile = makeEmptyProfile()
+    vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ version: '0.2.0' }), { status: 200 }))
+    ShieldSeat.shieldSpawn.current = async () => {
+      const pkgDir = join(profile.dir, 'node_modules', '@shrestech', 'shres-shield-plugin')
+      mkdirSync(pkgDir, { recursive: true })
+      writeFileSync(
+        join(pkgDir, 'package.json'),
+        '{"name":"@shrestech/shres-shield-plugin","version":"0.2.0","type":"module","main":"index.js"}\n',
+      )
+      writeFileSync(join(pkgDir, 'index.js'), UPDATE_MODULE)
+      return { status: 0, stderr: '' }
+    }
+    try {
+      const engine = await ShieldSeat.maybeProvisionPayload(undefined, {
+        profileDir: profile.dir,
+        enabled: true,
+        panic: false,
+        envExclusive: false,
+      })
+      expect(engine?.source).toBe('profile')
+      expect(ShieldSeat.readPayloadVersion(engine?.entry ?? '')).toBe('0.2.0')
+    } finally {
+      ShieldSeat.restoreDefaultSpawn()
+      vi.unstubAllGlobals()
+      profile.cleanup()
+    }
+  })
+
+  it('does not provision when disabled, panicking, env-exclusive, or already resolved', async () => {
+    let spawned = 0
+    ShieldSeat.shieldSpawn.current = async () => {
+      spawned += 1
+      return { status: 0, stderr: '' }
+    }
+    const profile = makeEmptyProfile()
+    try {
+      await expect(ShieldSeat.maybeProvisionPayload(undefined, {
+        profileDir: profile.dir,
+        enabled: false,
+        panic: false,
+        envExclusive: false,
+      })).resolves.toBeUndefined()
+      await expect(ShieldSeat.maybeProvisionPayload(undefined, {
+        profileDir: profile.dir,
+        enabled: true,
+        panic: true,
+        envExclusive: false,
+      })).resolves.toBeUndefined()
+      await expect(ShieldSeat.maybeProvisionPayload(undefined, {
+        profileDir: profile.dir,
+        enabled: true,
+        panic: false,
+        envExclusive: true,
+      })).resolves.toBeUndefined()
+      const existing = { source: 'package' as const, apply: async () => ({ dispose: async () => undefined }), entry: 'x' }
+      await expect(ShieldSeat.maybeProvisionPayload(existing, {
+        profileDir: profile.dir,
+        enabled: true,
+        panic: false,
+        envExclusive: false,
+      })).resolves.toBe(existing)
+      await expect(ShieldSeat.maybeProvisionPayload(undefined, {
+        profileDir: undefined,
+        enabled: true,
+        panic: false,
+        envExclusive: false,
+      })).resolves.toBeUndefined()
+      expect(spawned).toBe(0)
+      vi.stubGlobal('fetch', async () => new Response('nope', { status: 500 }))
+      await expect(ShieldSeat.maybeProvisionPayload(undefined, {
+        profileDir: profile.dir,
+        enabled: true,
+        panic: false,
+        envExclusive: false,
+      })).resolves.toBeUndefined()
+      vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ version: '0.2.0' }), { status: 200 }))
+      ShieldSeat.shieldSpawn.current = async () => ({ status: 1, stderr: 'EACCES' })
+      await expect(ShieldSeat.maybeProvisionPayload(undefined, {
+        profileDir: profile.dir,
+        enabled: true,
+        panic: false,
+        envExclusive: false,
+      })).resolves.toBeUndefined()
+    } finally {
+      ShieldSeat.restoreDefaultSpawn()
+      vi.unstubAllGlobals()
+      profile.cleanup()
+    }
+  })
 })
 
 const UPDATE_MODULE = `
@@ -968,6 +1222,13 @@ function makeUpdateProfile(version: string): { dir: string; cleanup(): void } {
     `{"name":"@shrestech/shres-shield-plugin","version":${JSON.stringify(version)},"type":"module","main":"index.js"}\n`,
   )
   writeFileSync(join(pkgDir, 'index.js'), UPDATE_MODULE)
+  return { dir, cleanup: () => { rmSync(dir, { recursive: true, force: true }) } }
+}
+
+function makeEmptyProfile(): { dir: string; cleanup(): void } {
+  const dir = resolve(tmpdir(), `shres-shield-host-empty-${Math.random().toString(36).slice(2)}`)
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, 'package.json'), '{"name":"profile-test","private":true,"dependencies":{}}\n')
   return { dir, cleanup: () => { rmSync(dir, { recursive: true, force: true }) } }
 }
 

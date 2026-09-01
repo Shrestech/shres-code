@@ -21,7 +21,7 @@ Truncation is render-only. `jspace/card` events still carry the whole snapshot. 
 
 #### What the model sees
 
-The availability line while enabled and no card is open. An open card is the last N Checked lines and last M Open questions, framed as untrusted session-authored working memory.
+The availability line while enabled and no card is open. An open card is the last N Checked lines and last M Open questions, framed as untrusted session-authored working memory. After a passing `jspace_ship`, the card body is prefixed with a settled line (`Goal settled (ship check passed at seq N). Do not re-tend this Goal.`) until a new Goal epoch or close.
 
 ##### Availability line
 
@@ -83,7 +83,7 @@ The section appears on the first request that carries the user task and disappea
 
 #### What the model sees
 
-`jspace:protocol` always includes the tool-driver lines while the seat is engaged (how to open or update the card). The closed-card driver asks for a Goal covering the work that remains, because under a non-zero `engageAfterSteps` the section first appears partway through the session, and for the constraints the task stated once on Core, the field that survives compaction whole. When a `jspace/charter-proposal` exists and the card charter is still empty — closed card, or open card after loop auto-open — it appends `JSPACE_DRIVER_CHARTER` (`Pass the charter on jspace_open (accept the proposal or amend it). Ship re-runs every check and names the first failure.`). The open-card driver repeats that a changed Goal clears Core, so the constraints are restated. `jspace:module:capacity` and `jspace:module:broadcast` load when the pass earns them.
+`jspace:protocol` always includes the tool-driver lines while the seat is engaged (how to open or update the card). The closed-card driver asks for a Goal covering the work that remains, because under a non-zero `engageAfterSteps` the section first appears partway through the session, and for the constraints the task stated once on Core, the field that survives compaction whole. When a `jspace/charter-proposal` exists and the card charter is still empty — closed card, or open card after loop auto-open — it appends `JSPACE_DRIVER_CHARTER` (`Pass the charter on jspace_open (accept the proposal or amend it). Ship re-runs every check and names the first failure.`). The open-card driver repeats that a changed Goal clears Core, so the constraints are restated. After a passing ship stamp for the current epoch, `jspace:protocol` is only `JSPACE_DRIVER_SETTLED` (do not re-tend; next epoch via `jspace_open`; user turns J-Space off). Capacity, broadcast, and extra modules stay empty until a new Goal epoch. `jspace:module:capacity` and `jspace:module:broadcast` otherwise load when the pass earns them.
 
 #### Token effect
 

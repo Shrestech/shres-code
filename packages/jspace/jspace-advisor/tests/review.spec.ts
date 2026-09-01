@@ -2,9 +2,13 @@ import { describe, expect, it } from 'vitest'
 import type { Session, SessionEvent } from '@shres-code/shres-code-session'
 import { foldAdvisorDelta, foldAdvisorDigest } from '../src/digest.ts'
 import {
+  buildConsultPersona,
   buildReviewDeltaPrompt,
   buildReviewPrompt,
+  buildStandingReviewerPersona,
   DEFAULT_REVIEWER_PERSONA,
+  parentEventReadAllowed,
+  isCadenceTrigger,
   classifyDrift,
   classifyTrigger,
   isErroredToolResult,
@@ -60,6 +64,12 @@ describe('classifyTrigger', () => {
 
   it('classifies a ship attempt', () => {
     expect(classifyTrigger(event('jspace/charter-run', { phase: 'ship', passed: true }), [], 2)).toBe('ship-attempt')
+    expect(classifyTrigger(event('jspace/shipped', { goalOpenedSeq: 0 }, 3), [], 2)).toBe('ship-attempt')
+    const shipLog = [
+      toolCall('ship-1', 'jspace_ship', 1),
+      erroredResult('ship-1', 2, false),
+    ]
+    expect(classifyTrigger(shipLog[1] as SessionEvent, shipLog, 2)).toBe('ship-attempt')
   })
 
   it('ignores a passing checkpoint run', () => {
@@ -267,15 +277,35 @@ describe('isErroredToolResult', () => {
   })
 })
 
-describe('DEFAULT_REVIEWER_PERSONA', () => {
-  it('names the job, tools, parent-session read, Ward, and the reply protocol', () => {
+describe('DEFAULT_REVIEWER_PERSONA / parent-event read', () => {
+  it('names the standing job, Ward, and verdict JSON without advertising session_event_read', () => {
     expect(DEFAULT_REVIEWER_PERSONA).toContain('standing reviewer of one main session')
-    expect(DEFAULT_REVIEWER_PERSONA).toContain('session_event_read')
-    expect(DEFAULT_REVIEWER_PERSONA).toContain('Omitting session_id reads YOUR log')
+    expect(DEFAULT_REVIEWER_PERSONA).not.toContain('session_event_read')
     expect(DEFAULT_REVIEWER_PERSONA).toContain('call ward')
     expect(DEFAULT_REVIEWER_PERSONA).toContain('tokens are expensive')
     expect(DEFAULT_REVIEWER_PERSONA).toContain('exactly one JSON object')
     expect(DEFAULT_REVIEWER_PERSONA).toContain('omit redirect')
+    expect(DEFAULT_REVIEWER_PERSONA).toContain('jspace_open only for new work')
+    expect(DEFAULT_REVIEWER_PERSONA).toContain('/j-space off')
+  })
+
+  it('mentions session_event_read only when the name is filtered in and mounted', () => {
+    expect(parentEventReadAllowed(['wiki_search', 'wiki_read'], true)).toBe(false)
+    expect(parentEventReadAllowed(['wiki_search', 'session_event_read'], false)).toBe(false)
+    expect(parentEventReadAllowed(['wiki_search', 'session_event_read'], true)).toBe(true)
+    const allowed = buildStandingReviewerPersona(true)
+    expect(allowed).toContain('session_event_read')
+    expect(allowed).toContain('Omitting session_id reads YOUR log')
+    expect(buildConsultPersona(false)).not.toContain('session_event_read')
+    expect(buildConsultPersona(false)).toContain('do not inspect session events')
+    expect(buildConsultPersona(false)).toContain('one-shot consult')
+    expect(buildConsultPersona(false)).toContain('`advice`')
+    expect(buildConsultPersona(false)).toContain('`recommendation`')
+    expect(buildConsultPersona(false)).not.toContain('exactly one JSON object')
+    expect(buildConsultPersona(true)).toContain('session_event_read')
+    expect(isCadenceTrigger('drift-check')).toBe(true)
+    expect(isCadenceTrigger('error-burst')).toBe(true)
+    expect(isCadenceTrigger('ship-attempt')).toBe(false)
   })
 })
 

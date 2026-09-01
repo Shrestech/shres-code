@@ -494,7 +494,7 @@ Source: [`packages/hooks/hook-protocol/src/types.ts:31`](../packages/hooks/hook-
 'jspace/advisor': JspaceAdvisorAdvice
 ```
 
-Source: [`packages/jspace/jspace-advisor/src/types.ts:126`](../packages/jspace/jspace-advisor/src/types.ts)
+Source: [`packages/jspace/jspace-advisor/src/types.ts:133`](../packages/jspace/jspace-advisor/src/types.ts)
 
 <a id="jspacecard--log-only"></a>
 
@@ -516,7 +516,7 @@ Source: [`packages/jspace/jspace-advisor/src/types.ts:126`](../packages/jspace/j
 'jspace/card': JspaceCard
 ```
 
-Source: [`packages/jspace/jspace/src/types.ts:203`](../packages/jspace/jspace/src/types.ts)
+Source: [`packages/jspace/jspace/src/types.ts:228`](../packages/jspace/jspace/src/types.ts)
 
 <a id="jspacecharter-amend--log-only"></a>
 
@@ -537,7 +537,7 @@ Source: [`packages/jspace/jspace/src/types.ts:203`](../packages/jspace/jspace/sr
 }
 ```
 
-Source: [`packages/jspace/jspace/src/types.ts:275`](../packages/jspace/jspace/src/types.ts)
+Source: [`packages/jspace/jspace/src/types.ts:308`](../packages/jspace/jspace/src/types.ts)
 
 <a id="jspacecharter-probe--log-only"></a>
 
@@ -566,7 +566,7 @@ Source: [`packages/jspace/jspace/src/types.ts:275`](../packages/jspace/jspace/sr
 
 Types: [CallId](subsystems/core.md)
 
-Source: [`packages/jspace/jspace/src/types.ts:260`](../packages/jspace/jspace/src/types.ts)
+Source: [`packages/jspace/jspace/src/types.ts:293`](../packages/jspace/jspace/src/types.ts)
 
 <a id="jspacecharter-proposal--log-only"></a>
 
@@ -587,7 +587,7 @@ Source: [`packages/jspace/jspace/src/types.ts:260`](../packages/jspace/jspace/sr
 }
 ```
 
-Source: [`packages/jspace/jspace/src/types.ts:217`](../packages/jspace/jspace/src/types.ts)
+Source: [`packages/jspace/jspace/src/types.ts:250`](../packages/jspace/jspace/src/types.ts)
 
 <a id="jspacecharter-run--log-only"></a>
 
@@ -626,7 +626,7 @@ Source: [`packages/jspace/jspace/src/types.ts:217`](../packages/jspace/jspace/sr
 
 Types: [CallId](subsystems/core.md)
 
-Source: [`packages/jspace/jspace/src/types.ts:237`](../packages/jspace/jspace/src/types.ts)
+Source: [`packages/jspace/jspace/src/types.ts:270`](../packages/jspace/jspace/src/types.ts)
 
 <a id="jspaceclosed--log-only"></a>
 
@@ -641,7 +641,24 @@ Source: [`packages/jspace/jspace/src/types.ts:237`](../packages/jspace/jspace/sr
 'jspace/closed': JspaceClosed
 ```
 
-Source: [`packages/jspace/jspace/src/types.ts:209`](../packages/jspace/jspace/src/types.ts)
+Source: [`packages/jspace/jspace/src/types.ts:234`](../packages/jspace/jspace/src/types.ts)
+
+<a id="jspaceshipped--log-only"></a>
+
+#### `jspace/shipped` — log-only
+
+```ts persistence-catalog
+/**
+ * Goal-epoch ship stamp. Log-only. Writers pass `{ ignorable: true }`.
+ * Does not close the card.
+ * @param sessionId - writing session id.
+ * @param goal - Goal text at ship time.
+ * @param goalOpenedSeq - epoch this stamp settles.
+ */
+'jspace/shipped': JspaceShipped
+```
+
+Source: [`packages/jspace/jspace/src/types.ts:242`](../packages/jspace/jspace/src/types.ts)
 
 ### `ledger/*`
 

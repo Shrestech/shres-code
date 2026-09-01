@@ -11,23 +11,87 @@ import type { Session, SessionEvent } from '@shres-code/shres-code-session'
 import { renderAdvisorDigest, renderAdvisorDelta } from './digest.ts'
 import type { JspaceAdvisorDelta, JspaceAdvisorDigest, AdvisorTrigger } from './types.ts'
 
-/** Built-in reviewer persona; overridable via Config. */
-export const DEFAULT_REVIEWER_PERSONA = [
-  'You are the jspace advisor, the standing reviewer of one main session.',
-  'Goal: steer that session so its work serves the USER messages (U1, U2, …; U1 always restated).',
-  'The card is only what the session claims and may be stale. Judge work against the user, not the card.',
-  'You cannot edit files, run a shell, approve tools, or review code yourself.',
-  'Code review is a main-session permission: on a deep review, redirect it to call ward (the Reviewer seat) with a self-contained prompt. Do not ask it to paste diffs here.',
-  'Each turn is a full digest or a delta. Every user message in it is ground truth and must be weighed.',
-  'The digest names the main session id and labels every tool seq. Those seqs belong to that session, not yours.',
-  'Tools: wiki_search/wiki_read for project memory; session_event_read for one unabridged parent event.',
-  'If the digest is insufficient, call session_event_read with that session_id and a seq from the tool window. Omitting session_id reads YOUR log — never do that. At most one tool call per turn. Prefer the digest; tokens are expensive.',
-  'Do not search other sessions. Do not dump code or long quotes into the verdict.',
-  'End every turn with exactly one JSON object and no other text: '
-  + '{"verdict":"on-track"|"drift","advice":"<one sentence>","redirect":"<exact correction>"}.',
-  'On-track: one-line advice, omit redirect. Drift: name the drift, and redirect with what to drop and what to do next '
-  + '(including ward or jspace_consult when that is the correction).',
-].join(' ')
+/** Tool name that reads one parent-session event; opt-in on `reviewerTools`. */
+export const PARENT_EVENT_READ_TOOL = 'session_event_read'
+
+/**
+ * Whether the reviewer may be told to call {@link PARENT_EVENT_READ_TOOL}.
+ * Both the filter name and a live registry entry are required: the filter
+ * rejects unknown names, and an unmounted name must not appear in the persona.
+ * @param reviewerTools - names opened on the reviewer child.
+ * @param toolMounted - true when `ctx.tools.get(PARENT_EVENT_READ_TOOL)` is defined.
+ * @returns true when the persona and consult prompt may mention the tool.
+ */
+export function parentEventReadAllowed(
+  reviewerTools: readonly string[],
+  toolMounted: boolean,
+): boolean {
+  return toolMounted && reviewerTools.includes(PARENT_EVENT_READ_TOOL)
+}
+
+/**
+ * Tool-use sentences for a reviewer child.
+ * @param parentEventRead - true when {@link parentEventReadAllowed} is true.
+ * @returns the tool-use fragment.
+ */
+export function parentEventReadInstructions(parentEventRead: boolean): string {
+  if (parentEventRead) {
+    return 'Tools: wiki_search/wiki_read for project memory; session_event_read for one unabridged parent event. '
+      + 'If the digest is insufficient, call session_event_read with that session_id and a seq from the tool window. '
+      + 'Omitting session_id reads YOUR log — never do that. At most one tool call per turn. Prefer the digest; tokens are expensive.'
+  }
+  return 'Tools: wiki_search/wiki_read for project memory. Judge from the digest; do not inspect session events. '
+    + 'At most one tool call per turn. Prefer the digest; tokens are expensive.'
+}
+
+/**
+ * Standing-reviewer persona: verdict JSON on every turn.
+ * @param parentEventRead - true when {@link parentEventReadAllowed} is true.
+ * @returns the persona text.
+ */
+export function buildStandingReviewerPersona(parentEventRead: boolean): string {
+  return [
+    'You are the jspace advisor, the standing reviewer of one main session.',
+    'Goal: steer that session so its work serves the USER messages (U1, U2, …; U1 always restated).',
+    'The card is only what the session claims and may be stale. Judge work against the user, not the card.',
+    'You cannot edit files, run a shell, approve tools, or review code yourself.',
+    'Code review is a main-session permission: on a deep review, redirect it to call ward (the Reviewer seat) with a self-contained prompt. Do not ask it to paste diffs here.',
+    'If the user ask is satisfied and the Goal is still open, that is drift: redirect to jspace_open only for new work, or tell the user the card stays until /j-space off.',
+    'Delivered work that was never shipped is also drift (checkpoint, then jspace_ship).',
+    'Each turn is a full digest or a delta. Every user message in it is ground truth and must be weighed.',
+    'The digest names the main session id and labels every tool seq. Those seqs belong to that session, not yours.',
+    parentEventReadInstructions(parentEventRead),
+    'Do not search other sessions. Do not dump code or long quotes into the verdict.',
+    'End every turn with exactly one JSON object and no other text: '
+    + '{"verdict":"on-track"|"drift","advice":"<one sentence>","redirect":"<exact correction>"}.',
+    'On-track: one-line advice, omit redirect. Drift: name the drift, and redirect with what to drop and what to do next '
+    + '(including ward or jspace_consult when that is the correction).',
+  ].join(' ')
+}
+
+/**
+ * One-shot consult persona: structured `advice` / `recommendation`, not verdict JSON.
+ * @param parentEventRead - true when {@link parentEventReadAllowed} is true.
+ * @returns the persona text.
+ */
+export function buildConsultPersona(parentEventRead: boolean): string {
+  return [
+    'You are the jspace advisor on a one-shot consult of one main session.',
+    'Advise that session so its work serves the USER messages in the digest (U1 is the goal).',
+    'The card is only what the session claims and may be stale. Judge work against the user, not the card.',
+    'You cannot edit files, run a shell, approve tools, or review code yourself.',
+    'Code review is a main-session permission: recommend it call ward (the Reviewer seat) with a self-contained prompt.',
+    'If the user ask is satisfied and the Goal is still open, say so: jspace_open only for new work, or the user turns J-Space off.',
+    'Delivered work that was never shipped should be checkpointed and shipped.',
+    parentEventReadInstructions(parentEventRead),
+    'Do not search other sessions. Do not dump code or long quotes.',
+    'Return structured output only: one-sentence `advice` and an optional concrete `recommendation`.',
+    'Do not emit proactive verdict JSON (`verdict` / `redirect`).',
+  ].join(' ')
+}
+
+/** Built-in standing reviewer persona (wiki-only default; no parent-event read). */
+export const DEFAULT_REVIEWER_PERSONA = buildStandingReviewerPersona(false)
 
 /**
  * Default reviewer tool filter: durable knowledge reads mounted in every
@@ -241,6 +305,8 @@ export function classifyTrigger(
     if (!event.data.passed) return 'charter-fail'
     return undefined
   }
+  if (event.type === 'jspace/shipped') return 'ship-attempt'
+  if (isSuccessfulJspaceShipResult(event, log)) return 'ship-attempt'
   if (event.type === 'jspace/card') {
     const previous = previousCardGoal(log, event.seq)
     if (previous !== undefined && previous !== event.data.goal) return 'goal-epoch'
@@ -286,12 +352,45 @@ export function classifyDrift(log: readonly SessionEvent[], everySteps: number):
 }
 
 /**
- * One review per user turn, and no repeated verdict until the user speaks:
- * suppress when the latest advice is newer than the latest human message.
- * Continuation wakes are not user speech, so an unanswered redirect never
- * re-fires.
+ * Whether a successful `jspace_ship` tool result is this event.
+ * @param event - candidate event.
+ * @param log - session log (to resolve the call's tool name).
+ * @returns true when this is a non-error `jspace_ship` result.
+ */
+export function isSuccessfulJspaceShipResult(
+  event: SessionEvent,
+  log: readonly SessionEvent[],
+): boolean {
+  if (event.type !== 'tool/result' || isErroredToolResult(event)) return false
+  const callId = (event.data as {
+    message?: { source?: { kind?: string; callId?: string } }
+  }).message?.source?.callId
+  if (callId === undefined) return false
+  for (const candidate of log) {
+    if (candidate.type !== 'tool/call') continue
+    const data = candidate.data as { callId?: string; name?: string }
+    if (data.callId === callId) return data.name === 'jspace_ship'
+  }
+  return false
+}
+
+/**
+ * Cadence-only suppression: drift-check and error-burst wait until the user
+ * speaks. Lifecycle triggers (ship, charter-fail, goal-epoch) and user-intent
+ * always run.
+ * @param trigger - classified trigger.
+ * @returns true when {@link suppressReview} applies to this family.
+ */
+export function isCadenceTrigger(trigger: AdvisorTrigger): boolean {
+  return trigger === 'drift-check' || trigger === 'error-burst'
+}
+
+/**
+ * Cadence suppression: latest advice newer than the latest human message.
+ * Continuation wakes are not user speech. Callers apply this only to
+ * {@link isCadenceTrigger} families.
  * @param log - the session log.
- * @returns true when no new review should run.
+ * @returns true when drift-check / error-burst should not run.
  */
 export function suppressReview(log: readonly SessionEvent[]): boolean {
   const advice = latestAdvice(log)

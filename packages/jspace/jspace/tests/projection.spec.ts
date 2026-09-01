@@ -67,6 +67,12 @@ describe('jspace projection unit', () => {
       data: { seq: 2, sessionId: 'ws-proj' },
     })).toEqual({ card: null, closed: true })
     expect(applyJspaceProjection(prior, {
+      type: 'jspace/shipped',
+      seq: 3,
+      time: 0,
+      data: { sessionId: 'ws-proj', goal: 'A', goalOpenedSeq: 1 },
+    }).settled).toEqual({ goal: 'A', goalOpenedSeq: 1, seq: 3 })
+    expect(applyJspaceProjection(prior, {
       type: 'jspace/closed',
       seq: 2,
       time: 0,

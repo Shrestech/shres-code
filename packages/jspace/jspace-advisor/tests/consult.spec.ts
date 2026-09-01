@@ -94,6 +94,15 @@ describe('buildConsultPrompt', () => {
     expect(prompt).toContain('Goal: ship')
     expect(prompt).toContain('am I drifting?')
     expect(prompt).toContain('recommend ward')
+    expect(prompt).toContain('`advice`')
+    expect(prompt).toContain('`recommendation`')
     expect(prompt).not.toContain('session_search family')
+    expect(prompt).not.toContain('session_event_read')
+  })
+
+  it('mentions session_event_read only when the parent-event read is live', () => {
+    const prompt = buildConsultPrompt(DIGEST, 'am I drifting?', true)
+    expect(prompt).toContain('session_event_read')
+    expect(prompt).toContain('Omitting session_id reads YOUR log')
   })
 })

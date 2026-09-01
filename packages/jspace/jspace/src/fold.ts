@@ -18,6 +18,8 @@ import type {
   JspaceClosed,
   JspaceOpenLine,
   JspaceProjection,
+  JspaceSettled,
+  JspaceShipped,
 } from './types.ts'
 
 /** Fold result including an inherited parent card used only for copy-on-fork. */
@@ -36,6 +38,7 @@ interface FoldState {
   inherited: JspaceCard | null
   inheritedClosed: boolean
   seenChecked: Set<number>
+  settled: JspaceSettled | undefined
 }
 
 /**
@@ -52,6 +55,7 @@ export function emptyJspaceFoldState(): FoldState {
     inherited: null,
     inheritedClosed: false,
     seenChecked: new Set(),
+    settled: undefined,
   }
 }
 
@@ -183,6 +187,20 @@ export function decodeJspaceClosed(value: unknown): JspaceClosed {
 }
 
 /**
+ * Decode a `jspace/shipped` payload. Throws on shape failure.
+ * @param value - event data.
+ * @returns the stamp.
+ */
+export function decodeJspaceShipped(value: unknown): JspaceShipped {
+  if (!isRecord(value)) throw new Error('jspace shipped must be a record')
+  return {
+    sessionId: requiredLine(value['sessionId'], 'sessionId'),
+    goal: requiredLine(value['goal'], 'goal'),
+    goalOpenedSeq: sessionEventSeq(value['goalOpenedSeq'], 'goalOpenedSeq'),
+  }
+}
+
+/**
  * Apply one decoded native card.
  * @param state - accumulator.
  * @param card - native card.
@@ -197,6 +215,9 @@ function applyNativeCard(state: FoldState, card: JspaceCard): void {
   state.lastSeq = card.seq
   state.nativeStarted = true
   state.seenChecked = new Set(card.checked.map(line => line.n))
+  if (state.settled !== undefined && state.settled.goalOpenedSeq !== card.goalOpenedSeq) {
+    state.settled = undefined
+  }
 }
 
 /**
@@ -214,6 +235,7 @@ function applyNativeClosed(state: FoldState, closed: JspaceClosed): void {
   state.lastSeq = closed.seq
   state.nativeStarted = true
   state.seenChecked = new Set()
+  state.settled = undefined
 }
 
 /**
@@ -227,8 +249,17 @@ export function applyJspaceEvent(
   event: SessionEvent,
   ownerSessionId: string,
 ): void {
-  if (event.type !== 'jspace/card' && event.type !== 'jspace/closed') return
+  if (event.type !== 'jspace/card' && event.type !== 'jspace/closed' && event.type !== 'jspace/shipped') {
+    return
+  }
   try {
+    if (event.type === 'jspace/shipped') {
+      const stamp = decodeJspaceShipped(event.data)
+      if (stamp.sessionId !== ownerSessionId) return
+      if (state.card === null || stamp.goalOpenedSeq !== state.card.goalOpenedSeq) return
+      state.settled = { goal: stamp.goal, goalOpenedSeq: stamp.goalOpenedSeq, seq: event.seq }
+      return
+    }
     if (event.type === 'jspace/card') {
       const card = decodeJspaceCard(event.data)
       if (card.sessionId !== ownerSessionId) {
@@ -277,6 +308,7 @@ export function foldJspace(
     card: state.card,
     closed: state.closed,
     inherited: state.inheritedClosed ? null : state.inherited,
+    ...state.settled === undefined ? {} : { settled: state.settled },
     ...state.fault === undefined ? {} : { fault: state.fault },
   }
 }

@@ -12,7 +12,7 @@ import type { InvariantFailure, InvariantInstaller } from '@shres-code/shres-cod
 import type { Session, SessionEvent } from '@shres-code/shres-code-session'
 import { assertNever } from '@shres-code/shres-code-jspace'
 import type { AdvisorTrigger } from './types.ts'
-import { isErroredToolResult } from './review.ts'
+import { isErroredToolResult, isSuccessfulJspaceShipResult } from './review.ts'
 
 const PACKAGE_NAME = '@shres-code/shres-code-jspace-advisor'
 
@@ -58,7 +58,9 @@ export function triggerSatisfiedAt(
       return event.type === 'jspace/charter-run'
         && event.data.phase !== 'ship' && event.data.phase !== 'probe' && event.data.passed === false
     case 'ship-attempt':
-      return event.type === 'jspace/charter-run' && event.data.phase === 'ship'
+      return (event.type === 'jspace/charter-run' && event.data.phase === 'ship')
+        || event.type === 'jspace/shipped'
+        || isSuccessfulJspaceShipResult(event, log)
     case 'goal-epoch': {
       if (event.type !== 'jspace/card') return false
       const previous = previousCardGoal(log, triggerSeq)

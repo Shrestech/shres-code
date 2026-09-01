@@ -143,12 +143,37 @@ export interface JspaceClosed {
   readonly sessionId: string
 }
 
+/** Register-check stamp carried by `jspace/shipped`. Does not close the card. */
+export interface JspaceShipped {
+  /** Session that authored the stamp. */
+  readonly sessionId: string
+  /** Goal text at ship time. */
+  readonly goal: string
+  /** `goalOpenedSeq` of the epoch this stamp settles. */
+  readonly goalOpenedSeq: number
+}
+
+/** Folded ship stamp for the current Goal epoch. */
+export interface JspaceSettled {
+  /** Goal text recorded at ship. */
+  readonly goal: string
+  /** Epoch this stamp belongs to. */
+  readonly goalOpenedSeq: number
+  /** Session event seq of the `jspace/shipped` event. */
+  readonly seq: number
+}
+
 /** Folded projection served to the dock and Settings snapshot. */
 export interface JspaceProjection {
   /** Current native card, or null when none is open. */
   readonly card: JspaceCard | null
   /** True after a native close with no later native card. */
   readonly closed: boolean
+  /**
+   * Present when `jspace_ship` passed for the current Goal epoch.
+   * Cleared when `goalOpenedSeq` advances or the card closes.
+   */
+  readonly settled?: JspaceSettled
   /** Framing or seq fault, when the fold kept the last good snapshot. */
   readonly fault?: string
 }
@@ -207,6 +232,14 @@ declare module '@shres-code/shres-code-session/types' {
      * @param sessionId - writing session id.
      */
     'jspace/closed': JspaceClosed
+    /**
+     * Goal-epoch ship stamp. Log-only. Writers pass `{ ignorable: true }`.
+     * Does not close the card.
+     * @param sessionId - writing session id.
+     * @param goal - Goal text at ship time.
+     * @param goalOpenedSeq - epoch this stamp settles.
+     */
+    'jspace/shipped': JspaceShipped
     /**
      * Harness-authored charter proposal extracted from the first human user
      * message. Log-only. Writers pass `{ ignorable: true }`.

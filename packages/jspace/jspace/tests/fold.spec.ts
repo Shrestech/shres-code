@@ -34,7 +34,11 @@ function card(overrides: Partial<JspaceCard> = {}): JspaceCard {
   }
 }
 
-function event(type: 'jspace/card' | 'jspace/closed', data: unknown, seq = 0): SessionEvent {
+function event(
+  type: 'jspace/card' | 'jspace/closed' | 'jspace/shipped',
+  data: unknown,
+  seq = 0,
+): SessionEvent {
   return { type, seq, time: 0, data } as SessionEvent
 }
 
@@ -66,6 +70,23 @@ describe('foldJspace', () => {
     ], owner)
     expect(folded.card).toBeNull()
     expect(folded.closed).toBe(true)
+  })
+
+  it('records a ship stamp for the current Goal epoch and clears it on a new Goal', () => {
+    const opened = card({ goalOpenedSeq: 0 })
+    const folded = foldJspace([
+      event('jspace/card', opened, 0),
+      event('jspace/shipped', { sessionId: owner, goal: opened.goal, goalOpenedSeq: 0 }, 1),
+    ], owner)
+    expect(folded.settled).toEqual({ goal: opened.goal, goalOpenedSeq: 0, seq: 1 })
+    expect(folded.card).not.toBeNull()
+    const next = foldJspace([
+      event('jspace/card', opened, 0),
+      event('jspace/shipped', { sessionId: owner, goal: opened.goal, goalOpenedSeq: 0 }, 1),
+      event('jspace/card', card({ seq: 2, goal: 'Next', goalOpenedSeq: 2 }), 2),
+    ], owner)
+    expect(next.settled).toBeUndefined()
+    expect(next.card?.goal).toBe('Next')
   })
 
   it('keeps the last good snapshot when a native close seq regresses', () => {

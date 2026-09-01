@@ -2387,9 +2387,12 @@ Requires: `systemPrompt` · `tools` · `approval` · `jobs`
 /** Host-seat config. Engine-owned tunables stay on `@shrestech/shres-shield-plugin`. */
 export interface Config {
   /**
-   * Entitlement string. Defaults to {@link DEFAULT_SHIELD_LICENSE} until a
-   * paid key exists. `SHRES_SHIELD_LICENSE` overrides this field. A sibling
-   * `../shres-shield` checkout is also entitled without a key.
+   * Entitlement string forwarded to the paid `apply`. Defaults to
+   * {@link DEFAULT_SHIELD_LICENSE} until a paid key exists.
+   * `SHRES_SHIELD_LICENSE` overrides this field. A sibling
+   * `../shres-shield` checkout is also entitled without a key. Unsigned
+   * loads in non-production enable the payload's unsigned-dev hatch;
+   * production requires a signed `shres1.` token.
    */
   license?: string
   /**

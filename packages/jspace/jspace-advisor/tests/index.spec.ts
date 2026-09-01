@@ -6,6 +6,7 @@ import SubagentRuntime from '@shres-code/shres-code-subagent'
 import SessionStore, { SessionId } from '@shres-code/shres-code-session'
 import type { Session, SessionEvent } from '@shres-code/shres-code-session'
 import { CallId, MessageId } from '@shres-code/shres-code-llm'
+import { defineTool } from '@shres-code/shres-code-tools'
 import JspaceService, { JSPACE_SETTINGS_NAMESPACE } from '@shres-code/shres-code-jspace'
 import { SettingsProvider, type SettingsNamespace } from '@shres-code/shres-code-settings'
 import * as Advisor from '../src/index.ts'
@@ -47,6 +48,10 @@ class StubAgents extends Service {
 
 /** Labels observed on reviewer-child start requests, newest last. */
 const startLabels: (string | undefined)[] = []
+/** Personas observed on one-shot consult starts, newest last. */
+const startPersonas: (string | undefined)[] = []
+/** Prompts observed on one-shot consult starts, newest last. */
+const startPrompts: string[] = []
 
 /** A spawn provider whose one-shot consult children settle a scripted reply. */
 function registerSpawn(ctx: Context, behavior: 'verdict' | 'noredirect'): void {
@@ -54,8 +59,13 @@ function registerSpawn(ctx: Context, behavior: 'verdict' | 'noredirect'): void {
     name: 'spawn',
     capabilities: { outputSchema: true, depthLimit: true, toolFilter: true, persona: true },
     inheritsParentContext: false,
-    start: async (request: { label?: string; outputSchema?: { properties?: Record<string, unknown> } }) => {
+    start: async (request) => {
       startLabels.push(request.label)
+      startPersonas.push(request.persona)
+      startPrompts.push(request.prompt
+        .filter((part): part is { type: 'text'; text: string } => part.type === 'text')
+        .map(part => part.text)
+        .join(''))
       const structured = 'verdict' in (request.outputSchema?.properties ?? {})
         ? behavior === 'noredirect'
           ? { verdict: 'drift', advice: 'off course' }
@@ -136,6 +146,7 @@ interface ContinuableLog {
   followups: number
   interrupts: number
   prompts: string[]
+  personas: string[]
   childId: SessionId
   setBehavior: (behavior: 'verdict' | 'noredirect' | 'garbage' | 'fail' | 'hang') => void
 }
@@ -152,6 +163,7 @@ function patchContinuable(ctx: Context): ContinuableLog {
     followups: 0,
     interrupts: 0,
     prompts: [],
+    personas: [],
     childId: SessionId('advisor-child-1'),
     setBehavior: () => {},
   }
@@ -177,13 +189,16 @@ function patchContinuable(ctx: Context): ContinuableLog {
     }, 0)
   }
   const runtime = ctx.subagents as unknown as {
-    startContinuable: (spec: { request: { prompt: { text?: string }[] } }) => Promise<{ childId: SessionId; messageId: MessageId }>
+    startContinuable: (spec: {
+      request: { prompt: { text?: string }[]; persona?: string }
+    }) => Promise<{ childId: SessionId; messageId: MessageId }>
     followup: (parent: unknown, childId: SessionId, content: { text?: string }[]) => Promise<MessageId>
     interrupt: (target: SessionId, authority: unknown) => void
   }
   runtime.startContinuable = async (spec) => {
     log.starts += 1
     log.prompts.push(spec.request.prompt.map(part => part.text ?? '').join(''))
+    log.personas.push(spec.request.persona ?? '')
     if (behavior === 'fail') throw new Error('stub start failure')
     deliverTurn()
     return { childId: log.childId, messageId: MessageId('m-' + String(log.starts)) }
@@ -222,6 +237,14 @@ describe('resolveConfig', () => {
     expect(() => Advisor.resolveConfig({ ...ENABLED, reviewerTools: [] })).toThrow(/reviewerTools/)
     expect(Advisor.resolveConfig(ENABLED).subagentProvider).toBe('spawn')
     expect(Advisor.resolveConfig({ ...ENABLED, subagentProvider: '  ' }).subagentProvider).toBe('spawn')
+  })
+})
+
+describe('MAIN_SESSION_ADVISOR_RULES', () => {
+  it('treats a Redirect as a suggestion, not an order', () => {
+    expect(Advisor.MAIN_SESSION_ADVISOR_RULES).toContain('A Redirect is a suggestion')
+    expect(Advisor.MAIN_SESSION_ADVISOR_RULES).not.toMatch(/act on a Redirect/)
+    expect(Advisor.MAIN_SESSION_ADVISOR_RULES).toContain('stop tending the card')
   })
 })
 
@@ -271,6 +294,57 @@ describe('advisor apply', () => {
     expect(result.isError).toBe(false)
     expect(JSON.stringify(result)).toContain('off course')
     expect(startLabels.at(-1)).toBe('Advisor')
+    expect(startPersonas.at(-1)).toContain('one-shot consult')
+    expect(startPersonas.at(-1)).toContain('`advice`')
+    expect(startPersonas.at(-1)).not.toContain('exactly one JSON object')
+    expect(startPersonas.at(-1)).not.toContain('session_event_read')
+    expect(startPrompts.at(-1)).not.toContain('session_event_read')
+    await ctx.fiber.dispose()
+  })
+
+  it('does not advertise session_event_read when the name is filtered but unmounted', async () => {
+    const { ctx } = await boot({
+      ...ENABLED,
+      reviewerTools: ['wiki_search', 'wiki_read', 'session_event_read'],
+    })
+    const session = await liveSession(ctx)
+    const result = await ctx.tools.execute(consultExec(session) as never)
+    expect(result.isError).toBe(false)
+    expect(startPersonas.at(-1)).not.toContain('session_event_read')
+    expect(startPrompts.at(-1)).not.toContain('session_event_read')
+    await ctx.fiber.dispose()
+  })
+
+  it('advertises session_event_read on consult only when the tool is filtered and mounted', async () => {
+    const { ctx } = await boot({
+      ...ENABLED,
+      reviewerTools: ['wiki_search', 'wiki_read', 'session_event_read'],
+    })
+    ctx.tools.register(defineTool({
+      name: 'session_event_read',
+      description: 'stub parent-event read',
+      parameters: { seq: { type: 'number', required: true } },
+      output: {
+        schema: { type: 'object', additionalProperties: false, properties: {} },
+        render: () => [{ type: 'text', text: '' }],
+      },
+      execute: async () => ({}),
+    }))
+    const session = await liveSession(ctx)
+    const result = await ctx.tools.execute(consultExec(session) as never)
+    expect(result.isError).toBe(false)
+    expect(startPersonas.at(-1)).toContain('session_event_read')
+    expect(startPrompts.at(-1)).toContain('session_event_read')
+    await ctx.fiber.dispose()
+  })
+
+  it('uses a custom standing persona on the continuable child', async () => {
+    const { ctx } = await boot({ ...ENABLED, persona: 'custom standing voice' })
+    const continuable = patchContinuable(ctx)
+    const session = await liveSession(ctx)
+    for (let step = 1; step <= 8; step += 1) session.append('step/end', { turn: 1, step })
+    await until(() => adviceEvents(session).length === 1)
+    expect(continuable.personas[0]).toBe('custom standing voice')
     await ctx.fiber.dispose()
   })
 
@@ -283,6 +357,9 @@ describe('advisor apply', () => {
     }
     await until(() => adviceEvents(session).length === 1)
     expect(continuable.starts).toBe(1)
+    expect(continuable.personas[0]).toContain('standing reviewer of one main session')
+    expect(continuable.personas[0]).toContain('exactly one JSON object')
+    expect(continuable.personas[0]).not.toContain('session_event_read')
     expect(continuable.prompts[0]).toContain('reply with only the verdict JSON now')
     expect(continuable.prompts[0]).toContain('Main session id: s-advisor')
     const advice = adviceEvents(session)[0]?.data
@@ -341,6 +418,8 @@ describe('advisor apply', () => {
     const freshAssembly = await ctx.systemPrompt.assemble({ agent: { id: fresh.id, session: fresh } } as never)
     expect(JSON.stringify(freshAssembly)).toContain('jspace_consult')
     expect(JSON.stringify(freshAssembly)).toContain('call ward')
+    expect(JSON.stringify(freshAssembly)).toContain('A Redirect is a suggestion')
+    expect(JSON.stringify(freshAssembly)).not.toContain('act on a Redirect')
     expect(JSON.stringify(freshAssembly)).not.toContain('untrusted-jspace-advisor')
     await ctx.fiber.dispose()
   })
@@ -415,6 +494,25 @@ describe('advisor apply', () => {
     await new Promise(resolve => setTimeout(resolve, 150))
     expect(continuable.starts).toBe(1)
     expect(adviceEvents(session)).toHaveLength(0)
+    await ctx.fiber.dispose()
+  })
+
+  it('reviews a ship stamp even after a landed verdict', async () => {
+    const { ctx } = await boot()
+    const continuable = patchContinuable(ctx)
+    const session = await liveSession(ctx)
+    for (let step = 1; step <= 8; step += 1) session.append('step/end', { turn: 1, step })
+    await until(() => adviceEvents(session).length === 1)
+    const card = ctx.jspace.card(session)
+    session.append('jspace/shipped', {
+      sessionId: session.id,
+      goal: card?.goal ?? 'Ship the advisor',
+      goalOpenedSeq: card?.goalOpenedSeq ?? 0,
+    }, { ignorable: true })
+    await until(() => adviceEvents(session).length === 2)
+    expect(adviceEvents(session)[1]?.data.trigger).toBe('ship-attempt')
+    expect(continuable.starts).toBe(1)
+    expect(continuable.followups).toBe(1)
     await ctx.fiber.dispose()
   })
 

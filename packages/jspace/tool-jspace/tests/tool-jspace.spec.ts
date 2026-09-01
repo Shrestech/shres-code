@@ -402,6 +402,7 @@ describe('jspace tools', () => {
     expect(shipped.value).toEqual({ shipped: true, path: 'notes.md' })
     expect(text(shipped)).toBe('Ship check passed.')
     expect(ctx.jspace.card(agent.session)).not.toBeNull()
+    expect(ctx.jspace.fold(agent.session).settled?.goal).toBe('A')
 
     const rejected = await execute(ctx, 'jspace_note', { goal: 'B-goal' }, agent)
     expect(rejected.isError).toBe(true)

@@ -84,6 +84,15 @@ describe('jspace-advisor invariant', () => {
     expect(failures).toEqual([])
   })
 
+  it('accepts a jspace/shipped stamp as the ship-attempt pointer', () => {
+    const { ctx, failures, dispatch } = harness()
+    void apply(ctx)
+    dispatch(sessionWith([
+      { type: 'jspace/shipped', seq: 1, data: { sessionId: 's1', goal: 'A', goalOpenedSeq: 0 } },
+    ]), advisorEvent('ship-attempt', 1, 2))
+    expect(failures).toEqual([])
+  })
+
   it('accepts a goal change as the goal-epoch pointer', () => {
     const { ctx, failures, dispatch } = harness()
     void apply(ctx)

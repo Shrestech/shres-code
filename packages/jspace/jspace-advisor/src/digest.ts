@@ -184,6 +184,50 @@ export interface AdvisorDigestCaps {
 }
 
 /**
+ * Latest passing ship for this Goal epoch, if any.
+ * @param events - session log.
+ * @param card - open card, or null.
+ * @returns the digest line, or undefined.
+ */
+export function foldShippedMarker(
+  events: readonly SessionEvent[],
+  card: JspaceCard | null,
+): string | undefined {
+  if (card === null) return undefined
+  let seq: number | undefined
+  for (const event of events) {
+    if (event.seq < card.goalOpenedSeq) continue
+    if (event.type === 'jspace/shipped') {
+      const opened = (event.data as { goalOpenedSeq?: number }).goalOpenedSeq
+      if (opened === card.goalOpenedSeq) seq = event.seq
+      continue
+    }
+    if (event.type === 'jspace/charter-run' && event.data.phase === 'ship' && event.data.passed) {
+      seq = event.seq
+      continue
+    }
+    if (event.type !== 'tool/result') continue
+    const message = (event.data as {
+      message?: { source?: { kind?: string; callId?: string } }
+    }).message
+    if (message?.source?.kind !== 'tool' || message.source.callId === undefined) continue
+    const block = (event.data as {
+      message?: { content?: ReadonlyArray<{ type?: string; isError?: boolean }> }
+    }).message?.content?.find(part => part.type === 'tool-result')
+    if (block?.isError === true) continue
+    const callId = message.source.callId
+    for (const candidate of events) {
+      if (candidate.type !== 'tool/call') continue
+      const data = candidate.data as { callId?: string; name?: string }
+      if (data.callId === callId && data.name === 'jspace_ship') seq = event.seq
+    }
+  }
+  if (seq === undefined) return undefined
+  return 'Card Goal shipped (register check passed at seq ' + String(seq)
+    + '; ship does not close the card)'
+}
+
+/**
  * Fold a bounded advisory digest from one session's committed events.
  * @param session - live session whose log to fold.
  * @param card - the open card, or null when none is open.
@@ -203,6 +247,7 @@ export function foldAdvisorDigest(
       checkedReprintLimit: DEFAULT_CHECKED_REPRINT_LIMIT,
       openReprintLimit: DEFAULT_OPEN_REPRINT_LIMIT,
     })
+  const shipped = foldShippedMarker(session.events, card)
   return {
     sessionId: session.id,
     card: renderedCard,
@@ -213,6 +258,7 @@ export function foldAdvisorDigest(
     seq: session.seq,
     maxTools: caps.maxTools,
     maxChars: caps.maxChars,
+    ...shipped === undefined ? {} : { shipped },
   }
 }
 
@@ -248,6 +294,7 @@ export function renderAdvisorDigest(digest: JspaceAdvisorDigest): string {
     lines.push('User messages (the goal ground truth):\n' + history.join('\n'))
   }
   if (digest.card !== null) lines.push('Session card (the session\'s own claim):\n' + digest.card)
+  if (digest.shipped !== undefined) lines.push(digest.shipped)
   lines.push('Completed steps: ' + String(digest.steps))
   if (digest.recentTools.length > 0) {
     lines.push('Recent tool outcomes:\n' + renderToolSignals(digest.recentTools))
@@ -297,6 +344,7 @@ export function foldAdvisorDelta(
       checkedReprintLimit: DEFAULT_CHECKED_REPRINT_LIMIT,
       openReprintLimit: DEFAULT_OPEN_REPRINT_LIMIT,
     })
+  const shipped = foldShippedMarker(session.events, card)
   return {
     sessionId: session.id,
     goal: goalMessage(session.events, caps.maxUserMessage),
@@ -308,6 +356,7 @@ export function foldAdvisorDelta(
     seq: session.seq,
     maxTools: caps.maxTools,
     maxChars: caps.maxChars,
+    ...shipped === undefined ? {} : { shipped },
   }
 }
 
@@ -332,6 +381,7 @@ export function renderAdvisorDelta(delta: JspaceAdvisorDelta): string {
     lines.push('New user messages since event ' + String(delta.sinceSeq) + ': (none)')
   }
   if (delta.card !== null) lines.push('Session card (the session\'s own claim):\n' + delta.card)
+  if (delta.shipped !== undefined) lines.push(delta.shipped)
   lines.push('Steps completed since the last review: ' + String(delta.steps))
   if (delta.recentTools.length > 0) {
     lines.push('Tool outcomes since the last review:\n' + renderToolSignals(delta.recentTools))

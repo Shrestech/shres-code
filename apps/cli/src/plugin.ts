@@ -9,9 +9,10 @@
  * gained its `shres.bundle` declaration in a newer version.
  *
  * Editions are the paid-plugin install path: the profile manifest declares the
- * inventory (`shres.editions.<name>` with its `packages` and `autoProvision`),
- * `enable-edition` selects one by setting `autoProvision` and provisioning, and
- * profile boot re-provisions a selected edition whose package is missing.
+ * inventory (`shres.editions.<name>` with its `packages` and `autoProvision`).
+ * New web and headless profiles declare Shield with `autoProvision: true`.
+ * `enable-edition` selects among declared editions, and profile boot
+ * re-provisions a selected edition whose package is missing.
  * @module @shres-code/shres-code/plugin
  */
 
@@ -23,6 +24,7 @@ import { fileURLToPath } from 'node:url'
 import {
   DEFAULT_PROFILE_BUNDLES,
   initProfile,
+  PROFILE_TEMPLATE_EDITIONS,
   PROFILE_TEMPLATES,
   readProfileManifest,
   resolveBundleDir,
@@ -210,7 +212,7 @@ function writePnpmFailure(profileDir: string, args: readonly string[]): void {
 export function runPlugin(profile: string, args: readonly string[]): number {
   const dir = resolveProfileDir(profile)
   if (!existsSync(join(dir, 'package.json'))) {
-    initProfile(dir, PROFILE_TEMPLATES[profile] ?? DEFAULT_PROFILE_BUNDLES)
+    initProfile(dir, PROFILE_TEMPLATES[profile] ?? DEFAULT_PROFILE_BUNDLES, PROFILE_TEMPLATE_EDITIONS[profile])
     process.stderr.write(`${NAME}: initialized profile ${profile} at ${dir}\n`)
   }
   const before = readProfileManifest(NAME, dir)
@@ -229,7 +231,7 @@ export function runPlugin(profile: string, args: readonly string[]): number {
 export function runEnableEdition(profile: string, edition: string): number {
   const dir = resolveProfileDir(profile)
   if (!existsSync(join(dir, 'package.json'))) {
-    initProfile(dir, PROFILE_TEMPLATES[profile] ?? DEFAULT_PROFILE_BUNDLES)
+    initProfile(dir, PROFILE_TEMPLATES[profile] ?? DEFAULT_PROFILE_BUNDLES, PROFILE_TEMPLATE_EDITIONS[profile])
     process.stderr.write(`${NAME}: initialized profile ${profile} at ${dir}\n`)
   }
   const before = readProfileManifest(NAME, dir)

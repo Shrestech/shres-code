@@ -55,6 +55,8 @@ export interface JspaceAdvisorDelta {
   readonly userMessages: readonly string[]
   /** Rendered open card - the session's own claim - or null when none is open. */
   readonly card: string | null
+  /** One line when the current Goal epoch has a passing ship; omitted otherwise. */
+  readonly shipped?: string
   /** Trailing tool signals with seq beyond sinceSeq, oldest-first, capped by maxTools. */
   readonly recentTools: readonly JspaceAdvisorToolSignal[]
   /** Completed step count with seq beyond sinceSeq. */
@@ -89,6 +91,11 @@ export interface JspaceAdvisorDigest {
   readonly sessionId: string
   /** Rendered open card — the session's own claim — or `null` when none is open. */
   readonly card: string | null
+  /**
+   * One line when the current Goal epoch has a passing ship; omitted otherwise.
+   * Ship does not close the card.
+   */
+  readonly shipped?: string
   /**
    * Every source-'user' message, oldest-first and bounded. This is the goal
    * ground truth: the first message (the session's goal statement) is always

@@ -231,6 +231,28 @@ describe('jspace-prompt', () => {
     expect(JspacePrompt.JSPACE_DRIVER_OPEN).toContain('jspace_note')
     expect(JspacePrompt.JSPACE_DRIVER_OPEN).toContain('evidence must be a call_* tool-call id')
     expect(JspacePrompt.JSPACE_DRIVER_OPEN).toContain('a changed Goal clears Core and Checked')
+    expect(JspacePrompt.JSPACE_DRIVER_SETTLED).toContain('This Goal is settled')
+  })
+
+  it('stops re-tending protocol after a passing ship stamp', async () => {
+    const ctx = await harness({ enabled: true })
+    const agent = liveAgent(ctx, 'ws-prompt-settled')
+    ctx.jspace.open(agent.session, { goal: 'Ship J2', next: 'Write tests' })
+    ctx.jspace.checkpoint(agent.session, {
+      check: 'done',
+      by: 'unit tests covering the fold',
+    })
+    ctx.jspace.recordShipped(agent.session)
+    const loop = await ctx.systemPrompt.assemble({ agent, scope: agent })
+    const protocol = loop.sections.find(section => section.name === JspacePrompt.JSPACE_PROTOCOL_SECTION)?.text ?? ''
+    expect(protocol).toContain('This Goal is settled')
+    expect(protocol).not.toContain('Pass: loop')
+    expect(loop.sections.find(section => section.name === JspacePrompt.JSPACE_SECTION)?.text)
+      .toContain('Goal settled')
+    expect(loop.sections.find(section => section.name === JspacePrompt.JSPACE_CAPACITY_SECTION)?.text)
+      .toBe('')
+    expect(loop.sections.find(section => section.name === JspacePrompt.JSPACE_BROADCAST_SECTION)?.text)
+      .toBe('')
   })
 
   it('renders nothing until the session reaches engageAfterSteps', async () => {

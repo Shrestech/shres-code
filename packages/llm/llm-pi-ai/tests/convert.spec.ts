@@ -726,6 +726,7 @@ describe('mapStopReason / mapUsage', () => {
     ['length', { kind: 'max-tokens' }],
     ['toolUse', { kind: 'tool-calls' }],
     ['aborted', { kind: 'aborted', failure: { message: 'pi-ai stream aborted', code: 'ABORTED' } }],
+    ['pending', { kind: 'error', failure: { message: 'model "deepseek-v4-flash" ended before a terminal stop reason', code: 'PI_AI_ERROR' } }],
   ] as const)('maps %s', (stopReason, expected) => {
     expect(mapStopReason(assistant({ stopReason, content: [{ type: 'text', text: 'ok' }] }))).toEqual(expected)
   })

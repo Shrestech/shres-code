@@ -1,6 +1,6 @@
 # @shres-code/shres-code-jspace
 
-Default-off host seat for the J-Space card. This package remounts from the `jspace` settings namespace, publishes `ctx.jspace`, and writes `jspace/card` / `jspace/closed` session events. Prompt and tool consumers are separate packages that watch `status.active`.
+Default-off host seat for the J-Space card. This package remounts from the `jspace` settings namespace, publishes `ctx.jspace`, and writes `jspace/card` / `jspace/closed` / `jspace/shipped` session events. Prompt and tool consumers are separate packages that watch `status.active`.
 
 ## Plugin (namespace: `jspace`)
 
@@ -36,7 +36,7 @@ Both inputs are folds of the session log â€” `step/end` count and card status â€
 
 ## Service
 
-`ctx.jspace` accepts a live `Session`. `open`, `openGoal`, `note`, `checkpoint`, and `close` append `{ ignorable: true }` events. `card(session)` and `fold(session)` replay the log. A fork with an inherited parent card receives a native copy (`seq` 1, child `sessionId`) while the seat is active.
+`ctx.jspace` accepts a live `Session`. `open`, `openGoal`, `note`, `checkpoint`, `recordShipped`, and `close` append `{ ignorable: true }` events. `card(session)` and `fold(session)` replay the log. A fork with an inherited parent card receives a native copy (`seq` 1, child `sessionId`) while the seat is active.
 
 `open` refuses while a card is open (`JSPACE_ALREADY_OPEN`). `openGoal` opens a new Goal epoch on an open card: a Goal identity change resets Core and Checked and moves the `goalOpenedSeq` anchor so ship requires a checkpoint under the new Goal; a same-Goal call updates Goal and Next in place and keeps Core, Checked, Open, and the charter. `open` applies optional `charter` only on the first open. `amendCharter` replaces the list on an open card. `note` rejects a Goal identity change (`JSPACE_NOTE_GOAL_CHANGE`); Goal epochs open only through `openGoal`. `note` also rejects a patch whose Goal, Next, Core, and Open match the current card (`JSPACE_NOTE_NOOP`). Line validation refuses a Core, Checked, or Open string whose trimmed text `JSON.parse`s to an array (`JSPACE_LINE_PACKED`); a line that merely starts with `[` or that parses to a JSON object or string is accepted. Open questions and the charter carry over unchanged across an epoch change. `checkpoint()` still applies `requireCoverage` to `by`. When `evidence` names a completed non-error `tool/call` whose `name` is in `verifierTools`, or a passed `jspace/charter-run`, the Checked line carries `verified: true`.
 
@@ -46,7 +46,7 @@ Both inputs are folds of the session log â€” `step/end` count and card status â€
 
 ## Durable record
 
-`jspace/card` is a whole-card snapshot. `jspace/closed` is a tombstone. The fold takes the highest native `seq`. A regressing native `seq`, a foreign write after the native origin, or a shape failure keeps the last good native snapshot and records `fault`. Inherited parent-seed events are not the live card.
+`jspace/card` is a whole-card snapshot. `jspace/closed` is a tombstone. `jspace/shipped` is a Goal-epoch stamp from a passing `jspace_ship`; the fold exposes `settled` until `goalOpenedSeq` advances or the card closes. The fold takes the highest native `seq`. A regressing native `seq`, a foreign write after the native origin, or a shape failure keeps the last good native snapshot and records `fault`. Inherited parent-seed events are not the live card.
 
 `SESSION_FORMAT_VERSION` stays `0`.
 

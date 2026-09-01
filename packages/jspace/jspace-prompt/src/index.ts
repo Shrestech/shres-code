@@ -51,6 +51,7 @@ export {
   JSPACE_DRIVER_CHARTER,
   JSPACE_DRIVER_CLOSED,
   JSPACE_DRIVER_OPEN,
+  JSPACE_DRIVER_SETTLED,
   JSPACE_MODULE_SECTIONS,
   JSPACE_PROTOCOL_SECTION,
   selectJspaceModules,
@@ -297,7 +298,15 @@ export function apply(ctx: Context, config: Config = {}): void {
       if (session === undefined) return JSPACE_AVAILABLE_LINE
       const folded = ctx.jspace.fold(session)
       if (folded.card === null) return JSPACE_AVAILABLE_LINE
-      return frameJspaceCard(formatJspaceCard(folded.card, reprint))
+      const body = formatJspaceCard(folded.card, reprint)
+      if (folded.settled !== undefined
+        && folded.settled.goalOpenedSeq === folded.card.goalOpenedSeq) {
+        return frameJspaceCard(
+          'Goal settled (ship check passed at seq ' + String(folded.settled.seq)
+          + '). Do not re-tend this Goal.\n' + body,
+        )
+      }
+      return frameJspaceCard(body)
     },
   })
 
@@ -307,12 +316,21 @@ export function apply(ctx: Context, config: Config = {}): void {
     text: (context) => {
       const session = context.agent?.session
       if (!ctx.jspace.engaged(session)) return ''
-      const card = session === undefined ? null : ctx.jspace.card(session)
+      const folded = session === undefined ? undefined : ctx.jspace.fold(session)
+      const card = folded?.card ?? null
       const cardOpen = card !== null
+      const settled = folded?.settled !== undefined
+        && card !== null
+        && folded.settled.goalOpenedSeq === card.goalOpenedSeq
       const charterProposal = session !== undefined
         && latestProposal(session) !== undefined
         && (card === null || card.charter.length === 0)
-      return formatJspaceProtocol(passFor(ctx, session, context.messages), cardOpen, charterProposal)
+      return formatJspaceProtocol(
+        passFor(ctx, session, context.messages),
+        cardOpen,
+        charterProposal,
+        settled,
+      )
     },
   })
 
@@ -320,7 +338,15 @@ export function apply(ctx: Context, config: Config = {}): void {
     name: JSPACE_CAPACITY_SECTION,
     order: JSPACE_CAPACITY_ORDER,
     text: (context) => {
-      const pass = passFor(ctx, context.agent?.session, context.messages)
+      const session = context.agent?.session
+      if (session !== undefined) {
+        const folded = ctx.jspace.fold(session)
+        if (folded.settled !== undefined && folded.card !== null
+          && folded.settled.goalOpenedSeq === folded.card.goalOpenedSeq) {
+          return ''
+        }
+      }
+      const pass = passFor(ctx, session, context.messages)
       return pass === 'fast' ? '' : JSPACE_CAPACITY_TEXT
     },
   })
@@ -329,7 +355,15 @@ export function apply(ctx: Context, config: Config = {}): void {
     name: JSPACE_BROADCAST_SECTION,
     order: JSPACE_BROADCAST_ORDER,
     text: (context) => {
-      return passFor(ctx, context.agent?.session, context.messages) === 'loop'
+      const session = context.agent?.session
+      if (session !== undefined) {
+        const folded = ctx.jspace.fold(session)
+        if (folded.settled !== undefined && folded.card !== null
+          && folded.settled.goalOpenedSeq === folded.card.goalOpenedSeq) {
+          return ''
+        }
+      }
+      return passFor(ctx, session, context.messages) === 'loop'
         ? JSPACE_BROADCAST_TEXT
         : ''
     },
@@ -341,7 +375,15 @@ export function apply(ctx: Context, config: Config = {}): void {
       name: JSPACE_MODULE_SECTIONS[moduleName],
       order: JSPACE_FIRST_EXTRA_MODULE_ORDER + index,
       text: (context) => {
-        return modulesFor(ctx, context.agent?.session, context.messages).includes(moduleName)
+        const session = context.agent?.session
+        if (session !== undefined) {
+          const folded = ctx.jspace.fold(session)
+          if (folded.settled !== undefined && folded.card !== null
+            && folded.settled.goalOpenedSeq === folded.card.goalOpenedSeq) {
+            return ''
+          }
+        }
+        return modulesFor(ctx, session, context.messages).includes(moduleName)
           ? JSPACE_MODULE_TEXT[moduleName]
           : ''
       },

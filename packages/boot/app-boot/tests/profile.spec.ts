@@ -14,7 +14,9 @@ import {
   initProfile,
   loadProfile,
   PROFILE_PATCH_FILENAME,
+  PROFILE_TEMPLATE_EDITIONS,
   PROFILE_TEMPLATES,
+  SHIELD_EDITION_PACKAGE,
   readProfileManifest,
   resolveBundleDir,
   resolveProfileDir,
@@ -69,6 +71,22 @@ describe('initProfile', () => {
     initProfile(dir, ['other'])
     expect(readProfileManifest('t', dir).shres?.profile?.bundles).toEqual(['@shres-code/shres-code-base'])
     expect(readFileSync(join(dir, PROFILE_PATCH_FILENAME), 'utf8')).toContain('- id: x')
+  })
+
+  it('writes the Shield edition on a web template init', () => {
+    const home = tmp()
+    const dir = resolveProfileDir('web', home)
+    initProfile(dir, [...PROFILE_TEMPLATES.web ?? []], PROFILE_TEMPLATE_EDITIONS.web)
+    expect(readProfileManifest('t', dir).shres?.editions?.shield).toEqual({
+      packages: [SHIELD_EDITION_PACKAGE],
+      autoProvision: true,
+    })
+  })
+
+  it('omits editions when the caller does not pass an inventory', () => {
+    const dir = resolveProfileDir('tui', tmp())
+    initProfile(dir, ['@shres-code/shres-code-base'])
+    expect(readProfileManifest('t', dir).shres?.editions).toBeUndefined()
   })
 })
 

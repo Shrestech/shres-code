@@ -9,10 +9,10 @@
  *   `tools/post-execute` + `tools/result` (tool_result channel) via the real
  *   `ctx.tools.execute` pipeline.
  *
- * The seat forwards only `{ posture }` to the engine, so approval tunables
- * (cap / budget / grant TTL / ask timeout) are NOT externally configurable:
- * the engine uses its 120s default ask timeout. The timeout scenario therefore
- * drives that real default under a stubbed clock (see the spec).
+ * The seat forwards `{ posture, license }` to the engine. Approval tunables
+ * (cap / budget / grant TTL / ask timeout) stay engine-owned: the engine uses
+ * its 120s default ask timeout. The timeout scenario therefore drives that
+ * real default under a stubbed clock (see the spec).
  */
 
 import { Context } from '@shres-code/cordis'
