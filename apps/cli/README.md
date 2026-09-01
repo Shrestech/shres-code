@@ -42,15 +42,15 @@ Use `--dump-default-config` and `--dump-config` to inspect the composed tree wit
 
 ## Editions
 
-A profile may declare an **edition inventory** under `shres.editions` in its `package.json` — a named set of npm specs and an `autoProvision` flag, e.g.:
+A profile may declare an **edition inventory** under `shres.editions` in its `package.json` — a named set of npm specs and an `autoProvision` flag. New `web` and `headless` profiles ship:
 
 ```json
-{ "shres": { "editions": { "shield": { "packages": ["@shrestech/shres-shield-plugin"], "autoProvision": false } } } }
+{ "shres": { "editions": { "shield": { "packages": ["@shrestech/shres-shield-plugin"], "autoProvision": true } } } }
 ```
 
-Config declares the inventory; **enabling selects** among declared editions. Nothing auto-writes an edition. `enable-edition <edition>` is the explicit selection: it sets that edition's `autoProvision` and provisions its packages through the same pnpm forwarder (then reconciles the bundle layers). An undeclared edition fails loud.
+Config declares the inventory; **enabling selects** among declared editions. Nothing auto-writes an edition onto an existing profile. `enable-edition <edition>` is the explicit selection: it sets that edition's `autoProvision` and provisions its packages through the same pnpm forwarder (then reconciles the bundle layers). An undeclared edition fails loud.
 
-At profile boot, every edition with `autoProvision: true` has each declared package checked against the profile's `node_modules`; a missing package is installed once through the same forwarder, and a pnpm failure fails the boot loudly with the exact pnpm error — a missing paid payload is never silently skipped. The shield seat resolves its paid payload from that same profile directory.
+At profile boot, every edition with `autoProvision: true` has each declared package checked against the profile's `node_modules`; a missing package is installed once through the same forwarder, and a pnpm failure fails the boot loudly with the exact pnpm error — a missing paid payload is never silently skipped. An enabled Shield seat also installs npm `latest` into the boot profile when resolve is empty and `SHRES_SHIELD_MODULE` is unset. The shield seat resolves its paid payload from that same profile directory.
 
 The [CLI behavior reference](reference/README.md) owns exact layer precedence, flags, shutdown behavior, deployment defaults, and source execution.
 

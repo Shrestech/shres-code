@@ -70,9 +70,12 @@ export const DEFAULT_SHIELD_LICENSE = 'shres-dev'
 /** Host-seat config. Engine-owned tunables stay on `@shrestech/shres-shield-plugin`. */
 export interface Config {
   /**
-   * Entitlement string. Defaults to {@link DEFAULT_SHIELD_LICENSE} until a
-   * paid key exists. `SHRES_SHIELD_LICENSE` overrides this field. A sibling
-   * `../shres-shield` checkout is also entitled without a key.
+   * Entitlement string forwarded to the paid `apply`. Defaults to
+   * {@link DEFAULT_SHIELD_LICENSE} until a paid key exists.
+   * `SHRES_SHIELD_LICENSE` overrides this field. A sibling
+   * `../shres-shield` checkout is also entitled without a key. Unsigned
+   * profile/package loads in non-production enable the payload's unsigned-dev
+   * hatch; production requires a signed `shres1.` token.
    */
   license?: string
   /**
@@ -344,7 +347,13 @@ export class ShieldHost extends TypertRemoteService {
     const installed = this.resolved?.version ?? null
     if (installed === null) return
     if (!isNpmVersion(installed)) return
-    const queried = await queryNpmLatest().catch(() => null)
+    let queried: Awaited<ReturnType<typeof queryNpmLatest>> | null
+    try {
+      queried = await queryNpmLatest()
+    } catch {
+      /* v8 ignore next -- queryNpmLatest returns a structured miss, it does not throw */
+      queried = null
+    }
     if (queried === null || queried.latest === null || queried.blocked !== undefined) return
     const latest = queried.latest
     if (!isNpmVersion(latest) || latest === installed) {
@@ -356,8 +365,11 @@ export class ShieldHost extends TypertRemoteService {
       const pa = a.split('.').map(Number)
       const pb = b.split('.').map(Number)
       for (let i = 0; i < 3; i++) {
+        // isNpmVersion requires three numeric fields; ?? 0 is belt-and-braces.
+        /* v8 ignore next -- three-part semver always yields numeric slots */
         if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) > (pb[i] ?? 0)
       }
+      /* v8 ignore next -- equal numeric triples are caught by latest === installed */
       return false
     }
     if (!newer(latest, installed)) {
@@ -605,6 +617,97 @@ export function readLicense(config: Config): string {
   return DEFAULT_SHIELD_LICENSE
 }
 
+/** Signed payload tokens start with this prefix (`shres1.<kid>.<payload>.<sig>`). */
+export const SIGNED_LICENSE_PREFIX = 'shres1.'
+
+/**
+ * Whether `license` is a signed `shres1.` token the paid plugin can verify.
+ * @param license - effective license string.
+ * @returns true when the string uses the signed-token prefix.
+ */
+export function licenseLooksSigned(license: string): boolean {
+  return license.startsWith(SIGNED_LICENSE_PREFIX)
+}
+
+/**
+ * Production lock: unsigned-dev hatch must not activate.
+ * `NODE_ENV=production` or `SHRES_SHIELD_PRODUCTION=1`.
+ * @returns true when the hatch is forbidden.
+ */
+export function productionLockActive(): boolean {
+  try {
+    return process.env.NODE_ENV === 'production' || process.env.SHRES_SHIELD_PRODUCTION === '1'
+  } catch {
+    /* v8 ignore next -- env probe never throws to the caller */
+    return false
+  }
+}
+
+/**
+ * Enable the paid plugin's unsigned-dev hatch for profile/package loads that
+ * have no signed token. Env and sibling loads are already developer-entitled
+ * without it. Production stays fail-closed. Does not overwrite an existing
+ * `SHRES_SHIELD_DEV=1`.
+ * @param license - effective license string.
+ * @param source - where `apply` was loaded from.
+ */
+export function ensureUnsignedDevHatch(license: string, source: ShieldEngineSource): void {
+  if (source !== 'profile' && source !== 'package') return
+  if (licenseLooksSigned(license)) return
+  if (productionLockActive()) return
+  try {
+    if (process.env.SHRES_SHIELD_DEV === '1') return
+    process.env.SHRES_SHIELD_DEV = '1'
+  } catch {
+    /* v8 ignore next -- env assign never throws to the caller */
+  }
+}
+
+function pluginEntitlement(instance: unknown): { active: boolean; reason?: string } | undefined {
+  /* v8 ignore next -- paid apply always returns an object instance */
+  if (instance === null || typeof instance !== 'object') return undefined
+  const entitlement = (instance as { entitlement?: unknown }).entitlement
+  if (entitlement === null || typeof entitlement !== 'object') return undefined
+  const active = (entitlement as { active?: unknown }).active
+  if (typeof active !== 'boolean') return undefined
+  const reason = (entitlement as { reason?: unknown }).reason
+  return typeof reason === 'string' ? { active, reason } : { active }
+}
+
+function hostReasonFromPlugin(reason: string | undefined): ShieldReason {
+  return reason === 'panic' ? 'panic' : 'unlicensed'
+}
+
+/**
+ * Install npm `latest` into `profileDir` and re-resolve when the engine is
+ * missing, Shield is enabled, panic is off, and no exclusive env override is
+ * set. Failures stay missing (registry/pnpm errors do not throw).
+ * @param engine - current resolve result.
+ * @param options - mount flags and the boot profile directory.
+ * @returns the existing engine, a newly resolved profile engine, or `undefined`.
+ */
+export async function maybeProvisionPayload(
+  engine: Awaited<ReturnType<typeof resolveShieldEngine>>,
+  options: {
+    profileDir: string | undefined
+    enabled: boolean
+    panic: boolean
+    envExclusive: boolean
+  },
+): Promise<Awaited<ReturnType<typeof resolveShieldEngine>>> {
+  if (engine !== undefined) return engine
+  if (options.envExclusive || !options.enabled || options.panic || options.profileDir === undefined) {
+    return undefined
+  }
+  const queried = await queryNpmLatest()
+  if (queried.latest === null || queried.blocked !== undefined || !isNpmVersion(queried.latest)) {
+    return undefined
+  }
+  const installedNow = await installPayload(options.profileDir, queried.latest)
+  if (!installedNow.ok) return undefined
+  return resolveShieldEngine({ profileDir: options.profileDir })
+}
+
 function setStatus(status: { active: boolean; reason: ShieldReason }, next: ShieldStatus): void {
   status.active = next.active
   status.reason = next.reason
@@ -612,8 +715,11 @@ function setStatus(status: { active: boolean; reason: ShieldReason }, next: Shie
 
 /**
  * Mount the seat. Panic, missing engine, and missing entitlement leave the
- * row loaded and `ctx.shield.active === false`. The paid `apply` is invoked
- * only when entitled; its dispose rides this fiber.
+ * row loaded and `ctx.shield.active === false`. An enabled seat with a boot
+ * profile and no exclusive env override installs npm `latest` once when the
+ * payload is missing. The paid `apply` receives posture and license; its
+ * dispose rides this fiber. A payload that returns `entitlement.active ===
+ * false` stays inactive.
  */
 export function apply(ctx: Context, config: Config): void {
   const status = { active: false, reason: 'engine-missing' as ShieldReason }
@@ -652,7 +758,16 @@ export function apply(ctx: Context, config: Config): void {
       // the same profile whose `node_modules` edition ensure installs into.
       const profileDir = ctx.baseUrl === undefined ? undefined : fileURLToPath(ctx.baseUrl)
       host.bindProfileDir(profileDir)
-      const engine = await resolveShieldEngine(profileDir === undefined ? {} : { profileDir })
+      const current = source()
+      const engine = await maybeProvisionPayload(
+        await resolveShieldEngine(profileDir === undefined ? {} : { profileDir }),
+        {
+          profileDir,
+          enabled: current.enabled !== false,
+          panic: isPanicDisabled(),
+          envExclusive: envModuleSet(),
+        },
+      )
       host.bindResolved(engine === undefined ? undefined : {
         source: engine.source,
         version: readPayloadVersion(engine.entry),
@@ -665,7 +780,6 @@ export function apply(ctx: Context, config: Config): void {
       }
       // `stopped` is set from dispose while this await runs.
       /* v8 ignore start -- dispose can flip `stopped` while resolve awaits */
-      // oxlint-disable-next-line typescript/no-unnecessary-condition -- mutated concurrently during await
       if (stopped) return
       /* v8 ignore stop */
       host.bindPersistedReader(engine?.snapshot)
@@ -673,7 +787,6 @@ export function apply(ctx: Context, config: Config): void {
         setStatus(status, { active: false, reason: 'panic' })
         return
       }
-      const current = source()
       const license = readLicense(current)
       if (engine === undefined) {
         setStatus(status, { active: false, reason: 'engine-missing' })
@@ -695,9 +808,9 @@ export function apply(ctx: Context, config: Config): void {
       }
       /* v8 ignore next -- apply() always stores a concrete posture on entry */
       const posture = current.posture ?? 'ask'
-      instance = await engine.apply(ctx, { posture })
+      ensureUnsignedDevHatch(license, engine.source)
+      instance = await engine.apply(ctx, { posture, license })
       /* v8 ignore start -- dispose can flip `stopped` while apply awaits */
-      // oxlint-disable-next-line typescript/no-unnecessary-condition -- mutated concurrently during await
       if (stopped) {
         await instance.dispose()
         instance = undefined
@@ -706,6 +819,11 @@ export function apply(ctx: Context, config: Config): void {
       }
       /* v8 ignore stop */
       host.bindPayload(instance)
+      const entitlement = pluginEntitlement(instance)
+      if (entitlement?.active === false) {
+        setStatus(status, { active: false, reason: hostReasonFromPlugin(entitlement.reason) })
+        return
+      }
       setStatus(status, { active: true, reason: 'active' })
     /* v8 ignore start -- resolve is fail-soft; a throw is an unexpected loader failure */
     }).catch(() => {

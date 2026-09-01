@@ -6,8 +6,8 @@
  * host-observable outcome (turn entry/rejection, tool error, quarantine
  * placeholder, re-injected content, or an added warning context).
  *
- * The seat forwards only `{ posture }` to the engine, so the approval ask
- * timeout is not externally configurable — the engine keeps its 120s default.
+ * The seat forwards `{ posture, license }` to the engine. The approval ask
+ * timeout stays engine-owned — the engine keeps its 120s default.
  * The timeout scenario drives that real default under vitest fake timers.
  */
 

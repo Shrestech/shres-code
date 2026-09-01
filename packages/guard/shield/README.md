@@ -12,7 +12,7 @@ Default-on Cordis seat for the **paid** Shres Shield plugin. This package resolv
     posture: ask
 ```
 
-`shres-base` inserts this row on every profile. The row mounting is not the same as the engine screening. The seat injects `systemPrompt`, `tools`, `approval`, and `jobs` so the payload adapter can probe those services without throw-as-absent. Product `shres-base` always mounts `approval` and `jobs`; a composition that omits either leaves this row pending, does not publish `ctx.shield`, and does not screen. The Web Settings **Shield** page writes the `shres-shield` namespace (`posture`, `license`, `repos`); this seat remounts the paid payload when that document changes.
+`shres-base` inserts this row on every profile. The row mounting is not the same as the engine screening. The seat injects `systemPrompt`, `tools`, `approval`, and `jobs` so the payload adapter can probe those services without throw-as-absent. Product `shres-base` always mounts `approval` and `jobs`; a composition that omits either leaves this row pending, does not publish `ctx.shield`, and does not screen. The Web Settings **Shield** page writes the `shres-shield` namespace (`posture`, `license`, `repos`); this seat remounts the paid payload when that document changes. An enabled seat whose boot profile has no payload and no exclusive `SHRES_SHIELD_MODULE` installs npm `latest` once through `pnpm add`, then remounts. New `web` and `headless` profiles also declare `shres.editions.shield` with `autoProvision: true` so first boot provisions the same package.
 
 ### Per-repo exemption (`repos`)
 
@@ -35,12 +35,13 @@ The engine mounts once per harness boot, so the gate is a mount gate: when every
 - `SHRES_SHIELD` is not `off`
 - `@shrestech/shres-shield-plugin` resolves, in order: `SHRES_SHIELD_MODULE` (exclusive when set), the active profile's installed payload (the profile `node_modules` the seat's boot profile anchors), sibling `../shres-shield/packages/plugin/dist/index.js`, then the `@shrestech/shres-shield-plugin` package specifier
 - the payload is entitled: a non-empty `license` / `SHRES_SHIELD_LICENSE` (default `shres-dev` until a paid key exists), or the engine loaded from the sibling checkout or `SHRES_SHIELD_MODULE`
+- the paid `apply` did not return `entitlement.active === false`
 - `enabled` is not `false` (Settings → Shield switch; default on)
 - at least one live session's repo is not exempt through `repos`; no live sessions counts as enabled
 
 An unentitled or missing payload keeps the seat loaded and `active: false`. The agent loop is unchanged. The product mark stays monochrome.
 
-`license` is a deployment-varying string. This seat does not verify a signature; that check belongs to a later paid-release of the payload.
+The seat forwards `license` and `posture` into paid `apply`. Plugin 0.2.0 verifies signed `shres1.` tokens. For a profile- or package-resolved load without a signed token, a non-production seat sets `SHRES_SHIELD_DEV=1` so the payload's unsigned-dev hatch can screen until a paid key exists. `NODE_ENV=production` or `SHRES_SHIELD_PRODUCTION=1` forbids that hatch.
 
 ### `ctx.shield`
 
@@ -70,8 +71,7 @@ Inactive: none. Active: the doctrine section is prefix-stable for a given plugin
 
 ## Known Limitations and Deferred Work
 
-- **License strings are not signature-verified** — a non-empty `license` entitles a package- or profile-resolved payload; cryptographic verification is deferred to the paid release of `@shrestech/shres-shield-plugin`.
 - **Concurrent mixed-repo sessions over-screen** — the repo gate is a mount gate over the live session set; when enabled and exempt repos both have live sessions, the exempt repos stay screened. Exact suppression needs an engine-side exclusion contract in the sibling `shres-shield` repo (`apply` config or a suppression callback in `docs/integration-shres-code.md`).
 - **Ask posture needs an open-turn `ctx.approval.request`** — the payload adapter maps `'allowed-once'` and fail-closes without an `agent` on the live tool execution; headless compositions stay fail-closed.
-- **The payload is not a workspace dependency** — CI without a sibling checkout or `SHRES_SHIELD_MODULE` loads the seat as `engine-missing` and does not screen.
+- **The payload is not a workspace runtime dependency** — CI without a sibling checkout, `SHRES_SHIELD_MODULE`, or a profile install loads the seat as `engine-missing` and does not screen. Product boots install npm `latest` into the profile when the payload is missing and Shield is enabled.
 - **Definition freshness is optional on the snapshot** — the pane shows `—` until the engine reports `definitions`. Plugin npm updates are a separate RPC (`checkUpdate` / `applyUpdate`), not a SIG-PACK refresh.

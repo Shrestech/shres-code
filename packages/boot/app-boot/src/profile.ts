@@ -129,6 +129,22 @@ export const PROFILE_TEMPLATES: Record<string, readonly string[]> = {
   headless: ['@shres-code/shres-code-base', '@shres-code/shres-code-headless'],
 }
 
+/**
+ * Paid Shield payload specifier declared on shipped web/headless editions.
+ * Keep equal to `PAYLOAD_SPECIFIER` in `@shres-code/shres-code-shield`.
+ */
+export const SHIELD_EDITION_PACKAGE = '@shrestech/shres-shield-plugin'
+
+/**
+ * Edition inventory written into a new web or headless profile. `autoProvision:
+ * true` so first boot installs a missing Shield payload. Existing profiles are
+ * never rewritten; the seat installs a missing payload on an enabled mount.
+ */
+export const PROFILE_TEMPLATE_EDITIONS: Record<string, Record<string, ShresEdition>> = {
+  web: { shield: { packages: [SHIELD_EDITION_PACKAGE], autoProvision: true } },
+  headless: { shield: { packages: [SHIELD_EDITION_PACKAGE], autoProvision: true } },
+}
+
 /** Installation-owned bundle tuples normalized to the shipped template. */
 const INSTALLATION_OWNED_PROFILE_TUPLES: Record<string, readonly string[]> = {
   headless: ['@shres-code/shres-code-base', '@shres-code/shres-code-web-app', '@shres-code/shres-code-headless'],
@@ -161,8 +177,14 @@ autoInstallPeers: false
  * so re-running is a no-op on an initialized profile.
  * @param dir - the profile directory from {@link resolveProfileDir}.
  * @param bundles - the initial `shres.profile.bundles` layer list.
+ * @param editions - optional edition inventory (`web` / `headless` templates
+ *   pass {@link PROFILE_TEMPLATE_EDITIONS}).
  */
-export function initProfile(dir: string, bundles: readonly string[]): void {
+export function initProfile(
+  dir: string,
+  bundles: readonly string[],
+  editions?: Record<string, ShresEdition>,
+): void {
   mkdirSync(dir, { recursive: true })
   const manifestPath = join(dir, 'package.json')
   if (!existsSync(manifestPath)) {
@@ -170,7 +192,10 @@ export function initProfile(dir: string, bundles: readonly string[]): void {
       name: `shres-profile-${basename(dir)}`,
       private: true,
       dependencies: {},
-      shres: { profile: { bundles: [...bundles] } },
+      shres: {
+        profile: { bundles: [...bundles] },
+        ...editions === undefined ? {} : { editions },
+      },
     }
     writeFileSync(manifestPath, JSON.stringify(manifest, undefined, 2) + '\n')
   }
@@ -393,7 +418,7 @@ export function loadProfile(
         `${binName}: profile ${JSON.stringify(name)} does not exist; create it with 'shres plugin --profile ${name} add <package>'`,
       )
     }
-    initProfile(dir, template)
+    initProfile(dir, template, PROFILE_TEMPLATE_EDITIONS[name])
   }
   const manifest = normalizeShippedProfile(name, dir, readProfileManifest(binName, dir))
   // A hand-written profile manifest may omit the shres section entirely.

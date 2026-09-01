@@ -24,7 +24,7 @@ No model-visible text.
 
 **One button that checks and installs without a confirmation step.** Rejected: a registry GET is cheap and safe; `pnpm add` writes the profile. The pane shows installed vs latest before Update.
 
-**Auto-write `shres.editions.shield` on Update.** Rejected: editions stay "config declares, enabling selects". `pnpm add` writes an ordinary profile dependency; wiping `node_modules` without re-running Update or `pnpm install` in the profile leaves the seat `engine-missing` until the user checks again.
+**Auto-write `shres.editions.shield` on Update.** Rejected: editions stay "config declares, enabling selects". New web/headless profiles declare the edition at init instead. `pnpm add` writes an ordinary profile dependency. An enabled seat with no resolved payload now installs npm `latest` itself ([default-on provision](2026-09-01-shield-default-on-provision-and-hatch.md)); wiping `node_modules` no longer stays `engine-missing` until the user clicks Update.
 
 **Depend on `ctx.subprocess` for the pnpm spawn.** Rejected: adding `subprocess` to `inject` would leave the seat pending on compositions that omit it. Direct `node:child_process` spawn matches the CLI edition forwarder.
 
