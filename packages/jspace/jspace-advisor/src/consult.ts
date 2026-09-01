@@ -8,6 +8,7 @@ import type { SubagentResult } from '@shres-code/shres-code-subagent'
 import type { ObjectJsonSchema } from '@shres-code/shres-code-tools'
 import type { JspaceAdvisorDigest } from './types.ts'
 import { renderAdvisorDigest } from './digest.ts'
+import { parentEventReadInstructions } from './review.ts'
 
 /** Model-visible refusal when a session has no open J-Space card. */
 export const CONSULT_REQUIRES_CARD =
@@ -123,13 +124,17 @@ export function settleConsult(result: SubagentResult): ConsultReply {
  * Build the reviewer's consult prompt: the rendered digest plus the question.
  * @param digest - folded advisory digest.
  * @param question - the caller's question.
+ * @param parentEventRead - true when `session_event_read` is in `reviewerTools` and mounted.
  * @returns the prompt text.
  */
-export function buildConsultPrompt(digest: JspaceAdvisorDigest, question: string): string {
+export function buildConsultPrompt(
+  digest: JspaceAdvisorDigest,
+  question: string,
+  parentEventRead = false,
+): string {
   return `${renderAdvisorDigest(digest)}\n\nThe named main session asks: ${question}\n`
-    + 'Advise it from the digest. If you must inspect one event, session_event_read that '
-    + 'session_id at a listed seq — omitting session_id reads your own log. Do not search '
-    + 'other sessions. Do not review code here; recommend ward for a deep review. Return a '
-    + 'one-sentence verdict in `advice` and an optional concrete `recommendation`. Spend tokens '
+    + `Advise it from the digest. ${parentEventReadInstructions(parentEventRead)} `
+    + 'Do not search other sessions. Do not review code here; recommend ward for a deep review. '
+    + 'Return a one-sentence `advice` and an optional concrete `recommendation`. Spend tokens '
     + 'only on the answer.'
 }

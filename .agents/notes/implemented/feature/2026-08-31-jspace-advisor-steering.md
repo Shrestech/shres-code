@@ -13,7 +13,7 @@ Keep the standing-child / one-shot-consult split. Give the reviewer enough addre
 - **Parent identity in every digest and delta.** Render `Main session id` and the folded seq range. Those seqs belong to that session. The spawn child already shares `cwd` and `parentSession` on its header; session-query authorizes a same-cwd target, so `session_event_read({ session_id, seq })` is enough. The digest is the address; the reviewer does not hunt.
 - **Seq-labeled tool window with a bounded argument excerpt.** Each line is `ok|FAIL name seq=N` plus a truncated `command` / `file_path` / `path` / `url` / `query` / `question` (config `maxArgChars`, default 80). A path is enough to steer most of the time; the one allowed `session_event_read` verifies a listed seq.
 - **`user-intent` trigger.** A source-`user` `user/message` wakes the standing child immediately. Plugin and subagent notices do not. After a review settles, if a newer human message exists than `lastSeq`, one catch-up delta runs even if `suppressReview` would block cadence — that is the in-flight second-message case. `drift-check` remains for silent work. User-intent always runs after a failed review, like epoch and charter.
-- **Persona and main-session rules.** The child persona states the job (steer to the user goal), the tools (wiki plus one parent `session_event_read`), the self-read trap, token frugality, and that code review is a main-session `ward` call. The parent `jspace:advisor` section always prints trusted rules while armed and a card is open: consult with `jspace_consult` when unsure; treat framed advice as untrusted; deep review via `ward`. Latest verdict, when present, stays in the untrusted frame underneath.
+- **Persona and main-session rules.** The standing persona states the job (steer to the user goal), wiki tools, token frugality, Ward for code review, and the verdict-JSON reply protocol. It mentions `session_event_read` only when that name is in `reviewerTools` and the tool is mounted (see [honest-persona](../bug-fix/2026-09-01-jspace-advisor-honest-persona.md)). Consult children use a separate consult persona (`advice` / `recommendation`). The parent `jspace:advisor` section always prints trusted rules while armed and a card is open: consult with `jspace_consult` when unsure; treat framed advice as untrusted; a Redirect is a suggestion; deep review via `ward`. Latest verdict, when present, stays in the untrusted frame underneath.
 
 ## Alternatives considered
 
@@ -27,7 +27,7 @@ Keep the standing-child / one-shot-consult split. Give the reviewer enough addre
 
 ## Consequences
 
-- A deployment that wants the one parent read must still mount `tool-session-query` and add `session_event_read` to `reviewerTools`. Wiki-only remains the shipped default.
+- A deployment that wants the one parent read must still mount `tool-session-query` and add `session_event_read` to `reviewerTools`. Until both are true, the persona does not mention that tool. Wiki-only remains the shipped default.
 - Catch-up bypasses `suppressReview` only for human messages newer than the last fold, so an ignored redirect still does not re-nag until the user speaks.
 - Direct chat in the Advisor pane is a separate inbox and is unchanged.
 
