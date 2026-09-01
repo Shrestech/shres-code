@@ -8,6 +8,7 @@ import {
   buildStandingReviewerPersona,
   DEFAULT_REVIEWER_PERSONA,
   parentEventReadAllowed,
+  isCadenceTrigger,
   classifyDrift,
   classifyTrigger,
   isErroredToolResult,
@@ -63,6 +64,12 @@ describe('classifyTrigger', () => {
 
   it('classifies a ship attempt', () => {
     expect(classifyTrigger(event('jspace/charter-run', { phase: 'ship', passed: true }), [], 2)).toBe('ship-attempt')
+    expect(classifyTrigger(event('jspace/shipped', { goalOpenedSeq: 0 }, 3), [], 2)).toBe('ship-attempt')
+    const shipLog = [
+      toolCall('ship-1', 'jspace_ship', 1),
+      erroredResult('ship-1', 2, false),
+    ]
+    expect(classifyTrigger(shipLog[1] as SessionEvent, shipLog, 2)).toBe('ship-attempt')
   })
 
   it('ignores a passing checkpoint run', () => {
@@ -278,6 +285,8 @@ describe('DEFAULT_REVIEWER_PERSONA / parent-event read', () => {
     expect(DEFAULT_REVIEWER_PERSONA).toContain('tokens are expensive')
     expect(DEFAULT_REVIEWER_PERSONA).toContain('exactly one JSON object')
     expect(DEFAULT_REVIEWER_PERSONA).toContain('omit redirect')
+    expect(DEFAULT_REVIEWER_PERSONA).toContain('jspace_open only for new work')
+    expect(DEFAULT_REVIEWER_PERSONA).toContain('/j-space off')
   })
 
   it('mentions session_event_read only when the name is filtered in and mounted', () => {
@@ -294,6 +303,9 @@ describe('DEFAULT_REVIEWER_PERSONA / parent-event read', () => {
     expect(buildConsultPersona(false)).toContain('`recommendation`')
     expect(buildConsultPersona(false)).not.toContain('exactly one JSON object')
     expect(buildConsultPersona(true)).toContain('session_event_read')
+    expect(isCadenceTrigger('drift-check')).toBe(true)
+    expect(isCadenceTrigger('error-burst')).toBe(true)
+    expect(isCadenceTrigger('ship-attempt')).toBe(false)
   })
 })
 

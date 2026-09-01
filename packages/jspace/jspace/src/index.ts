@@ -16,6 +16,7 @@ import type { ZodType } from 'zod'
 import {
   decodeJspaceCard,
   decodeJspaceClosed,
+  decodeJspaceShipped,
   foldJspace,
   matchesCoverageTerms,
 } from './fold.ts'
@@ -45,6 +46,7 @@ export type { CharterProposalExtract } from './charter-seed.ts'
 export {
   decodeJspaceCard,
   decodeJspaceClosed,
+  decodeJspaceShipped,
   foldJspace,
   formatJspaceCard,
   formatJspaceCheckedElision,
@@ -204,6 +206,11 @@ const jspaceProjectionSchema: ZodType<JspaceProjection> = zod.object({
     })).default([]),
   }).nullable(),
   closed: zod.boolean(),
+  settled: zod.object({
+    goal: zod.string().min(1),
+    goalOpenedSeq: zod.number().int().nonnegative(),
+    seq: zod.number().int().nonnegative(),
+  }).optional(),
   fault: zod.string().optional(),
 }) as ZodType<JspaceProjection>
 
@@ -651,6 +658,21 @@ export default class JspaceService extends Service {
     }, { ignorable: true })
   }
 
+  /**
+   * Stamp the current Goal epoch as settled after a passing ship check.
+   * Does not close the card.
+   * @param session - owning session.
+   */
+  recordShipped(session: Session): void {
+    this.requireActive()
+    const card = this.requireCard(session)
+    session.append('jspace/shipped', {
+      sessionId: session.id,
+      goal: card.goal,
+      goalOpenedSeq: card.goalOpenedSeq,
+    }, { ignorable: true })
+  }
+
   private sync(): void {
     const enabled = this.config.enabled === true
     const next: JspaceStatus = enabled
@@ -772,10 +794,26 @@ export function applyJspaceProjection(
   state: JspaceProjection,
   event: SessionEvent,
 ): JspaceProjection {
-  if (event.type !== 'jspace/card' && event.type !== 'jspace/closed') return state
+  if (event.type !== 'jspace/card' && event.type !== 'jspace/closed' && event.type !== 'jspace/shipped') {
+    return state
+  }
   try {
+    if (event.type === 'jspace/shipped') {
+      const stamp = decodeJspaceShipped(event.data)
+      if (state.card === null || stamp.goalOpenedSeq !== state.card.goalOpenedSeq) return state
+      return {
+        ...state,
+        settled: { goal: stamp.goal, goalOpenedSeq: stamp.goalOpenedSeq, seq: event.seq },
+      }
+    }
     if (event.type === 'jspace/card') {
-      return { card: decodeJspaceCard(event.data), closed: false }
+      const card = decodeJspaceCard(event.data)
+      const keep = state.settled !== undefined && state.settled.goalOpenedSeq === card.goalOpenedSeq
+      return {
+        card,
+        closed: false,
+        ...keep ? { settled: state.settled } : {},
+      }
     }
     decodeJspaceClosed(event.data)
     return { card: null, closed: true }

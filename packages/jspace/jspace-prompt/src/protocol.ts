@@ -33,6 +33,12 @@ export const JSPACE_DRIVER_CLOSED =
   + 'compaction. Keep it current with jspace_note and jspace_checkpoint; '
   + 'call jspace_ship before claiming done.'
 
+/** How to drive the tools when the current Goal epoch has passed ship. */
+export const JSPACE_DRIVER_SETTLED =
+  'This Goal is settled (jspace_ship passed). Do not refresh Goal/Core/Checked/Open/Next. '
+  + 'Open the next Goal epoch with jspace_open only when new work starts. '
+  + 'J-Space stays on until the user turns it off (/j-space off).'
+
 /** How to drive the tools when a card is already printed. */
 export const JSPACE_DRIVER_OPEN =
   'A J-Space card is open. Update it with jspace_note. Record checks with jspace_checkpoint '
@@ -51,13 +57,16 @@ export const JSPACE_DRIVER_CHARTER
  * @param pass - selected pass.
  * @param cardOpen - true when a native card is already printed.
  * @param charterProposal - when true, append {@link JSPACE_DRIVER_CHARTER} (a proposal exists and the card charter is still empty).
+ * @param settled - true when the current Goal epoch has a passing ship stamp.
  * @returns the protocol section text.
  */
 export function formatJspaceProtocol(
   pass: JspacePass,
   cardOpen: boolean,
   charterProposal = false,
+  settled = false,
 ): string {
+  if (settled) return JSPACE_DRIVER_SETTLED
   let driver = cardOpen ? JSPACE_DRIVER_OPEN : JSPACE_DRIVER_CLOSED
   if (charterProposal) {
     driver = `${driver} ${JSPACE_DRIVER_CHARTER}`

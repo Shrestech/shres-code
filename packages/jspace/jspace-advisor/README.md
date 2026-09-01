@@ -40,21 +40,23 @@ Default-off jspace feature that puts a reviewer model on the session. The adviso
 - **Consult** (`jspace_consult`) folds the digest, asks the reviewer the caller's question, and returns `{advice, recommendation?}` synchronously as the tool result.
 - **Proactive** watches committed session events; on a trigger or the drift cadence it delivers one review turn to the standing advisor, awaits the JSON verdict `{verdict, advice, redirect?}`, and appends it as a log-only `jspace/advisor` event. The first turn carries the full digest; every later turn carries only the delta since the previous review (parent session id, goal anchor, new user messages, current card, trailing tool window, step count), so the reviewer keeps its earlier verdicts in its own conversation instead of re-deriving them from a cold digest. A human `user/message` is itself a trigger (`user-intent`); a second human message that arrives while a review is in flight is delivered as one catch-up delta after that review settles.
 - The verdict channel is the reviewer's final reply: the persona demands a reply that is exactly one JSON object, parsed and validated at the model boundary. A turn that ends without a parseable verdict is a failed review: the advisor is discarded, the next trigger cold-restarts a fresh one, and cadence triggers (drift, error bursts) cool down until the user speaks again — epoch, charter, and user-intent triggers always run. A stuck turn is interrupted after `reviewTimeoutMs`.
-- The digest names the **parent session id** and folds through that session's seqs. It anchors on the **user-message stream** (U1, U2, … with U1 always retained) — the card Goal is the agent's own claim and can be a placeholder — and renders the trailing tool window last so the digest cap truncates it first. Each tool line is `ok|FAIL name seq=N` plus a bounded path or command excerpt.
+- The digest names the **parent session id** and folds through that session's seqs. It anchors on the **user-message stream** (U1, U2, … with U1 always retained) — the card Goal is the agent's own claim and can be a placeholder — and renders the trailing tool window last so the digest cap truncates it first. Each tool line is `ok|FAIL name seq=N` plus a bounded path or command excerpt. A passing ship for the current epoch adds one line: ship passed and does not close the card.
 - The reviewer **judges from the digest and its own prior turns**. The standing persona and consult prompt mention `session_event_read` only when that name is in `reviewerTools` **and** the tool is mounted; omitting `session_id` then reads the advisor's own log and is forbidden. Wiki-only remains the shipped default. It cannot edit the tree or review code; a deep review is a main-session `ward` call. Tokens stay small: prefer the digest, one-sentence verdicts. Consult children receive a consult persona that asks for `advice` / `recommendation`, not the standing verdict JSON.
-- The **`jspace:advisor` prompt section** always carries trusted main-session rules while armed (consult when unsure; treat framed advice as untrusted; a Redirect is a suggestion; deep review via `ward`). Latest verdict text, when present, is framed untrusted underneath. Assembly runs on every step, so a verdict completing mid-turn reaches the main model in the same turn.
-- Coalescing is log-derived: one review in flight, and no new cadence review until the user speaks after the latest advice. User-intent and catch-up still deliver every human prompt. Failure is contained — a broken reviewer logs a warning and nothing else; plugin disposal aborts in-flight reviews.
+- The **`jspace:advisor` prompt section** always carries trusted main-session rules while armed (consult when unsure; treat framed advice as untrusted; a Redirect is a suggestion; stop tending a shipped Goal; deep review via `ward`). Latest verdict text, when present, is framed untrusted underneath. Assembly runs on every step, so a verdict completing mid-turn reaches the main model in the same turn.
+- Coalescing is log-derived: one review in flight, and no new cadence review until the user speaks after the latest advice. `ship-attempt`, `goal-epoch`, `charter-fail`, and `user-intent` still run. Catch-up still delivers every human prompt. Failure is contained — a broken reviewer logs a warning and nothing else; plugin disposal aborts in-flight reviews.
 
 ## Proactive triggers
 
 | Trigger | Event |
 |---|---|
 | `charter-fail` | `jspace/charter-run` with `passed: false` (discrimination probes, phase `probe`, are excluded) |
-| `ship-attempt` | `jspace/charter-run` with `phase: 'ship'` |
+| `ship-attempt` | `jspace/charter-run` phase `ship`, a `jspace/shipped` stamp, or a successful `jspace_ship` result |
 | `goal-epoch` | a `jspace/card` whose Goal changed |
 | `error-burst` | `errorBurst` consecutive errored `tool/result`s (interleaved `tool/call`s do not reset the run) |
 | `drift-check` | every `driftEverySteps` completed `step/end`s since the last advice |
 | `user-intent` | a source-`user` `user/message` (plugin and subagent notices are excluded) |
+
+Cadence triggers (`drift-check`, `error-burst`) wait until the user speaks after the latest advice. `ship-attempt`, `goal-epoch`, `charter-fail`, and `user-intent` always run.
 
 Every `jspace/advisor` event carries `triggerSeq`; the package invariant companion checks the pointed-at event against a config-free predicate per trigger family, plus strictly increasing drift-check pointers.
 

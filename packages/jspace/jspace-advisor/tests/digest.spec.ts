@@ -105,6 +105,14 @@ describe('foldAdvisorDigest', () => {
     expect(digest.sessionId).toBe('s1')
   })
 
+  it('names a passing ship for the current Goal epoch', () => {
+    const digest = foldAdvisorDigest(sessionWith([
+      { type: 'jspace/shipped', seq: 4, data: { sessionId: 's1', goal: CARD.goal, goalOpenedSeq: 0 } },
+    ], 5), CARD, CAPS)
+    expect(digest.shipped).toContain('seq 4')
+    expect(renderAdvisorDigest(digest)).toContain('ship does not close the card')
+  })
+
   it('keeps the trailing tool window, not the head', () => {
     const events: unknown[] = []
     for (let i = 0; i < 5; i += 1) {

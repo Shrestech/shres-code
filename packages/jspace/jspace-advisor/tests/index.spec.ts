@@ -246,6 +246,7 @@ describe('MAIN_SESSION_ADVISOR_RULES', () => {
   it('treats a Redirect as a suggestion, not an order', () => {
     expect(Advisor.MAIN_SESSION_ADVISOR_RULES).toContain('A Redirect is a suggestion')
     expect(Advisor.MAIN_SESSION_ADVISOR_RULES).not.toMatch(/act on a Redirect/)
+    expect(Advisor.MAIN_SESSION_ADVISOR_RULES).toContain('stop tending the card')
   })
 })
 
@@ -492,6 +493,25 @@ describe('advisor apply', () => {
     await new Promise(resolve => setTimeout(resolve, 150))
     expect(continuable.starts).toBe(1)
     expect(adviceEvents(session)).toHaveLength(0)
+    await ctx.fiber.dispose()
+  })
+
+  it('reviews a ship stamp even after a landed verdict', async () => {
+    const { ctx } = await boot()
+    const continuable = patchContinuable(ctx)
+    const session = await liveSession(ctx)
+    for (let step = 1; step <= 8; step += 1) session.append('step/end', { turn: 1, step })
+    await until(() => adviceEvents(session).length === 1)
+    const card = ctx.jspace.card(session)
+    session.append('jspace/shipped', {
+      sessionId: session.id,
+      goal: card?.goal ?? 'Ship the advisor',
+      goalOpenedSeq: card?.goalOpenedSeq ?? 0,
+    }, { ignorable: true })
+    await until(() => adviceEvents(session).length === 2)
+    expect(adviceEvents(session)[1]?.data.trigger).toBe('ship-attempt')
+    expect(continuable.starts).toBe(1)
+    expect(continuable.followups).toBe(1)
     await ctx.fiber.dispose()
   })
 

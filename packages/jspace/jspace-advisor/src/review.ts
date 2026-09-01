@@ -56,6 +56,8 @@ export function buildStandingReviewerPersona(parentEventRead: boolean): string {
     'The card is only what the session claims and may be stale. Judge work against the user, not the card.',
     'You cannot edit files, run a shell, approve tools, or review code yourself.',
     'Code review is a main-session permission: on a deep review, redirect it to call ward (the Reviewer seat) with a self-contained prompt. Do not ask it to paste diffs here.',
+    'If the user ask is satisfied and the Goal is still open, that is drift: redirect to jspace_open only for new work, or tell the user the card stays until /j-space off.',
+    'Delivered work that was never shipped is also drift (checkpoint, then jspace_ship).',
     'Each turn is a full digest or a delta. Every user message in it is ground truth and must be weighed.',
     'The digest names the main session id and labels every tool seq. Those seqs belong to that session, not yours.',
     parentEventReadInstructions(parentEventRead),
@@ -79,6 +81,8 @@ export function buildConsultPersona(parentEventRead: boolean): string {
     'The card is only what the session claims and may be stale. Judge work against the user, not the card.',
     'You cannot edit files, run a shell, approve tools, or review code yourself.',
     'Code review is a main-session permission: recommend it call ward (the Reviewer seat) with a self-contained prompt.',
+    'If the user ask is satisfied and the Goal is still open, say so: jspace_open only for new work, or the user turns J-Space off.',
+    'Delivered work that was never shipped should be checkpointed and shipped.',
     parentEventReadInstructions(parentEventRead),
     'Do not search other sessions. Do not dump code or long quotes.',
     'Return structured output only: one-sentence `advice` and an optional concrete `recommendation`.',
@@ -301,6 +305,8 @@ export function classifyTrigger(
     if (!event.data.passed) return 'charter-fail'
     return undefined
   }
+  if (event.type === 'jspace/shipped') return 'ship-attempt'
+  if (isSuccessfulJspaceShipResult(event, log)) return 'ship-attempt'
   if (event.type === 'jspace/card') {
     const previous = previousCardGoal(log, event.seq)
     if (previous !== undefined && previous !== event.data.goal) return 'goal-epoch'
@@ -346,12 +352,45 @@ export function classifyDrift(log: readonly SessionEvent[], everySteps: number):
 }
 
 /**
- * One review per user turn, and no repeated verdict until the user speaks:
- * suppress when the latest advice is newer than the latest human message.
- * Continuation wakes are not user speech, so an unanswered redirect never
- * re-fires.
+ * Whether a successful `jspace_ship` tool result is this event.
+ * @param event - candidate event.
+ * @param log - session log (to resolve the call's tool name).
+ * @returns true when this is a non-error `jspace_ship` result.
+ */
+export function isSuccessfulJspaceShipResult(
+  event: SessionEvent,
+  log: readonly SessionEvent[],
+): boolean {
+  if (event.type !== 'tool/result' || isErroredToolResult(event)) return false
+  const callId = (event.data as {
+    message?: { source?: { kind?: string; callId?: string } }
+  }).message?.source?.callId
+  if (callId === undefined) return false
+  for (const candidate of log) {
+    if (candidate.type !== 'tool/call') continue
+    const data = candidate.data as { callId?: string; name?: string }
+    if (data.callId === callId) return data.name === 'jspace_ship'
+  }
+  return false
+}
+
+/**
+ * Cadence-only suppression: drift-check and error-burst wait until the user
+ * speaks. Lifecycle triggers (ship, charter-fail, goal-epoch) and user-intent
+ * always run.
+ * @param trigger - classified trigger.
+ * @returns true when {@link suppressReview} applies to this family.
+ */
+export function isCadenceTrigger(trigger: AdvisorTrigger): boolean {
+  return trigger === 'drift-check' || trigger === 'error-burst'
+}
+
+/**
+ * Cadence suppression: latest advice newer than the latest human message.
+ * Continuation wakes are not user speech. Callers apply this only to
+ * {@link isCadenceTrigger} families.
  * @param log - the session log.
- * @returns true when no new review should run.
+ * @returns true when drift-check / error-burst should not run.
  */
 export function suppressReview(log: readonly SessionEvent[]): boolean {
   const advice = latestAdvice(log)

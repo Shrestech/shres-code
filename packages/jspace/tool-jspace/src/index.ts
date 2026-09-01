@@ -188,7 +188,8 @@ const CHECKPOINT_DESCRIPTION =
 const SHIP_DESCRIPTION =
   'Check that the open card is ready to ship: Goal and Next are set, and a checkpoint '
   + 'exists for the current Goal. Re-runs every charter check against the current workspace. '
-  + 'Writes no files and does not close the card.'
+  + 'Writes no files and does not close the card. A passing ship stamps the Goal settled '
+  + 'so the session stops re-tending that epoch.'
 
 const AMEND_DESCRIPTION =
   'Replace charter entries on the open card. Drop by id, replace an id with a new check or '
@@ -497,6 +498,7 @@ function registerTools(ctx: Context, config: ResolvedConfig): () => void {
       if (card !== null && card.charter.length > 0) {
         await runCharter(ctx, exec, card.charter, 'ship', config)
       }
+      ctx.jspace.recordShipped(session)
       return args.path === undefined ? { shipped: true } : { shipped: true, path: args.path }
     },
     presentCall: args => present('Ship J-Space', args.path),
