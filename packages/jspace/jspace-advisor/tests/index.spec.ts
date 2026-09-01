@@ -59,15 +59,13 @@ function registerSpawn(ctx: Context, behavior: 'verdict' | 'noredirect'): void {
     name: 'spawn',
     capabilities: { outputSchema: true, depthLimit: true, toolFilter: true, persona: true },
     inheritsParentContext: false,
-    start: async (request: {
-      label?: string
-      persona?: string
-      prompt?: { text?: string }[]
-      outputSchema?: { properties?: Record<string, unknown> }
-    }) => {
+    start: async (request) => {
       startLabels.push(request.label)
       startPersonas.push(request.persona)
-      startPrompts.push((request.prompt ?? []).map(part => part.text ?? '').join(''))
+      startPrompts.push(request.prompt
+        .filter((part): part is { type: 'text'; text: string } => part.type === 'text')
+        .map(part => part.text)
+        .join(''))
       const structured = 'verdict' in (request.outputSchema?.properties ?? {})
         ? behavior === 'noredirect'
           ? { verdict: 'drift', advice: 'off course' }
@@ -326,7 +324,10 @@ describe('advisor apply', () => {
       name: 'session_event_read',
       description: 'stub parent-event read',
       parameters: { seq: { type: 'number', required: true } },
-      output: { schema: { type: 'object', additionalProperties: false, properties: {} } },
+      output: {
+        schema: { type: 'object', additionalProperties: false, properties: {} },
+        render: () => [{ type: 'text', text: '' }],
+      },
       execute: async () => ({}),
     }))
     const session = await liveSession(ctx)
