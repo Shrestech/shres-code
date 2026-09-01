@@ -339,6 +339,12 @@
     - id: command-jspace
       name: '@shres-code/shres-code-command-jspace'
 
+    # Default-off reviewer; Settings → J-Space → Advisor binds enabled + route.
+    - id: jspace-advisor
+      name: '@shres-code/shres-code-jspace-advisor'
+      config:
+        enabled: false
+
     # Project wiki: enabled by default, directory created on the first write.
     # The librarian stays dormant until Settings → J-Space → LLM Wiki binds a route.
     - id: wiki-filesystem

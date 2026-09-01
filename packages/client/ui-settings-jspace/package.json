@@ -1,6 +1,6 @@
 {
   "name": "@shres-code/shres-code-client-ui-settings-jspace",
-  "description": "J-Space settings page: allow switch, mode, coverage, last-known card counts, and the LLM Wiki librarian binding",
+  "description": "J-Space settings page: allow switch, mode, coverage, last-known card counts, Advisor route, and the LLM Wiki librarian binding",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"

@@ -39,6 +39,19 @@ export const en = {
   wikiProvider: 'Provider',
   wikiModel: 'Model',
   wikiUnbound: 'Unbound',
+  advisorTitle: 'Advisor',
+  advisorIntro:
+    'A background reviewer that steers the session back to the user goal. Off keeps the plugin loaded and mounts nothing.',
+  advisorToggleHint:
+    'On arms the advisor once a provider and model are bound. Off unloads consult and proactive reviews.',
+  advisorActive: 'Active',
+  advisorInactive: 'Disabled',
+  advisorActivate: 'Enable Advisor',
+  advisorDisable: 'Disable Advisor',
+  advisorModelHint: 'Bind the reviewer model. Unbound, the advisor stays dormant.',
+  advisorProvider: 'Provider',
+  advisorModel: 'Model',
+  advisorUnbound: 'Unbound',
 }
 
 /** The JSpaceKey union. */

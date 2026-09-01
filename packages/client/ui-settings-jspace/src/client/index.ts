@@ -12,11 +12,11 @@ import type {} from '@shres-code/shres-code-client-locale/client'
 import type {} from '@shres-code/shres-code-api-remotes/client'
 import { createJSpaceViewSource, type JSpaceSessionRead } from './card-source.ts'
 import { JSpaceSection } from './JSpaceSection.tsx'
-import type { JSpaceSectionInjected, JSpaceSettings, WikiSettings } from './JSpaceSection.tsx'
+import type { AdvisorSettings, JSpaceSectionInjected, JSpaceSettings, WikiSettings } from './JSpaceSection.tsx'
 import { en, type JSpaceKey } from './locales.ts'
 
 export type {
-  JSpaceSectionInjected, JSpaceSectionProps, JSpaceSettings, WikiSettings,
+  AdvisorSettings, JSpaceSectionInjected, JSpaceSectionProps, JSpaceSettings, WikiSettings,
 } from './JSpaceSection.tsx'
 export type { JSpaceCardView } from './card-source.ts'
 export type { JSpaceKey } from './locales.ts'
@@ -24,6 +24,7 @@ export type { JSpaceKey } from './locales.ts'
 /** Settings namespace the Host seat registers. Spelled here: client must not import the Host package. */
 export const JSPACE_SETTINGS_NAMESPACE = 'jspace'
 const WIKI_SETTINGS_NAMESPACE = 'wiki'
+const ADVISOR_SETTINGS_NAMESPACE = 'jspace-advisor'
 
 declare module '@shres-code/shres-code-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -51,8 +52,12 @@ export function apply(ctx: ClientContext): void {
   const wikiScope = ctx.settingsScope.bind<WikiSettings>({
     namespace: WIKI_SETTINGS_NAMESPACE,
   })
+  const advisorScope = ctx.settingsScope.bind<AdvisorSettings>({
+    namespace: ADVISOR_SETTINGS_NAMESPACE,
+  })
   const useSnapshot = bindSnapshotSelector(scope)
   const useWikiSnapshot = bindSnapshotSelector(wikiScope)
+  const useAdvisorSnapshot = bindSnapshotSelector(advisorScope)
   const useCard = bindSnapshotSelector(
     createJSpaceViewSource(ctx.sessions as unknown as JSpaceSessionRead),
   )
@@ -61,6 +66,8 @@ export function apply(ctx: ClientContext): void {
     useSnapshot,
     wikiScope,
     useWikiSnapshot,
+    advisorScope,
+    useAdvisorSnapshot,
     useCard,
     api: connection.api,
     t,

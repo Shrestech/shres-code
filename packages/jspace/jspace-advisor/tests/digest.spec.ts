@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { Session, SessionEvent } from '@shres-code/shres-code-session'
 import type { JspaceCard } from '@shres-code/shres-code-jspace'
-import { boundText, foldAdvisorDelta, foldAdvisorDigest, foldUserMessages, renderAdvisorDelta, renderAdvisorDigest, TRUNCATION_MARKER } from '../src/digest.ts'
+import { argsExcerpt, boundText, foldAdvisorDelta, foldAdvisorDigest, foldUserMessages, renderAdvisorDelta, renderAdvisorDigest, TRUNCATION_MARKER } from '../src/digest.ts'
 
 /** Minimal session stub carrying only the events the fold reads. */
 function sessionWith(events: readonly unknown[], seq = 0): Session {
-  return { events, seq } as unknown as Session
+  return { events, seq, id: 's1' } as unknown as Session
 }
 
 /** Cast raw fixture events to the fold's log type. */
@@ -25,7 +25,7 @@ const CARD: JspaceCard = {
   charter: [],
 }
 
-const CAPS = { maxTools: 12, maxChars: 4000, maxExcerpt: 200, maxUserMessage: 300, maxUserHistory: 1500 }
+const CAPS = { maxTools: 12, maxChars: 4000, maxExcerpt: 200, maxUserMessage: 300, maxUserHistory: 1500, maxArgs: 80 }
 
 function userMsg(text: string, seq: number) {
   return { type: 'user/message', seq, data: { source: { kind: 'user' }, content: [{ type: 'text', text }] } }
@@ -38,6 +38,22 @@ describe('boundText', () => {
 
   it('truncates long text with a marker', () => {
     expect(boundText('abcdef', 4)).toBe('abc' + TRUNCATION_MARKER)
+  })
+})
+
+describe('argsExcerpt', () => {
+  it('prefers command and file_path over the rest of the JSON', () => {
+    expect(argsExcerpt('{"command":"git log","timeout":1}', 80)).toBe('git log')
+    expect(argsExcerpt('{"file_path":"/tmp/a.ts"}', 80)).toBe('/tmp/a.ts')
+  })
+
+  it('bounds a raw non-JSON blob', () => {
+    expect(argsExcerpt('not-json-at-all', 8)).toBe('not-jso' + TRUNCATION_MARKER)
+  })
+
+  it('returns undefined for empty arguments', () => {
+    expect(argsExcerpt(undefined, 80)).toBeUndefined()
+    expect(argsExcerpt('', 80)).toBeUndefined()
   })
 })
 
@@ -86,6 +102,7 @@ describe('foldAdvisorDigest', () => {
     expect(digest.steps).toBe(2)
     expect(digest.card).toContain('Ship the feature')
     expect(digest.seq).toBe(0)
+    expect(digest.sessionId).toBe('s1')
   })
 
   it('keeps the trailing tool window, not the head', () => {
@@ -98,6 +115,17 @@ describe('foldAdvisorDigest', () => {
     expect(digest.recentTools.map(signal => signal.name)).toEqual(['tool2', 'tool3', 'tool4'])
   })
 
+  it('records seq and a truncated argument excerpt on each tool signal', () => {
+    const digest = foldAdvisorDigest(sessionWith([
+      { type: 'tool/call', seq: 9, data: { callId: 'a', name: 'write', arguments: '{"file_path":"/tmp/out.ts"}' } },
+      { type: 'tool/result', seq: 10, data: { message: { source: { kind: 'tool', callId: 'a' }, content: [{ type: 'tool-result' }] } } },
+    ]), null, CAPS)
+    expect(digest.recentTools).toEqual([
+      { seq: 9, name: 'write', ok: true, argsExcerpt: '/tmp/out.ts' },
+    ])
+    expect(renderAdvisorDigest(digest)).toContain('ok write seq=9 /tmp/out.ts')
+  })
+
   it('records error excerpts only for failures', () => {
     const digest = foldAdvisorDigest(sessionWith([
       { type: 'tool/call', data: { callId: 'a', name: 'read' } },
@@ -106,8 +134,8 @@ describe('foldAdvisorDigest', () => {
       { type: 'tool/result', data: { message: { source: { kind: 'tool', callId: 'b' }, content: [{ type: 'tool-result', isError: true, text: 'boom' }] } } },
     ]), null, CAPS)
     expect(digest.recentTools).toEqual([
-      { name: 'read', ok: true },
-      { name: 'bash', ok: false, errorExcerpt: 'boom' },
+      { seq: 0, name: 'read', ok: true },
+      { seq: 0, name: 'bash', ok: false, errorExcerpt: 'boom' },
     ])
   })
 
@@ -126,7 +154,7 @@ describe('foldAdvisorDigest', () => {
       undefined,
     ]
     const digest = foldAdvisorDigest(sessionWith(events), null, CAPS)
-    expect(digest.recentTools).toEqual([{ name: 'read', ok: true }])
+    expect(digest.recentTools).toEqual([{ seq: 0, name: 'read', ok: true }])
   })
 
   it('folds the user message history', () => {
@@ -150,7 +178,7 @@ describe('foldAdvisorDigest edges', () => {
       { type: 'tool/call', data: { callId: 'a' } },
       { type: 'tool/result', data: { message: { source: { kind: 'tool', callId: 'a' }, content: [{ type: 'tool-result' }] } } },
     ]), null, CAPS)
-    expect(digest.recentTools).toEqual([{ name: '<unknown>', ok: true }])
+    expect(digest.recentTools).toEqual([{ seq: 0, name: '<unknown>', ok: true }])
   })
 })
 
@@ -164,8 +192,9 @@ describe('renderAdvisorDigest', () => {
     const render = renderAdvisorDigest(digest)
     expect(render).toContain('U1: hi')
     expect(render).toContain('Ship the feature')
-    expect(render).toContain('ok read')
-    expect(render.indexOf('U1: hi')).toBeLessThan(render.indexOf('ok read'))
+    expect(render).toContain('Main session id: s1')
+    expect(render).toContain('ok read seq=0')
+    expect(render.indexOf('U1: hi')).toBeLessThan(render.indexOf('ok read seq=0'))
   })
 
   it('renders the elision count between the first message and the suffix', () => {
@@ -182,8 +211,8 @@ describe('renderAdvisorDigest', () => {
       { type: 'tool/result', data: { message: { source: { kind: 'tool', callId: 'b' }, content: [{ type: 'tool-result', isError: true }] } } },
     ]), null, CAPS)
     const render = renderAdvisorDigest(digest)
-    expect(render).toContain('FAIL bash: denied')
-    expect(render).toContain('FAIL read')
+    expect(render).toContain('FAIL bash seq=0: denied')
+    expect(render).toContain('FAIL read seq=0')
   })
 
   it('caps the complete render at maxChars, eating the trailing tools first', () => {
@@ -191,7 +220,7 @@ describe('renderAdvisorDigest', () => {
     const render = renderAdvisorDigest(digest)
     expect(render.length).toBeLessThanOrEqual(30)
     expect(render.endsWith(TRUNCATION_MARKER)).toBe(true)
-    expect(render.startsWith('User messages')).toBe(true)
+    expect(render.startsWith('Main session id:')).toBe(true)
   })
 })
 
@@ -218,7 +247,7 @@ describe('foldAdvisorDelta', () => {
       { type: 'tool/call', seq: 5, data: { callId: 'new', name: 'read' } },
       { type: 'tool/result', seq: 6, data: { message: { source: { kind: 'tool', callId: 'new' }, content: [{ type: 'tool-result' }] } } },
     ], 6), null, CAPS, 3)
-    expect(delta.recentTools).toEqual([{ name: 'read', ok: true }])
+    expect(delta.recentTools).toEqual([{ seq: 5, name: 'read', ok: true }])
   })
 
   it('renders the goal, the delta boundary, and the new messages', () => {
@@ -227,6 +256,8 @@ describe('foldAdvisorDelta', () => {
       userMsg('new ask', 4),
     ], 4), CARD, CAPS, 3)
     const render = renderAdvisorDelta(delta)
+    expect(render).toContain('Main session id: s1')
+    expect(render).toContain('Folded events: 3 → 4')
     expect(render).toContain('Goal (U1): goal')
     expect(render).toContain('New user messages since event 3:')
     expect(render).toContain('N1: new ask')

@@ -199,14 +199,20 @@ function patchContinuable(ctx: Context): ContinuableLog {
 }
 
 describe('resolveConfig', () => {
-  it('requires a route when enabled', () => {
-    expect(() => Advisor.resolveConfig({ enabled: true })).toThrow(/enabled requires provider and model/)
-    expect(() => Advisor.resolveConfig({ enabled: true, provider: 'zai' })).toThrow(/enabled requires/)
+  it('keeps enabled without a bound route unarmed', () => {
+    const unbound = Advisor.resolveConfig({ enabled: true })
+    expect(unbound.enabled).toBe(true)
+    expect(unbound.provider).toBeUndefined()
+    expect(Advisor.armed(unbound, { active: true, reason: 'enabled' } as never)).toBe(false)
+    expect(Advisor.armed(
+      Advisor.resolveConfig({ enabled: true, provider: 'zai' }),
+      { active: true, reason: 'enabled' } as never,
+    )).toBe(false)
   })
 
   it('rejects invalid numeric fields', () => {
     for (const field of ['maxDigestTools', 'maxDigestChars', 'maxExcerptChars', 'maxUserMessageChars',
-      'maxUserHistoryChars', 'maxAdviceChars', 'errorBurst', 'driftEverySteps', 'advisorySectionOrder']) {
+      'maxUserHistoryChars', 'maxAdviceChars', 'maxArgChars', 'errorBurst', 'driftEverySteps', 'advisorySectionOrder']) {
       expect(() => Advisor.resolveConfig({ ...ENABLED, [field]: 0 })).toThrow(field)
     }
     expect(() => Advisor.resolveConfig({ ...ENABLED, driftEverySteps: 1 })).toThrow(/driftEverySteps/)
@@ -230,6 +236,25 @@ describe('armed', () => {
 })
 
 describe('advisor apply', () => {
+  it('remounts consult when settings enable a bound route', async () => {
+    const { ctx } = await boot({ enabled: false })
+    const session = await liveSession(ctx)
+    expect(ctx.tools.schemas().map(schema => schema.name)).not.toContain('jspace_consult')
+    await ctx.settings.replace(Advisor.ADVISOR_SETTINGS_NAMESPACE, { enabled: true })
+    expect(ctx.tools.schemas().map(schema => schema.name)).not.toContain('jspace_consult')
+    await ctx.settings.replace(Advisor.ADVISOR_SETTINGS_NAMESPACE, {
+      enabled: true,
+      provider: 'zai',
+      model: 'glm-5.3',
+    })
+    expect(ctx.tools.schemas().map(schema => schema.name)).toContain('jspace_consult')
+    const assembly = await ctx.systemPrompt.assemble({ agent: { id: session.id, session } } as never)
+    expect(JSON.stringify(assembly)).toContain('call ward')
+    await ctx.settings.replace(Advisor.ADVISOR_SETTINGS_NAMESPACE, { enabled: false })
+    expect(ctx.tools.schemas().map(schema => schema.name)).not.toContain('jspace_consult')
+    await ctx.fiber.dispose()
+  })
+
   it('denies consult before a card opens', async () => {
     const { ctx } = await boot()
     const session = ctx.sessions.create(SessionId('s-no-card'))
@@ -259,6 +284,7 @@ describe('advisor apply', () => {
     await until(() => adviceEvents(session).length === 1)
     expect(continuable.starts).toBe(1)
     expect(continuable.prompts[0]).toContain('reply with only the verdict JSON now')
+    expect(continuable.prompts[0]).toContain('Main session id: s-advisor')
     const advice = adviceEvents(session)[0]?.data
     expect(advice?.trigger).toBe('drift-check')
     expect(advice?.triggerSeq).toBe(session.events.findLast(e => e.type === 'step/end')?.seq)
@@ -281,7 +307,6 @@ describe('advisor apply', () => {
       source: { kind: 'user' },
       content: [{ type: 'text', text: 'stay on the goal' }],
     } as never, { surfaceOp: 'append' })
-    for (let step = 1; step <= 8; step += 1) session.append('step/end', { turn: 3, step })
     await until(() => adviceEvents(session).length === 2)
     expect(continuable.starts).toBe(1)
     expect(continuable.followups).toBe(1)
@@ -315,6 +340,7 @@ describe('advisor apply', () => {
     const fresh = await liveSession(ctx)
     const freshAssembly = await ctx.systemPrompt.assemble({ agent: { id: fresh.id, session: fresh } } as never)
     expect(JSON.stringify(freshAssembly)).toContain('jspace_consult')
+    expect(JSON.stringify(freshAssembly)).toContain('call ward')
     expect(JSON.stringify(freshAssembly)).not.toContain('untrusted-jspace-advisor')
     await ctx.fiber.dispose()
   })
@@ -411,7 +437,6 @@ describe('advisor apply', () => {
       source: { kind: 'user' },
       content: [{ type: 'text', text: 'try again' }],
     } as never, { surfaceOp: 'append' })
-    for (let step = 1; step <= 8; step += 1) session.append('step/end', { turn: 3, step })
     await until(() => adviceEvents(session).length === 1)
     expect(continuable.starts).toBe(2)
     await ctx.fiber.dispose()
@@ -447,6 +472,39 @@ describe('advisor apply', () => {
     for (let step = 1; step <= 8; step += 1) session.append('step/end', { turn: 1, step })
     await new Promise(resolve => setTimeout(resolve, 150))
     expect(adviceEvents(session)).toHaveLength(0)
+    await ctx.fiber.dispose()
+  })
+
+  it('wakes the standing advisor on a human user message without waiting for the step cadence', async () => {
+    const { ctx } = await boot()
+    const continuable = patchContinuable(ctx)
+    const session = await liveSession(ctx)
+    session.append('user/message', {
+      source: { kind: 'user' },
+      content: [{ type: 'text', text: 'do the thing' }],
+    } as never, { surfaceOp: 'append' })
+    await until(() => adviceEvents(session).length === 1)
+    expect(adviceEvents(session)[0]?.data.trigger).toBe('user-intent')
+    expect(continuable.starts).toBe(1)
+    expect(continuable.prompts[0]).toContain('U1: do the thing')
+    await ctx.fiber.dispose()
+  })
+
+  it('catches a second user message that arrived while a review was in flight', async () => {
+    const { ctx } = await boot()
+    const continuable = patchContinuable(ctx)
+    const session = await liveSession(ctx)
+    session.append('user/message', {
+      source: { kind: 'user' },
+      content: [{ type: 'text', text: 'first ask' }],
+    } as never, { surfaceOp: 'append' })
+    session.append('user/message', {
+      source: { kind: 'user' },
+      content: [{ type: 'text', text: 'second ask' }],
+    } as never, { surfaceOp: 'append' })
+    await until(() => continuable.followups === 1)
+    expect(continuable.starts).toBe(1)
+    expect(continuable.prompts[1]).toContain('N1: second ask')
     await ctx.fiber.dispose()
   })
 

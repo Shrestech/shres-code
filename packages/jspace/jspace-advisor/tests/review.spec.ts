@@ -8,7 +8,9 @@ import {
   classifyDrift,
   classifyTrigger,
   isErroredToolResult,
+  isHumanUserMessage,
   isRootSession,
+  latestHumanUserSeqAfter,
   parseFinalVerdict,
   parseReviewVerdict,
   suppressReview,
@@ -16,7 +18,7 @@ import {
 
 /** Minimal session stub carrying only the events the helpers read. */
 function sessionWith(events: readonly unknown[], header: Record<string, unknown> = {}): Session {
-  return { events, header } as unknown as Session
+  return { events, header, id: 's1', seq: 0 } as unknown as Session
 }
 
 function toLog(events: readonly unknown[]): readonly SessionEvent[] {
@@ -205,8 +207,16 @@ describe('parseFinalVerdict', () => {
 })
 
 describe('classifyTrigger coverage paths', () => {
+  it('classifies a human user message as user-intent', () => {
+    expect(classifyTrigger(event('user/message', { source: { kind: 'user' } }, 1), [], 2)).toBe('user-intent')
+  })
+
+  it('ignores machine-sourced user messages', () => {
+    expect(classifyTrigger(event('user/message', { source: { kind: 'plugin' } }, 1), [], 2)).toBeUndefined()
+  })
+
   it('returns undefined for a non-trigger event type', () => {
-    expect(classifyTrigger(event('user/message', { source: { kind: 'user' } }, 1), [], 2)).toBeUndefined()
+    expect(classifyTrigger(event('assistant/message', { message: {} }, 1), [], 2)).toBeUndefined()
   })
 
   it('counts only events up to the checked seq', () => {
@@ -258,22 +268,38 @@ describe('isErroredToolResult', () => {
 })
 
 describe('DEFAULT_REVIEWER_PERSONA', () => {
-  it('frames the input as sufficient, forbids session hunting, and fixes the reply protocol', () => {
+  it('names the job, tools, parent-session read, Ward, and the reply protocol', () => {
     expect(DEFAULT_REVIEWER_PERSONA).toContain('standing reviewer of one main session')
-    expect(DEFAULT_REVIEWER_PERSONA).toContain('do not search for other sessions')
-    expect(DEFAULT_REVIEWER_PERSONA).toContain('a single JSON object')
-    expect(DEFAULT_REVIEWER_PERSONA).toContain('Omit redirect when on-track')
+    expect(DEFAULT_REVIEWER_PERSONA).toContain('session_event_read')
+    expect(DEFAULT_REVIEWER_PERSONA).toContain('Omitting session_id reads YOUR log')
+    expect(DEFAULT_REVIEWER_PERSONA).toContain('call ward')
+    expect(DEFAULT_REVIEWER_PERSONA).toContain('tokens are expensive')
+    expect(DEFAULT_REVIEWER_PERSONA).toContain('exactly one JSON object')
+    expect(DEFAULT_REVIEWER_PERSONA).toContain('omit redirect')
+  })
+})
+
+describe('isHumanUserMessage / latestHumanUserSeqAfter', () => {
+  it('finds the latest human user seq after a bound', () => {
+    const log = [
+      event('user/message', { source: { kind: 'user' } }, 1),
+      event('user/message', { source: { kind: 'plugin' } }, 2),
+      event('user/message', { source: { kind: 'user' } }, 5),
+    ]
+    expect(isHumanUserMessage(log[0] as SessionEvent)).toBe(true)
+    expect(latestHumanUserSeqAfter(log, 1)).toBe(5)
+    expect(latestHumanUserSeqAfter(log, 5)).toBeUndefined()
   })
 })
 
 describe('buildReviewPrompt', () => {
   it('embeds the digest render and the trigger', () => {
     const digest = foldAdvisorDigest(sessionWith([{ type: 'user/message', data: { source: { kind: 'user' }, content: [{ type: 'text', text: 'goal' }] }, seq: 1 }]), null,
-      { maxTools: 12, maxChars: 4000, maxExcerpt: 200, maxUserMessage: 300, maxUserHistory: 1500 })
+      { maxTools: 12, maxChars: 4000, maxExcerpt: 200, maxUserMessage: 300, maxUserHistory: 1500, maxArgs: 80 })
     const prompt = buildReviewPrompt(digest, 'drift-check')
     expect(prompt).toContain('U1: goal')
     expect(prompt).toContain('drift-check')
-    expect(prompt).toContain('The digest above is the main session')
+    expect(prompt).toContain('The digest above is the named main session')
     expect(prompt).toContain('reply with only the verdict JSON now')
   })
 
@@ -282,7 +308,7 @@ describe('buildReviewPrompt', () => {
       { type: 'user/message', data: { source: { kind: 'user' }, content: [{ type: 'text', text: 'goal' }] }, seq: 1 },
       { type: 'user/message', data: { source: { kind: 'user' }, content: [{ type: 'text', text: 'new ask' }] }, seq: 5 },
     ]), null,
-    { maxTools: 12, maxChars: 4000, maxExcerpt: 200, maxUserMessage: 300, maxUserHistory: 1500 }, 3)
+    { maxTools: 12, maxChars: 4000, maxExcerpt: 200, maxUserMessage: 300, maxUserHistory: 1500, maxArgs: 80 }, 3)
     const prompt = buildReviewDeltaPrompt(delta, 'goal-epoch')
     expect(prompt).toContain('Goal (U1): goal')
     expect(prompt).toContain('N1: new ask')

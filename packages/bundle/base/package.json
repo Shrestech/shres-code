@@ -76,6 +76,7 @@
     "@shres-code/shres-code-jspace-prompt": "workspace:^",
     "@shres-code/shres-code-tool-jspace": "workspace:^",
     "@shres-code/shres-code-command-jspace": "workspace:^",
+    "@shres-code/shres-code-jspace-advisor": "workspace:^",
     "@shres-code/shres-code-wiki": "workspace:^",
     "@shres-code/shres-code-wiki-filesystem": "workspace:^",
     "@shres-code/shres-code-tool-wiki": "workspace:^",

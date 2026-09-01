@@ -979,9 +979,9 @@ Requires: `jspace` · `tools` · `systemPrompt` · `subagents`
 export interface Config {
   /** Master allow. Default false. */
   enabled?: boolean
-  /** LLM route provider the reviewer runs on; required when enabled. */
+  /** LLM route provider the reviewer runs on; required to arm. */
   provider?: string
-  /** Model id on that route; required when enabled. */
+  /** Model id on that route; required to arm. */
   model?: string
   /** `ctx.subagents` provider that runs reviewer children. Default 'spawn'. */
   subagentProvider?: string
@@ -1001,6 +1001,8 @@ export interface Config {
   maxUserHistoryChars?: number
   /** Character cap on recorded advice and redirect text. Default 1000. */
   maxAdviceChars?: number
+  /** Character cap on each tool-argument excerpt. Default 80. */
+  maxArgChars?: number
   /** Consecutive errored tool results that count as a burst. Default 2. */
   errorBurst?: number
   /** Drift-check cadence in completed steps since the last advice. Default 8. */
@@ -1014,7 +1016,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/jspace/jspace-advisor/src/index.ts:97`](../packages/jspace/jspace-advisor/src/index.ts)
+Source: [`packages/jspace/jspace-advisor/src/index.ts:115`](../packages/jspace/jspace-advisor/src/index.ts)
 
 <a id="shres-codeshres-code-jspace-prompt"></a>
 

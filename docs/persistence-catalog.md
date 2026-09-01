@@ -480,18 +480,21 @@ Source: [`packages/hooks/hook-protocol/src/types.ts:31`](../packages/hooks/hook-
 
 ```ts persistence-catalog
 /**
- * Reviewer advice surfaced for the main session. Log-only. Writers pass
+ * Reviewer verdict surfaced for the main session. Log-only. Writers pass
  * `{ ignorable: true }`.
  * @param sessionId - session that authored the advice.
  * @param childId - the reviewer child that produced it.
  * @param trigger - why the review ran.
+ * @param triggerSeq - session event seq of the triggering event.
+ * @param verdict - whether the session is serving the user's goal.
  * @param advice - bounded reviewer advice text.
+ * @param redirect - concrete redirect back to the user's goal, on drift.
  * @param seq - session event seq the review folded against.
  */
 'jspace/advisor': JspaceAdvisorAdvice
 ```
 
-Source: [`packages/jspace/jspace-advisor/src/types.ts:73`](../packages/jspace/jspace-advisor/src/types.ts)
+Source: [`packages/jspace/jspace-advisor/src/types.ts:126`](../packages/jspace/jspace-advisor/src/types.ts)
 
 <a id="jspacecard--log-only"></a>
 

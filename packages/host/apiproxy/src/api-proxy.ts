@@ -258,12 +258,13 @@ function referencedImage(events: readonly SessionEvent[], attachmentId: string):
  * configuration boundary or the pickers silently fail to persist. `shres-shield`
  * is the Shield Settings page (posture and license). `jspace` is the J-Space
  * Settings page (allow switch, mode, requireCoverage). `wiki` is the same
- * page's project-wiki seat (enable switch and librarian route binding). `game`
+ * page's project-wiki seat (enable switch and librarian route binding).
+ * `jspace-advisor` is that page's Advisor toggle and reviewer route. `game`
  * is the composer Game mode switch that shows the Goal fight arena. `speech`
  * is General Settings voice/language/auto-submit plus the composer mic's Talk
  * mode flag.
  */
-const PRODUCT_SETTINGS_NAMESPACES = new Set(['ui-onboarding', 'agent-seats', 'shres-shield', 'jspace', 'wiki', 'game', 'speech', AGENT_PRESET_SETTINGS_NAMESPACE])
+const PRODUCT_SETTINGS_NAMESPACES = new Set(['ui-onboarding', 'agent-seats', 'shres-shield', 'jspace', 'wiki', 'jspace-advisor', 'game', 'speech', AGENT_PRESET_SETTINGS_NAMESPACE])
 
 /** Strict browser-zone profile: UTC or an IANA Area/Location-style identifier. */
 const IANA_TIME_ZONE = /^[A-Za-z][A-Za-z0-9_+.-]*(?:\/[A-Za-z0-9_+.-]+)+$/

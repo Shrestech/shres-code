@@ -17,6 +17,7 @@ export type AdvisorTrigger =
   | 'goal-epoch'
   | 'ship-attempt'
   | 'drift-check'
+  | 'user-intent'
 
 /** One reviewer-produced verdict surfaced for the main session. */
 export interface JspaceAdvisorAdvice {
@@ -46,6 +47,8 @@ export interface JspaceAdvisorAdvice {
  * last review.
  */
 export interface JspaceAdvisorDelta {
+  /** Parent session id the seqs and tool window belong to. */
+  readonly sessionId: string
   /** First source-'user' message, bounded; the goal ground truth anchor. */
   readonly goal: string
   /** Source-'user' messages with seq beyond sinceSeq, oldest-first, bounded. */
@@ -68,16 +71,22 @@ export interface JspaceAdvisorDelta {
 
 /** One trailing tool signal in the advisory digest. */
 export interface JspaceAdvisorToolSignal {
+  /** Parent-session `tool/call` seq this signal came from. */
+  readonly seq: number
   /** Tool name. */
   readonly name: string
   /** True when the tool result was not an error. */
   readonly ok: boolean
+  /** Bounded path, command, or argument excerpt. */
+  readonly argsExcerpt?: string
   /** Bounded error excerpt, present only for failures. */
   readonly errorExcerpt?: string
 }
 
 /** Bounded fold of a parent session used to seed one reviewer run. */
 export interface JspaceAdvisorDigest {
+  /** Parent session id the seqs and tool window belong to. */
+  readonly sessionId: string
   /** Rendered open card — the session's own claim — or `null` when none is open. */
   readonly card: string | null
   /**
