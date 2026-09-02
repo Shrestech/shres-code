@@ -318,13 +318,19 @@ export function ModelSelect(
                                 {/* 'text' is the floor every route carries; only
                                     additional declared modalities earn a tag. The
                                     map is merge-extensible, so an unrecognized
-                                    value renders as its own label. */}
+                                    value renders as its own label. Hosted web
+                                    search is the same kind of named claim. */}
                                 {(model.inputModalities ?? []).filter(modality => modality !== 'text')
                                   .map(modality => (
                                     <span className={css.modality} key={modality}>
                                       {modality === 'image' ? t('modality.vision') : modality}
                                     </span>
                                   ))}
+                                {model.hostedTools?.includes('web_search') === true && (
+                                  <span className={css.modality} key="hosted.web_search">
+                                    {t('hosted.webSearch')}
+                                  </span>
+                                )}
                               </span>
                               {model.description !== undefined && (
                                 <span className={css.description}>{model.description}</span>

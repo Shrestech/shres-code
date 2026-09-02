@@ -35,6 +35,7 @@ class CatalogAdapter extends LlmAdapter {
     private readonly reasoning?: LlmModelReasoningInfo,
     private readonly exactError?: Error,
     private readonly modalities?: LlmResolvedModelInfo['inputModalities'],
+    private readonly hosted?: LlmResolvedModelInfo['hostedTools'],
   ) {
     super()
   }
@@ -57,6 +58,7 @@ class CatalogAdapter extends LlmAdapter {
       name: model,
       ...this.reasoning === undefined ? {} : { reasoning: this.reasoning },
       ...this.modalities === undefined ? {} : { inputModalities: [...this.modalities] },
+      ...this.hosted === undefined ? {} : { hostedTools: [...this.hosted] },
     })
   }
 
@@ -92,7 +94,7 @@ async function harness(logged?: {
   ctx.llm.registerAdapter(['deepseek-official'], new CatalogAdapter('DeepSeek', [
     { provider: 'deepseek-official', id: 'deepseek-chat', name: 'DeepSeek Chat' },
     { provider: 'deepseek-official', id: 'deepseek-reasoner', name: 'DeepSeek Reasoner', description: 'Reasoning model' },
-  ], REASONING, undefined, ['text', 'image']))
+  ], REASONING, undefined, ['text', 'image'], ['web_search']))
   ctx.llm.registerAdapter(['plain'], new CatalogAdapter('Plain', [
     { provider: 'plain', id: 'plain-text', name: 'Plain Text' },
   ]))
@@ -292,13 +294,20 @@ describe('Web session model selection', () => {
       id: 'deepseek-official',
       name: 'DeepSeek',
       models: [
-        { id: 'deepseek-chat', name: 'DeepSeek Chat', reasoning: REASONING, inputModalities: ['text', 'image'] },
+        {
+          id: 'deepseek-chat',
+          name: 'DeepSeek Chat',
+          reasoning: REASONING,
+          inputModalities: ['text', 'image'],
+          hostedTools: ['web_search'],
+        },
         {
           id: 'deepseek-reasoner',
           name: 'DeepSeek Reasoner',
           description: 'Reasoning model',
           reasoning: REASONING,
           inputModalities: ['text', 'image'],
+          hostedTools: ['web_search'],
         },
       ],
     }, {

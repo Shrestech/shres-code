@@ -144,6 +144,15 @@
             apiKeyEnv: GROQ_API_KEY
           zai:
             apiKeyEnv: ZAI_API_KEY
+            # Provider-native web search on the z.ai coding endpoint: every
+            # request carries the hosted web_search tool entry (search-prime
+            # engine) and the local web_search function tool is dropped for
+            # this route. z.ai bills each search query; the backend folds
+            # results into the answer silently, so no search artifact
+            # surfaces on the response (verified live 2026-09-02, both
+            # streaming and non-streaming).
+            hostedTools:
+              webSearch: true
 
     # First-run picker: probes local Ollama and, on headless, prints a TTY menu
     # when the composition default cannot serve. autoRunCli stays false here so

@@ -2,7 +2,7 @@
  * Hosted search on the grok-session route: the request carries the hosted
  * tool declarations and drops the colliding local web_search while enabled,
  * a hosted x_search surfaces as a server-tool-call block (never a local
- * dispatch), and the configuration switches default off and fail loud on a
+ * dispatch), and the configuration switches default on and fail loud on a
  * non-boolean value.
  */
 
@@ -12,7 +12,7 @@ import LlmRuntime, { BlockAssembler } from '@shres-code/shres-code-llm'
 import { isLocalToolCall } from '@shres-code/shres-code-agent-loop'
 import * as LlmGrokSession from '../src/index.ts'
 import type { Config as GrokSessionConfig } from '../src/config.ts'
-import { resolveHostedSearch } from '../src/config.ts'
+import { resolveHostedTools } from '../src/config.ts'
 import { ENTRY_KEY, entryRaw, farFuture, mockUpstream, textTurn, writeAuthDocument } from './helpers.ts'
 import type { MockUpstream } from './helpers.ts'
 
@@ -65,28 +65,28 @@ function xSearchTurn(): string[] {
 const localWebSearchTool = { name: 'web_search', description: 'local search', parameters: { type: 'object', properties: {} } }
 const echoTool = { name: 'echo', description: 'echo', parameters: { type: 'object', properties: {} } }
 
-describe('resolveHostedSearch', () => {
-  it('defaults both hosted switches off', () => {
-    expect(resolveHostedSearch({})).toEqual({ webSearch: false, xSearch: false })
+describe('resolveHostedTools', () => {
+  it('defaults both hosted switches on', () => {
+    expect(resolveHostedTools({})).toEqual({ webSearch: true, xSearch: true })
   })
 
   it('resolves each switch independently', () => {
-    expect(resolveHostedSearch({ hostedWebSearch: true })).toEqual({ webSearch: true, xSearch: false })
-    expect(resolveHostedSearch({ hostedXSearch: true })).toEqual({ webSearch: false, xSearch: true })
-    expect(resolveHostedSearch({ hostedWebSearch: true, hostedXSearch: true })).toEqual({ webSearch: true, xSearch: true })
+    expect(resolveHostedTools({ hostedWebSearch: false })).toEqual({ webSearch: false, xSearch: true })
+    expect(resolveHostedTools({ hostedXSearch: false })).toEqual({ webSearch: true, xSearch: false })
+    expect(resolveHostedTools({ hostedWebSearch: false, hostedXSearch: false })).toEqual({ webSearch: false, xSearch: false })
   })
 
   it('fails loud on a non-boolean switch value', () => {
-    expect(() => resolveHostedSearch({ hostedWebSearch: 'yes' } as unknown as GrokSessionConfig))
+    expect(() => resolveHostedTools({ hostedWebSearch: 'yes' } as unknown as GrokSessionConfig))
       .toThrow(/hostedWebSearch must be a boolean/)
-    expect(() => resolveHostedSearch({ hostedXSearch: 1 } as unknown as GrokSessionConfig))
+    expect(() => resolveHostedTools({ hostedXSearch: 1 } as unknown as GrokSessionConfig))
       .toThrow(/hostedXSearch must be a boolean/)
   })
 })
 
 describe('hosted search request splice', () => {
   it('offers only the local web_search when hosted is off', async () => {
-    await boot()
+    await boot({ hostedWebSearch: false, hostedXSearch: false })
     const assembler = new BlockAssembler()
     for await (const chunk of ctx!.llm.stream({
       provider: 'grok-session', model: 'grok-4.6', messages: [],
@@ -99,7 +99,7 @@ describe('hosted search request splice', () => {
   })
 
   it('splices hosted web_search and x_search entries and drops the local web_search when enabled', async () => {
-    await boot({ hostedWebSearch: true, hostedXSearch: true })
+    await boot()
     const assembler = new BlockAssembler()
     for await (const chunk of ctx!.llm.stream({
       provider: 'grok-session', model: 'grok-4.6', messages: [],
@@ -117,7 +117,7 @@ describe('hosted search request splice', () => {
   })
 
   it('splices x_search only when only X search is enabled', async () => {
-    await boot({ hostedXSearch: true })
+    await boot({ hostedWebSearch: false })
     const assembler = new BlockAssembler()
     for await (const chunk of ctx!.llm.stream({
       provider: 'grok-session', model: 'grok-4.6', messages: [],

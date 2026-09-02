@@ -22,22 +22,15 @@ import type {
   DirectoryRegistrationHandle,
   LlmConfigurableProvider,
 } from '@shres-code/shres-code-llm'
-import {
-  HOSTED_X_SEARCH_NAME,
-  LOCAL_WEB_SEARCH_NAME,
-  PiAiAdapter,
-  resolveProfiles,
-  webSearchToolEntry,
-  xSearchToolEntry,
-} from '@shres-code/shres-code-llm-pi-ai'
-import type { PiAiAdapterHostedSearch, ResolvedPiAiProviderProfile } from '@shres-code/shres-code-llm-pi-ai'
+import { PiAiAdapter, resolveProfiles } from '@shres-code/shres-code-llm-pi-ai'
+import type { ResolvedPiAiProviderProfile } from '@shres-code/shres-code-llm-pi-ai'
 import { GrokSessionManager } from '@shres-code/shres-code-grok-credential'
 import { deepEqualJson, installSettingsSection, settingsNamespace } from '@shres-code/shres-code-settings'
 import {
   Config,
   GROK_SESSION_PROVIDER_ID,
   resolveCredentialSpec,
-  resolveHostedSearch,
+  resolveHostedTools,
   resolveRoute,
 } from './config.ts'
 import type { CredentialSpec } from './config.ts'
@@ -51,10 +44,10 @@ export {
   SHIPPED_MODELS,
   defaultAuthPath,
   resolveCredentialSpec,
-  resolveHostedSearch,
+  resolveHostedTools,
   resolveRoute,
 } from './config.ts'
-export type { GrokSessionModelConfig, ResolvedHostedSearch } from './config.ts'
+export type { GrokSessionModelConfig } from './config.ts'
 export { GrokSessionManager, OIDC_ISSUER, selectSessionEntry } from '@shres-code/shres-code-grok-credential'
 export type { GrokSessionEntry, GrokSessionOptions } from '@shres-code/shres-code-grok-credential'
 
@@ -112,35 +105,6 @@ function createCredentialResolver(ctx: Context): (spec: CredentialSpec) => GrokS
 }
 
 /**
- * Resolve the route's hosted-search facts from the current section. Both
- * switches default off; when either is on the matching tool entry is spliced
- * into the outgoing request, the local `web_search` tool is dropped while a
- * hosted web search is on, and a hosted tool pi-ai surfaces as a tool call is
- * promoted to a server-tool-call block. Read live per request so a settings
- * change reaches the next stream without touching the registry.
- * @param current - read of the current section value.
- * @returns the hosted-search facts, or undefined when both switches are off.
- */
-function buildHostedSearch(current: () => Config): PiAiAdapterHostedSearch | undefined {
-  const { webSearch, xSearch } = resolveHostedSearch(current())
-  if (!webSearch && !xSearch) return undefined
-  const entries: Record<string, unknown>[] = []
-  const dropLocalTools: string[] = []
-  const callNames: string[] = []
-  if (webSearch) {
-    entries.push(webSearchToolEntry())
-    // hosted wins: the colliding local web_search function tool is omitted
-    dropLocalTools.push(LOCAL_WEB_SEARCH_NAME)
-  }
-  if (xSearch) {
-    entries.push(xSearchToolEntry())
-    // pi-ai surfaces the hosted x_search custom tool call as a tool call
-    callNames.push(HOSTED_X_SEARCH_NAME)
-  }
-  return { entries, dropLocalTools, callNames }
-}
-
-/**
  * Build the adapter over the one resolved route, with the credential hook
  * owned here and everything else delegated to the shared pi-ai adapter. The
  * instance is built once and stays registered: every config fact it depends
@@ -172,7 +136,6 @@ function buildAdapter(
       }
     },
     resolveAttachments: () => ctx.get('attachments'),
-    hostedSearch: () => buildHostedSearch(current),
     onReplayDegrade: ({ provider, model, reason }) => {
       ctx.logger.warn(
         `llm-grok-session: unusable replay state on assistant history for route "${provider}/${model}";`
@@ -208,7 +171,7 @@ export function apply(ctx: Context, config: Config): void {
   // Fail loud at mount for a self-contained misconfiguration, the same set
   // the settings validator refuses at write time below.
   resolveCredentialSpec(current())
-  resolveHostedSearch(current())
+  resolveHostedTools(current())
 
   // The credential hook resolves through the shared service when present and
   // falls back to the local single-flight manager otherwise.
@@ -263,7 +226,7 @@ export function apply(ctx: Context, config: Config): void {
     validate: (section: Config) => {
       resolveRoute(section)
       resolveCredentialSpec(section)
-      resolveHostedSearch(section)
+      resolveHostedTools(section)
     },
     setSource: (source) => { current = () => source() },
     onChange: () => {

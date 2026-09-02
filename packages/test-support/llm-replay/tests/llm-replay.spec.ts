@@ -597,6 +597,7 @@ describe('installLlmReplay (through the real LlmRuntime)', () => {
               id: 'flash',
               contextWindow: 128_000,
               inputModalities: ['text', 'image'],
+              hostedTools: ['web_search', 'x_search'],
               defaultMaxTokens: 64_000,
               reasoningEfforts: ['off', 'max'],
               defaultReasoningEffort: 'max',
@@ -613,13 +614,20 @@ describe('installLlmReplay (through the real LlmRuntime)', () => {
       { id: 'empty', name: 'empty' },
     ])
     await expect(ctx.llm.listModels('deepseek')).resolves.toEqual([
-      { provider: 'deepseek', id: 'flash', name: 'flash', inputModalities: ['text', 'image'] },
+      {
+        provider: 'deepseek',
+        id: 'flash',
+        name: 'flash',
+        inputModalities: ['text', 'image'],
+        hostedTools: ['web_search', 'x_search'],
+      },
       { provider: 'deepseek', id: 'pro', name: 'Pro', description: 'Larger model' },
     ])
     await expect(ctx.llm.listModels('empty')).resolves.toEqual([])
     await expect(ctx.llm.resolveModelInfo('deepseek', 'flash')).resolves.toMatchObject({
       context: { contextWindow: 128_000 },
       inputModalities: ['text', 'image'],
+      hostedTools: ['web_search', 'x_search'],
       defaultMaxTokens: 64_000,
       reasoning: {
         efforts: [{ id: 'off', name: 'off' }, { id: 'max', name: 'max' }],
@@ -627,6 +635,7 @@ describe('installLlmReplay (through the real LlmRuntime)', () => {
       },
     })
     await expect(ctx.llm.resolveModelInfo('deepseek', 'pro')).resolves.not.toHaveProperty('inputModalities')
+    await expect(ctx.llm.resolveModelInfo('deepseek', 'pro')).resolves.not.toHaveProperty('hostedTools')
     await expect(ctx.llm.resolveModelInfo('deepseek', 'pro')).resolves.not.toHaveProperty('context')
     // Efforts without a configured default preserve the provider's own default.
     await expect(ctx.llm.resolveModelInfo('deepseek', 'pro')).resolves.toMatchObject({
@@ -1137,6 +1146,18 @@ describe('apply (the plugin entry)', () => {
       NonNullable<Config['providers']>
     expect(() => { apply(ctx, { file, providers }) }).toThrow(
       'llm-replay: provider "m" model "m" inputModalities must be an array containing only "text" and "image"',
+    )
+  })
+
+  it.each([
+    ['a string', 'web_search'],
+    ['an unknown tool', ['web_fetch']],
+  ])('rejects hostedTools configured as %s during load', (_case, hostedTools) => {
+    const ctx = new Context()
+    const providers = [{ id: 'm', models: [{ id: 'm', hostedTools }] }] as unknown as
+      NonNullable<Config['providers']>
+    expect(() => { apply(ctx, { file, providers }) }).toThrow(
+      'llm-replay: provider "m" model "m" hostedTools must be an array containing only "web_search" and "x_search"',
     )
   })
 

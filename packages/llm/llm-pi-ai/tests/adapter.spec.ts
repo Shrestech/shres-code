@@ -903,7 +903,7 @@ describe('abort wiring', () => {
   })
 })
 
-describe('hosted-search and route onPayload composition', () => {
+describe('hosted tools and route onPayload composition', () => {
   it('applies both the hosted splice and a route onPayload hook to one request body', async () => {
     // A minimal Responses text turn so the openai-responses wire completes.
     const responsesTextTurn = [
@@ -920,11 +920,11 @@ describe('hosted-search and route onPayload composition', () => {
         'xai-apikey': {
           api: 'openai-responses',
           baseURL: server.url,
+          hostedTools: { webSearch: true },
           models: [{ id: 'grok-4.6' }],
         },
       }),
       resolveApiKey: () => Promise.resolve('test-key'),
-      hostedSearch: () => ({ entries: [{ type: 'web_search' }], dropLocalTools: ['web_search'] }),
       onPayload: (payload) => {
         if (payload !== null && typeof payload === 'object') {
           ;(payload as Record<string, unknown>).service_tier = 'priority'

@@ -45,6 +45,7 @@ const GROUPS = [{
       id: 'deepseek-v4-pro',
       name: 'DeepSeek-V4-Pro',
       inputModalities: ['text', 'image'],
+      hostedTools: ['web_search'],
       reasoning: {
         efforts: [
           { id: 'off', name: 'Off' },
@@ -165,8 +166,8 @@ describe('ui-model-selection dual entry', () => {
     expect(options.map((o: SelectOption) => o.label)).toEqual(['DeepSeek-V4-Flash', 'DeepSeek-V4-Pro'])
     expect(options[0]).toMatchObject({ active: true, detail: 'DeepSeek' })
     expect(options[1]?.active).toBeUndefined()
-    // A declared image modality joins the provider group in the detail.
-    expect(options[1]).toMatchObject({ detail: 'DeepSeek · vision' })
+    // A declared image modality and hosted web search join the provider group.
+    expect(options[1]).toMatchObject({ detail: 'DeepSeek · vision · web search' })
   })
 
   it('a seat selection is the current the popup marks active next — one shared state', async () => {

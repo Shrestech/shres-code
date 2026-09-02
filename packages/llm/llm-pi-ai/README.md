@@ -2,7 +2,7 @@
 
 Generic multi-provider adapter for the harness LLM seam backed by [`@earendil-works/pi-ai`](https://www.npmjs.com/package/@earendil-works/pi-ai). One plugin instance owns a dict of provider profiles keyed by route; every request selects a profile with `GenerateOptions.provider` and resolves `GenerateOptions.model` against that route's configured catalog. A route naming an installed pi-ai provider inherits its endpoint, wire protocol, and model catalog as defaults and overrides them field by field; a route pi-ai does not ship is declared outright, so an OpenAI-compatible gateway, a self-hosted server, or a provider newer than the installed catalog is configuration rather than a code change.
 
-The package root exposes the Cordis plugin contract, `PiAiAdapter`, `supportedProtocols()`, `discoverModels`, and the hosted-search wire helpers (`webSearchToolEntry`, `xSearchToolEntry`, `applyHostedToolsPayload`, `webSearchCallToServerToolCall`, `hostedCustomToolCallToServerToolCall`, `mapHostedToolCalls`). First-run setup and the Models page **Fetch available models** action share `discoverModels` so OpenAI-compatible `GET /models` parsing stays in one place. Profile resolution, catalog materialization, provider construction, replay conversion, and stream conversion remain package-internal.
+The package root exposes the Cordis plugin contract, `PiAiAdapter`, `supportedProtocols()`, `discoverModels`, and the hosted-tools helpers (`webSearchToolEntry`, `xSearchToolEntry`, `applyHostedToolsPayload`, `hostedToolsDialectFor`, `webSearchCallToServerToolCall`, `hostedCustomToolCallToServerToolCall`, `mapHostedToolCalls`). First-run setup and the Models page **Fetch available models** action share `discoverModels` so OpenAI-compatible `GET /models` parsing stays in one place. Profile resolution, catalog materialization, provider construction, replay conversion, and stream conversion remain package-internal.
 
 ## Config
 
@@ -156,16 +156,23 @@ Every request carries the shared attribution header from shres-llm's `attributio
 
 pi-ai installs several provider SDKs and lazy-loads the one selected by the catalog model. The dependency weight is isolated to this opt-in adapter package.
 
-## Hosted search
+## Hosted tools
 
-A route in the `openai-responses` dialect can present search as a hosted backend tool - the
-provider executes the search on the model's behalf. The adapter exposes an optional
-`hostedSearch` option (read live per stream call) carrying the raw tool entries to splice into
-the outgoing `tools` array, the local function-tool names to drop while their hosted counterpart
-is enabled (hosted wins on name collision), and the hosted names to promote from pi-ai's tool
-calls to `server-tool-call` content blocks so the loop never dispatches them. The splice rides
-pi-ai's `onPayload` hook; no pi-ai fork is involved. Entry JSON and tool names mirror the Grok
-Build CLI's sampler (`web_search`, `x_search`).
+A route declares the provider-executed tools its models serve with a `hostedTools` dict on the
+profile - `{ webSearch?: boolean, xSearch?: boolean }` at the route level, the same dict on a
+`models` entry or `modelOverrides` value to flip one model - and resolution materializes the
+effective per-model set, failing loud when a switch is not a boolean or names a tool the model's
+dialect does not serve (`x_search` exists only on `openai-responses`). The adapter derives the
+splice from the declaration per request: the dialect module for the model's wire protocol
+contributes the raw tool entries and the local function-tool names to drop while their hosted
+counterpart is enabled (hosted wins on name collision), and promotes hosted names that surface
+as pi-ai tool calls to `server-tool-call` content blocks so the loop never dispatches them. The
+splice rides pi-ai's `onPayload` hook; no pi-ai fork is involved. Entry JSON and tool names
+mirror the Grok Build CLI's sampler (`web_search`, `x_search`); the `openai-completions`
+dialect serves z.ai's hosted `web_search` (`search-prime` engine, accepted on request, folded
+into the answer silently with no surfaced artifact — verified live both streaming and not); a
+dialect without a module serves no hosted tools, so absent declarations leave the local tool
+catalog unchanged.
 
 `webSearchCallToServerToolCall` projects a `web_search_call` output item into the bounded
 server-tool-call block; the pinned pi-ai dependency drops that item before the harness sees it, so

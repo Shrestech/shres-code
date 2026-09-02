@@ -372,6 +372,9 @@ async function buildModelCatalog(ctx: Context): Promise<{
           ...resolved.inputModalities === undefined
             ? {}
             : { inputModalities: [...resolved.inputModalities] },
+          ...resolved.hostedTools === undefined
+            ? {}
+            : { hostedTools: [...resolved.hostedTools] },
         }
       }))
       const group: ModelProviderGroup = {

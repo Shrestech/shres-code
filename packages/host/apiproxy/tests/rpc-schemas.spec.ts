@@ -222,6 +222,7 @@ describe('sessions domain schemas', () => {
             defaultEffort: 'off',
           },
           inputModalities: ['text', 'image'],
+          hostedTools: ['web_search', 'x_search'],
         }],
       }],
       failures: [{ id: 'broken', name: 'Broken', message: 'offline' }],
@@ -262,6 +263,15 @@ describe('sessions domain schemas', () => {
         id: 'deepseek-official',
         name: 'DeepSeek',
         models: [{ id: 'm', name: 'M', inputModalities: [] }],
+      }],
+      failures: [],
+    })).toThrow()
+    expect(() => sessionModelsValueSchema.parse({
+      current: { provider: 'deepseek-official', model: 'm' },
+      groups: [{
+        id: 'deepseek-official',
+        name: 'DeepSeek',
+        models: [{ id: 'm', name: 'M', hostedTools: ['web_fetch'] }],
       }],
       failures: [],
     })).toThrow()

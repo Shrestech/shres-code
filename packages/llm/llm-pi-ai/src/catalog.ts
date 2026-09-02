@@ -23,6 +23,8 @@ import type {
   Provider,
   ThinkingLevelMap,
 } from '@earendil-works/pi-ai'
+import type { HostedTool } from '@shres-code/shres-code-llm'
+import { hostedToolsDialectFor } from './hosted-tools/index.ts'
 
 /**
  * Pricing for a model the installed catalog does not describe. The harness
@@ -198,6 +200,58 @@ export interface PiAiCompatProfile {
   supportsReasoningEffort?: boolean
 }
 
+/**
+ * Hosted-tool switches a route or model entry declares. Absent fields stay
+ * off; the effective value is the model entry's dict over the route's, and a
+ * switch naming a tool the model's dialect does not serve fails resolution.
+ */
+export interface PiAiHostedTools {
+  /** Serve the provider's hosted `web_search` tool on this route/model. */
+  webSearch?: boolean
+  /** Serve the provider's hosted `x_search` tool on this route/model. */
+  xSearch?: boolean
+}
+
+/**
+ * Resolve one model's effective hosted tools, merging the model entry's
+ * switches over the route's per field. A dict the config schema materialized
+ * as empty — or one whose every field is absent — states no answer and
+ * inherits the route's, so an absent entry never masks a route declaration.
+ * @param provider - provider route key, for diagnostics.
+ * @param subject - the model id the declaration resolves for, for diagnostics.
+ * @param entry - the model entry's switch dict, when any.
+ * @param route - the route-level switch dict, when any.
+ * @param api - the model's resolved wire protocol.
+ * @returns the effective hosted tools, or `undefined` when none are enabled.
+ */
+function resolveModelHostedTools(
+  provider: string,
+  subject: string,
+  entry: PiAiHostedTools | undefined,
+  route: PiAiHostedTools | undefined,
+  api: string,
+): readonly HostedTool[] | undefined {
+  const webSearch = entry?.webSearch ?? route?.webSearch
+  const xSearch = entry?.xSearch ?? route?.xSearch
+  if (webSearch === undefined && xSearch === undefined) return undefined
+  for (const [field, value] of [['webSearch', webSearch], ['xSearch', xSearch]] as const) {
+    if (value !== undefined && typeof value !== 'boolean') {
+      invalid(provider, `model "${subject}" hostedTools.${field} must be a boolean`)
+    }
+  }
+  const tools: HostedTool[] = []
+  if (webSearch === true) tools.push('web_search')
+  if (xSearch === true) tools.push('x_search')
+  if (tools.length === 0) return undefined
+  const dialect = hostedToolsDialectFor(api)
+  for (const tool of tools) {
+    if (dialect === undefined || !dialect.served.includes(tool)) {
+      invalid(provider, `model "${subject}" declares hosted tool "${tool}", but its api "${api}" does not serve it`)
+    }
+  }
+  return tools
+}
+
 /** One configured model entry: an id plus the catalog fields it overrides. */
 export interface PiAiModelProfile {
   /** Model id sent to the provider and accepted by {@link GenerateOptions.model}. */
@@ -235,6 +289,12 @@ export interface PiAiModelProfile {
   reasoningEfforts?: false | PiAiReasoningEfforts
   /** Reasoning-dispatch switches for this model, winning over the route's. */
   compat?: PiAiCompatProfile
+  /**
+   * Hosted-tool switches for this model, winning over the route's. Absent
+   * inherits the route declaration; an explicit `false` disables a tool the
+   * route enabled for every other model.
+   */
+  hostedTools?: PiAiHostedTools
 }
 
 /**
@@ -260,6 +320,8 @@ export interface RouteCatalogRequest {
   modelOverrides?: Readonly<Record<string, PiAiModelOverride>>
   /** Reasoning-dispatch switches for every `openai-completions` model on the route; entries override per field. */
   compat?: PiAiCompatProfile
+  /** Route-default hosted-tool switches; each model entry's dict wins over these. */
+  hostedTools?: PiAiHostedTools
   /** Context capacity for a model neither the entry nor the catalog sizes. */
   defaultContextWindow: number
   /** Output capability for a model neither the entry nor the catalog sizes. */
@@ -433,6 +495,12 @@ export interface RouteCatalog {
    * picked, so only an explicit configuration lands here.
    */
   configuredMaxTokens: ReadonlyMap<string, number>
+  /**
+   * Effective hosted tools by model id, materialized from the route default
+   * and each entry's override. A model absent from the map declares none, so
+   * the local tool catalog applies to it unchanged.
+   */
+  hostedTools: ReadonlyMap<string, readonly HostedTool[]>
 }
 
 /**
@@ -489,6 +557,7 @@ export function resolveRouteModels(request: RouteCatalogRequest): RouteCatalog {
     || request.compat?.supportsReasoningEffort !== undefined
   const seen = new Set<string>()
   const configuredMaxTokens = new Map<string, number>()
+  const hostedTools = new Map<string, readonly HostedTool[]>()
   const models = entries.map((entry) => {
     if (entry.id.length === 0) invalid(provider, 'has a model with an empty id')
     if (seen.has(entry.id)) invalid(provider, `lists model "${entry.id}" more than once`)
@@ -518,6 +587,14 @@ export function resolveRouteModels(request: RouteCatalogRequest): RouteCatalog {
     // Only a value the profile named is a deployment choice; the catalog's is
     // the model's capability and stays out of request defaults.
     if (entry.maxTokens !== undefined) configuredMaxTokens.set(entry.id, entry.maxTokens)
+    const effectiveHostedTools = resolveModelHostedTools(
+      provider,
+      entry.id,
+      entry.hostedTools,
+      request.hostedTools,
+      api,
+    )
+    if (effectiveHostedTools !== undefined) hostedTools.set(entry.id, effectiveHostedTools)
     return {
       // The installed entry lays the floor, and the fields below override it.
       // Enumerating instead would silently drop every `Model` field this
@@ -542,5 +619,5 @@ export function resolveRouteModels(request: RouteCatalogRequest): RouteCatalog {
     invalid(provider, 'sets compat reasoning switches, but no model on the route speaks openai-completions;'
       + ' thinkingFormat and supportsReasoningEffort exist only on that protocol')
   }
-  return { models, configuredMaxTokens }
+  return { models, configuredMaxTokens, hostedTools }
 }

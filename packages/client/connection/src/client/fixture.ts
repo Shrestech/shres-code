@@ -324,7 +324,13 @@ function fixtureModelGroups(): ModelProviderGroup[] {
     {
       id: 'openai',
       name: 'OpenAI',
-      models: [{ id: 'gpt-5', name: 'GPT-5', reasoning: OPENAI_REASONING, inputModalities: ['text', 'image'] }],
+      models: [{
+        id: 'gpt-5',
+        name: 'GPT-5',
+        reasoning: OPENAI_REASONING,
+        inputModalities: ['text', 'image'],
+        hostedTools: ['web_search'],
+      }],
     },
   ]
 }
