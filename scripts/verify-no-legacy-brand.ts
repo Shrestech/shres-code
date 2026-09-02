@@ -20,7 +20,7 @@ const FORBIDDEN = [
   { id: 'env-prefix', pattern: /\bDSH_[A-Z]/ },
   { id: 'home-dir', pattern: /~\/\.dsh\b/ },
   { id: 'python-sdk', pattern: /deepseek-harness-sdk/ },
-  { id: 'product-prose', pattern: /DeepSeek Harness/ },
+  { id: 'product-prose', pattern: /DeepSeek[- ]Harness/i },
   { id: 'product-vendor', pattern: /DeepSeek AI/ },
   { id: 'slash-stripped-slug', pattern: /deepseek-aidsh/ },
   { id: 'mermaid-dsh-node', pattern: /pkg_[A-Za-z0-9_]*_dsh_[A-Za-z0-9_]+/ },
@@ -30,6 +30,11 @@ const FORBIDDEN = [
   { id: 'python-sdk-roos', pattern: /roos-code-sdk/ },
   { id: 'product-prose-roos', pattern: /Roos Code/ },
   { id: 'mermaid-roos-node', pattern: /pkg_[A-Za-z0-9_]*_roos_[A-Za-z0-9_]+/ },
+  { id: 'shell-var-roos', pattern: /\broos_[A-Za-z]/ },
+  { id: 'dsh-word', pattern: /\bDSH\b/ },
+  { id: 'dsh-home-path', pattern: /\/home\/\.dsh\// },
+  { id: 'dsh-tool-skill', pattern: /\bdsh-tool-skill\b/ },
+  { id: 'python-runtime-dir', pattern: /deepseek_harness_runtime/ },
 ] as const
 
 /** One tracked leftover of a retired brand token. */
@@ -47,10 +52,15 @@ function keepListed(file: string): boolean {
   if (file.startsWith('.agents/notes/archived/')) return true
   if (file === '.agents/notes/implemented/process/2026-08-16-rebrand-to-roos-code.md') return true
   if (file === '.agents/notes/implemented/process/2026-08-17-rebrand-to-shres-code.md') return true
+  if (file === '.agents/notes/implemented/process/2026-09-02-purge-legacy-branding-traces.md') return true
   if (file === 'scripts/rebrand.ts' || file === 'scripts/rebrand.spec.ts') return true
   if (file === 'scripts/rescope-vendor.ts' || file === 'scripts/rescope-vendor.spec.ts') return true
   if (file === 'scripts/verify-no-legacy-brand.ts') return true
   if (file === 'scripts/purge-zh.ts' || file === 'scripts/purge-zh.spec.ts') return true
+  // Tests that assert the retired identity is absent must name it to prove it.
+  if (file === 'apps/web/tests/brand-rebrand.e2e.ts') return true
+  if (file === 'apps/web/tests/verify-app.live.mjs') return true
+  if (file === 'scripts/verify-public-repository-links.spec.ts') return true
   if (/^vendor\/[^/]+\/(README\.md|LICENSE)$/.test(file)) return true
   return false
 }

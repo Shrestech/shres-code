@@ -38,7 +38,7 @@ const SID = 's1' as SessionId
 /** Locale seat for the card render sites (GenericToolCard, DetailsPanel), as the sibling suites build it. */
 const t = makeTranslate(en, commonEn)
 
-const SEARCH_ARGS = '{"query":"deepseek harness"}'
+const SEARCH_ARGS = '{"query":"shres"}'
 const FETCH_ARGS = '{"url":"https://example.com/page"}'
 
 /** A web_search result view; overrides tune the sources / answer / truncation. */

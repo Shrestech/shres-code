@@ -29,7 +29,7 @@ export async function readRemoteEnvironment(sandbox: Sandbox, signal?: AbortSign
   // TODO(e2b-replace-environment): Remove this ambient probe when E2B can start
   // a command with a replacement environment instead of merged overrides.
   const result = await sandbox.commands.run(
-    'set -o pipefail; roos_e2b_passwd="$(getent passwd "$(id -u)")"; IFS=: read -r _ _ _ _ _ roos_e2b_home _ <<<"$roos_e2b_passwd"; test -n "$roos_e2b_home" -a -d "$roos_e2b_home"; printf \'%s\' "$roos_e2b_home" | base64 -w 0; printf \'\\n\'; env -0 | base64 -w 0',
+    'set -o pipefail; shres_e2b_passwd="$(getent passwd "$(id -u)")"; IFS=: read -r _ _ _ _ _ shres_e2b_home _ <<<"$shres_e2b_passwd"; test -n "$shres_e2b_home" -a -d "$shres_e2b_home"; printf \'%s\' "$shres_e2b_home" | base64 -w 0; printf \'\\n\'; env -0 | base64 -w 0',
     { envs: e2bControlEnvs(), ...(signal === undefined ? {} : { signal }) },
   )
   const lines = result.stdout.trim().split('\n')

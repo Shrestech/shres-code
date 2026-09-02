@@ -300,9 +300,9 @@ describe('E2B terminal allocation', () => {
     expect(marker).toMatch(/^shres-e2b-bootstrap:/)
     expect(fake.inputs[0]?.data.toString()).not.toContain(marker)
     const runner = fake.writes.get('/runtime/terminal-one/runner.bash') ?? ''
-    expect(runner).toContain('if (( ${#roos_argv[@]} == 0 )); then')
-    expect(runner).toContain('printf \'%s\' "$roos_output_marker"')
-    expect(runner).toContain('exec env -i -- "${roos_env[@]}" "${roos_argv[@]}"')
+    expect(runner).toContain('if (( ${#shres_argv[@]} == 0 )); then')
+    expect(runner).toContain('printf \'%s\' "$shres_output_marker"')
+    expect(runner).toContain('exec env -i -- "${shres_env[@]}" "${shres_argv[@]}"')
     expect(runner).not.toContain('\u007f')
     terminal.output.destroy()
     await fake.createOptions?.onData(Buffer.from('late bootstrap callback'))
