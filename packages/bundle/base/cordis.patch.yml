@@ -528,9 +528,12 @@
     - id: web
       name: '@shres-code/shres-code-web'
       config:
+        # Perplexity is reserved for the deep_research tool's request-level
+        # pin (a billed model turn per call, wrong shape for routine
+        # lookups); the routine chain is vendor-following search first, then
+        # the DeepSeek official search.
         searchProviders:
           - attached-cli
-          - perplexity
           - deepseek-official
 
     - id: web-search-attached-cli

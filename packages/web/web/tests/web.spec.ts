@@ -137,6 +137,33 @@ describe('WebRuntime execution resolution', () => {
     await expect(web.search({ query: 'q' })).resolves.toMatchObject({ content: 'perplexity' })
   })
 
+  it('lets a request-level provider pin win over the singular pin and the ordered list', async () => {
+    const { web } = await mountWeb({
+      searchProvider: 'exa',
+      searchProviders: ['exa', 'perplexity'],
+    })
+    web.registerSearchProvider(makeSearchProvider('exa', available, () => Promise.resolve(searchResult('exa'))))
+    web.registerSearchProvider(makeSearchProvider('perplexity', available, () => Promise.resolve(searchResult('perplexity'))))
+    await expect(web.search({ query: 'q', provider: 'perplexity' })).resolves.toMatchObject({ content: 'perplexity' })
+  })
+
+  it('throws WEB_PROVIDER_CONFIGURED_MISSING for an unregistered request-level provider pin', async () => {
+    const { web } = await mountWeb({ searchProvider: 'exa' })
+    web.registerSearchProvider(makeSearchProvider('exa', available, () => Promise.resolve(searchResult('exa'))))
+    await expect(web.search({ query: 'q', provider: 'perplexity' })).rejects.toThrow(
+      expect.objectContaining({ code: 'WEB_PROVIDER_CONFIGURED_MISSING' }),
+    )
+  })
+
+  it('throws WEB_PROVIDER_CONFIGURED_UNAVAILABLE for an unusable request-level provider pin', async () => {
+    const { web } = await mountWeb({ searchProvider: 'exa' })
+    web.registerSearchProvider(makeSearchProvider('exa', available, () => Promise.resolve(searchResult('exa'))))
+    web.registerSearchProvider(makeSearchProvider('perplexity', unavailable, () => Promise.resolve(searchResult('perplexity'))))
+    await expect(web.search({ query: 'q', provider: 'perplexity' })).rejects.toThrow(
+      expect.objectContaining({ code: 'WEB_PROVIDER_CONFIGURED_UNAVAILABLE' }),
+    )
+  })
+
   it('ignores unusable providers when auto-selecting', async () => {
     const { web } = await mountWeb()
     web.registerSearchProvider(makeSearchProvider('exa', available, () => Promise.resolve(searchResult('exa'))))

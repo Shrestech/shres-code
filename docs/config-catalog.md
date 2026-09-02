@@ -3610,18 +3610,22 @@ export interface Config {
   search?: boolean
   /** Register `web_fetch`. Defaults to true. */
   fetch?: boolean
-  /** Upper bound on sources returned by one `web_search` call. */
+  /** Register `deep_research`. Defaults to true. */
+  research?: boolean
+  /** Upper bound on sources returned by one `web_search` or `deep_research` call. */
   searchMaxResults?: number
   /** Cooperative timeout budget (ms) for `web_fetch`. Defaults to 30000. */
   fetchTimeoutMs?: number
   /** Cooperative timeout budget (ms) for `web_search`. Defaults to 30000. */
   searchTimeoutMs?: number
+  /** Cooperative timeout budget (ms) for `deep_research`. Defaults to 180000. */
+  researchTimeoutMs?: number
   /** Cap on source characters converted and complete `web_fetch` output characters. Defaults to 200000. */
   fetchMaxOutputChars?: number
 }
 ```
 
-Source: [`packages/web/tool-web/src/index.ts:37`](../packages/web/tool-web/src/index.ts)
+Source: [`packages/web/tool-web/src/index.ts:46`](../packages/web/tool-web/src/index.ts)
 
 <a id="shres-codeshres-code-tool-workflow"></a>
 

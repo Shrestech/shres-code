@@ -18,7 +18,7 @@ Web access is a first-class capability seam following [the capability-seam Agent
 
 1. `@shres-code/shres-code-web` (`packages/web/web`) owns `ctx.web`, provider registration, provider selection, shared request/result vocabulary, and web-specific errors.
 2. Provider packages implement concrete backends and register capabilities with `ctx.web`, for example `@shres-code/shres-code-web-search-exa`, `@shres-code/shres-code-web-search-perplexity`, `@shres-code/shres-code-web-search-deepseek`, `@shres-code/shres-code-web-search-attached-cli`, and `@shres-code/shres-code-web-fetch-http`.
-3. `@shres-code/shres-code-tool-web` (`packages/web/tool-web`) owns the model-facing `web_search` and `web_fetch` tool schemas, prompt sections, argument validation, result formatting, and tool-owned presentation over `ctx.web`.
+3. `@shres-code/shres-code-tool-web` (`packages/web/tool-web`) owns the model-facing `web_search`, `web_fetch`, and `deep_research` tool schemas, prompt sections, argument validation, result formatting, and tool-owned presentation over `ctx.web`.
 
 Providers do not register tools. Providers register capabilities. `shres-tool-web` is the only owner of model-facing names, descriptions, prompt guidance, JSON schemas, and presentation.
 
@@ -26,7 +26,7 @@ Search and fetch are separate tools but one web-access seam. `ctx.web` owns prov
 
 `shres-tool-web` registers model-facing web tools when the product has enabled those tools and the `ctx.web` seam is present. Backend availability is an execution-time concern, not a schema-registration concern:
 
-- `web_search` is registered when web search is enabled for the product/app, `web_fetch` when web fetch is.
+- `web_search` is registered when web search is enabled for the product/app, `web_fetch` when web fetch is, `deep_research` when deep research is.
 - A tool is never unregistered merely because its selected provider is missing, misconfigured, missing credentials, ambiguous, or temporarily unavailable.
 - The provider is resolved at execution time, and a structured `WebError` is returned when the selected capability cannot run.
 
@@ -63,6 +63,7 @@ flowchart LR
   toolWeb["@shres-code/shres-code-tool-web"] -->|search/fetch| web
   toolWeb -->|ctx.tools.register| webSearch["tool: web_search"]
   toolWeb -->|ctx.tools.register| webFetch["tool: web_fetch"]
+  toolWeb -->|ctx.tools.register| deepResearch["tool: deep_research"]
 ```
 
 `@shres-code/shres-code-web` depends only on Cordis and low-level harness support. It declares `ctx.web`, provider interfaces, request/result types, the provider availability contract, and error codes. It does not import tool, agent, session, LLM, or provider packages.
@@ -123,6 +124,8 @@ Selection must not depend on registration order. Cordis load order, config order
 | No provider id is configured and multiple usable providers for that kind are registered | fails with `WEB_PROVIDER_AMBIGUOUS` rather than choosing by registration order |
 | No provider id is configured and providers exist but none are usable | fails with `WEB_PROVIDER_UNAVAILABLE` |
 
+A `WebSearchRequest.provider` pin is exclusive in the same way as a singular config pin, wins over both that pin and the ordered list, and uses the same `WEB_PROVIDER_CONFIGURED_MISSING` / `WEB_PROVIDER_CONFIGURED_UNAVAILABLE` failures. `deep_research` is the consumer of that pin: every call sets `provider: 'perplexity'` so Perplexity serves deep research even when the composition's default search chain is a different provider.
+
 The "single provider auto-selects" rule is for tests, demos, and simple deployments. Product configs set explicit provider ids:
 
 ```yaml
@@ -167,13 +170,15 @@ The `web_search` model-facing tool is small. The only model-facing argument is:
 - A provider applies `maxResults` at the request layer when its API supports it (Exa's `numResults`), as a cost/latency optimization.
 - `ctx.web` enforces the bound on the result: if a provider returns more than `maxResults` sources — because its API has no result-count control (Perplexity) or ignored the hint — the seam truncates `sources[]` to `maxResults` and sets `WebSearchResult.truncated` to `true` before returning. This makes the bound a single cross-provider guarantee the model-facing layer can rely on, rather than something each provider must remember to honor.
 
-The seam request carries no provider-specific controls — no Perplexity model selection, search recency, domain filters, Exa `livecrawl`, Exa `type`, regional hints, generated-answer budgets, or search depth. Such a field is added only when it has provider-neutral semantics that both the tool schema and selected providers can honor honestly.
+The seam request carries no provider-specific search controls — no Perplexity model selection, search recency, domain filters, Exa `livecrawl`, Exa `type`, regional hints, generated-answer budgets, or search depth. `provider` is a selection pin, not a search control. A search-control field is added only when it has provider-neutral semantics that both the tool schema and selected providers can honor honestly.
 
 ```ts
 interface WebSearchRequest {
   readonly query: string
   /** Upper bound on returned sources; the seam truncates to it. Omitted = no bound. `shres-tool-web` always sets it. */
   readonly maxResults?: number
+  /** Exclusive search provider id for this call. Wins over the singular config pin and the ordered list. */
+  readonly provider?: string
 }
 
 interface WebSearchResult {
@@ -243,15 +248,15 @@ SSRF / private-network protection (blocking private, loopback, link-local, multi
 
 ## Tool consumer behavior
 
-`shres-tool-web` owns two `ToolDefinition`s: `web_search` and `web_fetch`. It owns model-facing JSON schemas, snake_case argument names, prompt sections, result rendering to `ContentBlock[]`, `presentCall`, and `presentResult`.
+`shres-tool-web` owns three `ToolDefinition`s: `web_search`, `web_fetch`, and `deep_research`. It owns model-facing JSON schemas, snake_case argument names, prompt sections, result rendering to `ContentBlock[]`, `presentCall`, and `presentResult`. `deep_research` reuses the search result card and pins Perplexity through `WebSearchRequest.provider`; its cooperative timeout budget (`researchTimeoutMs`, default 180000) is independent of `searchTimeoutMs` because a deep-research call takes tens of seconds to minutes.
 
 `shres-tool-web` must not enumerate providers or call provider `available()` directly. Its only path into the seam is `ctx.web.search()` / `ctx.web.fetch()`. That keeps provider selection in one layer; otherwise the tool package could decide one provider is usable while execution resolves a different state.
 
-Tool registration is a minimal stable sync: on plugin startup the `shres-tool-web` `Config` (`search?: boolean`, `fetch?: boolean`, both default `true`) enables or disables each web tool; an enabled tool is registered with a fiber-scoped disposer via the effect-based registry; neither tool is disposed merely because its selected provider is missing, unusable, or ambiguous; disposing the `tool-web` fiber tears down its registrations automatically.
+Tool registration is a minimal stable sync: on plugin startup the `shres-tool-web` `Config` (`search?: boolean`, `fetch?: boolean`, `research?: boolean`, all default `true`) enables or disables each web tool; an enabled tool is registered with a fiber-scoped disposer via the effect-based registry; an enabled tool is not disposed merely because its selected provider is missing, unusable, or ambiguous; disposing the `tool-web` fiber tears down its registrations automatically.
 
 Provider availability changes affect execution results and diagnostics, not whether the model-facing schema exists. If a product wants no web tools at all, it disables `shres-tool-web` or the individual web tool in config; if it wants web tools but the backend is misconfigured, the model sees a structured tool error at execution time.
 
-The prompt guidance explains the semantic split — `web_search` for discovery and current information, `web_fetch` when the model needs the content of a specific URL — and the prompt and tool result tell the model to cite relevant URLs with markdown links.
+The prompt guidance explains the semantic split — `web_search` for discovery and current information, `web_fetch` when the model needs the content of a specific URL, `deep_research` for multi-source synthesis with citations when depth matters (expensive and slow; not for routine queries) — and the prompt and tool result tell the model to cite relevant URLs with markdown links. Deep-research guidance names `web_search` and `web_fetch` only when those tools are also config-enabled. Backend routing (native vs chain, chain order, the Perplexity pin) appears nowhere in model-visible text.
 
 The model-facing output is text-first because tool results are `ContentBlock[]`, but the seam outcome stays structured so UI presentation and future adapters do not have to scrape rendered text.
 
@@ -327,7 +332,7 @@ Rejected for the seam. `prompt` turns fetch into LLM summarization and couples p
 - A `pdf` `WebFetchBody` kind: the `http` provider decodes text-extractable PDFs (best-effort, capped, `truncated`) into a `{ kind: 'pdf'; content; pageCount? }` arm, and `tool-web` renders it. This is fetch, not `web_extract` — PDF retrieval is a concrete HTTP 200 plus deterministic local decoding, not provider-side extraction of a non-HTTP resource. Adding it is a coordinated change across `shres-web` (declare the arm), the provider (decode + narrow "binary rejection" to "reject binary except text-extractable PDF"; scanned/image PDFs needing OCR stay out of scope), and `tool-web` (render). The closed `WebFetchBody` union makes the consumer side fail to compile until the new arm is handled.
 - Provider-backed extraction as a separate `web_extract` capability, rather than widening `web_fetch` silently.
 - Permission policy integration: the permission system now exists ([sandbox and approval](../feature/2026-07-06-sandbox.md), [web permission presets](../feature/2026-07-23-web-permission-and-approval.md)) but bundles only sandbox mode and approval policy; web permission policy remains unintegrated.
-- Provider-neutral search controls beyond `query` and `maxResults`, once Exa and Perplexity can both honor them honestly.
+- Provider-neutral search controls beyond `query` and `maxResults`, once Exa and Perplexity can both honor them honestly. `provider` is a selection pin, not that deferred search-control work.
 
 ## Open questions
 

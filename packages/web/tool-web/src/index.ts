@@ -1,8 +1,8 @@
 /**
- * Model-facing `web_search` and `web_fetch` tools over `ctx.web`. This package owns schemas,
- * validation, prompt guidance, limits, and presentation, never concrete providers. Enablement
- * controls tool registration; an enabled tool remains visible when its provider is unavailable
- * and fails with a structured error at execution time.
+ * Model-facing `web_search`, `web_fetch`, and `deep_research` tools over `ctx.web`. This package
+ * owns schemas, validation, prompt guidance, limits, and presentation, never concrete providers.
+ * Enablement controls tool registration; an enabled tool remains visible when its provider is
+ * unavailable and fails with a structured error at execution time.
  * @module @shres-code/shres-code-tool-web
  */
 
@@ -11,11 +11,13 @@ import z from '@shres-code/schemastery'
 import type {} from '@shres-code/shres-code-web'
 import { applyWebSearchTool, WEB_SEARCH_MAX_RESULTS } from './search.ts'
 import { applyWebFetchTool } from './fetch.ts'
+import { applyDeepResearchTool } from './research.ts'
 
 export { WEB_SEARCH_MAX_RESULTS, applyWebSearchTool, formatSearchOutput, parseSearchArgs, presentSearchCall, presentSearchResult, searchMetaFromValue, searchMetaFromResult } from './search.ts'
 export type { WebSearchMeta } from './search.ts'
 export { applyWebFetchTool, formatFetchOutput, parseFetchArgs, presentFetchCall, presentFetchResult, fetchMetaFromValue, fetchMetaFromResult } from './fetch.ts'
 export type { WebFetchMeta } from './fetch.ts'
+export { applyDeepResearchTool, DEEP_RESEARCH_PROVIDER_ID, deepResearchGuidance } from './research.ts'
 
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'tool-web'
@@ -25,6 +27,13 @@ export const inject = ['tools', 'web', 'systemPrompt']
 
 /** Default cooperative tool-call timeout budget (ms) for the web tools. */
 export const DEFAULT_WEB_TOOL_TIMEOUT_MS = 30_000
+
+/**
+ * Default cooperative tool-call timeout budget (ms) for `deep_research`.
+ * Deep research takes tens of seconds to minutes; do not reuse
+ * {@link DEFAULT_WEB_TOOL_TIMEOUT_MS}.
+ */
+export const DEFAULT_RESEARCH_TIMEOUT_MS = 180_000
 
 /**
  * Default cap on one `web_fetch` output and on source characters converted
@@ -39,12 +48,16 @@ export interface Config {
   search?: boolean
   /** Register `web_fetch`. Defaults to true. */
   fetch?: boolean
-  /** Upper bound on sources returned by one `web_search` call. */
+  /** Register `deep_research`. Defaults to true. */
+  research?: boolean
+  /** Upper bound on sources returned by one `web_search` or `deep_research` call. */
   searchMaxResults?: number
   /** Cooperative timeout budget (ms) for `web_fetch`. Defaults to 30000. */
   fetchTimeoutMs?: number
   /** Cooperative timeout budget (ms) for `web_search`. Defaults to 30000. */
   searchTimeoutMs?: number
+  /** Cooperative timeout budget (ms) for `deep_research`. Defaults to 180000. */
+  researchTimeoutMs?: number
   /** Cap on source characters converted and complete `web_fetch` output characters. Defaults to 200000. */
   fetchMaxOutputChars?: number
 }
@@ -52,9 +65,11 @@ export interface Config {
 export const Config: z<Config> = z.object({
   search: z.boolean().default(true),
   fetch: z.boolean().default(true),
+  research: z.boolean().default(true),
   searchMaxResults: z.number().default(WEB_SEARCH_MAX_RESULTS),
   fetchTimeoutMs: z.number().default(DEFAULT_WEB_TOOL_TIMEOUT_MS),
   searchTimeoutMs: z.number().default(DEFAULT_WEB_TOOL_TIMEOUT_MS),
+  researchTimeoutMs: z.number().default(DEFAULT_RESEARCH_TIMEOUT_MS),
   fetchMaxOutputChars: z.number().default(DEFAULT_FETCH_MAX_OUTPUT_CHARS),
 })
 
@@ -69,10 +84,11 @@ function assertPositiveInteger(name: string, value: number): void {
 }
 
 /**
- * Register the enabled web tools. `search`/`fetch` default to true; a product
- * that wants only one disables the other in config. Each tool's cooperative
- * timeout budget (`fetchTimeoutMs`/`searchTimeoutMs`, default 30000) is resolved
- * here and attached to the tool as `ToolDefinition.timeoutMs` for
+ * Register the enabled web tools. `search`/`fetch`/`research` default to true; a
+ * product that wants a subset disables the rest in config. Each tool's
+ * cooperative timeout budget (`fetchTimeoutMs`/`searchTimeoutMs`, default 30000;
+ * `researchTimeoutMs`, default 180000) is resolved here and attached to the
+ * tool as `ToolDefinition.timeoutMs` for
  * `@shres-code/shres-code-tool-call-timeout-policy` to enforce. The tools' disposers are
  * fiber-scoped (the effect-based registries clean up on dispose), so no manual
  * teardown is needed.
@@ -83,9 +99,19 @@ export function apply(ctx: Context, config: Config): void {
   assertPositiveInteger('searchMaxResults', resolved.searchMaxResults)
   assertPositiveInteger('fetchTimeoutMs', resolved.fetchTimeoutMs)
   assertPositiveInteger('searchTimeoutMs', resolved.searchTimeoutMs)
+  assertPositiveInteger('researchTimeoutMs', resolved.researchTimeoutMs)
   assertPositiveInteger('fetchMaxOutputChars', resolved.fetchMaxOutputChars)
   if (resolved.search) {
     applyWebSearchTool(ctx, resolved.searchMaxResults, resolved.searchTimeoutMs, resolved.fetch)
   }
   if (resolved.fetch) applyWebFetchTool(ctx, resolved.fetchTimeoutMs, resolved.fetchMaxOutputChars)
+  if (resolved.research) {
+    applyDeepResearchTool(
+      ctx,
+      resolved.searchMaxResults,
+      resolved.researchTimeoutMs,
+      resolved.search,
+      resolved.fetch,
+    )
+  }
 }

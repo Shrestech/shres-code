@@ -574,7 +574,7 @@ const TOOL_PACKAGES: ToolPackage[] = [
       await ctx.plugin(ToolWeb)
     },
     note:
-      'web_search and web_fetch keep provider selection behind ctx.web so model-visible schemas stay stable across backend swaps.',
+      'web_search, web_fetch, and deep_research keep provider selection behind ctx.web so model-visible schemas stay stable across backend swaps.',
   },
   {
     pkg: '@shres-code/shres-code-tool-tracker',

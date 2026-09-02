@@ -21,6 +21,8 @@ import {
   fetchMetaFromValue,
   fetchMetaFromResult,
   WEB_SEARCH_MAX_RESULTS,
+  DEEP_RESEARCH_PROVIDER_ID,
+  deepResearchGuidance,
 } from '@shres-code/shres-code-tool-web'
 import type { ContentBlock } from '@shres-code/shres-code-llm'
 import type { ToolResult } from '@shres-code/shres-code-tools'
@@ -57,6 +59,23 @@ async function mountTools(opts: {
   const call = (name: string, args: unknown) => ctx.tools.execute({ signal: testToolSignal, callId: CallId(`call-${++counter}`), name, arguments: args })
   return { ctx, fiber, call }
 }
+
+describe('deep_research guidance', () => {
+  it('names sibling tools only when they are enabled', () => {
+    expect(deepResearchGuidance(true, true)).toBe(
+      'Use the deep_research tool for multi-source synthesis with citations when depth matters. It is expensive (billed per call) and slow. Do not use it for routine queries. Use web_search for a quick factual lookup and web_fetch to read a specific page.',
+    )
+    expect(deepResearchGuidance(true, false)).toBe(
+      'Use the deep_research tool for multi-source synthesis with citations when depth matters. It is expensive (billed per call) and slow. Do not use it for routine queries. Use web_search for a quick factual lookup.',
+    )
+    expect(deepResearchGuidance(false, true)).toBe(
+      'Use the deep_research tool for multi-source synthesis with citations when depth matters. It is expensive (billed per call) and slow. Do not use it for routine queries. Use web_fetch to read a specific page.',
+    )
+    expect(deepResearchGuidance(false, false)).toBe(
+      'Use the deep_research tool for multi-source synthesis with citations when depth matters. It is expensive (billed per call) and slow. Do not use it for routine queries.',
+    )
+  })
+})
 
 describe('search formatting', () => {
   it('renders content, sources with titles/hostnames, snippets, and a citation reminder', () => {
@@ -504,24 +523,38 @@ describe('web_fetch presentation meta and result view', () => {
 })
 
 describe('tool-web registration', () => {
-  it('registers both tools by default', async () => {
+  it('registers search, fetch, and deep_research by default', async () => {
     const { fiber, ctx } = await mountTools()
     const names = ctx.tools.schemas().map(s => s.name)
     expect(names).toContain('web_search')
     expect(names).toContain('web_fetch')
+    expect(names).toContain('deep_research')
     expect(ctx.tools.executionMode({ signal: testToolSignal, callId: CallId('search-safe'), name: 'web_search', arguments: { query: 'q' } }))
       .toEqual({ kind: 'parallel' })
     expect(ctx.tools.executionMode({ signal: testToolSignal, callId: CallId('fetch-safe'), name: 'web_fetch', arguments: { url: 'https://a.test' } }))
       .toEqual({ kind: 'parallel' })
+    expect(ctx.tools.executionMode({ signal: testToolSignal, callId: CallId('research-safe'), name: 'deep_research', arguments: { query: 'q' } }))
+      .toEqual({ kind: 'parallel' })
     await fiber.dispose()
     expect(ctx.tools.schemas().map(s => s.name)).not.toContain('web_search')
+    expect(ctx.tools.schemas().map(s => s.name)).not.toContain('deep_research')
   })
 
   it('registers only enabled tools', async () => {
-    const { fiber, ctx } = await mountTools({ config: { search: true, fetch: false } })
+    const { fiber, ctx } = await mountTools({ config: { search: true, fetch: false, research: false } })
     const names = ctx.tools.schemas().map(s => s.name)
     expect(names).toContain('web_search')
     expect(names).not.toContain('web_fetch')
+    expect(names).not.toContain('deep_research')
+    await fiber.dispose()
+  })
+
+  it('registers only deep_research when search and fetch are disabled', async () => {
+    const { fiber, ctx } = await mountTools({ config: { search: false, fetch: false, research: true } })
+    const names = ctx.tools.schemas().map(s => s.name)
+    expect(names).not.toContain('web_search')
+    expect(names).not.toContain('web_fetch')
+    expect(names).toContain('deep_research')
     await fiber.dispose()
   })
 
@@ -549,14 +582,25 @@ describe('tool-web registration', () => {
     const text = prompt.sections.map(s => s.text).join('\n')
     expect(text).toContain('Use the web_search tool to discover current information on the web. It returns an optional answer plus a list of source URLs. Follow up with web_fetch when you need the full content of a specific result, and cite the relevant URLs as markdown links.')
     expect(text).toContain('Use the web_fetch tool to retrieve the content of a specific HTTP(S) URL')
+    expect(text).toContain(deepResearchGuidance(true, true))
     await fiber.dispose()
   })
 
   it('does not advertise web_fetch in search-only prompt guidance', async () => {
-    const { fiber, ctx } = await mountTools({ config: { search: true, fetch: false } })
+    const { fiber, ctx } = await mountTools({ config: { search: true, fetch: false, research: false } })
     const prompt = await ctx.systemPrompt.assemble()
     const text = prompt.sections.map(s => s.text).join('\n')
     expect(text).toContain('Use the returned source snippets when available')
+    expect(text).not.toContain('web_fetch')
+    await fiber.dispose()
+  })
+
+  it('omits sibling-tool names from deep_research guidance when those tools are disabled', async () => {
+    const { fiber, ctx } = await mountTools({ config: { search: false, fetch: false, research: true } })
+    const prompt = await ctx.systemPrompt.assemble()
+    const text = prompt.sections.map(s => s.text).join('\n')
+    expect(text).toContain(deepResearchGuidance(false, false))
+    expect(text).not.toContain('web_search')
     expect(text).not.toContain('web_fetch')
     await fiber.dispose()
   })
@@ -703,6 +747,40 @@ describe('tool-web execution through the real registry', () => {
     expect(seen.signal).toBe(controller.signal)
     await fiber.dispose()
   })
+
+  it('executes deep_research with a Perplexity request pin even when another provider is configured', async () => {
+    const seen: { provider?: string; query?: string; maxResults?: number } = {}
+    const configured: WebSearchProvider = {
+      id: 'stub-search',
+      available: () => available,
+      search: () => Promise.resolve({ content: 'configured', sources: [], truncated: false }),
+    }
+    const perplexity: WebSearchProvider = {
+      id: DEEP_RESEARCH_PROVIDER_ID,
+      available: () => available,
+      search: (request) => {
+        if (request.provider !== undefined) seen.provider = request.provider
+        seen.query = request.query
+        if (request.maxResults !== undefined) seen.maxResults = request.maxResults
+        return Promise.resolve({ content: 'research', sources: [{ url: 'https://a.test' }], truncated: false })
+      },
+    }
+    const { ctx, fiber, call } = await mountTools({ webConfig: { searchProvider: 'stub-search' }, search: configured })
+    ctx.web.registerSearchProvider(perplexity)
+    const out = await call('deep_research', { query: 'q' })
+    expect(out.isError).toBe(false)
+    expect(out.value).toEqual({ content: 'research', sources: [{ url: 'https://a.test' }], truncated: false })
+    expect(seen).toEqual({ provider: DEEP_RESEARCH_PROVIDER_ID, query: 'q', maxResults: WEB_SEARCH_MAX_RESULTS })
+    await fiber.dispose()
+  })
+
+  it('surfaces WEB_PROVIDER_CONFIGURED_MISSING for deep_research when perplexity is not registered', async () => {
+    const { fiber, call } = await mountTools({ webConfig: { searchProvider: 'stub-search' }, search: searchProvider({ sources: [], truncated: false }) })
+    const out = await call('deep_research', { query: 'q' })
+    expect(out.isError).toBe(true)
+    expect(out.error?.info?.code).toBe('WEB_PROVIDER_CONFIGURED_MISSING')
+    await fiber.dispose()
+  })
 })
 
 describe('searchMaxResults is plugin config', () => {
@@ -751,23 +829,26 @@ describe('searchMaxResults is plugin config', () => {
 })
 
 describe('tool-call timeout budget is plugin config', () => {
-  it('attaches the default 30s budget to web_fetch and web_search', async () => {
+  it('attaches the default 30s budget to web_fetch and web_search, and 180s to deep_research', async () => {
     const { fiber, ctx } = await mountTools()
     expect(ctx.tools.get('web_fetch')?.timeoutMs).toBe(30_000)
     expect(ctx.tools.get('web_search')?.timeoutMs).toBe(30_000)
+    expect(ctx.tools.get('deep_research')?.timeoutMs).toBe(180_000)
     await fiber.dispose()
   })
 
   it('honors per-tool timeout overrides from config', async () => {
-    const { fiber, ctx } = await mountTools({ config: { fetchTimeoutMs: 60_000, searchTimeoutMs: 10_000 } })
+    const { fiber, ctx } = await mountTools({ config: { fetchTimeoutMs: 60_000, searchTimeoutMs: 10_000, researchTimeoutMs: 240_000 } })
     expect(ctx.tools.get('web_fetch')?.timeoutMs).toBe(60_000)
     expect(ctx.tools.get('web_search')?.timeoutMs).toBe(10_000)
+    expect(ctx.tools.get('deep_research')?.timeoutMs).toBe(240_000)
     await fiber.dispose()
   })
 
   it.each([
     ['fetchTimeoutMs', { fetchTimeoutMs: 0 }],
     ['searchTimeoutMs', { searchTimeoutMs: -5 }],
+    ['researchTimeoutMs', { researchTimeoutMs: 0 }],
   ])('rejects a non-positive-integer %s at load', async (key, config) => {
     const ctx = new Context()
     await ctx.plugin(SystemPrompt)
