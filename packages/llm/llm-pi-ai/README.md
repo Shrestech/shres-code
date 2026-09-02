@@ -168,8 +168,11 @@ contributes the raw tool entries and the local function-tool names to drop while
 counterpart is enabled (hosted wins on name collision), and promotes hosted names that surface
 as pi-ai tool calls to `server-tool-call` content blocks so the loop never dispatches them. The
 splice rides pi-ai's `onPayload` hook; no pi-ai fork is involved. Entry JSON and tool names
-mirror the Grok Build CLI's sampler (`web_search`, `x_search`); a dialect without a module
-serves no hosted tools, so absent declarations leave the local tool catalog unchanged.
+mirror the Grok Build CLI's sampler (`web_search`, `x_search`); the `openai-completions`
+dialect serves z.ai's hosted `web_search` (`search-prime` engine, accepted on request, folded
+into the answer silently with no surfaced artifact — verified live both streaming and not); a
+dialect without a module serves no hosted tools, so absent declarations leave the local tool
+catalog unchanged.
 
 `webSearchCallToServerToolCall` projects a `web_search_call` output item into the bounded
 server-tool-call block; the pinned pi-ai dependency drops that item before the harness sees it, so

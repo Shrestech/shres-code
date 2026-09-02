@@ -12,6 +12,7 @@ import type { HostedTool } from '@shres-code/shres-code-llm'
 import { toServerToolCallBlock } from '@shres-code/shres-code-llm'
 import type { StreamChunk } from '@shres-code/shres-code-llm'
 import { HOSTED_X_SEARCH_NAME, LOCAL_WEB_SEARCH_NAME, webSearchToolEntry, xSearchToolEntry } from './openai-responses.ts'
+import { openaiCompletionsDialect } from './openai-completions.ts'
 
 export * from './openai-responses.ts'
 
@@ -159,6 +160,7 @@ const openaiResponsesDialect: HostedToolDialect = {
 /** Hosted-tool dialects by pi-ai api id; protocols without an entry serve none. */
 const DIALECTS: Readonly<Record<string, HostedToolDialect>> = {
   'openai-responses': openaiResponsesDialect,
+  'openai-completions': openaiCompletionsDialect,
 }
 
 /**

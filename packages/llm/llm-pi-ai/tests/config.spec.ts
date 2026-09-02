@@ -96,9 +96,9 @@ describe('hosted-tools declaration boundary', () => {
   })
 
   it('rejects a hosted tool the route dialect does not serve', () => {
-    // openai-completions has no hosted-tools dialect, so a web-search
-    // declaration there is unserviceable rather than silently off.
-    expect(() => { assertServiceable(routeWith({ hostedTools: { webSearch: true } })() as Config) })
+    // openai-completions serves z.ai's web_search only; x_search exists on
+    // the responses dialect alone.
+    expect(() => { assertServiceable(routeWith({ hostedTools: { xSearch: true } })() as Config) })
       .toThrow(/does not serve it/)
     expect(() => {
       assertServiceable(Config({
@@ -109,7 +109,7 @@ describe('hosted-tools declaration boundary', () => {
             models: [{ id: 'm', hostedTools: { xSearch: true } }],
           },
         },
-      }) as Config)
+      }))
     }).toThrow(/does not serve it/)
   })
 

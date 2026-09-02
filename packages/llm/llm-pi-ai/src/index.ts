@@ -80,6 +80,7 @@ export {
   webSearchToolEntry,
   xSearchToolEntry,
 } from './hosted-tools/index.ts'
+export { openaiCompletionsDialect } from './hosted-tools/openai-completions.ts'
 export type {
   HostedCustomToolCallItem,
   HostedToolDialect,
