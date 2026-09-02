@@ -13,7 +13,7 @@ A function/namespace plugin (`name` / `inject` / `Config` / `apply`), not a serv
     defaultTimeoutMs: 600000   # absent by default: undeclared tools get no deadline
 ```
 
-The per-tool budget is declared by the tool plugin (e.g. `shres-tool-web`'s `fetchTimeoutMs`/`searchTimeoutMs` config, attached as `ToolDefinition.timeoutMs`); this plugin only enforces it, so a mistyped tool name is not possible. `defaultTimeoutMs` fails loud at plugin load: anything but a positive integer throws, never a silent fall-back. It is absent by default, so adding this plugin changes no shipped behavior; a deployment that wants the workhorse tools (`bash`, `read`, `write`, `edit`, which declare nothing) covered sets it.
+The per-tool budget is declared by the tool plugin (e.g. `shres-tool-web`'s `fetchTimeoutMs`/`searchTimeoutMs`/`researchTimeoutMs` config, attached as `ToolDefinition.timeoutMs`); this plugin only enforces it, so a mistyped tool name is not possible. `defaultTimeoutMs` fails loud at plugin load: anything but a positive integer throws, never a silent fall-back. It is absent by default, so adding this plugin changes no shipped behavior; a deployment that wants the workhorse tools (`bash`, `read`, `write`, `edit`, which declare nothing) covered sets it.
 
 ### Behavior
 

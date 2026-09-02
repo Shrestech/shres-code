@@ -11,6 +11,7 @@ import { HarnessError } from '@shres-code/shres-code-llm'
  * What one search-capable backend can return. The model-facing argument is just
  * a query; `maxResults` is a `shres-tool-web`-layer bound passed through unchanged
  * and enforced on the way back by the seam (see {@link WebSearchResult}).
+ * `provider` is an optional per-call selection pin, not a model-facing argument.
  */
 export interface WebSearchRequest {
   readonly query: string
@@ -22,6 +23,12 @@ export interface WebSearchRequest {
    * regardless.
    */
   readonly maxResults?: number
+  /**
+   * Exclusive search provider id for this call. Wins over the singular config
+   * pin and the ordered fallback list. A missing or unusable id fails with the
+   * same configured-id errors as a singular pin.
+   */
+  readonly provider?: string
 }
 
 /**

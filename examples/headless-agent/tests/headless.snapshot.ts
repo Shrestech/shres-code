@@ -49,6 +49,8 @@ const retryScenarioDir = join(snapshotsDir, 'provider-retry')
 const retryConfigPath = fileURLToPath(new URL('../retry.cordis.snapshot.yml', import.meta.url))
 const hostedSearchScenarioDir = join(snapshotsDir, 'hosted-search')
 const hostedSearchConfigPath = fileURLToPath(new URL('../hosted-search.cordis.snapshot.yml', import.meta.url))
+const deepResearchScenarioDir = join(snapshotsDir, 'deep-research')
+const deepResearchConfigPath = fileURLToPath(new URL('../deep-research.cordis.snapshot.yml', import.meta.url))
 const compactionScenarioDir = join(snapshotsDir, 'compaction-recovery')
 const compactionSessionFixture = join(compactionScenarioDir, 'session.jsonl')
 const compactionStreamExpected = join(compactionScenarioDir, 'stream-json.expected.jsonl')
@@ -435,6 +437,42 @@ describe('headless stream-json snapshots', () => {
         expect(content).toContain('HOSTED_OK')
         expect(content).not.toContain('HOSTED_MISSING')
         expect(content).not.toContain('HOSTED_LOCAL_WEB_SEARCH_NOT_DROPPED')
+      },
+    })
+
+    expect(result.stderr).toBe('')
+    const normalized = normalizeHeadlessStream(result.stdout, runCwd)
+    if (refreshing) await writeFile(streamExpected, normalized)
+    expect(normalized).toBe(await readFile(streamExpected, 'utf8'))
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+
+  it('executes deep_research through its provider pin and answers from the result', async () => {
+    const prompt = await scenarioPrompt(deepResearchScenarioDir, 'deep-research')
+    const streamExpected = join(deepResearchScenarioDir, 'stream-json.expected.jsonl')
+    let runCwd = ''
+    const result = await runLoaderSmoke({
+      label: 'deep research headless stream-json snapshot',
+      tempDirPrefix: 'headless-snapshot-deep-research-',
+      binScript,
+      libBinScript: binScript,
+      configPath: deepResearchConfigPath,
+      binArgs: [deepResearchConfigPath, prompt],
+      tsconfigPath,
+      env: {
+        SHRES_SNAPSHOT: 'replay',
+        NODE_OPTIONS: [process.env.NODE_OPTIONS, '--disable-warning=ExperimentalWarning'].filter(Boolean).join(' '),
+      },
+      prepare: (cwd) => { runCwd = cwd },
+      inspect: async (cwd) => {
+        // The transcript must carry the deep_research tool call, its result
+        // from the pinned provider, and the follow-up answer derived from it.
+        const logs = await persistedLogs(cwd)
+        expect(logs).toHaveLength(1)
+        const content = logs[0]?.content ?? ''
+        expect(content).toContain('deep_research')
+        expect(content).toContain('RESEARCH_SYNTHESIS')
+        expect(content).toContain('RESEARCH_OK')
+        expect(content).not.toContain('RESEARCH_UNEXPECTED')
       },
     })
 

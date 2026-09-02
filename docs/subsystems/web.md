@@ -1,6 +1,6 @@
 # Web Access
 
-The web access seam — a [capability seam](../../.agents/notes/implemented/architecture/2026-06-24-web-capability-seam.md) that spans **two operations** (search and fetch) on one `ctx.web` service, split across packages: Service Definition ([shres-web](../../packages/web/web), `ctx.web` + the provider registries), Service Providers ([shres-web-search-exa](../../packages/web/web-search-exa), [shres-web-search-perplexity](../../packages/web/web-search-perplexity), [shres-web-search-deepseek](../../packages/web/web-search-deepseek), [shres-web-search-attached-cli](../../packages/web/web-search-attached-cli), [shres-web-fetch-http](../../packages/web/web-fetch-http)), and Consumer ([shres-tool-web](../../packages/web/tool-web), the `web_search`/`web_fetch` tool schemas). Web is **one optional capability**, not part of the agent-loop spine — so its vocabulary lives here, not in [core.md](core.md). A search-provider swap does not change how the model asks for a query, and a fetch-provider swap does not change how the model asks for a URL.
+The web access seam — a [capability seam](../../.agents/notes/implemented/architecture/2026-06-24-web-capability-seam.md) that spans **two operations** (search and fetch) on one `ctx.web` service, split across packages: Service Definition ([shres-web](../../packages/web/web), `ctx.web` + the provider registries), Service Providers ([shres-web-search-exa](../../packages/web/web-search-exa), [shres-web-search-perplexity](../../packages/web/web-search-perplexity), [shres-web-search-deepseek](../../packages/web/web-search-deepseek), [shres-web-search-attached-cli](../../packages/web/web-search-attached-cli), [shres-web-fetch-http](../../packages/web/web-fetch-http)), and Consumer ([shres-tool-web](../../packages/web/tool-web), the `web_search`/`web_fetch`/`deep_research` tool schemas). Web is **one optional capability**, not part of the agent-loop spine — so its vocabulary lives here, not in [core.md](core.md). A search-provider swap does not change how the model asks for a query, and a fetch-provider swap does not change how the model asks for a URL.
 
 Source: [`packages/web/web/src/types.ts`](../../packages/web/web/src/types.ts)
 
@@ -10,13 +10,14 @@ Search and fetch share no request schema and no business logic, but they are del
 
 ## Search request and result
 
-The model-facing tool argument is just a `query`; `maxResults` is a consumer-owned bound (`shres-tool-web`'s `searchMaxResults` config, default `8`) passed through the seam and enforced on the way back — if a provider over-returns, the seam truncates `sources[]` and sets `truncated`.
+The model-facing tool argument is just a `query`; `maxResults` is a consumer-owned bound (`shres-tool-web`'s `searchMaxResults` config, default `8`) passed through the seam and enforced on the way back — if a provider over-returns, the seam truncates `sources[]` and sets `truncated`. `provider` is an optional per-call selection pin (not a model argument); `deep_research` uses it to pin Perplexity.
 
 ```ts type-equiv
 /**
  * What one search-capable backend can return. The model-facing argument is just
  * a query; `maxResults` is a `shres-tool-web`-layer bound passed through unchanged
  * and enforced on the way back by the seam (see {@link WebSearchResult}).
+ * `provider` is an optional per-call selection pin, not a model-facing argument.
  */
 interface WebSearchRequest {
   readonly query: string
@@ -28,6 +29,12 @@ interface WebSearchRequest {
    * regardless.
    */
   readonly maxResults?: number
+  /**
+   * Exclusive search provider id for this call. Wins over the singular config
+   * pin and the ordered fallback list. A missing or unusable id fails with the
+   * same configured-id errors as a singular pin.
+   */
+  readonly provider?: string
 }
 ```
 
@@ -119,7 +126,7 @@ type WebFetchBody =
 
 A provider's `available(): boolean` is a cheap LOCAL check (credential presence, parseable config) and **must not make network calls**. It is an input to execution-time selection, not a health system: `search()`/`fetch()` read it to pick a usable provider, and a selection failure surfaces as the structured `WebError` the caller routes on — which carries the branchable detail (the missing id or ambiguous candidate set) in its code and message.
 
-Selection never depends on registration, config, or HMR order: a singular pin (`searchProvider`/`fetchProvider`, or the matching env var) is exclusive; `searchProviders`/`fetchProviders` (or `$SHRES_WEB_*_PROVIDERS`) is first-usable-wins and is ignored when a singular pin is set; with neither, the seam auto-selects when exactly one usable provider is registered. Multiple usable providers with no pin and no list is `WEB_PROVIDER_AMBIGUOUS`. The shipped base composition lists `attached-cli`, then `perplexity`, then `deepseek-official`: an attached CLI vendor owns search, Perplexity serves when its key is configured, and DeepSeek remains the always-available terminal entry that reports its own missing key.
+Selection never depends on registration, config, or HMR order: a singular pin (`searchProvider`/`fetchProvider`, or the matching env var) is exclusive; a per-call `WebSearchRequest.provider` pin is exclusive in the same way and wins over both the singular config pin and the ordered list; `searchProviders`/`fetchProviders` (or `$SHRES_WEB_*_PROVIDERS`) is first-usable-wins and is ignored when a singular pin is set; with neither, the seam auto-selects when exactly one usable provider is registered. Multiple usable providers with no pin and no list is `WEB_PROVIDER_AMBIGUOUS`. The shipped base composition lists `attached-cli`, then `perplexity`, then `deepseek-official`: an attached CLI vendor owns search, Perplexity serves when its key is configured, and DeepSeek remains the always-available terminal entry that reports its own missing key.
 
 ## Errors
 
@@ -145,6 +152,7 @@ The web access service. Registered as `ctx.web` (one instance per context).
 
 Selection semantics (resolved at execution time, never order-dependent):
 
+- A request-level `provider` on `search()` is exclusive, wins over the singular config pin and the ordered list, and uses the same missing and unavailable failures as a singular pin.
 - A singular configured id that is registered and `available()` → that provider.
 - A singular configured id not registered → `WEB_PROVIDER_CONFIGURED_MISSING`.
 - A singular configured id registered but unavailable → `WEB_PROVIDER_CONFIGURED_UNAVAILABLE`.
@@ -178,7 +186,7 @@ registerFetchProvider(provider: WebFetchProvider): () => void
  * time with the selection rules above; throws {@link WebError} when the
  * capability cannot run. The seam enforces `request.maxResults` on the result:
  * if the provider over-returns, `sources[]` is truncated and `truncated` set.
- * @param request - the query and optional result limit.
+ * @param request - the query, optional result limit, and optional per-call provider pin.
  * @param signal - optional cancellation signal forwarded to the provider.
  * @returns the provider's results, capped to `request.maxResults`.
  */
@@ -195,5 +203,5 @@ async search(request: WebSearchRequest, signal?: AbortSignal): Promise<WebSearch
 async fetch(request: WebFetchRequest, signal?: AbortSignal): Promise<WebFetchResult>
 ```
 
-Source: [`packages/web/web/src/index.ts:85`](../../packages/web/web/src/index.ts)
+Source: [`packages/web/web/src/index.ts:88`](../../packages/web/web/src/index.ts)
 <!-- END GENERATED cordis-surface -->

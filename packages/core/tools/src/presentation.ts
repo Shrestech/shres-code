@@ -329,12 +329,12 @@ export interface WebSource {
 
 /**
  * A completed web retrieval rendered as a structured card by a capable UI. Set
- * by a web tool whose call retrieves from the web (`web_search`, `web_fetch`).
+ * by a web tool whose call retrieves from the web (`web_search`, `web_fetch`, `deep_research`).
  * One `kind`-tagged union carries both shapes because both are web retrieval and
  * a UI renders them with one component family; a UI switches on `kind`. An
  * incapable UI falls back to the raw `tool/result` content (this view carries no
  * `content` copy — see the web-result-card Agent Note). This is the result-time
- * analogue of the `web_search`/`web_fetch` calls' generic call views
+ * analogue of the `web_search`/`web_fetch`/`deep_research` calls' generic call views
  * (`kind: 'search'`/`'fetch'`); those tools keep their generic pending card and
  * add only this completed card.
  *
@@ -347,7 +347,7 @@ export interface WebSource {
 export type WebResultView = WebSearchResultView | WebFetchResultView
 
 /**
- * The completed state of a `web_search` call: the structured sources the model
+ * The completed state of a `web_search` or `deep_research` call: the structured sources the model
  * cited, an optional provider answer, and whether the source list was cut to the
  * result cap. A capable UI renders the sources as a citation list; a UI without
  * the `web` capability falls back to the raw `tool/result` content.
