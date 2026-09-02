@@ -34,7 +34,7 @@
     "@shres-code/shres-code-client-ui-slots": "workspace:^",
     "@shres-code/shres-code-client-ui-theme": "workspace:^",
     "@shres-code/shres-code-client-web-react": "workspace:^",
-    "react": "^18.2.0",
+    "react": "^19.2.8",
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
@@ -42,7 +42,7 @@
     "@shres-code/shres-code-client-runtime": "workspace:^",
     "@shres-code/shres-code-client-test-runtime": "workspace:^",
     "@shres-code/shres-code-invariants": "workspace:^",
-    "@types/react": "~18.3.1",
+    "@types/react": "~19.2.18",
     "@types/react-dom": "~18.3.0",
     "@shres-code/cordis": "workspace:^",
     "typescript": "^6.0.3"

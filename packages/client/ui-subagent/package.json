@@ -47,7 +47,7 @@
   },
   "license": "MIT",
   "dependencies": {
-    "react": "^18.2.0"
+    "react": "^19.2.8"
   },
   "peerDependencies": {
     "@shres-code/shres-code-client-locale": "workspace:^",
@@ -72,7 +72,7 @@
     "@shres-code/shres-code-invariants": "workspace:^",
     "@shres-code/shres-code-subagent": "workspace:^",
     "@shres-code/shres-code-token-meter": "workspace:^",
-    "@types/react": "~18.3.1",
+    "@types/react": "~19.2.18",
     "@shres-code/cordis": "workspace:^"
   },
   "files": [

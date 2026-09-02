@@ -73,7 +73,7 @@
     "@shres-code/shres-code-session-stats": "workspace:^",
     "@shres-code/shres-code-token-meter": "workspace:^",
     "@shres-code/shres-code-tools": "workspace:^",
-    "react": "^18.2.0"
+    "react": "^19.2.8"
   },
   "devDependencies": {
     "@shres-code/cordis": "workspace:^",
@@ -104,8 +104,8 @@
     "@shres-code/shres-code-token-meter": "workspace:^",
     "@shres-code/shres-code-tool-todo": "workspace:^",
     "@shres-code/shres-code-tools": "workspace:^",
-    "@types/react": "~18.3.1",
-    "react": "^18.2.0"
+    "@types/react": "~19.2.18",
+    "react": "^19.2.8"
   },
   "files": [
     "lib/index.js",

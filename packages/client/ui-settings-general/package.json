@@ -64,7 +64,7 @@
     "@shres-code/shres-code-client-web-react": "workspace:^",
     "@shres-code/shres-code-invariants": "workspace:^",
     "@shres-code/cordis": "workspace:^",
-    "react": "^18.2.0"
+    "react": "^19.2.8"
   },
   "devDependencies": {
     "@shres-code/shres-code-api-remotes": "workspace:^",
@@ -79,8 +79,8 @@
     "@shres-code/shres-code-client-web-react": "workspace:^",
     "@shres-code/shres-code-invariants": "workspace:^",
     "@shres-code/cordis": "workspace:^",
-    "@types/react": "~18.3.1",
-    "react": "^18.2.0"
+    "@types/react": "~19.2.18",
+    "react": "^19.2.8"
   },
   "files": [
     "lib/index.js",

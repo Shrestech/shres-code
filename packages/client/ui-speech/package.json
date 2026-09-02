@@ -58,7 +58,7 @@
     "@shres-code/shres-code-speech": "workspace:^",
     "@shres-code/shres-code-typert-protocol": "workspace:^",
     "@shres-code/cordis": "workspace:^",
-    "react": "^18.2.0"
+    "react": "^19.2.8"
   },
   "devDependencies": {
     "@shres-code/shres-code-api-remotes": "workspace:^",
@@ -73,9 +73,9 @@
     "@shres-code/shres-code-speech": "workspace:^",
     "@shres-code/shres-code-typert-protocol": "workspace:^",
     "@testing-library/react": "^16.1.0",
-    "@types/react": "~18.3.1",
+    "@types/react": "~19.2.18",
     "@shres-code/cordis": "workspace:^",
-    "react": "^18.2.0",
+    "react": "^19.2.8",
     "react-dom": "^18.2.0"
   },
   "files": [
