@@ -52,8 +52,8 @@ importers:
         specifier: ^4.1.8
         version: 4.1.8(vitest@4.1.8)
       '@yarnpkg/cli-dist':
-        specifier: 4.17.1
-        version: 4.17.1
+        specifier: 4.18.0
+        version: 4.18.0
       eslint-plugin-sonarjs:
         specifier: ^4.1.0
         version: 4.1.0(eslint@10.5.0(jiti@2.7.0))
@@ -13422,8 +13422,8 @@ packages:
   '@vueuse/shared@12.8.2':
     resolution: {integrity: sha512-dznP38YzxZoNloI0qpEfpkms8knDtaoQ6Y/sfS0L7Yki4zh40LFHEhur0odJC6xTHG5dxWVPiUWBXn+wCG2s5w==}
 
-  '@yarnpkg/cli-dist@4.17.1':
-    resolution: {integrity: sha512-2tiSQuJNl/L3QwTdrq6lKWDpkcnp9MGvCT/rIldHcbu3SWfnLdmehvt3eulX1hT7FFt1Gjfq3CesF+kvhFip6g==}
+  '@yarnpkg/cli-dist@4.18.0':
+    resolution: {integrity: sha512-WV9H+/O8BPElO7GKzrKipTtCNt8/gBCUJaNAEOw4U/x2k17aZjseYzll4QhpZE4xIsEvo8bK6KvjhsXuHrclPg==}
     engines: {node: '>=18.12.0'}
     hasBin: true
 
@@ -18962,7 +18962,7 @@ snapshots:
     transitivePeerDependencies:
       - typescript
 
-  '@yarnpkg/cli-dist@4.17.1': {}
+  '@yarnpkg/cli-dist@4.18.0': {}
 
   accepts@2.0.0:
     dependencies:
