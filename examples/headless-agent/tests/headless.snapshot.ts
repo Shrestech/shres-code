@@ -47,6 +47,8 @@ const houseRulesHelper = fileURLToPath(new URL(
 ))
 const retryScenarioDir = join(snapshotsDir, 'provider-retry')
 const retryConfigPath = fileURLToPath(new URL('../retry.cordis.snapshot.yml', import.meta.url))
+const hostedSearchScenarioDir = join(snapshotsDir, 'hosted-search')
+const hostedSearchConfigPath = fileURLToPath(new URL('../hosted-search.cordis.snapshot.yml', import.meta.url))
 const compactionScenarioDir = join(snapshotsDir, 'compaction-recovery')
 const compactionSessionFixture = join(compactionScenarioDir, 'session.jsonl')
 const compactionStreamExpected = join(compactionScenarioDir, 'stream-json.expected.jsonl')
@@ -395,6 +397,44 @@ describe('headless stream-json snapshots', () => {
           delayMs: 1,
           failure: { message: 'snapshot transient failure', code: 'RATE_LIMIT', status: 429 },
         })
+      },
+    })
+
+    expect(result.stderr).toBe('')
+    const normalized = normalizeHeadlessStream(result.stdout, runCwd)
+    if (refreshing) await writeFile(streamExpected, normalized)
+    expect(normalized).toBe(await readFile(streamExpected, 'utf8'))
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+
+  it('splices hosted tools over the local web_search on a declared route', async () => {
+    const prompt = await scenarioPrompt(hostedSearchScenarioDir, 'hosted-search')
+    const streamExpected = join(hostedSearchScenarioDir, 'stream-json.expected.jsonl')
+    let runCwd = ''
+    const result = await runLoaderSmoke({
+      label: 'hosted tools headless stream-json snapshot',
+      tempDirPrefix: 'headless-snapshot-hosted-search-',
+      binScript,
+      libBinScript: binScript,
+      configPath: hostedSearchConfigPath,
+      binArgs: [hostedSearchConfigPath, prompt],
+      tsconfigPath,
+      env: {
+        SHRES_SNAPSHOT: 'replay',
+        NODE_OPTIONS: [process.env.NODE_OPTIONS, '--disable-warning=ExperimentalWarning'].filter(Boolean).join(' '),
+      },
+      prepare: (cwd) => { runCwd = cwd },
+      inspect: async (cwd) => {
+        // The persisted transcript must carry the hosted call as a
+        // server-tool-call block (never dispatched) and the wire-verified
+        // splice verdict text.
+        const logs = await persistedLogs(cwd)
+        expect(logs).toHaveLength(1)
+        const content = logs[0]?.content ?? ''
+        expect(content).toContain('server-tool-call')
+        expect(content).toContain('x_search')
+        expect(content).toContain('HOSTED_OK')
+        expect(content).not.toContain('HOSTED_MISSING')
+        expect(content).not.toContain('HOSTED_LOCAL_WEB_SEARCH_NOT_DROPPED')
       },
     })
 

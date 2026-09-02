@@ -1,0 +1,16 @@
+# Keyless hosted-tools composition for the headless stream-json snapshot: the
+# fixture backend serves one Responses turn carrying a hosted x_search call,
+# and the default route declares both hosted tools, so the run exercises the
+# production splice (hosted entries in, local web_search dropped) over a real
+# HTTP wire with no API key.
+- id: base
+  name: '@shres-code/cordis-plugin-include'
+  config:
+    path: ./cordis.yml
+    patches:
+      - id: llm-deepseek
+        name: '@shres-code/shres-code-llm-deepseek'
+        disabled: true
+      - insert:
+          - id: hosted-search-snapshot-backend
+            name: './tests/fixtures/hosted-search-snapshot-backend.mjs'
