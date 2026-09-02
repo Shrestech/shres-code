@@ -20,10 +20,11 @@ import { credentialRef } from '@shres-code/shres-code-credentials'
 import type { CredentialRef } from '@shres-code/shres-code-credentials'
 import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
 import { resolveRetryPolicy, RetryPolicySchema } from '@shres-code/shres-code-llm'
-import type { ResolvedRetryPolicy, RetryPolicyConfig } from '@shres-code/shres-code-llm'
+import type { HostedTool, ResolvedRetryPolicy, RetryPolicyConfig } from '@shres-code/shres-code-llm'
 import { MODALITIES, resolveRouteModels, SUPPORTED_THINKING_FORMATS, THINKING_LEVELS } from './catalog.ts'
 import type {
   PiAiCompatProfile,
+  PiAiHostedTools,
   PiAiModality,
   PiAiModelOverride,
   PiAiModelProfile,
@@ -54,6 +55,7 @@ export const DEFAULT_INPUT: readonly PiAiModality[] = ['text']
 
 export type {
   PiAiCompatProfile,
+  PiAiHostedTools,
   PiAiModality,
   PiAiModelOverride,
   PiAiModelProfile,
@@ -122,6 +124,13 @@ export interface PiAiProviderProfile {
    */
   compat?: PiAiCompatProfile
   /**
+   * Route-default hosted-tool switches: which provider-executed tools every
+   * model on this route serves inside the conversation, with the local
+   * counterparts dropped per request. Absent stays off; each model entry's
+   * {@link PiAiModelProfile.hostedTools} dict wins over these.
+   */
+  hostedTools?: PiAiHostedTools
+  /**
    * Context capacity for a model this route lists that neither the entry nor
    * the installed catalog sizes (default 262,144). A guess by construction, so
    * a deployment whose gateway serves smaller models corrects it here.
@@ -168,7 +177,7 @@ export interface PiAiProviderProfile {
 
 /** Validated profile with its route stamped and every adapter-owned default resolved. */
 export interface ResolvedPiAiProviderProfile
-  extends Omit<PiAiProviderProfile, 'apiKeyEnv' | 'retryPolicy' | 'models' | 'displayName'> {
+  extends Omit<PiAiProviderProfile, 'apiKeyEnv' | 'retryPolicy' | 'models' | 'displayName' | 'hostedTools'> {
   /** Harness route key and the `Models` collection key (the configuration dict key). */
   provider: string
   /** Resolved display name for selectors and configuration surfaces. */
@@ -192,6 +201,12 @@ export interface ResolvedPiAiProviderProfile
    * own, so a catalog capability must not appear here.
    */
   configuredMaxTokens: ReadonlyMap<string, number>
+  /**
+   * Effective hosted tools by model id, materialized from this profile's
+   * route declaration and per-model overrides. A model absent from the map
+   * serves none, so its requests carry the local tool catalog unchanged.
+   */
+  hostedTools: ReadonlyMap<string, readonly HostedTool[]>
 }
 
 /** Plugin configuration: the provider routes this instance owns. */
@@ -214,6 +229,11 @@ const thinkingBudgets = z.object({
 const compatProfile: z<PiAiCompatProfile> = z.object({
   thinkingFormat: z.union(SUPPORTED_THINKING_FORMATS),
   supportsReasoningEffort: z.boolean(),
+})
+
+const hostedToolsProfile: z<PiAiHostedTools> = z.object({
+  webSearch: z.boolean(),
+  xSearch: z.boolean(),
 })
 
 /**
@@ -245,6 +265,7 @@ const modelFields = {
   // installed catalog's capability", while `false` disables reasoning.
   reasoningEfforts: z.union([z.const(false), reasoningEfforts]),
   compat: compatProfile,
+  hostedTools: hostedToolsProfile,
 }
 
 const endpointVariant: z<PiAiEndpointVariant> = z.object({
@@ -271,6 +292,7 @@ const profile = z.object({
   models: z.array(modelProfile),
   modelOverrides: z.dict(modelOverride),
   compat: compatProfile,
+  hostedTools: hostedToolsProfile,
   defaultContextWindow: z.number().step(1).min(1).default(DEFAULT_CONTEXT_WINDOW),
   defaultMaxTokens: z.number().step(1).min(1).default(DEFAULT_MAX_TOKENS),
   defaultInput: z.array(z.union(MODALITIES)).default([...DEFAULT_INPUT]),
@@ -378,6 +400,7 @@ export function resolveProfiles(
       ...source.models === undefined ? {} : { models: source.models },
       ...source.modelOverrides === undefined ? {} : { modelOverrides: source.modelOverrides },
       ...source.compat === undefined ? {} : { compat: source.compat },
+      ...source.hostedTools === undefined ? {} : { hostedTools: source.hostedTools },
       defaultInput,
       defaultContextWindow: source.defaultContextWindow ?? DEFAULT_CONTEXT_WINDOW,
       defaultMaxTokens: source.defaultMaxTokens ?? DEFAULT_MAX_TOKENS,
@@ -393,6 +416,7 @@ export function resolveProfiles(
       ...rest.headers === undefined ? {} : { headers: { ...rest.headers } },
       ...rest.thinkingBudgets === undefined ? {} : { thinkingBudgets: { ...rest.thinkingBudgets } },
       configuredMaxTokens: catalog.configuredMaxTokens,
+      hostedTools: catalog.hostedTools,
       piProvider: buildProvider({
         provider,
         displayName,

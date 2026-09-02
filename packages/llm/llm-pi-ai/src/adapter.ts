@@ -49,10 +49,11 @@ import type {
 } from '@shres-code/shres-code-llm'
 import type { AttachmentStore } from '@shres-code/shres-code-attachment'
 import { idleWatchdog, timeoutOf } from '@shres-code/shres-code-timeout'
+import type { HostedTool } from '@shres-code/shres-code-llm'
 import type { ResolvedPiAiProviderProfile } from './config.ts'
 import { toPiContext } from './context.ts'
-import { applyHostedToolsPayload, mapHostedToolCalls } from './hosted-tools.ts'
-import type { HostedToolsSplice } from './hosted-tools.ts'
+import { applyHostedToolsPayload, hostedToolsDialectFor, mapHostedToolCalls } from './hosted-tools/index.ts'
+import type { HostedToolsPlan } from './hosted-tools/index.ts'
 import { toStreamChunks } from './stream.ts'
 
 /** One resolution's frozen view: the profiles and the collection built from them. */
@@ -61,18 +62,6 @@ interface PiAiSnapshot {
   profiles: ReadonlyMap<string, ResolvedPiAiProviderProfile>
   /** Providers for exactly those profiles; never mutated once published. */
   models: Models
-}
-
-/**
- * Hosted-search facts one route supplies the adapter with, resolved per
- * stream call. `entries` are appended to the outgoing tools array, local
- * tools in `dropLocalTools` are omitted, and hosted tools in `callNames`
- * surface as pi-ai tool calls that must be promoted to server-tool-call
- * blocks so the loop never dispatches them.
- */
-export interface PiAiAdapterHostedSearch extends HostedToolsSplice {
-  /** Hosted tool names that surface as pi-ai tool calls; promoted to server-tool-call blocks. */
-  callNames?: readonly string[]
 }
 
 /** Constructor options for {@link PiAiAdapter}: the two resolution hooks the plugin owns. */
@@ -95,14 +84,6 @@ export interface PiAiAdapterOptions {
    * conversion because its stored replay state is unusable by this build.
    */
   onReplayDegrade?: (detail: { provider: string; model: string; reason: string }) => void
-  /**
-   * Hosted-search facts, read live per stream call like `profiles`. When the
-   * resolved value names entries, they are spliced into the outgoing payload
-   * and the colliding local tools are dropped; `callNames` names hosted tools
-   * that surface as pi-ai tool calls and therefore must be promoted to
-   * `server-tool-call` blocks instead of dispatching locally.
-   */
-  hostedSearch?: () => PiAiAdapterHostedSearch | undefined
   /**
    * Rewrite one outgoing provider request payload before it is sent. pi-ai
    * hands the hook the request body it built for the model; returning a value
@@ -261,6 +242,34 @@ export class PiAiAdapter extends LlmAdapter {
     return resolved
   }
 
+  /**
+   * The splice plan for one model's effective hosted tools, derived from the
+   * resolved profile declaration and the model's wire dialect. `undefined`
+   * leaves the request on the local tool catalog.
+   * @param profile - the route's resolved profile.
+   * @param model - the resolved model descriptor, for its wire protocol.
+   * @param modelId - the model id the declaration resolved under.
+   * @returns the dialect's splice plan, or `undefined` when none are declared.
+   */
+  private hostedPlanOf(
+    profile: ResolvedPiAiProviderProfile,
+    model: Model<Api>,
+    modelId: string,
+  ): HostedToolsPlan | undefined {
+    const tools = profile.hostedTools.get(modelId)
+    if (tools === undefined || tools.length === 0) return undefined
+    return hostedToolsDialectFor(model.api)?.spliceFor(tools)
+  }
+
+  /** The advertised hosted-tool field for one model, or nothing to declare none. */
+  private hostedToolsOf(
+    profile: ResolvedPiAiProviderProfile,
+    modelId: string,
+  ): { hostedTools: readonly HostedTool[] } | Record<string, never> {
+    const tools = profile.hostedTools.get(modelId)
+    return tools === undefined ? {} : { hostedTools: [...tools] }
+  }
+
   override providerInfo(provider: string): LlmProviderInfo {
     // The configured name, not the route key: `displayName` exists so a
     // deployment can label a route, and a label only the configuration surface
@@ -275,12 +284,13 @@ export class PiAiAdapter extends LlmAdapter {
   override listModels(provider: string): Promise<readonly LlmModelInfo[]> {
     return Promise.resolve().then(() => {
       const snapshot = this.current()
-      this.profileOf(snapshot, provider)
+      const profile = this.profileOf(snapshot, provider)
       return snapshot.models.getModels(provider).map(model => ({
         provider,
         id: model.id,
         name: model.name,
         inputModalities: [...model.input],
+        ...this.hostedToolsOf(profile, model.id),
       }))
     })
   }
@@ -303,6 +313,7 @@ export class PiAiAdapter extends LlmAdapter {
         id: model,
         name: resolvedModel.name,
         inputModalities: [...resolvedModel.input],
+        ...this.hostedToolsOf(profile, model),
         context: { contextWindow: resolvedModel.contextWindow },
         ...configuredMaxTokens === undefined ? {} : { defaultMaxTokens: configuredMaxTokens },
         ...reasoningInfo(resolvedModel, defaultLevel),
@@ -327,7 +338,7 @@ export class PiAiAdapter extends LlmAdapter {
       options.reasoningEffort ?? profile.reasoning,
     )
     const apiKey = await this.config.resolveApiKey(options.provider, profile)
-    const hosted = this.config.hostedSearch?.()
+    const hosted = this.hostedPlanOf(profile, model, options.model)
 
     const consumer = new AbortController()
     const upstream = options.signal === undefined
@@ -385,7 +396,7 @@ export class PiAiAdapter extends LlmAdapter {
       // A hosted tool pi-ai surfaces as an ordinary tool call must be promoted
       // to a server-tool-call block here, the adapter seam that knows the
       // route's hosted names, so the loop structurally never dispatches it.
-      const hostedNames = hosted === undefined || hosted.callNames === undefined || hosted.callNames.length === 0
+      const hostedNames = hosted === undefined || hosted.callNames.length === 0
         ? undefined
         : new Set(hosted.callNames)
       const translated = toStreamChunks(events, model.contextWindow)

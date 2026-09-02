@@ -11,7 +11,7 @@ import {
   webSearchCallToServerToolCall,
   webSearchToolEntry,
   xSearchToolEntry,
-} from '../src/hosted-tools.ts'
+} from '../src/hosted-tools/index.ts'
 
 async function* streamOf(chunks: StreamChunk[]): AsyncGenerator<StreamChunk> {
   for (const chunk of chunks) yield chunk

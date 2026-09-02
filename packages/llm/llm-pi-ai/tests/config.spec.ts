@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { assertServiceable, Config } from '../src/config.ts'
+import { assertServiceable, Config, resolveProfiles } from '../src/config.ts'
 
 /** Validate one hand-declared route, with the caller's fields layered onto it. */
 const routeWith = (profile: Record<string, unknown>): (() => unknown) =>
@@ -62,5 +62,70 @@ describe('modality schema boundary', () => {
     const absent = configWith({})() as Materialized
     expect(absent.providers['acme-gateway']?.models?.[0]?.input).toEqual([])
     expect(absent.providers['acme-gateway']?.defaultInput).toEqual(['text'])
+  })
+})
+
+describe('hosted-tools declaration boundary', () => {
+  /** Validate one hand-declared responses route, the dialect that serves both hosted tools. */
+  const responsesRoute = (profile: Record<string, unknown>): (() => unknown) =>
+    () => Config({
+      providers: {
+        'acme-gateway': {
+          api: 'openai-responses',
+          baseURL: 'https://acme.test',
+          models: [{ id: 'm' }],
+          ...profile,
+        },
+      },
+    })
+
+  it('rejects a non-boolean switch at the write and at resolution', () => {
+    // The settings-path schema refuses the value where it is written...
+    expect(() => { assertServiceable(responsesRoute({ hostedTools: { webSearch: 'yes' } })() as Config) })
+      .toThrow(/expected boolean/)
+    // ...and resolution refuses the same shape arriving without the schema.
+    expect(() => {
+      resolveProfiles({
+        'acme-gateway': {
+          api: 'openai-responses',
+          baseURL: 'https://acme.test',
+          models: [{ id: 'm', hostedTools: { webSearch: 'yes' as unknown as boolean } }],
+        },
+      })
+    }).toThrow(/hostedTools\.webSearch must be a boolean/)
+  })
+
+  it('rejects a hosted tool the route dialect does not serve', () => {
+    // openai-completions has no hosted-tools dialect, so a web-search
+    // declaration there is unserviceable rather than silently off.
+    expect(() => { assertServiceable(routeWith({ hostedTools: { webSearch: true } })() as Config) })
+      .toThrow(/does not serve it/)
+    expect(() => {
+      assertServiceable(Config({
+        providers: {
+          'acme-gateway': {
+            api: 'openai-completions',
+            baseURL: 'https://acme.test',
+            models: [{ id: 'm', hostedTools: { xSearch: true } }],
+          },
+        },
+      }) as Config)
+    }).toThrow(/does not serve it/)
+  })
+
+  it('accepts both hosted tools on a responses route and materializes per-model overrides', () => {
+    expect(() => { assertServiceable(responsesRoute({ hostedTools: { webSearch: true, xSearch: true } })() as Config) })
+      .not.toThrow()
+    const resolved = resolveProfiles({
+      'acme-gateway': {
+        api: 'openai-responses',
+        baseURL: 'https://acme.test',
+        hostedTools: { webSearch: true, xSearch: true },
+        models: [{ id: 'a' }, { id: 'b', hostedTools: { xSearch: false } }, { id: 'c', hostedTools: { webSearch: false, xSearch: false } }],
+      },
+    })
+    expect(resolved.get('acme-gateway')?.hostedTools.get('a')).toEqual(['web_search', 'x_search'])
+    expect(resolved.get('acme-gateway')?.hostedTools.get('b')).toEqual(['web_search'])
+    expect(resolved.get('acme-gateway')?.hostedTools.get('c')).toBeUndefined()
   })
 })
