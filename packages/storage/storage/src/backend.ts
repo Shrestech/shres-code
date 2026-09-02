@@ -52,6 +52,15 @@ export interface KvUnitDescriptor {
   readonly tables: readonly string[]
   /** Whether this unit carries the global singleton slot. */
   readonly hasGlobal: boolean
+  /**
+   * Medium layout. `single` (the default) keeps the whole unit in one
+   * document; `per-record` keeps each record in its own document, so a unit
+   * whose records are large or sparse never rewrites the rest on one write,
+   * and a version bump discards stale records instead of rejecting the whole
+   * unit. Backends that only serve one layout accept the other's units as
+   * foreign documents.
+   */
+  readonly layout?: 'single' | 'per-record'
 }
 
 /**

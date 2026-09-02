@@ -16,6 +16,19 @@ import { tmpdir } from 'node:os'
 
 let defaultRoot: string | undefined
 
+/** The backend-generated default root prefix: `mkdtemp` appends a 6-character suffix. */
+export const DEFAULT_ROOT_PREFIX = 'shres-spill-'
+
+/**
+ * Test a caught value for a Node system error code.
+ * @param error - The caught value.
+ * @param code - The `errno` code to test for (for example `'ENOENT'`).
+ * @returns whether `error` is an `Error` carrying that `code`.
+ */
+export function isErrno(error: unknown, code: string): boolean {
+  return error instanceof Error && (error as NodeJS.ErrnoException).code === code
+}
+
 /**
  * The default spill root: a private (0700) per-process directory under the OS
  * tmpdir, created lazily. Predictable world-readable paths would let other
@@ -25,7 +38,7 @@ let defaultRoot: string | undefined
  * @returns The lazily-created private spill root.
  */
 export function privateRoot(): string {
-  defaultRoot ??= mkdtempSync(join(tmpdir(), 'shres-spill-'))
+  defaultRoot ??= mkdtempSync(join(tmpdir(), DEFAULT_ROOT_PREFIX))
   return defaultRoot
 }
 
