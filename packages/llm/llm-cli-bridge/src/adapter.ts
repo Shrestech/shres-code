@@ -84,9 +84,12 @@ export class CliLlmAdapter extends LlmAdapter {
       name: configured?.name ?? model,
       context: { contextWindow: route.contextWindow },
       defaultMaxTokens: route.defaultMaxTokens,
-      reasoning: {
-        efforts: effortInfo(route.efforts),
-      },
+      // A route with no effort flags (cursor-agent) declares no reasoning
+      // metadata at all; the seam requires at least one advertised effort
+      // whenever `reasoning` is present.
+      ...(route.efforts.length === 0
+        ? {}
+        : { reasoning: { efforts: effortInfo(route.efforts) } }),
     })
   }
 

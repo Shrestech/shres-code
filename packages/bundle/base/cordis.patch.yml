@@ -591,6 +591,8 @@
     # binary; its own tools bypass harness approval. The Models picker marks
     # them delegated. `shres models set grok-cli <model> --effort <level>`
     # writes through the same agent-default-model section as HTTP routes.
+    # The cursor-cli route runs the Cursor Agent CLI, whose `cursor-agent
+    # login` session bills the Cursor subscription.
     - id: llm-cli-bridge
       name: '@shres-code/shres-code-llm-cli-bridge'
 
