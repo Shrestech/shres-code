@@ -1394,6 +1394,9 @@ importers:
       '@shres-code/shres-code-web-search-attached-cli':
         specifier: workspace:^
         version: link:../../web/web-search-attached-cli
+      '@shres-code/shres-code-web-search-brave':
+        specifier: workspace:^
+        version: link:../../web/web-search-brave
       '@shres-code/shres-code-web-search-deepseek':
         specifier: workspace:^
         version: link:../../web/web-search-deepseek
@@ -9460,6 +9463,34 @@ importers:
       '@shres-code/shres-code-credentials':
         specifier: workspace:^
         version: link:../../credentials/credentials
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-launch-environment':
+        specifier: workspace:^
+        version: link:../../util/launch-environment
+      '@shres-code/shres-code-settings':
+        specifier: workspace:^
+        version: link:../../settings/settings
+      '@shres-code/shres-code-web':
+        specifier: workspace:^
+        version: link:../web
+
+  packages/web/web-search-brave:
+    dependencies:
+      '@shres-code/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/shres-code-credentials':
+        specifier: workspace:^
+        version: link:../../credentials/credentials
+      '@shres-code/shres-code-credentials-local':
+        specifier: workspace:^
+        version: link:../../credentials/credentials-local
       '@shres-code/shres-code-invariants':
         specifier: workspace:^
         version: link:../../runtime-diagnostics/invariants
