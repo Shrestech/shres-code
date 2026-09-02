@@ -528,12 +528,14 @@
     - id: web
       name: '@shres-code/shres-code-web'
       config:
-        # Perplexity is reserved for the deep_research tool's request-level
-        # pin (a billed model turn per call, wrong shape for routine
-        # lookups); the routine chain is vendor-following search first, then
-        # the DeepSeek official search.
+        # The routine chain: vendor-following search first (when the default
+        # model's vendor serves one), then Brave's link engine as the fallback,
+        # then the DeepSeek official search. Perplexity is reserved for the
+        # deep_research tool's request-level pin (a billed model turn per
+        # call, wrong shape for routine lookups).
         searchProviders:
           - attached-cli
+          - brave
           - deepseek-official
 
     - id: web-search-attached-cli
@@ -541,6 +543,12 @@
 
     - id: web-search-perplexity
       name: '@shres-code/shres-code-web-search-perplexity'
+
+    # Brave's link engine: the routine chain's fallback when the default
+    # model's vendor serves no search of its own. Key reference BRAVE_API_KEY
+    # through the credentials seam.
+    - id: web-search-brave
+      name: '@shres-code/shres-code-web-search-brave'
 
     - id: web-search-deepseek
       name: '@shres-code/shres-code-web-search-deepseek'
