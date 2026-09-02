@@ -218,11 +218,12 @@ export function formatSelection(label: string, selected: ModelSelection): string
 
 function formatListedModel(id: string, info: LlmResolvedModelInfo | undefined): string {
   const efforts = info?.reasoning?.efforts.map(effort => effort.id) ?? []
-  if (efforts.length === 0) return id
+  const webSearch = info?.hostedTools?.includes('web_search') === true ? ' · web search' : ''
+  if (efforts.length === 0) return `${id}${webSearch}`
   const fallback = info?.reasoning?.defaultEffort === undefined
     ? ''
     : ` default=${info.reasoning.defaultEffort}`
-  return `${id}  efforts: ${efforts.join(', ')}${fallback}`
+  return `${id}  efforts: ${efforts.join(', ')}${fallback}${webSearch}`
 }
 
 async function resolveInfo(

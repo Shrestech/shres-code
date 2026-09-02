@@ -50,12 +50,14 @@ function optionsOf(directory: SessionModels, t: TranslateNS<'model'>): SelectOpt
   for (const group of directory.groups) {
     for (const model of group.models) {
       // The only modality with a named affordance today; unknown values stay
-      // out of the detail line rather than guessing a label.
+      // out of the detail line rather than guessing a label. Hosted web search
+      // is the same kind of named claim: only `web_search` earns a suffix.
       const vision = model.inputModalities?.includes('image') === true ? ` · ${t('modality.vision')}` : ''
+      const webSearch = model.hostedTools?.includes('web_search') === true ? ` · ${t('hosted.webSearch')}` : ''
       rows.push({
         id: rowId(group.id, model.id),
         label: model.name,
-        detail: (model.description !== undefined ? `${group.name} · ${model.description}` : group.name) + vision,
+        detail: (model.description !== undefined ? `${group.name} · ${model.description}` : group.name) + vision + webSearch,
         ...(directory.current.provider === group.id && directory.current.model === model.id
           ? { active: true } : {}),
       })

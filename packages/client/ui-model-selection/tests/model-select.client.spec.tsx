@@ -106,7 +106,7 @@ describe('ModelSelect reasoning effort', () => {
     expect(screen.getByTitle(en['delegated.hint'])).toBeTruthy()
   })
 
-  it('tags declared input modalities, and only those', () => {
+  it('tags declared input modalities and hosted web search, and only those', () => {
     const directory = createSnapshotStore(state({
       current: { provider: 'provider', model: 'seeing' },
       groups: [{
@@ -119,6 +119,8 @@ describe('ModelSelect reasoning effort', () => {
           // A modality this build has never heard of renders as its own label
           // rather than being dropped or mapped to a guess.
           { id: 'listening', name: 'Listening', inputModalities: ['text', 'audio'] },
+          { id: 'searching', name: 'Searching', hostedTools: ['web_search'] },
+          { id: 'x-only', name: 'X only', hostedTools: ['x_search'] },
         ],
       }],
     }))
@@ -134,7 +136,14 @@ describe('ModelSelect reasoning effort', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Select model, current Seeing' }))
     fireEvent.click(screen.getByRole('menuitem', { name: /Model/ }))
     const rows = screen.getAllByRole('menuitemradio').map(item => item.textContent)
-    expect(rows).toEqual(['Seeingvision', 'Plain', 'Undeclared', 'Listeningaudio'])
+    expect(rows).toEqual([
+      'Seeingvision',
+      'Plain',
+      'Undeclared',
+      'Listeningaudio',
+      'Searchingweb search',
+      'X only',
+    ])
   })
 
   it('offers provider default only when the adapter does not configure a model default', () => {

@@ -30,6 +30,7 @@ export const en = {
   'delegated.tag': 'Delegated',
   'delegated.hint': 'This route runs an external CLI. That CLI may call its own tools without Shres Code approval.',
   'modality.vision': 'vision',
+  'hosted.webSearch': 'web search',
 } satisfies Record<string, string>
 
 /** The ModelKey union. */
