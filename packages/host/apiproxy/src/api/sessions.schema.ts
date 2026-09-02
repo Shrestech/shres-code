@@ -175,6 +175,9 @@ export const modelCatalogModelSchema = z.object({
   // newer host may declare modalities an older client has never heard of.
   // Never empty: absence is the only unknown, so an empty claim is refused.
   inputModalities: z.array(z.string()).min(1).optional(),
+  // Closed enum on the wire: unlike modalities, the hosted-tool vocabulary is
+  // not merge-extensible here. The design pins `web_search` / `x_search`.
+  hostedTools: z.array(z.enum(['web_search', 'x_search'])).optional(),
 }) satisfies z.ZodType<Wire<ModelCatalogModel>>
 
 /** One successfully loaded provider group. */

@@ -206,6 +206,15 @@ export interface ModelModalityMap {
 /** Any declared provider model modality. */
 export type ModelModality = ModelModalityMap[keyof ModelModalityMap]
 
+/** Merge-extensible hosted-tool vocabulary: provider-executed tools a route can splice. */
+export interface HostedToolMap {
+  web_search: 'web_search'
+  x_search: 'x_search'
+}
+
+/** Any declared hosted tool a model's route serves provider-side. */
+export type HostedTool = HostedToolMap[keyof HostedToolMap]
+
 /**
  * One provider route an adapter plugin can activate through configuration,
  * whether or not the route is currently registered. Configuration surfaces
@@ -308,6 +317,11 @@ export interface LlmModelInfo {
   description?: string
   /** Accepted request modalities; absent means unknown, while an explicit omission is negative capability. */
   inputModalities?: readonly ModelModality[]
+  /**
+   * Provider-executed tools this model's route serves inside the conversation;
+   * absent declares none, so the local tool catalog applies unchanged.
+   */
+  hostedTools?: readonly HostedTool[]
 }
 
 /** Provider-owned context capacity for one exact provider/model route. */

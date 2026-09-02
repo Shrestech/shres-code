@@ -166,6 +166,9 @@ function excluded(file: string): boolean {
   if (file === 'scripts/rebrand.ts' || file === 'scripts/rebrand.spec.ts') return true
   if (file === 'scripts/verify-no-legacy-brand.ts') return true
   if (file === 'scripts/purge-zh.ts' || file === 'scripts/purge-zh.spec.ts') return true
+  // Tests that assert the retired identity is absent must name it to prove it.
+  if (file === 'apps/web/tests/brand-rebrand.e2e.ts') return true
+  if (file === 'apps/web/tests/verify-app.live.mjs') return true
   if (file === 'CLAUDE.md' || file.endsWith('/CLAUDE.md')) return true
   if (file === 'LICENSE' || file === 'NOTICE') return true
   if (file.startsWith('.agents/notes/archived/')) return true

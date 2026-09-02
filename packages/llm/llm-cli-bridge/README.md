@@ -2,7 +2,7 @@
 
 Delegated-completion adapter: `stream()` serializes `system` plus `messages` into a prompt, spawns a product CLI through [`shres-subprocess`](../../subprocess/subprocess/README.md), and emits `block-start` → `text-delta` → `block-end` → optional `usage` → `finish: stop`. There is no HTTP request, so `attributionHeaders()` does not apply.
 
-The four shipped routes are `claude-cli`, `codex-cli`, `grok-cli`, and `kimi-cli`. They are marked `kind: 'delegated'` on `providerInfo()` and in the configurable-provider directory. The CLI's own tools bypass harness approval; the Models picker shows a Delegated tag. See the [CLI agent bridges](../../../.agents/notes/implemented/architecture/2026-08-16-cli-agent-bridges.md) note.
+The five shipped routes are `claude-cli`, `codex-cli`, `cursor-cli`, `grok-cli`, and `kimi-cli`. They are marked `kind: 'delegated'` on `providerInfo()` and in the configurable-provider directory. The CLI's own tools bypass harness approval; the Models picker shows a Delegated tag. See the [CLI agent bridges](../../../.agents/notes/implemented/architecture/2026-08-16-cli-agent-bridges.md) note. `cursor-cli` runs the Cursor Agent CLI: its `cursor-agent login` session bills the Cursor subscription (Pro/Pro+/Business), and an optional `CURSOR_API_KEY` pay-as-you-go key overrides it.
 
 ## Honesty gate
 
@@ -18,6 +18,7 @@ A non-empty `GenerateOptions.tools` without that route's `allowDelegatedTools: t
 | `kimi-cli` | `kimi` | `--model` | `--thinking` / `--no-thinking` (`high` / `off`) |
 | `claude-cli` | `claude` | `--model` | `--effort` (`low`/`medium`/`high`/`max`) |
 | `codex-cli` | `codex` | `-m` | `-c model_reasoning_effort=` (`minimal`/`low`/`medium`/`high`/`xhigh`) |
+| `cursor-cli` | `cursor-agent` | `--model` | none (the CLI has no effort flag; the prompt is the trailing positional after `-p`) |
 
 ## Configuration
 
@@ -44,6 +45,6 @@ Independent of harness HTTP request cache. There is no provider replay state.
 - **Delegated tools bypass harness approval** — stated in the picker and this README.
 - **No HTTP attribution** — the child CLI owns its User-Agent.
 - **No live token streaming** — the adapter emits the final text as one delta after the process exits.
-- **Host-managed binaries** — a missing `grok` / `kimi` / `claude` / `codex` is a spawn error.
+- **Host-managed binaries** — a missing `grok` / `kimi` / `claude` / `codex` / `cursor-agent` is a spawn error.
 - **Keyless delegated routes do not complete first-run** — `kind: 'delegated'` is not usable for onboarding, same as composed local Ollama.
 - **Spawn cwd is the session workspace** — `stream()` fails if the request has no session header cwd.

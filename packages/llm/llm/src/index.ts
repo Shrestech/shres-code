@@ -17,6 +17,7 @@ import type {
   LlmModelInfo,
   LlmResolvedModelInfo,
   LlmProviderInfo,
+  HostedTool,
   ModelModality,
   StreamChunk,
 } from './types.ts'
@@ -581,6 +582,11 @@ export class LlmRuntime extends Service {
     return modalities === undefined ? undefined : [...modalities]
   }
 
+  /** Detach typed adapter-owned hosted-tool declarations. */
+  private detachedHostedTools(hostedTools: readonly HostedTool[] | undefined): HostedTool[] | undefined {
+    return hostedTools === undefined ? undefined : [...hostedTools]
+  }
+
   /**
    * Discover models advertised by one registered provider. Catalog membership
    * is advisory and never changes routing or request validation.
@@ -606,12 +612,14 @@ export class LlmRuntime extends Service {
       }
       seen.add(model.id)
       const inputModalities = this.detachedModalities(model.inputModalities)
+      const hostedTools = this.detachedHostedTools(model.hostedTools)
       return {
         provider: model.provider,
         id: model.id,
         name: model.name,
         ...model.description === undefined ? {} : { description: model.description },
         ...inputModalities === undefined ? {} : { inputModalities },
+        ...hostedTools === undefined ? {} : { hostedTools },
       }
     })
   }
@@ -664,6 +672,7 @@ export class LlmRuntime extends Service {
     // Capability metadata rides through: an explicit modality omission is
     // negative capability downstream preflights act on (image admission).
     const inputModalities = this.detachedModalities(resolved.inputModalities)
+    const hostedTools = this.detachedHostedTools(resolved.hostedTools)
     const defaultMaxTokens = resolved.defaultMaxTokens
     if (defaultMaxTokens !== undefined
       && (!Number.isSafeInteger(defaultMaxTokens) || defaultMaxTokens <= 0)) {
@@ -678,6 +687,7 @@ export class LlmRuntime extends Service {
       name: resolved.name,
       ...resolved.description === undefined ? {} : { description: resolved.description },
       ...inputModalities === undefined ? {} : { inputModalities },
+      ...hostedTools === undefined ? {} : { hostedTools },
       ...context === undefined ? {} : { context: { contextWindow: context.contextWindow } },
       ...defaultMaxTokens === undefined ? {} : { defaultMaxTokens },
     }

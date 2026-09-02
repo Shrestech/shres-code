@@ -26,6 +26,30 @@ ${UNTRUSTED_INSTRUCTION_DISCLAIMER}`
  */
 export const WEB_SEARCH_MAX_RESULTS = 8
 
+/** Output schema shared by `web_search` and `deep_research`. */
+export const SEARCH_TOOL_OUTPUT_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    content: { type: 'string' },
+    sources: {
+      type: 'array',
+      required: true,
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          url: { type: 'string', required: true },
+          title: { type: 'string' },
+          snippet: { type: 'string' },
+          publishedAt: { type: 'string' },
+        },
+      },
+    },
+    truncated: { type: 'boolean', required: true },
+  },
+} as const
+
 /**
  * Validate value constraints the schema DSL can't express: a non-blank
  * `query`. Throws a plain `Error` otherwise.
@@ -138,6 +162,25 @@ function projectSource(source: WebSearchSource): {
 }
 
 /**
+ * Canonical tool value for a seam search result. Shared by `web_search` and
+ * `deep_research` so both omit absent optional source fields the same way.
+ *
+ * @param result - the `ctx.web` search outcome.
+ * @returns the structured tool value (`content` only when the provider sent it).
+ */
+export function searchToolValue(result: WebSearchResult): {
+  content?: string
+  sources: ReturnType<typeof projectSource>[]
+  truncated: boolean
+} {
+  return {
+    ...result.content !== undefined ? { content: result.content } : {},
+    sources: result.sources.map(projectSource),
+    truncated: result.truncated,
+  }
+}
+
+/**
  * Project a validated `web_search` output value into its replayable
  * presentation meta ({@link WebSearchMeta} as opaque JSON).
  *
@@ -242,28 +285,7 @@ export function applyWebSearchTool(
       query: { type: 'string', required: true, description: 'The search query.' },
     },
     output: {
-      schema: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          content: { type: 'string' },
-          sources: {
-            type: 'array',
-            required: true,
-            items: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                url: { type: 'string', required: true },
-                title: { type: 'string' },
-                snippet: { type: 'string' },
-                publishedAt: { type: 'string' },
-              },
-            },
-          },
-          truncated: { type: 'boolean', required: true },
-        },
-      },
+      schema: SEARCH_TOOL_OUTPUT_SCHEMA,
       render: (_args, value) => [{ type: 'text', text: formatSearchOutput(value) }],
       presentationMeta: (_args, value) => searchMetaFromValue(value),
     },
@@ -276,11 +298,7 @@ export function applyWebSearchTool(
         { query: input.query, maxResults },
         exec.signal,
       )
-      return {
-        ...result.content !== undefined ? { content: result.content } : {},
-        sources: result.sources.map(projectSource),
-        truncated: result.truncated,
-      }
+      return searchToolValue(result)
     },
     presentCall: presentSearchCall,
     presentResult: (args, result) => presentSearchResult(args, result),

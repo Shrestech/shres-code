@@ -169,6 +169,14 @@ const PROFILE_PNPM_WORKSPACE = `packages:
 
 nodeLinker: hoisted
 autoInstallPeers: false
+
+# pnpm >=10 blocks install/build scripts unless listed here; the profile's
+# dependency closure needs these native binaries (speech, terminal, bundling).
+allowBuilds:
+  esbuild: true
+  koffi: true
+  node-pty: true
+  onnxruntime-node: true
 `
 
 /**

@@ -10,7 +10,7 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import z from '@shres-code/schemastery'
-import type { PiAiModality, PiAiProviderProfile } from '@shres-code/shres-code-llm-pi-ai'
+import type { PiAiHostedTools, PiAiModality, PiAiProviderProfile } from '@shres-code/shres-code-llm-pi-ai'
 
 /** Route id this adapter registers under. */
 export const GROK_SESSION_PROVIDER_ID = 'grok-session'
@@ -133,8 +133,8 @@ export const Config: z<Config> = z.object({
   models: z.array(modelSchema).default(undefined as unknown as never),
   refreshLeewayMs: z.number().step(1).min(0),
   cliVersion: z.string(),
-  hostedWebSearch: z.boolean().default(false),
-  hostedXSearch: z.boolean().default(false),
+  hostedWebSearch: z.boolean().default(true),
+  hostedXSearch: z.boolean().default(true),
 })
 
 /**
@@ -148,25 +148,16 @@ export interface CredentialSpec {
 }
 
 /**
- * The hosted-search switches of the section, with every default decided here
- * rather than inline at use sites.
- */
-export interface ResolvedHostedSearch {
-  /** Serve web search as a hosted backend tool. */
-  webSearch: boolean
-  /** Serve X (Twitter) search as a hosted backend tool. */
-  xSearch: boolean
-}
-
-/**
- * Resolve the hosted-search switches of the section, failing loud on a value
- * the boundary cannot serve. A section comes through composition JSON as well
- * as the typed settings schema, so a non-boolean switch is refused here rather
- * than silently treated as off.
+ * Resolve the section's hosted-tool switches into the profile declaration the
+ * shared adapter enforces, failing loud on a value the boundary cannot serve.
+ * A section comes through composition JSON as well as the typed settings
+ * schema, so a non-boolean switch is refused here rather than silently
+ * treated as off. Both switches default on, matching the Grok CLI's own
+ * sampler: the proxy's models reach their freshest with both hosted tools.
  * @param config - composition or settings section value.
- * @returns the resolved hosted-search switches.
+ * @returns the hosted-tool switches the route profile declares.
  */
-export function resolveHostedSearch(config: Config): ResolvedHostedSearch {
+export function resolveHostedTools(config: Config): PiAiHostedTools {
   const source = config as unknown as Record<string, unknown>
   for (const field of ['hostedWebSearch', 'hostedXSearch'] as const) {
     const value = source[field]
@@ -175,8 +166,8 @@ export function resolveHostedSearch(config: Config): ResolvedHostedSearch {
     }
   }
   return {
-    webSearch: config.hostedWebSearch ?? false,
-    xSearch: config.hostedXSearch ?? false,
+    webSearch: config.hostedWebSearch ?? true,
+    xSearch: config.hostedXSearch ?? true,
   }
 }
 
@@ -214,6 +205,7 @@ export function resolveRoute(config: Config): Omit<PiAiProviderProfile, 'display
     displayName: config.displayName ?? DEFAULT_DISPLAY_NAME,
     api: 'openai-responses',
     baseURL,
+    hostedTools: resolveHostedTools(config),
     headers: {
       'x-xai-token-auth': 'xai-grok-cli',
       'x-grok-client-version': cliVersion,

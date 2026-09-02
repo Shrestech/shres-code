@@ -59,4 +59,44 @@ describe('llm-cli-bridge real CLI', () => {
     expect(chunks.join('').trim().length).toBeGreaterThan(0)
     await ctx.fiber.dispose()
   }, 120_000)
+
+  it('completes one prompt through cursor-agent when that CLI is signed in', async () => {
+    // cursor-agent exits 0 even while signed out, so the gate reads the
+    // status text; a signed-out CLI would only burn a login error.
+    const binary = SHIPPED_ROUTES['cursor-cli'].binary
+    let status: string
+    try {
+      const result = await execFileAsync(binary, ['status'], { timeout: 20_000 })
+      status = result.stdout
+    } catch {
+      return
+    }
+    if (!status.includes('Logged in')) return
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    await ctx.plugin(LocalSubprocessRuntime)
+    const sessionId = SessionId('cli-bridge-e2e-cursor')
+    ctx.provide('sessions' as never, {
+      get: () => ({ header: { cwd: process.cwd() } }),
+    })
+    await ctx.plugin(plugin, {})
+    const model = SHIPPED_ROUTES['cursor-cli'].models[0]?.id ?? 'default'
+    const chunks: string[] = []
+    for await (const chunk of ctx.llm.stream({
+      provider: 'cursor-cli',
+      model,
+      sessionId,
+      messages: [createUserMessage({
+        content: [{ type: 'text', text: 'Reply with the single word ok and nothing else.' }],
+        source: { kind: 'plugin', plugin: 'test' },
+      })],
+    })) {
+      if (chunk.type === 'text-delta') chunks.push(chunk.text)
+      if (chunk.type === 'finish' && chunk.reason.kind === 'error') {
+        throw new Error(chunk.reason.failure.message)
+      }
+    }
+    expect(chunks.join('').trim().length).toBeGreaterThan(0)
+    await ctx.fiber.dispose()
+  }, 120_000)
 })

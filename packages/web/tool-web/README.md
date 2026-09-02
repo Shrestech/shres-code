@@ -1,8 +1,8 @@
 # @shres-code/shres-code-tool-web
 
-The model-facing web tool suite — `web_search` and `web_fetch` — over the [web capability seam](../web/README.md) (`ctx.web`). It owns model-facing concerns only: tool names, JSON schemas, snake_case argument names, prompt sections, the result-count bound, result formatting, HTML→markdown presentation, and the UI presentation projection — `presentCall`, `presentResult` (a `card: 'web'` result card discriminated by `kind: 'search' | 'fetch'`), and the `output.presentationMeta` that carries the structured search sources or the fetch summary the lossy render text cannot (see the [web-result-card Agent Note](../../../.agents/notes/implemented/feature/2026-07-30-web-result-card.md)). All web access goes through `ctx.web`; this package never imports a concrete provider. Neither tool exposes a model-facing timeout — each tool's cooperative tool-call budget is declared here via config (`fetchTimeoutMs`/`searchTimeoutMs`, attached as `ToolDefinition.timeoutMs`) and enforced by [`@shres-code/shres-code-tool-call-timeout-policy`](../../guard/timeout-policy/README.md) (a `tools/execute` wrapper); each tool just forwards `exec.signal` to the seam.
+The model-facing web tool suite — `web_search`, `web_fetch`, and `deep_research` — over the [web capability seam](../web/README.md) (`ctx.web`). It owns model-facing concerns only: tool names, JSON schemas, snake_case argument names, prompt sections, the result-count bound, result formatting, HTML→markdown presentation, and the UI presentation projection — `presentCall`, `presentResult` (a `card: 'web'` result card discriminated by `kind: 'search' | 'fetch'`), and the `output.presentationMeta` that carries the structured search sources or the fetch summary the lossy render text cannot (see the [web-result-card Agent Note](../../../.agents/notes/implemented/feature/2026-07-30-web-result-card.md)). All web access goes through `ctx.web`; this package never imports a concrete provider. No tool exposes a model-facing timeout — each tool's cooperative tool-call budget is declared here via config (`fetchTimeoutMs`/`searchTimeoutMs`/`researchTimeoutMs`, attached as `ToolDefinition.timeoutMs`) and enforced by [`@shres-code/shres-code-tool-call-timeout-policy`](../../guard/timeout-policy/README.md) (a `tools/execute` wrapper); each tool just forwards `exec.signal` to the seam.
 
-Each tool is registered independently; a product that wants only one disables the other via config (`{ search: false }` / `{ fetch: false }`). Search guidance mentions `web_fetch` only when fetch is also config-enabled; a search-only composition instead tells the model to use returned snippets and cite their URLs.
+Each tool is registered independently; a product that wants a subset disables the rest via config (`{ search: false }` / `{ fetch: false }` / `{ research: false }`). Search guidance mentions `web_fetch` only when fetch is also config-enabled; a search-only composition instead tells the model to use returned snippets and cite their URLs. Deep-research guidance mentions `web_search` and `web_fetch` by name only when those tools are also config-enabled.
 
 ## Tools
 
@@ -10,8 +10,9 @@ Each tool is registered independently; a product that wants only one disables th
 |---|---|---|
 | `web_search` | `query` (string) | Discovery. Returns an optional answer plus source URLs. `max_results` is **not** model-facing — the tool sets the bound (the `searchMaxResults` config, default 8) and passes it to the seam. |
 | `web_fetch` | `url` (string) | Retrieves a specific URL. HTML bodies are rendered to markdown (turndown with GFM tables/strikethrough); text bodies pass through. A non-2xx status is reported, not an error. The tool-call timeout is deployment policy (`shres-tool-call-timeout-policy`), not a model argument. |
+| `deep_research` | `query` (string) | Perplexity deep web research: multi-source synthesis with citations, served by the Perplexity search provider via a per-call `provider` pin. Same result card as `web_search`. The prompt section tells the model to use `web_search`/`web_fetch` for routine lookups. |
 
-Both tools opt into concurrent scheduling because provider reads return content without mutating parent-agent state.
+All three tools opt into concurrent scheduling because provider reads return content without mutating parent-agent state.
 
 The normalized service results are also the canonical tool values: `WebSearchResult` and `WebFetchResult`. Native renderers preserve the answer/source and fetched-body text below; provider search/body caps remain acquisition limits rather than presentation-only truncation.
 
@@ -21,12 +22,14 @@ The normalized service results are also the canonical tool values: `WebSearchRes
 |---|---|---|
 | `search` | `true` | Register `web_search`. |
 | `fetch` | `true` | Register `web_fetch`. |
-| `searchMaxResults` | `8` | Upper bound on sources returned by one `web_search` call (the seam truncates a longer provider list and flags it). |
+| `research` | `true` | Register `deep_research`. |
+| `searchMaxResults` | `8` | Upper bound on sources returned by one `web_search` or `deep_research` call (the seam truncates a longer provider list and flags it). |
 | `fetchTimeoutMs` | `30000` | Cooperative tool-call timeout budget (ms) for `web_fetch`. |
 | `searchTimeoutMs` | `30000` | Cooperative tool-call timeout budget (ms) for `web_search`. |
+| `researchTimeoutMs` | `180000` | Cooperative tool-call timeout budget (ms) for `deep_research`. Independent of `searchTimeoutMs` because deep research takes tens of seconds to minutes. |
 | `fetchMaxOutputChars` | `200000` | Cap on source characters converted synchronously and on one complete `web_fetch` output (header, untrusted frame, and footer); a cut body gets the truncation notice when it fits. |
 
-`fetchTimeoutMs`/`searchTimeoutMs` declare each tool's cooperative timeout budget (attached as `ToolDefinition.timeoutMs`), enforced by [`@shres-code/shres-code-tool-call-timeout-policy`](../../guard/timeout-policy/README.md); the model-facing schema exposes no timeout argument. `fetchMaxOutputChars` bounds both synchronous conversion work and the complete rendered result: only that many source characters are converted, and the header, untrusted frame, and truncation notice are then capped together. The default leaves headroom above the local provider's 100,000-character body cap, but rendered expansion can still make the final bound truncate the result.
+`fetchTimeoutMs`/`searchTimeoutMs`/`researchTimeoutMs` declare each tool's cooperative timeout budget (attached as `ToolDefinition.timeoutMs`), enforced by [`@shres-code/shres-code-tool-call-timeout-policy`](../../guard/timeout-policy/README.md); the model-facing schema exposes no timeout argument. `fetchMaxOutputChars` bounds both synchronous conversion work and the complete rendered result: only that many source characters are converted, and the header, untrusted frame, and truncation notice are then capped together. The default leaves headroom above the local provider's 100,000-character body cap, but rendered expansion can still make the final bound truncate the result.
 
 ```yaml
 - id: tool-web
@@ -37,7 +40,7 @@ The normalized service results are also the canonical tool values: `WebSearchRes
 
 Tool registration follows product **enablement**, not backend availability. A tool stays visible even when its selected provider is missing, misconfigured, ambiguous, or temporarily unavailable; the seam resolves the provider at execution time and execution fails with a structured `WebError` (e.g. `WEB_PROVIDER_UNAVAILABLE`, `WEB_PROVIDER_AMBIGUOUS`), which `ToolRuntime.execute()` turns into an error tool result the model can read and hooks/UI can route on. This keeps the model schema stable without making plugin load order, credential state, or HMR timing part of the model-facing contract. To remove a web tool entirely, disable it here in config.
 
-The tool never calls a provider's `available()` and never enumerates providers — its only execution path is `ctx.web.search()` / `ctx.web.fetch()`, and provider unavailability reaches it as the structured `WebError` codes selection throws at execution time. Provider selection stays entirely inside the seam, with one owner.
+The tool never calls a provider's `available()` and never enumerates providers — its only execution path is `ctx.web.search()` / `ctx.web.fetch()`, and provider unavailability reaches it as the structured `WebError` codes selection throws at execution time. Provider selection stays entirely inside the seam, with one owner. `deep_research` pins Perplexity by passing `provider: 'perplexity'` on the search request; that pin is a seam selection input, not a model-facing argument.
 
 ## Model Experience
 
@@ -45,7 +48,7 @@ The tool never calls a provider's `available()` and never enumerates providers �
 
 #### What the model sees
 
-Search and fetch contribute the web-search and web-fetch guidance below. Search chooses its fetch-enabled or search-only text from config at registration time. A scoped tool restriction does not remove these independently registered sections.
+Search, fetch, and deep research contribute the guidance below. Search chooses its fetch-enabled or search-only text from config at registration time. Deep research chooses its alternative-tool clause from which of `web_search` and `web_fetch` are also enabled. A scoped tool restriction does not remove these independently registered sections.
 
 ##### Web search guidance with fetch enabled
 
@@ -65,9 +68,15 @@ Use the web_search tool to discover current information on the web. It returns a
 Use the web_fetch tool to retrieve the content of a specific HTTP(S) URL (for example a result from web_search). It returns the page content decoded to text. Cite the URL as a markdown link when you use its content.
 ```
 
+##### Deep research guidance with search and fetch enabled
+
+```markdown
+Use the deep_research tool for Perplexity deep web research: multi-source synthesis with citations when depth matters. Do not use it for routine queries. Use web_search for a quick factual lookup and web_fetch to read a specific page.
+```
+
 #### Token effect
 
-Fixed guidance cost per request for each config-enabled tool, even when a restriction hides its schema. Toggling fetch changes the search guidance as well as registering or removing the fetch section.
+Fixed guidance cost per request for each config-enabled tool, even when a restriction hides its schema. Toggling fetch changes the search guidance as well as registering or removing the fetch section. Toggling search or fetch changes the deep-research alternative-tool clause.
 
 #### KV Cache effect
 
@@ -77,7 +86,7 @@ Prefix-stable while enabled tools, scope, and guidance text are unchanged. Confi
 
 #### What the model sees
 
-The model sees the generated [`web_search` and `web_fetch` schemas](../../../docs/tool-catalog.md#shres-codeshres-code-tool-web). Result-count and timeout budgets are deployment settings, not model arguments.
+The model sees the generated [`web_search`, `web_fetch`, and `deep_research` schemas](../../../docs/tool-catalog.md#shres-codeshres-code-tool-web). Result-count and timeout budgets are deployment settings, not model arguments. Provider selection, including the Perplexity pin on `deep_research`, is not model-visible.
 
 #### Token effect
 
@@ -91,7 +100,7 @@ Prefix-stable while definitions and visibility are unchanged. Config enablement,
 
 #### What the model sees
 
-When the provider returned an answer or any source, the shared [`shres-untrusted-frame`](../../util/untrusted-frame/README.md) disclaimer precedes those fragments. The optional provider-owned answer is wrapped in `<untrusted-web-answer>`; each snippet is wrapped in `<untrusted-web-snippet>`. Then `Sources:` and data-dependent lines shaped exactly `- [<title-or-url>](<url>)`, optionally suffixed ` — <framed-snippet> (<publishedAt>)`. With neither answer nor sources the result says `No results found.` A capped list adds `(Showing the first <count> sources. Refine the query for more.)`; every result ends `Cite the relevant URLs above as markdown links in your answer.` The disclaimer, source titles/URLs, dates, truncation note, and citation instruction stay outside the tagged fragments.
+`web_search` and `deep_research` share this render. When the provider returned an answer or any source, the shared [`shres-untrusted-frame`](../../util/untrusted-frame/README.md) disclaimer precedes those fragments. The optional provider-owned answer is wrapped in `<untrusted-web-answer>`; each snippet is wrapped in `<untrusted-web-snippet>`. Then `Sources:` and data-dependent lines shaped exactly `- [<title-or-url>](<url>)`, optionally suffixed ` — <framed-snippet> (<publishedAt>)`. With neither answer nor sources the result says `No results found.` A capped list adds `(Showing the first <count> sources. Refine the query for more.)`; every result ends `Cite the relevant URLs above as markdown links in your answer.` The disclaimer, source titles/URLs, dates, truncation note, and citation instruction stay outside the tagged fragments.
 
 #### Token effect
 

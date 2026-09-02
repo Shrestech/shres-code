@@ -71,6 +71,9 @@ export interface WebRuntimeConfig {
  * The web access service. Registered as `ctx.web` (one instance per context).
  *
  * Selection semantics (resolved at execution time, never order-dependent):
+ * - A request-level `provider` on `search()` is exclusive, wins over the
+ *   singular config pin and the ordered list, and uses the same missing and
+ *   unavailable failures as a singular pin.
  * - A singular configured id that is registered and `available()` → that provider.
  * - A singular configured id not registered → `WEB_PROVIDER_CONFIGURED_MISSING`.
  * - A singular configured id registered but unavailable →
@@ -154,14 +157,15 @@ export class WebRuntime extends Service {
    * time with the selection rules above; throws {@link WebError} when the
    * capability cannot run. The seam enforces `request.maxResults` on the result:
    * if the provider over-returns, `sources[]` is truncated and `truncated` set.
-   * @param request - the query and optional result limit.
+   * @param request - the query, optional result limit, and optional per-call provider pin.
    * @param signal - optional cancellation signal forwarded to the provider.
    * @returns the provider's results, capped to `request.maxResults`.
    */
   async search(request: WebSearchRequest, signal?: AbortSignal): Promise<WebSearchResult> {
+    const configuredId = request.provider ?? this.searchProviderId
     const provider = resolveProvider({
       providers: this.searchProviders,
-      ...this.searchProviderId !== undefined ? { configuredId: this.searchProviderId } : {},
+      ...configuredId !== undefined ? { configuredId } : {},
       ...this.searchProviderFallbackIds !== undefined
         ? { fallbackIds: this.searchProviderFallbackIds }
         : {},

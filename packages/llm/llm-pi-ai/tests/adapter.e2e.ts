@@ -162,3 +162,47 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('llm-pi-ai e2e (real API)', () =>
     expect(fromPiAi.finish.kind).toBe(fromDeepSeek.finish.kind)
   })
 })
+
+describe('zai hosted web search', () => {
+  // Key-gated: pins the live surface the dialect module encodes — the
+  // web_search tool entry is accepted, the backend folds the search into the
+  // answer silently, and nothing surfaces as a dispatchable tool call.
+  it('serves the hosted web search as a silent fold with no tool-call blocks', async () => {
+    if (process.env.ZAI_API_KEY === undefined) return
+    const ctx = new Context()
+    contexts.push(ctx)
+    await ctx.plugin(LlmRuntime)
+    await ctx.plugin(LlmPiAi, {
+      providers: {
+        zai: {
+          apiKeyEnv: 'ZAI_API_KEY',
+          hostedTools: { webSearch: true },
+          models: [{ id: 'glm-4.5-air' }],
+        },
+      },
+    })
+    const localWebSearch: ToolSchema = {
+      name: 'web_search',
+      description: 'local search that must be dropped for this route',
+      parameters: { type: 'object', properties: {} },
+    }
+    const result = await assemble(ctx, {
+      provider: 'zai',
+      model: 'glm-4.5-air',
+      messages: [createUserMessage({
+        content: [{ type: 'text', text: 'Search the web and answer in one line: the current stable Node.js LTS version.' }],
+        source: { kind: 'plugin', plugin: 'test' },
+      })],
+      tools: [localWebSearch],
+    })
+    expect(result.finish.kind).toBe('stop')
+    const text = result.message.content
+      .filter(block => block.type === 'text')
+      .map(block => block.text)
+      .join('')
+    expect(text.trim().length).toBeGreaterThan(0)
+    // The silent fold: no hosted call surfaced, and the dropped local
+    // web_search was never dispatched.
+    expect(result.message.content.some(block => block.type === 'tool-call' && block.name === 'web_search')).toBe(false)
+  }, 120_000)
+})

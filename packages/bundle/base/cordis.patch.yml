@@ -144,6 +144,15 @@
             apiKeyEnv: GROQ_API_KEY
           zai:
             apiKeyEnv: ZAI_API_KEY
+            # Provider-native web search on the z.ai coding endpoint: every
+            # request carries the hosted web_search tool entry (search-prime
+            # engine) and the local web_search function tool is dropped for
+            # this route. z.ai bills each search query; the backend folds
+            # results into the answer silently, so no search artifact
+            # surfaces on the response (verified live 2026-09-02, both
+            # streaming and non-streaming).
+            hostedTools:
+              webSearch: true
 
     # First-run picker: probes local Ollama and, on headless, prints a TTY menu
     # when the composition default cannot serve. autoRunCli stays false here so
@@ -519,9 +528,14 @@
     - id: web
       name: '@shres-code/shres-code-web'
       config:
+        # The routine chain: vendor-following search first (when the default
+        # model's vendor serves one), then Brave's link engine as the fallback,
+        # then the DeepSeek official search. Perplexity is reserved for the
+        # deep_research tool's request-level pin (a billed model turn per
+        # call, wrong shape for routine lookups).
         searchProviders:
           - attached-cli
-          - perplexity
+          - brave
           - deepseek-official
 
     - id: web-search-attached-cli
@@ -529,6 +543,12 @@
 
     - id: web-search-perplexity
       name: '@shres-code/shres-code-web-search-perplexity'
+
+    # Brave's link engine: the routine chain's fallback when the default
+    # model's vendor serves no search of its own. Key reference BRAVE_API_KEY
+    # through the credentials seam.
+    - id: web-search-brave
+      name: '@shres-code/shres-code-web-search-brave'
 
     - id: web-search-deepseek
       name: '@shres-code/shres-code-web-search-deepseek'
@@ -591,6 +611,8 @@
     # binary; its own tools bypass harness approval. The Models picker marks
     # them delegated. `shres models set grok-cli <model> --effort <level>`
     # writes through the same agent-default-model section as HTTP routes.
+    # The cursor-cli route runs the Cursor Agent CLI, whose `cursor-agent
+    # login` session bills the Cursor subscription.
     - id: llm-cli-bridge
       name: '@shres-code/shres-code-llm-cli-bridge'
 

@@ -28,7 +28,7 @@
   "license": "MIT",
   "devDependencies": {
     "@shres-code/shres-code-invariants": "workspace:^",
-    "@types/react": "~18.3.1",
+    "@types/react": "~19.2.18",
     "@shres-code/cordis": "workspace:^"
   },
   "files": [

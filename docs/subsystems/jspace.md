@@ -290,9 +290,16 @@ checkpoint(session: Session, input: CheckpointJspaceInput): JspaceCard
  * @param session - owning session.
  */
 close(session: Session): void
+
+/**
+ * Stamp the current Goal epoch as settled after a passing ship check.
+ * Does not close the card.
+ * @param session - owning session.
+ */
+recordShipped(session: Session): void
 ```
 
 Types: [Session](session.md)
 
-Source: [`packages/jspace/jspace/src/index.ts:294`](../../packages/jspace/jspace/src/index.ts)
+Source: [`packages/jspace/jspace/src/index.ts:301`](../../packages/jspace/jspace/src/index.ts)
 <!-- END GENERATED cordis-surface -->

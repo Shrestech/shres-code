@@ -10,7 +10,7 @@ This family provides provider-neutral web search and fetch operations plus the m
 | [`web-search-deepseek/`](web-search-deepseek/README.md) | Provides native DeepSeek web search | registers on `ctx.web` |
 | [`web-search-attached-cli/`](web-search-attached-cli/README.md) | Provides web search through an attached CLI vendor (Grok, Claude, Codex, Kimi) | registers on `ctx.web` |
 | [`web-fetch-http/`](web-fetch-http/README.md) | Fetches public HTTP and HTTPS resources | registers on `ctx.web` |
-| [`tool-web/`](tool-web/README.md) | Exposes web search and fetch to the model | registers on `ctx.tools` |
+| [`tool-web/`](tool-web/README.md) | Exposes web search, fetch, and deep research to the model | registers on `ctx.tools` |
 
 The [web capability decision](../../.agents/notes/implemented/architecture/2026-06-24-web-capability-seam.md) records why search and fetch share one provider-selection service.
 

@@ -35,6 +35,7 @@ function mockLlm(options: {
   providers?: { id: string }[]
   models?: Record<string, { id: string; name: string; provider: string }[]>
   efforts?: Record<string, { id: string; name: string }[]>
+  hostedTools?: Record<string, readonly string[]>
   defaultEffort?: string
   materializeDefault?: string
   remapEffort?: string
@@ -51,6 +52,7 @@ function mockLlm(options: {
     resolveModelInfo: (provider: string, model: string) => {
       if (options.infoError !== undefined) return Promise.reject(options.infoError)
       const efforts = options.efforts?.[`${provider}/${model}`]
+      const hostedTools = options.hostedTools?.[`${provider}/${model}`]
       return Promise.resolve({
         provider,
         id: model,
@@ -65,6 +67,7 @@ function mockLlm(options: {
                 : { defaultEffort: options.defaultEffort },
             },
           },
+        ...hostedTools === undefined ? {} : { hostedTools },
       })
     },
     resolveCallConfig: (config: LlmCallConfig) => {
@@ -157,6 +160,7 @@ describe('/model command', () => {
     expect(execution?.result.text).toContain('deepseek-v4-flash  efforts: off, high default=high')
     expect(execution?.result.text).toContain('deepseek-v4-pro  efforts: max')
     expect(execution?.result.text).toContain('(no advertised models)')
+    expect(execution?.result.text).not.toContain('web search')
     const run = agent.session.events.find(event => event.type === 'command/run')
     expect(run?.data).toMatchObject({ name: 'model', source: { kind: 'user' } })
     await ctx.fiber.dispose()
@@ -189,6 +193,34 @@ describe('/model command', () => {
     expect(catalog?.result.text).toContain('    deepseek-v4-flash')
     expect(catalog?.result.text).not.toContain('efforts:')
     await failing.ctx.fiber.dispose()
+  })
+
+  it('appends a web search marker only when hostedTools includes web_search', async () => {
+    const { ctx, agent } = await boot({
+      llm: mockLlm({
+        providers: [{ id: 'openai' }, { id: 'grok-session' }],
+        models: {
+          openai: [
+            { id: 'gpt-search', name: 'Search', provider: 'openai' },
+            { id: 'gpt-plain', name: 'Plain', provider: 'openai' },
+          ],
+          'grok-session': [{ id: 'grok-4', name: 'Grok', provider: 'grok-session' }],
+        },
+        efforts: {
+          'openai/gpt-search': [{ id: 'high', name: 'High' }],
+        },
+        hostedTools: {
+          'openai/gpt-search': ['web_search'],
+          'grok-session/grok-4': ['x_search'],
+        },
+      }),
+    })
+    const listed = await ctx.commands.execute(agent, '/model', new AbortController().signal)
+    const lines = listed?.result.text?.split('\n') ?? []
+    expect(lines).toContain('    gpt-search  efforts: high · web search')
+    expect(lines).toContain('    gpt-plain')
+    expect(lines).toContain('    grok-4')
+    await ctx.fiber.dispose()
   })
 
   it('switches the session selection and the stored default, including effort', async () => {

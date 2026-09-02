@@ -1,0 +1,20 @@
+# Keyless deep_research composition for the headless stream-json snapshot: the
+# web seam and tool suite mount first (the headless base ships no web rows),
+# a canned `perplexity` search provider serves the request-level pin, and a
+# deterministic model adapter drives one deep_research tool call plus the
+# follow-up turn that answers from the tool result.
+- id: base
+  name: '@shres-code/cordis-plugin-include'
+  config:
+    path: ./cordis.yml
+    patches:
+      - id: llm-deepseek
+        name: '@shres-code/shres-code-llm-deepseek'
+        disabled: true
+      - insert:
+          - id: web
+            name: '@shres-code/shres-code-web'
+          - id: tool-web
+            name: '@shres-code/shres-code-tool-web'
+          - id: deep-research-snapshot-backend
+            name: './tests/fixtures/deep-research-snapshot-backend.mjs'

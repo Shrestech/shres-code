@@ -24,8 +24,8 @@ The optional `llm-grok-session` settings section overlays the composition entry 
 | `models` | `grok-4.6`, `grok-4.5` (500k context, `low`/`medium`/`high`/`xhigh`) | Catalog; a new proxy release is a settings entry, not a code change. |
 | `refreshLeewayMs` | `300000` | Refresh when the token is at or within this distance of expiry. |
 | `cliVersion` | `1.0.13` | CLI version the route advertises via `x-grok-client-version` (sent with `X-XAI-Token-Auth: xai-grok-cli` and `x-grok-client-identifier: grok-shell`, the header set the proxy's 426 gate requires); a proxy floor bump is a settings entry. |
-| `hostedWebSearch` | `false` | Serve web search as a hosted backend tool instead of the local `tool-web` tool. While on, the colliding local `web_search` function tool is dropped from the request for this route (hosted wins). |
-| `hostedXSearch` | `false` | Serve X (Twitter) search as a hosted backend tool. |
+| `hostedWebSearch` | `true` | Serve web search as a hosted backend tool instead of the local `tool-web` tool. While on, the colliding local `web_search` function tool is dropped from the request for this route (hosted wins). Both switches default on, matching the Grok CLI's own sampler. |
+| `hostedXSearch` | `true` | Serve X (Twitter) search as a hosted backend tool. |
 
 ## Model Experience
 
@@ -47,7 +47,7 @@ Provider-side. The proxy reports cached input inside its usage when it serves a 
 
 The route can present web search and X (Twitter) search as hosted backend tools - the provider
 (the Grok proxy) executes the search on the model's behalf - instead of asking a harness tool to
-run it. Both switches default off.
+run it. Both switches default on, matching the Grok CLI's own sampler.
 
 When a switch is on, the matching Responses tool entry is spliced into the outgoing request's
 tools array through the shared adapter's payload hook, mirroring the declarations the Grok Build

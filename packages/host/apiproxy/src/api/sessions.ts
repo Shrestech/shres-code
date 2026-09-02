@@ -133,6 +133,12 @@ export interface ModelCatalogModel {
    * strict reading of absence.
    */
   inputModalities?: string[]
+  /**
+   * Provider-executed tools this model's route serves inside the conversation
+   * (`web_search`, `x_search`). Absent declares none, so selectors show no
+   * hosted-tool claim and the local tool catalog applies unchanged.
+   */
+  hostedTools?: string[]
 }
 
 /** One provider and the models it advertised successfully. */

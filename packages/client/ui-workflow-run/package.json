@@ -51,7 +51,7 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "react": "^18.2.0"
+    "react": "^19.2.8"
   },
   "peerDependencies": {
     "@shres-code/shres-code-client-locale": "workspace:^",
@@ -76,7 +76,7 @@
     "@shres-code/shres-code-session": "workspace:^",
     "@shres-code/shres-code-tool-workflow": "workspace:^",
     "@shres-code/shres-code-workflow": "workspace:^",
-    "@types/react": "~18.3.1",
+    "@types/react": "~19.2.18",
     "@shres-code/cordis": "workspace:^"
   }
 }

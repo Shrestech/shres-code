@@ -11,7 +11,8 @@ import {
   webSearchCallToServerToolCall,
   webSearchToolEntry,
   xSearchToolEntry,
-} from '../src/hosted-tools.ts'
+} from '../src/hosted-tools/index.ts'
+import { openaiCompletionsDialect } from '../src/hosted-tools/openai-completions.ts'
 
 async function* streamOf(chunks: StreamChunk[]): AsyncGenerator<StreamChunk> {
   for (const chunk of chunks) yield chunk
@@ -224,6 +225,25 @@ describe('mapHostedToolCalls', () => {
         },
       },
     ])
+  })
+
+  it('derives the z.ai openai-completions splice with no surfaced calls', () => {
+    expect(openaiCompletionsDialect.served).toEqual(['web_search'])
+    const plan = openaiCompletionsDialect.spliceFor(['web_search'])
+    expect(plan.entries).toEqual([{ type: 'web_search', web_search: { search_engine: 'search-prime' } }])
+    expect(plan.dropLocalTools).toEqual(['web_search'])
+    expect(plan.callNames).toEqual([])
+    // The splice drops the local web_search and appends the z.ai entry.
+    const spliced = applyHostedToolsPayload(
+      { tools: [{ type: 'function', name: 'web_search' }, { type: 'function', name: 'echo' }] },
+      plan,
+    )
+    expect(spliced).toEqual({
+      tools: [
+        { type: 'function', name: 'echo' },
+        { type: 'web_search', web_search: { search_engine: 'search-prime' } },
+      ],
+    })
   })
 
   it('passes a local tool-call start/delta/end through unchanged', async () => {

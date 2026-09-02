@@ -118,7 +118,7 @@ export const Config = z.object({
 })
 
 /** Shipped route ids. */
-export const SHIPPED_ROUTE_IDS = ['claude-cli', 'codex-cli', 'grok-cli', 'kimi-cli'] as const
+export const SHIPPED_ROUTE_IDS = ['claude-cli', 'codex-cli', 'cursor-cli', 'grok-cli', 'kimi-cli'] as const
 
 /** One shipped route id. */
 export type ShippedRouteId = (typeof SHIPPED_ROUTE_IDS)[number]
@@ -144,7 +144,7 @@ export const CUSTOM_ROUTE_TEMPLATE: CliBridgeRoute = {
   models: [],
 }
 
-/** Built-in defaults for the four shipped CLI routes. */
+/** Built-in defaults for the five shipped CLI routes. */
 export const SHIPPED_ROUTES: Record<ShippedRouteId, CliBridgeRoute> = {
   'claude-cli': {
     displayName: 'Claude Code CLI (delegated)',
@@ -180,6 +180,29 @@ export const SHIPPED_ROUTES: Record<ShippedRouteId, CliBridgeRoute> = {
     contextWindow: DEFAULT_CONTEXT_WINDOW,
     defaultMaxTokens: DEFAULT_MAX_TOKENS,
     models: [{ id: 'gpt-5.4', name: 'GPT-5.4' }],
+  },
+  'cursor-cli': {
+    displayName: 'Cursor Agent CLI (delegated)',
+    binary: 'cursor-agent',
+    modelArg: '--model',
+    // The CLI has no reasoning-effort flag; efforts stay empty so requesting
+    // one fails with UNSUPPORTED_OPTION instead of sending a flag it rejects.
+    effortStyle: 'flag',
+    efforts: [],
+    // -p is cursor-agent's print flag, not a prompt flag: the prompt rides as
+    // the trailing positional. --output-format json emits one
+    // {type:"result", result} line, which parse mode json reads. --force
+    // auto-approves the CLI's own tools in headless mode, the same posture as
+    // grok-cli's --always-approve.
+    extraArgs: ['-p', '--output-format', 'json', '--force'],
+    promptStyle: 'trailing',
+    parseMode: 'json',
+    env: {},
+    apiKeyEnv: 'CURSOR_API_KEY',
+    allowDelegatedTools: true,
+    contextWindow: DEFAULT_CONTEXT_WINDOW,
+    defaultMaxTokens: DEFAULT_MAX_TOKENS,
+    models: [{ id: 'gpt-5', name: 'GPT-5' }, { id: 'sonnet-4', name: 'Sonnet 4' }],
   },
   'grok-cli': {
     displayName: 'Grok Build CLI (delegated)',

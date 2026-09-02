@@ -55,7 +55,7 @@
     "@shres-code/shres-code-session-title": "workspace:^",
     "@shres-code/shres-code-tools": "workspace:^",
     "immer": "^11.1.15",
-    "react": "^18.2.0",
+    "react": "^19.2.8",
     "zustand": "5.0.14"
   },
   "peerDependencies": {
@@ -72,7 +72,7 @@
     "@shres-code/shres-code-timeout": "workspace:^",
     "@shres-code/shres-code-typert-protocol": "workspace:^",
     "@shres-code/shres-code-typert-registry": "workspace:^",
-    "@types/react": "~18.3.1"
+    "@types/react": "~19.2.18"
   },
   "files": [
     "lib/index.js",

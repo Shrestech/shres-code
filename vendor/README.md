@@ -12,15 +12,17 @@ Upstream workspace: `cordis-workspace` (local checkout: `~/repos/cordis-workspac
 
 | Directory | npm name | Upstream name | Version | Upstream repo | Commit |
 |---|---|---|---|---|---|
-| `cosmokit/` | `@shres-code/cosmokit` | `cosmokit` | 1.8.1 | https://github.com/shigma/cosmokit | `16f6fc058ade66e8ac5da0033d35a8d0f279f544` |
-| `schemastery/` | `@shres-code/schemastery` | `schemastery` | 3.18.0 | https://github.com/shigma/schemastery (`packages/core`) | `e67cee00ad725bd1534aee930a979ea3eec6f698` |
-| `cordis/` | `@shres-code/cordis` | `cordis` | 4.0.0-rc.7 | https://github.com/cordiverse/cordis (`packages/core`) | `56b3d4f725681cf4556c1a8695a709cc3b6eed74` |
-| `loader/` | `@shres-code/cordis-plugin-loader` | `@cordisjs/plugin-loader` | 1.0.0-rc.5 | https://github.com/cordiverse/cordis (`packages/loader`) | `56b3d4f725681cf4556c1a8695a709cc3b6eed74` |
-| `include/` | `@shres-code/cordis-plugin-include` | `@cordisjs/plugin-include` | 1.0.4 | https://github.com/cordiverse/cordis (`packages/include`) | `abb0a307cb1d3b0947f455d590cf5ba922d4caa4` |
-| `group/` | `@shres-code/cordis-plugin-group` | `@cordisjs/plugin-group` | 1.0.0 | https://github.com/cordiverse/cordis (`packages/group`) | `abb0a307cb1d3b0947f455d590cf5ba922d4caa4` |
-| `timer/` | `@shres-code/cordis-plugin-timer` | `@cordisjs/plugin-timer` | 1.1.2 | https://github.com/cordiverse/cordis (`packages/timer`) | `abb0a307cb1d3b0947f455d590cf5ba922d4caa4` |
-| `hmr/` | `@shres-code/cordis-plugin-hmr` | `@cordisjs/plugin-hmr` | 1.0.15 | https://github.com/cordiverse/cordis (`packages/hmr`) | `abb0a307cb1d3b0947f455d590cf5ba922d4caa4` |
-| `logger-console/` | `@shres-code/cordis-plugin-logger-console` | `@cordisjs/plugin-logger-console` | 1.0.0 | https://github.com/cordiverse/cordis (`packages/logger-console`) | `abb0a307cb1d3b0947f455d590cf5ba922d4caa4` |
+| `cosmokit/` | `@shres-code/cosmokit` | `cosmokit` | 1.8.2 | https://github.com/shigma/cosmokit | `16f6fc058ade66e8ac5da0033d35a8d0f279f544` |
+| `schemastery/` | `@shres-code/schemastery` | `schemastery` | 3.18.1 | https://github.com/shigma/schemastery (`packages/core`) | `e67cee00ad725bd1534aee930a979ea3eec6f698` |
+| `cordis/` | `@shres-code/cordis` | `cordis` | 4.0.1 | https://github.com/cordiverse/cordis (`packages/core`) | `56b3d4f725681cf4556c1a8695a709cc3b6eed74` |
+| `loader/` | `@shres-code/cordis-plugin-loader` | `@cordisjs/plugin-loader` | 1.0.2 | https://github.com/cordiverse/cordis (`packages/loader`) | `56b3d4f725681cf4556c1a8695a709cc3b6eed74` |
+| `include/` | `@shres-code/cordis-plugin-include` | `@cordisjs/plugin-include` | 1.0.6 | https://github.com/cordiverse/cordis (`packages/include`) | `abb0a307cb1d3b0947f455d590cf5ba922d4caa4` |
+| `group/` | `@shres-code/cordis-plugin-group` | `@cordisjs/plugin-group` | 1.0.1 | https://github.com/cordiverse/cordis (`packages/group`) | `abb0a307cb1d3b0947f455d590cf5ba922d4caa4` |
+| `timer/` | `@shres-code/cordis-plugin-timer` | `@cordisjs/plugin-timer` | 1.1.3 | https://github.com/cordiverse/cordis (`packages/timer`) | `abb0a307cb1d3b0947f455d590cf5ba922d4caa4` |
+| `hmr/` | `@shres-code/cordis-plugin-hmr` | `@cordisjs/plugin-hmr` | 1.0.16 | https://github.com/cordiverse/cordis (`packages/hmr`) | `abb0a307cb1d3b0947f455d590cf5ba922d4caa4` |
+| `logger-console/` | `@shres-code/cordis-plugin-logger-console` | `@cordisjs/plugin-logger-console` | 1.0.1 | https://github.com/cordiverse/cordis (`packages/logger-console`) | `abb0a307cb1d3b0947f455d590cf5ba922d4caa4` |
+
+> The `Version` column reflects the vendored package versions. The `Commit` column records the upstream source pin; verify the exact upstream SHAs against the sync record after the next `release(vendor)` bump, since the release commits update the version numbers but not this table.
 
 Third-party dependencies of the vendored packages stay on npm: `@standard-schema/spec`, `js-yaml`, `chokidar`, `picomatch`, `@babel/code-frame`, `supports-color`, `node-addon-require-builtin`.
 

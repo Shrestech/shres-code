@@ -955,6 +955,11 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Close the card.',
         parameters: [{ name: 'session', description: 'owning session.' }],
       },
+      {
+        signature: 'recordShipped(session: Session): void',
+        description: 'Stamp the current Goal epoch as settled after a passing ship check. Does not close the card.',
+        parameters: [{ name: 'session', description: 'owning session.' }],
+      },
     ],
   },
   {
@@ -2419,7 +2424,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
   {
     key: 'web',
     summary: 'The web access service.',
-    description: 'The web access service. Registered as `ctx.web` (one instance per context).\n\nSelection semantics (resolved at execution time, never order-dependent):\n\n- A singular configured id that is registered and `available()` → that provider.\n- A singular configured id not registered → `WEB_PROVIDER_CONFIGURED_MISSING`.\n- A singular configured id registered but unavailable → `WEB_PROVIDER_CONFIGURED_UNAVAILABLE`.\n- An ordered fallback list → first listed id that is registered and usable.\n- A fallback list whose members are all missing or unusable → `WEB_PROVIDER_UNAVAILABLE`.\n- No pin, exactly one registered usable provider → that provider.\n- No pin, multiple usable providers → `WEB_PROVIDER_AMBIGUOUS`.\n- No pin, no usable provider → `WEB_PROVIDER_UNAVAILABLE`.',
+    description: 'The web access service. Registered as `ctx.web` (one instance per context).\n\nSelection semantics (resolved at execution time, never order-dependent):\n\n- A request-level `provider` on `search()` is exclusive, wins over the singular config pin and the ordered list, and uses the same missing and unavailable failures as a singular pin.\n- A singular configured id that is registered and `available()` → that provider.\n- A singular configured id not registered → `WEB_PROVIDER_CONFIGURED_MISSING`.\n- A singular configured id registered but unavailable → `WEB_PROVIDER_CONFIGURED_UNAVAILABLE`.\n- An ordered fallback list → first listed id that is registered and usable.\n- A fallback list whose members are all missing or unusable → `WEB_PROVIDER_UNAVAILABLE`.\n- No pin, exactly one registered usable provider → that provider.\n- No pin, multiple usable providers → `WEB_PROVIDER_AMBIGUOUS`.\n- No pin, no usable provider → `WEB_PROVIDER_UNAVAILABLE`.',
     methods: [
       {
         signature: 'registerSearchProvider(provider: WebSearchProvider): () => void',
@@ -2436,7 +2441,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       {
         signature: 'async search(request: WebSearchRequest, signal?: AbortSignal): Promise<WebSearchResult>',
         description: 'Run one search through the selected provider. Resolves the provider at call time with the selection rules above; throws WebError when the capability cannot run. The seam enforces `request.maxResults` on the result: if the provider over-returns, `sources[]` is truncated and `truncated` set.',
-        parameters: [{ name: 'request', description: 'the query and optional result limit.' }, { name: 'signal', description: 'optional cancellation signal forwarded to the provider.' }],
+        parameters: [{ name: 'request', description: 'the query, optional result limit, and optional per-call provider pin.' }, { name: 'signal', description: 'optional cancellation signal forwarded to the provider.' }],
         returns: 'the provider\'s results, capped to `request.maxResults`.',
       },
       {
@@ -3719,6 +3724,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface GrokSessionOptions {\n    authPath: string;\n    refreshLeewayMs: number;\n    fetch?: typeof fetch;\n    now?: () => number;\n}',
   },
   {
+    name: 'HostedTool',
+    declaration: 'export type HostedTool = HostedToolMap[keyof HostedToolMap];',
+  },
+  {
+    name: 'HostedToolMap',
+    declaration: 'export interface HostedToolMap {\n    web_search: \'web_search\';\n    x_search: \'x_search\';\n}',
+  },
+  {
     name: 'ImageAttachmentLimits',
     declaration: 'export interface ImageAttachmentLimits {\n    maxImageBytes: number;\n    maxImagesPerMessage: number;\n    maxMessageImageBytes: number;\n    maxImagePixels: number;\n    maxImageDimension: number;\n    mediaTypes: readonly ImageMediaType[];\n}',
   },
@@ -3868,7 +3881,11 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'JspaceProjection',
-    declaration: 'export interface JspaceProjection {\n    readonly card: JspaceCard | null;\n    readonly closed: boolean;\n    readonly fault?: string;\n}',
+    declaration: 'export interface JspaceProjection {\n    readonly card: JspaceCard | null;\n    readonly closed: boolean;\n    readonly settled?: JspaceSettled;\n    readonly fault?: string;\n}',
+  },
+  {
+    name: 'JspaceSettled',
+    declaration: 'export interface JspaceSettled {\n    readonly goal: string;\n    readonly goalOpenedSeq: number;\n    readonly seq: number;\n}',
   },
   {
     name: 'JspaceSnapshot',
@@ -3896,7 +3913,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'KvUnitDescriptor',
-    declaration: 'export interface KvUnitDescriptor {\n    readonly name: string;\n    readonly version: number;\n    readonly tables: readonly string[];\n    readonly hasGlobal: boolean;\n}',
+    declaration: 'export interface KvUnitDescriptor {\n    readonly name: string;\n    readonly version: number;\n    readonly tables: readonly string[];\n    readonly hasGlobal: boolean;\n    readonly layout?: \'single\' | \'per-record\';\n}',
   },
   {
     name: 'LedgerEntry',
@@ -3964,7 +3981,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'LlmModelInfo',
-    declaration: 'export interface LlmModelInfo {\n    provider: string;\n    id: string;\n    name: string;\n    description?: string;\n    inputModalities?: readonly ModelModality[];\n}',
+    declaration: 'export interface LlmModelInfo {\n    provider: string;\n    id: string;\n    name: string;\n    description?: string;\n    inputModalities?: readonly ModelModality[];\n    hostedTools?: readonly HostedTool[];\n}',
   },
   {
     name: 'LlmModelReasoningInfo',
@@ -5476,7 +5493,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'WebSearchRequest',
-    declaration: 'export interface WebSearchRequest {\n    readonly query: string;\n    readonly maxResults?: number;\n}',
+    declaration: 'export interface WebSearchRequest {\n    readonly query: string;\n    readonly maxResults?: number;\n    readonly provider?: string;\n}',
   },
   {
     name: 'WebSearchResult',

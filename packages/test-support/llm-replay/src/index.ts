@@ -19,6 +19,7 @@ import type {
   LlmModelInfo,
   LlmProviderInfo,
   LlmResolvedModelInfo,
+  HostedTool,
   ModelModality,
   ResolvedRetryPolicy,
   RetryPolicyConfig,
@@ -54,6 +55,12 @@ export interface ReplayModelConfig {
   contextWindow?: number
   /** Optional declared input modalities, so a scenario can exercise capability gates (e.g. image-capable `read_image`). */
   inputModalities?: readonly ModelModality[]
+  /**
+   * Optional declared hosted tools (`web_search`, `x_search`) so a scenario can
+   * exercise picker markers and adapter-side splice without a live provider.
+   * Absent declares none.
+   */
+  hostedTools?: readonly HostedTool[]
   /**
    * Optional per-request output cap the replay route materializes when callers
    * omit one, so replay reconstructs the request header a live catalog produced.
@@ -585,6 +592,7 @@ class ReplayAdapter extends LlmAdapter {
       name: model.name ?? model.id,
       ...model.description === undefined ? {} : { description: model.description },
       ...model.inputModalities === undefined ? {} : { inputModalities: [...model.inputModalities] },
+      ...model.hostedTools === undefined ? {} : { hostedTools: [...model.hostedTools] },
     })))
   }
 
@@ -601,6 +609,9 @@ class ReplayAdapter extends LlmAdapter {
       ...configuredModel?.inputModalities === undefined
         ? {}
         : { inputModalities: [...configuredModel.inputModalities] },
+      ...configuredModel?.hostedTools === undefined
+        ? {}
+        : { hostedTools: [...configuredModel.hostedTools] },
       ...configuredModel?.contextWindow === undefined
         ? {}
         : { context: { contextWindow: configuredModel.contextWindow } },
@@ -806,12 +817,29 @@ function validateConfiguredModalities(providers: ReplayProviderConfig[] | undefi
   }
 }
 
+function validateConfiguredHostedTools(providers: ReplayProviderConfig[] | undefined): void {
+  for (const provider of providers ?? []) {
+    for (const model of provider.models ?? []) {
+      const hostedTools: unknown = model.hostedTools
+      if (hostedTools === undefined) continue
+      if (!Array.isArray(hostedTools)
+        || !hostedTools.every((tool: unknown) => tool === 'web_search' || tool === 'x_search')) {
+        throw new Error(
+          `llm-replay: provider "${provider.id}" model "${model.id}" hostedTools `
+          + 'must be an array containing only "web_search" and "x_search"',
+        )
+      }
+    }
+  }
+}
+
 export function apply(ctx: Context, config: Config = {}): void {
   const file = config.file ?? process.env.SHRES_SNAPSHOT_FILE
   if (file === undefined || file.length === 0) {
     throw new Error('llm-replay: a fixture path is required (Config.file or $SHRES_SNAPSHOT_FILE)')
   }
   validateConfiguredModalities(config.providers)
+  validateConfiguredHostedTools(config.providers)
   const overrideFile = config.overrideFile ?? process.env.SHRES_SNAPSHOT_OVERRIDE
   const childEnv = process.env.SHRES_SNAPSHOT_CHILD_FILES
   const childFiles = config.childFiles
