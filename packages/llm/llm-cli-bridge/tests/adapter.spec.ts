@@ -128,6 +128,27 @@ describe('argv and serialize', () => {
     ])
   })
 
+  it('builds cursor-agent argv with the prompt as trailing positional', () => {
+    // -p is cursor-agent's print flag and the prompt rides as the trailing
+    // positional; the CLI has no effort flag, so none is forwarded.
+    expect(buildCliArgv(SHIPPED_ROUTES['cursor-cli'], {
+      model: 'gpt-5',
+      prompt: 'do it',
+    })).toEqual([
+      'cursor-agent',
+      '-p',
+      '--output-format', 'json',
+      '--force',
+      '--model', 'gpt-5',
+      'do it',
+    ])
+    expect(() => buildCliArgv(SHIPPED_ROUTES['cursor-cli'], {
+      model: 'gpt-5',
+      effort: 'high',
+      prompt: 'do it',
+    })).toThrow(LlmError)
+  })
+
   it('rejects an effort the route does not advertise', () => {
     expect(() => buildCliArgv(SHIPPED_ROUTES['kimi-cli'], {
       model: 'kimi-code/k3',
@@ -253,6 +274,12 @@ describe('CliLlmAdapter', () => {
     ])
     const kimi = await adapter.resolveModel('kimi-cli', 'kimi-code/k3')
     expect(kimi.reasoning?.efforts.map(effort => effort.id)).toEqual(['off', 'high'])
+    const cursor = await adapter.resolveModel('cursor-cli', 'gpt-5')
+    expect(cursor.reasoning).toBeUndefined()
+    expect(await adapter.listModels('cursor-cli')).toEqual([
+      { provider: 'cursor-cli', id: 'gpt-5', name: 'GPT-5' },
+      { provider: 'cursor-cli', id: 'sonnet-4', name: 'Sonnet 4' },
+    ])
     expect(await adapter.listModels('kimi-cli')).toEqual([
       { provider: 'kimi-cli', id: 'kimi-code/k3-256k', name: 'K3-256k' },
       { provider: 'kimi-cli', id: 'kimi-code/k3', name: 'K3' },
@@ -387,11 +414,20 @@ describe('parse, serialize, and resolveRoutes', () => {
   it('parses json and stream-json, including failures', () => {
     const grok = SHIPPED_ROUTES['grok-cli']
     const kimi = SHIPPED_ROUTES['kimi-cli']
+    const cursor = SHIPPED_ROUTES['cursor-cli']
     expect(parseCliOutput(grok, '{"result":"ok","usage":{"inputTokens":1,"outputTokens":2}}'))
       .toEqual({ text: 'ok', usage: { inputTokens: 1, outputTokens: 2 } })
     expect(() => parseCliOutput(grok, '')).toThrow('no output')
     expect(() => parseCliOutput(grok, 'nope')).toThrow('not JSON')
     expect(() => parseCliOutput(grok, '{"type":"error","message":"auth"}')).toThrow('no answer')
+    // cursor-agent --print --output-format json emits exactly this object.
+    expect(parseCliOutput(cursor, JSON.stringify({
+      type: 'result', subtype: 'success', is_error: false,
+      duration_ms: 12, result: 'ok', session_id: 's', request_id: 'r',
+    }))).toEqual({ text: 'ok' })
+    expect(() => parseCliOutput(cursor, JSON.stringify({
+      type: 'result', subtype: 'error', is_error: true, duration_ms: 12, result: '', session_id: 's',
+    }))).toThrow('no answer')
     expect(parseCliOutput(kimi, '{"type":"assistant","text":"one"}\nnot-json\n{"result":"two"}'))
       .toEqual({ text: 'two' })
     expect(parseCliOutput(kimi, '{"result":"ok"}')).toEqual({ text: 'ok' })
@@ -520,13 +556,14 @@ describe('plugin registration', () => {
       routes: {
         'claude-cli': { enabled: false },
         'codex-cli': { enabled: false },
+        'cursor-cli': { enabled: false },
         'grok-cli': { enabled: false },
         'kimi-cli': { enabled: false },
       },
     })
     expect(ctx.llm.listProviders()).toEqual([])
     expect(ctx.llm.listConfigurableProviders().map(entry => entry.provider)).toEqual(
-      expect.arrayContaining(['claude-cli', 'codex-cli', 'grok-cli', 'kimi-cli']),
+      expect.arrayContaining(['claude-cli', 'codex-cli', 'cursor-cli', 'grok-cli', 'kimi-cli']),
     )
     await ctx.fiber.dispose()
   })
@@ -545,18 +582,23 @@ describe('plugin registration', () => {
     await ctx.fiber.dispose()
   })
 
-  it('registers the four shipped delegated routes', async () => {
+  it('registers the five shipped delegated routes', async () => {
     const ctx = new Context()
     await ctx.plugin(LlmRuntime)
     await ctx.plugin(plugin, {})
     const ids = ctx.llm.listProviders().map(provider => provider.id)
-    expect(ids).toEqual(expect.arrayContaining(['claude-cli', 'codex-cli', 'grok-cli', 'kimi-cli']))
+    expect(ids).toEqual(expect.arrayContaining(['claude-cli', 'codex-cli', 'cursor-cli', 'grok-cli', 'kimi-cli']))
     expect(ctx.llm.listProviders().every(provider => provider.kind === 'delegated')).toBe(true)
     const directory = ctx.llm.listConfigurableProviders()
     expect(directory.find(entry => entry.provider === 'grok-cli')).toMatchObject({
       kind: 'delegated',
       settingsNs: 'llm-cli-bridge',
       binary: 'grok',
+    })
+    expect(directory.find(entry => entry.provider === 'cursor-cli')).toMatchObject({
+      kind: 'delegated',
+      settingsNs: 'llm-cli-bridge',
+      binary: 'cursor-agent',
     })
     expect(typeof directory.find(entry => entry.provider === 'grok-cli')?.binaryFound).toBe('boolean')
     const resolved = await ctx.llm.resolveCallConfig({

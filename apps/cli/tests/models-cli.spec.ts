@@ -88,8 +88,30 @@ describe('shres models / providers', () => {
     expect(result.stdout).toContain('llama3.2')
     expect(result.stdout).toContain('grok-cli')
     expect(result.stdout).toMatch(/delegated/)
+    expect(result.stdout).toContain('cursor-cli')
     expect(result.stdout).toContain('grok-session')
     expect(result.stdout).toContain('grok-4.6')
+  })
+
+  it('sets a cursor-cli model and rejects an effort it cannot forward', async () => {
+    const home = await tempHome()
+    const set = await run(home, {
+      kind: 'models-set',
+      provider: 'cursor-cli',
+      model: 'gpt-5',
+    })
+    expect(set.exit).toBe(0)
+    expect(set.stdout).toContain('Default: cursor-cli gpt-5')
+    const listed = await run(home, { kind: 'models-list' })
+    expect(listed.stdout).toContain('gpt-5  (default)')
+    const effort = await run(home, {
+      kind: 'models-set',
+      provider: 'cursor-cli',
+      model: 'gpt-5',
+      effort: 'high',
+    })
+    expect(effort.exit).toBe(1)
+    expect(effort.stderr).toMatch(/does not support reasoning effort/)
   })
 
   it('sets a grok-cli model and advertised effort', async () => {

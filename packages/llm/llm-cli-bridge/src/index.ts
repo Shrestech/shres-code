@@ -1,8 +1,8 @@
 /**
  * Register {@link CliLlmAdapter} for the `claude-cli`, `codex-cli`,
- * `grok-cli`, and `kimi-cli` provider routes. Per-route binary, model arg,
- * effort arg, and env come from the optional `llm-cli-bridge` settings
- * section over this composition entry.
+ * `cursor-cli`, `grok-cli`, and `kimi-cli` provider routes. Per-route binary,
+ * model arg, effort arg, and env come from the optional `llm-cli-bridge`
+ * settings section over this composition entry.
  *
  * @module @shres-code/shres-code-llm-cli-bridge
  */

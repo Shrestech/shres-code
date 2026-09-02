@@ -20,7 +20,7 @@ An API key reaches the child only when `env` names it. The subprocess seam strip
 
 ## Delegated model routes
 
-`claude-cli`, `codex-cli`, `grok-cli`, and `kimi-cli` are model-picker routes. Selecting one makes the conversation completion that CLI, not an HTTP adapter. The Models page and `shres models list` mark them `delegated`.
+`claude-cli`, `codex-cli`, `cursor-cli`, `grok-cli`, and `kimi-cli` are model-picker routes. Selecting one makes the conversation completion that CLI, not an HTTP adapter. The Models page and `shres models list` mark them `delegated`.
 
 ```sh
 shres models set grok-cli grok-4.6 --effort high
