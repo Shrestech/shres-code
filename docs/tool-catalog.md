@@ -40,6 +40,7 @@ This table connects model-visible tool names to the plugin package and service s
 | `@shres-code/shres-code-tool-jspace` | `jspace_charter_amend`, `jspace_checkpoint`, `jspace_note`, `jspace_open`, `jspace_ship` | `ctx.tools`, `ctx.jspace`, `owning Agent session` | `tool/call`, `jspace/card or jspace/closed`, `tool/result` | - | Schemas are registered only while Settings `enabled` is true. `jspace_ship` is a register check, not a file writer. Checkpoint `evidence` must name a completed, non-error tool-call id; citing a configured verifier tool is evidence-grade and does not prove coverage. |
 | `@shres-code/shres-code-tool-workflow` | `workflow` | `ctx.tools`, `ctx.workflowEngine`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents the script children)` | `tool/call`, `tool/result` | - | - |
 | `@shres-code/shres-code-tool-web` | `deep_research`, `web_fetch`, `web_search` | `ctx.tools`, `ctx.web`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | web_search, web_fetch, and deep_research keep provider selection behind ctx.web so model-visible schemas stay stable across backend swaps. |
+| `@shres-code/shres-code-tool-image-gen` | `image_gen` | `ctx.tools`, `ctx.systemPrompt`, `ctx.grokCredential` | `tool/call`, `a workspace image file and optional attachment`, `tool/result` | - | image_gen is default-off; the catalog boots it enabled so its schema is catalogued, while shipped compositions leave it unregistered unless enabled. |
 | `@shres-code/shres-code-tool-tracker` | `experiment_log_metrics`, `experiment_log_run`, `experiment_query`, `experiment_verify_decision_rule` | `ctx.tools`, `ctx.tracker` | `tool/call`, `experiment run and metric records through ctx.tracker`, `tool/result` | - | experiment_log_run, experiment_log_metrics, and experiment_query fold experiment records through the tracker service seam. |
 | `@shres-code/shres-code-tool-ledger` | `ledger_query`, `ledger_record_decision` | `ctx.tools`, `ctx.ledger`, `ctx.tracker` | `tool/call`, `ledger/decision`, `tool/result` | - | ledger_record_decision and ledger_query record decisions whose cited run ids must resolve through ctx.tracker. |
 | `@shres-code/shres-code-tool-wiki` | `wiki_log`, `wiki_read`, `wiki_search`, `wiki_write` | `ctx.tools`, `ctx.wiki`, `owning Agent session` | `tool/call`, `wiki/page`, `tool/result` | - | Schemas are registered only while Settings `enabled` is true. wiki_read bumps `touched` itself. Wiki content reaches the model only through these tools. |
@@ -2314,7 +2315,7 @@ Source: [`packages/jspace/tool-jspace/src/index.ts`](../packages/jspace/tool-jsp
 
 ### `jspace_ship`
 
-Check that the open card is ready to ship: Goal and Next are set, and a checkpoint exists for the current Goal. Re-runs every charter check against the current workspace. Writes no files and does not close the card.
+Check that the open card is ready to ship: Goal and Next are set, and a checkpoint exists for the current Goal. Re-runs every charter check against the current workspace. Writes no files and does not close the card. A passing ship stamps the Goal settled so the session stops re-tending that epoch.
 
 ```json
 {
@@ -2433,7 +2434,7 @@ Source: [`packages/workflow/tool-workflow/src/index.ts`](../packages/workflow/to
 
 ### `deep_research`
 
-Synthesize a multi-source research answer with citations. Expensive and slow; not for routine queries.
+Perplexity deep web research: synthesize a multi-source research answer with citations. Not for routine queries.
 
 ```json
 {
@@ -2495,6 +2496,45 @@ Search the web for current information. Returns an optional summary answer and a
 Source: [`packages/web/tool-web/src/index.ts`](../packages/web/tool-web/src/index.ts)
 
 web_search, web_fetch, and deep_research keep provider selection behind ctx.web so model-visible schemas stay stable across backend swaps.
+
+<a id="shres-codeshres-code-tool-image-gen"></a>
+
+## `@shres-code/shres-code-tool-image-gen`
+
+### `image_gen`
+
+Generate a new image from a text description using the Grok Imagine API and save it to disk; returns the saved image path.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "prompt": {
+      "type": "string",
+      "description": "Text description of the image to generate."
+    },
+    "aspect_ratio": {
+      "type": "string",
+      "description": "Aspect ratio of the generated image, decided from the user's request. Defaults to 'auto'. 1:1 for square (icons, profiles), 16:9 for wide (landscapes, cinematic), 9:16 for tall (phone wallpapers, stories), 3:2 for horizontal photos, 2:3 for vertical (portraits, posters).",
+      "enum": [
+        "auto",
+        "1:1",
+        "16:9",
+        "9:16",
+        "3:2",
+        "2:3"
+      ]
+    }
+  },
+  "required": [
+    "prompt"
+  ]
+}
+```
+
+Source: [`packages/llm/tool-image-gen/src/index.ts`](../packages/llm/tool-image-gen/src/index.ts)
+
+image_gen is default-off; the catalog boots it enabled so its schema is catalogued, while shipped compositions leave it unregistered unless enabled.
 
 <a id="shres-codeshres-code-tool-tracker"></a>
 

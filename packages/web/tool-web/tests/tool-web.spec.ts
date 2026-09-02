@@ -63,16 +63,16 @@ async function mountTools(opts: {
 describe('deep_research guidance', () => {
   it('names sibling tools only when they are enabled', () => {
     expect(deepResearchGuidance(true, true)).toBe(
-      'Use the deep_research tool for multi-source synthesis with citations when depth matters. It is expensive (billed per call) and slow. Do not use it for routine queries. Use web_search for a quick factual lookup and web_fetch to read a specific page.',
+      'Use the deep_research tool for Perplexity deep web research: multi-source synthesis with citations when depth matters. Do not use it for routine queries. Use web_search for a quick factual lookup and web_fetch to read a specific page.',
     )
     expect(deepResearchGuidance(true, false)).toBe(
-      'Use the deep_research tool for multi-source synthesis with citations when depth matters. It is expensive (billed per call) and slow. Do not use it for routine queries. Use web_search for a quick factual lookup.',
+      'Use the deep_research tool for Perplexity deep web research: multi-source synthesis with citations when depth matters. Do not use it for routine queries. Use web_search for a quick factual lookup.',
     )
     expect(deepResearchGuidance(false, true)).toBe(
-      'Use the deep_research tool for multi-source synthesis with citations when depth matters. It is expensive (billed per call) and slow. Do not use it for routine queries. Use web_fetch to read a specific page.',
+      'Use the deep_research tool for Perplexity deep web research: multi-source synthesis with citations when depth matters. Do not use it for routine queries. Use web_fetch to read a specific page.',
     )
     expect(deepResearchGuidance(false, false)).toBe(
-      'Use the deep_research tool for multi-source synthesis with citations when depth matters. It is expensive (billed per call) and slow. Do not use it for routine queries.',
+      'Use the deep_research tool for Perplexity deep web research: multi-source synthesis with citations when depth matters. Do not use it for routine queries.',
     )
   })
 })

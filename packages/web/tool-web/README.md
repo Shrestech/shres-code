@@ -10,7 +10,7 @@ Each tool is registered independently; a product that wants a subset disables th
 |---|---|---|
 | `web_search` | `query` (string) | Discovery. Returns an optional answer plus source URLs. `max_results` is **not** model-facing — the tool sets the bound (the `searchMaxResults` config, default 8) and passes it to the seam. |
 | `web_fetch` | `url` (string) | Retrieves a specific URL. HTML bodies are rendered to markdown (turndown with GFM tables/strikethrough); text bodies pass through. A non-2xx status is reported, not an error. The tool-call timeout is deployment policy (`shres-tool-call-timeout-policy`), not a model argument. |
-| `deep_research` | `query` (string) | Multi-source synthesis with citations, served by the Perplexity search provider via a per-call `provider` pin. Same result card as `web_search`. Expensive and slow; the prompt section tells the model to use `web_search`/`web_fetch` for routine lookups. |
+| `deep_research` | `query` (string) | Perplexity deep web research: multi-source synthesis with citations, served by the Perplexity search provider via a per-call `provider` pin. Same result card as `web_search`. The prompt section tells the model to use `web_search`/`web_fetch` for routine lookups. |
 
 All three tools opt into concurrent scheduling because provider reads return content without mutating parent-agent state.
 
@@ -71,7 +71,7 @@ Use the web_fetch tool to retrieve the content of a specific HTTP(S) URL (for ex
 ##### Deep research guidance with search and fetch enabled
 
 ```markdown
-Use the deep_research tool for multi-source synthesis with citations when depth matters. It is expensive (billed per call) and slow. Do not use it for routine queries. Use web_search for a quick factual lookup and web_fetch to read a specific page.
+Use the deep_research tool for Perplexity deep web research: multi-source synthesis with citations when depth matters. Do not use it for routine queries. Use web_search for a quick factual lookup and web_fetch to read a specific page.
 ```
 
 #### Token effect

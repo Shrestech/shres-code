@@ -48,7 +48,7 @@ export function applyDeepResearchTool(
 
   ctx.tools.register(defineTool({
     name: 'deep_research',
-    description: 'Synthesize a multi-source research answer with citations. Expensive and slow; not for routine queries.',
+    description: 'Perplexity deep web research: synthesize a multi-source research answer with citations. Not for routine queries.',
     parameters: {
       query: { type: 'string', required: true, description: 'The research question.' },
     },
@@ -82,7 +82,7 @@ export function applyDeepResearchTool(
  * @returns the prompt-section text.
  */
 export function deepResearchGuidance(searchEnabled: boolean, fetchEnabled: boolean): string {
-  const head = 'Use the deep_research tool for multi-source synthesis with citations when depth matters. It is expensive (billed per call) and slow. Do not use it for routine queries.'
+  const head = 'Use the deep_research tool for Perplexity deep web research: multi-source synthesis with citations when depth matters. Do not use it for routine queries.'
   if (searchEnabled && fetchEnabled) {
     return `${head} Use web_search for a quick factual lookup and web_fetch to read a specific page.`
   }

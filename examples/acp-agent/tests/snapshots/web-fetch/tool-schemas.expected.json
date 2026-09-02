@@ -66,6 +66,22 @@
       }
     },
     {
+      "name": "deep_research",
+      "description": "Perplexity deep web research: synthesize a multi-source research answer with citations. Not for routine queries.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "The research question."
+          }
+        },
+        "required": [
+          "query"
+        ]
+      }
+    },
+    {
       "name": "edit",
       "description": "Edit an existing UTF-8 text file by replacing literal text.",
       "parameters": {

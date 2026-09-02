@@ -50,7 +50,7 @@
     "@shres-code/cordis": "workspace:^"
   },
   "dependencies": {
-    "js-yaml": "^5.2.3",
+    "js-yaml": "^4.2.0",
     "@shres-code/schemastery": "workspace:^"
   },
   "devDependencies": {

@@ -166,7 +166,9 @@ function runPnpmInProfile(profileDir: string, before: ProfileManifest, args: rea
   // without a shell since the CVE-2024-27980 hardening.
   const result = spawnSync('pnpm', args.map(argument => anchorPathSpec(argument, process.cwd())), {
     cwd: profileDir,
-    stdio: 'inherit',
+    // Capture pnpm's progress so a successful install never pollutes the CLI's
+    // stdout; the captured output is replayed to stderr only on failure.
+    stdio: ['inherit', 'pipe', 'pipe'],
     shell: process.platform === 'win32',
   })
   if (result.error !== undefined) {
@@ -181,6 +183,10 @@ function runPnpmInProfile(profileDir: string, before: ProfileManifest, args: rea
   if (exitCode === 0) {
     reconcilePlugins(before, profileDir)
   } else {
+    // Replay pnpm's own diagnostics (captured above) so a failed install still
+    // shows its cause, then add the profile-specific hint.
+    if (result.stdout.length > 0) process.stderr.write(result.stdout)
+    if (result.stderr.length > 0) process.stderr.write(result.stderr)
     writePnpmFailure(profileDir, args)
   }
   return exitCode

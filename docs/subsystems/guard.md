@@ -169,5 +169,5 @@ bindRemount(remount: (() => Promise<void>) | undefined): void
 @Remote('applyUpdate') async applyUpdate(): Promise<ShieldPayloadUpdate>
 ```
 
-Source: [`packages/guard/shield/src/index.ts:264`](../../packages/guard/shield/src/index.ts)
+Source: [`packages/guard/shield/src/index.ts:268`](../../packages/guard/shield/src/index.ts)
 <!-- END GENERATED cordis-surface -->

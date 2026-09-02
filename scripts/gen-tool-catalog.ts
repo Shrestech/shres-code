@@ -61,6 +61,8 @@ import { ShrestechTrackerService } from '@shres-code/shres-code-tracker-shrestec
 import * as ToolTracker from '@shres-code/shres-code-tool-tracker'
 import LedgerService from '@shres-code/shres-code-ledger'
 import * as ToolLedger from '@shres-code/shres-code-tool-ledger'
+import GrokCredential from '@shres-code/shres-code-grok-credential'
+import * as ToolImageGen from '@shres-code/shres-code-tool-image-gen'
 import * as ToolTasks from '@shres-code/shres-code-tool-jobs'
 import * as ToolTodo from '@shres-code/shres-code-tool-todo'
 import JspaceService from '@shres-code/shres-code-jspace'
@@ -575,6 +577,21 @@ const TOOL_PACKAGES: ToolPackage[] = [
     },
     note:
       'web_search, web_fetch, and deep_research keep provider selection behind ctx.web so model-visible schemas stay stable across backend swaps.',
+  },
+  {
+    pkg: '@shres-code/shres-code-tool-image-gen',
+    dir: 'tool-image-gen',
+    source: 'packages/llm/tool-image-gen/src/index.ts',
+    requires: ['ctx.tools', 'ctx.systemPrompt', 'ctx.grokCredential'],
+    writes: ['tool/call', 'a workspace image file and optional attachment', 'tool/result'],
+    async mount(ctx) {
+      // The shared Grok credential engine backs the tool's session manager; the
+      // tool is default-off, so the catalog boots it enabled to harvest its schema.
+      await ctx.plugin(GrokCredential)
+      await ctx.plugin(ToolImageGen, { enabled: true })
+    },
+    note:
+      'image_gen is default-off; the catalog boots it enabled so its schema is catalogued, while shipped compositions leave it unregistered unless enabled.',
   },
   {
     pkg: '@shres-code/shres-code-tool-tracker',

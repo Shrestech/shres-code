@@ -103,7 +103,7 @@
     "@shres-code/shres-code-agent-instructions": "workspace:^",
     "commander": "^15.0.0",
     "@shres-code/cordis": "workspace:^",
-    "js-yaml": "^5.2.3",
+    "js-yaml": "^4.2.0",
     "node-addon-require-builtin": "^0.1.4"
   },
   "devDependencies": {

@@ -67,8 +67,8 @@ importers:
         specifier: ^3.0.1
         version: 3.0.1
       js-yaml:
-        specifier: ^5.2.3
-        version: 5.2.3
+        specifier: ^4.2.0
+        version: 4.3.1
       jscpd:
         specifier: ^5.0.12
         version: 5.0.12
@@ -379,8 +379,8 @@ importers:
         specifier: ^15.0.0
         version: 15.0.0
       js-yaml:
-        specifier: ^5.2.3
-        version: 5.2.3
+        specifier: ^4.2.0
+        version: 4.3.1
       node-addon-require-builtin:
         specifier: ^0.1.4
         version: 0.1.4
@@ -1061,8 +1061,8 @@ importers:
   packages/boot/app-boot:
     dependencies:
       js-yaml:
-        specifier: ^5.2.3
-        version: 5.2.3
+        specifier: ^4.2.0
+        version: 4.3.1
     devDependencies:
       '@shres-code/cordis':
         specifier: workspace:^
@@ -6626,8 +6626,8 @@ importers:
         specifier: link:../../../vendor/schemastery
         version: link:../../../vendor/schemastery
       js-yaml:
-        specifier: ^5.2.3
-        version: 5.2.3
+        specifier: ^4.2.0
+        version: 4.3.1
     devDependencies:
       '@shres-code/cordis':
         specifier: workspace:^
@@ -14527,10 +14527,6 @@ packages:
     resolution: {integrity: sha512-CY6crGq313MX8GkwvB7tzgp99vjQxY1++5y10/BKN/GUfHqWaOGQMNZkBvqSzsZKWk/ijwHlWzzkLulsGHhjWQ==}
     hasBin: true
 
-  js-yaml@5.2.3:
-    resolution: {integrity: sha512-n+mUVyUX5bVv7G/G2zyIHOhdxfuU1dY2NOFzTQUWiMUbFss8b57NFlgCCaggU78wSw5KVS9cllzeLyzyR+n5nw==}
-    hasBin: true
-
   jscpd-darwin-arm64@5.0.12:
     resolution: {integrity: sha512-CQCDYhQY9yOGGeauzkRGYW/QtXurPCjfDkEhUoM/M5UdmpzxfG3i9mnNsaheJ0RdFRf73mL7JaLVRP8U2l5/kA==}
     cpu: [arm64]
@@ -20203,10 +20199,6 @@ snapshots:
     dependencies:
       argparse: 2.0.1
 
-  js-yaml@5.2.3:
-    dependencies:
-      argparse: 2.0.1
-
   jscpd-darwin-arm64@5.0.12:
     optional: true
 
@@ -22015,7 +22007,7 @@ snapshots:
   vite@8.0.16(@types/node@22.20.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0):
     dependencies:
       lightningcss: 1.33.0
-      picomatch: 4.0.5
+      picomatch: 4.0.7
       postcss: 8.5.25
       rolldown: 1.0.3
       tinyglobby: 0.2.17
@@ -22030,7 +22022,7 @@ snapshots:
   vite@8.0.16(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0):
     dependencies:
       lightningcss: 1.33.0
-      picomatch: 4.0.5
+      picomatch: 4.0.7
       postcss: 8.5.25
       rolldown: 1.0.3
       tinyglobby: 0.2.17
