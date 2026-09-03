@@ -894,3 +894,15 @@ export const IconSpeakerOutline16 = ({ size = 16, className }: IconProps) => (
     />
   </svg>
 )
+
+/** ic_ds_pin_outline_16 — harness-only extract for the Session-row pin action. */
+export const IconPinOutline16 = ({ size = 16, className }: IconProps) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path
+      fillRule="evenodd"
+      clipRule="evenodd"
+      d="M8.75 1.25a.75.75 0 0 0-1.5 0V3.08c-1.36.22-2.4 1.4-2.4 2.82 0 .52.14 1 .39 1.42L3.16 9.4A.75.75 0 0 0 3.75 10.7h2.5v3.55a.75.75 0 0 0 1.5 0V10.7h2.5a.75.75 0 0 0 .59-1.3L8.76 7.32c.25-.42.39-.9.39-1.42 0-1.42-1.04-2.6-2.4-2.82V1.25ZM6.1 5.9c0-.77.6-1.4 1.4-1.4s1.4.63 1.4 1.4c0 .28-.08.54-.23.76L7.5 8.1 6.33 6.66A1.4 1.4 0 0 1 6.1 5.9Z"
+      fill="currentColor"
+    />
+  </svg>
+)

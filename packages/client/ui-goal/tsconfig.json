@@ -12,9 +12,6 @@
       "path": "../../../vendor/cordis"
     },
     {
-      "path": "../../../vendor/schemastery"
-    },
-    {
       "path": "../locale"
     },
     {
@@ -27,12 +24,6 @@
       "path": "../ui-conversation"
     },
     {
-      "path": "../ui-settings"
-    },
-    {
-      "path": "../ui-sidebar"
-    },
-    {
       "path": "../ui-primitives"
     },
     {
@@ -43,12 +34,6 @@
     },
     {
       "path": "../../goal/goal"
-    },
-    {
-      "path": "../../settings/settings"
-    },
-    {
-      "path": "../../todo/tool-todo"
     },
     {
       "path": "../../runtime-diagnostics/invariants"

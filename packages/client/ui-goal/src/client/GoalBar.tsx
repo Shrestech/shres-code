@@ -2,13 +2,10 @@
  * GoalBar: the goal indicator docked above the message composer (input dock
  * strip). A present goal shows a goal glyph, a phase label, the truncated
  * objective, and icon actions — resume when paused, edit (inline form in
- * the same strip), and clear. When Game mode is on, the fight arena sits
- * at the left of the strip. Incomplete todos are the army; an empty list
- * still draws a standing army. The clock is elapsed since create, not an
- * ETA. Goal creation lives on the `/goal` command, not here: loading
- * (undefined), no goal (null), and complete goals render nothing. Live
- * state arrives as the projected whole snapshot; the verbs are the
- * injected face.
+ * the same strip), and clear. Goal creation lives on the `/goal` command,
+ * not here: loading (undefined), no goal (null), and complete goals render
+ * nothing. Live state arrives as the projected whole snapshot; the verbs
+ * are the injected face.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -18,24 +15,13 @@ import {
   IconPauseOutline16, IconPlayOutline16, IconTrashOutline16, Tooltip,
 } from '@shres-code/shres-code-client-ui-primitives'
 import type { InjectFace, PropsLocale } from '@shres-code/shres-code-client-ui-slots'
-// Type-only: the `todos` SessionProjectionMap merge.
-import type {} from '@shres-code/shres-code-tool-todo/client'
 import type { GoalActionResult, GoalBarActions, GoalDockInjected } from './slots.ts'
-import { gameSettingsEnabled } from './game-settings.ts'
 import type { GoalKey } from './locales.ts'
-import { GoalFight } from './GoalFight.tsx'
-import { remainingFightUnits, type FightUnit } from './units.ts'
 import css from './GoalBar.module.css'
 
 export interface GoalBarProps extends GoalBarActions {
   /** Current goal snapshot; undefined = capability absent or loading, null = no goal set. */
   goal: GoalSnapshot | null | undefined
-  /** Remaining fight units (incomplete todos, or the standing army). */
-  units?: readonly FightUnit[]
-  /** Goal create time (epoch ms) for the elapsed clock. */
-  createdAt?: number
-  /** When false the arena is omitted; default off. */
-  gameEnabled?: boolean
 }
 
 /** Strip label keys per visible phase; complete goals render nothing. */
@@ -46,7 +32,7 @@ const PHASE_LABELS = {
 } as const satisfies Record<string, GoalKey>
 
 export function GoalBar({
-  goal, units = [], createdAt, gameEnabled = false, onEdit, onPause, onResume, onClear, t,
+  goal, onEdit, onPause, onResume, onClear, t,
 }: GoalBarProps & PropsLocale<'goal'>) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
@@ -143,7 +129,6 @@ export function GoalBar({
   return (
     <div className={css.dock} data-goal-bar>
       <div className={css.bar} title={title}>
-        {gameEnabled && <GoalFight units={units} frozen={goal.phase !== 'active'} createdAt={createdAt} />}
         <span className={css.goalGlyph}><IconGoalOutline16 size={14} /></span>
         <span className={css.label}>{t(PHASE_LABELS[goal.phase])}</span>
         <span className={css.objective}>{goal.objective}</span>
@@ -190,21 +175,12 @@ export type GoalDockProps = import('@shres-code/shres-code-client-ui-slots').Pro
 
 /** Dock adapter: reads the host-computed 'goal' projection (whole value; absent or null renders nothing). */
 export function GoalDock({
-  useProjection, useGameSettings, onEdit, onPause, onResume, onClear, t,
+  useProjection, onEdit, onPause, onResume, onClear, t,
 }: GoalDockProps) {
   const projection = useProjection('goal')
-  const todos = useProjection('todos')
-  // Tests and some assemblies omit the Game settings hook; InjectFace types it as required.
-  // oxlint-disable-next-line typescript/no-unnecessary-condition -- hook is absent when Game mode is not mounted
-  const gameEnabled = useGameSettings === undefined
-    ? false
-    : gameSettingsEnabled(useGameSettings(current => current))
   return (
     <GoalBar
       goal={projection === undefined ? undefined : projection === null ? null : projection.goal}
-      units={remainingFightUnits(todos)}
-      {...(projection?.createdAt === undefined ? {} : { createdAt: projection.createdAt })}
-      gameEnabled={gameEnabled}
       onEdit={onEdit}
       onPause={onPause}
       onResume={onResume}

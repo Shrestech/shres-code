@@ -8,8 +8,6 @@
  */
 
 import type { RemoteResult } from '@shres-code/shres-code-typert-protocol'
-import type { SettingsScope } from '@shres-code/shres-code-client-runtime/client'
-import type { GameSettings } from './game-settings.ts'
 
 /**
  * Settled outcome of one goal mutation, rendered inline by the strip. The
@@ -33,25 +31,5 @@ export interface GoalBarActions {
   onClear: () => Promise<GoalActionResult>
 }
 
-/** Injected face of the Goal dock: verbs plus the Game mode settings hook. */
-export interface GoalDockInjected extends GoalBarActions {
-  /** Settings scope for the `game` namespace. */
-  hooks: {
-    /** Bound Host mirror of Settings → Game mode. */
-    gameSettings: SettingsScope<GameSettings>
-  }
-}
-
-/** Injected face of the composer-row Game mode switch. */
-export interface GameModeToggleInjected {
-  /** Settings scope for the `game` namespace. */
-  hooks: {
-    /** Bound Host mirror of Settings → Game mode. */
-    gameSettings: SettingsScope<GameSettings>
-  }
-  /**
-   * Persist Game mode.
-   * @param enabled - next allow value.
-   */
-  setEnabled: (enabled: boolean) => Promise<void>
-}
+/** Injected face of the Goal dock: the mutation verbs. */
+export type GoalDockInjected = GoalBarActions

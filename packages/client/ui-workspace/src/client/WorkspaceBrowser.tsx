@@ -1,8 +1,8 @@
 /**
  * The workspace/session browsing region filling the sidebar shell's
  * `sidebar.workspaces` hole: section header (title + view options + add
- * workspace), search, the grouped tree or flat list, and the workspace
- * dialogs. Wide state renders the full browser; rail state renders the two
+ * workspace), search, Pinned and Running shortcut lists, the grouped tree
+ * or flat list, and the workspace dialogs. Wide state renders the full browser; rail state renders the two
  * region icons (search / add workspace) as 36px controls on the shell's shared
  * rail entry path, each requesting expansion through the owner share. Adding
  * is the header button's one action, so it raises the directory flow with no
@@ -20,7 +20,7 @@ import type {
 } from '@shres-code/shres-code-client-runtime/client'
 import type { WorkspaceBrowserProps } from './contract/slots.ts'
 import type { SessionNode, SessionOrderBy } from './tree.ts'
-import { deriveFlat, deriveGroups, deriveSearchResults, UNGROUPED_KEY } from './tree.ts'
+import { deriveFlat, deriveGroups, derivePinned, deriveRunning, deriveSearchResults, UNGROUPED_KEY } from './tree.ts'
 import { ProjectRowItem, SearchResultItem, SessionNodeItem } from './rows/Rows.tsx'
 import { FLAT_SESSION_ORDER_KEY } from './stores.ts'
 import { WorkspacePickFlow } from './WorkspacePicker.tsx'
@@ -243,13 +243,76 @@ type SessionTreeProps = Pick<
   onSessionArchive: (sessionId: SessionNode['id']) => void
   /** Session order behavior: fixed after edits, or additionally promoted by user activity. */
   orderBy: SessionOrderBy
+  /** Browser-local pin order (most recently pinned first). */
+  pinnedSessionIds: readonly string[]
+  /** Pin or unpin a session (row menu action). */
+  onPin: (sessionId: SessionNode['id']) => void
+}
+
+/** Pinned and Running shortcut lists; omitted while both are empty. */
+function SessionHighlights({
+  list, archivedSessionIds, pinnedSessionIds, currentId, now,
+  onOpen, onRename, onFork, onArchive, onPin, t,
+}: {
+  list: SessionListState
+  archivedSessionIds: readonly SessionNode['id'][]
+  pinnedSessionIds: readonly string[]
+  currentId: SessionListState['current']
+  now: number
+  onOpen: SessionTreeProps['open']
+  onRename: SessionTreeProps['onSessionRename']
+  onFork: SessionTreeProps['forkSession']
+  onArchive: SessionTreeProps['onSessionArchive']
+  onPin: SessionTreeProps['onPin']
+  t: SessionTreeProps['t']
+}) {
+  const pinned = useMemo(
+    () => derivePinned(list, archivedSessionIds, pinnedSessionIds),
+    [archivedSessionIds, list, pinnedSessionIds],
+  )
+  const running = useMemo(
+    () => deriveRunning(list, archivedSessionIds, pinnedSessionIds),
+    [archivedSessionIds, list, pinnedSessionIds],
+  )
+  if (pinned.length === 0 && running.length === 0) return null
+  const renderRow = (node: SessionNode) => (
+    <SessionNodeItem
+      key={node.id}
+      node={node}
+      currentId={currentId}
+      now={now}
+      onOpen={onOpen}
+      onRename={onRename}
+      onFork={onFork}
+      onArchive={onArchive}
+      onPin={onPin}
+      pinned={pinnedSessionIds.includes(node.id)}
+      t={t}
+    />
+  )
+  return (
+    <div className={css.highlights}>
+      {pinned.length > 0 && (
+        <div className={css.stickySection} role="group" aria-label={t('section.pinned')}>
+          <div className={css.stickyHeader}>{t('section.pinned')}</div>
+          {pinned.map(renderRow)}
+        </div>
+      )}
+      {running.length > 0 && (
+        <div className={css.stickySection} role="group" aria-label={t('section.running')}>
+          <div className={css.stickyHeader}>{t('section.running')}</div>
+          {running.map(renderRow)}
+        </div>
+      )}
+    </div>
+  )
 }
 
 /** The scrolling session tree; unmounting drops the sessions subscription and expand-all state. */
 function SessionTree({
   useSessions, startSession, open, forkSession, workspaces, archivedSessionIds,
-  onRenameRequest, onDeleteRequest, onSessionRename, onSessionArchive,
-  insertWorkspaceBefore, insertSessionBefore, orderBy,
+  onRenameRequest, onDeleteRequest, onSessionRename, onSessionArchive, onPin,
+  insertWorkspaceBefore, insertSessionBefore, orderBy, pinnedSessionIds,
   groupExpansion, setGroupExpanded,
   sessionOrderByAccount, sessionUpdatedAtByAccount, syncSessionOrderAccount, setSessionOrder, t,
 }: SessionTreeProps) {
@@ -388,6 +451,19 @@ function SessionTree({
         role="tree"
         aria-label={t('section.sessions')}
       >
+        <SessionHighlights
+          list={list}
+          archivedSessionIds={archivedSessionIds}
+          pinnedSessionIds={pinnedSessionIds}
+          currentId={current}
+          now={now}
+          onOpen={open}
+          onRename={onSessionRename}
+          onFork={forkSession}
+          onArchive={onSessionArchive}
+          onPin={onPin}
+          t={t}
+        />
         {groups.length === 0 && (
           <div className={css.empty}>{t('empty.none')}</div>
         )}
@@ -516,6 +592,8 @@ function SessionTree({
                     onRename={onSessionRename}
                     onFork={forkSession}
                     onArchive={onSessionArchive}
+                    onPin={onPin}
+                    pinned={pinnedSessionIds.includes(node.id)}
                     drag={dragProps}
                     t={t}
                   />
@@ -544,8 +622,9 @@ function SessionTree({
 
 /** The flat "In one list" body: every session is one draggable top-level row. */
 function FlatList({
-  useSessions, open, forkSession, onSessionRename, onSessionArchive, archivedSessionIds,
-  orderBy, sessionOrderByAccount, sessionUpdatedAtByAccount, syncSessionOrderAccount, setSessionOrder, t,
+  useSessions, open, forkSession, onSessionRename, onSessionArchive, onPin, archivedSessionIds,
+  orderBy, pinnedSessionIds, sessionOrderByAccount, sessionUpdatedAtByAccount,
+  syncSessionOrderAccount, setSessionOrder, t,
 }: Pick<
   SessionTreeProps,
   | 'useSessions'
@@ -553,8 +632,10 @@ function FlatList({
   | 'forkSession'
   | 'onSessionRename'
   | 'onSessionArchive'
+  | 'onPin'
   | 'archivedSessionIds'
   | 'orderBy'
+  | 'pinnedSessionIds'
   | 'sessionOrderByAccount'
   | 'sessionUpdatedAtByAccount'
   | 'syncSessionOrderAccount'
@@ -617,6 +698,19 @@ function FlatList({
   return (
     <div className={clsx(css.treeBody, css.wide)}>
       <div className={clsx(css.list, css.flatList)} role="tree" aria-label={t('section.sessions')}>
+        <SessionHighlights
+          list={list}
+          archivedSessionIds={archivedSessionIds}
+          pinnedSessionIds={pinnedSessionIds}
+          currentId={list.current}
+          now={now}
+          onOpen={open}
+          onRename={onSessionRename}
+          onFork={forkSession}
+          onArchive={onSessionArchive}
+          onPin={onPin}
+          t={t}
+        />
         {rows.length === 0 && (
           <div className={css.empty}>{t('empty.none')}</div>
         )}
@@ -632,6 +726,8 @@ function FlatList({
               onRename={onSessionRename}
               onFork={forkSession}
               onArchive={onSessionArchive}
+              onPin={onPin}
+              pinned={pinnedSessionIds.includes(node.id)}
               flat
               drag={{
                 start: () => {
@@ -772,6 +868,9 @@ export function WorkspaceBrowser({
   const groupExpansion = useStore(s => s.groupExpansion)
   const sessionOrderByAccount = useStore(s => s.sessionOrderByAccount)
   const sessionUpdatedAtByAccount = useStore(s => s.sessionUpdatedAtByAccount)
+  const pinnedSessionIds = useStore(s => s.pinnedSessionIds) ?? []
+  const listPhase = useSessions(state => state.phase)
+  const listIds = useSessions(state => state.ids)
   useEffect(() => {
     if (workspacePhase !== 'ready') return
     actions.retainAccountKeys([
@@ -780,6 +879,13 @@ export function WorkspaceBrowser({
       ...workspaces.map(workspace => workspace.workspaceId as string),
     ])
   }, [actions.retainAccountKeys, workspacePhase, workspaces])
+  useEffect(() => {
+    if (listPhase !== 'ready') return
+    const archived = new Set(archivedSessionIds)
+    actions.retainPinnedSessions(
+      listIds.filter(id => !archived.has(id)).map(id => id as string),
+    )
+  }, [actions.retainPinnedSessions, archivedSessionIds, listIds, listPhase])
   // The query outlives the tree and the input (both wide-only) so collapsing
   // does not silently drop an in-progress filter.
   const [query, setQuery] = useState('')
@@ -935,6 +1041,9 @@ export function WorkspaceBrowser({
     archiveSession(sessionId).catch((reason: unknown) => {
       console.warn('session archive rejected:', reason)
     })
+  }
+  const onPin = (sessionId: SessionNode['id']) => {
+    actions.togglePinned(sessionId)
   }
 
   // Delete dialog is separate from the row so a successful removal can
@@ -1124,8 +1233,10 @@ export function WorkspaceBrowser({
               <FlatList
                 useSessions={useSessions} open={open} forkSession={forkSession}
                 onSessionRename={onSessionRename} onSessionArchive={onSessionArchive}
+                onPin={onPin}
                 archivedSessionIds={archivedSessionIds}
                 orderBy={orderBy}
+                pinnedSessionIds={pinnedSessionIds}
                 sessionOrderByAccount={sessionOrderByAccount}
                 sessionUpdatedAtByAccount={sessionUpdatedAtByAccount}
                 syncSessionOrderAccount={actions.syncSessionOrderAccount}
@@ -1138,6 +1249,7 @@ export function WorkspaceBrowser({
                 useSessions={useSessions}
                 onSessionRename={onSessionRename}
                 onSessionArchive={onSessionArchive}
+                onPin={onPin}
                 forkSession={forkSession}
                 workspaces={workspaces}
                 groupExpansion={groupExpansion}
@@ -1152,6 +1264,7 @@ export function WorkspaceBrowser({
                 insertWorkspaceBefore={insertWorkspaceBefore}
                 insertSessionBefore={insertSessionBefore}
                 orderBy={orderBy}
+                pinnedSessionIds={pinnedSessionIds}
                 t={t}
                 onRenameRequest={(workspaceId, currentTitle) => {
                   setRenameTarget({ workspaceId, currentTitle })

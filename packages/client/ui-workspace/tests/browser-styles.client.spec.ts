@@ -108,6 +108,13 @@ describe('WorkspaceBrowser.module.css list', () => {
       .toBe('var(--dsw-alias-interactive-bg-hover)')
   })
 
+  it('separates Pinned and Running from Workspace groups without tightening row rhythm', () => {
+    expect(declarations('.highlights + .groupSection')?.get('margin-top')).toBe('8px')
+    expect(declarations('.flatList > .highlights + *')?.get('margin-top')).toBe('8px')
+    expect(declarations('.stickySection + .stickySection')?.get('margin-top')).toBe('8px')
+    expect(declarations('.stickyHeader')?.get('font-size')).toBe('13px')
+  })
+
   it('pins both rail controls to the shared left anchor during the column slide', () => {
     expect(declarations('.rail .sectionHeader')?.get('justify-content')).toBe('flex-start')
     expect(declarations('.rail .iconButton')?.get('width')).toBe('36px')

@@ -35,8 +35,7 @@
         "@shres-code/shres-code-client-runtime",
         "@shres-code/shres-code-api-remotes",
         "@shres-code/shres-code-client-locale",
-        "@shres-code/shres-code-client-ui-conversation",
-        "@shres-code/shres-code-client-ui-settings"
+        "@shres-code/shres-code-client-ui-conversation"
       ],
       "platform": "web"
     }
@@ -52,19 +51,12 @@
     "@shres-code/shres-code-client-runtime": "workspace:^",
     "@shres-code/shres-code-client-ui-conversation": "workspace:^",
     "@shres-code/shres-code-client-ui-primitives": "workspace:^",
-    "@shres-code/shres-code-client-ui-settings": "workspace:^",
-    "@shres-code/shres-code-client-ui-sidebar": "workspace:^",
     "@shres-code/shres-code-client-ui-slots": "workspace:^",
     "@shres-code/shres-code-commands": "workspace:^",
     "@shres-code/shres-code-goal": "workspace:^",
     "@shres-code/shres-code-invariants": "workspace:^",
-    "@shres-code/shres-code-settings": "workspace:^",
-    "@shres-code/shres-code-tool-todo": "workspace:^",
     "@shres-code/cordis": "workspace:^",
     "react": "^19.2.8"
-  },
-  "dependencies": {
-    "@shres-code/schemastery": "workspace:^"
   },
   "devDependencies": {
     "@shres-code/shres-code-client-locale": "workspace:^",
@@ -73,14 +65,10 @@
     "@shres-code/shres-code-client-test-runtime": "workspace:^",
     "@shres-code/shres-code-client-ui-conversation": "workspace:^",
     "@shres-code/shres-code-client-ui-primitives": "workspace:^",
-    "@shres-code/shres-code-client-ui-settings": "workspace:^",
-    "@shres-code/shres-code-client-ui-sidebar": "workspace:^",
     "@shres-code/shres-code-client-ui-slots": "workspace:^",
     "@shres-code/shres-code-commands": "workspace:^",
     "@shres-code/shres-code-goal": "workspace:^",
     "@shres-code/shres-code-invariants": "workspace:^",
-    "@shres-code/shres-code-settings": "workspace:^",
-    "@shres-code/shres-code-tool-todo": "workspace:^",
     "@testing-library/react": "^16.1.0",
     "@types/react": "~19.2.18",
     "@shres-code/cordis": "workspace:^",

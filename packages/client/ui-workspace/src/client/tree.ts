@@ -211,6 +211,16 @@ function groupByWorkspace(
   return groups
 }
 
+/** True when the session itself or a subagent descendant is in-flight or waiting. */
+function sessionIsLive(
+  summary: SessionSummary,
+  descendants: ReadonlyMap<SessionId, SubagentDescendantSummary>,
+): boolean {
+  return summary.running
+    || summary.pendingInteraction !== undefined
+    || (descendants.get(summary.id)?.runningCount ?? 0) > 0
+}
+
 function sessionNode(
   s: SessionSummary,
   descendants: ReadonlyMap<SessionId, SubagentDescendantSummary>,
@@ -292,6 +302,63 @@ export function deriveFlat(
     const s = list.byId[id]
     if (s === undefined || !sessionVisible(s, list.current, archived)) continue
     rows.push(s)
+  }
+  rows.sort(byRecency)
+  return rows.map(session => sessionNode(session, descendants))
+}
+
+/**
+ * Derive pinned shortcut rows in stored pin order. Archived, subagent-origin,
+ * and non-current blank sessions are omitted the same way as every other
+ * browsing projection; unknown ids drop out of the list.
+ * @param list - sessions list snapshot.
+ * @param archivedSessionIds - registry-global archive set.
+ * @param pinnedSessionIds - browser-local pin order (most recently pinned first).
+ * @returns pinned rows in pin order.
+ */
+export function derivePinned(
+  list: SessionListState,
+  archivedSessionIds: readonly SessionId[],
+  pinnedSessionIds: readonly string[],
+): SessionNode[] {
+  const archived = new Set(archivedSessionIds)
+  const descendants = indexSubagentDescendants(list.byId)
+  const included = new Set<string>()
+  const rows: SessionNode[] = []
+  for (const key of pinnedSessionIds) {
+    if (included.has(key)) continue
+    const summary = list.byId[key as SessionId]
+    if (summary === undefined || !sessionVisible(summary, list.current, archived)) continue
+    included.add(key)
+    rows.push(sessionNode(summary, descendants))
+  }
+  return rows
+}
+
+/**
+ * Derive live-work shortcut rows: the session is running, a descendant reached
+ * through uninterrupted subagent-origin lineage is running, or a user
+ * interaction is pending. Pinned ids are omitted so a live pinned Session
+ * appears only in the Pinned section.
+ * @param list - sessions list snapshot.
+ * @param archivedSessionIds - registry-global archive set.
+ * @param pinnedSessionIds - ids already shown in the Pinned section.
+ * @returns live rows newest-first.
+ */
+export function deriveRunning(
+  list: SessionListState,
+  archivedSessionIds: readonly SessionId[],
+  pinnedSessionIds: readonly string[],
+): SessionNode[] {
+  const archived = new Set(archivedSessionIds)
+  const pinned = new Set(pinnedSessionIds)
+  const descendants = indexSubagentDescendants(list.byId)
+  const rows: SessionSummary[] = []
+  for (const id of list.ids) {
+    const summary = list.byId[id]
+    if (summary === undefined || pinned.has(id) || !sessionVisible(summary, list.current, archived)) continue
+    if (!sessionIsLive(summary, descendants)) continue
+    rows.push(summary)
   }
   rows.sort(byRecency)
   return rows.map(session => sessionNode(session, descendants))

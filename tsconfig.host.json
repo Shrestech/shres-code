@@ -62,7 +62,6 @@
     "apps/web/tests/agent-preset-authoring.e2e.ts",
     "apps/web/tests/shipped-composition.e2e.ts",
     "apps/web/tests/goal-bar.e2e.ts",
-    "apps/web/tests/goal-fight.e2e.ts",
     "apps/web/tests/speech-io.e2e.ts",
     "apps/web/tests/bench-report.e2e.ts",
     "apps/web/tests/jspace-settings.e2e.ts",

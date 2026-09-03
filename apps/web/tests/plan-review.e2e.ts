@@ -83,7 +83,7 @@ describe('web e2e: plan review takeover round trip', () => {
     expect(await page.locator('[data-question-key]').count()).toBe(0)
     await expect.poll(() => card.getByText('Plan review').count(), { timeout: 10_000 }).toBeGreaterThan(0)
 
-    const selectedRow = page.locator('[role="treeitem"][aria-selected="true"]')
+    const selectedRow = page.locator('[role="treeitem"][aria-selected="true"]').first()
     await expect.poll(() => selectedRow.locator('[data-state="warning"]').count(), { timeout: 10_000 }).toBe(1)
     await expect.poll(() => selectedRow.getByText('Plan awaiting review', { exact: true }).count(), { timeout: 10_000 }).toBe(1)
 

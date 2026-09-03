@@ -1,10 +1,8 @@
 /**
  * Goal surface plugin, browser half: the GoalBar entry in the
- * conversation.input.dock strip and the Game mode switch in the composer
- * tool row beside J-Space. Projection-mode surface — the live goal arrives
- * through `useProjection('goal')`. Game mode arrives through the `game`
- * settings namespace. The inject face carries mutation verbs plus the
- * settings hook. Goal creation stays on the /goal host command.
+ * conversation.input.dock strip. Projection-mode surface — the live goal
+ * arrives through `useProjection('goal')`. The inject face carries mutation
+ * verbs. Goal creation stays on the /goal host command.
  */
 import type { ClientContext, SessionId } from '@shres-code/shres-code-client-runtime/client'
 // Type-only: pulls the generated Remote API and ctx.remote merge through the Client assembly boundary.
@@ -15,19 +13,15 @@ import type {} from '@shres-code/shres-code-client-ui-conversation/client'
 import type {} from '@shres-code/shres-code-client-locale/client'
 // Type-only: the `goal` SessionProjectionMap key merge (single source, the domain's pure outlet).
 import type { GoalProjection, GoalRef } from '@shres-code/shres-code-goal/client'
-import type {} from '@shres-code/shres-code-client-ui-settings/client'
-import type { GoalActionResult, GoalDockInjected, GameModeToggleInjected } from './slots.ts'
+import type { GoalActionResult, GoalDockInjected } from './slots.ts'
 import { GoalDock } from './GoalBar.tsx'
-import { GameModeToggle } from './GameModeToggle.tsx'
 import { GoalCommandInputView } from './GoalCommandInputView.tsx'
 import { goalCommandInputDefinition } from './goal-command-input.ts'
 import { en, type GoalKey } from './locales.ts'
-import { GAME_SETTINGS_NAMESPACE, type GameSettings } from './game-settings.ts'
 
 export { GoalBar, GoalDock } from './GoalBar.tsx'
-export type { GoalActionResult, GoalBarActions, GoalDockInjected, GameModeToggleInjected } from './slots.ts'
+export type { GoalActionResult, GoalBarActions, GoalDockInjected } from './slots.ts'
 export type { GoalKey } from './locales.ts'
-export type { GameSettings } from './game-settings.ts'
 
 declare module '@shres-code/shres-code-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -40,7 +34,7 @@ declare module '@shres-code/shres-code-client-ui-slots' {
 const NS = 'goal'
 
 /** Required services for the Goal dock, command-input projection, Remote mutations, and copy. */
-export const inject = ['slots', 'sessions', 'remote', 'remote.goals', 'locale', 'conversationEvents', 'settingsScope']
+export const inject = ['slots', 'sessions', 'remote', 'remote.goals', 'locale', 'conversationEvents']
 
 /**
  * Client plugin body: the GoalBar dock entry with its mutation verbs.
@@ -71,28 +65,12 @@ export function apply(ctx: ClientContext): void {
     error: { code: 'no-current-goal', message: 'no current goal to mutate', details: {} },
   }
 
-  const gameScope = ctx.settingsScope.bind<GameSettings>({
-    namespace: GAME_SETTINGS_NAMESPACE,
-  })
-
-  ctx.slots.inject('conversation.input.left', () => ctx.slots.register({
-    name: 'conversation.input.left',
-    id: 'game-mode',
-    order: 10,
-    locale: NS,
-    inject: (): GameModeToggleInjected => ({
-      hooks: { gameSettings: gameScope },
-      setEnabled: enabled => gameScope.set('enabled', enabled),
-    }),
-  }, GameModeToggle))
-
   ctx.slots.inject('conversation.input.dock', () => ctx.slots.register({
     name: 'conversation.input.dock',
     id: 'goal',
     order: 10,
     locale: NS,
     inject: (sessionId): GoalDockInjected => ({
-      hooks: { gameSettings: gameScope },
       onEdit: async (objective) => {
         const ref = refOf(sessionId)
         if (ref === undefined) return noCurrentGoal

@@ -1,7 +1,8 @@
 /**
  * `workspace` namespace dictionaries: the browsing region (section header,
- * search, tree rows, dialogs) and the pick/add flow. Runtime failure
- * messages (wire error strings) pass through untranslated by policy.
+ * Pinned/Running shortcut lists, search, tree rows, dialogs) and the pick/add
+ * flow. Runtime failure messages (wire error strings) pass through
+ * untranslated by policy.
  */
 
 /** English dictionary, the key-set source of truth. */
@@ -10,6 +11,8 @@ export const en = {
   'session.new': 'New Session',
   'section.workspaces': 'Workspaces',
   'section.sessions': 'Sessions',
+  'section.pinned': 'Pinned',
+  'section.running': 'Running',
   'viewOptions.label': 'View options',
   'groupBy.label': 'Group by',
   'groupBy.workspace': 'WorkSpace',
@@ -43,6 +46,8 @@ export const en = {
   'delete.workspace': 'Delete workspace',
   'delete.desc': 'This removes “{name}” from the workspace list. The folder and session logs will be kept. Its sessions will appear under Ungrouped.',
   'delete.pending': 'Deleting workspace…',
+  'menu.pinSession': 'Pin session',
+  'menu.unpinSession': 'Unpin session',
   'menu.fork': 'Fork session',
   'menu.archiveSession': 'Archive session',
   'sessions.count.one': '{n} session',

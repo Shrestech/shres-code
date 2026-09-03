@@ -26,8 +26,9 @@ An active, paused, or blocked Goal with Game mode on always paints four or more 
 
 ## Related
 
-The Game switch, sprite inlining, elapsed clock, and arena motion live in [Goal fight bar](../feature/2026-08-18-goal-fight-bar.md).
+- [Goal fight bar](../feature/2026-08-18-goal-fight-bar.md) — the switch and arena this army rule served.
+- [Remove Game mode](../feature/2026-09-03-remove-game-mode.md) — Game mode does not ship.
 
 ## Testing
 
-`packages/client/ui-goal/tests/units.client.spec.ts` pins the four standing ids for absent, empty, all-completed, and non-list input, and still maps incomplete todos under the six-unit cap. `packages/client/ui-goal/tests/browser-plugin.client.spec.tsx` asserts four `[data-unit]` nodes when Game mode is on and the dock mock has no todo list.
+The remaining-fight-unit specs listed when this shipped were deleted with Game mode. Current coverage of the removal is in [Remove Game mode](../feature/2026-09-03-remove-game-mode.md).

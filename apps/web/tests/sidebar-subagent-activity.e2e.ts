@@ -23,6 +23,7 @@ import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './suppor
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/sidebar-subagent-activity', import.meta.url))
 const RUNNING_OWNER_EXPECTED = join(SNAPSHOT_DIR, 'owner-running.expected.md')
+const PINNED_OWNER_EXPECTED = join(SNAPSHOT_DIR, 'owner-pinned.expected.md')
 const MODE = webSnapshotMode()
 const HOLD_PROVIDER = 'web-test-hold'
 const HOLD_MODEL = 'hold'
@@ -136,7 +137,8 @@ describe('web e2e: sidebar subagent activity', () => {
   it('pins a running descendant on its visible idle owner row', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-sidebar-subagent-activity'))
     const sidebar = page.getByRole('tree', { name: 'Sessions' })
-    const ownerRow = sidebar.getByRole('treeitem', { name: /1 subagent running Delegate a background job/ })
+    const runningGroup = sidebar.getByRole('group', { name: 'Running' })
+    const ownerRow = runningGroup.getByRole('treeitem', { name: /1 subagent running Delegate a background job/ })
     await ownerRow.waitFor({ timeout: 10_000 })
     expect(parentHandle.agent.status).toBe('idle')
     await compareOrRefreshGolden(
@@ -149,7 +151,18 @@ describe('web e2e: sidebar subagent activity', () => {
     const runningTrigger = page.getByRole('button', { name: '1 subagent running' })
     await runningTrigger.waitFor({ timeout: 10_000 })
     expect(await runningTrigger.locator('[data-state="ongoing"]').count()).toBe(1)
-    await assertFixtureInventory(SNAPSHOT_DIR, ['owner-running.expected.md'])
+
+    await ownerRow.getByRole('button', { name: /Session actions/ }).click()
+    await page.getByRole('menuitem', { name: 'Pin session' }).click()
+    const pinnedGroup = sidebar.getByRole('group', { name: 'Pinned' })
+    await pinnedGroup.waitFor({ timeout: 10_000 })
+    expect(await sidebar.getByRole('group', { name: 'Running' }).count()).toBe(0)
+    await compareOrRefreshGolden(
+      PINNED_OWNER_EXPECTED,
+      await captureStableAria(page, '[role="tree"][aria-label="Sessions"]', scaffold.workspaceCwd),
+      MODE,
+    )
+    await assertFixtureInventory(SNAPSHOT_DIR, ['owner-running.expected.md', 'owner-pinned.expected.md'])
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
   })

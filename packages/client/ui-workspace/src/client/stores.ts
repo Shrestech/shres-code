@@ -25,6 +25,11 @@ type WorkspaceViewState = {
   sessionOrderByAccount: Record<string, string[]>
   /** Last observed update timestamps per order account for one-time promotion events. */
   sessionUpdatedAtByAccount: Record<string, Record<string, number>>
+  /**
+   * Browser-local pin order (most recently pinned first). Absent on a persist
+   * document written before this field existed; writers coerce that to `[]`.
+   */
+  pinnedSessionIds?: string[]
 }
 
 /**
@@ -43,6 +48,13 @@ type WorkspaceViewActions = {
     updatedAt: Record<string, number>,
   ) => void
   setSessionOrder: (draft: WorkspaceViewState, accountKey: string, order: string[]) => void
+  retainPinnedSessions: (draft: WorkspaceViewState, sessionIds: readonly string[]) => void
+  togglePinned: (draft: WorkspaceViewState, sessionId: string) => void
+}
+
+/** Coerce a rehydrated pin list that predates this field. */
+function pinnedList(draft: WorkspaceViewState): string[] {
+  return draft.pinnedSessionIds ?? []
 }
 
 /**
@@ -57,6 +69,7 @@ export function createWorkspaceViewStore(): EngineStoreHandle<WorkspaceViewState
       groupExpansion: {},
       sessionOrderByAccount: {},
       sessionUpdatedAtByAccount: {},
+      pinnedSessionIds: [],
     }),
     persist: 'shres.workspace.view.v5',
     actions: {
@@ -81,6 +94,16 @@ export function createWorkspaceViewStore(): EngineStoreHandle<WorkspaceViewState
       },
       setSessionOrder: (d, accountKey: string, order: string[]) => {
         d.sessionOrderByAccount[accountKey] = order
+      },
+      retainPinnedSessions: (d, sessionIds: readonly string[]) => {
+        const allowed = new Set(sessionIds)
+        d.pinnedSessionIds = pinnedList(d).filter(id => allowed.has(id))
+      },
+      togglePinned: (d, sessionId: string) => {
+        const current = pinnedList(d)
+        d.pinnedSessionIds = current.includes(sessionId)
+          ? current.filter(id => id !== sessionId)
+          : [sessionId, ...current]
       },
     },
   })
