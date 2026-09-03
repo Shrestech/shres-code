@@ -65,7 +65,6 @@ describe('web e2e: speech I/O settings and composer mic', () => {
     await mic.waitFor({ timeout: 10_000 })
     expect(await mic.isDisabled()).toBe(false)
     expect(await page.getByRole('switch', { name: 'Turn Talk mode on' }).count()).toBe(0)
-    await page.getByRole('switch', { name: 'Turn Game mode on' }).waitFor({ timeout: 10_000 })
 
     await mic.click()
     const offer = page.getByRole('dialog', { name: 'Hands-free Talk' })

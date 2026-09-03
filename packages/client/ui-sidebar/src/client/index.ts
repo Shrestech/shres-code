@@ -43,8 +43,7 @@ export function apply(ctx: ClientContext): void {
       locale: NS,
       // The shell owns geometry; ui-workspace registers the whole browsing
       // region (header, search, session list, workspace dialogs), ui-settings
-      // registers the foot trigger + settings panel, ui-goal registers the
-      // Game mode switch beside the wordmark.
+      // registers the foot trigger + settings panel.
       children: {
         'sidebar.remotes': { kind: 'single', scope: 'root' },
         'sidebar.workspaces': { kind: 'single', scope: 'root' },

@@ -40,4 +40,8 @@ The Goal strip is unchanged until Game mode is on. Then it is wider on the left 
 
 ## Testing
 
-`packages/client/ui-goal/tests/units.client.spec.ts` pins the standing army for empty/non-list/all-completed input, completed-item drop, the six-unit cap, and elapsed formatting. `packages/client/ui-goal/tests/goal-fight.client.spec.tsx` plays one kill through lunge/slash/scatter, freezes under `frozen` and reduced motion, appends new units, and shows/clears the clock. `packages/client/ui-goal/tests/goalbar.client.spec.tsx` asserts the arena is absent by default and mounts `aria-hidden` when Game mode is on. `packages/client/ui-goal/tests/game-mode.client.spec.tsx` pins the ready+enabled predicate and the sidebar switch. `packages/host/apiproxy/tests/api-proxy-config.spec.ts` persists `game.enabled`.
+The Game-mode specs listed when this shipped were deleted with the feature. Current coverage of the removal is in [Remove Game mode](2026-09-03-remove-game-mode.md).
+
+## Related
+
+- [Remove Game mode](2026-09-03-remove-game-mode.md) — Game mode does not ship; this note is the prior switch, namespace, and arena decision.

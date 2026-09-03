@@ -62,23 +62,6 @@ describe('GoalBar', () => {
     expect(actions.onClear).toHaveBeenCalledTimes(1)
   })
 
-  it('draws incomplete todos as the army and hides the arena from the accessibility tree', () => {
-    const actions = makeActions()
-    const { container } = render(
-      <GoalBar
-        goal={makeGoal()}
-        units={[{ id: 'read#0', kind: 'zombie' }, { id: 'write#0', kind: 'zombie-2' }]}
-        createdAt={1}
-        gameEnabled
-        {...actions}
-        t={t}
-      />,
-    )
-    const arena = container.querySelector('[data-goal-fight]')
-    expect(arena?.getAttribute('aria-hidden')).toBe('true')
-    expect(container.querySelectorAll('[data-unit]')).toHaveLength(2)
-  })
-
   it('single-flights rapid clear clicks and hides the committed goal before its projection catches up', async () => {
     const actions = makeActions()
     let resolveClear!: (result: GoalActionResult) => void

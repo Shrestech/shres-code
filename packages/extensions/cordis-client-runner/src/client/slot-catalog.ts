@@ -643,7 +643,6 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     slotInject: '',
     declaredBy: 'an entry in \'conversation\' (client-ui-conversation), so it exists while that entry is mounted',
     occupants: [
-      'client-ui-goal GameModeToggle id \'game-mode\'',
       'client-ui-jspace JSpaceChip id \'jspace\'',
     ],
     replaceRisk: 'none',
@@ -1657,8 +1656,8 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     key: 'sidebar.workspaces',
     kind: 'single',
     scope: 'root',
-    summary: 'The workspace/session browsing region: section header, search, the grouped/flat session list, and every workspace dialog.',
-    doc: 'The workspace/session browsing region: section header, search, the\ngrouped/flat session list, and every workspace dialog. Declared by this\npackage\'s \'sidebar\' entry (declaring is claiming); ui-workspace\nregisters the browser.',
+    summary: 'The workspace/session browsing region: section header, search, Pinned and Running shortcut lists, the grouped/flat session list, and every workspace dialog.',
+    doc: 'The workspace/session browsing region: section header, search, Pinned\nand Running shortcut lists, the grouped/flat session list, and every\nworkspace dialog. Declared by this package\'s \'sidebar\' entry (declaring\nis claiming); ui-workspace registers the browser.',
     registerOptions: [],
     ownerProps: [
       '/**\n * Owner share of the browser hole — the only facts crossing the shell/region\n * boundary. Business data and actions arrive through the region\'s own inject.\n */\nexport interface SidebarSectionOwnerProps {\n  /** Shell fold-state output: wide renders the full browser, rail the icon column. */\n  wide: boolean\n  /** Rail icons request expansion; the browser rides the wide flip for focus. */\n  expandSidebar: () => void\n}',

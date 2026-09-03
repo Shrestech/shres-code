@@ -353,8 +353,32 @@
 
 .flatList > * + *,
 .searchTree > [role='treeitem'] + [role='treeitem'],
-.groupSection > * + * {
+.groupSection > * + *,
+.stickySection > * + * {
   margin-top: 2px;
+}
+
+/* Pinned and Running sit above Workspace groups / the flat list. */
+.highlights {
+  display: flex;
+  flex-direction: column;
+}
+
+.highlights + .groupSection,
+.flatList > .highlights + * {
+  margin-top: 8px;
+}
+
+.stickySection + .stickySection {
+  margin-top: 8px;
+}
+
+.stickyHeader {
+  padding: 4px 8px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+  color: var(--dsw-alias-label-tertiary);
 }
 
 .searchStatus,
@@ -414,7 +438,8 @@
   right: var(--shres-session-list-edge-inset);
 }
 
-.listTopDropActive > .workspaceDropBefore:first-child::before {
+.listTopDropActive > .workspaceDropBefore:first-child::before,
+.listTopDropActive > .highlights + .workspaceDropBefore::before {
   display: none;
 }
 

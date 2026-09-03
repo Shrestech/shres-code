@@ -82,7 +82,6 @@
     "tests/produced-files.e2e.ts",
     "tests/produced-file-mentions.e2e.ts",
     "tests/goal-bar.e2e.ts",
-    "tests/goal-fight.e2e.ts",
     "tests/speech-io.e2e.ts",
     "tests/bench-report.e2e.ts",
     "tests/goal-command-presentation.e2e.ts",

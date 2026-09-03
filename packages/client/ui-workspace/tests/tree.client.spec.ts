@@ -3,7 +3,7 @@ import type {
   SessionId, SessionListState, SessionSummary, WorkspaceId, WorkspaceView,
 } from '@shres-code/shres-code-client-runtime/client'
 import {
-  deriveFlat, deriveGroups, deriveSearchResults, workspaceLabel, relativeTime,
+  deriveFlat, deriveGroups, derivePinned, deriveRunning, deriveSearchResults, workspaceLabel, relativeTime,
   UNGROUPED_KEY, UNGROUPED_LABEL,
 } from '../src/client/tree.ts'
 import { createWorkspaceViewStore } from '../src/client/stores.ts'
@@ -391,6 +391,39 @@ describe('deriveSearchResults', () => {
   })
 })
 
+describe('derivePinned and deriveRunning', () => {
+  it('lists live sessions newest-first and omits pinned, archived, and subagent-origin rows', () => {
+    const parent = summary('parent', 4)
+    const live = { ...summary('live', 3), running: true }
+    const waiting = { ...summary('waiting', 5), pendingInteraction: 'question' as const }
+    const pinnedLive = { ...summary('pinned-live', 6), running: true }
+    const archivedLive = { ...summary('archived-live', 7), running: true }
+    const subagent = {
+      ...summary('subagent', 8), parentId: parent.id, origin: 'subagent' as const, running: true,
+    }
+    const sessions = list(parent, live, waiting, pinnedLive, archivedLive, subagent)
+    expect(deriveRunning(sessions, archived(archivedLive.id), [pinnedLive.id]).map(node => node.id)).toEqual([
+      waiting.id, parent.id, live.id,
+    ])
+    expect(deriveRunning(sessions, archived(archivedLive.id), [pinnedLive.id])[1]).toMatchObject({
+      id: parent.id, running: false, runningSubagentCount: 1,
+    })
+  })
+
+  it('keeps stored pin order and drops unknown, archived, duplicate, and hidden ids', () => {
+    const one = summary('one', 1)
+    const two = { ...summary('two', 2), running: true }
+    const blank = { ...summary('blank', 3), blank: true }
+    const gone = summary('gone', 4)
+    const sessions = { ...list(one, two, blank), current: one.id }
+    expect(derivePinned(
+      sessions,
+      archived(gone.id),
+      ['missing', two.id, two.id, one.id, blank.id, gone.id],
+    ).map(node => node.id)).toEqual([two.id, one.id])
+  })
+})
+
 describe('createWorkspaceViewStore', () => {
   it('stores grouping, ordering, Workspace expansion, and recent-session view order', () => {
     const store = createWorkspaceViewStore().create()
@@ -424,6 +457,17 @@ describe('createWorkspaceViewStore', () => {
     expect(snapshot.groupExpansion).toEqual({ '': true, alpha: true })
     expect(snapshot.sessionOrderByAccount).toEqual({ alpha: ['alpha-session'] })
     expect(snapshot.sessionUpdatedAtByAccount).toEqual({ alpha: { 'alpha-session': 2 } })
+  })
+
+  it('prepends pins, unpins, and drops ids that leave the visible Session set', () => {
+    const store = createWorkspaceViewStore().create()
+    store.actions.togglePinned('one')
+    store.actions.togglePinned('two')
+    expect(store.getSnapshot().pinnedSessionIds).toEqual(['two', 'one'])
+    store.actions.togglePinned('one')
+    expect(store.getSnapshot().pinnedSessionIds).toEqual(['two'])
+    store.actions.retainPinnedSessions(['gone'])
+    expect(store.getSnapshot().pinnedSessionIds).toEqual([])
   })
 })
 

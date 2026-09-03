@@ -23,10 +23,10 @@ declare module '@shres-code/shres-code-client-ui-slots' {
      */
     'sidebar.remotes': { kind: 'single'; scope: 'root'; owner: SidebarSectionOwnerProps }
     /**
-     * The workspace/session browsing region: section header, search, the
-     * grouped/flat session list, and every workspace dialog. Declared by this
-     * package's 'sidebar' entry (declaring is claiming); ui-workspace
-     * registers the browser.
+     * The workspace/session browsing region: section header, search, Pinned
+     * and Running shortcut lists, the grouped/flat session list, and every
+     * workspace dialog. Declared by this package's 'sidebar' entry (declaring
+     * is claiming); ui-workspace registers the browser.
      */
     'sidebar.workspaces': { kind: 'single'; scope: 'root'; owner: SidebarSectionOwnerProps }
     /**

@@ -373,6 +373,27 @@ describe('workspace browser rows', () => {
     expect(screen.queryByRole('menu')).toBeNull()
   })
 
+  it('pins and unpins from the Session row menu without opening the session', () => {
+    const onOpen = vi.fn()
+    const onPin = vi.fn()
+    const node: SessionNode = {
+      id: sid('s1'), title: 'One', blank: false, running: false,
+      runningSubagentCount: 0, completed: false, updatedAt: 0,
+    }
+    const view = render(<SessionNodeItem node={node} currentId={undefined} now={0} onOpen={onOpen}
+      onRename={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} onPin={onPin} t={t} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Session actions for One' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Pin session' }))
+    expect(onPin).toHaveBeenCalledWith(node.id)
+    expect(onOpen).not.toHaveBeenCalled()
+
+    view.rerender(<SessionNodeItem node={node} currentId={undefined} now={0} onOpen={onOpen}
+      onRename={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} onPin={onPin} pinned t={t} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Session actions for One' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Unpin session' }))
+    expect(onPin).toHaveBeenCalledTimes(2)
+  })
+
 
   it('shows the hover card after the dwell and suppresses it while the row menu is open', () => {
     vi.useFakeTimers()

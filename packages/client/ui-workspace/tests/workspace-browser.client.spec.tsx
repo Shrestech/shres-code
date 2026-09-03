@@ -314,6 +314,87 @@ describe('WorkspaceBrowser', () => {
     expect(screen.getAllByRole('treeitem').slice(1)[0]?.textContent).toContain('two')
   })
 
+  it('treats a rehydrated view without a pin list as empty', () => {
+    localStorage.setItem('shres.workspace.view.v5', JSON.stringify({
+      groupBy: 'workspace',
+      orderBy: 'updated',
+      groupExpansion: {},
+      sessionOrderByAccount: {},
+      sessionUpdatedAtByAccount: {},
+    }))
+    const store = createWorkspaceViewStore().create()
+    expect(store.getSnapshot().pinnedSessionIds).toBeUndefined()
+    store.actions.togglePinned('one')
+    expect(store.getSnapshot().pinnedSessionIds).toEqual(['one'])
+    store.actions.retainPinnedSessions(['one', 'two'])
+    expect(store.getSnapshot().pinnedSessionIds).toEqual(['one'])
+  })
+
+  it('lists live sessions in Running while their Workspace stays folded', () => {
+    const live = { ...summary('live-s', 2), running: true }
+    const waiting = { ...summary('ask-s', 3), pendingInteraction: 'question' as const }
+    mount({
+      useSessions: hook(sessionState([live, waiting, summary('idle-s', 1)])),
+      useWorkspaces: hook(workspaceState([workspace('alpha', ['live-s', 'ask-s', 'idle-s'])])),
+    })
+    expect(screen.getByRole('group', { name: 'Running' })).toBeTruthy()
+    expect(screen.getByText('live-s')).toBeTruthy()
+    expect(screen.getByText('ask-s')).toBeTruthy()
+    expect(screen.queryByText('idle-s')).toBeNull()
+    expect(screen.getByText('alpha')).toBeTruthy()
+  })
+
+  it('pins a live session into Pinned and keeps it out of Running', async () => {
+    const live = { ...summary('live-s', 2), running: true }
+    const b = mount({
+      useSessions: hook(sessionState([live])),
+      useWorkspaces: hook(workspaceState([workspace('alpha', ['live-s'])])),
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Session actions for live-s' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Pin session' }))
+    expect(b.store.getSnapshot().pinnedSessionIds).toEqual(['live-s'])
+    expect(screen.getByRole('group', { name: 'Pinned' })).toBeTruthy()
+    expect(screen.queryByRole('group', { name: 'Running' })).toBeNull()
+    expect(screen.getAllByText('live-s')).toHaveLength(1)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Session actions for live-s' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Unpin session' }))
+    expect(b.store.getSnapshot().pinnedSessionIds).toEqual([])
+    expect(screen.queryByRole('group', { name: 'Pinned' })).toBeNull()
+    expect(screen.getByRole('group', { name: 'Running' })).toBeTruthy()
+  })
+
+  it('drops archived sessions from the pin list once the archive set lands', async () => {
+    const b = mount({
+      useSessions: hook(sessionState([summary('kept-s', 2), summary('gone-s', 1)])),
+      useWorkspaces: hook(workspaceState([workspace('alpha', ['kept-s', 'gone-s'])])),
+    })
+    act(() => { b.store.actions.togglePinned('gone-s') })
+    expect(b.store.getSnapshot().pinnedSessionIds).toEqual(['gone-s'])
+    rerender(b, {
+      useWorkspaces: hook(workspaceState([workspace('alpha', ['kept-s', 'gone-s'])], [sid('gone-s')])),
+    })
+    await waitFor(() => {
+      expect(b.store.getSnapshot().pinnedSessionIds).toEqual([])
+    })
+    expect(screen.queryByText('Pinned')).toBeNull()
+  })
+
+  it('hides Pinned and Running while a search query replaces the browsing body', () => {
+    const live = { ...summary('live-s', 2), running: true }
+    const b = mount({
+      useSessions: hook(sessionState([live])),
+      useWorkspaces: hook(workspaceState([workspace('alpha', ['live-s'])])),
+    })
+    act(() => { b.store.actions.togglePinned('live-s') })
+    expect(screen.getByRole('group', { name: 'Pinned' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Search sessions' }))
+    fireEvent.change(screen.getByPlaceholderText('Search sessions...'), { target: { value: 'live' } })
+    expect(screen.queryByRole('group', { name: 'Pinned' })).toBeNull()
+    expect(screen.queryByRole('group', { name: 'Running' })).toBeNull()
+    expect(screen.getByText('live-s')).toBeTruthy()
+  })
+
   it('archives a session from the row menu and hides archived rows in both modes', async () => {
     const archiveSession = vi.fn(async () => {})
     const b = mount({

@@ -1,0 +1,8 @@
+- tree "Sessions":
+  - group "Pinned":
+    - text: Pinned
+    - treeitem "1 subagent running Delegate a background job. now" [selected]
+  - treeitem "workspace" [expanded]:
+    - img
+    - text: workspace
+  - treeitem "1 subagent running Delegate a background job. now" [selected]
