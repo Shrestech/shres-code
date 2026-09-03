@@ -9,6 +9,7 @@
  */
 import { describe, expect, it, vi } from 'vitest'
 import { act, render } from '@testing-library/react'
+import type { ReactNode } from 'react'
 import { SlotCore, type PropsRenderSlots, type SlotRendererHost } from '@shres-code/shres-code-client-ui-slots'
 import { createSlotRenderer, StaleAuthorizationError } from '@shres-code/shres-code-client-web-react'
 
@@ -47,7 +48,7 @@ function hostOver(core: SlotCore): SlotRendererHost {
 }
 
 /** Register the root frame (declaring both child keys) and mount the renderer. */
-function mountFrame(core: SlotCore, body: (renderSlot: FrameSlots['renderSlot']) => React.ReactNode) {
+function mountFrame(core: SlotCore, body: (renderSlot: FrameSlots['renderSlot']) => ReactNode) {
   const dispose = core.register({
     name: 'root',
     children: {

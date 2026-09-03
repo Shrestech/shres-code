@@ -7,8 +7,7 @@
  */
 import { Context } from '@shres-code/cordis'
 import { describe, expect, it, vi } from 'vitest'
-import type { FC } from 'react'
-import type { SlotRendererHost } from '@shres-code/shres-code-client-ui-slots'
+import type { SlotComponent, SlotRendererHost } from '@shres-code/shres-code-client-ui-slots'
 import { SlotRegistry } from '../src/client/slots.ts'
 
 // Test-only slot keys (merged so the typed entries/spec faces accept them).
@@ -20,7 +19,7 @@ declare module '@shres-code/shres-code-client-ui-slots' {
   }
 }
 
-const C: FC<object> = () => null
+const C: SlotComponent<object> = () => null
 
 /**
  * Register/install/renderSlot through a type-erased view: the typed register
@@ -385,7 +384,7 @@ describe('declaration injection', () => {
     }, C)
     const componentA = (): null => null
     const componentB = (): null => null
-    const mount = (name: string, component: FC<object>) => bench.ctx.plugin({
+    const mount = (name: string, component: SlotComponent<object>) => bench.ctx.plugin({
       name,
       inject: ['slots'],
       apply: (ctx: Context) => { ctx.slots.inject('t.host', () => ctx.slots.register({ name: 't.host' }, component)) },

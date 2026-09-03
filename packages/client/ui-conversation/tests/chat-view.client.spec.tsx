@@ -16,6 +16,7 @@ import {
   createSnapshotStore, EMPTY_CONVERSATION_VIEWS, PendingWait,
 } from '@shres-code/shres-code-client-runtime/client'
 import { RpcId } from '@shres-code/shres-code-client-connection/client'
+import type { PropsRenderSlots } from '@shres-code/shres-code-client-ui-slots'
 import type {
   ChatNode, ChatNodeOwnerProps, ChatNodeViewProps, ChatViewSlotProps, SelectionTarget, UseChatNodeTurnData,
 } from '@shres-code/shres-code-client-ui-conversation/client'
@@ -175,11 +176,11 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
     inspectCall: ChatNodeOwnerProps['inspectCall']
   }> = []
   const renderCommandSlot = ((_key: string, _owner: object, opts?: { fallback?: React.ReactNode }) =>
-    opts?.fallback ?? null) as unknown as React.ComponentProps<typeof CommandNodeView>['renderSlot']
+    opts?.fallback ?? null) as unknown as PropsRenderSlots<'conversation.chat.commandview'>['renderSlot']
   const renderTurnTail = ((_key: string, _owner: object) => null) as unknown as
-    React.ComponentProps<typeof TurnTailNodeView>['renderSlotChain']
+    PropsRenderSlots<'conversation.chat.turnTail'>['renderSlotChain']
   const renderTurnTailSlot = (() => null) as unknown as
-    React.ComponentProps<typeof TurnTailNodeView>['renderSlot']
+    PropsRenderSlots<'conversation.chat.assistant-actions'>['renderSlot']
   const renderSlot = ((key: string, owner: object, opts?: {
     fallback?: React.ReactNode
     hookContext?: unknown

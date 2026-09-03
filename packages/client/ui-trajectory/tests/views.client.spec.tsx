@@ -1125,7 +1125,7 @@ describe('timeline projection', () => {
         ...standaloneHistory(historySnapshot([])),
         ...standaloneDuration(),
       },
-    ))
+    ) as never)
     expect(screen.getByRole('toolbar', { name: 'Trajectory toolbar' })).toBeTruthy()
     expect(screen.queryByRole('row')).toBeNull()
   })
@@ -1161,7 +1161,7 @@ describe('TrajectoryView state', () => {
         })),
         ...standaloneDuration(),
       },
-    ))
+    ) as never)
     expect(screen.getByRole('row', { name: /USER, hello, Open/ })).toBeTruthy()
     expect(screen.getByRole('row', { name: /ASSISTANT, ok, Checkpoint/ })).toBeTruthy()
     expect(screen.getByRole('row', { name: /TOOL, bash \{\}, Closed/ })).toBeTruthy()

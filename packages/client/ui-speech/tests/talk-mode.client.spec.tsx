@@ -35,7 +35,7 @@ afterEach(cleanup)
 const t = makeTranslate(en)
 
 function renderLoose(component: ComponentType<never>, props: object) {
-  return render(createElement(component, props as never))
+  return render(createElement(component, props as never) as never)
 }
 
 function hookOf<T>(source: { getSnapshot(): T; subscribe(fn: () => void): () => void }) {

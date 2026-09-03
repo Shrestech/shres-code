@@ -74,7 +74,7 @@
     "@types/react": "~19.2.18",
     "@shres-code/cordis": "workspace:^",
     "react": "^19.2.8",
-    "react-dom": "^18.2.0"
+    "react-dom": "^19.2.8"
   },
   "files": [
     "lib/index.js",
