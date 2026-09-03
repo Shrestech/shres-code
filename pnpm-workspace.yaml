@@ -27,10 +27,14 @@ linkWorkspacePackages: true
 overrides:
   '@shres-code/cosmokit': 'link:vendor/cosmokit'
   '@shres-code/schemastery': 'link:vendor/schemastery'
+  '@types/react': '~19.2.18'
+  '@types/react-dom': '~19.2.5'
 
 peerDependencyRules:
   allowedVersions:
     typescript: '>=5 <7'
+    '@types/react': '>=19'
+    '@types/react-dom': '>=19'
 
 # pnpm 10+ blocks any dependency shipping an install/build script until it is
 # explicitly reviewed here (strictDepBuilds defaults to true: an unlisted script

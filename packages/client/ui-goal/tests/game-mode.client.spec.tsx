@@ -12,7 +12,7 @@ import { en } from '../src/client/locales.ts'
 import type { GameSettings } from '../src/client/game-settings.ts'
 
 function renderLoose(component: ComponentType<never>, props: object) {
-  return render(createElement(component, props as never))
+  return render(createElement(component, props as never) as never)
 }
 
 afterEach(cleanup)
