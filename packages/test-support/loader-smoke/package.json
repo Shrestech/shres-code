@@ -33,7 +33,7 @@
   "license": "MIT",
   "dependencies": {
     "execa": "^10.0.1",
-    "tsx": "^4.23.5"
+    "tsx": "^4.23.8"
   },
   "peerDependencies": {
     "@shres-code/shres-code-agent": "workspace:^",
