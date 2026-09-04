@@ -169,6 +169,14 @@ describe('web e2e: Models Audio card configures the cloud speech seat', () => {
     await dialog.getByLabel('Read-aloud engine').selectOption({ label: 'Cloud (OpenAI-compatible)' })
     await dialog.getByRole('button', { name: 'Apply audio settings' }).click()
     await dialog.getByText('Audio settings saved.', { exact: true }).waitFor({ timeout: 10_000 })
+    // Like every editor card here, a committed Apply closes the card; the
+    // collapsed row keeps it reachable through Edit.
+    await expect.poll(async () => dialog.getByText('Custom cloud provider', { exact: true }).count(), { timeout: 10_000 }).toBe(0)
+    const audioRowEdit = dialog.getByRole('button', { name: 'Audio: speech-to-text and read-aloud', exact: true })
+    await audioRowEdit.waitFor({ timeout: 10_000 })
+    await audioRowEdit.click()
+    await dialog.getByText('Custom cloud provider', { exact: true }).waitFor({ timeout: 10_000 })
+    await expect.poll(async () => dialog.getByText('Audio settings saved.', { exact: true }).count(), { timeout: 5_000 }).toBe(0)
     await expect.poll(async () => readFile(join(scaffold.harnessHome, 'settings.yaml'), 'utf8'), { timeout: 10_000 })
       .toMatch(/speech:[\s\S]*sttProvider:\s*openai-compatible-stt[\s\S]*ttsProvider:\s*openai-compatible-tts/s)
     const document = await readFile(join(scaffold.harnessHome, 'settings.yaml'), 'utf8')

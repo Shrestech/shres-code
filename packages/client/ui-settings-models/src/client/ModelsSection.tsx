@@ -189,6 +189,7 @@ function Loaded({ injected }: { injected: ModelsSectionInjected }): ReactNode {
   const [deleteFailure, setDeleteFailure] = useState<string | undefined>(undefined)
   const [savedTarget, setSavedTarget] = useState<ProviderIdentity | undefined>(undefined)
   const [audioSaved, setAudioSaved] = useState(false)
+  const [audioOpen, setAudioOpen] = useState(true)
   const [declaring, setDeclaring] = useState(false)
   const [dismissedSetup, setDismissedSetup] = useState<ReadonlySet<string>>(() => new Set())
 
@@ -471,7 +472,32 @@ function Loaded({ injected }: { injected: ModelsSectionInjected }): ReactNode {
           )
         })}
       </ul>
-      {state.status === 'ready'
+      {state.status === 'ready' && !audioOpen
+        ? (
+          <div className={styles['rowCard']}>
+            <div className={styles['rowHead']}>
+              <span className={styles['rowIdentity']}>
+                <span className={styles['rowName']}>{t('speechTitle')}</span>
+              </span>
+              <span className={styles['rowActions']}>
+                <button
+                  type="button"
+                  className={styles['secondaryButton']}
+                  aria-label={t('speechTitle')}
+                  onClick={() => {
+                    setSavedTarget(undefined)
+                    setAudioSaved(false)
+                    setAudioOpen(true)
+                  }}
+                >
+                  {t('edit')}
+                </button>
+              </span>
+            </div>
+          </div>
+        )
+        : null}
+      {state.status === 'ready' && audioOpen
         ? (
           <div className={styles['rowCard']}>
             <SpeechAudioCard
@@ -482,6 +508,7 @@ function Loaded({ injected }: { injected: ModelsSectionInjected }): ReactNode {
               readOnly={!state.writable}
               onChanged={() => { void controller.load() }}
               onSaved={() => { setAudioSaved(true) }}
+              onClose={() => { setAudioOpen(false) }}
             />
           </div>
         )

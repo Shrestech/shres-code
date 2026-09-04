@@ -12,7 +12,7 @@ import type { FetchFn, OpenAiCompatibleComposition } from '../src/provider.ts'
 const COMPOSITION: OpenAiCompatibleComposition = {
   enabled: true,
   baseURL: 'https://openrouter.ai/api/v1',
-  apiKeyRef: credentialRef('SPEECH_OPENAI_COMPATIBLE_API_KEY'),
+  apiKeyRef: credentialRef('OPENROUTER_API_KEY'),
   sttModel: 'microsoft/mai-transcribe-2',
   sttMode: 'chat-audio',
   ttsModel: 'openai/gpt-4o-audio-preview',

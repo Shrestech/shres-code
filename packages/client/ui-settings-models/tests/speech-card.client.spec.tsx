@@ -63,7 +63,7 @@ describe('SpeechAudioCard', () => {
     const { container } = render(
       <SpeechAudioCard
         api={cardApi({})} speech={speechFace()} namespace={undefined} t={t} readOnly={false}
-        onChanged={() => {}} onSaved={() => {}}
+        onChanged={() => {}} onSaved={() => {}} onClose={() => {}}
       />,
     )
     expect(container.innerHTML).toBe('')
@@ -73,7 +73,7 @@ describe('SpeechAudioCard', () => {
     render(
       <SpeechAudioCard
         api={cardApi({})} speech={speechFace()} namespace={speechNamespace({})} t={t} readOnly={false}
-        onChanged={() => {}} onSaved={() => {}}
+        onChanged={() => {}} onSaved={() => {}} onClose={() => {}}
       />,
     )
     await waitFor(() => {
@@ -86,9 +86,10 @@ describe('SpeechAudioCard', () => {
     expect([...tts.options].map(option => option.value)).toEqual(['', 'kokoro-tts', 'openai-compatible-tts'])
   })
 
-  it('applies the pins and the cloud profile with the captured revision', async () => {
+  it('applies the pins and the cloud profile with the captured revision, then closes', async () => {
     const mutate = vi.fn(() => Promise.resolve(ok({})))
     const onChanged = vi.fn()
+    const onClose = vi.fn()
     render(
       <SpeechAudioCard
         api={cardApi({ mutate })}
@@ -98,6 +99,7 @@ describe('SpeechAudioCard', () => {
         readOnly={false}
         onChanged={onChanged}
         onSaved={() => {}}
+        onClose={onClose}
       />,
     )
     fireEvent.change(screen.getByLabelText('Speech-to-text engine'), { target: { value: 'openai-compatible-stt' } })
@@ -126,6 +128,7 @@ describe('SpeechAudioCard', () => {
       expectedRevision: 7,
     })
     expect(onChanged).toHaveBeenCalled()
+    expect(onClose).toHaveBeenCalledWith(true)
   })
 
   it('stores a typed key under the composed default reference', async () => {
@@ -133,13 +136,13 @@ describe('SpeechAudioCard', () => {
     render(
       <SpeechAudioCard
         api={cardApi({ set })} speech={speechFace()} namespace={speechNamespace({})} t={t} readOnly={false}
-        onChanged={() => {}} onSaved={() => {}}
+        onChanged={() => {}} onSaved={() => {}} onClose={() => {}}
       />,
     )
     fireEvent.change(screen.getByLabelText('API key'), { target: { value: ' sk-test ' } })
     fireEvent.click(screen.getByText('Apply audio settings'))
     await waitFor(() => {
-      expect(set).toHaveBeenCalledWith({ ref: 'SPEECH_OPENAI_COMPATIBLE_API_KEY', value: 'sk-test' })
+      expect(set).toHaveBeenCalledWith({ ref: 'OPENROUTER_API_KEY', value: 'sk-test' })
     })
   })
 
@@ -154,7 +157,7 @@ describe('SpeechAudioCard', () => {
     render(
       <SpeechAudioCard
         api={cardApi({ discoverModels })} speech={speechFace()} namespace={speechNamespace({})} t={t}
-        readOnly={false} onChanged={() => {}} onSaved={() => {}}
+        readOnly={false} onChanged={() => {}} onSaved={() => {}} onClose={() => {}}
       />,
     )
     fireEvent.click(screen.getByText('Fetch audio models'))
@@ -190,7 +193,7 @@ describe('SpeechAudioCard', () => {
     render(
       <SpeechAudioCard
         api={cardApi({ discoverModels })} speech={speechFace()} namespace={speechNamespace({})} t={t}
-        readOnly={false} onChanged={() => {}} onSaved={() => {}}
+        readOnly={false} onChanged={() => {}} onSaved={() => {}} onClose={() => {}}
       />,
     )
     fireEvent.click(screen.getByText('Fetch audio models'))
