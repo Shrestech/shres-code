@@ -214,7 +214,8 @@ describe('web e2e: Models Audio card configures the cloud speech seat', () => {
     expect(Buffer.from(spoken.value.audioBase64, 'base64')).toEqual(Buffer.from([9, 8, 7]))
     const ttsCall = stub.calls.find(call => call.body.includes('"modalities"'))
     expect(ttsCall).toBeDefined()
-    expect(JSON.parse(ttsCall?.body ?? '{}').audio).toEqual({ voice: 'alloy', format: 'wav' })
+    const ttsBody = JSON.parse(typeof ttsCall?.body === 'string' ? ttsCall.body : '{}') as { audio?: unknown }
+    expect(ttsBody.audio).toEqual({ voice: 'alloy', format: 'wav' })
   }, 60_000)
 
   it('leaves the page without console errors', async () => {
