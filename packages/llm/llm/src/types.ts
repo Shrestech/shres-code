@@ -303,6 +303,14 @@ export interface LlmDiscoveredModel {
    * route's catalog or `defaultInput` fallback rather than a claim.
    */
   input?: readonly ModelModality[]
+  /**
+   * The endpoint declares audio input (speech-to-text) for this model.
+   * Display metadata only: the chat conversation never constructs audio
+   * parts, so this is not a chat modality and lives outside {@link input}.
+   */
+  audioInput?: boolean
+  /** The endpoint declares audio output (text-to-speech) for this model. */
+  audioOutput?: boolean
 }
 
 /** One adapter-discovered model; catalog membership is advisory, not request validation. */

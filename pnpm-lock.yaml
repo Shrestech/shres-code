@@ -1294,6 +1294,9 @@ importers:
       '@shres-code/shres-code-speech-kokoro':
         specifier: workspace:^
         version: link:../../speech/speech-kokoro
+      '@shres-code/shres-code-speech-openai-compatible':
+        specifier: workspace:^
+        version: link:../../speech/speech-openai-compatible
       '@shres-code/shres-code-speech-whisper':
         specifier: workspace:^
         version: link:../../speech/speech-whisper
@@ -2869,6 +2872,10 @@ importers:
         version: 19.2.8(react@19.2.8)
 
   packages/client/ui-settings-models:
+    dependencies:
+      '@shres-code/shres-code-speech':
+        specifier: workspace:^
+        version: link:../../speech/speech
     devDependencies:
       '@shres-code/cordis':
         specifier: workspace:^
@@ -7961,6 +7968,28 @@ importers:
       '@shres-code/shres-code-invariants':
         specifier: workspace:^
         version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-speech':
+        specifier: workspace:^
+        version: link:../speech
+
+  packages/speech/speech-openai-compatible:
+    dependencies:
+      '@shres-code/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/shres-code-credentials':
+        specifier: workspace:^
+        version: link:../../credentials/credentials
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-settings':
+        specifier: workspace:^
+        version: link:../../settings/settings
       '@shres-code/shres-code-speech':
         specifier: workspace:^
         version: link:../speech

@@ -600,9 +600,9 @@ const SERVICE_ROLES: ServiceRole[] = [
     pkg: 'speech',
     title: 'Speech I/O seam',
     mode: 'seam',
-    implementations: ['speech-kokoro', 'speech-whisper'],
-    consumers: ['ui-speech'],
-    note: 'TTS and STT provider registry with selection independent of registration order; local Kokoro and Whisper providers implement the seam, and the Web client consumes status plus synthesize/transcribe remotes.',
+    implementations: ['speech-kokoro', 'speech-whisper', 'speech-openai-compatible'],
+    consumers: ['ui-speech', 'ui-settings-models'],
+    note: 'TTS and STT provider registry with selection independent of registration order; local Kokoro and Whisper providers plus the opt-in OpenAI-compatible cloud provider implement the seam, the Web client consumes status plus synthesize/transcribe remotes, and the Models page Audio card writes the user-layer provider pins.',
   },
   {
     key: 'tracker',

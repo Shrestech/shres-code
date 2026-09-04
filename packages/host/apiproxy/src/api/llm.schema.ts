@@ -48,6 +48,8 @@ export const discoveredModelViewSchema = z.object({
   // Plain strings: the modality vocabulary is merge-extensible host-side.
   // Never empty: absence states no answer, so an empty claim is refused.
   input: z.array(z.string()).min(1).optional(),
+  audioInput: z.boolean().optional(),
+  audioOutput: z.boolean().optional(),
 }) satisfies z.ZodType<Wire<DiscoveredModelView>>
 
 /** llm.discoverModels request payload. */

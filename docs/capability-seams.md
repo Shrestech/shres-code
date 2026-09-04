@@ -174,7 +174,6 @@ flowchart LR
   pkg_web_search_exa["web-search-exa"]
   pkg_web_search_perplexity["web-search-perplexity"]
   pkg_web_search_brave["web-search-brave"]
-  pkg_web_search_brave["web-search-brave"]
   pkg_web_search_deepseek["web-search-deepseek"]
   pkg_web_search_attached_cli["web-search-attached-cli"]
   pkg_web_fetch_http["web-fetch-http"]
@@ -217,7 +216,9 @@ flowchart LR
   svc_speech["ctx.speech<br/>Speech I/O seam"]
   pkg_speech_kokoro["speech-kokoro"]
   pkg_speech_whisper["speech-whisper"]
+  pkg_speech_openai_compatible["speech-openai-compatible"]
   pkg_ui_speech["ui-speech"]
+  pkg_ui_settings_models["ui-settings-models"]
   pkg_tracker["tracker"]
   svc_tracker["ctx.tracker<br/>Experiment tracking seam"]
   pkg_tracker_shrestech["tracker-shrestech"]
@@ -309,6 +310,7 @@ flowchart LR
   pkg_skill_filesystem --> svc_skills
   pkg_speech --> svc_speech
   pkg_speech_kokoro --> svc_speech
+  pkg_speech_openai_compatible --> svc_speech
   pkg_speech_whisper --> svc_speech
   pkg_spill --> svc_spillStore
   pkg_spill_local --> svc_spillStore
@@ -340,10 +342,10 @@ flowchart LR
   pkg_web --> svc_web
   pkg_web_fetch_http --> svc_web
   pkg_web_search_attached_cli --> svc_web
+  pkg_web_search_brave --> svc_web
   pkg_web_search_deepseek --> svc_web
   pkg_web_search_exa --> svc_web
   pkg_web_search_perplexity --> svc_web
-  pkg_web_search_brave --> svc_web
   pkg_webserver --> svc_webServer
   pkg_wiki --> svc_wiki
   pkg_wiki_embed_onnx --> svc_wiki
@@ -432,6 +434,7 @@ flowchart LR
   svc_shellEnv --> pkg_tool_pwsh
   svc_shield --> pkg_ui_settings_shield
   svc_skills --> pkg_tool_skill
+  svc_speech --> pkg_ui_settings_models
   svc_speech --> pkg_ui_speech
   svc_spillStore --> pkg_spill_policy
   svc_storage --> pkg_storage_domain
@@ -535,7 +538,7 @@ flowchart LR
 | `ctx.compaction` | `seam` | [`compaction`](../packages/compaction/compaction) | [`compaction-basic`](../packages/compaction/compaction-basic) | [`compaction-basic`](../packages/compaction/compaction-basic) | - | The basic backend consumes post-step pressure and request-error recovery events; there is no model-facing compact tool. |
 | `ctx.subagents` | `seam` | [`subagent`](../packages/subagent/subagent) | [`subagent-spawn-in-process`](../packages/subagent/subagent-spawn-in-process), [`subagent-fork-in-process`](../packages/subagent/subagent-fork-in-process), [`subagent-acp`](../packages/subagent/subagent-acp), [`subagent-codex`](../packages/subagent/subagent-codex), [`subagent-claude-code`](../packages/subagent/subagent-claude-code), [`subagent-grok-cli`](../packages/subagent/subagent-grok-cli), [`subagent-kimi-cli`](../packages/subagent/subagent-kimi-cli), [`subagent-shres-sdk`](../packages/subagent/subagent-shres-sdk) | [`tool-subagent`](../packages/subagent/tool-subagent), [`tool-subagent-control`](../packages/subagent/tool-subagent-control), [`tool-ralph`](../packages/workflow/tool-ralph) | - | Providers implement transports; the service also owns optional Activation-based continuation orchestration, tool-subagent selects one-shot or continuable delegation, tool-subagent-control delivers follow-ups, and tool-ralph requires one fresh structured-output route. |
 | `ctx.jobs` | `seam` | [`jobs`](../packages/jobs/jobs) | [`jobs-local`](../packages/jobs/jobs-local) | [`tool-bash`](../packages/shell/tool-bash), [`tool-terminal`](../packages/terminal/tool-terminal), [`tool-subagent`](../packages/subagent/tool-subagent), [`tool-jobs`](../packages/jobs/tool-jobs) | - | Producers (background bash, PTY sends, and subagent delegations) register running work; tool-jobs is the model-facing controller that reads, lists, and kills it; jobs-local is the process-local registry. |
-| `ctx.web` | `seam` | [`web`](../packages/web/web) | [`web-search-exa`](../packages/web/web-search-exa), [`web-search-perplexity`](../packages/web/web-search-perplexity), [`web-search-brave`](../packages/web/web-search-brave), [`web-search-deepseek`](../packages/web/web-search-deepseek), [`web-search-attached-cli`](../packages/web/web-search-attached-cli), [`web-fetch-http`](../packages/web/web-fetch-http) | [`tool-web`](../packages/web/tool-web) | - | Search and fetch providers register into one ctx.web seam; tool-web owns the stable model-facing names (`web_search`, `web_fetch`, `deep_research`). |
+| `ctx.web` | `seam` | [`web`](../packages/web/web) | [`web-search-exa`](../packages/web/web-search-exa), [`web-search-perplexity`](../packages/web/web-search-perplexity), [`web-search-brave`](../packages/web/web-search-brave), [`web-search-deepseek`](../packages/web/web-search-deepseek), [`web-search-attached-cli`](../packages/web/web-search-attached-cli), [`web-fetch-http`](../packages/web/web-fetch-http) | [`tool-web`](../packages/web/tool-web) | - | Search and fetch providers register into one ctx.web seam; tool-web owns the stable model-facing names. |
 | `ctx.spillStore` | `seam` | [`spill`](../packages/spill/spill) | [`spill-local`](../packages/spill/spill-local) | [`spill-policy`](../packages/spill/spill-policy) | - | The backend saves oversized tool text and returns a model-facing locator plus retrieval hint; spill-policy is the tools/post-execute consumer that decides when to spill. |
 | `ctx.directoryPicker` | `seam` | `directory-picker` | `directory-picker-native`, `directory-picker-browse` | `apiproxy` | - | Discriminated interaction capability: the native backend opens one OS chooser on the host display, the browse backend serves listing/creation primitives for the in-app browser; dual-face backends fill ui-workspace directory-flow slots from their browser halves (no wire advertisement). |
 | `ctx.webServer` | `core` | `webserver` | - | `connection`, `modules`, `hmr` | - | Plain node:http carrier: named-route registry, index transform taps, and the static dist fallback; web-transport plugins register their own routes. |
@@ -547,7 +550,7 @@ flowchart LR
 | `ctx.cordisInspect` | `core` | [`cordis-host-runner`](../packages/extensions/cordis-host-runner) | - | [`tool-cordis`](../packages/extensions/tool-cordis) | - | Registers host inspect providers, mirrors the client provider manifest, and routes client queries through the dynamic Cordis transport. |
 | `ctx.jspace` | `core` | [`jspace`](../packages/jspace/jspace) | - | [`tool-jspace`](../packages/jspace/tool-jspace), [`jspace-prompt`](../packages/jspace/jspace-prompt), `ui-jspace`, `ui-settings-jspace` | - | Publishes ctx.jspace, folds logged card events, and remounts prompt plus tool consumers from seat status. |
 | `ctx.shield` | `core` | [`shield`](../packages/guard/shield) | - | `ui-settings-shield` | - | Host seat for the paid screening engine: entitlement, engine resolve, published status, snapshot RPC, and npm check/install remotes. The detection payload is not a workspace package. |
-| `ctx.speech` | `seam` | [`speech`](../packages/speech/speech) | [`speech-kokoro`](../packages/speech/speech-kokoro), [`speech-whisper`](../packages/speech/speech-whisper) | `ui-speech` | - | TTS and STT provider registry with selection independent of registration order; local Kokoro and Whisper providers implement the seam, and the Web client consumes status plus synthesize/transcribe remotes. |
+| `ctx.speech` | `seam` | [`speech`](../packages/speech/speech) | [`speech-kokoro`](../packages/speech/speech-kokoro), [`speech-whisper`](../packages/speech/speech-whisper), [`speech-openai-compatible`](../packages/speech/speech-openai-compatible) | `ui-speech`, `ui-settings-models` | - | TTS and STT provider registry with selection independent of registration order; local Kokoro and Whisper providers plus the opt-in OpenAI-compatible cloud provider implement the seam, the Web client consumes status plus synthesize/transcribe remotes, and the Models page Audio card writes the user-layer provider pins. |
 | `ctx.tracker` | `seam` | [`tracker`](../packages/tracker/tracker) | [`tracker-shrestech`](../packages/tracker/tracker-shrestech) | [`tool-tracker`](../packages/tracker/tool-tracker) | - | Run, metrics, and query vocabulary with provider-post failure taxonomy; the shrestech backend persists, and the model tools log through ctx.tracker onto the session. |
 | `ctx.ledger` | `seam` | [`ledger`](../packages/ledger/ledger) | - | [`tool-ledger`](../packages/ledger/tool-ledger) | - | Accepted, rejected, and deferred hypothesis decisions whose cited run ids must resolve through ctx.tracker; the JSONL store is durable and queryable, and every record lands as an ignorable ledger/decision event. |
 | `ctx.wiki` | `seam` | [`wiki`](../packages/wiki/wiki) | [`wiki-filesystem`](../packages/wiki/wiki-filesystem), [`wiki-embed-onnx`](../packages/wiki/wiki-embed-onnx) | [`tool-wiki`](../packages/wiki/tool-wiki), [`wiki-librarian`](../packages/wiki/wiki-librarian), `ui-settings-jspace` | - | Long-term markdown memory with temperature/demotion/lint folds; the filesystem provider persists under .shres/wiki, embeddings are optional, and the librarian seat stays dormant until a cheap model is bound. |

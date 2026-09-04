@@ -18,7 +18,9 @@
  * through OpenRouter's `architecture.input_modalities` — so a surface can show
  * and adopt the detection instead of asking the user to declare `input` by
  * hand. Endpoints without that block disclose nothing, and the entry inherits
- * the route's `defaultInput` as before.
+ * the route's `defaultInput` as before. OpenRouter rows additionally carry
+ * their declared audio directions as display-only `audioInput`/`audioOutput`
+ * answers; audio never joins the chat modality vocabulary.
  *
  * Only OpenAI-compatible protocols are interrogated. Their listing is the one
  * shape a gateway, a self-hosted server, and the official endpoints all agree
@@ -70,7 +72,6 @@ interface ListingEntry {
   /** OpenRouter's per-model architecture block; absent elsewhere. */
   architecture?: unknown
 }
-
 /** A positive integer field of a listing entry, or `undefined` when absent or unusable. */
 function capacity(...candidates: readonly unknown[]): number | undefined {
   for (const candidate of candidates) {
@@ -103,6 +104,28 @@ function listingInput(entry: ListingEntry): readonly PiAiModality[] | undefined 
   if (!Array.isArray(modalities)) return undefined
   const known = modalities.filter((m): m is PiAiModality => (MODALITIES as readonly unknown[]).includes(m))
   return known.length === 0 ? undefined : known
+}
+
+/**
+ * The declared audio modalities of a listing entry's OpenRouter-style
+ * `architecture` block: `input_modalities` containing `audio` names a
+ * speech-to-text model, `output_modalities` containing `audio` a
+ * text-to-speech one. Audio never joins the chat {@link PiAiModality}
+ * vocabulary — the conversation never constructs audio parts — so these are
+ * display-only answers carried beside `input`.
+ * @param entry - one raw listing row.
+ * @returns the declared audio answers; both false when the row discloses none.
+ */
+function listingAudio(entry: ListingEntry): { input: boolean; output: boolean } {
+  const architecture = entry.architecture as
+    | { input_modalities?: unknown; output_modalities?: unknown }
+    | null
+  const declares = (modalities: unknown): boolean =>
+    Array.isArray(modalities) && modalities.includes('audio')
+  return {
+    input: declares(architecture?.input_modalities),
+    output: declares(architecture?.output_modalities),
+  }
 }
 
 /**
@@ -181,12 +204,15 @@ function readListing(body: unknown): LlmDiscoveredModel[] {
     const contextWindow = capacity(entry.context_window, entry.context_length)
     const maxTokens = capacity(entry.max_output_tokens, entry.max_tokens)
     const input = listingInput(entry)
+    const audio = listingAudio(entry)
     models.push({
       id,
       ...name === undefined ? {} : { name },
       ...contextWindow === undefined ? {} : { contextWindow },
       ...maxTokens === undefined ? {} : { maxTokens },
       ...input === undefined ? {} : { input },
+      ...audio.input ? { audioInput: true } : {},
+      ...audio.output ? { audioOutput: true } : {},
     })
   }
   return models

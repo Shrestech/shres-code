@@ -20,8 +20,20 @@ async function bench(isLoopback = true) {
   const locale = new LocaleRuntime(ctx)
   ctx.provide('locale', locale)
   // The plugins inject `remote`; forwarded events reach them through the
-  // same `$dispatch` handoff the connection sink makes.
+  // same `$dispatch` handoff the connection sink makes. `remote.speech` is a
+  // distinct inject key (the typert namespace the Audio card reads); the
+  // double answers status so activation can resolve it.
   new TestRemote(ctx)
+  ctx.provide('remote.speech', {
+    status: () => Promise.resolve({
+      ok: true as const,
+      value: {
+        tts: { kind: 'unavailable' as const, code: 'SPEECH_PROVIDER_UNAVAILABLE', message: 'test' },
+        stt: { kind: 'unavailable' as const, code: 'SPEECH_PROVIDER_UNAVAILABLE', message: 'test' },
+        voices: [],
+      },
+    }),
+  })
   // The apply path only captures the wire face; no call leaves this fake
   // until a section actually loads.
   ctx.provide('connection', { api: {}, isLoopback } as never)
@@ -43,7 +55,7 @@ function declare(slots: SlotRegistry): () => void {
 
 describe('ui-settings-models apply', () => {
   it('declares the services it uses', () => {
-    expect(inject).toEqual(['slots', 'locale', 'connection', 'remote'])
+    expect(inject).toEqual(['slots', 'locale', 'connection', 'remote', 'remote.speech'])
   })
 
   it('registers the models nav entry for declarations before or after apply', async () => {

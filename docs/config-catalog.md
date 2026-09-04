@@ -966,7 +966,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/jspace/jspace/src/index.ts:69`](../packages/jspace/jspace/src/index.ts)
+Source: [`packages/jspace/jspace/src/index.ts:71`](../packages/jspace/jspace/src/index.ts)
 
 <a id="shres-codeshres-code-jspace-advisor"></a>
 
@@ -985,7 +985,7 @@ export interface Config {
   model?: string
   /** `ctx.subagents` provider that runs reviewer children. Default 'spawn'. */
   subagentProvider?: string
-  /** Reviewer persona; defaults to the built-in reviewer persona. */
+  /** Standing-reviewer persona; defaults to the built-in standing persona. Consult children use a separate consult persona. */
   persona?: string
   /** Reviewer tool filter; defaults to the wiki read tools. */
   reviewerTools?: string[]
@@ -1016,7 +1016,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/jspace/jspace-advisor/src/index.ts:115`](../packages/jspace/jspace-advisor/src/index.ts)
+Source: [`packages/jspace/jspace-advisor/src/index.ts:122`](../packages/jspace/jspace-advisor/src/index.ts)
 
 <a id="shres-codeshres-code-jspace-prompt"></a>
 
@@ -1034,7 +1034,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/jspace/jspace-prompt/src/index.ts:69`](../packages/jspace/jspace-prompt/src/index.ts)
+Source: [`packages/jspace/jspace-prompt/src/index.ts:70`](../packages/jspace/jspace-prompt/src/index.ts)
 
 <a id="shres-codeshres-code-ledger"></a>
 
@@ -1336,6 +1336,13 @@ export interface PiAiProviderProfile {
    */
   compat?: PiAiCompatProfile
   /**
+   * Route-default hosted-tool switches: which provider-executed tools every
+   * model on this route serves inside the conversation, with the local
+   * counterparts dropped per request. Absent stays off; each model entry's
+   * {@link PiAiModelProfile.hostedTools} dict wins over these.
+   */
+  hostedTools?: PiAiHostedTools
+  /**
    * Context capacity for a model this route lists that neither the entry nor
    * the installed catalog sizes (default 262,144). A guess by construction, so
    * a deployment whose gateway serves smaller models corrects it here.
@@ -1434,6 +1441,12 @@ export interface PiAiModelProfile {
   reasoningEfforts?: false | PiAiReasoningEfforts
   /** Reasoning-dispatch switches for this model, winning over the route's. */
   compat?: PiAiCompatProfile
+  /**
+   * Hosted-tool switches for this model, winning over the route's. Absent
+   * inherits the route declaration; an explicit `false` disables a tool the
+   * route enabled for every other model.
+   */
+  hostedTools?: PiAiHostedTools
 }
 
 /**
@@ -1459,6 +1472,18 @@ export interface PiAiCompatProfile {
   thinkingFormat?: PiAiThinkingFormat
   /** Whether the endpoint accepts `reasoning_effort`; absent keeps the catalog entry's, then pi-ai's baseURL-derived guess. */
   supportsReasoningEffort?: boolean
+}
+
+/**
+ * Hosted-tool switches a route or model entry declares. Absent fields stay
+ * off; the effective value is the model entry's dict over the route's, and a
+ * switch naming a tool the model's dialect does not serve fails resolution.
+ */
+export interface PiAiHostedTools {
+  /** Serve the provider's hosted `web_search` tool on this route/model. */
+  webSearch?: boolean
+  /** Serve the provider's hosted `x_search` tool on this route/model. */
+  xSearch?: boolean
 }
 
 /** One request modality a pi-ai model may accept. */
@@ -1489,7 +1514,7 @@ type WithheldThinkingFormat = 'chat-template' | 'qwen-chat-template'
 
 Depends on: `Api` (`@earendil-works/pi-ai`) · `CacheRetention` (`@earendil-works/pi-ai`) · `Model` (`@earendil-works/pi-ai`) · `ModelThinkingLevel` (`@earendil-works/pi-ai`) · `OpenAICompletionsCompat` (`@earendil-works/pi-ai`) · [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts) · `ThinkingBudgets` (`@earendil-works/pi-ai`) · `Transport` (`@earendil-works/pi-ai`)
 
-Source: [`packages/llm/llm-pi-ai/src/config.ts:198`](../packages/llm/llm-pi-ai/src/config.ts)
+Source: [`packages/llm/llm-pi-ai/src/config.ts:213`](../packages/llm/llm-pi-ai/src/config.ts)
 
 <a id="shres-codeshres-code-llm-replay"></a>
 
@@ -1541,6 +1566,12 @@ export interface ReplayModelConfig {
   /** Optional declared input modalities, so a scenario can exercise capability gates (e.g. image-capable `read_image`). */
   inputModalities?: readonly ModelModality[]
   /**
+   * Optional declared hosted tools (`web_search`, `x_search`) so a scenario can
+   * exercise picker markers and adapter-side splice without a live provider.
+   * Absent declares none.
+   */
+  hostedTools?: readonly HostedTool[]
+  /**
    * Optional per-request output cap the replay route materializes when callers
    * omit one, so replay reconstructs the request header a live catalog produced.
    */
@@ -1555,9 +1586,9 @@ export interface ReplayModelConfig {
 }
 ```
 
-Depends on: [`ModelModality`](../packages/llm/llm/src/index.ts) · [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts)
+Depends on: [`HostedTool`](../packages/llm/llm/src/index.ts) · [`ModelModality`](../packages/llm/llm/src/index.ts) · [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts)
 
-Source: [`packages/test-support/llm-replay/src/index.ts:776`](../packages/test-support/llm-replay/src/index.ts)
+Source: [`packages/test-support/llm-replay/src/index.ts:787`](../packages/test-support/llm-replay/src/index.ts)
 
 <a id="shres-codeshres-code-llm-retry"></a>
 
@@ -2422,7 +2453,7 @@ export interface ShieldRepoEntry {
 }
 ```
 
-Source: [`packages/guard/shield/src/index.ts:71`](../packages/guard/shield/src/index.ts)
+Source: [`packages/guard/shield/src/index.ts:72`](../packages/guard/shield/src/index.ts)
 
 <a id="shres-codeshres-code-skill"></a>
 
@@ -2506,7 +2537,7 @@ export interface SpeechRuntimeConfig {
 }
 ```
 
-Source: [`packages/speech/speech/src/index.ts:116`](../packages/speech/speech/src/index.ts)
+Source: [`packages/speech/speech/src/index.ts:118`](../packages/speech/speech/src/index.ts)
 
 <a id="shres-codeshres-code-speech-kokoro"></a>
 
@@ -2539,6 +2570,42 @@ export type KokoroDevice = typeof KOKORO_DEVICES[number]
 ```
 
 Source: [`packages/speech/speech-kokoro/src/index.ts:38`](../packages/speech/speech-kokoro/src/index.ts)
+
+<a id="shres-codeshres-code-speech-openai-compatible"></a>
+
+## `@shres-code/shres-code-speech-openai-compatible`
+
+Requires: `speech` · `credentials` · `settings`
+
+```ts config-catalog
+/** Plugin config (all optional — {@link resolveComposition} fills defaults). */
+export interface Config {
+  /** Endpoint base such as `https://openrouter.ai/api/v1`. */
+  baseURL?: string
+  /** Credential reference holding the bearer key. */
+  apiKeyEnv?: string
+  /** Speech-to-text model id. */
+  sttModel?: string
+  /** Speech-to-text wire mode. Defaults to `chat-audio`. */
+  sttMode?: SttWireMode
+  /** Text-to-speech model id. */
+  ttsModel?: string
+  /** Text-to-speech wire mode. Defaults to `chat-audio`. */
+  ttsMode?: TtsWireMode
+  /** Text-to-speech voice id. */
+  ttsVoice?: string
+  /** When false, the providers stay registered but refuse calls. Defaults to on. */
+  enabled?: boolean
+}
+
+/** One speech-to-text wire mode. */
+export type SttWireMode = typeof STT_WIRE_MODES[number]
+
+/** One text-to-speech wire mode. */
+export type TtsWireMode = typeof TTS_WIRE_MODES[number]
+```
+
+Source: [`packages/speech/speech-openai-compatible/src/config.ts:29`](../packages/speech/speech-openai-compatible/src/config.ts)
 
 <a id="shres-codeshres-code-speech-whisper"></a>
 
@@ -2577,10 +2644,21 @@ export interface Config {
    * a local deployment. Set it to keep spill files under a known location.
    */
   root?: string
+  /**
+   * Age in days after which a spill file is eligible for the one-shot startup
+   * cleanup sweep. Defaults to `30`; `0` disables cleanup entirely. Files whose
+   * `mtime` is strictly older than the cutoff are deleted and emptied
+   * directories are pruned; fresh files, symlinks, and unrelated entries are
+   * left untouched. On POSIX, cleanup skips roots and session directories that
+   * another local user could modify or replace. Retention is deliberate — a
+   * resumed or forked session may still reference an older locator until it
+   * ages out.
+   */
+  cleanupPeriodDays?: number
 }
 ```
 
-Source: [`packages/spill/spill-local/src/index.ts:22`](../packages/spill/spill-local/src/index.ts)
+Source: [`packages/spill/spill-local/src/index.ts:31`](../packages/spill/spill-local/src/index.ts)
 
 <a id="shres-codeshres-code-spill-policy"></a>
 
@@ -2663,12 +2741,12 @@ Requires: `storage`
  * location explicitly.
  */
 export interface Config {
-  /** Directory holding one `<unit>.json` file per unit. */
+  /** Directory holding one `<unit>.json` file (or `<unit>/` tree) per unit. */
   root: string
 }
 ```
 
-Source: [`packages/storage/storage-json/src/index.ts:27`](../packages/storage/storage-json/src/index.ts)
+Source: [`packages/storage/storage-json/src/index.ts:28`](../packages/storage/storage-json/src/index.ts)
 
 <a id="shres-codeshres-code-storage-sqlite"></a>
 
@@ -3856,6 +3934,30 @@ export interface Config {
 ```
 
 Source: [`packages/web/web-search-attached-cli/src/index.ts:49`](../packages/web/web-search-attached-cli/src/index.ts)
+
+<a id="shres-codeshres-code-web-search-brave"></a>
+
+## `@shres-code/shres-code-web-search-brave`
+
+Requires: `web`
+
+```ts config-catalog
+/** Plugin config (all optional — `apply` fills credential and constant defaults). */
+export interface Config {
+  /** Literal Brave subscription token; prefer {@link apiKeyEnv} so no secret enters configuration files. */
+  apiKey?: string
+  /** Credential reference resolved for each refresh; defaults to `BRAVE_API_KEY`. */
+  apiKeyEnv?: string
+  /** Endpoint base; `/web/search` is appended. Defaults to the public API. */
+  baseURL?: string
+  /** Upper bound on result rows requested per search. Defaults to 8. */
+  count?: number
+  /** When false, this provider is omitted from the search pool. Defaults to on. */
+  enabled?: boolean
+}
+```
+
+Source: [`packages/web/web-search-brave/src/index.ts:42`](../packages/web/web-search-brave/src/index.ts)
 
 <a id="shres-codeshres-code-web-search-deepseek"></a>
 

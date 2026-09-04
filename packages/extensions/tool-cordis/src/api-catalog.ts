@@ -1814,7 +1814,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
   {
     key: 'speech',
     summary: 'The speech I/O service.',
-    description: 'The speech I/O service. Registered as `ctx.speech` (one instance per context).\n\nSelection semantics (resolved at execution time, never order-dependent):\n\n- A singular configured id that is registered and `available()` → that provider.\n- A singular configured id not registered → `SPEECH_PROVIDER_CONFIGURED_MISSING`.\n- A singular configured id registered but unavailable → `SPEECH_PROVIDER_CONFIGURED_UNAVAILABLE`.\n- An ordered fallback list → first listed id that is registered and usable.\n- A fallback list whose members are all missing or unusable → `SPEECH_PROVIDER_UNAVAILABLE`.\n- No pin, exactly one registered usable provider → that provider.\n- No pin, multiple usable providers → `SPEECH_PROVIDER_AMBIGUOUS`.\n- No pin, no usable provider → `SPEECH_PROVIDER_UNAVAILABLE`.',
+    description: 'The speech I/O service. Registered as `ctx.speech` (one instance per context).\n\nSelection semantics (resolved at execution time, never order-dependent), in precedence order:\n\n- A non-empty user-layer pin from the speech settings section (`sttProvider` / `ttsProvider`): registered → that provider; not registered → `SPEECH_PROVIDER_CONFIGURED_MISSING`; registered but unavailable → `SPEECH_PROVIDER_CONFIGURED_UNAVAILABLE`.\n- A singular configured id that is registered and `available()` → that provider.\n- A singular configured id not registered → `SPEECH_PROVIDER_CONFIGURED_MISSING`.\n- A singular configured id registered but unavailable → `SPEECH_PROVIDER_CONFIGURED_UNAVAILABLE`.\n- An ordered fallback list → first listed id that is registered and usable.\n- A fallback list whose members are all missing or unusable → `SPEECH_PROVIDER_UNAVAILABLE`.\n- No pin, exactly one registered usable provider → that provider.\n- No pin, multiple usable providers → `SPEECH_PROVIDER_AMBIGUOUS`.\n- No pin, no usable provider → `SPEECH_PROVIDER_UNAVAILABLE`.',
     methods: [
       {
         signature: 'settings(): SpeechUserSettings',
@@ -3965,7 +3965,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'LlmDiscoveredModel',
-    declaration: 'export interface LlmDiscoveredModel {\n    id: string;\n    name?: string;\n    contextWindow?: number;\n    maxTokens?: number;\n    input?: readonly ModelModality[];\n}',
+    declaration: 'export interface LlmDiscoveredModel {\n    id: string;\n    name?: string;\n    contextWindow?: number;\n    maxTokens?: number;\n    input?: readonly ModelModality[];\n    audioInput?: boolean;\n    audioOutput?: boolean;\n}',
   },
   {
     name: 'LlmFailure',

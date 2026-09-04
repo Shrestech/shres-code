@@ -249,6 +249,7 @@
     { "path": "./packages/web/tool-web" },
     { "path": "./packages/speech/speech" },
     { "path": "./packages/speech/speech-kokoro" },
+    { "path": "./packages/speech/speech-openai-compatible" },
     { "path": "./packages/speech/speech-whisper" },
     { "path": "./packages/spill/spill" },
     { "path": "./packages/spill/spill-local" },

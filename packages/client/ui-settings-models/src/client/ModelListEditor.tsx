@@ -50,6 +50,11 @@ function inputOf(model: ModelDraft): readonly string[] | undefined {
   return Array.isArray(value) && value.every(item => typeof item === 'string') ? value : undefined
 }
 
+/** A row's declared audio direction, or false when the endpoint disclosed none. */
+function audioFlagOf(model: ModelDraft, key: 'audioInput' | 'audioOutput'): boolean {
+  return model[key] === true
+}
+
 /**
  * The input control's value for one row. `auto` is the absent key — and a
  * stored empty list, which the schema reads as no answer — so the row
@@ -188,6 +193,8 @@ function adopt(candidate: DiscoveredModelView): ModelDraft {
     // model is claimed as one without a hand-written settings.yaml edit. An
     // endpoint that disclosed nothing keeps the key absent and inherits.
     ...candidate.input === undefined ? {} : { input: [...candidate.input] },
+    ...candidate.audioInput === true ? { audioInput: true } : {},
+    ...candidate.audioOutput === true ? { audioOutput: true } : {},
   }
 }
 
@@ -398,6 +405,20 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
               disabled={disabled}
               onChange={(event) => { patch(index, { name: event.target.value === '' ? undefined : event.target.value }) }}
             />
+            {audioFlagOf(model, 'audioInput')
+              ? (
+                <span className={styles['rowTag']} title={t('sttBadgeHint')}>
+                  {t('sttBadge')}
+                </span>
+              )
+              : null}
+            {audioFlagOf(model, 'audioOutput')
+              ? (
+                <span className={styles['rowTag']} title={t('ttsBadgeHint')}>
+                  {t('ttsBadge')}
+                </span>
+              )
+              : null}
             <button
               type="button"
               className={styles['iconButton']}
@@ -526,6 +547,20 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
                       {candidate.input.includes('image') ? t('candidateVision') : candidate.input.join(' + ')}
                     </span>
                   )}
+                {candidate.audioInput === true
+                  ? (
+                    <span className={styles['candidateMeta']} title={t('sttBadgeHint')}>
+                      {t('sttBadge')}
+                    </span>
+                  )
+                  : null}
+                {candidate.audioOutput === true
+                  ? (
+                    <span className={styles['candidateMeta']} title={t('ttsBadgeHint')}>
+                      {t('ttsBadge')}
+                    </span>
+                  )
+                  : null}
               </label>
             </li>
           ))}

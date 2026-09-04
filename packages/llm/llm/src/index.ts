@@ -563,6 +563,8 @@ export class LlmRuntime extends Service {
         ...model.contextWindow === undefined ? {} : { contextWindow: model.contextWindow },
         ...model.maxTokens === undefined ? {} : { maxTokens: model.maxTokens },
         ...input === undefined ? {} : { input },
+        ...model.audioInput === true ? { audioInput: true } : {},
+        ...model.audioOutput === true ? { audioOutput: true } : {},
       })
     }
     return models

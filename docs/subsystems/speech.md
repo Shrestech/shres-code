@@ -191,8 +191,9 @@ Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnp
 
 The speech I/O service. Registered as `ctx.speech` (one instance per context).
 
-Selection semantics (resolved at execution time, never order-dependent):
+Selection semantics (resolved at execution time, never order-dependent), in precedence order:
 
+- A non-empty user-layer pin from the speech settings section (`sttProvider` / `ttsProvider`): registered → that provider; not registered → `SPEECH_PROVIDER_CONFIGURED_MISSING`; registered but unavailable → `SPEECH_PROVIDER_CONFIGURED_UNAVAILABLE`.
 - A singular configured id that is registered and `available()` → that provider.
 - A singular configured id not registered → `SPEECH_PROVIDER_CONFIGURED_MISSING`.
 - A singular configured id registered but unavailable → `SPEECH_PROVIDER_CONFIGURED_UNAVAILABLE`.
@@ -268,5 +269,5 @@ async transcribe( request: SpeechTranscribeRequest, signal?: AbortSignal, ): Pro
 @Remote('transcribe') async transcribeRemote(request: SpeechTranscribeWireRequest): Promise<SpeechTranscribeWireResult>
 ```
 
-Source: [`packages/speech/speech/src/index.ts:146`](../../packages/speech/speech/src/index.ts)
+Source: [`packages/speech/speech/src/index.ts:153`](../../packages/speech/speech/src/index.ts)
 <!-- END GENERATED cordis-surface -->

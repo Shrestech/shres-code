@@ -574,6 +574,12 @@
     - id: speech-kokoro
       name: '@shres-code/shres-code-speech-kokoro'
 
+    # Cloud STT/TTS over an OpenAI-compatible endpoint (OpenRouter by default).
+    # Registered but outside the fallback lists: a call uses it only through the
+    # speech settings section's user-layer pin.
+    - id: speech-openai-compatible
+      name: '@shres-code/shres-code-speech-openai-compatible'
+
     - id: speech-whisper
       name: '@shres-code/shres-code-speech-whisper'
 

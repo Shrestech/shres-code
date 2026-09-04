@@ -184,6 +184,8 @@ flowchart LR
   cfg --> plugin_shres_base_web_search_attached_cli
   plugin_shres_base_web_search_perplexity["web-search-perplexity<br/>@shres-code/shres-code-web-search-perplexity"]
   cfg --> plugin_shres_base_web_search_perplexity
+  plugin_shres_base_web_search_brave["web-search-brave<br/>@shres-code/shres-code-web-search-brave"]
+  cfg --> plugin_shres_base_web_search_brave
   plugin_shres_base_web_search_deepseek["web-search-deepseek<br/>@shres-code/shres-code-web-search-deepseek"]
   cfg --> plugin_shres_base_web_search_deepseek
   plugin_shres_base_tool_web["tool-web<br/>@shres-code/shres-code-tool-web"]
@@ -192,6 +194,8 @@ flowchart LR
   cfg --> plugin_shres_base_speech
   plugin_shres_base_speech_kokoro["speech-kokoro<br/>@shres-code/shres-code-speech-kokoro"]
   cfg --> plugin_shres_base_speech_kokoro
+  plugin_shres_base_speech_openai_compatible["speech-openai-compatible<br/>@shres-code/shres-code-speech-openai-compatible"]
+  cfg --> plugin_shres_base_speech_openai_compatible
   plugin_shres_base_speech_whisper["speech-whisper<br/>@shres-code/shres-code-speech-whisper"]
   cfg --> plugin_shres_base_speech_whisper
   plugin_shres_base_tools["tools<br/>@shres-code/shres-code-tools"]
@@ -304,10 +308,12 @@ flowchart LR
 | `web` | `@shres-code/shres-code-web` |
 | `web-search-attached-cli` | `@shres-code/shres-code-web-search-attached-cli` |
 | `web-search-perplexity` | `@shres-code/shres-code-web-search-perplexity` |
+| `web-search-brave` | `@shres-code/shres-code-web-search-brave` |
 | `web-search-deepseek` | `@shres-code/shres-code-web-search-deepseek` |
 | `tool-web` | `@shres-code/shres-code-tool-web` |
 | `speech` | `@shres-code/shres-code-speech` |
 | `speech-kokoro` | `@shres-code/shres-code-speech-kokoro` |
+| `speech-openai-compatible` | `@shres-code/shres-code-speech-openai-compatible` |
 | `speech-whisper` | `@shres-code/shres-code-speech-whisper` |
 | `tools` | `@shres-code/shres-code-tools` |
 | `system-prompt` | `@shres-code/shres-code-system-prompt` |
