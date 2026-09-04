@@ -142,7 +142,7 @@ describe('SpeechAudioCard', () => {
     fireEvent.change(screen.getByLabelText('API key'), { target: { value: ' sk-test ' } })
     fireEvent.click(screen.getByText('Apply audio settings'))
     await waitFor(() => {
-      expect(set).toHaveBeenCalledWith({ ref: 'SPEECH_OPENAI_COMPATIBLE_API_KEY', value: 'sk-test' })
+      expect(set).toHaveBeenCalledWith({ ref: 'OPENROUTER_API_KEY', value: 'sk-test' })
     })
   })
 

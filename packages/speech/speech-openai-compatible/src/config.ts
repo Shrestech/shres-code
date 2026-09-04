@@ -22,8 +22,12 @@ export const OPENAI_COMPATIBLE_DEFAULT_TTS_MODEL = 'openai/gpt-4o-audio-preview'
 /** Default text-to-speech voice. */
 export const OPENAI_COMPATIBLE_DEFAULT_TTS_VOICE = 'alloy'
 
-/** Credential reference holding the endpoint key when none is configured. */
-export const OPENAI_COMPATIBLE_DEFAULT_KEY_REF = 'SPEECH_OPENAI_COMPATIBLE_API_KEY'
+/**
+ * Credential reference holding the endpoint key when none is configured. The
+ * default endpoint and models are OpenRouter's, so the default reference is
+ * the OpenRouter key an LLM-route configuration already stores.
+ */
+export const OPENAI_COMPATIBLE_DEFAULT_KEY_REF = 'OPENROUTER_API_KEY'
 
 /** Plugin config (all optional — {@link resolveComposition} fills defaults). */
 export interface Config {
@@ -33,7 +37,7 @@ export interface Config {
   apiKeyEnv?: string
   /** Speech-to-text model id. */
   sttModel?: string
-  /** Speech-to-text wire mode. Defaults to `chat-audio`. */
+  /** Speech-to-text wire mode. Defaults to `transcriptions`. */
   sttMode?: SttWireMode
   /** Text-to-speech model id. */
   ttsModel?: string
@@ -50,7 +54,7 @@ export const Config: z<Config> = z.object({
   baseURL: z.string().default(OPENAI_COMPATIBLE_DEFAULT_BASE_URL),
   apiKeyEnv: z.string().default(OPENAI_COMPATIBLE_DEFAULT_KEY_REF),
   sttModel: z.string().default(OPENAI_COMPATIBLE_DEFAULT_STT_MODEL),
-  sttMode: z.union([...STT_WIRE_MODES]).default('chat-audio'),
+  sttMode: z.union([...STT_WIRE_MODES]).default('transcriptions'),
   ttsModel: z.string().default(OPENAI_COMPATIBLE_DEFAULT_TTS_MODEL),
   ttsMode: z.union([...TTS_WIRE_MODES]).default('chat-audio'),
   ttsVoice: z.string().default(OPENAI_COMPATIBLE_DEFAULT_TTS_VOICE),
@@ -69,7 +73,7 @@ export function resolveComposition(config: Config): OpenAiCompatibleComposition 
     baseURL: (config.baseURL ?? OPENAI_COMPATIBLE_DEFAULT_BASE_URL).replace(/\/+$/, ''),
     apiKeyRef: credentialRef(config.apiKeyEnv ?? OPENAI_COMPATIBLE_DEFAULT_KEY_REF),
     sttModel: config.sttModel ?? OPENAI_COMPATIBLE_DEFAULT_STT_MODEL,
-    sttMode: config.sttMode ?? 'chat-audio',
+    sttMode: config.sttMode ?? 'transcriptions',
     ttsModel: config.ttsModel ?? OPENAI_COMPATIBLE_DEFAULT_TTS_MODEL,
     ttsMode: config.ttsMode ?? 'chat-audio',
     ttsVoice: config.ttsVoice ?? OPENAI_COMPATIBLE_DEFAULT_TTS_VOICE,

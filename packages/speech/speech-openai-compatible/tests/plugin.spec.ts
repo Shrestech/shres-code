@@ -76,7 +76,7 @@ describe('speech-openai-compatible Config', () => {
   it('fills the OpenRouter-facing defaults', () => {
     expect(Config({})).toMatchObject({
       baseURL: OPENAI_COMPATIBLE_DEFAULT_BASE_URL,
-      sttMode: 'chat-audio',
+      sttMode: 'transcriptions',
       ttsMode: 'chat-audio',
       enabled: true,
     })
@@ -94,13 +94,13 @@ describe('speech-openai-compatible plugin', () => {
     await ctx.plugin(SpeechRuntime, { maxAudioBytes: 1024, maxTextChars: 64 })
     await ctx.plugin(MemorySettings)
     await ctx.plugin(MemoryCredentials)
-    const { fetchFn, calls } = fetchReply(() => jsonResponse({ choices: [{ message: { content: ' hi ' } }] }))
+    const { fetchFn, calls } = fetchReply(() => jsonResponse({ text: ' hi ' }))
     registerCloudProviders(ctx, {}, fetchFn)
 
     // No key, no pin: the single registered STT provider is auto-selected and
     // the request goes out unauthenticated to the composed base URL.
     await expect(ctx.speech.transcribe({ audio: wav, mediaType: 'audio/wav' })).resolves.toEqual({ text: 'hi' })
-    expect(calls[0]?.url).toBe(`${OPENAI_COMPATIBLE_DEFAULT_BASE_URL}/chat/completions`)
+    expect(calls[0]?.url).toBe(`${OPENAI_COMPATIBLE_DEFAULT_BASE_URL}/audio/transcriptions`)
     expect((calls[0]?.init.headers as Record<string, string>).authorization).toBeUndefined()
 
     // A stored key reaches the next operation without any restart.
@@ -111,9 +111,9 @@ describe('speech-openai-compatible plugin', () => {
       cloud: { baseURL: 'https://gw.example/v1', sttModel: 'other-stt' },
     })
     await expect(ctx.speech.transcribe({ audio: wav, mediaType: 'audio/wav' })).resolves.toEqual({ text: 'hi' })
-    expect(calls[1]?.url).toBe('https://gw.example/v1/chat/completions')
-    const body = JSON.parse(typeof calls[1]?.init.body === 'string' ? calls[1].init.body : '{}') as { model: string }
-    expect(body.model).toBe('other-stt')
+    expect(calls[1]?.url).toBe('https://gw.example/v1/audio/transcriptions')
+    const form = calls[1]?.init.body as FormData
+    expect(form.get('model')).toBe('other-stt')
     expect((calls[1]?.init.headers as Record<string, string>).authorization).toBe('Bearer k-9')
   })
 

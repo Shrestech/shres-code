@@ -37,7 +37,7 @@ const CLOUD_TTS_ID = 'openai-compatible-tts'
  * The credential reference the composed provider defaults to. Mirrored
  * client-side: the browser cannot import the Host package to read it.
  */
-const DEFAULT_CLOUD_KEY_REF = 'SPEECH_OPENAI_COMPATIBLE_API_KEY'
+const DEFAULT_CLOUD_KEY_REF = 'OPENROUTER_API_KEY'
 
 /** The endpoint the model fetch asks when the card's base URL is blank. */
 const DEFAULT_CLOUD_BASE_URL = 'https://openrouter.ai/api/v1'

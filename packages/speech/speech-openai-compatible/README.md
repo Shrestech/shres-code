@@ -6,7 +6,7 @@ OpenAI-compatible cloud speech provider for the speech capability seam (`ctx.spe
 
 | id | capability | wire modes |
 |---|---|---|
-| `openai-compatible-stt` | speech-to-text | `chat-audio` — `POST /chat/completions` with an `input_audio` part (OpenRouter); `transcriptions` — `POST /audio/transcriptions` multipart (OpenAI-style) |
+| `openai-compatible-stt` | speech-to-text | `transcriptions` — `POST /audio/transcriptions` multipart (OpenRouter and OpenAI-style servers; the default); `chat-audio` — `POST /chat/completions` with an `input_audio` part (audio-input chat models) |
 | `openai-compatible-tts` | text-to-speech | `chat-audio` — streaming `modalities: ["text","audio"]` completion, audio deltas collected from the SSE stream (OpenRouter); `speech` — `POST /audio/speech` (OpenAI-style) |
 
 All requests carry the resolved bearer key; when no key resolves, the request goes out unauthenticated, which is how a keyless LAN endpoint is served.
@@ -17,7 +17,7 @@ The base composition's fallback lists do not include these ids, so a call runs o
 
 ## Configuration
 
-Composition config (cordis.yml): `baseURL` (default `https://openrouter.ai/api/v1`), `apiKeyEnv` (default `SPEECH_OPENAI_COMPATIBLE_API_KEY`), `sttModel` (default `microsoft/mai-transcribe-2`), `sttMode`, `ttsModel` (default `openai/gpt-4o-audio-preview`), `ttsMode`, `ttsVoice` (default `alloy`), `enabled`.
+Composition config (cordis.yml): `baseURL` (default `https://openrouter.ai/api/v1`), `apiKeyEnv` (default `OPENROUTER_API_KEY` — the key an OpenRouter LLM-route configuration already stores), `sttModel` (default `microsoft/mai-transcribe-2`), `sttMode` (default `transcriptions`), `ttsModel` (default `openai/gpt-4o-audio-preview`), `ttsMode`, `ttsVoice` (default `alloy`), `enabled`.
 
 Every field has a runtime-editable counterpart in the speech settings section's `cloud` object, re-read on each call; a non-empty section field wins, an empty one inherits. The credential reference is resolved through `ctx.credentials` once per operation. A section value that no schema should have stored (a bad wire mode or reference) fails loud with `SPEECH_PROVIDER_CONFIG`.
 

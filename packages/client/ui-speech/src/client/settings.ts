@@ -50,4 +50,4 @@ export const DEFAULT_SPEECH_VOICE_ID = 'af_heart'
 export const DEFAULT_SPEECH_LANGUAGE = 'en'
 
 /** Credential reference the cloud speech provider defaults to. */
-export const DEFAULT_SPEECH_CLOUD_KEY_REF = 'SPEECH_OPENAI_COMPATIBLE_API_KEY'
+export const DEFAULT_SPEECH_CLOUD_KEY_REF = 'OPENROUTER_API_KEY'
