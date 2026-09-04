@@ -109,6 +109,8 @@ export interface SpeechAudioCardProps {
    * never survive to be read.
    */
   onSaved: () => void
+  /** Close the card after a committed write, like every editor card here. */
+  onClose: (changed: boolean) => void
 }
 
 /**
@@ -251,6 +253,7 @@ export function SpeechAudioCard(props: SpeechAudioCardProps): ReactNode {
       setKeyDraft('')
       props.onChanged()
       props.onSaved()
+      props.onClose(true)
     } catch (error) {
       setFailure(messageOf(error))
     } finally {
