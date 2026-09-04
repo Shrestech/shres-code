@@ -231,8 +231,9 @@ describe('draft-provider model discovery', () => {
           { id: 'watching', architecture: { input_modalities: ['text', 'video'] } },
           { id: 'plain' },
           { id: 'odd-shape', architecture: { input_modalities: 'image' } },
-          // An all-unknown list states no answer the harness can act on, so
-          // the entry inherits the route fallback rather than a bogus claim.
+          // An all-unknown list states no chat answer the harness can act on, so
+          // the entry inherits the route fallback rather than a bogus claim —
+          // while the audio direction is still carried for speech surfaces.
           { id: 'hearing-only', architecture: { input_modalities: ['audio'] } },
         ],
       }),
@@ -245,7 +246,35 @@ describe('draft-provider model discovery', () => {
         { id: 'watching', input: ['text'] },
         { id: 'plain' },
         { id: 'odd-shape' },
-        { id: 'hearing-only' },
+        { id: 'hearing-only', audioInput: true },
+      ])
+  })
+
+  it('carries OpenRouter\'s declared audio directions as display-only flags', async () => {
+    const server = await listingServer({
+      body: JSON.stringify({
+        data: [
+          {
+            id: 'mai-transcribe',
+            architecture: { input_modalities: ['audio'], output_modalities: ['text'] },
+          },
+          {
+            id: 'audio-out',
+            architecture: { input_modalities: ['text'], output_modalities: ['text', 'audio'] },
+          },
+          { id: 'silent', architecture: { input_modalities: ['text'], output_modalities: ['text'] } },
+          { id: 'unshaped', architecture: { output_modalities: 'audio' } },
+        ],
+      }),
+    })
+    const ctx = await harness()
+
+    expect(await ctx.llm.discoverModels('llm-pi-ai', { baseURL: server.url }))
+      .toEqual([
+        { id: 'mai-transcribe', audioInput: true },
+        { id: 'audio-out', input: ['text'], audioOutput: true },
+        { id: 'silent', input: ['text'] },
+        { id: 'unshaped' },
       ])
   })
 

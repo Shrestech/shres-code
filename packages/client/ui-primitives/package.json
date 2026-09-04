@@ -46,7 +46,7 @@
     "micromark-util-types": "^2.0.2",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "shiki": "^4.3.1"
+    "shiki": "^4.4.1"
   },
   "devDependencies": {
     "@shres-code/shres-code-invariants": "workspace:^",

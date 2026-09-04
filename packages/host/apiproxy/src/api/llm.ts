@@ -100,4 +100,8 @@ export interface DiscoveredModelView {
    * states no answer; adoption inherits the route's catalog/default fallback.
    */
   input?: readonly string[]
+  /** The endpoint declares audio input (speech-to-text) for this model. */
+  audioInput?: boolean
+  /** The endpoint declares audio output (text-to-speech) for this model. */
+  audioOutput?: boolean
 }

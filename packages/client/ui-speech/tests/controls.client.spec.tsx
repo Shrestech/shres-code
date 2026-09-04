@@ -8,12 +8,14 @@ import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react
 import { makeTranslate, stubSettingsScope } from '@shres-code/shres-code-client-test-runtime'
 import { createSnapshotStore } from '@shres-code/shres-code-client-runtime/client'
 import {
+  DEFAULT_SPEECH_CLOUD_KEY_REF as HOST_DEFAULT_CLOUD_KEY_REF,
   DEFAULT_SPEECH_USER_SETTINGS,
   DEFAULT_SPEECH_VOICE_ID,
   SPEECH_SETTINGS_NAMESPACE,
   type SpeechUserSettings,
 } from '@shres-code/shres-code-speech/settings'
 import {
+  DEFAULT_SPEECH_CLOUD_KEY_REF as CLIENT_DEFAULT_CLOUD_KEY_REF,
   DEFAULT_SPEECH_LANGUAGE as CLIENT_DEFAULT_LANGUAGE,
   DEFAULT_SPEECH_VOICE_ID as CLIENT_DEFAULT_VOICE_ID,
   SPEECH_SETTINGS_NAMESPACE as CLIENT_SETTINGS_NAMESPACE,
@@ -66,6 +68,10 @@ describe('client-spelled settings constants', () => {
     expect(CLIENT_DEFAULT_LANGUAGE).toBe(DEFAULT_SPEECH_USER_SETTINGS.language)
     expect(DEFAULT_SPEECH_USER_SETTINGS.voiceId).toBe(CLIENT_DEFAULT_VOICE_ID)
     expect(DEFAULT_SPEECH_USER_SETTINGS.talkMode).toBe(false)
+    expect(CLIENT_DEFAULT_CLOUD_KEY_REF).toBe(HOST_DEFAULT_CLOUD_KEY_REF)
+    expect(DEFAULT_SPEECH_USER_SETTINGS.sttProvider).toBe('')
+    expect(DEFAULT_SPEECH_USER_SETTINGS.ttsProvider).toBe('')
+    expect(DEFAULT_SPEECH_USER_SETTINGS.cloud?.apiKeyEnv).toBe('')
   })
 })
 

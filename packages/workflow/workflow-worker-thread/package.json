@@ -64,6 +64,6 @@
     "@shres-code/shres-code-tools": "workspace:^",
     "@shres-code/shres-code-workflow": "workspace:^",
     "@shres-code/cordis": "workspace:^",
-    "tsx": "^4.19.2"
+    "tsx": "^4.23.5"
   }
 }

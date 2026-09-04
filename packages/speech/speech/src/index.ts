@@ -42,13 +42,15 @@ import type {
 import { decodeSpeechBase64, encodeSpeechBase64 } from './wire.ts'
 
 export {
+  DEFAULT_SPEECH_CLOUD_KEY_REF,
+  DEFAULT_SPEECH_CLOUD_SETTINGS,
   DEFAULT_SPEECH_LANGUAGE,
   DEFAULT_SPEECH_USER_SETTINGS,
   DEFAULT_SPEECH_VOICE_ID,
   SPEECH_SETTINGS_NAMESPACE,
   SpeechUserSettingsSchema,
 } from './settings.ts'
-export type { SpeechUserSettings } from './settings.ts'
+export type { SpeechCloudSettings, SpeechUserSettings } from './settings.ts'
 export {
   languagePrimary,
   modelForLanguage,
@@ -131,7 +133,12 @@ export interface SpeechRuntimeConfig {
 /**
  * The speech I/O service. Registered as `ctx.speech` (one instance per context).
  *
- * Selection semantics (resolved at execution time, never order-dependent):
+ * Selection semantics (resolved at execution time, never order-dependent), in
+ * precedence order:
+ * - A non-empty user-layer pin from the speech settings section
+ *   (`sttProvider` / `ttsProvider`): registered → that provider; not
+ *   registered → `SPEECH_PROVIDER_CONFIGURED_MISSING`; registered but
+ *   unavailable → `SPEECH_PROVIDER_CONFIGURED_UNAVAILABLE`.
  * - A singular configured id that is registered and `available()` → that provider.
  * - A singular configured id not registered → `SPEECH_PROVIDER_CONFIGURED_MISSING`.
  * - A singular configured id registered but unavailable →
@@ -257,7 +264,7 @@ export class SpeechRuntime extends TypertRemoteService {
     if (script.text.length === 0) {
       return { audio: new Uint8Array(), mediaType: 'audio/wav', voiceId }
     }
-    const provider = this.resolveTts()
+    const provider = this.resolveTts(settings.ttsProvider)
     return provider.synthesize({ text: script.text, voiceId, language }, signal)
   }
 
@@ -282,7 +289,7 @@ export class SpeechRuntime extends TypertRemoteService {
     }
     const settings = this.userSettings()
     const language = request.language ?? settings.language
-    const provider = this.resolveStt()
+    const provider = this.resolveStt(settings.sttProvider)
     return provider.transcribe({ ...request, language }, signal)
   }
 
@@ -293,8 +300,9 @@ export class SpeechRuntime extends TypertRemoteService {
    */
   @Remote('status')
   async status(): Promise<SpeechStatus> {
-    const tts = this.capabilityStatus(() => this.resolveTts())
-    const stt = this.capabilityStatus(() => this.resolveStt())
+    const settings = this.userSettings()
+    const tts = this.capabilityStatus(() => this.resolveTts(settings.ttsProvider))
+    const stt = this.capabilityStatus(() => this.resolveStt(settings.sttProvider))
     let voices: readonly SpeechVoice[] = []
     if (tts.kind === 'ready') {
       const provider = this.ttsProviders.get(tts.providerId)
@@ -353,22 +361,34 @@ export class SpeechRuntime extends TypertRemoteService {
     }
   }
 
-  private resolveTts(): SpeechTtsProvider {
+  /**
+   * Resolve the TTS provider for one call: the user-layer pin wins when
+   * non-empty, otherwise the composition pin and fallback chain decide.
+   * @param userPin - the settings-section `ttsProvider`.
+   * @returns the selected provider.
+   */
+  private resolveTts(userPin: string): SpeechTtsProvider {
     return resolveProvider({
       kind: 'tts',
       providers: this.ttsProviders,
-      ...this.ttsProviderId !== undefined ? { configuredId: this.ttsProviderId } : {},
+      ...userPin !== '' ? { configuredId: userPin } : this.ttsProviderId !== undefined ? { configuredId: this.ttsProviderId } : {},
       ...this.ttsProviderFallbackIds !== undefined
         ? { fallbackIds: this.ttsProviderFallbackIds }
         : {},
     })
   }
 
-  private resolveStt(): SpeechSttProvider {
+  /**
+   * Resolve the STT provider for one call, with the same precedence as
+   * {@link resolveTts}.
+   * @param userPin - the settings-section `sttProvider`.
+   * @returns the selected provider.
+   */
+  private resolveStt(userPin: string): SpeechSttProvider {
     return resolveProvider({
       kind: 'stt',
       providers: this.sttProviders,
-      ...this.sttProviderId !== undefined ? { configuredId: this.sttProviderId } : {},
+      ...userPin !== '' ? { configuredId: userPin } : this.sttProviderId !== undefined ? { configuredId: this.sttProviderId } : {},
       ...this.sttProviderFallbackIds !== undefined
         ? { fallbackIds: this.sttProviderFallbackIds }
         : {},

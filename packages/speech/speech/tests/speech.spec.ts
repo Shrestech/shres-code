@@ -442,6 +442,17 @@ describe('SpeechRuntime environment and config', () => {
       autoSubmitVoice: false,
       language: 'en',
       talkMode: false,
+      sttProvider: '',
+      ttsProvider: '',
+      cloud: {
+        baseURL: '',
+        sttModel: '',
+        sttMode: '',
+        ttsModel: '',
+        ttsMode: '',
+        ttsVoice: '',
+        apiKeyEnv: '',
+      },
     })
   })
 
@@ -452,6 +463,42 @@ describe('SpeechRuntime environment and config', () => {
     expect(ctx.speech.settings().readAloud).toBe(false)
     await ctx.settings.update(SPEECH_SETTINGS_NAMESPACE, { readAloud: true })
     expect(ctx.speech.settings().readAloud).toBe(true)
+  })
+
+  it('lets a user-layer TTS pin win over composition pins and fallbacks', async () => {
+    const ctx = new Context()
+    await ctx.plugin(MemorySettings)
+    await ctx.plugin(SpeechRuntime, { ...LIMITS, ttsProvider: 'composition-tts', ttsProviders: ['composition-tts'] })
+    ctx.speech.registerTtsProvider(ttsProvider('composition-tts', true, () =>
+      Promise.resolve({ audio: mpeg, mediaType: 'audio/mpeg', voiceId: 'composition' })))
+    ctx.speech.registerTtsProvider(ttsProvider('cloud-tts', true, () =>
+      Promise.resolve({ audio: mpeg, mediaType: 'audio/wav', voiceId: 'cloud' })))
+    await expect(ctx.speech.synthesize({ text: 'Hello' })).resolves.toMatchObject({ voiceId: 'composition' })
+    await ctx.settings.update(SPEECH_SETTINGS_NAMESPACE, { ttsProvider: 'cloud-tts' })
+    await expect(ctx.speech.synthesize({ text: 'Hello' })).resolves.toMatchObject({ voiceId: 'cloud' })
+  })
+
+  it('reports a user-layer STT pin naming no registered provider as CONFIGURED_MISSING', async () => {
+    const ctx = new Context()
+    await ctx.plugin(MemorySettings)
+    await ctx.plugin(SpeechRuntime, LIMITS)
+    ctx.speech.registerSttProvider(sttProvider('local-stt', true))
+    await ctx.settings.update(SPEECH_SETTINGS_NAMESPACE, { sttProvider: 'gone-stt' })
+    await expect(ctx.speech.transcribe({ audio: mpeg, mediaType: 'audio/webm' })).rejects.toThrow(
+      expect.objectContaining({ code: 'SPEECH_PROVIDER_CONFIGURED_MISSING' }),
+    )
+    await expect(ctx.speech.status()).resolves.toMatchObject({
+      stt: { kind: 'unavailable', code: 'SPEECH_PROVIDER_CONFIGURED_MISSING' },
+    })
+  })
+
+  it('keeps composition selection working when the user pins are blank', async () => {
+    const ctx = new Context()
+    await ctx.plugin(MemorySettings)
+    await ctx.plugin(SpeechRuntime, { ...LIMITS, sttProviders: ['local-stt'] })
+    ctx.speech.registerSttProvider(sttProvider('local-stt', true, () => Promise.resolve({ text: 'local' })))
+    await ctx.settings.update(SPEECH_SETTINGS_NAMESPACE, { sttProvider: '' })
+    await expect(ctx.speech.transcribe({ audio: mpeg, mediaType: 'audio/webm' })).resolves.toEqual({ text: 'local' })
   })
 })
 

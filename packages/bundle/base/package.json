@@ -97,6 +97,7 @@
     "@shres-code/shres-code-skill-filesystem": "workspace:^",
     "@shres-code/shres-code-speech": "workspace:^",
     "@shres-code/shres-code-speech-kokoro": "workspace:^",
+    "@shres-code/shres-code-speech-openai-compatible": "workspace:^",
     "@shres-code/shres-code-speech-whisper": "workspace:^",
     "@shres-code/shres-code-spill-local": "workspace:^",
     "@shres-code/shres-code-spill-policy": "workspace:^",

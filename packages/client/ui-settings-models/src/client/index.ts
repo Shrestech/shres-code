@@ -18,6 +18,7 @@ import type {} from '@shres-code/shres-code-client-locale/client'
 import type {} from '@shres-code/shres-code-api-remotes/client'
 import { ModelsSection } from './ModelsSection.tsx'
 import type { ModelsSectionInjected } from './ModelsSection.tsx'
+import type { SpeechStatusFace } from './SpeechAudioCard.tsx'
 import { FirstRunOnboardingDialog } from './FirstRunOnboardingDialog.tsx'
 import type { FirstRunOnboardingInjected } from './FirstRunOnboardingDialog.tsx'
 import { WelcomeNotice } from './WelcomeNotice.tsx'
@@ -55,8 +56,10 @@ export function refreshIfLoaded(controller: ModelsSettingsStore): void {
  * Required services (cordis fiber inject). The target slot is declared by
  * ui-settings' apply, whose activation order relative to this one is NOT
  * constrained; registration depends on each slot through `slots.inject()`.
+ * `remote.speech` names the typert remote namespace the Audio card reads;
+ * api-remotes contributes it wherever this plugin is composed.
  */
-export const inject = ['slots', 'locale', 'connection', 'remote']
+export const inject = ['slots', 'locale', 'connection', 'remote', 'remote.speech']
 
 /**
  * Register the Models section once the `settings.section` declaration is on
@@ -73,11 +76,16 @@ export function apply(ctx: ClientContext): void {
   // Registration-time text (the nav label thunk) and the inject faces share
   // one bound translate; copy freshness rides the locale revision.
   const t = ctx.locale.bind(NS) as ModelsSectionInjected['t']
+  // The speech Remote mounts with the typert remote namespace; absent (a
+  // browser without the speech package) the Audio card degrades to the
+  // stored section alone.
+  const speech: SpeechStatusFace | undefined = (ctx.remote as { speech?: SpeechStatusFace }).speech
   const injected = (): ModelsSectionInjected => ({
     controller,
     useSnapshot,
     api: connection.api,
     t,
+    ...speech === undefined ? {} : { speech },
   })
   const firstRunOnboardingInjected = (): FirstRunOnboardingInjected => ({
     controller,

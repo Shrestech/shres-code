@@ -22,6 +22,8 @@ import { deriveKeyRef, messageOf, protocolChoices, providerEnabled, providerUsab
 import type { ModelsSettingsState, ModelsSettingsStore, ProviderRow } from './store.ts'
 import { ProviderEditor, type ProviderEditorProps } from './ProviderEditor.tsx'
 import { SeatsCard } from './SeatsCard.tsx'
+import { SpeechAudioCard } from './SpeechAudioCard.tsx'
+import type { SpeechStatusFace } from './SpeechAudioCard.tsx'
 import type { en } from './locales.ts'
 import styles from './ModelsSection.module.css'
 
@@ -35,6 +37,8 @@ export interface ModelsSectionInjected {
   api: Pick<IApiClient, 'settings' | 'credentials' | 'llm'>
   /** Section copy. */
   t: (key: keyof typeof en) => string
+  /** The speech Remote, when the browser mounted one; backs the Audio card. */
+  speech?: SpeechStatusFace
 }
 
 /**
@@ -184,6 +188,7 @@ function Loaded({ injected }: { injected: ModelsSectionInjected }): ReactNode {
   const [deleting, setDeleting] = useState(false)
   const [deleteFailure, setDeleteFailure] = useState<string | undefined>(undefined)
   const [savedTarget, setSavedTarget] = useState<ProviderIdentity | undefined>(undefined)
+  const [audioSaved, setAudioSaved] = useState(false)
   const [declaring, setDeclaring] = useState(false)
   const [dismissedSetup, setDismissedSetup] = useState<ReadonlySet<string>>(() => new Set())
 
@@ -284,6 +289,13 @@ function Loaded({ injected }: { injected: ModelsSectionInjected }): ReactNode {
     <div className={styles['section']}>
       <h2 className={styles['title']}>{t('title')}</h2>
       <p className={styles['intro']}>{t('intro')}</p>
+      {audioSaved
+        ? (
+          <p className={styles['savedNotice']} role="status" aria-live="polite">
+            {t('speechSaved')}
+          </p>
+        )
+        : null}
       {!state.writable && state.status === 'ready' ? <p className={styles['notice']}>{t('readOnly')}</p> : null}
       {savedIdentity === undefined
         ? null
@@ -402,6 +414,7 @@ function Loaded({ injected }: { injected: ModelsSectionInjected }): ReactNode {
                     disabled={!state.writable}
                     onClick={() => {
                       setSavedTarget(undefined)
+                      setAudioSaved(false)
                       setProviderEnabled(row, !providerEnabled(row, state.namespaces))
                     }}
                   >
@@ -413,6 +426,7 @@ function Loaded({ injected }: { injected: ModelsSectionInjected }): ReactNode {
                     aria-label={providerCopy(t('editProvider'), target)}
                     onClick={() => {
                       setSavedTarget(undefined)
+                      setAudioSaved(false)
                       // One card at a time: leaving `declaring` set would show
                       // the create card beside this editor, and closing either
                       // one discards the other's draft.
@@ -432,6 +446,7 @@ function Loaded({ injected }: { injected: ModelsSectionInjected }): ReactNode {
                         disabled={!state.writable}
                         onClick={() => {
                           setSavedTarget(undefined)
+                          setAudioSaved(false)
                           setDeleteFailure(undefined)
                           setDeleteTarget(target)
                         }}
@@ -456,6 +471,21 @@ function Loaded({ injected }: { injected: ModelsSectionInjected }): ReactNode {
           )
         })}
       </ul>
+      {state.status === 'ready'
+        ? (
+          <div className={styles['rowCard']}>
+            <SpeechAudioCard
+              api={api}
+              speech={injected.speech}
+              namespace={state.namespaces.get('speech')}
+              t={t}
+              readOnly={!state.writable}
+              onChanged={() => { void controller.load() }}
+              onSaved={() => { setAudioSaved(true) }}
+            />
+          </div>
+        )
+        : null}
       <div className={styles['addBlock']}>
         {addTarget !== undefined && addNamespace !== undefined
           ? (
@@ -525,6 +555,7 @@ function Loaded({ injected }: { injected: ModelsSectionInjected }): ReactNode {
                     /* v8 ignore next -- the button is disabled while nothing is addable */
                     if (first === undefined) return
                     setSavedTarget(undefined)
+                    setAudioSaved(false)
                     setDeclaring(false)
                     setAdding(true)
                     setEditing(targetOf(first))
@@ -540,6 +571,7 @@ function Loaded({ injected }: { injected: ModelsSectionInjected }): ReactNode {
                   disabled={protocols.length === 0 || !state.writable}
                   onClick={() => {
                     setSavedTarget(undefined)
+                    setAudioSaved(false)
                     setAdding(false)
                     setEditing(undefined)
                     setDeclaring(true)
