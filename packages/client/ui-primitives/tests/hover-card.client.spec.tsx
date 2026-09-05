@@ -409,6 +409,7 @@ describe('HoverCard', () => {
     const { wrapper } = mount()
     fireEvent.pointerEnter(wrapper)
     act(() => { vi.advanceTimersByTime(500) })
+    act(() => { fireEvent.scroll(document) })
     stubAnchorRect(screen.getByText('row'), { top: 90, right: 300 })
     act(() => { fireEvent.scroll(document) })
     const card = screen.getByText('card body').parentElement as HTMLElement

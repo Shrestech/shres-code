@@ -100,7 +100,10 @@ export function HoverCard({
   // Fixed-position from the anchor rect before paint; track the anchor while
   // open (capture-phase scroll catches nested panes), as in Menu portal mode.
   useLayoutEffect(() => {
-    if (!open) { setPos(null); return }
+    if (!open) {
+      setPos(prev => (prev === null ? prev : null))
+      return
+    }
     const place = () => {
       const wrapper = rootRef.current
       /* v8 ignore next -- the ref is attached before the layout effect runs and the listeners die with it. */
@@ -108,7 +111,8 @@ export function HoverCard({
       const r = wrapper.getBoundingClientRect()
       const h = cardRef.current?.offsetHeight ?? 0
       const top = r.top + h > window.innerHeight - 8 ? window.innerHeight - h - 8 : r.top
-      setPos({ left: r.right + 8, top })
+      const left = r.right + 8
+      setPos(prev => (prev !== null && prev.left === left && prev.top === top ? prev : { left, top }))
     }
     place()
     window.addEventListener('scroll', place, true)
