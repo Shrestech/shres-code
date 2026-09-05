@@ -107,6 +107,10 @@ export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, o
 }) {
   const rootRef = useRef<HTMLSpanElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+  const getAnchorRectRef = useRef(getAnchorRect)
+  getAnchorRectRef.current = getAnchorRect
   const [openSubmenuId, setOpenSubmenuId] = useState<string | null>(null)
   const [fixedPos, setFixedPos] = useState<CSSProperties | null>(null)
   const { arm: armClose, cancel: cancelClose } = usePointerGrace(onClose)
@@ -116,12 +120,19 @@ export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, o
   // getAnchorRect trumps measuring the wrapper span: a child layout effect
   // runs before the parent's, so a wrapper the host positions in its own
   // effect measures stale here — the host callback owns the truth instead.
+  // The callback is read from a ref: putting it in this effect's deps would
+  // re-place (and setState) on every parent render that passes a fresh
+  // closure, which is how owners actually call this.
   useLayoutEffect(() => {
-    if (!open || !portal) { setFixedPos(null); return }
+    if (!open || !portal) {
+      setFixedPos(prev => (prev === null ? prev : null))
+      return
+    }
     const place = () => {
+      const getter = getAnchorRectRef.current
       let r: DOMRect | null
-      if (getAnchorRect !== undefined) {
-        r = getAnchorRect()
+      if (getter !== undefined) {
+        r = getter()
       } else {
         /* v8 ignore next 2 -- the ref is attached before the layout effect runs and the listeners die with it. */
         r = rootRef.current?.getBoundingClientRect() ?? null
@@ -150,7 +161,7 @@ export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, o
       if (lw > 0) x = Math.min(Math.max(x, MARGIN), vw - lw - MARGIN)
       if (lh > 0) y = Math.min(Math.max(y, MARGIN), vh - lh - MARGIN)
 
-      setFixedPos({ left: x, top: y })
+      setFixedPos(prev => (prev !== null && prev.left === x && prev.top === y ? prev : { left: x, top: y }))
     }
     // First run measures the hidden pre-render (same commit as `open`), so
     // end/top alignment and clamping use real dimensions before anything
@@ -162,11 +173,16 @@ export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, o
       window.removeEventListener('scroll', place, true)
       window.removeEventListener('resize', place)
     }
-  }, [open, portal, align, side, getAnchorRect])
+  }, [open, portal, align, side])
 
+  // onClose is read from a ref so a fresh owner closure does not re-run this
+  // effect. Re-running it while closed scheduled a setState per mounted menu
+  // on every parent render, which a workspace-length list pushes past React's
+  // nested-update limit.
   useEffect(() => {
     if (!open) {
-      setOpenSubmenuId(null)
+      setOpenSubmenuId(id => (id === null ? id : null))
+      cancelClose()
       return
     }
     const onPointerDown = (e: PointerEvent) => {
@@ -174,10 +190,10 @@ export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, o
       // The portaled list is outside the anchor subtree; check both.
       if (rootRef.current?.contains(e.target) === true) return
       if (listRef.current?.contains(e.target) === true) return
-      onClose()
+      onCloseRef.current()
     }
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') onCloseRef.current()
     }
     document.addEventListener('pointerdown', onPointerDown)
     document.addEventListener('keydown', onKeyDown)
@@ -185,14 +201,6 @@ export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, o
       document.removeEventListener('pointerdown', onPointerDown)
       document.removeEventListener('keydown', onKeyDown)
     }
-  }, [open, onClose])
-
-  // A close from selection/Escape/outside click outruns a pending grace close;
-  // left armed it would shut a list reopened inside the grace window. Its own
-  // effect, not the listener effect above: that one re-runs on every `onClose`
-  // identity change and would cancel the grace mid-transit.
-  useEffect(() => {
-    if (!open) cancelClose()
   }, [open, cancelClose])
 
   // The submenu card is absolutely positioned outside the list box; the

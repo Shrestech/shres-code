@@ -280,6 +280,57 @@ describe('Menu', () => {
     expect(screen.queryByRole('menuitem', { name: 'Create ok' })).toBeNull()
   })
 
+  it('clears an open submenu when the list closes', () => {
+    const nested = [{ id: 'p', label: 'Parent', submenu: [{ id: 's', label: 'Sub' }] }]
+    const { rerender } = render(
+      <Menu open anchor={<span>trigger</span>} items={nested} onSelect={() => {}} onClose={() => {}} />)
+    fireEvent.mouseEnter(screen.getByRole('menuitem', { name: 'Parent' }).parentElement as HTMLElement)
+    expect(screen.getByRole('menuitem', { name: 'Sub' })).toBeDefined()
+    rerender(
+      <Menu open={false} anchor={<span>trigger</span>} items={nested} onSelect={() => {}} onClose={() => {}} />)
+    expect(screen.queryByRole('menuitem', { name: 'Sub' })).toBeNull()
+  })
+
+  it('Escape and outside click use the latest onClose after the owner passes a new closure', () => {
+    const first = vi.fn()
+    const second = vi.fn()
+    const { rerender } = render(
+      <Menu open portal anchor={<span>trigger</span>} items={items} onSelect={() => {}} onClose={first} />)
+    rerender(
+      <Menu open portal anchor={<span>trigger</span>} items={items} onSelect={() => {}} onClose={second} />)
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(first).not.toHaveBeenCalled()
+    expect(second).toHaveBeenCalledTimes(1)
+    second.mockClear()
+    fireEvent.pointerDown(document.body)
+    expect(first).not.toHaveBeenCalled()
+    expect(second).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not throw when many closed portal menus receive a fresh onClose each parent render', () => {
+    function Host() {
+      return (
+        <>
+          {Array.from({ length: 60 }, (_, i) => (
+            <Menu
+              key={i}
+              open={false}
+              portal
+              anchor={<span>{`t${String(i)}`}</span>}
+              items={items}
+              onSelect={() => {}}
+              onClose={() => {}}
+            />
+          ))}
+        </>
+      )
+    }
+    const { rerender } = render(<Host />)
+    expect(() => {
+      for (let i = 0; i < 5; i++) rerender(<Host />)
+    }).not.toThrow()
+  })
+
   it('portal mode prefers getAnchorRect over measuring its own wrapper', () => {
     const rect = { left: 40, right: 72, top: 100, bottom: 128, width: 32, height: 28, x: 40, y: 100, toJSON: () => ({}) } as DOMRect
     render(
@@ -309,6 +360,20 @@ describe('Menu', () => {
         onSelect={() => {}}
         onClose={() => {}}
       />)
+    expect(screen.queryByRole('menu')).toBeNull()
+  })
+
+  it('portal mode keeps placement when a scroll does not move the list, and clears it when closed', () => {
+    const { rerender } = render(
+      <Menu portal open anchor={<span>trigger</span>} items={items} onSelect={() => {}} onClose={() => {}} />)
+    const menu = screen.getByRole('menu')
+    const left = menu.style.left
+    const top = menu.style.top
+    fireEvent.scroll(window)
+    expect(menu.style.left).toBe(left)
+    expect(menu.style.top).toBe(top)
+    rerender(
+      <Menu portal open={false} anchor={<span>trigger</span>} items={items} onSelect={() => {}} onClose={() => {}} />)
     expect(screen.queryByRole('menu')).toBeNull()
   })
 
