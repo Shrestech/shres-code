@@ -105,8 +105,8 @@ importers:
         specifier: 7.0.2001
         version: 7.0.2001
       publint:
-        specifier: 0.3.23
-        version: 0.3.23
+        specifier: 0.3.22
+        version: 0.3.22
       smol-toml:
         specifier: ^1.7.1
         version: 1.7.1
@@ -115,7 +115,7 @@ importers:
         version: 5.0.0
       tsdown:
         specifier: ^0.22.2
-        version: 0.22.2(oxc-resolver@11.24.2)(publint@0.3.23)(tsx@4.23.8)(typescript@6.0.3)
+        version: 0.22.2(oxc-resolver@11.24.2)(publint@0.3.22)(tsx@4.23.8)(typescript@6.0.3)
       tsx:
         specifier: ^4.23.8
         version: 4.23.8
@@ -15048,6 +15048,10 @@ packages:
     resolution: {integrity: sha512-QP88BAKvMam/3NxH6vj2o21R6MjxZUAd6nlwAS/pnGvN9IVLocLHxGYIzFhg6fUQ+5th6P4dv4eW9jX3DSIj7A==}
     engines: {node: '>=12'}
 
+  picomatch@4.0.5:
+    resolution: {integrity: sha512-RvwwcruNjI1ncT5xRakeyS9Lf8lcItv34KD+aif+VH9kduAyfYBipGh12274xtenIPZ119/R9BdTBa8gAwSh0A==}
+    engines: {node: '>=12'}
+
   picomatch@4.0.7:
     resolution: {integrity: sha512-qcJu88Q2IWqJsDD529JKMdwGm/dvInW4HvQnRwiH9JtihJvzGOscDtHE3x1pBKeUOTysQ8kVmLnJ2kJu7yhcGA==}
     engines: {node: '>=12'}
@@ -15117,8 +15121,8 @@ packages:
     resolution: {integrity: sha512-llQsMLSUDUPT44jdrU/O37qlnifitDP+ZwrmmZcoSKyLKvtZxpyV0n2/bD/N4tBAAZ/gJEdZU7KMraoK1+XYAg==}
     engines: {node: '>= 0.10'}
 
-  publint@0.3.23:
-    resolution: {integrity: sha512-5MQipUPcB7MWw84zLUkHrg/H/UBtk3LL+A0GngTTBSsiNJLQurMUaSIRG3edlOrRz4UFe0AOKK9TZdIWviV+jQ==}
+  publint@0.3.22:
+    resolution: {integrity: sha512-6Z/scsr5CA7APdwyF35EY88CqgDj1textWuY788DVTJYPCWVv/Wn9G6KmLnrVRnStgYcahqN4wCDLZGSbQJ69w==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -20581,6 +20585,8 @@ snapshots:
 
   picomatch@4.0.4: {}
 
+  picomatch@4.0.5: {}
+
   picomatch@4.0.7: {}
 
   pkce-challenge@5.0.1: {}
@@ -20651,7 +20657,7 @@ snapshots:
       forwarded: 0.2.0
       ipaddr.js: 1.9.1
 
-  publint@0.3.23:
+  publint@0.3.22:
     dependencies:
       '@publint/pack': 0.1.7
       package-manager-detector: 1.8.0
@@ -21192,7 +21198,7 @@ snapshots:
     optionalDependencies:
       typescript: 6.0.3
 
-  tsdown@0.22.2(oxc-resolver@11.24.2)(publint@0.3.23)(tsx@4.23.8)(typescript@6.0.3):
+  tsdown@0.22.2(oxc-resolver@11.24.2)(publint@0.3.22)(tsx@4.23.8)(typescript@6.0.3):
     dependencies:
       ansis: 4.3.1
       cac: 7.0.0
@@ -21210,7 +21216,7 @@ snapshots:
       tree-kill: 1.2.2
       unconfig-core: 7.5.0
     optionalDependencies:
-      publint: 0.3.23
+      publint: 0.3.22
       tsx: 4.23.8
       typescript: 6.0.3
     transitivePeerDependencies:
@@ -21353,7 +21359,7 @@ snapshots:
   vite@8.2.0(@types/node@22.20.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.8)(yaml@2.9.0):
     dependencies:
       lightningcss: 1.33.0
-      picomatch: 4.0.7
+      picomatch: 4.0.5
       postcss: 8.5.25
       rolldown: 1.2.3
       tinyglobby: 0.2.17
@@ -21368,7 +21374,7 @@ snapshots:
   vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.8)(yaml@2.9.0):
     dependencies:
       lightningcss: 1.33.0
-      picomatch: 4.0.7
+      picomatch: 4.0.5
       postcss: 8.5.25
       rolldown: 1.2.3
       tinyglobby: 0.2.17
