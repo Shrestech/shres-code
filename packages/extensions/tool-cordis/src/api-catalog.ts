@@ -475,6 +475,19 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'codexCredential',
+    summary: 'Single-flight Codex session-credential service.',
+    description: 'Single-flight Codex session-credential service.\n\nCodexCredential.managerFor returns the one CodexSessionManager memoized for a credential spec, preserving one shared in-flight refresh per document. The memoization caches every spec key for the service\'s lifetime (develop\'s single-slot resolver evicted on change); that is safe because each `current()` call re-validates the document and refresh at the moment it runs rather than trusting a stale cached token state.',
+    methods: [
+      {
+        signature: 'managerFor(spec: CodexSessionOptions): CodexSessionManager',
+        description: 'Resolve the credential manager for one spec, sharing the cached instance across callers so concurrent requests refresh the document once.',
+        parameters: [{ name: 'spec', description: 'the credential spec this manager reads and refreshes.' }],
+        returns: 'the manager for the spec\'s credential facts.',
+      },
+    ],
+  },
+  {
     key: 'commands',
     summary: 'Human-command registry.',
     description: 'Human-command registry. Plain-context definitions are global; definitions registered through a command-injected child of an agent context shadow globals for that agent.',
@@ -3354,6 +3367,18 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'CodeRunResult',
     declaration: 'export interface CodeRunResult {\n    value?: CodeJsonValue;\n    logs: string[];\n    error?: CodeRunFailure;\n}',
+  },
+  {
+    name: 'CodexSessionManager',
+    declaration: 'export class CodexSessionManager {\n    constructor(options: CodexSessionOptions);\n    current(): Promise<CodexSessionToken>;\n    async peekAccountId(): Promise<string>;\n}',
+  },
+  {
+    name: 'CodexSessionOptions',
+    declaration: 'export interface CodexSessionOptions {\n    authPath: string;\n    refreshLeewayMs: number;\n    fetch?: typeof fetch;\n    now?: () => number;\n}',
+  },
+  {
+    name: 'CodexSessionToken',
+    declaration: 'export interface CodexSessionToken {\n    accessToken: string;\n    accountId: string;\n}',
   },
   {
     name: 'CollectedOutput',

@@ -634,6 +634,19 @@
     - id: llm-grok-session
       name: '@shres-code/shres-code-llm-grok-session'
 
+    # Codex subscription session: the same credential the Codex CLI's
+    # "codex login" stores in ~/.codex/auth.json, served as a bearer token
+    # (with the account header) to chatgpt.com's backend-api/codex over the
+    # openai-responses wire and refreshed through auth.openai.com. Dormant
+    # until that login exists on the machine; use bills the ChatGPT account's
+    # Codex subscription (Plus/Pro/Max), not the OpenAI API. The delegated
+    # codex-cli route above is the spawn-based alternative.
+    - id: codex-credential
+      name: '@shres-code/shres-code-codex-credential'
+
+    - id: llm-codex-session
+      name: '@shres-code/shres-code-llm-codex-session'
+
     # Pay-per-token xAI API-key route: serves api.x.ai over the openai-responses
     # wire with a key stored through the credentials seam. Ships off by default
     # (enabled: false) and is orthogonal to the subscription route above; a

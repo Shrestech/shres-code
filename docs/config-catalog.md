@@ -1134,6 +1134,52 @@ export interface CliBridgeModel {
 
 Source: [`packages/llm/llm-cli-bridge/src/config.ts:82`](../packages/llm/llm-cli-bridge/src/config.ts)
 
+<a id="shres-codeshres-code-llm-codex-session"></a>
+
+## `@shres-code/shres-code-llm-codex-session`
+
+Requires: `llm`
+
+```ts config-catalog
+/** Plugin / settings section configuring the one route. */
+export interface Config {
+  /** When false, the route is omitted from the live adapter registry. Defaults to on. */
+  enabled?: boolean
+  /** Auth document path; defaults to `~/.codex/auth.json`. */
+  authPath?: string
+  /** Endpoint base for the backend; defaults to {@link DEFAULT_BASE_URL}. */
+  baseURL?: string
+  /** Selector label; defaults to {@link DEFAULT_DISPLAY_NAME}. */
+  displayName?: string
+  /** Model catalog; defaults to {@link SHIPPED_MODELS}. */
+  models?: CodexSessionModelConfig[]
+  /** Refresh leeway in milliseconds; defaults to {@link DEFAULT_REFRESH_LEEWAY_MS}. */
+  refreshLeewayMs?: number
+}
+
+/** One advisory model entry a deployment may declare. */
+export interface CodexSessionModelConfig {
+  /** Model id the backend accepts. */
+  id: string
+  /** Selector label; defaults to the id. */
+  name?: string
+  /** Maximum combined request and response context in tokens. */
+  contextWindow?: number
+  /** Maximum output tokens; configuring one also makes it the request default. */
+  maxTokens?: number
+  /**
+   * Request modalities this model accepts; absent keeps the text floor. Both
+   * shipped models serve image input (verified live), so the shipped
+   * entries declare `['text', 'image']`, which is what admits image blocks.
+   */
+  input?: PiAiModality[]
+}
+```
+
+Depends on: [`PiAiModality`](../packages/llm/llm-pi-ai/src/index.ts)
+
+Source: [`packages/llm/llm-codex-session/src/config.ts:80`](../packages/llm/llm-codex-session/src/config.ts)
+
 <a id="shres-codeshres-code-llm-deepseek"></a>
 
 ## `@shres-code/shres-code-llm-deepseek`
@@ -2586,7 +2632,7 @@ export interface Config {
   apiKeyEnv?: string
   /** Speech-to-text model id. */
   sttModel?: string
-  /** Speech-to-text wire mode. Defaults to `chat-audio`. */
+  /** Speech-to-text wire mode. Defaults to `transcriptions`. */
   sttMode?: SttWireMode
   /** Text-to-speech model id. */
   ttsModel?: string
@@ -2605,7 +2651,7 @@ export type SttWireMode = typeof STT_WIRE_MODES[number]
 export type TtsWireMode = typeof TTS_WIRE_MODES[number]
 ```
 
-Source: [`packages/speech/speech-openai-compatible/src/config.ts:29`](../packages/speech/speech-openai-compatible/src/config.ts)
+Source: [`packages/speech/speech-openai-compatible/src/config.ts:33`](../packages/speech/speech-openai-compatible/src/config.ts)
 
 <a id="shres-codeshres-code-speech-whisper"></a>
 
@@ -4187,6 +4233,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@shres-code/shres-code-client-ui-user-questions` ([`packages/client/ui-user-questions/src/index.ts`](../packages/client/ui-user-questions/src/index.ts))
 - `@shres-code/shres-code-client-ui-workflow-run` ([`packages/client/ui-workflow-run/src/index.ts`](../packages/client/ui-workflow-run/src/index.ts))
 - `@shres-code/shres-code-client-ui-workspace` ([`packages/client/ui-workspace/src/index.ts`](../packages/client/ui-workspace/src/index.ts))
+- `@shres-code/shres-code-codex-credential` ([`packages/llm/codex-credential/src/index.ts`](../packages/llm/codex-credential/src/index.ts))
 - `@shres-code/shres-code-command-compact` — requires `commands` · `compaction` ([`packages/compaction/command-compact/src/index.ts`](../packages/compaction/command-compact/src/index.ts))
 - `@shres-code/shres-code-command-feedback` — requires `commands` ([`packages/feedback/command-feedback/src/index.ts`](../packages/feedback/command-feedback/src/index.ts))
 - `@shres-code/shres-code-command-goal` — requires `commands` · `goals` ([`packages/goal/command-goal/src/index.ts`](../packages/goal/command-goal/src/index.ts))
