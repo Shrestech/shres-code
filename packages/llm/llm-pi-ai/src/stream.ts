@@ -68,7 +68,8 @@ function classifyPiAiError(message: string): string {
  * @returns the mapped harness reason. Recognized error text, `stop` usage above
  *   `contextWindow`, and zero-output `length` usage that fills the window map
  *   to `CONTEXT_WINDOW_EXCEEDED`; a `stop` with no content blocks maps to an
- *   `EMPTY_RESPONSE` error.
+ *   `EMPTY_RESPONSE` error; `pending` and `deferred` map to `PI_AI_ERROR`
+ *   because this adapter does not complete partial or batch handles.
  */
 export function mapStopReason(message: AssistantMessage, contextWindow?: number): FinishReason {
   const piAiOverflow = isContextOverflow(message, contextWindow)
@@ -115,6 +116,15 @@ export function mapStopReason(message: AssistantMessage, contextWindow?: number)
         kind: 'error',
         failure: {
           message: message.errorMessage ?? `model "${message.model}" ended before a terminal stop reason`,
+          code: 'PI_AI_ERROR',
+        },
+      }
+    case 'deferred':
+      // pi-ai batch/async handles; this adapter does not poll DeferredHandle.
+      return {
+        kind: 'error',
+        failure: {
+          message: message.errorMessage ?? `model "${message.model}" returned a deferred completion this adapter does not poll`,
           code: 'PI_AI_ERROR',
         },
       }
