@@ -34,6 +34,7 @@ describe('reasoning schema boundary', () => {
 
   it('rejects a thinking format outside the offered set', () => {
     expect(configWith({ compat: { thinkingFormat: 'quantum' } })).toThrow(/expected/)
+    expect(configWith({ compat: { thinkingFormat: 'baseten' } })).toThrow(/expected/)
   })
 })
 

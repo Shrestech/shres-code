@@ -1552,10 +1552,11 @@ export type PiAiThinkingFormat = Exclude<PiThinkingFormat, WithheldThinkingForma
 type PiThinkingFormat = NonNullable<OpenAICompletionsCompat['thinkingFormat']>
 
 /**
- * pi-ai thinking formats a profile cannot name: both drive the request through
- * `chatTemplateKwargs`, which this configuration does not expose.
+ * pi-ai thinking formats a profile cannot name: they drive the request through
+ * `chatTemplateKwargs` or `chatTemplateArgs`, which this configuration does not
+ * expose.
  */
-type WithheldThinkingFormat = 'chat-template' | 'qwen-chat-template'
+type WithheldThinkingFormat = 'chat-template' | 'qwen-chat-template' | 'baseten'
 ```
 
 Depends on: `Api` (`@earendil-works/pi-ai`) · `CacheRetention` (`@earendil-works/pi-ai`) · `Model` (`@earendil-works/pi-ai`) · `ModelThinkingLevel` (`@earendil-works/pi-ai`) · `OpenAICompletionsCompat` (`@earendil-works/pi-ai`) · [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts) · `ThinkingBudgets` (`@earendil-works/pi-ai`) · `Transport` (`@earendil-works/pi-ai`)

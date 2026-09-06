@@ -117,6 +117,22 @@ function profileOptions(
 }
 
 /**
+ * Reclassify a terminal error finish as caller abort.
+ * @param chunk - one translated stream chunk.
+ * @returns an abort finish when `chunk` is an error finish, otherwise `chunk`.
+ */
+function errorFinishAsCallerAbort(chunk: StreamChunk): StreamChunk {
+  if (chunk.type !== 'finish' || chunk.reason.kind !== 'error') return chunk
+  return {
+    ...chunk,
+    reason: {
+      kind: 'aborted',
+      failure: { message: 'pi-ai request aborted by caller', code: 'ABORTED' },
+    },
+  }
+}
+
+/**
  * The profile default this exact model can actually take, for DESCRIBING it.
  * A configured level the model does not support yields none rather than
  * throwing: `resolveModel` builds the model catalog, and a catalog that fails
@@ -413,7 +429,12 @@ export class PiAiAdapter extends LlmAdapter {
             exhausted = true
             return
           }
-          yield result.value
+          // pi-ai can emit an error event (with the abort reason as the
+          // message) instead of throwing when the caller signal is already
+          // aborted, so the catch remap below never runs.
+          yield options.signal?.aborted === true
+            ? errorFinishAsCallerAbort(result.value)
+            : result.value
         }
       } finally {
         if (!exhausted) {
