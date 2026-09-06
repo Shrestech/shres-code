@@ -131,6 +131,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Owns one single-flight Grok session-credential manager per credential spec; the llm-grok-session adapter resolves its bearer token through this service.',
   },
   {
+    key: 'codexCredential',
+    pkg: 'codex-credential',
+    title: 'Codex subscription credential engine',
+    mode: 'core',
+    consumers: ['llm-codex-session'],
+    note: 'Owns one single-flight Codex session-credential manager per credential spec; the llm-codex-session adapter resolves its bearer token and account header through this service.',
+  },
+  {
     key: 'toolResultPruner',
     pkg: 'compaction-tool-result-pruner',
     title: 'Model-free tool-result pruning',

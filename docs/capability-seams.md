@@ -24,6 +24,9 @@ flowchart LR
   svc_tokenMeter["ctx.tokenMeter<br/>Replay token measurement"]
   pkg_grok_credential["grok-credential"]
   svc_grokCredential["ctx.grokCredential<br/>Grok Build subscription credential engine"]
+  pkg_codex_credential["codex-credential"]
+  svc_codexCredential["ctx.codexCredential<br/>Codex subscription credential engine"]
+  pkg_llm_codex_session["llm-codex-session"]
   pkg_compaction_tool_result_pruner["compaction-tool-result-pruner"]
   svc_toolResultPruner["ctx.toolResultPruner<br/>Model-free tool-result pruning"]
   pkg_session["session"]
@@ -246,6 +249,7 @@ flowchart LR
   pkg_bash_sandbox --> svc_shell
   pkg_code_runtime --> svc_codeRuntime
   pkg_code_runtime_worker --> svc_codeRuntime
+  pkg_codex_credential --> svc_codexCredential
   pkg_commands --> svc_commands
   pkg_compaction --> svc_compaction
   pkg_compaction_basic --> svc_compaction
@@ -367,6 +371,7 @@ flowchart LR
   svc_attachments --> pkg_llm_pi_ai
   svc_clientModules --> pkg_hmr
   svc_codeRuntime --> pkg_tools
+  svc_codexCredential --> pkg_llm_codex_session
   svc_compaction --> pkg_compaction_basic
   svc_cordisInspect --> pkg_tool_cordis
   svc_credentials --> pkg_apiproxy
@@ -494,6 +499,7 @@ flowchart LR
 | `ctx.llm` | `seam` | [`llm`](../packages/llm/llm) | [`llm-deepseek`](../packages/llm/llm-deepseek), [`llm-pi-ai`](../packages/llm/llm-pi-ai), [`llm-replay`](../packages/test-support/llm-replay), [`llm-cli-bridge`](../packages/llm/llm-cli-bridge), [`llm-grok-session`](../packages/llm/llm-grok-session) | [`agent-loop`](../packages/core/agent-loop), [`compaction-basic`](../packages/compaction/compaction-basic) | - | Adapters register provider implementations; the loop and compaction call the provider-neutral stream service. |
 | `ctx.tokenMeter` | `core` | [`token-meter`](../packages/llm/token-meter) | - | [`compaction-basic`](../packages/compaction/compaction-basic) | - | Owns isolated per-session replay folds; pressure consumers share immutable revisioned measurements. |
 | `ctx.grokCredential` | `core` | [`grok-credential`](../packages/llm/grok-credential) | - | [`llm-grok-session`](../packages/llm/llm-grok-session) | - | Owns one single-flight Grok session-credential manager per credential spec; the llm-grok-session adapter resolves its bearer token through this service. |
+| `ctx.codexCredential` | `core` | [`codex-credential`](../packages/llm/codex-credential) | - | [`llm-codex-session`](../packages/llm/llm-codex-session) | - | Owns one single-flight Codex session-credential manager per credential spec; the llm-codex-session adapter resolves its bearer token and account header through this service. |
 | `ctx.toolResultPruner` | `core` | [`compaction-tool-result-pruner`](../packages/compaction/compaction-tool-result-pruner) | - | [`compaction-basic`](../packages/compaction/compaction-basic) | - | Rewrites oversized current tool results through replayable single-node surface replacements before summary compaction. |
 | `ctx.sessions` | `core` | [`session`](../packages/core/session) | - | [`agent-loop`](../packages/core/agent-loop), [`agent`](../packages/core/agent), [`session-persistence`](../packages/session/session-persistence), [`session-query`](../packages/session-query/session-query), [`session-query-sqlite`](../packages/session-query/session-query-sqlite), `subagent-inprocess`, [`invariants`](../packages/runtime-diagnostics/invariants), [`message-feedback`](../packages/feedback/message-feedback) | - | Owns append-only Session instances and emits the durable session event feed. |
 | `ctx.invariants` | `core` | [`invariants`](../packages/runtime-diagnostics/invariants) | - | [`session`](../packages/core/session), [`agent`](../packages/core/agent), [`scope`](../packages/core/scope), [`agent-loop`](../packages/core/agent-loop) | - | Companion subpaths register owner-local checks; the service owns selection, uniqueness, child fibers, and package-attributed failures. |
