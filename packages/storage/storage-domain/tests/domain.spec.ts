@@ -1,8 +1,12 @@
-import { describe, expect, it, vi } from 'vitest'
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 import { Context } from '@shres-code/cordis'
 import { z } from 'zod'
 import Storage, { storageBackendServiceKey } from '@shres-code/shres-code-storage'
-import { apply, DomainFacility, defineDomain, domainTable } from '../src/index.ts'
+import { JsonStorageBackend } from '../../storage-json/src/index.ts'
+import { apply, DomainFacility, defineDomain, descriptorOf, domainTable } from '../src/index.ts'
 import type { Config } from '../src/index.ts'
 import type { DomainChanged } from '../src/events.ts'
 import { MemoryMediaPool, MemoryStorageBackend } from './helpers/memory-backend.ts'
@@ -17,6 +21,12 @@ const spec = defineDomain({
   version: 1,
   global: { schema: settingsSchema, initial: { theme: 'plain' } },
   tables: { items: domainTable<string, Item>(itemSchema) },
+})
+
+const jsonRoots: string[] = []
+
+afterAll(async () => {
+  for (const root of jsonRoots) await rm(root, { recursive: true, force: true })
 })
 
 const bareSpec = defineDomain({
@@ -56,6 +66,36 @@ describe('defineDomain', () => {
       global: { schema: settingsSchema.nullable(), initial: null },
       tables: {},
     })).toThrow(/must not accept null/)
+  })
+
+  it('validates compatibleVersions entries and projects them onto the descriptor', () => {
+    expect(() => defineDomain({ name: 'ok', version: 2, compatibleVersions: [1.5], tables: {} }))
+      .toThrow(/compatibleVersions/)
+    expect(() => defineDomain({ name: 'ok', version: 2, compatibleVersions: [2], tables: {} }))
+      .toThrow(/below version/)
+    expect(() => defineDomain({ name: 'ok', version: 2, compatibleVersions: [-1], tables: {} }))
+      .toThrow(/compatibleVersions/)
+    expect(descriptorOf(defineDomain({ name: 'ok', version: 2, compatibleVersions: [0, 1], tables: {} })))
+      .toMatchObject({ compatibleVersions: [0, 1] })
+    // An undeclared set is absent from the descriptor.
+    expect(descriptorOf(spec)).not.toHaveProperty('compatibleVersions')
+  })
+
+  it('rejects an unknown invalidRecords policy', () => {
+    expect(() => defineDomain({
+      name: 'ok', version: 1, invalidRecords: 'zap' as 'backup-and-skip', tables: {},
+    })).toThrow(/invalidRecords/)
+  })
+
+  it('rejects an invalid layout and projects the declared one onto the descriptor', () => {
+    // A spec built from config can carry any value; the union type is
+    // compile-time only, so the runtime boundary check must reject it.
+    expect(() => defineDomain({
+      name: 'ok', version: 1, layout: 'tree' as 'per-record', tables: {},
+    })).toThrow(/layout/)
+    expect(descriptorOf(defineDomain({ name: 'ok', version: 1, layout: 'per-record', tables: {} })))
+      .toMatchObject({ layout: 'per-record' })
+    expect(descriptorOf(spec)).not.toHaveProperty('layout')
   })
 })
 
@@ -126,6 +166,97 @@ describe('DomainFacility.open', () => {
       code: 'invalid-record',
       detail: { table: 'items', key: 'bad' },
     })
+  })
+
+  it('keeps the rejecting default under backup-and-skip when the backend cannot move documents', async () => {
+    // The memory backend has no backupRecord, so the declared policy cannot
+    // apply and the open falls back to failing loud.
+    const salvageSpec = defineDomain({
+      name: 'salvage',
+      version: 1,
+      invalidRecords: 'backup-and-skip',
+      tables: { items: domainTable<string, Item>(itemSchema) },
+    })
+    const pool = new MemoryMediaPool()
+    {
+      const { facility } = await harness({ pool })
+      await (await facility.open(salvageSpec)).table('items').put('bad', { label: 'x', count: 2 })
+    }
+    pool.media.get('salvage')!.tables.get('items')!.set('bad', { label: 'x', count: 'NaN' })
+    const { facility } = await harness({ pool })
+    await expect(facility.open(salvageSpec)).rejects.toMatchObject({
+      code: 'invalid-record',
+      detail: { table: 'items', key: 'bad' },
+    })
+  })
+
+  it('backs up and skips a schema-failing record when the json unit can move documents', async () => {
+    const salvageSpec = defineDomain({
+      name: 'salvage',
+      version: 1,
+      layout: 'per-record',
+      invalidRecords: 'backup-and-skip',
+      tables: { items: domainTable<string, Item>(itemSchema) },
+    })
+    const root = await mkdtemp(join(tmpdir(), 'shres-domain-salvage-'))
+    jsonRoots.push(root)
+    const sessionsDir = join(root, 'salvage', 'items')
+    await mkdir(sessionsDir, { recursive: true })
+    await writeFile(join(sessionsDir, 'bad.json'), JSON.stringify({
+      version: 1,
+      record: { label: 'x', count: 'NaN' },
+    }))
+    await writeFile(join(sessionsDir, 'good.json'), JSON.stringify({
+      version: 1,
+      record: { label: 'ok', count: 2 },
+    }))
+    const ctx = new Context()
+    await ctx.plugin(Storage)
+    const backend = new JsonStorageBackend(root)
+    ctx.storage.backend.register('json', backend)
+    const facility = new DomainFacility(ctx, { backend: 'json', routes: {} })
+    ctx.storage.mount('domain', facility)
+    const error = vi.spyOn(ctx.logger, 'error').mockImplementation(() => {})
+    const domain = await facility.open(salvageSpec)
+    expect(error).toHaveBeenCalledWith(expect.stringContaining("record 'bad'"))
+    expect(error).toHaveBeenCalledWith(expect.stringContaining('.json.bak.'))
+    expect(domain.table('items').get('bad')).toBeUndefined()
+    expect(domain.table('items').get('good')).toEqual({ label: 'ok', count: 2 })
+    const entries = await readdir(sessionsDir)
+    expect(entries).not.toContain('bad.json')
+    const backup = entries.find(name => /^bad\.json\.bak\.\d{12}$/.test(name))
+    expect(backup).toBeDefined()
+    expect(JSON.parse(await readFile(join(sessionsDir, backup!), 'utf8')))
+      .toMatchObject({ record: { count: 'NaN' } })
+    await domain.close()
+    await backend.close()
+  })
+
+  it('still rejects the open under the default policy even when the json unit can move documents', async () => {
+    const loudSpec = defineDomain({
+      name: 'loud',
+      version: 1,
+      layout: 'per-record',
+      tables: { items: domainTable<string, Item>(itemSchema) },
+    })
+    const root = await mkdtemp(join(tmpdir(), 'shres-domain-loud-'))
+    jsonRoots.push(root)
+    const dir = join(root, 'loud', 'items')
+    await mkdir(dir, { recursive: true })
+    const payload = JSON.stringify({ version: 1, record: { label: 'x', count: 'NaN' } })
+    await writeFile(join(dir, 'bad.json'), payload)
+    const ctx = new Context()
+    await ctx.plugin(Storage)
+    const backend = new JsonStorageBackend(root)
+    ctx.storage.backend.register('json', backend)
+    const facility = new DomainFacility(ctx, { backend: 'json', routes: {} })
+    ctx.storage.mount('domain', facility)
+    await expect(facility.open(loudSpec)).rejects.toMatchObject({
+      code: 'invalid-record',
+      detail: { table: 'items', key: 'bad' },
+    })
+    await expect(readFile(join(dir, 'bad.json'), 'utf8')).resolves.toBe(payload)
+    await backend.close()
   })
 
   it('rejects a stored global that fails its schema with the global marker', async () => {

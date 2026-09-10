@@ -4,7 +4,7 @@
  * session (`key → {ver, seq, val}` rows). The spec object
  * is the single source of the domain's identity, version, and record schema;
  * the storage-domain routing decides the medium (the shipped composition's
- * json backend lands it at `<root>/session_projcache.json`, beside
+ * json backend lands it at `<root>/session_projcache/`, beside
  * `workspace.json`).
  * @module @shres-code/shres-code-session-projection-cache/src/spec
  */
@@ -59,12 +59,21 @@ export const checkpointRecord = z.object({
 export type CheckpointRecord = z.infer<typeof checkpointRecord>
 
 /**
- * The session-projcache domain spec. Version bumps discard the whole medium
- * (cache semantics: a stale or unreadable cache costs a longer tail replay,
- * never a wrong value).
+ * The session-projcache domain spec. Records are disposable derived data:
+ * a stale or unreadable cache costs a longer tail replay, never a wrong
+ * value. `layout: 'per-record'` scopes a bad document to one session.
+ * `compatibleVersions: [1, 2]` admits older stamps whose current record
+ * schemas still parse (this generation's identity fields already match).
+ * `invalidRecords: 'backup-and-skip'` moves a schema-failing document aside
+ * as `<key>.json.bak.<stamp>`, logs the cause, and serves that session as
+ * uncached instead of refusing the plugin tree. Writes always stamp
+ * {@link version}.
  */
 export const projectionCacheDomainSpec = defineDomain({
   name: 'session_projcache',
   version: 3,
+  compatibleVersions: [1, 2],
+  invalidRecords: 'backup-and-skip',
+  layout: 'per-record',
   tables: { sessions: domainTable<SessionId, CheckpointRecord>(checkpointRecord) },
 })

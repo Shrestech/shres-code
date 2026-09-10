@@ -35,8 +35,40 @@ export interface DomainTableSpec<K extends string = string, V = unknown> {
 export interface DomainSpec {
   /** Domain name; must match `UNIT_NAME_RE` (doubles as the backend unit name). */
   readonly name: string
-  /** Domain format version; a medium stamped with a different version rejects at open. */
+  /**
+   * Domain format version. Writes always stamp this value. A stored record
+   * whose stamped version is this value or a declared {@link compatibleVersions}
+   * entry is admitted; any other stamp is refused (per-record documents read
+   * as absent; a `single` unit still rejects at open).
+   */
   readonly version: number
+  /**
+   * Medium layout. `single` (the default) keeps the whole unit in one
+   * document; `per-record` keeps each record in its own document so a version
+   * bump discards a stale record instead of rejecting the whole unit
+   * (a stale record document is discarded, never migrated).
+   */
+  readonly layout?: 'single' | 'per-record'
+  /**
+   * Older domain versions whose stored records the current record schemas
+   * also accept (the declaring owner vouches for that, typically by
+   * declaring the fields older records lack as optional). `per-record` backends
+   * read documents stamped with a listed version instead of discarding them,
+   * and accept a legacy whole-unit file so stamped for the one-time
+   * bootstrap; writes always stamp {@link version}.
+   */
+  readonly compatibleVersions?: readonly number[]
+  /**
+   * What `open` does with a stored table record that fails its zod schema.
+   * Absent (the default), the whole open rejects with `invalid-record` —
+   * right for authoritative data. `'backup-and-skip'` is for domains whose
+   * records are disposable derived data: the backend moves the record's
+   * document aside (`KvUnit.backupRecord`), the failure is logged with
+   * its cause, and the open continues with the record absent. A backend
+   * without `backupRecord` (no per-record document to move) falls back
+   * to the rejecting default. The global slot always rejects.
+   */
+  readonly invalidRecords?: 'backup-and-skip'
   /** Optional global singleton slot. */
   readonly global?: DomainGlobalSpec<unknown>
   /** Table declarations keyed by table name; each name must match `UNIT_NAME_RE`. */
@@ -68,7 +100,9 @@ export function domainTable<K extends string, V>(schema: ZodType<V>): DomainTabl
  * Identity helper that pins a spec's literal types and validates its fields.
  * Misconfiguration fails loud at the owning package's module load, before any
  * medium is touched: a domain or table name outside `UNIT_NAME_RE`, a version
- * that is not a non-negative integer, or a global schema that accepts `null`
+ * that is not a non-negative integer, a `compatibleVersions` entry that is not
+ * a non-negative integer strictly below {@link DomainSpec.version}, an unknown
+ * `layout` or `invalidRecords` value, or a global schema that accepts `null`
  * all throw. The `null` rejection guards round-tripping: backends store the
  * global as opaque JSON with `null` as the "never written" sentinel, so a
  * nullable global would be indistinguishable from an absent one on reopen
@@ -82,6 +116,27 @@ export function defineDomain<S extends DomainSpec>(spec: S): S {
   }
   if (!Number.isInteger(spec.version) || spec.version < 0) {
     throw new Error(`domain '${spec.name}' version must be a non-negative integer, got ${spec.version}`)
+  }
+  for (const compat of spec.compatibleVersions ?? []) {
+    if (!Number.isInteger(compat) || compat < 0 || compat >= spec.version) {
+      throw new Error(
+        `domain '${spec.name}' compatibleVersions entries must be non-negative integers below version ${spec.version}, got ${compat}`,
+      )
+    }
+  }
+  if (spec.layout !== undefined) {
+    // Runtime boundary: the union type is compile-time only — a spec built
+    // from config could carry any value, and a bad one must fail loud here.
+    const layout: string = spec.layout
+    if (layout !== 'single' && layout !== 'per-record') {
+      throw new Error(`domain '${spec.name}' layout must be 'single' or 'per-record', got ${layout}`)
+    }
+  }
+  if (spec.invalidRecords !== undefined) {
+    const policy: string = spec.invalidRecords
+    if (policy !== 'backup-and-skip') {
+      throw new Error(`domain '${spec.name}' invalidRecords must be 'backup-and-skip' when present, got ${policy}`)
+    }
   }
   for (const table of Object.keys(spec.tables)) {
     if (!UNIT_NAME_RE.test(table)) {
@@ -108,5 +163,7 @@ export function descriptorOf(spec: DomainSpec): KvUnitDescriptor {
     version: spec.version,
     tables: Object.keys(spec.tables),
     hasGlobal: spec.global !== undefined,
+    ...spec.layout === undefined ? {} : { layout: spec.layout },
+    ...spec.compatibleVersions === undefined ? {} : { compatibleVersions: spec.compatibleVersions },
   }
 }

@@ -17,6 +17,7 @@ import SessionProjectionRegistry from '@shres-code/shres-code-session-projection
 import type { ProjectionDefinition } from '@shres-code/shres-code-session-projection'
 import { MemoryMediaPool, MemoryStorageBackend } from '../../../storage/storage-domain/tests/helpers/memory-backend.ts'
 import SessionProjectionCache from '../src/index.ts'
+import { projectionCacheDomainSpec } from '../src/spec.ts'
 
 declare module '@shres-code/shres-code-session-projection/types' {
   interface SessionProjectionMap {
@@ -115,6 +116,18 @@ const settle = () => new Promise(resolve => setTimeout(resolve, 0))
 afterEach(async () => {
   vi.useRealTimers()
   await Promise.all(contexts.splice(0).map(ctx => ctx.fiber.dispose()))
+})
+
+describe('projectionCacheDomainSpec', () => {
+  it('opts the derived cache into per-record read-compat and salvage', () => {
+    expect(projectionCacheDomainSpec).toMatchObject({
+      name: 'session_projcache',
+      version: 3,
+      layout: 'per-record',
+      compatibleVersions: [1, 2],
+      invalidRecords: 'backup-and-skip',
+    })
+  })
 })
 
 describe('SessionProjectionCache write policy', () => {
