@@ -3,13 +3,9 @@
 import type { TypertForwardableEvent } from '@shres-code/shres-code-typert-protocol'
 import { API_REMOTE_FORWARDED_EVENTS } from './remote-events.ts'
 
-// The owner packages' client-safe `./types` exports carry the cordis `Events`
-// declarations for every allowlisted event. Pulling them into this face is what
-// makes the shape assertion below judge real signatures rather than an empty
-// event vocabulary.
-import type {} from '@shres-code/shres-code-host-remote-control/remote'
 // The remote-control event vocabulary (tunnel-state) lives in the package's
-// client-safe types face; the /remote artifact carries only the namespace map.
+// client-safe types face. Host typecheck runs before Typert writes the
+// `./remote` artifact, so this Host entry must not import it.
 import type {} from '@shres-code/shres-code-host-remote-control/types'
 import type {} from '@shres-code/shres-code-commands/types'
 import type {} from '@shres-code/shres-code-cordis-host-runner/types'

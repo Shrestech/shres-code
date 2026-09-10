@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@shres-code/cordis'
 import { createScope, scopeTarget } from '@shres-code/shres-code-scope'
-import { createUserMessage, CallId, createMessage, createToolResultMessage, freezeMessage } from '@shres-code/shres-code-llm'
+import {
+  createUserMessage, CallId, createMessage, createToolResultMessage, freezeMessage,
+  type ToolResultBlock,
+} from '@shres-code/shres-code-llm'
 import SessionStore, { SessionId, TOOL_NOT_STARTED } from '@shres-code/shres-code-session'
 import * as SessionInvariant from '@shres-code/shres-code-session/invariant'
 import InvariantRegistry, { InvariantError } from '@shres-code/shres-code-invariants'
@@ -277,7 +280,7 @@ describe('session-log invariants', () => {
         content: [{
           ...original.data.message.content[0],
           content: [{ type: 'text', text: 'pruned' }],
-        }],
+        }] as [ToolResultBlock],
       }),
     }, {
       surfaceOp: { op: 'replace', start: original.seq, end: original.seq },
@@ -316,7 +319,7 @@ describe('session-log invariants', () => {
         content: [{
           ...original.data.message.content[0],
           content: [{ type: 'text', text: 'pruned' }],
-        }],
+        }] as [ToolResultBlock],
       }),
     }, {
       surfaceOp: { op: 'replace', start: original.seq, end: original.seq },
