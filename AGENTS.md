@@ -27,14 +27,15 @@ packages/    @shres-code/shres-code-<pkg> workspaces at packages/<group>/<pkg>/
   compaction/     compaction capability + basic provider
   context/     request-context plugins
   subagent/    subagent capability: Service Definition + providers + delegation Consumers
+  team/        Agent Teams coordination
   bundle/      installable shres --profile patch-layer bundles
   workflow/    workflow capability + worker-thread provider + tool Consumer
   todo/        todo_write tool
   plan/        plan mode as logged state
-  preset/      per-session agent composition from preset cordis.yml files
+  preset/      per-session agent composition from cordis.yml
   research/    autoresearch toggle and researcher protocol
   wiki/         project long-term markdown memory
-  guard/       loop-hygiene + tool-timeout plugins
+  guard/       loop-hygiene guards
   self-modification/  the agent inspects/mounts its own plugins
   hooks/       Claude Code/Codex hook bridges + wire-protocol library
   session/     durable session data: persistence, projection, titles, telemetry
