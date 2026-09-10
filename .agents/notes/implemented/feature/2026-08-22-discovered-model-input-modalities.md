@@ -8,7 +8,7 @@ A hand-declared pi-ai route serving a vision model reported `inputModalities: ['
 
 ## Decision
 
-**Discovery carries declared modalities; absence stays absence.** `LlmDiscoveredModel.input` is optional and means "the endpoint or the installed catalog stated this" — never `[]`, never a guess. The pi-ai adapter fills it from both of its discovery paths: a catalog route maps the catalog entry's `input`, and a draft-provider listing parses OpenRouter's `architecture.input_modalities`, keeping only the modalities pi-ai knows and answering absent for a missing, malformed, or wholly unknown list. The discovery contract is otherwise unchanged: no endpoint is probed beyond the listing it already serves, and a row that cannot be read is still skipped, never fatal.
+**Discovery carries declared modalities; absence stays absence.** `LlmDiscoveredModel.input` is optional and means "the endpoint or the installed catalog stated this" — never `[]`, never a guess. The pi-ai adapter fills it from its discovery paths: a catalog route maps the catalog entry's `input`, a draft-provider listing parses OpenRouter's `architecture.input_modalities`, keeping only the modalities pi-ai knows and answering absent for a missing, malformed, or wholly unknown list, and an Ollama origin additionally reads `POST /api/show` as [Ollama `/api/show` discovery](2026-09-10-ollama-show-discovery-capabilities.md). A listing row that cannot be read is still skipped, never fatal.
 
 **The wire field is `inputModalities`, named exactly like the llm service field.** `ModelCatalogModel` gains it optional, `DiscoveredModelView` gains `input`; both project absence as an absent key, so the client reads the same tri-state the host's own admission reads — declared-with-image, declared-without, unknown. Renaming at the boundary would invent a second vocabulary for one fact.
 
@@ -22,7 +22,7 @@ A hand-declared pi-ai route serving a vision model reported `inputModalities: ['
 - **A host projection for the composer hint** (the `imageLimits` pattern) — rejected: model selection is process-local proxy state with no session event, so a projection has no change frames to push on switch and would serve a stale refusal; the client directory is already the fact source for the current model and updates on select.
 - **A full composer block for image-less models** — rejected: text input still works on such a model, and a block makes the whole composer inert. The refusal belongs to image intake alone.
 - **Reactive disable of the attach affordances** — rejected as surface out of proportion: every intake path (paste, drop, command) funnels through the one `addImages` refusal, which announces the exact obstacle; gating the drop overlay's invitation copy reactively would need a new slot-inject channel for a hint the refusal already delivers.
-- **Per-model Ollama probing** (`/api/show`) — rejected: ollama.com listings carry no modality data, so the probe buys nothing for the routes that motivated the fallback; the manual override and the route `defaultInput` cover them.
+- **Per-model Ollama probing** (`/api/show`) — rejected here because `GET /models` on ollama.com discloses no modalities. That rejection is superseded: `/api/show` is a different endpoint and does answer, implemented in [Ollama `/api/show` discovery](2026-09-10-ollama-show-discovery-capabilities.md). The listing itself is still id-only.
 - **An optimistic `[text, image]` default** — remains rejected under the route-default note: detection narrows the gap to endpoints that declare nothing, it does not change what being wrong costs.
 
 ## Consequences
@@ -31,7 +31,7 @@ A vision model behind an OpenRouter-declaring gateway is claimed as one by fetch
 
 Detection shifts where a wrong claim can come from, not what one costs: an adopted declaration is the endpoint's claim about itself, still not a verification of it, and a model claiming images its endpoint refuses produces the same poisoned-session failure the route-default note records. What detection removes is the common case of *under*-claiming against an endpoint that could have answered.
 
-Routes whose listings say nothing (ollama.com today) gain no badge and no adopted key, and their `defaultInput` floor is intact — which makes the floor's `['text']` itself a stated list: the composer refuses image intake on those routes where the refusal previously arrived at send, with the same copy. The admissible-unknown reading is reserved for what states nothing: delegated CLI routes report no modalities and keep the host's leniency, as do a directory that has not loaded and a current model absent from the advertised groups.
+Routes whose listings say nothing and which are not Ollama origins gain no badge and no adopted key, and their `defaultInput` floor is intact — which makes the floor's `['text']` itself a stated list: the composer refuses image intake on those routes where the refusal previously arrived at send, with the same copy. Ollama origins fill the declaration from `/api/show` instead. The admissible-unknown reading is reserved for what states nothing: delegated CLI routes report no modalities and keep the host's leniency, as do a directory that has not loaded and a current model absent from the advertised groups.
 
 ## Testing
 
@@ -39,6 +39,8 @@ Routes whose listings say nothing (ollama.com today) gain no badge and no adopte
 
 ## Related
 
+- [OpenRouter Fetch reads the live `/models` listing, not the pinned catalog](2026-09-10-openrouter-live-listing-discovery.md) — the OpenRouter card's catalog short-circuit this note's listing parser never reached.
+- [Ollama discovery reads `/api/show` for vision and context, instead of inheriting text-only](2026-09-10-ollama-show-discovery-capabilities.md) — the Ollama-origin probe this note's listing-only clause deferred.
 - [A pi-ai model declares its own input modalities, and undeclared means text](../architecture/2026-08-12-pi-ai-route-default-input-modalities.md) — the resolution chain this change feeds and the conservative floor it keeps.
 - [Minimal read_image tool](../feature/2026-08-10-minimal-read-image-tool.md) — the strict gate whose refusal named the motivating symptom.
 - [Web multimodal image input and durable attachments](../feature/2026-07-22-web-multimodal-image-input-and-durable-attachments.md) — the intake and admission paths the composer hint fronts.

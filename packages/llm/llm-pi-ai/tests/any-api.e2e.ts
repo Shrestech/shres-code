@@ -53,11 +53,42 @@ async function localOllamaReachable(): Promise<boolean> {
 }
 
 const ollamaCloudKey = process.env.OLLAMA_API_KEY
+const openrouterKey = process.env.OPENROUTER_API_KEY
 const xaiKey = process.env.XAI_API_KEY
 const moonshotKey = process.env.MOONSHOT_API_KEY
 const anthropicKey = process.env.ANTHROPIC_API_KEY
 
+describe.skipIf(!openrouterKey)('openrouter e2e', () => {
+  it('discovers vision from the live listing, not the pinned catalog', async () => {
+    const models = await discoverModels({
+      provider: 'openrouter',
+      api: 'openai-completions',
+      apiKey: openrouterKey ?? '',
+    })
+    expect(models.find(model => model.id === 'meta/muse-spark-1.3')?.input)
+      .toEqual(['text', 'image'])
+    expect(models.find(model => model.id === 'meta/muse-spark-1.3')?.audioInput).toBe(true)
+    expect(models.find(model => model.id === 'moonshotai/kimi-k2-thinking')?.input)
+      .toEqual(['text'])
+  })
+})
+
 describe.skipIf(!ollamaCloudKey)('ollama-cloud e2e', () => {
+  it('discovers vision from /api/show, not from GET /models', async () => {
+    const models = await discoverModels({
+      provider: 'ollama-cloud',
+      baseURL: 'https://ollama.com/v1',
+      api: 'openai-completions',
+      apiKey: ollamaCloudKey ?? '',
+    })
+    expect(models.find(model => model.id === 'kimi-k3' || model.id === 'kimi-k3:cloud')?.input)
+      .toEqual(['text', 'image'])
+    expect(models.find(model => model.id.startsWith('deepseek-v4-flash'))?.input)
+      .toEqual(['text'])
+    expect(models.find(model => model.id === 'kimi-k3' || model.id === 'kimi-k3:cloud')?.contextWindow)
+      .toBe(1_048_576)
+  })
+
   it('streams a :cloud model id', async () => {
     const ctx = await harness({
       providers: {

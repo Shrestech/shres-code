@@ -16,11 +16,11 @@ Keys are write-only. The page receives a redacted descriptor after saving, never
 
 ### Local Ollama
 
-The `ollama-local` route talks to `http://localhost:11434/v1` and needs no API key. First run probes `GET /v1/models` and offers whatever that listing returns. The CLI id you pass to `ollama run` is the same id the API accepts.
+The `ollama-local` route talks to `http://localhost:11434/v1` and needs no API key. First run probes `GET /v1/models` and offers whatever that listing returns. **Fetch available models** then asks `POST /api/show` for each id so a vision-capable local model is marked **vision** instead of inheriting text-only. The CLI id you pass to `ollama run` is the same id the API accepts.
 
 ### Ollama Cloud
 
-The `ollama-cloud` route talks to `https://ollama.com/v1` with `OLLAMA_API_KEY`. Cloud model ids carry a `:cloud` suffix; the shipped catalog includes `deepseek-v4-flash:cloud` and `deepseek-v4-pro:cloud`. Those spellings match `ollama run deepseek-v4-flash:cloud`. Context window and max tokens are pinned on the route because `GET /models` does not disclose them.
+The `ollama-cloud` route talks to `https://ollama.com/v1` with `OLLAMA_API_KEY`. Cloud model ids carry a `:cloud` suffix; the shipped catalog includes `deepseek-v4-flash:cloud` and `deepseek-v4-pro:cloud`. Those spellings match `ollama run deepseek-v4-flash:cloud`. `GET /models` returns ids only; **Fetch available models** asks `POST /api/show` for `capabilities` (including `vision`) and `context_length`, then adopting a candidate stores that declaration. Max output tokens stay a route default because `/api/show` does not disclose them.
 
 ### Claude, Grok, and Kimi
 
@@ -36,11 +36,11 @@ Choose **Add a custom provider** for a company gateway, self-hosted server, or p
 
 The Provider ID is permanent because requests, saved sessions, model defaults, and credential references use it. To rename a provider, add a new provider and delete the old one. The display name, base URL, protocol, credential, and models remain editable.
 
-Under **Model catalog**, choose **Fetch available models** to query the base URL and credential currently shown in the form. Selecting candidates updates the draft; the provider is not stored until you save. Catalog providers use their installed catalog without a network request.
+Under **Model catalog**, choose **Fetch available models** to query the base URL and credential currently shown in the form. Selecting candidates updates the draft; the provider is not stored until you save. Catalog providers other than OpenRouter use their installed catalog without a network request. OpenRouter Fetch reads the live `GET /models` listing, which declares each model's input modalities (vision, and STT/TTS chips when the row includes audio).
 
 ### Image input
 
-A fetched candidate whose listing declares modalities brings the declaration with it: **Fetch available models** marks an image-capable one **vision**, and adopting it stores the declaration. A model you enter by hand — or one fetched from a listing that declares nothing, which is most of them — stays undeclared and is treated as text-only. Attaching an image to such a model is refused before it is sent.
+A fetched candidate whose listing, OpenRouter `architecture.input_modalities`, or Ollama `/api/show` reply declares modalities brings the declaration with it: **Fetch available models** marks an image-capable one **vision**, and adopting it stores the declaration. A model you enter by hand — or one fetched from a listing that declares nothing, which is most other OpenAI-compatible endpoints — stays undeclared and is treated as text-only. Attaching an image to such a model is refused before it is sent. **Auto (catalog or route default)** on a row is the absent `input` key: inherit the installed catalog, then the route's `defaultInput` (text-only unless you set it). It is not a live query; Fetch is.
 
 To declare a vision model yourself, open the model row's advanced fold and set **Input** to **Text + image (vision)**. The equivalent in `$SHRES_HOME/settings.yaml` is one `input` line on the model:
 
@@ -102,7 +102,7 @@ If a saved default names a provider that was deleted, the composer displays **Se
 - **Local Ollama is missing from the picker** — `GET http://localhost:11434/v1/models` did not answer. Start Ollama and retry; the shipped route still appears on the Models page.
 - **`UNKNOWN_MODEL`** — Select a configured model or add the missing model to the custom provider.
 - **Fetching available models returns 401** — Check the key. Model discovery calls the OpenAI-compatible `GET /models` endpoint; enter models manually for endpoints that do not provide it.
-- **An image is refused before sending** — The model declares no image modality. Set the model row's **Input** to **Text + image (vision)**, or give a custom provider's model `input: [text, image]` in `settings.yaml`; DeepSeek's own chat-completions route is text-only and cannot be configured otherwise.
+- **An image is refused before sending** — The model declares no image modality. On an Ollama route, **Fetch available models** and adopt the candidate so `/api/show` can store `input: [text, image]`; otherwise set the model row's **Input** to **Text + image (vision)**, or write that list in `settings.yaml`. DeepSeek's own chat-completions route is text-only and cannot be configured otherwise. An existing row keeps its stored declaration when you fetch again — set **Input** on that row, or delete it and re-adopt.
 - **The provider rejects a request carrying an image** — The model declares images its endpoint does not actually serve. Remove `image` from whichever list granted it — the model's `input`, or the route's `defaultInput` — then start a new session: the attached image stays in the session log, so the same request repeats until the session moves off it.
 
 ## Advanced configuration

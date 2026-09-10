@@ -1,7 +1,8 @@
 /**
  * Local Ollama probe. Reuses pi-ai discovery so `/v1/models` parsing stays
- * in one place; this module only supplies the timeout and maps a miss to
- * `reachable: false` instead of throwing.
+ * in one place (and `/api/show` enrichment, when it runs, cannot fail a
+ * listing that already succeeded); this module only supplies the timeout
+ * and maps a miss to `reachable: false` instead of throwing.
  *
  * @module @shres-code/shres-code-first-run-setup/detect
  */

@@ -386,6 +386,7 @@ async function discoverModels(
         ...model.name === undefined ? {} : { name: model.name },
         ...model.contextWindow === undefined ? {} : { contextWindow: model.contextWindow },
         ...model.maxTokens === undefined ? {} : { maxTokens: model.maxTokens },
+        ...model.input === undefined ? {} : { input: [...model.input] },
       })
     }
     await ctx.settings.mutate(settingsNamespace(entry.settingsNs), [{

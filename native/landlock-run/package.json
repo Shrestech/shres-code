@@ -24,8 +24,8 @@
   },
   "devDependencies": {
     "@shres-code/node-addon-landlock-run": "workspace:*",
-    "@types/node": "^26.0.1",
-    "tsx": "^4.23.8",
+    "@types/node": "^26.2.0",
+    "tsx": "^4.23.11",
     "typescript": "^6.0.3"
   }
 }

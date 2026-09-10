@@ -35,7 +35,7 @@ shres models discover ollama-local
 shres models discover ollama-local --base-url http://127.0.0.1:11434/v1 --add
 ```
 
-`discover` asks the same `GET /v1/models` path the Models page uses. `--add` appends advertised ids to that route's stored model list.
+`discover` asks the same path the Models page uses: `GET /v1/models`, and on an Ollama route `POST /api/show` for vision and context. `--add` appends advertised ids (and any declared `input` or window) to that route's stored model list. Existing rows are not rewritten.
 
 ## Add or remove a provider
 
