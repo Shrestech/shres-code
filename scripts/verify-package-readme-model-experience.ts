@@ -57,6 +57,7 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/core/first-run-setup': { kind: 'indirect', reason: 'The picker writes a ModelSelection and credentials; request assembly and adapters own the model-visible request.' },
   'packages/preset/agent-presets': { kind: 'indirect', reason: 'The mount installs a preset\'s own plugins, which own every model-facing registration it makes visible.' },
   'packages/jspace/jspace': { kind: 'none', reason: 'The seat stores logged card state; the prompt Consumer owns request text.' },
+  'packages/team/agent-team': { kind: 'none', reason: 'The package stores log-only coordination records and a client-facing projection of them; later tool consumers own every model-visible byte.' },
   'packages/wiki/wiki': { kind: 'none', reason: 'The seat stores project markdown and ranked search results; the tool Consumer owns every model-visible byte.' },
   'packages/wiki/wiki-filesystem': { kind: 'none', reason: 'The provider persists markdown on disk; the tool Consumer owns every model-visible byte.' },
   'packages/wiki/wiki-embed-onnx': { kind: 'none', reason: 'The provider supplies vectors to ctx.wiki.search; the tool Consumer owns every model-visible byte.' },

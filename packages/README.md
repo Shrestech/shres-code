@@ -28,6 +28,7 @@ Groups hold `packages/<group>/<pkg>/`; names stay `@shres-code/shres-code-<pkg>`
 | [`compaction/`](compaction/README.md) | Compaction capability family: Service Definition + basic provider + command Consumer | Product — stable API |
 | [`context/`](context/README.md) | Model-visible request context, including workspace instructions and time context | Product — stable API |
 | [`subagent/`](subagent/README.md) | Subagent capability family: the provider-registry contract and the model-facing delegation tool | Product — stable API |
+| [`team/`](team/README.md) | Agent Teams coordination | Product — stable API |
 | [`jobs/`](jobs/README.md) | Generic background-job runtime and model-facing `job_*` control tools | Product — stable API |
 | [`workflow/`](workflow/README.md) | Workflow seam, worker-thread engine, and model-facing `workflow`/`ralph` tools | Product — stable API |
 | [`web/`](web/README.md) | Web capability family: seam, search/fetch provider impls, and the model-facing web tools | Product — stable API |
@@ -45,7 +46,7 @@ Groups hold `packages/<group>/<pkg>/`; names stay `@shres-code/shres-code-<pkg>`
 | [`bundle/`](bundle/README.md) | Installable `shres --profile` patch layers | Product — stable API |
 | [`extensions/`](extensions/README.md) | Agent runtime self-modification: live plugin/service inspection and model-written plugin mount/unmount ([design](../.agents/notes/implemented/feature/2026-07-08-self-referential-cordis-toolset.md)) | Product — stable API |
 | [`hooks/`](hooks/README.md) | Hook bridges + the shared Claude Code / Codex wire-protocol library | Product — stable API |
-| [`session/`](session/README.md) | Durable session data plane: persistence seam + JSONL/SQLite backends, projection seam, log-backed titles, session reporting | Product — stable API |
+| [`session/`](session/README.md) | Durable session data plane: persistence seam + JSONL/SQLite backends, projection seam, log-backed titles | Product — stable API |
 | [`session-query/`](session-query/README.md) | Session retrieval: bounded reads, lineage, semantic filtering, and SQLite full-text search | Product — stable API |
 | [`settings/`](settings/README.md) | User-settings seam + file-backed provider | Product — stable API |
 | [`credentials/`](credentials/README.md) | Credential-reference seam + env-over-`.env` provider | Product — stable API |
@@ -58,8 +59,8 @@ Groups hold `packages/<group>/<pkg>/`; names stay `@shres-code/shres-code-<pkg>`
 | [`host/`](host/README.md) | Web-GUI host half: API gateway + HTTP route server | Product — stable API |
 | [`client/`](client/README.md) | Web-GUI browser half: shell, wire, object services, slots, `ui-*` plugins | Product — stable API |
 | [`examples/`](examples/README.md) | Demo bundles (agent-spine + CLI/ACP/JSON-RPC bins) leaves load | Support — example infra |
-| [`test-support/`](test-support/README.md) | Support infrastructure (testkits, invariants, replay, Loader smokes) | Support — lower compatibility expectations |
-| [`util/`](util/README.md) | Low-level zero-dependency utilities shared across groups (`Branded<B>`, Harness home/path helpers, timeout, retention) | Support — small, stable, harness-dep-free |
+| [`test-support/`](test-support/README.md) | Support infrastructure | Support — lower compatibility expectations |
+| [`util/`](util/README.md) | Low-level zero-dependency utilities shared across groups (`Branded<B>`, Harness home/path helpers) | Support — small, stable, harness-dep-free |
 
 New packages join existing groups; new groups update their README and this table.
 

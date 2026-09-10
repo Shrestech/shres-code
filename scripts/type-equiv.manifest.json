@@ -2239,6 +2239,26 @@
       "doc": "docs/subsystems/wiki.md",
       "symbol": "WikiLibrarianRequestEvent",
       "source": "packages/wiki/wiki/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/agent-team.md",
+      "symbol": "TeamMemberSnapshot",
+      "source": "packages/team/agent-team/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/agent-team.md",
+      "symbol": "TeamMessageSnapshot",
+      "source": "packages/team/agent-team/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/agent-team.md",
+      "symbol": "TeamMessageSource",
+      "source": "packages/team/agent-team/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/agent-team.md",
+      "symbol": "TeamTaskSnapshot",
+      "source": "packages/team/agent-team/src/types.ts"
     }
   ]
 }
