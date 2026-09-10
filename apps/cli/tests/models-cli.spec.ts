@@ -204,7 +204,12 @@ describe('shres models / providers', () => {
 
   it('discovers models and optionally appends them', async () => {
     const home = await tempHome()
-    const baseURL = await listingServer({ data: [{ id: 'qwen3', name: 'Qwen 3' }, { id: 'llama3.2' }] })
+    const baseURL = await listingServer({
+      data: [
+        { id: 'qwen3', name: 'Qwen 3', architecture: { input_modalities: ['text', 'image'] } },
+        { id: 'llama3.2' },
+      ],
+    })
     const listed = await run(home, {
       kind: 'models-discover', provider: 'ollama-local', baseURL, add: false,
     })
@@ -216,6 +221,13 @@ describe('shres models / providers', () => {
     expect(added.exit).toBe(0)
     const after = await run(home, { kind: 'models-list' })
     expect(after.stdout).toContain('qwen3')
+    const ctx = await bootModelsCli(home)
+    const descriptor = ctx.settings.describe().find(entry => entry.ns === settingsNamespace('llm-pi-ai'))
+    const providers = (descriptor?.value as { providers?: Record<string, { models?: unknown[] }> })?.providers
+    expect(providers?.['ollama-local']?.models).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'qwen3', name: 'Qwen 3', input: ['text', 'image'] }),
+    ]))
+    await ctx.fiber.dispose()
     const empty = await run(home, {
       kind: 'models-discover', provider: 'ollama-local', baseURL: await listingServer({ data: [] }), add: true,
     })

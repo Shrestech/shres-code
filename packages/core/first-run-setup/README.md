@@ -5,7 +5,7 @@ First-run model picker. `FirstRunSetup` provides `ctx.firstRunSetup`; it probes 
 The plugin does not silently select a vendor. A composition default such as `deepseek-official` is used only when that route is already usable (typically `DEEPSEEK_API_KEY` is set). Otherwise a TTY shows detected local Ollama models, the shipped template routes (Ollama Cloud, OpenAI, Anthropic, xAI, Moonshot, OpenRouter, Groq, Z.AI, DeepSeek), and a custom base URL; a non-TTY process fails with an error that names those same configuration paths.
 
 - `ctx.firstRunSetup.needsSetup()` is true when the user layer of `agent-default-model` is empty and the current default cannot serve.
-- `ctx.firstRunSetup.detectLocalOllama()` calls `GET {ollamaBaseURL}/models` through pi-ai discovery, with `detectTimeoutMs`.
+- `ctx.firstRunSetup.detectLocalOllama()` calls pi-ai discovery (`GET {ollamaBaseURL}/models`, then `/api/show` enrichment that cannot fail a successful listing), with `detectTimeoutMs`.
 - `ctx.firstRunSetup.ensureReady(io?)` runs the CLI picker when setup is required. Headless calls this after the loader settles so adapter routes exist first.
 - `autoRunCli` runs that picker during plugin apply. The base bundle leaves it false so the Web process never blocks on stdin.
 

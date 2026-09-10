@@ -3,10 +3,10 @@
  * surface's "fetch available models" action.
  *
  * A route the installed pi-ai catalog ships is answered **from that catalog**,
- * with no network call at all: pi-ai's registry is the authoritative list for
- * its own providers, and it carries the capacities a listing endpoint would
- * not disclose. Only a route the catalog does not describe — a gateway, a
- * self-hosted server — is interrogated over the wire.
+ * with no network call at all — except OpenRouter, whose `GET /models` listing
+ * discloses `architecture.input_modalities` (and context length) the pinned
+ * catalog does not keep current. Only a route the catalog does not describe,
+ * or OpenRouter, is interrogated over the wire.
  *
  * Neither path is a catalog refresh. Nothing here is stored: the request
  * carries a draft the user is still editing, and the reply is candidate
@@ -14,13 +14,17 @@
  * thing that decides what a route serves.
  *
  * Both paths also carry declared input modalities when the source discloses
- * them — the installed catalog always does; a listing endpoint does only
- * through OpenRouter's `architecture.input_modalities` — so a surface can show
- * and adopt the detection instead of asking the user to declare `input` by
- * hand. Endpoints without that block disclose nothing, and the entry inherits
- * the route's `defaultInput` as before. OpenRouter rows additionally carry
- * their declared audio directions as display-only `audioInput`/`audioOutput`
- * answers; audio never joins the chat modality vocabulary.
+ * them — the installed catalog always does; a listing endpoint does through
+ * OpenRouter's `architecture.input_modalities`, and an Ollama origin (Cloud,
+ * local `:11434`, or an `ollama*` provider route) additionally answers
+ * `POST /api/show` per listed id, because `GET /models` and `GET /api/tags`
+ * disclose none. `/api/show` is enrichment, never a second listing: a miss,
+ * a malformed body, or caller abort while it is in flight leaves that row
+ * as the listing returned it, and never fails the interrogation. Endpoints
+ * that disclose nothing still inherit the route's `defaultInput`. OpenRouter
+ * rows additionally carry their declared audio directions as display-only
+ * `audioInput`/`audioOutput` answers; audio never joins the chat modality
+ * vocabulary.
  *
  * Only OpenAI-compatible protocols are interrogated. Their listing is the one
  * shape a gateway, a self-hosted server, and the official endpoints all agree
@@ -34,7 +38,7 @@
 import { INVALID_CREDENTIAL_CODE, LlmError, normalizeApiKey } from '@shres-code/shres-code-llm'
 import type { LlmDiscoveredModel, LlmModelDiscoveryRequest } from '@shres-code/shres-code-llm'
 import { attributionHeaders } from '@shres-code/shres-code-llm'
-import { MODALITIES, catalogModels } from './catalog.ts'
+import { MODALITIES, catalogModels, catalogProvider } from './catalog.ts'
 import type { PiAiModality } from './catalog.ts'
 
 /**
@@ -49,6 +53,16 @@ const LISTABLE_PROTOCOLS: ReadonlySet<string> = new Set([
   'openai-completions',
   'openai-responses',
 ])
+
+/**
+ * Parallel `/api/show` probes per listing. Ollama Cloud's public catalog is
+ * tens of models, not hundreds; eight keeps the enrichment inside a fetch
+ * click without serializing every probe.
+ */
+const SHOW_CONCURRENCY = 8
+
+/** Ollama's documented default listen port, used to recognize a local host. */
+const OLLAMA_PORT = '11434'
 
 /**
  * Endpoint replies larger than this are refused. The endpoint is whatever URL
@@ -71,6 +85,8 @@ interface ListingEntry {
   max_output_tokens?: unknown
   /** OpenRouter's per-model architecture block; absent elsewhere. */
   architecture?: unknown
+  /** OpenRouter nests the output cap here; absent from the official OpenAI listing. */
+  top_provider?: unknown
 }
 /** A positive integer field of a listing entry, or `undefined` when absent or unusable. */
 function capacity(...candidates: readonly unknown[]): number | undefined {
@@ -129,6 +145,174 @@ function listingAudio(entry: ListingEntry): { input: boolean; output: boolean } 
 }
 
 /**
+ * Whether this interrogation should ask Ollama's native `/api/show` after the
+ * OpenAI-compatible listing. `GET /models` on ollama.com and a local daemon
+ * returns ids only; capabilities live on `/api/show`. The probe is confined to
+ * origins that already identify as Ollama so a random gateway is not POSTed
+ * at `/api/show`.
+ * @param baseURL - the OpenAI-compatible base, including `/v1`.
+ * @param provider - the draft route key, when the surface named one.
+ * @returns whether `/api/show` enrichment should run.
+ */
+function looksLikeOllama(baseURL: string, provider: string | undefined): boolean {
+  if (provider !== undefined && provider.startsWith('ollama')) return true
+  try {
+    const url = new URL(baseURL)
+    const host = url.hostname.toLowerCase()
+    if (host === 'ollama.com' || host.endsWith('.ollama.com')) return true
+    return url.port === OLLAMA_PORT
+  } catch {
+    // A baseURL that is not a URL still concatenates as a listing prefix; it
+    // is not an Ollama host we can name.
+    return false
+  }
+}
+
+/**
+ * Native Ollama origin for `/api/show`. The OpenAI-compatible base ends in
+ * `/v1`; the native API sits on the same host without that suffix.
+ * @param baseURL - the OpenAI-compatible base, including `/v1`.
+ * @returns `{origin}/api/show`.
+ */
+function ollamaShowUrl(baseURL: string): string {
+  return `${baseURL.replace(/\/+$/, '').replace(/\/v1$/i, '')}/api/show`
+}
+
+/**
+ * Chat input modalities from an `/api/show` `capabilities` list. `vision`
+ * means images; any of `completion`, `chat`, `tools`, or `thinking` without
+ * `vision` is text. An embedding-only or unreadable list states no chat
+ * answer, so adoption keeps inheriting rather than claiming text.
+ * @param capabilities - the show reply's `capabilities` field.
+ * @returns the declared modalities, or `undefined` when the row discloses none.
+ */
+function showInput(capabilities: unknown): readonly PiAiModality[] | undefined {
+  if (!Array.isArray(capabilities)) return undefined
+  const names = capabilities.filter((value): value is string => typeof value === 'string')
+  if (names.length === 0) return undefined
+  if (names.includes('vision')) return ['text', 'image']
+  if (names.some(name => name === 'completion' || name === 'chat' || name === 'tools' || name === 'thinking')) {
+    return ['text']
+  }
+  return undefined
+}
+
+/**
+ * Context window from `/api/show` `model_info`. Ollama stores it as
+ * `{architecture}.context_length`.
+ * @param info - the show reply's `model_info` object.
+ * @returns a positive integer window, or `undefined` when absent.
+ */
+function showContextWindow(info: unknown): number | undefined {
+  if (info === null || typeof info !== 'object') return undefined
+  for (const [key, value] of Object.entries(info as Record<string, unknown>)) {
+    if ((key === 'context_length' || key.endsWith('.context_length'))
+      && typeof value === 'number' && Number.isInteger(value) && value > 0) {
+      return value
+    }
+  }
+  return undefined
+}
+
+/**
+ * Best-effort `POST /api/show` for one model. Every failure — network, non-2xx,
+ * oversized, non-JSON, abort — returns `undefined` so the listing row stands.
+ * @param url - native `/api/show` URL.
+ * @param id - model id from the listing.
+ * @param apiKey - bearer token, when the listing used one.
+ * @param signal - caller cancellation.
+ * @returns parsed JSON, or `undefined` when the probe cannot be used.
+ */
+async function showModel(
+  url: string,
+  id: string,
+  apiKey: string | undefined,
+  signal: AbortSignal | undefined,
+): Promise<unknown | undefined> {
+  if (signal?.aborted) return undefined
+  let response: Response
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        accept: 'application/json',
+        'content-type': 'application/json',
+        ...apiKey === undefined ? {} : { authorization: `Bearer ${apiKey}` },
+        ...attributionHeaders(),
+      },
+      body: JSON.stringify({ model: id }),
+      ...signal === undefined ? {} : { signal },
+    })
+  } catch {
+    // Abort, DNS, connect, or a header TypeError: the listing already
+    // succeeded, so this row stays as GET /models returned it.
+    return undefined
+  }
+  if (!response.ok) {
+    /* v8 ignore next -- fetch exposes a body stream on an error Response; cancel is cleanup. */
+    await response.body?.cancel().catch(() => {
+      // Best-effort drain of a refused show body; the listing already succeeded.
+    })
+    return undefined
+  }
+  try {
+    return JSON.parse(await readBounded(response, url))
+  } catch {
+    // Oversized, aborted mid-body, or non-JSON: skip this row's enrichment.
+    return undefined
+  }
+}
+
+/**
+ * Fill listing rows that disclosed no `input` or `contextWindow` from Ollama
+ * `/api/show`. Parallelism is bounded; abort or a per-row miss leaves that
+ * row as the listing returned it.
+ * @param models - OpenAI-compatible listing rows.
+ * @param baseURL - the OpenAI-compatible base.
+ * @param apiKey - bearer token used for the listing, when any.
+ * @param signal - caller cancellation.
+ * @returns the same rows, with show-declared fields filled where missing.
+ */
+async function enrichFromOllamaShow(
+  models: LlmDiscoveredModel[],
+  baseURL: string,
+  apiKey: string | undefined,
+  signal: AbortSignal | undefined,
+): Promise<LlmDiscoveredModel[]> {
+  const pending = models.flatMap((model, index) =>
+    model.input === undefined || model.contextWindow === undefined ? [{ model, index }] : [])
+  if (pending.length === 0) return models
+  const url = ollamaShowUrl(baseURL)
+  const results = [...models]
+  let cursor = 0
+  const worker = async (): Promise<void> => {
+    for (;;) {
+      const next = pending[cursor++]
+      if (next === undefined) return
+      const body = await showModel(url, next.model.id, apiKey, signal)
+      if (body === null || typeof body !== 'object') continue
+      const shown = body as { capabilities?: unknown; model_info?: unknown }
+      const input = showInput(shown.capabilities)
+      const contextWindow = showContextWindow(shown.model_info)
+      const current = results[next.index]
+      /* v8 ignore next -- pending indexes are listing rows this function still owns. */
+      if (current === undefined) continue
+      results[next.index] = {
+        ...current,
+        ...current.input === undefined && input !== undefined ? { input } : {},
+        ...current.contextWindow === undefined && contextWindow !== undefined
+          ? { contextWindow } : {},
+      }
+    }
+  }
+  await Promise.all(Array.from(
+    { length: Math.min(SHOW_CONCURRENCY, pending.length) },
+    () => worker(),
+  ))
+  return results
+}
+
+/**
  * Join the endpoint base with the listing path. The base is treated as a
  * prefix rather than a URL to resolve against, so a deployment path such as
  * `https://gateway.example/openai/v1` keeps its segments instead of losing
@@ -136,6 +320,40 @@ function listingAudio(entry: ListingEntry): { input: boolean; output: boolean } 
  */
 function listingUrl(baseURL: string): string {
   return `${baseURL.replace(/\/+$/, '')}/models`
+}
+
+/**
+ * Whether this interrogation should skip the installed catalog and read
+ * OpenRouter's live `GET /models`. That listing always carries
+ * `architecture.input_modalities`; the pinned catalog does not stay current
+ * (Muse Spark and similar never appear there). A random catalog route still
+ * answers from the registry — its listing usually discloses ids only.
+ * @param provider - the draft route key, when the surface named one.
+ * @param baseURL - the OpenAI-compatible base, when the form shows one.
+ * @returns whether to interrogate OpenRouter over the wire.
+ */
+function isOpenRouter(provider: string | undefined, baseURL: string | undefined): boolean {
+  if (provider === 'openrouter') return true
+  if (baseURL === undefined || baseURL.length === 0) return false
+  try {
+    const host = new URL(baseURL).hostname.toLowerCase()
+    return host === 'openrouter.ai' || host.endsWith('.openrouter.ai')
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Endpoint to interrogate. An OpenRouter card often has no `baseURL` in
+ * settings (the catalog default is the endpoint); Fetch still has to hit it.
+ * @param provider - the draft route key, when the surface named one.
+ * @param baseURL - the form's endpoint, when shown.
+ * @returns the OpenAI-compatible base, or `undefined` when none can be named.
+ */
+function resolveDiscoveryBaseURL(provider: string | undefined, baseURL: string | undefined): string | undefined {
+  if (baseURL !== undefined && baseURL.length > 0) return baseURL
+  if (provider === 'openrouter') return catalogProvider(provider)?.baseUrl
+  return undefined
 }
 
 /**
@@ -202,7 +420,8 @@ function readListing(body: unknown): LlmDiscoveredModel[] {
     if (id === undefined) continue
     const name = label(entry.name, entry.display_name)
     const contextWindow = capacity(entry.context_window, entry.context_length)
-    const maxTokens = capacity(entry.max_output_tokens, entry.max_tokens)
+    const nestedMax = (entry.top_provider as { max_completion_tokens?: unknown } | null)?.max_completion_tokens
+    const maxTokens = capacity(entry.max_output_tokens, entry.max_tokens, nestedMax)
     const input = listingInput(entry)
     const audio = listingAudio(entry)
     models.push({
@@ -255,7 +474,10 @@ export async function discoverModels(
 ): Promise<readonly LlmDiscoveredModel[]> {
   // A catalog route already has its answer, and a better one: the installed
   // entries carry context windows and output caps no listing endpoint reports.
-  if (request.provider !== undefined) {
+  // OpenRouter is the exception: its listing discloses modalities the pinned
+  // catalog does not keep current, and Fetch on that card often sends no
+  // baseURL (the catalog default is the endpoint).
+  if (request.provider !== undefined && !isOpenRouter(request.provider, request.baseURL)) {
     const installed = catalogModels(request.provider)
     if (installed.size > 0) {
       return [...installed.values()].map(model => ({
@@ -267,7 +489,8 @@ export async function discoverModels(
       }))
     }
   }
-  if (request.baseURL === undefined || request.baseURL.length === 0) {
+  const baseURL = resolveDiscoveryBaseURL(request.provider, request.baseURL)
+  if (baseURL === undefined || baseURL.length === 0) {
     throw new LlmError(
       `pi-ai ships no catalog for provider "${request.provider ?? ''}", so its models can only come from its`
       + " endpoint; set a baseURL, or enter this provider's models by hand",
@@ -287,7 +510,7 @@ export async function discoverModels(
       'DISCOVERY_UNSUPPORTED',
     )
   }
-  const url = listingUrl(request.baseURL)
+  const url = listingUrl(baseURL)
   // A key typed into the form wins: it is the one the user is testing, and it
   // may be the replacement for exactly the stored key that is failing. The
   // stored one is only asked for here, past the catalog short-circuit and the
@@ -338,5 +561,11 @@ export async function discoverModels(
   } catch (error: unknown) {
     throw new LlmError(`${url} did not answer with JSON`, 'DISCOVERY_FAILED', { cause: error })
   }
-  return readListing(body)
+  const models = readListing(body)
+  // Ollama's OpenAI-compatible listing is ids only. `/api/show` is where
+  // vision and context_length live; a miss must not fail a listing that
+  // already succeeded (first-run's 1.5s probe would otherwise flip reachable
+  // to false because enrichment overran).
+  if (!looksLikeOllama(baseURL, request.provider)) return models
+  return await enrichFromOllamaShow(models, baseURL, apiKey, request.signal)
 }

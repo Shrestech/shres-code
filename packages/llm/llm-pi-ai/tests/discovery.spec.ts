@@ -64,6 +64,60 @@ async function listingServer(behavior: {
   return { url: `http://127.0.0.1:${address.port}`, paths, headers }
 }
 
+/**
+ * OpenAI-compatible listing plus native Ollama `/api/show`, keyed by model
+ * id. Show probes run concurrently, so a sequential scripted mock cannot
+ * own this path.
+ */
+async function ollamaServer(behavior: {
+  listing: unknown
+  shows: Record<string, unknown | string | { status: number; body?: string }>
+  holdShow?: boolean
+}): Promise<ListingServer & { methods: string[]; bodies: unknown[] }> {
+  const paths: string[] = []
+  const methods: string[] = []
+  const bodies: unknown[] = []
+  const headers: IncomingMessage['headers'][] = []
+  const server = createServer((request: IncomingMessage, response: ServerResponse) => {
+    let raw = ''
+    request.on('data', (chunk: Buffer) => { raw += chunk.toString('utf8') })
+    request.on('end', () => {
+      paths.push(request.url ?? '')
+      methods.push(request.method ?? '')
+      headers.push(request.headers)
+      bodies.push(raw.length === 0 ? undefined : JSON.parse(raw))
+      if (request.method === 'POST' && (request.url ?? '').endsWith('/api/show')) {
+        if (behavior.holdShow) return
+        const id = (bodies[bodies.length - 1] as { model?: string } | undefined)?.model ?? ''
+        const shown = behavior.shows[id]
+        if (typeof shown === 'string') {
+          response.writeHead(200, { 'content-type': 'application/json' })
+          response.end(shown)
+          return
+        }
+        if (typeof shown === 'object' && shown !== null && 'status' in shown) {
+          const refused = shown as { status: number; body?: string }
+          response.writeHead(refused.status, { 'content-type': 'application/json' })
+          response.end(refused.body ?? '{}')
+          return
+        }
+        const body = JSON.stringify(shown ?? {})
+        response.writeHead(shown === undefined ? 404 : 200, { 'content-type': 'application/json' })
+        response.end(shown === undefined ? '{"error":"not found"}' : body)
+        return
+      }
+      const body = JSON.stringify(behavior.listing)
+      response.writeHead(200, { 'content-type': 'application/json' })
+      response.end(body)
+    })
+  })
+  servers.push(server)
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+  const address = server.address()
+  if (address === null || typeof address === 'string') throw new Error('no port')
+  return { url: `http://127.0.0.1:${address.port}`, paths, headers, methods, bodies }
+}
+
 /** A bare dormant mount: discovery is offered whether or not a route exists. */
 async function harness(): Promise<Context> {
   const ctx = new Context()
@@ -114,6 +168,102 @@ describe('catalog-route model discovery', () => {
     // The seam refuses a request naming neither, so the module's own guard for
     // that shape is only reachable by calling it directly.
     await expect(discoverModels({})).rejects.toThrow(/set a baseURL/)
+  })
+})
+
+describe('OpenRouter live listing', () => {
+  it('interrogates the endpoint instead of the installed catalog', async () => {
+    const server = await listingServer({
+      body: JSON.stringify({
+        data: [
+          {
+            id: 'meta/muse-spark-1.3',
+            name: 'Muse Spark 1.3',
+            context_length: 1_048_576,
+            architecture: { input_modalities: ['text', 'image', 'video', 'audio'] },
+            top_provider: { max_completion_tokens: 943_718 },
+          },
+          {
+            id: 'moonshotai/kimi-k2-thinking',
+            architecture: { input_modalities: ['text'] },
+          },
+        ],
+      }),
+    })
+    const ctx = await harness()
+
+    const models = await ctx.llm.discoverModels('llm-pi-ai', {
+      provider: 'openrouter',
+      baseURL: `${server.url}/v1`,
+    })
+
+    expect(server.paths).toEqual(['/v1/models'])
+    expect(models.map(model => model.id)).not.toEqual(getBuiltinModels('openrouter').map(model => model.id))
+    expect(models).toEqual([
+      {
+        id: 'meta/muse-spark-1.3',
+        name: 'Muse Spark 1.3',
+        contextWindow: 1_048_576,
+        maxTokens: 943_718,
+        input: ['text', 'image'],
+        audioInput: true,
+      },
+      { id: 'moonshotai/kimi-k2-thinking', input: ['text'] },
+    ])
+  })
+
+  it('uses the catalog provider endpoint when the form shows no baseURL', async () => {
+    const urls: string[] = []
+    vi.stubGlobal('fetch', async (input: string | URL) => {
+      urls.push(String(input))
+      return new Response(JSON.stringify({
+        data: [{ id: 'meta/muse-spark-1.3', architecture: { input_modalities: ['text', 'image'] } }],
+      }), { status: 200 })
+    })
+
+    expect(await discoverModels({ provider: 'openrouter', api: 'openai-completions' }))
+      .toEqual([{ id: 'meta/muse-spark-1.3', input: ['text', 'image'] }])
+    expect(urls).toEqual(['https://openrouter.ai/api/v1/models'])
+  })
+
+  it('does not treat a non-URL base as OpenRouter on another catalog route', async () => {
+    const ctx = await harness()
+    const models = await ctx.llm.discoverModels('llm-pi-ai', { provider: 'deepseek', baseURL: 'not a url' })
+    expect(models.map(model => model.id).sort())
+      .toEqual(getBuiltinModels('deepseek').map(model => model.id).sort())
+  })
+
+  it('recognizes openrouter.ai itself without a provider id', async () => {
+    const urls: string[] = []
+    vi.stubGlobal('fetch', async (input: string | URL) => {
+      urls.push(String(input))
+      return new Response(JSON.stringify({
+        data: [{ id: 'x-ai/grok-4.6', architecture: { input_modalities: ['text', 'image'] } }],
+      }), { status: 200 })
+    })
+
+    expect(await discoverModels({
+      baseURL: 'https://openrouter.ai/api/v1',
+      api: 'openai-completions',
+    })).toEqual([{ id: 'x-ai/grok-4.6', input: ['text', 'image'] }])
+    expect(urls).toEqual(['https://openrouter.ai/api/v1/models'])
+  })
+
+  it('recognizes an openrouter.ai hostname without the catalog route id', async () => {
+    const urls: string[] = []
+    vi.stubGlobal('fetch', async (input: string | URL) => {
+      urls.push(String(input))
+      return new Response(JSON.stringify({
+        data: [{ id: 'x-ai/grok-4.6', architecture: { input_modalities: ['text', 'image'] } }],
+      }), { status: 200 })
+    })
+
+    expect(await discoverModels({
+      provider: 'or-proxy',
+      baseURL: 'https://eu.openrouter.ai/api/v1',
+      api: 'openai-completions',
+    })).toEqual([{ id: 'x-ai/grok-4.6', input: ['text', 'image'] }])
+    expect(urls).toEqual(['https://eu.openrouter.ai/api/v1/models'])
   })
 })
 
@@ -248,6 +398,19 @@ describe('draft-provider model discovery', () => {
         { id: 'odd-shape' },
         { id: 'hearing-only', audioInput: true },
       ])
+  })
+
+  it('does not POST /api/show at a gateway that is not Ollama', async () => {
+    const server = await ollamaServer({
+      listing: { data: [{ id: 'plain' }] },
+      shows: { plain: { capabilities: ['vision'] } },
+    })
+    const ctx = await harness()
+
+    expect(await ctx.llm.discoverModels('llm-pi-ai', { baseURL: `${server.url}/v1` }))
+      .toEqual([{ id: 'plain' }])
+    expect(server.paths).toEqual(['/v1/models'])
+    expect(server.methods).toEqual(['GET'])
   })
 
   it('carries OpenRouter\'s declared audio directions as display-only flags', async () => {
@@ -399,6 +562,230 @@ describe('draft-provider model discovery', () => {
 
     await expect(ctx.llm.discoverModels('llm-pi-ai', { provider: 'openai' }))
       .rejects.toMatchObject({ code: 'NO_DISCOVERY' })
+  })
+})
+
+describe('Ollama /api/show enrichment', () => {
+  it('reads vision, text, and context_length from /api/show for an ollama* route', async () => {
+    const server = await ollamaServer({
+      listing: { data: [{ id: 'kimi-k3' }, { id: 'deepseek-v4-flash' }, { id: 'embed' }] },
+      shows: {
+        'kimi-k3': {
+          capabilities: ['vision', 'thinking', 'completion', 'tools'],
+          model_info: { 'kimi-k3.context_length': 1_048_576 },
+        },
+        'deepseek-v4-flash': {
+          capabilities: ['completion', 'tools', 'thinking'],
+          model_info: { 'deepseek4.context_length': 1_048_576 },
+        },
+        embed: { capabilities: ['embedding'] },
+      },
+    })
+    const ctx = await harness()
+
+    expect(await ctx.llm.discoverModels('llm-pi-ai', {
+      provider: 'ollama-cloud',
+      baseURL: `${server.url}/v1`,
+      apiKey: 'ollama-cloud-key',
+    })).toEqual([
+      { id: 'kimi-k3', input: ['text', 'image'], contextWindow: 1_048_576 },
+      { id: 'deepseek-v4-flash', input: ['text'], contextWindow: 1_048_576 },
+      { id: 'embed' },
+    ])
+    expect(server.paths).toContain('/v1/models')
+    expect(server.paths.filter(path => path === '/api/show')).toHaveLength(3)
+    expect(server.headers.some(header => header.authorization === 'Bearer ollama-cloud-key')).toBe(true)
+    expect(new Set(server.bodies.filter(body => body !== undefined).map(body => (body as { model: string }).model)))
+      .toEqual(new Set(['kimi-k3', 'deepseek-v4-flash', 'embed']))
+  })
+
+  it('recognizes ollama.com without an ollama* provider id', async () => {
+    const requests: string[] = []
+    vi.stubGlobal('fetch', async (input: string | URL, init?: RequestInit) => {
+      const url = String(input)
+      requests.push(`${init?.method ?? 'GET'} ${url}`)
+      if (url.endsWith('/v1/models')) {
+        return new Response(JSON.stringify({ data: [{ id: 'gemma4:31b' }] }), { status: 200 })
+      }
+      return new Response(JSON.stringify({
+        capabilities: ['completion', 'vision'],
+        model_info: { 'gemma4.context_length': 262_144 },
+      }), { status: 200 })
+    })
+
+    expect(await discoverModels({ baseURL: 'https://ollama.com/v1', api: 'openai-completions' }))
+      .toEqual([{ id: 'gemma4:31b', input: ['text', 'image'], contextWindow: 262_144 }])
+    expect(requests).toEqual([
+      'GET https://ollama.com/v1/models',
+      'POST https://ollama.com/api/show',
+    ])
+  })
+
+  it('keeps a listing-declared input over a contradictory show reply', async () => {
+    const server = await ollamaServer({
+      listing: {
+        data: [{
+          id: 'seeing',
+          architecture: { input_modalities: ['text', 'image'] },
+          context_length: 64_000,
+        }],
+      },
+      shows: {
+        seeing: {
+          capabilities: ['completion'],
+          model_info: { 'x.context_length': 8 },
+        },
+      },
+    })
+    const ctx = await harness()
+
+    expect(await ctx.llm.discoverModels('llm-pi-ai', {
+      provider: 'ollama-local',
+      baseURL: `${server.url}/v1`,
+    })).toEqual([{ id: 'seeing', input: ['text', 'image'], contextWindow: 64_000 }])
+    expect(server.paths.filter(path => path === '/api/show')).toEqual([])
+  })
+
+  it('leaves the listing intact when /api/show refuses or returns nothing usable', async () => {
+    const server = await ollamaServer({
+      listing: { data: [{ id: 'plain' }, { id: 'odd' }] },
+      shows: {
+        plain: { status: 404 },
+        odd: { capabilities: 'vision' },
+      },
+    })
+    const ctx = await harness()
+
+    expect(await ctx.llm.discoverModels('llm-pi-ai', {
+      provider: 'ollama-cloud',
+      baseURL: `${server.url}/v1`,
+    })).toEqual([{ id: 'plain' }, { id: 'odd' }])
+  })
+
+  it('treats chat without vision as text and ignores model_info without a context_length', async () => {
+    const server = await ollamaServer({
+      listing: { data: [{ id: 'chatty' }] },
+      shows: {
+        chatty: { capabilities: ['chat'], model_info: { 'general.architecture': 'llama' } },
+      },
+    })
+    const ctx = await harness()
+
+    expect(await ctx.llm.discoverModels('llm-pi-ai', {
+      provider: 'ollama-local',
+      baseURL: `${server.url}/v1`,
+    })).toEqual([{ id: 'chatty', input: ['text'] }])
+  })
+
+  it('reads a bare context_length and an ollama.com subdomain', async () => {
+    const requests: string[] = []
+    vi.stubGlobal('fetch', async (input: string | URL, init?: RequestInit) => {
+      const url = String(input)
+      requests.push(`${init?.method ?? 'GET'} ${url}`)
+      if (url.endsWith('/v1/models')) {
+        return new Response(JSON.stringify({ data: [{ id: 'local' }] }), { status: 200 })
+      }
+      return new Response(JSON.stringify({
+        capabilities: ['completion'],
+        model_info: { context_length: 8192 },
+      }), { status: 200 })
+    })
+
+    expect(await discoverModels({ baseURL: 'https://eu.ollama.com/v1', api: 'openai-completions' }))
+      .toEqual([{ id: 'local', input: ['text'], contextWindow: 8192 }])
+    expect(requests[1]).toBe('POST https://eu.ollama.com/api/show')
+  })
+
+  it('recognizes the default local Ollama port', async () => {
+    const requests: string[] = []
+    vi.stubGlobal('fetch', async (input: string | URL, init?: RequestInit) => {
+      requests.push(`${init?.method ?? 'GET'} ${String(input)}`)
+      if (String(input).endsWith('/v1/models')) {
+        return new Response(JSON.stringify({ data: [{ id: 'llama3.2' }] }), { status: 200 })
+      }
+      return new Response(JSON.stringify({ capabilities: ['completion', 'tools'] }), { status: 200 })
+    })
+
+    expect(await discoverModels({
+      baseURL: 'http://127.0.0.1:11434/v1',
+      api: 'openai-completions',
+    })).toEqual([{ id: 'llama3.2', input: ['text'] }])
+    expect(requests[1]).toBe('POST http://127.0.0.1:11434/api/show')
+  })
+
+  it('does not treat a non-URL base as Ollama', async () => {
+    vi.stubGlobal('fetch', async () =>
+      new Response(JSON.stringify({ data: [{ id: 'plain' }] }), { status: 200 }))
+
+    expect(await discoverModels({ baseURL: 'not a url', api: 'openai-completions' }))
+      .toEqual([{ id: 'plain' }])
+  })
+
+  it('ignores an empty or non-string capabilities list', async () => {
+    const server = await ollamaServer({
+      listing: { data: [{ id: 'empty' }, { id: 'numeric' }] },
+      shows: {
+        empty: { capabilities: [] },
+        numeric: { capabilities: [1, 2] },
+      },
+    })
+    const ctx = await harness()
+
+    expect(await ctx.llm.discoverModels('llm-pi-ai', {
+      provider: 'ollama-cloud',
+      baseURL: `${server.url}/v1`,
+    })).toEqual([{ id: 'empty' }, { id: 'numeric' }])
+  })
+
+  it('skips show when the caller has already aborted after the listing', async () => {
+    const controller = new AbortController()
+    vi.stubGlobal('fetch', async (input: string | URL) => {
+      const url = String(input)
+      if (url.endsWith('/v1/models')) {
+        controller.abort('test cancellation')
+        return new Response(JSON.stringify({ data: [{ id: 'kimi-k3' }] }), { status: 200 })
+      }
+      throw new Error('show should not run')
+    })
+
+    expect(await discoverModels({
+      provider: 'ollama-cloud',
+      baseURL: 'https://ollama.com/v1',
+      api: 'openai-completions',
+      signal: controller.signal,
+    })).toEqual([{ id: 'kimi-k3' }])
+  })
+
+  it('skips a show body that is not JSON', async () => {
+    const server = await ollamaServer({
+      listing: { data: [{ id: 'plain' }] },
+      shows: { plain: 'not json at all' },
+    })
+    const ctx = await harness()
+
+    expect(await ctx.llm.discoverModels('llm-pi-ai', {
+      provider: 'ollama-cloud',
+      baseURL: `${server.url}/v1`,
+    })).toEqual([{ id: 'plain' }])
+  })
+
+  it('returns the listing when show enrichment is aborted rather than failing discovery', async () => {
+    const server = await ollamaServer({
+      listing: { data: [{ id: 'kimi-k3' }] },
+      shows: {},
+      holdShow: true,
+    })
+    const ctx = await harness()
+    const controller = new AbortController()
+    const probe = ctx.llm.discoverModels('llm-pi-ai', {
+      provider: 'ollama-cloud',
+      baseURL: `${server.url}/v1`,
+      signal: controller.signal,
+    })
+    await vi.waitFor(() => { expect(server.paths).toContain('/api/show') })
+    controller.abort('test cancellation')
+
+    await expect(probe).resolves.toEqual([{ id: 'kimi-k3' }])
   })
 })
 
