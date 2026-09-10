@@ -12,7 +12,7 @@ JSONL lookup selects a physical log from the requested session id across project
 
 The coordinator independently asserts the returned id and compares the stored cwd with a live session's cwd before repair, state publication, or suffix persistence. It keeps a detached copy of validated metadata; JSONL append and repair derive their path from that copy. The `PersistenceBackend<TornMarker>` interface therefore needs neither a scope-specific live lookup nor a storage-locator type.
 
-An existing configured JSONL root must be a readable directory when the plugin loads. An absent root remains valid and is created on first materialization. The backend supports one live writer per session; another backend instance or process must not mutate that session until the owner finishes disposal and all writes stop.
+An existing configured JSONL root must be a readable directory when the plugin loads. An absent root remains valid and is created on first materialization. The JSONL backend's kernel write lock (`SessionWriteLease`) is the cross-process half of that one-live-writer rule; see [the write-lease note](../feature/2026-09-10-cross-process-session-write-lease.md).
 
 ## Alternatives considered
 
@@ -20,7 +20,7 @@ An existing configured JSONL root must be a readable directory when the plugin l
 
 **Carry an opaque storage locator through the coordinator.** A locator binds JSONL mutations directly to a selected path, but JSONL can reproduce that path from metadata it has already validated. Adding another generic and argument to SQLite, test backends, append, and repair makes every implementation carry a concept only the file backend needs.
 
-**Coordinate multiple live writers.** A dedicated coordination service, process-global registry, or cross-process lock would define a new deployment topology rather than repair identity validation. The supported topology has one live writer; no-overwrite hard-link publication still arbitrates an initial same-id creation race.
+**Coordinate multiple live writers as part of identity validation.** A dedicated coordination service or process-global registry would have defined a new topology rather than repair identity validation. Cross-process write exclusion later shipped as a kernel lock on the JSONL backend ([write-lease note](../feature/2026-09-10-cross-process-session-write-lease.md)); identity binding remains independent of that lock.
 
 ## Consequences
 

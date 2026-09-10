@@ -4,7 +4,7 @@ import SessionStore, { Session, SessionId, isJsonValue } from '@shres-code/shres
 import type { SessionEvent, SessionHeader } from '@shres-code/shres-code-session'
 import {
   DEFAULT_PREPARED_SESSION_CACHE_SIZE, DEFAULT_WRITE_BATCH_MAX_DELAY_MS, MAX_WRITE_BATCH_DELAY_MS,
-  SessionPersistence, SessionPersistenceRevision, PersistenceCoordinator,
+  SessionPersistence, SessionPersistenceRevision, PersistenceCoordinator, SessionWriteAlreadyOwnedError,
   type PersistenceBackend, type SessionPersistenceSnapshot, type StoredPrefix, type StoredSuffix,
 } from '../src/index.ts'
 import { runPersistenceContract, meta, oneTurnLog } from './contract.ts'
@@ -187,6 +187,8 @@ class ControlledBackend implements PersistenceBackend<never> {
   beforeLoadStored?: (attempt: number, signal?: AbortSignal) => Promise<void>
   /** When set, the declared seek hook delegates here so readFrom exercises it; unset throws (tests set it first). */
   seekHook?: (id: SessionId, fromSeq: number, signal?: AbortSignal) => Promise<StoredSuffix | undefined>
+  claimWrite?: (meta: SessionHeader) => Promise<void>
+  releaseWrite?: (id: SessionId) => Promise<void>
 
   loadStoredFrom(id: SessionId, fromSeq: number, signal?: AbortSignal): Promise<StoredSuffix | undefined> {
     if (this.seekHook === undefined) throw new Error('seekHook not configured for this test')
@@ -1780,6 +1782,36 @@ describe('PersistenceCoordinator retirement', () => {
       await fiber.dispose()
       await ctx.fiber.dispose()
     }
+  })
+
+  it('propagates a claimWrite refusal as SessionWriteAlreadyOwnedError and still releases on dispose', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const backend = new ControlledBackend()
+    const claimed: string[] = []
+    const released: string[] = []
+    backend.claimWrite = async (header) => {
+      claimed.push(header.id)
+      throw new SessionWriteAlreadyOwnedError(header.id)
+    }
+    backend.releaseWrite = async (id) => { released.push(id) }
+    let coordinator!: PersistenceCoordinator<never>
+    const fiber = await ctx.plugin(Object.assign((inner: Context) => {
+      coordinator = new PersistenceCoordinator(inner, backend)
+    }, { inject: ['sessions'] }))
+    const id = SessionId('already-owned')
+    await coordinator.create(meta(id))
+    await expect(coordinator.append(id, [{
+      type: 'turn/start',
+      seq: 0,
+      time: 1,
+      data: { turn: 1 },
+    }])).rejects.toBeInstanceOf(SessionWriteAlreadyOwnedError)
+    expect(claimed).toEqual([id])
+    expect(new SessionWriteAlreadyOwnedError(id).name).toBe('SessionWriteAlreadyOwnedError')
+    await fiber.dispose()
+    expect(released).toEqual([id])
+    await ctx.fiber.dispose()
   })
 })
 
