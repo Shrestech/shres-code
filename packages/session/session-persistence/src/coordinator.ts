@@ -75,6 +75,23 @@ export class SessionFormatUnsupportedError extends Error {
  * @returns the stable refusal text, without a raw-log path suffix.
  */
 /**
+ * Another process holds this session's kernel write lock, so this backend
+ * cannot append or repair until that holder releases it (process exit
+ * included). Distinct from an in-process id collision: the lock is
+ * kernel-arbitrated and has no TTL. JSONL implements it; backends that
+ * omit {@link PersistenceBackend.claimWrite} never throw it.
+ */
+export class SessionWriteAlreadyOwnedError extends Error {
+  /**
+   * @param sessionId - the session whose write lock is already held.
+   */
+  constructor(readonly sessionId: SessionId) {
+    super(`session "${sessionId}" is already owned by another writer`)
+    this.name = 'SessionWriteAlreadyOwnedError'
+  }
+}
+
+/**
  * A later full-log read cannot reconstruct `assistant/chunk` events that
  * opt-in assembled retention tombstoned. Distinct from corruption: the rows
  * are intact, and the refusal is the documented cost of that policy.
@@ -238,6 +255,25 @@ export interface PersistenceBackend<TornMarker = unknown> {
    * @param meta - the header whose artifact is requested.
    */
   locate?(meta: SessionHeader): SessionLocation | undefined
+
+  /**
+   * Optional exclusive write-lock acquisition for one session. Called before
+   * the first materializing append or repair, and when a live session binds
+   * to an already-materialized log. Held until {@link releaseWrite} or
+   * {@link close}. Readers never call it. A session that has not materialized
+   * must gain no filesystem footprint from this hook.
+   * @param meta - header of the session whose writes this process is claiming.
+   * @throws {SessionWriteAlreadyOwnedError} when another process holds the lock.
+   */
+  claimWrite?(meta: SessionHeader): Promise<void>
+
+  /**
+   * Optional counterpart to {@link claimWrite}. Idempotent when this process
+   * holds no claim. The coordinator drops its in-process claim even when this
+   * hook rejects, so a failed release cannot wedge the id in this process.
+   * @param id - the session whose write lock is released.
+   */
+  releaseWrite?(id: SessionId): Promise<void>
 
   /**
    * Optional lifecycle teardown (e.g. close a database handle). Awaited by the
@@ -752,6 +788,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       }
     }
 
+    await this.ensureWriteClaim(state.meta)
     await this.backend.appendBatch(state.meta, events, state.materialized)
     // The durable write is the transaction: mark materialized + advance the
     // cursor as soon as it commits (uniform across backends).
@@ -759,6 +796,10 @@ export class PersistenceCoordinator<TornMarker = unknown> {
     state.cursor += events.length
     this.preparations.invalidate(id)
     this.releaseOwnerMemory(state)
+    // An ownerless public append is a discrete write, not a live handle: drop
+    // the kernel lock so another process can continue the log. Live sessions
+    // keep the lock until retirement.
+    if (state.owner === undefined) await this.dropWriteClaim(id)
   }
 
   /**
@@ -822,6 +863,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
         return this.loadLiveSnapshot(attached)
       }
       this.preparations.discard(reservation)
+      if (this.states.get(id)?.owner === undefined) await this.dropWriteClaim(id)
       return reservation.source.inspection
     }
   }
@@ -994,9 +1036,12 @@ export class PersistenceCoordinator<TornMarker = unknown> {
     }
     if (!await this.isPreparedSourceCurrent(source)) return undefined
     if (source.tornMarker !== undefined || source.closers.length > 0) {
+      await this.ensureWriteClaim(source.inspection.meta)
       await this.backend.commitRepair(source.inspection.meta, source.tornMarker, source.closers)
       // The repair changed the durable revision. Reload the exact committed
       // graph instead of associating the old in-memory view with a newer revision.
+      // Keep the kernel lock: adopt/load retry the next prefix under the same
+      // exclusive claim, and a later append continues it.
       return undefined
     }
     const state = existing ?? {
@@ -1039,6 +1084,25 @@ export class PersistenceCoordinator<TornMarker = unknown> {
   /** Borrow one immutable view from an already-live Session. */
   private inspectLive(session: Session): SessionInspection {
     return Object.freeze({ meta: session.header, events: session.events })
+  }
+
+  /**
+   * Take the backend's exclusive write lock for a session that is about to
+   * materialize or mutate an existing artifact. Omitted backends are a no-op.
+   * @param meta - header of the session whose writes this process is claiming.
+   */
+  private async ensureWriteClaim(meta: SessionHeader): Promise<void> {
+    await this.backend.claimWrite?.(meta)
+  }
+
+  /**
+   * Drop the backend's exclusive write lock after this process no longer
+   * tracks a writing session. Coordinator bookkeeping is cleared before this
+   * call so a failed release cannot wedge the id in this process.
+   * @param id - the session whose write lock is released.
+   */
+  private async dropWriteClaim(id: SessionId): Promise<void> {
+    await this.backend.releaseWrite?.(id)
   }
 
   /** Await one retiring lifecycle with caller cancellation. */
@@ -1153,6 +1217,9 @@ export class PersistenceCoordinator<TornMarker = unknown> {
         disposeError = error
         throw error
       } finally {
+        const remaining = [...this.states.keys()]
+        this.states.clear()
+        const releaseErrors = await settledErrors(remaining.map(id => this.dropWriteClaim(id)))
         try {
           await this.backend.close?.()
         } catch (closeError: unknown) {
@@ -1162,6 +1229,9 @@ export class PersistenceCoordinator<TornMarker = unknown> {
           /* v8 ignore start -- close failure racing disposal is a defensive teardown edge */
           if (disposeError === undefined) throw closeError
           /* v8 ignore stop */
+        }
+        if (disposeError === undefined && releaseErrors.length > 0) {
+          throw new AggregateError(releaseErrors, `${this.backend.name} write-lock release failed`)
         }
       }
     }, `${this.backend.name} write path`)
@@ -1206,9 +1276,12 @@ export class PersistenceCoordinator<TornMarker = unknown> {
   private async retireCore(session: Session): Promise<void> {
     await this.flush(session)
     const id = session.header.id
-    await this.serialize(id, () => {
+    await this.serialize(id, async () => {
       this.live.delete(session)
-      if (this.states.get(id)?.owner === session) this.states.delete(id)
+      if (this.states.get(id)?.owner === session) {
+        this.states.delete(id)
+        await this.dropWriteClaim(id)
+      }
     })
   }
 
@@ -1254,10 +1327,11 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       init: Promise.resolve(),
       writes: this.createWriteBehind(session, () => live.init),
     }
-    if (suffix.length > 0) {
-      live.init = this.serialize(session.id, () => this.appendCore(session.id, suffix))
-      live.init.catch(() => { /* observed by flush/dispose through the controller */ })
-    }
+    live.init = this.serialize(session.id, async () => {
+      if (state.materialized) await this.ensureWriteClaim(state.meta)
+      if (suffix.length > 0) await this.appendCore(session.id, suffix)
+    })
+    live.init.catch(() => { /* observed by flush/dispose through the controller */ })
     return live
   }
 
@@ -1309,6 +1383,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
         if (!await this.seedMatchesPersisted(id, seed, tracked.cursor)) {
           throw new Error(`session "${id}" is already persisted with ${tracked.cursor} event(s) that do not match this live session (id collision)`)
         }
+        if (tracked.materialized) await this.ensureWriteClaim(tracked.meta)
         tracked.owner = session
         // Persist the seed SUFFIX beyond the persisted prefix. Constructor seed
         // events never emit session/event, so the buffer never sees them.
@@ -1320,6 +1395,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       const owner = this.live.get(tracked.owner)
       if (!tracked.materialized && !owner?.writes.hasWork) {
         this.states.delete(id)
+        await this.dropWriteClaim(id)
       } else {
         throw new Error(`session "${id}" is already bound to a different live session in this backend (id collision)`)
       }
@@ -1366,6 +1442,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
     if (!seedCoversPrefix(seed, storedEvents)) {
       throw new Error(`session "${session.header.id}" already has a persisted log on disk that does not match this live session (id collision)`)
     }
+    await this.ensureWriteClaim(meta)
     // Truncate-only repair (no closers): the open turn is NOT closed here.
     if (tornMarker !== undefined) await this.backend.commitRepair(meta, tornMarker, [])
     const adopted: SessionState = {

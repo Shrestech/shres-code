@@ -30,6 +30,7 @@ import {
 import {
   compressZstdFrame, createZstdFrameDecoder, decompressZstdFrame, decompressZstdPrefix, scanZstdFrames,
 } from './zstd.ts'
+import { SessionWriteLease } from './lease.ts'
 import { ensureDurableDirectoryWin32, publishNewFileWin32 } from './win32.ts'
 
 export type { JsonlCompression } from './format.ts'
@@ -151,6 +152,8 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
   private compression: JsonlCompression
   private coordinator: PersistenceCoordinator<JsonlTornMarker>
   private rootEncodingCheck: Promise<void> | undefined
+  /** Kernel write locks held for coordinator-tracked writing sessions. */
+  private readonly writeLeases = new Map<SessionId, SessionWriteLease>()
 
   constructor(ctx: Context, public config: Config) {
     super(ctx)
@@ -489,6 +492,51 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
       throw error
     } finally {
       decoder.close()
+    }
+  }
+
+  /**
+   * Acquire the session directory's kernel write lock and retain it until
+   * {@link releaseWrite} or {@link close}. Idempotent while this process already
+   * holds the lock for `meta.id`.
+   * @param meta - header whose cwd and id locate the session directory.
+   */
+  async claimWrite(meta: SessionHeader): Promise<void> {
+    if (this.writeLeases.has(meta.id)) return
+    await this.rejectOppositeArtifact(meta.cwd, meta.id)
+    this.writeLeases.set(meta.id, await SessionWriteLease.acquire(sessionDir(this.root, meta.cwd, meta.id), meta.id))
+  }
+
+  /**
+   * Release the kernel write lock for one session. Idempotent when this
+   * process holds no claim. The POSIX lock file is never unlinked.
+   * @param id - the session whose write lock is released.
+   */
+  async releaseWrite(id: SessionId): Promise<void> {
+    const lease = this.writeLeases.get(id)
+    if (lease === undefined) return
+    await lease.release()
+    this.writeLeases.delete(id)
+  }
+
+  /**
+   * Release every remaining kernel write lock during backend teardown.
+   * Coordinator disposal already drops per-session claims; this is the
+   * last-resort sweep if any survive.
+   */
+  async close(): Promise<void> {
+    const remaining = [...this.writeLeases.entries()]
+    this.writeLeases.clear()
+    const errors: unknown[] = []
+    for (const [, lease] of remaining) {
+      try {
+        await lease.release()
+      } catch (error: unknown) {
+        errors.push(error)
+      }
+    }
+    if (errors.length > 0) {
+      throw new AggregateError(errors, `${this.name} write-lock close failed`)
     }
   }
 
