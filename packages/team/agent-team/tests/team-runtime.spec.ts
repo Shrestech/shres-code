@@ -134,8 +134,9 @@ describe('Agent Teams runtime mailbox', () => {
     releaseAegis()
     await vi.waitFor(() => {
       const targetMail = aegisAgent.session.events.filter(event =>
-        event.type === 'user/message' && event.data.source.kind === 'team-message')
-      expect(targetMail.some(event => event.data.source.kind === 'team-message'
+        event.type === 'user/message')
+      expect(targetMail.some(event => event.type === 'user/message'
+        && event.data.source.kind === 'team-message'
         && event.data.source.messageId === toAegis.messageId)).toBe(true)
     }, { timeout: 5_000 })
     expect(lead.session.events.filter(event => event.type === 'team/message/delivered')).toEqual(

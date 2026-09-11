@@ -35,7 +35,11 @@ function fakeSession(id: SessionId, events: SessionEvent[] = []): Session & { ev
   } as unknown as Session & { events: SessionEvent[] }
 }
 
-function fakeAgent(id: SessionId, session: Session, extras: Partial<Agent> = {}): Agent {
+function fakeAgent(
+  id: SessionId,
+  session: Session & { events: SessionEvent[] },
+  extras: Partial<Agent> = {},
+): Agent {
   return {
     id,
     session,
