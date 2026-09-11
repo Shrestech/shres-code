@@ -27,6 +27,18 @@
       "path": "../../core/session"
     },
     {
+      "path": "../../core/agent"
+    },
+    {
+      "path": "../../core/tools"
+    },
+    {
+      "path": "../../session/session-persistence"
+    },
+    {
+      "path": "../../subagent/subagent"
+    },
+    {
       "path": "../../session/session-projection"
     },
     {

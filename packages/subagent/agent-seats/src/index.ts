@@ -93,7 +93,9 @@ export function apply(ctx: Context, config: Config): void {
       provider: 'spawn',
       toolName: 'subagent',
       backgroundMode: 'continuable',
-      ...generic !== undefined ? { agentOptions: { provider: generic.provider, model: generic.model } } : {},
+      ...generic?.provider !== undefined && generic.model !== undefined
+        ? { agentOptions: { provider: generic.provider, model: generic.model } }
+        : {},
     })
     disposeGeneric = () => { void fiber.dispose() }
   }

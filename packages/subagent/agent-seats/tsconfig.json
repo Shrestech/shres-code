@@ -30,6 +30,9 @@
       "path": "../tool-subagent"
     },
     {
+      "path": "../../team/agent-team"
+    },
+    {
       "path": "../../runtime-diagnostics/invariants"
     }
   ]
