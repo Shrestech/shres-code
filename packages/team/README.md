@@ -4,6 +4,6 @@ Named peer teammates coordinated from one Lead session through a durable roster,
 
 | Package | Role | ctx key |
 |---|---|---|
-| [`agent-team/`](agent-team/README.md) | Durable vocabulary, replay fold, `agentTeam` projection, and `TeamJournal` | registers on `ctx.sessionProjections` |
+| [`agent-team/`](agent-team/README.md) | Durable vocabulary, Lead-log mailbox, continuable provisioning, steer delivery, `team_send` / `team_list` | `ctx.agentTeams` |
 
 Types and semantics: [the Agent Teams subsystem page](../../docs/subsystems/agent-team.md).

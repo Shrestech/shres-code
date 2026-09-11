@@ -18,10 +18,26 @@ export interface SeatBinding {
   model?: string
 }
 
+/** YAML extra teammate beyond the three product seats. */
+export interface ExtraSeat {
+  /** Lower-kebab-case teammate name. */
+  name: string
+  /** Child persona. */
+  persona: string
+  /** Live `ctx.llm` route id. */
+  provider: string
+  /** Provider-owned model id. */
+  model: string
+  /** Optional role gloss. */
+  role?: string
+}
+
 /** User and composition document for the `agent-seats` settings section. */
 export interface AgentSeatsSettings {
   /** Per-seat bindings; an omitted or empty seat stays unmounted. */
-  seats?: Partial<Record<SeatId, SeatBinding>>
+  seats?: Partial<Record<SeatId | 'subagent', SeatBinding>>
+  /** Extra named teammates reachable only through team_send. */
+  extras?: ExtraSeat[]
 }
 
 /** Fixed product copy and child defaults for one seat. */
@@ -110,4 +126,39 @@ export function boundSeats(settings: AgentSeatsSettings): BoundSeat[] {
     bound.push({ entry, provider, model })
   }
   return bound
+}
+
+const RESERVED_EXTRA_NAMES = new Set(['aegis', 'stride', 'ward', 'subagent', 'lead'])
+
+/**
+ * Validate YAML extras: kebab-case names that do not collide with product seats.
+ * @param extras - extras array from settings.
+ * @returns the same extras when valid.
+ */
+export function assertExtras(extras: readonly ExtraSeat[] | undefined): readonly ExtraSeat[] {
+  if (extras === undefined) return []
+  const seen = new Set<string>()
+  for (const extra of extras) {
+    const name = extra.name.trim()
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(name) || RESERVED_EXTRA_NAMES.has(name)) {
+      throw new Error(`agent-seats extra name "${extra.name}" collides with a product seat or is not lower-kebab-case`)
+    }
+    if (seen.has(name)) throw new Error(`agent-seats extra name "${name}" is duplicated`)
+    seen.add(name)
+  }
+  return extras
+}
+
+/**
+ * Generic `subagent` hire route when both provider and model are set.
+ * @param settings - resolved `agent-seats` document.
+ * @returns the binding, or undefined to inherit the parent route.
+ */
+export function boundSubagentSeat(settings: AgentSeatsSettings): SeatBinding | undefined {
+  const binding = settings.seats?.subagent
+  const provider = binding?.provider?.trim()
+  const model = binding?.model?.trim()
+  if (provider === undefined || provider.length === 0) return undefined
+  if (model === undefined || model.length === 0) return undefined
+  return { provider, model }
 }

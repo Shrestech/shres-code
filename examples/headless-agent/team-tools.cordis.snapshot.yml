@@ -1,0 +1,40 @@
+# Keyless assembled-app coverage for `team_list`: an ordinary root is an
+# implicit Lead, generic subagent children are omitted, and the tool is
+# present without a Team profile overlay.
+
+- id: persistence
+  name: '@shres-code/shres-code-session-persistence-jsonl'
+  config:
+    root: './.sessions'
+    compression: none
+
+- id: replay
+  name: '@shres-code/shres-code-llm-replay'
+
+- id: session-projection
+  name: '@shres-code/shres-code-session-projection'
+
+- id: subagent
+  name: '@shres-code/shres-code-subagent'
+
+- id: subagent-spawn-in-process
+  name: '@shres-code/shres-code-subagent-spawn-in-process'
+  config:
+    providerName: spawn
+
+- id: agent-team
+  name: '@shres-code/shres-code-agent-team'
+
+- id: agent
+  name: '@shres-code/shres-code-agent-spine-demo'
+  config:
+    agents:
+      - id: team-lead
+        provider: deepseek-official
+        model: deepseek-v4-flash
+    workspaceContext: false
+    skills:
+      enabled: false
+    toolBash: false
+    toolJobs: false
+    goals: false

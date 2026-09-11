@@ -152,6 +152,59 @@ export interface TeamState {
  */
 export type AgentTeamProjection = Record<string, TeamState>
 
+/** Current runtime-enriched roster row. */
+export interface TeamMemberView {
+  readonly id: SessionId
+  readonly name: string
+  readonly role: 'lead' | 'teammate'
+  readonly status: 'running' | 'idle' | 'inactive' | 'provisioning' | 'failed'
+  readonly description?: string
+  readonly provider?: string
+  readonly context?: 'fresh' | 'fork'
+  readonly model?: string
+  readonly diagnostics: string[]
+}
+
+/** Input for creating one durable teammate. */
+export interface SpawnTeammateRequest {
+  readonly name: string
+  readonly description: string
+  readonly prompt: ContentBlock[]
+  readonly context: 'fresh' | 'fork'
+  readonly provider: string
+  readonly signal: AbortSignal
+  readonly persona?: string
+  readonly agentOptions?: { readonly provider?: string; readonly model?: string }
+}
+
+/** Result after one teammate reaches a durable active or failed edge. */
+export interface SpawnTeammateResult {
+  readonly member: TeamMemberView
+}
+
+/** Input for one durable peer message. */
+export interface SendTeamMessageRequest {
+  readonly target: string
+  readonly content: ContentBlock[]
+  readonly signal: AbortSignal
+}
+
+/** Result after a peer message enters the durable mailbox. */
+export interface SendTeamMessageResult {
+  readonly messageId: TeamMessageId
+  readonly status: 'accepted' | 'queued'
+}
+
+/** Human-configured teammate that can be lazily provisioned. */
+export interface TeamRosterTemplateEntry {
+  readonly name: string
+  readonly description: string
+  readonly persona?: string
+  readonly provider: string
+  readonly model?: string
+  readonly context?: 'fresh' | 'fork'
+}
+
 declare module '@shres-code/shres-code-session-projection/types' {
   interface SessionProjectionMap {
     /**

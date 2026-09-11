@@ -19,6 +19,7 @@ const SeatsConfig = Schema.object({
     aegis: Schema.object({ provider: Schema.string(), model: Schema.string() }),
     stride: Schema.object({ provider: Schema.string(), model: Schema.string() }),
     ward: Schema.object({ provider: Schema.string(), model: Schema.string() }),
+    subagent: Schema.object({ provider: Schema.string(), model: Schema.string() }),
   }),
 })
 
@@ -117,6 +118,9 @@ describe('SeatsCard', () => {
     expect(screen.getByText(en.seatAegisRole)).toBeTruthy()
     expect(screen.getByText(en.seatStrideRole)).toBeTruthy()
     expect(screen.getByText(en.seatWardRole)).toBeTruthy()
+    expect(screen.getByText(en.seatSubagentName)).toBeTruthy()
+    expect(screen.getByText(en.seatSubagentRole)).toBeTruthy()
+    expect(screen.getByText(en.seatSubagentDescription)).toBeTruthy()
     expect(screen.getByText(en.seatAegisDescription)).toBeTruthy()
     await waitFor(() => {
       expect(face.llm.models).toHaveBeenCalled()
@@ -128,6 +132,15 @@ describe('SeatsCard', () => {
       expect(mutate).toHaveBeenCalledWith({
         ns: 'agent-seats',
         ops: [{ op: 'set', path: ['seats', 'aegis'], value: { provider: 'ollama-cloud' } }],
+      })
+    })
+    fireEvent.change(screen.getByLabelText(`${en.seatSubagentName} ${en.seatsProvider}`), {
+      target: { value: 'ollama-cloud' },
+    })
+    await waitFor(() => {
+      expect(mutate).toHaveBeenCalledWith({
+        ns: 'agent-seats',
+        ops: [{ op: 'set', path: ['seats', 'subagent'], value: { provider: 'ollama-cloud' } }],
       })
     })
   })

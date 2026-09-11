@@ -215,7 +215,9 @@ export interface Config extends AgentSeatsSettings {}
 /** User and composition document for the `agent-seats` settings section. */
 export interface AgentSeatsSettings {
   /** Per-seat bindings; an omitted or empty seat stays unmounted. */
-  seats?: Partial<Record<SeatId, SeatBinding>>
+  seats?: Partial<Record<SeatId | 'subagent', SeatBinding>>
+  /** Extra named teammates reachable only through team_send. */
+  extras?: ExtraSeat[]
 }
 
 /** One named seat the conductor can delegate to. */
@@ -228,9 +230,23 @@ export interface SeatBinding {
   /** Provider-owned model id on that route. */
   model?: string
 }
+
+/** YAML extra teammate beyond the three product seats. */
+export interface ExtraSeat {
+  /** Lower-kebab-case teammate name. */
+  name: string
+  /** Child persona. */
+  persona: string
+  /** Live `ctx.llm` route id. */
+  provider: string
+  /** Provider-owned model id. */
+  model: string
+  /** Optional role gloss. */
+  role?: string
+}
 ```
 
-Source: [`packages/subagent/agent-seats/src/index.ts:34`](../packages/subagent/agent-seats/src/index.ts)
+Source: [`packages/subagent/agent-seats/src/index.ts:37`](../packages/subagent/agent-seats/src/index.ts)
 
 <a id="shres-codeshres-code-agent-spine-demo"></a>
 
@@ -323,6 +339,30 @@ export interface GoalConfig {
 Depends on: [`AgentLoopConfig`](#shres-codeshres-code-agent-loop) · [`GoalDomainConfig`](#shres-codeshres-code-goal) · [`InvariantConfig`](#shres-codeshres-code-invariants) · [`JobsConfig`](#shres-codeshres-code-jobs-local) · [`SessionTitleConfig`](#shres-codeshres-code-session-title) · [`SkillFileSystem`](../packages/skill/skill-filesystem/src/index.ts) · [`SkillRegistryConfig`](#shres-codeshres-code-skill) · [`SystemPromptConfig`](#shres-codeshres-code-system-prompt) · [`toolBash`](../packages/shell/tool-bash/src/index.ts) · [`toolGoal`](../packages/goal/tool-goal/src/index.ts) · [`toolJobs`](../packages/jobs/tool-jobs/src/index.ts) · [`ToolsConfig`](#shres-codeshres-code-tools) · [`toolSkill`](../packages/skill/tool-skill/src/index.ts) · [`workspaceContext`](../packages/context/agent-instructions/src/index.ts)
 
 Source: [`packages/examples/agent-spine-demo/src/index.ts:92`](../packages/examples/agent-spine-demo/src/index.ts)
+
+<a id="shres-codeshres-code-agent-team"></a>
+
+## `@shres-code/shres-code-agent-team`
+
+Requires: `sessionProjections`
+
+```ts config-catalog
+/** Host-plugin config. Limits are deployment-varying; they are not module constants. */
+export interface Config {
+  /** Maximum immutable teammate names retained by one Team. */
+  readonly maxMembers?: number
+  /** Maximum non-deleted tasks retained by one Team. */
+  readonly maxTasks?: number
+  /** Maximum queued-minus-delivered messages for one target member. */
+  readonly maxPendingMessagesPerMember?: number
+  /** Maximum UTF-8 bytes in one complete sender-framed delivery. */
+  readonly maxMessageBytes?: number
+  /** Maximum milliseconds allowed for Team-owned runtime disposal. */
+  readonly disposalTimeoutMs?: number
+}
+```
+
+Source: [`packages/team/agent-team/src/index.ts:60`](../packages/team/agent-team/src/index.ts)
 
 <a id="shres-codeshres-code-agent-tool-presentation"></a>
 
@@ -2167,7 +2207,7 @@ export interface Config {
 export type JsonlCompression = 'zstd' | 'none'
 ```
 
-Source: [`packages/session/session-persistence-jsonl/src/index.ts:60`](../packages/session/session-persistence-jsonl/src/index.ts)
+Source: [`packages/session/session-persistence-jsonl/src/index.ts:61`](../packages/session/session-persistence-jsonl/src/index.ts)
 
 <a id="shres-codeshres-code-session-persistence-sqlite"></a>
 
@@ -2257,7 +2297,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/session/session-projection-cache/src/index.ts:42`](../packages/session/session-projection-cache/src/index.ts)
+Source: [`packages/session/session-projection-cache/src/index.ts:43`](../packages/session/session-projection-cache/src/index.ts)
 
 <a id="shres-codeshres-code-session-query-sqlite"></a>
 

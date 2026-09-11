@@ -957,6 +957,75 @@ Source: [`packages/guard/step-budget/src/types.ts:29`](../packages/guard/step-bu
 
 Source: [`packages/subagent/subagent/src/descriptor.ts:37`](../packages/subagent/subagent/src/descriptor.ts)
 
+### `team/*`
+
+<a id="teammember--log-only"></a>
+
+#### `team/member` — log-only
+
+```ts persistence-catalog
+/**
+ * Whole teammate lifecycle value, stored only in the Team Lead Session.
+ * Latest snapshot for a member id wins. A name is reserved permanently
+ * and a failed provisioning keeps its row. Log-only. Writers pass
+ * `{ ignorable: true }`.
+ * @param teamId - implicit Team identity, the Lead Session id under a distinct brand.
+ * @param member - complete post-change teammate snapshot.
+ */
+'team/member': TeamMemberEvent
+```
+
+Source: [`packages/team/agent-team/src/types.ts:109`](../packages/team/agent-team/src/types.ts)
+
+<a id="teammessagedelivered--log-only"></a>
+
+#### `team/message/delivered` — log-only
+
+```ts persistence-catalog
+/**
+ * Durable acknowledgement that the target Session recorded the message.
+ * Log-only. Writers pass `{ ignorable: true }`.
+ * @param teamId - implicit Team identity.
+ * @param messageId - queued message identity being acknowledged.
+ * @param targetId - Session that durably recorded the message.
+ */
+'team/message/delivered': TeamMessageDeliveredEvent
+```
+
+Source: [`packages/team/agent-team/src/types.ts:131`](../packages/team/agent-team/src/types.ts)
+
+<a id="teammessagequeued--log-only"></a>
+
+#### `team/message/queued` — log-only
+
+```ts persistence-catalog
+/**
+ * Durable mailbox enqueue, stored before delivery is attempted. Log-only.
+ * Writers pass `{ ignorable: true }`.
+ * @param teamId - implicit Team identity.
+ * @param message - complete queued peer-message snapshot.
+ */
+'team/message/queued': TeamMessageQueuedEvent
+```
+
+Source: [`packages/team/agent-team/src/types.ts:123`](../packages/team/agent-team/src/types.ts)
+
+<a id="teamtask--log-only"></a>
+
+#### `team/task` — log-only
+
+```ts persistence-catalog
+/**
+ * Whole shared-task value, stored only in the Team Lead Session. Latest
+ * snapshot for a task id wins. Log-only. Writers pass `{ ignorable: true }`.
+ * @param teamId - implicit Team identity.
+ * @param task - complete post-change task snapshot.
+ */
+'team/task': TeamTaskEvent
+```
+
+Source: [`packages/team/agent-team/src/types.ts:116`](../packages/team/agent-team/src/types.ts)
+
 ### `todo/*`
 
 <a id="todowrite--log-only"></a>

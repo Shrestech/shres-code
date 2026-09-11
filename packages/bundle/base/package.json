@@ -46,6 +46,7 @@
     "@shres-code/shres-code-agent-instructions": "workspace:^",
     "@shres-code/shres-code-agent-loop": "workspace:^",
     "@shres-code/shres-code-agent-seats": "workspace:^",
+    "@shres-code/shres-code-agent-team": "workspace:^",
     "@shres-code/shres-code-api-gateway": "workspace:^",
     "@shres-code/shres-code-attachment-local": "workspace:^",
     "@shres-code/shres-code-bash-sandbox": "workspace:^",

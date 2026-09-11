@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@shres-code/cordis'
+import type { Agent } from '@shres-code/shres-code-agent'
 import SessionStore from '@shres-code/shres-code-session'
+import SessionProjectionRegistry from '@shres-code/shres-code-session-projection'
 import { TeamError } from '../src/error.ts'
 import { TeamJournal } from '../src/journal.ts'
 import { ROOT, TEAM, member } from './helpers.ts'
@@ -75,5 +77,15 @@ describe('TeamJournal', () => {
   it('wraps a rejecting flush as TEAM_PERSISTENCE_FAILED', async () => {
     const { session, journal } = await setup({ flush: 'reject' })
     await expect(journal.flush(session)).rejects.toBeInstanceOf(TeamError)
+  })
+
+  it('fails loud when the agentTeam projection unit is not registered', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(SessionProjectionRegistry)
+    const session = ctx.sessions.create(ROOT)
+    const journal = new TeamJournal(ctx)
+    expect(() => journal.state({ id: ROOT, session } as Agent)).toThrow(/not registered/)
+    await ctx.fiber.dispose()
   })
 })

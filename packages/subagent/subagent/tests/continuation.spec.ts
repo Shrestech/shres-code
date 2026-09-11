@@ -516,6 +516,30 @@ describe('SubagentRuntime.followup residency routing', () => {
     expect(userTexts(loaded.events)).toEqual(['child task', 'first follow-up', 'second follow-up'])
   })
 
+  it('steers a resident child at the next step when delivery is steer', async () => {
+    const releaseFirst = Promise.withResolvers<undefined>()
+    const adapter = new GatedAdapter([
+      { chunks: textResponse('first'), gate: releaseFirst.promise },
+      { chunks: textResponse('after steer') },
+    ])
+    const { ctx, parent } = await setupWith(adapter)
+    const started = await ctx.subagents.startContinuable(startSpec(parent))
+    await vi.waitFor(() => { expect(adapter.requests).toHaveLength(1) })
+    const child = ctx.agents.get(started.childId)
+    expect(child).toBeDefined()
+    await ctx.subagents.followup(parent, started.childId, message('steer me'), {
+      source: { kind: 'user' },
+      signal: testSignal,
+      delivery: 'steer',
+    })
+    expect(child!.inbox.nextStep.some(queued => queued.content.some(block =>
+      block.type === 'text' && block.text === 'steer me'))).toBe(true)
+    expect(child!.inbox.nextTurn.some(queued => queued.content.some(block =>
+      block.type === 'text' && block.text === 'steer me'))).toBe(false)
+    releaseFirst.resolve(undefined)
+    await waitNoActivation(ctx, started.childId)
+  })
+
   it('cold-resumes a settled child into a new Activation', async () => {
     const { ctx, parent } = await setup([textResponse('first'), textResponse('after resume')])
     const started = await ctx.subagents.startContinuable(startSpec(parent))

@@ -10,7 +10,7 @@ Anything that later reaches a model request must be reconstructable from a sessi
 
 ## Decision
 
-`@shres-code/shres-code-agent-team` in `packages/team/agent-team/` owns the durable vocabulary and replay substrate. Agent Teams is a coordination capability that consumes the existing `subagent/` delegation seam; it is not folded into that family. This package does not spawn teammates, deliver or retry messages, expose a task-board service API, or register model tools.
+`@shres-code/shres-code-agent-team` in `packages/team/agent-team/` owns the durable vocabulary and replay substrate. Agent Teams is a coordination capability that consumes the existing `subagent/` delegation seam; it is not folded into that family. Live provisioning, steer delivery, and `team_send` / `team_list` are recorded in [the runtime note](2026-09-11-agent-teams-runtime-and-seats.md). Task-board tools are still later work.
 
 ### Durable record
 

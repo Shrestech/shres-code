@@ -1,5 +1,5 @@
 /**
- * Models-page card that binds Aegis, Stride, and Ward to enabled providers.
+ * Models-page card that binds Aegis, Stride, Ward, and the generic Subagent hire.
  */
 
 import { useEffect, useState, type ReactNode } from 'react'
@@ -11,19 +11,21 @@ import type { ModelsSettingsState } from './store.ts'
 import type { en } from './locales.ts'
 import styles from './ModelsSection.module.css'
 
-const SEAT_IDS = ['aegis', 'stride', 'ward'] as const
+const SEAT_IDS = ['aegis', 'stride', 'ward', 'subagent'] as const
 type SeatId = (typeof SEAT_IDS)[number]
 
 const SEAT_COLORS: Record<SeatId, string> = {
   aegis: '#c9842a',
   stride: '#2f9e62',
   ward: '#3b7dd8',
+  subagent: '#6b5b95',
 }
 
 const SEAT_COPY: Record<SeatId, { name: keyof typeof en; role: keyof typeof en; description: keyof typeof en }> = {
   aegis: { name: 'seatAegisName', role: 'seatAegisRole', description: 'seatAegisDescription' },
   stride: { name: 'seatStrideName', role: 'seatStrideRole', description: 'seatStrideDescription' },
   ward: { name: 'seatWardName', role: 'seatWardRole', description: 'seatWardDescription' },
+  subagent: { name: 'seatSubagentName', role: 'seatSubagentRole', description: 'seatSubagentDescription' },
 }
 
 /** One stored seat binding as the settings document carries it. */

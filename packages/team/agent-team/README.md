@@ -1,8 +1,8 @@
 # @shres-code/shres-code-agent-team
 
-Durable Agent Teams vocabulary and replay substrate. One Lead session coordinates named peer teammates through a roster, a mailbox, and a compare-and-set task board, all reconstructed from the Lead session log. This package owns the log events, the pure fold, the `agentTeam` projection unit, and `TeamJournal`. It does not spawn teammates, deliver or retry messages, expose a task-board service API, or register model tools; later packages consume these building blocks.
+Agent Teams runtime: one Lead session coordinates named peer teammates through a roster and a Lead-log mailbox. This package owns the log events, the fold, the `agentTeam` projection, `TeamJournal`, continuable provisioning, steer delivery, and the `team_send` / `team_list` tools. Task-board tools are not registered yet.
 
-The [Agent Teams Agent Note](../../../.agents/notes/implemented/feature/2026-09-10-agent-teams-durable-vocabulary.md) owns identity, mailbox, and replay decisions; the [subsystem page](../../../docs/subsystems/agent-team.md) records the literal durable forms.
+The [runtime note](../../../.agents/notes/implemented/feature/2026-09-11-agent-teams-runtime-and-seats.md) owns live delivery; the [vocabulary note](../../../.agents/notes/implemented/feature/2026-09-10-agent-teams-durable-vocabulary.md) owns identity and replay; the [subsystem page](../../../docs/subsystems/agent-team.md) records the durable forms.
 
 ## Config
 
@@ -50,14 +50,14 @@ Mailbox bookkeeping reconstructs from the Lead log; model-visible content recons
 
 ## Model Experience
 
-None, as this package stores log-only coordination records and a client-facing projection of them; later tool consumers own every model-visible byte.
+Indirectly, through the `team_list` and `team_send` tools this package registers on `ctx.tools`. Named seat tools are owned by `@shres-code/shres-code-agent-seats`.
 
 #### KV Cache effect
 
-None; this package neither assembles nor sends a provider request.
+Prefix-stable while the Team tool schemas are unchanged. Binding or unbinding a seat remounts that named tool and invalidates parent reuse from the first changed tool.
 
 ## Known Limitations and Deferred Work
 
-- **No spawning, delivery, task service, or tools** — this slice is the durable substrate. Teammate creation, mailbox dispatch, the task-board service API, and model-facing tools belong to later packages.
-- **Limits are validated, not enforced** — `maxMembers`, `maxTasks`, `maxPendingMessagesPerMember`, `maxMessageBytes`, and `disposalTimeoutMs` fail loud at plugin load when invalid; later operations apply them.
+- **No model-facing `spawn_teammate`** — the grant is Models bindings plus YAML `extras`. The service method exists for seats and `team_send` lazy provision.
+- **No task-board tools** — `team/task` events fold, but create/claim/complete tools are not registered.
 - **Trusted in-process producers** — a plugin with direct `Session` access can append counterfeit Team events. The fold and invariant detect inconsistency; they do not isolate plugins.

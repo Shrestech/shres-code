@@ -6,7 +6,7 @@ import SubagentRuntime from '@shres-code/shres-code-subagent'
 import z from '@shres-code/schemastery'
 import { SettingsProvider, settingsNamespace, type SettingsNamespace } from '@shres-code/shres-code-settings'
 import * as seats from '../src/index.ts'
-import { boundSeats, SEAT_ROSTER } from '../src/roster.ts'
+import { assertExtras, boundSeats, boundSubagentSeat, SEAT_ROSTER } from '../src/roster.ts'
 
 /** The smallest real provider: one in-memory document, always writable. */
 class MemorySettings extends SettingsProvider {
@@ -67,8 +67,26 @@ describe('boundSeats', () => {
   })
 })
 
+describe('assertExtras / boundSubagentSeat', () => {
+  it('rejects extras that collide with product seats and pins a complete generic hire route', () => {
+    expect(assertExtras(undefined)).toEqual([])
+    expect(() => assertExtras([{ name: 'aegis', persona: 'p', provider: 'x', model: 'y' }])).toThrow(/collides/)
+    expect(() => assertExtras([{ name: 'subagent', persona: 'p', provider: 'x', model: 'y' }])).toThrow(/collides/)
+    expect(() => assertExtras([
+      { name: 'researcher', persona: 'p', provider: 'x', model: 'y' },
+      { name: 'researcher', persona: 'q', provider: 'x', model: 'y' },
+    ])).toThrow(/duplicated/)
+    expect(assertExtras([{ name: 'researcher', persona: 'p', provider: 'x', model: 'y' }])).toHaveLength(1)
+    expect(boundSubagentSeat({})).toBeUndefined()
+    expect(boundSubagentSeat({ seats: { subagent: { provider: 'ollama-cloud' } } })).toBeUndefined()
+    expect(boundSubagentSeat({
+      seats: { subagent: { provider: 'ollama-cloud', model: 'glm-5.3-flash:cloud' } },
+    })).toEqual({ provider: 'ollama-cloud', model: 'glm-5.3-flash:cloud' })
+  })
+})
+
 describe('agent-seats remount', () => {
-  it('registers no tools while every seat is unbound', async () => {
+  it('registers no named seats while every product seat is unbound', async () => {
     const { ctx } = await boot()
     expect(toolNames(ctx).filter(name => name === 'aegis' || name === 'stride' || name === 'ward')).toEqual([])
     await ctx.fiber.dispose()
@@ -90,6 +108,17 @@ describe('agent-seats remount', () => {
 
     await ctx.settings.replace(seats.AGENT_SEATS_SETTINGS_NAMESPACE, { seats: {} })
     expect(toolNames(ctx).filter(name => name === 'aegis' || name === 'ward')).toEqual([])
+    await ctx.fiber.dispose()
+  })
+
+  it('pins the generic subagent hire when seats.subagent is fully bound', async () => {
+    const { ctx } = await boot()
+    await ctx.settings.replace(seats.AGENT_SEATS_SETTINGS_NAMESPACE, {
+      seats: { subagent: { provider: 'ollama-cloud', model: 'glm-5.3-flash:cloud' } },
+    })
+    expect(toolNames(ctx)).toContain('subagent')
+    const schema = ctx.tools.schemas().find(entry => entry.name === 'subagent')
+    expect(schema).toBeDefined()
     await ctx.fiber.dispose()
   })
 

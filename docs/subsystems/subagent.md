@@ -174,6 +174,11 @@ interface SubagentFollowupOptions {
   readonly source: MessageSource
   /** Caller cancellation, owning the operation only until inbox acceptance. */
   readonly signal: AbortSignal
+  /**
+   * Inbox slot for the accepted message. `followup` (default) is the child's
+   * next turn. `steer` is the next step, used by Team mail.
+   */
+  readonly delivery?: 'followup' | 'steer'
 }
 ```
 

@@ -122,6 +122,11 @@ export interface ContinuableStartSpec {
   readonly request: Omit<SubagentStartRequest, 'label' | 'signal' | 'outputSchema'>
   /** Caller cancellation, owning the operation only until inbox acceptance. */
   readonly signal: AbortSignal
+  /**
+   * Reserved durable child session id. Team provisioning writes this id to the
+   * Lead log before spawn so recovery can match the child Session.
+   */
+  readonly childId?: SessionId
 }
 
 /** Identities returned once a continuable child accepted its initial prompt. */
@@ -147,6 +152,11 @@ export interface SubagentFollowupOptions {
   readonly source: MessageSource
   /** Caller cancellation, owning the operation only until inbox acceptance. */
   readonly signal: AbortSignal
+  /**
+   * Inbox slot for the accepted message. `followup` (default) is the child's
+   * next turn. `steer` is the next step, used by Team mail.
+   */
+  readonly delivery?: 'followup' | 'steer'
 }
 
 /**
@@ -426,7 +436,7 @@ export class SubagentContinuationManager {
     this.assertAdmitting(parent)
     this.requirePersistence()
     assertSubagentMaxDepth(request.maxDepth)
-    const childId = SessionId(randomUUID())
+    const childId = spec.childId ?? SessionId(randomUUID())
     const childDepth = resolveChildDepth(parent, request.maxDepth)
     // Snapshot before any await: invalid descriptor JSON rejects the call
     // before a child exists, and the detached value is what reaches the log.
@@ -523,7 +533,7 @@ export class SubagentContinuationManager {
         if (activation.disposal !== undefined) {
           return activation.disposal.then(() => undefined, () => undefined)
         }
-        return this.submitAdmitted(activation, content, options.source, parent, options.signal)
+        return this.submitAdmitted(activation, content, options.source, parent, options.signal, options.delivery)
       })
       /* v8 ignore start -- only the lost-cutoff arm above returns undefined, so only that
        * race reaches the retry below, which then cold-resumes a new Activation. */
@@ -958,7 +968,7 @@ export class SubagentContinuationManager {
       if (error instanceof SubagentError) throw error
       throw new SubagentError(`subagent "${childId}" is unavailable`, 'NOT_RESUMABLE', { cause: error })
     }
-    return this.submitMaterialized(activation, content, options.source, parent, options.signal)
+    return this.submitMaterialized(activation, content, options.source, parent, options.signal, options.delivery)
   }
 
   /**
@@ -976,9 +986,10 @@ export class SubagentContinuationManager {
     source: MessageSource,
     parent: Agent,
     signal: AbortSignal,
+    delivery: 'followup' | 'steer' = 'followup',
   ): Promise<MessageId> {
     try {
-      return this.submitAdmitted(activation, content, source, parent, signal)
+      return this.submitAdmitted(activation, content, source, parent, signal, delivery)
     } catch (error: unknown) {
       /* v8 ignore next -- rollback disposal failures must not mask the
        * pre-acceptance signal, drain, or lifecycle failure. */
@@ -1164,13 +1175,15 @@ export class SubagentContinuationManager {
     content: ContentBlock[],
     source: MessageSource,
     parent: Agent,
+    delivery: 'followup' | 'steer' = 'followup',
   ): MessageId {
     // Parent-originated delivery keeps the parent live through ownership, so
     // establish it before the message can enter the child's inbox.
     this.acquireOwnership(parent, activation.childId)
     const message = createUserMessage({ content, source })
     const accepted = this.admitWaking(activation, message.id, () => {
-      activation.handle.agent.followup(message)
+      if (delivery === 'steer') activation.handle.agent.steer(message)
+      else activation.handle.agent.followup(message)
     })
     // Past this point the caller has an id for this child, so its eventual
     // settlement is something the parent is owed an account of.
@@ -1216,6 +1229,7 @@ export class SubagentContinuationManager {
     source: MessageSource,
     parent: Agent,
     signal: AbortSignal,
+    delivery: 'followup' | 'steer' = 'followup',
   ): MessageId {
     signal.throwIfAborted()
     this.assertAdmitting(parent)
@@ -1232,7 +1246,7 @@ export class SubagentContinuationManager {
       activation.childId,
       activation.handle.agent.session.header.parentSession,
     )
-    return this.submit(activation, content, source, parent)
+    return this.submit(activation, content, source, parent, delivery)
   }
 
   /**

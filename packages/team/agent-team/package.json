@@ -1,6 +1,6 @@
 {
   "name": "@shres-code/shres-code-agent-team",
-  "description": "Durable Agent Teams vocabulary and replay substrate: log-only roster, task, and mailbox events plus the agentTeam projection",
+  "description": "Agent Teams runtime: Lead-log mailbox, continuable teammate provisioning, steer delivery, and team_send / team_list",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
@@ -45,19 +45,32 @@
     "zod": "^4.4.3"
   },
   "peerDependencies": {
+    "@shres-code/shres-code-agent": "workspace:^",
     "@shres-code/shres-code-brand": "workspace:^",
     "@shres-code/shres-code-invariants": "workspace:^",
     "@shres-code/shres-code-llm": "workspace:^",
     "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-session-persistence": "workspace:^",
     "@shres-code/shres-code-session-projection": "workspace:^",
+    "@shres-code/shres-code-subagent": "workspace:^",
+    "@shres-code/shres-code-tools": "workspace:^",
     "@shres-code/cordis": "workspace:^"
   },
   "devDependencies": {
+    "@shres-code/shres-code-agent": "workspace:^",
+    "@shres-code/shres-code-agent-loop": "workspace:^",
+    "@shres-code/shres-code-agent-loop-testkit": "workspace:^",
     "@shres-code/shres-code-brand": "workspace:^",
     "@shres-code/shres-code-invariants": "workspace:^",
     "@shres-code/shres-code-llm": "workspace:^",
     "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-session-persistence": "workspace:^",
+    "@shres-code/shres-code-session-persistence-jsonl": "workspace:^",
     "@shres-code/shres-code-session-projection": "workspace:^",
+    "@shres-code/shres-code-subagent": "workspace:^",
+    "@shres-code/shres-code-subagent-spawn-in-process": "workspace:^",
+    "@shres-code/shres-code-system-prompt": "workspace:^",
+    "@shres-code/shres-code-tools": "workspace:^",
     "@shres-code/cordis": "workspace:^",
     "@shres-code/cordis-plugin-loader": "workspace:^"
   }

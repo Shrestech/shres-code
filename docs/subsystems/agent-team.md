@@ -1,6 +1,6 @@
 # Agent Teams
 
-Types shared by the implicit-root Team domain. The [Agent Teams Agent Note](../../.agents/notes/implemented/feature/2026-09-10-agent-teams-durable-vocabulary.md) owns identity, mailbox, and replay decisions; this page records the literal durable forms from [`packages/team/agent-team/src/types.ts`](../../packages/team/agent-team/src/types.ts). The [package README](../../packages/team/agent-team/README.md) owns operation, recovery, and limit behavior.
+Types shared by the implicit-root Team domain. The [runtime note](../../.agents/notes/implemented/feature/2026-09-11-agent-teams-runtime-and-seats.md) owns live provisioning and steer delivery; the [vocabulary note](../../.agents/notes/implemented/feature/2026-09-10-agent-teams-durable-vocabulary.md) owns identity and replay; this page records the literal durable forms from [`packages/team/agent-team/src/types.ts`](../../packages/team/agent-team/src/types.ts). The [package README](../../packages/team/agent-team/README.md) owns operation, recovery, and limit behavior.
 
 ## Identity and roster
 
@@ -75,6 +75,156 @@ interface TeamTaskSnapshot {
 
 `pending` is unstarted or released, `in_progress` carries an owner, `completed` satisfies blockers, and `deleted` is a retained tombstone.
 
+## Runtime
+
+`ctx.agentTeams` provisions continuable teammates, lists the roster, and steers peer mail. The [package README](../../packages/team/agent-team/README.md) owns operation and recovery.
+
+```ts type-equiv
+/** Caller identity inside one implicit Team. */
+interface TeamMembership {
+  readonly root: Agent
+  readonly id: TeamId
+  readonly role: 'lead' | 'teammate'
+  readonly name: string
+}
+```
+
+```ts type-equiv
+/** Current runtime-enriched roster row. */
+interface TeamMemberView {
+  readonly id: SessionId
+  readonly name: string
+  readonly role: 'lead' | 'teammate'
+  readonly status: 'running' | 'idle' | 'inactive' | 'provisioning' | 'failed'
+  readonly description?: string
+  readonly provider?: string
+  readonly context?: 'fresh' | 'fork'
+  readonly model?: string
+  readonly diagnostics: string[]
+}
+```
+
+```ts type-equiv
+/** Input for creating one durable teammate. */
+interface SpawnTeammateRequest {
+  readonly name: string
+  readonly description: string
+  readonly prompt: ContentBlock[]
+  readonly context: 'fresh' | 'fork'
+  readonly provider: string
+  readonly signal: AbortSignal
+  readonly persona?: string
+  readonly agentOptions?: { readonly provider?: string; readonly model?: string }
+}
+```
+
+```ts type-equiv
+/** Result after one teammate reaches a durable active or failed edge. */
+interface SpawnTeammateResult {
+  readonly member: TeamMemberView
+}
+```
+
+```ts type-equiv
+/** Input for one durable peer message. */
+interface SendTeamMessageRequest {
+  readonly target: string
+  readonly content: ContentBlock[]
+  readonly signal: AbortSignal
+}
+```
+
+```ts type-equiv
+/** Result after a peer message enters the durable mailbox. */
+interface SendTeamMessageResult {
+  readonly messageId: TeamMessageId
+  readonly status: 'accepted' | 'queued'
+}
+```
+
+```ts type-equiv
+/** Human-configured teammate that can be lazily provisioned. */
+interface TeamRosterTemplateEntry {
+  readonly name: string
+  readonly description: string
+  readonly persona?: string
+  readonly provider: string
+  readonly model?: string
+  readonly context?: 'fresh' | 'fork'
+}
+```
+
 ## Replay
 
 `foldTeam(rootId, events)` replays one root Session into the roster, task board, and queued-minus-delivered mailbox that later Team operations read. It selects records by `TeamId`, so events inherited by an ordinary fork retain the ancestor id and never enter the new root's state. Session event `seq` and `time` remain the ordering and timing record; Team snapshots do not duplicate them. The `agentTeam` projection unit folds every Team present in a Session log, keyed by `teamId`; callers select the projected Session's own Team with `values.agentTeam?.[session.id]`.
+
+<!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
+
+<a id="cordis-surface"></a>
+
+## Cordis API
+
+Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — this section is byte-identical in both language sides of the page. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+
+<a id="ctxagentteams--teamservice"></a>
+
+### `ctx.agentTeams` — `TeamService`
+
+Agent Teams service backed by the exact live Lead Session log.
+
+```ts cordis-catalog
+/**
+ * Resolve one exact live Agent's Team role.
+ * @param agent - exact live Agent used as the authority credential.
+ * @returns its root, Team identity, role, and model-facing name.
+ */
+membership(agent: Agent): TeamMembership
+
+/**
+ * Resolve a caller without throwing.
+ * @param agent - candidate exact live Agent.
+ * @returns Team membership, or undefined for non-Team subagents.
+ */
+tryMembership(agent: Agent): TeamMembership | undefined
+
+/**
+ * List the runtime-enriched roster visible to one Team member.
+ * @param agent - exact live Team member.
+ * @returns Lead and teammate rows in creation order.
+ */
+listMembers(agent: Agent): TeamMemberView[]
+
+/**
+ * Create one named, continuable direct child of the Team Lead.
+ * @param caller - exact live Lead Agent.
+ * @param request - immutable name, description, prompt, context mode, provider, and cancellation.
+ * @returns the active roster row.
+ */
+async spawnTeammate(caller: Agent, request: SpawnTeammateRequest): Promise<SpawnTeammateResult>
+
+/**
+ * Queue one durable peer message, then attempt immediate steer delivery.
+ * @param caller - exact live sending Team member.
+ * @param request - target name, content, and pre-queue cancellation.
+ * @returns durable message identity and immediate-delivery observation.
+ */
+async sendMessage(caller: Agent, request: SendTeamMessageRequest): Promise<SendTeamMessageResult>
+
+/**
+ * Replace the human-configured roster used for lazy provisioning.
+ * @param source - bound seats and YAML extras for this process.
+ */
+setRosterTemplate(source: () => readonly TeamRosterTemplateEntry[]): void
+
+/**
+ * Provision a template teammate when the Lead first addresses that name.
+ * @param lead - exact live Team Lead.
+ * @param rawName - teammate name from team_send or a named seat tool.
+ */
+async ensureTemplateMember(lead: Agent, rawName: string): Promise<void>
+```
+
+Types: [Agent](core.md)
+
+Source: [`packages/team/agent-team/src/service.ts:29`](../../packages/team/agent-team/src/service.ts)
+<!-- END GENERATED cordis-surface -->

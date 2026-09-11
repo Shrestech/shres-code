@@ -10,13 +10,16 @@ import z from '@shres-code/schemastery'
 import { deepEqualJson, installSettingsSection, settingsNamespace } from '@shres-code/shres-code-settings'
 import * as ToolSubagent from '@shres-code/shres-code-tool-subagent'
 import type { AgentSeatsSettings, BoundSeat, SeatBinding } from './roster.ts'
-import { boundSeats } from './roster.ts'
+import { assertExtras, boundSeats, boundSubagentSeat } from './roster.ts'
+import type { TeamRosterTemplateEntry } from '@shres-code/shres-code-agent-team'
+import type { TeamService } from '@shres-code/shres-code-agent-team'
+import { registerTeamSeatTool } from './team-seat-tool.ts'
 
 export {
-  boundSeats, SEAT_IDS, SEAT_ROSTER,
+  assertExtras, boundSeats, boundSubagentSeat, SEAT_IDS, SEAT_ROSTER,
 } from './roster.ts'
 export type {
-  AgentSeatsSettings, BoundSeat, SeatBinding, SeatId, SeatRosterEntry,
+  AgentSeatsSettings, BoundSeat, ExtraSeat, SeatBinding, SeatId, SeatRosterEntry,
 } from './roster.ts'
 
 export const name = 'agent-seats'
@@ -39,7 +42,15 @@ export const Config: z<Config> = z.object({
     aegis: seatBinding,
     stride: seatBinding,
     ward: seatBinding,
+    subagent: seatBinding,
   }),
+  extras: z.array(z.object({
+    name: z.string(),
+    persona: z.string(),
+    provider: z.string(),
+    model: z.string(),
+    role: z.string(),
+  })),
 })
 
 /** Composition entry used as the settings base: every seat starts unbound. */
@@ -70,27 +81,96 @@ export function seatToolConfig(seat: BoundSeat): ToolSubagent.Config {
 export function apply(ctx: Context, config: Config): void {
   let source: () => AgentSeatsSettings = () => config
   let mounted: BoundSeat[] = []
+  let lastGeneric: SeatBinding | undefined
+  let teamsPresent = false
   let disposeTools: (() => void) | undefined
+  let disposeGeneric: (() => void) | undefined
+
+  const remountGeneric = (generic: SeatBinding | undefined): void => {
+    disposeGeneric?.()
+    disposeGeneric = undefined
+    const fiber = ctx.plugin(ToolSubagent, {
+      provider: 'spawn',
+      toolName: 'subagent',
+      backgroundMode: 'continuable',
+      ...generic !== undefined ? { agentOptions: { provider: generic.provider, model: generic.model } } : {},
+    })
+    disposeGeneric = () => { void fiber.dispose() }
+  }
 
   const remount = (): void => {
-    const next = boundSeats(source())
-    if (deepEqualJson(mounted, next)) return
+    const settings = source()
+    assertExtras(settings.extras)
+    const next = boundSeats(settings)
+    const generic = boundSubagentSeat(settings)
+    const teams = ctx.get('agentTeams') as TeamService | undefined
+    const teamsReady = teams !== undefined
+    if (
+      deepEqualJson(mounted, next)
+      && deepEqualJson(lastGeneric, generic)
+      && teamsReady === teamsPresent
+      && disposeGeneric !== undefined
+      && (next.length === 0 || disposeTools !== undefined)
+    ) {
+      syncTemplate(settings)
+      return
+    }
+    if (!deepEqualJson(lastGeneric, generic) || disposeGeneric === undefined) {
+      remountGeneric(generic)
+      lastGeneric = generic
+    }
+    if (deepEqualJson(mounted, next) && teamsReady === teamsPresent && disposeTools !== undefined) {
+      syncTemplate(settings)
+      return
+    }
     disposeTools?.()
     disposeTools = undefined
     mounted = next
-    if (next.length === 0) return
+    teamsPresent = teamsReady
+    if (next.length === 0) {
+      syncTemplate(settings)
+      return
+    }
     const fiber = ctx.plugin(function agentSeatsTools(child: Context) {
       for (const seat of next) {
-        child.plugin(ToolSubagent, seatToolConfig(seat))
+        if (teamsReady && teams !== undefined) registerTeamSeatTool(child, seat, teams)
+        else child.plugin(ToolSubagent, seatToolConfig(seat))
       }
     })
     disposeTools = () => { void fiber.dispose() }
+    syncTemplate(settings)
+  }
+
+  const syncTemplate = (settings: AgentSeatsSettings): void => {
+    const teams = ctx.get('agentTeams')
+    if (teams === undefined) return
+    const entries: TeamRosterTemplateEntry[] = [
+      ...boundSeats(settings).map(seat => ({
+        name: seat.entry.id,
+        description: seat.entry.role,
+        persona: seat.entry.persona,
+        provider: seat.provider,
+        model: seat.model,
+      })),
+      ...assertExtras(settings.extras).map(extra => ({
+        name: extra.name.trim(),
+        description: extra.role ?? extra.name,
+        persona: extra.persona,
+        provider: extra.provider,
+        model: extra.model,
+      })),
+    ]
+    teams.setRosterTemplate(() => entries)
   }
 
   installSettingsSection(ctx, AGENT_SEATS_SETTINGS_NAMESPACE, Config, Object.assign({}, EMPTY_SEATS, config), {
     setSource: (current) => { source = current },
-    onChange: remount,
+    onChange: () => { void remount() },
   })
   remount()
-  ctx.effect(() => () => { disposeTools?.() }, 'agent-seats: withdraw tools')
+  ctx.inject(['agentTeams'], () => { remount() })
+  ctx.effect(() => () => {
+    disposeTools?.()
+    disposeGeneric?.()
+  }, 'agent-seats: withdraw tools')
 }

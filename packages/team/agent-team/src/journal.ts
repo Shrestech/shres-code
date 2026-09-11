@@ -10,9 +10,12 @@
  */
 
 import type { Context } from '@shres-code/cordis'
+import type { Agent } from '@shres-code/shres-code-agent'
 import type { Session, SessionEventMap, SessionId } from '@shres-code/shres-code-session'
 import { TeamError } from './error.ts'
+import { emptyTeamFoldState, teamStateFromFold } from './fold.ts'
 import type { TeamEventType } from './fold.ts'
+import type { TeamState } from './types.ts'
 
 type MutableTeamEventType = TeamEventType
 type AppendTeamEvent = <T extends MutableTeamEventType>(
@@ -27,8 +30,24 @@ export class TeamJournal {
 
   /**
    * @param ctx - context carrying the live session store.
+   * @param onCommit - optional notification after a Team event flush succeeds.
    */
-  constructor(private readonly ctx: Context) {}
+  constructor(
+    private readonly ctx: Context,
+    private readonly onCommit?: (root: Agent) => void,
+  ) {}
+
+  /**
+   * Read authoritative Team state for one exact live Lead.
+   * @param root - exact live Team Lead.
+   * @returns current projected state selected by the Lead Team id.
+   */
+  state(root: Agent): TeamState {
+    const values = this.ctx.sessionProjections.snapshot(root.session).values
+    const projection = values.agentTeam
+    if (projection === undefined) throw new Error('Agent Teams projection is not registered')
+    return projection[String(root.id)] ?? teamStateFromFold(emptyTeamFoldState(root.id))
+  }
 
   /**
    * Serialize one Lead's asynchronous mutation operation.
@@ -67,6 +86,8 @@ export class TeamJournal {
     const append = session.append.bind(session) as unknown as AppendTeamEvent
     append(type, data, { ignorable: true })
     await this.flush(session)
+    const live = this.ctx.get('agents')?.get(session.id)
+    if (live !== undefined) this.onCommit?.(live)
   }
 
   /**

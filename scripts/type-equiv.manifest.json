@@ -2259,6 +2259,41 @@
       "doc": "docs/subsystems/agent-team.md",
       "symbol": "TeamTaskSnapshot",
       "source": "packages/team/agent-team/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/agent-team.md",
+      "symbol": "TeamMembership",
+      "source": "packages/team/agent-team/src/roster.ts"
+    },
+    {
+      "doc": "docs/subsystems/agent-team.md",
+      "symbol": "TeamMemberView",
+      "source": "packages/team/agent-team/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/agent-team.md",
+      "symbol": "SpawnTeammateRequest",
+      "source": "packages/team/agent-team/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/agent-team.md",
+      "symbol": "SpawnTeammateResult",
+      "source": "packages/team/agent-team/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/agent-team.md",
+      "symbol": "SendTeamMessageRequest",
+      "source": "packages/team/agent-team/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/agent-team.md",
+      "symbol": "SendTeamMessageResult",
+      "source": "packages/team/agent-team/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/agent-team.md",
+      "symbol": "TeamRosterTemplateEntry",
+      "source": "packages/team/agent-team/src/types.ts"
     }
   ]
 }
