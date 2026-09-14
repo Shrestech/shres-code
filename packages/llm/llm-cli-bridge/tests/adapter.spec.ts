@@ -628,6 +628,20 @@ describe('parse, serialize, and resolveRoutes', () => {
       .toThrow('model ids')
   })
 
+  it('resolves a disabled bare toggle as dormant instead of rejecting it', () => {
+    // Settings written as bare switch-offs (`{ enabled: false }`, the shape the
+    // Models page wrote for shipped routes) are not declarations: they must not
+    // break the declared routes sharing the section.
+    const routes = resolveRoutes({
+      'off-cli': { enabled: false },
+      'on-cli': { displayName: 'On CLI (delegated)', binary: 'on-cli' },
+    })
+    expect(routes.get('off-cli')).toMatchObject({ enabled: false, binary: '' })
+    expect(routes.get('on-cli')).toMatchObject({ enabled: true, binary: 'on-cli' })
+    expect(() => resolveRoutes({ 'on-cli': { enabled: true, binary: 'on-cli' } }))
+      .toThrow('displayName and binary')
+  })
+
   it('merges overlay fields onto the conservative template', () => {
     const routes = resolveRoutes({
       extra: {
@@ -721,6 +735,37 @@ describe('plugin registration', () => {
     })
     expect(ctx.llm.listProviders().map(provider => provider.id)).toEqual(['flag-cli'])
     expect(ctx.llm.listConfigurableProviders().map(entry => entry.provider)).toEqual(['flag-cli'])
+    await ctx.fiber.dispose()
+  })
+
+  it('keeps declared routes live beside bare disabled toggles from a settings overlay', async () => {
+    // Regression: a section mixing bare switch-offs with one declared route
+    // must not sink the declared route.
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    await ctx.plugin(MemorySettings)
+    await ctx.plugin(plugin, {})
+    await ctx.settings.update(settingsNamespace('llm-cli-bridge'), {
+      routes: {
+        'off-cli': { enabled: false },
+        'flag-cli': { displayName: 'Flag CLI (delegated)', binary: 'flag-cli' },
+      },
+    })
+    expect(ctx.llm.listProviders().map(provider => provider.id)).toEqual(['flag-cli'])
+    // A bare toggle-off placeholder carries no binary, so it earns no card.
+    expect(ctx.llm.listConfigurableProviders().map(entry => entry.provider)).toEqual(['flag-cli'])
+    await ctx.fiber.dispose()
+  })
+
+  it('rejects a settings write enabling a route without displayName and binary', async () => {
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    await ctx.plugin(MemorySettings)
+    await ctx.plugin(plugin, {})
+    await expect(ctx.settings.update(settingsNamespace('llm-cli-bridge'), {
+      routes: { 'flag-cli': { enabled: true } },
+    })).rejects.toThrow('displayName and binary')
+    expect(ctx.llm.listProviders()).toEqual([])
     await ctx.fiber.dispose()
   })
 

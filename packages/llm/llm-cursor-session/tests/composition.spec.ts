@@ -70,6 +70,7 @@ describe('llm-cursor-session real composition', () => {
     await ctx.loader.await()
 
     expect(ctx.llm.listProviders().map(provider => provider.id)).toEqual(['cursor-session'])
+    expect(ctx.llm.listConfigurableProviders().map(entry => entry.provider)).toContain('cursor-session')
     const models = await ctx.llm.listModels('cursor-session')
     expect(models.map(model => model.id)).toContain('cursor-grok-4.6-high')
 
@@ -127,5 +128,54 @@ describe('llm-cursor-session real composition', () => {
     expect(ctx.llm.listProviders().map(provider => provider.id)).toEqual(['cursor-session'])
     const models = await ctx.llm.listModels('cursor-session')
     expect(models.map(model => model.id)).toContain('gpt-5.2')
+
+    // Without the cursor-credential engine mounted, stream() skips the login
+    // preflight and surfaces the wire gate directly.
+    const chunks: { type: string; reason?: { kind?: string; failure?: { code?: string } } }[] = []
+    for await (const chunk of ctx.llm.stream({ provider: 'cursor-session', model: 'gpt-5.2', messages: [] })) {
+      chunks.push(chunk)
+    }
+    const finish = chunks.find(chunk => chunk.type === 'finish')
+    expect(finish?.reason?.kind).toBe('error')
+    expect(finish?.reason?.failure?.code).toBe('UNSUPPORTED_OPTION')
+  })
+
+  it('omits the route from the live registry when disabled, keeping the directory entry', async () => {
+    root = await mkdtemp(join(tmpdir(), 'cursor-session-composition-'))
+    const configPath = join(root, 'cordis.yml')
+    await writeFile(configPath, [
+      '- id: llm',
+      "  name: 'test-llm-service'",
+      '- id: llm-cursor-session',
+      "  name: '@shres-code/shres-code-llm-cursor-session'",
+      '  config:',
+      '    enabled: false',
+      '',
+    ].join('\n'))
+
+    const ctx = new Context()
+    context = ctx
+    ctx.baseUrl = pathToFileURL(root).href + '/'
+    await ctx.plugin(Loader)
+    ctx.loader.builtins.include = Include
+    const modules = new Map<string, unknown>([
+      ['test-llm-service', LlmRuntime],
+      ['@shres-code/shres-code-llm-cursor-session', LlmCursorSession],
+    ])
+    ctx.loader.internal = {
+      version: 'v2',
+      async import(specifier: string) {
+        if (!modules.has(specifier)) throw new Error(`unexpected Loader import: ${specifier}`)
+        return modules.get(specifier)
+      },
+    } as unknown as NonNullable<typeof ctx.loader.internal>
+    await ctx.loader.create({
+      name: 'cordis:include',
+      config: { path: pathToFileURL(configPath).href },
+    })
+    await ctx.loader.await()
+
+    expect(ctx.llm.listProviders()).toEqual([])
+    expect(ctx.llm.listConfigurableProviders().map(entry => entry.provider)).toContain('cursor-session')
   })
 })

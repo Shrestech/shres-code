@@ -76,23 +76,28 @@ function registrationFacts(routes: ReadonlyMap<string, CliBridgeRoute>): unknown
 }
 
 /**
- * Configurable-provider directory for every resolved CLI route.
+ * Configurable-provider directory for every resolved CLI route. Dormant
+ * placeholders from bare `enabled: false` toggles carry no binary and are
+ * excluded: there is nothing to show or probe for them, and an empty binary
+ * is not a valid directory field on the wire.
  * @param routes - currently resolved routes.
  * @returns directory entries marked delegated.
  */
 function directoryEntries(
   routes: ReadonlyMap<string, CliBridgeRoute>,
 ): LlmConfigurableProvider[] {
-  return [...routes.entries()].map(([provider, route]) => ({
-    provider,
-    displayName: route.displayName,
-    settingsNs: NS,
-    settingsPath: ['routes', provider],
-    declared: false,
-    kind: 'delegated' as const,
-    binary: route.binary,
-    binaryFound: executableOnPath(route.binary),
-  }))
+  return [...routes.entries()]
+    .filter(([, route]) => route.binary.length > 0)
+    .map(([provider, route]) => ({
+      provider,
+      displayName: route.displayName,
+      settingsNs: NS,
+      settingsPath: ['routes', provider],
+      declared: false,
+      kind: 'delegated' as const,
+      binary: route.binary,
+      binaryFound: executableOnPath(route.binary),
+    }))
 }
 
 /**
@@ -236,6 +241,13 @@ export function apply(ctx: Context, config: Config): void {
     onChange: () => {
       ensureDirectory()
       ensureRegistrationFacts()
+    },
+    // An enabled route without displayName/binary must fail at registration,
+    // not surface as an empty registry: a throw inside onChange would be
+    // contained by the settings plumbing and read as "no routes declared".
+    validate: (value) => {
+      resolveRoutes(value.routes)
+      readDisposeGraceMs(value.disposeGraceMs)
     },
   })
 }
