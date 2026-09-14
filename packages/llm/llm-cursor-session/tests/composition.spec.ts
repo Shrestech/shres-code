@@ -90,4 +90,42 @@ describe('llm-cursor-session real composition', () => {
     context = ctx2
     expect(ctx2.get('llm')).toBeUndefined()
   })
+
+  it('boots the bundle posture: an entry with no config section resolves schema defaults', async () => {
+    root = await mkdtemp(join(tmpdir(), 'cursor-session-composition-'))
+    const configPath = join(root, 'cordis.yml')
+    await writeFile(configPath, [
+      '- id: llm',
+      "  name: 'test-llm-service'",
+      '- id: llm-cursor-session',
+      "  name: '@shres-code/shres-code-llm-cursor-session'",
+      '',
+    ].join('\n'))
+
+    const ctx = new Context()
+    context = ctx
+    ctx.baseUrl = pathToFileURL(root).href + '/'
+    await ctx.plugin(Loader)
+    ctx.loader.builtins.include = Include
+    const modules = new Map<string, unknown>([
+      ['test-llm-service', LlmRuntime],
+      ['@shres-code/shres-code-llm-cursor-session', LlmCursorSession],
+    ])
+    ctx.loader.internal = {
+      version: 'v2',
+      async import(specifier: string) {
+        if (!modules.has(specifier)) throw new Error(`unexpected Loader import: ${specifier}`)
+        return modules.get(specifier)
+      },
+    } as unknown as NonNullable<typeof ctx.loader.internal>
+    await ctx.loader.create({
+      name: 'cordis:include',
+      config: { path: pathToFileURL(configPath).href },
+    })
+    await ctx.loader.await()
+
+    expect(ctx.llm.listProviders().map(provider => provider.id)).toEqual(['cursor-session'])
+    const models = await ctx.llm.listModels('cursor-session')
+    expect(models.map(model => model.id)).toContain('gpt-5.2')
+  })
 })

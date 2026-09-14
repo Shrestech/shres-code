@@ -1180,6 +1180,9 @@ importers:
       '@shres-code/shres-code-credentials-local':
         specifier: workspace:^
         version: link:../../credentials/credentials-local
+      '@shres-code/shres-code-cursor-credential':
+        specifier: workspace:^
+        version: link:../../llm/cursor-credential
       '@shres-code/shres-code-first-run-setup':
         specifier: workspace:^
         version: link:../../core/first-run-setup
@@ -1222,6 +1225,9 @@ importers:
       '@shres-code/shres-code-llm-codex-session':
         specifier: workspace:^
         version: link:../../llm/llm-codex-session
+      '@shres-code/shres-code-llm-cursor-session':
+        specifier: workspace:^
+        version: link:../../llm/llm-cursor-session
       '@shres-code/shres-code-llm-deepseek':
         specifier: workspace:^
         version: link:../../llm/llm-deepseek

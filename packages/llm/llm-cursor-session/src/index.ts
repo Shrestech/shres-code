@@ -18,6 +18,7 @@ import { CURSOR_SESSION_PROVIDER_ID, Config, resolveConfig } from './config.ts'
 export { CursorSessionLlmAdapter } from './adapter.ts'
 export type { CursorSessionAdapterOptions } from './adapter.ts'
 export {
+  Config,
   CURSOR_SESSION_PROVIDER_ID,
   DEFAULT_BASE_URL,
   DEFAULT_DISPLAY_NAME,
