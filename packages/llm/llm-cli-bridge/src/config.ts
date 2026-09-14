@@ -202,7 +202,13 @@ export const SHIPPED_ROUTES: Record<ShippedRouteId, CliBridgeRoute> = {
     allowDelegatedTools: true,
     contextWindow: DEFAULT_CONTEXT_WINDOW,
     defaultMaxTokens: DEFAULT_MAX_TOKENS,
-    models: [{ id: 'gpt-5', name: 'GPT-5' }, { id: 'sonnet-4', name: 'Sonnet 4' }],
+    models: [
+      { id: 'gpt-5', name: 'GPT-5' },
+      { id: 'sonnet-4', name: 'Sonnet 4' },
+      { id: 'fabel-5.1', name: 'Fabel 5.1' },
+      { id: 'gpt-astra', name: 'GPT Astra' },
+      { id: 'grok-4.6', name: 'Grok 4.6' },
+    ],
   },
   'grok-cli': {
     displayName: 'Grok Build CLI (delegated)',

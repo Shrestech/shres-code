@@ -279,6 +279,9 @@ describe('CliLlmAdapter', () => {
     expect(await adapter.listModels('cursor-cli')).toEqual([
       { provider: 'cursor-cli', id: 'gpt-5', name: 'GPT-5' },
       { provider: 'cursor-cli', id: 'sonnet-4', name: 'Sonnet 4' },
+      { provider: 'cursor-cli', id: 'fabel-5.1', name: 'Fabel 5.1' },
+      { provider: 'cursor-cli', id: 'gpt-astra', name: 'GPT Astra' },
+      { provider: 'cursor-cli', id: 'grok-4.6', name: 'Grok 4.6' },
     ])
     expect(await adapter.listModels('kimi-cli')).toEqual([
       { provider: 'kimi-cli', id: 'kimi-code/k3-256k', name: 'K3-256k' },
