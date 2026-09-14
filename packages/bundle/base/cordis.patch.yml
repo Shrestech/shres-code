@@ -515,12 +515,12 @@
         thresholds: [3, 5, 8]
         argumentsPreviewChars: 500
 
-    # Every mode enables the stable model-facing web_search tool. An attached
-    # CLI (Grok, Claude, Codex, Kimi) owns search through that vendor's hosted
-    # web-search tool and the same credential the Models page already stores;
-    # Perplexity serves when its key is configured (the Settings web-search
-    # card writes it); DeepSeek official is the fallback when no listed vendor
-    # has a key. Fetch stays disabled and no fetch provider is mounted: that
+    # Every mode enables the stable model-facing web_search tool. Brave's link
+    # engine owns routine search when BRAVE_API_KEY is configured (the Settings
+    # web-search card writes it); an attached CLI vendor (Grok, Kimi, Ollama
+    # Cloud, Z.AI) follows through that vendor's hosted web-search tool and the
+    # same credential the Models page already stores; DeepSeek official is the
+    # terminal entry. Fetch stays disabled and no fetch provider is mounted: that
     # provider defers SSRF protection and the model would choose the request
     # target. Search is a full auxiliary model request with server-side
     # retrieval, so this shipped route gets 60s while the provider-neutral
@@ -528,14 +528,14 @@
     - id: web
       name: '@shres-code/shres-code-web'
       config:
-        # The routine chain: vendor-following search first (when the default
-        # model's vendor serves one), then Brave's link engine as the fallback,
-        # then the DeepSeek official search. Perplexity is reserved for the
-        # deep_research tool's request-level pin (a billed model turn per
-        # call, wrong shape for routine lookups).
+        # The routine chain: Brave's key-presence-gated link engine first,
+        # then vendor-following attached-CLI search, then the DeepSeek
+        # official search. Perplexity is reserved for the deep_research
+        # tool's request-level pin (a billed model turn per call, wrong
+        # shape for routine lookups).
         searchProviders:
-          - attached-cli
           - brave
+          - attached-cli
           - deepseek-official
 
     - id: web-search-attached-cli
@@ -544,9 +544,8 @@
     - id: web-search-perplexity
       name: '@shres-code/shres-code-web-search-perplexity'
 
-    # Brave's link engine: the routine chain's fallback when the default
-    # model's vendor serves no search of its own. Key reference BRAVE_API_KEY
-    # through the credentials seam.
+    # Brave's link engine: the routine chain's first entry when its key is
+    # configured. Key reference BRAVE_API_KEY through the credentials seam.
     - id: web-search-brave
       name: '@shres-code/shres-code-web-search-brave'
 

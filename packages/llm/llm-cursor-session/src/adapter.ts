@@ -69,8 +69,9 @@ export class CursorSessionLlmAdapter extends LlmAdapter {
     throw new LlmError(
       'llm-cursor-session: the Cursor agent wire (agent.v1.AgentService/Run on'
       + ' agentn.global.api5.cursor.sh) gates model turns behind an undocumented'
-      + ' client handshake this adapter does not replicate; use the delegated'
-      + ' cursor-cli route (cursor-agent spawn) until the wire is served',
+      + ' client handshake this adapter does not replicate; for Cursor completions'
+      + ' declare a cursor-cli overlay route in the llm-cli-bridge settings'
+      + ' (cursor-agent spawn) until the wire is served',
       'UNSUPPORTED_OPTION',
     )
   }

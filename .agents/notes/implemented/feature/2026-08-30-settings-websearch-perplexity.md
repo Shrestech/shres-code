@@ -10,7 +10,7 @@ Mounting it is not a one-line bundle row, because the provider would sit **mid-f
 
 ## Decision
 
-Perplexity ships as the middle entry of the base bundle's search fallback — `[attached-cli, perplexity, deepseek-official]` — with **key-presence availability** and a credentials-seam key lifecycle:
+Perplexity ships with **key-presence availability** and a credentials-seam key lifecycle, reserved for the `deep_research` tool's request-level pin rather than the routine fallback chain (which runs `[brave, attached-cli, deepseek-official]`):
 
 - The provider's options become a per-call snapshot (the attached-CLI/DeepSeek thunk pattern). `available()` requires a resolved key in the snapshot, so a keyless Perplexity drops out of the chain and DeepSeek keeps serving; the shipped behavior without a Perplexity key is byte-identical to before.
 - The plugin keeps a credential cache filled from the credentials domain (the Settings web-search card writes `PERPLEXITY_API_KEY` through it), with the launching environment as the no-seam fallback. The cache refreshes at boot, before every search, and on a `credentials/updated` commit naming the section's reference — the event exists for this activation gap, since a keyless provider is never searched and a search-time refresh alone could never observe the write. The cache is keyed by reference, so a section renaming `apiKeyEnv` never serves a key resolved under the old name.

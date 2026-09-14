@@ -3,15 +3,20 @@
  * over the Cursor Agent CLI's own login credential, served through the
  * shared `cursor-credential` engine. Model listing and resolution are live;
  * chat streaming fails loud while the agent wire's proprietary handshake is
- * not replicated — the delegated `cursor-cli` route remains the serving
- * path for completions.
+ * not replicated — a hand-declared `cursor-cli` overlay route on
+ * `llm-cli-bridge` (cursor-agent spawn) is the serving path for completions.
  *
  * @module @shres-code/shres-code-llm-cursor-session
  */
 
 import type { Context } from '@shres-code/cordis'
 import { CursorSessionManager } from '@shres-code/shres-code-cursor-credential'
-import { installSettingsSection, settingsNamespace } from '@shres-code/shres-code-settings'
+import type {
+  AdapterRegistrationHandle,
+  DirectoryRegistrationHandle,
+  LlmConfigurableProvider,
+} from '@shres-code/shres-code-llm'
+import { deepEqualJson, installSettingsSection, settingsNamespace } from '@shres-code/shres-code-settings'
 import { CursorSessionLlmAdapter } from './adapter.ts'
 import { CURSOR_SESSION_PROVIDER_ID, Config, resolveConfig } from './config.ts'
 
@@ -39,12 +44,6 @@ const NS = settingsNamespace('llm-cursor-session')
 /** Register the cursor-session route with `ctx.llm`. */
 export function apply(ctx: Context, config: Config): void {
   let current: () => Config = () => config
-  installSettingsSection(ctx, NS, Config, config, {
-    setSource: (source) => {
-      current = source
-    },
-    onChange: () => {},
-  })
   const route = () => resolveConfig(current())
   const manager = () => {
     const engine = ctx.get('cursorCredential')
@@ -57,8 +56,58 @@ export function apply(ctx: Context, config: Config): void {
     })
   }
   const adapter = new CursorSessionLlmAdapter({ route, manager })
-  const registration = ctx.llm.registerAdapter([CURSOR_SESSION_PROVIDER_ID], adapter)
-  ctx.effect(() => registration)
+
+  const directoryEntry = (): LlmConfigurableProvider => ({
+    provider: CURSOR_SESSION_PROVIDER_ID,
+    displayName: route().displayName,
+    settingsNs: NS,
+    settingsPath: [],
+    declared: false,
+  })
+  let directory: DirectoryRegistrationHandle | undefined
+  let directoryFacts: unknown
+  const ensureDirectory = (): void => {
+    const entry = directoryEntry()
+    if (deepEqualJson(entry, directoryFacts)) return
+    if (directory === undefined) {
+      directory = ctx.llm.registerConfigurableProviders([entry])
+    } else {
+      directory.replace([entry])
+    }
+    directoryFacts = entry
+  }
+  ensureDirectory()
+
+  // The settings schema defaults `enabled` to true, so the section value is
+  // always a boolean here.
+  let registration: AdapterRegistrationHandle | undefined
+  let registeredEnabled: boolean | undefined
+  const ensureRegistration = (): void => {
+    const enabled = current().enabled
+    if (enabled === registeredEnabled) return
+    registeredEnabled = enabled
+    if (registration === undefined) {
+      if (!enabled) return
+      registration = ctx.llm.registerAdapter([CURSOR_SESSION_PROVIDER_ID], adapter)
+      return
+    }
+    if (enabled) {
+      registration.replace([CURSOR_SESSION_PROVIDER_ID])
+    } else {
+      registration.replace([])
+    }
+  }
+  ensureRegistration()
+
+  installSettingsSection(ctx, NS, Config, config, {
+    setSource: (source) => {
+      current = source
+    },
+    onChange: () => {
+      ensureDirectory()
+      ensureRegistration()
+    },
+  })
 }
 
 // Re-export for consumers that build a manager directly.

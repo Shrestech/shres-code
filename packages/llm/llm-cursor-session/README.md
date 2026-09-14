@@ -2,7 +2,7 @@
 
 Cursor subscription-session adapter for the LLM seam. Registers one provider route, `cursor-session`, that serves the model catalog the Cursor Agent CLI validated against its live backend, authenticated with the CLI's own login credential — the macOS login keychain's `cursor-access-token` (account `cursor-user`) that `cursor-agent login` writes, or the file store under `AGENT_CLI_CREDENTIAL_STORE=file` — resolved through the shared [`shres-code-cursor-credential`](../cursor-credential/README.md) engine. Using the route bills the Cursor subscription (Pro/Pro+/Ultra), not a `CURSOR_API_KEY`.
 
-The adapter is HTTP-based and spawns nothing, unlike the delegated `cursor-cli` route in [`shres-code-llm-cli-bridge`](../llm-cli-bridge/README.md), which runs the `cursor-agent` binary. Because Cursor's agent wire is a proprietary, undocumented protocol (`agent.v1.AgentService/Run` on `agentn.global.api5.cursor.sh`, Connect/gRPC framing with a client handshake this package does not replicate), `stream()` currently fails loud: model listing and resolution are live, completions are not — the delegated `cursor-cli` route remains the serving path until the wire is cracked.
+The adapter is HTTP-based and spawns nothing, unlike a `cursor-cli` overlay route on [`shres-code-llm-cli-bridge`](../llm-cli-bridge/README.md), which runs the `cursor-agent` binary. Because Cursor's agent wire is a proprietary, undocumented protocol (`agent.v1.AgentService/Run` on `agentn.global.api5.cursor.sh`, Connect/gRPC framing with a client handshake this package does not replicate), `stream()` currently fails loud: model listing and resolution are live, completions are not — a hand-declared `cursor-cli` overlay route remains the serving path until the wire is cracked.
 
 ## Session credential
 
@@ -41,7 +41,7 @@ None: no request is sent.
 
 ## Known Limitations and Deferred Work
 
-- **Chat is gated on an undocumented handshake** — the agent wire (`agent.v1.AgentService/Run`, BiDi Connect streams on `agentn.global.api5.cursor.sh`) accepts the conversation state and checkpoints it, but model turns do not start without a client behavior byte-level replay could not reproduce (14 systematic variants: exact bytes, headers, timing, keepalives, session affinity, blob keys, body compression). `stream()` fails loud with `UNSUPPORTED_OPTION` naming the delegated `cursor-cli` alternative.
+- **Chat is gated on an undocumented handshake** — the agent wire (`agent.v1.AgentService/Run`, BiDi Connect streams on `agentn.global.api5.cursor.sh`) accepts the conversation state and checkpoints it, but model turns do not start without a client behavior byte-level replay could not reproduce (14 systematic variants: exact bytes, headers, timing, keepalives, session affinity, blob keys, body compression). `stream()` fails loud with `UNSUPPORTED_OPTION` naming the `cursor-cli` overlay alternative.
 - **No self-serve credential refresh** — the JWT issuer (`authentication.cursor.sh`) does not resolve publicly; the CLI owns rotation and this route adopts it on the next resolve. See the [credential engine](../cursor-credential/README.md).
 - **Unofficial wire and store** — the keychain service names and the agent protocol are the Cursor Agent CLI's implementation details, not a published contract; a CLI self-update can change them.
 - **Catalog is advisory** — served from the shipped list or the settings overlay; it is not fetched live from `AvailableModels` (that endpoint is trivially available over JSON+Bearer and is the natural next step when chat lands).

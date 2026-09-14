@@ -12,7 +12,7 @@ Shipped `web_search` pinned `searchProvider: deepseek-official`. A user who atta
 
 `web-search-attached-cli` registers id `attached-cli`. It POSTs to the attached vendor's hosted search tool with the same credential that conversation adapter already stores (`XAI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `MOONSHOT_API_KEY`, `OLLAMA_API_KEY`, `ZAI_API_KEY`). It does not spawn `grok`, `claude`, `codex`, or `kimi`.
 
-Backend pick: the current conversation vendor when that route is a shipped id in this list; otherwise the first usable id in preference (default Grok, Claude, Codex, Kimi, Ollama Cloud, Z.AI). The shipped base composition lists `attached-cli`, then `perplexity`, then `deepseek-official` ([the Perplexity settings note](2026-08-30-settings-websearch-perplexity.md) owns the middle entry's key-presence availability).
+Backend pick: the current conversation vendor when that route is a shipped id in this list; otherwise the first usable id in preference (default Grok, Claude, Codex, Kimi, Ollama Cloud, Z.AI). The shipped base composition lists `brave`, then `attached-cli`, then `deepseek-official` (Brave's key-presence availability means a keyless Brave never shadows the chain; Perplexity stays reserved for the `deep_research` request-level pin — [the Perplexity settings note](2026-08-30-settings-websearch-perplexity.md) owns its key lifecycle).
 
 The Plugins **Web search** card exposes one on/off switch per method (Grok, Claude, Codex, Kimi, Ollama, Z.AI, Perplexity, DeepSeek). A switch off removes that method from the pool. DeepSeek off stops the DeepSeek-missing-key failure when the user is not using DeepSeek.
 

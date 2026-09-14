@@ -152,6 +152,12 @@ export const CUSTOM_ROUTE_TEMPLATE: CliBridgeRoute = {
 
 /**
  * Merge shipped defaults with a settings/composition overlay.
+ *
+ * An `enabled: false` entry is a switch, not a declaration: it resolves to a
+ * dormant placeholder without requiring `displayName`/`binary`, so settings
+ * written as bare toggle-offs (the retired shipped routes left exactly those)
+ * never break the routes that are declared. An enabled entry without
+ * `displayName` and `binary` fails loud.
  * @param overlay - partial routes from config or settings.
  * @returns fully resolved routes keyed by provider id.
  */
@@ -162,6 +168,15 @@ export function resolveRoutes(
   if (overlay !== undefined) {
     for (const [id, partial] of Object.entries(overlay)) {
       if (resolved.has(id)) continue
+      if (partial.enabled === false && (partial.binary === undefined || partial.displayName === undefined)) {
+        resolved.set(id, mergeRoute({
+          ...CUSTOM_ROUTE_TEMPLATE,
+          displayName: partial.displayName ?? id,
+          binary: partial.binary ?? '',
+          enabled: false,
+        }, partial))
+        continue
+      }
       if (partial.binary === undefined || partial.displayName === undefined) {
         throw new Error(`llm-cli-bridge: route "${id}" needs displayName and binary`)
       }
