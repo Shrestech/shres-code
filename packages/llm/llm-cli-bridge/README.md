@@ -18,7 +18,7 @@ A non-empty `GenerateOptions.tools` without that route's `allowDelegatedTools: t
 | `kimi-cli` | `kimi` | `--model` | `--thinking` / `--no-thinking` (`high` / `off`) |
 | `claude-cli` | `claude` | `--model` | `--effort` (`low`/`medium`/`high`/`max`) |
 | `codex-cli` | `codex` | `-m` | `-c model_reasoning_effort=` (`minimal`/`low`/`medium`/`high`/`xhigh`) |
-| `cursor-cli` | `cursor-agent` | `--model` | none (the CLI has no effort flag; the prompt is the trailing positional after `-p`) |
+| `cursor-cli` | `cursor-agent` | `--model` | none (the CLI has no effort flag; effort is part of the model id, e.g. `cursor-grok-4.6-high`, and the prompt is the trailing positional after `-p`) |
 
 ## Configuration
 
