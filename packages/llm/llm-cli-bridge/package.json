@@ -1,6 +1,6 @@
 {
   "name": "@shres-code/shres-code-llm-cli-bridge",
-  "description": "Delegated-completion LLM adapter over grok/kimi/codex/claude CLIs",
+  "description": "Delegated-completion LLM adapter for the Shres Code: spawns a product CLI declared through the llm-cli-bridge settings section and streams its answer. No shipped routes — shipped CLI delegations were retired in favor of the subscription-session routes",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"

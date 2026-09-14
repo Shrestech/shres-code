@@ -117,11 +117,16 @@ export const Config = z.object({
   disposeGraceMs: z.number().default(DEFAULT_DISPOSE_GRACE_MS),
 })
 
-/** Shipped route ids. */
-export const SHIPPED_ROUTE_IDS = ['claude-cli', 'codex-cli', 'cursor-cli', 'grok-cli', 'kimi-cli'] as const
+/**
+ * Shipped route ids: none — delegated completion for the shipped CLIs was
+ * retired in favor of the subscription-session routes (`codex-session`,
+ * `grok-session`, `cursor-session`); this adapter serves hand-declared
+ * overlay routes only.
+ */
+export const SHIPPED_ROUTE_IDS = [] as const
 
 /** One shipped route id. */
-export type ShippedRouteId = (typeof SHIPPED_ROUTE_IDS)[number]
+export type ShippedRouteId = never
 
 /**
  * Blank template for a hand-declared extra route. Overlays must opt into
@@ -144,120 +149,6 @@ export const CUSTOM_ROUTE_TEMPLATE: CliBridgeRoute = {
   models: [],
 }
 
-/** Built-in defaults for the five shipped CLI routes. */
-export const SHIPPED_ROUTES: Record<ShippedRouteId, CliBridgeRoute> = {
-  'claude-cli': {
-    displayName: 'Claude Code CLI (delegated)',
-    binary: 'claude',
-    modelArg: '--model',
-    effortArg: '--effort',
-    effortStyle: 'flag',
-    efforts: ['low', 'medium', 'high', 'max'],
-    extraArgs: ['--output-format', 'json', '--dangerously-skip-permissions'],
-    promptStyle: 'flag',
-    promptArg: '-p',
-    parseMode: 'json',
-    env: {},
-    apiKeyEnv: 'ANTHROPIC_API_KEY',
-    allowDelegatedTools: true,
-    contextWindow: DEFAULT_CONTEXT_WINDOW,
-    defaultMaxTokens: DEFAULT_MAX_TOKENS,
-    models: [{ id: 'sonnet', name: 'Claude Sonnet' }, { id: 'opus', name: 'Claude Opus' }],
-  },
-  'codex-cli': {
-    displayName: 'Codex CLI (delegated)',
-    binary: 'codex',
-    modelArg: '-m',
-    effortArg: 'model_reasoning_effort',
-    effortStyle: 'codex-config',
-    efforts: ['minimal', 'low', 'medium', 'high', 'xhigh'],
-    extraArgs: ['exec', '--json'],
-    promptStyle: 'trailing',
-    parseMode: 'stream-json',
-    env: {},
-    apiKeyEnv: 'OPENAI_API_KEY',
-    allowDelegatedTools: true,
-    contextWindow: DEFAULT_CONTEXT_WINDOW,
-    defaultMaxTokens: DEFAULT_MAX_TOKENS,
-    models: [{ id: 'gpt-5.4', name: 'GPT-5.4' }],
-  },
-  'cursor-cli': {
-    displayName: 'Cursor Agent CLI (delegated)',
-    binary: 'cursor-agent',
-    modelArg: '--model',
-    // The CLI has no reasoning-effort flag; efforts stay empty so requesting
-    // one fails with UNSUPPORTED_OPTION instead of sending a flag it rejects.
-    effortStyle: 'flag',
-    efforts: [],
-    // -p is cursor-agent's print flag, not a prompt flag: the prompt rides as
-    // the trailing positional. --output-format json emits one
-    // {type:"result", result} line, which parse mode json reads. --force
-    // auto-approves the CLI's own tools in headless mode, the same posture as
-    // grok-cli's --always-approve.
-    extraArgs: ['-p', '--output-format', 'json', '--force'],
-    promptStyle: 'trailing',
-    parseMode: 'json',
-    env: {},
-    apiKeyEnv: 'CURSOR_API_KEY',
-    allowDelegatedTools: true,
-    contextWindow: DEFAULT_CONTEXT_WINDOW,
-    defaultMaxTokens: DEFAULT_MAX_TOKENS,
-    // cursor-agent validates model ids server-side against a prefixed,
-    // effort-suffixed catalog (cursor-grok-4.6-high, claude-fable-5-1-thinking-high);
-    // bare ids like gpt-5 or grok-4.6 are rejected with the valid-id list.
-    models: [
-      { id: 'gpt-5.2', name: 'GPT-5.2' },
-      { id: 'claude-4.5-sonnet', name: 'Sonnet 4.5' },
-      { id: 'cursor-grok-4.6-high', name: 'Grok 4.6 (high)' },
-      { id: 'cursor-grok-4.6-high-fast', name: 'Grok 4.6 (high, fast)' },
-      { id: 'claude-fable-5-1-thinking-high', name: 'Fable 5.1 Thinking (high)' },
-      { id: 'gemini-3.8-flash-high', name: 'Gemini 3.8 Flash (high)' },
-    ],
-  },
-  'grok-cli': {
-    displayName: 'Grok Build CLI (delegated)',
-    binary: 'grok',
-    modelArg: '--model',
-    effortArg: '--effort',
-    effortStyle: 'flag',
-    efforts: ['low', 'medium', 'high', 'xhigh'],
-    extraArgs: ['--output-format', 'json', '--always-approve', '--no-auto-update'],
-    promptStyle: 'flag',
-    promptArg: '-p',
-    parseMode: 'json',
-    env: {},
-    apiKeyEnv: 'XAI_API_KEY',
-    allowDelegatedTools: true,
-    contextWindow: DEFAULT_CONTEXT_WINDOW,
-    defaultMaxTokens: DEFAULT_MAX_TOKENS,
-    models: [{ id: 'grok-4.6', name: 'Grok 4.6' }, { id: 'grok-4.5', name: 'Grok 4.5' }],
-  },
-  'kimi-cli': {
-    displayName: 'Kimi Code CLI (delegated)',
-    binary: 'kimi',
-    modelArg: '--model',
-    effortStyle: 'thinking-bool',
-    efforts: ['off', 'high'],
-    // No autonomy flag: kimi >= 0.36 rejects `--yolo`/`--auto` in `-p` mode
-    // ("Cannot combine --prompt with --yolo"), and one-shot mode already runs
-    // regular tool calls without asking — verified against 0.36.1.
-    extraArgs: ['--output-format', 'stream-json'],
-    promptStyle: 'flag',
-    promptArg: '-p',
-    parseMode: 'stream-json',
-    env: {},
-    apiKeyEnv: 'MOONSHOT_API_KEY',
-    allowDelegatedTools: true,
-    contextWindow: DEFAULT_CONTEXT_WINDOW,
-    defaultMaxTokens: DEFAULT_MAX_TOKENS,
-    models: [
-      { id: 'kimi-code/k3-256k', name: 'K3-256k' },
-      { id: 'kimi-code/k3', name: 'K3' },
-      { id: 'kimi-code/kimi-for-coding', name: 'K2.7 Coding' },
-      { id: 'kimi-code/kimi-for-coding-highspeed', name: 'K2.7 Coding Highspeed' },
-    ],
-  },
-}
 
 /**
  * Merge shipped defaults with a settings/composition overlay.
@@ -268,9 +159,6 @@ export function resolveRoutes(
   overlay: Config['routes'],
 ): ReadonlyMap<string, CliBridgeRoute> {
   const resolved = new Map<string, CliBridgeRoute>()
-  for (const id of SHIPPED_ROUTE_IDS) {
-    resolved.set(id, mergeRoute(SHIPPED_ROUTES[id], overlay?.[id]))
-  }
   if (overlay !== undefined) {
     for (const [id, partial] of Object.entries(overlay)) {
       if (resolved.has(id)) continue

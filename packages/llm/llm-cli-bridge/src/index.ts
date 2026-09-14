@@ -1,8 +1,10 @@
 /**
- * Register {@link CliLlmAdapter} for the `claude-cli`, `codex-cli`,
- * `cursor-cli`, `grok-cli`, and `kimi-cli` provider routes. Per-route binary,
- * model arg, effort arg, and env come from the optional `llm-cli-bridge`
- * settings section over this composition entry.
+ * Register {@link CliLlmAdapter} for hand-declared delegated CLI routes.
+ * There are no shipped routes: the shipped CLI delegations were retired in
+ * favor of the subscription-session routes (`codex-session`, `grok-session`,
+ * `cursor-session`). Per-route binary, model arg, effort arg, and env come
+ * from the optional `llm-cli-bridge` settings section over this composition
+ * entry.
  *
  * @module @shres-code/shres-code-llm-cli-bridge
  */
@@ -39,7 +41,6 @@ export {
   DEFAULT_MAX_TOKENS,
   CUSTOM_ROUTE_TEMPLATE,
   SHIPPED_ROUTE_IDS,
-  SHIPPED_ROUTES,
   resolveRoutes,
 } from './config.ts'
 export type { CliBridgeModel, CliBridgeRoute, EffortStyle, ShippedRouteId } from './config.ts'
@@ -196,7 +197,11 @@ export function apply(ctx: Context, config: Config): void {
   const ensureDirectory = (): void => {
     const entries = directoryEntries(routes())
     if (deepEqualJson(entries, directoryFacts)) return
-    if (directory === undefined) {
+    if (entries.length === 0) {
+      // The llm service refuses an empty registration; with no declared route
+      // the directory stays dormant until a settings overlay declares one.
+      if (directory !== undefined) directory.replace(entries)
+    } else if (directory === undefined) {
       directory = ctx.llm.registerConfigurableProviders(entries)
     } else {
       directory.replace(entries)
