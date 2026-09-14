@@ -15,7 +15,7 @@ This is an **implementation** package: it registers provider id `attached-cli` i
 1. If the current default model provider is an enabled shipped vendor in this list, use that vendor.
 2. Else the first enabled usable id among Grok, Claude, Codex, Kimi, Ollama Cloud, Z.AI.
 
-The Plugins **Web search** card turns each method on or off. The shipped web seam lists `attached-cli`, then `perplexity`, then `deepseek-official`, so an enabled method with a key runs first.
+The Plugins **Web search** card turns each method on or off. The shipped web seam lists `brave`, then `attached-cli`, then `deepseek-official`, so an enabled method with a key runs when Brave has none.
 
 ## Config
 
