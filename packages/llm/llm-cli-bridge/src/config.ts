@@ -202,12 +202,14 @@ export const SHIPPED_ROUTES: Record<ShippedRouteId, CliBridgeRoute> = {
     allowDelegatedTools: true,
     contextWindow: DEFAULT_CONTEXT_WINDOW,
     defaultMaxTokens: DEFAULT_MAX_TOKENS,
+    // cursor-agent validates model ids server-side against a prefixed,
+    // effort-suffixed catalog (cursor-grok-4.6-high, claude-fable-5-1-thinking-high);
+    // bare ids like gpt-5 or grok-4.6 are rejected with the valid-id list.
     models: [
-      { id: 'gpt-5', name: 'GPT-5' },
-      { id: 'sonnet-4', name: 'Sonnet 4' },
-      { id: 'fabel-5.1', name: 'Fabel 5.1' },
-      { id: 'gpt-astra', name: 'GPT Astra' },
-      { id: 'grok-4.6', name: 'Grok 4.6' },
+      { id: 'gpt-5.2', name: 'GPT-5.2' },
+      { id: 'claude-4.5-sonnet', name: 'Sonnet 4.5' },
+      { id: 'cursor-grok-4.6-high', name: 'Grok 4.6 (high)' },
+      { id: 'claude-fable-5-1-thinking-high', name: 'Fable 5.1 Thinking (high)' },
     ],
   },
   'grok-cli': {

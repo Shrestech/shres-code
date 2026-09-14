@@ -274,14 +274,13 @@ describe('CliLlmAdapter', () => {
     ])
     const kimi = await adapter.resolveModel('kimi-cli', 'kimi-code/k3')
     expect(kimi.reasoning?.efforts.map(effort => effort.id)).toEqual(['off', 'high'])
-    const cursor = await adapter.resolveModel('cursor-cli', 'gpt-5')
+    const cursor = await adapter.resolveModel('cursor-cli', 'gpt-5.2')
     expect(cursor.reasoning).toBeUndefined()
     expect(await adapter.listModels('cursor-cli')).toEqual([
-      { provider: 'cursor-cli', id: 'gpt-5', name: 'GPT-5' },
-      { provider: 'cursor-cli', id: 'sonnet-4', name: 'Sonnet 4' },
-      { provider: 'cursor-cli', id: 'fabel-5.1', name: 'Fabel 5.1' },
-      { provider: 'cursor-cli', id: 'gpt-astra', name: 'GPT Astra' },
-      { provider: 'cursor-cli', id: 'grok-4.6', name: 'Grok 4.6' },
+      { provider: 'cursor-cli', id: 'gpt-5.2', name: 'GPT-5.2' },
+      { provider: 'cursor-cli', id: 'claude-4.5-sonnet', name: 'Sonnet 4.5' },
+      { provider: 'cursor-cli', id: 'cursor-grok-4.6-high', name: 'Grok 4.6 (high)' },
+      { provider: 'cursor-cli', id: 'claude-fable-5-1-thinking-high', name: 'Fable 5.1 Thinking (high)' },
     ])
     expect(await adapter.listModels('kimi-cli')).toEqual([
       { provider: 'kimi-cli', id: 'kimi-code/k3-256k', name: 'K3-256k' },
