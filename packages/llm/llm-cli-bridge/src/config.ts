@@ -209,7 +209,9 @@ export const SHIPPED_ROUTES: Record<ShippedRouteId, CliBridgeRoute> = {
       { id: 'gpt-5.2', name: 'GPT-5.2' },
       { id: 'claude-4.5-sonnet', name: 'Sonnet 4.5' },
       { id: 'cursor-grok-4.6-high', name: 'Grok 4.6 (high)' },
+      { id: 'cursor-grok-4.6-high-fast', name: 'Grok 4.6 (high, fast)' },
       { id: 'claude-fable-5-1-thinking-high', name: 'Fable 5.1 Thinking (high)' },
+      { id: 'gemini-3.8-flash-high', name: 'Gemini 3.8 Flash (high)' },
     ],
   },
   'grok-cli': {

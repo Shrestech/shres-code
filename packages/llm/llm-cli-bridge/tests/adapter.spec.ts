@@ -280,7 +280,9 @@ describe('CliLlmAdapter', () => {
       { provider: 'cursor-cli', id: 'gpt-5.2', name: 'GPT-5.2' },
       { provider: 'cursor-cli', id: 'claude-4.5-sonnet', name: 'Sonnet 4.5' },
       { provider: 'cursor-cli', id: 'cursor-grok-4.6-high', name: 'Grok 4.6 (high)' },
+      { provider: 'cursor-cli', id: 'cursor-grok-4.6-high-fast', name: 'Grok 4.6 (high, fast)' },
       { provider: 'cursor-cli', id: 'claude-fable-5-1-thinking-high', name: 'Fable 5.1 Thinking (high)' },
+      { provider: 'cursor-cli', id: 'gemini-3.8-flash-high', name: 'Gemini 3.8 Flash (high)' },
     ])
     expect(await adapter.listModels('kimi-cli')).toEqual([
       { provider: 'kimi-cli', id: 'kimi-code/k3-256k', name: 'K3-256k' },
