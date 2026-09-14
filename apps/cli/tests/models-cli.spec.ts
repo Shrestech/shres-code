@@ -3,7 +3,7 @@
 import { createServer } from 'node:http'
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
 import { readFileSync } from 'node:fs'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -31,6 +31,11 @@ async function tempHome(): Promise<string> {
   const home = await mkdtemp(join(tmpdir(), 'shres-models-cli-'))
   homes.push(home)
   return home
+}
+
+/** Seed one settings document into the temp home before the CLI boots. */
+async function seedSettings(home: string, lines: string[]): Promise<void> {
+  await writeFile(join(home, 'settings.yaml'), `${lines.join('\n')}\n`, 'utf8')
 }
 
 async function listingServer(payload: unknown): Promise<string> {
@@ -86,46 +91,77 @@ describe('shres models / providers', () => {
     expect(result.stdout).toMatch(/unusable until keyed/)
     expect(result.stdout).toContain('ollama-local')
     expect(result.stdout).toContain('llama3.2')
-    expect(result.stdout).toContain('grok-cli')
-    expect(result.stdout).toMatch(/delegated/)
-    expect(result.stdout).toContain('cursor-cli')
     expect(result.stdout).toContain('grok-session')
     expect(result.stdout).toContain('grok-4.6')
   })
 
-  it('sets a cursor-cli model and rejects an effort it cannot forward', async () => {
+  it('sets a declared CLI route model and rejects an effort it cannot forward', async () => {
     const home = await tempHome()
+    // A route with no advertised efforts, like the cursor print-flag shape:
+    // any effort request is rejected.
+    await seedSettings(home, [
+      'llm-cli-bridge:',
+      '  routes:',
+      '    my-cli:',
+      '      displayName: My CLI',
+      '      binary: mycli',
+      '      models:',
+      '        - id: my-4',
+    ])
     const set = await run(home, {
       kind: 'models-set',
-      provider: 'cursor-cli',
-      model: 'gpt-5',
+      provider: 'my-cli',
+      model: 'my-4',
     })
     expect(set.exit).toBe(0)
-    expect(set.stdout).toContain('Default: cursor-cli gpt-5')
+    expect(set.stdout).toContain('Default: my-cli my-4')
     const listed = await run(home, { kind: 'models-list' })
-    expect(listed.stdout).toContain('gpt-5  (default)')
+    expect(listed.stdout).toContain('my-4  (default)')
     const effort = await run(home, {
       kind: 'models-set',
-      provider: 'cursor-cli',
-      model: 'gpt-5',
+      provider: 'my-cli',
+      model: 'my-4',
       effort: 'high',
     })
     expect(effort.exit).toBe(1)
-    expect(effort.stderr).toMatch(/does not support reasoning effort/)
+    expect(effort.stderr).toMatch(/does not support reasoning effort "high"/)
   })
 
-  it('sets a grok-cli model and advertised effort', async () => {
+  it('sets a declared CLI route model and advertised effort', async () => {
     const home = await tempHome()
+    await seedSettings(home, [
+      'llm-cli-bridge:',
+      '  routes:',
+      '    my-cli:',
+      '      displayName: My CLI',
+      '      binary: mycli',
+      '      models:',
+      '        - id: my-4',
+      '          name: My 4',
+      '      efforts:',
+      '        - low',
+      '        - high',
+      '      apiKeyEnv: MY_CLI_API_KEY',
+    ])
     const set = await run(home, {
       kind: 'models-set',
-      provider: 'grok-cli',
-      model: 'grok-4',
+      provider: 'my-cli',
+      model: 'my-4',
       effort: 'high',
     })
     expect(set.exit).toBe(0)
-    expect(set.stdout).toContain('Default: grok-cli grok-4 effort=high')
+    expect(set.stdout).toContain('Default: my-cli my-4 effort=high')
     const listed = await run(home, { kind: 'models-list' })
-    expect(listed.stdout).toContain('Default: grok-cli grok-4 effort=high')
+    expect(listed.stdout).toContain('Default: my-cli my-4 effort=high')
+    expect(listed.stdout).toContain('my-cli  My CLI  [active, default, delegated, unusable until keyed]')
+    const unadvertised = await run(home, {
+      kind: 'models-set',
+      provider: 'my-cli',
+      model: 'my-4',
+      effort: 'xhigh',
+    })
+    expect(unadvertised.exit).toBe(1)
+    expect(unadvertised.stderr).toMatch(/does not support reasoning effort "xhigh"/)
   })
 
   it('sets a grok-session model and effort without a stored key', async () => {

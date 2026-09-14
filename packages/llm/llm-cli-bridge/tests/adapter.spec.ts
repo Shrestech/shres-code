@@ -13,7 +13,8 @@ import type { SettingsNamespace } from '@shres-code/shres-code-settings'
 import type { SubprocessHandle, SubprocessOutcome, SubprocessSpawnSpec } from '@shres-code/shres-code-subprocess'
 import { CliLlmAdapter } from '../src/adapter.ts'
 import { buildCliArgv, effortFlags } from '../src/argv.ts'
-import { Config, resolveRoutes, SHIPPED_ROUTES } from '../src/config.ts'
+import { Config, CUSTOM_ROUTE_TEMPLATE, resolveRoutes } from '../src/config.ts'
+import type { CliBridgeRoute } from '../src/config.ts'
 import {
   answerFromObject,
   isCliErrorPayload,
@@ -40,6 +41,97 @@ class MemorySettings extends SettingsProvider {
     return Promise.resolve()
   }
 }
+
+// Flag dialect: model and effort are plain flags, the prompt sits behind -p,
+// stdout is one JSON object, and harness tools are delegated to the CLI.
+const FLAG_ROUTE: CliBridgeRoute = {
+  displayName: 'Flag CLI (delegated)',
+  binary: 'flag-cli',
+  modelArg: '--model',
+  effortArg: '--effort',
+  effortStyle: 'flag',
+  efforts: ['low', 'medium', 'high', 'xhigh'],
+  extraArgs: [],
+  promptStyle: 'flag',
+  promptArg: '-p',
+  parseMode: 'json',
+  env: {},
+  apiKeyEnv: 'TEST_API_KEY',
+  allowDelegatedTools: true,
+  contextWindow: 128_000,
+  defaultMaxTokens: 8_192,
+  models: [
+    { id: 'flag-4', name: 'Flag 4' },
+    { id: 'flag-3', name: 'Flag 3' },
+  ],
+  enabled: true,
+}
+
+// thinking-bool dialect: effort becomes --thinking / --no-thinking and stdout
+// is a stream-json transcript.
+const THINKING_ROUTE: CliBridgeRoute = {
+  displayName: 'Thinking CLI (delegated)',
+  binary: 'thinking-cli',
+  modelArg: '--model',
+  effortStyle: 'thinking-bool',
+  efforts: ['off', 'high'],
+  extraArgs: ['--output-format', 'stream-json'],
+  promptStyle: 'flag',
+  promptArg: '-p',
+  parseMode: 'stream-json',
+  env: {},
+  allowDelegatedTools: false,
+  contextWindow: 128_000,
+  defaultMaxTokens: 8_192,
+  models: [{ id: 'think-1', name: 'Think 1' }],
+  enabled: true,
+}
+
+// codex-config dialect: effort rides -c <key>=<id> and the prompt is the
+// trailing positional.
+const CONFIG_ROUTE: CliBridgeRoute = {
+  displayName: 'Config CLI (delegated)',
+  binary: 'config-cli',
+  modelArg: '-m',
+  effortArg: 'model_reasoning_effort',
+  effortStyle: 'codex-config',
+  efforts: ['minimal', 'low', 'medium', 'high', 'xhigh'],
+  extraArgs: ['exec', '--json'],
+  promptStyle: 'trailing',
+  parseMode: 'stream-json',
+  env: {},
+  allowDelegatedTools: false,
+  contextWindow: 128_000,
+  defaultMaxTokens: 8_192,
+  models: [{ id: 'cfg-5' }],
+  enabled: true,
+}
+
+// Trailing-prompt print-flag route: no effort flag at all, so no efforts are
+// advertised and any effort request is rejected.
+const TRAILING_ROUTE: CliBridgeRoute = {
+  displayName: 'Trailing CLI (delegated)',
+  binary: 'trailing-cli',
+  modelArg: '--model',
+  effortStyle: 'flag',
+  efforts: [],
+  extraArgs: ['-p', '--output-format', 'json', '--force'],
+  promptStyle: 'trailing',
+  parseMode: 'json',
+  env: {},
+  allowDelegatedTools: false,
+  contextWindow: 128_000,
+  defaultMaxTokens: 8_192,
+  models: [{ id: 'tr-1', name: 'TR 1' }],
+  enabled: true,
+}
+
+const ROUTES: ReadonlyMap<string, CliBridgeRoute> = new Map([
+  ['flag-cli', FLAG_ROUTE],
+  ['thinking-cli', THINKING_ROUTE],
+  ['config-cli', CONFIG_ROUTE],
+  ['trailing-cli', TRAILING_ROUTE],
+])
 
 function fakeChild(options: {
   stdout?: string
@@ -72,8 +164,8 @@ async function collect(stream: AsyncIterable<StreamChunk>): Promise<StreamChunk[
 
 function options(overrides: Partial<GenerateOptions> = {}): GenerateOptions {
   return {
-    provider: 'grok-cli',
-    model: 'grok-4',
+    provider: 'flag-cli',
+    model: 'flag-4',
     messages: [createUserMessage({
       content: [{ type: 'text', text: 'hi' }],
       source: { kind: 'plugin', plugin: 'test' },
@@ -83,83 +175,100 @@ function options(overrides: Partial<GenerateOptions> = {}): GenerateOptions {
 }
 
 describe('argv and serialize', () => {
-  it('forwards selected model and effort onto grok argv', () => {
-    expect(buildCliArgv(SHIPPED_ROUTES['grok-cli'], {
-      model: 'grok-4.6',
+  it('forwards selected model and effort onto flag-route argv', () => {
+    expect(buildCliArgv(FLAG_ROUTE, {
+      model: 'flag-4',
       effort: 'high',
       prompt: 'do it',
     })).toEqual([
-      'grok',
-      '--output-format', 'json',
-      '--always-approve',
-      '--no-auto-update',
-      '--model', 'grok-4.6',
+      'flag-cli',
+      '--model', 'flag-4',
       '--effort', 'high',
       '-p', 'do it',
     ])
   })
 
-  it('maps kimi thinking-bool and Codex config effort flags', () => {
-    expect(buildCliArgv(SHIPPED_ROUTES['kimi-cli'], {
-      model: 'kimi-code/k3',
+  it('maps thinking-bool flags and the codex -c config effort', () => {
+    expect(buildCliArgv(THINKING_ROUTE, {
+      model: 'think-1',
       effort: 'high',
       prompt: 'q',
     })).toEqual([
-      'kimi',
-      '--output-format', 'stream-json',
-      '--model', 'kimi-code/k3',
+      'thinking-cli', '--output-format', 'stream-json',
+      '--model', 'think-1',
       '--thinking',
       '-p', 'q',
     ])
-    expect(buildCliArgv(SHIPPED_ROUTES['kimi-cli'], {
-      model: 'kimi-code/k3',
+    expect(buildCliArgv(THINKING_ROUTE, {
+      model: 'think-1',
       effort: 'off',
       prompt: 'q',
     })).toContain('--no-thinking')
-    expect(buildCliArgv(SHIPPED_ROUTES['codex-cli'], {
-      model: 'gpt-5.4',
+    expect(buildCliArgv(CONFIG_ROUTE, {
+      model: 'cfg-5',
       effort: 'xhigh',
       prompt: 'q',
     })).toEqual([
-      'codex', 'exec', '--json',
-      '-m', 'gpt-5.4',
+      'config-cli', 'exec', '--json',
+      '-m', 'cfg-5',
       '-c', 'model_reasoning_effort=xhigh',
       'q',
     ])
   })
 
-  it('builds cursor-agent argv with the prompt as trailing positional', () => {
-    // -p is cursor-agent's print flag and the prompt rides as the trailing
-    // positional; the CLI has no effort flag, so none is forwarded.
-    expect(buildCliArgv(SHIPPED_ROUTES['cursor-cli'], {
-      model: 'gpt-5',
+  it('builds trailing-prompt argv and rejects effort on an effortless route', () => {
+    // -p here is the CLI's print flag and the prompt rides as the trailing
+    // positional; the route advertises no efforts, so none is forwarded.
+    expect(buildCliArgv(TRAILING_ROUTE, {
+      model: 'tr-1',
       prompt: 'do it',
     })).toEqual([
-      'cursor-agent',
+      'trailing-cli',
       '-p',
       '--output-format', 'json',
       '--force',
-      '--model', 'gpt-5',
+      '--model', 'tr-1',
       'do it',
     ])
-    expect(() => buildCliArgv(SHIPPED_ROUTES['cursor-cli'], {
-      model: 'gpt-5',
+    expect(() => buildCliArgv(TRAILING_ROUTE, {
+      model: 'tr-1',
       effort: 'high',
       prompt: 'do it',
     })).toThrow(LlmError)
   })
 
   it('rejects an effort the route does not advertise', () => {
-    expect(() => buildCliArgv(SHIPPED_ROUTES['kimi-cli'], {
-      model: 'kimi-code/k3',
+    expect(() => buildCliArgv(THINKING_ROUTE, {
+      model: 'think-1',
       effort: 'xhigh',
       prompt: 'q',
     })).toThrow(LlmError)
     try {
-      buildCliArgv(SHIPPED_ROUTES['kimi-cli'], { model: 'kimi-code/k3', effort: 'xhigh', prompt: 'q' })
+      buildCliArgv(THINKING_ROUTE, { model: 'think-1', effort: 'xhigh', prompt: 'q' })
     } catch (error) {
       expect(error).toMatchObject({ code: 'UNSUPPORTED_OPTION' })
     }
+  })
+
+  it('rejects an empty model id and a flag promptStyle without promptArg', () => {
+    expect(() => buildCliArgv(FLAG_ROUTE, { model: '', prompt: 'q' }))
+      .toThrow(LlmError)
+    const noPromptArg = { ...FLAG_ROUTE, promptStyle: 'flag' as const }
+    delete noPromptArg.promptArg
+    expect(() => buildCliArgv(noPromptArg, { model: 'flag-4', prompt: 'q' })).toThrow('promptArg')
+  })
+
+  it('rejects a missing flag effortArg, defaults the codex key, and rejects an unknown effortStyle', () => {
+    const noEffortArg = { ...FLAG_ROUTE, effortStyle: 'flag' as const }
+    delete noEffortArg.effortArg
+    expect(() => effortFlags(noEffortArg, 'high')).toThrow('effortArg')
+    const defaultKey = { ...CONFIG_ROUTE }
+    delete defaultKey.effortArg
+    expect(effortFlags(defaultKey, 'high')).toEqual(['-c', 'model_reasoning_effort=high'])
+    expect(() => effortFlags({
+      ...FLAG_ROUTE,
+      effortStyle: 'nope' as never,
+    }, 'high')).toThrow()
   })
 
   it('serializes system plus messages', () => {
@@ -177,13 +286,12 @@ describe('CliLlmAdapter', () => {
   it('emits block-start, text-delta, block-end, usage, finish and captures argv', async () => {
     const spawn = vi.fn((_spec: SubprocessSpawnSpec) => fakeChild())
     const adapter = new CliLlmAdapter({
-      routes: () => resolveRoutes(undefined),
+      routes: () => ROUTES,
       spawn,
       cwd: () => '/tmp/ws',
       disposeGraceMs: () => 3000,
     })
     const chunks = await collect(adapter.stream(options({
-      model: 'grok-4.5',
       reasoningEffort: ReasoningEffortId('high'),
     })))
     expect(chunks).toEqual([
@@ -194,40 +302,70 @@ describe('CliLlmAdapter', () => {
       { type: 'finish', reason: { kind: 'stop' } },
     ])
     const spec = spawn.mock.calls[0]![0]
-    expect(spec.argv).toEqual(buildCliArgv(SHIPPED_ROUTES['grok-cli'], {
-      model: 'grok-4.5',
+    expect(spec.argv).toEqual(buildCliArgv(FLAG_ROUTE, {
+      model: 'flag-4',
       effort: 'high',
       prompt: serializePrompt(options()),
     }))
     expect(spec.cwd).toBe('/tmp/ws')
+
+    await collect(adapter.stream(options({ provider: 'config-cli', model: 'cfg-5' })))
+    expect(spawn.mock.calls[1]![0].argv).toEqual(buildCliArgv(CONFIG_ROUTE, {
+      model: 'cfg-5',
+      prompt: serializePrompt(options({ provider: 'config-cli', model: 'cfg-5' })),
+    }))
   })
 
   it('injects a resolved credential into spawn env', async () => {
     const spawn = vi.fn((_spec: SubprocessSpawnSpec) => fakeChild())
-    const adapter = new CliLlmAdapter({
-      routes: () => resolveRoutes({ 'grok-cli': { apiKeyEnv: 'XAI_API_KEY' } }),
-      spawn,
-      cwd: () => '/tmp/ws',
-      disposeGraceMs: () => 3000,
-      resolveEnv: async route => ({ ...route.env, XAI_API_KEY: 'from-seam' }),
-    })
-    await collect(adapter.stream(options()))
-    expect(spawn.mock.calls[0]![0].env).toEqual({ XAI_API_KEY: 'from-seam' })
-  })
-
-  it('throws UNSUPPORTED_OPTION when tools are present without allowDelegatedTools', async () => {
     const routes = resolveRoutes({
-      'grok-cli': { allowDelegatedTools: false },
+      keyed: {
+        displayName: 'Keyed CLI',
+        binary: 'keyed-cli',
+        apiKeyEnv: 'TEST_API_KEY',
+        env: { ROUTE_FLAG: '1' },
+      },
     })
     const adapter = new CliLlmAdapter({
       routes: () => routes,
-      spawn: () => fakeChild(),
-      cwd: () => process.cwd(),
+      spawn,
+      cwd: () => '/tmp/ws',
+      disposeGraceMs: () => 3000,
+      resolveEnv: async route => ({ ...route.env, TEST_API_KEY: 'from-seam' }),
+    })
+    await collect(adapter.stream(options({ provider: 'keyed', model: 'm' })))
+    expect(spawn.mock.calls[0]![0].env).toEqual({ ROUTE_FLAG: '1', TEST_API_KEY: 'from-seam' })
+
+    // Without resolveEnv the route env passes to spawn verbatim.
+    const plain = new CliLlmAdapter({
+      routes: () => routes,
+      spawn,
+      cwd: () => '/tmp/ws',
+      disposeGraceMs: () => 3000,
+    })
+    await collect(plain.stream(options({ provider: 'keyed', model: 'm' })))
+    expect(spawn.mock.calls[1]![0].env).toEqual({ ROUTE_FLAG: '1' })
+  })
+
+  it('gates tools behind allowDelegatedTools', async () => {
+    const spawn = vi.fn((_spec: SubprocessSpawnSpec) => fakeChild())
+    const adapter = new CliLlmAdapter({
+      routes: () => ROUTES,
+      spawn,
+      cwd: () => '/tmp/ws',
       disposeGraceMs: () => 3000,
     })
     await expect(collect(adapter.stream(options({
+      provider: 'thinking-cli',
+      model: 'think-1',
       tools: [{ name: 'bash', description: 'run', parameters: {} }],
     })))).rejects.toMatchObject({ code: 'UNSUPPORTED_OPTION' })
+
+    const chunks = await collect(adapter.stream(options({
+      tools: [{ name: 'bash', description: 'run', parameters: {} }],
+    })))
+    expect(spawn).toHaveBeenCalledTimes(1)
+    expect(chunks.at(-1)).toEqual({ type: 'finish', reason: { kind: 'stop' } })
   })
 
   it('honors abort by terminating the process tree', async () => {
@@ -237,7 +375,7 @@ describe('CliLlmAdapter', () => {
       done: new Promise((resolve) => { resolveDone = resolve }),
     })
     const adapter = new CliLlmAdapter({
-      routes: () => resolveRoutes(undefined),
+      routes: () => ROUTES,
       spawn: () => child,
       cwd: () => process.cwd(),
       disposeGraceMs: () => 3000,
@@ -252,61 +390,47 @@ describe('CliLlmAdapter', () => {
 
   it('advertises conservative context and per-route efforts', async () => {
     const adapter = new CliLlmAdapter({
-      routes: () => resolveRoutes(undefined),
+      routes: () => ROUTES,
       spawn: () => fakeChild(),
       cwd: () => process.cwd(),
       disposeGraceMs: () => 3000,
     })
-    expect(adapter.providerInfo('grok-cli')).toEqual({
-      id: 'grok-cli',
-      name: 'Grok Build CLI (delegated)',
+    expect(adapter.providerInfo('flag-cli')).toEqual({
+      id: 'flag-cli',
+      name: 'Flag CLI (delegated)',
       kind: 'delegated',
     })
-    const resolved = await adapter.resolveModel('grok-cli', 'grok-4.6')
+    const resolved = await adapter.resolveModel('flag-cli', 'flag-4')
     expect(resolved.context).toEqual({ contextWindow: 128_000 })
     expect(resolved.defaultMaxTokens).toBe(8_192)
     expect(resolved.reasoning?.efforts.map(effort => effort.id)).toEqual([
       'low', 'medium', 'high', 'xhigh',
     ])
-    expect(await adapter.listModels('grok-cli')).toEqual([
-      { provider: 'grok-cli', id: 'grok-4.6', name: 'Grok 4.6' },
-      { provider: 'grok-cli', id: 'grok-4.5', name: 'Grok 4.5' },
+    expect(await adapter.listModels('flag-cli')).toEqual([
+      { provider: 'flag-cli', id: 'flag-4', name: 'Flag 4' },
+      { provider: 'flag-cli', id: 'flag-3', name: 'Flag 3' },
     ])
-    const kimi = await adapter.resolveModel('kimi-cli', 'kimi-code/k3')
-    expect(kimi.reasoning?.efforts.map(effort => effort.id)).toEqual(['off', 'high'])
-    const cursor = await adapter.resolveModel('cursor-cli', 'gpt-5.2')
-    expect(cursor.reasoning).toBeUndefined()
-    expect(await adapter.listModels('cursor-cli')).toEqual([
-      { provider: 'cursor-cli', id: 'gpt-5.2', name: 'GPT-5.2' },
-      { provider: 'cursor-cli', id: 'claude-4.5-sonnet', name: 'Sonnet 4.5' },
-      { provider: 'cursor-cli', id: 'cursor-grok-4.6-high', name: 'Grok 4.6 (high)' },
-      { provider: 'cursor-cli', id: 'cursor-grok-4.6-high-fast', name: 'Grok 4.6 (high, fast)' },
-      { provider: 'cursor-cli', id: 'claude-fable-5-1-thinking-high', name: 'Fable 5.1 Thinking (high)' },
-      { provider: 'cursor-cli', id: 'gemini-3.8-flash-high', name: 'Gemini 3.8 Flash (high)' },
-    ])
-    expect(await adapter.listModels('kimi-cli')).toEqual([
-      { provider: 'kimi-cli', id: 'kimi-code/k3-256k', name: 'K3-256k' },
-      { provider: 'kimi-cli', id: 'kimi-code/k3', name: 'K3' },
-      { provider: 'kimi-cli', id: 'kimi-code/kimi-for-coding', name: 'K2.7 Coding' },
-      { provider: 'kimi-cli', id: 'kimi-code/kimi-for-coding-highspeed', name: 'K2.7 Coding Highspeed' },
-    ])
+    const thinking = await adapter.resolveModel('thinking-cli', 'think-1')
+    expect(thinking.reasoning?.efforts.map(effort => effort.id)).toEqual(['off', 'high'])
+    const effortless = await adapter.resolveModel('trailing-cli', 'tr-1')
+    expect(effortless.reasoning).toBeUndefined()
     const nameless = new CliLlmAdapter({
-      routes: () => resolveRoutes({ 'grok-cli': { models: [{ id: 'bare' }] } }),
+      routes: () => resolveRoutes({ bare: { displayName: 'Bare', binary: 'bare-cli', models: [{ id: 'bare' }] } }),
       spawn: () => fakeChild(),
       cwd: () => '/tmp/ws',
       disposeGraceMs: () => 3000,
     })
-    expect(await nameless.listModels('grok-cli')).toEqual([
-      { provider: 'grok-cli', id: 'bare', name: 'bare' },
+    expect(await nameless.listModels('bare')).toEqual([
+      { provider: 'bare', id: 'bare', name: 'bare' },
     ])
-    expect((await nameless.resolveModel('grok-cli', 'unlisted')).name).toBe('unlisted')
+    expect((await nameless.resolveModel('bare', 'unlisted')).name).toBe('unlisted')
     expect(adapter.providerInfo('missing')).toEqual({ id: 'missing', name: 'missing', kind: 'delegated' })
     expect(() => { void adapter.listModels('missing') }).toThrow(LlmError)
   })
 
-  it('rejects temperature, stop, missing route, parse failure, and CLI_EXIT', async () => {
+  it('rejects temperature, stop, missing route, CLI_EXIT, and parse failure', async () => {
     const adapter = new CliLlmAdapter({
-      routes: () => resolveRoutes(undefined),
+      routes: () => ROUTES,
       spawn: () => fakeChild(),
       cwd: () => '/tmp/ws',
       disposeGraceMs: () => 3000,
@@ -319,7 +443,7 @@ describe('CliLlmAdapter', () => {
       .rejects.toMatchObject({ code: 'NO_ADAPTER' })
 
     const exitAdapter = new CliLlmAdapter({
-      routes: () => resolveRoutes(undefined),
+      routes: () => ROUTES,
       spawn: () => fakeChild({ outcome: { exitCode: 2, signal: null } }),
       cwd: () => '/tmp/ws',
       disposeGraceMs: () => 3000,
@@ -327,7 +451,7 @@ describe('CliLlmAdapter', () => {
     await expect(collect(exitAdapter.stream(options()))).rejects.toMatchObject({ code: 'CLI_EXIT' })
 
     const parseAdapter = new CliLlmAdapter({
-      routes: () => resolveRoutes(undefined),
+      routes: () => ROUTES,
       spawn: () => fakeChild({ stdout: 'not-json' }),
       cwd: () => '/tmp/ws',
       disposeGraceMs: () => 3000,
@@ -338,7 +462,7 @@ describe('CliLlmAdapter', () => {
   it('omits usage, tears down a pid-less child, and parses stream-json', async () => {
     const child = fakeChild({ stdout: JSON.stringify({ result: 'plain' }), pid: 0 })
     const adapter = new CliLlmAdapter({
-      routes: () => resolveRoutes(undefined),
+      routes: () => ROUTES,
       spawn: () => child,
       cwd: () => '/tmp/ws',
       disposeGraceMs: () => 3000,
@@ -354,14 +478,14 @@ describe('CliLlmAdapter', () => {
     expect(child.terminate).not.toHaveBeenCalled()
 
     const streamAdapter = new CliLlmAdapter({
-      routes: () => resolveRoutes(undefined),
+      routes: () => ROUTES,
       spawn: () => fakeChild({
         stdout: '{"type":"assistant","text":"one"}\n{"result":"two","usage":{"input_tokens":1,"output_tokens":2,"reasoning_tokens":3}}\n',
       }),
       cwd: () => '/tmp/ws',
       disposeGraceMs: () => 3000,
     })
-    const streamed = await collect(streamAdapter.stream(options({ provider: 'kimi-cli', model: 'kimi-code/k3' })))
+    const streamed = await collect(streamAdapter.stream(options({ provider: 'thinking-cli', model: 'think-1' })))
     expect(streamed).toEqual(expect.arrayContaining([
       { type: 'text-delta', index: 0, text: 'two' },
       { type: 'usage', usage: { inputTokens: 1, outputTokens: 2, reasoningTokens: 3 } },
@@ -377,7 +501,7 @@ describe('CliLlmAdapter', () => {
       throw new Error('already gone')
     })
     const emptyAdapter = new CliLlmAdapter({
-      routes: () => resolveRoutes(undefined),
+      routes: () => ROUTES,
       spawn: () => empty,
       cwd: () => '/tmp/ws',
       disposeGraceMs: () => 3000,
@@ -386,7 +510,7 @@ describe('CliLlmAdapter', () => {
 
     const noStdout = fakeChild({ collected: {} })
     const noStdoutAdapter = new CliLlmAdapter({
-      routes: () => resolveRoutes(undefined),
+      routes: () => ROUTES,
       spawn: () => noStdout,
       cwd: () => '/tmp/ws',
       disposeGraceMs: () => 3000,
@@ -415,43 +539,39 @@ describe('parse, serialize, and resolveRoutes', () => {
     expect(usageFromObject('x')).toBeUndefined()
   })
 
-  it('parses json and stream-json, including failures', () => {
-    const grok = SHIPPED_ROUTES['grok-cli']
-    const kimi = SHIPPED_ROUTES['kimi-cli']
-    const cursor = SHIPPED_ROUTES['cursor-cli']
-    expect(parseCliOutput(grok, '{"result":"ok","usage":{"inputTokens":1,"outputTokens":2}}'))
+  it('parses json and stream-json, including failure payloads', () => {
+    expect(parseCliOutput(FLAG_ROUTE, '{"result":"ok","usage":{"inputTokens":1,"outputTokens":2}}'))
       .toEqual({ text: 'ok', usage: { inputTokens: 1, outputTokens: 2 } })
-    expect(() => parseCliOutput(grok, '')).toThrow('no output')
-    expect(() => parseCliOutput(grok, 'nope')).toThrow('not JSON')
-    expect(() => parseCliOutput(grok, '{"type":"error","message":"auth"}')).toThrow('no answer')
-    // cursor-agent --print --output-format json emits exactly this object.
-    expect(parseCliOutput(cursor, JSON.stringify({
+    expect(() => parseCliOutput(FLAG_ROUTE, '')).toThrow('no output')
+    expect(() => parseCliOutput(FLAG_ROUTE, 'nope')).toThrow('not JSON')
+    expect(() => parseCliOutput(FLAG_ROUTE, '{"type":"error","message":"auth"}')).toThrow('no answer')
+    // A print-flag CLI emits exactly this result object.
+    expect(parseCliOutput(TRAILING_ROUTE, JSON.stringify({
       type: 'result', subtype: 'success', is_error: false,
       duration_ms: 12, result: 'ok', session_id: 's', request_id: 'r',
     }))).toEqual({ text: 'ok' })
-    expect(() => parseCliOutput(cursor, JSON.stringify({
+    expect(() => parseCliOutput(TRAILING_ROUTE, JSON.stringify({
       type: 'result', subtype: 'error', is_error: true, duration_ms: 12, result: '', session_id: 's',
     }))).toThrow('no answer')
-    expect(parseCliOutput(kimi, '{"type":"assistant","text":"one"}\nnot-json\n{"result":"two"}'))
+    expect(parseCliOutput(THINKING_ROUTE, '{"type":"assistant","text":"one"}\nnot-json\n{"result":"two"}'))
       .toEqual({ text: 'two' })
-    expect(parseCliOutput(kimi, '{"result":"ok"}')).toEqual({ text: 'ok' })
-    expect(parseCliOutput(kimi, '{"foo":1}\n\n{"result":"ok"}')).toEqual({ text: 'ok' })
-    expect(() => parseCliOutput(kimi, 'not-json\nstill-not')).toThrow('no answer')
-    expect(parseCliOutput(kimi, '"commentary"\n{"result":"ok"}')).toEqual({ text: 'ok' })
+    expect(parseCliOutput(THINKING_ROUTE, '{"result":"ok"}')).toEqual({ text: 'ok' })
+    expect(parseCliOutput(THINKING_ROUTE, '{"foo":1}\n\n{"result":"ok"}')).toEqual({ text: 'ok' })
+    expect(() => parseCliOutput(THINKING_ROUTE, 'not-json\nstill-not')).toThrow('no answer')
+    expect(parseCliOutput(THINKING_ROUTE, '"commentary"\n{"result":"ok"}')).toEqual({ text: 'ok' })
   })
 
-  it('ignores kimi meta stream events so the resume hint cannot win over the reply', () => {
-    const kimi = SHIPPED_ROUTES['kimi-cli']
+  it('ignores role meta stream events so a resume hint cannot win over the reply', () => {
     // kimi >= 0.36 stream-json shape: version meta, the assistant reply, then
-    // a session.resume_hint meta whose own `content` used to clobber the text.
+    // a session.resume_hint meta whose own `content` would clobber the text.
     const stream = [
       '{"role":"meta","type":"system.version","version":"0.36.1"}',
       '{"role":"assistant","content":"Hi! What can I do for you?"}',
       '{"role":"meta","type":"session.resume_hint","session_id":"s1","command":"kimi -r s1","content":"To resume this session: kimi -r s1"}',
     ].join('\n')
-    expect(parseCliOutput(kimi, stream)).toEqual({ text: 'Hi! What can I do for you?' })
+    expect(parseCliOutput(THINKING_ROUTE, stream)).toEqual({ text: 'Hi! What can I do for you?' })
     // A meta-only stream is no answer at all.
-    expect(() => parseCliOutput(kimi, '{"role":"meta","type":"system.version","version":"0.36.1"}'))
+    expect(() => parseCliOutput(THINKING_ROUTE, '{"role":"meta","type":"system.version","version":"0.36.1"}'))
       .toThrow('no answer')
   })
 
@@ -490,85 +610,117 @@ describe('parse, serialize, and resolveRoutes', () => {
     })).toBe('user\nhi')
   })
 
-  it('starts custom extra routes conservative and rejects empty ids', () => {
+  it('starts custom routes conservative and rejects missing or empty ids', () => {
     const routes = resolveRoutes({
-      extra: { displayName: 'Extra', binary: 'extra' },
+      extra: { displayName: 'Extra (custom)', binary: 'extra-cli' },
     })
-    const extra = routes.get('extra')
-    expect(extra).toMatchObject({
-      extraArgs: [],
-      allowDelegatedTools: false,
-      displayName: 'Extra',
-      binary: 'extra',
+    expect(routes.get('extra')).toEqual({
+      ...CUSTOM_ROUTE_TEMPLATE,
+      displayName: 'Extra (custom)',
+      binary: 'extra-cli',
+      enabled: true,
     })
-    expect(resolveRoutes({ 'codex-cli': { displayName: 'Codex' } }).get('codex-cli')?.promptArg)
-      .toBeUndefined()
-    expect(resolveRoutes({ 'grok-cli': { models: [{ id: 'only-id' }] } }).get('grok-cli')?.models)
-      .toEqual([{ id: 'only-id' }])
-    expect(resolveRoutes({ 'grok-cli': { displayName: 'Grok' } }).get('grok-cli')?.apiKeyEnv)
-      .toBe('XAI_API_KEY')
-    expect(resolveRoutes({ 'grok-cli': { enabled: false } }).get('grok-cli')?.enabled).toBe(false)
-    expect(resolveRoutes({}).get('grok-cli')?.enabled).toBe(true)
-    expect(resolveRoutes({ extra: { displayName: 'E', binary: 'e', apiKeyEnv: 'CUSTOM_KEY' } })
-      .get('extra')?.apiKeyEnv).toBe('CUSTOM_KEY')
     expect(() => resolveRoutes({ extra: { displayName: 'X' } })).toThrow('displayName and binary')
-    expect(() => resolveRoutes({ 'grok-cli': { efforts: [''] } })).toThrow('effort ids')
-    expect(() => resolveRoutes({ 'grok-cli': { models: [{ id: '' }] } })).toThrow('model ids')
+    expect(() => resolveRoutes({ extra: { binary: 'x' } })).toThrow('displayName and binary')
+    expect(() => resolveRoutes({ extra: { displayName: 'E', binary: 'e', efforts: [''] } }))
+      .toThrow('effort ids')
+    expect(() => resolveRoutes({ extra: { displayName: 'E', binary: 'e', models: [{ id: '' }] } }))
+      .toThrow('model ids')
   })
 
-  it('preserves shipped route defaults when settings override only enabled', () => {
-    // The settings layer coerces a partial route (just `enabled`) through the
-    // Config schema before resolveRoutes merges it. Array/dict fields must stay
-    // absent so the shipped base models/efforts/env survive the merge.
-    const section = Config({ routes: { 'grok-cli': { enabled: true } } })
-    const routes = resolveRoutes(section.routes)
-    const grok = routes.get('grok-cli')
-    expect(grok?.enabled).toBe(true)
-    expect(grok?.models.map(model => model.id)).toEqual(['grok-4.6', 'grok-4.5'])
-    expect(grok?.efforts).toEqual(['low', 'medium', 'high', 'xhigh'])
+  it('merges overlay fields onto the conservative template', () => {
+    const routes = resolveRoutes({
+      extra: {
+        displayName: 'Extra (custom)',
+        binary: 'extra-cli',
+        modelArg: '-m',
+        effortArg: 'model_reasoning_effort',
+        effortStyle: 'codex-config',
+        efforts: ['low', 'high'],
+        extraArgs: ['exec', '--json'],
+        promptStyle: 'trailing',
+        parseMode: 'stream-json',
+        env: { FLAG: '1' },
+        apiKeyEnv: 'CUSTOM_KEY',
+        allowDelegatedTools: true,
+        contextWindow: 200_000,
+        defaultMaxTokens: 16_384,
+        models: [{ id: 'x-1', name: 'X 1' }, { id: 'x-2' }],
+        enabled: false,
+      },
+    })
+    expect(routes.get('extra')).toMatchObject({
+      displayName: 'Extra (custom)',
+      binary: 'extra-cli',
+      modelArg: '-m',
+      effortArg: 'model_reasoning_effort',
+      effortStyle: 'codex-config',
+      efforts: ['low', 'high'],
+      extraArgs: ['exec', '--json'],
+      promptStyle: 'trailing',
+      promptArg: '-p',
+      parseMode: 'stream-json',
+      env: { FLAG: '1' },
+      apiKeyEnv: 'CUSTOM_KEY',
+      allowDelegatedTools: true,
+      contextWindow: 200_000,
+      defaultMaxTokens: 16_384,
+      models: [{ id: 'x-1', name: 'X 1' }, { id: 'x-2' }],
+      enabled: false,
+    })
+    expect(CUSTOM_ROUTE_TEMPLATE.extraArgs).toEqual([])
   })
 
   it('keeps an explicit empty models list as a clearing override', () => {
-    const routes = resolveRoutes(Config({ routes: { 'grok-cli': { enabled: true, models: [] } } }).routes)
-    expect(routes.get('grok-cli')?.models).toEqual([])
+    const routes = resolveRoutes(Config({
+      routes: { extra: { displayName: 'Extra (custom)', binary: 'extra-cli', enabled: true, models: [] } },
+    }).routes)
+    expect(routes.get('extra')?.models).toEqual([])
   })
 
-  it('rejects empty model ids, missing promptArg, missing effortArg, and unknown effortStyle', () => {
-    expect(() => buildCliArgv(SHIPPED_ROUTES['grok-cli'], { model: '', prompt: 'q' }))
-      .toThrow(LlmError)
-    const grokFlag = { ...SHIPPED_ROUTES['grok-cli'], promptStyle: 'flag' as const }
-    delete grokFlag.promptArg
-    expect(() => buildCliArgv(grokFlag, { model: 'grok-4', prompt: 'q' })).toThrow('promptArg')
-    const grokEffort = { ...SHIPPED_ROUTES['grok-cli'], effortStyle: 'flag' as const }
-    delete grokEffort.effortArg
-    expect(() => effortFlags(grokEffort, 'high')).toThrow('effortArg')
-    const codexEffort = { ...SHIPPED_ROUTES['codex-cli'] }
-    delete codexEffort.effortArg
-    expect(effortFlags(codexEffort, 'high')).toEqual(['-c', 'model_reasoning_effort=high'])
-    expect(() => effortFlags({
-      ...SHIPPED_ROUTES['grok-cli'],
-      effortStyle: 'nope' as never,
-    }, 'high')).toThrow()
+  it('coerces a custom route partial through Config before resolveRoutes', () => {
+    // The settings layer coerces a partial route through the Config schema
+    // before resolveRoutes merges it; absent array/dict fields stay absent.
+    const section = Config({
+      routes: { extra: { displayName: 'Extra (custom)', binary: 'extra-cli', enabled: true } },
+    })
+    const extra = resolveRoutes(section.routes).get('extra')
+    expect(extra?.enabled).toBe(true)
+    expect(extra?.models).toEqual([])
+    expect(extra?.efforts).toEqual([])
+    expect(extra?.parseMode).toBe('json')
   })
 })
 
 describe('plugin registration', () => {
-  it('registers no adapter when every shipped route is disabled', async () => {
+  it('registers no adapter when every declared route is disabled', async () => {
     const ctx = new Context()
     await ctx.plugin(LlmRuntime)
     await ctx.plugin(plugin, {
       routes: {
-        'claude-cli': { enabled: false },
-        'codex-cli': { enabled: false },
-        'cursor-cli': { enabled: false },
-        'grok-cli': { enabled: false },
-        'kimi-cli': { enabled: false },
+        'flag-cli': { displayName: 'Flag CLI (delegated)', binary: 'flag-cli', enabled: false },
+        'thinking-cli': { displayName: 'Thinking CLI (delegated)', binary: 'thinking-cli', enabled: false },
       },
     })
     expect(ctx.llm.listProviders()).toEqual([])
     expect(ctx.llm.listConfigurableProviders().map(entry => entry.provider)).toEqual(
-      expect.arrayContaining(['claude-cli', 'codex-cli', 'cursor-cli', 'grok-cli', 'kimi-cli']),
+      expect.arrayContaining(['flag-cli', 'thinking-cli']),
     )
+    await ctx.fiber.dispose()
+  })
+
+  it('boots with no declared routes and grows on a settings overlay', async () => {
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    await ctx.plugin(MemorySettings)
+    await ctx.plugin(plugin, {})
+    expect(ctx.llm.listProviders()).toEqual([])
+    expect(ctx.llm.listConfigurableProviders()).toEqual([])
+    await ctx.settings.update(settingsNamespace('llm-cli-bridge'), {
+      routes: { 'flag-cli': { displayName: 'Flag CLI (delegated)', binary: 'flag-cli' } },
+    })
+    expect(ctx.llm.listProviders().map(provider => provider.id)).toEqual(['flag-cli'])
+    expect(ctx.llm.listConfigurableProviders().map(entry => entry.provider)).toEqual(['flag-cli'])
     await ctx.fiber.dispose()
   })
 
@@ -576,44 +728,51 @@ describe('plugin registration', () => {
     const ctx = new Context()
     await ctx.plugin(LlmRuntime)
     await ctx.plugin(MemorySettings)
-    await ctx.plugin(plugin, {})
-    expect(ctx.llm.listProviders().some(provider => provider.id === 'grok-cli')).toBe(true)
-    await ctx.settings.update(settingsNamespace('llm-cli-bridge'), {
-      routes: { 'grok-cli': { enabled: false } },
+    await ctx.plugin(plugin, {
+      routes: { 'flag-cli': { displayName: 'Flag CLI (delegated)', binary: 'flag-cli' } },
     })
-    expect(ctx.llm.listProviders().some(provider => provider.id === 'grok-cli')).toBe(false)
-    expect(ctx.llm.listConfigurableProviders().some(entry => entry.provider === 'grok-cli')).toBe(true)
+    expect(ctx.llm.listProviders().some(provider => provider.id === 'flag-cli')).toBe(true)
+    await ctx.settings.update(settingsNamespace('llm-cli-bridge'), {
+      routes: { 'flag-cli': { displayName: 'Flag CLI (delegated)', binary: 'flag-cli', enabled: false } },
+    })
+    expect(ctx.llm.listProviders().some(provider => provider.id === 'flag-cli')).toBe(false)
+    expect(ctx.llm.listConfigurableProviders().some(entry => entry.provider === 'flag-cli')).toBe(true)
     await ctx.fiber.dispose()
   })
 
-  it('registers the five shipped delegated routes', async () => {
+  it('registers the declared delegated routes and validates efforts', async () => {
     const ctx = new Context()
     await ctx.plugin(LlmRuntime)
-    await ctx.plugin(plugin, {})
-    const ids = ctx.llm.listProviders().map(provider => provider.id)
-    expect(ids).toEqual(expect.arrayContaining(['claude-cli', 'codex-cli', 'cursor-cli', 'grok-cli', 'kimi-cli']))
+    await ctx.plugin(plugin, {
+      routes: {
+        'flag-cli': {
+          displayName: 'Flag CLI (delegated)',
+          binary: 'flag-cli',
+          efforts: ['low', 'high'],
+          models: [{ id: 'flag-4', name: 'Flag 4' }],
+          allowDelegatedTools: true,
+          apiKeyEnv: 'TEST_API_KEY',
+        },
+      },
+    })
+    expect(ctx.llm.listProviders().map(provider => provider.id)).toEqual(['flag-cli'])
     expect(ctx.llm.listProviders().every(provider => provider.kind === 'delegated')).toBe(true)
     const directory = ctx.llm.listConfigurableProviders()
-    expect(directory.find(entry => entry.provider === 'grok-cli')).toMatchObject({
+    expect(directory.find(entry => entry.provider === 'flag-cli')).toMatchObject({
       kind: 'delegated',
       settingsNs: 'llm-cli-bridge',
-      binary: 'grok',
+      binary: 'flag-cli',
     })
-    expect(directory.find(entry => entry.provider === 'cursor-cli')).toMatchObject({
-      kind: 'delegated',
-      settingsNs: 'llm-cli-bridge',
-      binary: 'cursor-agent',
-    })
-    expect(typeof directory.find(entry => entry.provider === 'grok-cli')?.binaryFound).toBe('boolean')
+    expect(typeof directory.find(entry => entry.provider === 'flag-cli')?.binaryFound).toBe('boolean')
     const resolved = await ctx.llm.resolveCallConfig({
-      provider: 'grok-cli',
-      model: 'grok-4',
+      provider: 'flag-cli',
+      model: 'flag-4',
       reasoningEffort: ReasoningEffortId('high'),
     })
     expect(resolved.reasoningEffort).toBe('high')
     await expect(ctx.llm.resolveCallConfig({
-      provider: 'grok-cli',
-      model: 'grok-4',
+      provider: 'flag-cli',
+      model: 'flag-4',
       reasoningEffort: ReasoningEffortId('nope'),
     })).rejects.toMatchObject({ code: 'UNSUPPORTED_REASONING_EFFORT' })
     await ctx.fiber.dispose()
@@ -637,21 +796,21 @@ describe('plugin registration', () => {
         ? { header: { cwd: '/ws/project' } }
         : { header: {} },
     })
-    await ctx.plugin(plugin, {})
+    await ctx.plugin(plugin, {
+      routes: { 'flag-cli': { displayName: 'Flag CLI (delegated)', binary: 'flag-cli' } },
+    })
     await collect(ctx.llm.stream(options({ sessionId: SessionId('sess-1') })))
     expect(spawn.mock.calls[0]![0].cwd).toBe('/ws/project')
     expect(spawn.mock.calls[0]![0].graceMs).toBe(3_000)
 
     await ctx.settings.update(settingsNamespace('llm-cli-bridge'), {
-      routes: {
-        'grok-cli': { ...SHIPPED_ROUTES['grok-cli'], displayName: 'Renamed Grok' },
-      },
+      routes: { 'flag-cli': { displayName: 'Renamed Flag', binary: 'flag-cli' } },
       disposeGraceMs: 4_500,
     })
     await collect(ctx.llm.stream(options({ sessionId: SessionId('sess-1') })))
     expect(spawn.mock.calls[1]![0].graceMs).toBe(4_500)
-    expect(ctx.llm.listProviders().find(provider => provider.id === 'grok-cli')?.name)
-      .toBe('Renamed Grok')
+    expect(ctx.llm.listProviders().find(provider => provider.id === 'flag-cli')?.name)
+      .toBe('Renamed Flag')
 
     const missingSession = await collect(ctx.llm.stream(options()))
     const missingLast = missingSession.at(-1)
@@ -668,7 +827,7 @@ describe('plugin registration', () => {
     await ctx.fiber.dispose()
   })
 
-  it('uses the default disposeGraceMs when settings omit it', async () => {
+  it('uses the default disposeGraceMs for a composition-only route', async () => {
     const spawn = vi.fn((_spec: SubprocessSpawnSpec) => fakeChild())
     const ctx = new Context()
     await ctx.plugin(LlmRuntime)
@@ -676,7 +835,9 @@ describe('plugin registration', () => {
     ctx.provide('sessions', {
       get: () => ({ header: { cwd: '/ws' } }),
     })
-    plugin.apply(ctx, {})
+    plugin.apply(ctx, {
+      routes: { 'flag-cli': { displayName: 'Flag CLI (delegated)', binary: 'flag-cli' } },
+    })
     await collect(ctx.llm.stream(options({ sessionId: SessionId('s') })))
     expect(spawn.mock.calls[0]![0].graceMs).toBe(3_000)
     await ctx.fiber.dispose()
@@ -685,7 +846,9 @@ describe('plugin registration', () => {
   it('fails loud when subprocess or sessions is absent', async () => {
     const ctx = new Context()
     await ctx.plugin(LlmRuntime)
-    await ctx.plugin(plugin, {})
+    await ctx.plugin(plugin, {
+      routes: { 'flag-cli': { displayName: 'Flag CLI (delegated)', binary: 'flag-cli' } },
+    })
     const noSessions = await collect(ctx.llm.stream(options({ sessionId: SessionId('s') })))
     const noSessionsLast = noSessions.at(-1)
     expect(noSessionsLast?.type).toBe('finish')
@@ -719,11 +882,11 @@ describe('plugin registration', () => {
 describe('resolveRouteEnv', () => {
   it('returns the route overlay when no credential is named', async () => {
     const ctx = new Context()
-    const unnamed = { ...SHIPPED_ROUTES['grok-cli'] }
+    const unnamed = { ...THINKING_ROUTE }
     delete unnamed.apiKeyEnv
     await expect(plugin.resolveRouteEnv(ctx, unnamed)).resolves.toEqual({})
     await expect(plugin.resolveRouteEnv(ctx, {
-      ...SHIPPED_ROUTES['grok-cli'],
+      ...THINKING_ROUTE,
       apiKeyEnv: '',
       env: { FLAG: '1' },
     })).resolves.toEqual({ FLAG: '1' })
@@ -734,34 +897,34 @@ describe('resolveRouteEnv', () => {
     keyed.provide('credentials', {
       resolve: async () => ({ value: 'sk-live', source: 'file' }),
     })
-    await expect(plugin.resolveRouteEnv(keyed, SHIPPED_ROUTES['grok-cli']))
-      .resolves.toEqual({ XAI_API_KEY: 'sk-live' })
+    await expect(plugin.resolveRouteEnv(keyed, FLAG_ROUTE))
+      .resolves.toEqual({ TEST_API_KEY: 'sk-live' })
 
     const missing = new Context()
     missing.provide('credentials', {
       resolve: async () => undefined,
     })
-    await expect(plugin.resolveRouteEnv(missing, SHIPPED_ROUTES['grok-cli']))
+    await expect(plugin.resolveRouteEnv(missing, FLAG_ROUTE))
       .resolves.toEqual({})
 
     const blank = new Context()
     blank.provide('credentials', {
       resolve: async () => ({ value: '', source: 'file' }),
     })
-    await expect(plugin.resolveRouteEnv(blank, SHIPPED_ROUTES['grok-cli']))
+    await expect(plugin.resolveRouteEnv(blank, FLAG_ROUTE))
       .resolves.toEqual({})
   })
 
   it('reads the launch environment when the credentials seam is absent', async () => {
-    const previous = process.env.XAI_API_KEY
-    process.env.XAI_API_KEY = 'from-launch'
+    const previous = process.env.TEST_API_KEY
+    process.env.TEST_API_KEY = 'from-launch'
     try {
       const ctx = new Context()
-      await expect(plugin.resolveRouteEnv(ctx, SHIPPED_ROUTES['grok-cli']))
-        .resolves.toEqual({ XAI_API_KEY: 'from-launch' })
+      await expect(plugin.resolveRouteEnv(ctx, FLAG_ROUTE))
+        .resolves.toEqual({ TEST_API_KEY: 'from-launch' })
     } finally {
-      if (previous === undefined) delete process.env.XAI_API_KEY
-      else process.env.XAI_API_KEY = previous
+      if (previous === undefined) delete process.env.TEST_API_KEY
+      else process.env.TEST_API_KEY = previous
     }
   })
 })

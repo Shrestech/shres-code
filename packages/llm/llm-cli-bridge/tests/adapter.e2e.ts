@@ -1,91 +1,42 @@
 /**
- * Real-CLI e2e. Self-skips when none of the shipped binaries are on PATH.
+ * Real-CLI e2e for one hand-declared route. Self-skips unless
+ * SHRES_CLI_BRIDGE_E2E_BINARY names an executable that completes a prompt and
+ * prints a JSON answer object (for example {"result":"..."}); the optional
+ * SHRES_CLI_BRIDGE_E2E_MODEL, SHRES_CLI_BRIDGE_E2E_MODEL_ARG, and
+ * SHRES_CLI_BRIDGE_E2E_PROMPT_ARG variables align the remaining flags.
  */
 import { describe, expect, it } from 'vitest'
-import { execFile } from 'node:child_process'
-import { promisify } from 'node:util'
 import { Context } from '@shres-code/cordis'
 import LlmRuntime, { createUserMessage } from '@shres-code/shres-code-llm'
 import { SessionId } from '@shres-code/shres-code-session'
 import LocalSubprocessRuntime from '@shres-code/shres-code-subprocess-local'
 import * as plugin from '../src/index.ts'
-import { SHIPPED_ROUTES, type ShippedRouteId } from '../src/config.ts'
-
-const execFileAsync = promisify(execFile)
-
-const CANDIDATES: readonly ShippedRouteId[] = ['grok-cli', 'kimi-cli', 'claude-cli', 'codex-cli']
-
-async function presentBinary(): Promise<ShippedRouteId | undefined> {
-  for (const id of CANDIDATES) {
-    const binary = SHIPPED_ROUTES[id].binary
-    try {
-      await execFileAsync(binary, ['--version'], { timeout: 4_000 })
-      return id
-    } catch {
-      // Missing or non-zero version probe: try the next shipped CLI.
-    }
-  }
-  return undefined
-}
 
 describe('llm-cli-bridge real CLI', () => {
-  it('completes one prompt when a shipped binary is installed', async () => {
-    const route = await presentBinary()
-    if (route === undefined) return
+  it('completes one prompt through a declared binary when one is provided', async () => {
+    const binary = process.env.SHRES_CLI_BRIDGE_E2E_BINARY
+    if (binary === undefined || binary.length === 0) return
     const ctx = new Context()
     await ctx.plugin(LlmRuntime)
     await ctx.plugin(LocalSubprocessRuntime)
-    const sessionId = SessionId('cli-bridge-e2e')
     ctx.provide('sessions' as never, {
       get: () => ({ header: { cwd: process.cwd() } }),
     })
-    await ctx.plugin(plugin, {})
-    const model = SHIPPED_ROUTES[route].models[0]?.id ?? 'default'
-    const chunks: string[] = []
-    for await (const chunk of ctx.llm.stream({
-      provider: route,
-      model,
-      sessionId,
-      messages: [createUserMessage({
-        content: [{ type: 'text', text: 'Reply with the single word ok and nothing else.' }],
-        source: { kind: 'plugin', plugin: 'test' },
-      })],
-    })) {
-      if (chunk.type === 'text-delta') chunks.push(chunk.text)
-      if (chunk.type === 'finish' && chunk.reason.kind === 'error') {
-        throw new Error(chunk.reason.failure.message)
-      }
-    }
-    expect(chunks.join('').trim().length).toBeGreaterThan(0)
-    await ctx.fiber.dispose()
-  }, 120_000)
-
-  it('completes one prompt through cursor-agent when that CLI is signed in', async () => {
-    // cursor-agent exits 0 even while signed out, so the gate reads the
-    // status text; a signed-out CLI would only burn a login error.
-    const binary = SHIPPED_ROUTES['cursor-cli'].binary
-    let status: string
-    try {
-      const result = await execFileAsync(binary, ['status'], { timeout: 20_000 })
-      status = result.stdout
-    } catch {
-      return
-    }
-    if (!status.includes('Logged in')) return
-    const ctx = new Context()
-    await ctx.plugin(LlmRuntime)
-    await ctx.plugin(LocalSubprocessRuntime)
-    const sessionId = SessionId('cli-bridge-e2e-cursor')
-    ctx.provide('sessions' as never, {
-      get: () => ({ header: { cwd: process.cwd() } }),
+    await ctx.plugin(plugin, {
+      routes: {
+        'e2e-cli': {
+          displayName: 'E2E CLI (delegated)',
+          binary,
+          modelArg: process.env.SHRES_CLI_BRIDGE_E2E_MODEL_ARG ?? '--model',
+          promptArg: process.env.SHRES_CLI_BRIDGE_E2E_PROMPT_ARG ?? '-p',
+        },
+      },
     })
-    await ctx.plugin(plugin, {})
-    const model = SHIPPED_ROUTES['cursor-cli'].models[0]?.id ?? 'default'
     const chunks: string[] = []
     for await (const chunk of ctx.llm.stream({
-      provider: 'cursor-cli',
-      model,
-      sessionId,
+      provider: 'e2e-cli',
+      model: process.env.SHRES_CLI_BRIDGE_E2E_MODEL ?? 'default',
+      sessionId: SessionId('cli-bridge-e2e'),
       messages: [createUserMessage({
         content: [{ type: 'text', text: 'Reply with the single word ok and nothing else.' }],
         source: { kind: 'plugin', plugin: 'test' },
