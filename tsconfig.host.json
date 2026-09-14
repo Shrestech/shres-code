@@ -216,6 +216,8 @@
     { "path": "./packages/llm/llm-grok-session" },
     { "path": "./packages/llm/codex-credential" },
     { "path": "./packages/llm/llm-codex-session" },
+    { "path": "./packages/llm/cursor-credential" },
+    { "path": "./packages/llm/llm-cursor-session" },
     { "path": "./packages/llm/llm-xai-apikey" },
     { "path": "./packages/llm/tool-image-gen" },
     { "path": "./packages/shell/bash-local" },

@@ -647,6 +647,16 @@
     - id: llm-codex-session
       name: '@shres-code/shres-code-llm-codex-session'
 
+    # Cursor subscription-session route: serves the verified model catalog
+    # with the cursor-agent login credential; chat fails loud until the
+    # agent wire's handshake is replicated (the cursor-cli route above is
+    # the spawn-based serving path).
+    - id: cursor-credential
+      name: '@shres-code/shres-code-cursor-credential'
+
+    - id: llm-cursor-session
+      name: '@shres-code/shres-code-llm-cursor-session'
+
     # Pay-per-token xAI API-key route: serves api.x.ai over the openai-responses
     # wire with a key stored through the credentials seam. Ships off by default
     # (enabled: false) and is orthogonal to the subscription route above; a

@@ -6123,6 +6123,18 @@ importers:
         specifier: workspace:^
         version: link:../llm
 
+  packages/llm/cursor-credential:
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-llm':
+        specifier: workspace:^
+        version: link:../llm
+
   packages/llm/grok-credential:
     devDependencies:
       '@shres-code/cordis':
@@ -6218,6 +6230,24 @@ importers:
       '@shres-code/shres-code-llm-pi-ai':
         specifier: workspace:^
         version: link:../llm-pi-ai
+      '@shres-code/shres-code-settings':
+        specifier: workspace:^
+        version: link:../../settings/settings
+
+  packages/llm/llm-cursor-session:
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/shres-code-cursor-credential':
+        specifier: workspace:^
+        version: link:../cursor-credential
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-llm':
+        specifier: workspace:^
+        version: link:../llm
       '@shres-code/shres-code-settings':
         specifier: workspace:^
         version: link:../../settings/settings
