@@ -491,6 +491,53 @@ describe('Web session model selection', () => {
     await ctx.fiber.dispose()
   })
 
+  it('refuses a chat-gated selection before applying or persisting it', async () => {
+    const { ctx, sessionId } = await harness()
+    ctx.llm.registerAdapter(['gated'], new CatalogAdapter('Gated', [
+      { provider: 'gated', id: 'gated-1', name: 'Gated 1' },
+    ]))
+    ctx.llm.registerConfigurableProviders([{
+      provider: 'gated',
+      displayName: 'Gated',
+      settingsNs: 'llm-gated',
+      settingsPath: [],
+      chatGated: true,
+    }])
+    const saved: unknown[] = []
+    const api = createApiProxy(ctx, {
+      defaultModelSelection: () => ({ provider: 'deepseek-official', model: 'deepseek-chat' }),
+      saveDefaultModelSelection: (selection) => {
+        saved.push(selection)
+        return Promise.resolve()
+      },
+      cwd: '/tmp',
+    })
+
+    const refused = await api.sessions.selectModel(request({
+      sessionId, provider: 'gated', model: 'gated-1',
+    }))
+    expect(refused.result).toMatchObject({
+      ok: false,
+      error: {
+        code: 'model-unavailable',
+        // oxlint-disable-next-line typescript/no-unsafe-assignment -- vitest asymmetric matcher for the message text
+        message: expect.stringContaining('does not serve chat turns'),
+        details: { provider: 'gated', model: 'gated-1' },
+      },
+    })
+    // Neither the session selection nor the stored default moved.
+    expect(saved).toEqual([])
+    expect(expectValue(await api.sessions.models(request({ sessionId }))).current)
+      .toEqual({ provider: 'deepseek-official', model: 'deepseek-chat' })
+
+    // A serving route is unaffected by the gate check.
+    expectValue(await api.sessions.selectModel(request({
+      sessionId, provider: 'deepseek-official', model: 'deepseek-reasoner',
+    })))
+    expect(saved).toHaveLength(1)
+    await ctx.fiber.dispose()
+  })
+
   it('refuses a prompt no adapter can route, and reports it on the directory', async () => {
     const { ctx, sessionId } = await harness()
     const api = createApiProxy(ctx, {

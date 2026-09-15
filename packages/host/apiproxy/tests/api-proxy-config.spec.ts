@@ -778,6 +778,27 @@ describe('llm domain', () => {
     ]))
   })
 
+  it('forwards chatGated on directory rows only', async () => {
+    const ctx = await harness({ configurableProviders: false })
+    ctx.llm.registerConfigurableProviders([
+      {
+        provider: 'cursor-session',
+        displayName: 'Cursor (subscription)',
+        settingsNs: 'llm-cursor-session',
+        settingsPath: [],
+        chatGated: true,
+      },
+      { provider: 'deepseek-official', displayName: 'DeepSeek', settingsNs: 'llm-deepseek', settingsPath: [] },
+    ])
+    ctx.llm.registerAdapter(['cursor-session'], new CatalogAdapter('Cursor', ['gpt-5.2']))
+    const api = createApiProxy(ctx, DEFAULTS)
+    const providers = expectOk(await api.llm.providers(request({})))
+    expect(providers.providers.find(row => row.provider === 'cursor-session'))
+      .toMatchObject({ active: true, chatGated: true })
+    expect(providers.providers.find(row => row.provider === 'deepseek-official'))
+      .not.toHaveProperty('chatGated')
+  })
+
   it('serves the host-scoped catalog with per-provider failures contained', async () => {
     const ctx = await harness()
     ctx.llm.registerAdapter(['deepseek-official'], new CatalogAdapter('DeepSeek', ['deepseek-v4-flash', 'deepseek-v4-pro']))

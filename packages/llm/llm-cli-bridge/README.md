@@ -14,6 +14,37 @@ Each route declares its own flag map, and `stream()` forwards `GenerateOptions.m
 
 The optional `llm-cli-bridge` settings section overlays the composition entry; both carry the same named route dict, and every route needs `displayName` and `binary`. Unspecified fields start conservative from `CUSTOM_ROUTE_TEMPLATE`: `modelArg: '--model'`, `promptArg: '-p'`, `parseMode: 'json'`, no efforts, no extra args, no delegated tools, `contextWindow` 128000, and `defaultMaxTokens` 8192. Each route accepts `modelArg`, `effortArg`, `effortStyle`, `efforts`, `extraArgs`, `promptStyle`, `promptArg`, `parseMode`, `env`, `apiKeyEnv`, `allowDelegatedTools`, `contextWindow`, `defaultMaxTokens`, an advisory `models` list, and `enabled` (default true); an empty effort or model id throws at resolve time. `enabled: false` keeps the route in the Models directory but withdraws it from the live adapter registry, so the composer picker no longer offers it. Directory entries carry the resolved `binary` and whether that command is on PATH, which Models shows as found / not on PATH. An API key is optional (the CLI's own login can be enough) and is stored write-only through the credentials seam under `apiKeyEnv` when typed; the adapter injects the resolved secret into spawn env after the subprocess scrub. `env` values, if present, are `role('secret')` and are not written by the Models card. The advisory `models` list feeds the picker only; unlisted model ids still resolve.
 
+### Worked example: a `cursor-cli` overlay
+
+The `cursor-session` route lists Cursor subscription models but refuses chat turns; this declaration is the serving path for Cursor completions, running the `cursor-agent` binary:
+
+```yaml
+# $SHRES_HOME/settings.yaml
+llm-cli-bridge:
+  routes:
+    cursor-cli:
+      displayName: Cursor Agent CLI (delegated)
+      binary: cursor-agent
+      modelArg: --model
+      effortStyle: flag
+      extraArgs: [-p, --output-format, json, --force]
+      promptStyle: trailing
+      parseMode: json
+      apiKeyEnv: CURSOR_API_KEY
+      allowDelegatedTools: true
+      contextWindow: 128000
+      defaultMaxTokens: 8192
+      models:
+        - { id: gpt-5.2, name: GPT-5.2 }
+        - { id: claude-4.5-sonnet, name: Sonnet 4.5 }
+        - { id: cursor-grok-4.6-high, name: Grok 4.6 (high) }
+        - { id: cursor-grok-4.6-high-fast, name: Grok 4.6 (high, fast) }
+        - { id: claude-fable-5-1-thinking-high, name: Fable 5.1 Thinking (high) }
+        - { id: gemini-3.8-flash-high, name: Gemini 3.8 Flash (high) }
+```
+
+`-p` is cursor-agent's print flag, not a prompt flag, so the prompt rides as the trailing positional; `--output-format json` emits one `{"type":"result"}` line that `parseMode: json` reads; `--force` auto-approves the CLI's own tools in headless mode. cursor-agent validates model ids server-side against its prefixed, effort-suffixed catalog, so the advisory list names those exact ids. The template defaults already supply `modelArg`, `effortStyle`, `parseMode`, `contextWindow`, and `defaultMaxTokens`; they are spelled out here so the route survives a template change.
+
 ## Model Experience
 
 ### Delegated CLI prompt

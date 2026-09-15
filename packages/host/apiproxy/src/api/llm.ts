@@ -38,6 +38,11 @@ export interface ConfigurableProviderView {
   binary?: string
   /** Whether {@link binary} is an executable file or a command on PATH. */
   binaryFound?: boolean
+  /**
+   * When true, the route lists and resolves models but refuses chat turns;
+   * usability checks and selection must not treat it as servable.
+   */
+  chatGated?: boolean
 }
 
 /** Llm-domain unary methods (the map keys llm.* of RpcMethodMap). */

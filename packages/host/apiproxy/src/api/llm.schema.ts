@@ -20,6 +20,7 @@ export const configurableProviderViewSchema = z.object({
   kind: z.literal('delegated').optional(),
   binary: z.string().min(1).optional(),
   binaryFound: z.boolean().optional(),
+  chatGated: z.boolean().optional(),
 }) satisfies z.ZodType<Wire<ConfigurableProviderView>>
 
 /** llm.providers request payload. */

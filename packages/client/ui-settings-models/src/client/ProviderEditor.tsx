@@ -10,7 +10,9 @@
  * both families, DeepSeek's id/name/context-window model catalog, and the
  * display name and wire protocol of a pi-ai route the adapter does not ship —
  * the two fields the create card asked that route for, editable here for the
- * same reason).
+ * same reason). A chat-gated session route (cursor-session) has no key field:
+ * its card carries the gate notice and the same model-catalog editor the
+ * cli-bridge layout uses.
  * Reasoning effort is deliberately absent: it is a per-MODEL capability, and
  * the models under one provider disagree about it, so a provider-scoped
  * control can only be set to a value some of them reject. The composer's
@@ -38,7 +40,7 @@ import type { en } from './locales.ts'
 import styles from './ModelsSection.module.css'
 
 /** Per-adapter-family curated field sets (unknown namespaces get the hint alone). */
-type EditorLayout = 'deepseek' | 'pi-ai' | 'cli-bridge' | 'unknown'
+type EditorLayout = 'deepseek' | 'pi-ai' | 'cli-bridge' | 'session' | 'unknown'
 
 /** The public DeepSeek endpoint shown as the deepseek base-URL placeholder. */
 const DEEPSEEK_PUBLIC_BASE_URL = 'https://api.deepseek.com'
@@ -76,6 +78,12 @@ export interface ProviderEditorProps {
    * override every one of them and the card does not offer it.
    */
   declared?: boolean
+  /**
+   * Whether the directory marks this route chat-gated: it lists and resolves
+   * models but refuses chat turns. The session layout shows the gate notice
+   * only while the host still reports the gate.
+   */
+  chatGated?: boolean
   /** The owning namespace view (schema, layers, secrets). */
   namespace: SettingsNamespaceView
   /** Path from the section root to this provider's profile. */
@@ -143,6 +151,7 @@ function layoutOf(ns: string): EditorLayout {
   if (ns === 'llm-deepseek') return 'deepseek'
   if (ns === 'llm-pi-ai') return 'pi-ai'
   if (ns === 'llm-cli-bridge') return 'cli-bridge'
+  if (ns === 'llm-cursor-session') return 'session'
   return 'unknown'
 }
 
@@ -636,6 +645,32 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
     )
   }
 
+  const sessionFields = (): ReactNode => {
+    const modelsOverridden = hasPath(draft, ['models'])
+    return (
+      <>
+        {props.chatGated === true
+          ? <p className={styles['advancedHint']}>{t('sessionGate')}</p>
+          : null}
+        {props.credentialOnly === true ? null : (
+          <>
+            <p className={styles['advancedHint']}>{t('sessionModelsHint')}</p>
+            <DeepSeekModelsEditor
+              models={modelDrafts(modelsOverridden ? getPath(draft, ['models']) : inheritedModels())}
+              overridden={modelsOverridden}
+              defaultContextWindow={undefined}
+              defaultMaxTokens={undefined}
+              t={t}
+              disabled={disabled}
+              onChange={(next) => { setDraft(current => setPath(current, ['models'], next)) }}
+              onReset={() => { setDraft(current => deletePath(current, ['models'])) }}
+            />
+          </>
+        )}
+      </>
+    )
+  }
+
   return (
     <div className={props.credentialOnly === true ? styles['addBlock'] : styles['editor']}>
       {props.hideTitle === true
@@ -652,7 +687,9 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
         ? <p className={styles['advancedHint']}>{`${t('advancedHint')} (${namespace.ns})`}</p>
         : layout === 'cli-bridge'
           ? cliBridgeFields()
-          : curatedFields(layout)}
+          : layout === 'session'
+            ? sessionFields()
+            : curatedFields(layout)}
       {failure !== undefined ? <p className={styles['error']}>{failure}</p> : null}
       {props.credentialOnly === true || modelFailure === undefined
         ? null

@@ -59,7 +59,8 @@ export async function credentialConfigured(ctx: Context, ref: string): Promise<b
 /**
  * Whether the current composition/settings default can serve a request.
  * Local Ollama counts only while the probe succeeds; a named key counts only
- * while it is stored. Delegated CLI routes never count.
+ * while it is stored. Delegated CLI routes never count, and neither do
+ * chat-gated routes, which list models but refuse chat turns.
  * @param ctx - context carrying the default-model service and optional credentials.
  * @param ollama - latest local-Ollama probe.
  * @returns whether `currentSelection()` is usable as-is.
@@ -72,6 +73,7 @@ export async function isDefaultUsable(ctx: Context, ollama: LocalOllamaStatus): 
   const listed = ctx.get('llm')?.listConfigurableProviders() ?? []
   const entry = listed.find(candidate => candidate.provider === selection.provider)
   if (entry?.kind === 'delegated') return false
+  if (entry?.chatGated === true) return false
   const live = ctx.get('llm')?.listProviders().find(provider => provider.id === selection.provider)
   if (live?.kind === 'delegated') return false
   const apiKeyEnv = apiKeyEnvOf(ctx, entry?.settingsNs, entry?.settingsPath)

@@ -215,6 +215,30 @@ describe('readiness', () => {
     await liveOnly.fiber.dispose()
   })
 
+  it('does not treat a chat-gated default as usable', async () => {
+    class GatedAdapter extends LlmAdapter {
+      override providerInfo(provider: string) {
+        return { id: provider, name: provider }
+      }
+
+      async * stream(_options: GenerateOptions): AsyncIterable<StreamChunk> {
+        throw new Error('unused')
+      }
+    }
+
+    const ctx = await boot({ defaultProvider: 'cursor-session', defaultModel: 'gpt-5.2' })
+    ctx.llm.registerConfigurableProviders([{
+      provider: 'cursor-session',
+      displayName: 'Cursor (subscription)',
+      settingsNs: 'llm-cursor-session',
+      settingsPath: [],
+      chatGated: true,
+    }])
+    ctx.llm.registerAdapter(['cursor-session'], new GatedAdapter())
+    expect(await isDefaultUsable(ctx, { reachable: false, models: [] })).toBe(false)
+    await ctx.fiber.dispose()
+  })
+
   it('treats an ollama-local default as usable only while the probe succeeds', async () => {
     const ctx = await boot({ defaultProvider: 'ollama-local', defaultModel: 'llama3.2' })
     expect(await isDefaultUsable(ctx, { reachable: false, models: [] })).toBe(false)

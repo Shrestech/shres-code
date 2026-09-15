@@ -1523,6 +1523,179 @@ describe('ModelsSection', () => {
   })
 })
 
+describe('session layout', () => {
+  const CursorSessionConfig = Schema.object({
+    enabled: Schema.boolean(),
+    displayName: Schema.string(),
+    models: Schema.array(Schema.object({
+      id: Schema.string().required(),
+      name: Schema.string(),
+      contextWindow: Schema.number(),
+      maxTokens: Schema.number(),
+    })),
+  })
+
+  /** The whole-section cursor-session namespace as the host serializes it. */
+  function cursorNamespace(user?: Record<string, unknown>): SettingsNamespaceView {
+    return {
+      ns: 'llm-cursor-session',
+      schema: JSON.parse(JSON.stringify(CursorSessionConfig.toJSON())) as unknown,
+      value: { models: [{ id: 'gpt-5.2', name: 'GPT-5.2' }], ...user },
+      base: { models: [{ id: 'gpt-5.2', name: 'GPT-5.2' }] },
+      ...user === undefined ? {} : { user },
+      applies: 'live',
+      secrets: [],
+      revision: 0,
+    }
+  }
+
+  /** A wire face carrying a keyed openai route beside the gated cursor-session row. */
+  function sessionFace(user?: Record<string, unknown>, mutate?: ReturnType<typeof vi.fn>) {
+    const namespace = cursorNamespace(user)
+    const face = {
+      llm: {
+        providers: vi.fn(() => Promise.resolve(ok({
+          providers: [
+            { provider: 'openai', displayName: 'openai', settingsNs: 'llm-pi-ai', settingsPath: ['providers', 'openai'], active: true },
+            {
+              provider: 'cursor-session',
+              displayName: 'Cursor (subscription)',
+              settingsNs: 'llm-cursor-session',
+              settingsPath: [],
+              active: true,
+              chatGated: true,
+            },
+          ],
+        }))),
+        models: vi.fn(() => Promise.resolve(ok({ groups: [], failures: [] }))),
+      },
+      settings: {
+        describe: vi.fn(() => Promise.resolve(ok({
+          writable: true,
+          hasDocument: false,
+          namespaces: [wireNamespaces()[2]!, namespace],
+        }))),
+        update: vi.fn(),
+        replace: vi.fn(),
+        mutate: mutate ?? vi.fn(() => Promise.resolve(ok(namespace))),
+      },
+      credentials: {
+        describe: vi.fn((payload: { refs: string[] }) => Promise.resolve(ok({
+          credentials: Object.fromEntries(payload.refs.map(ref => [ref, {
+            configured: ref === 'OPENAI_API_KEY',
+            ...ref === 'OPENAI_API_KEY' ? { source: 'file' as const } : {},
+            writable: true,
+          }])),
+        }))),
+        set: vi.fn(() => Promise.resolve(ok({}))),
+        unset: vi.fn(),
+      },
+    }
+    return { face, namespace }
+  }
+
+  async function mountSessionRow(user?: Record<string, unknown>, mutate?: ReturnType<typeof vi.fn>) {
+    const { face, namespace } = sessionFace(user, mutate)
+    const controller = new ModelsSettingsStore(face as unknown as WireFace)
+    await controller.load()
+    render(<ModelsSection
+      controller={controller}
+      useSnapshot={bindSnapshotSelector(controller.store)}
+      api={face as never}
+      t={t}
+    />)
+    fireEvent.click(await screen.findByRole('button', {
+      name: providerCopy(en.editProvider, {
+        provider: 'cursor-session',
+        displayName: 'Cursor (subscription)',
+      }),
+    }))
+    return { face, namespace, controller }
+  }
+
+  it('renders the gate notice with the catalog editor and applies catalog edits', async () => {
+    const mutate = vi.fn((_payload: { ns: string; ops: unknown[]; expectedRevision?: number }) => Promise.resolve(ok(
+      cursorNamespace({ models: [{ id: 'gpt-5.2', name: 'GPT-5.2' }, { id: 'cursor-new' }] }),
+    )))
+    await mountSessionRow(undefined, mutate)
+
+    expect(screen.getByText(en.sessionGate)).toBeTruthy()
+    expect(screen.getByText(en.sessionModelsHint)).toBeTruthy()
+    // The inherited catalog comes from the layer beneath the user override.
+    expect(screen.getByLabelText<HTMLInputElement>(`${en.modelId} 1`).value).toBe('gpt-5.2')
+    // The card is not the hint-only unknown layout: Apply is available.
+    expect(screen.getByText<HTMLButtonElement>(en.apply).disabled).toBe(false)
+
+    fireEvent.click(screen.getByText(en.addModel))
+    fireEvent.change(screen.getByLabelText(`${en.modelId} 2`), { target: { value: 'cursor-new' } })
+    fireEvent.click(screen.getByText(en.apply))
+
+    await waitFor(() => { expect(mutate).toHaveBeenCalledTimes(1) })
+    expect(mutate.mock.calls[0]?.[0]).toEqual({
+      ns: 'llm-cursor-session',
+      ops: [{
+        op: 'set',
+        path: ['models'],
+        value: [{ id: 'gpt-5.2', name: 'GPT-5.2' }, { id: 'cursor-new' }],
+      }],
+      expectedRevision: 0,
+    })
+  })
+
+  it('restores the inherited catalog through the same editor', async () => {
+    const mutate = vi.fn((_payload: { ns: string; ops: unknown[]; expectedRevision?: number }) =>
+      Promise.resolve(ok(cursorNamespace())))
+    await mountSessionRow({ models: [{ id: 'custom-1' }] }, mutate)
+
+    expect(screen.getByLabelText<HTMLInputElement>(`${en.modelId} 1`).value).toBe('custom-1')
+    fireEvent.click(screen.getByText(en.resetModels))
+    fireEvent.click(screen.getByText(en.apply))
+
+    await waitFor(() => { expect(mutate).toHaveBeenCalledTimes(1) })
+    expect(mutate.mock.calls[0]?.[0]).toEqual({
+      ns: 'llm-cursor-session',
+      ops: [{ op: 'unset', path: ['models'] }],
+      expectedRevision: 0,
+    })
+  })
+
+  it('drops the gate notice when the host no longer reports the gate', async () => {
+    const { face } = sessionFace()
+    render(<ProviderEditor
+      provider="cursor-session"
+      displayName="Cursor (subscription)"
+      namespace={cursorNamespace()}
+      settingsPath={[]}
+      api={face as never}
+      t={t}
+      readOnly={false}
+      onClose={vi.fn()}
+    />)
+    expect(screen.queryByText(en.sessionGate)).toBeNull()
+    expect(screen.getByText(en.sessionModelsHint)).toBeTruthy()
+    await waitFor(() => { expect(face.credentials.describe).toHaveBeenCalled() })
+  })
+
+  it('credential-only mode keeps the notice and drops the catalog editor', async () => {
+    const { face } = sessionFace()
+    render(<ProviderEditor
+      provider="cursor-session"
+      displayName="Cursor (subscription)"
+      namespace={cursorNamespace()}
+      settingsPath={[]}
+      api={face as never}
+      t={t}
+      readOnly={false}
+      credentialOnly
+      chatGated
+      onClose={vi.fn()}
+    />)
+    expect(screen.getByText(en.sessionGate)).toBeTruthy()
+    expect(screen.queryByText(en.sessionModelsHint)).toBeNull()
+    await waitFor(() => { expect(face.credentials.describe).toHaveBeenCalled() })
+  })
+})
+
 describe('apiKeyFailure', () => {
   it('treats a blank field as no failure — it means keep the stored key', () => {
     expect(apiKeyFailure('')).toBeUndefined()

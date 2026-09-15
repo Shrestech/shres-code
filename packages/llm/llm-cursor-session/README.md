@@ -19,7 +19,7 @@ The optional `llm-cursor-session` settings section overlays the composition entr
 | `securityPath` | `/usr/bin/security` | macOS security tool the keychain source reads through. |
 | `authPath` | `~/.cursor/auth.json` | File-store document, used when `useKeychain` is false. |
 | `useKeychain` | true on macOS | Read the login keychain instead of the file store. |
-| `models` | the six verified ids below | Advisory catalog; a new backend release is a settings entry, not a code change. |
+| `models` | the six verified ids below | Advisory catalog; a new backend release is a settings entry, not a code change. An explicit empty array is rejected — it would remove the route's picker group; omit the field to inherit the shipped catalog. |
 
 Shipped catalog (ids cursor-agent validated against the live backend): `gpt-5.2`, `claude-4.5-sonnet`, `cursor-grok-4.6-high`, `cursor-grok-4.6-high-fast`, `claude-fable-5-1-thinking-high`, `gemini-3.8-flash-high`.
 
@@ -42,6 +42,7 @@ None: no request is sent.
 ## Known Limitations and Deferred Work
 
 - **Chat is gated on an undocumented handshake** — the agent wire (`agent.v1.AgentService/Run`, BiDi Connect streams on `agentn.global.api5.cursor.sh`) accepts the conversation state and checkpoints it, but model turns do not start without a client behavior byte-level replay could not reproduce (14 systematic variants: exact bytes, headers, timing, keepalives, session affinity, blob keys, body compression). `stream()` fails loud with `UNSUPPORTED_OPTION` naming the `cursor-cli` overlay alternative.
+- **The directory advertises the gate** — the configurable-provider entry carries `chatGated: true`: usability checks do not count the route as servable, and model selection refuses it with `model-unavailable` before the selection is applied or persisted. The [`cursor-cli` overlay](../llm-cli-bridge/README.md#worked-example-a-cursor-cli-overlay) remains the serving path for Cursor completions.
 - **No self-serve credential refresh** — the JWT issuer (`authentication.cursor.sh`) does not resolve publicly; the CLI owns rotation and this route adopts it on the next resolve. See the [credential engine](../cursor-credential/README.md).
 - **Unofficial wire and store** — the keychain service names and the agent protocol are the Cursor Agent CLI's implementation details, not a published contract; a CLI self-update can change them.
 - **Catalog is advisory** — served from the shipped list or the settings overlay; it is not fetched live from `AvailableModels` (that endpoint is trivially available over JSON+Bearer and is the natural next step when chat lands).
