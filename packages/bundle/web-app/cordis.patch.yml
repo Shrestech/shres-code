@@ -254,6 +254,10 @@
     - id: ui-subagent
       name: '@shres-code/shres-code-client-ui-subagent'
 
+    # Chat-header Team roster panel over the agentTeams view RPC.
+    - id: ui-agent-team
+      name: '@shres-code/shres-code-client-ui-agent-team'
+
     # Background jobs: the session-header list over the jobsBySession mirror.
     - id: ui-jobs
       name: '@shres-code/shres-code-client-ui-jobs'

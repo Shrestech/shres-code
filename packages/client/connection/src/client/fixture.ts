@@ -2528,6 +2528,9 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
       })),
       interrupt: request => Promise.resolve(ok(request, { accepted: true as const })),
     },
+    agentTeams: {
+      view: request => Promise.resolve(ok(request, { sessionId: request.payload.sessionId, isTeam: false, members: [] })),
+    },
     host: {
       describe: request => ok(request, {
         version: '0.0.0-fixture', cwd: '/tmp/fixture', attachedSessions, canOpenPath: true,
@@ -3108,6 +3111,7 @@ export class FixtureApiClient extends AbstractApiClient {
       case 'subagent.history': return this.api.subagents.history(request)
       case 'subagent.prompt': return this.api.subagents.prompt(request, signal)
       case 'subagent.interrupt': return this.api.subagents.interrupt(request)
+      case 'agentTeams.view': return this.api.agentTeams.view(request)
       case 'host.describe': return this.api.host.describe(request)
       case 'host.pickDirectory': return this.api.host.pickDirectory(request, new AbortController().signal)
       case 'host.listDirectory': return this.api.host.listDirectory(request, new AbortController().signal)

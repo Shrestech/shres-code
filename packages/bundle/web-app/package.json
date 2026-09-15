@@ -79,6 +79,7 @@
     "@shres-code/shres-code-client-ui-skill": "workspace:^",
     "@shres-code/shres-code-client-ui-input-trigger": "workspace:^",
     "@shres-code/shres-code-client-ui-subagent": "workspace:^",
+    "@shres-code/shres-code-client-ui-agent-team": "workspace:^",
     "@shres-code/shres-code-client-ui-jobs": "workspace:^",
     "@shres-code/shres-code-client-ui-theme": "workspace:^",
     "@shres-code/shres-code-client-ui-tool": "workspace:^",
