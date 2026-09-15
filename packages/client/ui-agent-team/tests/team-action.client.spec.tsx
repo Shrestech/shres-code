@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { TeamAction } from '../src/client/TeamAction.tsx'
+import { TeamAction, type TeamActionProps } from '../src/client/TeamAction.tsx'
 import { en } from '../src/client/locales.ts'
 
 afterEach(cleanup)
@@ -12,7 +12,7 @@ function roster(members: unknown[]) {
   return { sessionId, isTeam: true, members } as never
 }
 
-function renderTeam(over: Partial<Parameters<typeof TeamAction>[0]> = {}) {
+function renderTeam(over: Partial<TeamActionProps> = {}) {
   const load = vi.fn(async () => roster([]))
   const openTeammate = vi.fn()
   const props = {
@@ -21,7 +21,7 @@ function renderTeam(over: Partial<Parameters<typeof TeamAction>[0]> = {}) {
     openTeammate: over.openTeammate ?? openTeammate,
     t: (key: keyof typeof en) => en[key],
     ...over,
-  } as never
+  } as TeamActionProps
   const result = render(<TeamAction {...props} />)
   return { load, openTeammate, container: result.container }
 }

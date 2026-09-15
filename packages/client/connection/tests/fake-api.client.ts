@@ -143,6 +143,14 @@ export class FakeApiClient implements IApiClient {
     }))),
   }
 
+  readonly agentTeams: IApiClient['agentTeams'] = {
+    view: (payload: unknown) => this.record('agentTeams.view', payload, Promise.resolve(ok({
+      sessionId: (payload as { sessionId: never }).sessionId,
+      isTeam: false,
+      members: [],
+    }))),
+  }
+
   readonly host: IApiClient['host'] = {
     describe: payload => this.record('host.describe', payload, this.onDescribe(payload)),
     pickDirectory: payload => this.record('host.pickDirectory', payload, this.onPickDirectory(payload)),

@@ -25,4 +25,22 @@ The browser half registers one `conversation.session.header.actions` contributio
 
 ## Model Experience
 
-This package renders no model-facing surface: every element it draws is user chrome. Roster reads add no tokens to any model request and produce no session events.
+### Team roster panel and teammate navigation
+
+#### What the model sees
+
+Nothing: every element this package draws is user chrome. Roster reads ride `agentTeams/view`, panel state stays component-local, and teammate navigation reuses the ordinary addressed-subagent conversation path.
+
+#### Token effect
+
+Zero model tokens. Opening, reading, or navigating from the panel adds no prompt section and produces no session events.
+
+#### KV Cache effect
+
+None. No model request changes shape because the panel exists or is used.
+
+## Known Limitations and Deferred Work
+
+- **Read-once panel** — the roster loads when the session header action mounts; a reload rides reopening the panel or the session, not a live subscription. Provisioning started elsewhere becomes visible on the next read.
+- **No task board** — the runtime registers no task tools, so the panel is roster-only; task chrome waits on the board runtime.
+- **Navigation needs an active teammate** — failed or unprovisioned template rows carry no conversation to open; the row shows status or diagnostics instead.
