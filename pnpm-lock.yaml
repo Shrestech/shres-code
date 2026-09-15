@@ -5434,6 +5434,9 @@ importers:
       '@shres-code/shres-code-agent-presets':
         specifier: workspace:^
         version: link:../../preset/agent-presets
+      '@shres-code/shres-code-agent-team':
+        specifier: workspace:^
+        version: link:../../team/agent-team
       '@shres-code/shres-code-cordis-host-runner':
         specifier: workspace:^
         version: link:../../extensions/cordis-host-runner

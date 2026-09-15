@@ -83,6 +83,7 @@
   "devDependencies": {
     "@shres-code/cordis": "workspace:^",
     "@shres-code/shres-code-agent-presets": "workspace:^",
+    "@shres-code/shres-code-agent-team": "workspace:^",
     "@shres-code/shres-code-cordis-host-runner": "workspace:^",
     "@shres-code/shres-code-invariants": "workspace:^",
     "@shres-code/shres-code-storage": "workspace:^",
