@@ -854,3 +854,97 @@ select.input {
   font-size: 12px;
   color: var(--dsw-alias-label-tertiary);
 }
+.teamHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.teamOpenDocument {
+  flex: none;
+  padding: 4px 10px;
+  border: 1px solid var(--dsw-alias-border-l3);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.teamOpenDocument:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.teamError {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.seatPersona {
+  display: block;
+  margin: 10px 0 0;
+}
+
+.personaInput {
+  width: 100%;
+  margin-top: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--dsw-alias-border-l3);
+  border-radius: 6px;
+  background: var(--dsw-alias-bg-module-platform);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  resize: vertical;
+}
+
+.teamMembersTitle {
+  margin: 18px 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary);
+}
+
+.memberList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.memberRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--dsw-alias-border-l3);
+}
+
+.memberName {
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary);
+}
+
+.memberBinding {
+  flex: 1;
+  font-size: 12px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.memberRemove {
+  padding: 2px 8px;
+  border: 1px solid var(--dsw-alias-border-l3);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.memberAdd {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
