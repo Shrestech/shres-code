@@ -239,13 +239,15 @@ export function providerEnabled(
  * nothing), as does a live route with no settings address at all, so neither
  * owes this page a key. Delegated CLI routes are keyless in this join — their
  * keys live in `route.env` after the subprocess scrub — so they never count
- * as ready here.
+ * as ready here, and neither do chat-gated routes, which list models but
+ * refuse chat turns.
  * @param row - one joined provider row.
  * @returns whether the user already has this provider to talk to.
  */
 export function providerUsable(row: ProviderRow): boolean {
   if (!row.entry.active) return false
   if (row.entry.kind === 'delegated') return false
+  if (row.entry.chatGated === true) return false
   if (row.apiKeyEnv === undefined) return true
   return row.credential?.configured === true
 }
@@ -254,7 +256,7 @@ export function providerUsable(row: ProviderRow): boolean {
  * Whether a usable row ends first-run onboarding. Local Ollama is keyless and
  * always composed, so it does not count until the user picks it — otherwise
  * the card would never appear on a machine without a cloud key. Delegated
- * CLI routes are excluded by {@link providerUsable}.
+ * CLI and chat-gated routes are excluded by {@link providerUsable}.
  * @param row - one joined provider row.
  * @returns whether this row already satisfies first-run.
  */

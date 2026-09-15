@@ -431,6 +431,13 @@ interface LlmConfigurableProvider {
   binary?: string
   /** Whether {@link binary} is an executable file or a command on PATH. */
   binaryFound?: boolean
+  /**
+   * When true, the route lists and resolves models but refuses chat turns
+   * (the adapter's stream diagnostic names the serving alternative).
+   * Usability checks and selection must not treat it as servable. Absent
+   * means the adapter draws no such distinction.
+   */
+  chatGated?: boolean
 }
 ```
 

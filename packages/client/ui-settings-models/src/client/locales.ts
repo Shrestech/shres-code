@@ -92,6 +92,8 @@ export const en = {
   customTag: 'Custom',
   delegatedTag: 'Delegated',
   delegatedHint: 'This route runs an external CLI. That CLI may call its own tools without Shres Code approval.',
+  sessionGate: 'This route lists models but refuses chat turns: the Cursor agent wire is not served. Cursor completions run through a cursor-cli overlay route, declared in the llm-cli-bridge settings or on the Cursor Agent CLI (delegated) card.',
+  sessionModelsHint: 'Models this route advertises. The model picker stays in sync with this list.',
   cliFound: 'Found {binary} on PATH',
   cliMissing: '{binary} is not on PATH',
   cliUses: 'Uses {binary} on PATH',

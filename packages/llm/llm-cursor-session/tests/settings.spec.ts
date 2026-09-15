@@ -1,7 +1,8 @@
 /**
  * Settings-section behavior: the directory entry follows a display-name
- * change without re-registration, and the `enabled` switch withdraws and
- * restores the live route.
+ * change without re-registration, the `enabled` switch withdraws and
+ * restores the live route, and the section validate refuses an explicit
+ * empty models catalog.
  */
 
 import { describe, expect, it } from 'vitest'
@@ -37,7 +38,7 @@ describe('llm-cursor-session settings section', () => {
     await ctx.plugin(MemorySettings)
     await ctx.plugin(plugin, {})
     expect(ctx.llm.listConfigurableProviders().find(entry => entry.provider === 'cursor-session'))
-      .toMatchObject({ displayName: 'Cursor (subscription)', settingsNs: 'llm-cursor-session' })
+      .toMatchObject({ displayName: 'Cursor (subscription)', settingsNs: 'llm-cursor-session', chatGated: true })
     await ctx.settings.update(NS, { displayName: 'Cursor sub' })
     expect(ctx.llm.listConfigurableProviders().find(entry => entry.provider === 'cursor-session'))
       .toMatchObject({ displayName: 'Cursor sub' })
@@ -67,6 +68,18 @@ describe('llm-cursor-session settings section', () => {
     expect(ctx.llm.listProviders()).toEqual([])
     await ctx.settings.update(NS, { enabled: true })
     expect(ctx.llm.listProviders().map(provider => provider.id)).toEqual(['cursor-session'])
+    await ctx.fiber.dispose()
+  })
+
+  it('rejects an explicit empty models catalog and adopts a non-empty overlay', async () => {
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    await ctx.plugin(MemorySettings)
+    await ctx.plugin(plugin, {})
+    await expect(ctx.settings.update(NS, { models: [] })).rejects.toThrow(/empty models catalog/)
+    expect((await ctx.llm.listModels('cursor-session')).map(model => model.id)).toContain('gpt-5.2')
+    await ctx.settings.update(NS, { models: [{ id: 'cursor-new' }] })
+    expect((await ctx.llm.listModels('cursor-session')).map(model => model.id)).toEqual(['cursor-new'])
     await ctx.fiber.dispose()
   })
 })

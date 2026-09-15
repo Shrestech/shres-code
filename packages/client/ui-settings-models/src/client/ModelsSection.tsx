@@ -63,6 +63,8 @@ interface EditorTarget extends ProviderIdentity {
   credentialRef?: string
   /** The adapter reports this route as one it does not ship (see {@link ProviderEditorProps.declared}). */
   declared?: boolean
+  /** The directory marks this route chat-gated (see {@link ProviderEditorProps.chatGated}). */
+  chatGated?: boolean
 }
 
 /** Values that vary around the shared provider-editor rendering. */
@@ -81,6 +83,7 @@ function renderProviderEditor({ target, ...props }: ProviderEditorRenderProps): 
       displayName={target.displayName}
       settingsPath={target.settingsPath}
       {...target.declared === true ? { declared: true } : {}}
+      {...target.chatGated === true ? { chatGated: true } : {}}
       {...props}
     />
   )
@@ -153,6 +156,7 @@ function targetOf(row: ProviderRow): EditorTarget {
     // route-level fields only a declared route owns off the card, exactly as
     // it leaves the custom tag off the row.
     ...row.entry.declared === true ? { declared: true } : {},
+    ...row.entry.chatGated === true ? { chatGated: true } : {},
   }
 }
 

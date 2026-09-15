@@ -2428,6 +2428,15 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
                 ? {}
                 : { reasoningEffort: ReasoningEffortId(reasoningEffort) },
             })
+            const gated = ctx.llm.listConfigurableProviders()
+              .find(entry => entry.provider === resolved.provider)?.chatGated === true
+            if (gated) {
+              return err(request, {
+                code: 'model-unavailable',
+                message: `provider "${resolved.provider}" lists models but does not serve chat turns; select a serving route`,
+                details: { provider, model },
+              })
+            }
             const pendingImage = [...found.agent.inbox.nextTurn, ...found.agent.inbox.nextStep]
               .some(message => contentHasImage(message.content))
             if (pendingImage || messagesHaveImage(found.agent.session.deriveMessages())) {
@@ -3522,6 +3531,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           ...entry.kind === 'delegated' ? { kind: 'delegated' as const } : {},
           ...entry.binary === undefined ? {} : { binary: entry.binary },
           ...entry.binaryFound === undefined ? {} : { binaryFound: entry.binaryFound },
+          ...entry.chatGated === true ? { chatGated: true } : {},
         }))
         // Routes registered without a directory declaration still appear —
         // they exist and serve models — just with no settings address. No

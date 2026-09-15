@@ -388,6 +388,160 @@ describe('CliLlmAdapter', () => {
     expect(child.terminate).toHaveBeenCalled()
   })
 
+  it('streams stream-json chunks while the CLI is still running', async () => {
+    const transcript = [
+      '{"type":"thinking","subtype":"delta","text":"working"}',
+      '{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"hello"}]}}',
+      '{"type":"result","subtype":"success","result":"hello","usage":{"inputTokens":10,"outputTokens":2}}',
+      '',
+    ].join('\n')
+    let resolveDone!: (outcome: SubprocessOutcome) => void
+    const child = fakeChild({
+      stdout: transcript,
+      done: new Promise((resolve) => { resolveDone = resolve }),
+    })
+    const adapter = new CliLlmAdapter({
+      routes: () => ROUTES,
+      spawn: () => child,
+      cwd: () => '/tmp/ws',
+      disposeGraceMs: () => 3000,
+    })
+    const iterator = adapter.stream(options({ provider: 'thinking-cli', model: 'think-1' }))[Symbol.asyncIterator]()
+    const early: StreamChunk[] = []
+    // Every event chunk arrives before the process exits; the closing
+    // block-end, usage, and finish wait for settlement.
+    for (let i = 0; i < 5; i += 1) {
+      const step = await iterator.next()
+      expect(step.done).toBe(false)
+      if (step.done === true) throw new Error('stream ended early')
+      early.push(step.value)
+    }
+    expect(early).toEqual([
+      { type: 'block-start', index: 0, blockType: 'reasoning' },
+      { type: 'reasoning-delta', index: 0, text: 'working' },
+      { type: 'block-end', index: 0, block: { type: 'reasoning', text: 'working' } },
+      { type: 'block-start', index: 1, blockType: 'text' },
+      { type: 'text-delta', index: 1, text: 'hello' },
+    ])
+    resolveDone({ exitCode: 0, signal: null })
+    const rest: StreamChunk[] = []
+    for (;;) {
+      const step = await iterator.next()
+      if (step.done === true) break
+      rest.push(step.value)
+    }
+    expect(rest).toEqual([
+      { type: 'block-end', index: 1, block: { type: 'text', text: 'hello' } },
+      { type: 'usage', usage: { inputTokens: 10, outputTokens: 2 } },
+      { type: 'finish', reason: { kind: 'stop' } },
+    ])
+  })
+
+  it('falls back to whole-transcript parsing for unrecognized stream-json shapes', async () => {
+    const adapter = new CliLlmAdapter({
+      routes: () => ROUTES,
+      spawn: () => fakeChild({
+        stdout: '{"type":"item.completed","item":{"text":"codex style"}}\n{"text":"codex style"}\n',
+      }),
+      cwd: () => '/tmp/ws',
+      disposeGraceMs: () => 3000,
+    })
+    const chunks = await collect(adapter.stream(options({ provider: 'config-cli', model: 'cfg-5' })))
+    expect(chunks).toEqual([
+      { type: 'block-start', index: 0, blockType: 'text' },
+      { type: 'text-delta', index: 0, text: 'codex style' },
+      { type: 'block-end', index: 0, block: { type: 'text', text: 'codex style' } },
+      { type: 'finish', reason: { kind: 'stop' } },
+    ])
+  })
+
+  it('maps abort, exit code, and a missing stdout reader on stream-json routes', async () => {
+    const controller = new AbortController()
+    let resolveDone!: (outcome: SubprocessOutcome) => void
+    const pending = fakeChild({ done: new Promise((resolve) => { resolveDone = resolve }) })
+    const adapter = new CliLlmAdapter({
+      routes: () => ROUTES,
+      spawn: () => pending,
+      cwd: () => '/tmp/ws',
+      disposeGraceMs: () => 3000,
+    })
+    const iterating = collect(adapter.stream(options({
+      provider: 'thinking-cli', model: 'think-1', signal: controller.signal,
+    })))
+    controller.abort()
+    resolveDone({ exitCode: 0, signal: null })
+    await expect(iterating).rejects.toMatchObject({ code: 'ABORTED' })
+
+    const exitAdapter = new CliLlmAdapter({
+      routes: () => ROUTES,
+      spawn: () => fakeChild({ outcome: { exitCode: 3, signal: null } }),
+      cwd: () => '/tmp/ws',
+      disposeGraceMs: () => 3000,
+    })
+    await expect(collect(exitAdapter.stream(options({ provider: 'thinking-cli', model: 'think-1' }))))
+      .rejects.toMatchObject({ code: 'CLI_EXIT' })
+
+    const noReader = new CliLlmAdapter({
+      routes: () => ROUTES,
+      spawn: () => fakeChild({ collected: {} }),
+      cwd: () => '/tmp/ws',
+      disposeGraceMs: () => 3000,
+    })
+    await expect(collect(noReader.stream(options({ provider: 'thinking-cli', model: 'think-1' }))))
+      .rejects.toThrow('no output')
+  })
+
+  it('propagates a settled rejection on a stream-json route', async () => {
+    const gone = fakeChild({
+      stdout: '',
+      collected: {},
+      done: Promise.reject(new Error('already gone')),
+    })
+    void gone.done.catch(() => undefined)
+    gone.waitForExit = vi.fn(async () => {
+      throw new Error('already gone')
+    })
+    const adapter = new CliLlmAdapter({
+      routes: () => ROUTES,
+      spawn: () => gone,
+      cwd: () => '/tmp/ws',
+      disposeGraceMs: () => 3000,
+    })
+    await expect(collect(adapter.stream(options({ provider: 'thinking-cli', model: 'think-1' }))))
+      .rejects.toThrow('already gone')
+  })
+
+  it('drains bytes that arrive exactly at settlement and forwards fallback usage', async () => {
+    const transcript = '{"text":"late answer","usage":{"input_tokens":7,"output_tokens":8}}\n'
+    let calls = 0
+    const draining = fakeChild({
+      collected: {
+        stdout: {
+          readFrom: (from: number) => {
+            calls += 1
+            // Nothing during the poll loop; the transcript lands on the drain.
+            const text = calls === 1 ? '' : transcript.slice(from)
+            return { text, nextOffset: from + text.length, lossy: false }
+          },
+        },
+      },
+    })
+    const adapter = new CliLlmAdapter({
+      routes: () => ROUTES,
+      spawn: () => draining,
+      cwd: () => '/tmp/ws',
+      disposeGraceMs: () => 3000,
+    })
+    const chunks = await collect(adapter.stream(options({ provider: 'thinking-cli', model: 'think-1' })))
+    expect(chunks).toEqual([
+      { type: 'block-start', index: 0, blockType: 'text' },
+      { type: 'text-delta', index: 0, text: 'late answer' },
+      { type: 'block-end', index: 0, block: { type: 'text', text: 'late answer' } },
+      { type: 'usage', usage: { inputTokens: 7, outputTokens: 8 } },
+      { type: 'finish', reason: { kind: 'stop' } },
+    ])
+  })
+
   it('advertises conservative context and per-route efforts', async () => {
     const adapter = new CliLlmAdapter({
       routes: () => ROUTES,
@@ -486,10 +640,15 @@ describe('CliLlmAdapter', () => {
       disposeGraceMs: () => 3000,
     })
     const streamed = await collect(streamAdapter.stream(options({ provider: 'thinking-cli', model: 'think-1' })))
-    expect(streamed).toEqual(expect.arrayContaining([
-      { type: 'text-delta', index: 0, text: 'two' },
+    // The assistant event streams live; the result object supplies usage, and
+    // its text is only a fallback when no assistant event streamed.
+    expect(streamed).toEqual([
+      { type: 'block-start', index: 0, blockType: 'text' },
+      { type: 'text-delta', index: 0, text: 'one' },
+      { type: 'block-end', index: 0, block: { type: 'text', text: 'one' } },
       { type: 'usage', usage: { inputTokens: 1, outputTokens: 2, reasoningTokens: 3 } },
-    ]))
+      { type: 'finish', reason: { kind: 'stop' } },
+    ])
 
     const empty = fakeChild({
       stdout: '',

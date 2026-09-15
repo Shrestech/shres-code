@@ -80,6 +80,21 @@ describe('providerUsable', () => {
       },
     }))).toBe(false)
   })
+
+  it('does not treat a chat-gated route as usable', () => {
+    expect(providerUsable(otherRow({
+      apiKeyEnv: undefined,
+      credential: undefined,
+      entry: {
+        provider: 'cursor-session',
+        displayName: 'Cursor (subscription)',
+        settingsNs: 'llm-cursor-session',
+        settingsPath: [],
+        active: true,
+        chatGated: true,
+      },
+    }))).toBe(false)
+  })
 })
 
 describe('onboardingReadiness', () => {
@@ -128,6 +143,25 @@ describe('onboardingReadiness', () => {
     expect(onboardingReadiness(state({ rows: [delegated, row()] }))).toEqual({ kind: 'credential-missing' })
     expect(onboardingCandidates(state({ rows: [delegated, row()] }).rows).map(item => item.entry.provider))
       .toEqual(['deepseek-official'])
+  })
+
+  it('does not treat a chat-gated route as already set up', () => {
+    const gated = row({
+      apiKeyEnv: undefined,
+      credential: undefined,
+      entry: {
+        provider: 'cursor-session',
+        displayName: 'Cursor (subscription)',
+        settingsNs: 'llm-cursor-session',
+        settingsPath: [],
+        active: true,
+        chatGated: true,
+      },
+    })
+    expect(onboardingReadiness(state({ rows: [gated] }))).toEqual({
+      kind: 'unavailable',
+      reason: 'provider-inactive',
+    })
   })
 
   it('does not treat keyless local Ollama as already set up', () => {

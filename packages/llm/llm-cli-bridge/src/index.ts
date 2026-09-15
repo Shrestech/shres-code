@@ -46,6 +46,7 @@ export {
 export type { CliBridgeModel, CliBridgeRoute, EffortStyle, ShippedRouteId } from './config.ts'
 export { answerFromObject, isCliErrorPayload, parseCliOutput } from './parse.ts'
 export { serializePrompt } from './serialize.ts'
+export { CliStreamMapper } from './stream.ts'
 export { executableOnPath } from './probe.ts'
 
 export const name = 'llm-cli-bridge'

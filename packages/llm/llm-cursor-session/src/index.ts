@@ -63,6 +63,7 @@ export function apply(ctx: Context, config: Config): void {
     settingsNs: NS,
     settingsPath: [],
     declared: false,
+    chatGated: true,
   })
   let directory: DirectoryRegistrationHandle | undefined
   let directoryFacts: unknown
@@ -100,6 +101,15 @@ export function apply(ctx: Context, config: Config): void {
   ensureRegistration()
 
   installSettingsSection(ctx, NS, Config, config, {
+    validate: (section: Config) => {
+      if (Array.isArray(section.models) && section.models.length === 0) {
+        throw new Error(
+          'llm-cursor-session: an empty models catalog removes the route\'s picker group;'
+          + ' omit models to inherit the shipped catalog',
+        )
+      }
+      resolveConfig(section)
+    },
     setSource: (source) => {
       current = source
     },
