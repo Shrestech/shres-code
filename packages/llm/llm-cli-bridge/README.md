@@ -2,6 +2,10 @@
 
 Delegated-completion adapter for hand-declared CLI routes: `stream()` serializes `system` plus `messages` into a prompt, spawns the route's binary through [`shres-subprocess`](../../subprocess/subprocess/README.md), and emits `block-start` → `text-delta` → `block-end` → optional `usage` → `finish: stop`. There are no shipped routes: the shipped CLI delegations (`claude-cli`, `codex-cli`, `cursor-cli`, `grok-cli`, `kimi-cli`) were retired in favor of the subscription-session routes `codex-session`, `grok-session`, and `cursor-session`, and this adapter now registers custom routes declared in the `llm-cli-bridge` settings section only. Registered routes are marked `kind: 'delegated'` on `providerInfo()` and in the configurable-provider directory, so the Models picker shows a Delegated tag. There is no HTTP request, so `attributionHeaders()` does not apply.
 
+## Live streaming
+
+A route with `parseMode: 'stream-json'` streams while the CLI runs: the adapter polls incremental stdout reads and maps recognized transcript events to chunks as they arrive — `thinking` deltas become a reasoning block, each assistant message becomes a text block (a same-call snapshot that only grew extends its open block), and each `tool_call` started/completed pair becomes a `server-tool-call` block recorded for rendering and never dispatched by the agent loop. The final `result` object supplies usage, and its text is the reply only when no assistant event streamed. An error payload throws as soon as its line arrives. A transcript with no recognized events falls back to whole-transcript parsing at process end, so foreign stream-json shapes keep the collect-at-exit behavior. `parseMode: 'json'` always collects and parses at exit.
+
 ## Honesty gate
 
 A non-empty `GenerateOptions.tools` without that route's `allowDelegatedTools: true` throws `LlmError` `UNSUPPORTED_OPTION`. The flag opts a route in to serving a conversation loop through the CLI's own tools; `CUSTOM_ROUTE_TEMPLATE` defaults it to false, so an overlay must opt in, and a deployment that wants the route only for tool-free auxiliary calls leaves it false.
@@ -27,9 +31,9 @@ llm-cli-bridge:
       binary: cursor-agent
       modelArg: --model
       effortStyle: flag
-      extraArgs: [-p, --output-format, json, --force]
+      extraArgs: [-p, --output-format, stream-json, --force]
       promptStyle: trailing
-      parseMode: json
+      parseMode: stream-json
       apiKeyEnv: CURSOR_API_KEY
       allowDelegatedTools: true
       contextWindow: 128000
@@ -43,7 +47,7 @@ llm-cli-bridge:
         - { id: gemini-3.8-flash-high, name: Gemini 3.8 Flash (high) }
 ```
 
-`-p` is cursor-agent's print flag, not a prompt flag, so the prompt rides as the trailing positional; `--output-format json` emits one `{"type":"result"}` line that `parseMode: json` reads; `--force` auto-approves the CLI's own tools in headless mode. cursor-agent validates model ids server-side against its prefixed, effort-suffixed catalog, so the advisory list names those exact ids. The template defaults already supply `modelArg`, `effortStyle`, `parseMode`, `contextWindow`, and `defaultMaxTokens`; they are spelled out here so the route survives a template change.
+`-p` is cursor-agent's print flag, not a prompt flag, so the prompt rides as the trailing positional; `--output-format stream-json` emits one NDJSON event per line that the adapter maps live (thinking, assistant text, and tool calls render as the turn runs); `--force` auto-approves the CLI's own tools in headless mode. cursor-agent validates model ids server-side against its prefixed, effort-suffixed catalog, so the advisory list names those exact ids. The template defaults already supply `modelArg`, `effortStyle`, `contextWindow`, and `defaultMaxTokens`; they are spelled out here so the route survives a template change.
 
 ## Model Experience
 
