@@ -116,6 +116,7 @@ function brandTeamState(entry: TeamProjectionEntry): TeamState {
     })),
     delivered: entry.delivered.map(id => toTeamMessageId(id)),
     nextTaskNumber: entry.nextTaskNumber,
+    ...entry.fault === undefined ? {} : { fault: entry.fault },
   }
 }
 

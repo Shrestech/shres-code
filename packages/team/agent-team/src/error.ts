@@ -21,6 +21,7 @@ export type TeamErrorCode =
   | 'TEAM_PROVISIONING_CONFLICT'
   | 'TEAM_RESERVED_NAME'
   | 'TEAM_INVALID_ARGUMENT'
+  | 'TEAM_LOG_FAULT'
 
 /** Error returned by the Agent Team domain boundary. */
 export class TeamError extends HarnessError {

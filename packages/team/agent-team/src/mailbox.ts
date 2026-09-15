@@ -245,14 +245,21 @@ export class TeamMailbox {
         senderName: message.senderName,
       }
       const content = this.deliveryContent(message)
-      if (message.targetId === root.id) {
-        const input = createUserMessage({ content, source })
-        root.steer(input)
+      if (target === root) {
+        // The runtime owns the exact live Lead, so Lead self-delivery steers
+        // it directly; teammate delivery below must use the continuation owner.
+        root.steer(createUserMessage({ content, source }))
         return await this.checkpointDelivered(root, root.session, message.id)
       }
       if (target !== undefined) {
-        const input = createUserMessage({ content, source })
-        target.steer(input)
+        // A live teammate steers through the continuation owner's admitted
+        // path: direct child steer would bypass activation ownership and the
+        // admission cutoff guarding the Lead-to-child edge.
+        await this.ctx.subagents.followup(root, message.targetId, content, {
+          source,
+          signal,
+          delivery: 'steer',
+        })
         return await this.checkpointDelivered(root, target.session, message.id)
       }
       const recorded = await this.persistedTargetRecorded(message.targetId, message.id, signal)

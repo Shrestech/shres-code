@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { Context } from '@shres-code/cordis'
 import type { Agent } from '@shres-code/shres-code-agent'
 import { createUserMessage } from '@shres-code/shres-code-llm'
+import type { ContentBlock } from '@shres-code/shres-code-llm'
 import { SessionId } from '@shres-code/shres-code-session'
 import type { Session, SessionEvent } from '@shres-code/shres-code-session'
 import { TeamId, TeamMessageId } from '../src/brand.ts'
@@ -61,7 +62,12 @@ function setupMailbox(options: {
   state?: TeamState
   agents?: Map<SessionId, Agent>
   inspect?: (id: SessionId) => Promise<{ meta: { seedLength?: number }; events: SessionEvent[] }>
-  followup?: () => Promise<string>
+  followup?: (
+    parent: Agent,
+    targetId: SessionId,
+    content: ContentBlock[],
+    opts: { source?: unknown; signal?: AbortSignal },
+  ) => Promise<string>
   flush?: () => Promise<boolean>
   maxPending?: number
   maxBytes?: number
@@ -105,14 +111,34 @@ function setupMailbox(options: {
       : undefined),
   } as unknown as TeamRoster
   const lifecycle = new TeamRuntimeLifecycle(1_000)
-  const followup = options.followup ?? (async () => 'ok')
+  // The real continuation owner records the message on the target session
+  // before returning; the default double mirrors that so checkpointing sees
+  // a durable receipt.
+  let followupImpl = options.followup ?? (async (
+    _parent: Agent,
+    targetId: SessionId,
+    content: ContentBlock[],
+    opts: { source?: unknown },
+  ) => {
+    const target = agents.get(targetId)
+    if (target === undefined) throw new Error('target is not live')
+    target.steer(createUserMessage({ content, source: opts.source as never }))
+    return 'team-followup-message'
+  })
   const ctx = {
     agents: { get: (id: SessionId) => agents.get(id) },
     sessions: {
       flush: options.flush ?? (async () => true),
       get: (id: SessionId) => agents.get(id)?.session,
     },
-    subagents: { followup },
+    subagents: {
+      followup: (
+        parent: Agent,
+        targetId: SessionId,
+        content: ContentBlock[],
+        opts: { source?: unknown; signal?: AbortSignal },
+      ) => followupImpl(parent, targetId, content, opts),
+    },
     sessionPersistence: {
       inspect: options.inspect ?? (async () => {
         throw new Error('missing persisted target')
@@ -138,6 +164,7 @@ function setupMailbox(options: {
     warnings,
     getState: () => state,
     setState: (next: TeamState) => { state = next },
+    setFollowup: (next: typeof followupImpl) => { followupImpl = next },
   }
 }
 
@@ -329,7 +356,7 @@ describe('TeamMailbox', () => {
   it('acks a live target that already recorded the message and queues when steer throws', async () => {
     const childSession = fakeSession(CHILD_ID)
     const child = fakeAgent(CHILD_ID, childSession)
-    const { mailbox, lead, agents, getState, setState, warnings } = setupMailbox({
+    const { mailbox, lead, agents, getState, setState, warnings, setFollowup } = setupMailbox({
       agents: new Map([[CHILD_ID, child]]),
     })
     agents.set(CHILD_ID, child)
@@ -343,9 +370,9 @@ describe('TeamMailbox', () => {
     await mailbox.recoverFor(lead, SIGNAL)
     expect(getState().delivered).toContain(accepted.messageId)
 
-    child.steer = () => {
+    setFollowup(async () => {
       throw new Error('steer boom')
-    }
+    })
     const queued = await mailbox.send(lead, {
       target: 'aegis',
       content: [{ type: 'text', text: 'again' }],

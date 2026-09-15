@@ -41,12 +41,23 @@ export class TeamJournal {
    * Read authoritative Team state for one exact live Lead.
    * @param root - exact live Team Lead.
    * @returns current projected state selected by the Lead Team id.
+   * @throws {TeamError} `TEAM_LOG_FAULT` when replay recorded a fault: the fold
+   *   froze at its last good snapshot and drops later events, so serving this
+   *   state silently would hide durable corruption.
    */
   state(root: Agent): TeamState {
     const values = this.ctx.sessionProjections.snapshot(root.session).values
     const projection = values.agentTeam
     if (projection === undefined) throw new Error('Agent Teams projection is not registered')
-    return projection[String(root.id)] ?? teamStateFromFold(emptyTeamFoldState(root.id))
+    const entry = projection[String(root.id)]
+    if (entry === undefined) return teamStateFromFold(emptyTeamFoldState(root.id))
+    if (entry.fault !== undefined) {
+      throw new TeamError(
+        `Agent Team log for "${root.id}" recorded a fault and stopped replay: ${entry.fault}`,
+        'TEAM_LOG_FAULT',
+      )
+    }
+    return entry
   }
 
   /**

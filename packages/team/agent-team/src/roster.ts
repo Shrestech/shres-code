@@ -191,7 +191,7 @@ export class TeamRoster {
   }
 
   /**
-   * Release exact teammate Activations by cancelling live children.
+   * Release exact teammate activation forests through the continuation owner.
    * @param root - exact live Team Lead authorizing release.
    * @param childIds - selected roster child ids.
    */
@@ -202,6 +202,9 @@ export class TeamRoster {
         /* v8 ignore start -- drain a child that materialized before the creator failed. */
         if (live === undefined) continue
         this.ctx.subagents.interrupt(childId, { kind: 'ancestor', agent: root })
+        // Release tracked descendants through the continuation owner so they
+        // tear down child-first instead of leaking behind a direct cancel.
+        await this.ctx.subagents.drainContinuableDescendants([live])
         live.cancel({ kind: 'parent' })
         /* v8 ignore stop */
       }

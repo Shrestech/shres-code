@@ -140,6 +140,8 @@ export interface TeamState {
   readonly messages: TeamMessageSnapshot[]
   readonly delivered: TeamMessageId[]
   readonly nextTaskNumber: number
+  /** Replay fault recorded by the fold; a faulted Team freezes at its last good snapshot. */
+  readonly fault?: string
 }
 
 /**
