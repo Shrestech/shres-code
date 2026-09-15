@@ -112,9 +112,9 @@ describe('TeamJournal', () => {
     }, 1))
     expect(teamProjectionDefinition.view(faulted)[String(TEAM)]?.fault).toBeTypeOf('string')
     const ctx = new Context()
-    await ctx.plugin(FaultedProjections, faulted)
+    await ctx.plugin(FaultedProjections, faulted as unknown as AgentTeamProjection)
     const journal = new TeamJournal(ctx)
-    const state = (): TeamState => journal.state({ id: ROOT, session: {} as never } as Agent)
+    const state = (): TeamState => journal.state({ id: ROOT, session: {} as never } as unknown as Agent)
     expect(state).toThrow(TeamError)
     let caught: unknown
     try {
