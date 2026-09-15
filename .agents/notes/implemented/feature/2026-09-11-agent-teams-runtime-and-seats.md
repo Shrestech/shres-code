@@ -8,9 +8,11 @@ The `#175` Agent Teams package stored roster, mailbox, and task events but did n
 
 ## Decision
 
-`@shres-code/shres-code-agent-team` owns `ctx.agentTeams`: provision a continuable child after a `team/member` provisioning snapshot, queue `team/message/queued` on the Lead log, land an ordinary `user/message` with `source.kind: 'team-message'` on the target, `Agent.steer` (next-step), then `team/message/delivered`. Restart retries queued-minus-delivered; the target de-dupes on team id plus message id.
+`@shres-code/shres-code-agent-team` owns `ctx.agentTeams`: provision a continuable child after a `team/member` provisioning snapshot, queue `team/message/queued` on the Lead log, land an ordinary `user/message` with `source.kind: 'team-message'` on the target, steer, then `team/message/delivered`. Lead self-delivery steers the exact live root; teammate delivery rides the continuation owner's admitted steer path (`subagents.followup` with `delivery: 'steer'`), so activation ownership and the admission cutoff guard every Lead-to-child edge. Restart retries queued-minus-delivered; the target de-dupes on team id plus message id. Failed spawn release drains tracked descendants through the continuation owner before cancelling the child. A replay fault fails loud (`TEAM_LOG_FAULT`) instead of serving the frozen last-good snapshot.
 
 Bound product seats plus YAML `extras` are the roster template. `aegis` / `stride` / `ward` remain named tools that ensure the teammate exists then Team-steer. Extra members are only `team_send` / `team_list`. `seats.subagent` is the generic hire route and is not a teammate. J-Space Advisor stays a watchdog child and is omitted from `team_list`. Generic `send_message` stays followup / next-turn.
+
+Seat personas are settings, not code: `seats.<id>.persona` in the `agent-seats` settings document overrides the product default, and the Models-page Team card edits personas, bindings, and custom members in place (with an Open-configuration-file affordance over the same document). The chat surface is `ui-agent-team`: one conversation-header action that reads `agentTeams.view` — a Lead-session read over `ctx.agentTeams` — and navigates active teammates through the stable addressed-subagent path; non-lead sessions render no Team control.
 
 The base bundle mounts `agent-team` and keeps `tool-subagent-control`. The generic `subagent` tool is remounted by `agent-seats` so an optional `seats.subagent` provider/model can pin the hire route.
 

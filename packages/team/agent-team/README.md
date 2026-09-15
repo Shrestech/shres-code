@@ -38,7 +38,7 @@ Writers pass `{ ignorable: true }`. A build without this plugin may skip the eve
 
 ## Replay
 
-`foldTeam(rootId, events)` reconstructs roster, tasks, queued messages, and delivered ids for the Team whose `teamId` equals `rootId`. Inherited fork-seed events retain the ancestor id and never enter the new root's state. The `agentTeam` projection unit folds every Team present in a Session log, keyed by `teamId`; callers select the projected Session's own Team with `values.agentTeam?.[session.id]`. The separately published `./invariant` companion maintains an independent fold of each attached session and rejects illegal native transitions before commit.
+`foldTeam(rootId, events)` reconstructs roster, tasks, queued messages, and delivered ids for the Team whose `teamId` equals `rootId`. Inherited fork-seed events retain the ancestor id and never enter the new root's state. The `agentTeam` projection unit folds every Team present in a Session log, keyed by `teamId`; callers select the projected Session's own Team with `values.agentTeam?.[session.id]`. A replay fault freezes the fold at its last good snapshot and drops later events; `TeamJournal.state()` surfaces that as `TEAM_LOG_FAULT` instead of serving the frozen state silently. The separately published `./invariant` companion maintains an independent fold of each attached session and rejects illegal native transitions before commit.
 
 ## Model-visible attribution
 
@@ -61,3 +61,4 @@ Prefix-stable while the Team tool schemas are unchanged. Binding or unbinding a 
 - **No model-facing `spawn_teammate`** — the grant is Models bindings plus YAML `extras`. The service method exists for seats and `team_send` lazy provision.
 - **No task-board tools** — `team/task` events fold, but create/claim/complete tools are not registered.
 - **Trusted in-process producers** — a plugin with direct `Session` access can append counterfeit Team events. The fold and invariant detect inconsistency; they do not isolate plugins.
+- **Roster reads are Lead-session reads** — the `agentTeams.view` wire surface in `@shres-code/shres-code-host-apiproxy` serves the chat panel and answers only for a live Lead.

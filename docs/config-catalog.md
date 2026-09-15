@@ -229,6 +229,8 @@ export interface SeatBinding {
   provider?: string
   /** Provider-owned model id on that route. */
   model?: string
+  /** Child persona overriding the roster default; empty or omitted keeps the default. */
+  persona?: string
 }
 
 /** YAML extra teammate beyond the three product seats. */
@@ -246,7 +248,7 @@ export interface ExtraSeat {
 }
 ```
 
-Source: [`packages/subagent/agent-seats/src/index.ts:37`](../packages/subagent/agent-seats/src/index.ts)
+Source: [`packages/subagent/agent-seats/src/index.ts:38`](../packages/subagent/agent-seats/src/index.ts)
 
 <a id="shres-codeshres-code-agent-spine-demo"></a>
 
@@ -4241,6 +4243,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@shres-code/shres-code-client-modules` — requires `webServer` · `loader` ([`packages/client/modules/src/index.ts`](../packages/client/modules/src/index.ts))
 - `@shres-code/shres-code-client-runtime` ([`packages/client/runtime/src/index.ts`](../packages/client/runtime/src/index.ts))
 - `@shres-code/shres-code-client-ui-agent-preset` ([`packages/client/ui-agent-preset/src/index.ts`](../packages/client/ui-agent-preset/src/index.ts))
+- `@shres-code/shres-code-client-ui-agent-team` ([`packages/client/ui-agent-team/src/index.ts`](../packages/client/ui-agent-team/src/index.ts))
 - `@shres-code/shres-code-client-ui-commands` ([`packages/client/ui-commands/src/index.ts`](../packages/client/ui-commands/src/index.ts))
 - `@shres-code/shres-code-client-ui-conversation` ([`packages/client/ui-conversation/src/index.ts`](../packages/client/ui-conversation/src/index.ts))
 - `@shres-code/shres-code-client-ui-cordis` ([`packages/extensions/ui-cordis/src/index.ts`](../packages/extensions/ui-cordis/src/index.ts))

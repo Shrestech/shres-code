@@ -2,7 +2,7 @@
 
 Product roster for **Aegis** (Architect), **Stride** (Worker), and **Ward** (Reviewer) as Agent Team teammates, plus a **Subagent** hire route that is not a teammate. YAML `extras` add named teammates reachable only through `team_send`. Bound product seats remount named tools that provision then Team-steer when `ctx.agentTeams` is present.
 
-The plugin registers the `agent-seats` settings section. A product seat mounts only when both provider and model are non-empty. `seats.subagent` pins the generic `subagent` tool's route when both fields are set; otherwise that hire inherits the parent route.
+The plugin registers the `agent-seats` settings section. A product seat mounts only when both provider and model are non-empty. `seats.<id>.persona` overrides that seat's child persona; empty or omitted keeps the product default from `src/roster.ts`. `seats.subagent` pins the generic `subagent` tool's route when both fields are set; otherwise that hire inherits the parent route.
 
 | Seat | Role | Tool name |
 |---|---|---|
@@ -10,7 +10,7 @@ The plugin registers the `agent-seats` settings section. A product seat mounts o
 | Stride | Worker — bounded implementation | `stride` |
 | Ward | Reviewer — report findings, do not rewrite unless asked | `ward` |
 
-The Models page writes this section. Child personas and tool descriptions live in `src/roster.ts`.
+The Models page Team card writes this section: provider/model pickers, the persona editor for the three named seats, custom-member management, and an "Open configuration file" action over the backing settings document.
 
 ## Model Experience
 
