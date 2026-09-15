@@ -64,6 +64,18 @@ describe('boundSeats', () => {
     expect(aegis?.entry.id).toBe('aegis')
     expect(aegis?.provider).toBe('ollama-cloud')
     expect(aegis?.model).toBe('kimi-k3')
+    expect(aegis?.persona).toBe(SEAT_ROSTER[0]?.persona)
+  })
+
+  it('overrides a seat persona from the settings document and keeps the default otherwise', () => {
+    const [custom] = boundSeats({
+      seats: { stride: { provider: 'deepseek', model: 'kimi-k3', persona: '  You are the fast worker.  ' } },
+    })
+    expect(custom?.persona).toBe('You are the fast worker.')
+    const [fallback] = boundSeats({
+      seats: { stride: { provider: 'deepseek', model: 'kimi-k3', persona: '   ' } },
+    })
+    expect(fallback?.persona).toBe(SEAT_ROSTER[1]?.persona)
   })
 })
 

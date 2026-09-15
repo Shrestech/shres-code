@@ -16,6 +16,8 @@ export interface SeatBinding {
   provider?: string
   /** Provider-owned model id on that route. */
   model?: string
+  /** Child persona overriding the roster default; empty or omitted keeps the default. */
+  persona?: string
 }
 
 /** YAML extra teammate beyond the three product seats. */
@@ -106,6 +108,8 @@ export interface BoundSeat {
   readonly provider: string
   /** Model id on that route. */
   readonly model: string
+  /** Effective child persona: the stored override, or the roster default. */
+  readonly persona: string
 }
 
 /**
@@ -123,7 +127,13 @@ export function boundSeats(settings: AgentSeatsSettings): BoundSeat[] {
     const model = binding?.model?.trim()
     if (provider === undefined || provider.length === 0) continue
     if (model === undefined || model.length === 0) continue
-    bound.push({ entry, provider, model })
+    const persona = binding?.persona?.trim()
+    bound.push({
+      entry,
+      provider,
+      model,
+      persona: persona !== undefined && persona.length > 0 ? persona : entry.persona,
+    })
   }
   return bound
 }

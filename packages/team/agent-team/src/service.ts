@@ -158,7 +158,7 @@ export class TeamService extends Service {
     await this.roster.spawn(lead, {
       name: entry.name,
       description: entry.description,
-      prompt: [{ type: 'text', text: `You are ${entry.name}. ${entry.description}` }],
+      prompt: [{ type: 'text', text: entry.description === entry.name ? `You are ${entry.name}.` : `You are ${entry.name}. ${entry.description}` }],
       context: entry.context ?? 'fresh',
       provider: 'spawn',
       signal: this.lifecycle.signal,
