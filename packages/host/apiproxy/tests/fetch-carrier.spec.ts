@@ -285,6 +285,11 @@ function fakeApi(overrides: Partial<{ muxFrames: MuxFrame[]; hostFrames: HostFra
         return { rpcId: request.rpcId, result: { ok: true, value: { models: [] } } }
       },
     },
+    agentTeams: {
+      async view(request) {
+        return { rpcId: request.rpcId, result: { ok: true, value: { sessionId: request.payload.sessionId, isTeam: false, members: [] } } }
+      },
+    },
     events: {
       mux: (_request, signal) => stream(muxFrames, signal),
       host: (_request, signal) => stream(hostFrames, signal),

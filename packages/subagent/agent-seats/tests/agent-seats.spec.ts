@@ -175,6 +175,7 @@ describe('agent-seats remount', () => {
       entry: SEAT_ROSTER[0]!,
       provider: 'p',
       model: 'm',
+      persona: SEAT_ROSTER[0]!.persona,
     })).toMatchObject({
       provider: 'spawn',
       toolName: 'aegis',
