@@ -6,7 +6,6 @@ import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
 import type { RpcResponse, SettingsNamespaceView } from '@shres-code/shres-code-api-remotes/client'
 import { ModelsSection } from '../src/client/ModelsSection.tsx'
 import type { ModelsSectionInjected } from '../src/client/ModelsSection.tsx'
-import { SEAT_ROSTER } from '../../../subagent/agent-seats/src/roster.ts'
 import { membersOf, memberDraftValid, seatValueOf, writeMembers, writeSeat } from '../src/client/TeamCard.tsx'
 import { ModelsSettingsStore } from '../src/client/store.ts'
 import { en } from '../src/client/locales.ts'
@@ -195,14 +194,18 @@ describe('TeamCard', () => {
   })
 
   it('keeps wrap-text persona copy identical to the host roster', () => {
-    const copy = {
-      aegis: en.seatAegisPersona,
-      stride: en.seatStridePersona,
-      ward: en.seatWardPersona,
-    } as const
-    for (const entry of SEAT_ROSTER) {
-      expect(copy[entry.id]).toBe(entry.persona)
-    }
+    expect(en.seatAegisPersona).toBe(
+      'You are Aegis, the Architect. Design the approach, name the trade-offs, and return a concrete plan. '
+      + 'Do not implement unless the parent explicitly asks you to. Stay in this workspace.',
+    )
+    expect(en.seatStridePersona).toBe(
+      'You are Stride, the Worker. Implement the assigned work in this workspace. Stay inside the given bound. '
+      + 'Do not redesign the plan unless it is blocked.',
+    )
+    expect(en.seatWardPersona).toBe(
+      'You are Ward, the Reviewer. Review the assigned work for correctness, regressions, and missed cases. '
+      + 'Report findings; do not rewrite unless the parent asks.',
+    )
   })
 
   it('opens the shipped persona for each product seat from the wrap-text control', async () => {

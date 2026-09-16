@@ -73,7 +73,7 @@ describe('ui-agent-team browser half', () => {
       .mockResolvedValueOnce({ result: { ok: false, error: { message: 'view failed' } } })
     const { ctx } = await bench(view)
     const entry = ctx.slots.entries('conversation.session.header.actions')[0]!
-    const injected = (entry.inject as () => TeamActionInjected)()
+    const injected = (entry.inject as unknown as () => TeamActionInjected)()
     await expect(injected.load('lead' as never)).resolves.toEqual({
       sessionId: 'lead',
       isTeam: true,

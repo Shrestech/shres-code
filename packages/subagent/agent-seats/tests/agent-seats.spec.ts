@@ -160,6 +160,14 @@ describe('agent-seats remount', () => {
       ['stride', 'Stride', 'Worker'],
       ['ward', 'Ward', 'Reviewer'],
     ])
+    expect(SEAT_ROSTER.map(entry => entry.persona)).toEqual([
+      'You are Aegis, the Architect. Design the approach, name the trade-offs, and return a concrete plan. '
+      + 'Do not implement unless the parent explicitly asks you to. Stay in this workspace.',
+      'You are Stride, the Worker. Implement the assigned work in this workspace. Stay inside the given bound. '
+      + 'Do not redesign the plan unless it is blocked.',
+      'You are Ward, the Reviewer. Review the assigned work for correctness, regressions, and missed cases. '
+      + 'Report findings; do not rewrite unless the parent asks.',
+    ])
     expect(seats.seatToolConfig({
       entry: SEAT_ROSTER[0]!,
       provider: 'p',

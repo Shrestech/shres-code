@@ -12,6 +12,8 @@ function roster(members: unknown[], id: string = sessionId) {
   return { sessionId: id, isTeam: true, members } as never
 }
 
+const t = ((key: keyof typeof en) => en[key]) as TeamActionProps['t']
+
 function renderTeam(over: Partial<TeamActionProps> = {}) {
   const load = vi.fn(async () => roster([]))
   const openTeammate = vi.fn()
@@ -19,7 +21,7 @@ function renderTeam(over: Partial<TeamActionProps> = {}) {
     sessionId,
     load: over.load ?? load,
     openTeammate: over.openTeammate ?? openTeammate,
-    t: (key: keyof typeof en) => en[key],
+    t,
     ...over,
   } as TeamActionProps
   const result = render(<TeamAction {...props} />)
@@ -145,12 +147,12 @@ describe('TeamAction', () => {
       ))
     const { rerender } = renderTeam({ load: load as never })
     rerender(
-      <TeamAction
-        sessionId={'other-root' as never}
-        load={load as never}
-        openTeammate={vi.fn()}
-        t={(key: keyof typeof en) => en[key]}
-      />,
+      <TeamAction {...{
+        sessionId: 'other-root' as never,
+        load: load as never,
+        openTeammate: vi.fn(),
+        t,
+      } as TeamActionProps} />,
     )
     await waitFor(() => {
       expect(load).toHaveBeenCalledTimes(2)
@@ -173,12 +175,12 @@ describe('TeamAction', () => {
       .mockResolvedValue({ sessionId: 'other-root', isTeam: false, members: [] })
     const { rerender, container } = renderTeam({ load: load as never })
     rerender(
-      <TeamAction
-        sessionId={'other-root' as never}
-        load={load as never}
-        openTeammate={vi.fn()}
-        t={(key: keyof typeof en) => en[key]}
-      />,
+      <TeamAction {...{
+        sessionId: 'other-root' as never,
+        load: load as never,
+        openTeammate: vi.fn(),
+        t,
+      } as TeamActionProps} />,
     )
     await waitFor(() => {
       expect(load).toHaveBeenCalledTimes(2)
