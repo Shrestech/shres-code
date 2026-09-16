@@ -4,6 +4,10 @@ import { AttachmentId } from '@shres-code/shres-code-attachment'
 import BasicCompactionEngine from '@shres-code/shres-code-compaction-basic'
 import type { BasicCompactionConfig } from '@shres-code/shres-code-compaction-basic'
 import { selectCompactableRange } from '@shres-code/shres-code-compaction-basic/src/region.ts'
+import {
+  SummarizationFailureError,
+  summarizationFailureFacts,
+} from '@shres-code/shres-code-compaction-basic/src/summarizer.ts'
 import type { SummarizationInput, SummaryResult } from '@shres-code/shres-code-compaction-basic/src/summarizer.ts'
 import {
   POINTER_READ_CUE,
@@ -1244,6 +1248,15 @@ async function summarizerHarness(
   return { ctx, adapter, compact }
 }
 
+/** The terminal finish the production wedge produced: a completed call reclassified as overflow. */
+const OVERFLOW_FINISH = {
+  kind: 'error',
+  failure: {
+    message: 'pi-ai detected context overflow for model "gpt-6-astra"',
+    code: CONTEXT_WINDOW_EXCEEDED_CODE,
+  },
+} as const
+
 describe('default one-shot summarizer', () => {
   it('requires complete raw output when a subclass marks one local LLM stream call', () => {
     expectTypeOf<{
@@ -1469,6 +1482,58 @@ describe('default one-shot summarizer', () => {
       expect((thrown as Error & { code?: string }).code).toBe(code)
     },
   )
+
+  it('carries the failed call facts on the summarization error', async () => {
+    const { adapter, compact } = await summarizerHarness([], OVERFLOW_FINISH)
+    adapter.usage = { inputTokens: 294_609, outputTokens: 597 }
+
+    const thrown: unknown = await compact
+      .runSummarize(promptInput('history'), agent(conversation(1), MODEL))
+      .then(() => undefined, (error: unknown) => error)
+
+    expect(thrown).toBeInstanceOf(SummarizationFailureError)
+    expect(summarizationFailureFacts(thrown)).toEqual({
+      provider: MODEL,
+      model: MODEL,
+      reason: 'error',
+      code: CONTEXT_WINDOW_EXCEEDED_CODE,
+      usage: { inputTokens: 294_609, outputTokens: 597 },
+    })
+  })
+
+  it('records the failed summarization call on the durable end bracket', async () => {
+    const { adapter, compact } = await summarizerHarness([], OVERFLOW_FINISH)
+    adapter.usage = { inputTokens: 294_609, outputTokens: 597 }
+    const session = conversation(2)
+    const nodes = session.surface.nodes
+
+    await expect(compact.compactRegion(nodes[0]!, nodes[2]!, agent(session, MODEL), SIGNAL))
+      .rejects.toThrow(/context overflow/)
+
+    const end = session.events.findLast(event => event.type === 'compaction/end')?.data
+    expect(end?.error).toMatch(/context overflow/)
+    expect(end?.failure).toEqual({
+      provider: MODEL,
+      model: MODEL,
+      reason: 'error',
+      code: CONTEXT_WINDOW_EXCEEDED_CODE,
+      usage: { inputTokens: 294_609, outputTokens: 597 },
+      attempt: 1,
+    })
+    expect(session.events.some(event => event.type === 'compaction/summary')).toBe(false)
+  })
+
+  it('records the attempt index its caller assigns', async () => {
+    const { compact } = await summarizerHarness([], OVERFLOW_FINISH)
+    const session = conversation(2)
+    const nodes = session.surface.nodes
+
+    await expect(compact.compactRegion(nodes[0]!, nodes[2]!, agent(session, MODEL), SIGNAL, 3))
+      .rejects.toThrow(/context overflow/)
+
+    expect(session.events.findLast(event => event.type === 'compaction/end')?.data.failure)
+      .toMatchObject({ attempt: 3 })
+  })
 
   it('rejects empty or reasoning-only successful output', async () => {
     const { compact } = await summarizerHarness([{ type: 'reasoning', text: 'private' }])
