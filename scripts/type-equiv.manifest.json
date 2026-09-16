@@ -2267,6 +2267,11 @@
     },
     {
       "doc": "docs/subsystems/agent-team.md",
+      "symbol": "TeamMemberStatus",
+      "source": "packages/team/agent-team/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/agent-team.md",
       "symbol": "TeamMemberView",
       "source": "packages/team/agent-team/src/types.ts"
     },

@@ -79,4 +79,45 @@ describe('team tools', () => {
     expect(seen[1]).not.toHaveProperty('cwd')
     await ctx.fiber.dispose()
   })
+
+  it('renders reserved seats as unstarted, not inactive', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRuntime)
+    class FakeTeams extends Service {
+      constructor(host: Context) {
+        super(host, 'agentTeams')
+      }
+
+      membership() {
+        return { name: 'lead' }
+      }
+
+      listMembers() {
+        return [
+          { name: 'lead', role: 'lead', status: 'running', id: 'lead-id', diagnostics: [] },
+          { name: 'aegis', role: 'teammate', status: 'unstarted', id: 'unprovisioned:aegis', diagnostics: [] },
+        ]
+      }
+    }
+    await ctx.plugin(FakeTeams)
+    registerTeamTools(ctx)
+    const listed = ctx.tools.schemas().find(schema => schema.name === 'team_list')
+    expect(listed?.description).toMatch(/unstarted means the name is reserved/)
+    expect(listed?.description).toMatch(/not crashed or stopped/)
+    expect(listed?.description).not.toMatch(/not yet started/)
+    const result = await ctx.tools.execute({
+      signal: SIGNAL,
+      callId: CallId('list-unstarted'),
+      name: 'team_list',
+      arguments: {},
+      agent: { id: 'lead' } as never,
+    })
+    expect(result.isError).toBe(false)
+    expect(result.content).toEqual([{
+      type: 'text',
+      text: 'you are lead; members: lead (running), aegis (unstarted)',
+    }])
+    await ctx.fiber.dispose()
+  })
 })

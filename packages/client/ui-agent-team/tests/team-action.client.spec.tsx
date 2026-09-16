@@ -65,6 +65,7 @@ describe('TeamAction', () => {
   it('keeps the Lead row and unprovisioned rows non-navigable and shows diagnostics', async () => {
     const members = [
       { name: 'lead', role: 'lead', status: 'running', id: '', diagnostics: [] },
+      { name: 'aegis', role: 'teammate', status: 'unstarted', id: 'unprovisioned:aegis', diagnostics: [] },
       { name: 'docs-reviewer', role: 'teammate', status: 'failed', id: 'docs-child', diagnostics: ['spawn rejected'] },
     ]
     const openTeammate = vi.fn()

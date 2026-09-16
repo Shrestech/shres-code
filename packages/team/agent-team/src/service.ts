@@ -128,7 +128,7 @@ export class TeamService extends Service {
         id: SessionId(`unprovisioned:${entry.name}`),
         name: entry.name,
         role: 'teammate',
-        status: 'inactive',
+        status: 'unstarted',
         description: entry.description,
         provider: entry.provider,
         ...entry.model === undefined ? {} : { model: entry.model },

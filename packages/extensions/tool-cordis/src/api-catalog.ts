@@ -4538,7 +4538,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SendTeamMessageRequest',
-    declaration: 'export interface SendTeamMessageRequest {\n    readonly target: string;\n    readonly content: ContentBlock[];\n    readonly signal: AbortSignal;\n    readonly persona?: string;\n    readonly cwd?: string;\n}',
+    declaration: 'export interface SendTeamMessageRequest {\n    readonly target: string;\n    readonly content: readonly ContentBlock[];\n    readonly signal: AbortSignal;\n    readonly persona?: string;\n    readonly cwd?: string;\n}',
   },
   {
     name: 'SendTeamMessageResult',
@@ -4958,7 +4958,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SpawnTeammateRequest',
-    declaration: 'export interface SpawnTeammateRequest {\n    readonly name: string;\n    readonly description: string;\n    readonly prompt: ContentBlock[];\n    readonly context: \'fresh\' | \'fork\';\n    readonly provider: string;\n    readonly signal: AbortSignal;\n    readonly persona?: string;\n    readonly cwd?: string;\n    readonly source?: MessageSource;\n    readonly agentOptions?: {\n        readonly provider?: string;\n        readonly model?: string;\n    };\n}',
+    declaration: 'export interface SpawnTeammateRequest {\n    readonly name: string;\n    readonly description: string;\n    readonly prompt: readonly ContentBlock[];\n    readonly context: \'fresh\' | \'fork\';\n    readonly provider: string;\n    readonly signal: AbortSignal;\n    readonly persona?: string;\n    readonly cwd?: string;\n    readonly source?: MessageSource;\n    readonly agentOptions?: {\n        readonly provider?: string;\n        readonly model?: string;\n    };\n}',
   },
   {
     name: 'SpawnTeammateResult',
@@ -5225,8 +5225,12 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface TeamMembership {\n    readonly root: Agent;\n    readonly id: TeamId;\n    readonly role: \'lead\' | \'teammate\';\n    readonly name: string;\n}',
   },
   {
+    name: 'TeamMemberStatus',
+    declaration: 'export type TeamMemberStatus = \'running\' | \'idle\' | \'unstarted\' | \'inactive\' | \'provisioning\' | \'failed\';',
+  },
+  {
     name: 'TeamMemberView',
-    declaration: 'export interface TeamMemberView {\n    readonly id: SessionId;\n    readonly name: string;\n    readonly role: \'lead\' | \'teammate\';\n    readonly status: \'running\' | \'idle\' | \'inactive\' | \'provisioning\' | \'failed\';\n    readonly description?: string;\n    readonly provider?: string;\n    readonly context?: \'fresh\' | \'fork\';\n    readonly model?: string;\n    readonly diagnostics: string[];\n}',
+    declaration: 'export interface TeamMemberView {\n    readonly id: SessionId;\n    readonly name: string;\n    readonly role: \'lead\' | \'teammate\';\n    readonly status: TeamMemberStatus;\n    readonly description?: string;\n    readonly provider?: string;\n    readonly context?: \'fresh\' | \'fork\';\n    readonly model?: string;\n    readonly diagnostics: string[];\n}',
   },
   {
     name: 'TeamMessageId',

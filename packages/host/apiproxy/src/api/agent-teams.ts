@@ -12,7 +12,7 @@ export interface AgentTeamsMemberRow {
   /** Model-facing teammate name; the Lead row is `lead`. */
   name: string
   role: 'lead' | 'teammate'
-  status: 'running' | 'idle' | 'inactive' | 'provisioning' | 'failed'
+  status: 'running' | 'idle' | 'unstarted' | 'inactive' | 'provisioning' | 'failed'
   /** Durable child Session id; empty for the Lead row and unprovisioned template rows. */
   id: string
   description?: string

@@ -19,9 +19,14 @@ export function registerTeamTools(ctx: Context): void {
   ctx.tools.register(defineTool({
     name: 'team_list',
     description:
-      'List this Agent Team: the Lead, bound seats, and YAML extras (including teammates not yet started). '
-      + 'Generic subagent children and the J-Space Advisor are not teammates and do not appear here. '
-      + 'Use team_send to mail a listed name. This call returns no reply from anyone.',
+      'List this Agent Team: the Lead, bound seats, and YAML extras. Status is roster liveness, not '
+      + 'list_agents residency: running means a live turn, idle means loaded and between turns, '
+      + 'unstarted means the name is reserved and no session exists yet (not crashed or stopped — '
+      + 'only the Lead\'s first team_send or named-seat call starts it), inactive means a session '
+      + 'exists but is not loaded, provisioning means start is in flight, and failed means start '
+      + 'failed and the name stays reserved. Generic subagent children and the J-Space Advisor are '
+      + 'not teammates. Use team_send to mail a listed name. This call returns no reply from anyone. '
+      + 'The snapshot is not a delivery promise — team_send performs the authoritative check.',
     parameters: {},
     output: {
       schema: {
@@ -38,7 +43,11 @@ export function registerTeamTools(ctx: Context): void {
               properties: {
                 name: { type: 'string', required: true },
                 role: { type: 'string', required: true },
-                status: { type: 'string', required: true },
+                status: {
+                  type: 'string',
+                  required: true,
+                  enum: ['running', 'idle', 'unstarted', 'inactive', 'provisioning', 'failed'],
+                },
                 id: { type: 'string', required: true },
               },
             },

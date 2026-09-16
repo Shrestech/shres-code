@@ -258,7 +258,10 @@ describe('Agent Teams runtime mailbox', () => {
     let started: { prompt?: unknown; persona?: string } = {}
     const orig = ctx.subagents.startContinuable.bind(ctx.subagents)
     const spy = vi.spyOn(ctx.subagents, 'startContinuable').mockImplementation(async (spec) => {
-      started = { prompt: spec.request.prompt, persona: spec.request.persona }
+      started = {
+        prompt: spec.request.prompt,
+        ...spec.request.persona !== undefined ? { persona: spec.request.persona } : {},
+      }
       return orig(spec)
     })
     const sent = await ctx.agentTeams.sendMessage(lead, {
@@ -308,7 +311,10 @@ describe('Agent Teams runtime mailbox', () => {
     const seen: { prompt?: unknown; persona?: string }[] = []
     const orig = ctx.subagents.startContinuable.bind(ctx.subagents)
     const spy = vi.spyOn(ctx.subagents, 'startContinuable').mockImplementation(async (spec) => {
-      seen.push({ prompt: spec.request.prompt, persona: spec.request.persona })
+      seen.push({
+        prompt: spec.request.prompt,
+        ...spec.request.persona !== undefined ? { persona: spec.request.persona } : {},
+      })
       return orig(spec)
     })
     await ctx.agentTeams.sendMessage(lead, {
@@ -420,7 +426,7 @@ describe('Agent Teams runtime mailbox', () => {
       content: content('this first assignment is far too large for the mailbox'),
       signal: SIGNAL,
     })).rejects.toMatchObject({ code: 'TEAM_MESSAGE_TOO_LARGE' })
-    expect(ctx.agentTeams.listMembers(lead).some(member => member.name === 'aegis' && member.status !== 'inactive'))
+    expect(ctx.agentTeams.listMembers(lead).some(member => member.name === 'aegis' && member.status !== 'unstarted'))
       .toBe(false)
     await ctx.fiber.dispose()
   })
@@ -440,7 +446,7 @@ describe('Agent Teams runtime mailbox', () => {
       content: content('Design the approach.'),
       signal: controller.signal,
     })).rejects.toThrow()
-    expect(ctx.agentTeams.listMembers(lead).some(member => member.name === 'aegis' && member.status !== 'inactive'))
+    expect(ctx.agentTeams.listMembers(lead).some(member => member.name === 'aegis' && member.status !== 'unstarted'))
       .toBe(false)
     await ctx.fiber.dispose()
   })
@@ -555,7 +561,7 @@ describe('Agent Teams runtime mailbox', () => {
       description: 'Architect',
       provider: 'mock',
     }])
-    expect(ctx.agentTeams.listMembers(lead).some(row => row.name === 'aegis' && row.status === 'inactive')).toBe(true)
+    expect(ctx.agentTeams.listMembers(lead).some(row => row.name === 'aegis' && row.status === 'unstarted')).toBe(true)
     await expect(ctx.agentTeams.sendMessage(lead, {
       target: 'aegis',
       content: content('plan'),

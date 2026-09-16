@@ -19,7 +19,7 @@ interface TeamMemberSnapshot {
 }
 ```
 
-Every member starts in `provisioning` and reaches exactly one terminal roster phase, `active` or `failed`. Runtime `running`/`idle`/`inactive` status is derived separately and never rewrites this record.
+Every member starts in `provisioning` and reaches exactly one terminal roster phase, `active` or `failed`. Runtime `running`/`idle`/`unstarted`/`inactive` status is derived separately and never rewrites this record.
 
 ## Durable mailbox
 
@@ -32,7 +32,7 @@ interface TeamMessageSnapshot {
   readonly senderId: SessionId
   readonly senderName: string
   readonly targetId: SessionId
-  readonly content: ContentBlock[]
+  readonly content: readonly ContentBlock[]
 }
 ```
 
@@ -90,12 +90,31 @@ interface TeamMembership {
 ```
 
 ```ts type-equiv
+/**
+ * Roster liveness for one {@link TeamMemberView} row. Distinct from
+ * `list_agents` residency (`running` / `idle` / `ready`) and from durable
+ * {@link TeamMemberPhase}.
+ *
+ * `unstarted` is a reserved template name with no session. `inactive` is a
+ * started member whose Agent is not loaded. `idle` is a loaded Agent between
+ * turns.
+ */
+type TeamMemberStatus =
+  | 'running'
+  | 'idle'
+  | 'unstarted'
+  | 'inactive'
+  | 'provisioning'
+  | 'failed'
+```
+
+```ts type-equiv
 /** Current runtime-enriched roster row. */
 interface TeamMemberView {
   readonly id: SessionId
   readonly name: string
   readonly role: 'lead' | 'teammate'
-  readonly status: 'running' | 'idle' | 'inactive' | 'provisioning' | 'failed'
+  readonly status: TeamMemberStatus
   readonly description?: string
   readonly provider?: string
   readonly context?: 'fresh' | 'fork'
@@ -109,7 +128,7 @@ interface TeamMemberView {
 interface SpawnTeammateRequest {
   readonly name: string
   readonly description: string
-  readonly prompt: ContentBlock[]
+  readonly prompt: readonly ContentBlock[]
   readonly context: 'fresh' | 'fork'
   readonly provider: string
   readonly signal: AbortSignal
@@ -140,7 +159,7 @@ interface SpawnTeammateResult {
 /** Input for one durable peer message. */
 interface SendTeamMessageRequest {
   readonly target: string
-  readonly content: ContentBlock[]
+  readonly content: readonly ContentBlock[]
   readonly signal: AbortSignal
   /**
    * Lead-sent role for first provision. Shadows the child's `deployment:persona`.

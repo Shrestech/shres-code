@@ -47,7 +47,7 @@ export interface TeamMessageSnapshot {
   readonly senderId: SessionId
   readonly senderName: string
   readonly targetId: SessionId
-  readonly content: ContentBlock[]
+  readonly content: readonly ContentBlock[]
 }
 
 /**
@@ -154,12 +154,29 @@ export interface TeamState {
  */
 export type AgentTeamProjection = Record<string, TeamState>
 
+/**
+ * Roster liveness for one {@link TeamMemberView} row. Distinct from
+ * `list_agents` residency (`running` / `idle` / `ready`) and from durable
+ * {@link TeamMemberPhase}.
+ *
+ * `unstarted` is a reserved template name with no session. `inactive` is a
+ * started member whose Agent is not loaded. `idle` is a loaded Agent between
+ * turns.
+ */
+export type TeamMemberStatus =
+  | 'running'
+  | 'idle'
+  | 'unstarted'
+  | 'inactive'
+  | 'provisioning'
+  | 'failed'
+
 /** Current runtime-enriched roster row. */
 export interface TeamMemberView {
   readonly id: SessionId
   readonly name: string
   readonly role: 'lead' | 'teammate'
-  readonly status: 'running' | 'idle' | 'inactive' | 'provisioning' | 'failed'
+  readonly status: TeamMemberStatus
   readonly description?: string
   readonly provider?: string
   readonly context?: 'fresh' | 'fork'
@@ -171,7 +188,7 @@ export interface TeamMemberView {
 export interface SpawnTeammateRequest {
   readonly name: string
   readonly description: string
-  readonly prompt: ContentBlock[]
+  readonly prompt: readonly ContentBlock[]
   readonly context: 'fresh' | 'fork'
   readonly provider: string
   readonly signal: AbortSignal
@@ -198,7 +215,7 @@ export interface SpawnTeammateResult {
 /** Input for one durable peer message. */
 export interface SendTeamMessageRequest {
   readonly target: string
-  readonly content: ContentBlock[]
+  readonly content: readonly ContentBlock[]
   readonly signal: AbortSignal
   /**
    * Lead-sent role for first provision. Shadows the child's `deployment:persona`.

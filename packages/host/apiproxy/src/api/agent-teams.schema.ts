@@ -13,6 +13,7 @@ export const agentTeamsMemberRowSchema = z.object({
   status: z.union([
     z.literal('running'),
     z.literal('idle'),
+    z.literal('unstarted'),
     z.literal('inactive'),
     z.literal('provisioning'),
     z.literal('failed'),

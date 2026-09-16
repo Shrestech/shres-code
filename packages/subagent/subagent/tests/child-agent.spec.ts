@@ -44,7 +44,7 @@ function parentForMeta(cwd?: string): Agent {
   return {
     session: { header: { id: SessionId('parent'), ...cwd === undefined ? {} : { cwd } } },
     ctx: { get: () => undefined },
-  } as Agent
+  } as unknown as Agent
 }
 
 describe('childSessionMeta workspace', () => {

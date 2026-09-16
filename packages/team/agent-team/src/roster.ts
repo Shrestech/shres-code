@@ -309,7 +309,7 @@ export class TeamRoster {
         provider: request.provider,
         label: description,
         request: {
-          prompt: request.prompt,
+          prompt: [...request.prompt],
           parent: root,
           ...request.agentOptions !== undefined ? { agentOptions: request.agentOptions } : {},
           ...request.persona !== undefined ? { persona: request.persona } : {},

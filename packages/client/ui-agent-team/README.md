@@ -15,7 +15,7 @@ The web-app bundle mounts this plugin wherever the Agent Teams runtime is compos
 
 ### What the panel shows
 
-- Roster rows in creation order: the Lead pinned first, then teammates with status (`running`, `idle`, `inactive`, `provisioning`, `failed`) and provider/model when bound.
+- Roster rows in creation order: the Lead pinned first, then teammates with status (`running`, `idle`, `unstarted`, `inactive`, `provisioning`, `failed`) and provider/model when bound.
 - Failed provisioning keeps its name reserved and shows the durable diagnostic under the row.
 - Teammates that are active expose `Open conversation`; the Lead row and unprovisioned template rows do not.
 

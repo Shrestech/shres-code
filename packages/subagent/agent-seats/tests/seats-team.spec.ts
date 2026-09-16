@@ -246,9 +246,9 @@ describe('agent-seats wired to Agent Teams', () => {
     const spy = vi.spyOn(ctx.subagents, 'startContinuable').mockImplementation(async (spec) => {
       started = {
         prompt: spec.request.prompt,
-        persona: spec.request.persona,
-        cwd: spec.request.cwd,
-        toolFilter: spec.request.toolFilter,
+        ...spec.request.persona !== undefined ? { persona: spec.request.persona } : {},
+        ...spec.request.cwd !== undefined ? { cwd: spec.request.cwd } : {},
+        ...spec.request.toolFilter !== undefined ? { toolFilter: spec.request.toolFilter } : {},
       }
       return orig(spec)
     })

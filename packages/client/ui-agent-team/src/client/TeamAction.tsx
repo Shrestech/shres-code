@@ -39,6 +39,7 @@ function navigable(member: AgentTeamsMemberRow): boolean {
     && !member.id.startsWith('unprovisioned:')
     && member.status !== 'failed'
     && member.status !== 'provisioning'
+    && member.status !== 'unstarted'
 }
 
 /**
