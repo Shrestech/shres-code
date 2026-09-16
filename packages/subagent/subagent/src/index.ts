@@ -109,8 +109,13 @@ export {
   captureDelegatedPolicyOverrides,
   childSessionMeta,
   effectiveChildRoute,
+  ENVIRONMENT_ORDER,
+  ENVIRONMENT_SECTION,
+  HARNESS_SOURCE_SECTION,
   resolveChildAgentOptions,
   resolveChildDepth,
+  resolveRequestedChildCwd,
+  SEAT_GUIDANCE_SECTION,
   SubagentDepthError,
 } from './child-agent.ts'
 export type { ChildComposition, DelegatedPolicyOverrides } from './child-agent.ts'

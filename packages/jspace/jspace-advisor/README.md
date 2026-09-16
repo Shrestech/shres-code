@@ -93,7 +93,7 @@ Append-only; each consult follows the request prefix.
 ## Known Limitations and Deferred Work
 
 - **Session-query tools need mounting** — the default `reviewerTools` covers only wiki reads because no shipped bundle mounts `tool-session-query`; a deployment that wants the advisor to `session_event_read` the named parent must mount that consumer and add the name to `reviewerTools`. Workspace-wide `session_search` stays off the default reviewer filter.
-- **Seat-roster reuse deferred** — the reviewer route is explicit config; reusing the `agent-seats` bindings would need a live seat-reading service (fast-follow).
+- **Seat-roster reuse deferred** — the reviewer route is explicit config; reusing the `agent-seats` bindings would need a live seat-reading service (fast-follow). Advisor is not an Agent Team member and never appears on `team_list`.
 - **Root sessions only** — delegated children carry their own folds and get no advisor.
 - **Standing-child reattachment depends on session persistence** — after a process restart the advisor reattaches to the prior continuable child via `followup` cold resume; without a mounted persistence provider the reattach attempt fails once and the next trigger starts a fresh advisor.
 - **Per-child setup contributions deferred** — the verdict travels as the final reply JSON rather than a child-scoped structured-output tool, because continuable children accept only persona/toolFilter composition today; a per-child setup seam on `startContinuable` is the documented fast-follow.

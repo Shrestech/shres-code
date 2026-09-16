@@ -21,7 +21,7 @@ import { CustomProviderCard } from './CustomProviderCard.tsx'
 import { deriveKeyRef, messageOf, protocolChoices, providerEnabled, providerUsable } from './store.ts'
 import type { ModelsSettingsState, ModelsSettingsStore, ProviderRow } from './store.ts'
 import { ProviderEditor, type ProviderEditorProps } from './ProviderEditor.tsx'
-import { SeatsCard } from './SeatsCard.tsx'
+import { TeamCard } from './TeamCard.tsx'
 import { SpeechAudioCard } from './SpeechAudioCard.tsx'
 import type { SpeechStatusFace } from './SpeechAudioCard.tsx'
 import type { en } from './locales.ts'
@@ -309,7 +309,7 @@ function Loaded({ injected }: { injected: ModelsSectionInjected }): ReactNode {
             {providerCopy(t('savedProvider'), savedIdentity)}
           </p>
         )}
-      <SeatsCard
+      <TeamCard
         state={state}
         api={api}
         reload={() => { void controller.load() }}

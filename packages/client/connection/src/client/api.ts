@@ -17,6 +17,7 @@ export type {
   SettingsApi, SettingsNamespaceView, SettingsPathOpView, SettingsSecretView,
   CredentialsApi, CredentialView, ConfigurableProviderView, DiscoveredModelView, LlmApi,
   SubagentsApi, SubagentAddress, SubagentCatalog, SubagentListEntry, SubagentPromptReceipt,
+  AgentTeamsApi, AgentTeamsMemberRow, AgentTeamsRoster,
   JobView,
 } from '@shres-code/shres-code-host-apiproxy/api'
 export type { ToolCallView, ToolResultView } from '@shres-code/shres-code-tools/presentation'

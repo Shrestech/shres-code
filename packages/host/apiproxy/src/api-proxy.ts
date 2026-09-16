@@ -40,7 +40,7 @@ import type {
   ImageMediaType, ModelCatalogFailure, ModelProviderGroup,
   ModelReasoning, MuxFrame, PromptContentPart, QuestionResponsePayload, SessionListMetadata, SessionProjectionsBlock, SessionSearchItem,
   QueuedInboxItem, SessionSummary, SettingsNamespaceView, SubagentAddress, JobView, ToolEventView,
-  WorkspaceId, WorkspaceView,
+  WorkspaceId, WorkspaceView, AgentTeamsRoster,
 } from './api/index.ts'
 import {
   DEFAULT_SESSION_LOG_COMPRESSION_LEVEL,
@@ -68,6 +68,9 @@ import type {} from '@shres-code/shres-code-session-projection-cache'
 // GoalError narrows domain rejections to their stable codes at the wire boundary.
 import { GoalError } from '@shres-code/shres-code-goal'
 import type { GoalRef as CoreGoalRef } from '@shres-code/shres-code-goal'
+// Type-only: resolves `ctx.get('agentTeams')` for the roster view; a composition
+// without the Team plugin still serves every other domain.
+import type {} from '@shres-code/shres-code-agent-team'
 // Type-only edges: resolve the command-change stream and `ctx.get('skills')`.
 import type {} from '@shres-code/shres-code-commands'
 // Type-only: the dynamic-package runner's forwarded-event declarations. Its
@@ -2775,6 +2778,32 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         }
         agent.cancel({ kind: 'user' }, { keepInbox: true })
         return Promise.resolve(ok(request, { accepted: true as const }))
+      },
+    },
+
+    agentTeams: {
+      async view(request) {
+        const sessionId = request.payload.sessionId
+        const empty: AgentTeamsRoster = { sessionId, isTeam: false, members: [] }
+        const teams = ctx.get('agentTeams')
+        const root = ctx.agents.get(sessionId)
+        if (teams === undefined || root === undefined) return ok(request, empty)
+        const membership = teams.tryMembership(root)
+        if (membership === undefined || membership.role !== 'lead') return ok(request, empty)
+        return ok(request, {
+          sessionId,
+          isTeam: true,
+          members: teams.listMembers(root).map(row => ({
+            name: row.name,
+            role: row.role,
+            status: row.status,
+            id: String(row.id),
+            ...row.description === undefined ? {} : { description: row.description },
+            ...row.provider === undefined ? {} : { provider: row.provider },
+            ...row.model === undefined ? {} : { model: row.model },
+            diagnostics: [...row.diagnostics],
+          })),
+        })
       },
     },
 

@@ -157,6 +157,8 @@ describe('shres-tool-subagent-control', () => {
       message: 'also consider Y',
     }, parent)
     expect(result.isError).toBe(false)
+    const live = ctx.agents.get(started.childId)
+    expect(live?.inbox.nextStep ?? []).toHaveLength(0)
 
     await waitNoActivation(ctx, started.childId)
     const loaded = await ctx.sessionPersistence.load(started.childId)

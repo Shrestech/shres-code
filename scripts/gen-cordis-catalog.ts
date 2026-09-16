@@ -48,6 +48,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   firstRunSetup: 'core.md',
   agentPresets: 'core.md',
   agents: 'core.md',
+  agentTeams: 'agent-team.md',
   apiProxy: 'typert.md',
   approval: 'approval.md',
   attachments: 'attachment.md',
@@ -217,6 +218,13 @@ export const EVENT_WALK_EXEMPTIONS: Record<string, string> = {
  */
 export const LINK_MAP: Readonly<Record<string, string>> = {
   Agent: 'core.md',
+  TeamMembership: 'agent-team.md',
+  TeamMemberView: 'agent-team.md',
+  SpawnTeammateRequest: 'agent-team.md',
+  SpawnTeammateResult: 'agent-team.md',
+  SendTeamMessageRequest: 'agent-team.md',
+  SendTeamMessageResult: 'agent-team.md',
+  TeamRosterTemplateEntry: 'agent-team.md',
   TunnelStateView: 'remote-control.md',
   AgentCancelCause: 'core.md',
   AgentFactory: 'core.md',

@@ -148,6 +148,8 @@ flowchart LR
   cfg --> plugin_shres_base_tool_subagent
   plugin_shres_base_agent_seats["agent-seats<br/>@shres-code/shres-code-agent-seats"]
   cfg --> plugin_shres_base_agent_seats
+  plugin_shres_base_agent_team["agent-team<br/>@shres-code/shres-code-agent-team"]
+  cfg --> plugin_shres_base_agent_team
   plugin_shres_base_tool_subagent_fork["tool-subagent-fork<br/>@shres-code/shres-code-tool-subagent"]
   cfg --> plugin_shres_base_tool_subagent_fork
   plugin_shres_base_tool_subagent_report["tool-subagent-report<br/>@shres-code/shres-code-tool-subagent-report"]
@@ -294,6 +296,7 @@ flowchart LR
 | `tool-subagent-list-agents` | `@shres-code/shres-code-tool-subagent-control/list-agents` |
 | `tool-subagent` | `@shres-code/shres-code-tool-subagent` |
 | `agent-seats` | `@shres-code/shres-code-agent-seats` |
+| `agent-team` | `@shres-code/shres-code-agent-team` |
 | `tool-subagent-fork` | `@shres-code/shres-code-tool-subagent` |
 | `tool-subagent-report` | `@shres-code/shres-code-tool-subagent-report` |
 | `workflow-worker-thread` | `@shres-code/shres-code-workflow-worker-thread` |

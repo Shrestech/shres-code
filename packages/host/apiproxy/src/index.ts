@@ -88,6 +88,7 @@ export class ApiProxyService extends Service implements ApiProxy {
 
   readonly sessions: ApiProxy['sessions']
   readonly subagents: ApiProxy['subagents']
+  readonly agentTeams: ApiProxy['agentTeams']
   readonly workspace: ApiProxy['workspace']
   readonly host: ApiProxy['host']
   readonly goals: ApiProxy['goals']
@@ -119,6 +120,7 @@ export class ApiProxyService extends Service implements ApiProxy {
     })
     this.sessions = api.sessions
     this.subagents = api.subagents
+    this.agentTeams = api.agentTeams
     this.workspace = api.workspace
     this.host = api.host
     this.goals = api.goals

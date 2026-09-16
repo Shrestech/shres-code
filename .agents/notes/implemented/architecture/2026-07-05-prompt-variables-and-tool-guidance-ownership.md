@@ -30,7 +30,7 @@ Plugins register `{{name}}` values through `ctx.systemPrompt.variable(name, prov
 
 ### Persona as the order-0 section
 
-`shres-system-prompt` owns `harness:identity` at order `-100` and the configured `deployment:persona` at order 0, so both survive a replacement loop. Prompt rendering has one path, `renderPrompt(assembly)`, and the routed request header therefore records the exact prompt later replayed by `ctx.tokenMeter` for compaction pressure. An agent-scoped `deployment:persona` shadows the global default and lets subagent providers install a persona before publication. The conventional order bands are identity `-100`, persona `0`, and tool guidance `100–199`.
+`shres-system-prompt` owns `harness:identity` at order `-100` and the configured `deployment:persona` at order 0, so both survive a replacement loop. Prompt rendering has one path, `renderPrompt(assembly)`, and the routed request header therefore records the exact prompt later replayed by `ctx.tokenMeter` for compaction pressure. An agent-scoped `deployment:persona` shadows the global default and lets subagent providers install a persona before publication. The conventional order bands are identity `-100`, persona `0`, and tool guidance `100–199`. In-process children add `deployment:environment` at `200`; Agent Teams teammates add `team:policy` at `600`. The slot name stays `deployment:persona` ([layout without loop](2026-09-16-system-prompt-layout-without-loop.md)).
 
 ### Tool guidance ownership
 

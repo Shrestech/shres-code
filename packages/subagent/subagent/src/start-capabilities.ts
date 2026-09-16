@@ -9,7 +9,7 @@
 import { SubagentError } from './error.ts'
 import type { SubagentCapabilities, SubagentStartRequest } from './types.ts'
 
-type StartOptionRequest = Pick<SubagentStartRequest, 'outputSchema' | 'maxDepth' | 'toolFilter' | 'persona'>
+type StartOptionRequest = Pick<SubagentStartRequest, 'outputSchema' | 'maxDepth' | 'toolFilter' | 'persona' | 'cwd'>
 
 const START_OPTIONS = [
   {
@@ -32,6 +32,11 @@ const START_OPTIONS = [
     cap: 'persona',
     present: (request: StartOptionRequest) => request.persona !== undefined,
   },
+  {
+    option: 'cwd',
+    cap: 'cwd',
+    present: (request: StartOptionRequest) => request.cwd !== undefined,
+  },
 ] as const satisfies ReadonlyArray<{
   option: string
   cap: keyof SubagentCapabilities
@@ -48,7 +53,7 @@ const START_OPTIONS = [
  */
 export function assertStartCapabilities(
   providerName: string,
-  request: Pick<SubagentStartRequest, 'outputSchema' | 'maxDepth' | 'toolFilter' | 'persona'>,
+  request: Pick<SubagentStartRequest, 'outputSchema' | 'maxDepth' | 'toolFilter' | 'persona' | 'cwd'>,
   capabilities: SubagentCapabilities,
 ): void {
   for (const { option, cap, present } of START_OPTIONS) {

@@ -196,6 +196,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Plugins register namespace schemas and resolve layered values; providers store the raw document. The LLM adapters register their entry config as the composition base under the user section; the web gateway serves redacted layered descriptors and writes the user layer.',
   },
   {
+    key: 'agentTeams',
+    pkg: 'team/agent-team',
+    title: 'Agent Teams runtime seam',
+    mode: 'seam',
+    consumers: ['apiproxy', 'tool-cordis'],
+    note: 'The plugin provides the service over the exact live Lead Session log: roster provisioning, the durable mailbox, and team_send/team_list consume it; agent-seats lazily provisions template members, apiproxy serves the chat roster view, and the tool catalog documents the surface.',
+  },
+  {
     key: 'credentials',
     pkg: 'credentials',
     title: 'Credential seam',

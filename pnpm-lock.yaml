@@ -514,9 +514,15 @@ importers:
       '@shres-code/shres-code-agent-loop':
         specifier: workspace:*
         version: link:../packages/core/agent-loop
+      '@shres-code/shres-code-agent-seats':
+        specifier: workspace:*
+        version: link:../packages/subagent/agent-seats
       '@shres-code/shres-code-agent-spine-demo':
         specifier: workspace:*
         version: link:../packages/examples/agent-spine-demo
+      '@shres-code/shres-code-agent-team':
+        specifier: workspace:*
+        version: link:../packages/team/agent-team
       '@shres-code/shres-code-app-boot':
         specifier: workspace:*
         version: link:../packages/boot/app-boot
@@ -1144,6 +1150,9 @@ importers:
       '@shres-code/shres-code-agent-seats':
         specifier: workspace:^
         version: link:../../subagent/agent-seats
+      '@shres-code/shres-code-agent-team':
+        specifier: workspace:^
+        version: link:../../team/agent-team
       '@shres-code/shres-code-api-gateway':
         specifier: workspace:^
         version: link:../../api/gateway
@@ -1518,6 +1527,9 @@ importers:
       '@shres-code/shres-code-client-ui-agent-preset':
         specifier: workspace:^
         version: link:../../client/ui-agent-preset
+      '@shres-code/shres-code-client-ui-agent-team':
+        specifier: workspace:^
+        version: link:../../client/ui-agent-team
       '@shres-code/shres-code-client-ui-commands':
         specifier: workspace:^
         version: link:../../client/ui-commands
@@ -1944,6 +1956,46 @@ importers:
       react:
         specifier: ^19.2.8
         version: 19.2.8
+
+  packages/client/ui-agent-team:
+    dependencies:
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/shres-code-api-remotes':
+        specifier: workspace:^
+        version: link:../../api/remotes
+      '@shres-code/shres-code-client-connection':
+        specifier: workspace:^
+        version: link:../connection
+      '@shres-code/shres-code-client-locale':
+        specifier: workspace:^
+        version: link:../locale
+      '@shres-code/shres-code-client-runtime':
+        specifier: workspace:^
+        version: link:../runtime
+      '@shres-code/shres-code-client-test-runtime':
+        specifier: workspace:^
+        version: link:../../test-support/client-runtime
+      '@shres-code/shres-code-client-ui-conversation':
+        specifier: workspace:^
+        version: link:../ui-conversation
+      '@shres-code/shres-code-client-ui-primitives':
+        specifier: workspace:^
+        version: link:../ui-primitives
+      '@shres-code/shres-code-client-ui-slots':
+        specifier: workspace:^
+        version: link:../ui-slots
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@types/react':
+        specifier: ~19.2.18
+        version: 19.2.18
 
   packages/client/ui-attachment:
     dependencies:
@@ -5434,6 +5486,9 @@ importers:
       '@shres-code/shres-code-agent-presets':
         specifier: workspace:^
         version: link:../../preset/agent-presets
+      '@shres-code/shres-code-agent-team':
+        specifier: workspace:^
+        version: link:../../team/agent-team
       '@shres-code/shres-code-cordis-host-runner':
         specifier: workspace:^
         version: link:../../extensions/cordis-host-runner
@@ -8256,6 +8311,15 @@ importers:
       '@shres-code/shres-code-agent':
         specifier: workspace:^
         version: link:../../core/agent
+      '@shres-code/shres-code-agent-loop':
+        specifier: workspace:^
+        version: link:../../core/agent-loop
+      '@shres-code/shres-code-agent-loop-testkit':
+        specifier: workspace:^
+        version: link:../../test-support/agent-loop-testkit
+      '@shres-code/shres-code-agent-team':
+        specifier: workspace:^
+        version: link:../../team/agent-team
       '@shres-code/shres-code-invariants':
         specifier: workspace:^
         version: link:../../runtime-diagnostics/invariants
@@ -8265,6 +8329,12 @@ importers:
       '@shres-code/shres-code-session':
         specifier: workspace:^
         version: link:../../core/session
+      '@shres-code/shres-code-session-persistence-jsonl':
+        specifier: workspace:^
+        version: link:../../session/session-persistence-jsonl
+      '@shres-code/shres-code-session-projection':
+        specifier: workspace:^
+        version: link:../../session/session-projection
       '@shres-code/shres-code-settings':
         specifier: workspace:^
         version: link:../../settings/settings
@@ -8274,6 +8344,9 @@ importers:
       '@shres-code/shres-code-subagent':
         specifier: workspace:^
         version: link:../subagent
+      '@shres-code/shres-code-subagent-spawn-in-process':
+        specifier: workspace:^
+        version: link:../subagent-spawn-in-process
       '@shres-code/shres-code-system-prompt':
         specifier: workspace:^
         version: link:../../core/system-prompt
@@ -8344,6 +8417,9 @@ importers:
       '@shres-code/shres-code-storage-domain':
         specifier: workspace:^
         version: link:../../storage/storage-domain
+      '@shres-code/shres-code-system-prompt':
+        specifier: workspace:^
+        version: link:../../core/system-prompt
       '@shres-code/shres-code-tools':
         specifier: workspace:^
         version: link:../../core/tools
@@ -8944,6 +9020,15 @@ importers:
       '@shres-code/cordis-plugin-loader':
         specifier: workspace:^
         version: link:../../../vendor/loader
+      '@shres-code/shres-code-agent':
+        specifier: workspace:^
+        version: link:../../core/agent
+      '@shres-code/shres-code-agent-loop':
+        specifier: workspace:^
+        version: link:../../core/agent-loop
+      '@shres-code/shres-code-agent-loop-testkit':
+        specifier: workspace:^
+        version: link:../../test-support/agent-loop-testkit
       '@shres-code/shres-code-brand':
         specifier: workspace:^
         version: link:../../util/brand
@@ -8956,9 +9041,27 @@ importers:
       '@shres-code/shres-code-session':
         specifier: workspace:^
         version: link:../../core/session
+      '@shres-code/shres-code-session-persistence':
+        specifier: workspace:^
+        version: link:../../session/session-persistence
+      '@shres-code/shres-code-session-persistence-jsonl':
+        specifier: workspace:^
+        version: link:../../session/session-persistence-jsonl
       '@shres-code/shres-code-session-projection':
         specifier: workspace:^
         version: link:../../session/session-projection
+      '@shres-code/shres-code-subagent':
+        specifier: workspace:^
+        version: link:../../subagent/subagent
+      '@shres-code/shres-code-subagent-spawn-in-process':
+        specifier: workspace:^
+        version: link:../../subagent/subagent-spawn-in-process
+      '@shres-code/shres-code-system-prompt':
+        specifier: workspace:^
+        version: link:../../core/system-prompt
+      '@shres-code/shres-code-tools':
+        specifier: workspace:^
+        version: link:../../core/tools
 
   packages/terminal/terminal:
     devDependencies:

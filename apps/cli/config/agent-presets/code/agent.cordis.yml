@@ -184,8 +184,10 @@
     - id: tool-subagent-list-agents
       name: '@shres-code/shres-code-tool-subagent-control/list-agents'
 
+    # Host agent-seats remounts the generic hire and applies seats.subagent.
     - id: tool-subagent
       name: '@shres-code/shres-code-tool-subagent'
+      disabled: true
       config:
         provider: spawn
         toolName: subagent

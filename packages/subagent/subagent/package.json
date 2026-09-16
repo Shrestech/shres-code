@@ -55,6 +55,7 @@
     "@shres-code/shres-code-session-projection": "workspace:^",
     "@shres-code/shres-code-session-projection-cache": "workspace:^",
     "@shres-code/shres-code-jobs": "workspace:^",
+    "@shres-code/shres-code-system-prompt": "workspace:^",
     "@shres-code/shres-code-tools": "workspace:^",
     "@shres-code/shres-code-user-approval": "workspace:^",
     "@shres-code/cordis": "workspace:^"
@@ -102,6 +103,7 @@
     "@shres-code/shres-code-storage": "workspace:^",
     "@shres-code/shres-code-storage-domain": "workspace:^",
     "@shres-code/shres-code-jobs": "workspace:^",
+    "@shres-code/shres-code-system-prompt": "workspace:^",
     "@shres-code/shres-code-tools": "workspace:^",
     "@shres-code/shres-code-user-approval": "workspace:^",
     "@shres-code/cordis": "workspace:^"

@@ -33,7 +33,9 @@ import type {} from '@shres-code/shres-code-agent-presets'
 // (the documented `ctx.get` pattern), never a hard dep; the read is
 // non-installing, so it never attaches selection listeners to the parent.
 import type {} from '@shres-code/shres-code-agent-default-model'
+import type {} from '@shres-code/shres-code-system-prompt'
 import { delegationDepthOf } from './depth.ts'
+import { assertUsableCwd } from './out-of-process.ts'
 
 /** Thrown when starting a child would exceed the requested depth cap. */
 export class SubagentDepthError extends Error {
@@ -151,17 +153,20 @@ export function resolveChildAgentOptions(
  * @param parent - the delegating parent agent.
  * @param childDepth - the resolved delegation depth to persist.
  * @param lineageSeedLength - how many leading events came from the parent's log.
+ * @param cwd - optional validated workspace override; omitted inherits the parent cwd.
  * @returns the `meta` for `ctx.agents.create()`.
  */
 export function childSessionMeta(
   parent: Agent,
   childDepth: number,
   lineageSeedLength: number,
+  cwd?: string,
 ): NonNullable<CreateAgentOptions['meta']> {
   const parentHeader = parent.session.header
+  const workspace = cwd ?? parentHeader.cwd
   const agentPreset = parent.ctx.get('agentPresets')?.composedPreset(parent.ctx)
   return {
-    ...parentHeader.cwd !== undefined ? { cwd: parentHeader.cwd } : {},
+    ...workspace !== undefined ? { cwd: workspace } : {},
     ...agentPreset === undefined ? {} : { agentPreset },
     parentSession: parentHeader.id,
     // Navigation classification only; the descriptor remains the authority
@@ -171,6 +176,31 @@ export function childSessionMeta(
     delegationDepth: childDepth,
     ...lineageSeedLength > 0 ? { seedLength: lineageSeedLength } : {},
   }
+}
+
+/** Global `harness:source` name; children shadow it empty so they do not treat the checkout as the task. */
+export const HARNESS_SOURCE_SECTION = 'harness:source'
+
+/** Lead `tool:agent-seats` name; children shadow it empty because they are not the Lead. */
+export const SEAT_GUIDANCE_SECTION = 'tool:agent-seats'
+
+/** Teammate working-directory section after tool guidance. The role slot stays `deployment:persona`. */
+export const ENVIRONMENT_SECTION = 'deployment:environment'
+
+/** Prompt order of {@link ENVIRONMENT_SECTION}, after the 100–199 tool-guidance band. */
+export const ENVIRONMENT_ORDER = 200
+
+/**
+ * Validate an optional in-process child workspace override. Whitespace is
+ * omitted so the child inherits the parent session cwd.
+ * @param requested - caller-supplied cwd, or undefined.
+ * @returns the enterable absolute path, or undefined to inherit.
+ */
+export function resolveRequestedChildCwd(requested: string | undefined): string | undefined {
+  if (requested === undefined) return undefined
+  const cwd = requested.trim()
+  if (cwd.length === 0) return undefined
+  return assertUsableCwd('subagent', 'child cwd', cwd)
 }
 
 /** The scoped composition a child agent's creation window applies. */
@@ -194,10 +224,11 @@ export const SUBAGENT_DELEGATION_CONTEXT
 
 /**
  * Compose one child inside its creation window: join its parent's preset,
- * register the fixed delegation-scope statement, then apply the child's own
- * shadowing persona section and tool restriction, all owned by the child's
- * scope and therefore invisible to its parent and siblings. Creation and cold
- * resume both pass through here.
+ * register the fixed delegation-scope statement, suppress Lead-only prompt
+ * sections, then apply the child's own shadowing persona and tool
+ * restriction, all owned by the child's scope and therefore
+ * invisible to its parent and siblings. Creation and cold resume both pass
+ * through here.
  *
  * The join comes first and the child's own registrations second, which is the
  * order the layering already implies — the nearest scope wins a name, and a
@@ -222,6 +253,8 @@ export function applyChildComposition(
   childCtx.get('agentPresets')?.composeFrom(childCtx, parent.ctx)
   // Order 120: after the sandbox:policy (110) and approval:policy (115) sentences.
   childCtx.systemPrompt.context({ name: 'subagent:delegation', order: 120, text: SUBAGENT_DELEGATION_CONTEXT })
+  childCtx.systemPrompt.section({ name: HARNESS_SOURCE_SECTION, order: -99, text: '' })
+  childCtx.systemPrompt.section({ name: SEAT_GUIDANCE_SECTION, order: 115, text: '' })
   if (composition.persona !== undefined) {
     childCtx.systemPrompt.section({ name: 'deployment:persona', order: 0, text: composition.persona })
   }

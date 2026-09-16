@@ -416,8 +416,10 @@
     - id: tool-subagent-list-agents
       name: '@shres-code/shres-code-tool-subagent-control/list-agents'
 
+    # agent-seats remounts the generic `subagent` hire (optional seats.subagent route).
     - id: tool-subagent
       name: '@shres-code/shres-code-tool-subagent'
+      disabled: true
       config:
         provider: spawn
         toolName: subagent
@@ -427,6 +429,9 @@
     # `agent-seats` settings section. Unbound seats register nothing.
     - id: agent-seats
       name: '@shres-code/shres-code-agent-seats'
+
+    - id: agent-team
+      name: '@shres-code/shres-code-agent-team'
 
     # Fork stays one-shot: a continuable child's `report` tool and prompt
     # section precede the inherited history a fork exists to reuse; one-shot

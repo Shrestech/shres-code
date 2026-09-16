@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { Context } from '@shres-code/cordis'
+import { Context, Service } from '@shres-code/cordis'
+import type { Agent } from '@shres-code/shres-code-agent'
 import SessionStore from '@shres-code/shres-code-session'
+import SessionProjectionRegistry from '@shres-code/shres-code-session-projection'
 import { TeamError } from '../src/error.ts'
 import { TeamJournal } from '../src/journal.ts'
-import { ROOT, TEAM, member } from './helpers.ts'
+import { teamProjectionDefinition } from '../src/projection.ts'
+import type { AgentTeamProjection, TeamState } from '../src/types.ts'
+import { ROOT, TEAM, event, member } from './helpers.ts'
 
 async function setup(options: { flush?: 'ok' | 'reject' | 'none' } = {}) {
   const ctx = new Context()
@@ -75,5 +79,49 @@ describe('TeamJournal', () => {
   it('wraps a rejecting flush as TEAM_PERSISTENCE_FAILED', async () => {
     const { session, journal } = await setup({ flush: 'reject' })
     await expect(journal.flush(session)).rejects.toBeInstanceOf(TeamError)
+  })
+
+  it('fails loud when the agentTeam projection unit is not registered', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(SessionProjectionRegistry)
+    const session = ctx.sessions.create(ROOT)
+    const journal = new TeamJournal(ctx)
+    expect(() => journal.state({ id: ROOT, session } as Agent)).toThrow(/not registered/)
+    await ctx.fiber.dispose()
+  })
+
+  /** Service stub providing one fixed projection snapshot. */
+  class FaultedProjections extends Service {
+    constructor(ctx: Context, private readonly faulted: AgentTeamProjection) {
+      super(ctx, 'sessionProjections')
+    }
+
+    snapshot(): { values: { agentTeam: AgentTeamProjection } } {
+      return { values: { agentTeam: this.faulted } }
+    }
+  }
+
+  it('fails loud with TEAM_LOG_FAULT when replay recorded a fault', async () => {
+    const seeded = member()
+    // The write-side invariant rejects illegal transitions, so drive the
+    // projection definition directly to reproduce a log written without it.
+    const faulted = teamProjectionDefinition.apply({}, event('team/member', {
+      teamId: TEAM,
+      member: { ...seeded, name: 'worker-b', phase: 'active' },
+    }, 1))
+    expect(teamProjectionDefinition.view(faulted)[String(TEAM)]?.fault).toBeTypeOf('string')
+    const ctx = new Context()
+    await ctx.plugin(FaultedProjections, faulted as unknown as AgentTeamProjection)
+    const journal = new TeamJournal(ctx)
+    const state = (): TeamState => journal.state({ id: ROOT, session: {} as never } as unknown as Agent)
+    expect(state).toThrow(TeamError)
+    let caught: unknown
+    try {
+      state()
+    } catch (error: unknown) {
+      caught = error
+    }
+    expect(caught).toMatchObject({ name: 'TeamError', code: 'TEAM_LOG_FAULT' } satisfies Partial<TeamError>)
   })
 })

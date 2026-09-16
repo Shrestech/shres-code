@@ -6,7 +6,7 @@
  * @module @shres-code/shres-code-agent-team/types
  */
 
-import type { ContentBlock } from '@shres-code/shres-code-llm'
+import type { ContentBlock, MessageSource } from '@shres-code/shres-code-llm'
 import type { SessionId } from '@shres-code/shres-code-session/types'
 import type { TeamId, TeamMessageId, TeamTaskId } from './brand.ts'
 
@@ -47,7 +47,7 @@ export interface TeamMessageSnapshot {
   readonly senderId: SessionId
   readonly senderName: string
   readonly targetId: SessionId
-  readonly content: ContentBlock[]
+  readonly content: readonly ContentBlock[]
 }
 
 /**
@@ -140,6 +140,8 @@ export interface TeamState {
   readonly messages: TeamMessageSnapshot[]
   readonly delivered: TeamMessageId[]
   readonly nextTaskNumber: number
+  /** Replay fault recorded by the fold; a faulted Team freezes at its last good snapshot. */
+  readonly fault?: string
 }
 
 /**
@@ -151,6 +153,99 @@ export interface TeamState {
  * select by identity after the snapshot.
  */
 export type AgentTeamProjection = Record<string, TeamState>
+
+/**
+ * Roster liveness for one {@link TeamMemberView} row. Distinct from
+ * `list_agents` residency (`running` / `idle` / `ready`) and from durable
+ * {@link TeamMemberPhase}.
+ *
+ * `unstarted` is a reserved template name with no session. `inactive` is a
+ * started member whose Agent is not loaded. `idle` is a loaded Agent between
+ * turns.
+ */
+export type TeamMemberStatus =
+  | 'running'
+  | 'idle'
+  | 'unstarted'
+  | 'inactive'
+  | 'provisioning'
+  | 'failed'
+
+/** Current runtime-enriched roster row. */
+export interface TeamMemberView {
+  readonly id: SessionId
+  readonly name: string
+  readonly role: 'lead' | 'teammate'
+  readonly status: TeamMemberStatus
+  readonly description?: string
+  readonly provider?: string
+  readonly context?: 'fresh' | 'fork'
+  readonly model?: string
+  readonly diagnostics: string[]
+}
+
+/** Input for creating one durable teammate. */
+export interface SpawnTeammateRequest {
+  readonly name: string
+  readonly description: string
+  readonly prompt: readonly ContentBlock[]
+  readonly context: 'fresh' | 'fork'
+  readonly provider: string
+  readonly signal: AbortSignal
+  readonly persona?: string
+  /**
+   * Optional teammate workspace. Becomes the child's session cwd on first
+   * provision. Whitespace is omitted; a non-empty value must be an enterable
+   * absolute directory.
+   */
+  readonly cwd?: string
+  /**
+   * Durable source for the child's initial inbox message. Omitted is an
+   * ordinary user prompt.
+   */
+  readonly source?: MessageSource
+  readonly agentOptions?: { readonly provider?: string; readonly model?: string }
+}
+
+/** Result after one teammate reaches a durable active or failed edge. */
+export interface SpawnTeammateResult {
+  readonly member: TeamMemberView
+}
+
+/** Input for one durable peer message. */
+export interface SendTeamMessageRequest {
+  readonly target: string
+  readonly content: readonly ContentBlock[]
+  readonly signal: AbortSignal
+  /**
+   * Lead-sent role for first provision. Shadows the child's `deployment:persona`.
+   * Tool guidance, team policy, and the working-directory line stay. Ignored
+   * after the teammate is active.
+   */
+  readonly persona?: string
+  /**
+   * Optional teammate workspace for first provision. Becomes the child's
+   * session cwd and AGENTS.md root. Whitespace is omitted. A non-empty value
+   * after the teammate is active is rejected.
+   */
+  readonly cwd?: string
+}
+
+/** Result after a peer message enters the durable mailbox. */
+export interface SendTeamMessageResult {
+  readonly messageId: TeamMessageId
+  readonly status: 'accepted' | 'queued'
+}
+
+/** Human-configured teammate that can be lazily provisioned. */
+export interface TeamRosterTemplateEntry {
+  readonly name: string
+  readonly description: string
+  readonly persona?: string
+  readonly provider: string
+  readonly model?: string
+  readonly context?: 'fresh' | 'fork'
+}
 
 declare module '@shres-code/shres-code-session-projection/types' {
   interface SessionProjectionMap {

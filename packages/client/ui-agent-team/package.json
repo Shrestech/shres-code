@@ -1,0 +1,84 @@
+{
+  "name": "@shres-code/shres-code-client-ui-agent-team",
+  "description": "Chat-header Team roster panel over the agentTeams view RPC",
+  "version": "0.1.0-rc.5",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
+    "directory": "packages/client/ui-agent-team"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./invariant": {
+      "types": "./lib/types/invariant.d.ts",
+      "default": "./lib/invariant.js"
+    },
+    "./client": {
+      "types": "./lib/types/client/index.d.ts",
+      "default": "./lib/client.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "shres": {
+    "client": {
+      "inject": [
+        "@shres-code/shres-code-client-connection",
+        "@shres-code/shres-code-client-locale",
+        "@shres-code/shres-code-client-runtime",
+        "@shres-code/shres-code-client-ui-conversation",
+        "@shres-code/shres-code-client-ui-primitives",
+        "@shres-code/shres-code-client-ui-slots",
+        "@shres-code/shres-code-api-remotes"
+      ],
+      "platform": "web"
+    }
+  },
+  "scripts": {
+    "bundle": "tsdown",
+    "watch": "tsdown --watch"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "react": "^19.2.8"
+  },
+  "peerDependencies": {
+    "@shres-code/cordis": "workspace:^",
+    "@shres-code/shres-code-api-remotes": "workspace:^",
+    "@shres-code/shres-code-client-connection": "workspace:^",
+    "@shres-code/shres-code-client-locale": "workspace:^",
+    "@shres-code/shres-code-client-runtime": "workspace:^",
+    "@shres-code/shres-code-client-ui-conversation": "workspace:^",
+    "@shres-code/shres-code-client-ui-primitives": "workspace:^",
+    "@shres-code/shres-code-client-ui-slots": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^"
+  },
+  "devDependencies": {
+    "@shres-code/cordis": "workspace:^",
+    "@shres-code/shres-code-api-remotes": "workspace:^",
+    "@shres-code/shres-code-client-connection": "workspace:^",
+    "@shres-code/shres-code-client-locale": "workspace:^",
+    "@shres-code/shres-code-client-runtime": "workspace:^",
+    "@shres-code/shres-code-client-test-runtime": "workspace:^",
+    "@shres-code/shres-code-client-ui-conversation": "workspace:^",
+    "@shres-code/shres-code-client-ui-primitives": "workspace:^",
+    "@shres-code/shres-code-client-ui-slots": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@types/react": "~19.2.18"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/invariant.js",
+    "lib/client.js",
+    "lib/types/**/*.d.ts"
+  ]
+}

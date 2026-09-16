@@ -6,7 +6,7 @@ import SubagentRuntime from '@shres-code/shres-code-subagent'
 import z from '@shres-code/schemastery'
 import { SettingsProvider, settingsNamespace, type SettingsNamespace } from '@shres-code/shres-code-settings'
 import * as seats from '../src/index.ts'
-import { boundSeats, SEAT_ROSTER } from '../src/roster.ts'
+import { assertExtras, boundSeats, boundSubagentSeat, SEAT_ROSTER, seatUseGuidance } from '../src/roster.ts'
 
 /** The smallest real provider: one in-memory document, always writable. */
 class MemorySettings extends SettingsProvider {
@@ -64,11 +64,30 @@ describe('boundSeats', () => {
     expect(aegis?.entry.id).toBe('aegis')
     expect(aegis?.provider).toBe('ollama-cloud')
     expect(aegis?.model).toBe('kimi-k3')
+    expect(aegis?.entry.persona).toBe(SEAT_ROSTER[0]?.persona)
+  })
+})
+
+describe('assertExtras / boundSubagentSeat', () => {
+  it('rejects extras that collide with product seats and pins a complete generic hire route', () => {
+    expect(assertExtras(undefined)).toEqual([])
+    expect(() => assertExtras([{ name: 'aegis', persona: 'p', provider: 'x', model: 'y' }])).toThrow(/collides/)
+    expect(() => assertExtras([{ name: 'subagent', persona: 'p', provider: 'x', model: 'y' }])).toThrow(/collides/)
+    expect(() => assertExtras([
+      { name: 'researcher', persona: 'p', provider: 'x', model: 'y' },
+      { name: 'researcher', persona: 'q', provider: 'x', model: 'y' },
+    ])).toThrow(/duplicated/)
+    expect(assertExtras([{ name: 'researcher', persona: 'p', provider: 'x', model: 'y' }])).toHaveLength(1)
+    expect(boundSubagentSeat({})).toBeUndefined()
+    expect(boundSubagentSeat({ seats: { subagent: { provider: 'ollama-cloud' } } })).toBeUndefined()
+    expect(boundSubagentSeat({
+      seats: { subagent: { provider: 'ollama-cloud', model: 'glm-5.3-flash:cloud' } },
+    })).toEqual({ provider: 'ollama-cloud', model: 'glm-5.3-flash:cloud' })
   })
 })
 
 describe('agent-seats remount', () => {
-  it('registers no tools while every seat is unbound', async () => {
+  it('registers no named seats while every product seat is unbound', async () => {
     const { ctx } = await boot()
     expect(toolNames(ctx).filter(name => name === 'aegis' || name === 'stride' || name === 'ward')).toEqual([])
     await ctx.fiber.dispose()
@@ -87,9 +106,47 @@ describe('agent-seats remount', () => {
     const aegis = ctx.tools.schemas().find(schema => schema.name === 'aegis')
     expect(aegis?.description).toContain('Architect')
     expect(aegis?.description).toContain('does not implement')
+    const both = (await ctx.systemPrompt.assemble()).sections.find(section => section.name === 'tool:agent-seats')
+    expect(both?.text).toBe(seatUseGuidance(boundSeats({
+      seats: {
+        aegis: { provider: 'ollama-cloud', model: 'kimi-k3' },
+        ward: { provider: 'deepseek-official', model: 'deepseek-v4-pro' },
+      },
+    })))
 
     await ctx.settings.replace(seats.AGENT_SEATS_SETTINGS_NAMESPACE, { seats: {} })
     expect(toolNames(ctx).filter(name => name === 'aegis' || name === 'ward')).toEqual([])
+    expect((await ctx.systemPrompt.assemble()).sections.some(section => section.name === 'tool:agent-seats')).toBe(false)
+    await ctx.fiber.dispose()
+  })
+
+  it('tells the Lead to use only the bound Architect or Reviewer seat', async () => {
+    const { ctx } = await boot()
+    await ctx.settings.replace(seats.AGENT_SEATS_SETTINGS_NAMESPACE, {
+      seats: { stride: { provider: 'ollama-cloud', model: 'kimi-k3' } },
+    })
+    expect((await ctx.systemPrompt.assemble()).sections.some(section => section.name === 'tool:agent-seats')).toBe(false)
+    await ctx.settings.replace(seats.AGENT_SEATS_SETTINGS_NAMESPACE, {
+      seats: { aegis: { provider: 'ollama-cloud', model: 'kimi-k3' } },
+    })
+    expect((await ctx.systemPrompt.assemble()).sections.find(section => section.name === 'tool:agent-seats')?.text)
+      .toBe(seatUseGuidance(boundSeats({ seats: { aegis: { provider: 'ollama-cloud', model: 'kimi-k3' } } })))
+    await ctx.settings.replace(seats.AGENT_SEATS_SETTINGS_NAMESPACE, {
+      seats: { ward: { provider: 'deepseek-official', model: 'deepseek-v4-pro' } },
+    })
+    expect((await ctx.systemPrompt.assemble()).sections.find(section => section.name === 'tool:agent-seats')?.text)
+      .toBe(seatUseGuidance(boundSeats({ seats: { ward: { provider: 'deepseek-official', model: 'deepseek-v4-pro' } } })))
+    await ctx.fiber.dispose()
+  })
+
+  it('pins the generic subagent hire when seats.subagent is fully bound', async () => {
+    const { ctx } = await boot()
+    await ctx.settings.replace(seats.AGENT_SEATS_SETTINGS_NAMESPACE, {
+      seats: { subagent: { provider: 'ollama-cloud', model: 'glm-5.3-flash:cloud' } },
+    })
+    expect(toolNames(ctx)).toContain('subagent')
+    const schema = ctx.tools.schemas().find(entry => entry.name === 'subagent')
+    expect(schema).toBeDefined()
     await ctx.fiber.dispose()
   })
 
@@ -124,17 +181,44 @@ describe('agent-seats remount', () => {
     expect(() => service!.register(probe, z.object({}))).toThrow(/already registered/)
   })
 
+  it('writes Lead guidance only for bound Architect and Reviewer seats', () => {
+    expect(seatUseGuidance([])).toBe('')
+    expect(seatUseGuidance(boundSeats({ seats: { stride: { provider: 'p', model: 'm' } } }))).toBe('')
+    const aegis = seatUseGuidance(boundSeats({ seats: { aegis: { provider: 'p', model: 'm' } } }))
+    expect(aegis).toContain('use the aegis seat')
+    expect(aegis).not.toContain('ward')
+    const ward = seatUseGuidance(boundSeats({ seats: { ward: { provider: 'p', model: 'm' } } }))
+    expect(ward).toContain('use the ward seat')
+    expect(ward).not.toContain('aegis')
+    const both = seatUseGuidance(boundSeats({
+      seats: { aegis: { provider: 'p', model: 'm' }, ward: { provider: 'p', model: 'm' } },
+    }))
+    expect(both).toContain('aegis')
+    expect(both).toContain('ward')
+    expect(both).toContain('replaces the shipped seat role only')
+    expect(both).toContain('Pass cwd')
+  })
+
   it('keeps roster labels aligned with the three product seats', () => {
     expect(SEAT_ROSTER.map(entry => [entry.id, entry.label, entry.role])).toEqual([
       ['aegis', 'Aegis', 'Architect'],
       ['stride', 'Stride', 'Worker'],
       ['ward', 'Ward', 'Reviewer'],
     ])
+    expect(SEAT_ROSTER.map(entry => entry.persona)).toEqual([
+      'You are Aegis, the Architect. Design the approach, name the trade-offs, and return a concrete plan. '
+      + 'Do not implement unless the parent explicitly asks you to. Stay in this workspace.',
+      'You are Stride, the Worker. Implement the assigned work in this workspace. Stay inside the given bound. '
+      + 'Do not redesign the plan unless it is blocked.',
+      'You are Ward, the Reviewer. Review the assigned work for correctness, regressions, and missed cases. '
+      + 'Report findings; do not rewrite unless the parent asks.',
+    ])
     expect(seats.seatToolConfig({
       entry: SEAT_ROSTER[0]!,
       provider: 'p',
       model: 'm',
     })).toMatchObject({
+      persona: SEAT_ROSTER[0]!.persona,
       provider: 'spawn',
       toolName: 'aegis',
       backgroundMode: 'continuable',

@@ -88,6 +88,12 @@ export interface SubagentCapabilities {
   readonly depthLimit: boolean
   readonly toolFilter: boolean
   readonly persona: boolean
+  /**
+   * Whether {@link SubagentStartRequest.cwd} is honored. In-process backends
+   * that write the child session header advertise this. Out-of-process
+   * backends omit it or set false and keep resolving cwd from their own config.
+   */
+  readonly cwd?: boolean
 }
 
 /**
@@ -146,6 +152,15 @@ export interface SubagentStartRequest {
    * persona (strict `{{…}}` interpolation against the registered variables).
    */
   readonly persona?: string
+  /**
+   * Optional in-process child workspace. Whitespace is omitted. A non-empty
+   * value must be an enterable absolute directory and becomes the child's
+   * session cwd (instruction-file root and `{{cwd}}`). Omitted inherits the
+   * parent session cwd. Requires {@link SubagentCapabilities.cwd}; rejected at
+   * start otherwise. Out-of-process providers keep resolving cwd from their
+   * own config and the parent session and do not read this field.
+   */
+  readonly cwd?: string
 }
 
 /**

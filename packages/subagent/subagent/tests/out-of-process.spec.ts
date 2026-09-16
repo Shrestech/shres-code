@@ -23,7 +23,13 @@ import {
 
 describe('NO_START_CAPABILITIES', () => {
   it('advertises nothing and is frozen (test fixture for a fully incapable provider)', () => {
-    expect(NO_START_CAPABILITIES).toEqual({ outputSchema: false, depthLimit: false, toolFilter: false, persona: false })
+    expect(NO_START_CAPABILITIES).toEqual({
+      outputSchema: false,
+      depthLimit: false,
+      toolFilter: false,
+      persona: false,
+      cwd: false,
+    })
     expect(Object.isFrozen(NO_START_CAPABILITIES)).toBe(true)
   })
 })
@@ -35,6 +41,7 @@ describe('REMOTE_START_CAPABILITIES', () => {
       depthLimit: true,
       toolFilter: false,
       persona: false,
+      cwd: false,
     })
     expect(Object.isFrozen(REMOTE_START_CAPABILITIES)).toBe(true)
   })
@@ -54,6 +61,9 @@ describe('assertStartCapabilities', () => {
     expect(() => {
       assertStartCapabilities('acp', { persona: 'reviewer' }, REMOTE_START_CAPABILITIES)
     }).toThrow(/does not support persona/)
+    expect(() => {
+      assertStartCapabilities('acp', { cwd: '/tmp/ws' }, REMOTE_START_CAPABILITIES)
+    }).toThrow(/does not support cwd/)
   })
 })
 

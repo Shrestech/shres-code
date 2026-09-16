@@ -18,10 +18,26 @@ export interface SeatBinding {
   model?: string
 }
 
+/** YAML extra teammate beyond the three product seats. */
+export interface ExtraSeat {
+  /** Lower-kebab-case teammate name. */
+  name: string
+  /** Child persona. */
+  persona: string
+  /** Live `ctx.llm` route id. */
+  provider: string
+  /** Provider-owned model id. */
+  model: string
+  /** Optional role gloss. */
+  role?: string
+}
+
 /** User and composition document for the `agent-seats` settings section. */
 export interface AgentSeatsSettings {
   /** Per-seat bindings; an omitted or empty seat stays unmounted. */
-  seats?: Partial<Record<SeatId, SeatBinding>>
+  seats?: Partial<Record<SeatId | 'subagent', SeatBinding>>
+  /** Extra named teammates reachable only through team_send. */
+  extras?: ExtraSeat[]
 }
 
 /** Fixed product copy and child defaults for one seat. */
@@ -93,6 +109,35 @@ export interface BoundSeat {
 }
 
 /**
+ * Lead system-prompt text: use bound Architect and Reviewer seats for those
+ * jobs. Empty when neither seat is bound.
+ * @param bound - currently remounted product seats.
+ * @returns guidance, or '' when aegis and ward are both unbound.
+ */
+export function seatUseGuidance(bound: readonly BoundSeat[]): string {
+  const ids = new Set(bound.map(seat => seat.entry.id))
+  const parts: string[] = []
+  if (ids.has('aegis')) {
+    parts.push(
+      'For architecture, trade-offs, and a concrete plan, use the aegis seat. '
+      + 'Do not do that design work in this conversation when aegis is available.',
+    )
+  }
+  if (ids.has('ward')) {
+    parts.push(
+      'For review of diffs, tests, and findings, use the ward seat. '
+      + 'Do not do that review in this conversation when ward is available.',
+    )
+  }
+  if (parts.length === 0) return ''
+  return (
+    `${parts.join(' ')} The prompt you pass replaces the shipped seat role only. `
+    + 'Pass cwd when the work is in another repository so the teammate reads that tree and its AGENTS.md. '
+    + 'Teammates do not have named seat tools.'
+  )
+}
+
+/**
  * Collect seats whose stored binding names both a provider and a model.
  * @param settings - resolved `agent-seats` document.
  * @returns bound seats in roster order.
@@ -110,4 +155,39 @@ export function boundSeats(settings: AgentSeatsSettings): BoundSeat[] {
     bound.push({ entry, provider, model })
   }
   return bound
+}
+
+const RESERVED_EXTRA_NAMES = new Set(['aegis', 'stride', 'ward', 'subagent', 'lead'])
+
+/**
+ * Validate YAML extras: kebab-case names that do not collide with product seats.
+ * @param extras - extras array from settings.
+ * @returns the same extras when valid.
+ */
+export function assertExtras(extras: readonly ExtraSeat[] | undefined): readonly ExtraSeat[] {
+  if (extras === undefined) return []
+  const seen = new Set<string>()
+  for (const extra of extras) {
+    const name = extra.name.trim()
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(name) || RESERVED_EXTRA_NAMES.has(name)) {
+      throw new Error(`agent-seats extra name "${extra.name}" collides with a product seat or is not lower-kebab-case`)
+    }
+    if (seen.has(name)) throw new Error(`agent-seats extra name "${name}" is duplicated`)
+    seen.add(name)
+  }
+  return extras
+}
+
+/**
+ * Generic `subagent` hire route when both provider and model are set.
+ * @param settings - resolved `agent-seats` document.
+ * @returns the binding, or undefined to inherit the parent route.
+ */
+export function boundSubagentSeat(settings: AgentSeatsSettings): SeatBinding | undefined {
+  const binding = settings.seats?.subagent
+  const provider = binding?.provider?.trim()
+  const model = binding?.model?.trim()
+  if (provider === undefined || provider.length === 0) return undefined
+  if (model === undefined || model.length === 0) return undefined
+  return { provider, model }
 }

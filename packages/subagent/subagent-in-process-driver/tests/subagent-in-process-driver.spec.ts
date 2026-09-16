@@ -1,7 +1,10 @@
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { CallId, createUserMessage } from '@shres-code/shres-code-llm'
 import { describe, expect, it } from 'vitest'
 import { Context } from '@shres-code/cordis'
-import { type Agent, type AgentOptions } from '@shres-code/shres-code-agent'
+import { assembleContextFor, type Agent, type AgentOptions } from '@shres-code/shres-code-agent'
 import { SessionId } from '@shres-code/shres-code-session'
 import AgentLoop from '@shres-code/shres-code-agent-loop'
 import { mountAgentLoopTestDependencies } from '@shres-code/shres-code-agent-loop-testkit'
@@ -9,7 +12,13 @@ import InvariantRegistry from '@shres-code/shres-code-invariants'
 import * as SessionInvariant from '@shres-code/shres-code-session/invariant'
 import * as AgentInvariant from '@shres-code/shres-code-agent/invariant'
 import * as AgentLoopInvariant from '@shres-code/shres-code-agent-loop/invariant'
-import SubagentRuntime, { snapshotSubagentDescriptor } from '@shres-code/shres-code-subagent'
+import SubagentRuntime, {
+  ENVIRONMENT_SECTION,
+  HARNESS_SOURCE_SECTION,
+  SEAT_GUIDANCE_SECTION,
+  snapshotSubagentDescriptor,
+} from '@shres-code/shres-code-subagent'
+import { renderPrompt } from '@shres-code/shres-code-system-prompt'
 import { defineContentToolFixture } from '@shres-code/shres-code-tools'
 import { maxTokensResponse, MockAdapter, textResponse, toolCallResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
 import { startInProcessRun } from '../src/index.ts'
@@ -80,6 +89,43 @@ describe('startInProcessRun', () => {
     expect(child.session.header.cwd).toBe('/workspace')
     await expect(run.result).resolves.toMatchObject({ stopReason: 'completed' })
     await run.dispose()
+  })
+
+  it('overrides the child workspace and suppresses Lead-only prompt sections', async () => {
+    const parentWs = mkdtempSync(join(tmpdir(), 'shres-parent-ws-'))
+    const childWs = mkdtempSync(join(tmpdir(), 'shres-child-ws-'))
+    try {
+      const { ctx } = await setup([textResponse('driver answer')])
+      ctx.systemPrompt.section({
+        name: HARNESS_SOURCE_SECTION,
+        order: -99,
+        text: 'The Shres Code implementation checkout is at /checkout.',
+      })
+      ctx.systemPrompt.section({
+        name: SEAT_GUIDANCE_SECTION,
+        order: 115,
+        text: 'Use the aegis seat.',
+      })
+      const parent = ctx.agentLoop.create(SessionId('cwd-parent'), { provider: 'mock', model: 'mock' }, { cwd: parentWs })
+      const run = await startInProcessRun({ ...request(parent), cwd: childWs }, {})
+      const child = ctx.agents.get(run.id)!
+      expect(child.session.header.cwd).toBe(childWs)
+      const parentAssembly = await ctx.systemPrompt.assemble(assembleContextFor(parent))
+      const childAssembly = await ctx.systemPrompt.assemble(assembleContextFor(child))
+      expect(parentAssembly.sections.find(section => section.name === HARNESS_SOURCE_SECTION)?.text)
+        .toContain('/checkout')
+      expect(childAssembly.sections.find(section => section.name === HARNESS_SOURCE_SECTION)?.text).toBe('')
+      expect(childAssembly.sections.find(section => section.name === SEAT_GUIDANCE_SECTION)?.text).toBe('')
+      expect(childAssembly.sections.some(section => section.name === ENVIRONMENT_SECTION)).toBe(false)
+      expect(renderPrompt(childAssembly)).not.toContain('Your working directory is')
+      expect(renderPrompt(childAssembly)).not.toContain('/checkout')
+      expect(renderPrompt(childAssembly)).not.toContain('Use the aegis seat.')
+      await expect(run.result).resolves.toMatchObject({ stopReason: 'completed' })
+      await run.dispose()
+    } finally {
+      rmSync(parentWs, { recursive: true, force: true })
+      rmSync(childWs, { recursive: true, force: true })
+    }
   })
 
   it('reports a prompt a pre-step rejection discarded as refusal, not completion', async () => {

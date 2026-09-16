@@ -68,6 +68,7 @@ import {
   subagentListValueSchema,
   subagentPromptValueSchema,
 } from '../api/subagents.schema.ts'
+import { agentTeamsViewValueSchema } from '../api/agent-teams.schema.ts'
 
 /**
  * Client consumption face of the contract (shape a): same domain tree as ApiProxy, but unary
@@ -105,6 +106,9 @@ export interface IApiClient {
     history(payload: RequestPayload<'subagent.history'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'subagent.history'>>>
     prompt(payload: RequestPayload<'subagent.prompt'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'subagent.prompt'>>>
     interrupt(payload: RequestPayload<'subagent.interrupt'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'subagent.interrupt'>>>
+  }
+  agentTeams: {
+    view(payload: RequestPayload<'agentTeams.view'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'agentTeams.view'>>>
   }
   host: {
     describe(payload: RequestPayload<'host.describe'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'host.describe'>>>
@@ -188,6 +192,7 @@ const UNARY_VALUE_SCHEMAS: { [K in keyof RpcMethodMap]: z.ZodType<Wire<ResponseV
   'subagent.history': subagentHistoryValueSchema,
   'subagent.prompt': subagentPromptValueSchema,
   'subagent.interrupt': subagentInterruptValueSchema,
+  'agentTeams.view': agentTeamsViewValueSchema,
   'host.describe': hostDescribeValueSchema,
   'host.pickDirectory': hostPickDirectoryValueSchema,
   'host.listDirectory': hostListDirectoryValueSchema,
@@ -432,6 +437,10 @@ export abstract class AbstractApiClient implements IApiClient {
     history: (payload, signal) => this.callUnary('subagent.history', payload, signal),
     prompt: (payload, signal) => this.callUnary('subagent.prompt', payload, signal),
     interrupt: (payload, signal) => this.callUnary('subagent.interrupt', payload, signal),
+  }
+
+  readonly agentTeams: IApiClient['agentTeams'] = {
+    view: (payload, signal) => this.callUnary('agentTeams.view', payload, signal),
   }
 
   readonly host: IApiClient['host'] = {

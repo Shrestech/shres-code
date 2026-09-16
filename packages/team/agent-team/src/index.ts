@@ -1,8 +1,6 @@
 /**
- * Agent Teams durable vocabulary and replay substrate. This package registers
- * the `agentTeam` projection unit, owns the four log-only Team events, and
- * exposes `TeamJournal` as an internal building block. It does not spawn teammates, deliver
- * messages, expose a task-board service API, or register model tools.
+ * Agent Teams: durable vocabulary, Lead-log mailbox, continuable-child
+ * provisioning, steer delivery, and `team_send` / `team_list` tools.
  *
  * @module @shres-code/shres-code-agent-team
  */
@@ -10,8 +8,15 @@
 import type { Context } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
 import type {} from '@shres-code/shres-code-session-projection'
+import type {} from '@shres-code/shres-code-agent'
+import type {} from '@shres-code/shres-code-session-persistence'
+import type {} from '@shres-code/shres-code-subagent'
+import type {} from '@shres-code/shres-code-tools'
+import type {} from '@shres-code/shres-code-system-prompt'
 import { TeamError } from './error.ts'
 import { teamProjectionDefinition } from './projection.ts'
+import { TeamService } from './service.ts'
+import { registerTeamTools } from './tools.ts'
 
 export type * from './types.ts'
 export { TeamId, TeamMessageId, TeamTaskId } from './brand.ts'
@@ -30,6 +35,10 @@ export { teamProjectionDefinition } from './projection.ts'
 export type { TeamProjectionState } from './projection.ts'
 export { assertTaskGraphCandidate, TeamTaskGraphError } from './task-graph.ts'
 export type { TeamTaskGraphViolation } from './task-graph.ts'
+export { TeamService } from './service.ts'
+export type { TeamMembership } from './roster.ts'
+export { SEAT_TOOL_NAMES, teammateSeatGuard } from './roster.ts'
+export { TEAM_POLICY_ORDER, TEAM_POLICY_SECTION, teammatePolicy } from './policy.ts'
 
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'agent-team'
@@ -99,6 +108,10 @@ export function resolveConfig(config: Config): ResolvedConfig {
  * @param config - schema-defaulted deployment limits.
  */
 export function apply(ctx: Context, config: Config): void {
-  resolveConfig(config)
+  const resolved = resolveConfig(config)
   ctx.sessionProjections.register(teamProjectionDefinition)
+  ctx.plugin(TeamService, resolved)
+  ctx.inject(['tools', 'agentTeams'], (toolsCtx) => {
+    registerTeamTools(toolsCtx)
+  })
 }
