@@ -1,7 +1,9 @@
 /**
- * Models-page card for the default Team: the three named seats with editable
- * personas and model bindings, the generic Subagent hire, and user-added custom
- * members. Everything writes to the `agent-seats` settings namespace.
+ * Models-page card for the default Team: the three named seats with model
+ * bindings, the generic Subagent hire, and user-added custom members.
+ * A wrap-text control next to each product-seat role opens that seat's
+ * shipped roster persona. Everything writes to the `agent-seats` settings
+ * namespace.
  */
 
 import { useEffect, useState, type ReactNode } from 'react'
@@ -15,13 +17,8 @@ import styles from './ModelsSection.module.css'
 
 const SEAT_IDS = ['aegis', 'stride', 'ward', 'subagent'] as const
 type SeatId = (typeof SEAT_IDS)[number]
-
-const SEAT_COLORS: Record<SeatId, string> = {
-  aegis: '#c9842a',
-  stride: '#2f9e62',
-  ward: '#3b7dd8',
-  subagent: '#6b5b95',
-}
+const NAMED_SEAT_IDS = ['aegis', 'stride', 'ward'] as const
+type NamedSeatId = (typeof NAMED_SEAT_IDS)[number]
 
 const SEAT_COPY: Record<SeatId, { name: keyof typeof en; role: keyof typeof en; description: keyof typeof en }> = {
   aegis: { name: 'seatAegisName', role: 'seatAegisRole', description: 'seatAegisDescription' },
@@ -30,11 +27,49 @@ const SEAT_COPY: Record<SeatId, { name: keyof typeof en; role: keyof typeof en; 
   subagent: { name: 'seatSubagentName', role: 'seatSubagentRole', description: 'seatSubagentDescription' },
 }
 
+const SEAT_PERSONA: Record<NamedSeatId, keyof typeof en> = {
+  aegis: 'seatAegisPersona',
+  stride: 'seatStridePersona',
+  ward: 'seatWardPersona',
+}
+
+/**
+ * Whether this Models seat is a product teammate with a shipped persona.
+ * @param id - seat id including the generic hire.
+ * @returns true for Aegis, Stride, and Ward.
+ */
+function isNamedSeat(id: SeatId): id is NamedSeatId {
+  return (NAMED_SEAT_IDS as readonly string[]).includes(id)
+}
+
+/** Wrap-text glyph next to a product-seat role; click opens the roster persona. */
+function WrapTextIcon(): ReactNode {
+  return (
+    <svg width={14} height={14} viewBox="0 0 14 14" fill="none" aria-hidden="true">
+      <path d="M2 3.25h10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      <path d="M2 6.75h10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      <path d="M2 10.25h5.25" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      <path
+        d="M10.25 9.25v.85c0 .72.58 1.3 1.3 1.3H12.5"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+      />
+      <path
+        d="M11.55 12.55 12.75 11.4l-1.2-1.15"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
 /** One stored seat binding as the settings document carries it. */
 interface SeatValue {
   provider?: string
   model?: string
-  persona?: string
 }
 
 /** One custom member as the settings document carries it. */
@@ -45,9 +80,6 @@ interface MemberValue {
   model?: string
   role?: string
 }
-
-/** Seat ids with an editable persona; the generic hire has no persona. */
-const NAMED_SEAT_IDS = ['aegis', 'stride', 'ward'] as const
 
 /** Props for {@link TeamCard}. */
 export interface TeamCardProps {
@@ -78,10 +110,11 @@ export function seatValueOf(value: unknown, id: SeatId): SeatValue {
 }
 
 /**
- * Bind or clear one seat. Both fields must be set for the host to remount it.
+ * Bind or clear one seat's provider and model as field path ops. Both
+ * provider and model must be set for the host to remount it.
  * @param api - settings wire face.
  * @param id - seat id.
- * @param next - next binding, or undefined to unbind.
+ * @param next - next binding, or undefined to clear provider and model.
  * @returns fulfillment after the mutate settles.
  */
 export async function writeSeat(
@@ -89,14 +122,20 @@ export async function writeSeat(
   id: SeatId,
   next: SeatValue | undefined,
 ): Promise<void> {
+  const provider = next?.provider
+  const model = next?.model
   await api.settings.mutate({
     ns: 'agent-seats',
-    ops: next === undefined
-      ? [{ op: 'unset', path: ['seats', id] }]
-      : [{ op: 'set', path: ['seats', id], value: next }],
+    ops: [
+      provider === undefined
+        ? { op: 'unset', path: ['seats', id, 'provider'] }
+        : { op: 'set', path: ['seats', id, 'provider'], value: provider },
+      model === undefined
+        ? { op: 'unset', path: ['seats', id, 'model'] }
+        : { op: 'set', path: ['seats', id, 'model'], value: model },
+    ],
   })
 }
-
 
 /**
  * Read the stored custom members from the `agent-seats` namespace value.
@@ -107,26 +146,6 @@ export function membersOf(value: unknown): MemberValue[] {
   const extras = getPath(value, ['extras'])
   if (!Array.isArray(extras)) return []
   return extras.filter((entry): entry is MemberValue => typeof entry === 'object' && entry !== null)
-}
-
-/**
- * Store or clear one seat's persona override without touching its binding.
- * @param api - settings wire face.
- * @param id - seat id.
- * @param persona - trimmed persona text, or undefined to restore the default.
- * @returns fulfillment after the mutate settles.
- */
-export async function writeSeatPersona(
-  api: Pick<IApiClient, 'settings'>,
-  id: SeatId,
-  persona: string | undefined,
-): Promise<void> {
-  await api.settings.mutate({
-    ns: 'agent-seats',
-    ops: persona === undefined
-      ? [{ op: 'unset', path: ['seats', id, 'persona'] }]
-      : [{ op: 'set', path: ['seats', id, 'persona'], value: persona }],
-  })
 }
 
 /**
@@ -167,6 +186,7 @@ export function memberDraftValid(
     && draft.provider.length > 0
     && draft.model.length > 0
 }
+
 /**
  * Render the Team card when the host exposes `agent-seats`.
  * @param props - snapshot, wire, and copy.
@@ -181,9 +201,8 @@ export function TeamCard({ state, api, reload, t }: TeamCardProps): ReactNode {
       if (response.result.ok) setGroups(response.result.value.groups)
     })
   }, [api, namespace, state.rows])
-  const [personaDrafts, setPersonaDrafts] = useState<Partial<Record<SeatId, string>>>({})
-  const [openError, setOpenError] = useState(false)
   const [draft, setDraft] = useState({ name: '', persona: '', provider: '', model: '' })
+  const [openPersonas, setOpenPersonas] = useState<Partial<Record<NamedSeatId, boolean>>>({})
   if (namespace === undefined) return null
 
   const enabled = new Set(
@@ -200,44 +219,45 @@ export function TeamCard({ state, api, reload, t }: TeamCardProps): ReactNode {
 
   return (
     <section className={styles['seatsCard']}>
-      <div className={styles['teamHead']}>
-        <div>
-          <h3 className={styles['seatsTitle']}>{t('seatsTitle')}</h3>
-          <p className={styles['seatsIntro']}>{t('seatsIntro')}</p>
-        </div>
-        <button
-          type="button"
-          className={styles['teamOpenDocument']}
-          disabled={!state.writable}
-          onClick={() => {
-            api.settings.openDocument({})
-              .then(() => { setOpenError(false) })
-              .catch(() => { setOpenError(true) })
-          }}
-        >
-          {t('teamOpenDocument')}
-        </button>
-      </div>
-      {openError ? <p className={styles['teamError']} role="alert">{t('teamOpenDocumentError')}</p> : null}
+      <h3 className={styles['seatsTitle']}>{t('seatsTitle')}</h3>
+      <p className={styles['seatsIntro']}>{t('seatsIntro')}</p>
       <ul className={styles['seatsList']}>
         {SEAT_IDS.map((id) => {
           const copy = SEAT_COPY[id]
           const current = seatValueOf(namespace.value, id)
           const models = choices.find(group => group.id === current.provider)?.models ?? []
-          const named = (NAMED_SEAT_IDS as readonly string[]).includes(id)
-          const personaDraft = personaDrafts[id] ?? current.persona ?? ''
+          const named = isNamedSeat(id)
+          const personaOpen = named && openPersonas[id] === true
           return (
             <li key={id} className={styles['seatRow']}>
               <div className={styles['seatIdentity']}>
-                <span className={styles['seatMark']} style={{ color: SEAT_COLORS[id] }}>
-                  <FishLogo size={18} />
+                <span className={styles['seatMark']} data-seat={id}>
+                  <FishLogo size={16} />
                 </span>
                 <div className={styles['seatCopy']}>
                   <div className={styles['seatHeadline']}>
                     <span className={styles['seatName']}>{t(copy.name)}</span>
                     <span className={styles['seatRole']}>{t(copy.role)}</span>
+                    {named
+                      ? (
+                        <button
+                          type="button"
+                          className={styles['seatPersonaButton']}
+                          aria-label={`${t(copy.name)} ${t('seatsPersona')}`}
+                          aria-expanded={personaOpen}
+                          onClick={() => {
+                            setOpenPersonas(open => ({ ...open, [id]: !personaOpen }))
+                          }}
+                        >
+                          <WrapTextIcon />
+                        </button>
+                      )
+                      : null}
                   </div>
                   <p className={styles['seatDescription']}>{t(copy.description)}</p>
+                  {named && personaOpen
+                    ? <p className={styles['seatPersona']}>{t(SEAT_PERSONA[id])}</p>
+                    : null}
                 </div>
               </div>
               <div className={styles['seatFields']}>
@@ -298,31 +318,6 @@ export function TeamCard({ state, api, reload, t }: TeamCardProps): ReactNode {
                   </select>
                 </label>
               </div>
-              {named
-                ? (
-                  <label className={styles['seatPersona']}>
-                    <span className={styles['fieldLabel']}>{t('seatsPersona')}</span>
-                    <textarea
-                      className={styles['personaInput']}
-                      rows={3}
-                      value={personaDraft}
-                      placeholder={t('seatsPersonaPlaceholder')}
-                      aria-label={`${t(copy.name)} ${t('seatsPersona')}`}
-                      disabled={!state.writable}
-                      onChange={(event) => {
-                        setPersonaDrafts(drafts => ({ ...drafts, [id]: event.target.value }))
-                      }}
-                      onBlur={() => {
-                        const stored = current.persona ?? ''
-                        const next = personaDraft.trim()
-                        if (next === stored.trim()) return
-                        void writeSeatPersona(api, id, next === '' ? undefined : next)
-                          .then(reload, reload)
-                      }}
-                    />
-                  </label>
-                )
-                : null}
             </li>
           )
         })}
@@ -399,7 +394,7 @@ export function TeamCard({ state, api, reload, t }: TeamCardProps): ReactNode {
         </select>
         <button
           type="button"
-          className={styles['teamOpenDocument']}
+          className={styles['secondaryButton']}
           disabled={!state.writable || !memberDraftValid(draft, members)}
           onClick={() => {
             const name = draft.name.trim()

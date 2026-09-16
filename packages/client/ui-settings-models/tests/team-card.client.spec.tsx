@@ -6,7 +6,7 @@ import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
 import type { RpcResponse, SettingsNamespaceView } from '@shres-code/shres-code-api-remotes/client'
 import { ModelsSection } from '../src/client/ModelsSection.tsx'
 import type { ModelsSectionInjected } from '../src/client/ModelsSection.tsx'
-import { membersOf, memberDraftValid, seatValueOf, writeMembers, writeSeat, writeSeatPersona } from '../src/client/TeamCard.tsx'
+import { membersOf, memberDraftValid, seatValueOf, writeMembers, writeSeat } from '../src/client/TeamCard.tsx'
 import { ModelsSettingsStore } from '../src/client/store.ts'
 import { en } from '../src/client/locales.ts'
 
@@ -16,9 +16,9 @@ const t: ModelsSectionInjected['t'] = key => en[key]
 
 const SeatsConfig = Schema.object({
   seats: Schema.object({
-    aegis: Schema.object({ provider: Schema.string(), model: Schema.string(), persona: Schema.string() }),
-    stride: Schema.object({ provider: Schema.string(), model: Schema.string(), persona: Schema.string() }),
-    ward: Schema.object({ provider: Schema.string(), model: Schema.string(), persona: Schema.string() }),
+    aegis: Schema.object({ provider: Schema.string(), model: Schema.string() }),
+    stride: Schema.object({ provider: Schema.string(), model: Schema.string() }),
+    ward: Schema.object({ provider: Schema.string(), model: Schema.string() }),
     subagent: Schema.object({ provider: Schema.string(), model: Schema.string() }),
   }),
   extras: Schema.array(Schema.object({
@@ -46,25 +46,36 @@ function ok<T>(value: T): RpcResponse<T> {
 }
 
 describe('seatValueOf / writeSeat', () => {
-  it('reads a stored binding and writes set/unset ops', async () => {
-    expect(seatValueOf({ seats: { aegis: { provider: 'ollama-cloud', model: 'kimi-k3' } } }, 'aegis'))
-      .toEqual({ provider: 'ollama-cloud', model: 'kimi-k3' })
+  it('reads a stored binding and writes field path ops', async () => {
+    expect(seatValueOf({
+      seats: { aegis: { provider: 'ollama-cloud', model: 'kimi-k3' } },
+    }, 'aegis')).toEqual({
+      provider: 'ollama-cloud',
+      model: 'kimi-k3',
+    })
     expect(seatValueOf({}, 'stride')).toEqual({})
+    expect(seatValueOf({ seats: { aegis: { provider: 1, model: 2 } } }, 'aegis')).toEqual({})
     const mutate = vi.fn(() => Promise.resolve(ok({})))
     await writeSeat({ settings: { mutate } as never }, 'ward', { provider: 'p', model: 'm' })
     expect(mutate).toHaveBeenCalledWith({
       ns: 'agent-seats',
-      ops: [{ op: 'set', path: ['seats', 'ward'], value: { provider: 'p', model: 'm' } }],
+      ops: [
+        { op: 'set', path: ['seats', 'ward', 'provider'], value: 'p' },
+        { op: 'set', path: ['seats', 'ward', 'model'], value: 'm' },
+      ],
     })
     await writeSeat({ settings: { mutate } as never }, 'ward', undefined)
     expect(mutate).toHaveBeenLastCalledWith({
       ns: 'agent-seats',
-      ops: [{ op: 'unset', path: ['seats', 'ward'] }],
+      ops: [
+        { op: 'unset', path: ['seats', 'ward', 'provider'] },
+        { op: 'unset', path: ['seats', 'ward', 'model'] },
+      ],
     })
   })
 })
 
-function buildFace(mutate: ReturnType<typeof vi.fn>) {
+function buildFace(mutate: ReturnType<typeof vi.fn>, seatsValue: unknown = {}) {
   return {
     llm: {
       providers: vi.fn(() => Promise.resolve(ok({
@@ -89,7 +100,7 @@ function buildFace(mutate: ReturnType<typeof vi.fn>) {
         writable: true,
         hasDocument: false,
         namespaces: [
-          seatsNamespace(),
+          seatsNamespace(seatsValue),
           {
             ns: 'llm-pi-ai',
             schema: JSON.parse(JSON.stringify(Schema.object({
@@ -141,7 +152,10 @@ describe('TeamCard', () => {
     await waitFor(() => {
       expect(mutate).toHaveBeenCalledWith({
         ns: 'agent-seats',
-        ops: [{ op: 'set', path: ['seats', 'aegis'], value: { provider: 'ollama-cloud' } }],
+        ops: [
+          { op: 'set', path: ['seats', 'aegis', 'provider'], value: 'ollama-cloud' },
+          { op: 'unset', path: ['seats', 'aegis', 'model'] },
+        ],
       })
     })
     fireEvent.change(screen.getByLabelText(`${en.seatSubagentName} ${en.seatsProvider}`), {
@@ -150,14 +164,19 @@ describe('TeamCard', () => {
     await waitFor(() => {
       expect(mutate).toHaveBeenCalledWith({
         ns: 'agent-seats',
-        ops: [{ op: 'set', path: ['seats', 'subagent'], value: { provider: 'ollama-cloud' } }],
+        ops: [
+          { op: 'set', path: ['seats', 'subagent', 'provider'], value: 'ollama-cloud' },
+          { op: 'unset', path: ['seats', 'subagent', 'model'] },
+        ],
       })
     })
   })
 
-  it('commits an edited persona on blur and restores the default with an empty value', async () => {
-    const mutate = vi.fn(() => Promise.resolve(ok(seatsNamespace({ seats: { aegis: { provider: 'ollama-cloud', model: 'kimi-k3' } } }))))
-    const face = buildFace(mutate)
+  it('does not offer a persona field for Aegis, Stride, or Ward', async () => {
+    const mutate = vi.fn(() => Promise.resolve(ok(seatsNamespace())))
+    const face = buildFace(mutate, {
+      seats: { aegis: { provider: 'ollama-cloud', model: 'kimi-k3' } },
+    })
     const controller = new ModelsSettingsStore(face as never)
     await controller.load()
     render(
@@ -168,18 +187,13 @@ describe('TeamCard', () => {
         t={t}
       />,
     )
-    const persona = screen.getByLabelText(`${en.seatAegisName} ${en.seatsPersona}`)
-    fireEvent.change(persona, { target: { value: '  You are the planning seat.  ' } })
-    fireEvent.blur(persona)
-    await waitFor(() => {
-      expect(mutate).toHaveBeenCalledWith({
-        ns: 'agent-seats',
-        ops: [{ op: 'set', path: ['seats', 'aegis', 'persona'], value: 'You are the planning seat.' }],
-      })
-    })
+    expect(screen.queryByRole('textbox', { name: /Aegis/ })).toBeNull()
+    expect(screen.queryByRole('textbox', { name: /Stride/ })).toBeNull()
+    expect(screen.queryByRole('textbox', { name: /Ward/ })).toBeNull()
+    expect(screen.getByLabelText(en.teamMemberPersona)).toBeTruthy()
   })
 
-  it('opens the configuration file from the card header', async () => {
+  it('opens the shipped persona for each product seat from the wrap-text control', async () => {
     const mutate = vi.fn(() => Promise.resolve(ok(seatsNamespace())))
     const face = buildFace(mutate)
     const controller = new ModelsSettingsStore(face as never)
@@ -192,11 +206,179 @@ describe('TeamCard', () => {
         t={t}
       />,
     )
-    fireEvent.click(screen.getByText(en.teamOpenDocument))
+    expect(screen.queryByRole('button', { name: `${en.seatSubagentName} ${en.seatsPersona}` })).toBeNull()
+    expect(screen.queryByText(en.seatAegisPersona)).toBeNull()
+    const aegis = screen.getByRole('button', { name: `${en.seatAegisName} ${en.seatsPersona}` })
+    fireEvent.click(aegis)
+    expect(screen.getByText(en.seatAegisPersona)).toBeTruthy()
+    expect(aegis.getAttribute('aria-expanded')).toBe('true')
+    fireEvent.click(screen.getByRole('button', { name: `${en.seatStrideName} ${en.seatsPersona}` }))
+    fireEvent.click(screen.getByRole('button', { name: `${en.seatWardName} ${en.seatsPersona}` }))
+    expect(screen.getByText(en.seatStridePersona)).toBeTruthy()
+    expect(screen.getByText(en.seatWardPersona)).toBeTruthy()
+    fireEvent.click(aegis)
+    expect(screen.queryByText(en.seatAegisPersona)).toBeNull()
+    expect(aegis.getAttribute('aria-expanded')).toBe('false')
+  })
+
+  it('writes model path ops, keeps an unknown catalog id, and ignores a model change while unbound', async () => {
+    const mutate = vi.fn(() => Promise.resolve(ok(seatsNamespace())))
+    const face = buildFace(mutate, {
+      seats: { aegis: { provider: 'ollama-cloud', model: 'legacy-id' } },
+    })
+    const controller = new ModelsSettingsStore(face as never)
+    await controller.load()
+    render(
+      <ModelsSection
+        controller={controller}
+        useSnapshot={bindSnapshotSelector(controller.store)}
+        api={face as never}
+        t={t}
+      />,
+    )
     await waitFor(() => {
-      expect(face.settings.openDocument).toHaveBeenCalled()
+      expect(face.llm.models).toHaveBeenCalled()
+    })
+    expect(screen.getByText('legacy-id')).toBeTruthy()
+    fireEvent.change(screen.getByLabelText(`${en.seatAegisName} ${en.seatsModel}`), {
+      target: { value: 'kimi-k3' },
+    })
+    await waitFor(() => {
+      expect(mutate).toHaveBeenCalledWith({
+        ns: 'agent-seats',
+        ops: [
+          { op: 'set', path: ['seats', 'aegis', 'provider'], value: 'ollama-cloud' },
+          { op: 'set', path: ['seats', 'aegis', 'model'], value: 'kimi-k3' },
+        ],
+      })
+    })
+    fireEvent.change(screen.getByLabelText(`${en.seatAegisName} ${en.seatsModel}`), {
+      target: { value: '' },
+    })
+    await waitFor(() => {
+      expect(mutate).toHaveBeenCalledWith({
+        ns: 'agent-seats',
+        ops: [
+          { op: 'set', path: ['seats', 'aegis', 'provider'], value: 'ollama-cloud' },
+          { op: 'unset', path: ['seats', 'aegis', 'model'] },
+        ],
+      })
+    })
+    fireEvent.change(screen.getByLabelText(`${en.seatAegisName} ${en.seatsProvider}`), {
+      target: { value: '' },
+    })
+    await waitFor(() => {
+      expect(mutate).toHaveBeenCalledWith({
+        ns: 'agent-seats',
+        ops: [
+          { op: 'unset', path: ['seats', 'aegis', 'provider'] },
+          { op: 'unset', path: ['seats', 'aegis', 'model'] },
+        ],
+      })
+    })
+    fireEvent.change(screen.getByLabelText(`${en.seatStrideName} ${en.seatsModel}`), {
+      target: { value: 'kimi-k3' },
+    })
+    expect(mutate).toHaveBeenCalledTimes(3)
+  })
+
+  it('adds and removes custom members through the card form', async () => {
+    const mutate = vi.fn(() => Promise.resolve(ok(seatsNamespace())))
+    const face = buildFace(mutate, {
+      extras: [
+        { name: 'docs-reviewer', persona: 'Review docs.', provider: 'ollama-cloud', model: 'kimi-k3' },
+        { persona: 'Incomplete row.' },
+      ],
+    })
+    const controller = new ModelsSettingsStore(face as never)
+    await controller.load()
+    render(
+      <ModelsSection
+        controller={controller}
+        useSnapshot={bindSnapshotSelector(controller.store)}
+        api={face as never}
+        t={t}
+      />,
+    )
+    await waitFor(() => {
+      expect(face.llm.models).toHaveBeenCalled()
+    })
+    expect(screen.getByText('docs-reviewer')).toBeTruthy()
+    expect(screen.getByText('? / ?')).toBeTruthy()
+    fireEvent.click(screen.getByLabelText(`${en.teamRemoveMember} docs-reviewer`))
+    await waitFor(() => {
+      expect(mutate).toHaveBeenCalledWith({
+        ns: 'agent-seats',
+        ops: [{ op: 'set', path: ['extras'], value: [{ persona: 'Incomplete row.' }] }],
+      })
+    })
+    fireEvent.click(screen.getAllByRole('button', { name: /Remove/ })[1]!)
+    fireEvent.change(screen.getByLabelText(en.teamMemberName), { target: { value: 'note-taker' } })
+    fireEvent.change(screen.getByLabelText(en.teamMemberPersona), { target: { value: 'Take notes.' } })
+    fireEvent.change(screen.getByLabelText(`${en.teamAddMember} ${en.seatsProvider}`), {
+      target: { value: 'ollama-cloud' },
+    })
+    fireEvent.change(screen.getByLabelText(`${en.teamAddMember} ${en.seatsModel}`), {
+      target: { value: 'kimi-k3' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: en.teamAddMember }))
+    await waitFor(() => {
+      expect(mutate).toHaveBeenCalledWith({
+        ns: 'agent-seats',
+        ops: [{
+          op: 'set',
+          path: ['extras'],
+          value: [
+            { name: 'docs-reviewer', persona: 'Review docs.', provider: 'ollama-cloud', model: 'kimi-k3' },
+            { persona: 'Incomplete row.' },
+            { name: 'note-taker', persona: 'Take notes.', provider: 'ollama-cloud', model: 'kimi-k3' },
+          ],
+        }],
+      })
     })
   })
+
+  it('falls back to provider rows when the catalog fails and still hides without agent-seats', async () => {
+    const mutate = vi.fn(() => Promise.resolve(ok(seatsNamespace())))
+    const face = buildFace(mutate)
+    face.llm.models = vi.fn(() => Promise.resolve({
+      rpcId: `r-${nextRpc++}` as never,
+      result: { ok: false, error: { code: 'unavailable', message: 'no catalog' } },
+    } as never))
+    const controller = new ModelsSettingsStore(face as never)
+    await controller.load()
+    render(
+      <ModelsSection
+        controller={controller}
+        useSnapshot={bindSnapshotSelector(controller.store)}
+        api={face as never}
+        t={t}
+      />,
+    )
+    await waitFor(() => {
+      expect(face.llm.models).toHaveBeenCalled()
+    })
+    expect(screen.getByLabelText(`${en.seatAegisName} ${en.seatsProvider}`)).toBeTruthy()
+    const empty = buildFace(mutate)
+    empty.settings.describe = vi.fn(() => Promise.resolve(ok({
+      writable: true,
+      hasDocument: false,
+      namespaces: [],
+    })))
+    const emptyController = new ModelsSettingsStore(empty as never)
+    await emptyController.load()
+    cleanup()
+    render(
+      <ModelsSection
+        controller={emptyController}
+        useSnapshot={bindSnapshotSelector(emptyController.store)}
+        api={empty as never}
+        t={t}
+      />,
+    )
+    expect(screen.queryByText(en.seatsTitle)).toBeNull()
+  })
+
 })
 
 describe('TeamCard member helpers', () => {
@@ -214,11 +396,6 @@ describe('TeamCard member helpers', () => {
     expect(mutate).toHaveBeenCalledWith({
       ns: 'agent-seats',
       ops: [{ op: 'set', path: ['extras'], value: [{ name: 'note-taker', persona: 'p', provider: 'a', model: 'm' }] }],
-    })
-    await writeSeatPersona({ settings: { mutate } as never }, 'ward', undefined)
-    expect(mutate).toHaveBeenLastCalledWith({
-      ns: 'agent-seats',
-      ops: [{ op: 'unset', path: ['seats', 'ward', 'persona'] }],
     })
   })
 })

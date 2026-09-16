@@ -229,8 +229,6 @@ export interface SeatBinding {
   provider?: string
   /** Provider-owned model id on that route. */
   model?: string
-  /** Child persona overriding the roster default; empty or omitted keeps the default. */
-  persona?: string
 }
 
 /** YAML extra teammate beyond the three product seats. */
@@ -248,7 +246,7 @@ export interface ExtraSeat {
 }
 ```
 
-Source: [`packages/subagent/agent-seats/src/index.ts:38`](../packages/subagent/agent-seats/src/index.ts)
+Source: [`packages/subagent/agent-seats/src/index.ts:37`](../packages/subagent/agent-seats/src/index.ts)
 
 <a id="shres-codeshres-code-agent-spine-demo"></a>
 

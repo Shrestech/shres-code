@@ -84,15 +84,19 @@
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 10px;
 }
 
 .seatRow {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 10px;
 }
 
 .seatIdentity {
@@ -116,8 +120,9 @@
 
 .seatHeadline {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
+  min-width: 0;
 }
 
 .seatName {
@@ -140,15 +145,66 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
+.seatPersonaButton {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  cursor: pointer;
+  flex: none;
+}
+
+.seatPersonaButton:hover,
+.seatPersonaButton[aria-expanded='true'] {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.seatPersona {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+  overflow-wrap: anywhere;
+}
+
 .seatFields {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
 }
 
 .seatFields .field {
-  flex: 1 1 180px;
   min-width: 0;
+}
+
+.seatFields select.input,
+.memberAdd select.input {
+  max-width: none;
+}
+
+.seatMark[data-seat='aegis'] {
+  color: var(--dsw-alias-state-warn-label);
+}
+
+.seatMark[data-seat='stride'] {
+  color: var(--dsw-alias-state-success-primary);
+}
+
+.seatMark[data-seat='ward'] {
+  color: var(--dsw-alias-button-info-fill);
+}
+
+.seatMark[data-seat='subagent'] {
+  color: var(--dsw-alias-label-secondary);
 }
 
 /* A configured provider: outlined on the panel fill, so the filled editor
@@ -359,6 +415,7 @@
 .linkButton:focus-visible,
 .addModelButton:focus-visible,
 .iconButton:focus-visible,
+.seatPersonaButton:focus-visible,
 .customizedSummary:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--dsw-alias-border-l3);
@@ -854,54 +911,9 @@ select.input {
   font-size: 12px;
   color: var(--dsw-alias-label-tertiary);
 }
-.teamHead {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.teamOpenDocument {
-  flex: none;
-  padding: 4px 10px;
-  border: 1px solid var(--dsw-alias-border-l3);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--dsw-alias-label-primary);
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.teamOpenDocument:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.teamError {
-  margin: 6px 0 0;
-  font-size: 12px;
-  color: var(--dsw-alias-state-error-primary);
-}
-
-.seatPersona {
-  display: block;
-  margin: 10px 0 0;
-}
-
-.personaInput {
-  width: 100%;
-  margin-top: 4px;
-  padding: 8px 10px;
-  border: 1px solid var(--dsw-alias-border-l3);
-  border-radius: 6px;
-  background: var(--dsw-alias-bg-module-platform);
-  color: var(--dsw-alias-label-primary);
-  font: inherit;
-  resize: vertical;
-}
 
 .teamMembersTitle {
-  margin: 18px 0 6px;
+  margin: 4px 0 0;
   font-size: 13px;
   font-weight: 600;
   color: var(--dsw-alias-label-primary);
@@ -943,8 +955,11 @@ select.input {
 }
 
 .memberAdd {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 8px;
-  margin-top: 10px;
+}
+
+.memberAdd button {
+  justify-self: end;
 }

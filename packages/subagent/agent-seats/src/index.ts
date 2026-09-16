@@ -31,7 +31,6 @@ export const AGENT_SEATS_SETTINGS_NAMESPACE = settingsNamespace('agent-seats')
 const seatBinding: z<SeatBinding> = z.object({
   provider: z.string(),
   model: z.string(),
-  persona: z.string(),
 })
 
 /** Plugin config and `agent-seats` settings schema. Seats default unbound. */
@@ -67,7 +66,7 @@ export function seatToolConfig(seat: BoundSeat): ToolSubagent.Config {
     provider: 'spawn',
     toolName: seat.entry.id,
     backgroundMode: 'continuable',
-    persona: seat.persona,
+    persona: seat.entry.persona,
     description: seat.entry.description,
     labelPrefix: seat.entry.label,
     agentOptions: { provider: seat.provider, model: seat.model },
@@ -151,7 +150,7 @@ export function apply(ctx: Context, config: Config): void {
       ...boundSeats(settings).map(seat => ({
         name: seat.entry.id,
         description: seat.entry.role,
-        persona: seat.persona,
+        persona: seat.entry.persona,
         provider: seat.provider,
         model: seat.model,
       })),
