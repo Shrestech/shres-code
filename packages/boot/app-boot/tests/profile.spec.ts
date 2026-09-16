@@ -4,7 +4,7 @@
  * empty-root composition, and the installation module-fallback healing.
  */
 
-import { lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -13,6 +13,7 @@ import {
   healProfilesModuleFallback,
   initProfile,
   loadProfile,
+  loadProfileDirectory,
   PROFILE_PATCH_FILENAME,
   PROFILE_TEMPLATE_EDITIONS,
   PROFILE_TEMPLATES,
@@ -212,6 +213,52 @@ describe('loadProfile', () => {
     const dir = resolveProfileDir('demo', home)
     initProfile(dir, ['not-a-bundle'])
     expect(() => loadProfile('t', 'demo', anchor, home)).toThrow('declares no shres.bundle')
+  })
+})
+
+describe('loadProfileDirectory', () => {
+  it('loads an explicit directory outside the Harness home without name-keyed normalization', () => {
+    const anchor = stageInstallation({
+      '@shres-code/shres-code-base': { patch: '[]\n' },
+      '@shres-code/shres-code-web-app': { patch: '[]\n' },
+      '@shres-code/shres-code-headless': { patch: '[]\n' },
+    })
+    // A directory outside $SHRES_HOME/profiles whose basename matches a shipped
+    // template: the shell that placed it owns the manifest, so nothing is
+    // auto-initialized and the installation-owned tuple is loaded as written.
+    const dir = join(tmp(), 'headless')
+    mkdirSync(dir, { recursive: true })
+    writeProfileManifest(dir, {
+      shres: { profile: { bundles: ['@shres-code/shres-code-base', '@shres-code/shres-code-web-app', '@shres-code/shres-code-headless'] } },
+    })
+    writeFileSync(join(dir, PROFILE_PATCH_FILENAME), '- insert:\n    - id: a\n      name: pkg-a\n')
+    const profile = loadProfileDirectory('t', dir, anchor)
+    expect(profile.name).toBe('headless')
+    expect(profile.dir).toBe(dir)
+    expect(profile.layers.map(layer => layer.packageName))
+      .toEqual(['@shres-code/shres-code-base', '@shres-code/shres-code-web-app', '@shres-code/shres-code-headless'])
+    expect(composeEntries([...profile.layers.map(layer => layer.patches), profile.patches]))
+      .toEqual([{ id: 'a', name: 'pkg-a' }])
+    expect(readProfileManifest('t', dir).shres?.profile?.bundles).toContain('@shres-code/shres-code-web-app')
+    expect(loadProfileDirectory('t', dir, anchor, { userLayer: false }).patches).toEqual([])
+  })
+
+  it('fails loud on a missing manifest instead of initializing a template', () => {
+    const anchor = stageInstallation({})
+    const dir = join(tmp(), 'missing')
+    expect(() => loadProfileDirectory('t', dir, anchor)).toThrow('failed to read profile manifest')
+    expect(existsSync(dir)).toBe(false)
+    // A shipped template name gets no special treatment from an explicit directory.
+    const web = resolveProfileDir('web', tmp())
+    expect(() => loadProfileDirectory('t', web, anchor)).toThrow('failed to read profile manifest')
+    expect(existsSync(web)).toBe(false)
+  })
+
+  it('fails loud when a listed bundle declares no shres.bundle', () => {
+    const anchor = stageInstallation({ 'not-a-bundle': {} })
+    const dir = tmp()
+    writeProfileManifest(dir, { shres: { profile: { bundles: ['not-a-bundle'] } } })
+    expect(() => loadProfileDirectory('t', dir, anchor)).toThrow('declares no shres.bundle')
   })
 })
 

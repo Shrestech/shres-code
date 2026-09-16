@@ -12,6 +12,10 @@
  * an empty entry list, then the profile's own patches, then any launcher
  * layers (`--patch` files and flag-derived patches).
  *
+ * {@link loadProfileDirectory} loads the same layers from an explicit
+ * directory for an embedding shell that owns profile creation, without the
+ * template auto-init and name-keyed normalization `loadProfile` applies.
+ *
  * Module resolution is two-anchor by construction: a bundle name resolves
  * first from the shres installation (the launcher's own package), then from the
  * profile directory. The Loader's `baseUrl` is the profile directory, whose
@@ -401,6 +405,35 @@ export function resolveBundleDir(
 }
 
 /**
+ * Resolve one profile directory's manifest into its bundle layers and its own
+ * patch layer. {@link loadProfile} and {@link loadProfileDirectory} share this
+ * body so both apply the same two-anchor bundle resolution, the same
+ * `shres.bundle.patch` validation, and the same user-layer rule.
+ */
+function resolveProfile(
+  binName: string, name: string, dir: string, manifest: ProfileManifest,
+  installAnchor: string, options: { userLayer?: boolean },
+): Profile {
+  // A hand-written profile manifest may omit the shres section entirely.
+  const bundles = manifest.shres?.profile?.bundles ?? []
+  const layers = bundles.map((packageName): ProfileLayer => {
+    const packageDir = resolveBundleDir(binName, packageName, installAnchor, dir)
+    const bundleManifest = JSON.parse(readFileSync(join(packageDir, 'package.json'), 'utf8')) as ProfileManifest
+    const declared = bundleManifest.shres?.bundle?.patch
+    if (declared === undefined) {
+      throw new Error(`${binName}: profile bundle ${JSON.stringify(packageName)} declares no shres.bundle in its package.json`)
+    }
+    const patchPath = join(packageDir, declared)
+    return { packageName, packageDir, patchPath, patches: loadOverlayPatches(binName, patchPath) }
+  })
+  const patchPath = join(dir, PROFILE_PATCH_FILENAME)
+  const patches = options.userLayer !== false && existsSync(patchPath)
+    ? loadOverlayPatches(binName, patchPath)
+    : []
+  return { name, dir, layers, patchPath, patches }
+}
+
+/**
  * Load a profile: resolve every `shres.profile.bundles` entry to its patch
  * layer and parse the profile's own patch file. A listed bundle without a
  * `shres.bundle` manifest fails loud — naming a bundle-less package as a layer
@@ -428,24 +461,27 @@ export function loadProfile(
     }
     initProfile(dir, template, PROFILE_TEMPLATE_EDITIONS[name])
   }
-  const manifest = normalizeShippedProfile(name, dir, readProfileManifest(binName, dir))
-  // A hand-written profile manifest may omit the shres section entirely.
-  const bundles = manifest.shres?.profile?.bundles ?? []
-  const layers = bundles.map((packageName): ProfileLayer => {
-    const packageDir = resolveBundleDir(binName, packageName, installAnchor, dir)
-    const bundleManifest = JSON.parse(readFileSync(join(packageDir, 'package.json'), 'utf8')) as ProfileManifest
-    const declared = bundleManifest.shres?.bundle?.patch
-    if (declared === undefined) {
-      throw new Error(`${binName}: profile bundle ${JSON.stringify(packageName)} declares no shres.bundle in its package.json`)
-    }
-    const patchPath = join(packageDir, declared)
-    return { packageName, packageDir, patchPath, patches: loadOverlayPatches(binName, patchPath) }
-  })
-  const patchPath = join(dir, PROFILE_PATCH_FILENAME)
-  const patches = options.userLayer !== false && existsSync(patchPath)
-    ? loadOverlayPatches(binName, patchPath)
-    : []
-  return { name, dir, layers, patchPath, patches }
+  return resolveProfile(binName, name, dir, normalizeShippedProfile(name, dir, readProfileManifest(binName, dir)), installAnchor, options)
+}
+
+/**
+ * Load a profile from an explicit directory: the same bundle resolution,
+ * `shres.bundle.patch` validation, and user patch layer as {@link loadProfile},
+ * for a caller that owns profile creation and placement. A missing manifest
+ * and a bundle-less listed package both fail loud; nothing is initialized and
+ * no name-keyed normalization runs, so the directory is loaded exactly as
+ * written. The loaded profile's name is the directory basename.
+ * @param binName - the diagnostic prefix on thrown errors.
+ * @param dir - the profile directory.
+ * @param installAnchor - absolute path of the shres app's package.json (first resolution anchor).
+ * @param options - `userLayer: false` skips reading `cordis.patch.yml`, so a
+ * bundles-only consumer cannot fail on a broken user layer.
+ * @returns the loaded profile (empty `patches` when the user layer is skipped).
+ */
+export function loadProfileDirectory(
+  binName: string, dir: string, installAnchor: string, options: { userLayer?: boolean } = {},
+): Profile {
+  return resolveProfile(binName, basename(dir), dir, readProfileManifest(binName, dir), installAnchor, options)
 }
 
 /**
