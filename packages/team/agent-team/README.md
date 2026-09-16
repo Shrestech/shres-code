@@ -62,3 +62,4 @@ Prefix-stable while the Team tool schemas are unchanged. Binding or unbinding a 
 - **No task-board tools** — `team/task` events fold, but create/claim/complete tools are not registered.
 - **Trusted in-process producers** — a plugin with direct `Session` access can append counterfeit Team events. The fold and invariant detect inconsistency; they do not isolate plugins.
 - **Roster reads are Lead-session reads** — the `agentTeams.view` wire surface in `@shres-code/shres-code-host-apiproxy` serves the chat panel and answers only for a live Lead.
+- **Only the Lead provisions** — concurrent first-use of one name joins the in-flight creation. A teammate can mail an active or still-creating name; mailing an unstarted listed name fails until the Lead starts it.

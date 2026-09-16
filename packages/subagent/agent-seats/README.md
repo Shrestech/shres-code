@@ -14,7 +14,7 @@ The Models page Team card writes this section: provider/model pickers for the pr
 
 ## Model Experience
 
-Indirectly, through the `tool-subagent` instances this plugin remounts; that package owns each seat's schema, prompt section, and result.
+When `ctx.agentTeams` is present, bound product seats remount as Team-steer tools owned by this package (`description` and `prompt` in; `{ messageId, status }` after mailbox accept). Without Agent Teams they remount as `tool-subagent` instances, and that package owns the schema, prompt section, and result.
 
 #### KV Cache effect
 

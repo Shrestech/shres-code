@@ -100,3 +100,16 @@
   font-size: 12px;
   color: var(--dsw-alias-state-error-primary);
 }
+
+.errorRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.errorRow .diagnostic {
+  width: auto;
+  flex: 1 1 auto;
+}

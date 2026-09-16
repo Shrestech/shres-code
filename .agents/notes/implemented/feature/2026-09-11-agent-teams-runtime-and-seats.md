@@ -28,4 +28,4 @@ The base bundle mounts `agent-team` and keeps `tool-subagent-control`. The gener
 
 ## Consequences
 
-Every chat that is an ordinary root is an implicit Lead. Binding seats remounts named tools and a template; the first `aegis` or `team_send` to that name provisions the child. Failed provisioning still reserves the name. Generic children and Advisor remain outside `team_list`.
+Every chat that is an ordinary root is an implicit Lead. Binding seats remounts named tools and a template; the Lead's first `aegis` or `team_send` to that name provisions the child. Concurrent first-use of the same name waits for the one in-flight creation. A teammate named-seat or `team_send` call reads the Lead journal and can mail an active or still-creating name; only the Lead starts a missing template member. Failed provisioning still reserves the name. Generic children and Advisor remain outside `team_list`. The chat-header roster reloads when the panel opens; a failed read keeps the last successful roster or shows Retry.

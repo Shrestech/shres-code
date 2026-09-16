@@ -70,8 +70,10 @@ export function registerTeamTools(ctx: Context): void {
     name: 'team_send',
     description:
       'Send a message to a named teammate or to lead. A running teammate is steered at the next step; '
-      + 'an idle teammate starts a turn. This is not send_message: it cannot address a generic subagent child. '
-      + 'The call returns no reply from the target. Failure means the mailbox did not accept the message.',
+      + 'an idle teammate starts a turn. Only the Lead provisions an unstarted listed name; a teammate '
+      + 'can mail a name that is already active or still being created. This is not send_message: it '
+      + 'cannot address a generic subagent child. The call returns no reply from the target. Failure '
+      + 'means the mailbox did not accept the message.',
     parameters: {
       target: {
         type: 'string',

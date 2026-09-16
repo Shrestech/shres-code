@@ -120,13 +120,13 @@ export class TeamService extends Service {
 
   /**
    * Queue one durable peer message, then attempt immediate steer delivery.
+   * Ensures the target through the caller's Team root before the mailbox write.
    * @param caller - exact live sending Team member.
    * @param request - target name, content, and pre-queue cancellation.
    * @returns durable message identity and immediate-delivery observation.
    */
   async sendMessage(caller: Agent, request: SendTeamMessageRequest): Promise<SendTeamMessageResult> {
-    const membership = this.roster.membership(caller)
-    if (membership.role === 'lead') await this.ensureTemplateMember(caller, request.target)
+    await this.ensureTemplateMember(caller, request.target)
     return await this.mailbox.send(caller, request)
   }
 
@@ -140,22 +140,34 @@ export class TeamService extends Service {
 
   /**
    * Provision a template teammate when the Lead first addresses that name.
-   * @param lead - exact live Team Lead.
+   * Reads the Lead journal from the caller's membership root. Concurrent
+   * first-use of the same name waits for the one in-flight creation. A
+   * teammate may wait for an in-flight row or mail an active name; only the
+   * Lead starts a missing template member.
+   * @param caller - exact live Team member addressing the name.
    * @param rawName - teammate name from team_send or a named seat tool.
    */
-  async ensureTemplateMember(lead: Agent, rawName: string): Promise<void> {
+  async ensureTemplateMember(caller: Agent, rawName: string): Promise<void> {
+    const membership = this.roster.membership(caller)
+    const root = membership.root
     const name = rawName.trim()
-    if (name === 'lead' || name === String(lead.id)) return
-    const state = this.journal.state(lead)
+    if (name === 'lead' || name === String(root.id)) return
+    await this.roster.waitForCreation(root, name)
+    const state = this.journal.state(root)
     const existing = state.members.find(member => member.name === name)
     if (existing?.phase === 'active') return
     if (existing?.phase === 'failed') {
       throw new TeamError(`teammate "${name}" previously failed provisioning`, 'TEAM_MEMBER_NOT_FOUND')
     }
-    if (existing?.phase === 'provisioning') return
+    if (existing?.phase === 'provisioning') {
+      throw new TeamError(`active teammate "${name}" not found`, 'TEAM_MEMBER_NOT_FOUND')
+    }
+    if (membership.role !== 'lead') {
+      throw new TeamError(`only the Team Lead can provision teammate "${name}"`, 'TEAM_LEAD_REQUIRED')
+    }
     const entry = this.template().find(candidate => candidate.name === name)
     if (entry === undefined) return
-    await this.roster.spawn(lead, {
+    await this.roster.spawn(root, {
       name: entry.name,
       description: entry.description,
       prompt: [{ type: 'text', text: entry.description === entry.name ? `You are ${entry.name}.` : `You are ${entry.name}. ${entry.description}` }],

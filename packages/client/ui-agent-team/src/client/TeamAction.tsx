@@ -1,8 +1,9 @@
-/** Chat-header Team action: loads the roster view once and renders the panel. */
+/** Chat-header Team action: loads the roster view and reloads when the panel opens. */
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { SessionId } from '@shres-code/shres-code-client-runtime/client'
 import type { AgentTeamsMemberRow, AgentTeamsRoster } from '@shres-code/shres-code-api-remotes/client'
+import type { RpcResponse } from '@shres-code/shres-code-api-remotes/client'
 import type { PropsLocale, PropsRuntime } from '@shres-code/shres-code-client-ui-slots'
 import type {} from '@shres-code/shres-code-client-ui-conversation/client'
 import { NS } from './locales.ts'
@@ -20,6 +21,17 @@ export interface TeamActionInjected {
 export type TeamActionProps =
   PropsRuntime<'conversation.session.header.actions'> & TeamActionInjected & PropsLocale<typeof NS>
 
+/**
+ * Unwrap one `agentTeams.view` RPC response. A failed call throws so the
+ * panel can retry instead of treating the session as a non-Lead.
+ * @param response - unary view result.
+ * @returns the roster value.
+ */
+export function rosterFromView(response: RpcResponse<AgentTeamsRoster>): AgentTeamsRoster {
+  if (!response.result.ok) throw new Error(response.result.error.message)
+  return response.result.value
+}
+
 /** Whether one roster row can navigate into a child conversation. */
 function navigable(member: AgentTeamsMemberRow): boolean {
   return member.role === 'teammate'
@@ -30,31 +42,51 @@ function navigable(member: AgentTeamsMemberRow): boolean {
 }
 
 /**
- * Render the Team trigger only for sessions that are live Team Leads; the
- * panel lists the roster and navigates into teammates.
+ * Render the Team trigger for live Team Leads, and a retry control when the
+ * first roster read fails. Opening the panel reloads `agentTeams.view`.
  * @param props - session runtime props, injected face, and localized copy.
- * @returns the action, or null while loading or off a Team Lead.
+ * @returns the action, or null while the first load is in flight or off a Team Lead.
  */
 export function TeamAction({ sessionId, load, openTeammate, t }: TeamActionProps): ReactNode {
   const [roster, setRoster] = useState<AgentTeamsRoster | undefined>(undefined)
+  const [error, setError] = useState(false)
   const [open, setOpen] = useState(false)
   const loadRef = useRef(load)
   loadRef.current = load
+  const sessionRef = useRef(sessionId)
+  sessionRef.current = sessionId
+  const generationRef = useRef(0)
+
+  const refresh = (): Promise<void> => {
+    const generation = generationRef.current + 1
+    generationRef.current = generation
+    const requested = sessionRef.current
+    return loadRef.current(requested).then(
+      (view) => {
+        if (generation !== generationRef.current) return
+        setRoster(view)
+        setError(false)
+      },
+      () => {
+        if (generation !== generationRef.current) return
+        setError(true)
+      },
+    )
+  }
+
   useEffect(() => {
-    let cancelled = false
+    generationRef.current += 1
     setRoster(undefined)
-    loadRef.current(sessionId)
-      .then((view) => {
-        if (!cancelled) setRoster(view)
-      })
-      .catch(() => {
-        if (!cancelled) setRoster({ sessionId, isTeam: false, members: [] })
-      })
+    setError(false)
+    setOpen(false)
+    void refresh()
     return () => {
-      cancelled = true
+      generationRef.current += 1
     }
   }, [sessionId])
-  if (roster === undefined || !roster.isTeam) return null
+
+  const visible = roster?.isTeam === true || (error && roster === undefined)
+  if (!visible) return null
   return (
     <div className={css.action}>
       <button
@@ -63,7 +95,10 @@ export function TeamAction({ sessionId, load, openTeammate, t }: TeamActionProps
         aria-expanded={open}
         aria-haspopup="dialog"
         onClick={() => {
-          setOpen(value => !value)
+          setOpen((value) => {
+            if (!value) void refresh()
+            return !value
+          })
         }}
       >
         {t('teamAction')}
@@ -72,36 +107,54 @@ export function TeamAction({ sessionId, load, openTeammate, t }: TeamActionProps
         ? (
           <div className={css.panel} role="dialog" aria-label={t('teamPanelTitle')}>
             <p className={css.panelTitle}>{t('teamPanelTitle')}</p>
-            {roster.members.length === 0
-              ? <p className={css.empty}>{t('teamEmpty')}</p>
-              : (
-                <ul className={css.rows}>
-                  {roster.members.map(member => (
-                    <li key={member.role === 'lead' ? 'lead' : member.id} className={css.row}>
-                      <span className={css.name}>{member.name}</span>
-                      <span className={css.status}>{member.status}</span>
-                      {member.model === undefined ? null : <span className={css.model}>{member.model}</span>}
-                      {navigable(member)
-                        ? (
-                          <button
-                            type="button"
-                            className={css.open}
-                            onClick={() => {
-                              openTeammate(sessionId, member)
-                              setOpen(false)
-                            }}
-                          >
-                            {t('teamOpenConversation')}
-                          </button>
-                        )
-                        : null}
-                      {member.diagnostics.length === 0
-                        ? null
-                        : <p className={css.diagnostic}>{member.diagnostics.join('; ')}</p>}
-                    </li>
-                  ))}
-                </ul>
-              )}
+            {error
+              ? (
+                <div className={css.errorRow}>
+                  <p className={css.diagnostic}>{t('teamLoadFailed')}</p>
+                  <button
+                    type="button"
+                    className={css.open}
+                    onClick={() => {
+                      void refresh()
+                    }}
+                  >
+                    {t('teamRetry')}
+                  </button>
+                </div>
+              )
+              : null}
+            {roster?.isTeam !== true
+              ? null
+              : roster.members.length === 0
+                ? <p className={css.empty}>{t('teamEmpty')}</p>
+                : (
+                  <ul className={css.rows}>
+                    {roster.members.map(member => (
+                      <li key={member.role === 'lead' ? 'lead' : member.id} className={css.row}>
+                        <span className={css.name}>{member.name}</span>
+                        <span className={css.status}>{member.status}</span>
+                        {member.model === undefined ? null : <span className={css.model}>{member.model}</span>}
+                        {navigable(member)
+                          ? (
+                            <button
+                              type="button"
+                              className={css.open}
+                              onClick={() => {
+                                openTeammate(sessionId, member)
+                                setOpen(false)
+                              }}
+                            >
+                              {t('teamOpenConversation')}
+                            </button>
+                          )
+                          : null}
+                        {member.diagnostics.length === 0
+                          ? null
+                          : <p className={css.diagnostic}>{member.diagnostics.join('; ')}</p>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
           </div>
         )
         : null}

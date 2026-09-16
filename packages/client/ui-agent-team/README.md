@@ -7,7 +7,7 @@ kind: "package-reference"
 
 ## Summary
 
-This plugin adds a `Team` action to the conversation header of sessions that lead an Agent Team. Opening it shows the durable roster — the Lead, each named teammate with its live status and model binding, and provisioning diagnostics — and every teammate row navigates into that teammate's conversation through the stable addressed-subagent path. The panel reads authoritative state once per open session through the `agentTeams.view` RPC, stores nothing in the browser, and registers no model-facing input; sessions that are not Team Leads render no Team control at all.
+This plugin adds a `Team` action to the conversation header of sessions that lead an Agent Team. Opening it shows the durable roster — the Lead, each named teammate with its live status and model binding, and provisioning diagnostics — and every teammate row navigates into that teammate's conversation through the stable addressed-subagent path. The panel reads `agentTeams.view` when the header action mounts and again when the panel opens, stores nothing in the browser, and registers no model-facing input; sessions that are not Team Leads render no Team control at all.
 
 ## Use this package
 
@@ -41,6 +41,6 @@ None. No model request changes shape because the panel exists or is used.
 
 ## Known Limitations and Deferred Work
 
-- **Read-once panel** — the roster loads when the session header action mounts; a reload rides reopening the panel or the session, not a live subscription. Provisioning started elsewhere becomes visible on the next read.
+- **Reload on open** — the roster loads when the session header action mounts and again when the panel opens, not as a live subscription. A failed read keeps the last successful roster; a first-load failure shows Retry instead of hiding the control. Provisioning started elsewhere becomes visible on the next read.
 - **No task board** — the runtime registers no task tools, so the panel is roster-only; task chrome waits on the board runtime.
 - **Navigation needs an active teammate** — failed or unprovisioned template rows carry no conversation to open; the row shows status or diagnostics instead.

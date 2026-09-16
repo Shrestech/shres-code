@@ -56,6 +56,7 @@ export function resolveActiveMember(
 /** Owns Team identities and the lifecycle of rostered continuable children. */
 export class TeamRoster {
   private readonly inFlightCreations = new Set<Promise<unknown>>()
+  private readonly inFlightByName = new Map<string, Promise<SpawnTeammateResult>>()
 
   /**
    * @param ctx - Team service context with Agent, Session, persistence, and subagent services.
@@ -155,6 +156,8 @@ export class TeamRoster {
 
   /**
    * Create one named, continuable direct child of the Team Lead.
+   * Concurrent callers for the same Lead and name share one creation; a later
+   * call after that name is already on the roster still fails `TEAM_MEMBER_NAME_TAKEN`.
    * @param caller - exact live Lead Agent.
    * @param request - immutable name, description, prompt, context mode, provider, and cancellation.
    * @returns the active roster row.
@@ -162,13 +165,37 @@ export class TeamRoster {
   async spawn(caller: Agent, request: SpawnTeammateRequest): Promise<SpawnTeammateResult> {
     /* v8 ignore next -- spawn after the runtime admission cutoff. */
     if (this.lifecycle.disposed) throw new TeamError('Agent Teams service is disposing', 'TEAM_DISPOSED')
+    const membership = this.membership(caller)
+    if (membership.role !== 'lead') {
+      throw new TeamError('only the Team Lead can create teammates', 'TEAM_LEAD_REQUIRED')
+    }
+    const key = this.creationKey(membership.root.id, request.name)
+    const pending = this.inFlightByName.get(key)
+    if (pending !== undefined) return await pending
     const operation = this.spawnAdmitted(caller, request)
+    this.inFlightByName.set(key, operation)
     this.inFlightCreations.add(operation)
     try {
       return await operation
     } finally {
       this.inFlightCreations.delete(operation)
+      this.inFlightByName.delete(key)
     }
+  }
+
+  /**
+   * Await an in-flight same-name creation on this Lead, if one exists.
+   * @param root - exact live Team Lead.
+   * @param name - model-facing teammate name.
+   */
+  async waitForCreation(root: Agent, name: string): Promise<void> {
+    const pending = this.inFlightByName.get(this.creationKey(root.id, name))
+    if (pending !== undefined) await pending
+  }
+
+  /** Key in-flight creations by Lead identity and trimmed teammate name. */
+  private creationKey(rootId: SessionId, rawName: string): string {
+    return `${rootId}:${rawName.trim()}`
   }
 
   /**
@@ -217,9 +244,6 @@ export class TeamRoster {
     request: SpawnTeammateRequest,
   ): Promise<SpawnTeammateResult> {
     const membership = this.membership(caller)
-    if (membership.role !== 'lead') {
-      throw new TeamError('only the Team Lead can create teammates', 'TEAM_LEAD_REQUIRED')
-    }
     const signal = AbortSignal.any([request.signal, this.lifecycle.signal])
     signal.throwIfAborted()
     const root = membership.root

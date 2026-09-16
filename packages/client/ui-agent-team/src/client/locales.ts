@@ -9,6 +9,8 @@ export const en = {
   teamPanelTitle: 'Team roster',
   teamOpenConversation: 'Open conversation',
   teamEmpty: 'No teammates yet. Delegate to a seat to provision it.',
+  teamLoadFailed: 'The Team roster could not be loaded.',
+  teamRetry: 'Retry',
 } as const
 
 export type TeamKey = keyof typeof en

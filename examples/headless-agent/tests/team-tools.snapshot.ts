@@ -1,9 +1,10 @@
 /**
  * Assembled-app regression: `team_list` is mounted on an ordinary root, lists
  * the implicit Lead, and does not treat a generic hire as a teammate.
+ * `team_send` to a bound Aegis seat provisions then returns mailbox status.
  */
 
-import { readFile, readdir, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { normalizeSessionLog, scrubRequestHeaders, type NormalizeContext } from '@shres-code/shres-code-acp-snapshot'
@@ -70,6 +71,78 @@ describe('team_list headless snapshot', () => {
     const records = result.stdout.trimEnd().split('\n').map(line => JSON.parse(line) as Record<string, unknown>)
     expect(records.at(-1)).toMatchObject({
       output: 'TEAM_LIST_OK lead only',
+    })
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+})
+
+const sendFixtureDir = fileURLToPath(new URL('./team-tools-snapshots/team-send', import.meta.url))
+const sendReplayOverride = join(sendFixtureDir, 'replay.override.json')
+const sendParentExpected = join(sendFixtureDir, 'parent.expected.jsonl')
+const sendConfigPath = fileURLToPath(new URL('../team-send.cordis.snapshot.yml', import.meta.url))
+const sendTask = 'Call team_send to aegis with a short design prompt, report the mailbox status, then stop.'
+
+describe('team_send headless snapshot', () => {
+  it('provisions Aegis through Team mail and returns mailbox status', async () => {
+    let cwd = ''
+    const result = await runLoaderSmoke({
+      label: 'team_send headless stream-json snapshot',
+      tempDirPrefix: 'shres-team-send-',
+      binScript,
+      libBinScript: binScript,
+      configPath: sendConfigPath,
+      binArgs: [sendConfigPath, sendTask],
+      tsconfigPath,
+      env: {
+        SHRES_SNAPSHOT_FILE: sendReplayOverride,
+        SHRES_SNAPSHOT_OVERRIDE: sendReplayOverride,
+      },
+      prepare: async (runCwd) => {
+        cwd = runCwd
+        await mkdir(join(runCwd, '.shres'), { recursive: true })
+        await writeFile(join(runCwd, '.shres', 'settings.yaml'), [
+          'agent-seats:',
+          '  seats:',
+          '    aegis:',
+          '      provider: deepseek-official',
+          '      model: deepseek-v4-flash',
+          '',
+        ].join('\n'))
+      },
+      inspect: async (runCwd) => {
+        const sessionsDir = join(runCwd, '.sessions')
+        let files: string[] = []
+        try {
+          files = (await readdir(sessionsDir, { recursive: true })).filter(file => file.endsWith('.jsonl'))
+        } catch {
+          files = (await readdir(runCwd, { recursive: true })).filter(file => file.endsWith('.jsonl'))
+        }
+        const logs = await Promise.all(files.map(async file => ({
+          file,
+          content: await readFile(join(sessionsDir, file), 'utf8'),
+        })))
+        if (logs.length === 0) throw new Error(`no persisted session logs under ${sessionsDir}`)
+        const parent = logs.find(log => log.content.includes('team_send'))?.content
+          ?? logs[0]?.content
+        if (parent === undefined) throw new Error(`missing persisted lead log in ${files.join(', ')}`)
+        expect(parent).toContain('"name":"team_send"')
+        expect(parent).toMatch(/team message .* (accepted|queued) for aegis/)
+        expect(parent).not.toContain('"isError":true')
+
+        const header = parent.split('\n').find(line => line.trim().startsWith('{'))
+        const sessionId = header !== undefined
+          ? (JSON.parse(header) as { id?: string }).id ?? 'team-lead'
+          : 'team-lead'
+        const context: NormalizeContext = { sessionIds: [sessionId], cwd }
+        const normalizedParent = scrubRequestHeaders(normalizeSessionLog(parent, context))
+        if (refreshing) await writeFile(sendParentExpected, normalizedParent)
+        expect(normalizedParent).toBe(await readFile(sendParentExpected, 'utf8'))
+      },
+    })
+
+    expect(result.stderr).toBe('')
+    const records = result.stdout.trimEnd().split('\n').map(line => JSON.parse(line) as Record<string, unknown>)
+    expect(records.at(-1)).toMatchObject({
+      output: 'TEAM_SEND_OK accepted',
     })
   }, LOADER_SMOKE_TEST_TIMEOUT_MS)
 })

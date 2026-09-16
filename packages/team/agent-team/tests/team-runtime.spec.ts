@@ -207,6 +207,7 @@ describe('Agent Teams runtime mailbox', () => {
     const { ctx, lead } = await setup(new MockAdapter([
       textResponse('researcher ready'),
       textResponse('researcher after mail'),
+      textResponse('notes ready'),
     ]))
     ctx.agentTeams.setRosterTemplate(() => [{
       name: 'researcher',
@@ -214,6 +215,10 @@ describe('Agent Teams runtime mailbox', () => {
       persona: 'You are Researcher.',
       provider: 'mock',
       model: 'mock',
+    }, {
+      name: 'notes',
+      description: 'notes',
+      provider: 'mock',
     }])
     expect(ctx.agentTeams.listMembers(lead).map(row => row.name)).toContain('researcher')
     const sent = await ctx.agentTeams.sendMessage(lead, {
@@ -222,8 +227,15 @@ describe('Agent Teams runtime mailbox', () => {
       signal: SIGNAL,
     })
     expect(['accepted', 'queued']).toContain(sent.status)
+    const notes = await ctx.agentTeams.sendMessage(lead, {
+      target: 'notes',
+      content: content('take a note'),
+      signal: SIGNAL,
+    })
+    expect(['accepted', 'queued']).toContain(notes.status)
     const names = ctx.agentTeams.listMembers(lead).map(row => row.name)
     expect(names).toContain('researcher')
+    expect(names).toContain('notes')
     expect(names).not.toContain('subagent')
     await ctx.fiber.dispose()
   })
@@ -340,23 +352,108 @@ describe('Agent Teams runtime mailbox', () => {
     await ctx.fiber.dispose()
   })
 
-  it('keeps a provisioning row until startContinuable settles', async () => {
+  it('joins concurrent first-use of the same name and waits for in-flight provisioning', async () => {
     let release!: () => void
     const gate = new Promise<void>((resolve) => { release = resolve })
-    const { ctx, lead } = await setup(new MockAdapter([textResponse('aegis done')]))
+    const { ctx, lead } = await setup(new MockAdapter([
+      textResponse('aegis done'),
+      textResponse('aegis after first mail'),
+      textResponse('aegis after second mail'),
+    ]))
+    ctx.agentTeams.setRosterTemplate(() => [{
+      name: 'aegis',
+      description: 'Architect',
+      provider: 'mock',
+      model: 'mock',
+    }])
     const orig = ctx.subagents.startContinuable.bind(ctx.subagents)
     vi.spyOn(ctx.subagents, 'startContinuable').mockImplementation(async (spec) => {
       await gate
       return orig(spec)
     })
-    const pending = spawn(ctx, lead, 'aegis')
+    const first = ctx.agentTeams.sendMessage(lead, {
+      target: 'aegis',
+      content: content('plan one'),
+      signal: SIGNAL,
+    })
     await vi.waitFor(() => {
       expect(ctx.agentTeams.listMembers(lead).some(row => row.name === 'aegis' && row.status === 'provisioning')).toBe(true)
     }, { timeout: 5_000 })
-    await ctx.agentTeams.ensureTemplateMember(lead, 'aegis')
+    const second = ctx.agentTeams.sendMessage(lead, {
+      target: 'aegis',
+      content: content('plan two'),
+      signal: SIGNAL,
+    })
+    const joined = spawn(ctx, lead, 'aegis')
     release()
-    await pending
+    const [left, right, same] = await Promise.all([first, second, joined])
+    expect(left.messageId).not.toBe(right.messageId)
+    expect(['accepted', 'queued']).toContain(left.status)
+    expect(['accepted', 'queued']).toContain(right.status)
+    expect(same.member.name).toBe('aegis')
+    expect(ctx.agentTeams.listMembers(lead).filter(row => row.name === 'aegis')).toHaveLength(1)
     expect(ctx.agentTeams.listMembers(lead).some(row => row.name === 'aegis' && row.status !== 'provisioning')).toBe(true)
+    await ctx.fiber.dispose()
+  })
+
+  it('lets a teammate mail an active seat and refuses teammate provision of a missing name', async () => {
+    let releaseAegis!: () => void
+    let releaseStride!: () => void
+    const aegisGate = new Promise<undefined>((resolve) => {
+      releaseAegis = () => { resolve(undefined) }
+    })
+    const strideGate = new Promise<undefined>((resolve) => {
+      releaseStride = () => { resolve(undefined) }
+    })
+    const { ctx, lead } = await setup(new GatedAdapter([
+      { chunks: textResponse('aegis working'), gate: aegisGate },
+      { chunks: textResponse('stride working'), gate: strideGate },
+    ]))
+    ctx.agentTeams.setRosterTemplate(() => [{
+      name: 'researcher',
+      description: 'Researcher',
+      provider: 'mock',
+      model: 'mock',
+    }])
+    const aegis = await spawn(ctx, lead, 'aegis')
+    const stride = await spawn(ctx, lead, 'stride')
+    const aegisAgent = ctx.agents.get(aegis.member.id)
+    expect(aegisAgent).toBeDefined()
+    await ctx.agentTeams.ensureTemplateMember(aegisAgent!, 'stride')
+    const mailed = await ctx.agentTeams.sendMessage(aegisAgent!, {
+      target: 'stride',
+      content: content('review this'),
+      signal: SIGNAL,
+    })
+    expect(['accepted', 'queued']).toContain(mailed.status)
+    expect(stride.member.name).toBe('stride')
+    await expect(ctx.agentTeams.sendMessage(aegisAgent!, {
+      target: 'researcher',
+      content: content('look this up'),
+      signal: SIGNAL,
+    })).rejects.toMatchObject({ code: 'TEAM_LEAD_REQUIRED' })
+    releaseAegis()
+    releaseStride()
+    await ctx.fiber.dispose()
+  })
+
+  it('refuses leftover provisioning that has no in-flight creator', async () => {
+    const { ctx, lead } = await setup(new MockAdapter([]))
+    lead.session.append('team/member', {
+      teamId: TeamId(lead.id),
+      member: {
+        id: SessionId('leftover-child'),
+        name: 'leftover',
+        description: 'stuck',
+        provider: 'spawn',
+        context: 'fresh',
+        phase: 'provisioning',
+      },
+    }, { ignorable: true })
+    await ctx.sessions.flush(lead.session)
+    await expect(ctx.agentTeams.ensureTemplateMember(lead, 'leftover')).rejects.toMatchObject({
+      code: 'TEAM_MEMBER_NOT_FOUND',
+    })
     await ctx.fiber.dispose()
   })
 

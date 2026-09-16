@@ -15,8 +15,9 @@ export function registerTeamSeatTool(ctx: Context, seat: BoundSeat, teams: TeamS
   ctx.tools.register(defineTool({
     name: seat.entry.id,
     description:
-      `${seat.entry.description} This teammate is part of the Agent Team: the first call provisions it, `
-      + 'later calls steer the current turn at the next step via Team mail. It does not see this conversation.',
+      `${seat.entry.description} This teammate is part of the Agent Team: the Lead's first call `
+      + 'provisions it, later calls steer the current turn at the next step via Team mail. A teammate '
+      + 'can mail this name only after it is active or while it is being created. It does not see this conversation.',
     parameters: {
       description: {
         type: 'string',

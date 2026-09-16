@@ -6,6 +6,7 @@ import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
 import type { RpcResponse, SettingsNamespaceView } from '@shres-code/shres-code-api-remotes/client'
 import { ModelsSection } from '../src/client/ModelsSection.tsx'
 import type { ModelsSectionInjected } from '../src/client/ModelsSection.tsx'
+import { SEAT_ROSTER } from '../../../subagent/agent-seats/src/roster.ts'
 import { membersOf, memberDraftValid, seatValueOf, writeMembers, writeSeat } from '../src/client/TeamCard.tsx'
 import { ModelsSettingsStore } from '../src/client/store.ts'
 import { en } from '../src/client/locales.ts'
@@ -191,6 +192,17 @@ describe('TeamCard', () => {
     expect(screen.queryByRole('textbox', { name: /Stride/ })).toBeNull()
     expect(screen.queryByRole('textbox', { name: /Ward/ })).toBeNull()
     expect(screen.getByLabelText(en.teamMemberPersona)).toBeTruthy()
+  })
+
+  it('keeps wrap-text persona copy identical to the host roster', () => {
+    const copy = {
+      aegis: en.seatAegisPersona,
+      stride: en.seatStridePersona,
+      ward: en.seatWardPersona,
+    } as const
+    for (const entry of SEAT_ROSTER) {
+      expect(copy[entry.id]).toBe(entry.persona)
+    }
   })
 
   it('opens the shipped persona for each product seat from the wrap-text control', async () => {

@@ -1,7 +1,9 @@
 /**
- * Remount named `tool-subagent` spawn seats from the `agent-seats` settings
- * section. Each bound seat is one Shres child tool (`aegis`, `stride`, `ward`)
- * with its own `agentOptions` provider/model. Unbound seats stay unmounted.
+ * Remount named product seats from the `agent-seats` settings section. Each
+ * bound seat is one Shres child tool (`aegis`, `stride`, `ward`) with its own
+ * `agentOptions` provider/model. When `ctx.agentTeams` is present the tools
+ * provision then Team-steer; otherwise they remount as `tool-subagent`.
+ * Unbound seats stay unmounted.
  * @module @shres-code/shres-code-agent-seats
  */
 

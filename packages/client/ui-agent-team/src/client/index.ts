@@ -1,14 +1,14 @@
 /**
  * Agent Team roster plugin, browser half: registers the Team header action
- * into the conversation header. The action loads the roster view once per
- * session and renders only for live Team Leads; teammate rows navigate
- * through the stable addressed-subagent path.
+ * into the conversation header. The action loads the roster view on mount
+ * and again when the panel opens, and renders only for live Team Leads;
+ * teammate rows navigate through the stable addressed-subagent path.
  */
 import type { ClientContext, SessionId } from '@shres-code/shres-code-client-runtime/client'
 import type { IApiClient } from '@shres-code/shres-code-api-remotes/client'
 import type { AgentTeamsMemberRow } from '@shres-code/shres-code-api-remotes/client'
 import type {} from '@shres-code/shres-code-client-locale/client'
-import { TeamAction, type TeamActionInjected } from './TeamAction.tsx'
+import { rosterFromView, TeamAction, type TeamActionInjected } from './TeamAction.tsx'
 import { en, NS, type TeamKey } from './locales.ts'
 
 declare module '@shres-code/shres-code-client-ui-slots' {
@@ -35,8 +35,7 @@ export function apply(ctx: ClientContext): void {
   const teamInjected = (): TeamActionInjected => ({
     load: async (sessionId) => {
       const response = await connection.api.agentTeams.view({ sessionId })
-      if (!response.result.ok) return { sessionId, isTeam: false, members: [] }
-      return response.result.value
+      return rosterFromView(response)
     },
     openTeammate(parentSessionId: SessionId, member: AgentTeamsMemberRow) {
       void sessions.refreshSubagents(parentSessionId)

@@ -6,7 +6,8 @@ import { fileURLToPath } from 'node:url'
 import { Context } from '@shres-code/cordis'
 import AgentLoop from '@shres-code/shres-code-agent-loop'
 import { mountAgentLoopTestDependencies } from '@shres-code/shres-code-agent-loop-testkit'
-import { CallId } from '@shres-code/shres-code-llm'
+import { CallId, LlmAdapter } from '@shres-code/shres-code-llm'
+import type { GenerateOptions, StreamChunk } from '@shres-code/shres-code-llm'
 import { SessionId } from '@shres-code/shres-code-session'
 import JsonlSessionPersistence from '@shres-code/shres-code-session-persistence-jsonl'
 import SessionProjectionRegistry from '@shres-code/shres-code-session-projection'
@@ -41,7 +42,23 @@ afterEach(() => {
 
 const SIGNAL = new AbortController().signal
 
-async function bootTeamSeats() {
+class GatedAdapter extends LlmAdapter {
+  constructor(private script: { chunks: StreamChunk[]; gate?: Promise<undefined> }[]) {
+    super()
+  }
+
+  async * stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
+    const entry = this.script.shift()
+    if (!entry) throw new Error('GatedAdapter: script exhausted')
+    if (entry.gate) await entry.gate
+    for (const chunk of entry.chunks) {
+      if (options.signal?.aborted) throw new Error('aborted')
+      yield chunk
+    }
+  }
+}
+
+async function bootTeamSeats(adapter?: LlmAdapter) {
   const ctx = new Context()
   await ctx.plugin(MemorySettings)
   await mountAgentLoopTestDependencies(ctx)
@@ -54,10 +71,13 @@ async function bootTeamSeats() {
   await ctx.plugin(SubagentSpawn, { providerName: 'spawn' })
   await ctx.plugin(seats)
   await ctx.plugin(AgentTeamPlugin)
-  ctx.llm.registerAdapter(['mock'], new MockAdapter([
+  ctx.llm.registerAdapter(['mock'], adapter ?? new MockAdapter([
     textResponse('aegis working'),
     textResponse('researcher working'),
     textResponse('generic child'),
+    textResponse('stride working'),
+    textResponse('stride after mail'),
+    textResponse('extra child'),
   ]))
   const lead = ctx.agentLoop.create(SessionId('lead'), { provider: 'mock', model: 'mock' })
   ctx.on('agent/pre-step', async ({ agent }, next) => {
@@ -161,6 +181,47 @@ describe('agent-seats wired to Agent Teams', () => {
     expect(ctx.tools.schemas().map(schema => schema.name)).toEqual(
       expect.arrayContaining(['aegis', 'stride', 'subagent']),
     )
+    await ctx.fiber.dispose()
+  })
+
+  it('lets a teammate steer an already-active named seat', async () => {
+    let releaseAegis!: () => void
+    let releaseStride!: () => void
+    const aegisGate = new Promise<undefined>((resolve) => {
+      releaseAegis = () => { resolve(undefined) }
+    })
+    const strideGate = new Promise<undefined>((resolve) => {
+      releaseStride = () => { resolve(undefined) }
+    })
+    const { ctx, lead } = await bootTeamSeats(new GatedAdapter([
+      { chunks: textResponse('aegis working'), gate: aegisGate },
+      { chunks: textResponse('stride working'), gate: strideGate },
+    ]))
+    await ctx.settings.replace(seats.AGENT_SEATS_SETTINGS_NAMESPACE, {
+      seats: {
+        aegis: { provider: 'mock', model: 'mock' },
+        stride: { provider: 'mock', model: 'mock' },
+      },
+    })
+    const first = await callTool(ctx, 'aegis', { description: 'plan', prompt: 'Design billing.' }, lead)
+    expect(first.isError).toBe(false)
+    const second = await callTool(ctx, 'stride', { description: 'impl', prompt: 'Write the handler.' }, lead)
+    expect(second.isError).toBe(false)
+    const aegisId = ctx.agentTeams.listMembers(lead).find(row => row.name === 'aegis')?.id
+    expect(aegisId).toBeDefined()
+    const aegisAgent = ctx.agents.get(aegisId!)
+    expect(aegisAgent).toBeDefined()
+    const mailed = await callTool(ctx, 'stride', {
+      description: 'follow-up',
+      prompt: 'Keep the handler bounded.',
+    }, aegisAgent)
+    const mailedText = mailed.content.map(block => 'text' in block ? block.text : '').join('')
+    expect(mailedText, mailed.isError ? mailedText : 'ok').toContain('stride')
+    expect(mailed.isError).toBe(false)
+    const self = await callTool(ctx, 'aegis', { description: 'x', prompt: 'y' }, aegisAgent)
+    expect(self.isError).toBe(true)
+    releaseAegis()
+    releaseStride()
     await ctx.fiber.dispose()
   })
 
