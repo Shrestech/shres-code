@@ -7,6 +7,7 @@ import {
 } from '@shres-code/shres-code-host-apiproxy/api'
 import type { ClientConnectionRpc } from '../rpc.ts'
 import { randomUuid } from './random-uuid.ts'
+import type { TransportFetch } from './transport.ts'
 
 const INTERNAL_BASE = 'http://shres.internal'
 const CHANNEL_PATTERN = /^\/[A-Za-z0-9._~-]+$/
@@ -14,9 +15,13 @@ const ENDPOINT_SEGMENT_PATTERN = /^[A-Za-z0-9_$.-]+$/
 
 /**
  * Create the browser-backed generic RPC caller.
+ * @param fetchCarrier - unary carrier; defaults to `globalThis.fetch`. A shell
+ *   transport routes this over its own pipes.
  * @returns caller that owns request correlation and response-envelope validation.
  */
-export function createWebConnectionRpc(): ClientConnectionRpc {
+export function createWebConnectionRpc(
+  fetchCarrier: TransportFetch = (input, init) => globalThis.fetch(input, init),
+): ClientConnectionRpc {
   return {
     async call(channel, endpoint, payload, signal) {
       assertTarget(channel, endpoint)
@@ -27,7 +32,7 @@ export function createWebConnectionRpc(): ClientConnectionRpc {
         method: endpoint,
         payload,
       }
-      const response = await globalThis.fetch(
+      const response = await fetchCarrier(
         new URL(`${channel}/${endpoint}`, resolveBase()),
         {
           method: 'POST',
