@@ -63,6 +63,14 @@ describe('llm-codex-session route', () => {
     const resolved = await context.llm.resolveModelInfo('codex-session', 'gpt-6-astra')
     expect(resolved.inputModalities).toEqual(['text', 'image'])
     expect(resolved.reasoning?.efforts.map(effort => effort.id)).toEqual(['low', 'medium', 'high', 'xhigh', 'max'])
+    // The shipped lower bound, not the adapter's fallback, is what pressure policy reads.
+    expect(resolved.context).toEqual({ contextWindow: 311_000 })
+  })
+
+  it('keeps an unbounded shipped model on the adapter fallback window', async () => {
+    const context = await boot()
+    const resolved = await context.llm.resolveModelInfo('codex-session', 'gpt-5.6-luna')
+    expect(resolved.context).toEqual({ contextWindow: 262_144 })
   })
 
   it('streams one text turn with the document token as bearer and the account header', async () => {
