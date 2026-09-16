@@ -8,7 +8,7 @@ import { Context } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
 import { CompactionEngine, ManualCompactionError } from '@shres-code/shres-code-compaction'
 import type { CompactionResult, CompactionTrigger } from '@shres-code/shres-code-compaction'
-import type { TokenMeter } from '@shres-code/shres-code-token-meter'
+import type { TokenMeasurement, TokenMeter } from '@shres-code/shres-code-token-meter'
 import type { Session } from '@shres-code/shres-code-session'
 import { CONTEXT_WINDOW_EXCEEDED_CODE, assertNever } from '@shres-code/shres-code-llm'
 import type { LlmCallConfig } from '@shres-code/shres-code-llm'
@@ -58,6 +58,43 @@ function routedTarget(
     return undefined
   }
   return { provider: config.provider, model: config.model }
+}
+
+/** The pressure a measurement reports: the figure compared against the threshold and its source. */
+interface PressureReading {
+  /** Tokens compared against the target's threshold. */
+  readonly tokens: number
+  /** Whether the figure is the provider-anchored prompt or the heuristic envelope. */
+  readonly source: 'usage' | 'heuristic'
+}
+
+/**
+ * Read the pressure the latest routed request is under.
+ *
+ * The provider-anchored figure wins when the meter measured usage for a request
+ * whose header still matches the current one: it is the only side that counts
+ * what the heuristic estimator cannot see, so a route whose wire carries
+ * adapter-private replay or whose content is denser than four characters per
+ * token crosses the threshold there first. The heuristic envelope — surface
+ * plus request furniture — is the fallback before the first response reports
+ * usage and after a header change moves the anchor.
+ * @param measurement - one snapshot from the session's token meter.
+ * @returns the tokens to compare against the threshold and their source.
+ */
+function pressureReading(measurement: TokenMeasurement): PressureReading {
+  return measurement.baseline.kind === 'usage'
+    ? { tokens: measurement.totalTokens, source: 'usage' }
+    : { tokens: measurement.surfaceTokens + measurement.headerTokens, source: 'heuristic' }
+}
+
+/**
+ * Whether one measurement is at or above a target's pressure threshold.
+ * @param measurement - one snapshot from the session's token meter.
+ * @param thresholdTokens - the target's threshold, in the reading's own units.
+ * @returns true when the next request is at or above the threshold.
+ */
+function underPressure(measurement: TokenMeasurement, thresholdTokens: number): boolean {
+  return pressureReading(measurement).tokens >= thresholdTokens
 }
 
 /** Resolve the conversation target used to select an optional policy override. */
@@ -306,18 +343,16 @@ export class BasicCompactionEngine extends CompactionEngine {
       )
     }
     const spec = resolveCompactSpec(policy, context.contextWindow)
-    // Pressure prices only the compactable surface. The request header
-    // (system prompt + tool schemas) is furniture no compaction can remove, so
-    // its tokens come out of the budget instead of the measured side: a
-    // threshold configured near or below the furniture floor would otherwise
-    // fire on every step with nothing removable, and the same ratio would
-    // apply wildly different real pressure on different window sizes.
-    // A threshold smaller than the furniture plus the retained tail cannot
-    // express pressure for this window and composition: compacting can never
-    // bring the surface under it, so firing would only loop. Decline instead.
+    // Pressure prices the whole next request through {@link pressureReading}:
+    // the provider-anchored prompt when the meter has one, the heuristic
+    // envelope otherwise. The request header (system prompt + tool schemas) is
+    // furniture no compaction can remove, so a threshold configured near or
+    // below that floor cannot express pressure for this window and composition:
+    // compacting could never bring the surface under it, so firing would only
+    // loop. Decline instead.
     const surfaceBudget = () => spec.thresholdTokens - measurement.headerTokens
     if (surfaceBudget() <= spec.retainTokens) return null
-    if (measurement.surfaceTokens < surfaceBudget()) return null
+    if (!underPressure(measurement, spec.thresholdTokens)) return null
 
     // Once pressure qualifies, land the model-free pass before choosing a
     // summary range, then remeasure through the singleton replay fold.
@@ -325,7 +360,8 @@ export class BasicCompactionEngine extends CompactionEngine {
       prune.pruneSession(agent.session)
       measurement = meter.measure(agent.session)
     }
-    if (surfaceBudget() <= spec.retainTokens || measurement.surfaceTokens < surfaceBudget()) return null
+    if (surfaceBudget() <= spec.retainTokens
+      || !underPressure(measurement, spec.thresholdTokens)) return null
 
     let result: CompactionResult | null = null
     for (let attempt = 0; attempt <= spec.compactionRetries; attempt += 1) {
@@ -343,13 +379,15 @@ export class BasicCompactionEngine extends CompactionEngine {
       }
       result = await this.compactRegion(range.start, range.end, agent, signal, attempt + 1)
       measurement = meter.measure(agent.session)
-      if (measurement.surfaceTokens < surfaceBudget()) return result
+      if (!underPressure(measurement, spec.thresholdTokens)) return result
     }
 
+    const reading = pressureReading(measurement)
     throw new Error(
       `compaction still above surface budget after ${spec.compactionRetries + 1} compaction attempts `
         + `(${measurement.surfaceTokens} surface tokens >= budget ${surfaceBudget()} of threshold `
-        + `${spec.thresholdTokens} minus ${measurement.headerTokens} header furniture)`,
+        + `${spec.thresholdTokens} minus ${measurement.headerTokens} header furniture; `
+        + `${reading.source} pressure ${reading.tokens} tokens)`,
     )
   }
 

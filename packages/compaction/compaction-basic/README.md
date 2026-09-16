@@ -8,7 +8,7 @@ This package owns the Service Provider role of the compaction capability — see
 
 This backend owns the compaction policy:
 
-- **Measurement** — the singleton `ctx.tokenMeter` prices the latest canonical logged envelope and current surface at one consumed-log revision. Step-boundary pressure therefore includes the actual system prompt, tools, routing, assistant completion, tool results, buffered context, and steering.
+- **Measurement** — the singleton `ctx.tokenMeter` prices the latest canonical logged envelope and current surface at one consumed-log revision. Step-boundary pressure therefore includes the actual system prompt, tools, routing, assistant completion, tool results, buffered context, and steering. Pressure compares the provider-reported prompt of that request — plus the meter's repricing of everything the surface gained since — whenever the meter measured usage for a matching header, because reported usage is the only side that counts replay and density the heuristic estimator cannot see. Before the first response, and after a header change moves the anchor, the heuristic envelope (surface plus request furniture) is the reading.
 - **Routed policy** — proactive pressure resolves capacity from the adapter that owns the latest durable provider/model route, then scales the default policy plus an optional exact-target override into concrete token budgets. Model discovery remains advisory and is not consulted.
 - **Model-free pruning** — after pressure or canonical overflow qualifies, the optional [`ctx.toolResultPruner`](../compaction-tool-result-pruner/README.md) service rewrites oversized tool results before range selection. Compact-basic remeasures through `ctx.tokenMeter`, skips summarization when pressure becomes safe, and otherwise summarizes the pruned surface. Below-pressure step checks never prune.
 - **Retention** — compact the oldest whole surface units while preserving a recent tail and balanced tool-call/result cuts through the [`shres-compaction` boundary helpers](../compaction/README.md#tool-pairing-boundaries). Turn boundaries do not protect old steps inside a runaway turn. An open indivisible tail declines until it closes. The optional pruner can repair an oversized closed tool unit when its text-bearing result is the removable bulk; indivisible non-tool units and non-prunable tool remainders remain out of scope.
@@ -27,7 +27,7 @@ Every setting is optional. Top-level policy fields are defaults for every routed
 
 | Key | Required | Meaning |
 |---|---|---|
-| `thresholdRatio` | no (default `0.8`) | Compact at `floor(routedContextWindow × ratio)`. |
+| `thresholdRatio` | no (default `0.8`) | Compact once the next request reaches `floor(routedContextWindow × ratio)`, priced as described under Measurement. |
 | `retainRatio` | no (default `0.16`) | Recent surface budget kept verbatim as a fraction of the routed context window; mutually exclusive with `retainTokens`. |
 | `retainTokens` | no | Absolute recent surface budget kept verbatim; mutually exclusive with `retainRatio` and must be below the resolved threshold. |
 | `summarizationProvider` | no (default `''`) | Set together with `summarizationModel`; an empty pair resolves the latest logged request target, then the `AgentOptions` pair. |

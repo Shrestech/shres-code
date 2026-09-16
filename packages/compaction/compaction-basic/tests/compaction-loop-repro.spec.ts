@@ -69,6 +69,22 @@ class StepwiseToolAdapter extends LlmAdapter {
   }
 }
 
+/**
+ * Reports a prompt far larger than its window while letting its content stay
+ * small, so the heuristic surface remains below the threshold the reported usage
+ * crosses. `reportUsage: false` leaves the scripted turn priced heuristically.
+ */
+class AnchoredPressureAdapter extends StepwiseToolAdapter {
+  constructor(private readonly reportUsage: boolean, toolSteps = 6) {
+    super(toolSteps)
+  }
+
+  override async * stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
+    if (this.reportUsage) yield { type: 'usage', usage: { inputTokens: 4_000, outputTokens: 5 } }
+    yield* super.stream(options)
+  }
+}
+
 /** First conversation request overflows, then the rebuilt retry succeeds. */
 class OverflowRecoveryAdapter extends LlmAdapter {
   readonly conversationRequests: GenerateOptions[] = []
@@ -173,6 +189,47 @@ async function harness(toolSteps: number): Promise<{ ctx: Context; compact: Repr
   return { ctx, compact }
 }
 
+/** Run one scripted tool turn through the real loop and return its durable events. */
+async function anchoredTurnEvents(reportUsage: boolean): Promise<SessionEvent[]> {
+  const ctx = new Context()
+  await mountAgentLoopTestDependencies(ctx)
+  await mountInvariants(ctx)
+  await ctx.plugin(AgentLoop, { agents: [] })
+  await ctx.plugin(TokenMeter)
+  ctx.llm.registerAdapter(['mock'], new AnchoredPressureAdapter(reportUsage))
+  ctx.tools.register(defineContentToolFixture({
+    name: 'work',
+    description: 'does work',
+    parameters: { i: { type: 'number' } },
+    async execute() {
+      return [{ type: 'text', text: 'work result' }]
+    },
+  }))
+  // Window 400 at ratio 1: the threshold equals the window, and the turn's
+  // content stays near a hundred heuristic tokens.
+  void new ReproCompactionEngine(ctx, {
+    auto: true,
+    thresholdRatio: 1,
+    retainTokens: 20,
+    maxTokens: 64,
+    compactionRetries: 1,
+  })
+  try {
+    const agent = ctx.agentLoop.create(
+      SessionId(`anchored-pressure-${String(reportUsage)}`),
+      { provider: 'mock', model: 'mock' },
+    )
+    agent.followup(createUserMessage({
+      content: [{ type: 'text', text: 'do tool work '.repeat(10).trim() }],
+      source: { kind: 'user' },
+    }))
+    await waitForIdle(ctx, agent)
+    return [...agent.session.events]
+  } finally {
+    await ctx.fiber.dispose()
+  }
+}
+
 function waitForIdle(ctx: Context, agent: Agent): Promise<void> {
   return new Promise((resolve) => {
     const dispose = ctx.on('agent/status', ({ agent: subject, status }) => {
@@ -237,6 +294,19 @@ describe('CBR-001: a real-loop checkpoint is a valid boundary on both sides', ()
     } finally {
       await ctx.fiber.dispose()
     }
+  })
+
+  it('fires pressure from the reported prompt when the heuristic surface stays under the threshold', async () => {
+    const heuristicOnly = await anchoredTurnEvents(false)
+    // The turn advanced through several pre-step boundaries, so the heuristic
+    // gate was evaluated and declined rather than never reached.
+    expect(heuristicOnly.filter(event => event.type === 'step/start').length).toBeGreaterThan(3)
+    expect(heuristicOnly.some(event => event.type === 'compaction/start')).toBe(false)
+
+    const anchored = await anchoredTurnEvents(true)
+    const summary = anchored.find(event => event.type === 'compaction/summary')
+    expect(summary).toBeDefined()
+    expect(anchored.some(event => event.type === 'compaction/end')).toBe(true)
   })
 
   it('runs automatic pressure between the completed tool step and the next step', async () => {
