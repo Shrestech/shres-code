@@ -14,7 +14,7 @@ import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
 import { getBuiltinModels } from '@earendil-works/pi-ai/providers/all'
 import { resolveProfiles } from '../src/config.ts'
 import { assemble } from './assemble.ts'
-import { closeMockServers, mockServer, textEvents } from './mock-server.ts'
+import { closeMockServers, mockServer, responsesTextEvents, textEvents } from './mock-server.ts'
 
 afterEach(async () => {
   vi.unstubAllEnvs()
@@ -333,6 +333,30 @@ describe('PiAiAdapter provider routing', () => {
         code: CONTEXT_WINDOW_EXCEEDED_CODE,
       },
     })
+  })
+
+  it('keeps a completed openai-responses turn whose input exceeds the declared window', async () => {
+    // A provider that fails an oversized request loudly leaves a completed
+    // response authoritative, so the usage cases stay off for its protocol even
+    // when the harness's declared capacity is smaller than the input counted.
+    const server = await mockServer([{ events: responsesTextEvents({ input: 4097, output: 1 }) }])
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    await ctx.plugin(LlmPiAi, {
+      providers: {
+        'responses-mock': {
+          apiKeyEnv: 'PI_TEST_KEY',
+          api: 'openai-responses',
+          baseURL: server.url,
+          models: [{ id: 'responses-mock-model', contextWindow: 4096 }],
+        },
+      },
+    })
+
+    const result = await assemble(ctx, { provider: 'responses-mock', model: 'responses-mock-model', messages: [] })
+
+    expect(result.finish).toEqual({ kind: 'stop' })
+    expect(server.paths).toEqual(['/responses'])
   })
 
   it('stops the SDK request when the adapter idle watchdog expires', async () => {

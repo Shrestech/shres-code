@@ -76,6 +76,23 @@ describe('llm-codex-session route', () => {
     expect(upstream!.accountHeaders[0]).toBe(document.tokens.account_id)
   })
 
+  it('keeps a completed turn whose input exceeds the declared window', async () => {
+    const context = await boot()
+    // The ChatGPT backend fails an oversized request rather than truncating it,
+    // so a completed response is authoritative even when the input it counted
+    // exceeds the harness's declared capacity (the production wedge: a
+    // 311,781-token prompt answered and then discarded as an overflow).
+    upstream!.respondStream(textTurn('hello', { input: 311_781, cached: 302_976, output: 87 }))
+
+    const result = await assemble(context, { model: 'gpt-6-astra', messages: [] })
+
+    expect(result.text).toBe('hello')
+    // The backend reports the whole prompt and breaks out the cached subset;
+    // pi-ai keeps the uncached remainder as inputTokens.
+    expect(result.usage).toMatchObject({ inputTokens: 8_805, cacheReadTokens: 302_976 })
+    expect(result.finish).toEqual({ kind: 'stop' })
+  })
+
   it('strips max_output_tokens from the outgoing body the backend rejects', async () => {
     const context = await boot()
     await assemble(context, { model: 'gpt-6-astra', messages: [] })
