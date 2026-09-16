@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -211,9 +211,11 @@ describe('agent-seats wired to Agent Teams', () => {
     expect(aegisId).toBeDefined()
     const aegisAgent = ctx.agents.get(aegisId!)
     expect(aegisAgent).toBeDefined()
-    const mailed = await callTool(ctx, 'stride', {
-      description: 'follow-up',
-      prompt: 'Keep the handler bounded.',
+    expect(aegisAgent!.ctx.tools.schemas(aegisAgent).map(schema => schema.name)).not.toContain('stride')
+    expect(aegisAgent!.ctx.tools.schemas(aegisAgent).map(schema => schema.name)).not.toContain('aegis')
+    const mailed = await callTool(ctx, 'team_send', {
+      target: 'stride',
+      message: 'Keep the handler bounded.',
     }, aegisAgent)
     const mailedText = mailed.content.map(block => 'text' in block ? block.text : '').join('')
     expect(mailedText, mailed.isError ? mailedText : 'ok').toContain('stride')
@@ -222,6 +224,53 @@ describe('agent-seats wired to Agent Teams', () => {
     expect(self.isError).toBe(true)
     releaseAegis()
     releaseStride()
+    await ctx.fiber.dispose()
+  })
+
+  it('starts a named seat with the Lead prompt as the child system prompt', async () => {
+    let releaseAegis!: () => void
+    const aegisGate = new Promise<undefined>((resolve) => {
+      releaseAegis = () => { resolve(undefined) }
+    })
+    const { ctx, lead } = await bootTeamSeats(new GatedAdapter([
+      { chunks: textResponse('aegis working'), gate: aegisGate },
+    ]))
+    await ctx.settings.replace(seats.AGENT_SEATS_SETTINGS_NAMESPACE, {
+      seats: { aegis: { provider: 'mock', model: 'mock' } },
+    })
+    const role = 'You are the Architect seat. Probe shres-verity. Do not invent structure.'
+    const workspace = mkdtempSync(join(tmpdir(), 'shres-seat-cwd-'))
+    roots.push(workspace)
+    let started: { prompt?: unknown; persona?: string; cwd?: string; toolFilter?: unknown } = {}
+    const orig = ctx.subagents.startContinuable.bind(ctx.subagents)
+    const spy = vi.spyOn(ctx.subagents, 'startContinuable').mockImplementation(async (spec) => {
+      started = {
+        prompt: spec.request.prompt,
+        persona: spec.request.persona,
+        cwd: spec.request.cwd,
+        toolFilter: spec.request.toolFilter,
+      }
+      return orig(spec)
+    })
+    const steered = await callTool(ctx, 'aegis', {
+      description: 'Architecture probe: shres-verity',
+      prompt: role,
+      cwd: workspace,
+    }, lead)
+    expect(steered.isError).toBe(false)
+    expect(started.persona).toBe(role)
+    expect(started.prompt).toEqual([{ type: 'text', text: role }])
+    expect(started.cwd).toBe(workspace)
+    expect(started.toolFilter).toEqual({ deny: ['aegis'] })
+    const aegisId = ctx.agentTeams.listMembers(lead).find(row => row.name === 'aegis')?.id
+    const child = ctx.agents.get(aegisId!)!
+    expect(child.session.header.cwd).toBe(workspace)
+    expect(child.ctx.tools.schemas(child).map(schema => schema.name)).not.toContain('aegis')
+    expect(child.ctx.tools.schemas(child).map(schema => schema.name)).toEqual(
+      expect.arrayContaining(['team_send', 'team_list']),
+    )
+    spy.mockRestore()
+    releaseAegis()
     await ctx.fiber.dispose()
   })
 

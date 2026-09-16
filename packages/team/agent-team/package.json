@@ -53,6 +53,7 @@
     "@shres-code/shres-code-session-persistence": "workspace:^",
     "@shres-code/shres-code-session-projection": "workspace:^",
     "@shres-code/shres-code-subagent": "workspace:^",
+    "@shres-code/shres-code-system-prompt": "workspace:^",
     "@shres-code/shres-code-tools": "workspace:^",
     "@shres-code/cordis": "workspace:^"
   },

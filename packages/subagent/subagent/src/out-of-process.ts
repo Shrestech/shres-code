@@ -26,21 +26,23 @@ export const NO_START_CAPABILITIES: SubagentCapabilities = Object.freeze({
   depthLimit: false,
   toolFilter: false,
   persona: false,
+  cwd: false,
 })
 
 /**
  * Start-time advertisement for an out-of-process backend that cannot filter
- * tools, set a persona, or capture structured output. `depthLimit` is true
- * because the service enforces `maxDepth` from the parent's durable
- * delegation depth before `provider.start()` — the child process is not
- * required. A request that still needs an unadvertised option is rejected
- * with `UNSUPPORTED_CAPABILITY` rather than accepted-then-ignored.
+ * tools, set a persona, honor a request cwd, or capture structured output.
+ * `depthLimit` is true because the service enforces `maxDepth` from the
+ * parent's durable delegation depth before `provider.start()` — the child
+ * process is not required. A request that still needs an unadvertised option
+ * is rejected with `UNSUPPORTED_CAPABILITY` rather than accepted-then-ignored.
  */
 export const REMOTE_START_CAPABILITIES: SubagentCapabilities = Object.freeze({
   outputSchema: false,
   depthLimit: true,
   toolFilter: false,
   persona: false,
+  cwd: false,
 })
 
 /**

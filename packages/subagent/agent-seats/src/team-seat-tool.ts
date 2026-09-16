@@ -27,7 +27,18 @@ export function registerTeamSeatTool(ctx: Context, seat: BoundSeat, teams: TeamS
       prompt: {
         type: 'string',
         required: true,
-        description: 'Complete standalone instructions for this teammate.',
+        description:
+          'Complete standalone instructions and role for this teammate. '
+          + 'On first provision this text is the teammate\'s first user message and shadows '
+          + 'deployment:persona (the shipped seat role). Tool guidance, team policy, and the '
+          + 'working-directory line stay.',
+      },
+      cwd: {
+        type: 'string',
+        description:
+          'Optional absolute working directory for first provision. That path becomes the '
+          + 'teammate\'s session cwd and AGENTS.md root. Omit to inherit the Lead workspace. '
+          + 'Ignored after the teammate is active.',
       },
     },
     output: {
@@ -47,11 +58,12 @@ export function registerTeamSeatTool(ctx: Context, seat: BoundSeat, teams: TeamS
     async execute(args, exec) {
       const parent = exec.agent
       if (!parent) throw new Error(`${seat.entry.id} requires a calling agent`)
-      await teams.ensureTemplateMember(parent, seat.entry.id)
       const result = await teams.sendMessage(parent, {
         target: seat.entry.id,
         content: [{ type: 'text', text: args.prompt }],
+        persona: args.prompt,
         signal: exec.signal,
+        ...args.cwd !== undefined ? { cwd: args.cwd } : {},
       })
       return { messageId: String(result.messageId), status: result.status }
     },

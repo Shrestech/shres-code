@@ -50,7 +50,7 @@ Mailbox bookkeeping reconstructs from the Lead log; model-visible content recons
 
 ## Model Experience
 
-Indirectly, through the `team_list` and `team_send` tools this package registers on `ctx.tools`. Named seat tools are owned by `@shres-code/shres-code-agent-seats`.
+Indirectly, through the `team_list` and `team_send` tools this package registers on `ctx.tools`, and through the teammate-only `team:policy` and `deployment:environment` sections (`You are an Agent Team teammate named <name>, not the Team Lead.` and `Your working directory is {{cwd}}.`). Named seat tools are owned by `@shres-code/shres-code-agent-seats`.
 
 #### KV Cache effect
 
@@ -62,4 +62,4 @@ Prefix-stable while the Team tool schemas are unchanged. Binding or unbinding a 
 - **No task-board tools** — `team/task` events fold, but create/claim/complete tools are not registered.
 - **Trusted in-process producers** — a plugin with direct `Session` access can append counterfeit Team events. The fold and invariant detect inconsistency; they do not isolate plugins.
 - **Roster reads are Lead-session reads** — the `agentTeams.view` wire surface in `@shres-code/shres-code-host-apiproxy` serves the chat panel and answers only for a live Lead.
-- **Only the Lead provisions** — concurrent first-use of one name joins the in-flight creation. A teammate can mail an active or still-creating name; mailing an unstarted listed name fails until the Lead starts it.
+- **Only the Lead provisions** — concurrent first-use of one name joins the in-flight creation. The Lead's first `aegis` or `team_send` starts that teammate with the assignment as the child's first user message and records that assignment as queued then delivered Team mail. A Lead-sent role (`persona` on `sendMessage` and `team_send`, the named-seat `prompt`) shadows `deployment:persona`; tool guidance, `team:policy`, and the working-directory line stay. A Lead-sent `cwd` becomes the child's session cwd and AGENTS.md root; omitted inherits the Lead workspace; a cwd after the teammate is active is rejected. Named seat tools are denied on the child, including after a later remount. Later mail steers. A teammate can mail an active or still-creating name; mailing an unstarted listed name fails until the Lead starts it.

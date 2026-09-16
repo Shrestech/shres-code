@@ -6,7 +6,7 @@
  * @module @shres-code/shres-code-agent-team/types
  */
 
-import type { ContentBlock } from '@shres-code/shres-code-llm'
+import type { ContentBlock, MessageSource } from '@shres-code/shres-code-llm'
 import type { SessionId } from '@shres-code/shres-code-session/types'
 import type { TeamId, TeamMessageId, TeamTaskId } from './brand.ts'
 
@@ -176,6 +176,17 @@ export interface SpawnTeammateRequest {
   readonly provider: string
   readonly signal: AbortSignal
   readonly persona?: string
+  /**
+   * Optional teammate workspace. Becomes the child's session cwd on first
+   * provision. Whitespace is omitted; a non-empty value must be an enterable
+   * absolute directory.
+   */
+  readonly cwd?: string
+  /**
+   * Durable source for the child's initial inbox message. Omitted is an
+   * ordinary user prompt.
+   */
+  readonly source?: MessageSource
   readonly agentOptions?: { readonly provider?: string; readonly model?: string }
 }
 
@@ -189,6 +200,18 @@ export interface SendTeamMessageRequest {
   readonly target: string
   readonly content: ContentBlock[]
   readonly signal: AbortSignal
+  /**
+   * Lead-sent role for first provision. Shadows the child's `deployment:persona`.
+   * Tool guidance, team policy, and the working-directory line stay. Ignored
+   * after the teammate is active.
+   */
+  readonly persona?: string
+  /**
+   * Optional teammate workspace for first provision. Becomes the child's
+   * session cwd and AGENTS.md root. Whitespace is omitted. A non-empty value
+   * after the teammate is active is rejected.
+   */
+  readonly cwd?: string
 }
 
 /** Result after a peer message enters the durable mailbox. */

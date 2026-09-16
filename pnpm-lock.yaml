@@ -8381,6 +8381,9 @@ importers:
       '@shres-code/shres-code-storage-domain':
         specifier: workspace:^
         version: link:../../storage/storage-domain
+      '@shres-code/shres-code-system-prompt':
+        specifier: workspace:^
+        version: link:../../core/system-prompt
       '@shres-code/shres-code-tools':
         specifier: workspace:^
         version: link:../../core/tools

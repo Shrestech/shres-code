@@ -46,6 +46,7 @@ import {
   effectiveChildRoute,
   resolveChildAgentOptions,
   resolveChildDepth,
+  resolveRequestedChildCwd,
 } from './child-agent.ts'
 import type { DelegatedPolicyOverrides } from './child-agent.ts'
 import { assertSubagentMaxDepth } from './depth.ts'
@@ -119,7 +120,10 @@ export interface ContinuableStartSpec {
    * The delegation request. The manager reserves the stable child id, resolves
    * the durable descriptor, and composes the child itself.
    */
-  readonly request: Omit<SubagentStartRequest, 'label' | 'signal' | 'outputSchema'>
+  readonly request: Omit<SubagentStartRequest, 'label' | 'signal' | 'outputSchema'> & {
+    /** Durable source for the initial inbox message; omitted is an ordinary user prompt. */
+    readonly source?: MessageSource
+  }
   /** Caller cancellation, owning the operation only until inbox acceptance. */
   readonly signal: AbortSignal
   /**
@@ -475,7 +479,16 @@ export class SubagentContinuationManager {
           childId,
           provider: spec.provider,
           parent,
-          create: { seed, meta: childSessionMeta(parent, childDepth, lineageSeedLength), delegatedPolicies },
+          create: {
+            seed,
+            meta: childSessionMeta(
+              parent,
+              childDepth,
+              lineageSeedLength,
+              resolveRequestedChildCwd(request.cwd),
+            ),
+            delegatedPolicies,
+          },
           agentOptions: resolveChildAgentOptions(parent, request.agentOptions, childDepth),
           composition: { persona: request.persona, toolFilter: request.toolFilter },
           signal: spec.signal,
@@ -484,7 +497,7 @@ export class SubagentContinuationManager {
         return this.submitMaterialized(
           activation,
           request.prompt,
-          { kind: 'user' },
+          request.source ?? { kind: 'user' },
           parent,
           spec.signal,
         )

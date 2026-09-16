@@ -114,6 +114,17 @@ interface SpawnTeammateRequest {
   readonly provider: string
   readonly signal: AbortSignal
   readonly persona?: string
+  /**
+   * Optional teammate workspace. Becomes the child's session cwd on first
+   * provision. Whitespace is omitted; a non-empty value must be an enterable
+   * absolute directory.
+   */
+  readonly cwd?: string
+  /**
+   * Durable source for the child's initial inbox message. Omitted is an
+   * ordinary user prompt.
+   */
+  readonly source?: MessageSource
   readonly agentOptions?: { readonly provider?: string; readonly model?: string }
 }
 ```
@@ -131,6 +142,18 @@ interface SendTeamMessageRequest {
   readonly target: string
   readonly content: ContentBlock[]
   readonly signal: AbortSignal
+  /**
+   * Lead-sent role for first provision. Shadows the child's `deployment:persona`.
+   * Tool guidance, team policy, and the working-directory line stay. Ignored
+   * after the teammate is active.
+   */
+  readonly persona?: string
+  /**
+   * Optional teammate workspace for first provision. Becomes the child's
+   * session cwd and AGENTS.md root. Whitespace is omitted. A non-empty value
+   * after the teammate is active is rejected.
+   */
+  readonly cwd?: string
 }
 ```
 
@@ -197,15 +220,20 @@ listMembers(agent: Agent): TeamMemberView[]
 /**
  * Create one named, continuable direct child of the Team Lead.
  * @param caller - exact live Lead Agent.
- * @param request - immutable name, description, prompt, context mode, provider, and cancellation.
+ * @param request - immutable name, description, prompt, context mode, provider, optional persona and cwd, and cancellation.
  * @returns the active roster row.
  */
 async spawnTeammate(caller: Agent, request: SpawnTeammateRequest): Promise<SpawnTeammateResult>
 
 /**
  * Queue one durable peer message, then attempt immediate steer delivery.
+ * The Lead's first address of a template name starts that teammate with
+ * this content as the child's initial user message. A Lead-sent `persona`
+ * shadows `deployment:persona`. A Lead-sent `cwd` becomes the child's
+ * workspace. The assignment is recorded on the Lead log as queued then
+ * delivered mail; this call does not steer a second copy.
  * @param caller - exact live sending Team member.
- * @param request - target name, content, and pre-queue cancellation.
+ * @param request - target name, content, optional first-provision persona and cwd, and pre-queue cancellation.
  * @returns durable message identity and immediate-delivery observation.
  */
 async sendMessage(caller: Agent, request: SendTeamMessageRequest): Promise<SendTeamMessageResult>
@@ -218,13 +246,22 @@ setRosterTemplate(source: () => readonly TeamRosterTemplateEntry[]): void
 
 /**
  * Provision a template teammate when the Lead first addresses that name.
- * @param lead - exact live Team Lead.
+ * Reads the Lead journal from the caller's membership root. Concurrent
+ * first-use of the same name waits for the one in-flight creation. A
+ * teammate may wait for an in-flight row or mail an active name; only the
+ * Lead starts a missing template member.
+ * @param caller - exact live Team member addressing the name.
  * @param rawName - teammate name from team_send or a named seat tool.
+ * @param assignment - first user message when this call starts the teammate. Omitted or empty text keeps the role gloss.
+ * @param persona - Lead-sent role. Non-empty text shadows the child's `deployment:persona`.
+ * @param cwd - Lead-sent workspace. Non-empty text becomes the child's session cwd.
+ * @param signal - caller cancellation; omitted uses the Team lifecycle signal.
+ * @returns the recorded first-assignment mail when this call started the teammate.
  */
-async ensureTemplateMember(lead: Agent, rawName: string): Promise<void>
+async ensureTemplateMember( caller: Agent, rawName: string, assignment?: readonly ContentBlock[], persona?: string, cwd?: string, signal?: AbortSignal, ): Promise<SendTeamMessageResult | undefined>
 ```
 
-Types: [Agent](core.md)
+Types: [Agent](core.md) · [ContentBlock](llm-streaming.md)
 
-Source: [`packages/team/agent-team/src/service.ts:29`](../../packages/team/agent-team/src/service.ts)
+Source: [`packages/team/agent-team/src/service.ts:56`](../../packages/team/agent-team/src/service.ts)
 <!-- END GENERATED cordis-surface -->

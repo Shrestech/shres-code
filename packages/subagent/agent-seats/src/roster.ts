@@ -109,6 +109,35 @@ export interface BoundSeat {
 }
 
 /**
+ * Lead system-prompt text: use bound Architect and Reviewer seats for those
+ * jobs. Empty when neither seat is bound.
+ * @param bound - currently remounted product seats.
+ * @returns guidance, or '' when aegis and ward are both unbound.
+ */
+export function seatUseGuidance(bound: readonly BoundSeat[]): string {
+  const ids = new Set(bound.map(seat => seat.entry.id))
+  const parts: string[] = []
+  if (ids.has('aegis')) {
+    parts.push(
+      'For architecture, trade-offs, and a concrete plan, use the aegis seat. '
+      + 'Do not do that design work in this conversation when aegis is available.',
+    )
+  }
+  if (ids.has('ward')) {
+    parts.push(
+      'For review of diffs, tests, and findings, use the ward seat. '
+      + 'Do not do that review in this conversation when ward is available.',
+    )
+  }
+  if (parts.length === 0) return ''
+  return (
+    `${parts.join(' ')} The prompt you pass replaces the shipped seat role only. `
+    + 'Pass cwd when the work is in another repository so the teammate reads that tree and its AGENTS.md. '
+    + 'Teammates do not have named seat tools.'
+  )
+}
+
+/**
  * Collect seats whose stored binding names both a provider and a model.
  * @param settings - resolved `agent-seats` document.
  * @returns bound seats in roster order.

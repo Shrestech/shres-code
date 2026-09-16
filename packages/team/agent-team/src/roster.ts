@@ -3,6 +3,7 @@
 import { randomUUID } from 'node:crypto'
 import type { Context } from '@shres-code/cordis'
 import type { Agent } from '@shres-code/shres-code-agent'
+import type {} from '@shres-code/shres-code-tools'
 import type { MessageId } from '@shres-code/shres-code-llm'
 import { SessionId } from '@shres-code/shres-code-session'
 import { foldSubagentDescriptor } from '@shres-code/shres-code-subagent'
@@ -23,6 +24,21 @@ import type {
 import { requiredText } from './validation.ts'
 
 const MEMBER_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u
+
+/** Named product-seat tools teammates must not execute, even if bound later. */
+export const SEAT_TOOL_NAMES = ['aegis', 'stride', 'ward'] as const
+
+/**
+ * Deny named seat tools on a teammate after catalog remount.
+ * @param execution - pending tool call.
+ * @returns a denial reason, or undefined to leave the call unchanged.
+ */
+export function teammateSeatGuard(execution: { readonly name: string }): string | undefined {
+  if ((SEAT_TOOL_NAMES as readonly string[]).includes(execution.name)) {
+    return 'teammates do not have named seat tools; use team_send'
+  }
+  return undefined
+}
 
 /** Caller identity inside one implicit Team. */
 export interface TeamMembership {
@@ -159,7 +175,7 @@ export class TeamRoster {
    * Concurrent callers for the same Lead and name share one creation; a later
    * call after that name is already on the roster still fails `TEAM_MEMBER_NAME_TAKEN`.
    * @param caller - exact live Lead Agent.
-   * @param request - immutable name, description, prompt, context mode, provider, and cancellation.
+   * @param request - immutable name, description, prompt, context mode, provider, optional persona and cwd, and cancellation.
    * @returns the active roster row.
    */
   async spawn(caller: Agent, request: SpawnTeammateRequest): Promise<SpawnTeammateResult> {
@@ -196,6 +212,21 @@ export class TeamRoster {
   /** Key in-flight creations by Lead identity and trimmed teammate name. */
   private creationKey(rootId: SessionId, rawName: string): string {
     return `${rootId}:${rawName.trim()}`
+  }
+
+  /**
+   * Hide named seat tools from a teammate. Only names that are actually
+   * registered as global tools are denied, so an unbound seat is omitted.
+   * @returns a deny filter, or undefined when no seat tools are mounted.
+   */
+  private teammateToolFilter(): { readonly deny: string[] } | undefined {
+    const tools = this.ctx.get('tools')
+    /* v8 ignore next -- Team spawn in product trees has the tool registry; unbound seats already yield an empty deny. */
+    if (tools === undefined) return undefined
+    const deny = SEAT_TOOL_NAMES.filter(name =>
+      tools.schemas().some(schema => schema.name === name))
+    if (deny.length === 0) return undefined
+    return { deny }
   }
 
   /**
@@ -270,6 +301,7 @@ export class TeamRoster {
       await this.journal.appendAndFlush(root.session, 'team/member', { teamId: TeamId(root.id), member })
     })
 
+    const toolFilter = this.teammateToolFilter()
     let started: ContinuableStart
     try {
       started = await this.ctx.subagents.startContinuable({
@@ -281,6 +313,9 @@ export class TeamRoster {
           parent: root,
           ...request.agentOptions !== undefined ? { agentOptions: request.agentOptions } : {},
           ...request.persona !== undefined ? { persona: request.persona } : {},
+          ...request.cwd !== undefined ? { cwd: request.cwd } : {},
+          ...request.source !== undefined ? { source: request.source } : {},
+          ...toolFilter !== undefined ? { toolFilter } : {},
         },
         signal,
       })

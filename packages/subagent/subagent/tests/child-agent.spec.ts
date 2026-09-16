@@ -2,9 +2,13 @@
  * Child route inheritance: logged header, else live default, else creation options.
  */
 
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import type { Agent } from '@shres-code/shres-code-agent'
-import { effectiveChildRoute } from '../src/child-agent.ts'
+import { SessionId } from '@shres-code/shres-code-session'
+import { childSessionMeta, effectiveChildRoute, resolveRequestedChildCwd } from '../src/child-agent.ts'
 
 function parent(overrides: {
   header?: { provider?: string; model?: string }
@@ -33,5 +37,39 @@ describe('effectiveChildRoute', () => {
   it('falls back to creation options when no header and no default-model service exist', () => {
     expect(effectiveChildRoute(parent({ options: { provider: 'opt', model: 'n' } }), undefined))
       .toEqual({ provider: 'opt', model: 'n' })
+  })
+})
+
+function parentForMeta(cwd?: string): Agent {
+  return {
+    session: { header: { id: SessionId('parent'), ...cwd === undefined ? {} : { cwd } } },
+    ctx: { get: () => undefined },
+  } as Agent
+}
+
+describe('childSessionMeta workspace', () => {
+  it('inherits the parent cwd and accepts a validated override', () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'shres-child-cwd-'))
+    try {
+      expect(childSessionMeta(parentForMeta('/parent-ws'), 1, 0).cwd).toBe('/parent-ws')
+      expect(childSessionMeta(parentForMeta('/parent-ws'), 1, 0, workspace).cwd).toBe(workspace)
+      expect(childSessionMeta(parentForMeta(), 1, 0).cwd).toBeUndefined()
+    } finally {
+      rmSync(workspace, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('resolveRequestedChildCwd', () => {
+  it('omits blank values and rejects a path that cannot host the child', () => {
+    expect(resolveRequestedChildCwd(undefined)).toBeUndefined()
+    expect(resolveRequestedChildCwd('   ')).toBeUndefined()
+    expect(() => resolveRequestedChildCwd('relative/path')).toThrow('must be an absolute path')
+    const workspace = mkdtempSync(join(tmpdir(), 'shres-child-cwd-ok-'))
+    try {
+      expect(resolveRequestedChildCwd(`  ${workspace}  `)).toBe(workspace)
+    } finally {
+      rmSync(workspace, { recursive: true, force: true })
+    }
   })
 })

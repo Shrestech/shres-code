@@ -354,13 +354,13 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       {
         signature: 'async spawnTeammate(caller: Agent, request: SpawnTeammateRequest): Promise<SpawnTeammateResult>',
         description: 'Create one named, continuable direct child of the Team Lead.',
-        parameters: [{ name: 'caller', description: 'exact live Lead Agent.' }, { name: 'request', description: 'immutable name, description, prompt, context mode, provider, and cancellation.' }],
+        parameters: [{ name: 'caller', description: 'exact live Lead Agent.' }, { name: 'request', description: 'immutable name, description, prompt, context mode, provider, optional persona and cwd, and cancellation.' }],
         returns: 'the active roster row.',
       },
       {
         signature: 'async sendMessage(caller: Agent, request: SendTeamMessageRequest): Promise<SendTeamMessageResult>',
-        description: 'Queue one durable peer message, then attempt immediate steer delivery.',
-        parameters: [{ name: 'caller', description: 'exact live sending Team member.' }, { name: 'request', description: 'target name, content, and pre-queue cancellation.' }],
+        description: 'Queue one durable peer message, then attempt immediate steer delivery. The Lead\'s first address of a template name starts that teammate with this content as the child\'s initial user message. A Lead-sent `persona` shadows `deployment:persona`. A Lead-sent `cwd` becomes the child\'s workspace. The assignment is recorded on the Lead log as queued then delivered mail; this call does not steer a second copy.',
+        parameters: [{ name: 'caller', description: 'exact live sending Team member.' }, { name: 'request', description: 'target name, content, optional first-provision persona and cwd, and pre-queue cancellation.' }],
         returns: 'durable message identity and immediate-delivery observation.',
       },
       {
@@ -369,9 +369,10 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'source', description: 'bound seats and YAML extras for this process.' }],
       },
       {
-        signature: 'async ensureTemplateMember(lead: Agent, rawName: string): Promise<void>',
-        description: 'Provision a template teammate when the Lead first addresses that name.',
-        parameters: [{ name: 'lead', description: 'exact live Team Lead.' }, { name: 'rawName', description: 'teammate name from team_send or a named seat tool.' }],
+        signature: 'async ensureTemplateMember( caller: Agent, rawName: string, assignment?: readonly ContentBlock[], persona?: string, cwd?: string, signal?: AbortSignal, ): Promise<SendTeamMessageResult | undefined>',
+        description: 'Provision a template teammate when the Lead first addresses that name. Reads the Lead journal from the caller\'s membership root. Concurrent first-use of the same name waits for the one in-flight creation. A teammate may wait for an in-flight row or mail an active name; only the Lead starts a missing template member.',
+        parameters: [{ name: 'caller', description: 'exact live Team member addressing the name.' }, { name: 'rawName', description: 'teammate name from team_send or a named seat tool.' }, { name: 'assignment', description: 'first user message when this call starts the teammate. Omitted or empty text keeps the role gloss.' }, { name: 'persona', description: 'Lead-sent role. Non-empty text shadows the child\'s `deployment:persona`.' }, { name: 'cwd', description: 'Lead-sent workspace. Non-empty text becomes the child\'s session cwd.' }, { name: 'signal', description: 'caller cancellation; omitted uses the Team lifecycle signal.' }],
+        returns: 'the recorded first-assignment mail when this call started the teammate.',
       },
     ],
   },
@@ -3517,7 +3518,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ContinuableStartSpec',
-    declaration: 'export interface ContinuableStartSpec {\n    readonly provider: string;\n    readonly label: string;\n    readonly request: Omit<SubagentStartRequest, \'label\' | \'signal\' | \'outputSchema\'>;\n    readonly signal: AbortSignal;\n    readonly childId?: SessionId;\n}',
+    declaration: 'export interface ContinuableStartSpec {\n    readonly provider: string;\n    readonly label: string;\n    readonly request: Omit<SubagentStartRequest, \'label\' | \'signal\' | \'outputSchema\'> & {\n        readonly source?: MessageSource;\n    };\n    readonly signal: AbortSignal;\n    readonly childId?: SessionId;\n}',
   },
   {
     name: 'ContinuableSubagentDescriptorData',
@@ -4537,7 +4538,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SendTeamMessageRequest',
-    declaration: 'export interface SendTeamMessageRequest {\n    readonly target: string;\n    readonly content: ContentBlock[];\n    readonly signal: AbortSignal;\n}',
+    declaration: 'export interface SendTeamMessageRequest {\n    readonly target: string;\n    readonly content: ContentBlock[];\n    readonly signal: AbortSignal;\n    readonly persona?: string;\n    readonly cwd?: string;\n}',
   },
   {
     name: 'SendTeamMessageResult',
@@ -4957,7 +4958,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SpawnTeammateRequest',
-    declaration: 'export interface SpawnTeammateRequest {\n    readonly name: string;\n    readonly description: string;\n    readonly prompt: ContentBlock[];\n    readonly context: \'fresh\' | \'fork\';\n    readonly provider: string;\n    readonly signal: AbortSignal;\n    readonly persona?: string;\n    readonly agentOptions?: {\n        readonly provider?: string;\n        readonly model?: string;\n    };\n}',
+    declaration: 'export interface SpawnTeammateRequest {\n    readonly name: string;\n    readonly description: string;\n    readonly prompt: ContentBlock[];\n    readonly context: \'fresh\' | \'fork\';\n    readonly provider: string;\n    readonly signal: AbortSignal;\n    readonly persona?: string;\n    readonly cwd?: string;\n    readonly source?: MessageSource;\n    readonly agentOptions?: {\n        readonly provider?: string;\n        readonly model?: string;\n    };\n}',
   },
   {
     name: 'SpawnTeammateResult',
@@ -5069,7 +5070,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SubagentCapabilities',
-    declaration: 'export interface SubagentCapabilities {\n    readonly outputSchema: boolean;\n    readonly depthLimit: boolean;\n    readonly toolFilter: boolean;\n    readonly persona: boolean;\n}',
+    declaration: 'export interface SubagentCapabilities {\n    readonly outputSchema: boolean;\n    readonly depthLimit: boolean;\n    readonly toolFilter: boolean;\n    readonly persona: boolean;\n    readonly cwd?: boolean;\n}',
   },
   {
     name: 'SubagentDescendantListEntry',
@@ -5125,7 +5126,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SubagentStartRequest',
-    declaration: 'export interface SubagentStartRequest {\n    readonly label?: string;\n    readonly prompt: ContentBlock[];\n    readonly parent: Agent;\n    readonly signal: AbortSignal;\n    readonly agentOptions?: AgentOptions;\n    readonly outputSchema?: ObjectJsonSchema;\n    readonly maxDepth?: number;\n    readonly toolFilter?: ToolRestriction;\n    readonly persona?: string;\n}',
+    declaration: 'export interface SubagentStartRequest {\n    readonly label?: string;\n    readonly prompt: ContentBlock[];\n    readonly parent: Agent;\n    readonly signal: AbortSignal;\n    readonly agentOptions?: AgentOptions;\n    readonly outputSchema?: ObjectJsonSchema;\n    readonly maxDepth?: number;\n    readonly toolFilter?: ToolRestriction;\n    readonly persona?: string;\n    readonly cwd?: string;\n}',
   },
   {
     name: 'SubagentStopReason',

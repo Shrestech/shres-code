@@ -46,6 +46,53 @@ export class TeamMailbox {
   ) {}
 
   /**
+   * Reject an assignment that would exceed the framed mailbox byte limit.
+   * @param message - queued snapshot whose framed delivery is measured.
+   * @returns nothing.
+   */
+  assertFits(message: TeamMessageSnapshot): void {
+    if (Buffer.byteLength(JSON.stringify(this.deliveryContent(message)), 'utf8') > this.maxMessageBytes) {
+      throw new TeamError(`team message exceeds ${this.maxMessageBytes} bytes`, 'TEAM_MESSAGE_TOO_LARGE')
+    }
+  }
+
+  /**
+   * Record first-provision mail that the child already accepted as its
+   * initial prompt. Writes `queued` then `delivered` without a second steer.
+   * @param caller - exact live Lead that started the teammate.
+   * @param targetId - durable child session id.
+   * @param content - assignment already submitted as the child's first user message.
+   * @param messageId - Team mail identity stamped on that user message's source.
+   * @returns after the Lead log records queued then delivered.
+   */
+  async recordSpawnedAssignment(
+    caller: Agent,
+    targetId: SessionId,
+    content: readonly ContentBlock[],
+    messageId: TeamMessageId,
+  ): Promise<void> {
+    const membership = this.roster.membership(caller)
+    const root = membership.root
+    const message: TeamMessageSnapshot = {
+      id: messageId,
+      senderId: caller.id,
+      senderName: membership.name,
+      targetId,
+      content: structuredClone(content),
+    }
+    this.assertFits(message)
+    await this.journal.transact(root.id, async () => {
+      const state = this.journal.state(root)
+      if (state.messages.some(candidate => candidate.id === messageId)) return
+      await this.journal.appendAndFlush(root.session, 'team/message/queued', {
+        teamId: TeamId(root.id),
+        message,
+      })
+    })
+    await this.markDelivered(root, messageId, targetId)
+  }
+
+  /**
    * Queue one durable peer message, then attempt immediate delivery.
    * @param caller - exact live sending Team member.
    * @param request - target name, content, and pre-queue cancellation.

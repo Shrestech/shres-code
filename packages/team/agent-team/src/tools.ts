@@ -85,6 +85,13 @@ export function registerTeamTools(ctx: Context): void {
         required: true,
         description: 'The message to deliver to that teammate.',
       },
+      cwd: {
+        type: 'string',
+        description:
+          'Optional absolute working directory when the Lead first provisions this name. '
+          + 'That path becomes the teammate\'s session cwd and AGENTS.md root. '
+          + 'Rejected after the teammate is active.',
+      },
     },
     output: {
       schema: {
@@ -108,6 +115,8 @@ export function registerTeamTools(ctx: Context): void {
         target: args.target,
         content,
         signal: exec.signal,
+        persona: args.message,
+        ...args.cwd !== undefined ? { cwd: args.cwd } : {},
       })
       return { messageId: String(result.messageId), status: result.status }
     },

@@ -404,4 +404,30 @@ describe('TeamMailbox', () => {
     expect((await first).status).toBe('queued')
     expect((await second).status).toBe('queued')
   })
+
+  it('records first-provision mail without a second steer and rejects oversize', async () => {
+    const tiny = setupMailbox({ maxBytes: 16 })
+    expect(() => tiny.mailbox.assertFits({
+      id: TeamMessageId('team-message-oversize'),
+      senderId: LEAD_ID,
+      senderName: 'lead',
+      targetId: CHILD_ID,
+      content: [{ type: 'text', text: 'hi' }],
+    })).toThrow(/exceeds/)
+
+    const childSession = fakeSession(CHILD_ID)
+    const child = fakeAgent(CHILD_ID, childSession)
+    const { mailbox, lead, agents, getState } = setupMailbox({
+      agents: new Map([[CHILD_ID, child]]),
+    })
+    agents.set(CHILD_ID, child)
+    const messageId = TeamMessageId('team-message-spawn')
+    const assignment = [{ type: 'text' as const, text: 'Design billing.' }]
+    await mailbox.recordSpawnedAssignment(lead, CHILD_ID, assignment, messageId)
+    expect(getState().messages).toEqual([expect.objectContaining({ id: messageId, targetId: CHILD_ID })])
+    expect(getState().delivered).toContain(messageId)
+    expect(childSession.events).toHaveLength(0)
+    await mailbox.recordSpawnedAssignment(lead, CHILD_ID, assignment, messageId)
+    expect(getState().messages.filter(message => message.id === messageId)).toHaveLength(1)
+  })
 })

@@ -2,14 +2,20 @@
 
 import { Context, Service } from '@shres-code/cordis'
 import type { Agent } from '@shres-code/shres-code-agent'
+import { randomUUID } from 'node:crypto'
+import type { ContentBlock } from '@shres-code/shres-code-llm'
 import { SessionId } from '@shres-code/shres-code-session'
+import { TeamId, TeamMessageId } from './brand.ts'
 import { errorMessage } from './error.ts'
 import { TeamJournal } from './journal.ts'
 import { TeamRuntimeLifecycle } from './lifecycle.ts'
 import { TeamMailbox } from './mailbox.ts'
-import { TeamRoster } from './roster.ts'
+import { TeamRoster, teammateSeatGuard } from './roster.ts'
 import type { TeamMembership } from './roster.ts'
 import { TeamError } from './error.ts'
+import { ENVIRONMENT_ORDER, ENVIRONMENT_SECTION } from '@shres-code/shres-code-subagent'
+import type {} from '@shres-code/shres-code-system-prompt'
+import { TEAM_POLICY_ORDER, TEAM_POLICY_SECTION, teammatePolicy } from './policy.ts'
 import type {
   SendTeamMessageRequest,
   SendTeamMessageResult,
@@ -23,6 +29,27 @@ declare module '@shres-code/cordis' {
   interface Context {
     agentTeams: TeamService
   }
+}
+
+/**
+ * Join text blocks from one assignment used as the child's first user message.
+ * @param assignment - mailbox content from team_send or a named seat tool.
+ * @returns joined text, or undefined when the assignment has no text.
+ */
+function assignmentText(assignment: readonly ContentBlock[] | undefined): string | undefined {
+  if (assignment === undefined || assignment.length === 0) return undefined
+  const parts: string[] = []
+  for (const block of assignment) {
+    switch (block.type) {
+      case 'text':
+        if (block.text.trim().length > 0) parts.push(block.text)
+        break
+      default:
+        break
+    }
+  }
+  if (parts.length === 0) return undefined
+  return parts.join('\n\n')
 }
 
 /** Agent Teams service backed by the exact live Lead Session log. */
@@ -59,7 +86,10 @@ export class TeamService extends Service {
       config.maxMessageBytes,
     )
     ctx.on('session/event', (session, event) => { this.mailbox.observeSessionEvent(session, event) })
-    ctx.on('agent/session-start', ({ agent }) => { this.scheduleRecovery(agent) })
+    ctx.on('agent/session-start', ({ agent }) => {
+      this.installTeammateComposition(agent)
+      this.scheduleRecovery(agent)
+    })
     ctx.effect(() => () => {
       void this.disposeRuntime()
     }, 'agentTeams.runtimeLifecycle()')
@@ -111,7 +141,7 @@ export class TeamService extends Service {
   /**
    * Create one named, continuable direct child of the Team Lead.
    * @param caller - exact live Lead Agent.
-   * @param request - immutable name, description, prompt, context mode, provider, and cancellation.
+   * @param request - immutable name, description, prompt, context mode, provider, optional persona and cwd, and cancellation.
    * @returns the active roster row.
    */
   async spawnTeammate(caller: Agent, request: SpawnTeammateRequest): Promise<SpawnTeammateResult> {
@@ -120,13 +150,25 @@ export class TeamService extends Service {
 
   /**
    * Queue one durable peer message, then attempt immediate steer delivery.
-   * Ensures the target through the caller's Team root before the mailbox write.
+   * The Lead's first address of a template name starts that teammate with
+   * this content as the child's initial user message. A Lead-sent `persona`
+   * shadows `deployment:persona`. A Lead-sent `cwd` becomes the child's
+   * workspace. The assignment is recorded on the Lead log as queued then
+   * delivered mail; this call does not steer a second copy.
    * @param caller - exact live sending Team member.
-   * @param request - target name, content, and pre-queue cancellation.
+   * @param request - target name, content, optional first-provision persona and cwd, and pre-queue cancellation.
    * @returns durable message identity and immediate-delivery observation.
    */
   async sendMessage(caller: Agent, request: SendTeamMessageRequest): Promise<SendTeamMessageResult> {
-    await this.ensureTemplateMember(caller, request.target)
+    const provisioned = await this.ensureTemplateMember(
+      caller,
+      request.target,
+      request.content,
+      request.persona,
+      request.cwd,
+      request.signal,
+    )
+    if (provisioned !== undefined) return provisioned
     return await this.mailbox.send(caller, request)
   }
 
@@ -146,16 +188,37 @@ export class TeamService extends Service {
    * Lead starts a missing template member.
    * @param caller - exact live Team member addressing the name.
    * @param rawName - teammate name from team_send or a named seat tool.
+   * @param assignment - first user message when this call starts the teammate. Omitted or empty text keeps the role gloss.
+   * @param persona - Lead-sent role. Non-empty text shadows the child's `deployment:persona`.
+   * @param cwd - Lead-sent workspace. Non-empty text becomes the child's session cwd.
+   * @param signal - caller cancellation; omitted uses the Team lifecycle signal.
+   * @returns the recorded first-assignment mail when this call started the teammate.
    */
-  async ensureTemplateMember(caller: Agent, rawName: string): Promise<void> {
+  async ensureTemplateMember(
+    caller: Agent,
+    rawName: string,
+    assignment?: readonly ContentBlock[],
+    persona?: string,
+    cwd?: string,
+    signal?: AbortSignal,
+  ): Promise<SendTeamMessageResult | undefined> {
     const membership = this.roster.membership(caller)
     const root = membership.root
     const name = rawName.trim()
-    if (name === 'lead' || name === String(root.id)) return
+    if (name === 'lead' || name === String(root.id)) return undefined
     await this.roster.waitForCreation(root, name)
     const state = this.journal.state(root)
     const existing = state.members.find(member => member.name === name)
-    if (existing?.phase === 'active') return
+    const assignedCwd = cwd !== undefined && cwd.trim().length > 0 ? cwd : undefined
+    if (existing?.phase === 'active') {
+      if (assignedCwd !== undefined) {
+        throw new TeamError(
+          `cwd can be set only when first provisioning teammate "${name}"`,
+          'TEAM_INVALID_ARGUMENT',
+        )
+      }
+      return undefined
+    }
     if (existing?.phase === 'failed') {
       throw new TeamError(`teammate "${name}" previously failed provisioning`, 'TEAM_MEMBER_NOT_FOUND')
     }
@@ -166,17 +229,74 @@ export class TeamService extends Service {
       throw new TeamError(`only the Team Lead can provision teammate "${name}"`, 'TEAM_LEAD_REQUIRED')
     }
     const entry = this.template().find(candidate => candidate.name === name)
-    if (entry === undefined) return
-    await this.roster.spawn(root, {
+    if (entry === undefined) return undefined
+    const assigned = assignmentText(assignment)
+    const prompt = assigned !== undefined && assignment !== undefined
+      ? structuredClone(assignment)
+      : [{
+        type: 'text' as const,
+        text: entry.description === entry.name ? `You are ${entry.name}.` : `You are ${entry.name}. ${entry.description}`,
+      }]
+    const assignedPersona = persona !== undefined && persona.trim().length > 0 ? persona : undefined
+    const childPersona = assignedPersona ?? entry.persona
+    const messageId = TeamMessageId(`team-message-${randomUUID()}`)
+    const message = {
+      id: messageId,
+      senderId: caller.id,
+      senderName: membership.name,
+      targetId: root.id,
+      content: structuredClone(prompt),
+    }
+    this.mailbox.assertFits(message)
+    const started = await this.roster.spawn(root, {
       name: entry.name,
       description: entry.description,
-      prompt: [{ type: 'text', text: entry.description === entry.name ? `You are ${entry.name}.` : `You are ${entry.name}. ${entry.description}` }],
+      prompt,
       context: entry.context ?? 'fresh',
       provider: 'spawn',
-      signal: this.lifecycle.signal,
-      ...entry.persona !== undefined ? { persona: entry.persona } : {},
+      signal: AbortSignal.any([signal ?? this.lifecycle.signal, this.lifecycle.signal]),
+      source: {
+        kind: 'team-message',
+        form: 'relay',
+        teamId: TeamId(root.id),
+        messageId,
+        senderSessionId: caller.id,
+        senderName: membership.name,
+      },
+      ...childPersona !== undefined ? { persona: childPersona } : {},
+      ...assignedCwd !== undefined ? { cwd: assignedCwd } : {},
       ...entry.model !== undefined ? { agentOptions: { provider: entry.provider, model: entry.model } } : {},
     })
+    await this.mailbox.recordSpawnedAssignment(caller, started.member.id, prompt, messageId)
+    return { messageId, status: 'accepted' }
+  }
+
+  /**
+   * Install teammate-only prompt sections and seat-tool denial. Ordinary roots
+   * and generic subagents are left unchanged.
+   * @param agent - newly started exact live Agent.
+   */
+  private installTeammateComposition(agent: Agent): void {
+    const membership = this.roster.tryMembership(agent)
+    if (membership?.role !== 'teammate') return
+    /* v8 ignore next -- product trees mount systemPrompt; a registry-less host has no section to install. */
+    if (agent.ctx.get('systemPrompt') !== undefined) {
+      agent.ctx.systemPrompt.section({
+        name: TEAM_POLICY_SECTION,
+        order: TEAM_POLICY_ORDER,
+        text: teammatePolicy(membership.name),
+      })
+      const cwd = agent.session.header.cwd
+      if (cwd !== undefined && cwd.length > 0) {
+        agent.ctx.systemPrompt.section({
+          name: ENVIRONMENT_SECTION,
+          order: ENVIRONMENT_ORDER,
+          text: 'Your working directory is {{cwd}}.',
+        })
+      }
+    }
+    /* v8 ignore next -- product trees mount tools; a registry-less host has no seat tools to deny. */
+    if (agent.ctx.get('tools') !== undefined) agent.ctx.tools.guard(teammateSeatGuard)
   }
 
   /** Queue one contained recovery pass after publication has unwound. */

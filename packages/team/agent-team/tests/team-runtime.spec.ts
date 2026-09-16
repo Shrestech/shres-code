@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@shres-code/cordis'
-import type { Agent } from '@shres-code/shres-code-agent'
+import { assembleContextFor, type Agent } from '@shres-code/shres-code-agent'
 import AgentLoop from '@shres-code/shres-code-agent-loop'
 import { mountAgentLoopTestDependencies } from '@shres-code/shres-code-agent-loop-testkit'
 import type { GenerateOptions, StreamChunk } from '@shres-code/shres-code-llm'
@@ -15,7 +15,11 @@ import SessionProjectionRegistry from '@shres-code/shres-code-session-projection
 import SubagentRuntime from '@shres-code/shres-code-subagent'
 import * as SubagentSpawn from '@shres-code/shres-code-subagent-spawn-in-process'
 import { MockAdapter, textResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
+import { renderPrompt } from '@shres-code/shres-code-system-prompt'
 import * as AgentTeamPlugin from '../src/index.ts'
+import { ENVIRONMENT_SECTION } from '@shres-code/shres-code-subagent'
+import { TEAM_POLICY_SECTION, teammatePolicy } from '../src/policy.ts'
+import { teammateSeatGuard } from '../src/roster.ts'
 
 
 const SIGNAL = new AbortController().signal
@@ -237,6 +241,224 @@ describe('Agent Teams runtime mailbox', () => {
     expect(names).toContain('researcher')
     expect(names).toContain('notes')
     expect(names).not.toContain('subagent')
+    await ctx.fiber.dispose()
+  })
+
+  it('uses the Lead-sent role as the child system prompt instead of the template persona', async () => {
+    const { ctx, lead } = await setup(new MockAdapter([textResponse('aegis ready')]))
+    const shipped = 'You are Aegis, the shipped Architect.'
+    const role = 'You are the Architect seat. Probe /tmp/verity. Do not invent structure.'
+    ctx.agentTeams.setRosterTemplate(() => [{
+      name: 'aegis',
+      description: 'Architect',
+      persona: shipped,
+      provider: 'mock',
+      model: 'mock',
+    }])
+    let started: { prompt?: unknown; persona?: string } = {}
+    const orig = ctx.subagents.startContinuable.bind(ctx.subagents)
+    const spy = vi.spyOn(ctx.subagents, 'startContinuable').mockImplementation(async (spec) => {
+      started = { prompt: spec.request.prompt, persona: spec.request.persona }
+      return orig(spec)
+    })
+    const sent = await ctx.agentTeams.sendMessage(lead, {
+      target: 'aegis',
+      content: [
+        { type: 'reasoning', text: 'ignore' },
+        { type: 'text', text: 'Architecture probe: shres-verity' },
+      ],
+      persona: role,
+      signal: SIGNAL,
+    })
+    expect(sent.status).toBe('accepted')
+    expect(started.persona).toBe(role)
+    expect(started.prompt).toEqual([
+      { type: 'reasoning', text: 'ignore' },
+      { type: 'text', text: 'Architecture probe: shres-verity' },
+    ])
+    spy.mockRestore()
+    await ctx.fiber.dispose()
+  })
+
+  it('keeps the shipped persona when the Lead sends no role and uses a role on an empty assignment', async () => {
+    const { ctx, lead } = await setup(new MockAdapter([
+      textResponse('aegis ready'),
+      textResponse('ward ready'),
+      textResponse('notes ready'),
+    ]))
+    const shipped = 'You are Aegis, the shipped Architect.'
+    const reviewRole = 'You are the Reviewer seat. Report findings only.'
+    ctx.agentTeams.setRosterTemplate(() => [{
+      name: 'aegis',
+      description: 'Architect',
+      persona: shipped,
+      provider: 'mock',
+      model: 'mock',
+    }, {
+      name: 'ward',
+      description: 'Reviewer',
+      persona: 'You are Ward, the shipped Reviewer.',
+      provider: 'mock',
+      model: 'mock',
+    }, {
+      name: 'notes',
+      description: 'notes',
+      provider: 'mock',
+    }])
+    const seen: { prompt?: unknown; persona?: string }[] = []
+    const orig = ctx.subagents.startContinuable.bind(ctx.subagents)
+    const spy = vi.spyOn(ctx.subagents, 'startContinuable').mockImplementation(async (spec) => {
+      seen.push({ prompt: spec.request.prompt, persona: spec.request.persona })
+      return orig(spec)
+    })
+    await ctx.agentTeams.sendMessage(lead, {
+      target: 'aegis',
+      content: content('look this up'),
+      persona: '   ',
+      signal: SIGNAL,
+    })
+    await ctx.agentTeams.sendMessage(lead, {
+      target: 'ward',
+      content: content('   '),
+      persona: reviewRole,
+      signal: SIGNAL,
+    })
+    await ctx.agentTeams.ensureTemplateMember(lead, 'notes', [])
+    expect(seen[0]?.persona).toBe(shipped)
+    expect(seen[0]?.prompt).toEqual(content('look this up'))
+    expect(seen[1]?.persona).toBe(reviewRole)
+    expect(seen[1]?.prompt).toEqual(content('You are ward. Reviewer'))
+    expect(seen[2]?.persona).toBeUndefined()
+    expect(seen[2]?.prompt).toEqual(content('You are notes.'))
+    spy.mockRestore()
+    await ctx.fiber.dispose()
+  })
+
+  it('provisions a teammate in an explicit workspace and installs team policy', async () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'shres-team-cwd-'))
+    let releaseAegis!: () => void
+    const aegisGate = new Promise<undefined>((resolve) => {
+      releaseAegis = () => { resolve(undefined) }
+    })
+    const { ctx, lead } = await setup(new GatedAdapter([
+      { chunks: textResponse('aegis ready'), gate: aegisGate },
+    ]))
+    ctx.agentTeams.setRosterTemplate(() => [{
+      name: 'aegis',
+      description: 'Architect',
+      persona: 'You are Aegis.',
+      provider: 'mock',
+      model: 'mock',
+    }])
+    const sent = await ctx.agentTeams.sendMessage(lead, {
+      target: 'aegis',
+      content: content('Design the approach.'),
+      cwd: workspace,
+      signal: SIGNAL,
+    })
+    expect(sent.status).toBe('accepted')
+    const row = ctx.agentTeams.listMembers(lead).find(member => member.name === 'aegis')
+    expect(row).toBeDefined()
+    const child = ctx.agents.get(row!.id)!
+    expect(child.session.header.cwd).toBe(workspace)
+    expect(lead.session.events.filter(event => event.type === 'team/message/queued')).toHaveLength(1)
+    expect(lead.session.events.filter(event => event.type === 'team/message/delivered')).toHaveLength(1)
+    const firstUser = child.session.events.find(event => event.type === 'user/message')
+    expect(firstUser?.data.source).toMatchObject({
+      kind: 'team-message',
+      messageId: sent.messageId,
+    })
+    expect(firstUser?.data.content).toEqual(content('Design the approach.'))
+    const assembly = await ctx.systemPrompt.assemble(assembleContextFor(child))
+    expect(assembly.sections.find(section => section.name === TEAM_POLICY_SECTION)?.text)
+      .toBe(teammatePolicy('aegis'))
+    expect(assembly.sections.find(section => section.name === ENVIRONMENT_SECTION)?.text)
+      .toBe('Your working directory is {{cwd}}.')
+    expect(renderPrompt(assembly)).toContain(`Your working directory is ${workspace}`)
+    const leadAssembly = await ctx.systemPrompt.assemble(assembleContextFor(lead))
+    expect(leadAssembly.sections.some(section => section.name === TEAM_POLICY_SECTION)).toBe(false)
+    expect(leadAssembly.sections.some(section => section.name === ENVIRONMENT_SECTION)).toBe(false)
+    releaseAegis()
+    await ctx.fiber.dispose()
+    rmSync(workspace, { recursive: true, force: true })
+  })
+
+  it('rejects a cwd after the teammate is already active', async () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'shres-team-cwd-late-'))
+    const { ctx, lead } = await setup(new MockAdapter([textResponse('aegis ready')]))
+    ctx.agentTeams.setRosterTemplate(() => [{
+      name: 'aegis',
+      description: 'Architect',
+      provider: 'mock',
+      model: 'mock',
+    }])
+    await ctx.agentTeams.sendMessage(lead, {
+      target: 'aegis',
+      content: content('Design the approach.'),
+      signal: SIGNAL,
+    })
+    await expect(ctx.agentTeams.sendMessage(lead, {
+      target: 'aegis',
+      content: content('later'),
+      cwd: workspace,
+      signal: SIGNAL,
+    })).rejects.toMatchObject({ code: 'TEAM_INVALID_ARGUMENT' })
+    await ctx.fiber.dispose()
+    rmSync(workspace, { recursive: true, force: true })
+  })
+
+  it('rejects an oversized first assignment before spawning the teammate', async () => {
+    const { ctx, lead } = await setup(new MockAdapter([]), { maxMessageBytes: 32 })
+    ctx.agentTeams.setRosterTemplate(() => [{
+      name: 'aegis',
+      description: 'Architect',
+      provider: 'mock',
+      model: 'mock',
+    }])
+    await expect(ctx.agentTeams.sendMessage(lead, {
+      target: 'aegis',
+      content: content('this first assignment is far too large for the mailbox'),
+      signal: SIGNAL,
+    })).rejects.toMatchObject({ code: 'TEAM_MESSAGE_TOO_LARGE' })
+    expect(ctx.agentTeams.listMembers(lead).some(member => member.name === 'aegis' && member.status !== 'inactive'))
+      .toBe(false)
+    await ctx.fiber.dispose()
+  })
+
+  it('honors the caller abort signal on first provision', async () => {
+    const { ctx, lead } = await setup(new MockAdapter([]))
+    ctx.agentTeams.setRosterTemplate(() => [{
+      name: 'aegis',
+      description: 'Architect',
+      provider: 'mock',
+      model: 'mock',
+    }])
+    const controller = new AbortController()
+    controller.abort()
+    await expect(ctx.agentTeams.sendMessage(lead, {
+      target: 'aegis',
+      content: content('Design the approach.'),
+      signal: controller.signal,
+    })).rejects.toThrow()
+    expect(ctx.agentTeams.listMembers(lead).some(member => member.name === 'aegis' && member.status !== 'inactive'))
+      .toBe(false)
+    await ctx.fiber.dispose()
+  })
+
+  it('rejects a teammate cwd that is not an accessible directory', async () => {
+    const { ctx, lead } = await setup(new MockAdapter([]))
+    ctx.agentTeams.setRosterTemplate(() => [{
+      name: 'aegis',
+      description: 'Architect',
+      provider: 'mock',
+      model: 'mock',
+    }])
+    await expect(ctx.agentTeams.sendMessage(lead, {
+      target: 'aegis',
+      content: content('Design the approach.'),
+      cwd: join(tmpdir(), 'shres-missing-team-cwd'),
+      signal: SIGNAL,
+    })).rejects.toThrow('not an accessible directory')
     await ctx.fiber.dispose()
   })
 
@@ -493,5 +715,14 @@ describe('Agent Teams runtime mailbox', () => {
       expect(row?.status).toBe('failed')
     }, { timeout: 8_000 })
     await resumed.fiber.dispose()
+  })
+})
+
+describe('teammateSeatGuard', () => {
+  it('denies named seat tools and leaves other names unchanged', () => {
+    expect(teammateSeatGuard({ name: 'aegis' })).toMatch(/team_send/)
+    expect(teammateSeatGuard({ name: 'stride' })).toMatch(/team_send/)
+    expect(teammateSeatGuard({ name: 'ward' })).toMatch(/team_send/)
+    expect(teammateSeatGuard({ name: 'team_send' })).toBeUndefined()
   })
 })

@@ -2,7 +2,7 @@
 
 Product roster for **Aegis** (Architect), **Stride** (Worker), and **Ward** (Reviewer) as Agent Team teammates, plus a **Subagent** hire route that is not a teammate. YAML `extras` add named teammates reachable only through `team_send`. Bound product seats remount named tools that provision then Team-steer when `ctx.agentTeams` is present.
 
-The plugin registers the `agent-seats` settings section. A product seat mounts only when both provider and model are non-empty. Aegis, Stride, and Ward always use the child personas in `src/roster.ts`; those seats have no settings persona field. `seats.subagent` pins the generic `subagent` tool's route when both fields are set; otherwise that hire inherits the parent route.
+The plugin registers the `agent-seats` settings section. A product seat mounts only when both provider and model are non-empty. Aegis, Stride, and Ward ship child personas in `src/roster.ts`; those seats have no settings persona field. When Agent Teams is present, the Lead's first named-seat `prompt` is that teammate's first user message and shadows `deployment:persona`. `description` is only a short label. Optional `cwd` becomes the teammate's session cwd and AGENTS.md root; omitted inherits the Lead workspace. Bound Architect and Reviewer seats also register a Lead `tool:agent-seats` system-prompt section that tells the parent to use those seats for architecture and review and to pass `cwd` when the assignment is another repository. Teammates do not receive named seat tools. `seats.subagent` pins the generic `subagent` tool's route when both fields are set; otherwise that hire inherits the parent route.
 
 | Seat | Role | Tool name |
 |---|---|---|
@@ -14,11 +14,11 @@ The Models page Team card writes this section: provider/model pickers for the pr
 
 ## Model Experience
 
-When `ctx.agentTeams` is present, bound product seats remount as Team-steer tools owned by this package (`description` and `prompt` in; `{ messageId, status }` after mailbox accept). Without Agent Teams they remount as `tool-subagent` instances, and that package owns the schema, prompt section, and result.
+Indirectly, through the named seat tools this plugin remounts and the Lead `tool:agent-seats` section those tools add.
 
 #### KV Cache effect
 
-Prefix-stable while the bound set, descriptions, and child models are unchanged. Binding, unbinding, or rebinding a seat remounts that tool definition and invalidates parent reuse from the first changed tool.
+Prefix-stable while the bound set, descriptions, and child models are unchanged. Binding, unbinding, or rebinding a seat remounts that tool definition and the Lead section and invalidates parent reuse from the first changed tool.
 
 ## Known Limitations and Deferred Work
 

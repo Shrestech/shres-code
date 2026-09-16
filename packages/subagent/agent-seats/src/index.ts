@@ -10,15 +10,16 @@
 import type { Context } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
 import { deepEqualJson, installSettingsSection, settingsNamespace } from '@shres-code/shres-code-settings'
+import type {} from '@shres-code/shres-code-system-prompt'
 import * as ToolSubagent from '@shres-code/shres-code-tool-subagent'
 import type { AgentSeatsSettings, BoundSeat, SeatBinding } from './roster.ts'
-import { assertExtras, boundSeats, boundSubagentSeat } from './roster.ts'
+import { assertExtras, boundSeats, boundSubagentSeat, seatUseGuidance } from './roster.ts'
 import type { TeamRosterTemplateEntry } from '@shres-code/shres-code-agent-team'
 import type { TeamService } from '@shres-code/shres-code-agent-team'
 import { registerTeamSeatTool } from './team-seat-tool.ts'
 
 export {
-  assertExtras, boundSeats, boundSubagentSeat, SEAT_IDS, SEAT_ROSTER,
+  assertExtras, boundSeats, boundSubagentSeat, SEAT_IDS, SEAT_ROSTER, seatUseGuidance,
 } from './roster.ts'
 export type {
   AgentSeatsSettings, BoundSeat, ExtraSeat, SeatBinding, SeatId, SeatRosterEntry,
@@ -87,6 +88,22 @@ export function apply(ctx: Context, config: Config): void {
   let teamsPresent = false
   let disposeTools: (() => void) | undefined
   let disposeGeneric: (() => void) | undefined
+  let disposeGuidance: (() => void) | undefined
+  let lastGuidance = ''
+
+  const syncGuidance = (bound: readonly BoundSeat[]): void => {
+    const text = seatUseGuidance(bound)
+    if (text === lastGuidance) return
+    disposeGuidance?.()
+    disposeGuidance = undefined
+    lastGuidance = text
+    if (text.length === 0) return
+    disposeGuidance = ctx.systemPrompt.section({
+      name: 'tool:agent-seats',
+      order: 115,
+      text,
+    })
+  }
 
   const remountGeneric = (generic: SeatBinding | undefined): void => {
     disposeGeneric?.()
@@ -106,6 +123,7 @@ export function apply(ctx: Context, config: Config): void {
     const settings = source()
     assertExtras(settings.extras)
     const next = boundSeats(settings)
+    syncGuidance(next)
     const generic = boundSubagentSeat(settings)
     const teams = ctx.get('agentTeams') as TeamService | undefined
     const teamsReady = teams !== undefined
@@ -176,5 +194,7 @@ export function apply(ctx: Context, config: Config): void {
   ctx.effect(() => () => {
     disposeTools?.()
     disposeGeneric?.()
+    disposeGuidance?.()
+    lastGuidance = ''
   }, 'agent-seats: withdraw tools')
 }
