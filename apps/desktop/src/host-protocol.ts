@@ -10,7 +10,7 @@ import {
   DESKTOP_HOST_PROTOCOL_VERSION,
   DESKTOP_PIPE_CHUNK_BYTES,
   FRAME_MAGIC,
-} from '@shres-code/shres-code-desktop-host/wire'
+} from '@shres-code/shres-code-desktop-host'
 
 const FRAME_HEADER_BYTES = 13
 const MAX_CONTROL_PAYLOAD_BYTES = 1024 * 1024

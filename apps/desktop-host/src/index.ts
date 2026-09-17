@@ -47,7 +47,13 @@ import {
   type DesktopHostRequestFrame,
 } from './wire.ts'
 
-export { DESKTOP_HOST_PROTOCOL_VERSION, FRAME_MAGIC } from './wire.ts'
+export {
+  DESKTOP_HOST_PROTOCOL_VERSION,
+  DESKTOP_PIPE_CHUNK_BYTES,
+  DESKTOP_REQUEST_PIPE_FD,
+  DESKTOP_RESPONSE_PIPE_FD,
+  FRAME_MAGIC,
+} from './wire.ts'
 
 /** Diagnostic prefix on every error and IPC event this process emits. */
 const NAME = 'shres desktop'
@@ -363,6 +369,16 @@ export async function runDesktopHost(
     // Before any config-tree entry mounts, so every plugin reads the same
     // immutable launch-environment provenance snapshot.
     hostCtx.provide(SHRES_LAUNCH_ENVIRONMENT_KEY, environment)
+    // The desktop composition runs without the webserver row, while the
+    // client-modules and client-connection node halves statically inject
+    // webServer. A no-op service satisfies those injects: their routes and
+    // index taps register here and dispose immediately, nothing binds, and
+    // the desktop host keeps owning dispatch over the pipes.
+    hostCtx.provide('webServer', {
+      register: () => () => {},
+      registerUpgrade: () => () => {},
+      tapIndex: () => () => {},
+    })
     provideCmdline(hostCtx, { args: [], exit: () => {} })
   })
   current = ctx
