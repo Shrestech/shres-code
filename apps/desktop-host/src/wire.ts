@@ -12,7 +12,8 @@ export const DESKTOP_RESPONSE_PIPE_FD = 4
 /** Maximum raw body bytes carried by one data frame. */
 export const DESKTOP_PIPE_CHUNK_BYTES = 64 * 1024
 
-const FRAME_MAGIC = 0x53485233
+/** Frame marker shared with the Electron shell (its request encoder and response decoder read this). */
+export const FRAME_MAGIC = 0x53485233
 const FRAME_HEADER_BYTES = 13
 const MAX_CONTROL_PAYLOAD_BYTES = 1024 * 1024
 

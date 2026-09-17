@@ -47,7 +47,7 @@ import {
   type DesktopHostRequestFrame,
 } from './wire.ts'
 
-export { DESKTOP_HOST_PROTOCOL_VERSION } from './wire.ts'
+export { DESKTOP_HOST_PROTOCOL_VERSION, FRAME_MAGIC } from './wire.ts'
 
 /** Diagnostic prefix on every error and IPC event this process emits. */
 const NAME = 'shres desktop'
