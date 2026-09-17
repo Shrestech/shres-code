@@ -12,10 +12,12 @@ the shell's `shres-app://` handler forwards into.
 project's composition root, loads the project profile with
 `loadProfileDirectory` (the desktop owns profile creation — no template
 auto-init), and layers the shipped `config/desktop.cordis.patch.yml` over the
-base + web-app bundle rows: the socket-bound transport rows (`web-startup`,
-`webserver`, `web-runtime`, `client-hmr`, `connection`) are disabled and the
-native directory-picker pair is inserted in place of the bind-dependent auto
-picker. The profile's listed bundles must resolve inside the runtime or project
+base + web-app bundle rows: `web-startup`, `webserver`, `web-runtime`, and
+`client-hmr` are disabled, the `connection` row is re-scoped but stays
+inactive on its own (its node half still injects `webServer`, which never
+activates without a webserver — so the host owns the `/api` handler directly),
+and the native directory-picker pair is inserted in place of the
+bind-dependent auto picker. The profile's listed bundles must resolve inside the runtime or project
 trees unless the development launch option allows linked packages.
 
 ## Dispatch
