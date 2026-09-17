@@ -246,7 +246,7 @@ export interface ExtraSeat {
 }
 ```
 
-Source: [`packages/subagent/agent-seats/src/index.ts:37`](../packages/subagent/agent-seats/src/index.ts)
+Source: [`packages/subagent/agent-seats/src/index.ts:40`](../packages/subagent/agent-seats/src/index.ts)
 
 <a id="shres-codeshres-code-agent-spine-demo"></a>
 
@@ -362,7 +362,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/team/agent-team/src/index.ts:60`](../packages/team/agent-team/src/index.ts)
+Source: [`packages/team/agent-team/src/index.ts:63`](../packages/team/agent-team/src/index.ts)
 
 <a id="shres-codeshres-code-agent-tool-presentation"></a>
 
@@ -588,6 +588,11 @@ export interface CompactionPolicyConfig {
   compactionRetries?: number
   /** Maximum retries after canonical context overflow; `0` disables recovery. Defaults to `1`. */
   maxOverflowRetries?: number
+  /**
+   * Maximum retries that re-select a smaller region after the summarizer reports
+   * that its own request exceeded the model's context window. `0` disables the reduction. Defaults to `2`.
+   */
+  maxSummaryOverflowRetries?: number
 }
 
 /** Exact provider/model override merged over the default compaction policy. */
@@ -599,7 +604,7 @@ export interface ModelCompactPolicyConfig extends CompactionPolicyConfig {
 }
 ```
 
-Source: [`packages/compaction/compaction-basic/src/types.ts:38`](../packages/compaction/compaction-basic/src/types.ts)
+Source: [`packages/compaction/compaction-basic/src/types.ts:43`](../packages/compaction/compaction-basic/src/types.ts)
 
 <a id="shres-codeshres-code-compaction-tool-result-pruner"></a>
 
@@ -1218,7 +1223,47 @@ export interface CodexSessionModelConfig {
 
 Depends on: [`PiAiModality`](../packages/llm/llm-pi-ai/src/index.ts)
 
-Source: [`packages/llm/llm-codex-session/src/config.ts:80`](../packages/llm/llm-codex-session/src/config.ts)
+Source: [`packages/llm/llm-codex-session/src/config.ts:89`](../packages/llm/llm-codex-session/src/config.ts)
+
+<a id="shres-codeshres-code-llm-cursor-session"></a>
+
+## `@shres-code/shres-code-llm-cursor-session`
+
+Requires: `llm`
+
+```ts config-catalog
+/** Plugin / settings section configuring the one route. */
+export interface Config {
+  /** When false, the route is omitted from the live adapter registry. Defaults to on. */
+  enabled?: boolean
+  /** Endpoint base for the JSON RPC family. Defaults to the public API host. */
+  baseURL?: string
+  /** macOS security tool path for the keychain credential source. */
+  securityPath?: string
+  /** File-store document path, used when {@link useKeychain} is false. */
+  authPath?: string
+  /** Read the login keychain instead of the file store. Defaults to true on macOS. */
+  useKeychain?: boolean
+  /** Selector label; defaults to the shipped display name. */
+  displayName?: string
+  /** Advisory models; overlays the shipped catalog. */
+  models?: CursorSessionModelConfig[]
+}
+
+/** One advisory model entry a deployment may declare. */
+export interface CursorSessionModelConfig {
+  /** Model id cursor-agent's backend accepts. */
+  id: string
+  /** Selector label; defaults to the id. */
+  name?: string
+  /** Maximum combined request and response context in tokens. */
+  contextWindow?: number
+  /** Maximum output tokens; configuring one also makes it the request default. */
+  maxTokens?: number
+}
+```
+
+Source: [`packages/llm/llm-cursor-session/src/config.ts:78`](../packages/llm/llm-cursor-session/src/config.ts)
 
 <a id="shres-codeshres-code-llm-deepseek"></a>
 
@@ -2899,7 +2944,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/subagent/subagent/src/index.ts:179`](../packages/subagent/subagent/src/index.ts)
+Source: [`packages/subagent/subagent/src/index.ts:184`](../packages/subagent/subagent/src/index.ts)
 
 <a id="shres-codeshres-code-subagent-acp"></a>
 
@@ -4282,6 +4327,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@shres-code/shres-code-command-jspace` — requires `commands` · `jspace` ([`packages/jspace/command-jspace/src/index.ts`](../packages/jspace/command-jspace/src/index.ts))
 - `@shres-code/shres-code-commands` ([`packages/interaction/commands/src/index.ts`](../packages/interaction/commands/src/index.ts))
 - `@shres-code/shres-code-cordis-client-runner` ([`packages/extensions/cordis-client-runner/src/index.ts`](../packages/extensions/cordis-client-runner/src/index.ts))
+- `@shres-code/shres-code-cursor-credential` ([`packages/llm/cursor-credential/src/index.ts`](../packages/llm/cursor-credential/src/index.ts))
 - `@shres-code/shres-code-fs-e2b` — requires `e2b` ([`packages/e2b/fs-e2b/src/index.ts`](../packages/e2b/fs-e2b/src/index.ts))
 - `@shres-code/shres-code-fs-observation-policy` ([`packages/fs/fs-observation-policy/src/index.ts`](../packages/fs/fs-observation-policy/src/index.ts))
 - `@shres-code/shres-code-goal-round-driver` — requires `agents` · `goals` · `sessions` ([`packages/goal/goal-round-driver/src/index.ts`](../packages/goal/goal-round-driver/src/index.ts))

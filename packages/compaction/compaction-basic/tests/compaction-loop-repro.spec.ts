@@ -13,6 +13,9 @@ import * as SessionInvariant from '@shres-code/shres-code-session/invariant'
 import * as AgentInvariant from '@shres-code/shres-code-agent/invariant'
 import * as AgentLoopInvariant from '@shres-code/shres-code-agent-loop/invariant'
 import { BasicCompactionEngine } from '@shres-code/shres-code-compaction-basic'
+import type { BasicCompactionConfig } from '@shres-code/shres-code-compaction-basic'
+import { SummarizationFailureError } from '@shres-code/shres-code-compaction-basic/src/summarizer.ts'
+import type { SummarizationInput } from '@shres-code/shres-code-compaction-basic/src/summarizer.ts'
 import TokenMeter from '@shres-code/shres-code-token-meter'
 import * as LlmRetry from '@shres-code/shres-code-llm-retry'
 import { Session, SessionId, type SessionEvent, type SurfaceEvent } from '@shres-code/shres-code-session'
@@ -26,6 +29,40 @@ import { Session, SessionId, type SessionEvent, type SurfaceEvent } from '@shres
 
 class ReproCompactionEngine extends BasicCompactionEngine {
   override async summarize(): Promise<{ summary: ContentBlock[]; provider: string; model: string }> {
+    return {
+      summary: [{ type: 'text', text: 'CHECKPOINT SUMMARY' }],
+      provider: 'mock',
+      model: 'stub',
+    }
+  }
+}
+
+/**
+ * Rejects the first summarization with the context overflow its own request
+ * produces, then condenses the smaller region an automatic retry selects.
+ */
+class OverflowingSummaryEngine extends BasicCompactionEngine {
+  /** Metered tokens of each region the summarizer was asked to condense. */
+  readonly regionTokens: number[] = []
+
+  override async summarize(
+    input: SummarizationInput,
+  ): Promise<{ summary: ContentBlock[]; provider: string; model: string }> {
+    this.regionTokens.push(
+      input.messages.reduce((total, message) => total + this.ctx.tokenMeter.estimateMessage(message), 0),
+    )
+    if (this.regionTokens.length === 1) {
+      throw new SummarizationFailureError({
+        provider: 'mock',
+        model: 'stub',
+        reason: 'error',
+        code: CONTEXT_WINDOW_EXCEEDED_CODE,
+        usage: { inputTokens: 294_609, outputTokens: 597 },
+      }, Object.assign(
+        new Error('pi-ai detected context overflow for model "mock"'),
+        { code: CONTEXT_WINDOW_EXCEEDED_CODE },
+      ))
+    }
     return {
       summary: [{ type: 'text', text: 'CHECKPOINT SUMMARY' }],
       provider: 'mock',
@@ -162,7 +199,22 @@ async function mountInvariants(ctx: Context): Promise<void> {
   await ctx.plugin(AgentLoopInvariant)
 }
 
-async function harness(toolSteps: number): Promise<{ ctx: Context; compact: ReproCompactionEngine }> {
+/**
+ * Pressure policy the scripted turn runs under: a small window so several tool
+ * steps cross the threshold and compaction fires inside the runaway turn.
+ */
+const LOOP_COMPACT_CONFIG = {
+  auto: true,
+  thresholdRatio: 0.5,
+  retainTokens: 50,
+  maxTokens: 8192,
+  compactionRetries: 1,
+} satisfies BasicCompactionConfig
+
+async function harness(
+  toolSteps: number,
+  engine: (ctx: Context) => BasicCompactionEngine = ctx => new ReproCompactionEngine(ctx, LOOP_COMPACT_CONFIG),
+): Promise<{ ctx: Context; compact: BasicCompactionEngine }> {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
   await mountInvariants(ctx)
@@ -177,16 +229,7 @@ async function harness(toolSteps: number): Promise<{ ctx: Context; compact: Repr
       return [{ type: 'text', text: 'work result' }]
     },
   }))
-  // Small window so several tool steps cross the threshold and compaction
-  // fires within the runaway turn after enough history can shrink.
-  const compact = new ReproCompactionEngine(ctx, {
-    auto: true,
-    thresholdRatio: 0.5,
-    retainTokens: 50,
-    maxTokens: 8192,
-    compactionRetries: 1,
-  })
-  return { ctx, compact }
+  return { ctx, compact: engine(ctx) }
 }
 
 /** Run one scripted tool turn through the real loop and return its durable events. */
@@ -272,6 +315,25 @@ function overflowHistorySeed(): SessionEvent[] {
 }
 
 describe('CBR-001: a real-loop checkpoint is a valid boundary on both sides', () => {
+  it('reduces the region after the summarizer reports its own overflow', async () => {
+    const { ctx, compact } = await harness(8, subject => new OverflowingSummaryEngine(subject, LOOP_COMPACT_CONFIG))
+    try {
+      const agent = ctx.agentLoop.create(SessionId('overflow-reduction'), { provider: 'mock', model: 'mock' })
+      agent.followup(createUserMessage({ content: [{ type: 'text', text: 'do a long multi-step task' }], source: { kind: 'user' } }))
+      await waitForIdle(ctx, agent)
+
+      expect(compact).toBeInstanceOf(OverflowingSummaryEngine)
+      const regions = (compact as OverflowingSummaryEngine).regionTokens
+      expect(regions.length).toBeGreaterThanOrEqual(2)
+      // The retried region carries at most half the tokens that overflowed.
+      expect(regions[1]!).toBeLessThanOrEqual(Math.floor(regions[0]! / 2))
+      expect(agent.session.events.some(event => event.type === 'compaction/summary')).toBe(true)
+      expect(agent.session.events.at(-1)).toMatchObject({ type: 'turn/end' })
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('uses the model actually routed by agent/request for post-step pressure', async () => {
     const { ctx } = await harness(8)
     ctx.on('agent/request', async (_payload, next) => ({
