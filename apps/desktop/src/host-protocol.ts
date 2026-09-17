@@ -1,34 +1,57 @@
 /**
- * Shell-side wire framing: the request encoder and response decoder for the
- * desktop host's byte pipes. Byte layout mirrors `apps/desktop-host/src/wire.ts`
- * (big-endian u32 magic, u8 type, u32 stream id, u32 payload length); both
- * sides ship together, so the constants come from the host package.
+ * Versioned control messages and framed byte transport for the desktop host
+ * child. The byte layout and the protocol constants live in the sibling desktop
+ * host's `wire.ts`; this module imports them instead of restating them, so the
+ * two ends of the pipe cannot drift.
  * @module @shres-code/shres-code-desktop/host-protocol
  */
 
-import { DESKTOP_PIPE_CHUNK_BYTES, FRAME_MAGIC } from '@shres-code/shres-code-desktop-host'
+import {
+  DESKTOP_HOST_PROTOCOL_VERSION,
+  DESKTOP_PIPE_CHUNK_BYTES,
+  FRAME_MAGIC,
+} from '@shres-code/shres-code-desktop-host/wire'
+
+const FRAME_HEADER_BYTES = 13
+const MAX_CONTROL_PAYLOAD_BYTES = 1024 * 1024
 
 const REQUEST_FRAME_START = 1
 const REQUEST_FRAME_DATA = 2
 const REQUEST_FRAME_END = 3
 const REQUEST_FRAME_CANCEL = 4
+type RequestFrameType = typeof REQUEST_FRAME_START | typeof REQUEST_FRAME_DATA
+  | typeof REQUEST_FRAME_END | typeof REQUEST_FRAME_CANCEL
 
 const RESPONSE_FRAME_START = 1
 const RESPONSE_FRAME_DATA = 2
 const RESPONSE_FRAME_END = 3
 const RESPONSE_FRAME_ERROR = 4
-const HEADER_BYTES = 13
 
-/** One forwarded request's metadata, as the host's decoder reads it. */
-export interface ShellRequestStart {
+/** Metadata that precedes one optional request body on the request pipe. */
+export interface DesktopHostRequestStart {
   readonly url: string
   readonly method: string
   readonly headers: readonly [string, string][]
   readonly hasBody: boolean
 }
 
-/** One decoded host response frame. */
-export type ShellResponseFrame = {
+/** Commands retained on Node IPC because they do not carry Fetch payload bytes. */
+export type DesktopHostCommand = {
+  readonly type: 'shutdown'
+}
+
+/** Lifecycle events retained on Node IPC. */
+export type DesktopHostEvent = {
+  readonly type: 'ready'
+  readonly protocolVersion: typeof DESKTOP_HOST_PROTOCOL_VERSION
+  readonly appVersion: string
+} | {
+  readonly type: 'fatal'
+  readonly message: string
+}
+
+/** One decoded response-pipe frame. */
+export type DesktopHostResponseFrame = {
   readonly type: 'start'
   readonly streamId: number
   readonly status: number
@@ -37,47 +60,90 @@ export type ShellResponseFrame = {
 } | {
   readonly type: 'data'
   readonly streamId: number
-  readonly data: Uint8Array
+  readonly data: Buffer
 } | {
-  readonly type: 'end' | 'error'
+  readonly type: 'end'
   readonly streamId: number
-  readonly message?: string
+} | {
+  readonly type: 'error'
+  readonly streamId: number
+  readonly message: string
 }
 
-function frame(type: number, streamId: number, payload: Buffer): Buffer {
-  const bytes = Buffer.allocUnsafe(HEADER_BYTES + payload.byteLength)
-  bytes.writeUInt32BE(FRAME_MAGIC, 0)
-  bytes.writeUInt8(type, 4)
-  bytes.writeUInt32BE(streamId, 5)
-  bytes.writeUInt32BE(payload.byteLength, 9)
-  payload.copy(bytes, HEADER_BYTES)
-  return bytes
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
 }
 
-/** Encode one request start frame. */
-export function encodeRequestStart(streamId: number, request: ShellRequestStart): Buffer {
-  return frame(REQUEST_FRAME_START, streamId, Buffer.from(JSON.stringify(request), 'utf8'))
+function isHeaders(value: unknown): value is readonly [string, string][] {
+  return Array.isArray(value) && value.every(header => Array.isArray(header) && header.length === 2
+    && typeof header[0] === 'string' && typeof header[1] === 'string')
 }
 
-/** Encode one bounded request body chunk. */
-export function encodeRequestData(streamId: number, chunk: Uint8Array): Buffer {
-  return frame(REQUEST_FRAME_DATA, streamId, Buffer.from(chunk))
+function assertStreamId(streamId: number): void {
+  if (!Number.isInteger(streamId) || streamId < 1 || streamId > 0xffff_ffff) {
+    throw new Error(`shres desktop: invalid pipe stream id ${String(streamId)}`)
+  }
 }
 
-/** Encode request body completion. */
-export function encodeRequestEnd(streamId: number): Buffer {
-  return frame(REQUEST_FRAME_END, streamId, Buffer.alloc(0))
+function encodeFrame(type: RequestFrameType, streamId: number, payload: Buffer): Buffer {
+  assertStreamId(streamId)
+  const limit = type === REQUEST_FRAME_DATA ? DESKTOP_PIPE_CHUNK_BYTES : MAX_CONTROL_PAYLOAD_BYTES
+  if (payload.byteLength > limit) {
+    throw new Error(`shres desktop: request pipe frame exceeds the ${String(limit)}-byte limit`)
+  }
+  const frame = Buffer.allocUnsafe(FRAME_HEADER_BYTES + payload.byteLength)
+  frame.writeUInt32BE(FRAME_MAGIC, 0)
+  frame.writeUInt8(type, 4)
+  frame.writeUInt32BE(streamId, 5)
+  frame.writeUInt32BE(payload.byteLength, 9)
+  payload.copy(frame, FRAME_HEADER_BYTES)
+  return frame
 }
 
-/** Encode request cancellation. */
-export function encodeRequestCancel(streamId: number): Buffer {
-  return frame(REQUEST_FRAME_CANCEL, streamId, Buffer.alloc(0))
+function encodeJsonFrame(type: RequestFrameType, streamId: number, value: unknown): Buffer {
+  return encodeFrame(type, streamId, Buffer.from(JSON.stringify(value), 'utf8'))
 }
 
 /**
- * Incrementally decode validated host response frames from the response pipe.
+ * Encode the metadata opening one request stream.
+ * @param streamId - request stream id, strictly increasing across the pipe.
+ * @param request - the forwarded request's url, method, headers, and body presence.
+ * @returns the encoded start frame.
  */
-export class ShellResponseDecoder {
+export function encodeDesktopRequestStart(streamId: number, request: DesktopHostRequestStart): Buffer {
+  return encodeJsonFrame(REQUEST_FRAME_START, streamId, request)
+}
+
+/**
+ * Encode one bounded raw request-body chunk.
+ * @param streamId - request stream the chunk belongs to.
+ * @param data - raw bytes, at most `DESKTOP_PIPE_CHUNK_BYTES`.
+ * @returns the encoded data frame.
+ */
+export function encodeDesktopRequestData(streamId: number, data: Uint8Array): Buffer {
+  return encodeFrame(REQUEST_FRAME_DATA, streamId, Buffer.from(data))
+}
+
+/**
+ * Encode normal request-body completion.
+ * @param streamId - request stream whose body ended.
+ * @returns the encoded end frame.
+ */
+export function encodeDesktopRequestEnd(streamId: number): Buffer {
+  return encodeFrame(REQUEST_FRAME_END, streamId, Buffer.alloc(0))
+}
+
+/**
+ * Encode cancellation of one request and its response.
+ * @param streamId - request stream to cancel.
+ * @returns the encoded cancel frame.
+ */
+export function encodeDesktopRequestCancel(streamId: number): Buffer {
+  return encodeFrame(REQUEST_FRAME_CANCEL, streamId, Buffer.alloc(0))
+}
+
+/** Incrementally decode validated response frames from the host byte pipe. */
+export class DesktopHostResponseDecoder {
   private buffer: Buffer = Buffer.alloc(0)
 
   /**
@@ -85,41 +151,82 @@ export class ShellResponseDecoder {
    * @param chunk - next bytes read from the host response pipe.
    * @returns complete frames in pipe order.
    */
-  push(chunk: Buffer): ShellResponseFrame[] {
+  push(chunk: Buffer): DesktopHostResponseFrame[] {
     this.buffer = this.buffer.byteLength === 0 ? chunk : Buffer.concat([this.buffer, chunk])
-    const frames: ShellResponseFrame[] = []
+    const frames: DesktopHostResponseFrame[] = []
     for (;;) {
-      const next = this.decode()
-      if (next === undefined) return frames
-      frames.push(next)
+      const frame = this.next()
+      if (frame === undefined) return frames
+      frames.push(frame)
     }
   }
 
-  private decode(): ShellResponseFrame | undefined {
-    if (this.buffer.byteLength < HEADER_BYTES) return undefined
+  /**
+   * Reject an end of pipe that splits a frame.
+   * @throws when the pipe ended inside a frame.
+   */
+  finish(): void {
+    if (this.buffer.byteLength !== 0) throw new Error('shres desktop: host response pipe ended inside a frame')
+  }
+
+  private next(): DesktopHostResponseFrame | undefined {
+    if (this.buffer.byteLength < FRAME_HEADER_BYTES) return undefined
     if (this.buffer.readUInt32BE(0) !== FRAME_MAGIC) throw new Error('shres desktop: invalid host response frame marker')
-    const type = this.buffer.readUInt8(4)
+    const rawType = this.buffer.readUInt8(4)
     const streamId = this.buffer.readUInt32BE(5)
-    const length = this.buffer.readUInt32BE(9)
-    const limit = type === RESPONSE_FRAME_DATA ? DESKTOP_PIPE_CHUNK_BYTES : Number.MAX_SAFE_INTEGER
-    if (length > limit) throw new Error('shres desktop: host response frame exceeds its limit')
-    const total = HEADER_BYTES + length
-    if (this.buffer.byteLength < total) return undefined
-    const payload = this.buffer.subarray(HEADER_BYTES, total)
-    this.buffer = this.buffer.subarray(total)
-    if (type === RESPONSE_FRAME_DATA) return { type: 'data', streamId, data: payload }
-    if (type === RESPONSE_FRAME_END) return { type: 'end', streamId }
-    const value = JSON.parse(payload.toString('utf8')) as Record<string, unknown>
-    if (type === RESPONSE_FRAME_ERROR) return { type: 'error', streamId, message: typeof value.message === 'string' ? value.message : undefined }
-    if (typeof value.status === 'number' && Array.isArray(value.headers) && typeof value.hasBody === 'boolean') {
-      return {
-        type: 'start',
-        streamId,
-        status: value.status,
-        headers: value.headers as readonly [string, string][],
-        hasBody: value.hasBody,
-      }
+    const payloadLength = this.buffer.readUInt32BE(9)
+    assertStreamId(streamId)
+    const limit = rawType === RESPONSE_FRAME_DATA ? DESKTOP_PIPE_CHUNK_BYTES : MAX_CONTROL_PAYLOAD_BYTES
+    if (payloadLength > limit) {
+      throw new Error(`shres desktop: host response frame exceeds the ${String(limit)}-byte limit`)
     }
-    throw new Error('shres desktop: invalid host response start payload')
+    const frameLength = FRAME_HEADER_BYTES + payloadLength
+    if (this.buffer.byteLength < frameLength) return undefined
+    const payload = this.buffer.subarray(FRAME_HEADER_BYTES, frameLength)
+    this.buffer = this.buffer.subarray(frameLength)
+    switch (rawType) {
+      case RESPONSE_FRAME_START:
+        return this.parseStart(streamId, payload)
+      case RESPONSE_FRAME_DATA:
+        return { type: 'data', streamId, data: payload }
+      case RESPONSE_FRAME_END:
+        if (payloadLength !== 0) throw new Error('shres desktop: host response end frame carried a payload')
+        return { type: 'end', streamId }
+      case RESPONSE_FRAME_ERROR:
+        return this.parseError(streamId, payload)
+      default:
+        throw new Error(`shres desktop: unknown host response frame type ${String(rawType)}`)
+    }
+  }
+
+  private parseStart(streamId: number, payload: Buffer): DesktopHostResponseFrame {
+    const value = this.parseJson(payload, 'start')
+    if (!isRecord(value) || !Number.isInteger(value.status) || (value.status as number) < 100
+      || (value.status as number) > 599 || !isHeaders(value.headers) || typeof value.hasBody !== 'boolean') {
+      throw new Error('shres desktop: invalid host response start payload')
+    }
+    return {
+      type: 'start',
+      streamId,
+      status: value.status as number,
+      headers: value.headers,
+      hasBody: value.hasBody,
+    }
+  }
+
+  private parseError(streamId: number, payload: Buffer): DesktopHostResponseFrame {
+    const value = this.parseJson(payload, 'error')
+    if (!isRecord(value) || typeof value.message !== 'string') {
+      throw new Error('shres desktop: invalid host response error payload')
+    }
+    return { type: 'error', streamId, message: value.message }
+  }
+
+  private parseJson(payload: Buffer, subject: string): unknown {
+    try {
+      return JSON.parse(payload.toString('utf8')) as unknown
+    } catch (error) {
+      throw new Error(`shres desktop: host response ${subject} payload is not JSON: ${error instanceof Error ? error.message : String(error)}`)
+    }
   }
 }
