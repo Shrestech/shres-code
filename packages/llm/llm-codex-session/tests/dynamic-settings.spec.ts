@@ -86,6 +86,17 @@ describe('llm-codex-session settings lifecycle', () => {
     expect(assemblerThird.finish).toMatchObject({ kind: 'stop' })
   })
 
+  it('lets a settings entry raise the shipped window without a release', async () => {
+    await boot()
+    expect((await ctx!.llm.resolveModelInfo('codex-session', 'gpt-6-astra')).context)
+      .toEqual({ contextWindow: 311_000 })
+
+    await ctx!.settings.update(NS, { models: [{ id: 'gpt-6-astra', contextWindow: 400_000 }] })
+
+    expect((await ctx!.llm.resolveModelInfo('codex-session', 'gpt-6-astra')).context)
+      .toEqual({ contextWindow: 400_000 })
+  })
+
   it('enabled: false in settings withdraws the route and restoring re-registers it', async () => {
     await boot()
     await ctx!.settings.update(NS, { enabled: false })

@@ -7,10 +7,10 @@
 import { Context } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
 import { CompactionEngine, ManualCompactionError } from '@shres-code/shres-code-compaction'
-import type { CompactionResult, CompactionTrigger } from '@shres-code/shres-code-compaction'
-import type { TokenMeter } from '@shres-code/shres-code-token-meter'
+import type { CompactionFailureFacts, CompactionResult, CompactionTrigger } from '@shres-code/shres-code-compaction'
+import type { TokenMeasurement, TokenMeter } from '@shres-code/shres-code-token-meter'
 import type { Session } from '@shres-code/shres-code-session'
-import { CONTEXT_WINDOW_EXCEEDED_CODE, assertNever } from '@shres-code/shres-code-llm'
+import { CONTEXT_WINDOW_EXCEEDED_CODE, assertNever, errorChain } from '@shres-code/shres-code-llm'
 import type { LlmCallConfig } from '@shres-code/shres-code-llm'
 import type { Agent, PreStepDecision } from '@shres-code/shres-code-agent'
 import type { CommandId } from '@shres-code/shres-code-commands/brand'
@@ -28,7 +28,7 @@ import {
   compactSurfaceRegion,
   selectCompactableRange,
 } from './region.ts'
-import { summarizeWithLlm } from './summarizer.ts'
+import { summarizationFailureFacts, summarizeWithLlm } from './summarizer.ts'
 import type { SummarizationInput, SummaryResult } from './summarizer.ts'
 import type {
   BasicCompactionConfig,
@@ -60,6 +60,142 @@ function routedTarget(
   return { provider: config.provider, model: config.model }
 }
 
+/** The pressure a measurement reports: the figure compared against the threshold and its source. */
+interface PressureReading {
+  /** Tokens compared against the target's threshold. */
+  readonly tokens: number
+  /** Whether the figure is the provider-anchored prompt or the heuristic envelope. */
+  readonly source: 'usage' | 'heuristic'
+}
+
+/**
+ * Read the pressure the latest routed request is under.
+ *
+ * The provider-anchored figure wins when the meter measured usage for a request
+ * whose header still matches the current one: it is the only side that counts
+ * what the heuristic estimator cannot see, so a route whose wire carries
+ * adapter-private replay or whose content is denser than four characters per
+ * token crosses the threshold there first. The heuristic envelope — surface
+ * plus request furniture — is the fallback before the first response reports
+ * usage and after a header change moves the anchor.
+ * @param measurement - one snapshot from the session's token meter.
+ * @returns the tokens to compare against the threshold and their source.
+ */
+function pressureReading(measurement: TokenMeasurement): PressureReading {
+  return measurement.baseline.kind === 'usage'
+    ? { tokens: measurement.totalTokens, source: 'usage' }
+    : { tokens: measurement.surfaceTokens + measurement.headerTokens, source: 'heuristic' }
+}
+
+/**
+ * Whether one measurement is at or above a target's pressure threshold.
+ * @param measurement - one snapshot from the session's token meter.
+ * @param thresholdTokens - the target's threshold, in the reading's own units.
+ * @returns true when the next request is at or above the threshold.
+ */
+function underPressure(measurement: TokenMeasurement, thresholdTokens: number): boolean {
+  return pressureReading(measurement).tokens >= thresholdTokens
+}
+
+/** One attempt plan for {@link BasicCompactionEngine}'s overflow-reducing compaction. */
+interface RegionRetryPlan {
+  /** Snapshot the first attempt selects from. */
+  readonly measurement: TokenMeasurement
+  /** Retention floor for the first attempt, in metered surface tokens. */
+  readonly retainTokens: number
+  /** 1-based attempt index recorded for the first attempt; later attempts continue from it. */
+  readonly firstAttempt?: number
+  /** Run one transaction over the selected span with its 1-based attempt index. */
+  readonly run: (
+    range: { readonly start: number; readonly end: number },
+    attempt: number,
+  ) => Promise<CompactionResult>
+}
+
+/**
+ * Metered tokens of one selected surface span, priced by the meter's own nodes.
+ * @param measurement - the snapshot the span was selected from.
+ * @param range - inclusive first and last surface-node seqs.
+ * @returns the sum of the span's node prices, or 0 when the span is absent.
+ */
+function meteredRangeTokens(
+  measurement: TokenMeasurement,
+  range: { readonly start: number; readonly end: number },
+): number {
+  const start = measurement.nodes.findIndex(node => node.seq === range.start)
+  const end = measurement.nodes.findIndex(node => node.seq === range.end)
+  if (start === -1 || end === -1 || end < start) return 0
+  let tokens = 0
+  for (let index = start; index <= end; index += 1) {
+    tokens += measurement.nodes[index]?.tokens ?? 0
+  }
+  return tokens
+}
+
+/**
+ * Errors reachable from one attempt's failure through `cause`, nearest first.
+ * A manual attempt classifies its failure as `ManualCompactionError('summary')` around
+ * the summarizer's own error, so the facts to read are one or two links down.
+ * @param error - the failure a transaction attempt threw.
+ * @returns up to eight chained errors, nearest first.
+ */
+function causeChain(error: unknown): Error[] {
+  const chain: Error[] = []
+  for (let current: unknown = error; current instanceof Error && chain.length < 8; current = current.cause) {
+    chain.push(current)
+  }
+  return chain
+}
+
+/**
+ * The summarization failure facts reachable from an attempt's error, if any.
+ * @param error - the failure a transaction attempt threw.
+ * @returns the nearest structured facts, or `undefined` when the chain carries none.
+ */
+function attemptFailureFacts(error: unknown): Omit<CompactionFailureFacts, 'attempt'> | undefined {
+  for (const entry of causeChain(error)) {
+    const facts = summarizationFailureFacts(entry)
+    if (facts !== undefined) return facts
+  }
+  return undefined
+}
+
+/**
+ * Whether one compaction attempt failed on the summarizer's own context overflow.
+ * @param error - the failure a transaction attempt threw.
+ * @returns true when durable facts or an error's own code report context overflow.
+ */
+function summarizerOverflowed(error: unknown): boolean {
+  return causeChain(error).some(entry => summarizationFailureFacts(entry)?.code === CONTEXT_WINDOW_EXCEEDED_CODE
+    || (entry as { code?: unknown }).code === CONTEXT_WINDOW_EXCEEDED_CODE)
+}
+
+/**
+ * Name what a spent region-reduction could not do: the region's size, the
+ * attempts, the summarizer target, and the usage that attempt reported.
+ * @param overflowed - the last failed attempt and the region it ran over.
+ * @param attempts - attempts made within this reduction.
+ * @returns the diagnostic to throw.
+ */
+function summarizationOverflowExhausted(
+  overflowed: { readonly error: unknown; readonly regionTokens: number },
+  attempts: number,
+): Error {
+  const facts = attemptFailureFacts(overflowed.error)
+  const target = facts === undefined ? 'an unreported target' : `${facts.provider}/${facts.model}`
+  const usage = facts?.usage === undefined
+    ? 'no usage'
+    : `${facts.usage.inputTokens + (facts.usage.cacheReadTokens ?? 0) + (facts.usage.cacheWriteTokens ?? 0)} prompt tokens`
+  const message = `compaction could not summarize a ${overflowed.regionTokens}-token region after ${attempts} `
+    + `${attempts === 1 ? 'attempt' : 'attempts'} (summarizer ${target}; last attempt reported ${usage}: `
+    + `${errorChain(overflowed.error)}); reduce the retained history, point summarization at `
+    + 'a larger-window model, or raise maxSummaryOverflowRetries'
+  // A manual attempt already classified its failure; keep the command-facing class.
+  return overflowed.error instanceof ManualCompactionError
+    ? new ManualCompactionError('summary', message, { cause: overflowed.error })
+    : new Error(message, { cause: overflowed.error })
+}
+
 /** Resolve the conversation target used to select an optional policy override. */
 function conversationTarget(
   agent: Agent,
@@ -79,6 +215,7 @@ const summarizationModelSchema = z.string()
 const maxTokensSchema = z.number().step(1).min(1)
 const compactionRetriesSchema = z.number().step(1).min(0)
 const maxOverflowRetriesSchema = z.number().step(1).min(0)
+const maxSummaryOverflowRetriesSchema = z.number().step(1).min(0)
 const maxPointersSchema = z.number().step(1).min(0).max(MAX_MAX_POINTERS)
 const pinSeqsSchema = z.array(z.number().step(1).min(0))
 
@@ -93,6 +230,7 @@ const modelPolicy: z<ModelCompactPolicyConfig> = z.object({
   maxTokens: maxTokensSchema,
   compactionRetries: compactionRetriesSchema,
   maxOverflowRetries: maxOverflowRetriesSchema,
+  maxSummaryOverflowRetries: maxSummaryOverflowRetriesSchema,
 })
 
 /**
@@ -115,6 +253,7 @@ export class BasicCompactionEngine extends CompactionEngine {
     maxTokens: maxTokensSchema,
     compactionRetries: compactionRetriesSchema,
     maxOverflowRetries: maxOverflowRetriesSchema,
+    maxSummaryOverflowRetries: maxSummaryOverflowRetriesSchema,
     modelPolicies: z.array(modelPolicy),
     auto: z.boolean(),
     maxPointers: maxPointersSchema,
@@ -290,9 +429,11 @@ export class BasicCompactionEngine extends CompactionEngine {
         prune.pruneSession(agent.session)
         measurement = meter.measure(agent.session)
       }
-      const range = selectCompactableRange(agent.session, measurement, 0, this.config.pinSeqs)
-      if (range === null) return null
-      return this.compactRegion(range.start, range.end, agent, signal)
+      return this.compactRangeWithOverflowRetries(agent, {
+        measurement,
+        retainTokens: 0,
+        run: (range, attempt) => this.compactRegion(range.start, range.end, agent, signal, attempt),
+      })
     }
 
     const context = (await this.ctx.llm.resolveModelInfo(target.provider, target.model, signal)).context
@@ -306,18 +447,16 @@ export class BasicCompactionEngine extends CompactionEngine {
       )
     }
     const spec = resolveCompactSpec(policy, context.contextWindow)
-    // Pressure prices only the compactable surface. The request header
-    // (system prompt + tool schemas) is furniture no compaction can remove, so
-    // its tokens come out of the budget instead of the measured side: a
-    // threshold configured near or below the furniture floor would otherwise
-    // fire on every step with nothing removable, and the same ratio would
-    // apply wildly different real pressure on different window sizes.
-    // A threshold smaller than the furniture plus the retained tail cannot
-    // express pressure for this window and composition: compacting can never
-    // bring the surface under it, so firing would only loop. Decline instead.
+    // Pressure prices the whole next request through {@link pressureReading}:
+    // the provider-anchored prompt when the meter has one, the heuristic
+    // envelope otherwise. The request header (system prompt + tool schemas) is
+    // furniture no compaction can remove, so a threshold configured near or
+    // below that floor cannot express pressure for this window and composition:
+    // compacting could never bring the surface under it, so firing would only
+    // loop. Decline instead.
     const surfaceBudget = () => spec.thresholdTokens - measurement.headerTokens
     if (surfaceBudget() <= spec.retainTokens) return null
-    if (measurement.surfaceTokens < surfaceBudget()) return null
+    if (!underPressure(measurement, spec.thresholdTokens)) return null
 
     // Once pressure qualifies, land the model-free pass before choosing a
     // summary range, then remeasure through the singleton replay fold.
@@ -325,32 +464,86 @@ export class BasicCompactionEngine extends CompactionEngine {
       prune.pruneSession(agent.session)
       measurement = meter.measure(agent.session)
     }
-    if (surfaceBudget() <= spec.retainTokens || measurement.surfaceTokens < surfaceBudget()) return null
+    if (surfaceBudget() <= spec.retainTokens
+      || !underPressure(measurement, spec.thresholdTokens)) return null
 
     let result: CompactionResult | null = null
     for (let attempt = 0; attempt <= spec.compactionRetries; attempt += 1) {
-      const range = selectCompactableRange(
-        agent.session,
+      const compacted = await this.compactRangeWithOverflowRetries(agent, {
         measurement,
-        spec.retainTokens,
-        this.config.pinSeqs,
-      )
-      if (range === null) {
+        retainTokens: spec.retainTokens,
+        firstAttempt: attempt + 1,
+        run: (range, index) => this.compactRegion(range.start, range.end, agent, signal, index),
+      })
+      if (compacted === null) {
         /* v8 ignore else -- concrete replacement preserves a compactable checkpoint; subclass hooks cannot mutate it. */
         if (result === null) return null
         /* v8 ignore next -- paired with the defensive post-success branch above. */
         break
       }
-      result = await this.compactRegion(range.start, range.end, agent, signal)
+      result = compacted
       measurement = meter.measure(agent.session)
-      if (measurement.surfaceTokens < surfaceBudget()) return result
+      if (!underPressure(measurement, spec.thresholdTokens)) return result
     }
 
+    const reading = pressureReading(measurement)
     throw new Error(
       `compaction still above surface budget after ${spec.compactionRetries + 1} compaction attempts `
         + `(${measurement.surfaceTokens} surface tokens >= budget ${surfaceBudget()} of threshold `
-        + `${spec.thresholdTokens} minus ${measurement.headerTokens} header furniture)`,
+        + `${spec.thresholdTokens} minus ${measurement.headerTokens} header furniture; `
+        + `${reading.source} pressure ${reading.tokens} tokens)`,
     )
+  }
+
+  /**
+   * Select and compact one region, re-selecting a smaller one when the
+   * summarizer reports that its own request exceeded the model's context window.
+   *
+   * A summarization call replays the region it condenses, so a session whose
+   * remaining history alone is larger than the window fails every attempt at the
+   * same size and can never compact. Each attempt keeps its own closed
+   * `compaction/start`/`compaction/end` bracket; a failed one raises the
+   * retention floor so the next selected region carries at most half the failed
+   * region's metered tokens, which makes termination structural — the region at
+   * least halves per retry, or selection declines.
+   * @param agent - owner of the target session.
+   * @param plan - first retention floor, its measurement, and the transaction to run.
+   * @returns the first successful result, or `null` when nothing is compactable.
+   * @throws the attempt's own failure when the retry budget is spent, and a named
+   *   failure when the reduced region has nothing left to compact.
+   */
+  private async compactRangeWithOverflowRetries(
+    agent: Agent,
+    plan: RegionRetryPlan,
+  ): Promise<CompactionResult | null> {
+    const firstAttempt = plan.firstAttempt ?? 1
+    let measurement = plan.measurement
+    let retainTokens = plan.retainTokens
+    let attempt = firstAttempt
+    let overflowed: { error: unknown; regionTokens: number } | undefined
+    for (;;) {
+      const range = selectCompactableRange(agent.session, measurement, retainTokens, this.config.pinSeqs)
+      if (range === null) {
+        if (overflowed === undefined) return null
+        throw summarizationOverflowExhausted(overflowed, attempt - firstAttempt)
+      }
+      const regionTokens = meteredRangeTokens(measurement, range)
+      try {
+        return await plan.run(range, attempt)
+      } catch (error: unknown) {
+        if (!summarizerOverflowed(error)) throw error
+        if (attempt - firstAttempt >= this.config.maxSummaryOverflowRetries) {
+          throw summarizationOverflowExhausted({ error, regionTokens }, attempt - firstAttempt + 1)
+        }
+        retainTokens = Math.max(
+          retainTokens + 1,
+          measurement.surfaceTokens - Math.floor(regionTokens / 2),
+        )
+        overflowed = { error, regionTokens }
+        attempt += 1
+        measurement = this.ctx.tokenMeter.measure(agent.session)
+      }
+    }
   }
 
   /**
@@ -360,6 +553,7 @@ export class BasicCompactionEngine extends CompactionEngine {
    * @param end - inclusive last surface-node seq.
    * @param agent - owner of the target session, used by the summarizer.
    * @param signal - optional summarization cancellation signal.
+   * @param attempt - 1-based index of this attempt within its compaction, recorded on failure.
    * @returns the successful durable compaction result.
    */
   override async compactRegion(
@@ -367,6 +561,7 @@ export class BasicCompactionEngine extends CompactionEngine {
     end: number,
     agent: Agent,
     signal?: AbortSignal,
+    attempt = 1,
   ): Promise<CompactionResult> {
     return compactSurfaceRegion(
       this.regionDependencies(),
@@ -374,7 +569,7 @@ export class BasicCompactionEngine extends CompactionEngine {
       start,
       end,
       agent,
-      { owner: 'current-turn', stability: 'whole-surface' },
+      { owner: 'current-turn', stability: 'whole-surface', attempt },
       signal,
     )
   }
@@ -398,29 +593,27 @@ export class BasicCompactionEngine extends CompactionEngine {
         const operationSignal = AbortSignal.any([agentSignal, signal])
         try {
           operationSignal.throwIfAborted()
-          const range = selectCompactableRange(
-            agent.session,
-            this.ctx.tokenMeter.measure(agent.session),
-            0,
-            this.config.pinSeqs,
-          )
-          if (range === null) return null
-          return await compactSurfaceRegion(
-            this.regionDependencies(),
-            agent.session,
-            range.start,
-            range.end,
-            agent,
-            {
-              owner: null,
-              stability: 'selected-span',
-              ...sourceCommandId === undefined ? {} : { sourceCommandId },
-              flush: async () => {
-                await this.ctx.sessions.flush(agent.session)
+          return await this.compactRangeWithOverflowRetries(agent, {
+            measurement: this.ctx.tokenMeter.measure(agent.session),
+            retainTokens: 0,
+            run: (range, attempt) => compactSurfaceRegion(
+              this.regionDependencies(),
+              agent.session,
+              range.start,
+              range.end,
+              agent,
+              {
+                owner: null,
+                stability: 'selected-span',
+                attempt,
+                ...sourceCommandId === undefined ? {} : { sourceCommandId },
+                flush: async () => {
+                  await this.ctx.sessions.flush(agent.session)
+                },
               },
-            },
-            operationSignal,
-          )
+              operationSignal,
+            ),
+          })
         } catch (error: unknown) {
           if (agentSignal.aborted && operationSignal.reason === agentSignal.reason) {
             throw new ManualCompactionError(

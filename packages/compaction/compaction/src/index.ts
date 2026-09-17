@@ -12,7 +12,7 @@ import type { Session } from '@shres-code/shres-code-session'
 import type { CommandId } from '@shres-code/shres-code-commands/brand'
 import type { CompactionResult } from './types.ts'
 
-export type { CompactionResult } from './types.ts'
+export type { CompactionFailureFacts, CompactionResult, SummarizationFailureReason } from './types.ts'
 export { CompactionId } from './brand.ts'
 export { toolPairingBalancedAfter, toolPairingBalancedBefore } from './tool-pairing.ts'
 // The checkpoint source constructor and predicate are declared on the cordis-free
@@ -158,6 +158,7 @@ export abstract class CompactionEngine extends Service {
    * @param end - last surface seq, inclusive.
    * @param agent - context whose session is mutated and whose routing options guide summarization.
    * @param signal - optional cancellation; model-backed implementations must forward it.
+   * @param attempt - 1-based index of this attempt within its compaction, recorded on a summarization failure.
    * @throws when compaction is active or the range is missing, reversed, or unbalanced.
    * @returns the appended event seqs, summary, replaced range, and token accounting.
    */
@@ -166,6 +167,7 @@ export abstract class CompactionEngine extends Service {
     end: number,
     agent: CompactionAgentContext,
     signal?: AbortSignal,
+    attempt?: number,
   ): Promise<CompactionResult>
 }
 

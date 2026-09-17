@@ -214,7 +214,51 @@ function validateCompactionEvent(
   if (event.data.error === undefined && !open.summarized) {
     fail('successful compaction/end requires one compaction/summary')
   }
+  if (event.data.failure !== undefined) {
+    if (event.data.error === undefined) fail('compaction/end failure facts require an error')
+    validateFailureFacts(event.data.failure, fail)
+  }
   return { kind: 'end' }
+}
+
+/** Require the optional summarization failure facts to be complete and typed. */
+function validateFailureFacts(value: unknown, fail: InvariantFailure): void {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    fail('compaction/end failure must be an object')
+    return
+  }
+  const facts = value as Record<string, unknown>
+  validateId(facts.provider, 'compaction/end failure provider', fail)
+  validateId(facts.model, 'compaction/end failure model', fail)
+  if (facts.reason !== 'error' && facts.reason !== 'aborted' && facts.reason !== 'max-tokens') {
+    fail(`compaction/end failure reason ${String(facts.reason)} is not a known terminal finish kind`)
+  }
+  if (facts.code !== undefined) validateId(facts.code, 'compaction/end failure code', fail)
+  if (!Number.isSafeInteger(facts.attempt) || (facts.attempt as number) < 1) {
+    fail('compaction/end failure attempt must be a positive safe integer')
+  }
+  if (facts.usage !== undefined) validateFailureUsage(facts.usage, fail)
+}
+
+/** Require the provider usage recorded with a failure to be non-negative integers. */
+function validateFailureUsage(value: unknown, fail: InvariantFailure): void {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    fail('compaction/end failure usage must be an object')
+    return
+  }
+  const usage = value as Record<string, unknown>
+  if (!Number.isSafeInteger(usage.inputTokens) || (usage.inputTokens as number) < 0) {
+    fail('compaction/end failure usage inputTokens must be a non-negative safe integer')
+  }
+  if (!Number.isSafeInteger(usage.outputTokens) || (usage.outputTokens as number) < 0) {
+    fail('compaction/end failure usage outputTokens must be a non-negative safe integer')
+  }
+  for (const key of ['cacheReadTokens', 'cacheWriteTokens']) {
+    const field = usage[key]
+    if (field !== undefined && (!Number.isSafeInteger(field) || (field as number) < 0)) {
+      fail(`compaction/end failure usage ${key} must be a non-negative safe integer`)
+    }
+  }
 }
 
 /** Apply one committed compaction transition. */

@@ -3,6 +3,7 @@ import { Context } from '@shres-code/cordis'
 import SessionStore, { Session, SessionId } from '@shres-code/shres-code-session'
 import { createUserMessage } from '@shres-code/shres-code-llm'
 import { CompactionId, compactCheckpointSource } from '@shres-code/shres-code-compaction'
+import type { CompactionFailureFacts } from '@shres-code/shres-code-compaction'
 import * as CompactionInvariant from '@shres-code/shres-code-compaction/invariant'
 import { CommandId } from '@shres-code/shres-code-commands/brand'
 import InvariantRegistry from '@shres-code/shres-code-invariants'
@@ -31,6 +32,15 @@ const summary = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 })
 
+/** Complete failure facts; overrides carry deliberate violations past the payload type. */
+const facts = (overrides: Record<string, unknown> = {}): CompactionFailureFacts => ({
+  provider: 'mock',
+  model: 'mock',
+  reason: 'error',
+  attempt: 1,
+  ...overrides,
+})
+
 function startTurn(session: ReturnType<Context['sessions']['create']>, turn = 1): void {
   session.append('turn/start', { turn })
 }
@@ -47,7 +57,12 @@ describe('compaction invariants', () => {
     const failed = ctx.sessions.create()
     startTurn(failed, 2)
     failed.append('compaction/start', { compactionId: TEST_COMPACTION_ID, turn: 2 })
-    failed.append('compaction/end', { compactionId: TEST_COMPACTION_ID, turn: 2, error: 'provider failed' })
+    failed.append('compaction/end', {
+      compactionId: TEST_COMPACTION_ID,
+      turn: 2,
+      error: 'provider failed',
+      failure: facts({ usage: { inputTokens: 294_609, outputTokens: 597 } }),
+    })
   })
 
   it('accepts standalone successful and failed compaction lifecycles between turns', async () => {
@@ -382,6 +397,47 @@ describe('compaction invariants', () => {
       session.append('compaction/start', { compactionId: TEST_COMPACTION_ID, turn: 1 })
       session.append('compaction/end', { compactionId: TEST_COMPACTION_ID, turn: 1 })
     }, /requires one compaction\/summary/],
+    ['failure facts without an error', (session: ReturnType<Context['sessions']['create']>) => {
+      session.append('compaction/start', { compactionId: TEST_COMPACTION_ID, turn: 1 })
+      session.append('compaction/summary', summary())
+      session.append('compaction/end', { compactionId: TEST_COMPACTION_ID, turn: 1, failure: facts() })
+    }, /failure facts require an error/],
+    ['failure facts without a provider', (session: ReturnType<Context['sessions']['create']>) => {
+      session.append('compaction/start', { compactionId: TEST_COMPACTION_ID, turn: 1 })
+      session.append('compaction/end', {
+        compactionId: TEST_COMPACTION_ID,
+        turn: 1,
+        error: 'failed',
+        failure: facts({ provider: '' }),
+      })
+    }, /failure provider must be a non-empty string/],
+    ['failure facts with an unknown reason', (session: ReturnType<Context['sessions']['create']>) => {
+      session.append('compaction/start', { compactionId: TEST_COMPACTION_ID, turn: 1 })
+      session.append('compaction/end', {
+        compactionId: TEST_COMPACTION_ID,
+        turn: 1,
+        error: 'failed',
+        failure: facts({ reason: 'stop' }),
+      })
+    }, /is not a known terminal finish kind/],
+    ['failure facts with a zero attempt', (session: ReturnType<Context['sessions']['create']>) => {
+      session.append('compaction/start', { compactionId: TEST_COMPACTION_ID, turn: 1 })
+      session.append('compaction/end', {
+        compactionId: TEST_COMPACTION_ID,
+        turn: 1,
+        error: 'failed',
+        failure: facts({ attempt: 0 }),
+      })
+    }, /attempt must be a positive safe integer/],
+    ['failure facts with malformed usage', (session: ReturnType<Context['sessions']['create']>) => {
+      session.append('compaction/start', { compactionId: TEST_COMPACTION_ID, turn: 1 })
+      session.append('compaction/end', {
+        compactionId: TEST_COMPACTION_ID,
+        turn: 1,
+        error: 'failed',
+        failure: facts({ usage: { inputTokens: -1, outputTokens: 1 } }),
+      })
+    }, /usage inputTokens must be a non-negative safe integer/],
   ])('rejects %s', async (_name, action, message) => {
     const ctx = await setup()
     const session = ctx.sessions.create()

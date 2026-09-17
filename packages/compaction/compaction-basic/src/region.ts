@@ -14,14 +14,14 @@ import {
   toolPairingBalancedAfter,
   toolPairingBalancedBefore,
 } from '@shres-code/shres-code-compaction'
-import type { CompactionResult } from '@shres-code/shres-code-compaction'
+import type { CompactionFailureFacts, CompactionResult } from '@shres-code/shres-code-compaction'
 import type { CommandId } from '@shres-code/shres-code-commands/brand'
 import { createUserMessage, errorChain } from '@shres-code/shres-code-llm'
 import type { Message, UserMessage } from '@shres-code/shres-code-llm'
 import type { TokenMeasurement, TokenMeter } from '@shres-code/shres-code-token-meter'
 import type { Session, SessionEvent } from '@shres-code/shres-code-session'
 import type { Agent } from '@shres-code/shres-code-agent'
-import { frameSummary } from './summarizer.ts'
+import { frameSummary, summarizationFailureFacts } from './summarizer.ts'
 import type { SummarizationInput, SummaryResult } from './summarizer.ts'
 import { attachElisionPointersWithinBudget } from './pointers.ts'
 
@@ -62,6 +62,12 @@ interface CompactionTransactionOptions {
   readonly flush?: () => Promise<void>
   /** Manual command that initiated this transaction, when present. */
   readonly sourceCommandId?: CommandId
+  /**
+   * 1-based index of this attempt within its compaction, recorded on a
+   * summarization failure so a retry sequence is legible from the log.
+   * Absent for a transaction that runs once.
+   */
+  readonly attempt?: number
 }
 
 interface CompactionEntryState {
@@ -246,7 +252,12 @@ export async function compactSurfaceRegion(
     if (!closing) {
       closing = true
       try {
-        session.append('compaction/end', { ...lifecycle, error: errorChain(error) })
+        const facts = attemptFailureFacts(error, options.attempt ?? 1)
+        session.append('compaction/end', {
+          ...lifecycle,
+          error: errorChain(error),
+          ...facts === undefined ? {} : { failure: facts },
+        })
         closed = true
       } catch (closeError: unknown) {
         failure = { error: closeError, stage: 'commit' }
@@ -549,6 +560,17 @@ function buildSummarizationInput(
     ...header?.tools === undefined ? {} : { tools: header.tools },
     messages: regionMessages,
   }
+}
+
+/**
+ * Attach this attempt's index to the summarization facts a failure carries.
+ * @param error - the failure a transaction stage caught.
+ * @param attempt - 1-based index of the failed attempt within its compaction.
+ * @returns the durable facts, or `undefined` when the error carried none.
+ */
+function attemptFailureFacts(error: unknown, attempt: number): CompactionFailureFacts | undefined {
+  const facts = summarizationFailureFacts(error)
+  return facts === undefined ? undefined : { ...facts, attempt }
 }
 
 /** Inspect open-turn, unmatched-compaction, and latest seed-boundary state independently. */

@@ -202,7 +202,7 @@ pi-ai events become harness reasoning, text, tool-call, usage, and finish chunks
 
 #### Token effect
 
-Generated content affects later inputs only after the loop records it. pi-ai folds reasoning tokens into output usage when the provider does not report them separately.
+Generated content affects later inputs only after the loop records it. pi-ai folds reasoning tokens into output usage when the provider does not report them separately. Reported usage is compared against the declared context window only for the protocols whose provider can accept an oversized prompt silently (`openai-completions`); every other protocol fails such a request loudly, so its failure is classified from the error text and a completed response is never reclassified by a capacity the provider did not enforce.
 
 #### KV Cache effect
 
