@@ -53,7 +53,7 @@ export { DESKTOP_HOST_PROTOCOL_VERSION, FRAME_MAGIC } from './wire.ts'
 const NAME = 'shres desktop'
 
 /** One request forwarded from the Electron custom-scheme handler. */
-export interface DesktopHostFetchCommand {
+interface DesktopHostFetchCommand {
   /** Electron-minted stream id, strictly increasing across the pipe. */
   readonly streamId: number
   /** The forwarded request. */
@@ -65,12 +65,12 @@ export interface DesktopHostFetchCommand {
 }
 
 /** Commands accepted by the desktop child process. */
-export type DesktopHostCommand = {
+type DesktopHostCommand = {
   readonly type: 'shutdown'
 }
 
 /** Events emitted by the desktop child process. */
-export type DesktopHostEvent = {
+type DesktopHostEvent = {
   readonly type: 'ready'
   readonly protocolVersion: typeof DESKTOP_HOST_PROTOCOL_VERSION
   readonly appVersion: string
