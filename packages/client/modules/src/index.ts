@@ -455,6 +455,39 @@ export class ClientModuleRegistry extends Service {
       res.end()
     }
   }
+
+  /**
+   * Answer one `/plugins/<id>/client.js[.map]` request without a web server:
+   * a carrier that owns dispatch (the desktop host's pipes) forwards the
+   * request here instead of a mounted route.
+   * @param request - the forwarded bundle request.
+   * @returns 405 for non-GET/HEAD, 404 for unknown ids, else the bundle bytes.
+   */
+  async fetchBundle(request: Request): Promise<Response> {
+    if (request.method !== 'GET' && request.method !== 'HEAD') return new Response(null, { status: 405 })
+    const pathname = decodeURIComponent(new URL(request.url).pathname)
+    const prefix = '/plugins/'
+    const mapSuffix = '/client.js.map'
+    const bundleSuffix = '/client.js'
+    const isSourceMap = pathname.startsWith(prefix) && pathname.endsWith(mapSuffix)
+    const suffix = isSourceMap ? mapSuffix : bundleSuffix
+    const clientPath = pathname.startsWith(prefix) && pathname.endsWith(suffix)
+      ? this.clientPath(pathname.slice(prefix.length, -suffix.length))
+      : undefined
+    const path = clientPath === undefined ? undefined : `${clientPath}${isSourceMap ? '.map' : ''}`
+    if (path === undefined) return new Response(null, { status: 404 })
+    try {
+      const body = await readFile(path)
+      return new Response(request.method === 'HEAD' ? null : body, {
+        headers: {
+          'content-type': isSourceMap ? 'application/json; charset=utf-8' : 'text/javascript; charset=utf-8',
+          'cache-control': 'no-cache',
+        },
+      })
+    } catch {
+      return new Response(null, { status: 404 })
+    }
+  }
 }
 
 export default ClientModuleRegistry
