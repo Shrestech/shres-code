@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest'
 // constants, not a possibly stale built lib/.
 import {
   DesktopHostRequestDecoder, encodeDesktopResponseData, encodeDesktopResponseEnd, encodeDesktopResponseError, encodeDesktopResponseStart, FRAME_MAGIC,
-} from '../../desktop-host/src/index.ts'
+} from '../../desktop-host/src/wire.ts'
 import {
   encodeRequestCancel, encodeRequestData, encodeRequestEnd, encodeRequestStart, ShellResponseDecoder,
 } from '../src/host-protocol.ts'
