@@ -13,10 +13,19 @@ export const DESKTOP_IPC = {
 } as const
 
 /** Host lifecycle state rendered by the shell's own documents. */
-export interface DesktopBackendState {
-  readonly phase: 'starting' | 'ready' | 'error'
-  readonly message?: string
-}
+export type DesktopBackendState =
+  | { readonly phase: 'starting' }
+  | { readonly phase: 'ready' }
+  | {
+    readonly phase: 'error'
+    readonly message: string
+    /**
+     * True when the startup failure path offered profile recovery (the
+     * disable-plugins and reset forms). Absent until the shell's startup-failure
+     * document lands; the renderer renders the plain error without it.
+     */
+    readonly profileRecovery?: boolean
+  }
 
 /** Narrow bridge exposed through context isolation. */
 export interface ShresDesktopApi {

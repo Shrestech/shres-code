@@ -43,6 +43,7 @@
       "@shres-code/shres-code-tool-call-timeout-policy/invariant": ["./packages/guard/timeout-policy/src/invariant.ts"],
       "@shres-code/shres-code-typert-registry": ["./packages/typert/registry/src/index.ts"],
       "@shres-code/shres-code-typert-registry/client": ["./packages/typert/registry/src/client/index.ts"],
+      "@shres-code/shres-code-desktop-host/wire": ["./apps/desktop-host/src/wire.ts"],
       "@shres-code/shres-code-api-gateway": ["./packages/api/gateway/src/index.ts"],
       "@shres-code/shres-code-api-gateway/client": ["./packages/api/gateway/src/client/index.ts"],
       "@shres-code/shres-code-api-gateway/invariant": ["./packages/api/gateway/src/invariant.ts"],

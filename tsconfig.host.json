@@ -92,6 +92,7 @@
     "apps/web/stress-tests/reasoning-chunks.stress.ts",
     "apps/cli/tests/**/*.ts",
     "apps/desktop-host/tests/**/*.ts",
+    "apps/desktop/tests/**/*.ts",
     "examples/*/src/**/*.ts",
     "examples/*/start.ts",
     "examples/*/tests/**/*.ts",
@@ -344,6 +345,7 @@
     { "path": "./packages/lsp/lsp-stdio" },
     { "path": "./packages/lsp/tool-lsp" },
     { "path": "./apps/cli" },
+    { "path": "./apps/desktop" },
     { "path": "./apps/desktop-host" }
   ]
 }
