@@ -4,9 +4,11 @@
  */
 
 import { describe, expect, it } from 'vitest'
+// Source-plane import: the round-trip must hold against the host's source
+// constants, not a possibly stale built lib/.
 import {
   DesktopHostRequestDecoder, encodeDesktopResponseData, encodeDesktopResponseEnd, encodeDesktopResponseError, encodeDesktopResponseStart, FRAME_MAGIC,
-} from '@shres-code/shres-code-desktop-host'
+} from '../../desktop-host/src/index.ts'
 import {
   encodeRequestCancel, encodeRequestData, encodeRequestEnd, encodeRequestStart, ShellResponseDecoder,
 } from '../src/host-protocol.ts'
