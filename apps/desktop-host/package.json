@@ -6,10 +6,16 @@
   "license": "MIT",
   "type": "module",
   "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
   "files": [
     "lib/index.js",
+    "lib/wire.js",
     "config/desktop.cordis.patch.yml"
   ],
+  "scripts": {
+    "build": "tsc -b && tsdown",
+    "test": "vitest run"
+  },
   "dependencies": {
     "@shres-code/cordis": "workspace:^",
     "@shres-code/cordis-plugin-include": "workspace:^",
