@@ -54,6 +54,7 @@ import type { ResolvedPiAiProviderProfile } from './config.ts'
 import { toPiContext } from './context.ts'
 import { applyHostedToolsPayload, hostedToolsDialectFor, mapHostedToolCalls } from './hosted-tools/index.ts'
 import type { HostedToolsPlan } from './hosted-tools/index.ts'
+import { SILENT_OVERFLOW_PROTOCOLS } from './provider.ts'
 import { toStreamChunks } from './stream.ts'
 
 /** One resolution's frozen view: the profiles and the collection built from them. */
@@ -415,7 +416,12 @@ export class PiAiAdapter extends LlmAdapter {
       const hostedNames = hosted === undefined || hosted.callNames.length === 0
         ? undefined
         : new Set(hosted.callNames)
-      const translated = toStreamChunks(events, model.contextWindow)
+      // Usage-based overflow detection is scoped to the protocols whose
+      // provider can accept an oversized prompt silently.
+      const translated = toStreamChunks(
+        events,
+        SILENT_OVERFLOW_PROTOCOLS.has(model.api) ? model.contextWindow : undefined,
+      )
       const iterator = hostedNames === undefined
         ? translated[Symbol.asyncIterator]()
         : mapHostedToolCalls(translated, hostedNames)[Symbol.asyncIterator]()

@@ -84,6 +84,8 @@ export interface MockUpstream {
   bodies: unknown[]
   /** Replace the next scripted response with a raw status/body rejection. */
   respond: (status: number, body: string) => void
+  /** Replace the next scripted response with a raw SSE stream. */
+  respondStream: (sse: string[]) => void
   close: () => Promise<void>
 }
 
@@ -135,12 +137,19 @@ export async function mockUpstream(events: string[]): Promise<MockUpstream> {
     accountHeaders,
     bodies,
     respond: (status, bodyText) => { override = { status, body: bodyText } },
+    respondStream: (sse) => { override = { status: 200, sse } },
     close: () => new Promise(resolve => server.close(() => { resolve() })),
   }
 }
 
 /** One assistant text turn in the backend's responses stream, with usage. */
-export function textTurn(text: string): string[] {
+export function textTurn(
+  text: string,
+  usage: { input?: number; cached?: number; output?: number } = {},
+): string[] {
+  const input = usage.input ?? 3
+  const cached = usage.cached ?? 0
+  const output = usage.output ?? 1
   return [
     JSON.stringify({ type: 'response.created', response: { id: 'resp_1' } }),
     JSON.stringify({ type: 'response.output_item.added', output_index: 0, item: { type: 'message', role: 'assistant' } }),
@@ -150,11 +159,11 @@ export function textTurn(text: string): string[] {
       response: {
         id: 'resp_1',
         usage: {
-          input_tokens: 3,
-          input_tokens_details: { cached_tokens: 0 },
-          output_tokens: 1,
+          input_tokens: input,
+          input_tokens_details: { cached_tokens: cached },
+          output_tokens: output,
           output_tokens_details: { reasoning_tokens: 0 },
-          total_tokens: 4,
+          total_tokens: input + output,
         },
       },
     }),

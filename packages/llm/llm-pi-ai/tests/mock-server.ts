@@ -25,6 +25,28 @@ export const textEvents = [
   '[DONE]',
 ]
 
+/** One complete `openai-responses` text turn reporting the given input usage. */
+export function responsesTextEvents(usage: { input: number; output: number }): string[] {
+  return [
+    JSON.stringify({ type: 'response.created', response: { id: 'resp_mock' } }),
+    JSON.stringify({ type: 'response.output_item.added', output_index: 0, item: { type: 'message', role: 'assistant' } }),
+    JSON.stringify({ type: 'response.output_text.delta', item_id: 'msg_mock', output_index: 0, content_index: 0, delta: 'hello' }),
+    JSON.stringify({
+      type: 'response.completed',
+      response: {
+        id: 'resp_mock',
+        usage: {
+          input_tokens: usage.input,
+          input_tokens_details: { cached_tokens: 0 },
+          output_tokens: usage.output,
+          output_tokens_details: { reasoning_tokens: 0 },
+          total_tokens: usage.input + usage.output,
+        },
+      },
+    }),
+  ]
+}
+
 /** Local provider stand-in: replays scripted behaviors per request. */
 export async function mockServer(script: {
   status?: number

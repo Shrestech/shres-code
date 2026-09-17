@@ -51,6 +51,23 @@ const PROTOCOLS: Readonly<Record<string, () => ProviderStreams>> = {
 }
 
 /**
+ * Wire protocols whose provider accepts a prompt larger than its context window
+ * without failing the request: z.ai truncates silently and Xiaomi MiMo fills the
+ * window from the input and returns no output, and both ride
+ * `openai-completions` (the installed catalog builds them on the completions
+ * implementation, as it does `deepseek`). pi-ai's usage-based overflow cases exist
+ * for exactly those behaviors, so only these protocols receive the resolved
+ * window. Every other protocol this table reaches rejects an oversized request
+ * loudly, and that rejection is classified from its error text; passing the
+ * window to one of them would instead reclassify a response whose provider
+ * counted more input than the harness's declared capacity — a number the
+ * provider never agreed to. A protocol fact, not a deployment tunable.
+ */
+export const SILENT_OVERFLOW_PROTOCOLS: ReadonlySet<string> = new Set([
+  'openai-completions',
+])
+
+/**
  * Every wire protocol a configured route may name, most-reached first. The
  * order is the table's and therefore stable; a configuration surface offering
  * a choice presents the first as its default, which is why the protocol a

@@ -24,6 +24,11 @@ export interface CompactionPolicyConfig {
   compactionRetries?: number
   /** Maximum retries after canonical context overflow; `0` disables recovery. Defaults to `1`. */
   maxOverflowRetries?: number
+  /**
+   * Maximum retries that re-select a smaller region after the summarizer reports
+   * that its own request exceeded the model's context window. `0` disables the reduction. Defaults to `2`.
+   */
+  maxSummaryOverflowRetries?: number
 }
 
 /** Exact provider/model override merged over the default compaction policy. */
@@ -67,6 +72,7 @@ interface ResolvedPolicyFields {
   readonly maxTokens: number
   readonly compactionRetries: number
   readonly maxOverflowRetries: number
+  readonly maxSummaryOverflowRetries: number
 }
 
 /** Validated immutable config whose target-specific defaults remain unresolved. */

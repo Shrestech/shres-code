@@ -289,7 +289,20 @@ Source: [`packages/interaction/commands/src/types.ts:88`](../packages/interactio
  * Marks the end of a compaction — log-only, releases the lock. Its owner
  * matches `compaction/start`; `error` records an unsuccessful attempt.
  */
-'compaction/end': { compactionId: CompactionId; sourceCommandId?: CommandId; turn: number | null; error?: string }
+'compaction/end': {
+  compactionId: CompactionId
+  sourceCommandId?: CommandId
+  turn: number | null
+  error?: string
+  /**
+   * Structured facts about the summarization call that failed the attempt,
+   * present only when one did. `error` stays the human-facing chain; these
+   * are the fields a reader needs to tell an adapter failure from a
+   * provider-side overflow, or a truncation from a transport drop, without
+   * inferring them from prose.
+   */
+  failure?: CompactionFailureFacts
+}
 ```
 
 Source: [`packages/compaction/compaction/src/types.ts:73`](../packages/compaction/compaction/src/types.ts)
@@ -318,7 +331,7 @@ Source: [`packages/compaction/compaction/src/types.ts:73`](../packages/compactio
 }
 ```
 
-Source: [`packages/compaction/compaction/src/types.ts:83`](../packages/compaction/compaction/src/types.ts)
+Source: [`packages/compaction/compaction/src/types.ts:96`](../packages/compaction/compaction/src/types.ts)
 
 <a id="compactionstart--log-only"></a>
 

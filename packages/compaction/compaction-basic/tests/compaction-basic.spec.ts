@@ -4,6 +4,10 @@ import { AttachmentId } from '@shres-code/shres-code-attachment'
 import BasicCompactionEngine from '@shres-code/shres-code-compaction-basic'
 import type { BasicCompactionConfig } from '@shres-code/shres-code-compaction-basic'
 import { selectCompactableRange } from '@shres-code/shres-code-compaction-basic/src/region.ts'
+import {
+  SummarizationFailureError,
+  summarizationFailureFacts,
+} from '@shres-code/shres-code-compaction-basic/src/summarizer.ts'
 import type { SummarizationInput, SummaryResult } from '@shres-code/shres-code-compaction-basic/src/summarizer.ts'
 import {
   POINTER_READ_CUE,
@@ -15,6 +19,7 @@ import {
   resolveConfig,
   resolveTargetPolicy,
   DEFAULT_MAX_POINTERS,
+  DEFAULT_MAX_SUMMARY_OVERFLOW_RETRIES,
   MAX_MAX_POINTERS,
 } from '@shres-code/shres-code-compaction-basic/src/config.ts'
 import type { CompactionResult } from '@shres-code/shres-code-compaction'
@@ -245,6 +250,8 @@ class TestCompactionEngine extends BasicCompactionEngine {
   summaryProvider = 'summary-provider'
   summaryModel = 'summary-model'
   error: unknown
+  /** Failures thrown by successive summarize calls before `error` applies. */
+  failures: unknown[] = []
   mutateDuringSummary: (() => void) | undefined
   calls: Array<{ input: SummarizationInput; signal: AbortSignal | undefined }> = []
 
@@ -262,6 +269,8 @@ class TestCompactionEngine extends BasicCompactionEngine {
   }> {
     this.calls.push({ input, signal })
     this.mutateDuringSummary?.()
+    const failure = this.failures.shift()
+    if (failure !== undefined) throw failure
     if (this.error !== undefined) throw this.error
     return {
       summary: this.summary,
@@ -272,6 +281,21 @@ class TestCompactionEngine extends BasicCompactionEngine {
       ...this.usage === undefined ? {} : { usage: this.usage },
     }
   }
+}
+
+/** The summarizer's own report that its request exceeded its model's window. */
+function overflowFailure(): SummarizationFailureError {
+  const failure = Object.assign(
+    new Error('pi-ai detected context overflow for model "gpt-6-astra"'),
+    { code: CONTEXT_WINDOW_EXCEEDED_CODE },
+  )
+  return new SummarizationFailureError({
+    provider: 'summary-provider',
+    model: 'summary-model',
+    reason: 'error',
+    code: CONTEXT_WINDOW_EXCEEDED_CODE,
+    usage: { inputTokens: 294_609, outputTokens: 597 },
+  }, failure)
 }
 
 function service(
@@ -302,6 +326,7 @@ describe('compact configuration and defaults', () => {
       maxTokens: 8192,
       compactionRetries: 1,
       maxOverflowRetries: 1,
+      maxSummaryOverflowRetries: DEFAULT_MAX_SUMMARY_OVERFLOW_RETRIES,
       modelPolicies: [],
       auto: true,
       maxPointers: DEFAULT_MAX_POINTERS,
@@ -423,6 +448,8 @@ describe('compact configuration and defaults', () => {
       [{ maxTokens: 0 }, /maxTokens/],
       [{ compactionRetries: -1 }, /compactionRetries/],
       [{ maxOverflowRetries: -1 }, /maxOverflowRetries/],
+      [{ maxSummaryOverflowRetries: -1 }, /maxSummaryOverflowRetries/],
+      [{ maxSummaryOverflowRetries: 1.5 }, /maxSummaryOverflowRetries/],
       [{ maxPointers: -1 }, /maxPointers/],
       [{ maxPointers: MAX_MAX_POINTERS + 1 }, /maxPointers/],
       [{ maxPointers: 1.5 }, /maxPointers/],
@@ -468,6 +495,9 @@ describe('compact configuration and defaults', () => {
         /modelPolicies\[0\]: retainRatio \(0.9\).*thresholdRatio \(0.8\)/,
       ],
       [{ modelPolicies: [{ provider: MODEL, model: MODEL }, { provider: MODEL, model: MODEL }] }, /duplicate model policy/],
+      [{
+        modelPolicies: [{ provider: MODEL, model: MODEL, maxSummaryOverflowRetries: -1 }],
+      }, /modelPolicies\[0\].maxSummaryOverflowRetries/],
       [{ modelPolicies: [{ provider: MODEL, model: MODEL, maxPointers: 1 }] }, /unknown key "maxPointers"/],
       [{ pinSeqs: 1 }, /pinSeqs must be an array/],
       [{ pinSeqs: [-1] }, /pinSeqs\[0\].*non-negative safe integer/],
@@ -485,11 +515,78 @@ describe('compact configuration and defaults', () => {
       thresholdRatio: 0.5,
       retainTokens: 500,
     }), { provider: MODEL, model: MODEL })
+    expect(resolveConfig({ maxSummaryOverflowRetries: 0 }).maxSummaryOverflowRetries).toBe(0)
+    expect(resolveTargetPolicy(resolveConfig({
+      modelPolicies: [{ provider: MODEL, model: MODEL, maxSummaryOverflowRetries: 5 }],
+    }), { provider: MODEL, model: MODEL }).maxSummaryOverflowRetries).toBe(5)
+
     expect(() => resolveCompactSpec(invalidPressure, 1_000)).toThrow(/less than threshold/)
     expect(() => resolveCompactSpec(invalidPressure, 1.5)).toThrow(/positive integer/)
     expect(() => resolveCompactSpec(invalidPressure, 0)).toThrow(/positive integer/)
   })
 
+})
+
+describe('region reduction after a summarizer context overflow', () => {
+  it('re-selects at most half the failed region when the summarizer overflows', async () => {
+    const ctx = createContext()
+    const compact = service({ auto: false }, ctx)
+    compact.failures = [overflowFailure()]
+    const session = conversation(6)
+    const surfaceTokens = ctx.tokenMeter.measure(session).surfaceTokens
+
+    const result = await compactIfNeeded(compact, session, 'context-overflow')
+
+    expect(result).not.toBeNull()
+    expect(compact.calls).toHaveLength(2)
+    expect(result?.shadowedTokenCount).toBeLessThanOrEqual(Math.floor(surfaceTokens / 2))
+    // Each attempt keeps its own closed bracket, and only the failed one carries facts.
+    const ends = session.events.filter(event => event.type === 'compaction/end')
+    expect(ends.map(event => event.data.error === undefined)).toEqual([false, true])
+    expect(ends[0]?.data.failure).toMatchObject({
+      attempt: 1,
+      code: CONTEXT_WINDOW_EXCEEDED_CODE,
+    })
+    expect(ends[1]?.data.failure).toBeUndefined()
+  })
+
+  it('names the region, target, and reported usage when the reduction budget is spent', async () => {
+    const compact = service({ auto: false, maxSummaryOverflowRetries: 1 })
+    compact.failures = [overflowFailure(), overflowFailure(), overflowFailure()]
+    const session = conversation(6)
+
+    const error: unknown = await compactIfNeeded(compact, session, 'context-overflow')
+      .then(() => undefined, (caught: unknown) => caught)
+
+    expect(error).toBeInstanceOf(Error)
+    const message = (error as Error).message
+    expect(message).toContain('could not summarize a')
+    expect(message).toContain('-token region after 2 attempts')
+    expect(message).toContain('summarizer summary-provider/summary-model')
+    expect(message).toContain('294609 prompt tokens')
+    expect(message).toContain('pi-ai detected context overflow')
+    expect(compact.calls).toHaveLength(2)
+  })
+
+  it('reports an unreported target and no usage when the failure carries no facts', async () => {
+    const compact = service({ auto: false, maxSummaryOverflowRetries: 0 })
+    compact.failures = [Object.assign(
+      new Error('provider refused the summary'),
+      { code: CONTEXT_WINDOW_EXCEEDED_CODE },
+    )]
+    const session = conversation(6)
+
+    const error: unknown = await compactIfNeeded(compact, session, 'context-overflow')
+      .then(() => undefined, (caught: unknown) => caught)
+
+    expect(error).toBeInstanceOf(Error)
+    const message = (error as Error).message
+    expect(message).toContain('after 1 attempt')
+    expect(message).toContain('summarizer an unreported target')
+    expect(message).toContain('reported no usage')
+    expect(message).toContain('provider refused the summary')
+    expect(compact.calls).toHaveLength(1)
+  })
 })
 
 describe('pressure measurement and retention', () => {
@@ -1244,6 +1341,15 @@ async function summarizerHarness(
   return { ctx, adapter, compact }
 }
 
+/** The terminal finish the production wedge produced: a completed call reclassified as overflow. */
+const OVERFLOW_FINISH = {
+  kind: 'error',
+  failure: {
+    message: 'pi-ai detected context overflow for model "gpt-6-astra"',
+    code: CONTEXT_WINDOW_EXCEEDED_CODE,
+  },
+} as const
+
 describe('default one-shot summarizer', () => {
   it('requires complete raw output when a subclass marks one local LLM stream call', () => {
     expectTypeOf<{
@@ -1469,6 +1575,58 @@ describe('default one-shot summarizer', () => {
       expect((thrown as Error & { code?: string }).code).toBe(code)
     },
   )
+
+  it('carries the failed call facts on the summarization error', async () => {
+    const { adapter, compact } = await summarizerHarness([], OVERFLOW_FINISH)
+    adapter.usage = { inputTokens: 294_609, outputTokens: 597 }
+
+    const thrown: unknown = await compact
+      .runSummarize(promptInput('history'), agent(conversation(1), MODEL))
+      .then(() => undefined, (error: unknown) => error)
+
+    expect(thrown).toBeInstanceOf(SummarizationFailureError)
+    expect(summarizationFailureFacts(thrown)).toEqual({
+      provider: MODEL,
+      model: MODEL,
+      reason: 'error',
+      code: CONTEXT_WINDOW_EXCEEDED_CODE,
+      usage: { inputTokens: 294_609, outputTokens: 597 },
+    })
+  })
+
+  it('records the failed summarization call on the durable end bracket', async () => {
+    const { adapter, compact } = await summarizerHarness([], OVERFLOW_FINISH)
+    adapter.usage = { inputTokens: 294_609, outputTokens: 597 }
+    const session = conversation(2)
+    const nodes = session.surface.nodes
+
+    await expect(compact.compactRegion(nodes[0]!, nodes[2]!, agent(session, MODEL), SIGNAL))
+      .rejects.toThrow(/context overflow/)
+
+    const end = session.events.findLast(event => event.type === 'compaction/end')?.data
+    expect(end?.error).toMatch(/context overflow/)
+    expect(end?.failure).toEqual({
+      provider: MODEL,
+      model: MODEL,
+      reason: 'error',
+      code: CONTEXT_WINDOW_EXCEEDED_CODE,
+      usage: { inputTokens: 294_609, outputTokens: 597 },
+      attempt: 1,
+    })
+    expect(session.events.some(event => event.type === 'compaction/summary')).toBe(false)
+  })
+
+  it('records the attempt index its caller assigns', async () => {
+    const { compact } = await summarizerHarness([], OVERFLOW_FINISH)
+    const session = conversation(2)
+    const nodes = session.surface.nodes
+
+    await expect(compact.compactRegion(nodes[0]!, nodes[2]!, agent(session, MODEL), SIGNAL, 3))
+      .rejects.toThrow(/context overflow/)
+
+    expect(session.events.findLast(event => event.type === 'compaction/end')?.data.failure)
+      .toMatchObject({ attempt: 3 })
+  })
 
   it('rejects empty or reasoning-only successful output', async () => {
     const { compact } = await summarizerHarness([{ type: 'reasoning', text: 'private' }])

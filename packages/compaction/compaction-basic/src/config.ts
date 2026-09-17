@@ -28,6 +28,9 @@ const DEFAULT_THRESHOLD_RATIO = 0.8
 /** Default verbatim-tail fraction for every routed model. */
 const DEFAULT_RETAIN_RATIO = 0.16
 
+/** Default retries that re-select a smaller region after a summarizer context overflow. */
+export const DEFAULT_MAX_SUMMARY_OVERFLOW_RETRIES = 2
+
 /** Fields shared by top-level defaults and exact-target overrides. */
 const POLICY_CONFIG_KEYS = [
   'thresholdRatio',
@@ -38,6 +41,7 @@ const POLICY_CONFIG_KEYS = [
   'maxTokens',
   'compactionRetries',
   'maxOverflowRetries',
+  'maxSummaryOverflowRetries',
 ] as const
 
 /** Complete public top-level configuration key set. */
@@ -103,6 +107,7 @@ export function resolveConfig(config: BasicCompactionConfig = {}): ResolvedConfi
     maxTokens: config.maxTokens ?? 8192,
     compactionRetries: config.compactionRetries ?? 1,
     maxOverflowRetries: config.maxOverflowRetries ?? 1,
+    maxSummaryOverflowRetries: config.maxSummaryOverflowRetries ?? DEFAULT_MAX_SUMMARY_OVERFLOW_RETRIES,
     modelPolicies,
     auto: config.auto ?? true,
     maxPointers: config.maxPointers ?? DEFAULT_MAX_POINTERS,
@@ -135,6 +140,7 @@ export function resolveTargetPolicy(
     maxTokens: override?.maxTokens ?? config.maxTokens,
     compactionRetries: override?.compactionRetries ?? config.compactionRetries,
     maxOverflowRetries: override?.maxOverflowRetries ?? config.maxOverflowRetries,
+    maxSummaryOverflowRetries: override?.maxSummaryOverflowRetries ?? config.maxSummaryOverflowRetries,
   })
 }
 
@@ -177,6 +183,7 @@ export function resolveCompactSpec(
     maxTokens: policy.maxTokens,
     compactionRetries: policy.compactionRetries,
     maxOverflowRetries: policy.maxOverflowRetries,
+    maxSummaryOverflowRetries: policy.maxSummaryOverflowRetries,
   })
 }
 
@@ -248,6 +255,7 @@ function validatePolicy(
   const maxTokens = config.maxTokens
   const compactionRetries = config.compactionRetries
   const maxOverflowRetries = config.maxOverflowRetries
+  const maxSummaryOverflowRetries = config.maxSummaryOverflowRetries
   if (thresholdRatio !== undefined) assertRatio(`${name}.thresholdRatio`, thresholdRatio)
   if (retainRatio !== undefined) assertRatio(`${name}.retainRatio`, retainRatio)
   if (retainTokens !== undefined) assertNonNegativeInteger(`${name}.retainTokens`, retainTokens)
@@ -260,6 +268,9 @@ function validatePolicy(
   }
   if (maxOverflowRetries !== undefined) {
     assertNonNegativeInteger(`${name}.maxOverflowRetries`, maxOverflowRetries)
+  }
+  if (maxSummaryOverflowRetries !== undefined) {
+    assertNonNegativeInteger(`${name}.maxSummaryOverflowRetries`, maxSummaryOverflowRetries)
   }
 
   validateSummarizationPair(config, name)
