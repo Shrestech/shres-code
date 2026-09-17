@@ -497,6 +497,33 @@ describe('advisor apply', () => {
     await ctx.fiber.dispose()
   })
 
+  it('does not re-enter catch-up for the user message that triggered a failed review', async () => {
+    const { ctx } = await boot()
+    const continuable = patchContinuable(ctx)
+    continuable.setBehavior('fail')
+    const session = await liveSession(ctx)
+    session.append('user/message', {
+      source: { kind: 'user' },
+      content: [{ type: 'text', text: 'older ask' }],
+    } as never, { surfaceOp: 'append' })
+    await new Promise(resolve => setTimeout(resolve, 150))
+    expect(continuable.starts).toBe(1)
+    expect(adviceEvents(session)).toHaveLength(0)
+    await ctx.fiber.dispose()
+  })
+
+  it('does not spin when a user-intent trigger fires without an agents service', async () => {
+    const { ctx } = await boot(ENABLED, { agents: false })
+    const session = await liveSession(ctx)
+    session.append('user/message', {
+      source: { kind: 'user' },
+      content: [{ type: 'text', text: 'do the thing' }],
+    } as never, { surfaceOp: 'append' })
+    await new Promise(resolve => setTimeout(resolve, 150))
+    expect(adviceEvents(session)).toHaveLength(0)
+    await ctx.fiber.dispose()
+  })
+
   it('reviews a ship stamp even after a landed verdict', async () => {
     const { ctx } = await boot()
     const continuable = patchContinuable(ctx)
