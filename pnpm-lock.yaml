@@ -427,6 +427,51 @@ importers:
         specifier: ^10.0.1
         version: 10.0.1
 
+  apps/desktop-host:
+    dependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../vendor/cordis
+      '@shres-code/cordis-plugin-include':
+        specifier: workspace:^
+        version: link:../../vendor/include
+      '@shres-code/shres-code':
+        specifier: workspace:^
+        version: link:../cli
+      '@shres-code/shres-code-api-gateway':
+        specifier: workspace:^
+        version: link:../../packages/api/gateway
+      '@shres-code/shres-code-app-boot':
+        specifier: workspace:^
+        version: link:../../packages/boot/app-boot
+      '@shres-code/shres-code-client-connection':
+        specifier: workspace:^
+        version: link:../../packages/client/connection
+      '@shres-code/shres-code-client-modules':
+        specifier: workspace:^
+        version: link:../../packages/client/modules
+      '@shres-code/shres-code-client-ui-directory-picker-native':
+        specifier: workspace:^
+        version: link:../../packages/client/ui-directory-picker-native
+      '@shres-code/shres-code-cmdline':
+        specifier: workspace:^
+        version: link:../../packages/boot/cmdline
+      '@shres-code/shres-code-host-apiproxy':
+        specifier: workspace:^
+        version: link:../../packages/host/apiproxy
+      '@shres-code/shres-code-host-directory-picker-native':
+        specifier: workspace:^
+        version: link:../../packages/host/directory-picker-native
+      '@shres-code/shres-code-host-webserver':
+        specifier: workspace:^
+        version: link:../../packages/host/webserver
+      '@shres-code/shres-code-launch-environment':
+        specifier: workspace:^
+        version: link:../../packages/util/launch-environment
+      '@shres-code/shres-code-web-frontend':
+        specifier: workspace:^
+        version: link:../web
+
   apps/web:
     dependencies:
       '@shres-code/shres-code-client-web':
