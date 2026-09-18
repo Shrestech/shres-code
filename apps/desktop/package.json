@@ -9,7 +9,11 @@
   "scripts": {
     "build": "tsc -b && tsdown",
     "dev": "tsx scripts/dev.ts",
-    "start": "tsx scripts/dev.ts --skip-build"
+    "start": "tsx scripts/dev.ts --skip-build",
+    "prepare:runtime-tree": "tsx scripts/prepare-runtime-tree.ts",
+    "finalize-package": "node scripts/finalize-package.mjs",
+    "package": "pnpm run build && pnpm run prepare:runtime-tree && electron-builder --config electron-builder.config.mjs && pnpm run finalize-package",
+    "package:dir": "pnpm run build && pnpm run prepare:runtime-tree && electron-builder --dir --config electron-builder.config.mjs && pnpm run finalize-package"
   },
   "dependencies": {
     "@shres-code/shres-code-desktop-host": "workspace:^",
@@ -18,6 +22,9 @@
   "devDependencies": {
     "@types/node": "^22.20.0",
     "electron": "^44.0.0",
+    "electron-builder": "^26.15.3",
+    "pnpm": "11.7.0",
+    "tar": "^7.5.0",
     "typescript": "^6.0.3"
   }
 }
