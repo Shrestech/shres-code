@@ -4,6 +4,8 @@
   "version": "0.1.0-rc.5",
   "private": true,
   "license": "MIT",
+  "author": "Shres Code contributors",
+  "homepage": "https://github.com/parthmstech/shres-code",
   "type": "module",
   "main": "lib/main.js",
   "scripts": {
