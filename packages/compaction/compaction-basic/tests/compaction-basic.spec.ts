@@ -35,6 +35,7 @@ import type {
 } from '@shres-code/shres-code-llm'
 import SessionStore, { Session, SessionId } from '@shres-code/shres-code-session'
 import TokenMeter from '@shres-code/shres-code-token-meter'
+import type { TokenMeasurement } from '@shres-code/shres-code-token-meter'
 import { agentEvents, type Agent, type RequestErrorAction } from '@shres-code/shres-code-agent'
 import ToolResultPruner from '@shres-code/shres-code-compaction-tool-result-pruner'
 
@@ -312,6 +313,33 @@ async function compactIfNeeded(
   model: string | undefined = MODEL,
 ): Promise<CompactionResult | null> {
   return compact.compactIfNeeded(agent(session, model), trigger, SIGNAL)
+}
+
+/**
+ * Subclass proving both documented hooks are honored at event time: it widens
+ * the selected span head-ward to the surface's first node when tool pairing
+ * allows, records the span it asked for, and replaces the summary text.
+ */
+class HookOverridingCompactionEngine extends TestCompactionEngine {
+  selections = 0
+  requested: { start: number; end: number } | null = null
+
+  override async selectRange(
+    session: Session,
+    measurement: TokenMeasurement,
+    retainTokens: number,
+    pinSeqs: readonly number[],
+  ): Promise<{ start: number; end: number } | null> {
+    const base = await super.selectRange(session, measurement, retainTokens, pinSeqs)
+    if (base === null) return null
+    this.selections += 1
+    const head = session.surface.nodes[0]
+    const widened = head === undefined || head === base.start || !toolPairingBalancedBefore(session, head)
+      ? base
+      : { start: head, end: base.end }
+    this.requested = widened
+    return widened
+  }
 }
 
 describe('compact configuration and defaults', () => {
@@ -2237,5 +2265,64 @@ describe('constraint retention and pin list', () => {
       session.surface.nodes.indexOf(range!.start),
       session.surface.nodes.indexOf(range!.end) + 1,
     )).not.toContain(pin)
+  })
+})
+
+/** Subclass proving a declining selection hook stops the attempt before any call. */
+class DecliningCompactionEngine extends TestCompactionEngine {
+  selections = 0
+  summaries = 0
+
+  override selectRange(): Promise<{ start: number; end: number } | null> {
+    this.selections += 1
+    return Promise.resolve(null)
+  }
+
+  override async summarize(
+    input: SummarizationInput,
+    agent: Agent,
+    signal?: AbortSignal,
+  ): Promise<SummaryResult> {
+    this.summaries += 1
+    return super.summarize(input, agent, signal)
+  }
+}
+
+describe('subclass customization hooks', () => {
+  const hookConfig: BasicCompactionConfig = { auto: false, thresholdRatio: 0.5, retainTokens: 180 }
+
+  it('honors an overridden selectRange and summarize at event time', async () => {
+    const baseline = service(hookConfig)
+    const baselineResult = await compactIfNeeded(baseline, conversation(6))
+    expect(baselineResult).not.toBeNull()
+
+    const overriding = new HookOverridingCompactionEngine(createContext(), hookConfig)
+    overriding.summary = [{ type: 'text', text: 'hook checkpoint' }]
+    const session = conversation(6)
+    const surfaceHead = session.surface.nodes[0]
+    const result = await compactIfNeeded(overriding, session)
+
+    // The selection hook ran once, and the span it chose is the span that was
+    // shadowed: the override reaches the transaction, not just the call site.
+    expect(overriding.selections).toBe(1)
+    expect(overriding.requested).not.toBeNull()
+    expect(result).not.toBeNull()
+    expect(result?.shadowedRange).toEqual(overriding.requested)
+    expect(surfaceHead).toBe(overriding.requested?.start)
+    expect(result?.shadowedSeqs.length).toBe(baselineResult!.shadowedSeqs.length)
+
+    // The summarize hook's own text is what the replacement carries.
+    const head = result?.summary[0]
+    expect(head?.type === 'text' ? head.text : '').toContain('hook checkpoint')
+  })
+
+  it('lets a selection hook decline the attempt before any summarization', async () => {
+    const declining = new DecliningCompactionEngine(createContext(), hookConfig)
+    const session = conversation(6)
+
+    await expect(compactIfNeeded(declining, session)).resolves.toBeNull()
+    expect(declining.selections).toBe(1)
+    expect(declining.summaries).toBe(0)
+    expect(session.events.some(event => event.type === 'compaction/start')).toBe(false)
   })
 })

@@ -333,6 +333,22 @@ Source: [`packages/compaction/compaction/src/types.ts:73`](../packages/compactio
 
 Source: [`packages/compaction/compaction/src/types.ts:96`](../packages/compaction/compaction/src/types.ts)
 
+<a id="compactionselection--log-only"></a>
+
+#### `compaction/selection` — log-only
+
+```ts persistence-catalog
+/**
+ * One semantic selection decision: log-only, append-only, and written once
+ * per automatic compaction attempt before any summarization call. It records
+ * what the selection considered, what it rescued, and how it moved the
+ * sub-span edges, which is the evidence the bench reads.
+ */
+'compaction/selection': CompactionSelectionEvent
+```
+
+Source: [`packages/compaction/compaction-jev/src/types.ts:149`](../packages/compaction/compaction-jev/src/types.ts)
+
 <a id="compactionstart--log-only"></a>
 
 #### `compaction/start` — log-only
@@ -403,6 +419,21 @@ Source: [`packages/compaction/compaction/src/types.ts:23`](../packages/compactio
 Types: [ContentBlock](subsystems/core.md) · [TokenUsage](subsystems/llm-streaming.md)
 
 Source: [`packages/compaction/compaction/src/types.ts:35`](../packages/compaction/compaction/src/types.ts)
+
+<a id="compactionverification--log-only"></a>
+
+#### `compaction/verification` — log-only
+
+```ts persistence-catalog
+/**
+ * One verify-cascade attempt: log-only, append-only, and written for every
+ * verification of a draft, including the degraded case where the inherited
+ * summarizer's output was accepted without a battery.
+ */
+'compaction/verification': CompactionVerificationEvent
+```
+
+Source: [`packages/compaction/compaction-jev/src/types.ts:155`](../packages/compaction/compaction-jev/src/types.ts)
 
 ### `feedback/*`
 
@@ -717,6 +748,38 @@ Source: [`packages/llm/llm-retry/src/types.ts:9`](../packages/llm/llm-retry/src/
 ```
 
 Source: [`packages/llm/llm-retry/src/types.ts:11`](../packages/llm/llm-retry/src/types.ts)
+
+### `model-routing/*`
+
+<a id="model-routingdecision--log-only"></a>
+
+#### `model-routing/decision` — log-only
+
+```ts persistence-catalog
+/**
+ * One turn's routing decision: log-only, append-only, and written after the
+ * consult resolved the turn, so the `request/header` that follows it
+ * records the route it selected.
+ */
+'model-routing/decision': ModelRoutingDecision
+```
+
+Source: [`packages/llm/model-router/src/types.ts:268`](../packages/llm/model-router/src/types.ts)
+
+<a id="model-routingmode--log-only"></a>
+
+#### `model-routing/mode` — log-only
+
+```ts persistence-catalog
+/**
+ * Whether model routing is in force from this point on: log-only,
+ * non-surface, whole-value replace. The last `model-routing/mode` wins; a
+ * log with none folds to inactive through {@link foldModelRouting}.
+ */
+'model-routing/mode': { active: boolean }
+```
+
+Source: [`packages/llm/model-router/src/types.ts:262`](../packages/llm/model-router/src/types.ts)
 
 ### `permission/*`
 
