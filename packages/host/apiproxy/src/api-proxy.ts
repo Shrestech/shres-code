@@ -264,9 +264,12 @@ function referencedImage(events: readonly SessionEvent[], attachmentId: string):
  * page's project-wiki seat (enable switch and librarian route binding).
  * `jspace-advisor` is that page's Advisor toggle and reviewer route. `speech`
  * is General Settings voice/language/auto-submit plus the composer mic's Talk
- * mode flag.
+ * mode flag. `model-router` is the deployment's model routing section — the
+ * downgrade allowlist, the two gate thresholds, and the judgment question
+ * texts — which an operator changes through a settings surface rather than by
+ * editing the composition.
  */
-const PRODUCT_SETTINGS_NAMESPACES = new Set(['ui-onboarding', 'agent-seats', 'shres-shield', 'jspace', 'wiki', 'jspace-advisor', 'speech', AGENT_PRESET_SETTINGS_NAMESPACE])
+const PRODUCT_SETTINGS_NAMESPACES = new Set(['ui-onboarding', 'agent-seats', 'shres-shield', 'jspace', 'wiki', 'jspace-advisor', 'speech', 'model-router', 'judgment', AGENT_PRESET_SETTINGS_NAMESPACE])
 
 /** Strict browser-zone profile: UTC or an IANA Area/Location-style identifier. */
 const IANA_TIME_ZONE = /^[A-Za-z][A-Za-z0-9_+.-]*(?:\/[A-Za-z0-9_+.-]+)+$/

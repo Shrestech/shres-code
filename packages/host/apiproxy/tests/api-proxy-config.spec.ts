@@ -353,6 +353,12 @@ describe('settings domain', () => {
     ctx.settings.register(settingsNamespace('ui-conversation'), z.object({
       busyEnter: z.union(['queue', 'steer']).default('queue'),
     }))
+    // The judgment Definition's section is admitted so the Model UI's Classifier
+    // switch is remotely readable and writable like every other exposed product
+    // preference.
+    ctx.settings.register(settingsNamespace('judgment'), z.object({
+      enabled: z.boolean().default(true),
+    }))
     ctx.settings.register(settingsNamespace('shell'), z.object({
       timeoutMs: z.number().default(120_000),
     }))
@@ -369,9 +375,14 @@ describe('settings domain', () => {
 
     const value = expectOk(await api.settings.describe(request({})))
     expect(value.namespaces.map(view => view.ns)).toEqual([
-      'llm-deepseek', 'permission', 'ui-theme', 'locale', 'ui-conversation',
+      'llm-deepseek', 'permission', 'ui-theme', 'locale', 'ui-conversation', 'judgment',
       'shell', 'agent-loop', 'web-search-deepseek', 'web-search-attached-cli',
     ])
+    const judgment = expectOk(await api.settings.mutate(request({
+      ns: 'judgment',
+      ops: [{ op: 'set', path: ['enabled'], value: false }],
+    })))
+    expect(judgment.value).toEqual({ enabled: false })
     const permission = expectOk(await api.settings.mutate(request({
       ns: 'permission',
       ops: [{ op: 'set', path: ['defaultPreset'], value: 'workspace-write' }],
@@ -461,6 +472,23 @@ describe('settings domain', () => {
     })))
     expect(ctx.settings.describe().find(view => String(view.ns) === 'agent-seats')?.value)
       .toEqual({ seats: { aegis: { provider: 'ollama-cloud', model: 'kimi-k3' } } })
+  })
+
+  // The namespace string must equal `MODEL_ROUTER_SETTINGS_NAMESPACE`; the router
+  // package is not a dependency of this one, so the name is not importable here.
+  it('serves the model-router namespace so the deployment can read and write routing configuration', async () => {
+    const ctx = await harness()
+    ctx.settings.register(settingsNamespace('model-router'), z.object({
+      initialMode: z.union(['off', 'on'] as const),
+      candidates: z.array(z.object({ id: z.string(), provider: z.string(), model: z.string() })),
+    }))
+    const api = createApiProxy(ctx, DEFAULTS)
+    expectOk(await api.settings.mutate(request({
+      ns: 'model-router',
+      ops: [{ op: 'set', path: ['candidates'], value: [{ id: 'cheap', provider: 'openrouter', model: 'kimi-k3' }] }],
+    })))
+    expect(ctx.settings.describe().find(view => String(view.ns) === 'model-router')?.value)
+      .toEqual({ candidates: [{ id: 'cheap', provider: 'openrouter', model: 'kimi-k3' }] })
   })
 
   it('serves the speech namespace so General Settings and Talk mode can persist', async () => {

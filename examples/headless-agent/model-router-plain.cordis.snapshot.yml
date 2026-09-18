@@ -1,0 +1,26 @@
+# Keyless model-routing composition for the headless stream-json snapshot:
+# the shipping `cordis.yml` spine with the routed turn served by a loopback
+# stub, and NO router composed at all — the byte-identity reference for the OFF arm.
+
+- id: base
+  name: '@shres-code/cordis-plugin-include'
+  config:
+    path: ./cordis.yml
+    patches:
+      - id: llm-deepseek
+        config:
+          baseURL: !!js process.env.SHRES_SNAPSHOT_BASE_URL
+      - id: agent-spine
+        config:
+          agents:
+            - id: main
+              provider: deepseek-official
+              model: deepseek-v4-pro
+              cwd: !!js process.cwd()
+          workspaceContext:
+            maxBytes: 65536
+          persona: |
+            You are headless-agent, a coding assistant powered by the {{model}} model.
+
+            Verify your work by running the code or tests. Keep answers brief and
+            factual.
