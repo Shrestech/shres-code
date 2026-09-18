@@ -6,7 +6,7 @@ Source: [`packages/compaction/compaction/src/types.ts`](../../packages/compactio
 
 ## The `compaction/*` session events
 
-Compaction extends [`SessionEventMap`](session.md) with three event types via declaration merging. All three are **log-only** — they record the lock, summary, selected range, shadowed event seqs, token count, and model call without joining the surface. `SurfaceEventType` is deliberately NOT extended (only message-producing events reach the model), so the summary itself rides on a separate `user/message` with `surfaceOp: { op: 'replace', start, end }` — the only surface mutation performed by summary compaction. The [Agent Note](../../.agents/notes/implemented/feature/2026-06-18-compaction-capability-seam.md) owns the rationale for reusing `user/message`.
+Compaction extends [`SessionEventMap`](session.md) with three event types via declaration merging, and a backend may declare its own log-only companions beside them — the [judgment-backed provider](#the-judgment-backed-provider) adds two — while this shared `compaction/*` vocabulary stays backend-neutral. All three are **log-only** — they record the lock, summary, selected range, shadowed event seqs, token count, and model call without joining the surface. `SurfaceEventType` is deliberately NOT extended (only message-producing events reach the model), so the summary itself rides on a separate `user/message` with `surfaceOp: { op: 'replace', start, end }` — the only surface mutation performed by summary compaction. The [Agent Note](../../.agents/notes/implemented/feature/2026-06-18-compaction-capability-seam.md) owns the rationale for reusing `user/message`.
 
 | Event | Payload | Role |
 |---|---|---|
@@ -84,6 +84,84 @@ type ManualCompactionErrorCode =
 Pressure compaction runs at serial `agent/pre-step` before request derivation. Once pressure or canonical overflow qualifies, compaction-basic invokes optional [`ctx.toolResultPruner`](../../packages/compaction/compaction-tool-result-pruner/README.md) before range selection, remeasures through `ctx.tokenMeter`, and can advance the surface without a summary. Failed-request recovery runs through `agent/request-error` after the failed step closes and returns a retry action only when the surface replacement generation advances, even if later summary work throws after pruning; cancellation still wins. Region boundaries preserve tool-call/result pairing but not whole turns, allowing early closed steps of one oversized turn to compact. `shres-compaction-basic` owns thresholds, retained-tail policy, overflow caps, and failure handling.
 
 The Service Definition exports `toolPairingBalancedBefore(session, seq)` and `toolPairingBalancedAfter(session, seq)` for the tool-call/result pairing checks before and after a seq. Both validate current surface membership and reject missing seqs and orphan results; the [package contract](../../packages/compaction/compaction/README.md#tool-pairing-boundaries) defines their cache behavior.
+
+## The judgment-backed provider
+
+[shres-compaction-jev](../../packages/compaction/compaction-jev) is the judgment-backed provider of the same `ctx.compaction` service: it subclasses the basic engine, so composition swaps it for that row (disable the row, insert this one) and the inherited listeners, durable transaction, retention, overflow recovery, and shrink validation are reused unchanged. It asks [`ctx.judgment`](judgment.md) about the segments and drafts it is about to act on, and it owns every question string, rubric, and threshold as validated Config. Each overridden step degrades on its own to the inherited behavior, and both companion events name the class that applied:
+
+```ts type-equiv
+/** Why a judgment-backed step fell back to the inherited compaction-basic behavior. */
+type CompactionDegradationReason =
+  /** No judgment engine is composed. */
+  | 'engine-absent'
+  /** An engine is composed and the deployment turned judgment off. */
+  | 'engine-disabled'
+  /** The engine could not be reached, refused the ask, or did not answer in time. */
+  | 'engine-unavailable'
+  /** The engine answered with a body this provider could not use. */
+  | 'invalid-answer'
+  /** The engine answered below the configured confidence floor. */
+  | 'below-confidence'
+```
+
+Selection replaces the inherited contiguous range with the semantic segments of that same span, scores each segment for load-bearingness, and hands the rescued segments' sub-spans to the inherited machinery tail-most-first; `maxRescues: 0` skips scoring altogether rather than asking and discarding. Segments partition on step boundaries and balanced tool-call/result pairing, `maxSegmentsPerCall` bounds one judgment ask, and each logged fact carries its span, the score and confidence the engine returned when it was scored, and one disposition — `rescued`, `dropped`, or `unscored`.
+
+```ts type-equiv
+/** One logged selection decision. */
+interface CompactionSelectionEvent {
+  /** The trigger this selection ran under. */
+  trigger: CompactionSelectionTrigger
+  /** Whether the selection fell back to the inherited body. */
+  degraded: boolean
+  /** Which degradation class applied, when the selection degraded. */
+  reason?: CompactionDegradationReason
+  /** Segment facts, in surface order; empty when no scoring happened. */
+  segments: CompactionSegmentFact[]
+  /** Boundary moves, in the order they were made. */
+  boundaryAdjustments: CompactionBoundaryAdjustment[]
+  /** Engine that answered the selection asks, when one did. */
+  engine?: string
+  /** Exact model that answered, when one did. */
+  model?: string
+  /** Total duration of this selection's judgment calls, in milliseconds. */
+  latencyMs?: number
+}
+```
+
+Boundary judgment asks one hazard question per sub-span edge and is deliberately conservative: a probability at or above `boundaryThreshold` is unsafe, and so is one inside the `boundaryMargin` band below it, so an unsafe edge moves outward to a legal pairing-balanced position within `maxBoundaryAdjustment` surface nodes, and an edge with no legal move inside that cap stays where it was.
+
+Draft verification is a verify-then-escalate cascade: the inherited summarizer's draft is read against the capped original region by the configured binary checks plus one overall score question, every check at or above `verifyThreshold` together with an overall score at or above `verifyScore` accepts it, and otherwise one escalation to `escalationProvider`/`escalationModel` — or the conversation target when both are omitted — produces a second draft that the battery reads again. The better-scoring draft is kept, and `onVerifyFailure` decides the last word: `accept-logged` records the failure and returns that draft, while `fail-attempt` throws and fails the attempt. A band-only failure, where nothing sits below the threshold but something sits inside `verifyMargin` of it, spends no escalation under `accept-logged`.
+
+```ts type-equiv
+/** One logged verification attempt. */
+interface CompactionVerificationEvent {
+  /** Compaction lifecycle this attempt belongs to. */
+  compactionId: Branded<'CompactionId'>
+  /**
+   * 1-based index of the verification attempt within its compaction. Attempt 1
+   * verifies the first draft; attempt 2 verifies the escalation draft.
+   */
+  attempt: number
+  /** Provider route the verified draft was produced on. */
+  provider: string
+  /** Exact model the verified draft was produced on. */
+  model: string
+  /** Battery answers, `overall` last; empty when verification degraded. */
+  questions: CompactionVerificationQuestionFact[]
+  /** What the battery concluded. */
+  verdict: CompactionVerificationVerdict
+  /** Whether verification was skipped and the inherited summarizer used as-is. */
+  degraded: boolean
+  /** Which degradation class applied, when verification degraded. */
+  reason?: CompactionDegradationReason
+  /** Engine that answered the battery, when one did. */
+  engine?: string
+  /** Duration of this attempt's judgment call, in milliseconds. */
+  latencyMs?: number
+}
+```
+
+Both events are log-only and append-only, and neither extends `SurfaceEventType`, so the surface change is still the one `user/message` replacement the inherited transaction makes. The provider registers no service of its own: its whole-config schema restates every basic field beside the judgment fields so a forced-compaction overlay names one config, and [`JevCompactionConfig`](../../packages/compaction/compaction-jev/src/config.ts) is that declared type — the [package README](../../packages/compaction/compaction-jev/README.md) owns the field table. Its `./invariant` companion asserts the cascade relation: a compaction that closes without an error never leaves its latest `compaction/verification` reading `escalated`.
 
 ## Tool-result pruning outcomes
 
@@ -182,10 +260,11 @@ abstract compactNow( agent: ManualCompactAgentContext, signal: AbortSignal, sour
  * @param end - last surface seq, inclusive.
  * @param agent - context whose session is mutated and whose routing options guide summarization.
  * @param signal - optional cancellation; model-backed implementations must forward it.
+ * @param attempt - 1-based index of this attempt within its compaction, recorded on a summarization failure.
  * @throws when compaction is active or the range is missing, reversed, or unbalanced.
  * @returns the appended event seqs, summary, replaced range, and token accounting.
  */
-abstract compactRegion( start: number, end: number, agent: CompactionAgentContext, signal?: AbortSignal, ): Promise<CompactionResult>
+abstract compactRegion( start: number, end: number, agent: CompactionAgentContext, signal?: AbortSignal, attempt?: number, ): Promise<CompactionResult>
 ```
 
 Types: [CommandId](commands.md)

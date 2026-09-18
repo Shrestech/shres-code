@@ -606,6 +606,89 @@ export interface ModelCompactPolicyConfig extends CompactionPolicyConfig {
 
 Source: [`packages/compaction/compaction-basic/src/types.ts:43`](../packages/compaction/compaction-basic/src/types.ts)
 
+<a id="shres-codeshres-code-compaction-jev"></a>
+
+## `@shres-code/shres-code-compaction-jev`
+
+```ts config-catalog
+/** Jev compaction configuration: the inherited policy plus the judgment fields. */
+export interface JevCompactionConfig extends BasicCompactionConfig {
+  /** Judgment tier the scoring and verification calls run at. Defaults to `accurate`. */
+  tier?: 'fast' | 'accurate'
+  /** The segment load-bearingness question text. Required. */
+  segmentScoreInstructions: string
+  /**
+   * Ordered score levels for the segment question, lowest first. Defaults to a
+   * five-level rubric. A score question needs ordered levels, which the seam
+   * requires; the rubric is Config on the consumer, like the model-router's
+   * difficulty levels.
+   */
+  segmentScoreLevels?: string[]
+  /**
+   * The per-sub-span-edge boundary question text. Required. Phrased as the
+   * hazard: a high probability means this edge cuts through work that belongs
+   * together, which is what `boundaryThreshold` marks unsafe.
+   */
+  boundaryInstructions: string
+  /** The overall draft-quality score question text. Required. */
+  verifyInstructions: string
+  /** The named binary checks the battery runs beside the overall score. Required, at least one. */
+  verifyChecks: JevVerifyCheckConfig[]
+  /** Ordered score levels for the overall question, lowest first. Defaults to a five-level rubric. */
+  verifyScoreLevels?: string[]
+  /** Segment questions per judgment ask. Defaults to 4; a larger span is chunked. */
+  maxSegmentsPerCall?: number
+  /** Per-segment character cap for scoring, head and tail kept. Defaults to 2000. */
+  segmentMaxChars?: number
+  /** Character cap for the draft plus original region a verification reads. Defaults to 6000. */
+  verifyMaxChars?: number
+  /** Load-bearingness score at or above which a segment is rescued. Defaults to 3. */
+  rescueScore?: number
+  /** Confidence at or above which a score is trusted. Defaults to 0.6. */
+  segmentConfidence?: number
+  /** Maximum rescued segments per compaction; `0` disables rescue. Defaults to 2. */
+  maxRescues?: number
+  /** Boundary hazard probability at or above which an edge is unsafe. Defaults to 0.4. */
+  boundaryThreshold?: number
+  /** Wobble band below the boundary threshold that also counts as unsafe. Defaults to 0.15. */
+  boundaryMargin?: number
+  /** Maximum surface nodes one edge may move. Defaults to 2. */
+  maxBoundaryAdjustment?: number
+  /** Verify-check probability at or above which a check passes. Defaults to 0.7. */
+  verifyThreshold?: number
+  /** Wobble band below the verify threshold treated as not verified. Defaults to 0.1. */
+  verifyMargin?: number
+  /** Overall score at or above which a draft passes. Defaults to 4. */
+  verifyScore?: number
+  /** Provider route for the escalation draft; pair with `escalationModel`, or omit both for the conversation target. */
+  escalationProvider?: string
+  /** Model for the escalation draft; pair with `escalationProvider`. */
+  escalationModel?: string
+  /** Escalation drafts after a failed verification. Defaults to 1. */
+  maxEscalations?: number
+  /** What a draft that failed every escalation attempt does. Defaults to `accept-logged`. */
+  onVerifyFailure?: JevOnVerifyFailure
+}
+
+/** One named binary check of the verification battery. */
+export interface JevVerifyCheckConfig {
+  /** Stable name recorded on the verification event. */
+  name: string
+  /**
+   * The binary question text, phrased as the hazard (a high probability means
+   * the draft breaks this rule). The consumer owns the text; the seam adds none.
+   */
+  instructions: string
+}
+
+/** What a draft that fails its verification battery does. */
+export type JevOnVerifyFailure = 'accept-logged' | 'fail-attempt'
+```
+
+Depends on: [`BasicCompactionConfig`](#shres-codeshres-code-compaction-basic)
+
+Source: [`packages/compaction/compaction-jev/src/config.ts:27`](../packages/compaction/compaction-jev/src/config.ts)
+
 <a id="shres-codeshres-code-compaction-tool-result-pruner"></a>
 
 ## `@shres-code/shres-code-compaction-tool-result-pruner`
@@ -1081,6 +1164,48 @@ export interface Config {
 
 Source: [`packages/jspace/jspace-prompt/src/index.ts:70`](../packages/jspace/jspace-prompt/src/index.ts)
 
+<a id="shres-codeshres-code-judgment-typesafe"></a>
+
+## `@shres-code/shres-code-judgment-typesafe`
+
+```ts config-catalog
+/**
+ * Composition config of the TypeSafe judgment engine.
+ *
+ * Schemastery rejects a wrong type at plugin load; {@link resolveConfig} from
+ * `./config.ts` re-judges every field, including unknown and misspelled keys,
+ * because programmatic construction bypasses the schema.
+ */
+export interface TypesafeJudgmentConfig {
+  /**
+   * Credential reference (environment-variable name) holding the API key.
+   * Required with no default: which environment reference holds the key is the
+   * deployment's decision, and the reference is resolved per ask through the
+   * credentials seam.
+   */
+  apiKeyRef: string
+  /** Vendor endpoint base without a trailing slash; defaults to the public API. */
+  endpoint?: string
+  /** Model id per judgment tier; defaults to `jev-preview` and `jev-latest`. */
+  models?: TypesafeJudgmentModels
+  /**
+   * Deadline for one vendor request in milliseconds, defaulting to 30000. An
+   * ask that outlives it fails with `UNAVAILABLE` naming the figure.
+   */
+  timeoutMs?: number
+}
+
+/** Model id each judgment tier resolves to. */
+export interface TypesafeJudgmentModels {
+  /** Model serving the `fast` tier. */
+  fast: string
+  /** Model serving the `accurate` tier, and every ask that omits a tier. */
+  accurate: string
+}
+```
+
+Source: [`packages/llm/judgment-typesafe/src/types.ts:24`](../packages/llm/judgment-typesafe/src/types.ts)
+
 <a id="shres-codeshres-code-ledger"></a>
 
 ## `@shres-code/shres-code-ledger`
@@ -1348,7 +1473,7 @@ export interface DeepSeekCatalogModel {
 
 Depends on: [`ModelModality`](../packages/llm/llm/src/index.ts) · [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts)
 
-Source: [`packages/llm/llm-deepseek/src/index.ts:106`](../packages/llm/llm-deepseek/src/index.ts)
+Source: [`packages/llm/llm-deepseek/src/index.ts:111`](../packages/llm/llm-deepseek/src/index.ts)
 
 <a id="shres-codeshres-code-llm-grok-session"></a>
 
@@ -1496,6 +1621,17 @@ export interface PiAiProviderProfile {
    * to answer instead.
    */
   defaultInput?: PiAiModality[]
+  /**
+   * Whether this route's requests carry the vendor's prompt cache key, with
+   * the request's session id as its value (default `off`).
+   *
+   * A key is sent only where the exact model's wire protocol declares such a
+   * field (`PROMPT_CACHE_KEY_FIELDS`), and only to a request the loop stamped
+   * with a session id. A profile whose protocol has no field sends nothing —
+   * not an error, because what a vendor spells as a cache key is a property of
+   * its wire format rather than of the configuration.
+   */
+  promptCacheKey?: PiAiPromptCacheKey
   /** Provider request headers; Harness attribution wins reserved names. */
   headers?: Record<string, string>
   /** Provider-neutral pi-ai reasoning level. */
@@ -1621,6 +1757,13 @@ export interface PiAiHostedTools {
 export type PiAiModality = Model<Api>['input'][number]
 
 /**
+ * How one route's requests identify their prompt cache. `session` sends each
+ * request's session id as the vendor's cache key, so every turn of one session
+ * stays in one cache domain; `off` sends nothing.
+ */
+export type PiAiPromptCacheKey = 'session' | 'off'
+
+/**
  * Selectable reasoning efforts for one model: each key is a level the model
  * offers (and selectors show), and its value is the wire spelling dispatch
  * sends for it. `off` alone may leave its value empty — "supported, send
@@ -1646,7 +1789,7 @@ type WithheldThinkingFormat = 'chat-template' | 'qwen-chat-template' | 'baseten'
 
 Depends on: `Api` (`@earendil-works/pi-ai`) · `CacheRetention` (`@earendil-works/pi-ai`) · `Model` (`@earendil-works/pi-ai`) · `ModelThinkingLevel` (`@earendil-works/pi-ai`) · `OpenAICompletionsCompat` (`@earendil-works/pi-ai`) · [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts) · `ThinkingBudgets` (`@earendil-works/pi-ai`) · `Transport` (`@earendil-works/pi-ai`)
 
-Source: [`packages/llm/llm-pi-ai/src/config.ts:213`](../packages/llm/llm-pi-ai/src/config.ts)
+Source: [`packages/llm/llm-pi-ai/src/config.ts:233`](../packages/llm/llm-pi-ai/src/config.ts)
 
 <a id="shres-codeshres-code-llm-replay"></a>
 
@@ -1921,6 +2064,120 @@ export interface Config {
 ```
 
 Source: [`packages/feedback/message-feedback/src/index.ts:49`](../packages/feedback/message-feedback/src/index.ts)
+
+<a id="shres-codeshres-code-model-router"></a>
+
+## `@shres-code/shres-code-model-router`
+
+```ts config-catalog
+/** Composition config of the model router; also the `model-router` settings section. */
+export interface ModelRouterConfig {
+  /** Whether routing starts in force. Required: a stored mode is an explicit deployment choice. */
+  initialMode: ModelRoutingInitialMode
+  /**
+   * Downgrade allowlist. Routing may select a member of this list or nothing —
+   * never the manual route and never anything stronger — so an empty list
+   * leaves every turn on the manual route with `no-candidates` logged.
+   */
+  candidates?: ModelRoutingCandidateConfig[]
+  /** Route confidence at or above which a candidate may be selected. Required. */
+  downgradeThreshold: number
+  /** Required top-two probability margin (`top1 - top2`) for a selection. Required. */
+  downgradeMargin: number
+  /**
+   * Turns a downgraded streak is held before a failed gate may end it. `0`
+   * disables stickiness (each turn is judged on its own), which keeps the
+   * non-sticky design reachable and falsifiable. Defaults to 5.
+   */
+  minTurnsDowngraded?: number
+  /** The choice question text asked about the conversation state. Required. */
+  routeInstructions: string
+  /**
+   * The difficulty question text. Required at load while
+   * `minTurnsDowngraded > 0`: a held downgrade re-judges every turn and needs
+   * the difficulty answer to escalate back immediately.
+   */
+  difficultyInstructions?: string
+  /** Ordered difficulty-level descriptions for the score question, lowest first. Defaults to a five-level rubric. */
+  difficultyLevels?: string[]
+  /** Escalate-back operating point. */
+  escalateBack?: ModelRoutingEscalateBackConfig
+  /** Durable route-failure streak at which a held downgrade escalates back immediately. Defaults to 2. */
+  maxRouteErrors?: number
+  /** What a failed judgment call does to the turn. Defaults to `fallback`. */
+  onUnavailable?: ModelRoutingUnavailablePolicy
+  /**
+   * Optional effort lift for a selected route on a hard turn. Omitted — or
+   * written as a valueless key, which the schema resolves to null — means not
+   * configured; the group is never implied by a default.
+   */
+  difficultyToEffort?: ModelRoutingDifficultyToEffortConfig
+  /**
+   * Optional advisory hint while the manual route stands. Omitted — or a
+   * valueless key — means not configured, so a deployment without it is not
+   * asked for the difficulty question.
+   */
+  hardHint?: ModelRoutingHardHintConfig
+  /** The state window each judgment call reads. */
+  state?: ModelRoutingStateConfig
+  /** Judgment tier each call runs at. Defaults to `fast`. */
+  tier?: 'fast' | 'accurate'
+}
+
+/** Whether routing starts in force. */
+export type ModelRoutingInitialMode = 'off' | 'on'
+
+/**
+ * One allowlisted downgrade candidate as configuration states it: plain
+ * strings, because a composition file carries no brands. Resolution brands the
+ * effort into {@link ModelRoutingCandidate}.
+ */
+export interface ModelRoutingCandidateConfig {
+  /** Stable id a decision records, for logs and configuration surfaces. */
+  id: string
+  /** Registered provider route this candidate runs on. */
+  provider: string
+  /** Provider-owned model id this candidate runs. */
+  model: string
+  /** Adapter-owned reasoning effort this candidate runs at, when it names one. */
+  reasoningEffort?: string
+  /** Why this candidate is allowlisted, for configuration surfaces. */
+  description?: string
+}
+
+/** The escalation operating point. */
+export interface ModelRoutingEscalateBackConfig {
+  /** Difficulty score at or above which a held downgrade escalates back immediately. Defaults to 4. */
+  scoreThreshold?: number
+}
+
+/** What a failed judgment call means for the turn. */
+export type ModelRoutingUnavailablePolicy = 'fallback' | 'error'
+
+/** The optional difficulty-to-effort lift. */
+export interface ModelRoutingDifficultyToEffortConfig {
+  /** Difficulty score at or above which the selected route runs at {@link reasoningEffort}. */
+  scoreThreshold: number
+  /** Effort the selected downgraded route runs at above the threshold. */
+  reasoningEffort: string
+}
+
+/** The advisory-hint operating point. */
+export interface ModelRoutingHardHintConfig {
+  /** Difficulty score at or above which a STRONG turn carries the `consider-stronger` hint. Defaults to 4. */
+  scoreThreshold?: number
+}
+
+/** The state window one judgment call reads. */
+export interface ModelRoutingStateConfig {
+  /** Prior user messages of the conversation to include before the current turn's. Defaults to 2. */
+  contextTurns?: number
+  /** Hard cap on the assembled state text, in characters. Defaults to 12000. */
+  maxChars?: number
+}
+```
+
+Source: [`packages/llm/model-router/src/config.ts:50`](../packages/llm/model-router/src/config.ts)
 
 <a id="shres-codeshres-code-permission-presets"></a>
 
@@ -4368,6 +4625,7 @@ Abstract service classes — a deployment loads a concrete implementation packag
 - `@shres-code/shres-code-fs` — abstract `FileSystem` ([`packages/fs/fs/src/index.ts`](../packages/fs/fs/src/index.ts))
 - `@shres-code/shres-code-host-directory-picker` — abstract `DirectoryPicker` ([`packages/host/directory-picker/src/index.ts`](../packages/host/directory-picker/src/index.ts))
 - `@shres-code/shres-code-jobs` — abstract `JobRegistry` ([`packages/jobs/jobs/src/index.ts`](../packages/jobs/jobs/src/index.ts))
+- `@shres-code/shres-code-judgment` — abstract `JudgmentService` ([`packages/llm/judgment/src/index.ts`](../packages/llm/judgment/src/index.ts))
 - `@shres-code/shres-code-sandbox` — abstract `SandboxProvider` ([`packages/sandbox/sandbox/src/index.ts`](../packages/sandbox/sandbox/src/index.ts))
 - `@shres-code/shres-code-session-persistence` — abstract `SessionPersistence` ([`packages/session/session-persistence/src/index.ts`](../packages/session/session-persistence/src/index.ts))
 - `@shres-code/shres-code-session-query` — abstract `SessionQueryEngine` ([`packages/session-query/session-query/src/index.ts`](../packages/session-query/session-query/src/index.ts))

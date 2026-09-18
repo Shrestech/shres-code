@@ -218,6 +218,10 @@ flowchart LR
   cfg --> plugin_shres_base_codex_credential
   plugin_shres_base_llm_codex_session["llm-codex-session<br/>@shres-code/shres-code-llm-codex-session"]
   cfg --> plugin_shres_base_llm_codex_session
+  plugin_shres_base_cursor_credential["cursor-credential<br/>@shres-code/shres-code-cursor-credential"]
+  cfg --> plugin_shres_base_cursor_credential
+  plugin_shres_base_llm_cursor_session["llm-cursor-session<br/>@shres-code/shres-code-llm-cursor-session"]
+  cfg --> plugin_shres_base_llm_cursor_session
   plugin_shres_base_llm_xai_apikey["llm-xai-apikey<br/>@shres-code/shres-code-llm-xai-apikey"]
   cfg --> plugin_shres_base_llm_xai_apikey
   plugin_shres_base_llm_deepseek["llm-deepseek<br/>@shres-code/shres-code-llm-deepseek"]
@@ -331,6 +335,8 @@ flowchart LR
 | `llm-grok-session` | `@shres-code/shres-code-llm-grok-session` |
 | `codex-credential` | `@shres-code/shres-code-codex-credential` |
 | `llm-codex-session` | `@shres-code/shres-code-llm-codex-session` |
+| `cursor-credential` | `@shres-code/shres-code-cursor-credential` |
+| `llm-cursor-session` | `@shres-code/shres-code-llm-cursor-session` |
 | `llm-xai-apikey` | `@shres-code/shres-code-llm-xai-apikey` |
 | `llm-deepseek` | `@shres-code/shres-code-llm-deepseek` |
 

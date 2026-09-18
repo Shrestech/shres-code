@@ -657,7 +657,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     doc: 'The named model-select seat at the right end of the composer tool row,\nleft of the send button — one occupant, so taking it means rendering the\nwhole model affordance yourself. Same `locked`-only owner share and same\nrenders-nothing-while-empty contract as the plan seat. Note the composer\ndeliberately keeps this seat LIVE while it refuses text for a\nmodel-related block: every such block is one the user clears by picking\na model here.',
     registerOptions: [],
     ownerProps: [
-      '/**\n * Owner share of the two named composer control seats (plan / model): the\n * bar passes its disable state; the filling entry owns everything else.\n */\nexport interface InputControlOwnerProps {\n  /** Session-removed lock (the bar\'s chrome disable state). */\n  locked: boolean\n}',
+      '/**\n * Owner share of the named composer control seats (plan / routing / model): the\n * bar passes its disable state; the filling entry owns everything else.\n */\nexport interface InputControlOwnerProps {\n  /** Session-removed lock (the bar\'s chrome disable state). */\n  locked: boolean\n}',
     ],
     ownerPropsReferences: [],
     standardProps: [
@@ -679,6 +679,37 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'conversation.input.model\', () => ctx.slots.register(\n      { name: \'conversation.input.model\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
     source: 'packages/client/ui-conversation/src/client/contract/slots.ts:221',
+  },
+  {
+    key: 'conversation.input.modelRouting',
+    kind: 'single',
+    scope: 'session',
+    summary: 'The named model-routing seat immediately left of the model-select seat — one occupant, so taking it means rendering the whole routing affordance yourself.',
+    doc: 'The named model-routing seat immediately left of the model-select seat —\none occupant, so taking it means rendering the whole routing affordance\nyourself. Same `locked`-only owner share and same renders-nothing-while-\nempty contract as the plan seat: a host composing no router registers no\nrouting projection, and the seat then draws nothing.',
+    registerOptions: [],
+    ownerProps: [
+      '/**\n * Owner share of the named composer control seats (plan / routing / model): the\n * bar passes its disable state; the filling entry owns everything else.\n */\nexport interface InputControlOwnerProps {\n  /** Session-removed lock (the bar\'s chrome disable state). */\n  locked: boolean\n}',
+    ],
+    ownerPropsReferences: [],
+    standardProps: [
+      'useSessions: SnapshotSelectorHook<SessionListState>',
+      'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'useSession: SnapshotSelectorHook<ConversationSnapshot>',
+      'sessionId: SessionId',
+      'useProjection: UseProjection',
+      'useInput: SnapshotSelectorHook<InputState>',
+      'inputActions: InputActions',
+    ],
+    keyDomain: '',
+    hookContext: '',
+    slotInject: '',
+    declaredBy: 'an entry in \'conversation.composer.bar\' (client-ui-conversation), so it exists while that entry is mounted',
+    occupants: [
+      'client-ui-model-routing RoutingChip',
+    ],
+    replaceRisk: 'shadows-shipped-ui',
+    example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'conversation.input.modelRouting\', () => ctx.slots.register(\n      { name: \'conversation.input.modelRouting\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
+    source: 'packages/client/ui-conversation/src/client/contract/slots.ts:229',
   },
   {
     key: 'conversation.input.overlay',
@@ -737,7 +768,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     doc: 'The named plan-status seat in the composer tool row, immediately right\nof the access-mode control — one occupant, so taking it means rendering\nthe plan affordance yourself. The owner passes only `locked` (see\nInputControlOwnerProps): honour it by refusing interaction, and\ntake everything else from the framework session kit or your own inject.\nUnoccupied, the seat renders nothing at all — the bar paints no\nplaceholder, so an absent plan plugin costs no layout.',
     registerOptions: [],
     ownerProps: [
-      '/**\n * Owner share of the two named composer control seats (plan / model): the\n * bar passes its disable state; the filling entry owns everything else.\n */\nexport interface InputControlOwnerProps {\n  /** Session-removed lock (the bar\'s chrome disable state). */\n  locked: boolean\n}',
+      '/**\n * Owner share of the named composer control seats (plan / routing / model): the\n * bar passes its disable state; the filling entry owns everything else.\n */\nexport interface InputControlOwnerProps {\n  /** Session-removed lock (the bar\'s chrome disable state). */\n  locked: boolean\n}',
     ],
     ownerPropsReferences: [],
     standardProps: [

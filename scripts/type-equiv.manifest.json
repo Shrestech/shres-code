@@ -1296,6 +1296,21 @@
       "source": "packages/compaction/compaction-tool-result-pruner/src/types.ts"
     },
     {
+      "doc": "docs/subsystems/compaction.md",
+      "symbol": "CompactionDegradationReason",
+      "source": "packages/compaction/compaction-jev/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/compaction.md",
+      "symbol": "CompactionSelectionEvent",
+      "source": "packages/compaction/compaction-jev/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/compaction.md",
+      "symbol": "CompactionVerificationEvent",
+      "source": "packages/compaction/compaction-jev/src/types.ts"
+    },
+    {
       "doc": "docs/subsystems/subagent.md",
       "symbol": "SubagentCapabilities",
       "source": "packages/subagent/subagent/src/types.ts"
@@ -2299,6 +2314,106 @@
       "doc": "docs/subsystems/agent-team.md",
       "symbol": "TeamRosterTemplateEntry",
       "source": "packages/team/agent-team/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/judgment.md",
+      "symbol": "JudgmentQuestion",
+      "source": "packages/llm/judgment/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/judgment.md",
+      "symbol": "JudgmentBinaryQuestion",
+      "source": "packages/llm/judgment/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/judgment.md",
+      "symbol": "JudgmentChoiceQuestion",
+      "source": "packages/llm/judgment/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/judgment.md",
+      "symbol": "JudgmentScoreQuestion",
+      "source": "packages/llm/judgment/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/judgment.md",
+      "symbol": "JudgmentAnswer",
+      "source": "packages/llm/judgment/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/judgment.md",
+      "symbol": "JudgmentBinaryAnswer",
+      "source": "packages/llm/judgment/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/judgment.md",
+      "symbol": "JudgmentChoiceAnswer",
+      "source": "packages/llm/judgment/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/judgment.md",
+      "symbol": "JudgmentScoreAnswer",
+      "source": "packages/llm/judgment/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/judgment.md",
+      "symbol": "JudgmentInput",
+      "source": "packages/llm/judgment/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/judgment.md",
+      "symbol": "JudgmentResult",
+      "source": "packages/llm/judgment/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/judgment.md",
+      "symbol": "JudgmentEngine",
+      "source": "packages/llm/judgment/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/judgment.md",
+      "symbol": "JudgmentRedactor",
+      "source": "packages/llm/judgment/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/judgment.md",
+      "symbol": "JudgmentSettings",
+      "source": "packages/llm/judgment/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/model-router.md",
+      "symbol": "ModelRoutingOutcome",
+      "source": "packages/llm/model-router/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/model-router.md",
+      "symbol": "ModelRoutingReason",
+      "source": "packages/llm/model-router/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/model-router.md",
+      "symbol": "ModelRoutingBreakReason",
+      "source": "packages/llm/model-router/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/model-router.md",
+      "symbol": "ModelRoutingStickyView",
+      "source": "packages/llm/model-router/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/model-router.md",
+      "symbol": "ModelRoutingDecision",
+      "source": "packages/llm/model-router/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/model-router.md",
+      "symbol": "ModelRoutingStickyState",
+      "source": "packages/llm/model-router/src/folds.ts"
+    },
+    {
+      "doc": "docs/subsystems/model-router.md",
+      "symbol": "ModelRouterConfig",
+      "source": "packages/llm/model-router/src/config.ts"
     }
   ]
 }

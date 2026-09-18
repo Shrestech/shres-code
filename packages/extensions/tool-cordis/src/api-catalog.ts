@@ -585,9 +585,9 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         throws: ['{@link ManualCompactionError} for expected busy, agent-cancellation, changed-span, summarization/shrink, commit-stage, or persistence failures; an aborted request preserves its exact abort reason. Failed attempts remain visible in the log.'],
       },
       {
-        signature: 'abstract compactRegion( start: number, end: number, agent: CompactionAgentContext, signal?: AbortSignal, ): Promise<CompactionResult>',
+        signature: 'abstract compactRegion( start: number, end: number, agent: CompactionAgentContext, signal?: AbortSignal, attempt?: number, ): Promise<CompactionResult>',
         description: 'Forcibly compact a range of surface nodes into a single summary node. `start` and `end` name an inclusive span by surface position, not numeric seq order; replacements can make visible seqs non-monotonic. Both edges must be balanced so assistant tool calls remain paired with their results. A model- backed implementation forwards cancellation and rejects active, missing, reversed, or unbalanced ranges. The target session is `agent.session`. Its replacement user message must use compactCheckpointSource with the transaction\'s `CompactionId`. Use toolPairingBalancedBefore and toolPairingBalancedAfter for the edge checks.',
-        parameters: [{ name: 'start', description: 'first surface seq, inclusive.' }, { name: 'end', description: 'last surface seq, inclusive.' }, { name: 'agent', description: 'context whose session is mutated and whose routing options guide summarization.' }, { name: 'signal', description: 'optional cancellation; model-backed implementations must forward it.' }],
+        parameters: [{ name: 'start', description: 'first surface seq, inclusive.' }, { name: 'end', description: 'last surface seq, inclusive.' }, { name: 'agent', description: 'context whose session is mutated and whose routing options guide summarization.' }, { name: 'signal', description: 'optional cancellation; model-backed implementations must forward it.' }, { name: 'attempt', description: '1-based index of this attempt within its compaction, recorded on a summarization failure.' }],
         returns: 'the appended event seqs, summary, replaced range, and token accounting.',
         throws: ['when compaction is active or the range is missing, reversed, or unbalanced.'],
       },
@@ -619,6 +619,19 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         signature: 'abstract unset(ref: CredentialRef): Promise<void>',
         description: 'Remove one reference from the provider-managed writable source; removing an absent reference is a no-op. Rejects while a read-only source shadows the reference, like set.',
         parameters: [{ name: 'ref', description: 'the reference to remove.' }],
+      },
+    ],
+  },
+  {
+    key: 'cursorCredential',
+    summary: 'Single-flight Cursor session-credential service.',
+    description: 'Single-flight Cursor session-credential service.\n\nCursorCredential.managerFor returns the one CursorSessionManager memoized for a credential spec, preserving one shared in-flight read per source. The memoization caches every spec key for the service\'s lifetime; that is safe because each `current()` call re-reads the store at the moment it runs rather than trusting a cached token.',
+    methods: [
+      {
+        signature: 'managerFor(spec: CursorSessionOptions): CursorSessionManager',
+        description: 'Resolve the credential manager for one spec, sharing the cached instance across callers so concurrent requests read the store once.',
+        parameters: [{ name: 'spec', description: 'the credential spec this manager reads.' }],
+        returns: 'the manager for the spec\'s credential facts.',
       },
     ],
   },
@@ -1024,6 +1037,25 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'judgment',
+    summary: 'Abstract judgment service.',
+    description: 'Abstract judgment service. Load one implementation per context as `ctx.judgment`; it owns tier selection, credentials, transport, and the validation of every provider response it reads, and registers no session event, prompt, or tool of its own.\n\nMounting an engine installs the Definition-owned JUDGMENT_SETTINGS_NAMESPACE section, because the toggle exists only where an engine does. settings reads it live.',
+    methods: [
+      {
+        signature: 'readonly settings: () => JudgmentSettings',
+        description: 'Live read of the resolved judgment settings. Consumers call it at the decision the toggle gates and treat `enabled: false` exactly as an absent engine — never as a third behavior mode.',
+        parameters: [],
+      },
+      {
+        signature: 'abstract ask(input: JudgmentInput): Promise<JudgmentResult>',
+        description: 'Answer one set of typed questions about one state. Answers come back in the order the questions were asked, each carrying its question\'s id.',
+        parameters: [{ name: 'input', description: 'the state, the questions, the optional tier, and the cancellation signal.' }],
+        returns: 'the answers with the engine and model identity and the ask\'s duration.',
+        throws: ['{@link JudgmentError} for an unconfigured credential (`UNCONFIGURED`), an unreachable or refusing provider (`UNAVAILABLE`), an unusable provider response (`INVALID_ANSWER`), or a cancelled ask (`ABORTED`).'],
+      },
+    ],
+  },
+  {
     key: 'ledger',
     summary: 'The abstract decision-ledger service.',
     description: 'The abstract decision-ledger service. Registered as `ctx.ledger` (one provider per context; loading a second throws cordis\' standard duplicate-service behavior). A provider subclasses this, implements the three abstract persistence hooks, and loads the subclass as a plugin.\n\nImplementations must honor these semantics:\n\n- persistRecord persists a resolved decision spec under its entry id.\n- queryEntries reads the provider\'s authoritative entry store.\n- hasEntry reports whether an entry id is present in the store.',
@@ -1179,6 +1211,43 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Delete one feedback item. Absence is successful regardless of the supplied version; an existing item requires an exact version match.',
         parameters: [{ name: 'request', description: 'Session, message, and observed item version.' }],
         returns: 'the stable absent postcondition, or an explicit failure.',
+      },
+    ],
+  },
+  {
+    key: 'modelRouting',
+    summary: '`ctx.modelRouting`: owns the logged routing mode, the per-turn decision, and the consult `installModelSelection` reaches.',
+    description: '`ctx.modelRouting`: owns the logged routing mode, the per-turn decision, and the consult `installModelSelection` reaches. No live mirror of the mode is kept — the log is the state — and beyond its two routing events it writes nothing: no prompt, no tool, and no request of its own.',
+    methods: [
+      {
+        signature: 'config(): ResolvedModelRouterConfig',
+        description: 'The resolved configuration in force, re-resolved per read and memoized by the raw snapshot\'s identity.\n\nThere is no keep-last-good recovery here on purpose: a settings write this resolver could not act on is refused by the `validate` hook below before it commits, and the settings seam keeps a namespace\'s last good value when an already-stored section fails to resolve — so a bad value reaches this method only from a caller that bypassed both, and failing loud there is the honest answer rather than masking a configuration the deployment did not write.',
+        parameters: [],
+        returns: 'the resolved configuration.',
+      },
+      {
+        signature: 'get(agent: Agent): { active: boolean; pending?: boolean }',
+        description: 'Read the logged mode and any selection awaiting the next accepted pre-step.',
+        parameters: [{ name: 'agent', description: 'the agent to read.' }],
+        returns: 'the mode in force plus a pending selection, when present.',
+      },
+      {
+        signature: 'modeOf(session: Session, end: number = session.events.length): boolean',
+        description: 'The mode in force on one session: the last logged `model-routing/mode` wins, and a log with none starts from the configured `initialMode`.',
+        parameters: [{ name: 'session', description: 'the session to read.' }, { name: 'end', description: 'fold the first `end` events; defaults to the whole log.' }],
+        returns: 'whether routing is active.',
+      },
+      {
+        signature: 'set(agent: Agent, active: boolean): \'committed\' | \'queued\' | \'cancelled\' | \'noop\'',
+        description: 'Switch routing on or off. Between turns the change is appended immediately; during an open turn it waits for the next accepted in-turn pre-step, like every other logged mode in this harness.',
+        parameters: [{ name: 'agent', description: 'the agent to switch.' }, { name: 'active', description: 'whether routing should be active.' }],
+        returns: 'what happened: `committed`, `queued`, `cancelled`, or `noop`.',
+      },
+      {
+        signature: 'async resolveRequest( agent: Agent, turn: number, _step: number, base: ModelSelection, signal: AbortSignal, ): Promise<ModelSelection | undefined>',
+        description: 'Resolve the route one turn should run. Called by `installModelSelection` after the manual selection rewrote the request: a non-undefined result replaces provider/model/effort, and `undefined` leaves the manual route in force.\n\nOne decision per turn: later steps of the same turn and same-turn request retries reuse the pinned decision instead of judging again.',
+        parameters: [{ name: 'agent', description: 'the agent whose turn is being prepared.' }, { name: 'turn', description: 'the turn number, as the loop dispatched it.' }, { name: '_step', description: 'the step number within that turn; underscore-prefixed because the pin is keyed by turn, so the decision is taken once and later steps reuse it.' }, { name: 'base', description: 'the route the manual selection left in force.' }, { name: 'signal', description: 'the request\'s cancellation signal.' }],
+        returns: 'the route to run, or `undefined` to keep the manual route.',
       },
     ],
   },
@@ -3577,6 +3646,18 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type CredentialRef = Branded<\'CredentialRef\'>;',
   },
   {
+    name: 'CursorSessionManager',
+    declaration: 'export class CursorSessionManager {\n    constructor(options: CursorSessionOptions);\n    current(): Promise<CursorSessionToken>;\n}',
+  },
+  {
+    name: 'CursorSessionOptions',
+    declaration: 'export interface CursorSessionOptions {\n    securityPath: string;\n    authPath: string;\n    useKeychain: boolean;\n    readKeychain?: (service: string) => Promise<string | undefined>;\n    now?: () => number;\n}',
+  },
+  {
+    name: 'CursorSessionToken',
+    declaration: 'export interface CursorSessionToken {\n    accessToken: string;\n}',
+  },
+  {
     name: 'Decision',
     declaration: 'export type Decision = \'accepted\' | \'rejected\' | \'deferred\';',
   },
@@ -3969,6 +4050,66 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface JspaceStatus {\n    readonly active: boolean;\n    readonly reason: \'active\' | \'disabled\';\n}',
   },
   {
+    name: 'JudgmentAnswer',
+    declaration: 'export type JudgmentAnswer = JudgmentBinaryAnswer | JudgmentChoiceAnswer | JudgmentScoreAnswer;',
+  },
+  {
+    name: 'JudgmentBinaryAnswer',
+    declaration: 'export interface JudgmentBinaryAnswer {\n    kind: \'binary\';\n    id: JudgmentQuestionId;\n    probability: number;\n}',
+  },
+  {
+    name: 'JudgmentBinaryCriteria',
+    declaration: 'export interface JudgmentBinaryCriteria {\n    yes?: string;\n    no?: string;\n}',
+  },
+  {
+    name: 'JudgmentBinaryQuestion',
+    declaration: 'export interface JudgmentBinaryQuestion {\n    kind: \'binary\';\n    id: JudgmentQuestionId;\n    instructions: string;\n    criteria?: JudgmentBinaryCriteria;\n}',
+  },
+  {
+    name: 'JudgmentChoiceAnswer',
+    declaration: 'export interface JudgmentChoiceAnswer {\n    kind: \'choice\';\n    id: JudgmentQuestionId;\n    option: string;\n    probabilities: Readonly<Record<string, number>>;\n    confidence: number;\n}',
+  },
+  {
+    name: 'JudgmentChoiceOption',
+    declaration: 'export interface JudgmentChoiceOption {\n    option: string;\n    description?: string;\n}',
+  },
+  {
+    name: 'JudgmentChoiceQuestion',
+    declaration: 'export interface JudgmentChoiceQuestion {\n    kind: \'choice\';\n    id: JudgmentQuestionId;\n    instructions: string;\n    options: JudgmentChoiceOption[];\n}',
+  },
+  {
+    name: 'JudgmentInput',
+    declaration: 'export interface JudgmentInput {\n    state: string;\n    questions: readonly JudgmentQuestion[];\n    tier?: JudgmentTier;\n    signal?: AbortSignal;\n}',
+  },
+  {
+    name: 'JudgmentQuestion',
+    declaration: 'export type JudgmentQuestion = JudgmentBinaryQuestion | JudgmentChoiceQuestion | JudgmentScoreQuestion;',
+  },
+  {
+    name: 'JudgmentQuestionId',
+    declaration: 'export type JudgmentQuestionId = Branded<\'JudgmentQuestionId\'>;',
+  },
+  {
+    name: 'JudgmentResult',
+    declaration: 'export interface JudgmentResult {\n    answers: readonly JudgmentAnswer[];\n    engine: string;\n    model: string;\n    latencyMs: number;\n}',
+  },
+  {
+    name: 'JudgmentScoreAnswer',
+    declaration: 'export interface JudgmentScoreAnswer {\n    kind: \'score\';\n    id: JudgmentQuestionId;\n    score: number;\n    probabilities: Readonly<Record<string, number>>;\n    confidence: number;\n}',
+  },
+  {
+    name: 'JudgmentScoreQuestion',
+    declaration: 'export interface JudgmentScoreQuestion {\n    kind: \'score\';\n    id: JudgmentQuestionId;\n    instructions: string;\n    levels: string[];\n}',
+  },
+  {
+    name: 'JudgmentSettings',
+    declaration: 'export interface JudgmentSettings {\n    enabled: boolean;\n}',
+  },
+  {
+    name: 'JudgmentTier',
+    declaration: 'export type JudgmentTier = \'fast\' | \'accurate\';',
+  },
+  {
     name: 'KnobState',
     declaration: 'export interface KnobState {\n    preset: string | null;\n    sandbox: SandboxMode | null;\n    approval: ApprovalPolicy | null;\n}',
   },
@@ -4034,7 +4175,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'LlmConfigurableProvider',
-    declaration: 'export interface LlmConfigurableProvider {\n    provider: string;\n    displayName: string;\n    settingsNs: string;\n    settingsPath: readonly string[];\n    declared?: boolean;\n    kind?: \'delegated\';\n    binary?: string;\n    binaryFound?: boolean;\n}',
+    declaration: 'export interface LlmConfigurableProvider {\n    provider: string;\n    displayName: string;\n    settingsNs: string;\n    settingsPath: readonly string[];\n    declared?: boolean;\n    kind?: \'delegated\';\n    binary?: string;\n    binaryFound?: boolean;\n    chatGated?: boolean;\n}',
   },
   {
     name: 'LlmDiscoveredModel',
@@ -4249,6 +4390,18 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type ModelPurpose = \'compaction\' | \'session-title\';',
   },
   {
+    name: 'ModelRoutingCandidate',
+    declaration: 'export interface ModelRoutingCandidate {\n    id: string;\n    provider: string;\n    model: string;\n    reasoningEffort?: ReasoningEffortId;\n    description?: string;\n}',
+  },
+  {
+    name: 'ModelRoutingInitialMode',
+    declaration: 'export type ModelRoutingInitialMode = \'off\' | \'on\';',
+  },
+  {
+    name: 'ModelRoutingUnavailablePolicy',
+    declaration: 'export type ModelRoutingUnavailablePolicy = \'fallback\' | \'error\';',
+  },
+  {
     name: 'NoteJspaceInput',
     declaration: 'export interface NoteJspaceInput {\n    readonly goal?: string;\n    readonly departing?: string;\n    readonly core?: string;\n    readonly open?: readonly JspaceOpenLine[];\n    readonly next?: string;\n}',
   },
@@ -4407,6 +4560,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ResolvedCredential',
     declaration: 'export interface ResolvedCredential {\n    value: string;\n    source: string;\n}',
+  },
+  {
+    name: 'ResolvedModelRouterConfig',
+    declaration: 'export interface ResolvedModelRouterConfig {\n    readonly initialMode: ModelRoutingInitialMode;\n    readonly candidates: readonly Readonly<ModelRoutingCandidate>[];\n    readonly downgradeThreshold: number;\n    readonly downgradeMargin: number;\n    readonly minTurnsDowngraded: number;\n    readonly routeInstructions: string;\n    readonly difficultyInstructions?: string;\n    readonly difficultyLevels: readonly string[];\n    readonly escalateBackScoreThreshold: number;\n    readonly maxRouteErrors: number;\n    readonly onUnavailable: ModelRoutingUnavailablePolicy;\n    readonly difficultyToEffort?: {\n        readonly scoreThreshold: number;\n        readonly reasoningEffort: string;\n    };\n    readonly hardHintScoreThreshold?: number;\n    readonly state: ResolvedModelRoutingState;\n    readonly tier: \'fast\' | \'accurate\';\n}',
+  },
+  {
+    name: 'ResolvedModelRoutingState',
+    declaration: 'export interface ResolvedModelRoutingState {\n    readonly contextTurns: number;\n    readonly maxChars: number;\n}',
   },
   {
     name: 'ResolvedNormalRetryPolicy',
