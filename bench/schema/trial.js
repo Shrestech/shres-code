@@ -80,6 +80,29 @@ export const FAILURE_MODES = Object.freeze([
  *   non-researcher arms.
  * @property {number | null} thinDebates - debate pairs whose combined descendant seat-token
  *   volume fell under the thinDebates floor (200); null for non-researcher arms.
+ * @property {number | null} cacheHitShare - cache-read fraction of billed input over the trial's
+ *   reported usage: `cacheReadTokens / (inputTokens + cacheReadTokens + cacheWriteTokens)`. The
+ *   three counts are disjoint (`TokenUsage`), so the denominator is billed input. Null when the
+ *   trial recorded no usage, or recorded no billed input; a usage record that carries no cache
+ *   count reads as 0, which is a reported miss rather than a missing datum.
+ * @property {number | null} modelTransitions - consecutive `request/header` pairs whose
+ *   `config.provider`/`config.model` differ. A header logged only to re-state the same route
+ *   is not a transition. Null when the log carries no readable header.
+ * @property {number[] | null} downgradedStreaks - run lengths of consecutive
+ *   `model-routing/decision` events whose `outcome` is `downgraded`, in log order. An empty
+ *   array is "judged, never downgraded"; null is "never judged".
+ * @property {number | null} downgradedShare - downgraded decisions over all decisions; null when
+ *   no decision was logged.
+ * @property {number | null} keptStrongShare - `kept-strong` decisions over all decisions; null
+ *   when no decision was logged. `skipped` and `error` decisions sit in the denominator and in
+ *   neither numerator.
+ * @property {number | null} routingHintCount - decisions carrying an advisory `hint` (the router
+ *   logs `consider-stronger` while the manual route stands); null when no decision was logged.
+ * @property {number | null} jevCompactionAcceptedBelowThreshold - `compaction/verification`
+ *   events whose `verdict` is `accepted-below-threshold`; null when the log carries no
+ *   verification event, which is every non-JEV compaction backend.
+ * @property {number | null} jevSelectionDegraded - `compaction/selection` events with
+ *   `degraded: true`; null when the log carries no selection event.
  */
 
 /**
@@ -118,7 +141,7 @@ export const FAILURE_MODES = Object.freeze([
 const METRIC_FIELDS = ['inputTokens', 'outputTokens', 'durationMs', 'turns', 'toolCalls', 'identicalRetries', 'checkpoints', 'shipPasses', 'descendantSessions', 'outOfLoopExperiments', 'coverageRefusalThenPad', 'noopNoteRefusals', 'noteCapRefusals', 'compactionCount']
 
 /** TrialMetrics field names that are number|null. */
-const NULLABLE_NUMBER_FIELDS = ['tokensIncludingDescendants', 'costIncludingDescendants', 'verifiedCheckpointShare', 'sessionQueryCalls', 'gateRefusals', 'debateCalls', 'runsLogged', 'verifySatisfiedRate', 'unverifiedRunRefusals', 'deferredShare', 'thinDebates']
+const NULLABLE_NUMBER_FIELDS = ['tokensIncludingDescendants', 'costIncludingDescendants', 'verifiedCheckpointShare', 'sessionQueryCalls', 'gateRefusals', 'debateCalls', 'runsLogged', 'verifySatisfiedRate', 'unverifiedRunRefusals', 'deferredShare', 'thinDebates', 'cacheHitShare', 'modelTransitions', 'downgradedShare', 'keptStrongShare', 'routingHintCount', 'jevCompactionAcceptedBelowThreshold', 'jevSelectionDegraded']
 
 /** TrialMetrics field names that are boolean|null. */
 const NULLABLE_BOOLEAN_FIELDS = ['danglingCard', 'ledgerAbandoned', 'unverifiedAcceptRecovery']
@@ -150,6 +173,14 @@ function validateMetrics(value, name) {
   }
   for (const field of BOOLEAN_FIELDS) {
     if (typeof m[field] !== 'boolean') throw new Error(`${name}.${field} must be a boolean`)
+  }
+  // downgradedStreaks is a nullable list of run lengths, so every entry is a
+  // positive integer — a zero or negative length is not a run.
+  const streaks = m.downgradedStreaks
+  if (streaks !== null) {
+    if (!Array.isArray(streaks) || streaks.some(length => !Number.isSafeInteger(length) || length < 1)) {
+      throw new Error(`${name}.downgradedStreaks must be an array of positive integers or null`)
+    }
   }
   // ledgerDecisions is a nullable object of three non-negative counts.
   const ld = m.ledgerDecisions

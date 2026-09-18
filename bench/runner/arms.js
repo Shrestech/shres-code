@@ -51,10 +51,31 @@
  * | `research-lite` | Same + protocol `enabled: true, requireDesignDefense: 'off'`. |
  * | `research-on` | Same + `requireDesignDefense: 'per-epoch'`, jspace `verifierTools` + `requireVerifiedEvidence`. |
  *
+ * The Jev ladder (PR4) measures judgment-backed routing and compaction in two
+ * paired contrasts. The three packages are inserted, never patched, because the
+ * base headless composition mounts none of them. Routing is priced against the
+ * same pinned manual route; compaction against the same forced-compaction
+ * posture, which the arms restate as one whole config because the profile
+ * default never fires on the catalog's turn counts. Each arm's treatment rows
+ * live in a pinned overlay — `bench/routing/` for the routing pair, the
+ * `bench/pressure/forced-compaction.patch.yml` posture for the compaction
+ * baseline, and `bench/compaction/jev.patch.yml` for the treatment — and
+ * `ArmEntry.pinnedOverlay` names it for the renderer, which emits it verbatim.
+ * The pinned file is therefore not a copy of the arm but the arm's own rows.
+ *
+ * | Arm | Configuration |
+ * |---|---|
+ * | `route-off` | Control: strong manual route pinned, neither the judgment engine nor the router mounted. |
+ * | `route-on` | Same tree + judgment engine and router, `initialMode: 'on'`, one candidate (the weak route). |
+ * | `compact-basic` | Control: `compaction-basic` restating the forced-compaction posture. |
+ * | `compact-jev` | Same posture with `compaction-basic` disabled and the jev backend inserted beside the judgment engine. |
+ *
  * @module bench/runner/arms
  */
 
+import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 /**
  * @typedef {object} ArmEntry
@@ -70,6 +91,15 @@ import { join } from 'node:path'
  * @property {Record<string, unknown> | undefined} [researcher] - research-protocol config; when present the overlay mounts
  *   the researcher surface (protocol, tracker, ledger, tools, debate seats) and the arm expects researcher metrics.
  * @property {boolean} [expectsResearcher] - whether researcher metrics are expected (non-null) in trial logs.
+ * @property {string} [pinnedOverlay] - bench-relative path of the arm's pinned treatment overlay: `renderArmOverlay`
+ *   reads the file and emits its content verbatim, so the file is the single source of that arm's rows.
+ * @property {string} [judgmentKeyEnv] - credential environment variable the arm's judgment engine resolves through
+ *   the credentials seam. The runner resolves it exactly like `--api-key-env` (exported value first, else the
+ *   harness store) but tolerates absence: the consumers' documented degradation is not a usage error.
+ * @property {boolean} [expectsModelRouting] - whether every session with at least one turn must log at least one
+ *   `model-routing/decision` event (routing adoption).
+ * @property {boolean} [expectsCompactionVerification] - whether every session that compacted must log at least one
+ *   `compaction/verification` event (verification adoption).
  */
 
 /** Headless profile persona restated when a driver-line overlay replaces `system-prompt` config. */
@@ -81,6 +111,25 @@ export const HEADLESS_PERSONA = 'You are a coding agent powered by the {{model}}
  * not mention a prior session.
  */
 export const SESSION_QUERY_DRIVER_LINE = 'The previous session in this workspace recorded a decision this task needs. Look it up with session_search or session_event_search, then session_event_read the matching event; do not guess the recorded value.'
+
+/** The bench directory: the root an arm's pinned-overlay path resolves against. */
+const BENCH_ROOT = fileURLToPath(new URL('..', import.meta.url))
+
+/**
+ * Read one arm's pinned treatment overlay. The file holds the arm's non-shared
+ * rows and the renderer emits it verbatim, so the pinned posture is the single
+ * source of the measured composition; a missing or unreadable pin fails loud
+ * instead of rendering a baseline the arm never chose.
+ * @param {string} pinnedOverlay - bench-relative path from the arm entry.
+ * @returns {string} the pinned document, without its trailing newline.
+ */
+function readPinnedOverlay(pinnedOverlay) {
+  try {
+    return readFileSync(join(BENCH_ROOT, pinnedOverlay), 'utf8').trimEnd()
+  } catch (error) {
+    throw new Error(`arm pinned overlay ${pinnedOverlay} is unreadable: ${/** @type {Error} */ (error).message}`)
+  }
+}
 
 /**
  * Registered arms, in run order. `off` is the baseline every comparison is
@@ -249,6 +298,48 @@ export const ARMS = Object.freeze({
     expectsJspace: true,
     expectsResearcher: true,
   }),
+  // Jev ladder (PR4). Each arm's treatment rows are pinned on disk and the
+  // renderer emits that file verbatim, so the pinned posture is the single
+  // source of the measured composition. The routing pair pins its own route in
+  // `bench/routing/`; the compaction baseline reads the forced-compaction
+  // posture file itself, and the jev arm's file restates that posture beside
+  // its judgment fields because a `config` patch replaces a whole config.
+  'route-off': Object.freeze({
+    name: 'route-off',
+    jspace: Object.freeze({ enabled: false, mode: 'available', requireCoverage: true }),
+    pinnedOverlay: 'routing/route-off.patch.yml',
+    sessionQuery: false,
+    expectsSessionQuery: false,
+    expectsJspace: false,
+  }),
+  'route-on': Object.freeze({
+    name: 'route-on',
+    jspace: Object.freeze({ enabled: false, mode: 'available', requireCoverage: true }),
+    pinnedOverlay: 'routing/route-on.patch.yml',
+    judgmentKeyEnv: 'TYPESAFE_API_KEY',
+    sessionQuery: false,
+    expectsSessionQuery: false,
+    expectsJspace: false,
+    expectsModelRouting: true,
+  }),
+  'compact-basic': Object.freeze({
+    name: 'compact-basic',
+    jspace: Object.freeze({ enabled: false, mode: 'available', requireCoverage: true }),
+    pinnedOverlay: 'pressure/forced-compaction.patch.yml',
+    sessionQuery: false,
+    expectsSessionQuery: false,
+    expectsJspace: false,
+  }),
+  'compact-jev': Object.freeze({
+    name: 'compact-jev',
+    jspace: Object.freeze({ enabled: false, mode: 'available', requireCoverage: true }),
+    pinnedOverlay: 'compaction/jev.patch.yml',
+    judgmentKeyEnv: 'TYPESAFE_API_KEY',
+    sessionQuery: false,
+    expectsSessionQuery: false,
+    expectsJspace: false,
+    expectsCompactionVerification: true,
+  }),
 })
 
 /**
@@ -283,6 +374,16 @@ function configRows(config) {
 }
 
 /**
+ * Render one nested entry's config rows: the indentation a `config:` key inside
+ * an `- insert:` layer needs.
+ * @param {Record<string, unknown>} config - config keys for the entry.
+ * @returns {string} rows indented under the nested `config:` key.
+ */
+function nestedConfigRows(config) {
+  return configRows(config).split('\n').map(row => `    ${row}`).join('\n')
+}
+
+/**
  * Render the `--patch` overlay for one trial. Besides the jspace toggle, the
  * overlay redirects session persistence into a per-trial root with
  * `compression: none` so the runner can locate and line-read the log without
@@ -296,7 +397,10 @@ function configRows(config) {
  * surface — research-protocol, tracker (spool-only, per-trial spool/index),
  * ledger (per-trial store), their tool packages, and the aegis/ward/stride
  * debate seats — with persistence redirected into the per-trial root exactly
- * like the session-persistence redirect.
+ * like the session-persistence redirect. An arm carrying `pinnedOverlay` emits that
+ * file's content verbatim into the document — the Jev arms' treatment rows, which
+ * pin the routing arms' manual route and insert the judgment engine and its
+ * consumer (router or jev backend) because the base composition mounts none of them.
  * @param {ArmEntry} arm - arm entry from {@link getArm}.
  * @param {{ sessionLogRoot: string }} options - absolute per-trial persistence root.
  * @returns {string} the overlay YAML document.
@@ -342,6 +446,13 @@ ${configRows(arm.toolJspace)}
     mode: "both"
 `
   }
+  // A Jev arm's treatment rows are pinned on disk and emitted verbatim, so the
+  // pinned file is the single source of what the arm measured; its own header
+  // carries the insert-not-patch contract and the frozen operating points.
+  if (arm.pinnedOverlay) {
+    overlay += `${readPinnedOverlay(arm.pinnedOverlay)}
+`
+  }
   if (arm.researcher) {
     // research-protocol must be INSERTED, not patched: the base headless
     // composition does not mount it, and a patch against a missing entry
@@ -351,7 +462,7 @@ ${configRows(arm.toolJspace)}
     - id: research-protocol
       name: "@shres-code/shres-code-research-protocol"
       config:
-${configRows(arm.researcher).split('\n').map(row => `    ${row}`).join('\n')}
+${nestedConfigRows(arm.researcher)}
     - id: tracker-shrestech
       name: "@shres-code/shres-code-tracker-shrestech"
       config:

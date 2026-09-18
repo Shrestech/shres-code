@@ -1,0 +1,52 @@
+# Pinned treatment rows for the `route-on` routing arm — the routing treatment.
+#
+# This file is the source of the arm's rows: `ArmEntry.pinnedOverlay` names it and
+# bench/runner/arms.js reads it and emits its content verbatim into the arm's
+# per-trial `--patch` overlay. Nothing restates these values, so the pinned
+# posture and the applied composition cannot drift. The file is path-free and
+# timestamp-free; the per-trial session root is added by the renderer.
+#
+# Both routing arms pin the manual route to the strong model in the tier-overlay
+# posture (`bench/tiers/*.patch.yml`): a `config` patch replaces the entry's whole
+# config, so `provider` and `model` are stated together. The router's
+# manual/default selection is the strong route and `candidates` is a downgrade
+# allowlist, so this pin is what makes a downgrade the only routable transition;
+# without it the profile default is already the candidate and every turn resolves
+# `candidate-equals-base`.
+#
+# The judgment engine and the router are INSERTED, never patched: the base
+# headless composition mounts neither, and a patch against a missing entry
+# no-ops silently, which would leave the arm measuring its own baseline.
+#
+# The judgment engine resolves TYPESAFE_API_KEY through the credentials seam on
+# every ask: only the reference name is pinned here, never a key value.
+#
+# Values are the frozen ones from bench/jev-preregistration.md: the fast judgment
+# tier (273 ms against 685 ms for `accurate` on a 1.7k-token state), the 0.8/0.1
+# gate above the measured ±0.06 wobble, a five-turn sticky horizon, escalate-back
+# at a difficulty score of 4, a two-error route breaker, fallback on an
+# unavailable engine, and exactly one candidate (the weak route of the same
+# adapter, so the credential and endpoint the arm already runs on serve it).
+- id: agent-default-model
+  config:
+    provider: "deepseek-official"
+    model: "deepseek-v4-pro"
+- insert:
+    - id: judgment-typesafe
+      name: "@shres-code/shres-code-judgment-typesafe"
+      config:
+        apiKeyRef: "TYPESAFE_API_KEY"
+    - id: model-router
+      name: "@shres-code/shres-code-model-router"
+      config:
+        initialMode: "on"
+        tier: "fast"
+        candidates: [{"id":"flash","provider":"deepseek-official","model":"deepseek-v4-flash","description":"a small, well-scoped change in familiar code"}]
+        downgradeThreshold: 0.8
+        downgradeMargin: 0.1
+        minTurnsDowngraded: 5
+        escalateBack: {"scoreThreshold":4}
+        maxRouteErrors: 2
+        onUnavailable: "fallback"
+        routeInstructions: "Which route should handle this turn? Choose the cheapest route that is still a safe fit, or the strong route when the turn is ambiguous or its work is not yet known."
+        difficultyInstructions: "How hard is this turn for the model handling it? Score it on the levels below."

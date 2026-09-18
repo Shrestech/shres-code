@@ -11,6 +11,12 @@
 # Applies identically to every arm; combine with a provider tier via a
 # second --tier-patch. A long-horizon verdict only counts when
 # pressureFired is true.
+#
+# This file is also the `compact-basic` arm's pin: that arm's `pinnedOverlay`
+# names it, so the arm's per-trial overlay and an experiment-level pressure run
+# apply the same bytes and the posture has one home. The `compact-jev` arm
+# restates these fields inside its own engine row because a `config` patch
+# replaces an entry's whole config, so an inserted backend cannot inherit them.
 # maxPointers 0 pins the pre-pointer instrument the w7/w8 baselines and the
 # w9 power analysis were measured on; summary seq pointers get their own
 # paired experiment (compaction-pointer-follow) rather than riding into every

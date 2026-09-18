@@ -26,9 +26,18 @@
  * verifier runs once, after the final phase, on the carried workspace.
  *
  * Every trial passes an arm-integrity audit: no session root may pre-exist
- * (leakage from a previous trial), and the off arm's logs must contain zero
- * `jspace/` events (overlay leakage). Violations land on `trial.integrity`;
+ * (leakage from a previous trial), the off arm's logs must contain zero
+ * `jspace/` events (overlay leakage), a routing arm must log a decision on every
+ * turn-bearing session (adoption), and a compaction-jev arm must log a
+ * verification whenever it compacted. Violations land on `trial.integrity`;
  * the trial is still recorded and the experiment never aborts.
+ *
+ * Credentials: `--api-key-env` names the conversation route's variable and is
+ * required for a real run; each selected arm may additionally declare
+ * `judgmentKeyEnv` for the engine its composition resolves on its own. Both
+ * resolve exported-value-first, then the harness store, and reach the child
+ * environment only — no bench record carries a value, and an unresolved
+ * judgment reference is left unset so the arm degrades as documented.
  *
  * Status policy: `error` is reserved for infrastructure noise that must not
  * count against the pass rate — PROVIDER_ERROR (provider failure signature in
@@ -76,6 +85,9 @@ Options:
                         An unset variable falls back to the harness credential store
                         ($SHRES_HOME/.credentials.yaml, default ~/.shres); the value is injected
                         into the child environment only, never into any bench record.
+                        An arm's own credential references (its judgment engine) resolve the same
+                        way and are injected the same way; an unresolved one is left unset, which
+                        is the arm's documented degradation rather than a usage error.
   --tier-patch <path>   experiment-level overlay applied after the arm overlay; repeatable, order preserved
   --concurrency <n>     max trials in flight (default: 1; 1 is sequential)
   --max-total-tokens <n>  live token cap per trial: observed root+descendant usage
@@ -84,7 +96,7 @@ Options:
                         skip (task, trial, arm) triples already recorded with a
                         delivered verdict (status success); retried provider-error
                         trials run again. Pin mismatches refuse loud.
-  --dry-run             print the plan and exit without writing or executing
+  --dry-run             print each selected arm's rendered overlay, then the plan; writes nothing and executes nothing
   --help                this text
 `
 
@@ -584,11 +596,14 @@ const SUMMABLE_METRICS = ['inputTokens', 'outputTokens', 'durationMs', 'turns', 
  * Sum per-phase metrics into the trial-level row. Researcher integrity fields
  * are nullable per phase; they sum across the phases that actually mounted the
  * researcher surface (the phase whose `gateRefusals` is non-null), with rates
- * averaged and derived booleans recomputed from the summed counts.
+ * averaged and derived booleans recomputed from the summed counts. The Jev
+ * routing/compaction fields are not rolled up here: a phase records shares
+ * without the counts behind them, so {@link rollupChainJevMetrics} recomputes
+ * them from the phase logs themselves.
  * @param {import('../schema/trial.js').PhaseRecord[]} phases - completed phases.
  * @returns {import('../schema/trial.js').TrialMetrics} field-wise sums.
  */
-function sumPhaseMetrics(phases) {
+export function sumPhaseMetrics(phases) {
   const total = emptyMetrics()
   for (const phase of phases) {
     for (const field of SUMMABLE_METRICS) {
@@ -623,6 +638,58 @@ function sumPhaseMetrics(phases) {
     total.unverifiedAcceptRecovery = (total.unverifiedRunRefusals ?? 0) > 0 && totalDecisions > 0
   }
   return total
+}
+
+/** Jev routing/compaction fields a chain trial recomputes from its phase logs instead of summing per phase. */
+const JEV_CHAIN_ROLLUP_FIELDS = ['cacheHitShare', 'modelTransitions', 'downgradedShare', 'keptStrongShare', 'routingHintCount', 'jevCompactionAcceptedBelowThreshold', 'jevSelectionDegraded']
+
+/**
+ * Fold a chain trial's Jev routing/compaction fields from its phases.
+ *
+ * A phase is folded on its own, so its metrics carry shares without the counts
+ * that produced them and count route changes only inside that phase. Re-folding
+ * the concatenated phase logs at the trial level recovers the exact counts — a
+ * route change at a phase boundary is a real transition — and leaves the null
+ * rules to the one fold that owns them: a chain with no usage anywhere keeps
+ * `cacheHitShare` null, and a phase that logged no usage contributes nothing to
+ * the denominator, so it cannot turn a measurable trial into zero.
+ *
+ * `downgradedStreaks` is the one field the concatenation cannot state: each
+ * phase is its own session, so a run of downgraded turns spanning a phase
+ * boundary is deliberately NOT merged, and the trial's list is the phases'
+ * lists in phase order.
+ * @param {import('../schema/trial.js').TrialMetrics} metrics - the trial's summed metrics; the Jev fields are overwritten.
+ * @param {import('../schema/trial.js').PhaseRecord[]} phases - completed phases, in order.
+ * @param {string} armDir - the arm's output directory; phase `sessionFile` values are relative to it.
+ * @returns {Promise<void>}
+ */
+export async function rollupChainJevMetrics(metrics, phases, armDir) {
+  const logs = []
+  for (const phase of phases) {
+    if (phase.sessionFile === null) continue
+    logs.push(await readFile(join(armDir, phase.sessionFile), 'utf8'))
+  }
+  if (logs.length === 0) return
+  const folded = foldSessionLog(logs.join('\n'))
+  for (const field of JEV_CHAIN_ROLLUP_FIELDS) {
+    metrics[field] = folded[field]
+  }
+  const judged = phases.some(phase => Array.isArray(phase.metrics.downgradedStreaks))
+  metrics.downgradedStreaks = judged ? phases.flatMap(phase => phase.metrics.downgradedStreaks ?? []) : null
+}
+
+/**
+ * The trial metrics for a chain the runner itself aborted: the phase sums with
+ * the Jev fields rolled up, or an empty record when no phase completed.
+ * @param {import('../schema/trial.js').PhaseRecord[] | undefined} partial - completed phases, when any.
+ * @param {string} armDir - the arm's output directory.
+ * @returns {Promise<import('../schema/trial.js').TrialMetrics>} the trial's metrics.
+ */
+async function partialMetrics(partial, armDir) {
+  if (partial === undefined) return emptyMetrics()
+  const metrics = sumPhaseMetrics(partial)
+  await rollupChainJevMetrics(metrics, partial, armDir)
+  return metrics
 }
 
 /**
@@ -760,13 +827,15 @@ async function runChainTrial({ task, entry, arm, armDir, scratchDir, sessionRoot
     })
     const outcome = classifySpawn(execution)
     if (outcome === 'provider-error' || outcome === 'harness-error') {
+      const metrics = sumPhaseMetrics(phases)
+      await rollupChainJevMetrics(metrics, phases, armDir)
       return {
         ...base,
         status: 'error',
         resolved: false,
         failureMode: outcome === 'provider-error' ? 'PROVIDER_ERROR' : 'HARNESS_ERROR',
         verifier: skippedVerifier(spawnFailureDetail(outcome, execution, ` in phase ${index}`)),
-        metrics: sumPhaseMetrics(phases),
+        metrics,
         sessionFile: phases.at(-1).sessionFile,
         phases: [...phases],
         endedAt: new Date().toISOString(),
@@ -776,13 +845,15 @@ async function runChainTrial({ task, entry, arm, armDir, scratchDir, sessionRoot
   const verifier = await runVerifier({ taskDir: task.dir, verify: task.verify, scratchDir, signal })
   const anyPhaseTimedOut = phases.some(phase => phase.timedOut)
   const anyPhaseBudgetExceeded = phases.some(phase => phase.budgetExceeded)
+  const metrics = sumPhaseMetrics(phases)
+  await rollupChainJevMetrics(metrics, phases, armDir)
   return {
     ...base,
     status: 'success',
     resolved: verifier.resolved,
     failureMode: verifier.resolved ? null : anyPhaseBudgetExceeded ? 'BUDGET_EXCEEDED' : anyPhaseTimedOut ? 'AGENT_TIMEOUT' : verifier.failureMode,
     verifier,
-    metrics: sumPhaseMetrics(phases),
+    metrics,
     sessionFile: /** @type {string | null} */ (phases.at(-1).sessionFile),
     phases: [...phases],
     endedAt: new Date().toISOString(),
@@ -796,31 +867,39 @@ const SESSION_QUERY_TOOL_NAMES = new Set([
 ])
 
 /**
- * Scan one session log for jspace events and session-query tool calls.
- * The metrics fold has already read this file, so its lines parse.
+ * Scan one session log for the events the integrity audit judges: the leakage
+ * evidence (jspace events and session-query tool calls) and the adoption
+ * evidence (routing decisions and jev verifications). The metrics fold has
+ * already read this file, so its lines parse.
  * @param {string} sessionLogPath - absolute session.jsonl path.
- * @returns {Promise<{ jspaceTypes: string[], sessionQueryTools: string[] }>}
- *   distinct `jspace/` event types and session-query tool names in first-seen order.
+ * @returns {Promise<{ jspaceTypes: string[], sessionQueryTools: string[], routingDecisions: number, compactionVerifications: number }>}
+ *   distinct `jspace/` event types and session-query tool names in first-seen
+ *   order, plus the counts of `model-routing/decision` and
+ *   `compaction/verification` events.
  */
-async function findIntegrityViolationEvents(sessionLogPath) {
+async function scanSessionLog(sessionLogPath) {
   const text = await readFile(sessionLogPath, 'utf8')
   /** @type {string[]} */
   const jspaceTypes = []
   /** @type {string[]} */
   const sessionQueryTools = []
+  let routingDecisions = 0
+  let compactionVerifications = 0
   for (const line of text.split('\n')) {
     if (line.trim() === '') continue
     const event = /** @type {{ type?: unknown, data?: Record<string, unknown> }} */ (JSON.parse(line))
     if (typeof event.type === 'string' && event.type.startsWith('jspace/') && !jspaceTypes.includes(event.type)) {
       jspaceTypes.push(event.type)
     }
+    if (event.type === 'model-routing/decision') routingDecisions += 1
+    if (event.type === 'compaction/verification') compactionVerifications += 1
     if (event.type === 'tool/call' && event.data && typeof event.data.name === 'string') {
       if (SESSION_QUERY_TOOL_NAMES.has(event.data.name) && !sessionQueryTools.includes(event.data.name)) {
         sessionQueryTools.push(event.data.name)
       }
     }
   }
-  return { jspaceTypes, sessionQueryTools }
+  return { jspaceTypes, sessionQueryTools, routingDecisions, compactionVerifications }
 }
 
 /**
@@ -856,6 +935,27 @@ export async function readStoredCredential(env, name) {
     return value === '' ? null : value
   }
   return null
+}
+
+/**
+ * Add each named credential the harness store holds and the environment does
+ * not export. `--api-key-env` resolves the same way but refuses to run without
+ * its value; these are references an arm's composition resolves on its own, so
+ * an unresolved one is left alone and the consumer degrades as documented.
+ * @param {NodeJS.ProcessEnv} env - runner environment (pre-override SHRES_HOME).
+ * @param {string[]} names - declared credential variable names, in arm order.
+ * @returns {Promise<NodeJS.ProcessEnv>} `env`, with every resolvable name added.
+ */
+export async function injectStoredCredentials(env, names) {
+  let injected = env
+  for (const name of names) {
+    const exported = injected[name]
+    if (typeof exported === 'string' && exported !== '') continue
+    const stored = await readStoredCredential(injected, name)
+    if (stored === null) continue
+    injected = { ...injected, [name]: stored }
+  }
+  return injected
 }
 
 /**
@@ -900,6 +1000,7 @@ export async function main(argv, io = {}) {
   }
 
   const plan = buildPlan({ taskIds, arms: options.arms, repeats: options.repeats })
+  const experimentDir = join(benchRoot, 'runs', options.experiment)
 
   if (options.dryRun) {
     print(`experiment: ${options.experiment}`)
@@ -909,6 +1010,18 @@ export async function main(argv, io = {}) {
       : `  tierPatches: ${tierPatchRecords.map(r => `${r.path} (${r.sha256.slice(0, 12)}…)`).join(', ')}`
     print(`apiKeyEnv: ${apiKeyEnv}${tierSummary}`)
     print(`tasks: ${taskIds.join(', ')}`)
+    // The integrity check a dry run exists for: render every selected arm's
+    // overlay at the per-trial root its first plan entry would use, so a
+    // config the harness refuses is visible before any spend. Nothing is
+    // created or written.
+    for (const armName of options.arms) {
+      const entry = /** @type {PlanEntry} */ (plan.find(candidate => candidate.arm === armName))
+      const sessionLogRoot = join(experimentDir, armName, 'sessions', entry.taskId, String(entry.trialIndex))
+      print(`overlay [${armName}] ${sessionLogRoot}`)
+      for (const line of renderArmOverlay(getArm(armName), { sessionLogRoot }).trimEnd().split('\n')) {
+        print(`  ${line}`)
+      }
+    }
     print(`plan: ${plan.length} trials (${taskIds.length} tasks × ${options.repeats} repeats × ${options.arms.length} arms)`)
     if (options.concurrency > 1) print(`concurrency: ${options.concurrency}`)
     for (const entry of plan) {
@@ -932,8 +1045,15 @@ export async function main(argv, io = {}) {
     }
     if (fromEnv !== key) env = { ...env, [apiKeyEnv]: key }
   }
+  // The selected arms' own credential references, resolved the same way and
+  // injected into the child environment only. Absence is not a usage error:
+  // a judgment consumer whose engine cannot be reached runs its documented
+  // degradation, so the run is recorded and reported as not evidence.
+  const optionalCredentials = [...new Set(options.arms
+    .map(name => getArm(name).judgmentKeyEnv)
+    .filter(name => typeof name === 'string'))]
+  env = await injectStoredCredentials(env, optionalCredentials)
 
-  const experimentDir = join(benchRoot, 'runs', options.experiment)
   const shresHome = join(experimentDir, '.shres-home')
   const gitCommit = await resolveGitCommit(repoRoot)
   const startedAt = new Date().toISOString()
@@ -1118,7 +1238,7 @@ export async function main(argv, io = {}) {
           exitCode: -1,
           detail: `runner failure: ${/** @type {Error} */ (error).message}`.slice(0, 200),
         },
-        metrics: partial === undefined ? emptyMetrics() : sumPhaseMetrics(partial),
+        metrics: await partialMetrics(partial, armDir),
         sessionFile: partial?.at(-1)?.sessionFile ?? null,
         ...(partial === undefined ? {} : { phases: [...partial] }),
         endedAt: new Date().toISOString(),
@@ -1128,23 +1248,32 @@ export async function main(argv, io = {}) {
     if (signal?.aborted) return
 
     // Integrity audit, part 2: arms that exclude jspace must log zero jspace
-    // events; arms that exclude session-query must log zero session-query
-    // tool/call events.
-    const sessionFiles = (trial.phases ?? [{ sessionFile: trial.sessionFile }])
-      .map(record => record.sessionFile)
-      .filter(file => file !== null)
-    if (!arm.expectsJspace || !arm.expectsSessionQuery) {
-      for (const file of sessionFiles) {
-        const { jspaceTypes, sessionQueryTools } = await findIntegrityViolationEvents(join(armDir, file))
+    // events, arms that exclude session-query must log zero session-query
+    // tool/call events, a routing arm must log a decision on every session that
+    // ran a turn, and a compaction-jev arm must log a verification on every
+    // session that compacted. Presence is judged per session against that
+    // session's own metrics, because a chain's phases are separate sessions.
+    const sessionRecords = trial.phases ?? [{ sessionFile: trial.sessionFile, metrics: trial.metrics }]
+    const judgesAdoption = arm.expectsModelRouting === true || arm.expectsCompactionVerification === true
+    if (!arm.expectsJspace || !arm.expectsSessionQuery || judgesAdoption) {
+      for (const record of sessionRecords) {
+        if (record.sessionFile === null) continue
+        const facts = await scanSessionLog(join(armDir, record.sessionFile))
         if (!arm.expectsJspace) {
-          for (const type of jspaceTypes) {
+          for (const type of facts.jspaceTypes) {
             violations.push(`off-arm-jspace-event:${type}`)
           }
         }
         if (!arm.expectsSessionQuery) {
-          for (const name of sessionQueryTools) {
+          for (const name of facts.sessionQueryTools) {
             violations.push(`excluded-session-query-tool:${name}`)
           }
+        }
+        if (arm.expectsModelRouting === true && record.metrics.turns >= 1 && facts.routingDecisions === 0) {
+          violations.push(`missing-model-routing-decision:turns=${record.metrics.turns}`)
+        }
+        if (arm.expectsCompactionVerification === true && record.metrics.compactionCount > 0 && facts.compactionVerifications === 0) {
+          violations.push(`missing-compaction-verification:compactions=${record.metrics.compactionCount}`)
         }
       }
     }

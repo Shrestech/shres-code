@@ -8,11 +8,14 @@ Static, zero-build, zero-dependency report. `index.html` loads `data.js` (genera
 
 `ReportData.comparisons` is an array of `off` vs treatment pairings, one record per non-`off` arm in the experiment (`treatment`, `grade`, `deltaAccuracy`, `mcnemarP`, `pairs`). There is no singular `comparison` field and no top-level `pairs` array.
 
+`ReportData.verdicts` is optional: the pre-registered Jev verdict block, one record per hypothesis (`{ id, rule, arms, status, outcome, reason, observed, threshold, ci95, trials, facts }`), graded by `report/verdicts.js` from the embedded trials. A record is either `evaluable` with `outcome`, `ci95`, and `trials`, or `not-evaluable` with a `reason` and no outcome; the schema rejects anything in between. Each arm's `results.json` carries the subset whose `arms` name it.
+
 Extended fields the UI tolerates (both optional):
 
 - `tasks[].stratum` may be `"chain"` (multi-session tasks) or `"pressure"` (memory-pressure tasks), in addition to `long` / `short` / `adversarial`.
 - `trials[]` may carry `phases`: `{ phaseIndex, sessionFile, resumedFrom, exitCode, timedOut, metrics: TrialMetrics, startedAt, endedAt }[]` — the per-phase breakdown of one chain trial (`resumedFrom: null` means a cold start) — and `integrity`: `{ violations: string[] }`, present only when non-empty.
 - Arm summaries may carry forensics and compaction aggregates (`meanDanglingCard`, `meanVerifiedCheckpointShare`, `meanSessionQueryCalls`, `totalNoopNoteRefusals`, `totalCompactionCount`, `pressureFiredRate`, and the matching cell fields). A `null` mean means the arm excludes that metric.
+- Arm summaries and cells may also carry the Jev routing/compaction aggregates (`meanCacheHitShare`, `cacheHitShareNullTrials`, `meanModelTransitions`, `routingDecisionTrials`, `meanDowngradedShare`, `meanKeptStrongShare`, `meanDowngradedStreakLongest`, `totalDowngradedRuns`, `totalRoutingHintCount`, `compactionVerificationTrials`, `totalJevCompactionAcceptedBelowThreshold`, `totalJevSelectionDegraded`). A `null` mean or total means no trial in the group recorded that datum; the three trial counts are never null. The headline arm table renders a fixed column set and does not show these.
 
 The hero banner's bootstrap interval and the matrix subtotals are recomputed in the UI from embedded trials. serve.js roots the static report at `bench/ui`, so the browser cannot import `bench/stats`; `model.js` mirrors the seeded mulberry32 PRNG, the paired percentile bootstrap, the Wilson interval, and the outcome pairing from `bench/stats/{intervals,paired}.js` and must stay algorithm-equivalent to them.
 

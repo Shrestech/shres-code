@@ -25,6 +25,10 @@ The nine-arm ladder covers every jspace/session-query contrast. `sq-driver` exis
 | `research-inert` | disabled | absent | Researcher surface mounted (tracker spool-only + ledger + tools + aegis/ward/stride seats), protocol `enabled: false`. |
 | `research-lite` | disabled | absent | Same surface, protocol `enabled: true, requireDesignDefense: 'off'`. |
 | `research-on` | available | absent | Same surface, `requireDesignDefense: 'per-epoch'`, plus jspace `verifierTools: ['bash','experiment_verify_decision_rule']` and `requireVerifiedEvidence: true` (the on-sq-verified pattern). |
+| `route-off` | disabled | absent | Jev routing control: `agent-default-model` pinned to the strong route; neither the judgment engine nor the router inserted. |
+| `route-on` | disabled | absent | Jev routing treatment: the same pin plus `judgment-typesafe` and `model-router` (`initialMode: 'on'`), one allowlisted candidate. |
+| `compact-basic` | disabled | absent | Jev compaction control: `compaction-basic` restating the forced-compaction posture as one whole config. |
+| `compact-jev` | disabled | absent | Jev compaction treatment: the same posture with `compaction-basic` disabled and `compaction-jev` inserted beside the judgment engine. |
 
 Arms register in `runner/arms.js`. Every overlay carries a `jspace` config patch and the per-trial persistence redirect; an arm with a `toolJspace` config adds a `tool-jspace` patch; session-query arms additionally patch the shipped `session-query-sqlite` service to open a per-trial index at startup (it ships with `openAt: never` and an in-memory path) and append an `- insert:` layer mounting `tool-session-query`. The `code` arm patches `tools.mode` to `both`. Arms without session-query need no disable rows, because the tool is absent from the profile.
 
@@ -41,6 +45,8 @@ bench/
   tasks/        Task catalog: instruction + fixture + verifier per directory
   tiers/        Provider-swap experiment overlays (`--tier-patch`)
   pressure/     Repeatable experiment overlays that force mid-task memory pressure
+  routing/      Pinned treatment rows of the Jev routing arms, emitted verbatim into their per-trial overlay
+  compaction/   Pinned treatment rows of the Jev compaction arms, emitted verbatim into their per-trial overlay
   tests/        node --test suites
   runs/         Output. runs/<experiment>/<arm>/{run.json, trials.jsonl, results.json}
 ```
@@ -131,7 +137,7 @@ Each trial records `compactionCount` (`compaction/end` events in the session log
 
 ## Chain tasks
 
-A task with `phases` (at least 2) in task.json runs as a chain: one scratch dir whose workspace carries across phases, but a separate headless spawn per phase with a fresh per-phase session root (`runs/<experiment>/<arm>/sessions/<taskId>/<trialIndex>/phase-<i>`) — the session boundary is the experiment. The verifier runs once, after the final phase, against the carried workspace; a phase ending in PROVIDER_ERROR or HARNESS_ERROR aborts the chain and excludes the trial from the pass rate. Trial-level metrics are per-phase sums. Carry is **cold-only** today: `resumedFrom` stays null because the harness has no headless/SDK session resume or fork yet; card carry across sessions is a proposed uplift.
+A task with `phases` (at least 2) in task.json runs as a chain: one scratch dir whose workspace carries across phases, but a separate headless spawn per phase with a fresh per-phase session root (`runs/<experiment>/<arm>/sessions/<taskId>/<trialIndex>/phase-<i>`) — the session boundary is the experiment. The verifier runs once, after the final phase, against the carried workspace; a phase ending in PROVIDER_ERROR or HARNESS_ERROR aborts the chain and excludes the trial from the pass rate. Trial-level metrics are per-phase sums, with one exception: the Jev routing/compaction fields cannot be summed (a share and a route change are not additive), so a chain trial recomputes them by folding its phases' concatenated logs — a route change at a phase boundary counts as a real transition — and `downgradedStreaks` is the phases' run lists in phase order, deliberately never merging a run across a boundary, because each phase is its own session. Carry is **cold-only** today: `resumedFrom` stays null because the harness has no headless/SDK session resume or fork yet; card carry across sessions is a proposed uplift.
 
 Every trial (chains and single-session) passes an arm-integrity audit: no session root of the trial may pre-exist; arms not expecting jspace (`off`, `sq-only`, `sq-driver`, `stuffed`, `read`, `code`) must contain zero `jspace/` events in their session logs; arms not expecting session-query (`off`, `on`, `stuffed`) must contain zero session-query `tool/call` events. The audit only checks absence, so an arm that permits jspace records no violation when a trial logs no jspace event — the expected outcome for an `on-adaptive` trial that finishes before step 10. Violations are recorded on `trial.integrity.violations`; the trial still counts and the experiment never aborts.
 
@@ -186,6 +192,41 @@ pairs per Goal epoch), `runsLogged` (landed posts; zero under spool-only),
 (debate pairs under the 200-token seat floor). These are null for non-researcher
 arms.
 
+## Jev ladder (WP-jev)
+
+The Jev experiment prices judgment-backed routing and compaction against one pinned manual route and one forced-compaction posture. Four arms — two paired contrasts — all mounted on the shipped headless composition, which mounts neither the judgment engine, nor the model router, nor a compaction provider of its own. The decision rules are fixed in [`jev-preregistration.md`](jev-preregistration.md); the arms below are the composition those rules measure.
+
+| Arm | Judgment engine | Router | Compaction | Notes |
+|---|---|---|---|---|
+| `route-off` | absent | absent | shipped default | Routing control, pinned in `routing/route-off.patch.yml`. Both routing arms patch `agent-default-model` to the strong route (`deepseek-official / deepseek-v4-pro`), so the pair starts from one route and a downgrade is the only routable transition. |
+| `route-on` | `judgment-typesafe` (`tier: 'fast'`) | `model-router`, `initialMode: 'on'` | shipped default | Pinned in `routing/route-on.patch.yml`. One allowlisted candidate (`deepseek-official / deepseek-v4-flash`, the weak route of the same adapter, so the credential and endpoint the arm already runs on serve it), `downgradeThreshold: 0.8`, `downgradeMargin: 0.1`, `minTurnsDowngraded: 5`, `escalateBack: { scoreThreshold: 4 }`, `maxRouteErrors: 2`, `onUnavailable: 'fallback'`. |
+| `compact-basic` | absent | absent | `compaction-basic` | Compaction control, pinned in `pressure/forced-compaction.patch.yml`: the forced-compaction posture (`auto: true`, `thresholdRatio: 0.015`, `retainRatio: 0.003`, `maxTokens: 8192`, the retry budget, `maxPointers: 0`). |
+| `compact-jev` | `judgment-typesafe` (`tier: 'accurate'`) | absent | `compaction-jev` | Pinned in `compaction/jev.patch.yml`: the same posture restated as one whole `compaction-jev` config, plus the three-hazard verification battery (constraints, errors, paths). |
+
+Each arm's treatment rows are pinned in a committed overlay — `bench/routing/route-off.patch.yml`, `bench/routing/route-on.patch.yml`, `bench/pressure/forced-compaction.patch.yml` (the `compact-basic` arm's pin and the posture's one home), `bench/compaction/jev.patch.yml` — which `runner/arms.js` emits verbatim into the arm's per-trial `--patch` overlay, so the pinned posture and the applied composition have one source and cannot drift. The pinned files are path-free and timestamp-free: the renderer adds the per-trial session root beside them.
+
+The judgment engine, the router, and the Jev backend are **inserted, never patched**: the base composition mounts none of them, and a patch against a missing entry no-ops silently, which would leave the arm measuring its own baseline — the lesson the researcher overlay records. Both routing arms pin `agent-default-model` and restate `provider` and `model` together, because a `config` patch replaces the entry's whole config. Both compaction arms restate the whole inherited policy the forced-compaction overlay names — the profile default never fires on the catalog's turn counts — so anything the pair does not share would confound the contrast, and `retainRatio` must stay below `thresholdRatio` or the plugin refuses to load. `compact-jev` disables the `compaction-basic` row before inserting the Jev backend because the two register the same compaction service key. The judgment engine resolves `TYPESAFE_API_KEY` through the credential seam on every ask, so only the reference name is pinned and no key value reaches an overlay or a bench record; without that key every judgment ask fails, both arms resolve to their baseline, and the run is not evidence.
+
+```sh
+node bench/runner/run.js --arms route-off,route-on,compact-basic,compact-jev
+```
+
+### Verdicts
+
+`report/build.js` grades the four rules the pre-registration freezes: `report.verdicts` carries one record per hypothesis — `id`, `rule` (the frozen wording), `arms`, `status`, `outcome`, `reason`, `observed`, `threshold`, `ci95`, `trials`, and the supporting `facts` — and each arm's `results.json` carries the verdicts that read that arm, so a per-arm file shows its own screens.
+
+| Verdict | Rule | Arms | Estimator and interval |
+|---|---|---|---|
+| `H2` | mean `tokensIncludingDescendants` on `route-on` trials with ≥1 downgraded decision is ≥15% below the paired `route-off` trial's | `route-off`, `route-on` | mean paired relative delta, bootstrap over the paired deltas; gated by `H3` |
+| `H3` | ≥2/3 of `route-on` trials log ≥1 `model-routing/decision` | `route-on` | share of the arm's trials that logged a decision, Wilson interval |
+| `H4` | `cacheHitShare(route-on) ≥ cacheHitShare(route-off) − 5 points`, applied only when ≥80% of trials in both arms carry usage data | `route-off`, `route-on` | difference of the arms' mean per-trial shares, paired bootstrap over matched share deltas |
+| `H5` | on `pressureFired` trials the verifier-passed rate under `compact-jev` is ≥+10 points over `compact-basic` with the interval excluding zero, and tokens stay within 1.2× of the basic arm | `compact-basic`, `compact-jev` | paired pass-rate delta with its paired bootstrap interval (McNemar p rides along as a diagnostic), paired token ratio against the 1.2× ceiling; gated by `H6` |
+| `H6` | ≥2/3 of `compact-jev` trials that compact at all log ≥1 `compaction/verification` | `compact-jev` | share of the arm's compacting trials that logged a verification, Wilson interval |
+
+Three rules make a verdict honest, and the report schema enforces them at build time: the status is `evaluable` or `not-evaluable`; a missing datum, an empty subset, or fewer than two matched pairs is `not-evaluable` **with its reason** and carries no outcome, no interval, and no threshold at all — never a pass, and never a fail by default; and an evaluated verdict carries its outcome, its interval, and its trial count. One matched pair reproduces itself under every bootstrap resample, so it has no interval to report and does not evaluate a paired rule; the pre-registration states no minimum sample, so that guard is the suite's own reading of protocol rule 3 rather than a threshold of the frozen file. A screen that fails makes the hypothesis it gates not-evaluable rather than confirmed, exactly as the pre-registration states: a failed `H3` leaves `H2` not-evaluable, and a failed `H6` leaves `H5` not-evaluable. Every experiment gets all five records, so an experiment that ran none of these arms reports five not-evaluable verdicts — as the demo report does — instead of no claim.
+
+The task list, repeats, and tier flags come from the suite's normal argv surface; `--dry-run` on the same command is the integrity check that every overlay renders and every arm loads, and is not evidence about any hypothesis. Routing is priced on `route-on` trials that log at least one downgraded decision, compaction on `pressureFired` trials, and the churn screen on trials that carry usage data at all — so the per-arm aggregates carry each screen's trial count (`routingDecisionTrials`, `compactionVerificationTrials`, `cacheHitShareNullTrials`) beside the means. Every Jev metric is null, never zero, where its surface is absent: a `route-off` trial logs no routing decision at all (routing off is off), and a `compact-basic` trial records no Jev compaction event.
+
 ## Forensics metrics
 
 Per-trial metrics beyond pass/fail, computed from the session JSONL:
@@ -208,13 +249,30 @@ Per-trial metrics beyond pass/fail, computed from the session JSONL:
 | `emptyCharterRate` | `number \| null` | 1 when the last `jspace/card` charter is empty or no card opened; 0 when the last card carries at least one entry; null for jspace-off. |
 | `unverifiedShare` | `number \| null` | Last-card `kind: 'check'` entries with `discrimination: 'unverified'`, divided by registered checks; null when no checks. |
 | `echoOkRejectRate` | `number \| null` | Floor registration refusals (`JSPACE_CHARTER_CONSTANT` / `JSPACE_CHARTER_NO_READ`, or their model-visible copy) over `jspace_open` / `jspace_charter_amend` results; null when no registration attempt. The amend event is `jspace/charter-amend`. |
+| `cacheHitShare` | `number \| null` | `cacheReadTokens / (inputTokens + cacheReadTokens + cacheWriteTokens)` over the trial's `assistant/message` usage. The three counts are disjoint (`TokenUsage`), so the denominator is billed input. Null when the trial recorded no usage record or no billed input; a usage record that carries no cache count reads as 0 (a reported miss), which is the case the churn screen's usage-data coverage counts as measurable. |
+| `modelTransitions` | `number \| null` | Consecutive `request/header` pairs whose `config.provider` / `config.model` differ; null when the log carries no readable header, 0 for a single route. The harness logs a header on the first request and then only when the whole header differs (system prompt and tool set included), so a re-stated route is not a transition. |
+| `downgradedStreaks` | `number[] \| null` | Run lengths of consecutive `model-routing/decision` events whose `outcome` is `downgraded`, in log order. An empty list is "judged, never downgraded"; null is "never judged". |
+| `downgradedShare` | `number \| null` | Downgraded decisions over every decision; null when none was logged. |
+| `keptStrongShare` | `number \| null` | `kept-strong` decisions over every decision; null when none was logged. `skipped` (mode off) and `error` decisions stay in the denominator and in neither numerator. |
+| `routingHintCount` | `number \| null` | Decisions carrying the advisory `hint` the router logs while the manual route stands (`consider-stronger`); null when none was logged. |
+| `jevCompactionAcceptedBelowThreshold` | `number \| null` | `compaction/verification` events whose `verdict` is `accepted-below-threshold` (the draft kept after a failed battery with no escalation left); null when the log carries no verification event, which is every backend other than compaction-jev. |
+| `jevSelectionDegraded` | `number \| null` | `compaction/selection` events with `degraded: true`; null when the log carries no selection event. |
 
-Aggregates flow through `report/build.js` into `ui/data.js`. The demo generator exercises every field.
+Aggregates flow through `report/build.js` into `ui/data.js`. The demo generator writes every field; the surfaces no demo arm mounts (researcher, and the Jev router and compaction backend) stay null there rather than carrying synthesized values.
 
 ## Report
 
 `node bench/report/build.js [--experiment <name>|latest]` rebuilds per-arm `results.json` and `bench/ui/data.js` from `trials.jsonl`. `latest` (the default) picks the `runs/` directory with the newest modification time.
 
-The payload's `comparisons` array holds one `off` vs treatment record for every non-baseline arm present in the experiment (`off` vs `on`, `off` vs `on-adaptive`, and so on). Each record carries the McNemar grade, accuracy delta, and per-task paired rows; there is no singular `comparison` field. Arm summaries include forensics and compaction aggregates (`meanDanglingCard`, `meanVerifiedCheckpointShare`, `meanSessionQueryCalls`, `totalNoopNoteRefusals`, `totalCompactionCount`, `pressureFiredRate`, `meanCharterRunFailNamed`, `meanEmptyCharterRate`, `meanUnverifiedShare`, `meanEchoOkRejectRate`). The `pressure` stratum is a first-class catalog value alongside `long`, `short`, `adversarial`, and `chain`.
+The payload's `comparisons` array holds one `off` vs treatment record for every non-baseline arm present in the experiment (`off` vs `on`, `off` vs `on-adaptive`, and so on). Each record carries the McNemar grade, accuracy delta, and per-task paired rows; there is no singular `comparison` field. Arm summaries include forensics and compaction aggregates (`meanDanglingCard`, `meanVerifiedCheckpointShare`, `meanSessionQueryCalls`, `totalNoopNoteRefusals`, `totalCompactionCount`, `pressureFiredRate`, `meanCharterRunFailNamed`, `meanEmptyCharterRate`, `meanUnverifiedShare`, `meanEchoOkRejectRate`) and the Jev routing/compaction aggregates (`meanCacheHitShare`, `cacheHitShareNullTrials`, `meanModelTransitions`, `routingDecisionTrials`, `meanDowngradedShare`, `meanKeptStrongShare`, `meanDowngradedStreakLongest`, `totalDowngradedRuns`, `totalRoutingHintCount`, `compactionVerificationTrials`, `totalJevCompactionAcceptedBelowThreshold`, `totalJevSelectionDegraded`), mirrored on the per-task cells. Every Jev mean is null when no trial in the group recorded that datum, and every total is null when no trial recorded the event family it counts, so a report distinguishes a measured zero from a never-measured surface; `cacheHitShareNullTrials`, `routingDecisionTrials`, and `compactionVerificationTrials` are the count each pre-registered screen reads (churn, routing adoption, verification adoption). The `pressure` stratum is a first-class catalog value alongside `long`, `short`, `adversarial`, and `chain`.
+
+The payload also carries `verdicts`: the pre-registered Jev verdict block described under the Jev ladder, graded from the same embedded trials.
 
 Serve the static report with `node bench/report/serve.js`. The UI contract lives in `bench/ui/CONTRACT.md`.
+
+## Known limitations and deferred work
+
+- **The arm-integrity audit is one-directional.** It checks presence where a surface is expected and absence where it is excluded (an arm that must not mount jspace logs no `jspace/` event, a routing arm logs a decision on every session that ran a turn). There is no inverse leakage check: an event type no arm expects, or a surface that reaches a session through the profile rather than the arm's overlay, is not audited, so a violation of that direction is invisible to `trial.integrity.violations`.
+- **The UI headline table renders a fixed column set.** `bench/ui/views.js` lists its own columns, so the Jev routing/compaction aggregates and the verdict block reach `results.json`, `ui/data.js`, and the payload contract but not that table; a reader of the table alone sees none of them.
+- **No real Jev trial has been run.** The pre-registration's own precondition applies: without a live `TYPESAFE_API_KEY` every judgment ask fails, routing resolves `kept-strong`, compaction-jev degrades to the byte-identical basic path, and both arms become their baseline. The fold and the verdict block are therefore verified against synthetic session logs and fixture runs, never against a real Jev spend.
+- **H1 and H7 are not in the verdict block.** H1 (routing non-inferiority at −5 points) stays with `comparisons[].grade`'s McNemar path, which is `off`-baselined and implements no non-inferiority margin; H7 (any adversarial-stratum regression is an automatic NO-GO) is not computed at all. The per-task cells and the embedded `trials` carry the inputs for a later stratum-restricted test.

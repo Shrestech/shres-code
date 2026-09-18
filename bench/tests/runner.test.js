@@ -320,7 +320,7 @@ describe('arms registry', () => {
   it('registers the jspace ladder and the OOLONG-lite arms in order', () => {
     assert.deepEqual(
       listArms(),
-      ['off', 'on', 'sq-only', 'sq-driver', 'on-sq', 'on-sq-verified', 'on-adaptive', 'on-core', 'on-charter', 'stuffed', 'read', 'code', 'research-inert', 'research-lite', 'research-on'],
+      ['off', 'on', 'sq-only', 'sq-driver', 'on-sq', 'on-sq-verified', 'on-adaptive', 'on-core', 'on-charter', 'stuffed', 'read', 'code', 'research-inert', 'research-lite', 'research-on', 'route-off', 'route-on', 'compact-basic', 'compact-jev'],
     )
     assert.equal(ARMS.off.jspace.enabled, false)
     assert.equal(ARMS.on.jspace.enabled, true)
@@ -675,16 +675,11 @@ describe('schema compaction fields', () => {
       failureMode: null,
       verifier: { command: 'node verify.mjs', exitCode: 0 },
       metrics: {
+        ...emptyMetrics(),
         inputTokens: 100, outputTokens: 50, durationMs: 1000, turns: 4,
-        toolCalls: 3, identicalRetries: 0, checkpoints: 0, shipPasses: 0,
-        tokensIncludingDescendants: null, costIncludingDescendants: null, descendantSessions: 0, outOfLoopExperiments: 0,
-        danglingCard: null, verifiedCheckpointShare: null,
-        coverageRefusalThenPad: 0, noopNoteRefusals: 0, noteCapRefusals: 0,
-        sessionQueryCalls: null,
+        toolCalls: 3,
         compactionCount: 1,
         pressureFired: true,
-        gateRefusals: null, debateCalls: null, runsLogged: null, verifySatisfiedRate: null, unverifiedRunRefusals: null,
-        ledgerDecisions: null, deferredShare: null, ledgerAbandoned: null, unverifiedAcceptRecovery: null, thinDebates: null,
         ...metrics,
       },
       sessionFile: null,
