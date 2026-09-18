@@ -70,7 +70,7 @@ interface RuntimeResources {
 function runtimeResources(): RuntimeResources {
   const development = !app.isPackaged
   const runtime = process.env.SHRES_DESKTOP_RUNTIME_DIR
-    ?? (development ? join(app.getAppPath(), '.desktop-build', 'development', 'project') : join(app.getAppPath(), 'shres'))
+    ?? (development ? join(app.getAppPath(), '.desktop-build', 'development', 'project') : join(process.resourcesPath, 'shres'))
   return { node: process.env.SHRES_DESKTOP_NODE_BINARY ?? process.execPath, runtime }
 }
 
