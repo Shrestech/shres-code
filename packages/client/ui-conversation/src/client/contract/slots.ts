@@ -219,6 +219,14 @@ declare module '@shres-code/shres-code-client-ui-slots' {
      * a model here.
      */
     'conversation.input.model': { kind: 'single'; scope: 'session'; owner: InputControlOwnerProps }
+    /**
+     * The named model-routing seat immediately left of the model-select seat —
+     * one occupant, so taking it means rendering the whole routing affordance
+     * yourself. Same `locked`-only owner share and same renders-nothing-while-
+     * empty contract as the plan seat: a host composing no router registers no
+     * routing projection, and the seat then draws nothing.
+     */
+    'conversation.input.modelRouting': { kind: 'single'; scope: 'session'; owner: InputControlOwnerProps }
   }
 
   /**
@@ -539,7 +547,7 @@ export interface ComposerBarInjected {
 }
 
 /**
- * Owner share of the two named composer control seats (plan / model): the
+ * Owner share of the named composer control seats (plan / routing / model): the
  * bar passes its disable state; the filling entry owns everything else.
  */
 export interface InputControlOwnerProps {
@@ -550,7 +558,7 @@ export interface InputControlOwnerProps {
 /** Full composer-bar props: standard kit & owner share & control-seat render share & injected share (hooks bound) & locale seat. */
 export type ComposerBarProps =
   PropsRuntime<'conversation.composer.bar'>
-  & PropsRenderSlots<'conversation.input.plan' | 'conversation.input.model'>
+  & PropsRenderSlots<'conversation.input.plan' | 'conversation.input.modelRouting' | 'conversation.input.model'>
   & InjectFace<ComposerBarInjected>
   & PropsLocale<'conversation'>
 

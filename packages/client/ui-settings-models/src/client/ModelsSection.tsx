@@ -22,6 +22,7 @@ import { deriveKeyRef, messageOf, protocolChoices, providerEnabled, providerUsab
 import type { ModelsSettingsState, ModelsSettingsStore, ProviderRow } from './store.ts'
 import { ProviderEditor, type ProviderEditorProps } from './ProviderEditor.tsx'
 import { TeamCard } from './TeamCard.tsx'
+import { ClassifierCard } from './ClassifierCard.tsx'
 import { SpeechAudioCard } from './SpeechAudioCard.tsx'
 import type { SpeechStatusFace } from './SpeechAudioCard.tsx'
 import type { en } from './locales.ts'
@@ -315,6 +316,14 @@ function Loaded({ injected }: { injected: ModelsSectionInjected }): ReactNode {
         reload={() => { void controller.load() }}
         t={t}
       />
+      <div className={styles['rowCard']}>
+        <ClassifierCard
+          state={state}
+          api={api}
+          reload={() => { void controller.load() }}
+          t={t}
+        />
+      </div>
       <ul className={styles['rows']}>
         {listed.map((row) => {
           const target = targetOf(row)

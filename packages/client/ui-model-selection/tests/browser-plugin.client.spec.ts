@@ -14,9 +14,10 @@ import { createScope } from '@shres-code/shres-code-client-runtime/client'
 import type { SessionId } from '@shres-code/shres-code-client-runtime/client'
 import { LocaleRuntime } from '@shres-code/shres-code-client-locale/client'
 import { TestRemote } from '@shres-code/shres-code-client-test-runtime'
-import type { ModelSelection } from '@shres-code/shres-code-api-remotes/client'
+import type { ModelProviderGroup, ModelSelection } from '@shres-code/shres-code-api-remotes/client'
 import type { CommandDecoration, SelectOption } from '@shres-code/shres-code-client-ui-commands/client'
 import type { ModelSelectInjected } from '../src/client/slots.ts'
+import { conversationSelectable } from '../src/client/directory.ts'
 import { apply, inject } from '../src/client/index.ts'
 import { en } from '../src/client/locales.ts'
 
@@ -55,7 +56,18 @@ const GROUPS = [{
         defaultEffort: 'high',
       },
     },
+    {
+      id: 'jev-latest',
+      name: 'Jev Latest',
+      // A judgment engine entry: role-bound, so no conversation picker may
+      // offer it as a turn's model.
+      capabilities: ['judgment'],
+    },
   ],
+}, {
+  id: 'typesafe',
+  name: 'Typesafe',
+  models: [{ id: 'jev-preview', name: 'Jev Preview', capabilities: ['judgment'] }],
 }]
 
 /** Boot the plugin over fake faces + a stateful fake host (current moves on selectModel). */
@@ -148,6 +160,10 @@ async function bench() {
 }
 
 const projection = (id: string) => ({ sessionId: sid(id) })
+
+/** Every model id a set of provider groups advertises. */
+const modelIds = (groups: readonly ModelProviderGroup[]): string[] =>
+  groups.flatMap(group => group.models.map(model => model.id))
 
 describe('ui-model-selection dual entry', () => {
   it('decorates the host /model command and registers the composer model seat', async () => {
@@ -364,5 +380,31 @@ describe('ui-model-selection dual entry', () => {
     b.ctx.emit('connection/reset')
     await Promise.resolve()
     expect(b.calls).toEqual({ models: 0, select: 0 })
+  })
+})
+
+describe('conversation picker capability filter', () => {
+  it('withdraws a declared marker and keeps one it does not act on', () => {
+    expect(conversationSelectable({ id: 'plain', name: 'Plain' })).toBe(true)
+    expect(conversationSelectable({ id: 'engine', name: 'Engine', capabilities: ['judgment'] })).toBe(false)
+    // The marker vocabulary is merge-extensible, so a marker this client does
+    // not know is not a reason to withdraw a selectable model.
+    expect(conversationSelectable({ id: 'later', name: 'Later', capabilities: ['realtime'] })).toBe(true)
+  })
+
+  it('keeps engine entries out of the popup rows and the seat directory alike', async () => {
+    const b = await bench()
+    b.mint('s1')
+    const directory = b.ctx.modelDirectories.directoryFor(sid('s1'))
+    // The value the /model popup builds its rows from.
+    const loaded = await directory.load()
+    expect(modelIds(loaded.groups)).toEqual(['deepseek-v4-flash', 'deepseek-v4-pro'])
+    // A group that served an engine entry alone is dropped, not left empty.
+    expect(loaded.groups.map(group => group.id)).toEqual(['deepseek-official'])
+    // The seat reads the same projection out of the shared store.
+    expect(modelIds(directory.store.getSnapshot().groups)).toEqual(['deepseek-v4-flash', 'deepseek-v4-pro'])
+
+    const options = await b.contribution().ui.options(projection('s1'), new AbortController().signal)
+    expect(options.map((o: SelectOption) => o.label)).toEqual(['DeepSeek-V4-Flash', 'DeepSeek-V4-Pro'])
   })
 })

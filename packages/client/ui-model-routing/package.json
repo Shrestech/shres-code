@@ -1,0 +1,82 @@
+{
+  "name": "@shres-code/shres-code-client-ui-model-routing",
+  "description": "Model-routing composer chip: the conversation.input.modelRouting seat over the modelRouting projection and the /route command channel",
+  "version": "0.1.0-rc.5",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
+    "directory": "packages/client/ui-model-routing"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./invariant": {
+      "types": "./lib/types/invariant.d.ts",
+      "default": "./lib/invariant.js"
+    },
+    "./client": {
+      "types": "./lib/types/client/index.d.ts",
+      "default": "./lib/client.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "shres": {
+    "client": {
+      "inject": [
+        "@shres-code/shres-code-api-remotes",
+        "@shres-code/shres-code-client-locale",
+        "@shres-code/shres-code-client-runtime",
+        "@shres-code/shres-code-client-ui-conversation",
+        "@shres-code/shres-code-model-router"
+      ],
+      "platform": "web"
+    }
+  },
+  "scripts": {
+    "bundle": "tsdown",
+    "watch": "tsdown --watch"
+  },
+  "license": "MIT",
+  "peerDependencies": {
+    "@shres-code/shres-code-api-remotes": "workspace:^",
+    "@shres-code/shres-code-client-locale": "workspace:^",
+    "@shres-code/shres-code-client-runtime": "workspace:^",
+    "@shres-code/shres-code-client-ui-conversation": "workspace:^",
+    "@shres-code/shres-code-client-ui-slots": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-model-router": "workspace:^",
+    "@shres-code/cordis": "workspace:^",
+    "clsx": "^2.1.1",
+    "react": "^19.2.8"
+  },
+  "devDependencies": {
+    "@shres-code/shres-code-api-remotes": "workspace:^",
+    "@shres-code/shres-code-client-locale": "workspace:^",
+    "@shres-code/shres-code-client-runtime": "workspace:^",
+    "@shres-code/shres-code-client-test-runtime": "workspace:^",
+    "@shres-code/shres-code-client-ui-conversation": "workspace:^",
+    "@shres-code/shres-code-client-ui-slots": "workspace:^",
+    "@shres-code/shres-code-client-web-react": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-model-router": "workspace:^",
+    "@types/react": "~19.2.18",
+    "@shres-code/cordis": "workspace:^",
+    "clsx": "^2.1.1",
+    "react": "^19.2.8"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/invariant.js",
+    "lib/client.js",
+    "lib/types/**/*.d.ts"
+  ]
+}

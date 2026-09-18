@@ -156,6 +156,18 @@ export const en = {
   teamMemberPersona: 'Persona prompt',
   teamAddMember: 'Add member',
   teamRemoveMember: 'Remove',
+  classifierTitle: 'Classifier',
+  classifierIntro:
+    'The classifier is the judgment engine the harness consults for routing and compaction decisions. It is a bound engine, not a chat model, so it never appears in the model picker.',
+  classifierSwitchLabel: 'Judgment engine',
+  classifierOn: 'On',
+  classifierOff: 'Off',
+  classifierEnable: 'Turn the judgment engine on',
+  classifierDisable: 'Turn the judgment engine off',
+  classifierOffMeans:
+    'Off treats the engine as exactly absent: routing keeps the strong route, and compaction runs its basic path.',
+  classifierBinding:
+    'This section carries the deployment switch alone. The engine is bound by the deployment composition, so no engine model is listed here.',
   sttBadge: 'STT',
   ttsBadge: 'TTS',
   sttBadgeHint: 'Audio input: this model can transcribe speech (speech-to-text).',

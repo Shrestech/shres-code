@@ -839,6 +839,7 @@ export function InputBar({
           </div>
           <div className={css.trailing}>
             {rightItems}
+            {renderSlot('conversation.input.modelRouting', { locked })}
             {renderSlot('conversation.input.model', { locked: modelSeatLocked })}
             <ContextMeter useProjection={useProjection} t={t} />
             {interruptible && (

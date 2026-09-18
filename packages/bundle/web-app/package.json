@@ -65,6 +65,7 @@
     "@shres-code/shres-code-client-ui-jspace": "workspace:^",
     "@shres-code/shres-code-client-ui-layout": "workspace:^",
     "@shres-code/shres-code-client-ui-model-selection": "workspace:^",
+    "@shres-code/shres-code-client-ui-model-routing": "workspace:^",
     "@shres-code/shres-code-client-ui-settings-models": "workspace:^",
     "@shres-code/shres-code-client-ui-settings-shield": "workspace:^",
     "@shres-code/shres-code-client-ui-settings-jspace": "workspace:^",

@@ -23,7 +23,11 @@ export interface ModelDirectoryState {
    * from the groups yet perfectly usable.
    */
   routable: boolean | null
-  /** Successfully loaded provider groups (last good load). */
+  /**
+   * Successfully loaded provider groups (last good load), as a conversation
+   * picker may offer them: entries declaring a withdrawn capability marker
+   * are absent, so no rendered row can name one.
+   */
   groups: readonly ModelProviderGroup[]
   /** Provider-local failures from the last load; usable groups stay usable. */
   failures: readonly ModelCatalogFailure[]
@@ -48,6 +52,45 @@ export function acceptsImageInput(state: Pick<ModelDirectoryState, 'current' | '
   const modalities = groups.find(group => group.id === current.provider)
     ?.models.find(model => model.id === current.model)?.inputModalities
   return modalities === undefined ? undefined : modalities.includes('image')
+}
+
+/**
+ * Capability markers this client reads off a catalog entry. The wire carries
+ * plain strings because the marker vocabulary is merge-extensible, so an
+ * entry may declare a marker this client does not act on.
+ */
+export type ModelCapability = 'judgment'
+
+/**
+ * Markers that withdraw an entry from every conversation picker: an entry
+ * carrying one is a role-bound engine rather than a model a turn can select.
+ */
+const WITHDRAWN_FROM_CONVERSATION: ReadonlySet<string> = new Set<ModelCapability>(['judgment'])
+
+/**
+ * Whether one advisory entry may be offered as a conversation model. Absence
+ * of the marker list is the ordinary case and never withdraws an entry.
+ * @param model - one catalog entry from a session's advisory directory.
+ * @returns false when the entry declares a marker that withdraws it.
+ */
+export function conversationSelectable(model: ModelProviderGroup['models'][number]): boolean {
+  const declared = model.capabilities ?? []
+  return !declared.some(marker => WITHDRAWN_FROM_CONVERSATION.has(marker))
+}
+
+/**
+ * The provider groups a conversation picker may offer: every entry declaring a
+ * withdrawn marker is removed, and a group left with no models is dropped
+ * rather than rendered as an empty heading. Both selection entries and the
+ * host-reported current selection read this projection, so a non-generative
+ * engine can neither be listed nor submitted as a turn's model.
+ * @param groups - the host's advisory provider groups.
+ * @returns the groups both pickers build their rows from.
+ */
+export function conversationGroups(groups: readonly ModelProviderGroup[]): ModelProviderGroup[] {
+  return groups
+    .map(group => ({ ...group, models: group.models.filter(conversationSelectable) }))
+    .filter(group => group.models.length > 0)
 }
 
 /** One session's shared directory controller; disposed with the session scope. */
@@ -75,22 +118,29 @@ export class ModelDirectory {
   /**
    * Refresh the advisory directory (both entries call this on open).
    * Failure preserves the last good groups and current selection.
-   * @returns the fresh directory value.
+   * @returns the directory value the store now publishes: the host reply with
+   * every entry a conversation picker must not offer already removed.
    */
   async load(): Promise<SessionModels> {
     this.assertAvailable()
     const generation = ++this.generation
     this.store.update((s) => { s.status = 'loading'; s.error = null })
     const { result } = await this.sessions.models({ sessionId: this.sessionId })
-    if (this.disposed || generation !== this.generation) {
-      if (!result.ok) throw new Error(`${result.error.code}: ${result.error.message}`)
-      return result.value
-    }
     if (!result.ok) {
+      // A superseded response reports its failure to its own caller alone; the
+      // store belongs to the newer operation.
+      if (this.disposed || generation !== this.generation) {
+        throw new Error(`${result.error.code}: ${result.error.message}`)
+      }
       this.store.update((s) => { s.status = 'error'; s.error = `${result.error.code}: ${result.error.message}` })
       throw new Error(`session.models failed: ${result.error.code}: ${result.error.message}`)
     }
-    const { current, routable, groups, failures } = result.value
+    // The popup builds its rows from this returned value and the seat reads the
+    // store, so both carry the same projection — including when a late
+    // settlement hands its value back after the caller moved on.
+    const directory: SessionModels = { ...result.value, groups: conversationGroups(result.value.groups) }
+    if (this.disposed || generation !== this.generation) return directory
+    const { current, routable, groups, failures } = directory
     this.store.update((s) => {
       s.current = current
       s.routable = routable
@@ -99,7 +149,7 @@ export class ModelDirectory {
       s.status = 'ready'
       s.error = null
     })
-    return result.value
+    return directory
   }
 
   /**

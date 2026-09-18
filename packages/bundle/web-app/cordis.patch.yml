@@ -281,6 +281,12 @@
     - id: ui-model-selection
       name: '@shres-code/shres-code-client-ui-model-selection'
 
+    # Model routing: the composer toggle over the modelRouting projection and
+    # the /route channel. A host composing no router registers no projection,
+    # and the seat renders nothing.
+    - id: ui-model-routing
+      name: '@shres-code/shres-code-client-ui-model-routing'
+
     - id: ui-permission
       name: '@shres-code/shres-code-client-ui-permission-presets'
 
