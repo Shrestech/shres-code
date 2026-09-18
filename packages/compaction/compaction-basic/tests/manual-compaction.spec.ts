@@ -13,6 +13,7 @@ import { BasicCompactionEngine } from '@shres-code/shres-code-compaction-basic'
 import { CompactionId, isCompactCheckpointSource, ManualCompactionError } from '@shres-code/shres-code-compaction'
 import type { CompactionResult } from '@shres-code/shres-code-compaction'
 import {
+  CONTEXT_WINDOW_EXCEEDED_CODE,
   createAssistantMessage,
   createUserMessage,
   LlmAdapter,
@@ -28,6 +29,7 @@ import SessionStore, { Session, SessionId, type SessionEvent } from '@shres-code
 import LlmRuntime from '@shres-code/shres-code-llm'
 import TokenMeter from '@shres-code/shres-code-token-meter'
 import type { Agent } from '@shres-code/shres-code-agent'
+import { SummarizationFailureError } from '@shres-code/shres-code-compaction-basic/src/summarizer.ts'
 import type {
   SummarizationInput,
   SummaryResult,
@@ -43,6 +45,8 @@ class GatedCompactionEngine extends BasicCompactionEngine {
   rawOutput: ContentBlock[] | undefined
   usage: TokenUsage | undefined
   error: unknown
+  /** Failures thrown by successive summarize calls before `error` applies. */
+  failures: unknown[] = []
   gate: Promise<undefined> | undefined
   duringSummary: (() => void) | undefined
   calls: SummarizationInput[] = []
@@ -55,6 +59,8 @@ class GatedCompactionEngine extends BasicCompactionEngine {
     this.calls.push(input)
     this.duringSummary?.()
     if (this.gate !== undefined) await this.gate
+    const failure = this.failures.shift()
+    if (failure !== undefined) throw failure
     if (this.error !== undefined) throw this.error
     return {
       summary: this.summary,
@@ -353,6 +359,39 @@ describe('compactNow through the real loop', () => {
     await agent.whenIdle()
     expect(adapter.requests).toHaveLength(2)
     expect(agent.session.events.some(event => event.type === 'compaction/start')).toBe(false)
+  })
+
+  it('shrinks the region instead of failing when the summarizer overflows', async () => {
+    const harness = await loopHarness()
+    const { agent, compact } = harness
+    // Two closed turns, so the reduced region still has a span to summarize.
+    await seedHistory(harness)
+    await seedHistory(harness)
+    compact.failures = [new SummarizationFailureError({
+      provider: 'summary-provider',
+      model: 'summary-model',
+      reason: 'error',
+      code: CONTEXT_WINDOW_EXCEEDED_CODE,
+      usage: { inputTokens: 294_609, outputTokens: 597 },
+    }, Object.assign(
+      new Error('pi-ai detected context overflow for model "gpt-6-astra"'),
+      { code: CONTEXT_WINDOW_EXCEEDED_CODE },
+    ))]
+    const surfaceTokens = harness.ctx.tokenMeter.measure(agent.session).surfaceTokens
+
+    const result = await compact.compactNow(agent, SIGNAL)
+
+    expect(result).not.toBeNull()
+    expect(compact.calls).toHaveLength(2)
+    expect(result?.shadowedTokenCount).toBeLessThanOrEqual(Math.floor(surfaceTokens / 2))
+    // Two standalone attempts, each with its own closed bracket.
+    expect(compactEvents(agent.session).map(event => event.type)).toEqual([
+      'compaction/start',
+      'compaction/end',
+      'compaction/start',
+      'compaction/summary',
+      'compaction/end',
+    ])
   })
 
   it('releases turn admission after a summarizer failure and records the failed attempt', async () => {

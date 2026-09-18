@@ -10,6 +10,7 @@ import type {
   ContentBlock, FinishReason, GenerateOptions, Message, TokenUsage, ToolSchema,
 } from '@shres-code/shres-code-llm'
 import type { Agent } from '@shres-code/shres-code-agent'
+import type { CompactionFailureFacts, SummarizationFailureReason } from '@shres-code/shres-code-compaction'
 
 interface SummaryConfig {
   readonly summarizationProvider: string
@@ -113,6 +114,42 @@ export type SummaryResult = {
 )
 
 /**
+ * A summarization call failure that carries the call facts the durable failure
+ * record needs. The reason, the code, and the usage come from the terminal
+ * finish, so a reader can tell a provider-side context overflow from a transport
+ * failure without parsing the message.
+ */
+export class SummarizationFailureError extends Error {
+  /** Facts about the failed call, without the attempt index its caller owns. */
+  readonly facts: Omit<CompactionFailureFacts, 'attempt'>
+  /** Failure code the terminal finish mapped to, when it carried one. */
+  readonly code: string | undefined
+
+  /**
+   * @param facts - route, usage, and terminal finish facts of the failed call.
+   * @param failure - the error the terminal finish mapped to; its message and
+   *   code stay on this error so existing failure consumers read them unchanged.
+   */
+  constructor(facts: Omit<CompactionFailureFacts, 'attempt'>, failure: Error & { code?: string }) {
+    super(failure.message, { cause: failure })
+    this.name = 'SummarizationFailureError'
+    this.facts = facts
+    this.code = failure.code
+  }
+}
+
+/**
+ * Read the structured call facts a summarization failure carries.
+ * @param error - the failure a compaction stage caught.
+ * @returns the facts, or `undefined` when the error carried none.
+ */
+export function summarizationFailureFacts(
+  error: unknown,
+): Omit<CompactionFailureFacts, 'attempt'> | undefined {
+  return error instanceof SummarizationFailureError ? error.facts : undefined
+}
+
+/**
  * Run the default cache-reusing `ctx.llm.stream()` summarization call: replay
  * the conversation prefix, then append the compaction instruction as the final
  * user message so the provider's warm prefix cache is reused.
@@ -167,8 +204,16 @@ export async function summarizeWithLlm(
     ...signal === undefined ? {} : { signal },
   }
   for await (const chunk of ctx.llm.stream(options)) assembler.push(chunk)
-  const error = finishError(assembler.finish)
-  if (error !== undefined) throw error
+  const failure = finishFailure(assembler.finish)
+  if (failure !== undefined) {
+    throw new SummarizationFailureError({
+      provider: options.provider,
+      model: options.model,
+      reason: failure.reason,
+      ...failure.error.code === undefined ? {} : { code: failure.error.code },
+      ...assembler.usage === undefined ? {} : { usage: assembler.usage },
+    }, failure.error)
+  }
 
   const rawOutput = assembler.blocks()
   const summary = summaryText(rawOutput)
@@ -199,19 +244,21 @@ export function frameSummary(summary: readonly ContentBlock[]): ContentBlock[] {
   ]
 }
 
-/** Map a terminal summarization finish to its fail-closed error. */
-function finishError(finish: FinishReason): Error | undefined {
+/** Map a terminal summarization finish to its fail-closed error and reason. */
+function finishFailure(
+  finish: FinishReason,
+): { error: Error & { code?: string }; reason: SummarizationFailureReason } | undefined {
   switch (finish.kind) {
     case 'error':
     case 'aborted': {
       const error = new Error(finish.failure.message) as Error & { code?: string }
       error.code = finish.failure.code
-      return error
+      return { error, reason: finish.kind }
     }
     case 'max-tokens': {
       const error = new Error('summarization truncated at the token cap (incomplete checkpoint)') as Error & { code?: string }
       error.code = 'MAX_TOKENS'
-      return error
+      return { error, reason: 'max-tokens' }
     }
     default:
       return undefined

@@ -51,10 +51,19 @@ const SHIPPED_REASONING_EFFORTS = {
 /**
  * Models the subscription backend served when this catalog shipped
  * (modalities and the effort set verified live). A release this list has
- * not caught up with is a settings ``models`` entry, not a code change.
+ * not caught up with is a settings `models` entry, not a code change.
+ *
+ * `gpt-6-astra` names a window because the backend publishes none — `GET /models`
+ * answers 400 and `GET /v1/models` 403 — and an undeclared window leaves
+ * usage comparison and pressure policy on the adapter's fallback. 311,000 is a
+ * deliberate lower bound: the session behind it (session-8bec6678, seq 52100)
+ * completed a response reporting a 311,781-token prompt, which proves that much
+ * served capacity without bounding it from above. Raise it through the settings
+ * `models` entry as evidence accumulates. `gpt-5.6-luna` stays undeclared because
+ * nothing observed bounds it.
  */
 export const SHIPPED_MODELS: readonly CodexSessionModelConfig[] = [
-  { id: 'gpt-6-astra', name: 'GPT-6 Astra', input: ['text', 'image'] },
+  { id: 'gpt-6-astra', name: 'GPT-6 Astra', contextWindow: 311_000, input: ['text', 'image'] },
   { id: 'gpt-5.6-luna', name: 'GPT-5.6 Luna', input: ['text', 'image'] },
 ]
 

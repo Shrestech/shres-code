@@ -64,9 +64,12 @@ function classifyPiAiError(message: string): string {
 /**
  * Map a terminal pi-ai event to the harness finish reason.
  * @param message - the assistant message carried by the `done` or `error` event.
- * @param contextWindow - resolved catalog capacity for usage-based overflow detection.
- * @returns the mapped harness reason. Recognized error text, `stop` usage above
- *   `contextWindow`, and zero-output `length` usage that fills the window map
+ * @param contextWindow - resolved catalog capacity for usage-based overflow
+ *   detection, supplied only for the protocols whose provider accepts an
+ *   oversized prompt silently (see `SILENT_OVERFLOW_PROTOCOLS`); `undefined`
+ *   leaves the usage-based cases off.
+ * @returns the mapped harness reason. Recognized error text, `stop` usage above a
+ *   supplied `contextWindow`, and zero-output `length` usage that fills the window map
  *   to `CONTEXT_WINDOW_EXCEEDED`; a `stop` with no content blocks maps to an
  *   `EMPTY_RESPONSE` error; `pending` and `deferred` map to `PI_AI_ERROR`
  *   because this adapter does not complete partial or batch handles.
@@ -136,7 +139,9 @@ export function mapStopReason(message: AssistantMessage, contextWindow?: number)
  * mid-stream — failures arrive as `error` events, which become error/aborted
  * `finish` chunks (the harness protocol's other error-delivery style).
  * @param events - one assistant turn's pi-ai event stream.
- * @param contextWindow - resolved catalog capacity for usage-based overflow detection.
+ * @param contextWindow - resolved catalog capacity for usage-based overflow
+ *   detection, or `undefined` to classify only explicit provider errors; see
+ *   {@link mapStopReason}.
  * @returns the harness chunks, ending with `usage` then `finish`; throws
  *   `LlmError` (`STREAM_CLOSED`) if the source ends without a terminal event.
  */

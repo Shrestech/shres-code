@@ -8,6 +8,16 @@ describe('resolveRoute headers', () => {
     }
   })
 
+  it('names the observed lower-bound window for the model production exercised', () => {
+    const astra = resolveRoute({}, 'account-7').models?.find(model => model.id === 'gpt-6-astra')
+    expect(astra?.contextWindow).toBe(311_000)
+  })
+
+  it('leaves an unbounded model on the adapter fallback window', () => {
+    const luna = resolveRoute({}, 'account-7').models?.find(model => model.id === 'gpt-5.6-luna')
+    expect(luna?.contextWindow).toBeUndefined()
+  })
+
   it('sends the backend header set the subscription wire requires', () => {
     const route = resolveRoute({}, 'account-7')
     expect(route.headers?.['chatgpt-account-id']).toBe('account-7')

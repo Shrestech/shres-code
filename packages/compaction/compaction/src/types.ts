@@ -70,7 +70,20 @@ declare module '@shres-code/shres-code-session/types' {
      * Marks the end of a compaction — log-only, releases the lock. Its owner
      * matches `compaction/start`; `error` records an unsuccessful attempt.
      */
-    'compaction/end': { compactionId: CompactionId; sourceCommandId?: CommandId; turn: number | null; error?: string }
+    'compaction/end': {
+      compactionId: CompactionId
+      sourceCommandId?: CommandId
+      turn: number | null
+      error?: string
+      /**
+       * Structured facts about the summarization call that failed the attempt,
+       * present only when one did. `error` stays the human-facing chain; these
+       * are the fields a reader needs to tell an adapter failure from a
+       * provider-side overflow, or a truncation from a transport drop, without
+       * inferring them from prose.
+       */
+      failure?: CompactionFailureFacts
+    }
     /**
      * Shadow price of one model-free prune replacement — log-only, no
      * surfaceOp. The shared shadow-price protocol: a surface `replace` event
@@ -89,6 +102,32 @@ declare module '@shres-code/shres-code-session/types' {
       shadowedTokenCount: number
     }
   }
+}
+
+/** Terminal harness finish kinds a summarization call can fail with. */
+export type SummarizationFailureReason = 'error' | 'aborted' | 'max-tokens'
+
+/**
+ * Facts about the summarization call that failed one compaction attempt.
+ *
+ * Recorded on `compaction/end` so a failed attempt is diagnosable from the log
+ * alone: which route was asked, what it reported consuming, how the stream
+ * ended, and which attempt died. Absent when the failure happened before a
+ * summarization call was made or came from the commit stage.
+ */
+export interface CompactionFailureFacts {
+  /** Provider route the summarization call was dispatched to. */
+  provider: string
+  /** Model the summarization call was dispatched to. */
+  model: string
+  /** Provider-reported usage for the failed call, when the stream emitted any. */
+  usage?: TokenUsage
+  /** Terminal finish kind that failed the attempt. */
+  reason: SummarizationFailureReason
+  /** Failure code carried by that finish, absent when it carried none. */
+  code?: string
+  /** 1-based index of this attempt within the compaction. */
+  attempt: number
 }
 
 /** Result of a successful compaction operation. */
