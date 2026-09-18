@@ -516,7 +516,9 @@ export function apply(ctx: Context, config: Config = {}): void {
           if (!isRootSession(session)) return
           /* v8 ignore next -- an open card implies engagement in jspace semantics */
           if (!ctx.jspace.engaged(session) || ctx.jspace.card(session) === null) return
-          const pending = latestHumanUserSeqAfter(session.events, run.lastSeq)
+          // Catch-up is messages after this trigger. lastSeq stays -1 on a
+          // failed turn and would replay the whole user history.
+          const pending = latestHumanUserSeqAfter(session.events, triggerSeq)
           if (pending === undefined) return
           launchReview(session, 'user-intent', pending)
         })

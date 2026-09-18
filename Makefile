@@ -7,7 +7,7 @@ RUN_DIR := .run
 PID_FILE := $(RUN_DIR)/web.pid
 LOG_FILE := $(RUN_DIR)/web.log
 URL := http://127.0.0.1:3080
-START_TIMEOUT := 15
+START_TIMEOUT := 45
 
 .PHONY: help start stop restart status logs build
 
@@ -29,7 +29,7 @@ start: ## Start the web app in the background
 	echo $$! > $(PID_FILE); \
 	i=0; \
 	while [ $$i -lt $(START_TIMEOUT) ]; do \
-		if curl -sf -o /dev/null $(URL) && kill -0 $$(cat $(PID_FILE)) 2>/dev/null; then \
+		if curl -sf --max-time 2 -o /dev/null $(URL) && kill -0 $$(cat $(PID_FILE)) 2>/dev/null; then \
 			sleep 1; \
 			if ! kill -0 $$(cat $(PID_FILE)) 2>/dev/null; then continue; fi; \
 			echo "up, pid $$(cat $(PID_FILE)): $(URL)"; exit 0; \
@@ -61,7 +61,7 @@ status: ## Show pid and whether the app answers
 	else \
 		echo "not running"; exit 1; \
 	fi; \
-	if curl -sf -o /dev/null $(URL); then echo "serving $(URL)"; else echo "no answer on $(URL)"; fi
+	if curl -sf --max-time 2 -o /dev/null $(URL); then echo "serving $(URL)"; else echo "no answer on $(URL)"; fi
 
 logs: ## Follow the app log (Ctrl-C to detach; the app keeps running)
 	tail -f $(LOG_FILE)
