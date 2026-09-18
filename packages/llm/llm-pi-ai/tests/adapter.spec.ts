@@ -13,6 +13,7 @@ import { PiAiAdapter } from '@shres-code/shres-code-llm-pi-ai'
 import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
 import { getBuiltinModels } from '@earendil-works/pi-ai/providers/all'
 import { resolveProfiles } from '../src/config.ts'
+import { PROMPT_CACHE_KEY_FIELDS } from '../src/provider.ts'
 import { assemble } from './assemble.ts'
 import { closeMockServers, mockServer, responsesTextEvents, textEvents } from './mock-server.ts'
 
@@ -970,5 +971,141 @@ describe('hosted tools and route onPayload composition', () => {
     expect(tools.some(tool => tool['name'] === 'web_search')).toBe(false)
     // route onPayload: service_tier spliced on the same body
     expect(body['service_tier']).toBe('priority')
+  })
+})
+
+describe('route prompt cache key', () => {
+  /**
+   * A registered hand-declared route over the mock server, with an optional
+   * deployment payload hook. The route declares its own protocol, so a test can
+   * ask for one whose wire format has a vendor cache-key field and one whose
+   * does not without depending on the installed catalog.
+   */
+  async function routeContext(
+    serverUrl: string,
+    profile: Record<string, unknown>,
+    onPayload?: (payload: unknown, request: LlmPiAi.PiAiPayloadRequest) => unknown,
+  ): Promise<Context> {
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    const adapter = new PiAiAdapter({
+      profiles: () => resolveProfiles({
+        'acme-gateway': {
+          api: 'openai-completions',
+          baseURL: serverUrl,
+          models: [{ id: 'acme-large' }],
+          ...profile,
+        },
+      }),
+      resolveApiKey: () => Promise.resolve('test-key'),
+      ...onPayload === undefined ? {} : { onPayload },
+    })
+    ctx.llm.registerAdapter(['acme-gateway'], adapter)
+    return ctx
+  }
+
+  it('declares a vendor cache-key field only for the protocols that have one', () => {
+    // The protocol fact behind the emit decision. A protocol absent from the
+    // table sends nothing — anthropic-messages marks prefix boundaries with
+    // cache_control blocks, and no other protocol here spells a key at all.
+    expect(PROMPT_CACHE_KEY_FIELDS).toEqual({ 'openai-completions': 'prompt_cache_key' })
+  })
+
+  it('sends the session id as the vendor cache key on a protocol that declares one', async () => {
+    const server = await mockServer([{ events: textEvents }])
+    const ctx = await routeContext(server.url, { promptCacheKey: 'session' })
+    await assemble(ctx, {
+      provider: 'acme-gateway',
+      model: 'acme-large',
+      messages: [],
+      sessionId: 'session-cache-1' as never,
+    })
+    expect(server.requests[0]).toMatchObject({ prompt_cache_key: 'session-cache-1' })
+  })
+
+  it('sends nothing when the profile leaves the policy off', async () => {
+    const server = await mockServer([{ events: textEvents }])
+    const ctx = await routeContext(server.url, {})
+    await assemble(ctx, {
+      provider: 'acme-gateway',
+      model: 'acme-large',
+      messages: [],
+      sessionId: 'session-cache-2' as never,
+    })
+    expect(server.requests[0]).not.toHaveProperty('prompt_cache_key')
+  })
+
+  it('sends nothing for a request that names no session', async () => {
+    const server = await mockServer([{ events: textEvents }])
+    const ctx = await routeContext(server.url, { promptCacheKey: 'session' })
+    await assemble(ctx, { provider: 'acme-gateway', model: 'acme-large', messages: [] })
+    expect(server.requests[0]).not.toHaveProperty('prompt_cache_key')
+  })
+
+  it('sends nothing on a model whose protocol declares no vendor field', async () => {
+    // The other side of the protocol fact: no pi-ai OpenAI-compatible
+    // implementation keys an anthropic-messages request, so this route proves
+    // the emit decision reads the exact model's protocol rather than the route.
+    // The scripted failure is deliberate — the assertion is on the request body
+    // the endpoint received, and the response framing is not part of it.
+    const server = await mockServer([{ status: 500, body: '{}' }])
+    const ctx = await routeContext(server.url, { api: 'anthropic-messages', promptCacheKey: 'session' })
+    await assemble(ctx, {
+      provider: 'acme-gateway',
+      model: 'acme-large',
+      messages: [],
+      sessionId: 'session-cache-3' as never,
+    })
+    expect(server.requests).toHaveLength(1)
+    expect(server.requests[0]).not.toHaveProperty('prompt_cache_key')
+  })
+
+  it('splices the cache key before the deployment hook and keeps both effects on one body', async () => {
+    const seen: Record<string, unknown>[] = []
+    const server = await mockServer([{ events: textEvents }])
+    const ctx = await routeContext(
+      server.url,
+      { promptCacheKey: 'session', hostedTools: { webSearch: true } },
+      (payload) => {
+        seen.push(payload as Record<string, unknown>)
+        if (payload !== null && typeof payload === 'object') {
+          ;(payload as Record<string, unknown>).service_tier = 'priority'
+        }
+      },
+    )
+    await assemble(ctx, {
+      provider: 'acme-gateway',
+      model: 'acme-large',
+      messages: [],
+      sessionId: 'session-cache-4' as never,
+      tools: [{ name: 'web_search', description: 'local', parameters: { type: 'object', properties: {} } }],
+    })
+    // The deployment hook runs last, so it already observes the hosted splice
+    // and the cache key on the body it is handed...
+    expect(seen[0]).toMatchObject({ prompt_cache_key: 'session-cache-4' })
+    const body = server.requests[0] as Record<string, unknown>
+    // ...and its own in-place mutation still reaches the wire beside both.
+    expect(body['prompt_cache_key']).toBe('session-cache-4')
+    expect(body['service_tier']).toBe('priority')
+    const tools = body['tools'] as Record<string, unknown>[]
+    expect(tools.some(tool => tool['type'] === 'web_search')).toBe(true)
+    expect(tools.some(tool => tool['name'] === 'web_search')).toBe(false)
+  })
+
+  it('hands the deployment hook the provider, the exact model, and the session the request names', async () => {
+    const requests: LlmPiAi.PiAiPayloadRequest[] = []
+    const server = await mockServer([{ events: textEvents }, { events: textEvents }])
+    const ctx = await routeContext(server.url, {}, (_payload, request) => { requests.push(request) })
+    await assemble(ctx, {
+      provider: 'acme-gateway',
+      model: 'acme-large',
+      messages: [],
+      sessionId: 'session-hook' as never,
+    })
+    await assemble(ctx, { provider: 'acme-gateway', model: 'acme-large', messages: [] })
+    expect(requests).toEqual([
+      { provider: 'acme-gateway', model: 'acme-large', sessionId: 'session-hook' },
+      { provider: 'acme-gateway', model: 'acme-large' },
+    ])
   })
 })

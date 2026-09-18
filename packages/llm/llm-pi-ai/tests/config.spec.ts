@@ -38,6 +38,33 @@ describe('reasoning schema boundary', () => {
   })
 })
 
+describe('prompt cache key boundary', () => {
+  it('rejects a policy outside the offered set where it is written', () => {
+    expect(routeWith({ promptCacheKey: 'always' })).toThrow(/expected/)
+    expect(routeWith({ promptCacheKey: 'off' })).not.toThrow()
+  })
+
+  it('defaults to off and keeps a declared session policy', () => {
+    const declared = resolveProfiles({
+      'acme-gateway': {
+        api: 'openai-completions',
+        baseURL: 'https://acme.test',
+        models: [{ id: 'm' }],
+      },
+    })
+    expect(declared.get('acme-gateway')?.promptCacheKey).toBe('off')
+    const requested = resolveProfiles({
+      'acme-gateway': {
+        api: 'openai-completions',
+        baseURL: 'https://acme.test',
+        models: [{ id: 'm' }],
+        promptCacheKey: 'session',
+      },
+    })
+    expect(requested.get('acme-gateway')?.promptCacheKey).toBe('session')
+  })
+})
+
 describe('modality schema boundary', () => {
   it('rejects a modality pi-ai does not know, at either level', () => {
     expect(configWith({ input: ['audio'] })).toThrow(/expected/)

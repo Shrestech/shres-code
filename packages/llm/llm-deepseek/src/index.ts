@@ -60,7 +60,12 @@ export {
   DEFAULT_STREAM_IDLE_TIMEOUT_MS,
   DeepSeekAdapter,
 } from './adapter.ts'
-export type { DeepSeekAdapterOptions, DeepSeekCatalogModel, DeepSeekConnectionOptions } from './adapter.ts'
+export type {
+  DeepSeekAdapterOptions,
+  DeepSeekCatalogModel,
+  DeepSeekConnectionOptions,
+  DeepSeekPayloadRequest,
+} from './adapter.ts'
 export { DeepSeekFileStore, MAX_CHAT_IMAGE_BYTES } from './file-store.ts'
 export type { DeepSeekFileConnection, DeepSeekFilePolicy, DeepSeekFileReference } from './file-store.ts'
 export { DeepSeekFilesClient, MAX_FILE_EXPIRY_SECONDS, MAX_FILE_UPLOAD_BYTES, MAX_STORED_FILE_BYTES, MAX_STORED_FILE_COUNT, MIN_FILE_EXPIRY_SECONDS } from './files-api.ts'

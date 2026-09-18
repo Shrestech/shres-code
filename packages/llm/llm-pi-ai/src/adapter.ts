@@ -54,7 +54,7 @@ import type { ResolvedPiAiProviderProfile } from './config.ts'
 import { toPiContext } from './context.ts'
 import { applyHostedToolsPayload, hostedToolsDialectFor, mapHostedToolCalls } from './hosted-tools/index.ts'
 import type { HostedToolsPlan } from './hosted-tools/index.ts'
-import { SILENT_OVERFLOW_PROTOCOLS } from './provider.ts'
+import { PROMPT_CACHE_KEY_FIELDS, SILENT_OVERFLOW_PROTOCOLS } from './provider.ts'
 import { toStreamChunks } from './stream.ts'
 
 /** One resolution's frozen view: the profiles and the collection built from them. */
@@ -87,12 +87,35 @@ export interface PiAiAdapterOptions {
   onReplayDegrade?: (detail: { provider: string; model: string; reason: string }) => void
   /**
    * Rewrite one outgoing provider request payload before it is sent. pi-ai
-   * hands the hook the request body it built for the model; returning a value
-   * replaces it and returning `undefined` keeps it (which still lets the hook
-   * mutate the body in place). Deployment-owned so a route can splice
-   * provider-specific request fields, such as xAI's `service_tier`.
+   * hands the hook the request body it built for the model, together with the
+   * provider, the model, and the session this request belongs to; returning a
+   * value replaces it and returning `undefined` keeps it (which still lets the
+   * hook mutate the body in place).
+   *
+   * Deployment-owned, and the escape hatch for a vendor request field this
+   * package does not model: a route can splice provider-specific fields such as
+   * xAI's `service_tier`, or a cache-key spelling
+   * {@link PROMPT_CACHE_KEY_FIELDS} does not cover. The hook runs last, after
+   * the hosted-tools and prompt-cache-key splices, so it observes the final
+   * body.
    */
-  onPayload?: (payload: unknown, request: { provider: string; model: string }) => unknown
+  onPayload?: (payload: unknown, request: PiAiPayloadRequest) => unknown
+}
+
+/**
+ * The request one {@link PiAiAdapterOptions.onPayload | payload hook} observes.
+ *
+ * The session id is derived from the seam's own `GenerateOptions.sessionId`
+ * rather than restated, so the brand and the optionality cannot drift from the
+ * field this context mirrors.
+ */
+export interface PiAiPayloadRequest {
+  /** Provider route key selecting the profile that built this request. */
+  provider: string
+  /** Exact model id the request names (`GenerateOptions.model`). */
+  model: string
+  /** Session the request belongs to; absent for a call the loop did not stamp. */
+  sessionId?: GenerateOptions['sessionId']
 }
 
 /** Copy profile stream knobs into pi-ai's common option vocabulary. */
@@ -356,6 +379,18 @@ export class PiAiAdapter extends LlmAdapter {
     )
     const apiKey = await this.config.resolveApiKey(options.provider, profile)
     const hosted = this.hostedPlanOf(profile, model, options.model)
+    // Whether a cache key goes out is decided per request for the model actually
+    // being sent: one route's catalog can span protocols, so the field is looked
+    // up on the resolved model's protocol, never on the route. A profile asking
+    // for session affinity on a protocol that declares no such field sends
+    // nothing, which is not an error; a request with no session id has no key to
+    // send either.
+    const cacheKeyField = profile.promptCacheKey === 'session'
+      ? PROMPT_CACHE_KEY_FIELDS[model.api]
+      : undefined
+    const cacheKey = cacheKeyField === undefined || options.sessionId === undefined
+      ? undefined
+      : { field: cacheKeyField, value: String(options.sessionId) }
 
     const consumer = new AbortController()
     const upstream = options.signal === undefined
@@ -379,14 +414,15 @@ export class PiAiAdapter extends LlmAdapter {
       const context = attachments === undefined
         ? toPiContext(options, undefined, onReplayDegrade)
         : await toPiContext(options, attachments, onReplayDegrade)
-      // Hosted tools ride pi-ai's payload hook, then the route's own onPayload
-      // hook runs on the (possibly replaced) body: splicing here (rather than
-      // forking pi-ai) keeps the shared adapter on the stock dependency, and
-      // chaining the hosted result into the route hook keeps both effects on
-      // the one payload pi-ai sends. Only a final non-undefined result
+      // Everything this package splices rides pi-ai's one payload hook, in
+      // order: hosted tools, then the vendor prompt cache key, then the route's
+      // own onPayload hook. Splicing here (rather than forking pi-ai) keeps the
+      // shared adapter on the stock dependency, and chaining the results keeps
+      // every effect on the one payload pi-ai sends — the deployment hook last,
+      // so it observes the final body. Only a final non-undefined result
       // replaces the outgoing payload; a hook that mutates in place and
       // returns undefined keeps its own mutation.
-      const onPayload = hosted === undefined && this.config.onPayload === undefined
+      const onPayload = hosted === undefined && cacheKey === undefined && this.config.onPayload === undefined
         ? undefined
         : (payload: unknown): unknown => {
           let current = payload
@@ -394,8 +430,18 @@ export class PiAiAdapter extends LlmAdapter {
             const spliced = applyHostedToolsPayload(current, hosted)
             if (spliced !== undefined) current = spliced
           }
+          if (cacheKey !== undefined) {
+            // Spreading is the whole splice: pi-ai hands the hook the request
+            // params object it built and is about to serialize, so the body
+            // needs no shape inspection the way the hosted-tools splice does.
+            current = { ...(current as Record<string, unknown>), [cacheKey.field]: cacheKey.value }
+          }
           if (this.config.onPayload !== undefined) {
-            const result = this.config.onPayload(current, { provider: options.provider, model: model.id })
+            const result = this.config.onPayload(current, {
+              provider: options.provider,
+              model: model.id,
+              ...options.sessionId === undefined ? {} : { sessionId: options.sessionId },
+            })
             if (result !== undefined) current = result
           }
           return current === payload ? undefined : current

@@ -48,6 +48,10 @@ A delivered peer message is an ordinary `user/message` in the TARGET session. It
 
 Mailbox bookkeeping reconstructs from the Lead log; model-visible content reconstructs from the target's own `user/message`. This package declares the source; it does not write target messages.
 
+## Cache discipline
+
+Seats share one provider key, so they share its prompt cache too: batched review rounds — one round of findings per teammate — reuse the prefix the previous round warmed, while sub-minute Lead-teammate alternation pays a fresh prefill for nearly every exchange. Long-lived seat sessions are the other half of the discipline, because a session that keeps growing stops reusing its cached prefix; compacting a seat that has run for hours keeps that prefix stable. Where a seat's route declares a vendor prompt cache key, its provider profile pins that seat's affinity (`promptCacheKey: session` on the seat's `llm-pi-ai` route profile), so one seat's turns stay in one cache domain.
+
 ## Model Experience
 
 Indirectly, through the `team_list` and `team_send` tools this package registers on `ctx.tools`, and through the teammate-only `team:policy` and `deployment:environment` sections (`You are an Agent Team teammate named <name>, not the Team Lead.` and `Your working directory is {{cwd}}.`). Named seat tools are owned by `@shres-code/shres-code-agent-seats`.

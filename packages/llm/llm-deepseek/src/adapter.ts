@@ -106,6 +106,21 @@ export interface DeepSeekConnectionOptions {
   retryPolicy: ResolvedRetryPolicy
 }
 
+/**
+ * The request one {@link DeepSeekAdapterOptions.onPayload | payload hook}
+ * observes. The session id is derived from the seam's own
+ * `GenerateOptions.sessionId` rather than restated, so the brand and the
+ * optionality cannot drift from the field this context mirrors.
+ */
+export interface DeepSeekPayloadRequest {
+  /** Provider route key the request was dispatched to. */
+  provider: string
+  /** Exact model id the request names (`GenerateOptions.model`). */
+  model: string
+  /** Session the request belongs to; absent for a call the loop did not stamp. */
+  sessionId?: GenerateOptions['sessionId']
+}
+
 /** Constructor options for {@link DeepSeekAdapter}: the operation-local resolution hooks the plugin owns. */
 export interface DeepSeekAdapterOptions {
   /** Current validated connection facts; called once per operation. */
@@ -123,6 +138,19 @@ export interface DeepSeekAdapterOptions {
   resolveAttachments?: () => AttachmentStore | undefined
   /** Resolve the process-wide upload reuse store. */
   resolveFiles?: () => DeepSeekFileStore
+  /**
+   * Rewrite one outgoing request body before it is serialized. The adapter hands
+   * the hook the body it built for the current attempt, together with the
+   * provider, the model, and the session this request belongs to; returning a
+   * value replaces it and returning `undefined` keeps it (which still lets the
+   * hook mutate the body in place).
+   *
+   * This is the adapter's extension point for wrapper plugins, exactly like the
+   * pi-ai adapter's, and it is what a deployment splices its own vendor request
+   * fields through. DeepSeek needs no cache key: its prefix caching is
+   * automatic, so nothing here is required for cache reuse.
+   */
+  onPayload?: (payload: unknown, request: DeepSeekPayloadRequest) => unknown
 }
 
 /** Default maximum idle interval while an adapter stream read is outstanding. */
@@ -589,7 +617,16 @@ export class DeepSeekAdapter extends LlmAdapter {
           continue
         }
       }
-      const payload = JSON.stringify(body)
+      // The hook observes this attempt's built body before it is serialized, and
+      // a hook that mutates it in place and returns undefined keeps its
+      // mutation. Nothing supplies one from this package's own apply(); it is
+      // the extension point a wrapper plugin composes.
+      const hooked = this.config.onPayload?.(body, {
+        provider: options.provider,
+        model: options.model,
+        ...options.sessionId === undefined ? {} : { sessionId: options.sessionId },
+      })
+      const payload = JSON.stringify(hooked === undefined ? body : hooked)
 
       // TODO(http): adopt the Cordis HTTP service when shared transport configuration
       // outweighs its additional runtime dependencies.

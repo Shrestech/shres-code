@@ -2057,3 +2057,81 @@ describe('plugin registration and config', () => {
     expect(ctx.llm.listProviders()).toEqual([])
   })
 })
+
+describe('route onPayload hook', () => {
+  /** Direct adapter over the plugin's real resolve step, with one deployment hook. */
+  const hookedAdapter = (
+    baseURL: string,
+    onPayload?: LlmDeepSeek.DeepSeekAdapterOptions['onPayload'],
+  ): DeepSeekAdapter => new DeepSeekAdapter({
+    options: () => resolveAdapterOptions({ baseURL }),
+    resolveApiKey: () => Promise.resolve('k'),
+    resolveUserId: () => TEST_USER_ID,
+    ...onPayload === undefined ? {} : { onPayload },
+  })
+
+  it('sends the replacement body when the hook returns one', async () => {
+    const server = await mockServer([{ kind: 'sse', events: textEvents }])
+    const adapter = hookedAdapter(server.url, payload => ({
+      ...(payload as Record<string, unknown>),
+      metadata: { routed: 'wrapper-plugin' },
+    }))
+
+    await drain(adapter.stream({
+      provider: 'deepseek-official',
+      model: 'deepseek-v4-flash',
+      messages: [],
+    }))
+
+    expect(server.requests[0]).toMatchObject({
+      model: 'deepseek-v4-flash',
+      metadata: { routed: 'wrapper-plugin' },
+    })
+  })
+
+  it('keeps an in-place mutation when the hook returns undefined', async () => {
+    const server = await mockServer([{ kind: 'sse', events: textEvents }])
+    const adapter = hookedAdapter(server.url, (payload) => {
+      if (payload !== null && typeof payload === 'object') {
+        ;(payload as Record<string, unknown>).service_tier = 'priority'
+      }
+    })
+
+    await drain(adapter.stream({
+      provider: 'deepseek-official',
+      model: 'deepseek-v4-flash',
+      messages: [],
+    }))
+
+    expect(server.requests[0]).toMatchObject({
+      model: 'deepseek-v4-flash',
+      service_tier: 'priority',
+    })
+  })
+
+  it('hands the hook the provider, the exact model, and the session the request names', async () => {
+    const requests: LlmDeepSeek.DeepSeekPayloadRequest[] = []
+    const server = await mockServer([
+      { kind: 'sse', events: textEvents },
+      { kind: 'sse', events: textEvents },
+    ])
+    const adapter = hookedAdapter(server.url, (_payload, request) => { requests.push(request) })
+
+    await drain(adapter.stream({
+      provider: 'deepseek-official',
+      model: 'deepseek-v4-flash',
+      messages: [],
+      sessionId: SessionId('hook-session'),
+    }))
+    await drain(adapter.stream({
+      provider: 'deepseek-official',
+      model: 'deepseek-v4-flash',
+      messages: [],
+    }))
+
+    expect(requests).toEqual([
+      { provider: 'deepseek-official', model: 'deepseek-v4-flash', sessionId: 'hook-session' },
+      { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+    ])
+  })
+})
