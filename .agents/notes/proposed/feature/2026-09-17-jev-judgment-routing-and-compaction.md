@@ -117,4 +117,12 @@ Spend is bounded by counts in Config (consults, strong consults, planners per ep
 
 The staged order is the argument: deterministic stuck-detection and Lead reporting ship first and dominate the zero-cost alternatives; the engine earns each acting rung only by out-measuring the previous stage's baseline, and the planner — the branch where untrusted text could otherwise reach execution — ships last, behind the adversarial NO-GO.
 
+## PR5b: session selection stickiness and routing transparency
+
+The session model selection is sticky by invariant: it changes only by an explicit user gesture (the composer picker, /model, or spawn-time options), it is the session's capability ceiling, and routing never writes it. Routing rewrites request headers per turn and descends beneath the ceiling; escalateBack returns to the selection, so "strong" is always the user's stated default and never a router invention.
+
+Display surfaces are separated by contract. The model seat and directory show the sticky selection; the routing chip shows the routed actual for the current turn (model, confidence, streak position). No surface may conflate the two: a host projection that reports the selection for the next assembled step must report the sticky selection, not the routed rewrite — the 3081 demo exposed the conflation when a held downgrade read as "the main session changed to deepseek-v4.1-flash", inviting a manual pick of the routed route that then dead-ends routing (candidate-equals-base forever, since the allowlist only descends from the ceiling).
+
+The chip carries a routing-idle state: when the fold yields candidate-equals-base — the selection is itself the downgrade target — the chip says so and offers a one-click restore to the last strong entryBase. That restore is a deliberate phase-level switch with the cache transition cost stated, matching the cache contract: selection changes are rare and user-owned; routed transitions are amortized by the sticky streak (minTurnsDowngraded); per-task manual model hopping is the churn anti-pattern and the UI must not invite it.
+
 Related: [compaction capability-seam note](../../implemented/feature/2026-06-18-compaction-capability-seam.md) (the seam this extends), [plan-mode collaboration state](../../implemented/simplification/2026-07-22-plan-specific-collaboration-state.md) (the toggle pattern mirrored by PR5), [capability seams](../../implemented/architecture/2026-06-13-capability-seams.md) (the Definition/Provider/Consumer rule the judgment seam follows).
