@@ -41,7 +41,7 @@ import {
 } from './config.ts'
 import type { ResolvedWorkerEscalationConfig, WorkerEscalationConfig } from './config.ts'
 import { foldWorkerDigest, renderWorkerDigest } from './digest.ts'
-import { foldEscalationAging, foldEscalationCooldown, foldEscalationTriggers } from './fold.ts'
+import { foldEscalationAging, foldEscalationCooldown, foldEscalationTriggers, probeInFlight } from './fold.ts'
 import type { EscalationAgingState } from './fold.ts'
 import type { EscalationTrigger, EscalationTriggerOutcome } from './types.ts'
 
@@ -176,18 +176,27 @@ function agingView(aging: EscalationAgingState): { continues: number; lastContin
 
 /**
  * Install the ladder: the settings namespace, the committed-event watch, and
- * the disposer that stops both.
+ * the lifetime that ends the report.
+ *
+ * Every registration here is an effect, so Cordis disposes it with the fiber
+ * that mounted this plugin; a `ctx.plugin()` mount never receives this
+ * return value and never needs it. The disposer is for a caller that invoked
+ * `apply` directly and must remove the registrations itself.
  *
  * The ladder decides after the append that scheduled it, never inside it:
  * `Session.append` refuses to reenter while another append is published, so a
- * scheduled evaluation runs from a microtask once that boundary has closed.
+ * scheduled evaluation runs from a microtask once that boundary has closed, and
+ * no evaluation is taken while a charter discrimination probe is in flight
+ * ({@link probeInFlight}), whose exclusion is complete only once its
+ * registering call settles.
  * The engagement gates are the session's own delegation depth and the step
  * cooldown — never the presence of mail, because a worker that must wait for
  * the Lead to write before it can decide would deadlock on exactly the
  * situation the ladder exists for.
  * @param ctx - plugin context; every registration is scoped to it.
  * @param config - composition config, re-judged fail-loud here.
- * @returns a disposer that removes every registration this call made.
+ * @returns a disposer that removes every registration this call made, for a
+ *   caller that invoked `apply` directly.
  */
 export function apply(ctx: Context, config: WorkerEscalationConfig = {}): () => void {
   let source: () => WorkerEscalationConfig = () => config
@@ -271,6 +280,10 @@ export function apply(ctx: Context, config: WorkerEscalationConfig = {}): () => 
     const current = configuration()
     if (!current.enabled) return
     if (!engaged(session, current)) return
+    // A probe's nested check run is harness machinery, and its markers land after
+    // that run: no verdict is taken while the registering call is open, so every
+    // verdict reads a log in which the probe's exclusion is complete.
+    if (probeInFlight(session.events)) return
     const anchorSeq = epochAnchorSeq(ctx, session)
     const outcomes: readonly EscalationTriggerOutcome[] = foldEscalationTriggers(session.events, current, anchorSeq)
     const firing = outcomes.find(outcome => outcome.fired)

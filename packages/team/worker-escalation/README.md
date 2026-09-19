@@ -48,7 +48,7 @@ The package registers the `worker-escalation` settings namespace so a deployment
 
 ## Triggers
 
-Each verdict reports the newest event that satisfies its trigger, so a standing condition keeps pointing at fresh evidence rather than at the moment it began. A trigger that measures failures treats a sandbox policy denial and a charter-discrimination probe run as transparent: they neither count nor reset the run, because the harness's own refusals are not approaches the worker chose.
+Each verdict reports the newest event that satisfies its trigger, so a standing condition keeps pointing at fresh evidence rather than at the moment it began. A trigger that measures failures treats a sandbox policy denial and a charter-discrimination probe run as transparent: they neither count nor reset the run, because the harness's own refusals are not approaches the worker chose. A probe run is dispatched inside the call that registered the probed check, and that call's own result lands after the run's markers, so no verdict is taken while the registering call is open: the exclusion is read from the log rather than from the order its records arrive in.
 
 | Trigger | Fires on | Scope |
 |---|---|---|

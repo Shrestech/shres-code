@@ -30,6 +30,7 @@ import {
   foldEscalationCooldown,
   foldEscalationTriggers,
   isSandboxDenial,
+  probeInFlight,
 } from '../src/fold.ts'
 import type { EscalationDecision, EscalationTrigger, EscalationTriggerOutcome } from '../src/types.ts'
 
@@ -312,6 +313,29 @@ describe('errorBurst', () => {
       call(4, 'other', 'read'),
       failed(5, 'other'),
     ], 'errorBurst', config)).toEqual({ trigger: 'errorBurst', fired: true, triggerSeq: 5 })
+    // The harness logs the probe's own run before the run's markers, so the
+    // exclusion reads the log rather than the order its records arrive in.
+    const markersLast = [
+      call(1, 'probe-call', 'bash'),
+      failed(2, 'probe-call'),
+      charterRun(3, 'probe', false, 'probe-call'),
+      charterProbe(4, 'probe-call'),
+      call(5, 'real', 'bash'),
+      failed(6, 'real'),
+    ]
+    expect(verdict(markersLast, 'errorBurst', config)).toEqual({ trigger: 'errorBurst', fired: false })
+    // The probe's own successful run is transparent too: it neither supplies a
+    // failing result of its own nor resets the burst across it.
+    const probeSuccess = [
+      call(1, 'real-1', 'bash'),
+      failed(2, 'real-1'),
+      call(3, 'probe-call', 'bash'),
+      toolResult(4, 'probe-call'),
+      charterProbe(5, 'probe-call'),
+      call(6, 'real-2', 'bash'),
+      failed(7, 'real-2'),
+    ]
+    expect(verdict(probeSuccess, 'errorBurst', config)).toEqual({ trigger: 'errorBurst', fired: true, triggerSeq: 7 })
   })
 
   it('reads a result whose content carries no text', () => {
@@ -340,6 +364,50 @@ describe('errorBurst', () => {
     expect(verdict(twoFailures, 'errorBurst', config)).toEqual({ trigger: 'errorBurst', fired: false })
     const three = [...twoFailures, call(5, 'c3', 'bash', '{"command":"c"}'), failed(6, 'c3')]
     expect(verdict(three, 'errorBurst', config)).toEqual({ trigger: 'errorBurst', fired: true, triggerSeq: 6 })
+  })
+})
+
+describe('probeInFlight', () => {
+  /** The arguments `jspace_open` carries for one check the harness will probe. */
+  const registration = JSON.stringify({
+    goal: 'finish the assignment',
+    next: 'keep going',
+    charter: [{
+      kind: 'check',
+      constraint: 'the audit tag is the first line',
+      command: 'grep AUDIT-TAG src/mod.js',
+      reads: ['src/mod.js'],
+      failProbe: { path: 'src/mod.js', mutation: { kind: 'insert', content: '// no tag' } },
+    }],
+  })
+
+  it("stays in flight until the registering call's own result lands", () => {
+    const events = [
+      call(1, 'open-call', 'jspace_open', registration),
+      call(2, 'open-call:charter:e1', 'bash', '{"command":"grep AUDIT-TAG src/mod.js"}'),
+      failed(3, 'open-call:charter:e1'),
+    ]
+    // The probe's own run settles nothing: only the call that dispatched it does.
+    expect(probeInFlight(events)).toBe(true)
+    expect(probeInFlight([...events, toolResult(4, 'open-call')])).toBe(false)
+  })
+
+  it('ignores calls that register no probed check, unparseable arguments, and results alone', () => {
+    expect(probeInFlight([call(1, 'plain', 'bash', '{"command":"a"}')])).toBe(false)
+    expect(probeInFlight([toolResult(1, 'plain')])).toBe(false)
+    expect(probeInFlight([call(1, 'c', 'jspace_open', 'not json')])).toBe(false)
+    // A check without a failProbe is registered unprobed.
+    const unprobed = JSON.stringify({ charter: [{ kind: 'check', constraint: 'c', command: 'x', reads: ['f'] }] })
+    expect(probeInFlight([call(1, 'c', 'jspace_open', unprobed)])).toBe(false)
+    const noCheck = JSON.stringify({ charter: [null, 'prose'] })
+    expect(probeInFlight([call(1, 'c', 'jspace_open', noCheck)])).toBe(false)
+  })
+
+  it('recognizes a check nested the way jspace_charter_amend nests one', () => {
+    const amend = JSON.stringify({
+      replace: [{ id: 'e1', entry: { kind: 'check', constraint: 'c', command: 'x', reads: ['f'], failProbe: { path: 'f', mutation: { kind: 'prepend', content: 'x' } } } }],
+    })
+    expect(probeInFlight([call(1, 'amend', 'jspace_charter_amend', amend)])).toBe(true)
   })
 })
 

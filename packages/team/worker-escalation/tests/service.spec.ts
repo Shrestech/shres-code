@@ -12,7 +12,7 @@
 
 import { afterEach, describe, expect, it } from 'vitest'
 import { Context, Service } from '@shres-code/cordis'
-import JspaceService from '@shres-code/shres-code-jspace'
+import JspaceService, { CharterEntryId } from '@shres-code/shres-code-jspace'
 import { CallId, createToolResultMessage } from '@shres-code/shres-code-llm'
 import SessionStore, { SessionId } from '@shres-code/shres-code-session'
 import type { Session, SessionEvent } from '@shres-code/shres-code-session'
@@ -285,6 +285,98 @@ describe('worker-escalation evaluation', () => {
     expect(logged).toHaveLength(1)
     expect(logged[0]?.data.trigger).toBe('attemptCount')
     expect(logged[0]?.data.triggerSeq).toBeGreaterThan(booted.ctx.jspace.card(worker)?.goalOpenedSeq ?? 0)
+  })
+})
+
+describe('the charter-probe window', () => {
+  /** The `jspace_open` arguments for one check the harness will discriminate. */
+  const PROBED_REGISTRATION = JSON.stringify({
+    goal: 'finish the assignment',
+    next: 'keep going',
+    charter: [{
+      kind: 'check',
+      constraint: 'the audit tag is the first line',
+      command: 'grep AUDIT-TAG src/mod.js',
+      reads: ['src/mod.js'],
+      failProbe: { path: 'src/mod.js', mutation: { kind: 'insert', content: '// no tag' } },
+    }],
+  })
+
+  it('takes no verdict from a probe run whose markers have not landed yet', async () => {
+    const booted = await boot({
+      enabled: true,
+      minStepsBetween: 0,
+      triggers: {
+        errorBurst: { enabled: true, burst: 2 },
+        attemptCount: { enabled: false },
+        repeatRunLength: { enabled: false },
+        stepBudgetExhausted: { enabled: false },
+        turnFailureStreak: { enabled: false },
+      },
+    })
+    const worker = session(booted, 'worker-probe-window', 1)
+    // One genuine failure, so the probe's own run would be the burst's second.
+    failing(worker, 1, 'a')
+    await settle()
+    expect(decisions(worker)).toEqual([])
+
+    const parentCall = CallId('call-open')
+    const parent = worker.append('tool/call', {
+      turn: 1,
+      step: 1,
+      callId: parentCall,
+      name: 'jspace_open',
+      arguments: PROBED_REGISTRATION,
+    })
+    const nestedCall = CallId('call-open:charter:e1')
+    const nested = worker.append('tool/call', {
+      turn: 1,
+      step: 1,
+      callId: nestedCall,
+      name: 'bash',
+      arguments: JSON.stringify({
+        command: 'grep AUDIT-TAG src/mod.js',
+        description: 'Run charter check e1',
+        timeoutMs: 10_000,
+      }),
+    })
+    worker.append('tool/result', {
+      turn: 1,
+      step: 1,
+      message: createToolResultMessage({ callId: nestedCall, content: [{ type: 'text', text: 'no tag' }], isError: true }),
+    }, { surfaceOp: 'append', sourceEventSeqs: [nested.seq] })
+    await settle()
+    // The nested run failing is the probe succeeding: reading it as the worker's
+    // second failed approach is the decision this window must not take.
+    expect(decisions(worker)).toEqual([])
+
+    worker.append('jspace/charter-run', {
+      entryId: CharterEntryId('e1'),
+      callId: nestedCall,
+      parentCallId: parentCall,
+      phase: 'probe',
+      command: 'grep AUDIT-TAG src/mod.js',
+      passed: false,
+      exitCode: 1,
+      outputPreview: '',
+    }, { ignorable: true })
+    worker.append('jspace/charter-probe', {
+      entryId: CharterEntryId('e1'),
+      callId: nestedCall,
+      path: 'src/mod.js',
+      mutationKind: 'insert',
+      demonstrated: true,
+    }, { ignorable: true })
+    worker.append('tool/result', {
+      turn: 1,
+      step: 1,
+      message: createToolResultMessage({ callId: parentCall, content: [{ type: 'text', text: 'charter registered' }], isError: false }),
+    }, { surfaceOp: 'append', sourceEventSeqs: [parent.seq] })
+    await settle()
+    // Settled: the probe's run is transparent, and the burst still stands at the
+    // one genuine failure the window opened with.
+    expect(decisions(worker)).toEqual([])
+    expect(booted.mailbox?.sent).toEqual([])
   })
 })
 

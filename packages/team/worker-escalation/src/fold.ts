@@ -147,6 +147,66 @@ function charterProbeCallIds(events: readonly SessionEvent[]): ReadonlySet<strin
   return ids
 }
 
+/**
+ * Whether one node of a parsed `tool/call` argument value declares a charter
+ * check the harness will discriminate: a check object carrying a `failProbe`, at
+ * any depth, because `jspace_open` carries its checks under `charter` while
+ * `jspace_charter_amend` nests them under `add` and `replace[].entry`.
+ * @param value - one node of the parsed argument value.
+ * @returns true when the node declares a probed check.
+ */
+function declaresProbedCheck(value: unknown): boolean {
+  if (Array.isArray(value)) return value.some(declaresProbedCheck)
+  if (value === null || typeof value !== 'object') return false
+  const record = value as Record<string, unknown>
+  return (record.kind === 'check' && record.failProbe !== undefined)
+    || Object.values(record).some(declaresProbedCheck)
+}
+
+/**
+ * Whether one call's raw arguments declare a check the harness will probe.
+ * @param raw - the `tool/call` event's raw `arguments` string.
+ * @returns true when the call registers a probed check.
+ */
+function declaresProbe(raw: string): boolean {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    // The same fallback the chain key takes: argument text that does not parse
+    // declares nothing.
+    return false
+  }
+  return declaresProbedCheck(parsed)
+}
+
+/**
+ * Whether a charter discrimination probe is still in flight: a call that
+ * registers a probed check and whose own `tool/result` has not landed yet.
+ *
+ * The probe's nested check run is dispatched inside that call, and the run's
+ * markers (`jspace/charter-run` phase `probe`, then `jspace/charter-probe`) are
+ * appended before the call's own result. A verdict taken while the call is open
+ * would therefore read the probe's own run, whose failure is the probe
+ * succeeding; the registering call's arguments are the one probe signal that is
+ * in the log before the probe runs, which is what makes this recognition
+ * independent of when the markers land.
+ * @param events - the session log or any prefix of it.
+ * @returns true when a probe-owning call is unresolved.
+ */
+export function probeInFlight(events: readonly SessionEvent[]): boolean {
+  let open: string | undefined
+  for (const event of events) {
+    if (event.type === 'tool/call') {
+      if (declaresProbe(event.data.arguments)) open = String(event.data.callId)
+      continue
+    }
+    if (event.type !== 'tool/result' || open === undefined) continue
+    if (String(event.data.message.source.callId) === open) open = undefined
+  }
+  return open !== undefined
+}
+
 /** One call's logged identity: the name and raw arguments a failed attempt is keyed by. */
 interface CallIdentity {
   /** Tool name. */
@@ -234,7 +294,9 @@ function attemptCountSeq(
     if (outcome.seq <= floor || outcome.ok) continue
     if (isSandboxDenial(outcome.code, outcome.text) || probes.has(outcome.callId)) continue
     const call = calls.get(outcome.callId)
-    /* v8 ignore next -- a tool result without its call is not a log this repo writes. */
+    // The fold reads any prefix of the log, so the call event can sit outside
+    // it; the attempt then has no chain identity to count under, and skipping it
+    // is what keeps the count to approaches the fold can identify.
     if (call === undefined) continue
     const key = callChainKey(call.name, call.arguments)
     if (seen.has(key)) continue
