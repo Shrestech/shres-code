@@ -1,5 +1,5 @@
 /**
- * Worker difficulty ladder, Stage 0: deterministic and engine-free.
+ * Worker difficulty ladder: Stage 0 deterministic, Stage 1 an observer.
  *
  * A delegated worker session has no structured response to mid-turn
  * difficulty — it cannot ask the human, the step budget bounds only one turn,
@@ -9,18 +9,30 @@
  * continue resolutions on a goal epoch reports the worker blocked to the Lead
  * through the Team mailbox the worker already owns.
  *
- * The ladder ships off and appears in no default bundle row: `enabled: false`
- * writes no session event and sends no mail, so a composed-but-off deployment
- * is byte-identical to one without this package.
+ * Stage 1 consults an optional judgment engine through the structural
+ * `ctx.get('judgment')` read — no declared injection, so the ladder composes
+ * with or without an engine. One two-option choice ask is made per continue
+ * resolution — the deterministic terminal consults nothing — gated on the
+ * answer's confidence and its top-two probability margin, and the decision logs
+ * the engine class and the gate outcome. Nothing
+ * executes on that answer: a `needs-help` choice is a record, and the
+ * report-blocked terminal stays the ladder's one action.
  *
- * Nothing here consults a judgment engine: `engine` is `'absent'` on every
- * decision this stage writes.
+ * The ladder ships off and appears in no default bundle row: `enabled: false`
+ * writes no session event, sends no mail, and makes no ask, so a
+ * composed-but-off deployment is byte-identical to one without this package.
  *
  * @module @shres-code/shres-code-worker-escalation
  */
 
 import type { Context } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
+import { judgmentEnabled, judgmentQuestionId } from '@shres-code/shres-code-judgment'
+import type {
+  JudgmentChoiceAnswer,
+  JudgmentChoiceQuestion,
+  JudgmentResult,
+} from '@shres-code/shres-code-judgment'
 import type { Session } from '@shres-code/shres-code-session'
 import { installSettingsSection } from '@shres-code/shres-code-settings'
 // Type-only edges: resolve `ctx.agents`, `ctx.jspace`, and `ctx.agentTeams`.
@@ -28,6 +40,9 @@ import type {} from '@shres-code/shres-code-agent'
 import type {} from '@shres-code/shres-code-agent-team'
 import type {} from '@shres-code/shres-code-jspace'
 import {
+  DEFAULT_JUDGMENT_CONFIDENCE,
+  DEFAULT_JUDGMENT_MARGIN,
+  DEFAULT_JUDGMENT_TIER,
   DEFAULT_MAX_ARG_CHARS,
   DEFAULT_MAX_CONTINUES,
   DEFAULT_MAX_DIGEST_CHARS,
@@ -43,13 +58,23 @@ import type { ResolvedWorkerEscalationConfig, WorkerEscalationConfig } from './c
 import { foldWorkerDigest, renderWorkerDigest } from './digest.ts'
 import { foldEscalationAging, foldEscalationCooldown, foldEscalationTriggers, probeInFlight } from './fold.ts'
 import type { EscalationAgingState } from './fold.ts'
-import type { EscalationTrigger, EscalationTriggerOutcome } from './types.ts'
+import { composeProgressState } from './progress.ts'
+import type {
+  EscalationChoice,
+  EscalationConsultReason,
+  EscalationEngineClass,
+  EscalationTrigger,
+  EscalationTriggerOutcome,
+} from './types.ts'
 
 // The `escalation/decision` session-event declaration lives in src/types.ts
 // (its one home); this re-export keeps the module edge in the emitted
 // declarations so aggregate programs receive the merge.
 export type * from './types.ts'
 export {
+  DEFAULT_JUDGMENT_CONFIDENCE,
+  DEFAULT_JUDGMENT_MARGIN,
+  DEFAULT_JUDGMENT_TIER,
   DEFAULT_MAX_ARG_CHARS,
   DEFAULT_MAX_ARBITER_DEPTH,
   DEFAULT_MAX_CONTINUES,
@@ -62,11 +87,12 @@ export {
   WORKER_ESCALATION_SETTINGS_NAMESPACE,
   resolveConfig,
 } from './config.ts'
-export { foldEscalationAging, foldEscalationCooldown, foldEscalationTriggers, triggerSatisfiedAt } from './fold.ts'
-export { canonicalizeArguments, callChainKey, isSandboxDenial } from './fold.ts'
-export type { EscalationAgingState, EscalationCooldownState } from './fold.ts'
+export { foldEscalationAging, foldEscalationCooldown, foldEscalationTriggers, foldProgressFacts, triggerSatisfiedAt } from './fold.ts'
+export { canonicalizeArguments, callChainKey, foldToolWindow, isSandboxDenial } from './fold.ts'
+export type { EscalationAgingState, EscalationCooldownState, WorkerToolWindowEntry } from './fold.ts'
 export { foldTeamMessages, foldWorkerDigest, foldWorkerCharter, renderWorkerDigest } from './digest.ts'
 export type { WorkerAssignmentFold, WorkerDigestCaps } from './digest.ts'
+export { composeProgressState } from './progress.ts'
 
 /** Cordis plugin name. */
 export const name = 'worker-escalation'
@@ -74,7 +100,9 @@ export const name = 'worker-escalation'
 /**
  * Composition config schema, which is also the `worker-escalation` settings
  * section schema. Unknown keys and wrong types fail plugin load by name, and
- * `resolveConfig` re-judges every bound and the cross-field requirements.
+ * `resolveConfig` re-judges every bound and the cross-field requirements;
+ * `progressInstructions` is required because the judgment engine owns no
+ * prose of its own.
  */
 export const Config: z<WorkerEscalationConfig> = z.object({
   enabled: z.boolean().default(false),
@@ -107,6 +135,10 @@ export const Config: z<WorkerEscalationConfig> = z.object({
   maxDigestChars: z.number().step(1).min(1).default(DEFAULT_MAX_DIGEST_CHARS),
   maxExcerptChars: z.number().step(1).min(1).default(DEFAULT_MAX_EXCERPT_CHARS),
   maxArgChars: z.number().step(1).min(1).default(DEFAULT_MAX_ARG_CHARS),
+  progressInstructions: z.string().required(),
+  confidence: z.number().min(0).max(1).default(DEFAULT_JUDGMENT_CONFIDENCE),
+  margin: z.number().min(0).max(1).default(DEFAULT_JUDGMENT_MARGIN),
+  judgmentTier: z.union(['fast', 'accurate']).default(DEFAULT_JUDGMENT_TIER),
 })
 
 /** The `agentTeams` target name the Team Lead answers to. */
@@ -126,6 +158,59 @@ const LADDER_EVENTS: ReadonlySet<string> = new Set([
   'jspace/charter-run',
   'step-budget/exhausted',
 ])
+
+/** The Stage 1 ask's question id, echoed by the answer this ladder reads. */
+const PROGRESS_QUESTION_ID = judgmentQuestionId('worker-progress')
+
+/**
+ * The two options the Stage 1 ask offers, which are exactly the choices a
+ * passed gate logs. Stage 1 executes neither: `needs-help` is a record, and
+ * only the ladder's own `report-blocked` terminal acts.
+ */
+const PROGRESS_OPTIONS = ['continue', 'needs-help'] as const
+
+/** The figures one answered ask reports, present whenever an engine answered. */
+interface ProgressAnswer {
+  /** Confidence the answer reported, 0 through 1. */
+  readonly confidence: number
+  /** Top-two probability margin of the answer's distribution. */
+  readonly margin: number
+}
+
+/** What one Stage 1 consult resolved for a firing trigger. */
+interface ProgressConsult {
+  /** Engine class that answered, or the class of the consult that could not answer. */
+  readonly engine: EscalationEngineClass
+  /** Why the consult resolved this way. */
+  readonly reason: EscalationConsultReason
+  /** The choice to log: the ask's own option where the gate passed, `continue` otherwise. */
+  readonly choice: EscalationChoice
+  /** The answer's figures, present only where an engine answered. */
+  readonly answer?: ProgressAnswer
+}
+
+/** The choice question one ask asks: whether the worker should keep going. */
+function progressQuestion(config: ResolvedWorkerEscalationConfig): JudgmentChoiceQuestion {
+  return {
+    kind: 'choice',
+    id: PROGRESS_QUESTION_ID,
+    instructions: config.progressInstructions,
+    options: PROGRESS_OPTIONS.map(option => ({ option })),
+  }
+}
+
+/**
+ * Top-two probability margin of the ask's answer. The question offers exactly
+ * two options, so the margin is their difference. A provider validates one
+ * probability per option before an answer reaches a consumer, so an option the
+ * distribution omits reads as zero here.
+ * @param probabilities - the answer's per-option distribution.
+ * @returns the absolute difference between the two options' probabilities.
+ */
+function progressMargin(probabilities: Readonly<Record<string, number>>): number {
+  const [first, second] = PROGRESS_OPTIONS
+  return Math.abs((probabilities[first] ?? 0) - (probabilities[second] ?? 0))
+}
 
 /**
  * Whether the ladder owns this session: a delegated child within the
@@ -188,7 +273,9 @@ function agingView(aging: EscalationAgingState): { continues: number; lastContin
  * scheduled evaluation runs from a microtask once that boundary has closed, and
  * no evaluation is taken while a charter discrimination probe is in flight
  * ({@link probeInFlight}), whose exclusion is complete only once its
- * registering call settles.
+ * registering call settles. One evaluation runs per session at a time — the
+ * schedule entry is held until the consult it may await has settled, so a
+ * second committed event cannot start an overlapping pass over the same log.
  * The engagement gates are the session's own delegation depth and the step
  * cooldown — never the presence of mail, because a worker that must wait for
  * the Lead to write before it can decide would deadlock on exactly the
@@ -198,7 +285,7 @@ function agingView(aging: EscalationAgingState): { continues: number; lastContin
  * @returns a disposer that removes every registration this call made, for a
  *   caller that invoked `apply` directly.
  */
-export function apply(ctx: Context, config: WorkerEscalationConfig = {}): () => void {
+export function apply(ctx: Context, config: WorkerEscalationConfig): () => void {
   let source: () => WorkerEscalationConfig = () => config
   let raw: WorkerEscalationConfig = config
   let resolved: ResolvedWorkerEscalationConfig = resolveConfig(config)
@@ -227,8 +314,10 @@ export function apply(ctx: Context, config: WorkerEscalationConfig = {}): () => 
   })
 
   const lifetime = new AbortController()
+  // One evaluation per session at a time, held until the consult it may await
+  // has settled; it is also what keeps a second blocked report from starting
+  // while the first is unresolved.
   const scheduled = new WeakSet<Session>()
-  const reporting = new WeakSet<Session>()
 
   /**
    * Deliver the blocked report through the Team mailbox the worker already
@@ -261,22 +350,86 @@ export function apply(ctx: Context, config: WorkerEscalationConfig = {}): () => 
         content: [{ type: 'text', text: reportText(trigger, triggerSeq, aging.continues) + '\n\n' + renderWorkerDigest(digest) }],
         signal: lifetime.signal,
       })
+      // The terminal resolves on the epoch's own count before any consult runs,
+      // so it carries the rule it resolved on and no engine class.
       session.append('escalation/decision', {
         trigger,
         triggerSeq,
         choice: 'report-blocked',
-        engine: 'absent',
+        reason: 'max-continues',
         aging: agingView(aging),
       }, { ignorable: true })
     } catch (error: unknown) {
       ctx.logger.warn('worker-escalation: the blocked report was not delivered: ' + String(error))
-    } finally {
-      reporting.delete(session)
     }
   }
 
-  /** Resolve one firing trigger into a decision, or into the report-blocked terminal. */
-  const evaluate = (session: Session): void => {
+  /**
+   * Consult the judgment engine for one firing trigger: compose the ask's
+   * numbers-first state, apply the deployment's egress hook once, ask the
+   * two-option progress question, and judge the answer against both gates.
+   *
+   * Every failure resolves to the Stage 0 continue carrying its own class: no
+   * engine composed, a disabled engine, an engine that threw, an answer this
+   * ladder could not use, and an answer below either gate. The consult executes
+   * nothing — its only product is what the decision logs — and it is reached
+   * only for a firing trigger that has not already resolved the terminal.
+   * @param session - the worker session the trigger fired on.
+   * @param current - resolved ladder configuration.
+   * @param anchorSeq - the goal epoch's exclusive lower bound.
+   * @returns the engine class, the reason, the choice to log, and the answer's figures where one answered.
+   */
+  const consultProgress = async (
+    session: Session,
+    current: ResolvedWorkerEscalationConfig,
+    anchorSeq: number,
+  ): Promise<ProgressConsult> => {
+    /** One degradation: the Stage 0 continue, carrying the class that caused it. */
+    const degraded = (engine: EscalationEngineClass, reason: EscalationConsultReason): ProgressConsult =>
+      ({ engine, reason, choice: 'continue' })
+    const engine = ctx.get('judgment')
+    if (engine === undefined) return degraded('absent', 'engine-absent')
+    if (!judgmentEnabled(engine.settings)) return degraded('disabled', 'engine-disabled')
+    const state = composeProgressState(session, current, anchorSeq)
+    const redactor = ctx.get('judgmentRedactor')
+    let result: JudgmentResult
+    try {
+      result = await engine.ask({
+        state: redactor === undefined ? state : await redactor.redactState(state),
+        questions: [progressQuestion(current)],
+        tier: current.judgmentTier,
+        signal: lifetime.signal,
+      })
+    } catch (error: unknown) {
+      // A provider that refused an unusable response classified it itself; every
+      // other failure is a transport class the seam reports as UNAVAILABLE.
+      const code = (error as { code?: unknown } | null)?.code
+      return code === 'INVALID_ANSWER'
+        ? degraded('invalid-answer', 'invalid-answer')
+        : degraded('unavailable', 'engine-unavailable')
+    }
+    const answer = result.answers.find((candidate): candidate is JudgmentChoiceAnswer => candidate.kind === 'choice')
+    if (answer === undefined) return degraded('invalid-answer', 'invalid-answer')
+    const option = PROGRESS_OPTIONS.find(candidate => candidate === answer.option)
+    if (option === undefined) return degraded('invalid-answer', 'invalid-answer')
+    const margin = progressMargin(answer.probabilities)
+    const figures: ProgressAnswer = { confidence: answer.confidence, margin }
+    if (answer.confidence < current.confidence) {
+      return { engine: 'ok', reason: 'low-confidence', choice: 'continue', answer: figures }
+    }
+    if (margin < current.margin) {
+      return { engine: 'ok', reason: 'thin-margin', choice: 'continue', answer: figures }
+    }
+    return { engine: 'ok', reason: 'gate-passed', choice: option, answer: figures }
+  }
+
+  /**
+   * Resolve one firing trigger into a decision, or into the report-blocked
+   * terminal. The consult runs before the append, so the decision records what
+   * the engine answered and the gate resolved; the append reads the log's own
+   * newest seq at that point, which is the decision's own seq minus one.
+   */
+  const evaluate = async (session: Session): Promise<void> => {
     const current = configuration()
     if (!current.enabled) return
     if (!engaged(session, current)) return
@@ -298,16 +451,19 @@ export function apply(ctx: Context, config: WorkerEscalationConfig = {}): () => 
     const aging = foldEscalationAging(session.events, anchorSeq)
     if (aging.reportBlocked) return
     if (aging.continues >= current.maxContinues) {
-      if (reporting.has(session)) return
-      reporting.add(session)
-      void reportBlocked(session, current, firing.trigger, triggerSeq, aging)
+      await reportBlocked(session, current, firing.trigger, triggerSeq, aging)
       return
     }
+    const consult = await consultProgress(session, current, anchorSeq)
     session.append('escalation/decision', {
       trigger: firing.trigger,
       triggerSeq,
-      choice: 'continue',
-      engine: 'absent',
+      choice: consult.choice,
+      engine: consult.engine,
+      reason: consult.reason,
+      ...consult.answer === undefined
+        ? {}
+        : { confidence: consult.answer.confidence, margin: consult.answer.margin },
       aging: { continues: aging.continues + 1, lastContinueSeq: session.seq },
     }, { ignorable: true })
   }
@@ -317,8 +473,9 @@ export function apply(ctx: Context, config: WorkerEscalationConfig = {}): () => 
     if (scheduled.has(session)) return
     scheduled.add(session)
     queueMicrotask(() => {
-      scheduled.delete(session)
-      evaluate(session)
+      void evaluate(session).finally(() => {
+        scheduled.delete(session)
+      })
     })
   }, { global: true }), 'worker-escalation: committed-event watch')
 

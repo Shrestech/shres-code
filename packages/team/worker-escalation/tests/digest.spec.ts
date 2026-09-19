@@ -6,10 +6,16 @@
  * only human messages produces an empty anchor rather than the human's text.
  * The caps bound the trailing tool window, every excerpt, and the complete
  * render.
+ *
+ * The Stage 1 ask's state is composed from the same log and asserted here
+ * beside the report's digest: it is numbers-first, and it carries no excerpt at
+ * all.
  */
 
 import { describe, expect, it } from 'vitest'
 import type { Session, SessionEvent } from '@shres-code/shres-code-session'
+import { resolveConfig } from '../src/config.ts'
+import type { ResolvedWorkerEscalationConfig, WorkerEscalationConfig } from '../src/config.ts'
 import {
   TRUNCATION_MARKER,
   argsExcerpt,
@@ -20,6 +26,7 @@ import {
   renderWorkerDigest,
 } from '../src/digest.ts'
 import type { WorkerDigestCaps } from '../src/digest.ts'
+import { composeProgressState } from '../src/progress.ts'
 
 /** One logged event carrying only the fields the digest reads. */
 function event(type: string, seq: number, data: unknown): SessionEvent {
@@ -96,6 +103,21 @@ function card(seq: number, charter: readonly { readonly id: string; readonly con
 /** Digest caps with every bound explicit. */
 function caps(overrides: Partial<WorkerDigestCaps> = {}): WorkerDigestCaps {
   return { maxTools: 12, maxChars: 4000, maxExcerpt: 200, maxArgs: 80, ...overrides }
+}
+
+/**
+ * Resolved ladder configuration with the Stage 1 bounds this suite varies.
+ * @param overrides - ladder fields to replace.
+ * @returns the resolved configuration.
+ */
+function progressConfig(overrides: Partial<WorkerEscalationConfig> = {}): ResolvedWorkerEscalationConfig {
+  return resolveConfig({
+    enabled: true,
+    progressInstructions: 'Is this worker going to finish without help?',
+    maxDigestTools: 3,
+    maxDigestChars: 400,
+    ...overrides,
+  })
 }
 
 describe('boundText', () => {
@@ -351,5 +373,65 @@ describe('renderWorkerDigest', () => {
     expect(render.startsWith('Worker session id: worker-session')).toBe(true)
     expect(render).toContain("Assignment (the Lead's team message): ship the parser")
     expect(render).not.toContain('Recent tool outcomes:')
+  })
+})
+
+describe('composeProgressState', () => {
+  /** One worker log with a success, a failure carrying error text, and a workspace path in an argument. */
+  function progressLog(): readonly SessionEvent[] {
+    return [
+      teamMessage(1, 'ship the parser'),
+      stepEnd(2),
+      call(3, 'c1', 'bash', '{"command":"pnpm test --filter src/worker/parser.ts"}'),
+      result(4, 'c1', { ok: true, text: 'all green' }),
+      call(5, 'c2', 'bash', '{"command":"pnpm test --filter src/worker/parser.ts"}'),
+      result(6, 'c2', { text: 'TypeError: cannot read properties of undefined at src/worker/parser.ts:41' }),
+      stepEnd(7),
+    ]
+  }
+
+  it('leads with the counts and follows with one ok|FAIL line per trailing call', () => {
+    const state = composeProgressState(sessionWith(progressLog(), 7), progressConfig(), -1)
+    expect(state.split('\n')).toEqual([
+      'Tool outcomes: ok=1 fail=1',
+      'Distinct failed approaches this goal epoch: 1',
+      'Identical-call chain in force: 2',
+      'Completed steps since the last verified checkpoint: 2',
+      'Recent tool outcomes:',
+      'ok bash seq=3',
+      'FAIL bash seq=5',
+    ])
+  })
+
+  it('carries no excerpt of any kind: the error text, the arguments, and the assignment stay out', () => {
+    const state = composeProgressState(sessionWith(progressLog(), 7), progressConfig(), -1)
+    // The excerpts the Lead's report carries never reach the ask's state, and no
+    // configuration switch turns either on.
+    expect(state).not.toContain('TypeError')
+    expect(state).not.toContain('parser.ts')
+    expect(state).not.toContain('pnpm test')
+    expect(state).not.toContain('ship the parser')
+    expect(state).not.toContain('all green')
+  })
+
+  it('bounds the tool window and the complete render by the configured caps', () => {
+    const log = progressLog()
+    const window = composeProgressState(
+      sessionWith(log, 7),
+      progressConfig({ maxDigestTools: 1 }),
+      -1,
+    )
+    expect(window).toContain('Recent tool outcomes:\nFAIL bash seq=5')
+    expect(window).not.toContain('ok bash seq=3')
+
+    const capped = composeProgressState(sessionWith(log, 7), progressConfig({ maxDigestChars: 60 }), -1)
+    expect(capped.length).toBeLessThanOrEqual(60)
+    expect(capped.endsWith(TRUNCATION_MARKER)).toBe(true)
+  })
+
+  it('omits the tool section when no call has a result yet', () => {
+    const state = composeProgressState(sessionWith([call(1, 'c1', 'bash')], 1), progressConfig(), -1)
+    expect(state).not.toContain('Recent tool outcomes:')
+    expect(state).toContain('Tool outcomes: ok=0 fail=0')
   })
 })

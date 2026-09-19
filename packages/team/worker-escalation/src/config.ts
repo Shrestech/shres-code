@@ -12,6 +12,7 @@
 
 import { settingsNamespace } from '@shres-code/shres-code-settings'
 import type { SettingsNamespace } from '@shres-code/shres-code-settings'
+import type { JudgmentTier } from '@shres-code/shres-code-judgment'
 import type { EscalationTrigger } from './types.ts'
 
 /**
@@ -62,6 +63,18 @@ export const DEFAULT_MAX_EXCERPT_CHARS = 200
 
 /** Default character cap on each tool-argument excerpt. */
 export const DEFAULT_MAX_ARG_CHARS = 80
+
+/** Default confidence the Stage 1 ask's answer must reach to pass its gate. */
+export const DEFAULT_JUDGMENT_CONFIDENCE = 0.8
+
+/** Default top-two probability margin the ask's answer must reach to pass its gate. */
+export const DEFAULT_JUDGMENT_MARGIN = 0.1
+
+/**
+ * Default tier the Stage 1 ask runs at. The cheap tier is an explicit
+ * optimization, so a deployment that says nothing gets the accurate one.
+ */
+export const DEFAULT_JUDGMENT_TIER: JudgmentTier = 'accurate'
 
 /** The `errorBurst` row: consecutive errored tool results. */
 export interface EscalationErrorBurstConfig {
@@ -176,6 +189,28 @@ export interface WorkerEscalationConfig {
   maxExcerptChars?: number
   /** Character cap on each tool-argument excerpt inside the tool window. Default 80. */
   maxArgChars?: number
+  /**
+   * Instructions of the Stage 1 ask's two-option choice question. Required: the
+   * judgment engine owns no prose, so the package that composes the ask owns
+   * the text, and a deployment that omits it fails at load rather than asking
+   * an unstated question.
+   */
+  progressInstructions: string
+  /**
+   * Confidence the ask's answer must reach for its gate to pass, from 0
+   * through 1. An answer below it resolves `continue` with
+   * `low-confidence`. Default 0.8, the routing operating point.
+   */
+  confidence?: number
+  /**
+   * Top-two probability margin (`top1 - top2`) the ask's answer must reach for
+   * its gate to pass, from 0 through 1. An answer below it resolves
+   * `continue` with `thin-margin`. Default 0.1, the routing operating point
+   * and above the measured wobble of a rented classifier's borderline answers.
+   */
+  margin?: number
+  /** Judgment tier the ask runs at: `fast` or `accurate`. Default `accurate`. */
+  judgmentTier?: JudgmentTier
 }
 
 /** One resolved trigger row. */
@@ -209,6 +244,14 @@ export interface ResolvedWorkerEscalationConfig {
   readonly maxExcerptChars: number
   /** Character cap on each tool-argument excerpt. */
   readonly maxArgChars: number
+  /** Instructions of the Stage 1 ask's two-option choice question. */
+  readonly progressInstructions: string
+  /** Confidence floor the ask's answer must reach to pass its gate. */
+  readonly confidence: number
+  /** Top-two probability margin floor the ask's answer must reach to pass its gate. */
+  readonly margin: number
+  /** Judgment tier the ask runs at. */
+  readonly judgmentTier: JudgmentTier
 }
 
 /**
@@ -234,6 +277,10 @@ const CONFIG_KEYS: ReadonlySet<string> = new Set([
   'maxDigestChars',
   'maxExcerptChars',
   'maxArgChars',
+  'progressInstructions',
+  'confidence',
+  'margin',
+  'judgmentTier',
 ])
 
 /** Reject a key this ladder could not act on, naming it. */
@@ -260,6 +307,20 @@ function assertPositive(name: string, value: unknown): asserts value is number {
 /** Require one field to be a boolean. */
 function assertBoolean(name: string, value: unknown): asserts value is boolean {
   if (typeof value !== 'boolean') throw new Error(`${name} must be a boolean`)
+}
+
+/** Require one field to be a non-empty string. */
+function assertNonEmptyString(name: string, value: unknown): asserts value is string {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw new Error(`${name} must be a non-empty string`)
+  }
+}
+
+/** Require one probability-shaped threshold inside [0, 1]. */
+function assertRatio(name: string, value: unknown): asserts value is number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1) {
+    throw new Error(`${name} must be a number from 0 through 1`)
+  }
 }
 
 /**
@@ -303,14 +364,20 @@ function resolveTriggerRow(
  * @param config - raw config from a composition entry, a settings snapshot, or a caller.
  * @returns the resolved facts, frozen.
  * @throws Error naming the offending key when the config carries an unknown
- *   key, a non-boolean `enabled`, a non-integer count, a trigger table that
- *   enables nothing while the ladder is on, or a delegation-depth cap that
- *   engages no session.
+ *   key, a missing question text, a non-boolean `enabled`, a non-integer
+ *   count, a threshold outside its range, a trigger table that enables nothing
+ *   while the ladder is on, or a delegation-depth cap that engages no session.
  */
-export function resolveConfig(config: WorkerEscalationConfig = {}): ResolvedWorkerEscalationConfig {
+export function resolveConfig(config: WorkerEscalationConfig): ResolvedWorkerEscalationConfig {
   validateKeys(config)
-  const raw = config as { enabled?: unknown; maxArbiterDepth?: unknown; triggers?: unknown }
+  const raw = config as { enabled?: unknown; maxArbiterDepth?: unknown; triggers?: unknown; judgmentTier?: unknown }
   if (raw.enabled !== undefined) assertBoolean('WorkerEscalationConfig.enabled', raw.enabled)
+  // The two tier literals are the schema's to enforce for a composition entry,
+  // but programmatic construction and a settings snapshot bypass it, so the raw
+  // value is re-judged here the way every other field is.
+  if (raw.judgmentTier !== undefined && raw.judgmentTier !== 'fast' && raw.judgmentTier !== 'accurate') {
+    throw new Error('WorkerEscalationConfig.judgmentTier must be "fast" or "accurate"')
+  }
   const rows = (raw.triggers ?? {}) as Record<string, Record<string, unknown> | undefined>
   for (const key of Object.keys(rows)) {
     if (!ESCALATION_TRIGGERS.includes(key as EscalationTrigger)) {
@@ -347,6 +414,15 @@ export function resolveConfig(config: WorkerEscalationConfig = {}): ResolvedWork
   assertPositive('WorkerEscalationConfig.maxExcerptChars', maxExcerptChars)
   const maxArgChars = config.maxArgChars ?? DEFAULT_MAX_ARG_CHARS
   assertPositive('WorkerEscalationConfig.maxArgChars', maxArgChars)
+  // The engine owns no prose, so the ask's question text is the consuming
+  // package's to own and a deployment that omits it fails here rather than
+  // asking an unstated question.
+  assertNonEmptyString('WorkerEscalationConfig.progressInstructions', config.progressInstructions)
+  const confidence = config.confidence ?? DEFAULT_JUDGMENT_CONFIDENCE
+  assertRatio('WorkerEscalationConfig.confidence', confidence)
+  const margin = config.margin ?? DEFAULT_JUDGMENT_MARGIN
+  assertRatio('WorkerEscalationConfig.margin', margin)
+  const judgmentTier = config.judgmentTier ?? DEFAULT_JUDGMENT_TIER
   return Object.freeze({
     enabled,
     triggers: Object.freeze(resolvedRows),
@@ -357,5 +433,9 @@ export function resolveConfig(config: WorkerEscalationConfig = {}): ResolvedWork
     maxDigestChars,
     maxExcerptChars,
     maxArgChars,
+    progressInstructions: config.progressInstructions,
+    confidence,
+    margin,
+    judgmentTier,
   })
 }

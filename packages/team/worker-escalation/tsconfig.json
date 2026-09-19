@@ -30,6 +30,9 @@
       "path": "../../jspace/jspace"
     },
     {
+      "path": "../../llm/judgment"
+    },
+    {
       "path": "../../runtime-diagnostics/invariants"
     },
     {

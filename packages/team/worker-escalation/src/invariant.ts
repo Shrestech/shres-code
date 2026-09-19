@@ -27,16 +27,20 @@ export const inject = ['invariants']
  * 1. **Every decision points at a real trigger event.** A decision names the
  *    event that woke the ladder, so a decision whose `triggerSeq` holds no
  *    event of that trigger's family is a record of nothing.
- * 2. **The epoch's aging counter is exact.** A `continue` decision records one
- *    more resolution than the epoch already took and its own seq as the newest
- *    continue; a `report-blocked` decision records the count it inherited. The
- *    counter therefore only ever advances by one per decision, which is the
- *    monotonicity the `maxContinues` terminal is defined against.
+ * 2. **The epoch's aging counter is exact.** Any decision that is not the
+ *    terminal records one more resolution than the epoch already took and its
+ *    own seq as the newest continue; a `report-blocked` decision records the
+ *    count it inherited. The counter therefore only ever advances by one per
+ *    decision, which is the monotonicity the `maxContinues` terminal is
+ *    defined against.
  * 3. **Nothing is written while the ladder is off.** A resolved settings
  *    section that reads `enabled: false` and an `escalation/decision` in the
  *    same log contradict each other. The check is inert when no settings
  *    service carries the section, because a composition's own entry config is
  *    then the only switch and a companion cannot see it.
+ * 4. **A recorded confidence comes from an engine.** Only an answered ask
+ *    reports a confidence and a margin, so a decision carrying either without
+ *    the `'ok'` engine class records figures nothing produced.
  *
  * The step cooldown stays out of the companion: it is policy over the same log
  * (completed steps advance monotonically by construction), and the invariant
@@ -71,15 +75,24 @@ const install: InvariantInstaller = (ctx: Context, fail: InvariantFailure) => {
       continues += 1
       lastContinueSeq = candidate.seq
     }
-    const expectedContinues = data.choice === 'continue' ? continues + 1 : continues
+    const terminal = data.choice === 'report-blocked'
+    const expectedContinues = terminal ? continues : continues + 1
     if (data.aging.continues !== expectedContinues) {
       fail('escalation/decision records ' + String(data.aging.continues)
         + ' continue resolutions while its goal epoch already took ' + String(continues))
     }
-    const expectedLast = data.choice === 'continue' ? event.seq : lastContinueSeq
+    const expectedLast = terminal ? lastContinueSeq : event.seq
     if (data.aging.lastContinueSeq !== expectedLast) {
       fail('escalation/decision records lastContinueSeq '
         + String(data.aging.lastContinueSeq) + ' while the epoch\'s newest continue is ' + String(expectedLast))
+    }
+    if (data.confidence !== undefined && data.engine !== 'ok') {
+      fail('escalation/decision carries confidence ' + String(data.confidence)
+        + ' with engine class ' + String(data.engine) + ', which cannot be an answered ask')
+    }
+    if (data.margin !== undefined && data.engine !== 'ok') {
+      fail('escalation/decision carries margin ' + String(data.margin)
+        + ' with engine class ' + String(data.engine) + ', which cannot be an answered ask')
     }
   }, { global: true })
 }

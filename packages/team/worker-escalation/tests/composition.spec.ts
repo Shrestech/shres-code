@@ -64,6 +64,7 @@ async function boot(): Promise<Context> {
     `- name: '${PACKAGE}'`,
     '  config:',
     '    enabled: false',
+    "    progressInstructions: 'Is this worker going to finish without help?'",
     '',
   ].join('\n'))
 

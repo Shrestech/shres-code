@@ -149,6 +149,7 @@ async function boot(): Promise<Context> {
     '    enabled: true',
     '    maxContinues: 0',
     '    minStepsBetween: 0',
+    "    progressInstructions: 'Is this worker going to finish without help?'",
     '',
   ].join('\n'))
 

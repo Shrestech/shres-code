@@ -16,6 +16,7 @@
 import type { Session, SessionEvent } from '@shres-code/shres-code-session'
 import type {} from '@shres-code/shres-code-agent-team'
 import type {} from '@shres-code/shres-code-jspace'
+import { foldToolWindow } from './fold.ts'
 import type { WorkerEscalationDigest, WorkerEscalationToolSignal } from './types.ts'
 
 /** Truncation marker appended when a bounded field is cut. */
@@ -160,38 +161,17 @@ function countSteps(events: readonly SessionEvent[]): number {
  * @returns the trailing window, oldest-first.
  */
 function recentTools(events: readonly SessionEvent[], caps: WorkerDigestCaps): readonly WorkerEscalationToolSignal[] {
-  const resultByCall = new Map<string, { ok: boolean; excerpt?: string }>()
-  for (const event of events) {
-    if (event.type !== 'tool/result') continue
-    const block = event.data.message.content[0]
-    const parts: string[] = []
-    for (const part of block.content) {
-      if (part.type === 'text' && part.text.length > 0) parts.push(part.text)
-    }
-    const ok = block.isError !== true
-    const text = parts.join('\n')
-    resultByCall.set(String(event.data.message.source.callId), {
-      ok,
-      ...ok || text.length === 0 ? {} : { excerpt: boundText(text, caps.maxExcerpt) },
-    })
-  }
-  const out: WorkerEscalationToolSignal[] = []
-  for (let index = events.length - 1; index >= 0 && out.length < caps.maxTools; index -= 1) {
-    const event = events[index]
-    if (event === undefined || event.type !== 'tool/call') continue
-    const callId = String(event.data.callId)
-    const result = resultByCall.get(callId)
-    if (result === undefined) continue
-    const args = argsExcerpt(event.data.arguments, caps.maxArgs)
-    out.push({
-      seq: event.seq,
-      name: event.data.name,
-      ok: result.ok,
+  return foldToolWindow(events, caps.maxTools).map((entry) => {
+    const args = argsExcerpt(entry.arguments, caps.maxArgs)
+    const excerpt = entry.ok || entry.text.length === 0 ? undefined : boundText(entry.text, caps.maxExcerpt)
+    return {
+      seq: entry.seq,
+      name: entry.name,
+      ok: entry.ok,
       ...args === undefined ? {} : { argsExcerpt: args },
-      ...result.excerpt === undefined ? {} : { errorExcerpt: result.excerpt },
-    })
-  }
-  return out.reverse()
+      ...excerpt === undefined ? {} : { errorExcerpt: excerpt },
+    }
+  })
 }
 
 /**

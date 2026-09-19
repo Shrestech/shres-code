@@ -7,10 +7,13 @@
  *    family (a failed approach for the two failure triggers, a call for the
  *    repeat chain, a stop for the step budget, a durable failure for the turn
  *    streak), and a sandbox denial or charter probe never satisfies one;
- * 2. the epoch's aging pair is exact — a continue advances the count by one and
- *    records its own seq, a terminal inherits the count and the newest continue;
+ * 2. the epoch's aging pair is exact — any decision that is not the terminal
+ *    advances the count by one and records its own seq, a terminal inherits the
+ *    count and the newest continue;
  * 3. nothing is written while the resolved settings section reads
- *    `enabled: false`.
+ *    `enabled: false`;
+ * 4. a decision carrying the answer's own figures also carries an engine class,
+ *    and not the one that means no engine is composed.
  *
  * Manual invariant topology (the focused-suite convention): the suite mounts
  * the registry and the companion on one root context and drives the relations
@@ -30,7 +33,10 @@ import type { SettingsNamespace } from '@shres-code/shres-code-settings'
 import { triggerSatisfiedAt } from '../src/fold.ts'
 import * as WorkerEscalationInvariant from '../src/invariant.ts'
 import { Config, WORKER_ESCALATION_SETTINGS_NAMESPACE } from '../src/index.ts'
-import type { EscalationDecision } from '../src/types.ts'
+import type { EscalationDecision, EscalationEngineClass } from '../src/types.ts'
+
+/** The required question text, which no invariant relation reads. */
+const PROGRESS = 'Is this worker going to finish without help?'
 
 /** Smallest real settings provider: one in-memory document. */
 class MemorySettings extends SettingsProvider {
@@ -86,17 +92,26 @@ async function setup(options: { readonly settings?: boolean; readonly jspace?: b
 }
 
 /**
+ * Fields one case may replace. `engine: undefined` drops the class instead of
+ * logging it, which is the deterministic terminal's own payload.
+ */
+type DecisionOverrides = Omit<Partial<EscalationDecision>, 'engine'> & {
+  readonly engine?: EscalationEngineClass | undefined
+}
+
+/**
  * One logged decision. An override set to `undefined` drops the key instead of
  * logging it: `Session.append` refuses data carrying an explicit `undefined`.
  * @param overrides - fields to replace.
  * @returns the decision payload.
  */
-function decision(overrides: Partial<EscalationDecision> = {}): EscalationDecision {
+function decision(overrides: DecisionOverrides = {}): EscalationDecision {
   const merged: Record<string, unknown> = {
     trigger: 'errorBurst',
     triggerSeq: 0,
     choice: 'continue',
     engine: 'absent',
+    reason: 'engine-absent',
     aging: { continues: 1 },
     ...overrides,
   }
@@ -309,6 +324,35 @@ describe('the aging pair is exact', () => {
     expect(session.events.at(-1)?.data).not.toHaveProperty('aging.lastContinueSeq')
   })
 
+  it('accepts a needs-help decision as the epoch\'s newest continue resolution', async () => {
+    const ctx = await setup()
+    const session = ctx.sessions.create(SessionId('invariant-needs-help'))
+    const callEvent = call(session, 1)
+    const failed = result(session, 1, true, callEvent.seq)
+    const at = session.seq
+    appendDecision(session, decision({
+      triggerSeq: failed.seq,
+      choice: 'needs-help',
+      engine: 'ok',
+      reason: 'gate-passed',
+      confidence: 0.9,
+      margin: 0.8,
+      aging: { continues: 1, lastContinueSeq: at },
+    }))
+    expect(session.events.at(-1)?.data).toMatchObject({ choice: 'needs-help', aging: { continues: 1 } })
+    expect(() => {
+      appendDecision(session, decision({
+        triggerSeq: failed.seq,
+        choice: 'needs-help',
+        engine: 'ok',
+        reason: 'gate-passed',
+        confidence: 0.9,
+        margin: 0.8,
+        aging: { continues: 1, lastContinueSeq: session.seq },
+      }))
+    }).toThrow(/records 1 continue resolutions while its goal epoch already took 1/)
+  })
+
   it('rejects a continue that does not advance the epoch count by one', async () => {
     const ctx = await setup()
     const session = ctx.sessions.create(SessionId('invariant-non-monotone'))
@@ -354,6 +398,64 @@ describe('the aging pair is exact', () => {
       appendDecision(session, decision({ triggerSeq: failed.seq, choice: 'report-blocked', aging: { continues: 1, lastContinueSeq: 99 } }))
     }).toThrow(/while the epoch's newest continue is 2/)
     expect(session.events.filter(event => event.type === 'escalation/decision')).toHaveLength(1)
+  })
+})
+
+describe('an answered ask carries its class', () => {
+  /**
+   * One decision whose trigger relation holds, so only the class relation can
+   * refuse it.
+   * @param ctx - the booted context.
+   * @param id - session id.
+   * @param overrides - fields to replace; `engine: undefined` drops the class.
+   * @returns the session and the payload.
+   */
+  function answered(
+    ctx: Context,
+    id: string,
+    overrides: DecisionOverrides = {},
+  ): { session: Session; data: EscalationDecision } {
+    const session = ctx.sessions.create(SessionId(id))
+    const callEvent = call(session, 1)
+    const failed = result(session, 1, true, callEvent.seq)
+    const at = session.seq
+    return {
+      session,
+      data: decision({ triggerSeq: failed.seq, aging: { continues: 1, lastContinueSeq: at }, ...overrides }),
+    }
+  }
+
+  it('accepts the figures an answered ask records', async () => {
+    const ctx = await setup()
+    const { session, data } = answered(ctx, 'invariant-answered', {
+      engine: 'ok',
+      reason: 'gate-passed',
+      choice: 'needs-help',
+      confidence: 0.9,
+      margin: 0.8,
+    })
+    appendDecision(session, data)
+    expect(session.events.at(-1)?.data).toMatchObject({ engine: 'ok', confidence: 0.9, margin: 0.8 })
+  })
+
+  it('rejects figures no engine reported', async () => {
+    const ctx = await setup()
+    for (const overrides of [
+      // No engine class at all: the deterministic terminal records none.
+      { choice: 'report-blocked' as const, engine: undefined, reason: 'max-continues' as const, confidence: 0.9, margin: 0.8, aging: { continues: 0 } },
+      // The class meaning no engine is composed.
+      { engine: 'absent' as const, confidence: 0.9 },
+      { engine: 'absent' as const, margin: 0.8 },
+      // A class that could not answer cannot have produced figures either.
+      { engine: 'unavailable' as const, reason: 'engine-unavailable' as const, confidence: 0.9 },
+      { engine: 'invalid-answer' as const, reason: 'invalid-answer' as const, margin: 0.8 },
+    ]) {
+      const { session, data } = answered(ctx, 'invariant-figures-' + Object.keys(overrides).join('-'), overrides)
+      expect(() => {
+        appendDecision(session, data)
+      }).toThrow(/cannot be an answered ask/)
+      expect(session.events.some(event => event.type === 'escalation/decision')).toBe(false)
+    }
   })
 })
 
@@ -409,7 +511,7 @@ describe('nothing is written while the settings section is off', () => {
 
   it('rejects a decision appended while the resolved section reads enabled: false', async () => {
     const ctx = await setup({ settings: true })
-    ctx.settings.register(WORKER_ESCALATION_SETTINGS_NAMESPACE, Config, { base: { enabled: false } })
+    ctx.settings.register(WORKER_ESCALATION_SETTINGS_NAMESPACE, Config, { base: { enabled: false, progressInstructions: PROGRESS } })
     const { session, data } = await satisfiable(ctx, 'invariant-settings-off')
     expect(() => {
       appendDecision(session, data)
@@ -419,7 +521,7 @@ describe('nothing is written while the settings section is off', () => {
 
   it('accepts the same decision once the section reads enabled: true', async () => {
     const ctx = await setup({ settings: true })
-    ctx.settings.register(WORKER_ESCALATION_SETTINGS_NAMESPACE, Config, { base: { enabled: true } })
+    ctx.settings.register(WORKER_ESCALATION_SETTINGS_NAMESPACE, Config, { base: { enabled: true, progressInstructions: PROGRESS } })
     const { session, data } = await satisfiable(ctx, 'invariant-settings-on')
     appendDecision(session, data)
     expect(session.events.filter(event => event.type === 'escalation/decision')).toHaveLength(1)
@@ -434,7 +536,7 @@ describe('nothing is written while the settings section is off', () => {
 
   it('reads the committed change rather than the composition entry', async () => {
     const ctx = await setup({ settings: true })
-    ctx.settings.register(WORKER_ESCALATION_SETTINGS_NAMESPACE, Config, { base: { enabled: false } })
+    ctx.settings.register(WORKER_ESCALATION_SETTINGS_NAMESPACE, Config, { base: { enabled: false, progressInstructions: PROGRESS } })
     const { session, data } = await satisfiable(ctx, 'invariant-settings-commit')
     await ctx.settings.replace(WORKER_ESCALATION_SETTINGS_NAMESPACE, { enabled: true })
     appendDecision(session, data)

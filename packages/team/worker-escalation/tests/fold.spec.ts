@@ -7,6 +7,9 @@
  * `repeatRunLength`) are pinned here because they decide whether a worker is
  * reported as stuck at all.
  *
+ * The Stage 1 ask's state reads its numbers from the same folds, so
+ * `foldProgressFacts` is pinned here beside the triggers it measures.
+ *
  * The logs are bare event arrays: a fold reads only what a case appends, so no
  * store, invariant host, or service topology enters these cases.
  */
@@ -29,6 +32,7 @@ import {
   foldEscalationAging,
   foldEscalationCooldown,
   foldEscalationTriggers,
+  foldProgressFacts,
   isSandboxDenial,
   probeInFlight,
 } from '../src/fold.ts'
@@ -141,12 +145,39 @@ function decision(seq: number, data: EscalationDecision): SessionEvent {
 
 /** One `continue` decision recording the aging state after itself. */
 function continued(seq: number, continues: number): SessionEvent {
-  return decision(seq, { trigger: 'errorBurst', triggerSeq: 1, choice: 'continue', engine: 'absent', aging: { continues, lastContinueSeq: seq } })
+  return decision(seq, {
+    trigger: 'errorBurst',
+    triggerSeq: 1,
+    choice: 'continue',
+    engine: 'absent',
+    reason: 'engine-absent',
+    aging: { continues, lastContinueSeq: seq },
+  })
 }
 
 /** The terminal decision, which records its inherited continue count. */
 function reportedBlocked(seq: number, continues: number): SessionEvent {
-  return decision(seq, { trigger: 'errorBurst', triggerSeq: 1, choice: 'report-blocked', engine: 'absent', aging: { continues } })
+  return decision(seq, {
+    trigger: 'errorBurst',
+    triggerSeq: 1,
+    choice: 'report-blocked',
+    reason: 'max-continues',
+    aging: { continues },
+  })
+}
+
+/** A `needs-help` decision: a passed gate whose choice the ladder records and does not act on. */
+function needsHelp(seq: number, continues: number): SessionEvent {
+  return decision(seq, {
+    trigger: 'errorBurst',
+    triggerSeq: 1,
+    choice: 'needs-help',
+    engine: 'ok',
+    reason: 'gate-passed',
+    confidence: 0.9,
+    margin: 0.8,
+    aging: { continues, lastContinueSeq: seq },
+  })
 }
 
 /** Any one row's own fields. */
@@ -156,6 +187,9 @@ type TriggerRow =
   | EscalationRepeatRunLengthConfig
   | EscalationStepBudgetExhaustedConfig
   | EscalationTurnFailureStreakConfig
+
+/** The required question text, which no fold case varies. */
+const PROGRESS = 'Is this worker going to finish without help?'
 
 /** The ladder fields outside the trigger table a case may vary. */
 interface OnlyRest {
@@ -174,7 +208,7 @@ function only(trigger: EscalationTrigger, row: TriggerRow, rest: OnlyRest = {}):
     stepBudgetExhausted: { enabled: on('stepBudgetExhausted'), ...on('stepBudgetExhausted') ? row : {} },
     turnFailureStreak: { enabled: on('turnFailureStreak'), ...on('turnFailureStreak') ? row : {} },
   }
-  return resolveConfig({ enabled: true, ...rest, triggers: table })
+  return resolveConfig({ enabled: true, ...rest, triggers: table, progressInstructions: PROGRESS })
 }
 
 /** One trigger's verdict over a log, at an exclusive goal-epoch lower bound. */
@@ -191,7 +225,7 @@ function verdict(
 
 describe('the trigger table', () => {
   it('reports one verdict per trigger, in table order, all unfired over an empty log', () => {
-    expect(foldEscalationTriggers([], resolveConfig({ enabled: true }))).toEqual([
+    expect(foldEscalationTriggers([], resolveConfig({ enabled: true, progressInstructions: PROGRESS }))).toEqual([
       { trigger: 'errorBurst', fired: false },
       { trigger: 'attemptCount', fired: false },
       { trigger: 'repeatRunLength', fired: false },
@@ -201,7 +235,7 @@ describe('the trigger table', () => {
   })
 
   it('omits triggerSeq from an unfired verdict', () => {
-    expect(Object.keys(verdict([], 'errorBurst', resolveConfig({ enabled: true }))).sort()).toEqual(['fired', 'trigger'])
+    expect(Object.keys(verdict([], 'errorBurst', resolveConfig({ enabled: true, progressInstructions: PROGRESS }))).sort()).toEqual(['fired', 'trigger'])
   })
 
   it('keeps a disabled trigger unfired while its own condition holds', () => {
@@ -709,6 +743,62 @@ describe('foldEscalationAging', () => {
     expect(foldEscalationAging(events, 4)).toEqual({ continues: 0, reportBlocked: true })
     expect(foldEscalationAging(events, 3)).toEqual({ continues: 1, lastContinueSeq: 4, reportBlocked: true })
     expect(foldEscalationAging(events, 0)).toEqual({ continues: 2, lastContinueSeq: 4, reportBlocked: true })
+  })
+
+  it('counts a needs-help decision as a continue resolution', () => {
+    // Stage 1 executes nothing on the ask's choice, so a needs-help decision
+    // advances the epoch exactly as a continue does and the terminal stays
+    // reachable while the ask keeps answering it.
+    expect(foldEscalationAging([continued(1, 1), needsHelp(4, 2)]))
+      .toEqual({ continues: 2, lastContinueSeq: 4, reportBlocked: false })
+  })
+})
+
+describe('foldProgressFacts', () => {
+  it('counts the worker\'s own outcomes and leaves harness refusals out', () => {
+    const events = [
+      call(1, 'c1', 'bash'),
+      toolResult(2, 'c1'),
+      call(3, 'c2', 'bash'),
+      toolResult(4, 'c2', { text: 'boom' }),
+      call(5, 'c3', 'bash'),
+      sandboxDenied(6, 'c3'),
+      call(7, 'c4', 'bash'),
+      failed(8, 'c4'),
+      charterProbe(9, 'c4'),
+    ]
+    const facts = foldProgressFacts(events, only('errorBurst', { burst: 2 }), -1)
+    expect(facts.ok).toBe(1)
+    expect(facts.fail).toBe(1)
+  })
+
+  it('reports the runs the trigger folds measure, including a disabled row\'s own value', () => {
+    const config = only('repeatRunLength', { runLength: 3 })
+    const events = [
+      call(1, 'c1', 'bash', '{"command":"a"}'),
+      failed(2, 'c1'),
+      call(3, 'c2', 'bash', '{"command":"a"}'),
+      failed(4, 'c2'),
+    ]
+    // The attemptCount row is disabled in this configuration, and its count is
+    // still evidence about the worker rather than a verdict on it.
+    const facts = foldProgressFacts(events, config)
+    expect(facts.repeatRunLength).toBe(2)
+    expect(facts.attemptCount).toBe(1)
+    // A different call starts a new chain of one.
+    expect(foldProgressFacts([...events, call(5, 'c3', 'bash', '{"command":"b"}')], config).repeatRunLength).toBe(1)
+  })
+
+  it('counts completed steps after the goal epoch\'s progress floor', () => {
+    const events = [
+      stepEnd(1),
+      failed(2, 'c1'),
+      charterRun(3, 'checkpoint', true),
+      stepEnd(4),
+      stepEnd(5),
+    ]
+    expect(foldProgressFacts(events, only('errorBurst', { burst: 2 })).stepsSinceCheckpoint).toBe(2)
+    expect(foldProgressFacts(events, only('errorBurst', { burst: 2 }), 4).stepsSinceCheckpoint).toBe(1)
   })
 })
 

@@ -18,6 +18,7 @@ import type { MessageSource, ToolResultMessage, UserMessage } from '@shres-code/
 import SessionStore, { SessionId } from '@shres-code/shres-code-session'
 import type { Session } from '@shres-code/shres-code-session'
 import * as WorkerEscalation from '../src/index.ts'
+import { FakeJudgment, StubRedactor } from './fake-judgment.ts'
 
 const contexts: Context[] = []
 
@@ -30,18 +31,35 @@ async function settle(): Promise<void> {
   await new Promise(resolve => setTimeout(resolve, 0))
 }
 
+/** One booted arm: the context it composed and the worker session it created. */
+interface Arm {
+  readonly ctx: Context
+  readonly session: Session
+}
+
 /**
  * Boot one arm and create its worker session.
  * @param composed - `off` mounts the ladder at `enabled: false`; `absent`
  *   mounts no ladder at all; `on` mounts it enabled.
- * @returns the live worker session.
+ * @param judgment - `true` also composes a judgment engine and the egress hook,
+ *   which the ladder reaches only while it may decide.
+ * @returns the composed context and its worker session.
  */
-async function boot(composed: 'off' | 'absent' | 'on'): Promise<Session> {
+async function boot(composed: 'off' | 'absent' | 'on', judgment = false): Promise<Arm> {
   const ctx = new Context()
   contexts.push(ctx)
   await ctx.plugin(SessionStore)
-  if (composed !== 'absent') await ctx.plugin(WorkerEscalation, { enabled: composed === 'on' })
-  return ctx.sessions.create(SessionId('worker-twin'), { meta: { delegationDepth: 1 } })
+  if (judgment) {
+    await ctx.plugin(FakeJudgment)
+    await ctx.plugin(StubRedactor)
+  }
+  if (composed !== 'absent') {
+    await ctx.plugin(WorkerEscalation, {
+      enabled: composed === 'on',
+      progressInstructions: 'Is this worker going to finish without help?',
+    })
+  }
+  return { ctx, session: ctx.sessions.create(SessionId('worker-twin'), { meta: { delegationDepth: 1 } }) }
 }
 
 /**
@@ -121,11 +139,11 @@ function durable(session: Session): string {
 
 describe('composed-but-off twin', () => {
   it('writes the identical durable log whether the ladder is composed off or absent', async () => {
-    const composedOff = await boot('off')
+    const composedOff = (await boot('off')).session
     script(composedOff)
     await settle()
 
-    const absent = await boot('absent')
+    const absent = (await boot('absent')).session
     script(absent)
     await settle()
 
@@ -133,13 +151,33 @@ describe('composed-but-off twin', () => {
     expect(durable(composedOff)).toBe(durable(absent))
   })
 
+  it('writes the identical durable log with a judgment engine and an egress hook composed while off', async () => {
+    const composedOff = await boot('off', true)
+    script(composedOff.session)
+    await settle()
+
+    const absent = (await boot('absent')).session
+    script(absent)
+    await settle()
+
+    // Off is off: no decision, no ask, and no redaction.
+    expect(durable(composedOff.session)).toBe(durable(absent))
+    expect((composedOff.ctx.get('judgment') as FakeJudgment).asks).toEqual([])
+    expect((composedOff.ctx.get('judgmentRedactor') as StubRedactor).states).toEqual([])
+  })
+
   it('writes a decision for the same script once the ladder is on', async () => {
-    const on = await boot('on')
+    const on = (await boot('on')).session
     script(on)
     await settle()
 
     const decisions = on.events.filter(event => event.type === 'escalation/decision')
     expect(decisions).toHaveLength(1)
-    expect(decisions[0]?.data).toMatchObject({ trigger: 'errorBurst', choice: 'continue', engine: 'absent' })
+    expect(decisions[0]?.data).toMatchObject({
+      trigger: 'errorBurst',
+      choice: 'continue',
+      engine: 'absent',
+      reason: 'engine-absent',
+    })
   })
 })

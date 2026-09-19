@@ -16,7 +16,11 @@ import type {} from '@shres-code/shres-code-jspace'
 import type {} from '@shres-code/shres-code-step-budget'
 import { ESCALATION_TRIGGERS } from './config.ts'
 import type { ResolvedWorkerEscalationConfig } from './config.ts'
-import type { EscalationTrigger, EscalationTriggerOutcome } from './types.ts'
+import type {
+  EscalationTrigger,
+  EscalationTriggerOutcome,
+  WorkerEscalationProgressFacts,
+} from './types.ts'
 
 /** Modes that can refuse a file effect; `danger-full-access` bypasses confinement. */
 const CONFINING_MODES: readonly ConfinedSandboxMode[] = ['read-only', 'workspace-write']
@@ -129,6 +133,51 @@ function toolOutcomes(events: readonly SessionEvent[]): ToolOutcome[] {
     if (outcome !== undefined) outcomes.push(outcome)
   }
   return outcomes
+}
+
+/** One trailing tool call paired with the result that answered it. */
+export interface WorkerToolWindowEntry {
+  /** `tool/call` event seq. */
+  readonly seq: number
+  /** Tool name. */
+  readonly name: string
+  /** True when the result was not an error. */
+  readonly ok: boolean
+  /** The call's raw `arguments` string, exactly as the model produced it. */
+  readonly arguments: string
+  /** Joined model-facing text of the result. */
+  readonly text: string
+}
+
+/**
+ * Fold the trailing tool window, oldest-first: each call a result already
+ * answered, capped at `maxTools` and counted back from the newest call. A call
+ * still in flight carries no outcome yet and is not part of the window.
+ * @param events - session log or any prefix of it.
+ * @param maxTools - maximum entries retained.
+ * @returns the trailing entries, oldest-first.
+ */
+export function foldToolWindow(events: readonly SessionEvent[], maxTools: number): readonly WorkerToolWindowEntry[] {
+  const results = new Map<string, { readonly ok: boolean; readonly text: string }>()
+  for (const event of events) {
+    const outcome = toolOutcomeOf(event)
+    if (outcome !== undefined) results.set(outcome.callId, { ok: outcome.ok, text: outcome.text })
+  }
+  const window: WorkerToolWindowEntry[] = []
+  for (let index = events.length - 1; index >= 0 && window.length < maxTools; index -= 1) {
+    const event = events[index]
+    if (event === undefined || event.type !== 'tool/call') continue
+    const result = results.get(String(event.data.callId))
+    if (result === undefined) continue
+    window.push({
+      seq: event.seq,
+      name: event.data.name,
+      ok: result.ok,
+      arguments: event.data.arguments,
+      text: result.text,
+    })
+  }
+  return window.reverse()
 }
 
 /**
@@ -248,16 +297,32 @@ function isDurableTurnFailure(reason: TurnEndReason): boolean {
 }
 
 /**
- * The seq of the newest result completing an error burst of `burst` counted
- * failures, or undefined. A sandbox denial and a charter probe are transparent:
- * they neither count nor reset the run. Any successful tool-sourced result
- * resets it.
+ * One run's length at a fold point, with the newest seq at which it reached the
+ * threshold the caller asked about. The length is threshold-independent, which
+ * is what lets a trigger fold read `seq` alone while the Stage 1 ask's state
+ * reads `count` from the same fold.
  */
-function errorBurstSeq(
+interface MeasuredRun {
+  /** The run's length at the fold point. */
+  readonly count: number
+  /** Seq of the newest event at which the run reached the caller's threshold. */
+  readonly seq: number | undefined
+}
+
+/**
+ * Measure the current error burst. A sandbox denial and a charter probe are
+ * transparent: they neither count nor reset the run. Any successful
+ * tool-sourced result resets it.
+ * @param outcomes - every tool-sourced result in log order.
+ * @param probes - call ids the charter machinery probed with.
+ * @param burst - failure count the caller's threshold asks about.
+ * @returns the current run of consecutive failures, and the newest seq at which it reached `burst`.
+ */
+function errorBurstRun(
   outcomes: readonly ToolOutcome[],
   probes: ReadonlySet<string>,
   burst: number,
-): number | undefined {
+): MeasuredRun {
   let count = 0
   let seq: number | undefined
   for (const outcome of outcomes) {
@@ -270,23 +335,29 @@ function errorBurstSeq(
     count += 1
     if (count >= burst) seq = outcome.seq
   }
-  return seq
+  return { count, seq }
 }
 
 /**
- * The seq of the failed attempt at which `attempts` distinct approaches have
- * failed since the goal epoch's progress floor, or undefined. A distinct
- * approach is a distinct `[tool, canonical arguments]` chain key, so repeating
- * one failing call is one approach, not several.
+ * Measure the failed approaches of one goal epoch. A distinct approach is a
+ * distinct `[tool, canonical arguments]` chain key, so repeating one failing
+ * call is one approach, not several.
+ * @param events - the session log or any prefix of it.
+ * @param outcomes - every tool-sourced result in log order.
+ * @param calls - model-ordered calls by call id.
+ * @param probes - call ids the charter machinery probed with.
+ * @param attempts - distinct-approach count the caller's threshold asks about.
+ * @param epochAnchorSeq - exclusive lower bound of the goal epoch.
+ * @returns the distinct failed approaches since the progress floor, and the newest seq at which they reached `attempts`.
  */
-function attemptCountSeq(
+function attemptCountRun(
   events: readonly SessionEvent[],
   outcomes: readonly ToolOutcome[],
   calls: ReadonlyMap<string, CallIdentity>,
   probes: ReadonlySet<string>,
   attempts: number,
   epochAnchorSeq: number,
-): number | undefined {
+): MeasuredRun {
   const floor = progressFloor(events, epochAnchorSeq)
   const seen = new Set<string>()
   let seq: number | undefined
@@ -303,7 +374,7 @@ function attemptCountSeq(
     seen.add(key)
     if (seen.size >= attempts) seq = outcome.seq
   }
-  return seq
+  return { count: seen.size, seq }
 }
 
 /**
@@ -322,12 +393,15 @@ function progressFloor(events: readonly SessionEvent[], epochAnchorSeq: number):
 }
 
 /**
- * The seq of the call at which an identical-call chain reaches `runLength`, or
- * undefined. The chain uses the repeat-tool-reminder guard's semantics: a call
- * identical to the chain's last tracked call extends it, any other call starts
- * a new chain of one, and a source-`user` message resets it entirely.
+ * Measure the identical-call chain in force. The chain uses the
+ * repeat-tool-reminder guard's semantics: a call identical to the chain's last
+ * tracked call extends it, any other call starts a new chain of one, and a
+ * source-`user` message resets it entirely.
+ * @param events - the session log or any prefix of it.
+ * @param runLength - chain length the caller's threshold asks about.
+ * @returns the chain length at the fold point, and the newest seq at which it reached `runLength`.
  */
-function repeatRunSeq(events: readonly SessionEvent[], runLength: number): number | undefined {
+function repeatRunRun(events: readonly SessionEvent[], runLength: number): MeasuredRun {
   let key: string | undefined
   let length = 0
   let seq: number | undefined
@@ -346,11 +420,17 @@ function repeatRunSeq(events: readonly SessionEvent[], runLength: number): numbe
     key = next
     seq = length >= runLength ? event.seq : undefined
   }
-  return seq
+  return { count: length, seq }
 }
 
-/** The seq of the step-budget stop at which the goal epoch reaches `exhaustions` stops, or undefined. */
-function stepBudgetSeq(events: readonly SessionEvent[], exhaustions: number, epochAnchorSeq: number): number | undefined {
+/**
+ * Measure the step-budget stops of one goal epoch.
+ * @param events - the session log or any prefix of it.
+ * @param exhaustions - stop count the caller's threshold asks about.
+ * @param epochAnchorSeq - exclusive lower bound of the goal epoch.
+ * @returns the stops on the epoch, and the newest seq at which they reached `exhaustions`.
+ */
+function stepBudgetRun(events: readonly SessionEvent[], exhaustions: number, epochAnchorSeq: number): MeasuredRun {
   let count = 0
   let seq: number | undefined
   for (const event of events) {
@@ -358,11 +438,16 @@ function stepBudgetSeq(events: readonly SessionEvent[], exhaustions: number, epo
     count += 1
     if (count >= exhaustions) seq = event.seq
   }
-  return seq
+  return { count, seq }
 }
 
-/** The seq of the turn at which a durable failure streak reaches `streak`, or undefined. */
-function turnFailureSeq(events: readonly SessionEvent[], streak: number): number | undefined {
+/**
+ * Measure the durable turn-failure streak in force.
+ * @param events - the session log or any prefix of it.
+ * @param streak - streak length the caller's threshold asks about.
+ * @returns the streak at the fold point, and the newest seq at which it reached `streak`.
+ */
+function turnFailureRun(events: readonly SessionEvent[], streak: number): MeasuredRun {
   let count = 0
   let seq: number | undefined
   for (const event of events) {
@@ -375,7 +460,7 @@ function turnFailureSeq(events: readonly SessionEvent[], streak: number): number
     count += 1
     if (count >= streak) seq = event.seq
   }
-  return seq
+  return { count, seq }
 }
 
 /**
@@ -403,16 +488,18 @@ export function foldEscalationTriggers(
   const calls = callsById(events)
   const rows = config.triggers
   const fires: Record<EscalationTrigger, number | undefined> = {
-    errorBurst: rows.errorBurst.enabled ? errorBurstSeq(outcomes, probes, rows.errorBurst.threshold) : undefined,
+    errorBurst: rows.errorBurst.enabled ? errorBurstRun(outcomes, probes, rows.errorBurst.threshold).seq : undefined,
     attemptCount: rows.attemptCount.enabled
-      ? attemptCountSeq(events, outcomes, calls, probes, rows.attemptCount.threshold, epochAnchorSeq)
+      ? attemptCountRun(events, outcomes, calls, probes, rows.attemptCount.threshold, epochAnchorSeq).seq
       : undefined,
-    repeatRunLength: rows.repeatRunLength.enabled ? repeatRunSeq(events, rows.repeatRunLength.threshold) : undefined,
+    repeatRunLength: rows.repeatRunLength.enabled
+      ? repeatRunRun(events, rows.repeatRunLength.threshold).seq
+      : undefined,
     stepBudgetExhausted: rows.stepBudgetExhausted.enabled
-      ? stepBudgetSeq(events, rows.stepBudgetExhausted.threshold, epochAnchorSeq)
+      ? stepBudgetRun(events, rows.stepBudgetExhausted.threshold, epochAnchorSeq).seq
       : undefined,
     turnFailureStreak: rows.turnFailureStreak.enabled
-      ? turnFailureSeq(events, rows.turnFailureStreak.threshold)
+      ? turnFailureRun(events, rows.turnFailureStreak.threshold).seq
       : undefined,
   }
   return ESCALATION_TRIGGERS.map((trigger) => {
@@ -421,6 +508,53 @@ export function foldEscalationTriggers(
       ? { trigger, fired: false }
       : { trigger, fired: true, triggerSeq: seq }
   })
+}
+
+/**
+ * Fold the numbers-first facts the Stage 1 ask's state renders: how the
+ * worker's tool calls resolved, the identical-call chain in force, the goal
+ * epoch's distinct failed approaches, and the completed steps since its
+ * progress floor.
+ *
+ * Every count comes from the same fold that fires the trigger it measures, at
+ * the deployment's own configured threshold, so a state number and a firing
+ * verdict cannot drift apart. Enablement is deliberately not read: a trigger
+ * the deployment turned off still measures here, because the ask's state is
+ * evidence about the worker rather than a verdict on it.
+ * @param events - the session log or any prefix of it.
+ * @param config - resolved ladder configuration.
+ * @param epochAnchorSeq - exclusive lower bound of the goal epoch: the jspace
+ *   card's `goalOpenedSeq`, or -1 to fold the whole log.
+ * @returns the outcome counts and the run lengths those folds report.
+ */
+export function foldProgressFacts(
+  events: readonly SessionEvent[],
+  config: ResolvedWorkerEscalationConfig,
+  epochAnchorSeq: number = -1,
+): WorkerEscalationProgressFacts {
+  const outcomes = toolOutcomes(events)
+  const probes = charterProbeCallIds(events)
+  const calls = callsById(events)
+  const rows = config.triggers
+  let ok = 0
+  let fail = 0
+  for (const outcome of outcomes) {
+    if (isSandboxDenial(outcome.code, outcome.text) || probes.has(outcome.callId)) continue
+    if (outcome.ok) ok += 1
+    else fail += 1
+  }
+  const floor = progressFloor(events, epochAnchorSeq)
+  let steps = 0
+  for (const event of events) {
+    if (event.type === 'step/end' && event.seq > floor) steps += 1
+  }
+  return {
+    ok,
+    fail,
+    repeatRunLength: repeatRunRun(events, rows.repeatRunLength.threshold).count,
+    attemptCount: attemptCountRun(events, outcomes, calls, probes, rows.attemptCount.threshold, epochAnchorSeq).count,
+    stepsSinceCheckpoint: steps,
+  }
 }
 
 /**

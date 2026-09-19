@@ -12,12 +12,40 @@
 
 import { afterEach, describe, expect, it } from 'vitest'
 import { Context, Service } from '@shres-code/cordis'
+import { JUDGMENT_SETTINGS_NAMESPACE, JudgmentError } from '@shres-code/shres-code-judgment'
 import JspaceService, { CharterEntryId } from '@shres-code/shres-code-jspace'
 import { CallId, createToolResultMessage } from '@shres-code/shres-code-llm'
 import SessionStore, { SessionId } from '@shres-code/shres-code-session'
 import type { Session, SessionEvent } from '@shres-code/shres-code-session'
+import { SettingsProvider } from '@shres-code/shres-code-settings'
+import type { SettingsNamespace } from '@shres-code/shres-code-settings'
 import * as WorkerEscalation from '../src/index.ts'
 import type { WorkerEscalationConfig } from '../src/config.ts'
+import { FakeJudgment, StubRedactor, REDACTION_MARK } from './fake-judgment.ts'
+
+/** The question text every boot supplies; the consult suites read it back off the ask. */
+const PROGRESS = 'Is this worker going to finish without help?'
+
+/** One step below a double, for the gate's own boundary cases. */
+const STEP = Number.EPSILON
+
+/** Smallest real settings provider: one in-memory document. */
+class MemorySettings extends SettingsProvider {
+  private doc: Record<string, unknown> = {}
+
+  get writable(): boolean {
+    return true
+  }
+
+  protected load(): Promise<Record<string, unknown>> {
+    return Promise.resolve(structuredClone(this.doc))
+  }
+
+  protected persist(ns: SettingsNamespace, section: Record<string, unknown>): Promise<void> {
+    this.doc = { ...this.doc, [ns]: structuredClone(section) }
+    return Promise.resolve()
+  }
+}
 
 /** One message the ladder asked the Team mailbox to deliver. */
 interface SentMail {
@@ -86,20 +114,37 @@ async function settle(): Promise<void> {
   await new Promise(resolve => setTimeout(resolve, 0))
 }
 
-/** One booted ladder: the root context and the two doubles it reaches. */
+/** What one boot composes beyond the ladder itself. */
+interface BootOptions {
+  /** `false` omits the Team mailbox service entirely. */
+  readonly mailbox?: boolean
+  /** `true` mounts a scripted judgment engine as `ctx.judgment`. */
+  readonly judgment?: boolean
+  /** `true` mounts the egress hook beside the engine. */
+  readonly redactor?: boolean
+  /** `true` mounts the in-memory settings provider, so the judgment toggle can be written. */
+  readonly settings?: boolean
+}
+
+/** One booted ladder: the root context and every double it reaches. */
 interface Booted {
   readonly ctx: Context
   readonly agents: StubAgents
   readonly mailbox: StubTeamMailbox | undefined
+  readonly judgment: FakeJudgment | undefined
+  readonly redactor: StubRedactor | undefined
 }
 
 /**
  * Boot the ladder over a real context, session store, and agent registry.
- * @param config - composition config.
- * @param options - `mailbox: false` omits the Team mailbox service entirely.
+ * @param config - composition config; the required question text is supplied here.
+ * @param options - which optional services the composition carries.
  * @returns the context and its doubles.
  */
-async function boot(config: WorkerEscalationConfig, options: { readonly mailbox?: boolean } = {}): Promise<Booted> {
+async function boot(
+  config: Omit<WorkerEscalationConfig, 'progressInstructions'>,
+  options: BootOptions = {},
+): Promise<Booted> {
   const ctx = new Context()
   contexts.push(ctx)
   await ctx.plugin(SessionStore)
@@ -110,8 +155,19 @@ async function boot(config: WorkerEscalationConfig, options: { readonly mailbox?
     await ctx.plugin(StubTeamMailbox)
     mailbox = ctx.get('agentTeams') as unknown as StubTeamMailbox
   }
-  await ctx.plugin(WorkerEscalation, config)
-  return { ctx, agents, mailbox }
+  if (options.settings === true) await ctx.plugin(MemorySettings)
+  let judgment: FakeJudgment | undefined
+  let redactor: StubRedactor | undefined
+  if (options.judgment === true) {
+    await ctx.plugin(FakeJudgment)
+    judgment = ctx.get('judgment') as unknown as FakeJudgment
+  }
+  if (options.redactor === true) {
+    await ctx.plugin(StubRedactor)
+    redactor = ctx.get('judgmentRedactor') as unknown as StubRedactor
+  }
+  await ctx.plugin(WorkerEscalation, { progressInstructions: PROGRESS, ...config })
+  return { ctx, agents, mailbox, judgment, redactor }
 }
 
 /**
@@ -172,6 +228,7 @@ describe('worker-escalation evaluation', () => {
       triggerSeq: second.seq,
       choice: 'continue',
       engine: 'absent',
+      reason: 'engine-absent',
       aging: { continues: 1, lastContinueSeq: decision?.seq },
     })
     // The recorded triggerSeq resolves to a real event of that trigger's family.
@@ -207,6 +264,7 @@ describe('worker-escalation evaluation', () => {
       triggerSeq: third.seq,
       choice: 'continue',
       engine: 'absent',
+      reason: 'engine-absent',
       aging: { continues: 2, lastContinueSeq: logged[1]?.seq },
     })
   })
@@ -385,7 +443,7 @@ describe('the returned disposer', () => {
     const ctx = new Context()
     contexts.push(ctx)
     await ctx.plugin(SessionStore)
-    const dispose = WorkerEscalation.apply(ctx, { enabled: true, minStepsBetween: 0 })
+    const dispose = WorkerEscalation.apply(ctx, { enabled: true, minStepsBetween: 0, progressInstructions: PROGRESS })
     const worker = ctx.sessions.create(SessionId('worker-disposed'), { meta: { delegationDepth: 1 } })
     failing(worker, 1, 'a')
     failing(worker, 2, 'b')
@@ -396,6 +454,194 @@ describe('the returned disposer', () => {
     failing(worker, 3, 'c')
     await settle()
     expect(decisions(worker)).toHaveLength(1)
+  })
+})
+
+/**
+ * Drive one firing trigger on a fresh worker and return its session.
+ * @param booted - the booted ladder.
+ * @param id - session id.
+ * @returns the live worker session.
+ */
+async function fire(booted: Booted, id: string): Promise<Session> {
+  const worker = session(booted, id, 1)
+  failing(worker, 1, 'a')
+  failing(worker, 2, 'b')
+  await settle()
+  return worker
+}
+
+describe('the Stage 1 judgment consult', () => {
+  it('asks the configured question at the configured tier and logs the ask\'s own choice', async () => {
+    const booted = await boot(
+      { enabled: true, minStepsBetween: 0, judgmentTier: 'fast', confidence: 0.8, margin: 0.125 },
+      { judgment: true },
+    )
+    booted.judgment?.script({
+      option: 'needs-help',
+      confidence: 0.8,
+      probabilities: { continue: 1, 'needs-help': 0.875 },
+    })
+    const worker = await fire(booted, 'worker-gate-passed')
+
+    expect(booted.judgment?.asks).toHaveLength(1)
+    const ask = booted.judgment?.asks[0]
+    expect(ask?.tier).toBe('fast')
+    expect(ask?.questions).toEqual([{
+      kind: 'choice',
+      id: 'worker-progress',
+      instructions: PROGRESS,
+      options: [{ option: 'continue' }, { option: 'needs-help' }],
+    }])
+    expect(ask?.state).toContain('Tool outcomes: ok=0 fail=2')
+
+    const logged = decisions(worker)
+    expect(logged).toHaveLength(1)
+    const triggerSeq = worker.events.filter(event => event.type === 'tool/result').at(-1)?.seq
+    // Both gates pass exactly at their thresholds: the answer's confidence equals
+    // the configured one and its top-two margin equals the configured margin.
+    expect(logged[0]?.data).toEqual({
+      trigger: 'errorBurst',
+      triggerSeq,
+      choice: 'needs-help',
+      engine: 'ok',
+      reason: 'gate-passed',
+      confidence: 0.8,
+      margin: 0.125,
+      aging: { continues: 1, lastContinueSeq: logged[0]?.seq },
+    })
+    // Observer means observer: the choice is a record. Nothing is mailed, and
+    // nothing enters the worker's own conversation.
+    expect(booted.mailbox?.sent).toEqual([])
+    expect(worker.events.filter(event => event.type === 'user/message')).toEqual([])
+  })
+
+  it('fails one step below each threshold and records the class that failed', async () => {
+    const lowConfidence = await boot({ enabled: true, minStepsBetween: 0, confidence: 0.8, margin: 0.125 }, { judgment: true })
+    lowConfidence.judgment?.script({ confidence: 0.8 - STEP, probabilities: { continue: 1, 'needs-help': 0.875 } })
+    const belowConfidence = decisions(await fire(lowConfidence, 'worker-low-confidence'))
+
+    const thinMargin = await boot({ enabled: true, minStepsBetween: 0, confidence: 0.8, margin: 0.125 }, { judgment: true })
+    thinMargin.judgment?.script({ confidence: 0.8, probabilities: { continue: 1, 'needs-help': 0.875 + STEP } })
+    const belowMargin = decisions(await fire(thinMargin, 'worker-thin-margin'))
+
+    expect(belowConfidence[0]?.data).toMatchObject({
+      choice: 'continue',
+      engine: 'ok',
+      reason: 'low-confidence',
+      confidence: 0.8 - STEP,
+      margin: 0.125,
+    })
+    expect(belowMargin[0]?.data).toMatchObject({
+      choice: 'continue',
+      engine: 'ok',
+      reason: 'thin-margin',
+      confidence: 0.8,
+    })
+    expect(belowMargin[0]?.data.margin).toBeLessThan(0.125)
+  })
+
+  it('reads a distribution that omits an option as a zero probability', async () => {
+    // A provider validates one entry per option before an answer reaches a
+    // consumer; a missing entry reads as zero, which leaves the answer below the
+    // margin gate rather than above it.
+    for (const probabilities of [{ continue: 0.05 }, { 'needs-help': 0.05 }]) {
+      const booted = await boot({ enabled: true, minStepsBetween: 0 }, { judgment: true })
+      booted.judgment?.script({ probabilities })
+      const logged = decisions(await fire(booted, 'worker-partial-distribution'))
+      expect(logged[0]?.data).toMatchObject({ choice: 'continue', engine: 'ok', reason: 'thin-margin', margin: 0.05 })
+    }
+  })
+
+  it('degrades every consult class to the Stage 0 continue with its own class', async () => {
+    const absent = await boot({ enabled: true, minStepsBetween: 0 }, {})
+    const absentLogged = decisions(await fire(absent, 'worker-engine-absent'))
+
+    const disabled = await boot({ enabled: true, minStepsBetween: 0 }, { judgment: true, settings: true })
+    await disabled.ctx.settings.replace(JUDGMENT_SETTINGS_NAMESPACE, { enabled: false })
+    const disabledLogged = decisions(await fire(disabled, 'worker-engine-disabled'))
+
+    const unavailable = await boot({ enabled: true, minStepsBetween: 0 }, { judgment: true })
+    unavailable.judgment?.scriptFailure(new JudgmentError('UNAVAILABLE', 'the engine is down'))
+    const unavailableLogged = decisions(await fire(unavailable, 'worker-engine-unavailable'))
+
+    const classified = await boot({ enabled: true, minStepsBetween: 0 }, { judgment: true })
+    classified.judgment?.scriptFailure(new JudgmentError('INVALID_ANSWER', 'the body did not match the question'))
+    const classifiedLogged = decisions(await fire(classified, 'worker-invalid-answer'))
+
+    const foreignKind = await boot({ enabled: true, minStepsBetween: 0 }, { judgment: true })
+    foreignKind.judgment?.scriptForeignKind()
+    const foreignKindLogged = decisions(await fire(foreignKind, 'worker-foreign-kind'))
+
+    const unknownOption = await boot({ enabled: true, minStepsBetween: 0 }, { judgment: true })
+    unknownOption.judgment?.script({ option: 'report-blocked' })
+    const unknownOptionLogged = decisions(await fire(unknownOption, 'worker-unknown-option'))
+
+    const cases = [
+      [absentLogged, 'absent', 'engine-absent'],
+      [disabledLogged, 'disabled', 'engine-disabled'],
+      [unavailableLogged, 'unavailable', 'engine-unavailable'],
+      [classifiedLogged, 'invalid-answer', 'invalid-answer'],
+      [foreignKindLogged, 'invalid-answer', 'invalid-answer'],
+      [unknownOptionLogged, 'invalid-answer', 'invalid-answer'],
+    ] as const
+    for (const [logged, engine, reason] of cases) {
+      expect(logged).toHaveLength(1)
+      expect(logged[0]?.data).toMatchObject({ choice: 'continue', engine, reason })
+      expect(logged[0]?.data.aging.continues).toBe(1)
+      // The Stage 0 continue carries no figures: only an answered ask has them.
+      expect(logged[0]?.data).not.toHaveProperty('confidence')
+      expect(logged[0]?.data).not.toHaveProperty('margin')
+    }
+    // The two classes that make no ask at all asked nothing; every other class
+    // either asked once or refused the ask it was given.
+    expect(disabled.judgment?.asks).toEqual([])
+    expect(unavailable.judgment?.asks).toHaveLength(1)
+    expect(classified.judgment?.asks).toHaveLength(1)
+    expect(foreignKind.judgment?.asks).toHaveLength(1)
+    expect(unknownOption.judgment?.asks).toHaveLength(1)
+  })
+
+  it('reaches the deterministic terminal without consulting the engine', async () => {
+    const booted = await boot({ enabled: true, maxContinues: 0, minStepsBetween: 0 }, { judgment: true })
+    const worker = await fire(booted, 'worker-terminal-unconsulted')
+
+    expect(booted.judgment?.asks).toEqual([])
+    const logged = decisions(worker)
+    expect(logged).toHaveLength(1)
+    expect(logged[0]?.data).toMatchObject({ choice: 'report-blocked', reason: 'max-continues' })
+    expect(logged[0]?.data).not.toHaveProperty('engine')
+    expect(booted.mailbox?.sent).toHaveLength(1)
+  })
+})
+
+describe('the Stage 1 egress hook', () => {
+  it('is consulted once per ask, and what it returns is what the engine receives', async () => {
+    const booted = await boot({ enabled: true, minStepsBetween: 0 }, { judgment: true, redactor: true })
+    const worker = await fire(booted, 'worker-redacted')
+    failing(worker, 3, 'c')
+    failing(worker, 4, 'd')
+    await settle()
+
+    expect(decisions(worker)).toHaveLength(2)
+    const asks = booted.judgment?.asks ?? []
+    const redacted = booted.redactor?.states ?? []
+    expect(asks).toHaveLength(2)
+    expect(redacted).toHaveLength(2)
+    expect(redacted[0]).toContain('Tool outcomes:')
+    expect(asks[0]?.state).toBe(REDACTION_MARK + '\n' + String(redacted[0]))
+    expect(asks[1]?.state).toBe(REDACTION_MARK + '\n' + String(redacted[1]))
+  })
+
+  it('is not consulted when the ladder is off or no engine is composed', async () => {
+    const off = await boot({ enabled: false }, { judgment: true, redactor: true })
+    await fire(off, 'worker-off-with-engine')
+    expect(off.judgment?.asks).toEqual([])
+    expect(off.redactor?.states).toEqual([])
+
+    const engineLess = await boot({ enabled: true, minStepsBetween: 0 }, { redactor: true })
+    await fire(engineLess, 'worker-redactor-without-engine')
+    expect(engineLess.redactor?.states).toEqual([])
   })
 })
 
@@ -413,11 +659,13 @@ describe('the report-blocked terminal', () => {
     const logged = decisions(worker)
     expect(logged).toHaveLength(2)
     const terminal = logged[1]
+    // The terminal resolves on the epoch's own count, so it records that rule and
+    // the class of no ask.
     expect(terminal?.data).toEqual({
       trigger: 'errorBurst',
       triggerSeq: third.seq,
       choice: 'report-blocked',
-      engine: 'absent',
+      reason: 'max-continues',
       aging: { continues: 1, lastContinueSeq: logged[0]?.seq },
     })
 
@@ -485,7 +733,8 @@ describe('the report-blocked terminal', () => {
     await settle()
     expect(booted.mailbox?.sent).toHaveLength(1)
 
-    // A second firing re-enters the evaluator while the first report is unresolved.
+    // A second firing lands while the first report is unresolved. The session is
+    // still evaluating, so no second evaluation starts and no second report is sent.
     failing(worker, 3, 'c')
     completeStep(worker, 1)
     await settle()

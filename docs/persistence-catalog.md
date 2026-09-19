@@ -448,14 +448,17 @@ Source: [`packages/compaction/compaction-jev/src/types.ts:155`](../packages/comp
  * model-visible message of its own. Writers pass `{ ignorable: true }`.
  * @param trigger - trigger that fired.
  * @param triggerSeq - session event seq of the event satisfying it.
- * @param choice - continue, or report blocked to the Lead.
- * @param engine - engine class that answered; `'absent'` while none is composed.
+ * @param choice - continue, the ask's needs-help option where its answer passed the gate, or report blocked to the Lead.
+ * @param engine - engine class that answered or could not; absent for the deterministic terminal, which consults nothing.
+ * @param reason - why this decision resolved the way it did.
+ * @param confidence - confidence the ask reported, where an engine answered.
+ * @param margin - top-two probability margin of the answer's distribution, where an engine answered.
  * @param aging - aging fold state this decision records for its goal epoch.
  */
 'escalation/decision': EscalationDecision
 ```
 
-Source: [`packages/team/worker-escalation/src/types.ts:131`](../packages/team/worker-escalation/src/types.ts)
+Source: [`packages/team/worker-escalation/src/types.ts:213`](../packages/team/worker-escalation/src/types.ts)
 
 ### `feedback/*`
 

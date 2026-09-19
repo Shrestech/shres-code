@@ -17,19 +17,68 @@ export type EscalationTrigger =
   | 'stepBudgetExhausted'
   | 'turnFailureStreak'
 
-/** What the ladder resolved for one firing trigger. */
+/**
+ * What one decision resolved: the ladder's own resolution, or the option the
+ * Stage 1 ask chose where its answer passed the gate.
+ */
 export type EscalationChoice =
   /** The worker is told nothing yet; the decision is the log record. */
   | 'continue'
+  /**
+   * The ask chose needs-help and passed both gates. Stage 1 logs it and
+   * executes nothing, so it is a continue resolution for `maxContinues`.
+   */
+  | 'needs-help'
   /** The worker reports itself blocked to the Lead and stops escalating. */
   | 'report-blocked'
 
 /**
- * Which escalation engine answered. Stage 0 is engine-free, so `'absent'` is
- * the only class it writes; a stage that consults a composed judgment engine
- * adds that engine's class here.
+ * Which escalation engine answered one decision, or why no answer reached it.
+ * `'ok'` is the only class an answer carries; the other four are the classes a
+ * Stage 1 ask degrades through, and every one of them degrades to `continue`.
  */
-export type EscalationEngineClass = 'absent'
+export type EscalationEngineClass =
+  /** The engine answered. */
+  | 'ok'
+  /** The engine could not be reached, refused the ask, or did not answer in time. */
+  | 'unavailable'
+  /** The engine answered with a body this ladder could not use. */
+  | 'invalid-answer'
+  /** No judgment engine is composed. */
+  | 'absent'
+  /** A judgment engine is composed and the deployment turned it off. */
+  | 'disabled'
+
+/**
+ * Why the Stage 1 consult resolved one firing trigger. Each class is its own
+ * reason because the classes fail differently: an absent engine is a
+ * composition gap, a below-threshold answer is a judgment an operator tunes
+ * against a labeled set, and an unusable answer is the engine's own defect.
+ */
+export type EscalationConsultReason =
+  /** The answer named one of the question's own options and both gates passed. */
+  | 'gate-passed'
+  /** The answer's confidence is below the configured `confidence` gate. */
+  | 'low-confidence'
+  /** The answer's top-two probability margin is below the configured `margin` gate. */
+  | 'thin-margin'
+  /** No judgment engine is composed. */
+  | 'engine-absent'
+  /** A judgment engine is composed and the deployment turned it off. */
+  | 'engine-disabled'
+  /** The engine could not be reached, refused the ask, or did not answer in time. */
+  | 'engine-unavailable'
+  /** The answer was missing, of another kind, or named an option the question does not carry. */
+  | 'invalid-answer'
+
+/**
+ * Why one decision resolved the way it did: the consult's own class, or the
+ * rule the deterministic terminal resolved on.
+ */
+export type EscalationDecisionReason =
+  | EscalationConsultReason
+  /** The goal epoch reached `maxContinues`, so the ladder reported the worker blocked without consulting an engine. */
+  | 'max-continues'
 
 /**
  * The aging fold facts one decision records: how many continue resolutions
@@ -46,19 +95,49 @@ export interface EscalationAging {
  * One logged ladder decision: the trigger that woke the ladder, the event that
  * satisfied it, and what the ladder resolved. Stage 3 records its adoption as
  * a separate event; nothing about the decision is executed beyond the
- * `report-blocked` report.
+ * `report-blocked` report, so a `needs-help` choice is a record and nothing more.
  */
 export interface EscalationDecision {
   /** Trigger that fired. */
   readonly trigger: EscalationTrigger
   /** Session event seq of the event satisfying that trigger; the invariant's event pointer. */
   readonly triggerSeq: number
-  /** What the ladder resolved. */
+  /** What the ladder resolved, or the option the ask chose where its answer passed the gate. */
   readonly choice: EscalationChoice
-  /** Engine class that answered; `'absent'` while no engine is composed. */
-  readonly engine: EscalationEngineClass
+  /**
+   * Engine class that answered, or the class of the consult that could not
+   * answer. Absent only for the deterministic terminal, whose `max-continues`
+   * rule resolves before any consult runs.
+   */
+  readonly engine?: EscalationEngineClass
+  /** Why this decision resolved the way it did. */
+  readonly reason: EscalationDecisionReason
+  /** Confidence the ask reported; present only where an engine answered. */
+  readonly confidence?: number
+  /** Top-two probability margin of the answer's distribution; present only where an engine answered. */
+  readonly margin?: number
   /** Aging state this decision records for its goal epoch. */
   readonly aging: EscalationAging
+}
+
+/**
+ * Numbers-first facts the Stage 1 ask's state carries about one worker
+ * session: how its tool calls resolved, the identical-call chain in force, the
+ * goal epoch's distinct failed approaches, and completed steps since the last
+ * verified checkpoint. No excerpt of any kind is part of this state — the
+ * error and argument excerpts exist for the Lead's report alone.
+ */
+export interface WorkerEscalationProgressFacts {
+  /** Tool-sourced results that succeeded, excluding sandbox denials and charter probes. */
+  readonly ok: number
+  /** Tool-sourced results that failed, excluding sandbox denials and charter probes. */
+  readonly fail: number
+  /** Length of the identical-call chain in force at the fold point. */
+  readonly repeatRunLength: number
+  /** Distinct failed approaches since the goal epoch's progress floor. */
+  readonly attemptCount: number
+  /** Completed steps since the goal epoch's progress floor. */
+  readonly stepsSinceCheckpoint: number
 }
 
 /** One trigger's verdict at a fold point. */
@@ -124,8 +203,11 @@ declare module '@shres-code/shres-code-session/types' {
      * model-visible message of its own. Writers pass `{ ignorable: true }`.
      * @param trigger - trigger that fired.
      * @param triggerSeq - session event seq of the event satisfying it.
-     * @param choice - continue, or report blocked to the Lead.
-     * @param engine - engine class that answered; `'absent'` while none is composed.
+     * @param choice - continue, the ask's needs-help option where its answer passed the gate, or report blocked to the Lead.
+     * @param engine - engine class that answered or could not; absent for the deterministic terminal, which consults nothing.
+     * @param reason - why this decision resolved the way it did.
+     * @param confidence - confidence the ask reported, where an engine answered.
+     * @param margin - top-two probability margin of the answer's distribution, where an engine answered.
      * @param aging - aging fold state this decision records for its goal epoch.
      */
     'escalation/decision': EscalationDecision

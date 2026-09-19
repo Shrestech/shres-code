@@ -4547,6 +4547,28 @@ export interface WorkerEscalationConfig {
   maxExcerptChars?: number
   /** Character cap on each tool-argument excerpt inside the tool window. Default 80. */
   maxArgChars?: number
+  /**
+   * Instructions of the Stage 1 ask's two-option choice question. Required: the
+   * judgment engine owns no prose, so the package that composes the ask owns
+   * the text, and a deployment that omits it fails at load rather than asking
+   * an unstated question.
+   */
+  progressInstructions: string
+  /**
+   * Confidence the ask's answer must reach for its gate to pass, from 0
+   * through 1. An answer below it resolves `continue` with
+   * `low-confidence`. Default 0.8, the routing operating point.
+   */
+  confidence?: number
+  /**
+   * Top-two probability margin (`top1 - top2`) the ask's answer must reach for
+   * its gate to pass, from 0 through 1. An answer below it resolves
+   * `continue` with `thin-margin`. Default 0.1, the routing operating point
+   * and above the measured wobble of a rented classifier's borderline answers.
+   */
+  margin?: number
+  /** Judgment tier the ask runs at: `fast` or `accurate`. Default `accurate`. */
+  judgmentTier?: JudgmentTier
 }
 
 /** The per-trigger table: one row per trigger, each independently enabled and counted. */
@@ -4623,7 +4645,9 @@ export interface EscalationTurnFailureStreakConfig {
 }
 ```
 
-Source: [`packages/team/worker-escalation/src/config.ts:147`](../packages/team/worker-escalation/src/config.ts)
+Depends on: [`JudgmentTier`](../packages/llm/judgment/src/index.ts)
+
+Source: [`packages/team/worker-escalation/src/config.ts:160`](../packages/team/worker-escalation/src/config.ts)
 
 <a id="shres-codeshres-code-workflow-worker-thread"></a>
 

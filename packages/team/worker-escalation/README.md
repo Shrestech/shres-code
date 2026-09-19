@@ -1,8 +1,8 @@
 # @shres-code/shres-code-worker-escalation
 
-Stage 0 of the worker difficulty ladder: deterministic stuck detection for delegated worker sessions. A delegation child cannot ask the human (the caller is delegated), the step budget bounds one turn rather than a session, and the jspace advisor engages root sessions only — so a worker that cannot make progress has no structured response at all. This package folds the worker's own log for five stuck signals, records one log-only `escalation/decision` per firing trigger, and after `maxContinues` continue resolutions on a goal epoch reports the worker blocked to the Lead through the mailbox the worker already owns.
+Deterministic stuck detection for delegated worker sessions, with a judgment engine as an observer on top. A delegation child cannot ask the human (the caller is delegated), the step budget bounds one turn rather than a session, and the jspace advisor engages root sessions only — so a worker that cannot make progress has no structured response at all. This package folds the worker's own log for five stuck signals, records one log-only `escalation/decision` per firing trigger, and after `maxContinues` continue resolutions on a goal epoch reports the worker blocked to the Lead through the mailbox the worker already owns.
 
-It is engine-free: every decision it writes carries `engine: 'absent'`, and nothing beyond the report is executed. It appears in no default bundle row, and `enabled: false` writes no session event and sends no mail, so a composed-but-off deployment is byte-identical to one without this package.
+Stage 1 consults an optional judgment engine for every continue resolution: one two-option choice ask, gated on the answer's confidence and its top-two probability margin, logged with the engine class, the gate outcome, and the answer's own figures. Nothing executes on that answer — a `needs-help` choice is a record — and the report-blocked terminal stays the ladder's one action. It appears in no default bundle row, and `enabled: false` writes no session event, sends no mail, and makes no ask, so a composed-but-off deployment is byte-identical to one without this package.
 
 ## Config
 
@@ -24,12 +24,16 @@ Every field is validated at plugin load (and again for a settings write), unknow
 | `maxContinues` | `3` | Continue resolutions one goal epoch may take before the terminal. `0` reports at the first firing trigger. |
 | `maxArbiterDepth` | `1` | Delegation depth the ladder engages within; must be at least 1 because root sessions are never engaged. |
 | `minStepsBetween` | `2` | Completed steps between two decisions on one session. `0` removes the cooldown. |
-| `maxDigestTools` | `12` | Trailing `tool/call` signals the report's digest retains. |
-| `maxDigestChars` | `4000` | Character cap on the rendered digest, and the total budget for retained later team mail. |
+| `maxDigestTools` | `12` | Trailing `tool/call` signals the report's digest and the Stage 1 state's tool window retain. |
+| `maxDigestChars` | `4000` | Character cap on the rendered digest and on the Stage 1 state, and the total budget for retained later team mail. |
 | `maxExcerptChars` | `200` | Character cap on each bounded excerpt: an error, the assignment, and each later team message. |
 | `maxArgChars` | `80` | Character cap on each tool-argument excerpt. |
+| `progressInstructions` | — | Instructions of the Stage 1 ask's choice question. Required: the judgment engine owns no prose, so a composition that omits it fails at load. |
+| `confidence` | `0.8` | Confidence the ask's answer must reach for its gate to pass. |
+| `margin` | `0.1` | Top-two probability margin (`top1 - top2`) the answer must reach for its gate to pass. |
+| `judgmentTier` | `accurate` | Tier the ask runs at: `fast` or `accurate`. |
 
-The trigger defaults follow their owning packages: `burst` matches the advisor's error-burst default, `runLength` matches the repeat-tool-reminder guard's first threshold, and `streak` matches model-routing's durable route-failure streak.
+The trigger defaults follow their owning packages: `burst` matches the advisor's error-burst default, `runLength` matches the repeat-tool-reminder guard's first threshold, and `streak` matches model-routing's durable route-failure streak. The two gates default to model-routing's operating points, which stay provisional until a labeled stuck-worker set exists.
 
 ## Composition
 
@@ -64,11 +68,28 @@ The goal epoch's anchor is the jspace card's own `goalOpenedSeq`; without an ope
 
 ## Decisions and the terminal
 
-One `escalation/decision` is appended per resolved trigger, log-only and `ignorable`. A `continue` records the aging state after itself — the epoch's continue count including this decision, and this decision's own seq as the newest continue. After `maxContinues` continues on one goal epoch, the next firing trigger resolves `report-blocked` instead: the worker mails the Lead a `team_send` report (the fixed preamble plus the bounded digest) and then records the terminal. The terminal is one-shot per epoch.
+One `escalation/decision` is appended per resolved trigger, log-only and `ignorable`. It records the trigger and its seq, the choice, the engine class, the reason, the aging state, and the answer's confidence and margin where an engine answered. Any decision that is not the terminal records the aging state after itself — the epoch's resolution count including this decision, and this decision's own seq as the newest — which is what makes a `needs-help` choice a continue resolution. After `maxContinues` of them on one goal epoch, the next firing trigger resolves `report-blocked` instead: the worker mails the Lead a `team_send` report (the fixed preamble plus the bounded digest) and then records the terminal with `reason: 'max-continues'` and no engine class, because that rule resolves before any consult runs. The terminal is one-shot per epoch.
 
 Two gates sit in front of every decision. The session must be a delegation child within `maxArbiterDepth` — a root session carries no delegation depth and is never engaged — and `minStepsBetween` completed steps must have passed since the previous decision. Neither gate reads mail: a worker that had to wait for the Lead to write before it could decide would deadlock on exactly the situation the ladder exists for.
 
 An evaluation runs from a microtask scheduled by the committed event that changed a verdict, never inside that event's publication window: `Session.append` refuses to reenter while another append is published.
+
+## The judgment consult
+
+The ladder reaches the judgment engine through a structural `ctx.get('judgment')` read with no declared injection, so a composition carries an engine or does not. One ask is made per firing trigger that is still a continue resolution — the deterministic terminal makes none — carrying the numbers-first state, one choice question whose options are `continue` and `needs-help`, and the configured tier.
+
+The gate passes only when the answer's confidence is at or above `confidence` and the top-two margin of its distribution is at or above `margin`. A passed gate logs the ask's own option, so a `needs-help` choice appears on the decision and executes nothing. Every other outcome degrades to the Stage 0 continue, carrying the class that caused it:
+
+| `engine` | `reason` | Cause |
+|---|---|---|
+| `absent` | `engine-absent` | No judgment engine is composed. |
+| `disabled` | `engine-disabled` | An engine is composed and the Definition's `judgment` settings section reads `enabled: false`. |
+| `unavailable` | `engine-unavailable` | The ask threw — an unreachable engine, a refusal, an aborted or timed-out ask. |
+| `invalid-answer` | `invalid-answer` | The answer was missing, of another kind, or named an option the question does not carry. |
+| `ok` | `low-confidence` | The engine answered, and its confidence is below the gate. |
+| `ok` | `thin-margin` | The engine answered, and its top-two margin is below the gate. |
+
+When an ask runs, `ctx.judgmentRedactor` is consulted exactly once and its return value is the state the engine receives; with no hook composed the composed state goes out unchanged. Neither the hook nor the engine's toggle is read while the ladder is off, so an off deployment makes no ask and redacts nothing. The state is numbers-first: the tool-outcome counts, the goal epoch's distinct failed approaches, the identical-call chain in force, the completed steps since the progress floor, and one `ok`|`FAIL` line per trailing call. It composes no excerpt of any kind — neither the error nor the argument excerpt the Lead's report carries — and no Config switch turns either on, because those excerpts are workspace-derived text. A decision carries `confidence` and `margin` only where an engine answered, which the `./invariant` companion asserts.
 
 ## Anchors
 
@@ -90,9 +111,26 @@ Fixed and terminal-only: at most one report per goal epoch, bounded by `maxDiges
 
 The report is appended to the Lead's conversation, so it grows that prefix append-only and invalidates nothing already reused there. The worker's conversation prefix is untouched: the ladder writes no message into it.
 
+### Stage 1 judgment ask
+
+#### What the model sees
+
+One request to the judgment engine per continue resolution: `state` — the numbers-first worker state, after `ctx.judgmentRedactor` has run when a deployment mounts one — plus the question's own text: the configured `progressInstructions` and its `continue` and `needs-help` options. The engine answers the highest-probability option with a probability per option and a confidence figure. No conversation model sees this text, and nothing the ask returns reaches the worker's conversation or the Lead's.
+
+#### Token effect
+
+The state and the question text are the ask's input, charged at the engine's own rate, and the answer is its output. The state is bounded by `maxDigestChars`, with the tool window capped at `maxDigestTools`, and it carries no text beyond the configured question, the counts, and one line per trailing tool. One ask happens per continue resolution, so a worker whose triggers keep firing asks once per cooldown window. Nothing about an ask enters a conversation, so the ladder's own context cost is zero.
+
+#### KV Cache effect
+
+Independent model request: the ask neither reads nor extends the worker's conversation prefix, and nothing about it enters a later request. Repeating an identical state may reuse the engine's own prefix cache, which that provider owns.
+
 ## Known Limitations and Deferred Work
 
-- **Stage 0 acts only through the terminal** — the ladder's continue resolutions are logged and never delivered, so a stuck worker keeps working unchanged until it reports blocked. The judgment rungs that make a decision observable to the worker are a later stage.
+- **The ladder acts only through the terminal** — continue resolutions are logged and never delivered, and the Stage 1 consult observes: a `needs-help` choice is a record, so a stuck worker keeps working unchanged until it reports blocked. The rungs that make a consult observable to the worker are a later stage.
+- **The terminal makes no ask** — the epoch's `maxContinues` rule resolves before any consult runs, so the one firing trigger that reports the worker blocked contributes no labeled answer.
+- **The gates are provisional, and the tier is an alias** — `confidence` and `margin` default to model-routing's measured operating points rather than a labeled stuck-worker set, and `judgmentTier` names a seam tier that a provider resolves to a model id, so two tiers resolving to one model are not distinguishable from the decision alone.
+- **A slow engine serializes one session's decisions** — one evaluation runs per session at a time and each waits for its ask, so an engine that takes seconds delays that session's next decision. The ask carries the ladder's lifetime signal, and a provider bounds it with its own timeout.
 - **The durable-failure taxonomy is restated, and it degrades loudly** — model-routing's route-failure predicate is private to that package, so `turnFailureStreak` restates it: a failure a recovery listener absorbs without scheduling a retry leaves no `turn/end` error, a throw the harness flattens to `UNKNOWN` is not attributable, a crash-orphaned turn closes as `interrupted`, and auxiliary calls never log a failure — none of them advances the streak.
 - **A report the mailbox refuses is not recorded** — the terminal decision is appended only after `team_send` accepts the report, so the epoch stays open and a later firing trigger retries it. A worker that is not a Team member (no `agentTeams`, or no roster entry) can therefore never reach the terminal: it keeps logging continues until `maxContinues`, then logs nothing further and warns once per cooldown window.
 - **Epoch scoping needs the jspace card** — `attemptCount` and `stepBudgetExhausted` anchor on `goalOpenedSeq` and fall back to the whole log without an open card. A worker composition without the jspace seat loses the epoch boundary, not the trigger.
