@@ -4502,6 +4502,129 @@ export interface Config {
 
 Source: [`packages/wiki/wiki-librarian/src/resolve.ts:11`](../packages/wiki/wiki-librarian/src/resolve.ts)
 
+<a id="shres-codeshres-code-worker-escalation"></a>
+
+## `@shres-code/shres-code-worker-escalation`
+
+```ts config-catalog
+/**
+ * Composition config of the worker escalation ladder; also the
+ * `worker-escalation` settings section.
+ *
+ * The ladder ships off. `enabled: false` writes no session event and sends no
+ * mail, so a composed-but-off deployment's log is byte-identical to one
+ * without this package.
+ */
+export interface WorkerEscalationConfig {
+  /** Master allow. Default false. */
+  enabled?: boolean
+  /** Per-trigger rows; an omitted row takes its own defaults. */
+  triggers?: WorkerEscalationTriggerTable
+  /**
+   * Continue resolutions one goal epoch may take before the ladder reports the
+   * worker blocked instead. `0` reports at the first firing trigger, which
+   * keeps the terminal reachable without any continue. Default 3.
+   */
+  maxContinues?: number
+  /**
+   * Delegation depth the ladder engages within. Root sessions (depth 0) are
+   * never engaged; the cap must be at least 1. Default 1.
+   */
+  maxArbiterDepth?: number
+  /**
+   * Completed steps between two decisions on one session, so a standing
+   * trigger cannot write a decision per event. Default 2.
+   */
+  minStepsBetween?: number
+  /** `tool/call` signals the worker digest retains. Default 12. */
+  maxDigestTools?: number
+  /** Character cap on the rendered worker digest. Default 4000. */
+  maxDigestChars?: number
+  /**
+   * Character cap on each bounded excerpt: an error excerpt, a tool-argument
+   * excerpt, the assignment, and each later team message. Default 200.
+   */
+  maxExcerptChars?: number
+  /** Character cap on each tool-argument excerpt inside the tool window. Default 80. */
+  maxArgChars?: number
+}
+
+/** The per-trigger table: one row per trigger, each independently enabled and counted. */
+export interface WorkerEscalationTriggerTable {
+  /** Error-burst row. */
+  errorBurst?: EscalationErrorBurstConfig
+  /** Attempt-count row. */
+  attemptCount?: EscalationAttemptCountConfig
+  /** Repeat-run-length row. */
+  repeatRunLength?: EscalationRepeatRunLengthConfig
+  /** Step-budget row. */
+  stepBudgetExhausted?: EscalationStepBudgetExhaustedConfig
+  /** Turn-failure-streak row. */
+  turnFailureStreak?: EscalationTurnFailureStreakConfig
+}
+
+/** The `errorBurst` row: consecutive errored tool results. */
+export interface EscalationErrorBurstConfig {
+  /** Whether this trigger may fire. Default true. */
+  enabled?: boolean
+  /**
+   * Consecutive errored tool results that count as a burst. Sandbox denials and
+   * charter-discrimination probe runs are transparent — they neither count nor
+   * reset the run. {@link DEFAULT_TRIGGER_THRESHOLDS.errorBurst} when omitted.
+   */
+  burst?: number
+}
+
+/** The `attemptCount` row: distinct failed approaches on one goal epoch. */
+export interface EscalationAttemptCountConfig {
+  /** Whether this trigger may fire. Default true. */
+  enabled?: boolean
+  /**
+   * Distinct failed approaches since the goal epoch's anchor that count as
+   * stuck. A passing checkpoint restarts the count, so verified progress
+   * clears the failures before it. {@link DEFAULT_TRIGGER_THRESHOLDS.attemptCount}
+   * when omitted.
+   */
+  attempts?: number
+}
+
+/** The `repeatRunLength` row: identical-call chains. */
+export interface EscalationRepeatRunLengthConfig {
+  /** Whether this trigger may fire. Default true. */
+  enabled?: boolean
+  /**
+   * Identical-call chain length that counts as stuck, using the
+   * repeat-tool-reminder guard's own chain identity and reset rules.
+   * {@link DEFAULT_TRIGGER_THRESHOLDS.repeatRunLength} when omitted.
+   */
+  runLength?: number
+}
+
+/** The `stepBudgetExhausted` row: the per-turn step budget stopped a turn. */
+export interface EscalationStepBudgetExhaustedConfig {
+  /** Whether this trigger may fire. Default true. */
+  enabled?: boolean
+  /**
+   * Step-budget stops on the current goal epoch that count as stuck.
+   * {@link DEFAULT_TRIGGER_THRESHOLDS.stepBudgetExhausted} when omitted.
+   */
+  exhaustions?: number
+}
+
+/** The `turnFailureStreak` row: durable turn failures. */
+export interface EscalationTurnFailureStreakConfig {
+  /** Whether this trigger may fire. Default true. */
+  enabled?: boolean
+  /**
+   * Consecutive durable turn failures that count as stuck.
+   * {@link DEFAULT_TRIGGER_THRESHOLDS.turnFailureStreak} when omitted.
+   */
+  streak?: number
+}
+```
+
+Source: [`packages/team/worker-escalation/src/config.ts:147`](../packages/team/worker-escalation/src/config.ts)
+
 <a id="shres-codeshres-code-workflow-worker-thread"></a>
 
 ## `@shres-code/shres-code-workflow-worker-thread`
@@ -4556,6 +4679,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@shres-code/shres-code-client-ui-jspace` ([`packages/client/ui-jspace/src/index.ts`](../packages/client/ui-jspace/src/index.ts))
 - `@shres-code/shres-code-client-ui-layout` ([`packages/client/ui-layout/src/index.ts`](../packages/client/ui-layout/src/index.ts))
 - `@shres-code/shres-code-client-ui-message-feedback` ([`packages/client/ui-message-feedback/src/index.ts`](../packages/client/ui-message-feedback/src/index.ts))
+- `@shres-code/shres-code-client-ui-model-routing` ([`packages/client/ui-model-routing/src/index.ts`](../packages/client/ui-model-routing/src/index.ts))
 - `@shres-code/shres-code-client-ui-model-selection` ([`packages/client/ui-model-selection/src/index.ts`](../packages/client/ui-model-selection/src/index.ts))
 - `@shres-code/shres-code-client-ui-permission-presets` ([`packages/client/ui-permission-presets/src/index.ts`](../packages/client/ui-permission-presets/src/index.ts))
 - `@shres-code/shres-code-client-ui-plan` ([`packages/client/ui-plan/src/index.ts`](../packages/client/ui-plan/src/index.ts))

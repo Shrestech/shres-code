@@ -9295,6 +9295,49 @@ importers:
         specifier: workspace:^
         version: link:../../core/tools
 
+  packages/team/worker-escalation:
+    dependencies:
+      '@shres-code/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/cordis-plugin-include':
+        specifier: workspace:^
+        version: link:../../../vendor/include
+      '@shres-code/cordis-plugin-loader':
+        specifier: workspace:^
+        version: link:../../../vendor/loader
+      '@shres-code/shres-code-agent':
+        specifier: workspace:^
+        version: link:../../core/agent
+      '@shres-code/shres-code-agent-team':
+        specifier: workspace:^
+        version: link:../agent-team
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-jspace':
+        specifier: workspace:^
+        version: link:../../jspace/jspace
+      '@shres-code/shres-code-llm':
+        specifier: workspace:^
+        version: link:../../llm/llm
+      '@shres-code/shres-code-sandbox':
+        specifier: workspace:^
+        version: link:../../sandbox/sandbox
+      '@shres-code/shres-code-session':
+        specifier: workspace:^
+        version: link:../../core/session
+      '@shres-code/shres-code-settings':
+        specifier: workspace:^
+        version: link:../../settings/settings
+      '@shres-code/shres-code-settings-file':
+        specifier: workspace:^
+        version: link:../../settings/settings-file
+
   packages/terminal/terminal:
     devDependencies:
       '@shres-code/cordis':

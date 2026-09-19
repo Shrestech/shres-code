@@ -1,0 +1,73 @@
+{
+  "name": "@shres-code/shres-code-worker-escalation",
+  "description": "Stage 0 of the Jev worker difficulty ladder: a pure trigger fold over a delegated worker's own log, a Lead-anchored worker digest, and a report-blocked terminal",
+  "version": "0.1.0-rc.5",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/parthmstech/shres-code.git",
+    "directory": "packages/team/worker-escalation"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./invariant": {
+      "types": "./lib/types/invariant.d.ts",
+      "default": "./lib/invariant.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/invariant.js",
+    "lib/types/**/*.d.ts"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "@shres-code/shres-code-agent": "workspace:^",
+    "@shres-code/shres-code-agent-team": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-jspace": "workspace:^",
+    "@shres-code/shres-code-sandbox": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-settings": "workspace:^",
+    "@shres-code/cordis": "workspace:^"
+  },
+  "peerDependenciesMeta": {
+    "@shres-code/shres-code-agent-team": {
+      "optional": true
+    },
+    "@shres-code/shres-code-jspace": {
+      "optional": true
+    },
+    "@shres-code/shres-code-settings": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@shres-code/schemastery": "workspace:^"
+  },
+  "devDependencies": {
+    "@shres-code/cordis-plugin-include": "workspace:^",
+    "@shres-code/cordis-plugin-loader": "workspace:^",
+    "@shres-code/shres-code-agent": "workspace:^",
+    "@shres-code/shres-code-agent-team": "workspace:^",
+    "@shres-code/shres-code-invariants": "workspace:^",
+    "@shres-code/shres-code-jspace": "workspace:^",
+    "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-sandbox": "workspace:^",
+    "@shres-code/shres-code-session": "workspace:^",
+    "@shres-code/shres-code-settings": "workspace:^",
+    "@shres-code/shres-code-settings-file": "workspace:^",
+    "@shres-code/cordis": "workspace:^",
+    "@shres-code/schemastery": "workspace:^"
+  }
+}

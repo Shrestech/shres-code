@@ -297,6 +297,7 @@
     { "path": "./packages/subagent/subagent-kimi-cli" },
     { "path": "./packages/subagent/subagent-shres-sdk" },
     { "path": "./packages/team/agent-team" },
+    { "path": "./packages/team/worker-escalation" },
     { "path": "./packages/jobs/jobs" },
     { "path": "./packages/jobs/jobs-local" },
     { "path": "./packages/jobs/tool-jobs" },

@@ -435,6 +435,28 @@ Source: [`packages/compaction/compaction/src/types.ts:35`](../packages/compactio
 
 Source: [`packages/compaction/compaction-jev/src/types.ts:155`](../packages/compaction/compaction-jev/src/types.ts)
 
+### `escalation/*`
+
+<a id="escalationdecision--log-only"></a>
+
+#### `escalation/decision` — log-only
+
+```ts persistence-catalog
+/**
+ * One worker-escalation ladder decision. Log-only and append-only: the
+ * decision records what the ladder resolved for a firing trigger, never a
+ * model-visible message of its own. Writers pass `{ ignorable: true }`.
+ * @param trigger - trigger that fired.
+ * @param triggerSeq - session event seq of the event satisfying it.
+ * @param choice - continue, or report blocked to the Lead.
+ * @param engine - engine class that answered; `'absent'` while none is composed.
+ * @param aging - aging fold state this decision records for its goal epoch.
+ */
+'escalation/decision': EscalationDecision
+```
+
+Source: [`packages/team/worker-escalation/src/types.ts:131`](../packages/team/worker-escalation/src/types.ts)
+
 ### `feedback/*`
 
 <a id="feedbackrecord--log-only"></a>
