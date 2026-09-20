@@ -4569,6 +4569,15 @@ export interface WorkerEscalationConfig {
   margin?: number
   /** Judgment tier the ask runs at: `fast` or `accurate`. Default `accurate`. */
   judgmentTier?: JudgmentTier
+  /**
+   * Whether a firing trigger also asks the human, through the user-questions
+   * seam, to escalate this worker to the Lead now or let it keep working. The
+   * chosen option is logged on the decision and nothing is executed on it; the
+   * terminal asks nothing. That seam admits only a live runtime root, so a worker
+   * owned by its parent is asked as the Team root supervising it, and one with no
+   * live Team root is refused as `delegated-caller`. Default false.
+   */
+  askToEscalate?: boolean
 }
 
 /** The per-trigger table: one row per trigger, each independently enabled and counted. */

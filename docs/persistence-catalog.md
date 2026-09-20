@@ -453,12 +453,13 @@ Source: [`packages/compaction/compaction-jev/src/types.ts:155`](../packages/comp
  * @param reason - why this decision resolved the way it did.
  * @param confidence - confidence the ask reported, where an engine answered.
  * @param margin - top-two probability margin of the answer's distribution, where an engine answered.
+ * @param ask - what the ask-to-escalate resolved, where `askToEscalate` is on and the decision is not the terminal.
  * @param aging - aging fold state this decision records for its goal epoch.
  */
 'escalation/decision': EscalationDecision
 ```
 
-Source: [`packages/team/worker-escalation/src/types.ts:213`](../packages/team/worker-escalation/src/types.ts)
+Source: [`packages/team/worker-escalation/src/types.ts:268`](../packages/team/worker-escalation/src/types.ts)
 
 ### `feedback/*`
 
@@ -789,7 +790,7 @@ Source: [`packages/llm/llm-retry/src/types.ts:11`](../packages/llm/llm-retry/src
 'model-routing/decision': ModelRoutingDecision
 ```
 
-Source: [`packages/llm/model-router/src/types.ts:268`](../packages/llm/model-router/src/types.ts)
+Source: [`packages/llm/model-router/src/types.ts:285`](../packages/llm/model-router/src/types.ts)
 
 <a id="model-routingmode--log-only"></a>
 
@@ -804,7 +805,7 @@ Source: [`packages/llm/model-router/src/types.ts:268`](../packages/llm/model-rou
 'model-routing/mode': { active: boolean }
 ```
 
-Source: [`packages/llm/model-router/src/types.ts:262`](../packages/llm/model-router/src/types.ts)
+Source: [`packages/llm/model-router/src/types.ts:279`](../packages/llm/model-router/src/types.ts)
 
 ### `permission/*`
 

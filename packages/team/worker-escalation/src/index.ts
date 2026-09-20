@@ -18,6 +18,16 @@
  * executes on that answer: a `needs-help` choice is a record, and the
  * report-blocked terminal stays the ladder's one action.
  *
+ * The ask-to-escalate is anchored on the Stage 0 triggers alone: while
+ * `askToEscalate` is on, every non-terminal decision also asks the human, through
+ * the structural `ctx.get('userQuestions')` read, whether to escalate this worker
+ * to the Lead now or let it keep working, and logs the chosen option on the
+ * decision. Nothing executes on that answer either, and no judgment threshold
+ * gates it. The ask rides a session the human can answer in: a worker session
+ * that is a runtime root is asked directly, and one owned by another live agent
+ * is asked through the Team root that supervises it, which is where the human
+ * already reads that team.
+ *
  * The ladder ships off and appears in no default bundle row: `enabled: false`
  * writes no session event, sends no mail, and makes no ask, so a
  * composed-but-off deployment is byte-identical to one without this package.
@@ -35,8 +45,9 @@ import type {
 } from '@shres-code/shres-code-judgment'
 import type { Session } from '@shres-code/shres-code-session'
 import { installSettingsSection } from '@shres-code/shres-code-settings'
-// Type-only edges: resolve `ctx.agents`, `ctx.jspace`, and `ctx.agentTeams`.
-import type {} from '@shres-code/shres-code-agent'
+import type { AskUserQuestionAnswer, AskUserQuestionItem } from '@shres-code/shres-code-user-questions'
+import type { Agent, AgentRegistry } from '@shres-code/shres-code-agent'
+// Type-only edges: resolve `ctx.jspace` and `ctx.agentTeams`.
 import type {} from '@shres-code/shres-code-agent-team'
 import type {} from '@shres-code/shres-code-jspace'
 import {
@@ -60,11 +71,14 @@ import { foldEscalationAging, foldEscalationCooldown, foldEscalationTriggers, pr
 import type { EscalationAgingState } from './fold.ts'
 import { composeProgressState } from './progress.ts'
 import type {
+  EscalationAskOption,
+  EscalationAskOutcome,
   EscalationChoice,
   EscalationConsultReason,
   EscalationEngineClass,
   EscalationTrigger,
   EscalationTriggerOutcome,
+  WorkerEscalationDigest,
 } from './types.ts'
 
 // The `escalation/decision` session-event declaration lives in src/types.ts
@@ -139,6 +153,7 @@ export const Config: z<WorkerEscalationConfig> = z.object({
   confidence: z.number().min(0).max(1).default(DEFAULT_JUDGMENT_CONFIDENCE),
   margin: z.number().min(0).max(1).default(DEFAULT_JUDGMENT_MARGIN),
   judgmentTier: z.union(['fast', 'accurate']).default(DEFAULT_JUDGMENT_TIER),
+  askToEscalate: z.boolean().default(false),
 })
 
 /** The `agentTeams` target name the Team Lead answers to. */
@@ -212,6 +227,75 @@ function progressMargin(probabilities: Readonly<Record<string, number>>): number
   return Math.abs((probabilities[first] ?? 0) - (probabilities[second] ?? 0))
 }
 
+/** The ask-to-escalate's question id, echoed by the answer this ladder reads. */
+const ESCALATE_QUESTION_ID = 'worker-escalation'
+
+/** The heading the ask-to-escalate is shown under. */
+const ESCALATE_HEADER = 'Worker escalation'
+
+/**
+ * The label the human sees for each ask-to-escalate option. The answer carries
+ * the label, so the ladder maps it back to the option it logs.
+ */
+const ESCALATE_LABELS: Readonly<Record<EscalationAskOption, string>> = {
+  escalate: 'Escalate to the Lead now',
+  'keep-working': 'Keep working',
+}
+
+/** What each option means, as the human reads it beside the label. */
+const ESCALATE_DESCRIPTIONS: Readonly<Record<EscalationAskOption, string>> = {
+  escalate: 'Record that this worker should be escalated to the Lead now. The choice is logged; nothing is sent.',
+  'keep-working': 'Record that this worker should keep going. The ladder asks again after the next firing trigger.',
+}
+
+/** The two options in the order the human sees them. */
+const ESCALATE_OPTIONS: readonly EscalationAskOption[] = ['escalate', 'keep-working']
+
+/**
+ * The option a chosen label names.
+ * @param label - the selected label the answer carries.
+ * @returns the option, or undefined for a label the question did not offer.
+ */
+function escalateOptionForLabel(label: string): EscalationAskOption | undefined {
+  return ESCALATE_OPTIONS.find(option => ESCALATE_LABELS[option] === label)
+}
+
+/**
+ * The question the ask-to-escalate puts to the human: which trigger fired on
+ * which worker, the bounded digest of what the worker was doing as its detail,
+ * and the two options.
+ * @param trigger - the trigger that fired.
+ * @param triggerSeq - session event seq it fired at.
+ * @param digest - the bounded worker digest, shown as the question's detail.
+ * @returns the one question item the ask carries.
+ */
+function escalateQuestion(trigger: EscalationTrigger, triggerSeq: number, digest: WorkerEscalationDigest): AskUserQuestionItem {
+  return {
+    id: ESCALATE_QUESTION_ID,
+    header: ESCALATE_HEADER,
+    question: 'Worker ' + digest.sessionId + ' looks stuck: its ' + trigger + ' trigger fired at event '
+      + String(triggerSeq) + '. Escalate it to the Lead now?',
+    detail: renderWorkerDigest(digest),
+    options: ESCALATE_OPTIONS.map(option => ({ label: ESCALATE_LABELS[option], description: ESCALATE_DESCRIPTIONS[option] })),
+  }
+}
+
+/**
+ * Read the option one answer chose. A usable answer carries exactly this
+ * question's id, exactly one selected label the question offered, and no
+ * custom text; anything else is the provider's defect and reads as no option.
+ * @param answer - the answer the seam returned.
+ * @returns the chosen option, or undefined for an answer this ladder cannot use.
+ */
+function escalateAnswerOption(answer: AskUserQuestionAnswer): EscalationAskOption | undefined {
+  const items = answer.answers.filter(item => item.id === ESCALATE_QUESTION_ID)
+  const item = items.length === 1 ? items[0] : undefined
+  if (item === undefined || item.custom !== undefined) return undefined
+  const [label, ...rest] = item.selected
+  if (label === undefined || rest.length > 0) return undefined
+  return escalateOptionForLabel(label)
+}
+
 /**
  * Whether the ladder owns this session: a delegated child within the
  * delegation-depth cap. A root session carries no delegation depth and is
@@ -274,8 +358,9 @@ function agingView(aging: EscalationAgingState): { continues: number; lastContin
  * no evaluation is taken while a charter discrimination probe is in flight
  * ({@link probeInFlight}), whose exclusion is complete only once its
  * registering call settles. One evaluation runs per session at a time — the
- * schedule entry is held until the consult it may await has settled, so a
- * second committed event cannot start an overlapping pass over the same log.
+ * schedule entry is held until the consult and the human ask it may await have
+ * settled, so a second committed event cannot start an overlapping pass over
+ * the same log.
  * The engagement gates are the session's own delegation depth and the step
  * cooldown — never the presence of mail, because a worker that must wait for
  * the Lead to write before it can decide would deadlock on exactly the
@@ -314,9 +399,9 @@ export function apply(ctx: Context, config: WorkerEscalationConfig): () => void 
   })
 
   const lifetime = new AbortController()
-  // One evaluation per session at a time, held until the consult it may await
-  // has settled; it is also what keeps a second blocked report from starting
-  // while the first is unresolved.
+  // One evaluation per session at a time, held until the consult and the human
+  // ask it may await have settled; it is also what keeps a second blocked
+  // report from starting while the first is unresolved.
   const scheduled = new WeakSet<Session>()
 
   /**
@@ -424,10 +509,79 @@ export function apply(ctx: Context, config: WorkerEscalationConfig): () => void 
   }
 
   /**
+   * Resolve the live Agent whose session the human answers in. A worker the
+   * registry lists as a runtime root answers for itself, because the seam admits
+   * that root and the question belongs in its own session. A worker owned by
+   * another live agent has no human answerer — asking as the child is exactly
+   * what the seam refuses with `DELEGATED_CALLER` and why this package exists —
+   * so the ask rides the Team root supervising it, which is the session the
+   * human watching the team already reads. A worker with no live Team root falls
+   * back to its own agent, and the seam's own refusal becomes the outcome.
+   * @param agents - the live agent registry to read both identities from.
+   * @param agent - the worker's own live Agent.
+   * @returns the Agent to ask as.
+   */
+  const askAsAgent = (agents: AgentRegistry, agent: Agent): Agent =>
+    agents.roots().includes(agent)
+      ? agent
+      : ctx.get('agentTeams')?.tryMembership(agent)?.root ?? agent
+
+  /**
+   * Ask the human, through the user-questions seam, whether to escalate this
+   * worker to the Lead now or let it keep working. The ask is made on behalf of
+   * the asker {@link askAsAgent} resolves, so a Team-spawned worker reaches the
+   * human through the root that supervises it rather than being refused as a
+   * delegated caller.
+   *
+   * Every failure resolves to its own class and no option: no seam composed, no
+   * live Agent for the session, the seam's refusal, any other throw, and an
+   * answer this ladder cannot use. The ask executes nothing — its only product
+   * is what the decision logs — and it is reached only for a firing trigger
+   * that has not already resolved the terminal.
+   * @param session - the worker session the trigger fired on.
+   * @param current - resolved ladder configuration.
+   * @param trigger - the trigger that fired.
+   * @param triggerSeq - session event seq it fired at.
+   * @returns the reason, and the chosen option where the human answered.
+   */
+  const askToEscalate = async (
+    session: Session,
+    current: ResolvedWorkerEscalationConfig,
+    trigger: EscalationTrigger,
+    triggerSeq: number,
+  ): Promise<EscalationAskOutcome> => {
+    const questions = ctx.get('userQuestions')
+    if (questions === undefined) return { reason: 'seam-absent' }
+    const agents = ctx.get('agents')
+    const agent = agents?.get(session.id)
+    if (agents === undefined || agent === undefined) return { reason: 'agent-absent' }
+    const digest = foldWorkerDigest(session, {
+      maxTools: current.maxDigestTools,
+      maxChars: current.maxDigestChars,
+      maxExcerpt: current.maxExcerptChars,
+      maxArgs: current.maxArgChars,
+    })
+    let answer: AskUserQuestionAnswer
+    try {
+      answer = await questions.ask({
+        questions: [escalateQuestion(trigger, triggerSeq, digest)],
+        agent: askAsAgent(agents, agent),
+        signal: lifetime.signal,
+      })
+    } catch (error: unknown) {
+      const code = (error as { code?: unknown } | null)?.code
+      return { reason: code === 'DELEGATED_CALLER' ? 'delegated-caller' : 'seam-unavailable' }
+    }
+    const option = escalateAnswerOption(answer)
+    return option === undefined ? { reason: 'invalid-answer' } : { reason: 'answered', option }
+  }
+
+  /**
    * Resolve one firing trigger into a decision, or into the report-blocked
-   * terminal. The consult runs before the append, so the decision records what
-   * the engine answered and the gate resolved; the append reads the log's own
-   * newest seq at that point, which is the decision's own seq minus one.
+   * terminal. The consult and the ask-to-escalate run before the append, so the
+   * decision records what the engine answered, what the gate resolved, and what
+   * the human chose; the append reads the log's own newest seq at that point,
+   * which is the decision's own seq minus one.
    */
   const evaluate = async (session: Session): Promise<void> => {
     const current = configuration()
@@ -455,6 +609,7 @@ export function apply(ctx: Context, config: WorkerEscalationConfig): () => void 
       return
     }
     const consult = await consultProgress(session, current, anchorSeq)
+    const ask = current.askToEscalate ? await askToEscalate(session, current, firing.trigger, triggerSeq) : undefined
     session.append('escalation/decision', {
       trigger: firing.trigger,
       triggerSeq,
@@ -464,6 +619,7 @@ export function apply(ctx: Context, config: WorkerEscalationConfig): () => void 
       ...consult.answer === undefined
         ? {}
         : { confidence: consult.answer.confidence, margin: consult.answer.margin },
+      ...ask === undefined ? {} : { ask },
       aging: { continues: aging.continues + 1, lastContinueSeq: session.seq },
     }, { ignorable: true })
   }

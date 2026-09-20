@@ -167,6 +167,8 @@ describe('worker-escalation real composition', () => {
     expect(loaded.get('settings')).toBeInstanceOf(FileSettingsProvider)
     expect(loaded.settings.describe().map(descriptor => descriptor.ns)).toContain(WORKER_ESCALATION_SETTINGS_NAMESPACE)
     expect(section(loaded)).toMatchObject({ enabled: false })
+    // The ask-to-escalate switch is part of the section, off by default.
+    expect(section(loaded)).toMatchObject({ askToEscalate: false })
 
     // The shipped default is off: a firing script writes nothing at all.
     const quiet = worker(loaded, 'worker-composition-off')

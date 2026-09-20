@@ -2,7 +2,11 @@
 
 Deterministic stuck detection for delegated worker sessions, with a judgment engine as an observer on top. A delegation child cannot ask the human (the caller is delegated), the step budget bounds one turn rather than a session, and the jspace advisor engages root sessions only — so a worker that cannot make progress has no structured response at all. This package folds the worker's own log for five stuck signals, records one log-only `escalation/decision` per firing trigger, and after `maxContinues` continue resolutions on a goal epoch reports the worker blocked to the Lead through the mailbox the worker already owns.
 
-Stage 1 consults an optional judgment engine for every continue resolution: one two-option choice ask, gated on the answer's confidence and its top-two probability margin, logged with the engine class, the gate outcome, and the answer's own figures. Nothing executes on that answer — a `needs-help` choice is a record — and the report-blocked terminal stays the ladder's one action. It appears in no default bundle row, and `enabled: false` writes no session event, sends no mail, and makes no ask, so a composed-but-off deployment is byte-identical to one without this package.
+Stage 1 consults an optional judgment engine for every continue resolution: one two-option choice ask, gated on the answer's confidence and its top-two probability margin, logged with the engine class, the gate outcome, and the answer's own figures. Nothing executes on that answer — a `needs-help` choice is a record — and the report-blocked terminal stays the ladder's one action.
+
+The ask-to-escalate is anchored on the deterministic triggers alone: while `askToEscalate` is on, every non-terminal decision also puts one two-option question to the human through the user-questions seam, and the option they chose is logged on that decision. No judgment threshold gates it, and nothing executes on it either.
+
+It appears in no default bundle row, and `enabled: false` writes no session event, sends no mail, and makes no ask, so a composed-but-off deployment is byte-identical to one without this package.
 
 ## Config
 
@@ -32,6 +36,7 @@ Every field is validated at plugin load (and again for a settings write), unknow
 | `confidence` | `0.8` | Confidence the ask's answer must reach for its gate to pass. |
 | `margin` | `0.1` | Top-two probability margin (`top1 - top2`) the answer must reach for its gate to pass. |
 | `judgmentTier` | `accurate` | Tier the ask runs at: `fast` or `accurate`. |
+| `askToEscalate` | `false` | Whether a non-terminal decision also asks the human to escalate this worker now or let it keep working. |
 
 The trigger defaults follow their owning packages: `burst` matches the advisor's error-burst default, `runLength` matches the repeat-tool-reminder guard's first threshold, and `streak` matches model-routing's durable route-failure streak. The two gates default to model-routing's operating points, which stay provisional until a labeled stuck-worker set exists.
 
@@ -91,6 +96,25 @@ The gate passes only when the answer's confidence is at or above `confidence` an
 
 The ladder passes the numbers-first state to `ctx.judgment` unredacted and never reads `ctx.judgmentRedactor`: when a deployment mounts that hook, consulting it exactly once per ask is the provider's obligation ([judgment README](../../llm/judgment/README.md#redaction-hook)). The engine's toggle is not read while the ladder is off, so an off deployment makes no ask. The state is numbers-first: the tool-outcome counts, the goal epoch's distinct failed approaches, the identical-call chain in force, the completed steps since the progress floor, and one `ok`|`FAIL` line per trailing call. It composes no excerpt of any kind — neither the error nor the argument excerpt the Lead's report carries — and no Config switch turns either on, because those excerpts are workspace-derived text. A decision carries `confidence` and `margin` only where an engine answered, which the `./invariant` companion asserts.
 
+## The ask-to-escalate
+
+While `askToEscalate` is on, every non-terminal decision puts one two-option question to the human through the user-questions seam: the worker session, the trigger that fired, its `triggerSeq`, the bounded digest of what the worker was doing, and exactly two options — escalate to the Lead now, or keep working. The chosen option is logged on the decision as `ask`; nothing executes on it, neither option is delivered anywhere, and the terminal asks nothing because it already reports. No judgment threshold gates the ask: it is anchored on the deterministic triggers alone.
+
+The prose of that question is the package's own rather than Config. `progressInstructions` is a required field because the judgment engine owns no prose and the composed ask must state its own question; this question is composed by the ladder and read by a human, so its two option labels are the package's vocabulary — a UI renders them, and the answer echoes one back.
+
+The seam admits a request carrying an agent only for that session's exact live runtime root, so the ladder resolves which session carries the question. A worker session that is a runtime root asks for itself. A worker still owned by its parent — every in-process delegation child, which is what a Team deployment spawns — has no human answerer of its own, so the ask rides the Team root supervising it: the human answers it in the Lead's session, which is where that team is read, and the question itself names the stuck worker. A worker with no live Team root keeps its own agent as the asker, and the seam's refusal is what the decision then records. Every other failure records its own class, and none of them changes the decision's choice:
+
+| `ask.reason` | Cause |
+|---|---|
+| `answered` | The human chose one of the question's own options, which `ask.option` carries. |
+| `seam-absent` | No user-questions service is composed. |
+| `agent-absent` | The session has no live Agent to ask on behalf of. |
+| `delegated-caller` | The asker is owned by another live agent and no live Team root was resolved for it, so the seam refuses before its provider runs. |
+| `seam-unavailable` | The ask threw for any other reason: no provider, an aborted ask, or a provider failure. |
+| `invalid-answer` | The answer named neither option, more than one, custom text, or a question this ladder did not ask. |
+
+The ask runs beside the consult in the same evaluation, so a slow provider delays that session's next decision exactly as a slow engine does, and one ask is made per decision — never per event.
+
 ## Anchors
 
 The digest anchors on the Lead's assignment: the first delivered team message — a `user/message` whose source kind is `team-message`, which the human-message fold drops — plus the latest logged card's charter, then a bounded window of completed steps and trailing tool outcomes. A delegated worker's conversation holds no human message, so anchoring on one would produce an empty digest.
@@ -125,9 +149,24 @@ The state and the question text are the ask's input, charged at the engine's own
 
 Independent model request: the ask neither reads nor extends the worker's conversation prefix, and nothing about it enters a later request. Repeating an identical state may reuse the engine's own prefix cache, which that provider owns.
 
+### Ask-to-escalate question to the human
+
+#### What the model sees
+
+Nothing. The question is a UI frame composed by this package — the two option labels and the bounded digest — and no conversation model or judgment engine receives it. The human reads it in the session of the agent the ladder asked as: the worker's own session when that session is a runtime root, otherwise the Team root supervising the worker. The chosen option is recorded on the log-only decision and reaches no conversation, so neither the worker's nor the Lead's history changes.
+
+#### Token effect
+
+Zero. The question is not a model request and the decision is log-only, so the ask adds no tokens to the worker's conversation, the Lead's conversation, or any engine call.
+
+#### KV Cache effect
+
+None. No conversation prefix changes: the ask is a provider frame, and the option it returns is written to the session log alone.
+
 ## Known Limitations and Deferred Work
 
-- **The ladder acts only through the terminal** — continue resolutions are logged and never delivered, and the Stage 1 consult observes: a `needs-help` choice is a record, so a stuck worker keeps working unchanged until it reports blocked. The rungs that make a consult observable to the worker are a later stage.
+- **The ladder acts only through the terminal** — continue resolutions are logged and never delivered, and the Stage 1 consult observes: a `needs-help` choice is a record, so a stuck worker keeps working unchanged until it reports blocked. The ask-to-escalate is a record of the same kind: neither option is delivered or acted on. The rungs that make a consult observable to the worker are a later stage.
+- **A worker with no live Team root cannot be asked** — the question has to be carried by a session the seam admits, so an owned worker's ask rides the Team root supervising it, and the root's own session shows it. A worker that is not a Team member — a plain subagent, or a deployment composing no Team service — has no such root, so the ask keeps the worker as its caller, the seam refuses it with `DELEGATED_CALLER`, and the decision records `delegated-caller` with no question shown.
 - **The terminal makes no ask** — the epoch's `maxContinues` rule resolves before any consult runs, so the one firing trigger that reports the worker blocked contributes no labeled answer.
 - **The gates are provisional, and the tier is an alias** — `confidence` and `margin` default to model-routing's measured operating points rather than a labeled stuck-worker set, and `judgmentTier` names a seam tier that a provider resolves to a model id, so two tiers resolving to one model are not distinguishable from the decision alone.
 - **A slow engine serializes one session's decisions** — one evaluation runs per session at a time and each waits for its ask, so an engine that takes seconds delays that session's next decision. The ask carries the ladder's lifetime signal, and a provider bounds it with its own timeout.

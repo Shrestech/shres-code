@@ -81,6 +81,54 @@ export type EscalationDecisionReason =
   | 'max-continues'
 
 /**
+ * The two options the ask-to-escalate offers the human. A closed union;
+ * consumers switch on it and end in `assertNever`. Neither option is executed:
+ * the chosen one is logged, and the report-blocked terminal stays the ladder's
+ * one action.
+ */
+export type EscalationAskOption =
+  /** The human chose to escalate this worker to the Lead now. */
+  | 'escalate'
+  /** The human chose to let this worker keep working. */
+  | 'keep-working'
+
+/**
+ * Why the ask-to-escalate resolved one firing trigger the way it did. Each
+ * class is its own reason because the classes fail differently: an absent seam
+ * is a composition gap, a refused asker is the seam's own verdict that no session
+ * this ladder could ask as has a human answerer, and an unusable answer is the
+ * provider's defect.
+ */
+export type EscalationAskReason =
+  /** The human chose one of the two options. */
+  | 'answered'
+  /** No user-questions service is composed. */
+  | 'seam-absent'
+  /** The session has no live Agent to ask on behalf of. */
+  | 'agent-absent'
+  /**
+   * The seam refused the asker: the worker is owned by another live agent and no
+   * live Team root was resolved to ask as, so no admitted session carries it.
+   */
+  | 'delegated-caller'
+  /** The ask threw for any other reason: no provider, an aborted ask, or a provider failure. */
+  | 'seam-unavailable'
+  /** The answer named neither option, more than one, custom text, or a question this ladder did not ask. */
+  | 'invalid-answer'
+
+/**
+ * What one ask-to-escalate resolved. Present on a decision only while
+ * `askToEscalate` is on and the decision is not the terminal, which asks
+ * nothing because it already reports to the Lead.
+ */
+export interface EscalationAskOutcome {
+  /** Why the ask resolved this way. */
+  readonly reason: EscalationAskReason
+  /** The option the human chose; present exactly when `reason` is `answered`. */
+  readonly option?: EscalationAskOption
+}
+
+/**
  * The aging fold facts one decision records: how many continue resolutions
  * this goal epoch has taken, counting the decision that carries them.
  */
@@ -116,6 +164,12 @@ export interface EscalationDecision {
   readonly confidence?: number
   /** Top-two probability margin of the answer's distribution; present only where an engine answered. */
   readonly margin?: number
+  /**
+   * What the ask-to-escalate resolved. Present only while `askToEscalate` is
+   * on and this decision is not the terminal; the chosen option is a record
+   * and nothing is executed on it.
+   */
+  readonly ask?: EscalationAskOutcome
   /** Aging state this decision records for its goal epoch. */
   readonly aging: EscalationAging
 }
@@ -208,6 +262,7 @@ declare module '@shres-code/shres-code-session/types' {
      * @param reason - why this decision resolved the way it did.
      * @param confidence - confidence the ask reported, where an engine answered.
      * @param margin - top-two probability margin of the answer's distribution, where an engine answered.
+     * @param ask - what the ask-to-escalate resolved, where `askToEscalate` is on and the decision is not the terminal.
      * @param aging - aging fold state this decision records for its goal epoch.
      */
     'escalation/decision': EscalationDecision

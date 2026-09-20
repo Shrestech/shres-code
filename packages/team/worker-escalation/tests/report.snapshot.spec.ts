@@ -1,15 +1,24 @@
 /**
- * Keyless committed expected outputs for the one model-visible surface this
- * package adds: the blocked report a worker mails its Lead. The arm boots a
- * test-only `cordis.yml` through the real Loader and include builtin over the
- * real settings-file provider, the real session store, the real package, and a
- * test double for the two external boundaries — the Agent registry the ladder
- * resolves the worker through, and the Team mailbox it reports through. The
- * double delivers the way the mailbox does, so the Lead's committed log holds
- * the report as the ordinary `user/message` its conversation receives.
+ * Keyless committed expected outputs for the two human-facing surfaces this
+ * package produces: the blocked report a worker mails its Lead, and the
+ * ask-to-escalate question the human answers. Each arm boots a test-only
+ * `cordis.yml` through the real Loader and include builtin over the real
+ * settings-file provider, the real session store, the real Agent registry, the
+ * real user-questions seam, and the real package, with one test double for the
+ * external boundary that arm needs: the Team mailbox, or the UI that answers a
+ * question. The mailbox double delivers the way the mailbox does, so the Lead's
+ * committed log holds the report as the ordinary `user/message` its conversation
+ * receives; the UI double renders nothing of its own, so the committed question
+ * is exactly what a provider hands the human.
  *
- * The committed outputs are the complete model-visible report text and the
- * Lead's normalized durable log. Record with
+ * The ask arm enters its worker as its own runtime root, because the seam admits
+ * an ask only for the session's exact live runtime root; a worker the Team
+ * spawns is owned by its parent and refused with `DELEGATED_CALLER` before any
+ * provider runs (`tests/ask-seam.spec.ts` pins that case).
+ *
+ * The committed outputs are the complete model-visible report text, the Lead's
+ * normalized durable log, the question as the human receives it, and the worker's
+ * normalized durable decision log. Record with
  * `SHRES_SNAPSHOT=refresh npx vitest run packages/team/worker-escalation/tests/report.snapshot.spec.ts`;
  * every other run replays and compares.
  *
@@ -27,11 +36,16 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { Context, Service } from '@shres-code/cordis'
 import Loader from '@shres-code/cordis-plugin-loader'
 import Include from '@shres-code/cordis-plugin-include'
+import AgentRegistry, { type Agent } from '@shres-code/shres-code-agent'
+import { TeamId } from '@shres-code/shres-code-agent-team'
+import type { TeamMembership } from '@shres-code/shres-code-agent-team'
 import { CallId, MessageId } from '@shres-code/shres-code-llm'
 import type { MessageSource, ToolResultMessage } from '@shres-code/shres-code-llm'
 import SessionStore, { SessionId } from '@shres-code/shres-code-session'
 import type { Session, SessionEvent } from '@shres-code/shres-code-session'
 import FileSettingsProvider from '@shres-code/shres-code-settings-file'
+import UserQuestionService from '@shres-code/shres-code-user-questions'
+import type { AskUserQuestionRequest, UserQuestionProvider } from '@shres-code/shres-code-user-questions'
 import * as WorkerEscalation from '../src/index.ts'
 import { WORKER_ESCALATION_SETTINGS_NAMESPACE } from '../src/config.ts'
 
@@ -41,6 +55,9 @@ const PACKAGE = '@shres-code/shres-code-worker-escalation'
 /** Cold-cache Loader resolution can exceed the default per-test budget. */
 const COMPOSITION_TIMEOUT_MS = 60_000
 
+/** The option label the UI double answers with, as a human would click it. */
+const ESCALATE = 'Escalate to the Lead now'
+
 /** One message the ladder asked the mailbox to deliver. */
 interface SentMail {
   readonly target: string
@@ -48,17 +65,33 @@ interface SentMail {
 }
 
 /**
- * Team mailbox double. It records each send and delivers the report the way the
- * real mailbox does: an ordinary `user/message` on the target session whose
- * source kind is `team-message`.
+ * Team double. It records each send and delivers the report the way the real
+ * mailbox does — an ordinary `user/message` on the target session whose source
+ * kind is `team-message` — and it answers `tryMembership` the way the shipped
+ * roster does, naming the live Lead as its teammate's root, which is the asker
+ * the ladder resolves for a worker it cannot ask directly.
  */
 class SnapshotTeamMailbox extends Service {
   readonly sent: SentMail[] = []
   /** The Lead session deliveries land on. */
   lead: Session | undefined
+  /** The live Lead agent, which is the root this double reports. */
+  root: Agent | undefined
 
   constructor(ctx: Context) {
     super(ctx, 'agentTeams')
+  }
+
+  /**
+   * Resolve one live Agent's Team role.
+   * @param agent - the candidate live Agent.
+   * @returns its membership, or undefined while this double has no live root.
+   */
+  tryMembership(agent: Agent): TeamMembership | undefined {
+    const root = this.root
+    if (root === undefined) return undefined
+    const isRoot = agent.id === root.id
+    return { root, id: TeamId(root.id), role: isRoot ? 'lead' : 'teammate', name: isRoot ? 'lead' : 'worker' }
   }
 
   /**
@@ -88,27 +121,32 @@ class SnapshotTeamMailbox extends Service {
   }
 }
 
-/** Agent-registry double: the ladder only asks whether an Agent exists for a session id. */
-class SnapshotAgents extends Service {
-  private readonly agents = new Map<string, { readonly id: string; readonly session: Session }>()
-
-  constructor(ctx: Context) {
-    super(ctx, 'agents')
-  }
-
-  /** Register one live agent. */
-  register(session: Session): void {
-    this.agents.set(session.id, { id: session.id, session })
-  }
+/**
+ * UI double, standing in for the client that shows a question and returns the
+ * human's click. It renders nothing and invents no wording: the recorded request
+ * is the surface a human sees.
+ */
+class SnapshotQuestions implements UserQuestionProvider {
+  /** Every question this UI was shown, in order. */
+  readonly seen: AskUserQuestionRequest[] = []
 
   /**
-   * Resolve one registered agent.
-   * @param id - session id the ladder asked about.
-   * @returns the agent, or undefined when the session is not one.
+   * Record one question and answer it as the human would.
+   * @param request - the questions, agent, and signal the ladder sent.
+   * @returns the answer naming the recorded option label.
    */
-  get(id: string): { readonly id: string; readonly session: Session } | undefined {
-    return this.agents.get(id)
+  ask(request: AskUserQuestionRequest): Promise<{ answers: { id: string; selected: string[] }[] }> {
+    this.seen.push(request)
+    return Promise.resolve({
+      answers: [{ id: request.questions[0]?.id ?? 'missing', selected: [ESCALATE] }],
+    })
   }
+}
+
+/** Structural Agent: the identity the shipped registry and the ask seam both accept. */
+function stubAgent(id: string, session: Session): Agent {
+  const agentId = id as Agent['id']
+  return { id: agentId, session: { id: agentId, header: session.header } } as unknown as Agent
 }
 
 const snapshotsDir = join(dirname(fileURLToPath(import.meta.url)), 'snapshots', 'worker-escalation')
@@ -124,13 +162,17 @@ afterEach(async () => {
   root = undefined
 })
 
-/** Flush the microtask the ladder evaluates from, and the report it starts. */
+/** Flush the microtask the ladder evaluates from, and the ask or report it starts. */
 async function settle(): Promise<void> {
   await new Promise(resolve => setTimeout(resolve, 0))
 }
 
-/** Boot the test-only composition through the real Loader. */
-async function boot(): Promise<Context> {
+/**
+ * Boot the test-only composition through the real Loader.
+ * @param config - the ladder config the composition passes its entry.
+ * @returns the loaded context.
+ */
+async function boot(config: Record<string, unknown>): Promise<Context> {
   root = await mkdtemp(join(tmpdir(), 'shres-worker-escalation-snapshot-'))
   const settingsPath = join(root, 'settings.yaml')
   await writeFile(settingsPath, '')
@@ -139,17 +181,15 @@ async function boot(): Promise<Context> {
     '- id: settings',
     "  name: '@shres-code/shres-code-settings-file'",
     '  config:',
-    `    path: ${JSON.stringify(settingsPath)}`,
+    '    path: ' + JSON.stringify(settingsPath),
     '    debounceMs: 10',
     "- name: '@shres-code/shres-code-session'",
-    "- name: '@test/worker-escalation-agents'",
+    "- name: '@shres-code/shres-code-agent'",
+    "- name: '@shres-code/shres-code-user-questions'",
     "- name: '@test/worker-escalation-team'",
-    `- name: '${PACKAGE}'`,
+    "- name: '" + PACKAGE + "'",
     '  config:',
-    '    enabled: true',
-    '    maxContinues: 0',
-    '    minStepsBetween: 0',
-    "    progressInstructions: 'Is this worker going to finish without help?'",
+    ...Object.entries(config).map(([key, value]) => '    ' + key + ': ' + JSON.stringify(value)),
     '',
   ].join('\n'))
 
@@ -160,14 +200,15 @@ async function boot(): Promise<Context> {
   const modules = new Map<string, unknown>([
     ['@shres-code/shres-code-settings-file', FileSettingsProvider],
     ['@shres-code/shres-code-session', SessionStore],
-    ['@test/worker-escalation-agents', SnapshotAgents],
+    ['@shres-code/shres-code-agent', AgentRegistry],
+    ['@shres-code/shres-code-user-questions', UserQuestionService],
     ['@test/worker-escalation-team', SnapshotTeamMailbox],
     [PACKAGE, WorkerEscalation],
   ])
   context.loader.internal = {
     version: 'v2',
     async import(specifier: string) {
-      if (!modules.has(specifier)) throw new Error(`unexpected Loader import: ${specifier}`)
+      if (!modules.has(specifier)) throw new Error('unexpected Loader import: ' + specifier)
       return modules.get(specifier)
     },
   } as unknown as NonNullable<typeof context.loader.internal>
@@ -198,7 +239,11 @@ function failing(session: Session, index: number, command: string): void {
   session.append('tool/result', { turn: 1, step: 1, message }, { surfaceOp: 'append', sourceEventSeqs: [called.seq] })
 }
 
-/** The worker log that reaches the terminal: one failed approach on an open epoch. */
+/**
+ * The assignment and the two failed approaches every arm starts from: the
+ * shortest log that carries a Team assignment and fires a trigger.
+ * @param session - the worker session to drive.
+ */
 function drive(session: Session): void {
   session.append('user/message', {
     id: MessageId('prompt-1'),
@@ -215,8 +260,12 @@ function drive(session: Session): void {
   }, { surfaceOp: 'append' })
   failing(session, 1, 'pnpm test')
   failing(session, 2, 'pnpm test -- --run')
-  session.append('step/start', { turn: 1, step: 1 })
-  session.append('step/end', { turn: 1, step: 1 })
+}
+
+/** One finished step, which is the unit the cooldown counts. */
+function completeStep(session: Session, step: number): void {
+  session.append('step/start', { turn: 1, step })
+  session.append('step/end', { turn: 1, step })
 }
 
 /**
@@ -237,6 +286,30 @@ function normalizeLog(session: Session, messageIds: readonly string[]): string {
   let rendered = JSON.stringify(records)
   for (const id of messageIds) rendered = rendered.replaceAll(id, '{{messageId}}')
   return rendered + '\n'
+}
+
+/**
+ * Render one question exactly as the UI hands it to the human: the heading, the
+ * question, the supporting detail, and each option with its description.
+ * @param request - the ask request a provider received.
+ * @returns the human-facing text.
+ */
+function renderQuestion(request: AskUserQuestionRequest): string {
+  const question = request.questions[0]
+  if (question === undefined) throw new Error('the ask carried no question')
+  const options = (question.options ?? []).map(option => '- ' + option.label + ' — ' + (option.description ?? ''))
+  return [
+    // The session whose view shows the question: for a worker the Team spawned it is
+    // the root that supervises it, which is where the human reads the team.
+    'Shown in session: ' + (request.agent?.id ?? 'no agent'),
+    'Header: ' + (question.header ?? ''),
+    'Question: ' + question.question,
+    'Detail:',
+    question.detail ?? '',
+    '',
+    'Options:',
+    ...options,
+  ].join('\n')
 }
 
 /**
@@ -265,19 +338,20 @@ interface Delivery {
 }
 
 /** Drive one terminal report through the composed package and return what the Lead received. */
-async function arm(): Promise<Delivery> {
-  const loaded = await boot()
+async function reportArm(): Promise<Delivery> {
+  const loaded = await boot({ enabled: true, maxContinues: 0, minStepsBetween: 0, progressInstructions: 'Is this worker going to finish without help?' })
   expect(loaded.settings.get(WORKER_ESCALATION_SETTINGS_NAMESPACE)).toMatchObject({ enabled: true })
   const lead = loaded.sessions.create(SessionId('lead-session'))
-  const agents = loaded.get('agents') as unknown as SnapshotAgents
+  const agents = loaded.get('agents') as AgentRegistry
   const mailbox = loaded.get('agentTeams') as unknown as SnapshotTeamMailbox
   mailbox.lead = lead
   const worker = loaded.sessions.create(SessionId('worker-snapshot'), {
     meta: { delegationDepth: 1, parentSession: lead.id },
   })
-  agents.register(lead)
-  agents.register(worker)
+  agents.enter(stubAgent(lead.id, lead), undefined)
+  agents.enter(stubAgent(worker.id, worker), agents.get(lead.id))
   drive(worker)
+  completeStep(worker, 1)
   await settle()
 
   const delivered = lead.events.filter(
@@ -291,9 +365,56 @@ async function arm(): Promise<Delivery> {
   }
 }
 
-describe('blocked report snapshot', () => {
+/** The question one ask arm showed the human, and the decision it wrote. */
+interface Asked {
+  readonly question: string
+  readonly decisionLog: string
+}
+
+/** Drive one ask-to-escalate through the composed package and return what the human saw. */
+async function askArm(): Promise<Asked> {
+  const loaded = await boot({
+    enabled: true,
+    maxContinues: 3,
+    minStepsBetween: 0,
+    askToEscalate: true,
+    progressInstructions: 'Is this worker going to finish without help?',
+  })
+  const agents = loaded.get('agents') as AgentRegistry
+  const questions = new SnapshotQuestions()
+  loaded.userQuestions.registerProvider(questions)
+  const lead = loaded.sessions.create(SessionId('lead-session'))
+  const mailbox = loaded.get('agentTeams') as unknown as SnapshotTeamMailbox
+  const leadAgent = stubAgent(lead.id, lead)
+  agents.enter(leadAgent, undefined)
+  mailbox.root = leadAgent
+  // A worker the Team spawned is owned by its Lead, which the seam refuses as a
+  // caller: the ask rides the live Team root instead, and the human answers it in
+  // the Lead's session.
+  const worker = loaded.sessions.create(SessionId('worker-ask-snapshot'), {
+    meta: { delegationDepth: 1, parentSession: lead.id },
+  })
+  agents.enter(stubAgent(worker.id, worker), leadAgent)
+  drive(worker)
+  completeStep(worker, 1)
+  await settle()
+
+  expect(questions.seen).toHaveLength(1)
+  const asked = questions.seen[0]
+  if (asked === undefined) throw new Error('the ask arm recorded no question')
+  expect(asked.agent).toBe(leadAgent)
+  const decisions = worker.events.filter(event => event.type === 'escalation/decision')
+  expect(decisions).toHaveLength(1)
+  expect(decisions[0]?.data).toMatchObject({ ask: { reason: 'answered', option: 'escalate' } })
+  return {
+    question: renderQuestion(asked),
+    decisionLog: normalizeLog(worker, []),
+  }
+}
+
+describe('snapshots of the package', () => {
   it('delivers the bounded report into the Lead conversation as a team message', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
-    const delivered = await arm()
+    const delivered = await reportArm()
 
     expect(await expectFixture('report-blocked.expected.txt', delivered.report)).toBe(delivered.report)
     expect(await expectFixture('lead-log.expected.jsonl', delivered.leadLog)).toBe(delivered.leadLog)
@@ -304,5 +425,21 @@ describe('blocked report snapshot', () => {
     expect(delivered.leadLog).toContain('"surfaceOp":"append"')
     // The report is bounded by the digest cap the composition set.
     expect(delivered.report.length).toBeLessThan(4000)
+  })
+
+  it('shows the human the two-option question and logs the option they chose', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
+    const asked = await askArm()
+
+    expect(await expectFixture('escalate-ask.expected.txt', asked.question)).toBe(asked.question)
+    expect(await expectFixture('escalate-decision.expected.jsonl', asked.decisionLog)).toBe(asked.decisionLog)
+
+    // The question's own contract, beside the compared text: two options, and the
+    // trigger and digest that tell the human which worker this is about.
+    expect(asked.question).toContain('Shown in session: lead-session')
+    expect(asked.question).toContain('Escalate to the Lead now')
+    expect(asked.question).toContain('Keep working')
+    expect(asked.question).toContain('its errorBurst trigger fired at event 4')
+    expect(asked.question).toContain('Fix the failing parser test.')
+    expect(asked.decisionLog).toContain('"reason":"answered"')
   })
 })

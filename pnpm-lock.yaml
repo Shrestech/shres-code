@@ -3508,6 +3508,9 @@ importers:
       '@shres-code/shres-code-jspace':
         specifier: workspace:^
         version: link:../../jspace/jspace
+      '@shres-code/shres-code-model-router':
+        specifier: workspace:^
+        version: link:../../llm/model-router
       '@shres-code/shres-code-shield':
         specifier: workspace:^
         version: link:../../guard/shield
@@ -9322,6 +9325,9 @@ importers:
       '@shres-code/shres-code-jspace':
         specifier: workspace:^
         version: link:../../jspace/jspace
+      '@shres-code/shres-code-judgment':
+        specifier: workspace:^
+        version: link:../../llm/judgment
       '@shres-code/shres-code-llm':
         specifier: workspace:^
         version: link:../../llm/llm
@@ -9337,6 +9343,9 @@ importers:
       '@shres-code/shres-code-settings-file':
         specifier: workspace:^
         version: link:../../settings/settings-file
+      '@shres-code/shres-code-user-questions':
+        specifier: workspace:^
+        version: link:../../interaction/user-questions
 
   packages/terminal/terminal:
     devDependencies:

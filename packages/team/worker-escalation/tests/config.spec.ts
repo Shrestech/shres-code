@@ -127,6 +127,11 @@ describe('resolveConfig defaults', () => {
     expect(DEFAULT_JUDGMENT_TIER).toBe('accurate')
   })
 
+  it('reads the ask-to-escalate switch, which ships off', () => {
+    expect(resolve({}).askToEscalate).toBe(false)
+    expect(resolve({ askToEscalate: true }).askToEscalate).toBe(true)
+  })
+
   it('accepts a row-enabled ladder with every other row disabled', () => {
     const config = resolve({
       enabled: true,
@@ -154,8 +159,10 @@ describe('resolveConfig rejections', () => {
       .toThrow(/triggers.turnFailureStreak: unknown key "errorBurst"/)
   })
 
-  it('refuses a non-boolean enabled bit', () => {
+  it('refuses a non-boolean enabled bit, including the ask-to-escalate switch', () => {
     expect(() => resolve({ enabled: 'yes' })).toThrow(/WorkerEscalationConfig.enabled must be a boolean/)
+    expect(() => resolve({ askToEscalate: 'yes' }))
+      .toThrow(/WorkerEscalationConfig.askToEscalate must be a boolean/)
     expect(() => resolve({ triggers: { errorBurst: { enabled: 1 } } }))
       .toThrow(/triggers.errorBurst.enabled must be a boolean/)
   })

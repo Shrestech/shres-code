@@ -43,9 +43,11 @@ interface Arm {
  *   mounts no ladder at all; `on` mounts it enabled.
  * @param judgment - `true` also composes a judgment engine, which the ladder
  *   reaches only while it may decide.
+ * @param ask - `true` composes the ladder with its ask-to-escalate switch on,
+ *   so the switch alone can be shown to write nothing while the ladder is off.
  * @returns the composed context and its worker session.
  */
-async function boot(composed: 'off' | 'absent' | 'on', judgment = false): Promise<Arm> {
+async function boot(composed: 'off' | 'absent' | 'on', judgment = false, ask = false): Promise<Arm> {
   const ctx = new Context()
   contexts.push(ctx)
   await ctx.plugin(SessionStore)
@@ -54,6 +56,7 @@ async function boot(composed: 'off' | 'absent' | 'on', judgment = false): Promis
     await ctx.plugin(WorkerEscalation, {
       enabled: composed === 'on',
       progressInstructions: 'Is this worker going to finish without help?',
+      ...ask ? { askToEscalate: true } : {},
     })
   }
   return { ctx, session: ctx.sessions.create(SessionId('worker-twin'), { meta: { delegationDepth: 1 } }) }
@@ -160,6 +163,20 @@ describe('composed-but-off twin', () => {
     // Off is off: no decision and no ask.
     expect(durable(composedOff.session)).toBe(durable(absent))
     expect((composedOff.ctx.get('judgment') as FakeJudgment).asks).toEqual([])
+  })
+
+  it('writes the identical durable log with the ask switch on while the ladder is off', async () => {
+    const composedOff = await boot('off', false, true)
+    script(composedOff.session)
+    await settle()
+
+    const absent = await boot('absent')
+    script(absent.session)
+    await settle()
+
+    // Off is off: the ask switch alone writes no decision and no ask.
+    expect(composedOff.session.events.map(event => event.type)).not.toContain('escalation/decision')
+    expect(durable(composedOff.session)).toBe(durable(absent.session))
   })
 
   it('writes a decision for the same script once the ladder is on', async () => {

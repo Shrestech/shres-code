@@ -1,6 +1,6 @@
 {
   "name": "@shres-code/shres-code-worker-escalation",
-  "description": "Stage 0 of the Jev worker difficulty ladder: a pure trigger fold over a delegated worker's own log, a Lead-anchored worker digest, and a report-blocked terminal",
+  "description": "The Jev worker difficulty ladder: a pure trigger fold over a delegated worker's own log, a Lead-anchored worker digest, a report-blocked terminal, an observer judgment consult, and an ask-to-escalate to the human",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
@@ -40,6 +40,7 @@
     "@shres-code/shres-code-sandbox": "workspace:^",
     "@shres-code/shres-code-session": "workspace:^",
     "@shres-code/shres-code-settings": "workspace:^",
+    "@shres-code/shres-code-user-questions": "workspace:^",
     "@shres-code/cordis": "workspace:^"
   },
   "peerDependenciesMeta": {
@@ -50,6 +51,9 @@
       "optional": true
     },
     "@shres-code/shres-code-settings": {
+      "optional": true
+    },
+    "@shres-code/shres-code-user-questions": {
       "optional": true
     }
   },
@@ -69,6 +73,7 @@
     "@shres-code/shres-code-session": "workspace:^",
     "@shres-code/shres-code-settings": "workspace:^",
     "@shres-code/shres-code-settings-file": "workspace:^",
+    "@shres-code/shres-code-user-questions": "workspace:^",
     "@shres-code/cordis": "workspace:^",
     "@shres-code/schemastery": "workspace:^"
   }

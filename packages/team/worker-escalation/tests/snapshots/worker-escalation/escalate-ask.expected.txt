@@ -1,0 +1,15 @@
+Shown in session: lead-session
+Header: Worker escalation
+Question: Worker worker-ask-snapshot looks stuck: its errorBurst trigger fired at event 4. Escalate it to the Lead now?
+Detail:
+Worker session id: worker-ask-snapshot
+Folded through seq: 7
+Assignment (the Lead's team message): Fix the failing parser test.
+Completed steps: 1
+Recent tool outcomes:
+FAIL bash seq=1 pnpm test: exit status 1
+FAIL bash seq=3 pnpm test -- --run: exit status 1
+
+Options:
+- Escalate to the Lead now — Record that this worker should be escalated to the Lead now. The choice is logged; nothing is sent.
+- Keep working — Record that this worker should keep going. The ladder asks again after the next firing trigger.

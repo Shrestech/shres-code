@@ -1,6 +1,6 @@
 /**
  * The package invariant companion, exercised at runtime rather than only
- * compiled. Its three relations are checked on `internal/dispatch` before
+ * compiled. Its five relations are checked on `internal/dispatch` before
  * publication, so a violating append fails the `session.append` that wrote it:
  *
  * 1. every decision's `triggerSeq` resolves to an event of that trigger's own
@@ -13,7 +13,10 @@
  * 3. nothing is written while the resolved settings section reads
  *    `enabled: false`;
  * 4. a decision carrying the answer's own figures also carries an engine class,
- *    and not the one that means no engine is composed.
+ *    and not the one that means no engine is composed;
+ * 5. a decision carrying `ask` is not the terminal, carries an option exactly
+ *    when the human answered, and is absent while the resolved settings section
+ *    reads `askToEscalate: false`.
  *
  * Manual invariant topology (the focused-suite convention): the suite mounts
  * the registry and the companion on one root context and drives the relations
@@ -181,6 +184,29 @@ function appendDecision(session: Session, data: EscalationDecision): SessionEven
 /** The last event type in a log, so a refused append can be shown to have changed nothing. */
 function lastType(session: Session): string | undefined {
   return session.events.at(-1)?.type
+}
+
+/**
+ * One decision whose trigger and aging relations hold, so only the relation a
+ * case is about can refuse it.
+ * @param ctx - the booted context.
+ * @param id - session id.
+ * @param overrides - fields to replace; `engine: undefined` drops the class.
+ * @returns the session and the payload.
+ */
+function satisfiable(
+  ctx: Context,
+  id: string,
+  overrides: DecisionOverrides = {},
+): { session: Session; data: EscalationDecision } {
+  const session = ctx.sessions.create(SessionId(id))
+  const callEvent = call(session, 1)
+  const failed = result(session, 1, true, callEvent.seq)
+  const at = session.seq
+  return {
+    session,
+    data: decision({ triggerSeq: failed.seq, aging: { continues: 1, lastContinueSeq: at }, ...overrides }),
+  }
 }
 
 describe('worker-escalation invariant companion', () => {
@@ -402,32 +428,9 @@ describe('the aging pair is exact', () => {
 })
 
 describe('an answered ask carries its class', () => {
-  /**
-   * One decision whose trigger relation holds, so only the class relation can
-   * refuse it.
-   * @param ctx - the booted context.
-   * @param id - session id.
-   * @param overrides - fields to replace; `engine: undefined` drops the class.
-   * @returns the session and the payload.
-   */
-  function answered(
-    ctx: Context,
-    id: string,
-    overrides: DecisionOverrides = {},
-  ): { session: Session; data: EscalationDecision } {
-    const session = ctx.sessions.create(SessionId(id))
-    const callEvent = call(session, 1)
-    const failed = result(session, 1, true, callEvent.seq)
-    const at = session.seq
-    return {
-      session,
-      data: decision({ triggerSeq: failed.seq, aging: { continues: 1, lastContinueSeq: at }, ...overrides }),
-    }
-  }
-
   it('accepts the figures an answered ask records', async () => {
     const ctx = await setup()
-    const { session, data } = answered(ctx, 'invariant-answered', {
+    const { session, data } = satisfiable(ctx, 'invariant-answered', {
       engine: 'ok',
       reason: 'gate-passed',
       choice: 'needs-help',
@@ -450,12 +453,89 @@ describe('an answered ask carries its class', () => {
       { engine: 'unavailable' as const, reason: 'engine-unavailable' as const, confidence: 0.9 },
       { engine: 'invalid-answer' as const, reason: 'invalid-answer' as const, margin: 0.8 },
     ]) {
-      const { session, data } = answered(ctx, 'invariant-figures-' + Object.keys(overrides).join('-'), overrides)
+      const { session, data } = satisfiable(ctx, 'invariant-figures-' + Object.keys(overrides).join('-'), overrides)
       expect(() => {
         appendDecision(session, data)
       }).toThrow(/cannot be an answered ask/)
       expect(session.events.some(event => event.type === 'escalation/decision')).toBe(false)
     }
+  })
+})
+
+describe('a recorded ask is one the human could have answered', () => {
+  it('accepts the option an answered ask records', async () => {
+    const ctx = await setup()
+    const { session, data } = satisfiable(ctx, 'invariant-ask-answered', {
+      ask: { reason: 'answered', option: 'escalate' },
+    })
+    appendDecision(session, data)
+    expect(session.events.at(-1)?.data).toMatchObject({ ask: { reason: 'answered', option: 'escalate' } })
+  })
+
+  it('accepts an ask that resolved without an option', async () => {
+    const ctx = await setup()
+    for (const reason of ['delegated-caller', 'seam-absent', 'agent-absent', 'seam-unavailable', 'invalid-answer'] as const) {
+      const { session, data } = satisfiable(ctx, 'invariant-ask-class-' + reason, { ask: { reason } })
+      appendDecision(session, data)
+      expect(session.events.at(-1)?.data).toMatchObject({ ask: { reason } })
+    }
+  })
+
+  it('rejects an option on an ask the human did not answer, and an answered ask without one', async () => {
+    const ctx = await setup()
+    for (const ask of [
+      { reason: 'delegated-caller' as const, option: 'escalate' as const },
+      { reason: 'answered' as const },
+    ]) {
+      const { session, data } = satisfiable(ctx, 'invariant-ask-mismatch-' + (ask.option ?? 'none'), { ask })
+      expect(() => {
+        appendDecision(session, data)
+      }).toThrow(/which is not an answered ask/)
+      expect(session.events.some(event => event.type === 'escalation/decision')).toBe(false)
+    }
+  })
+
+  it('rejects the terminal carrying an ask, which the terminal never makes', async () => {
+    const ctx = await setup()
+    const { session, data } = satisfiable(ctx, 'invariant-ask-terminal', {
+      choice: 'report-blocked',
+      reason: 'max-continues',
+      engine: undefined,
+      ask: { reason: 'answered', option: 'keep-working' },
+      aging: { continues: 0 },
+    })
+    expect(() => {
+      appendDecision(session, data)
+    }).toThrow(/is the report-blocked terminal and carries an ask/)
+    expect(session.events.some(event => event.type === 'escalation/decision')).toBe(false)
+  })
+
+  it('rejects an ask while the settings section reads askToEscalate: false', async () => {
+    const ctx = await setup({ settings: true })
+    ctx.settings.register(WORKER_ESCALATION_SETTINGS_NAMESPACE, Config, {
+      base: { enabled: true, progressInstructions: PROGRESS, askToEscalate: false },
+    })
+    const { session, data } = satisfiable(ctx, 'invariant-ask-settings-off', {
+      ask: { reason: 'answered', option: 'escalate' },
+    })
+    expect(() => {
+      appendDecision(session, data)
+    }).toThrow(/settings section reads askToEscalate: false/)
+    expect(session.events.some(event => event.type === 'escalation/decision')).toBe(false)
+
+    // The same decision stands once the switch is committed on.
+    await ctx.settings.replace(WORKER_ESCALATION_SETTINGS_NAMESPACE, { enabled: true, askToEscalate: true })
+    appendDecision(session, data)
+    expect(session.events.filter(event => event.type === 'escalation/decision')).toHaveLength(1)
+  })
+
+  it('is inert when no settings service carries the section', async () => {
+    const ctx = await setup()
+    const { session, data } = satisfiable(ctx, 'invariant-ask-settings-absent', {
+      ask: { reason: 'answered', option: 'keep-working' },
+    })
+    appendDecision(session, data)
+    expect(session.events.filter(event => event.type === 'escalation/decision')).toHaveLength(1)
   })
 })
 
@@ -501,7 +581,7 @@ describe('the epoch the aging relation counts over', () => {
 
 describe('nothing is written while the settings section is off', () => {
   /** A decision that satisfies the trigger relation, so only the settings relation can refuse it. */
-  async function satisfiable(ctx: Context, id: string): Promise<{ session: Session; data: EscalationDecision }> {
+  async function epochDecision(ctx: Context, id: string): Promise<{ session: Session; data: EscalationDecision }> {
     const session = ctx.sessions.create(SessionId(id))
     const callEvent = call(session, 1)
     const failed = result(session, 1, true, callEvent.seq)
@@ -512,7 +592,7 @@ describe('nothing is written while the settings section is off', () => {
   it('rejects a decision appended while the resolved section reads enabled: false', async () => {
     const ctx = await setup({ settings: true })
     ctx.settings.register(WORKER_ESCALATION_SETTINGS_NAMESPACE, Config, { base: { enabled: false, progressInstructions: PROGRESS } })
-    const { session, data } = await satisfiable(ctx, 'invariant-settings-off')
+    const { session, data } = await epochDecision(ctx, 'invariant-settings-off')
     expect(() => {
       appendDecision(session, data)
     }).toThrow(/settings section reads enabled: false/)
@@ -522,14 +602,14 @@ describe('nothing is written while the settings section is off', () => {
   it('accepts the same decision once the section reads enabled: true', async () => {
     const ctx = await setup({ settings: true })
     ctx.settings.register(WORKER_ESCALATION_SETTINGS_NAMESPACE, Config, { base: { enabled: true, progressInstructions: PROGRESS } })
-    const { session, data } = await satisfiable(ctx, 'invariant-settings-on')
+    const { session, data } = await epochDecision(ctx, 'invariant-settings-on')
     appendDecision(session, data)
     expect(session.events.filter(event => event.type === 'escalation/decision')).toHaveLength(1)
   })
 
   it('is inert when no settings service carries the section', async () => {
     const ctx = await setup()
-    const { session, data } = await satisfiable(ctx, 'invariant-settings-absent')
+    const { session, data } = await epochDecision(ctx, 'invariant-settings-absent')
     appendDecision(session, data)
     expect(session.events.filter(event => event.type === 'escalation/decision')).toHaveLength(1)
   })
@@ -537,7 +617,7 @@ describe('nothing is written while the settings section is off', () => {
   it('reads the committed change rather than the composition entry', async () => {
     const ctx = await setup({ settings: true })
     ctx.settings.register(WORKER_ESCALATION_SETTINGS_NAMESPACE, Config, { base: { enabled: false, progressInstructions: PROGRESS } })
-    const { session, data } = await satisfiable(ctx, 'invariant-settings-commit')
+    const { session, data } = await epochDecision(ctx, 'invariant-settings-commit')
     await ctx.settings.replace(WORKER_ESCALATION_SETTINGS_NAMESPACE, { enabled: true })
     appendDecision(session, data)
     expect(session.events.filter(event => event.type === 'escalation/decision')).toHaveLength(1)

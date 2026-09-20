@@ -41,6 +41,12 @@ export const inject = ['invariants']
  * 4. **A recorded confidence comes from an engine.** Only an answered ask
  *    reports a confidence and a margin, so a decision carrying either without
  *    the `'ok'` engine class records figures nothing produced.
+ * 5. **A recorded ask is one the human could have answered.** The terminal
+ *    asks nothing, so a `report-blocked` decision carrying `ask` records an
+ *    ask that never happened; an `ask` carries an option exactly when its
+ *    reason is `answered`; and a resolved settings section that reads
+ *    `askToEscalate: false` beside a decision carrying `ask` contradicts it,
+ *    inert without a settings service the way relation 3 is.
  *
  * The step cooldown stays out of the companion: it is policy over the same log
  * (completed steps advance monotonically by construction), and the invariant
@@ -61,9 +67,24 @@ const install: InvariantInstaller = (ctx: Context, fail: InvariantFailure) => {
       fail('escalation/decision trigger ' + JSON.stringify(data.trigger)
         + ' has no satisfying event at triggerSeq ' + String(data.triggerSeq))
     }
-    const section = ctx.get('settings')?.get(WORKER_ESCALATION_SETTINGS_NAMESPACE) as { enabled?: boolean } | undefined
+    const section = ctx.get('settings')?.get(WORKER_ESCALATION_SETTINGS_NAMESPACE) as
+      | { enabled?: boolean; askToEscalate?: boolean }
+      | undefined
     if (section !== undefined && section.enabled === false) {
       fail('an escalation/decision was appended while the worker-escalation settings section reads enabled: false')
+    }
+    const ask = data.ask
+    if (ask !== undefined) {
+      if (data.choice === 'report-blocked') {
+        fail('escalation/decision is the report-blocked terminal and carries an ask, which the terminal never makes')
+      }
+      if ((ask.option !== undefined) !== (ask.reason === 'answered')) {
+        fail('escalation/decision ask carries option ' + JSON.stringify(ask.option)
+          + ' with reason ' + JSON.stringify(ask.reason) + ', which is not an answered ask')
+      }
+      if (section !== undefined && section.askToEscalate === false) {
+        fail('an escalation/decision carries an ask while the worker-escalation settings section reads askToEscalate: false')
+      }
     }
     const anchorSeq = ctx.get('jspace')?.card(session)?.goalOpenedSeq ?? -1
     let continues = 0

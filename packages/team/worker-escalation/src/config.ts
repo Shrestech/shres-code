@@ -211,6 +211,15 @@ export interface WorkerEscalationConfig {
   margin?: number
   /** Judgment tier the ask runs at: `fast` or `accurate`. Default `accurate`. */
   judgmentTier?: JudgmentTier
+  /**
+   * Whether a firing trigger also asks the human, through the user-questions
+   * seam, to escalate this worker to the Lead now or let it keep working. The
+   * chosen option is logged on the decision and nothing is executed on it; the
+   * terminal asks nothing. That seam admits only a live runtime root, so a worker
+   * owned by its parent is asked as the Team root supervising it, and one with no
+   * live Team root is refused as `delegated-caller`. Default false.
+   */
+  askToEscalate?: boolean
 }
 
 /** One resolved trigger row. */
@@ -252,6 +261,8 @@ export interface ResolvedWorkerEscalationConfig {
   readonly margin: number
   /** Judgment tier the ask runs at. */
   readonly judgmentTier: JudgmentTier
+  /** Whether a non-terminal decision also asks the human to escalate or keep working. */
+  readonly askToEscalate: boolean
 }
 
 /**
@@ -281,6 +292,7 @@ const CONFIG_KEYS: ReadonlySet<string> = new Set([
   'confidence',
   'margin',
   'judgmentTier',
+  'askToEscalate',
 ])
 
 /** Reject a key this ladder could not act on, naming it. */
@@ -364,14 +376,22 @@ function resolveTriggerRow(
  * @param config - raw config from a composition entry, a settings snapshot, or a caller.
  * @returns the resolved facts, frozen.
  * @throws Error naming the offending key when the config carries an unknown
- *   key, a missing question text, a non-boolean `enabled`, a non-integer
- *   count, a threshold outside its range, a trigger table that enables nothing
- *   while the ladder is on, or a delegation-depth cap that engages no session.
+ *   key, a missing question text, a non-boolean `enabled` or `askToEscalate`,
+ *   a non-integer count, a threshold outside its range, a trigger table that
+ *   enables nothing while the ladder is on, or a delegation-depth cap that
+ *   engages no session.
  */
 export function resolveConfig(config: WorkerEscalationConfig): ResolvedWorkerEscalationConfig {
   validateKeys(config)
-  const raw = config as { enabled?: unknown; maxArbiterDepth?: unknown; triggers?: unknown; judgmentTier?: unknown }
+  const raw = config as {
+    enabled?: unknown
+    maxArbiterDepth?: unknown
+    triggers?: unknown
+    judgmentTier?: unknown
+    askToEscalate?: unknown
+  }
   if (raw.enabled !== undefined) assertBoolean('WorkerEscalationConfig.enabled', raw.enabled)
+  if (raw.askToEscalate !== undefined) assertBoolean('WorkerEscalationConfig.askToEscalate', raw.askToEscalate)
   // The two tier literals are the schema's to enforce for a composition entry,
   // but programmatic construction and a settings snapshot bypass it, so the raw
   // value is re-judged here the way every other field is.
@@ -423,6 +443,7 @@ export function resolveConfig(config: WorkerEscalationConfig): ResolvedWorkerEsc
   const margin = config.margin ?? DEFAULT_JUDGMENT_MARGIN
   assertRatio('WorkerEscalationConfig.margin', margin)
   const judgmentTier = config.judgmentTier ?? DEFAULT_JUDGMENT_TIER
+  const askToEscalate = raw.askToEscalate ?? false
   return Object.freeze({
     enabled,
     triggers: Object.freeze(resolvedRows),
@@ -437,5 +458,6 @@ export function resolveConfig(config: WorkerEscalationConfig): ResolvedWorkerEsc
     confidence,
     margin,
     judgmentTier,
+    askToEscalate,
   })
 }
