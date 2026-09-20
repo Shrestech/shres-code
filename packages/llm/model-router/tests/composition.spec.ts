@@ -268,11 +268,11 @@ describe('real Loader composition', () => {
       options: [{ option: SCRIPTED_CANDIDATE }, { option: 'vision' }],
     })
 
-    // The projection renders the same decision the log holds. Its `active` is the
-    // LOGGED mode, which is off before the first `model-routing/mode` event.
+    // The projection renders the same decision the log holds. Its `active` is
+    // the mode in force: `initialMode: on` with no logged mode event is on.
     const projection = loaded.sessionProjections.snapshot(agent.session).values['modelRouting']
     expect(projection).toMatchObject({
-      active: false,
+      active: true,
       pending: false,
       last: { outcome: 'downgraded', selection: { model: CANDIDATE_MODEL } },
       sticky: { active: true, turnsElapsed: 0, selection: { model: CANDIDATE_MODEL } },

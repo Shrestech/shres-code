@@ -332,7 +332,9 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
         key: 'modelRouting',
         schema: modelRoutingProjectionSchema,
         init: () => ({
-          active: false,
+          // Mirrors `modeOf`: a log with no `model-routing/mode` event starts
+          // from the configured initial mode, not from off.
+          active: this.config().initialMode === 'on',
           wanted: null,
           turn: 0,
           last: null,

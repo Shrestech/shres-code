@@ -981,7 +981,9 @@ describe('the projection unit', () => {
     await b.resolve(1)
 
     expect(projectionOf(b.ctx, b.session)).toEqual({
-      active: false,
+      // The bench boots `initialMode: on`, and no mode event exists, so the
+      // projection's mode in force is on — the decision below required it.
+      active: true,
       pending: false,
       last: {
         outcome: 'downgraded',
