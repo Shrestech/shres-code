@@ -6,8 +6,9 @@
  * vocabulary back onto the seam's, validating every field an answer depends on
  * before a consumer can see it. The API key is resolved through the optional
  * credentials seam on every ask and cached nowhere; the optional
- * `ctx.judgmentRedactor` hook is consulted once, before the state leaves the
- * process; and `timeoutMs` bounds the request, so a request that outlives its
+ * `ctx.judgmentRedactor` hook is consulted exactly once per ask, before the
+ * state is serialized — the provider is that hook's one home, so the state a
+ * consumer passes arrives unredacted; and `timeoutMs` bounds the request, so a request that outlives its
  * deadline fails with `UNAVAILABLE` naming that figure while the caller's own
  * `AbortSignal` fails with `ABORTED`.
  *
@@ -167,7 +168,9 @@ export class TypesafeJudgmentEngine extends JudgmentService {
 
   /**
    * Consult the deployment's egress hook once, or send the state unchanged.
-   * @param state - the state the consumer supplied.
+   * This is the hook's one consult per ask: the seam obliges every provider to
+   * make it and no consumer to.
+   * @param state - the state the consumer supplied, unredacted.
    * @returns the text to send; a mounted hook's own return value, awaited.
    */
   private redactState(state: string): string | Promise<string> {

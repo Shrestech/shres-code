@@ -64,7 +64,7 @@ No threshold lives here. Probabilities can be borderline and are not determinist
 
 ## Redaction hook
 
-`ctx.judgmentRedactor` is optional and interface-typed: a deployment mounts one service implementing `JudgmentRedactor` when state text must be rewritten before it leaves the process. A provider that supports it consults the hook once per ask, before the request goes out, and sends what the hook returns.
+`ctx.judgmentRedactor` is optional and interface-typed: a deployment mounts one service implementing `JudgmentRedactor` when state text must be rewritten before it leaves the process. The hook has one home, the provider. Every provider consults it exactly once per ask, before the state is serialized, and sends what it returns. A consumer passes its composed state to `ctx.judgment.ask()` unredacted and does not consult the hook, so a composed redactor runs exactly once per ask however many consumers a deployment composes.
 
 ```ts
 interface JudgmentRedactor {
@@ -104,7 +104,7 @@ Independent model request: the ask neither reads nor extends a conversation pref
 
 #### What the model sees
 
-When a deployment mounts `ctx.judgmentRedactor`, the state the engine receives is what that hook returned, not what the consumer passed. Question text is not passed through the hook.
+When a deployment mounts `ctx.judgmentRedactor`, the state the engine receives is what that hook returned from the provider's one consult, not what the consumer passed. Question text is not passed through the hook.
 
 #### Token effect
 

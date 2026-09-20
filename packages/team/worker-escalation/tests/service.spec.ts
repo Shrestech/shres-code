@@ -120,7 +120,7 @@ interface BootOptions {
   readonly mailbox?: boolean
   /** `true` mounts a scripted judgment engine as `ctx.judgment`. */
   readonly judgment?: boolean
-  /** `true` mounts the egress hook beside the engine. */
+  /** `true` mounts the egress hook beside the engine, so a suite can show the ladder never reaches it. */
   readonly redactor?: boolean
   /** `true` mounts the in-memory settings provider, so the judgment toggle can be written. */
   readonly settings?: boolean
@@ -616,32 +616,24 @@ describe('the Stage 1 judgment consult', () => {
 })
 
 describe('the Stage 1 egress hook', () => {
-  it('is consulted once per ask, and what it returns is what the engine receives', async () => {
+  it('is never consulted by the ladder: the engine receives the composed state unredacted', async () => {
+    // The hook's one home is the provider. A mounted redactor beside a bare
+    // engine double records zero consults from this package, and every ask
+    // carries the state exactly as composed.
     const booted = await boot({ enabled: true, minStepsBetween: 0 }, { judgment: true, redactor: true })
-    const worker = await fire(booted, 'worker-redacted')
+    const worker = await fire(booted, 'worker-unredacted')
     failing(worker, 3, 'c')
     failing(worker, 4, 'd')
     await settle()
 
     expect(decisions(worker)).toHaveLength(2)
     const asks = booted.judgment?.asks ?? []
-    const redacted = booted.redactor?.states ?? []
     expect(asks).toHaveLength(2)
-    expect(redacted).toHaveLength(2)
-    expect(redacted[0]).toContain('Tool outcomes:')
-    expect(asks[0]?.state).toBe(REDACTION_MARK + '\n' + String(redacted[0]))
-    expect(asks[1]?.state).toBe(REDACTION_MARK + '\n' + String(redacted[1]))
-  })
-
-  it('is not consulted when the ladder is off or no engine is composed', async () => {
-    const off = await boot({ enabled: false }, { judgment: true, redactor: true })
-    await fire(off, 'worker-off-with-engine')
-    expect(off.judgment?.asks).toEqual([])
-    expect(off.redactor?.states).toEqual([])
-
-    const engineLess = await boot({ enabled: true, minStepsBetween: 0 }, { redactor: true })
-    await fire(engineLess, 'worker-redactor-without-engine')
-    expect(engineLess.redactor?.states).toEqual([])
+    expect(booted.redactor?.states).toEqual([])
+    for (const ask of asks) {
+      expect(ask.state).toContain('Tool outcomes:')
+      expect(ask.state.startsWith(REDACTION_MARK)).toBe(false)
+    }
   })
 })
 

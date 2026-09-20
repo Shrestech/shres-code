@@ -32,7 +32,7 @@ The key itself is never in configuration: the credentials seam (`ctx.credentials
 
 ## Ask behaviour
 
-One ask resolves the credential reference, consults the optional egress hook `ctx.judgmentRedactor` exactly once, resolves the tier to a model id, and posts one request. The result carries `answers` in the order the questions were asked (each with its question id), `engine: 'typesafe'`, the model id the response reported, and `latencyMs`, measured around the whole ask and rounded to a whole millisecond. The vendor reports the versioned id an alias resolved to, so a log records what answered rather than what was requested.
+One ask resolves the credential reference, consults the optional egress hook `ctx.judgmentRedactor` exactly once — the provider is the hook's one home, so a consumer's state arrives unredacted and leaves as what the hook returned — resolves the tier to a model id, and posts one request. The result carries `answers` in the order the questions were asked (each with its question id), `engine: 'typesafe'`, the model id the response reported, and `latencyMs`, measured around the whole ask and rounded to a whole millisecond. The vendor reports the versioned id an alias resolved to, so a log records what answered rather than what was requested.
 
 Failures are one `JudgmentError` each, and a consumer branches on `code`:
 
@@ -67,7 +67,7 @@ Answers are translated back, and the discriminant must match the question kind:
 
 TypeSafe retains Input. There is no zero-retention option on the standard plan — zero data retention is an enterprise arrangement, on request — and the service is US-hosted. TypeSafe states that it does not train on customer requests or responses.
 
-Because no zero-retention mode is available, bounding what leaves the process is the deployment's job, and the seam exposes exactly one control for it: `ctx.judgmentRedactor`, consulted once per ask before the state is serialized. State caps belong in the consuming package's own Config, next to the question text that produces the state, so a cap and the text it bounds are tuned together. A distilled on-box engine behind the same `ctx.judgment` contract is the endgame for deployments whose governance rules cannot accept a retained-input vendor.
+Because no zero-retention mode is available, bounding what leaves the process is the deployment's job, and the seam exposes exactly one control for it: `ctx.judgmentRedactor`, which this provider consults exactly once per ask before the state is serialized; no consumer consults it. State caps belong in the consuming package's own Config, next to the question text that produces the state, so a cap and the text it bounds are tuned together. A distilled on-box engine behind the same `ctx.judgment` contract is the endgame for deployments whose governance rules cannot accept a retained-input vendor.
 
 The vendor's site terms clause (vi) restricts using the service to develop new products without express written permission. Evaluation and BYOK experimentation proceed under that reading; shipping a product integration waits on the partnership conversation that also owns enterprise zero data retention and volume pricing.
 

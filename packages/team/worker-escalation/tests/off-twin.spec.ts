@@ -18,7 +18,7 @@ import type { MessageSource, ToolResultMessage, UserMessage } from '@shres-code/
 import SessionStore, { SessionId } from '@shres-code/shres-code-session'
 import type { Session } from '@shres-code/shres-code-session'
 import * as WorkerEscalation from '../src/index.ts'
-import { FakeJudgment, StubRedactor } from './fake-judgment.ts'
+import { FakeJudgment } from './fake-judgment.ts'
 
 const contexts: Context[] = []
 
@@ -41,18 +41,15 @@ interface Arm {
  * Boot one arm and create its worker session.
  * @param composed - `off` mounts the ladder at `enabled: false`; `absent`
  *   mounts no ladder at all; `on` mounts it enabled.
- * @param judgment - `true` also composes a judgment engine and the egress hook,
- *   which the ladder reaches only while it may decide.
+ * @param judgment - `true` also composes a judgment engine, which the ladder
+ *   reaches only while it may decide.
  * @returns the composed context and its worker session.
  */
 async function boot(composed: 'off' | 'absent' | 'on', judgment = false): Promise<Arm> {
   const ctx = new Context()
   contexts.push(ctx)
   await ctx.plugin(SessionStore)
-  if (judgment) {
-    await ctx.plugin(FakeJudgment)
-    await ctx.plugin(StubRedactor)
-  }
+  if (judgment) await ctx.plugin(FakeJudgment)
   if (composed !== 'absent') {
     await ctx.plugin(WorkerEscalation, {
       enabled: composed === 'on',
@@ -151,7 +148,7 @@ describe('composed-but-off twin', () => {
     expect(durable(composedOff)).toBe(durable(absent))
   })
 
-  it('writes the identical durable log with a judgment engine and an egress hook composed while off', async () => {
+  it('writes the identical durable log with a judgment engine composed while off', async () => {
     const composedOff = await boot('off', true)
     script(composedOff.session)
     await settle()
@@ -160,10 +157,9 @@ describe('composed-but-off twin', () => {
     script(absent)
     await settle()
 
-    // Off is off: no decision, no ask, and no redaction.
+    // Off is off: no decision and no ask.
     expect(durable(composedOff.session)).toBe(durable(absent))
     expect((composedOff.ctx.get('judgment') as FakeJudgment).asks).toEqual([])
-    expect((composedOff.ctx.get('judgmentRedactor') as StubRedactor).states).toEqual([])
   })
 
   it('writes a decision for the same script once the ladder is on', async () => {

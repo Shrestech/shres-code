@@ -89,7 +89,7 @@ The gate passes only when the answer's confidence is at or above `confidence` an
 | `ok` | `low-confidence` | The engine answered, and its confidence is below the gate. |
 | `ok` | `thin-margin` | The engine answered, and its top-two margin is below the gate. |
 
-When an ask runs, `ctx.judgmentRedactor` is consulted exactly once and its return value is the state the engine receives; with no hook composed the composed state goes out unchanged. Neither the hook nor the engine's toggle is read while the ladder is off, so an off deployment makes no ask and redacts nothing. The state is numbers-first: the tool-outcome counts, the goal epoch's distinct failed approaches, the identical-call chain in force, the completed steps since the progress floor, and one `ok`|`FAIL` line per trailing call. It composes no excerpt of any kind — neither the error nor the argument excerpt the Lead's report carries — and no Config switch turns either on, because those excerpts are workspace-derived text. A decision carries `confidence` and `margin` only where an engine answered, which the `./invariant` companion asserts.
+The ladder passes the numbers-first state to `ctx.judgment` unredacted and never reads `ctx.judgmentRedactor`: when a deployment mounts that hook, consulting it exactly once per ask is the provider's obligation ([judgment README](../../llm/judgment/README.md#redaction-hook)). The engine's toggle is not read while the ladder is off, so an off deployment makes no ask. The state is numbers-first: the tool-outcome counts, the goal epoch's distinct failed approaches, the identical-call chain in force, the completed steps since the progress floor, and one `ok`|`FAIL` line per trailing call. It composes no excerpt of any kind — neither the error nor the argument excerpt the Lead's report carries — and no Config switch turns either on, because those excerpts are workspace-derived text. A decision carries `confidence` and `margin` only where an engine answered, which the `./invariant` companion asserts.
 
 ## Anchors
 
@@ -115,7 +115,7 @@ The report is appended to the Lead's conversation, so it grows that prefix appen
 
 #### What the model sees
 
-One request to the judgment engine per continue resolution: `state` — the numbers-first worker state, after `ctx.judgmentRedactor` has run when a deployment mounts one — plus the question's own text: the configured `progressInstructions` and its `continue` and `needs-help` options. The engine answers the highest-probability option with a probability per option and a confidence figure. No conversation model sees this text, and nothing the ask returns reaches the worker's conversation or the Lead's.
+One request to the judgment engine per continue resolution: `state` — the numbers-first worker state, which this package passes unredacted and the provider passes through `ctx.judgmentRedactor` when a deployment mounts one ([judgment README](../../llm/judgment/README.md#redaction-hook)) — plus the question's own text: the configured `progressInstructions` and its `continue` and `needs-help` options. The engine answers the highest-probability option with a probability per option and a confidence figure. No conversation model sees this text, and nothing the ask returns reaches the worker's conversation or the Lead's.
 
 #### Token effect
 

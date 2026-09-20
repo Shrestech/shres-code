@@ -8,11 +8,15 @@
  * providers own transport, credential resolution, and wire validation, so a
  * distilled on-box engine is a composition swap behind the same contract.
  *
- * One provider registers per context as `ctx.judgment`. An optional
- * `ctx.judgmentRedactor` is consulted once per ask, before the state leaves the
- * process. Mounting an engine also installs the Definition-owned `judgment`
- * settings section: the deployment's on/off switch, which consumers read live
- * and treat as an absent engine when it is off.
+ * One provider registers per context as `ctx.judgment`. The optional
+ * `ctx.judgmentRedactor` egress hook has one home, the provider: every
+ * provider consults it exactly once per ask, before the state is serialized,
+ * and sends what it returns; a consumer passes its composed state unredacted
+ * and does not consult the hook, so a composed redactor runs exactly once per
+ * ask regardless of how many consumers exist. Mounting an engine also installs
+ * the Definition-owned `judgment` settings section: the deployment's on/off
+ * switch, which consumers read live and treat as an absent engine when it is
+ * off.
  *
  * @module @shres-code/shres-code-judgment
  */

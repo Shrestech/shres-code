@@ -366,8 +366,10 @@ export function apply(ctx: Context, config: WorkerEscalationConfig): () => void 
 
   /**
    * Consult the judgment engine for one firing trigger: compose the ask's
-   * numbers-first state, apply the deployment's egress hook once, ask the
-   * two-option progress question, and judge the answer against both gates.
+   * numbers-first state, ask the two-option progress question, and judge the
+   * answer against both gates. The state goes to `ctx.judgment.ask()`
+   * unredacted: consulting `ctx.judgmentRedactor` is the provider's obligation,
+   * so this ladder never reads the hook.
    *
    * Every failure resolves to the Stage 0 continue carrying its own class: no
    * engine composed, a disabled engine, an engine that threw, an answer this
@@ -390,12 +392,10 @@ export function apply(ctx: Context, config: WorkerEscalationConfig): () => void 
     const engine = ctx.get('judgment')
     if (engine === undefined) return degraded('absent', 'engine-absent')
     if (!judgmentEnabled(engine.settings)) return degraded('disabled', 'engine-disabled')
-    const state = composeProgressState(session, current, anchorSeq)
-    const redactor = ctx.get('judgmentRedactor')
     let result: JudgmentResult
     try {
       result = await engine.ask({
-        state: redactor === undefined ? state : await redactor.redactState(state),
+        state: composeProgressState(session, current, anchorSeq),
         questions: [progressQuestion(current)],
         tier: current.judgmentTier,
         signal: lifetime.signal,

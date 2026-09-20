@@ -175,10 +175,11 @@ export interface JudgmentEngine {
 }
 
 /**
- * Optional egress hook consulted once per ask, before the state leaves the
- * process. A deployment that must not send identifiable text to a judgment
- * engine mounts one; the seam provides the hook, and each provider decides
- * whether it forwards the state through it.
+ * Optional egress hook with one home, the provider. A deployment that must not
+ * send identifiable text to a judgment engine mounts one; every provider
+ * consults it exactly once per ask, before the state is serialized, and sends
+ * what it returns. A consumer passes its state to `ctx.judgment.ask()`
+ * unredacted and never consults the hook.
  */
 export interface JudgmentRedactor {
   /**

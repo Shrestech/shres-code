@@ -186,14 +186,15 @@ interface JudgmentEngine {
 
 ## Redaction hook
 
-`ctx.judgmentRedactor` is optional and interface-typed. When a deployment mounts one, a provider that supports it consults it once per ask, before the request leaves the process, and sends what it returns. It is the seam's single egress control over the state text.
+`ctx.judgmentRedactor` is optional and interface-typed, and it has one home: the provider. When a deployment mounts one, every provider consults it exactly once per ask, before the state is serialized, and sends what it returns; a consumer passes its composed state to `ctx.judgment.ask()` unredacted and does not consult the hook, so a composed redactor runs exactly once per ask however many consumers exist. It is the seam's single egress control over the state text.
 
 ```ts type-equiv
 /**
- * Optional egress hook consulted once per ask, before the state leaves the
- * process. A deployment that must not send identifiable text to a judgment
- * engine mounts one; the seam provides the hook, and each provider decides
- * whether it forwards the state through it.
+ * Optional egress hook with one home, the provider. A deployment that must not
+ * send identifiable text to a judgment engine mounts one; every provider
+ * consults it exactly once per ask, before the state is serialized, and sends
+ * what it returns. A consumer passes its state to `ctx.judgment.ask()`
+ * unredacted and never consults the hook.
  */
 interface JudgmentRedactor {
   /**

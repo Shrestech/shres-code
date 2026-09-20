@@ -6,8 +6,9 @@
  * The judgment engine is an external service to this package, so the suites
  * substitute a deterministic one: every ask is retained, and each test scripts
  * the answer, the answer's kind, or a failure. No clock, randomness, or network
- * reaches an answer. The redactor double marks every state it is given, so a
- * test can show that what the engine received is what the hook returned.
+ * reaches an answer. The redactor double marks and retains every state it is
+ * given, so a test can show that the ladder never consults it and that the
+ * engine receives the composed state unmarked.
  *
  * @module @shres-code/shres-code-worker-escalation/tests/fake-judgment
  */
@@ -111,8 +112,8 @@ export class StubRedactor extends Service {
   }
 
   /**
-   * Replace one state the engine is about to receive.
-   * @param state - the state an ask is about to send.
+   * Replace one state a provider is about to send.
+   * @param state - the state a provider handed the hook.
    * @returns the state behind the redaction mark.
    */
   redactState(state: string): string {
