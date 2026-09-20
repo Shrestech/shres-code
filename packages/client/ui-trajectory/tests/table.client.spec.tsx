@@ -3,7 +3,10 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
 import { TrajectoryTable } from '../src/client/TrajectoryTable.tsx'
+import { en } from '../src/client/locales.ts'
+import type { TrajectoryCellProps } from '../src/client/trajectory-record.ts'
 import type { TrajectoryTurnModel } from '../src/client/layout.ts'
 
 afterEach(() => {
@@ -1080,5 +1083,189 @@ describe('TrajectoryTable', () => {
 
     expect(screen.getByRole('row', { name: /TOOL/ }).getAttribute('aria-selected')).toBe('false')
     expect(onInspectApplied).not.toHaveBeenCalled()
+  })
+
+  const ROUTING_FOLD_PROPS = { ...FOLD_PROPS, t: makeTranslate(en) }
+
+  function routingCell(overrides: Partial<TrajectoryCellProps>): TrajectoryCellProps {
+    return { index: 1, kind: 'routing', text: '', timeSeconds: 0, ...overrides }
+  }
+
+  const ROUTING_TURNS: readonly TrajectoryTurnModel[] = [{
+    turn: 1,
+    groups: [
+      {
+        title: 'Message',
+        cells: [{ index: 1, kind: 'user', text: 'go', timeSeconds: 0 }],
+      },
+      {
+        title: 'Step 1',
+        cells: [
+          routingCell({
+            index: 2,
+            sourceSeq: 6,
+            startedAt: 6,
+            text: 'downgraded · gate-passed',
+            routing: {
+              outcome: 'downgraded',
+              reason: 'gate-passed',
+              confidence: 0.9,
+              selection: {
+                candidateId: 'flash',
+                provider: 'deepseek-official',
+                model: 'deepseek-v4-flash',
+              },
+              streak: { kind: 'entered', turn: 3 },
+              quiet: false,
+            },
+          }),
+          {
+            index: 3,
+            kind: 'message',
+            text: '',
+            outputDetail: 'ROUTED_OK',
+            timeSeconds: 1,
+          },
+          routingCell({
+            index: 4,
+            sourceSeq: 9,
+            startedAt: 9,
+            text: 'kept-strong · thin-margin',
+            routing: {
+              outcome: 'kept-strong',
+              reason: 'thin-margin',
+              confidence: 0.5,
+              quiet: true,
+            },
+          }),
+          {
+            index: 5,
+            kind: 'message',
+            text: '',
+            outputDetail: 'STRONG_AGAIN',
+            timeSeconds: 1,
+          },
+          routingCell({
+            index: 6,
+            sourceSeq: 12,
+            startedAt: 12,
+            text: 'kept-strong · escalated',
+            routing: {
+              outcome: 'kept-strong',
+              reason: 'escalated',
+              streak: { kind: 'exited', reason: 'escalated' },
+              quiet: false,
+            },
+          }),
+        ],
+      },
+    ],
+  }]
+
+  it('renders a decision with its outcome, reason, confidence, route, and entering streak', () => {
+    render(<TrajectoryTable turns={ROUTING_TURNS} {...ROUTING_FOLD_PROPS} />)
+
+    const row = screen.getByRole('row', { name: /ROUTING, downgraded · gate passed/ })
+    expect(row.getAttribute('data-kind')).toBe('routing')
+    expect(row.querySelector('[data-routing="decision"]')).toBeTruthy()
+    expect(screen.getByText('downgraded · gate passed')).toBeTruthy()
+    expect(screen.getByText('confidence 0.90')).toBeTruthy()
+    expect(screen.getByText('deepseek-official/deepseek-v4-flash')).toBeTruthy()
+    expect(screen.getByText('streak entered · turn 3')).toBeTruthy()
+    expect(screen.queryByText('Routed')).toBeNull()
+  })
+
+  it('collapses a kept-strong decision that changed nothing to the quiet marker', () => {
+    render(<TrajectoryTable turns={ROUTING_TURNS} {...ROUTING_FOLD_PROPS} />)
+
+    const quiet = screen.getByRole('row', { name: /ROUTING, kept strong · thin top-two margin/ })
+    expect(quiet.querySelector('[data-routing="quiet"]')).toBeTruthy()
+    expect(screen.getByText('kept strong · thin top-two margin')).toBeTruthy()
+    // The distinction from a decision row: no route, confidence, or streak chip,
+    // even though the quiet decision's judgment answered with a confidence.
+    expect(quiet.querySelector('[data-routing-confidence]')).toBeNull()
+    expect(quiet.querySelector('[data-routing-selection]')).toBeNull()
+    expect(quiet.querySelector('[data-routing-streak]')).toBeNull()
+    expect(screen.queryByText('confidence 0.50')).toBeNull()
+    expect(screen.queryByText('Routed')).toBeNull()
+  })
+
+  it('renders the streak exit a decision caused', () => {
+    render(<TrajectoryTable turns={ROUTING_TURNS} {...ROUTING_FOLD_PROPS} />)
+
+    const row = screen.getByRole('row', { name: /ROUTING, kept strong · escalated to the stronger model/ })
+    expect(row.querySelector('[data-routing="decision"]')).toBeTruthy()
+    expect(screen.getByText('kept strong · escalated to the stronger model')).toBeTruthy()
+    expect(screen.getByText('streak ended · escalated to the stronger model')).toBeTruthy()
+  })
+
+  it('keeps a routing row outside its turn collapse, which folds content only', () => {
+    render(
+      <TrajectoryTable
+        turns={ROUTING_TURNS}
+        {...ROUTING_FOLD_PROPS}
+        collapsedTurns={new Set([1])}
+      />,
+    )
+
+    expect(screen.getByRole('row', { name: /ROUTING, downgraded · gate passed/ })).toBeTruthy()
+    expect(screen.getByRole('row', { name: /ROUTING, kept strong · thin top-two margin/ })).toBeTruthy()
+    expect(screen.getByRole('row', { name: /ROUTING, kept strong · escalated/ })).toBeTruthy()
+    expect(screen.queryByText('ROUTED_OK')).toBeNull()
+    expect(screen.queryByText('STRONG_AGAIN')).toBeNull()
+  })
+
+  it('carries the effective route on the request row and badges the routed one', () => {
+    render(
+      <TrajectoryTable
+        turns={TURNS}
+        requestNumbers={[{
+          seq: 2,
+          turn: 1,
+          step: 1,
+          group: 'Step 1',
+          number: 1,
+          route: { provider: 'deepseek-official', model: 'deepseek-v4-flash', routed: true },
+        }]}
+        {...ROUTING_FOLD_PROPS}
+      />,
+    )
+
+    const row = screen.getByRole('button', { name: 'Request #1' }).closest('tr')
+    expect(row?.querySelector('[data-request-route="routed"]')).toBeTruthy()
+    expect(screen.getByText('deepseek-official/deepseek-v4-flash')).toBeTruthy()
+    expect(screen.getByText('Routed')).toBeTruthy()
+  })
+
+  it('leaves the badge off a request row still on the session selection', () => {
+    render(
+      <TrajectoryTable
+        turns={TURNS}
+        requestNumbers={[{
+          seq: 2,
+          turn: 1,
+          step: 1,
+          group: 'Step 1',
+          number: 1,
+          route: { provider: 'deepseek-official', model: 'deepseek-v4.1', routed: false },
+        }]}
+        {...ROUTING_FOLD_PROPS}
+      />,
+    )
+
+    const route = screen.getByText('deepseek-official/deepseek-v4.1').closest('[data-request-route]')
+    expect(route?.getAttribute('data-request-route')).toBe('selection')
+    expect(screen.queryByText('Routed')).toBeNull()
+  })
+
+  it('opens a routing row own facts without a tool schema section', () => {
+    render(<TrajectoryTable turns={ROUTING_TURNS} {...ROUTING_FOLD_PROPS} />)
+
+    fireEvent.keyDown(screen.getByRole('row', { name: /ROUTING, downgraded/ }), { key: 'Enter' })
+
+    const details = screen.getByRole('complementary', { name: 'Event details' })
+    expect(details.textContent).toContain('Routing')
+    expect(details.textContent).toContain('confidence 0.90')
+    expect(screen.queryByText('Schema')).toBeNull()
   })
 })

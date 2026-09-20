@@ -13,7 +13,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { createUserMessage } from '@shres-code/shres-code-llm'
+import { ReasoningEffortId, createUserMessage } from '@shres-code/shres-code-llm'
 import type { LlmFailure } from '@shres-code/shres-code-llm'
 import { Session, SessionId } from '@shres-code/shres-code-session'
 import type { TurnEndReason } from '@shres-code/shres-code-session'
@@ -155,6 +155,23 @@ describe('stickyState entry', () => {
       candidate: CHEAP,
       entryBase: recordedBase,
     })
+  })
+
+  it('carries the header\u2019s reasoning effort into a derived entry base', () => {
+    const session = scripted('sticky-entry-effort')
+    session.append('request/header', {
+      header: {
+        config: {
+          provider: STRONG_BASE.provider,
+          model: STRONG_BASE.model,
+          reasoningEffort: ReasoningEffortId('high'),
+        },
+      },
+      reason: 'initial',
+    })
+    session.append('model-routing/decision', decision({ active: true, turnsElapsed: 0, enteredTurn: 1 }))
+
+    expect(stickyState(session.events, CONFIG).entryBase).toEqual({ ...STRONG_BASE, reasoningEffort: 'high' })
   })
 
   it('takes the turn in force when the logged decision names none', () => {

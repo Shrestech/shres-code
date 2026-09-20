@@ -11,6 +11,7 @@ import { registerTrajectoryMessageDefinitions } from '../src/client/trajectory-m
 import { registerTrajectoryRequestHeaderDefinition } from '../src/client/trajectory-request-header-definition.ts'
 import { registerTrajectoryShieldDefinition } from '../src/client/trajectory-shield-definition.ts'
 import { registerTrajectoryJSpaceDefinition } from '../src/client/trajectory-jspace-definition.ts'
+import { registerTrajectoryRoutingDefinition } from '../src/client/trajectory-routing-definition.ts'
 import { trajectoryViewDefinition } from '../src/client/trajectory-snapshot-builder.ts'
 import { registerTrajectoryToolDefinition } from '../src/client/trajectory-tool-definition.ts'
 import { deriveTrajectoryLayout } from '../src/client/layout.ts'
@@ -31,6 +32,7 @@ registerTrajectoryAssistantDefinition(registrationContext)
 registerTrajectoryToolDefinition(registrationContext)
 registerTrajectoryShieldDefinition(registrationContext)
 registerTrajectoryJSpaceDefinition(registrationContext)
+registerTrajectoryRoutingDefinition(registrationContext)
 registerTrajectoryCompactionDefinitions(registrationContext)
 
 class TestEventDefinitions {
@@ -81,6 +83,24 @@ function snapshot(value: ConversationNodeAssembler): TrajectorySnapshot {
   const current = value.snapshot('trajectory') as TrajectorySnapshot | undefined
   if (current === undefined) throw new Error('trajectory view was not registered')
   return current
+}
+
+function routingData(overrides: Record<string, unknown> = {}) {
+  return {
+    outcome: 'downgraded',
+    reason: 'gate-passed',
+    stateHash: 'd0157f83',
+    stateSeqs: [4],
+    selection: { candidateId: 'flash', provider: 'p', model: 'cheap' },
+    route: { choice: 'flash', confidence: 0.9, probabilities: { flash: 0.9 } },
+    sticky: {
+      active: true,
+      turnsElapsed: 0,
+      enteredTurn: 1,
+      entryBase: { provider: 'p', model: 'strong' },
+    },
+    ...overrides,
+  }
 }
 
 function assistantMessage(id: string, text: string) {
@@ -380,6 +400,77 @@ describe('Trajectory conversation Definitions', () => {
     }).flatMap(turn => turn.groups.flatMap(group => group.cells))
     expect(cells.find(cell => cell.callId === 'c1')?.shield?.verdict).toBe('deny')
     expect(cells.find(cell => cell.callId === 'c2')?.shield).toBeUndefined()
+  })
+
+  it('folds model-routing/decision into routing and not eventNodes', () => {
+    const current = snapshot(assembler([
+      at(1, 'turn/start', { turn: 1 }),
+      at(2, 'step/start', { turn: 1, step: 1 }),
+      at(3, 'model-routing/decision', routingData()),
+      at(4, 'request/header', {
+        reason: 'initial',
+        header: { config: { provider: 'p', model: 'cheap' }, system: 's', tools: [] },
+      }),
+      at(5, 'step/end', { turn: 1, step: 1 }),
+    ]))
+
+    expect(current.routing).toMatchObject([{
+      seq: 3,
+      time: 1_700_000_000_003,
+      turn: 1,
+      step: 1,
+      outcome: 'downgraded',
+      reason: 'gate-passed',
+      sticky: { active: true, turnsElapsed: 0, enteredTurn: 1 },
+    }])
+    expect(current.eventNodes.map(node => node.kind)).not.toContain('routing')
+
+    const definition = DEFINITIONS.find(entry => entry.kind === 'trajectory-routing')
+    expect(definition?.match({ type: 'turn/start', data: { turn: 1 } } as never)).toBeNull()
+    expect(() => definition?.start(
+      {} as never,
+      { event: { type: 'turn/start', data: { turn: 1 } } } as never,
+      {} as never,
+    )).toThrow('trajectory-routing-decision start requires model-routing/decision')
+
+    const data = { get: () => undefined }
+    const step = { turn: 2, step: 3, start: undefined, end: undefined, status: 'open' as const, data }
+    const turn = {
+      turn: 2, start: undefined, end: undefined, status: 'open' as const, steps: [step], data,
+    }
+    const decisionEvent = {
+      type: 'model-routing/decision',
+      seq: 8,
+      time: 88,
+      data: routingData(),
+    }
+    expect(definition?.start(
+      {} as never,
+      { event: decisionEvent, location: { kind: 'step', turn, step } } as never,
+      {} as never,
+    )).toMatchObject({ seq: 8, time: 88, turn: 2, step: 3, outcome: 'downgraded' })
+    expect(definition?.start(
+      {} as never,
+      { event: decisionEvent, location: { kind: 'session' } } as never,
+      {} as never,
+    )).toEqual({ ...routingData(), seq: 8, time: 88 })
+    expect(definition?.update?.(
+      { state: { seq: 8 } } as never,
+      { event: decisionEvent } as never,
+    )).toEqual({ seq: 8 })
+    expect(definition?.buildViewNode?.({
+      key: 'k', kind: 'trajectory-routing', id: '8', matches: [],
+      start: undefined, state: undefined, current: new Map(),
+    })).toBeNull()
+    expect(definition?.buildViewNode?.({
+      key: 'k', kind: 'trajectory-routing', id: '8', matches: [],
+      start: { event: decisionEvent } as never, state: { seq: 8, time: 88 }, current: new Map(),
+    })).toMatchObject({
+      key: 'k',
+      target: 'trajectory',
+      anchorSeq: 8,
+      data: { kind: 'routing', decision: { seq: 8, time: 88 } },
+    })
   })
 
   it('folds jspace/card and jspace/closed into jspace and not eventNodes', () => {

@@ -13,21 +13,36 @@ import css from './RoutingChip.module.css'
 export type RoutingChipProps =
   PropsRuntime<'conversation.input.modelRouting'> & InjectFace<RoutingChipInjected> & PropsLocale<'modelRouting'>
 
+/** The chip's two gestures; each carries its own failure label. */
+type ChipAction = 'mode' | 'restore'
+
+/** English failure labels, one per gesture (error-surface policy: not localized). */
+const FAILURE_LABEL: Record<ChipAction, string> = {
+  mode: 'failed to switch model routing',
+  restore: 'failed to restore the strong model',
+}
+
 /**
  * Model-routing status over the host-computed `modelRouting` projection. The
  * seat is a toggle, so both modes render: while routing is off the button is the
  * `Auto` affordance that executes /route on; while it is on the button reads
- * `auto → <model> (<confidence>)` from the last logged decision, carries the
- * held streak's elapsed turns and the consider-stronger hint beside it, and
- * executes /route off. Nothing here holds routing state — the projection is the
- * only source, and a decision the host has not logged yet is not predicted.
+ * `auto` and executes /route off. The chip states the routing mode alone — it
+ * names no routed model, no confidence, no streak position, and no model hint,
+ * because those render in the trajectory and the full session log. A session
+ * whose last decision reads `candidate-equals-base` runs the routing target as
+ * its own selection, so routing is on and can change nothing: the chip reports
+ * that idle state and offers the one-click restore of the selection to the route
+ * the last streak was entered on, submitted through the same model-selection
+ * path both selection surfaces use, with its prefix re-prefill cost stated.
+ * Nothing here holds routing state — the projection is the only source, and a
+ * decision the host has not logged yet is not predicted.
  * @param props - runtime share, injected face, and the locale seat.
  * @returns the chip, or null while routing is unavailable for this session.
  */
-export function RoutingChip({ useProjection, locked, available, setRouting, t }: RoutingChipProps) {
+export function RoutingChip({ useProjection, locked, available, setRouting, restoreStrong, t }: RoutingChipProps) {
   const routing = useProjection('modelRouting')
-  const [flipping, setFlipping] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [pending, setPending] = useState<ChipAction | null>(null)
+  const [failure, setFailure] = useState<{ action: ChipAction; detail: string } | null>(null)
   const aliveRef = useRef(true)
 
   useEffect(() => {
@@ -40,25 +55,23 @@ export function RoutingChip({ useProjection, locked, available, setRouting, t }:
   if (!available || routing === undefined) return null
 
   const on = routing.active
-  const last = routing.last
-  const sticky = routing.sticky
-  const selection = last?.selection
-  const confidence = last?.confidence
-  const stickyTurn = sticky !== undefined && sticky.active ? sticky.turnsElapsed : null
-  const hint = last?.hint === 'consider-stronger' ? t('hint.considerStronger') : null
+  // Idle is the dead end the projection names: routing is on and every decision
+  // resolves the candidate the session already runs, so no turn can downgrade.
+  const idle = on && routing.last?.reason === 'candidate-equals-base'
+  const strong = idle ? routing.lastStrong : undefined
 
-  const toggle = (): void => {
-    // No flipping/locked guard: both disable the button, so no click arrives.
-    setFlipping(true)
-    setError(null)
-    void setRouting(!on).then((failure) => {
+  const run = (action: ChipAction, request: () => Promise<string | null>): void => {
+    // No pending/locked guard: both disable the controls, so no click arrives.
+    setPending(action)
+    setFailure(null)
+    void request().then((detail) => {
       if (!aliveRef.current) return
-      setFlipping(false)
-      setError(failure)
+      setPending(null)
+      if (detail !== null) setFailure({ action, detail })
     }, (reason: unknown) => {
       if (!aliveRef.current) return
-      setFlipping(false)
-      setError(reason instanceof Error ? reason.message : String(reason))
+      setPending(null)
+      setFailure({ action, detail: reason instanceof Error ? reason.message : String(reason) })
     })
   }
 
@@ -69,24 +82,33 @@ export function RoutingChip({ useProjection, locked, available, setRouting, t }:
         className={clsx(css.chip, on ? css.chipOn : css.chipOff)}
         aria-label={on ? t('chip.on.aria') : t('chip.off.aria')}
         title={on ? t('chip.on.title') : t('chip.off.title')}
-        aria-busy={flipping}
-        disabled={locked || flipping}
-        onClick={toggle}
+        aria-busy={pending === 'mode'}
+        disabled={locked || pending !== null}
+        onClick={() => { run('mode', () => setRouting(!on)) }}
       >
         {/* Design literal, not copy: the wordmark is Auto off and auto on in every locale. */}
         {on ? 'auto' : 'Auto'}
-        {/* The routed route is a host identity from the projection, not client state. */}
-        {on && selection !== undefined && (
-          <span className={css.route}>
-            {` → ${selection.model}`}
-            {confidence !== undefined && ` (${confidence.toFixed(2)})`}
-          </span>
-        )}
       </button>
-      {on && stickyTurn !== null && <span className={css.sticky}>{t('sticky.turn', { turn: stickyTurn })}</span>}
-      {on && hint !== null && <span className={css.hint}>{hint}</span>}
+      {idle && <span className={css.idle}>{t('idle.warning')}</span>}
+      {strong !== undefined && (
+        <button
+          type="button"
+          className={css.restore}
+          // One string for the tooltip and the accessible name, so the announced
+          // gesture keeps the visible label and still states what it costs.
+          aria-label={t('idle.restore.title')}
+          title={t('idle.restore.title')}
+          aria-busy={pending === 'restore'}
+          disabled={locked || pending !== null}
+          onClick={() => { run('restore', () => restoreStrong(strong)) }}
+        >
+          {t('idle.restore')}
+        </button>
+      )}
       {/* Failure copy stays English (error-surface policy: not localized). */}
-      {error !== null && <span className={css.error} role="status" title={error}>failed to switch model routing</span>}
+      {failure !== null && (
+        <span className={css.error} role="status" title={failure.detail}>{FAILURE_LABEL[failure.action]}</span>
+      )}
     </span>
   )
 }

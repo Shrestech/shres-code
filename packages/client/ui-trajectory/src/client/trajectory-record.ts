@@ -2,6 +2,9 @@
 
 import type { HTMLAttributes } from 'react'
 import type { ConversationPromptSnapshot } from '@shres-code/shres-code-client-runtime/client'
+import type {
+  ModelRoutingBreakReason, ModelRoutingOutcome, ModelRoutingReason, ModelRoutingSelectionView,
+} from '@shres-code/shres-code-model-router/client'
 
 /** Closed set of trajectory record kinds. */
 export type TrajectoryCellKind =
@@ -12,6 +15,7 @@ export type TrajectoryCellKind =
   | 'message'
   | 'tool'
   | 'subtool'
+  | 'routing'
 
 /** Recorded inputs needed to derive assistant TTFT and decode throughput. */
 export interface AssistantMetricDetail {
@@ -45,6 +49,52 @@ export interface TrajectoryJSpaceBadge {
   turn?: number
   /** Enclosing step when the event carried one. */
   step?: number
+}
+
+/** One downgraded streak's transition, as the decision that caused it records it. */
+export type TrajectoryRoutingStreak =
+  | {
+    /** The decision entered a downgraded streak. */
+    readonly kind: 'entered'
+    /** Turn the streak was entered on. */
+    readonly turn: number
+  }
+  | {
+    /** The decision ended a downgraded streak. */
+    readonly kind: 'exited'
+    /** Why the streak ended. */
+    readonly reason: ModelRoutingBreakReason
+  }
+
+/**
+ * Routing facts one `model-routing/decision` renders on its own ledger row.
+ *
+ * A kept-strong decision that ended no streak changed nothing, so it carries no
+ * route, confidence, or streak fact and renders as the quiet marker.
+ */
+export interface TrajectoryRoutingRow {
+  /** What the consult resolved. */
+  readonly outcome: ModelRoutingOutcome
+  /** Why it resolved that way. */
+  readonly reason: ModelRoutingReason
+  /** Confidence of the route answer, when a judgment call produced one. */
+  readonly confidence?: number
+  /** Allowlisted route the decision selected; present on a downgrade only. */
+  readonly selection?: ModelRoutingSelectionView
+  /** Streak transition this decision caused, when it caused one. */
+  readonly streak?: TrajectoryRoutingStreak
+  /** Whether the decision changed nothing and renders as the quiet marker. */
+  readonly quiet: boolean
+}
+
+/** Effective route one request row reports, and whether routing moved it off the selection. */
+export interface TrajectoryRequestRoute {
+  /** Registered provider route the request ran on. */
+  readonly provider: string
+  /** Provider-owned model id the request ran on. */
+  readonly model: string
+  /** Whether the effective route differs from the sticky session selection in force. */
+  readonly routed: boolean
 }
 
 /** Compact Shield verdict painted on a user, context, tool, or subtool row. */
@@ -115,6 +165,8 @@ export interface TrajectoryCellProps extends HTMLAttributes<HTMLDivElement> {
   shield?: TrajectoryShieldBadge
   /** Compact J-Space badge copied onto this existing row. Never creates a row. */
   jspace?: TrajectoryJSpaceBadge
+  /** Routing facts of the decision this ROUTING row renders. */
+  routing?: TrajectoryRoutingRow
   /** Message-only prompt token count. */
   input?: number
   /** Message-only input tokens served from a provider cache. */

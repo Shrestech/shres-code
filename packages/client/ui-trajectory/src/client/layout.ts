@@ -21,6 +21,8 @@ import type {
   TrajectoryJSpaceBadge,
 } from './trajectory-record.ts'
 import { formatElapsedSeconds } from './trajectory-record.ts'
+import type { TrajectoryRoutingDecision } from './trajectory-contract.ts'
+import { trajectoryRoutingRow } from './trajectory-routing.ts'
 
 /** One Message or Step group inside a turn. */
 export interface TrajectoryGroupModel {
@@ -47,6 +49,8 @@ export interface TrajectoryLayoutInput {
   decisions?: readonly TrajectoryShieldMatch[]
   /** Folded J-Space badges; attached onto existing rows only. */
   jspace?: readonly TrajectoryJSpaceBadge[]
+  /** Folded routing decisions; each renders as its own row at its seq. */
+  routing?: readonly TrajectoryRoutingDecision[]
 }
 
 /** Decision fields used to match an existing user/context/tool cell. */
@@ -123,6 +127,11 @@ type OrderedLayoutEntry =
     seq: number
     request: AssistantRequestView
   }
+  | {
+    kind: 'routing'
+    seq: number
+    decision: TrajectoryRoutingDecision
+  }
 
 function layoutEntryOrder(entry: OrderedLayoutEntry): number {
   return entry.kind === 'system' && entry.change.kind === 'initial'
@@ -162,7 +171,7 @@ function inputCellDetail(node: InputNode): Pick<
 export function deriveTrajectoryLayout(input: TrajectoryLayoutInput): readonly TrajectoryTurnModel[] {
   const {
     nodes, eventLocations, partial, runningCalls, requests = [], callSchemas,
-    decisions = [], jspace = [],
+    decisions = [], jspace = [], routing = [],
   } = input
   const resultByCall = indexResults(nodes)
   const callById = new Map<string, ToolCallBlock>(resultByCall)
@@ -276,6 +285,11 @@ export function deriveTrajectoryLayout(input: TrajectoryLayoutInput): readonly T
         seq: request.startSeq,
         request,
       })),
+    ...routing.map(decision => ({
+      kind: 'routing' as const,
+      seq: decision.seq,
+      decision,
+    })),
   ].sort((left, right) => layoutEntryOrder(left) - layoutEntryOrder(right))
 
   for (const entry of entries) {
@@ -373,6 +387,30 @@ export function deriveTrajectoryLayout(input: TrajectoryLayoutInput): readonly T
       if (request.turn === null) standaloneCompactions.push(compaction)
       else bucket(request.turn).groups.push(...compaction.groups)
       prevAbsTime = finiteTime(request.completedAt) ?? finiteTime(request.startedAt) ?? prevAbsTime
+      continue
+    }
+    if (entry.kind === 'routing') {
+      const { decision } = entry
+      // A decision outside any turn still belongs to the turn that consumes it:
+      // the consult runs while assembling that turn's first request.
+      const turn = decision.turn ?? enclosingPromptTurn(nodes, decision.seq, partial)
+      const laid: LaidCell = {
+        absTime: finiteTime(decision.time),
+        cell: {
+          index: ++index,
+          kind: 'routing',
+          // The logged ids, not display copy: the row's rendered line is
+          // translated at its consumer, and search and the timeline read these.
+          text: `${decision.outcome} · ${decision.reason}`,
+          sourceSeq: decision.seq,
+          routing: trajectoryRoutingRow(decision),
+          timeSeconds: 0,
+          startedAt: finiteTime(decision.time),
+        },
+      }
+      if (decision.step === undefined) pushMessage(turn, laid)
+      else pushStep(turn, decision.step, [laid])
+      prevAbsTime = finiteTime(decision.time) ?? prevAbsTime
       continue
     }
     const { node, nodeIndex: i } = entry

@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto'
 import { mkdir, open, realpath, stat } from 'node:fs/promises'
 import { dirname, isAbsolute, relative, resolve } from 'node:path'
 import type { Context } from '@shres-code/cordis'
-import { installModelSelection } from '@shres-code/shres-code-agent'
+import { installModelSelection, selectionInForce } from '@shres-code/shres-code-agent'
 import type { Agent, ModelSelection, ModelSelectionRef, AgentOptions, AgentStatus } from '@shres-code/shres-code-agent'
 import type {} from '@shres-code/shres-code-agent-presets/types'
 import { AttachmentError } from '@shres-code/shres-code-attachment'
@@ -1222,6 +1222,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
    * another) reads any default saved after it was created. There is no create-time
    * per-session override tier on this wire — if one returns (a create-options
    * contribution), it must fold in between the selection and the log.
+   *
+   * The logged tier `selectionInForce` returns is the session's own selection,
+   * so a composed router reports the route a held downgrade descends beneath
+   * rather than the candidate it rewrote the header to.
    */
   function selectionFor(agent: Agent): WebModelSelectionRef {
     const owned = ctx.get('agentDefaultModel')
@@ -1232,17 +1236,9 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     const selection: WebModelSelectionRef = {
       get current(): ModelSelection {
         if (picked !== undefined) return picked
-        // Incrementally folded by the session, so a per-step read costs
-        // O(new events) rather than a rescan.
-        const logged = agent.session.requestHeader()?.config
-        if (logged === undefined) return defaults.defaultModelSelection()
-        return {
-          provider: logged.provider,
-          model: logged.model,
-          ...logged.reasoningEffort === undefined
-            ? {}
-            : { reasoningEffort: logged.reasoningEffort },
-        }
+        // Incrementally folded by the session, so the logged tier costs O(new
+        // events) rather than a rescan.
+        return selectionInForce(agent) ?? defaults.defaultModelSelection()
       },
       set current(next: ModelSelection) {
         picked = next

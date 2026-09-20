@@ -6,8 +6,9 @@ export const en = {
   'chip.off.title': 'Automatic model routing off — click to turn on (/route on)',
   'chip.on.aria': 'Automatic model routing on, press to turn off',
   'chip.on.title': 'Automatic model routing on — click to turn off (/route off)',
-  'sticky.turn': 'turn {turn}',
-  'hint.considerStronger': 'consider a stronger model',
+  'idle.warning': 'Auto routing is idle — this session already runs the routing target',
+  'idle.restore': 'Restore strong model',
+  'idle.restore.title': 'Restore strong model — switch back to the last strong route; one prefix re-prefill on the next request (cache miss)',
 } satisfies Record<string, string>
 
 /** The RoutingKey union. */

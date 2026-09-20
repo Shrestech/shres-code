@@ -4,6 +4,7 @@ import SystemPrompt from '@shres-code/shres-code-system-prompt'
 import {
   agentEvents,
   installModelSelection,
+  selectionInForce,
   type Agent,
   type ModelSelection,
   type ModelSelectionRef,
@@ -62,10 +63,24 @@ describe('installModelSelection()', () => {
 })
 /** The consult a composed router satisfies; this suite drives it directly. */
 class StubRouting extends Service {
-  readonly calls: Array<{ turn: number; step: number; base: { provider: string; model: string } }> = []
+  readonly calls: Array<{
+    turn: number
+    step: number
+    base: { provider: string; model: string; reasoningEffort?: ReasoningEffortId }
+  }> = []
+
+  /** Route the sticky selection reports; `undefined` stands for a strong state. */
+  sticky: ModelSelection | undefined
 
   constructor(ctx: Context, private readonly answer: (base: ModelSelection) => ModelSelection | undefined) {
     super(ctx, 'modelRouting')
+  }
+
+  /**
+   * @returns the scripted sticky selection.
+   */
+  stickySelection(): ModelSelection | undefined {
+    return this.sticky
   }
 
   resolveRequest(
@@ -75,7 +90,15 @@ class StubRouting extends Service {
     base: ModelSelection,
     _signal: AbortSignal,
   ): Promise<ModelSelection | undefined> {
-    this.calls.push({ turn, step, base: { provider: base.provider, model: base.model } })
+    this.calls.push({
+      turn,
+      step,
+      base: {
+        provider: base.provider,
+        model: base.model,
+        ...base.reasoningEffort === undefined ? {} : { reasoningEffort: base.reasoningEffort },
+      },
+    })
     return Promise.resolve(this.answer(base))
   }
 }
@@ -148,6 +171,87 @@ describe('installModelSelection() with a composed router', () => {
       'agent/request', { turn: 1, step: 0, signal },
       () => Promise.resolve({ provider: 'persisted', model: 'p1', temperature: 0.1 }),
     )).resolves.toEqual({ provider: 'cheap', model: 'p1', temperature: 0.1 })
+    await ctx.fiber.dispose()
+  })
+
+  it('carries an effort that reached the request without an assembly through to the consult', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SystemPrompt)
+    const selection: ModelSelectionRef = { current: undefined, assembled: undefined }
+    installModelSelection(ctx, selection)
+    const agent = {} as Agent
+    const signal = new AbortController().signal
+    await ctx.plugin(StubRouting, base => ({ provider: 'cheap', model: base.model }))
+
+    await ctx.systemPrompt.assemble()
+    // The manual route the router is handed is the resolved config itself, its
+    // effort included: an effort the request carried is what the gate compares
+    // and what a held streak records as its entry base.
+    await expect(agentEvents(ctx, agent).waterfall(
+      'agent/request', { turn: 1, step: 0, signal },
+      () => Promise.resolve({
+        provider: 'persisted',
+        model: 'p1',
+        reasoningEffort: ReasoningEffortId('max'),
+        temperature: 0.1,
+      }),
+    )).resolves.toEqual({ provider: 'cheap', model: 'p1', temperature: 0.1 })
+    const routed = ctx.get('modelRouting') as unknown as StubRouting
+    expect(routed.calls).toEqual([{
+      turn: 1,
+      step: 0,
+      base: { provider: 'persisted', model: 'p1', reasoningEffort: ReasoningEffortId('max') },
+    }])
+    await ctx.fiber.dispose()
+  })
+})
+
+describe('selectionInForce()', () => {
+  /**
+   * The Agent surface this suite scripts: a context to reach the routing
+   * consult through, and the session header the getter falls back to.
+   * @param ctx - the context the agent reads services from.
+   * @param header - the session's latest request header, when one is logged.
+   * @returns the minimal Agent.
+   */
+  function agentFor(ctx: Context, header?: { config: ModelSelection }): Agent {
+    return {
+      id: 'selection-in-force',
+      ctx,
+      session: { requestHeader: () => header },
+    } as unknown as Agent
+  }
+
+  it('reports the logged selection, with its effort, when no router is composed', async () => {
+    const ctx = new Context()
+
+    // Nothing logged yet: the caller's own default is the only thing left.
+    expect(selectionInForce(agentFor(ctx))).toBeUndefined()
+    expect(selectionInForce(agentFor(ctx, { config: { provider: 'alpha', model: 'a1' } })))
+      .toEqual({ provider: 'alpha', model: 'a1' })
+    expect(selectionInForce(agentFor(ctx, {
+      config: { provider: 'alpha', model: 'a1', reasoningEffort: ReasoningEffortId('high') },
+    }))).toEqual({ provider: 'alpha', model: 'a1', reasoningEffort: 'high' })
+    await ctx.fiber.dispose()
+  })
+
+  it('reports the held streak’s entry route over the routed header', async () => {
+    const ctx = new Context()
+    await ctx.plugin(StubRouting, () => undefined)
+    const routing = ctx.get('modelRouting') as unknown as StubRouting
+    // The header a routed turn consumed: routing rewrote it to the candidate.
+    const agent = agentFor(ctx, { config: { provider: 'cheap-provider', model: 'cheap-model' } })
+
+    // Strong: nothing overrides the header, which is the manual route itself.
+    expect(selectionInForce(agent)).toEqual({ provider: 'cheap-provider', model: 'cheap-model' })
+
+    // Held: the session stays pointed at the route the streak was entered on.
+    routing.sticky = {
+      provider: 'strong-provider',
+      model: 'strong-model',
+      reasoningEffort: ReasoningEffortId('high'),
+    }
+    expect(selectionInForce(agent)).toEqual(routing.sticky)
     await ctx.fiber.dispose()
   })
 })

@@ -112,7 +112,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'selectionFor(agent: Agent): LiveModelSelectionRef',
-        description: 'Install or return the session-local model selection that prompt assembly snapshots.\n\nPrecedence, resolved on every read: a selection made in this process, else the session\'s latest logged request/header, else the live default.',
+        description: 'Install or return the session-local model selection that prompt assembly snapshots.\n\nPrecedence, resolved on every read: a selection made in this process, else the session\'s latest logged request/header, else the live default. The logged tier is the session\'s own selection rather than the header\'s own route, so a composed router reports the route a held downgrade descends beneath instead of the candidate it rewrote the header to.',
         parameters: [{ name: 'agent', description: 'the Agent whose request waterfall should observe this selection.' }],
         returns: 'the shared mutable selection for this Agent.',
       },
@@ -1248,6 +1248,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Resolve the route one turn should run. Called by `installModelSelection` after the manual selection rewrote the request: a non-undefined result replaces provider/model/effort, and `undefined` leaves the manual route in force.\n\nOne decision per turn: later steps of the same turn and same-turn request retries reuse the pinned decision instead of judging again.',
         parameters: [{ name: 'agent', description: 'the agent whose turn is being prepared.' }, { name: 'turn', description: 'the turn number, as the loop dispatched it.' }, { name: '_step', description: 'the step number within that turn; underscore-prefixed because the pin is keyed by turn, so the decision is taken once and later steps reuse it.' }, { name: 'base', description: 'the route the manual selection left in force.' }, { name: 'signal', description: 'the request\'s cancellation signal.' }],
         returns: 'the route to run, or `undefined` to keep the manual route.',
+      },
+      {
+        signature: 'stickySelection(agent: Agent): ModelSelection | undefined',
+        description: 'Report the manual selection a held downgrade descends beneath.\n\nA held streak rewrites the consumed `request/header` to the candidate, so that header stops reporting the route the session is pointed at; a reader asking for the session\'s selection asks this first. The answer is the same fold the consult reads — no live mirror — and the effort is the one the streak was entered on, because that is what the manual route still runs at.',
+        parameters: [{ name: 'agent', description: 'the agent whose selection is being read.' }],
+        returns: 'the route the held streak was entered on, or `undefined` while the state is strong, where the last logged header already is that route.',
       },
     ],
   },

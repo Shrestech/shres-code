@@ -1,0 +1,286 @@
+/**
+ * Model-routing projections: the decision row, its streak transitions, the
+ * effective route a request row reports, and where the decision lands in the
+ * turn fold.
+ */
+import { describe, expect, it } from 'vitest'
+import type { ConversationSnapshot, RequestView } from '@shres-code/shres-code-client-runtime/client'
+import type { TrajectoryRoutingDecision } from '../src/client/trajectory-contract.ts'
+import { deriveTrajectoryLayout } from '../src/client/layout.ts'
+import {
+  trajectoryRequestRoute, trajectoryRoutingRow, trajectoryRoutingStreak,
+} from '../src/client/trajectory-routing.ts'
+
+type AssistantRequest = Extract<RequestView, { purpose: 'assistant' }>
+
+/** Fields a real decision leaves out entirely, so the fixture must drop them. */
+type DecisionOmission = 'selection' | 'route' | 'turn' | 'step'
+
+function decision(
+  overrides: Partial<TrajectoryRoutingDecision> = {},
+  omit: readonly DecisionOmission[] = [],
+): TrajectoryRoutingDecision {
+  const dropped = new Set<string>(omit)
+  return {
+    seq: 6,
+    time: 1_700_000_000_006,
+    ...(dropped.has('turn') ? {} : { turn: 1 }),
+    ...(dropped.has('step') ? {} : { step: 1 }),
+    outcome: 'downgraded',
+    reason: 'gate-passed',
+    stateHash: 'd0157f83',
+    stateSeqs: [4],
+    ...(dropped.has('selection')
+      ? {}
+      : {
+        selection: {
+          candidateId: 'flash',
+          provider: 'deepseek-official',
+          model: 'deepseek-v4-flash',
+          reasoningEffort: 'high',
+        },
+      }),
+    ...(dropped.has('route')
+      ? {}
+      : { route: { choice: 'flash', confidence: 0.9, probabilities: { flash: 0.9 } } }),
+    sticky: {
+      active: true,
+      turnsElapsed: 0,
+      enteredTurn: 1,
+      entryBase: { provider: 'deepseek-official', model: 'deepseek-v4.1' },
+    },
+    ...overrides,
+  } as unknown as TrajectoryRoutingDecision
+}
+
+function assistantRequest(overrides: Partial<AssistantRequest> = {}): AssistantRequest {
+  return {
+    purpose: 'assistant',
+    startSeq: 7,
+    turn: 1,
+    step: 1,
+    startedAt: 1_700_000_000_007,
+    completedAt: 1_700_000_000_014,
+    status: 'complete',
+    provenance: { provider: 'p', model: 'cheap' },
+    ...overrides,
+  }
+}
+
+function nodes(): ConversationSnapshot['nodes'] {
+  return [
+    { kind: 'user', seq: 4, time: 1_700_000_000_004, content: [], source: null },
+    {
+      kind: 'assistant', seq: 14, time: 1_700_000_000_014, turn: 1, step: 1,
+      blocks: [{ kind: 'text', text: 'ROUTED_OK' }],
+      provenance: { provider: 'p', model: 'cheap' },
+    },
+  ] as unknown as ConversationSnapshot['nodes']
+}
+
+describe('trajectoryRoutingStreak', () => {
+  it('reads the entering turn, a held streak, and a broken one', () => {
+    expect(trajectoryRoutingStreak(decision({
+      sticky: { active: true, turnsElapsed: 0, enteredTurn: 5 },
+    }))).toEqual({ kind: 'entered', turn: 5 })
+    expect(trajectoryRoutingStreak(decision({
+      sticky: { active: true, turnsElapsed: 3, enteredTurn: 1 },
+    }))).toBeUndefined()
+    expect(trajectoryRoutingStreak(decision({
+      sticky: { active: true, turnsElapsed: 0 },
+    }))).toBeUndefined()
+    expect(trajectoryRoutingStreak(decision({
+      outcome: 'kept-strong',
+      reason: 'gate-failed',
+      sticky: { active: false, turnsElapsed: 0, brokenBy: 'gate-failed' },
+    }, ['selection']))).toEqual({ kind: 'exited', reason: 'gate-failed' })
+    expect(trajectoryRoutingStreak(decision({
+      outcome: 'kept-strong',
+      reason: 'thin-margin',
+      sticky: { active: false, turnsElapsed: 0 },
+    }, ['selection']))).toBeUndefined()
+  })
+})
+
+describe('trajectoryRoutingRow', () => {
+  it('carries the route, confidence, and entering streak of a downgrade', () => {
+    expect(trajectoryRoutingRow(decision())).toEqual({
+      outcome: 'downgraded',
+      reason: 'gate-passed',
+      confidence: 0.9,
+      selection: {
+        candidateId: 'flash',
+        provider: 'deepseek-official',
+        model: 'deepseek-v4-flash',
+        reasoningEffort: 'high',
+      },
+      streak: { kind: 'entered', turn: 1 },
+      quiet: false,
+    })
+  })
+
+  it('holds a streak without a transition and drops an unnamed effort', () => {
+    const row = trajectoryRoutingRow(decision({
+      reason: 'sticky-hold',
+      selection: { candidateId: 'flash', provider: 'p', model: 'cheap' },
+      sticky: {
+        active: true,
+        turnsElapsed: 2,
+        enteredTurn: 1,
+        entryBase: { provider: 'p', model: 'strong' },
+      },
+    }))
+    expect(row.streak).toBeUndefined()
+    expect(row.quiet).toBe(false)
+    expect(row.selection).toEqual({ candidateId: 'flash', provider: 'p', model: 'cheap' })
+  })
+
+  it('collapses a kept-strong decision that changed nothing to the quiet marker', () => {
+    const row = trajectoryRoutingRow(decision({
+      outcome: 'kept-strong',
+      reason: 'thin-margin',
+      sticky: { active: false, turnsElapsed: 0 },
+    }, ['selection']))
+    expect(row).toEqual({
+      outcome: 'kept-strong',
+      reason: 'thin-margin',
+      quiet: true,
+    })
+  })
+
+  it('keeps a kept-strong decision that ended a streak out of the quiet marker', () => {
+    const row = trajectoryRoutingRow(decision({
+      outcome: 'kept-strong',
+      reason: 'gate-failed',
+      sticky: { active: false, turnsElapsed: 0, brokenBy: 'gate-failed' },
+    }, ['selection']))
+    expect(row).toEqual({
+      outcome: 'kept-strong',
+      reason: 'gate-failed',
+      confidence: 0.9,
+      streak: { kind: 'exited', reason: 'gate-failed' },
+      quiet: false,
+    })
+  })
+
+  it('renders a failed judgment without a route or selection', () => {
+    const row = trajectoryRoutingRow(decision({
+      outcome: 'error',
+      reason: 'judgment-error',
+      sticky: { active: false, turnsElapsed: 0 },
+    }, ['selection', 'route']))
+    expect(row).toEqual({ outcome: 'error', reason: 'judgment-error', quiet: false })
+  })
+})
+
+describe('trajectoryRequestRoute', () => {
+  it('reports nothing without an effective route or a judged turn', () => {
+    expect(trajectoryRequestRoute(1, undefined, 'cheap', [decision()])).toBeUndefined()
+    expect(trajectoryRequestRoute(1, 'p', undefined, [decision()])).toBeUndefined()
+    expect(trajectoryRequestRoute(2, 'p', 'cheap', [decision()])).toBeUndefined()
+  })
+
+  it('badges the request whose effective route left the sticky selection', () => {
+    expect(trajectoryRequestRoute(1, 'p', 'cheap', [decision()])).toEqual({
+      provider: 'p',
+      model: 'cheap',
+      routed: true,
+    })
+    expect(trajectoryRequestRoute(1, 'deepseek-official', 'deepseek-v4.1', [decision()])).toEqual({
+      provider: 'deepseek-official',
+      model: 'deepseek-v4.1',
+      routed: false,
+    })
+  })
+
+  it('reports the effective route without a badge when no streak holds one', () => {
+    const strong = decision({
+      outcome: 'kept-strong',
+      reason: 'thin-margin',
+      sticky: { active: false, turnsElapsed: 0 },
+    }, ['selection'])
+    expect(trajectoryRequestRoute(1, 'p', 'cheap', [strong])).toEqual({
+      provider: 'p',
+      model: 'cheap',
+      routed: false,
+    })
+  })
+
+  it('lets the turn last decision govern every request of the turn', () => {
+    const entered = decision()
+    const broken = decision({
+      seq: 9,
+      outcome: 'kept-strong',
+      reason: 'gate-failed',
+      sticky: { active: false, turnsElapsed: 0, brokenBy: 'gate-failed' },
+    }, ['selection'])
+    expect(trajectoryRequestRoute(1, 'p', 'cheap', [entered, broken])).toEqual({
+      provider: 'p',
+      model: 'cheap',
+      routed: false,
+    })
+  })
+})
+
+describe('deriveTrajectoryLayout routing rows', () => {
+  function cells(routing: readonly TrajectoryRoutingDecision[]) {
+    return deriveTrajectoryLayout({
+      nodes: nodes(),
+      partial: null,
+      runningCalls: [],
+      requests: [assistantRequest()],
+      routing,
+    }).flatMap(turn => turn.groups.flatMap(group =>
+      group.cells.map(cell => ({ group: group.title, cell }))))
+  }
+
+  it('renders the decision at its seq inside its step', () => {
+    const laid = cells([decision()])
+    const routing = laid.find(entry => entry.cell.kind === 'routing')
+    expect(routing?.group).toBe('Step 1')
+    expect(routing?.cell.index).toBeLessThan(
+      laid.find(entry => entry.cell.kind === 'message')?.cell.index ?? 0,
+    )
+    expect(routing?.cell).toMatchObject({
+      kind: 'routing',
+      text: 'downgraded · gate-passed',
+      sourceSeq: 6,
+      timeSeconds: 0,
+      startedAt: 1_700_000_000_006,
+      routing: { outcome: 'downgraded', reason: 'gate-passed', quiet: false },
+    })
+  })
+
+  it('folds a decision outside a step into the turn message group', () => {
+    const laid = cells([decision({}, ['step'])])
+    expect(laid.find(entry => entry.cell.kind === 'routing')?.group).toBe('Message')
+  })
+
+  it('renders a decision whose logged time is unusable as a time-less marker', () => {
+    const turns = deriveTrajectoryLayout({
+      nodes: nodes(),
+      partial: null,
+      runningCalls: [],
+      requests: [assistantRequest()],
+      routing: [decision({ time: Number.NaN })],
+    })
+    const routing = turns
+      .flatMap(turn => turn.groups.flatMap(group => group.cells))
+      .find(cell => cell.kind === 'routing')
+    expect(routing?.startedAt).toBeNull()
+    expect(routing?.timeSeconds).toBe(0)
+  })
+
+  it('resolves an unlocated decision to the turn that consumed it', () => {
+    const turns = deriveTrajectoryLayout({
+      nodes: nodes(),
+      partial: null,
+      runningCalls: [],
+      requests: [assistantRequest()],
+      routing: [decision({}, ['turn', 'step'])],
+    })
+    expect(turns.map(turn => turn.turn)).toEqual([1])
+    expect(turns[0]?.groups.flatMap(group => group.cells)
+      .some(cell => cell.kind === 'routing')).toBe(true)
+  })
+})

@@ -6,7 +6,7 @@
 
 import { Context, Service } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
-import { installModelSelection } from '@shres-code/shres-code-agent'
+import { installModelSelection, selectionInForce } from '@shres-code/shres-code-agent'
 import type { Agent, ModelSelection, ModelSelectionRef } from '@shres-code/shres-code-agent'
 import type {} from '@shres-code/shres-code-commands'
 import { ReasoningEffortId } from '@shres-code/shres-code-llm'
@@ -188,7 +188,10 @@ export class AgentDefaultModelConfig extends Service {
    * Install or return the session-local model selection that prompt assembly snapshots.
    *
    * Precedence, resolved on every read: a selection made in this process, else
-   * the session's latest logged request/header, else the live default.
+   * the session's latest logged request/header, else the live default. The
+   * logged tier is the session's own selection rather than the header's own
+   * route, so a composed router reports the route a held downgrade descends
+   * beneath instead of the candidate it rewrote the header to.
    *
    * @param agent - the Agent whose request waterfall should observe this selection.
    * @returns the shared mutable selection for this Agent.
@@ -201,15 +204,7 @@ export class AgentDefaultModelConfig extends Service {
     const selectionRef: LiveModelSelectionRef = {
       get current(): ModelSelection {
         if (picked !== undefined) return picked
-        const logged = agent.session.requestHeader()?.config
-        if (logged === undefined) return readDefault()
-        return {
-          provider: logged.provider,
-          model: logged.model,
-          ...logged.reasoningEffort === undefined
-            ? {}
-            : { reasoningEffort: logged.reasoningEffort },
-        }
+        return selectionInForce(agent) ?? readDefault()
       },
       set current(next: ModelSelection) {
         picked = next

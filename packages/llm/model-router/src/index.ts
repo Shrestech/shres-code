@@ -62,6 +62,7 @@ import type { ModelRoutingStickyState } from './folds.ts'
 import type {
   ModelRoutingCandidate,
   ModelRoutingDecision,
+  ModelRoutingEntryBaseView,
   ModelRoutingLastDecision,
   ModelRoutingProjection,
   ModelRoutingReason,
@@ -120,7 +121,7 @@ interface PinnedDecision {
   decision: ModelRoutingDecision
 }
 
-/** Projection unit state: the logged mode, an outstanding `/route` selection, and the last decision. */
+/** Projection unit state: the logged mode, an outstanding `/route` selection, the last decision, and the last entered streak base. */
 interface ModelRoutingUnitState {
   active: boolean
   wanted: boolean | null
@@ -129,6 +130,7 @@ interface ModelRoutingUnitState {
   stickyActive: boolean
   stickyEnteredTurn: number | null
   stickyCandidate: ModelRoutingSelectionView | null
+  lastStrong: ModelRoutingEntryBaseView | null
 }
 
 /** Project one in-process selection onto its plain wire view. */
@@ -138,6 +140,26 @@ function selectionView(selection: ModelRoutingSelection): ModelRoutingSelectionV
     provider: selection.provider,
     model: selection.model,
     ...selection.reasoningEffort === undefined ? {} : { reasoningEffort: String(selection.reasoningEffort) },
+  }
+}
+
+/**
+ * The manual route one downgraded decision records as the streak's entry base.
+ *
+ * The live base supplies the effort only when the fold carried none: the entry
+ * base outlives the header it came from, because routing rewrites that header to
+ * the candidate once the streak holds.
+ * @param sticky - the sticky state this decision was taken from.
+ * @param base - the manual selection the consult was handed for this turn.
+ * @returns the entry base to record, effort included.
+ */
+function entryBaseOf(sticky: ModelRoutingStickyState, base: ModelSelection): ModelRoutingEntryBaseView {
+  const effort = sticky.entryBase?.reasoningEffort
+    ?? (base.reasoningEffort === undefined ? undefined : String(base.reasoningEffort))
+  return {
+    provider: sticky.entryBase?.provider ?? base.provider,
+    model: sticky.entryBase?.model ?? base.model,
+    ...effort === undefined ? {} : { reasoningEffort: effort },
   }
 }
 
@@ -167,6 +189,11 @@ const modelRoutingProjectionSchema = zod.object({
       reasoningEffort: zod.string(),
     }).partial({ reasoningEffort: true }).optional(),
   }).optional(),
+  lastStrong: zod.object({
+    provider: zod.string(),
+    model: zod.string(),
+    reasoningEffort: zod.string(),
+  }).partial({ reasoningEffort: true }).optional(),
 }) as unknown as ZodType<ModelRoutingProjection>
 
 /**
@@ -312,6 +339,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
           stickyActive: false,
           stickyEnteredTurn: null,
           stickyCandidate: null,
+          lastStrong: null,
         }),
         apply: (state, event) => {
           switch (event.type) {
@@ -337,6 +365,9 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
                 stickyActive: data.sticky.active,
                 stickyEnteredTurn: data.sticky.active ? (data.sticky.enteredTurn ?? state.turn) : null,
                 stickyCandidate: data.sticky.active && data.selection !== undefined ? selectionView(data.selection) : null,
+                // Only an active record carries a base, so the retained route
+                // outlives the streak: ending one reports nothing itself.
+                lastStrong: data.sticky.entryBase ?? state.lastStrong,
               }
             }
             default:
@@ -347,6 +378,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
           active: state.active,
           pending: state.wanted !== null && state.wanted !== state.active,
           ...state.last === null ? {} : { last: state.last },
+          ...state.lastStrong === null ? {} : { lastStrong: state.lastStrong },
           sticky: {
             active: state.stickyActive,
             turnsElapsed: state.stickyActive && state.stickyEnteredTurn !== null
@@ -355,7 +387,8 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
             ...state.stickyCandidate === null ? {} : { selection: state.stickyCandidate },
           },
         }),
-        stateVersion: 1,
+        // Version 2 adds the retained entry base to the unit state.
+        stateVersion: 2,
       })
     })
     ctx.inject(['commands'], (commandCtx) => {
@@ -525,6 +558,33 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
   }
 
   /**
+   * Report the manual selection a held downgrade descends beneath.
+   *
+   * A held streak rewrites the consumed `request/header` to the candidate, so
+   * that header stops reporting the route the session is pointed at; a reader
+   * asking for the session's selection asks this first. The answer is the same
+   * fold the consult reads — no live mirror — and the effort is the one the
+   * streak was entered on, because that is what the manual route still runs at.
+   * @param agent - the agent whose selection is being read.
+   * @returns the route the held streak was entered on, or `undefined` while the
+   *   state is strong, where the last logged header already is that route.
+   */
+  stickySelection(agent: Agent): ModelSelection | undefined {
+    const sticky = stickyState(agent.session.events, this.config())
+    if (!sticky.active) return undefined
+    const base = sticky.entryBase
+    // A state with no base is one this consult never produced — a replayed
+    // decision from a log whose entering turn recorded none — and it reports
+    // nothing rather than inventing the candidate it holds.
+    if (base === undefined) return undefined
+    return {
+      provider: base.provider,
+      model: base.model,
+      ...base.reasoningEffort === undefined ? {} : { reasoningEffort: toEffortId(base.reasoningEffort) },
+    }
+  }
+
+  /**
    * Judge one turn and resolve it against the allowlist and the sticky state.
    * @param config - resolved configuration.
    * @param state - the assembled state.
@@ -633,10 +693,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
           active: true,
           turnsElapsed: sticky.active ? sticky.turnsElapsed : 0,
           enteredTurn: sticky.active && sticky.enteredTurn !== undefined ? sticky.enteredTurn : turn,
-          entryBase: {
-            provider: sticky.entryBase?.provider ?? base.provider,
-            model: sticky.entryBase?.model ?? base.model,
-          },
+          entryBase: entryBaseOf(sticky, base),
         },
       }
     }
@@ -659,10 +716,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
             // satisfies the optional field's type.
             /* v8 ignore next -- active streaks always carry enteredTurn */
             ...sticky.enteredTurn === undefined ? {} : { enteredTurn: sticky.enteredTurn },
-            entryBase: {
-              provider: sticky.entryBase?.provider ?? base.provider,
-              model: sticky.entryBase?.model ?? base.model,
-            },
+            entryBase: entryBaseOf(sticky, base),
           },
         }
       }

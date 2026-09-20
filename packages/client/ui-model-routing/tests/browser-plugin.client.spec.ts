@@ -1,9 +1,12 @@
 /**
  * ui-model-routing browser half on a real SlotRegistry: the plugin occupies the
  * conversation-declared `conversation.input.modelRouting` single seat; the
- * injected face reports availability per session and executes /route on|off,
+ * injected face reports availability per session, executes /route on|off,
  * folding admission outcomes into null (admitted) or a user-visible failure
- * line; teardown empties the seat (HMR safety).
+ * line, and submits the routing-idle restore through the session's
+ * model-selection directory — the same path the composer picker uses — folding a
+ * refusal or an absent selection surface into a failure line; teardown empties
+ * the seat (HMR safety).
  */
 import { Context } from '@shres-code/cordis'
 import { describe, expect, it, vi } from 'vitest'
@@ -18,7 +21,9 @@ import { apply as nodeApply } from '../src/index.ts'
 const SID = 's-routing' as SessionId
 const CHILD = 's-routing-child' as SessionId
 
-async function bench() {
+const STRONG = { provider: 'deepseek', model: 'deepseek-v4.1' }
+
+async function bench(options: { directories?: boolean } = {}) {
   const ctx = new Context()
   await ctx.plugin(SlotRegistry).await()
   const slots = ctx.get('slots') as SlotRegistry
@@ -36,7 +41,16 @@ async function bench() {
     subagentAddress: (id: SessionId): SubagentAddress | undefined =>
       id === CHILD ? { parentSessionId: SID, childSessionId: CHILD, mode: 'continuable' } : undefined,
   })
-  return { ctx, slots, execute }
+  const select = vi.fn((_selection: { provider: string; model: string }) => Promise.resolve())
+  if (options.directories !== false) {
+    ctx.provide('modelDirectories', {
+      directoryFor: (id: SessionId) => {
+        if (id !== SID) throw new Error(`ui-model-selection: session "${String(id)}" resolved no scope`)
+        return { select }
+      },
+    })
+  }
+  return { ctx, slots, execute, select }
 }
 
 describe('ui-model-routing browser apply', () => {
@@ -97,5 +111,52 @@ describe('ui-model-routing browser apply', () => {
 
     await fiber.dispose()
     expect(b.slots.entries('conversation.input.modelRouting')).toHaveLength(0)
+  })
+
+  it('restores the strong route through the session model-selection directory', async () => {
+    const b = await bench()
+    const fiber = b.ctx.plugin({ inject: [...inject], apply })
+    await fiber.await()
+    const seat = b.slots.entries('conversation.input.modelRouting')[0]!.inject as unknown as (
+      id: SessionId,
+    ) => RoutingChipInjected
+
+    await expect(seat(SID).restoreStrong(STRONG)).resolves.toBeNull()
+    expect(b.select).toHaveBeenCalledWith(STRONG)
+    await fiber.dispose()
+  })
+
+  it('folds a refused selection and an unresolvable session scope into failure lines', async () => {
+    const b = await bench()
+    const fiber = b.ctx.plugin({ inject: [...inject], apply })
+    await fiber.await()
+    const seat = b.slots.entries('conversation.input.modelRouting')[0]!.inject as unknown as (
+      id: SessionId,
+    ) => RoutingChipInjected
+
+    // The host refused the selection (route gone, model unavailable, image
+    // policy): the directory rethrows what the wire reported.
+    b.select.mockRejectedValueOnce(new Error('session.selectModel failed: model-unavailable: no images'))
+    await expect(seat(SID).restoreStrong(STRONG)).resolves.toBe('session.selectModel failed: model-unavailable: no images')
+
+    // A rejection that is not an Error still reaches the caller as text.
+    b.select.mockRejectedValueOnce('socket closed')
+    await expect(seat(SID).restoreStrong(STRONG)).resolves.toBe('socket closed')
+
+    // A session with no live scope cannot resolve a directory at all.
+    await expect(seat(CHILD).restoreStrong(STRONG)).resolves.toContain('resolved no scope')
+    await fiber.dispose()
+  })
+
+  it('reports an absent model-selection surface instead of failing the gesture', async () => {
+    const b = await bench({ directories: false })
+    const fiber = b.ctx.plugin({ inject: [...inject], apply })
+    await fiber.await()
+    const seat = b.slots.entries('conversation.input.modelRouting')[0]!.inject as unknown as (
+      id: SessionId,
+    ) => RoutingChipInjected
+
+    await expect(seat(SID).restoreStrong(STRONG)).resolves.toBe('model selection is unavailable')
+    await fiber.dispose()
   })
 })

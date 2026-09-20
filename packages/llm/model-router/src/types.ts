@@ -121,6 +121,14 @@ export interface ModelRoutingEntryBaseView {
   provider: string
   /** Provider-owned model id in force when the streak was entered. */
   model: string
+  /**
+   * Adapter-owned reasoning effort in force when the streak was entered.
+   * Recorded so a reader can report the complete manual selection the streak
+   * descends beneath: the consumed header stops carrying the manual effort once
+   * routing rewrites it. The manual-deviation comparison stays provider/model
+   * only.
+   */
+  reasoningEffort?: string
 }
 
 /** The sticky-fold facts one decision records about the streak it belongs to. */
@@ -250,6 +258,15 @@ export interface ModelRoutingProjection {
   last?: ModelRoutingLastDecision
   /** Sticky state folded from the decisions and the mode. */
   sticky?: ModelRoutingStickyViewForUi
+  /**
+   * Manual route the last downgraded streak was entered on, retained after that
+   * streak broke: the selection a routing-idle session restores. It is the
+   * fold's entry base rather than the session's current selection, so it
+   * survives the manual pick of a downgrade candidate — the dead-end state
+   * whose every decision reports `candidate-equals-base`. Absent until one
+   * streak has been entered.
+   */
+  lastStrong?: ModelRoutingEntryBaseView
 }
 
 declare module '@shres-code/shres-code-session/types' {

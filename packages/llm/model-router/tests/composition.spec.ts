@@ -321,6 +321,27 @@ describe('real Loader composition', () => {
     expect(headers[0]!.seq).toBeLessThan(secondTurnStart.seq)
   })
 
+  it('reports the session’s own selection while a held streak serves the routed candidate', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
+    const loaded = await boot()
+    const agent = createAgent(loaded, 'router-reported-selection')
+    const selection = loaded.agentDefaultModel.selectionFor(agent)
+
+    await turn(agent, 'First easy turn.')
+
+    // The turn ran on the allowlisted candidate: the decision selected it, the
+    // header the turn consumed carries it, and the stub endpoint served it.
+    const decisions = eventsOfType(agent.session.events, 'model-routing/decision')
+    expect(decisions[0]?.data).toMatchObject({ outcome: 'downgraded', reason: 'gate-passed' })
+    expect(eventsOfType(agent.session.events, 'request/header').at(-1)?.data.header.config)
+      .toMatchObject({ provider: PROVIDER, model: CANDIDATE_MODEL })
+    expect(requestedModel(0)).toBe(CANDIDATE_MODEL)
+
+    // The selection the Host reports for the next assembled step is still the
+    // route the session is pointed at: routing rewrites the request, never the
+    // session, so a held streak must not read back as a model switch.
+    expect(selection.current).toEqual({ provider: PROVIDER, model: MANUAL_MODEL })
+  })
+
   it('keeps the held route when the gate fails below the streak horizon, recording the entry base', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
     const loaded = await boot()
     const agent = createAgent(loaded, 'router-hold')
@@ -379,24 +400,46 @@ describe('real Loader composition', () => {
     expect(requestedModel(1)).toBe(MANUAL_MODEL)
   })
 
-  it('a manual route the session log already rewrote ends the streak as a manual deviation', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
+  it('resolves the session’s route from the log, holding the streak until a real manual switch ends it', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
     const loaded = await boot()
     const agent = createAgent(loaded, 'router-log-manual')
 
     await turn(agent, 'First easy turn.')
     await turn(agent, 'Second easy turn.')
 
-    // Without an explicit selection this process made, the manual route a live
-    // session resolves is its own latest logged header — which turn one recorded
-    // as the routed route. The next consult therefore reads that as a manual
-    // deviation from the streak's entry base and ends the streak.
+    // No selection was made in this process, so the manual route the live
+    // session resolves is the one its held streak was entered on. Turn two
+    // re-affirms the streak instead of reading the routed header as a deviation.
     const decisions = eventsOfType(agent.session.events, 'model-routing/decision')
     expect(decisions).toHaveLength(2)
     expect(decisions[1]?.data).toMatchObject({
+      outcome: 'downgraded',
+      reason: 'gate-passed',
+      sticky: {
+        active: true,
+        turnsElapsed: 1,
+        enteredTurn: 1,
+        entryBase: { provider: PROVIDER, model: MANUAL_MODEL },
+      },
+    })
+    expect(requestedModel(1)).toBe(CANDIDATE_MODEL)
+
+    // A user switch still wins: the new manual route is a deviation from the
+    // entry base, so the streak ends and the manual route returns.
+    const execution = await loaded.commands.execute(
+      agent,
+      `/model ${PROVIDER} ${SECOND_CANDIDATE_MODEL}`,
+      new AbortController().signal,
+    )
+    expect(execution?.result.kind).toBe('success')
+    await turn(agent, 'Third easy turn.')
+
+    expect(eventsOfType(agent.session.events, 'model-routing/decision')[2]?.data).toMatchObject({
       outcome: 'kept-strong',
       reason: 'manual-deviation',
       sticky: { active: false, turnsElapsed: 0, brokenBy: 'manual-deviation' },
     })
+    expect(requestedModel(2)).toBe(SECOND_CANDIDATE_MODEL)
   })
 
   it('withdraws the router service, its command, and its projection when the loaded entry fiber disposes', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {

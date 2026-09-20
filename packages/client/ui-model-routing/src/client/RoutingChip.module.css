@@ -45,15 +45,35 @@
   cursor: default;
 }
 
-.route {
-  color: var(--dsw-alias-label-secondary);
-}
-
-.sticky,
-.hint {
+.idle {
   color: var(--dsw-alias-label-caption);
   font-size: 12px;
   line-height: 18px;
+}
+
+.restore {
+  border: none;
+  padding: 0;
+  background: none;
+  color: var(--dsw-alias-state-business-primary);
+  font-size: 12px;
+  line-height: 18px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.restore:hover:not(:disabled) {
+  color: var(--dsw-alias-label-primary);
+}
+
+.restore:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 2px;
+}
+
+.restore:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 .error {

@@ -102,6 +102,11 @@
   );
 }
 
+.tagRouting {
+  color: var(--dsw-alias-state-business-primary);
+  background: var(--dsw-alias-state-business-tertiary);
+}
+
 .root[data-kind='subtool'] {
   padding-left: 28px;
 }

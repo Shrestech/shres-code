@@ -30,7 +30,7 @@ import {
 import { createChatStore } from '@shres-code/shres-code-client-ui-conversation/src/client/stores.ts'
 import { en as conversationEn } from '@shres-code/shres-code-client-ui-conversation/src/client/locales.ts'
 import { apply as localeApply, inject as localeInject } from '@shres-code/shres-code-client-locale/client'
-import { stubSettingsScope } from '@shres-code/shres-code-client-test-runtime'
+import { makeTranslate, stubSettingsScope } from '@shres-code/shres-code-client-test-runtime'
 import type { LocaleKeysOf } from '@shres-code/shres-code-client-ui-slots'
 import { en, type TrajectoryKey } from '../src/client/locales.ts'
 import { apply, inject } from '@shres-code/shres-code-client-ui-trajectory/client'
@@ -48,6 +48,8 @@ const SID = 's1' as SessionId
 const sessionSnapshots = new WeakMap<SlotRegistry, SnapshotStore<ConversationSnapshot>>()
 const tConversation: ConversationSessionHeaderProps['t'] =
   key => (conversationEn as Record<string, string>)[key] ?? key
+
+const dictionary = makeTranslate(en)
 
 afterEach(cleanup)
 // The chat store persists under its declared key; clear so one case's active
@@ -86,6 +88,7 @@ function historySnapshot(
     runningCalls: [],
     decisions: [],
     jspace: [],
+    routing: [],
     ...inspection,
   }
   return {
@@ -666,6 +669,41 @@ describe('timeline projection', () => {
     }
   })
 
+  it('labels a routing span as ROUTING in the overview', () => {
+    vi.useFakeTimers()
+    try {
+      const view = render(
+        <TrajectoryTimeline
+          turns={[{
+            turn: 1,
+            groups: [{
+              title: 'Step 1',
+              cells: [{
+                index: 1,
+                kind: 'routing',
+                text: 'downgraded · gate-passed',
+                startedAt: 1_000,
+                timeSeconds: 0,
+              }],
+            }],
+          }]}
+          mode="sequence"
+          range={null}
+          onRangeChange={vi.fn()}
+        />,
+      )
+      const span = view.container.querySelector<HTMLElement>('[data-timeline-span="routing"]')
+
+      expect(span).toBeTruthy()
+      fireEvent.mouseEnter(span as HTMLElement)
+      act(() => { vi.advanceTimersByTime(500) })
+      expect(view.container.querySelector<HTMLElement>('[role="tooltip"]')?.textContent)
+        .toContain('ROUTING')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('marks an unloaded history prefix without inventing timeline duration', () => {
     const onLoadEarlier = vi.fn(() => new Promise<boolean>(() => {}))
     const view = render(
@@ -1174,6 +1212,71 @@ describe('TrajectoryView state', () => {
     fireEvent.click(screen.getByRole('row', { name: /USER, hello, Open/ }))
     expect(screen.getByText('J-Space')).toBeTruthy()
     expect(screen.getAllByText('Open')).toHaveLength(2)
+  })
+
+  it('renders the folded decision row and the routed route the request ran on', () => {
+    const nodes = [
+      {
+        kind: 'user', seq: 4, time: 4,
+        content: [{ type: 'text', text: 'ROUTED_OK' }], source: null,
+      },
+      {
+        kind: 'assistant', seq: 14, time: 14, turn: 1, step: 1,
+        blocks: [{ kind: 'text', text: 'ROUTED_OK' }],
+        provenance: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+      },
+    ] as unknown as ConversationSnapshot['nodes']
+    const requests: readonly RequestView[] = [{
+      purpose: 'assistant',
+      startSeq: 3,
+      turn: 1,
+      step: 1,
+      startedAt: 3,
+      completedAt: 14,
+      status: 'complete',
+      provenance: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+    }]
+    render(createElement(
+      TrajectoryView,
+      {
+        ...standaloneProps(nodes),
+        ...standaloneHistory(historySnapshot(nodes, {
+          requests,
+          routing: [{
+            seq: 6,
+            time: 6,
+            turn: 1,
+            step: 1,
+            outcome: 'downgraded',
+            reason: 'gate-passed',
+            stateHash: 'd0157f83',
+            stateSeqs: [4],
+            selection: {
+              candidateId: 'flash',
+              provider: 'deepseek-official',
+              model: 'deepseek-v4-flash',
+            },
+            route: { choice: 'flash', confidence: 0.9, probabilities: { flash: 0.9 } },
+            sticky: {
+              active: true,
+              turnsElapsed: 0,
+              enteredTurn: 1,
+              entryBase: { provider: 'deepseek-official', model: 'deepseek-v4.1' },
+            },
+          }],
+        })),
+        ...standaloneDuration(),
+        t: dictionary,
+      },
+    ) as never)
+
+    const decision = screen.getByRole('row', { name: /ROUTING, downgraded · gate passed/ })
+    expect(decision.textContent).toContain('confidence 0.90')
+    expect(decision.textContent).toContain('streak entered · turn 1')
+    const request = screen.getByRole('button', { name: 'Request #1' }).closest('tr')
+    expect(request?.querySelector('[data-request-route="routed"]')).toBeTruthy()
+    expect(request?.textContent).toContain('deepseek-official/deepseek-v4-flash')
+    expect(screen.getByText('Routed')).toBeTruthy()
   })
 
   it('persists the duration preference through the runtime snapshot-store seam', () => {

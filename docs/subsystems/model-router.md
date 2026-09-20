@@ -154,11 +154,12 @@ interface ModelRoutingStickyState {
   /** Allowlisted route the streak holds; absent while strong. */
   readonly candidate?: ModelRoutingSelection
   /**
-   * Manual provider/model in force when the streak was entered, read from the
-   * last `request/header` before the entering decision. Absent while strong.
-   * This is the route a manual switch is compared against, and only its
-   * provider/model fields count — an unrelated header change (a plan-mode
-   * toggle rewriting `header.system`) must not end a streak.
+   * Manual route in force when the streak was entered, read from the last
+   * `request/header` before the entering decision. Absent while strong. This is
+   * the route a manual switch is compared against, and only its provider/model
+   * fields count — an unrelated header change (a plan-mode toggle rewriting
+   * `header.system`) must not end a streak. The effort rides along for readers
+   * that report the selection; the comparison never reads it.
    */
   readonly entryBase?: ModelRoutingEntryBaseView
   /** Why the streak ended, when the fold passed its end. */
@@ -232,7 +233,7 @@ interface ModelRouterConfig {
 
 `/route` reports the mode in force and any held streak, `/route on` and `/route off` switch it, and any other argument prints the usage line. Between turns the switch is appended immediately as the log-only `model-routing/mode` event; during an open turn it waits for the next accepted in-turn pre-step, like every other logged mode in this harness, and the command reports `committed`, `queued`, `cancelled`, or `noop`.
 
-The `modelRouting` projection folds the `/route` records, the committed mode, the last decision, and the sticky state into one wire value, so a UI renders the toggle, the hint line, and the held route without reading the log. Capability absence — model-router not composed — is the projection key's absence rather than an empty value.
+The `modelRouting` projection folds the `/route` records, the committed mode, the last decision, the sticky state, and the retained entry base of the last streak into one wire value, so a UI renders the routing mode and offers the restore of a session whose own selection is the routing target without reading the log. `lastStrong` is what makes that restore possible: the fold drops `entryBase` the moment a streak breaks, and a session stuck on `candidate-equals-base` has no active streak to read one from. Capability absence — model-router not composed — is the projection key's absence rather than an empty value.
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -307,9 +308,23 @@ set(agent: Agent, active: boolean): 'committed' | 'queued' | 'cancelled' | 'noop
  * @returns the route to run, or `undefined` to keep the manual route.
  */
 async resolveRequest( agent: Agent, turn: number, _step: number, base: ModelSelection, signal: AbortSignal, ): Promise<ModelSelection | undefined>
+
+/**
+ * Report the manual selection a held downgrade descends beneath.
+ *
+ * A held streak rewrites the consumed `request/header` to the candidate, so
+ * that header stops reporting the route the session is pointed at; a reader
+ * asking for the session's selection asks this first. The answer is the same
+ * fold the consult reads — no live mirror — and the effort is the one the
+ * streak was entered on, because that is what the manual route still runs at.
+ * @param agent - the agent whose selection is being read.
+ * @returns the route the held streak was entered on, or `undefined` while the
+ *   state is strong, where the last logged header already is that route.
+ */
+stickySelection(agent: Agent): ModelSelection | undefined
 ```
 
 Types: [Agent](core.md) · [ModelSelection](core.md) · [Session](session.md)
 
-Source: [`packages/llm/model-router/src/index.ts:232`](../../packages/llm/model-router/src/index.ts)
+Source: [`packages/llm/model-router/src/index.ts:259`](../../packages/llm/model-router/src/index.ts)
 <!-- END GENERATED cordis-surface -->

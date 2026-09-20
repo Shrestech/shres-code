@@ -51,6 +51,20 @@ export interface ModelRoutingConsult {
     base: ModelSelection,
     signal: AbortSignal,
   ): Promise<ModelSelection | undefined>
+
+  /**
+   * Report the selection a held downgrade descends beneath.
+   *
+   * A held streak rewrites the consumed `request/header` to the candidate, so
+   * the last logged header no longer reports the route the session is pointed
+   * at; a reader that reports that route asks this first. Reporting is its only
+   * purpose — the routing gate keeps its own provider/model comparison — and the
+   * answer is the router's own fold, never a mirrored copy.
+   * @param agent - the agent whose selection is being read.
+   * @returns the route the held streak was entered on, or `undefined` while the
+   *   state is strong, where the last logged header already is that route.
+   */
+  stickySelection(agent: Agent): ModelSelection | undefined
 }
 
 /**
@@ -70,6 +84,32 @@ function applySelection(config: LlmCallConfig, selection: ModelSelection): LlmCa
     ...selection.reasoningEffort === undefined
       ? {}
       : { reasoningEffort: selection.reasoningEffort },
+  }
+}
+
+/**
+ * The model selection in force on one live Agent: the session's own selection,
+ * which routing descends beneath rather than rewrites.
+ *
+ * The last logged `request/header` alone reports the ROUTED rewrite while a
+ * downgraded streak is held, because routing rewrites that header to its
+ * candidate; a composed `ctx.modelRouting` therefore reports the streak's
+ * entry route first. Everything else is the log's own precedence, and the
+ * caller's default stays the caller's: an entry point that owns one applies it
+ * on `undefined`.
+ * @param agent - the agent whose selection is read.
+ * @returns the selection in force, or `undefined` when the log records none.
+ */
+export function selectionInForce(agent: Agent): ModelSelection | undefined {
+  const routing = agent.ctx.get('modelRouting') as ModelRoutingConsult | undefined
+  const sticky = routing?.stickySelection(agent)
+  if (sticky !== undefined) return sticky
+  const logged = agent.session.requestHeader()?.config
+  if (logged === undefined) return undefined
+  return {
+    provider: logged.provider,
+    model: logged.model,
+    ...logged.reasoningEffort === undefined ? {} : { reasoningEffort: logged.reasoningEffort },
   }
 }
 

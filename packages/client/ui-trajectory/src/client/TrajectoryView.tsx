@@ -18,6 +18,7 @@ import {
   appendTrajectoryPartialLayout, deriveTrajectoryLayout,
   type TrajectoryTurnModel,
 } from './layout.ts'
+import { trajectoryRequestRoute } from './trajectory-routing.ts'
 import {
   trajectoryTimelineFocusIndexes,
   type TrajectoryTimelineMode,
@@ -152,6 +153,7 @@ export function TrajectoryView({
   const runningCalls = inspection.runningCalls
   const requests = inspection.requests
   const callSchemas = inspection.callSchemas
+  const routing = inspection.routing
   const requestNumbers = useMemo<readonly TrajectoryRequestNumber[]>(() => {
     const assistantsByStep = new Map<string, AssistantMessageNode>()
     for (const node of nodes) {
@@ -195,9 +197,15 @@ export function TrajectoryView({
         const turn = request?.turn ?? node?.turn
         const step = request?.step ?? node?.step
         if (turn === undefined || step === undefined) continue
-        const provider = request?.provenance?.provider ?? node?.provenance?.provider
-        const model = request?.provenance?.model ?? node?.provenance?.model
+        // The effective route the request actually used: a settled request
+        // reports it on its answer, and a running or interrupted one only on
+        // the header it was assembled from.
         const requestConfig = request?.requestConfig ?? node?.requestConfig
+        const provider = request?.provenance?.provider ?? node?.provenance?.provider
+          ?? requestConfig?.provider
+        const model = request?.provenance?.model ?? node?.provenance?.model
+          ?? requestConfig?.model
+        const route = trajectoryRequestRoute(turn, provider, model, routing)
         numbered.push({
           seq: entry.seq,
           turn,
@@ -217,6 +225,7 @@ export function TrajectoryView({
           ...(provider === undefined ? {} : { provider }),
           ...(model === undefined ? {} : { model }),
           ...(requestConfig === undefined ? {} : { requestConfig }),
+          ...(route === undefined ? {} : { route }),
           ...(usage === undefined ? {} : { usage }),
           ...(cumulativeUsage === undefined ? {} : { cumulativeUsage }),
         })
@@ -249,7 +258,7 @@ export function TrajectoryView({
 
     return numbered
   }, [
-    nodes, requests,
+    nodes, requests, routing,
   ])
   const partialTurn = partial?.turn ?? null
   const partialStep = partial?.step ?? null
@@ -265,11 +274,12 @@ export function TrajectoryView({
       callSchemas,
       decisions: inspection.decisions,
       jspace: inspection.jspace,
+      routing,
     })
     return { turns, lastIndex: lastCellIndex(turns) }
   }, [
     nodes, eventLocations, partialTurn, partialStep,
-    runningCalls, requests, callSchemas, inspection.decisions, inspection.jspace,
+    runningCalls, requests, callSchemas, inspection.decisions, inspection.jspace, routing,
   ])
   const timelinePartialSignature = partialStructureSignature(partial)
   const timelinePartial = useMemo<ConversationSnapshot['partial']>(() => partial === null
@@ -379,7 +389,9 @@ export function TrajectoryView({
         turn.groups.reduce(
           (count, group) =>
             count + group.cells.filter(cell =>
-              cell.requestOnly !== true && cell.kind !== 'system').length,
+              cell.requestOnly !== true
+              && cell.kind !== 'system'
+              && cell.kind !== 'routing').length,
           0,
         ) > 1)
       .flatMap(turn => turn.turn === null ? [] : [turn.turn]),

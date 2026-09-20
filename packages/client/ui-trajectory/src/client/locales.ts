@@ -1,4 +1,8 @@
-/** `trajectory` namespace dictionaries (view tab label, toolbar, and thinking-collapse strings). */
+/** `trajectory` namespace dictionaries (view tab label, toolbar, thinking-collapse, and routing strings). */
+
+import type {
+  ModelRoutingBreakReason, ModelRoutingOutcome, ModelRoutingReason,
+} from '@shres-code/shres-code-model-router/client'
 
 /** Dictionary namespace owned by this plugin. */
 export const NS = 'trajectory'
@@ -21,10 +25,35 @@ export type TrajectoryKey =
   | 'toolbar.searchPlaceholder'
   | 'thinking.label'
   | 'thinking.segments'
+  | 'routing.outcome.downgraded'
+  | 'routing.outcome.keptStrong'
+  | 'routing.outcome.skipped'
+  | 'routing.outcome.error'
+  | 'routing.reason.gatePassed'
+  | 'routing.reason.stickyHold'
+  | 'routing.reason.engineAbsent'
+  | 'routing.reason.engineDisabled'
+  | 'routing.reason.engineUnavailable'
+  | 'routing.reason.invalidAnswer'
+  | 'routing.reason.noCandidates'
+  | 'routing.reason.unknownCandidate'
+  | 'routing.reason.lowConfidence'
+  | 'routing.reason.thinMargin'
+  | 'routing.reason.candidateEqualsBase'
+  | 'routing.reason.gateFailed'
+  | 'routing.reason.escalated'
+  | 'routing.reason.manualDeviation'
+  | 'routing.reason.routeErrors'
+  | 'routing.reason.modeOff'
+  | 'routing.reason.judgmentError'
+  | 'routing.confidence'
+  | 'routing.streak.entered'
+  | 'routing.streak.exited'
+  | 'routing.badge.routed'
 
 declare module '@shres-code/shres-code-client-ui-slots' {
   interface LocaleNamespaceMap {
-    /** The trajectory view tab label, toolbar, and thinking-collapse strings. */
+    /** The trajectory view tab label, toolbar, thinking-collapse, and routing strings. */
     'trajectory': TrajectoryKey
   }
 }
@@ -47,4 +76,67 @@ export const en: Record<TrajectoryKey, string> = {
   'toolbar.searchPlaceholder': 'Search',
   'thinking.label': 'Thinking',
   'thinking.segments': '{count} segments',
+  'routing.outcome.downgraded': 'downgraded',
+  'routing.outcome.keptStrong': 'kept strong',
+  'routing.outcome.skipped': 'skipped',
+  'routing.outcome.error': 'error',
+  'routing.reason.gatePassed': 'gate passed',
+  'routing.reason.stickyHold': 'streak held',
+  'routing.reason.engineAbsent': 'engine absent',
+  'routing.reason.engineDisabled': 'engine disabled',
+  'routing.reason.engineUnavailable': 'engine unavailable',
+  'routing.reason.invalidAnswer': 'invalid answer',
+  'routing.reason.noCandidates': 'no candidates configured',
+  'routing.reason.unknownCandidate': 'chosen route is not allowlisted',
+  'routing.reason.lowConfidence': 'low confidence',
+  'routing.reason.thinMargin': 'thin top-two margin',
+  'routing.reason.candidateEqualsBase': 'already on the routed model',
+  'routing.reason.gateFailed': 'gate failed',
+  'routing.reason.escalated': 'escalated to the stronger model',
+  'routing.reason.manualDeviation': 'model switched manually',
+  'routing.reason.routeErrors': 'route failures',
+  'routing.reason.modeOff': 'routing off',
+  'routing.reason.judgmentError': 'judgment failed',
+  'routing.confidence': 'confidence {value}',
+  'routing.streak.entered': 'streak entered · turn {turn}',
+  'routing.streak.exited': 'streak ended · {reason}',
+  'routing.badge.routed': 'Routed',
+}
+
+/** Dictionary key per logged outcome. */
+export const ROUTING_OUTCOME_KEYS: Record<ModelRoutingOutcome, TrajectoryKey> = {
+  downgraded: 'routing.outcome.downgraded',
+  'kept-strong': 'routing.outcome.keptStrong',
+  skipped: 'routing.outcome.skipped',
+  error: 'routing.outcome.error',
+}
+
+/** Dictionary key per resolved reason; one per reason class, including every streak break. */
+export const ROUTING_REASON_KEYS: Record<ModelRoutingReason, TrajectoryKey> = {
+  'gate-passed': 'routing.reason.gatePassed',
+  'sticky-hold': 'routing.reason.stickyHold',
+  'engine-absent': 'routing.reason.engineAbsent',
+  'engine-disabled': 'routing.reason.engineDisabled',
+  'engine-unavailable': 'routing.reason.engineUnavailable',
+  'invalid-answer': 'routing.reason.invalidAnswer',
+  'no-candidates': 'routing.reason.noCandidates',
+  'unknown-candidate': 'routing.reason.unknownCandidate',
+  'low-confidence': 'routing.reason.lowConfidence',
+  'thin-margin': 'routing.reason.thinMargin',
+  'candidate-equals-base': 'routing.reason.candidateEqualsBase',
+  'gate-failed': 'routing.reason.gateFailed',
+  escalated: 'routing.reason.escalated',
+  'manual-deviation': 'routing.reason.manualDeviation',
+  'route-errors': 'routing.reason.routeErrors',
+  'mode-off': 'routing.reason.modeOff',
+  'judgment-error': 'routing.reason.judgmentError',
+}
+
+/** Dictionary key per streak break reason. */
+export const ROUTING_BREAK_KEYS: Record<ModelRoutingBreakReason, TrajectoryKey> = {
+  'gate-failed': 'routing.reason.gateFailed',
+  escalated: 'routing.reason.escalated',
+  'manual-deviation': 'routing.reason.manualDeviation',
+  'mode-off': 'routing.reason.modeOff',
+  'route-errors': 'routing.reason.routeErrors',
 }

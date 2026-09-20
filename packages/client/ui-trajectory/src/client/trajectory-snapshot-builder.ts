@@ -6,7 +6,7 @@ import type {
 } from '@shres-code/shres-code-client-runtime/client'
 import type {
   TrajectoryConversationViewNode, TrajectoryRequestHeaderState,
-  TrajectoryShieldDecision, TrajectorySnapshot,
+  TrajectoryRoutingDecision, TrajectoryShieldDecision, TrajectorySnapshot,
 } from './trajectory-contract.ts'
 import type { TrajectoryJSpaceBadge } from './trajectory-record.ts'
 
@@ -24,6 +24,7 @@ export const EMPTY_TRAJECTORY_SNAPSHOT: TrajectorySnapshot = {
   runningCalls: EMPTY_LIST,
   decisions: EMPTY_LIST,
   jspace: EMPTY_LIST,
+  routing: EMPTY_LIST,
 }
 
 function stepKey(turn: number, step: number): string {
@@ -195,6 +196,7 @@ export class TrajectorySnapshotBuilder implements ConversationViewBuilder<
     const runningCalls: TrajectorySnapshot['runningCalls'][number][] = []
     const decisions: TrajectoryShieldDecision[] = []
     const jspace: TrajectoryJSpaceBadge[] = []
+    const routing: TrajectoryRoutingDecision[] = []
 
     for (const contribution of this.contributions) {
       const data = contribution.data
@@ -246,6 +248,10 @@ export class TrajectorySnapshotBuilder implements ConversationViewBuilder<
         jspace.push(data.badge)
         continue
       }
+      if (data.kind === 'routing') {
+        routing.push(data.decision)
+        continue
+      }
       turnEndings.push({
         turn: data.turn,
         time: data.time,
@@ -267,6 +273,7 @@ export class TrajectorySnapshotBuilder implements ConversationViewBuilder<
       runningCalls,
       decisions,
       jspace,
+      routing,
     }
   }
 

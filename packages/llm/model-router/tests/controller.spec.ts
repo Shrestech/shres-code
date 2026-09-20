@@ -687,6 +687,88 @@ describe('the sticky streak', () => {
   })
 })
 
+describe('the reported session selection', () => {
+  /**
+   * Enter a streak on turn one from `base` and open turn two, so the consumed
+   * header carries the candidate while the streak holds.
+   * @param base - the manual route turn one runs under.
+   * @returns the bench, entered into a held streak.
+   */
+  async function entered(base: ModelSelection = STRONG): Promise<Bench> {
+    const b = await bench({ config: { ...CONFIG, minTurnsDowngraded: 2 } })
+    openTurn(b.session, 1)
+    user(b.session, 'a small change')
+    expect(await b.resolve(1, base)).toEqual(CHEAP)
+    closeTurn(b.session, 1)
+    openTurn(b.session, 2)
+    return b
+  }
+
+  it('reports nothing while the state is strong', async () => {
+    const b = await bench()
+    expect(b.ctx.modelRouting.stickySelection(b.agent)).toBeUndefined()
+    user(b.session, 'a small change')
+    b.engine.choice = LOW_CONFIDENCE
+    expect(await b.resolve(1)).toBeUndefined()
+    // A strong decision rewrites nothing, so the header the turn consumed is
+    // already the manual route and there is no rewrite to report over.
+    expect(b.ctx.modelRouting.stickySelection(b.agent)).toBeUndefined()
+  })
+
+  it('reports the manual route a held streak descends beneath', async () => {
+    const b = await entered()
+    expect(b.decision(0)).toMatchObject({
+      outcome: 'downgraded',
+      selection: { candidateId: 'cheap', provider: CHEAP.provider, model: CHEAP.model },
+    })
+
+    expect(b.ctx.modelRouting.stickySelection(b.agent)).toStrictEqual(STRONG)
+  })
+
+  it('reports the entry route with the effort the streak was entered on', async () => {
+    const base: ModelSelection = { ...STRONG, reasoningEffort: ReasoningEffortId('high') }
+    const b = await entered(base)
+    expect(b.decision(0)).toMatchObject({ sticky: { entryBase: { ...STRONG, reasoningEffort: 'high' } } })
+    expect(b.ctx.modelRouting.stickySelection(b.agent)).toEqual(base)
+
+    // The held turn re-affirms the streak, and the entry base keeps its effort —
+    // the consumed header no longer carries the manual one.
+    b.engine.choice = LOW_CONFIDENCE
+    expect(await b.resolve(2)).toEqual(CHEAP)
+    expect(b.decision(1)?.sticky.entryBase).toEqual({ ...STRONG, reasoningEffort: 'high' })
+    expect(b.ctx.modelRouting.stickySelection(b.agent)).toEqual(base)
+  })
+
+  it('reports nothing once the streak ends', async () => {
+    const b = await entered()
+    expect(b.ctx.modelRouting.stickySelection(b.agent)).toStrictEqual(STRONG)
+
+    b.engine.choice = LOW_CONFIDENCE
+    closeTurn(b.session, 2)
+    openTurn(b.session, 3)
+    expect(await b.resolve(3)).toBeUndefined()
+    expect(b.decision(1)).toMatchObject({ reason: 'gate-failed', sticky: { active: false } })
+    expect(b.ctx.modelRouting.stickySelection(b.agent)).toBeUndefined()
+  })
+
+  it('reports nothing for a replayed streak whose entering decision recorded no base', async () => {
+    const b = await bench({ config: { ...CONFIG, minTurnsDowngraded: 2 } })
+    // A hand-written decision with no entry base and no preceding header: the
+    // fold holds the candidate but can name no manual route to report.
+    b.session.append('model-routing/decision', {
+      outcome: 'downgraded',
+      reason: 'gate-passed',
+      stateHash: '00000000',
+      stateSeqs: [0],
+      selection: { candidateId: 'cheap', provider: CHEAP.provider, model: CHEAP.model },
+      sticky: { active: true, turnsElapsed: 0, enteredTurn: 1 },
+    })
+
+    expect(stickyState(b.session.events, b.ctx.modelRouting.config()).active).toBe(true)
+    expect(b.ctx.modelRouting.stickySelection(b.agent)).toBeUndefined()
+  })
+})
+
 describe('the intra-turn pin', () => {
   it('judges once per turn and re-judges the next turn', async () => {
     const b = await bench()
@@ -907,6 +989,7 @@ describe('the projection unit', () => {
         confidence: 0.9,
         selection: { candidateId: 'cheap', provider: CHEAP.provider, model: CHEAP.model },
       },
+      lastStrong: STRONG,
       sticky: {
         active: true,
         turnsElapsed: 0,
@@ -921,6 +1004,35 @@ describe('the projection unit', () => {
       turnsElapsed: 2,
       selection: { candidateId: 'cheap', provider: CHEAP.provider, model: CHEAP.model },
     })
+  })
+
+  it('retains the last streak’s entry base after that streak broke', async () => {
+    const b = await bench({ projections: true, config: { ...CONFIG, minTurnsDowngraded: 2 } })
+    openTurn(b.session, 1)
+    user(b.session, 'a small change')
+    expect(await b.resolve(1)).toEqual(CHEAP)
+    expect(projectionOf(b.ctx, b.session).lastStrong).toEqual(STRONG)
+
+    // A manual switch away from the entry base ends the streak; the route the
+    // streak was entered on stays published, because that is the selection a
+    // session stuck on the candidate restores.
+    closeTurn(b.session, 1)
+    openTurn(b.session, 2)
+    expect(await b.resolve(2, { provider: 'other-provider', model: 'other-model' })).toBeUndefined()
+    expect(b.decision(1)).toMatchObject({ reason: 'manual-deviation', sticky: { active: false } })
+    expect(projectionOf(b.ctx, b.session).lastStrong).toEqual(STRONG)
+  })
+
+  it('publishes no retained route for an idle session that never entered a streak', async () => {
+    const b = await bench({ projections: true })
+    openTurn(b.session, 1)
+    user(b.session, 'a small change')
+
+    // The session already runs the allowlisted candidate, so the gate refuses it
+    // as no downgrade and no streak ever recorded a route to restore.
+    expect(await b.resolve(1, { provider: CHEAP.provider, model: CHEAP.model })).toBeUndefined()
+    expect(b.decision(0)).toMatchObject({ reason: 'candidate-equals-base', sticky: { active: false } })
+    expect(projectionOf(b.ctx, b.session).lastStrong).toBeUndefined()
   })
 
   it('ignores another command record and a route record with no input', async () => {

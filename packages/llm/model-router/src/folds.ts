@@ -22,11 +22,12 @@ export interface ModelRoutingStickyState {
   /** Allowlisted route the streak holds; absent while strong. */
   readonly candidate?: ModelRoutingSelection
   /**
-   * Manual provider/model in force when the streak was entered, read from the
-   * last `request/header` before the entering decision. Absent while strong.
-   * This is the route a manual switch is compared against, and only its
-   * provider/model fields count — an unrelated header change (a plan-mode
-   * toggle rewriting `header.system`) must not end a streak.
+   * Manual route in force when the streak was entered, read from the last
+   * `request/header` before the entering decision. Absent while strong. This is
+   * the route a manual switch is compared against, and only its provider/model
+   * fields count — an unrelated header change (a plan-mode toggle rewriting
+   * `header.system`) must not end a streak. The effort rides along for readers
+   * that report the selection; the comparison never reads it.
    */
   readonly entryBase?: ModelRoutingEntryBaseView
   /** Why the streak ended, when the fold passed its end. */
@@ -118,9 +119,15 @@ export function stickyState(
       case 'turn/start':
         currentTurn = event.data.turn
         break
-      case 'request/header':
-        lastHeader = { provider: event.data.header.config.provider, model: event.data.header.config.model }
+      case 'request/header': {
+        const config = event.data.header.config
+        lastHeader = {
+          provider: config.provider,
+          model: config.model,
+          ...config.reasoningEffort === undefined ? {} : { reasoningEffort: String(config.reasoningEffort) },
+        }
         break
+      }
       case 'turn/end':
         routeFailures = isRouteFailure(event.data.reason)
           ? routeFailures + 1
