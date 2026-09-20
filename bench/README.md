@@ -40,6 +40,7 @@ bench/
   runner/       Executes tasks against the harness per arm, writes trials.jsonl + run.json
   stats/        Aggregation, Wilson/bootstrap intervals, paired tests (McNemar, tie counts)
   report/       Rebuilds results.json per arm and ui/data.js for the report
+  analysis/     Recomputations over stored runs with zero API spend (out-of-loop table, model ranking)
   ui/           Static zero-build report (index.html + SVG charts); reads generated data.js
   demo/         Seeded synthetic data so the UI runs without an API key
   tasks/        Task catalog: instruction + fixture + verifier per directory
@@ -57,6 +58,7 @@ bench/
 node bench/demo/generate.js            # synthetic data into runs/demo/
 node bench/report/build.js             # rebuild aggregates + ui/data.js
 node bench/report/serve.js             # open the report at http://127.0.0.1:7474
+node bench/analysis/model-ranking.js   # strength-per-cost ranking of every model pin over stored runs
 node --test bench/tests/*.test.js        # unit tests
 ```
 
@@ -269,6 +271,10 @@ The payload's `comparisons` array holds one `off` vs treatment record for every 
 The payload also carries `verdicts`: the pre-registered Jev verdict block described under the Jev ladder, graded from the same embedded trials.
 
 Serve the static report with `node bench/report/serve.js`. The UI contract lives in `bench/ui/CONTRACT.md`.
+
+### Model ranking
+
+`node bench/analysis/model-ranking.js [--experiment <substring>]... [--arm <name>]... [--runs-dir <path>] [--json]` ranks the roster — every distinct `run.json` `model` pin across the stored experiments — by strength per realized cost, reading only the recorded `run.json` and `trials.jsonl` artifacts. Strength is the frozen arm pass rate: verifier-passed success-status trials over success-status trials, `status: error` excluded, the same `accuracy` every arm summary carries. Cost is realized usage: the `assistant/message` provider-reported `inputTokens + outputTokens` the runner folded into each trial record, summed over the same trials; no price table and no per-model rate ratio enter the computation, so tokens stay the only cost currency. The rank key is `strength / meanRealizedTokens` (pass rate per realized token per trial), which does not depend on how many trials a model recorded; the table prints it per million tokens. A model that recorded one arm reports that arm's pass rate; a model that recorded several arms pools their gradable trials and lists each arm run's own frozen pass rate and realized tokens under the row, so `--arm off` is how a ranking on one frozen arm is read. A model with no gradable trial or no realized usage is unranked (`rank: null`) and sorts after the ranked rows. Arm directories without `run.json` contribute nothing; an invalid manifest or trial record fails the command, and `--runs-dir` points it at an archived runs tree.
 
 ## Known limitations and deferred work
 

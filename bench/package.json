@@ -7,6 +7,7 @@
     "test": "node --test tests/*.test.js",
     "demo": "node demo/generate.js",
     "report": "node report/build.js",
+    "rank": "node analysis/model-ranking.js",
     "serve": "node report/serve.js"
   },
   "engines": {
