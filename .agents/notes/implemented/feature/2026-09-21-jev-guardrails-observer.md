@@ -1,6 +1,6 @@
 # Agent Note: Judgment guardrails — injection observer over the typed-judgment seam
 
-Status: proposed
+Status: implemented
 
 ## Problem
 
