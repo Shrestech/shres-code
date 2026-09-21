@@ -492,6 +492,35 @@ Source: [`packages/feedback/command-feedback/src/index.ts:62`](../packages/feedb
 
 Source: [`packages/goal/goal/src/domain.ts:66`](../packages/goal/goal/src/domain.ts)
 
+### `guard/*`
+
+<a id="guarddecision--log-only"></a>
+
+#### `guard/decision` — log-only
+
+```ts persistence-catalog
+/**
+ * One guardrails check of one committed tool call. Log-only and
+ * append-only: the observer reads the call's input, asks the judgment engine
+ * about it, and records the answer. Nothing is blocked, rewritten, or
+ * surfaced to a model, and the event carries no verdict — the operating
+ * points of any acting rung are deliberately absent until a labeled set says
+ * what they should be. Writers pass `{ ignorable: true }`.
+ * @param outcome - observed when both answers were read, degraded otherwise.
+ * @param reason - why this check resolved the way it did.
+ * @param stateHash - hash of the state the judgment read, never a gate.
+ * @param stateSeqs - session event seqs the state was assembled from.
+ * @param injection - the noul answer's probability, where an engine answered.
+ * @param severity - the score answer's score and confidence, where an engine answered.
+ * @param engine - engine that answered, where one did.
+ * @param model - exact model that answered, where one did.
+ * @param latencyMs - duration of the judgment call, where one was made.
+ */
+'guard/decision': GuardDecision
+```
+
+Source: [`packages/llm/judgment-guardrails/src/types.ts:106`](../packages/llm/judgment-guardrails/src/types.ts)
+
 ### `hook/*`
 
 <a id="hookinvoked--log-only"></a>

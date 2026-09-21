@@ -22,6 +22,7 @@ flowchart TD
     pkg_cursor_credential["cursor-credential"]
     pkg_grok_credential["grok-credential"]
     pkg_judgment["judgment"]
+    pkg_judgment_guardrails["judgment-guardrails"]
     pkg_judgment_typesafe["judgment-typesafe"]
     pkg_llm["llm"]
     pkg_llm_cli_bridge["llm-cli-bridge"]
@@ -533,6 +534,10 @@ flowchart TD
   pkg_speech --> pkg_llm
   pkg_speech --> pkg_settings
   pkg_speech --> pkg_typert_protocol
+  pkg_judgment_guardrails --> pkg_invariants
+  pkg_judgment_guardrails --> pkg_judgment
+  pkg_judgment_guardrails --> pkg_session
+  pkg_judgment_guardrails --> pkg_settings
   pkg_llm_cli_bridge --> pkg_credentials
   pkg_llm_cli_bridge --> pkg_invariants
   pkg_llm_cli_bridge --> pkg_launch_environment
@@ -1860,6 +1865,7 @@ flowchart TD
 | [`web`](../packages/web/web) | `web` | [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm) |
 | [`lsp`](../packages/lsp/lsp) | `lsp` | [`brand`](../packages/util/brand), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm) |
 | [`speech`](../packages/speech/speech) | `speech` | [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`settings`](../packages/settings/settings), [`typert-protocol`](../packages/typert/protocol) |
+| [`judgment-guardrails`](../packages/llm/judgment-guardrails) | `llm` | [`invariants`](../packages/runtime-diagnostics/invariants), [`judgment`](../packages/llm/judgment), [`session`](../packages/core/session), [`settings`](../packages/settings/settings) |
 | [`llm-cli-bridge`](../packages/llm/llm-cli-bridge) | `llm` | [`credentials`](../packages/credentials/credentials), [`invariants`](../packages/runtime-diagnostics/invariants), [`launch-environment`](../packages/util/launch-environment), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`settings`](../packages/settings/settings), [`subprocess`](../packages/subprocess/subprocess), [`timeout`](../packages/util/timeout) |
 | [`llm-codex-session`](../packages/llm/llm-codex-session) | `llm` | [`codex-credential`](../packages/llm/codex-credential), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`llm-pi-ai`](../packages/llm/llm-pi-ai), [`settings`](../packages/settings/settings) |
 | [`llm-cursor-session`](../packages/llm/llm-cursor-session) | `llm` | [`cursor-credential`](../packages/llm/cursor-credential), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`settings`](../packages/settings/settings) |

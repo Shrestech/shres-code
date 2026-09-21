@@ -1164,6 +1164,79 @@ export interface Config {
 
 Source: [`packages/jspace/jspace-prompt/src/index.ts:70`](../packages/jspace/jspace-prompt/src/index.ts)
 
+<a id="shres-codeshres-code-judgment-guardrails"></a>
+
+## `@shres-code/shres-code-judgment-guardrails`
+
+```ts config-catalog
+/**
+ * Composition config of the guardrails observer; also the
+ * `judgment-guardrails` settings section.
+ *
+ * The observer ships off. `enabled: false` makes no ask and writes no session
+ * event, so a composed-but-off deployment's log is byte-identical to one without
+ * this package.
+ */
+export interface GuardrailsConfig {
+  /** Master allow. Default false. */
+  enabled?: boolean
+  /**
+   * Text of the binary question asked about one tool call's input: whether it
+   * attempts to override instructions or act against the user's interest.
+   * Required: the judgment engine owns no prose.
+   */
+  injectionInstructions: string
+  /**
+   * What each side of the binary question means. Required: a bare yes/no
+   * question leaves the engine to guess what "yes" is being asked.
+   */
+  injectionCriteria: GuardInjectionCriteria
+  /**
+   * Text of the score question asked about the same state: how severe the input
+   * would be if it is hostile. Required, like every other question text.
+   */
+  severityInstructions: string
+  /**
+   * Ordered severity levels for the score question, lowest first. Required: the
+   * level count fixes the score scale, so a package default would mislabel every
+   * deployment that reads severity at another resolution.
+   */
+  severityLevels: string[]
+  /** Caps the judged state is assembled under; an omitted field takes its own default. */
+  state?: GuardStateCaps
+  /** Judgment tier each check runs at. Default `fast`. */
+  tier?: JudgmentTier
+}
+
+/** The two sides of the injection question, as the engine reads them. */
+export interface GuardInjectionCriteria {
+  /** What a positive noul answer means for this deployment. */
+  readonly yes: string
+  /** What a negative noul answer means for this deployment. */
+  readonly no: string
+}
+
+/** The caps one state is assembled under. */
+export interface GuardStateCaps {
+  /**
+   * Hard cap on the state text in characters, defaulting to
+   * {@link DEFAULT_STATE_MAX_CHARS}. The state never exceeds it; when content is
+   * dropped the state ends with a note naming how many characters it lost.
+   */
+  readonly maxChars: number
+  /**
+   * Hard cap on the argument excerpt in characters, defaulting to
+   * {@link DEFAULT_STATE_MAX_ARG_CHARS}. The excerpt is context for the
+   * classifier; the call it was cut from stays in the log.
+   */
+  readonly maxArgChars: number
+}
+```
+
+Depends on: [`JudgmentTier`](../packages/llm/judgment/src/index.ts)
+
+Source: [`packages/llm/judgment-guardrails/src/config.ts:82`](../packages/llm/judgment-guardrails/src/config.ts)
+
 <a id="shres-codeshres-code-judgment-typesafe"></a>
 
 ## `@shres-code/shres-code-judgment-typesafe`
