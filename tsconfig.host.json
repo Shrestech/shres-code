@@ -213,6 +213,7 @@
     { "path": "./packages/llm/llm-pi-ai" },
     { "path": "./packages/llm/judgment" },
     { "path": "./packages/llm/judgment-typesafe" },
+    { "path": "./packages/llm/judgment-guardrails" },
     { "path": "./packages/llm/model-router" },
     { "path": "./packages/compaction/compaction-jev" },
     { "path": "./packages/llm/llm-cli-bridge" },
