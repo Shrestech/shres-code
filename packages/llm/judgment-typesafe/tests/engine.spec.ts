@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context, Service } from '@shres-code/cordis'
 import { credentialRef } from '@shres-code/shres-code-credentials'
 import { JudgmentError, judgmentQuestionId } from '@shres-code/shres-code-judgment'
@@ -10,9 +10,13 @@ import type {
 import { MAX_TIMER_DELAY_MS } from '@shres-code/shres-code-timeout'
 import TypesafeJudgmentEngine, {
   DEFAULT_ENDPOINT,
+  DEFAULT_MAX_RETRIES,
   DEFAULT_MODELS,
+  DEFAULT_RETRY_DELAY_MS,
+  DEFAULT_RETRY_STATUSES,
   DEFAULT_TIMEOUT_MS,
   resolveConfig,
+  retryWait,
 } from '../src/index.ts'
 import type { TypesafeJudgmentConfig } from '../src/index.ts'
 import { MemoryCredentials } from './credentials-memory.ts'
@@ -118,6 +122,7 @@ function wireQuestions(server: MockServer, index = 0): Record<string, Record<str
 }
 
 afterEach(async () => {
+  vi.useRealTimers()
   await Promise.all(contexts.splice(0).map(ctx => ctx.fiber.dispose()))
   await closeMockServers()
 })
@@ -129,6 +134,11 @@ describe('resolveConfig', () => {
       endpoint: DEFAULT_ENDPOINT,
       models: DEFAULT_MODELS,
       timeoutMs: DEFAULT_TIMEOUT_MS,
+      retry: {
+        maxRetries: DEFAULT_MAX_RETRIES,
+        delayMs: DEFAULT_RETRY_DELAY_MS,
+        statuses: [...DEFAULT_RETRY_STATUSES],
+      },
     })
   })
 
@@ -138,12 +148,63 @@ describe('resolveConfig', () => {
       endpoint: 'http://127.0.0.1:1234/',
       models: { fast: 'fast-id', accurate: 'accurate-id' },
       timeoutMs: 1_000,
+      retry: { maxRetries: 3, delayMs: 50, statuses: [503] },
     })).toEqual({
       apiKeyRef: API_KEY_REF,
       endpoint: 'http://127.0.0.1:1234',
       models: { fast: 'fast-id', accurate: 'accurate-id' },
       timeoutMs: 1_000,
+      retry: { maxRetries: 3, delayMs: 50, statuses: [503] },
     })
+  })
+
+  it('retries only the vendor documented transient statuses by default', () => {
+    expect(DEFAULT_RETRY_STATUSES).toEqual([429, 529])
+    expect(DEFAULT_MAX_RETRIES).toBe(1)
+    expect(DEFAULT_RETRY_DELAY_MS).toBe(300)
+  })
+
+  it('detaches the resolved retry policy from the caller list', () => {
+    const statuses = [503]
+    const resolved = resolveConfig({ apiKeyRef: API_KEY_REF, retry: { statuses } })
+
+    statuses.push(500)
+
+    expect(resolved.retry.statuses).toEqual([503])
+  })
+
+  it('rejects an unknown key inside the retry entry by name', () => {
+    expect(() => resolveConfig({ apiKeyRef: API_KEY_REF, retry: { attempts: 2 } as never }))
+      .toThrow(/TypesafeJudgmentConfig.retry: unknown key "attempts"/)
+  })
+
+  it('rejects a retry budget that is not a non-negative safe integer', () => {
+    for (const maxRetries of [-1, 1.5, 'twice']) {
+      expect(() => resolveConfig({ apiKeyRef: API_KEY_REF, retry: { maxRetries } as never }))
+        .toThrow(/retry.maxRetries must be a non-negative safe integer/)
+    }
+  })
+
+  it('rejects a retry wait that is negative, non-finite, or unschedulable', () => {
+    for (const delayMs of [-1, Number.POSITIVE_INFINITY, MAX_TIMER_DELAY_MS + 1]) {
+      expect(() => resolveConfig({ apiKeyRef: API_KEY_REF, retry: { delayMs } }))
+        .toThrow(new RegExp('retry.delayMs must be a non-negative finite number no greater than ' + String(MAX_TIMER_DELAY_MS)))
+    }
+  })
+
+  it('rejects a retry status outside the HTTP range', () => {
+    for (const statuses of [[99], [600], [429.5], ['429']]) {
+      expect(() => resolveConfig({ apiKeyRef: API_KEY_REF, retry: { statuses } as never }))
+        .toThrow(/retry.statuses must hold HTTP statuses from 100 through 599/)
+    }
+  })
+
+  it('rejects a positive retry budget with no status to spend it on, and accepts a disabled one', () => {
+    expect(() => resolveConfig({ apiKeyRef: API_KEY_REF, retry: { maxRetries: 1, statuses: [] } }))
+      .toThrow(/maxRetries is 1 while no status is retryable/)
+    // Disabled retry keeps an empty list coherent.
+    expect(resolveConfig({ apiKeyRef: API_KEY_REF, retry: { maxRetries: 0, statuses: [] } }).retry)
+      .toEqual({ maxRetries: 0, delayMs: DEFAULT_RETRY_DELAY_MS, statuses: [] })
   })
 
   it('rejects an unknown key by name', () => {
@@ -639,8 +700,8 @@ describe('response validation', () => {
 })
 
 describe('provider failures', () => {
-  it.each([401, 422, 429, 529, 500])('fails UNAVAILABLE on HTTP %i with the provider message', async (status) => {
-    const { ctx } = await harness([
+  it.each([401, 422, 500])('fails UNAVAILABLE on HTTP %i without spending a retry', async (status) => {
+    const { ctx, server } = await harness([
       { kind: 'json', status, body: JSON.stringify({ error: { message: `refused ${status}` } }) },
     ])
 
@@ -649,17 +710,21 @@ describe('provider failures', () => {
     expect(failure.code).toBe('UNAVAILABLE')
     expect(failure.message).toContain(`HTTP ${status}`)
     expect(failure.message).toContain(`refused ${status}`)
+    // A deterministic refusal is answered from the first response: the vendor's
+    // 401 and 422 cannot change on a repeat, and the stub would answer 500 if a
+    // second request were sent.
+    expect(server.requests).toHaveLength(1)
   })
 
   it('reads a message from the top level of a JSON error body', async () => {
     const { ctx } = await harness([
-      { kind: 'json', status: 429, body: JSON.stringify({ message: 'slow down' }) },
+      { kind: 'json', status: 500, body: JSON.stringify({ message: 'backend is down' }) },
     ])
 
     const failure = await askFailure(() => ctx.judgment.ask({ state: 'state', questions: [BINARY] }))
 
-    expect(failure.message).toContain('HTTP 429')
-    expect(failure.message).toContain('slow down')
+    expect(failure.message).toContain('HTTP 500')
+    expect(failure.message).toContain('backend is down')
   })
 
   it('reports the status when the error body is not JSON', async () => {
@@ -855,6 +920,209 @@ describe('deadline and cancellation', () => {
   })
 })
 
+
+/** Fake the timer the retry wait arms, leaving real I/O and `AbortSignal` timers alone. */
+function fakeRetryTimer(): void {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+}
+
+/**
+ * Let real I/O run until the stub has answered, without advancing a timer.
+ * @param server - the stub the ask's requests land on.
+ */
+async function drainRefusal(server: MockServer): Promise<void> {
+  for (let turn = 0; turn < 200 && server.requests.length === 0; turn += 1) {
+    await new Promise(resolve => setImmediate(resolve))
+  }
+  // The refusal is in flight; these turns read its body and arm the retry wait.
+  for (let turn = 0; turn < 20; turn += 1) await new Promise(resolve => setImmediate(resolve))
+}
+
+/**
+ * Advance the faked retry timer until the ask settles, yielding real I/O between
+ * advances so the request each release sends can complete.
+ * @param pending - the ask to settle.
+ * @returns the settled ask.
+ */
+async function settleRetry<T>(pending: Promise<T>): Promise<T> {
+  let settled = false
+  void pending.then(() => { settled = true }, () => { settled = true })
+  for (let turn = 0; turn < 400 && !settled; turn += 1) {
+    await new Promise(resolve => setImmediate(resolve))
+    await vi.advanceTimersByTimeAsync(DEFAULT_RETRY_DELAY_MS)
+  }
+  return pending
+}
+
+describe('bounded retry', () => {
+  it('retries a 429 after one fixed wait and answers the second attempt', async () => {
+    fakeRetryTimer()
+    const { ctx, server } = await harness([
+      { kind: 'json', status: 429, body: JSON.stringify({ error: { message: 'slow down' } }) },
+      { kind: 'json', status: 200, body: answerBody({ urgent: { type: 'noul', noul: 0.7 } }) },
+    ])
+
+    const pending = ctx.judgment.ask({ state: 'state', questions: [BINARY] })
+    await drainRefusal(server)
+
+    // The refusal is in and the retry is armed on the faked timer: nothing is sent
+    // until that wait elapses, which is the one fixed delay the policy configures.
+    expect(server.requests).toHaveLength(1)
+
+    const result = await settleRetry(pending)
+
+    expect(server.requests).toHaveLength(2)
+    // A retry re-sends the ask it already sent, byte for byte.
+    expect(server.requests[1]?.body).toEqual(server.requests[0]?.body)
+    expect(result.answers).toEqual([{ kind: 'binary', id: 'urgent', probability: 0.7 }])
+    expect(result.engine).toBe('typesafe')
+  })
+
+  it('retries a 529 after one fixed wait and answers the second attempt', async () => {
+    fakeRetryTimer()
+    const { ctx, server } = await harness([
+      { kind: 'json', status: 529, body: JSON.stringify({ error: { message: 'overloaded' } }) },
+      { kind: 'json', status: 200, body: answerBody({ urgent: { type: 'noul', noul: 0.55 } }) },
+    ])
+
+    const pending = ctx.judgment.ask({ state: 'state', questions: [BINARY] })
+    await drainRefusal(server)
+    expect(server.requests).toHaveLength(1)
+
+    const result = await settleRetry(pending)
+
+    expect(server.requests).toHaveLength(2)
+    expect(result.answers).toEqual([{ kind: 'binary', id: 'urgent', probability: 0.55 }])
+  })
+
+  it('surfaces the last refusal as UNAVAILABLE once the budget is spent', async () => {
+    fakeRetryTimer()
+    const { ctx, server } = await harness([
+      { kind: 'json', status: 429, body: JSON.stringify({ error: { message: 'slow down' } }) },
+      { kind: 'json', status: 429, body: JSON.stringify({ error: { message: 'still busy' } }) },
+    ])
+
+    const failure = await askFailure(() => settleRetry(ctx.judgment.ask({ state: 'state', questions: [BINARY] })))
+
+    expect(failure.code).toBe('UNAVAILABLE')
+    expect(failure.message).toContain('HTTP 429')
+    expect(failure.message).toContain('still busy')
+    // The default budget is one retry, and the failure is the response that spent it.
+    expect(server.requests).toHaveLength(2)
+  })
+
+  it('sends no retry when the budget is zero', async () => {
+    const { ctx, server } = await harness([
+      { kind: 'json', status: 429, body: JSON.stringify({ message: 'slow down' }) },
+    ], { config: { retry: { maxRetries: 0 } } })
+
+    const failure = await askFailure(() => ctx.judgment.ask({ state: 'state', questions: [BINARY] }))
+
+    expect(failure.code).toBe('UNAVAILABLE')
+    expect(failure.message).toContain('slow down')
+    expect(server.requests).toHaveLength(1)
+  })
+
+  it('retries only a status the policy names', async () => {
+    // A deployment that names 503 leaves the vendor's rate limit to its caller.
+    const unnamed = await harness([
+      { kind: 'json', status: 429, body: JSON.stringify({ message: 'slow down' }) },
+    ], { config: { retry: { statuses: [503] } } })
+
+    const failure = await askFailure(() => unnamed.ctx.judgment.ask({ state: 'state', questions: [BINARY] }))
+
+    expect(failure.message).toContain('HTTP 429')
+    expect(unnamed.server.requests).toHaveLength(1)
+
+    // The status it does name is retried.
+    fakeRetryTimer()
+    const named = await harness([
+      { kind: 'json', status: 503, body: JSON.stringify({ message: 'try later' }) },
+      { kind: 'json', status: 200, body: answerBody({ urgent: { type: 'noul', noul: 0.6 } }) },
+    ], { config: { retry: { statuses: [503] } } })
+
+    const pending = named.ctx.judgment.ask({ state: 'state', questions: [BINARY] })
+    await drainRefusal(named.server)
+    expect(named.server.requests).toHaveLength(1)
+
+    await expect(settleRetry(pending)).resolves.toMatchObject({ engine: 'typesafe' })
+    expect(named.server.requests).toHaveLength(2)
+  })
+
+  it('aborts the ask while the retry wait is outstanding', async () => {
+    fakeRetryTimer()
+    const { ctx, server } = await harness([
+      { kind: 'json', status: 429, body: JSON.stringify({ message: 'slow down' }) },
+      { kind: 'json', status: 200, body: answerBody({ urgent: { type: 'noul', noul: 0.7 } }) },
+    ])
+    const controller = new AbortController()
+
+    const pending = ctx.judgment.ask({ state: 'state', questions: [BINARY], signal: controller.signal })
+    await drainRefusal(server)
+    expect(server.requests).toHaveLength(1)
+
+    controller.abort()
+
+    const failure = await askFailure(() => pending)
+
+    expect(failure.code).toBe('ABORTED')
+    expect(failure.message).toContain('cancelled by the caller')
+    // The wait ended the ask where it stood: the doomed retry was never sent.
+    expect(server.requests).toHaveLength(1)
+    await vi.advanceTimersByTimeAsync(DEFAULT_RETRY_DELAY_MS)
+    expect(server.requests).toHaveLength(1)
+  })
+})
+
+describe('retryWait', () => {
+  it('resolves once the delay elapses and not before', async () => {
+    fakeRetryTimer()
+    const signal = new AbortController().signal
+    let settled = false
+    const waiting = retryWait(DEFAULT_RETRY_DELAY_MS, signal)
+    void waiting.then(() => { settled = true })
+
+    await vi.advanceTimersByTimeAsync(DEFAULT_RETRY_DELAY_MS - 1)
+    expect(settled).toBe(false)
+
+    await vi.advanceTimersByTimeAsync(1)
+    await expect(waiting).resolves.toBeUndefined()
+  })
+
+  it('rejects with the signal own reason when the ask is cancelled during the wait', async () => {
+    fakeRetryTimer()
+    const controller = new AbortController()
+    const waiting = retryWait(DEFAULT_RETRY_DELAY_MS, controller.signal)
+
+    controller.abort(new Error('caller gave up'))
+
+    await expect(waiting).rejects.toThrow('caller gave up')
+  })
+
+  it('ends at once when the signal is already aborted', async () => {
+    fakeRetryTimer()
+    const controller = new AbortController()
+    controller.abort('caller gave up')
+
+    // An AbortSignal fires no event for an abort that already happened, so the wait
+    // reads it up front; a reason that is not an Error is wrapped, because a wait
+    // never rejects with a non-error value.
+    const waiting = retryWait(DEFAULT_RETRY_DELAY_MS, controller.signal)
+
+    await expect(waiting).rejects.toThrow(/retry wait was cancelled by the caller/)
+    // Nothing was scheduled: the delay never ran.
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('retries on the next timer turn with a zero delay', async () => {
+    fakeRetryTimer()
+    const waiting = retryWait(0, new AbortController().signal)
+
+    await vi.advanceTimersByTimeAsync(0)
+
+    await expect(waiting).resolves.toBeUndefined()
+  })
+})
 describe('service registration', () => {
   it('registers as ctx.judgment and withdraws the service when its fiber disposes', async () => {
     const { ctx } = await harness([

@@ -10,7 +10,7 @@ The harness needed rented calibrated judgment for two decisions — which model 
 
 Shipped on PR #195, one seam with staged consumers.
 
-- `ctx.judgment` (`packages/llm/judgment`, `packages/llm/judgment-typesafe`): choice/score/noul questions against TypeSafe's systemone API; the deployment switch treats off as exactly absent; request redaction has one home, the provider.
+- `ctx.judgment` (`packages/llm/judgment`, `packages/llm/judgment-typesafe`): choice/score/noul questions against TypeSafe's systemone API; the deployment switch treats off as exactly absent; request redaction has one home, the provider, and transient 429/529 refusals retry once after a validated wait with a spent budget surfacing the same UNAVAILABLE failure as before.
 - `model-router` (`packages/llm/model-router`): downgrade-only sticky routing with the allowlist as the enforcement point, `minTurnsDowngraded` hysteresis, the `/route` command, and the `modelRouting` projection whose seed mirrors `modeOf` — an eventless log starts from the configured `initialMode`. `lastStrong` retention powers the chip's restore gesture.
 - `compaction-jev`: verify-then-escalate range selection over the basic engine's protected `selectRange` hook.
 - Bench (`bench/`): frozen route/compact arms under preregistration, executable verdicts, and the strength-per-realized-cost model ranking (`bench/analysis/model-ranking.js`) — tokens are the only cost currency, never a price table.

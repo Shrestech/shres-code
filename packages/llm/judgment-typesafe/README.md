@@ -4,7 +4,7 @@ TypeSafe AI "System One" judgment provider for the typed-judgment seam (`ctx.jud
 
 The engine owns transport, credential resolution, tier-to-model mapping, and the validation of the one untyped input it reads — the response body. It adds no prompt prose, no session event, and no tool: every question string, threshold, and decision belongs to the consuming package. The request path, headers, and body follow the vendor's documented API.
 
-There is no retry, no backoff, and no streaming in this provider. A 429 or 529 response arrives as `UNAVAILABLE`, and the caller owns any retry policy.
+A refused request is retried in a bounded way: only a status the retry policy names — the vendor's documented transient 429 and 529 by default — is sent again, at most `retry.maxRetries` times, after one fixed `retry.delayMs` wait that ends at once when the caller cancels. A deterministic refusal such as 401 or 422, a spent budget, a status the policy does not name, and a transport failure with no status all arrive as `UNAVAILABLE` on their first response, exactly as this provider behaved before retry existed. There is no streaming.
 
 ## Config
 
@@ -17,8 +17,11 @@ Every field is validated at plugin load, and unrecognized keys fail load by name
 | `models.fast` | `jev-preview` | Model id serving the `fast` tier. |
 | `models.accurate` | `jev-latest` | Model id serving the `accurate` tier, and every ask that omits a tier. |
 | `timeoutMs` | `30000` | Deadline for one vendor request, in milliseconds. An ask that outlives it fails with `UNAVAILABLE` naming the figure. Must be a positive finite number no greater than `MAX_TIMER_DELAY_MS` (2147483647). |
+| `retry.maxRetries` | `1` | Retries allowed after the first request. `0` disables retry. Must be a non-negative safe integer. |
+| `retry.delayMs` | `300` | Fixed wait before each retry, in milliseconds. `0` retries on the next timer turn. Must be a non-negative finite number no greater than `MAX_TIMER_DELAY_MS`. |
+| `retry.statuses` | `[429, 529]` | HTTP statuses eligible for retry: the vendor's documented transient rate limit and overloaded service. Every other status fails on its first response, so a deterministic 401 or 422 must not be added here. Must hold statuses from 100 through 599, and must not be empty while `retry.maxRetries` is positive. |
 
-The deadline is armed when the vendor request starts, so credential resolution and redaction are not counted against it.
+The deadline is armed once per ask, before the first request, so credential resolution and redaction are not counted against it while a retry and its wait are: an ask whose retries outlast `timeoutMs` fails with `UNAVAILABLE` naming the figure, and a cancel during a wait fails with `ABORTED`.
 
 ## Composition
 
@@ -32,14 +35,14 @@ The key itself is never in configuration: the credentials seam (`ctx.credentials
 
 ## Ask behaviour
 
-One ask resolves the credential reference, consults the optional egress hook `ctx.judgmentRedactor` exactly once — the provider is the hook's one home, so a consumer's state arrives unredacted and leaves as what the hook returned — resolves the tier to a model id, and posts one request. The result carries `answers` in the order the questions were asked (each with its question id), `engine: 'typesafe'`, the model id the response reported, and `latencyMs`, measured around the whole ask and rounded to a whole millisecond. The vendor reports the versioned id an alias resolved to, so a log records what answered rather than what was requested.
+One ask resolves the credential reference, consults the optional egress hook `ctx.judgmentRedactor` exactly once — the provider is the hook's one home, so a consumer's state arrives unredacted and leaves as what the hook returned — resolves the tier to a model id, and posts one request. A refusal the retry policy names is sent again after its fixed wait, byte for byte: the retry repeats the same ask with the same credential rather than re-resolving anything. The result carries `answers` in the order the questions were asked (each with its question id), `engine: 'typesafe'`, the model id the response reported, and `latencyMs`, measured around the whole ask — every attempt and wait included — and rounded to a whole millisecond. The vendor reports the versioned id an alias resolved to, so a log records what answered rather than what was requested.
 
 Failures are one `JudgmentError` each, and a consumer branches on `code`:
 
 | Code | Raised when |
 |---|---|
 | `UNCONFIGURED` | No credentials service is mounted, or the reference holds no value. Thrown before any request is sent. |
-| `UNAVAILABLE` | The request failed, the vendor answered non-2xx (401, 422, 429, 529 and any other status), or the request outlived `timeoutMs`. A non-2xx message carries the HTTP status and the provider's own message when its error body is JSON. |
+| `UNAVAILABLE` | The request failed, the vendor answered non-2xx (401, 422, 429, 529 and any other status), a transient status outlasted `retry.maxRetries`, or the ask outlived `timeoutMs`. A non-2xx message carries the HTTP status and the provider's own message when its error body is JSON, and an exhausted retry carries the response that spent the budget. |
 | `INVALID_ANSWER` | The response body is not an object, carries no model id or answers, or answers a question with a missing entry, another kind's discriminant, an option the question never offered, or a non-finite number. |
 | `ABORTED` | The caller's own `AbortSignal` ended the ask. Caller cancellation is classified before the deadline, so a cancelled ask is never reported as a timeout. |
 
@@ -93,15 +96,15 @@ The vendor's model receives `state` — after `ctx.judgmentRedactor` has run, wh
 
 #### Token effect
 
-The ask's input is the state plus the question text, charged at the vendor's input rate; a longer state costs more input tokens. The vendor returns probabilities rather than generated text, so this ask contributes no tokens to any conversation, and this package adds no text of its own. Question criteria that are never set are omitted from the request rather than sent empty.
+The ask's input is the state plus the question text, charged at the vendor's input rate; a longer state costs more input tokens, and a retry sends that same input again, so it is charged again. The vendor returns probabilities rather than generated text, so this ask contributes no tokens to any conversation, and this package adds no text of its own. Question criteria that are never set are omitted from the request rather than sent empty.
 
 #### KV Cache effect
 
-Independent model request: the ask neither reads nor extends a conversation prefix, and nothing here appends to a later model request. A deployment that redacts or caps the state changes the bytes of this one request and no conversation prefix.
+Independent model request: the ask neither reads nor extends a conversation prefix, and nothing here appends to a later model request. A retry sends identical bytes, which the vendor's own prefix cache may reuse, and the wait between attempts changes nothing outside this ask. A deployment that redacts or caps the state changes the bytes of this one request and no conversation prefix.
 
 ## Known Limitations and Deferred Work
 
-- **No retries and no backoff** — a 429 or 529 arrives as `UNAVAILABLE` with the provider's message, and this provider neither waits nor repeats. A caller that wants a retry policy owns it entirely.
+- **Retry is bounded, fixed, and status-only** — one fixed delay is waited per retry, with no exponential growth, no jitter, no `Retry-After` reading, and no budget beyond `retry.maxRetries`. Only a refused HTTP status is retried: a transport failure, a body that cannot be read, and a malformed answer are not repeated, so a caller that wants those repeated owns that policy itself.
 - **No streaming and no generated text** — the vendor returns one JSON body of probabilities, so there is no partial answer and nothing to render as text.
 - **State is one string** — `JudgmentInput.state` is a string, so a consumer with structured state serializes it itself; this package sends what it was given, and a JSON state is the caller's serialization.
 - **Text-only input** — the state and every question string are text. An image must be turned into text before it reaches an ask.

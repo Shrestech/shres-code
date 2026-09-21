@@ -12,9 +12,13 @@
  * deadline fails with `UNAVAILABLE` naming that figure while the caller's own
  * `AbortSignal` fails with `ABORTED`.
  *
- * There is no retry, no backoff, and no streaming: the documented 401, 422,
- * 429, and 529 responses all arrive as `UNAVAILABLE`, and the caller owns any
- * retry.
+ * A refused response is repeated only when its status is one of the configured
+ * `retry.statuses` — the vendor's documented transient 429 and 529 by default —
+ * up to `retry.maxRetries` times, after one fixed `retry.delayMs` wait that
+ * ends at once when the ask is cancelled. A deterministic refusal such as 401 or
+ * 422, an exhausted budget, a transport failure with no status at all, and every
+ * other status still arrive as `UNAVAILABLE` on their first response. There is
+ * no streaming.
  *
  * @module @shres-code/shres-code-judgment-typesafe
  */
@@ -28,7 +32,16 @@ import type {
   JudgmentInput,
   JudgmentResult,
 } from '@shres-code/shres-code-judgment'
-import { DEFAULT_ENDPOINT, DEFAULT_MODELS, DEFAULT_TIMEOUT_MS, resolveConfig, resolveTierModel } from './config.ts'
+import {
+  DEFAULT_ENDPOINT,
+  DEFAULT_MAX_RETRIES,
+  DEFAULT_MODELS,
+  DEFAULT_RETRY_DELAY_MS,
+  DEFAULT_RETRY_STATUSES,
+  DEFAULT_TIMEOUT_MS,
+  resolveConfig,
+  resolveTierModel,
+} from './config.ts'
 import type { ResolvedTypesafeJudgmentConfig } from './config.ts'
 import { readWireResponse, toWireRequest } from './wire.ts'
 import type { WireRequest } from './wire.ts'
@@ -36,15 +49,18 @@ import type { TypesafeJudgmentConfig } from './types.ts'
 
 export {
   DEFAULT_ENDPOINT,
+  DEFAULT_MAX_RETRIES,
   DEFAULT_MODELS,
+  DEFAULT_RETRY_DELAY_MS,
+  DEFAULT_RETRY_STATUSES,
   DEFAULT_TIMEOUT_MS,
   resolveConfig,
   resolveTierModel,
 } from './config.ts'
-export type { ResolvedTypesafeJudgmentConfig } from './config.ts'
+export type { ResolvedTypesafeJudgmentConfig, ResolvedTypesafeJudgmentRetry } from './config.ts'
 export { readWireResponse, toWireRequest } from './wire.ts'
 export type { ReadWireResponse, WireNoulCriteria, WireQuestion, WireRequest } from './wire.ts'
-export type { TypesafeJudgmentConfig, TypesafeJudgmentModels } from './types.ts'
+export type { TypesafeJudgmentConfig, TypesafeJudgmentModels, TypesafeJudgmentRetry } from './types.ts'
 
 /** Value the seam reports as the engine that produced an answer. */
 const ENGINE = 'typesafe'
@@ -73,13 +89,15 @@ interface AskCancellation {
 }
 
 /**
- * TypeSafe AI judgment engine: one HTTP request per ask, one validated answer
- * per question, no session event and no prompt text of its own.
+ * TypeSafe AI judgment engine: one HTTP request per attempt, one validated
+ * answer per question, no session event and no prompt text of its own.
  *
  * Registered by {@link JudgmentService} as `ctx.judgment`. Nothing is cached
  * across asks — the credential reference is re-resolved and the deadline is
  * restarted on every call — so a rotated key reaches the next ask without a
- * restart.
+ * restart. A refused attempt adds nothing to that list: the same ask is sent
+ * again after the configured wait, and the credential and deadline of the ask
+ * are the ones the first attempt used.
  */
 export class TypesafeJudgmentEngine extends JudgmentService {
   /**
@@ -94,6 +112,11 @@ export class TypesafeJudgmentEngine extends JudgmentService {
       accurate: z.string().required(),
     }).default(DEFAULT_MODELS),
     timeoutMs: z.number().min(Number.MIN_VALUE).max(MAX_TIMER_DELAY_MS).default(DEFAULT_TIMEOUT_MS),
+    retry: z.object({
+      maxRetries: z.number().step(1).min(0).max(Number.MAX_SAFE_INTEGER).default(DEFAULT_MAX_RETRIES),
+      delayMs: z.number().min(0).max(MAX_TIMER_DELAY_MS).default(DEFAULT_RETRY_DELAY_MS),
+      statuses: z.array(z.number().step(1).min(100).max(599)).default([...DEFAULT_RETRY_STATUSES]),
+    }),
   })
 
   /** Resolved and validated ask facts. */
@@ -113,12 +136,14 @@ export class TypesafeJudgmentEngine extends JudgmentService {
    * Answer one set of typed questions about one state.
    * @param input - the state, the questions, the optional tier, and the cancellation signal.
    * @returns the answers in ask order with `engine: 'typesafe'`, the model id the
-   *   response reported, and the ask's duration in whole milliseconds.
+   *   response reported, and the ask's duration in whole milliseconds, which
+   *   covers every attempt and wait the ask spent.
    * @throws JudgmentError code `UNCONFIGURED` when the credentials seam is absent
    *   or the reference resolves to nothing, code `UNAVAILABLE` when the request
-   *   fails, is refused, or outlives `timeoutMs`, code `INVALID_ANSWER` when the
-   *   response cannot answer the questions asked, or code `ABORTED` when the
-   *   caller cancelled the ask.
+   *   fails, is refused — including a transient refusal that outlasts
+   *   `retry.maxRetries` — or outlives `timeoutMs`, code `INVALID_ANSWER` when
+   *   the response cannot answer the questions asked, or code `ABORTED` when the
+   *   caller cancelled the ask, during a retry wait included.
    */
   override async ask(input: JudgmentInput): Promise<JudgmentResult> {
     const startedAt = performance.now()
@@ -179,8 +204,15 @@ export class TypesafeJudgmentEngine extends JudgmentService {
   }
 
   /**
-   * Send one ask and return its response. A non-2xx status fails here, so no
-   * caller ever reads an error body as an answer.
+   * Send one ask and return its accepted response, retrying a transient
+   * refusal. A non-2xx status fails here, so no caller ever reads an error body
+   * as an answer.
+   *
+   * The retry decision reads the refused status and the remaining budget on the
+   * response itself: a status the policy does not name, and a budget already
+   * spent, both surface that response's own `UNAVAILABLE` failure, so an
+   * exhausted retry is indistinguishable from the single attempt this engine
+   * made before retry existed.
    * @param request - the mapped request body.
    * @param apiKey - the bearer token resolved for this ask.
    * @param cancellation - the ask's signals and deadline.
@@ -189,22 +221,51 @@ export class TypesafeJudgmentEngine extends JudgmentService {
    */
   private async post(request: WireRequest, apiKey: string, cancellation: AskCancellation): Promise<Response> {
     const endpoint = this.config.endpoint
-    let response: Response
-    try {
-      response = await fetch(`${endpoint}${SYSTEMONE_PATH}`, {
-        method: 'POST',
-        headers: {
-          authorization: `Bearer ${apiKey}`,
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify(request),
-        signal: cancellation.signal,
-      })
-    } catch (error: unknown) {
-      throw stepFailure(error, cancellation, 'UNAVAILABLE', `TypeSafe request to ${endpoint} failed`)
+    const retry = this.config.retry
+    for (let attempt = 0; ; attempt += 1) {
+      let response: Response
+      try {
+        response = await fetch(`${endpoint}${SYSTEMONE_PATH}`, {
+          method: 'POST',
+          headers: {
+            authorization: `Bearer ${apiKey}`,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify(request),
+          signal: cancellation.signal,
+        })
+      } catch (error: unknown) {
+        throw stepFailure(error, cancellation, 'UNAVAILABLE', `TypeSafe request to ${endpoint} failed`)
+      }
+      if (response.ok) return response
+      const failure = await httpFailure(response, endpoint, cancellation)
+      if (attempt >= retry.maxRetries || !retry.statuses.includes(response.status)) throw failure
+      await this.backOff(retry.delayMs, cancellation)
     }
-    if (!response.ok) throw await httpFailure(response, endpoint, cancellation)
-    return response
+  }
+
+  /**
+   * Wait the configured fixed delay before the next attempt. The wait is the
+   * ask's own cancellation point: a caller that cancels during it stops the ask
+   * rather than spending the delay on a request that is already doomed, and a
+   * deadline that passes during it reports the timeout the request would.
+   * @param delayMs - the configured fixed delay in milliseconds.
+   * @param cancellation - the ask's signals and deadline.
+   * @throws JudgmentError code `ABORTED` when the caller cancelled, or code
+   *   `UNAVAILABLE` naming `timeoutMs` when the deadline passed, both classified
+   *   by {@link stepFailure}.
+   */
+  private async backOff(delayMs: number, cancellation: AskCancellation): Promise<void> {
+    try {
+      await retryWait(delayMs, cancellation.signal)
+    } catch (error: unknown) {
+      throw stepFailure(
+        error,
+        cancellation,
+        'UNAVAILABLE',
+        `TypeSafe judgment ask did not finish retrying within timeoutMs ${cancellation.timeoutMs}`,
+      )
+    }
   }
 
   /**
@@ -224,6 +285,47 @@ export class TypesafeJudgmentEngine extends JudgmentService {
       throw stepFailure(error, cancellation, 'INVALID_ANSWER', 'TypeSafe response body is not JSON')
     }
   }
+}
+
+/**
+ * Wait one fixed retry delay, ending as soon as the ask is cancelled.
+ *
+ * The signal is read once up front and then observed by listener, because an
+ * `AbortSignal` fires no event for an abort that already happened: a wait
+ * entered with a cancelled ask ends immediately instead of sleeping the delay
+ * out. A wait entered with no cancellation resolves on the timer alone.
+ *
+ * @param delayMs - the delay to wait in milliseconds; `0` waits one timer turn.
+ * @param signal - the ask's cancellation signal, which ends the wait when it aborts.
+ * @returns a promise that resolves once the delay has elapsed.
+ * @throws Error carrying the signal's own abort reason when the ask is cancelled first.
+ */
+export function retryWait(delayMs: number, signal: AbortSignal): Promise<void> {
+  if (signal.aborted) return Promise.reject(abortReason(signal))
+  return new Promise<void>((resolve, reject) => {
+    const onAbort = (): void => {
+      clearTimeout(timer)
+      reject(abortReason(signal))
+    }
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort)
+      resolve()
+    }, delayMs)
+    signal.addEventListener('abort', onAbort, { once: true })
+  })
+}
+
+/**
+ * One cancellation reason as a thrown error, so a wait never rejects with a
+ * non-error value. An `AbortSignal` without an explicit reason aborts with a
+ * `DOMException`, which this wraps and keeps as the cause.
+ * @param signal - the signal that aborted.
+ * @returns the signal's reason when it is an Error, otherwise a wrapping error.
+ */
+function abortReason(signal: AbortSignal): Error {
+  return signal.reason instanceof Error
+    ? signal.reason
+    : new Error('TypeSafe judgment retry wait was cancelled by the caller', { cause: signal.reason })
 }
 
 /**

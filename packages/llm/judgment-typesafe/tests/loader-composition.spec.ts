@@ -132,6 +132,30 @@ describe('real Loader composition', () => {
     })
   })
 
+  it('retries one transient refusal through the loaded composition', async () => {
+    const server = await mockServer([
+      { kind: 'json', status: 429, body: JSON.stringify({ error: { message: 'slow down' } }) },
+      {
+        kind: 'json',
+        status: 200,
+        body: JSON.stringify({
+          model: ANSWERED_MODEL,
+          answers: { urgent: { type: 'noul', noul: 0.9 } },
+          usage: { input_tokens: 64, output_tokens: 0 },
+        }),
+      },
+    ])
+    // The nested retry entry is the loaded schema's, and the wait is real here: the
+    // test shortens it rather than faking the timer the Loader's own boot runs on.
+    const loaded = await loadYaml(rows(server, ['    retry:', '      delayMs: 1']))
+
+    const result = await loaded.judgment.ask({ state: 'the build is failing', questions: [BINARY] })
+
+    expect(result.answers).toEqual([{ kind: 'binary', id: 'urgent', probability: 0.9 }])
+    expect(server.requests).toHaveLength(2)
+    expect(server.requests[1]?.body).toEqual(server.requests[0]?.body)
+  })
+
   it('rejects an unknown config key at load', async () => {
     const server = await mockServer([])
 
