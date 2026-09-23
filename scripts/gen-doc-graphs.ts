@@ -139,6 +139,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Owns one single-flight Codex session-credential manager per credential spec; the llm-codex-session adapter resolves its bearer token and account header through this service.',
   },
   {
+    key: 'claudeCredential',
+    pkg: 'claude-credential',
+    title: 'Claude subscription credential engine',
+    mode: 'core',
+    consumers: ['llm-claude-session'],
+    note: 'Owns one single-flight Claude session-credential manager per credential spec; the llm-claude-session adapter resolves its bearer token through this service.',
+  },
+  {
     key: 'toolResultPruner',
     pkg: 'compaction-tool-result-pruner',
     title: 'Model-free tool-result pruning',

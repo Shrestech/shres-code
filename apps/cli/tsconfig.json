@@ -75,6 +75,9 @@
       "path": "../../packages/llm/llm-codex-session"
     },
     {
+      "path": "../../packages/llm/llm-claude-session"
+    },
+    {
       "path": "../../packages/llm/llm-xai-apikey"
     },
     {
