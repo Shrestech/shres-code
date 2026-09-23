@@ -18,7 +18,7 @@ Windows run sandboxed with context isolation and no node integration; the shell 
 
 `dev:desktop` and `start:desktop` build the workspace and the app, materialize `.desktop-build/development/project` (profile manifest with the base and web-app bundles, pnpm settings, the workspace virtual-hoist mirror, and links to `apps/cli` and `apps/desktop-host`), and launch Electron with `SHRES_HOME` inside `.desktop-build` and the main, renderer, and host inspectors on 9229, 9222, and 9230.
 
-The shell carries no plugin-manager page, no update coordinator, and no packaging or signing path; those arrive with the packaging stages.
+The shell carries no plugin-manager page or update coordinator. Installer packaging and signing are owned by the [desktop release pipeline](../process/2026-09-23-desktop-release-artifacts.md).
 
 ## Alternatives considered
 
@@ -30,4 +30,4 @@ The shell carries no plugin-manager page, no update coordinator, and no packagin
 
 ## Consequences
 
-The desktop page runs the unmodified served client: the transport global flips its carrier to fetch-stream downlinks and grants loopback authority. A real desktop profile must install the two inserted picker packages (the packaging stage owns that; fixtures stage no-ops). The Electron shell spawns this process with the pipes and forwards `shres-app://` fetches into `runDesktopHost`'s controller. Stage B (ASAR + signing) moves packaging, not this dispatch design.
+The desktop page runs the unmodified served client: the transport global flips its carrier to fetch-stream downlinks and grants loopback authority. A real desktop profile must install the two inserted picker packages (the packaging stage owns that; fixtures stage no-ops). The Electron shell spawns this process with the pipes and forwards `shres-app://` fetches into `runDesktopHost`'s controller. The [release pipeline](../process/2026-09-23-desktop-release-artifacts.md) packages this dispatch design without ASAR.

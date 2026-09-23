@@ -1,12 +1,16 @@
-/** Boot a packaged runtime tree's desktop host child and prove it reports ready and stops cleanly. */
+/** Boot a packaged runtime tree's host child, exercise its real pipes, and stop it. */
 
-import { spawn, type ChildProcess } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
+import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
-import { DESKTOP_HOST_PROTOCOL_VERSION } from '../../desktop-host/src/wire.ts'
-import { resolveDesktopTargetBuildPaths } from './desktop-build-paths.ts'
+import { DESKTOP_HOST_PROTOCOL_VERSION } from '@shres-code/shres-code-desktop-host/wire'
+import { HOST_EVENTS_PATH } from '../../../packages/client/connection/src/api-path.ts'
+import { DesktopHostProcess } from '../src/host-process.ts'
+import { ensureDesktopProfile } from '../src/profile-init.ts'
+import { resolveDesktopBuildTarget, resolveDesktopTargetBuildPaths } from './desktop-build-paths.ts'
 
 /** Diagnostic prefix on every failure and progress line this smoke emits. */
 const NAME = 'shres desktop'
@@ -20,51 +24,14 @@ const INSTALLED_HOST_ENTRY: readonly string[] = ['node_modules', '@shres-code', 
 /** Installed manifest carrying the shres version the host child reports as ready. */
 const INSTALLED_APP_MANIFEST: readonly string[] = ['node_modules', '@shres-code', 'shres-code', 'package.json']
 
-/** Millisecond budget for the child to compose its host and report ready. */
-const READY_TIMEOUT_MS = 120_000
+/** Stable, keyless smoke contract for the first document and host downlink. */
+const EXPECTED_SMOKE_OUTPUT = join(import.meta.dirname, '..', 'tests', 'expected', 'smoke-runtime.txt')
 
-/** Millisecond budget for the child to exit after the shutdown command. */
-const SHUTDOWN_TIMEOUT_MS = 30_000
-
-/** Ready facts a host child reports over the lifecycle IPC channel. */
-interface DesktopHostReadyEvent {
-  /** Protocol version the child speaks, shared with the Electron shell. */
-  readonly protocolVersion: number
-  /** Version of the installed shres application package the child booted. */
-  readonly appVersion: string
-}
+/** Millisecond budget for each framed request to answer. */
+const ROUND_TRIP_TIMEOUT_MS = 30_000
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
-}
-
-/**
- * Whether one IPC message is a host child's ready event.
- * @param message - the message a child sent over its lifecycle IPC channel.
- * @returns true when the message carries a numeric protocol version and a string application version.
- */
-function isReadyEvent(message: unknown): message is DesktopHostReadyEvent {
-  return isRecord(message) && message.type === 'ready'
-    && typeof message.protocolVersion === 'number' && typeof message.appVersion === 'string'
-}
-
-/**
- * Whether one IPC message is a host child's fatal event.
- * @param message - the message a child sent over its lifecycle IPC channel.
- * @returns true when the message carries a failure text.
- */
-function isFatalEvent(message: unknown): message is { readonly message: string } {
-  return isRecord(message) && message.type === 'fatal' && typeof message.message === 'string'
-}
-
-/**
- * Quote a child's standard error for a failure detail.
- * @param stderr - everything the child has written to standard error.
- * @returns the diagnostics on their own line, or an empty string when the child wrote none.
- */
-function stderrDetail(stderr: string): string {
-  const trimmed = stderr.trim()
-  return trimmed === '' ? '' : `\n${trimmed}`
 }
 
 /**
@@ -89,114 +56,234 @@ function installedAppVersion(runtime: string): string {
 /**
  * Build the child environment from this process's, without the launch overrides a packaged run must not inherit.
  * @param home - disposable harness home this smoke owns.
- * @returns the child environment, with SHRES_HOME on the disposable home.
+ * @returns the child environment with every home and Shres settings path on disposable state.
  */
-function smokeEnvironment(home: string): NodeJS.ProcessEnv {
+export function smokeEnvironment(home: string): NodeJS.ProcessEnv {
   const inherited = Object.fromEntries(Object.entries(process.env).filter(([name]) => (
-    name !== 'NODE_OPTIONS' && name !== 'NODE_PATH' && name !== 'SHRES_HOME'
-    && !name.startsWith('SHRES_DESKTOP_') && !/^(?:npm|pnpm|corepack)_/iu.test(name)
+    name !== 'NODE_OPTIONS' && name !== 'NODE_PATH'
+    && name !== 'HOME' && name !== 'USERPROFILE' && name !== 'HOMEDRIVE' && name !== 'HOMEPATH'
+    && name !== 'ELECTRON_USER_DATA_DIR' && name !== 'ELECTRON_CACHE_DIR'
+    && !name.startsWith('SHRES_')
+    && !name.startsWith('XDG_')
+    && !/^(?:npm|pnpm|corepack)_/iu.test(name)
+    && !/(?:key|token|secret|password|credential)/iu.test(name)
   )))
-  return { ...inherited, SHRES_HOME: home }
+  return {
+    ...inherited,
+    HOME: home,
+    USERPROFILE: home,
+    SHRES_HOME: home,
+    SHRES_AGENTS_HOME: join(home, 'agents'),
+    SHRES_TELEMETRY_DISABLED: '1',
+    XDG_CONFIG_HOME: join(home, '.config'),
+    XDG_DATA_HOME: join(home, '.local', 'share'),
+    XDG_CACHE_HOME: join(home, '.cache'),
+    XDG_STATE_HOME: join(home, '.local', 'state'),
+    ELECTRON_RUN_AS_NODE: '1',
+  }
 }
 
 /**
- * Drive one host child from spawn to a clean exit.
- * @param child - spawned host child holding the byte pipes and the lifecycle IPC channel.
- * @param expectedAppVersion - version of the shres package the packaged tree installs.
- * @param stderrOf - reader for what the child has written to standard error.
- * @returns nothing; rejects with the child's own diagnostics on any mismatch.
+ * Stable response markers the packaged smoke compares after exercising the
+ * production host-process carrier.
  */
-function runHostChild(child: ChildProcess, expectedAppVersion: string, stderrOf: () => string): Promise<void> {
-  return new Promise<void>((resolveSmoke, rejectSmoke) => {
-    let stopping = false
-    let timer: ReturnType<typeof setTimeout> | undefined
-    const settle = (error?: Error): void => {
-      if (timer !== undefined) clearTimeout(timer)
-      child.off('message', handleMessage)
-      child.off('close', handleClose)
-      child.off('error', handleError)
-      if (error === undefined) resolveSmoke()
-      else rejectSmoke(error)
-    }
-    const fail = (detail: string): void => {
-      settle(new Error(`${NAME}: ${detail}${stderrDetail(stderrOf())}`))
-    }
-    const armTimer = (milliseconds: number, detail: string): void => {
-      if (timer !== undefined) clearTimeout(timer)
-      timer = setTimeout(() => { fail(detail) }, milliseconds)
-    }
-    const handleMessage = (message: unknown): void => {
-      if (stopping) return
-      if (isFatalEvent(message)) {
-        fail(`the packaged host child failed to boot: ${message.message}`)
-        return
-      }
-      if (!isReadyEvent(message)) {
-        fail('the packaged host child sent an unrecognized IPC event')
-        return
-      }
-      if (message.protocolVersion !== DESKTOP_HOST_PROTOCOL_VERSION) {
-        fail(`the packaged host child speaks protocol ${String(message.protocolVersion)}, expected ${String(DESKTOP_HOST_PROTOCOL_VERSION)}`)
-        return
-      }
-      if (message.appVersion !== expectedAppVersion) {
-        fail(`the packaged host child booted shres ${message.appVersion}, expected ${expectedAppVersion}`)
-        return
-      }
-      stopping = true
-      console.log(`${NAME}: packaged host ready at protocol ${String(message.protocolVersion)} with shres ${message.appVersion}`)
-      armTimer(SHUTDOWN_TIMEOUT_MS, `the packaged host child did not stop within ${String(SHUTDOWN_TIMEOUT_MS)} ms`)
-      child.send({ type: 'shutdown' })
-    }
-    const handleClose = (code: number | null, signal: NodeJS.Signals | null): void => {
-      if (!stopping) {
-        fail(`the packaged host child exited with ${String(code ?? signal)} before reporting ready`)
-        return
-      }
-      if (code === 0) settle()
-      else fail(`the packaged host child stopped with ${String(code ?? signal)}, expected a clean shutdown`)
-    }
-    const handleError = (error: Error): void => {
-      fail(`the packaged host child could not start: ${error.message}`)
-    }
-    child.on('message', handleMessage)
-    child.on('close', handleClose)
-    child.on('error', handleError)
-    armTimer(READY_TIMEOUT_MS, `the packaged host child reported no ready event within ${String(READY_TIMEOUT_MS)} ms`)
+interface SmokeExpectedOutput {
+  /** Status returned by the shell document route. */
+  readonly documentStatus: number
+  /** Marker returned in the shell document body. */
+  readonly documentMarker: string
+  /** Client providers required by the shipped app shell. */
+  readonly documentPlugins: readonly string[]
+  /** Status returned by the host event downlink. */
+  readonly eventsStatus: number
+  /** Marker returned in the host event stream body. */
+  readonly eventsMarker: string
+}
+
+/**
+ * Read the committed, keyless output contract used by the packaged smoke.
+ * @returns expected status and body markers for the two real transport probes.
+ */
+function readSmokeExpectedOutput(): SmokeExpectedOutput {
+  let documentStatus: number | undefined
+  let documentMarker: string | undefined
+  let documentPlugins: string[] | undefined
+  let eventsStatus: number | undefined
+  let eventsMarker: string | undefined
+  for (const line of readFileSync(EXPECTED_SMOKE_OUTPUT, 'utf8').split(/\r?\n/u)) {
+    if (line.startsWith('document.status=')) documentStatus = Number(line.slice('document.status='.length))
+    else if (line.startsWith('document.marker=')) documentMarker = line.slice('document.marker='.length)
+    else if (line.startsWith('document.plugins=')) documentPlugins = line.slice('document.plugins='.length).split(',')
+    else if (line.startsWith('events.status=')) eventsStatus = Number(line.slice('events.status='.length))
+    else if (line.startsWith('events.marker=')) eventsMarker = line.slice('events.marker='.length)
+  }
+  if (typeof documentStatus !== 'number' || !Number.isInteger(documentStatus) || documentMarker === undefined
+    || documentPlugins === undefined || documentPlugins.some(id => id === '')
+    || typeof eventsStatus !== 'number' || !Number.isInteger(eventsStatus) || eventsMarker === undefined) {
+    throw new Error(`${NAME}: smoke output contract is incomplete at ${EXPECTED_SMOKE_OUTPUT}`)
+  }
+  return { documentStatus, documentMarker, documentPlugins, eventsStatus, eventsMarker }
+}
+
+/**
+ * Read required client bundle URLs from the actual served boot graph.
+ * @param document - HTML returned by the desktop host.
+ * @param requiredIds - Client providers needed by the application shell.
+ * @returns URLs whose bundles the smoke must fetch successfully.
+ */
+export function desktopBootBundleUrls(document: string, requiredIds: readonly string[]): string[] {
+  const injection = /window\.__SHRES_BOOT__ = (.*?)<\/script>/su.exec(document)?.[1]
+  const graph: unknown = injection === undefined ? undefined : JSON.parse(injection)
+  if (!isRecord(graph) || !Array.isArray(graph.entries)) throw new Error(`${NAME}: packaged document has no client boot graph`)
+  const entries = graph.entries
+  return requiredIds.map((id) => {
+    const entry: unknown = entries.find((candidate: unknown) => isRecord(candidate) && candidate.id === id)
+    if (!isRecord(entry) || typeof entry.url !== 'string') throw new Error(`${NAME}: missing required client plugin ${id}`)
+    return entry.url
   })
 }
 
 /**
- * Prove the packaged runtime tree boots its host child and stops it cleanly.
- * The child runs without a user profile: its project and harness home live in a disposable
- * directory removed on every outcome.
+ * Read one streaming response until a stable marker arrives, then cancel it
+ * through the production carrier so the host can complete its teardown.
+ * @param response - response returned by {@link DesktopHostProcess.fetch}.
+ * @param marker - body text proving the intended route answered.
+ * @returns nothing; rejects when the stream ends without the marker.
+ */
+async function readStreamingMarker(response: Response, marker: string): Promise<void> {
+  if (response.body === null) throw new Error(`${NAME}: the streaming response had no body`)
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let body = ''
+  const deadline = setTimeout(() => { void reader.cancel() }, ROUND_TRIP_TIMEOUT_MS)
+  try {
+    for (;;) {
+      const chunk = await reader.read()
+      if (chunk.done) throw new Error(`${NAME}: the streaming response ended before ${JSON.stringify(marker)}`)
+      body += decoder.decode(chunk.value, { stream: true })
+      if (body.includes(marker)) return
+    }
+  } finally {
+    clearTimeout(deadline)
+    await reader.cancel().catch(() => undefined)
+  }
+}
+
+/** Execute the bundled PTY helper under the app's own Node runtime. */
+function smokeTerminal(runtime: string, nodeBinary: string, home: string): void {
+  const result = spawnSync(nodeBinary, ['--input-type=module', '--eval', `
+    import { createRequire } from 'node:module'
+    const { spawn } = createRequire(process.cwd() + '/package.json')('node-pty')
+    const terminal = spawn('/bin/sh', ['-c', 'printf DESKTOP_PTY_READY'], { cwd: process.env.HOME })
+    let output = ''
+    const deadline = setTimeout(() => { terminal.kill(); process.exitCode = 1 }, 10000)
+    terminal.onData(data => { output += data })
+    terminal.onExit(({ exitCode }) => {
+      clearTimeout(deadline)
+      if (exitCode !== 0 || !output.includes('DESKTOP_PTY_READY')) process.exitCode = 1
+      else console.log('DESKTOP_PTY_READY')
+    })
+  `], { cwd: runtime, env: smokeEnvironment(home), encoding: 'utf8', timeout: 15_000 })
+  if (result.status !== 0 || !result.stdout.includes('DESKTOP_PTY_READY')) {
+    throw new Error(`${NAME}: bundled terminal spawn failed: ${result.error?.message ?? result.stderr}`)
+  }
+}
+
+/**
+ * Prove the packaged runtime tree boots its host child and serves its UI.
+ * The child uses a production profile initializer and disposable home/project
+ * directories removed only after the host process has stopped.
  * @param runtimeDir - packaged runtime tree root the Electron application ships.
- * @param nodeBinary - bundled Node executable that runs the host child.
+ * @param nodeBinary - Electron executable running the host child as Node.
  * @returns nothing; rejects with the child's standard error on any mismatch.
  */
 export async function smokeDesktopRuntime(runtimeDir: string, nodeBinary: string): Promise<void> {
   const runtime = resolve(runtimeDir)
   const hostEntry = join(runtime, ...INSTALLED_HOST_ENTRY)
   if (!existsSync(hostEntry)) throw new Error(`${NAME}: the packaged runtime tree has no host entry at ${hostEntry}`)
-  if (!existsSync(nodeBinary)) throw new Error(`${NAME}: the bundled Node executable is missing at ${nodeBinary}`)
+  if (!existsSync(nodeBinary)) throw new Error(`${NAME}: the Electron executable is missing at ${nodeBinary}`)
   const expectedAppVersion = installedAppVersion(runtime)
+  const expected = readSmokeExpectedOutput()
   const home = mkdtempSync(join(tmpdir(), 'shres-desktop-smoke-'))
-  const project = join(home, 'project')
+  const project = join(home, 'profiles', 'desktop')
   mkdirSync(project, { recursive: true })
-  let stderr = ''
-  const child = spawn(nodeBinary, [hostEntry, runtime, project], {
-    cwd: project,
-    env: smokeEnvironment(home),
-    stdio: ['ignore', 'pipe', 'pipe', 'pipe', 'pipe', 'ipc'],
-  })
-  child.stderr?.setEncoding('utf8')
-  child.stderr?.on('data', (chunk: string) => { stderr += chunk })
+  const host = new DesktopHostProcess(nodeBinary, runtime, project, undefined, smokeEnvironment(home))
+  let smokeFailure: unknown
   try {
-    await runHostChild(child, expectedAppVersion, () => stderr)
+    smokeTerminal(runtime, nodeBinary, home)
+    ensureDesktopProfile(project, expectedAppVersion)
+    const ready = await host.start()
+    if (ready.protocolVersion !== DESKTOP_HOST_PROTOCOL_VERSION) {
+      throw new Error(`${NAME}: the packaged host child speaks protocol ${String(ready.protocolVersion)}, expected ${String(DESKTOP_HOST_PROTOCOL_VERSION)}`)
+    }
+    if (ready.appVersion !== expectedAppVersion) {
+      throw new Error(`${NAME}: the packaged host child booted shres ${ready.appVersion}, expected ${expectedAppVersion}`)
+    }
+    console.log(`${NAME}: packaged host ready at protocol ${String(ready.protocolVersion)} with shres ${ready.appVersion}`)
+
+    const document = await host.fetch(new Request('shres-app://app/', { signal: AbortSignal.timeout(ROUND_TRIP_TIMEOUT_MS) }))
+    if (document.status !== expected.documentStatus) {
+      throw new Error(`${NAME}: the packaged document answered ${String(document.status)}, expected ${String(expected.documentStatus)}`)
+    }
+    const documentBody = await document.text()
+    if (!documentBody.includes(expected.documentMarker)) {
+      throw new Error(`${NAME}: the packaged document did not contain ${JSON.stringify(expected.documentMarker)}`)
+    }
+    if (!documentBody.includes('__SHRES_BOOT__') || !documentBody.includes('__SHRES_TRANSPORT__')) {
+      throw new Error(`${NAME}: the packaged document is missing its client boot or desktop transport configuration`)
+    }
+    for (const url of desktopBootBundleUrls(documentBody, expected.documentPlugins)) {
+      const bundle = await host.fetch(new Request(new URL(url, 'shres-app://app'), { signal: AbortSignal.timeout(ROUND_TRIP_TIMEOUT_MS) }))
+      if (bundle.status !== 200 || !bundle.headers.get('content-type')?.includes('javascript') || (await bundle.text()).length === 0) {
+        throw new Error(`${NAME}: client bundle did not load: ${url}`)
+      }
+    }
+    console.log(`${NAME}: served the bundled UI with desktop transport configuration`)
+
+    const events = await host.fetch(new Request(`shres-app://app${HOST_EVENTS_PATH}`, {
+      method: 'POST',
+      headers: { accept: 'application/x-ndjson' },
+      signal: AbortSignal.timeout(ROUND_TRIP_TIMEOUT_MS),
+    }))
+    if (events.status !== expected.eventsStatus) {
+      throw new Error(`${NAME}: ${HOST_EVENTS_PATH} answered ${String(events.status)}, expected ${String(expected.eventsStatus)}`)
+    }
+    const workspace = join(home, 'workspace')
+    mkdirSync(workspace)
+    // Host downlinks have no baseline frames; a real workspace write proves
+    // both RPC dispatch and delivery through the open event stream.
+    await Promise.all([
+      readStreamingMarker(events, expected.eventsMarker),
+      (async () => {
+        const response = await host.fetch(new Request('shres-app://app/api/workspace.create', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ type: 'client-request', rpcId: randomUUID(), method: 'workspace.create', payload: { path: workspace } }),
+          signal: AbortSignal.timeout(ROUND_TRIP_TIMEOUT_MS),
+        }))
+        const envelope: unknown = await response.json()
+        if (response.status !== 200 || !isRecord(envelope) || !isRecord(envelope.result) || envelope.result.ok !== true) {
+          throw new Error(`${NAME}: packaged workspace creation failed: ${JSON.stringify(envelope)}`)
+        }
+      })(),
+    ])
+    console.log(`${NAME}: served ${expected.documentMarker} and ${HOST_EVENTS_PATH}`)
+  } catch (error) {
+    smokeFailure = error
   } finally {
-    if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL')
+    let teardownFailure: unknown
+    try {
+      await host.stop()
+    } catch (error) {
+      teardownFailure = error
+    }
     rmSync(home, { recursive: true, force: true })
+    if (smokeFailure !== undefined && teardownFailure !== undefined) {
+      throw new AggregateError([smokeFailure, teardownFailure], `${NAME}: smoke and teardown failed`)
+    }
+    if (teardownFailure !== undefined) throw teardownFailure
   }
+  if (smokeFailure !== undefined) throw smokeFailure
 }
 
 /** Smoke the selected target's packaged runtime tree under its own bundled Node executable. */
@@ -206,12 +293,13 @@ async function main(): Promise<void> {
     options: { runtime: { type: 'string' }, node: { type: 'string' } },
     allowPositionals: false,
   })
-  const runtime = values.runtime === undefined ? paths.dsh : resolve(REPOSITORY_ROOT, values.runtime)
+  const defaultBundle = join(paths.artifacts, resolveDesktopBuildTarget(), 'Shres Code.app')
+  const runtime = values.runtime === undefined ? join(defaultBundle, 'Contents', 'Resources', 'shres') : resolve(REPOSITORY_ROOT, values.runtime)
   const node = values.node === undefined
-    ? join(paths.runtime, 'node', process.platform === 'win32' ? 'node.exe' : 'node')
+    ? join(defaultBundle, 'Contents', 'MacOS', 'Shres Code')
     : resolve(REPOSITORY_ROOT, values.node)
   await smokeDesktopRuntime(runtime, node)
-  console.log(`${NAME}: packaged runtime tree booted and stopped cleanly at ${runtime}`)
+  console.log(`${NAME}: packaged runtime tree booted, served / and ${HOST_EVENTS_PATH}, and stopped at ${runtime}`)
 }
 
 if (import.meta.main) {

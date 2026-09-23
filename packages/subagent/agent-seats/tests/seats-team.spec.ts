@@ -60,7 +60,8 @@ class GatedAdapter extends LlmAdapter {
 
 async function bootTeamSeats(adapter?: LlmAdapter) {
   const ctx = new Context()
-  await ctx.plugin(MemorySettings)
+  const settings = ctx.plugin(MemorySettings)
+  await settings
   await mountAgentLoopTestDependencies(ctx)
   const storageRoot = mkdtempSync(join(tmpdir(), 'shres-seats-team-'))
   roots.push(storageRoot)
@@ -84,7 +85,7 @@ async function bootTeamSeats(adapter?: LlmAdapter) {
     if (agent.id !== lead.id) return next()
     return { kind: 'reject' as const }
   })
-  return { ctx, lead }
+  return { ctx, lead, settings }
 }
 
 let calls = 0
@@ -99,6 +100,23 @@ function callTool(ctx: Context, name: string, args: unknown, agent: unknown) {
 }
 
 describe('agent-seats wired to Agent Teams', () => {
+  it('withdraws unstarted template members when the settings provider is removed', async () => {
+    const { ctx, lead, settings } = await bootTeamSeats()
+    try {
+      await ctx.settings.update(seats.AGENT_SEATS_SETTINGS_NAMESPACE, {
+        seats: { aegis: { provider: 'mock', model: 'mock' } },
+        extras: [{ name: 'helper', persona: 'Review changes.', provider: 'mock', model: 'mock' }],
+      })
+      expect(ctx.agentTeams.listMembers(lead).map(row => row.name)).toEqual(['lead', 'aegis', 'helper'])
+      await settings.dispose()
+      await vi.waitFor(() => {
+        expect(ctx.agentTeams.listMembers(lead).map(row => row.name)).toEqual(['lead'])
+      })
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('remounts bound seats as Team-steer tools, lists YAML extras, and team_sends them', async () => {
     const { ctx, lead } = await bootTeamSeats()
     await ctx.settings.replace(seats.AGENT_SEATS_SETTINGS_NAMESPACE, {
@@ -154,7 +172,7 @@ describe('agent-seats wired to Agent Teams', () => {
     const steeredText = steered.content.map(block => 'text' in block ? block.text : '').join('')
     expect(steeredText, steered.isError ? steeredText : 'ok').toContain('aegis')
     expect(steered.isError).toBe(false)
-    expect(String(steered.content.map(block => 'text' in block ? block.text : '').join(''))).toContain('aegis')
+    expect(steered.content.map(block => 'text' in block ? block.text : '').join('')).toContain('aegis')
 
     const missing = await ctx.tools.execute({
       signal: SIGNAL,

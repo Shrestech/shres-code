@@ -7,6 +7,7 @@
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
+import { isPrivateDesktopPackage } from './release/families.ts'
 import { hasTypertRemoteNavigation, isForbiddenPublicationFile } from './publication-payload.ts'
 import { collectProjectReferenceFaceViolations } from './project-reference-faces.ts'
 
@@ -47,7 +48,7 @@ const repositoryUrl = 'git+https://github.com/parthmstech/shres-code.git'
  * their trusted publishing against the repository that runs the workflow.
  */
 const publishedRepositoryUrl = 'git+https://github.com/parthmstech/shres-code.git'
-/** Directories whose packages this repository publishes: one release member each. */
+/** Candidate release-member directories; the known private desktop pair is handled first. */
 const releaseMemberDirectory = /^(?:packages\/[^/]+\/[^/]+|apps\/[^/]+|vendor\/[^/]+)$/
 
 const localArtifactDirs = new Set(['node_modules'])
@@ -139,6 +140,10 @@ const packageFileExtras: Readonly<Record<string, readonly string[]>> = {
   // The Python runtime uses a distinct closed-resolution bin; the public CLI
   // keeps config-owned bare-package resolution through lib/bin.js.
   '@shres-code/shres-code-sdk-jsonrpc-demo': ['lib/packaged-bin.js'],
+  '@shres-code/shres-code-jspace': ['lib/fold-*.js'],
+  '@shres-code/shres-code-jspace-advisor': ['lib/review-*.js'],
+  '@shres-code/shres-code-research-protocol': ['lib/epoch-*.js'],
+  '@shres-code/shres-code-agent-team': ['lib/fold-*.js'],
   // The argv-prefix runner entry ships beside the lib as its own bundle;
   // sandbox-local resolves it through the package's ./runner export. tsdown
   // also shares its generated FFI code through a hashed runtime chunk.
@@ -222,12 +227,20 @@ function usesEmittedTreeDefaults(manifest: PackageManifest): boolean {
 function checkWorkspace({ dir, manifest }: WorkspaceManifest): string[] {
   const errors: string[] = []
   const label = manifest.name ?? dir
+  const isPrivateDesktop = isPrivateDesktopPackage(dir, manifest.name)
   const isLandlockPackageDir = dir.startsWith('native/landlock-run/packages/')
   const isPublicLandlockPackage = isLandlockPackageDir
     && manifest.name !== undefined
     && publicLandlockPackages.has(manifest.name)
 
-  if (isPublicLandlockPackage) {
+  if (isPrivateDesktop) {
+    if (manifest.private !== true) {
+      errors.push(`${label}: private desktop package must set "private": true`)
+    }
+    if (manifest.version !== repositoryVersion) {
+      errors.push(`${label}: private desktop package version must match root version ${repositoryVersion ?? '(missing)'}`)
+    }
+  } else if (isPublicLandlockPackage) {
     if (manifest.private === true) {
       errors.push(`${label}: published Landlock package must not set "private": true`)
     }
@@ -279,7 +292,7 @@ function checkWorkspace({ dir, manifest }: WorkspaceManifest): string[] {
     }
   }
 
-  if (dir.startsWith('apps/') && manifest.name?.startsWith('@shres-code/')) {
+  if (!isPrivateDesktop && dir.startsWith('apps/') && manifest.name?.startsWith('@shres-code/')) {
     const expectedFiles = appPackageFiles[manifest.name]
     if (expectedFiles === undefined) {
       errors.push(`${label}: app package has no publication files policy`)

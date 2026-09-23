@@ -9,6 +9,7 @@ import { extname, join, normalize, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { app, BrowserWindow, ipcMain, protocol, type IpcMainInvokeEvent } from 'electron'
 import { resolveDesktopPaths } from './paths.ts'
+import { ensureDesktopProfile } from './profile-init.ts'
 import { DesktopHostProcess } from './host-process.ts'
 import { DESKTOP_IPC, type DesktopBackendState } from './ipc.ts'
 import { resolveDesktopLocale } from './locale.ts'
@@ -213,6 +214,7 @@ async function main(): Promise<void> {
       pageError = undefined
       await navigateMain(startupUrl)
       publishBackend({ phase: 'starting' })
+      if (development === undefined) ensureDesktopProfile(activeProject, app.getVersion())
       const child = new DesktopHostProcess(
         resources.node,
         resources.runtime,

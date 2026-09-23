@@ -14,8 +14,7 @@ import {
 } from 'node:fs'
 import { dirname, join } from 'node:path'
 
-/** Bundles the development project boots, in layer order. */
-const DEVELOPMENT_PROJECT_BUNDLES = ['@shres-code/shres-code-base', '@shres-code/shres-code-web-app']
+import { DESKTOP_PROFILE_BUNDLES } from '../src/profile-init.ts'
 
 interface PackageManifest {
   readonly name?: string
@@ -91,7 +90,7 @@ function writeProjectMetadata(projectDir: string, version: string): void {
     version,
     private: true,
     dependencies: {},
-    shres: { profile: { bundles: [...DEVELOPMENT_PROJECT_BUNDLES] } },
+    shres: { profile: { bundles: [...DESKTOP_PROFILE_BUNDLES] } },
   }, undefined, 2) + '\n')
   writeFileSync(join(projectDir, 'pnpm-workspace.yaml'),
     'packages:\n  - .\n\nnodeLinker: hoisted\nautoInstallPeers: false\n')

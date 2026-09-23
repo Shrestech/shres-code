@@ -9,13 +9,12 @@
 
 import type { Context } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
-import { deepEqualJson, installSettingsSection, settingsNamespace } from '@shres-code/shres-code-settings'
+import { deepEqualJson, settingsNamespace, type SettingsScope } from '@shres-code/shres-code-settings'
 import type {} from '@shres-code/shres-code-system-prompt'
 import * as ToolSubagent from '@shres-code/shres-code-tool-subagent'
 import type { AgentSeatsSettings, BoundSeat, SeatBinding } from './roster.ts'
 import { assertExtras, boundSeats, boundSubagentSeat, seatUseGuidance } from './roster.ts'
 import type { TeamRosterTemplateEntry } from '@shres-code/shres-code-agent-team'
-import type { TeamService } from '@shres-code/shres-code-agent-team'
 import { registerTeamSeatTool } from './team-seat-tool.ts'
 
 export {
@@ -26,9 +25,9 @@ export type {
 } from './roster.ts'
 
 export const name = 'agent-seats'
-export const inject = ['tools', 'subagents', 'systemPrompt']
+export const inject = ['tools', 'subagents', 'systemPrompt', 'settings']
 
-/** Settings namespace the Models seats card writes. */
+/** Settings namespace the Teams page writes. */
 export const AGENT_SEATS_SETTINGS_NAMESPACE = settingsNamespace('agent-seats')
 
 const seatBinding: z<SeatBinding> = z.object({
@@ -48,16 +47,13 @@ export const Config: z<Config> = z.object({
     subagent: seatBinding,
   }),
   extras: z.array(z.object({
-    name: z.string(),
-    persona: z.string(),
-    provider: z.string(),
-    model: z.string(),
+    name: z.string().required(),
+    persona: z.string().required(),
+    provider: z.string().required(),
+    model: z.string().required(),
     role: z.string(),
   })),
 })
-
-/** Composition entry used as the settings base: every seat starts unbound. */
-const EMPTY_SEATS: Config = {}
 
 /**
  * Build the `tool-subagent` config for one bound seat.
@@ -78,11 +74,24 @@ export function seatToolConfig(seat: BoundSeat): ToolSubagent.Config {
 
 /**
  * Remount `aegis` / `stride` / `ward` whenever the seats document changes.
- * @param ctx - host context that already has tools, subagents, and systemPrompt.
+ * Invalid stored settings reject plugin activation before any seat tools mount.
+ * @param ctx - host context with tools, subagents, systemPrompt, and settings.
  * @param config - composition entry used as the settings base.
  */
 export function apply(ctx: Context, config: Config): void {
-  let source: () => AgentSeatsSettings = () => config
+  let scope: SettingsScope<Config>
+  try {
+    scope = ctx.settings.register(AGENT_SEATS_SETTINGS_NAMESPACE, Config, {
+      base: config,
+      validate: (settings) => { assertExtras(settings.extras) },
+    })
+  } catch (cause) {
+    const detail = cause instanceof Error ? cause.message : String(cause)
+    throw new Error(
+      `agent-seats: invalid settings; correct the agent-seats section in the settings document. ${detail}`,
+      { cause },
+    )
+  }
   let mounted: BoundSeat[] = []
   let lastGeneric: SeatBinding | undefined
   let teamsPresent = false
@@ -120,12 +129,11 @@ export function apply(ctx: Context, config: Config): void {
   }
 
   const remount = (): void => {
-    const settings = source()
-    assertExtras(settings.extras)
+    const settings = scope.get()
     const next = boundSeats(settings)
     syncGuidance(next)
     const generic = boundSubagentSeat(settings)
-    const teams = ctx.get('agentTeams') as TeamService | undefined
+    const teams = ctx.get('agentTeams')
     const teamsReady = teams !== undefined
     if (
       deepEqualJson(mounted, next)
@@ -155,7 +163,7 @@ export function apply(ctx: Context, config: Config): void {
     }
     const fiber = ctx.plugin(function agentSeatsTools(child: Context) {
       for (const seat of next) {
-        if (teamsReady && teams !== undefined) registerTeamSeatTool(child, seat, teams)
+        if (teams !== undefined) registerTeamSeatTool(child, seat, teams)
         else child.plugin(ToolSubagent, seatToolConfig(seat))
       }
     })
@@ -185,13 +193,11 @@ export function apply(ctx: Context, config: Config): void {
     teams.setRosterTemplate(() => entries)
   }
 
-  installSettingsSection(ctx, AGENT_SEATS_SETTINGS_NAMESPACE, Config, Object.assign({}, EMPTY_SEATS, config), {
-    setSource: (current) => { source = current },
-    onChange: () => { void remount() },
-  })
+  ctx.effect(() => scope.watch(remount), 'agent-seats: watch settings')
   remount()
   ctx.inject(['agentTeams'], () => { remount() })
   ctx.effect(() => () => {
+    ctx.get('agentTeams')?.setRosterTemplate(() => [])
     disposeTools?.()
     disposeGeneric?.()
     disposeGuidance?.()
