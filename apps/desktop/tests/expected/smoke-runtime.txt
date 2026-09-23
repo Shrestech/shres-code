@@ -1,4 +1,5 @@
 document.status=200
 document.marker=<title>Shres Code</title>
+document.plugins=@shres-code/shres-code-client-modules,@shres-code/shres-code-client-runtime,@shres-code/shres-code-client-ui-layout
 events.status=200
 events.marker="method":"host/workspace-changed"

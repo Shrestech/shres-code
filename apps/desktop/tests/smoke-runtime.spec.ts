@@ -1,9 +1,16 @@
 /** Focused checks for the packaged runtime smoke's isolated environment and output contract. */
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { smokeEnvironment } from '../scripts/smoke-runtime.ts'
+import { desktopBootBundleUrls, smokeEnvironment } from '../scripts/smoke-runtime.ts'
 
 afterEach(() => { vi.unstubAllEnvs() })
+
+it('rejects an empty boot graph and returns the required providers from a complete graph', () => {
+  const html = (entries: unknown[]): string => `<script>window.__SHRES_BOOT__ = ${JSON.stringify({ rev: 'test', entries })}</script>`
+  expect(() => desktopBootBundleUrls(html([]), ['layout'])).toThrow('missing required client plugin layout')
+  expect(desktopBootBundleUrls(html([{ id: 'layout', url: '/plugins/layout/client.js' }]), ['layout']))
+    .toEqual(['/plugins/layout/client.js'])
+})
 
 describe('desktop runtime smoke environment', () => {
   it('replaces user homes and removes inherited settings and secret variables', () => {

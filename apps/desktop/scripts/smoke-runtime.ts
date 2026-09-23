@@ -92,6 +92,8 @@ interface SmokeExpectedOutput {
   readonly documentStatus: number
   /** Marker returned in the shell document body. */
   readonly documentMarker: string
+  /** Client providers required by the shipped app shell. */
+  readonly documentPlugins: readonly string[]
   /** Status returned by the host event downlink. */
   readonly eventsStatus: number
   /** Marker returned in the host event stream body. */
@@ -105,19 +107,40 @@ interface SmokeExpectedOutput {
 function readSmokeExpectedOutput(): SmokeExpectedOutput {
   let documentStatus: number | undefined
   let documentMarker: string | undefined
+  let documentPlugins: string[] | undefined
   let eventsStatus: number | undefined
   let eventsMarker: string | undefined
   for (const line of readFileSync(EXPECTED_SMOKE_OUTPUT, 'utf8').split(/\r?\n/u)) {
     if (line.startsWith('document.status=')) documentStatus = Number(line.slice('document.status='.length))
     else if (line.startsWith('document.marker=')) documentMarker = line.slice('document.marker='.length)
+    else if (line.startsWith('document.plugins=')) documentPlugins = line.slice('document.plugins='.length).split(',')
     else if (line.startsWith('events.status=')) eventsStatus = Number(line.slice('events.status='.length))
     else if (line.startsWith('events.marker=')) eventsMarker = line.slice('events.marker='.length)
   }
   if (typeof documentStatus !== 'number' || !Number.isInteger(documentStatus) || documentMarker === undefined
+    || documentPlugins === undefined || documentPlugins.some(id => id === '')
     || typeof eventsStatus !== 'number' || !Number.isInteger(eventsStatus) || eventsMarker === undefined) {
     throw new Error(`${NAME}: smoke output contract is incomplete at ${EXPECTED_SMOKE_OUTPUT}`)
   }
-  return { documentStatus, documentMarker, eventsStatus, eventsMarker }
+  return { documentStatus, documentMarker, documentPlugins, eventsStatus, eventsMarker }
+}
+
+/**
+ * Read required client bundle URLs from the actual served boot graph.
+ * @param document - HTML returned by the desktop host.
+ * @param requiredIds - Client providers needed by the application shell.
+ * @returns URLs whose bundles the smoke must fetch successfully.
+ */
+export function desktopBootBundleUrls(document: string, requiredIds: readonly string[]): string[] {
+  const injection = /window\.__SHRES_BOOT__ = (.*?)<\/script>/su.exec(document)?.[1]
+  const graph: unknown = injection === undefined ? undefined : JSON.parse(injection)
+  if (!isRecord(graph) || !Array.isArray(graph.entries)) throw new Error(`${NAME}: packaged document has no client boot graph`)
+  const entries = graph.entries
+  return requiredIds.map((id) => {
+    const entry: unknown = entries.find((candidate: unknown) => isRecord(candidate) && candidate.id === id)
+    if (!isRecord(entry) || typeof entry.url !== 'string') throw new Error(`${NAME}: missing required client plugin ${id}`)
+    return entry.url
+  })
 }
 
 /**
@@ -182,7 +205,7 @@ export async function smokeDesktopRuntime(runtimeDir: string, nodeBinary: string
   const expectedAppVersion = installedAppVersion(runtime)
   const expected = readSmokeExpectedOutput()
   const home = mkdtempSync(join(tmpdir(), 'shres-desktop-smoke-'))
-  const project = join(home, 'project')
+  const project = join(home, 'profiles', 'desktop')
   mkdirSync(project, { recursive: true })
   const host = new DesktopHostProcess(nodeBinary, runtime, project, undefined, smokeEnvironment(home))
   let smokeFailure: unknown
@@ -208,6 +231,12 @@ export async function smokeDesktopRuntime(runtimeDir: string, nodeBinary: string
     }
     if (!documentBody.includes('__SHRES_BOOT__') || !documentBody.includes('__SHRES_TRANSPORT__')) {
       throw new Error(`${NAME}: the packaged document is missing its client boot or desktop transport configuration`)
+    }
+    for (const url of desktopBootBundleUrls(documentBody, expected.documentPlugins)) {
+      const bundle = await host.fetch(new Request(new URL(url, 'shres-app://app'), { signal: AbortSignal.timeout(ROUND_TRIP_TIMEOUT_MS) }))
+      if (bundle.status !== 200 || !bundle.headers.get('content-type')?.includes('javascript') || (await bundle.text()).length === 0) {
+        throw new Error(`${NAME}: client bundle did not load: ${url}`)
+      }
     }
     console.log(`${NAME}: served the bundled UI with desktop transport configuration`)
 
