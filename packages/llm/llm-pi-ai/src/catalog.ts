@@ -15,6 +15,7 @@
 import { builtinProviders, getBuiltinModels, getBuiltinProviders } from '@earendil-works/pi-ai/providers/all'
 import type { BuiltinProvider } from '@earendil-works/pi-ai/providers/all'
 import type {
+  AnthropicMessagesCompat,
   Api,
   Model,
   ModelCost,
@@ -189,16 +190,39 @@ export type PiAiReasoningEfforts = Partial<Record<ModelThinkingLevel, string | n
  * Reasoning-dispatch compatibility switches, set on the route (its models'
  * default) or per model (winning over the route). Only the switches pi-ai's
  * reasoning dispatch reads are offered; the rest of pi-ai's compat surface
- * keeps its baseURL-derived auto-detection. pi-ai types both fields only on
- * `OpenAICompletionsCompat` — the other wire protocols define their reasoning
- * fields in the protocol itself — so resolution rejects a model-level switch
- * anywhere else, while a route-level default skips past models it cannot fit.
+ * keeps its baseURL-derived auto-detection. Each family is typed by exactly one
+ * protocol — the reasoning-parameter switches by `OpenAICompletionsCompat`,
+ * the thinking-format and temperature switches by `AnthropicMessagesCompat` —
+ * so resolution rejects a model-level switch on any other protocol, while a
+ * route-level default skips past models it cannot fit.
  */
 export interface PiAiCompatProfile {
-  /** Reasoning parameter format the endpoint expects; absent keeps the catalog entry's, then pi-ai's baseURL-derived guess. */
+  /**
+   * Reasoning parameter format the endpoint expects, on an `openai-completions`
+   * model; absent keeps the catalog entry's, then pi-ai's baseURL-derived guess.
+   */
   thinkingFormat?: PiAiThinkingFormat
-  /** Whether the endpoint accepts `reasoning_effort`; absent keeps the catalog entry's, then pi-ai's baseURL-derived guess. */
+  /**
+   * Whether the endpoint accepts `reasoning_effort`, on an `openai-completions`
+   * model; absent keeps the catalog entry's, then pi-ai's baseURL-derived guess.
+   */
   supportsReasoningEffort?: boolean
+  /**
+   * Whether the endpoint requires adaptive thinking (`thinking.type:
+   * "adaptive"` with `output_config.effort` instead of a token budget), on an
+   * `anthropic-messages` model; absent keeps the catalog entry's value, then
+   * pi-ai's `false`. A route pi-ai's catalog does not ship cannot inherit that
+   * metadata, and pi-ai's Claude models past Opus 4.5 have deprecated the
+   * budget format.
+   */
+  forceAdaptiveThinking?: boolean
+  /**
+   * Whether the endpoint accepts the Anthropic `temperature` request field, on
+   * an `anthropic-messages` model; absent keeps the catalog entry's value, then
+   * pi-ai's `true`. Claude Opus 4.7 and later reject a non-default
+   * temperature, so a route serving them declares `false`.
+   */
+  supportsTemperature?: boolean
 }
 
 /**
@@ -431,16 +455,22 @@ function resolveModelReasoning(
   return { reasoning: true, thinkingLevelMap: map }
 }
 
+/** The `compat` field one materialized model carries, in the shape of the one protocol that types the resolved switches. */
+type MaterializedModelCompat =
+  | { compat: OpenAICompletionsCompat }
+  | { compat: AnthropicMessagesCompat }
+  | Record<string, never>
+
 /**
  * Resolve one model's compat block from the profile's reasoning switches.
  *
  * A model switch wins over the route switch; whatever neither sets keeps the
  * installed entry's value, and a field no layer decides falls through to
- * pi-ai's baseURL-derived detection. Only an `openai-completions` model takes
- * the switches at all: a model-level switch on any other protocol fails
- * resolution, while a route-level default skips past such models — the same
- * posture as the route-level `reasoning` default, which also must not fail
- * models it does not fit.
+ * pi-ai's baseURL-derived detection. Each protocol takes only its own switch
+ * family: a model-level switch of the other family fails resolution, while a
+ * route-level default skips past such models — the same posture as the
+ * route-level `reasoning` default, which also must not fail models it does
+ * not fit.
  * @param provider - provider route key, for diagnostics.
  * @param entry - the configured model entry.
  * @param route - the route-level switches, when any.
@@ -454,16 +484,26 @@ function resolveModelCompat(
   route: PiAiCompatProfile | undefined,
   base: Model<Api> | undefined,
   api: string,
-): { compat: OpenAICompletionsCompat } | Record<string, never> {
+): MaterializedModelCompat {
   const thinkingFormat = entry.compat?.thinkingFormat ?? route?.thinkingFormat
   const supportsReasoningEffort = entry.compat?.supportsReasoningEffort ?? route?.supportsReasoningEffort
-  if (thinkingFormat === undefined && supportsReasoningEffort === undefined) return {}
+  const forceAdaptiveThinking = entry.compat?.forceAdaptiveThinking ?? route?.forceAdaptiveThinking
+  const supportsTemperature = entry.compat?.supportsTemperature ?? route?.supportsTemperature
+  if (thinkingFormat === undefined && supportsReasoningEffort === undefined
+    && forceAdaptiveThinking === undefined && supportsTemperature === undefined) {
+    return {}
+  }
   if (api !== 'openai-completions') {
     if (entry.compat?.thinkingFormat !== undefined || entry.compat?.supportsReasoningEffort !== undefined) {
       invalid(provider, `model "${entry.id}" sets compat reasoning switches, but its api is "${api}";`
         + ' thinkingFormat and supportsReasoningEffort exist only on openai-completions')
     }
-    return {}
+  }
+  if (api !== 'anthropic-messages') {
+    if (entry.compat?.forceAdaptiveThinking !== undefined || entry.compat?.supportsTemperature !== undefined) {
+      invalid(provider, `model "${entry.id}" sets compat anthropic switches, but its api is "${api}";`
+        + ' forceAdaptiveThinking and supportsTemperature exist only on anthropic-messages')
+    }
   }
   // The installed entry's compat matches the entry's OWN api — a route-level
   // `api` repoint (an anthropic catalog served through an OpenAI-compatible
@@ -471,14 +511,30 @@ function resolveModelCompat(
   // inherited only while the resolved api still is the entry's. A repointed
   // model starts from pi-ai's baseURL-derived detection instead, which is
   // what a protocol change means for every other compat field too.
-  const inherited: OpenAICompletionsCompat | undefined = base?.api === api ? base.compat : undefined
-  return {
-    compat: {
-      ...inherited,
-      ...thinkingFormat === undefined ? {} : { thinkingFormat },
-      ...supportsReasoningEffort === undefined ? {} : { supportsReasoningEffort },
-    },
+  if (api === 'openai-completions') {
+    const inherited: OpenAICompletionsCompat | undefined = base?.api === api ? base.compat : undefined
+    return {
+      compat: {
+        ...inherited,
+        ...thinkingFormat === undefined ? {} : { thinkingFormat },
+        ...supportsReasoningEffort === undefined ? {} : { supportsReasoningEffort },
+      },
+    }
   }
+  if (api === 'anthropic-messages' && (forceAdaptiveThinking !== undefined || supportsTemperature !== undefined)) {
+    // The installed entry's compat, narrowed by the api guard above: the
+    // declared type is every protocol's compat, and only the anthropic member
+    // can be in hand once the api is this one.
+    const inherited = base?.api === api ? base.compat as AnthropicMessagesCompat : undefined
+    return {
+      compat: {
+        ...inherited,
+        ...forceAdaptiveThinking === undefined ? {} : { forceAdaptiveThinking },
+        ...supportsTemperature === undefined ? {} : { supportsTemperature },
+      },
+    }
+  }
+  return {}
 }
 
 /** One route's materialized catalog, plus the request caps its profile chose. */
@@ -556,6 +612,8 @@ export function resolveRouteModels(request: RouteCatalogRequest): RouteCatalog {
   const routeApi = sharedCatalogApi(defaults)
   const routeCompatDefined = request.compat?.thinkingFormat !== undefined
     || request.compat?.supportsReasoningEffort !== undefined
+  const routeAnthropicCompatDefined = request.compat?.forceAdaptiveThinking !== undefined
+    || request.compat?.supportsTemperature !== undefined
   const seen = new Set<string>()
   const configuredMaxTokens = new Map<string, number>()
   const hostedTools = new Map<string, readonly HostedTool[]>()
@@ -619,6 +677,10 @@ export function resolveRouteModels(request: RouteCatalogRequest): RouteCatalog {
   if (routeCompatDefined && !models.some(model => model.api === 'openai-completions')) {
     invalid(provider, 'sets compat reasoning switches, but no model on the route speaks openai-completions;'
       + ' thinkingFormat and supportsReasoningEffort exist only on that protocol')
+  }
+  if (routeAnthropicCompatDefined && !models.some(model => model.api === 'anthropic-messages')) {
+    invalid(provider, 'sets compat anthropic switches, but no model on the route speaks anthropic-messages;'
+      + ' forceAdaptiveThinking and supportsTemperature exist only on that protocol')
   }
   return { models, configuredMaxTokens, hostedTools }
 }

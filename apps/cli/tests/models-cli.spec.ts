@@ -93,6 +93,8 @@ describe('shres models / providers', () => {
     expect(result.stdout).toContain('llama3.2')
     expect(result.stdout).toContain('grok-session')
     expect(result.stdout).toContain('grok-4.6')
+    expect(result.stdout).toContain('claude-session')
+    expect(result.stdout).toContain('claude-opus-5')
   })
 
   it('sets a declared CLI route model and rejects an effort it cannot forward', async () => {
@@ -176,6 +178,20 @@ describe('shres models / providers', () => {
     expect(set.stdout).toContain('Default: grok-session grok-4.6 effort=xhigh')
     const listed = await run(home, { kind: 'models-list' })
     expect(listed.stdout).toContain('grok-4.6  (default)')
+  })
+
+  it('sets a claude-session model and effort without a stored subscription login', async () => {
+    const home = await tempHome()
+    const set = await run(home, {
+      kind: 'models-set',
+      provider: 'claude-session',
+      model: 'claude-opus-5',
+      effort: 'xhigh',
+    })
+    expect(set.exit).toBe(0)
+    expect(set.stdout).toContain('Default: claude-session claude-opus-5 effort=xhigh')
+    const listed = await run(home, { kind: 'models-list' })
+    expect(listed.stdout).toContain('claude-opus-5  (default)')
   })
 
   it('sets the default including reasoning effort', async () => {

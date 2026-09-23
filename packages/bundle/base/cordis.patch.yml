@@ -661,6 +661,18 @@
     - id: llm-cursor-session
       name: '@shres-code/shres-code-llm-cursor-session'
 
+    # Claude subscription session: the credential the Claude Code CLI's
+    # sign-in stores - macOS login keychain service "Claude Code-credentials",
+    # ~/.claude/.credentials.json elsewhere - served as the OAuth bearer to
+    # api.anthropic.com over the anthropic-messages wire and refreshed through
+    # console.anthropic.com. Dormant until that sign-in exists; use bills the
+    # Claude subscription (Pro/Max), not the Anthropic API.
+    - id: claude-credential
+      name: '@shres-code/shres-code-claude-credential'
+
+    - id: llm-claude-session
+      name: '@shres-code/shres-code-llm-claude-session'
+
     # Pay-per-token xAI API-key route: serves api.x.ai over the openai-responses
     # wire with a key stored through the credentials seam. Ships off by default
     # (enabled: false) and is orthogonal to the subscription route above; a

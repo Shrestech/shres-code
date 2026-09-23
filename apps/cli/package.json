@@ -52,6 +52,7 @@
     "@shres-code/shres-code-launch-environment": "workspace:^",
     "@shres-code/shres-code-ledger": "workspace:^",
     "@shres-code/shres-code-llm": "workspace:^",
+    "@shres-code/shres-code-llm-claude-session": "workspace:^",
     "@shres-code/shres-code-llm-cli-bridge": "workspace:^",
     "@shres-code/shres-code-llm-codex-session": "workspace:^",
     "@shres-code/shres-code-llm-deepseek": "workspace:^",

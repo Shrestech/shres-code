@@ -11,7 +11,7 @@ import * as LlmPiAi from '@shres-code/shres-code-llm-pi-ai'
 import { PiAiAdapter } from '@shres-code/shres-code-llm-pi-ai'
 import { getBuiltinModels } from '@earendil-works/pi-ai/providers/all'
 import { createModels, getSupportedThinkingLevels } from '@earendil-works/pi-ai'
-import type { Api, Model, OpenAICompletionsCompat, Provider } from '@earendil-works/pi-ai'
+import type { AnthropicMessagesCompat, Api, Model, OpenAICompletionsCompat, Provider } from '@earendil-works/pi-ai'
 import { resolveProfiles } from '../src/config.ts'
 import { buildProvider, supportedProtocols } from '../src/provider.ts'
 import { assemble } from './assemble.ts'
@@ -825,6 +825,83 @@ describe('reasoning-dispatch compat switches', () => {
     expect(() => resolveProfiles({
       anthropic: { compat: { thinkingFormat: 'openai' } },
     })).toThrow(/no model on the route speaks openai-completions/)
+  })
+
+  it('materializes the anthropic switches a hand-declared route declares', () => {
+    // A route pi-ai does not ship inherits no catalog compat, which is why the
+    // switches exist: without them the model takes budget thinking and sends
+    // the temperature pi-ai's own catalog metadata forbids for it.
+    const models = modelsOf({
+      'acme-claude': {
+        api: 'anthropic-messages',
+        baseURL: 'https://acme.test',
+        models: [
+          { id: 'adaptive', compat: { forceAdaptiveThinking: true, supportsTemperature: false } },
+          { id: 'temperature', compat: { supportsTemperature: true } },
+        ],
+      },
+    }, 'acme-claude')
+
+    expect(models.get('adaptive')?.compat)
+      .toEqual({ forceAdaptiveThinking: true, supportsTemperature: false })
+    expect(models.get('temperature')?.compat).toEqual({ supportsTemperature: true })
+  })
+
+  it('applies anthropic route switches to that protocol alone on a mixed route', () => {
+    // fireworks ships both protocols, so an anthropic route-level switch must
+    // land on the anthropic-messages models without invalidating the
+    // openai-completions ones.
+    const catalog = getBuiltinModels('fireworks') as readonly Model<Api>[]
+    const anthropic = catalog.find(model => model.api === 'anthropic-messages')
+    const completions = catalog.find(model => model.api === 'openai-completions')
+    if (anthropic === undefined || completions === undefined) throw new Error('fireworks no longer ships a mixed catalog')
+
+    const models = modelsOf({
+      fireworks: {
+        compat: { forceAdaptiveThinking: true },
+        models: [{ id: anthropic.id }, { id: completions.id }],
+      },
+    }, 'fireworks')
+
+    // The catalog entry's own quirks survive beside the switch, because
+    // configuration has no way to restate them.
+    expect(models.get(anthropic.id)?.compat)
+      .toEqual({ ...(anthropic.compat as AnthropicMessagesCompat), forceAdaptiveThinking: true })
+    expect(models.get(completions.id)?.compat).toEqual(completions.compat)
+  })
+
+  it('merges an anthropic switch over a catalog model’s own compat instead of replacing it', () => {
+    const catalog = getBuiltinModels('anthropic') as readonly Model<Api>[]
+    const catalogModel = catalog.find(model => (model.compat as AnthropicMessagesCompat | undefined)?.forceAdaptiveThinking === true)
+    if (catalogModel === undefined) throw new Error('the installed catalog ships no adaptive-thinking anthropic model')
+    const inherited = catalogModel.compat as AnthropicMessagesCompat
+
+    const models = modelsOf({
+      anthropic: { models: [{ id: catalogModel.id, compat: { forceAdaptiveThinking: false } }] },
+    }, 'anthropic')
+
+    expect(models.get(catalogModel.id)?.compat)
+      .toEqual({ ...inherited, forceAdaptiveThinking: false })
+  })
+
+  it('rejects a model-level anthropic switch on a protocol that has no such field', () => {
+    const resolve = (): unknown => resolveProfiles({
+      'acme-gateway': {
+        api: 'openai-responses',
+        baseURL: 'https://acme.test',
+        models: [{ id: 'm', compat: { supportsTemperature: false } }],
+      },
+    })
+    // The diagnostic names the model, the protocol it actually speaks, and the
+    // protocol the switches belong to.
+    expect(resolve).toThrow(/model "m" sets compat anthropic switches, but its api is "openai-responses"/)
+    expect(resolve).toThrow(/forceAdaptiveThinking and supportsTemperature exist only on anthropic-messages/)
+  })
+
+  it('rejects anthropic route switches no model on the route can take', () => {
+    expect(() => resolveProfiles({
+      deepseek: { compat: { forceAdaptiveThinking: true } },
+    })).toThrow(/no model on the route speaks anthropic-messages/)
   })
 })
 
