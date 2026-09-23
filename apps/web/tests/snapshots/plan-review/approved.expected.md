@@ -1,14 +1,7 @@
 - banner:
   - navigation "Session hierarchy":
     - 'button "Plan a small change: add" [disabled]'
-  - img
-  - text: Standard mode
-  - button "Session log":
-    - text: Session log
-    - img
-  - tablist:
-    - tab "Chat" [selected]
-    - tab "Trajectory"
+  - button "Activity"
 - img
 - text: "plan Plan mode on. Use /plan off to leave. Plan a small change: add a --greeting flag to a CLI. Do not read or write any files. Call exit_plan_mode with a short plan of at most five bullet points. Once the plan is approved, reply with the single word DONE and stop. {{clock}}"
 - button "Copy":
@@ -40,6 +33,8 @@
   - img
 - button "Bad response":
   - img
+- button "Read aloud":
+  - img
 - button "Branch into a new conversation":
   - img
 - text: {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s
@@ -47,6 +42,8 @@
 - button "Commands":
   - img
 - 'button "Access mode, current: Workspace Write"': Workspace Write
+- button "Dictate":
+  - img
 - button "Select model, current DeepSeek-V4-Flash":
   - text: DeepSeek-V4-Flash
   - img

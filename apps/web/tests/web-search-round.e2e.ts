@@ -255,7 +255,9 @@ describe('web e2e: shipped default web search', () => {
     expect(await sources.locator('li').count()).toBe(WEB_SEARCH_MAX_RESULTS)
     // The list is complete in the DOM, so the card carries no expand control.
     expect(await card.locator('button').count()).toBe(0)
-    expect(await card.getByText('source listtruncated').isVisible()).toBe(true)
+    const truncated = card.getByText('Source list truncated', { exact: true })
+    await truncated.waitFor({ state: 'visible', timeout: 5_000 })
+    expect(await truncated.count()).toBe(1)
 
     const geometry = await sources.evaluate((element) => {
       const computed = getComputedStyle(element)

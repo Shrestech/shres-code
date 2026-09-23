@@ -43,6 +43,12 @@ peerDependencyRules:
 # (git hooks) genuinely need theirs.
 allowBuilds:
   esbuild: true
+  # The Electron shell's dev dependency downloads its runtime binary in a
+  # postinstall; pnpm >=10 blocks unlisted lifecycle scripts.
+  electron: true
+  # electron-builder's Windows installer helper (Windows-only, unused in the
+  # mac-arm64 stage): its lifecycle script is a no-op we deny explicitly.
+  electron-winstaller: false
   lefthook: true
   # Cross-platform boundary for the persistent PTY backend, including ConPTY on Windows.
   node-pty: true

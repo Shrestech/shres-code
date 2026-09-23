@@ -1,0 +1,67 @@
+# Desktop lane: build the Electron shell and desktop host, run their suites.
+# Stage A covers build + tests only — packaging (unsigned --dir artifacts,
+# prepare-runtime/package-set) lands with the packaging scripts and extends
+# this workflow then.
+name: desktop
+
+on:
+  push:
+    branches: [master, develop]
+  pull_request:
+    paths:
+      - 'apps/desktop/**'
+      - 'apps/desktop-host/**'
+      - 'packages/client/connection/**'
+      - 'packages/client/modules/**'
+      - 'packages/boot/app-boot/**'
+      - '.github/workflows/desktop.yml'
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PRIMARY_NODE_VERSION: '24'
+
+jobs:
+  desktop:
+    runs-on: macos-14
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install
+        env:
+          # Electron's postinstall downloads the runtime binary.
+          SHRES_ALLOW_ELECTRON_BUILD: '1'
+      - run: pnpm run build:lib
+      - run: pnpm exec vitest run apps/desktop apps/desktop-host
+      - run: pnpm run typecheck
+
+  package:
+    runs-on: macos-14
+    timeout-minutes: 60
+    needs: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install
+        env:
+          # Electron's postinstall downloads the runtime binary.
+          SHRES_ALLOW_ELECTRON_BUILD: '1'
+      - name: Package unsigned dir build
+        run: pnpm --filter @shres-code/shres-code-desktop run package:dir
+      - name: Upload application bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: shres-code-mac-arm64
+          path: apps/desktop/.desktop-build/targets/mac-arm64/artifacts/mac-arm64/Shres Code.app
+          retention-days: 7

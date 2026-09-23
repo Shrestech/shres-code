@@ -8,24 +8,17 @@
   src: url('data:font/ttf;base64,AAEAAAAKAIAAAwAgT1MvMkT8SmIAAAEoAAAAYGNtYXAADQBPAAABkAAAADRnbHlmAAAAAAAAAcwAAAABaGVhZCwtPGoAAACsAAAANmhoZWEDIg7bAAAA5AAAACRobXR4EZQAAAAAAYgAAAAIbG9jYQAAAAAAAAHEAAAABm1heHAAAwACAAABCAAAACBuYW1lvljk2gAAAdAAAABscG9zdNNweNQAAAI8AAAALQABAAAAAQAAdia1tV8PPPUAAwPoAAAAAOaLfcUAAAAA5ot9xQAAAAAAAAAAAAAAAwACAAAAAAAAAAEAAAMg/zgAAA+gAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAACAAEAAAACAAAAAAAAAAAAAgAAAAAAAAAAAAAAAAAAAAAAAwjKAZAABQAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAAAAAPz8/PwAA//z//AMg/zgAAAMgAMgAAAAAAAAAAAAAAAAAAAAgAAAB9AAAD6AAAAAAAAIAAAADAAAAFAADAAEAAAAUAAQAIAAAAAQABAABAAD//P//AAD//P//AAUAAQAAAAAAAAAAAAAAAAAAAAAAAAAEADYAAQAAAAAAAQALAAAAAQAAAAAAAgAHAAsAAwABBAkAAQAWABIAAwABBAkAAgAOAChEc2hDaGlwQ2VsbFJlZ3VsYXIARABzAGgAQwBoAGkAcABDAGUAbABsAFIAZQBnAHUAbABhAHIAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAABAgZvYmpyZXAAAAA=') format('truetype');
 }
 
-/* Floating capsule input (figma Input_Bottom 75:8208): card floats above the
-   viewport bottom inside the centered message column; textarea on top, action
-   row below, primary action controls bottom-right. Input width rides the
-   column (--shres-composer-card-max-width = chat content + 32px, 16px per side,
-   is a cap, not a fixed size — layout rule: the box shrinks with the center
-   column keeping its clearance). Hero variant = the same card centered in the
-   empty state; the transition between the two is a position move of one
-   component. */
+/* The composer is one resident editor surface. Its width follows the shared
+   conversation column; the Hero variant only changes its position so the
+   textarea survives the blank → active transition. */
 
 .root {
   display: flex;
   flex-direction: column;
   align-items: center;
-  /* Side pads ride the shared clearance (figma Input_Bottom drew L32/R32/B8;
-     the sides narrow with the shared width axis); the bottom gradient mask
-     is owned by the chat scroller. No top pad: the composer stack's gap owns
-     the space above; error/status strips still carry their own margin. */
-  padding: 0 var(--shres-composer-side-clearance) 8px;
+  /* Shared clearance keeps the editor aligned with the conversation column;
+     the chat scroller owns the bottom fade. */
+  padding: 0 var(--shres-composer-side-clearance) 10px;
 }
 
 .hero {
@@ -57,19 +50,15 @@
   position: relative; /* overlay anchor positioning context */
   display: flex;
   flex-direction: column;
-  /* figma Input 75:8208: 12px between the text area and the button row; 10px
-     top pad on the card before .InputText. */
-  gap: 12px;
+  /* Keep a small separation between the draft and its control row. */
+  gap: 10px;
   width: 100%;
   max-width: var(--shres-composer-card-max-width);
-  padding-top: 10px;
-  /* Input stroke: black/0.10 light, white/0.06 dark (figma darkmode note says
-     the input border is one notch weaker than buttons) — exactly the
-     l2-darkmode-thin pair. Fill: the input surface token (elevated in dark). */
-  border: 1px solid var(--dsw-alias-border-l2-darkmode-thin);
-  border-radius: 22px;
-  background: var(--dsw-specific-input-major);
-  box-shadow: var(--dsw-shadow-lv2);
+  padding-top: 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 10px;
+  background: var(--dsw-alias-bg-layer-1);
+  box-shadow: none;
   font-size: 16px;
   line-height: 24px;
   /* Elevated surface in dark, same as the menus: the draft scrollport inside
@@ -81,14 +70,12 @@
   --shres-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
 }
 
-/* No-workspace trigger state: dashed l4 stroke marks the card as a pick-a-
-   workspace affordance rather than a live composer; hover answers in the
-   business blue to invite the click. Native `dashed` has a fixed browser
-   pattern, so the stroke is an ::after overlay: theme-token background masked
-   by an SVG dash ring (stroke-width 2 centered on the box edge = 1px visible
-   inside), which keeps the 22px radius and both themes. */
+/* No-workspace trigger state: a dashed ring marks the card as a pick-a-
+   workspace affordance rather than a live composer. Native `dashed` has a
+   fixed browser pattern, so the stroke is an ::after overlay masked by an SVG
+   dash ring. */
 .cardWorkspaceTrigger {
-  border-color: transparent;
+  border-color: var(--dsw-alias-border-l2);
   cursor: pointer;
 }
 
@@ -96,17 +83,16 @@
   content: '';
   position: absolute;
   inset: -1px;
-  border-radius: 22px;
+  border-radius: 6px;
   background: var(--dsw-alias-border-l4);
   transition: background-color 100ms ease;
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='100%25' height='100%25' fill='none' rx='22' ry='22' stroke='black' stroke-width='2' stroke-dasharray='4 4'/%3E%3C/svg%3E");
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='100%25' height='100%25' fill='none' rx='22' ry='22' stroke='black' stroke-width='2' stroke-dasharray='4 4'/%3E%3C/svg%3E");
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='100%25' height='100%25' fill='none' rx='6' ry='6' stroke='black' stroke-width='2' stroke-dasharray='4 4'/%3E%3C/svg%3E");
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='100%25' height='100%25' fill='none' rx='6' ry='6' stroke='black' stroke-width='2' stroke-dasharray='4 4'/%3E%3C/svg%3E");
   pointer-events: none;
 }
 
 /* Disabled toolbar controls neither receive nor swallow clicks in the trigger
-   state: pointer events fall through to the card's own click handler, making
-   the full capsule one pick target. */
+   state: pointer events fall through to the card's own click handler. */
 .cardWorkspaceTrigger :disabled {
   pointer-events: none;
 }
@@ -214,7 +200,7 @@
   outline: none;
   background: transparent;
   color: transparent;
-  /* Business blue, not brand-primary: that token resolves to ink in this sheet. */
+  /* The caret follows the warm action accent. */
   caret-color: var(--dsw-alias-state-business-primary);
 }
 
@@ -225,8 +211,7 @@
      width:100% textarea gains its padding OUTSIDE the card and text runs past
      the right padding — and wraps 28px later than the mirror/backdrop layers. */
   box-sizing: border-box;
-  /* figma .InputText 34:10434: pl 16 / pr 12 / pt 4. Backdrop MUST share these
-     metrics or the highlight ranges drift off the glyphs. */
+  /* The backdrop shares these metrics or highlight ranges drift off the glyphs. */
   padding: 4px 12px 0 16px;
   /* ShresChipCell first: ONLY U+FFFC resolves there (4em blank cell — the chip
      slot); everything else falls through to the app stack. All three layers
@@ -253,7 +238,7 @@
      (768 against 776) — worth 2 to 5 wrapped lines on a long draft. */
 }
 
-/* figma 34:10434: #ADB2B8 light / #81858C dark — the caption pair exactly. */
+/* Placeholder copy stays on the caption token in both themes. */
 .input::placeholder {
   color: var(--dsw-alias-label-caption);
   user-select: none;
@@ -274,23 +259,18 @@
   pointer-events: none;
 }
 
-/* Hero (centered empty-state) keeps the 2-line floor (figma min-h 52 = ~2 × 24
-   line + 4pt); the docked composer collapses to the content height. */
+/* Hero keeps a two-line floor; the docked composer collapses to content height. */
 .hero .mirror {
   min-height: 52px;
 }
 
-/* Toolbar: attach + Plan + Read-only on the left; model + send on the right
-   (figma Input_Bottom chrome). */
+/* Toolbar: command + mode controls on the left; model + send on the right. */
 .row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  /* 2px moved from the bottom pad to the top: the whole control row sits 2px
-     lower in the card (it read too high against the textarea) while the card
-     height and the controls' own centering stay untouched. */
-  padding: 2px 8px 6px;
+  padding: 2px 8px 8px;
   min-width: 0;
   /* Size container so the chips inside can collapse to icon-only when the
      card runs out of row width (PermissionSelect @container rule). Anonymous
@@ -307,38 +287,37 @@
   min-width: 0;
 }
 
-/* figma 75:8208 drew 16 between + and the mode chips and 4 between Plan /
-   Read-only; the chip gap widened to 12 so the pill chips read as separate
-   controls. */
+/* Keep mode and action controls visually separate without pill containers. */
 .tools {
-  gap: 16px;
+  gap: 10px;
 }
 
 .modes {
-  gap: 12px;
+  gap: 8px;
 }
 
 .trailing {
   flex: none;
-  gap: 12px;
+  gap: 8px;
 }
 
-/* Attach circle (figma + control): 28px, selector fill, primary glyph. */
+/* Compact command control with a primary glyph. */
 .add {
   display: grid;
   place-items: center;
   flex: none;
   width: 28px;
   height: 28px;
-  border: none;
-  border-radius: 999px;
-  background: var(--dsw-specific-selector);
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  background: transparent;
   color: var(--dsw-alias-label-primary);
   cursor: pointer;
 }
 
 .add:hover:not(:disabled) {
-  background: var(--dsw-alias-interactive-bg-hover-solid);
+  border-color: var(--dsw-alias-brand-primary);
+  background: var(--dsw-alias-interactive-bg-hover-accent);
 }
 
 .add:disabled {
@@ -346,14 +325,13 @@
   cursor: default;
 }
 
-/* Plan / Read-only / model — native <select>, chip-like closed chrome
-   (figma ToggleButton: 13/20 medium secondary, 12px chevron). */
+/* Plan / Read-only / model — native <select> controls with a small chevron. */
 .select {
   max-width: 220px;
   height: 28px;
   padding: 0 20px 0 8px;
-  border: none;
-  border-radius: 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
   outline: none;
   background-color: transparent;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%2381858C' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
@@ -370,7 +348,8 @@
 }
 
 .select:hover:not(:disabled) {
-  background-color: var(--dsw-alias-interactive-bg-hover);
+  border-color: var(--dsw-alias-border-l2);
+  background-color: var(--dsw-alias-interactive-bg-hover-accent);
 }
 
 .select:disabled {
@@ -378,31 +357,24 @@
   cursor: default;
 }
 
-/* Primary send (figma IconButton 34:10465): 34px circle, #3964FE light /
-   #679EFE dark — the info-fill pair (500→400), NOT button-primary (ink);
-   white glyph; empty text = 0.4 opacity. */
+/* Primary send/stop action: compact accent rectangle. */
 .primary {
   display: grid;
   place-items: center;
   flex: none;
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   border: none;
-  border-radius: 999px;
-  background: var(--dsw-alias-button-info-fill);
-  /* Static white, not the foreground token: the arrow stays white on the blue
-     fill in both themes (design 34:10465). */
-  color: #fff;
+  border-radius: 6px;
+  background: var(--dsw-alias-brand-primary);
+  color: var(--dsw-alias-label-primary-foreground);
   cursor: pointer;
   transition: background-color 100ms ease;
-  /* Opts out of the row's 2px downward shift (.row top pad): the send circle
-     keeps its original seat while the smaller chips sit lower. Transform, not
-     margin, so flex centering math is untouched. */
-  transform: translateY(-2px);
+  transform: none;
 }
 
 .primary:hover:not(:disabled) {
-  background: var(--dsw-alias-button-info-hover);
+  background: var(--dsw-alias-button-primary-hover);
 }
 
 .primary:disabled {
@@ -426,7 +398,7 @@
    Chip family colors; clone keeps rounded ends on soft-wrap fragments. */
 .textRef {
   background-color: transparent;
-  color: var(--dsw-alias-state-business-primary);
+  color: var(--dsw-alias-brand-primary);
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
 }
@@ -443,8 +415,8 @@
    with an ellipsis; the full name rides the title tooltip. */
 .chip {
   position: relative;
-  border-radius: 6px;
-  background: rgba(97, 135, 216, 0.22);
+  border-radius: 4px;
+  background: var(--dsw-alias-interactive-bg-hover-accent);
 }
 
 .chip::before {
@@ -470,7 +442,7 @@
 }
 
 .chipInvalid {
-  background: rgba(216, 97, 97, 0.2);
+  background: var(--dsw-alias-interactive-bg-hover-danger);
   text-decoration: line-through;
   opacity: 0.7;
 }

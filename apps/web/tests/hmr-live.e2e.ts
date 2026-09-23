@@ -75,8 +75,8 @@ it('hot-reloads a real client-plugin source edit without refreshing the page', a
   if (!existsSync(binPath)) throw new Error('HMR browser test needs the built shres bin; run pnpm run build first')
   const originalSource = await readFile(sourcePath)
   const originalBundle = await readFile(bundlePath)
-  const oldText = 'Take the Leap'
-  const sourceNeedle = "'hero.headline': 'Take the Leap'"
+  const oldText = 'Start with an idea'
+  const sourceNeedle = "'hero.headline': 'Start with an idea'"
   const newText = `HMR UPDATED ${'x'.repeat(80)}`
   const updatedSource = originalSource.toString().replace(sourceNeedle, `'hero.headline': '${newText}'`)
   if (updatedSource === originalSource.toString()) throw new Error(`HMR source lacks ${JSON.stringify(sourceNeedle)}`)

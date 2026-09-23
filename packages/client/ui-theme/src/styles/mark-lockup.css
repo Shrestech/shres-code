@@ -7,7 +7,7 @@
 }
 
 [data-shres-shield='on'] .shres-mark-girl {
-  fill: #2563eb;
+  fill: var(--dsw-static-deepseek-500);
 }
 
 [data-shres-shield='on'] .shres-mark-shield {

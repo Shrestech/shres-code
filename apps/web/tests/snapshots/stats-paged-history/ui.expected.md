@@ -1,12 +1,7 @@
 - banner:
   - navigation "Session hierarchy":
     - button "{{workspace}}" [disabled]
-  - button "Session log":
-    - text: Session log
-    - img
-  - tablist:
-    - tab "Chat" [selected]
-    - tab "Trajectory"
+  - button "Activity"
 - text: m1 7/25 {{clock}}
 - button "Copy":
   - img
@@ -16,6 +11,8 @@
 - button "Good response":
   - img
 - button "Bad response":
+  - img
+- button "Read aloud":
   - img
 - button "Branch into a new conversation":
   - img
@@ -29,6 +26,8 @@
   - img
 - button "Bad response":
   - img
+- button "Read aloud":
+  - img
 - button "Branch into a new conversation":
   - img
 - text: 7/25 {{clock}} Ran for {{duration}} m3 7/25 {{clock}}
@@ -40,6 +39,8 @@
 - button "Good response":
   - img
 - button "Bad response":
+  - img
+- button "Read aloud":
   - img
 - button "Branch into a new conversation":
   - img
@@ -53,6 +54,8 @@
   - img
 - button "Bad response":
   - img
+- button "Read aloud":
+  - img
 - button "Branch into a new conversation":
   - img
 - text: 7/25 {{clock}} Ran for {{duration}} m5 7/25 {{clock}}
@@ -64,6 +67,8 @@
 - button "Good response":
   - img
 - button "Bad response":
+  - img
+- button "Read aloud":
   - img
 - button "Branch into a new conversation":
   - img
@@ -77,6 +82,8 @@
   - img
 - button "Bad response":
   - img
+- button "Read aloud":
+  - img
 - button "Branch into a new conversation":
   - img
 - text: 7/25 {{clock}} Ran for {{duration}} m7 7/25 {{clock}}
@@ -88,6 +95,8 @@
 - button "Good response":
   - img
 - button "Bad response":
+  - img
+- button "Read aloud":
   - img
 - button "Branch into a new conversation":
   - img
@@ -101,6 +110,8 @@
   - img
 - button "Bad response":
   - img
+- button "Read aloud":
+  - img
 - button "Branch into a new conversation":
   - img
 - text: 7/25 {{clock}} Ran for {{duration}} m9 7/25 {{clock}}
@@ -112,6 +123,8 @@
 - button "Good response":
   - img
 - button "Bad response":
+  - img
+- button "Read aloud":
   - img
 - button "Branch into a new conversation":
   - img
@@ -125,6 +138,8 @@
   - img
 - button "Bad response":
   - img
+- button "Read aloud":
+  - img
 - button "Branch into a new conversation":
   - img
 - text: 7/25 {{clock}} Ran for {{duration}} m11 7/25 {{clock}}
@@ -136,6 +151,8 @@
 - button "Good response":
   - img
 - button "Bad response":
+  - img
+- button "Read aloud":
   - img
 - button "Branch into a new conversation":
   - img
@@ -149,6 +166,8 @@
   - img
 - button "Bad response":
   - img
+- button "Read aloud":
+  - img
 - button "Branch into a new conversation":
   - img
 - text: 7/25 {{clock}} Ran for {{duration}} m13 7/25 {{clock}}
@@ -160,6 +179,8 @@
 - button "Good response":
   - img
 - button "Bad response":
+  - img
+- button "Read aloud":
   - img
 - button "Branch into a new conversation":
   - img
@@ -173,6 +194,8 @@
   - img
 - button "Bad response":
   - img
+- button "Read aloud":
+  - img
 - button "Branch into a new conversation":
   - img
 - text: 7/25 {{clock}} Ran for {{duration}} m15 7/25 {{clock}}
@@ -184,6 +207,8 @@
 - button "Good response":
   - img
 - button "Bad response":
+  - img
+- button "Read aloud":
   - img
 - button "Branch into a new conversation":
   - img
@@ -197,6 +222,8 @@
   - img
 - button "Bad response":
   - img
+- button "Read aloud":
+  - img
 - button "Branch into a new conversation":
   - img
 - text: 7/25 {{clock}} Ran for {{duration}} m17 7/25 {{clock}}
@@ -208,6 +235,8 @@
 - button "Good response":
   - img
 - button "Bad response":
+  - img
+- button "Read aloud":
   - img
 - button "Branch into a new conversation":
   - img
@@ -221,6 +250,8 @@
   - img
 - button "Bad response":
   - img
+- button "Read aloud":
+  - img
 - button "Branch into a new conversation":
   - img
 - text: 7/25 {{clock}} Ran for {{duration}} m19 7/25 {{clock}}
@@ -232,6 +263,8 @@
 - button "Good response":
   - img
 - button "Bad response":
+  - img
+- button "Read aloud":
   - img
 - button "Branch into a new conversation":
   - img
@@ -245,6 +278,8 @@
   - img
 - button "Bad response":
   - img
+- button "Read aloud":
+  - img
 - button "Branch into a new conversation":
   - img
 - text: 7/25 {{clock}} Ran for {{duration}} m21 7/25 {{clock}}
@@ -256,6 +291,8 @@
 - button "Good response":
   - img
 - button "Bad response":
+  - img
+- button "Read aloud":
   - img
 - button "Branch into a new conversation":
   - img
@@ -269,6 +306,8 @@
   - img
 - button "Bad response":
   - img
+- button "Read aloud":
+  - img
 - button "Branch into a new conversation":
   - img
 - text: 7/25 {{clock}} Ran for {{duration}} m23 7/25 {{clock}}
@@ -280,6 +319,8 @@
 - button "Good response":
   - img
 - button "Bad response":
+  - img
+- button "Read aloud":
   - img
 - button "Branch into a new conversation":
   - img
@@ -293,6 +334,8 @@
   - img
 - button "Bad response":
   - img
+- button "Read aloud":
+  - img
 - button "Branch into a new conversation":
   - img
 - text: 7/25 {{clock}} Ran for {{duration}} m25 7/25 {{clock}}
@@ -304,6 +347,8 @@
 - button "Good response":
   - img
 - button "Bad response":
+  - img
+- button "Read aloud":
   - img
 - button "Branch into a new conversation":
   - img
@@ -317,6 +362,8 @@
   - img
 - button "Bad response":
   - img
+- button "Read aloud":
+  - img
 - button "Branch into a new conversation":
   - img
 - text: 7/25 {{clock}} Ran for {{duration}} m27 7/25 {{clock}}
@@ -328,6 +375,8 @@
 - button "Good response":
   - img
 - button "Bad response":
+  - img
+- button "Read aloud":
   - img
 - button "Branch into a new conversation":
   - img
@@ -341,6 +390,8 @@
   - img
 - button "Bad response":
   - img
+- button "Read aloud":
+  - img
 - button "Branch into a new conversation":
   - img
 - text: 7/25 {{clock}} Ran for {{duration}}
@@ -350,6 +401,8 @@
 - button "Commands":
   - img
 - 'button "Access mode, current: Workspace Write"': Workspace Write
+- button "Dictate":
+  - img
 - button "Select model, current DeepSeek-V4-Flash":
   - text: DeepSeek-V4-Flash
   - img

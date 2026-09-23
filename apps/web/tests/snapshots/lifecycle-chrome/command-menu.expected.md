@@ -4,6 +4,6 @@
   - option "export Download this Session log as a ZIP archive"
   - option "feedback record feedback about this session"
   - option "goal set or view the goal for a long-running task"
+  - option "model Show or switch the session model and reasoning effort"
   - option "permission Switch the permission preset (sandbox mode + approval policy)"
   - option "plan Enter or leave plan mode"
-  - option "model Select the model for this conversation"

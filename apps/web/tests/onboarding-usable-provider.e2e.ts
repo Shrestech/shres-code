@@ -10,6 +10,7 @@ import { join } from 'node:path'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
+import { settingsNamespace } from '@shres-code/shres-code-settings'
 import {
   acknowledgeReloadConnectionLoss, assertFixtureInventory, captureStableAria, compareOrRefreshGolden,
   launchWebScaffold, watchConsole, webSnapshotMode, type WebScaffold,
@@ -29,6 +30,19 @@ describe.skipIf(MODE === 'record')('web e2e: another usable provider ends first-
 
   beforeAll(async () => {
     scaffold = await launchWebScaffold({ deepSeekMissingCredential: true })
+    // Keep subscription-session routes out of this keyless lane: their
+    // dormant, keyless rows would satisfy readiness before the test can prove
+    // that configuring another provider ends first-run onboarding.
+    for (const namespace of ['llm-cursor-session', 'llm-grok-session', 'llm-codex-session'] as const) {
+      await scaffold.ctx.settings.mutate(settingsNamespace(namespace), [
+        { op: 'set', path: ['enabled'], value: false },
+      ])
+    }
+    // Ollama is deliberately offered as a first-run choice but must not make
+    // the Models page skip the DeepSeek setup card before it is selected.
+    await scaffold.ctx.settings.mutate(settingsNamespace('llm-pi-ai'), [
+      { op: 'set', path: ['providers', 'ollama-local', 'enabled'], value: false },
+    ])
     browser = await chromium.launch()
     // The scenario asserts the shipped English copy, so the browser asks for it.
     page = await browser.newPage({ viewport: { width: 1440, height: 960 }, locale: 'en-US' })
@@ -50,11 +64,11 @@ describe.skipIf(MODE === 'record')('web e2e: another usable provider ends first-
     await credentialStep.waitFor({ state: 'detached', timeout: 15_000 })
 
     await page.getByRole('button', { name: 'Settings', exact: true }).click()
-    const settings = page.getByRole('dialog', { name: 'Settings' })
+    const settings = page.getByRole('region', { name: 'Settings' })
     await settings.waitFor({ timeout: 10_000 })
     // The onboarding step no longer navigates into Settings on dismissal, so
     // enter the Models section explicitly before exercising its normal cards.
-    await settings.getByRole('button', { name: 'Model' }).click()
+    await settings.getByRole('button', { name: 'Models & providers', exact: true }).click()
     const setupKey = settings.getByRole('textbox', { name: 'API key', exact: true })
     await setupKey.waitFor({ timeout: 10_000 })
 
@@ -71,14 +85,14 @@ describe.skipIf(MODE === 'record')('web e2e: another usable provider ends first-
 
     // Cancelling the setup card must not close the independent add-provider
     // draft beside it.
-    await settings.getByRole('button', { name: 'Cancel', exact: true }).first().click()
+    await setupKey.locator('xpath=ancestor::li').getByRole('button', { name: 'Cancel', exact: true }).click()
     expect(await settings.getByLabel('Provider').count()).toBe(1)
     await expect.poll(
       async () => settings.getByRole('textbox', { name: 'API key', exact: true }).count(),
       { timeout: 10_000 },
     ).toBe(1)
     await settings.getByRole('button', { name: 'Edit DeepSeek (deepseek-official)' }).waitFor({ timeout: 10_000 })
-    const dismissed = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
+    const dismissed = await captureStableAria(page, '[role="region"][aria-label="Settings"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(DISMISSED_EXPECTED, dismissed, MODE)
 
     expect(tripwire.warnings).toEqual([])
@@ -87,10 +101,11 @@ describe.skipIf(MODE === 'record')('web e2e: another usable provider ends first-
 
   it('stops prompting for DeepSeek once the other provider can serve requests', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-onboarding-other-provider'))
-    const settings = page.getByRole('dialog', { name: 'Settings' })
-    await settings.getByRole('textbox', { name: 'API key', exact: true }).fill('sk-e2e-minimax')
-    await settings.getByRole('button', { name: 'Save', exact: true }).click()
-    await settings.getByText('Saved minimax-cn。', { exact: true }).waitFor({ timeout: 15_000 })
+    const settings = page.getByRole('region', { name: 'Settings' })
+    const addCard = settings.getByLabel('Provider').locator('xpath=ancestor::div[contains(@class, "addCard")]')
+    await addCard.getByRole('textbox', { name: 'API key', exact: true }).fill('sk-e2e-minimax')
+    await addCard.getByRole('button', { name: 'Apply', exact: true }).click()
+    await settings.getByText('Saved minimax-cn.', { exact: true }).waitFor({ timeout: 15_000 })
 
     // Only minimax-cn is reachable; DeepSeek still holds no credential.
     const document = await readFile(join(scaffold.harnessHome, 'settings.yaml'), 'utf8')
@@ -115,7 +130,7 @@ describe.skipIf(MODE === 'record')('web e2e: another usable provider ends first-
     // setup card over a user who already has somewhere to send a request.
     await page.getByRole('button', { name: 'Settings', exact: true }).click()
     await settings.waitFor({ timeout: 10_000 })
-    await settings.getByRole('button', { name: 'Model' }).click()
+    await settings.getByRole('button', { name: 'Models & providers', exact: true }).click()
     await settings.getByRole('button', { name: 'Edit DeepSeek (deepseek-official)' }).waitFor({ timeout: 10_000 })
     expect(await settings.getByRole('textbox', { name: 'API key', exact: true }).count()).toBe(0)
 

@@ -156,7 +156,6 @@ export function JSpaceSection({
 
   return (
     <div className={css.section}>
-      <h2 className={css.title}>{t('title')}</h2>
       {settings.status === 'loading' ? <p className={css.status}>{t('loading')}</p> : null}
       {settings.status === 'unavailable' ? <p className={css.notice} role="status">{t('unavailable')}</p> : null}
       {showForm ? (

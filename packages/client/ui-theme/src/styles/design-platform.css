@@ -1,184 +1,216 @@
-/* Figma font-weight 510 (an SF Pro variable-font weight) always renders as
-   font-weight: 500 in this UI — non-variable webfonts snap intermediate
-   weights unpredictably across platforms. */
+/*
+ * Shres visual language: warm paper, olive ink, and a restrained rust accent.
+ *
+ * The token names stay stable because feature packages consume them directly.
+ * Their values are intentionally independent of the old vendor palette: the
+ * light scheme is porcelain and the dark scheme is warm charcoal. Functional
+ * state colors remain distinct from the product accent so status is still
+ * legible at a glance.
+ */
+
+/* Static scale ------------------------------------------------------------ */
 body {
-  --dsw-static-amber-100: rgb(254, 245, 231);
-  --dsw-static-amber-400: rgb(247, 173, 49);
-  --dsw-static-amber-500: rgb(245, 158, 11);
-  --dsw-static-amber-600: rgb(221, 134, 41);
-  --dsw-static-amber-900: rgb(39, 36, 31);
-  --dsw-static-blue-100: rgb(219, 234, 254);
-  --dsw-static-blue-300: rgb(147, 197, 253);
-  --dsw-static-blue-400: rgb(96, 165, 250);
-  --dsw-static-blue-450: rgb(77, 147, 248);
-  --dsw-static-blue-500: rgb(59, 130, 246);
-  --dsw-static-blue-50: rgb(239, 246, 255);
-  --dsw-static-blue-50p: rgb(234, 243, 255);
-  --dsw-static-blue-600: rgb(37, 99, 235);
-  --dsw-static-blue-75: rgb(229, 240, 255);
-  --dsw-static-blue-800: rgb(30, 64, 175);
-  --dsw-static-blue-900: rgb(14, 48, 116);
-  --dsw-static-blue-950: rgb(23, 37, 84);
-  --dsw-static-deepseek-100: rgb(228, 237, 253);
-  --dsw-static-deepseek-200: rgb(211, 226, 255);
-  --dsw-static-deepseek-300: rgb(183, 200, 254);
-  --dsw-static-deepseek-400: rgb(103, 158, 254);
-  --dsw-static-deepseek-450: rgb(86, 134, 254);
-  --dsw-static-deepseek-500: rgb(65, 118, 230);
-  --dsw-static-deepseek-50: rgb(237, 243, 254);
-  --dsw-static-deepseek-600: rgb(72, 104, 178);
-  --dsw-static-deepseek-700-delete: rgb(47, 76, 143);
-  --dsw-static-deepseek-800: rgb(52, 65, 91);
-  --dsw-static-deepseek-900: rgb(40, 49, 66);
-  --dsw-static-green-100: rgb(230, 250, 237);
-  --dsw-static-green-400: rgb(78, 209, 126);
-  --dsw-static-green-500: rgb(34, 197, 94);
-  --dsw-static-green-900: rgb(35, 60, 44);
-  --dsw-static-neutral-00: rgb(255, 255, 255);
-  --dsw-static-neutral-1000: rgb(0, 0, 0);
-  --dsw-static-neutral-100: rgb(245, 245, 245);
-  --dsw-static-neutral-150: rgb(237, 237, 237);
-  --dsw-static-neutral-200: rgb(229, 229, 229);
-  --dsw-static-neutral-250: rgb(220, 220, 220);
-  --dsw-static-neutral-300: rgb(212, 212, 212);
-  --dsw-static-neutral-400: rgb(162, 164, 166);
-  --dsw-static-neutral-500: rgb(127, 130, 135);
-  --dsw-static-neutral-50: rgb(250, 250, 250);
-  --dsw-static-neutral-550: rgb(101, 103, 107);
-  --dsw-static-neutral-600: rgb(84, 85, 87);
-  --dsw-static-neutral-700: rgb(60, 60, 61);
-  --dsw-static-neutral-800: rgb(41, 41, 41);
-  --dsw-static-neutral-850: rgb(33, 33, 35);
-  --dsw-static-neutral-900: rgb(15, 15, 15);
-  --dsw-static-neutral-bluish-00: rgb(255, 255, 255);
-  --dsw-static-neutral-bluish-1000: rgb(15, 17, 21);
-  --dsw-static-neutral-bluish-100: rgb(235, 238, 242);
-  --dsw-static-neutral-bluish-150: rgb(233, 236, 242);
-  --dsw-static-neutral-bluish-200: rgb(225, 229, 238);
-  --dsw-static-neutral-bluish-300: rgb(207, 211, 214);
-  --dsw-static-neutral-bluish-400: rgb(173, 178, 184);
-  --dsw-static-neutral-bluish-500: rgb(151, 157, 166);
-  --dsw-static-neutral-bluish-50: rgb(249, 250, 251);
-  --dsw-static-neutral-bluish-600: rgb(129, 133, 140);
-  --dsw-static-neutral-bluish-60: rgb(245, 246, 247);
-  --dsw-static-neutral-bluish-700: rgb(97, 102, 107);
-  --dsw-static-neutral-bluish-750: rgb(67, 69, 74);
-  --dsw-static-neutral-bluish-75: rgb(241, 243, 245);
-  --dsw-static-neutral-bluish-800: rgb(53, 54, 56);
-  --dsw-static-neutral-bluish-850: rgb(44, 44, 46);
-  --dsw-static-neutral-bluish-875: rgb(35, 35, 36);
-  --dsw-static-neutral-bluish-900: rgb(27, 27, 28);
-  --dsw-static-neutral-bluish-950: rgb(21, 21, 23);
-  --dsw-static-red-100: rgb(254, 226, 226);
-  --dsw-static-red-400: rgb(242, 90, 90);
-  --dsw-static-red-500: rgb(239, 68, 68);
-  --dsw-static-red-50: rgb(254, 242, 242);
-  --dsw-static-red-600: rgb(236, 19, 19);
-  --dsw-static-red-900: rgb(87, 12, 12);
+  --dsw-static-amber-100: #f6ead8;
+  --dsw-static-amber-400: #d7a05c;
+  --dsw-static-amber-500: #c0843e;
+  --dsw-static-amber-600: #a56a2f;
+  --dsw-static-amber-900: #4a2f1e;
+
+  /* Legacy blue names remain as compatibility names for consumers. They now
+     carry the rust family so no product surface emits a blue identity. */
+  --dsw-static-blue-50: #fbf0eb;
+  --dsw-static-blue-50p: #f8e9e2;
+  --dsw-static-blue-75: #f5e7df;
+  --dsw-static-blue-100: #f2e2d9;
+  --dsw-static-blue-300: #e2b39a;
+  --dsw-static-blue-400: #cf8766;
+  --dsw-static-blue-450: #bd6d49;
+  --dsw-static-blue-500: #ad542f;
+  --dsw-static-blue-600: #954324;
+  --dsw-static-blue-800: #6d2e1b;
+  --dsw-static-blue-900: #4f271c;
+  --dsw-static-blue-950: #3e231b;
+
+  --dsw-static-deepseek-50: #fcf2ee;
+  --dsw-static-deepseek-100: #f3e3da;
+  --dsw-static-deepseek-200: #eccfc1;
+  --dsw-static-deepseek-300: #e1b3a0;
+  --dsw-static-deepseek-400: #c97a58;
+  --dsw-static-deepseek-450: #ba6848;
+  --dsw-static-deepseek-500: #ad542f;
+  --dsw-static-deepseek-600: #8f3f24;
+  --dsw-static-deepseek-700-delete: #71321f;
+  --dsw-static-deepseek-800: #573021;
+  --dsw-static-deepseek-900: #3b2720;
+
+  --dsw-static-green-100: #e5f2e8;
+  --dsw-static-green-400: #67ad7d;
+  --dsw-static-green-500: #3c8e59;
+  --dsw-static-green-900: #254b33;
+
+  --dsw-static-neutral-00: #fffefa;
+  --dsw-static-neutral-50: #fbfaf6;
+  --dsw-static-neutral-100: #f5f3ed;
+  --dsw-static-neutral-150: #efede6;
+  --dsw-static-neutral-200: #e6e3da;
+  --dsw-static-neutral-250: #ddd9cf;
+  --dsw-static-neutral-300: #d2cec2;
+  --dsw-static-neutral-400: #b2aea2;
+  --dsw-static-neutral-500: #979388;
+  --dsw-static-neutral-550: #7f7c72;
+  --dsw-static-neutral-600: #68675f;
+  --dsw-static-neutral-700: #514f49;
+  --dsw-static-neutral-800: #3c3d37;
+  --dsw-static-neutral-850: #34352f;
+  --dsw-static-neutral-900: #272923;
+  --dsw-static-neutral-1000: #191c16;
+
+  /* Warm neutral aliases retain the historical `bluish` suffix for callers. */
+  --dsw-static-neutral-bluish-00: #fffefa;
+  --dsw-static-neutral-bluish-50: #f6f5f0;
+  --dsw-static-neutral-bluish-60: #f8f7f2;
+  --dsw-static-neutral-bluish-75: #f3f1eb;
+  --dsw-static-neutral-bluish-100: #eeeae2;
+  --dsw-static-neutral-bluish-150: #e7e4dc;
+  --dsw-static-neutral-bluish-200: #dedbd1;
+  --dsw-static-neutral-bluish-300: #d3d0c5;
+  --dsw-static-neutral-bluish-400: #b0aea3;
+  --dsw-static-neutral-bluish-500: #97958c;
+  --dsw-static-neutral-bluish-600: #706e66;
+  --dsw-static-neutral-bluish-700: #5f6058;
+  --dsw-static-neutral-bluish-750: #494a43;
+  --dsw-static-neutral-bluish-800: #393b35;
+  --dsw-static-neutral-bluish-850: #30322d;
+  --dsw-static-neutral-bluish-875: #2b2d28;
+  --dsw-static-neutral-bluish-900: #252722;
+  --dsw-static-neutral-bluish-950: #20221e;
+  --dsw-static-neutral-bluish-1000: #191c16;
+
+  --dsw-static-red-50: #fcf0ee;
+  --dsw-static-red-100: #f8e4e1;
+  --dsw-static-red-400: #d87873;
+  --dsw-static-red-500: #c7554d;
+  --dsw-static-red-600: #b6403a;
+  --dsw-static-red-900: #552622;
 }
 
 body[data-ds-dark-theme] {
-  --dsw-static-amber-100: rgb(254, 245, 231);
-  --dsw-static-amber-400: rgb(247, 173, 49);
-  --dsw-static-amber-500: rgb(245, 158, 11);
-  --dsw-static-amber-600: rgb(221, 134, 41);
-  --dsw-static-amber-900: rgb(39, 36, 31);
-  --dsw-static-blue-100: rgb(219, 234, 254);
-  --dsw-static-blue-300: rgb(147, 197, 253);
-  --dsw-static-blue-400: rgb(96, 165, 250);
-  --dsw-static-blue-450: rgb(77, 147, 248);
-  --dsw-static-blue-500: rgb(59, 130, 246);
-  --dsw-static-blue-50: rgb(239, 246, 255);
-  --dsw-static-blue-50p: rgb(234, 243, 255);
-  --dsw-static-blue-600: rgb(37, 99, 235);
-  --dsw-static-blue-75: rgb(229, 240, 255);
-  --dsw-static-blue-800: rgb(30, 64, 175);
-  --dsw-static-blue-900: rgb(14, 48, 116);
-  --dsw-static-blue-950: rgb(23, 37, 84);
-  --dsw-static-deepseek-100: rgb(228, 237, 253);
-  --dsw-static-deepseek-200: rgb(211, 226, 255);
-  --dsw-static-deepseek-300: rgb(183, 200, 254);
-  --dsw-static-deepseek-400: rgb(103, 158, 254);
-  --dsw-static-deepseek-450: rgb(86, 134, 254);
-  --dsw-static-deepseek-500: rgb(65, 118, 230);
-  --dsw-static-deepseek-50: rgb(237, 243, 254);
-  --dsw-static-deepseek-600: rgb(72, 104, 178);
-  --dsw-static-deepseek-700-delete: rgb(47, 76, 143);
-  --dsw-static-deepseek-800: rgb(52, 65, 91);
-  --dsw-static-deepseek-900: rgb(40, 49, 66);
-  --dsw-static-green-100: rgb(230, 250, 237);
-  --dsw-static-green-400: rgb(78, 209, 126);
-  --dsw-static-green-500: rgb(34, 197, 94);
-  --dsw-static-green-900: rgb(35, 60, 44);
-  --dsw-static-neutral-00: rgb(255, 255, 255);
-  --dsw-static-neutral-1000: rgb(0, 0, 0);
-  --dsw-static-neutral-100: rgb(245, 245, 245);
-  --dsw-static-neutral-150: rgb(237, 237, 237);
-  --dsw-static-neutral-200: rgb(229, 229, 229);
-  --dsw-static-neutral-250: rgb(220, 220, 220);
-  --dsw-static-neutral-300: rgb(212, 212, 212);
-  --dsw-static-neutral-400: rgb(162, 164, 166);
-  --dsw-static-neutral-500: rgb(127, 130, 135);
-  --dsw-static-neutral-50: rgb(250, 250, 250);
-  --dsw-static-neutral-550: rgb(101, 103, 107);
-  --dsw-static-neutral-600: rgb(84, 85, 87);
-  --dsw-static-neutral-700: rgb(60, 60, 61);
-  --dsw-static-neutral-800: rgb(41, 41, 41);
-  --dsw-static-neutral-850: rgb(33, 33, 35);
-  --dsw-static-neutral-900: rgb(15, 15, 15);
-  --dsw-static-neutral-bluish-00: rgb(255, 255, 255);
-  --dsw-static-neutral-bluish-1000: rgb(15, 17, 21);
-  --dsw-static-neutral-bluish-100: rgb(235, 238, 242);
-  --dsw-static-neutral-bluish-150: rgb(233, 236, 242);
-  --dsw-static-neutral-bluish-200: rgb(225, 229, 238);
-  --dsw-static-neutral-bluish-300: rgb(207, 211, 214);
-  --dsw-static-neutral-bluish-400: rgb(173, 178, 184);
-  --dsw-static-neutral-bluish-500: rgb(151, 157, 166);
-  --dsw-static-neutral-bluish-50: rgb(249, 250, 251);
-  --dsw-static-neutral-bluish-600: rgb(129, 133, 140);
-  --dsw-static-neutral-bluish-60: rgb(249, 250, 251);
-  --dsw-static-neutral-bluish-700: rgb(97, 102, 107);
-  --dsw-static-neutral-bluish-750: rgb(67, 69, 74);
-  --dsw-static-neutral-bluish-75: rgb(241, 243, 245);
-  --dsw-static-neutral-bluish-800: rgb(53, 54, 56);
-  --dsw-static-neutral-bluish-850: rgb(44, 44, 46);
-  --dsw-static-neutral-bluish-875: rgb(35, 35, 36);
-  --dsw-static-neutral-bluish-900: rgb(27, 27, 28);
-  --dsw-static-neutral-bluish-950: rgb(21, 21, 23);
-  --dsw-static-red-100: rgb(254, 226, 226);
-  --dsw-static-red-400: rgb(242, 90, 90);
-  --dsw-static-red-500: rgb(239, 68, 68);
-  --dsw-static-red-50: rgb(254, 242, 242);
-  --dsw-static-red-600: rgb(236, 19, 19);
-  --dsw-static-red-900: rgb(87, 12, 12);
+  --dsw-static-amber-100: #5a422b;
+  --dsw-static-amber-400: #d9a15c;
+  --dsw-static-amber-500: #e0a760;
+  --dsw-static-amber-600: #e9b673;
+  --dsw-static-amber-900: #f3d9b9;
+
+  --dsw-static-blue-50: #3f2b25;
+  --dsw-static-blue-50p: #472e27;
+  --dsw-static-blue-75: #4e3129;
+  --dsw-static-blue-100: #593a30;
+  --dsw-static-blue-300: #a55e43;
+  --dsw-static-blue-400: #d18362;
+  --dsw-static-blue-450: #db966f;
+  --dsw-static-blue-500: #d58b68;
+  --dsw-static-blue-600: #e6ab8a;
+  --dsw-static-blue-800: #f1c2a9;
+  --dsw-static-blue-900: #f5d3c0;
+  --dsw-static-blue-950: #f8e0d2;
+
+  --dsw-static-deepseek-50: #3f2b25;
+  --dsw-static-deepseek-100: #593a30;
+  --dsw-static-deepseek-200: #704637;
+  --dsw-static-deepseek-300: #a55e43;
+  --dsw-static-deepseek-400: #d18362;
+  --dsw-static-deepseek-450: #db966f;
+  --dsw-static-deepseek-500: #d58b68;
+  --dsw-static-deepseek-600: #e6ab8a;
+  --dsw-static-deepseek-700-delete: #f0bca0;
+  --dsw-static-deepseek-800: #f1c2a9;
+  --dsw-static-deepseek-900: #f5d3c0;
+
+  --dsw-static-green-100: #23432f;
+  --dsw-static-green-400: #83ca99;
+  --dsw-static-green-500: #65bb81;
+  --dsw-static-green-900: #d0efd7;
+
+  --dsw-static-neutral-00: #f8f5ec;
+  --dsw-static-neutral-50: #e8e4d9;
+  --dsw-static-neutral-100: #ddd9ce;
+  --dsw-static-neutral-150: #d0ccc0;
+  --dsw-static-neutral-200: #c4c0b4;
+  --dsw-static-neutral-250: #b8b4a8;
+  --dsw-static-neutral-300: #aca89d;
+  --dsw-static-neutral-400: #98958b;
+  --dsw-static-neutral-500: #848178;
+  --dsw-static-neutral-550: #76736b;
+  --dsw-static-neutral-600: #67645d;
+  --dsw-static-neutral-700: #56534d;
+  --dsw-static-neutral-800: #44433e;
+  --dsw-static-neutral-850: #3a3a35;
+  --dsw-static-neutral-900: #2e302b;
+  --dsw-static-neutral-1000: #1a1d18;
+
+  --dsw-static-neutral-bluish-00: #f8f5ec;
+  --dsw-static-neutral-bluish-50: #e8e4d9;
+  --dsw-static-neutral-bluish-60: #dedbd0;
+  --dsw-static-neutral-bluish-75: #d2cec3;
+  --dsw-static-neutral-bluish-100: #c7c3b8;
+  --dsw-static-neutral-bluish-150: #b9b5aa;
+  --dsw-static-neutral-bluish-200: #aaa79c;
+  --dsw-static-neutral-bluish-300: #9c998f;
+  --dsw-static-neutral-bluish-400: #969389;
+  --dsw-static-neutral-bluish-500: #807e76;
+  --dsw-static-neutral-bluish-600: #727068;
+  --dsw-static-neutral-bluish-700: #63615a;
+  --dsw-static-neutral-bluish-750: #55544d;
+  --dsw-static-neutral-bluish-800: #474741;
+  --dsw-static-neutral-bluish-850: #3b3c36;
+  --dsw-static-neutral-bluish-875: #343530;
+  --dsw-static-neutral-bluish-900: #2d2f2a;
+  --dsw-static-neutral-bluish-950: #252722;
+  --dsw-static-neutral-bluish-1000: #1a1d18;
+
+  --dsw-static-red-50: #472a29;
+  --dsw-static-red-100: #56312f;
+  --dsw-static-red-400: #ef8b80;
+  --dsw-static-red-500: #de6d66;
+  --dsw-static-red-600: #f08a7f;
+  --dsw-static-red-900: #f7c5bf;
 }
 
+/* Semantic light palette -------------------------------------------------- */
 body {
-  --dsw-alias-bg-base: var(--dsw-static-neutral-bluish-00);
+  --dsw-alias-bg-base: var(--dsw-static-neutral-bluish-50);
   --dsw-alias-bg-layer-1: var(--dsw-static-neutral-bluish-00);
-  --dsw-alias-bg-layer-2: var(--dsw-static-neutral-bluish-00);
-  --dsw-alias-bg-layer-3: var(--dsw-static-neutral-bluish-00);
-  --dsw-alias-bg-mask-1: rgba(0, 0, 0, 0.24);
-  --dsw-alias-bg-mask-2: rgba(0, 0, 0, 0.12);
-  --dsw-alias-bg-mask-3: rgba(0, 0, 0, 0.48);
-  --dsw-alias-bg-mask-photo: rgba(0, 0, 0, 0.88);
-  --dsw-alias-bg-mask-drop: rgba(255, 255, 255, 0.7);
-  --dsw-alias-bg-module-platform: var(--dsw-static-neutral-bluish-60);
+  --dsw-alias-bg-layer-2: var(--dsw-static-neutral-bluish-60);
+  --dsw-alias-bg-layer-3: var(--dsw-static-neutral-bluish-75);
+  --dsw-alias-bg-mask-1: rgba(25, 28, 22, 0.24);
+  --dsw-alias-bg-mask-2: rgba(25, 28, 22, 0.12);
+  --dsw-alias-bg-mask-3: rgba(25, 28, 22, 0.48);
+  --dsw-alias-bg-mask-photo: rgba(25, 28, 22, 0.88);
+  --dsw-alias-bg-mask-drop: rgba(255, 254, 250, 0.72);
+  --dsw-alias-bg-module-platform: var(--dsw-static-neutral-bluish-100);
   --dsw-alias-bg-multi-select: var(--dsw-static-neutral-bluish-60);
   --dsw-alias-bg-overlay: var(--dsw-static-neutral-bluish-150);
-  --dsw-alias-bg-skeleton: rgba(0, 0, 0, 0.04);
-  --dsw-alias-border-inverted2: rgba(0, 0, 0, 0);
-  --dsw-alias-border-inverted: rgba(0, 0, 0, 0);
-  --dsw-alias-border-l1: rgba(0, 0, 0, 0.04);
-  --dsw-alias-border-l2-darkmode-thin: rgba(0, 0, 0, 0.1);
-  --dsw-alias-border-l2: rgba(0, 0, 0, 0.1);
-  --dsw-alias-border-l3: rgba(0, 0, 0, 0.12);
-  --dsw-alias-border-l4: rgba(0, 0, 0, 0.16);
+  --dsw-alias-bg-skeleton: rgba(25, 28, 22, 0.05);
+  --dsw-alias-bg-primary: var(--dsw-alias-bg-base);
+
+  --dsw-alias-border-inverted2: rgba(25, 28, 22, 0.24);
+  --dsw-alias-border-inverted: rgba(25, 28, 22, 0.16);
+  --dsw-alias-border-l1: rgba(25, 28, 22, 0.08);
+  --dsw-alias-border-l2-darkmode-thin: rgba(25, 28, 22, 0.12);
+  --dsw-alias-border-l2: rgba(25, 28, 22, 0.15);
+  --dsw-alias-border-l3: rgba(25, 28, 22, 0.22);
+  --dsw-alias-border-l4: rgba(25, 28, 22, 0.32);
+  --dsw-alias-border-secondary: var(--dsw-alias-border-l2);
+  --dsw-alias-border-subtle: var(--dsw-alias-border-l1);
+  --dsw-alias-line-secondary: var(--dsw-alias-border-l1);
+  --dsw-alias-separator-primary: var(--dsw-alias-border-l1);
+
   --dsw-alias-brand-primary-invert: var(--dsw-static-neutral-bluish-1000);
-  --dsw-alias-brand-primary-new-colorprimary-new-color: rgb(65, 118, 230);
-  --dsw-alias-brand-primary: var(--dsw-static-neutral-bluish-1000);
-  --dsw-alias-brand-text: var(--dsw-static-neutral-bluish-1000);
-  --dsw-alias-button-contrast-fill: var(--dsw-static-neutral-bluish-700);
+  --dsw-alias-brand-primary-new-colorprimary-new-color: var(--dsw-static-deepseek-500);
+  --dsw-alias-brand-primary: var(--dsw-static-deepseek-500);
+  --dsw-alias-brand-text: var(--dsw-static-deepseek-500);
+
+  --dsw-alias-button-contrast-fill: var(--dsw-static-neutral-bluish-800);
   --dsw-alias-button-elevated-fill: var(--dsw-static-neutral-bluish-00);
   --dsw-alias-button-floating-fill: var(--dsw-static-neutral-bluish-00);
   --dsw-alias-button-floating-hover: var(--dsw-static-neutral-bluish-75);
@@ -187,40 +219,56 @@ body {
   --dsw-alias-button-ghost-active-hover: var(--dsw-static-neutral-bluish-150);
   --dsw-alias-button-info-fill: var(--dsw-static-deepseek-500);
   --dsw-alias-button-info-hover: var(--dsw-static-deepseek-400);
-  --dsw-alias-button-primary-dimmed: var(--dsw-static-neutral-bluish-100);
+  --dsw-alias-button-primary-dimmed: var(--dsw-static-deepseek-100);
   --dsw-alias-button-primary-fill: var(--dsw-alias-brand-primary);
-  --dsw-alias-button-primary-hover: var(--dsw-static-neutral-bluish-750);
-  --dsw-alias-button-tool-bar-fill-invisible: rgba(31, 31, 31, 0.36);
-  --dsw-alias-button-tool-bar-fill: rgba(84, 85, 87, 0.5);
-  --dsw-alias-button-tool-bar-hover: rgba(84, 85, 87, 0.6);
-  --dsw-alias-interactive-bg-active: rgba(38, 49, 72, 0.1);
-  --dsw-alias-interactive-bg-hover-accent: rgba(38, 49, 72, 0.14);
-  --dsw-alias-interactive-bg-hover-danger: rgba(236, 19, 19, 0.05);
+  --dsw-alias-button-primary-hover: var(--dsw-static-deepseek-600);
+  --dsw-alias-button-tool-bar-fill-invisible: rgba(25, 28, 22, 0.14);
+  --dsw-alias-button-tool-bar-fill: rgba(25, 28, 22, 0.62);
+  --dsw-alias-button-tool-bar-hover: rgba(25, 28, 22, 0.72);
+
+  --dsw-alias-fill-l2: var(--dsw-alias-bg-layer-2);
+  --dsw-alias-fill-tsp-secondary: rgba(25, 28, 22, 0.05);
+  --dsw-alias-fg: var(--dsw-alias-label-primary);
+  --dsw-alias-interactive-bg-active: rgba(173, 84, 47, 0.08);
+  --dsw-alias-interactive-bg-hover-accent: rgba(173, 84, 47, 0.1);
+  --dsw-alias-interactive-bg-hover-danger: rgba(182, 64, 58, 0.08);
   --dsw-alias-interactive-bg-hover-solid: var(--dsw-static-neutral-bluish-75);
-  --dsw-alias-interactive-bg-hover: rgba(38, 49, 72, 0.06);
-  --dsw-alias-label-caption: var(--dsw-static-neutral-bluish-400);
-  --dsw-alias-label-dimmed: var(--dsw-static-neutral-bluish-200);
-  --dsw-alias-label-primary-bluish: var(--dsw-static-blue-900);
+  --dsw-alias-interactive-bg-hover: rgba(25, 28, 22, 0.06);
+  --dsw-alias-interactive-bg-primary: var(--dsw-alias-interactive-bg-active);
+
+  --dsw-alias-label-caption: var(--dsw-static-neutral-bluish-500);
+  --dsw-alias-label-dimmed: var(--dsw-static-neutral-bluish-400);
+  --dsw-alias-label-error: var(--dsw-alias-state-error-primary);
+  --dsw-alias-label-inverse: var(--dsw-static-neutral-bluish-00);
+  --dsw-alias-label-primary-bluish: var(--dsw-static-neutral-bluish-1000);
   --dsw-alias-label-primary-dimmed: var(--dsw-static-neutral-bluish-950);
   --dsw-alias-label-primary-foreground: var(--dsw-static-neutral-bluish-00);
   --dsw-alias-label-primary-inverted: var(--dsw-static-neutral-bluish-00);
   --dsw-alias-label-primary: var(--dsw-static-neutral-bluish-1000);
+  --dsw-alias-label-quaternary: var(--dsw-static-neutral-bluish-500);
   --dsw-alias-label-secondary: var(--dsw-static-neutral-bluish-700);
   --dsw-alias-label-tertiary: var(--dsw-static-neutral-bluish-600);
+  --dsw-alias-text-primary: var(--dsw-alias-label-primary);
+  --dsw-alias-text-tertiary: var(--dsw-alias-label-tertiary);
+
   --dsw-alias-markdown-citation: var(--dsw-static-neutral-bluish-100);
-  --dsw-alias-markdown-code-block-banner: var(--dsw-static-neutral-bluish-50);
+  --dsw-alias-markdown-code-block-banner: var(--dsw-static-neutral-bluish-60);
   --dsw-alias-markdown-code-block: var(--dsw-static-neutral-bluish-50);
   --dsw-alias-markdown-code-segment-selected: var(--dsw-static-neutral-bluish-00);
   --dsw-alias-markdown-code-segment-unselected: var(--dsw-static-neutral-bluish-75);
   --dsw-alias-markdown-inline-code: var(--dsw-static-neutral-bluish-100);
   --dsw-alias-markdown-placeholder: var(--dsw-static-neutral-bluish-60);
   --dsw-alias-markdown-tag: var(--dsw-static-neutral-bluish-75);
+
   --dsw-alias-scrollbar-bg-l1: var(--dsw-static-neutral-200);
-  --dsw-alias-scrollbar-bg-l2: var(--dsw-static-neutral-200);
+  --dsw-alias-scrollbar-bg-l2: var(--dsw-static-neutral-300);
   --dsw-alias-scrollbar-hover-l1: var(--dsw-static-neutral-300);
-  --dsw-alias-scrollbar-hover-l2: var(--dsw-static-neutral-300);
+  --dsw-alias-scrollbar-hover-l2: var(--dsw-static-neutral-400);
+
   --dsw-alias-state-business-primary: var(--dsw-static-deepseek-500);
   --dsw-alias-state-business-tertiary: var(--dsw-static-deepseek-100);
+  --dsw-alias-state-danger-bg: rgba(182, 64, 58, 0.1);
+  --dsw-alias-state-danger-label: var(--dsw-static-red-600);
   --dsw-alias-state-error-primary: var(--dsw-static-red-600);
   --dsw-alias-state-error-secondary: var(--dsw-static-red-400);
   --dsw-alias-state-success-primary: var(--dsw-static-green-500);
@@ -231,7 +279,8 @@ body {
   --dsw-alias-state-warn-secondary: var(--dsw-static-amber-400);
   --dsw-alias-state-warn-tertiary: var(--dsw-static-amber-100);
   --dsw-alias-toast-bg: var(--dsw-static-neutral-bluish-800);
-  --dsw-alias-tooltip-bg: var(--dsw-static-neutral-bluish-850);
+  --dsw-alias-tooltip-bg: var(--dsw-static-neutral-bluish-800);
+
   --dsw-specific-bubble-highlight: var(--dsw-static-deepseek-200);
   --dsw-specific-bubble: var(--dsw-static-deepseek-50);
   --dsw-specific-input-major: var(--dsw-static-neutral-bluish-00);
@@ -245,94 +294,120 @@ body {
   --dsw-specific-tip: var(--dsw-static-neutral-bluish-60);
 }
 
+/* Semantic dark palette --------------------------------------------------- */
 body[data-ds-dark-theme] {
   --dsw-alias-bg-base: var(--dsw-static-neutral-bluish-950);
-  --dsw-alias-bg-layer-1: var(--dsw-static-neutral-bluish-875);
-  --dsw-alias-bg-layer-2: var(--dsw-static-neutral-bluish-850);
-  --dsw-alias-bg-layer-3: var(--dsw-static-neutral-bluish-800);
-  --dsw-alias-bg-mask-1: rgba(0, 0, 0, 0.5);
-  --dsw-alias-bg-mask-2: rgba(0, 0, 0, 0.2);
-  --dsw-alias-bg-mask-3: rgba(0, 0, 0, 0.48);
-  --dsw-alias-bg-mask-photo: rgba(0, 0, 0, 0.88);
-  --dsw-alias-bg-mask-drop: rgba(39, 39, 48, 0.7);
+  --dsw-alias-bg-layer-1: var(--dsw-static-neutral-bluish-900);
+  --dsw-alias-bg-layer-2: var(--dsw-static-neutral-bluish-875);
+  --dsw-alias-bg-layer-3: var(--dsw-static-neutral-bluish-850);
+  --dsw-alias-bg-mask-1: rgba(0, 0, 0, 0.52);
+  --dsw-alias-bg-mask-2: rgba(0, 0, 0, 0.24);
+  --dsw-alias-bg-mask-3: rgba(0, 0, 0, 0.62);
+  --dsw-alias-bg-mask-photo: rgba(0, 0, 0, 0.9);
+  --dsw-alias-bg-mask-drop: rgba(43, 45, 40, 0.78);
   --dsw-alias-bg-module-platform: var(--dsw-static-neutral-bluish-800);
-  --dsw-alias-bg-multi-select: var(--dsw-static-neutral-850);
-  --dsw-alias-bg-overlay: var(--dsw-static-neutral-bluish-700);
-  --dsw-alias-bg-skeleton: rgba(255, 255, 255, 0.08);
-  --dsw-alias-border-inverted2: rgba(255, 255, 255, 0.08);
-  --dsw-alias-border-inverted: rgba(255, 255, 255, 0.06);
-  --dsw-alias-border-l1: rgba(255, 255, 255, 0.06);
-  --dsw-alias-border-l2-darkmode-thin: rgba(255, 255, 255, 0.06);
-  --dsw-alias-border-l2: rgba(255, 255, 255, 0.12);
-  --dsw-alias-border-l3: rgba(255, 255, 255, 0.16);
-  --dsw-alias-border-l4: rgba(255, 255, 255, 0.2);
-  --dsw-alias-brand-primary-invert: var(--dsw-static-neutral-bluish-50);
+  --dsw-alias-bg-multi-select: var(--dsw-static-neutral-bluish-875);
+  --dsw-alias-bg-overlay: var(--dsw-static-neutral-bluish-750);
+  --dsw-alias-bg-skeleton: rgba(248, 245, 236, 0.08);
+  --dsw-alias-bg-primary: var(--dsw-alias-bg-base);
+
+  --dsw-alias-border-inverted2: rgba(248, 245, 236, 0.22);
+  --dsw-alias-border-inverted: rgba(248, 245, 236, 0.16);
+  --dsw-alias-border-l1: rgba(248, 245, 236, 0.08);
+  --dsw-alias-border-l2-darkmode-thin: rgba(248, 245, 236, 0.1);
+  --dsw-alias-border-l2: rgba(248, 245, 236, 0.15);
+  --dsw-alias-border-l3: rgba(248, 245, 236, 0.23);
+  --dsw-alias-border-l4: rgba(248, 245, 236, 0.34);
+  --dsw-alias-border-secondary: var(--dsw-alias-border-l2);
+  --dsw-alias-border-subtle: var(--dsw-alias-border-l1);
+  --dsw-alias-line-secondary: var(--dsw-alias-border-l1);
+  --dsw-alias-separator-primary: var(--dsw-alias-border-l1);
+
+  --dsw-alias-brand-primary-invert: var(--dsw-static-neutral-bluish-950);
   --dsw-alias-brand-primary-new-colorprimary-new-color: var(--dsw-static-deepseek-450);
-  --dsw-alias-brand-primary: var(--dsw-static-neutral-bluish-50);
-  --dsw-alias-brand-text: var(--dsw-static-neutral-bluish-50);
-  --dsw-alias-button-contrast-fill: var(--dsw-static-neutral-bluish-50);
-  --dsw-alias-button-elevated-fill: var(--dsw-static-neutral-bluish-750);
+  --dsw-alias-brand-primary: var(--dsw-static-deepseek-400);
+  --dsw-alias-brand-text: var(--dsw-static-deepseek-400);
+
+  --dsw-alias-button-contrast-fill: var(--dsw-static-neutral-bluish-100);
+  --dsw-alias-button-elevated-fill: var(--dsw-static-neutral-bluish-800);
   --dsw-alias-button-floating-fill: var(--dsw-static-neutral-bluish-850);
   --dsw-alias-button-floating-hover: var(--dsw-static-neutral-bluish-800);
   --dsw-alias-button-ghost-active-border: var(--dsw-static-neutral-bluish-600);
-  --dsw-alias-button-ghost-active-fill: var(--dsw-static-neutral-bluish-750);
-  --dsw-alias-button-ghost-active-hover: var(--dsw-static-neutral-bluish-700);
+  --dsw-alias-button-ghost-active-fill: var(--dsw-static-neutral-bluish-800);
+  --dsw-alias-button-ghost-active-hover: var(--dsw-static-neutral-bluish-750);
   --dsw-alias-button-info-fill: var(--dsw-static-deepseek-400);
-  --dsw-alias-button-info-hover: var(--dsw-static-deepseek-500);
-  --dsw-alias-button-primary-dimmed: var(--dsw-static-neutral-bluish-750);
+  --dsw-alias-button-info-hover: var(--dsw-static-deepseek-450);
+  --dsw-alias-button-primary-dimmed: var(--dsw-static-deepseek-100);
   --dsw-alias-button-primary-fill: var(--dsw-alias-brand-primary);
-  --dsw-alias-button-primary-hover: var(--dsw-static-neutral-bluish-100);
-  --dsw-alias-button-tool-bar-fill-invisible: rgba(31, 31, 31, 0.36);
-  --dsw-alias-button-tool-bar-fill: rgba(84, 85, 87, 0.5);
-  --dsw-alias-button-tool-bar-hover: rgba(84, 85, 87, 0.6);
-  --dsw-alias-interactive-bg-active: rgba(255, 255, 255, 0.14);
-  --dsw-alias-interactive-bg-hover-accent: rgba(255, 255, 255, 0.24);
-  --dsw-alias-interactive-bg-hover-danger: rgba(242, 90, 90, 0.15);
+  --dsw-alias-button-primary-hover: var(--dsw-static-deepseek-450);
+  --dsw-alias-button-tool-bar-fill-invisible: rgba(248, 245, 236, 0.12);
+  --dsw-alias-button-tool-bar-fill: rgba(248, 245, 236, 0.22);
+  --dsw-alias-button-tool-bar-hover: rgba(248, 245, 236, 0.3);
+
+  --dsw-alias-fill-l2: var(--dsw-alias-bg-layer-2);
+  --dsw-alias-fill-tsp-secondary: rgba(248, 245, 236, 0.06);
+  --dsw-alias-fg: var(--dsw-alias-label-primary);
+  --dsw-alias-interactive-bg-active: rgba(213, 139, 104, 0.2);
+  --dsw-alias-interactive-bg-hover-accent: rgba(213, 139, 104, 0.14);
+  --dsw-alias-interactive-bg-hover-danger: rgba(240, 138, 127, 0.16);
   --dsw-alias-interactive-bg-hover-solid: var(--dsw-static-neutral-bluish-800);
-  --dsw-alias-interactive-bg-hover: rgba(255, 255, 255, 0.08);
-  --dsw-alias-label-caption: var(--dsw-static-neutral-bluish-600);
-  --dsw-alias-label-dimmed: var(--dsw-static-neutral-bluish-750);
+  --dsw-alias-interactive-bg-hover: rgba(248, 245, 236, 0.08);
+  --dsw-alias-interactive-bg-primary: var(--dsw-alias-interactive-bg-active);
+
+  --dsw-alias-label-caption: var(--dsw-static-neutral-bluish-500);
+  --dsw-alias-label-dimmed: var(--dsw-static-neutral-bluish-700);
+  --dsw-alias-label-error: var(--dsw-alias-state-error-primary);
+  --dsw-alias-label-inverse: var(--dsw-static-neutral-bluish-1000);
   --dsw-alias-label-primary-bluish: var(--dsw-static-neutral-bluish-50);
   --dsw-alias-label-primary-dimmed: var(--dsw-static-neutral-bluish-100);
   --dsw-alias-label-primary-foreground: var(--dsw-static-neutral-bluish-1000);
   --dsw-alias-label-primary-inverted: var(--dsw-static-neutral-bluish-800);
   --dsw-alias-label-primary: var(--dsw-static-neutral-bluish-50);
+  --dsw-alias-label-quaternary: var(--dsw-static-neutral-bluish-500);
   --dsw-alias-label-secondary: var(--dsw-static-neutral-bluish-300);
   --dsw-alias-label-tertiary: var(--dsw-static-neutral-bluish-400);
+  --dsw-alias-text-primary: var(--dsw-alias-label-primary);
+  --dsw-alias-text-tertiary: var(--dsw-alias-label-tertiary);
+
   --dsw-alias-markdown-citation: var(--dsw-static-neutral-bluish-800);
   --dsw-alias-markdown-code-block-banner: var(--dsw-static-neutral-bluish-850);
-  --dsw-alias-markdown-code-block: var(--dsw-static-neutral-bluish-900);
+  --dsw-alias-markdown-code-block: var(--dsw-static-neutral-bluish-950);
   --dsw-alias-markdown-code-segment-selected: var(--dsw-static-neutral-bluish-800);
   --dsw-alias-markdown-code-segment-unselected: var(--dsw-static-neutral-bluish-900);
   --dsw-alias-markdown-inline-code: var(--dsw-static-neutral-bluish-850);
   --dsw-alias-markdown-placeholder: var(--dsw-static-neutral-bluish-850);
   --dsw-alias-markdown-tag: var(--dsw-static-neutral-bluish-850);
+
   --dsw-alias-scrollbar-bg-l1: var(--dsw-static-neutral-700);
   --dsw-alias-scrollbar-bg-l2: var(--dsw-static-neutral-600);
   --dsw-alias-scrollbar-hover-l1: var(--dsw-static-neutral-600);
   --dsw-alias-scrollbar-hover-l2: var(--dsw-static-neutral-550);
+
   --dsw-alias-state-business-primary: var(--dsw-static-deepseek-400);
-  --dsw-alias-state-business-tertiary: var(--dsw-static-deepseek-800);
+  --dsw-alias-state-business-tertiary: var(--dsw-static-deepseek-100);
+  --dsw-alias-state-danger-bg: rgba(240, 138, 127, 0.16);
+  --dsw-alias-state-danger-label: var(--dsw-static-red-400);
   --dsw-alias-state-error-primary: var(--dsw-static-red-400);
   --dsw-alias-state-error-secondary: var(--dsw-static-red-400);
   --dsw-alias-state-success-primary: var(--dsw-static-green-500);
   --dsw-alias-state-success-secondary: var(--dsw-static-green-400);
-  --dsw-alias-state-success-tertiary: var(--dsw-static-green-900);
+  --dsw-alias-state-success-tertiary: var(--dsw-static-green-100);
   --dsw-alias-state-warn-label: var(--dsw-static-amber-600);
   --dsw-alias-state-warn-primary: var(--dsw-static-amber-500);
   --dsw-alias-state-warn-secondary: var(--dsw-static-amber-400);
   --dsw-alias-state-warn-tertiary: var(--dsw-static-amber-900);
-  --dsw-alias-toast-bg: var(--dsw-static-neutral-bluish-750);
-  --dsw-alias-tooltip-bg: var(--dsw-static-neutral-bluish-750);
-  --dsw-specific-bubble-highlight: var(--dsw-static-neutral-bluish-750);
+  --dsw-alias-toast-bg: var(--dsw-static-neutral-bluish-800);
+  --dsw-alias-tooltip-bg: var(--dsw-static-neutral-bluish-800);
+
+  --dsw-specific-bubble-highlight: var(--dsw-static-deepseek-100);
   --dsw-specific-bubble: var(--dsw-static-neutral-bluish-850);
   --dsw-specific-input-major: var(--dsw-static-neutral-bluish-850);
   --dsw-specific-login-input: var(--dsw-static-neutral-bluish-900);
   --dsw-specific-menu: var(--dsw-alias-bg-layer-3);
   --dsw-specific-selector: var(--dsw-static-neutral-bluish-800);
   --dsw-specific-sidebar-fill: var(--dsw-static-neutral-bluish-900);
-  --dsw-specific-sidebar-nav-item-active-accent: var(--dsw-static-neutral-bluish-800);
-  --dsw-specific-sidebar-nav-item-active: var(--dsw-static-neutral-bluish-750);
+  --dsw-specific-sidebar-nav-item-active-accent: var(--dsw-static-deepseek-100);
+  --dsw-specific-sidebar-nav-item-active: var(--dsw-static-neutral-bluish-800);
   --dsw-specific-sidebar-nav-item-hover: var(--dsw-static-neutral-bluish-850);
-  --dsw-specific-tip: var(--dsw-static-neutral-bluish-800);
+  --dsw-specific-tip: var(--dsw-static-neutral-bluish-850);
 }

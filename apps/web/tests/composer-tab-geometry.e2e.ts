@@ -52,7 +52,7 @@ import {
   assertFixtureInventory, compareOrRefreshGolden, launchWebScaffold, seedSession, watchConsole,
   webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { newEnglishPage, saveFailureShot } from './support.ts'
+import { newEnglishPage, saveFailureShot, selectSessionView } from './support.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/composer-tab-geometry', import.meta.url))
 /**
@@ -190,7 +190,7 @@ function measureTab(page: Page): Promise<TabMetrics> {
  * @param tab - the tab to show.
  */
 async function showTab(page: Page, tab: 'Chat' | 'Trajectory'): Promise<void> {
-  await page.getByRole('tab', { name: tab, exact: true }).click()
+  await selectSessionView(page, tab)
   if (tab === 'Trajectory') await page.getByLabel('Trajectory timeline').waitFor({ timeout: 30_000 })
   else await page.locator('[data-conversation-scroll] [data-chat-anchor-key]').first().waitFor({ timeout: 30_000 })
   // Both measurements are taken after a paint, so a rectangle read mid-transition
@@ -264,6 +264,7 @@ async function openSeededSession(page: Page): Promise<void> {
     await page.waitForTimeout(200)
   }
   await results.click()
+  await selectSessionView(page, 'Chat')
 }
 
 /**
@@ -314,7 +315,6 @@ describe('web e2e: input card position across view tabs', () => {
     await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     await openSeededSession(page)
-    await page.getByRole('tab', { name: 'Chat', exact: true }).waitFor({ timeout: 30_000 })
     await page.getByText(FIXTURE.markers.assistant(FIXTURE.turns), { exact: false }).last()
       .waitFor({ timeout: 30_000 })
   }, 180_000)

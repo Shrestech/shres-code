@@ -25,7 +25,10 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
-import { REPO_ROOT, connectFreshWorkspace, newEnglishPage, probeFreePort, requireDist, saveFailureShot } from './support.ts'
+import {
+  REPO_ROOT, connectFreshWorkspace, newEnglishPage, probeFreePort, requireDist, saveFailureShot,
+  selectSessionView,
+} from './support.ts'
 
 const WEB_SURFACE_PROMPT = fileURLToPath(new URL('./snapshots/web-runtime-context/web-surface-prompt.expected.md', import.meta.url))
 
@@ -579,11 +582,11 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY || notReady.length > 0)('web smoke
 
   it('view tabs: Chat and Trajectory switch', async () => {
     onTestFailed(() => saveFailureShot(page, 'w5-tabs'))
-    await page.locator('button', { hasText: /Trajectory/i }).first().click()
+    await selectSessionView(page, 'Trajectory')
     await screen(page, '05-trajectory-tab')
     await page.getByLabel('Trajectory timeline').waitFor()
     await expect.poll(() => page.getByRole('tab', { name: 'Waterfall' }).count()).toBe(0)
-    await page.locator('button', { hasText: /^Chat$/i }).first().click()
+    await selectSessionView(page, 'Chat')
     await screen(page, '07-back-to-chat')
   })
 

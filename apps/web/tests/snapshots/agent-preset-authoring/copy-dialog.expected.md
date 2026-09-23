@@ -2,7 +2,7 @@
   - heading "Duplicate preset · Copied from Minimal mode" [level=2]
   - button "Close":
     - img
-  - paragraph: the wholepresetis copied on this machineCopy。Identifier willfordirectory name，cannot be changed later；remainingcontentafterdirectly in preset ownfile inEdit。
+  - paragraph: The whole preset is copied on this machine. The identifier becomes its directory name and cannot be changed later; everything else is edited in the preset's own files.
   - text: Identifier
   - textbox "Identifier":
     - /placeholder: my-agent

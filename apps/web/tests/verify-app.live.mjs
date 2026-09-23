@@ -37,13 +37,22 @@ async function openSettings(page) {
   const trigger = page.getByRole('button', { name: 'Settings', exact: true })
   await trigger.waitFor({ timeout: 15_000 })
   await trigger.click()
-  const dialog = page.getByRole('dialog', { name: 'Settings' })
+  const dialog = page.getByRole('region', { name: 'Settings' })
   await dialog.waitFor({ timeout: 10_000 })
   return dialog
 }
 
 function markState(page) {
   return page.evaluate(() => document.documentElement.dataset.shresShield ?? '')
+}
+
+async function selectSessionView(page, view) {
+  const activity = page.getByRole('button', { name: 'Activity', exact: true })
+  await activity.waitFor({ timeout: 30_000 })
+  if (await activity.getAttribute('aria-expanded') !== 'true') await activity.click()
+  const panel = page.getByRole('dialog', { name: 'Inspect this session' })
+  await panel.waitFor({ timeout: 30_000 })
+  await panel.getByRole('button', { name: view, exact: true }).click()
 }
 
 const browser = await chromium.launch({ headless: true })
@@ -108,13 +117,11 @@ try {
   }
 
   const dialog = await openSettings(page)
-  ok('settings dialog opened', await dialog.isVisible())
+  ok('settings page opened', await dialog.isVisible())
   await page.screenshot({ path: join(SHOT, '01-general.png'), fullPage: true })
 
-  const modelsNavName = (await dialog.getByRole('button', { name: 'Models', exact: true }).count()) > 0
-    ? 'Models'
-    : 'Model'
-  const navNames = ['General', modelsNavName, 'Shield', 'Plugins', 'Agent presets']
+  const modelsNavName = 'Models & providers'
+  const navNames = ['Preferences', modelsNavName, 'Shield', 'Voice & audio', 'J-Space']
   for (const name of navNames) {
     const btn = dialog.getByRole('button', { name, exact: true })
     ok(`Settings nav: ${name}`, await btn.count() > 0)
@@ -125,18 +132,18 @@ try {
     if (await btn.count() > 0) navOrder.push(name)
   }
   ok(
-    'nav order General → Models → Shield → Plugins → Agent presets',
+    'Settings nav order Preferences → Models & providers → Shield → Voice & audio → J-Space',
     navOrder.join(',') === navNames.join(','),
     navOrder.join(','),
   )
 
-  const general = dialog.getByRole('button', { name: 'General', exact: true })
+  const general = dialog.getByRole('button', { name: 'Preferences', exact: true })
   if (await general.count() > 0) {
     await general.click()
     await page.waitForTimeout(300)
     const generalText = await dialog.innerText()
-    ok('General has Appearance or Language', /Appearance|Language|Permission|Workspace/.test(generalText))
-    ok('General has no Roos', !/\bRoos\b/.test(generalText))
+    ok('Preferences has Appearance or Language', /Appearance|Language|Permission|Workspace/.test(generalText))
+    ok('Preferences has no Roos', !/\bRoos\b/.test(generalText))
   }
 
   const modelsNav = dialog.getByRole('button', { name: modelsNavName, exact: true })
@@ -144,7 +151,7 @@ try {
   if (await modelsNav.count() > 0) {
     await modelsNav.click()
     await Promise.race([
-      dialog.getByRole('heading', { name: /Models?/ }).waitFor({ timeout: 15_000 }),
+      dialog.getByRole('heading', { name: /Providers|Models/ }).waitFor({ timeout: 15_000 }),
       dialog.getByRole('heading', { name: 'Seats' }).waitFor({ timeout: 15_000 }),
       dialog.getByText(/Loading the provider directory failed/).waitFor({ timeout: 15_000 }),
     ]).catch(() => {})
@@ -242,54 +249,61 @@ try {
     }
   }
 
-  const pluginsNav = dialog.getByRole('button', { name: 'Plugins', exact: true })
-  ok('Plugins nav', await pluginsNav.count() > 0)
-  if (await pluginsNav.count() > 0) {
+  const customizeNav = page.getByRole('button', { name: 'Customize', exact: true })
+  ok('Customize destination', await customizeNav.count() > 0)
+  let customize
+  if (await customizeNav.count() > 0) {
+    await customizeNav.click()
+    customize = page.getByRole('region', { name: 'Customize' })
+    await customize.waitFor({ timeout: 10_000 })
+    const pluginsNav = customize.getByRole('button', { name: 'Plugins', exact: true })
+    ok('Plugins nav', await pluginsNav.count() > 0)
+    if (await pluginsNav.count() === 0) throw new Error('Customize destination has no Plugins section')
     await pluginsNav.click()
     await page.waitForTimeout(500)
     await page.screenshot({ path: join(SHOT, '04-plugins.png'), fullPage: true })
-    const plugins = await dialog.innerText()
+    const plugins = await customize.innerText()
     ok('Plugins section rendered', plugins.length > 20)
     ok('Web search card or plugin list', /Web search|Search|plugin|Plugin/i.test(plugins))
-    const listTab = dialog.getByRole('tab', { name: 'Plugin list', exact: true })
+    const listTab = customize.getByRole('tab', { name: 'Plugin list', exact: true })
     if (await listTab.count() > 0) {
       await listTab.click()
       await page.waitForTimeout(400)
       await page.screenshot({ path: join(SHOT, '04b-plugin-list.png'), fullPage: true })
-      ok('plugin list search', await dialog.getByRole('searchbox', { name: /Search/i }).count() > 0)
+      ok('plugin list search', await customize.getByRole('searchbox', { name: /Search/i }).count() > 0)
       ok('shield seat in plugin list or config',
-        /shres-shield|Shield/i.test(await dialog.innerText()))
+        /shres-shield|Shield/i.test(await customize.innerText()))
+    }
+    const presetsNav = customize.getByRole('button', { name: /Agent presets?/ })
+    ok('Agent presets nav', await presetsNav.count() > 0)
+    if (await presetsNav.count() > 0) {
+      await presetsNav.click()
+      await page.waitForTimeout(500)
+      await page.screenshot({ path: join(SHOT, '05-presets.png'), fullPage: true })
+      const presets = await customize.innerText()
+      ok('Standard mode listed', presets.includes('Standard mode'))
+      ok('another built-in preset', /Creator mode|Code mode|Minimal/.test(presets))
     }
   }
 
-  const presetsNav = dialog.getByRole('button', { name: /Agent presets?/ })
-  ok('Agent presets nav', await presetsNav.count() > 0)
-  if (await presetsNav.count() > 0) {
-    await presetsNav.click()
-    await page.waitForTimeout(500)
-    await page.screenshot({ path: join(SHOT, '05-presets.png'), fullPage: true })
-    const presets = await dialog.innerText()
-    ok('Standard mode listed', presets.includes('Standard mode'))
-    ok('another built-in preset', /Creator mode|Code mode|Minimal/.test(presets))
-  }
-
-  const close = dialog.getByRole('button', { name: 'Close', exact: true })
+  const close = (customize ?? dialog).getByRole('button', { name: 'Close', exact: true })
   if (await close.count() > 0) await close.click()
   await page.waitForTimeout(300)
-  ok('settings closed', await page.getByRole('dialog', { name: 'Settings' }).count() === 0)
+  ok('settings closed', await page.getByRole('region', { name: 'Settings' }).count() === 0
+    && await page.getByRole('region', { name: 'Customize' }).count() === 0)
 
-  for (const name of ['Chat', 'Trajectory', 'New session', 'New chat']) {
-    const tab = page.getByRole('button', { name, exact: true })
-    if (await tab.count() > 0 && await tab.first().isVisible().catch(() => false)) {
-      await tab.first().click()
+  for (const name of ['New session', 'New chat']) {
+    const button = page.getByRole('button', { name, exact: true })
+    if (await button.count() > 0 && await button.first().isVisible().catch(() => false)) {
+      await button.first().click()
       await page.waitForTimeout(350)
       ok(`nav ${name} clickable`, true)
     }
   }
 
-  const trajectory = page.getByRole('button', { name: 'Trajectory', exact: true })
-  if (await trajectory.count() > 0) {
-    await trajectory.click()
+  const activity = page.getByRole('button', { name: 'Activity', exact: true })
+  if (await activity.count() > 0 && await activity.isVisible().catch(() => false)) {
+    await selectSessionView(page, 'Trajectory')
     await page.waitForTimeout(500)
     await page.screenshot({ path: join(SHOT, '06-trajectory.png'), fullPage: true })
     const traj = await page.innerText()
@@ -301,11 +315,7 @@ try {
       || (traj.match(/\bShield\b/g) ?? []).length === 0
       || true)
     notes.push('NOTE  Trajectory opened; badges only appear after a flagged session event')
-  }
-
-  const chat = page.getByRole('button', { name: 'Chat', exact: true })
-  if (await chat.count() > 0) {
-    await chat.click()
+    await selectSessionView(page, 'Chat')
     await page.waitForTimeout(300)
   }
   await page.screenshot({ path: join(SHOT, '07-after-nav.png'), fullPage: true })
@@ -322,19 +332,19 @@ try {
   let opened = false
   if (await namedSettings.count() > 0) {
     await namedSettings.first().click({ force: true })
-    opened = await page.getByRole('dialog', { name: 'Settings' }).isVisible().catch(() => false)
+    opened = await page.getByRole('region', { name: 'Settings' }).isVisible().catch(() => false)
   }
   if (!opened) {
     const rail = page.locator('[class*="sidebar"] button, aside button, [class*="rail"] button').first()
     if (await rail.count() > 0) {
       await rail.click({ force: true }).catch(() => {})
-      opened = await page.getByRole('dialog', { name: 'Settings' }).isVisible().catch(() => false)
+      opened = await page.getByRole('region', { name: 'Settings' }).isVisible().catch(() => false)
     }
   }
   ok('mobile Settings opens or rail remains usable',
     opened || await page.locator('[class*="frame"]').first().isVisible())
   if (opened) {
-    const mobileDialog = page.getByRole('dialog', { name: 'Settings' })
+    const mobileDialog = page.getByRole('region', { name: 'Settings' })
     const mobileShield = mobileDialog.getByRole('button', { name: 'Shield', exact: true })
     ok('mobile Shield nav', await mobileShield.count() > 0)
     if (await mobileShield.count() > 0) {

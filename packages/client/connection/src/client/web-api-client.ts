@@ -5,14 +5,29 @@ import { AbstractApiClient } from './api.ts'
 import { hostFrameSchema, muxFrameSchema } from '@shres-code/shres-code-host-apiproxy/api/events.schema'
 import { serverRequestSchema } from '@shres-code/shres-code-host-apiproxy/api/rpc.schema'
 import { HOST_EVENTS_PATH, MUX_EVENTS_PATH } from '../api-path.ts'
+import type { ClientTransportHooks, TransportFetch } from './transport.ts'
 
 type SocketItem<F> = { kind: 'frame'; envelope: RpcRequest<F> } | { kind: 'end' }
 type Parser<F> = { parse(value: unknown): F }
 
-/** Browser platform subclass: unary/respond use fetch; mux/host use downlink-only WebSockets. */
+/**
+ * Browser platform subclass: unary/respond use fetch; mux/host use downlink-only
+ * WebSockets. A shell transport routes every fetch through its carrier and, when
+ * present at all, replaces the WebSocket downlinks with newline-delimited
+ * streaming response bodies on the same paths.
+ */
 export class WebApiClient extends AbstractApiClient {
+  private readonly fetchCarrier: TransportFetch
+  private readonly streamCarrier: TransportFetch | undefined
+
+  constructor(hooks: ClientTransportHooks = {}, timeoutMs?: number) {
+    super(timeoutMs)
+    this.fetchCarrier = hooks.fetch ?? ((input, init) => globalThis.fetch(input, init))
+    this.streamCarrier = hooks.fetch
+  }
+
   protected doFetch(input: URL, init?: RequestInit): Promise<Response> {
-    return globalThis.fetch(input, init)
+    return this.fetchCarrier(input, init)
   }
 
   protected override openMux(
@@ -20,7 +35,9 @@ export class WebApiClient extends AbstractApiClient {
     signal: AbortSignal,
     onOpen?: () => void,
   ): AsyncIterable<RpcRequest<MuxFrame>> {
-    return this.readWebSocket(MUX_EVENTS_PATH, signal, muxFrameSchema, onOpen)
+    return this.streamCarrier !== undefined
+      ? this.readFetchStream(this.streamCarrier, MUX_EVENTS_PATH, signal, muxFrameSchema, onOpen)
+      : this.readWebSocket(MUX_EVENTS_PATH, signal, muxFrameSchema, onOpen)
   }
 
   protected override openHost(
@@ -28,7 +45,64 @@ export class WebApiClient extends AbstractApiClient {
     signal: AbortSignal,
     onOpen?: () => void,
   ): AsyncIterable<RpcRequest<HostFrame>> {
-    return this.readWebSocket(HOST_EVENTS_PATH, signal, hostFrameSchema, onOpen)
+    return this.streamCarrier !== undefined
+      ? this.readFetchStream(this.streamCarrier, HOST_EVENTS_PATH, signal, hostFrameSchema, onOpen)
+      : this.readWebSocket(HOST_EVENTS_PATH, signal, hostFrameSchema, onOpen)
+  }
+
+  /**
+   * Read one downlink as a newline-delimited streaming response body: each line
+   * is a `ServerRequest` envelope carrying one frame. Body end is stream loss,
+   * exactly like a WebSocket close.
+   */
+  private async *readFetchStream<F extends MuxFrame | HostFrame>(
+    carrier: TransportFetch,
+    path: string,
+    signal: AbortSignal,
+    frameSchema: Parser<F>,
+    onOpen?: () => void,
+  ): AsyncGenerator<RpcRequest<F>> {
+    const response = await carrier(new URL(path, this.resolveBase()), {
+      method: 'POST',
+      headers: { accept: 'application/x-ndjson' },
+      ...signal.aborted ? {} : { signal },
+    })
+    if (!response.ok || response.body === null) {
+      throw new Error(`transport failure for event stream ${path}: HTTP ${response.status}`)
+    }
+    onOpen?.()
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    const abort = (): void => { void reader.cancel().catch(() => {}) }
+    signal.addEventListener('abort', abort, { once: true })
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) return
+        buffer += decoder.decode(value, { stream: true })
+        let newline: number
+        while ((newline = buffer.indexOf('\n')) >= 0) {
+          const line = buffer.slice(0, newline)
+          buffer = buffer.slice(newline + 1)
+          if (line === '') continue
+          let full: ServerRequest
+          let frame: F
+          try {
+            full = serverRequestSchema.parse(JSON.parse(line))
+            frame = frameSchema.parse(full.payload)
+          } catch (error) {
+            console.error(`[client-connection] dropping malformed stream frame on ${path}:`, error)
+            continue
+          }
+          this.onEnvelope(full)
+          yield { rpcId: full.rpcId, payload: frame }
+        }
+      }
+    } finally {
+      signal.removeEventListener('abort', abort)
+      abort()
+    }
   }
 
   private async *readWebSocket<F extends MuxFrame | HostFrame>(

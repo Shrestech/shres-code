@@ -12,7 +12,7 @@
 // workspace graph can prove that transport-to-row path end to end.
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { expect, it } from 'vitest'
-import { installAssembledBootEnv, mountAssembledApp } from './assembled-boot.ts'
+import { findFixtureSession, installAssembledBootEnv, mountAssembledApp } from './assembled-boot.ts'
 
 installAssembledBootEnv()
 
@@ -23,15 +23,10 @@ it('boots the built plugin graph and renders a fixture session end to end', asyn
   const tree = await screen.findByRole('tree', { name: 'Sessions' }, { timeout: 10_000 })
   // The compact layout dropped group session counts; the fixture workspace
   // group row renders immediately with its sessions beneath it.
-  const fixtureGroup = (await within(tree).findAllByText('fixture'))
-    .map(el => el.closest<HTMLElement>('[role="treeitem"]'))
-    .find(el => el?.getAttribute('aria-expanded') !== null)
-  if (fixtureGroup === undefined) throw new Error('fixture Workspace group missing')
-
   // The resident fixture has both a question and an approval; composer routing
   // exposes the question first, and the assembled workspace plugin mirrors that
   // actionable wait instead of the underlying running state.
-  const waitingTitle = await within(tree).findByText('Fixture historySessions')
+  const waitingTitle = await findFixtureSession(tree)
   const waitingRow = waitingTitle.closest<HTMLElement>('[role="treeitem"]')
   if (waitingRow === null) throw new Error('fixture Session title must belong to a tree row')
   expect(waitingRow.querySelector('[data-state="warning"]')).not.toBeNull()

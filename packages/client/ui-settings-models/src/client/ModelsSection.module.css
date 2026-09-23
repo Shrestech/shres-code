@@ -1,18 +1,10 @@
-/* Models settings section, in the settings-panel design language: 14/22 body,
- * 12/18 caption, capsule controls (h36 r18; h28 r14 where a row is dense),
- * 32px fields, and `border-l2` hairlines — the vocabulary GeneralSection and
- * the Button/Input primitives already use.
- *
- * Every color resolves through a `--dsw-alias-*` token. Bare `--border` /
- * `--surface` / `--text-*` names, which nothing in this app defines, would
- * render the light-mode literals written as their fallbacks and stay light
- * under the dark theme. */
+/* Provider, team, and audio forms share the global settings surface. */
 
 .section {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  max-width: 720px;
+  max-width: none;
   color: var(--dsw-alias-label-primary);
 }
 
@@ -29,6 +21,17 @@
   font-size: 14px;
   line-height: 22px;
   color: var(--dsw-alias-label-tertiary);
+}
+
+.emptyState {
+  margin: 16px 0 0;
+  padding: 14px 16px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-secondary);
+  font-size: 14px;
+  line-height: 22px;
 }
 
 .notice {
@@ -56,20 +59,20 @@
 }
 
 .seatsCard {
-  margin-top: 8px;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 12px;
-  padding: 14px 16px;
+  margin-top: 16px;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 
 .seatsTitle {
   margin: 0;
-  font-size: 14px;
-  line-height: 22px;
-  font-weight: 500;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   color: var(--dsw-alias-label-primary);
 }
 
@@ -82,21 +85,21 @@
 
 .seatsList {
   list-style: none;
-  margin: 0;
+  margin: 4px 0 0;
   padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 10px;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--dsw-alias-border-l2);
 }
 
 .seatRow {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(300px, 1.15fr);
+  align-items: start;
+  gap: 24px;
   min-width: 0;
-  padding: 10px 12px;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 10px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
 }
 
 .seatIdentity {
@@ -178,8 +181,8 @@
 
 .seatFields {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
 }
 
 .seatFields .field {
@@ -211,7 +214,7 @@
    card it expands into reads as the nested object. */
 .rowCard {
   border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 12px;
+  border-radius: 6px;
   padding: 12px 14px;
   display: flex;
   flex-direction: column;
@@ -335,7 +338,7 @@
   height: 36px;
   padding: 0 14px;
   border: none;
-  border-radius: 18px;
+  border-radius: 6px;
   font: inherit;
   font-size: 14px;
   line-height: 22px;
@@ -375,7 +378,7 @@
   height: 36px;
   padding: 0 14px;
   border: none;
-  border-radius: 18px;
+  border-radius: 6px;
   background: transparent;
   color: var(--dsw-alias-state-error-primary);
   font: inherit;
@@ -388,12 +391,12 @@
   background: var(--dsw-alias-interactive-bg-hover-danger);
 }
 
-/* Provider-row controls take the dense capsule (Button `.sm`). */
+/* Provider rows use compact actions. */
 .rowActions .secondaryButton,
 .rowActions .dangerButton {
   height: 28px;
   padding: 0 10px;
-  border-radius: 14px;
+  border-radius: 6px;
   font-size: 12px;
   line-height: 18px;
 }
@@ -424,7 +427,7 @@
 /* Editing surface: a filled module on the panel, matching the settings
    selector fill rather than adding another outline inside the row. */
 .editor {
-  border-radius: 12px;
+  border-radius: 6px;
   background: var(--dsw-alias-bg-module-platform);
   padding: 14px 16px;
   display: flex;
@@ -474,7 +477,7 @@
   height: 28px;
   padding: 0 10px;
   border: none;
-  border-radius: 14px;
+  border-radius: 6px;
   background: transparent;
   color: var(--dsw-alias-label-tertiary);
   font: inherit;
@@ -526,12 +529,12 @@
   gap: 6px;
   height: 44px;
   border: 1px dashed var(--dsw-alias-border-l3);
-  border-radius: 12px;
+  border-radius: 6px;
 }
 
 .addCard,
 .setupCard {
-  border-radius: 12px;
+  border-radius: 6px;
   background: var(--dsw-alias-bg-module-platform);
   padding: 14px 16px;
   display: flex;
@@ -732,7 +735,7 @@
   height: 28px;
   padding: 0 10px;
   border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 14px;
+  border-radius: 6px;
   background: transparent;
   color: var(--dsw-alias-label-primary);
   font: inherit;
@@ -913,9 +916,12 @@ select.input {
 }
 
 .teamMembersTitle {
-  margin: 4px 0 0;
+  margin: 12px 0 0;
   font-size: 13px;
+  line-height: 18px;
   font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   color: var(--dsw-alias-label-primary);
 }
 
@@ -927,10 +933,25 @@ select.input {
 
 .memberRow {
   display: flex;
+  align-items: flex-start;
+  gap: 18px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+}
+
+.memberIdentity {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.memberHeadline {
+  display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 0;
-  border-bottom: 1px solid var(--dsw-alias-border-l3);
+  gap: 8px;
+  min-width: 0;
 }
 
 .memberName {
@@ -938,10 +959,46 @@ select.input {
   color: var(--dsw-alias-label-primary);
 }
 
+.memberRole {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+}
+
 .memberBinding {
-  flex: 1;
   font-size: 12px;
   color: var(--dsw-alias-label-tertiary);
+}
+
+.memberPersonaButton {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  cursor: pointer;
+  flex: none;
+}
+
+.memberPersonaButton:hover,
+.memberPersonaButton[aria-expanded='true'] {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.memberPersona {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+  overflow-wrap: anywhere;
 }
 
 .memberRemove {
@@ -956,10 +1013,36 @@ select.input {
 
 .memberAdd {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .memberAdd button {
   justify-self: end;
+}
+
+.audioItems {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border-top: 1px solid var(--dsw-alias-border-l2);
+}
+
+@media (max-width: 640px) {
+  .seatRow {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .seatFields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .memberRow {
+    flex-direction: column;
+  }
+
+  .memberRemove {
+    align-self: flex-start;
+  }
 }

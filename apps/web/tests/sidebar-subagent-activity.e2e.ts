@@ -19,7 +19,7 @@ import {
   webSnapshotMode,
   type WebScaffold,
 } from './scaffold.ts'
-import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
+import { connectFreshWorkspace, newEnglishPage, openSessionActivity, saveFailureShot } from './support.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/sidebar-subagent-activity', import.meta.url))
 const RUNNING_OWNER_EXPECTED = join(SNAPSHOT_DIR, 'owner-running.expected.md')
@@ -148,11 +148,17 @@ describe('web e2e: sidebar subagent activity', () => {
     )
     expect(await ownerRow.locator('[data-state="ongoing"]').count()).toBe(1)
     await ownerRow.click()
-    const runningTrigger = page.getByRole('button', { name: '1 subagent running' })
+    const activity = await openSessionActivity(page)
+    const runningTrigger = activity.getByRole('button', { name: '1 subagent running' })
     await runningTrigger.waitFor({ timeout: 10_000 })
     expect(await runningTrigger.locator('[data-state="ongoing"]').count()).toBe(1)
 
-    await ownerRow.getByRole('button', { name: /Session actions/ }).click()
+    const actions = ownerRow.getByRole('button', { name: /Session actions/ })
+    await expect.poll(async () => {
+      await ownerRow.hover()
+      return await actions.isVisible()
+    }, { timeout: 10_000 }).toBe(true)
+    await actions.click()
     await page.getByRole('menuitem', { name: 'Pin session' }).click()
     const pinnedGroup = sidebar.getByRole('group', { name: 'Pinned' })
     await pinnedGroup.waitFor({ timeout: 10_000 })

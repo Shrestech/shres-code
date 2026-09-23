@@ -37,6 +37,7 @@ export function LanguageRow({ t, setLocale, useStore }: LanguageRowComponentProp
     <div className={css.row}>
       <div className={css.rowText}>
         <div className={css.title}>{t('language.title')}</div>
+        <div className={css.desc}>{t('language.description')}</div>
       </div>
       <Menu
         open={open}

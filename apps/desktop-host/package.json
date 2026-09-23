@@ -1,0 +1,35 @@
+{
+  "name": "@shres-code/shres-code-desktop-host",
+  "description": "Private Node-mode host process for the Electron desktop application",
+  "version": "0.1.0-rc.5",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "files": [
+    "lib/index.js",
+    "lib/wire.js",
+    "config/desktop.cordis.patch.yml"
+  ],
+  "scripts": {
+    "build": "tsc -b && tsdown",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@shres-code/cordis": "workspace:^",
+    "@shres-code/cordis-plugin-include": "workspace:^",
+    "@shres-code/shres-code": "workspace:^",
+    "@shres-code/shres-code-api-gateway": "workspace:^",
+    "@shres-code/shres-code-app-boot": "workspace:^",
+    "@shres-code/shres-code-client-connection": "workspace:^",
+    "@shres-code/shres-code-client-modules": "workspace:^",
+    "@shres-code/shres-code-client-ui-directory-picker-native": "workspace:^",
+    "@shres-code/shres-code-cmdline": "workspace:^",
+    "@shres-code/shres-code-host-apiproxy": "workspace:^",
+    "@shres-code/shres-code-host-directory-picker-native": "workspace:^",
+    "@shres-code/shres-code-host-webserver": "workspace:^",
+    "@shres-code/shres-code-launch-environment": "workspace:^",
+    "@shres-code/shres-code-web-frontend": "workspace:^"
+  }
+}

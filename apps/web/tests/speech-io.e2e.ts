@@ -1,5 +1,5 @@
 // Keyless assembled-browser coverage for the speech I/O surface shipped in
-// #24/#26/#27: General settings rows persist, the composer mic appears after
+// Voice & audio settings rows persist, the composer mic appears after
 // a workspace connects, and the host speech seat is mounted. Zero model calls;
 // this does not download Kokoro/Whisper weights or drive a real microphone.
 import { readFile } from 'node:fs/promises'
@@ -37,9 +37,10 @@ describe('web e2e: speech I/O settings and composer mic', () => {
     expect(status.stt.kind === 'ready' || status.stt.kind === 'unavailable').toBe(true)
 
     await page.getByRole('button', { name: 'Settings', exact: true }).click()
-    const dialog = page.getByRole('dialog', { name: 'Settings' })
+    const dialog = page.getByRole('region', { name: 'Settings' })
     await dialog.waitFor({ timeout: 10_000 })
-    expect(await dialog.getByRole('button', { name: 'General' }).getAttribute('aria-current')).toBe('true')
+    expect(await dialog.getByRole('button', { name: 'Preferences', exact: true }).getAttribute('aria-current')).toBe('page')
+    await dialog.getByRole('button', { name: 'Voice & audio', exact: true }).click()
     await dialog.getByText('Read-aloud voice', { exact: true }).waitFor({ timeout: 10_000 })
     await dialog.getByText('Send after dictation', { exact: true }).waitFor({ timeout: 10_000 })
     await dialog.getByText('Spoken language', { exact: true }).waitFor({ timeout: 10_000 })
@@ -58,7 +59,7 @@ describe('web e2e: speech I/O settings and composer mic', () => {
       .toMatch(/speech:[\s\S]*autoSubmitVoice:\s*true/)
 
     await dialog.getByRole('button', { name: 'Close' }).click()
-    await expect.poll(() => page.getByRole('dialog', { name: 'Settings' }).count(), { timeout: 5_000 }).toBe(0)
+    await expect.poll(() => page.getByRole('region', { name: 'Settings' }).count(), { timeout: 5_000 }).toBe(0)
 
     await connectFreshWorkspace(page, scaffold.workspaceCwd)
     const mic = page.getByRole('button', { name: 'Dictate', exact: true })

@@ -17,7 +17,7 @@ import {
   assertFixtureInventory, captureStableAria, compareOrRefreshGolden,
   launchWebScaffold, seedSession, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { newEnglishPage, saveFailureShot } from './support.ts'
+import { newEnglishPage, openSessionActivity, saveFailureShot } from './support.ts'
 
 const FIXTURE = fileURLToPath(new URL('./snapshots/fresh-round-trip/session.jsonl', import.meta.url))
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/background-job-list', import.meta.url))
@@ -85,8 +85,7 @@ describe.skipIf(MODE === 'record')('web e2e: background job list', () => {
     // Point assertion, not a poll: `expect.poll` retries until a predicate
     // holds, so polling for zero passes at t=0 and proves nothing. The
     // "renders nothing without a task" branch is owned by the component suite.
-    const trigger = page.getByRole('button', { name: '1 background job running' })
-    expect(await trigger.count()).toBe(0)
+    expect(await page.getByRole('button', { name: '1 background job running' }).count()).toBe(0)
 
     const started = await scaffold.ctx.tools.execute({
       signal: new AbortController().signal,
@@ -100,6 +99,8 @@ describe.skipIf(MODE === 'record')('web e2e: background job list', () => {
     if (matched === null) throw new Error(`background bash reported no job id: ${reported}`)
     jobId = JobId(matched[0])
 
+    const activity = await openSessionActivity(page)
+    const trigger = activity.getByRole('button', { name: '1 background job running' })
     await trigger.waitFor({ timeout: 15_000 })
     await trigger.click()
     const row = page.getByRole('list', { name: 'Background jobs' }).getByRole('listitem').first()

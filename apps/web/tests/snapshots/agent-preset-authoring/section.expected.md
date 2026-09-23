@@ -1,66 +1,75 @@
-- dialog "Settings":
-  - navigation:
-    - text: Settings
-    - button "General":
+- region "Customize":
+  - complementary:
+    - heading "Customize" [level=2]
+    - button "Close":
       - img
-      - text: General
-    - button "Model":
-      - img
-      - text: Model
-    - button "Plugins":
-      - img
-      - text: Plugins
-    - button "Agent presets":
-      - img
-      - text: Agent presets
-  - button "Open configuration file"
-  - button "Close":
+      - text: Close
     - img
-    - text: Close
-  - heading "Agent presets" [level=2]
-  - paragraph: preset is aSessions  Agent Run Pluginscomposition —— itsTools、prompt and capabilities。Copyan existingpresetand make it yours，or let the agent draft one for you in Creator mode。
+    - searchbox "Search settings…"
+    - text: ⌘ K
+    - navigation "Customize":
+      - button "Plugins":
+        - img
+        - text: Plugins
+      - button "Agent presets":
+        - img
+        - text: Agent presets
+  - text: Customize
+  - heading "Agent presets" [level=1]
+  - paragraph: Shape your agent with presets and plugins.
+  - paragraph: A preset is the plugin composition one session's agent runs — its tools, prompt, and capabilities. Duplicate an existing one and make it yours, or let the agent draft one for you in Creator mode.
   - heading "Built-in" [level=3]
   - list:
     - listitem:
       - 'button "In use: Standard mode" [disabled] [pressed]':
-        - text: Standard mode Built-in In use featurefull coding Agent，supportsfileEdit、Shell、fileand web search、Skills、plan、goal、subagentand workflows。
+        - text: Standard mode Built-in In use Full coding agent with file editing, shell, file and web search, skills, planning, goals, subagents, and workflows.
         - code: standard
       - 'button "View: Standard mode"':
         - img
         - text: View
-      - 'button "Copy: Standard mode"':
+      - 'button "Duplicate: Standard mode"':
         - img
-        - text: Copy
+        - text: Duplicate
     - listitem:
       - 'button "Set as default: Code mode"':
-        - text: Code mode Built-in hasStandard mode all capabilities，and via Code Mode SDK presentsTools，letModelwith one TypeScript program combining multi-step operations。
+        - text: Code mode Built-in All Standard mode capabilities, with tools exposed through the Code Mode SDK so the model can combine multi-step operations in one TypeScript program.
         - code: code
       - 'button "View: Code mode"':
         - img
         - text: View
-      - 'button "Copy: Code mode"':
+      - 'button "Duplicate: Code mode"':
         - img
-        - text: Copy
+        - text: Duplicate
     - listitem:
       - 'button "Set as default: Minimal mode"':
-        - text: Minimal mode Built-in only provides persistent bash  and  str_replace_editor  dualToolscoding Agent。
+        - text: Minimal mode Built-in Two-tool coding agent with persistent bash and str_replace_editor.
         - code: minimal
       - 'button "View: Minimal mode"':
         - img
         - text: View
-      - 'button "Copy: Minimal mode"':
+      - 'button "Duplicate: Minimal mode"':
         - img
-        - text: Copy
+        - text: Duplicate
     - listitem:
       - 'button "Set as default: Creator mode"':
-        - text: Creator mode Built-in forCreateCustom Agent preset：hasStandard mode all capabilities，and providesRun runtime inspection、Plugins experiments and preset authorguidance。
+        - text: Creator mode Built-in Built for creating custom agent presets, with all Standard mode capabilities plus runtime inspection, plugin experiments, and preset-authoring guidance.
         - code: cordis
       - 'button "View: Creator mode"':
         - img
         - text: View
-      - 'button "Copy: Creator mode"':
+      - 'button "Duplicate: Creator mode"':
         - img
-        - text: Copy
+        - text: Duplicate
+    - listitem:
+      - 'button "Set as default: AI Researcher mode"':
+        - text: AI Researcher mode Built-in Autonomous research cycle — hypothesis, design defense, experiment, evidence, verdict, ledger, digest. Tracker, decision ledger, debate seats, and the design-defense gate under the autoresearch toggle.
+        - code: researcher
+      - 'button "View: AI Researcher mode"':
+        - img
+        - text: View
+      - 'button "Duplicate: AI Researcher mode"':
+        - img
+        - text: Duplicate
   - heading "Custom" [level=3]
   - button "Draft a custom preset with Creator mode":
     - img

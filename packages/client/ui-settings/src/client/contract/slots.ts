@@ -1,19 +1,9 @@
-/**
- * Settings slot contract — the canonical home of every settings slot type,
- * owned by the settings domain base rather than by the shell that renders
- * them (ui-settings-general, which occupies `sidebar.settings`). The shell has
- * zero copy of its own: ALL text (trigger label, panel title, header actions,
- * close aria, section content) arrives from registrants. A feature owns its
- * own settings pages — adding a setting never means editing the shell; copy
- * that belongs to no single feature (chrome, the General section) is owned by
- * ui-settings-general too.
- */
-
+/** Settings contributions shared by feature plugins and the global navigation shell. */
 
 declare module '@shres-code/shres-code-client-ui-slots' {
   interface SlotMap {
     /**
-     * The sidebar-foot trigger row content: icon + label, supplied as slot
+     * The global navigation trigger content: icon + label, supplied as slot
      * content (the accessible name comes from the content — rail state
      * renders the label visually hidden). The shell renders the button
      * chrome and owns open state. Absent contribution degrades to an
@@ -22,13 +12,12 @@ declare module '@shres-code/shres-code-client-ui-slots' {
      */
     'settings.trigger': { kind: 'single'; scope: 'root'; owner: SettingsTriggerOwnerProps }
     /**
-     * The panel title text seat. Content renders inside the nav heading row;
-     * the dialog's accessible name points at that node via aria-labelledby.
+     * The settings navigation heading text.
      * Absent contribution leaves the heading empty.
      */
     'settings.header': { kind: 'single'; scope: 'root'; owner: SettingsHeaderOwnerProps }
     /**
-     * Optional actions rendered in the content-column header before Close.
+     * Optional actions rendered below the active settings section.
      * Registrants own visibility, behavior, copy, and failure presentation;
      * the shell supplies only the ordered render site.
      */
@@ -46,9 +35,6 @@ declare module '@shres-code/shres-code-client-ui-slots' {
      * re-registers with fresh text on locale change, so the shell never
      * subscribes locale state; the ledger bump doubles as the shell's
      * re-render trigger). Sections render inside the panel content column.
-     * (`settings.general.item`, declared by ui-settings-general's General
-     * entry, is typed in the locale package — the common dependency of every
-     * item registrant; the shell neither declares nor renders it.)
      */
     'settings.section': { kind: 'list'; scope: 'root'; owner: SettingsSectionOwnerProps }
     /**
@@ -86,6 +72,8 @@ declare module '@shres-code/shres-code-client-ui-slots' {
      * layer and every registrant already depends on it for `ctx.settingsScope`.
      */
     'settings.general.item': { kind: 'list'; scope: 'root'; owner: SettingsGeneralItemOwnerProps }
+    /** Voice preferences rendered above the audio engine configuration. */
+    'settings.audio.item': { kind: 'list'; scope: 'root'; owner: SettingsGeneralItemOwnerProps }
   }
 }
 /** Owner share of a General preference row (the section supplies nothing). */
@@ -100,9 +88,9 @@ export interface SettingsPluginsTabOwnerProps {
   children?: never
 }
 
-/** Owner share of the trigger content seat: the sidebar column state. */
+/** Owner share of the settings trigger content. */
 export interface SettingsTriggerOwnerProps {
-  /** Whether the sidebar renders wide content (false = 56px rail, icon only). */
+  /** Whether the trigger displays its text label. */
   wide: boolean
 }
 
@@ -113,15 +101,17 @@ export interface SettingsHeaderOwnerProps {
 }
 
 /**
- * Owner share of a settings section entry. The shell owns modal visibility
+ * Owner share of a settings section entry. The shell owns page visibility
  * and navigation; a section's data arrives through its own inject faces and
  * stores. `close` is the one shell affordance a section receives, for flows
  * that leave settings altogether (starting a session from a section) — the
  * onboarding coordinator's `openSection`/`complete` precedent, inverted.
  */
 export interface SettingsSectionOwnerProps {
-  /** Close the settings panel (the shell owns the open state). */
+  /** Return to the workspace. */
   close: () => void
+  /** Optional preference id for a focused view of a contributed item. */
+  item?: string
 }
 
 /** Owner share of the currently active settings-backed onboarding step. */
@@ -130,6 +120,6 @@ export interface SettingsOnboardingOwnerProps {
   stepId: string
   /** Complete or skip this step and transfer ownership to the next entry. */
   complete: () => void
-  /** Open the settings panel directly on one registered section. */
+  /** Navigate directly to one registered section. */
   openSection: (id: string) => void
 }

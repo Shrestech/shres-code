@@ -12,9 +12,9 @@
 // jsdom package suites bench over src and cannot see the bundled registration.
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { hasClass, installAssembledBootEnv, mountAssembledApp, REFRESHING_GOLDEN } from './assembled-boot.ts'
+import { findFixtureSession, hasClass, installAssembledBootEnv, mountAssembledApp, REFRESHING_GOLDEN } from './assembled-boot.ts'
 
 const EXPECTED = join(process.cwd(), 'apps/web/tests/snapshots/todo-row/parallel-plan.expected.txt')
 
@@ -45,7 +45,7 @@ describe('assembled todo surfaces', () => {
     mountAssembledApp()
 
     const tree = await screen.findByRole('tree', { name: 'Sessions' }, { timeout: 10_000 })
-    fireEvent.click(await within(tree).findByText('Fixture historySessions'))
+    fireEvent.click(await findFixtureSession(tree))
     // The todo turn is the fixture's last, so wait for its keyed row rather
     // than for chat content in general.
     const row = await waitFor(() => {
@@ -61,7 +61,7 @@ describe('assembled todo surfaces', () => {
     if (toggle === null) throw new Error('the plan strip must expose its expand toggle')
     if (toggle.getAttribute('aria-expanded') === 'false') fireEvent.click(toggle)
 
-    const shape = todoShape(row, panel)
+    const shape = `${todoShape(row, panel)}\n`
     if (REFRESHING_GOLDEN) {
       mkdirSync(dirname(EXPECTED), { recursive: true })
       writeFileSync(EXPECTED, shape)

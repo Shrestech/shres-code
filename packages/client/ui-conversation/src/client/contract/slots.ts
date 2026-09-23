@@ -43,29 +43,40 @@ declare module '@shres-code/shres-code-client-ui-slots' {
      */
     'conversation.session': { kind: 'single'; scope: 'session' }
     /**
-     * The strip above the session's scrollport: title, view tabs, and the
-     * action row. Taking this seat means rendering all three yourself, and it
+     * The strip above the session's scrollport: title and Activity control.
+     * Taking this seat means rendering the complete header yourself, and it
      * also collapses `conversation.session.header.actions` — that additive
      * seat is declared by whoever occupies this one, so replacing the header
      * takes every action entry down with it.
      */
     'conversation.session.header': { kind: 'single'; scope: 'session' }
     /**
-     * One button in the session header's action row — the additive way to put
-     * a per-session control beside the title without replacing the header.
+     * One per-session control available from the Activity inspector — the
+     * additive way to contribute a utility without replacing the header.
      * Entries render by ascending `order`; negative values are reserved for
      * static session context that precedes interactive actions. The owner
      * passes nothing: everything a control needs comes from the framework
      * session kit (`sessionId`, `useSession`, `useInput`, `inputActions`) and
      * from the registrant's own inject face, so an empty owner share means
-     * self-sufficient, not starved.
+     * self-sufficient, not starved. The contribution remains mounted in the
+     * inspector's hidden/inert state while it is closed.
      */
     'conversation.session.header.actions': { kind: 'list'; scope: 'session'; owner: ConversationHeaderActionOwnerProps }
     /**
-     * Right-aligned Session utilities kept outside the title-adjacent action
-     * group, so an optional utility cannot reorder session context or lineage.
+     * Session utilities contributed to the Activity inspector after the
+     * session-local action group, so optional tools cannot reorder lineage.
+     * The contribution remains mounted in the inspector's hidden/inert state
+     * while it is closed, allowing a portal-owned dialog to stay actionable.
      */
     'conversation.session.header.utilities': { kind: 'list'; scope: 'session'; owner: ConversationHeaderActionOwnerProps }
+    /**
+     * Session-local activity additions rendered inside the Activity inspector.
+     * The conversation shell owns the inspector; feature packages contribute
+     * their own controls here without importing one another. Entries remain
+     * mounted while the inspector is hidden/inert so portal-owned dialogs keep
+     * their lifecycle after Activity closes.
+     */
+    'conversation.session.activity': { kind: 'list'; scope: 'session'; owner: ConversationHeaderActionOwnerProps }
     /**
      * The conversation view ring: one list entry per view tab (chat here;
      * trajectory/waterfall from ui-trajectory), rendered one-at-a-time by
@@ -608,7 +619,11 @@ export type ConversationSessionSlotProps =
 /** Full strict-session header props: shared store, tabs/actions render shares, navigation, and locale. */
 export type ConversationSessionHeaderSlotProps =
   PropsRuntime<'conversation.session.header'>
-  & PropsRenderSlots<'conversation.session.header.actions' | 'conversation.session.header.utilities'>
+  & PropsRenderSlots<
+    | 'conversation.session.header.actions'
+    | 'conversation.session.header.utilities'
+    | 'conversation.session.activity'
+  >
   & PropsStore<ChatStore>
   & ConversationSessionHeaderInjected
   & PropsLocale<'conversation'>

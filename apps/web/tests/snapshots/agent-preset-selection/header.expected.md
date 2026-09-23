@@ -1,10 +1,16 @@
 - navigation "Session hierarchy":
   - button "Seeded turn" [disabled]
-- img
-- text: Minimal mode
-- button "1 subagent":
-  - text: 1 subagent
+- button "Activity" [expanded]
+- dialog "Inspect this session":
+  - text: SESSION TOOLS Inspect this session Views
+  - button "Chat"
+  - button "Trajectory"
+  - text: Tools & utilities
   - img
-- button "Session log":
-  - text: Session log
-  - img
+  - text: Minimal mode
+  - button "1 subagent":
+    - text: 1 subagent
+    - img
+  - button "Session log":
+    - text: Session log
+    - img

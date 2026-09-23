@@ -1,7 +1,7 @@
-- dialog "Delete minimax-cn？":
-  - heading "Delete minimax-cn？" [level=2]
+- dialog "Delete minimax-cn?":
+  - heading "Delete minimax-cn?" [level=2]
   - button "Close":
     - img
-  - paragraph: Delete minimax-cn willRemove；use  ()frommanage， willwillkeep。
+  - paragraph: Deleting minimax-cn removes its configuration. Any credential it uses is managed elsewhere and will be kept.
   - button "Cancel"
   - button "Delete minimax-cn"

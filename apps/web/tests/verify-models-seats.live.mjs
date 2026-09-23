@@ -1,5 +1,5 @@
 /**
- * Live Playwright walk of Settings → Models / Agent presets on the running
+ * Live Playwright walk of Settings → Models / Customize on the running
  * shres web at 127.0.0.1:3080. Prints a report; non-zero exit on failure.
  */
 import { mkdir } from 'node:fs/promises'
@@ -48,14 +48,14 @@ try {
   const settingsTrigger = page.getByRole('button', { name: 'Settings', exact: true })
   await settingsTrigger.waitFor({ timeout: 15_000 })
   await settingsTrigger.click()
-  const dialog = page.getByRole('dialog', { name: 'Settings' })
+  const dialog = page.getByRole('region', { name: 'Settings' })
   await dialog.waitFor({ timeout: 10_000 })
-  ok('settings dialog opened', await dialog.isVisible())
+  ok('settings page opened', await dialog.isVisible())
 
-  const modelsNav = dialog.getByRole('button', { name: 'Models', exact: true })
+  const modelsNav = dialog.getByRole('button', { name: 'Models & providers', exact: true })
   await modelsNav.click()
   await Promise.race([
-    dialog.getByRole('heading', { name: 'Models', exact: true }).waitFor({ timeout: 15_000 }),
+    dialog.getByRole('heading', { name: 'Providers', exact: true }).waitFor({ timeout: 15_000 }),
     dialog.getByRole('heading', { name: 'Seats', exact: true }).waitFor({ timeout: 15_000 }),
     dialog.getByText('Loading the provider directory failed').waitFor({ timeout: 15_000 }),
   ]).catch(() => {})
@@ -140,13 +140,18 @@ try {
     ok('Codex CLI Edit button', false, 'not found')
   }
 
-  const presetsNav = dialog.getByRole('button', { name: /Agent presets?/ })
-  ok('Agent presets nav exists', await presetsNav.count() > 0)
-  if (await presetsNav.count() > 0) {
-    await presetsNav.click()
+  const customizeNav = page.getByRole('button', { name: 'Customize', exact: true })
+  ok('Customize destination exists', await customizeNav.count() > 0)
+  if (await customizeNav.count() > 0) {
+    await customizeNav.click()
+    const customize = page.getByRole('region', { name: 'Customize' })
+    await customize.waitFor({ timeout: 10_000 })
+    const presetsNav = customize.getByRole('button', { name: /Agent presets?/ })
+    ok('Agent presets nav exists', await presetsNav.count() > 0)
+    if (await presetsNav.count() > 0) await presetsNav.click()
     await page.waitForTimeout(600)
     await page.screenshot({ path: join(SHOT, '04-presets.png'), fullPage: true })
-    const presets = await dialog.innerText()
+    const presets = await customize.innerText()
     ok('preset intro', /plugin composition/i.test(presets))
     ok('Standard mode', presets.includes('Standard mode'))
     ok('another built-in preset', presets.includes('Creator mode') || presets.includes('Code mode'))

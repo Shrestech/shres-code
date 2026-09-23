@@ -1,5 +1,98 @@
-- dialog "Settings":
-  - navigation:
-    - text: Settings
-    - button "General":
+- region "Settings":
+  - complementary:
+    - heading "Settings" [level=2]
+    - button "Close":
       - img
+      - text: Close
+    - img
+    - searchbox "Search settings…"
+    - text: ⌘ K
+    - navigation "Settings":
+      - button "Preferences":
+        - img
+        - text: Preferences
+      - button "Appearance":
+        - img
+        - text: Appearance
+      - button "Models & providers":
+        - img
+        - text: Models & providers
+      - button "Shield":
+        - img
+        - text: Shield
+      - button "J-Space":
+        - img
+        - text: J-Space
+      - button "Voice & audio":
+        - img
+        - text: Voice & audio
+  - text: Settings
+  - heading "J-Space" [level=1]
+  - paragraph: Set up Shres for the way you work.
+  - paragraph: J-Space is an allow switch. On mounts the card tools and prompt section. Off unloads them.
+  - text: J-Space Active
+  - switch "Disable" [checked]
+  - paragraph: Turn J-Space on or off. Off unloads the tools, prompt section, and session chip.
+  - text: Mode
+  - combobox "Mode":
+    - option "Available" [selected]
+    - option "Always open"
+  - text: Available waits for an open. Always open starts the stock Goal/Next on the first pre-step of a session that has none. Require coverage A checkpoint must name a verifier and a coverage claim.
+  - switch "Require coverage" [checked]
+  - paragraph: A background reviewer that steers the session back to the user goal. Off keeps the plugin loaded and mounts nothing.
+  - text: Advisor Active
+  - switch "Disable Advisor" [checked]
+  - paragraph: On arms the advisor once a provider and model are bound. Off unloads consult and proactive reviews.
+  - paragraph: Bind the reviewer model. Unbound, the advisor stays dormant.
+  - text: Provider
+  - combobox "Advisor Provider":
+    - option "Unbound" [selected]
+    - option "Cursor (subscription)"
+    - option "Ollama (local)"
+    - option "Ollama Cloud"
+    - option "openai"
+    - option "anthropic"
+    - option "xai"
+    - option "moonshotai"
+    - option "openrouter"
+    - option "groq"
+    - option "zai"
+    - option "Grok (subscription)"
+    - option "Codex (subscription)"
+    - option "DeepSeek"
+  - text: Model
+  - combobox "Advisor Model" [disabled]:
+    - option "Unbound" [selected]
+  - paragraph: "WikiSkill: persistent knowledge wiki improved benchmark scores up to +24 pts; 9B + wiki beat 27B without."
+  - text: LLM Wiki Active
+  - switch "Disable LLM Wiki" [checked]
+  - paragraph: On mounts the wiki tools. Off unloads them. No directory is created until the first write.
+  - paragraph: Bind a cheap or local model for librarian consolidation. Unbound, the librarian stays dormant and never uses the session frontier model.
+  - text: Provider
+  - combobox "Librarian Provider":
+    - option "Unbound" [selected]
+    - option "Cursor (subscription)"
+    - option "Ollama (local)"
+    - option "Ollama Cloud"
+    - option "openai"
+    - option "anthropic"
+    - option "xai"
+    - option "moonshotai"
+    - option "openrouter"
+    - option "groq"
+    - option "zai"
+    - option "Grok (subscription)"
+    - option "Codex (subscription)"
+    - option "DeepSeek"
+  - text: Model
+  - combobox "Librarian Model" [disabled]:
+    - option "Unbound" [selected]
+  - region "This session":
+    - paragraph: This session · —
+    - term: Checked
+    - definition: —
+    - paragraph: Checkpoints name a verifier; the harness cannot prove it ran.
+  - button "Open configuration file":
+    - img
+    - text: Open configuration file
+    - img

@@ -1,10 +1,4 @@
-/**
- * Appearance preference row registered into the General section item slot
- * (figma 501:30012 'Frame 2117131228'): title + three preference cubes.
- * Registered by this package — the theme feature owns its own settings
- * surface. Selection follows the persisted preference, never the resolved
- * active theme.
- */
+/** Theme preference selection, independent of the resolved system appearance. */
 import clsx from 'clsx'
 import {
   IconDarkOutline16, IconFollowsystemOutline16, IconLightOutline16,
@@ -43,7 +37,7 @@ export function AppearanceRow({ t, setTheme, useStore }: AppearanceRowComponentP
   const preference = useStore(s => s.preference)
   return (
     <div className={css.group}>
-      <div className={css.title}>{t('appearance.title')}</div>
+      <div><div className={css.title}>{t('appearance.title')}</div><div className={css.desc}>{t('appearance.description')}</div></div>
       <div className={css.cubeRow}>
         {CUBES.map(({ id, labelKey, Icon }) => (
           <button

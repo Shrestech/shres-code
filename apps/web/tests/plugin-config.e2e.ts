@@ -40,24 +40,19 @@ describe('web e2e: plugin configuration section', () => {
     await scaffold?.close()
   })
 
-  /**
-   * Open the settings dialog on the Plugins section. The scenarios share one
-   * page so the settings document accumulates across them, so this leaves any
-   * dialog a previous scenario opened closed first — its mask would otherwise
-   * swallow the trigger click.
-   */
+  /** Open the global Customize destination on the Plugins section. */
   async function openPlugins() {
-    if (await page.getByRole('dialog', { name: 'Settings' }).count() > 0) {
+    if (await page.getByRole('region', { name: 'Customize' }).count() > 0) {
       await page.keyboard.press('Escape')
-      await expect.poll(() => page.getByRole('dialog', { name: 'Settings' }).count(), { timeout: 5_000 }).toBe(0)
+      await expect.poll(() => page.getByRole('region', { name: 'Customize' }).count(), { timeout: 5_000 }).toBe(0)
     }
-    await page.getByRole('button', { name: 'Settings', exact: true }).click()
-    const dialog = page.getByRole('dialog', { name: 'Settings' })
+    await page.getByRole('button', { name: 'Customize', exact: true }).click()
+    const dialog = page.getByRole('region', { name: 'Customize' })
     await dialog.waitFor({ timeout: 10_000 })
     await dialog.getByRole('button', { name: 'Plugins', exact: true }).click()
     await expect
       .poll(() => dialog.getByRole('button', { name: 'Plugins', exact: true }).getAttribute('aria-current'), { timeout: 5_000 })
-      .toBe('true')
+      .toBe('page')
     await expect
       .poll(() => dialog.getByRole('tab', { name: 'Plugin configuration', exact: true }).getAttribute('aria-selected'), { timeout: 5_000 })
       .toBe('true')
@@ -81,7 +76,7 @@ describe('web e2e: plugin configuration section', () => {
     // Collapsed: a card's fields appear only once it is expanded.
     expect(await dialog.getByLabel('Command timeout (ms)').count()).toBe(0)
 
-    const snapshot = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
+    const snapshot = await captureStableAria(page, '[role="region"][aria-label="Customize"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(SECTION_EXPECTED, snapshot, MODE)
     expect(tripwire.pageErrors).toEqual([])
   }, 60_000)
@@ -111,7 +106,7 @@ describe('web e2e: plugin configuration section', () => {
     expect(deepseekBox).not.toBeNull()
     expect(perplexityBox!.y).toBeLessThan(perplexityKeyBox!.y)
     expect(perplexityKeyBox!.y).toBeLessThan(deepseekBox!.y)
-    const snapshot = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
+    const snapshot = await captureStableAria(page, '[role="region"][aria-label="Customize"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'web-search.expected.md'), snapshot, MODE)
     // No edit was staged: expanding the card changes nothing on disk.
     expect(await settingsDocument()).not.toContain('web-search-perplexity')

@@ -806,6 +806,33 @@
         "@shres-code/.+"
       ]
     },
+    "apps/desktop": {
+      "entry": [
+        "src/main.ts",
+        "tests/**/*.spec.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts",
+        "renderer/**/*.{js,html}",
+        "scripts/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@shres-code/.+"
+      ]
+    },
+    "apps/desktop-host": {
+      "entry": [
+        "tests/**/*.spec.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@shres-code/.+"
+      ]
+    },
     "packages/client/modules": {
       "entry": [
         "tests/**/*.spec.ts"

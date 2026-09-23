@@ -39,7 +39,7 @@ describe('web e2e: Shield settings plugin-update card', () => {
   it('shows Check for updates on the idle Plugin updates card', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-shield-settings-idle'))
     await page.getByRole('button', { name: 'Settings', exact: true }).click()
-    const dialog = page.getByRole('dialog', { name: 'Settings' })
+    const dialog = page.getByRole('region', { name: 'Settings' })
     await dialog.waitFor({ timeout: 10_000 })
     await dialog.getByRole('button', { name: 'Shield', exact: true }).click()
     const check = dialog.getByRole('button', { name: 'Check for updates' })

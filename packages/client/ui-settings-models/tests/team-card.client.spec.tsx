@@ -4,15 +4,16 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import Schema from '@shres-code/schemastery'
 import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
 import type { RpcResponse, SettingsNamespaceView } from '@shres-code/shres-code-api-remotes/client'
-import { ModelsSection } from '../src/client/ModelsSection.tsx'
-import type { ModelsSectionInjected } from '../src/client/ModelsSection.tsx'
+import { TeamSection } from '../src/client/TeamSection.tsx'
+import type { TeamSectionInjected } from '../src/client/TeamSection.tsx'
 import { membersOf, memberDraftValid, seatValueOf, writeMembers, writeSeat } from '../src/client/TeamCard.tsx'
 import { ModelsSettingsStore } from '../src/client/store.ts'
 import { en } from '../src/client/locales.ts'
 
 afterEach(cleanup)
 
-const t: ModelsSectionInjected['t'] = key => en[key]
+const t: TeamSectionInjected['t'] = key => en[key]
+const unusedHook = (() => { throw new Error('unused standard hook') }) as never
 
 const SeatsConfig = Schema.object({
   seats: Schema.object({
@@ -128,7 +129,10 @@ describe('TeamCard', () => {
     const controller = new ModelsSettingsStore(face as never)
     await controller.load()
     render(
-      <ModelsSection
+      <TeamSection
+        useSessions={unusedHook}
+        useWorkspaces={unusedHook}
+        close={() => {}}
         controller={controller}
         useSnapshot={bindSnapshotSelector(controller.store)}
         api={face as never}
@@ -180,7 +184,10 @@ describe('TeamCard', () => {
     const controller = new ModelsSettingsStore(face as never)
     await controller.load()
     render(
-      <ModelsSection
+      <TeamSection
+        useSessions={unusedHook}
+        useWorkspaces={unusedHook}
+        close={() => {}}
         controller={controller}
         useSnapshot={bindSnapshotSelector(controller.store)}
         api={face as never}
@@ -214,7 +221,10 @@ describe('TeamCard', () => {
     const controller = new ModelsSettingsStore(face as never)
     await controller.load()
     render(
-      <ModelsSection
+      <TeamSection
+        useSessions={unusedHook}
+        useWorkspaces={unusedHook}
+        close={() => {}}
         controller={controller}
         useSnapshot={bindSnapshotSelector(controller.store)}
         api={face as never}
@@ -244,7 +254,10 @@ describe('TeamCard', () => {
     const controller = new ModelsSettingsStore(face as never)
     await controller.load()
     render(
-      <ModelsSection
+      <TeamSection
+        useSessions={unusedHook}
+        useWorkspaces={unusedHook}
+        close={() => {}}
         controller={controller}
         useSnapshot={bindSnapshotSelector(controller.store)}
         api={face as never}
@@ -301,14 +314,17 @@ describe('TeamCard', () => {
     const mutate = vi.fn(() => Promise.resolve(ok(seatsNamespace())))
     const face = buildFace(mutate, {
       extras: [
-        { name: 'docs-reviewer', persona: 'Review docs.', provider: 'ollama-cloud', model: 'kimi-k3' },
+        { name: 'docs-reviewer', role: 'Reviewer', persona: 'Review docs.', provider: 'ollama-cloud', model: 'kimi-k3' },
         { persona: 'Incomplete row.' },
       ],
     })
     const controller = new ModelsSettingsStore(face as never)
     await controller.load()
     render(
-      <ModelsSection
+      <TeamSection
+        useSessions={unusedHook}
+        useWorkspaces={unusedHook}
+        close={() => {}}
         controller={controller}
         useSnapshot={bindSnapshotSelector(controller.store)}
         api={face as never}
@@ -319,7 +335,13 @@ describe('TeamCard', () => {
       expect(face.llm.models).toHaveBeenCalled()
     })
     expect(screen.getByText('docs-reviewer')).toBeTruthy()
+    expect(screen.getAllByText('Reviewer')).toHaveLength(2)
     expect(screen.getByText('? / ?')).toBeTruthy()
+    const persona = screen.getByRole('button', { name: `docs-reviewer ${en.teamMemberPersonaToggle}` })
+    fireEvent.click(persona)
+    expect(screen.getByText('Review docs.')).toBeTruthy()
+    fireEvent.click(persona)
+    expect(screen.queryByText('Review docs.')).toBeNull()
     fireEvent.click(screen.getByLabelText(`${en.teamRemoveMember} docs-reviewer`))
     await waitFor(() => {
       expect(mutate).toHaveBeenCalledWith({
@@ -329,6 +351,7 @@ describe('TeamCard', () => {
     })
     fireEvent.click(screen.getAllByRole('button', { name: /Remove/ })[1]!)
     fireEvent.change(screen.getByLabelText(en.teamMemberName), { target: { value: 'note-taker' } })
+    fireEvent.change(screen.getByLabelText(en.teamMemberRole), { target: { value: 'Note taker' } })
     fireEvent.change(screen.getByLabelText(en.teamMemberPersona), { target: { value: 'Take notes.' } })
     fireEvent.change(screen.getByLabelText(`${en.teamAddMember} ${en.seatsProvider}`), {
       target: { value: 'ollama-cloud' },
@@ -344,9 +367,9 @@ describe('TeamCard', () => {
           op: 'set',
           path: ['extras'],
           value: [
-            { name: 'docs-reviewer', persona: 'Review docs.', provider: 'ollama-cloud', model: 'kimi-k3' },
+            { name: 'docs-reviewer', role: 'Reviewer', persona: 'Review docs.', provider: 'ollama-cloud', model: 'kimi-k3' },
             { persona: 'Incomplete row.' },
-            { name: 'note-taker', persona: 'Take notes.', provider: 'ollama-cloud', model: 'kimi-k3' },
+            { name: 'note-taker', persona: 'Take notes.', provider: 'ollama-cloud', model: 'kimi-k3', role: 'Note taker' },
           ],
         }],
       })
@@ -363,7 +386,10 @@ describe('TeamCard', () => {
     const controller = new ModelsSettingsStore(face as never)
     await controller.load()
     render(
-      <ModelsSection
+      <TeamSection
+        useSessions={unusedHook}
+        useWorkspaces={unusedHook}
+        close={() => {}}
         controller={controller}
         useSnapshot={bindSnapshotSelector(controller.store)}
         api={face as never}
@@ -384,7 +410,10 @@ describe('TeamCard', () => {
     await emptyController.load()
     cleanup()
     render(
-      <ModelsSection
+      <TeamSection
+        useSessions={unusedHook}
+        useWorkspaces={unusedHook}
+        close={() => {}}
         controller={emptyController}
         useSnapshot={bindSnapshotSelector(emptyController.store)}
         api={empty as never}

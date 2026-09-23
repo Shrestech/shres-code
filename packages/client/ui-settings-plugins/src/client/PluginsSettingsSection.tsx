@@ -51,7 +51,6 @@ export function PluginsSettingsSection({ t, renderSlot, useTabs }: PluginsSettin
 
   return (
     <div className={css.section}>
-      <h2 className={css.heading}>{t('title')}</h2>
       <p className={css.intro}>{t('intro')}</p>
       {rows.length === 0 ? <p className={css.empty}>{t('empty')}</p> : (
         <>

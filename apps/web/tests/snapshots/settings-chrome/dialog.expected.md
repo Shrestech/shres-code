@@ -1,61 +1,73 @@
-- dialog "Settings":
-  - navigation:
-    - text: Settings
-    - button "General":
+- region "Settings":
+  - complementary:
+    - heading "Settings" [level=2]
+    - button "Close":
       - img
-      - text: General
-    - button "Models":
+      - text: Close
+    - img
+    - searchbox "Search settings…"
+    - text: ⌘ K
+    - navigation "Settings":
+      - button "Preferences":
+        - img
+        - text: Preferences
+      - button "Appearance":
+        - img
+        - text: Appearance
+      - button "Models & providers":
+        - img
+        - text: Models & providers
+      - button "Shield":
+        - img
+        - text: Shield
+      - button "J-Space":
+        - img
+        - text: J-Space
+      - button "Voice & audio":
+        - img
+        - text: Voice & audio
+  - text: Settings
+  - heading "Your workspace, your way." [level=1]
+  - paragraph: Preferences for everyday work.
+  - region "Session defaults":
+    - text: "01"
+    - heading "Session defaults" [level=2]
+    - paragraph: Set the starting point for new sessions.
+    - text: Agent preset Applies to sessions you start from now on.
+    - button "Standard mode":
+      - text: Standard mode
       - img
-      - text: Models
-    - button "Shield":
+    - text: Default access Choose the default permission mode for new sessions.
+    - button "Workspace Write":
+      - text: Workspace Write
       - img
-      - text: Shield
-    - button "J-Space":
+  - region "Interaction":
+    - text: "02"
+    - heading "Interaction" [level=2]
+    - paragraph: Control how Shres behaves while you work.
+    - text: Enter while busy Busy only; Cmd/Ctrl+Enter uses the other behavior.
+    - button "Queue":
+      - text: Queue
       - img
-      - text: J-Space
-    - button "Plugins":
+    - text: Language Set the language for the interface.
+    - button "English":
+      - text: English
       - img
-      - text: Plugins
-    - button "Agent presets":
+  - region "Appearance":
+    - text: "03"
+    - heading "Appearance" [level=2]
+    - paragraph: Choose how Shres looks on your device.
+    - text: Theme Select your preferred theme.
+    - button "Light":
       - img
-      - text: Agent presets
-  - button "Open configuration file"
-  - button "Close":
+      - text: Light
+    - button "Dark":
+      - img
+      - text: Dark
+    - button "System" [pressed]:
+      - img
+      - text: System
+  - button "Open configuration file":
     - img
-    - text: Close
-  - text: Agent preset Applies to sessions you start from now on. Running sessions keep the preset they began with.
-  - button "Standard mode":
-    - text: Standard mode
-    - img
-  - text: Permission Choose the default permission mode for new sessions
-  - button "Workspace Write":
-    - text: Workspace Write
-    - img
-  - text: Language
-  - button "English":
-    - text: English
-    - img
-  - text: Appearance
-  - button "Light":
-    - img
-    - text: Light
-  - button "Dark":
-    - img
-    - text: Dark
-  - button "System" [pressed]:
-    - img
-    - text: System
-  - text: Enter behavior while busy Busy only; Cmd/Ctrl+Enter uses the other behavior
-  - button "Queue":
-    - text: Queue
-    - img
-  - text: Read-aloud voice Kokoro voice used for read-aloud. Twenty-eight US and UK voices.
-  - button "Heart":
-    - text: Heart
-    - img
-  - text: Send after dictation Submit the transcribed draft immediately instead of leaving it in the composer.
-  - button "Off"
-  - text: Spoken language Language for Talk mode and dictation. English also speaks the confirm prompt.
-  - button "English":
-    - text: English
+    - text: Open configuration file
     - img

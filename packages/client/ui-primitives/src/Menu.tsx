@@ -193,13 +193,21 @@ export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, o
       onCloseRef.current()
     }
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCloseRef.current()
+      if (e.key === 'Escape') {
+        // A portaled menu can sit above a Modal in the DOM while its trigger
+        // remains inside the modal. Consume the first Escape before sibling
+        // document listeners see it; the next key reaches the owner after the
+        // menu has unmounted.
+        e.preventDefault()
+        e.stopImmediatePropagation()
+        onCloseRef.current()
+      }
     }
     document.addEventListener('pointerdown', onPointerDown)
-    document.addEventListener('keydown', onKeyDown)
+    document.addEventListener('keydown', onKeyDown, true)
     return () => {
       document.removeEventListener('pointerdown', onPointerDown)
-      document.removeEventListener('keydown', onKeyDown)
+      document.removeEventListener('keydown', onKeyDown, true)
     }
   }, [open, cancelClose])
 

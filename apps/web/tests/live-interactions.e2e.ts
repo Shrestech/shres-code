@@ -23,7 +23,7 @@ import {
   assertFixtureInventory, captureStableAria, compareOrRefreshGolden, fixtureUserPrompts,
   launchWebScaffold, recordFixture, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
+import { connectFreshWorkspace, newEnglishPage, saveFailureShot, selectSessionView } from './support.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/live-interactions', import.meta.url))
 const FIXTURE = join(SNAPSHOT_DIR, 'session.jsonl')
@@ -175,7 +175,7 @@ describe('web e2e: live-turn interactions (cancel / error / retry)', () => {
     expect(await page.locator('body').textContent()).not.toContain('sk-preview-secret')
     const snapshot = await captureStableAria(page, '[class*="centerCol"]', scaffold!.workspaceCwd)
     await compareOrRefreshGolden(ERROR_EXPECTED, snapshot, MODE)
-    await page.getByRole('tab', { name: 'Trajectory' }).click()
+    await selectSessionView(page, 'Trajectory')
     const requestMarker = page.locator('tr[data-request-only="true"]').last()
       .getByRole('button', { name: /Request #/ })
     await requestMarker.click()
@@ -191,7 +191,7 @@ describe('web e2e: live-turn interactions (cancel / error / retry)', () => {
     }))
     const { settled } = await sendPrompt()
     await settled
-    await page.getByRole('tab', { name: 'Trajectory' }).click()
+    await selectSessionView(page, 'Trajectory')
     // The boundary marker row itself is a 0-height hairline except at the
     // table tail; the marker button is absolutely positioned and stays
     // visible, so wait on it directly.

@@ -114,7 +114,7 @@ describe('PluginsSettingsSection', () => {
   it('leads with its own heading and intro', () => {
     renderSection([{ id: 'configurable', order: 0, label: en.configurableTab }])
 
-    expect(screen.getByRole('heading', { name: en.title })).toBeTruthy()
+    expect(screen.getByRole('tablist')).toBeTruthy()
     expect(screen.getByText(en.intro)).toBeTruthy()
   })
 

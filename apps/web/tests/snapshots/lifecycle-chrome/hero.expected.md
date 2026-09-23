@@ -1,9 +1,28 @@
-- button "New session"
+- banner:
+  - button "Shres home": SHRES
+  - navigation "Main navigation":
+    - button "Workspace"
+    - button "Teams"
+    - button "Customize"
+  - button "workspace":
+    - img
+    - text: workspace
+  - button "Settings":
+    - img
+    - text: Settings
+- button "New session": Workspace
 - button "Collapse sidebar":
   - img
 - button "New session":
   - img
   - text: New Session
+- region "Remotes":
+  - button "Hide remotes" [expanded]:
+    - img
+    - text: Remotes
+  - button "Add remote…":
+    - img
+    - text: Add remote…
 - text: Workspaces
 - button "Search sessions":
   - img
@@ -17,10 +36,7 @@
     - img
     - text: workspace
   - treeitem "New Session" [selected]
-- button "Settings":
-  - img
-  - text: Settings
-- text: Take the Leap Preview
+- text: Start with an idea
 - button "Choose workspace":
   - img
   - text: workspace
@@ -34,6 +50,8 @@
   - img
 - tooltip "Commands"
 - 'button "Access mode, current: Workspace Write"': Workspace Write
+- button "Dictate":
+  - img
 - button "Select model, current DeepSeek-V4-Flash":
   - text: DeepSeek-V4-Flash
   - img

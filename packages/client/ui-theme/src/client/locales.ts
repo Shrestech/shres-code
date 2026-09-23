@@ -2,7 +2,8 @@
 
 /** English dictionary, the key-set source of truth. */
 export const en = {
-  'appearance.title': 'Appearance',
+  'appearance.title': 'Theme',
+  'appearance.description': 'Select your preferred theme.',
   'appearance.light': 'Light',
   'appearance.dark': 'Dark',
   'appearance.system': 'System',

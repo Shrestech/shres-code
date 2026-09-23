@@ -1,4 +1,4 @@
-/** Chat-header Team action: loads the roster view and reloads when the panel opens. */
+/** Activity inspector Team action: loads the roster view and reloads when the panel opens. */
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { SessionId } from '@shres-code/shres-code-client-runtime/client'
@@ -17,9 +17,9 @@ export interface TeamActionInjected {
   openTeammate: (parentSessionId: SessionId, member: AgentTeamsMemberRow) => void
 }
 
-/** Full props for the session-header Team action. */
+/** Full props for the session Activity contribution. */
 export type TeamActionProps =
-  PropsRuntime<'conversation.session.header.actions'> & TeamActionInjected & PropsLocale<typeof NS>
+  PropsRuntime<'conversation.session.activity'> & TeamActionInjected & PropsLocale<typeof NS>
 
 /**
  * Unwrap one `agentTeams.view` RPC response. A failed call throws so the

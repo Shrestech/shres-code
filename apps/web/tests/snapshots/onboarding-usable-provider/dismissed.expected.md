@@ -1,35 +1,119 @@
-- dialog "Settings":
-  - navigation:
-    - text: Settings
-    - button "General":
+- region "Settings":
+  - complementary:
+    - heading "Settings" [level=2]
+    - button "Close":
       - img
-      - text: General
-    - button "Model":
-      - img
-      - text: Model
-    - button "Plugins":
-      - img
-      - text: Plugins
-    - button "Agent presets":
-      - img
-      - text: Agent presets
-  - button "Open configuration file"
-  - button "Close":
+      - text: Close
     - img
-    - text: Close
-  - heading "Model" [level=2]
-  - paragraph: Enter your API keys to use models from the following providers.
+    - searchbox "Search settings…"
+    - text: ⌘ K
+    - navigation "Settings":
+      - button "Preferences":
+        - img
+        - text: Preferences
+      - button "Appearance":
+        - img
+        - text: Appearance
+      - button "Models & providers":
+        - img
+        - text: Models & providers
+      - button "Shield":
+        - img
+        - text: Shield
+      - button "J-Space":
+        - img
+        - text: J-Space
+      - button "Voice & audio":
+        - img
+        - text: Voice & audio
+  - text: Settings
+  - heading "Models & providers" [level=1]
+  - paragraph: Set up Shres for the way you work.
+  - heading "Providers" [level=2]
+  - paragraph: HTTP providers need an API key. Delegated CLIs use a command on your PATH and their own login — a key is optional.
   - list:
+    - listitem:
+      - text: Cursor (subscription) cursor-session
+      - paragraph: "This route lists models but refuses chat turns: the Cursor agent wire is not served. Cursor completions run through a cursor-cli overlay route, declared in the llm-cli-bridge settings or on the Cursor Agent CLI (delegated) card."
+      - paragraph: Models this route advertises. The model picker stays in sync with this list.
+      - region "Models":
+        - text: Models Using the adapter defaults
+        - paragraph: No models will be shown in the selector. Unlisted IDs can still be sent directly.
+        - button "Add model":
+          - img
+          - text: Add model
+      - button "Cancel"
+      - button "Apply"
     - listitem:
       - text: DeepSeek
       - img "API key missing"
+      - switch "Disable DeepSeek (deepseek-official)" [checked]
       - button "Edit DeepSeek (deepseek-official)": Edit
+    - listitem:
+      - text: anthropic
+      - img "API key missing"
+      - switch "Disable anthropic" [checked]
+      - button "Edit anthropic": Edit
+    - listitem:
+      - text: groq
+      - img "API key missing"
+      - switch "Disable groq" [checked]
+      - button "Edit groq": Edit
+    - listitem:
+      - text: moonshotai
+      - img "API key missing"
+      - switch "Disable moonshotai" [checked]
+      - button "Edit moonshotai": Edit
+    - listitem:
+      - text: openai
+      - img "API key missing"
+      - switch "Disable openai" [checked]
+      - button "Edit openai": Edit
+    - listitem:
+      - text: openrouter
+      - img "API key missing"
+      - switch "Disable openrouter" [checked]
+      - button "Edit openrouter": Edit
+    - listitem:
+      - text: xai
+      - img "API key missing"
+      - switch "Disable xai" [checked]
+      - button "Edit xai": Edit
+    - listitem:
+      - text: zai
+      - img "API key missing"
+      - switch "Disable zai" [checked]
+      - button "Edit zai": Edit
+    - listitem:
+      - text: Ollama (local) Custom
+      - switch "Enable Ollama (local) (ollama-local)"
+      - button "Edit Ollama (local) (ollama-local)": Edit
+    - listitem:
+      - text: Ollama Cloud Custom
+      - img "API key missing"
+      - switch "Disable Ollama Cloud (ollama-cloud)" [checked]
+      - button "Edit Ollama Cloud (ollama-cloud)": Edit
+    - listitem:
+      - text: Grok (subscription) grok-session
+      - paragraph: Other fields live in settings.yaml; edit that section directly. (llm-grok-session)
+      - button "Cancel"
+      - button "Apply" [disabled]
+    - listitem:
+      - text: xAI (pay-per-token) xai-apikey
+      - paragraph: Other fields live in settings.yaml; edit that section directly. (llm-xai-apikey)
+      - button "Cancel"
+      - button "Apply" [disabled]
+    - listitem:
+      - text: Codex (subscription) codex-session
+      - paragraph: Other fields live in settings.yaml; edit that section directly. (llm-codex-session)
+      - button "Cancel"
+      - button "Apply" [disabled]
   - text: Provider
   - combobox "Provider":
     - option "amazon-bedrock"
     - option "ant-ling"
-    - option "anthropic"
     - option "azure-openai-responses"
+    - option "baseten"
     - option "cerebras"
     - option "cloudflare-ai-gateway"
     - option "cloudflare-workers-ai"
@@ -38,33 +122,32 @@
     - option "github-copilot"
     - option "google"
     - option "google-vertex"
-    - option "groq"
     - option "huggingface"
     - option "kimi-coding"
     - option "minimax"
     - option "minimax-cn" [selected]
     - option "mistral"
-    - option "moonshotai"
     - option "moonshotai-cn"
     - option "nvidia"
-    - option "openai"
     - option "opencode"
     - option "opencode-go"
-    - option "openrouter"
     - option "qwen-token-plan"
     - option "qwen-token-plan-cn"
+    - option "qwen-token-plan-individual"
     - option "together"
     - option "vercel-ai-gateway"
-    - option "xai"
     - option "xiaomi"
     - option "xiaomi-token-plan-ams"
     - option "xiaomi-token-plan-cn"
     - option "xiaomi-token-plan-sgp"
-    - option "zai"
     - option "zai-coding-cn"
   - text: API key
   - textbox "API key":
-    - /placeholder: Input API key，or leave blank to use environment authentication
-  - group: CustomSettings
+    - /placeholder: Enter an API key, or leave blank to use environment authentication
+  - group: Customized settings
   - button "Cancel"
-  - button "Save"
+  - button "Apply"
+  - button "Open configuration file":
+    - img
+    - text: Open configuration file
+    - img

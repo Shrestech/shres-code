@@ -18,15 +18,6 @@ exports[`sidebar shell snapshots > renders the collapsed rail after the crossfad
         type="button"
       >
         <svg
-          aria-hidden="true"
-          class="railFish"
-          data-content="2164eee2"
-          fill="none"
-          height="36"
-          viewBox="0 0 623 802"
-          width="28"
-        />
-        <svg
           class="panelIcon"
           data-content="35f95b0c"
           fill="none"
@@ -74,14 +65,6 @@ exports[`sidebar shell snapshots > renders the collapsed rail after the crossfad
           style="display: contents;"
         />
       </div>
-      <div
-        class="settingsArea"
-      >
-        <div
-          data-slot="sidebar.settings"
-          style="display: contents;"
-        />
-      </div>
     </div>
   </div>
 </div>
@@ -104,14 +87,11 @@ exports[`sidebar shell snapshots > renders the expanded column (wordmark, capsul
         class="brand wide"
         type="button"
       >
-        <svg
-          aria-hidden="true"
-          data-content="f7a7aae2"
-          fill="none"
-          height="48"
-          viewBox="0 0 168 48"
-          width="168"
-        />
+        <span
+          class="workspaceTitle"
+        >
+          Workspace
+        </span>
       </button>
       <div
         class="brandActions wide"
@@ -176,14 +156,6 @@ exports[`sidebar shell snapshots > renders the expanded column (wordmark, capsul
       >
         <div
           data-slot="sidebar.footer.action"
-          style="display: contents;"
-        />
-      </div>
-      <div
-        class="settingsArea"
-      >
-        <div
-          data-slot="sidebar.settings"
           style="display: contents;"
         />
       </div>
@@ -209,14 +181,11 @@ exports[`sidebar shell snapshots > renders the expanded column in the default lo
         class="brand wide"
         type="button"
       >
-        <svg
-          aria-hidden="true"
-          data-content="f7a7aae2"
-          fill="none"
-          height="48"
-          viewBox="0 0 168 48"
-          width="168"
-        />
+        <span
+          class="workspaceTitle"
+        >
+          Workspace
+        </span>
       </button>
       <div
         class="brandActions wide"
@@ -281,14 +250,6 @@ exports[`sidebar shell snapshots > renders the expanded column in the default lo
       >
         <div
           data-slot="sidebar.footer.action"
-          style="display: contents;"
-        />
-      </div>
-      <div
-        class="settingsArea"
-      >
-        <div
-          data-slot="sidebar.settings"
           style="display: contents;"
         />
       </div>

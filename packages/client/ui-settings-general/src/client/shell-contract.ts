@@ -1,15 +1,8 @@
-/**
- * Settings shell contract — the types of the `sidebar.settings` occupant this
- * package renders. They live here rather than in ui-settings because they
- * reference the sidebar's own slot type: ui-settings is the settings domain's
- * base layer and must not depend on any `ui-*` presentation package, or the
- * reference graph closes a cycle through ui-sidebar → ui-layout → ui-theme.
- * The settings SLOT types (what registrants contribute) stay in ui-settings.
- */
-import type { HostObservable, InjectFace, PropsRenderSlots, PropsRuntime } from '@shres-code/shres-code-client-ui-slots'
-// Type-only: pulls ui-sidebar's SlotMap merge (the 'sidebar.settings' entry)
+/** Global navigation props and live settings-section projections. */
+import type { HostObservable, InjectFace, PropsLocale, PropsRenderSlots, PropsRuntime } from '@shres-code/shres-code-client-ui-slots'
+// Type-only: pulls ui-layout's SlotMap merge (the 'shell.navigation' entry)
 // into every program that sees this contract.
-import type {} from '@shres-code/shres-code-client-ui-sidebar/client'
+import type {} from '@shres-code/shres-code-client-ui-layout/client'
 // Type-only: pulls the settings slot declarations the shell renders into.
 import type {} from '@shres-code/shres-code-client-ui-settings/client'
 
@@ -40,14 +33,9 @@ export type SettingsRootInjected = {
   }
 }
 
-/**
- * Full component props of the settings shell root: the sidebar owner share
- * (wide/rail state) plus the declared render shares and the injected face
- * (hooks compartment bound to useSections). No store is registered — modal
- * open state and active section id are component-local viewing state.
- */
+/** Frame-owned navigation, contributed sections, and localized shell copy. */
 export type SettingsRootComponentProps =
-  PropsRuntime<'sidebar.settings'>
+  PropsRuntime<'shell.navigation'>
   & PropsRenderSlots<
     | 'settings.trigger'
     | 'settings.header'
@@ -56,4 +44,4 @@ export type SettingsRootComponentProps =
     | 'settings.section'
     | 'settings.onboarding'
   >
-  & InjectFace<SettingsRootInjected>
+  & InjectFace<SettingsRootInjected> & PropsLocale<'settings'>
