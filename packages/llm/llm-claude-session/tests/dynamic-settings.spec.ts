@@ -89,7 +89,7 @@ describe('llm-claude-session settings lifecycle', () => {
 
     expect(ctx!.llm.listProviders().map(provider => provider.id)).toEqual(['claude-session'])
     expect((await ctx!.llm.listModels('claude-session')).map(model => model.id))
-      .toEqual(['claude-opus-5', 'claude-sonnet-5'])
+      .toEqual(['claude-opus-5-5', 'claude-opus-5', 'claude-sonnet-5'])
   })
 
   it('enabled: false in settings withdraws the route and restoring re-registers it', async () => {

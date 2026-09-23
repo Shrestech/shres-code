@@ -536,7 +536,10 @@ export class ClaudeSessionManager {
         ...latest,
         claudeAiOauth: { ...(latest['claudeAiOauth'] as Record<string, unknown>), ...rotated.raw },
       }
-    const json = JSON.stringify(document, null, 2)
+    // One line, no indentation. `security -w` hex-encodes a password that
+    // contains a newline and `find-generic-password -w` then prints that hex,
+    // which is not the document; the CLI's own item is a single JSON line.
+    const json = JSON.stringify(document)
     if (this.options.useKeychain) {
       const write = this.options.writeKeychain ?? this.writeViaSecurity.bind(this)
       await write(KEYCHAIN_SERVICE, this.options.keychainAccount, json)

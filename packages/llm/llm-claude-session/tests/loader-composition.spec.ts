@@ -129,19 +129,27 @@ describe('llm-claude-session real composition', () => {
     expect(request.body['output_config']).toEqual({ effort: 'xhigh' })
   })
 
-  it('sends thinking disabled for the shipped off effort', async () => {
+  it('refuses the off effort the subscription models reject', async () => {
     const ctx = await boot()
     expect(ctx.llm.listProviders().map(provider => provider.id)).toEqual(['claude-session'])
+    // Live 5.x models answer 400 for thinking.type disabled, so the level is
+    // not offered and the refusal is a finish chunk before any request leaves.
     const turn = await assemble({
       model: 'claude-opus-5',
       messages: [],
       reasoningEffort: ReasoningEffortId('off'),
     })
-    expect(turn.text).toBe('hello')
-    expect(turn.chunks).toContainEqual({ type: 'reasoning-delta', index: 0, text: 'mulling it over' })
-    const body = upstream!.requests[0]!.body
-    expect(body['thinking']).toEqual({ type: 'disabled' })
-    expect(body).not.toHaveProperty('output_config')
+    expect(turn.chunks).toContainEqual({
+      type: 'finish',
+      reason: {
+        kind: 'error',
+        failure: {
+          code: 'UNSUPPORTED_REASONING_EFFORT',
+          message: 'provider "claude-session" model "claude-opus-5" does not support reasoning effort "off"',
+        },
+      },
+    })
+    expect(upstream!.requests).toHaveLength(0)
   })
 
   it('disposal withdraws the provider', async () => {

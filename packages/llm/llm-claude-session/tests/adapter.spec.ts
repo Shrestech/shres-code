@@ -68,12 +68,12 @@ describe('llm-claude-session route', () => {
     const context = await boot()
     expect(context.llm.listProviders()).toEqual([{ id: 'claude-session', name: 'Claude (subscription)' }])
     const models = await context.llm.listModels('claude-session')
-    expect(models.map(model => model.id)).toEqual(['claude-opus-5', 'claude-sonnet-5'])
-    const resolved = await context.llm.resolveModelInfo('claude-session', 'claude-opus-5')
+    expect(models.map(model => model.id)).toEqual(['claude-opus-5-5', 'claude-opus-5', 'claude-sonnet-5'])
+    const resolved = await context.llm.resolveModelInfo('claude-session', 'claude-opus-5-5')
     expect(resolved.context).toEqual({ contextWindow: 1_000_000 })
     expect(resolved.inputModalities).toEqual(['text', 'image'])
     expect(resolved.reasoning?.efforts.map(effort => effort.id))
-      .toEqual(['off', 'low', 'medium', 'high', 'xhigh', 'max'])
+      .toEqual(['low', 'medium', 'high', 'xhigh', 'max'])
   })
 
   it('streams reasoning and text with cache usage over the OAuth bearer', async () => {

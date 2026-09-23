@@ -30,13 +30,13 @@ export const DEFAULT_REFRESH_LEEWAY_MS = 300_000
 
 /**
  * Reasoning efforts the subscription models accept, in pi-ai's escalation
- * order. `off` is genuinely servable on an adaptive-thinking model: pi-ai sends
- * `thinking: {type: "disabled"}` for it, which is what the map's empty value
- * leaves in place. `minimal` stays undeclared — the wire has no effort for it,
- * and pi-ai's fallback would alias it to `low`.
+ * order. `off` stays undeclared: the live 5.x models reject
+ * `thinking: {type: "disabled"}` and require adaptive thinking, so pinning
+ * `off` unsupported keeps that parameter off the wire. `minimal` stays
+ * undeclared too — the wire has no effort for it, and pi-ai's fallback would
+ * alias it to `low`.
  */
 const SHIPPED_REASONING_EFFORTS = {
-  off: null,
   low: 'low',
   medium: 'medium',
   high: 'high',
@@ -45,13 +45,24 @@ const SHIPPED_REASONING_EFFORTS = {
 }
 
 /**
- * Models the subscription served when this catalog shipped: capacities,
- * modalities, and the adaptive-thinking requirement as pi-ai's own Anthropic
- * catalog records them, and both ids verified in the installed Claude Code CLI
- * binary. A release this list has not caught up with is a settings `models`
- * entry, not a code change.
+ * Models the subscription served when this catalog shipped: capacities and
+ * the adaptive-thinking requirement as pi-ai's Anthropic catalog records them
+ * for the 5 generation, with `claude-opus-5-5` added from the live
+ * `GET /v1/models` catalog (display name "Claude Opus 5.5", the same 1,000,000 /
+ * 128,000 capacities, adaptive thinking only). A release this list has not
+ * caught up with is a settings `models` entry, not a code change.
  */
 export const SHIPPED_MODELS: readonly ClaudeSessionModelConfig[] = [
+  {
+    id: 'claude-opus-5-5',
+    name: 'Claude Opus 5.5',
+    contextWindow: 1_000_000,
+    maxTokens: 128_000,
+    input: ['text', 'image'],
+    // The live model rejects budget thinking and, like Opus past 4.5, a stated
+    // temperature. Adaptive thinking with an effort is the only thinking mode.
+    compat: { forceAdaptiveThinking: true, supportsTemperature: false },
+  },
   {
     id: 'claude-opus-5',
     name: 'Claude Opus 5',

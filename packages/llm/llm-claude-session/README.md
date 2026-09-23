@@ -27,12 +27,12 @@ The optional `llm-claude-session` settings section overlays the composition entr
 | `useKeychain` | `true` on macOS, `false` elsewhere | Read the login keychain instead of the credential document. |
 | `baseURL` | `https://api.anthropic.com` | Endpoint base; the vendor SDK appends `/v1/messages`. |
 | `displayName` | `Claude (subscription)` | Selector label. |
-| `models` | `claude-opus-5`, `claude-sonnet-5` (both `text`+`image`, 1,000,000 context, 128,000 output; efforts `off`/`low`/`medium`/`high`/`xhigh`/`max`) | Catalog; a new release is a settings entry, not a code change. |
+| `models` | `claude-opus-5-5`, `claude-opus-5`, `claude-sonnet-5` (each `text`+`image`, 1,000,000 context, 128,000 output; efforts `low`/`medium`/`high`/`xhigh`/`max`) | Catalog; a new release is a settings entry, not a code change. |
 | `refreshLeewayMs` | `300000` | Refresh when the token is at or within this distance of expiry. |
 
 The section declares no `headers` field: pi-ai builds the OAuth request's header set (the `claude-code` and `oauth` betas, the pinned CLI user-agent, `x-app`) and merges configured headers over it later-wins, so a route header would replace the beta set the subscription login needs rather than add to it.
 
-An Opus 5.5 release ships as a settings `models` entry carrying the published capacities and `compat: { forceAdaptiveThinking: true }` once its model id is confirmed against the served catalog; the shipped list holds the two ids the installed CLI and pi-ai's catalog both name today.
+`claude-opus-5-5` is the live catalog's "Claude Opus 5.5" (`GET /v1/models`, 2026-09-21). It shares the 5 generation's capacities and, like Opus 5, rejects both a stated temperature and `thinking: {type: "disabled"}`, so its entry carries the same compat and the route does not offer `off`.
 
 ## Model Experience
 
@@ -50,7 +50,7 @@ You are Claude Code, Anthropic's official CLI for Claude.
 
 #### Token effect
 
-Usage chunks carry Anthropic's reported input/output counts, with thinking tokens folded into the output count by pi-ai, and the cache-creation/cache-read counts as reported. Each shipped model declares 128,000 output tokens, which a configured entry can change through `maxTokens` (it also becomes that model's per-request default); both shipped models declare `input: ['text', 'image']`, which admits image blocks (vision).
+Usage chunks carry Anthropic's reported input/output counts, with thinking tokens folded into the output count by pi-ai, and the cache-creation/cache-read counts as reported. Each shipped model declares 128,000 output tokens, which a configured entry can change through `maxTokens` (it also becomes that model's per-request default); every shipped model declares `input: ['text', 'image']`, which admits image blocks (vision).
 
 #### KV Cache effect
 
@@ -59,9 +59,8 @@ Provider-side. Anthropic reports prompt-cache hits and writes inside its usage, 
 ## Known Limitations and Deferred Work
 
 - **Unofficial wire** — the keychain service name (`Claude Code-credentials`), the `claudeAiOauth` document fields, the `claude-code-20250219` / `oauth-2025-04-20` beta set, and the identity system block are the CLI's implementation details, not a published contract; a CLI update can change them, and the failure at request time names the sign-in step.
-- **Harness attribution replaces pi-ai's CLI user-agent** — the beta set and `x-app: cli` reach the subscription endpoint, but the `User-Agent` header is Harness app attribution on every provider request ([mandatory attribution](../../../.agents/notes/implemented/architecture/2026-06-21-mandatory-app-attribution-headers.md)), applied through pi-ai's later-wins options merge over the `claude-cli/2.1.75` value pi-ai pins for OAuth requests. Whether the endpoint accepts the harness identity is unverified; correcting it is a decision about attribution versus CLI identity in `shres-code-llm-pi-ai` or pi-ai, not a route setting. A new required beta or a server-side floor bump is likewise a pi-ai upgrade.
-- **`?beta=true` unverified** — the Anthropic SDK builds `baseURL + /v1/messages` with no query string, and no query can be smuggled through `baseURL` or headers; if the subscription endpoint turns out to require it, the fix belongs upstream in pi-ai.
-- **Thinking-disabled acceptance unverified** — an effort of `off` sends `thinking: {type: "disabled"}` on these adaptive-thinking models; that the subscription endpoint accepts the explicit disabled mode (as the shipped catalog's absence of an `off` pin implies) awaits a live request.
+- **Harness attribution replaces pi-ai's CLI user-agent** — the beta set and `x-app: cli` reach the subscription endpoint, but the `User-Agent` header is Harness app attribution on every provider request ([mandatory attribution](../../../.agents/notes/implemented/architecture/2026-06-21-mandatory-app-attribution-headers.md)), applied through pi-ai's later-wins options merge over the `claude-cli/2.1.75` value pi-ai pins for OAuth requests. A live Opus 5.5 turn was accepted with that harness identity, so no CLI user-agent is required. A new required beta or a server-side floor bump is a pi-ai upgrade.
+- **No thinking-off mode** — the live 5.x models reject `thinking: {type: "disabled"}` (the error names adaptive thinking plus `output_config.effort`), so `off` is not offered. A request that names no effort sends no thinking field, which the endpoint accepts; `POST /v1/messages` needs no `?beta=true` query.
 - **`expires_at` unit assumed** — the grant parser reads `expires_at` as epoch milliseconds, matching the store's own convention, and falls back to `expires_in` seconds; a live rotation that states the other unit would persist a wrong expiry.
 - **Refresh races are resolved by adoption, not prevention** — a sibling that refreshes concurrently wins the store; this adapter adopts its session rather than clobbering it. The refresh token is single-use, so a grant this process already started cannot be un-spent.
 - **Keychain account mismatch** — a rotation writes its item under the configured `keychainAccount` (the OS user name by default); a CLI whose item lives under a different account keeps its own value, which `keychainAccount` corrects.

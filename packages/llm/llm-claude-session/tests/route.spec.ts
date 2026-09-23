@@ -18,7 +18,7 @@ import {
   SHIPPED_MODELS,
 } from '../src/index.ts'
 
-const SHIPPED_EFFORTS = { off: null, low: 'low', medium: 'medium', high: 'high', xhigh: 'xhigh', max: 'max' }
+const SHIPPED_EFFORTS = { low: 'low', medium: 'medium', high: 'high', xhigh: 'xhigh', max: 'max' }
 
 describe('resolveRoute', () => {
   it('resolves the one anthropic-messages route with its deployment defaults', () => {
@@ -37,20 +37,24 @@ describe('resolveRoute', () => {
   })
 
   it('ships the subscription catalog with its per-model compat and efforts', () => {
-    expect(SHIPPED_MODELS.map(model => model.id)).toEqual(['claude-opus-5', 'claude-sonnet-5'])
+    expect(SHIPPED_MODELS.map(model => model.id)).toEqual(['claude-opus-5-5', 'claude-opus-5', 'claude-sonnet-5'])
     const models = resolveRoute({}).models ?? []
-    expect(models.map(model => model.id)).toEqual(['claude-opus-5', 'claude-sonnet-5'])
+    expect(models.map(model => model.id)).toEqual(['claude-opus-5-5', 'claude-opus-5', 'claude-sonnet-5'])
     expect(models[0]).toMatchObject({
-      id: 'claude-opus-5',
-      name: 'Claude Opus 5',
+      id: 'claude-opus-5-5',
+      name: 'Claude Opus 5.5',
       contextWindow: 1_000_000,
       maxTokens: 128_000,
       input: ['text', 'image'],
       compat: { forceAdaptiveThinking: true, supportsTemperature: false },
     })
+    expect(models[1]).toMatchObject({
+      id: 'claude-opus-5',
+      compat: { forceAdaptiveThinking: true, supportsTemperature: false },
+    })
     // Sonnet accepts a temperature, so its entry must not declare one absent.
-    expect(models[1]).toMatchObject({ id: 'claude-sonnet-5', compat: { forceAdaptiveThinking: true } })
-    expect(models[1]?.compat).not.toHaveProperty('supportsTemperature')
+    expect(models[2]).toMatchObject({ id: 'claude-sonnet-5', compat: { forceAdaptiveThinking: true } })
+    expect(models[2]?.compat).not.toHaveProperty('supportsTemperature')
     for (const model of models) expect(model.reasoningEfforts).toEqual(SHIPPED_EFFORTS)
   })
 

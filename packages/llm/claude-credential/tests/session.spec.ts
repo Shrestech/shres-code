@@ -537,6 +537,9 @@ describe('ClaudeSessionManager keychain write', () => {
     const write = writes[0]!
     expect(write.service).toBe(KEYCHAIN_SERVICE)
     expect(write.account).toBe('configured-account')
+    // security -w hex-encodes a password that contains a newline, and the
+    // read path would then not see a document. The writer hands it one line.
+    expect(write.json).not.toContain('\n')
     const document = JSON.parse(write.json) as Record<string, unknown>
     expect(document['unknownRootSibling']).toBe('kept')
     expect(document['mcpOAuth']).toEqual(MCP_OAUTH)
