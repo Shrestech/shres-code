@@ -8,17 +8,9 @@ the shell's `shres-app://` handler forwards into.
 
 ## Composition
 
-`runDesktopHost(runtimeDir, projectDir, writeResponse, options)` writes the
-project's composition root, loads the project profile with
-`loadProfileDirectory` (the desktop owns profile creation — no template
-auto-init), and layers the shipped `config/desktop.cordis.patch.yml` over the
-base + web-app bundle rows: `web-startup`, `webserver`, `web-runtime`, and
-`client-hmr` are disabled, the `connection` row is re-scoped but stays
-inactive on its own (its node half still injects `webServer`, which never
-activates without a webserver — so the host owns the `/api` handler directly),
-and the native directory-picker pair is inserted in place of the
-bind-dependent auto picker. The profile's listed bundles must resolve inside the runtime or project
-trees unless the development launch option allows linked packages.
+`runDesktopHost(runtimeDir, projectDir, writeResponse, options)` writes the project's composition root, loads the project profile with `loadProfileDirectory` (the desktop owns profile creation — no template auto-init), and layers the shipped `config/desktop.cordis.patch.yml` over the base + web-app bundle rows: `web-startup`, `webserver`, `web-runtime`, and `client-hmr` are disabled. The host provides no-op `webServer` metadata so the client node halves can register and dispose without binding a socket, then owns `/api` dispatch through the connection service or its `HostConnectionService` fallback. The native directory-picker pair is inserted in place of the bind-dependent auto picker. The profile's listed bundles must resolve inside the runtime or project trees unless the development launch option allows linked packages.
+
+The executable entrypoint calls `healProfilesModuleFallback` with the installed `@shres-code/shres-code-desktop-host/package.json` before it opens the pipes. That links the installed dependency closure under `$SHRES_HOME/profiles/node_modules` for the profile's Node parent walk. Exported `runDesktopHost` remains an explicit API and does not heal or mutate that home fallback.
 
 ## Dispatch
 

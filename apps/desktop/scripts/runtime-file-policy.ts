@@ -43,11 +43,13 @@ const PER_PLATFORM_PACKAGES: readonly PerPlatformPackage[] = [
  * node_modules tree, including nested package containers.
  * @param path - Path relative to the production node_modules directory.
  * @param target - Platform and architecture of the bundled Node executable.
+ * @param isDirectory - Whether the path is a directory that must be traversed.
  * @returns Omission reason, or undefined when the entry must be copied.
  */
 export function desktopRuntimeFileExclusion(
   path: string,
   target: { readonly platform: NodeJS.Platform; readonly arch: string },
+  isDirectory = false,
 ): string | undefined {
   const parts = path.split(/[\\/]/u)
   if (parts.some(part => PACKAGE_MANAGER_ENTRIES.includes(part))) return 'package-manager metadata'
@@ -71,7 +73,12 @@ export function desktopRuntimeFileExclusion(
     if (/^build\/(?:Release|Debug)\/(?:\.deps|obj\.target)(?:\/|$)/u.test(entry)) return 'node-pty compiler output'
   }
   if (name === 'koffi') {
-    if (entry === 'src' || entry.startsWith('src/')) return 'Koffi native sources'
+    // Koffi's package entry imports the bundled JavaScript from src/koffi;
+    // only the C/C++ implementation sources and build headers are removable.
+    if (entry === 'src' || entry.startsWith('src/koffi')) {
+      if (isDirectory || /\.[cm]?js$/u.test(file)) return undefined
+      return 'Koffi native sources'
+    }
     if (entry === 'lib/native' || entry.startsWith('lib/native/')) return 'Koffi native sources'
     if (entry === 'vendor' || entry.startsWith('vendor/')) return 'Koffi build headers'
   }

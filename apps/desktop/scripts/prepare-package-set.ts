@@ -14,7 +14,12 @@ import {
 } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
-import { releaseFamily, tarballName, type ReleaseMember } from '../../../scripts/release/families.ts'
+import {
+  PRIVATE_DESKTOP_PACKAGE_ENTRIES,
+  releaseFamily,
+  tarballName,
+  type ReleaseMember,
+} from '../../../scripts/release/families.ts'
 import { run } from '../../../scripts/release/process.ts'
 import { packedIdentity, tarballFiles } from '../../../scripts/release/tarball.ts'
 import { resolveDesktopTargetBuildPaths, type DesktopTargetBuildPaths } from './desktop-build-paths.ts'
@@ -45,7 +50,10 @@ const CLOSURE_ROOTS: readonly string[] = [
 const HOST_RUNTIME_FILES: readonly string[] = ['lib/index.js', 'config/desktop.cordis.patch.yml']
 
 /** Manifests no release family covers; these packages join the closure as workspace members. */
-const FAMILY_FREE_MANIFEST_GLOB = 'native/landlock-run/packages/*/package.json'
+const FAMILY_FREE_MANIFEST_GLOBS: readonly string[] = [
+  'native/landlock-run/packages/*/package.json',
+  `${PRIVATE_DESKTOP_PACKAGE_ENTRIES.host.directory}/package.json`,
+]
 
 /** Dependency sections every selected member must resolve inside the closure. */
 const REQUIRED_DEPENDENCY_SECTIONS: readonly string[] = ['dependencies', 'peerDependencies']
@@ -111,7 +119,9 @@ function workspaceCatalog(): Map<string, ReleaseMember> {
       catalog.set(member.name, member)
     }
   }
-  for (const manifestPath of globSync(FAMILY_FREE_MANIFEST_GLOB, { cwd: REPOSITORY_ROOT }).sort()) {
+  for (const manifestPath of FAMILY_FREE_MANIFEST_GLOBS.flatMap(pattern => (
+    globSync(pattern, { cwd: REPOSITORY_ROOT })
+  )).sort()) {
     const manifest = readManifest(join(REPOSITORY_ROOT, manifestPath))
     const name = manifest.name
     const version = manifest.version

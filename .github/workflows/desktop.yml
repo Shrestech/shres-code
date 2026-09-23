@@ -1,67 +1,366 @@
-# Desktop lane: build the Electron shell and desktop host, run their suites.
-# Stage A covers build + tests only — packaging (unsigned --dir artifacts,
-# prepare-runtime/package-set) lands with the packaging scripts and extends
-# this workflow then.
+# Build and package the desktop application on GitHub's arm64 macOS image.
+# Pull requests and branch pushes produce unsigned validation artifacts. A
+# manual dispatch from a matching shres-v* tag is the only path that can use
+# release credentials or create a public GitHub release.
 name: desktop
 
 on:
+  pull_request:
   push:
     branches: [master, develop]
-  pull_request:
-    paths:
-      - 'apps/desktop/**'
-      - 'apps/desktop-host/**'
-      - 'packages/client/connection/**'
-      - 'packages/client/modules/**'
-      - 'packages/boot/app-boot/**'
-      - '.github/workflows/desktop.yml'
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish a signed and notarized desktop release. Must run from a matching shres-v* tag.
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
 
 concurrency:
-  group: desktop-${{ github.ref }}
-  cancel-in-progress: true
+  group: desktop-${{ github.workflow }}-${{ github.ref }}
+  # A release dispatch must finish once it has passed the environment gate;
+  # stale validation runs may be replaced while they are still on a branch.
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' || inputs.publish != true }}
 
 env:
   PRIMARY_NODE_VERSION: '24'
+  SHRES_TELEMETRY_DISABLED: '1'
 
 jobs:
   desktop:
-    runs-on: macos-14
-    timeout-minutes: 40
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: ${{ env.PRIMARY_NODE_VERSION }}
-          cache: pnpm
-      - run: pnpm install
-        env:
-          # Electron's postinstall downloads the runtime binary.
-          SHRES_ALLOW_ELECTRON_BUILD: '1'
-      - run: pnpm run build:lib
-      - run: pnpm exec vitest run apps/desktop apps/desktop-host
-      - run: pnpm run typecheck
-
-  package:
+    name: Build and test desktop
     runs-on: macos-14
     timeout-minutes: 60
-    needs: desktop
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Confirm arm64 runner
+        run: test "$(uname -m)" = arm64
+
       - uses: pnpm/action-setup@v6
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm
+
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.PRIMARY_NODE_VERSION }}
           cache: pnpm
-      - run: pnpm install
+
+      - name: Install (immutable)
+        run: pnpm install --frozen-lockfile
         env:
           # Electron's postinstall downloads the runtime binary.
           SHRES_ALLOW_ELECTRON_BUILD: '1'
-      - name: Package unsigned dir build
-        run: pnpm --filter @shres-code/shres-code-desktop run package:dir
-      - name: Upload application bundle
+
+      - name: Build runtime and web
+        run: pnpm run build
+
+      - name: Test desktop packages
+        run: pnpm exec vitest run apps/desktop apps/desktop-host
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+  package:
+    name: Package unsigned desktop artifacts
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.publish != true }}
+    needs: desktop
+    runs-on: macos-14
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Confirm arm64 runner
+        run: test "$(uname -m)" = arm64
+
+      - uses: pnpm/action-setup@v6
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install (immutable)
+        run: pnpm install --frozen-lockfile
+        env:
+          SHRES_ALLOW_ELECTRON_BUILD: '1'
+
+      - name: Build runtime and web
+        run: pnpm run build
+
+      - name: Package unsigned DMG and ZIP
+        run: pnpm --filter @shres-code/shres-code-desktop run package
+        # With no SHRES_DESKTOP_RELEASE value, electron-builder uses the
+        # ad-hoc identity. Release credentials are available only below.
+
+      - name: Smoke packaged desktop runtime
+        run: pnpm --filter @shres-code/shres-code-desktop run smoke
+
+      - name: Smoke extracted ZIP desktop runtime
+        shell: bash
+        run: |
+          artifact_dir="apps/desktop/.desktop-build/targets/mac-arm64/artifacts"
+          shopt -s nullglob
+          zips=("$artifact_dir"/*.zip)
+          if (( ${#zips[@]} != 1 )); then
+            echo "Expected one ZIP before extracted smoke, found ${#zips[@]}." >&2
+            exit 1
+          fi
+          extract_dir="$(mktemp -d "$RUNNER_TEMP/shres-code-zip.XXXXXX")"
+          ditto -x -k "${zips[0]}" "$extract_dir"
+          app_bundle="$(find "$extract_dir" -type d -name 'Shres Code.app' -print -quit)"
+          if [[ -z "$app_bundle" ]]; then
+            echo 'The ZIP did not contain a Shres Code.app bundle.' >&2
+            exit 1
+          fi
+          pnpm --filter @shres-code/shres-code-desktop run smoke \
+            --runtime "$app_bundle/Contents/Resources/shres" \
+            --node "$app_bundle/Contents/MacOS/Shres Code"
+
+      - name: Generate checksums
+        shell: bash
+        run: |
+          artifact_dir="apps/desktop/.desktop-build/targets/mac-arm64/artifacts"
+          test -d "$artifact_dir"
+          shopt -s nullglob
+          dmgs=("$artifact_dir"/*.dmg)
+          zips=("$artifact_dir"/*.zip)
+          if (( ${#dmgs[@]} != 1 || ${#zips[@]} != 1 )); then
+            echo "Expected one DMG and one ZIP, found ${#dmgs[@]} DMGs and ${#zips[@]} ZIPs." >&2
+            exit 1
+          fi
+          artifacts=("${dmgs[@]}" "${zips[@]}")
+          names=()
+          for artifact in "${artifacts[@]}"; do
+            names+=("${artifact##*/}")
+          done
+          (cd "$artifact_dir" && shasum -a 256 -- "${names[@]}" > SHA256SUMS.txt)
+
+      - name: Upload unsigned artifacts
         uses: actions/upload-artifact@v4
         with:
           name: shres-code-mac-arm64
-          path: apps/desktop/.desktop-build/targets/mac-arm64/artifacts/mac-arm64/Shres Code.app
+          path: |
+            apps/desktop/.desktop-build/targets/mac-arm64/artifacts/*.dmg
+            apps/desktop/.desktop-build/targets/mac-arm64/artifacts/*.zip
+            apps/desktop/.desktop-build/targets/mac-arm64/artifacts/SHA256SUMS.txt
+          if-no-files-found: error
           retention-days: 7
+
+  release-validate:
+    name: Validate release ref
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish == true }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+
+      - name: Require matching shres-v tag
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF_TYPE" != tag || "$GITHUB_REF_NAME" != shres-v* ]]; then
+            echo 'publish must be dispatched from a shres-v* tag.' >&2
+            exit 1
+          fi
+          tag_commit="$(git rev-list -n 1 "$GITHUB_REF_NAME")"
+          if [[ "$tag_commit" != "$GITHUB_SHA" ]]; then
+            echo "Tag $GITHUB_REF_NAME does not point to the dispatch commit $GITHUB_SHA." >&2
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/master; then
+            echo "Release commit $GITHUB_SHA is not an ancestor of origin/master." >&2
+            exit 1
+          fi
+          tag_version="${GITHUB_REF_NAME#shres-v}"
+          app_version="$(node -p "require('./apps/desktop/package.json').version")"
+          if [[ "$tag_version" != "$app_version" ]]; then
+            echo "Tag version $tag_version does not match apps/desktop/package.json version $app_version." >&2
+            exit 1
+          fi
+
+  publish:
+    name: Publish signed desktop release
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish == true }}
+    needs: [desktop, release-validate]
+    runs-on: macos-14
+    timeout-minutes: 120
+    # Required reviewers and the release secrets belong to this environment.
+    # No pull request or ordinary branch build can enter this job.
+    environment: desktop-release
+    permissions:
+      contents: write
+    concurrency:
+      group: desktop-release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Confirm arm64 runner
+        run: test "$(uname -m)" = arm64
+
+      - uses: pnpm/action-setup@v6
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install (immutable)
+        run: pnpm install --frozen-lockfile
+        env:
+          SHRES_ALLOW_ELECTRON_BUILD: '1'
+
+      - name: Validate release tag and desktop version
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF_TYPE" != tag || "$GITHUB_REF_NAME" != shres-v* ]]; then
+            echo 'publish must be dispatched from a shres-v* tag.' >&2
+            exit 1
+          fi
+          tag_version="${GITHUB_REF_NAME#shres-v}"
+          app_version="$(node -p "require('./apps/desktop/package.json').version")"
+          if [[ "$tag_version" != "$app_version" ]]; then
+            echo "Tag version $tag_version does not match apps/desktop/package.json version $app_version." >&2
+            exit 1
+          fi
+          echo "RELEASE_VERSION=$app_version" >> "$GITHUB_ENV"
+
+      - name: Verify release credentials
+        shell: bash
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          for variable in CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
+            if [[ -z "${!variable}" ]]; then
+              echo "desktop-release environment is missing $variable." >&2
+              exit 1
+            fi
+          done
+
+      - name: Build runtime and web
+        run: pnpm run build
+
+      - name: Package signed and notarized DMG and ZIP
+        run: pnpm --filter @shres-code/shres-code-desktop run package
+        env:
+          SHRES_DESKTOP_RELEASE: '1'
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Smoke packaged desktop runtime
+        run: pnpm --filter @shres-code/shres-code-desktop run smoke
+
+      - name: Smoke extracted ZIP desktop runtime
+        shell: bash
+        run: |
+          artifact_dir="apps/desktop/.desktop-build/targets/mac-arm64/artifacts"
+          shopt -s nullglob
+          zips=("$artifact_dir"/*.zip)
+          if (( ${#zips[@]} != 1 )); then
+            echo "Expected one signed ZIP before extracted smoke, found ${#zips[@]}." >&2
+            exit 1
+          fi
+          extract_dir="$(mktemp -d "$RUNNER_TEMP/shres-code-signed-zip.XXXXXX")"
+          ditto -x -k "${zips[0]}" "$extract_dir"
+          app_bundle="$(find "$extract_dir" -type d -name 'Shres Code.app' -print -quit)"
+          if [[ -z "$app_bundle" ]]; then
+            echo 'The signed ZIP did not contain a Shres Code.app bundle.' >&2
+            exit 1
+          fi
+          echo "SHRES_DESKTOP_ZIP_APP=$app_bundle" >> "$GITHUB_ENV"
+          pnpm --filter @shres-code/shres-code-desktop run smoke \
+            --runtime "$app_bundle/Contents/Resources/shres" \
+            --node "$app_bundle/Contents/MacOS/Shres Code"
+
+      - name: Verify signed and notarized application
+        shell: bash
+        run: |
+          app_bundle="${SHRES_DESKTOP_ZIP_APP:-}"
+          if [[ -z "$app_bundle" || ! -d "$app_bundle" ]]; then
+            echo 'The extracted ZIP application bundle was not found for signature verification.' >&2
+            exit 1
+          fi
+          codesign --verify --deep --strict --verbose=2 "$app_bundle"
+          spctl --assess --type execute --verbose=2 "$app_bundle"
+          xcrun stapler validate "$app_bundle"
+
+      - name: Generate release checksums
+        shell: bash
+        run: |
+          artifact_dir="apps/desktop/.desktop-build/targets/mac-arm64/artifacts"
+          test -d "$artifact_dir"
+          shopt -s nullglob
+          dmgs=("$artifact_dir"/*.dmg)
+          zips=("$artifact_dir"/*.zip)
+          if (( ${#dmgs[@]} != 1 || ${#zips[@]} != 1 )); then
+            echo "Expected one signed DMG and one signed ZIP, found ${#dmgs[@]} DMGs and ${#zips[@]} ZIPs." >&2
+            exit 1
+          fi
+          artifacts=("${dmgs[@]}" "${zips[@]}")
+          names=()
+          for artifact in "${artifacts[@]}"; do
+            names+=("${artifact##*/}")
+          done
+          (cd "$artifact_dir" && shasum -a 256 -- "${names[@]}" > SHA256SUMS.txt)
+
+      - name: Upload signed artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: shres-code-mac-arm64-release-${{ github.run_id }}
+          path: |
+            apps/desktop/.desktop-build/targets/mac-arm64/artifacts/*.dmg
+            apps/desktop/.desktop-build/targets/mac-arm64/artifacts/*.zip
+            apps/desktop/.desktop-build/targets/mac-arm64/artifacts/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          artifact_dir="apps/desktop/.desktop-build/targets/mac-arm64/artifacts"
+          shopt -s nullglob
+          release_files=("$artifact_dir"/*.dmg "$artifact_dir"/*.zip "$artifact_dir"/SHA256SUMS.txt)
+          release_flags=(--verify-tag --draft --title "Shres Code $RELEASE_VERSION" --generate-notes)
+          if [[ "$RELEASE_VERSION" == *-* ]]; then
+            release_flags+=(--prerelease --latest=false)
+            publish_flags=(--draft=false --latest=false)
+          else
+            release_flags+=(--latest)
+            publish_flags=(--draft=false --latest)
+          fi
+          gh release create "$GITHUB_REF_NAME" \
+            "${release_flags[@]}"
+          gh release upload "$GITHUB_REF_NAME" "${release_files[@]}"
+          gh release edit "$GITHUB_REF_NAME" "${publish_flags[@]}"

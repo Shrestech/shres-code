@@ -20,6 +20,7 @@ import type { PatchOptions } from '@shres-code/cordis-plugin-include'
 import {
   boot,
   composeEntries,
+  healProfilesModuleFallback,
   loadLayeredEnv,
   loadOverlayPatches,
   loadProfileDirectory,
@@ -474,6 +475,9 @@ async function main(): Promise<void> {
   if (option !== undefined && option !== '--allow-linked-profile') {
     throw new Error(`${NAME}: unsupported internal option ${JSON.stringify(option)}`)
   }
+  // Client package metadata resolves from the profile's ordinary Node parent
+  // walk, just as it does for the CLI's named profiles.
+  healProfilesModuleFallback(packageManifestPath(runtimeDir, '@shres-code/shres-code-desktop-host'))
   const requestPipe = createReadStream('', { fd: DESKTOP_REQUEST_PIPE_FD, autoClose: false })
   const responsePipe = createWriteStream('', { fd: DESKTOP_RESPONSE_PIPE_FD, autoClose: false })
   let responseWriteTail: Promise<void> = Promise.resolve()

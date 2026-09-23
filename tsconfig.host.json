@@ -94,6 +94,7 @@
     "apps/cli/tests/**/*.ts",
     "apps/desktop-host/tests/**/*.ts",
     "apps/desktop/tests/**/*.ts",
+    "apps/desktop/scripts/**/*.ts",
     "examples/*/src/**/*.ts",
     "examples/*/start.ts",
     "examples/*/tests/**/*.ts",

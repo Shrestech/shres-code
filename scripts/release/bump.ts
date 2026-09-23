@@ -3,7 +3,8 @@
  * readable from the repository rather than derived inside CI
  * ([rationale](../../.agents/notes/implemented/process/2026-08-10-npm-release-sequences.md)).
  *
- * The shres family shares one version across its members and the workspace root:
+ * The shres family shares one version across its published members, the
+ * workspace root, and the private desktop manifests:
  * `major`, `minor`, `patch`, or an explicit `x.y.z` (including a prerelease such
  * as `0.0.1-rc.1`). The vendored family has one version line per package, but
  * every release advances and publishes the complete family so the next release
@@ -17,7 +18,12 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join, matchesGlob } from 'node:path'
 import { parseArgs } from 'node:util'
-import { releaseFamily, type ReleaseFamily, type ReleaseMember } from './families.ts'
+import {
+  PRIVATE_DESKTOP_PACKAGE_ENTRIES,
+  releaseFamily,
+  type ReleaseFamily,
+  type ReleaseMember,
+} from './families.ts'
 import { capture, isEntry } from './process.ts'
 
 /** Files npm publishes whether or not `files` lists them. */
@@ -236,7 +242,35 @@ function rootVersion(root: string): string {
 }
 
 /**
- * Plan the shres family's rewrite: one version for every member and the root.
+ * Plan the private desktop manifests that share the shres version without
+ * entering the npm release family.
+ * @param root - repository root.
+ * @param expectedVersion - current workspace root version.
+ * @param nextVersion - target shared version.
+ * @returns private desktop manifests to rewrite.
+ */
+function planPrivateDesktopVersions(root: string, expectedVersion: string, nextVersion: string): PlannedVersion[] {
+  return Object.values(PRIVATE_DESKTOP_PACKAGE_ENTRIES).map((entry) => {
+    const manifestPath = join(entry.directory, 'package.json')
+    const manifest: unknown = JSON.parse(readFileSync(join(root, manifestPath), 'utf8'))
+    const version = (manifest as Record<string, unknown>).version
+    if (typeof version !== 'string') throw new Error(`${manifestPath} must declare a string version`)
+    if (version !== expectedVersion) {
+      throw new Error(`${manifestPath} version ${version} must match workspace root version ${expectedVersion}`)
+    }
+    return {
+      manifestPath,
+      label: entry.directory,
+      from: version,
+      to: nextVersion,
+      tag: undefined,
+    }
+  })
+}
+
+/**
+ * Plan the shres family's rewrite: one version for every member, the root, and
+ * the private desktop manifests that stay outside npm publication.
  * @param family - the shres family.
  * @param root - repository root.
  * @param members - the family's members.
@@ -254,8 +288,10 @@ function planShared(
   const version = nextSharedVersion(first.version, request)
   // The workspace root carries the family version too: the workspace constraint
   // requires every member's version to equal the root's.
+  const currentRootVersion = rootVersion(root)
   const planned: PlannedVersion[] = [
-    { manifestPath: ROOT_MANIFEST, label: ROOT_MANIFEST, from: rootVersion(root), to: version, tag: undefined },
+    { manifestPath: ROOT_MANIFEST, label: ROOT_MANIFEST, from: currentRootVersion, to: version, tag: undefined },
+    ...planPrivateDesktopVersions(root, currentRootVersion, version),
   ]
   for (const member of members) {
     planned.push({

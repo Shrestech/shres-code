@@ -1,7 +1,14 @@
 /** Release family discovery, publish order, tag naming, and the bump judgements. */
 
+import { execFileSync } from 'node:child_process'
+import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { releaseFamily, type ReleaseMember } from './families.ts'
+import {
+  isPrivateDesktopPackage,
+  PRIVATE_DESKTOP_PACKAGE_ENTRIES,
+  releaseFamily,
+  type ReleaseMember,
+} from './families.ts'
 import { compareVersions, nextVendorVersion, reachesPayload } from './bump.ts'
 
 /**
@@ -16,6 +23,29 @@ function member(directory: string, name: string, manifest: Record<string, unknow
 }
 
 describe('release families', () => {
+  it('keeps the private desktop shell and host out of npm family discovery', () => {
+    const root = resolve(import.meta.dirname, '../..')
+    const members = releaseFamily('shres').members(root)
+
+    expect(members.some(member => member.directory === PRIVATE_DESKTOP_PACKAGE_ENTRIES.shell.directory)).toBe(false)
+    expect(members.some(member => member.directory === PRIVATE_DESKTOP_PACKAGE_ENTRIES.host.directory)).toBe(false)
+    expect(isPrivateDesktopPackage('apps/desktop', '@shres-code/shres-code-desktop')).toBe(true)
+    expect(isPrivateDesktopPackage('apps/desktop', '@shres-code/shres-code-web-frontend')).toBe(false)
+    expect(isPrivateDesktopPackage('apps/desktop-host', '@shres-code/shres-code-desktop-host')).toBe(true)
+  })
+
+  it('keeps private desktop versions in the shared shres bump plan', () => {
+    const root = resolve(import.meta.dirname, '../..')
+    const output = execFileSync(process.execPath, ['--import', 'tsx/esm', 'scripts/release/bump.ts', '--family', 'shres', '--dry-run', 'patch'], {
+      cwd: root,
+      encoding: 'utf8',
+    })
+
+    expect(output).toMatch(/\n  apps\/desktop: [^ ]+ -> [^ ]+/u)
+    expect(output).toMatch(/\n  apps\/desktop-host: [^ ]+ -> [^ ]+/u)
+    expect(output).toContain('release bump: dry run, nothing written')
+  })
+
   it('names one tag for the whole shres family and one per vendored package', () => {
     const shres = releaseFamily('shres')
     const vendor = releaseFamily('vendor')
