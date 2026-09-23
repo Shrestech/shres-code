@@ -146,6 +146,8 @@ async function serveShellAsset(request: Request): Promise<Response> {
 }
 
 async function main(): Promise<void> {
+  // Unpackaged macOS launches inherit Electron's bundle icon.
+  if (!app.isPackaged) app.dock?.setIcon(join(app.getAppPath(), 'build', 'icon.png'))
   const resources = runtimeResources()
   const paths = resolveDesktopPaths()
   const development = app.isPackaged ? undefined : resources.runtime
