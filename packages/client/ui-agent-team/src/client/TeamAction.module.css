@@ -1,39 +1,41 @@
 .action {
-  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 .trigger {
-  padding: 4px 10px;
-  border: none;
+  width: 100%;
+  padding: 8px 9px;
+  border: 1px solid transparent;
   border-radius: 6px;
   background: transparent;
   color: var(--dsw-alias-label-secondary);
   font: inherit;
   font-size: 13px;
+  text-align: left;
   cursor: pointer;
 }
 
 .trigger:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
+  border-color: var(--dsw-alias-border-l2);
+  background: var(--dsw-alias-interactive-bg-hover-accent);
+  color: var(--dsw-alias-brand-primary);
 }
 
 .trigger[aria-expanded="true"] {
-  color: var(--dsw-alias-label-primary);
+  border-color: var(--dsw-alias-border-l2);
+  background: var(--dsw-alias-interactive-bg-hover-accent);
+  color: var(--dsw-alias-brand-primary);
 }
 
 .panel {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  z-index: 30;
-  width: 320px;
+  width: 100%;
   max-height: 380px;
   overflow: auto;
-  padding: 10px 12px;
-  border: 1px solid var(--dsw-alias-border-l3);
-  border-radius: 8px;
-  background: var(--dsw-alias-bg-module-platform);
-  box-shadow: var(--dsw-shadow-lv3);
+  padding: 8px 9px;
+  border-top: 1px solid var(--dsw-alias-border-l2);
+  background: transparent;
 }
 
 .panelTitle {
@@ -60,8 +62,8 @@
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  padding: 6px 0;
-  border-bottom: 1px solid var(--dsw-alias-border-l3);
+  padding: 8px 0;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
 }
 
 .row:last-child {

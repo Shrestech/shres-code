@@ -85,7 +85,7 @@ describe.skipIf(MODE === 'record')('web e2e: declared reasoning efforts reach th
       { timeout: 10_000 },
     ).toContain('reasoningEffort: high')
     await expect.poll(() => trigger.getAttribute('aria-label'), { timeout: 10_000 })
-      .toBe('Select model, current Acme Think，Effort High')
+      .toBe('Select model, current Acme Think, reasoning effort High')
     expect(tripwire.pageErrors).toEqual([])
   }, 60_000)
 

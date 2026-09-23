@@ -1,6 +1,6 @@
 /** Strict per-session header/body content inserted into the resident conversation layout. */
 
-import { useEffect, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import clsx from 'clsx'
 import type { SessionId, SessionListState, SessionSummary } from '@shres-code/shres-code-client-runtime/client'
 import type {
@@ -54,9 +54,10 @@ function equalBreadcrumbs(left: readonly Breadcrumb[], right: readonly Breadcrum
 }
 
 /**
- * Renders Session header chrome above the resident conversation scrollport.
+ * Renders Session header chrome and the Activity inspector above the resident
+ * conversation scrollport.
  * @param props - Strict Session store, view ledger, navigation, render, and locale shares.
- * @returns the hidden blank-session header or visible title and tabs.
+ * @returns the hidden blank-session header or visible title and Activity control.
  */
 export function ConversationSessionHeader({
   sessionId, useSession, useSessions, useStore, actions,
@@ -66,10 +67,59 @@ export function ConversationSessionHeader({
   const tabs = views.list()
   const selectedId = useStore(s => s.view)
   const active = resolveActiveView(tabs, selectedId)
+  // Chat stays the primary conversation surface. Every registered view
+  // remains in the same ring so inspect handoffs can still select it, but all
+  // view changes are reached from the session-local Activity inspector
+  // instead of a competing top-level tab row.
+  const activityViews = tabs
   const ancestry = useSessions(s => deriveAncestry(s, sessionId), equalBreadcrumbs)
   const composerPhase = useSession(s => s.composerPhase)
   const blank = useSession(s => s.blank)
   const hideChrome = blank && composerPhase === 'blank'
+  const [activityOpen, setActivityOpen] = useState(false)
+  const activityRef = useRef<HTMLDivElement | null>(null)
+  const activityPanelRef = useRef<HTMLDivElement | null>(null)
+  const activityTriggerRef = useRef<HTMLButtonElement | null>(null)
+
+  const closeActivity = (restoreFocus = false): void => {
+    setActivityOpen(false)
+    if (restoreFocus) {
+      queueMicrotask(() => { activityTriggerRef.current?.focus() })
+    }
+  }
+
+  useEffect(() => {
+    setActivityOpen(false)
+  }, [sessionId])
+
+  useEffect(() => {
+    if (!activityOpen) return
+    const onPointerDown = (event: PointerEvent): void => {
+      const target = event.target
+      if (!(target instanceof Node) || activityRef.current?.contains(target) !== true) {
+        setActivityOpen(false)
+      }
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => { document.removeEventListener('pointerdown', onPointerDown) }
+  }, [activityOpen])
+
+  useEffect(() => {
+    if (!activityOpen) return
+    activityPanelRef.current?.querySelector<HTMLButtonElement>('button')?.focus()
+  }, [activityOpen])
+
+  // Resolve the legacy action/utilities lists on every header render so their
+  // registration lifecycle remains observable even while the inspector is
+  // closed. The panel stays mounted but hidden below, which keeps portaled
+  // dialogs owned by those contributions alive after Activity closes.
+  const activityItems = (
+    <>
+      {renderSlot('conversation.session.activity', {})}
+      {renderSlot('conversation.session.header.actions', {})}
+      {renderSlot('conversation.session.header.utilities', {})}
+    </>
+  )
 
   return (
     <header
@@ -99,30 +149,78 @@ export function ConversationSessionHeader({
                 })}
                 {ancestry.length === 0 && <span className={css.crumbCurrent}>{sessionId}</span>}
               </nav>
-              <div className={css.headerActions}>
-                {renderSlot('conversation.session.header.actions', {})}
+            </div>
+            <div ref={activityRef} className={css.activity}>
+              <button
+                type="button"
+                aria-label={t('activity.label')}
+                ref={activityTriggerRef}
+                className={css.activityTrigger}
+                aria-expanded={activityOpen}
+                aria-haspopup="dialog"
+                aria-controls="shres-session-activity"
+                onClick={() => {
+                  if (activityOpen) closeActivity(true)
+                  else setActivityOpen(true)
+                }}
+              >
+                <span className={css.activityMark} aria-hidden="true">+</span>
+                <span>{t('activity.label')}</span>
+                {active !== undefined && active.id !== DEFAULT_VIEW_ID
+                  ? <span className={css.activityCurrent}>{active.label}</span>
+                  : null}
+              </button>
+              <div
+                id="shres-session-activity"
+                ref={activityPanelRef}
+                className={css.activityPanel}
+                role="dialog"
+                aria-label={t('activity.title')}
+                hidden={!activityOpen}
+                inert={!activityOpen}
+                onKeyDown={(event) => {
+                  const target = event.target
+                  if (!(target instanceof Node) || activityPanelRef.current?.contains(target) !== true) return
+                  if (event.defaultPrevented || event.key !== 'Escape') return
+                  event.preventDefault()
+                  closeActivity(true)
+                }}
+              >
+                <div className={css.activityHeading}>
+                  <span className={css.activityKicker}>{t('activity.kicker')}</span>
+                  <span className={css.activityTitle}>{t('activity.title')}</span>
+                </div>
+                {activityViews.length > 0 && (
+                  <div className={css.activitySection}>
+                    <span className={css.activitySectionLabel}>{t('activity.views')}</span>
+                    <div className={css.activityViewList}>
+                      {activityViews.map(view => (
+                        <button
+                          key={view.id}
+                          type="button"
+                          className={clsx(css.activityView, view.id === active?.id && css.activityViewActive)}
+                          aria-current={view.id === active?.id ? 'page' : undefined}
+                          onClick={() => {
+                            actions.setView(view.id)
+                            closeActivity(true)
+                          }}
+                        >
+                          <span>{view.label}</span>
+                          <span className={css.activityArrow} aria-hidden="true">→</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className={css.activitySection}>
+                  <span className={css.activitySectionLabel}>{t('activity.tools')}</span>
+                  <div className={css.activityItems}>
+                    {activityItems}
+                  </div>
+                </div>
               </div>
             </div>
-            <div className={css.headerUtilities}>
-              {renderSlot('conversation.session.header.utilities', {})}
-            </div>
           </div>
-          {tabs.length > 1 && (
-            <div className={css.tabs} role="tablist">
-              {tabs.map(viewTab => (
-                <button
-                  key={viewTab.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={viewTab.id === active?.id}
-                  className={clsx(css.tab, viewTab.id === active?.id && css.tabActive)}
-                  onClick={() => { actions.setView(viewTab.id) }}
-                >
-                  {viewTab.label}
-                </button>
-              ))}
-            </div>
-          )}
         </>
       )}
     </header>

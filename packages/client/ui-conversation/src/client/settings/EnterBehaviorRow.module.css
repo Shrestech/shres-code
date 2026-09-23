@@ -1,10 +1,12 @@
-/* Composer Enter preference row: title/description plus selector pill. */
+/* Composer Enter preference row: title/description plus a compact selector. */
 
 .row {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 16px 0;
+  padding: 22px 0;
+  min-height: 100px;
+  box-sizing: border-box;
   border-bottom: 1px solid var(--dsw-alias-border-l2);
 }
 
@@ -14,43 +16,75 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding-right: 48px;
+  padding-right: 16px;
 }
 
 .title {
-  font-size: 14px;
+  font-size: 17px;
   font-weight: 400;
   line-height: 22px;
   color: var(--dsw-alias-label-primary);
 }
 
 .desc {
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 400;
-  line-height: 18px;
+  line-height: 22px;
   color: var(--dsw-alias-label-tertiary);
 }
 
 .selector {
+  width: 286px;
+  flex: none;
   display: inline-flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
-  height: 36px;
+  height: 46px;
   padding: 0 14px;
-  border: none;
-  border-radius: 18px;
-  background: var(--dsw-alias-bg-module-platform);
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  background: transparent;
   font: inherit;
-  font-size: 14px;
+  font-size: 17px;
   line-height: 22px;
   color: var(--dsw-alias-label-primary);
   cursor: pointer;
 }
 
-.selector:hover {
+.selector:hover:not(:disabled) {
   background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.selector:disabled {
+  cursor: default;
 }
 
 .chevron {
   flex: none;
+}
+
+@media (max-width: 1100px) {
+  .row {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .rowText {
+    min-width: 160px;
+  }
+
+  .selector {
+    width: 200px;
+  }
+}
+
+@media (max-width: 700px) {
+  .row {
+    min-height: 88px;
+  }
+
+  .selector {
+    width: 100%;
+  }
 }

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { useState } from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Button, ConnectionBanner, Input, Menu, Modal, Pill } from '@shres-code/shres-code-client-ui-primitives'
@@ -445,6 +446,47 @@ describe('Menu', () => {
 })
 
 describe('Modal', () => {
+  it('closes a portaled menu before its modal and preserves the outer Escape owner', () => {
+    const onSettingsClose = vi.fn()
+
+    function NestedLayers() {
+      const [modalOpen, setModalOpen] = useState(true)
+      const [menuOpen, setMenuOpen] = useState(true)
+      return (
+        <Modal open={modalOpen} onClose={() => { setModalOpen(false) }} title="Settings">
+          <Menu
+            open={menuOpen}
+            portal
+            anchor={<button type="button">Choose</button>}
+            items={[{ id: 'one', label: 'One' }]}
+            onSelect={() => {}}
+            onClose={() => { setMenuOpen(false) }}
+          />
+        </Modal>
+      )
+    }
+
+    render(<NestedLayers />)
+    // SettingsRoot's window listener is mounted around the modal. It must
+    // only observe an Escape after the modal has consumed its own layer.
+    const onSettingsKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape' && !event.defaultPrevented) onSettingsClose()
+    }
+    window.addEventListener('keydown', onSettingsKeyDown)
+    try {
+      fireEvent.keyDown(document, { key: 'Escape' })
+      expect(screen.queryByRole('menu')).toBeNull()
+      expect(screen.getByRole('dialog', { name: 'Settings' })).toBeDefined()
+      expect(onSettingsClose).not.toHaveBeenCalled()
+
+      fireEvent.keyDown(document, { key: 'Escape' })
+      expect(screen.queryByRole('dialog', { name: 'Settings' })).toBeNull()
+      expect(onSettingsClose).not.toHaveBeenCalled()
+    } finally {
+      window.removeEventListener('keydown', onSettingsKeyDown)
+    }
+  })
+
   it('is absent while closed; Escape and mask click call onClose', () => {
     const onClose = vi.fn()
     const { rerender } = render(

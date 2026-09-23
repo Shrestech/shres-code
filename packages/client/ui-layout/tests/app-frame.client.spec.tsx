@@ -11,7 +11,7 @@
  * resizes are driven through the ResizeObserver stub.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, render } from '@testing-library/react'
+import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import { useSyncExternalStore } from 'react'
 import { AppFrame } from '@shres-code/shres-code-client-ui-layout/src/client/AppFrame.tsx'
 import type { AppFrameProps } from '@shres-code/shres-code-client-ui-layout/src/client/AppFrame.tsx'
@@ -58,8 +58,13 @@ function mountFrame() {
   const slotCalls: { key: string; props: unknown }[] = []
   const renderSlot = ((key: string, owner: object) => {
     slotCalls.push({ key, props: owner })
+    if (key === 'shell.navigation') {
+      const { navigate } = owner as { navigate: (page: string | null) => void }
+      return <><button onClick={() => { navigate('general') }}>Settings</button><button onClick={() => { navigate(null) }}>Workspace</button></>
+    }
+    if (key === 'shell.overlay') return <button>Connection status</button>
     if (key === 'sidebar') return <div data-testid="sidebar-content" />
-    if (key === 'conversation') return <div data-testid="center-content" />
+    if (key === 'conversation') return <input data-testid="center-content" aria-label="Draft" />
     if (key === 'details') return <div data-testid="details-content" />
     if (key === 'conversation.empty') return <div data-testid="empty-content" />
     return <div data-testid="other-content" />
@@ -137,6 +142,21 @@ afterEach(() => {
 })
 
 describe('AppFrame', () => {
+  it('preserves a draft while global pages make workspace controls inert', () => {
+    const { frame, getByTestId, getByRole } = mountFrame()
+    const draft = getByTestId('center-content') as HTMLInputElement
+    fireEvent.change(draft, { target: { value: 'Keep this draft' } })
+    fireEvent.click(getByRole('button', { name: 'Settings' }))
+    expect(frame.hasAttribute('data-page-open')).toBe(true)
+    expect(draft.closest('[inert]')).not.toBeNull()
+    expect(getByRole('button', { name: 'Connection status' }).closest('[inert]')).toBeNull()
+    expect(getByTestId('sidebar-content').closest('[inert]')).not.toBeNull()
+    fireEvent.click(getByRole('button', { name: 'Workspace' }))
+    expect(getByTestId('center-content')).toBe(draft)
+    expect(draft.value).toBe('Keep this draft')
+    expect(draft.closest('[inert]')).toBeNull()
+  })
+
   it('renders three tracks from store state', () => {
     const { frame } = mountFrame()
     expect(tracks(frame)).toEqual([280, 0])

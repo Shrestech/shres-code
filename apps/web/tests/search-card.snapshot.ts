@@ -16,9 +16,9 @@
 // fields and its cap.
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { hasClass, installAssembledBootEnv, mountAssembledApp, REFRESHING_GOLDEN } from './assembled-boot.ts'
+import { findFixtureSession, hasClass, installAssembledBootEnv, mountAssembledApp, REFRESHING_GOLDEN } from './assembled-boot.ts'
 
 const EXPECTED = join(process.cwd(), 'apps/web/tests/snapshots/search-card/grep-card.expected.txt')
 
@@ -49,7 +49,7 @@ describe('assembled search card', () => {
     mountAssembledApp()
 
     const tree = await screen.findByRole('tree', { name: 'Sessions' }, { timeout: 10_000 })
-    fireEvent.click(await within(tree).findByText('Fixture historySessions'))
+    fireEvent.click(await findFixtureSession(tree))
     // Wait for chat content to reach the fixture's later turns (the bash sample
     // is turn 66, the grep card turn 67).
     await waitFor(() => {
@@ -70,7 +70,7 @@ describe('assembled search card', () => {
     await waitFor(() => {
       expect(grepRow.querySelector('[data-search]')).not.toBeNull()
     }, { timeout: 10_000 })
-    const shape = cardShape(grepRow)
+    const shape = `${cardShape(grepRow)}\n`
     if (REFRESHING_GOLDEN) {
       mkdirSync(dirname(EXPECTED), { recursive: true })
       writeFileSync(EXPECTED, shape)

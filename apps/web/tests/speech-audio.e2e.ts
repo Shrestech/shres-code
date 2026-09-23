@@ -104,7 +104,7 @@ async function launchStubEndpoint(): Promise<{ server: Server; url: string; call
   return { server, url: `http://127.0.0.1:${port}/v1`, calls }
 }
 
-describe('web e2e: Models Audio card configures the cloud speech seat', () => {
+describe('web e2e: Voice & audio configures the cloud speech seat', () => {
   let scaffold: WebScaffold
   let browser: Browser
   let page: Page
@@ -130,11 +130,11 @@ describe('web e2e: Models Audio card configures the cloud speech seat', () => {
   it('offers the cloud engine, fetches its audio models, and applies the pins', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-speech-audio'))
     await page.getByRole('button', { name: 'Settings', exact: true }).click()
-    const dialog = page.getByRole('dialog', { name: 'Settings' })
+    const dialog = page.getByRole('region', { name: 'Settings' })
     await dialog.waitFor({ timeout: 10_000 })
-    await dialog.getByRole('button', { name: 'Model' }).click()
-    const card = dialog.getByText('Audio: speech-to-text and read-aloud', { exact: true })
-    await card.waitFor({ timeout: 10_000 })
+    await dialog.getByRole('button', { name: 'Voice & audio', exact: true }).click()
+    await dialog.getByRole('heading', { name: 'Voice & audio', exact: true }).waitFor({ timeout: 10_000 })
+    await dialog.getByLabel('Speech-to-text engine').waitFor({ timeout: 10_000 })
 
     // The engine selects always offer the composition default and the cloud
     // ids; the local option appears only when a local engine resolves ready,
@@ -167,12 +167,15 @@ describe('web e2e: Models Audio card configures the cloud speech seat', () => {
     // Pin both engines on the cloud providers and apply.
     await dialog.getByLabel('Speech-to-text engine').selectOption({ label: 'Cloud (OpenAI-compatible)' })
     await dialog.getByLabel('Read-aloud engine').selectOption({ label: 'Cloud (OpenAI-compatible)' })
+    // Select the chat-audio mode explicitly so the stub exercises the
+    // OpenRouter-compatible input_audio request asserted below.
+    await dialog.getByLabel('STT wire mode').selectOption({ label: 'chat/completions audio parts (OpenRouter)' })
     await dialog.getByRole('button', { name: 'Apply audio settings' }).click()
     await dialog.getByText('Audio settings saved.', { exact: true }).waitFor({ timeout: 10_000 })
     // Like every editor card here, a committed Apply closes the card; the
     // collapsed row keeps it reachable through Edit.
     await expect.poll(async () => dialog.getByText('Custom cloud provider', { exact: true }).count(), { timeout: 10_000 }).toBe(0)
-    const audioRowEdit = dialog.getByRole('button', { name: 'Audio: speech-to-text and read-aloud', exact: true })
+    const audioRowEdit = dialog.getByLabel('Voice & audio', { exact: true })
     await audioRowEdit.waitFor({ timeout: 10_000 })
     await audioRowEdit.click()
     await dialog.getByText('Custom cloud provider', { exact: true }).waitFor({ timeout: 10_000 })

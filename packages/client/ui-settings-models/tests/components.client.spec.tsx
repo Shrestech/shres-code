@@ -187,7 +187,7 @@ async function mountFace(scripted: ReturnType<typeof scriptedFace>) {
   const { face, update, replace, mutate, set, unset } = scripted
   const controller = new ModelsSettingsStore(face as unknown as WireFace)
   await controller.load()
-  const injected: ModelsSectionInjected = {
+  const injected: ModelsSectionProps = {
     controller,
     useSnapshot: bindSnapshotSelector(controller.store),
     api: face as never,

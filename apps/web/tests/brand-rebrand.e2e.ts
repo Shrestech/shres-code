@@ -71,7 +71,8 @@ describe.skipIf(MODE === 'record')('web e2e: Shres Code rebrand chrome', () => {
     const faviconResponse = await page.request.get(new URL('/favicon.svg?v=shres4', scaffold.baseUrl).href)
     expect(faviconResponse.ok()).toBe(true)
     const favicon = await faviconResponse.text()
-    expect(favicon).toContain('fill="#000"')
+    expect(favicon).toContain('class="shield"')
+    expect(favicon).toContain('>S</text>')
     expect(favicon).toMatch(/prefers-color-scheme:\s*dark/)
     expect(favicon).not.toMatch(RETIRED)
   })
@@ -102,7 +103,7 @@ describe.skipIf(MODE === 'record')('web e2e: Shres Code rebrand chrome', () => {
     expect(await page.getByRole('textbox', { name: 'Describe what you want to build' }).count()).toBe(1)
 
     await page.getByRole('button', { name: 'Settings', exact: true }).click()
-    const settings = page.getByRole('dialog', { name: 'Settings' })
+    const settings = page.getByRole('region', { name: 'Settings' })
     await settings.waitFor({ timeout: 10_000 })
     const settingsText = await settings.innerText()
     expect(settingsText).not.toMatch(RETIRED)

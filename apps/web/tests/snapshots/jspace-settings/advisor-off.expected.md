@@ -1,29 +1,34 @@
-- dialog "Settings":
-  - navigation:
-    - text: Settings
-    - button "General":
+- region "Settings":
+  - complementary:
+    - heading "Settings" [level=2]
+    - button "Close":
       - img
-      - text: General
-    - button "Models":
-      - img
-      - text: Models
-    - button "Shield":
-      - img
-      - text: Shield
-    - button "J-Space":
-      - img
-      - text: J-Space
-    - button "Plugins":
-      - img
-      - text: Plugins
-    - button "Agent presets":
-      - img
-      - text: Agent presets
-  - button "Open configuration file"
-  - button "Close":
+      - text: Close
     - img
-    - text: Close
-  - heading "J-Space" [level=2]
+    - searchbox "Search settings…"
+    - text: ⌘ K
+    - navigation "Settings":
+      - button "Preferences":
+        - img
+        - text: Preferences
+      - button "Appearance":
+        - img
+        - text: Appearance
+      - button "Models & providers":
+        - img
+        - text: Models & providers
+      - button "Shield":
+        - img
+        - text: Shield
+      - button "J-Space":
+        - img
+        - text: J-Space
+      - button "Voice & audio":
+        - img
+        - text: Voice & audio
+  - text: Settings
+  - heading "J-Space" [level=1]
+  - paragraph: Set up Shres for the way you work.
   - paragraph: J-Space is an allow switch. On mounts the card tools and prompt section. Off unloads them.
   - text: J-Space Disabled
   - switch "Activate"
@@ -46,6 +51,19 @@
   - text: Provider
   - combobox "Librarian Provider":
     - option "Unbound" [selected]
+    - option "Cursor (subscription)"
+    - option "Ollama (local)"
+    - option "Ollama Cloud"
+    - option "openai"
+    - option "anthropic"
+    - option "xai"
+    - option "moonshotai"
+    - option "openrouter"
+    - option "groq"
+    - option "zai"
+    - option "Grok (subscription)"
+    - option "Codex (subscription)"
+    - option "DeepSeek"
   - text: Model
   - combobox "Librarian Model" [disabled]:
     - option "Unbound" [selected]
@@ -54,3 +72,7 @@
     - term: Checked
     - definition: —
     - paragraph: Checkpoints name a verifier; the harness cannot prove it ran.
+  - button "Open configuration file":
+    - img
+    - text: Open configuration file
+    - img

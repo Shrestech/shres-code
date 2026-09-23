@@ -1,12 +1,7 @@
 - banner:
   - navigation "Session hierarchy":
     - button "Use the read tool twice" [disabled]
-  - button "Session log":
-    - text: Session log
-    - img
-  - tablist:
-    - tab "Chat" [selected]
-    - tab "Trajectory"
+  - button "Activity"
 - text: "Use the read tool twice in one assistant message: read a.txt and b.txt. Then reply with the single word DONE and stop. 7/25 {{clock}}"
 - button "Copy":
   - img
@@ -21,6 +16,8 @@
 - button "Good response":
   - img
 - button "Bad response":
+  - img
+- button "Read aloud":
   - img
 - button "Branch into a new conversation" [disabled]:
   - img
@@ -49,6 +46,8 @@
   - img
 - button "Bad response":
   - img
+- button "Read aloud":
+  - img
 - button "Branch into a new conversation":
   - img
 - text: 7/25 {{clock}} Ran for {{duration}}
@@ -56,6 +55,8 @@
 - button "Commands":
   - img
 - 'button "Access mode, current: Workspace Write"': Workspace Write
+- button "Dictate":
+  - img
 - button "Select model, current DeepSeek-V4-Flash":
   - text: DeepSeek-V4-Flash
   - img

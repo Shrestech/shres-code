@@ -111,7 +111,7 @@ describe('web e2e: sidebar remote group', () => {
     await group.getByRole('button', { name: 'Add remote…' }).click()
     await group.getByLabel('Alias').fill('staging')
     await group.getByLabel('Target (user@host)').fill('ci@staging.remote.example')
-    await group.getByLabel('Remote port').fill('3080')
+    await group.getByLabel('Daemon port (shres web on the remote, default 3080)', { exact: true }).fill('3080')
     await group.getByRole('button', { name: 'Save' }).click()
     await group.getByRole('button', { name: 'Connect staging' }).waitFor({ timeout: 15_000 })
 

@@ -142,7 +142,7 @@ async function mountSection(options: Parameters<typeof scriptedFace>[0] = {}) {
   const scripted = scriptedFace(options)
   const controller = new ModelsSettingsStore(scripted.face as unknown as WireFace)
   await controller.load()
-  const injected: ModelsSectionInjected = {
+  const injected: import('../src/client/ModelsSection.tsx').ModelsSectionProps = {
     controller,
     useSnapshot: bindSnapshotSelector(controller.store),
     api: scripted.face as never,

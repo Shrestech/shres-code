@@ -3,7 +3,8 @@
 // hero (blank session) and active phases — same textarea DOM node, machine-
 // owned draft, and the hero workspace picker (switching = retargetWorkspace).
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, within } from '@testing-library/react'
+import { useState, type ReactNode } from 'react'
 import { bindSnapshotSelector } from '@shres-code/shres-code-client-web-react'
 import {
   createSnapshotStore, EMPTY_CHAT_SNAPSHOT, EMPTY_CONVERSATION_VIEWS,
@@ -15,6 +16,7 @@ import type { ConversationRootProps } from '../src/client/skeleton/ConversationR
 import type { ClientContext } from '@shres-code/shres-code-client-runtime/client'
 import { makeTranslate } from '@shres-code/shres-code-client-test-runtime'
 import { en as commonEn } from '@shres-code/shres-code-client-locale/src/locales/en.ts'
+import { Modal } from '@shres-code/shres-code-client-ui-primitives'
 import { createChatStore } from '../src/client/stores.ts'
 import { SessionInputShell } from '../src/client/input/facade.ts'
 import { en } from '../src/client/locales.ts'
@@ -81,6 +83,23 @@ function conversationSnapshot(overrides: Partial<ConversationSnapshot> = {}): Co
   }
 }
 
+/** Minimal export-like utility whose dialog is portaled outside Activity. */
+function PortaledExportAction(): ReactNode {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <>
+      <button type="button" onClick={() => { setOpen(true) }}>Export session</button>
+      <Modal
+        open={open}
+        onClose={() => { setOpen(false) }}
+        title="Session export"
+        closeLabel="Close export"
+      />
+    </>
+  )
+}
+
 function mount(
   snapshot: ConversationSnapshot,
   workspaceRows: WorkspaceView[] = [{ ...workspace('one'), sessionIds: [SID] }],
@@ -100,6 +119,10 @@ function mount(
     talkMode?: boolean
     /** Mutable view ledger used by registration-order regressions. */
     viewTabs?: ViewTab[]
+    /** Nested Activity content that can consume keyboard events in a test. */
+    activityAction?: ReactNode
+    /** Activity utility with a portal-owned dialog, like Session export. */
+    activityUtility?: ReactNode
   } = {},
 ) {
   const root = sid('root')
@@ -145,6 +168,12 @@ function mount(
       seatOwners.push({ key, owner })
     }
     if (key === 'conversation.hero.workspace') { pickerOwner = owner; return null }
+    if (key === 'conversation.session.activity' && options.activityAction !== undefined) {
+      return options.activityAction
+    }
+    if (key === 'conversation.session.header.utilities' && options.activityUtility !== undefined) {
+      return options.activityUtility
+    }
     if (key === 'conversation.session.header') {
       return (
         <ConversationSessionHeader
@@ -263,10 +292,11 @@ function mount(
 }
 
 describe('Hero chrome', () => {
-  it('renders the English preview badge through the hero locale seat', () => {
+  it('renders the warm hero heading without mascot or preview chrome', () => {
     const view = render(<HeroShell t={makeTranslate(en, commonEn)} />)
-    expect(view.getByText('Take the Leap')).toBeTruthy()
-    expect(view.getByText('Preview')).toBeTruthy()
+    expect(view.getByText('Start with an idea')).toBeTruthy()
+    expect(view.queryByText('Preview')).toBeNull()
+    expect(view.container.querySelector('svg')).toBeNull()
   })
 })
 
@@ -340,6 +370,7 @@ describe('ConversationRoot resident composer', () => {
     expect(host?.contains(header)).toBe(false)
     expect(host?.contains(seat)).toBe(true)
     expect(seat?.contains(textarea)).toBe(true)
+    expect(b.slotCalls).toContain('conversation.session.activity')
     expect(b.slotCalls).toContain('conversation.session.header.actions')
     expect(b.slotCalls).toContain('conversation.session.header.utilities')
   })
@@ -374,8 +405,8 @@ describe('ConversationRoot resident composer', () => {
     const header = b.view.container.querySelector('header')
     expect(host).not.toBeNull()
     expect(header?.getAttribute('aria-hidden')).toBe('true')
-    expect(b.view.getByText('Take the Leap')).toBeTruthy()
-    expect(b.view.getByText('Preview')).toBeTruthy()
+    expect(b.view.getByText('Start with an idea')).toBeTruthy()
+    expect(b.view.queryByText('Preview')).toBeNull()
     expect(b.view.queryByTestId('view-chat')).toBeNull()
     // The same machine-backed textarea is live in the hero, and the
     // persistence mirror stays bound (ConversationSession mounts chrome-hidden
@@ -398,7 +429,7 @@ describe('ConversationRoot resident composer', () => {
     const b = mount(conversationSnapshot({ composerPhase: 'blank', blank: true, openState: 'loading' }))
     const root = b.view.container.querySelector('[data-phase]')
     expect(root?.getAttribute('data-phase')).toBe('settling')
-    expect(b.view.queryByText('Take the Leap')).toBeNull()
+    expect(b.view.queryByText('Start with an idea')).toBeNull()
   })
 
   it('settling phase: a session the list has no row for settles conservatively', () => {
@@ -423,7 +454,7 @@ describe('ConversationRoot resident composer', () => {
     // blank the column for the history round-trip.
     const root = b.view.container.querySelector('[data-phase]')
     expect(root?.getAttribute('data-phase')).toBe('hero')
-    expect(b.view.getByText('Take the Leap')).toBeTruthy()
+    expect(b.view.getByText('Start with an idea')).toBeTruthy()
     expect(b.view.getByRole('textbox')).toBeTruthy()
   })
 
@@ -441,7 +472,7 @@ describe('ConversationRoot resident composer', () => {
     expect(after.value).toBe('kept across flip')
     expect(b.chat.store.getSnapshot().draft).toBe('kept across flip')
     expect(b.view.container.querySelector('[data-conversation-scroll]')?.contains(after)).toBe(true)
-    expect(b.view.queryByText('Take the Leap')).toBeNull()
+    expect(b.view.queryByText('Start with an idea')).toBeNull()
     expect(b.view.getByTestId('view-chat')).toBeTruthy()
   })
 
@@ -452,7 +483,7 @@ describe('ConversationRoot resident composer', () => {
     expect(b.view.getByRole('textbox')).toBeTruthy()
   })
 
-  it('keeps the Chat fallback selected by id when a view is inserted before it', () => {
+  it('keeps the Chat fallback selected by id when a view is inserted before it', async () => {
     const viewTabs: ViewTab[] = [
       { id: 'chat', label: 'Chat' },
       { id: 'trajectory', label: 'Trajectory' },
@@ -468,8 +499,70 @@ describe('ConversationRoot resident composer', () => {
 
     expect(b.view.getByTestId('view-chat')).toBeTruthy()
     expect(b.view.queryByTestId('view-new-view')).toBeNull()
-    expect(b.view.getByRole('tab', { name: 'Chat' }).getAttribute('aria-selected')).toBe('true')
-    expect(b.view.getByRole('tab', { name: 'New view' }).getAttribute('aria-selected')).toBe('false')
+    fireEvent.click(b.view.getByRole('button', { name: 'Activity' }))
+    const activity = b.view.getByRole('dialog', { name: 'Inspect this session' })
+    expect(activity).toBeTruthy()
+    fireEvent.keyDown(activity, { key: 'Escape' })
+    await act(async () => { await Promise.resolve() })
+    expect(b.view.queryByRole('dialog', { name: 'Inspect this session' })).toBeNull()
+    expect(document.activeElement).toBe(b.view.getByRole('button', { name: 'Activity' }))
+    fireEvent.click(b.view.getByRole('button', { name: 'Activity' }))
+    fireEvent.click(b.view.getByRole('button', { name: 'New view' }))
+    expect(b.view.getByTestId('view-new-view')).toBeTruthy()
+    expect(b.view.queryByRole('dialog', { name: 'Inspect this session' })).toBeNull()
+  })
+
+  it('keeps Activity open when a nested inspector consumes Escape', async () => {
+    const b = mount(conversationSnapshot(), undefined, undefined, {
+      activityAction: (
+        <div
+          role="dialog"
+          aria-label="Nested inspector"
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') event.preventDefault()
+          }}
+        >
+          Nested inspector
+        </div>
+      ),
+    })
+    fireEvent.click(b.view.getByRole('button', { name: 'Activity' }))
+    const activity = b.view.getByRole('dialog', { name: 'Inspect this session' })
+    fireEvent.keyDown(b.view.getByRole('dialog', { name: 'Nested inspector' }), { key: 'Escape' })
+    expect(b.view.getByRole('dialog', { name: 'Inspect this session' })).toBe(activity)
+
+    fireEvent.keyDown(activity, { key: 'Escape' })
+    await act(async () => { await Promise.resolve() })
+    expect(b.view.queryByRole('dialog', { name: 'Inspect this session' })).toBeNull()
+    expect(document.activeElement).toBe(b.view.getByRole('button', { name: 'Activity' }))
+  })
+
+  it('keeps portaled utility dialogs alive when Activity closes', async () => {
+    const b = mount(conversationSnapshot(), undefined, undefined, {
+      activityUtility: <PortaledExportAction />,
+    })
+    const trigger = b.view.getByRole('button', { name: 'Activity' })
+
+    fireEvent.click(trigger)
+    const activity = b.view.getByRole('dialog', { name: 'Inspect this session' })
+    fireEvent.click(within(activity).getByRole('button', { name: 'Export session' }))
+    const dialog = b.view.getByRole('dialog', { name: 'Session export' })
+
+    // The Modal primitive owns Escape for its body portal. Activity must not
+    // close first when the React event bubbles through the portal owner.
+    fireEvent.keyDown(dialog, { key: 'Escape' })
+    await act(async () => { await Promise.resolve() })
+    expect(b.view.queryByRole('dialog', { name: 'Session export' })).toBeNull()
+    expect(b.view.getByRole('dialog', { name: 'Inspect this session' })).toBe(activity)
+
+    fireEvent.click(within(activity).getByRole('button', { name: 'Export session' }))
+    const openDialog = b.view.getByRole('dialog', { name: 'Session export' })
+    fireEvent.click(trigger)
+    expect(b.view.queryByRole('dialog', { name: 'Inspect this session' })).toBeNull()
+    expect(b.view.getByRole('dialog', { name: 'Session export' })).toBe(openDialog)
+
+    fireEvent.click(within(openDialog).getByRole('button', { name: 'Close export' }))
+    expect(b.view.queryByRole('dialog', { name: 'Session export' })).toBeNull()
   })
 
   it('rolls the pending workspace label back when switching fails', async () => {

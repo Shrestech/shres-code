@@ -7,7 +7,7 @@
  * same top-down order) on one fade that ends with the slide. The bottom-pinned
  * settings control only fades. The workspace/session browsing region between
  * the New Session button and the foot is the `sidebar.workspaces` registrant's,
- * and the foot holds `sidebar.settings` plus `sidebar.footer.action`; the shell
+ * and the foot holds `sidebar.footer.action`; the shell
  * hands them the wide flag (plus an expand request callback for the browser).
  *
  * The column also owns whether the scroll regions nested in it draw a
@@ -18,7 +18,6 @@
 import { useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
 import {
-  BrandWordmark, FishLogo,
   IconNewChatOutline16, IconPanelLeftOutline16,
   Tooltip,
 } from '@shres-code/shres-code-client-ui-primitives'
@@ -137,7 +136,7 @@ export function SidebarRoot({
             aria-label={t('session.new.label')}
             onClick={() => { startSession() }}
           >
-            <BrandWordmark size={48} />
+            <span className={css.workspaceTitle}>Workspace</span>
           </button>
         )}
         {wide && (
@@ -145,8 +144,7 @@ export function SidebarRoot({
             {renderSlot('sidebar.brand.action', { wide })}
           </div>
         )}
-        {/* Rail resting state is the product mark; hovering swaps in the panel
-            icon (the expand affordance, figma sidebar-hover flow). */}
+        {/* The rail toggle uses the same panel icon as the expanded control. */}
         <Tooltip label={collapsed ? t('toggle.open') : t('toggle.collapse')} delayMs={500}>
           <button
             type="button"
@@ -154,8 +152,7 @@ export function SidebarRoot({
             aria-label={collapsed ? t('toggle.open') : t('toggle.collapse')}
             onClick={() => { toggleSidebar() }}
           >
-            {!wide && <FishLogo className={css.railFish} size={36} />}
-            {/* Rail icons render at 18 (figma rail spec); expanded keeps the glyph-native sizes. */}
+            {/* The rail uses the larger control glyph; expanded keeps its native size. */}
             <IconPanelLeftOutline16 className={css.panelIcon} size={wide ? 16 : 18} />
           </button>
         </Tooltip>
@@ -193,9 +190,6 @@ export function SidebarRoot({
       <div className={css.footArea}>
         <div className={css.footerActions}>
           {renderSlot('sidebar.footer.action', { wide })}
-        </div>
-        <div className={css.settingsArea}>
-          {renderSlot('sidebar.settings', { wide })}
         </div>
       </div>
     </div>

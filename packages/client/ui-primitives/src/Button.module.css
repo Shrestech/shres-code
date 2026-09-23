@@ -1,13 +1,11 @@
-/* Capsule geometry from the figma Button component (1:155 instances:
- * h36, pad 14/7, gap 4, r18; the wide New Session form is r24 at h38 —
- * owners with the wide form set their own radius/width). */
+/* Flat control geometry shared by the compact desktop and web surfaces. */
 .button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
   border: none;
-  border-radius: 18px;
+  border-radius: var(--dsw-radius-control);
   cursor: pointer;
   font-size: 14px;
   line-height: 22px;
@@ -21,18 +19,22 @@
   opacity: 0.4;
 }
 
+.button:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: 2px;
+}
+
 .md {
   height: 36px;
 }
 
-/* Compact height for dense rows; no dedicated figma node (Icon_container
- * 28x28 is the icon-only form) — geometry is ours. */
+/* Compact height for dense rows and icon-adjacent actions. */
 .sm {
   height: 28px;
   font-size: 12px;
   line-height: 18px;
   padding: 0 10px;
-  border-radius: 14px;
+  border-radius: var(--dsw-radius-control);
 }
 
 .primary {
@@ -52,7 +54,7 @@
   background: var(--dsw-alias-interactive-bg-active);
 }
 
-/* Dialog Cancel (figma 451:18655): bordered capsule on transparent fill. */
+/* Dialog Cancel: a bordered control on a transparent fill. */
 .outline {
   border: 1px solid var(--dsw-alias-border-l2);
   background: transparent;

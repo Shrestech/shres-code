@@ -31,6 +31,8 @@
   - img
 - button "Bad response":
   - img
+- button "Read aloud":
+  - img
 - button "Branch into a new conversation":
   - img
 - text: {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s

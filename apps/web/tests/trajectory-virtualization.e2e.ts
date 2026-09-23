@@ -20,7 +20,7 @@ import {
   webSnapshotMode,
   type WebScaffold,
 } from './scaffold.ts'
-import { newEnglishPage, saveFailureShot } from './support.ts'
+import { newEnglishPage, saveFailureShot, selectSessionView } from './support.ts'
 
 const MODE = webSnapshotMode()
 const LOAD_MORE_EXPECTED = fileURLToPath(new URL(
@@ -74,14 +74,14 @@ async function openSeed(page: Page): Promise<void> {
   const result = page.getByRole('tree', { name: 'Search results' }).getByRole('treeitem')
   await expect.poll(() => result.count(), { timeout: 60_000 }).toBe(1)
   await result.click()
-  await page.getByRole('tab', { name: 'Trajectory', exact: true }).waitFor({ timeout: 30_000 })
+  await page.getByRole('button', { name: 'Activity', exact: true }).waitFor({ timeout: 30_000 })
   await page.getByText(FIXTURE.markers.assistant(FIXTURE.turns), { exact: false })
     .last()
     .waitFor({ timeout: 30_000 })
 }
 
 async function openTrajectory(page: Page): Promise<void> {
-  await page.getByRole('tab', { name: 'Trajectory', exact: true }).click()
+  await selectSessionView(page, 'Trajectory')
   const pane = page.locator('[data-trajectory-scroll]')
   await pane.waitFor({ timeout: 30_000 })
   await page.locator('[data-trajectory-scroll] table[data-scroll-ready="true"]')

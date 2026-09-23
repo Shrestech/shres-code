@@ -1,6 +1,6 @@
 # @shres-code/shres-code-client-ui-speech
 
-Web controls over `ctx.speech`: a composer microphone (opens a hands-free Talk dialog, or dictates once), an assistant read-aloud button, and General Settings rows for Kokoro voice, send-after-dictation, and spoken language.
+Web controls over `ctx.speech`: a composer microphone (opens a hands-free Talk dialog, or dictates once), an assistant read-aloud button, and Voice & audio preference rows (`settings.audio.item`) for Kokoro voice, send-after-dictation, and spoken language.
 
 The host converts audio locally (Kokoro TTS, Whisper tiny.en for English, multilingual Whisper tiny otherwise). This package records, decodes MediaRecorder output to PCM16 WAV, and plays returned WAV.
 

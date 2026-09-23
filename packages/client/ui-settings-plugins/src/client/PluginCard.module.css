@@ -3,7 +3,7 @@
 .card {
   list-style: none;
   border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 12px;
+  border-radius: 6px;
   background: var(--dsw-alias-bg-layer-3);
   transition: border-color .16s, background .16s;
 }
@@ -31,7 +31,7 @@
   align-items: center;
   gap: 12px;
   padding: 14px 16px;
-  border-radius: 12px;
+  border-radius: 6px;
 }
 
 .header:focus-visible {

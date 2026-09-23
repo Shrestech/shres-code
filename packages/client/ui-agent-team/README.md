@@ -7,7 +7,7 @@ kind: "package-reference"
 
 ## Summary
 
-This plugin adds a `Team` action to the conversation header of sessions that lead an Agent Team. Opening it shows the durable roster — the Lead, each named teammate with its live status and model binding, and provisioning diagnostics — and every teammate row navigates into that teammate's conversation through the stable addressed-subagent path. The panel reads `agentTeams.view` when the header action mounts and again when the panel opens, stores nothing in the browser, and registers no model-facing input; sessions that are not Team Leads render no Team control at all.
+This plugin adds a `Team` action to the session Activity inspector for sessions that lead an Agent Team. Opening it shows the durable roster — the Lead, each named teammate with its live status and model binding, and provisioning diagnostics — and every teammate row navigates into that teammate's conversation through the stable addressed-subagent path. The panel reads `agentTeams.view` when the Activity contribution mounts and again when the roster opens, stores nothing in the browser, and registers no model-facing input; sessions that are not Team Leads render no Team control at all.
 
 ## Use this package
 
@@ -21,7 +21,7 @@ The web-app bundle mounts this plugin wherever the Agent Teams runtime is compos
 
 ## Understand the implementation
 
-The browser half registers one `conversation.session.header.actions` contribution whose injected face closes over the client connection and session navigation; components never see the connection. The host answers `agentTeams/view` from the exact live Lead, so the panel is a pure read — no Team state is mirrored client-side, and replaying or losing the connection cannot corrupt Team records.
+The browser half registers one `conversation.session.activity` contribution whose injected face closes over the client connection and session navigation; components never see the connection. The conversation shell renders it inside Activity beside legacy header actions and utilities. The host answers `agentTeams/view` from the exact live Lead, so the panel is a pure read — no Team state is mirrored client-side, and replaying or losing the connection cannot corrupt Team records.
 
 ## Model Experience
 

@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type {
   SidebarFooterActionOwnerProps, SidebarRootComponentProps,
-  SidebarSectionOwnerProps, SidebarSettingsOwnerProps,
+  SidebarSectionOwnerProps,
 } from '../src/client/contract/slots.ts'
 import { SidebarRoot } from '../src/client/SidebarRoot.tsx'
 import { en } from '../src/client/locales.ts'
@@ -26,7 +26,6 @@ function mountShell({ collapsed = false, width = 300 }: { collapsed?: boolean; w
   const toggleSidebar = vi.fn()
   let remotesOwner: SidebarSectionOwnerProps | undefined
   let regionOwner: SidebarSectionOwnerProps | undefined
-  let settingsOwner: SidebarSettingsOwnerProps | undefined
   let footerActionOwner: SidebarFooterActionOwnerProps | undefined
   let current = { collapsed, width }
   const root = () => (
@@ -36,12 +35,9 @@ function mountShell({ collapsed = false, width = 300 }: { collapsed?: boolean; w
       startSession={startSession} toggleSidebar={toggleSidebar} t={t}
       renderSlot={((
         key: string,
-        owner: SidebarFooterActionOwnerProps | SidebarSectionOwnerProps | SidebarSettingsOwnerProps,
+        owner: SidebarFooterActionOwnerProps | SidebarSectionOwnerProps,
       ) => {
-        if (key === 'sidebar.settings') {
-          settingsOwner = owner
-          return <div data-testid="settings-seat" data-wide={owner.wide} />
-        }
+
         if (key === 'sidebar.remotes') {
           remotesOwner = owner as SidebarSectionOwnerProps
           return <div data-testid="remotes-seat" data-wide={owner.wide} />
@@ -70,10 +66,6 @@ function mountShell({ collapsed = false, width = 300 }: { collapsed?: boolean; w
       if (regionOwner === undefined) throw new Error('region owner not rendered')
       return regionOwner
     },
-    settingsOwner: () => {
-      if (settingsOwner === undefined) throw new Error('settings owner not rendered')
-      return settingsOwner
-    },
     footerActionOwner: () => {
       if (footerActionOwner === undefined) throw new Error('footer action owner not rendered')
       return footerActionOwner
@@ -100,8 +92,6 @@ describe('SidebarRoot shell', () => {
   it('hands the region its wide flag and clamps expandSidebar to the collapsed state', () => {
     const b = mountShell()
     expect(b.regionOwner().wide).toBe(true)
-    // The settings seat rides the same wide flag (ui-settings renders the row).
-    expect(b.settingsOwner().wide).toBe(true)
     expect(b.footerActionOwner().wide).toBe(true)
     expect(screen.getByTestId('brand-action-seat')).toBeTruthy()
     // The remote-hosts group rides the same section owner share as the region.

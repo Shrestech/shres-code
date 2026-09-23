@@ -48,7 +48,7 @@ async function bench(remote: SpeechRemote = speechRemote()) {
       'conversation.input.right': { kind: 'list', scope: 'session' },
       'conversation.chat.assistant-actions': { kind: 'list', scope: 'session' },
       'conversation.composer': { kind: 'chain', scope: 'session' },
-      'settings.general.item': { kind: 'list', scope: 'root' },
+      'settings.audio.item': { kind: 'list', scope: 'root' },
     },
   } as never, () => null)
   ctx.provide('remote', { speech: remote })
@@ -60,7 +60,7 @@ async function bench(remote: SpeechRemote = speechRemote()) {
 }
 
 function settingsInject(slots: SlotRegistry): SpeechSettingsInjected {
-  const entry = slots.entries('settings.general.item').find(item => item.options.id === 'speech-voice')
+  const entry = slots.entries('settings.audio.item').find(item => item.options.id === 'speech-voice')
   const injectFace = (entry as { inject?: () => SpeechSettingsInjected } | undefined)?.inject
   if (injectFace === undefined) throw new Error('missing speech-voice inject')
   return injectFace()
@@ -82,7 +82,7 @@ describe('ui-speech browser apply', () => {
     expect(b.slots.entries('conversation.input.right').map(entry => entry.options.id)).toEqual(['mic'])
     expect(b.slots.entries('conversation.chat.assistant-actions').map(entry => entry.options.id)).toEqual(['speak'])
     expect(b.slots.entries('conversation.composer')[0]?.options.priority).toBe(2)
-    expect(b.slots.entries('settings.general.item').map(entry => entry.options.id)).toEqual([
+    expect(b.slots.entries('settings.audio.item').map(entry => entry.options.id)).toEqual([
       'speech-voice',
       'auto-submit-voice',
       'speech-language',
@@ -90,7 +90,7 @@ describe('ui-speech browser apply', () => {
     await fiber.dispose()
     expect(b.slots.entries('conversation.input.right')).toHaveLength(0)
     expect(b.slots.entries('conversation.chat.assistant-actions')).toHaveLength(0)
-    expect(b.slots.entries('settings.general.item')).toHaveLength(0)
+    expect(b.slots.entries('settings.audio.item')).toHaveLength(0)
   })
 
   it('publishes status() onto the settings inject store', async () => {

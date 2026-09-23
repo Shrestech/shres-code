@@ -24,7 +24,7 @@ import {
   acknowledgeReloadConnectionLoss, assertFixtureInventory, captureStableAria, compareOrRefreshGolden,
   launchWebScaffold, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
+import { connectFreshWorkspace, newEnglishPage, openSessionActivity, saveFailureShot } from './support.ts'
 
 const BASE_FIXTURE = fileURLToPath(new URL('./snapshots/live-interactions/session.jsonl', import.meta.url))
 
@@ -40,6 +40,13 @@ const WAKING = 'And add one concrete example.'
 const REARMED_ANSWER = 're-armed setup answer'
 const PARKED_ANSWER = 'parked follow-up answer'
 const WAKING_ANSWER = 'waking answer'
+
+/** Open the session-local subagent catalog from the Activity inspector. */
+async function openSubagentCatalog(page: Page, name: string | RegExp): Promise<void> {
+  const activity = await openSessionActivity(page)
+  const tree = page.getByRole('tree', { name: 'Subagent sessions' })
+  if (await tree.count() === 0) await activity.getByRole('button', { name }).click()
+}
 
 /** Poll a synchronous condition (hook-safe; expect.poll is test-body only). */
 async function waitFor(predicate: () => boolean, what: string, timeoutMs = 30_000): Promise<void> {
@@ -164,7 +171,8 @@ describe.skipIf(MODE === 'record')('web e2e: composer interrupt for a running co
     const warningStart = tripwire.warnings.length
     await page.reload({ waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
-    await page.getByRole('button', { name: /1 subagent/ }).waitFor({ timeout: 15_000 })
+    const activity = await openSessionActivity(page)
+    await activity.getByRole('button', { name: /1 subagent/ }).waitFor({ timeout: 15_000 })
     acknowledgeReloadConnectionLoss(tripwire, warningStart)
     expect(scaffold.ctx.agents.get(childId)?.status).toBe('running')
   }, 120_000)
@@ -197,7 +205,7 @@ describe.skipIf(MODE === 'record')('web e2e: composer interrupt for a running co
       await route.fulfill({ response, json: body })
     })
     try {
-      await page.getByRole('button', { name: /1 subagent/ }).click()
+      await openSubagentCatalog(page, /1 subagent/)
       await page.getByRole('treeitem', { name: new RegExp(LABEL) }).click()
       const input = page.getByRole('textbox', {
         name: 'Parent session offline; sending is unavailable but you can still stop the run',
@@ -256,7 +264,7 @@ describe.skipIf(MODE === 'record')('web e2e: composer interrupt for a running co
     // Reselect the child with the truthful catalog: parent available again.
     await page.getByRole('navigation', { name: 'Session hierarchy' })
       .getByRole('button').first().click()
-    await page.getByRole('button', { name: /1 subagent/ }).click()
+    await openSubagentCatalog(page, /1 subagent/)
     await page.getByRole('treeitem', { name: new RegExp(LABEL) }).click()
     const input = page.getByRole('textbox', { name: 'Message the agent' })
     await input.waitFor({ timeout: 15_000 })

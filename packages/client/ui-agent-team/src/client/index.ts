@@ -1,6 +1,6 @@
 /**
- * Agent Team roster plugin, browser half: registers the Team header action
- * into the conversation header. The action loads the roster view on mount
+ * Agent Team roster plugin, browser half: registers the Team Activity action
+ * into the conversation Activity inspector. The action loads the roster view on mount
  * and again when the panel opens, and renders only for live Team Leads;
  * teammate rows navigate through the stable addressed-subagent path.
  */
@@ -24,8 +24,8 @@ export type { TeamActionInjected, TeamActionProps } from './TeamAction.tsx'
 export const inject = ['slots', 'locale', 'sessions', 'connection']
 
 /**
- * Client plugin body: register the Team header action once the conversation
- * header slot declaration is on the ledger.
+ * Client plugin body: register the Team Activity contribution once the
+ * conversation Activity slot declaration is on the ledger.
  * @param ctx - client root context.
  */
 export function apply(ctx: ClientContext): void {
@@ -43,9 +43,9 @@ export function apply(ctx: ClientContext): void {
     },
   })
   ctx.slots.inject(
-    'conversation.session.header.actions',
+    'conversation.session.activity',
     () => ctx.slots.register({
-      name: 'conversation.session.header.actions',
+      name: 'conversation.session.activity',
       id: 'agent-team',
       order: 12,
       locale: NS,

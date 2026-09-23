@@ -82,7 +82,7 @@ async function setPostureEnforce(page) {
   const settings = page.getByRole('button', { name: 'Settings', exact: true })
   if (await settings.count() === 0) return false
   await settings.click()
-  const dialog = page.getByRole('dialog', { name: 'Settings' })
+  const dialog = page.getByRole('region', { name: 'Settings' })
   await dialog.waitFor({ timeout: 10_000 }).catch(() => {})
   const shieldNav = dialog.getByRole('button', { name: 'Shield', exact: true })
   if (await shieldNav.count() === 0) return false
@@ -118,9 +118,17 @@ function recentDecisions(sinceMs) {
   return out
 }
 
+async function selectSessionView(page, view) {
+  const activity = page.getByRole('button', { name: 'Activity', exact: true })
+  await activity.waitFor({ timeout: 30_000 })
+  if (await activity.getAttribute('aria-expanded') !== 'true') await activity.click()
+  const panel = page.getByRole('dialog', { name: 'Inspect this session' })
+  await panel.waitFor({ timeout: 30_000 })
+  await panel.getByRole('button', { name: view, exact: true }).click()
+}
+
 async function openTrajectory(page) {
-  const tab = page.getByRole('button', { name: 'Trajectory', exact: true })
-  if (await tab.count() > 0) await tab.first().click()
+  await selectSessionView(page, 'Trajectory')
   await page.waitForTimeout(500)
 }
 
@@ -167,8 +175,7 @@ try {
     'Initial System Prompt shows Blocked',
   )
 
-  const chat = page.getByRole('button', { name: 'Chat', exact: true })
-  if (await chat.count() > 0) await chat.first().click()
+  await selectSessionView(page, 'Chat')
   await page.waitForTimeout(400)
   const composer = page.locator('textarea:enabled').last()
   const composerReady = await composer.isEnabled().catch(() => false)
