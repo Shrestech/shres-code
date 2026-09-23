@@ -437,8 +437,8 @@ importers:
         version: link:../../packages/util/home-paths
     devDependencies:
       '@types/node':
-        specifier: ^22.20.0
-        version: 22.20.3
+        specifier: ^26.2.0
+        version: 26.5.0
       electron:
         specifier: ^44.0.0
         version: 44.4.0
@@ -2944,15 +2944,15 @@ importers:
       '@shres-code/shres-code-client-test-runtime':
         specifier: workspace:^
         version: link:../../test-support/client-runtime
+      '@shres-code/shres-code-client-ui-layout':
+        specifier: workspace:^
+        version: link:../ui-layout
       '@shres-code/shres-code-client-ui-primitives':
         specifier: workspace:^
         version: link:../ui-primitives
       '@shres-code/shres-code-client-ui-settings':
         specifier: workspace:^
         version: link:../ui-settings
-      '@shres-code/shres-code-client-ui-layout':
-        specifier: workspace:^
-        version: link:../ui-layout
       '@shres-code/shres-code-client-ui-slots':
         specifier: workspace:^
         version: link:../ui-slots
@@ -13336,9 +13336,6 @@ packages:
   '@types/ms@2.1.0':
     resolution: {integrity: sha512-GsCCIZDE/p3i96vtEqx+7dBUGXrc7zeSK3wwPHIaRThS+9OhWIXRqzs4d6k1SVU8g91DrNRWxWUGhp5KXQb2VA==}
 
-  '@types/node@22.20.3':
-    resolution: {integrity: sha512-DZmzkmwHzXrLPAXPyKNDzlIwMMUZCVacoD25ywdy5YTKGbOx/2ld+Q38Im2zJ0vBuZP5Prd3VZutKZyXwkOS8A==}
-
   '@types/node@24.13.5':
     resolution: {integrity: sha512-TXyindR+lBr22aJIdMQzCFHPHR6cR4js838mRDCSz5hOKWZvZwsXSSiXDmjRj4iJmgl+sR9O+1mkoVBSMadNug==}
 
@@ -16560,9 +16557,6 @@ packages:
   unconfig-core@7.5.0:
     resolution: {integrity: sha512-Su3FauozOGP44ZmKdHy2oE6LPjk51M/TRRjHv2HNCWiDvfvCoxC2lno6jevMA91MYAdCdwP05QnWdWpSbncX/w==}
 
-  undici-types@6.21.0:
-    resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}
-
   undici-types@7.18.2:
     resolution: {integrity: sha512-AsuCzffGHJybSaRrmr5eHr81mwJU3kjw6M+uprWvCXiNeN9SOGwQ3Jn8jb8m3Z6izVgknn1R0FTCEAP2QrLY/w==}
 
@@ -19171,7 +19165,7 @@ snapshots:
     dependencies:
       '@types/http-cache-semantics': 4.2.0
       '@types/keyv': 3.1.4
-      '@types/node': 22.20.3
+      '@types/node': 26.5.0
       '@types/responselike': 1.0.3
 
   '@types/chai@5.2.3':
@@ -19308,7 +19302,7 @@ snapshots:
 
   '@types/fs-extra@9.0.13':
     dependencies:
-      '@types/node': 22.20.3
+      '@types/node': 26.5.0
 
   '@types/geojson@7946.0.16': {}
 
@@ -19335,7 +19329,7 @@ snapshots:
 
   '@types/keyv@3.1.4':
     dependencies:
-      '@types/node': 22.20.3
+      '@types/node': 26.5.0
 
   '@types/linkify-it@5.0.0': {}
 
@@ -19351,10 +19345,6 @@ snapshots:
   '@types/mdurl@2.0.0': {}
 
   '@types/ms@2.1.0': {}
-
-  '@types/node@22.20.3':
-    dependencies:
-      undici-types: 6.21.0
 
   '@types/node@24.13.5':
     dependencies:
@@ -19380,7 +19370,7 @@ snapshots:
 
   '@types/responselike@1.0.3':
     dependencies:
-      '@types/node': 22.20.3
+      '@types/node': 26.5.0
 
   '@types/retry@0.12.0': {}
 
@@ -23106,8 +23096,6 @@ snapshots:
     dependencies:
       '@quansync/fs': 1.0.0
       quansync: 1.0.0
-
-  undici-types@6.21.0: {}
 
   undici-types@7.18.2: {}
 

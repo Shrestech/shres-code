@@ -1,6 +1,6 @@
 /**
  * The three independent publish sequences this repository releases from
- * (`packages/` + `apps/`, `vendor/`, and `native/`) and the two this module
+ * (`packages/` + public `apps/`, `vendor/`, and `native/`) and the two this module
  * owns: `shres` and `vendor`. Each family carries its own version baseline, tag
  * naming, and publish set, so releasing one never republishes another
  * ([rationale](../../.agents/notes/implemented/process/2026-08-10-npm-release-sequences.md)).
@@ -18,6 +18,28 @@ const ORDER_SECTIONS = ['dependencies', 'optionalDependencies'] as const
 
 /** The workspace root manifest, which is never a release member. */
 const WORKSPACE_ROOT_PACKAGE = '@shres-code/shres-code-root'
+
+/** Private Electron packages that are versioned with shres but never published to npm. */
+export const PRIVATE_DESKTOP_PACKAGE_ENTRIES = {
+  shell: {
+    directory: 'apps/desktop',
+    name: '@shres-code/shres-code-desktop',
+  },
+  host: {
+    directory: 'apps/desktop-host',
+    name: '@shres-code/shres-code-desktop-host',
+  },
+} as const
+
+/**
+ * Whether one workspace manifest is one of the private Electron packages.
+ * @param directory - repository-relative package directory.
+ * @param name - package name from its manifest.
+ * @returns true only for the known desktop shell and host pair.
+ */
+export function isPrivateDesktopPackage(directory: string, name: string | undefined): boolean {
+  return Object.values(PRIVATE_DESKTOP_PACKAGE_ENTRIES).some(entry => entry.directory === directory && entry.name === name)
+}
 
 /** One publishable package of a release family. */
 export interface ReleaseMember {
@@ -94,10 +116,13 @@ export abstract class ReleaseFamily {
       const version = requireString(manifest, 'version', normalized)
       if (name === WORKSPACE_ROOT_PACKAGE) throw new Error(`${normalized} selected the workspace root`)
       if (!name.startsWith('@shres-code/')) throw new Error(`${normalized} must name an @shres-code package`)
+      // These apps share the shres version but are packaged privately rather than published to npm.
+      const directory = normalized.slice(0, normalized.length - '/package.json'.length)
+      if (isPrivateDesktopPackage(directory, name)) continue
       if (seen.has(name)) throw new Error(`${name} appears twice in release family ${this.id}`)
       seen.add(name)
       members.push({
-        directory: normalized.slice(0, normalized.length - '/package.json'.length),
+        directory,
         name,
         version,
         manifest,
@@ -193,7 +218,7 @@ export abstract class ReleaseFamily {
   abstract readonly installedEntry: InstalledEntry | undefined
 }
 
-/** `packages/*` and `apps/*`: one shared version across the whole family. */
+/** `packages/*` and the public CLI/Web apps: one shared version across the family. */
 class ShresFamily extends ReleaseFamily {
   readonly id = 'shres'
   readonly patterns = ['packages/*/*/package.json', 'apps/*/package.json'] as const

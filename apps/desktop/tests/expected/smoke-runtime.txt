@@ -1,0 +1,4 @@
+document.status=200
+document.marker=<title>Shres Code</title>
+events.status=200
+events.marker="method":"host/workspace-changed"
