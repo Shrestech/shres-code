@@ -1265,6 +1265,7 @@ describe('TrajectoryView state', () => {
             route: { choice: 'flash', confidence: 0.9, probabilities: { flash: 0.9 } },
             sticky: {
               active: true,
+              routeErrorLimit: 2,
               turnsElapsed: 0,
               enteredTurn: 1,
               entryBase: { provider: 'deepseek-official', model: 'deepseek-v4.1' },
@@ -1283,6 +1284,104 @@ describe('TrajectoryView state', () => {
     expect(request?.querySelector('[data-request-route="routed"]')).toBeTruthy()
     expect(request?.textContent).toContain('deepseek-official/deepseek-v4-flash')
     expect(screen.getByText('Routed')).toBeTruthy()
+  })
+
+  it('associates same-turn requests by step while excluding a later step decision', () => {
+    const nodes = [
+      {
+        kind: 'user', seq: 1, time: 1,
+        content: [{ type: 'text', text: 'first request' }], source: null,
+      },
+      {
+        kind: 'assistant', seq: 20, time: 20, turn: 1, step: 1,
+        blocks: [{ kind: 'text', text: 'first answer' }],
+        provenance: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+      },
+      {
+        kind: 'assistant', seq: 30, time: 30, turn: 1, step: 2,
+        blocks: [{ kind: 'text', text: 'second answer' }],
+        provenance: { provider: 'deepseek-official', model: 'deepseek-v4.1' },
+      },
+    ] as unknown as ConversationSnapshot['nodes']
+    const requests: readonly RequestView[] = [
+      {
+        purpose: 'assistant',
+        startSeq: 3,
+        turn: 1,
+        step: 1,
+        startedAt: 3,
+        completedAt: 20,
+        status: 'complete',
+        provenance: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+      },
+      {
+        purpose: 'assistant',
+        startSeq: 23,
+        turn: 1,
+        step: 2,
+        startedAt: 23,
+        completedAt: 30,
+        status: 'complete',
+        provenance: { provider: 'deepseek-official', model: 'deepseek-v4.1' },
+      },
+    ]
+    render(createElement(
+      TrajectoryView,
+      {
+        ...standaloneProps(nodes),
+        ...standaloneHistory(historySnapshot(nodes, {
+          requests,
+          routing: [
+            {
+              seq: 6,
+              time: 6,
+              turn: 1,
+              step: 1,
+              outcome: 'downgraded',
+              reason: 'gate-passed',
+              stateHash: 'd0157f83',
+              stateSeqs: [1],
+              selection: {
+                candidateId: 'flash',
+                provider: 'deepseek-official',
+                model: 'deepseek-v4-flash',
+              },
+              route: { choice: 'flash', confidence: 0.9, probabilities: { flash: 0.9 } },
+              sticky: {
+                active: true,
+                routeErrorLimit: 2,
+                turnsElapsed: 0,
+                enteredTurn: 1,
+                entryBase: { provider: 'deepseek-official', model: 'deepseek-v4.1' },
+              },
+            },
+            {
+              seq: 25,
+              time: 25,
+              turn: 1,
+              step: 2,
+              outcome: 'kept-strong',
+              reason: 'gate-failed',
+              stateHash: 'd0157f83',
+              stateSeqs: [1],
+              route: { choice: 'keep-current', confidence: 0.9, probabilities: { 'keep-current': 0.9 } },
+              sticky: {
+                active: false,
+                turnsElapsed: 0,
+                brokenBy: 'gate-failed',
+              },
+            },
+          ],
+        })),
+        ...standaloneDuration(),
+        t: dictionary,
+      },
+    ) as never)
+
+    const first = screen.getByRole('button', { name: 'Request #1' }).closest('tr')
+    const second = screen.getByRole('button', { name: 'Request #2' }).closest('tr')
+    expect(first?.querySelector('[data-request-route="routed"]')).toBeTruthy()
+    expect(second?.querySelector('[data-request-route="selection"]')).toBeTruthy()
   })
 
   it('persists the duration preference through the runtime snapshot-store seam', () => {

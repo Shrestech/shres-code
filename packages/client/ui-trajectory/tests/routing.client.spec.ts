@@ -45,6 +45,7 @@ function decision(
       : { route: { choice: 'flash', confidence: 0.9, probabilities: { flash: 0.9 } } }),
     sticky: {
       active: true,
+      routeErrorLimit: 2,
       turnsElapsed: 0,
       enteredTurn: 1,
       entryBase: { provider: 'deepseek-official', model: 'deepseek-v4.1' },
@@ -81,13 +82,13 @@ function nodes(): ConversationSnapshot['nodes'] {
 describe('trajectoryRoutingStreak', () => {
   it('reads the entering turn, a held streak, and a broken one', () => {
     expect(trajectoryRoutingStreak(decision({
-      sticky: { active: true, turnsElapsed: 0, enteredTurn: 5 },
+      sticky: { active: true, routeErrorLimit: 2, turnsElapsed: 0, enteredTurn: 5 },
     }))).toEqual({ kind: 'entered', turn: 5 })
     expect(trajectoryRoutingStreak(decision({
-      sticky: { active: true, turnsElapsed: 3, enteredTurn: 1 },
+      sticky: { active: true, routeErrorLimit: 2, turnsElapsed: 3, enteredTurn: 1 },
     }))).toBeUndefined()
     expect(trajectoryRoutingStreak(decision({
-      sticky: { active: true, turnsElapsed: 0 },
+      sticky: { active: true, routeErrorLimit: 2, turnsElapsed: 0 },
     }))).toBeUndefined()
     expect(trajectoryRoutingStreak(decision({
       outcome: 'kept-strong',
@@ -125,6 +126,7 @@ describe('trajectoryRoutingRow', () => {
       selection: { candidateId: 'flash', provider: 'p', model: 'cheap' },
       sticky: {
         active: true,
+        routeErrorLimit: 2,
         turnsElapsed: 2,
         enteredTurn: 1,
         entryBase: { provider: 'p', model: 'strong' },
@@ -175,18 +177,18 @@ describe('trajectoryRoutingRow', () => {
 
 describe('trajectoryRequestRoute', () => {
   it('reports nothing without an effective route or a judged turn', () => {
-    expect(trajectoryRequestRoute(1, undefined, 'cheap', [decision()])).toBeUndefined()
-    expect(trajectoryRequestRoute(1, 'p', undefined, [decision()])).toBeUndefined()
-    expect(trajectoryRequestRoute(2, 'p', 'cheap', [decision()])).toBeUndefined()
+    expect(trajectoryRequestRoute(1, 1, 7, undefined, 'cheap', [decision()])).toBeUndefined()
+    expect(trajectoryRequestRoute(1, 1, 7, 'p', undefined, [decision()])).toBeUndefined()
+    expect(trajectoryRequestRoute(2, 1, 7, 'p', 'cheap', [decision()])).toBeUndefined()
   })
 
   it('badges the request whose effective route left the sticky selection', () => {
-    expect(trajectoryRequestRoute(1, 'p', 'cheap', [decision()])).toEqual({
+    expect(trajectoryRequestRoute(1, 1, 7, 'p', 'cheap', [decision()])).toEqual({
       provider: 'p',
       model: 'cheap',
       routed: true,
     })
-    expect(trajectoryRequestRoute(1, 'deepseek-official', 'deepseek-v4.1', [decision()])).toEqual({
+    expect(trajectoryRequestRoute(1, 1, 7, 'deepseek-official', 'deepseek-v4.1', [decision()])).toEqual({
       provider: 'deepseek-official',
       model: 'deepseek-v4.1',
       routed: false,
@@ -199,25 +201,58 @@ describe('trajectoryRequestRoute', () => {
       reason: 'thin-margin',
       sticky: { active: false, turnsElapsed: 0 },
     }, ['selection'])
-    expect(trajectoryRequestRoute(1, 'p', 'cheap', [strong])).toEqual({
+    expect(trajectoryRequestRoute(1, 1, 7, 'p', 'cheap', [strong])).toEqual({
       provider: 'p',
       model: 'cheap',
       routed: false,
     })
   })
 
-  it('lets the turn last decision govern every request of the turn', () => {
-    const entered = decision()
+  it('reuses a prior-step decision until the request step has its own decision', () => {
+    const entered = decision({ seq: 6 })
     const broken = decision({
-      seq: 9,
+      seq: 25,
+      step: 2,
       outcome: 'kept-strong',
       reason: 'gate-failed',
       sticky: { active: false, turnsElapsed: 0, brokenBy: 'gate-failed' },
     }, ['selection'])
-    expect(trajectoryRequestRoute(1, 'p', 'cheap', [entered, broken])).toEqual({
+    expect(trajectoryRequestRoute(1, 2, 23, 'p', 'cheap', [entered])).toEqual({
+      provider: 'p',
+      model: 'cheap',
+      routed: true,
+    })
+    expect(trajectoryRequestRoute(1, 2, 23, 'p', 'cheap', [entered, broken])).toEqual({
       provider: 'p',
       model: 'cheap',
       routed: false,
+    })
+  })
+
+  it('accepts a partial-window decision without a step only before the request anchor', () => {
+    const loadedPrefix = decision({ seq: 20 }, ['step'])
+    const loadedFuture = decision({ seq: 25 }, ['step'])
+    expect(trajectoryRequestRoute(1, 2, 23, 'p', 'cheap', [loadedPrefix])).toEqual({
+      provider: 'p',
+      model: 'cheap',
+      routed: true,
+    })
+    expect(trajectoryRequestRoute(1, 2, 23, 'p', 'cheap', [loadedFuture])).toBeUndefined()
+  })
+
+  it('does not let a later-step decision badge an earlier request', () => {
+    const entered = decision({ seq: 6 })
+    const later = decision({
+      seq: 25,
+      step: 2,
+      outcome: 'kept-strong',
+      reason: 'gate-failed',
+      sticky: { active: false, turnsElapsed: 0, brokenBy: 'gate-failed' },
+    }, ['selection'])
+    expect(trajectoryRequestRoute(1, 1, 3, 'p', 'cheap', [entered, later])).toEqual({
+      provider: 'p',
+      model: 'cheap',
+      routed: true,
     })
   })
 })
@@ -254,6 +289,19 @@ describe('deriveTrajectoryLayout routing rows', () => {
   it('folds a decision outside a step into the turn message group', () => {
     const laid = cells([decision({}, ['step'])])
     expect(laid.find(entry => entry.cell.kind === 'routing')?.group).toBe('Message')
+  })
+
+  it('reports one entry across repeated judgments on the same entering turn', () => {
+    const entered = decision()
+    const continued = decision({ seq: 16, step: 2 })
+    const changed = decision({
+      seq: 26, step: 3,
+      selection: { candidateId: 'other', provider: 'p', model: 'other-cheap' },
+    })
+    const routing = cells([entered, continued, changed])
+      .filter(entry => entry.cell.kind === 'routing')
+      .map(entry => entry.cell.routing?.streak)
+    expect(routing).toEqual([{ kind: 'entered', turn: 1 }, undefined, { kind: 'entered', turn: 1 }])
   })
 
   it('renders a decision whose logged time is unusable as a time-less marker', () => {

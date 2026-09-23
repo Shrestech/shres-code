@@ -112,7 +112,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'selectionFor(agent: Agent): LiveModelSelectionRef',
-        description: 'Install or return the session-local model selection that prompt assembly snapshots.\n\nPrecedence, resolved on every read: a selection made in this process, else the session\'s latest logged request/header, else the live default. The logged tier is the session\'s own selection rather than the header\'s own route, so a composed router reports the route a held downgrade descends beneath instead of the candidate it rewrote the header to.',
+        description: 'Install or return the session-local model selection that prompt assembly snapshots.\n\nExplicit selections are logged as `agent/model-selection` and survive resume and fork. Without one, the session\'s manual route precedes the live default; a composed router reports the base beneath its routed header.',
         parameters: [{ name: 'agent', description: 'the Agent whose request waterfall should observe this selection.' }],
         returns: 'the shared mutable selection for this Agent.',
       },
@@ -1042,6 +1042,11 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     description: 'Abstract judgment service. Load one implementation per context as `ctx.judgment`; it owns tier selection, credentials, transport, and the validation of every provider response it reads, and registers no session event, prompt, or tool of its own.\n\nMounting an engine installs the Definition-owned JUDGMENT_SETTINGS_NAMESPACE section, because the toggle exists only where an engine does. settings reads it live.',
     methods: [
       {
+        signature: 'readonly fitting?: JudgmentFittingEngine',
+        description: 'Atomic tokenizer fitting and judgment, when the provider supports it.',
+        parameters: [],
+      },
+      {
         signature: 'readonly settings: () => JudgmentSettings',
         description: 'Live read of the resolved judgment settings. Consumers call it at the decision the toggle gates and treat `enabled: false` exactly as an absent engine — never as a third behavior mode.',
         parameters: [],
@@ -1051,7 +1056,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Answer one set of typed questions about one state. Answers come back in the order the questions were asked, each carrying its question\'s id.',
         parameters: [{ name: 'input', description: 'the state, the questions, the optional tier, and the cancellation signal.' }],
         returns: 'the answers with the engine and model identity and the ask\'s duration.',
-        throws: ['{@link JudgmentError} for an unconfigured credential (`UNCONFIGURED`), an unreachable or refusing provider (`UNAVAILABLE`), an unusable provider response (`INVALID_ANSWER`), or a cancelled ask (`ABORTED`).'],
+        throws: ['{@link JudgmentError} for an unconfigured credential (`UNCONFIGURED`), an unreachable or refusing provider (`UNAVAILABLE`), oversized serialized input (`INPUT_TOO_LARGE`), an unusable provider response (`INVALID_ANSWER`), or a cancelled ask (`ABORTED`).'],
       },
     ],
   },
@@ -1216,8 +1221,8 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
   },
   {
     key: 'modelRouting',
-    summary: '`ctx.modelRouting`: owns the logged routing mode, the per-turn decision, and the consult `installModelSelection` reaches.',
-    description: '`ctx.modelRouting`: owns the logged routing mode, the per-turn decision, and the consult `installModelSelection` reaches. No live mirror of the mode is kept — the log is the state — and beyond its two routing events it writes nothing: no prompt, no tool, and no request of its own.',
+    summary: '`ctx.modelRouting`: owns the logged routing mode, routing decisions, and the consult `installModelSelection` reaches.',
+    description: '`ctx.modelRouting`: owns the logged routing mode, routing decisions, and the consult `installModelSelection` reaches. No live mirror of the mode is kept — the log is the state — and its configuration, mode, and decision events write no prompt, tool, or model request.',
     methods: [
       {
         signature: 'config(): ResolvedModelRouterConfig',
@@ -1233,27 +1238,27 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'modeOf(session: Session, end: number = session.events.length): boolean',
-        description: 'The mode in force on one session: the last logged `model-routing/mode` wins, and a log with none starts from the configured `initialMode`.',
+        description: 'The mode in force on one session, derived from committed configuration and user mode events. A log with neither starts off.',
         parameters: [{ name: 'session', description: 'the session to read.' }, { name: 'end', description: 'fold the first `end` events; defaults to the whole log.' }],
         returns: 'whether routing is active.',
       },
       {
         signature: 'set(agent: Agent, active: boolean): \'committed\' | \'queued\' | \'cancelled\' | \'noop\'',
-        description: 'Switch routing on or off. Between turns the change is appended immediately; during an open turn it waits for the next accepted in-turn pre-step, like every other logged mode in this harness.',
+        description: 'Switch routing on or off. Between turns the change is appended immediately; a changed value during an open turn waits for the next accepted pre-step. An explicit choice equal to the current value records user authority immediately and prevents later settings from overriding it.',
         parameters: [{ name: 'agent', description: 'the agent to switch.' }, { name: 'active', description: 'whether routing should be active.' }],
         returns: 'what happened: `committed`, `queued`, `cancelled`, or `noop`.',
       },
       {
-        signature: 'async resolveRequest( agent: Agent, turn: number, _step: number, base: ModelSelection, signal: AbortSignal, ): Promise<ModelSelection | undefined>',
-        description: 'Resolve the route one turn should run. Called by `installModelSelection` after the manual selection rewrote the request: a non-undefined result replaces provider/model/effort, and `undefined` leaves the manual route in force.\n\nOne decision per turn: later steps of the same turn and same-turn request retries reuse the pinned decision instead of judging again.',
-        parameters: [{ name: 'agent', description: 'the agent whose turn is being prepared.' }, { name: 'turn', description: 'the turn number, as the loop dispatched it.' }, { name: '_step', description: 'the step number within that turn; underscore-prefixed because the pin is keyed by turn, so the decision is taken once and later steps reuse it.' }, { name: 'base', description: 'the route the manual selection left in force.' }, { name: 'signal', description: 'the request\'s cancellation signal.' }],
+        signature: 'async resolveRequest( agent: Agent, turn: number, step: number, base: ModelSelection, signal: AbortSignal, request: ModelRoutingRequest, ): Promise<ModelSelection | undefined>',
+        description: 'Resolve the route one request should run. Called by `installModelSelection` after the manual selection rewrote the request: a non-undefined result replaces provider/model/effort, and `undefined` leaves the manual route in force.\n\nEach new downgraded step reassesses the latest task evidence. Same-step retries reuse the judgment only while its complete candidate inputs are unchanged, and recheck manual authority, allowlist membership, and capabilities. A manual-model decision lasts for the turn.',
+        parameters: [{ name: 'agent', description: 'the agent whose turn is being prepared.' }, { name: 'turn', description: 'the turn number, as the loop dispatched it.' }, { name: 'step', description: 'the step number within the turn; retries share its judgment.' }, { name: 'base', description: 'the route the manual selection left in force.' }, { name: 'signal', description: 'the request\'s cancellation signal.' }, { name: 'request', description: 'frozen conversation content and the manually selected call configuration.' }],
         returns: 'the route to run, or `undefined` to keep the manual route.',
       },
       {
         signature: 'stickySelection(agent: Agent): ModelSelection | undefined',
-        description: 'Report the manual selection a held downgrade descends beneath.\n\nA held streak rewrites the consumed `request/header` to the candidate, so that header stops reporting the route the session is pointed at; a reader asking for the session\'s selection asks this first. The answer is the same fold the consult reads — no live mirror — and the effort is the one the streak was entered on, because that is what the manual route still runs at.',
+        description: 'Report the manual selection a held downgrade descends beneath.\n\nA held streak rewrites the consumed `request/header` to the candidate, so that header stops reporting the route the session is pointed at; a reader asking for the session\'s selection asks this first. The answer is the same fold the consult reads — no live mirror — and the effort is the one the streak was entered on, because that is what the manual route still runs at. When the streak has just ended, the last request header can still carry its candidate. In that case the decision immediately before that header retains the manual entry route until a later manual header replaces it. A decision logged after the header is ignored because it may be a crash-orphaned turn.',
         parameters: [{ name: 'agent', description: 'the agent whose selection is being read.' }],
-        returns: 'the route the held streak was entered on, or `undefined` while the state is strong, where the last logged header already is that route.',
+        returns: 'the manual route behind an active streak or the last routed header awaiting replacement; `undefined` when the logged header is already manual.',
       },
     ],
   },
@@ -2914,9 +2919,9 @@ export const EVENT_API: readonly EventApiEntry[] = [
   {
     name: 'agent/request',
     mode: 'waterfall',
-    signature: '\'agent/request\'(this: Scoped<Agent>, payload: { agent: Agent; turn: number; step: number; signal: AbortSignal }, next: () => Promise<LlmCallConfig>): Promise<LlmCallConfig>',
+    signature: '\'agent/request\'(this: Scoped<Agent>, payload: { agent: Agent; turn: number; step: number; content: AgentRequestContent; signal: AbortSignal }, next: () => Promise<LlmCallConfig>): Promise<LlmCallConfig>',
     summary: 'Replace the frozen call configuration.',
-    description: 'Replace the frozen call configuration. `await next()` yields the config the machine would use (agent options on the first request, the logged header afterwards); return a replacement to switch. Model-visible content must use logged channels; this waterfall cannot mutate messages.',
+    description: 'Replace the frozen call configuration. `await next()` yields the config the machine would use (agent options on the first request, the logged header afterwards); return a replacement to switch. `payload.content` is the detached, deep-frozen content assembled for this request and is read-only; only the returned config may change. Model-visible content still uses the request header logged by the loop.',
     parameters: [{ name: 'payload', description: '.signal - the current turn\'s explicit abort signal. Scope-filtered dispatch (`@shres-code/shres-code-scope`): agent-scoped listeners receive only that agent.' }],
   },
   {
@@ -3326,6 +3331,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'AgentPreset',
     declaration: 'export interface AgentPreset {\n    readonly id: string;\n    readonly trust: PresetTrust;\n    readonly path: string;\n    readonly name?: string;\n    readonly description?: string;\n    readonly order?: number;\n    readonly broken?: string;\n}',
+  },
+  {
+    name: 'AgentRequestContent',
+    declaration: 'export interface AgentRequestContent {\n    readonly messages: readonly Message[];\n    readonly system: string;\n    readonly tools: readonly ToolSchema[];\n}',
   },
   {
     name: 'AgentSetup',
@@ -4084,6 +4093,18 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface JudgmentChoiceQuestion {\n    kind: \'choice\';\n    id: JudgmentQuestionId;\n    instructions: string;\n    options: JudgmentChoiceOption[];\n}',
   },
   {
+    name: 'JudgmentFittingEngine',
+    declaration: 'export interface JudgmentFittingEngine {\n    ask(input: JudgmentFittingInput): Promise<JudgmentFittingResult>;\n}',
+  },
+  {
+    name: 'JudgmentFittingInput',
+    declaration: 'export interface JudgmentFittingInput extends Omit<JudgmentInput, \'state\'> {\n    states: readonly string[];\n}',
+  },
+  {
+    name: 'JudgmentFittingResult',
+    declaration: 'export type JudgmentFittingResult = {\n    kind: \'answered\';\n    fit: JudgmentTokenFit;\n    result: JudgmentResult;\n} | {\n    kind: \'unfit\';\n    engine: string;\n    model: string;\n    limits: JudgmentTokenLimits;\n    reason: JudgmentTokenLimitReason;\n};',
+  },
+  {
     name: 'JudgmentInput',
     declaration: 'export interface JudgmentInput {\n    state: string;\n    questions: readonly JudgmentQuestion[];\n    tier?: JudgmentTier;\n    signal?: AbortSignal;\n}',
   },
@@ -4114,6 +4135,18 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'JudgmentTier',
     declaration: 'export type JudgmentTier = \'fast\' | \'accurate\';',
+  },
+  {
+    name: 'JudgmentTokenFit',
+    declaration: 'export interface JudgmentTokenFit {\n    selectedIndex: number;\n    state: string;\n    stateTokens: number;\n    sequenceTokens: readonly number[];\n    paddedTokens: number;\n    limits: JudgmentTokenLimits;\n}',
+  },
+  {
+    name: 'JudgmentTokenLimitReason',
+    declaration: 'export type JudgmentTokenLimitReason = \'state\' | \'head\' | \'option\' | \'batch\';',
+  },
+  {
+    name: 'JudgmentTokenLimits',
+    declaration: 'export interface JudgmentTokenLimits {\n    maxSequenceTokens: number;\n    maxHeadTokens: number;\n    maxBatchTokens: number;\n    manifestSha256: string;\n}',
   },
   {
     name: 'KnobState',
@@ -4404,6 +4437,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type ModelRoutingInitialMode = \'off\' | \'on\';',
   },
   {
+    name: 'ModelRoutingRequest',
+    declaration: 'export interface ModelRoutingRequest {\n    readonly config: LlmCallConfig;\n    readonly content: AgentRequestContent;\n}',
+  },
+  {
     name: 'ModelRoutingUnavailablePolicy',
     declaration: 'export type ModelRoutingUnavailablePolicy = \'fallback\' | \'error\';',
   },
@@ -4573,7 +4610,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ResolvedModelRoutingState',
-    declaration: 'export interface ResolvedModelRoutingState {\n    readonly contextTurns: number;\n    readonly maxChars: number;\n}',
+    declaration: 'export interface ResolvedModelRoutingState {\n    readonly contextTurns: number;\n    readonly maxChars: number;\n    readonly maxFitCandidates: number;\n}',
   },
   {
     name: 'ResolvedNormalRetryPolicy',

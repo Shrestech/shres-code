@@ -39,7 +39,7 @@ function decision(
     stateHash: '00000000',
     stateSeqs: [0],
     selection: { candidateId: 'cheap', provider: 'cheap-provider', model: 'cheap-model' },
-    sticky: { active: true, turnsElapsed: 0, enteredTurn: 1 },
+    sticky: { active: true, routeErrorLimit: 2, turnsElapsed: 0, enteredTurn: 1 },
     ...overrides,
   }
   return Object.fromEntries(
@@ -69,6 +69,35 @@ describe('model-router invariant companion', () => {
     expect(() => {
       ctx.invariants.register('@shres-code/shres-code-model-router', () => {})
     }).toThrow(/already registered/)
+  })
+
+  it('accepts configuration replacements before an explicit mode selection', async () => {
+    const ctx = await setup()
+    const session = ctx.sessions.create()
+
+    expect(() => {
+      session.append('model-routing/configuration', { active: true })
+      session.append('model-routing/configuration', { active: false })
+    }).not.toThrow()
+    expect(session.events.map(event => event.type)).toEqual([
+      'model-routing/configuration',
+      'model-routing/configuration',
+    ])
+  })
+
+  it('rejects configuration after a same-valued explicit mode selection', async () => {
+    const ctx = await setup()
+    const session = ctx.sessions.create()
+    session.append('model-routing/configuration', { active: true })
+    session.append('model-routing/mode', { active: true })
+
+    expect(() => {
+      session.append('model-routing/configuration', { active: false })
+    }).toThrow(/cannot follow an explicit model-routing\/mode selection/)
+    expect(session.events.map(event => event.type)).toEqual([
+      'model-routing/configuration',
+      'model-routing/mode',
+    ])
   })
 
   it('accepts the request header carrying the route a downgraded decision selected', async () => {
@@ -117,5 +146,29 @@ describe('model-router invariant companion', () => {
     expect(() => { header(session, 'strong-provider', 'strong-model') }).not.toThrow()
     // A non-header event is not a claim about the route.
     expect(() => { session.append('turn/start', { turn: 1 }) }).not.toThrow()
+  })
+
+  it('requires a recovery request to use its recorded manual route', async () => {
+    const ctx = await setup()
+    const session = ctx.sessions.create()
+    session.append('turn/start', { turn: 1 })
+    session.append('model-routing/decision', decision({
+      outcome: 'kept-strong', reason: 'route-errors', selection: undefined,
+      sticky: { active: false, turnsElapsed: 0, entryBase: { provider: 'strong', model: 'manual' } },
+    }))
+    expect(() => { header(session, 'cheap-provider', 'cheap-model') }).toThrow(/does not match the selected route/)
+    expect(() => { header(session, 'strong', 'manual') }).not.toThrow()
+    session.append('turn/start', { turn: 2 })
+    expect(() => { header(session, 'cheap-provider', 'cheap-model') }).not.toThrow()
+  })
+
+  it('refuses a recovery request whose decision has no recorded manual route', async () => {
+    const ctx = await setup()
+    const session = ctx.sessions.create()
+    session.append('model-routing/decision', decision({
+      outcome: 'kept-strong', reason: 'route-errors', selection: undefined,
+      sticky: { active: false, turnsElapsed: 0 },
+    }))
+    expect(() => { header(session, 'strong', 'manual') }).toThrow(/recovery decision carries no manual route/)
   })
 })

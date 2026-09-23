@@ -15,9 +15,11 @@ import {
   DEFAULT_MIN_TURNS_DOWNGRADED,
   DEFAULT_STATE_CONTEXT_TURNS,
   DEFAULT_STATE_MAX_CHARS,
+  DEFAULT_STATE_MAX_FIT_CANDIDATES,
   resolveConfig,
 } from '../src/index.ts'
 import ModelRoutingController from '../src/index.ts'
+import { KEEP_CURRENT_OPTION_ID } from '../src/config.ts'
 import type { ModelRouterConfig } from '../src/config.ts'
 
 const CANDIDATE = { id: 'cheap', provider: 'cheap-provider', model: 'cheap-model' }
@@ -104,6 +106,11 @@ describe('resolveConfig allowlist', () => {
       .toThrow('ModelRouterConfig.candidates["cheap"].description must be a non-empty string')
   })
 
+  it('rejects the route option id reserved for keeping the manual model', () => {
+    expect(() => resolveConfig(valid({ candidates: [{ ...CANDIDATE, id: KEEP_CURRENT_OPTION_ID }] })))
+      .toThrow('ModelRouterConfig.candidates["keep-current"].id is reserved for the keep-current route option')
+  })
+
   it('keeps the allowlist in configuration order and defaults it to empty', () => {
     const resolved = resolveConfig(valid({
       candidates: [
@@ -159,6 +166,16 @@ describe('resolveConfig the difficulty question', () => {
     expect(resolveConfig({ ...config, difficultyInstructions: 'How hard?' }).hardHintScoreThreshold).toBe(4)
   })
 
+  it('is required for an effort lift even when stickiness is disabled', () => {
+    const config = withoutDifficultyQuestion({
+      difficultyToEffort: { scoreThreshold: 0, reasoningEffort: 'high' },
+    })
+    expect(() => resolveConfig(config))
+      .toThrow('ModelRouterConfig.difficultyInstructions is required while minTurnsDowngraded > 0 or hardHint or difficultyToEffort')
+    expect(resolveConfig({ ...config, difficultyInstructions: 'How hard?' }).difficultyToEffort)
+      .toEqual({ scoreThreshold: 0, reasoningEffort: 'high' })
+  })
+
   it('is optional for a non-sticky router with no hint', () => {
     const resolved = resolveConfig(withoutDifficultyQuestion())
     expect(resolved.minTurnsDowngraded).toBe(0)
@@ -194,15 +211,39 @@ describe('resolveConfig bounds', () => {
     expect(resolveConfig(valid({ downgradeThreshold: 0, downgradeMargin: 1 })).downgradeThreshold).toBe(0)
   })
 
-  it('requires a difficulty score inside the 1..5 level scale', () => {
-    expect(() => resolveConfig(valid({ escalateBack: { scoreThreshold: 0.5 } })))
-      .toThrow('ModelRouterConfig.escalateBack.scoreThreshold must be a number from 1 through 5')
-    expect(() => resolveConfig(valid({ escalateBack: { scoreThreshold: 6 } })))
-      .toThrow('ModelRouterConfig.escalateBack.scoreThreshold must be a number from 1 through 5')
-    expect(() => resolveConfig(valid({ hardHint: { scoreThreshold: 5.5 } })))
-      .toThrow('ModelRouterConfig.hardHint.scoreThreshold must be a number from 1 through 5')
-    expect(() => resolveConfig(valid({ difficultyToEffort: { scoreThreshold: 0, reasoningEffort: 'high' } })))
-      .toThrow('ModelRouterConfig.difficultyToEffort.scoreThreshold must be a number from 1 through 5')
+  it('uses the zero-based difficulty level scale, including score zero', () => {
+    expect(resolveConfig(valid({ escalateBack: { scoreThreshold: 0 } })).escalateBackScoreThreshold).toBe(0)
+    expect(resolveConfig(valid({ hardHint: { scoreThreshold: 0 } })).hardHintScoreThreshold).toBe(0)
+    expect(resolveConfig(valid({ difficultyToEffort: { scoreThreshold: 0, reasoningEffort: 'high' } })).difficultyToEffort)
+      .toEqual({ scoreThreshold: 0, reasoningEffort: 'high' })
+    expect(() => resolveConfig(valid({ escalateBack: { scoreThreshold: -0.1 } })))
+      .toThrow('ModelRouterConfig.escalateBack.scoreThreshold must be a number from 0 through 4')
+    expect(() => resolveConfig(valid({ escalateBack: { scoreThreshold: 4.5 } })))
+      .toThrow('ModelRouterConfig.escalateBack.scoreThreshold must be a number from 0 through 4')
+    expect(() => resolveConfig(valid({ hardHint: { scoreThreshold: 5 } })))
+      .toThrow('ModelRouterConfig.hardHint.scoreThreshold must be a number from 0 through 4')
+    expect(() => resolveConfig(valid({ difficultyToEffort: { scoreThreshold: 4.5, reasoningEffort: 'high' } })))
+      .toThrow('ModelRouterConfig.difficultyToEffort.scoreThreshold must be a number from 0 through 4')
+  })
+
+  it('validates thresholds against a custom rubric and does not clamp its default', () => {
+    expect(resolveConfig(valid({ difficultyLevels: ['easy', 'hard', 'very hard', 'extreme'] })).escalateBackScoreThreshold)
+      .toBe(3)
+    expect(() => resolveConfig(valid({ difficultyLevels: ['easy', 'hard'] })))
+      .toThrow('ModelRouterConfig.escalateBack.scoreThreshold must be a number from 0 through 1')
+    const short = valid({
+      difficultyLevels: ['easy', 'hard'],
+      escalateBack: { scoreThreshold: 1 },
+      hardHint: { scoreThreshold: 0 },
+      difficultyToEffort: { scoreThreshold: 1, reasoningEffort: 'high' },
+    })
+    expect(resolveConfig(short)).toMatchObject({
+      escalateBackScoreThreshold: 1,
+      hardHintScoreThreshold: 0,
+      difficultyToEffort: { scoreThreshold: 1, reasoningEffort: 'high' },
+    })
+    expect(() => resolveConfig(valid({ difficultyLevels: ['easy', 'hard'], escalateBack: { scoreThreshold: 2 } })))
+      .toThrow('ModelRouterConfig.escalateBack.scoreThreshold must be a number from 0 through 1')
   })
 
   it('requires the effort lift to name an effort', () => {
@@ -229,6 +270,11 @@ describe('resolveConfig bounds', () => {
       .toThrow('ModelRouterConfig.maxRouteErrors must be a positive integer')
     expect(() => resolveConfig(valid({ maxRouteErrors: 1.5 })))
       .toThrow('ModelRouterConfig.maxRouteErrors must be a positive integer')
+  })
+
+  it.each([1, 0, -1, 2.5])('rejects an invalid fitting alternative count %s', (maxFitCandidates) => {
+    expect(() => resolveConfig(valid({ state: { maxFitCandidates } })))
+      .toThrow('ModelRouterConfig.state.maxFitCandidates must be an integer of at least two')
   })
 
   it('requires a non-negative context window and a positive state cap', () => {
@@ -296,7 +342,11 @@ describe('the composition schema', () => {
     expect('hardHintScoreThreshold' in resolved).toBe(false)
 
     // A set group resolves exactly as written, with no default substituted.
-    const set = throughSchema({ ...bare(), difficultyToEffort: { scoreThreshold: 3, reasoningEffort: 'medium' } })
+    const set = throughSchema({
+      ...bare(),
+      difficultyInstructions: 'How hard is this turn?',
+      difficultyToEffort: { scoreThreshold: 3, reasoningEffort: 'medium' },
+    })
     expect(set.difficultyToEffort).toEqual({ scoreThreshold: 3, reasoningEffort: 'medium' })
     expect(resolveConfig(set as unknown as ModelRouterConfig).difficultyToEffort)
       .toEqual({ scoreThreshold: 3, reasoningEffort: 'medium' })
@@ -309,10 +359,10 @@ describe('the composition schema', () => {
     // Writing the group (even valueless) takes the schema's inner default, and the
     // hint then reads the difficulty answer, so the question becomes required.
     const hinted = throughSchema({ ...bare(), hardHint: {} })
-    expect(hinted.hardHint).toEqual({ scoreThreshold: 4 })
+    expect(hinted.hardHint).toEqual({ scoreThreshold: 3 })
     expect(() => resolveConfig(hinted as unknown as ModelRouterConfig))
       .toThrow('ModelRouterConfig.difficultyInstructions is required while minTurnsDowngraded > 0 or hardHint')
-    expect(resolveConfig({ ...hinted, difficultyInstructions: 'How hard is this turn?' } as unknown as ModelRouterConfig).hardHintScoreThreshold).toBe(4)
+    expect(resolveConfig({ ...hinted, difficultyInstructions: 'How hard is this turn?' } as unknown as ModelRouterConfig).hardHintScoreThreshold).toBe(3)
 
     // A held downgrade requires it on its own, with no hint in the row at all.
     expect(() => resolveConfig(throughSchema({ ...bare(), minTurnsDowngraded: 5 }) as unknown as ModelRouterConfig))
@@ -326,19 +376,23 @@ describe('resolveConfig defaults and detachment', () => {
     expect(resolved.minTurnsDowngraded).toBe(DEFAULT_MIN_TURNS_DOWNGRADED)
     expect(resolved.minTurnsDowngraded).toBe(5)
     expect(resolved.escalateBackScoreThreshold).toBe(DEFAULT_ESCALATE_BACK_SCORE_THRESHOLD)
-    expect(resolved.escalateBackScoreThreshold).toBe(4)
+    expect(resolved.escalateBackScoreThreshold).toBe(3)
     expect(resolved.maxRouteErrors).toBe(DEFAULT_MAX_ROUTE_ERRORS)
     expect(resolved.maxRouteErrors).toBe(2)
     expect(resolved.onUnavailable).toBe('fallback')
     expect(resolved.tier).toBe('fast')
-    expect(resolved.state).toEqual({ contextTurns: DEFAULT_STATE_CONTEXT_TURNS, maxChars: DEFAULT_STATE_MAX_CHARS })
-    expect(resolved.state).toEqual({ contextTurns: 2, maxChars: 12_000 })
+    expect(resolved.state).toEqual({
+      contextTurns: DEFAULT_STATE_CONTEXT_TURNS, maxChars: DEFAULT_STATE_MAX_CHARS, maxFitCandidates: DEFAULT_STATE_MAX_FIT_CANDIDATES,
+    })
+    expect(resolved.state).toEqual({ contextTurns: 2, maxChars: 12_000, maxFitCandidates: 8 })
     expect(resolved.difficultyLevels).toEqual(DEFAULT_DIFFICULTY_LEVELS)
     expect(resolved.difficultyLevels).toHaveLength(5)
     expect(resolved.hardHintScoreThreshold).toBeUndefined()
     expect(resolved.difficultyToEffort).toBeUndefined()
-    expect(resolveConfig(valid({ state: { contextTurns: 0, maxChars: 1 } })).state).toEqual({ contextTurns: 0, maxChars: 1 })
-    expect(resolveConfig(valid({ difficultyLevels: ['a', 'b'] })).difficultyLevels).toEqual(['a', 'b'])
+    expect(resolveConfig(valid({ state: { contextTurns: 0, maxChars: 1 } })).state)
+      .toEqual({ contextTurns: 0, maxChars: 1, maxFitCandidates: 8 })
+    expect(resolveConfig(valid({ difficultyLevels: ['a', 'b'], escalateBack: { scoreThreshold: 1 } })).difficultyLevels)
+      .toEqual(['a', 'b'])
   })
 
   it('returns frozen facts', () => {
@@ -365,7 +419,7 @@ describe('resolveConfig defaults and detachment', () => {
   it('detaches the result from the caller\u2019s arrays', () => {
     const candidates = [{ ...CANDIDATE }]
     const levels = ['one', 'two']
-    const resolved = resolveConfig(valid({ candidates, difficultyLevels: levels }))
+    const resolved = resolveConfig(valid({ candidates, difficultyLevels: levels, escalateBack: { scoreThreshold: 1 } }))
 
     candidates.push({ id: 'mid', provider: 'mid-provider', model: 'mid-model' })
     candidates[0]!.model = 'mutated-model'

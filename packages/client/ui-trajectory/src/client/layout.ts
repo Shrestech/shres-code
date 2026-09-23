@@ -191,6 +191,7 @@ export function deriveTrajectoryLayout(input: TrajectoryLayoutInput): readonly T
   const standaloneCompactions: TurnBucket[] = []
   let index = 0
   let prevAbsTime: number | null = null
+  let previousRoutingDecision: TrajectoryRoutingDecision | undefined
   let lastAssistantTurn: number | null = null
 
   const bucket = (turn: number) => {
@@ -403,13 +404,14 @@ export function deriveTrajectoryLayout(input: TrajectoryLayoutInput): readonly T
           // translated at its consumer, and search and the timeline read these.
           text: `${decision.outcome} · ${decision.reason}`,
           sourceSeq: decision.seq,
-          routing: trajectoryRoutingRow(decision),
+          routing: trajectoryRoutingRow(decision, previousRoutingDecision),
           timeSeconds: 0,
           startedAt: finiteTime(decision.time),
         },
       }
       if (decision.step === undefined) pushMessage(turn, laid)
       else pushStep(turn, decision.step, [laid])
+      previousRoutingDecision = decision
       prevAbsTime = finiteTime(decision.time) ?? prevAbsTime
       continue
     }

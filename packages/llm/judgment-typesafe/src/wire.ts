@@ -69,7 +69,9 @@ export function toWireRequest(
  * and per asked question id the answer must exist, be an object, carry the
  * `type` of that question kind, and hold finite numbers. `usage` and `legend`
  * are carried by the vendor but not consumed, so their absence never fails an
- * ask.
+ * ask. Choice distributions must include one probability for every requested
+ * option; score distributions may remain sparse because the vendor reports
+ * only the levels it used.
  * @param body - the parsed JSON response.
  * @param questions - the questions this ask sent, in ask order.
  * @returns the answering model id and one mapped answer per question, in ask order.
@@ -181,6 +183,13 @@ function probabilityMap(value: unknown, question: JudgmentQuestion): Record<stri
       throw invalid(`answers question "${question.id}" with a non-finite probability for "${key}"`)
     }
     probabilities[key] = entry
+  }
+  if (question.kind === 'choice') {
+    for (const option of question.options) {
+      if (!Object.hasOwn(probabilities, option.option)) {
+        throw invalid(`answers question "${question.id}" has no probability for option "${option.option}"`)
+      }
+    }
   }
   return probabilities
 }

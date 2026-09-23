@@ -15,13 +15,13 @@ import LlmRuntime, { createUserMessage } from '@shres-code/shres-code-llm'
 // A function plugin: the Loader reads its `name`/`inject`/`apply` namespace, not a default.
 import * as DeepSeekPlugin from '@shres-code/shres-code-llm-deepseek'
 import { startMockLlmServer } from '@shres-code/shres-code-llm-mock-server'
-import type { MockLlmServer } from '@shres-code/shres-code-llm-mock-server'
+import type { MockLlmBehavior, MockLlmServer } from '@shres-code/shres-code-llm-mock-server'
 import SessionStore, { SessionId } from '@shres-code/shres-code-session'
 import type { SessionEvent } from '@shres-code/shres-code-session'
 import SessionProjectionRegistry from '@shres-code/shres-code-session-projection'
 import SystemPrompt from '@shres-code/shres-code-system-prompt'
 import ToolRuntime from '@shres-code/shres-code-tools'
-import ModelRoutingController, { ROUTE_COMMAND, ROUTE_QUESTION_ID, DIFFICULTY_QUESTION_ID } from '../src/index.ts'
+import ModelRoutingController, { KEEP_CURRENT_OPTION_ID, ROUTE_COMMAND, ROUTE_QUESTION_ID, DIFFICULTY_QUESTION_ID } from '../src/index.ts'
 import { FakeJudgment, SCRIPTED_CANDIDATE, SCRIPTED_ENGINE, SCRIPTED_OTHER_CANDIDATE } from './fake-judgment-provider.ts'
 
 /**
@@ -159,8 +159,11 @@ async function loadSpine(baseURL: string): Promise<Context> {
 }
 
 /** Start the stub model server and boot the composition against it. */
-async function boot(successText = 'ROUTED_OK'): Promise<Context> {
-  server = await startMockLlmServer({ sequence: ['success'], repeatLast: true, chunkSize: 4096, successText })
+async function boot(
+  successText = 'ROUTED_OK',
+  sequence: readonly MockLlmBehavior[] = ['success'],
+): Promise<Context> {
+  server = await startMockLlmServer({ sequence, repeatLast: true, chunkSize: 4096, successText })
   return loadSpine(server.baseURL)
 }
 
@@ -263,10 +266,14 @@ describe('real Loader composition', () => {
     const asked = judgment.asks[0]!
     expect(asked.questions.map(question => question.id)).toEqual([ROUTE_QUESTION_ID, DIFFICULTY_QUESTION_ID])
     expect(asked.state).toContain('Summarize the failing test name.')
-    expect(asked.questions[0]).toMatchObject({
-      kind: 'choice',
-      options: [{ option: SCRIPTED_CANDIDATE }, { option: 'vision' }],
-    })
+    expect(asked.questions[0]).toMatchObject({ kind: 'choice' })
+    const routeQuestion = asked.questions[0]
+    if (routeQuestion?.kind !== 'choice') throw new Error('the route question was not a choice question')
+    expect(routeQuestion.options.map(option => option.option)).toEqual([
+      KEEP_CURRENT_OPTION_ID,
+      SCRIPTED_CANDIDATE,
+      SCRIPTED_OTHER_CANDIDATE,
+    ])
 
     // The projection renders the same decision the log holds. Its `active` is
     // the mode in force: `initialMode: on` with no logged mode event is on.
@@ -373,10 +380,11 @@ describe('real Loader composition', () => {
   it('the /route command switches routing off, and the next turn reverts to the manual route', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
     const loaded = await boot()
     const agent = createAgent(loaded, 'router-off')
-    await pinManualRoute(loaded, agent)
+    const selection = loaded.agentDefaultModel.selectionFor(agent)
 
     await turn(agent, 'First easy turn.')
     expect(eventsOfType(agent.session.events, 'model-routing/decision')).toHaveLength(1)
+    expect(selection.current).toEqual({ provider: PROVIDER, model: MANUAL_MODEL })
 
     // The real command, through the real registry, exactly as a UI dispatches it.
     const execution = await loaded.commands.execute(agent, `/${ROUTE_COMMAND} off`, new AbortController().signal)
@@ -397,7 +405,41 @@ describe('real Loader composition', () => {
     // The consumed request is the manual route again, and the stub server sees it.
     const headers = eventsOfType(agent.session.events, 'request/header')
     expect(headers.at(-1)?.data.header.config).toMatchObject({ provider: PROVIDER, model: MANUAL_MODEL })
+    expect(selection.current).toEqual({ provider: PROVIDER, model: MANUAL_MODEL, reasoningEffort: 'high' })
     expect(requestedModel(1)).toBe(MANUAL_MODEL)
+  })
+
+  it('restores the initial default after routed request errors and resumes from that base', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
+    const loaded = await boot('ROUTED_OK', ['success', 'rate_limit', 'rate_limit', 'success'])
+    const agent = createAgent(loaded, 'router-route-errors')
+    const selection = loaded.agentDefaultModel.selectionFor(agent)
+
+    await turn(agent, 'First easy turn.')
+    await turn(agent, 'Second easy turn.')
+    await turn(agent, 'Third easy turn.')
+
+    const ends = eventsOfType(agent.session.events, 'turn/end')
+    expect(ends.map(event => event.data.reason.kind)).toEqual(['completed', 'error', 'error'])
+    expect(loaded.modelRouting.stickySelection(agent)).toEqual({ provider: PROVIDER, model: MANUAL_MODEL })
+    expect(selection.current).toEqual({ provider: PROVIDER, model: MANUAL_MODEL })
+
+    await turn(agent, 'Fourth easy turn.')
+    expect(requestedModel(3)).toBe(MANUAL_MODEL)
+    const decisions = eventsOfType(agent.session.events, 'model-routing/decision')
+    expect(decisions[3]?.data).toMatchObject({
+      outcome: 'kept-strong',
+      reason: 'route-errors',
+      sticky: { active: false, entryBase: { provider: PROVIDER, model: MANUAL_MODEL } },
+    })
+    expect(scriptedEngine(loaded).asks).toHaveLength(3)
+
+    await turn(agent, 'Fifth easy turn.')
+    expect(requestedModel(4)).toBe(CANDIDATE_MODEL)
+    expect(eventsOfType(agent.session.events, 'model-routing/decision')[4]?.data).toMatchObject({
+      outcome: 'downgraded',
+      reason: 'gate-passed',
+      sticky: { active: true, entryBase: { provider: PROVIDER, model: MANUAL_MODEL } },
+    })
   })
 
   it('resolves the session’s route from the log, holding the streak until a real manual switch ends it', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {

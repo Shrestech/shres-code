@@ -43,7 +43,7 @@ Failures are one `JudgmentError` each, and a consumer branches on `code`:
 |---|---|
 | `UNCONFIGURED` | No credentials service is mounted, or the reference holds no value. Thrown before any request is sent. |
 | `UNAVAILABLE` | The request failed, the vendor answered non-2xx (401, 422, 429, 529 and any other status), a transient status outlasted `retry.maxRetries`, or the ask outlived `timeoutMs`. A non-2xx message carries the HTTP status and the provider's own message when its error body is JSON, and an exhausted retry carries the response that spent the budget. |
-| `INVALID_ANSWER` | The response body is not an object, carries no model id or answers, or answers a question with a missing entry, another kind's discriminant, an option the question never offered, or a non-finite number. |
+| `INVALID_ANSWER` | The response body is not an object, carries no model id or answers, omits a probability for a requested choice option, or answers with a missing entry, another kind's discriminant, an unasked option, or a non-finite number. |
 | `ABORTED` | The caller's own `AbortSignal` ended the ask. Caller cancellation is classified before the deadline, so a cancelled ask is never reported as a timeout. |
 
 ## Wire mapping
@@ -61,7 +61,7 @@ Answers are translated back, and the discriminant must match the question kind:
 | Vendor answer | Seam answer | Notes |
 |---|---|---|
 | `{ type: 'noul', noul }` | `{ kind: 'binary', id, probability }` | The vendor reports no confidence for this kind, and the seam's binary answer has none either. |
-| `{ type: 'choice', choice, probabilities, confidence }` | `{ kind: 'choice', id, option, probabilities, confidence }` | `choice` must name one of the asked options. |
+| `{ type: 'choice', choice, probabilities, confidence }` | `{ kind: 'choice', id, option, probabilities, confidence }` | `choice` must name an asked option; every asked option must have a finite probability. The distribution is not renormalized. |
 | `{ type: 'score', score, probabilities, confidence }` | `{ kind: 'score', id, score, probabilities, confidence }` | Probabilities keep the vendor's level-index keys, and the `legend` it may accompany them with is dropped. |
 
 `usage` is carried by the vendor and not consumed, so its absence never fails an ask, and no token figure reaches the result.

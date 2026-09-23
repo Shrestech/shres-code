@@ -17,8 +17,8 @@ export const inject = ['invariants']
 
 /**
  * Install the routing contract the log must always satisfy: inside the turn that
- * took it, a downgraded decision is followed by a `request/header` whose config
- * carries the route that decision selected.
+ * took it, a downgrade or error-recovery decision is followed by a
+ * `request/header` whose config carries the selected route.
  *
  * That relation is the whole point of the feature — the decision is only
  * meaningful if the loop actually ran the downgraded route — and it is owned
@@ -27,6 +27,12 @@ export const inject = ['invariants']
  * decision's own turn: a later turn whose mode is off, or whose manual route was
  * chosen afresh, legitimately logs a header that does not match an earlier
  * decision, and checking that would reject a session turning routing off.
+ *
+ * Configuration events may replace one another until the session records an
+ * explicit `model-routing/mode`; after that point, even a same-valued
+ * configuration append is an invalid producer transition because the user
+ * choice owns the mode. The check rejects that transition before publication,
+ * so the pure fold never has to reinterpret malformed history.
  *
  * The check runs on `internal/dispatch` **before publication**, which is what
  * makes a violation fail loudly: a `session/event` listener's throw is
@@ -39,6 +45,12 @@ const install: InvariantInstaller = (ctx: Context, fail: InvariantFailure) => {
   ctx.on('internal/dispatch', (_mode, eventName, args) => {
     if (eventName !== 'session/event') return
     const [session, event] = args as [Session, SessionEvent]
+    if (event.type === 'model-routing/configuration') {
+      if (session.events.some(candidate => candidate.type === 'model-routing/mode')) {
+        fail('a model-routing/configuration event cannot follow an explicit model-routing/mode selection')
+      }
+      return
+    }
     if (event.type !== 'request/header') return
     let turnStartSeq = -1
     let decided: ModelRoutingDecision | undefined
@@ -52,16 +64,19 @@ const install: InvariantInstaller = (ctx: Context, fail: InvariantFailure) => {
     }
     // Only the decision this turn took is in force for this header.
     if (decided === undefined || decisionSeq < turnStartSeq) return
-    if (decided.outcome !== 'downgraded') return
-    const selection = decided.selection
+    const recovery = decided.outcome === 'kept-strong' && decided.reason === 'route-errors'
+    if (decided.outcome !== 'downgraded' && !recovery) return
+    const selection = recovery ? decided.sticky.entryBase : decided.selection
     if (selection === undefined) {
-      fail('a downgraded routing decision carries no selection')
+      fail(recovery
+        ? 'a route-error recovery decision carries no manual route'
+        : 'a downgraded routing decision carries no selection')
       return
     }
     const config = event.data.header.config
     if (config.provider !== selection.provider || config.model !== selection.model) {
       fail(
-        `the request header after a downgraded decision (${config.provider}/${config.model})`
+        `the request header after a routing decision (${config.provider}/${config.model})`
         + ` does not match the selected route (${selection.provider}/${selection.model})`,
       )
     }

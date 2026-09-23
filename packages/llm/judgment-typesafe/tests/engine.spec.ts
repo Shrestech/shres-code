@@ -642,6 +642,23 @@ describe('response validation', () => {
     expect(failure.message).toContain('no probabilities object')
   })
 
+  it('rejects a choice answer missing a requested option probability', async () => {
+    const { ctx } = await harness([
+      {
+        kind: 'json',
+        status: 200,
+        body: answerBody({
+          severity: { type: 'choice', choice: 'low', probabilities: { low: 1 }, confidence: 1 },
+        }),
+      },
+    ])
+
+    const failure = await askFailure(() => ctx.judgment.ask({ state: 'state', questions: [CHOICE] }))
+
+    expect(failure.code).toBe('INVALID_ANSWER')
+    expect(failure.message).toContain('has no probability for option "high"')
+  })
+
   it('rejects a probability entry that is not finite', async () => {
     const { ctx } = await harness([
       {

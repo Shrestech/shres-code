@@ -1551,6 +1551,15 @@ importers:
       '@shres-code/shres-code-code-runtime-worker-thread':
         specifier: workspace:^
         version: link:../../code-runtime/code-runtime-worker-thread
+      '@shres-code/shres-code-judgment-shield':
+        specifier: workspace:^
+        version: link:../../llm/judgment-shield
+      '@shres-code/shres-code-judgment-typesafe':
+        specifier: workspace:^
+        version: link:../../llm/judgment-typesafe
+      '@shres-code/shres-code-model-router':
+        specifier: workspace:^
+        version: link:../../llm/model-router
       commander:
         specifier: ^15.0.0
         version: 15.0.0
@@ -6455,6 +6464,31 @@ importers:
         specifier: workspace:^
         version: link:../../settings/settings-file
 
+  packages/llm/judgment-shield:
+    dependencies:
+      '@shres-code/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@shres-code/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@shres-code/cordis-plugin-include':
+        specifier: workspace:^
+        version: link:../../../vendor/include
+      '@shres-code/cordis-plugin-loader':
+        specifier: workspace:^
+        version: link:../../../vendor/loader
+      '@shres-code/shres-code-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@shres-code/shres-code-judgment':
+        specifier: workspace:^
+        version: link:../judgment
+      '@shres-code/shres-code-timeout':
+        specifier: workspace:^
+        version: link:../../util/timeout
+
   packages/llm/judgment-typesafe:
     dependencies:
       '@shres-code/schemastery':
@@ -6824,6 +6858,9 @@ importers:
       '@shres-code/shres-code-judgment':
         specifier: workspace:^
         version: link:../judgment
+      '@shres-code/shres-code-judgment-shield':
+        specifier: workspace:^
+        version: link:../judgment-shield
       '@shres-code/shres-code-judgment-typesafe':
         specifier: workspace:^
         version: link:../judgment-typesafe

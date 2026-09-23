@@ -8,7 +8,7 @@ The harness needed rented calibrated judgment for two decisions — which model 
 
 ## Decision
 
-Shipped on PR #195, one seam with staged consumers.
+One seam with staged consumers. The [routing choice and difficulty decision](../bug-fix/2026-09-22-routing-choice-and-difficulty.md) owns the current-model option, score scale, and sticky candidate transitions; it supersedes those portions of this record.
 
 - `ctx.judgment` (`packages/llm/judgment`, `packages/llm/judgment-typesafe`): choice/score/noul questions against TypeSafe's systemone API; the deployment switch treats off as exactly absent; request redaction has one home, the provider, and transient 429/529 refusals retry once after a validated wait with a spent budget surfacing the same UNAVAILABLE failure as before.
 - `model-router` (`packages/llm/model-router`): downgrade-only sticky routing with the allowlist as the enforcement point, `minTurnsDowngraded` hysteresis, the `/route` command, and the `modelRouting` projection whose seed mirrors `modeOf` — an eventless log starts from the configured `initialMode`. `lastStrong` retention powers the chip's restore gesture.

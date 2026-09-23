@@ -713,9 +713,9 @@ export interface ApiProxyDefaults {
    * Record a selection as the new default. Either absent, or a closure that
    * may itself decline — the gateway plugin always passes one, and it no-ops
    * when the deployment mounts no settings provider or when the write races
-   * service teardown. A switch then stays process-local. A rejection is
-   * reported and swallowed: the switch already applies to its own session,
-   * and undoing it because storage failed would be the worse outcome.
+   * service teardown. The session selection remains recorded in its own log.
+   * A settings-write rejection is reported and swallowed without undoing that
+   * session selection.
    */
   saveDefaultModelSelection?: (selection: ModelSelection) => Promise<void>
   /** Default project directory for new sessions whose create request carries no cwd. */
@@ -1214,34 +1214,26 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   /**
    * Install or return the session-local model selection that prompt assembly snapshots.
    *
-   * Precedence, resolved on EVERY read rather than seeded once: a selection
-   * made in this process, else the session's own latest logged request/header,
-   * else the live Agent default. Re-reading keeps the two tiers exact in both
-   * directions: a session with a recorded request derives its selection from
-   * its log, while a blank session (New Session reuses one rather than minting
-   * another) reads any default saved after it was created. There is no create-time
-   * per-session override tier on this wire — if one returns (a create-options
-   * contribution), it must fold in between the selection and the log.
-   *
-   * The logged tier `selectionInForce` returns is the session's own selection,
-   * so a composed router reports the route a held downgrade descends beneath
-   * rather than the candidate it rewrote the header to.
+   * Explicit selections are durable even when no subsequent request runs.
+   * Otherwise the session's manual route precedes the live default, which a
+   * blank unselected session re-reads on every access. A composed router
+   * reports the base beneath its routed header.
    */
   function selectionFor(agent: Agent): WebModelSelectionRef {
     const owned = ctx.get('agentDefaultModel')
     if (owned !== undefined) return owned.selectionFor(agent)
     const installed = selections.get(agent)
     if (installed !== undefined) return installed
-    let picked: ModelSelection | undefined
     const selection: WebModelSelectionRef = {
       get current(): ModelSelection {
-        if (picked !== undefined) return picked
-        // Incrementally folded by the session, so the logged tier costs O(new
-        // events) rather than a rescan.
         return selectionInForce(agent) ?? defaults.defaultModelSelection()
       },
       set current(next: ModelSelection) {
-        picked = next
+        agent.session.append('agent/model-selection', {
+          provider: next.provider,
+          model: next.model,
+          ...next.reasoningEffort === undefined ? {} : { reasoningEffort: next.reasoningEffort },
+        })
       },
       assembled: undefined,
     }

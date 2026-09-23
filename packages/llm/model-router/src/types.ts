@@ -1,14 +1,15 @@
 /**
  * Pure types of the model-routing domain: the routing vocabulary, the two
  * logged session events, and the ONE home of the `modelRouting` projection-key
- * declaration. Free of the host-side service, tools, and judgment imports, so
+ * declaration. Free of runtime imports, so
  * both the host namespace (`./types`) and the client namespace (`./client`)
  * project exactly this content with zero duplication.
  *
  * @module @shres-code/shres-code-model-router/types
  */
 
-import type { ReasoningEffortId } from '@shres-code/shres-code-llm'
+import type { HostedTool, ModelModality, ReasoningEffortId } from '@shres-code/shres-code-llm'
+import type { JudgmentQuestion, JudgmentTokenFit, JudgmentTokenLimitReason, JudgmentTokenLimits } from '@shres-code/shres-code-judgment'
 
 /**
  * One allowlisted downgrade candidate as configuration states it: plain
@@ -24,7 +25,7 @@ export interface ModelRoutingCandidateConfig {
   model: string
   /** Adapter-owned reasoning effort this candidate runs at, when it names one. */
   reasoningEffort?: string
-  /** Why this candidate is allowlisted, for configuration surfaces. */
+  /** Tasks this candidate can handle, included with its model identity in the judgment question. */
   description?: string
 }
 
@@ -42,14 +43,78 @@ export interface ModelRoutingCandidate {
    * one allowlist entry usable across routes with different effort vocabularies.
    */
   reasoningEffort?: ReasoningEffortId
-  /** Why this candidate is allowlisted, for configuration surfaces. */
+  /** Tasks this candidate can handle, included with its model identity in the judgment question. */
   description?: string
 }
 
+/** Stable result of one candidate capability check. */
+export type ModelRoutingCandidateEligibilityReason =
+  | 'eligible'
+  | 'base-unavailable'
+  | 'base-context-unknown'
+  | 'candidate-unavailable'
+  | 'candidate-invalid'
+  | 'difficulty-effort-invalid'
+  | 'image-capability-unknown'
+  | 'image-incompatible'
+  | 'context-unknown'
+  | 'context-too-small'
+  | 'max-tokens-exceeds-context'
+  | 'hosted-tools-incompatible'
+
+/** Detached, JSON-safe facts recorded for one configured candidate. */
+export interface ModelRoutingCandidateAssessment {
+  /** Configuration id used to identify the candidate. */
+  readonly id: string
+  /** Provider route checked. */
+  readonly provider: string
+  /** Exact model id checked. */
+  readonly model: string
+  /** Effective candidate effort, when the provider exposes or accepts one. */
+  readonly reasoningEffort?: string
+  /** Configured difficulty-lift effort checked for this candidate. */
+  readonly difficultyReasoningEffort?: string
+  /** Candidate input modalities, when the provider declares them. */
+  readonly inputModalities?: readonly ModelModality[]
+  /** Candidate context window, when the provider declares it. */
+  readonly contextWindow?: number
+  /** Candidate hosted tools, when the provider declares them. */
+  readonly hostedTools?: readonly HostedTool[]
+  /** Effective maximum output tokens, when known. */
+  readonly effectiveMaxTokens?: number
+  /** Stable eligibility result. */
+  readonly reason: ModelRoutingCandidateEligibilityReason
+}
+
+/** Detached facts the helper used as the manual route's capability floor. */
+export interface ModelRoutingCandidateRequirements {
+  /** Whether the request contains an image at any nested content depth. */
+  readonly requiresImage: boolean
+  /** Manual provider route, when its metadata resolved. */
+  readonly provider?: string
+  /** Manual exact model id, when its metadata resolved. */
+  readonly model?: string
+  /** Manual context window, when its metadata declares one. */
+  readonly contextWindow?: number
+  /** Manual hosted-tool floor, when its metadata declares one. */
+  readonly hostedTools?: readonly HostedTool[]
+}
+
+/** Candidate list and detached capability assessments for one routing request. */
+export interface ModelRoutingCandidateEligibility {
+  /** Detached manual-route requirements applied to each candidate. */
+  readonly requirements: ModelRoutingCandidateRequirements
+  /** The exact configured candidate list supplied by the caller. */
+  readonly candidates: readonly ModelRoutingCandidate[]
+  /** Candidates that passed every conservative capability check. */
+  readonly eligibleCandidates: readonly ModelRoutingCandidate[]
+  /** One detached assessment per configured candidate, in configuration order. */
+  readonly assessments: readonly ModelRoutingCandidateAssessment[]
+}
+
 /**
- * The exact route one decision downgraded to. Always an allowlisted candidate:
- * the allowlist is the enforcement point, so routing can never select the
- * manual route and never anything stronger.
+ * The exact allowlisted route selected by one decision. The deployment owns
+ * the candidate's capability and cost assessment.
  */
 export interface ModelRoutingSelection {
   /** Allowlist id this selection came from. */
@@ -86,6 +151,14 @@ export type ModelRoutingReason =
   | 'invalid-answer'
   /** No candidates are configured, so nothing may be downgraded to. */
   | 'no-candidates'
+  /** No generation runtime is available to validate candidate routes. */
+  | 'model-unavailable'
+  /** Candidate capabilities cannot preserve the current request's requirements. */
+  | 'candidate-ineligible'
+  /** The complete current user message exceeds the routing state budget. */
+  | 'state-too-large'
+  /** The complete judgment input exceeds a transport or pinned tokenizer limit. */
+  | 'judgment-input-too-large'
   /** The judgment chose a route the allowlist does not contain. */
   | 'unknown-candidate'
   /** The route's confidence is below `downgradeThreshold`. */
@@ -94,6 +167,10 @@ export type ModelRoutingReason =
   | 'thin-margin'
   /** The chosen candidate is the route already in force. */
   | 'candidate-equals-base'
+  /** The judgment selected the current model instead of any downgrade candidate. */
+  | 'current-preferred'
+  /** The difficulty answer prevents entry into a downgraded streak. */
+  | 'difficulty-too-high'
   /** The turn failed the gate after the streak reached its horizon. */
   | 'gate-failed'
   /** The difficulty answer reached `escalateBack.scoreThreshold`. */
@@ -110,6 +187,9 @@ export type ModelRoutingReason =
 /** Why a downgraded streak ended. */
 export type ModelRoutingBreakReason =
   | 'gate-failed'
+  | 'current-preferred'
+  | 'unknown-candidate'
+  | 'candidate-ineligible'
   | 'escalated'
   | 'manual-deviation'
   | 'mode-off'
@@ -131,48 +211,64 @@ export interface ModelRoutingEntryBaseView {
   reasoningEffort?: string
 }
 
-/** The sticky-fold facts one decision records about the streak it belongs to. */
-export interface ModelRoutingStickyView {
-  /** Whether a downgraded streak is in force after this decision. */
-  active: boolean
-  /** Turns elapsed since the streak was entered; 0 while strong. */
+/** The sticky-fold facts one active decision records about its streak. */
+export interface ModelRoutingActiveStickyView {
+  /** A downgraded streak is in force after this decision. */
+  active: true
+  /** Turns elapsed since the streak was entered. */
   turnsElapsed: number
-  /** Turn the streak was entered; absent while strong. */
+  /** Turn the streak was entered; absent only for malformed external records. */
   enteredTurn?: number
+  /**
+   * Manual route the streak was entered on. The consult records it because the
+   * manual route is only in the log while the state is strong.
+   */
+  entryBase?: ModelRoutingEntryBaseView
+  /** The route-error threshold that governs future durable failures in this streak. */
+  routeErrorLimit: number
+}
+
+/** The sticky-fold facts one inactive decision records. */
+export interface ModelRoutingInactiveStickyView {
+  /** No downgraded streak is in force after this decision. */
+  active: false
+  /** Zero while strong. */
+  turnsElapsed: number
   /** Why the streak ended, when this decision ended one. */
   brokenBy?: ModelRoutingBreakReason
   /**
-   * Manual route the streak was entered on, present while it is active. The
-   * consult records it because the manual route is only in the log while the
-   * state is strong — a streak entered on the very first turn has no preceding
-   * `request/header` to derive it from — and without it a manual switch could
-   * not end that streak.
+   * Manual route to use while recovering from a route-error break. Ordinary
+   * inactive decisions may carry this only when they preserve that durable
+   * recovery record.
    */
   entryBase?: ModelRoutingEntryBaseView
 }
 
-/** The route answer one judgment call returned for the turn. */
+/** The discriminated sticky facts written into every routing decision. */
+export type ModelRoutingStickyView = ModelRoutingActiveStickyView | ModelRoutingInactiveStickyView
+
+/** The route answer one judgment call returned for the step. */
 export interface ModelRoutingRouteAnswer {
-  /** Highest-probability candidate id. */
+  /** Chosen candidate id or the reserved `keep-current` option. */
   choice: string
   /** Confidence of that answer, 0 to 1. */
   confidence: number
-  /** Probability per candidate id, as the engine reported it. */
+  /** Probability per route option, including `keep-current`, as the engine reported it. */
   probabilities: Record<string, number>
 }
 
-/** The difficulty answer one judgment call returned for the turn. */
+/** The difficulty answer one judgment call returned for the step. */
 export interface ModelRoutingDifficultyAnswer {
-  /** Probability-weighted difficulty score. */
+  /** Probability-weighted zero-based difficulty level index. */
   score: number
   /** Confidence of that answer, 0 to 1. */
   confidence: number
 }
 
 /**
- * One logged routing decision for one turn. Log-only and append-only: the
- * decision is written after the consult resolved the turn, so the consumed
- * `request/header` that follows it carries the route it selected.
+ * One logged routing outcome. The initial judgment and any later manual or
+ * capability exit precede the request header that consumes their selection.
+ * Decisions are log-only and append-only.
  */
 export interface ModelRoutingDecision {
   /** What the consult resolved. */
@@ -186,6 +282,25 @@ export interface ModelRoutingDecision {
   stateHash: string
   /** Surface seqs the state was assembled from, in order. */
   stateSeqs: number[]
+  /** Renderer and bounds used when this decision assembled new judgment state. */
+  stateProjection?: {
+    /** Deterministic conversation renderer version. */
+    renderer: 'conversation-v1'
+    /** Prior user-message count admitted to the context window. */
+    contextTurns: number
+    /** Complete serialized state character budget. */
+    maxChars: number
+    /** Live surface messages omitted from the judgment state. */
+    omittedSeqs: number[]
+  }
+  /** Exact capability facts and filtered options checked for this request, when available. */
+  candidateEligibility?: ModelRoutingCandidateEligibility
+  /** Exact questions supplied to the judgment engine, including the eligible route options. */
+  judgmentQuestions?: readonly JudgmentQuestion[]
+  /** Exact selected text after redaction, measured tokens, and artifact identity. */
+  judgmentInput?: JudgmentTokenFit
+  /** Capacity rejection without model inference. */
+  judgmentRejection?: { limits: JudgmentTokenLimits; reason: JudgmentTokenLimitReason }
   /** Route to run; present for a downgraded outcome only. */
   selection?: ModelRoutingSelection
   /** The judgment's route answer, when a judgment call produced one. */
@@ -245,14 +360,14 @@ export interface ModelRoutingStickyViewForUi {
 
 /**
  * The `modelRouting` projection's wire value. `active` is the logged mode in
- * force (the last `model-routing/mode`, inactive before the first) and
- * `pending` reports a logged `/route` selection not yet recorded by a mode
+ * force (the last mode or configuration event, inactive before either) and
+ * `pending` reports a logged `/route on|off` selection not yet recorded by a mode
  * event. Capability absence (model-router not composed) is the key's absence.
  */
 export interface ModelRoutingProjection {
   /** Whether routing is in force. */
   active: boolean
-  /** Whether a logged `/route` selection still awaits its mode commit. */
+  /** Whether a logged `/route on|off` selection still awaits its mode commit. */
   pending: boolean
   /** Last logged decision, when the log holds one. */
   last?: ModelRoutingLastDecision
@@ -272,14 +387,20 @@ export interface ModelRoutingProjection {
 declare module '@shres-code/shres-code-session/types' {
   interface SessionEventMap {
     /**
+     * Committed deployment mode for a live session without an explicit user
+     * selection. Log-only, non-surface, whole-value replace. Changes during
+     * an open turn commit at its next accepted pre-step.
+     */
+    'model-routing/configuration': { active: boolean }
+    /**
      * Whether model routing is in force from this point on: log-only,
      * non-surface, whole-value replace. The last `model-routing/mode` wins; a
      * log with none folds to inactive through {@link foldModelRouting}.
      */
     'model-routing/mode': { active: boolean }
     /**
-     * One turn's routing decision: log-only, append-only, and written after the
-     * consult resolved the turn, so the `request/header` that follows it
+     * One request's routing decision: log-only, append-only, and written after
+     * the consult resolved the route, so a changed `request/header` that follows it
      * records the route it selected.
      */
     'model-routing/decision': ModelRoutingDecision

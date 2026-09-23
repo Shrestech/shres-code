@@ -3,27 +3,30 @@
  *
  * A consumer asks typed questions about one state — a choice between named
  * options, a score along an ordered rubric, or a yes/no binary — and reads back
- * calibrated probabilities with a confidence figure. Consumers own every
+ * probabilities with a confidence figure. Consumers own every
  * question string, every threshold, and every decision taken from an answer;
  * providers own transport, credential resolution, and wire validation, so a
  * distilled on-box engine is a composition swap behind the same contract.
  *
  * One provider registers per context as `ctx.judgment`. The optional
  * `ctx.judgmentRedactor` egress hook has one home, the provider: every
- * provider consults it exactly once per ask, before the state is serialized,
+ * provider consults it exactly once per state candidate, before serialization,
  * and sends what it returns; a consumer passes its composed state unredacted
- * and does not consult the hook, so a composed redactor runs exactly once per
- * ask regardless of how many consumers exist. Mounting an engine also installs
- * the Definition-owned `judgment` settings section: the deployment's on/off
- * switch, which consumers read live and treat as an absent engine when it is
- * off.
+ * and does not consult the hook. A regular ask has one candidate, while an
+ * atomic fitting ask applies the same hook once to each offered candidate.
+ * Mounting an engine also installs the Definition-owned `judgment` settings
+ * section: the deployment's on/off switch, which consumers read live and treat
+ * as an absent engine when it is off.
  *
  * @module @shres-code/shres-code-judgment
  */
 
 import { Context, Service } from '@shres-code/cordis'
 import { installJudgmentSettings } from './settings.ts'
-import type { JudgmentEngine, JudgmentErrorCode, JudgmentInput, JudgmentQuestionId, JudgmentRedactor, JudgmentResult, JudgmentSettings } from './types.ts'
+import type {
+  JudgmentEngine, JudgmentErrorCode, JudgmentFittingEngine, JudgmentInput,
+  JudgmentQuestionId, JudgmentRedactor, JudgmentResult, JudgmentSettings,
+} from './types.ts'
 
 export {
   JUDGMENT_SETTINGS_DEFAULT,
@@ -41,6 +44,9 @@ export type {
   JudgmentChoiceQuestion,
   JudgmentEngine,
   JudgmentErrorCode,
+  JudgmentFittingEngine,
+  JudgmentFittingInput,
+  JudgmentFittingResult,
   JudgmentInput,
   JudgmentQuestion,
   JudgmentQuestionId,
@@ -50,6 +56,9 @@ export type {
   JudgmentScoreQuestion,
   JudgmentSettings,
   JudgmentTier,
+  JudgmentTokenFit,
+  JudgmentTokenLimitReason,
+  JudgmentTokenLimits,
 } from './types.ts'
 
 /**
@@ -103,6 +112,8 @@ declare module '@shres-code/cordis' {
  * where an engine does. {@link settings} reads it live.
  */
 export abstract class JudgmentService extends Service implements JudgmentEngine {
+  /** Atomic tokenizer fitting and judgment, when the provider supports it. */
+  readonly fitting?: JudgmentFittingEngine
   /**
    * Live read of the resolved judgment settings. Consumers call it at the
    * decision the toggle gates and treat `enabled: false` exactly as an absent
@@ -122,6 +133,7 @@ export abstract class JudgmentService extends Service implements JudgmentEngine 
    * @returns the answers with the engine and model identity and the ask's duration.
    * @throws {@link JudgmentError} for an unconfigured credential
    *   (`UNCONFIGURED`), an unreachable or refusing provider (`UNAVAILABLE`),
+   *   oversized serialized input (`INPUT_TOO_LARGE`),
    *   an unusable provider response (`INVALID_ANSWER`), or a cancelled ask
    *   (`ABORTED`).
    */

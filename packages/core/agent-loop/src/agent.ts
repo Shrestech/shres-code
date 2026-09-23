@@ -441,6 +441,14 @@ export class ReactLoopAgent implements Agent {
       ? persistedConfig.reasoningEffort
       : undefined
     const maxTokens = this.options.maxTokens
+    // The request waterfall may inspect the exact assembled content, but it
+    // cannot mutate it. Clone before dispatch so listeners cannot retain or
+    // alter the loop-owned request arrays.
+    const content = deepFreeze(structuredClone({
+      messages: boundaryMessages,
+      system,
+      tools,
+    }))
     const seedConfig = deepFreeze(structuredClone(
       this.requestHeaderLogged
         // oxlint-disable-next-line typescript/no-non-null-assertion -- the instance logged the header it now folds
@@ -452,7 +460,7 @@ export class ReactLoopAgent implements Agent {
         },
     ))
     const proposedConfig = await this.dispatch.waterfall(
-      'agent/request', { turn, step, signal },
+      'agent/request', { turn, step, content, signal },
       () => Promise.resolve(seedConfig),
     )
     signal.throwIfAborted()

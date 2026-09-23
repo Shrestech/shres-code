@@ -1,6 +1,6 @@
 # Typed Judgment
 
-The typed-judgment seam of [shres-judgment](../../packages/llm/judgment) answers typed questions about one state — a choice between named options, a score along an ordered rubric, or a yes/no binary — and returns calibrated probabilities with a confidence figure. Consumers own every question string, threshold, and decision; a provider behind `ctx.judgment` owns tier selection, credentials, transport, and the validation of each provider response, so a distilled on-box engine is a composition swap behind the same contract.
+The typed-judgment seam of [shres-judgment](../../packages/llm/judgment) answers typed questions about one state — a choice between named options, a score along an ordered rubric, or a yes/no binary — and returns probabilities with a confidence figure. Consumers own every question string, threshold, and decision; a provider behind `ctx.judgment` owns tier selection, credentials, transport, and the validation of each provider response, so a distilled on-box engine is a composition swap behind the same contract.
 
 Source: [`packages/llm/judgment/src/index.ts`](../../packages/llm/judgment/src/index.ts)
 
@@ -163,7 +163,74 @@ interface JudgmentResult {
 
 ## The engine contract
 
-One provider registers per context as `ctx.judgment`. `ask` is the whole consumer-facing contract; everything else a provider does — credentials, transport, wire validation — stays behind it.
+One provider registers per context as `ctx.judgment`. `ask` is the general consumer-facing contract; providers may also expose `fitting` when they can measure complete candidate states with the same tokenizer and model that will answer. Everything else a provider does — credentials, transport, wire validation — stays behind it.
+
+`fitting.ask()` receives complete state alternatives in preference order. The provider redacts each candidate once, measures each complete question-and-state sequence and the padded batch against its verified limits, and judges the first candidate that fits. The returned `JudgmentTokenFit` records the selected text, index, token counts, applied limits, and artifact hash alongside the answers. When no candidate fits, the result is `unfit` and no model inference occurs. Consumers can use `ask()` when they already have one state or use `fitting` when choosing a state and judging it must be one atomic operation.
+
+```ts type-equiv
+/** Ordered complete state alternatives for one atomic capacity check and judgment. */
+interface JudgmentFittingInput extends Omit<JudgmentInput, 'state'> {
+  /** Most preferred first; providers select the first fitting state without truncation. */
+  states: readonly string[]
+}
+```
+
+```ts type-equiv
+/** Effective tokenizer limits and the verified artifact that supplies them. */
+interface JudgmentTokenLimits {
+  /** Maximum tokens in each complete question and state sequence. */
+  maxSequenceTokens: number
+  /** Maximum tokens reserved for a question and its options. */
+  maxHeadTokens: number
+  /** Maximum padded tokens across the whole question batch. */
+  maxBatchTokens: number
+  /** SHA-256 of the verified model, tokenizer, and configuration manifest. */
+  manifestSha256: string
+}
+```
+
+```ts type-equiv
+/** Exact input selected and measured before the corresponding inference. */
+interface JudgmentTokenFit {
+  /** Index in the caller's ordered state alternatives. */
+  selectedIndex: number
+  /** Complete selected text after the provider's one redaction per candidate. */
+  state: string
+  /** Tokens in the selected state. */
+  stateTokens: number
+  /** Complete token count for each question, in question order. */
+  sequenceTokens: readonly number[]
+  /** Longest sequence length multiplied by the question count. */
+  paddedTokens: number
+  /** Limits applied to this inference. */
+  limits: JudgmentTokenLimits
+}
+```
+
+```ts type-equiv
+/** Capacity that prevented all offered states from being judged. */
+type JudgmentTokenLimitReason = 'state' | 'head' | 'option' | 'batch'
+```
+
+```ts type-equiv
+/** One fitted judgment, or an explicit capacity rejection without inference. */
+type JudgmentFittingResult =
+  | { kind: 'answered'; fit: JudgmentTokenFit; result: JudgmentResult }
+  | { kind: 'unfit'; engine: string; model: string; limits: JudgmentTokenLimits; reason: JudgmentTokenLimitReason }
+```
+
+```ts type-equiv
+/** Optional provider capability that measures and judges with one pinned tokenizer and model. */
+interface JudgmentFittingEngine {
+  /**
+   * Redact each alternative once, select the first fitting state, and judge it.
+   * @param input - complete ordered states, common questions, tier, and cancellation signal.
+   * @returns measured input and answers, or a capacity rejection without inference.
+   * @throws JudgmentError with the same failure classes as {@link JudgmentEngine.ask}.
+   */
+  ask(input: JudgmentFittingInput): Promise<JudgmentFittingResult>
+}
+```
 
 ```ts type-equiv
 /**
@@ -172,12 +239,15 @@ One provider registers per context as `ctx.judgment`. `ask` is the whole consume
  * question string, threshold, and decision made from an answer.
  */
 interface JudgmentEngine {
+  /** Exact tokenizer fitting when supported; absence leaves input sizing to the consumer. */
+  readonly fitting?: JudgmentFittingEngine
   /**
    * Answer one set of typed questions about one state.
    * @param input - the state, the questions, the optional tier, and the cancellation signal.
    * @returns the answers with the engine and model identity and the ask's duration.
    * @throws JudgmentError for an unconfigured credential (`UNCONFIGURED`), an
-   * unreachable or refusing provider (`UNAVAILABLE`), an unusable provider
+   * unreachable or refusing provider (`UNAVAILABLE`), oversized serialized
+   * input (`INPUT_TOO_LARGE`), an unusable provider
    * response (`INVALID_ANSWER`), or a cancelled ask (`ABORTED`).
    */
   ask(input: JudgmentInput): Promise<JudgmentResult>
@@ -186,13 +256,13 @@ interface JudgmentEngine {
 
 ## Redaction hook
 
-`ctx.judgmentRedactor` is optional and interface-typed, and it has one home: the provider. When a deployment mounts one, every provider consults it exactly once per ask, before the state is serialized, and sends what it returns; a consumer passes its composed state to `ctx.judgment.ask()` unredacted and does not consult the hook, so a composed redactor runs exactly once per ask however many consumers exist. It is the seam's single egress control over the state text.
+`ctx.judgmentRedactor` is optional and interface-typed, and it has one home: the provider. When a deployment mounts one, every provider consults it exactly once per state candidate, before serialization, and sends what it returns; a consumer passes its composed state to `ctx.judgment.ask()` unredacted and does not consult the hook. A regular ask has one candidate; a fitting ask applies the same hook once to each offered candidate, so it remains the seam's single egress control over state text.
 
 ```ts type-equiv
 /**
  * Optional egress hook with one home, the provider. A deployment that must not
  * send identifiable text to a judgment engine mounts one; every provider
- * consults it exactly once per ask, before the state is serialized, and sends
+ * consults it exactly once per state candidate, before serialization, and sends
  * what it returns. A consumer passes its state to `ctx.judgment.ask()`
  * unredacted and never consults the hook.
  */
@@ -252,11 +322,12 @@ Mounting an engine installs the Definition-owned JUDGMENT_SETTINGS_NAMESPACE sec
  * @returns the answers with the engine and model identity and the ask's duration.
  * @throws {@link JudgmentError} for an unconfigured credential
  *   (`UNCONFIGURED`), an unreachable or refusing provider (`UNAVAILABLE`),
+ *   oversized serialized input (`INPUT_TOO_LARGE`),
  *   an unusable provider response (`INVALID_ANSWER`), or a cancelled ask
  *   (`ABORTED`).
  */
 abstract ask(input: JudgmentInput): Promise<JudgmentResult>
 ```
 
-Source: [`packages/llm/judgment/src/index.ts:101`](../../packages/llm/judgment/src/index.ts)
+Source: [`packages/llm/judgment/src/index.ts:114`](../../packages/llm/judgment/src/index.ts)
 <!-- END GENERATED cordis-surface -->

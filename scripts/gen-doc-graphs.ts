@@ -505,9 +505,9 @@ const SERVICE_ROLES: ServiceRole[] = [
     pkg: 'judgment',
     title: 'Typed judgment seam',
     mode: 'seam',
-    implementations: ['judgment-typesafe'],
-    consumers: ['compaction-jev', 'model-router'],
-    note: 'Consumers ask typed choice, score, and binary questions about one state and read calibrated probabilities; the provider owns credentials, transport, and wire validation, and an optional redactor hook bounds the state that leaves the process.',
+    implementations: ['judgment-typesafe', 'judgment-shield'],
+    consumers: ['compaction-jev', 'model-router', 'judgment-guardrails'],
+    note: 'Consumers ask typed choice, score, and binary questions about one state. The provider owns transport, wire validation, and any required credentials; the optional redactor hook transforms the state before it leaves the process.',
   },
   {
     key: 'modelRouting',
@@ -515,7 +515,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'Asymmetric cache-sticky model routing',
     mode: 'core',
     consumers: [],
-    note: 'The manual or default selection is always the strong model; `candidates` is a downgrade allowlist, so a consult selects an allowlisted candidate or nothing — never the manual route and never anything stronger. A downgrade is then held as a streak whose state is a pure fold over `model-routing/decision`, `request/header`, and turn events, which is what lets resume, fork, compaction, and a restart continue it.',
+    note: 'The manual or default selection is the strong model. The judgment chooses keep-current or an allowlisted downgrade candidate; difficulty and confidence limits determine whether a candidate may run. Held streaks derive from model-routing/decision, request/header, and turn events so resume, fork, compaction, and restart preserve the selection.',
   },
   {
     key: 'subagents',

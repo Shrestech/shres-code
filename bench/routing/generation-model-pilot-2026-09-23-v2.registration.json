@@ -1,0 +1,202 @@
+{
+  "schema": "shres-code/generation-model-pilot@1",
+  "pilot": "generation-model-pilot-2026-09-23-v2",
+  "status": "pre-registered",
+  "purpose": "Collect verifier-backed task outcomes and reported usage for two configured generation services.",
+  "decision": "Descriptive routing supervision only; this pilot cannot promote a model or replace JEV.",
+  "registeredAt": "2026-09-23T00:14:30.804Z",
+  "harness": {
+    "gitHead": "a96bfb22e412d20064b06f66d2da5cc571c07f59",
+    "workingTreeSha256": "b2751d585d494b09ca11e40058894873fc95f69cd906eff2e00fea054963604e",
+    "sourceSnapshotCommit": "71618dd226dea7da72d86067ae2e8390bdcdf252",
+    "sourceSnapshotRef": "refs/shres/model-pilot/generation-model-pilot-2026-09-23-v2/cf9986f5c3623dc5b56d0526de5846125a04e3ac",
+    "fingerprintExcludes": [
+      "bench/runs/**",
+      "bench/routing/generation-model-pilot-2026-09-23-v2.registration.json"
+    ],
+    "runner": "bench/runner/run.js"
+  },
+  "canary": {
+    "taskIds": [
+      "single-function-fix"
+    ],
+    "repeats": 1,
+    "plannedTrialsTotal": 2,
+    "plannedSpawnsTotal": 2,
+    "maxTotalTokensPerSpawn": 32000,
+    "maxTotalTokensSemantics": "live observed root-plus-descendant usage cap per runner spawn; this canary has no chain phase",
+    "arm": "off",
+    "concurrency": 1,
+    "noResume": true,
+    "gate": "Each service must resolve the short task, exit zero without timeout or budget termination, record a completed turn, and match registered runner pins and request/response routes. Fixed model ids require matching reported response models; an unknown floating backend supports configured-service evidence only."
+  },
+  "shared": {
+    "arm": "off",
+    "repeats": 3,
+    "taskIds": [
+      "single-function-fix",
+      "cross-module-refactor",
+      "chain-debug-resume",
+      "injection-ignore",
+      "constraint-survival-build",
+      "noise-needle"
+    ],
+    "taskSetSha256": "39ae79707863f135513379f87b7e2a2f4ed096590d9e3e94a7364f5f0ba765d1",
+    "temperature": 0,
+    "concurrency": 1,
+    "maxTotalTokensPerSpawn": 120000,
+    "maxTotalTokensSemantics": "live observed root-plus-descendant usage cap per runner spawn; chain tasks apply the cap separately to each phase",
+    "plannedTrialsPerModel": 18,
+    "plannedTrialsTotal": 36,
+    "plannedSpawnsPerModel": 21,
+    "plannedSpawnsTotal": 42,
+    "configuredSpawnTokenCapSum": 5040000,
+    "costCurrency": "reported inputTokens + outputTokens non-cache fields; cache categories are not retained in TrialMetrics and no price table is applied"
+  },
+  "inputs": {
+    "tasks": [
+      {
+        "taskId": "single-function-fix",
+        "sha256": "9d1292f53a9a1add9fe58edfc7c3ef6c52a4d6cae9f1a1faff22c86b5f65e1b3",
+        "files": [
+          "bench/tasks/single-function-fix/fixture/package.json",
+          "bench/tasks/single-function-fix/fixture/src/pagination.js",
+          "bench/tasks/single-function-fix/fixture/test/pagination.test.js",
+          "bench/tasks/single-function-fix/task.json",
+          "bench/tasks/single-function-fix/verify.mjs"
+        ]
+      },
+      {
+        "taskId": "cross-module-refactor",
+        "sha256": "495b53cff33142b889f2b332e06463d64a92c5b4b437c777f0a7d735947db42d",
+        "files": [
+          "bench/tasks/cross-module-refactor/fixture/package.json",
+          "bench/tasks/cross-module-refactor/fixture/src/orders.js",
+          "bench/tasks/cross-module-refactor/fixture/src/products.js",
+          "bench/tasks/cross-module-refactor/fixture/src/users.js",
+          "bench/tasks/cross-module-refactor/fixture/test/modules.test.js",
+          "bench/tasks/cross-module-refactor/task.json",
+          "bench/tasks/cross-module-refactor/verify.mjs"
+        ]
+      },
+      {
+        "taskId": "chain-debug-resume",
+        "sha256": "63f767041a8279e5e8d31445d7b66a8c259fd8b70a9df927405ae3626b68dedf",
+        "files": [
+          "bench/tasks/chain-debug-resume/fixture/package.json",
+          "bench/tasks/chain-debug-resume/fixture/README.md",
+          "bench/tasks/chain-debug-resume/fixture/src/index.js",
+          "bench/tasks/chain-debug-resume/fixture/src/reports.js",
+          "bench/tasks/chain-debug-resume/fixture/src/store.js",
+          "bench/tasks/chain-debug-resume/fixture/test/reports.test.js",
+          "bench/tasks/chain-debug-resume/fixture/test/store.test.js",
+          "bench/tasks/chain-debug-resume/task.json",
+          "bench/tasks/chain-debug-resume/verify.mjs"
+        ]
+      },
+      {
+        "taskId": "injection-ignore",
+        "sha256": "ea2eca8510c7902c37bba16e41014781a810e84bab4507f2ea5c2cde0f24dc7d",
+        "files": [
+          "bench/tasks/injection-ignore/fixture/DEPENDENCIES.md",
+          "bench/tasks/injection-ignore/fixture/package.json",
+          "bench/tasks/injection-ignore/fixture/README.md",
+          "bench/tasks/injection-ignore/fixture/src/calc.js",
+          "bench/tasks/injection-ignore/fixture/test/calc.test.js",
+          "bench/tasks/injection-ignore/task.json",
+          "bench/tasks/injection-ignore/verify.mjs"
+        ]
+      },
+      {
+        "taskId": "constraint-survival-build",
+        "sha256": "bd768b8ca6e4af73f2300f52d62ebf6e9acef2e2ac59b8dfc7096d5fb5952e5f",
+        "files": [
+          "bench/tasks/constraint-survival-build/fixture/package.json",
+          "bench/tasks/constraint-survival-build/fixture/README.md",
+          "bench/tasks/constraint-survival-build/fixture/src/errors.js",
+          "bench/tasks/constraint-survival-build/fixture/src/units.js",
+          "bench/tasks/constraint-survival-build/fixture/test/m01-sku.test.js",
+          "bench/tasks/constraint-survival-build/fixture/test/m02-qty.test.js",
+          "bench/tasks/constraint-survival-build/fixture/test/m03-lot.test.js",
+          "bench/tasks/constraint-survival-build/fixture/test/m04-bin.test.js",
+          "bench/tasks/constraint-survival-build/fixture/test/m05-reserve.test.js",
+          "bench/tasks/constraint-survival-build/fixture/test/m06-adjust.test.js",
+          "bench/tasks/constraint-survival-build/fixture/test/m07-transfer.test.js",
+          "bench/tasks/constraint-survival-build/fixture/test/m08-query.test.js",
+          "bench/tasks/constraint-survival-build/fixture/test/m09-report.test.js",
+          "bench/tasks/constraint-survival-build/fixture/test/m10-audit.test.js",
+          "bench/tasks/constraint-survival-build/fixture/tools/check-house-rules.mjs",
+          "bench/tasks/constraint-survival-build/task.json",
+          "bench/tasks/constraint-survival-build/verify.mjs"
+        ]
+      },
+      {
+        "taskId": "noise-needle",
+        "sha256": "f7bf8e81bc97002ada29ab975873338596916e4a6c6290ac280be18951de0356",
+        "files": [
+          "bench/tasks/noise-needle/fixture/package.json",
+          "bench/tasks/noise-needle/fixture/src/catalog.js",
+          "bench/tasks/noise-needle/fixture/src/constants.js",
+          "bench/tasks/noise-needle/fixture/src/discount.js",
+          "bench/tasks/noise-needle/fixture/src/order.js",
+          "bench/tasks/noise-needle/fixture/src/price.js",
+          "bench/tasks/noise-needle/fixture/src/stock.js",
+          "bench/tasks/noise-needle/fixture/test/catalog.test.js",
+          "bench/tasks/noise-needle/fixture/test/discount.test.js",
+          "bench/tasks/noise-needle/fixture/test/order.test.js",
+          "bench/tasks/noise-needle/fixture/test/price.test.js",
+          "bench/tasks/noise-needle/fixture/test/sku.test.js",
+          "bench/tasks/noise-needle/fixture/test/stock.test.js",
+          "bench/tasks/noise-needle/fixture/tools/diagnose.js",
+          "bench/tasks/noise-needle/task.json",
+          "bench/tasks/noise-needle/verify.mjs"
+        ]
+      }
+    ],
+    "configs": [
+      {
+        "path": "bench/tiers/zai-glm-5.3.patch.yml",
+        "sha256": "1cac51330befa348493b41d79d6015cd55cbbabcfad7a201d08551418919aae3",
+        "bytes": 319
+      },
+      {
+        "path": "bench/tiers/ollama-deepseek.patch.yml",
+        "sha256": "faa662a9e0f3cef8e2a06171c413aaeed8545969a7b64aa8161849048965730f",
+        "bytes": 540
+      }
+    ]
+  },
+  "models": [
+    {
+      "id": "zai-glm-5.3",
+      "provider": "zai",
+      "model": "glm-5.3",
+      "configuredIdentifier": "zai/glm-5.3",
+      "resolution": "provider-model-id",
+      "apiKeyEnv": "ZAI_API_KEY",
+      "tierPatch": "bench/tiers/zai-glm-5.3.patch.yml",
+      "canaryExperiment": "generation-model-pilot-2026-09-23-v2-canary-zai",
+      "experiment": "generation-model-pilot-2026-09-23-v2-zai"
+    },
+    {
+      "id": "ollama-deepseek-v4-flash-cloud",
+      "provider": "ollama-cloud",
+      "model": "deepseek-v4-flash:cloud",
+      "configuredIdentifier": "ollama-cloud/deepseek-v4-flash:cloud",
+      "resolution": "floating-provider-tag",
+      "apiKeyEnv": "OLLAMA_API_KEY",
+      "tierPatch": "bench/tiers/ollama-deepseek.patch.yml",
+      "canaryExperiment": "generation-model-pilot-2026-09-23-v2-canary-ollama",
+      "experiment": "generation-model-pilot-2026-09-23-v2-ollama"
+    }
+  ],
+  "labels": {
+    "eligible": "status === 'success' and failureMode is not PROVIDER_ERROR or HARNESS_ERROR",
+    "correctness": "trial.resolved (runner field derived from verifier outcome)",
+    "tokenCost": "trial.metrics.inputTokens + trial.metrics.outputTokens (non-cache usage fields; cache categories are not retained in TrialMetrics)",
+    "latency": "trial.metrics.durationMs",
+    "providerErrors": "retained in trials.jsonl and counted in analysis, excluded from labels",
+    "modelJudgments": "never used as labels"
+  },
+  "nextStep": "Repeat on a larger random task holdout with a separately frozen routing-quality registration."
+}

@@ -115,7 +115,24 @@ Sources: [`packages/core/session/src/types.ts:350`](../packages/core/session/src
 }
 ```
 
-Source: [`packages/core/agent/src/types.ts:19`](../packages/core/agent/src/types.ts)
+Source: [`packages/core/agent/src/types.ts:28`](../packages/core/agent/src/types.ts)
+
+<a id="agentmodel-selection--log-only"></a>
+
+#### `agent/model-selection` — log-only
+
+```ts persistence-catalog
+/**
+ * Explicit session model selection for subsequent prompt assembly. The
+ * latest selection remains authoritative across routed requests, resume,
+ * and fork; an absent effort selects the provider's default behavior.
+ * This non-surface event records intent even when the chosen route matches
+ * the last request header.
+ */
+'agent/model-selection': Pick<GenerateOptions, 'provider' | 'model' | 'reasoningEffort'>
+```
+
+Source: [`packages/core/agent/src/types.ts:21`](../packages/core/agent/src/types.ts)
 
 ### `agent-preset/*`
 
@@ -806,20 +823,35 @@ Source: [`packages/llm/llm-retry/src/types.ts:11`](../packages/llm/llm-retry/src
 
 ### `model-routing/*`
 
+<a id="model-routingconfiguration--log-only"></a>
+
+#### `model-routing/configuration` — log-only
+
+```ts persistence-catalog
+/**
+ * Committed deployment mode for a live session without an explicit user
+ * selection. Log-only, non-surface, whole-value replace. Changes during
+ * an open turn commit at its next accepted pre-step.
+ */
+'model-routing/configuration': { active: boolean }
+```
+
+Source: [`packages/llm/model-router/src/types.ts:394`](../packages/llm/model-router/src/types.ts)
+
 <a id="model-routingdecision--log-only"></a>
 
 #### `model-routing/decision` — log-only
 
 ```ts persistence-catalog
 /**
- * One turn's routing decision: log-only, append-only, and written after the
- * consult resolved the turn, so the `request/header` that follows it
+ * One request's routing decision: log-only, append-only, and written after
+ * the consult resolved the route, so a changed `request/header` that follows it
  * records the route it selected.
  */
 'model-routing/decision': ModelRoutingDecision
 ```
 
-Source: [`packages/llm/model-router/src/types.ts:285`](../packages/llm/model-router/src/types.ts)
+Source: [`packages/llm/model-router/src/types.ts:406`](../packages/llm/model-router/src/types.ts)
 
 <a id="model-routingmode--log-only"></a>
 
@@ -834,7 +866,7 @@ Source: [`packages/llm/model-router/src/types.ts:285`](../packages/llm/model-rou
 'model-routing/mode': { active: boolean }
 ```
 
-Source: [`packages/llm/model-router/src/types.ts:279`](../packages/llm/model-router/src/types.ts)
+Source: [`packages/llm/model-router/src/types.ts:400`](../packages/llm/model-router/src/types.ts)
 
 ### `permission/*`
 

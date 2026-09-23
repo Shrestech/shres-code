@@ -2006,6 +2006,16 @@
       "source": "packages/core/agent/src/runtime-types.ts"
     },
     {
+      "doc": "docs/subsystems/core.md",
+      "symbol": "AgentRequestContent",
+      "source": "packages/core/agent/src/runtime-types.ts"
+    },
+    {
+      "doc": "docs/subsystems/core.md",
+      "symbol": "ModelRoutingRequest",
+      "source": "packages/core/agent/src/model-selection.ts"
+    },
+    {
       "doc": "docs/subsystems/feedback.md",
       "symbol": "MessageFeedbackVersion",
       "source": "packages/feedback/message-feedback/src/types.ts"
@@ -2367,6 +2377,36 @@
     },
     {
       "doc": "docs/subsystems/judgment.md",
+      "symbol": "JudgmentFittingInput",
+      "source": "packages/llm/judgment/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/judgment.md",
+      "symbol": "JudgmentTokenLimits",
+      "source": "packages/llm/judgment/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/judgment.md",
+      "symbol": "JudgmentTokenFit",
+      "source": "packages/llm/judgment/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/judgment.md",
+      "symbol": "JudgmentTokenLimitReason",
+      "source": "packages/llm/judgment/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/judgment.md",
+      "symbol": "JudgmentFittingResult",
+      "source": "packages/llm/judgment/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/judgment.md",
+      "symbol": "JudgmentFittingEngine",
+      "source": "packages/llm/judgment/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/judgment.md",
       "symbol": "JudgmentEngine",
       "source": "packages/llm/judgment/src/types.ts"
     },
@@ -2387,12 +2427,42 @@
     },
     {
       "doc": "docs/subsystems/model-router.md",
+      "symbol": "ModelRoutingCandidateEligibilityReason",
+      "source": "packages/llm/model-router/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/model-router.md",
+      "symbol": "ModelRoutingCandidateAssessment",
+      "source": "packages/llm/model-router/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/model-router.md",
+      "symbol": "ModelRoutingCandidateRequirements",
+      "source": "packages/llm/model-router/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/model-router.md",
+      "symbol": "ModelRoutingCandidateEligibility",
+      "source": "packages/llm/model-router/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/model-router.md",
       "symbol": "ModelRoutingReason",
       "source": "packages/llm/model-router/src/types.ts"
     },
     {
       "doc": "docs/subsystems/model-router.md",
       "symbol": "ModelRoutingBreakReason",
+      "source": "packages/llm/model-router/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/model-router.md",
+      "symbol": "ModelRoutingActiveStickyView",
+      "source": "packages/llm/model-router/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/model-router.md",
+      "symbol": "ModelRoutingInactiveStickyView",
       "source": "packages/llm/model-router/src/types.ts"
     },
     {
@@ -2409,6 +2479,11 @@
       "doc": "docs/subsystems/model-router.md",
       "symbol": "ModelRoutingStickyState",
       "source": "packages/llm/model-router/src/folds.ts"
+    },
+    {
+      "doc": "docs/subsystems/model-router.md",
+      "symbol": "ModelRoutingStateConfig",
+      "source": "packages/llm/model-router/src/config.ts"
     },
     {
       "doc": "docs/subsystems/model-router.md",

@@ -59,7 +59,7 @@ import { homedir } from 'node:os'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
-import { getArm, listArms, renderArmOverlay } from './arms.js'
+import { getArm, listDefaultArms, renderArmOverlay } from './arms.js'
 import { executeTrial } from './execute.js'
 import { computeThinDebates, emptyMetrics, foldSessionLog } from './metrics.js'
 import { descendantUsage } from './descendants.js'
@@ -75,7 +75,7 @@ const USAGE = `Usage: node bench/runner/run.js --experiment <name> [options]
 
 Options:
   --experiment <name>   experiment directory under bench/runs/ (required)
-  --arms <a,b>          arms to run, comma-separated (default: ${listArms().join(',')})
+  --arms <a,b>          arms to run, comma-separated (default: ${listDefaultArms().join(',')})
   --repeats <n>         trials per task per arm (default: 3)
   --tasks <glob[,glob]> task-id filter; comma-separated * / ? globs; match is union (default: all)
   --model <id>          model pin for run.json (default: $BENCH_MODEL or deepseek-v4-flash)
@@ -158,7 +158,7 @@ export function parseArgs(argv) {
   /** @type {RunnerOptions} */
   const options = {
     experiment: '',
-    arms: listArms(),
+    arms: listDefaultArms(),
     repeats: 3,
     taskGlob: null,
     dryRun: false,
@@ -743,6 +743,11 @@ async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, ses
     maxTotalTokens,
   })
   const outcome = classifySpawn(execution)
+  const executionEvidence = {
+    exitCode: execution.exitCode,
+    timedOut: execution.timedOut,
+    budgetExceeded: execution.budgetExceeded,
+  }
   const endedAt = new Date().toISOString()
   if (outcome === 'provider-error' || outcome === 'harness-error') {
     return {
@@ -753,6 +758,7 @@ async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, ses
       verifier: skippedVerifier(spawnFailureDetail(outcome, execution)),
       metrics,
       sessionFile,
+      execution: executionEvidence,
       endedAt,
     }
   }
@@ -766,6 +772,7 @@ async function runSingleSessionTrial({ task, entry, arm, armDir, scratchDir, ses
     verifier,
     metrics,
     sessionFile,
+    execution: executionEvidence,
     endedAt,
   }
 }

@@ -1,12 +1,14 @@
 # @shres-code/shres-code-judgment
 
-Service Definition for the typed-judgment capability seam: typed questions in, calibrated answers out. A consumer asks about one state — a choice between named options, a score along an ordered rubric, or a yes/no binary — and reads back probabilities with a confidence figure. Consumers own every question string, threshold, and decision; providers own transport, credential resolution, and wire validation. Nothing here is vendor-specific: no HTTP, no session event, no prompt text.
+Service Definition for the typed-judgment capability seam: typed questions in, probabilistic answers out. A consumer asks about one state — a choice between named options, a score along an ordered rubric, or a yes/no binary — and reads back probabilities with a confidence figure. Consumers own every question string, threshold, and decision; providers own transport, credential resolution, and wire validation. Nothing here is vendor-specific: no HTTP, no session event, no prompt text.
 
 ## Service API
 
 One provider registers per context as `ctx.judgment` by subclassing the default export. Consumers reach it as `ctx.judgment.ask(input)`.
 
 ```ts
+import type { JudgmentQuestion, JudgmentAnswer } from '@shres-code/shres-code-judgment'
+
 interface JudgmentInput {
   state: string
   questions: readonly JudgmentQuestion[]
@@ -24,7 +26,15 @@ interface JudgmentResult {
 
 Answers come back in the order the questions were asked, each carrying its question's `id`. An omitted `tier` resolves to `accurate`: the cheap tier is an explicit optimization, so silence must not weaken a decision. `engine` names the provider that served the ask and `model` the exact model that answered — a provider serving tier aliases reports the model id the alias resolved to, which is what makes an answer reproducible from a log.
 
-Every failure is one `JudgmentError` whose `code` a consumer branches on: `UNCONFIGURED` (no usable credential, thrown before any request), `UNAVAILABLE` (the engine could not be reached or refused the request), `INVALID_ANSWER` (the response did not match the question kind or was malformed), and `ABORTED` (the ask was cancelled through `input.signal`).
+Every failure is one `JudgmentError` whose `code` a consumer branches on: `UNCONFIGURED` (no usable credential, thrown before any request), `UNAVAILABLE` (the engine could not be reached or refused the request), `INPUT_TOO_LARGE` (the complete serialized input exceeds a provider limit before transport), `INVALID_ANSWER` (the response did not match the question kind or was malformed), and `ABORTED` (the ask was cancelled through `input.signal`).
+
+## Atomic fitting
+
+Some providers expose `ctx.judgment.fitting`. Its `ask()` method accepts `states`, an ordered list of complete alternatives, with the preferred state first. The provider redacts each candidate exactly once, measures the complete question-and-state sequences and padded batch with one pinned tokenizer, and judges the first candidate that satisfies its verified sequence, head, option, and batch limits. It does not truncate a candidate or run inference for a candidate that fails a limit.
+
+An answered result reports the selected index and exact redacted state, state and sequence token counts, padded-token count, applied limits, and the model result. The limits include the SHA-256 of the verified model, tokenizer, and configuration manifest, so the selected input can be tied to the artifact that measured it. If no candidate fits, the result is `unfit` with the engine, model, limits, and capacity reason; it is an explicit capacity outcome rather than a judgment answer or a `JudgmentError`.
+
+The capability is optional. Consumers that require atomic state selection check `ctx.judgment.fitting` and handle `unfit` explicitly; a provider that only implements `ask()` leaves input sizing to the consumer. Both methods share the same questions, tier, cancellation, answer ordering, and provider failure classes.
 
 ## Settings
 
@@ -39,7 +49,13 @@ interface JudgmentSettings {
 Consumers read the section live and treat `enabled: false` exactly as an absent engine:
 
 ```ts
-if (!judgmentEnabled(ctx.judgment.settings)) return { kind: 'engine-absent' }
+import { judgmentEnabled } from '@shres-code/shres-code-judgment'
+import type { Context } from '@shres-code/cordis'
+
+function judgmentAvailability(ctx: Context): 'available' | 'engine-absent' {
+  const engine = ctx.get('judgment')
+  return engine !== undefined && judgmentEnabled(engine.settings) ? 'available' : 'engine-absent'
+}
 ```
 
 `ctx.judgment.settings` is the live source thunk — the resolved user layer while a settings service is attached, the composition default otherwise — and `judgmentEnabled(source)` reads `enabled` from it. Nothing is cached and nothing re-registers on a change, so a committed edit reaches the next decision.
@@ -60,11 +76,11 @@ A question is one of three kinds, discriminated by `kind`, each with an `instruc
 
 `binary` answers carry `probability` (0 is no, 1 is yes) and no confidence: a provider derives confidence from a distribution, and a binary answer has none — threshold the probability itself. `choice` answers carry the highest-probability `option`, the full `probabilities` map keyed by option, and `confidence`. `score` answers carry the probability-weighted `score`, the `probabilities` map keyed by each level's zero-based index as a decimal string, and `confidence`.
 
-No threshold lives here. Probabilities can be borderline and are not deterministic across identical asks, so every consumer sets its own margin — and a threshold tuned on one question kind does not transfer to another.
+Probability calibration is specific to the model, question, and task distribution; the service does not guarantee it. No threshold lives here. Probabilities can be borderline and are not deterministic across identical asks, so every consumer sets its own margin — and a threshold tuned on one question kind does not transfer to another.
 
 ## Redaction hook
 
-`ctx.judgmentRedactor` is optional and interface-typed: a deployment mounts one service implementing `JudgmentRedactor` when state text must be rewritten before it leaves the process. The hook has one home, the provider. Every provider consults it exactly once per ask, before the state is serialized, and sends what it returns. A consumer passes its composed state to `ctx.judgment.ask()` unredacted and does not consult the hook, so a composed redactor runs exactly once per ask however many consumers a deployment composes.
+`ctx.judgmentRedactor` is optional and interface-typed: a deployment mounts one service implementing `JudgmentRedactor` when state text must be rewritten before it leaves the process. The hook has one home, the provider. Every provider consults it exactly once per state candidate, before serialization, and sends what it returns. A regular ask has one candidate; an atomic fitting ask applies the same hook once to each offered candidate. A consumer passes its composed state to `ctx.judgment.ask()` unredacted and does not consult the hook.
 
 ```ts
 interface JudgmentRedactor {
@@ -114,11 +130,26 @@ The redacted text is what the engine tokenizes, so a shorter replacement lowers 
 
 Redaction rewrites text inside one independent ask. It can change the engine's own prefix reuse for that ask and does not touch any conversation prefix.
 
+### Fitted state
+
+#### What the model sees
+
+An atomic fitting ask sends only the first complete candidate that satisfies the provider's pinned limits. The model sees the redacted selected state and the consumer's questions; if every candidate exceeds capacity, no model request is made.
+
+#### Token effect
+
+The provider measures each candidate before inference and returns the selected state and counts. A candidate rejected for capacity contributes no output tokens, and the `unfit` result tells the consumer why no state was judged.
+
+#### KV Cache effect
+
+Fitting measures alternatives within one independent judgment operation. It does not append a conversation prefix or promise cache reuse between candidates.
+
 ## Known Limitations and Deferred Work
 
 - **The toggle gates consumers, not the engine** — `ctx.judgment.ask` answers while the engine is mounted regardless of `judgment.enabled`; a consumer reads the toggle itself and takes its own engine-absent path. A deployment that wants the engine physically out of the composition withdraws the plugin instead.
 - **Consumer decisions are out of scope** — the seam reports probabilities and confidence and applies no threshold, margin, or fallback. A consumer that acts on an answer owns the band it treats as safe, and thresholds do not transfer between question kinds.
 - **State is text** — `JudgmentInput.state` is a string, so a consumer with structured state serializes it itself. Sending the engine a JSON object or an array of text values directly is deferred until a consumer needs it.
+- **Fitting is provider-optional** — `JudgmentEngine.fitting` is absent when a provider cannot measure and judge atomically. Consumers that need ordered candidate selection must handle an absent capability and the explicit `unfit` capacity result.
 - **The redaction hook covers state only** — question instructions, criteria, options, and levels are consumer-authored and pass through unchanged, and nothing here caps their size. A deployment that must bound egress caps the state it builds.
 - **No session event** — an ask is a model request a consumer made, not a session-log record: nothing in this package emits, replays, or persists. A consumer that must reconstruct why it asked logs its own decision.
 - **Confidence is the provider's statistic** — the seam carries the provider's `confidence` value as-is and defines no own measure. Providers differ in how they derive it, so a consumer tuning a threshold does so against one provider.

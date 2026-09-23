@@ -15,6 +15,7 @@ import { registerTrajectoryRoutingDefinition } from '../src/client/trajectory-ro
 import { trajectoryViewDefinition } from '../src/client/trajectory-snapshot-builder.ts'
 import { registerTrajectoryToolDefinition } from '../src/client/trajectory-tool-definition.ts'
 import { deriveTrajectoryLayout } from '../src/client/layout.ts'
+import { trajectoryRequestRoute } from '../src/client/trajectory-routing.ts'
 
 const DEFINITIONS: ConversationNodeDefinition[] = []
 const registrationContext = {
@@ -95,6 +96,7 @@ function routingData(overrides: Record<string, unknown> = {}) {
     route: { choice: 'flash', confidence: 0.9, probabilities: { flash: 0.9 } },
     sticky: {
       active: true,
+      routeErrorLimit: 2,
       turnsElapsed: 0,
       enteredTurn: 1,
       entryBase: { provider: 'p', model: 'strong' },
@@ -103,12 +105,17 @@ function routingData(overrides: Record<string, unknown> = {}) {
   }
 }
 
-function assistantMessage(id: string, text: string) {
+function assistantMessage(
+  id: string,
+  text: string,
+  provider = 'test',
+  model = 'test',
+) {
   return {
     id,
     role: 'assistant',
     content: [{ type: 'text', text }],
-    source: { kind: 'model', provider: 'test', model: 'test' },
+    source: { kind: 'model', provider, model },
   }
 }
 
@@ -471,6 +478,60 @@ describe('Trajectory conversation Definitions', () => {
       anchorSeq: 8,
       data: { kind: 'routing', decision: { seq: 8, time: 88 } },
     })
+  })
+
+  it('associates routed requests from step-start anchors through the real definitions', () => {
+    const current = snapshot(assembler([
+      at(1, 'turn/start', { turn: 1 }),
+      at(3, 'step/start', { turn: 1, step: 1 }),
+      at(4, 'request/header', {
+        reason: 'initial',
+        header: { config: { provider: 'p', model: 'strong' }, system: 's', tools: [] },
+      }),
+      at(6, 'model-routing/decision', routingData()),
+      at(20, 'assistant/message', {
+        turn: 1,
+        step: 1,
+        message: assistantMessage('assistant-1', 'first', 'p', 'cheap'),
+      }),
+      at(21, 'step/end', { turn: 1, step: 1 }),
+      at(23, 'step/start', { turn: 1, step: 2 }),
+      at(25, 'model-routing/decision', routingData({
+        outcome: 'kept-strong',
+        reason: 'gate-failed',
+        sticky: { active: false, turnsElapsed: 0, brokenBy: 'gate-failed' },
+      })),
+      at(30, 'assistant/message', {
+        turn: 1,
+        step: 2,
+        message: assistantMessage('assistant-2', 'second', 'p', 'strong'),
+      }),
+      at(31, 'step/end', { turn: 1, step: 2 }),
+    ]))
+    const requests = current.requests.filter((request): request is Extract<typeof request, { purpose: 'assistant' }> =>
+      request.purpose === 'assistant')
+
+    expect(requests.map(request => request.startSeq)).toEqual([3, 23])
+    expect(current.routing.map(decision => ({ seq: decision.seq, step: decision.step })))
+      .toEqual([{ seq: 6, step: 1 }, { seq: 25, step: 2 }])
+    const first = requests[0]!
+    const second = requests[1]!
+    expect(trajectoryRequestRoute(
+      first.turn,
+      first.step,
+      first.startSeq,
+      first.provenance?.provider,
+      first.provenance?.model,
+      current.routing,
+    )).toEqual({ provider: 'p', model: 'cheap', routed: true })
+    expect(trajectoryRequestRoute(
+      second.turn,
+      second.step,
+      second.startSeq,
+      second.provenance?.provider,
+      second.provenance?.model,
+      current.routing,
+    )).toEqual({ provider: 'p', model: 'strong', routed: false })
   })
 
   it('folds jspace/card and jspace/closed into jspace and not eventNodes', () => {

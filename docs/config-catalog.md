@@ -246,7 +246,7 @@ export interface ExtraSeat {
 }
 ```
 
-Source: [`packages/subagent/agent-seats/src/index.ts:40`](../packages/subagent/agent-seats/src/index.ts)
+Source: [`packages/subagent/agent-seats/src/index.ts:39`](../packages/subagent/agent-seats/src/index.ts)
 
 <a id="shres-codeshres-code-agent-spine-demo"></a>
 
@@ -1237,6 +1237,36 @@ Depends on: [`JudgmentTier`](../packages/llm/judgment/src/index.ts)
 
 Source: [`packages/llm/judgment-guardrails/src/config.ts:82`](../packages/llm/judgment-guardrails/src/config.ts)
 
+<a id="shres-codeshres-code-judgment-shield"></a>
+
+## `@shres-code/shres-code-judgment-shield`
+
+```ts config-catalog
+/** Configuration for the loopback-only typed-judgment gateway. */
+export interface ShieldJudgmentConfig {
+  /** Loopback HTTP(S) endpoint hosting `/v1/judgments`. */
+  endpoint: string
+  /** Explicit artifact id for each judgment tier. */
+  models: ShieldJudgmentModels
+  /** Maximum time spent waiting for the gateway response, in milliseconds. */
+  timeoutMs?: number
+  /** Maximum UTF-8 response body size accepted from the gateway. */
+  maxResponseBytes?: number
+  /** Maximum complete serialized UTF-8 request body size; align with the gateway's body limit. */
+  maxRequestBytes?: number
+}
+
+/** The two pinned model artifacts a judgment tier resolves to. */
+export interface ShieldJudgmentModels {
+  /** Artifact serving the explicit `fast` tier. */
+  fast: string
+  /** Artifact serving `accurate` and asks that omit a tier. */
+  accurate: string
+}
+```
+
+Source: [`packages/llm/judgment-shield/src/types.ts:16`](../packages/llm/judgment-shield/src/types.ts)
+
 <a id="shres-codeshres-code-judgment-typesafe"></a>
 
 ## `@shres-code/shres-code-judgment-typesafe`
@@ -2176,12 +2206,11 @@ Source: [`packages/feedback/message-feedback/src/index.ts:49`](../packages/feedb
 ```ts config-catalog
 /** Composition config of the model router; also the `model-router` settings section. */
 export interface ModelRouterConfig {
-  /** Whether routing starts in force. Required: a stored mode is an explicit deployment choice. */
+  /** Deployment mode for sessions without an explicit user choice. Changes commit between requests. */
   initialMode: ModelRoutingInitialMode
   /**
-   * Downgrade allowlist. Routing may select a member of this list or nothing —
-   * never the manual route and never anything stronger — so an empty list
-   * leaves every turn on the manual route with `no-candidates` logged.
+   * Downgrade allowlist whose relative capability and cost the deployment owns.
+   * An empty list leaves every turn on the manual route with `no-candidates`.
    */
   candidates?: ModelRoutingCandidateConfig[]
   /** Route confidence at or above which a candidate may be selected. Required. */
@@ -2197,16 +2226,20 @@ export interface ModelRouterConfig {
   /** The choice question text asked about the conversation state. Required. */
   routeInstructions: string
   /**
-   * The difficulty question text. Required at load while
-   * `minTurnsDowngraded > 0`: a held downgrade re-judges every turn and needs
-   * the difficulty answer to escalate back immediately.
+   * The difficulty question text. Required by stickiness, `hardHint`, and
+   * `difficultyToEffort`. When configured, every consult asks it and checks
+   * the difficulty limit before allowing a downgrade.
    */
   difficultyInstructions?: string
-  /** Ordered difficulty-level descriptions for the score question, lowest first. Defaults to a five-level rubric. */
+  /** Ordered score descriptions, lowest first; scores use zero-based indices. Defaults to a five-level rubric. */
   difficultyLevels?: string[]
   /** Escalate-back operating point. */
   escalateBack?: ModelRoutingEscalateBackConfig
-  /** Durable route-failure streak at which a held downgrade escalates back immediately. Defaults to 2. */
+  /**
+   * Consecutive candidate failures that require a manual-model turn. Recorded
+   * on each held decision; settings changes affect subsequent decisions.
+   * Defaults to 2.
+   */
   maxRouteErrors?: number
   /** What a failed judgment call does to the turn. Defaults to `fallback`. */
   onUnavailable?: ModelRoutingUnavailablePolicy
@@ -2245,13 +2278,13 @@ export interface ModelRoutingCandidateConfig {
   model: string
   /** Adapter-owned reasoning effort this candidate runs at, when it names one. */
   reasoningEffort?: string
-  /** Why this candidate is allowlisted, for configuration surfaces. */
+  /** Tasks this candidate can handle, included with its model identity in the judgment question. */
   description?: string
 }
 
 /** The escalation operating point. */
 export interface ModelRoutingEscalateBackConfig {
-  /** Difficulty score at or above which a held downgrade escalates back immediately. Defaults to 4. */
+  /** Difficulty at or above which the manual model handles the turn. Defaults to level 3 in the five-level rubric. */
   scoreThreshold?: number
 }
 
@@ -2268,7 +2301,7 @@ export interface ModelRoutingDifficultyToEffortConfig {
 
 /** The advisory-hint operating point. */
 export interface ModelRoutingHardHintConfig {
-  /** Difficulty score at or above which a STRONG turn carries the `consider-stronger` hint. Defaults to 4. */
+  /** Difficulty at or above which a manual-model turn carries `consider-stronger`. Defaults to level 3 in the five-level rubric. */
   scoreThreshold?: number
 }
 
@@ -2278,10 +2311,12 @@ export interface ModelRoutingStateConfig {
   contextTurns?: number
   /** Hard cap on the assembled state text, in characters. Defaults to 12000. */
   maxChars?: number
+  /** Maximum complete context alternatives offered to a tokenizer-aware provider. Defaults to 8. */
+  maxFitCandidates?: number
 }
 ```
 
-Source: [`packages/llm/model-router/src/config.ts:50`](../packages/llm/model-router/src/config.ts)
+Source: [`packages/llm/model-router/src/config.ts:52`](../packages/llm/model-router/src/config.ts)
 
 <a id="shres-codeshres-code-permission-presets"></a>
 

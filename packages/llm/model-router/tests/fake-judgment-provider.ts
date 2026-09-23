@@ -74,7 +74,7 @@ export class FakeJudgment extends JudgmentService {
           kind: 'score',
           id: question.id,
           score: SCRIPTED_DIFFICULTY_SCORE,
-          probabilities: { '1': 1 },
+          probabilities: { '2': 1 },
           confidence: 1,
         }
       }

@@ -1,9 +1,8 @@
 /**
  * Asymmetric, cache-sticky model routing.
  *
- * The manual/default selection is always the strong model; `candidates` is a
- * **downgrade allowlist**, so this service can select a member of that list or
- * nothing at all — never the manual route and never anything stronger. A
+ * The deployment declares the manual/default model and a downgrade allowlist.
+ * The judgment can keep that model or select an allowlisted candidate. A
  * downgrade requires both `confidence >= downgradeThreshold` and
  * `top1 - top2 >= downgradeMargin`, above the measured wobble of a rented
  * classifier's borderline answers.
@@ -13,34 +12,36 @@
  * turns to net positive. The streak lives in the log (`model-routing/decision`,
  * `model-routing/mode`, plus `request/header` and turn events) and is folded
  * purely by `stickyState`, so resume, fork, compaction, and a process restart
- * continue it exactly as the live consult left it. While downgraded the turn is
- * still judged — the difficulty question is then mandatory — so a turn that
- * turns hard escalates back immediately.
+ * continue it exactly as the live consult left it. While downgraded each new
+ * step is judged — the difficulty question is then mandatory — so harder work
+ * revealed by steering or tool results can return to the manual model.
  *
  * The consult sits inside `installModelSelection` (`packages/core/agent`): after
  * the manual selection rewrote the request, `resolveRequest` may replace it.
- * One decision is taken per turn and reused by later steps and retries.
+ * Same-step retries reuse their judgment while its input is unchanged and
+ * recheck capabilities and manual authority. A manual-model decision remains
+ * in force for the rest of the turn.
  *
  * Agent Note:
- * - .agents/notes/proposed/feature/2026-09-17-jev-judgment-routing-and-compaction.md
+ * - .agents/notes/implemented/bug-fix/2026-09-22-routing-choice-and-difficulty.md
  *
  * @module @shres-code/shres-code-model-router
  */
 
-import { Context, Service } from '@shres-code/cordis'
+import { Context, Service, symbols } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
 import { z as zod } from 'zod'
 import type { ZodType } from 'zod'
-import type { Agent, ModelRoutingConsult, ModelSelection, PreStepDecision } from '@shres-code/shres-code-agent'
+import type { Agent, ModelRoutingConsult, ModelRoutingRequest, ModelSelection, PreStepDecision } from '@shres-code/shres-code-agent'
 import { judgmentEnabled, judgmentQuestionId } from '@shres-code/shres-code-judgment'
 import type {
   JudgmentChoiceAnswer,
   JudgmentChoiceQuestion,
   JudgmentQuestion,
+  JudgmentResult,
   JudgmentScoreAnswer,
   JudgmentScoreQuestion,
 } from '@shres-code/shres-code-judgment'
-import type { Message } from '@shres-code/shres-code-llm'
 import { ReasoningEffortId as toEffortId } from '@shres-code/shres-code-llm'
 import type { Session, SessionEvent } from '@shres-code/shres-code-session'
 import { installSettingsSection, settingsNamespace } from '@shres-code/shres-code-settings'
@@ -53,12 +54,23 @@ import {
   DEFAULT_MIN_TURNS_DOWNGRADED,
   DEFAULT_STATE_CONTEXT_TURNS,
   DEFAULT_STATE_MAX_CHARS,
+  DEFAULT_STATE_MAX_FIT_CANDIDATES,
   DEFAULT_DIFFICULTY_LEVELS,
+  KEEP_CURRENT_OPTION_ID,
   resolveConfig,
 } from './config.ts'
 import type { ModelRouterConfig, ResolvedModelRouterConfig } from './config.ts'
-import { foldModelRouting, stickyState } from './folds.ts'
-import type { ModelRoutingStickyState } from './folds.ts'
+import {
+  advanceStickyFoldState,
+  createStickyFoldState,
+  foldModelRouting,
+  readStickyFoldState,
+  stickyState,
+} from './folds.ts'
+import { buildRoutingStateCandidates } from './state.ts'
+import type { RoutingState as RoutingStateCandidate } from './state.ts'
+import { assessModelRoutingCandidates } from './eligibility.ts'
+import type { ModelRoutingStickyFoldState, ModelRoutingStickyState } from './folds.ts'
 import type {
   ModelRoutingCandidate,
   ModelRoutingDecision,
@@ -80,6 +92,8 @@ export {
   DEFAULT_MIN_TURNS_DOWNGRADED,
   DEFAULT_STATE_CONTEXT_TURNS,
   DEFAULT_STATE_MAX_CHARS,
+  DEFAULT_STATE_MAX_FIT_CANDIDATES,
+  KEEP_CURRENT_OPTION_ID,
   resolveConfig,
 } from './config.ts'
 export { foldModelRouting, stickyState } from './folds.ts'
@@ -105,31 +119,46 @@ declare module '@shres-code/cordis' {
 
 /** One assembled judgment state, with the surface seqs it came from. */
 interface RoutingState {
+  /** Complete alternatives, ordered by retained context. */
+  alternatives: readonly RoutingStateCandidate[]
+  /** Exact complete candidate inputs used to recognize an unchanged retry. */
+  inputKey: string
   /** Assembled state text. */
   text: string
   /** Stable hash of that text. */
   hash: string
   /** Surface seqs the text was assembled from, in order. */
   seqs: number[]
+  /** Selected-window messages omitted to retain the complete current request. */
+  omittedSeqs: number[]
+  /** The complete current request cannot fit the configured state budget. */
+  oversizedCurrent: boolean
 }
 
-/** The intra-turn pin: one decision per turn, reused by later steps and retries. */
+/** A downgraded step's retry decision, or the manual route retained for its turn. */
 interface PinnedDecision {
   /** Turn the decision belongs to. */
   turn: number
+  /** Step whose judgment can be reused by a request retry. */
+  step: number
+  /** Unredacted candidate inputs, before a provider selects or transforms one. */
+  inputKey: string
   /** The logged decision. */
   decision: ModelRoutingDecision
 }
 
-/** Projection unit state: the logged mode, an outstanding `/route` selection, the last decision, and the last entered streak base. */
+/** A mode change awaiting an accepted request boundary. */
+interface PendingMode {
+  active: boolean
+  source: 'configuration' | 'user'
+}
+
+/** Projection unit state: mode and command fields plus the shared sticky fold. */
 interface ModelRoutingUnitState {
   active: boolean
   wanted: boolean | null
-  turn: number
   last: ModelRoutingLastDecision | null
-  stickyActive: boolean
-  stickyEnteredTurn: number | null
-  stickyCandidate: ModelRoutingSelectionView | null
+  sticky: ModelRoutingStickyFoldState
   lastStrong: ModelRoutingEntryBaseView | null
 }
 
@@ -141,6 +170,47 @@ function selectionView(selection: ModelRoutingSelection): ModelRoutingSelectionV
     model: selection.model,
     ...selection.reasoningEffort === undefined ? {} : { reasoningEffort: String(selection.reasoningEffort) },
   }
+}
+
+/** Convert the durable entry-base view back to the in-process model selection. */
+function modelSelectionFromEntryBase(base: ModelRoutingEntryBaseView): ModelSelection {
+  return {
+    provider: base.provider,
+    model: base.model,
+    ...base.reasoningEffort === undefined ? {} : { reasoningEffort: toEffortId(base.reasoningEffort) },
+  }
+}
+
+/**
+ * Find the manual route behind the request header that actually served the last
+ * routed request. A later decision without a header is deliberately ignored:
+ * the process may have stopped between decision logging and request assembly.
+ * @param events - the session log to inspect.
+ * @returns the routed decision's entry base, or undefined when the last header
+ *   was manual or no matching decision exists in that turn.
+ */
+function entryBaseForLastRoutedHeader(events: readonly SessionEvent[]): ModelRoutingEntryBaseView | undefined {
+  let header: Extract<SessionEvent, { type: 'request/header' }> | undefined
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index]
+    if (header === undefined) {
+      if (event?.type === 'request/header') header = event
+      continue
+    }
+    if (event?.type === 'turn/start') return undefined
+    if (event?.type !== 'model-routing/decision') continue
+    if (event.data.outcome !== 'downgraded' || event.data.selection === undefined) return undefined
+    const selection = event.data.selection
+    const headerConfig = header.data.header.config
+    if (selection.provider !== headerConfig.provider || selection.model !== headerConfig.model) return undefined
+    const selectionEffort = selection.reasoningEffort === undefined ? undefined : String(selection.reasoningEffort)
+    const headerEffort = header.data.header.adapterDefaults?.reasoningEffort === true
+      ? undefined
+      : headerConfig.reasoningEffort === undefined ? undefined : String(headerConfig.reasoningEffort)
+    if (selectionEffort !== headerEffort) return undefined
+    return event.data.sticky.entryBase
+  }
+  return undefined
 }
 
 /**
@@ -212,15 +282,6 @@ export function stateHash(text: string): string {
   return hash.toString(16).padStart(8, '0')
 }
 
-/** Text blocks of one message, joined. */
-function messageText(message: Message): string {
-  const parts: string[] = []
-  for (const block of message.content) {
-    if (block.type === 'text' && typeof block.text === 'string' && block.text.length > 0) parts.push(block.text)
-  }
-  return parts.join('\n')
-}
-
 /** Whether the log holds an opened turn without its closing `turn/end`. */
 function hasOpenTurn(events: readonly SessionEvent[]): boolean {
   let open = false
@@ -251,10 +312,10 @@ export function routeMargin(probabilities: Readonly<Record<string, number>>): nu
 }
 
 /**
- * `ctx.modelRouting`: owns the logged routing mode, the per-turn decision, and
+ * `ctx.modelRouting`: owns the logged routing mode, routing decisions, and
  * the consult `installModelSelection` reaches. No live mirror of the mode is
- * kept — the log is the state — and beyond its two routing events it writes
- * nothing: no prompt, no tool, and no request of its own.
+ * kept — the log is the state — and its configuration, mode, and decision events write no prompt, tool,
+ * or model request.
  */
 export class ModelRoutingController extends Service implements ModelRoutingConsult {
   /**
@@ -277,7 +338,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     difficultyInstructions: z.string(),
     difficultyLevels: z.array(z.string()).default([...DEFAULT_DIFFICULTY_LEVELS]),
     escalateBack: z.object({
-      scoreThreshold: z.number().min(1).max(5).default(DEFAULT_ESCALATE_BACK_SCORE_THRESHOLD),
+      scoreThreshold: z.number().min(0).default(DEFAULT_ESCALATE_BACK_SCORE_THRESHOLD),
     }),
     maxRouteErrors: z.number().step(1).min(1).default(DEFAULT_MAX_ROUTE_ERRORS),
     onUnavailable: z.union(['fallback', 'error']).default('fallback'),
@@ -287,15 +348,16 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     // union keeps an omitted key absent, and a valueless `difficultyToEffort:`
     // resolves to null — which resolveConfig reads as not configured.
     difficultyToEffort: z.union([z.const(null), z.object({
-      scoreThreshold: z.number().min(1).max(5),
+      scoreThreshold: z.number().min(0),
       reasoningEffort: z.string(),
     })]) as unknown as z<ModelRouterConfig['difficultyToEffort']>,
     hardHint: z.union([z.const(null), z.object({
-      scoreThreshold: z.number().min(1).max(5).default(DEFAULT_ESCALATE_BACK_SCORE_THRESHOLD),
+      scoreThreshold: z.number().min(0).default(DEFAULT_ESCALATE_BACK_SCORE_THRESHOLD),
     })]) as unknown as z<ModelRouterConfig['hardHint']>,
     state: z.object({
       contextTurns: z.number().step(1).min(0).default(DEFAULT_STATE_CONTEXT_TURNS),
       maxChars: z.number().step(1).min(1).default(DEFAULT_STATE_MAX_CHARS),
+      maxFitCandidates: z.number().step(1).min(2).default(DEFAULT_STATE_MAX_FIT_CANDIDATES),
     }),
     tier: z.union(['fast', 'accurate']).default('fast'),
     // The annotation is a cast because two fields are unions with `z.const(null)`
@@ -307,7 +369,8 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
   private lastRaw: ModelRouterConfig | undefined
   private lastGood: ResolvedModelRouterConfig | undefined
   private readonly pins = new WeakMap<Session, PinnedDecision>()
-  private readonly pendingIntents = new WeakMap<Session, boolean>()
+  private readonly pendingIntents = new WeakMap<Session, PendingMode>()
+  private readonly liveAgents = new Set<Agent>()
 
   /**
    * @param ctx - the context this service registers `ctx.modelRouting` on.
@@ -317,13 +380,18 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     super(ctx, 'modelRouting')
     this.source = () => config
     this.config()
+    ctx.on('agent/created', ({ agent }) => { this.attachAgent(agent) })
+    ctx.on('agent/disposed', ({ agent }) => { this.forgetAgent(agent) }, { global: true })
+    ctx.effect(() => () => { this.liveAgents.clear() })
     // A pending mode selection is committed at the next accepted in-turn
     // pre-step, so the change lands with the request assembly it belongs to
     // rather than mid-step.
     ctx.on('agent/pre-step', async ({ agent, signal }, next): Promise<PreStepDecision> => {
       const decision = await next()
+      if (decision.kind === 'reject' || signal.aborted || !this.ownsAgent(agent)) return decision
+      this.attachAgent(agent)
       const wanted = this.pendingIntents.get(agent.session)
-      if (wanted === undefined || decision.kind === 'reject' || signal.aborted) return decision
+      if (wanted === undefined) return decision
       this.commitMode(agent.session, wanted)
       return decision
     })
@@ -332,26 +400,22 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
         key: 'modelRouting',
         schema: modelRoutingProjectionSchema,
         init: () => ({
-          // Mirrors `modeOf`: a log with no `model-routing/mode` event starts
-          // from the configured initial mode, not from off.
-          active: this.config().initialMode === 'on',
+          active: false,
           wanted: null,
-          turn: 0,
           last: null,
-          stickyActive: false,
-          stickyEnteredTurn: null,
-          stickyCandidate: null,
+          sticky: createStickyFoldState(),
           lastStrong: null,
         }),
         apply: (state, event) => {
+          const sticky = advanceStickyFoldState(state.sticky, event)
           switch (event.type) {
             case 'command/run':
               if (event.data.name !== ROUTE_COMMAND || event.data.args === undefined) return state
-              return { ...state, wanted: event.data.args.trim() !== 'off' }
+              if (event.data.args.trim() !== 'on' && event.data.args.trim() !== 'off') return state
+              return { ...state, wanted: event.data.args.trim() === 'on' }
             case 'model-routing/mode':
-              return { ...state, active: event.data.active, wanted: null }
-            case 'turn/start':
-              return { ...state, turn: event.data.turn }
+            case 'model-routing/configuration':
+              return { ...state, active: event.data.active, wanted: null, sticky }
             case 'model-routing/decision': {
               const data = event.data
               const last: ModelRoutingLastDecision = {
@@ -363,34 +427,33 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
               }
               return {
                 ...state,
+                sticky,
                 last,
-                stickyActive: data.sticky.active,
-                stickyEnteredTurn: data.sticky.active ? (data.sticky.enteredTurn ?? state.turn) : null,
-                stickyCandidate: data.sticky.active && data.selection !== undefined ? selectionView(data.selection) : null,
                 // Only an active record carries a base, so the retained route
                 // outlives the streak: ending one reports nothing itself.
                 lastStrong: data.sticky.entryBase ?? state.lastStrong,
               }
             }
             default:
-              return state
+              return sticky === state.sticky ? state : { ...state, sticky }
           }
         },
-        view: state => ({
-          active: state.active,
-          pending: state.wanted !== null && state.wanted !== state.active,
-          ...state.last === null ? {} : { last: state.last },
-          ...state.lastStrong === null ? {} : { lastStrong: state.lastStrong },
-          sticky: {
-            active: state.stickyActive,
-            turnsElapsed: state.stickyActive && state.stickyEnteredTurn !== null
-              ? Math.max(0, state.turn - state.stickyEnteredTurn)
-              : 0,
-            ...state.stickyCandidate === null ? {} : { selection: state.stickyCandidate },
-          },
-        }),
-        // Version 2 adds the retained entry base to the unit state.
-        stateVersion: 2,
+        view: (state) => {
+          const sticky = readStickyFoldState(state.sticky)
+          return {
+            active: state.active,
+            pending: state.wanted !== null && state.wanted !== state.active,
+            ...state.last === null ? {} : { last: state.last },
+            ...state.lastStrong === null ? {} : { lastStrong: state.lastStrong },
+            sticky: {
+              active: sticky.active,
+              turnsElapsed: sticky.turnsElapsed,
+              ...sticky.candidate === undefined ? {} : { selection: selectionView(sticky.candidate) },
+            },
+          }
+        },
+        // Configuration mode is a durable fact; empty logs always start off.
+        stateVersion: 5,
       })
     })
     ctx.inject(['commands'], (commandCtx) => {
@@ -411,10 +474,55 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
         this.source = next
       },
       onChange: () => {
-        // Nothing is derived from the configuration at registration: every
-        // decision re-resolves it, so a committed change reaches the next turn.
+        for (const agent of this.liveAgents) {
+          if (this.ownsAgent(agent)) this.reconcileConfiguration(agent.session)
+          else this.forgetAgent(agent)
+        }
       },
     })
+    ctx.inject(['agents', 'modelRouting'], (agentCtx) => {
+      for (const agent of agentCtx.agents.list()) this.attachAgent(agent)
+    })
+  }
+
+  /** Adopt only agents whose resolved routing service is this controller. */
+  private attachAgent(agent: Agent): void {
+    if (!this.ownsAgent(agent)) return
+    this.liveAgents.add(agent)
+    this.reconcileConfiguration(agent.session)
+  }
+
+  /** Resolve service ownership through the agent's current isolation realm. */
+  private ownsAgent(agent: Agent): boolean {
+    const service = agent.ctx.get('modelRouting') as (ModelRoutingController & {
+      [symbols.original]?: ModelRoutingController
+    }) | undefined
+    return (service?.[symbols.original] ?? service) === this
+  }
+
+  /** Release pending work when an agent leaves this controller. */
+  private forgetAgent(agent: Agent): void {
+    if (!this.liveAgents.delete(agent)) return
+    this.pendingIntents.delete(agent.session)
+    this.pins.delete(agent.session)
+  }
+
+  /** Commit deployment defaults without replacing an explicit session choice. */
+  private reconcileConfiguration(session: Session): void {
+    if (this.hasManualMode(session) || this.pendingIntents.get(session)?.source === 'user') return
+    const active = this.config().initialMode === 'on'
+    if (active === this.modeOf(session)) {
+      this.pendingIntents.delete(session)
+      return
+    }
+    const wanted: PendingMode = { active, source: 'configuration' }
+    if (hasOpenTurn(session.events)) this.pendingIntents.set(session, wanted)
+    else this.commitMode(session, wanted)
+  }
+
+  /** An explicit user selection remains authoritative across settings updates. */
+  private hasManualMode(session: Session): boolean {
+    return session.events.some(event => event.type === 'model-routing/mode')
   }
 
   /**
@@ -446,24 +554,25 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
   get(agent: Agent): { active: boolean; pending?: boolean } {
     const active = this.modeOf(agent.session)
     const pending = this.pendingIntents.get(agent.session)
-    return pending === undefined ? { active } : { active, pending }
+    return pending === undefined ? { active } : { active, pending: pending.active }
   }
 
   /**
-   * The mode in force on one session: the last logged `model-routing/mode`
-   * wins, and a log with none starts from the configured `initialMode`.
+   * The mode in force on one session, derived from committed configuration
+   * and user mode events. A log with neither starts off.
    * @param session - the session to read.
    * @param end - fold the first `end` events; defaults to the whole log.
    * @returns whether routing is active.
    */
   modeOf(session: Session, end: number = session.events.length): boolean {
-    return foldModelRouting(session.events, end, this.config().initialMode === 'on')
+    return foldModelRouting(session.events, end)
   }
 
   /**
    * Switch routing on or off. Between turns the change is appended
-   * immediately; during an open turn it waits for the next accepted in-turn
-   * pre-step, like every other logged mode in this harness.
+   * immediately; a changed value during an open turn waits for the next
+   * accepted pre-step. An explicit choice equal to the current value records
+   * user authority immediately and prevents later settings from overriding it.
    * @param agent - the agent to switch.
    * @param active - whether routing should be active.
    * @returns what happened: `committed`, `queued`, `cancelled`, or `noop`.
@@ -471,78 +580,93 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
   set(agent: Agent, active: boolean): 'committed' | 'queued' | 'cancelled' | 'noop' {
     const session = agent.session
     const pending = this.pendingIntents.get(session)
-    const target = pending ?? this.modeOf(session)
-    if (active === target) return 'noop'
-    if (hasOpenTurn(session.events)) {
-      this.pendingIntents.set(session, active)
-      return this.modeOf(session) === active ? 'cancelled' : 'queued'
-    }
     const logged = this.modeOf(session)
-    if (logged === active) {
-      this.pendingIntents.delete(session)
-      return 'cancelled'
+    const manual = this.hasManualMode(session)
+    if (pending?.source === 'user' && active === pending.active) return 'noop'
+    const wanted: PendingMode = { active, source: 'user' }
+    if (active === logged) {
+      this.commitMode(session, wanted)
+      return pending !== undefined ? 'cancelled' : manual ? 'noop' : 'committed'
     }
-    session.append('model-routing/mode', { active })
-    this.pendingIntents.delete(session)
+    if (hasOpenTurn(session.events)) {
+      this.pendingIntents.set(session, wanted)
+      return 'queued'
+    }
+    this.commitMode(session, wanted)
     return 'committed'
   }
 
   /** Append one pending selection before the next request assembly. */
-  private commitMode(session: Session, active: boolean): void {
-    if (active === this.modeOf(session)) {
-      this.pendingIntents.delete(session)
-      return
+  private commitMode(session: Session, wanted: PendingMode): void {
+    const manual = this.hasManualMode(session)
+    if (wanted.source === 'user') {
+      if (!manual || wanted.active !== this.modeOf(session)) {
+        session.append('model-routing/mode', { active: wanted.active })
+      }
+    } else {
+      session.append('model-routing/configuration', { active: wanted.active })
     }
-    session.append('model-routing/mode', { active })
     // Delete only after the append succeeds so a later accepted pre-step can
     // retry a failed durable write.
     this.pendingIntents.delete(session)
   }
 
   /**
-   * Resolve the route one turn should run. Called by
+   * Resolve the route one request should run. Called by
    * `installModelSelection` after the manual selection rewrote the request: a
    * non-undefined result replaces provider/model/effort, and `undefined` leaves
    * the manual route in force.
    *
-   * One decision per turn: later steps of the same turn and same-turn request
-   * retries reuse the pinned decision instead of judging again.
+   * Each new downgraded step reassesses the latest task evidence. Same-step
+   * retries reuse the judgment only while its complete candidate inputs are
+   * unchanged, and recheck manual authority, allowlist membership, and
+   * capabilities. A manual-model decision lasts for the turn.
    * @param agent - the agent whose turn is being prepared.
    * @param turn - the turn number, as the loop dispatched it.
-   * @param _step - the step number within that turn; underscore-prefixed because
-   *   the pin is keyed by turn, so the decision is taken once and later steps
-   *   reuse it.
+   * @param step - the step number within the turn; retries share its judgment.
    * @param base - the route the manual selection left in force.
    * @param signal - the request's cancellation signal.
+   * @param request - frozen conversation content and the manually selected call configuration.
    * @returns the route to run, or `undefined` to keep the manual route.
    */
   async resolveRequest(
     agent: Agent,
     turn: number,
-    _step: number,
+    step: number,
     base: ModelSelection,
     signal: AbortSignal,
+    request: ModelRoutingRequest,
   ): Promise<ModelSelection | undefined> {
+    signal.throwIfAborted()
     const session = agent.session
     const active = this.modeOf(session)
     const pinned = this.pins.get(session)
+    let state: RoutingState | undefined
     if (pinned !== undefined && pinned.turn === turn) {
-      if (active) {
-        return pinned.decision.outcome === 'downgraded'
-          ? selectionAsModel(pinned.decision.selection)
-          : undefined
+      if (!active) {
+        // A committed off-switch releases this turn's pinned selection.
+        this.pins.delete(session)
+        this.log(session, {
+          outcome: 'skipped',
+          reason: 'mode-off',
+          stateHash: pinned.decision.stateHash,
+          stateSeqs: pinned.decision.stateSeqs,
+          sticky: { active: false, turnsElapsed: 0 },
+        })
+        return undefined
       }
-      // The mode went off under a turn that had already been judged: record the
-      // skip once, then stop applying the decision.
-      this.pins.delete(session)
-      this.log(session, {
-        outcome: 'skipped',
-        reason: 'mode-off',
-        stateHash: pinned.decision.stateHash,
-        stateSeqs: pinned.decision.stateSeqs,
-        sticky: { active: false, turnsElapsed: 0 },
-      })
-      return undefined
+      if (pinned.decision.outcome === 'downgraded') {
+        if (pinned.step === step) {
+          state = this.buildState(session, this.config())
+          if (pinned.inputKey === state.inputKey) {
+            return this.revalidatePinned(agent, turn, step, pinned.decision, base, request, signal)
+          }
+        }
+      } else {
+        const manual = pinned.decision.sticky.entryBase
+        if (pinned.decision.reason !== 'route-errors'
+          || (manual?.provider === base.provider && manual.model === base.model)) return undefined
+      }
     }
     if (!active) {
       // Off is off: no judgment, no decision event, no request rewrite. This is
@@ -551,12 +675,81 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       return undefined
     }
     const config = this.config()
-    const state = this.buildState(session, config)
-    const sticky = stickyState(session.events, config)
-    const decision = await this.decide(config, state, sticky, base, turn, signal)
+    state ??= this.buildState(session, config)
+    const sticky = stickyState(session.events)
+    const resolved = await this.decide(config, state, sticky, base, turn, signal, request)
+    const decision = {
+      ...resolved,
+      stateProjection: resolved.stateProjection ?? {
+        renderer: 'conversation-v1' as const,
+        contextTurns: config.state.contextTurns,
+        maxChars: config.state.maxChars,
+        omittedSeqs: state.omittedSeqs,
+      },
+    }
+    signal.throwIfAborted()
     this.log(session, decision)
-    this.pins.set(session, { turn, decision })
+    this.pins.set(session, { turn, step, inputKey: state.inputKey, decision })
     return decision.outcome === 'downgraded' ? selectionAsModel(decision.selection) : undefined
+  }
+
+  /** Recheck a retry's held route against manual authority and current provider registrations. */
+  private async revalidatePinned(
+    agent: Agent,
+    turn: number,
+    step: number,
+    previous: ModelRoutingDecision,
+    base: ModelSelection,
+    request: ModelRoutingRequest,
+    signal: AbortSignal,
+  ): Promise<ModelSelection | undefined> {
+    const selection = previous.selection
+    /* v8 ignore next -- only this controller's complete downgraded decisions enter the pin. */
+    if (selection === undefined) return undefined
+    const config = this.config()
+    const entryBase = previous.sticky.entryBase
+    const candidate = config.candidates.find(entry => entry.id === selection.candidateId
+      && entry.provider === selection.provider && entry.model === selection.model)
+    let reason: 'manual-deviation' | 'unknown-candidate' | 'candidate-ineligible' | undefined
+    let candidateEligibility: ModelRoutingDecision['candidateEligibility']
+    if (entryBase !== undefined && (entryBase.provider !== base.provider || entryBase.model !== base.model)) {
+      reason = 'manual-deviation'
+    } else if (candidate === undefined) {
+      reason = 'unknown-candidate'
+    } else {
+      const llm = this.ctx.get('llm')
+      if (llm !== undefined) {
+        const { reasoningEffort: _configuredEffort, ...identity } = candidate
+        const heldCandidate = {
+          ...identity,
+          ...selection.reasoningEffort === undefined ? {} : { reasoningEffort: selection.reasoningEffort },
+        }
+        candidateEligibility = await assessModelRoutingCandidates(
+          llm, request.config, request.content.messages, [heldCandidate], undefined, signal,
+        )
+      }
+      if (candidateEligibility?.eligibleCandidates.length !== 1) reason = 'candidate-ineligible'
+    }
+    signal.throwIfAborted()
+    if (reason === undefined) return selectionAsModel(selection)
+    const state = this.buildState(agent.session, config)
+    const decision: ModelRoutingDecision = {
+      outcome: 'kept-strong',
+      reason,
+      stateHash: state.hash,
+      stateSeqs: state.seqs,
+      stateProjection: {
+        renderer: 'conversation-v1',
+        contextTurns: config.state.contextTurns,
+        maxChars: config.state.maxChars,
+        omittedSeqs: state.omittedSeqs,
+      },
+      ...candidateEligibility === undefined ? {} : { candidateEligibility },
+      sticky: { active: false, turnsElapsed: 0, brokenBy: reason },
+    }
+    this.log(agent.session, decision)
+    this.pins.set(agent.session, { turn, step, inputKey: state.inputKey, decision })
+    return undefined
   }
 
   /**
@@ -567,33 +760,33 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
    * asking for the session's selection asks this first. The answer is the same
    * fold the consult reads — no live mirror — and the effort is the one the
    * streak was entered on, because that is what the manual route still runs at.
+   * When the streak has just ended, the last request header can still carry its
+   * candidate. In that case the decision immediately before that header retains
+   * the manual entry route until a later manual header replaces it. A decision
+   * logged after the header is ignored because it may be a crash-orphaned turn.
    * @param agent - the agent whose selection is being read.
-   * @returns the route the held streak was entered on, or `undefined` while the
-   *   state is strong, where the last logged header already is that route.
+   * @returns the manual route behind an active streak or the last routed header
+   *   awaiting replacement; `undefined` when the logged header is already manual.
    */
   stickySelection(agent: Agent): ModelSelection | undefined {
-    const sticky = stickyState(agent.session.events, this.config())
-    if (!sticky.active) return undefined
-    const base = sticky.entryBase
+    const sticky = stickyState(agent.session.events)
+    const base = sticky.active ? sticky.entryBase : entryBaseForLastRoutedHeader(agent.session.events)
     // A state with no base is one this consult never produced — a replayed
     // decision from a log whose entering turn recorded none — and it reports
     // nothing rather than inventing the candidate it holds.
     if (base === undefined) return undefined
-    return {
-      provider: base.provider,
-      model: base.model,
-      ...base.reasoningEffort === undefined ? {} : { reasoningEffort: toEffortId(base.reasoningEffort) },
-    }
+    return modelSelectionFromEntryBase(base)
   }
 
   /**
-   * Judge one turn and resolve it against the allowlist and the sticky state.
+   * Judge one step and resolve it against the allowlist and the sticky state.
    * @param config - resolved configuration.
    * @param state - the assembled state.
    * @param sticky - the sticky state before this decision.
    * @param base - the manual route in force.
    * @param turn - the turn being judged.
    * @param signal - cancellation signal forwarded to the judgment call.
+   * @param request - content and call configuration whose requirements candidates must preserve.
    * @returns the decision to log.
    */
   private async decide(
@@ -603,19 +796,41 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     base: ModelSelection,
     turn: number,
     signal: AbortSignal,
+    request: ModelRoutingRequest,
   ): Promise<ModelRoutingDecision> {
     const held = sticky.active ? sticky.candidate : undefined
+    let observed = state
+    const facts: Pick<ModelRoutingDecision,
+      'candidateEligibility' | 'judgmentQuestions' | 'stateProjection' | 'judgmentInput'
+      | 'judgmentRejection' | 'engine' | 'model'> = {}
     /** One fallback: the manual route stands, with the class that kept it. */
     const keep = (reason: ModelRoutingReason): ModelRoutingDecision => ({
       outcome: 'kept-strong',
       reason,
-      stateHash: state.hash,
-      stateSeqs: state.seqs,
+      stateHash: observed.hash,
+      stateSeqs: observed.seqs,
+      ...facts,
       sticky: { active: false, turnsElapsed: 0 },
     })
+    if (sticky.needsStrongTurn === true) {
+      return {
+        ...keep('route-errors'),
+        sticky: {
+          active: false,
+          turnsElapsed: 0,
+          brokenBy: 'route-errors',
+          entryBase: entryBaseOf({ active: false, turnsElapsed: 0 }, base),
+        },
+      }
+    }
     // The allowlist is the enforcement point: with nothing on it nothing may be
     // downgraded to, and no judgment call is worth making.
     if (config.candidates.length === 0) return keep('no-candidates')
+    if (state.oversizedCurrent) return keep('state-too-large')
+    if (held !== undefined && !config.candidates.some(candidate => candidate.id === held.candidateId
+      && candidate.provider === held.provider && candidate.model === held.model)) {
+      return { ...keep('unknown-candidate'), sticky: { active: false, turnsElapsed: 0, brokenBy: 'unknown-candidate' } }
+    }
     if (held !== undefined && sticky.entryBase !== undefined
       && (sticky.entryBase.provider !== base.provider || sticky.entryBase.model !== base.model)) {
       // Manual authority wins immediately: only the provider/model comparison
@@ -623,139 +838,188 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       return {
         outcome: 'kept-strong',
         reason: 'manual-deviation',
-        stateHash: state.hash,
-        stateSeqs: state.seqs,
+        stateHash: observed.hash,
+        stateSeqs: observed.seqs,
         sticky: { active: false, turnsElapsed: 0, brokenBy: 'manual-deviation' },
       }
     }
     const engine = this.ctx.get('judgment')
     if (engine === undefined) return keep('engine-absent')
     if (!judgmentEnabled(engine.settings)) return keep('engine-disabled')
+    const llm = this.ctx.get('llm')
+    if (llm === undefined) return keep('model-unavailable')
+    const eligibility = await assessModelRoutingCandidates(
+      llm, request.config, request.content.messages, config.candidates, config.difficultyToEffort, signal,
+    )
+    facts.candidateEligibility = eligibility
+    const eligibleConfig = { ...config, candidates: eligibility.eligibleCandidates }
+    if (eligibility.eligibleCandidates.length === 0
+      || (held !== undefined && !eligibility.eligibleCandidates.some(candidate => candidate.id === held.candidateId))) {
+      return {
+        ...keep('candidate-ineligible'),
+        sticky: { active: false, turnsElapsed: 0, ...held === undefined ? {} : { brokenBy: 'candidate-ineligible' as const } },
+      }
+    }
     const difficultyInstructions = config.difficultyInstructions
     const questions: JudgmentQuestion[] = [
-      routeQuestion(config),
+      routeQuestion(eligibleConfig, base),
       ...difficultyInstructions === undefined ? [] : [difficultyQuestion(config, difficultyInstructions)],
     ]
-    let result
+    facts.judgmentQuestions = questions
+    let result: JudgmentResult
     try {
-      result = await engine.ask({
-        state: state.text,
-        questions,
-        tier: config.tier,
-        signal,
-      })
+      if (engine.fitting === undefined) {
+        result = await engine.ask({ state: state.text, questions, tier: config.tier, signal })
+      } else {
+        const fitted = await engine.fitting.ask({
+          states: state.alternatives.map(candidate => candidate.text),
+          questions,
+          tier: config.tier,
+          signal,
+        })
+        signal.throwIfAborted()
+        if (fitted.kind === 'unfit') {
+          facts.judgmentRejection = { limits: fitted.limits, reason: fitted.reason }
+          facts.engine = fitted.engine
+          facts.model = fitted.model
+          return keep('judgment-input-too-large')
+        }
+        // Providers validate the selected index against the exact outbound candidates.
+        const selected = state.alternatives[fitted.fit.selectedIndex] as RoutingStateCandidate
+        observed = { ...state, ...selected, text: fitted.fit.state, hash: stateHash(fitted.fit.state) }
+        facts.judgmentInput = fitted.fit
+        facts.stateProjection = {
+          renderer: 'conversation-v1',
+          contextTurns: config.state.contextTurns,
+          maxChars: config.state.maxChars,
+          omittedSeqs: selected.omittedSeqs,
+        }
+        result = fitted.result
+      }
     } catch (error: unknown) {
+      signal.throwIfAborted()
+      const code = (error as { code?: unknown } | null)?.code
+      if (code === 'ABORTED') throw error
+      if (code === 'INPUT_TOO_LARGE') return keep('judgment-input-too-large')
       if (config.onUnavailable === 'error') {
         return {
           outcome: 'error',
           reason: 'judgment-error',
-          stateHash: state.hash,
-          stateSeqs: state.seqs,
-          sticky: { active: sticky.active, turnsElapsed: sticky.turnsElapsed },
+          stateHash: observed.hash,
+          stateSeqs: observed.seqs,
+          ...facts,
+          sticky: { active: false, turnsElapsed: 0 },
         }
       }
-      const code = (error as { code?: unknown } | null)?.code
       return keep(code === 'INVALID_ANSWER' ? 'invalid-answer' : 'engine-unavailable')
     }
-    const route = result.answers.find((answer): answer is JudgmentChoiceAnswer => answer.kind === 'choice')
-    const score = result.answers.find((answer): answer is JudgmentScoreAnswer => answer.kind === 'score')
-    if (route === undefined) return keep('invalid-answer')
+    const route = result.answers.find((answer): answer is JudgmentChoiceAnswer =>
+      answer.kind === 'choice' && answer.id === ROUTE_QUESTION_ID)
+    const score = result.answers.find((answer): answer is JudgmentScoreAnswer =>
+      answer.kind === 'score' && answer.id === DIFFICULTY_QUESTION_ID)
+    if (route === undefined || (difficultyInstructions !== undefined && score === undefined)) return keep('invalid-answer')
     const routeAnswer = { choice: route.option, confidence: route.confidence, probabilities: { ...route.probabilities } }
     const difficulty = score === undefined ? undefined : { score: score.score, confidence: score.confidence }
     const answered = {
+      ...facts,
       route: routeAnswer,
       ...difficulty === undefined ? {} : { difficulty },
       engine: result.engine,
       model: result.model,
       latencyMs: result.latencyMs,
     }
-    // While downgraded, a hard turn escalates back at any elapsed count: a
-    // sticky session never runs blind.
-    if (held !== undefined && difficulty !== undefined && difficulty.score >= config.escalateBackScoreThreshold) {
+    if (difficulty !== undefined && difficulty.score >= config.escalateBackScoreThreshold) {
       return {
         outcome: 'kept-strong',
-        reason: 'escalated',
-        stateHash: state.hash,
-        stateSeqs: state.seqs,
+        reason: held === undefined ? 'difficulty-too-high' : 'escalated',
+        stateHash: observed.hash,
+        stateSeqs: observed.seqs,
         ...answered,
-        sticky: { active: false, turnsElapsed: 0, brokenBy: 'escalated' },
+        ...hintFor(config, difficulty),
+        sticky: { active: false, turnsElapsed: 0, ...held === undefined ? {} : { brokenBy: 'escalated' } },
       }
     }
-    const verdict = gate(config, routeAnswer, base)
-    if (verdict.ok) {
-      const selection = candidateSelection(verdict.candidate, config, difficulty)
+    if (route.option === KEEP_CURRENT_OPTION_ID) {
+      return {
+        outcome: 'kept-strong',
+        reason: 'current-preferred',
+        stateHash: observed.hash,
+        stateSeqs: observed.seqs,
+        ...answered,
+        ...hintFor(config, difficulty),
+        sticky: { active: false, turnsElapsed: 0, ...held === undefined ? {} : { brokenBy: 'current-preferred' } },
+      }
+    }
+    const verdict = gate(eligibleConfig, routeAnswer, base)
+    if (held !== undefined && sticky.turnsElapsed < config.minTurnsDowngraded
+      && (!verdict.ok || verdict.candidate.id !== held.candidateId)) {
       return {
         outcome: 'downgraded',
-        reason: 'gate-passed',
-        stateHash: state.hash,
-        stateSeqs: state.seqs,
-        selection,
+        reason: 'sticky-hold',
+        stateHash: observed.hash,
+        stateSeqs: observed.seqs,
+        selection: held,
         ...answered,
         sticky: {
           active: true,
-          turnsElapsed: sticky.active ? sticky.turnsElapsed : 0,
-          enteredTurn: sticky.active && sticky.enteredTurn !== undefined ? sticky.enteredTurn : turn,
+          routeErrorLimit: config.maxRouteErrors,
+          turnsElapsed: sticky.turnsElapsed,
+          /* v8 ignore next -- stickyState assigns enteredTurn whenever a held candidate exists */
+          ...sticky.enteredTurn === undefined ? {} : { enteredTurn: sticky.enteredTurn },
           entryBase: entryBaseOf(sticky, base),
         },
       }
     }
-    const failed = verdict.reason
-    // A held streak survives a failed gate until its horizon; after the horizon
-    // the failed gate ends it and the manual route returns.
-    if (held !== undefined) {
-      if (sticky.turnsElapsed < config.minTurnsDowngraded) {
-        return {
-          outcome: 'downgraded',
-          reason: 'sticky-hold',
-          stateHash: state.hash,
-          stateSeqs: state.seqs,
-          selection: held,
-          ...answered,
-          sticky: {
-            active: true,
-            turnsElapsed: sticky.turnsElapsed,
-            // An active streak always carries enteredTurn, so this guard only
-            // satisfies the optional field's type.
-            /* v8 ignore next -- active streaks always carry enteredTurn */
-            ...sticky.enteredTurn === undefined ? {} : { enteredTurn: sticky.enteredTurn },
-            entryBase: entryBaseOf(sticky, base),
-          },
-        }
+    if (verdict.ok) {
+      const selection = candidateSelection(verdict.candidate, config, difficulty)
+      const continuing = held !== undefined && held.candidateId === selection.candidateId
+      return {
+        outcome: 'downgraded',
+        reason: 'gate-passed',
+        stateHash: observed.hash,
+        stateSeqs: observed.seqs,
+        selection,
+        ...answered,
+        sticky: {
+          active: true,
+          routeErrorLimit: config.maxRouteErrors,
+          turnsElapsed: continuing ? sticky.turnsElapsed : 0,
+          enteredTurn: continuing && sticky.enteredTurn !== undefined ? sticky.enteredTurn : turn,
+          entryBase: entryBaseOf(sticky, base),
+        },
       }
+    }
+    if (held !== undefined) {
       return {
         outcome: 'kept-strong',
         reason: 'gate-failed',
-        stateHash: state.hash,
-        stateSeqs: state.seqs,
+        stateHash: observed.hash,
+        stateSeqs: observed.seqs,
         ...answered,
         sticky: { active: false, turnsElapsed: 0, brokenBy: 'gate-failed' },
       }
     }
     return {
       outcome: 'kept-strong',
-      reason: failed,
-      stateHash: state.hash,
-      stateSeqs: state.seqs,
+      reason: verdict.reason,
+      stateHash: observed.hash,
+      stateSeqs: observed.seqs,
       ...answered,
       ...hintFor(config, difficulty),
       sticky: { active: false, turnsElapsed: 0 },
     }
   }
 
-  /** Assemble the judgment state: the turn's user message plus prior context, capped. */
+  /** Render the current conversation projection within the configured character budget. */
   private buildState(session: Session, config: ResolvedModelRouterConfig): RoutingState {
-    const wanted = config.state.contextTurns + 1
-    const picked: Array<{ seq: number; text: string }> = []
-    for (const event of session.events) {
-      if (event.type !== 'user/message') continue
-      const text = messageText(event.data)
-      if (text.length === 0) continue
-      picked.push({ seq: event.seq, text })
+    const alternatives = buildRoutingStateCandidates(session, config.state)
+    const state = alternatives[0]
+    return {
+      ...state,
+      alternatives,
+      inputKey: JSON.stringify(alternatives.map(candidate => candidate.text)),
+      hash: stateHash(state.text),
     }
-    const recent = picked.slice(Math.max(0, picked.length - wanted))
-    let text = recent.map(entry => entry.text).join('\n\n')
-    if (text.length > config.state.maxChars) text = text.slice(text.length - config.state.maxChars)
-    return { text, hash: stateHash(text), seqs: recent.map(entry => entry.seq) }
   }
 
   /** Append one decision to the session log. */
@@ -769,7 +1033,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     const config = this.config()
     if (args === '' || args === 'status') {
       const { active, pending } = this.get(agent)
-      const sticky = stickyState(agent.session.events, config)
+      const sticky = stickyState(agent.session.events)
       const state = active ? 'Routing is on.' : 'Routing is off.'
       const queued = pending === undefined ? '' : ' A change applies from the next step.'
       const held = sticky.active && sticky.candidate !== undefined
@@ -876,17 +1140,28 @@ function hintFor(
     : {}
 }
 
-/** The choice question asking which allowlisted candidate should handle the turn. */
-function routeQuestion(config: ResolvedModelRouterConfig): JudgmentChoiceQuestion {
+/** The route question includes the manual model so the judgment can decline every downgrade. */
+function routeQuestion(config: ResolvedModelRouterConfig, base: ModelSelection): JudgmentChoiceQuestion {
   return {
     kind: 'choice',
     id: ROUTE_QUESTION_ID,
     instructions: config.routeInstructions,
-    options: config.candidates.map(candidate => ({
-      option: candidate.id,
-      ...candidate.description === undefined ? {} : { description: candidate.description },
-    })),
+    options: [
+      {
+        option: KEEP_CURRENT_OPTION_ID,
+        description: `Keep the current model (${routeDescription(base)}). Choose this when no downgrade candidate is suitable or the task is uncertain.`,
+      },
+      ...config.candidates.map(candidate => ({
+        option: candidate.id,
+        description: `Use ${routeDescription(candidate)}.${candidate.description === undefined ? '' : ` ${candidate.description}`}`,
+      })),
+    ],
   }
+}
+
+/** Provider, model, and explicit effort shown to the judgment for one route. */
+function routeDescription(route: ModelSelection | ModelRoutingCandidate): string {
+  return `${route.provider}/${route.model}${route.reasoningEffort === undefined ? '' : `, reasoning effort ${route.reasoningEffort}`}`
 }
 
 /** The mandatory score question a held downgrade needs. */

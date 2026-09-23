@@ -1,5 +1,5 @@
 /**
- * Vocabulary of the typed-judgment seam: typed questions in, calibrated answers
+ * Vocabulary of the typed-judgment seam: typed questions in, probabilistic answers
  * out. Types only — no runtime code, no provider vocabulary, no transport, and
  * no session or conversation concept, so both a remote classifier provider and
  * an on-box distilled engine implement the same {@link JudgmentEngine} contract.
@@ -157,18 +157,74 @@ export interface JudgmentResult {
   latencyMs: number
 }
 
+/** Ordered complete state alternatives for one atomic capacity check and judgment. */
+export interface JudgmentFittingInput extends Omit<JudgmentInput, 'state'> {
+  /** Most preferred first; providers select the first fitting state without truncation. */
+  states: readonly string[]
+}
+
+/** Effective tokenizer limits and the verified artifact that supplies them. */
+export interface JudgmentTokenLimits {
+  /** Maximum tokens in each complete question and state sequence. */
+  maxSequenceTokens: number
+  /** Maximum tokens reserved for a question and its options. */
+  maxHeadTokens: number
+  /** Maximum padded tokens across the whole question batch. */
+  maxBatchTokens: number
+  /** SHA-256 of the verified model, tokenizer, and configuration manifest. */
+  manifestSha256: string
+}
+
+/** Exact input selected and measured before the corresponding inference. */
+export interface JudgmentTokenFit {
+  /** Index in the caller's ordered state alternatives. */
+  selectedIndex: number
+  /** Complete selected text after the provider's one redaction per candidate. */
+  state: string
+  /** Tokens in the selected state. */
+  stateTokens: number
+  /** Complete token count for each question, in question order. */
+  sequenceTokens: readonly number[]
+  /** Longest sequence length multiplied by the question count. */
+  paddedTokens: number
+  /** Limits applied to this inference. */
+  limits: JudgmentTokenLimits
+}
+
+/** Capacity that prevented all offered states from being judged. */
+export type JudgmentTokenLimitReason = 'state' | 'head' | 'option' | 'batch'
+
+/** One fitted judgment, or an explicit capacity rejection without inference. */
+export type JudgmentFittingResult =
+  | { kind: 'answered'; fit: JudgmentTokenFit; result: JudgmentResult }
+  | { kind: 'unfit'; engine: string; model: string; limits: JudgmentTokenLimits; reason: JudgmentTokenLimitReason }
+
+/** Optional provider capability that measures and judges with one pinned tokenizer and model. */
+export interface JudgmentFittingEngine {
+  /**
+   * Redact each alternative once, select the first fitting state, and judge it.
+   * @param input - complete ordered states, common questions, tier, and cancellation signal.
+   * @returns measured input and answers, or a capacity rejection without inference.
+   * @throws JudgmentError with the same failure classes as {@link JudgmentEngine.ask}.
+   */
+  ask(input: JudgmentFittingInput): Promise<JudgmentFittingResult>
+}
+
 /**
  * The judgment capability every provider implements. Implementations own
  * transport, credential resolution, and wire validation; consumers own every
  * question string, threshold, and decision made from an answer.
  */
 export interface JudgmentEngine {
+  /** Exact tokenizer fitting when supported; absence leaves input sizing to the consumer. */
+  readonly fitting?: JudgmentFittingEngine
   /**
    * Answer one set of typed questions about one state.
    * @param input - the state, the questions, the optional tier, and the cancellation signal.
    * @returns the answers with the engine and model identity and the ask's duration.
    * @throws JudgmentError for an unconfigured credential (`UNCONFIGURED`), an
-   * unreachable or refusing provider (`UNAVAILABLE`), an unusable provider
+   * unreachable or refusing provider (`UNAVAILABLE`), oversized serialized
+   * input (`INPUT_TOO_LARGE`), an unusable provider
    * response (`INVALID_ANSWER`), or a cancelled ask (`ABORTED`).
    */
   ask(input: JudgmentInput): Promise<JudgmentResult>
@@ -177,7 +233,7 @@ export interface JudgmentEngine {
 /**
  * Optional egress hook with one home, the provider. A deployment that must not
  * send identifiable text to a judgment engine mounts one; every provider
- * consults it exactly once per ask, before the state is serialized, and sends
+ * consults it exactly once per state candidate, before serialization, and sends
  * what it returns. A consumer passes its state to `ctx.judgment.ask()`
  * unredacted and never consults the hook.
  */
@@ -203,4 +259,4 @@ export interface JudgmentSettings {
 }
 
 /** Stable failure classes of one judgment ask. */
-export type JudgmentErrorCode = 'UNCONFIGURED' | 'UNAVAILABLE' | 'INVALID_ANSWER' | 'ABORTED'
+export type JudgmentErrorCode = 'UNCONFIGURED' | 'UNAVAILABLE' | 'INPUT_TOO_LARGE' | 'INVALID_ANSWER' | 'ABORTED'

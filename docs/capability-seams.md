@@ -170,7 +170,9 @@ flowchart LR
   pkg_judgment["judgment"]
   svc_judgment["ctx.judgment<br/>Typed judgment seam"]
   pkg_judgment_typesafe["judgment-typesafe"]
+  pkg_judgment_shield["judgment-shield"]
   pkg_model_router["model-router"]
+  pkg_judgment_guardrails["judgment-guardrails"]
   svc_modelRouting["ctx.modelRouting<br/>Asymmetric cache-sticky model routing"]
   pkg_subagent["subagent"]
   svc_subagents["ctx.subagents<br/>Subagent provider and continuation service"]
@@ -287,6 +289,7 @@ flowchart LR
   pkg_jobs_local --> svc_jobs
   pkg_jspace --> svc_jspace
   pkg_judgment --> svc_judgment
+  pkg_judgment_shield --> svc_judgment
   pkg_judgment_typesafe --> svc_judgment
   pkg_ledger --> svc_ledger
   pkg_llm --> svc_llm
@@ -417,6 +420,7 @@ flowchart LR
   svc_jspace --> pkg_ui_jspace
   svc_jspace --> pkg_ui_settings_jspace
   svc_judgment --> pkg_compaction_jev
+  svc_judgment --> pkg_judgment_guardrails
   svc_judgment --> pkg_model_router
   svc_ledger --> pkg_tool_ledger
   svc_llm --> pkg_agent_loop
@@ -566,8 +570,8 @@ flowchart LR
 | `ctx.codeRuntime` | `seam` | [`code-runtime`](../packages/code-runtime/code-runtime) | `code-runtime-worker` | [`tools`](../packages/core/tools) | - | Runs one model-written program against host-provided async bindings; backends differ by substrate and language (the tool registry consumes it for Code Mode). |
 | `ctx.fs` | `seam` | [`fs`](../packages/fs/fs) | [`fs-local`](../packages/fs/fs-local), [`fs-sandbox`](../packages/fs/fs-sandbox), [`fs-e2b`](../packages/e2b/fs-e2b) | [`tool-fs`](../packages/fs/tool-fs) | [`fs-observation-policy`](../packages/fs/fs-observation-policy) | tool-fs executes read/write/edit through ctx.fs; fs-sandbox fences mutations by the shared sandbox mode; fs-observation-policy contributes observed-state checks through the fs/* event gate. |
 | `ctx.compaction` | `seam` | [`compaction`](../packages/compaction/compaction) | [`compaction-basic`](../packages/compaction/compaction-basic), [`compaction-jev`](../packages/compaction/compaction-jev) | [`compaction-basic`](../packages/compaction/compaction-basic) | - | The basic backend consumes post-step pressure and request-error recovery events; the judgment-backed backend overrides selection and summarization on the same inherited transaction; there is no model-facing compact tool. |
-| `ctx.judgment` | `seam` | [`judgment`](../packages/llm/judgment) | [`judgment-typesafe`](../packages/llm/judgment-typesafe) | [`compaction-jev`](../packages/compaction/compaction-jev), [`model-router`](../packages/llm/model-router) | - | Consumers ask typed choice, score, and binary questions about one state and read calibrated probabilities; the provider owns credentials, transport, and wire validation, and an optional redactor hook bounds the state that leaves the process. |
-| `ctx.modelRouting` | `core` | [`model-router`](../packages/llm/model-router) | - | - | - | The manual or default selection is always the strong model; `candidates` is a downgrade allowlist, so a consult selects an allowlisted candidate or nothing — never the manual route and never anything stronger. A downgrade is then held as a streak whose state is a pure fold over `model-routing/decision`, `request/header`, and turn events, which is what lets resume, fork, compaction, and a restart continue it. |
+| `ctx.judgment` | `seam` | [`judgment`](../packages/llm/judgment) | [`judgment-typesafe`](../packages/llm/judgment-typesafe), [`judgment-shield`](../packages/llm/judgment-shield) | [`compaction-jev`](../packages/compaction/compaction-jev), [`model-router`](../packages/llm/model-router), [`judgment-guardrails`](../packages/llm/judgment-guardrails) | - | Consumers ask typed choice, score, and binary questions about one state. The provider owns transport, wire validation, and any required credentials; the optional redactor hook transforms the state before it leaves the process. |
+| `ctx.modelRouting` | `core` | [`model-router`](../packages/llm/model-router) | - | - | - | The manual or default selection is the strong model. The judgment chooses keep-current or an allowlisted downgrade candidate; difficulty and confidence limits determine whether a candidate may run. Held streaks derive from model-routing/decision, request/header, and turn events so resume, fork, compaction, and restart preserve the selection. |
 | `ctx.subagents` | `seam` | [`subagent`](../packages/subagent/subagent) | [`subagent-spawn-in-process`](../packages/subagent/subagent-spawn-in-process), [`subagent-fork-in-process`](../packages/subagent/subagent-fork-in-process), [`subagent-acp`](../packages/subagent/subagent-acp), [`subagent-codex`](../packages/subagent/subagent-codex), [`subagent-claude-code`](../packages/subagent/subagent-claude-code), [`subagent-grok-cli`](../packages/subagent/subagent-grok-cli), [`subagent-kimi-cli`](../packages/subagent/subagent-kimi-cli), [`subagent-shres-sdk`](../packages/subagent/subagent-shres-sdk) | [`tool-subagent`](../packages/subagent/tool-subagent), [`tool-subagent-control`](../packages/subagent/tool-subagent-control), [`tool-ralph`](../packages/workflow/tool-ralph) | - | Providers implement transports; the service also owns optional Activation-based continuation orchestration, tool-subagent selects one-shot or continuable delegation, tool-subagent-control delivers follow-ups, and tool-ralph requires one fresh structured-output route. |
 | `ctx.jobs` | `seam` | [`jobs`](../packages/jobs/jobs) | [`jobs-local`](../packages/jobs/jobs-local) | [`tool-bash`](../packages/shell/tool-bash), [`tool-terminal`](../packages/terminal/tool-terminal), [`tool-subagent`](../packages/subagent/tool-subagent), [`tool-jobs`](../packages/jobs/tool-jobs) | - | Producers (background bash, PTY sends, and subagent delegations) register running work; tool-jobs is the model-facing controller that reads, lists, and kills it; jobs-local is the process-local registry. |
 | `ctx.web` | `seam` | [`web`](../packages/web/web) | [`web-search-exa`](../packages/web/web-search-exa), [`web-search-perplexity`](../packages/web/web-search-perplexity), [`web-search-brave`](../packages/web/web-search-brave), [`web-search-deepseek`](../packages/web/web-search-deepseek), [`web-search-attached-cli`](../packages/web/web-search-attached-cli), [`web-fetch-http`](../packages/web/web-fetch-http) | [`tool-web`](../packages/web/tool-web) | - | Search and fetch providers register into one ctx.web seam; tool-web owns the stable model-facing names. |

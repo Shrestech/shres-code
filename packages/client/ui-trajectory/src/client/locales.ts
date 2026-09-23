@@ -36,10 +36,16 @@ export type TrajectoryKey =
   | 'routing.reason.engineUnavailable'
   | 'routing.reason.invalidAnswer'
   | 'routing.reason.noCandidates'
+  | 'routing.reason.modelUnavailable'
+  | 'routing.reason.candidateIneligible'
+  | 'routing.reason.stateTooLarge'
+  | 'routing.reason.judgmentInputTooLarge'
   | 'routing.reason.unknownCandidate'
   | 'routing.reason.lowConfidence'
   | 'routing.reason.thinMargin'
   | 'routing.reason.candidateEqualsBase'
+  | 'routing.reason.currentPreferred'
+  | 'routing.reason.difficultyTooHigh'
   | 'routing.reason.gateFailed'
   | 'routing.reason.escalated'
   | 'routing.reason.manualDeviation'
@@ -87,10 +93,16 @@ export const en: Record<TrajectoryKey, string> = {
   'routing.reason.engineUnavailable': 'engine unavailable',
   'routing.reason.invalidAnswer': 'invalid answer',
   'routing.reason.noCandidates': 'no candidates configured',
+  'routing.reason.modelUnavailable': 'model capabilities unavailable',
+  'routing.reason.candidateIneligible': 'candidate cannot preserve request capabilities',
+  'routing.reason.stateTooLarge': 'current request exceeds routing context budget',
+  'routing.reason.judgmentInputTooLarge': 'routing input exceeds judgment token budget',
   'routing.reason.unknownCandidate': 'chosen route is not allowlisted',
   'routing.reason.lowConfidence': 'low confidence',
   'routing.reason.thinMargin': 'thin top-two margin',
   'routing.reason.candidateEqualsBase': 'already on the routed model',
+  'routing.reason.currentPreferred': 'current model preferred',
+  'routing.reason.difficultyTooHigh': 'task too difficult to downgrade',
   'routing.reason.gateFailed': 'gate failed',
   'routing.reason.escalated': 'escalated to the stronger model',
   'routing.reason.manualDeviation': 'model switched manually',
@@ -120,10 +132,16 @@ export const ROUTING_REASON_KEYS: Record<ModelRoutingReason, TrajectoryKey> = {
   'engine-unavailable': 'routing.reason.engineUnavailable',
   'invalid-answer': 'routing.reason.invalidAnswer',
   'no-candidates': 'routing.reason.noCandidates',
+  'model-unavailable': 'routing.reason.modelUnavailable',
+  'candidate-ineligible': 'routing.reason.candidateIneligible',
+  'state-too-large': 'routing.reason.stateTooLarge',
+  'judgment-input-too-large': 'routing.reason.judgmentInputTooLarge',
   'unknown-candidate': 'routing.reason.unknownCandidate',
   'low-confidence': 'routing.reason.lowConfidence',
   'thin-margin': 'routing.reason.thinMargin',
   'candidate-equals-base': 'routing.reason.candidateEqualsBase',
+  'current-preferred': 'routing.reason.currentPreferred',
+  'difficulty-too-high': 'routing.reason.difficultyTooHigh',
   'gate-failed': 'routing.reason.gateFailed',
   escalated: 'routing.reason.escalated',
   'manual-deviation': 'routing.reason.manualDeviation',
@@ -134,7 +152,10 @@ export const ROUTING_REASON_KEYS: Record<ModelRoutingReason, TrajectoryKey> = {
 
 /** Dictionary key per streak break reason. */
 export const ROUTING_BREAK_KEYS: Record<ModelRoutingBreakReason, TrajectoryKey> = {
+  'candidate-ineligible': 'routing.reason.candidateIneligible',
   'gate-failed': 'routing.reason.gateFailed',
+  'current-preferred': 'routing.reason.currentPreferred',
+  'unknown-candidate': 'routing.reason.unknownCandidate',
   escalated: 'routing.reason.escalated',
   'manual-deviation': 'routing.reason.manualDeviation',
   'mode-off': 'routing.reason.modeOff',

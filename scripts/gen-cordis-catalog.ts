@@ -233,6 +233,8 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   AgentCancelCause: 'core.md',
   AgentFactory: 'core.md',
   AgentHandle: 'core.md',
+  AgentRequestContent: 'core.md',
+  ModelRoutingRequest: 'core.md',
   ModelSelection: 'core.md',
   ModelPurpose: 'core.md',
   SaveSelectionOptions: 'core.md',

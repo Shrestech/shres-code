@@ -15,6 +15,13 @@ export const FAILURE_MODES = Object.freeze([
 ])
 
 /**
+ * @typedef {object} TrialExecution
+ * @property {number | null} exitCode - harness process exit code; null when killed by a signal.
+ * @property {boolean} timedOut - the harness exceeded its task timeout and was killed.
+ * @property {boolean} budgetExceeded - the live token cap terminated the harness child.
+ */
+
+/**
  * @typedef {object} TrialMetrics
  * @property {number} inputTokens - provider-reported input tokens, summed over requests.
  * @property {number} outputTokens - provider-reported output tokens, summed over requests.
@@ -131,6 +138,7 @@ export const FAILURE_MODES = Object.freeze([
  * @property {{ command: string, exitCode: number, detail?: string }} verifier - how resolved was decided.
  * @property {TrialMetrics} metrics - for chains, the per-phase sums.
  * @property {string | null} sessionFile - session log path relative to the arm directory; for chains, the final phase's.
+ * @property {TrialExecution} [execution] - process outcome for a single-session spawn; absent on chain trials and legacy rows.
  * @property {string} startedAt - ISO 8601.
  * @property {string} endedAt - ISO 8601.
  * @property {PhaseRecord[]} [phases] - chain trials only, in phase order.
@@ -198,6 +206,24 @@ function validateMetrics(value, name) {
 }
 
 /**
+ * Validate a process outcome retained alongside a single-session trial.
+ * @param {unknown} value - candidate.
+ * @param {string} name - dotted field path used in error messages.
+ * @returns {asserts value is TrialExecution}
+ */
+function validateExecution(value, name) {
+  const execution = /** @type {Record<string, unknown>} */ (value)
+  if (typeof execution !== 'object' || execution === null || Array.isArray(execution)) {
+    throw new Error(`${name} must be a record`)
+  }
+  if (execution.exitCode !== null && !Number.isSafeInteger(execution.exitCode)) {
+    throw new Error(`${name}.exitCode must be an integer|null`)
+  }
+  if (typeof execution.timedOut !== 'boolean') throw new Error(`${name}.timedOut must be boolean`)
+  if (typeof execution.budgetExceeded !== 'boolean') throw new Error(`${name}.budgetExceeded must be boolean`)
+}
+
+/**
  * Validate one chain phase record. Throws on the first violation.
  * @param {unknown} value - candidate.
  * @param {number} index - expected phaseIndex; phases are strictly 0..n-1 in order.
@@ -242,6 +268,7 @@ export function validateTrial(value) {
   if (t.score !== undefined && (typeof t.score !== 'number' || t.score < 0 || t.score > 1)) {
     throw new Error('trial.score must be in [0, 1] when present')
   }
+  if (t.execution !== undefined) validateExecution(t.execution, 'trial.execution')
   const v = /** @type {Record<string, unknown>} */ (t.verifier)
   if (typeof v !== 'object' || v === null) throw new Error('trial.verifier must be a record')
   if (typeof v.command !== 'string' || v.command.length === 0) throw new Error('trial.verifier.command required')

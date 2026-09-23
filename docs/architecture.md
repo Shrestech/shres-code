@@ -79,7 +79,7 @@ turn/start
 turn/end
 ```
 
-`turn/*`, `step/*`, `user/message`, `assistant/*`, and `tool/*` are durable session events; the rest are live extension points across three domains. `agent/pre-step`, `agent/request`, `llm/stream`, and the three `tools/*` events are waterfalls, whose listeners must call `next()` to delegate; `agent/turn-stopping` is serial and has no `next()`.
+`turn/*`, `step/*`, `user/message`, `assistant/*`, and `tool/*` are durable session events; the rest are live extension points across three domains. `agent/pre-step`, `agent/request`, `llm/stream`, and the three `tools/*` events are waterfalls, whose listeners must call `next()` to delegate; `agent/turn-stopping` is serial and has no `next()`. The `agent/request` payload includes detached, deep-frozen messages, rendered system text, and tool schemas for the assembled request; listeners may replace only the returned call configuration.
 
 Only `tool-call` blocks reach the `tools/execute` pipeline. A `server-tool-call` block — a hosted tool the provider executed on the model's behalf (for example a provider-native web search) — is structurally excluded by the loop's `isLocalToolCall` dispatch predicate: it is logged in `assistant/message` content and rendered generically but never looked up, executed, or correlated by tool name.
 

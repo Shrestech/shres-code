@@ -278,12 +278,30 @@ describe('sessions.fork', () => {
     })
     const fallback: LlmCallConfig = { provider: 'default-provider', model: 'default-model' }
     await expect(agentEvents(child.ctx, child).waterfall(
-      'agent/request', { turn: 1, step: 0, signal: new AbortController().signal }, () => Promise.resolve(fallback),
+      'agent/request', { turn: 1, step: 0, content: { messages: [], system: '', tools: [] }, signal: new AbortController().signal }, () => Promise.resolve(fallback),
     )).resolves.toMatchObject({
       provider: 'inherited-provider',
       model: 'inherited-model',
       reasoningEffort: 'high',
     })
+    await ctx.fiber.dispose()
+  })
+
+  it('forks an explicit selection even when the request header has the same routed route', async () => {
+    const ctx = await composed()
+    const source = liveAgent(ctx, 'session-selected-routed', 1)
+    const selected = { provider: 'routed-provider', model: 'routed-model' }
+    source.append('agent/model-selection', selected)
+    source.append('request/header', { header: { config: selected }, reason: 'initial' })
+
+    const response = await api(ctx).sessions.fork(request({ sessionId: source.id }))
+    expect(response.result.ok).toBe(true)
+    if (!response.result.ok) return
+    const child = ctx.agents.get(response.result.value.sessionId)
+    if (child === undefined) throw new Error('fork did not publish the child agent')
+    expect(child.session.events.filter(event => event.type === 'agent/model-selection').map(event => event.data))
+      .toEqual([selected])
+    expect((await child.ctx.systemPrompt.assemble()).variables).toMatchObject(selected)
     await ctx.fiber.dispose()
   })
 })

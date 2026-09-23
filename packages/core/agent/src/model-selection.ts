@@ -4,8 +4,17 @@
  */
 
 import type { Context } from '@shres-code/cordis'
-import type { LlmCallConfig, ReasoningEffortId } from '@shres-code/shres-code-llm'
-import type { Agent } from './runtime-types.ts'
+import { ReasoningEffortId } from '@shres-code/shres-code-llm'
+import type { LlmCallConfig } from '@shres-code/shres-code-llm'
+import type { Agent, AgentRequestContent } from './runtime-types.ts'
+
+/** Immutable request facts a routing consult may inspect after config assembly. */
+export interface ModelRoutingRequest {
+  /** Config after downstream request listeners and manual selection are applied. */
+  readonly config: LlmCallConfig
+  /** The detached model content assembled for this request. */
+  readonly content: AgentRequestContent
+}
 
 /** Complete provider, model, and optional reasoning effort selected for one live Agent. */
 export interface ModelSelection {
@@ -36,12 +45,13 @@ export interface ModelSelectionRef {
  */
 export interface ModelRoutingConsult {
   /**
-   * Resolve the route one turn should run.
+   * Resolve the route one request should run.
    * @param agent - the agent whose turn is being prepared.
    * @param turn - the turn number, as the loop dispatched it.
    * @param step - the step number within that turn.
    * @param base - the route the manual selection left in force.
    * @param signal - the request's cancellation signal.
+   * @param request - the resolved manual config and detached assembled content.
    * @returns the route to run, or `undefined` to keep the manual route.
    */
   resolveRequest(
@@ -50,6 +60,7 @@ export interface ModelRoutingConsult {
     step: number,
     base: ModelSelection,
     signal: AbortSignal,
+    request: ModelRoutingRequest,
   ): Promise<ModelSelection | undefined>
 
   /**
@@ -61,8 +72,8 @@ export interface ModelRoutingConsult {
    * purpose — the routing gate keeps its own provider/model comparison — and the
    * answer is the router's own fold, never a mirrored copy.
    * @param agent - the agent whose selection is being read.
-   * @returns the route the held streak was entered on, or `undefined` while the
-   *   state is strong, where the last logged header already is that route.
+   * @returns the manual route behind an active streak or the last routed header
+   *   awaiting replacement; `undefined` when the logged header is already manual.
    */
   stickySelection(agent: Agent): ModelSelection | undefined
 }
@@ -87,20 +98,53 @@ function applySelection(config: LlmCallConfig, selection: ModelSelection): LlmCa
   }
 }
 
+/** Validate the owned payload when restoring a selection from durable history. */
+function restoredSelection(value: unknown): ModelSelection {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new Error('agent/model-selection data must be an object')
+  }
+  const record = value as Record<string, unknown>
+  for (const key of Object.keys(record)) {
+    if (key !== 'provider' && key !== 'model' && key !== 'reasoningEffort') {
+      throw new Error(`agent/model-selection has an unknown field: ${key}`)
+    }
+  }
+  if (typeof record['provider'] !== 'string' || record['provider'].trim().length === 0) {
+    throw new Error('agent/model-selection provider must be a nonempty string')
+  }
+  if (typeof record['model'] !== 'string' || record['model'].trim().length === 0) {
+    throw new Error('agent/model-selection model must be a nonempty string')
+  }
+  const effort = record['reasoningEffort']
+  if (effort !== undefined && (typeof effort !== 'string' || effort.trim().length === 0)) {
+    throw new Error('agent/model-selection reasoningEffort must be a nonempty string when present')
+  }
+  return {
+    provider: record['provider'],
+    model: record['model'],
+    ...effort === undefined ? {} : { reasoningEffort: ReasoningEffortId(effort) },
+  }
+}
+
 /**
  * The model selection in force on one live Agent: the session's own selection,
  * which routing descends beneath rather than rewrites.
  *
- * The last logged `request/header` alone reports the ROUTED rewrite while a
- * downgraded streak is held, because routing rewrites that header to its
- * candidate; a composed `ctx.modelRouting` therefore reports the streak's
- * entry route first. Everything else is the log's own precedence, and the
+ * An explicit `agent/model-selection` takes priority over routing and request
+ * headers. Without one, a composed `ctx.modelRouting` reports the streak's
+ * entry route before the last header, which can carry a routed candidate. The
  * caller's default stays the caller's: an entry point that owns one applies it
  * on `undefined`.
  * @param agent - the agent whose selection is read.
  * @returns the selection in force, or `undefined` when the log records none.
+ * @throws when the latest durable explicit selection has invalid fields.
  */
 export function selectionInForce(agent: Agent): ModelSelection | undefined {
+  const events = agent.session.events
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index]
+    if (event?.type === 'agent/model-selection') return restoredSelection(event.data)
+  }
   const routing = agent.ctx.get('modelRouting') as ModelRoutingConsult | undefined
   const sticky = routing?.stickySelection(agent)
   if (sticky !== undefined) return sticky
@@ -162,7 +206,14 @@ export function installModelSelection(agentCtx: Context, selection: ModelSelecti
       // route byte-for-byte.
       const routing = agentCtx.get('modelRouting') as ModelRoutingConsult | undefined
       if (routing === undefined) return applied
-      const routed = await routing.resolveRequest(payload.agent, payload.turn, payload.step, manual, payload.signal)
+      const routed = await routing.resolveRequest(
+        payload.agent,
+        payload.turn,
+        payload.step,
+        manual,
+        payload.signal,
+        { config: applied, content: payload.content },
+      )
       return routed === undefined ? applied : applySelection(applied, routed)
     },
   )

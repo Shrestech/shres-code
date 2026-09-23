@@ -24,17 +24,19 @@ export interface ModelRoutingStateConfig {
   contextTurns?: number
   /** Hard cap on the assembled state text, in characters. Defaults to 12000. */
   maxChars?: number
+  /** Maximum complete context alternatives offered to a tokenizer-aware provider. Defaults to 8. */
+  maxFitCandidates?: number
 }
 
 /** The escalation operating point. */
 export interface ModelRoutingEscalateBackConfig {
-  /** Difficulty score at or above which a held downgrade escalates back immediately. Defaults to 4. */
+  /** Difficulty at or above which the manual model handles the turn. Defaults to level 3 in the five-level rubric. */
   scoreThreshold?: number
 }
 
 /** The advisory-hint operating point. */
 export interface ModelRoutingHardHintConfig {
-  /** Difficulty score at or above which a STRONG turn carries the `consider-stronger` hint. Defaults to 4. */
+  /** Difficulty at or above which a manual-model turn carries `consider-stronger`. Defaults to level 3 in the five-level rubric. */
   scoreThreshold?: number
 }
 
@@ -48,12 +50,11 @@ export interface ModelRoutingDifficultyToEffortConfig {
 
 /** Composition config of the model router; also the `model-router` settings section. */
 export interface ModelRouterConfig {
-  /** Whether routing starts in force. Required: a stored mode is an explicit deployment choice. */
+  /** Deployment mode for sessions without an explicit user choice. Changes commit between requests. */
   initialMode: ModelRoutingInitialMode
   /**
-   * Downgrade allowlist. Routing may select a member of this list or nothing —
-   * never the manual route and never anything stronger — so an empty list
-   * leaves every turn on the manual route with `no-candidates` logged.
+   * Downgrade allowlist whose relative capability and cost the deployment owns.
+   * An empty list leaves every turn on the manual route with `no-candidates`.
    */
   candidates?: ModelRoutingCandidateConfig[]
   /** Route confidence at or above which a candidate may be selected. Required. */
@@ -69,16 +70,20 @@ export interface ModelRouterConfig {
   /** The choice question text asked about the conversation state. Required. */
   routeInstructions: string
   /**
-   * The difficulty question text. Required at load while
-   * `minTurnsDowngraded > 0`: a held downgrade re-judges every turn and needs
-   * the difficulty answer to escalate back immediately.
+   * The difficulty question text. Required by stickiness, `hardHint`, and
+   * `difficultyToEffort`. When configured, every consult asks it and checks
+   * the difficulty limit before allowing a downgrade.
    */
   difficultyInstructions?: string
-  /** Ordered difficulty-level descriptions for the score question, lowest first. Defaults to a five-level rubric. */
+  /** Ordered score descriptions, lowest first; scores use zero-based indices. Defaults to a five-level rubric. */
   difficultyLevels?: string[]
   /** Escalate-back operating point. */
   escalateBack?: ModelRoutingEscalateBackConfig
-  /** Durable route-failure streak at which a held downgrade escalates back immediately. Defaults to 2. */
+  /**
+   * Consecutive candidate failures that require a manual-model turn. Recorded
+   * on each held decision; settings changes affect subsequent decisions.
+   * Defaults to 2.
+   */
   maxRouteErrors?: number
   /** What a failed judgment call does to the turn. Defaults to `fallback`. */
   onUnavailable?: ModelRoutingUnavailablePolicy
@@ -106,11 +111,13 @@ export interface ResolvedModelRoutingState {
   readonly contextTurns: number
   /** Hard cap on the assembled state text. */
   readonly maxChars: number
+  /** Maximum alternatives, including the full selected context and the current entry alone. */
+  readonly maxFitCandidates: number
 }
 
 /** Resolved and validated router configuration. */
 export interface ResolvedModelRouterConfig {
-  /** Mode in force before any `model-routing/mode` event. */
+  /** Deployment mode applied until the session records an explicit user choice. */
   readonly initialMode: ModelRoutingInitialMode
   /** Detached allowlist in configuration order. */
   readonly candidates: readonly Readonly<ModelRoutingCandidate>[]
@@ -122,7 +129,7 @@ export interface ResolvedModelRouterConfig {
   readonly minTurnsDowngraded: number
   /** Choice question text. */
   readonly routeInstructions: string
-  /** Difficulty question text; absent when stickiness is disabled. */
+  /** Difficulty question text; absent when no configured feature reads difficulty. */
   readonly difficultyInstructions?: string
   /** Difficulty score levels, lowest first. */
   readonly difficultyLevels: readonly string[]
@@ -148,20 +155,22 @@ export const DEFAULT_STATE_CONTEXT_TURNS = 2
 /** Default assembled-state cap, in characters. */
 export const DEFAULT_STATE_MAX_CHARS = 12_000
 
+/** Default number of complete input alternatives for exact token fitting. */
+export const DEFAULT_STATE_MAX_FIT_CANDIDATES = 8
+
 /** Default streak horizon. */
 export const DEFAULT_MIN_TURNS_DOWNGRADED = 5
 
-/** Default escalate-back difficulty threshold on a 1-5 scale. */
-export const DEFAULT_ESCALATE_BACK_SCORE_THRESHOLD = 4
+/** Default escalate-back difficulty threshold: the fourth level (index 3) of the five-level rubric. */
+export const DEFAULT_ESCALATE_BACK_SCORE_THRESHOLD = 3
 
 /** Default durable route-failure streak. */
 export const DEFAULT_MAX_ROUTE_ERRORS = 2
 
 /**
- * Default difficulty levels: the five-level rubric the measured operating
- * points assume (`escalateBack.scoreThreshold` is documented on a 1-5 scale).
- * A deployment replaces the descriptions with its own rubric; the count is
- * what fixes the scale.
+ * Default difficulty levels. Scores are zero-based indexes into this ordered
+ * list, so the fourth level (`hard`) is score 3. A deployment replaces the
+ * descriptions with its own rubric; the count fixes the valid score range.
  */
 export const DEFAULT_DIFFICULTY_LEVELS: readonly string[] = Object.freeze([
   'routine: the turn is a small, well-scoped change',
@@ -240,6 +249,9 @@ export function resolveConfig(config: ModelRouterConfig): ResolvedModelRouterCon
   const candidates: ModelRoutingCandidate[] = (config.candidates ?? []).map((candidate) => {
     const id = candidate.id
     assertNonEmptyString('ModelRouterConfig.candidates[].id', id)
+    if (id === KEEP_CURRENT_OPTION_ID) {
+      throw new Error(`ModelRouterConfig.candidates["${id}"].id is reserved for the keep-current route option`)
+    }
     assertNonEmptyString(`ModelRouterConfig.candidates["${id}"].provider`, candidate.provider)
     assertNonEmptyString(`ModelRouterConfig.candidates["${id}"].model`, candidate.model)
     if (seen.has(id)) throw new Error(`ModelRouterConfig.candidates lists "${id}" more than once`)
@@ -262,12 +274,13 @@ export function resolveConfig(config: ModelRouterConfig): ResolvedModelRouterCon
     throw new Error('ModelRouterConfig.minTurnsDowngraded must be a non-negative integer')
   }
   const difficultyInstructions = config.difficultyInstructions
-  const needsDifficulty = minTurnsDowngraded > 0 || (config.hardHint ?? undefined) !== undefined
+  const needsDifficulty = minTurnsDowngraded > 0
+    || (config.hardHint ?? undefined) !== undefined
+    || (config.difficultyToEffort ?? undefined) !== undefined
   if (needsDifficulty && (difficultyInstructions === undefined || difficultyInstructions.trim() === '')) {
     throw new Error(
-      'ModelRouterConfig.difficultyInstructions is required while minTurnsDowngraded > 0 or hardHint'
-      + ' is set: a held downgrade re-judges every turn and the advisory hint reads the difficulty'
-      + ' answer, so the question those answers come from must be configured',
+      'ModelRouterConfig.difficultyInstructions is required while minTurnsDowngraded > 0 or hardHint or difficultyToEffort'
+      + ' is set: these features require a difficulty answer',
     )
   }
   if (difficultyInstructions !== undefined) {
@@ -280,8 +293,9 @@ export function resolveConfig(config: ModelRouterConfig): ResolvedModelRouterCon
   difficultyLevels.forEach((level, index) => {
     assertNonEmptyString(`ModelRouterConfig.difficultyLevels[${index}]`, level)
   })
+  const maxDifficultyScore = difficultyLevels.length - 1
   const scoreThreshold = config.escalateBack?.scoreThreshold ?? DEFAULT_ESCALATE_BACK_SCORE_THRESHOLD
-  assertScoreThreshold('ModelRouterConfig.escalateBack.scoreThreshold', scoreThreshold)
+  assertScoreThreshold('ModelRouterConfig.escalateBack.scoreThreshold', scoreThreshold, maxDifficultyScore)
   const maxRouteErrors = config.maxRouteErrors ?? DEFAULT_MAX_ROUTE_ERRORS
   if (!Number.isInteger(maxRouteErrors) || maxRouteErrors < 1) {
     throw new Error('ModelRouterConfig.maxRouteErrors must be a positive integer')
@@ -296,15 +310,23 @@ export function resolveConfig(config: ModelRouterConfig): ResolvedModelRouterCon
   if (!Number.isInteger(maxChars) || maxChars < 1) {
     throw new Error('ModelRouterConfig.state.maxChars must be a positive integer')
   }
+  const maxFitCandidates = config.state?.maxFitCandidates ?? DEFAULT_STATE_MAX_FIT_CANDIDATES
+  if (!Number.isInteger(maxFitCandidates) || maxFitCandidates < 2) {
+    throw new Error('ModelRouterConfig.state.maxFitCandidates must be an integer of at least two')
+  }
   // The schema resolves an omitted optional group to absent and a valueless key
   // to null; both mean "not configured" here.
   const hardHintScoreThreshold = (config.hardHint ?? undefined)?.scoreThreshold
   if (hardHintScoreThreshold !== undefined) {
-    assertScoreThreshold('ModelRouterConfig.hardHint.scoreThreshold', hardHintScoreThreshold)
+    assertScoreThreshold('ModelRouterConfig.hardHint.scoreThreshold', hardHintScoreThreshold, maxDifficultyScore)
   }
   const difficultyToEffort = config.difficultyToEffort ?? undefined
   if (difficultyToEffort !== undefined) {
-    assertScoreThreshold('ModelRouterConfig.difficultyToEffort.scoreThreshold', difficultyToEffort.scoreThreshold)
+    assertScoreThreshold(
+      'ModelRouterConfig.difficultyToEffort.scoreThreshold',
+      difficultyToEffort.scoreThreshold,
+      maxDifficultyScore,
+    )
     assertNonEmptyString(
       'ModelRouterConfig.difficultyToEffort.reasoningEffort',
       difficultyToEffort.reasoningEffort,
@@ -331,7 +353,7 @@ export function resolveConfig(config: ModelRouterConfig): ResolvedModelRouterCon
         }),
       },
     ...hardHintScoreThreshold === undefined ? {} : { hardHintScoreThreshold },
-    state: Object.freeze({ contextTurns, maxChars }),
+    state: Object.freeze({ contextTurns, maxChars, maxFitCandidates }),
     tier,
   })
 }
@@ -343,9 +365,12 @@ function assertRatio(name: string, value: unknown): asserts value is number {
   }
 }
 
-/** Require one difficulty threshold inside the 1-5 scale the levels define. */
-function assertScoreThreshold(name: string, value: unknown): asserts value is number {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value < 1 || value > 5) {
-    throw new Error(`${name} must be a number from 1 through 5`)
+/** Require one difficulty threshold inside the zero-based scale the levels define. */
+function assertScoreThreshold(name: string, value: unknown, maxScore: number): asserts value is number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > maxScore) {
+    throw new Error(`${name} must be a number from 0 through ${maxScore}`)
   }
 }
+
+/** Protocol id reserved for the explicit route option that keeps the manual model. */
+export const KEEP_CURRENT_OPTION_ID = 'keep-current'

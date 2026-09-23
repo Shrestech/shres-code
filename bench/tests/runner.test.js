@@ -15,7 +15,7 @@ import { describe, it } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import assert from 'node:assert/strict'
 
-import { ARMS, getArm, listArms, renderArmOverlay, SESSION_QUERY_DRIVER_LINE } from '../runner/arms.js'
+import { ARMS, getArm, listArms, listDefaultArms, renderArmOverlay, SESSION_QUERY_DRIVER_LINE } from '../runner/arms.js'
 import { computeThinDebates, emptyMetrics, foldSessionLog } from '../runner/metrics.js'
 import { runSetup } from '../runner/setup.js'
 import { runVerifier } from '../runner/verify.js'
@@ -320,7 +320,7 @@ describe('arms registry', () => {
   it('registers the jspace ladder and the OOLONG-lite arms in order', () => {
     assert.deepEqual(
       listArms(),
-      ['off', 'on', 'sq-only', 'sq-driver', 'on-sq', 'on-sq-verified', 'on-adaptive', 'on-core', 'on-charter', 'stuffed', 'read', 'code', 'research-inert', 'research-lite', 'research-on', 'route-off', 'route-on', 'compact-basic', 'compact-jev'],
+      ['off', 'on', 'sq-only', 'sq-driver', 'on-sq', 'on-sq-verified', 'on-adaptive', 'on-core', 'on-charter', 'stuffed', 'read', 'code', 'research-inert', 'research-lite', 'research-on', 'route-off', 'route-on', 'route-shield', 'compact-basic', 'compact-jev'],
     )
     assert.equal(ARMS.off.jspace.enabled, false)
     assert.equal(ARMS.on.jspace.enabled, true)
@@ -344,12 +344,17 @@ describe('arms registry', () => {
       charterChecksMustBeReadOnly: true,
     })
     assert.equal(ARMS.on.toolJspace, undefined)
+    assert.equal(ARMS['route-shield'].optIn, true)
+    assert.equal(ARMS['route-shield'].judgmentKeyEnv, undefined)
+    assert.equal(ARMS['route-shield'].expectsModelRouting, true)
+    assert.deepEqual(listDefaultArms(), listArms().filter(name => name !== 'route-shield'))
     assert.equal(getArm('off'), ARMS.off)
   })
 
   it('session-query mounting matches arm semantics', () => {
     assert.equal(ARMS.off.sessionQuery, false)
     assert.equal(ARMS.on.sessionQuery, false)
+    assert.equal(ARMS['route-shield'].sessionQuery, false)
     assert.equal(ARMS['sq-only'].sessionQuery, true)
     assert.equal(ARMS['sq-driver'].sessionQuery, true)
     assert.equal(ARMS['on-sq'].sessionQuery, true)
@@ -367,6 +372,9 @@ describe('arms registry', () => {
     assert.equal(ARMS.off.expectsSessionQuery, false)
     assert.equal(ARMS.on.expectsJspace, true)
     assert.equal(ARMS.on.expectsSessionQuery, false)
+    assert.equal(ARMS['route-shield'].expectsJspace, false)
+    assert.equal(ARMS['route-shield'].expectsSessionQuery, false)
+    assert.equal(ARMS['route-shield'].expectsModelRouting, true)
     assert.equal(ARMS['sq-only'].expectsJspace, false)
     assert.equal(ARMS['sq-only'].expectsSessionQuery, true)
     assert.equal(ARMS['sq-driver'].expectsJspace, false)
@@ -473,6 +481,18 @@ describe('arms registry', () => {
     assert.ok(!off.includes('insert'), 'off arm inserts nothing')
   })
 
+  it('renders the pinned Shield route arm without a TypeSafe credential reference', () => {
+    const shield = renderArmOverlay(ARMS['route-shield'], {
+      sessionLogRoot: '/tmp/bench/route-shield/sessions/t/0',
+    })
+    assert.match(shield, /judgment-shield/)
+    assert.match(shield, /endpoint: "http:\/\/127\.0\.0\.1:8765"/)
+    assert.match(shield, /convaiinnovations\/laya@1c5edc17a7acd8701df6fc341c0d179f1c62c982/)
+    assert.match(shield, /initialMode: "on"/)
+    assert.match(shield, /model-router/)
+    assert.doesNotMatch(shield, /TYPESAFE_API_KEY/)
+  })
+
   it('renders the researcher surface and per-trial persistence into a research arm overlay', () => {
     const root = '/tmp/bench/research-on/sessions/t/0'
     const overlay = renderArmOverlay(ARMS['research-on'], { sessionLogRoot: root })
@@ -537,7 +557,8 @@ describe('run.parseArgs', () => {
   it('applies defaults', () => {
     const options = parseArgs(['--experiment', 'w0'])
     assert.equal(options.experiment, 'w0')
-    assert.deepEqual(options.arms, listArms())
+    assert.deepEqual(options.arms, listDefaultArms())
+    assert.ok(!options.arms.includes('route-shield'))
     assert.equal(options.repeats, 3)
     assert.equal(options.taskGlob, null)
     assert.equal(options.dryRun, false)
@@ -624,6 +645,11 @@ describe('run.parseArgs', () => {
   it('accepts --api-key-env none for keyless tiers', () => {
     const options = parseArgs(['--experiment', 'w2', '--api-key-env', 'none'])
     assert.equal(options.apiKeyEnv, 'none')
+  })
+
+  it('accepts the explicit Shield route arm without a judgment credential flag', () => {
+    const options = parseArgs(['--experiment', 'shield', '--arms', 'route-shield', '--api-key-env', 'none'])
+    assert.deepEqual(options.arms, ['route-shield'])
   })
 
   it('rejects malformed invocations', () => {
@@ -1371,8 +1397,10 @@ describe('execute.resolveHarnessLaunch', () => {
  * text to spawn-log.txt in the scratch dir (proving the carried workspace),
  * and fabricates a one-turn session log. Failure steering via the task text:
  * PROVIDER_FAIL exits 1 with a provider signature after logging; HARNESS_DIE
- * exits 2 without logging; JSPACE_LEAK logs a jspace/card event; HANG
- * never finishes (the runner's timeout kills it).
+ * exits 2 without logging; JSPACE_LEAK logs a jspace/card event;
+ * ROUTING_DECISION logs one model-routing decision; BUDGET_STOP writes a log
+ * and stays alive until the runner's token watcher kills it; HANG never
+ * finishes without logging (the runner's timeout kills it).
  */
 const FAKE_BIN = `import { appendFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -1411,9 +1439,13 @@ if (taskText.includes('HANG')) {
   if (taskText.includes('JSPACE_LEAK')) {
     lines.push(JSON.stringify({ type: 'jspace/card', seq: 3, time: 3000, data: {} }))
   }
+  if (taskText.includes('ROUTING_DECISION')) {
+    lines.push(JSON.stringify({ type: 'model-routing/decision', seq: 4, time: 4000, data: { outcome: 'kept-strong' } }))
+  }
   const dir = join(root, 'workspace', 's1')
   await mkdir(dir, { recursive: true })
   await writeFile(join(dir, 'session.jsonl'), lines.join('\\n') + '\\n')
+  if (taskText.includes('BUDGET_STOP')) setTimeout(() => {}, 60000)
   if (taskText.includes('PROVIDER_FAIL')) {
     console.error('Error: DeepSeek API returned 429 Too Many Requests')
     process.exit(1)
@@ -1551,6 +1583,7 @@ describe('run.main execution (fake harness)', () => {
       assert.equal(trial.sessionFile, trial.phases[1].sessionFile)
       assert.equal(trial.status, 'success')
       assert.equal(trial.resolved, true)
+      assert.ok(!('execution' in trial), 'chain trials retain process outcomes on phases only')
       assert.equal(trial.failureMode, null)
       assert.equal(trial.verifier.exitCode, 0)
       assert.ok(!('integrity' in trial), 'clean trials omit integrity')
@@ -1583,8 +1616,94 @@ describe('run.main execution (fake harness)', () => {
       assert.equal(trial.sessionFile, 'sessions/plain/0/workspace/s1/session.jsonl')
       assert.equal(trial.metrics.inputTokens, 100)
       assert.equal(trial.resolved, true)
+      assert.deepEqual(trial.execution, { exitCode: 0, timedOut: false, budgetExceeded: false })
       const overlay = await readFile(join(benchRoot, 'runs', 'e2e', 'on', 'sessions', 'plain', '0', 'arm-overlay.yml'), 'utf8')
       assert.match(overlay, /enabled: true/)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('retains execution evidence when a verifier-passing single session hits the token cap', async () => {
+    const root = await tempDir('bench-runner-budget-single-e2e-')
+    try {
+      const { benchRoot } = await writeBenchWorld(root, [{
+        taskId: 'budget-single',
+        definition: { instruction: 'write the log, then BUDGET_STOP' },
+      }])
+      const { code, trials } = await runWorld(
+        benchRoot,
+        ['--experiment', 'e2e', '--repeats', '1', '--arms', 'off', '--max-total-tokens', '1'],
+        'off',
+      )
+      assert.equal(code, 0)
+      const [trial] = trials
+      validateTrial(trial)
+      assert.equal(trial.status, 'success')
+      assert.equal(trial.resolved, true)
+      assert.equal(trial.failureMode, null)
+      assert.deepEqual(trial.execution, { exitCode: null, timedOut: false, budgetExceeded: true })
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('retains execution evidence for provider and harness errors in single sessions', async () => {
+    const root = await tempDir('bench-runner-errors-single-e2e-')
+    try {
+      const { benchRoot } = await writeBenchWorld(root, [
+        { taskId: 'provider-error', definition: { instruction: 'PROVIDER_FAIL' } },
+        { taskId: 'harness-error', definition: { instruction: 'HARNESS_DIE' } },
+      ])
+      const { code, trials } = await runWorld(
+        benchRoot,
+        ['--experiment', 'e2e', '--repeats', '1', '--arms', 'off'],
+        'off',
+      )
+      assert.equal(code, 1)
+      const provider = trials.find(trial => trial.taskId === 'provider-error')
+      const harness = trials.find(trial => trial.taskId === 'harness-error')
+      assert.ok(provider)
+      assert.ok(harness)
+      validateTrial(provider)
+      validateTrial(harness)
+      assert.equal(provider.status, 'error')
+      assert.equal(provider.failureMode, 'PROVIDER_ERROR')
+      assert.deepEqual(provider.execution, { exitCode: 1, timedOut: false, budgetExceeded: false })
+      assert.equal(harness.status, 'error')
+      assert.equal(harness.failureMode, 'HARNESS_ERROR')
+      assert.deepEqual(harness.execution, { exitCode: 2, timedOut: false, budgetExceeded: false })
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('runs the explicit Shield route arm and audits routing decisions', async () => {
+    const root = await tempDir('bench-runner-shield-route-e2e-')
+    try {
+      const { benchRoot } = await writeBenchWorld(root, [
+        { taskId: 'shield-judged', definition: { instruction: 'ROUTING_DECISION' } },
+        { taskId: 'shield-unjudged', definition: { instruction: 'no routing event' } },
+      ])
+      const { code, trials } = await runWorld(
+        benchRoot,
+        ['--experiment', 'e2e', '--repeats', '1', '--arms', 'route-shield', '--api-key-env', 'none'],
+        'route-shield',
+      )
+      assert.equal(code, 0)
+      assert.equal(trials.length, 2)
+      const judged = trials.find(trial => trial.taskId === 'shield-judged')
+      const unjudged = trials.find(trial => trial.taskId === 'shield-unjudged')
+      assert.ok(judged)
+      assert.ok(unjudged)
+      assert.ok(!('integrity' in judged), 'a Shield route trial with a decision is clean')
+      assert.deepEqual(unjudged.integrity, { violations: ['missing-model-routing-decision:turns=1'] })
+      const overlay = await readFile(
+        join(benchRoot, 'runs', 'e2e', 'route-shield', 'sessions', 'shield-judged', '0', 'arm-overlay.yml'),
+        'utf8',
+      )
+      assert.match(overlay, /judgment-shield/)
+      assert.match(overlay, /127\.0\.0\.1:8765/)
     } finally {
       await rm(root, { recursive: true, force: true })
     }

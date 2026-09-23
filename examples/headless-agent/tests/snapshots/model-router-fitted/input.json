@@ -1,0 +1,16 @@
+{
+  "steps": [
+    {
+      "op": "prompt",
+      "text": "Reply with exactly: ROUTED_OK"
+    },
+    {
+      "op": "prompt",
+      "text": "Continue."
+    },
+    {
+      "op": "prompt",
+      "text": "Review this complete request: preserve all input. preserve all input. preserve all input. preserve all input. preserve all input. preserve all input. preserve all input. preserve all input. preserve all input. preserve all input. preserve all input. preserve all input. preserve all input. preserve all input. preserve all input. preserve all input. preserve all input. preserve all input. preserve all input. preserve all input. preserve all input. preserve all input. preserve all input. preserve all input. preserve all input. preserve all input. preserve all input. preserve all input. preserve all input. preserve all input. preserve all input. preserve all input. preserve all input. preserve all input. preserve all input. "
+    }
+  ]
+}

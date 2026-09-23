@@ -4,6 +4,8 @@ Status: proposed
 
 Shipped scope through PR6b, PR4c, and the projection seed fix is recorded present-tense in [2026-09-20 typed-judgment shipped surfaces](../../implemented/feature/2026-09-20-jev-judgment-routing-shipped.md); this proposal remains the plan of record for the unshipped rungs.
 
+The [routing choice and difficulty decision](../../implemented/bug-fix/2026-09-22-routing-choice-and-difficulty.md) supersedes this proposal's route-option policy, 1–5 score scale, and sticky candidate transitions.
+
 ## Problem
 
 Two judgment calls per agent interaction are made by the cheapest possible logic today. **Which model handles this turn** is whatever the user selected once, applied to typo fixes and architecture work alike. **What survives compaction** is recency plus a token ratio, with no notion of which segments are load-bearing. A third problem surfaced from production billing: **prefix-cache economics dominate agent spend**, and both features interact with it. One 25.5-hour export (582 requests, $48.49) shows 42% of spend on uncached input from two multi-hour 0%-cache windows (250–624K re-prefills at list price; 54 full-miss requests caused 92% of uncached dollars) and 52% on cache reads — context size is a recurring subscription, and every model transition is a cold re-prefill.

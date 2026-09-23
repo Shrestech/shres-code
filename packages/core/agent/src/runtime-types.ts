@@ -7,7 +7,13 @@
 
 import type { Context } from '@shres-code/cordis'
 import type { Scoped } from '@shres-code/shres-code-scope'
-import type { LlmCallConfig, LlmFailure, ResolvedRetryPolicy } from '@shres-code/shres-code-llm'
+import type {
+  LlmCallConfig,
+  LlmFailure,
+  Message,
+  ResolvedRetryPolicy,
+  ToolSchema,
+} from '@shres-code/shres-code-llm'
 import type { AgentCancelCause, Session, SessionId, UserMessage } from '@shres-code/shres-code-session'
 export type { AgentCancelCause } from '@shres-code/shres-code-session'
 import type { Inbox } from './inbox.ts'
@@ -62,6 +68,23 @@ export type PreStepDecision =
 
 /** Action returned by a listener that owns model-request recovery. */
 export type RequestErrorAction = { kind: 'retry' } | undefined
+
+/**
+ * The immutable model content assembled for one request waterfall.
+ *
+ * AgentLoop detaches and deep-freezes this value before dispatch. Listeners
+ * may inspect the exact messages, rendered system prompt, and tool schemas the
+ * request will carry, but only the returned {@link LlmCallConfig} may be
+ * replaced by the waterfall.
+ */
+export interface AgentRequestContent {
+  /** Derived conversation history sent in the request. */
+  readonly messages: readonly Message[]
+  /** Rendered system prompt sent in the request, possibly empty. */
+  readonly system: string
+  /** Ordered tool schemas sent in the request. */
+  readonly tools: readonly ToolSchema[]
+}
 
 /** Why a session lifecycle began; seeded creates are `startup`, while persisted loads are `resume`. */
 export type SessionStartSource = 'startup' | 'resume' | 'clear' | 'compact'
@@ -238,16 +261,19 @@ declare module '@shres-code/cordis' {
     /**
      * Replace the frozen call configuration. `await next()` yields the config
      * the machine would use (agent options on the first request, the logged
-     * header afterwards); return a replacement to switch. Model-visible
-     * content must use logged channels; this waterfall cannot mutate messages.
+     * header afterwards); return a replacement to switch. `payload.content`
+     * is the detached, deep-frozen content assembled for this request and is
+     * read-only; only the returned config may change. Model-visible content
+     * still uses the request header logged by the loop.
      * @param payload.agent - the agent making the model call.
      * @param payload.turn - the open turn number.
      * @param payload.step - the step whose request this is.
+     * @param payload.content - detached messages, system prompt, and tool schemas for this request.
      * @param payload.signal - the current turn's explicit abort signal.
      * Scope-filtered dispatch (`@shres-code/shres-code-scope`): agent-scoped listeners receive only that agent.
      * @mode waterfall
     */
-    'agent/request'(this: Scoped<Agent>, payload: { agent: Agent; turn: number; step: number; signal: AbortSignal }, next: () => Promise<LlmCallConfig>): Promise<LlmCallConfig>
+    'agent/request'(this: Scoped<Agent>, payload: { agent: Agent; turn: number; step: number; content: AgentRequestContent; signal: AbortSignal }, next: () => Promise<LlmCallConfig>): Promise<LlmCallConfig>
     /**
      * Handle one failed model-request attempt before the loop retries or closes
      * its step. A listener returns `{ kind: 'retry' }` without calling `next()`

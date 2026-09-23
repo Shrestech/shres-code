@@ -238,12 +238,19 @@ describe('/model command', () => {
     expect(ctx.agentDefaultModel.selectionFor(agent).current).toEqual({
       provider: 'openai', model: 'gpt-4.1', reasoningEffort: 'high',
     })
+    expect(agent.session.events.filter(event => event.type === 'agent/model-selection').map(event => event.data))
+      .toEqual([{ provider: 'openai', model: 'gpt-4.1', reasoningEffort: 'high' }])
     expect(ctx.agentDefaultModel.currentSelection()).toEqual({
       provider: 'openai', model: 'gpt-4.1', reasoningEffort: 'high',
     })
     const cleared = await ctx.commands.execute(agent, '/model openai gpt-4.1', new AbortController().signal)
     expect(cleared?.result.text).toBe('model: openai gpt-4.1')
     expect(ctx.agentDefaultModel.currentSelection()).toEqual({ provider: 'openai', model: 'gpt-4.1' })
+    expect(agent.session.events.filter(event => event.type === 'agent/model-selection').map(event => event.data))
+      .toEqual([
+        { provider: 'openai', model: 'gpt-4.1', reasoningEffort: 'high' },
+        { provider: 'openai', model: 'gpt-4.1' },
+      ])
     await ctx.fiber.dispose()
   })
 
@@ -382,25 +389,32 @@ describe('/model command', () => {
 })
 
 describe('selectionFor()', () => {
-  it('prefers a process-local pick, then the logged header, then the live default', async () => {
+  it('prefers an explicit event, then the logged header, then the live default', async () => {
     const ctx = new Context()
     await ctx.plugin(MemorySettings)
+    await ctx.plugin(SessionStore)
     await ctx.plugin(AgentDefaultModelConfig, { provider: 'deepseek-official', model: 'deepseek-v4-flash' })
-    let header: { config: ModelSelection } | undefined
-    const session = { requestHeader: () => header } as Agent['session']
+    const session = ctx.sessions.create(SessionId('sel'))
     const agent = { id: 'sel', session, ctx } as unknown as Agent
     const first = ctx.agentDefaultModel.selectionFor(agent)
     expect(first.current).toEqual({ provider: 'deepseek-official', model: 'deepseek-v4-flash' })
     expect(ctx.agentDefaultModel.selectionFor(agent)).toBe(first)
 
-    header = { config: { provider: 'openai', model: 'gpt-4.1' } }
+    session.append('request/header', {
+      header: { config: { provider: 'openai', model: 'gpt-4.1' } },
+      reason: 'initial',
+    })
     expect(first.current).toEqual({ provider: 'openai', model: 'gpt-4.1' })
-    header = { config: { provider: 'openai', model: 'gpt-4.1', reasoningEffort: ReasoningEffortId('high') } }
+    session.append('request/header', {
+      header: { config: { provider: 'openai', model: 'gpt-4.1', reasoningEffort: ReasoningEffortId('high') } },
+      reason: 'change',
+    })
     expect(first.current).toEqual({ provider: 'openai', model: 'gpt-4.1', reasoningEffort: 'high' })
 
     const next: ModelSelection = { provider: 'ollama-local', model: 'llama3.2' }
     first.current = next
     expect(first.current).toEqual(next)
+    expect(session.events.filter(event => event.type === 'agent/model-selection')).toHaveLength(1)
     await ctx.fiber.dispose()
   })
 })

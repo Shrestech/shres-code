@@ -6,10 +6,18 @@ import {
   installModelSelection,
   selectionInForce,
   type Agent,
+  type AgentRequestContent,
+  type ModelRoutingRequest,
   type ModelSelection,
   type ModelSelectionRef,
 } from '../src/index.ts'
 import { ReasoningEffortId, type LlmCallConfig } from '@shres-code/shres-code-llm'
+import { Session, SessionId } from '@shres-code/shres-code-session'
+import type { SessionEvent } from '@shres-code/shres-code-session'
+
+function requestContent(): AgentRequestContent {
+  return { messages: [], system: '', tools: [] }
+}
 
 describe('installModelSelection()', () => {
   it('snapshots prompt variables and request routing together, then disposes both listeners', async () => {
@@ -23,7 +31,7 @@ describe('installModelSelection()', () => {
 
     expect((await ctx.systemPrompt.assemble()).variables).toEqual({})
     await expect(agentEvents(ctx, agent).waterfall(
-      'agent/request', { turn: 1, step: 0, signal }, () => Promise.resolve(seed),
+      'agent/request', { turn: 1, step: 0, content: requestContent(), signal }, () => Promise.resolve(seed),
     )).resolves.toBe(seed)
 
     selection.current = {
@@ -34,7 +42,7 @@ describe('installModelSelection()', () => {
     expect((await ctx.systemPrompt.assemble()).variables).toMatchObject({ provider: 'alpha', model: 'a1' })
     selection.current = { provider: 'beta', model: 'b1' }
     await expect(agentEvents(ctx, agent).waterfall(
-      'agent/request', { turn: 1, step: 0, signal }, () => Promise.resolve(seed),
+      'agent/request', { turn: 1, step: 0, content: requestContent(), signal }, () => Promise.resolve(seed),
     )).resolves.toEqual({
       provider: 'alpha',
       model: 'a1',
@@ -50,13 +58,13 @@ describe('installModelSelection()', () => {
       temperature: 0.2,
     }
     await expect(agentEvents(ctx, agent).waterfall(
-      'agent/request', { turn: 1, step: 1, signal }, () => Promise.resolve(inherited),
+      'agent/request', { turn: 1, step: 1, content: requestContent(), signal }, () => Promise.resolve(inherited),
     )).resolves.toEqual({ provider: 'beta', model: 'b1', temperature: 0.2 })
 
     dispose()
     expect((await ctx.systemPrompt.assemble()).variables).toEqual({})
     await expect(agentEvents(ctx, agent).waterfall(
-      'agent/request', { turn: 2, step: 0, signal }, () => Promise.resolve(seed),
+      'agent/request', { turn: 2, step: 0, content: requestContent(), signal }, () => Promise.resolve(seed),
     )).resolves.toBe(seed)
     await ctx.fiber.dispose()
   })
@@ -71,6 +79,7 @@ class StubRouting extends Service {
 
   /** Route the sticky selection reports; `undefined` stands for a strong state. */
   sticky: ModelSelection | undefined
+  lastRequest: ModelRoutingRequest | undefined
 
   constructor(ctx: Context, private readonly answer: (base: ModelSelection) => ModelSelection | undefined) {
     super(ctx, 'modelRouting')
@@ -89,7 +98,9 @@ class StubRouting extends Service {
     step: number,
     base: ModelSelection,
     _signal: AbortSignal,
+    request: ModelRoutingRequest,
   ): Promise<ModelSelection | undefined> {
+    this.lastRequest = request
     this.calls.push({
       turn,
       step,
@@ -118,7 +129,7 @@ describe('installModelSelection() with a composed router', () => {
     await ctx.systemPrompt.assemble()
     // The manual selection is the base the router consults, never the persisted config.
     await expect(agentEvents(ctx, agent).waterfall(
-      'agent/request', { turn: 3, step: 1, signal }, () => Promise.resolve(seed()),
+      'agent/request', { turn: 3, step: 1, content: requestContent(), signal }, () => Promise.resolve(seed()),
     )).resolves.toEqual({ provider: 'alpha', model: 'a1', temperature: 0.2 })
     await ctx.fiber.dispose()
   })
@@ -145,7 +156,7 @@ describe('installModelSelection() with a composed router', () => {
       temperature: 0.2,
     }
     await expect(agentEvents(ctx, agent).waterfall(
-      'agent/request', { turn: 4, step: 0, signal }, () => Promise.resolve(inherited),
+      'agent/request', { turn: 4, step: 0, content: requestContent(), signal }, () => Promise.resolve(inherited),
     )).resolves.toEqual({
       provider: 'cheap',
       model: 'c1',
@@ -154,6 +165,10 @@ describe('installModelSelection() with a composed router', () => {
     })
     // The router sees the manual route, the turn, and the step it is deciding for.
     expect(routed.calls).toEqual([{ turn: 4, step: 0, base: { provider: 'alpha', model: 'a1' } }])
+    expect(routed.lastRequest).toEqual({
+      config: { provider: 'alpha', model: 'a1', temperature: 0.2 },
+      content: requestContent(),
+    })
     await ctx.fiber.dispose()
   })
 
@@ -168,7 +183,7 @@ describe('installModelSelection() with a composed router', () => {
 
     await ctx.systemPrompt.assemble()
     await expect(agentEvents(ctx, agent).waterfall(
-      'agent/request', { turn: 1, step: 0, signal },
+      'agent/request', { turn: 1, step: 0, content: requestContent(), signal },
       () => Promise.resolve({ provider: 'persisted', model: 'p1', temperature: 0.1 }),
     )).resolves.toEqual({ provider: 'cheap', model: 'p1', temperature: 0.1 })
     await ctx.fiber.dispose()
@@ -188,7 +203,7 @@ describe('installModelSelection() with a composed router', () => {
     // effort included: an effort the request carried is what the gate compares
     // and what a held streak records as its entry base.
     await expect(agentEvents(ctx, agent).waterfall(
-      'agent/request', { turn: 1, step: 0, signal },
+      'agent/request', { turn: 1, step: 0, content: requestContent(), signal },
       () => Promise.resolve({
         provider: 'persisted',
         model: 'p1',
@@ -212,14 +227,32 @@ describe('selectionInForce()', () => {
    * consult through, and the session header the getter falls back to.
    * @param ctx - the context the agent reads services from.
    * @param header - the session's latest request header, when one is logged.
+   * @param events - the durable event prefix the getter folds.
    * @returns the minimal Agent.
    */
-  function agentFor(ctx: Context, header?: { config: ModelSelection }): Agent {
+  function agentFor(
+    ctx: Context,
+    header?: { config: ModelSelection },
+    events: readonly SessionEvent[] = [],
+  ): Agent {
     return {
       id: 'selection-in-force',
       ctx,
-      session: { requestHeader: () => header },
+      session: { events, requestHeader: () => header },
     } as unknown as Agent
+  }
+
+  let restoredSessionNumber = 0
+
+  /** Build an Agent whose selection event crossed the Session seed boundary. */
+  function restoredAgent(ctx: Context, data: unknown): Agent {
+    const session = Session.create(SessionId(`selection-restore-${++restoredSessionNumber}`), [{
+      type: 'agent/model-selection',
+      seq: 0,
+      time: 1,
+      data,
+    } as unknown as SessionEvent])
+    return { id: session.id, ctx, session } as unknown as Agent
   }
 
   it('reports the logged selection, with its effort, when no router is composed', async () => {
@@ -252,6 +285,78 @@ describe('selectionInForce()', () => {
       reasoningEffort: ReasoningEffortId('high'),
     }
     expect(selectionInForce(agent)).toEqual(routing.sticky)
+    await ctx.fiber.dispose()
+  })
+
+  it('reports an explicit selection even when it matches the routed header', async () => {
+    const ctx = new Context()
+    await ctx.plugin(StubRouting, () => undefined)
+    const routing = ctx.get('modelRouting') as unknown as StubRouting
+    routing.sticky = { provider: 'manual-provider', model: 'manual-model' }
+    const events = [
+      {
+        type: 'agent/model-selection',
+        seq: 0,
+        time: 1,
+        data: { provider: 'cheap-provider', model: 'cheap-model' },
+      },
+      {
+        type: 'request/header',
+        seq: 1,
+        time: 2,
+        data: { header: { config: { provider: 'cheap-provider', model: 'cheap-model' } }, reason: 'change' },
+      },
+    ] as SessionEvent[]
+    const agent = agentFor(ctx, { config: { provider: 'cheap-provider', model: 'cheap-model' } }, events)
+
+    expect(selectionInForce(agent)).toEqual({ provider: 'cheap-provider', model: 'cheap-model' })
+    await ctx.fiber.dispose()
+  })
+
+  it('round-trips a valid seeded selection with effort and returns a detached value', async () => {
+    const ctx = new Context()
+    const agent = restoredAgent(ctx, {
+      provider: 'alpha',
+      model: 'a1',
+      reasoningEffort: 'high',
+    })
+
+    const restored = selectionInForce(agent)
+    expect(restored).toEqual({
+      provider: 'alpha',
+      model: 'a1',
+      reasoningEffort: ReasoningEffortId('high'),
+    })
+    expect(restored).not.toBe(agent.session.events[0]?.data)
+    if (restored === undefined) throw new Error('expected a seeded selection')
+    restored.provider = 'mutated-provider'
+    restored.model = 'mutated-model'
+    restored.reasoningEffort = ReasoningEffortId('low')
+    expect(selectionInForce(agent)).toEqual({
+      provider: 'alpha',
+      model: 'a1',
+      reasoningEffort: ReasoningEffortId('high'),
+    })
+    await ctx.fiber.dispose()
+  })
+
+  it.each([
+    ['null', null, 'agent/model-selection data must be an object'],
+    ['array', [], 'agent/model-selection data must be an object'],
+    ['string', 'selection', 'agent/model-selection data must be an object'],
+    ['number', 1, 'agent/model-selection data must be an object'],
+    ['missing provider', { model: 'a1' }, 'agent/model-selection provider must be a nonempty string'],
+    ['wrong provider', { provider: 1, model: 'a1' }, 'agent/model-selection provider must be a nonempty string'],
+    ['blank provider', { provider: '   ', model: 'a1' }, 'agent/model-selection provider must be a nonempty string'],
+    ['missing model', { provider: 'alpha' }, 'agent/model-selection model must be a nonempty string'],
+    ['wrong model', { provider: 'alpha', model: 1 }, 'agent/model-selection model must be a nonempty string'],
+    ['blank model', { provider: 'alpha', model: '   ' }, 'agent/model-selection model must be a nonempty string'],
+    ['wrong effort', { provider: 'alpha', model: 'a1', reasoningEffort: 1 }, 'agent/model-selection reasoningEffort must be a nonempty string when present'],
+    ['blank effort', { provider: 'alpha', model: 'a1', reasoningEffort: '   ' }, 'agent/model-selection reasoningEffort must be a nonempty string when present'],
+    ['unknown field', { provider: 'alpha', model: 'a1', extra: true }, 'agent/model-selection has an unknown field: extra'],
+  ] as const)('rejects corrupted seeded selection data: %s', async (_name, data, message) => {
+    const ctx = new Context()
+    expect(() => selectionInForce(restoredAgent(ctx, data))).toThrow(message)
     await ctx.fiber.dispose()
   })
 })

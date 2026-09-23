@@ -67,6 +67,7 @@
  * |---|---|
  * | `route-off` | Control: strong manual route pinned, neither the judgment engine nor the router mounted. |
  * | `route-on` | Same tree + judgment engine and router, `initialMode: 'on'`, one candidate (the weak route). |
+ * | `route-shield` | Opt-in route-on composition using the owned loopback Shield gateway and its pinned local model artifact. |
  * | `compact-basic` | Control: `compaction-basic` restating the forced-compaction posture. |
  * | `compact-jev` | Same posture with `compaction-basic` disabled and the jev backend inserted beside the judgment engine. |
  *
@@ -88,6 +89,7 @@ import { fileURLToPath } from 'node:url'
  * @property {boolean} [driverLine] - whether the overlay appends the session-query driver line to the headless persona.
  * @property {boolean} [stuffed] - whether the runner must use `stuffedInstruction` / the stuffed arm template; refuses forced-compaction.
  * @property {boolean} [codeMode] - whether the overlay patches `tools.mode` to `both` (stateless `run_code`).
+ * @property {boolean} [optIn] - whether the arm is excluded from the default arm list and must be named explicitly.
  * @property {Record<string, unknown> | undefined} [researcher] - research-protocol config; when present the overlay mounts
  *   the researcher surface (protocol, tracker, ledger, tools, debate seats) and the arm expects researcher metrics.
  * @property {boolean} [expectsResearcher] - whether researcher metrics are expected (non-null) in trial logs.
@@ -322,6 +324,16 @@ export const ARMS = Object.freeze({
     expectsJspace: false,
     expectsModelRouting: true,
   }),
+  'route-shield': Object.freeze({
+    name: 'route-shield',
+    jspace: Object.freeze({ enabled: false, mode: 'available', requireCoverage: true }),
+    optIn: true,
+    pinnedOverlay: 'routing/route-shield.patch.yml',
+    sessionQuery: false,
+    expectsSessionQuery: false,
+    expectsJspace: false,
+    expectsModelRouting: true,
+  }),
   'compact-basic': Object.freeze({
     name: 'compact-basic',
     jspace: Object.freeze({ enabled: false, mode: 'available', requireCoverage: true }),
@@ -348,6 +360,16 @@ export const ARMS = Object.freeze({
  */
 export function listArms() {
   return Object.keys(ARMS)
+}
+
+/**
+ * List arms selected when `--arms` is omitted. Explicit opt-in arms stay
+ * available to CLI validation without requiring their external service for
+ * ordinary runs.
+ * @returns {string[]} default arm names in registry order.
+ */
+export function listDefaultArms() {
+  return listArms().filter(name => ARMS[name].optIn !== true)
 }
 
 /**

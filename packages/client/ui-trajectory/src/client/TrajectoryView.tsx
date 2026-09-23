@@ -205,7 +205,7 @@ export function TrajectoryView({
           ?? requestConfig?.provider
         const model = request?.provenance?.model ?? node?.provenance?.model
           ?? requestConfig?.model
-        const route = trajectoryRequestRoute(turn, provider, model, routing)
+        const route = trajectoryRequestRoute(turn, step, entry.seq, provider, model, routing)
         numbered.push({
           seq: entry.seq,
           turn,

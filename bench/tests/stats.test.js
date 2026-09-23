@@ -376,6 +376,26 @@ describe('test fixtures', () => {
     validateTrial(makeTrial({ resolved: true }))
     validateTrial(makeTrial({ status: 'error', failureMode: 'PROVIDER_ERROR' }))
   })
+
+  it('accepts single-session execution evidence and legacy rows without it', () => {
+    validateTrial(makeTrial({ execution: { exitCode: 0, timedOut: false, budgetExceeded: false } }))
+    validateTrial(makeTrial({ execution: { exitCode: null, timedOut: false, budgetExceeded: true } }))
+  })
+
+  it('rejects malformed single-session execution evidence', () => {
+    assert.throws(
+      () => validateTrial(makeTrial({ execution: { exitCode: '0', timedOut: false, budgetExceeded: false } })),
+      /trial\.execution\.exitCode must be an integer\|null/,
+    )
+    assert.throws(
+      () => validateTrial(makeTrial({ execution: { exitCode: 0, timedOut: 0, budgetExceeded: false } })),
+      /trial\.execution\.timedOut must be boolean/,
+    )
+    assert.throws(
+      () => validateTrial(makeTrial({ execution: { exitCode: 0, timedOut: false, budgetExceeded: 0 } })),
+      /trial\.execution\.budgetExceeded must be boolean/,
+    )
+  })
 })
 
 describe('chain trial schema', () => {
