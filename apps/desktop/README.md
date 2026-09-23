@@ -15,7 +15,7 @@ pnpm --filter @shres-code/shres-code-desktop run smoke
 
 `package` builds the shell, packs and installs the runtime dependency closure, and creates a DMG and ZIP under `apps/desktop/.desktop-build/targets/mac-arm64/artifacts`. `package:dir` produces only the `.app`. Both require the full runtime and web build above. The runtime enters the app before signing; installers contain those signed bytes. Local builds use ad-hoc signing and do not pass Apple's public-distribution checks.
 
-The smoke check boots the app's own Electron executable in Node mode against a disposable profile, requests the bundled UI, creates a scratch workspace over the production transport, observes its event, and checks shutdown. CI repeats it against the app extracted from the ZIP. `pnpm run dev:desktop` builds and launches from workspace sources; `pnpm run start:desktop` launches existing development outputs.
+The smoke check uses the app's own Electron executable in Node mode to execute the bundled terminal helper and boot a disposable profile. It requests the bundled UI, creates a scratch workspace over the production transport, observes its event, and checks shutdown. CI repeats it against the app extracted from the ZIP. `pnpm run dev:desktop` builds and launches from workspace sources; `pnpm run start:desktop` launches existing development outputs.
 
 ## CI artifacts and releases
 

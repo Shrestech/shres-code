@@ -1,6 +1,7 @@
 /** Boot a packaged runtime tree's host child, exercise its real pipes, and stop it. */
 
 import { randomUUID } from 'node:crypto'
+import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -145,6 +146,26 @@ async function readStreamingMarker(response: Response, marker: string): Promise<
   }
 }
 
+/** Execute the bundled PTY helper under the app's own Node runtime. */
+function smokeTerminal(runtime: string, nodeBinary: string, home: string): void {
+  const result = spawnSync(nodeBinary, ['--input-type=module', '--eval', `
+    import { createRequire } from 'node:module'
+    const { spawn } = createRequire(process.cwd() + '/package.json')('node-pty')
+    const terminal = spawn('/bin/sh', ['-c', 'printf DESKTOP_PTY_READY'], { cwd: process.env.HOME })
+    let output = ''
+    const deadline = setTimeout(() => { terminal.kill(); process.exitCode = 1 }, 10000)
+    terminal.onData(data => { output += data })
+    terminal.onExit(({ exitCode }) => {
+      clearTimeout(deadline)
+      if (exitCode !== 0 || !output.includes('DESKTOP_PTY_READY')) process.exitCode = 1
+      else console.log('DESKTOP_PTY_READY')
+    })
+  `], { cwd: runtime, env: smokeEnvironment(home), encoding: 'utf8', timeout: 15_000 })
+  if (result.status !== 0 || !result.stdout.includes('DESKTOP_PTY_READY')) {
+    throw new Error(`${NAME}: bundled terminal spawn failed: ${result.error?.message ?? result.stderr}`)
+  }
+}
+
 /**
  * Prove the packaged runtime tree boots its host child and serves its UI.
  * The child uses a production profile initializer and disposable home/project
@@ -166,6 +187,7 @@ export async function smokeDesktopRuntime(runtimeDir: string, nodeBinary: string
   const host = new DesktopHostProcess(nodeBinary, runtime, project, undefined, smokeEnvironment(home))
   let smokeFailure: unknown
   try {
+    smokeTerminal(runtime, nodeBinary, home)
     ensureDesktopProfile(project, expectedAppVersion)
     const ready = await host.start()
     if (ready.protocolVersion !== DESKTOP_HOST_PROTOCOL_VERSION) {
