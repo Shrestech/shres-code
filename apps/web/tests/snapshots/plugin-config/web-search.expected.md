@@ -1,29 +1,22 @@
-- dialog "Settings":
-  - navigation:
-    - text: Settings
-    - button "General":
+- region "Customize":
+  - complementary:
+    - heading "Customize" [level=2]
+    - button "Close":
       - img
-      - text: General
-    - button "Models":
-      - img
-      - text: Models
-    - button "Shield":
-      - img
-      - text: Shield
-    - button "J-Space":
-      - img
-      - text: J-Space
-    - button "Plugins":
-      - img
-      - text: Plugins
-    - button "Agent presets":
-      - img
-      - text: Agent presets
-  - button "Open configuration file"
-  - button "Close":
+      - text: Close
     - img
-    - text: Close
-  - heading "Plugins" [level=2]
+    - searchbox "Search settings…"
+    - text: ⌘ K
+    - navigation "Customize":
+      - button "Plugins":
+        - img
+        - text: Plugins
+      - button "Agent presets":
+        - img
+        - text: Agent presets
+  - text: Customize
+  - heading "Plugins" [level=1]
+  - paragraph: Shape your agent with presets and plugins.
   - paragraph: Configure and inspect the plugins installed in this deployment.
   - tablist "Plugin views":
     - tab "Plugin configuration" [selected]

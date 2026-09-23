@@ -2950,9 +2950,9 @@ importers:
       '@shres-code/shres-code-client-ui-settings':
         specifier: workspace:^
         version: link:../ui-settings
-      '@shres-code/shres-code-client-ui-sidebar':
+      '@shres-code/shres-code-client-ui-layout':
         specifier: workspace:^
-        version: link:../ui-sidebar
+        version: link:../ui-layout
       '@shres-code/shres-code-client-ui-slots':
         specifier: workspace:^
         version: link:../ui-slots

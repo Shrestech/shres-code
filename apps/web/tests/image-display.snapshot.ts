@@ -8,25 +8,14 @@
 // intake chain (paste → ordered thumbnail rail → image-only send enablement → remove).
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { expect, it } from 'vitest'
-import { installAssembledBootEnv, mountAssembledApp } from './assembled-boot.ts'
+import { findFixtureSession, installAssembledBootEnv, mountAssembledApp } from './assembled-boot.ts'
 
 installAssembledBootEnv()
 
 /** Open the fixture history session (the alpha log carrying the turn-72 image pair) and wait for its gallery. */
 async function openFixtureSession(): Promise<void> {
   const tree = await screen.findByRole('tree', { name: 'Sessions' }, { timeout: 10_000 })
-  const group = (await within(tree).findAllByText('fixture'))
-    .map(el => el.closest<HTMLElement>('[role="treeitem"]'))
-    .find(el => el?.getAttribute('aria-expanded') !== null)
-  if (group === null || group === undefined) throw new Error('fixture Workspace group missing')
-  if (group.getAttribute('aria-expanded') === 'false') {
-    fireEvent.click(within(group).getByText('fixture'))
-    await waitFor(() => {
-      expect(group.getAttribute('aria-expanded')).toBe('true')
-    })
-  }
-  const session = await within(tree).findByText('Fixture historySessions')
-  fireEvent.click(session)
+  fireEvent.click(await findFixtureSession(tree))
   await waitFor(() => {
     expect(document.querySelectorAll('[data-align] img').length).toBeGreaterThan(0)
   }, { timeout: 10_000 })

@@ -46,18 +46,18 @@ describe('web e2e: J-Space settings remount', () => {
   })
 
   async function openJspaceSection(): Promise<ReturnType<Page['getByRole']>> {
-    if (await page.getByRole('dialog', { name: 'Settings' }).count() > 0) {
+    if (await page.getByRole('region', { name: 'Settings' }).count() > 0) {
       await page.keyboard.press('Escape')
-      await expect.poll(() => page.getByRole('dialog', { name: 'Settings' }).count(), { timeout: 5_000 }).toBe(0)
+      await expect.poll(() => page.getByRole('region', { name: 'Settings' }).count(), { timeout: 5_000 }).toBe(0)
     }
     await page.getByRole('button', { name: 'Settings', exact: true }).click()
-    const dialog = page.getByRole('dialog', { name: 'Settings' })
+    const dialog = page.getByRole('region', { name: 'Settings' })
     await dialog.waitFor({ timeout: 10_000 })
     await dialog.getByRole('button', { name: 'J-Space', exact: true }).click()
     await expect.poll(
       () => dialog.getByRole('button', { name: 'J-Space', exact: true }).getAttribute('aria-current'),
       { timeout: 5_000 },
-    ).toBe('true')
+    ).toBe('page')
     await dialog.getByText('J-Space is an allow switch', { exact: false }).waitFor({ timeout: 10_000 })
     return dialog
   }
@@ -74,7 +74,7 @@ describe('web e2e: J-Space settings remount', () => {
     const enableAdvisor = dialog.getByRole('switch', { name: 'Enable Advisor' })
     await enableAdvisor.waitFor({ timeout: 10_000 })
     expect(await enableAdvisor.getAttribute('aria-checked')).toBe('false')
-    const offSnapshot = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
+    const offSnapshot = await captureStableAria(page, '[role="region"][aria-label="Settings"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(ADVISOR_OFF_EXPECTED, offSnapshot, MODE)
     expect(offSnapshot).toContain('Enable Advisor')
     expect(offSnapshot).not.toContain('Advisor Provider')
@@ -93,14 +93,14 @@ describe('web e2e: J-Space settings remount', () => {
       .toMatch(/jspace-advisor:[\s\S]*enabled: true/)
     await dialog.getByLabel('Advisor Provider').waitFor({ timeout: 10_000 })
     await dialog.getByLabel('Advisor Model').waitFor({ timeout: 10_000 })
-    const onSnapshot = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
+    const onSnapshot = await captureStableAria(page, '[role="region"][aria-label="Settings"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(ADVISOR_ON_EXPECTED, onSnapshot, MODE)
     expect(onSnapshot).toContain('Disable Advisor')
     expect(onSnapshot).toContain('Advisor Provider')
     expect(onSnapshot).toContain('Advisor Model')
 
     await dialog.getByRole('button', { name: 'Close' }).click()
-    await expect.poll(() => page.getByRole('dialog', { name: 'Settings' }).count(), { timeout: 5_000 }).toBe(0)
+    await expect.poll(() => page.getByRole('region', { name: 'Settings' }).count(), { timeout: 5_000 }).toBe(0)
 
     const workspaceDir = join(scaffold.workspaceCwd, 'jspace-ws')
     await mkdir(workspaceDir, { recursive: true })
@@ -131,7 +131,7 @@ describe('web e2e: J-Space settings remount', () => {
     const afterSession = await openJspaceSection()
     await afterSession.getByRole('switch', { name: 'Disable', exact: true }).waitFor({ timeout: 10_000 })
     await afterSession.getByRole('button', { name: 'Close' }).click()
-    await expect.poll(() => page.getByRole('dialog', { name: 'Settings' }).count(), { timeout: 5_000 }).toBe(0)
+    await expect.poll(() => page.getByRole('region', { name: 'Settings' }).count(), { timeout: 5_000 }).toBe(0)
 
     await scaffold.ctx.settings.mutate(settingsNamespace('jspace'), [
       { op: 'set', path: ['enabled'], value: false },

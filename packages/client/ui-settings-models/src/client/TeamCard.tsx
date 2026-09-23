@@ -1,6 +1,6 @@
 /**
- * Models-page card for the default Team: the three named seats with model
- * bindings, the generic Subagent hire, and user-added custom members.
+ * Team settings roster: the three named seats with model bindings, the
+ * generic Subagent hire, and user-added custom members.
  * A wrap-text control next to each product-seat role opens that seat's
  * shipped roster persona. Everything writes to the `agent-seats` settings
  * namespace.
@@ -8,7 +8,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react'
 import type { IApiClient, ModelProviderGroup } from '@shres-code/shres-code-api-remotes/client'
-import { FishLogo } from '@shres-code/shres-code-client-ui-primitives'
+import { IconAgentPresetOutline16 } from '@shres-code/shres-code-client-ui-primitives'
 import { getPath } from '@shres-code/shres-code-client-schema-form'
 import { providerEnabled } from './store.ts'
 import type { ModelsSettingsState } from './store.ts'
@@ -175,7 +175,7 @@ const RESERVED_MEMBER_NAMES = new Set(['aegis', 'stride', 'ward', 'subagent', 'l
  * @returns whether every field is usable.
  */
 export function memberDraftValid(
-  draft: { name: string; persona: string; provider: string; model: string },
+  draft: { name: string; persona: string; provider: string; model: string; role?: string },
   existing: readonly MemberValue[],
 ): boolean {
   const name = draft.name.trim()
@@ -188,7 +188,7 @@ export function memberDraftValid(
 }
 
 /**
- * Render the Team card when the host exposes `agent-seats`.
+ * Render the Team roster when the host exposes `agent-seats`.
  * @param props - snapshot, wire, and copy.
  * @returns the card, or null when the namespace is not exposed.
  */
@@ -201,8 +201,9 @@ export function TeamCard({ state, api, reload, t }: TeamCardProps): ReactNode {
       if (response.result.ok) setGroups(response.result.value.groups)
     })
   }, [api, namespace, state.rows])
-  const [draft, setDraft] = useState({ name: '', persona: '', provider: '', model: '' })
+  const [draft, setDraft] = useState({ name: '', role: '', persona: '', provider: '', model: '' })
   const [openPersonas, setOpenPersonas] = useState<Partial<Record<NamedSeatId, boolean>>>({})
+  const [openMembers, setOpenMembers] = useState<ReadonlySet<number>>(() => new Set())
   if (namespace === undefined) return null
 
   const enabled = new Set(
@@ -218,7 +219,7 @@ export function TeamCard({ state, api, reload, t }: TeamCardProps): ReactNode {
     : fallback.map(row => ({ id: row.entry.provider, name: row.entry.displayName }))
 
   return (
-    <section className={styles['seatsCard']}>
+    <div className={styles['seatsCard']}>
       <h3 className={styles['seatsTitle']}>{t('seatsTitle')}</h3>
       <p className={styles['seatsIntro']}>{t('seatsIntro')}</p>
       <ul className={styles['seatsList']}>
@@ -232,7 +233,7 @@ export function TeamCard({ state, api, reload, t }: TeamCardProps): ReactNode {
             <li key={id} className={styles['seatRow']}>
               <div className={styles['seatIdentity']}>
                 <span className={styles['seatMark']} data-seat={id}>
-                  <FishLogo size={16} />
+                  <IconAgentPresetOutline16 size={16} />
                 </span>
                 <div className={styles['seatCopy']}>
                   <div className={styles['seatHeadline']}>
@@ -328,8 +329,38 @@ export function TeamCard({ state, api, reload, t }: TeamCardProps): ReactNode {
           <ul className={styles['memberList']}>
             {members.map((member, index) => (
               <li key={member.name ?? index} className={styles['memberRow']}>
-                <span className={styles['memberName']}>{member.name}</span>
-                <span className={styles['memberBinding']}>{member.provider ?? '?'} / {member.model ?? '?'}</span>
+                <div className={styles['memberIdentity']}>
+                  <div className={styles['memberHeadline']}>
+                    <span className={styles['memberName']}>{member.name ?? t('teamMemberUnnamed')}</span>
+                    {typeof member.role !== 'string' || member.role.length === 0
+                      ? null
+                      : <span className={styles['memberRole']}>{member.role}</span>}
+                    {typeof member.persona === 'string' && member.persona.length > 0
+                      ? (
+                        <button
+                          type="button"
+                          className={styles['memberPersonaButton']}
+                          aria-label={`${member.name ?? t('teamMemberUnnamed')} ${t('teamMemberPersonaToggle')}`}
+                          aria-expanded={openMembers.has(index)}
+                          onClick={() => {
+                            setOpenMembers((current) => {
+                              const next = new Set(current)
+                              if (next.has(index)) next.delete(index)
+                              else next.add(index)
+                              return next
+                            })
+                          }}
+                        >
+                          <WrapTextIcon />
+                        </button>
+                      )
+                      : null}
+                  </div>
+                  <span className={styles['memberBinding']}>{member.provider ?? '?'} / {member.model ?? '?'}</span>
+                  {openMembers.has(index) && typeof member.persona === 'string' && member.persona.length > 0
+                    ? <p className={styles['memberPersona']}>{member.persona}</p>
+                    : null}
+                </div>
                 <button
                   type="button"
                   className={styles['memberRemove']}
@@ -356,7 +387,15 @@ export function TeamCard({ state, api, reload, t }: TeamCardProps): ReactNode {
           placeholder={t('teamMemberName')}
           aria-label={t('teamMemberName')}
           disabled={!state.writable}
-          onChange={event => setDraft(values => ({ ...values, name: event.target.value }))}
+          onChange={(event) => { setDraft(values => ({ ...values, name: event.target.value })) }}
+        />
+        <input
+          className={styles['input']}
+          value={draft.role}
+          placeholder={t('teamMemberRole')}
+          aria-label={t('teamMemberRole')}
+          disabled={!state.writable}
+          onChange={(event) => { setDraft(values => ({ ...values, role: event.target.value })) }}
         />
         <input
           className={styles['input']}
@@ -364,7 +403,7 @@ export function TeamCard({ state, api, reload, t }: TeamCardProps): ReactNode {
           placeholder={t('teamMemberPersona')}
           aria-label={t('teamMemberPersona')}
           disabled={!state.writable}
-          onChange={event => setDraft(values => ({ ...values, persona: event.target.value }))}
+          onChange={(event) => { setDraft(values => ({ ...values, persona: event.target.value })) }}
         />
         <select
           className={`${styles['input']} ${styles['selectInput']}`}
@@ -385,7 +424,7 @@ export function TeamCard({ state, api, reload, t }: TeamCardProps): ReactNode {
           value={draft.model}
           aria-label={`${t('teamAddMember')} ${t('seatsModel')}`}
           disabled={!state.writable || draft.provider === ''}
-          onChange={event => setDraft(values => ({ ...values, model: event.target.value }))}
+          onChange={(event) => { setDraft(values => ({ ...values, model: event.target.value })) }}
         >
           <option value="">{t('seatsUnbound')}</option>
           {(choices.find(group => group.id === draft.provider)?.models ?? []).map(model => (
@@ -401,9 +440,15 @@ export function TeamCard({ state, api, reload, t }: TeamCardProps): ReactNode {
             const persona = draft.persona.trim()
             void writeMembers(api, [
               ...members,
-              { name, persona, provider: draft.provider, model: draft.model },
+              {
+                name,
+                persona,
+                provider: draft.provider,
+                model: draft.model,
+                ...draft.role.trim().length > 0 ? { role: draft.role.trim() } : {},
+              },
             ]).then(() => {
-              setDraft({ name: '', persona: '', provider: '', model: '' })
+              setDraft({ name: '', role: '', persona: '', provider: '', model: '' })
               reload()
             }, reload)
           }}
@@ -411,6 +456,6 @@ export function TeamCard({ state, api, reload, t }: TeamCardProps): ReactNode {
           {t('teamAddMember')}
         </button>
       </div>
-    </section>
+    </div>
   )
 }

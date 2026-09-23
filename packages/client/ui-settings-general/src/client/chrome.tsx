@@ -1,6 +1,6 @@
 /**
  * Shell chrome content registered into the shell's trigger/header seats: the
- * trigger row icon + label (figma sidebar foot) and the panel title text.
+ * navigation icon and label, and the settings page title.
  * The shell renders the surrounding chrome (button, nav heading row) and
  * reads each entry's `label` option for aria text.
  */
@@ -8,14 +8,14 @@ import { IconSettingsOutline14, IconSettingsOutline16 } from '@shres-code/shres-
 import type { PropsLocale, PropsRuntime } from '@shres-code/shres-code-client-ui-slots'
 import css from './chrome.module.css'
 
-/** Trigger content props: the sidebar column state + the standard locale seat. */
+/** Trigger content props: the navigation presentation and standard locale share. */
 export type TriggerContentProps = PropsRuntime<'settings.trigger'> & PropsLocale<'settings'>
 
 /** Header content props: the standard locale seat only. */
 export type HeaderContentProps = PropsRuntime<'settings.header'> & PropsLocale<'settings'>
 
 /**
- * Render the trigger row content (icon; label only in the wide column).
+ * Render the navigation trigger content (icon, with an optional label).
  * @param props - composed slot props.
  * @returns the trigger content fragment.
  */

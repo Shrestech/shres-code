@@ -9,8 +9,8 @@
 // reaches a model or the network.
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { act, cleanup } from '@testing-library/react'
-import { afterEach, beforeEach, vi } from 'vitest'
+import { act, cleanup, fireEvent, waitFor, within } from '@testing-library/react'
+import { afterEach, beforeEach, expect, vi } from 'vitest'
 import type { WebBootEntry } from '@shres-code/shres-code-client-modules/client'
 import { AppWebEntry } from '@shres-code/shres-code-client-web'
 
@@ -129,6 +129,29 @@ export function mountAssembledApp(): void {
     void entry.run()
     unmount = () => { entry.dispose() }
   })
+}
+
+/**
+ * Locate the resident history session inside its fixture workspace group.
+ * The workspace header and its session rows share the session tree, so callers
+ * must scope the title lookup to the group's section before clicking it.
+ * @param tree - the Sessions tree rendered by the assembled application.
+ * @returns the resident Fixture history session title.
+ */
+export async function findFixtureSession(tree: HTMLElement): Promise<HTMLElement> {
+  const group = (await within(tree).findAllByText('fixture'))
+    .map(el => el.closest<HTMLElement>('[role="treeitem"]'))
+    .find(el => el?.getAttribute('aria-expanded') !== null)
+  if (group === null || group === undefined) throw new Error('fixture Workspace group missing')
+  if (group.getAttribute('aria-expanded') === 'false') {
+    fireEvent.click(within(group).getByText('fixture'))
+    await waitFor(() => {
+      expect(group.getAttribute('aria-expanded')).toBe('true')
+    })
+  }
+  const section = group.closest<HTMLElement>('[class*="groupSection"]')
+  if (section === null) throw new Error('fixture Workspace section missing')
+  return within(section).findByText('Fixture historySessions')
 }
 
 /**

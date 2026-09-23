@@ -1,6 +1,6 @@
 # @shres-code/shres-code-client-ui-settings-shield
 
-Browser Settings page for the paid Shres Shield host seat. It registers a `settings.section` row (`id: shield`, order 12, between Models and Plugins) and binds the Host `shres-shield` namespace.
+Browser Settings page for the paid Shres Shield host seat. It registers a `settings.section` row (`id: shield`, order 12, between Models and Plugins) and binds the Host `shres-shield` namespace. Shield controls use spaced rows on the full-page Settings surface.
 
 The page leads with an activate/disable switch beside the Shield mark (blue/green while on). It edits `posture` (`observe` / `ask` / `enforce`) immediately and writes `license` only when Apply is pressed. License defaults to `shres-dev` until a paid key exists. `SHRES_SHIELD=off` remains the panic switch and is not a settings field.
 

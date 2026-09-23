@@ -1,8 +1,20 @@
 - dialog "Add an API key to get started":
   - heading "Add an API key to get started" [level=2]
-  - paragraph:  DeepSeek Model，Get started。
+  - paragraph: Choose a provider and enter its API key, or use local Ollama if it is running. Shres Code does not pick a vendor for you.
+  - text: Provider
+  - combobox "Provider":
+    - option "DeepSeek" [selected]
+    - option "anthropic"
+    - option "groq"
+    - option "moonshotai"
+    - option "openai"
+    - option "openrouter"
+    - option "xai"
+    - option "zai"
+    - option "Ollama (local)"
+    - option "Ollama Cloud"
   - text: API key
   - textbox "API key":
-    - /placeholder: Input API key
+    - /placeholder: Enter your API key
   - button "Configure later"
   - button "Save and continue" [disabled]

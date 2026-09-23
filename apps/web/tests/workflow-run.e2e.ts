@@ -141,7 +141,11 @@ describe.skipIf(MODE === 'record')('web e2e: durable workflow run in Chat', () =
     await page.getByText(CHILD_PROMPT, { exact: true }).waitFor({ timeout: 15_000 })
 
     const sessions = page.getByRole('tree', { name: 'Sessions' })
-    await sessions.getByRole('treeitem', { name: /Use the workflow tool exactly/ }).click()
+    const parent = sessions
+      .locator('[role="treeitem"][draggable="true"]')
+      .filter({ hasText: 'Use the workflow tool exactly' })
+    expect(await parent.count()).toBe(1)
+    await parent.click()
     await settled
     await page.locator('[data-workflow-run][data-run-status="completed"]').waitFor()
 

@@ -1,5 +1,5 @@
 /**
- * The Audio card of the Models section: which engine transcribes the mic
+ * The Voice & audio editor: which engine transcribes the mic
  * (STT) and reads assistant replies aloud (TTS), plus the custom cloud
  * endpoint those engines can point at.
  *
@@ -114,9 +114,9 @@ export interface SpeechAudioCardProps {
 }
 
 /**
- * Render the Audio card.
+ * Render the Voice & audio editor.
  * @param props - wire faces, speech status, the speech namespace, and copy.
- * @returns the card, or null when the Host has no speech seam.
+ * @returns the editor, or null when the Host has no speech seam.
  */
 export function SpeechAudioCard(props: SpeechAudioCardProps): ReactNode {
   const { api, speech, namespace, t } = props

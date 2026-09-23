@@ -13,4 +13,5 @@ export const en = {
   teamRetry: 'Retry',
 } as const
 
+/** Keys available to the Agent Team locale namespace. */
 export type TeamKey = keyof typeof en

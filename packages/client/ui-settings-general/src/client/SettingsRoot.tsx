@@ -1,172 +1,165 @@
-/**
- * Settings shell root: the sidebar-foot trigger row plus the centered modal
- * panel (figma 501:29947, 1080x700) with the section nav rail. The shell is
- * a pure composition face — every piece of text (trigger label, panel title,
- * close label, sections) arrives from registrants through slots; accessible
- * names resolve to that content (trigger: its own text; dialog:
- * aria-labelledby the title node; close: visually-hidden slot text). Modal
- * open state and the active section id are component-local viewing state;
- * the onboarding coordinator mounts exactly one ordered registrant while the
- * sessions-derived empty-Hero fact is active. Visible dialog chrome belongs
- * to the step, so a mounted-but-deciding step paints nothing here.
- */
+/** Global destinations and searchable full-page settings; the workspace stays mounted underneath. */
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import clsx from 'clsx'
+import { workspaceTitleOf } from '@shres-code/shres-code-client-runtime/client'
 import {
   IconAgentPresetOutline16, IconCloseOutline16, IconDataOutline16,
-  IconPersonalizationOutline16, IconSettingsOutline16,
+  IconFolderOpen16, IconFollowsystemOutline16, IconPersonalizationOutline16,
+  IconMicOutline16, IconCodeOutline16, IconThinkOutline16,
+  IconSearchOutline16, IconSettingsOutline16,
 } from '@shres-code/shres-code-client-ui-primitives'
 import type { SettingsRootComponentProps, SettingsSectionRow } from './shell-contract.ts'
 import css from './SettingsRoot.module.css'
 
-/** Nav glyph by section id; unknown ids fall back to the settings gear. */
-function navIcon(id: string) {
-  if (id === 'models') return <IconDataOutline16 className={css.navIcon} size={16} />
-  if (id === 'agent-presets') return <IconAgentPresetOutline16 className={css.navIcon} size={16} />
-  if (id === 'plugins') return <IconPersonalizationOutline16 className={css.navIcon} size={16} />
-  return <IconSettingsOutline16 className={css.navIcon} size={16} />
+type Destination = 'settings' | 'teams' | 'customize'
+
+/** Unknown contributed sections remain discoverable in Settings. */
+function destination(id: string): Destination {
+  if (id === 'teams') return 'teams'
+  if (id === 'plugins' || id === 'agent-presets') return 'customize'
+  return 'settings'
 }
 
-type PanelProps = {
-  rows: readonly SettingsSectionRow[]
-  renderSlot: SettingsRootComponentProps['renderSlot']
-  activeId: string | undefined
-  onSelect: (id: string) => void
-  onClose: () => void
-}
-
-/**
- * The modal layer: full-viewport mask + centered panel. Close paths: the
- * header button, a mask click, and document-level Escape (mounted only while
- * open, so the listener lifetime is the panel's).
- */
-function SettingsPanel({ rows, renderSlot, activeId, onSelect, onClose }: PanelProps) {
-  // Entries can unmount underneath the requested id, so the render-time
-  // projection falls back to the first row when the id is gone.
-  const active = rows.find(r => r.id === activeId)?.id ?? rows[0]?.id
-  const titleId = useId()
-
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => { document.removeEventListener('keydown', onKeyDown) }
-  }, [onClose])
-
-  // Baseline focus management: entering the dialog lands on the close button.
-  const closeButton = useRef<HTMLButtonElement | null>(null)
-  useEffect(() => { closeButton.current?.focus() }, [])
-
-  return (
-    <div className={css.overlay} role="presentation">
-      <div className={css.mask} aria-hidden="true" onClick={onClose} />
-      <div className={css.panel} role="dialog" aria-modal="true" aria-labelledby={titleId}>
-        <nav className={css.nav}>
-          <div className={css.navTitle} id={titleId}>{renderSlot('settings.header', {})}</div>
-          <div className={css.navList}>
-            {rows.map(row => (
-              <button
-                key={row.id}
-                type="button"
-                className={clsx(css.navCell, row.id === active && css.active)}
-                aria-current={row.id === active ? 'true' : undefined}
-                onClick={() => { onSelect(row.id) }}
-              >
-                {navIcon(row.id)}
-                <span className={css.navLabel}>{row.label}</span>
-              </button>
-            ))}
-          </div>
-        </nav>
-        <div className={css.content}>
-          <div className={css.header}>
-            <div className={css.actions}>{renderSlot('settings.action', {})}</div>
-            <button ref={closeButton} type="button" className={css.close} onClick={onClose}>
-              <IconCloseOutline16 size={14} />
-              <span className={css.hiddenLabel}>{renderSlot('settings.close', {})}</span>
-            </button>
-          </div>
-          <div className={css.options}>
-            {active !== undefined && renderSlot('settings.section', { close: onClose }, { only: active })}
-          </div>
-        </div>
-      </div>
-    </div>
-  )
+function NavIcon({ id }: { id: string }) {
+  if (id === 'models') return <IconDataOutline16 size={18} />
+  if (id === 'appearance') return <IconFollowsystemOutline16 size={18} />
+  if (id === 'audio') return <IconMicOutline16 size={18} />
+  if (id === 'jspace') return <IconThinkOutline16 size={18} />
+  if (id === 'shield') return <IconCodeOutline16 size={18} />
+  if (id === 'general') return <IconPersonalizationOutline16 size={18} />
+  if (id === 'agent-presets' || id === 'teams') return <IconAgentPresetOutline16 size={18} />
+  if (id === 'plugins') return <IconPersonalizationOutline16 size={18} />
+  return <IconSettingsOutline16 size={18} />
 }
 
 /**
- * Render the settings trigger and panel.
- * @param props - composed slot props (contract/slots.ts).
- * @returns the settings shell element tree.
+ * Render global navigation, the active destination, and the ordered onboarding flow.
+ * @param props - Frame navigation, slot ledgers, locale, and session shares.
+ * @returns The navigation bar and selected page.
  */
-export function SettingsRoot(props: SettingsRootComponentProps) {
-  const { wide, useSections, useOnboardingSteps, useSessions, renderSlot } = props
-  const [open, setOpen] = useState(false)
-  const [activeId, setActiveId] = useState<string | undefined>(undefined)
-  const [completedOnboarding, setCompletedOnboarding] = useState<ReadonlySet<string>>(() => new Set())
-  const close = useCallback(() => {
-    setOpen(false)
-    setActiveId(undefined)
-  }, [])
-  const openSection = useCallback((id: string) => {
-    setActiveId(id)
-    setOpen(true)
-  }, [])
-
-  // The ledger tick keeps the nav rows fresh: registrants re-register with
-  // freshly localized text on locale change, and the trigger/header/close
-  // seats re-render through their own outlets' subscriptions.
+export function SettingsRoot({
+  page, navigate, useSections, useOnboardingSteps, useSessions, renderSlot, t,
+}: SettingsRootComponentProps) {
   const rows = useSections(s => s)
   const onboardingSteps = useOnboardingSteps(s => s)
-  const onboardingActive = useSessions(state =>
-    state.phase === 'ready'
+  const cwd = useSessions(s => s.current === undefined ? undefined : s.byId[s.current]?.cwd)
+  const [query, setQuery] = useState('')
+  const [completedOnboarding, setCompletedOnboarding] = useState<ReadonlySet<string>>(() => new Set())
+  const heading = useRef<HTMLHeadingElement>(null)
+  const trigger = useRef<HTMLButtonElement>(null)
+  const opener = useRef<HTMLButtonElement | null>(null)
+  const search = useRef<HTMLInputElement>(null)
+  const titleId = useId()
+  const open = page !== null
+  const activeDestination = destination(page ?? 'general')
+  const close = useCallback(() => { navigate(null); (opener.current ?? trigger.current)?.focus() }, [navigate])
+  const openSection = useCallback((id: string, source?: HTMLButtonElement) => {
+    opener.current = source ?? trigger.current
+    setQuery('')
+    navigate(id)
+  }, [navigate])
+  const navRows: readonly SettingsSectionRow[] = rows.flatMap(row => row.id === 'general'
+    ? [row, { id: 'appearance', order: row.order + 1, label: t('appearance.nav') }]
+    : [row])
+  const destinationRows = navRows.filter(row => destination(row.id) === activeDestination)
+  const active = destinationRows.find(row => row.id === page) ?? destinationRows[0]
+  const filtered = destinationRows.filter(row => row.label.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
+  const sectionId = active?.id === 'appearance' ? 'general' : active?.id
+  const title = activeDestination === 'settings' ? t('title') : t(`navigation.${activeDestination}`)
+  const general = active?.id === 'general'
+
+  useEffect(() => {
+    if (!open) return
+    heading.current?.focus()
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !event.defaultPrevented) close()
+      if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
+        event.preventDefault()
+        search.current?.focus()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => { window.removeEventListener('keydown', onKeyDown) }
+  }, [open, page, close])
+
+  const onboardingActive = useSessions(state => state.phase === 'ready'
     && (state.current === undefined || state.byId[state.current]?.blank === true))
   const onboardingStep = onboardingActive
     ? onboardingSteps.find(step => !completedOnboarding.has(step.id))
     : undefined
-
   useEffect(() => {
-    if (onboardingActive) return
-    setCompletedOnboarding(new Set())
+    if (!onboardingActive) setCompletedOnboarding(new Set())
   }, [onboardingActive])
-
   const completeOnboardingStep = useCallback((id: string) => {
-    setCompletedOnboarding((previous) => {
-      if (previous.has(id)) return previous
-      return new Set([...previous, id])
-    })
+    setCompletedOnboarding(previous => previous.has(id) ? previous : new Set([...previous, id]))
   }, [])
 
-  return (
-    <>
-      <button
-        type="button"
-        className={clsx(css.trigger, !wide && css.rail)}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        onClick={() => { setOpen(true) }}
-      >
-        {renderSlot('settings.trigger', { wide })}
+  return <>
+    <header className={css.topbar}>
+      <button className={css.wordmark} onClick={() => { navigate(null) }} aria-label={t('navigation.home')}>SHRES</button>
+      <nav className={css.destinations} aria-label={t('navigation.label')}>
+        <button className={clsx(css.destination, !open && css.selected)} aria-current={!open ? 'page' : undefined} onClick={() => { navigate(null) }}>{t('navigation.workspace')}</button>
+        {(['teams', 'customize'] as const).map((group) => {
+          const first = rows.find(row => destination(row.id) === group)
+          return first === undefined ? null : <button key={group}
+            className={clsx(css.destination, open && activeDestination === group && css.selected)}
+            aria-current={open && activeDestination === group ? 'page' : undefined}
+            onClick={(event) => { openSection(first.id, event.currentTarget) }}>{t(`navigation.${group}`)}</button>
+        })}
+      </nav>
+      {cwd !== undefined && <button className={css.workspace} onClick={() => { navigate(null) }} title={cwd}>
+        <IconFolderOpen16 size={18} /><span>{workspaceTitleOf(cwd)}</span>
+      </button>}
+      <button ref={trigger} type="button"
+        className={clsx(css.destination, css.settingsTrigger, open && activeDestination === 'settings' && css.selected)}
+        aria-expanded={open && activeDestination === 'settings'}
+        aria-current={open && activeDestination === 'settings' ? 'page' : undefined}
+        onClick={(event) => { openSection('general', event.currentTarget) }}>
+        {renderSlot('settings.trigger', { wide: true })}
       </button>
-      {open && (
-        <SettingsPanel
-          rows={rows}
-          renderSlot={renderSlot}
-          activeId={activeId}
-          onSelect={setActiveId}
-          onClose={close}
-        />
-      )}
-      {/* Dialog chrome and `#root` inert ownership live inside each step's
-          visible branch. A step still deciding (private facts loading)
-          renders null, so nothing paints or blocks while it decides. */}
-      {onboardingStep !== undefined && renderSlot('settings.onboarding', {
-        stepId: onboardingStep.id,
-        complete: () => { completeOnboardingStep(onboardingStep.id) },
-        openSection,
-      }, { only: onboardingStep.id })}
-    </>
-  )
+    </header>
+    {open && <section className={css.page} role="region" aria-label={title}>
+      <aside className={css.nav}>
+        <div className={css.navHeading}>
+          <h2>{activeDestination === 'settings' ? renderSlot('settings.header', {}) : title}</h2>
+          <button className={css.close} onClick={close}>
+            <IconCloseOutline16 size={16} /><span className={css.hiddenLabel}>{renderSlot('settings.close', {})}</span>
+          </button>
+        </div>
+        <label className={css.search}>
+          <IconSearchOutline16 size={16} />
+          <input ref={search} type="search" value={query} onChange={(event) => { setQuery(event.target.value) }}
+            placeholder={t('search')} aria-label={t('search')} />
+          <kbd>⌘ K</kbd>
+        </label>
+        <nav className={css.navList} aria-label={title}>
+          {filtered.map(row => <button key={row.id} type="button"
+            className={clsx(css.navCell, row.id === active?.id && css.active)}
+            aria-current={row.id === active?.id ? 'page' : undefined}
+            onClick={() => { navigate(row.id) }}>
+            <NavIcon id={row.id} /><span>{row.label}</span>
+          </button>)}
+          {filtered.length === 0 && <p className={css.noResults} role="status">{t('search.empty')}</p>}
+        </nav>
+      </aside>
+      <div className={css.content}>
+        <div className={css.contentInner}>
+          <div className={css.pageHeader}>
+            <div className={css.eyebrow}>{title}</div>
+            <h1 id={titleId} ref={heading} tabIndex={-1}>{general ? t('general.heading') : active?.label ?? title}</h1>
+            <p>{general ? t('general.description') : t(`description.${activeDestination}`)}</p>
+          </div>
+          <div className={css.options}>
+            {sectionId !== undefined && renderSlot('settings.section', {
+              close, ...(active?.id === 'appearance' ? { item: 'appearance' } : {}),
+            }, { only: sectionId })}
+          </div>
+          {activeDestination === 'settings' && <footer className={css.actions}>{renderSlot('settings.action', {})}</footer>}
+        </div>
+      </div>
+    </section>}
+    {onboardingStep !== undefined && renderSlot('settings.onboarding', {
+      stepId: onboardingStep.id, complete: () => { completeOnboardingStep(onboardingStep.id) }, openSection,
+    }, { only: onboardingStep.id })}
+  </>
 }

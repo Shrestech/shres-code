@@ -1,7 +1,7 @@
 /**
  * Layout plugin, browser half: one register() call contributes AppFrame into
  * the runtime's built-in 'root' slot and, in the same breath, declares the
- * four child slots (declaration = exclusive render authority), seats the
+ * child slots (declaration = exclusive render authority), seats the
  * layout store (panel geometry), and wires the panel-action service face.
  * ctx.layout is the cross-plugin panel-action contract; navigation state lives
  * with the runtime sessions service. A second effect seats the theme
@@ -33,12 +33,12 @@ declare module '@shres-code/cordis' {
 declare module '@shres-code/shres-code-client-ui-slots' {
   interface SlotMap {
     // The 'root' entry itself is the runtime's built-in slot (declared
-    // there); these four are the frame's children, declared by the same
+    // there); these are the frame's children, declared by the same
     // register() call that contributes AppFrame. Session owners never pass
     // sessionId: the framework injects it as a standard prop.
     /**
      * The whole left column. OCCUPIED by ui-sidebar's SidebarRoot, which
-     * declares the workspace and settings seats inside it — registering here
+     * declares the workspace and action seats inside it — registering here
      * replaces the navigation column outright rather than adding to it, and
      * the seats it declares disappear with it. To add something to the
      * sidebar, register into one of those inner seats instead.
@@ -81,6 +81,8 @@ declare module '@shres-code/shres-code-client-ui-slots' {
      * `id` is added beside the shipped entries instead of replacing them.
      */
     'shell.overlay': { kind: 'list'; scope: 'root' }
+    /** Global navigation and full-page destinations above the resident workspace. */
+    'shell.navigation': { kind: 'single'; scope: 'root'; owner: ShellNavigationOwnerProps }
   }
 }
 
@@ -89,6 +91,14 @@ declare module '@shres-code/shres-code-client-ui-slots' {
 // through the four-share intersection (PropsRuntime & PropsRenderSlots &
 // PropsStore & I). Conversation business state and actions arrive through
 // framework-standard hooks and each registrant's inject face, not owner props.
+
+/** Navigation selection owned by the frame; null displays the resident workspace. */
+export interface ShellNavigationOwnerProps {
+  /** Selected destination, or null for the workspace. */
+  page: string | null
+  /** Open a destination while preserving the mounted session and its draft. */
+  navigate: (page: string | null) => void
+}
 
 /** Sidebar owner share: live column state from the frame's concession solve. */
 export interface SidebarOwnerProps {
@@ -109,7 +119,7 @@ export const inject = ['slots', 'theme']
 
 /**
  * Client plugin body: provide ctx.layout, then one register() call — AppFrame
- * into 'root' with the four child-slot declarations, the layout store seat,
+ * into 'root' with its child-slot declarations, the layout store seat,
  * and the inject hook that hands the store's bound actions to the service.
  * @param ctx - client root context.
  */
@@ -124,6 +134,7 @@ export function apply(ctx: ClientContext): void {
         'conversation': { kind: 'single', scope: 'session-maybe' },
         'details': { kind: 'single', scope: 'session' },
         'shell.overlay': { kind: 'list', scope: 'root' },
+        'shell.navigation': { kind: 'single', scope: 'root' },
       },
       // Exclusive store: the factory itself — the framework instantiates per
       // entry and delivers useStore/actions to AppFrame as standard props.

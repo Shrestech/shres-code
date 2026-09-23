@@ -3,7 +3,7 @@ import { existsSync, mkdirSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { Browser, Page } from 'playwright'
+import type { Browser, Locator, Page } from 'playwright'
 
 /** The built page under test; `pnpm run test:web` rebuilds it before running. */
 export const DIST_INDEX = fileURLToPath(new URL('../dist/index.html', import.meta.url))
@@ -20,6 +20,31 @@ export const REPO_ROOT = fileURLToPath(new URL('../../..', import.meta.url))
  */
 export async function newEnglishPage(browser: Browser, height = 1000): Promise<Page> {
   return await browser.newPage({ viewport: { width: 1680, height }, locale: 'en-US' })
+}
+
+/**
+ * Open the session-local Activity inspector and wait for its dialog surface.
+ * @param page - The browser page hosting the conversation.
+ * @returns The open Activity dialog locator.
+ */
+export async function openSessionActivity(page: Page): Promise<Locator> {
+  const activity = page.getByRole('button', { name: 'Activity', exact: true })
+  await activity.waitFor({ timeout: 30_000 })
+  if (await activity.getAttribute('aria-expanded') !== 'true') await activity.click()
+  const panel = page.getByRole('dialog', { name: 'Inspect this session' })
+  await panel.waitFor({ timeout: 30_000 })
+  return panel
+}
+
+/**
+ * Select one registered conversation view through the session-local Activity inspector.
+ * @param page - The browser page hosting the conversation.
+ * @param view - The registered view to make active.
+ * @returns A promise that settles after the view is selected.
+ */
+export async function selectSessionView(page: Page, view: 'Chat' | 'Trajectory'): Promise<void> {
+  const panel = await openSessionActivity(page)
+  await panel.getByRole('button', { name: view, exact: true }).click()
 }
 
 /** Fail loud on a stale checkout instead of testing yesterday's bundle. */

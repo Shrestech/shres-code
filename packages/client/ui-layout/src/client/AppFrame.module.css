@@ -1,7 +1,8 @@
 .frame {
   position: relative; /* anchors the drag handles, which straddle column borders */
   display: grid;
-  grid-template-rows: 100%;
+  --shres-navigation-height: 64px;
+  grid-template-rows: var(--shres-navigation-height) minmax(0, 1fr);
   height: 100%;
   overflow: hidden;
   background: var(--dsw-alias-bg-base);
@@ -53,7 +54,7 @@
    adds a visible 12x32 pill at vertical center; sidebar keeps only the hit strip. */
 .handle {
   position: absolute;
-  top: 0;
+  top: var(--shres-navigation-height);
   bottom: 0;
   width: 8px;
   margin-left: -4px;
@@ -116,4 +117,24 @@
 
 .overlayLayer > * {
   pointer-events: auto;
+}
+
+.navigation {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  z-index: 10;
+  min-width: 0;
+}
+
+.sidebarCol, .centerCol, .detailsCol { grid-row: 2; }
+.sidebarCol { grid-column: 1; }
+.centerCol { grid-column: 2; }
+.detailsCol { grid-column: 3; }
+.frame[data-page-open] > .handle { display: none; }
+.frame[data-page-open] > .sidebarCol,
+.frame[data-page-open] > .centerCol,
+.frame[data-page-open] > .detailsCol { visibility: hidden; }
+
+@media (max-width: 600px) {
+  .frame { --shres-navigation-height: 56px; }
 }

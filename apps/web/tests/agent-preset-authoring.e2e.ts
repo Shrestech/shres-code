@@ -39,9 +39,9 @@ describe('web e2e: agent-preset authoring is a host-side copy', () => {
   let tripwire: ReturnType<typeof watchConsole>
   let userRoot: string
 
-  /** The settings dialog, opened on the Agent-presets section. */
+  /** The Customize region, opened on the Agent-presets section. */
   function settingsDialog(): Locator {
-    return page.getByRole('dialog', { name: 'Settings' })
+    return page.getByRole('region', { name: 'Customize' })
   }
 
   /** Tokenize the lane-owned preset root after general aria normalization. */
@@ -80,16 +80,16 @@ describe('web e2e: agent-preset authoring is a host-side copy', () => {
     await scaffold?.close()
   })
 
-  it('offers the roster with copy as the only way to create', async () => {
+  it('offers the built-in roster and Creator mode', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-preset-authoring-section'))
-    await page.getByRole('button', { name: 'Settings', exact: true }).click()
+    await page.getByRole('button', { name: 'Customize', exact: true }).click()
     const dialog = settingsDialog()
     await dialog.waitFor({ timeout: 10_000 })
     await dialog.getByRole('button', { name: 'Agent presets' }).click()
     await dialog.getByRole('heading', { name: 'Agent presets' }).waitFor({ timeout: 10_000 })
     await dialog.getByText('Standard mode').first().waitFor({ timeout: 10_000 })
 
-    const snapshot = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
+    const snapshot = await captureStableAria(page, '[role="region"][aria-label="Customize"]', scaffold.workspaceCwd)
 
     await compareOrRefreshGolden(SECTION_EXPECTED, snapshot, MODE)
     // The intro carries the guidance a create button used to imply, and the
@@ -123,12 +123,12 @@ describe('web e2e: agent-preset authoring is a host-side copy', () => {
   it('copies Minimal mode whole under a new id and lands in its files', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-preset-authoring-copy'))
     const dialog = settingsDialog()
-    await dialog.getByRole('button', { name: 'Copy: Minimal mode' }).click()
+    await dialog.getByRole('button', { name: 'Duplicate: Minimal mode' }).click()
     const copyDialog = page.getByRole('dialog', { name: 'Duplicate preset · Copied from Minimal mode' })
     await copyDialog.waitFor({ timeout: 10_000 })
 
     const dialogSnapshot = await captureStableAria(
-      page, '[role="dialog"][aria-label^="Copypreset"]', scaffold.workspaceCwd)
+      page, '[role="dialog"][aria-label^="Duplicate preset"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(COPY_DIALOG_EXPECTED, dialogSnapshot, MODE)
     // Two fields and nothing else: the id is the directory name the host
     // needs up front; description and composition live in the files.
@@ -145,11 +145,9 @@ describe('web e2e: agent-preset authoring is a host-side copy', () => {
     // the completion of a copy, not a follow-up.
     await dialog.getByText('My mode').first().waitFor({ timeout: 10_000 })
     await dialog.getByText('Preset files:').waitFor({ timeout: 10_000 })
-    // The copy dialog is detached, so the settings dialog is the only one
-    // left (it names itself via aria-labelledby, which a CSS attribute
-    // selector cannot address).
+    // The Customize page displays the copied preset and its directory.
     const snapshot = withPresetRoot(
-      await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd))
+      await captureStableAria(page, '[role="region"][aria-label="Customize"]', scaffold.workspaceCwd))
     await compareOrRefreshGolden(CREATED_EXPECTED, snapshot, MODE)
     expect(snapshot).toContain('{{presetRoot}}/my-agent')
 
@@ -161,7 +159,7 @@ describe('web e2e: agent-preset authoring is a host-side copy', () => {
     expect(composition).toBe(await readFile(join(SHIPPED_PRESETS, 'minimal', 'agent.cordis.yml'), 'utf8'))
     const metadata = await readFile(join(userRoot, 'my-agent', 'preset.yml'), 'utf8')
     expect(metadata).toContain('name: My mode')
-    expect(metadata).toContain('description: only provides persistent bash  and  str_replace_editor  dualToolscoding Agent。')
+    expect(metadata).toContain('description: Two-tool coding agent with persistent bash and str_replace_editor.')
     expect(metadata).not.toContain('order:')
   }, 60_000)
 
@@ -178,7 +176,7 @@ describe('web e2e: agent-preset authoring is a host-side copy', () => {
     expect(existsSync(join(userRoot, 'my-agent'))).toBe(false)
     // The custom group outlives its only member: the heading stays with the
     // creator entry so the place to author a preset never disappears.
-    expect(await dialog.getByRole('heading', { name: 'Custom' }).count()).toBe(1)
+    expect(await dialog.getByText('Custom', { exact: true }).count()).toBe(1)
     expect(await dialog.getByRole('button', { name: 'Draft a custom preset with Creator mode' }).count()).toBe(1)
     expect(await dialog.getByText('Standard mode').count()).toBeGreaterThan(0)
   }, 60_000)
@@ -194,12 +192,15 @@ describe('web e2e: agent-preset authoring is a host-side copy', () => {
 
     // The section reads the roster when it mounts; hop away and back.
     const dialog = settingsDialog()
-    await dialog.getByRole('button', { name: 'General' }).click()
+    await page.getByRole('button', { name: 'Settings', exact: true }).click()
+    await page.getByRole('region', { name: 'Settings' }).waitFor({ timeout: 10_000 })
+    await page.getByRole('button', { name: 'Customize', exact: true }).click()
+    await dialog.waitFor({ timeout: 10_000 })
     await dialog.getByRole('button', { name: 'Agent presets' }).click()
     await dialog.getByText('Failed to load').first().waitFor({ timeout: 10_000 })
 
     const snapshot = withPresetRoot(
-      await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd))
+      await captureStableAria(page, '[role="region"][aria-label="Customize"]', scaffold.workspaceCwd))
     await compareOrRefreshGolden(DAMAGED_EXPECTED, snapshot, MODE)
     // Both damage shapes surface as marked, unselectable, uncopyable cards
     // that still carry their metadata and the discovery-reported reason.
@@ -208,7 +209,7 @@ describe('web e2e: agent-preset authoring is a host-side copy', () => {
     expect(snapshot).toContain('not valid YAML')
     expect(snapshot).toContain('agent.cordis.yml is missing')
     expect(await dialog.getByRole('button', { name: 'Failed to load: broken-yaml' }).isDisabled()).toBe(true)
-    expect(await dialog.getByRole('button', { name: 'Copy: Ghost preset' }).isDisabled()).toBe(true)
+    expect(await dialog.getByRole('button', { name: 'Duplicate: Ghost preset' }).isDisabled()).toBe(true)
     // A broken card offers no "set default" affordance at all — the aria name
     // IS the broken marking, so the picking name must not exist.
     expect(await dialog.getByRole('button', { name: 'Set as default: broken-yaml' }).count()).toBe(0)
@@ -223,7 +224,7 @@ describe('web e2e: agent-preset authoring is a host-side copy', () => {
     await expect.poll(async () => dialog.getByText('Ghost preset').count(), { timeout: 10_000 }).toBe(0)
     expect(existsSync(join(userRoot, 'ghost'))).toBe(false)
 
-    await dialog.getByRole('button', { name: 'Copy: Minimal mode' }).click()
+    await dialog.getByRole('button', { name: 'Duplicate: Minimal mode' }).click()
     const copyDialog = page.getByRole('dialog', { name: 'Duplicate preset · Copied from Minimal mode' })
     await copyDialog.waitFor({ timeout: 10_000 })
     await copyDialog.getByPlaceholder('my-agent').fill('ghost')
@@ -247,7 +248,7 @@ describe('web e2e: agent-preset authoring is a host-side copy', () => {
     // the way to a composed host session.
     await settingsDialog().getByRole('button', { name: 'Close' }).last().click()
     await connectFreshWorkspace(page, scaffold.workspaceCwd)
-    await page.getByRole('button', { name: 'Settings', exact: true }).click()
+    await page.getByRole('button', { name: 'Customize', exact: true }).click()
     const dialog = settingsDialog()
     await dialog.waitFor({ timeout: 10_000 })
     await dialog.getByRole('button', { name: 'Agent presets' }).click()

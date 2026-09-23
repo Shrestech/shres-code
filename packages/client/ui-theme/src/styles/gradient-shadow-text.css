@@ -1,23 +1,43 @@
 body {
-  --dsw-linear-gradient-think: linear-gradient(180deg, #fff 20.19%, rgba(255, 255, 255, 0) 100%);
-  --dsw-linear-think-select: linear-gradient(180deg, #f5f6f7 20.19%, rgba(245, 246, 247, 0) 100%);
-  /* shadow */
-  --dsw-shadow-lv1: 0 2px 4px 0 rgba(0, 0, 0, 0.05);
-  --dsw-shadow-lv1-blur: 0 4px 12px 0 rgba(0, 0, 0, 0.02);
-  --dsw-shadow-lv2: 0 4px 12px 0 rgba(0, 0, 0, 0.02), 0 2px 8px 0 rgba(0, 0, 0, 0.04);
+  --dsw-linear-gradient-think: linear-gradient(
+    180deg,
+    var(--dsw-alias-bg-layer-1) 20%,
+    rgba(251, 250, 246, 0) 100%
+  );
+  --dsw-linear-think-select: linear-gradient(
+    180deg,
+    var(--dsw-alias-bg-layer-2) 20%,
+    rgba(248, 247, 242, 0) 100%
+  );
+  /* Keep elevation readable through a hairline and a short, quiet shadow. */
+  --dsw-shadow-lv1: 0 1px 2px 0 rgba(25, 28, 22, 0.06);
+  --dsw-shadow-lv1-blur: 0 2px 8px 0 rgba(25, 28, 22, 0.04);
+  --dsw-shadow-lv2: 0 0 0 1px var(--dsw-alias-border-l1), 0 3px 10px 0 rgba(25, 28, 22, 0.06);
   --dsw-shadow-lv3:
-    0 0 1px 0 rgba(0, 0, 0, 0.2), 0 0 4px 0 rgba(0, 0, 0, 0.02), 0 12px 32px 0 rgba(0, 0, 0, 0.08);
-  /* blur filter */
-  --dsw-mask-blur: blur(2px);
+    0 0 0 1px var(--dsw-alias-border-l2), 0 8px 20px 0 rgba(25, 28, 22, 0.1);
+  --dsw-mask-blur: blur(1px);
 }
 
 body[data-ds-dark-theme] {
-  --dsw-linear-gradient-think: linear-gradient(180deg, #151517 20.19%, rgba(21, 21, 23, 0) 100%);
-  --dsw-linear-think-select: linear-gradient(180deg, #232325 20.19%, rgba(35, 35, 37, 0) 100%);
+  --dsw-linear-gradient-think: linear-gradient(
+    180deg,
+    var(--dsw-alias-bg-layer-1) 20%,
+    rgba(37, 39, 34, 0) 100%
+  );
+  --dsw-linear-think-select: linear-gradient(
+    180deg,
+    var(--dsw-alias-bg-layer-2) 20%,
+    rgba(43, 45, 40, 0) 100%
+  );
+  --dsw-shadow-lv1: 0 1px 2px 0 rgba(0, 0, 0, 0.18);
+  --dsw-shadow-lv1-blur: 0 2px 8px 0 rgba(0, 0, 0, 0.16);
+  --dsw-shadow-lv2: 0 0 0 1px var(--dsw-alias-border-l1), 0 3px 10px 0 rgba(0, 0, 0, 0.2);
+  --dsw-shadow-lv3:
+    0 0 0 1px var(--dsw-alias-border-l2), 0 8px 20px 0 rgba(0, 0, 0, 0.28);
 }
 
-/* ---------- fonts ---------- */
-/* From @deepseek-figma-plugin/custom-variable-name plugin export */
+/* ---------- typography ---------- */
+/* The role names are stable; the family and weight values belong to Shres. */
 body {
   --dsw-font-markdown-h1: 700 24px/34px var(--dsw-font-family);
   --dsw-font-markdown-h1-font-family: var(--dsw-font-family);

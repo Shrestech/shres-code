@@ -2,8 +2,8 @@
 
 /** English dictionary, the key-set source of truth. */
 export const en = {
-  'title': 'Permission',
-  'description': 'Choose the default permission mode for new sessions',
+  'title': 'Default access',
+  'description': 'Choose the default permission mode for new sessions.',
   'loading': 'Loading',
   'unavailable': 'Unavailable',
   'confirm.title': 'Enable Full access?',

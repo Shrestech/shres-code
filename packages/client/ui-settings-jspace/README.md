@@ -1,6 +1,6 @@
 # @shres-code/shres-code-client-ui-settings-jspace
 
-Browser Settings page for the J-Space host seat. It registers a `settings.section` row (`id: jspace`, order 13, after Shield at 12) and binds the Host `jspace` namespace.
+Browser Settings page for the J-Space host seat. It registers a `settings.section` row (`id: jspace`, order 13, after Shield at 12) and binds the Host `jspace` namespace. J-Space controls use spaced rows on the full-page Settings surface.
 
 The page leads with an activate/disable switch. It edits `mode` (`available` / `always-open`) and `requireCoverage` immediately. Below the switch it shows the selected session's card as open or closed and the Checked-line count, or last-known values, or an em dash when none exist. Those fields come from the selected session's `jspace` projection, not from the `jspace` settings document.
 

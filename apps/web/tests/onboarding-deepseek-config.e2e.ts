@@ -33,6 +33,15 @@ describe.skipIf(MODE === 'record')('web e2e: first-run DeepSeek credential setup
 
   beforeAll(async () => {
     scaffold = await launchWebScaffold({ deepSeekMissingCredential: true, welcomeNoticePending: true })
+    // Subscription-session routes are composed for the product, but their
+    // keyless dormant rows would otherwise count as a usable provider and
+    // bypass this DeepSeek first-run scenario. Keep the lane focused on the
+    // missing credential it is meant to exercise.
+    for (const namespace of ['llm-cursor-session', 'llm-grok-session', 'llm-codex-session'] as const) {
+      await scaffold.ctx.settings.mutate(settingsNamespace(namespace), [
+        { op: 'set', path: ['enabled'], value: false },
+      ])
+    }
     browser = await chromium.launch()
     // The scenario asserts the shipped English copy, so the browser asks for it.
     page = await browser.newPage({ viewport: { width: 1440, height: 960 }, locale: 'en-US' })
@@ -73,7 +82,7 @@ describe.skipIf(MODE === 'record')('web e2e: first-run DeepSeek credential setup
 
     const credentialStep = page.getByRole('dialog', { name: 'Add an API key to get started' })
     await credentialStep.waitFor({ timeout: 15_000 })
-    const keyInput = credentialStep.getByLabel('API key', { exact: true })
+    const keyInput = credentialStep.getByRole('textbox', { name: 'API key', exact: true })
     await keyInput.waitFor({ timeout: 10_000 })
     const initial = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(MISSING_EXPECTED, initial, MODE)
@@ -96,13 +105,13 @@ describe.skipIf(MODE === 'record')('web e2e: first-run DeepSeek credential setup
     // The ordinary Models surface reuses the refreshed join and exposes the
     // configured write-only placeholder without a reload.
     await page.getByRole('button', { name: 'Settings', exact: true }).click()
-    const settings = page.getByRole('dialog', { name: 'Settings' })
+    const settings = page.getByRole('region', { name: 'Settings' })
     await settings.waitFor({ timeout: 10_000 })
-    await settings.getByRole('button', { name: 'Model' }).click()
+    await settings.getByRole('button', { name: 'Models & providers', exact: true }).click()
     const deepSeekRow = settings.getByText('DeepSeek', { exact: true }).first()
     await deepSeekRow.waitFor({ timeout: 10_000 })
     await deepSeekRow.locator('xpath=ancestor::li').getByRole('button', { name: 'Edit' }).click()
-    const configuredInput = settings.getByLabel('API key', { exact: true })
+    const configuredInput = settings.getByRole('textbox', { name: 'API key', exact: true })
     await configuredInput.waitFor({ timeout: 10_000 })
     await expect.poll(
       () => configuredInput.getAttribute('placeholder'),
@@ -196,14 +205,18 @@ describe.skipIf(MODE === 'record')('web e2e: first-run DeepSeek credential setup
     // Opened here rather than inherited: the credential test reloads the page
     // after configuring the key, so nothing carries an open dialog across.
     await page.getByRole('button', { name: 'Settings', exact: true }).click()
-    const settings = page.getByRole('dialog', { name: 'Settings' })
+    const settings = page.getByRole('region', { name: 'Settings' })
     await settings.waitFor({ timeout: 10_000 })
-    await settings.getByRole('button', { name: 'Model' }).click()
+    await settings.getByRole('button', { name: 'Models & providers', exact: true }).click()
     const deepSeek = settings.getByText('DeepSeek', { exact: true }).first()
     await deepSeek.waitFor({ timeout: 10_000 })
     await deepSeek.locator('xpath=ancestor::li').getByRole('button', { name: 'Edit' }).click()
-    await settings.getByText('CustomSettings').click()
-    await settings.getByRole('button', { name: /DeleteModel/ }).first().click()
+    await settings.getByText('Customized settings').click()
+    await settings.getByRole('button', { name: /Delete model/ }).first().click()
+    // The shipped catalog carries three rows. Remove the remaining vision row
+    // before adding the custom entry, so the test keeps only the retained
+    // Pro model and the model it is exercising.
+    await settings.getByRole('button', { name: 'Delete model 2', exact: true }).click()
     await settings.getByRole('button', { name: 'Add model' }).click()
     const customModelId = settings.getByLabel('Model ID 2')
     await customModelId.fill('private-preview')
@@ -213,9 +226,9 @@ describe.skipIf(MODE === 'record')('web e2e: first-run DeepSeek credential setup
     await settings.getByLabel('Context window 2').fill('131072')
     await settings.getByLabel('Max output tokens 2').fill('64K')
 
-    const modelEditor = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
+    const modelEditor = await captureStableAria(page, '[role="region"][aria-label="Settings"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(MODELS_EXPECTED, modelEditor, MODE)
-    await settings.getByRole('button', { name: 'Save', exact: true }).click()
+    await settings.getByRole('button', { name: 'Apply', exact: true }).click()
     await customModelId.waitFor({ state: 'detached', timeout: 15_000 })
 
     const document = await readFile(join(scaffold.harnessHome, 'settings.yaml'), 'utf8')

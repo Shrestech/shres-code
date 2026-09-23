@@ -5,12 +5,18 @@
   height: 32px;
   padding: 0 8px;
   border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 8px;
+  border-radius: var(--dsw-radius-control);
   background: var(--dsw-alias-bg-layer-1);
 }
 
 .wrap:focus-within {
   border-color: var(--dsw-alias-brand-primary);
+  box-shadow: var(--dsw-focus-ring);
+}
+
+.wrap:has(.input:focus-visible) {
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: 1px;
 }
 
 .icon {

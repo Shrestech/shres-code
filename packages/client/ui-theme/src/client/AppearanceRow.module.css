@@ -1,57 +1,88 @@
-/* Appearance row (figma 'Frame 2117131228': title + cube row, column gap 8,
- * pad 16/0, hairline separator; the section column strips it when last). */
-
+/* General settings row: a quiet label paired with one compact segmented
+ * control. The selected segment carries the rust keyline used across
+ * settings controls. */
 .group {
+  box-sizing: border-box;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 16px 0;
+  min-height: 100px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 22px 0;
   border-bottom: 1px solid var(--dsw-alias-border-l2);
 }
 
 .title {
-  font-size: 14px;
-  font-weight: 400;
-  line-height: 22px;
+  min-width: 0;
   color: var(--dsw-alias-label-primary);
+  font-size: 17px;
+  font-weight: 400;
+  line-height: 20px;
 }
 
 .cubeRow {
-  display: flex;
-  align-items: stretch;
-  gap: 8px;
-  flex-wrap: wrap;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0;
+  padding: 0;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-control);
+  background: var(--dsw-alias-bg-layer-2);
 }
 
-/* Appearance cube (figma '.Selector Cube' 276x82 r16, pad 20/32, centered
- * icon-over-label column, gap 4); flexed down from the figma width so all
- * three sit on one row in the 800 panel, wrapping when narrower. */
 .themeCube {
   box-sizing: border-box;
-  flex: 1 1 180px;
-  display: flex;
-  flex-direction: column;
+  display: inline-flex;
+  min-width: 110px;
+  height: 50px;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  padding: 20px 32px;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 16px;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 4px;
   background: transparent;
-  font: inherit;
-  font-size: 14px;
-  line-height: 22px;
-  color: var(--dsw-alias-label-primary);
+  color: var(--dsw-alias-label-secondary);
   cursor: pointer;
+  font: inherit;
+  font-size: 15px;
+  line-height: 18px;
+  white-space: nowrap;
 }
 
 .themeCube:hover:not(.selected) {
   background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
 }
 
-/* Selected cube: #F5F6F7 fill + #ADB2B8 border (static token — the bluish-400
- * step has no alias-layer name). */
-.selected {
-  background: var(--dsw-alias-bg-module-platform);
-  border-color: var(--dsw-static-neutral-bluish-400);
+.themeCube:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: -1px;
 }
+
+.selected {
+  border-color: var(--dsw-alias-brand-primary);
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-brand-text);
+}
+
+@media (max-width: 520px) {
+  .group {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .cubeRow {
+    width: 100%;
+  }
+
+  .themeCube {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+.desc { margin-top: 4px; color: var(--dsw-alias-label-secondary); font-size: 15px; line-height: 22px; }
+@media (min-width: 1350px) { .themeCube { min-width: 150px; } }

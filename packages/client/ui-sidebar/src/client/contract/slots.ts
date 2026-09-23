@@ -4,7 +4,7 @@
  * owns column geometry (fold state machine, brand row, New Session);
  * `sidebar.remotes` (ui-remote) stacks the remote-host group above the
  * browsing region, everything below it is the `sidebar.workspaces`
- * registrant's (ui-workspace), and the foot is the `sidebar.settings`
+ * registrant's (ui-workspace), and the foot is the `sidebar.footer.action`
  * registrant's (ui-settings), followed by optional footer actions in
  * `sidebar.footer.action`.
  */
@@ -30,12 +30,6 @@ declare module '@shres-code/shres-code-client-ui-slots' {
      */
     'sidebar.workspaces': { kind: 'single'; scope: 'root'; owner: SidebarSectionOwnerProps }
     /**
-     * The settings seat at the sidebar foot. Declared by this package's
-     * 'sidebar' entry; ui-settings registers its trigger row + modal panel.
-     * The sidebar passes only its column state — it holds no settings state.
-     */
-    'sidebar.settings': { kind: 'single'; scope: 'root'; owner: SidebarSettingsOwnerProps }
-    /**
      * Optional actions beside Settings at the sidebar foot. Declared by this
      * package's 'sidebar' entry; each action receives only the column state.
      */
@@ -58,15 +52,6 @@ export interface SidebarSectionOwnerProps {
   wide: boolean
   /** Rail icons request expansion; the browser rides the wide flip for focus. */
   expandSidebar: () => void
-}
-
-/**
- * Owner share of the sidebar settings seat: the column display state the
- * occupant's trigger row must render against (wide row vs rail icon).
- */
-export interface SidebarSettingsOwnerProps {
-  /** Whether the sidebar renders wide content (false = 56px rail). */
-  wide: boolean
 }
 
 /** Owner share of an action rendered beside Settings at the sidebar foot. */
@@ -104,5 +89,5 @@ export type SidebarRootInjected = {
  */
 export type SidebarRootComponentProps =
   PropsRuntime<'sidebar'>
-  & PropsRenderSlots<'sidebar.remotes' | 'sidebar.workspaces' | 'sidebar.settings' | 'sidebar.footer.action' | 'sidebar.brand.action'>
+  & PropsRenderSlots<'sidebar.remotes' | 'sidebar.workspaces' | 'sidebar.footer.action' | 'sidebar.brand.action'>
   & SidebarRootInjected & PropsLocale<'sidebar'>

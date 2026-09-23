@@ -3,8 +3,8 @@
   display: inline-flex;
 }
 
-/* Dropdown card (figma MenuDropdown 122:9481 / 419:16920): menu surface,
- * r12, inverted hairline border, shadow-lv3, 4px inset padding. */
+/* Dropdown card: warm surface, hairline border, quiet elevation, and compact
+ * inset padding. */
 .list,
 .submenu {
   /* min-widths below are the design's outer card widths — include the pad. */
@@ -14,7 +14,7 @@
   flex-direction: column;
   gap: 0;
   border: 1px solid var(--dsw-alias-border-inverted);
-  border-radius: 12px;
+  border-radius: var(--dsw-radius-surface);
   background: var(--dsw-specific-menu);
   box-shadow: var(--dsw-shadow-lv3);
   /* Elevated surface: the scrollbar thumb takes the l2 elevation tokens. The
@@ -26,7 +26,7 @@
   --shres-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
 }
 
-/* Primary card is 218 wide in the design across both hosts. */
+/* Keep a predictable reading width across both hosts. */
 .list {
   position: absolute;
   top: calc(100% + 4px);
@@ -92,8 +92,8 @@
   position: relative;
 }
 
-/* Menu cell (figma .Menu_cell): min-h 40, r10, pad 10/8, 14/22 primary,
- * gap 8 between leading icon / label / trailing check. */
+/* Menu cell: 40px minimum height, compact padding, and clear icon/label/check
+ * spacing. */
 .item {
   display: flex;
   align-items: center;
@@ -102,7 +102,7 @@
   min-height: 40px;
   padding: 8px 10px;
   border: none;
-  border-radius: 10px;
+  border-radius: 4px;
   background: transparent;
   cursor: pointer;
   font-size: 14px;
@@ -113,6 +113,11 @@
 
 .item:hover:not(:disabled) {
   background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.item:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: -2px;
 }
 
 .denseList .item {
@@ -128,14 +133,14 @@
 .submenu.compactList {
   min-width: 164px;
   padding: 2px;
-  border-radius: 7px;
+  border-radius: var(--dsw-radius-control);
 }
 
 .compactList .item {
   min-height: 26px;
   gap: 6px;
   padding: 3px 7px;
-  border-radius: 5px;
+  border-radius: 4px;
   font-size: 12px;
   line-height: 18px;
 }
@@ -210,7 +215,7 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
-/* Separator cell (figma 122:9481): py 4 / px 2 around the hairline. */
+/* Separator cell: a short breathing space around the hairline. */
 .separator {
   height: 1px;
   margin: 4px 2px;

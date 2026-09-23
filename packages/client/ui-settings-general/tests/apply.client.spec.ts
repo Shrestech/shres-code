@@ -88,7 +88,7 @@ describe('ui-settings-general apply', () => {
     const entry = generalEntry(before.slots)!
     expect(entry.options).toMatchObject({ id: 'general', order: 0 })
     // The nav label is a locale-following thunk; owners resolve at read time.
-    expect(resolveSlotLabel(entry.options.label)).toBe('General')
+    expect(resolveSlotLabel(entry.options.label)).toBe('Preferences')
     expect(before.slots.spec('settings.general.item')).toEqual({ kind: 'list', scope: 'root' })
     expect(before.slots.entries('settings.general.item')).toEqual([])
     // The onboarding hole stays declared for feature-owned steps; this plugin
@@ -142,7 +142,7 @@ describe('ui-settings-general apply', () => {
       expect(b.slots.getVersion(name)).toBe(versions[i]!)
       expect(b.slots.entries(name)).toHaveLength(1)
     })
-    expect(resolveSlotLabel(generalEntry(b.slots)!.options.label)).toBe('General')
+    expect(resolveSlotLabel(generalEntry(b.slots)!.options.label)).toBe('Preferences')
   })
 
   it('refreshes loaded document availability on reconnect without reading it eagerly', async () => {
@@ -188,7 +188,7 @@ describe('ui-settings-general apply', () => {
     expect(b.slots.spec('settings.general.item')).toEqual({ kind: 'list', scope: 'root' })
     // The recovered registrations still ride the locale path.
     b.locale.setLocale('en')
-    expect(resolveSlotLabel(generalEntry(b.slots)!.options.label)).toBe('General')
+    expect(resolveSlotLabel(generalEntry(b.slots)!.options.label)).toBe('Preferences')
   })
 
   it('removes every seat and the item declaration on teardown', async () => {

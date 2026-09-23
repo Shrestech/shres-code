@@ -8,7 +8,7 @@ import { en, type SidebarKey } from './locales.ts'
 
 export type {
   SidebarBrandActionOwnerProps, SidebarFooterActionOwnerProps, SidebarRootComponentProps,
-  SidebarRootInjected, SidebarSectionOwnerProps, SidebarSettingsOwnerProps,
+  SidebarRootInjected, SidebarSectionOwnerProps,
 } from './contract/slots.ts'
 export type { SidebarKey } from './locales.ts'
 
@@ -47,7 +47,6 @@ export function apply(ctx: ClientContext): void {
       children: {
         'sidebar.remotes': { kind: 'single', scope: 'root' },
         'sidebar.workspaces': { kind: 'single', scope: 'root' },
-        'sidebar.settings': { kind: 'single', scope: 'root' },
         'sidebar.footer.action': { kind: 'list', scope: 'root' },
         'sidebar.brand.action': { kind: 'list', scope: 'root' },
       },

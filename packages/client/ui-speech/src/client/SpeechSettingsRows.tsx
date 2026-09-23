@@ -18,7 +18,7 @@ export interface SpeechSettingsInjected {
 
 /** Full settings-row props. */
 export type SpeechSettingsRowProps =
-  PropsRuntime<'settings.general.item'>
+  PropsRuntime<'settings.audio.item'>
   & PropsLocale<'speech'>
   & InjectFace<SpeechSettingsInjected>
 

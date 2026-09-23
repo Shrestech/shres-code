@@ -1,226 +1,40 @@
-/* Settings shell (figma 501:29904 mask context / 501:29947 panel): sidebar
-   foot trigger row + centered 1080x700 modal panel. The trigger uses the
-   sidebar's 34px compact row / 36px rail circle rhythm; the
-   panel is a two-column layout — 188px nav rail + content column with a
-   54px header and the 24px-padded options area. */
-
-/* Trigger row: match the other wide sidebar controls' compact vertical rhythm. */
-.trigger {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: calc(100% + 8px);
-  height: 34px;
-  margin: 4px -4px 4px;
-  padding: 6px 2px 6px 10px;
-  box-sizing: border-box;
-  border: none;
-  border-radius: 12px;
-  background: transparent;
-  cursor: pointer;
-  overflow: hidden;
-  color: var(--dsw-alias-label-primary);
-  font-family: inherit;
-  font-size: 14px;
-  line-height: 22px;
-}
-
-.trigger:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-
-/* Rail trigger: the same 36x36 circle box as the other rail controls. */
-.trigger.rail {
-  width: 36px;
-  height: 36px;
-  margin: 8px 0 10px;
-  justify-content: center;
-  gap: 0;
-  padding: 0;
-  border-radius: 50%;
-}
-
-.triggerLabel {
-  overflow: hidden;
-  white-space: nowrap;
-}
-
-/* Full-viewport layer (figma Mask 501:29946 #000@24%): mask tokens match the
-   Modal primitive (--dsw-alias-bg-mask-1 + --dsw-mask-blur). */
-.overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.mask {
-  position: absolute;
-  inset: 0;
-  background: var(--dsw-alias-bg-mask-1);
-  backdrop-filter: var(--dsw-mask-blur);
-}
-
-/* Panel (figma Settings 501:29947): r24, white, lv3 shadow (figma effects
-   match --dsw-shadow-lv3 exactly); figma's 1080x700 is shrunk to 800 wide.
-   One height for every section, taken from the viewport rather than the
-   content: sections differ by hundreds of pixels (a settings list against the
-   composition editor), and a content-sized panel would resize under the
-   pointer on every nav click. Whatever does not fit scrolls in `.options`. */
-.panel {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  width: 800px;
-  height: min(800px, calc(100vh - 48px));
-  max-width: calc(100vw - 48px);
-  border-radius: 24px;
-  overflow: hidden;
-  background: var(--dsw-alias-bg-layer-2);
-  box-shadow: var(--dsw-shadow-lv3);
-  /* Elevated surface: the scrollbar thumb takes the l2 elevation tokens.
-     Declared on the panel rather than the scrolling `.options` child so the
-     elevation choice sits with the surface; the custom properties inherit
-     down to whichever descendant scrolls (see ui-theme
-     styles/scrollbar.css for the rebinding contract). */
-  --shres-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
-  --shres-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
-}
-
-/* Nav rail (figma .Setting-nav 501:29958): 188 wide, pad (12,22,12,0),
-   gap 18, no own fill — the panel white shows through. */
-.nav {
-  flex: none;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  width: 188px;
-  padding: 22px 12px 0;
-  box-sizing: border-box;
-}
-
-/* Title row (figma 501:29959): 16/500 lh24, 12px side padding. */
-.navTitle {
-  padding: 0 12px;
-  font-size: 16px;
-  line-height: 24px;
-  font-weight: 500;
-  color: var(--dsw-alias-label-primary);
-}
-
-/* Cell stack (figma 501:29961): gap 4. */
-.navList {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-/* Nav cell (figma .Setting-nav-cell 501:29962): 164x40, r12, pad
-   (12,9,16,9), gap 8; label 14/400 lh22; selected fill #EBEEF2. */
-.navCell {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 40px;
-  padding: 9px 16px 9px 12px;
-  box-sizing: border-box;
-  border: none;
-  border-radius: 12px;
-  background: transparent;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 14px;
-  line-height: 22px;
-  font-weight: 400;
-  color: var(--dsw-alias-label-primary);
-  text-align: left;
-}
-
-.navCell:hover {
-  background: var(--dsw-specific-sidebar-nav-item-hover);
-}
-
-.navCell.active {
-  background: var(--dsw-specific-sidebar-nav-item-active);
-}
-
-.navIcon {
-  flex: none;
-}
-
-.navLabel {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-/* Content column (figma Content 501:29980): header + options. */
-.content {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-/* Header (figma .Header 501:29981): h54, pad (10,20,14,8), close right. */
-.header {
-  flex: none;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-  height: 54px;
-  padding: 20px 14px 8px 10px;
-  box-sizing: border-box;
-}
-
-.actions {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-left: auto;
-}
-
-/* Close button (figma .Icon_container 501:29982): 28x28, r28, 14px glyph. */
-.close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: none;
-  border-radius: 28px;
-  background: transparent;
-  cursor: pointer;
-  color: var(--dsw-alias-label-primary);
-}
-
-.close:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-
-/* Options area (figma Options 501:29983): pad (24,0,24,24), scrolls. */
-.options {
-  flex: 1;
-  min-height: 0;
-  padding: 0 24px 24px;
-  overflow-y: auto;
-}
-
-/* Visually-hidden text seat (close button accessible name from slot content). */
-.hiddenLabel {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-}
+.topbar { height: 100%; display: flex; align-items: stretch; gap: 32px; padding: 0 32px; border-bottom: 1px solid var(--dsw-alias-border-l2); background: var(--dsw-alias-bg-base); box-sizing: border-box; }
+.topbar button { font-family: inherit; cursor: pointer; }
+.wordmark { border: 0; background: transparent; padding: 0 28px 0 0; font-size: 21px !important; font-weight: 650 !important; letter-spacing: 0.28em; color: var(--dsw-alias-label-primary); }
+.destinations { display: flex; align-items: stretch; gap: 30px; }
+.destination { display: inline-flex; align-items: center; justify-content: center; gap: 10px; border: 0; border-bottom: 2px solid transparent; padding: 0 2px; background: transparent; font-size: 16px; line-height: 22px; color: var(--dsw-alias-label-primary); white-space: nowrap; }
+.destination:hover, .workspace:hover { color: var(--dsw-alias-brand-text); }
+.destination.selected { border-bottom-color: var(--dsw-alias-brand-text); color: var(--dsw-alias-brand-text); }
+.workspace { font: inherit; margin-left: auto; display: inline-flex; align-items: center; gap: 10px; min-width: 0; max-width: 220px; border: 0; padding: 0; background: transparent; color: var(--dsw-alias-label-primary); }
+.workspace span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.settingsTrigger { margin-left: auto; }
+.workspace + .settingsTrigger { margin-left: 0; }
+.page { position: absolute; inset: var(--shres-navigation-height, 64px) 0 0; display: grid; grid-template-columns: 336px minmax(0, 1fr); background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); }
+.nav { min-width: 0; padding: 48px 34px; border-right: 1px solid var(--dsw-alias-border-l2); overflow-y: auto; }
+.navHeading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 24px; }
+.navHeading h2 { margin: 0; font-size: 26px; line-height: 34px; font-weight: 450; }
+.close { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: 0; border-radius: 6px; background: transparent; color: var(--dsw-alias-label-secondary); cursor: pointer; }
+.close:hover { background: var(--dsw-alias-interactive-bg-hover); }
+.search { display: flex; align-items: center; gap: 8px; padding: 0 10px; height: 46px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 6px; color: var(--dsw-alias-label-secondary); }
+.search input { width: 100%; min-width: 0; border: 0; outline: none; background: transparent; font: inherit; font-size: 15px; color: var(--dsw-alias-label-primary); }
+.search:focus-within { outline: 2px solid var(--dsw-alias-brand-text); outline-offset: 2px; }
+.search kbd { flex: none; font-size: 10px; line-height: 18px; color: var(--dsw-alias-label-tertiary); white-space: nowrap; }
+.navList { display: flex; flex-direction: column; gap: 6px; margin-top: 22px; }
+.navCell { min-height: 52px; display: flex; align-items: center; gap: 14px; padding: 10px 14px; border: 0; border-left: 3px solid transparent; border-radius: 0 6px 6px 0; background: transparent; text-align: left; color: var(--dsw-alias-label-secondary); font: inherit; font-size: 17px; line-height: 24px; cursor: pointer; }
+.navCell svg { flex: none; }
+.navCell:hover { background: var(--dsw-alias-interactive-bg-hover); }
+.navCell.active { border-left-color: var(--dsw-alias-brand-text); background: var(--dsw-alias-interactive-bg-active); color: var(--dsw-alias-brand-text); }
+.content { min-width: 0; overflow-y: auto; }
+.contentInner { width: 100%; max-width: 1180px; margin: 0 auto; padding: 52px 40px 32px 52px; box-sizing: border-box; }
+.pageHeader { margin-bottom: 22px; }
+.eyebrow { margin-bottom: 16px; font-family: var(--ds-font-family-code); font-size: 11px; line-height: 18px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dsw-alias-label-tertiary); }
+.pageHeader h1 { margin: 0; outline: none; font-size: clamp(28px, 3.8vw, 56px); line-height: 1.18; letter-spacing: -0.035em; font-weight: 400; }
+.pageHeader p { margin: 12px 0 0; font-size: 23px; line-height: 32px; color: var(--dsw-alias-label-secondary); }
+.options { min-width: 0; }
+.actions { display: flex; justify-content: flex-end; margin-top: 36px; padding-top: 14px; border-top: 1px solid var(--dsw-alias-border-l2); }
+.noResults { font-size: 13px; line-height: 20px; color: var(--dsw-alias-label-secondary); }
+.hiddenLabel { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.topbar button:focus-visible, .navCell:focus-visible, .close:focus-visible { outline: 2px solid var(--dsw-alias-brand-text); outline-offset: 3px; }
+@media (max-width: 1250px) { .page { grid-template-columns: 230px minmax(0, 1fr); } .nav { padding: 30px 18px; } .contentInner { padding: 36px 32px; } .topbar { gap: 24px; padding: 0 24px; } .destinations { gap: 24px; } }
+@media (max-width: 700px) { .topbar { gap: 16px; padding: 0 16px; } .wordmark { padding-right: 0; font-size: 16px !important; } .destinations { gap: 14px; } .workspace { display: none; } .destination { font-size: 12px; } .page { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); } .nav { padding: 18px 20px 12px; border-right: 0; border-bottom: 1px solid var(--dsw-alias-border-l2); overflow: visible; } .navHeading { margin-bottom: 12px; } .navHeading h2 { font-size: 20px; } .search { max-width: none; } .navList { flex-direction: row; overflow-x: auto; margin-top: 10px; gap: 4px; } .navCell { flex: none; min-height: 36px; padding: 6px 10px; font-size: 12px; border-left: 0; border-bottom: 2px solid transparent; border-radius: 4px; } .navCell.active { border-bottom-color: var(--dsw-alias-brand-text); } .navCell svg { display: none; } .contentInner { padding: 24px 20px; } .pageHeader { margin-bottom: 24px; } .pageHeader p { font-size: 15px; line-height: 24px; } }
+@media (max-width: 420px) { .topbar { gap: 10px; padding: 0 10px; } .destinations { gap: 10px; } .settingsTrigger { gap: 5px; } .settingsTrigger svg { display: none; } .wordmark { font-size: 14px !important; letter-spacing: 0.15em; } }

@@ -1,6 +1,6 @@
 /**
  * Speech plugin, browser half: composer mic, assistant read-aloud, Talk mode
- * (confirm-before-send), and General Settings rows for voice, auto-submit,
+ * (confirm-before-send), and Voice & audio preference rows for voice, auto-submit,
  * and spoken language.
  * @module @shres-code/shres-code-client-ui-speech/client
  */
@@ -160,24 +160,24 @@ export function apply(ctx: ClientContext): void {
     }),
   }, SpeakButton))
 
-  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
-    name: 'settings.general.item',
+  ctx.slots.inject('settings.audio.item', () => ctx.slots.register({
+    name: 'settings.audio.item',
     id: 'speech-voice',
     order: 41,
     locale: NS,
     inject: settingsInject,
   }, VoiceRow))
 
-  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
-    name: 'settings.general.item',
+  ctx.slots.inject('settings.audio.item', () => ctx.slots.register({
+    name: 'settings.audio.item',
     id: 'auto-submit-voice',
     order: 42,
     locale: NS,
     inject: settingsInject,
   }, AutoSubmitRow))
 
-  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
-    name: 'settings.general.item',
+  ctx.slots.inject('settings.audio.item', () => ctx.slots.register({
+    name: 'settings.audio.item',
     id: 'speech-language',
     order: 43,
     locale: NS,

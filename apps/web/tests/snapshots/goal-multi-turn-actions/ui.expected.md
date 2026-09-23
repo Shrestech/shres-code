@@ -1,14 +1,7 @@
 - banner:
   - navigation "Session hierarchy":
     - button "workspace" [disabled]
-  - img
-  - text: Standard mode
-  - button "Session log":
-    - text: Session log
-    - img
-  - tablist:
-    - tab "Chat" [selected]
-    - tab "Trajectory"
+  - button "Activity"
 - group "Command input": /goal Do two turns; each turn output the file structure of a random package. After you finish a turn, output the content and stop. The system will open another turn; do a similar one.
 - 'button "goal Goal created Status: active Objective: Do two turns; each turn output the file structure of a random package. After you finish a turn, output the content and stop. The system will open another turn; do a similar one. Rounds: 0/256 Activation: armed Commands: /goal edit <objective>, /goal pause, /goal clear"':
   - img
@@ -85,6 +78,8 @@
   - img
 - button "Bad response":
   - img
+- button "Read aloud":
+  - img
 - button "Branch into a new conversation":
   - img
 - text: {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s
@@ -140,10 +135,10 @@
   - img
   - img
   - text: Tool call update_goal · goal-{{uuid}}
-- 'button "Context injection tool-goal complete: Do two turns; each turn output the file structure of a random package. After you finish a turn, output the content and stop. The system will open another turn; do a similar one."':
+- 'button "Context injection tool-goal complete: Do two turns; each turn output the file structure of a random package. After you finish a turn, output the co…"':
   - img
   - img
-  - text: "Context injection tool-goal complete: Do two turns; each turn output the file structure of a random package. After you finish a turn, output the content and stop. The system will open another turn; do a similar one."
+  - text: "Context injection tool-goal complete: Do two turns; each turn output the file structure of a random package. After you finish a turn, output the co…"
 - paragraph: two turn are both complete ✅
 - paragraph:
   - strong: Summary：
@@ -168,7 +163,7 @@
   - code: python3 random.choice
   - text: fromWorkspaces
   - code: packages/
-  - text: directoryactually enumerated under 4  candidate packages (
+  - text: directoryactually enumerated under 4 candidate packages (
   - code: ui-conversation
   - text: 、
   - code: session-reference
@@ -180,7 +175,7 @@
   - code: find
   - text: actually listedfile then organizedOutput，already excluded
   - code: node_modules
-  - text:  and
+  - text: and
   - code: .git
   - text: 。secondrandomdrew the same as turn 1 the same package，so another was drawn to avoid a repeat。
 - paragraph:
@@ -198,6 +193,8 @@
   - img
 - button "Bad response":
   - img
+- button "Read aloud":
+  - img
 - button "Branch into a new conversation":
   - img
 - tooltip "Branch into a new conversation"
@@ -206,6 +203,8 @@
 - button "Commands":
   - img
 - 'button "Access mode, current: Workspace Write"': Workspace Write
+- button "Dictate":
+  - img
 - button "Select model, current DeepSeek-V4-Flash":
   - text: DeepSeek-V4-Flash
   - img

@@ -7,6 +7,8 @@ import { LocaleRuntime } from '@shres-code/shres-code-client-locale/client'
 import { TestRemote, usePinnedBrowserLanguages } from '@shres-code/shres-code-client-test-runtime'
 import { apply, inject, refreshIfLoaded } from '@shres-code/shres-code-client-ui-settings-models/client'
 import { ModelsSection } from '../src/client/ModelsSection.tsx'
+import { TeamSection } from '../src/client/TeamSection.tsx'
+import { AudioSection } from '../src/client/AudioSection.tsx'
 import { FirstRunOnboardingDialog } from '../src/client/FirstRunOnboardingDialog.tsx'
 import { WelcomeNotice } from '../src/client/WelcomeNotice.tsx'
 
@@ -62,16 +64,28 @@ describe('ui-settings-models apply', () => {
     const before = await bench()
     declare(before.slots)
     await before.ctx.plugin({ inject: [...inject], apply }).await()
-    const entry = before.slots.entries('settings.section')[0]!
+    const sections = before.slots.entries('settings.section')
+    expect(sections).toHaveLength(3)
+    const entry = sections.find(section => section.options.id === 'models')!
     expect(entry.component).toBe(ModelsSection)
     expect(entry.options).toMatchObject({ id: 'models', order: 10 })
     // The nav label is a locale-following thunk; owners resolve at read time.
-    expect(resolveSlotLabel(entry.options.label)).toBe('Models')
+    expect(resolveSlotLabel(entry.options.label)).toBe('Models & providers')
+    expect(sections.find(section => section.options.id === 'teams')).toMatchObject({
+      component: TeamSection,
+      options: { id: 'teams', order: 11 },
+    })
+    expect(resolveSlotLabel(sections.find(section => section.options.id === 'teams')!.options.label)).toBe('Team members')
+    expect(sections.find(section => section.options.id === 'audio')).toMatchObject({
+      component: AudioSection,
+      options: { id: 'audio', order: 14 },
+    })
+    expect(resolveSlotLabel(sections.find(section => section.options.id === 'audio')!.options.label)).toBe('Voice & audio')
     const injected = (entry.inject as unknown as () => import('../src/client/ModelsSection.tsx').ModelsSectionInjected)()
-    expect(injected.t('nav')).toBe('Models')
+    expect(injected.t('nav')).toBe('Models & providers')
     expect(injected.t('deleteTitle')).toBe('Delete {provider}?')
     expect(typeof injected.controller.load).toBe('function')
-    expect(typeof injected.useSnapshot).toBe('function')
+    expect(injected.hooks.snapshot).toBeDefined()
     expect(injected.api).toBeDefined()
     const onboarding = before.slots.entries('settings.onboarding')
     expect(onboarding).toHaveLength(2)
@@ -94,10 +108,10 @@ describe('ui-settings-models apply', () => {
     expect(after.slots.entries('settings.onboarding')).toHaveLength(0)
     declare(after.slots)
     await Promise.resolve()
-    expect(after.slots.entries('settings.section')[0]!.component).toBe(ModelsSection)
+    expect(after.slots.entries('settings.section').find(section => section.options.id === 'models')!.component).toBe(ModelsSection)
     expect(after.slots.entries('settings.onboarding')).toHaveLength(2)
     // The self-inflicted ledger notifications hit the duplicate guard.
-    expect(after.slots.entries('settings.section')).toHaveLength(1)
+    expect(after.slots.entries('settings.section')).toHaveLength(3)
   })
 
   it('the label thunk follows the active locale without re-registration', async () => {
@@ -105,10 +119,11 @@ describe('ui-settings-models apply', () => {
     declare(b.slots)
     await b.ctx.plugin({ inject: [...inject], apply }).await()
     b.locale.setLocale('en')
-    expect(resolveSlotLabel(b.slots.entries('settings.section')[0]!.options.label)).toBe('Models')
-    const injected = b.slots.entries('settings.section')[0]!.inject as unknown as () => import('../src/client/ModelsSection.tsx').ModelsSectionInjected
+    const models = b.slots.entries('settings.section').find(section => section.options.id === 'models')!
+    expect(resolveSlotLabel(models.options.label)).toBe('Models & providers')
+    const injected = models.inject as unknown as () => import('../src/client/ModelsSection.tsx').ModelsSectionInjected
     expect(injected().t('deleteTitle')).toBe('Delete {provider}?')
-    expect(resolveSlotLabel(b.slots.entries('settings.section')[0]!.options.label)).toBe('Models')
+    expect(resolveSlotLabel(models.options.label)).toBe('Models & providers')
   })
 
   it('locale change while the slot is undeclared stays a no-op', async () => {
@@ -122,7 +137,7 @@ describe('ui-settings-models apply', () => {
     const b = await bench()
     const redeclare = declare(b.slots)
     await b.ctx.plugin({ inject: [...inject], apply }).await()
-    expect(b.slots.entries('settings.section')).toHaveLength(1)
+    expect(b.slots.entries('settings.section')).toHaveLength(3)
     // Declarer unload: the cascade removes our entry while our local
     // disposer variable goes stale.
     redeclare()
@@ -130,11 +145,11 @@ describe('ui-settings-models apply', () => {
     expect(b.slots.entries('settings.onboarding')).toHaveLength(0)
     declare(b.slots)
     await Promise.resolve()
-    expect(b.slots.entries('settings.section')[0]!.component).toBe(ModelsSection)
+    expect(b.slots.entries('settings.section').find(section => section.options.id === 'models')!.component).toBe(ModelsSection)
     expect(b.slots.entries('settings.onboarding')).toHaveLength(2)
     // The locale path also recovers through the same ledger re-check.
     b.locale.setLocale('en')
-    expect(resolveSlotLabel(b.slots.entries('settings.section')[0]!.options.label)).toBe('Models')
+    expect(resolveSlotLabel(b.slots.entries('settings.section').find(section => section.options.id === 'models')!.options.label)).toBe('Models & providers')
   })
 
   it('registers the English nav dictionary and disposes everything with the fiber', async () => {
@@ -142,7 +157,7 @@ describe('ui-settings-models apply', () => {
     declare(b.slots)
     const fiber = b.ctx.plugin({ inject: [...inject], apply })
     await fiber.await()
-    expect(b.locale.bind('settings.models')('nav')).toBe('Models')
+    expect(b.locale.bind('settings.models')('nav')).toBe('Models & providers')
     await fiber.dispose()
     expect(b.slots.entries('settings.section')).toHaveLength(0)
     expect(b.slots.entries('settings.onboarding')).toHaveLength(0)

@@ -1,6 +1,6 @@
 /**
  * Settings shell and ownerless-copy plugin, browser half: renders the
- * `sidebar.settings` occupant — panel chrome, section navigation, and the
+ * `shell.navigation` occupant — panel chrome, section navigation, and the
  * onboarding stage — and registers everything on the Settings pages that
  * belongs to no single feature: the trigger/header chrome content,
  * local-document action, General section, and `settings` dictionaries.
@@ -23,6 +23,7 @@ import type {
 import { SettingsRoot } from './SettingsRoot.tsx'
 import { CloseLabel, HeaderContent, TriggerContent } from './chrome.tsx'
 import { GeneralSection } from './GeneralSection.tsx'
+import type { GeneralSectionInjected } from './GeneralSection.tsx'
 import { SettingsDocumentAction } from './SettingsDocumentAction.tsx'
 import type { SettingsDocumentActionInjected } from './SettingsDocumentAction.tsx'
 import { refreshDocumentIfLoaded, SettingsDocumentStore } from './settings-document-store.ts'
@@ -81,8 +82,8 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.on('connection/reset', () => {
     refreshDocumentIfLoaded(documentController)
   }), 'ui-settings-general: metadata invalidations')
-  // The settings shell: this package occupies the sidebar-owned hole and
-  // declares the settings slots. Ledger → nav-row projection as an observable
+  // The global navigation occupant declares the settings slots.
+  // Ledger → nav-row projection as an observable
   // source (uSES contract: getSnapshot returns the cached rows until the
   // ledger version moves). Labels may be locale-following thunks, so the cache
   // key includes the locale revision and subscribers ride both sources.
@@ -139,8 +140,9 @@ export function apply(ctx: ClientContext): void {
       },
     },
   })
-  ctx.slots.inject('sidebar.settings', () => ctx.slots.register({
-    name: 'sidebar.settings',
+  ctx.slots.inject('shell.navigation', () => ctx.slots.register({
+    name: 'shell.navigation',
+    locale: NS,
     children: {
       'settings.trigger': { kind: 'single', scope: 'root' },
       'settings.header': { kind: 'single', scope: 'root' },
@@ -167,11 +169,31 @@ export function apply(ctx: ClientContext): void {
   }
   ctx.slots.inject('settings.close', () =>
     ctx.slots.register({ name: 'settings.close', locale: NS }, CloseLabel))
+  let itemsVersion = -1
+  let items: readonly string[] = []
+  const generalInjected = (): GeneralSectionInjected => ({ hooks: { items: {
+    getSnapshot: () => {
+      const version = ctx.slots.getVersion('settings.general.item')
+      if (version !== itemsVersion) {
+        itemsVersion = version
+        items = ctx.slots.entries('settings.general.item')
+          .map(entry => ({
+            /* v8 ignore next -- list-slot registration requires an id */
+            id: entry.options.id ?? '', order: entry.options.order ?? 0,
+          }))
+          .sort((left, right) => left.order - right.order)
+          .map(entry => entry.id)
+      }
+      return items
+    },
+    subscribe: listener => ctx.slots.subscribe('settings.general.item', listener),
+  } } })
   ctx.slots.inject('settings.section', () => ctx.slots.register({
     name: 'settings.section',
     id: 'general',
     order: 0,
     label: () => t('general.nav'),
+    inject: generalInjected,
     locale: NS,
     children: { 'settings.general.item': { kind: 'list', scope: 'root' } },
   }, GeneralSection))

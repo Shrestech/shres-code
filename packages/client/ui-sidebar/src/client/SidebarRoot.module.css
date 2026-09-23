@@ -22,9 +22,8 @@
   --shres-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
 }
 
-/* Rail geometry (figma rail spec): 36x36 control boxes centered in the 56px
-   rail (10px side padding), 12px vertical rhythm, 18px from the rail top to
-   the kangaroo's box (24px to the 24-wide kangaroo glyph itself). */
+/* Rail geometry: 36x36 control boxes centered in the 56px rail, with a 12px
+   vertical rhythm. */
 .root.collapsed {
   padding: 18px 10px 6px;
 }
@@ -93,7 +92,7 @@
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
-  height: 64px;
+  height: 48px;
   padding: 8px 0 8px 4px;
   margin-bottom: 8px;
   box-sizing: border-box;
@@ -139,7 +138,7 @@
   width: 28px;
   height: 28px;
   border: none;
-  border-radius: 50%;
+  border-radius: 6px;
   padding: 0;
   background: transparent;
   cursor: pointer;
@@ -155,22 +154,17 @@
   height: 36px;
 }
 
-/* Rail logo swap: collapsed, the toggle rests as the kangaroo mark (brand ink,
-   no hover circle) and hovering reveals the panel icon — the expand
-   affordance (figma sidebar-hover flow). Expanded it is a plain panel icon. */
+/* The collapsed toggle keeps the panel icon in the same control box as the
+   expanded toggle, with the larger rail size below. */
 .collapsed .toggle .panelIcon {
-  display: none;
+  display: inline;
 }
 
 .collapsed .toggle:hover .panelIcon {
   display: inline;
 }
 
-.collapsed .toggle:hover .railFish {
-  display: none;
-}
-
-/* Rail icons ride the primary ink (figma rail spec); expanded keeps the
+/* Rail icons ride the primary ink; expanded keeps the
    secondary icon-button ink. */
 .collapsed .iconButton {
   color: var(--dsw-alias-label-primary);
@@ -189,7 +183,7 @@
   margin: 0 2px 8px;
   box-sizing: border-box;
   border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 12px;
+  border-radius: 6px;
   background: var(--dsw-alias-button-elevated-fill);
   color: var(--dsw-alias-label-primary);
   font-size: 14px;
@@ -290,3 +284,5 @@
     animation: none;
   }
 }
+
+.workspaceTitle { font-size: 12px; font-weight: 500; line-height: 20px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dsw-alias-label-secondary); }

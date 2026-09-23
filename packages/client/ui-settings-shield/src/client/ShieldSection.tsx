@@ -169,7 +169,6 @@ export function ShieldSection({
 
   return (
     <div className={css.section}>
-      <h2 className={css.title}>{t('title')}</h2>
       {bothMissing ? <p className={css.notice} role="status">{t('unavailable')}</p> : (
         <>
           {settings.status === 'loading' ? <p className={css.status}>{t('loading')}</p> : null}
