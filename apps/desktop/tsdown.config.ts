@@ -10,10 +10,12 @@ export default defineConfig([
     fixedExtension: false,
     dts: false,
     clean: false,
-    // The host package is spawned by path, never imported at runtime; inlining
-    // its wire constants keeps the shell's entry free of an unresolvable
-    // subpath import and lets the app payload ship no node_modules.
-    deps: { neverBundle: ['electron'], alwaysBundle: ['@shres-code/shres-code-desktop-host/wire'] },
+    // The shell ships without node_modules; only Electron and Node builtins
+    // remain external. The host itself is spawned from the runtime tree.
+    deps: {
+      neverBundle: ['electron'],
+      alwaysBundle: ['@shres-code/shres-code-desktop-host/wire', '@shres-code/shres-code-home-paths'],
+    },
   },
   ...(['preload', 'preload-app'] as const).map(name => ({
     // Sandboxed Electron preloads run as CommonJS even though the application package is ESM.

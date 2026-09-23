@@ -1,5 +1,6 @@
 /** The installer hook copies the complete runtime before signing and rejects unsafe inputs. */
 
+import { createRequire } from 'node:module'
 import { spawnSync } from 'node:child_process'
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -8,6 +9,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { afterEach, expect, it } from 'vitest'
 
 const roots: string[] = []
+const require = createRequire(import.meta.url)
 afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
@@ -18,6 +20,8 @@ function fixture(): { runtime: string; resources: string; run: () => ReturnType<
   const script = join(root, 'scripts', 'finalize-package.mjs')
   mkdirSync(dirname(script), { recursive: true })
   copyFileSync(fileURLToPath(new URL('../scripts/finalize-package.mjs', import.meta.url)), script)
+  mkdirSync(join(root, 'node_modules'), { recursive: true })
+  symlinkSync(dirname(require.resolve('typescript/package.json')), join(root, 'node_modules', 'typescript'), process.platform === 'win32' ? 'junction' : 'dir')
   const runtime = join(root, '.desktop-build', 'targets', 'mac-arm64', 'shres')
   for (const file of [
     'desktop-runtime.json',
@@ -61,6 +65,14 @@ it('rejects a runtime missing built frontend output', () => {
   expect(String(result.stderr)).toContain('runtime is missing')
 })
 
+it('rejects an app missing the main shell entry', () => {
+  const setup = fixture()
+  rmSync(join(setup.resources, 'app', 'lib', 'main.js'))
+  const result = setup.run()
+  expect(result.status).not.toBe(0)
+  expect(String(result.stderr)).toContain('shell entry is missing')
+})
+
 it('rejects runtime links without following them into another tree', () => {
   const setup = fixture()
   symlinkSync(join(setup.runtime, 'desktop-runtime.json'), join(setup.runtime, 'linked-file'), 'file')
@@ -75,4 +87,35 @@ it('rejects an unbundled shell import', () => {
   const result = setup.run()
   expect(result.status).not.toBe(0)
   expect(String(result.stderr)).toContain('shell entry imports')
+})
+
+it('allows built-in Node and Electron shell imports', () => {
+  const setup = fixture()
+  writeFileSync(join(setup.resources, 'app', 'lib', 'main.js'), 'import "electron"; import "node:fs"; import "./local.js"; require("node:path")')
+  const result = setup.run()
+  expect(result.status, String(result.stderr)).toBe(0)
+})
+
+it('rejects the home-paths package left outside the shell bundle', () => {
+  const setup = fixture()
+  writeFileSync(join(setup.resources, 'app', 'lib', 'main.js'), 'import "@shres-code/shres-code-home-paths"')
+  const result = setup.run()
+  expect(result.status).not.toBe(0)
+  expect(String(result.stderr)).toContain('unbundled package "@shres-code/shres-code-home-paths"')
+})
+
+it('rejects a generic external shell import', () => {
+  const setup = fixture()
+  writeFileSync(join(setup.resources, 'app', 'lib', 'main.js'), 'import "external-shell-package"')
+  const result = setup.run()
+  expect(result.status).not.toBe(0)
+  expect(String(result.stderr)).toContain('unbundled package "external-shell-package"')
+})
+
+it('rejects an unbundled import from an emitted preload', () => {
+  const setup = fixture()
+  writeFileSync(join(setup.resources, 'app', 'lib', 'preload.cjs'), 'module.exports = require("missing-shell-package")')
+  const result = setup.run()
+  expect(result.status).not.toBe(0)
+  expect(String(result.stderr)).toContain('unbundled package "missing-shell-package"')
 })
