@@ -14,7 +14,7 @@ Three shield-named seats remount `tool-subagent` spawn instances from the `agent
 - **Stride** (Worker) — bounded implementation.
 - **Ward** (Reviewer) — report findings; does not rewrite unless asked.
 
-Each bound seat is a Shres child (`provider: spawn` plus `agentOptions.provider` / `agentOptions.model`). A seat mounts only when both fields are set. The Models page card writes the section and shows the role name plus a one-line description next to the seat name.
+Each bound seat is a Shres child (`provider: spawn` plus `agentOptions.provider` / `agentOptions.model`). A seat mounts only when both fields are set. The Team members page writes the section and shows the role name plus a one-line description next to the seat name.
 
 While a seat (or any subagent) is working, the catalog trigger and running rows show a tiny hopping product mark. Aegis is ochre, Stride is green, Ward is blue; an unlabeled running child uses the current text color.
 

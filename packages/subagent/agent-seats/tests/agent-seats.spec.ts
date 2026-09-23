@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@shres-code/cordis'
 import SystemPrompt from '@shres-code/shres-code-system-prompt'
 import ToolRuntime from '@shres-code/shres-code-tools'
@@ -167,18 +167,64 @@ describe('agent-seats remount', () => {
   })
 
   it('one settings namespace tolerates one live registration, so seats stay host-plane', async () => {
-    // `SettingsProvider.register` fails loud on a duplicate namespace, and the
-    // duplicate lands on Cordis's async injection fiber, not the plugin load —
-    // racy, not a clean rejection. A per-preset agent-seats row would apply
-    // once per composed scope (a concurrent session, or every in-process
-    // subagent child joining its parent's preset). This pins the constraint
-    // that keeps the plugin in the base bundle, never in an agent preset.
+    // Per-preset registration would duplicate this process-global namespace
+    // for every session or in-process child using the preset.
     const { ctx } = await boot()
     const service = ctx.get('settings')
     expect(service).toBeDefined()
     const probe = settingsNamespace('agent-seats-duplicate-probe')
     service!.register(probe, z.object({}))
     expect(() => service!.register(probe, z.object({}))).toThrow(/already registered/)
+  })
+
+  it('rejects duplicate custom members before persisting or changing the roster', async () => {
+    const { ctx } = await boot()
+    const ns = seats.AGENT_SEATS_SETTINGS_NAMESPACE
+    const member = { name: 'helper', persona: 'Review changes.', provider: 'p', model: 'm' }
+    try {
+      await ctx.settings.update(ns, { extras: [member] })
+      await expect(ctx.settings.update(ns, { extras: [member, member] })).rejects.toThrow('is duplicated')
+      expect(ctx.settings.describe().find(entry => entry.ns === ns)?.user).toEqual({ extras: [member] })
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it.each(['name', 'persona', 'provider', 'model'])('rejects a custom member without %s before saving', async (field) => {
+    const { ctx } = await boot()
+    const ns = seats.AGENT_SEATS_SETTINGS_NAMESPACE
+    const member = Object.fromEntries(Object.entries({
+      name: 'helper', persona: 'Review changes.', provider: 'p', model: 'm',
+    }).filter(([key]) => key !== field))
+    try {
+      await expect(ctx.settings.update(ns, { extras: [member] })).rejects.toThrow(field)
+      expect(ctx.settings.describe().find(entry => entry.ns === ns)?.user).toBeUndefined()
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('withdraws and restores the roster with its required settings provider', async () => {
+    const ctx = new Context()
+    try {
+      await ctx.plugin(SystemPrompt)
+      await ctx.plugin(ToolRuntime)
+      await ctx.plugin(SubagentRuntime)
+      registerSpawn(ctx)
+      ctx.plugin(seats, { seats: { aegis: { provider: 'p', model: 'm' } } })
+      expect(toolNames(ctx)).not.toContain('aegis')
+      const settings = ctx.plugin(MemorySettings)
+      await settings
+      await vi.waitFor(() => { expect(toolNames(ctx)).toContain('aegis') })
+      expect(ctx.settings.describe().map(entry => entry.ns)).toContain('agent-seats')
+      await settings.dispose()
+      await vi.waitFor(() => { expect(toolNames(ctx)).not.toContain('aegis') })
+      await ctx.plugin(MemorySettings)
+      await vi.waitFor(() => { expect(toolNames(ctx)).toContain('aegis') })
+      expect(ctx.settings.describe().map(entry => entry.ns)).toContain('agent-seats')
+    } finally {
+      await ctx.fiber.dispose()
+    }
   })
 
   it('writes Lead guidance only for bound Architect and Reviewer seats', () => {

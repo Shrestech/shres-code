@@ -43,10 +43,10 @@ const spawnStub = {
   },
 }
 
-async function loadComposition(): Promise<{ ctx: Context; settingsPath: string }> {
+async function loadComposition(settingsDocument = '# personal settings\n'): Promise<{ ctx: Context; settingsPath: string }> {
   root = await mkdtemp(join(tmpdir(), 'shres-agent-seats-composition-'))
   const settingsPath = join(root, 'settings.yaml')
-  await writeFile(settingsPath, '# personal settings\n')
+  await writeFile(settingsPath, settingsDocument)
   const configPath = join(root, 'cordis.yml')
   await writeFile(configPath, [
     '- id: tools',
@@ -96,6 +96,44 @@ async function loadComposition(): Promise<{ ctx: Context; settingsPath: string }
 }
 
 describe('agent-seats real composition', () => {
+  it.each([
+    ['an extras map', ['    cartographer:', '      provider: p', '      model: m']],
+    ['an incomplete member', ['    - name: cartographer', '      role: Researcher']],
+  ])('rejects %s during Loader boot', async (_name, extras) => {
+    await expect(loadComposition([
+      'agent-seats:',
+      '  extras:',
+      ...extras,
+      '',
+    ].join('\n'))).rejects.toThrow(
+      'agent-seats: invalid settings; correct the agent-seats section in the settings document.',
+    )
+  })
+
+  it('registers the namespace and remounts seats from a corrected extras list', async () => {
+    const { ctx } = await loadComposition([
+      'agent-seats:',
+      '  seats:',
+      '    aegis:',
+      '      provider: ollama-cloud',
+      '      model: kimi-k3',
+      '  extras:',
+      '    - name: cartographer',
+      '      persona: Maps the repository.',
+      '      provider: ollama-cloud',
+      '      model: kimi-k3',
+      '      role: Researcher',
+      '',
+    ].join('\n'))
+    const descriptor = ctx.settings.describe({ redactSecrets: true }).find(entry => entry.ns === 'agent-seats')
+    expect(descriptor).toBeDefined()
+    expect(descriptor?.value).toMatchObject({
+      seats: { aegis: { provider: 'ollama-cloud', model: 'kimi-k3' } },
+      extras: [{ name: 'cartographer', role: 'Researcher' }],
+    })
+    expect(ctx.tools.schemas().some(schema => schema.name === 'aegis')).toBe(true)
+  })
+
   it('boots unbound and remounts Aegis when settings bind the seat', async () => {
     const { ctx, settingsPath } = await loadComposition()
     expect(ctx.tools.schemas().some(schema => schema.name === 'aegis')).toBe(false)

@@ -206,7 +206,7 @@ Source: [`packages/preset/agent-presets/src/preset.ts:52`](../packages/preset/ag
 
 ## `@shres-code/shres-code-agent-seats`
 
-Requires: `tools` · `subagents` · `systemPrompt`
+Requires: `tools` · `subagents` · `systemPrompt` · `settings`
 
 ```ts config-catalog
 /** Plugin config and `agent-seats` settings schema. Seats default unbound. */
