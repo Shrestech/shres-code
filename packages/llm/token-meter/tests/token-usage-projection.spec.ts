@@ -170,20 +170,22 @@ describe('tokenUsage session projection', () => {
       inputTokens: 20,
       outputTokens: 9,
       reasoningTokens: 7,
+      cacheReadTokens: 0,
       cacheWriteTokens: 4,
     }, 1, 2)
     finalUsage(session, {
       inputTokens: 20,
       outputTokens: 9,
       reasoningTokens: 7,
+      cacheReadTokens: 0,
       cacheWriteTokens: 4,
     }, 1, 2, [second])
 
-    // The second step reported writes but not reads, so its input may hold
-    // cache hits and stays out of the uncached bucket.
+    // Each reported step lands in its own disjoint buckets; reasoning is part
+    // of output and is not added again.
     expect(projected(ctx, session)).toEqual({
-      uncachedInputTokens: 10,
-      unreportedInputTokens: 20,
+      uncachedInputTokens: 30,
+      unreportedInputTokens: 0,
       outputTokens: 15,
       cacheReadTokens: 2,
       cacheWriteTokens: 4,
@@ -249,6 +251,21 @@ describe('tokenUsage session projection', () => {
     })
   })
 
+  it('counts a write carried without a read count as unreported input', async () => {
+    const { ctx, session } = await harness()
+    startStep(session, 1, 1)
+    usageChunk(session, { inputTokens: 100, outputTokens: 5, cacheWriteTokens: 10 }, 1, 1)
+    session.append('step/end', { turn: 1, step: 1 })
+    // The read count decides: no read means the whole prompt is unreported.
+    expect(projected(ctx, session)).toEqual({
+      uncachedInputTokens: 0,
+      unreportedInputTokens: 110,
+      outputTokens: 5,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+    })
+  })
+
   it('unregisters with the token-meter fiber and restores from a JSON checkpoint', async () => {
     const { ctx, session, meterFiber } = await harness()
     startStep(session, 1, 1)
@@ -261,7 +278,7 @@ describe('tokenUsage session projection', () => {
     expect(ctx.sessionProjections.snapshot(session).values).not.toHaveProperty('tokenUsage')
 
     await ctx.plugin(TokenMeter)
-    expect(checkpoint.tokenUsage?.ver).toBe(2)
+    expect(checkpoint.tokenUsage?.ver).toBe(3)
     expect(ctx.sessionProjections.viewCheckpoint(checkpoint).tokenUsage).toEqual({
       uncachedInputTokens: 8,
       unreportedInputTokens: 0,

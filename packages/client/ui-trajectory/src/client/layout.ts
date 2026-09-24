@@ -1159,12 +1159,17 @@ function firstVisibleTurn(
   return turns.length === 0 ? 1 : Math.min(...turns)
 }
 
-/** Copy provider usage onto a Message cell when present. */
+/**
+ * Copy provider usage onto a Message cell when present. The read count decides
+ * whether the cache counts are reported, so a write carried without a read is
+ * shown as unreported input, never as a cache write.
+ */
 function attachUsage(cell: TrajectoryCellProps, usage: UsageLike | undefined): void {
   if (usage === undefined) return
-  if (usage.inputTokens !== undefined) cell.input = usage.inputTokens
+  const reported = usage.cacheReadTokens !== undefined
+  if (usage.inputTokens !== undefined) cell.input = usage.inputTokens + (reported ? 0 : usage.cacheWriteTokens ?? 0)
   if (usage.cacheReadTokens !== undefined) cell.cacheRead = usage.cacheReadTokens
-  if (usage.cacheWriteTokens !== undefined) cell.cacheWrite = usage.cacheWriteTokens
+  if (reported && usage.cacheWriteTokens !== undefined) cell.cacheWrite = usage.cacheWriteTokens
   if (usage.outputTokens !== undefined) cell.output = usage.outputTokens
   if (usage.reasoningTokens !== undefined) cell.think = usage.reasoningTokens
 }

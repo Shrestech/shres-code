@@ -872,7 +872,7 @@ function tokenUsageOf(log: readonly SessionEvent[]): FixtureTokenUsageProjection
     const write = cacheCount(sample.usage, 'write')
     const buckets: FixtureTokenUsageProjection = {
       uncachedInputTokens: read === undefined ? 0 : sample.usage.inputTokens,
-      unreportedInputTokens: read === undefined ? sample.usage.inputTokens : 0,
+      unreportedInputTokens: read === undefined ? promptTokens(sample.usage) : 0,
       outputTokens: sample.usage.outputTokens,
       cacheReadTokens: read === undefined ? 0 : read,
       cacheWriteTokens: write === undefined ? 0 : write,

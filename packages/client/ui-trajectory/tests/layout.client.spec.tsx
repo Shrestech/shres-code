@@ -91,6 +91,24 @@ describe('deriveTrajectoryLayout', () => {
     expect(tool?.timeSeconds).toBe(1.3)
   })
 
+  it('shows a write carried without a read count as unreported input on the Message cell', () => {
+    const message = (usage: Record<string, number>) => deriveTrajectoryLayout({
+      nodes: [
+        { kind: 'user', seq: 1, time: 1_000, content: [{ type: 'text', text: 'hi' }], source: null },
+        { kind: 'assistant', seq: 2, time: 2_000, turn: 1, step: 1, blocks: [{ kind: 'text', text: 'ok' }], usage },
+      ] as unknown as ConversationSnapshot['nodes'],
+      partial: null,
+      runningCalls: [],
+    })[0]?.groups.flatMap(g => g.cells).find(c => c.kind === 'message')
+
+    const unreported = message({ inputTokens: 100, outputTokens: 5, cacheWriteTokens: 10 })
+    expect(unreported).toMatchObject({ input: 110, output: 5 })
+    expect(unreported).not.toHaveProperty('cacheWrite')
+    expect(unreported).not.toHaveProperty('cacheRead')
+    expect(message({ inputTokens: 100, outputTokens: 5, cacheReadTokens: 3, cacheWriteTokens: 10 }))
+      .toMatchObject({ input: 100, cacheRead: 3, cacheWrite: 10 })
+  })
+
   it('attaches shield verdicts to a user row and one tool while leaving the other unflagged', () => {
     const nodes = [
       { kind: 'user', seq: 1, time: 1_000, content: [{ type: 'text', text: 'hello' }], source: null },

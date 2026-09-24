@@ -72,8 +72,11 @@ describe('LLM stream invariants', () => {
       { type: 'usage', usage: { inputTokens: 1, outputTokens: 1, cacheReadTokens: -1 } },
     ], /cacheReadTokens must be a non-negative safe integer when reported, got -1/],
     [[
-      { type: 'usage', usage: { inputTokens: 1, outputTokens: 1, cacheWriteTokens: 1.5 } },
+      { type: 'usage', usage: { inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 1.5 } },
     ], /cacheWriteTokens must be a non-negative safe integer when reported, got 1.5/],
+    [[
+      { type: 'usage', usage: { inputTokens: 1, outputTokens: 1, cacheWriteTokens: 3 } },
+    ], /reports cacheWriteTokens without cacheReadTokens/],
     [[], /ended without a terminal finish/],
   ] as Array<[StreamChunk[], RegExp]>)('rejects malformed stream %#', async (chunks, message) => {
     const ctx = await setup()
@@ -87,8 +90,11 @@ describe('LLM stream invariants', () => {
       finish,
     ]
     const unreported: StreamChunk[] = [{ type: 'usage', usage: { inputTokens: 1, outputTokens: 1 } }, finish]
+    const readOnly: StreamChunk[] = [{ type: 'usage', usage: { inputTokens: 1, outputTokens: 1, cacheReadTokens: 4 } }, finish]
     await expect(consume(ctx, reported)).resolves.toEqual(reported)
     await expect(consume(ctx, unreported)).resolves.toEqual(unreported)
+    // A provider with no write concept reports reads alone.
+    await expect(consume(ctx, readOnly)).resolves.toEqual(readOnly)
   })
 
   it('preserves provider exceptions without inventing a missing-finish failure', async () => {
