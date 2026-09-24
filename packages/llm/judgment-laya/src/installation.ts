@@ -204,9 +204,15 @@ export async function installLaya(
   }
   await mkdir(config.runtimeDir, { recursive: true, mode: 0o700 })
   await mkdir(config.hfHome, { recursive: true, mode: 0o700 })
-  // uv's package cache stays inside the runtime directory, so removing that
-  // directory removes everything an install added.
-  const uvEnv = { UV_CACHE_DIR: config.uvCacheDir }
+  // uv's package cache and interpreter stay inside the runtime directory, so
+  // removing that directory removes everything an install added. Only a
+  // uv-managed CPython is used, so no system or globally installed Python,
+  // and no `uv python uninstall` elsewhere, can change or break the install.
+  const uvEnv = {
+    UV_CACHE_DIR: config.uvCacheDir,
+    UV_PYTHON_INSTALL_DIR: config.pythonInstallDir,
+    UV_PYTHON_PREFERENCE: 'only-managed',
+  }
   await dependencies.run('uv venv', [uv, 'venv', '--python', config.python, '--allow-existing', config.venvDir], uvEnv, signal)
   await dependencies.run('uv sync', [uv, 'sync', '--frozen', '--project', config.gatewayProject], {
     ...uvEnv,

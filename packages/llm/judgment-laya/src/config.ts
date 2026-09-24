@@ -107,6 +107,8 @@ export interface ResolvedLayaJudgmentConfig {
   readonly venvDir: string
   /** uv package cache used by every install-time uv command: `<runtimeDir>/uv-cache`. */
   readonly uvCacheDir: string
+  /** uv-managed CPython installs the virtual environment uses: `<runtimeDir>/python`. */
+  readonly pythonInstallDir: string
   /** Virtual environment interpreter. */
   readonly pythonPath: string
   /** Install marker: `<runtimeDir>/install.json`. */
@@ -183,6 +185,7 @@ export function resolveConfig(
     restart,
     venvDir,
     uvCacheDir: join(runtimeDir, 'uv-cache'),
+    pythonInstallDir: join(runtimeDir, 'python'),
     pythonPath: join(venvDir, 'bin', 'python'),
     markerPath: join(runtimeDir, 'install.json'),
     modelDir: join(hfHome, 'checkpoints', `${model.repo.replace('/', '__')}@${model.revision}`),

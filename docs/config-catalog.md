@@ -1252,7 +1252,7 @@ export interface LayaJudgmentConfig {
   checkpointContext: 512 | 1024
   /** Inference precision passed to laya-mlx. */
   dtype?: 'float16' | 'float32'
-  /** Absolute directory holding the virtual environment, uv package cache, and install marker. */
+  /** Absolute directory holding the virtual environment, its uv-managed Python, the uv package cache, and the install marker. */
   runtimeDir?: string
   /** Absolute Hugging Face home holding downloaded checkpoints. */
   hfHome?: string
@@ -1260,7 +1260,7 @@ export interface LayaJudgmentConfig {
   gatewayProject?: string
   /** `uv` executable: an absolute path or a name on PATH. */
   uvPath?: string
-  /** Python version `uv venv` creates, `major.minor`. */
+  /** Version of the uv-managed CPython the virtual environment uses, `major.minor`. */
   python?: string
   /** Questions per gateway inference batch. */
   batchSize?: number
