@@ -55,7 +55,7 @@ tool: web_fetch
 status: ok
 arguments: {"url":"https://example.test/notes"}
 result:
-Notes for the release: the policy lives in docs/policy.md.
+Notes for the release: the policy lives in the team runbook.
 ```
 
 The state is capped twice — the excerpt at `state.maxArgChars`, the whole text at `state.maxChars` — and hashed with the same 32-bit FNV-1a the model-router records its own state hashes with, so identical text hashes identically across the two packages. The hash is recorded so a rerun of the same input is recognizable; it never gates anything.

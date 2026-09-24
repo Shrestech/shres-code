@@ -3,7 +3,7 @@ tool: web_fetch
 status: ok
 arguments: {"url":"https://example.test/notes"}
 result:
-Notes for the release: the policy lives in docs/policy.md.
+Notes for the release: the policy lives in the team runbook.
 
 Tier: fast
 Questions:
