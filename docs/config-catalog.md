@@ -1418,7 +1418,7 @@ export interface ClaudeSessionModelConfig {
 
 Depends on: [`PiAiModality`](../packages/llm/llm-pi-ai/src/index.ts)
 
-Source: [`packages/llm/llm-claude-session/src/config.ts:106`](../packages/llm/llm-claude-session/src/config.ts)
+Source: [`packages/llm/llm-claude-session/src/config.ts:117`](../packages/llm/llm-claude-session/src/config.ts)
 
 <a id="shres-codeshres-code-llm-cli-bridge"></a>
 

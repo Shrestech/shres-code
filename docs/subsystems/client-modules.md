@@ -110,6 +110,15 @@ onRebuilt(listener: (id: string, rev: string) => void): () => void
  * @returns the unsubscriber.
  */
 onGraphChanged(listener: () => void): () => void
+
+/**
+ * Answer one `/plugins/<id>/client.js[.map]` request without a web server:
+ * a carrier that owns dispatch (the desktop host's pipes) forwards the
+ * request here instead of a mounted route.
+ * @param request - the forwarded bundle request.
+ * @returns 405 for non-GET/HEAD, 404 for unknown ids, else the bundle bytes.
+ */
+async fetchBundle(request: Request): Promise<Response>
 ```
 
 Source: [`packages/client/modules/src/index.ts:184`](../../packages/client/modules/src/index.ts)

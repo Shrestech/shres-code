@@ -30,6 +30,9 @@ flowchart LR
   pkg_cursor_credential["cursor-credential"]
   svc_cursorCredential["ctx.cursorCredential<br/>Cursor subscription credential engine"]
   pkg_llm_cursor_session["llm-cursor-session"]
+  pkg_claude_credential["claude-credential"]
+  svc_claudeCredential["ctx.claudeCredential<br/>Claude subscription credential engine"]
+  pkg_llm_claude_session["llm-claude-session"]
   pkg_compaction_tool_result_pruner["compaction-tool-result-pruner"]
   svc_toolResultPruner["ctx.toolResultPruner<br/>Model-free tool-result pruning"]
   pkg_session["session"]
@@ -260,6 +263,7 @@ flowchart LR
   pkg_attachment_local --> svc_attachments
   pkg_bash_local --> svc_shell
   pkg_bash_sandbox --> svc_shell
+  pkg_claude_credential --> svc_claudeCredential
   pkg_code_runtime --> svc_codeRuntime
   pkg_code_runtime_worker --> svc_codeRuntime
   pkg_codex_credential --> svc_codexCredential
@@ -391,6 +395,7 @@ flowchart LR
   svc_approval --> pkg_tools
   svc_attachments --> pkg_host_runtime
   svc_attachments --> pkg_llm_pi_ai
+  svc_claudeCredential --> pkg_llm_claude_session
   svc_clientModules --> pkg_hmr
   svc_codeRuntime --> pkg_tools
   svc_codexCredential --> pkg_llm_codex_session
@@ -527,6 +532,7 @@ flowchart LR
 | `ctx.grokCredential` | `core` | [`grok-credential`](../packages/llm/grok-credential) | - | [`llm-grok-session`](../packages/llm/llm-grok-session) | - | Owns one single-flight Grok session-credential manager per credential spec; the llm-grok-session adapter resolves its bearer token through this service. |
 | `ctx.codexCredential` | `core` | [`codex-credential`](../packages/llm/codex-credential) | - | [`llm-codex-session`](../packages/llm/llm-codex-session) | - | Owns one single-flight Codex session-credential manager per credential spec; the llm-codex-session adapter resolves its bearer token and account header through this service. |
 | `ctx.cursorCredential` | `core` | [`cursor-credential`](../packages/llm/cursor-credential) | - | [`llm-cursor-session`](../packages/llm/llm-cursor-session) | - | Owns one single-flight Cursor session-credential manager per credential spec; a cursor-session adapter resolves its bearer token through this service, and the CLI owns refresh because the issuer is not publicly resolvable. |
+| `ctx.claudeCredential` | `core` | [`claude-credential`](../packages/llm/claude-credential) | - | [`llm-claude-session`](../packages/llm/llm-claude-session) | - | Owns one single-flight Claude session-credential manager per credential spec; the llm-claude-session adapter resolves its bearer token through this service. |
 | `ctx.toolResultPruner` | `core` | [`compaction-tool-result-pruner`](../packages/compaction/compaction-tool-result-pruner) | - | [`compaction-basic`](../packages/compaction/compaction-basic) | - | Rewrites oversized current tool results through replayable single-node surface replacements before summary compaction. |
 | `ctx.sessions` | `core` | [`session`](../packages/core/session) | - | [`agent-loop`](../packages/core/agent-loop), [`agent`](../packages/core/agent), [`session-persistence`](../packages/session/session-persistence), [`session-query`](../packages/session-query/session-query), [`session-query-sqlite`](../packages/session-query/session-query-sqlite), `subagent-inprocess`, [`invariants`](../packages/runtime-diagnostics/invariants), [`message-feedback`](../packages/feedback/message-feedback) | - | Owns append-only Session instances and emits the durable session event feed. |
 | `ctx.invariants` | `core` | [`invariants`](../packages/runtime-diagnostics/invariants) | - | [`session`](../packages/core/session), [`agent`](../packages/core/agent), [`scope`](../packages/core/scope), [`agent-loop`](../packages/core/agent-loop) | - | Companion subpaths register owner-local checks; the service owns selection, uniqueness, child fibers, and package-attributed failures. |
