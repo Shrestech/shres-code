@@ -173,8 +173,15 @@ function validateStickyView(sticky: ModelRoutingStickyView): void {
   }
 }
 
-/** Compare two held selections as route identities, including effort. */
-function sameSelection(
+/**
+ * Compare two selections as route identities, including effort. The fold and
+ * the consult share this comparison, so a decision that continues a streak and
+ * the fold's transition test agree on what counts as a candidate change.
+ * @param left - one selection, or `undefined` when no route is held.
+ * @param right - the other selection, or `undefined`.
+ * @returns true when both are absent or name the same candidate, route, and effort.
+ */
+export function sameSelection(
   left: ModelRoutingSelection | undefined,
   right: ModelRoutingSelection | undefined,
 ): boolean {

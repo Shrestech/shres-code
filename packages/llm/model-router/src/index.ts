@@ -65,6 +65,7 @@ import {
   createStickyFoldState,
   foldModelRouting,
   readStickyFoldState,
+  sameSelection,
   stickyState,
 } from './folds.ts'
 import { buildRoutingStateCandidates } from './state.ts'
@@ -961,8 +962,13 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       }
     }
     const verdict = gate(eligibleConfig, routeAnswer)
-    if (held !== undefined && sticky.turnsElapsed < config.minTurnsDowngraded
-      && (!verdict.ok || verdict.candidate.id !== held.candidateId)) {
+    const picked = verdict.ok
+      ? { ok: true as const, selection: candidateSelection(verdict.candidate, config, difficulty, held) }
+      : verdict
+    // A different candidate or a different effort is a candidate change: below
+    // the horizon the held selection stands.
+    const continuing = held !== undefined && picked.ok && sameSelection(held, picked.selection)
+    if (held !== undefined && sticky.turnsElapsed < config.minTurnsDowngraded && !continuing) {
       return {
         outcome: 'downgraded',
         reason: 'sticky-hold',
@@ -980,15 +986,13 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
         },
       }
     }
-    if (verdict.ok) {
-      const selection = candidateSelection(verdict.candidate, config, difficulty)
-      const continuing = held !== undefined && held.candidateId === selection.candidateId
+    if (picked.ok) {
       return {
         outcome: 'downgraded',
         reason: 'gate-passed',
         stateHash: observed.hash,
         stateSeqs: observed.seqs,
-        selection,
+        selection: picked.selection,
         ...answered,
         sticky: {
           active: true,
@@ -1011,7 +1015,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     }
     return {
       outcome: 'kept-strong',
-      reason: verdict.reason,
+      reason: picked.reason,
       stateHash: observed.hash,
       stateSeqs: observed.seqs,
       ...answered,
@@ -1103,12 +1107,34 @@ function gate(
   if (candidate === undefined) return { ok: false, reason: 'unknown-candidate' }
   return { ok: true, candidate }
 }
+
+/**
+ * The route one passing answer selects, with its effort frozen for a streak.
+ *
+ * The difficulty lift is an entry-time choice. Re-affirming the held candidate
+ * returns the held selection while its effort is still one the candidate can
+ * enter at under the current configuration — its own configured effort or the
+ * lift — so per-step difficulty answers never move effort inside a streak. A
+ * configuration change that makes the held effort unreachable yields a fresh
+ * entry selection, which the caller treats as a candidate change.
+ * @param candidate - the eligible candidate the gate selected.
+ * @param config - resolved configuration carrying the optional lift.
+ * @param difficulty - this step's difficulty answer, used only at entry.
+ * @param held - the selection the active streak holds, if any.
+ * @returns the selection to record and run.
+ */
 function candidateSelection(
   candidate: ModelRoutingCandidate,
   config: ResolvedModelRouterConfig,
   difficulty: { score: number; confidence: number } | undefined,
+  held: ModelRoutingSelection | undefined,
 ): ModelRoutingSelection {
   const lift = config.difficultyToEffort
+  if (held !== undefined && held.candidateId === candidate.id) {
+    const heldEffort = held.reasoningEffort === undefined ? undefined : String(held.reasoningEffort)
+    const configured = candidate.reasoningEffort === undefined ? undefined : String(candidate.reasoningEffort)
+    if (heldEffort === configured || (lift !== undefined && heldEffort === lift.reasoningEffort)) return held
+  }
   const lifted = lift !== undefined && difficulty !== undefined && difficulty.score >= lift.scoreThreshold
     ? lift.reasoningEffort
     : undefined

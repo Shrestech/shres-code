@@ -42,9 +42,9 @@ export interface ModelRoutingHardHintConfig {
 
 /** The optional difficulty-to-effort lift. */
 export interface ModelRoutingDifficultyToEffortConfig {
-  /** Difficulty score at or above which the selected route runs at {@link reasoningEffort}. */
+  /** Difficulty score, on the step that enters a streak, at or above which the entered route runs at {@link reasoningEffort}. */
   scoreThreshold: number
-  /** Effort the selected downgraded route runs at above the threshold. */
+  /** Effort a route entering a streak runs at above the threshold; the streak keeps it. */
   reasoningEffort: string
 }
 
@@ -88,9 +88,10 @@ export interface ModelRouterConfig {
   /** What a failed judgment call does to the turn. Defaults to `fallback`. */
   onUnavailable?: ModelRoutingUnavailablePolicy
   /**
-   * Optional effort lift for a selected route on a hard turn. Omitted — or
-   * written as a valueless key, which the schema resolves to null — means not
-   * configured; the group is never implied by a default.
+   * Optional effort lift for a route entering a streak on a hard step; the
+   * streak keeps its entry effort. Omitted — or written as a valueless key,
+   * which the schema resolves to null — means not configured; the group is
+   * never implied by a default.
    */
   difficultyToEffort?: ModelRoutingDifficultyToEffortConfig
   /**

@@ -1077,6 +1077,80 @@ describe('the sticky streak', () => {
     expect(stickyState(b.session.events)).toMatchObject({ active: false, brokenBy: 'current-preferred' })
   })
 
+  it('difficultyToEffort applies at entry and is frozen for the streak', async () => {
+    const liftConfig = (): ModelRouterConfig => ({
+      ...config,
+      escalateBack: { scoreThreshold: 3 },
+      difficultyToEffort: { scoreThreshold: 2, reasoningEffort: 'high' },
+    })
+
+    // Entered on a hard step: a later easy step keeps the lifted effort.
+    const lifted = await bench({ config: liftConfig() })
+    openTurn(lifted.session, 1)
+    user(lifted.session, 'a small change')
+    lifted.engine.score = { ...EASY, score: 2 }
+    expect(await lifted.resolve(1)).toEqual({ ...CHEAP, reasoningEffort: 'high' })
+    closeTurn(lifted.session, 1)
+    openTurn(lifted.session, 2)
+    lifted.engine.score = { ...EASY, score: 1 }
+    expect(await lifted.resolve(2)).toEqual({ ...CHEAP, reasoningEffort: 'high' })
+    expect(lifted.decision(1)).toMatchObject({
+      reason: 'gate-passed',
+      selection: { candidateId: 'cheap', reasoningEffort: 'high' },
+      sticky: { active: true, turnsElapsed: 1, enteredTurn: 1 },
+    })
+
+    // Entered on an easy step: a later hard step does not lift the streak.
+    const plain = await bench({ config: liftConfig() })
+    openTurn(plain.session, 1)
+    user(plain.session, 'a small change')
+    expect(await plain.resolve(1)).toEqual(CHEAP)
+    closeTurn(plain.session, 1)
+    openTurn(plain.session, 2)
+    plain.engine.score = { ...EASY, score: 2.5 }
+    expect(await plain.resolve(2)).toEqual(CHEAP)
+    expect(plain.decision(1)).toMatchObject({ reason: 'gate-passed', sticky: { turnsElapsed: 1, enteredTurn: 1 } })
+    expect(plain.decision(1).selection).not.toHaveProperty('reasoningEffort')
+  })
+
+  it('an effort change mid-streak is treated as a candidate change', async () => {
+    // With and without a lift: the held effort is reachable under neither.
+    for (const difficultyToEffort of [undefined, { scoreThreshold: 2, reasoningEffort: 'high' }]) {
+      const b = await bench({
+        settings: true,
+        config: {
+          ...config,
+          escalateBack: { scoreThreshold: 3 },
+          candidates: [{ id: 'cheap', provider: CHEAP.provider, model: CHEAP.model, reasoningEffort: 'low' }],
+          ...difficultyToEffort === undefined ? {} : { difficultyToEffort },
+        },
+      })
+      openTurn(b.session, 1)
+      user(b.session, 'a small change')
+      expect(await b.resolve(1)).toEqual({ ...CHEAP, reasoningEffort: 'low' })
+      closeTurn(b.session, 1)
+      openTurn(b.session, 2)
+      await b.ctx.settings.update(MODEL_ROUTER_SETTINGS_NAMESPACE, {
+        candidates: [{ id: 'cheap', provider: CHEAP.provider, model: CHEAP.model, reasoningEffort: 'medium' }],
+      })
+
+      // Below the horizon the held effort stands, as for any candidate change.
+      expect(await b.resolve(2)).toEqual({ ...CHEAP, reasoningEffort: 'low' })
+      expect(b.decision(1)).toMatchObject({ reason: 'sticky-hold', sticky: { turnsElapsed: 1, enteredTurn: 1 } })
+
+      // After the horizon the new effort enters as a new streak.
+      closeTurn(b.session, 2)
+      openTurn(b.session, 3)
+      expect(await b.resolve(3)).toEqual({ ...CHEAP, reasoningEffort: 'medium' })
+      expect(b.decision(2)).toMatchObject({
+        reason: 'gate-passed',
+        selection: { candidateId: 'cheap', reasoningEffort: 'medium' },
+        sticky: { active: true, turnsElapsed: 0, enteredTurn: 3 },
+      })
+      expect(stickyState(b.session.events)).toMatchObject({ enteredTurn: 3, candidate: { reasoningEffort: 'medium' } })
+    }
+  })
+
   it('holds the entered candidate through the horizon and starts a new streak afterward', async () => {
     const b = await bench({
       config: {
