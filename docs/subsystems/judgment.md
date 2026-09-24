@@ -319,7 +319,7 @@ interface JudgmentEngine {
 
 A deployment mounts [judgment-dispatch](../../packages/llm/judgment-dispatch) as `ctx.judgment`. The dispatcher provides `ctx.judgmentEngines`, a registry where each engine provider registers one engine under a stable id — `typesafe`, `shield`, `laya`, and `llm:<provider>/<model>` for [judgment-llm](../../packages/llm/judgment-llm) — through `registerJudgmentEngine`, which ties the registration to the provider's fiber. The registry selects nothing; its subscribers are notified after every registration, removal, and announced status change, and a failing subscriber is logged without reaching the caller.
 
-Every ask goes to exactly one engine: the `judgment.overrides` entry for the ask's `consumer` when that consumer has declared its id, else `judgment.engine`, whose composition default is the dispatcher's required `defaultEngine`. The dispatcher never answers with a different engine. A selection no provider registered fails `UNCONFIGURED`, and a registered engine whose status is not `ready` fails `UNAVAILABLE` with the status detail, so each consumer takes its own engine-unavailable path instead of reading an answer made under another engine's calibration. `fitting` is present while the deployment-wide selection supports it, and a fitted ask whose consumer override selects an engine without fitting fails `UNAVAILABLE`.
+Every ask goes to exactly one engine: the `judgment.overrides` entry for the ask's `consumer` when that consumer has declared its id, else `judgment.engine`, whose composition default is the dispatcher's required `defaultEngine`. The dispatcher never answers with a different engine. A selection no provider registered fails `UNCONFIGURED`, and a registered engine whose status is not `ready` fails `UNAVAILABLE` with the status detail, so each consumer takes its own engine-unavailable path instead of reading an answer made under another engine's calibration. `fitting` is present while the deployment-wide selection supports it, and a fitted ask whose consumer override selects an engine without fitting fails `UNAVAILABLE`. A consumer reads the engine it would be routed to with `ctx.judgment.selectedEngine(consumer)` and its fitting capability with `ctx.judgment.fittingFor(consumer)`; a single-engine implementation selects nothing and answers every consumer with its own `fitting`.
 
 A consumer declares the id its asks carry with `declareJudgmentConsumer(ctx, id)`, which registers the id in `ctx.judgmentEngines` for the consumer's lifetime; `worker-escalation`, `compaction-jev`, and `judgment-guardrails` declare themselves, and the model router declares `model-router` once its asks carry that id. An override is valid only for a declared consumer, so an override that would silently leave a consumer's asks on the default engine is refused instead.
 
@@ -476,7 +476,7 @@ interface JudgmentSettings {
 
 ## Failure classes
 
-An engine reports every failure as one `JudgmentError` whose `code` a consumer branches on: `UNCONFIGURED` for a credential that is missing or unresolvable, raised before any request, and for a selected engine no provider registered; `UNAVAILABLE` for an engine that could not be reached, timed out, refused the request, or is not `ready`; `INPUT_TOO_LARGE` for serialized input over the engine's request limit; `INVALID_ANSWER` for a response that does not match the question kind or is malformed; and `ABORTED` for an ask the caller cancelled. No threshold, margin, or fallback lives in the seam.
+An engine reports every failure as one `JudgmentError` whose `code` a consumer branches on: `UNCONFIGURED` for a credential that is missing or unresolvable, raised before any request, and for a selected engine no provider registered; `UNAVAILABLE` for an engine that could not be reached, timed out, refused the request, or is not `ready`; `INPUT_TOO_LARGE` for serialized input over the engine's request limit; `INVALID_ANSWER` for a response that does not match the question kind or is malformed; and `ABORTED` for an ask the caller cancelled. A dispatched failure also carries `engineId`, the registry id of the engine the ask was routed to. No threshold, margin, or fallback lives in the seam.
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -496,6 +496,26 @@ The service installs the Definition-owned JUDGMENT_SETTINGS_NAMESPACE section, b
 
 ```ts cordis-catalog
 /**
+ * The fitting capability that answers one consumer's fitted asks. A
+ * dispatcher answers with the engine it selects for `consumer`, so a consumer
+ * that names itself reads its fitting here rather than from {@link fitting},
+ * which follows the deployment-wide selection. A single-engine
+ * implementation answers every consumer with {@link fitting}.
+ * @param _consumer - the asking consumer; omission reads the deployment-wide selection.
+ * @returns the fitting capability, or `undefined` when the engine answering this consumer has none.
+ */
+fittingFor(_consumer?: JudgmentConsumerId): JudgmentFittingEngine | undefined
+
+/**
+ * The registry id of the engine that answers one consumer's asks, read
+ * before an ask so a consumer can attribute its own state to an engine. A
+ * single-engine implementation selects nothing and returns `undefined`.
+ * @param _consumer - the asking consumer; omission reads the deployment-wide selection.
+ * @returns the selected registry id, or `undefined` when this service does not select engines.
+ */
+selectedEngine(_consumer?: JudgmentConsumerId): JudgmentEngineId | undefined
+
+/**
  * Answer one set of typed questions about one state. Answers come back in
  * the order the questions were asked, each carrying its question's id. An
  * implementation must honour `input.signal` at every await, settling
@@ -512,7 +532,7 @@ The service installs the Definition-owned JUDGMENT_SETTINGS_NAMESPACE section, b
 abstract ask(input: JudgmentInput): Promise<JudgmentResult>
 ```
 
-Source: [`packages/llm/judgment/src/index.ts:250`](../../packages/llm/judgment/src/index.ts)
+Source: [`packages/llm/judgment/src/index.ts:265`](../../packages/llm/judgment/src/index.ts)
 
 <a id="ctxjudgmentengines--judgmentengineregistry"></a>
 
