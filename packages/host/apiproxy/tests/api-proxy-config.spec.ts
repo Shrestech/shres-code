@@ -365,6 +365,14 @@ describe('settings domain', () => {
     ctx.settings.register(settingsNamespace('agent-loop'), z.object({
       maxParallelToolCalls: z.number().default(10),
     }))
+    for (const name of ['web-search-brave', 'web-search-perplexity']) {
+      ctx.settings.register(settingsNamespace(name), z.object({
+        enabled: z.boolean().default(true),
+        baseURL: z.string(),
+        apiKeyEnv: z.string().role('credential-ref'),
+        apiKey: z.string().role('secret'),
+      }), { base: { apiKey: 'private-test-key' } })
+    }
     ctx.settings.register(settingsNamespace('web-search-deepseek'), z.object({
       baseURL: z.string(),
     }))
@@ -376,7 +384,7 @@ describe('settings domain', () => {
     const value = expectOk(await api.settings.describe(request({})))
     expect(value.namespaces.map(view => view.ns)).toEqual([
       'llm-deepseek', 'permission', 'ui-theme', 'locale', 'ui-conversation', 'judgment',
-      'shell', 'agent-loop', 'web-search-deepseek', 'web-search-attached-cli',
+      'shell', 'agent-loop', 'web-search-brave', 'web-search-perplexity', 'web-search-deepseek', 'web-search-attached-cli',
     ])
     const judgment = expectOk(await api.settings.mutate(request({
       ns: 'judgment',
@@ -418,6 +426,17 @@ describe('settings domain', () => {
       ops: [{ op: 'set', path: ['baseURL'], value: 'https://search.test/v1' }],
     })))
     expect(webSearch.value).toEqual({ baseURL: 'https://search.test/v1' })
+    for (const ns of ['web-search-brave', 'web-search-perplexity']) {
+      expect(value.namespaces.find(view => view.ns === ns)?.value).toEqual({ enabled: true })
+      const updated = expectOk(await api.settings.mutate(request({
+        ns, ops: [
+          { op: 'set', path: ['enabled'], value: false },
+          { op: 'set', path: ['baseURL'], value: 'https://search.test' },
+        ],
+      })))
+      expect(updated.value).toEqual({ enabled: false, baseURL: 'https://search.test' })
+      expect(JSON.stringify(updated)).not.toContain('private-test-key')
+    }
     const attachedCli = expectOk(await api.settings.mutate(request({
       ns: 'web-search-attached-cli',
       ops: [{ op: 'set', path: ['ollama'], value: true }],

@@ -20,10 +20,23 @@ export interface TeamMemberSnapshot {
   readonly id: SessionId
   readonly name: string
   readonly description: string
+  /** Subagent spawn provider that created the child, such as `spawn`; not the LLM provider. */
   readonly provider: string
   readonly context: 'fresh' | 'fork'
   readonly phase: TeamMemberPhase
   readonly error?: string
+  /**
+   * LLM provider route the child was created with, as recorded in its
+   * subagent descriptor. Written only on the `active` edge; absent on older
+   * logs and when no route resolved.
+   */
+  readonly agentProvider?: string
+  /**
+   * LLM model the child was created with and cold-resumes on, as recorded in
+   * its subagent descriptor. Written only on the `active` edge; absent on
+   * older logs and when no route resolved.
+   */
+  readonly agentModel?: string
 }
 
 /** Durable task lifecycle. */
@@ -171,15 +184,31 @@ export type TeamMemberStatus =
   | 'provisioning'
   | 'failed'
 
-/** Current runtime-enriched roster row. */
+/**
+ * Current runtime-enriched roster row.
+ *
+ * `agentProvider` / `model` are the row's own LLM route. The loaded Lead
+ * reports its latest logged request header, else the live default-model
+ * selection, else its creation options. A loaded teammate reports its latest
+ * logged request header, else its creation options, which are the descriptor
+ * route it was created or resumed with. An unloaded started teammate reports
+ * its {@link TeamMemberSnapshot} route. An `unstarted` row reports the current
+ * template binding. A row whose route is unknown omits both fields and never
+ * reports the Lead's route instead. A `/model` switch appears after the
+ * switched Agent's next request.
+ */
 export interface TeamMemberView {
   readonly id: SessionId
   readonly name: string
   readonly role: 'lead' | 'teammate'
   readonly status: TeamMemberStatus
   readonly description?: string
+  /** Subagent spawn provider that starts or started the teammate, such as `spawn`; not the LLM provider. Absent on the Lead row. */
   readonly provider?: string
   readonly context?: 'fresh' | 'fork'
+  /** LLM provider route. */
+  readonly agentProvider?: string
+  /** LLM model. */
   readonly model?: string
   readonly diagnostics: string[]
 }
@@ -237,12 +266,18 @@ export interface SendTeamMessageResult {
   readonly status: 'accepted' | 'queued'
 }
 
-/** Human-configured teammate that can be lazily provisioned. */
+/**
+ * Human-configured teammate that can be lazily provisioned. The template is
+ * read when an `unstarted` name starts; a started teammate keeps the route it
+ * was created with.
+ */
 export interface TeamRosterTemplateEntry {
   readonly name: string
   readonly description: string
   readonly persona?: string
+  /** LLM provider route; applied together with {@link model}. */
   readonly provider: string
+  /** LLM model; without it the teammate inherits the Lead's route when it starts. */
   readonly model?: string
   readonly context?: 'fresh' | 'fork'
 }

@@ -43,6 +43,17 @@ function navigable(member: AgentTeamsMemberRow): boolean {
 }
 
 /**
+ * Format one row's LLM binding as `provider · model`, or the model alone
+ * when the provider route is unknown.
+ * @param agentProvider - the row's LLM provider route, when known.
+ * @param model - the row's LLM model.
+ * @returns the display text.
+ */
+function modelBinding(agentProvider: string | undefined, model: string): string {
+  return agentProvider === undefined ? model : `${agentProvider} · ${model}`
+}
+
+/**
  * Render the Team trigger for live Team Leads, and a retry control when the
  * first roster read fails. Opening the panel reloads `agentTeams.view`.
  * @param props - session runtime props, injected face, and localized copy.
@@ -134,7 +145,9 @@ export function TeamAction({ sessionId, load, openTeammate, t }: TeamActionProps
                       <li key={member.role === 'lead' ? 'lead' : member.id} className={css.row}>
                         <span className={css.name}>{member.name}</span>
                         <span className={css.status}>{member.status}</span>
-                        {member.model === undefined ? null : <span className={css.model}>{member.model}</span>}
+                        {member.model === undefined
+                          ? null
+                          : <span className={css.model}>{modelBinding(member.agentProvider, member.model)}</span>}
                         {navigable(member)
                           ? (
                             <button

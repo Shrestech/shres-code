@@ -376,8 +376,13 @@ describe('Agent Teams runtime mailbox', () => {
     })
     expect(firstUser?.data.content).toEqual(content('Design the approach.'))
     const assembly = await ctx.systemPrompt.assemble(assembleContextFor(child))
-    expect(assembly.sections.find(section => section.name === TEAM_POLICY_SECTION)?.text)
-      .toBe(teammatePolicy('aegis'))
+    const policy = assembly.sections.find(section => section.name === TEAM_POLICY_SECTION)?.text
+    expect(policy).toBe(teammatePolicy('aegis'))
+    // Literal pin: the provisioned teammate's assembled prompt carries the
+    // no-resend guidance verbatim, not merely whatever the helper returns.
+    expect(policy).toContain(
+      'Do not resend content you already delivered to the same recipient through another tool.',
+    )
     expect(assembly.sections.find(section => section.name === ENVIRONMENT_SECTION)?.text)
       .toBe('Your working directory is {{cwd}}.')
     expect(renderPrompt(assembly)).toContain(`Your working directory is ${workspace}`)

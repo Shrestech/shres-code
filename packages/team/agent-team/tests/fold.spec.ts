@@ -54,6 +54,43 @@ describe('Agent Team fold', () => {
     ])).toThrow(/name .* reused/)
   })
 
+  it('keeps the agent route recorded on the active edge and omits it on older rows', () => {
+    const routed = foldTeam(ROOT, [
+      event('team/member', { teamId: TEAM, member: member() }, 0),
+      event('team/member', {
+        teamId: TEAM,
+        member: member({ phase: 'active', agentProvider: 'child-llm', agentModel: 'child-model' }),
+      }, 1),
+    ])
+    expect(routed?.members[0]).toMatchObject({ agentProvider: 'child-llm', agentModel: 'child-model' })
+    const legacy = foldTeam(ROOT, [
+      event('team/member', { teamId: TEAM, member: member() }, 0),
+      event('team/member', { teamId: TEAM, member: member({ phase: 'active' }) }, 1),
+    ])
+    expect(legacy?.members[0]).not.toHaveProperty('agentProvider')
+    expect(legacy?.members[0]).not.toHaveProperty('agentModel')
+  })
+
+  it('rejects a malformed agent route or one recorded outside the active edge', () => {
+    for (const [route, pattern] of [
+      [{ agentModel: '' }, /member\.agentModel is invalid/],
+      [{ agentProvider: 7 }, /member\.agentProvider is invalid/],
+      [{ agentModel: null }, /member\.agentModel is invalid/],
+    ] as const) {
+      expect(() => teamStateFromThrow([
+        event('team/member', { teamId: TEAM, member: member() }, 0),
+        event('team/member', { teamId: TEAM, member: { ...member({ phase: 'active' }), ...route } as never }, 1),
+      ])).toThrow(pattern)
+    }
+    expect(() => teamStateFromThrow([
+      event('team/member', { teamId: TEAM, member: member({ agentModel: 'early' }) }, 0),
+    ])).toThrow(/agent route outside the active phase/)
+    expect(() => teamStateFromThrow([
+      event('team/member', { teamId: TEAM, member: member() }, 0),
+      event('team/member', { teamId: TEAM, member: member({ phase: 'failed', agentProvider: 'late' }) }, 1),
+    ])).toThrow(/agent route outside the active phase/)
+  })
+
   it('keeps a failed provisioning row and reserves its name', () => {
     const state = foldTeam(ROOT, [
       event('team/member', { teamId: TEAM, member: member() }, 0),

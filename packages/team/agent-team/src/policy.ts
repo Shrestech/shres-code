@@ -16,6 +16,7 @@ export function teammatePolicy(name: string): string {
     + 'You do not have named seat tools (aegis, stride, ward). '
     + 'Mail the Lead or another teammate with team_send; list members with team_list. '
     + 'Do the assigned work in this session\'s working directory and follow its AGENTS.md. '
-    + 'Do not treat the Shres Code checkout as the assigned project unless that is your working directory.'
+    + 'Do not treat the Shres Code checkout as the assigned project unless that is your working directory. '
+    + 'Do not resend content you already delivered to the same recipient through another tool.'
   )
 }

@@ -37,6 +37,22 @@ describe('Agent Team stream invariants', () => {
     expect(session.seq).toBe(1)
   })
 
+  it('accepts an active agent route and rejects a route on a provisioning edge before commit', async () => {
+    const ctx = await setup()
+    const session = ctx.sessions.create(ROOT)
+    expect(() => {
+      session.append('team/member', { teamId: TEAM, member: member({ agentModel: 'early' }) }, { ignorable: true })
+    }).toThrow(expect.objectContaining<Partial<InvariantError>>({ code: 'INVARIANT' }))
+    expect(session.seq).toBe(0)
+    expect(() => {
+      session.append('team/member', { teamId: TEAM, member: member() }, { ignorable: true })
+      session.append('team/member', {
+        teamId: TEAM,
+        member: member({ phase: 'active', agentProvider: 'child-llm', agentModel: 'child-model' }),
+      }, { ignorable: true })
+    }).not.toThrow()
+  })
+
   it('rejects a malformed native payload on late registration', async () => {
     const ctx = new Context()
     await ctx.plugin(SessionStore)

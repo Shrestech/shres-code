@@ -155,6 +155,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Owns one single-flight Claude session-credential manager per credential spec; the llm-claude-session adapter resolves its bearer token through this service.',
   },
   {
+    key: 'cursorCredential',
+    pkg: 'cursor-credential',
+    title: 'Cursor subscription credential engine',
+    mode: 'core',
+    consumers: ['llm-cursor-session'],
+    note: 'Owns one memoized Cursor session-credential manager per credential spec; the llm-cursor-session adapter resolves the Cursor Agent CLI login token through this service, and the CLI owns refresh.',
+  },
+  {
     key: 'toolResultPruner',
     pkg: 'compaction-tool-result-pruner',
     title: 'Model-free tool-result pruning',
