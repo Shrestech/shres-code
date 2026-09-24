@@ -3025,8 +3025,33 @@ describe('capability exits and cancellation', () => {
     expect(b.decision(1)).toMatchObject({
       outcome: 'kept-strong',
       reason: 'unknown-candidate',
+      objective: 'dollars',
       sticky: { active: false, stepsElapsed: 0, brokenBy: 'unknown-candidate' },
     })
+  })
+
+  it('breaks a same-step retry when settings remove its base from routeFrom', async () => {
+    const b = await bench({ settings: true })
+    expect(await b.resolve(1)).toEqual(CHEAP)
+
+    await b.ctx.settings.update(MODEL_ROUTER_SETTINGS_NAMESPACE, {
+      routeFrom: [{ provider: 'other-provider', model: 'other-model', objective: 'dollars' }],
+    })
+
+    // The retry of the same step keeps the manual route and logs exactly one exit.
+    expect(await b.resolve(1)).toBeUndefined()
+    expect(b.engine.asks).toHaveLength(1)
+    expect(b.decisions()).toHaveLength(2)
+    expect(b.decisions().filter(decision => decision.reason === 'base-unlisted')).toHaveLength(1)
+    expect(b.decision(1)).toMatchObject({
+      outcome: 'kept-strong',
+      reason: 'base-unlisted',
+      sticky: { active: false, stepsElapsed: 0, brokenBy: 'base-unlisted' },
+    })
+    expect(b.decision(1)).not.toHaveProperty('objective')
+    expect(b.decision(1)).not.toHaveProperty('candidateEligibility')
+    // A configuration exit starts no re-entry cooldown.
+    expect(stickyState(b.session.events).cooldownTurn).toBeUndefined()
   })
 
   it('breaks a same-turn pin when the LLM runtime disappears', async () => {

@@ -725,7 +725,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
    *
    * Each new downgraded step reassesses the latest task evidence. Same-step
    * retries reuse the judgment only while its complete candidate inputs are
-   * unchanged, and recheck manual authority, allowlist membership, and
+   * unchanged, and recheck manual authority, `routeFrom` and pool membership, and
    * capabilities. A manual-model decision lasts for the turn.
    * @param agent - the agent whose turn is being prepared.
    * @param turn - the turn number, as the loop dispatched it.
@@ -860,7 +860,10 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     return { kind: 'retry' }
   }
 
-  /** Recheck a retry's held route against manual authority and current provider registrations. */
+  /**
+   * Recheck a retry's held route against manual authority, the `routeFrom`
+   * allowlist, the candidate pool, and current provider registrations.
+   */
   private async revalidatePinned(
     agent: Agent,
     turn: number,
@@ -877,10 +880,15 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     const entryBase = previous.sticky.entryBase
     const candidate = config.candidates.find(entry => entry.id === selection.candidateId
       && entry.provider === selection.provider && entry.model === selection.model)
-    let reason: 'manual-deviation' | 'unknown-candidate' | 'candidate-ineligible' | undefined
+    const from = routeFromFor(config, base)
+    let reason: 'manual-deviation' | 'base-unlisted' | 'unknown-candidate' | 'candidate-ineligible' | undefined
     let candidateEligibility: ModelRoutingDecision['candidateEligibility']
     if (entryBase !== undefined && (entryBase.provider !== base.provider || entryBase.model !== base.model)) {
       reason = 'manual-deviation'
+    } else if (from === undefined) {
+      // As in a fresh consult: the retry keeps the manual route once settings
+      // remove it from `routeFrom`, and the ended streak starts no cooldown.
+      reason = 'base-unlisted'
     } else if (candidate === undefined) {
       reason = 'unknown-candidate'
     } else {
@@ -912,6 +920,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
         omittedSeqs: state.omittedSeqs,
       },
       ...candidateEligibility === undefined ? {} : { candidateEligibility },
+      ...from === undefined ? {} : { objective: from.objective },
       sticky: { active: false, stepsElapsed: 0, brokenBy: reason },
     }
     this.log(agent.session, decision)
