@@ -463,6 +463,19 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'claudeCredential',
+    summary: 'Single-flight Claude session-credential service.',
+    description: 'Single-flight Claude session-credential service.\n\nClaudeCredential.managerFor returns the one ClaudeSessionManager memoized for a credential spec, preserving one shared in-flight resolve per source. The memoization caches every spec key for the service\'s lifetime; that is safe because each `current()` call re-reads the store and re-checks freshness at the moment it runs rather than trusting a cached token.',
+    methods: [
+      {
+        signature: 'managerFor(spec: ClaudeSessionOptions): ClaudeSessionManager',
+        description: 'Resolve the credential manager for one spec, sharing the cached instance across callers so concurrent requests refresh the store once.',
+        parameters: [{ name: 'spec', description: 'the credential spec this manager reads and refreshes.' }],
+        returns: 'the manager for the spec\'s credential facts.',
+      },
+    ],
+  },
+  {
     key: 'clientModules',
     summary: 'The web plugin table service: incremental `shres.client` scan + wire composition + bundle route + index tap.',
     description: 'The web plugin table service: incremental `shres.client` scan + wire composition + bundle route + index tap. Construction runs the activation scan synchronously — a malformed declaration or missing bundle among the already-loaded entries aggregates into one loud throw (FAILED fiber; the boot activation audit reports it).',
@@ -496,6 +509,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Fires after any flush that recomposed the graph (row added/removed, or a rebuilt rev change). Pull model: listeners re-read graph.',
         parameters: [{ name: 'listener', description: 'notified with no payload.' }],
         returns: 'the unsubscriber.',
+      },
+      {
+        signature: 'async fetchBundle(request: Request): Promise<Response>',
+        description: 'Answer one `/plugins/<id>/client.js[.map]` request without a web server: a carrier that owns dispatch (the desktop host\'s pipes) forwards the request here instead of a mounted route.',
+        parameters: [{ name: 'request', description: 'the forwarded bundle request.' }],
+        returns: '405 for non-GET/HEAD, 404 for unknown ids, else the bundle bytes.',
       },
     ],
   },
@@ -585,9 +604,9 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         throws: ['{@link ManualCompactionError} for expected busy, agent-cancellation, changed-span, summarization/shrink, commit-stage, or persistence failures; an aborted request preserves its exact abort reason. Failed attempts remain visible in the log.'],
       },
       {
-        signature: 'abstract compactRegion( start: number, end: number, agent: CompactionAgentContext, signal?: AbortSignal, ): Promise<CompactionResult>',
+        signature: 'abstract compactRegion( start: number, end: number, agent: CompactionAgentContext, signal?: AbortSignal, attempt?: number, ): Promise<CompactionResult>',
         description: 'Forcibly compact a range of surface nodes into a single summary node. `start` and `end` name an inclusive span by surface position, not numeric seq order; replacements can make visible seqs non-monotonic. Both edges must be balanced so assistant tool calls remain paired with their results. A model- backed implementation forwards cancellation and rejects active, missing, reversed, or unbalanced ranges. The target session is `agent.session`. Its replacement user message must use compactCheckpointSource with the transaction\'s `CompactionId`. Use toolPairingBalancedBefore and toolPairingBalancedAfter for the edge checks.',
-        parameters: [{ name: 'start', description: 'first surface seq, inclusive.' }, { name: 'end', description: 'last surface seq, inclusive.' }, { name: 'agent', description: 'context whose session is mutated and whose routing options guide summarization.' }, { name: 'signal', description: 'optional cancellation; model-backed implementations must forward it.' }],
+        parameters: [{ name: 'start', description: 'first surface seq, inclusive.' }, { name: 'end', description: 'last surface seq, inclusive.' }, { name: 'agent', description: 'context whose session is mutated and whose routing options guide summarization.' }, { name: 'signal', description: 'optional cancellation; model-backed implementations must forward it.' }, { name: 'attempt', description: '1-based index of this attempt within its compaction, recorded on a summarization failure.' }],
         returns: 'the appended event seqs, summary, replaced range, and token accounting.',
         throws: ['when compaction is active or the range is missing, reversed, or unbalanced.'],
       },
@@ -619,6 +638,19 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         signature: 'abstract unset(ref: CredentialRef): Promise<void>',
         description: 'Remove one reference from the provider-managed writable source; removing an absent reference is a no-op. Rejects while a read-only source shadows the reference, like set.',
         parameters: [{ name: 'ref', description: 'the reference to remove.' }],
+      },
+    ],
+  },
+  {
+    key: 'cursorCredential',
+    summary: 'Single-flight Cursor session-credential service.',
+    description: 'Single-flight Cursor session-credential service.\n\nCursorCredential.managerFor returns the one CursorSessionManager memoized for a credential spec, preserving one shared in-flight read per source. The memoization caches every spec key for the service\'s lifetime; that is safe because each `current()` call re-reads the store at the moment it runs rather than trusting a cached token.',
+    methods: [
+      {
+        signature: 'managerFor(spec: CursorSessionOptions): CursorSessionManager',
+        description: 'Resolve the credential manager for one spec, sharing the cached instance across callers so concurrent requests read the store once.',
+        parameters: [{ name: 'spec', description: 'the credential spec this manager reads.' }],
+        returns: 'the manager for the spec\'s credential facts.',
       },
     ],
   },
@@ -3377,6 +3409,18 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface CheckpointJspaceInput {\n    readonly check: string;\n    readonly by: string;\n    readonly evidence?: string;\n}',
   },
   {
+    name: 'ClaudeSessionManager',
+    declaration: 'export class ClaudeSessionManager {\n    constructor(options: ClaudeSessionOptions);\n    current(): Promise<ClaudeSessionToken>;\n}',
+  },
+  {
+    name: 'ClaudeSessionOptions',
+    declaration: 'export interface ClaudeSessionOptions {\n    useKeychain: boolean;\n    securityPath: string;\n    authPath: string;\n    keychainAccount: string;\n    refreshLeewayMs: number;\n    fetch?: typeof fetch;\n    now?: () => number;\n    readKeychain?: (service: string) => Promise<string | undefined>;\n    writeKeychain?: (service: string, account: string, json: string) => Promise<void>;\n}',
+  },
+  {
+    name: 'ClaudeSessionToken',
+    declaration: 'export interface ClaudeSessionToken {\n    accessToken: string;\n}',
+  },
+  {
     name: 'ClientResponse',
     declaration: 'export interface ClientResponse {\n    type: \'client-response\';\n    rpcId: RpcId;\n    result: RpcResult<unknown>;\n}',
   },
@@ -3514,7 +3558,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ContinuableStart',
-    declaration: 'export interface ContinuableStart {\n    readonly childId: SessionId;\n    readonly messageId: MessageId;\n}',
+    declaration: 'export interface ContinuableStart {\n    readonly childId: SessionId;\n    readonly messageId: MessageId;\n    readonly route: {\n        readonly provider?: string;\n        readonly model?: string;\n    };\n}',
   },
   {
     name: 'ContinuableStartSpec',
@@ -3575,6 +3619,18 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'CredentialRef',
     declaration: 'export type CredentialRef = Branded<\'CredentialRef\'>;',
+  },
+  {
+    name: 'CursorSessionManager',
+    declaration: 'export class CursorSessionManager {\n    constructor(options: CursorSessionOptions);\n    current(): Promise<CursorSessionToken>;\n}',
+  },
+  {
+    name: 'CursorSessionOptions',
+    declaration: 'export interface CursorSessionOptions {\n    securityPath: string;\n    authPath: string;\n    useKeychain: boolean;\n    readKeychain?: (service: string) => Promise<string | undefined>;\n    now?: () => number;\n}',
+  },
+  {
+    name: 'CursorSessionToken',
+    declaration: 'export interface CursorSessionToken {\n    accessToken: string;\n}',
   },
   {
     name: 'Decision',
@@ -4034,7 +4090,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'LlmConfigurableProvider',
-    declaration: 'export interface LlmConfigurableProvider {\n    provider: string;\n    displayName: string;\n    settingsNs: string;\n    settingsPath: readonly string[];\n    declared?: boolean;\n    kind?: \'delegated\';\n    binary?: string;\n    binaryFound?: boolean;\n}',
+    declaration: 'export interface LlmConfigurableProvider {\n    provider: string;\n    displayName: string;\n    settingsNs: string;\n    settingsPath: readonly string[];\n    declared?: boolean;\n    kind?: \'delegated\';\n    binary?: string;\n    binaryFound?: boolean;\n    chatGated?: boolean;\n}',
   },
   {
     name: 'LlmDiscoveredModel',
@@ -5230,7 +5286,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'TeamMemberView',
-    declaration: 'export interface TeamMemberView {\n    readonly id: SessionId;\n    readonly name: string;\n    readonly role: \'lead\' | \'teammate\';\n    readonly status: TeamMemberStatus;\n    readonly description?: string;\n    readonly provider?: string;\n    readonly context?: \'fresh\' | \'fork\';\n    readonly model?: string;\n    readonly diagnostics: string[];\n}',
+    declaration: 'export interface TeamMemberView {\n    readonly id: SessionId;\n    readonly name: string;\n    readonly role: \'lead\' | \'teammate\';\n    readonly status: TeamMemberStatus;\n    readonly description?: string;\n    readonly provider?: string;\n    readonly context?: \'fresh\' | \'fork\';\n    readonly agentProvider?: string;\n    readonly model?: string;\n    readonly diagnostics: string[];\n}',
   },
   {
     name: 'TeamMessageId',

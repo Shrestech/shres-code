@@ -68,6 +68,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   grokCredential: 'grok-credential.md',
   codexCredential: 'codex-credential.md',
   claudeCredential: 'claude-credential.md',
+  cursorCredential: 'cursor-credential.md',
   webServer: 'web-server.md',
   invariants: 'invariants.md',
   llm: 'llm-streaming.md',
@@ -593,6 +594,8 @@ export const FOUNDATION_TYPE_NAMES: ReadonlySet<string> = new Set([
   'Promise',
   'Record',
   'Readonly',
+  'Request',
+  'Response',
   'Uint8Array',
 ])
 
@@ -660,6 +663,8 @@ export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
   CodexSessionOptions: 'credential spec fields are owned by packages/llm/codex-credential/README.md',
   ClaudeSessionManager: 'Claude session-credential engine is owned by packages/llm/claude-credential/README.md',
   ClaudeSessionOptions: 'credential spec fields are owned by packages/llm/claude-credential/README.md',
+  CursorSessionManager: 'Cursor session-credential engine is owned by packages/llm/cursor-credential/README.md',
+  CursorSessionOptions: 'credential spec fields are owned by packages/llm/cursor-credential/README.md',
   'z.core.JSONSchema.BaseSchema': 'zod projection output is owned by the zod v4 API',
   'z.core.ToJSONSchemaParams': 'zod projection parameters are owned by the zod v4 API',
   TypertDisposer: 'Typert lifecycle contract is owned by packages/typert/protocol/README.md',

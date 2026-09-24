@@ -405,6 +405,7 @@ describe('SubagentRuntime.startContinuable', () => {
     // persona or tool filter, so the descriptor records only what exists.
     const routeless = ctx.agentLoop.create(SessionId('routeless'), {})
     const started = await ctx.subagents.startContinuable(startSpec(routeless))
+    expect(started.route).toEqual({})
     const child = await vi.waitFor(() => {
       const found = ctx.agents.get(started.childId)
       expect(found).toBeDefined()
@@ -2451,6 +2452,59 @@ describe('continuable errors', () => {
       expect(ctx.agents.get(started.childId)?.options.model).toBe('child-model')
     })
     await waitNoActivation(ctx, started.childId)
+  })
+
+  it('runs the route captured at start when the parent switches during provider preparation', async () => {
+    const { ctx, parent, adapter } = await setup([textResponse('child first')])
+    parkParent(ctx, parent)
+    const parentRequest = vi.spyOn(parent.session, 'requestHeader')
+    parentRequest.mockReturnValue({ config: { provider: 'mock', model: 'before-switch' } })
+    const spawn = ctx.subagents.getProvider('spawn')!
+    const prepare = spawn.prepareContinuable!.bind(spawn)
+    vi.spyOn(spawn, 'prepareContinuable').mockImplementation(async (request) => {
+      parentRequest.mockReturnValue({ config: { provider: 'mock', model: 'after-switch' } })
+      return prepare(request)
+    })
+
+    const started = await ctx.subagents.startContinuable(startSpec(parent))
+    expect(started.route).toEqual({ provider: 'mock', model: 'before-switch' })
+    await waitNoActivation(ctx, started.childId)
+    const loaded = await ctx.sessionPersistence.load(started.childId)
+    expect(loaded.events.find(event => event.type === 'subagent/descriptor')?.data)
+      .toMatchObject({ agentProvider: 'mock', agentModel: 'before-switch' })
+    expect(adapter.requests.find(request => request.sessionId === started.childId)?.model).toBe('before-switch')
+  })
+
+  it('returns the descriptor route and keeps it after the parent switches models', async () => {
+    const { ctx, parent, adapter } = await setup([textResponse('child first'), textResponse('later child')])
+    parkParent(ctx, parent)
+    const parentRequest = vi.spyOn(parent.session, 'requestHeader')
+    const started = await ctx.subagents.startContinuable({
+      ...startSpec(parent),
+      request: {
+        prompt: message('routed work'),
+        parent,
+        agentOptions: { provider: 'mock', model: 'child-model' },
+      },
+    })
+    expect(started.route).toEqual({ provider: 'mock', model: 'child-model' })
+    await waitNoActivation(ctx, started.childId)
+    // The parent's next logged request header names a different model.
+    parentRequest.mockReturnValue({ config: { provider: 'mock', model: 'parent-switched' } })
+
+    const loaded = await ctx.sessionPersistence.load(started.childId)
+    const descriptor = loaded.events.find(event => event.type === 'subagent/descriptor')?.data
+    expect(descriptor).toMatchObject({ agentProvider: started.route.provider, agentModel: started.route.model })
+    expect(adapter.requests.find(request => request.sessionId === started.childId)?.model).toBe('child-model')
+
+    // A child started after the switch inherits the switched parent route, and
+    // the earlier child's durable route is unchanged.
+    const later = await ctx.subagents.startContinuable(startSpec(parent))
+    expect(later.route).toEqual({ provider: 'mock', model: 'parent-switched' })
+    const reloaded = await ctx.sessionPersistence.load(started.childId)
+    expect(reloaded.events.find(event => event.type === 'subagent/descriptor')?.data)
+      .toMatchObject({ agentProvider: 'mock', agentModel: 'child-model' })
+    await drainManager(ctx)
   })
 
   it('unloading the manager drains its live activations', async () => {

@@ -7,6 +7,7 @@ One page per subsystem of the Shres Code: what it is, the data structures it mov
 | [core.md](core.md) | how `packages/core` controls the agent loop: the package-by-package loop description, agent creation and ownership (`AgentHandle`), the `Agent` handle's delivery/cancellation/interception contracts, and the repo-wide type patterns (`…Map → derived-union`, branded ids) |
 | [llm-streaming.md](llm-streaming.md) | the `packages/llm` conversation types — `Message`/`ContentBlock`, the assembled model request, the `StreamChunk` wire protocol and adapter contract, `BlockAssembler`, and the `LlmAdapter` provider contract |
 | [token-meter.md](token-meter.md) | immutable scalar and positional replay measurements with consumed-log revisions |
+| [cursor-credential.md](cursor-credential.md) | the one Cursor subscription credential: the session-credential engine shared by the cursor-session adapter and future consumers |
 | [grok-credential.md](grok-credential.md) | the one Grok Build subscription credential: the single-flight session-credential engine shared by the grok-session adapter and future consumers |
 | [codex-credential.md](codex-credential.md) | the one Codex subscription credential: the single-flight ChatGPT-login session engine shared by the codex-session adapter and future consumers |
 | [claude-credential.md](claude-credential.md) | the one Claude subscription credential: the single-flight OAuth session engine the claude-session adapter refreshes through console.anthropic.com |

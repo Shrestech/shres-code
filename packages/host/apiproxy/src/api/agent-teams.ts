@@ -16,7 +16,11 @@ export interface AgentTeamsMemberRow {
   /** Durable child Session id; empty for the Lead row and unprovisioned template rows. */
   id: string
   description?: string
+  /** Subagent spawn provider, such as `spawn`; not the LLM provider. */
   provider?: string
+  /** LLM provider route the member runs or resumes on; absent when unknown. */
+  agentProvider?: string
+  /** LLM model the member runs or resumes on; absent when unknown, never the Lead's model as a stand-in. */
   model?: string
   /** Durable provisioning failure diagnostics. */
   diagnostics: string[]

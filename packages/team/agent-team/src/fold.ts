@@ -238,6 +238,15 @@ function decodeMember(value: unknown): TeamMemberSnapshot {
     context: context as TeamMemberSnapshot['context'],
     phase: phase as TeamMemberPhase,
     ...value['error'] === undefined ? {} : { error: decodeString(value['error'], 'member.error') },
+    ...value['agentProvider'] === undefined
+      ? {}
+      : { agentProvider: decodeNonEmptyString(value['agentProvider'], 'member.agentProvider') },
+    ...value['agentModel'] === undefined
+      ? {}
+      : { agentModel: decodeNonEmptyString(value['agentModel'], 'member.agentModel') },
+  }
+  if (member.phase !== 'active' && (member.agentProvider !== undefined || member.agentModel !== undefined)) {
+    throw new Error(`teammate "${member.name}" records an agent route outside the active phase`)
   }
   return member
 }

@@ -41,7 +41,7 @@ describe('rosterFromView', () => {
 describe('TeamAction', () => {
   it('renders nothing for sessions that are not Team Leads', async () => {
     const load = vi.fn(async () => ({ sessionId, isTeam: false, members: [] }) as never)
-    const { container } = renderTeam({ load: load as never })
+    const { container } = renderTeam({ load: load })
     await waitFor(() => {
       expect(load).toHaveBeenCalled()
     })
@@ -54,12 +54,35 @@ describe('TeamAction', () => {
       { name: 'aegis', role: 'teammate', status: 'idle', id: 'aegis-child', model: 'kimi-k3', diagnostics: [] },
     ]
     const load = vi.fn(async () => roster(members))
-    const { openTeammate } = renderTeam({ load: load as never })
+    const { openTeammate } = renderTeam({ load: load })
     fireEvent.click(await screen.findByText(en.teamAction))
     expect(screen.getByText(en.teamPanelTitle)).toBeTruthy()
     expect(screen.getByText('aegis')).toBeTruthy()
     fireEvent.click(screen.getByText(en.teamOpenConversation))
     expect(openTeammate).toHaveBeenCalledWith(sessionId, expect.objectContaining({ name: 'aegis' }))
+  })
+
+  it('shows each row\'s own LLM binding and omits it when the route is unknown', async () => {
+    const members = [
+      { name: 'lead', role: 'lead', status: 'idle', id: 'team-root', agentProvider: 'lead-llm', model: 'lead-model', diagnostics: [] },
+      {
+        name: 'scout', role: 'teammate', status: 'inactive', id: 'scout-child',
+        provider: 'spawn', agentProvider: 'child-llm', model: 'child-model', diagnostics: [],
+      },
+      { name: 'legacy', role: 'teammate', status: 'inactive', id: 'legacy-child', provider: 'spawn', diagnostics: [] },
+      { name: 'bare', role: 'teammate', status: 'idle', id: 'bare-child', provider: 'spawn', model: 'bare-model', diagnostics: [] },
+    ]
+    const load = vi.fn(async () => roster(members))
+    renderTeam({ load: load })
+    fireEvent.click(await screen.findByText(en.teamAction))
+    const rows = await screen.findAllByRole('listitem')
+    expect(rows.map(row => row.textContent)).toEqual([
+      'leadidlelead-llm · lead-model',
+      'scoutinactivechild-llm · child-model' + en.teamOpenConversation,
+      'legacyinactive' + en.teamOpenConversation,
+      'bareidlebare-model' + en.teamOpenConversation,
+    ])
+    expect(screen.queryByText(/spawn/)).toBeNull()
   })
 
   it('keeps the Lead row and unprovisioned rows non-navigable and shows diagnostics', async () => {
@@ -70,7 +93,7 @@ describe('TeamAction', () => {
     ]
     const openTeammate = vi.fn()
     const load = vi.fn(async () => roster(members))
-    renderTeam({ load: load as never, openTeammate: openTeammate as never })
+    renderTeam({ load: load, openTeammate: openTeammate as never })
     fireEvent.click(await screen.findByText(en.teamAction))
     expect(screen.getByText(/spawn rejected/)).toBeTruthy()
     const openButtons = screen.queryAllByText(en.teamOpenConversation)
@@ -89,7 +112,7 @@ describe('TeamAction', () => {
       { name: 'lead', role: 'lead', status: 'running', id: '', diagnostics: [] },
     ]
     const load = vi.fn(async () => roster(members))
-    renderTeam({ load: load as never })
+    renderTeam({ load: load })
     const trigger = await screen.findByText(en.teamAction)
     expect(load).toHaveBeenCalledTimes(1)
     fireEvent.click(trigger)
