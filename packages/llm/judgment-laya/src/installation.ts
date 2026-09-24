@@ -204,8 +204,12 @@ export async function installLaya(
   }
   await mkdir(config.runtimeDir, { recursive: true, mode: 0o700 })
   await mkdir(config.hfHome, { recursive: true, mode: 0o700 })
-  await dependencies.run('uv venv', [uv, 'venv', '--python', config.python, '--allow-existing', config.venvDir], {}, signal)
+  // uv's package cache stays inside the runtime directory, so removing that
+  // directory removes everything an install added.
+  const uvEnv = { UV_CACHE_DIR: config.uvCacheDir }
+  await dependencies.run('uv venv', [uv, 'venv', '--python', config.python, '--allow-existing', config.venvDir], uvEnv, signal)
   await dependencies.run('uv sync', [uv, 'sync', '--frozen', '--project', config.gatewayProject], {
+    ...uvEnv,
     UV_PROJECT_ENVIRONMENT: config.venvDir,
   }, signal)
   await dependencies.run('checkpoint download', [

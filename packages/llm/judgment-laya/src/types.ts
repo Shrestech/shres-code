@@ -37,7 +37,7 @@ export interface LayaJudgmentConfig {
   checkpointContext: 512 | 1024
   /** Inference precision passed to laya-mlx. */
   dtype?: 'float16' | 'float32'
-  /** Absolute directory holding the virtual environment and install marker. */
+  /** Absolute directory holding the virtual environment, uv package cache, and install marker. */
   runtimeDir?: string
   /** Absolute Hugging Face home holding downloaded checkpoints. */
   hfHome?: string

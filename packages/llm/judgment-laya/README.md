@@ -2,7 +2,7 @@
 
 Local provider for the typed-judgment seam (`ctx.judgment`). The package supervises one loopback [`shres-laya-gateway`](../../../python/laya-gateway/README.md) process that runs a pinned [Laya](https://github.com/NandhaKishorM/laya) checkpoint through [laya-mlx](https://github.com/mizorewww/laya-mlx) on Apple silicon, and answers every ask over the Shield judgment wire through [`createShieldWireEngine`](../judgment-shield/README.md#wire-client). Judgment state never leaves the machine.
 
-Installation is explicit: `/laya install` (or `install()`) creates a uv-managed virtual environment, syncs the gateway's hash-locked dependencies, downloads the pinned checkpoint, verifies every file's SHA-256 against the checked-in manifest, and writes an install marker. Startup never downloads; the gateway runs with `HF_HUB_OFFLINE=1`. Until the gateway is ready, every ask fails `UNAVAILABLE`, so a consumer such as the model router keeps its manual route.
+Installation is explicit: `/laya install` (or `install()`) creates a uv-managed virtual environment, syncs the gateway's hash-locked dependencies, downloads the pinned checkpoint, verifies every file's SHA-256 against the checked-in manifest, and writes an install marker. Every uv command runs with `UV_CACHE_DIR=<runtimeDir>/uv-cache`, so deleting `runtimeDir` removes the packages an install downloaded; uv's global cache is not used. Startup never downloads; the gateway runs with `HF_HUB_OFFLINE=1`. Until the gateway is ready, every ask fails `UNAVAILABLE`, so a consumer such as the model router keeps its manual route.
 
 ## Config
 
@@ -15,7 +15,7 @@ Every field is validated at load; unknown keys fail by name. Relative paths, a r
 | `model.manifestSha256` | required | SHA-256 of that manifest's exact bytes. Install refuses a different manifest; the gateway must report the same digest in its readiness line and health check. |
 | `checkpointContext` | required | `512` or `1024`; the gateway must report the same `maxSequenceTokens`. |
 | `dtype` | `float16` | laya-mlx precision, `float16` or `float32`. |
-| `runtimeDir` | `<SHRES_HOME>/runtimes/laya-gateway` | Holds the virtual environment, the install marker, and the gateway's working directory; created with mode 0700. |
+| `runtimeDir` | `<SHRES_HOME>/runtimes/laya-gateway` | Holds the virtual environment, uv's package cache (`uv-cache/`), the install marker, and the gateway's working directory; created with mode 0700. |
 | `hfHome` | `<runtimeDir>/hf` | Hugging Face home; the verified checkpoint lives in `<hfHome>/checkpoints/`. |
 | `gatewayProject` | the repository's `python/laya-gateway` | Gateway project with `pyproject.toml`, `uv.lock`, and manifests. Set it when the package runs outside a repository checkout. |
 | `uvPath` | `uv` | `uv` executable, an absolute path or a name on PATH. |

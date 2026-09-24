@@ -105,6 +105,8 @@ export interface ResolvedLayaJudgmentConfig {
   readonly restart: Readonly<Required<LayaRestartPolicy>>
   /** Virtual environment directory: `<runtimeDir>/venv`. */
   readonly venvDir: string
+  /** uv package cache used by every install-time uv command: `<runtimeDir>/uv-cache`. */
+  readonly uvCacheDir: string
   /** Virtual environment interpreter. */
   readonly pythonPath: string
   /** Install marker: `<runtimeDir>/install.json`. */
@@ -180,6 +182,7 @@ export function resolveConfig(
     maxResponseBytes,
     restart,
     venvDir,
+    uvCacheDir: join(runtimeDir, 'uv-cache'),
     pythonPath: join(venvDir, 'bin', 'python'),
     markerPath: join(runtimeDir, 'install.json'),
     modelDir: join(hfHome, 'checkpoints', `${model.repo.replace('/', '__')}@${model.revision}`),

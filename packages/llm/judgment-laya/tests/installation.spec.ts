@@ -163,7 +163,7 @@ describe('installLaya', () => {
     expect(run.calls.map(call => call.label)).toEqual(['uv venv', 'uv sync', 'checkpoint download'])
     expect(run.calls[0]?.argv).toEqual(['/opt/bin/uv-under-test', 'venv', '--python', '3.11', '--allow-existing', config.venvDir])
     expect(run.calls[1]?.argv).toEqual(['/opt/bin/uv-under-test', 'sync', '--frozen', '--project', config.gatewayProject])
-    expect(run.calls[1]?.env).toEqual({ UV_PROJECT_ENVIRONMENT: config.venvDir })
+    expect(run.calls[1]?.env).toEqual({ UV_CACHE_DIR: config.uvCacheDir, UV_PROJECT_ENVIRONMENT: config.venvDir })
     expect(run.calls[2]?.argv).toEqual([config.pythonPath, '-m', 'laya_gateway', 'install', '--manifest', config.manifestPath, '--dest', config.modelDir])
     expect(run.calls[2]?.env.HF_HUB_OFFLINE).toBe('0')
     const marker = JSON.parse(await readFile(config.markerPath, 'utf8')) as Record<string, unknown>
@@ -176,6 +176,16 @@ describe('installLaya', () => {
       modelDir: config.modelDir,
     })
     expect(result).toEqual({ modelDir: config.modelDir, manifestSha256: config.model.manifestSha256, lockSha256: marker.lockSha256 })
+  })
+
+  it('keeps uv\'s package cache inside the runtime directory for every uv command', async () => {
+    const run = recordingRunner()
+    await installLaya(config, { host: APPLE, resolveExecutable: resolveUv, run }, new AbortController().signal)
+
+    expect(config.uvCacheDir).toBe(join(runtime, 'uv-cache'))
+    const uvCalls = run.calls.filter(call => call.argv[0] === '/opt/bin/uv-under-test')
+    expect(uvCalls.map(call => call.label)).toEqual(['uv venv', 'uv sync'])
+    for (const call of uvCalls) expect(call.env.UV_CACHE_DIR).toBe(join(runtime, 'uv-cache'))
   })
 
   it('refuses a manifest whose digest differs from the pin before running anything', async () => {

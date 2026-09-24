@@ -41,6 +41,7 @@ describe('resolveConfig', () => {
       maxResponseBytes: 4_194_304,
       restart: DEFAULT_RESTART,
       venvDir: '/srv/laya/venv',
+      uvCacheDir: '/srv/laya/uv-cache',
       pythonPath: '/srv/laya/venv/bin/python',
       markerPath: '/srv/laya/install.json',
       modelDir: `/srv/laya/hf/checkpoints/owner__laya-test@${REVISION}`,
