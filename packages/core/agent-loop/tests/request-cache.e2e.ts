@@ -1,4 +1,4 @@
-import { createUserMessage } from '@shres-code/shres-code-llm'
+import { cacheCount, createUserMessage } from '@shres-code/shres-code-llm'
 import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@shres-code/cordis'
 import LlmRuntime from '@shres-code/shres-code-llm'
@@ -90,7 +90,11 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('log-derived request cache hits (
     // predecessor as a byte-identical prefix, so the provider must report
     // cached prompt tokens (prompt_cache_hit_tokens → cacheReadTokens).
     for (const usage of usages.slice(1)) {
-      expect(usage!.cacheReadTokens ?? 0).toBeGreaterThan(0)
+      const read = cacheCount(usage!, 'read')
+      // An absent count means the provider reported no cache hits at all, which
+      // is a different failure from a reported miss.
+      expect(read).toBeDefined()
+      expect(read!).toBeGreaterThan(0)
     }
 
     // World-verification of the conversation itself: the tool value made it

@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ConvViewProps } from '@shres-code/shres-code-client-ui-conversation/client'
 import type { InjectFace, PropsLocale } from '@shres-code/shres-code-client-ui-slots'
+import type { TokenUsage } from '@shres-code/shres-code-llm/types'
+import { addTokenUsage } from '@shres-code/shres-code-llm/usage'
 import type {
   AssistantBlock, AssistantMessageNode, ConversationSnapshot,
   SnapshotStore,
@@ -95,28 +97,29 @@ function requestUsage(value: unknown): TrajectoryUsage | undefined {
   }
 }
 
+/** Read a display usage back into the provider usage it was copied from. */
+function tokenUsageOf(usage: TrajectoryUsage): TokenUsage {
+  return {
+    inputTokens: usage.input ?? 0,
+    outputTokens: usage.output ?? 0,
+    ...(usage.cacheRead === undefined ? {} : { cacheReadTokens: usage.cacheRead }),
+    ...(usage.cacheWrite === undefined ? {} : { cacheWriteTokens: usage.cacheWrite }),
+    ...(usage.reasoning === undefined ? {} : { reasoningTokens: usage.reasoning }),
+  }
+}
+
+/**
+ * Add one request's usage to the running total. The sum follows the cache
+ * presence contract: a cache count stays shown only while every request
+ * reported it.
+ */
 function addUsage(
   total: TrajectoryUsage | undefined,
   usage: TrajectoryUsage | undefined,
 ): TrajectoryUsage | undefined {
   if (usage === undefined) return total
-  return {
-    ...(total?.input === undefined && usage.input === undefined
-      ? {}
-      : { input: (total?.input ?? 0) + (usage.input ?? 0) }),
-    ...(total?.cacheRead === undefined && usage.cacheRead === undefined
-      ? {}
-      : { cacheRead: (total?.cacheRead ?? 0) + (usage.cacheRead ?? 0) }),
-    ...(total?.cacheWrite === undefined && usage.cacheWrite === undefined
-      ? {}
-      : { cacheWrite: (total?.cacheWrite ?? 0) + (usage.cacheWrite ?? 0) }),
-    ...(total?.output === undefined && usage.output === undefined
-      ? {}
-      : { output: (total?.output ?? 0) + (usage.output ?? 0) }),
-    ...(total?.reasoning === undefined && usage.reasoning === undefined
-      ? {}
-      : { reasoning: (total?.reasoning ?? 0) + (usage.reasoning ?? 0) }),
-  }
+  if (total === undefined) return usage
+  return requestUsage(addTokenUsage(tokenUsageOf(total), tokenUsageOf(usage)))
 }
 
 export function TrajectoryView({

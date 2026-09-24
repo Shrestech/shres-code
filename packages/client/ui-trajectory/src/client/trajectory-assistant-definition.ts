@@ -7,6 +7,7 @@ import {
   displayFailureMessage, emptyAssistantBlock, isTokenDelta, toAssistantBlock,
   toAssistantBlocks,
 } from '@shres-code/shres-code-client-runtime/client'
+import { addTokenUsage } from '@shres-code/shres-code-llm/usage'
 import { trajectoryNode } from './trajectory-definition-common.ts'
 
 /* jscpd:ignore-start -- Target-owned Definitions intentionally keep their event
@@ -89,19 +90,7 @@ function hasInterruptionEvidence(blocks: readonly AssistantBlock[]): boolean {
 }
 
 function addUsage(current: UsageValue | undefined, next: UsageValue): UsageValue {
-  return {
-    inputTokens: (current?.inputTokens ?? 0) + next.inputTokens,
-    outputTokens: (current?.outputTokens ?? 0) + next.outputTokens,
-    ...(current?.cacheReadTokens === undefined && next.cacheReadTokens === undefined
-      ? {}
-      : { cacheReadTokens: (current?.cacheReadTokens ?? 0) + (next.cacheReadTokens ?? 0) }),
-    ...(current?.cacheWriteTokens === undefined && next.cacheWriteTokens === undefined
-      ? {}
-      : { cacheWriteTokens: (current?.cacheWriteTokens ?? 0) + (next.cacheWriteTokens ?? 0) }),
-    ...(current?.reasoningTokens === undefined && next.reasoningTokens === undefined
-      ? {}
-      : { reasoningTokens: (current?.reasoningTokens ?? 0) + (next.reasoningTokens ?? 0) }),
-  }
+  return current === undefined ? next : addTokenUsage(current, next)
 }
 
 function updateChunk(state: AssistantState, match: ConversationMatch): AssistantState {

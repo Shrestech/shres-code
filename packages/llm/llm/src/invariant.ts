@@ -32,6 +32,16 @@ function validateDelta(
   }
 }
 
+/**
+ * Require a present cache count to be a non-negative safe integer. Presence is
+ * the report, so an absent count needs no check.
+ */
+function validateCacheCount(count: number | undefined, field: string, fail: InvariantFailure): void {
+  if (count !== undefined && (!Number.isSafeInteger(count) || count < 0)) {
+    fail(`LLM stream usage ${field} must be a non-negative safe integer when reported, got ${count}`)
+  }
+}
+
 /** Wrap one provider stream and enforce its grammar as chunks are consumed. */
 async function* validateStream(
   source: AsyncIterable<StreamChunk>,
@@ -70,6 +80,8 @@ async function* validateStream(
       case 'usage':
         if (usageSeen) fail('LLM stream emitted usage more than once')
         usageSeen = true
+        validateCacheCount(chunk.usage.cacheReadTokens, 'cacheReadTokens', fail)
+        validateCacheCount(chunk.usage.cacheWriteTokens, 'cacheWriteTokens', fail)
         break
       case 'finish':
         if (open.size > 0 && chunk.reason.kind !== 'error' && chunk.reason.kind !== 'aborted') {

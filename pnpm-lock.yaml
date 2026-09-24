@@ -3602,6 +3602,9 @@ importers:
       '@shres-code/shres-code-jspace':
         specifier: workspace:^
         version: link:../../jspace/jspace
+      '@shres-code/shres-code-llm':
+        specifier: workspace:^
+        version: link:../../llm/llm
       '@shres-code/shres-code-model-router':
         specifier: workspace:^
         version: link:../../llm/model-router

@@ -80,3 +80,9 @@ describe('applyServiceTier', () => {
     expect(() => { applyServiceTier('nope', 'priority') }).not.toThrow()
   })
 })
+
+describe('cache-count reporting', () => {
+  it('declares reported cache counts for xAI Responses', () => {
+    expect(resolveRoute({}).cacheUsage).toBe('reported')
+  })
+})
