@@ -157,13 +157,15 @@ type ModelRoutingReason =
   | 'manual-deviation'
   /** Durable route failures reached `maxRouteErrors`. */
   | 'route-errors'
+  /** The downgraded request failed, and the step retries on the manual route. */
+  | 'route-failed'
   /** Routing is off, so this turn was not judged. */
   | 'mode-off'
   /** The judgment call itself failed and `onUnavailable` is `error`. */
   | 'judgment-error'
 ```
 
-Each kept-strong class is its own reason because the classes fail differently: an absent or disabled judgment engine is a composition decision, a low confidence or a thin margin is a judgment an operator tunes with the two thresholds, and `gate-failed`, `escalated`, `manual-deviation`, `mode-off`, and `route-errors` record which exit ended a held streak. `sticky-hold` is the one reason that keeps a downgrade without a fresh pass: the gate failed while the streak is still below its horizon.
+Each kept-strong class is its own reason because the classes fail differently: an absent or disabled judgment engine is a composition decision, a low confidence or a thin margin is a judgment an operator tunes with the two thresholds, and `gate-failed`, `escalated`, `manual-deviation`, `mode-off`, `route-errors`, and `route-failed` record which exit ended a held streak. `sticky-hold` is the one reason that keeps a downgrade without a fresh pass: the gate failed while the streak is still below its horizon.
 
 ```ts type-equiv
 /**
@@ -218,14 +220,34 @@ interface ModelRoutingDecision {
   model?: string
   /** Duration of the judgment call in milliseconds, when one was made. */
   latencyMs?: number
+  /** The failed downgraded request a `route-failed` decision retries on the manual route. */
+  failure?: ModelRoutingFailure
+  /** Seq of the failed attempt's last `assistant/chunk`, when the attempt logged one. */
+  failedChunkSeq?: number
 }
 ```
 
-One decision is logged per fresh judged request step as `model-routing/decision`, log-only and append-only: it is written after the consult resolved the step, so the `request/header` that follows it carries the route it selected and the consumed route is reconstructable from the log. `stateHash` and `stateSeqs` record the state the judgment read, so a rerun over the same state is recognizable; neither gates a decision. `selection` is present for a downgraded outcome only, `route`/`difficulty`/`engine`/`model`/`latencyMs` record what the engine answered and how long it took, and `hint` is advisory — it appears while the manual route stands and never changes it.
+```ts type-equiv
+/** The downgraded request whose failure a `route-failed` decision records. */
+interface ModelRoutingFailure {
+  /** Provider-neutral failure code the adapter reported. */
+  code: string
+  /** Registered provider route of the failed request. */
+  provider: string
+  /** Model id of the failed request. */
+  model: string
+}
+```
+
+One decision is logged per fresh judged request step as `model-routing/decision`, log-only and append-only: it is written after the consult resolved the step, so the `request/header` that follows it carries the route it selected and the consumed route is reconstructable from the log. `stateHash` and `stateSeqs` record the state the judgment read, so a rerun over the same state is recognizable; neither gates a decision. `selection` is present for a downgraded outcome only, `route`/`difficulty`/`engine`/`model`/`latencyMs` record what the engine answered and how long it took, and `hint` is advisory — it appears while the manual route stands and never changes it. A `route-failed` decision records the failed request in `failure` and the failed attempt's last chunk in `failedChunkSeq`; it is written after that attempt and before the retried request's header.
+
+## In-turn fallback
+
+The router listens on the `agent/request-error` waterfall. Its listener calls `next()` first, so a downstream recovery listener such as llm-retry keeps ownership of transient retries in any listener order: a `retry` from downstream is returned unchanged, and the candidate's retry reuses the step's downgraded pin. When no downstream listener recovers, `inTurnFallback` is `manual`, the failure is not a cancellation (`ABORTED` or an aborted signal), and the failed request is the one this router downgraded — its turn and step are pinned to a downgraded decision, and both the failed provider and the latest request header carry that selection — the router appends a `kept-strong` / `route-failed` decision, re-pins the step to it, and returns `retry`. The retried request resolves the decision's recorded manual route without another judgment, so the turn completes on the manual model. `inTurnFallback: off` leaves the failure terminal, as does a second failure in the same step, which runs on the manual route. The invariant companion rejects a `route-failed` decision that does not directly follow the same step's downgraded decision for the failed provider, and a later request header in that turn that runs the failed route.
 
 ## The sticky streak
 
-A held downgrade survives a failed gate until `minTurnsDowngraded` turns have elapsed; the documented horizon is 5, and `0` disables stickiness so every turn is judged on its own. While a streak is held, every new step is judged against the latest surface with fresh route and difficulty answers and full capability assessment. A same-step retry reuses its step's decision only while its complete candidate inputs are unchanged, after rechecking manual selection, allowlist membership, and capabilities. The selection's reasoning effort is fixed when the streak is entered, including a `difficultyToEffort` lift; a later effort change is a candidate change, held off until the horizon like any other. A turn that turns hard ends the streak immediately at any elapsed count once `difficulty.score` reaches `escalateBack.scoreThreshold` (documented 4). The streak also ends immediately when the manual provider or model differs from the route it was entered on — only those two fields are compared, so an unrelated header change such as a plan-mode toggle cannot break a streak — when `model-routing/mode` flips off, and when the durable route-failure streak reaches `maxRouteErrors` (documented 2). A manual, `kept-strong`, or `error` decision keeps the manual route for the rest of that turn, subject to the existing mode on/off override. The horizon counts turns, not steps.
+A held downgrade survives a failed gate until `minTurnsDowngraded` turns have elapsed; the documented horizon is 5, and `0` disables stickiness so every turn is judged on its own. While a streak is held, every new step is judged against the latest surface with fresh route and difficulty answers and full capability assessment. A same-step retry reuses its step's decision only while its complete candidate inputs are unchanged, after rechecking manual selection, allowlist membership, and capabilities. The selection's reasoning effort is fixed when the streak is entered, including a `difficultyToEffort` lift; a later effort change is a candidate change, held off until the horizon like any other. A turn that turns hard ends the streak immediately at any elapsed count once `difficulty.score` reaches `escalateBack.scoreThreshold` (documented 4). The streak also ends immediately when the manual provider or model differs from the route it was entered on — only those two fields are compared, so an unrelated header change such as a plan-mode toggle cannot break a streak — when `model-routing/mode` flips off, when a downgraded request fails and the in-turn fallback retries its step on the manual route (`route-failed`), and when the durable route-failure streak reaches `maxRouteErrors` (documented 2). That streak counts terminal failures of a held route, and `route-failed` decisions for one candidate across streaks; a completed turn on that candidate or a route-error break resets the latter count. A manual, `kept-strong`, or `error` decision keeps the manual route for the rest of that turn, subject to the existing mode on/off override. The horizon counts turns, not steps.
 
 These judgments use the latest bounded surface and establish routing mechanics only; they do not establish real-model task quality, completion, or security.
 
@@ -242,6 +264,7 @@ type ModelRoutingBreakReason =
   | 'manual-deviation'
   | 'mode-off'
   | 'route-errors'
+  | 'route-failed'
 ```
 
 ```ts type-equiv
@@ -366,13 +389,21 @@ interface ModelRouterConfig {
   /** Escalate-back operating point. */
   escalateBack?: ModelRoutingEscalateBackConfig
   /**
-   * Consecutive candidate failures that require a manual-model turn. Recorded
-   * on each held decision; settings changes affect subsequent decisions.
-   * Defaults to 2.
+   * Consecutive candidate failures that require a manual-model turn: terminal
+   * failures of a held route, or `route-failed` decisions for one candidate
+   * across streaks. Recorded on each held decision; settings changes affect
+   * subsequent decisions. Defaults to 2.
    */
   maxRouteErrors?: number
   /** What a failed judgment call does to the turn. Defaults to `fallback`. */
   onUnavailable?: ModelRoutingUnavailablePolicy
+  /**
+   * What a failed downgraded request does to its step. `manual` records a
+   * `route-failed` decision and retries the step on the manual route after
+   * every other recovery listener declined; `off` leaves the failure terminal.
+   * Defaults to `manual`.
+   */
+  inTurnFallback?: ModelRoutingInTurnFallback
   /**
    * Optional effort lift for a route entering a streak on a hard step; the
    * streak keeps its entry effort. Omitted — or written as a valueless key,

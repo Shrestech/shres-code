@@ -21,7 +21,7 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@shres-code/cordis'
 import AgentRegistry, { agentEvents } from '@shres-code/shres-code-agent'
-import type { Agent, ModelSelection } from '@shres-code/shres-code-agent'
+import type { Agent, ModelSelection, RequestErrorAction } from '@shres-code/shres-code-agent'
 import CommandRuntime from '@shres-code/shres-code-commands'
 import JudgmentService, { JUDGMENT_SETTINGS_NAMESPACE, JudgmentError } from '@shres-code/shres-code-judgment'
 import type {
@@ -43,6 +43,7 @@ import LlmRuntime, {
 import type {
   GenerateOptions,
   LlmCallConfigAdapterDefaults,
+  LlmFailure,
   LlmResolvedModelInfo,
   ModelModality,
   StreamChunk,
@@ -211,6 +212,8 @@ interface Bench {
   engine: ScriptedJudgment
   adapter: RoutingCapabilityAdapter
   llmFiber?: { dispose(): Promise<void> }
+  /** The router's own plugin fiber, for disposal cases. */
+  routerFiber: { dispose(): Promise<void> }
   /** One consult for a turn, against the strong manual route by default. */
   resolve(turn?: number, base?: ModelSelection, signal?: AbortSignal, step?: number): Promise<ModelSelection | undefined>
   decisions(): ModelRoutingDecision[]
@@ -253,7 +256,7 @@ async function bench(options: BenchOptions = {}): Promise<Bench> {
     await ctx.plugin(CommandRuntime)
     await new Promise(resolve => setImmediate(resolve))
   }
-  await ctx.plugin(ModelRoutingController, config)
+  const routerFiber = await ctx.plugin(ModelRoutingController, config)
   const session = ctx.sessions.create()
   const agent = agentFor(session, ctx)
   ctx.agents.register(agent)
@@ -269,6 +272,7 @@ async function bench(options: BenchOptions = {}): Promise<Bench> {
     engine: ctx.judgment as ScriptedJudgment,
     adapter,
     ...llmFiber === undefined ? {} : { llmFiber },
+    routerFiber,
     resolve: (turn = 1, base = STRONG, requestSignal = signal, step = 1) =>
       ctx.modelRouting.resolveRequest(agent, turn, step, base, requestSignal, {
         config: base,
@@ -2223,6 +2227,7 @@ describe('configuration at plugin load', () => {
       escalateBackScoreThreshold: 3,
       maxRouteErrors: 2,
       onUnavailable: 'fallback',
+      inTurnFallback: 'manual',
       tier: 'fast',
       state: { contextTurns: 2, maxChars: 12_000, maxFitCandidates: 8 },
     })
@@ -2288,6 +2293,208 @@ describe('configuration at plugin load', () => {
     await missing.plugin(SessionStore)
     await expect(missing.plugin(ModelRoutingController, { ...CONFIG, routeInstructions: '' }))
       .rejects.toThrow(/ModelRouterConfig.routeInstructions must be a non-empty string/)
+  })
+})
+
+describe('in-turn fallback', () => {
+  /** A failure the loop reports for one attempt on a route. */
+  function failure(code = 'AUTH'): LlmFailure {
+    return { message: 'the route failed', code }
+  }
+
+  /**
+   * Dispatch the loop's request-error waterfall for one failed attempt; the
+   * terminal `next` is what the loop supplies when no listener recovers.
+   */
+  function requestError(
+    b: Bench,
+    options: { turn?: number; step?: number; provider?: string; code?: string; signal?: AbortSignal } = {},
+  ): Promise<RequestErrorAction> {
+    return agentEvents(b.ctx, b.agent).waterfall(
+      'agent/request-error',
+      {
+        turn: options.turn ?? 1,
+        step: options.step ?? 1,
+        provider: options.provider ?? CHEAP.provider,
+        failure: failure(options.code),
+        retryPolicy: undefined,
+        signal: options.signal ?? b.signal,
+      },
+      () => Promise.resolve(undefined),
+    )
+  }
+
+  /** Route turn 1 step 1 to the candidate and log the request header and error chunk the loop would. */
+  async function routedAndFailed(options: BenchOptions = {}): Promise<Bench> {
+    const b = await bench(options)
+    openTurn(b.session, 1)
+    user(b.session, 'a small change')
+    expect(await b.resolve(1)).toEqual(CHEAP)
+    header(b.session, CHEAP.provider, CHEAP.model)
+    b.session.append('assistant/chunk', {
+      turn: 1,
+      step: 1,
+      chunk: { type: 'finish', reason: { kind: 'error', failure: failure() } },
+    })
+    return b
+  }
+
+  it('candidate stream error retries the same step on the manual route', async () => {
+    const b = await routedAndFailed()
+    const failedChunkSeq = b.session.events.at(-1)?.seq
+
+    expect(await requestError(b)).toEqual({ kind: 'retry' })
+    expect(b.decision(1)).toEqual({
+      outcome: 'kept-strong',
+      reason: 'route-failed',
+      stateHash: b.decision(0).stateHash,
+      stateSeqs: b.decision(0).stateSeqs,
+      failure: { code: 'AUTH', provider: CHEAP.provider, model: CHEAP.model },
+      failedChunkSeq,
+      sticky: { active: false, turnsElapsed: 0, brokenBy: 'route-failed', entryBase: STRONG },
+    })
+
+    // The retried request resolves the manual route without a second judgment,
+    // including when the caller's manual base is the failed header's route.
+    expect(await b.resolve(1)).toBeUndefined()
+    expect(await b.resolve(1, CHEAP)).toEqual(STRONG)
+    expect(b.engine.asks).toHaveLength(1)
+    expect(b.decisions()).toHaveLength(2)
+    expect(stickyState(b.session.events)).toMatchObject({ active: false, brokenBy: 'route-failed' })
+
+    // A second failure in that step, now on the manual route, stays terminal.
+    header(b.session, STRONG.provider, STRONG.model)
+    expect(await requestError(b, { provider: STRONG.provider })).toBeUndefined()
+    expect(b.decisions()).toHaveLength(2)
+  })
+
+  it('defers to llm-retry when it schedules a retry', async () => {
+    const b = await routedAndFailed()
+    // A downstream listener standing in for llm-retry: it owns a transient retry.
+    let downstreamCalls = 0
+    b.ctx.on('agent/request-error', async (_payload, next) => {
+      downstreamCalls += 1
+      const action = await next()
+      return action ?? { kind: 'retry' }
+    })
+
+    expect(await requestError(b)).toEqual({ kind: 'retry' })
+    expect(downstreamCalls).toBe(1)
+    expect(b.decisions()).toHaveLength(1)
+    // The candidate's retry keeps the downgraded pin.
+    expect(await b.resolve(1)).toEqual(CHEAP)
+  })
+
+  it('inTurnFallback off leaves the failure terminal', async () => {
+    const b = await routedAndFailed({ config: { ...CONFIG, inTurnFallback: 'off' } })
+
+    expect(await requestError(b)).toBeUndefined()
+    expect(b.decisions()).toHaveLength(1)
+  })
+
+  it('aborted failure is not converted', async () => {
+    const b = await routedAndFailed()
+    const controller = new AbortController()
+    controller.abort()
+
+    expect(await requestError(b, { code: 'ABORTED' })).toBeUndefined()
+    expect(await requestError(b, { signal: controller.signal })).toBeUndefined()
+    expect(b.decisions()).toHaveLength(1)
+  })
+
+  it('converts only the request this controller routed', async () => {
+    const b = await routedAndFailed()
+
+    // Another step, another turn, or another provider did not run the downgrade.
+    expect(await requestError(b, { step: 2 })).toBeUndefined()
+    expect(await requestError(b, { turn: 2 })).toBeUndefined()
+    expect(await requestError(b, { provider: STRONG.provider })).toBeUndefined()
+    expect(b.decisions()).toHaveLength(1)
+
+    // A manual decision for the step, or no request header yet, is not a downgrade that failed.
+    const kept = await bench()
+    openTurn(kept.session, 1)
+    kept.engine.choice = LOW_CONFIDENCE
+    expect(await kept.resolve(1)).toBeUndefined()
+    header(kept.session, STRONG.provider, STRONG.model)
+    expect(await requestError(kept, { provider: STRONG.provider })).toBeUndefined()
+    const unsent = await bench()
+    openTurn(unsent.session, 1)
+    expect(await unsent.resolve(1)).toEqual(CHEAP)
+    expect(await requestError(unsent)).toBeUndefined()
+    expect(unsent.decisions()).toHaveLength(1)
+    // A header from an earlier turn that ran the selection's provider with
+    // another model is not the failed attempt either.
+    const stale = await bench()
+    openTurn(stale.session, 1)
+    header(stale.session, CHEAP.provider, 'cheap-model-previous')
+    closeTurn(stale.session, 1)
+    openTurn(stale.session, 2)
+    expect(await stale.resolve(2)).toEqual(CHEAP)
+    expect(await requestError(stale, { turn: 2 })).toBeUndefined()
+    expect(stale.decisions()).toHaveLength(1)
+  })
+
+  it('records no failed chunk when the failed attempt logged none', async () => {
+    const b = await bench()
+    openTurn(b.session, 1)
+    expect(await b.resolve(1)).toEqual(CHEAP)
+    header(b.session, CHEAP.provider, CHEAP.model)
+
+    expect(await requestError(b)).toEqual({ kind: 'retry' })
+    expect(b.decision(1)).not.toHaveProperty('failedChunkSeq')
+    // An unrelated route in force for the retry keeps its own manual choice.
+    expect(await b.resolve(1, MID)).toBeUndefined()
+  })
+
+  it('only delegates after the plugin fiber is disposed', async () => {
+    const b = await routedAndFailed()
+    // Capture the router's callback mid-dispatch, as a waterfall in flight holds it.
+    const captured = Promise.withResolvers<undefined>()
+    let resume: (() => void) | undefined
+    b.ctx.on('agent/request-error', async (_payload, next) => {
+      await new Promise<void>((resolve) => {
+        resume = resolve
+        captured.resolve(undefined)
+      })
+      return next()
+    })
+    const pending = requestError(b)
+    await captured.promise
+    await b.routerFiber.dispose()
+    resume?.()
+
+    expect(await pending).toBeUndefined()
+    expect(b.decisions()).toHaveLength(1)
+  })
+
+  it('a callback entered after disposal only delegates', async () => {
+    const b = await routedAndFailed()
+    // A waterfall captured the router's listener before its fiber was disposed
+    // and enters it afterwards: the stale callback must not append a decision.
+    let downstreamCalls = 0
+    b.ctx.on('agent/request-error', async (_payload, next) => {
+      downstreamCalls += 1
+      return next()
+    })
+    const upstream = Promise.withResolvers<undefined>()
+    const entered = Promise.withResolvers<undefined>()
+    b.ctx.on('agent/request-error', async (_payload, next) => {
+      entered.resolve(undefined)
+      await upstream.promise
+      return next()
+    }, { prepend: true })
+    const pending = requestError(b)
+    await entered.promise
+    await b.routerFiber.dispose()
+    upstream.resolve(undefined)
+
+    expect(await pending).toBeUndefined()
+    expect(downstreamCalls).toBe(1)
+    expect(b.decisions()).toHaveLength(1)
+    // A fresh dispatch after disposal no longer reaches the router at all.
+    expect(await requestError(b)).toBeUndefined()
+    expect(b.decisions()).toHaveLength(1)
   })
 })
 

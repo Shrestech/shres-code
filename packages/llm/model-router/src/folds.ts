@@ -75,6 +75,13 @@ export interface ModelRoutingStickyFoldState {
   readonly recoveryBase?: ModelRoutingEntryBaseView
   /** Whether the recovery turn's latest matching request header was seen. */
   readonly recoveryHeaderMatches?: boolean
+  /**
+   * Consecutive `route-failed` decisions for one candidate. It survives the
+   * streak each failure ends, so repeated in-turn fallbacks reach the recorded
+   * error limit; a completed turn on that candidate or a route-error break
+   * clears it.
+   */
+  readonly candidateFailures?: { readonly candidate: ModelRoutingSelection; readonly count: number }
 }
 
 /**
@@ -244,6 +251,7 @@ function breakForRouteErrors(state: ModelRoutingStickyFoldState): ModelRoutingSt
   const {
     recoveryTurn: _recoveryTurn,
     recoveryHeaderMatches: _recoveryHeaderMatches,
+    candidateFailures: _candidateFailures,
     ...withoutRecoveryTurn
   } = clearActiveFields(state)
   return {
@@ -253,6 +261,23 @@ function breakForRouteErrors(state: ModelRoutingStickyFoldState): ModelRoutingSt
     routeFailures: 0,
     ...recoveryBase === undefined ? {} : { recoveryBase },
   }
+}
+
+/**
+ * Count one `route-failed` decision against the held candidate and end its
+ * streak. Reaching the recorded error limit is a route-error break, which
+ * requires a manual recovery turn exactly as terminal failures do.
+ * @param state - the active accumulator whose held route failed.
+ * @returns the broken state, or the route-error break at the limit.
+ */
+function failRoute(state: ModelRoutingStickyFoldState): ModelRoutingStickyFoldState {
+  assertRouteErrorLimit(state.routeErrorLimit)
+  const candidate = state.candidate
+  if (candidate === undefined) return breakSticky(state, 'route-failed')
+  const previous = state.candidateFailures
+  const count = previous !== undefined && sameSelection(previous.candidate, candidate) ? previous.count + 1 : 1
+  if (count >= state.routeErrorLimit) return breakForRouteErrors(state)
+  return { ...breakSticky(state, 'route-failed'), candidateFailures: { candidate, count } }
 }
 
 /**
@@ -339,6 +364,12 @@ export function advanceStickyFoldState(
         const routeFailures = isRouteFailure(event.data.reason) ? state.routeFailures + 1 : 0
         if (routeFailures >= state.routeErrorLimit) next = breakForRouteErrors(state)
         else if (state.routeFailures !== routeFailures) next = { ...state, routeFailures }
+        // A completed turn on the candidate ends its run of in-turn fallbacks.
+        if (event.data.reason.kind === 'completed' && state.candidateFailures !== undefined
+          && sameSelection(state.candidateFailures.candidate, state.candidate)) {
+          const { candidateFailures: _candidateFailures, ...recovered } = next
+          next = recovered
+        }
       }
       return isRecoveryProof(next, event) ? clearRecoveryFields(next) : next
     }
@@ -349,6 +380,7 @@ export function advanceStickyFoldState(
     case 'model-routing/decision': {
       const sticky = event.data.sticky
       validateStickyView(sticky)
+      if (!sticky.active && sticky.brokenBy === 'route-failed') return state.active ? failRoute(state) : state
       if (sticky.active) {
         const candidate = event.data.selection ?? state.candidate
         const entering = !state.active

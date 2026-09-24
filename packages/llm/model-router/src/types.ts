@@ -184,6 +184,8 @@ export type ModelRoutingReason =
   | 'manual-deviation'
   /** Durable route failures reached `maxRouteErrors`. */
   | 'route-errors'
+  /** The downgraded request failed, and the step retries on the manual route. */
+  | 'route-failed'
   /** Routing is off, so this turn was not judged. */
   | 'mode-off'
   /** The judgment call itself failed and `onUnavailable` is `error`. */
@@ -199,6 +201,7 @@ export type ModelRoutingBreakReason =
   | 'manual-deviation'
   | 'mode-off'
   | 'route-errors'
+  | 'route-failed'
 
 /** The manual route a streak was entered on, as the decision records it. */
 export interface ModelRoutingEntryBaseView {
@@ -322,6 +325,20 @@ export interface ModelRoutingDecision {
   model?: string
   /** Duration of the judgment call in milliseconds, when one was made. */
   latencyMs?: number
+  /** The failed downgraded request a `route-failed` decision retries on the manual route. */
+  failure?: ModelRoutingFailure
+  /** Seq of the failed attempt's last `assistant/chunk`, when the attempt logged one. */
+  failedChunkSeq?: number
+}
+
+/** The downgraded request whose failure a `route-failed` decision records. */
+export interface ModelRoutingFailure {
+  /** Provider-neutral failure code the adapter reported. */
+  code: string
+  /** Registered provider route of the failed request. */
+  provider: string
+  /** Model id of the failed request. */
+  model: string
 }
 
 /**

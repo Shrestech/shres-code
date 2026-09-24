@@ -195,6 +195,41 @@ describe('model-router invariant companion', () => {
     expect(() => { header(session, 'strong', 'strong-model', 'You are the strong-model model.') }).not.toThrow()
   })
 
+  it('requires a route-failed decision to follow the same step\'s downgrade for its provider', async () => {
+    const ctx = await setup()
+    const routeFailed = (provider = 'cheap-provider') => decision({
+      outcome: 'kept-strong',
+      reason: 'route-failed',
+      selection: undefined,
+      failure: { code: 'AUTH', provider, model: 'cheap-model' },
+      sticky: { active: false, turnsElapsed: 0, brokenBy: 'route-failed', entryBase: { provider: 'strong', model: 'strong-model' } },
+    })
+    const rejected = /a route-failed decision must follow the same step's downgraded decision for the failed provider/
+
+    // No decision, a step boundary, or another provider breaks the relation.
+    const none = ctx.sessions.create()
+    expect(() => { none.append('model-routing/decision', routeFailed()) }).toThrow(rejected)
+    const stepped = ctx.sessions.create()
+    stepped.append('model-routing/decision', decision())
+    stepped.append('step/start', { turn: 1, step: 2 })
+    expect(() => { stepped.append('model-routing/decision', routeFailed()) }).toThrow(rejected)
+    const other = ctx.sessions.create()
+    other.append('model-routing/decision', decision())
+    expect(() => { other.append('model-routing/decision', routeFailed('other-provider')) }).toThrow(rejected)
+
+    // The same step's downgrade for the provider admits it, and the retried
+    // request must then leave the failed route.
+    const valid = ctx.sessions.create()
+    valid.append('turn/start', { turn: 1 })
+    valid.append('model-routing/decision', decision())
+    header(valid, 'cheap-provider', 'cheap-model')
+    expect(() => { valid.append('model-routing/decision', routeFailed()) }).not.toThrow()
+    expect(() => { header(valid, 'cheap-provider', 'cheap-model') }).toThrow(/the retry after a route-failed decision runs the failed route/)
+    // The same provider with another model is not the failed route.
+    expect(() => { header(valid, 'cheap-provider', 'cheap-model-2') }).not.toThrow()
+    expect(() => { header(valid, 'strong', 'strong-model', 'You are the strong-model model.') }).not.toThrow()
+  })
+
   it('refuses a recovery request whose decision has no recorded manual route', async () => {
     const ctx = await setup()
     const session = ctx.sessions.create()

@@ -19,7 +19,10 @@ export const inject = ['invariants']
  * Install the routing contract the log must always satisfy: inside the turn that
  * took it, a downgrade or error-recovery decision is followed by a
  * `request/header` whose config carries the selected route, and a downgraded
- * request's system prompt does not name the manual model.
+ * request's system prompt does not name the manual model. A `route-failed`
+ * decision directly follows the same step's downgraded decision, with no turn
+ * or step boundary between them, and names the provider that decision selected;
+ * the request headers after it in its turn do not run the route that failed.
  *
  * That relation is the whole point of the feature — the decision is only
  * meaningful if the loop actually ran the downgraded route — and it is owned
@@ -52,6 +55,10 @@ const install: InvariantInstaller = (ctx: Context, fail: InvariantFailure) => {
       }
       return
     }
+    if (event.type === 'model-routing/decision') {
+      if (event.data.reason === 'route-failed') checkRouteFailed(session.events, event.data, fail)
+      return
+    }
     if (event.type !== 'request/header') return
     let turnStartSeq = -1
     let decided: ModelRoutingDecision | undefined
@@ -65,6 +72,14 @@ const install: InvariantInstaller = (ctx: Context, fail: InvariantFailure) => {
     }
     // Only the decision this turn took is in force for this header.
     if (decided === undefined || decisionSeq < turnStartSeq) return
+    const failed = decided.reason === 'route-failed' ? decided.failure : undefined
+    if (failed !== undefined) {
+      const retried = event.data.header.config
+      if (retried.provider === failed.provider && retried.model === failed.model) {
+        fail(`the retry after a route-failed decision runs the failed route (${failed.provider}/${failed.model})`)
+      }
+      return
+    }
     const recovery = decided.outcome === 'kept-strong' && decided.reason === 'route-errors'
     if (decided.outcome !== 'downgraded' && !recovery) return
     const selection = recovery ? decided.sticky.entryBase : decided.selection
@@ -94,6 +109,25 @@ const install: InvariantInstaller = (ctx: Context, fail: InvariantFailure) => {
       )
     }
   }, { global: true })
+}
+
+/**
+ * Require a `route-failed` decision to retry the step a downgrade selected:
+ * the last decision before it, with no `turn/start` or `step/start` between,
+ * is downgraded and selected the failed provider.
+ * @param events - the session log before the decision is published.
+ * @param decision - the `route-failed` decision being appended.
+ * @param fail - the reporter that rejects the append.
+ */
+function checkRouteFailed(events: readonly SessionEvent[], decision: ModelRoutingDecision, fail: InvariantFailure): void {
+  let previous: ModelRoutingDecision | undefined
+  for (const candidate of events) {
+    if (candidate.type === 'model-routing/decision') previous = candidate.data
+    else if (candidate.type === 'turn/start' || candidate.type === 'step/start') previous = undefined
+  }
+  if (previous?.outcome !== 'downgraded' || previous.selection?.provider !== decision.failure?.provider) {
+    fail('a route-failed decision must follow the same step\'s downgraded decision for the failed provider')
+  }
 }
 
 /**

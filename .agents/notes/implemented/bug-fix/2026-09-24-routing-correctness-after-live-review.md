@@ -10,6 +10,8 @@ The manual route could appear on its own allowlist. With `zai/glm-5.3` as the ma
 
 Routed requests also misidentified their model. The shipped personas rendered `You are a coding agent powered by the {{model}} model`, and `{{model}}` resolves to the manual model when the system prompt is assembled, once per turn and before routing rewrites the request configuration. A routed DeepSeek or Kimi request was therefore told that it was the manual model.
 
+A failed candidate request failed the user's turn. The router registered no `agent/request-error` listener, so a candidate failure that llm-retry did not retry ended the turn with an error, although the manual model could have served it. The route-error breaker counted such failures only while a streak was active, after the turn was already lost.
+
 Effort also moved inside a streak. The `difficultyToEffort` lift was recomputed from every step's difficulty answer, so a held candidate switched between its own effort and the lifted effort as the answers varied, while the streak comparison looked only at the candidate id. Anthropic invalidates cached message blocks when the request's effort changes, so each switch re-prefilled the conversation, and the fold, which compares effort, reset the route-failure count on changes the decision recorded as a continued streak.
 
 ## Decision
@@ -36,6 +38,18 @@ The headless and Web bundle personas and the `code`, `standard`, and `cordis` ag
 
 The model-router invariant companion rejects, before publication, a `request/header` that follows a downgraded decision in the same turn and whose system prompt contains that decision's manual model id, `sticky.entryBase.model`, with `routed request names the manual model`. A route-error recovery request runs the manual route and is exempt. The comparison is a substring match on the model id, and it runs wherever the invariant registry is composed; the shipped bundles do not compose it.
 
+### A failed downgraded request retries on the manual route
+
+The router registers an `agent/request-error` listener while it is composed. The listener calls `next()` first, so llm-retry keeps ownership of transient retries in any listener order: a `retry` from downstream is returned unchanged, and the candidate's retry reuses the step's downgraded pin. When nothing downstream retries, `inTurnFallback` is `manual` (the default), the failure is not a cancellation, and the failed request is the step this router downgraded, the router:
+
+- appends a `kept-strong` / `route-failed` decision that records the failed request in `failure` and the attempt's last `assistant/chunk` in `failedChunkSeq`;
+- re-pins the step to that decision, keeping the manual route recorded as the streak's entry base;
+- returns `retry`.
+
+The retried request resolves the manual route without another judgment. When the caller's manual base is the failed header's route, which happens for an agent without an installed session selection, the pin supplies the recorded manual route. The decision precedes the retried request's header. The invariant companion rejects a `route-failed` decision that does not directly follow the same step's downgraded decision for the failed provider, and a later header in that turn that runs the failed route. A failure of the manual retry is terminal. `inTurnFallback: off` keeps failures terminal for a deployment that wants them visible.
+
+The breaker counts `route-failed` decisions for one candidate across the streaks they end, in a new fold field; the projection's state version moves to 6 so a stored accumulator from before is rebuilt. Reaching `maxRouteErrors` is a route-error break with the existing manual recovery turn. A completed turn on the candidate, another candidate's failure, or a route-error break resets the count. Terminal failures of a held route still count while the streak is active.
+
 ## Alternatives considered
 
 **Omit the duplicate from the question only.** An engine answer naming it would reach the gate as an unknown candidate, and `sticky-hold` treats every gate failure below the horizon as a reason to keep the held cheap route. The answer has to be read as the current model before the gate.
@@ -50,6 +64,12 @@ The model-router invariant companion rejects, before publication, a `request/hea
 
 **Rewrite the system prompt for each routed request.** The `agent/request` waterfall grants the consult authority over the request configuration only. A per-request prompt rewrite would be a model-visible input with no session event of its own, and it would change the cached prefix on every route change.
 
+**Recover before llm-retry.** A listener that converts a failure before calling `next()` would replace every transient retry of the candidate with a switch to the manual model, even for a rate limit the candidate would have served on its next attempt, and its behavior would depend on listener order.
+
+**Judge the retried request again.** The failed step already has a decision; asking the engine again could select the failed candidate a second time, and it adds judgment latency to a recovery path.
+
+**Count in-turn fallbacks only while a streak is active.** Each `route-failed` decision ends its streak, so a candidate that fails on every entry would never reach `maxRouteErrors`, and every turn would pay one failed candidate attempt before its manual retry.
+
 **Keep same-model effort candidates as downgrades.** A different effort on the same model is not a model downgrade. On Anthropic routes an effort change invalidates the cached message blocks, so it costs a full re-prefill without the price difference a cheaper model provides.
 
 ## Consequences
@@ -57,5 +77,7 @@ The model-router invariant companion rejects, before publication, a `request/hea
 An allowlist cannot express a same-model effort downgrade; a deployment that wants a lower effort changes the manual selection. A session whose manual pick is its only candidate skips the judgment call on every turn. The allowlist still carries no cost or strength ordering relative to the manual route, so a candidate naming a different model can be lateral or stronger; per-base candidate lists are proposed in the [routing proposal](../../proposed/feature/2026-09-17-jev-judgment-routing-and-compaction.md).
 
 `eligibility.spec.ts` pins the `equals-base` classification, including a same-model candidate at another effort, and the absence of a metadata lookup for it. `controller.spec.ts` pins the omitted question option, the judgment-free `candidate-equals-base` resolution, the `candidate-ineligible` resolution for a mixed allowlist, and the held-streak exit through `current-preferred`. The keyless `model-router-keep-current` snapshot configures a base-equal candidate and records its `equals-base` assessment in the logged decision. `controller.spec.ts` also pins an effort lift fixed at entry in both directions, and a configured effort change that is held below the horizon and enters as a new streak after it, with and without a lift configured.
+
+`controller.spec.ts` pins the in-turn fallback through the real `agent/request-error` waterfall: a converted failure with its exact decision, the manual retry without a second judgment, deference to a downstream retry, `inTurnFallback: off`, cancellation, requests this router did not route, and a callback captured or entered after the plugin fiber is disposed. `folds.spec.ts` pins the count across streaks and its resets. `provider-composition.spec.ts` boots both real judgment providers through the Loader and completes a turn on the manual model after a 500 from the candidate. The keyless `model-router-fallback` snapshot records two converted failures and the route-error recovery turn they trigger. Compositions that test terminal candidate failures, including the keyless `model-router-on` snapshot and its recovery arm, set `inTurnFallback: off`.
 
 The shipped personas no longer state which model is running, a product-visible prompt change that the keyless Web fixture `fresh-round-trip/system-prompt.expected.md` pins. A deployment persona that interpolates `{{model}}` is incompatible with routing wherever invariants are composed. The ACP example personas and the headless example's base composition still interpolate it because they compose no router. `invariant.spec.ts` pins the rejection and the recovery exemption through real session appends. The Loader composition in `composition.spec.ts` runs a downgraded turn with the shipped headless persona and the companion composed, and a negative control whose `{{model}}` persona ends the turn with the guard's error before any model request.

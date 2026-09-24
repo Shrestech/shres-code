@@ -289,6 +289,9 @@ describe('resolveConfig bounds', () => {
   it('requires a known unavailable policy and tier', () => {
     expect(() => resolveConfig(raw({ onUnavailable: 'skip' })))
       .toThrow('ModelRouterConfig.onUnavailable must be "fallback" or "error"')
+    expect(() => resolveConfig(raw({ inTurnFallback: 'retry' })))
+      .toThrow('ModelRouterConfig.inTurnFallback must be "manual" or "off"')
+    expect(resolveConfig(valid({ inTurnFallback: 'off' })).inTurnFallback).toBe('off')
     expect(() => resolveConfig(raw({ tier: 'slow' })))
       .toThrow('ModelRouterConfig.tier must be "fast" or "accurate"')
     expect(resolveConfig(valid({ onUnavailable: 'error', tier: 'accurate' })).onUnavailable).toBe('error')
@@ -380,6 +383,7 @@ describe('resolveConfig defaults and detachment', () => {
     expect(resolved.maxRouteErrors).toBe(DEFAULT_MAX_ROUTE_ERRORS)
     expect(resolved.maxRouteErrors).toBe(2)
     expect(resolved.onUnavailable).toBe('fallback')
+    expect(resolved.inTurnFallback).toBe('manual')
     expect(resolved.tier).toBe('fast')
     expect(resolved.state).toEqual({
       contextTurns: DEFAULT_STATE_CONTEXT_TURNS, maxChars: DEFAULT_STATE_MAX_CHARS, maxFitCandidates: DEFAULT_STATE_MAX_FIT_CANDIDATES,

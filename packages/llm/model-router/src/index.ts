@@ -29,10 +29,18 @@
  */
 
 import { Context, Service, symbols } from '@shres-code/cordis'
+import type { Events } from '@shres-code/cordis'
 import z from '@shres-code/schemastery'
 import { z as zod } from 'zod'
 import type { ZodType } from 'zod'
-import type { Agent, ModelRoutingConsult, ModelRoutingRequest, ModelSelection, PreStepDecision } from '@shres-code/shres-code-agent'
+import type {
+  Agent,
+  ModelRoutingConsult,
+  ModelRoutingRequest,
+  ModelSelection,
+  PreStepDecision,
+  RequestErrorAction,
+} from '@shres-code/shres-code-agent'
 import { judgmentEnabled, judgmentQuestionId } from '@shres-code/shres-code-judgment'
 import type {
   JudgmentChoiceAnswer,
@@ -146,6 +154,8 @@ interface PinnedDecision {
   inputKey: string
   /** The logged decision. */
   decision: ModelRoutingDecision
+  /** For a `route-failed` pin: the route that failed and the manual route its retry runs. */
+  manualRetry?: { readonly failed: ModelRoutingSelection; readonly manual: ModelSelection }
 }
 
 /** A mode change awaiting an accepted request boundary. */
@@ -343,6 +353,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     }),
     maxRouteErrors: z.number().step(1).min(1).default(DEFAULT_MAX_ROUTE_ERRORS),
     onUnavailable: z.union(['fallback', 'error']).default('fallback'),
+    inTurnFallback: z.union(['manual', 'off']).default('manual'),
     // Both optional field groups are unions with `z.const(null)`: schemastery
     // materializes an absent bare object as `{}` (probe-verified), which would
     // make the router see a lift or a hint the deployment never wrote. The
@@ -396,6 +407,19 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
       this.commitMode(agent.session, wanted)
       return decision
     })
+    // A failed downgraded request retries its step on the manual route only
+    // after every other recovery listener declined: calling `next()` first
+    // leaves transient retries of the candidate to their owner in any listener
+    // order. A waterfall can hold this callback past disposal, so a stale
+    // callback only delegates.
+    let recoveryLive = true
+    ctx.on('agent/request-error', async (payload, next): Promise<RequestErrorAction> => {
+      if (!recoveryLive) return next()
+      const downstream = await next()
+      if (!recoveryLive || downstream?.kind === 'retry') return downstream
+      return this.fallBackToManual(payload)
+    })
+    ctx.effect(() => () => { recoveryLive = false })
     ctx.inject(['sessionProjections'], (projectionCtx) => {
       projectionCtx.sessionProjections.register<'modelRouting', ModelRoutingUnitState>({
         key: 'modelRouting',
@@ -453,8 +477,8 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
             },
           }
         },
-        // Configuration mode is a durable fact; empty logs always start off.
-        stateVersion: 5,
+        // Route-failed decisions count against their candidate across streaks.
+        stateVersion: 6,
       })
     })
     ctx.inject(['commands'], (commandCtx) => {
@@ -663,6 +687,11 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
             return this.revalidatePinned(agent, turn, step, pinned.decision, base, request, signal)
           }
         }
+      } else if (pinned.manualRetry !== undefined) {
+        // Without an installed session selection, the manual base is read from
+        // the last request header, which carries the route that just failed.
+        const { failed, manual } = pinned.manualRetry
+        return failed.provider === base.provider && failed.model === base.model ? manual : undefined
       } else {
         const manual = pinned.decision.sticky.entryBase
         if (pinned.decision.reason !== 'route-errors'
@@ -692,6 +721,58 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     this.log(session, decision)
     this.pins.set(session, { turn, step, inputKey: state.inputKey, decision })
     return decision.outcome === 'downgraded' ? selectionAsModel(decision.selection) : undefined
+  }
+
+  /**
+   * Retry one failed downgraded request on the manual route.
+   *
+   * Only the request this controller routed qualifies: the step's pinned
+   * decision is a downgrade, and the latest request header and the failed
+   * provider carry its selection. The `route-failed` decision is appended
+   * before the pin changes, so the retried request resolves the manual route
+   * and its header follows the decision; the pin keeps the recorded manual
+   * route for a caller whose manual base is the failed header. Cancellation and
+   * `inTurnFallback: 'off'` leave the failure terminal.
+   * @param payload - the failed attempt as the loop reported it.
+   * @returns a retry of the step, or `undefined` to leave the failure terminal.
+   */
+  private fallBackToManual(payload: Parameters<Events['agent/request-error']>[0]): RequestErrorAction {
+    const { agent, turn, step, provider, failure, signal } = payload
+    if (signal.aborted || failure.code === 'ABORTED' || this.config().inTurnFallback !== 'manual') return undefined
+    const session = agent.session
+    const pinned = this.pins.get(session)
+    if (pinned === undefined || pinned.turn !== turn || pinned.step !== step) return undefined
+    const routed = pinned.decision
+    const selection = routed.selection
+    if (routed.outcome !== 'downgraded') return undefined
+    /* v8 ignore next -- only this controller's complete downgraded decisions enter the pin. */
+    if (selection === undefined) return undefined
+    const ran = session.events.findLast((event): event is SessionEvent<'request/header'> => event.type === 'request/header')
+      ?.data.header.config
+    if (ran === undefined || ran.provider !== selection.provider || ran.model !== selection.model
+      || provider !== selection.provider) return undefined
+    const failedChunk = session.events.findLast((event): event is SessionEvent<'assistant/chunk'> =>
+      event.type === 'assistant/chunk' && event.data.turn === turn && event.data.step === step)
+    const entryBase = routed.sticky.entryBase
+    /* v8 ignore next -- a downgraded decision always records the manual route it descends beneath */
+    if (entryBase === undefined) return undefined
+    const decision: ModelRoutingDecision = {
+      outcome: 'kept-strong',
+      reason: 'route-failed',
+      stateHash: routed.stateHash,
+      stateSeqs: routed.stateSeqs,
+      failure: { code: failure.code, provider: selection.provider, model: selection.model },
+      ...failedChunk === undefined ? {} : { failedChunkSeq: failedChunk.seq },
+      sticky: {
+        active: false,
+        turnsElapsed: 0,
+        brokenBy: 'route-failed',
+        entryBase,
+      },
+    }
+    this.log(session, decision)
+    this.pins.set(session, { ...pinned, decision, manualRetry: { failed: selection, manual: modelSelectionFromEntryBase(entryBase) } })
+    return { kind: 'retry' }
   }
 
   /** Recheck a retry's held route against manual authority and current provider registrations. */

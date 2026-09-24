@@ -104,6 +104,8 @@ interface SpineOptions {
   readonly persona?: string
   /** Compose the invariant registry and this package's companion. */
   readonly invariants?: boolean
+  /** Router `inTurnFallback`; omitted keeps the documented default. */
+  readonly inTurnFallback?: 'manual' | 'off'
 }
 
 /** Boot one test-only cordis.yml through the real Loader and its include builtin. */
@@ -134,6 +136,7 @@ async function loadSpine(baseURL: string, options: SpineOptions = {}): Promise<C
     "- name: '@shres-code/shres-code-model-router'",
     '  config:',
     ...ROUTER_CONFIG,
+    ...options.inTurnFallback === undefined ? [] : [`    inTurnFallback: ${options.inTurnFallback}`],
     ...options.invariants === true
       ? ["- name: '@shres-code/shres-code-invariants'", "- name: '@shres-code/shres-code-model-router/invariant'"]
       : [],
@@ -464,7 +467,9 @@ describe('real Loader composition', () => {
   })
 
   it('restores the initial default after routed request errors and resumes from that base', { timeout: COMPOSITION_TIMEOUT_MS }, async () => {
-    const loaded = await boot('ROUTED_OK', ['success', 'rate_limit', 'rate_limit', 'success'])
+    // Terminal candidate failures drive the route-error breaker; the in-turn
+    // fallback would retry each on the manual model instead.
+    const loaded = await boot('ROUTED_OK', ['success', 'rate_limit', 'rate_limit', 'success'], { inTurnFallback: 'off' })
     const agent = createAgent(loaded, 'router-route-errors')
     const selection = loaded.agentDefaultModel.selectionFor(agent)
 
