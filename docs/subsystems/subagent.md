@@ -304,7 +304,7 @@ A local one-shot provider appends the descriptor inside the child's initial turn
 
 ## Durable enumeration: `listChildren()`, `listDescendants()`, and their entries
 
-`SubagentRuntime.listChildren(parentSessionId)` enumerates the parent's direct session-backed subagents from the live-preferred merge of `ctx.sessions.list()` and optional `ctx.sessionPersistence.list()` — no query service, and no Agent is loaded or resumed. Candidates are the direct children whose durable header carries `origin: 'subagent'`; the marker classifies enumeration and coarse generic-route denial but cannot establish a valid descriptor, resumability, or authorization — the projection fold owns identity, and the Activation contract owns resume. Each row's `mode`/`label` is the registered `subagent` projection unit's value, served through a three-rung ladder: the registry's watermark cache for a live child (zero log reads); the optional projection checkpoint cache for a cold one (`cachedSnapshot` — an identity passing the own-suffix seq gate is final, because an own descriptor is immutable once appended); otherwise one `persistence.inspect()` reading folded through the registry (bounded concurrency, recomputed per listing). The cache is a pure optional accelerator: absent, serving the `null` sentinel or missing the key, failing the seq gate, or faulting, it falls silently through to the authoritative refold. The fold is `subagent/descriptor` last-wins with no failure channel: the child's own descriptor overrides a fork-seeded ancestor's, and a malformed or unknown-version payload folds to a serializable `null` sentinel, treated as no value. The result is one `SubagentListEntry[]` in `createdAt`-then-id order: a served identity yields a `child` entry with `mode: 'one-shot' | 'continuable'` and `activity: 'running' | 'inactive'`; continuable entries always carry `label`, while one-shot entries carry it only when the start caller supplied presentation metadata. A settled candidate whose fold served no identity yields a `corrupt` diagnostic — missing, malformed, and unknown-version descriptors deliberately undistinguished (`unsupported` remains in the type but is never produced); a running candidate without an identity is omitted (the creation window before its descriptor lands); a failed cold inspection yields one `unavailable` diagnostic retried on the next listing, so one damaged sibling cannot hide healthy children. `hasChildren` marks a direct descendant with durable subagent origin, read from the same merged material. Activity snapshots only whether the logical record is live in `ctx.sessions`, not outcome or resumability. Absent persistence, enumeration is live-only rather than an error — a cold child cannot be resumed then either. `listChildren()` throws `SubagentError` with code `SUBAGENT_CONTROL_PROJECTIONS_UNAVAILABLE` when the `ctx.sessionProjections` registry is absent and `SUBAGENT_CONTROL_SESSION_STORE_UNAVAILABLE` when the session store is, both checked before any read so a deployment with zero children still fails deterministically; the list tool requires `ctx.subagents` and `ctx.agents` at plugin load. A service consumer such as a UI can display both modes and choose an unlabeled one-shot fallback, while the model-facing `list_agents` adapter (the separately loadable `/list-agents` plugin of [shres-tool-subagent-control](../../packages/subagent/tool-subagent-control)) keeps only continuable entries and refines status through the live Agent registry into its own `running`/`idle`/`ready` vocabulary, whose `ready` names a storage-only child as resumable rather than terminal. Listing does not consult the continuation manager's Activation map, Agent registry, or provider availability; `send_message` remains the authoritative delivery-time operation, and a listed running continuable child may still reject delivery as an ownership conflict. The read-path rationale lives in [the list-identity-projection Agent Note](../../.agents/notes/implemented/architecture/2026-08-06-subagent-list-identity-projection.md).
+`SubagentRuntime.listChildren(parentSessionId)` enumerates the parent's direct session-backed subagents from the live-preferred merge of `ctx.sessions.list()` and optional `ctx.sessionPersistence.list()` — no query service, and no Agent is loaded or resumed. Candidates are the direct children whose durable header carries `origin: 'subagent'`; the marker classifies enumeration and coarse generic-route denial but cannot establish a valid descriptor, resumability, or authorization — the projection fold owns identity, and the Activation contract owns resume. Each row's `mode`/`label` is the registered `subagent` projection unit's value, served through a three-rung ladder: the registry's watermark cache for a live child (zero log reads); the optional projection checkpoint cache for a cold one (`cachedSnapshot` — an identity passing the own-suffix seq gate is final, because an own descriptor is immutable once appended); otherwise one `persistence.inspect()` reading folded through the registry (bounded concurrency, recomputed per listing). The cache is a pure optional accelerator: absent, serving the `null` sentinel or missing the key, failing the seq gate, or faulting, it falls silently through to the authoritative refold. The fold is `subagent/descriptor` last-wins with no failure channel: the child's own descriptor overrides a fork-seeded ancestor's, and a malformed or unknown-version payload folds to a serializable `null` sentinel, treated as no value. The result is one `SubagentListEntry[]` in `createdAt`-then-id order: a served identity yields a `child` entry with `mode: 'one-shot' | 'continuable'` and `activity: 'running' | 'inactive'`; continuable entries always carry `label`, while one-shot entries carry it only when the start caller supplied presentation metadata. A settled candidate whose fold served no identity yields a `corrupt` diagnostic — missing, malformed, and unknown-version descriptors deliberately undistinguished (`unsupported` remains in the type but ... (line truncated to 2000 chars)
 
 `SubagentRuntime.listDescendants(rootSessionId)` applies the same live-preferred corpus and projection-backed interpretation to the root's complete descendant tree in stable pre-order. Ordinary sessions and one-shot children remain traversal nodes, so continuable descendants below them are discovered; only `origin: 'subagent'` candidates produce rows. Each returned child or diagnostic adds its position from the enumerated durable header, while a cold inspection revalidates that complete lifecycle before serving identity:
 
@@ -423,7 +423,7 @@ A local one-shot run MUST publish an ordinary child agent/session before `start(
 
 ## The provider contract: `SubagentProvider`
 
-Each provider is a named child-agent transport, and multiple providers may coexist. The service validates requested start-time capabilities before `start()`, and rejects a continuable start on a provider without `prepareContinuable`. `inheritsParentContext` describes only conversation seeding (`fork`: true; `spawn` and `acp`: false), allowing consumers to generate accurate model-facing wording without implying inherited tools, services, or authority.
+Each provider is a named child-agent transport, and multiple providers may coexist. The service validates requested start-time capabilities before `start()`, and rejects a continuable start on a provider without `prepareContinuable`. `inheritsParentContext` describes only conversation seeding (`fork`: true; `spawn` and `acp`: false), allowing consumers to generate accurate model-facing wording without implying inherited tools, services, or authority. `runsRequestedModel` states that the child runs the route named by `agentOptions`; the in-process `spawn` and `fork` backends set it, while out-of-process providers run their own configured model and omit it.
 
 ```ts type-equiv
 /**
@@ -445,6 +445,16 @@ interface SubagentProvider {
    * It says nothing about tool registration, injected services, or authority inheritance.
    */
   readonly inheritsParentContext: boolean
+  /**
+   * Whether the child runs the provider/model route named by the start
+   * request's `agentOptions`. In-process providers set it; an out-of-process
+   * provider runs its own configured model and omits it. Descriptive, like
+   * {@link inheritsParentContext}: start does not reject `agentOptions`
+   * without it, but `SubagentRuntime.resolveChildRoute` consults
+   * `subagent/child-route` only for providers that set it, so a routed model
+   * is never reported for a child that would not run it.
+   */
+  readonly runsRequestedModel?: boolean
   /**
    * Establish a ONE-SHOT child and return its handle after publication.
    * The service has already validated that every requested start-time
@@ -478,6 +488,81 @@ interface SubagentProvider {
 
 Provider `start()` fulfills with a published run. The service mints a unique `runId`, snapshots `local` from the provider's exact `localAgent`, observes the result, emits `subagent/start`, and returns the same run; a `start()` rejection implies cleanup of unpublished resources and emits no lifecycle pair, while a post-publication result rejection closes the emitted pair. Each continuable Activation emits the same observe-only pair for its residency epoch, so a cold resume is a new epoch with its own `runId`. The paired `subagent/end` carries the same identity and the final output or infrastructure failure. Both events are observe-only and contain listener exceptions. Their `provider` field names the provider that started the run or Activation epoch; it does not claim that the provider remains registered when the edge is emitted.
 
+## Child routing: `subagent/child-route`
+
+A delegation consumer may let a deployment choose a cheaper route for a fresh child. Before starting the child, the consumer calls `ctx.subagents.resolveChildRoute(provider, input)` once and passes the returned options as the start request's `agentOptions`, and derives any reported route from those same options with `effectiveChildRoute`. `tool-subagent` (kind `subagent`, with its tool name as `agentType`) and the worker-thread workflow engine (kind `workflow`) are the consuming callers; Team rosters and other direct `start()` callers never consult it.
+
+The resolver dispatches the `subagent/child-route` waterfall at most once, keyed by the delegating parent's scope, and only when the requested options name neither a provider nor a model, the provider sets `runsRequestedModel`, and the provider does not seed the child with parent history. A fork child keeps its parent's warm cached prefix and is never routed, and team seats always name their route. A listener route is merged over the inherited route and resolved with `ctx.llm.resolveModelInfo()` before return, so an unregistered route rejects with `INVALID_CHILD_ROUTE` before any child exists; agent creation itself does not validate a route. A throwing listener is logged and the child keeps its inherited route, because routing is an optional cost policy that must not fail the delegation, while a cancelled delegation rejects with its reason.
+
+The waterfall settles before any child resource exists, so a listener that records its choice appends to the parent session before returning. That record precedes the child's creation in the parent log, which is the ordering a routing policy needs to keep every routed request reconstructable.
+
+```ts type-equiv
+/** A child's provider/model route. */
+interface SubagentChildRoute {
+  /** Provider route the child runs, when known. */
+  readonly provider?: string
+  /** Model id the child runs, when known. */
+  readonly model?: string
+}
+```
+
+```ts type-equiv
+/** The delegation consumer starting a routable child. */
+type SubagentChildRouteKind = 'subagent' | 'workflow'
+```
+
+```ts type-equiv
+/**
+ * What a delegation consumer passes to `SubagentRuntime.resolveChildRoute`
+ * for one fresh child, before starting it.
+ */
+interface SubagentChildRouteInput {
+  /** The delegating parent agent. */
+  readonly parent: Agent
+  /** The delegation consumer starting the child. */
+  readonly kind: SubagentChildRouteKind
+  /**
+   * The consumer's per-child options. Naming a provider or a model makes the
+   * route explicit, and an explicit route is never consulted.
+   */
+  readonly requested?: AgentOptions
+  /**
+   * The delegating tool's model-facing name, which distinguishes differently
+   * configured delegation tools. Consumers without a tool omit it.
+   */
+  readonly agentType?: string
+  /** The child's task text. */
+  readonly prompt: string
+  /** Cancellation of the delegating call; a cancelled resolution rejects. */
+  readonly signal: AbortSignal
+}
+```
+
+```ts type-equiv
+/**
+ * The route question one `subagent/child-route` dispatch asks about a fresh
+ * child. The child does not exist yet.
+ */
+interface SubagentChildRouteRequest {
+  /**
+   * The delegating parent. A listener that records its choice appends to
+   * `parent.session` before returning, which precedes the child's creation.
+   */
+  readonly parent: Agent
+  /** The delegation consumer starting the child. */
+  readonly kind: SubagentChildRouteKind
+  /** The subagent provider the child starts on. */
+  readonly subagentProvider: string
+  /** The route the child runs when no listener answers: the parent's effective route. */
+  readonly inherited: SubagentChildRoute
+  /** The delegating tool's model-facing name, when a tool delegates. */
+  readonly agentType?: string
+  /** The child's task text. */
+  readonly prompt: string
+  /** Cancellation of the delegating call. */
+  readonly signal: AbortSignal
+}
+```
 ## In-process backends: depth and seed
 
 The spawn and fork backends create an ordinary one-shot agent through `parent.ctx`, pass cancellation into core creation, and dispose through `AgentHandle`; a continuable child is instead created by the continuation manager through its own activation-owner scope. Provider removal blocks new starts without revoking accepted runs. Each child gets a new flat scope rather than inheriting parent registrations. Depth and fork seeding reuse existing agent and session vocabulary:
@@ -662,15 +747,78 @@ list(): string[]
  * @returns the published holder-owned run.
  */
 async start(name: string, request: SubagentStartRequest): Promise<SubagentRun>
+
+/**
+ * Resolve the `agentOptions` a delegation consumer starts one fresh child
+ * with, dispatching `subagent/child-route` at most once. Consumers pass the
+ * result as the start request's `agentOptions` and derive any reported
+ * route from the same value with `effectiveChildRoute`, so the reported
+ * route and the run route cannot diverge.
+ *
+ * `input.requested` returns unchanged, without dispatch, when it names a
+ * provider or model (explicit routes win), when the provider seeds the child
+ * with parent history (fork), when the provider does not run requested
+ * routes, when no listener answers, or when the answer equals the inherited
+ * route. A throwing listener is logged and the child keeps its inherited
+ * route: routing is an optional cost policy, and a broken policy must not
+ * fail the delegation it would only have made cheaper. A cancelled
+ * `input.signal` rejects instead. A listener route is merged over the
+ * inherited route and resolved against its registered model before return,
+ * so an unregistered route rejects before any child exists; agent creation
+ * itself does not validate a route.
+ * @param name - the subagent provider the child will start on.
+ * @param input - the parent, consumer kind, requested options, task, and signal.
+ * @returns the options to start the child with, or `undefined` when none apply.
+ * @throws {SubagentError} `NO_PROVIDER` for an unregistered subagent provider,
+ *   or `INVALID_CHILD_ROUTE` when a listener route is incomplete or does not
+ *   resolve to a registered model.
+ */
+async resolveChildRoute(name: string, input: SubagentChildRouteInput): Promise<AgentOptions | undefined>
 ```
 
-Types: [Agent](core.md) · [ContentBlock](llm-streaming.md) · [MessageId](llm-streaming.md) · [SessionId](core.md)
+Types: [Agent](core.md) · [AgentOptions](core.md) · [ContentBlock](llm-streaming.md) · [MessageId](llm-streaming.md) · [SessionId](core.md)
 
-Source: [`packages/subagent/subagent/src/index.ts:240`](../../packages/subagent/subagent/src/index.ts)
+Source: [`packages/subagent/subagent/src/index.ts:272`](../../packages/subagent/subagent/src/index.ts)
 
 <a id="subagent-events"></a>
 
 ### `subagent/*` events
+
+<a id="subagentchild-route--waterfall"></a>
+
+#### `subagent/child-route` — waterfall
+
+Choose the provider/model route of one fresh child before its delegation consumer starts it. `SubagentRuntime.resolveChildRoute` dispatches this at most once per child, and only when the request names neither a provider nor a model, the subagent provider runs requested routes, and the provider does not seed the child with parent history: a fork child keeps its parent's warm cached prefix and is never routed. Team seats always name their route, so no seat reaches a listener. The returned route is merged over `request.inherited`; `undefined` keeps it.
+
+The waterfall settles before any child resource exists, so a listener that records its choice appends to `request.parent.session` before returning and that record precedes the child's creation. A throwing listener is logged and the child keeps its inherited route; a route that does not resolve to a registered model rejects the delegation. Scope-filtered dispatch keys the carrier by `request.parent`, so a listener registered on the parent's context answers only its delegations.
+
+```ts cordis-catalog
+/**
+ * Choose the provider/model route of one fresh child before its delegation
+ * consumer starts it. `SubagentRuntime.resolveChildRoute` dispatches this
+ * at most once per child, and only when the request names neither a
+ * provider nor a model, the subagent provider runs requested routes, and
+ * the provider does not seed the child with parent history: a fork child
+ * keeps its parent's warm cached prefix and is never routed. Team seats
+ * always name their route, so no seat reaches a listener. The returned
+ * route is merged over `request.inherited`; `undefined` keeps it.
+ *
+ * The waterfall settles before any child resource exists, so a listener
+ * that records its choice appends to `request.parent.session` before
+ * returning and that record precedes the child's creation. A throwing
+ * listener is logged and the child keeps its inherited route; a route that
+ * does not resolve to a registered model rejects the delegation.
+ * Scope-filtered dispatch keys the carrier by `request.parent`, so a
+ * listener registered on the parent's context answers only its delegations.
+ * @param request - the fresh child's route question.
+ * @mode waterfall
+ */
+'subagent/child-route'( this: Scoped<SubagentRuntime>, request: SubagentChildRouteRequest, next: () => Promise<SubagentChildRoute | undefined>, ): Promise<SubagentChildRoute | undefined>
+```
+
+Types: [Scoped](scope.md)
+
+Source: [`packages/subagent/subagent/src/index.ts:203`](../../packages/subagent/subagent/src/index.ts)
 
 <a id="subagentend--emit"></a>
 
@@ -692,7 +840,7 @@ A published child settled. Scope-filtered dispatch uses the same delegating pare
 
 Types: [Scoped](scope.md)
 
-Source: [`packages/subagent/subagent/src/index.ts:175`](../../packages/subagent/subagent/src/index.ts)
+Source: [`packages/subagent/subagent/src/index.ts:182`](../../packages/subagent/subagent/src/index.ts)
 
 <a id="subagentprovider-added--emit"></a>
 
@@ -709,7 +857,7 @@ A provider became resolvable in the registry.
 'subagent/provider-added'(provider: SubagentProvider): void
 ```
 
-Source: [`packages/subagent/subagent/src/index.ts:149`](../../packages/subagent/subagent/src/index.ts)
+Source: [`packages/subagent/subagent/src/index.ts:156`](../../packages/subagent/subagent/src/index.ts)
 
 <a id="subagentprovider-removed--emit"></a>
 
@@ -726,7 +874,7 @@ A provider left the registry. Accepted runs remain holder-owned.
 'subagent/provider-removed'(name: string): void
 ```
 
-Source: [`packages/subagent/subagent/src/index.ts:155`](../../packages/subagent/subagent/src/index.ts)
+Source: [`packages/subagent/subagent/src/index.ts:162`](../../packages/subagent/subagent/src/index.ts)
 
 <a id="subagentstart--emit"></a>
 
@@ -750,5 +898,5 @@ A provider established a published child. For in-process providers, `ctx.agents.
 
 Types: [Scoped](scope.md)
 
-Source: [`packages/subagent/subagent/src/index.ts:166`](../../packages/subagent/subagent/src/index.ts)
+Source: [`packages/subagent/subagent/src/index.ts:173`](../../packages/subagent/subagent/src/index.ts)
 <!-- END GENERATED cordis-surface -->

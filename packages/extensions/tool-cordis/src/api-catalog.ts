@@ -2171,6 +2171,13 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'name', description: 'the provider to use.' }, { name: 'request', description: 'child label, prompt, parent, signal, and optional capabilities.' }],
         returns: 'the published holder-owned run.',
       },
+      {
+        signature: 'async resolveChildRoute(name: string, input: SubagentChildRouteInput): Promise<AgentOptions | undefined>',
+        description: 'Resolve the `agentOptions` a delegation consumer starts one fresh child with, dispatching `subagent/child-route` at most once. Consumers pass the result as the start request\'s `agentOptions` and derive any reported route from the same value with `effectiveChildRoute`, so the reported route and the run route cannot diverge.\n\n`input.requested` returns unchanged, without dispatch, when it names a provider or model (explicit routes win), when the provider seeds the child with parent history (fork), when the provider does not run requested routes, when no listener answers, or when the answer equals the inherited route. A throwing listener is logged and the child keeps its inherited route: routing is an optional cost policy, and a broken policy must not fail the delegation it would only have made cheaper. A cancelled `input.signal` rejects instead. A listener route is merged over the inherited route and resolved against its registered model before return, so an unregistered route rejects before any child exists; agent creation itself does not validate a route.',
+        parameters: [{ name: 'name', description: 'the subagent provider the child will start on.' }, { name: 'input', description: 'the parent, consumer kind, requested options, task, and signal.' }],
+        returns: 'the options to start the child with, or `undefined` when none apply.',
+        throws: ['{SubagentError} `NO_PROVIDER` for an unregistered subagent provider, or `INVALID_CHILD_ROUTE` when a listener route is incomplete or does not resolve to a registered model.'],
+      },
     ],
   },
   {
@@ -3174,6 +3181,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     summary: 'A skill provider, runtime contribution, or provider-backed catalog may have changed.',
     description: 'A skill provider, runtime contribution, or provider-backed catalog may have changed. This is an unfiltered invalidation notification; consumers refetch the catalog for their own lookup options. Listener failures are contained and cannot veto the registry mutation.',
     parameters: [],
+  },
+  {
+    name: 'subagent/child-route',
+    mode: 'waterfall',
+    signature: '\'subagent/child-route\'( this: Scoped<SubagentRuntime>, request: SubagentChildRouteRequest, next: () => Promise<SubagentChildRoute | undefined>, ): Promise<SubagentChildRoute | undefined>',
+    summary: 'Choose the provider/model route of one fresh child before its delegation consumer starts it.',
+    description: 'Choose the provider/model route of one fresh child before its delegation consumer starts it. `SubagentRuntime.resolveChildRoute` dispatches this at most once per child, and only when the request names neither a provider nor a model, the subagent provider runs requested routes, and the provider does not seed the child with parent history: a fork child keeps its parent\'s warm cached prefix and is never routed. Team seats always name their route, so no seat reaches a listener. The returned route is merged over `request.inherited`; `undefined` keeps it.\n\nThe waterfall settles before any child resource exists, so a listener that records its choice appends to `request.parent.session` before returning and that record precedes the child\'s creation. A throwing listener is logged and the child keeps its inherited route; a route that does not resolve to a registered model rejects the delegation. Scope-filtered dispatch keys the carrier by `request.parent`, so a listener registered on the parent\'s context answers only its delegations.',
+    parameters: [{ name: 'request', description: 'the fresh child\'s route question.' }],
   },
   {
     name: 'subagent/end',
@@ -5308,6 +5323,22 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface SubagentCapabilities {\n    readonly outputSchema: boolean;\n    readonly depthLimit: boolean;\n    readonly toolFilter: boolean;\n    readonly persona: boolean;\n    readonly cwd?: boolean;\n}',
   },
   {
+    name: 'SubagentChildRoute',
+    declaration: 'export interface SubagentChildRoute {\n    readonly provider?: string;\n    readonly model?: string;\n}',
+  },
+  {
+    name: 'SubagentChildRouteInput',
+    declaration: 'export interface SubagentChildRouteInput {\n    readonly parent: Agent;\n    readonly kind: SubagentChildRouteKind;\n    readonly requested?: AgentOptions;\n    readonly agentType?: string;\n    readonly prompt: string;\n    readonly signal: AbortSignal;\n}',
+  },
+  {
+    name: 'SubagentChildRouteKind',
+    declaration: 'export type SubagentChildRouteKind = \'subagent\' | \'workflow\';',
+  },
+  {
+    name: 'SubagentChildRouteRequest',
+    declaration: 'export interface SubagentChildRouteRequest {\n    readonly parent: Agent;\n    readonly kind: SubagentChildRouteKind;\n    readonly subagentProvider: string;\n    readonly inherited: SubagentChildRoute;\n    readonly agentType?: string;\n    readonly prompt: string;\n    readonly signal: AbortSignal;\n}',
+  },
+  {
     name: 'SubagentDescendantListEntry',
     declaration: 'export type SubagentDescendantListEntry = SubagentListEntry & {\n    readonly parentId: SessionId;\n    readonly depth: number;\n};',
   },
@@ -5325,7 +5356,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SubagentProvider',
-    declaration: 'export interface SubagentProvider {\n    readonly name: string;\n    readonly capabilities: SubagentCapabilities;\n    readonly inheritsParentContext: boolean;\n    start(request: ResolvedSubagentStartRequest): Promise<SubagentRun>;\n    prepareContinuable?(request: ContinuableCreateRequest): Promise<ContinuableCreateSpec>;\n}',
+    declaration: 'export interface SubagentProvider {\n    readonly name: string;\n    readonly capabilities: SubagentCapabilities;\n    readonly inheritsParentContext: boolean;\n    readonly runsRequestedModel?: boolean;\n    start(request: ResolvedSubagentStartRequest): Promise<SubagentRun>;\n    prepareContinuable?(request: ContinuableCreateRequest): Promise<ContinuableCreateSpec>;\n}',
   },
   {
     name: 'SubagentReportDelivery',
@@ -5357,7 +5388,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SubagentRuntime',
-    declaration: 'export class SubagentRuntime extends Service {\n    static Config: z<Config>;\n    constructor(ctx: Context, config: Config);\n    async startContinuable(spec: ContinuableStartSpec): Promise<ContinuableStart>;\n    async followup(parent: Agent, childId: SessionId, content: ContentBlock[], options: SubagentFollowupOptions): Promise<MessageId>;\n    interrupt(targetSessionId: SessionId, authority: SubagentInterruptAuthority): void;\n    async reportFrom(child: Agent, content: ContentBlock[], options: SubagentReportOptions): Promise<MessageId>;\n    registerContinuableSetup(contribution: ContinuableSetupContribution): () => void;\n    async drainContinuableDescendants(parents: readonly Agent[]): Promise<void>;\n    listChildren(parentSessionId: SessionId, signal?: AbortSignal): Promise<SubagentListEntry[]>;\n    listDescendants(rootSessionId: SessionId, signal?: AbortSignal): Promise<SubagentDescendantListEntry[]>;\n    registerProvider(provider: SubagentProvider): () => void;\n    getProvider(name: string): SubagentProvider | undefined;\n    list(): string[];\n    async start(name: string, request: SubagentStartRequest): Promise<SubagentRun>;\n}',
+    declaration: 'export class SubagentRuntime extends Service {\n    static Config: z<Config>;\n    constructor(ctx: Context, config: Config);\n    async startContinuable(spec: ContinuableStartSpec): Promise<ContinuableStart>;\n    async followup(parent: Agent, childId: SessionId, content: ContentBlock[], options: SubagentFollowupOptions): Promise<MessageId>;\n    interrupt(targetSessionId: SessionId, authority: SubagentInterruptAuthority): void;\n    async reportFrom(child: Agent, content: ContentBlock[], options: SubagentReportOptions): Promise<MessageId>;\n    registerContinuableSetup(contribution: ContinuableSetupContribution): () => void;\n    async drainContinuableDescendants(parents: readonly Agent[]): Promise<void>;\n    listChildren(parentSessionId: SessionId, signal?: AbortSignal): Promise<SubagentListEntry[]>;\n    listDescendants(rootSessionId: SessionId, signal?: AbortSignal): Promise<SubagentDescendantListEntry[]>;\n    registerProvider(provider: SubagentProvider): () => void;\n    getProvider(name: string): SubagentProvider | undefined;\n    list(): string[];\n    async start(name: string, request: SubagentStartRequest): Promise<SubagentRun>;\n    async resolveChildRoute(name: string, input: SubagentChildRouteInput): Promise<AgentOptions | undefined>;\n}',
   },
   {
     name: 'SubagentStartRequest',

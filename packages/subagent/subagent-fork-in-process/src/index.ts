@@ -69,6 +69,8 @@ class ForkInProcessProvider implements SubagentProvider {
   }
   // Context contract: a forked child IS seeded with the parent's completed-turn prefix.
   readonly inheritsParentContext = true
+  // The shared in-process driver creates the child with the request's agentOptions route.
+  readonly runsRequestedModel = true
 
   constructor(readonly name: string) {}
 
