@@ -52,7 +52,8 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
-.reset {
+.reset,
+.disclosure {
   border: none;
   background: none;
   padding: 0;
@@ -63,7 +64,8 @@
   cursor: pointer;
 }
 
-.reset:hover:not(:disabled) {
+.reset:hover:not(:disabled),
+.disclosure:hover:not(:disabled) {
   color: var(--dsw-alias-label-primary);
 }
 
@@ -165,7 +167,6 @@
 }
 
 .disclosure {
-  composes: reset;
   text-align: left;
 }
 
