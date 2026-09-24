@@ -4,7 +4,8 @@ This document fixes the Jev routing and compaction experiment before any real
 (non-dry) trial runs. Every claim below is a decision rule stated before the
 data exists; a changed decision rule is a new experiment name. The arms, the
 tasks, and the command are frozen here; the metrics are implemented in
-`bench/runner/metrics.js` and aggregated by `bench/report/build.js`.
+`bench/runner/metrics.js` and `bench/runner/accounting.js` and aggregated by
+`bench/report/build.js`.
 
 ## Job definition
 
@@ -64,7 +65,7 @@ effect, and every report pins the `run.json` that produced it.
   intervention and H2 is not-evaluable rather than confirmed.
 - **H4 — The churn screen.** `cacheHitShare(route-on) ≥
   cacheHitShare(route-off) − 5 points`, applied **only when ≥80% of trials in
-  both arms carry usage data**. Otherwise this file declares it
+  both arms carry a reported cache-read count**. Otherwise this file declares it
   **NOT-EVALUABLE** — never silently skipped — and the economic case rests on
   H2's token delta alone.
 - **H5 — Compaction improves the verifier-passed rate at comparable cost.** On
@@ -108,9 +109,12 @@ hints), `jevCompactionAcceptedBelowThreshold`, `jevSelectionDegraded`,
 and the existing compaction forensics.
 
 Every metric is derived from the session log and the reported usage, never from
-a model self-report. `cacheHitShare` is **null** when a trial carries no
-usage data or its token denominator is zero; the aggregate reports how many
-trials were null, because H4 depends on that count.
+a model self-report. `cacheHitShare` is the trial's `accounting.cacheHitShare`:
+cache reads over the prompt tokens of the calls whose provider reported a
+cache-read count, over the root session and its descendants. A call with no
+reported count is excluded rather than read as a miss, and the share is
+**null** when no call reported one; the aggregate reports how many trials were
+null, because H4 depends on that count.
 
 ## Statistics
 

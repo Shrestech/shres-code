@@ -33,6 +33,8 @@ The runtime is unchanged: no runtime package carries a price table or a dollar f
 
 Arm summaries pool the records: total and upper-bound dollars, quota tokens, raw tokens by class, cache-hit and unreported shares, judge totals, and TTFT and judge-latency p50/p90.
 
+`accounting.cacheHitShare` is the bench's only cache-hit share. The Jev report aggregates (`meanCacheHitShare`, `cacheHitShareNullTrials`) and the routing pre-registration's H4 churn screen read it through `trialCacheHitShare`. No root-session fold computes a share that counts an unreported call's input as a miss. The pre-registration defines `cacheHitShare` this way, and its H4 coverage counts trials that "carry a reported cache-read count"; no confirmatory trial ran under the earlier root-session definition.
+
 ### The dollar cap
 
 `--max-dollars` gates launches, not trials. Before each launch the runner adds settled spend to a projection of every in-flight trial and the new one at the largest settled trial's spend; once that would exceed the cap it launches nothing more. In-flight trials finish, `run.json` records a `budgetStop` with the figures behind it, and the run exits 3. Spend is the upper-bound dollars, so an unreported call cannot hide under the cap. A resume counts every recorded trial's spend. `run.json` pins the cap, the snapshot id, and the accounting-config hash.
@@ -50,6 +52,8 @@ Arm summaries pool the records: total and upper-bound dollars, quota tokens, raw
 **A live dollar watcher that kills a trial mid-run.** Rejected: a killed trial becomes a delivered `BUDGET_EXCEEDED` verdict and changes pass rates, while the per-trial token cap already bounds one trial. The experiment budget needs only launch gating.
 
 **A write-TTL class that prices 1-hour writes separately.** Deferred: logged usage cannot separate the tiers, so the class would have no producer. Writes bill at the 5-minute tier until usage records the tier.
+
+**Keep a root-session `cacheHitShare` in the trial metrics beside the accounting share.** Rejected: it read an absent cache count as a miss, covered only the root session, and would give the churn screen two different shares under one name.
 
 **Import the cache readers from `@shres-code/shres-code-llm`.** Rejected: the bench is standalone plain ESM outside the workspace, with no runtime dependencies.
 

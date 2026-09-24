@@ -39,8 +39,9 @@ export const REPORT_STRATA = Object.freeze(['long', 'short', 'adversarial', 'cha
  * @property {number | null} meanEmptyCharterRate - mean of per-trial emptyCharterRate; null for jspace-off.
  * @property {number | null} meanUnverifiedShare - mean of per-trial unverifiedShare; null when no trial registered checks.
  * @property {number | null} meanEchoOkRejectRate - mean of per-trial echoOkRejectRate; null when no trial attempted registration.
- * @property {number | null} meanCacheHitShare - mean of per-trial cacheHitShare; null when no trial carried usage.
- * @property {number} cacheHitShareNullTrials - success trials with a null cacheHitShare: the pre-registered churn screen's input.
+ * @property {number | null} meanCacheHitShare - mean of per-trial `accounting.cacheHitShare`; null when no trial carried one.
+ * @property {number} cacheHitShareNullTrials - success trials without a cache-hit share (no call reported a cache-read
+ *   count, or the trial predates accounting): the pre-registered churn screen's input.
  * @property {number | null} meanModelTransitions - mean of per-trial modelTransitions; null when no trial logged a request header.
  * @property {number} routingDecisionTrials - success trials logging at least one routing decision: the adoption screen's input.
  * @property {number | null} meanDowngradedShare - mean of per-trial downgradedShare; null when no trial logged a decision.
@@ -90,8 +91,9 @@ export const REPORT_STRATA = Object.freeze(['long', 'short', 'adversarial', 'cha
  * @property {number | null} meanEmptyCharterRate - mean of per-trial emptyCharterRate; null for jspace-off.
  * @property {number | null} meanUnverifiedShare - mean of per-trial unverifiedShare; null when no trial registered checks.
  * @property {number | null} meanEchoOkRejectRate - mean of per-trial echoOkRejectRate; null when no trial attempted registration.
- * @property {number | null} meanCacheHitShare - mean of per-trial cacheHitShare; null when no trial carried usage.
- * @property {number} cacheHitShareNullTrials - success trials with a null cacheHitShare: the pre-registered churn screen's input.
+ * @property {number | null} meanCacheHitShare - mean of per-trial `accounting.cacheHitShare`; null when no trial carried one.
+ * @property {number} cacheHitShareNullTrials - success trials without a cache-hit share (no call reported a cache-read
+ *   count, or the trial predates accounting): the pre-registered churn screen's input.
  * @property {number | null} meanModelTransitions - mean of per-trial modelTransitions; null when no trial logged a request header.
  * @property {number} routingDecisionTrials - success trials logging at least one routing decision: the adoption screen's input.
  * @property {number | null} meanDowngradedShare - mean of per-trial downgradedShare; null when no trial logged a decision.

@@ -31,10 +31,9 @@
  * Jev routing/compaction metrics (added for the WP-jev experiment surface) read the
  * model-router and compaction-jev log-only events, so they are null for arms that
  * compose neither (all-null is the honest reading of "never judged", which is why
- * every one of them is nullable rather than zero):
- * - cacheHitShare: cacheReadTokens over billed input (inputTokens + cacheReadTokens +
- *   cacheWriteTokens, the disjoint `TokenUsage` counts). Null when the log carries no
- *   usage record or the denominator is zero.
+ * every one of them is nullable rather than zero). The cache-hit share is not
+ * folded here: it is `accounting.cacheHitShare` (`accounting.js`), which reads
+ * cache counts by presence over the whole session closure.
  * - modelTransitions: consecutive `request/header` events whose provider/model differ.
  *   Null when the log carries no readable header.
  * - downgradedStreaks: run lengths of consecutive `model-routing/decision` events with
@@ -280,7 +279,6 @@ export function foldSessionLog(text, armFlags) {
     ledgerAbandoned: null,
     unverifiedAcceptRecovery: null,
     thinDebates: null,
-    cacheHitShare: null,
     modelTransitions: null,
     downgradedStreaks: null,
     downgradedShare: null,
@@ -322,9 +320,6 @@ export function foldSessionLog(text, armFlags) {
   const debateByEpoch = new Map()
 
   // Jev routing/compaction state.
-  let usageEvents = 0
-  let cacheReadTokens = 0
-  let cacheWriteTokens = 0
   /** @type {{ provider: string, model: string } | null} */
   let lastHeaderRoute = null
   let headerEvents = 0
@@ -449,22 +444,12 @@ export function foldSessionLog(text, armFlags) {
       case 'assistant/message': {
         const rawUsage = data.usage
         if (typeof rawUsage !== 'object' || rawUsage === null) break
-        // Any usage record counts as reported usage, so the cache fields are
-        // read as reported: an absent count contributes 0, which is what the
-        // adapters that omit a zero cache count report.
-        usageEvents += 1
         const usage = /** @type {Record<string, unknown>} */ (rawUsage)
         if (typeof usage.inputTokens === 'number' && Number.isFinite(usage.inputTokens)) {
           metrics.inputTokens += usage.inputTokens
         }
         if (typeof usage.outputTokens === 'number' && Number.isFinite(usage.outputTokens)) {
           metrics.outputTokens += usage.outputTokens
-        }
-        if (typeof usage.cacheReadTokens === 'number' && Number.isFinite(usage.cacheReadTokens)) {
-          cacheReadTokens += usage.cacheReadTokens
-        }
-        if (typeof usage.cacheWriteTokens === 'number' && Number.isFinite(usage.cacheWriteTokens)) {
-          cacheWriteTokens += usage.cacheWriteTokens
         }
         break
       }
@@ -567,10 +552,6 @@ export function foldSessionLog(text, armFlags) {
 
   // Jev routing/compaction fold. Every field stays null when its events are
   // absent: a never-judged trial must not read as "judged, never downgraded".
-  const billedInput = metrics.inputTokens + cacheReadTokens + cacheWriteTokens
-  if (usageEvents > 0 && billedInput > 0) {
-    metrics.cacheHitShare = cacheReadTokens / billedInput
-  }
   if (headerEvents > 0) metrics.modelTransitions = modelTransitions
   if (routingDecisions > 0) {
     if (openDowngradedRun > 0) downgradedRuns.push(openDowngradedRun)
@@ -643,7 +624,6 @@ export function emptyMetrics() {
     ledgerAbandoned: null,
     unverifiedAcceptRecovery: null,
     thinDebates: null,
-    cacheHitShare: null,
     modelTransitions: null,
     downgradedStreaks: null,
     downgradedShare: null,

@@ -88,11 +88,6 @@ export const FAILURE_MODES = Object.freeze([
  *   non-researcher arms.
  * @property {number | null} thinDebates - debate pairs whose combined descendant seat-token
  *   volume fell under the thinDebates floor (200); null for non-researcher arms.
- * @property {number | null} cacheHitShare - cache-read fraction of billed input over the trial's
- *   reported usage: `cacheReadTokens / (inputTokens + cacheReadTokens + cacheWriteTokens)`. The
- *   three counts are disjoint (`TokenUsage`), so the denominator is billed input. Null when the
- *   trial recorded no usage, or recorded no billed input; a usage record that carries no cache
- *   count reads as 0, which is a reported miss rather than a missing datum.
  * @property {number | null} modelTransitions - consecutive `request/header` pairs whose
  *   `config.provider`/`config.model` differ. A header logged only to re-state the same route
  *   is not a transition. Null when the log carries no readable header.
@@ -147,7 +142,8 @@ export const FAILURE_MODES = Object.freeze([
  * @property {string} [priceSnapshot] - id (`YYYY-MM-DD`) of the `bench/prices` snapshot the trial
  *   was priced under; absent on trials recorded before the bench priced trials.
  * @property {import('../runner/accounting.js').TrialAccounting} [accounting] - priced, cache-inclusive
- *   accounting over the root session and its descendants; for chains, the sum over phases.
+ *   accounting over the root session and its descendants; for chains, the sum over phases. Its
+ *   `cacheHitShare` is the trial's cache-hit share for every report, aggregate, and verdict.
  * @property {{ violations: string[] }} [integrity] - arm-integrity audit findings; omitted when clean.
  */
 
@@ -155,7 +151,7 @@ export const FAILURE_MODES = Object.freeze([
 const METRIC_FIELDS = ['inputTokens', 'outputTokens', 'durationMs', 'turns', 'toolCalls', 'identicalRetries', 'checkpoints', 'shipPasses', 'descendantSessions', 'outOfLoopExperiments', 'coverageRefusalThenPad', 'noopNoteRefusals', 'noteCapRefusals', 'compactionCount']
 
 /** TrialMetrics field names that are number|null. */
-const NULLABLE_NUMBER_FIELDS = ['tokensIncludingDescendants', 'costIncludingDescendants', 'verifiedCheckpointShare', 'sessionQueryCalls', 'gateRefusals', 'debateCalls', 'runsLogged', 'verifySatisfiedRate', 'unverifiedRunRefusals', 'deferredShare', 'thinDebates', 'cacheHitShare', 'modelTransitions', 'downgradedShare', 'keptStrongShare', 'routingHintCount', 'jevCompactionAcceptedBelowThreshold', 'jevSelectionDegraded']
+const NULLABLE_NUMBER_FIELDS = ['tokensIncludingDescendants', 'costIncludingDescendants', 'verifiedCheckpointShare', 'sessionQueryCalls', 'gateRefusals', 'debateCalls', 'runsLogged', 'verifySatisfiedRate', 'unverifiedRunRefusals', 'deferredShare', 'thinDebates', 'modelTransitions', 'downgradedShare', 'keptStrongShare', 'routingHintCount', 'jevCompactionAcceptedBelowThreshold', 'jevSelectionDegraded']
 
 /** TrialMetrics field names that are boolean|null. */
 const NULLABLE_BOOLEAN_FIELDS = ['danglingCard', 'ledgerAbandoned', 'unverifiedAcceptRecovery']

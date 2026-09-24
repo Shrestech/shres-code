@@ -614,6 +614,18 @@ export function trialSpend(accounting) {
 }
 
 /**
+ * A trial's cache-hit share: `accounting.cacheHitShare`, the one presence-based
+ * reading every report, aggregate, and verdict uses. Null when the trial
+ * carries no accounting (recorded before the bench priced trials) or no call
+ * reported a cache-read count.
+ * @param {{ accounting?: TrialAccounting }} trial
+ * @returns {number | null}
+ */
+export function trialCacheHitShare(trial) {
+  return trial.accounting?.cacheHitShare ?? null
+}
+
+/**
  * The trial's exact API-equivalent cost, or null when any non-subscription
  * call or judge usage is unpriced or lacks a cache-read report.
  * @param {TrialAccounting} accounting

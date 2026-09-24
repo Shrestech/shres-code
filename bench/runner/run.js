@@ -635,7 +635,7 @@ async function executeSpawn({ repoRoot, arm, armDir, sessionLogRoot, taskText, s
  * @param {import('../schema/trial.js').PhaseRecord[]} phases
  * @returns {import('./accounting.js').TrialAccounting}
  */
-function sumPhaseAccounting(phases) {
+export function sumPhaseAccounting(phases) {
   return phases.reduce((sum, phase) => mergeAccounting(sum, phase.accounting ?? emptyAccounting()), emptyAccounting())
 }
 
@@ -694,7 +694,7 @@ export function sumPhaseMetrics(phases) {
 }
 
 /** Jev routing/compaction fields a chain trial recomputes from its phase logs instead of summing per phase. */
-const JEV_CHAIN_ROLLUP_FIELDS = ['cacheHitShare', 'modelTransitions', 'downgradedShare', 'keptStrongShare', 'routingHintCount', 'jevCompactionAcceptedBelowThreshold', 'jevSelectionDegraded']
+const JEV_CHAIN_ROLLUP_FIELDS = ['modelTransitions', 'downgradedShare', 'keptStrongShare', 'routingHintCount', 'jevCompactionAcceptedBelowThreshold', 'jevSelectionDegraded']
 
 /**
  * Fold a chain trial's Jev routing/compaction fields from its phases.
@@ -703,9 +703,9 @@ const JEV_CHAIN_ROLLUP_FIELDS = ['cacheHitShare', 'modelTransitions', 'downgrade
  * that produced them and count route changes only inside that phase. Re-folding
  * the concatenated phase logs at the trial level recovers the exact counts — a
  * route change at a phase boundary is a real transition — and leaves the null
- * rules to the one fold that owns them: a chain with no usage anywhere keeps
- * `cacheHitShare` null, and a phase that logged no usage contributes nothing to
- * the denominator, so it cannot turn a measurable trial into zero.
+ * rules to the one fold that owns them. The chain's cache-hit share needs no
+ * re-fold: the trial's `accounting` sums the phases' token classes, and its
+ * `cacheHitShare` is derived from those sums.
  *
  * `downgradedStreaks` is the one field the concatenation cannot state: each
  * phase is its own session, so a run of downgraded turns spanning a phase

@@ -8,7 +8,7 @@
  * @module bench/stats/aggregate
  */
 
-import { summarizeAccounting } from '../runner/accounting.js'
+import { summarizeAccounting, trialCacheHitShare } from '../runner/accounting.js'
 import { wilsonInterval } from './intervals.js'
 
 /** TrialMetrics field → ReportCell mean field, in ReportCell order. */
@@ -80,7 +80,8 @@ export function summarizeCell(taskId, arm, trials) {
  * total is null when no trial recorded the event family it counts, so a report
  * distinguishes "measured zero" from "never measured". The trial counts are the
  * pre-registered screens' inputs: `cacheHitShareNullTrials` feeds the churn
- * screen's "≥80% of trials carry usage data", `routingDecisionTrials` the
+ * screen's "≥80% of trials carry a reported cache-read count" (the share is
+ * `accounting.cacheHitShare`, read through `trialCacheHitShare`), `routingDecisionTrials` the
  * routing-adoption screen's "≥2/3 of route-on trials log a decision", and
  * `compactionVerificationTrials` the verification-adoption screen's "≥2/3 of
  * trials that compact log a verification".
@@ -95,7 +96,7 @@ export function summarizeCell(taskId, arm, trials) {
  */
 function jevAggregates(ok) {
   const present = field => ok.map(t => t.metrics[field]).filter(v => v !== null && v !== undefined)
-  const cacheShares = present('cacheHitShare')
+  const cacheShares = ok.map(trialCacheHitShare).filter(share => share !== null)
   const transitions = present('modelTransitions')
   const downgradedShares = present('downgradedShare')
   const keptStrongShares = present('keptStrongShare')
