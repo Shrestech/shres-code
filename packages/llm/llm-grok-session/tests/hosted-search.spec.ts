@@ -8,7 +8,7 @@
 
 import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@shres-code/cordis'
-import LlmRuntime, { BlockAssembler } from '@shres-code/shres-code-llm'
+import LlmRuntime, { BlockAssembler, createUserMessage } from '@shres-code/shres-code-llm'
 import { isLocalToolCall } from '@shres-code/shres-code-agent-loop'
 import * as LlmGrokSession from '../src/index.ts'
 import type { Config as GrokSessionConfig } from '../src/config.ts'
@@ -46,18 +46,32 @@ async function boot(config: BootConfig = {}): Promise<{ context: Context; body: 
   return { context, body: () => upstream!.bodies[0] as Record<string, unknown> }
 }
 
-/** A Responses stream whose assistant turn makes one server-side x_search call then answers. */
-function xSearchTurn(): string[] {
-  const custom: Record<string, unknown> = {
-    id: 'ctc_item_1', call_id: 'call_ctc_1', type: 'custom_tool_call',
-    name: 'x_search', input: 'grok news', status: 'completed',
-  }
+/**
+ * A Responses stream whose assistant turn makes one server-side custom tool
+ * call per name, then answers.
+ */
+function xSearchTurn(names: readonly string[] = ['x_search']): string[] {
+  const calls = names.flatMap((name, index) => {
+    const custom: Record<string, unknown> = {
+      id: `ctc_item_${index}`, call_id: `call_ctc_${index}`, type: 'custom_tool_call',
+      name, input: 'grok news', status: 'completed',
+    }
+    return [
+      JSON.stringify({ type: 'response.output_item.added', output_index: index, item: custom }),
+      JSON.stringify({ type: 'response.output_item.done', output_index: index, item: custom }),
+    ]
+  })
+  const text = names.length
   return [
     JSON.stringify({ type: 'response.created', response: { id: 'resp_1' } }),
-    JSON.stringify({ type: 'response.output_item.added', output_index: 0, item: custom }),
-    JSON.stringify({ type: 'response.output_item.done', output_index: 0, item: custom }),
-    JSON.stringify({ type: 'response.output_item.added', output_index: 1, item: { type: 'message', role: 'assistant' } }),
-    JSON.stringify({ type: 'response.output_text.delta', item_id: 'msg_1', output_index: 1, content_index: 0, delta: 'grok is an xai assistant' }),
+    ...calls,
+    JSON.stringify({ type: 'response.output_item.added', output_index: text, item: { type: 'message', role: 'assistant' } }),
+    JSON.stringify({ type: 'response.output_text.delta', item_id: 'msg_1', output_index: text, content_index: 0, delta: 'grok is an xai assistant' }),
+    JSON.stringify({
+      type: 'response.output_item.done',
+      output_index: text,
+      item: { type: 'message', id: 'msg_1', role: 'assistant', status: 'completed', content: [{ type: 'output_text', text: 'grok is an xai assistant', annotations: [] }] },
+    }),
     JSON.stringify({ type: 'response.completed', response: { id: 'resp_1', status: 'completed', usage: { input_tokens: 1, input_tokens_details: { cached_tokens: 0 }, output_tokens: 1, output_tokens_details: { reasoning_tokens: 0 }, total_tokens: 2 } } }),
   ]
 }
@@ -81,6 +95,8 @@ describe('resolveHostedTools', () => {
       .toThrow(/hostedWebSearch must be a boolean/)
     expect(() => resolveHostedTools({ hostedXSearch: 1 } as unknown as GrokSessionConfig))
       .toThrow(/hostedXSearch must be a boolean/)
+    expect(() => resolveHostedTools({ agentXTools: 'on' } as unknown as GrokSessionConfig))
+      .toThrow(/agentXTools must be a boolean/)
   })
 })
 
@@ -149,10 +165,69 @@ describe('hosted x_search response mapping', () => {
       type: 'server-tool-call',
       kind: 'x_search',
       name: 'x_search',
-      status: 'completed',
     })
+    // pi-ai's tool call reports no completion state, so none is recorded.
+    expect(hosted).not.toHaveProperty('status')
     expect(isLocalToolCall(hosted!)).toBe(false)
     expect(message.content.some(block => block.type === 'tool-call' && block.name === 'x_search')).toBe(false)
     expect(message.content.filter(block => block.type === 'text').map(block => block.text).join('')).toContain('xai')
+  })
+
+  it('promotes every X call subtype and replays the turn without function calls or outputs', async () => {
+    const names = ['x_search', 'x_keyword_search', 'x_semantic_search', 'x_user_search', 'x_thread_fetch']
+    authPath = await writeAuthDocument({ [ENTRY_KEY]: entryRaw(farFuture()) })
+    upstream = await mockUpstream(xSearchTurn(names))
+    const context = new Context()
+    ctx = context
+    await context.plugin(LlmRuntime)
+    await context.plugin(LlmGrokSession, { authPath, baseURL: `${upstream.url}/v1`, hostedXSearch: true })
+
+    const user = createUserMessage({ content: [{ type: 'text', text: 'what is new on X?' }], source: { kind: 'user' } })
+    const first = new BlockAssembler()
+    for await (const chunk of context.llm.stream({
+      provider: 'grok-session', model: 'grok-4.6', messages: [user],
+      tools: [echoTool, { ...echoTool, name: 'x_keyword_search' }],
+    })) first.push(chunk)
+    const sentTools = (upstream.bodies[0] as Record<string, unknown>)['tools'] as Record<string, unknown>[]
+    expect(sentTools.some(tool => tool['name'] === 'x_keyword_search')).toBe(false)
+    expect(first.finish).toEqual({ kind: 'tool-calls' })
+    const assistant = first.message({
+      kind: 'model', provider: 'grok-session', model: 'grok-4.6', replayState: first.replayState,
+    })
+    expect(assistant.content.filter(block => block.type === 'server-tool-call')).toEqual(names.map((name, index) => ({
+      type: 'server-tool-call', kind: 'x_search', name, id: `call_ctc_${index}|ctc_item_${index}`,
+    })))
+    expect(assistant.content.some(isLocalToolCall)).toBe(false)
+
+    for await (const _chunk of context.llm.stream({
+      provider: 'grok-session', model: 'grok-4.6',
+      messages: [user, assistant, createUserMessage({ content: [{ type: 'text', text: 'thanks' }], source: { kind: 'user' } })],
+    })) { /* drain */ }
+    const input = (upstream.bodies[1] as Record<string, unknown>)['input'] as Record<string, unknown>[]
+    const types = input.map(item => item['type'] ?? item['role'])
+    expect(types).not.toContain('function_call')
+    expect(types).not.toContain('function_call_output')
+    expect(types).not.toContain('custom_tool_call')
+    expect(types).not.toContain('custom_tool_call_output')
+    expect(JSON.stringify(input)).toContain('grok is an xai assistant')
+    // The native message id survives only when the replay state was usable,
+    // so the promoted blocks did not degrade the message to foreign history.
+    expect(input.some(item => item['type'] === 'message' && item['id'] === 'msg_1')).toBe(true)
+  })
+
+  it('keeps X call names local when hosted X search is off', async () => {
+    authPath = await writeAuthDocument({ [ENTRY_KEY]: entryRaw(farFuture()) })
+    upstream = await mockUpstream(xSearchTurn(['x_keyword_search']))
+    const context = new Context()
+    ctx = context
+    await context.plugin(LlmRuntime)
+    await context.plugin(LlmGrokSession, { authPath, baseURL: `${upstream.url}/v1`, hostedXSearch: false })
+    const assembler = new BlockAssembler()
+    for await (const chunk of context.llm.stream({ provider: 'grok-session', model: 'grok-4.6', messages: [] })) {
+      assembler.push(chunk)
+    }
+    const message = assembler.message({ kind: 'model', provider: 'grok-session', model: 'grok-4.6' })
+    expect(message.content.some(block => block.type === 'server-tool-call')).toBe(false)
+    expect(message.content.some(block => block.type === 'tool-call' && block.name === 'x_keyword_search')).toBe(true)
   })
 })

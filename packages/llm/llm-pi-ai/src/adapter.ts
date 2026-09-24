@@ -52,7 +52,7 @@ import { idleWatchdog, timeoutOf } from '@shres-code/shres-code-timeout'
 import type { HostedTool } from '@shres-code/shres-code-llm'
 import type { ResolvedPiAiProviderProfile } from './config.ts'
 import { toPiContext } from './context.ts'
-import { applyHostedToolsPayload, hostedToolsDialectFor, mapHostedToolCalls } from './hosted-tools/index.ts'
+import { applyHostedToolsPayload, hostedToolsDialectFor, mapHostedToolCalls, promotableCallNames } from './hosted-tools/index.ts'
 import type { HostedToolsPlan } from './hosted-tools/index.ts'
 import { SILENT_OVERFLOW_PROTOCOLS } from './provider.ts'
 import { toStreamChunks } from './stream.ts'
@@ -266,14 +266,17 @@ export class PiAiAdapter extends LlmAdapter {
    * @param profile - the route's resolved profile.
    * @param model - the resolved model descriptor, for its wire protocol.
    * @param modelId - the model id the declaration resolved under.
-   * @returns the dialect's splice plan, or `undefined` when none are declared.
+   * @param narrowed - the request's `hostedTools` narrowing; omitted keeps every declared tool.
+   * @returns the dialect's splice plan, or `undefined` when none remain.
    */
   private hostedPlanOf(
     profile: ResolvedPiAiProviderProfile,
     model: Model<Api>,
     modelId: string,
+    narrowed: readonly HostedTool[] | undefined,
   ): HostedToolsPlan | undefined {
-    const tools = profile.hostedTools.get(modelId)
+    const declared = profile.hostedTools.get(modelId)
+    const tools = narrowed === undefined ? declared : declared?.filter(tool => narrowed.includes(tool))
     if (tools === undefined || tools.length === 0) return undefined
     return hostedToolsDialectFor(model.api)?.spliceFor(tools)
   }
@@ -355,7 +358,7 @@ export class PiAiAdapter extends LlmAdapter {
       options.reasoningEffort ?? profile.reasoning,
     )
     const apiKey = await this.config.resolveApiKey(options.provider, profile)
-    const hosted = this.hostedPlanOf(profile, model, options.model)
+    const hosted = this.hostedPlanOf(profile, model, options.model, options.hostedTools)
 
     const consumer = new AbortController()
     const upstream = options.signal === undefined
@@ -386,6 +389,9 @@ export class PiAiAdapter extends LlmAdapter {
       // the one payload pi-ai sends. Only a final non-undefined result
       // replaces the outgoing payload; a hook that mutates in place and
       // returns undefined keeps its own mutation.
+      // The hosted call names this request may promote; narrowed once the final
+      // payload shows which client tools were actually declared.
+      let promotable: ReadonlySet<string> = new Set(hosted?.callNames ?? [])
       const onPayload = hosted === undefined && this.config.onPayload === undefined
         ? undefined
         : (payload: unknown): unknown => {
@@ -398,6 +404,7 @@ export class PiAiAdapter extends LlmAdapter {
             const result = this.config.onPayload(current, { provider: options.provider, model: model.id })
             if (result !== undefined) current = result
           }
+          if (hosted !== undefined) promotable = promotableCallNames(hosted.callNames, current)
           return current === payload ? undefined : current
         }
       const events = snapshot.models.streamSimple(model, context, {
@@ -412,19 +419,18 @@ export class PiAiAdapter extends LlmAdapter {
       })
       // A hosted tool pi-ai surfaces as an ordinary tool call must be promoted
       // to a server-tool-call block here, the adapter seam that knows the
-      // route's hosted names, so the loop structurally never dispatches it.
-      const hostedNames = hosted === undefined || hosted.callNames.length === 0
-        ? undefined
-        : new Set(hosted.callNames)
+      // route's hosted names, so the loop structurally never dispatches it. A
+      // name the sent request still declares as a client tool stays local.
+      const promotes = hosted !== undefined && hosted.callNames.length > 0
       // Usage-based overflow detection is scoped to the protocols whose
       // provider can accept an oversized prompt silently.
       const translated = toStreamChunks(
         events,
         SILENT_OVERFLOW_PROTOCOLS.has(model.api) ? model.contextWindow : undefined,
       )
-      const iterator = hostedNames === undefined
-        ? translated[Symbol.asyncIterator]()
-        : mapHostedToolCalls(translated, hostedNames)[Symbol.asyncIterator]()
+      const iterator = promotes
+        ? mapHostedToolCalls(translated, name => promotable.has(name))[Symbol.asyncIterator]()
+        : translated[Symbol.asyncIterator]()
       let exhausted = false
       try {
         while (true) {

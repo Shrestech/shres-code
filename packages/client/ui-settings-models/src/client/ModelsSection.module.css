@@ -454,6 +454,33 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
+.hostedTools {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.grokToolDescriptions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+}
+
+.grokToolDescriptions dd {
+  margin: 4px 0 0;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.hostedToolRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .field {
   display: flex;
   flex-direction: column;

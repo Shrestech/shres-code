@@ -40,6 +40,7 @@
     "tests/plugin-config.e2e.ts",
     "tests/settings-chrome.e2e.ts",
     "tests/models-settings.e2e.ts",
+    "tests/grok-subscription.e2e.ts",
     "tests/agent-seats-settings.e2e.ts",
     "tests/shield-settings.e2e.ts",
     "tests/default-model.e2e.ts",

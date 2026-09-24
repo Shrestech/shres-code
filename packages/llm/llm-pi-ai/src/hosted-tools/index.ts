@@ -11,8 +11,9 @@
 import type { HostedTool } from '@shres-code/shres-code-llm'
 import { toServerToolCallBlock } from '@shres-code/shres-code-llm'
 import type { StreamChunk } from '@shres-code/shres-code-llm'
-import { HOSTED_X_SEARCH_NAME, LOCAL_WEB_SEARCH_NAME, webSearchToolEntry, xSearchToolEntry } from './openai-responses.ts'
+import { HOSTED_X_SEARCH_CALL_NAMES, hostedCallKind, LOCAL_WEB_SEARCH_NAME, webSearchToolEntry, xSearchToolEntry } from './openai-responses.ts'
 import { openaiCompletionsDialect } from './openai-completions.ts'
+import { markServerToolCallBlocks } from '../replay.ts'
 
 export * from './openai-responses.ts'
 
@@ -26,7 +27,12 @@ export interface HostedToolsSplice {
 
 /** The full plan one dialect derives from a model's effective hosted tools. */
 export interface HostedToolsPlan extends HostedToolsSplice {
-  /** Hosted tool names that surface as tool calls; promoted to server-tool-call blocks. */
+  /**
+   * Call names a hosted tool may surface as ordinary tool calls. A call is
+   * promoted to a `server-tool-call` block only when its name is listed here
+   * and no client tool of that name is declared in the request that was sent;
+   * see {@link promotableCallNames}.
+   */
   callNames: readonly string[]
 }
 
@@ -63,10 +69,34 @@ export function applyHostedToolsPayload(
   return { ...params, tools: [...entries] }
 }
 
+/**
+ * The hosted call names to promote for one sent request: the plan's call
+ * names minus every tool name the final outgoing `tools` array still declares
+ * as a client tool. A declared name is a local tool the model may call, so a
+ * call to it stays an ordinary tool call.
+ * @param callNames - the plan's hosted call names.
+ * @param payload - the final request body after every payload hook.
+ * @returns the call names safe to treat as hosted.
+ */
+export function promotableCallNames(callNames: readonly string[], payload: unknown): ReadonlySet<string> {
+  const declared = new Set<string>()
+  if (typeof payload === 'object' && payload !== null && !Array.isArray(payload)) {
+    const tools = (payload as Record<string, unknown>)['tools']
+    if (Array.isArray(tools)) {
+      for (const tool of tools as unknown[]) {
+        if (typeof tool !== 'object' || tool === null) continue
+        const name = (tool as Record<string, unknown>)['name']
+        if (typeof name === 'string') declared.add(name)
+      }
+    }
+  }
+  return new Set(callNames.filter(name => !declared.has(name)))
+}
+
 /** Whether a chunk after a tool-call `block-start` belongs to a hosted call. */
-function isHostedChunk(chunk: StreamChunk, hostedNames: ReadonlySet<string>): boolean {
-  if (chunk.type === 'tool-call-delta') return chunk.name !== undefined && hostedNames.has(chunk.name)
-  if (chunk.type === 'block-end' && chunk.block.type === 'tool-call') return hostedNames.has(chunk.block.name)
+function isHostedChunk(chunk: StreamChunk, isHosted: (name: string) => boolean): boolean {
+  if (chunk.type === 'tool-call-delta') return chunk.name !== undefined && isHosted(chunk.name)
+  if (chunk.type === 'block-end' && chunk.block.type === 'tool-call') return isHosted(chunk.block.name)
   return false
 }
 
@@ -78,43 +108,56 @@ function isHostedChunk(chunk: StreamChunk, hostedNames: ReadonlySet<string>): bo
  * `block-start` is buffered until the first delta or end reveals the name, so
  * a hosted call is opened as `server-tool-call` and its streaming input JSON
  * is suppressed rather than rendered as a running local-style tool call.
+ *
+ * The promoted block's `kind` is the canonical hosted tool
+ * ({@link hostedCallKind}), `name` and `id` keep the reported call, and
+ * `status` is omitted because pi-ai's tool call reports none. The finish
+ * chunk's replay envelope tags each promoted index `server-tool-call`, so a
+ * later request replays the message without the hosted call.
  * @param chunks - the pi-ai stream chunks before hosting-aware mapping.
- * @param hostedNames - hosted tool names to promote; other calls pass through.
+ * @param isHosted - whether a call name is promoted; read when each call's
+ *   name is first seen, after the request payload was finalized.
  * @returns the stream with hosted tool-call blocks rewritten to `server-tool-call`.
  */
 export async function* mapHostedToolCalls(
   chunks: AsyncIterable<StreamChunk>,
-  hostedNames: ReadonlySet<string>,
+  isHosted: (name: string) => boolean,
 ): AsyncGenerator<StreamChunk> {
   let pendingStart: Extract<StreamChunk, { type: 'block-start' }> | undefined
+  const promoted = new Set<number>()
   for await (const chunk of chunks) {
     if (chunk.type === 'block-start' && chunk.blockType === 'tool-call') {
       pendingStart = chunk
       continue
     }
     if (pendingStart !== undefined) {
-      yield isHostedChunk(chunk, hostedNames)
+      const hosted = isHostedChunk(chunk, isHosted)
+      if (hosted) promoted.add(pendingStart.index)
+      yield hosted
         ? { type: 'block-start', index: pendingStart.index, blockType: 'server-tool-call' }
         : pendingStart
       pendingStart = undefined
     }
-    if (chunk.type === 'tool-call-delta' && chunk.name !== undefined && hostedNames.has(chunk.name)) {
+    if (chunk.type === 'tool-call-delta' && promoted.has(chunk.index)) {
       // A hosted call's input JSON is not a local tool invocation; suppress it.
       continue
     }
-    if (chunk.type === 'block-end' && chunk.block.type === 'tool-call' && hostedNames.has(chunk.block.name)) {
+    if (chunk.type === 'block-end' && chunk.block.type === 'tool-call'
+      && (promoted.has(chunk.index) || isHosted(chunk.block.name))) {
+      promoted.add(chunk.index)
       yield {
         type: 'block-end',
         index: chunk.index,
         block: toServerToolCallBlock({
-          kind: chunk.block.name,
+          kind: hostedCallKind(chunk.block.name),
           name: chunk.block.name,
           id: chunk.block.id,
-          // pi-ai's toolCall carries no completion status, so a hosted call is
-          // recorded completed even when the backend failed it.
-          status: 'completed',
         }),
       }
+      continue
+    }
+    if (chunk.type === 'finish' && chunk.replayState !== undefined && promoted.size > 0) {
+      yield { ...chunk, replayState: markServerToolCallBlocks(chunk.replayState, promoted) }
       continue
     }
     yield chunk
@@ -150,8 +193,10 @@ const openaiResponsesDialect: HostedToolDialect = {
     }
     if (tools.includes('x_search')) {
       entries.push(xSearchToolEntry())
-      // pi-ai surfaces the hosted x_search custom tool call as a tool call
-      callNames.push(HOSTED_X_SEARCH_NAME)
+      // pi-ai surfaces each hosted X custom tool call as a tool call; hosted
+      // wins, so client function tools with those names are omitted
+      callNames.push(...HOSTED_X_SEARCH_CALL_NAMES)
+      dropLocalTools.push(...HOSTED_X_SEARCH_CALL_NAMES)
     }
     return { entries, dropLocalTools, callNames }
   },

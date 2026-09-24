@@ -28,8 +28,11 @@ export interface ServerToolCallInput {
   name?: string
   /** Provider-issued call id for the hosted invocation, when reported. */
   id?: string
-  /** Provider-neutral completion state of the hosted call. */
-  status: 'completed' | 'failed'
+  /**
+   * Provider-neutral completion state of the hosted call. Omit it when the
+   * provider or adapter did not report one; never infer `completed`.
+   */
+  status?: 'completed' | 'failed'
   /** Provider-neutral result entries; the tail past the bound is dropped. */
   results?: readonly {
     title?: string
@@ -85,7 +88,7 @@ export function toServerToolCallBlock(input: ServerToolCallInput): ServerToolCal
     kind,
     ...name === undefined ? {} : { name },
     ...id === undefined ? {} : { id: CallId(id) },
-    status: input.status,
+    ...input.status === undefined ? {} : { status: input.status },
     ...results.length === 0 ? {} : { results: Object.freeze(results) },
   }) as ServerToolCallBlock
 }

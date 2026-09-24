@@ -119,6 +119,7 @@
     "@shres-code/shres-code-tool-fs": "workspace:^",
     "@shres-code/shres-code-tool-fs-search": "workspace:^",
     "@shres-code/shres-code-tool-goal": "workspace:^",
+    "@shres-code/shres-code-tool-grok-x-search": "workspace:^",
     "@shres-code/shres-code-tool-jobs": "workspace:^",
     "@shres-code/shres-code-tool-jspace": "workspace:^",
     "@shres-code/shres-code-tool-pwsh": "workspace:^",

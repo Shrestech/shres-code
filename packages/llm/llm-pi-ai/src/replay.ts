@@ -12,16 +12,24 @@ import { LlmError } from '@shres-code/shres-code-llm'
 import type { Message, ModelMessageSource, ReplayEnvelope } from '@shres-code/shres-code-llm'
 import type { Api, AssistantMessage, Usage as PiUsage } from '@earendil-works/pi-ai'
 
-/** Per-block half of the pi-ai replay envelope, one entry per content block. */
+/**
+ * Per-block half of the pi-ai replay envelope, one entry per content block.
+ * A `server-tool-call` entry marks a hosted call the adapter promoted from a
+ * pi-ai tool call; replay omits that block from pi-ai history.
+ */
 export type PiAiReplayBlock =
   | { type: 'text'; textSignature?: string }
   | { type: 'reasoning'; thinkingSignature?: string; redacted?: boolean }
   | { type: 'tool-call'; thoughtSignature?: string }
+  | { type: 'server-tool-call' }
+
+/** Replay envelope version this build writes and reads; any other version degrades to provider-neutral history. */
+const PI_AI_REPLAY_VERSION = 3
 
 /** Versioned response-level half of the pi-ai replay envelope. */
 export interface PiAiReplayResponse {
   kind: 'pi-ai'
-  version: 2
+  version: typeof PI_AI_REPLAY_VERSION
   api: Api
   provider: string
   model: string
@@ -72,7 +80,7 @@ function emptyPiUsage(): PiUsage {
 export function toPiReplayState(message: AssistantMessage): ReplayEnvelope {
   const response: PiAiReplayResponse = {
     kind: 'pi-ai',
-    version: 2,
+    version: PI_AI_REPLAY_VERSION,
     api: message.api,
     provider: message.provider,
     model: message.model,
@@ -102,6 +110,23 @@ export function toPiReplayState(message: AssistantMessage): ReplayEnvelope {
   }
 }
 
+/**
+ * Tag the per-block entries of hosted calls the adapter promoted from pi-ai
+ * tool calls as `server-tool-call`, keeping every other entry and the
+ * response half unchanged.
+ * @param envelope - the replay envelope {@link toPiReplayState} produced.
+ * @param indices - block indexes that now hold `server-tool-call` blocks.
+ * @returns the envelope with those entries retagged.
+ */
+export function markServerToolCallBlocks(envelope: ReplayEnvelope, indices: ReadonlySet<number>): ReplayEnvelope {
+  const blocks = envelope.blocks
+  if (blocks === undefined) return envelope
+  return {
+    response: envelope.response,
+    blocks: blocks.map((block, index): unknown => indices.has(index) ? { type: 'server-tool-call' } : block),
+  }
+}
+
 function invalidReplay(message: string): never {
   throw new LlmError(`invalid pi-ai replay state: ${message}`, 'INVALID_REPLAY_STATE')
 }
@@ -114,7 +139,7 @@ function readReplayState(value: unknown): PiAiReplayState {
   if (typeof rawResponse !== 'object' || rawResponse === null || Array.isArray(rawResponse)) return invalidReplay('expected a response object')
   const response = rawResponse as Record<string, unknown>
   if (response['kind'] !== 'pi-ai') return invalidReplay('unknown state kind')
-  if (response['version'] !== 2) return invalidReplay(`unsupported version ${String(response['version'])}`)
+  if (response['version'] !== PI_AI_REPLAY_VERSION) return invalidReplay(`unsupported version ${String(response['version'])}`)
   for (const key of ['api', 'provider', 'model'] as const) {
     if (typeof response[key] !== 'string' || response[key].length === 0) return invalidReplay(`${key} must be a non-empty string`)
   }
@@ -128,7 +153,7 @@ function readReplayState(value: unknown): PiAiReplayState {
   for (const [index, value] of blocks.entries()) {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) return invalidReplay(`block ${index} must be an object`)
     const block = value as Record<string, unknown>
-    if (!['text', 'reasoning', 'tool-call'].includes(String(block['type']))) return invalidReplay(`block ${index} has an unknown type`)
+    if (!['text', 'reasoning', 'tool-call', 'server-tool-call'].includes(String(block['type']))) return invalidReplay(`block ${index} has an unknown type`)
     for (const signature of ['textSignature', 'thinkingSignature', 'thoughtSignature'] as const) {
       if (block[signature] !== undefined && typeof block[signature] !== 'string') return invalidReplay(`block ${index} ${signature} must be a string`)
     }
@@ -175,38 +200,44 @@ function foreignAssistant(message: Message): AssistantMessage {
   }
 }
 
-/** Recombine durable Harness content with validated pi-ai replay metadata. */
+/**
+ * Recombine durable Harness content with validated pi-ai replay metadata. A
+ * `server-tool-call` block is omitted: the backend executed it, so pi-ai
+ * history carries neither a function call nor a function result for it.
+ */
 function replayedAssistant(message: Message, source: ModelMessageSource, rawState: unknown): AssistantMessage {
   const state = readReplayState(rawState)
   if (state.response.provider !== source.provider) return invalidReplay('provider does not match assistant source')
   if (state.response.model !== source.model) return invalidReplay('model does not match assistant source')
   if (state.blocks.length !== message.content.length) return invalidReplay('block count does not match assistant content')
-  const content: AssistantMessage['content'] = message.content.map((block, index) => {
+  const content: AssistantMessage['content'] = []
+  for (const [index, block] of message.content.entries()) {
     const replay = state.blocks[index]
     if (replay === undefined || replay.type !== block.type) return invalidReplay(`block ${index} does not match assistant content`)
     switch (block.type) {
-      case 'text': return {
+      case 'text': content.push({
         type: 'text',
         text: block.text,
         ...replay.type === 'text' && replay.textSignature !== undefined ? { textSignature: replay.textSignature } : {},
-      }
-      case 'reasoning': return {
+      }); break
+      case 'reasoning': content.push({
         type: 'thinking',
         thinking: block.text,
         ...replay.type === 'reasoning' && replay.thinkingSignature !== undefined ? { thinkingSignature: replay.thinkingSignature } : {},
         ...replay.type === 'reasoning' && replay.redacted !== undefined ? { redacted: replay.redacted } : {},
-      }
-      case 'tool-call': return {
+      }); break
+      case 'tool-call': content.push({
         type: 'toolCall',
         id: block.id,
         name: block.name,
         arguments: parseArguments(block.arguments),
         ...replay.type === 'tool-call' && replay.thoughtSignature !== undefined ? { thoughtSignature: replay.thoughtSignature } : {},
-      }
+      }); break
+      case 'server-tool-call': break
       /* v8 ignore next -- readReplayState rejects unknown replay tags, so an equal plugin-added Harness tag cannot reach this switch */
       default: return invalidReplay(`block ${index} has an unsupported Harness type`)
     }
-  })
+  }
   return {
     role: 'assistant',
     content,

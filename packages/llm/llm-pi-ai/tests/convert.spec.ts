@@ -428,7 +428,7 @@ describe('toPiContext', () => {
           ...{
             provider: 'deepseek',
             model: 'old',
-            replayState: { response: { kind: 'pi-ai', version: 3 }, blocks: [] },
+            replayState: { response: { kind: 'pi-ai', version: 2 }, blocks: [] },
           },
         },
       })],
@@ -440,7 +440,7 @@ describe('toPiContext', () => {
       model: 'old',
       content: [{ type: 'text', text: 'done' }],
     })
-    expect(onDegrade).toHaveBeenCalledWith(expect.stringContaining('unsupported version 3'))
+    expect(onDegrade).toHaveBeenCalledWith(expect.stringContaining('unsupported version 2'))
   })
 
   it('degrades the flat pre-envelope replay state a legacy session log carries', () => {
@@ -524,13 +524,68 @@ describe('toPiContext', () => {
 
   const validResponse = {
     kind: 'pi-ai',
-    version: 2,
+    version: 3,
     api: 'openai-completions',
     provider: 'deepseek',
     model: 'deepseek-v4-flash',
     stopReason: 'stop',
   }
   const validReplay = { response: validResponse, blocks: [{ type: 'text' }] }
+
+  it('replays a promoted hosted call as nothing: no function call, no degrade', () => {
+    const onDegrade = vi.fn()
+    const context = toPiContext({
+      provider: 'deepseek',
+      model: 'deepseek-v4-flash',
+      messages: [createMessage({
+        role: 'assistant',
+        content: [
+          { type: 'server-tool-call', kind: 'x_search', name: 'x_keyword_search', id: CallId('call_ctc_1|ctc_item_1') },
+          { type: 'text', text: 'found it' },
+        ],
+        source: {
+          kind: 'model',
+          ...{
+            provider: 'deepseek',
+            model: 'deepseek-v4-flash',
+            replayState: {
+              response: { ...validResponse, stopReason: 'toolUse' },
+              blocks: [{ type: 'server-tool-call' }, { type: 'text', textSignature: 'sig' }],
+            },
+          },
+        },
+      })],
+    }, undefined, onDegrade)
+    expect(onDegrade).not.toHaveBeenCalled()
+    expect(context.messages).toHaveLength(1)
+    expect(context.messages[0]).toMatchObject({
+      role: 'assistant',
+      api: 'openai-completions',
+      content: [{ type: 'text', text: 'found it', textSignature: 'sig' }],
+    })
+  })
+
+  it('degrades a replay tag that disagrees with a hosted block', () => {
+    const onDegrade = vi.fn()
+    const context = toPiContext({
+      provider: 'deepseek',
+      model: 'deepseek-v4-flash',
+      messages: [createMessage({
+        role: 'assistant',
+        content: [{ type: 'server-tool-call', kind: 'x_search', name: 'x_user_search' }],
+        source: {
+          kind: 'model',
+          ...{
+            provider: 'deepseek',
+            model: 'deepseek-v4-flash',
+            replayState: { response: validResponse, blocks: [{ type: 'tool-call' }] },
+          },
+        },
+      })],
+    }, undefined, onDegrade)
+    expect(onDegrade).toHaveBeenCalledWith(expect.stringContaining('block 0 does not match assistant content'))
+    expect(context.messages[0]).toMatchObject({ api: 'shres-foreign', content: [] })
+  })
 
   /** Convert with the given state and assert the message degraded to foreign with the given reason. */
   function expectDegraded(replayState: unknown, message: string): void {
@@ -613,7 +668,7 @@ describe('toStreamChunks', () => {
         replayState: {
           response: {
             kind: 'pi-ai',
-            version: 2,
+            version: 3,
             api: 'openai-completions',
             provider: 'deepseek',
             model: 'deepseek-v4-flash',
@@ -664,7 +719,7 @@ describe('toStreamChunks', () => {
         replayState: {
           response: {
             kind: 'pi-ai',
-            version: 2,
+            version: 3,
             api: 'openai-completions',
             provider: 'deepseek',
             model: 'deepseek-v4-flash',

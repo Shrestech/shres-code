@@ -10,9 +10,9 @@
  * both families, DeepSeek's id/name/context-window model catalog, and the
  * display name and wire protocol of a pi-ai route the adapter does not ship —
  * the two fields the create card asked that route for, editable here for the
- * same reason). A chat-gated session route (cursor-session) has no key field:
- * its card carries the gate notice and the same model-catalog editor the
- * cli-bridge layout uses.
+ * same reason). Subscription session routes have no API-key field or key-ref
+ * lookup. Their cards carry access requirements or chat-gate notices and a
+ * model-catalog editor; Grok also exposes its provider-hosted search switches.
  * Reasoning effort is deliberately absent: it is a per-MODEL capability, and
  * the models under one provider disagree about it, so a provider-scoped
  * control can only be set to a value some of them reject. The composer's
@@ -34,6 +34,7 @@ import {
 } from './DeepSeekModelsEditor.tsx'
 import { apiKeyFailure } from './apiKey.ts'
 import { EditorFooter } from './EditorFooter.tsx'
+import { GrokSubscriptionFields } from './GrokSubscriptionFields.tsx'
 import { ModelListEditor } from './ModelListEditor.tsx'
 import { deriveKeyRef, messageOf, protocolChoices } from './store.ts'
 import type { en } from './locales.ts'
@@ -151,7 +152,7 @@ function layoutOf(ns: string): EditorLayout {
   if (ns === 'llm-deepseek') return 'deepseek'
   if (ns === 'llm-pi-ai') return 'pi-ai'
   if (ns === 'llm-cli-bridge') return 'cli-bridge'
-  if (ns === 'llm-cursor-session') return 'session'
+  if (ns === 'llm-cursor-session' || ns === 'llm-grok-session') return 'session'
   return 'unknown'
 }
 
@@ -233,8 +234,9 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
   )
 
   useEffect(() => {
-    let stale = false
     setKeyState(undefined)
+    if (layout === 'session') return
+    let stale = false
     // The key state is a placeholder hint, not a precondition for editing:
     // neither a business rejection nor a transport failure may reach the
     // browser as an unhandled rejection, so the card simply renders without
@@ -247,7 +249,7 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
       () => undefined,
     )
     return () => { stale = true }
-  }, [api.credentials, keyRef])
+  }, [api.credentials, keyRef, layout])
 
   const stringAt = (source: unknown, key: string): string | undefined => {
     const value = getPath(source, [key])
@@ -652,6 +654,16 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
         {props.chatGated === true
           ? <p className={styles['advancedHint']}>{t('sessionGate')}</p>
           : null}
+        {namespace.ns === 'llm-grok-session' && (
+          <GrokSubscriptionFields
+            draft={draft}
+            inherited={fallback}
+            disabled={disabled}
+            credentialOnly={props.credentialOnly === true}
+            t={t}
+            onChange={(field, value) => { setDraft(current => setPath(current, [field], value)) }}
+          />
+        )}
         {props.credentialOnly === true ? null : (
           <>
             <p className={styles['advancedHint']}>{t('sessionModelsHint')}</p>

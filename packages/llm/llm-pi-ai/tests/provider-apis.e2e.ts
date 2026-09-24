@@ -126,7 +126,7 @@ function expectNativeReplay(result: AssembledResult, profile: ProviderCase): PiA
   expect(replayState).toMatchObject({
     response: {
       kind: 'pi-ai',
-      version: 2,
+      version: 3,
       api: profile.api,
       provider: profile.provider,
       model: profile.model,

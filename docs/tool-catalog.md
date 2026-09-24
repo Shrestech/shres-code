@@ -41,6 +41,7 @@ This table connects model-visible tool names to the plugin package and service s
 | `@shres-code/shres-code-tool-workflow` | `workflow` | `ctx.tools`, `ctx.workflowEngine`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents the script children)` | `tool/call`, `tool/result` | - | - |
 | `@shres-code/shres-code-tool-web` | `deep_research`, `web_fetch`, `web_search` | `ctx.tools`, `ctx.web`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | web_search, web_fetch, and deep_research keep provider selection behind ctx.web so model-visible schemas stay stable across backend swaps. |
 | `@shres-code/shres-code-tool-image-gen` | `image_gen` | `ctx.tools`, `ctx.systemPrompt`, `ctx.grokCredential` | `tool/call`, `a workspace image file and optional attachment`, `tool/result` | - | image_gen is default-off; the catalog boots it enabled so its schema is catalogued, while shipped compositions leave it unregistered unless enabled. |
+| `@shres-code/shres-code-tool-grok-x-search` | `x_keyword_search`, `x_semantic_search`, `x_thread_fetch`, `x_user_search` | `ctx.tools`, `ctx.llm`, `ctx.settings`, `the grok-session route`, `owning Agent session` | `tool/call`, `grok-x-search/request`, `tool/result` | - | The four X search tools are registered only while the llm-grok-session section has enabled, hostedXSearch, and agentXTools on; the catalog opens that gate. Each call asks the grok-session route with only hosted x_search offered. |
 | `@shres-code/shres-code-tool-tracker` | `experiment_log_metrics`, `experiment_log_run`, `experiment_query`, `experiment_verify_decision_rule` | `ctx.tools`, `ctx.tracker` | `tool/call`, `experiment run and metric records through ctx.tracker`, `tool/result` | - | experiment_log_run, experiment_log_metrics, and experiment_query fold experiment records through the tracker service seam. |
 | `@shres-code/shres-code-tool-ledger` | `ledger_query`, `ledger_record_decision` | `ctx.tools`, `ctx.ledger`, `ctx.tracker` | `tool/call`, `ledger/decision`, `tool/result` | - | ledger_record_decision and ledger_query record decisions whose cited run ids must resolve through ctx.tracker. |
 | `@shres-code/shres-code-tool-wiki` | `wiki_log`, `wiki_read`, `wiki_search`, `wiki_write` | `ctx.tools`, `ctx.wiki`, `owning Agent session` | `tool/call`, `wiki/page`, `tool/result` | - | Schemas are registered only while Settings `enabled` is true. wiki_read bumps `touched` itself. Wiki content reaches the model only through these tools. |
@@ -2535,6 +2536,96 @@ Generate a new image from a text description using the Grok Imagine API and save
 Source: [`packages/llm/tool-image-gen/src/index.ts`](../packages/llm/tool-image-gen/src/index.ts)
 
 image_gen is default-off; the catalog boots it enabled so its schema is catalogued, while shipped compositions leave it unregistered unless enabled.
+
+<a id="shres-codeshres-code-tool-grok-x-search"></a>
+
+## `@shres-code/shres-code-tool-grok-x-search`
+
+### `x_keyword_search`
+
+Ask Grok to search X posts by keywords. X search operators such as from:handle, since:YYYY-MM-DD and quoted phrases are passed through as written. Grok (your Grok subscription) runs this on its servers. Shres Code sends your request to Grok and Grok chooses which X search operations to run, so it may use a different operation than this tool's name. The result lists the X operations Grok ran and cites post URLs. Each call uses Grok plan quota; it fails if Grok sign-in or plan does not allow it.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "query": {
+      "type": "string",
+      "description": "Keyword query, 1-500 characters."
+    }
+  },
+  "required": [
+    "query"
+  ]
+}
+```
+
+Source: [`packages/llm/tool-grok-x-search/src/index.ts`](../packages/llm/tool-grok-x-search/src/index.ts)
+
+### `x_semantic_search`
+
+Ask Grok to find X posts matching a natural-language description. Grok (your Grok subscription) runs this on its servers. Shres Code sends your request to Grok and Grok chooses which X search operations to run, so it may use a different operation than this tool's name. The result lists the X operations Grok ran and cites post URLs. Each call uses Grok plan quota; it fails if Grok sign-in or plan does not allow it.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "query": {
+      "type": "string",
+      "description": "Description of the posts to find, 1-500 characters."
+    }
+  },
+  "required": [
+    "query"
+  ]
+}
+```
+
+Source: [`packages/llm/tool-grok-x-search/src/index.ts`](../packages/llm/tool-grok-x-search/src/index.ts)
+
+### `x_thread_fetch`
+
+Ask Grok to fetch an X post (URL or numeric id) with its thread context. Grok (your Grok subscription) runs this on its servers. Shres Code sends your request to Grok and Grok chooses which X search operations to run, so it may use a different operation than this tool's name. The result lists the X operations Grok ran and cites post URLs. Each call uses Grok plan quota; it fails if Grok sign-in or plan does not allow it.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "post": {
+      "type": "string",
+      "description": "One X post: its https://x.com/<handle>/status/<id> URL or its numeric id. Profile, search, and other URLs are refused."
+    }
+  },
+  "required": [
+    "post"
+  ]
+}
+```
+
+Source: [`packages/llm/tool-grok-x-search/src/index.ts`](../packages/llm/tool-grok-x-search/src/index.ts)
+
+### `x_user_search`
+
+Ask Grok to find X accounts by name, handle or topic. Grok (your Grok subscription) runs this on its servers. Shres Code sends your request to Grok and Grok chooses which X search operations to run, so it may use a different operation than this tool's name. The result lists the X operations Grok ran and cites post URLs. Each call uses Grok plan quota; it fails if Grok sign-in or plan does not allow it.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "query": {
+      "type": "string",
+      "description": "Name, handle or topic of the accounts to find, 1-200 characters."
+    }
+  },
+  "required": [
+    "query"
+  ]
+}
+```
+
+Source: [`packages/llm/tool-grok-x-search/src/index.ts`](../packages/llm/tool-grok-x-search/src/index.ts)
+
+The four X search tools are registered only while the llm-grok-session section has enabled, hostedXSearch, and agentXTools on; the catalog opens that gate. Each call asks the grok-session route with only hosted x_search offered.
 
 <a id="shres-codeshres-code-tool-tracker"></a>
 
