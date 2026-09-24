@@ -472,7 +472,15 @@ describe.each<ProviderKind>(['typesafe', 'shield'])('real %s judgment and model-
   })
 })
 
-describe.each<RetryPlacement>(['before-router', 'after-router'])('real llm-retry and model-router composition (llm-retry %s)', (placement) => {
+/*
+ * The llm-retry entry's position in the YAML does not reverse the
+ * agent/request-error waterfall: in both placements the router's listener runs
+ * first and reaches llm-retry through next(). These cases pin behaviour under
+ * both composition orders; they do not test llm-retry running ahead of the
+ * router. The router's order independence rests on calling next() before it
+ * falls back, by construction.
+ */
+describe.each<RetryPlacement>(['before-router', 'after-router'])('real llm-retry and model-router composition (llm-retry entry %s; same waterfall order)', (placement) => {
   /** One routed turn against the scripted model endpoint; returns the durable log. */
   async function routedTurn(sequence: ('server_error' | 'auth_error' | 'success')[], id: string): Promise<readonly SessionEvent[]> {
     modelServer = await startMockLlmServer({ sequence, repeatLast: true, chunkSize: 4096, successText: 'ROUTED_OK' })
