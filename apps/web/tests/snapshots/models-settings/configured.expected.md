@@ -92,6 +92,10 @@
       - switch "Disable Grok (subscription) (grok-session)" [checked]
       - button "Edit Grok (subscription) (grok-session)": Edit
     - listitem:
+      - text: Claude (subscription)
+      - switch "Disable Claude (subscription) (claude-session)" [checked]
+      - button "Edit Claude (subscription) (claude-session)": Edit
+    - listitem:
       - text: xAI (pay-per-token)
       - img "API key missing"
       - switch "Enable xAI (pay-per-token) (xai-apikey)"
