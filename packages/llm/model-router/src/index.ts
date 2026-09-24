@@ -855,6 +855,11 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
     const eligibleConfig = { ...config, candidates: eligibility.eligibleCandidates }
     if (eligibility.eligibleCandidates.length === 0
       || (held !== undefined && !eligibility.eligibleCandidates.some(candidate => candidate.id === held.candidateId))) {
+      // Every configured candidate is the manual route itself: routing is on and
+      // can change nothing, which the routing UI reports as its idle state.
+      if (held === undefined && eligibility.assessments.every(assessment => assessment.reason === 'equals-base')) {
+        return keep('candidate-equals-base')
+      }
       return {
         ...keep('candidate-ineligible'),
         sticky: { active: false, turnsElapsed: 0, ...held === undefined ? {} : { brokenBy: 'candidate-ineligible' as const } },
@@ -939,7 +944,12 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
         sticky: { active: false, turnsElapsed: 0, ...held === undefined ? {} : { brokenBy: 'escalated' } },
       }
     }
-    if (route.option === KEEP_CURRENT_OPTION_ID) {
+    // The question omits the manual route's own allowlist entries, so an answer
+    // naming one chose the current model: it must end a held streak here rather
+    // than fail the gate and fall into `sticky-hold`.
+    const namesBase = eligibility.assessments.some(assessment =>
+      assessment.reason === 'equals-base' && assessment.id === route.option)
+    if (route.option === KEEP_CURRENT_OPTION_ID || namesBase) {
       return {
         outcome: 'kept-strong',
         reason: 'current-preferred',
@@ -950,7 +960,7 @@ export class ModelRoutingController extends Service implements ModelRoutingConsu
         sticky: { active: false, turnsElapsed: 0, ...held === undefined ? {} : { brokenBy: 'current-preferred' } },
       }
     }
-    const verdict = gate(eligibleConfig, routeAnswer, base)
+    const verdict = gate(eligibleConfig, routeAnswer)
     if (held !== undefined && sticky.turnsElapsed < config.minTurnsDowngraded
       && (!verdict.ok || verdict.candidate.id !== held.candidateId)) {
       return {
@@ -1075,26 +1085,22 @@ type RouteVerdict =
  *
  * The gate is two measured operating points, both required: the answer's own
  * confidence and its top-two margin. The allowlist is the enforcement point, so
- * a choice it does not contain is refused rather than trusted, and a candidate
- * equal to the route already in force is not a downgrade.
- * @param config - resolved configuration carrying both thresholds.
+ * a choice it does not contain is refused rather than trusted. `config` carries
+ * only eligible candidates, and eligibility already excludes every candidate
+ * naming the manual provider/model, so a selected candidate is always a change
+ * of model.
+ * @param config - resolved configuration carrying both thresholds and the eligible candidates.
  * @param route - the judgment's route answer.
- * @param base - the manual route in force.
  * @returns the candidate to select, or the reason it may not be.
  */
 function gate(
   config: ResolvedModelRouterConfig,
   route: { choice: string; confidence: number; probabilities: Record<string, number> },
-  base: ModelSelection,
 ): RouteVerdict {
   if (route.confidence < config.downgradeThreshold) return { ok: false, reason: 'low-confidence' }
   if (routeMargin(route.probabilities) < config.downgradeMargin) return { ok: false, reason: 'thin-margin' }
   const candidate = config.candidates.find(entry => entry.id === route.choice)
   if (candidate === undefined) return { ok: false, reason: 'unknown-candidate' }
-  if (candidate.provider === base.provider && candidate.model === base.model
-    && (candidate.reasoningEffort ?? undefined) === (base.reasoningEffort ?? undefined)) {
-    return { ok: false, reason: 'candidate-equals-base' }
-  }
   return { ok: true, candidate }
 }
 function candidateSelection(

@@ -54,7 +54,7 @@ Deployment mode changes are recorded as `model-routing/configuration`; explicit 
 
 ## Asymmetric policy
 
-The choice question always includes `keep-current` plus every eligible allowlisted candidate. Each option names its provider/model and explicit reasoning effort; candidate descriptions supply deployment-specific capability guidance. Selecting `keep-current` retains the manual model immediately, including during a sticky streak. A high difficulty answer also keeps the manual model before any confidence or margin check. Missing required answers keep the manual model.
+The choice question always includes `keep-current` plus every eligible allowlisted candidate. A candidate naming the manual provider/model is never eligible, at any reasoning effort: eligibility records it as `equals-base` before any metadata lookup, an allowlist holding only such candidates resolves `candidate-equals-base` without a judgment call, and an answer that names one is read as `keep-current`. Each option names its provider/model and explicit reasoning effort; candidate descriptions supply deployment-specific capability guidance. Selecting `keep-current` retains the manual model immediately, including during a sticky streak. A high difficulty answer also keeps the manual model before any confidence or margin check. Missing required answers keep the manual model.
 
 The allowlist bounds the possible destinations; it does not establish judgment accuracy. Exact provider metadata and call preparation must accept each candidate's route and reasoning settings. Image-bearing requests require declared image support. A candidate must preserve the manual model's declared context capacity and hosted tools; unknown context capacity prevents a downgrade. This conservative capacity comparison does not prove token fit across different tokenizers.
 
@@ -78,8 +78,8 @@ Every fallback resolves to the manual route with a logged reason:
 | Chosen route is not on the allowlist | `unknown-candidate` |
 | Confidence below the floor | `low-confidence` |
 | Top-two margin below the floor | `thin-margin` |
-| Chosen candidate is the route already in force | `candidate-equals-base` |
-| Judge selects `keep-current` | `current-preferred` |
+| Every configured candidate is the manual provider/model, at any effort | `candidate-equals-base` |
+| Judge selects `keep-current` or names a candidate that is the manual provider/model | `current-preferred` |
 | Difficulty prevents an initial downgrade | `difficulty-too-high` |
 
 Cancellation propagates without appending or pinning a decision, including when a judgment resolves after its request was cancelled. A later retry judges the request again.
@@ -90,7 +90,7 @@ A model transition costs a prefix re-prefill at production context sizes (a 250â
 
 - The manual route is **STRONG**. An initial request below the difficulty threshold whose candidate answer passes both confidence and margin thresholds enters **DOWNGRADED(candidate, enteredTurn, entryBase)**.
 - While DOWNGRADED, every new step is judged against the latest surface with a fresh route and difficulty answer and a full capability assessment. A retry at the same step reuses that step's decision only while its complete candidate inputs are unchanged, after rechecking manual selection, allowlist membership, and capabilities. A different candidate cannot replace the held candidate before the horizon. After the horizon, an accepted candidate change starts a new streak with its own entry turn. A candidate removed from the allowlist cannot remain held.
-- DOWNGRADED returns to STRONG when the gate fails after the horizon (`gate-failed`), or immediately when the judge selects `keep-current` (`current-preferred`), difficulty reaches the threshold (`escalated`), the manual provider/model changes (`manual-deviation`), candidate capabilities no longer satisfy the request (`candidate-ineligible`), routing turns off (`mode-off`), or durable route failures reach `maxRouteErrors` (`route-errors`). A manual, `kept-strong`, or `error` decision keeps the manual route for the rest of that turn. A committed mode-off still releases the turn's pin and records `skipped`; a later mode-on can begin a fresh decision under the existing mode semantics.
+- DOWNGRADED returns to STRONG when the gate fails after the horizon (`gate-failed`), or immediately when the judge selects `keep-current` or names a candidate that is the manual provider/model (`current-preferred`), difficulty reaches the threshold (`escalated`), the manual provider/model changes (`manual-deviation`), candidate capabilities no longer satisfy the request (`candidate-ineligible`), routing turns off (`mode-off`), or durable route failures reach `maxRouteErrors` (`route-errors`). A manual, `kept-strong`, or `error` decision keeps the manual route for the rest of that turn. A committed mode-off still releases the turn's pin and records `skipped`; a later mode-on can begin a fresh decision under the existing mode semantics.
 
 The stickiness horizon counts turns, not steps. Fresh step judgments use the bounded latest surface, so these mechanics do not establish real-model routing quality, task completion, or security.
 

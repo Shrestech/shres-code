@@ -12,18 +12,23 @@ The latest explicit `agent/model-selection` event is the manual selection author
 
 ## Candidate eligibility and fitted state
 
-Before asking the judgment engine, the router prepares every configured candidate through the registered LLM runtime. A candidate must accept the requested reasoning effort, preserve the manual route's declared context window and hosted-tool requirements, and support image input when the request contains an image. Unknown capability facts are excluded conservatively. These checks establish request compatibility; they do not establish that a candidate is cheaper, accurate, available remotely, or suitable for the task.
+Before asking the judgment engine, the router prepares every configured candidate through the registered LLM runtime. A candidate must accept the requested reasoning effort, preserve the manual route's declared context window and hosted-tool requirements, and support image input when the request contains an image. Unknown capability facts are excluded conservatively. A candidate naming the manual provider/model is excluded as `equals-base` before any lookup, whatever its reasoning effort: it is no downgrade, and on providers that render effort into the cached request an effort change re-prefills the same model. These checks establish request compatibility; they do not establish that a candidate is cheaper, accurate, available remotely, or suitable for the task.
 
 The router builds complete state alternatives from one live session surface snapshot. The first retains the configured context window, then older whole entries are removed progressively; the final alternative retains the current entry alone. `state.maxFitCandidates` bounds the alternatives offered, including that final current-entry alternative, and rejects values below `2`. No alternative is sliced mid-entry.
 
 When `ctx.judgment.fitting` is available, the router sends the ordered alternatives and exact route/difficulty questions to its atomic fit-and-ask operation. The provider redacts and measures each candidate with one pinned tokenizer and model, then judges the first complete candidate that fits. The resulting decision records `judgmentInput` with the selected redacted text, selected index, token counts, applied limits, and manifest hash. If no candidate fits, the router records `judgmentRejection`, keeps the manual route with `judgment-input-too-large`, and performs no model inference. A provider without fitting receives the first bounded state and owns its input sizing.
 
 ```ts type-equiv
-/** Stable result of one candidate capability check. */
+/**
+ * Stable result of one candidate check. `equals-base` marks a candidate naming
+ * the manual provider/model at any effort; every other reason is a capability
+ * result.
+ */
 type ModelRoutingCandidateEligibilityReason =
   | 'eligible'
   | 'base-unavailable'
   | 'base-context-unknown'
+  | 'equals-base'
   | 'candidate-unavailable'
   | 'candidate-invalid'
   | 'difficulty-effort-invalid'
@@ -98,7 +103,7 @@ interface ModelRoutingCandidateEligibility {
 type ModelRoutingOutcome = 'downgraded' | 'kept-strong' | 'skipped' | 'error'
 ```
 
-`downgraded` means an allowlisted candidate is selected for the judged request step; `kept-strong` that the manual route stands; `skipped` that a decision already taken was dropped because the mode went off under the turn; and `error` that the judgment call failed while `onUnavailable` is `error`. A downgrade needs both gate axes to pass: the route answer's `confidence` at or above `downgradeThreshold`, and its top-two probability margin (`top1 - top2`) at or above `downgradeMargin`. The documented operating points are `>= 0.8` and `>= 0.1`, above the ±0.06 run-to-run wobble measured on a rented classifier's borderline answers. A choice the allowlist does not contain is refused rather than trusted, and a candidate equal to the route already in force is not a downgrade at all.
+`downgraded` means an allowlisted candidate is selected for the judged request step; `kept-strong` that the manual route stands; `skipped` that a decision already taken was dropped because the mode went off under the turn; and `error` that the judgment call failed while `onUnavailable` is `error`. A downgrade needs both gate axes to pass: the route answer's `confidence` at or above `downgradeThreshold`, and its top-two probability margin (`top1 - top2`) at or above `downgradeMargin`. The documented operating points are `>= 0.8` and `>= 0.1`, above the ±0.06 run-to-run wobble measured on a rented classifier's borderline answers. A choice the allowlist does not contain is refused rather than trusted. A candidate naming the manual provider/model is never offered to the judgment: an allowlist holding only such candidates resolves `candidate-equals-base` without a judgment call, and an answer that names one is read as `keep-current`, which also ends a held streak.
 
 ## Why a turn resolved that way
 
@@ -138,7 +143,7 @@ type ModelRoutingReason =
   | 'low-confidence'
   /** The route's top-two margin is below `downgradeMargin`. */
   | 'thin-margin'
-  /** The chosen candidate is the route already in force. */
+  /** Every configured candidate is the manual provider/model, so no downgrade exists and no judgment runs. */
   | 'candidate-equals-base'
   /** The judgment selected the current model instead of any downgrade candidate. */
   | 'current-preferred'

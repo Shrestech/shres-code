@@ -775,22 +775,67 @@ describe('the downgrade gate', () => {
     expect(b.decision()).toMatchObject({ outcome: 'kept-strong', reason: 'unknown-candidate' })
   })
 
-  it('refuses the candidate already in force as the manual route', async () => {
+  it('reports candidate-equals-base without asking when every candidate is the manual route', async () => {
     const b = await bench()
     expect(await b.resolve(1, { provider: CHEAP.provider, model: CHEAP.model })).toBeUndefined()
-    expect(b.decision()).toMatchObject({ outcome: 'kept-strong', reason: 'candidate-equals-base' })
+    expect(b.engine.asks).toHaveLength(0)
+    expect(b.decision()).toMatchObject({
+      outcome: 'kept-strong',
+      reason: 'candidate-equals-base',
+      candidateEligibility: { eligibleCandidates: [], assessments: [{ id: 'cheap', reason: 'equals-base' }] },
+    })
   })
 
-  it('refuses the candidate already in force at the same reasoning effort', async () => {
+  it('treats a same-model candidate at another reasoning effort as the manual route', async () => {
     const b = await bench({
       config: { ...CONFIG, candidates: [{ id: 'cheap', provider: CHEAP.provider, model: CHEAP.model, reasoningEffort: 'low' }] },
     })
-    expect(await b.resolve(1, { provider: CHEAP.provider, model: CHEAP.model, reasoningEffort: ReasoningEffortId('low') })).toBeUndefined()
-    expect(b.decision()).toMatchObject({ outcome: 'kept-strong', reason: 'candidate-equals-base' })
-    // A different effort on the same route is still a change of route, and the
-    // selected route runs at the candidate's own effort.
-    expect(await b.resolve(2, { provider: CHEAP.provider, model: CHEAP.model, reasoningEffort: ReasoningEffortId('high') }))
-      .toEqual({ ...CHEAP, reasoningEffort: 'low' })
+    // An effort change on the model already in force is no downgrade: on
+    // providers that render effort into the cached request it only re-prefills.
+    for (const effort of ['low', 'high']) {
+      expect(await b.resolve(1, { provider: CHEAP.provider, model: CHEAP.model, reasoningEffort: ReasoningEffortId(effort) }))
+        .toBeUndefined()
+    }
+    expect(b.engine.asks).toHaveLength(0)
+    expect(b.decisions().map(decision => decision.reason)).toEqual(['candidate-equals-base'])
+  })
+
+  it('route question omits the base-equal candidate', async () => {
+    const b = await bench({
+      config: {
+        ...CONFIG,
+        candidates: [
+          { id: 'cheap', provider: CHEAP.provider, model: CHEAP.model },
+          { id: 'strong-low', provider: STRONG.provider, model: STRONG.model, reasoningEffort: 'low' },
+        ],
+      },
+    })
+
+    expect(await b.resolve(1)).toEqual(CHEAP)
+    const route = b.engine.asks[0]?.questions[0]
+    if (route?.kind !== 'choice') throw new Error('the route question was not a choice question')
+    expect(route.options.map(option => option.option)).toEqual([KEEP_CURRENT_OPTION_ID, 'cheap'])
+    expect(b.decision().candidateEligibility?.assessments.map(assessment => [assessment.id, assessment.reason]))
+      .toEqual([['cheap', 'eligible'], ['strong-low', 'equals-base']])
+  })
+
+  it('keeps candidate-ineligible when another candidate fails a capability check', async () => {
+    const b = await bench({
+      config: {
+        ...CONFIG,
+        candidates: [
+          { id: 'cheap', provider: CHEAP.provider, model: CHEAP.model },
+          { id: 'strong-copy', provider: STRONG.provider, model: STRONG.model },
+        ],
+      },
+      capabilities: { [`${CHEAP.provider}/${CHEAP.model}`]: { context: { contextWindow: 1_000 } } },
+    })
+
+    expect(await b.resolve(1)).toBeUndefined()
+    expect(b.engine.asks).toHaveLength(0)
+    expect(b.decision()).toMatchObject({ outcome: 'kept-strong', reason: 'candidate-ineligible' })
+    expect(b.decision().candidateEligibility?.assessments.map(assessment => assessment.reason))
+      .toEqual(['context-too-small', 'equals-base'])
   })
 
   it('answers no-candidates without asking the engine', async () => {
@@ -1006,6 +1051,30 @@ describe('the sticky streak', () => {
       reason: 'current-preferred',
       sticky: { active: false, turnsElapsed: 0, brokenBy: 'current-preferred' },
     })
+  })
+
+  it('held streak: an answer naming the base-equal candidate ends the streak as current-preferred', async () => {
+    const b = await entered({
+      config: {
+        ...config,
+        candidates: [
+          { id: 'cheap', provider: CHEAP.provider, model: CHEAP.model },
+          { id: 'strong-copy', provider: STRONG.provider, model: STRONG.model },
+        ],
+      },
+    })
+    // The question never offered the manual route's own entry. An answer naming
+    // it chose the current model, so it must not fail the gate into sticky-hold.
+    b.engine.choice = { ...PASSING, option: 'strong-copy', probabilities: { 'strong-copy': 0.9, cheap: 0.05 } }
+
+    expect(await b.resolve(2)).toBeUndefined()
+    expect(b.decision(1)).toMatchObject({
+      outcome: 'kept-strong',
+      reason: 'current-preferred',
+      route: { choice: 'strong-copy' },
+      sticky: { active: false, turnsElapsed: 0, brokenBy: 'current-preferred' },
+    })
+    expect(stickyState(b.session.events)).toMatchObject({ active: false, brokenBy: 'current-preferred' })
   })
 
   it('holds the entered candidate through the horizon and starts a new streak afterward', async () => {
