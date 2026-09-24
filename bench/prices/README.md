@@ -33,7 +33,7 @@ Each `models` entry:
 | `offPeak` | The same five price fields for the provider's off-peak schedule, or `null` when it publishes none. |
 | `nullFields` | Every price field the entry leaves `null`, named as `cacheWrite5m` or `offPeak.cacheWrite1h`; it matches the entry's null prices exactly. |
 | `peakWindowsUtc` | Published peak windows, each `HH:MM-HH:MM` in UTC. |
-| `offPeakWindowsUtc` | Published off-peak windows in the same form. A window may span midnight; weekday and holiday qualifiers live in `windowNotes`. |
+| `offPeakWindowsUtc` | Published off-peak windows in the same form. A window may span midnight; weekday and holiday qualifiers live in `windowNotes`. An empty list beside a non-empty `peakWindowsUtc` means the provider publishes no off-peak rate for that model, so every hour bills at the peak price. |
 | `windowNotes` | Prose for the schedule's qualifiers; `null` when the provider publishes no peak/off-peak split. |
 | `cacheTtlNotes` | Prose for the cache TTL tiers, write premiums, and retention; `null` when the provider documents none. |
 | `sourceUrl` | The pricing page the values were read from; `null` only on an entry with no fetched source. |
