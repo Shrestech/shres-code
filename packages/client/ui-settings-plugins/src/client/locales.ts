@@ -9,6 +9,8 @@ export type PluginsSettingsLocaleKey =
   | 'bashMaxOutputBytes' | 'bashMaxOutputBytesHint'
   | 'agentLoopTitle' | 'agentLoopDescription' | 'agentLoopMaxParallel' | 'agentLoopMaxParallelHint'
   | 'webSearchTitle' | 'webSearchDescription' | 'webSearchMethods'
+  | 'providerUnavailable'
+  | 'webSearchBrave' | 'webSearchBraveHint' | 'webSearchBraveApiKey' | 'webSearchBraveBaseUrl'
   | 'webSearchGrok' | 'webSearchGrokHint'
   | 'webSearchClaude' | 'webSearchClaudeHint'
   | 'webSearchCodex' | 'webSearchCodexHint'
@@ -52,8 +54,13 @@ export const en: Record<PluginsSettingsLocaleKey, string> = {
   webSearchTitle: 'Web search',
   webSearchDescription: 'Turn on the search methods the agent may use.',
   webSearchMethods: 'Methods',
+  providerUnavailable: 'This provider is not installed or its settings are unavailable.',
+  webSearchBrave: 'Brave',
+  webSearchBraveHint: 'First in the default web_search order when enabled and a key is configured; other methods are fallbacks.',
+  webSearchBraveApiKey: 'Brave API key',
+  webSearchBraveBaseUrl: 'Brave endpoint',
   webSearchGrok: 'Grok',
-  webSearchGrokHint: 'xAI web search, using the same key as the Grok CLI.',
+  webSearchGrokHint: 'Web results using XAI_API_KEY. X (Twitter) search is available when chatting on a Grok subscription model.',
   webSearchClaude: 'Claude',
   webSearchClaudeHint: 'Anthropic web search, using the same key as the Claude CLI.',
   webSearchCodex: 'Codex',
@@ -65,11 +72,11 @@ export const en: Record<PluginsSettingsLocaleKey, string> = {
   webSearchZai: 'Z.AI',
   webSearchZaiHint: 'Z.AI web search, using the same key as Z.AI chat.',
   webSearchPerplexity: 'Perplexity',
-  webSearchPerplexityHint: 'Perplexity web search. Turn this off if you do not have a Perplexity key.',
+  webSearchPerplexityHint: 'Powers deep_research, not routine web_search. Requires a Perplexity API key.',
   webSearchPerplexityApiKey: 'Perplexity API key',
   webSearchPerplexityBaseUrl: 'Perplexity endpoint',
   webSearchDeepSeek: 'DeepSeek',
-  webSearchDeepSeekHint: 'DeepSeek web search. Turn this off if you do not have a DeepSeek key.',
+  webSearchDeepSeekHint: 'Last in the default web_search fallback order. Requires a DeepSeek API key.',
   webSearchApiKey: 'DeepSeek API key',
   webSearchApiKeyHint: 'Stored outside the settings file. Leave blank to keep the current key.',
   webSearchApiKeySet: 'A key is configured.',

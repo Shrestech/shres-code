@@ -159,6 +159,16 @@
   margin-left: 16px;
 }
 
+.provider {
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+  padding-bottom: 12px;
+}
+
+.disclosure {
+  composes: reset;
+  text-align: left;
+}
+
 .methods {
   display: flex;
   flex-direction: column;
